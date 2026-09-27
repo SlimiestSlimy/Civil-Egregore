@@ -52,7 +52,7 @@
 
 use crate::dsrn::region::{Region, DIRECTIONS};
 use crate::dsrn::stream::EncodedBitmap;
-use crate::dsrn_exp::greedy_tiles::{decide_tiles, PlacedTile, Says};
+use crate::dsrn_exp::greedy_tiles::{decide_tiles, PlacedTile, Says, EVERY_LEVEL};
 use crate::pyramid::{tiles_across, tiles_in_level, Pyramid, CELL_LEVEL};
 use crate::Bitmap;
 
@@ -76,7 +76,7 @@ impl TileLookup {
     fn build(pyramid: &Pyramid, bitmap: &Bitmap) -> Self {
         let mut says: Vec<Vec<Option<Says>>> =
             (0..=CELL_LEVEL).map(|level| vec![None; tiles_in_level(level)]).collect();
-        for PlacedTile { region, says: what } in decide_tiles(pyramid, bitmap) {
+        for PlacedTile { region, says: what } in decide_tiles(pyramid, bitmap, &EVERY_LEVEL) {
             let across = tiles_across(region.level);
             says[region.level][region.y * across + region.x] = Some(what);
         }
