@@ -3,11 +3,24 @@
 version = 4
 
 [[package]]
+name = "allocator"
+version = "0.1.0"
+
+[[package]]
 name = "bitmap"
 version = "0.1.0"
 
 [[package]]
-name = "chunks"
+name = "bitplane_manager"
+version = "0.1.0"
+dependencies = [
+ "allocator",
+ "bitmap",
+ "chunk_storage",
+]
+
+[[package]]
+name = "chunk_storage"
 version = "0.1.0"
 dependencies = [
  "bitmap",
@@ -26,7 +39,8 @@ dependencies = [
 name = "tilesim"
 version = "0.1.0"
 dependencies = [
- "chunks",
+ "bitplane_manager",
+ "chunk_storage",
 ]
 
 [[package]]
