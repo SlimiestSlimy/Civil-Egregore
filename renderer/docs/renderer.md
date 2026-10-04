@@ -1,13 +1,11 @@
-# The viewer
+# The renderer
 
 TileSim on the screen: a pasture ticking on a thread of its own, and a
-Bevy window showing it, a cell a pixel, each in one solid colour --
-dirt brown, grass green, a sheep white, one pixel as it is one cell;
-the world is a generated one (`world::generate_with`, seed 1), and its
-cliffs -- the cells keeping a wall to their east or south
-(`../terrain/`) -- are drawn darker, close up.
+Bevy window showing it -- dirt brown, grass green, a sheep white -- on
+ground lit by its height (below). The world is a generated one
+(`world::generate`, seed 1).
 
-`cargo run --release -p viewer -- [superchunks shown] [sheep] [ticks a second, 0 flat out] [ticks to watch for] [1 to force hot]`;
+`cargo run --release -p renderer -- [superchunks shown] [sheep] [ticks a second, 0 flat out] [ticks to watch for] [1 to force hot]`;
 49 superchunks shown, 4,000 sheep and 256 ticks a second if not said.
 
 The world is a generated one (`world::generate`): hot only in the
@@ -47,8 +45,8 @@ ever on its way; and what is not in view is never sent.
    grass's words, as the arena holds them (128 KiB), and the cells its
    sheep stand on. What is in view costs the ticks next to nothing,
    however much of it there is.
-2. **The painter** turns cells into pixels, a cell a pixel in one solid
-   colour, taking no time from the ticks or from the window's frames.
+2. **The painter** turns cells into pixels, lit by their height,
+   taking no time from the ticks or from the window's frames.
 3. **The window** shows the pixels, an image a superchunk.
 
 What is sent is what the cells are, not the writes that changed them: a
@@ -77,6 +75,37 @@ Measured, 1,024 superchunks with 1,000 sheep each, flat out on 12
 threads: 150 ticks a second, 2.3 GiB held, 45 seconds to make the mock
 world; a frame of one superchunk 111 us of the simulation's thread.
 
+## Height, from straight above
+
+The view is fully vertical, so height is shown by light alone, the sun
+to the top left and 35 degrees up; a cell is 2 m and a height 1 m
+(`src/ground.rs`). The painter works a superchunk's heights out itself,
+from the seed -- the simulation is asked for none -- once, on a thread
+a superchunk, and keeps them: the coarse levels for good, the fine
+parts (8 MiB) for the 48 superchunks last seen.
+
+- **Hillshade**: slopes facing the sun lighter, those facing away
+  darker, off the heights smoothed, in bands 7% apart.
+- **Tint**: high ground a little lighter than low.
+- **Cast shadows**: one sweep down the sun's diagonal; each cell keeps
+  how high the shadow line stands over it, so from near a shadow's
+  edge is found within the cell, with no sweep over pixels.
+- **From a cell a pixel outwards**: cliffs darkened by the walls in the
+  pixel, and a contour every 8, 16 or 32 heights.
+- **From near** (`src/near.rs`), a cell 2, 4 or 8 pixels -- as many as
+  the screen shows -- the cells in view are one picture, and height is
+  drawn at the edges: a step of one a thin line, light towards the sun
+  and dark away; a wall a band 2 to 4 eighths of a cell on its lower
+  cell, darkest at its foot, or a dark foot and a bright line where the
+  sun is on it; and a light lip on its upper cell.
+
+**Corners.** A pixel takes one edge's doing, never two multiplied: the
+darkest of the edges that darken it, and only if none does, the
+lightest of those that lighten it. A cast shadow and an edge's shade
+join the same way, the darker of the two. A cell higher only at a
+corner fills that corner's square. So bands turn corners as one
+outline, with no doubled patch and no gap.
+
 ## Still to come
 
 The words of every superchunk a frame carries are still copied whole,
@@ -100,5 +129,7 @@ pixels made here.
 |---|---|
 | `src/sim.rs` | the simulation's thread: requests read between ticks, the cells in view copied when asked |
 | `src/paint.rs` | the painter's thread: cells into pixels |
+| `src/ground.rs` | the light on the ground: heights from the seed, hillshade, tint, cast shadows, cliffs and contours |
+| `src/near.rs` | the cells in view from near as one picture: steps, walls and lips at their edges |
 | `src/main.rs` | the window: the camera, an image a superchunk, the keys, the text |
 | `docs/` | this, and the reference, function by function |

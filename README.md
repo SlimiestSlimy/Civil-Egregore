@@ -28,7 +28,7 @@ spreading over dirt -- and the first entities: sheep eating it.
 | [`chunk_storage/`](chunk_storage/) | chunks as stored, what loading and saving work on: height maps, the layer codec, superchunk images, the cold pool and the writeback ring |
 | [`terrain/`](terrain/) | every cell's height from the world's seed, and the walls between cells more than a step apart in height |
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
-| [`viewer/`](viewer/) | TileSim on the screen: a Bevy window asking the simulation, on a thread of its own, for the cells in view |
+| [`renderer/`](renderer/) | TileSim on the screen: a Bevy window asking the simulation, on a thread of its own, for the cells in view |
 | [`simulation/`](simulation/) | the simulation: Monte Carlo sampling, the two-phase tick and its outboxes, the thread dispatcher, and the entities -- a bucket a chunk, a timer wheel a superchunk |
 | [`bitplane_manager/`](bitplane_manager/) | the hot bitplanes: layers decoded into the bitmap arena, where cells are read and written -- writes batched -- and written back |
 | [`allocator/`](allocator/) | the allocator: equal-size blocks that never move, owned by their holder, taken back and handed out again |
@@ -46,8 +46,8 @@ Builds are for every x86-64 processor since about 2009
 many machines. They are one cargo workspace: one lock file and one `target/`, here at
 the root, whichever folder cargo is run from, on the toolchain
 `rust-toolchain.toml` names. `cargo test` at the root tests every crate
-but the viewer, which brings Bevy and is asked for by name:
-`cargo run --release -p viewer`. Run from a crate's folder, cargo keeps
+but the renderer, which brings Bevy and is asked for by name:
+`cargo run --release -p renderer`. Run from a crate's folder, cargo keeps
 to that crate. Two crates have a `diagnostics` tool: the world's is
 `--bin diagnostics`, Tessera's `--bin tessera_diagnostics`. Tessera's
 external benchmarks are a workspace of their own, so the codecs they
@@ -58,4 +58,4 @@ on `bitmap/`; `chunk_storage/` on those and Tessera;
 `bitplane_manager/` on `chunk_storage/`, `coordinates/` and
 `allocator/`; `simulation/` on `bitplane_manager/`; `entity_rules/` on
 `simulation/` and `pathfinding/`; TileSim itself, `src/`, on all of
-them; the viewer on TileSim.
+them; the renderer on TileSim.

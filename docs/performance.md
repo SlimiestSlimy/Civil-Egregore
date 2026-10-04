@@ -107,7 +107,7 @@ build.
 
 ## What a tick is made of
 
-Profiled in the viewer (`perf record -p`, 64 superchunks, flat out) at
+Profiled in the renderer (`perf record -p`, 64 superchunks, flat out) at
 the flock's peak, 700,000 sheep: the woken sheep's record 17%, its
 attributes 15%, the cells about it 10%, putting it back 12%, sampling
 grass 6%, pathfinding under 2%, painting and the window 9%. Woken
@@ -163,6 +163,34 @@ lookups on the hot path are marked `#[inline]` now -- `Bucket::get`,
 `index_of`, `find`, `entity`, `SuperchunkEntities::get`,
 `Rng::draw` -- and the tick takes 67.78 million. A change that moves
 the count with no change of work is looked for there first.
+
+## Under full load: every superchunk hot
+
+Measured in the renderer, every superchunk shown forced hot and grass
+growing everywhere (`cargo run --release -p renderer -- <superchunks>
+1000 0 0 1`), flat out on 12 threads, built for `x86-64-v2`; the rates
+are from the census, over the lines whose pace is 0. Each superchunk
+starts with 1,000 sheep, and the flock grows as the run goes.
+
+64 superchunks (8 x 8), 560 MiB resident:
+
+| tick | sheep | ticks a second |
+|---|---|---|
+| 25,000 | 98,884 | 14,006 |
+| 50,000 | 152,000 | 11,704 |
+| 100,000 | 318,000 | 9,513 |
+| 150,000 | 584,000 | 5,837 |
+| 200,000 | 782,000 | 3,078 |
+| 225,000 | 769,483 | 2,370 |
+
+1,024 superchunks (32 x 32), 2,585 MiB resident, 18 seconds to make:
+714 ticks a second at tick 1,000 (999,000 sheep), 926 to 943 from tick
+9,000 to 13,000, 724 at tick 49,000 (2.4 million sheep). This run was
+before the census kept the pace, so it is not known to be flat out
+throughout.
+
+65,536 superchunks (256 x 256) cannot be held hot: 2.5 MiB a
+superchunk is some 160 GiB.
 
 ## Elsewhere
 
