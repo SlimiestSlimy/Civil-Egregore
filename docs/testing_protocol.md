@@ -29,7 +29,7 @@ topic is a module of it, a file in the tier's folder
 | complete | more superchunks, more seeds, far more ticks; `#[ignore]`d, and run in release | minutes at most | `cargo test --release --test complete -- --ignored` |
 
 Plain `cargo test`, at the root, runs fine and fast of every crate but
-the viewer. `cargo test --release -- --ignored` runs every complete
+the renderer. `cargo test --release -- --ignored` runs every complete
 tier, Tessera's with them.
 
 A test belongs to the lowest tier it can be: by hand if one case shows
@@ -57,7 +57,7 @@ takes long. A test that only prints belongs to none: it is a tool.
 
 Speed is not a test: it is measured by a tool and written down with the
 command that gave it (`world`'s `diagnostics pasture` and `throughput`).
-A number in the docs names its command. While the viewer or another run
+A number in the docs names its command. While the renderer or another run
 is on the machine, times are skewed: the instructions counted
 (`perf stat -e instructions:u`) are not.
 

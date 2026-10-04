@@ -174,7 +174,7 @@ what is carried.
 At 256 ticks a second an entity moves far less than once a tick: of a
 flock of hundreds of thousands a few hundred wake in one, a handful a
 superchunk, each where nothing has read since it last woke. Profiled in
-the viewer at the flock's peak (700,000 sheep on 64 superchunks, `perf`,
+the renderer at the flock's peak (700,000 sheep on 64 superchunks, `perf`,
 2,400 ticks a second), a third of the time was two reads waiting for
 memory: the woken entity itself (`Bucket::get`, 17%) and its
 attributes (`EntityEdit::get`, 15%). Pathfinding, far search and all, was

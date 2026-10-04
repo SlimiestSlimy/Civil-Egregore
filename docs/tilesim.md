@@ -675,7 +675,7 @@ against 5,300.
 
 Resting where it ate, a sheep never left where it was born: lambs stayed
 beside their mothers, each flock grazed its own patch bare, and births
-stopped though a third of the world was green -- watched in the viewer,
+stopped though a third of the world was green -- watched in the renderer,
 64 superchunks fell from 256,000 sheep to 8,500 over 1.75 million ticks
 and went on falling. Breeding more readily did not mend it: at one meal
 in three the flock outgrew the grass, stripped it and died out, the
@@ -725,7 +725,7 @@ the same boom, crash and settling, to 10,319 sheep on 19% grass where
 it was 10,897 on 21% -- fewer starve in the trough, so the grass is
 kept a little shorter.
 
-### What the viewer's time goes to
+### What the renderer's time goes to
 
 Profiled as it ran (`perf record -p`, 64 superchunks, flat out): the
 simulation's threads are 90 to 95% of it, painting and the window the

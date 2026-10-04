@@ -3,7 +3,7 @@
 The world as a whole: made from a seed, ticked, saved and loaded. It is
 the one crate that holds the hot bitmaps, the stored superchunks, the
 entities and the simulation together; the program (`../src/main.rs`)
-and the viewer (`../viewer/`) call it.
+and the renderer (`../renderer/`) call it.
 
 ## Made from a seed
 

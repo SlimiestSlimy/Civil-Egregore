@@ -1,6 +1,7 @@
 //! TileSim on the screen: a pasture -- grass, dirt and sheep -- ticking
-//! on a thread of its own, and a Bevy window showing it, a cell a pixel,
-//! each in one solid colour.
+//! on a thread of its own, and a Bevy window showing it: dirt, grass
+//! and sheep, on ground lit by its height -- slopes shaded, cliffs
+//! casting shadows, and from near, steps and walls drawn at their edges.
 //!
 //! The window is the one that asks: each time it has shown a frame, it
 //! sends the simulation the superchunks in view, and the simulation
@@ -8,7 +9,7 @@
 //! a third thread turns into pixels ([`paint`]). The three share
 //! nothing else, so none waits on another.
 //!
-//! `cargo run --release -p viewer -- [superchunks shown] [sheep] [ticks a second, 0 flat out] [ticks to watch for] [1 to force every superchunk shown hot]`
+//! `cargo run --release -p renderer -- [superchunks shown] [sheep] [ticks a second, 0 flat out] [ticks to watch for] [1 to force every superchunk shown hot]`
 //!
 //! Forced hot, the world is loaded to be measured: every superchunk
 //! shown hot all the while, the sheep given a superchunk each, and grass
@@ -29,6 +30,8 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
+mod ground;
+mod near;
 mod paint;
 mod sim;
 
@@ -38,7 +41,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use coordinates::{square_side, SUPERCHUNK_SIDE_CELLS};
 use paint::Picture;
-use sim::{start, Ask, Request, Viewport, TARGET_PACE};
+use sim::{start, Ask, Near, Request, Viewport, TARGET_PACE};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use world::diagnostics::frames::BROWN;
@@ -61,6 +64,15 @@ const COARSEST: u32 = 6;
 /// Pixels along the side of an image kept when its superchunk goes out
 /// of view, at most: a finer one is dropped, to be asked for again.
 const KEPT_SIDE: u32 = 64;
+
+/// Cells a screen pixel at most for the view to be from near: a cell
+/// two pixels or more.
+const NEAR_SCALE: f32 = 0.5;
+/// Pixels along a cell's side from near, at most.
+const NEAR_PIXELS: u32 = 8;
+/// Cells past the view's edges painted from near: what a moving view
+/// shows before the next frame comes.
+const NEAR_MARGIN: f32 = 8.0;
 
 /// Superchunks a frame carries at most, drawn at `detail`: fewer the
 /// finer, a fine one being more to paint and to send to the graphics
@@ -125,6 +137,8 @@ struct Seen {
     in_view: u32,
     /// How coarsely they are drawn: a pixel `2^detail` cells a side.
     detail: u32,
+    /// Pixels along a cell's side, seen from near; 0 if not.
+    near_pixels: u32,
     /// Seconds of the simulation's thread the frame took.
     sync_seconds: f64,
     /// The share of that thread's time frames take.
@@ -132,6 +146,10 @@ struct Seen {
     /// Seconds of the painter's thread the frame took.
     paint_seconds: f64,
 }
+
+/// The picture of the cells in view from near, over the superchunks' images.
+#[derive(Component)]
+struct NearView;
 
 /// The text over the world.
 #[derive(Component)]
@@ -173,7 +191,7 @@ fn main() {
         .insert_resource(Sprites { side: square_side(superchunks), images: Vec::new(), sides: Vec::new() })
         .init_resource::<Seen>()
         .add_systems(Startup, setup)
-        .add_systems(Update, (steer, keys, sync, hud).chain())
+        .add_systems(Update, (steer, keys, show, ask, hud).chain())
         .run();
 }
 
@@ -182,12 +200,18 @@ const DIRT: [u8; 4] = [BROWN[0], BROWN[1], BROWN[2], u8::MAX];
 
 /// An image `side` pixels a side, of `pixels`.
 fn picture(side: u32, pixels: Vec<u8>) -> Image {
-    let size = Extent3d { width: side, height: side, depth_or_array_layers: 1 };
+    picture_of((side, side), pixels)
+}
+
+/// An image `size` pixels across and down, of `pixels`.
+fn picture_of(size: (u32, u32), pixels: Vec<u8>) -> Image {
+    let size = Extent3d { width: size.0, height: size.1, depth_or_array_layers: 1 };
     Image::new(size, TextureDimension::D2, pixels, TextureFormat::Rgba8UnormSrgb, RenderAssetUsages::default())
 }
 
 /// The camera over the world's middle, the whole of it in view; an
-/// image a superchunk, dirt until the first frame comes; and the text.
+/// image a superchunk, dirt until the first frame comes; the picture
+/// from near, hidden until there is one; and the text.
 fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, mut sprites: ResMut<Sprites>, window: Single<&Window>) {
     let world_side = sprites.side as f32 * SPRITE_SIDE;
     let scale = world_side / window.height().min(window.width());
@@ -205,6 +229,7 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, mut sprites:
         sprites.images.push(image);
         sprites.sides.push(1);
     }
+    commands.spawn((Sprite { image: images.add(picture(1, DIRT.to_vec())), ..default() }, Transform::from_xyz(0.0, 0.0, 1.0), Visibility::Hidden, NearView));
     commands.spawn((
         Text::new(""),
         Node { position_type: PositionType::Absolute, top: Val::Px(8.0), left: Val::Px(8.0), padding: UiRect::all(Val::Px(6.0)), ..default() },
@@ -260,18 +285,20 @@ fn keys(mut link: ResMut<Link>, keys: Res<ButtonInput<KeyCode>>) {
     _ = link.requests.send(Request::Pace(pace));
 }
 
-/// Shows the frame the simulation answered with, if it has, and asks
-/// for the next: the superchunks now in view.
-fn sync(
+/// Shows the frame the simulation answered with, if it has: each
+/// superchunk's image, and the picture from near -- hidden once the
+/// view is no longer near.
+fn show(
     mut link: ResMut<Link>,
     mut sprites: ResMut<Sprites>,
     mut images: ResMut<Assets<Image>>,
     mut seen: ResMut<Seen>,
-    camera: Single<(&Transform, &Projection), With<Camera2d>>,
-    window: Single<&Window>,
-    time: Res<Time>,
+    near_view: Single<(&Sprite, &mut Transform, &mut Visibility), With<NearView>>,
 ) {
-    link.since += time.delta_secs();
+    let (near_sprite, mut near_transform, mut near_visibility) = near_view.into_inner();
+    if seen.near_pixels == 0 {
+        *near_visibility = Visibility::Hidden;
+    }
     let frame = link.frames.lock().expect("the frames' receiver").try_iter().last();
     if let Some(frame) = frame {
         link.waiting = false;
@@ -283,6 +310,7 @@ fn sync(
             painted: frame.superchunks.len(),
             in_view: seen.in_view,
             detail: seen.detail,
+            near_pixels: seen.near_pixels,
             sync_seconds: frame.sync_seconds,
             sync_share: frame.sync_share,
             paint_seconds: frame.paint_seconds,
@@ -294,7 +322,31 @@ fn sync(
                 sprites.sides[index] = painted.side;
             }
         }
+        if let Some(painted) = frame.near {
+            let (first, size) = (painted.near.first, painted.near.size);
+            if let Some(mut image) = images.get_mut(&near_sprite.image) {
+                *image = picture_of((size.0 * painted.near.pixels_a_cell, size.1 * painted.near.pixels_a_cell), painted.pixels);
+            }
+            // Over the cells it is of, a cell a unit whatever its pixels.
+            *near_transform = Transform::from_xyz(first.0 as f32 + size.0 as f32 / 2.0, -(first.1 as f32 + size.1 as f32 / 2.0), 1.0).with_scale(Vec3::new(1.0 / painted.near.pixels_a_cell as f32, 1.0 / painted.near.pixels_a_cell as f32, 1.0));
+            if seen.near_pixels > 0 {
+                *near_visibility = Visibility::Visible;
+            }
+        }
     }
+}
+
+/// Asks the simulation for the next frame: the superchunks now in view.
+fn ask(
+    mut link: ResMut<Link>,
+    mut sprites: ResMut<Sprites>,
+    mut images: ResMut<Assets<Image>>,
+    mut seen: ResMut<Seen>,
+    camera: Single<(&Transform, &Projection), With<Camera2d>>,
+    window: Single<&Window>,
+    time: Res<Time>,
+) {
+    link.since += time.delta_secs();
     if link.waiting || link.since < SYNC_EVERY {
         return;
     }
@@ -315,14 +367,24 @@ fn sync(
     // A pixel of the screen is `scale` cells: drawn no finer than that.
     let detail = (view.scale.max(1.0).log2().floor() as u32).min(COARSEST);
     let in_view = (viewport.last.0 - viewport.first.0 + 1) * (viewport.last.1 - viewport.first.1 + 1);
-    let most = frame_holds(detail);
+    // From near, the cells in view and a margin about them, as many pixels a cell as the screen shows.
+    let world_cells = sprites.side as f32 * SPRITE_SIDE;
+    let cell = |cells: f32| cells.clamp(0.0, world_cells) as u32;
+    let near = (view.scale <= NEAR_SCALE).then(|| {
+        let first = (cell((left - NEAR_MARGIN).floor()), cell((top - NEAR_MARGIN).floor()));
+        let size = (cell((right + NEAR_MARGIN).ceil()) - first.0, cell((bottom + NEAR_MARGIN).ceil()) - first.1);
+        Near { first, size, pixels_a_cell: (1 << (1.0 / view.scale).log2().floor() as u32).min(NEAR_PIXELS) }
+    });
+    let near = near.filter(|near| near.size.0 > 0 && near.size.1 > 0);
+    // From near every superchunk in view is in the one picture.
+    let most = if near.is_some() { in_view } else { frame_holds(detail) };
     // On round the superchunks in view from the last frame's, or from the first if the view changed.
     let skip = match link.asked {
-        Some(last) if last.viewport == viewport && last.detail == detail && last.skip + last.most < in_view => last.skip + last.most,
+        Some(last) if near.is_none() && last.near.is_none() && last.viewport == viewport && last.detail == detail && last.skip + last.most < in_view => last.skip + last.most,
         _ => 0,
     };
-    let ask = Ask { viewport, detail, skip, most };
-    (seen.in_view, seen.detail) = (in_view, detail);
+    let ask = Ask { viewport, detail, skip, most, near };
+    (seen.in_view, seen.detail, seen.near_pixels) = (in_view, detail, near.map_or(0, |near| near.pixels_a_cell));
     // Fine images of superchunks gone out of view are dropped: each is 4 MiB here and as much on the graphics card.
     for index in 0..sprites.sides.len() {
         let (x, y) = (index as u32 % sprites.side, index as u32 / sprites.side);
@@ -351,14 +413,17 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         Some(ticks) => format!("   of {} to watch for ({:.0}%)", grouped(ticks), 100.0 * seen.tick as f64 / ticks as f64),
         None => String::new(),
     };
+    let drawn = match seen.near_pixels {
+        0 => format!("a pixel {} cell(s) a side", 1u32 << seen.detail),
+        pixels => format!("a cell {pixels} pixels a side"),
+    };
     text.0 = format!(
-        "tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, a pixel {} cell(s) a side\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause   F: flat out   [ ]: pace",
+        "tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause   F: flat out   [ ]: pace",
         grouped(seen.tick),
         grouped(seen.ticks_a_second as u64),
         grouped(seen.sheep as u64),
         grouped(seen.grass),
         seen.in_view,
-        1u32 << seen.detail,
         seen.painted,
         seen.sync_seconds * 1e6,
         seen.sync_share * 100.0,

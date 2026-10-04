@@ -21,7 +21,6 @@
 use bitplane_manager::BucketKey;
 use chunk_storage::mock::GRASS;
 use chunk_storage::LayerType;
-use terrain::{WALL_EAST, WALL_SOUTH};
 use coordinates::{square_side, CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
 use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Write};
@@ -56,7 +55,7 @@ fn census(superchunks: u32, flock: usize, forced_hot: bool) -> Option<BufWriter<
     let path = census_path();
     create_dir_all(path.parent()?).ok()?;
     let mut file = BufWriter::new(File::create(path).ok()?);
-    writeln!(file, "# viewer {superchunks} {flock}{}", if forced_hot { " forced hot" } else { "" }).ok()?;
+    writeln!(file, "# renderer {superchunks} {flock}{}", if forced_hot { " forced hot" } else { "" }).ok()?;
     writeln!(file, "tick,seconds,pace,sheep,grass").ok()?;
     Some(file)
 }
@@ -89,6 +88,20 @@ pub struct Ask {
     pub skip: u32,
     /// Superchunks to answer with, at most.
     pub most: u32,
+    /// The cells in view, if they are seen from near: drawn as one
+    /// picture, a cell many pixels. Passed on to the painter.
+    pub near: Option<Near>,
+}
+
+/// Cells seen from near: a rectangle of them, each many pixels.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Near {
+    /// The top left cell, `(x, y)` from the top left of the world's square.
+    pub first: (u32, u32),
+    /// Cells across and down.
+    pub size: (u32, u32),
+    /// Pixels along a cell's side: 2, 4 or 8.
+    pub pixels_a_cell: u32,
 }
 
 /// What the window asks of the simulation.
@@ -112,9 +125,9 @@ pub struct Cells {
     /// chunks' Morton order, [`CHUNK_WORDS`] words each, in Morton order
     /// -- as the arena holds them. A chunk not hot is all clear.
     pub grass: Vec<u64>,
-    /// Its cliffs, laid out as the grass: the cells keeping a wall to
-    /// their east or south.
-    pub cliffs: Vec<u64>,
+    /// Its top left cell in the world, `(x, y)`: what its ground is
+    /// worked out from.
+    pub top_left: (u32, u32),
     /// The cells its sheep stand on, `(x, y)` from its top left.
     pub sheep: Vec<(u16, u16)>,
 }
@@ -136,6 +149,8 @@ pub struct Frame {
     pub sync_share: f64,
     /// How coarsely the window will draw them ([`Ask::detail`]).
     pub detail: u32,
+    /// The cells seen from near ([`Ask::near`]).
+    pub near: Option<Near>,
     /// The superchunks asked for.
     pub cells: Vec<Cells>,
 }
@@ -177,7 +192,7 @@ fn run(superchunks: u32, flock: usize, forced_hot: bool, asked: &Receiver<Reques
                     let (sheep, grass, cells) = (world.entities.len(), grass(&world), copy(&world, &shown, ask));
                     let sync_seconds = asked_at.elapsed().as_secs_f64();
                     let sync_share = if elapsed > 0.0 { sync_seconds / elapsed } else { 0.0 };
-                    let frame = Frame { tick, ticks_a_second, sheep, grass, sync_seconds, sync_share, detail: ask.detail, cells };
+                    let frame = Frame { tick, ticks_a_second, sheep, grass, sync_seconds, sync_share, detail: ask.detail, near: ask.near, cells };
                     if answers.send(frame).is_err() {
                         return;
                     }
@@ -257,13 +272,10 @@ fn copy(world: &World, shown: &[SuperchunkIndex], ask: Ask) -> Vec<Cells> {
             continue;
         };
         // Hot if its entities are held; cold, there are no cells to copy.
-        if world.entities.superchunk(superchunk).is_none() {
-            copied.push(Cells { at: (x, y), hot: false, grass: Vec::new(), cliffs: Vec::new(), sheep: Vec::new() });
-            continue;
-        }
-        let mut cliffs = layer(world, WALL_EAST, superchunk);
-        cliffs.iter_mut().zip(layer(world, WALL_SOUTH, superchunk)).for_each(|(east, south)| *east |= south);
-        copied.push(Cells { at: (x, y), hot: true, grass: layer(world, GRASS, superchunk), cliffs, sheep: sheep(world, superchunk) });
+        let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
+        let hot = world.entities.superchunk(superchunk).is_some();
+        let (grass, sheep) = if hot { (layer(world, GRASS, superchunk), sheep(world, superchunk)) } else { (Vec::new(), Vec::new()) };
+        copied.push(Cells { at: (x, y), hot, top_left: (left, top), grass, sheep });
     }
     copied
 }

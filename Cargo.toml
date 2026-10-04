@@ -12,8 +12,8 @@ utilities = { path = "utilities" }
 
 # Every crate of TileSim, built together: one lock file and one `target/`
 # for them all, here, whichever crate's folder cargo is run from.
-# `cargo test` here tests every one but the viewer, which brings Bevy:
-# `cargo run --release -p viewer` for that. Tessera's external
+# `cargo test` here tests every one but the renderer, which brings Bevy:
+# `cargo run --release -p renderer` for that. Tessera's external
 # benchmarks stay a workspace of their own, so the codecs they compare
 # against never enter this build.
 [workspace]
@@ -31,7 +31,7 @@ members = [
     "terrain",
     "tessera",
     "utilities",
-    "viewer",
+    "renderer",
     "world",
 ]
 default-members = [
@@ -57,7 +57,7 @@ exclude = ["tessera/external_benchmarks"]
 [profile.release]
 debug = "line-tables-only"
 
-# Bevy unoptimized is too slow to watch, even while the viewer itself is
+# Bevy unoptimized is too slow to watch, even while the renderer itself is
 # being worked on.
 [profile.dev.package.bevy]
 opt-level = 3
