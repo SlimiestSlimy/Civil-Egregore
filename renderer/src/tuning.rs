@@ -88,26 +88,28 @@ pub const FINER_FALL: usize = 24;
 pub const WEIGHT_SPREAD: usize = 25;
 /// The share of those that raise it.
 pub const RAISED_SHARE: usize = 26;
+/// How many heights fine noise raises the land by at most.
+pub const ROUGHNESS: usize = 27;
 /// The share of the cells that are grass.
-pub const GRASS_COVER: usize = 27;
+pub const GRASS_COVER: usize = 28;
 /// The cells across a patch of grass, as a power of two.
-pub const GRASS_PATCH: usize = 28;
+pub const GRASS_PATCH: usize = 29;
 /// How much finer noise counts beside the patches'.
-pub const GRASS_DETAIL: usize = 29;
+pub const GRASS_DETAIL: usize = 30;
 /// How much each cell's own lot counts: grass scattered, not in patches.
-pub const GRASS_SCATTER: usize = 30;
+pub const GRASS_SCATTER: usize = 31;
 /// The share of the cells that have a tree.
-pub const TREE_COVER: usize = 31;
+pub const TREE_COVER: usize = 32;
 /// The cells across a patch of trees, as a power of two.
-pub const TREE_PATCH: usize = 32;
+pub const TREE_PATCH: usize = 33;
 /// How much finer noise counts beside the trees' patches'.
-pub const TREE_DETAIL: usize = 33;
+pub const TREE_DETAIL: usize = 34;
 /// How much each cell's own lot counts for trees.
-pub const TREE_SCATTER: usize = 34;
+pub const TREE_SCATTER: usize = 35;
 
 /// The numbers, in the order above; the shading's defaults are what was
 /// found by eye with the sliders.
-pub const TUNED: [Tuned; 35] = [
+pub const TUNED: [Tuned; 36] = [
     Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading, what: "How much lighter the border of a higher cell is where it faces the sun." },
     Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading, what: "How much darker the border of a higher cell is where it faces away from the sun." },
     Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading, what: "How dark the band at the foot of a wall is, on the side away from the sun." },
@@ -135,6 +137,7 @@ pub const TUNED: [Tuned; 35] = [
     Tuned { name: "finer mesh falloff", default: 0.75, range: (0.0, 1.0), page: Page::Generation, what: "How much each finer mesh moves the land beside the one before: 0.5, and each does half as much; near 1, and the finest do as much as the broadest -- rough ground; near 0, and only the first counts." },
     Tuned { name: "weight spread", default: 0.8, range: (0.0, 1.0), page: Page::Generation, what: "The top level has a weight of 1. The weight that reaches a subdivision point is shared out at random: each point draws a share of its own, by lot, between 1 minus this and 1, moves the land by its offset times that share, and hands the share on to its own subdivisions, where it is shared out again. So under some points the ground is broken up in detail and under others it keeps its parent's shape -- a plain stays a plain, a ridge a ridge. 0, and every point gets the whole weight: every level moves the land freely everywhere." },
     Tuned { name: "raised share", default: 0.6, range: (0.0, 1.0), page: Page::Generation, what: "The share of those vertices that raise the land; the rest sink it. Land sunk under the ocean level fills with water." },
+    Tuned { name: "roughness", default: 2.0, range: (0.0, 16.0), page: Page::Generation, what: "Whole heights on a gentle slope change along long curved lines, which show as streaks. Noise 4 to 16 cells broad raises the land by up to this many heights before the heights are made whole, so the lines break up into mottling. 0, and the land is exactly as the mesh shapes it." },
     Tuned { name: "grass cover", default: 0.95, range: (0.0, 1.0), page: Page::Generation, what: "The share of dry land that starts as grass; the rest is dirt." },
     Tuned { name: "grass patch size (2^)", default: 8.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a patch of grass or of dirt is: 2 to this power, in cells." },
     Tuned { name: "grass patch detail", default: 0.6, range: (0.0, 2.0), page: Page::Generation, what: "How ragged the patches' edges are: how much finer noise counts beside the patches'." },

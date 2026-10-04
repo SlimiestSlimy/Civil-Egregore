@@ -26,8 +26,8 @@ fn walled(terrain: &Terrain, way: usize, x: u32, y: u32) -> bool {
 }
 
 /// A shape of land and ocean little apart in height, joined by lines
-/// that slope their whole length, and nothing finer: no walls.
-const RAMPS: Shape = Shape { ground: 461, highest: 561, narrow: 1 << 16, wide: 1 << 16, soft: 512, hard: 512, finer_depth: 0, ..Shape::DEFAULT };
+/// that slope their whole length, nothing finer and no roughness: no walls.
+const RAMPS: Shape = Shape { ground: 461, highest: 561, narrow: 1 << 16, wide: 1 << 16, soft: 512, hard: 512, finer_depth: 0, rough: 0, ..Shape::DEFAULT };
 /// A shape all land, of small triangles joined by cliffs: plenty of walls.
 const CLIFFS: Shape = Shape { span: 8, sea: 0, highest: 552, narrow: 2, wide: 2, finer_depth: 3, ..Shape::DEFAULT };
 
