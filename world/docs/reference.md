@@ -137,6 +137,6 @@ as a patch, finer noise, and the cell's own lot;
 `Generation::DEFAULT`, as tuned in the renderer's lab; `TREES_SALT`.
 **`generate_with(generation, seed)`**: a world with nothing hot yet,
 generated so. **`generate_image(generation, seed, superchunk, codec)`**:
-terrain, lakes where it is under the water's level, and on the rest
+terrain, the ocean where it is under the ocean's level, and on the rest
 grass and trees with their stages. `World::generation`
 is not saved: a world loaded goes on with the default.

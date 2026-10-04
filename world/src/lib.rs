@@ -48,9 +48,6 @@ pub struct Generation {
     pub grass: Patches,
     /// How the trees lie.
     pub trees: Patches,
-    /// How far over the land's rise still water stands: the ground
-    /// under that level is a lake, as deep as it is lower.
-    pub water_level: Height,
 }
 
 impl Generation {
@@ -59,7 +56,6 @@ impl Generation {
         shape: Shape::DEFAULT,
         grass: Patches { cover: ONE * 951 / 1000, patch: 8, detail: ONE * 598 / 1000, scatter: ONE * 51 / 1000 },
         trees: Patches { cover: ONE * 60 / 1000, patch: 7, detail: ONE * 800 / 1000, scatter: ONE * 300 / 1000 },
-        water_level: 14,
     };
 }
 
@@ -179,8 +175,8 @@ pub fn generate_flocks(seed: u64, superchunks: &[SuperchunkIndex], sheep: usize)
 }
 
 /// The image of `superchunk` in a world made from `seed` as
-/// `generation` says: its terrain, lakes where it is under the water's
-/// level, and on the rest grass in patches -- dirt where there is none --
+/// `generation` says: its terrain, the ocean where it is under the
+/// ocean's level, and on the rest grass in patches -- dirt where there is none --
 /// and trees in patches of their own, each of a stage drawn for its
 /// cell -- the same whenever it is made.
 pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: SuperchunkIndex, codec: &mut LayerCodec) -> SuperchunkImage {
@@ -199,11 +195,9 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
         let (x, y) = (left + x, top + y);
         let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
         let mut set = |plane: usize| cells[plane * CHUNKS_IN_SUPERCHUNK + chunk][cell / bitmap::BITS_PER_WORD] |= 1 << (cell % bitmap::BITS_PER_WORD);
-        // A lake wherever the ground is under the water's level, as deep as it is lower: nothing grows under it.
-        // The water's surface follows the land's rise -- until plains are level, where a lake has one level --
-        // and is no deeper than its eight bits tell.
-        let level = generation.shape.ground as u64 + terrain::rise(&generation.shape, seed, x, y) + generation.water_level as u64;
-        let depth = level.saturating_sub(terrain.height(place) as u64).min(u8::MAX as u64);
+        // The ocean wherever the ground is under its level, as deep as it is lower: nothing grows under it.
+        // No deeper than its eight bits tell.
+        let depth = generation.shape.ocean.saturating_sub(terrain.height(place)).min(u8::MAX as Height);
         if depth > 0 {
             (0..WATER.len()).filter(|bit| depth >> bit & 1 == 1).for_each(|bit| set(water + bit));
             continue;

@@ -7,7 +7,7 @@
 //! world is made afresh and its ticks start from 0.
 
 use crate::sim::SEED;
-use crate::tuning::{self, BUMPS, GRASS_COVER, HEIGHT_SPAN, HILLS, PATCH_DETAIL, PATCH_SIZE, RIDGES, ROUGHNESS, SCATTER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER, GROUND_LEVEL, LAND_RISE, LAND_SPAN, PLAINS, PLAINS_HEIGHT, WATER_LEVEL};
+use crate::tuning::{self, BUMPS, GRASS_COVER, HEIGHT_SPAN, HILLS, PATCH_DETAIL, PATCH_SIZE, RIDGES, ROUGHNESS, SCATTER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER, GROUND_LEVEL, LAND_RISE, LAND_SPAN, COAST, OCEAN_LEVEL};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use terrain::Shape;
@@ -48,30 +48,25 @@ pub fn generation() -> Generation {
     // What is typed is held to what the noise can take.
     let of_one = |share: f32| (share.clamp(0.0, 1024.0) * ONE as f32) as u64;
     let patches = |[cover, patch, detail, scatter]: [usize; 4]| Patches { cover: of_one(tuned[cover]), patch: tuned[patch].round().clamp(0.0, 16.0) as u32, detail: of_one(tuned[detail]), scatter: of_one(tuned[scatter]) };
-    let shape = shape(&tuned);
-    let water_level = tuned[WATER_LEVEL].round().clamp(0.0, 255.0) as u16;
-    Generation { shape, grass: patches([GRASS_COVER, PATCH_SIZE, PATCH_DETAIL, SCATTER]), trees: patches([TREE_COVER, TREE_PATCH, TREE_DETAIL, TREE_SCATTER]), water_level }
+    Generation { shape: shape(&tuned), grass: patches([GRASS_COVER, PATCH_SIZE, PATCH_DETAIL, SCATTER]), trees: patches([TREE_COVER, TREE_PATCH, TREE_DETAIL, TREE_SCATTER]) }
 }
 
-/// The heights' shape, as the sliders have it: the plains' share of the
-/// height span, then each hill octave's share of the rest, whole
-/// numbers that come to no more than the span.
+/// The heights' shape, as the sliders have it: the land, the ocean,
+/// and each hill octave's share of the height span, whole numbers that
+/// come to no more than the span.
 fn shape(tuned: &tuning::Tuning) -> Shape {
-    // A height is a byte, whatever is typed.
+    // The hills are a byte high at most, whatever is typed.
     let span = tuned[HEIGHT_SPAN].round().clamp(0.0, 255.0) as u64;
-    let base = (tuned[PLAINS_HEIGHT].round().max(0.0) as u64).min(span);
-    let plains = (tuned[PLAINS].clamp(0.0, 1.0) * ONE as f32) as u64;
     // The highest ground is still a height: 16 bits.
-    let ground = tuned[GROUND_LEVEL].round().clamp(0.0, (u16::MAX - 255) as f32) as u16;
-    let (rise, rise_span) = (tuned[LAND_RISE].round().clamp(0.0, u16::MAX as f32) as u64, tuned[LAND_SPAN].round().clamp(2.0, 24.0) as u32);
+    let height = |tuned: f32| tuned.round().clamp(0.0, (u16::MAX - 255) as f32) as u16;
+    let land = Shape { weights: [0; 4], ocean: height(tuned[OCEAN_LEVEL]), coast: tuned[COAST].round().clamp(1.0, u16::MAX as f32) as u64, ground: height(tuned[GROUND_LEVEL]), rise: height(tuned[LAND_RISE]) as u64, rise_span: tuned[LAND_SPAN].round().clamp(2.0, 24.0) as u32 };
     let shares = [tuned[HILLS], tuned[RIDGES], tuned[BUMPS], tuned[ROUGHNESS]].map(|share| share.max(0.0));
     let all: f32 = shares.iter().sum();
     if all <= 0.0 {
-        return Shape { weights: [0; 4], base, plains, ground, rise, rise_span };
+        return land;
     }
-    let hills = span - base;
-    let mut weights = shares.map(|share| (share / all * hills as f32).round() as u64);
-    // Rounded up together they may pass what is left by one: the broadest gives it back.
-    weights[0] -= (weights.iter().sum::<u64>().saturating_sub(hills)).min(weights[0]);
-    Shape { weights, base, plains, ground, rise, rise_span }
+    let mut weights = shares.map(|share| (share / all * span as f32).round() as u64);
+    // Rounded up together they may pass the span by one: the broadest gives it back.
+    weights[0] -= (weights.iter().sum::<u64>().saturating_sub(span)).min(weights[0]);
+    Shape { weights, ..land }
 }

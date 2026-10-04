@@ -178,10 +178,10 @@ by the same keys. Generation's sliders are shown from the start:
 - **The heights**: how much of a height each of the four octaves makes
   up beside the others -- hills 512 cells across, ridges 128, bumps 32,
   roughness 8 -- and the height span they come to together, 255 at
-  most (`terrain::Shape`); how much of the world is plains, and how
-  high the plains roll.
-- **The water's level**: how far over the land's rise still water
-  stands; the ground under it is a lake.
+  most (`terrain::Shape`).
+- **The ocean's level**: the land under it is the ocean's floor; and
+  **the coast**: how far over the ocean the land is where the hills are
+  whole.
 - **The ground's level**, **the land's rise** and **its span**: the
   lowest ground, how far the land rises over it, and how broadly (a
   power of two of cells).

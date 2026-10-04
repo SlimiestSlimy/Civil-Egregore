@@ -28,8 +28,10 @@ what they always do and are not listed.
 | **Morton order** | the order of Morton indices: work is done and written in it, so memory is read forwards | sampling, wake | |
 | **height** | a cell's height, 16 bits, 0 to 65,535, from the seed alone (`terrain::height`) | wall, height map, floor, rise | elevation |
 | **dirt** | a cell with nothing on it: no layer of its own | grass | ground |
-| **water** | how deep water stands over a cell's ground, 0 none: a level over eight bitplanes (`terrain::WATER`) | level, lake | sea |
-| **plains** | the ground where no hills stand: the base alone, all but flat | shape | flats |
+| **water** | how deep water stands over a cell's ground, 0 none: a level over eight bitplanes (`terrain::WATER`) | level, ocean | |
+| **ocean** | the water at one height all over the world (`Shape::ocean`): the land under it is its floor | water, island, rise | sea |
+| **island** | land over the ocean's level, dozens to hundreds of superchunks | ocean, rise, coast | continent |
+| **coast** | how far over the ocean the land is where the hills are whole: from the shore to there they grow | island, shape | |
 | **tree** | a cell set in the layer `TREE`, with a **stage** | stage, patches | |
 | **stage** | how old a tree is, 0 to 15: a number kept over four bitplanes (`TREE_STAGE`), a bit each | tree, level | age, growth |
 | **level** | a number a cell holds over several bitplanes, the lowest bit first (`Turn::level`) | stage, bitplane | multi-bit plane |
@@ -75,7 +77,7 @@ what they always do and are not listed.
 | **cold pool** | chunk storage's superchunk images, one per superchunk stored. Never "pool" alone | image, block pool | |
 | **image** | one superchunk as stored, one run of words, in memory as on disk: its height map and every chunk's encoded layers (`SuperchunkImage`) | chunk storage, save | |
 | **height map** | a superchunk's heights: a floor a chunk, a byte a cell over it, and a tall chunk's 16 bits a cell (`HeightMap`) | height, floor, tall chunk | |
-| **floor** | a chunk's lowest height, 16 bits: what its cells' bytes are counted from | height map | chunk height, base |
+| **floor** | a chunk's lowest height, 16 bits: what its cells' bytes are counted from | height map | chunk height |
 | **tall chunk** | a chunk whose heights span more than 255: kept whole, 16 bits a cell, after the bytes | height map, floor | |
 | **rise** | how far the land stands over the lowest ground: noise many superchunks broad and far higher than a hill (`terrain::rise`) | height, shape | continent |
 | **layer codec** | encodes a layer for an image, and decodes it back, by Tessera (`LayerCodec`) | Tessera | |
