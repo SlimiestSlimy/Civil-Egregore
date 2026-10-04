@@ -105,7 +105,7 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     first.info.name = "Nine fields".to_string();
     world::save(&folder, &mut first).expect("saved");
     let text = std::fs::read_to_string(folder.join("world")).expect("the world's file");
-    assert_eq!(text, "tilesim world 1\nname = Nine fields\nseed = 99\ntick = 0\nlayers = 1 2 8 9\n");
+    assert_eq!(text, "tilesim world 1\nname = Nine fields\nseed = 99\ntick = 0\nlayers = 1 2 3 4 5 6 7 8 9\n");
     let hot: String = first.arena.superchunk_indices().iter().map(|superchunk| format!("{:011x}\n", superchunk.0)).collect();
     assert_eq!(std::fs::read_to_string(folder.join("hot")).expect("the hot file"), format!("tilesim hot 2\n{hot}"), "the nine hot, none cooling or warming");
     let mut names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|entry| entry.unwrap().file_name().into_string().unwrap()).collect();

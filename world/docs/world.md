@@ -14,7 +14,8 @@ and its superchunk index (`generate_image`), so a superchunk is the
 same whenever and in whatever order it is made: the world has no edge
 but the coordinates', and grows as the sheep wander. A superchunk is
 its terrain (`../terrain/`) -- heights, and the walls they make, four
-layers -- and on it, for now, pasture: dirt, about a third of it grass.
+layers -- and on it dirt, grass in patches, and trees in patches of
+their own, each of a stage drawn for its cell (`Generation`, `patches`).
 
 Each superchunk's random numbers are a stream of their own
 (`Rng::for_stream`): seeded by the seed moved along by the
@@ -164,7 +165,7 @@ save's folder.
 | `src/halos.rs` | the hot superchunks: the halos about the entities that keep one, cooling and warming |
 | `src/background.rs` | the threads encoding, generating and decoding off the tick |
 | `src/tick.rs` | the tick of every rule and entity, then the halos moved |
-| `src/pasture.rs` | where grass lies in patches: tried out in the renderer's lab, not yet what worlds are made with |
+| `src/patches.rs` | how grass and trees lie in patches when a superchunk is made |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; frames; the diagnostics tool |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
 | `tests/` | the halos follow their keepers; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; the files; refusals |

@@ -15,8 +15,9 @@
 //! shown hot all the while, whatever its sheep come to.
 //!
 //! `cargo run --release -p renderer -- lab [superchunks shown]` is the
-//! lab instead ([`lab`]): no sheep and no tick, only the world
-//! generated where it is looked at, with sliders for how.
+//! lab instead ([`lab`]): a world of the superchunks shown, every one
+//! hot, no sheep, its rules ticking, with sliders for how it is
+//! generated.
 //!
 //! It runs until closed. The ticks to watch for are only shown: how far
 //! the run is from what whoever started it wanted seen.
@@ -54,7 +55,7 @@ use bevy::sprite::Anchor;
 use bevy::window::{MonitorSelection, WindowMode};
 use coordinates::{place_from_cartesian, square_side, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 use paint::Picture;
-use sim::{start, Ask, Near, Request, Viewport, TARGET_PACE};
+use sim::{start, Ask, Mode, Near, Request, Viewport, TARGET_PACE};
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
@@ -187,6 +188,8 @@ struct Seen {
     sheep: usize,
     /// Cells of grass.
     grass: u64,
+    /// Trees.
+    trees: u64,
     /// Superchunks the frame painted.
     painted: usize,
     /// Superchunks in view.
@@ -296,15 +299,18 @@ fn main() {
     tuning::start();
     let in_lab = std::env::args().nth(1).is_some_and(|first| first == "lab");
     // In the lab the only number is the superchunks shown, after the word.
-    let (superchunks, flock) = (argument(1 + in_lab as usize, 49) as u32, argument(2, 8000));
+    let (superchunks, flock) = (argument(1 + in_lab as usize, 64) as u32, argument(2, 8000));
     let pace = Some(argument(3, TARGET_PACE as usize) as u32).filter(|&pace| pace > 0);
-    let forced_hot = argument(5, 0) > 0;
-    let (requests, frames) = if in_lab {
-        sliders::show_generation();
-        lab::start()
-    } else {
-        start(superchunks, flock, forced_hot)
+    let mode = match (in_lab, argument(5, 0) > 0) {
+        (true, _) => Mode::Lab,
+        (false, true) => Mode::ForcedHot,
+        (false, false) => Mode::Halos,
     };
+    if in_lab {
+        lab::run();
+        sliders::show_generation();
+    }
+    let (requests, frames) = start(superchunks, flock, mode);
     _ = requests.send(Request::Pace(pace));
     let watch_for = Some(argument(4, 0) as u64).filter(|&ticks| ticks > 0);
     App::new()
@@ -491,7 +497,7 @@ fn heights(
     let (first, last) = ((first_x, first_y), (last_x, last_y));
     let readable = shown.heights && 1.0 / view.scale >= HEIGHT_FROM && last.0 - first.0 < HEIGHT_LABELS.0 && last.1 - first.1 < HEIGHT_LABELS.1;
     let size = view.scale * (1.0 / view.scale / HEIGHT_WIDTH).min(1.0);
-    let (seed, shape) = (lab::seed(), lab::shape());
+    let (seed, shape) = (lab::seed(), lab::generation().shape);
     for (label, mut text, mut transform, mut visibility) in &mut labels {
         // The cell in view that is the label's: the first at or past the view's first whose place round the grid is its slot.
         let round = |first: u32, slot: u32, labels: u32| first + (slot + labels - first % labels) % labels;
@@ -586,6 +592,7 @@ fn show(
             ticks_a_second: frame.ticks_a_second,
             sheep: frame.sheep,
             grass: frame.grass,
+            trees: frame.trees,
             painted: frame.superchunks.len(),
             in_view: seen.in_view,
             detail: seen.detail,
@@ -704,12 +711,13 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         pixels => format!("a cell {pixels} pixels a side"),
     };
     text.0 = format!(
-        "seed {:016x}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   U: sliders",
+        "seed {:016x}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   U: sliders",
         lab::seed(),
         grouped(seen.tick),
         grouped(seen.ticks_a_second as u64),
         grouped(seen.sheep as u64),
         grouped(seen.grass),
+        grouped(seen.trees),
         seen.in_view,
         seen.painted,
         seen.sync_seconds * 1e6,

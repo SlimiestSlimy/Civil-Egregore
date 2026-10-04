@@ -108,7 +108,7 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
             let grass = grass::rule(turn, samples);
             let grassed = Instant::now();
             let sheep = sheep::rule(turn);
-            Timed { done: TickCounts { grass, sheep }, grass: grassed - start, sheep: grassed.elapsed() }
+            Timed { done: TickCounts { grass, sheep, ..TickCounts::default() }, grass: grassed - start, sheep: grassed.elapsed() }
         });
         timed += report.rules;
         since += report.rules.done.sheep;

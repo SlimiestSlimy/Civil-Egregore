@@ -6,7 +6,7 @@ ground lit by its height (below). The world is a generated one
 (`world::generate_flocks`, seed 1).
 
 `cargo run --release -p renderer -- [superchunks shown] [sheep a superchunk] [ticks a second, 0 flat out] [ticks to watch for] [1 to force hot]`;
-49 superchunks shown, 8,000 sheep on each and 256 ticks a second if
+64 superchunks shown, 8,000 sheep on each and 256 ticks a second if
 not said: a flock that reaches the most the grass feeds, some 16,000 a
 superchunk, within 70,000 ticks, and has not eaten it bare before.
 
@@ -168,31 +168,29 @@ found by eye is then written into the code as the defaults.
 
 ## The lab
 
-`cargo run --release -p renderer -- lab [superchunks shown]`, 49 if not
-said, is a mode to tune by eye how the world is made (`src/lab.rs`). In
-place of the simulation a thread only generates: no sheep, no tick. A
-superchunk is generated the first time it is in view and kept from then
-on, wherever in the world the view goes: the number given is only the
-square the view starts on. Past 2,048 kept, those out of view are
-dropped, to be made again if looked at. Generation's sliders are shown
-from the start:
+`cargo run --release -p renderer -- lab [superchunks shown]`, 64 (8 by
+8) if not said, is the renderer run to tune by eye how the world is
+made and how it changes (`src/lab.rs`). The world is of the superchunks
+shown and no more: every one hot from the start and kept so, no sheep,
+its rules -- grass and trees -- ticking as in any run, paused and paced
+by the same keys. Generation's sliders are shown from the start:
 
 - **The heights**: how much of a height each of the four octaves makes
   up beside the others -- hills 512 cells across, ridges 128, bumps 32,
   roughness 8 -- and the height span they come to together, 255 at
-  most (`terrain::Shape`, `terrain::height_shaped`).
-- **The grass** (`world::pasture`): in patches, not scattered cell by
-  cell. A cell's number is smooth noise as broad as a patch, finer
-  noise on it (patch detail), and a lot drawn for the cell alone
-  (scatter); it is grass under a threshold found, by looking at 16,384
-  cells, so that the share asked for (grass cover) is grass.
+  most (`terrain::Shape`).
+- **The grass**, and **the trees** (`world::patches`): each in patches,
+  not scattered cell by cell. A cell's number is smooth noise as broad
+  as a patch, finer noise on it (detail), and a lot drawn for the cell
+  alone (scatter); it has the thing under a threshold found, by looking
+  at 16,384 cells, so that the share asked for (cover) do.
 - **The button** draws a new seed off the clock; the seed is shown in
   the text.
 
-Whenever a slider of generation moves or the seed is drawn, all starts
-again from nothing but the sliders: all that was kept is dropped, the painter's ground with it, and what is in view
-is generated again. Worlds themselves are still made as before
-(`world::generate_image`): what is settled here is to be written there.
+Whenever a slider of generation moves or the seed is drawn, the world
+is made afresh from nothing but the sliders, and its ticks start again
+from 0. What is settled here is written into `world::Generation::DEFAULT`
+and `terrain::Shape::DEFAULT`, which every world is made with.
 
 ## Layout
 
@@ -203,7 +201,7 @@ is generated again. Worlds themselves are still made as before
 | `src/ground.rs` | the light on the ground: heights from the seed, hillshade, tint, cast shadows, cliffs and contours |
 | `src/tuning.rs` | the numbers the near view's shading is tuned by, kept between runs |
 | `src/sliders.rs` | the sliders that set them, their value boxes and the button |
-| `src/lab.rs` | the lab: a thread that only generates, in place of the simulation |
+| `src/lab.rs` | the lab: the seed and how the world is generated, as the sliders have it |
 | `src/near.rs` | the cells in view from near as one picture: steps and walls at their edges |
 | `src/main.rs` | the window: the camera, an image a superchunk, the keys, the text |
 | `docs/` | this, and the reference, function by function |

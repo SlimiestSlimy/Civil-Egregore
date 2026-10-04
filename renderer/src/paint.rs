@@ -22,6 +22,7 @@ use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::Instant;
+use mc_rules::trees::OLDEST;
 use world::diagnostics::frames::{BROWN, GREEN, WHITE};
 
 /// Pixels along a superchunk's side: a cell each.
@@ -53,6 +54,8 @@ pub struct Picture {
     pub sheep: usize,
     /// Cells of grass in the whole world.
     pub grass: u64,
+    /// Trees in the whole world.
+    pub trees: u64,
     /// What answering took of the simulation's thread, in seconds.
     pub sync_seconds: f64,
     /// The share of the thread's time that is.
@@ -81,7 +84,7 @@ fn ground(grounds: &mut HashMap<(u32, u32), Ground>, frame: &Frame, number: u64)
     let fine = frame.near.is_some() || frame.detail < 2;
     let hot = || frame.cells.iter().filter(|cells| cells.hot).map(|cells| cells.top_left);
     let missing: Vec<(u32, u32)> = hot().filter(|top_left| grounds.get(top_left).is_none_or(|ground| fine && ground.fine.is_none())).collect();
-    let (seed, shape) = (lab::seed(), lab::shape());
+    let (seed, shape) = (lab::seed(), lab::generation().shape);
     let made: Vec<Ground> = thread::scope(|scope| {
         let making: Vec<_> = missing.iter().map(|&top_left| scope.spawn(move || Ground::generate(seed, &shape, top_left))).collect();
         making.into_iter().map(|making| making.join().expect("a superchunk's ground")).collect()
@@ -135,6 +138,7 @@ pub fn start(frames: Receiver<Frame>) -> Receiver<Picture> {
                     ticks_a_second: frame.ticks_a_second,
                     sheep: frame.sheep,
                     grass: frame.grass,
+                    trees: frame.trees,
                     sync_seconds: frame.sync_seconds,
                     sync_share: frame.sync_share,
                     paint_seconds: started.elapsed().as_secs_f64(),
@@ -155,6 +159,21 @@ pub fn start(frames: Receiver<Frame>) -> Receiver<Picture> {
 fn chunk_top_left(place: usize) -> (usize, usize) {
     let (x, y) = cartesian_from_place(place * CELLS_IN_CHUNK);
     (x as usize, y as usize)
+}
+
+/// A tree at its first stage, and at its last: darker as it ages.
+const TREE_YOUNG: [u8; 3] = [62, 128, 44];
+/// A tree at its last stage.
+const TREE_OLD: [u8; 3] = [14, 62, 30];
+
+/// A tree's colour at `stage`.
+pub fn tree_colour(stage: u32) -> [u8; 3] {
+    mixed(TREE_YOUNG, TREE_OLD, stage as usize, OLDEST as usize)
+}
+
+/// The stage of the tree at bit `bit` of word `word` of `cells`' bitmaps.
+pub fn stage_at(cells: &Cells, word: usize, bit: u32) -> u32 {
+    (0..cells.stages.len()).map(|plane| ((cells.stages[plane][word] >> bit & 1) as u32) << plane).sum()
 }
 
 /// `colour`, opaque.
@@ -178,6 +197,17 @@ fn paint(cells: &Cells, ground: &Ground) -> Painted {
             }
         }
     }
+    // Its trees over the grass, each in its stage's colour.
+    for (index, &word) in cells.trees.iter().enumerate() {
+        let (left, top) = chunk_top_left(index / CHUNK_WORDS);
+        let mut bits = word;
+        while bits != 0 {
+            let bit = bits.trailing_zeros();
+            let (x, y) = morton_coordinates(index % CHUNK_WORDS * BITS_PER_WORD + bit as usize);
+            pixels[(top + y as usize) * SIDE + left + x as usize] = opaque(tree_colour(stage_at(cells, index, bit)));
+            bits &= bits - 1;
+        }
+    }
     for (pixel, &factor) in pixels.iter_mut().zip(&ground.levels[0]) {
         *pixel = opaque(lit([pixel[0], pixel[1], pixel[2]], factor));
     }
@@ -199,15 +229,14 @@ fn mixed(from: [u8; 3], to: [u8; 3], part: usize, whole: usize) -> [u8; 3] {
     std::array::from_fn(|channel| ((from[channel] as usize * (whole - part) + to[channel] as usize * part) / whole) as u8)
 }
 
-/// A superchunk's cells as pixels from far off, a pixel a tile of
-/// cells `2^detail` a side: dirt and grass mixed by the grass in the
-/// tile -- counted from its run of bits -- and white mixed in by the
-/// sheep on it, each as many cells as it is drawn from near; the
-/// ground in the `ground`'s light.
-fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
+/// The cells set in each tile of cells `2^detail` a side of a
+/// superchunk's `words` -- its chunks' bitmaps one after another --
+/// row by row: each tile a run of bits in Morton order, counted from
+/// the words with no cell looked at.
+fn counted(words: &[u64], detail: u32) -> Vec<u16> {
     let (side, tile_cells) = (SIDE >> detail, 1usize << (2 * detail));
-    let mut grass = vec![0u16; side * side];
-    for (place, chunk) in cells.grass.as_chunks::<CHUNK_WORDS>().0.iter().enumerate() {
+    let mut counts = vec![0u16; side * side];
+    for (place, chunk) in words.as_chunks::<CHUNK_WORDS>().0.iter().enumerate() {
         let (left, top) = chunk_top_left(place);
         let (left, top) = (left >> detail, top >> detail);
         for tile in 0..CELLS_IN_CHUNK / tile_cells {
@@ -219,9 +248,20 @@ fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
                 (chunk[bit / BITS_PER_WORD] >> (bit % BITS_PER_WORD) & ((1 << tile_cells) - 1)).count_ones()
             };
             let (x, y) = morton_coordinates(tile);
-            grass[(top + y as usize) * side + left + x as usize] = count as u16;
+            counts[(top + y as usize) * side + left + x as usize] = count as u16;
         }
     }
+    counts
+}
+
+/// A superchunk's cells as pixels from far off, a pixel a tile of
+/// cells `2^detail` a side: dirt and grass mixed by the grass in the
+/// tile, its trees' colour mixed in by the trees in it, and white mixed in by the
+/// sheep on it, each as many cells as it is drawn from near; the
+/// ground in the `ground`'s light.
+fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
+    let (side, tile_cells) = (SIDE >> detail, 1usize << (2 * detail));
+    let (grass, trees) = (counted(&cells.grass, detail), counted(&cells.trees, detail));
     let mut sheep = vec![0u16; side * side];
     for &(x, y) in &cells.sheep {
         let at = (y as usize >> detail) * side + (x as usize >> detail);
@@ -229,8 +269,9 @@ fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
     }
     let sheep_cells = (2 * SHEEP_REACH + 1) * (2 * SHEEP_REACH + 1);
     let mut pixels = Vec::with_capacity(side * side * 4);
-    for ((&grass, &sheep), &factor) in grass.iter().zip(&sheep).zip(&ground.levels[(detail as usize).min(COARSEST)]) {
-        let ground = lit(mixed(BROWN, GREEN, grass as usize, tile_cells), factor);
+    for (((&grass, &trees), &sheep), &factor) in grass.iter().zip(&trees).zip(&sheep).zip(&ground.levels[(detail as usize).min(COARSEST)]) {
+        let ground = mixed(mixed(BROWN, GREEN, grass as usize, tile_cells), tree_colour(OLDEST / 2), trees as usize, tile_cells);
+        let ground = lit(ground, factor);
         pixels.extend_from_slice(&opaque(mixed(ground, WHITE, sheep as usize * sheep_cells, tile_cells)));
     }
     Painted { at: cells.at, cold: false, side: side as u32, pixels }

@@ -16,12 +16,14 @@
 //! patch and no gap.
 
 use crate::ground::{shadow_drop, Fine, Ground, SIDE};
+use crate::paint::{stage_at, tree_colour};
 use crate::sim::{Cells, Near};
 use crate::tuning::{self, Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LIT, WALL_SHADE};
 use bitmap::BITS_PER_WORD;
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;
 use utilities::hash::mix;
+use mc_rules::trees::OLDEST;
 use world::diagnostics::frames::{BROWN, GREEN, WHITE};
 
 /// A cell's side in eighths: what edges are measured in, whatever the
@@ -106,7 +108,12 @@ pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: 
                 let place = place_from_cartesian(own_x as u32, own_y as u32);
                 let grass = cells.grass[place / BITS_PER_WORD] >> (place % BITS_PER_WORD) & 1 == 1;
                 let cell = Cell { fine, tuning: &tuning, at: (own_x, own_y), world: (cells.top_left.0 as u64 + own_x as u64, cells.top_left.1 as u64 + own_y as u64), colour: if grass { GREEN } else { BROWN } };
-                cell.paint(&mut pixels, width, ((x - first.0) * pixels_a_cell, (y - first.1) * pixels_a_cell), pixels_a_cell);
+                let corner = ((x - first.0) * pixels_a_cell, (y - first.1) * pixels_a_cell);
+                cell.paint(&mut pixels, width, corner, pixels_a_cell);
+                let (word, bit) = (place / BITS_PER_WORD, (place % BITS_PER_WORD) as u32);
+                if cells.trees[word] >> bit & 1 == 1 {
+                    tree(&mut pixels, width, corner, pixels_a_cell, stage_at(cells, word, bit));
+                }
             }
         }
         for &(x, y) in &cells.sheep {
@@ -199,6 +206,23 @@ impl Cell<'_> {
                 let colour: [u8; 3] = std::array::from_fn(|channel| (self.colour[channel] as f32 * tone * shade[channel]).round().min(255.0) as u8);
                 pixels[(corner.1 + down) * width + corner.0 + across] = [colour[0], colour[1], colour[2], u8::MAX];
             }
+        }
+    }
+}
+
+/// A tree `stage` old on the cell whose top left pixel is at `corner`:
+/// a square in the cell's middle, larger and darker the older it is,
+/// from three eighths of the cell to the whole of it.
+fn tree(pixels: &mut [[u8; 4]], width: usize, corner: (usize, usize), pixels_a_cell: usize, stage: u32) {
+    let colour = tree_colour(stage);
+    let side = (pixels_a_cell * (3 + 5 * stage as usize / OLDEST as usize) / 8).max(1);
+    let inset = (pixels_a_cell - side) / 2;
+    for down in inset..inset + side {
+        for across in inset..inset + side {
+            // Its lower right edge a little darker: a crown, lit from the top left.
+            let shade = if side > 2 && (down + 1 == inset + side || across + 1 == inset + side) { 3 } else { 4 };
+            let pixel = colour.map(|channel| (channel as usize * shade / 4) as u8);
+            pixels[(corner.1 + down) * width + corner.0 + across] = [pixel[0], pixel[1], pixel[2], u8::MAX];
         }
     }
 }

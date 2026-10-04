@@ -7,17 +7,20 @@
 
 use crate::{HaloChange, World};
 use mc_rules::grass::{self, GrassCounts};
+use mc_rules::trees::{self, TreeCounts};
 use entity_rules::sheep::{self, SheepCounts};
 use bitplane_manager::BitmapArena;
 use simulation::entity_store::Entities;
 use simulation::{Simulation, TickReport};
 use std::ops::AddAssign;
 
-/// What grass and sheep did in a tick.
+/// What grass, trees and sheep did in a tick.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TickCounts {
     /// What the grass did.
     pub grass: GrassCounts,
+    /// What the trees did.
+    pub trees: TreeCounts,
     /// What the sheep did.
     pub sheep: SheepCounts,
 }
@@ -26,6 +29,7 @@ impl AddAssign for TickCounts {
     /// Both added up.
     fn add_assign(&mut self, other: Self) {
         self.grass += other.grass;
+        self.trees += other.trees;
         self.sheep += other.sheep;
     }
 }
@@ -44,7 +48,7 @@ pub struct WorldTick {
 /// superchunk's random stream the first tick it is in. The halos are
 /// not moved: for a mock world's superchunks, hot all the while.
 pub fn tick_rules(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64) -> TickReport<TickCounts> {
-    simulation.tick(arena, entities, seed, |turn, samples| TickCounts { grass: grass::rule(turn, samples), sheep: sheep::rule(turn) })
+    simulation.tick(arena, entities, seed, |turn, samples| TickCounts { grass: grass::rule(turn, samples), trees: trees::rule(turn, samples), sheep: sheep::rule(turn) })
 }
 
 impl World {

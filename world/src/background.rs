@@ -10,7 +10,7 @@
 //! What a job makes depends on nothing but the job, so the world is the
 //! same however fast the threads are.
 
-use crate::generate_image;
+use crate::{generate_image, Generation};
 use bitmap::CellWords;
 use bitplane_manager::BucketKey;
 use chunk_storage::{Flush, LayerCodec, LayerType, SuperchunkImage};
@@ -39,6 +39,8 @@ pub enum Job {
         image: Option<Arc<SuperchunkImage>>,
         /// The world's seed.
         seed: u64,
+        /// How the world's superchunks are generated.
+        generation: Generation,
         /// The layer types to decode.
         types: Vec<LayerType>,
     },
@@ -69,8 +71,8 @@ impl Job {
         match self {
             Self::Encode(dirty) => Done::Encoded(dirty.into_iter().map(|(key, cells)| (key, codec.encode_layer(&cells).to_vec())).collect()),
             Self::Flush(flush) => Done::Flushed(flush.rewritten()),
-            Self::Warm { superchunk, image, seed, types } => {
-                let generated = image.is_none().then(|| generate_image(seed, superchunk, codec));
+            Self::Warm { superchunk, image, seed, generation, types } => {
+                let generated = image.is_none().then(|| generate_image(&generation, seed, superchunk, codec));
                 let image = generated.as_ref().or(image.as_deref()).expect("an image, kept or generated");
                 let mut cells = Vec::with_capacity(types.len() * superchunk.chunks().count());
                 for chunk in superchunk.chunks() {

@@ -20,3 +20,4 @@ pub mod diagnostics;
 pub mod transient_data;
 
 pub mod grass;
+pub mod trees;
