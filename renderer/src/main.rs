@@ -33,6 +33,7 @@
 //! | `B` | show the superchunks' boundaries, or not, and near enough each one's Morton index and `(x, y)` |
 //! | `C` | the same of the chunks |
 //! | `H` | show every cell's height, from near enough to read them |
+//! | `P` | draw the polygons' borders over the map |
 //! | `U` | the next page of sliders, or none: the near view's shading, and in the lab how the world is generated |
 
 // Every item is documented, private ones included; `cargo clippy`
@@ -225,6 +226,8 @@ struct MapLink {
     maps: Mutex<Receiver<map::Drawn>>,
     /// The last asked for.
     asked: Option<map::Wanted>,
+    /// Whether the polygons' borders are drawn over the map.
+    borders: bool,
 }
 
 /// The map's picture, over the superchunks' images.
@@ -352,7 +355,7 @@ fn main() {
         .insert_resource(Sprites::about_origin(superchunks))
         .insert_resource({
             let (requests, maps) = map::start();
-            MapLink { requests, maps: Mutex::new(maps), asked: None }
+            MapLink { requests, maps: Mutex::new(maps), asked: None, borders: false }
         })
         .insert_resource(ClearColor(Color::BLACK))
         .init_resource::<Seen>()
@@ -760,6 +763,7 @@ fn map_step(scale: f32) -> u32 {
 /// generated has changed, and lays the last drawn where it is of.
 fn far(
     mut link: ResMut<MapLink>,
+    keys: Res<ButtonInput<KeyCode>>,
     sprites: Res<Sprites>,
     mut images: ResMut<Assets<Image>>,
     camera: Single<(&Transform, &Projection), With<Camera2d>>,
@@ -767,6 +771,7 @@ fn far(
     map_view: Single<MapParts, (With<MapView>, Without<Camera2d>)>,
 ) {
     let (sprite, mut transform, mut visibility) = map_view.into_inner();
+    link.borders ^= keys.just_pressed(KeyCode::KeyP);
     let (camera, projection) = *camera;
     let Projection::Orthographic(view) = projection else {
         return;
@@ -782,11 +787,11 @@ fn far(
     let corner = |axis: usize, middle: f32, half: f32| ((sprites.origin[axis] * SUPERCHUNK_SIDE_CELLS) as i64 + (middle - half).floor() as i64).div_euclid(step as i64) - MAP_MARGIN;
     let first = (corner(0, camera.translation.x, half.x), corner(1, -camera.translation.y, half.y));
     let pixels = |half: f32| (2.0 * half / step as f32).ceil() as u32 + 2 * MAP_MARGIN as u32 + 1;
-    let wanted = map::Wanted { first: (first.0 * step as i64, first.1 * step as i64), step, size: (pixels(half.x), pixels(half.y)), seed: lab::seed(), generation: lab::generation() };
+    let wanted = map::Wanted { first: (first.0 * step as i64, first.1 * step as i64), step, size: (pixels(half.x), pixels(half.y)), seed: lab::seed(), generation: lab::generation(), borders: link.borders };
     // Not for every pixel the view moves: only once it is half the margin from what was asked for, or anything else differs.
     let near_enough = |asked: &map::Wanted| {
         let moved = |asked: i64, wanted: i64| (asked - wanted).abs() / step as i64 <= MAP_MARGIN / 2;
-        (asked.step, asked.size, asked.seed, asked.generation) == (wanted.step, wanted.size, wanted.seed, wanted.generation) && moved(asked.first.0, wanted.first.0) && moved(asked.first.1, wanted.first.1)
+        (asked.step, asked.size, asked.seed, asked.generation, asked.borders) == (wanted.step, wanted.size, wanted.seed, wanted.generation, wanted.borders) && moved(asked.first.0, wanted.first.0) && moved(asked.first.1, wanted.first.1)
     };
     if !link.asked.as_ref().is_some_and(near_enough) && link.requests.send(wanted).is_ok() {
         link.asked = Some(wanted);
@@ -822,7 +827,7 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         pixels => format!("a cell {pixels} pixels a side"),
     };
     text.0 = format!(
-        "seed {:016x}   ocean at {}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   U: sliders",
+        "seed {:016x}   ocean at {}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   P: polygons (on the map)   U: sliders",
         lab::seed(),
         lab::generation().shape.ocean,
         grouped(seen.tick),

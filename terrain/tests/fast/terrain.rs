@@ -98,3 +98,16 @@ fn a_cliff_is_walled_along_its_length() {
     assert!(walled(&terrain, 0, 499, 77));
     assert!(!walled(&terrain, 0, 500, 77) && !walled(&terrain, 0, 498, 77));
 }
+
+/// The land as polygons: some ocean at the lowest ground, some plains
+/// over the ocean's level, and between any two cells beside one
+/// another -- a border crossed or not -- a ramp, never a jump.
+#[test]
+fn polygons_are_ocean_or_plains_joined_by_ramps() {
+    use terrain::polygons::{land, Polygons};
+    let shape = Shape { polygons: Polygons { span: 10, ..Polygons::NONE }, ..Shape::DEFAULT };
+    let row: Vec<u64> = (0..40_000).map(|x| land(&shape, 1, 2_000_000_000 + x, 2_000_000_000)).collect();
+    assert!(row.iter().all(|&high| (shape.ground as u64..=shape.ocean as u64 + 1 + shape.polygons.levels).contains(&high)));
+    assert!(row.contains(&(shape.ground as u64)) && row.iter().any(|&high| high > shape.ocean as u64), "ocean and land both");
+    assert!(row.windows(2).all(|pair| pair[0].abs_diff(pair[1]) <= 3), "no jump");
+}

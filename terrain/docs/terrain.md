@@ -60,6 +60,30 @@ the cells about the change are worked out again.
 | `tests/` | heights settled by seed and cell, walls where they should be |
 | `docs/` | this, and the reference, function by function |
 
+## The land as polygons
+
+`src/polygons.rs`, tried in the renderer's lab and not yet what worlds
+are made with (`Shape::polygons`, `Polygons::NONE` by default). The
+world is cut into closed shapes that share borders and never overlap:
+a polygon is the cells nearer one site than any other, the sites one to
+each square of a grid `2^span` cells a side, placed by lot in the
+square's middle half. Each polygon is ocean -- its ground the lowest
+there is -- or land, a plain at a level of its own over the ocean's.
+Broad noise moves a cell before its polygon is looked up, which bends
+the borders. Within the edge's width of a border the levels of the
+polygons about it are mixed, each by how little farther its site is
+than the nearest: a ramp or a shore, or with a narrow edge a cliff. The
+hills are added to that as to the rise.
+
+A cell looks at the sites of the 25 squares about it, so any cell's
+land follows from the seed and the cell alone; a superchunk's terrain
+takes about 0.6 s so (0.13 s with the rise) -- the sites near a
+superchunk are yet to be found once for all its cells.
+
+To come: polygons within polygons, plains higher or lower than the one
+about them; open lines within a polygon, ridges and valleys; ranges
+where two polygons meet.
+
 ## Land, ocean and hills
 
 A height is 16 bits, 0 to 65,535. The lowest ground is at

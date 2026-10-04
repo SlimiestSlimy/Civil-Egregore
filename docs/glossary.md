@@ -78,6 +78,9 @@ what they always do and are not listed.
 | **image** | one superchunk as stored, one run of words, in memory as on disk: its height map and every chunk's encoded layers (`SuperchunkImage`) | chunk storage, save | |
 | **height map** | a superchunk's heights: a floor a chunk, a byte a cell over it, and a tall chunk's 16 bits a cell (`HeightMap`) | height, floor, tall chunk | |
 | **map** | the renderer's picture of the world from farther than its cells are drawn from: each pixel the cell in its middle as generated, nothing of the simulation read (`renderer/src/map.rs`) | detail, lab | overview, minimap |
+| **polygon** | a closed shape of the land: the cells nearer one site than any other, ocean or a plain at a level of its own (`terrain::polygons`) | site, edge, plain | region, plate, Voronoi cell |
+| **site** | the point a polygon is the cells nearest to: one to each square of a grid, by lot | polygon | |
+| **edge** (a polygon's) | the cells from a border over which the levels about it are mixed: a ramp, or narrow, a cliff | polygon | |
 | **floor** | a chunk's lowest height, 16 bits: what its cells' bytes are counted from | height map | chunk height |
 | **tall chunk** | a chunk whose heights span more than 255: kept whole, 16 bits a cell, after the bytes | height map, floor | |
 | **rise** | how far the land stands over the lowest ground: noise many superchunks broad and far higher than a hill (`terrain::rise`) | height, shape | continent |

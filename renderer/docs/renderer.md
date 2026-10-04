@@ -197,6 +197,12 @@ drawn, the view too goes back to where it started. No sheep,
 its rules -- grass and trees -- ticking as in any run, paused and paced
 by the same keys. Generation's sliders are shown from the start:
 
+- **The polygons** (`terrain::polygons`): how broad one is (0 for
+  none, and the land is its rise), how high the plains stand, the
+  edge's width and how far borders are bent. With polygons the ocean's
+  level is the ground's plus the ocean's depth, and the ocean's share
+  is the share of polygons that are ocean. `P` draws their borders
+  over the map.
 - **The hills**: how much of their height each of the fourteen octaves
   makes up beside the others -- 65,536 cells across to 8 -- and the
   height span they come to together (`terrain::Shape`).
