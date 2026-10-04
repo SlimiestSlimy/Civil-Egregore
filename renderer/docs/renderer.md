@@ -197,8 +197,8 @@ drawn, the view too goes back to where it started. No sheep,
 its rules -- grass and trees -- ticking as in any run, paused and paced
 by the same keys. Generation's sliders are shown from the start:
 
-- **The hills**: how much of their height each of the eleven octaves
-  makes up beside the others -- 8,192 cells across to 8 -- and the
+- **The hills**: how much of their height each of the fourteen octaves
+  makes up beside the others -- 65,536 cells across to 8 -- and the
   height span they come to together (`terrain::Shape`).
 - **The land**: the lowest ground's level, how far the land rises over
   it, how broadly (a power of two of cells), and the share of each of
