@@ -33,8 +33,10 @@ const SHEEP_REACH: usize = 0;
 
 /// One superchunk's pixels.
 pub struct Painted {
-    /// Where it is in the world's square, `(x, y)` from the top left.
+    /// Where it is in the world, `(x, y)` in superchunks.
     pub at: (u32, u32),
+    /// Whether it is cold: nothing to draw, its pixels none.
+    pub cold: bool,
     /// Pixels along its side: its cells', halved `detail` times.
     pub side: u32,
     /// Its pixels, row by row: red, green, blue, opacity.
@@ -66,6 +68,11 @@ pub struct Picture {
 
 /// Superchunks whose fine ground is kept, at most: 8 MiB each.
 const FINE_KEPT: usize = 48;
+/// Superchunks whose ground is kept at all, at most: past that, those
+/// longest unseen go.
+const GROUNDS_KEPT: usize = 2048;
+/// Frames a ground past [`GROUNDS_KEPT`] may go unseen before it goes.
+const UNSEEN_FRAMES: u64 = 256;
 
 /// Makes the ground of every hot superchunk of `frame` that has none
 /// yet, or none fine enough -- each on a thread of its own -- and
@@ -90,6 +97,9 @@ fn ground(grounds: &mut HashMap<(u32, u32), Ground>, frame: &Frame, number: u64)
             grounds.get_mut(&top_left).expect("listed above").coarsen();
         }
     }
+    if grounds.len() > GROUNDS_KEPT {
+        grounds.retain(|_, ground| ground.used + UNSEEN_FRAMES >= number);
+    }
 }
 
 /// Starts the painter's thread: every frame from `frames` painted, and
@@ -112,7 +122,7 @@ pub fn start(frames: Receiver<Frame>) -> Receiver<Picture> {
                     .cells
                     .iter()
                     .filter_map(|cells| match (cells.hot, frame.near, frame.detail) {
-                        (false, _, _) => Some(Painted { at: cells.at, side: 1, pixels: opaque(COLD).to_vec() }),
+                        (false, _, _) => Some(Painted { at: cells.at, cold: true, side: 0, pixels: Vec::new() }),
                         // From near the cells in view are one picture.
                         (true, Some(_), _) => None,
                         (true, None, 0) => Some(paint(cells, &grounds[&cells.top_left])),
@@ -147,9 +157,6 @@ fn chunk_top_left(place: usize) -> (usize, usize) {
     (x as usize, y as usize)
 }
 
-/// A cold superchunk: not ticked, its cells not held.
-const COLD: [u8; 3] = [0, 0, 0];
-
 /// `colour`, opaque.
 const fn opaque(colour: [u8; 3]) -> [u8; 4] {
     [colour[0], colour[1], colour[2], u8::MAX]
@@ -183,7 +190,7 @@ fn paint(cells: &Cells, ground: &Ground) -> Painted {
             }
         }
     }
-    Painted { at: cells.at, side: SIDE as u32, pixels: pixels.into_flattened() }
+    Painted { at: cells.at, cold: false, side: SIDE as u32, pixels: pixels.into_flattened() }
 }
 
 /// `from` and `to` mixed, `part` of `whole` of it `to`.
@@ -226,5 +233,5 @@ fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
         let ground = lit(mixed(BROWN, GREEN, grass as usize, tile_cells), factor);
         pixels.extend_from_slice(&opaque(mixed(ground, WHITE, sheep as usize * sheep_cells, tile_cells)));
     }
-    Painted { at: cells.at, side: side as u32, pixels }
+    Painted { at: cells.at, cold: false, side: side as u32, pixels }
 }

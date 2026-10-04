@@ -11,7 +11,8 @@ The design is in `renderer.md`.
 **`Viewport`** `{first, last}`: the superchunks in view, a rectangle of
 them counted from the world's top left, both corners in it.
 **`Ask`** `{viewport, detail, skip, most, near}`: what a frame is to carry --
-some of the superchunks in view, and how coarsely they will be drawn.
+some of the superchunks in view, and how coarsely they will be drawn;
+**`asked()`**, those it asks for, each `(x, y)` in the world.
 **`Near`** `{first, size, pixels_a_cell}`: the cells seen from near.
 **`Request`**: `Sync(ask)`, `Pause(bool)`, `Pace(ticks a second, or
 flat out)`. **`Cells`** `{at, hot, top_left, grass, sheep}`: a superchunk's grass
@@ -32,7 +33,7 @@ next one's time if paced; paused, it waits for a request.
 
 ## `paint.rs`
 
-**`Painted`** `{at, side, pixels}`: a superchunk's pixels, four bytes each.
+**`Painted`** `{at, cold, side, pixels}`: a superchunk's pixels, four bytes each.
 **`Picture`**: a frame, painted. **`start(frames)`**: the painter's
 thread; where pictures come. **`ground(grounds, frame, number)`**: the
 ground of every hot superchunk of the frame made if missing, the fine
@@ -101,7 +102,7 @@ the button pressed, the numbers kept and shown.
 a new one, off the clock. **`shape()`**: the heights' shape as the
 sliders have it. **`pasture(seed)`**: how the grass lies, with its
 threshold. **`grass(pasture, seed, top_left)`**: a superchunk's grass,
-as words. **`start(superchunks)`**, **`run`**: the lab's thread;
+as words. `KEPT` (2,048). **`start()`**, **`run`**: the lab's thread;
 **`copy`**: the superchunks asked for, those not kept generated first.
 
 ## `main.rs`
@@ -112,8 +113,12 @@ as words. **`start(superchunks)`**, **`run`**: the lab's thread;
 **`frame_holds(detail)`**: superchunks a frame carries at most.
 
 **`Link`**: the requests' sender, the pictures' receiver, whether a frame
-is awaited, and the pause and pace last sent. **`Sprites`**: a sprite
-and its image a superchunk. **`Seen`**: what the last frame said. **`NearView`**: the picture from
+is awaited, and the pause and pace last sent. **`Sprites`** `{origin,
+side, tiles}`: a sprite and its image a superchunk that has been in
+view, by where it is in the world; **`about_origin(superchunks)`**,
+**`plane(cell, axis)`** and **`cell(plane, axis)`** between the world's
+cells and the plane, **`in_view(transform, scale, window)`**.
+`FARTHEST` (32 cells a screen pixel), `LINES_FROM`, `LINES`, `TILES_KEPT`. **`Seen`**: what the last frame said. **`NearView`**: the picture from
 near's sprite. **`Hud`**: the text.
 **`Boundary`**: a line between chunks or superchunks; **`Boundaries`**:
 which are shown (`SUPERCHUNK_LINE`, `CHUNK_LINE`); **`boundaries`**:
