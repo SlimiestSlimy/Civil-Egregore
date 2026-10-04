@@ -148,10 +148,10 @@ pub fn load(folder: &Path) -> Result<World, DiskError> {
     }
     let mut entities = Entities::at_tick(info.tick);
     entities.align(&arena.superchunk_indices());
-    let (mut random, mut crossings, mut expected) = (Vec::new(), Vec::new(), 0);
+    let (mut random, mut expected) = (Vec::new(), 0);
     for &superchunk in &superchunks {
         let (words, path) = disk::read_state(folder, superchunk)?;
-        let state = saved::decode_state(&words, info.tick, &mut entities, &mut crossings).map_err(|what| DiskError::Invalid(path, what.to_string()))?;
+        let state = saved::decode_state(&words, info.tick, &mut entities).map_err(|what| DiskError::Invalid(path, what.to_string()))?;
         random.extend(state.random.map(|state| (superchunk, state)));
         expected += state.entities;
     }
@@ -159,9 +159,6 @@ pub fn load(folder: &Path) -> Result<World, DiskError> {
     let applied = entities.apply();
     if applied.puts != expected || applied.lost + applied.refused != 0 {
         return Err(invalid(format!("{} of {expected} entities put back, {} on no superchunk saved, {} on a cell taken", applied.puts, applied.lost, applied.refused)));
-    }
-    if let Some(crossing) = crossings.into_iter().find(|&crossing| !entities.restore_crossing(crossing)) {
-        return Err(invalid(format!("{crossing:?} on no superchunk saved")));
     }
     let mut simulation = Simulation::for_superchunks(superchunks.len());
     simulation.restore_random(&random);

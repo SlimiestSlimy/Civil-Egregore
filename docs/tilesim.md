@@ -626,13 +626,16 @@ by the rules: a chunk's bucket has one record a cell.
   chunk's.
 - **Crossing a superchunk border.** Two superchunks are changed apart,
   so the one left cannot know whether the one entered took the entity.
-  The entity is put there as new and stays here too, asleep, a tick:
-  the next tick's first phase reads whether it arrived, and removes
-  the one here, or -- its cell there taken -- wakes it to go on. Its
-  cell here is never left for one it could not have, and the
-  superchunks tell each other nothing. An entity is two for the tick
-  it crosses in; one walking to the edge of the superchunks held stays
-  there, where it used to be lost.
+  The entity is put there as new, and changed here too as if its cell
+  there were taken; once every superchunk has applied its
+  instructions, each one that arrived is removed from the cell it
+  left -- a short pass over the tick's arrivals alone. Its cell here
+  is never left for one it could not have, and no rule ever sees an
+  entity twice: between ticks it stands on one cell. (It used to stay
+  here asleep a tick, until the next tick's first phase found whether
+  it had arrived -- so for that tick it could be seen, counted and
+  acted on in both.) One walking to the edge of the superchunks held
+  stays there.
 - **Sheep**: a lamb is born on a cell seen free beside its mother, who
   waits for one.
 

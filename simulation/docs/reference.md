@@ -58,8 +58,7 @@ cell, round the entities in the way. **`area_of_tiles(type, centre, scale)`**: a
 **`seek(at, type)`**: the step to the nearest cell the type holds at,
 the area first, then tiles by scale, `FARTHEST_SCALE` (6) first and the
 finest that reach after -- a **`SoughtStep`** `{to, scale}`. **`Area::count`**.
-**`settle_crossings`**: before the rule, each of
-last tick's crossings removed here if found there, else woken. **`slot_of`**: the slot of a
+**`slot_of`**: the slot of a
 superchunk, past the neighbours panicking.
 
 **`TickReport`** `{writes_applied, instructions_applied, rules,
@@ -133,8 +132,8 @@ wakes by cell, then ID.
 found and still due, the entities `ENTITY_AHEAD` on asked of memory --
 **`put(earliest, header, from, attributes)`** -- within a chunk or from
 one to another (**`move_between`**), a `Put` -- **`in_word_tile(chunk,
-first)`**, **`remove(id, at)`**, **`cross(id, at, to)`**, **`crossings`**
-(a **`Crossing`** `{id, at, to}` each), **`clear_crossings`**,
+first)`**, **`remove(id, at)`**, **`arrived(id, left)`** -- an entity crossed in,
+noted --
 **`pass(tick)`**, **`sort_wakes(tick)`** -- after the second phase for
 the next tick, after `Entities::apply` for the tick about to run --
 **`counts`**. **`Entities`**: the tick about to run, the superchunks by
@@ -143,7 +142,9 @@ superchunk index, and instructions queued outside a tick: **`now`**,
 **`align(superchunk_indices)`** -- added empty, dropped, how many
 entities dropped -- **`queue_put(header, attributes)`**,
 **`queue_remove(header)`**, **`queued`**, **`apply`** -- as the arena's
-`queue` and `apply` -- **`iter`**, **`advance`**. **`EntityReader`**:
+`queue` and `apply` -- **`settle_crossings`** -- after the second
+phase, each entity that crossed removed from the cell it left --
+**`iter`**, **`advance`**. **`EntityReader`**:
 every superchunk's entities read in a tick, as the bitplanes' `Reader`:
 **`get(id, at)`**, **`chunk(chunk)`**, **`occupied(origin, width,
 height)`** -- the cells entities stand on among up to 16x16
@@ -152,20 +153,20 @@ places (**`in_word_tile`**).
 
 **`instructions.rs`**: **`Instructions`**: the instructions queued for one
 superchunk -- put, move, edit, remove -- the puts' attributes in a list
-beside: **`put(header, from, attributes)`**, **`cross(header, to,
+beside: **`put(header, from, attributes)`**, **`cross(header, left,
 attributes)`**, **`move_entity(header, from)`**,
 **`edit(id, at, kind, value)`**, **`remove`**, **`apply(superchunks, earliest,
 applied)`** in order, each on its cell's superchunk (a put elsewhere
 lost, one of an entity no longer where it stood passed over, a new
 one on a cell taken refused, a mover to one staying),
 **`count_lost`**, **`clear`**. **`InstructionsApplied`** `{puts, moves,
-edits, removes, lost, stayed, refused}`, added with `+=`.
+edits, removes, lost, stayed, refused, crossed}`, added with `+=`.
 
 **`saved.rs`**: a superchunk's state as words: **`encode_state(random,
 entities)`** -- the words, and how many entities -- and
-**`decode_state(words, now, entities, crossings)`**, its entities
-queued, a **`SavedState`** `{random, entities}`. **`Entities::at_tick(now)`**,
-**`restore_crossing(crossing)`**: what a load puts them back with.
+**`decode_state(words, now, entities)`**, its entities
+queued, a **`SavedState`** `{random, entities}`. **`Entities::at_tick(now)`**:
+what a load puts them back into.
 
 ## `diagnostics/entities.rs`
 

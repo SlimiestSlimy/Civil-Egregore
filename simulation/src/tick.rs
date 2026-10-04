@@ -30,7 +30,7 @@
 
 use crate::dispatcher::Dispatcher;
 use crate::around::{squeeze, Around};
-use crate::entity_store::{Attribute, AttributeType, Instructions, EntityEdit, Entities, InstructionsApplied, EntityId, EntityReader, EntityRef, EntityType, Header, SuperchunkEntities, NEVER, OCCUPIED_SIDE};
+use crate::entity_store::{Attribute, AttributeType, Instructions, EntityEdit, Entities, InstructionsApplied, EntityId, EntityReader, EntityRef, EntityType, Header, SuperchunkEntities, OCCUPIED_SIDE};
 use pathfinding::{a_star, step_towards, Cell, Rows, Walls};
 use terrain::{WALL_EAST, WALL_SOUTH};
 use crate::sampling::sample_layer;
@@ -539,37 +539,19 @@ impl<'a> Turn<'a> {
     /// where the tick found it is passed over.
     ///
     /// Moving to a cell of another superchunk, it crosses: it is put
-    /// there as new, and stays here too, asleep, until the next tick
-    /// finds whether it was -- when the one here is removed, or, the
-    /// cell having been taken, wakes again.
+    /// there as new, and changed here too, as if its cell were taken.
+    /// Once the second phase is over, the one here is removed if the
+    /// other was put ([`Entities::settle_crossings`]) -- so its cell
+    /// is never left for one that cannot be had, and between ticks it
+    /// stands on one cell.
     pub fn update(&mut self, before: &Header, after: Header, attributes: &[Attribute]) {
         debug_assert!(after.wake > self.now, "an entity put to wake at tick {}, not after {}", after.wake, self.now);
-        let own = slot(0, 0);
+        let there = self.slot_of(after.at.superchunk());
         if before.at.superchunk() == after.at.superchunk() {
-            let slot = self.slot_of(after.at.superchunk());
-            self.outbox.instructions[slot].put(after, before.at, attributes);
+            self.outbox.instructions[there].put(after, before.at, attributes);
         } else {
-            let there = self.slot_of(after.at.superchunk());
-            self.outbox.instructions[there].put(after, after.at, attributes);
-            self.outbox.instructions[own].cross(Header { at: before.at, wake: NEVER, ..after }, after.at, attributes);
-        }
-    }
-
-    /// Settles the superchunk's crossings of the tick before: an entity
-    /// found where it crossed to is removed here; one not -- the cell
-    /// was taken, or is in no hot superchunk -- wakes here next tick,
-    /// to go on as it was.
-    fn settle_crossings(&mut self) {
-        let entities: &'a SuperchunkEntities = self.entities;
-        for crossing in entities.crossings() {
-            let Some(here) = entities.get(crossing.id, crossing.at) else {
-                continue;
-            };
-            if self.entity_reader.get(crossing.id, crossing.to).is_some() {
-                self.remove(&here.header);
-            } else {
-                self.put(Header { wake: self.now + 1, ..here.header }, here.attributes);
-            }
+            self.outbox.instructions[there].cross(after, before.at, attributes);
+            self.outbox.instructions[slot(0, 0)].put(Header { at: before.at, ..after }, before.at, attributes);
         }
     }
 
@@ -725,7 +707,6 @@ impl Simulation {
                 let superchunk = &superchunks[first + offset];
                 let random = Rng::new(kept.1.state());
                 let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random };
-                turn.settle_crossings();
                 total += rule(&mut turn, &mut samples);
                 // Where its random numbers have come to: the next tick goes on from there.
                 kept.1 = turn.random;
@@ -752,7 +733,6 @@ impl Simulation {
             for (superchunk, entities) in superchunks.iter_mut().zip(entity_superchunks.iter_mut()) {
                 let here = superchunk.index();
                 entities.pass(now);
-                entities.clear_crossings();
                 for (dx, dy) in neighbours() {
                     let Some(source) = here.offset(dx, dy).and_then(|source| superchunk_indices.binary_search(&source).ok()) else {
                         continue;
@@ -771,6 +751,7 @@ impl Simulation {
             *applied_parts[part].lock().expect("a part's result") = (applied, instructions_applied);
         });
         drop(superchunks);
+        entities.settle_crossings();
         let mut applied = WritesApplied::default();
         for part in applied_parts {
             let (writes, instructions) = part.into_inner().expect("a part's result");

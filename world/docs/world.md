@@ -33,7 +33,7 @@ A save is a folder (`chunk_storage::disk`, and
 |---|---|
 | `world` | text: the world's name, its seed, the tick it is at, its layer types |
 | `superchunks/<index>.image` | a superchunk's cells and heights: its image, as the cold pool holds it |
-| `superchunks/<index>.state` | its random stream's state, its entities with their attributes, its crossings |
+| `superchunks/<index>.state` | its random stream's state, its entities with their attributes |
 
 `<index>` is the superchunk index, 44 bits, 11 hexadecimal
 digits: its name, and nothing else is.
@@ -65,8 +65,8 @@ to tick 4,000: the same cells, entities and random numbers). What makes it so:
 - **Entities are put back through the same door as any other**: queued
   and applied, so their wakes are filed as they were. Wakes left over
   from before an entity was changed are not kept: they wake nothing.
-- **Crossings are kept**: an entity that asked last tick to cross to
-  another superchunk stands in both until the next tick settles it.
+- **Nothing is half done between ticks**: a crossing is settled
+  within its tick, so a save holds each entity once, on one cell.
 - One whose wake passed with no rule seeing to it never wakes again in
   the world saved; loaded, its wake is `NEVER`, the one thing not the
   same to the word.

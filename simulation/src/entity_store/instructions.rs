@@ -34,9 +34,10 @@ enum Instruction {
         /// The cell it stood on, in its cell's superchunk: its own, if
         /// it has not moved or is new.
         from: CellIndex,
-        /// The cell of another superchunk it is crossing to, if it is:
-        /// it is put where it stands, and noted as crossing.
-        crossing: Option<CellIndex>,
+        /// The cell of another superchunk it left, if it is crossing:
+        /// put here, it is removed from there once the tick's
+        /// instructions are all applied.
+        left: Option<CellIndex>,
         /// Its attributes' first index.
         first: u32,
         /// How many attributes it has.
@@ -90,17 +91,18 @@ impl Instructions {
         self.push(header, from, None, attributes);
     }
 
-    /// Queues putting `header`'s entity, with `attributes`, where it
-    /// stands, and noting it as crossing to `to`, a cell of another
-    /// superchunk.
-    pub fn cross(&mut self, header: Header, to: CellIndex, attributes: &[Attribute]) {
-        self.push(header, header.at, Some(to), attributes);
+    /// Queues putting `header`'s entity, with `attributes`, on its cell,
+    /// crossing from `left`, a cell of another superchunk: put, it is
+    /// removed from `left` once the tick's instructions are all applied
+    /// ([`Entities::settle_crossings`](super::Entities::settle_crossings)).
+    pub fn cross(&mut self, header: Header, left: CellIndex, attributes: &[Attribute]) {
+        self.push(header, header.at, Some(left), attributes);
     }
 
     /// Queues a put.
-    fn push(&mut self, header: Header, from: CellIndex, crossing: Option<CellIndex>, attributes: &[Attribute]) {
+    fn push(&mut self, header: Header, from: CellIndex, left: Option<CellIndex>, attributes: &[Attribute]) {
         debug_assert_eq!(header.at.superchunk(), from.superchunk(), "an entity put from another superchunk: a crossing");
-        self.instructions.push(Instruction::Put { header, from, crossing, first: self.attributes.len() as u32, count: attributes.len() as u32 });
+        self.instructions.push(Instruction::Put { header, from, left, first: self.attributes.len() as u32, count: attributes.len() as u32 });
         self.attributes.extend_from_slice(attributes);
     }
 
@@ -163,7 +165,7 @@ impl Instructions {
             };
             let superchunk = &mut superchunks[found];
             match instruction {
-                Instruction::Put { header, from, crossing, first, count } => {
+                Instruction::Put { header, from, left, first, count } => {
                     let put = superchunk.put(earliest, header, from, Some(&self.attributes[first as usize..(first + count) as usize]));
                     match put {
                         Put::New | Put::InPlace | Put::Moved => applied.puts += 1,
@@ -171,8 +173,9 @@ impl Instructions {
                         Put::Refused => applied.refused += 1,
                         Put::PassedOver => {}
                     }
-                    if let (Some(to), Put::InPlace) = (crossing, put) {
-                        superchunk.cross(header.id, header.at, to);
+                    if let (Some(left), Put::New) = (left, put) {
+                        superchunk.arrived(header.id, left);
+                        applied.crossed += 1;
                     }
                 }
                 Instruction::Move { header, from } => match superchunk.put(earliest, header, from, None) {
@@ -213,6 +216,8 @@ pub struct InstructionsApplied {
     pub stayed: usize,
     /// New entities whose cell was taken: not put.
     pub refused: usize,
+    /// Of the entities put, those that crossed from another superchunk.
+    pub crossed: usize,
 }
 
 impl AddAssign for InstructionsApplied {
@@ -225,5 +230,6 @@ impl AddAssign for InstructionsApplied {
         self.lost += other.lost;
         self.stayed += other.stayed;
         self.refused += other.refused;
+        self.crossed += other.crossed;
     }
 }
