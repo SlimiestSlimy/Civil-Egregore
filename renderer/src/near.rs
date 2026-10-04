@@ -5,15 +5,17 @@
 //!
 //! Every pixel takes one edge's doing, never two multiplied: of the
 //! edges that darken it the darkest, and only if none does, of those
-//! that lighten it the lightest. A cast shadow and an edge's shade are
-//! joined the same way, the darker of the two. A wall met only at a
+//! that lighten it the lightest. A cast shadow falls over an edge's
+//! shade as over anything else -- a step's dark line lies in the
+//! shadow the step casts, and would be lost in it otherwise. A wall met only at a
 //! corner fills that corner, joining the bands either side of it; a
 //! step met only at a corner draws nothing, a dot alone saying
 //! nothing. So bands meet at corners as one outline, with no doubled
 //! patch and no gap.
 
-use crate::ground::{shadow_drop, Fine, Ground, SHADOW, SIDE};
+use crate::ground::{shadow_drop, Fine, Ground, SIDE};
 use crate::sim::{Cells, Near};
+use crate::tuning::{self, Tuning, LIP, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_BRIGHT, WALL_FADE, WALL_FOOT, WALL_SHADE};
 use bitmap::BITS_PER_WORD;
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;
@@ -53,8 +55,9 @@ struct Edge {
 
 impl Edge {
     /// What the edge does to a pixel `from` eighths in from it and
-    /// `span` wide: how dark it makes it and how light, 1 neither.
-    fn shading(self, from: f32, span: f32) -> (f32, f32) {
+    /// `span` wide: how dark it makes it and how light, 1 neither --
+    /// by as much as `tuning` says.
+    fn shading(self, from: f32, span: f32, tuning: &Tuning) -> (f32, f32) {
         // The share of the pixel within a band of the edge.
         let within = |nearest: f32, farthest: f32| ((from + span).min(farthest) - from.max(nearest)).max(0.0) / span;
         // Down or to the right the neighbour's face is towards the sun; up or to the left, away.
@@ -63,14 +66,14 @@ impl Edge {
             2.. if facing < 0 => {
                 // A wall in its own shade: a band, darkest at its foot.
                 let width = (2 + self.rise / 2).clamp(3, 5) as f32;
-                (1.0 + (0.45 * from / width - 0.75) * within(0.0, width), 1.0)
+                (1.0 + (tuning[WALL_FADE] * from / width - tuning[WALL_SHADE]) * within(0.0, width), 1.0)
             }
             // A wall the sun is on: a dark foot and, facing it, a bright line.
-            2.. => (1.0 - 0.55 * within(0.0, 2.0), 1.0 + if facing > 0 { 0.3 * within(2.0, 3.0) } else { 0.0 }),
-            1 if facing < 0 => (1.0 - 0.26 * within(0.0, 1.0), 1.0),
-            1 if facing > 0 => (1.0, 1.0 + 0.16 * within(0.0, 1.0)),
+            2.. => (1.0 - tuning[WALL_FOOT] * within(0.0, 2.0), 1.0 + if facing > 0 { tuning[WALL_BRIGHT] * within(2.0, 3.0) } else { 0.0 }),
+            1 if facing < 0 => (1.0 - tuning[STEP_DARK] * within(0.0, 1.0), 1.0),
+            1 if facing > 0 => (1.0, 1.0 + tuning[STEP_LIGHT] * within(0.0, 1.0)),
             // The lip over a wall.
-            ..=-2 => (1.0, 1.0 + 0.32 * within(0.0, 1.0)),
+            ..=-2 => (1.0, 1.0 + tuning[LIP] * within(0.0, 1.0)),
             _ => (1.0, 1.0),
         }
     }
@@ -83,6 +86,7 @@ pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: 
     let pixels_a_cell = near.pixels_a_cell as usize;
     let (first, size) = ((near.first.0 as usize, near.first.1 as usize), (near.size.0 as usize, near.size.1 as usize));
     let width = size.0 * pixels_a_cell;
+    let tuning = tuning::now();
     let mut pixels = vec![[0, 0, 0, u8::MAX]; width * size.1 * pixels_a_cell];
     for cells in cells.iter().filter(|cells| cells.hot) {
         let Some(fine) = grounds.get(&cells.top_left).and_then(|ground| ground.fine.as_ref()) else {
@@ -97,7 +101,7 @@ pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: 
                 let (own_x, own_y) = (x - left, y - top);
                 let place = place_from_cartesian(own_x as u32, own_y as u32);
                 let grass = cells.grass[place / BITS_PER_WORD] >> (place % BITS_PER_WORD) & 1 == 1;
-                let cell = Cell { fine, at: (own_x, own_y), world: (cells.top_left.0 as u64 + own_x as u64, cells.top_left.1 as u64 + own_y as u64), colour: if grass { GREEN } else { BROWN } };
+                let cell = Cell { fine, tuning: &tuning, at: (own_x, own_y), world: (cells.top_left.0 as u64 + own_x as u64, cells.top_left.1 as u64 + own_y as u64), colour: if grass { GREEN } else { BROWN } };
                 cell.paint(&mut pixels, width, ((x - first.0) * pixels_a_cell, (y - first.1) * pixels_a_cell), pixels_a_cell);
             }
         }
@@ -115,6 +119,8 @@ pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: 
 struct Cell<'a> {
     /// Its superchunk's ground.
     fine: &'a Fine,
+    /// What its shading is tuned by.
+    tuning: &'a Tuning,
     /// Where it is, from its superchunk's top left.
     at: (usize, usize),
     /// Where it is in the world.
@@ -145,7 +151,10 @@ impl Cell<'_> {
         let (drop, over) = (shadow_drop(), here as f32 + 0.01);
         let (diagonal, above, beside) = (self.fine.line(x - 1, y - 1) - over, self.fine.line(x, y - 1) - over, self.fine.line(x - 1, y) - over);
         let may_be_shadowed = diagonal.max(above).max(beside) > 0.0;
-        let light = self.fine.light(self.at.0, self.at.1);
+        let tuning = self.tuning;
+        let light = 1.0 + tuning[RELIEF] * (self.fine.light(self.at.0, self.at.1) - 1.0);
+        // A cast shadow: darker, and bluer.
+        let shadow = [1.0 - tuning[SHADOW], 1.0 - 0.885 * tuning[SHADOW], 1.0 - 0.46 * tuning[SHADOW]];
         let span = EIGHTHS / pixels_a_cell as f32;
         for down in 0..pixels_a_cell {
             for across in 0..pixels_a_cell {
@@ -165,7 +174,7 @@ impl Cell<'_> {
                         (-1, 1) => left.max(bottom),
                         _ => right.max(bottom),
                     };
-                    let (darkens, brightens) = edge.shading(from, span);
+                    let (darkens, brightens) = edge.shading(from, span, tuning);
                     (dark, bright) = (dark.min(darkens), bright.max(brightens));
                 }
                 let shadowed = may_be_shadowed && {
@@ -173,16 +182,16 @@ impl Cell<'_> {
                     let (in_x, in_y) = ((across as f32 + 0.5) / pixels_a_cell as f32, (down as f32 + 0.5) / pixels_a_cell as f32);
                     diagonal > drop * in_x.max(in_y) || if in_x > in_y { above > drop * in_y } else { beside > drop * in_x }
                 };
-                // One doing a pixel: an edge's shade a little blue, as the shadows are.
+                // One edge's doing a pixel, a little blue as the shadows are; and under a cast shadow an edge still shows, darker than it.
                 let shade = match (dark < 1.0, shadowed) {
-                    (true, true) => [dark.min(SHADOW[0]), dark.min(SHADOW[1]), (dark * 1.08).min(SHADOW[2])],
+                    (true, true) => [dark * shadow[0], dark * shadow[1], (dark * 1.08).min(1.0) * shadow[2]],
                     (true, false) => [dark, dark, (dark * 1.08).min(1.0)],
-                    (false, true) => SHADOW.map(|shadow| shadow * bright),
+                    (false, true) => shadow.map(|shadow| shadow * bright),
                     (false, false) => [bright; 3],
                 };
                 let (pixel_x, pixel_y) = (self.world.0 * pixels_a_cell as u64 + across as u64, self.world.1 * pixels_a_cell as u64 + down as u64);
                 // Each mixed in whole: a world pixel's place takes more than 32 bits.
-                let tone = TONES[(mix(mix(pixel_x) ^ pixel_y) >> 60) as usize] * light;
+                let tone = (1.0 + tuning[TEXTURE] * (TONES[(mix(mix(pixel_x) ^ pixel_y) >> 60) as usize] - 1.0)) * light;
                 let colour: [u8; 3] = std::array::from_fn(|channel| (self.colour[channel] as f32 * tone * shade[channel]).round().min(255.0) as u8);
                 pixels[(corner.1 + down) * width + corner.0 + across] = [colour[0], colour[1], colour[2], u8::MAX];
             }

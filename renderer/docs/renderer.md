@@ -105,8 +105,9 @@ parts (8 MiB) for the 48 superchunks last seen.
 
 **Corners.** A pixel takes one edge's doing, never two multiplied: the
 darkest of the edges that darken it, and only if none does, the
-lightest of those that lighten it. A cast shadow and an edge's shade
-join the same way, the darker of the two. A cell higher only at a
+lightest of those that lighten it. A cast shadow darkens an edge's
+shade as it does the ground: a step's dark line lies in the shadow the
+step casts, and would be lost in it otherwise. A cell higher only at a
 corner fills that corner's square if it is a wall there, joining the
 bands either side; a step met only at a corner draws nothing. So bands turn corners as one
 outline, with no doubled patch and no gap.
@@ -125,11 +126,23 @@ pixels made here.
 | arrows, WASD, or dragging with the left button | move the view |
 | the wheel, or `Q` and `E` | zoom |
 | space | pause, and go on |
-| `F` | tick flat out, or at the game's pace (256 ticks a second) |
+| `T` | tick flat out, or at the game's pace (256 ticks a second) |
+| `F` | the window over the whole screen, or not |
 | `[` and `]` | halve and double the pace |
 | `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |
 | `H` | every cell's height written on it, once a cell is 20 screen pixels across |
+
+## Sliders
+
+At the window's top right, a slider each of the numbers the near
+view's shading is tuned by (`src/tuning.rs`): how light and dark a
+step's lines are, a wall's band, foot, bright line and lip, the cast
+shadows, how much relief and how much texture. The left button drags
+one, the right sets it back to its default. The painter reads them
+each frame; they are kept when a slider is let go, in
+`transient_data/tuning.txt`, and taken up again the next run -- what
+is found by eye is then written into the code as the defaults.
 
 ## Layout
 
@@ -138,6 +151,8 @@ pixels made here.
 | `src/sim.rs` | the simulation's thread: requests read between ticks, the cells in view copied when asked |
 | `src/paint.rs` | the painter's thread: cells into pixels |
 | `src/ground.rs` | the light on the ground: heights from the seed, hillshade, tint, cast shadows, cliffs and contours |
+| `src/tuning.rs` | the numbers the near view's shading is tuned by, kept between runs |
+| `src/sliders.rs` | the sliders that set them |
 | `src/near.rs` | the cells in view from near as one picture: steps, walls and lips at their edges |
 | `src/main.rs` | the window: the camera, an image a superchunk, the keys, the text |
 | `docs/` | this, and the reference, function by function |
