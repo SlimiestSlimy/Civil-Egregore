@@ -10,11 +10,12 @@ stepped between. `WALL_EAST`, `WALL_SOUTH` (layer types 8 and 9);
 of its own: `pathfinding::Walls::new` and
 `Turn::around_unwalled` bar it from the two. `OCTAVES`, `ONE`.
 
-**`Shape`** `{weights, ocean, coast, ground, rise, rise_span}`: the
-hill octaves' shares of a height; the ocean's height; how far over it
-the hills are whole; the lowest ground; the most the land rises over
-it, and how broadly. `Shape::DEFAULT` (168, 22, 61, 4; ocean 800; coast
-64; ground 256; rise 1,024; span 14). `WATER` (layer types 24 to 31): a
+**`Shape`** `{weights, ocean, coast, ground, rise, rise_span,
+rise_shares, shore, shore_span}`: the seven hill octaves' shares of a
+height; the ocean's height; the heights of land the hills grow over;
+the lowest ground; the most the land rises over it, how broadly, and
+its five octaves' shares; how far the hills' start wanders about the
+shore, and how broadly. `Shape::DEFAULT`. `WATER` (layer types 24 to 31): a
 cell's water, its depth over eight bitplanes. **`rise(shape, seed, x,
 y)`**: how far the land has risen over the lowest ground.
 **`height(seed, x, y)`**: a cell's height; **`height_shaped(shape,

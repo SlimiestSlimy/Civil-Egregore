@@ -33,9 +33,9 @@ fn heights_are_settled_by_the_seed_and_the_cell() {
 }
 
 /// A shape all hills: level land well over the ocean.
-const HILLS: Shape = Shape { weights: [168, 22, 61, 4], ocean: 0, coast: 1, ground: 512, rise: 0, rise_span: 14 };
+const HILLS: Shape = Shape { ocean: 0, coast: 1, ground: 512, rise: 0, ..Shape::DEFAULT };
 /// A shape all ocean: the land rises, never to the ocean's level.
-const OCEAN: Shape = Shape { weights: [168, 22, 61, 4], ocean: 4096, coast: 64, ground: 256, rise: 1024, rise_span: 14 };
+const OCEAN: Shape = Shape { ocean: 4096, ..Shape::DEFAULT };
 
 /// The hills roll: heights span most of their range over a
 /// superchunk, and no cell is far from its neighbour's.
