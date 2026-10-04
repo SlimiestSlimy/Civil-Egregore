@@ -69,8 +69,8 @@ pub fn generation() -> Generation {
 fn shape(tuned: &tuning::Tuning) -> Shape {
     // The hills are a byte high at most, whatever is typed.
     let span = tuned[HEIGHT_SPAN].round().clamp(0.0, 255.0) as u64;
-    // The highest ground is still a height: 16 bits.
-    let height = |tuned: f32| tuned.round().clamp(0.0, (u16::MAX - 255) as f32) as u16;
+    // A height is 16 bits, whatever is typed: what the land and its hills would pass is held to the highest.
+    let height = |tuned: f32| tuned.round().clamp(0.0, u16::MAX as f32) as u16;
     let land = Shape {
         weights: [0; 7],
         ocean: height(tuned[OCEAN_LEVEL]),
