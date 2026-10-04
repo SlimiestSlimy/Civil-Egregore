@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 world = { path = "world" }
 chunk_storage = { path = "chunk_storage" }
+utilities = { path = "utilities" }
 
 # Every crate of TileSim, built together: one lock file and one `target/`
 # for them all, here, whichever crate's folder cargo is run from.

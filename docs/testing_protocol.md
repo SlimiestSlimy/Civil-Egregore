@@ -1,8 +1,9 @@
 # How TileSim is tested
 
-One protocol for every crate, the one Tessera set
-(`tessera/docs/testing_protocol.md`, which adds what an encoding needs:
-its seed file, its adversarial searches).
+One protocol for every crate, part of the
+[style guide](style_guide.md): few tests, each a generator of many
+cases. Tessera's own (`tessera/docs/testing_protocol.md`) adds what an
+encoding needs: its seed file, its adversarial searches.
 
 ## Three parts, kept apart
 
@@ -50,6 +51,7 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `terrain` | | terrain | walls over many seeds; no seam between superchunks |
 | `world` | | world: saves, loads, walls | 16 superchunks stopped every 5,000 ticks; a flock lasting 300,000 |
 | `tessera` | fine | fast | complete |
+| `tilesim` (the root) | | commands | |
 
 ## What is measured, and how
 
