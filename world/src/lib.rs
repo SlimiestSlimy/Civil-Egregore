@@ -60,7 +60,7 @@ impl Generation {
 }
 
 /// What keeps the trees' numbers apart from the grass's.
-const TREES_SALT: u64 = 0x7472_6565_735F_6C6F;
+pub const TREES_SALT: u64 = 0x7472_6565_735F_6C6F;
 /// Sheep the world's origin superchunk starts with, unless told.
 pub const FLOCK: usize = 4_000;
 
