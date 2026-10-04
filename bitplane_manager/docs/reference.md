@@ -17,8 +17,8 @@ counts, hot count. **`count`** / **`set_count`** a bucket's set cells;
 Morton index; **`put_cell`** a cell set or clear if not already, the
 bucket dirty and the counts moved by one: whether it changed.
 
-**`Superchunk`** `{morton_index, layers}`: one superchunk, owning its
-allocations. **`morton_index`**, **`position`**, **`layer(type)`** -- a
+**`Superchunk`** `{index, layers}`: one superchunk, owning its
+allocations. **`index`**, **`layer(type)`** -- a
 **`LayerView`** (**`hot_count`**, **`is_hot(chunk)`**,
 **`count(chunk)`**, **`cells(chunk)`**, **`tile_counts(chunk)`** -- the
 set cells of each of its `COUNT_TILES_IN_CHUNK` count tiles of
@@ -35,9 +35,7 @@ tile of `scale`, `2^scale` cells a side (to `COARSEST_SCALE`, 6), `cell`
 is in; **`tiles_holding(type, cell)`**: which of its chunk's 16 tiles of
 the coarsest scale (`COARSEST_TILES_IN_CHUNK`, 64x64 cells, four count
 tiles each) hold any, a bit each, off the counts --
-**`superchunk(superchunk_index)`**, remembering the last lookups.
-**`chunk_at(superchunk_index, chunk)`**: a chunk's position from the two
-Morton indices.
+**`superchunk(superchunk)`**, remembering the last lookups.
 
 **`Lookup`**: lookups remembering the last 16 (`REMEMBERED`, each in its
 **`slot`** by a hash of superchunk index and type), and the last
@@ -50,16 +48,18 @@ in it by index (`WORD_TILE_X`, `WORD_TILE_Y`, **`word_tile`**), one
 across its edge looked up again (**`word_tile_at`**); **`any_in_tile`**,
 **`tiles_holding`**; **`forget`** when the directory changes shape.
 
-**`Bucket`**: a hot bitmap to read: **`count`**, **`get(cell)`**,
+**`Bucket`**: a hot bitmap to read: **`count`**, **`get(place)`**,
 **`cells`**.
 
 **`BitmapArena`**: **`new`**; **`len`**, **`is_empty`**, **`allocations`**;
 **`is_hot`**, **`bucket`**, **`holds(type, cell)`**,
 **`superchunk_count(type, superchunk)`**; **`make_hot(key, layer,
 codec)`** -- a bucket waiting in the ring made hot as it is, else
-decoded or emptied, counted -- and **`make_hot_layers(chunk, types,
-storage, codec)`**; **`run(type)`** and **`keys`**, in Morton order;
-**`superchunks`** / **`superchunks_mut`**, for the simulation;
+decoded or emptied, counted -- **`make_hot_layers(chunk, types,
+storage, codec)`** and **`make_hot_superchunk(superchunk, types,
+storage, codec)`**, every chunk of it; **`run(type)`** and **`keys`**,
+in Morton order; **`superchunks`** / **`superchunks_mut`**, for the
+simulation, and **`superchunk_indices`**, theirs;
 **`write_back(superchunk, storage, codec)`** -- dirty buckets into the
 ring, marked waiting, flushes reported as they come; **`flushed`**;
 **`evict(key)`** -- an allocation with nothing hot or waiting released
@@ -71,7 +71,7 @@ to the block pool. Private: **`allocation`** (found or made), **`hot`**,
 
 **`WriteOp`**, **`Shape`**, **`Write`** `{at, op, shape}` (packed, 12
 bytes); **`Write::cell(at, op)`**; **`bounds`** and **`covers`**: a
-shape's cartesian rectangle and its cells; **`superchunk_indices`**
+shape's cartesian rectangle and its cells; **`superchunks`**
 (public, for routing): the superchunks a write lands in.
 
 **`WritesApplied`** `{writes, changed, missed}`, added with `+=`.
@@ -81,10 +81,10 @@ found again without a search, each in its slot of a small cache by a
 hash of the type (forgotten when a new queue moves the others):
 **`push`**, **`len`**, **`is_empty`**, **`iter`**, **`clear`**.
 
-**`count_missed(superchunk_index, write, applied)`**: a write's cells in a
+**`count_missed(superchunk, write, applied)`**: a write's cells in a
 superchunk with no bitmap in use, counted missed.
 
-**`apply_in(layers, superchunk_index, type, write, applied)`**: the part of a
+**`apply_in(layers, superchunk, type, write, applied)`**: the part of a
 write in one superchunk applied to its layers -- a cell from its index,
 a shape chunk by chunk, cells in bitmaps not hot counted missed.
 

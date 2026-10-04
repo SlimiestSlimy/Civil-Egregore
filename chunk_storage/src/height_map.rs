@@ -7,8 +7,7 @@
 //! are one run, and any aligned square of cells is one run of heights,
 //! as it is one run of bits in a layer.
 
-use coordinates::{CellPlace, ChunkPlace, CHUNK_SIDE, CHUNKS_IN_SUPERCHUNK};
-use bitmap::morton::morton_index;
+use coordinates::{CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 
 /// A cell's height.
 pub type Height = u8;
@@ -17,19 +16,19 @@ pub type Height = u8;
 const HEIGHTS_IN_WORD: usize = (u64::BITS / Height::BITS) as usize;
 
 /// Words a superchunk's heights take.
-pub const HEIGHT_WORDS: usize = CHUNK_SIDE * CHUNK_SIDE * CHUNKS_IN_SUPERCHUNK / HEIGHTS_IN_WORD;
+pub const HEIGHT_WORDS: usize = CELLS_IN_CHUNK * CHUNKS_IN_SUPERCHUNK / HEIGHTS_IN_WORD;
 
-/// Where the height of `cell` in the chunk at `chunk` is: its word, and
+/// Where the height of the cell at `place` in the superchunk
+/// ([`coordinates::CellIndex::place_in_superchunk`]) is: its word, and
 /// the shift to its byte there.
-fn word_and_shift(chunk: ChunkPlace, cell: CellPlace) -> (usize, u32) {
-    let index = chunk.index() * CHUNK_SIDE * CHUNK_SIDE + morton_index(cell.x, cell.y);
-    (index / HEIGHTS_IN_WORD, (index % HEIGHTS_IN_WORD) as u32 * Height::BITS)
+fn word_and_shift(place: usize) -> (usize, u32) {
+    (place / HEIGHTS_IN_WORD, (place % HEIGHTS_IN_WORD) as u32 * Height::BITS)
 }
 
-/// The height of `cell` in the chunk at `chunk`, from a superchunk's
-/// height words.
-pub fn height_in(words: &[u64], chunk: ChunkPlace, cell: CellPlace) -> Height {
-    let (word, shift) = word_and_shift(chunk, cell);
+/// The height of the cell at `place` in the superchunk, from the
+/// superchunk's height words.
+pub fn height_in(words: &[u64], place: usize) -> Height {
+    let (word, shift) = word_and_shift(place);
     (words[word] >> shift) as Height
 }
 
@@ -52,14 +51,14 @@ impl HeightMap {
         Self { words: words.into() }
     }
 
-    /// The height of `cell` in the chunk at `chunk`.
-    pub fn get(&self, chunk: ChunkPlace, cell: CellPlace) -> Height {
-        height_in(&self.words, chunk, cell)
+    /// The height of the cell at `place` in the superchunk.
+    pub fn get(&self, place: usize) -> Height {
+        height_in(&self.words, place)
     }
 
-    /// Sets the height of `cell` in the chunk at `chunk`.
-    pub fn set(&mut self, chunk: ChunkPlace, cell: CellPlace, height: Height) {
-        let (word, shift) = word_and_shift(chunk, cell);
+    /// Sets the height of the cell at `place` in the superchunk.
+    pub fn set(&mut self, place: usize, height: Height) {
+        let (word, shift) = word_and_shift(place);
         self.words[word] = self.words[word] & !((Height::MAX as u64) << shift) | (height as u64) << shift;
     }
 

@@ -8,7 +8,7 @@
 
 use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CartesianCell, CellIndex, ChunkPlace, ChunkPosition, SuperchunkPosition, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{CartesianCell, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use simulation::entity_store::{remove_attribute, set_attribute, AttributeType, Entities, EntityId, EntityReader, EntityType, Header, NEVER, WHEEL_TICKS};
 use simulation::{Simulation, Turn};
 use std::sync::Mutex;
@@ -28,14 +28,13 @@ fn world(side: u32) -> (BitmapArena, Entities) {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
     for y in 10..10 + side {
         for x in 10..10 + side {
-            for place in ChunkPlace::all() {
-                arena.make_hot(BucketKey { layer_type: STONE, chunk: ChunkPosition::of(SuperchunkPosition { x, y }, place) }, None, &mut codec);
+            for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
+                arena.make_hot(BucketKey { layer_type: STONE, chunk }, None, &mut codec);
             }
         }
     }
     let mut entities = Entities::new();
-    let superchunk_indices: Vec<u64> = arena.superchunks().iter().map(|superchunk| superchunk.morton_index()).collect();
-    assert_eq!(entities.align(&superchunk_indices), 0);
+    assert_eq!(entities.align(&arena.superchunk_indices()), 0);
     (arena, entities)
 }
 
@@ -145,7 +144,7 @@ fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
         most = most.max(entities.len());
     }
     assert_eq!(most, 2, "here and there for the tick it crossed in");
-    let right = SuperchunkPosition { x: 11, y: 10 }.morton_index();
+    let right = SuperchunkIndex::from_cartesian(11, 10);
     let entity = entities.superchunk(right).and_then(|superchunk| superchunk.iter().next()).expect("in the right neighbour");
     assert_eq!((entity.header.at, entity.attribute(WOKEN)), (cell(start + 10, 100), Some(10)));
     assert_eq!(entities.len(), 1, "the one left behind removed");
@@ -234,7 +233,7 @@ fn turns_read_entities_across_superchunks() {
     });
     assert_eq!(seen.into_inner().unwrap(), [(Some(right), vec![EntityId(2)], true)]);
     assert_eq!(entities.len(), 1);
-    assert!(Entities::new().superchunk(0).is_none());
+    assert!(Entities::new().superchunk(SuperchunkIndex(0)).is_none());
 }
 
 /// A superchunk's entities wake in Morton order, by cell then ID,

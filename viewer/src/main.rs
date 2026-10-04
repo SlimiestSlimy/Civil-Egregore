@@ -32,9 +32,9 @@ use bevy::asset::RenderAssetUsages;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use coordinates::SUPERCHUNK_SIDE_CELLS;
+use coordinates::{square_side, SUPERCHUNK_SIDE_CELLS};
 use paint::Picture;
-use sim::{side, start, Ask, Request, Viewport, TARGET_PACE};
+use sim::{start, Ask, Request, Viewport, TARGET_PACE};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use world::diagnostics::frames::BROWN;
@@ -165,7 +165,7 @@ fn main() {
                 .set(WindowPlugin { primary_window: Some(Window { title: "TileSim".to_string(), ..default() }), ..default() }),
         )
         .insert_resource(Link { requests, frames: Mutex::new(paint::start(frames)), waiting: false, since: SYNC_EVERY, asked: None, paused: false, pace, watch_for })
-        .insert_resource(Sprites { side: side(superchunks), images: Vec::new(), sides: Vec::new() })
+        .insert_resource(Sprites { side: square_side(superchunks), images: Vec::new(), sides: Vec::new() })
         .init_resource::<Seen>()
         .add_systems(Startup, setup)
         .add_systems(Update, (steer, keys, sync, hud).chain())

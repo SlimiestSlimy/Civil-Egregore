@@ -15,7 +15,7 @@ use super::instructions::{Instructions, InstructionsApplied};
 use super::entity::{sorted, Attribute, AttributeType, EntityId, EntityRef, Header, NEVER};
 use super::wheel::{Wake, Wheel};
 use bitmap::window::{in_word_tile, PLACE_IN_WORD_TILE};
-use coordinates::{CellIndex, ChunkPosition, SuperchunkPosition, CHUNKS_IN_SUPERCHUNK};
+use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 
 /// How many wakes ahead an entity is asked of memory.
 const ENTITY_AHEAD: usize = 8;
@@ -25,9 +25,9 @@ const ATTRIBUTES_AHEAD: usize = 4;
 /// A superchunk's entities: a bucket a chunk, in the chunks' Morton
 /// order, and when each wakes.
 pub struct SuperchunkEntities {
-    /// The superchunk's index.
-    morton_index: u64,
-    /// The buckets, by [`CellIndex::chunk_in_superchunk`].
+    /// Which superchunk it is.
+    index: SuperchunkIndex,
+    /// The buckets, by chunk place ([`ChunkIndex::place`]).
     chunks: [Bucket; CHUNKS_IN_SUPERCHUNK],
     /// When each entity wakes.
     wheel: Wheel,
@@ -55,19 +55,14 @@ pub struct Crossing {
 
 
 impl SuperchunkEntities {
-    /// No entities, in the superchunk at `superchunk_index`.
-    pub fn new(superchunk_index: u64) -> Self {
-        Self { morton_index: superchunk_index, chunks: Default::default(), wheel: Wheel::default(), crossings: Vec::new(), carried: Vec::new() }
+    /// No entities, in `superchunk`.
+    pub fn new(superchunk: SuperchunkIndex) -> Self {
+        Self { index: superchunk, chunks: Default::default(), wheel: Wheel::default(), crossings: Vec::new(), carried: Vec::new() }
     }
 
-    /// The superchunk's index.
-    pub fn morton_index(&self) -> u64 {
-        self.morton_index
-    }
-
-    /// The superchunk.
-    pub fn position(&self) -> SuperchunkPosition {
-        SuperchunkPosition::from_morton_index(self.morton_index)
+    /// Which superchunk it is.
+    pub fn index(&self) -> SuperchunkIndex {
+        self.index
     }
 
     /// How many entities it holds.
@@ -83,8 +78,8 @@ impl SuperchunkEntities {
     /// The entity whose ID is `id`, standing on `at`.
     #[inline]
     pub fn get(&self, id: EntityId, at: CellIndex) -> Option<EntityRef<'_>> {
-        debug_assert_eq!(at.superchunk_index(), self.morton_index);
-        self.chunks[at.chunk_in_superchunk()].get(id, at)
+        debug_assert_eq!(at.superchunk(), self.index);
+        self.chunks[at.chunk().place()].get(id, at)
     }
 
     /// Every entity it holds, in Morton order by cell, then by ID.
@@ -92,11 +87,10 @@ impl SuperchunkEntities {
         self.chunks.iter().flat_map(Bucket::iter)
     }
 
-    /// The entities on the chunk at `chunk` -- its place in Morton order
-    /// ([`CellIndex::chunk_in_superchunk`]) -- in Morton order by cell,
-    /// then by ID.
-    pub fn chunk(&self, chunk: usize) -> impl Iterator<Item = EntityRef<'_>> {
-        self.chunks[chunk].iter()
+    /// The entities on the chunk at `place` ([`ChunkIndex::place`]), in
+    /// Morton order by cell, then by ID.
+    pub fn chunk(&self, place: usize) -> impl Iterator<Item = EntityRef<'_>> {
+        self.chunks[place].iter()
     }
 
     /// The entities waking at `tick`, which is in reach of the wheel: in
@@ -115,18 +109,18 @@ impl SuperchunkEntities {
         due[..due.len().min(ENTITY_AHEAD)].iter().for_each(|ahead| prefetch(ahead.at));
         // The first have none before them to be asked for from.
         for ahead in &due[..due.len().min(ENTITY_AHEAD)] {
-            self.chunks[ahead.at.chunk_in_superchunk()].prefetch_entity(ahead.at);
+            self.chunks[ahead.at.chunk().place()].prefetch_entity(ahead.at);
         }
         for ahead in &due[..due.len().min(ATTRIBUTES_AHEAD)] {
-            self.chunks[ahead.at.chunk_in_superchunk()].prefetch_attributes(ahead.at);
+            self.chunks[ahead.at.chunk().place()].prefetch_attributes(ahead.at);
         }
         due.iter().enumerate().filter_map(move |(at, wake)| {
             if let Some(ahead) = due.get(at + ENTITY_AHEAD) {
                 prefetch(ahead.at);
-                self.chunks[ahead.at.chunk_in_superchunk()].prefetch_entity(ahead.at);
+                self.chunks[ahead.at.chunk().place()].prefetch_entity(ahead.at);
             }
             if let Some(ahead) = due.get(at + ATTRIBUTES_AHEAD) {
-                self.chunks[ahead.at.chunk_in_superchunk()].prefetch_attributes(ahead.at);
+                self.chunks[ahead.at.chunk().place()].prefetch_attributes(ahead.at);
             }
             self.get(wake.id, wake.at).filter(|entity| entity.header.wake == tick)
         })
@@ -140,10 +134,10 @@ impl SuperchunkEntities {
     /// `from`, changed all the same, and wakes there; a new one is not
     /// put.
     pub(crate) fn put(&mut self, earliest: u64, header: Header, from: CellIndex, attributes: Option<&[Attribute]>) -> Put {
-        debug_assert_eq!(header.at.superchunk_index(), self.morton_index, "an entity put in a superchunk it is not in");
-        debug_assert_eq!(from.superchunk_index(), self.morton_index, "an entity put from another superchunk: a crossing");
+        debug_assert_eq!(header.at.superchunk(), self.index, "an entity put in a superchunk it is not in");
+        debug_assert_eq!(from.superchunk(), self.index, "an entity put from another superchunk: a crossing");
         debug_assert!(attributes.is_none_or(sorted), "attributes sorted by type, each type once");
-        let (origin, target) = (from.chunk_in_superchunk(), header.at.chunk_in_superchunk());
+        let (origin, target) = (from.chunk().place(), header.at.chunk().place());
         let put = if origin == target {
             self.chunks[target].put(header, place(from), attributes)
         } else if let Some(stood) = self.chunks[origin].get(header.id, from) {
@@ -180,8 +174,8 @@ impl SuperchunkEntities {
     /// standing on `at` to `value`, or with none removes it: whether the
     /// entity is there.
     pub(crate) fn edit(&mut self, id: EntityId, at: CellIndex, kind: AttributeType, value: Option<u64>) -> bool {
-        debug_assert_eq!(at.superchunk_index(), self.morton_index);
-        self.chunks[at.chunk_in_superchunk()].edit(id, place(at), kind, value)
+        debug_assert_eq!(at.superchunk(), self.index);
+        self.chunks[at.chunk().place()].edit(id, place(at), kind, value)
     }
 
     /// The places, in the chunk at `chunk`, of the entities standing on
@@ -194,8 +188,8 @@ impl SuperchunkEntities {
     /// Removes the entity whose ID is `id` standing on `at`: whether it
     /// was there.
     pub(crate) fn remove(&mut self, id: EntityId, at: CellIndex) -> bool {
-        debug_assert_eq!(at.superchunk_index(), self.morton_index);
-        self.chunks[at.chunk_in_superchunk()].remove(id, at)
+        debug_assert_eq!(at.superchunk(), self.index);
+        self.chunks[at.chunk().place()].remove(id, at)
     }
 
     /// Notes that the entity whose ID is `id`, on `at`, is crossing to
@@ -266,7 +260,7 @@ impl Entities {
     /// Notes `crossing` again, as a save kept it: its entity stands in
     /// a superchunk kept here. Whether it was.
     pub fn restore_crossing(&mut self, crossing: Crossing) -> bool {
-        let Ok(at) = self.superchunks.binary_search_by_key(&crossing.at.superchunk_index(), SuperchunkEntities::morton_index) else {
+        let Ok(at) = self.superchunks.binary_search_by_key(&crossing.at.superchunk(), SuperchunkEntities::index) else {
             return false;
         };
         self.superchunks[at].cross(crossing.id, crossing.at, crossing.to);
@@ -293,32 +287,31 @@ impl Entities {
         &mut self.superchunks
     }
 
-    /// The superchunk at `superchunk_index`, if kept here.
-    pub fn superchunk(&self, superchunk_index: u64) -> Option<&SuperchunkEntities> {
-        let at = self.superchunks.binary_search_by_key(&superchunk_index, SuperchunkEntities::morton_index).ok()?;
-        Some(&self.superchunks[at])
+    /// `superchunk`'s entities, if kept here.
+    pub fn superchunk(&self, superchunk: SuperchunkIndex) -> Option<&SuperchunkEntities> {
+        EntityReader::new(&self.superchunks).superchunk(superchunk)
     }
 
     /// The entity whose ID is `id`, standing on `at`, if kept here.
     pub fn get(&self, id: EntityId, at: CellIndex) -> Option<EntityRef<'_>> {
-        self.superchunk(at.superchunk_index())?.get(id, at)
+        self.superchunk(at.superchunk())?.get(id, at)
     }
 
-    /// Keeps exactly the superchunks at `superchunk_indices`, sorted:
+    /// Keeps exactly `superchunk_indices`, sorted:
     /// those it lacked added empty, those not among them dropped with
     /// their entities -- how many entities were dropped. Keeping them in
     /// chunk storage when their bitmaps go cold is work to come.
-    pub fn align(&mut self, superchunk_indices: &[u64]) -> usize {
-        if self.superchunks.len() == superchunk_indices.len() && self.superchunks.iter().zip(superchunk_indices).all(|(kept, &index)| kept.morton_index == index) {
+    pub fn align(&mut self, superchunk_indices: &[SuperchunkIndex]) -> usize {
+        if self.superchunks.len() == superchunk_indices.len() && self.superchunks.iter().zip(superchunk_indices).all(|(kept, &index)| kept.index == index) {
             return 0;
         }
         let mut had = std::mem::take(&mut self.superchunks).into_iter().peekable();
         let mut dropped = 0;
         for &index in superchunk_indices {
-            while let Some(superchunk) = had.next_if(|superchunk| superchunk.morton_index < index) {
+            while let Some(superchunk) = had.next_if(|superchunk| superchunk.index < index) {
                 dropped += superchunk.len();
             }
-            let superchunk = had.next_if(|superchunk| superchunk.morton_index == index).unwrap_or_else(|| SuperchunkEntities::new(index));
+            let superchunk = had.next_if(|superchunk| superchunk.index == index).unwrap_or_else(|| SuperchunkEntities::new(index));
             self.superchunks.push(superchunk);
         }
         dropped + had.map(|superchunk| superchunk.len()).sum::<usize>()
@@ -383,15 +376,15 @@ impl<'a> EntityReader<'a> {
         Self { superchunks }
     }
 
-    /// The superchunk at `superchunk_index`, if read.
-    fn superchunk(&self, superchunk_index: u64) -> Option<&'a SuperchunkEntities> {
-        let at = self.superchunks.binary_search_by_key(&superchunk_index, SuperchunkEntities::morton_index).ok()?;
+    /// `superchunk`'s entities, if read.
+    fn superchunk(&self, superchunk: SuperchunkIndex) -> Option<&'a SuperchunkEntities> {
+        let at = self.superchunks.binary_search_by_key(&superchunk, SuperchunkEntities::index).ok()?;
         Some(&self.superchunks[at])
     }
 
     /// The entity whose ID is `id`, standing on `at`, if read.
     pub fn get(&self, id: EntityId, at: CellIndex) -> Option<EntityRef<'a>> {
-        self.superchunk(at.superchunk_index())?.get(id, at)
+        self.superchunk(at.superchunk())?.get(id, at)
     }
 
     /// The cells entities stand on among the `width` by `height` cells
@@ -416,13 +409,13 @@ impl<'a> EntityReader<'a> {
             let Some(tile) = first.offset(8 * tile_x, 8 * tile_y) else {
                 continue;
             };
-            if last.is_none_or(|last| last.morton_index != tile.superchunk_index()) {
-                last = self.superchunk(tile.superchunk_index());
+            if last.is_none_or(|last| last.index != tile.superchunk()) {
+                last = self.superchunk(tile.superchunk());
             }
             let Some(superchunk) = last else {
                 continue;
             };
-            for &place in superchunk.in_word_tile(tile.chunk_in_superchunk(), tile.place_in_chunk() as u16) {
+            for &place in superchunk.in_word_tile(tile.chunk().place(), tile.place() as u16) {
                 let (x, y) = in_word_tile(place as u64);
                 let (x, y) = (left + x as i32, top + y as i32);
                 if x >= 0 && y >= 0 && x < width as i32 && y < height as i32 {
@@ -435,8 +428,7 @@ impl<'a> EntityReader<'a> {
 
     /// The entities on `chunk`, in Morton order by cell, then by ID, if
     /// its superchunk is read.
-    pub fn chunk(&self, chunk: ChunkPosition) -> Option<impl Iterator<Item = EntityRef<'a>> + 'a> {
-        let (superchunk, place) = chunk.superchunk_and_place();
-        Some(self.superchunk(superchunk.morton_index())?.chunk(place.index()))
+    pub fn chunk(&self, chunk: ChunkIndex) -> Option<impl Iterator<Item = EntityRef<'a>> + 'a> {
+        Some(self.superchunk(chunk.superchunk())?.chunk(chunk.place()))
     }
 }

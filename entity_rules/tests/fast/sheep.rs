@@ -7,7 +7,7 @@
 
 use bitplane_manager::{Write, WriteOp};
 use chunk_storage::mock::{DIRT, GRASS};
-use coordinates::{CartesianCell, SUPERCHUNK_SIDE_CELLS};
+use coordinates::CartesianCell;
 use simulation::entity_store::{Attribute, EntityId, EntityRef, Header};
 use simulation::Simulation;
 use entity_rules::diagnostics::world::MockWorld;
@@ -68,7 +68,7 @@ fn sheep_eat_breed_and_grow_up() {
 fn hungry_sheep_walk_to_the_nearest_grass() {
     let mut world = MockWorld::grass_on_dirt(1, 0);
     let superchunk = world.superchunks[0];
-    let corner = CartesianCell { x: superchunk.x * SUPERCHUNK_SIDE_CELLS, y: superchunk.y * SUPERCHUNK_SIDE_CELLS };
+    let corner = superchunk.top_left().cartesian();
     let (sheep, grass) = (CartesianCell { x: corner.x + 500, y: corner.y + 500 }, CartesianCell { x: corner.x + 506, y: corner.y + 493 });
     world.arena.queue(GRASS, Write::cell(grass.into(), WriteOp::Set));
     world.arena.queue(DIRT, Write::cell(grass.into(), WriteOp::Unset));
@@ -99,8 +99,8 @@ fn hungry_sheep_walk_to_the_nearest_grass() {
 #[test]
 fn hungry_sheep_walk_to_grass_far_off() {
     let mut world = MockWorld::grass_on_dirt(4, 0);
-    let first = world.superchunks.iter().min_by_key(|superchunk| (superchunk.y, superchunk.x)).expect("four superchunks");
-    let corner = CartesianCell { x: first.x * SUPERCHUNK_SIDE_CELLS, y: first.y * SUPERCHUNK_SIDE_CELLS };
+    // The square's top left superchunk: the first, row by row.
+    let corner = world.superchunks[0].top_left().cartesian();
     let (sheep, grass) = (CartesianCell { x: corner.x + 900, y: corner.y + 700 }, CartesianCell { x: corner.x + 1050, y: corner.y + 800 });
     world.arena.queue(GRASS, Write::cell(grass.into(), WriteOp::Set));
     world.arena.queue(DIRT, Write::cell(grass.into(), WriteOp::Unset));
@@ -130,7 +130,8 @@ fn hungry_sheep_walk_to_grass_far_off() {
 fn sheep_on_thin_pasture_roam_away() {
     let mut world = MockWorld::grass_on_dirt(1, 0);
     let superchunk = world.superchunks[0];
-    let start = CartesianCell { x: superchunk.x * SUPERCHUNK_SIDE_CELLS + 500, y: superchunk.y * SUPERCHUNK_SIDE_CELLS + 500 };
+    let corner = superchunk.top_left().cartesian();
+    let start = CartesianCell { x: corner.x + 500, y: corner.y + 500 };
     world.arena.queue(GRASS, Write::cell(start.into(), WriteOp::Set));
     world.arena.queue(DIRT, Write::cell(start.into(), WriteOp::Unset));
     world.arena.apply();

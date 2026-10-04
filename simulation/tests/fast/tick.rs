@@ -9,7 +9,7 @@ use bitplane_manager::{BitmapArena, BucketKey, Shape, Write, WriteOp};
 use simulation::entity_store::Entities;
 use simulation::{Simulation, Turn, AREA_CENTRE, AREA_SIDE};
 use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CartesianCell, CellIndex, ChunkPlace, ChunkPosition, SuperchunkPosition, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{CartesianCell, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 
 /// The layer type the tests run on.
 const STONE: LayerType = LayerType(6);
@@ -20,8 +20,8 @@ fn arena(side: u32, cells: impl Iterator<Item = CartesianCell>) -> BitmapArena {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
     for y in 10..10 + side {
         for x in 10..10 + side {
-            for place in ChunkPlace::all() {
-                arena.make_hot(BucketKey { layer_type: STONE, chunk: ChunkPosition::of(SuperchunkPosition { x, y }, place) }, None, &mut codec);
+            for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
+                arena.make_hot(BucketKey { layer_type: STONE, chunk }, None, &mut codec);
             }
         }
     }
@@ -30,9 +30,9 @@ fn arena(side: u32, cells: impl Iterator<Item = CartesianCell>) -> BitmapArena {
     arena
 }
 
-/// The first cell of the superchunk `(x, y)`.
+/// The top left cell of the superchunk `(x, y)`, cartesian.
 fn corner(x: u32, y: u32) -> CartesianCell {
-    CartesianCell { x: x * SUPERCHUNK_SIDE_CELLS, y: y * SUPERCHUNK_SIDE_CELLS }
+    SuperchunkIndex::from_cartesian(x, y).top_left().cartesian()
 }
 
 /// Stone creeping: each cell sampled at 5% sets a random neighbour --
@@ -93,7 +93,7 @@ fn writes_cross_borders_and_reads_see_the_tick_start() {
     });
     assert_eq!((report.rules, report.writes_applied.changed), (1, 1));
     assert_eq!(arena.holds(STONE, across), Ok(true), "set in the neighbour");
-    assert_eq!(arena.superchunk_count(STONE, SuperchunkPosition { x: 11, y: 10 }), 1);
+    assert_eq!(arena.superchunk_count(STONE, SuperchunkIndex::from_cartesian(11, 10)), 1);
 }
 
 /// A rectangle straddling the corner four superchunks meet at lands in
@@ -111,7 +111,7 @@ fn shapes_split_over_the_superchunks_they_cover() {
     });
     assert_eq!(report.writes_applied.changed, 15, "the 4x4 from two up and left of the meeting point, one cell set already");
     for (x, y, cells) in [(10, 10, 4), (11, 10, 4), (10, 11, 4), (11, 11, 4)] {
-        assert_eq!(arena.superchunk_count(STONE, SuperchunkPosition { x, y }), cells, "superchunk ({x}, {y})");
+        assert_eq!(arena.superchunk_count(STONE, SuperchunkIndex::from_cartesian(x, y)), cells, "superchunk ({x}, {y})");
     }
 }
 
@@ -154,7 +154,7 @@ fn areas_read_at_once_are_the_cells_read_one_by_one() {
     let start = corner(10, 10);
     let centres = [(300, 300), (1024, 1024), (1020, 1029), (5, 5), (2040, 2047), (1024, 3), (777, 1023)];
     let checked = Simulation::new(1).tick(&mut arena, &mut Entities::new(), 0, |turn, _| {
-        if turn.superchunk() != (SuperchunkPosition { x: 10, y: 10 }) {
+        if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }
         for (x, y) in centres {

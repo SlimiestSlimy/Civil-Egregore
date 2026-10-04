@@ -92,9 +92,9 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
 }
 
 /// A save is a folder: a world file in text, and two files a
-/// superchunk named by its Morton index in hexadecimal.
+/// superchunk named by its superchunk index in hexadecimal.
 #[test]
-fn a_save_is_a_directory_of_files_named_by_morton_index() {
+fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let folder = folder("files");
     let mut first = MockWorld::with_sheep(4, 1_000, 10);
     let simulation = Simulation::new(1);
@@ -103,11 +103,10 @@ fn a_save_is_a_directory_of_files_named_by_morton_index() {
     assert_eq!(text, "tilesim world 1\nname = Four fields\nseed = 99\ntick = 0\nlayers = 1 2\n");
     let mut names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|entry| entry.unwrap().file_name().into_string().unwrap()).collect();
     names.sort();
-    let expected: Vec<String> = disk::saved_superchunks(&folder).expect("listed").iter().flat_map(|superchunk| ["image", "state"].map(|kind| format!("{:011x}.{kind}", superchunk.morton_index()))).collect();
+    let expected: Vec<String> = disk::saved_superchunks(&folder).expect("listed").iter().flat_map(|superchunk| ["image", "state"].map(|kind| format!("{:011x}.{kind}", superchunk.0))).collect();
     assert_eq!(names, expected);
     assert_eq!(names.len(), 8);
-    let held: Vec<u64> = first.arena.superchunks().iter().map(|superchunk| superchunk.morton_index()).collect();
-    assert_eq!(disk::saved_superchunks(&folder).unwrap().iter().map(|superchunk| superchunk.morton_index()).collect::<Vec<_>>(), held);
+    assert_eq!(disk::saved_superchunks(&folder).unwrap(), first.arena.superchunk_indices());
 }
 
 /// What is not a save is refused, saying which file and why.

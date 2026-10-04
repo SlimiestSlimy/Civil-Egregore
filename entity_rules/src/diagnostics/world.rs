@@ -5,7 +5,7 @@
 use bitplane_manager::BitmapArena;
 use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
 use chunk_storage::{ChunkStorage, LayerCodec};
-use coordinates::{ChunkPlace, ChunkPosition, SuperchunkPosition, WORLD_SIDE_SUPERCHUNKS};
+use coordinates::{square_from_middle, SuperchunkIndex};
 use crate::sheep::{flock, SHEEP};
 use simulation::entity_store::Entities;
 use utilities::rng::Rng;
@@ -19,7 +19,7 @@ pub struct MockWorld {
     /// The superchunks as stored.
     pub storage: ChunkStorage,
     /// The superchunks, row by row.
-    pub superchunks: Vec<SuperchunkPosition>,
+    pub superchunks: Vec<SuperchunkIndex>,
 }
 
 impl MockWorld {
@@ -27,18 +27,13 @@ impl MockWorld {
     /// on `grass_cells` cells -- fewer where a cell is drawn twice.
     pub fn grass_on_dirt(count: u32, grass_cells: usize) -> Self {
         let (mut codec, mut arena, mut storage) = (LayerCodec::new(), BitmapArena::new(), ChunkStorage::new(1 << 16));
-        let side = (count as f64).sqrt().ceil() as u32;
-        let middle = WORLD_SIDE_SUPERCHUNKS / 2;
-        let superchunks: Vec<SuperchunkPosition> = (0..count).map(|index| SuperchunkPosition { x: middle + index % side, y: middle + index / side }).collect();
+        let superchunks: Vec<SuperchunkIndex> = square_from_middle(count).collect();
         for (seed, &superchunk) in superchunks.iter().enumerate() {
             storage.insert(superchunk, grass_on_dirt(seed as u64 + 1, grass_cells, &mut codec));
-            for place in ChunkPlace::all() {
-                arena.make_hot_layers(ChunkPosition::of(superchunk, place), &[DIRT, GRASS], &storage, &mut codec);
-            }
+            arena.make_hot_superchunk(superchunk, &[DIRT, GRASS], &storage, &mut codec);
         }
         let mut entities = Entities::new();
-        let superchunk_indices: Vec<u64> = arena.superchunks().iter().map(|superchunk| superchunk.morton_index()).collect();
-        entities.align(&superchunk_indices);
+        entities.align(&arena.superchunk_indices());
         Self { arena, entities, storage, superchunks }
     }
 

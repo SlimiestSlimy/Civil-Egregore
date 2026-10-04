@@ -18,7 +18,7 @@
 
 use bitmap::BITS_PER_WORD;
 use bitplane_manager::{BitmapArena, LayerView, COUNT_TILE_WORDS};
-use coordinates::{CellIndex, CHUNKS_IN_SUPERCHUNK};
+use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use chunk_storage::LayerType;
 use utilities::rng::Rng;
 
@@ -41,12 +41,12 @@ fn select(mut word: u64, rank: u32) -> u32 {
     word.trailing_zeros()
 }
 
-/// Chooses each hot set cell of `layer` -- of the superchunk at
-/// `superchunk_index` -- with `probability`, independently,
+/// Chooses each hot set cell of `layer` -- of `superchunk` -- with
+/// `probability`, independently,
 /// and hands every chosen cell to `emit` in Morton order: how many were
 /// chosen. A probability of 1 or more chooses every set cell; 0 or
 /// less, none.
-pub fn sample_layer(superchunk_index: u64, layer: LayerView, probability: f64, random: &mut Rng, emit: &mut impl FnMut(CellIndex)) -> usize {
+pub fn sample_layer(superchunk: SuperchunkIndex, layer: LayerView, probability: f64, random: &mut Rng, emit: &mut impl FnMut(CellIndex)) -> usize {
     if probability <= 0.0 || layer.hot_count() == 0 {
         return 0;
     }
@@ -68,7 +68,7 @@ pub fn sample_layer(superchunk_index: u64, layer: LayerView, probability: f64, r
             next -= count;
             continue;
         }
-        let (cells, tile_counts) = (layer.cells(chunk), layer.tile_counts(chunk));
+        let (cells, tile_counts, chunk_index) = (layer.cells(chunk), layer.tile_counts(chunk), ChunkIndex::of(superchunk, chunk));
         // Set cells in the words before `word`, and in those before its count tile.
         let (mut word, mut before, mut before_tile) = (0, 0u64, 0u64);
         while next < count {
@@ -90,7 +90,7 @@ pub fn sample_layer(superchunk_index: u64, layer: LayerView, probability: f64, r
                 word += 1;
             }
             let bit = select(cells[word], (next - before) as u32);
-            emit(CellIndex::from_parts(superchunk_index, chunk, word * BITS_PER_WORD + bit as usize));
+            emit(CellIndex::of(chunk_index, word * BITS_PER_WORD + bit as usize));
             chosen += 1;
             next += 1 + draw(random);
         }
@@ -106,7 +106,7 @@ pub fn sample(arena: &BitmapArena, layer_type: LayerType, probability: f64, rand
     arena
         .superchunks()
         .iter()
-        .filter_map(|superchunk| superchunk.layer(layer_type).map(|layer| (superchunk.morton_index(), layer)))
-        .map(|(superchunk_index, layer)| sample_layer(superchunk_index, layer, probability, random, &mut emit))
+        .filter_map(|superchunk| superchunk.layer(layer_type).map(|layer| (superchunk.index(), layer)))
+        .map(|(superchunk, layer)| sample_layer(superchunk, layer, probability, random, &mut emit))
         .sum()
 }

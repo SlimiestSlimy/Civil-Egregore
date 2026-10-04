@@ -18,4 +18,5 @@ part. **`wall(a, b)`**: whether two heights are too far apart.
 each way each chunk's cells that keep a wall.
 **`Terrain::generate(seed, superchunk)`**;
 **`Terrain::from_heights(height_at)`**: from any heights, those a cell
-past the edges asked for too; **`wall_counts()`**.
+past the edges asked for too; **`height(place)`**, **`walled(way,
+place)`**: a cell's, by its place in the superchunk; **`wall_counts()`**.

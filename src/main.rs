@@ -66,7 +66,7 @@ fn run(folder: &Path, rest: &[&str]) -> Result<(), String> {
     }
     let seconds = start.elapsed().as_secs_f64();
     let saved = world::save(folder, &name, seed, &mut loaded.arena, &mut loaded.storage, &loaded.entities, &loaded.simulation).map_err(|error| error.to_string())?;
-    let grass: u64 = loaded.arena.superchunks().iter().map(|superchunk| loaded.arena.superchunk_count(GRASS, superchunk.position()) as u64).sum();
+    let grass: u64 = loaded.arena.superchunks().iter().map(|superchunk| loaded.arena.superchunk_count(GRASS, superchunk.index()) as u64).sum();
     println!("{name}: tick {} -> {}, {:.0} ticks a second; {} entities, {grass} cells of grass; {} bytes saved", loaded.info.tick, loaded.entities.now(), ticks as f64 / seconds, saved.entities, saved.bytes);
     Ok(())
 }

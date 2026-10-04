@@ -59,7 +59,7 @@ to tick 4,000: the same cells, entities and random numbers). What makes it so:
 
 - **Random numbers are a superchunk's own, and kept.** Each superchunk
   has a generator that goes on from tick to tick (`Simulation`), first
-  seeded from the world's seed and its Morton index; its state is in
+  seeded from the world's seed and its superchunk index; its state is in
   the state file. Were they made anew from a tick's seed, a load would
   start them over.
 - **Entities are put back through the same door as any other**: queued

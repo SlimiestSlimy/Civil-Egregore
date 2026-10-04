@@ -7,7 +7,8 @@ The design is in `world.md`.
 `GRASS_CELLS` (400,000), `FLOCK` (4,000): what a superchunk generated
 is given. **`generate(seed, superchunks)`**, **`generate_with(seed, superchunks,
 grass_cells, flock)`**: a square of them from the
-world's middle, each from the seed and its Morton index -- a
+world's middle (`coordinates::square_from_middle`), each from the seed
+and its superchunk index -- a
 **`World`** `{info, arena, storage, entities, simulation}`.
 **`save(folder, name, seed, arena, storage, entities, simulation)`**:
 every dirty bitmap written back, the ring flushed, then each

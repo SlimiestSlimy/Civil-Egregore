@@ -17,7 +17,7 @@ use crate::{contains, BitmapArena, SuperchunkLayer};
 use bitmap::morton::morton_index;
 use chunk_storage::LayerType;
 use utilities::hash::slot;
-use coordinates::{CellIndex, ChunkPosition, SuperchunkPosition, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{CartesianCell, CellIndex, SuperchunkIndex, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
 
 /// What a write does to each cell it covers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -186,34 +186,30 @@ impl WriteQueues {
 const CHUNK_SIDE_U32: u32 = CHUNK_SIDE as u32;
 
 impl Write {
-    /// The superchunk indices of the superchunks the write's cells lie
-    /// in: one, or for a shape across a border up to four.
-    pub fn superchunk_indices(self) -> impl Iterator<Item = u64> {
-        let at = { self.at };
-        let ([left, right], [top, bottom]) = match self.shape {
-            Shape::Cell => ([at.cartesian().x; 2], [at.cartesian().y; 2]),
-            _ => self.bounds().unwrap_or(([1, 0], [1, 0])),
-        };
+    /// The superchunks the write's cells lie in: one, or for a shape
+    /// across a border up to four.
+    pub fn superchunks(self) -> impl Iterator<Item = SuperchunkIndex> {
+        let ([left, right], [top, bottom]) = self.bounds().unwrap_or(([1, 0], [1, 0]));
         let superchunk_of = |coordinate: u32| coordinate / SUPERCHUNK_SIDE_CELLS;
         let (columns, rows) = (superchunk_of(left)..=superchunk_of(right), superchunk_of(top)..=superchunk_of(bottom));
         let empty = left > right;
         rows.flat_map(move |y| columns.clone().map(move |x| (x, y)))
             .filter(move |_| !empty)
-            .map(|(x, y)| SuperchunkPosition { x, y }.morton_index())
+            .map(|(x, y)| SuperchunkIndex::from_cartesian(x, y))
     }
 }
 
-/// Counts the cells of the part of `write` in the superchunk at
-/// `superchunk_index` -- which has no bitmap in use -- as missed.
-pub fn count_missed(superchunk_index: u64, write: Write, applied: &mut WritesApplied) {
-    apply_in(None, superchunk_index, LayerType(0), write, applied);
+/// Counts the cells of the part of `write` in `superchunk` -- which has
+/// no bitmap in use -- as missed.
+pub fn count_missed(superchunk: SuperchunkIndex, write: Write, applied: &mut WritesApplied) {
+    apply_in(None, superchunk, LayerType(0), write, applied);
 }
 
 /// Applies the part of `write`, to `layer_type`'s bitplane, that lies in
-/// the superchunk at `superchunk_index`, whose allocations are `layers`
-/// -- `None` if it has none in use: a cell straight from its cell index,
-/// a shape chunk by chunk over its bounds there.
-pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk_index: u64, layer_type: LayerType, write: Write, applied: &mut WritesApplied) {
+/// `superchunk`, whose allocations are `layers` -- `None` if it has none
+/// in use: a cell straight from its cell index, a shape chunk by chunk
+/// over its bounds there.
+pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk: SuperchunkIndex, layer_type: LayerType, write: Write, applied: &mut WritesApplied) {
     let layer = layers.and_then(|layers| {
         let at = layers.binary_search_by_key(&layer_type, |layer| layer.layer_type).ok()?;
         Some(&mut layers[at])
@@ -225,14 +221,14 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk_index:
     };
     let at = { write.at };
     if write.shape == Shape::Cell {
-        if at.superchunk_index() != superchunk_index {
+        if at.superchunk() != superchunk {
             return;
         }
-        let chunk = at.chunk_in_superchunk();
+        let chunk = at.chunk().place();
         match layer {
             Some(layer) if contains(layer.flags.hot, chunk) => {
-                let set = op(layer, chunk, at.place_in_chunk());
-                applied.changed += layer.put_cell(chunk, at.place_in_chunk(), set) as u64;
+                let set = op(layer, chunk, at.place());
+                applied.changed += layer.put_cell(chunk, at.place(), set) as u64;
             }
             _ => applied.missed += 1,
         }
@@ -242,8 +238,7 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk_index:
         return;
     };
     // The bounds' part inside this superchunk.
-    let position = SuperchunkPosition::from_morton_index(superchunk_index);
-    let (first_x, first_y) = (position.x * SUPERCHUNK_SIDE_CELLS, position.y * SUPERCHUNK_SIDE_CELLS);
+    let CartesianCell { x: first_x, y: first_y } = superchunk.top_left().cartesian();
     let (left, top) = (left.max(first_x), top.max(first_y));
     let (right, bottom) = (right.min(first_x + (SUPERCHUNK_SIDE_CELLS - 1)), bottom.min(first_y + (SUPERCHUNK_SIDE_CELLS - 1)));
     if left > right || top > bottom {
@@ -257,7 +252,7 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk_index:
             let (x0, y0) = (left.max(chunk_x * CHUNK_SIDE_U32), top.max(chunk_y * CHUNK_SIDE_U32));
             let (x1, y1) = (right.min(chunk_x * CHUNK_SIDE_U32 + (CHUNK_SIDE_U32 - 1)), bottom.min(chunk_y * CHUNK_SIDE_U32 + (CHUNK_SIDE_U32 - 1)));
             let covered = (y0..=y1).flat_map(|y| (x0..=x1).map(move |x| (x, y))).filter(|&(x, y)| write.covers(x, y));
-            let chunk = ChunkPosition { x: chunk_x, y: chunk_y }.superchunk_and_place().1.index();
+            let chunk = CellIndex::from(CartesianCell { x: x0, y: y0 }).chunk().place();
             match layer.as_deref_mut() {
                 Some(layer) if contains(layer.flags.hot, chunk) => {
                     for (x, y) in covered {
@@ -296,10 +291,10 @@ impl BitmapArena {
         for (layer_type, writes) in queued.iter() {
             applied.writes += writes.len();
             for &write in writes {
-                for superchunk_index in write.superchunk_indices() {
-                    let entry = self.lookup.superchunk(&self.directory, superchunk_index).ok();
+                for superchunk in write.superchunks() {
+                    let entry = self.lookup.superchunk(&self.directory, superchunk).ok();
                     let layers = entry.map(|entry| self.directory[entry].layers.as_mut_slice());
-                    apply_in(layers, superchunk_index, layer_type, write, &mut applied);
+                    apply_in(layers, superchunk, layer_type, write, &mut applied);
                 }
             }
         }

@@ -9,7 +9,7 @@
 //! those entries freed. The bitmap arena is told which superchunks were
 //! flushed, since only then may it drop their evicted layers.
 
-use coordinates::{ChunkPosition, SuperchunkPosition};
+use coordinates::{ChunkIndex, SuperchunkIndex};
 use crate::height_map::HeightMap;
 use crate::layer_codec::LayerType;
 use crate::superchunk_image::{LayerChange, SuperchunkImage};
@@ -18,7 +18,7 @@ use crate::writeback_ring::WritebackRing;
 /// The cold pool and the writeback ring.
 pub struct ChunkStorage {
     /// Every superchunk's image, sorted by superchunk index.
-    pub(crate) cold_pool: Vec<(SuperchunkPosition, SuperchunkImage)>,
+    pub(crate) cold_pool: Vec<(SuperchunkIndex, SuperchunkImage)>,
     /// Changed layers, encoded, on their way to the cold pool.
     pub(crate) ring: WritebackRing,
 }
@@ -30,15 +30,15 @@ impl ChunkStorage {
     }
 
     /// Where `superchunk` is in the cold pool, or where it would go.
-    fn find(&self, superchunk: SuperchunkPosition) -> Result<usize, usize> {
-        self.cold_pool.binary_search_by_key(&superchunk.morton_index(), |(position, _)| position.morton_index())
+    fn find(&self, superchunk: SuperchunkIndex) -> Result<usize, usize> {
+        self.cold_pool.binary_search_by_key(&superchunk, |&(kept, _)| kept)
     }
 
     /// Puts `image` in the cold pool as `superchunk` (read from disk, or
     /// generated), returning the image it replaces, if any. Its entries
     /// still in the ring are applied to the new image when it is
     /// flushed.
-    pub fn insert(&mut self, superchunk: SuperchunkPosition, image: SuperchunkImage) -> Option<SuperchunkImage> {
+    pub fn insert(&mut self, superchunk: SuperchunkIndex, image: SuperchunkImage) -> Option<SuperchunkImage> {
         match self.find(superchunk) {
             Ok(at) => Some(std::mem::replace(&mut self.cold_pool[at].1, image)),
             Err(at) => {
@@ -49,21 +49,20 @@ impl ChunkStorage {
     }
 
     /// Every superchunk the cold pool holds, in Morton order.
-    pub fn superchunks(&self) -> impl Iterator<Item = SuperchunkPosition> + '_ {
-        self.cold_pool.iter().map(|(position, _)| *position)
+    pub fn superchunks(&self) -> impl Iterator<Item = SuperchunkIndex> + '_ {
+        self.cold_pool.iter().map(|&(superchunk, _)| superchunk)
     }
 
     /// The image of `superchunk`, if the cold pool holds it.
-    pub fn image(&self, superchunk: SuperchunkPosition) -> Option<&SuperchunkImage> {
+    pub fn image(&self, superchunk: SuperchunkIndex) -> Option<&SuperchunkImage> {
         self.find(superchunk).ok().map(|at| &self.cold_pool[at].1)
     }
 
     /// The encoded layer of `layer_type` in `chunk`, if the cold pool has
     /// one: from its first word to its chunk's end
     /// ([`SuperchunkImage::layer`]).
-    pub fn layer(&self, chunk: ChunkPosition, layer_type: LayerType) -> Option<&[u64]> {
-        let (superchunk, place) = chunk.superchunk_and_place();
-        self.image(superchunk)?.layer(place, layer_type)
+    pub fn layer(&self, chunk: ChunkIndex, layer_type: LayerType) -> Option<&[u64]> {
+        self.image(chunk.superchunk())?.layer(chunk.place(), layer_type)
     }
 
     /// Writes `encoded` back into the ring as the layer of `layer_type`
@@ -71,7 +70,7 @@ impl ChunkStorage {
     /// ring's tail until it fits, and adding each one flushed to
     /// `flushed`. Every superchunk was flushed before `encoded` went in,
     /// so its entries left in the ring are this one and later ones.
-    pub fn write_back(&mut self, chunk: ChunkPosition, layer_type: LayerType, encoded: &[u64], flushed: &mut Vec<SuperchunkPosition>) {
+    pub fn write_back(&mut self, chunk: ChunkIndex, layer_type: LayerType, encoded: &[u64], flushed: &mut Vec<SuperchunkIndex>) {
         while !self.ring.push(chunk, layer_type, encoded) {
             match self.ring.tail_superchunk() {
                 Some(superchunk) => {
@@ -86,14 +85,14 @@ impl ChunkStorage {
     /// Rewrites the image of `superchunk` with all its entries in the
     /// ring, and frees them. Returns whether it had any. A superchunk the
     /// cold pool does not hold is made, flat at height 0.
-    pub fn flush(&mut self, superchunk: SuperchunkPosition) -> bool {
+    pub fn flush(&mut self, superchunk: SuperchunkIndex) -> bool {
         let entries = self.ring.entries_of(superchunk);
         if entries.is_empty() {
             return false;
         }
         let changes: Vec<LayerChange> = entries
             .iter()
-            .map(|entry| LayerChange { chunk: entry.chunk, layer_type: entry.layer_type, encoded: self.ring.encoded(entry) })
+            .map(|entry| LayerChange { place: entry.place, layer_type: entry.layer_type, encoded: self.ring.encoded(entry) })
             .collect();
         let rewritten = match self.image(superchunk) {
             Some(image) => image.rewritten(&changes),
@@ -106,7 +105,7 @@ impl ChunkStorage {
 
     /// Flushes every superchunk with entries in the ring, each added to
     /// `flushed`: the ring is empty after.
-    pub fn flush_all(&mut self, flushed: &mut Vec<SuperchunkPosition>) {
+    pub fn flush_all(&mut self, flushed: &mut Vec<SuperchunkIndex>) {
         while let Some(superchunk) = self.ring.tail_superchunk() {
             self.flush(superchunk);
             flushed.push(superchunk);

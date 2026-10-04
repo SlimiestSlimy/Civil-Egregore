@@ -14,11 +14,10 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-use bitmap::morton::morton_index;
-use utilities::hash::{mix, GOLDEN_RATIO};
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{Height, HeightMap, LayerType};
-use coordinates::{CellPlace, ChunkPlace, SuperchunkPosition, CHUNKS_IN_SUPERCHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{place_from_cartesian, CartesianCell, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
+use utilities::hash::{mix, GOLDEN_RATIO};
 
 /// The most two cells beside one another may differ in height and still
 /// be stepped between.
@@ -89,8 +88,8 @@ pub struct Terrain {
 
 impl Terrain {
     /// The terrain of `superchunk` in the world whose seed is `seed`.
-    pub fn generate(seed: u64, superchunk: SuperchunkPosition) -> Self {
-        let (left, top) = (superchunk.x * SUPERCHUNK_SIDE_CELLS, superchunk.y * SUPERCHUNK_SIDE_CELLS);
+    pub fn generate(seed: u64, superchunk: SuperchunkIndex) -> Self {
+        let CartesianCell { x: left, y: top } = superchunk.top_left().cartesian();
         Self::from_heights(|x, y| height(seed, left.wrapping_add_signed(x), top.wrapping_add_signed(y)))
     }
 
@@ -113,18 +112,30 @@ impl Terrain {
         let mut walls: [Box<[CellWords; CHUNKS_IN_SUPERCHUNK]>; 2] = std::array::from_fn(|_| Box::new([[0; WORDS]; CHUNKS_IN_SUPERCHUNK]));
         for y in 0..side {
             for x in 0..side {
-                let (chunk, cell) = (ChunkPlace::new((x as usize / CHUNK_SIDE) as u8, (y as usize / CHUNK_SIDE) as u8), CellPlace { x: x as u8, y: y as u8 });
+                let place = place_from_cartesian(x as u32, y as u32);
                 let here = at(x, y);
-                heights.set(chunk, cell, here);
-                let place = morton_index(cell.x, cell.y);
+                heights.set(place, here);
+                let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
                 for (way, &(_, (dx, dy))) in WALLS.iter().enumerate() {
                     if wall(here, at(x + dx, y + dy)) {
-                        walls[way][chunk.index()][place / BITS_PER_WORD] |= 1 << (place % BITS_PER_WORD);
+                        walls[way][chunk][cell / BITS_PER_WORD] |= 1 << (cell % BITS_PER_WORD);
                     }
                 }
             }
         }
         Self { heights, walls }
+    }
+
+    /// The height of the cell at `place` in the superchunk.
+    pub fn height(&self, place: usize) -> Height {
+        self.heights.get(place)
+    }
+
+    /// Whether the cell at `place` in the superchunk keeps a wall the
+    /// `way`-th way of [`WALLS`].
+    pub fn walled(&self, way: usize, place: usize) -> bool {
+        let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
+        self.walls[way][chunk][cell / BITS_PER_WORD] >> (cell % BITS_PER_WORD) & 1 == 1
     }
 
     /// How many walls it has, each of the two ways.

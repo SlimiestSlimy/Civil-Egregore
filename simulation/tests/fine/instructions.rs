@@ -10,7 +10,7 @@
 
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CartesianCell, CellIndex, ChunkPlace, ChunkPosition, SuperchunkPosition, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{CartesianCell, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use simulation::around::{self, CENTRE, RING};
 use simulation::entity_store::{Attribute, AttributeType, EntityEdit, Entities, EntityId, EntityType, Header, NEVER};
 use simulation::{Simulation, Turn};
@@ -34,14 +34,13 @@ fn world(side: u32) -> (BitmapArena, Entities) {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
     for y in 10..10 + side {
         for x in 10..10 + side {
-            for place in ChunkPlace::all() {
-                arena.make_hot(BucketKey { layer_type: STONE, chunk: ChunkPosition::of(SuperchunkPosition { x, y }, place) }, None, &mut codec);
+            for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
+                arena.make_hot(BucketKey { layer_type: STONE, chunk }, None, &mut codec);
             }
         }
     }
     let mut entities = Entities::new();
-    let superchunk_indices: Vec<u64> = arena.superchunks().iter().map(|superchunk| superchunk.morton_index()).collect();
-    assert_eq!(entities.align(&superchunk_indices), 0);
+    assert_eq!(entities.align(&arena.superchunk_indices()), 0);
     (arena, entities)
 }
 
@@ -293,8 +292,8 @@ fn walls_of_the_terrain_bar_steps() {
     let (mut arena, mut entities) = world(1);
     let mut codec = LayerCodec::new();
     for layer_type in [WALL_EAST, WALL_SOUTH] {
-        for place in ChunkPlace::all() {
-            arena.make_hot(BucketKey { layer_type, chunk: ChunkPosition::of(SuperchunkPosition { x: 10, y: 10 }, place) }, None, &mut codec);
+        for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {
+            arena.make_hot(BucketKey { layer_type, chunk }, None, &mut codec);
         }
     }
     // A cliff between columns 41 and 42, rows 20 to 40, with a gap at row 33: walls east of column 41, which bar the diagonals across it too.
@@ -340,8 +339,8 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
     let (mut arena, mut entities) = world(1);
     let mut codec = LayerCodec::new();
     for layer_type in [WALL_EAST, WALL_SOUTH] {
-        for place in ChunkPlace::all() {
-            arena.make_hot(BucketKey { layer_type, chunk: ChunkPosition::of(SuperchunkPosition { x: 10, y: 10 }, place) }, None, &mut codec);
+        for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {
+            arena.make_hot(BucketKey { layer_type, chunk }, None, &mut codec);
         }
     }
     let mut random = utilities::rng::Rng::new(7);
