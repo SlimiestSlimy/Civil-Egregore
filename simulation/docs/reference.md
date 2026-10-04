@@ -71,9 +71,9 @@ against another; **`threads`**. **`random_states()`**: each
 superchunk's index and random stream's state; **`restore_random(
 states)`**: taken up, as a save kept them. **`tick(arena, entities,
 seed, rule)`**: the entities aligned to the arena's superchunks (those
-dropped counted lost); the superchunks split into a contiguous run a
-thread; the first phase runs the rule on each, a `Reader` a thread, the
-outboxes a run each; the second, each thread its run of superchunks and
+dropped counted lost); the superchunks claimed by the threads one at a
+time (`CLAIMED`); the first phase runs the rule on each, a `Reader` a
+thread; the second, each thread the superchunks it claims and
 their entities, passes each wheel's tick, then applies every outbox's
 writes and instructions; writes to superchunks not in use counted
 missed (`count_missed`), entities put there lost; the crossings settled

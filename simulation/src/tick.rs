@@ -38,6 +38,7 @@ use bitplane_manager::{count_missed, COARSEST_TILES_IN_CHUNK, WritesApplied, Bit
 use chunk_storage::LayerType;
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex};
 use std::ops::AddAssign;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use utilities::rng::Rng;
@@ -102,8 +103,11 @@ struct Outbox {
     instructions: [Instructions; SLOTS],
 }
 
-/// A thread's part of the first phase: where its superchunks start among
-/// them all, their outboxes, and their random numbers.
+/// Superchunks a thread claims at a time, of a tick's work.
+const CLAIMED: usize = 1;
+
+/// A piece of the first phase, claimed by a thread: where its superchunks
+/// start among them all, their outboxes, and their random numbers.
 type PartOfTurns<'a> = (usize, &'a mut [Outbox], &'a mut [(SuperchunkIndex, Rng)]);
 
 /// One superchunk's turn in a tick's first phase: what the rule sees and
@@ -680,7 +684,8 @@ impl Simulation {
         let count = arena.superchunks().len();
         self.outboxes.resize_with(count, Outbox::default);
         let parts = self.dispatcher.threads();
-        let per_part = count.div_ceil(parts).max(1);
+        // The superchunks are not split among the threads beforehand: each thread claims the next piece not yet claimed, so none idles while another has work left.
+        let per_part = CLAIMED;
 
         let start = Instant::now();
         let superchunk_indices = arena.superchunk_indices();
@@ -698,21 +703,21 @@ impl Simulation {
             .collect();
         let results: Vec<Mutex<R>> = (0..parts).map(|_| Mutex::new(R::default())).collect();
         let samples = &self.samples;
+        let claimed = AtomicUsize::new(0);
         self.dispatcher.run(&|part| {
-            let Some(work) = outboxes.get(part) else {
-                return;
-            };
-            let (first, ref mut outboxes, ref mut random) = *work.lock().expect("a part's outboxes");
             let (reader, entity_reader) = (Reader::new(superchunks), EntityReader::new(entity_superchunks));
             let mut samples = samples[part].lock().expect("a part's samples");
             let mut total = R::default();
-            for (offset, (outbox, kept)) in outboxes.iter_mut().zip(random.iter_mut()).enumerate() {
-                let superchunk = &superchunks[first + offset];
-                let random = Rng::new(kept.1.state());
-                let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random };
-                total += rule(&mut turn, &mut samples);
-                // Where its random numbers have come to: the next tick goes on from there.
-                kept.1 = turn.random;
+            while let Some(work) = outboxes.get(claimed.fetch_add(1, Ordering::Relaxed)) {
+                let (first, ref mut outboxes, ref mut random) = *work.lock().expect("a piece's outboxes");
+                for (offset, (outbox, kept)) in outboxes.iter_mut().zip(random.iter_mut()).enumerate() {
+                    let superchunk = &superchunks[first + offset];
+                    let random = Rng::new(kept.1.state());
+                    let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random };
+                    total += rule(&mut turn, &mut samples);
+                    // Where its random numbers have come to: the next tick goes on from there.
+                    kept.1 = turn.random;
+                }
             }
             *results[part].lock().expect("a part's result") = total;
         });
@@ -727,29 +732,29 @@ impl Simulation {
         let superchunks: Vec<Mutex<(&mut [Superchunk], &mut [SuperchunkEntities])>> =
             arena.superchunks_mut().chunks_mut(per_part).zip(entities.superchunks_mut().chunks_mut(per_part)).map(Mutex::new).collect();
         let applied_parts: Vec<Mutex<(WritesApplied, InstructionsApplied)>> = (0..parts).map(|_| Mutex::new(Default::default())).collect();
+        let claimed = AtomicUsize::new(0);
         self.dispatcher.run(&|part| {
-            let Some(work) = superchunks.get(part) else {
-                return;
-            };
-            let (ref mut superchunks, ref mut entity_superchunks) = *work.lock().expect("a part's superchunks");
             let (mut applied, mut instructions_applied) = (WritesApplied::default(), InstructionsApplied::default());
-            for (superchunk, entities) in superchunks.iter_mut().zip(entity_superchunks.iter_mut()) {
-                let here = superchunk.index();
-                entities.pass(now);
-                for (dx, dy) in neighbours() {
-                    let Some(source) = here.offset(dx, dy).and_then(|source| superchunk_indices.binary_search(&source).ok()) else {
-                        continue;
-                    };
-                    let outbox = &outboxes[source];
-                    for (layer_type, writes) in outbox.writes[slot(-dx, -dy)].iter() {
-                        applied.writes += writes.len();
-                        for &write in writes {
-                            superchunk.apply(layer_type, write, &mut applied);
+            while let Some(work) = superchunks.get(claimed.fetch_add(1, Ordering::Relaxed)) {
+                let (ref mut superchunks, ref mut entity_superchunks) = *work.lock().expect("a piece's superchunks");
+                for (superchunk, entities) in superchunks.iter_mut().zip(entity_superchunks.iter_mut()) {
+                    let here = superchunk.index();
+                    entities.pass(now);
+                    for (dx, dy) in neighbours() {
+                        let Some(source) = here.offset(dx, dy).and_then(|source| superchunk_indices.binary_search(&source).ok()) else {
+                            continue;
+                        };
+                        let outbox = &outboxes[source];
+                        for (layer_type, writes) in outbox.writes[slot(-dx, -dy)].iter() {
+                            applied.writes += writes.len();
+                            for &write in writes {
+                                superchunk.apply(layer_type, write, &mut applied);
+                            }
                         }
+                        outbox.instructions[slot(-dx, -dy)].apply(std::slice::from_mut(entities), now + 1, &mut instructions_applied);
                     }
-                    outbox.instructions[slot(-dx, -dy)].apply(std::slice::from_mut(entities), now + 1, &mut instructions_applied);
+                    entities.sort_wakes(now + 1);
                 }
-                entities.sort_wakes(now + 1);
             }
             *applied_parts[part].lock().expect("a part's result") = (applied, instructions_applied);
         });
@@ -796,14 +801,14 @@ impl Simulation {
         if crossed {
             let arrived = &self.arrived;
             let parts: Vec<Mutex<&mut [SuperchunkEntities]>> = entities.superchunks_mut().chunks_mut(per_part).map(Mutex::new).collect();
-            self.dispatcher.run(&|part| {
-                let Some(work) = parts.get(part) else {
-                    return;
-                };
-                for superchunk in work.lock().expect("a part's superchunks").iter_mut() {
-                    for (dx, dy) in neighbours() {
-                        if let Some(there) = superchunk.index().offset(dx, dy).and_then(|there| superchunk_indices.binary_search(&there).ok()) {
-                            superchunk.settle_leavers(&arrived[there]);
+            let claimed = AtomicUsize::new(0);
+            self.dispatcher.run(&|_| {
+                while let Some(work) = parts.get(claimed.fetch_add(1, Ordering::Relaxed)) {
+                    for superchunk in work.lock().expect("a piece's superchunks").iter_mut() {
+                        for (dx, dy) in neighbours() {
+                            if let Some(there) = superchunk.index().offset(dx, dy).and_then(|there| superchunk_indices.binary_search(&there).ok()) {
+                                superchunk.settle_leavers(&arrived[there]);
+                            }
                         }
                     }
                 }

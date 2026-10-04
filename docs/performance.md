@@ -192,6 +192,23 @@ throughout.
 65,536 superchunks (256 x 256) cannot be held hot: 2.5 MiB a
 superchunk is some 160 GiB.
 
+## Superchunks claimed, not dealt out
+
+A tick used to deal the superchunks out, a fixed contiguous run a
+thread; the threads with light runs then waited for the heaviest, and
+12 threads were 41% busy flat out. Now each thread claims the next
+superchunk not yet claimed. Measured in the renderer, 256 superchunks
+shown (324 hot with their halos' rim), 8,000 sheep on each at the
+start, flat out (`cargo run --release -p renderer -- 256 8000 0`):
+
+| ticks | sheep | dealt out | claimed |
+|---|---|---|---|
+| 4,000 to 32,000 | 2.1 to 3.4 million | 966 a second | 1,338 a second |
+| 32,000 to 44,000 | 3.4 to 3.8 million | 527 a second | 564 a second |
+
+Workers watching for the next job a moment before parking, instead of
+parking at once, was tried on the same run and gained nothing: not kept.
+
 ## Elsewhere
 
 | what | where |
