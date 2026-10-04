@@ -96,8 +96,8 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
                             continue;
                         };
                         let shape = &generation.shape;
-                        let (colour, light) = if high < shape.ocean && terrain::under_ocean(shape, seed, cell_x, cell_y) {
-                            (WATER, 1.0 - (1.0 - DEEP_LIGHT) * ((shape.ocean - high) as f32 / shape.depth.max(1) as f32).min(1.0))
+                        let (colour, light) = if high < shape.ocean {
+                            (WATER, 1.0 - (1.0 - DEEP_LIGHT) * ((shape.ocean - high) as f32 / (shape.ocean - shape.ground).max(1) as f32).min(1.0))
                         } else {
                             let colour = if generation.trees.number(trees_seed, cell_x, cell_y) < trees_under {
                                 tree_colour(8)
@@ -109,12 +109,12 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
                             let above = height(wanted, x as i64, y - 1).map_or(high, |(.., above)| above);
                             let lower = (above as f32 + before.unwrap_or(high) as f32) / 2.0;
                             let slope = (high as f32 - lower) / wanted.step as f32;
-                            let tint = 0.8 + 0.3 * (high.saturating_sub(shape.ocean) as f32 / (shape.rise + shape.weights.iter().sum::<u64>()).max(1) as f32).min(1.0);
+                            let tint = 0.8 + 0.3 * (high.saturating_sub(shape.ocean) as f32 / shape.levels.max(1) as f32).min(1.0);
                             (colour, tint * (1.0 + SLOPE_LIGHT * slope).clamp(0.55, 1.45))
                         };
                         before = Some(high);
                         // A polygon's border, where the pixel is no farther from it than it is across.
-                        let on_border = wanted.borders && shape.polygons.span > 0 && terrain::polygons::polygon(shape, seed, cell_x, cell_y).2 < wanted.step as u64;
+                        let on_border = wanted.borders && terrain::polygons::polygon(shape, seed, cell_x, cell_y).2 < wanted.step as u64;
                         let light = if on_border { light * BORDER_LIGHT } else { light };
                         let lit = colour.map(|channel| (channel as f32 * light).min(255.0) as u8);
                         pixel.copy_from_slice(&[lit[0], lit[1], lit[2], u8::MAX]);

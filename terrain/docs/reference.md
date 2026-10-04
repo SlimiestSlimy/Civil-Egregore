@@ -10,17 +10,14 @@ stepped between. `WALL_EAST`, `WALL_SOUTH` (layer types 8 and 9);
 of its own: `pathfinding::Walls::new` and
 `Turn::around_unwalled` bar it from the two. `OCTAVES`, `ONE`.
 
-**`Shape`** `{weights, ocean, coast, ground, rise, rise_span,
-rise_shares, shore, shore_span}`: the seven hill octaves' shares of a
-height; the ocean's height; the heights of land the hills grow over;
-the lowest ground; the most the land rises over it, how broadly, and
-its five octaves' shares; how far the hills' start wanders about the
-shore, and how broadly. `Shape::DEFAULT`. `WATER` (layer types 24 to 31): a
-cell's water, its depth over eight bitplanes. **`rise(shape, seed, x,
-y)`**: how far the land has risen over the lowest ground.
-**`height(seed, x, y)`**: a cell's height; **`height_shaped(shape,
-seed, x, y)`**: the same in a world shaped otherwise, to try a shape
-out: the land, and the hills by how far it is over the ocean. **`noise(seed, index, shift, x,
+**`Shape`** `{ground, ocean, span, sea, levels, edge, warp}`: the
+lowest ground and the ocean's height; the polygons' grid, the share of
+them that are ocean, the most a plain stands over the ocean, the cells
+levels are mixed over at a border, how far borders are bent.
+`Shape::DEFAULT`. `WATER` (layer types 24 to 31): a cell's water, its
+depth over eight bitplanes. **`height(seed, x, y)`**: a cell's height;
+**`height_shaped(shape, seed, x, y)`**: the same in a world shaped
+otherwise. **`noise(seed, index, shift, x,
 y)`**: smooth noise, one octave of a height. Private: **`point`**, an
 octave's number at a point; **`between`**. **`wall(a, b)`**: whether two heights are too far apart.
 
@@ -33,11 +30,8 @@ place)`**: a cell's, by its place in the superchunk; **`wall_counts()`**.
 
 ## `polygons.rs`
 
-**`Polygons`** `{span, ocean, levels, edge, warp}`: the sites' grid, the
-share of polygons that are ocean, the most a plain stands over the
-ocean, the cells levels are mixed over at a border, how far borders are
-bent; `Polygons::NONE`. **`land(shape, seed, x, y)`**: the land at a
-cell, its polygon's level mixed near a border with its neighbours'.
-**`polygon(shape, seed, x, y)`**: the cell's polygon's number, whether
-it is land, and about how far the cell is from its border. Private:
-**`Site`**, **`sites`** (the 25 squares' sites, the nearest first).
+**`land(shape, seed, x, y)`**: the land at a cell, its polygon's level
+mixed near a border with its neighbours'. **`polygon(shape, seed, x,
+y)`**: the cell's polygon's number, whether it is land, and about how
+far the cell is from its border. Private: **`Site`**, **`sites`** (the
+25 squares' sites, the nearest first).

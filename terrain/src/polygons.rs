@@ -15,28 +15,6 @@
 use crate::{noise, Shape, ONE};
 use utilities::hash::{mix, GOLDEN_RATIO};
 
-/// How the land's polygons lie.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Polygons {
-    /// The cells along a square of the sites' grid, as a power of two:
-    /// about a polygon's breadth. 0, and there are none: the land is
-    /// its rise.
-    pub span: u32,
-    /// The share of the polygons that are ocean, of [`ONE`].
-    pub ocean: u64,
-    /// The most a land polygon's plain stands over the ocean, in heights.
-    pub levels: u64,
-    /// The cells from a border over which the levels about it are mixed.
-    pub edge: u64,
-    /// How far the borders are bent, beside a square's side, of [`ONE`].
-    pub warp: u64,
-}
-
-impl Polygons {
-    /// None: the land is its rise.
-    pub const NONE: Self = Self { span: 0, ocean: ONE / 2, levels: 200, edge: 512, warp: ONE / 4 };
-}
-
 /// What the sites are drawn by: mixed with the seed, so that they lie apart from all else.
 const SITES_SALT: u64 = 0x706F_6C79_676F_6E73;
 /// The number the noise that bends the borders is drawn by, across; down is the next.
@@ -57,11 +35,10 @@ struct Site {
 
 /// The sites of the 25 squares about the cell `(x, y)`, the nearest first.
 fn sites(shape: &Shape, seed: u64, x: u32, y: u32) -> [Site; 25] {
-    let polygons = &shape.polygons;
-    let span = polygons.span.clamp(6, 24);
+    let span = shape.span.clamp(6, 24);
     let side = 1i64 << span;
     // The cell, moved by broad noise: what bends the borders.
-    let bend = ((side as u64 * polygons.warp) >> 16) as i64;
+    let bend = ((side as u64 * shape.warp) >> 16) as i64;
     let moved = |index: u32| ((noise(seed, index, span - 2, x, y) as i64 - (ONE / 2) as i64) * 2 * bend) >> 16;
     let (x, y) = (x as i64 + moved(WARP_INDEX), y as i64 + moved(WARP_INDEX + 1));
     let (square_x, square_y) = (x.div_euclid(side), y.div_euclid(side));
@@ -71,7 +48,7 @@ fn sites(shape: &Shape, seed: u64, x: u32, y: u32) -> [Site; 25] {
         // In the square's middle half: no site that counts is then past the 25.
         let within = |bits: u64| side / 4 + (((bits & 0xFFFF) as i64 * (side / 2)) >> 16);
         let (across, down) = (x - (square_x * side + within(lot)), y - (square_y * side + within(lot >> 16)));
-        Site { away: ((across * across + down * down) as u64).isqrt(), land: (lot >> 32) & 0xFFFF >= polygons.ocean, level: ((lot >> 48) * polygons.levels) >> 16, lot }
+        Site { away: ((across * across + down * down) as u64).isqrt(), land: (lot >> 32) & 0xFFFF >= shape.sea, level: ((lot >> 48) * shape.levels) >> 16, lot }
     });
     sites.sort_unstable_by_key(|site| site.away);
     sites
@@ -83,7 +60,7 @@ fn sites(shape: &Shape, seed: u64, x: u32, y: u32) -> [Site; 25] {
 pub fn land(shape: &Shape, seed: u64, x: u32, y: u32) -> u64 {
     let sites = sites(shape, seed, x, y);
     // Each site counts by how little farther it is than the nearest: not at all past twice the edge.
-    let band = (2 * shape.polygons.edge.max(1)).min(1 << shape.polygons.span.clamp(6, 24));
+    let band = (2 * shape.edge.max(1)).min(1 << shape.span.clamp(6, 24));
     let (mut levels, mut counted) = (0, 0);
     for site in sites {
         let counts = band.saturating_sub(site.away - sites[0].away).pow(2);

@@ -10,13 +10,10 @@ generation. So a superchunk generated today and its neighbour
 generated next year meet with no seam, and a superchunk made again is
 the same.
 
-A height is a `u8`, the sum of four octaves of value noise: each octave
-has a point every 512, 128, 32 or 8 cells, a number at each point from
-a hash of the seed, the octave and the point, and a cell's part is
-eased between the four points about it (smoothstep, so there is no
-crease at the points). The octaves weigh 150, 75, 24 and 6 of the 255:
-broad hills, and rougher ground on them. All of it is whole numbers,
-16-bit fractions, so a world is the same on any machine.
+A height is 16 bits, 0 to 65,535: the level of the cell's polygon,
+mixed near a border with its neighbours' (below). All of it is whole
+numbers, 16-bit fractions and whole square roots, so a world is the
+same on any machine.
 
 ## Walls
 
@@ -62,68 +59,37 @@ the cells about the change are worked out again.
 
 ## The land as polygons
 
-`src/polygons.rs`, tried in the renderer's lab and not yet what worlds
-are made with (`Shape::polygons`, `Polygons::NONE` by default). The
-world is cut into closed shapes that share borders and never overlap:
-a polygon is the cells nearer one site than any other, the sites one to
-each square of a grid `2^span` cells a side, placed by lot in the
-square's middle half. Each polygon is ocean -- its ground the lowest
-there is -- or land, a plain at a level of its own over the ocean's.
-Broad noise moves a cell before its polygon is looked up, which bends
-the borders. Within the edge's width of a border the levels of the
-polygons about it are mixed, each by how little farther its site is
-than the nearest: a ramp or a shore, or with a narrow edge a cliff. The
-hills are added to that as to the rise.
+`src/polygons.rs`. The world is cut into closed shapes that share
+borders and never overlap: a polygon is the cells nearer one site than
+any other, the sites one to each square of a grid `2^span` cells a
+side, placed by lot in the square's middle half. Each polygon is ocean
+-- its ground the lowest there is (`Shape::ground`) -- or land, a plain
+at a level of its own over the ocean's (`Shape::ocean`, `levels`); the
+share that are ocean is `Shape::sea`. Broad noise moves a cell before
+its polygon is looked up, which bends the borders (`warp`). Within the
+edge's width of a border (`edge`) the levels of the polygons about it
+are mixed, each by how little farther its site is than the nearest: a
+ramp or a shore, or with a narrow edge a cliff, walled.
 
 A cell looks at the sites of the 25 squares about it, so any cell's
-land follows from the seed and the cell alone; a superchunk's terrain
-takes about 0.6 s so (0.13 s with the rise) -- the sites near a
-superchunk are yet to be found once for all its cells.
+height follows from the seed and the cell alone; a superchunk's terrain
+takes about 0.6 s so -- the sites near a superchunk are yet to be found
+once for all its cells.
 
 To come: polygons within polygons, plains higher or lower than the one
 about them; open lines within a polygon, ridges and valleys; ranges
-where two polygons meet.
+where two polygons meet; noise for the ground's detail.
 
-## Land, ocean and hills
-
-A height is 16 bits, 0 to 65,535. The lowest ground is at
-`Shape::ground`; on it the **land rises** (`rise`) by up to
-`Shape::rise` heights: five octaves of noise, the broadest
-`2^rise_span` cells between points -- many superchunks -- each next half
-as broad and of a smaller share (`Shape::rise_shares`), so that the
-finer shape the shores and add little slope.
-
-The **ocean** stands at one height all over the world (`Shape::ocean`):
-the land under it is the ocean's floor, the land over it islands, dozens
-to hundreds of superchunks each. **Hills** stand on the islands: fourteen
-octaves, every power of two from 65,536 cells to 8, so that no one
-octave's grid shows; their shares are heights, and come to the highest
-a hill stands (the four broadest none, as worlds are by default). They grow from nothing to
-their whole height over `Shape::coast` heights of land, from a line
-that is the shore on average but wanders above and below it
-(`Shape::shore`, `shore_span`): hills here stand out of the ocean, and
-there begin well inland, and no level band rings an island.
-
-With a coast of 0 the hills are whole everywhere, the ocean's floor
-too: simply added to the land's rise.
-
-A height is the lowest ground, the land's rise and the hills, added:
-nothing is taken away, so none is under the lowest ground. What is
-under the ocean's level is squeezed so that the lowest ground lies
-`Shape::depth` under it.
-
-The ocean is over a cell under its level only where the land and a
-share of the hills' height (`Shape::hollows`) are under it too
-(`under_ocean`): the rest are dry hollows under the ocean's level.
+The generator before this one -- a land's rise in octaves of noise,
+hills on it, a coast -- is gone; `noise` is kept for the borders and
+for what lies in patches.
 
 **Water** is a depth a cell: how far it stands over the ground, 0 none,
 eight bits over eight bitplanes (`WATER`) -- the ocean deeper than 255
 is kept as 255. Nothing grows or spreads under water. Water does not
-move yet. There are no lakes: no water over the ocean's level.
+move yet.
 
 The height map keeps a floor a chunk and a byte a cell over it; only a
 chunk whose heights span more than 255 -- a tall chunk -- keeps a map of
 16 bits a cell, after the bytes (see chunk storage).
 
-To come: plains level at heights of their own, lakes, mesas, ramps, cliffs --
-the generator as layers of noise, each with a curve and a mask.

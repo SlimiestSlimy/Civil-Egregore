@@ -38,7 +38,7 @@ fn everything(world: &World) -> Everything {
 #[test]
 fn a_world_loaded_goes_on_as_the_one_saved() {
     let folder = folder("goes_on");
-    let mut first = world::generate(17, 3_000);
+    let mut first = world::generate(16, 3_000);
     first.info.name = "Pasture".to_string();
     for _ in 0..1_500 {
         first.tick();
@@ -47,7 +47,7 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
     assert_eq!((saved.superchunks, saved.entities), (first.storage.superchunks().count(), first.entities.len()));
 
     let mut second = world::load(&folder).expect("loaded");
-    assert_eq!((second.info.name.as_str(), second.info.seed, second.info.tick), ("Pasture", 17, 1_500));
+    assert_eq!((second.info.name.as_str(), second.info.seed, second.info.tick), ("Pasture", 16, 1_500));
     assert_eq!(second.info.layers, first.info.layers);
     assert!(everything(&first) == everything(&second), "loaded as saved");
 
@@ -67,7 +67,7 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
 #[test]
 fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     const UNTIL: u64 = 4_000;
-    let mut straight = world::generate(17, 4_000);
+    let mut straight = world::generate(16, 4_000);
     let mut warming = None;
     while straight.entities.now() < UNTIL {
         straight.tick();
@@ -78,7 +78,7 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     let warming = warming.expect("a superchunk warming on the way");
 
     let folder = folder("mid_run");
-    let mut stopped = world::generate(17, 4_000);
+    let mut stopped = world::generate(16, 4_000);
     let mut stops = vec![1, 700, 701, 1_900, 3_333, warming, UNTIL];
     stops.sort_unstable();
     stops.dedup();
@@ -137,12 +137,13 @@ fn files_that_are_not_a_save_are_refused() {
 #[test]
 fn sheep_never_step_through_a_wall() {
     use std::collections::HashMap;
-    // A seed whose origin superchunk is hills, not plains: one with walls enough.
-    let seed = (1..).find(|&seed| terrain::Terrain::generate(seed, coordinates::WORLD_MIDDLE).wall_counts().iter().sum::<u64>() > 20_000).expect("a hilly origin");
-    let mut made = world::generate(seed, 4_000);
+    // Small polygons joined by cliffs, and a seed whose origin superchunk has walls enough.
+    let shape = terrain::Shape { span: 8, levels: 40, edge: 2, sea: 0, ..terrain::Shape::DEFAULT };
+    let seed = (1..).find(|&seed| terrain::Terrain::generate_shaped(&shape, seed, coordinates::WORLD_MIDDLE).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
+    let mut made = world::generate_flocks_with(world::Generation { shape, ..world::Generation::DEFAULT }, seed, &[coordinates::WORLD_MIDDLE], 4_000);
     let high = |at: coordinates::CellIndex| {
         let cell = at.cartesian();
-        terrain::height(seed, cell.x, cell.y)
+        terrain::height_shaped(&shape, seed, cell.x, cell.y)
     };
     let mut stood: HashMap<u64, coordinates::CellIndex> = made.entities.iter().map(|sheep| (sheep.header.id.0, sheep.header.at)).collect();
     let (mut moved, mut beside_walls) = (0, 0);

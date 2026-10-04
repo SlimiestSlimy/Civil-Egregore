@@ -197,26 +197,12 @@ drawn, the view too goes back to where it started. No sheep,
 its rules -- grass and trees -- ticking as in any run, paused and paced
 by the same keys. Generation's sliders are shown from the start:
 
-- **The polygons** (`terrain::polygons`): how broad one is (0 for
-  none, and the land is its rise), how high the plains stand, the
-  edge's width and how far borders are bent. With polygons the ocean's
-  level is the ground's plus the ocean's depth, and the ocean's share
-  is the share of polygons that are ocean. `P` draws their borders
-  over the map.
-- **The hills**: how much of their height each of the fourteen octaves
-  makes up beside the others -- 65,536 cells across to 8 -- and the
-  height span they come to together (`terrain::Shape`).
-- **The land**: the lowest ground's level, how far the land rises over
-  it, how broadly (a power of two of cells), and the share of each of
-  the rise's five octaves.
-- **The ocean's share** of the world: its level is set to the height
-  that share of the cells -- ground, rise and hills together -- are
-  under (found from 16,384 cells drawn over the world), and shown
-  with the seed; how much of what is under it is **dry hollows**;
-  **the ocean's depth**, how far under
-  it its deepest floor is; **the coast**, the heights of land the hills
-  grow over; and how far and how broadly the line they begin at
-  **wanders** about the shore.
+- **The polygons** (`terrain::Shape`): how broad one is, how high the
+  plains stand over the ocean, the edge's width and how far borders
+  are bent. `P` draws their borders over the map.
+- **The ground's level**, the ocean's floor; **the ocean's depth** over
+  it, which sets the ocean's level, shown with the seed; and **the
+  ocean's share** of the polygons.
 - **The grass**, and **the trees** (`world::patches`): each in patches,
   not scattered cell by cell. A cell's number is smooth noise as broad
   as a patch, finer noise on it (detail), and a lot drawn for the cell
