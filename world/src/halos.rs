@@ -18,8 +18,9 @@
 //!   else its image -- generated, if it was never made -- is decoded in
 //!   the background. It turns hot at the tick it is due, waiting for the
 //!   background if need be, so the world is the same however fast the
-//!   background is. Until then it is not hot: writes to it are missed,
-//!   and entities sent to it stay where they stood.
+//!   background is. Until then it is, to the simulation, cold like any
+//!   other: writes to it are missed, and entities sent to it stay where
+//!   they stood. So is a superchunk cooling.
 //!
 //! So between ticks the hot superchunks are the halos less those
 //! warming.

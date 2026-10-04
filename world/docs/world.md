@@ -48,9 +48,11 @@ asleep while there is nothing to do.
   made -- is decoded in the background. It turns hot at the tick it
   is due, its entities put back and its random numbers taken up,
   waiting for the background if it is not done: so the world is the
-  same however fast the background is. Until then it is not hot:
-  writes to it are missed, and entities sent to it stay where they
-  stood. A keeper reaches a superchunk its halo has just reached no
+  same however fast the background is. Until then, to the simulation,
+  it is a cold superchunk like any other: not ticked or read, writes
+  to it missed, entities sent to it staying where they stood, its own
+  entities and random numbers kept cold. So is one cooling. Warming
+  and cooling are the world's bookkeeping, not the simulation's. A keeper reaches a superchunk its halo has just reached no
   sooner than it crosses its own -- 1,024 cells, a step every 64 ticks
   or more -- so long after it has turned hot. A superchunk no halo
   wants any more stops warming.
