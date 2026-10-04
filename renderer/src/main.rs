@@ -28,7 +28,6 @@
 //! | `B` | show the superchunks' boundaries, or not, and near enough each one's Morton index and `(x, y)` |
 //! | `C` | the same of the chunks |
 //! | `H` | show every cell's height, from near enough to read them |
-//!
 //! | `U` | show the sliders that tune the near view's shading, or not |
 
 // Every item is documented, private ones included; `cargo clippy`
