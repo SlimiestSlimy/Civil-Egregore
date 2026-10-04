@@ -82,6 +82,11 @@ that is the shore on average but wanders above and below it
 (`Shape::shore`, `shore_span`): hills here stand out of the ocean, and
 there begin well inland, and no level band rings an island.
 
+A share of the hills' height may lie under the land (`Shape::sunk`):
+hollows as well as hills. The ocean is only where the land's rise is
+under its level (`under_ocean`): a hollow that goes under that level
+inland is dry.
+
 **Water** is a depth a cell: how far it stands over the ground, 0 none,
 eight bits over eight bitplanes (`WATER`) -- the ocean deeper than 255
 is kept as 255. Nothing grows or spreads under water. Water does not

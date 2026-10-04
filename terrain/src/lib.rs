@@ -59,6 +59,11 @@ pub struct Shape {
     pub weights: [u64; 11],
     /// The height the ocean stands at, all over the world.
     pub ocean: Height,
+    /// The share of the hills' height that lies under the land, of
+    /// [`ONE`]: none, and hills only stand on it; a half, and they are
+    /// as much hollows as hills -- hollows that may go under the
+    /// ocean's level and stay dry.
+    pub sunk: u64,
     /// How far under the ocean its deepest floor is: the land under
     /// the ocean falls to that, not to the lowest ground.
     pub depth: u64,
@@ -90,7 +95,7 @@ impl Shape {
     /// The world's shape: islands some 16 superchunks across in an
     /// ocean a little over half the world, hills as tuned by eye in the
     /// renderer's lab.
-    pub const DEFAULT: Self = Self { weights: [0, 0, 0, 0, 99, 58, 14, 25, 37, 20, 2], ocean: 800, depth: 255, coast: 64, ground: 256, rise: 1024, rise_span: 14, rise_shares: [625, 250, 100, 40, 16], shore: ONE, shore_span: 10 };
+    pub const DEFAULT: Self = Self { weights: [0, 0, 0, 0, 99, 58, 14, 25, 37, 20, 2], ocean: 800, sunk: 0, depth: 255, coast: 64, ground: 256, rise: 1024, rise_span: 14, rise_shares: [625, 250, 100, 40, 16], shore: ONE, shore_span: 10 };
 }
 
 /// One: a fraction's whole, 16 bits.
@@ -135,6 +140,13 @@ pub fn rise(shape: &Shape, seed: u64, x: u32, y: u32) -> u64 {
     (land / shares.iter().sum::<u64>().max(1) * shape.rise) >> 16
 }
 
+/// Whether the ocean is over the cell `(x, y)` wherever its ground is
+/// under the ocean's level: where the land's rise is. A hollow of the
+/// hills that goes under that level inland is dry.
+pub fn under_ocean(shape: &Shape, seed: u64, x: u32, y: u32) -> bool {
+    shape.ground as u64 + rise(shape, seed, x, y) < shape.ocean as u64
+}
+
 /// The height of the cell at `(x, y)` of the world whose seed is `seed`:
 /// whole numbers only, so the same on any machine.
 pub fn height(seed: u64, x: u32, y: u32) -> Height {
@@ -158,8 +170,10 @@ pub fn height_shaped(shape: &Shape, seed: u64, x: u32, y: u32) -> Height {
         return land.min(Height::MAX as u64) as Height;
     }
     let hills: u64 = OCTAVES.iter().zip(shape.weights).filter(|&(_, weight)| weight > 0).map(|(&(shift, index), weight)| noise(seed, index, shift, x, y) * weight).sum();
+    // What of the hills lies under the land, as much of it as of them stands here.
+    let sunk = (((shape.weights.iter().sum::<u64>() * shape.sunk) >> 16) * relief) >> 16;
     // The highest there is, whatever the shape would come to.
-    (land + (((hills * relief) >> 16) >> 16)).min(Height::MAX as u64) as Height
+    (land + (((hills * relief) >> 16) >> 16)).saturating_sub(sunk).min(Height::MAX as u64) as Height
 }
 
 /// Whether two heights are too far apart to step between.

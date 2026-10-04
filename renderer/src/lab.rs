@@ -7,7 +7,7 @@
 //! world is made afresh and its ticks start from 0.
 
 use crate::sim::SEED;
-use crate::tuning::{self, COAST, GRASS_COVER, GROUND_LEVEL, HEIGHT_SPAN, HILLS, LAND_RISE, LAND_SPAN, OCEAN_DEPTH, OCEAN_SHARE, PATCH_DETAIL, PATCH_SIZE, RISE_SHARES, SCATTER, SHORE_SPAN, SHORE_WANDER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
+use crate::tuning::{self, COAST, GRASS_COVER, GROUND_LEVEL, HEIGHT_SPAN, HILLS, HILL_SINK, LAND_RISE, LAND_SPAN, OCEAN_DEPTH, OCEAN_SHARE, PATCH_DETAIL, PATCH_SIZE, RISE_SHARES, SCATTER, SHORE_SPAN, SHORE_WANDER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -110,6 +110,7 @@ fn shape(tuned: &tuning::Tuning) -> Shape {
     let land = Shape {
         weights: [0; 11],
         ocean: 0,
+        sunk: (tuned[HILL_SINK].clamp(0.0, 1.0) * ONE as f32) as u64,
         depth: tuned[OCEAN_DEPTH].round().clamp(0.0, u16::MAX as f32) as u64,
         coast: tuned[COAST].round().clamp(1.0, u16::MAX as f32) as u64,
         ground: height(tuned[GROUND_LEVEL]),
