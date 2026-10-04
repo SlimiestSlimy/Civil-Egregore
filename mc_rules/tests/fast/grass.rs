@@ -1,19 +1,20 @@
 //! Grass over dirt: it spreads onto dirt at its chance, decays at its
 //! chance times its share of grass neighbours, and every cell stays dirt
-//! or grass.
+//! or grass -- and only in its circle.
 //!
 //! `cargo test`
 
 use bitplane_manager::{BitmapArena, Shape, Write, WriteOp};
 use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
 use chunk_storage::{ChunkStorage, LayerCodec};
-use coordinates::{CellCartesian, SuperchunkIndex};
+use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
 use simulation::entity_store::Entities;
 use simulation::Simulation;
-use mc_rules::grass::{tick, DECAY_CHANCE, SPREAD_CHANCE};
+use mc_rules::grass::{grows_in, tick, DECAY_CHANCE, GROWING_CENTRE, GROWING_RADIUS, SPREAD_CHANCE};
 
-/// The superchunk the tests run on.
-const SUPERCHUNK: SuperchunkIndex = SuperchunkIndex::from_cartesian(3, 3);
+/// The superchunk the tests run on: the world's origin, where grass
+/// grows.
+const SUPERCHUNK: SuperchunkIndex = WORLD_MIDDLE;
 
 /// Cells in a superchunk.
 const CELLS: u32 = 1 << 20;
@@ -92,4 +93,48 @@ fn every_cell_stays_dirt_or_grass() {
     }
     let growth = grass as f64 / start as f64;
     assert!(growth > 1.0 && growth < (1000.0 * SPREAD_CHANCE).exp() * 1.1, "grew {growth:.2} times");
+}
+
+/// Grass grows only in its circle: over the 5x5 superchunks about the
+/// origin, 300 ticks change grass in every one of the 3x3 about it and
+/// in no superchunk the circle misses, and on no cell farther from its
+/// centre than its radius and the one step a spread takes.
+#[test]
+fn grass_grows_only_in_its_circle() {
+    let (mut codec, mut arena, mut storage) = (LayerCodec::new(), BitmapArena::new(), ChunkStorage::new(1 << 12));
+    let superchunks: Vec<SuperchunkIndex> = (-2..=2).flat_map(|dy| (-2..=2).map(move |dx| WORLD_MIDDLE.offset(dx, dy).expect("in the world"))).collect();
+    for (seed, &superchunk) in superchunks.iter().enumerate() {
+        storage.insert(superchunk, grass_on_dirt(seed as u64, 300_000, &mut codec));
+        arena.make_hot_superchunk(superchunk, &[DIRT, GRASS], &storage, &mut codec);
+    }
+    // Every chunk's grass, as words.
+    let grass = |arena: &BitmapArena| -> Vec<(ChunkIndex, Vec<u64>)> { arena.run(GRASS).map(|(chunk, bucket)| (chunk, bucket.cells().to_vec())).collect() };
+    let before = grass(&arena);
+    let (mut simulation, mut entities) = (Simulation::new(2), Entities::new());
+    for seed in 0..300 {
+        tick(&mut simulation, &mut arena, &mut entities, seed);
+    }
+    let after = grass(&arena);
+    let reach = GROWING_RADIUS as u64 + 2;
+    let mut changed: Vec<CellCartesian> = Vec::new();
+    for ((chunk, was), (same, is)) in before.iter().zip(&after) {
+        assert_eq!(chunk, same);
+        for (word, (&was, &is)) in was.iter().zip(is).enumerate() {
+            let flipped = was ^ is;
+            changed.extend((0..64).filter(|bit| flipped >> bit & 1 == 1).map(|bit| CellIndex::of(*chunk, word * 64 + bit).cartesian()));
+        }
+    }
+    assert!(changed.len() > 1000, "grass changed on {} cells", changed.len());
+    for cell in &changed {
+        let (dx, dy) = (cell.x.abs_diff(GROWING_CENTRE.x) as u64, cell.y.abs_diff(GROWING_CENTRE.y) as u64);
+        assert!(dx * dx + dy * dy <= reach * reach, "({}, {}) changed, outside the circle", cell.x, cell.y);
+    }
+    let touched = |superchunk: SuperchunkIndex| changed.iter().any(|&cell| CellIndex::from(cell).superchunk() == superchunk);
+    for &superchunk in &superchunks {
+        let (x, y) = superchunk.cartesian();
+        let (middle, _) = WORLD_MIDDLE.cartesian();
+        let around_origin = x.abs_diff(middle) <= 1 && y.abs_diff(middle) <= 1;
+        assert!(!touched(superchunk) || grows_in(superchunk), "{x}, {y}: changed where grass does not grow");
+        assert!(touched(superchunk) || !around_origin, "{x}, {y}: around the origin, unchanged");
+    }
 }

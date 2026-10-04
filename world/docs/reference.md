@@ -4,23 +4,43 @@ The design is in `world.md`.
 
 ## `lib.rs`
 
-`GRASS_CELLS` (400,000), `FLOCK` (4,000): what a superchunk generated
-is given. **`generate(seed, superchunks)`**, **`generate_with(seed, superchunks,
-grass_cells, flock)`**: a square of them from the
-world's middle (`coordinates::square_from_middle`), each from the seed
-and its superchunk index -- a
-**`World`** `{info, arena, storage, entities, simulation}`.
-**`save(folder, name, seed, arena, storage, entities, simulation)`**:
-every dirty bitmap written back, the ring flushed, then each
-superchunk's image and state written, the world's file last -- a
-**`Saved`** `{superchunks, entities, bytes}`. **`load(folder)`**: a
+`GRASS_CELLS` (400,000): the grass a superchunk generated is given;
+`FLOCK` (4,000): the sheep the origin starts with, unless told.
+**`World`** `{info, arena, storage, entities, simulation, cold, codec}`
+-- **`cold`**, each cold superchunk's state as a save keeps it --
+and **`World::empty(info)`**, what generating and loading start from;
+**`layer_types`**. **`generate(seed, sheep)`**: the origin
+(`WORLD_MIDDLE`) hot, a flock of `sheep` on it, and its halo made.
+**`generate_image(seed, superchunk, codec)`**: a superchunk's terrain
+and pasture, from the seed and its superchunk index.
+**`save(folder, world)`**: every dirty bitmap written back, the ring
+flushed, then each superchunk's image and state -- live if hot, kept
+if cold -- written, the world's file last: a **`Saved`**
+`{superchunks, entities, bytes}`. **`load(folder)`**: every
+superchunk's image into the cold pool and its state kept cold, then
+the halos about the states holding a halo keeper made hot -- a
 `World`, or a `DiskError` naming the file and what is wrong.
+
+## `halos.rs`
+
+`HALO_KEEPERS` (the sheep, for now): the kinds of entity that keep a
+halo. **`HaloChange`** `{generated, warmed, cooled}`, added with `+=`.
+**`about(keepers)`**: the 3x3 superchunks about each, sorted, each
+once. **`World::keepers`**: the hot superchunks holding a keeper.
+**`World::move_halos`**: the halos moved to their keepers.
+**`World::keep_hot(wanted)`**: `wanted` made the hot superchunks --
+the others' states kept and their bitmaps made cold
+(`BitmapArena::make_cold_superchunk`), the new ones warmed from
+storage and their kept states, or generated -- the entities aligned
+and the random streams with them.
 
 ## `tick.rs`
 
-**`tick(simulation, arena, entities, seed)`**: grass
+**`tick_rules(simulation, arena, entities, seed)`**: grass
 (`mc_rules::grass::rule`) and then sheep (`entity_rules::sheep::rule`) on
-each superchunk's turn; **`TickCounts`** `{grass, sheep}`.
+each hot superchunk's turn, the halos left -- for mock worlds;
+**`TickCounts`** `{grass, sheep}`. **`World::tick`**: the rules, then
+the halos moved: a **`WorldTick`** `{rules, halos}`.
 
 ## `diagnostics/`
 

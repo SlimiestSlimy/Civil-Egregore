@@ -21,7 +21,7 @@ spreading over dirt -- and the first entities: sheep eating it.
 | [`docs/testing_protocol.md`](docs/testing_protocol.md) | how TileSim is tested: diagnostics, tests and tools apart, and three tiers of test -- fine, fast, complete |
 | [`docs/tilesim.md`](docs/tilesim.md) | what TileSim is, and every decision about it so far: chunks, superchunks, layers, the simulation's plan |
 | [`src/`](src/) | the `tilesim` crate: the program -- worlds made from a seed, run and saved, from the command line |
-| [`world/`](world/) | the world as a whole: made from a seed, ticked -- rules and entities together -- saved and loaded; and its diagnostics tool |
+| [`world/`](world/) | the world as a whole: made from a seed, ticked -- rules and entities together, hot only in the halos about the entities that matter -- saved and loaded; and its diagnostics tool |
 | [`mc_rules/`](mc_rules/) | the Monte Carlo rules of the cells, a file each: so far grass over dirt |
 | [`entity_rules/`](entity_rules/) | the entities, a file each: so far the sheep, eating the grass |
 | [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |

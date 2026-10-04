@@ -7,22 +7,50 @@ and the viewer (`../viewer/`) call it.
 
 ## Made from a seed
 
-`generate(seed, superchunks)`: every superchunk's contents come from
-the world's seed and the superchunk's Morton index, so a superchunk is
-the same whenever and in whatever order it is made. A superchunk is its
-terrain (`../terrain/`) -- heights, and the walls they make, four
-layers -- and on it, for now, pasture: dirt, about a third of it grass,
-4,000 sheep.
+`generate(seed, sheep)`: the world starts as its origin superchunk
+(`WORLD_MIDDLE`) with a flock on it, and the eight about it -- the
+flock's halo. Every superchunk's contents come from the world's seed
+and its superchunk index (`generate_image`), so a superchunk is the
+same whenever and in whatever order it is made: the world has no edge
+but the coordinates', and grows as the sheep wander. A superchunk is
+its terrain (`../terrain/`) -- heights, and the walls they make, four
+layers -- and on it, for now, pasture: dirt, about a third of it grass.
 
 Each superchunk's random numbers are a stream of their own
-(`Rng::for_stream`): seeded by the seed moved along by the Morton
-index, as they first were, two superchunks drew one sequence a few
-draws apart -- two flocks came out with the same sheep.
+(`Rng::for_stream`): seeded by the seed moved along by the
+superchunk index, as they first were, two superchunks drew one
+sequence a few draws apart -- two flocks came out with the same sheep.
+
+## Halos
+
+Only the superchunks about the entities that matter are hot. An
+entity of a kind that keeps a halo (`HALO_KEEPERS`: people, to come;
+for now the sheep stand in) keeps its superchunk and the eight about
+it hot -- as far as anything reaches in a tick, the speed of light.
+Every other superchunk is cold: its cells in its image in chunk
+storage, its entities and random numbers kept as a save keeps them
+(`World::cold`). After every tick the halos move to where their
+keepers stand (`World::move_halos`): a superchunk a halo comes to is
+warmed from storage and its kept state, or, never made, generated;
+one no halo reaches goes cold -- written back, flushed into its
+image, dropped from the arena. So between ticks the hot superchunks
+are the halos, exactly (`tests/fast/halos.rs`), and a superchunk gone
+cold comes back as it was, to the cell, the entity and the random
+number.
+
+Passive rules tick only where hot: grass grows only in its circle
+about the origin (`mc_rules::grass::grows_at`), and there only while a
+halo covers it. An entity kept cold whose wake passes wakes the tick
+its superchunk is warmed.
+
+Not yet: a halo is a fixed 3x3 whatever its keeper; and a keeper is
+found by looking through each hot superchunk's entities for one.
 
 ## TickCounts
 
-`tick` runs every rule of the cells (`../mc_rules/`) and every kind of
-entity (`../entities/`) on each superchunk's turn: grass, then sheep.
+`World::tick` runs every rule of the cells (`../mc_rules/`) and every
+kind of entity (`../entity_rules/`) on each hot superchunk's turn --
+grass, then sheep -- then moves the halos.
 
 ## Saved and loaded
 
@@ -44,11 +72,12 @@ image is written as it is, and beside it the superchunk's state. The
 world's file is written last, each file beside itself and then
 renamed, so a save cut short leaves the one before readable.
 
-**Loading** reads every image into the cold pool, makes every layer type of
-the world hot on every chunk -- a type with no cell left on a
-superchunk has no stored layer, and must be hot all the same to be
-written to -- puts the entities back at the world's tick, and takes up
-each superchunk's random numbers.
+**Loading** reads every image into the cold pool and keeps every
+state as a cold superchunk's, then warms the halos about the states
+holding a halo keeper: every layer type of the world made hot on every
+chunk of them -- a type with no cell left on a superchunk has no stored
+layer, and must be hot all the same to be written to -- their entities
+put back at the world's tick, their random numbers taken up.
 
 **A world loaded goes on as the one saved would have**, to the cell,
 the entity and the random number (`tests/world.rs`: 1,500 ticks,
@@ -67,23 +96,23 @@ to tick 4,000: the same cells, entities and random numbers). What makes it so:
   from before an entity was changed are not kept: they wake nothing.
 - **Nothing is half done between ticks**: a crossing is settled
   within its tick, so a save holds each entity once, on one cell.
-- One whose wake passed with no rule seeing to it never wakes again in
-  the world saved; loaded, its wake is `NEVER`, the one thing not the
-  same to the word.
+- An entity whose wake has passed when it is put back -- kept while
+  its superchunk was cold -- wakes the tick it is put back.
 
 Measured: 16 superchunks, 64,000 sheep: 24 MiB -- 1 MiB a superchunk of
 heights, raw, 250 KiB of layers, 260 KiB of entities.
 
 Not yet: superchunks no longer in the world are not removed from a
-save's folder; and every superchunk saved is loaded hot.
+save's folder.
 
 ## Layout
 
 | folder | what is in it |
 |---|---|
 | `src/lib.rs` | generate, save, load |
-| `src/tick.rs` | the tick of every rule and entity |
+| `src/halos.rs` | the hot superchunks: the halos about the entities that keep one |
+| `src/tick.rs` | the tick of every rule and entity, then the halos moved |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; frames; the diagnostics tool |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
-| `tests/` | a world loaded goes on as the one saved; the files; refusals |
+| `tests/` | the halos follow their keepers, and a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; the files; refusals |
 | `docs/` | this, and the reference, function by function |

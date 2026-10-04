@@ -46,8 +46,12 @@ what they always do and are not listed.
 | **around** | the 3x3 cells about a cell, nine bits, row by row: bit `3y + x`, the cell itself bit 4 (`Around`) | window, area | neighbourhood |
 | **area** | the 16x16 cells about a cell, a `u16` row each (`Area`, `Rows`): what an entity sees at once, and what paths are found over | around, window, pathfinding | |
 | **mask** | bits standing for cells, any shape: a window, an around, an area's rows | | |
-| **hot** | a layer decoded in the bitmap arena, read and written; a superchunk is hot when its layers are. The simulation ticks the hot superchunks only | cold, arena | held, loaded |
-| **cold** | a layer kept encoded in chunk storage, not readable cell by cell | hot, image | |
+| **hot** | a layer decoded in the bitmap arena, read and written; a superchunk is hot when its layers are -- when a halo covers it. The simulation ticks the hot superchunks only | cold, arena, halo | held, loaded |
+| **cold** | a layer kept encoded in chunk storage, not readable cell by cell; a superchunk no halo covers, its layers so and its entities kept as its cold state | hot, image, cold state | |
+| **halo** | the 3x3 superchunks about an entity that keeps one -- its own and the eight beside it -- kept hot (`world::halos`) | halo keeper, hot | halo chunk |
+| **halo keeper** | an entity of a kind that keeps a halo (`HALO_KEEPERS`): people, to come; the sheep, for now | halo | important entity |
+| **origin** | the superchunk the world starts from, in its middle (`WORLD_MIDDLE`): a world is generated as it and its halo | superchunk | centre |
+| **cold state** | a cold superchunk's entities and random numbers, kept as a save keeps them (`World::cold`) | cold, save | |
 | **dirty** | a hot layer changed since it was decoded: it must be written back before it is evicted | write back | |
 
 ## Storage

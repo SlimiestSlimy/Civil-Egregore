@@ -5,7 +5,7 @@
 //! value.
 
 use coordinates::CellIndex;
-use super::entity::{Attribute, AttributeType, EntityId, EntityType, Header, NEVER};
+use super::entity::{Attribute, AttributeType, EntityId, EntityType, Header};
 use super::store::{Entities, SuperchunkEntities};
 
 /// The first word: `TSstate` and the format's number, 2.
@@ -34,8 +34,23 @@ pub fn encode_state(random: Option<u64>, entities: Option<&SuperchunkEntities>) 
 }
 
 /// Reads the state file `words` of a world at tick `now`: its entities
-/// queued to be put in `entities`.
+/// queued to be put in `entities`, each whose wake has passed -- kept
+/// while its superchunk was cold -- waking at `now`.
 pub fn decode_state(words: &[u64], now: u64, entities: &mut Entities) -> Result<SavedState, &'static str> {
+    read(words, |header, attributes| entities.queue_put(Header { wake: header.wake.max(now), ..header }, attributes))
+}
+
+/// Whether the state file `words` holds an entity of one of `kinds`: or
+/// what is wrong with it.
+pub fn holds_any(words: &[u64], kinds: &[EntityType]) -> Result<bool, &'static str> {
+    let mut found = false;
+    read(words, |header, _| found |= kinds.contains(&header.kind))?;
+    Ok(found)
+}
+
+/// Reads the state file `words`, each entity handed to `each` with its
+/// attributes: what it held beside them, or what is wrong with it.
+fn read(words: &[u64], mut each: impl FnMut(Header, &[Attribute])) -> Result<SavedState, &'static str> {
     let mut words = words.iter().copied();
     let mut next = || words.next().ok_or("cut short");
     if next()? != FIRST_WORD {
@@ -49,9 +64,13 @@ pub fn decode_state(words: &[u64], now: u64, entities: &mut Entities) -> Result<
         for _ in 0..attribute_count {
             attributes.push(Attribute { kind: AttributeType(next()?), value: next()? });
         }
-        // One whose wake passed with no rule seeing to it wakes no more: it is not woken by being loaded.
-        let wake = if wake < now { NEVER } else { wake };
-        entities.queue_put(Header { id: EntityId(id), kind: EntityType(kind), at: CellIndex(at), wake }, &attributes);
+        each(Header { id: EntityId(id), kind: EntityType(kind), at: CellIndex(at), wake }, &attributes);
     }
     Ok(SavedState { random: (has_random == 1).then_some(random), entities: count as usize })
+}
+
+/// How many entities the state file `words` holds: none if it is not
+/// one.
+pub fn entity_count(words: &[u64]) -> usize {
+    read(words, |_, _| {}).map_or(0, |state| state.entities)
 }

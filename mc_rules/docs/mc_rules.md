@@ -9,7 +9,12 @@ other rule and no entity; the world's tick (`world/`) runs them
 together with the entities (`entity_rules/`).
 
 So far one: grass spreading over dirt and decaying
-(`../docs/tilesim.md`, "Sampling").
+(`../docs/tilesim.md`, "Sampling") -- only in a circle three
+superchunks across about the middle of the world's origin superchunk,
+and there only where a halo keeps it hot (`../world/docs/world.md`,
+"Halos"). A superchunk the circle misses samples nothing; one it
+crosses samples its grass and drops the samples outside. Grass
+elsewhere lies as it was made, unless eaten.
 
 ## Layout
 

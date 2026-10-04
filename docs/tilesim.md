@@ -808,6 +808,21 @@ was left as it is.) The threads are worth little while a tick is small:
 at 16 superchunks a tick is 40 microseconds, about what handing it to
 12 threads and back costs.
 
+### Halos (built, first test)
+
+The world is hot only about the entities that matter: each keeps its
+superchunk and the eight about it hot -- its halo, as far as anything
+reaches in a tick -- and every other superchunk is cold, its cells in
+its image and its entities and random numbers kept as a save keeps
+them. After every tick the halos move to where their keepers came to:
+superchunks reached are warmed from storage, or generated if never
+made; superchunks left go cold. The world has no size: it is made as
+it is reached. People will keep halos; for now the sheep do, and the
+world starts as its origin superchunk, a flock on it, and the flock's
+halo. Grass grows only in a circle three superchunks across about the
+origin's middle, and only where hot. The whole of it:
+`world/docs/world.md`, "Halos".
+
 ## Simulation (the plan)
 
 From the concept notes:

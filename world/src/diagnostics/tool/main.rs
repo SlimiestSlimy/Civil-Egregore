@@ -159,7 +159,7 @@ fn video(arguments: &[String]) {
                 eprintln!("tick {tick:>7}: grass {}, sheep {}", world.grass(), world.sheep());
             }
         }
-        since += world::tick(&mut simulation, &mut world.arena, &mut world.entities, tick as u64).rules.sheep;
+        since += world::tick_rules(&mut simulation, &mut world.arena, &mut world.entities, tick as u64).rules.sheep;
     }
     // Standard output is the video: the census is kept, not printed.
     let mut report = Report::new("video", &format!("diagnostics video {ticks} {grass_cells} {every} {flock}"));
