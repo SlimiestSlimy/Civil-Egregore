@@ -71,7 +71,7 @@ error)` or `Invalid(path, what)`. **`write_world(folder, info)`**,
 **`read_world(folder)`**; **`write_image(folder, superchunk,
 image)`**, **`read_image`**; **`write_state(folder, superchunk,
 words)`**, **`read_state`** -- the words, and the file's path;
-**`HotSuperchunks`** `{hot, warming}`, **`write_hot(folder, hot)`**,
+**`HotSuperchunks`** `{hot, cooling, warming}`, **`write_hot(folder, hot)`**,
 **`read_hot(folder)`**: the hot file;
 **`saved_superchunks(folder)`**: those with an image, in Morton order.
 Private: `superchunk_file`, `make_folder`, `write`, `write_words`,

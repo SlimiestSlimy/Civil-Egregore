@@ -7,7 +7,7 @@ The design is in `world.md`.
 `GRASS_CELLS` (400,000): the grass a superchunk generated is given;
 `FLOCK` (4,000): the sheep the origin starts with, unless told.
 **`World`** `{info, arena, storage, entities, simulation, cold,
-background, warming, writing_back, flushing}` -- **`cold`**, each cold
+background, warming, cooling, writing_back, flushing}` -- **`cold`**, each cold
 superchunk's state as a save keeps it; **`writing_back`**, the
 write-backs of superchunks gone cold being encoded, in order;
 **`flushing`**, the superchunks whose images are being rewritten -- and
@@ -22,30 +22,34 @@ image and state -- live if hot, kept if cold -- the hot file, and the
 world's file last: a **`Saved`** `{superchunks, entities, bytes}`.
 **`load(folder)`**: every superchunk's image into the cold pool and its
 state, read whole, kept cold; then the hot file's hot superchunks made
-hot and its warming ones warming again -- a `World`, or a `DiskError` naming
+hot, its cooling ones cooling again and its warming ones warming again -- a `World`, or a `DiskError` naming
 the file and what is wrong.
 
 ## `halos.rs`
 
 `HALO_KEEPERS` (the sheep, for now): the kinds of entity that keep a
-halo. `WARM_TICKS` (256): the ticks a superchunk is warming.
+halo. `WARM_TICKS` (256): the ticks a superchunk is warming;
+`COOL_TICKS` (256): the ticks one is cooling.
 **`HaloChange`** `{reached, generated, restored, cooled}`, added with
 `+=`. **`Warming`** `{superchunk, due, from}`, from a
-**`WarmedFrom`**: `Cooling`, or `Background(ticket)`.
+**`WarmedFrom`**: `Lingering`, or `Background(ticket)`.
 **`about(keepers)`**: the 3x3 superchunks about each, sorted, each
 once. **`World::keepers`**: the hot superchunks holding a keeper.
 **`World::move_halos`**: the halos moved to their keepers, those
-reached hot `WARM_TICKS` on. **`World::keep_hot(wanted)`**: `wanted`
-made the hot superchunks now. **`World::warming`**: the superchunks
-warming, each with its due tick. Both through
-**`World::make_hot_within(wanted, ticks)`**: the write-backs encoded
-landed; the hot superchunks not wanted made cold -- state kept, bitmaps
-cooling (`BitmapArena::make_cold_superchunk`), their dirty ones sent to
-be encoded; those warming not wanted dropped (`BitmapArena::let_go`, or
-the job forgotten); every one warming due no later than `ticks` on; the
-wanted ones neither hot nor warming started; those due made hot, the
+reached hot `WARM_TICKS` on, those left cold `COOL_TICKS` on.
+**`World::keep_hot(wanted)`**: `wanted` made the hot superchunks now.
+**`World::warming`**, **`World::cooling`**: the superchunks warming,
+and those cooling, each with its due tick. Both through
+**`World::make_hot_within(wanted, warm_ticks, cool_ticks)`**: the
+write-backs encoded landed; those cooling wanted again no longer
+cooling; every hot one not wanted cooling, due no later than
+`cool_ticks` on; those due made cold -- state kept, bitmaps lingering
+(`BitmapArena::make_cold_superchunk`), their dirty ones sent to be
+encoded; those warming not wanted dropped (`BitmapArena::let_go`, or
+the job forgotten); every one warming due no later than `warm_ticks`
+on; the wanted ones neither hot nor warming started; those due made hot, the
 entities aligned, the kept states put back and the random streams with
-them. **`World::start_warming(superchunk, due)`**: held if cooling
+them. **`World::start_warming(superchunk, due)`**: held if lingering
 (`BitmapArena::hold`), else sent to the background.
 **`World::finish_warming`**: a warming superchunk's bitmaps made hot -- again
 as they were (`BitmapArena::make_hot_again`), or as the background made

@@ -22,16 +22,16 @@ fn folder(name: &str) -> PathBuf {
 
 /// Every hot cell of grass and dirt, every entity with its attributes,
 /// the tick, every random stream, every cold superchunk's image and
-/// kept state, and the superchunks warming with when each is due: what
+/// kept state, and the superchunks warming and cooling with when each is due: what
 /// two worlds the same hold the same.
-type Everything = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, u64, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, SuperchunkImage, Vec<u64>)>, Vec<(SuperchunkIndex, u64)>);
+type Everything = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, u64, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, SuperchunkImage, Vec<u64>)>, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, u64)>);
 
 /// [`Everything`] `world` holds.
 fn everything(world: &World) -> Everything {
     let cells = [DIRT, GRASS].into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.cells().to_vec()).collect();
     let all = world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
     let cold = world.cold.iter().map(|(&superchunk, words)| (superchunk, world.storage.image(superchunk).expect("a cold superchunk's image").clone(), words.clone())).collect();
-    (cells, all, world.entities.now(), world.simulation.random_states().collect(), cold, world.warming().collect())
+    (cells, all, world.entities.now(), world.simulation.random_states().collect(), cold, world.warming().collect(), world.cooling().collect())
 }
 
 /// Grass and sheep ticked, saved, and ticked on; the save loaded and
@@ -107,7 +107,7 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let text = std::fs::read_to_string(folder.join("world")).expect("the world's file");
     assert_eq!(text, "tilesim world 1\nname = Nine fields\nseed = 99\ntick = 0\nlayers = 1 2 8 9\n");
     let hot: String = first.arena.superchunk_indices().iter().map(|superchunk| format!("{:011x}\n", superchunk.0)).collect();
-    assert_eq!(std::fs::read_to_string(folder.join("hot")).expect("the hot file"), format!("tilesim hot 1\n{hot}"), "the nine hot, none warming");
+    assert_eq!(std::fs::read_to_string(folder.join("hot")).expect("the hot file"), format!("tilesim hot 2\n{hot}"), "the nine hot, none cooling or warming");
     let mut names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|entry| entry.unwrap().file_name().into_string().unwrap()).collect();
     names.sort();
     let expected: Vec<String> = disk::saved_superchunks(&folder).expect("listed").iter().flat_map(|superchunk| ["image", "state"].map(|kind| format!("{:011x}.{kind}", superchunk.0))).collect();

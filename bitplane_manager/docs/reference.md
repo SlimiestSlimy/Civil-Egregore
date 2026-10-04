@@ -49,7 +49,7 @@ across its edge looked up again (**`word_tile_at`**); **`any_in_tile`**,
 **`Bucket`**: a hot bitmap to read: **`count`**, **`get(place)`**,
 **`cells`**.
 
-**`Cooling`** `{superchunk, wanted}`: a superchunk gone cold, its
+**`Lingering`** `{superchunk, wanted}`: a superchunk gone cold, its
 allocations kept; **`done`**, whether it can be let go.
 
 **`BitmapArena`**: **`new`**; **`len`**, **`is_empty`**, **`allocations`**;
@@ -61,8 +61,8 @@ the cells given, both through **`make_hot_with`**;
 **`make_hot_layers(chunk, types, storage, codec)`** and
 **`make_hot_superchunk(superchunk, types, storage, codec)`**, every
 chunk of it; **`make_cold_superchunk(superchunk)`** -- its dirty
-buckets taken and returned, its allocations cooling -- **`hold`**,
-**`let_go`**, **`make_hot_again`**, **`cooling`** (how many);
+buckets taken and returned, its allocations lingering -- **`hold`**,
+**`let_go`**, **`make_hot_again`**, **`lingering`** (how many);
 **`run(type)`** and **`keys`**, in Morton order; **`superchunks`** /
 **`superchunks_mut`**, for the simulation, and
 **`superchunk_indices`**, theirs; **`take_dirty(superchunk)`** -- the
@@ -74,8 +74,8 @@ put in the ring here, flushes reported as they come;
 **`flushed`**; **`evict(key)`** -- an allocation with nothing hot or
 waiting released to the block pool. Private: **`allocation`** (found or
 made), **`hot`**, **`at`**/**`at_mut`**, **`entry_mut`** (hot or
-cooling), **`cooling_at`**, **`layers`**, **`layers_of`**,
-**`leave_ring`**, **`release_unused`** -- cooling superchunks done with
+lingering), **`lingering_at`**, **`layers`**, **`layers_of`**,
+**`leave_ring`**, **`release_unused`** -- lingering superchunks done with
 let go too.
 
 ## `writes.rs`
