@@ -55,11 +55,44 @@ pub struct Shape {
     /// The height the highest land polygon's plain may stand at: each
     /// stands between just over the ocean and this.
     pub highest: Height,
-    /// The cells from a border over which the levels about it are
-    /// mixed: half a square's side at most.
-    pub edge: u64,
+    /// The cells the narrowest polygon's ramp is across: each polygon
+    /// has a ramp of its own, by lot, from this to the widest -- about
+    /// a narrow one cliffs, about a broad one slopes.
+    pub narrow: u64,
+    /// The cells the widest polygon's ramp is across: half a square's
+    /// side at most.
+    pub wide: u64,
+    /// How hard the softest polygon's ramp is, of
+    /// [`polygons::HARD_ONE`]: each polygon has a hardness of its own,
+    /// by lot, from this to the hardest. One is an even slope; more, two
+    /// levels and a step between them.
+    pub soft: u64,
+    /// How hard the hardest polygon's ramp is: 16 at most.
+    pub hard: u64,
     /// How far the borders are bent, beside a square's side, of [`ONE`].
     pub warp: u64,
+    /// The grids of smaller polygons within the land ones, each a
+    /// quarter the breadth of the one before: 3 at most.
+    pub inner_depth: u32,
+    /// The share of the smaller polygons that raise or sink the
+    /// ground, of [`ONE`].
+    pub inner_share: u64,
+    /// The most one of the broadest of them raises or sinks it, in
+    /// heights: half as much each grid finer.
+    pub inner_height: u64,
+    /// The share of those that raise it, of [`ONE`]: the rest sink it.
+    pub raised: u64,
+    /// The lines a land polygon has at most: 4 at most.
+    pub lines: u32,
+    /// The most a line raises or sinks the ground, in heights.
+    pub line_height: u64,
+    /// The share of the lines that are ridges, of [`ONE`]: the rest
+    /// are canyons.
+    pub ridges: u64,
+    /// The cells from it the narrowest line is gone at.
+    pub line_narrow: u64,
+    /// The cells from it the widest line is gone at.
+    pub line_wide: u64,
 }
 
 /// A cell's water: how deep it stands over the ground, 0 none, a number
@@ -69,8 +102,9 @@ pub const WATER: [LayerType; 8] = [LayerType(24), LayerType(25), LayerType(26), 
 impl Shape {
     /// The world's shape: polygons 8 superchunks across, half of them
     /// ocean 255 deep -- as deep as water is kept -- the plains to 200
-    /// over it (711), joined by ramps 2,048 cells from a border.
-    pub const DEFAULT: Self = Self { ground: 256, ocean: 511, span: 13, sea: ONE / 2, highest: 711, edge: 2048, warp: ONE * 3 / 10 };
+    /// over it (711), joined by ramps from 4 cells across to 2,048; within
+    /// the land, two grids of smaller polygons and up to two lines a polygon.
+    pub const DEFAULT: Self = Self { ground: 256, ocean: 511, span: 13, sea: ONE / 2, highest: 711, narrow: 4, wide: 2048, soft: polygons::HARD_ONE, hard: 8 * polygons::HARD_ONE, warp: ONE * 3 / 10, inner_depth: 2, inner_share: ONE * 7 / 10, inner_height: 120, raised: ONE * 3 / 5, lines: 2, line_height: 300, ridges: ONE * 7 / 10, line_narrow: 64, line_wide: 1024 };
 }
 
 /// One: a fraction's whole, 16 bits.
