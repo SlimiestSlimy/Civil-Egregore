@@ -94,7 +94,8 @@ far as its lines' blends leave it, and at a line two triangles agree.
 Broad noise moves a cell before its triangle is looked up, which bends
 the lines. **Finer meshes** (`finer_depth`, 10 at most), each with
 vertices half as far apart as the one before and none finer than 16
-cells -- nor any that would move the land by less than a height -- raise or sink the land by less each (`finer_fall`): points spread
+cells, raise or sink the land by less each (`finer_fall`), never by less than
+two heights: points spread
 again within the triangles of the mesh before, small variations at a
 time -- the lowest land a quarter as much as the highest, so
 differences compound inland.
