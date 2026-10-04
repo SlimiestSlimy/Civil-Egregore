@@ -3,5 +3,7 @@
 //!
 //! `cargo test --test fast`
 
+#[path = "fast/halos.rs"]
+mod halos;
 #[path = "fast/world.rs"]
 mod world;

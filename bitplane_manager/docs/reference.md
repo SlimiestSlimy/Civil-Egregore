@@ -55,7 +55,9 @@ across its edge looked up again (**`word_tile_at`**); **`any_in_tile`**,
 codec)`** -- a bucket waiting in the ring made hot as it is, else
 decoded or emptied, counted -- **`make_hot_layers(chunk, types,
 storage, codec)`** and **`make_hot_superchunk(superchunk, types,
-storage, codec)`**, every chunk of it; **`run(type)`** and **`keys`**,
+storage, codec)`**, every chunk of it -- undone by
+**`make_cold_superchunk(superchunk, storage, codec)`**: written back,
+every bitmap evicted, its ring entries flushed into its image -- **`run(type)`** and **`keys`**,
 in Morton order; **`superchunks`** / **`superchunks_mut`**, for the
 simulation, and **`superchunk_indices`**, theirs;
 **`write_back(superchunk, storage, codec)`** -- dirty buckets into the

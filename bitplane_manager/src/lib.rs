@@ -691,6 +691,22 @@ impl BitmapArena {
         superchunk.chunks().map(|chunk| self.make_hot_layers(chunk, types, storage, codec)).sum()
     }
 
+    /// Makes every bitmap over `superchunk` cold: written back, dropped,
+    /// and its entries in the ring flushed into its image in `storage`,
+    /// so the image is its cells and the arena keeps nothing of it --
+    /// [`BitmapArena::make_hot_superchunk`] undone. How many bitmaps
+    /// were dropped.
+    pub fn make_cold_superchunk(&mut self, superchunk: SuperchunkIndex, storage: &mut ChunkStorage, codec: &mut LayerCodec) -> usize {
+        self.write_back(superchunk, storage, codec);
+        let keys: Vec<BucketKey> = self.keys().filter(|key| key.chunk.superchunk() == superchunk).collect();
+        keys.iter().for_each(|&key| {
+            self.evict(key);
+        });
+        storage.flush(superchunk);
+        self.flushed(&[superchunk]);
+        keys.len()
+    }
+
     /// How many cells of `layer_type` are set over `superchunk`, in its
     /// hot bitmaps: what weighs the superchunk when sampling.
     pub fn superchunk_count(&self, layer_type: LayerType, superchunk: SuperchunkIndex) -> u32 {

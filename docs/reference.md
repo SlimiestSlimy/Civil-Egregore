@@ -11,9 +11,10 @@ decision about it: `tilesim.md`.
 
 Each command is given the rest of the command line after its folder,
 and gives the line to print, or why it could not.
-`tilesim new <folder> [name] [seed] [superchunks]`: a world
-generated from the seed (**`new`**, `world::generate`) and saved in the
-folder, which must not hold one. `tilesim run <folder> [ticks]`:
+`tilesim new <folder> [name] [seed] [sheep]`: a world
+generated from the seed -- the origin, a flock of `sheep` on it, and
+its halo (**`new`**, `world::generate`) -- and saved in the folder,
+which must not hold one. `tilesim run <folder> [ticks]`:
 it loaded, ticked and saved again (**`run`**). `tilesim info
 <folder>`: what its world file says (**`info`**). **`number`**: an
 argument, or its default. **`USAGE`**: how to call the program.
