@@ -48,7 +48,7 @@
 //! which then changes once.
 
 use bitplane_manager::{BitmapArena, Write, WriteOp};
-use chunk_storage::mock::{DIRT, GRASS};
+use chunk_storage::mock::GRASS;
 use coordinates::{CellCartesian, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use simulation::around::{self, CENTRE, RING};
 use terrain::{WALL_EAST, WALL_SOUTH};
@@ -169,7 +169,6 @@ pub fn rule(turn: &mut Turn) -> SheepCounts {
         let lush = fed && turn.area(GRASS, at).count() >= LUSH_CELLS;
         if fed {
             turn.queue(GRASS, Write::cell(at, WriteOp::Unset));
-            turn.queue(DIRT, Write::cell(at, WriteOp::Set));
             sheep.set(HUNGRY_AT, now + MEAL_TICKS);
             done.eaten += 1;
             if let (false, Some(way)) = (lush, around::pick(turn.random(), steppable)) {

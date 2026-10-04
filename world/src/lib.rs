@@ -25,7 +25,7 @@ use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
 use chunk_storage::{ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
 use terrain::{Shape, Terrain, WALLS};
-use chunk_storage::mock::{DIRT, GRASS};
+use chunk_storage::mock::GRASS;
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
 use mc_rules::trees::{OLDEST, TREE, TREE_STAGE};
 use patches::{Patches, ONE};
@@ -133,9 +133,10 @@ impl World {
     }
 }
 
-/// Every layer type a world has: the pasture's, the trees' and the walls'.
+/// Every layer type a world has: the grass's, the trees' and the walls'.
+/// Dirt has none: it is a cell with nothing on it.
 fn layer_types() -> Vec<LayerType> {
-    [DIRT, GRASS, TREE].into_iter().chain(TREE_STAGE).chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
+    [GRASS, TREE].into_iter().chain(TREE_STAGE).chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
 }
 
 /// A world made from `seed`: its origin superchunk ([`WORLD_MIDDLE`])
@@ -173,7 +174,8 @@ pub fn generate_flocks(seed: u64, superchunks: &[SuperchunkIndex], sheep: usize)
 }
 
 /// The image of `superchunk` in a world made from `seed` as
-/// `generation` says: its terrain, and on it dirt, grass in patches,
+/// `generation` says: its terrain, and on it grass in patches -- dirt
+/// where there is none --
 /// and trees in patches of their own, each of a stage drawn for its
 /// cell -- the same whenever it is made.
 pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: SuperchunkIndex, codec: &mut LayerCodec) -> SuperchunkImage {
@@ -181,20 +183,22 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
     let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     let trees_seed = seed ^ TREES_SALT;
     let (grass_under, trees_under) = (generation.grass.threshold(seed), generation.trees.threshold(trees_seed));
-    // The planes generated, each a bitmap a chunk: dirt, grass, trees and their stage's four.
-    let planes: [LayerType; 7] = [DIRT, GRASS, TREE, TREE_STAGE[0], TREE_STAGE[1], TREE_STAGE[2], TREE_STAGE[3]];
+    // The planes generated, each a bitmap a chunk: grass, trees and their stage's four.
+    let planes: [LayerType; 6] = [GRASS, TREE, TREE_STAGE[0], TREE_STAGE[1], TREE_STAGE[2], TREE_STAGE[3]];
     let mut cells = vec![[0u64; bitmap::WORDS]; planes.len() * CHUNKS_IN_SUPERCHUNK];
     for place in 0..CHUNKS_IN_SUPERCHUNK * CELLS_IN_CHUNK {
         let (x, y) = cartesian_from_place(place);
         let (x, y) = (left + x, top + y);
         let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
         let mut set = |plane: usize| cells[plane * CHUNKS_IN_SUPERCHUNK + chunk][cell / bitmap::BITS_PER_WORD] |= 1 << (cell % bitmap::BITS_PER_WORD);
-        set(if generation.grass.number(seed, x, y) < grass_under { 1 } else { 0 });
+        if generation.grass.number(seed, x, y) < grass_under {
+            set(0);
+        }
         if generation.trees.number(trees_seed, x, y) < trees_under {
-            set(2);
+            set(1);
             // Its stage: a lot of the cell's own.
             let stage = mix(trees_seed ^ ((y as u64) << 32 | x as u64)) % (OLDEST as u64 + 1);
-            (0..TREE_STAGE.len()).filter(|bit| stage >> bit & 1 == 1).for_each(|bit| set(3 + bit));
+            (0..TREE_STAGE.len()).filter(|bit| stage >> bit & 1 == 1).for_each(|bit| set(2 + bit));
         }
     }
     // A layer a chunk for each plane with a cell set on it, and for each way's walls.
