@@ -4,7 +4,7 @@
 //! | words | what they hold |
 //! |---|---|
 //! | 16 | the chunk table: each chunk's offset in the image, in Morton order |
-//! | [`HEIGHT_WORDS`] | the superchunk's height map, raw ([`HeightMap`]) |
+//! | [`HEIGHT_WORDS`], and more if a chunk is tall | the superchunk's height map, raw ([`HeightMap`]) |
 //! | the rest | each chunk in Morton order, its data together: its layer count, its layer table -- a type and an offset per layer, sorted by type -- then its encoded layers |
 //!
 //! An encoded layer's offset counts from its chunk's start, so a chunk
@@ -18,12 +18,13 @@
 //! ([`SuperchunkImage::rewritten`]).
 
 use coordinates::CHUNKS_IN_SUPERCHUNK;
-use crate::height_map::{height_in, Height, HeightMap, HEIGHT_WORDS};
+use crate::height_map::{height_in, words_of, Height, HeightMap, HEIGHT_WORDS};
 use crate::layer_codec::LayerType;
 
 /// Where the height map starts: after the chunk table.
 const HEIGHTS_START: usize = CHUNKS_IN_SUPERCHUNK;
-/// Where the first chunk starts: after the height map.
+/// Where the first chunk starts at the least: after a height map with
+/// no chunk tall.
 const CHUNKS_START: usize = HEIGHTS_START + HEIGHT_WORDS;
 /// Words a layer table entry takes: its type and its offset.
 const ENTRY_WORDS: usize = 2;
@@ -63,7 +64,11 @@ impl SuperchunkImage {
         if words.len() < CHUNKS_START {
             return Err(InvalidImage("shorter than its chunk table and height map"));
         }
-        let mut previous_end = CHUNKS_START;
+        // The first chunk starts where the height map ends: longer by its tall chunks' maps.
+        let mut previous_end = HEIGHTS_START + words_of(&words[HEIGHTS_START..]);
+        if previous_end > words.len() {
+            return Err(InvalidImage("shorter than its height map"));
+        }
         for index in 0..CHUNKS_IN_SUPERCHUNK {
             let start = words[index] as usize;
             if start != previous_end {
@@ -81,9 +86,8 @@ impl SuperchunkImage {
 
     /// This image with `heights` its heights, its layers as they are.
     pub fn with_heights(&self, heights: &HeightMap) -> Self {
-        let mut words = self.words.clone();
-        words[HEIGHTS_START..CHUNKS_START].copy_from_slice(heights.words());
-        Self { words }
+        let chunks: [Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK] = std::array::from_fn(|place| exact_layers(self.chunk(place)));
+        Self { words: build(heights.words(), &chunks) }
     }
 
     /// Every word, as on disk.
@@ -91,9 +95,10 @@ impl SuperchunkImage {
         &self.words
     }
 
-    /// The superchunk's heights, 8 a word, in Morton order.
+    /// The superchunk's height map's words ([`HeightMap`]): up to
+    /// its first chunk.
     pub fn height_words(&self) -> &[u64] {
-        &self.words[HEIGHTS_START..CHUNKS_START]
+        &self.words[HEIGHTS_START..self.words[0] as usize]
     }
 
     /// The height of the cell at `place` in the superchunk
@@ -194,8 +199,8 @@ fn exact_layers(chunk: &[u64]) -> Vec<(LayerType, &[u64])> {
 /// by type.
 fn build(heights: &[u64], chunks: &[Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK]) -> Box<[u64]> {
     let chunk_words = |layers: &Vec<(LayerType, &[u64])>| 1 + layers.len() * ENTRY_WORDS + layers.iter().map(|(_, words)| words.len()).sum::<usize>();
-    let mut words = Vec::with_capacity(CHUNKS_START + chunks.iter().map(chunk_words).sum::<usize>());
-    let mut start = CHUNKS_START;
+    let mut start = HEIGHTS_START + heights.len();
+    let mut words = Vec::with_capacity(start + chunks.iter().map(chunk_words).sum::<usize>());
     for layers in chunks {
         words.push(start as u64);
         start += chunk_words(layers);

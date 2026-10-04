@@ -9,7 +9,7 @@ use terrain::{height, height_shaped, wall, Shape, Terrain, STEP, WALLS};
 
 /// The height of the cell `(x, y)` of a superchunk's `terrain`, from
 /// its top left.
-fn at(terrain: &Terrain, x: u32, y: u32) -> u8 {
+fn at(terrain: &Terrain, x: u32, y: u32) -> u16 {
     terrain.height(place_from_cartesian(x, y))
 }
 
@@ -33,16 +33,16 @@ fn heights_are_settled_by_the_seed_and_the_cell() {
 }
 
 /// A shape all hills: no plains, no base.
-const HILLS: Shape = Shape { weights: [168, 22, 61, 4], base: 0, plains: 0 };
+const HILLS: Shape = Shape { weights: [168, 22, 61, 4], base: 0, plains: 0, ground: 512, rise: 0, rise_span: 14 };
 /// A shape all plains.
-const PLAINS: Shape = Shape { weights: [142, 19, 51, 3], base: 40, plains: 1 << 16 };
+const PLAINS: Shape = Shape { weights: [142, 19, 51, 3], base: 40, plains: 1 << 16, ground: 512, rise: 0, rise_span: 14 };
 
 /// The hills roll: heights span most of their range over a
 /// superchunk, and no cell is far from its neighbour's.
 #[test]
 fn the_hills_roll() {
     let terrain = Terrain::generate_shaped(&HILLS, 1, WORLD_MIDDLE);
-    let (mut low, mut high, mut steepest) = (u8::MAX, 0, 0);
+    let (mut low, mut high, mut steepest) = (u16::MAX, 0, 0);
     for y in 0..1024 {
         for x in 0..1024 {
             let here = at(&terrain, x, y);
@@ -84,7 +84,7 @@ fn walls_are_where_heights_are_more_than_a_step_apart() {
 fn the_plains_have_no_walls() {
     let terrain = Terrain::generate_shaped(&PLAINS, 1, WORLD_MIDDLE);
     assert_eq!(terrain.wall_counts(), [0; 2]);
-    let heights: Vec<u8> = (0..1024).map(|x| at(&terrain, x, 500)).collect();
+    let heights: Vec<u16> = (0..1024).map(|x| at(&terrain, x, 500)).collect();
     assert!(heights.windows(2).all(|pair| pair[0].abs_diff(pair[1]) <= 1), "a row of the plains: {heights:?}");
 }
 

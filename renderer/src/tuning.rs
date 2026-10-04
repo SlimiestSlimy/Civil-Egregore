@@ -79,12 +79,18 @@ pub const TREE_SCATTER: usize = 20;
 pub const PLAINS: usize = 21;
 /// How high the plains roll: the base's share of a height.
 pub const PLAINS_HEIGHT: usize = 22;
-/// The height still water stands at.
+/// The height still water stands at, over the ground level.
 pub const WATER_LEVEL: usize = 23;
+/// The height the lowest ground is at.
+pub const GROUND_LEVEL: usize = 24;
+/// The most the land rises over the lowest ground.
+pub const LAND_RISE: usize = 25;
+/// The cells between two points of the land's rise, as a power of two.
+pub const LAND_SPAN: usize = 26;
 
 /// The numbers, in the order above; the shading's defaults are what was
 /// found by eye with the sliders.
-pub const TUNED: [Tuned; 24] = [
+pub const TUNED: [Tuned; 27] = [
     Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading },
     Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading },
     Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading },
@@ -109,6 +115,9 @@ pub const TUNED: [Tuned; 24] = [
     Tuned { name: "plains", default: 0.5, range: (0.0, 1.0), page: Page::Generation },
     Tuned { name: "plains height", default: 40.0, range: (0.0, 120.0), page: Page::Generation },
     Tuned { name: "water level", default: 14.0, range: (0.0, 120.0), page: Page::Generation },
+    Tuned { name: "ground level", default: 256.0, range: (0.0, 4096.0), page: Page::Generation },
+    Tuned { name: "land rise", default: 1024.0, range: (0.0, 8192.0), page: Page::Generation },
+    Tuned { name: "land span", default: 14.0, range: (8.0, 20.0), page: Page::Generation },
 ];
 
 /// Counts the changes to how the world is generated: what was made

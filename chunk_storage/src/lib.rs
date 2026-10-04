@@ -6,7 +6,7 @@
 //!
 //! | file | what is in it |
 //! |---|---|
-//! | `height_map` | a superchunk's heights, one a cell |
+//! | `height_map` | a superchunk's heights: a floor a chunk and a byte a cell over it, or a whole height a cell where a chunk is tall |
 //! | `layer_codec` | what a layer is, and the codec that encodes and decodes its bitmap |
 //! | `superchunk_image` | a superchunk's words: its chunk table, its height map, its chunks' bitmap tables and bitmaps |
 //! | `writeback_ring` | the ring of changed bitmaps, encoded, on their way to the cold pool |
@@ -33,7 +33,7 @@ pub mod transient_data;
 mod writeback_ring;
 
 pub use chunk_storage::{ChunkStorage, Flush};
-pub use height_map::{Height, HeightMap, HEIGHT_WORDS};
+pub use height_map::{Height, HeightMap, HEIGHT_WORDS, TALL_WORDS};
 pub use layer_codec::{LayerCodec, LayerType};
 pub use superchunk_image::{InvalidImage, LayerChange, SuperchunkImage};
 pub use writeback_ring::{RingEntry, WritebackRing};

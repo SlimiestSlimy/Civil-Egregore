@@ -59,7 +59,7 @@ fn every_cell_has_its_own_height() {
         .collect();
     let height_of = |cell: CellIndex| {
         let CellCartesian { x, y } = cell.cartesian();
-        ((x - top_left.x) * 3 + (y - top_left.y) * 7) as u8
+        ((x - top_left.x) * 3 + (y - top_left.y) * 7) as u8 as u16
     };
     let mut heights = HeightMap::default();
     for &cell in &cells {
@@ -71,6 +71,38 @@ fn every_cell_has_its_own_height() {
         assert_eq!(image.height(cell.place_in_superchunk()), height_of(cell), "{:?}", cell.cartesian());
     }
     assert_eq!(heights.get(1), 0, "a cell never set");
+}
+
+/// Heights are 16 bits: a chunk whose ground spans a byte or less
+/// keeps a floor and a byte a cell, wherever its floor is; one that
+/// spans more is tall and keeps a map of its own -- and an image holds
+/// both, its chunks after them.
+#[test]
+fn heights_are_a_floor_a_chunk_or_a_map_where_a_chunk_is_tall() {
+    const CELLS: usize = 1 << 16;
+    // Chunk 3 a slope of 1,000 from a floor of 40,000; chunk 9 one of 60,000; the rest 700 and a byte.
+    let height_of = |place: usize| match place / CELLS {
+        3 => 40_000 + (place % CELLS * 1_000 / CELLS) as u16,
+        9 => (place % CELLS * 60_000 / CELLS) as u16,
+        chunk => 700 + chunk as u16 * 300 + (place % 256) as u16,
+    };
+    let heights = HeightMap::from_heights(height_of);
+    assert_eq!((0..16).filter(|&chunk| heights.tall(chunk)).collect::<Vec<_>>(), [3, 9]);
+    assert_eq!((heights.floor(0), heights.floor(3), heights.floor(15)), (700, 40_000, 700 + 15 * 300));
+    assert_eq!(heights.words().len(), chunk_storage::HEIGHT_WORDS + 2 * chunk_storage::TALL_WORDS);
+    let layer = [7u64, 8, 9];
+    let image = SuperchunkImage::new(&heights).rewritten(&[LayerChange { place: 5, layer_type: LayerType(2), encoded: &layer }]);
+    let read = SuperchunkImage::from_words(image.words().into()).expect("an image");
+    for place in (0..16 * CELLS).step_by(997) {
+        assert_eq!(heights.get(place), height_of(place), "cell {place}");
+        assert_eq!(read.height(place), height_of(place), "cell {place}, in the image");
+    }
+    assert_eq!(&read.layer(5, LayerType(2)).expect("the layer")[..3], &layer);
+    assert_eq!(HeightMap::from_words(read.height_words()), heights);
+    // Other heights put on it, none tall: the image shorter, its layer as it was.
+    let flat = read.with_heights(&HeightMap::filled(512));
+    assert_eq!((flat.height(12_345), flat.words().len() + 2 * chunk_storage::TALL_WORDS), (512, read.words().len()));
+    assert_eq!(&flat.layer(5, LayerType(2)).expect("the layer")[..3], &layer);
 }
 
 /// An image's layers come out by type, one a type, however they went

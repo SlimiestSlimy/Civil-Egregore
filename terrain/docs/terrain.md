@@ -76,8 +76,18 @@ still water at one level: every cell lower than it is a lake, as deep
 as it is lower (`world::Generation::water_level`). Nothing grows or
 spreads under water. Water does not move yet.
 
-## To come: a height a chunk
+## Heights of 16 bits
 
-A cell's height is a byte. A chunk is to have a height of its own, to
-which its cells' are added, so that heights vary by 16 bits over the
-world. Nothing of it is written yet.
+A height is 16 bits, 0 to 65,535. The lowest ground is at
+`Shape::ground`; on it the land rises (`rise`) by up to `Shape::rise`
+heights, as noise `2^rise_span` cells between points -- many
+superchunks -- with a quarter as much again a quarter as broad: too
+gentle for a wall, a step every ten cells or so at the steepest. The
+base, the plains and the hills stand on that, 255 heights at most.
+
+The height map keeps a floor a chunk and a byte a cell over it; only a
+chunk whose heights span more than 255 -- a tall chunk -- keeps a map of
+16 bits a cell, after the bytes (see chunk storage).
+
+To come: plains level at heights of their own, mesas, ramps, cliffs --
+the generator as layers of noise, each with a curve and a mask.
