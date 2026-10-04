@@ -50,47 +50,49 @@ pub const RELIEF: usize = 6;
 /// How much the ground's pixels differ by lot.
 pub const TEXTURE: usize = 7;
 
-/// The first of the hills' seven octaves, 512 cells across to 8: how
+/// The first of the hills' eleven octaves, 8192 cells across to 8: how
 /// much of the hills' height each makes up beside the others.
 pub const HILLS: usize = 8;
 /// The highest the hills stand: what their octaves make up together.
-pub const HEIGHT_SPAN: usize = 15;
+pub const HEIGHT_SPAN: usize = 19;
 /// The height the lowest ground is at.
-pub const GROUND_LEVEL: usize = 16;
+pub const GROUND_LEVEL: usize = 20;
 /// The most the land rises over the lowest ground.
-pub const LAND_RISE: usize = 17;
+pub const LAND_RISE: usize = 21;
 /// The cells between two points of the land's rise, as a power of two.
-pub const LAND_SPAN: usize = 18;
+pub const LAND_SPAN: usize = 22;
 /// The first of the five octaves of the land's rise: each one's share.
-pub const RISE_SHARES: usize = 19;
+pub const RISE_SHARES: usize = 23;
 /// The share of the world that is under the ocean.
-pub const OCEAN_SHARE: usize = 24;
+pub const OCEAN_SHARE: usize = 28;
+/// How far under the ocean its deepest floor is.
+pub const OCEAN_DEPTH: usize = 29;
 /// How many heights of land the hills grow to their whole height over.
-pub const COAST: usize = 25;
+pub const COAST: usize = 30;
 /// How far where the hills begin wanders about the shore, in coasts.
-pub const SHORE_WANDER: usize = 26;
+pub const SHORE_WANDER: usize = 31;
 /// The cells between two points of that wandering, as a power of two.
-pub const SHORE_SPAN: usize = 27;
+pub const SHORE_SPAN: usize = 32;
 /// The share of the cells that are grass.
-pub const GRASS_COVER: usize = 28;
+pub const GRASS_COVER: usize = 33;
 /// The cells across a patch of grass, as a power of two.
-pub const PATCH_SIZE: usize = 29;
+pub const PATCH_SIZE: usize = 34;
 /// How much finer noise counts beside the patches'.
-pub const PATCH_DETAIL: usize = 30;
+pub const PATCH_DETAIL: usize = 35;
 /// How much each cell's own lot counts: grass scattered, not in patches.
-pub const SCATTER: usize = 31;
+pub const SCATTER: usize = 36;
 /// The share of the cells that have a tree.
-pub const TREE_COVER: usize = 32;
+pub const TREE_COVER: usize = 37;
 /// The cells across a patch of trees, as a power of two.
-pub const TREE_PATCH: usize = 33;
+pub const TREE_PATCH: usize = 38;
 /// How much finer noise counts beside the trees' patches'.
-pub const TREE_DETAIL: usize = 34;
+pub const TREE_DETAIL: usize = 39;
 /// How much each cell's own lot counts for trees.
-pub const TREE_SCATTER: usize = 35;
+pub const TREE_SCATTER: usize = 40;
 
 /// The numbers, in the order above; the shading's defaults are what was
 /// found by eye with the sliders.
-pub const TUNED: [Tuned; 36] = [
+pub const TUNED: [Tuned; 41] = [
     Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading, what: "How much lighter the border of a higher cell is where it faces the sun." },
     Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading, what: "How much darker the border of a higher cell is where it faces away from the sun." },
     Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading, what: "How dark the band at the foot of a wall is, on the side away from the sun." },
@@ -99,6 +101,10 @@ pub const TUNED: [Tuned; 36] = [
     Tuned { name: "shadow", default: 0.4, range: (0.0, 0.8), page: Page::Shading, what: "How much darker ground is under a cast shadow." },
     Tuned { name: "relief", default: 0.7, range: (0.0, 3.0), page: Page::Shading, what: "How strongly slopes are lit and heights tinted." },
     Tuned { name: "texture", default: 2.0, range: (0.0, 4.0), page: Page::Shading, what: "How much the ground's pixels differ from one another by lot." },
+    Tuned { name: "hills (8192)", default: 0.0, range: (0.0, 255.0), page: Page::Generation, what: "The height the hills' octave 8192 cells across adds at most, beside the others: the height span is shared out among them." },
+    Tuned { name: "hills (4096)", default: 0.0, range: (0.0, 255.0), page: Page::Generation, what: "The height the hills' octave 4096 cells across adds at most, beside the others: the height span is shared out among them." },
+    Tuned { name: "hills (2048)", default: 0.0, range: (0.0, 255.0), page: Page::Generation, what: "The height the hills' octave 2048 cells across adds at most, beside the others: the height span is shared out among them." },
+    Tuned { name: "hills (1024)", default: 0.0, range: (0.0, 255.0), page: Page::Generation, what: "The height the hills' octave 1024 cells across adds at most, beside the others: the height span is shared out among them." },
     Tuned { name: "hills (512)", default: 255.0, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the octave 512 cells across. Only its size beside the other six counts." },
     Tuned { name: "hills (256)", default: 144.32, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the octave 256 cells across. Only its size beside the other six counts." },
     Tuned { name: "ridges (128)", default: 33.64, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the octave 128 cells across. Only its size beside the other six counts." },
@@ -106,7 +112,7 @@ pub const TUNED: [Tuned; 36] = [
     Tuned { name: "bumps (32)", default: 91.85, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the octave 32 cells across. Only its size beside the other six counts." },
     Tuned { name: "bumps (16)", default: 48.93, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the octave 16 cells across. Only its size beside the other six counts." },
     Tuned { name: "roughness (8)", default: 6.0, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the finest octave, 8 cells across: rough ground, many walls." },
-    Tuned { name: "height span", default: 255.0, range: (0.0, 255.0), page: Page::Generation, what: "How high the hills stand over the land, in heights: 255 at most." },
+    Tuned { name: "height span", default: 255.0, range: (0.0, 4096.0), page: Page::Generation, what: "How high the hills stand over the land at most, in heights: what their octaves share out. Broad octaves take a great span without a wall; fine ones turn it all to walls." },
     Tuned { name: "ground level", default: 256.0, range: (0.0, 4096.0), page: Page::Generation, what: "The height of the lowest ground there is: everything stands on it." },
     Tuned { name: "land rise", default: 1024.0, range: (0.0, 8192.0), page: Page::Generation, what: "How many heights the land rises over the lowest ground at most: the difference between the deepest ocean floor and the highest inland." },
     Tuned { name: "land span", default: 14.0, range: (8.0, 20.0), page: Page::Generation, what: "How broad the land's rises are: 2 to this power in cells between the noise's points. 14 is 16 superchunks." },
@@ -116,6 +122,7 @@ pub const TUNED: [Tuned; 36] = [
     Tuned { name: "rise octave 4", default: 0.064, range: (0.0, 1.0), page: Page::Generation, what: "The share of the land's rise from its octave 4 of 5 -- an eighth as broad: coves. Only its size beside the other four counts." },
     Tuned { name: "rise octave 5", default: 0.026, range: (0.0, 1.0), page: Page::Generation, what: "The share of the land's rise from its octave 5 of 5 -- a sixteenth as broad: a ragged shore, and steeper land. Only its size beside the other four counts." },
     Tuned { name: "ocean share", default: 0.55, range: (0.0, 1.0), page: Page::Generation, what: "The share of the world that is under the ocean: the ocean's level is set to whatever height that much of the land's rise is under, so it holds whatever the rise's sliders say. The level it comes to is shown with the seed." },
+    Tuned { name: "ocean depth", default: 255.0, range: (0.0, 4096.0), page: Page::Generation, what: "How many heights under the ocean its deepest floor is: the land under the ocean falls gently to that, not all the way to the ground level. Water keeps a depth to 255; deeper is drawn and kept as 255." },
     Tuned { name: "coast", default: 64.0, range: (1.0, 1024.0), page: Page::Generation, what: "How many heights over the ocean the land is where the hills reach their whole height: from the shore to there they grow." },
     Tuned { name: "shore wander", default: 1.0, range: (0.0, 4.0), page: Page::Generation, what: "How far the line the hills begin at wanders above and below the shore, in coasts: 0 leaves a level band round every island; more, and hills here stand out of the ocean and there begin well inland." },
     Tuned { name: "shore span (2^)", default: 10.0, range: (4.0, 14.0), page: Page::Generation, what: "How broad that wandering is: 2 to this power in cells between the noise's points." },

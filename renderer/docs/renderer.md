@@ -197,15 +197,16 @@ drawn, the view too goes back to where it started. No sheep,
 its rules -- grass and trees -- ticking as in any run, paused and paced
 by the same keys. Generation's sliders are shown from the start:
 
-- **The hills**: how much of their height each of the seven octaves
-  makes up beside the others -- 512 cells across to 8 -- and the height
-  span they come to together, 255 at most (`terrain::Shape`).
+- **The hills**: how much of their height each of the eleven octaves
+  makes up beside the others -- 8,192 cells across to 8 -- and the
+  height span they come to together (`terrain::Shape`).
 - **The land**: the lowest ground's level, how far the land rises over
   it, how broadly (a power of two of cells), and the share of each of
   the rise's five octaves.
 - **The ocean's share** of the world: its level is set to the height
   that share of the land's rise is under (found from 16,384 cells
-  drawn over the world), and shown with the seed; **the coast**, the heights of land the hills
+  drawn over the world), and shown with the seed; **the ocean's depth**, how far under
+  it its deepest floor is; **the coast**, the heights of land the hills
   grow over; and how far and how broadly the line they begin at
   **wanders** about the shore.
 - **The grass**, and **the trees** (`world::patches`): each in patches,

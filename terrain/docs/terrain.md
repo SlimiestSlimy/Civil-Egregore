@@ -71,9 +71,12 @@ finer shape the shores and add little slope.
 
 The **ocean** stands at one height all over the world (`Shape::ocean`):
 the land under it is the ocean's floor, the land over it islands, dozens
-to hundreds of superchunks each. **Hills** stand on the islands: seven
-octaves, every power of two from 512 cells to 8, so that no one
-octave's grid shows; 255 heights at most. They grow from nothing to
+to hundreds of superchunks each. Under the ocean the land falls gently:
+to `Shape::depth` under the ocean's level where the rise is lowest, not
+to the lowest ground. **Hills** stand on the islands: eleven
+octaves, every power of two from 8,192 cells to 8, so that no one
+octave's grid shows; their shares are heights, and come to the highest
+a hill stands (the four broadest none, as worlds are by default). They grow from nothing to
 their whole height over `Shape::coast` heights of land, from a line
 that is the shore on average but wanders above and below it
 (`Shape::shore`, `shore_span`): hills here stand out of the ocean, and
