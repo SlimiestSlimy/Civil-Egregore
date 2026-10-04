@@ -93,13 +93,16 @@ Chunk storage (`chunk_storage/`) is two parts in memory:
 2. **The writeback ring**: a ring buffer of changed bitmaps, encoded,
    each tagged with its chunk's Morton index and its type; one of no
    words says the layer is gone. Writing back a dirty bucket appends to
-   the ring; it never touches the cold pool. Evicting a superchunk from the
-   bitplanes fills the ring with its changed bitmaps, tagged.
+   the ring; it never touches the cold pool. A superchunk going cold
+   fills the ring with its changed bitmaps, tagged -- encoded off the
+   tick -- and is not flushed then: the ring flushes it when it needs
+   the room.
 
 The ring is cold writeback only: it is never read to make a bitmap
 hot. A bitmap with an entry in the ring is still in the bitplanes: an
 evicted bitmap's bucket stays allocated until its superchunk is
-flushed, and one made hot again before then is the bucket as it was.
+flushed, and one made hot again before then is the bucket as it was --
+a superchunk gone cold as a whole likewise, cooling.
 
 The ring is a sponge for writes into the cold pool. A superchunk is
 sequential even in memory, so changing one bitmap in place would mean
@@ -814,14 +817,20 @@ The world is hot only about the entities that matter: each keeps its
 superchunk and the eight about it hot -- its halo, as far as anything
 reaches in a tick -- and every other superchunk is cold, its cells in
 its image and its entities and random numbers kept as a save keeps
-them. After every tick the halos move to where their keepers came to:
-superchunks reached are warmed from storage, or generated if never
-made; superchunks left go cold. The world has no size: it is made as
-it is reached. People will keep halos; for now the sheep do, and the
+them. After every tick the halos move to where their keepers came to,
+nothing slow done on the tick: superchunks left go cold at once, their
+changes encoded in the background and flushed by the ring in its own
+time; superchunks reached are warming for 1,024 ticks -- decoded from
+storage in the background, or generated if never made -- and turn hot
+at that tick, not when the background is done, so the world is the
+same however fast it is. Until then writes to them are missed and
+entities sent there stay put. The world has no size: it is made as it
+is reached. People will keep halos; for now the sheep do, and the
 world starts as its origin superchunk, a flock on it, and the flock's
-halo. Grass grows only in a circle three superchunks across about the
-origin's middle, and only where hot. The whole of it:
-`world/docs/world.md`, "Halos".
+halo. For this test only, grass is ticked only within three
+superchunks across of the origin's middle, so its spreading cannot
+grow the world without end. The whole of it: `world/docs/world.md`,
+"Halos".
 
 ## Simulation (the plan)
 

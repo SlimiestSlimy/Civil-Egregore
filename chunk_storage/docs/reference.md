@@ -16,7 +16,8 @@ map's words.
 
 **`LayerCodec`**: Tessera and its buffers, allocated once.
 **`encode(cells)`**: the bitmap's stream, as words, until the next
-encoding. **`decode(words, cells)`**: the bitmap whose stream starts at
+encoding. **`encode_layer(cells)`**: as a layer's words -- encoded, or
+none where no cell is set. **`decode(words, cells)`**: the bitmap whose stream starts at
 `words`, at most `MOST_WORDS` of them read.
 
 ## `superchunk_image.rs`
@@ -47,7 +48,9 @@ walking entries from the tail, over wrap markers.
 ## `chunk_storage.rs`
 
 **`ChunkStorage::new(ring_words)`**. **`insert(superchunk, image)`**,
-**`image(superchunk)`**, **`superchunks()`**, **`layer(chunk, type)`**: the cold pool.
+**`image(superchunk)`**, **`shared_image(superchunk)`** -- a handle to
+it, to read on another thread -- **`superchunks()`**, **`layer(chunk,
+type)`**: the cold pool, its images shared (`Arc`).
 **`write_back(chunk, type, encoded, flushed)`**: into the ring, the
 superchunk at its tail flushed until it fits, each added to `flushed`
 -- before the encoded layer went in. **`flush(superchunk)`**: its image
@@ -61,9 +64,12 @@ error)` or `Invalid(path, what)`. **`write_world(folder, info)`**,
 **`read_world(folder)`**; **`write_image(folder, superchunk,
 image)`**, **`read_image`**; **`write_state(folder, superchunk,
 words)`**, **`read_state`** -- the words, and the file's path;
+**`HotSuperchunks`** `{hot, warming}`, **`write_hot(folder, hot)`**,
+**`read_hot(folder)`**: the hot file;
 **`saved_superchunks(folder)`**: those with an image, in Morton order.
 Private: `superchunk_file`, `make_folder`, `write`, `write_words`,
-`read`, `read_words`, `images_in`, `WorldInfo::to_text`, `from_text`.
+`read`, `read_words`, `images_in`, `WorldInfo::to_text`, `from_text`,
+`HotSuperchunks::to_text`, `from_text`.
 
 ## `mock.rs`
 

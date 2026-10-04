@@ -42,9 +42,10 @@ pub fn run(folder: &Path, rest: &[&str]) -> Result<String, String> {
     let hot = loaded.arena.superchunks().len();
     let grass: u64 = loaded.arena.superchunks().iter().map(|superchunk| loaded.arena.superchunk_count(GRASS, superchunk.index()) as u64).sum();
     let saved = world::save(folder, &mut loaded).map_err(|error| error.to_string())?;
-    let HaloChange { generated, warmed, cooled } = halos;
+    let warming = loaded.warming().count();
+    let HaloChange { reached, generated, restored, cooled } = halos;
     Ok(format!(
-        "{}: tick {} -> {}, {:.0} ticks a second; {} entities; {hot} of {} superchunks hot, {grass} cells of grass on them; superchunks {generated} generated, {warmed} warmed, {cooled} cooled; {} bytes saved",
+        "{}: tick {} -> {}, {:.0} ticks a second; {} entities; {hot} of {} superchunks hot, {warming} warming, {grass} cells of grass on them; superchunks {reached} reached, {generated} generated, {restored} restored, {cooled} cooled; {} bytes saved",
         loaded.info.name,
         loaded.info.tick,
         loaded.entities.now(),

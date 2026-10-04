@@ -168,8 +168,7 @@ edits, removes, lost, stayed, refused, crossed}`, added with `+=`.
 entities)`** -- the words, and how many entities -- and
 **`decode_state(words, now, entities)`**, its entities
 queued -- a wake passed made `now` -- a **`SavedState`** `{random,
-entities}`; **`holds_any(words, kinds)`**, whether an entity of one of
-the kinds is among them; **`entity_count(words)`**; all three read by
+entities}`; **`entity_count(words)`**; all three read by
 **`read(words, each)`**. **`Entities::at_tick(now)`**: what a load
 puts them back into.
 

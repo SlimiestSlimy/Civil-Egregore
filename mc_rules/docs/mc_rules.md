@@ -9,11 +9,13 @@ other rule and no entity; the world's tick (`world/`) runs them
 together with the entities (`entity_rules/`).
 
 So far one: grass spreading over dirt and decaying
-(`../docs/tilesim.md`, "Sampling") -- only in a circle three
-superchunks across about the middle of the world's origin superchunk,
-and there only where a halo keeps it hot (`../world/docs/world.md`,
-"Halos"). A superchunk the circle misses samples nothing; one it
-crosses samples its grass and drops the samples outside. Grass
+(`../docs/tilesim.md`, "Sampling"), where a halo keeps it hot
+(`../world/docs/world.md`, "Halos"). For now, too, only within three
+superchunks across of the middle of the world's origin superchunk: no
+part of the rule, a limit on the present test, since grass let spread
+without end would lead the sheep, their halos, and so the world, to
+grow without end. A superchunk the limit leaves out samples nothing;
+one it crosses samples its grass and drops the samples outside. Grass
 elsewhere lies as it was made, unless eaten.
 
 ## Layout

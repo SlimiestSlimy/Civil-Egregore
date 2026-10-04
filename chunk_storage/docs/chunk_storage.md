@@ -42,13 +42,34 @@ ring's end, and the ring grows only when empty and still too small.
 
 The ring is never read to make a layer hot: the bitmap arena keeps a
 written-back layer until its superchunk is flushed, and is told of
-every flush.
+every flush. So a superchunk gone cold is not flushed then: its
+changes wait in the ring, flushed when the ring needs the room, or
+when the world is saved.
+
+## Shared images
+
+A superchunk warming is decoded on another thread, off the tick
+(`../../world/`, "Halos"), from its image in the cold pool, while the
+tick goes on changing the pool: other superchunks' images put in, and
+flushes putting rewritten ones in place of theirs. A thread cannot
+just borrow an image from a pool changed meanwhile -- a change may move
+it, or free it -- so it would have to copy it: a megabyte or so, about
+a millisecond. Instead the pool holds each image behind a reference
+count (`Arc`): a handle any number of holders share, the image freed
+when the last lets go. The thread is handed a handle
+(`ChunkStorage::shared_image`), nothing copied. Since an image is never
+changed in place, only replaced (`rewritten`), what the thread reads is
+the image as it was when handed over, whatever the pool does next; and
+an image replaced while a thread reads it lives on until that thread is
+done with it.
 
 ## On disk
 
 A world is a folder (`disk.rs`): `world`, text, a line a thing --
 `name`, `seed`, `tick`, `layers` -- under a first line saying what it
-is; and `superchunks/`, two files a superchunk, named by its Morton
+is; `hot`, text, which superchunks were hot (`HotSuperchunks`), a line
+each, its index in hexadecimal -- one warming followed by the tick it
+turns hot at -- under a first line likewise; and `superchunks/`, two files a superchunk, named by its Morton
 index in 11 hexadecimal digits. `.image` is its image, word for word,
 checked when read (`from_words`). `.state` is words storage does not
 look into: whoever ticks the world keeps there what moves on the

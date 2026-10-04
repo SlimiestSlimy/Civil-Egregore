@@ -21,16 +21,17 @@ fn folder(name: &str) -> PathBuf {
 }
 
 /// Every hot cell of grass and dirt, every entity with its attributes,
-/// the tick, every random stream, and every cold superchunk's image and
-/// kept state: what two worlds the same hold the same.
-type Everything = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, u64, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, SuperchunkImage, Vec<u64>)>);
+/// the tick, every random stream, every cold superchunk's image and
+/// kept state, and the superchunks warming with when each is due: what
+/// two worlds the same hold the same.
+type Everything = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, u64, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, SuperchunkImage, Vec<u64>)>, Vec<(SuperchunkIndex, u64)>);
 
 /// [`Everything`] `world` holds.
 fn everything(world: &World) -> Everything {
     let cells = [DIRT, GRASS].into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.cells().to_vec()).collect();
     let all = world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
     let cold = world.cold.iter().map(|(&superchunk, words)| (superchunk, world.storage.image(superchunk).expect("a cold superchunk's image").clone(), words.clone())).collect();
-    (cells, all, world.entities.now(), world.simulation.random_states().collect(), cold)
+    (cells, all, world.entities.now(), world.simulation.random_states().collect(), cold, world.warming().collect())
 }
 
 /// Grass and sheep ticked, saved, and ticked on; the save loaded and
@@ -61,20 +62,28 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
     assert!(everything(&first) == everything(&second), "the same 3,000 ticks on");
 }
 
-/// A world saved and loaded again and again mid run is, at a tick
-/// agreed, the world that ran straight to it: every cell, every entity,
-/// every random number.
+/// A world saved and loaded again and again mid run -- once while a
+/// superchunk is warming -- is, at a tick agreed, the world that ran
+/// straight to it: every cell, every entity, every random number.
 #[test]
 fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     const UNTIL: u64 = 4_000;
-    let mut straight = world::generate(11, 4_000);
+    let mut straight = world::generate(4, 4_000);
+    let mut warming = None;
     while straight.entities.now() < UNTIL {
         straight.tick();
+        if warming.is_none() && straight.warming().next().is_some() {
+            warming = Some(straight.entities.now());
+        }
     }
+    let warming = warming.expect("a superchunk warming on the way");
 
     let folder = folder("mid_run");
-    let mut stopped = world::generate(11, 4_000);
-    for stop in [1, 700, 701, 1_900, 3_333, UNTIL] {
+    let mut stopped = world::generate(4, 4_000);
+    let mut stops = vec![1, 700, 701, 1_900, 3_333, warming, UNTIL];
+    stops.sort_unstable();
+    stops.dedup();
+    for stop in stops {
         while stopped.entities.now() < stop {
             stopped.tick();
         }
@@ -87,8 +96,8 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     assert!(everything(&straight) == everything(&stopped), "the same at tick {UNTIL}");
 }
 
-/// A save is a folder: a world file in text, and two files a
-/// superchunk named by its superchunk index in hexadecimal.
+/// A save is a folder: a world file and a hot file in text, and two
+/// files a superchunk named by its superchunk index in hexadecimal.
 #[test]
 fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let folder = folder("files");
@@ -97,6 +106,8 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     world::save(&folder, &mut first).expect("saved");
     let text = std::fs::read_to_string(folder.join("world")).expect("the world's file");
     assert_eq!(text, "tilesim world 1\nname = Nine fields\nseed = 99\ntick = 0\nlayers = 1 2 8 9\n");
+    let hot: String = first.arena.superchunk_indices().iter().map(|superchunk| format!("{:011x}\n", superchunk.0)).collect();
+    assert_eq!(std::fs::read_to_string(folder.join("hot")).expect("the hot file"), format!("tilesim hot 1\n{hot}"), "the nine hot, none warming");
     let mut names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|entry| entry.unwrap().file_name().into_string().unwrap()).collect();
     names.sort();
     let expected: Vec<String> = disk::saved_superchunks(&folder).expect("listed").iter().flat_map(|superchunk| ["image", "state"].map(|kind| format!("{:011x}.{kind}", superchunk.0))).collect();
