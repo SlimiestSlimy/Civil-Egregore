@@ -198,6 +198,8 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
         // The ocean wherever the ground is under its level, as deep as it is lower: nothing grows under it.
         // No deeper than its eight bits tell.
         let depth = generation.shape.ocean.saturating_sub(terrain.height(place)).min(u8::MAX as Height);
+        // A hollow under the ocean's level where the land is over it is dry.
+        let depth = if depth > 0 && terrain::under_ocean(&generation.shape, seed, x, y) { depth } else { 0 };
         if depth > 0 {
             (0..WATER.len()).filter(|bit| depth >> bit & 1 == 1).for_each(|bit| set(water + bit));
             continue;

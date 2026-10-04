@@ -92,7 +92,7 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
                             continue;
                         };
                         let shape = &generation.shape;
-                        let (colour, light) = if high < shape.ocean {
+                        let (colour, light) = if high < shape.ocean && terrain::under_ocean(shape, seed, cell_x, cell_y) {
                             (WATER, 1.0 - (1.0 - DEEP_LIGHT) * ((shape.ocean - high) as f32 / shape.depth.max(1) as f32).min(1.0))
                         } else {
                             let colour = if generation.trees.number(trees_seed, cell_x, cell_y) < trees_under {
@@ -105,7 +105,7 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
                             let above = height(wanted, x as i64, y - 1).map_or(high, |(.., above)| above);
                             let lower = (above as f32 + before.unwrap_or(high) as f32) / 2.0;
                             let slope = (high as f32 - lower) / wanted.step as f32;
-                            let tint = 0.8 + 0.3 * ((high - shape.ocean) as f32 / (shape.rise + shape.weights.iter().sum::<u64>()).max(1) as f32).min(1.0);
+                            let tint = 0.8 + 0.3 * (high.saturating_sub(shape.ocean) as f32 / (shape.rise + shape.weights.iter().sum::<u64>()).max(1) as f32).min(1.0);
                             (colour, tint * (1.0 + SLOPE_LIGHT * slope).clamp(0.55, 1.45))
                         };
                         before = Some(high);
