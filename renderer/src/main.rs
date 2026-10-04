@@ -29,8 +29,7 @@
 //! | `C` | the same of the chunks |
 //! | `H` | show every cell's height, from near enough to read them |
 //!
-//! The sliders at the top right tune the near view's shading
-//! ([`tuning`]): dragged with the left button, set back with the right.
+//! | `U` | show the sliders that tune the near view's shading, or not |
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -267,7 +266,7 @@ fn main() {
         .init_resource::<Boundaries>()
         .init_resource::<sliders::Dragged>()
         .add_systems(Startup, (setup, sliders::setup))
-        .add_systems(Update, (fullscreen, sliders::slide, steer, keys, boundaries, labels, heights, show, ask, hud).chain())
+        .add_systems(Update, (fullscreen, sliders::toggle, sliders::slide, steer, keys, boundaries, labels, heights, show, ask, hud).chain())
         .run();
 }
 
@@ -643,7 +642,7 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         pixels => format!("a cell {pixels} pixels a side"),
     };
     text.0 = format!(
-        "tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause   T: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights",
+        "tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause   T: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   U: sliders",
         grouped(seen.tick),
         grouped(seen.ticks_a_second as u64),
         grouped(seen.sheep as u64),

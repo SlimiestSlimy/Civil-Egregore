@@ -84,7 +84,8 @@ then what was kept. **`now()`**, **`set(index, value)`**, **`keep()`**.
 **`Dragged`**: the one being dragged. **`held()`**: whether the left
 button went down over them and is still held -- the view is then not
 dragged; **`pointer_over(window)`**.
-**`setup`**: the sliders. **`slide`**: dragged, set back, kept, shown.
+**`Part`**: anything of them; **`toggle`**: shown and hidden by `U`.
+**`setup`**: the sliders, hidden. **`slide`**: dragged, set back, kept, shown.
 
 ## `main.rs`
 
