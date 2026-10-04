@@ -63,8 +63,8 @@ pub const LAND_RISE: usize = 17;
 pub const LAND_SPAN: usize = 18;
 /// The first of the five octaves of the land's rise: each one's share.
 pub const RISE_SHARES: usize = 19;
-/// The height the ocean stands at.
-pub const OCEAN_LEVEL: usize = 24;
+/// The share of the world that is under the ocean.
+pub const OCEAN_SHARE: usize = 24;
 /// How many heights of land the hills grow to their whole height over.
 pub const COAST: usize = 25;
 /// How far where the hills begin wanders about the shore, in coasts.
@@ -115,7 +115,7 @@ pub const TUNED: [Tuned; 36] = [
     Tuned { name: "rise octave 3", default: 0.16, range: (0.0, 1.0), page: Page::Generation, what: "The share of the land's rise from its octave 3 of 5 -- a quarter as broad: bays and headlands. Only its size beside the other four counts." },
     Tuned { name: "rise octave 4", default: 0.064, range: (0.0, 1.0), page: Page::Generation, what: "The share of the land's rise from its octave 4 of 5 -- an eighth as broad: coves. Only its size beside the other four counts." },
     Tuned { name: "rise octave 5", default: 0.026, range: (0.0, 1.0), page: Page::Generation, what: "The share of the land's rise from its octave 5 of 5 -- a sixteenth as broad: a ragged shore, and steeper land. Only its size beside the other four counts." },
-    Tuned { name: "ocean level", default: 800.0, range: (0.0, 8192.0), page: Page::Generation, what: "The height the ocean stands at, all over the world. Land under it is ocean floor; land over it, islands." },
+    Tuned { name: "ocean share", default: 0.55, range: (0.0, 1.0), page: Page::Generation, what: "The share of the world that is under the ocean: the ocean's level is set to whatever height that much of the land's rise is under, so it holds whatever the rise's sliders say. The level it comes to is shown with the seed." },
     Tuned { name: "coast", default: 64.0, range: (1.0, 1024.0), page: Page::Generation, what: "How many heights over the ocean the land is where the hills reach their whole height: from the shore to there they grow." },
     Tuned { name: "shore wander", default: 1.0, range: (0.0, 4.0), page: Page::Generation, what: "How far the line the hills begin at wanders above and below the shore, in coasts: 0 leaves a level band round every island; more, and hills here stand out of the ocean and there begin well inland." },
     Tuned { name: "shore span (2^)", default: 10.0, range: (4.0, 14.0), page: Page::Generation, what: "How broad that wandering is: 2 to this power in cells between the noise's points." },
