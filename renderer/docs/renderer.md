@@ -169,6 +169,20 @@ found by eye is then written into the code as the defaults.
 The pointer rested on a slider's row for a moment, and what the slider
 does is said beside it (`Tuned::what`).
 
+## The map
+
+From farther than 32 cells a screen pixel -- to 4,096, four superchunks
+a pixel -- the cells are no longer asked for: what shows is the map
+(`src/map.rs`). A pixel is the cell in its middle as that cell is
+generated: its height from the seed, the ocean over it darker the
+deeper, or grass, dirt or a tree on it, lit by its slope and its
+height. Nothing is made hot to draw it and nothing of the simulation is
+read, so it is how the world was generated, not how it has changed
+since. A thread of its own draws the last map asked for, its rows
+shared out among every thread the machine has; a new one is asked for
+when the view has moved 32 pixels, zoomed to another power of two, or
+the seed or generation has changed.
+
 ## The lab
 
 `cargo run --release -p renderer -- lab [superchunks shown]`, 64 (8 by
@@ -213,6 +227,7 @@ and `terrain::Shape::DEFAULT`, which every world is made with.
 | `src/ground.rs` | the light on the ground: heights from the seed, hillshade, tint, cast shadows, cliffs and contours |
 | `src/tuning.rs` | the numbers the near view's shading is tuned by, kept between runs |
 | `src/sliders.rs` | the sliders that set them, their value boxes and the button |
+| `src/map.rs` | the map: the world from far, drawn from the generator alone |
 | `src/lab.rs` | the lab: the seed and how the world is generated, as the sliders have it |
 | `src/near.rs` | the cells in view from near as one picture: steps and walls at their edges |
 | `src/main.rs` | the window: the camera, an image a superchunk, the keys, the text |

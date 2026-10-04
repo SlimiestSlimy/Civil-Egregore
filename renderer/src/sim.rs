@@ -226,6 +226,10 @@ fn made(mode: Mode, shown: &[SuperchunkIndex], flock: usize) -> World {
     }
 }
 
+/// How far behind its pace the simulation may fall and still catch up:
+/// ticks made late by a frame or a sleep are made up, a stall is not.
+const CATCH_UP: Duration = Duration::from_millis(250);
+
 /// The simulation's thread: requests read between ticks, a tick, and a
 /// wait for the next one's time.
 fn run(superchunks: u32, flock: usize, mode: Mode, asked: &Receiver<Request>, answers: &Sender<Frame>) {
@@ -292,8 +296,8 @@ fn run(superchunks: u32, flock: usize, mode: Mode, asked: &Receiver<Request>, an
             let now = Instant::now();
             if next_tick > now {
                 thread::sleep(next_tick - now);
-            } else {
-                // Behind: no catching up in a burst.
+            } else if now - next_tick > CATCH_UP {
+                // Far behind: no catching up in a long burst.
                 next_tick = now;
             }
         }

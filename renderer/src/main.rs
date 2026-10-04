@@ -41,6 +41,7 @@
 
 mod ground;
 mod lab;
+mod map;
 mod near;
 mod paint;
 mod sim;
@@ -73,9 +74,15 @@ const WHEEL_ZOOM: f32 = 0.85;
 /// Seconds from one frame asked for to the next, at least: no oftener
 /// than a screen shows them.
 const SYNC_EVERY: f32 = 1.0 / 60.0;
-/// The farthest the view goes: cells a screen pixel. Some 60
-/// superchunks across a screen, each of which may have to be made.
+/// The farthest the world's cells are drawn from: cells a screen
+/// pixel. Some 60 superchunks across a screen, each of which may have
+/// to be made. Farther, the map ([`map`]) is what is shown.
 const FARTHEST: f32 = 32.0;
+/// The farthest the view goes: cells a screen pixel, four superchunks.
+const MAP_FARTHEST: f32 = 4096.0;
+/// Pixels of the map past each of the view's edges: what a moving view
+/// shows before the next map comes.
+const MAP_MARGIN: i64 = 64;
 /// Screen pixels two boundaries are apart before they are drawn.
 const LINES_FROM: f32 = 6.0;
 /// Boundaries of a kind, across or down, there are sprites for: as
@@ -198,6 +205,8 @@ struct Seen {
     detail: u32,
     /// Pixels along a cell's side, seen from near; 0 if not.
     near_pixels: u32,
+    /// Cells along a pixel's side of the map; 0 if it is not shown.
+    map: u32,
     /// Seconds of the simulation's thread the frame took.
     sync_seconds: f64,
     /// The share of that thread's time frames take.
@@ -205,6 +214,25 @@ struct Seen {
     /// Seconds of the painter's thread the frame took.
     paint_seconds: f64,
 }
+
+/// The map, as the window holds it: where to ask for one, where it
+/// comes back, and what was last asked for.
+#[derive(Resource)]
+struct MapLink {
+    /// Where the maps wanted go.
+    requests: Sender<map::Wanted>,
+    /// Where they come back, drawn.
+    maps: Mutex<Receiver<map::Drawn>>,
+    /// The last asked for.
+    asked: Option<map::Wanted>,
+}
+
+/// The map's picture, over the superchunks' images.
+#[derive(Component)]
+struct MapView;
+
+/// What of the map's picture is changed: its image, where it lies, whether it shows.
+type MapParts = (&'static Sprite, &'static mut Transform, &'static mut Visibility);
 
 /// The picture of the cells in view from near, over the superchunks' images.
 #[derive(Component)]
@@ -322,12 +350,16 @@ fn main() {
         )
         .insert_resource(Link { requests, frames: Mutex::new(paint::start(frames)), waiting: false, since: SYNC_EVERY, asked: None, paused: false, pace, watch_for })
         .insert_resource(Sprites::about_origin(superchunks))
+        .insert_resource({
+            let (requests, maps) = map::start();
+            MapLink { requests, maps: Mutex::new(maps), asked: None }
+        })
         .insert_resource(ClearColor(Color::BLACK))
         .init_resource::<Seen>()
         .init_resource::<Boundaries>()
         .init_resource::<sliders::Hands>()
         .add_systems(Startup, (setup, sliders::setup))
-        .add_systems(Update, (fullscreen, sliders::toggle, sliders::slide, sliders::tell, steer, keys, boundaries, labels, heights, show, ask, hud).chain())
+        .add_systems(Update, (fullscreen, sliders::toggle, sliders::slide, sliders::tell, steer, keys, boundaries, labels, heights, show, ask, far, hud).chain())
         .run();
 }
 
@@ -358,6 +390,7 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, sprites: Res
         Transform::from_xyz(square_side / 2.0, -square_side / 2.0, 0.0),
     ));
     commands.spawn((Sprite { image: images.add(picture(1, DIRT.to_vec())), ..default() }, Transform::from_xyz(0.0, 0.0, 1.0), Visibility::Hidden, NearView));
+    commands.spawn((Sprite { image: images.add(picture(1, DIRT.to_vec())), ..default() }, Transform::from_xyz(0.0, 0.0, 1.0), Visibility::Hidden, MapView));
     // The chunks' boundaries under the superchunks'.
     for (of_superchunks, (colour, _), height) in [(false, CHUNK_LINE, 2.0), (true, SUPERCHUNK_LINE, 3.0)] {
         for place in 0..LINES {
@@ -399,7 +432,7 @@ fn steer(
     let held = |these: [KeyCode; 2]| keys.any_pressed(these) as i32 as f32;
     let nearer = held([KeyCode::KeyE, KeyCode::Equal]) - held([KeyCode::KeyQ, KeyCode::Minus]);
     view.scale *= WHEEL_ZOOM.powf(scroll.delta.y) * ZOOM_SPEED.powf(-nearer * time.delta_secs());
-    view.scale = view.scale.clamp(0.02, FARTHEST);
+    view.scale = view.scale.clamp(0.02, MAP_FARTHEST);
     let across = held([KeyCode::KeyD, KeyCode::ArrowRight]) - held([KeyCode::KeyA, KeyCode::ArrowLeft]);
     let up = held([KeyCode::KeyW, KeyCode::ArrowUp]) - held([KeyCode::KeyS, KeyCode::ArrowDown]);
     let step = PAN_SPEED * window.height() * view.scale * time.delta_secs();
@@ -597,6 +630,7 @@ fn show(
             in_view: seen.in_view,
             detail: seen.detail,
             near_pixels: seen.near_pixels,
+            map: seen.map,
             sync_seconds: frame.sync_seconds,
             sync_share: frame.sync_share,
             paint_seconds: frame.paint_seconds,
@@ -670,8 +704,12 @@ fn ask(
         Near { first, size, pixels_a_cell: (1 << (1.0 / view.scale).log2().floor() as u32).min(NEAR_PIXELS) }
     });
     let near = near.filter(|near| near.size.0 > 0 && near.size.1 > 0);
-    // From near every superchunk in view is in the one picture.
-    let most = if near.is_some() { in_view } else { frame_holds(detail) };
+    // From near every superchunk in view is in the one picture; from as far as the map, none is asked for.
+    let most = match near {
+        Some(_) => in_view,
+        None if view.scale > FARTHEST => 0,
+        None => frame_holds(detail),
+    };
     // On round the superchunks in view from the last frame's, or from the first if the view changed.
     let skip = match link.asked {
         Some(last) if near.is_none() && last.near.is_none() && last.viewport == viewport && last.detail == detail && last.skip + last.most < in_view => last.skip + last.most,
@@ -679,6 +717,7 @@ fn ask(
     };
     let ask = Ask { viewport, detail, skip, most, near };
     (seen.in_view, seen.detail, seen.near_pixels) = (in_view, detail, near.map_or(0, |near| near.pixels_a_cell));
+    seen.map = if view.scale > FARTHEST { map_step(view.scale) } else { 0 };
     // Fine images of superchunks gone out of view are dropped, each 4 MiB here and as much on the graphics card; and every one out of view, once there are very many.
     let many = sprites.tiles.len() > TILES_KEPT;
     sprites.tiles.retain(|&(x, y), (sprite, _, side)| {
@@ -694,6 +733,61 @@ fn ask(
     link.since = 0.0;
 }
 
+/// Cells along a pixel's side of the map, the view `scale` cells a
+/// screen pixel: a power of two, no more than the screen's pixels'.
+fn map_step(scale: f32) -> u32 {
+    1 << scale.log2().floor() as u32
+}
+
+/// Shows the map from farther than the cells are drawn from: asks for
+/// one of what is in view when the view, the seed or how the world is
+/// generated has changed, and lays the last drawn where it is of.
+fn far(
+    mut link: ResMut<MapLink>,
+    sprites: Res<Sprites>,
+    mut images: ResMut<Assets<Image>>,
+    camera: Single<(&Transform, &Projection), With<Camera2d>>,
+    window: Single<&Window>,
+    map_view: Single<MapParts, (With<MapView>, Without<Camera2d>)>,
+) {
+    let (sprite, mut transform, mut visibility) = map_view.into_inner();
+    let (camera, projection) = *camera;
+    let Projection::Orthographic(view) = projection else {
+        return;
+    };
+    if view.scale <= FARTHEST {
+        visibility.set_if_neq(Visibility::Hidden);
+        link.asked = None;
+        return;
+    }
+    // The view's pixels and a margin, from a corner that is a whole number of pixels: the same cells whatever way it is moved.
+    let step = map_step(view.scale);
+    let half = Vec2::new(window.width(), window.height()) * view.scale / 2.0;
+    let corner = |axis: usize, middle: f32, half: f32| ((sprites.origin[axis] * SUPERCHUNK_SIDE_CELLS) as i64 + (middle - half).floor() as i64).div_euclid(step as i64) - MAP_MARGIN;
+    let first = (corner(0, camera.translation.x, half.x), corner(1, -camera.translation.y, half.y));
+    let pixels = |half: f32| (2.0 * half / step as f32).ceil() as u32 + 2 * MAP_MARGIN as u32 + 1;
+    let wanted = map::Wanted { first: (first.0 * step as i64, first.1 * step as i64), step, size: (pixels(half.x), pixels(half.y)), seed: lab::seed(), generation: lab::generation() };
+    // Not for every pixel the view moves: only once it is half the margin from what was asked for, or anything else differs.
+    let near_enough = |asked: &map::Wanted| {
+        let moved = |asked: i64, wanted: i64| (asked - wanted).abs() / step as i64 <= MAP_MARGIN / 2;
+        (asked.step, asked.size, asked.seed, asked.generation) == (wanted.step, wanted.size, wanted.seed, wanted.generation) && moved(asked.first.0, wanted.first.0) && moved(asked.first.1, wanted.first.1)
+    };
+    if !link.asked.as_ref().is_some_and(near_enough) && link.requests.send(wanted).is_ok() {
+        link.asked = Some(wanted);
+    }
+    let drawn = link.maps.lock().expect("the maps' receiver").try_iter().last();
+    if let Some(drawn) = drawn {
+        let (wanted, size) = (drawn.wanted, drawn.wanted.size);
+        if let Some(mut image) = images.get_mut(&sprite.image) {
+            *image = picture_of(size, drawn.pixels);
+        }
+        // Over the cells it is of: a pixel `step` units.
+        let plane = |axis: usize, first: i64, pixels: u32| (first - (sprites.origin[axis] * SUPERCHUNK_SIDE_CELLS) as i64) as f32 + (pixels * wanted.step) as f32 / 2.0;
+        *transform = Transform::from_xyz(plane(0, wanted.first.0, size.0), -plane(1, wanted.first.1, size.1), 1.5).with_scale(Vec3::new(wanted.step as f32, wanted.step as f32, 1.0));
+        visibility.set_if_neq(Visibility::Visible);
+    }
+}
+
 /// Writes what the last frame said over the world.
 fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>) {
     let pace = match (link.paused, link.pace) {
@@ -707,6 +801,7 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         None => String::new(),
     };
     let drawn = match seen.near_pixels {
+        0 if seen.map > 0 => format!("the map, a pixel {} cells a side", seen.map),
         0 => format!("a pixel {} cell(s) a side", 1u32 << seen.detail),
         pixels => format!("a cell {pixels} pixels a side"),
     };
