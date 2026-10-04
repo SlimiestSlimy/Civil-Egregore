@@ -3213,6 +3213,7 @@ dependencies = [
  "chunk_storage",
  "coordinates",
  "simulation",
+ "terrain",
  "utilities",
 ]
 

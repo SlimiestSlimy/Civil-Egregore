@@ -5,7 +5,7 @@
 //! `cargo test`
 
 use coordinates::{place_from_cartesian, CellCartesian, SuperchunkIndex, WORLD_MIDDLE};
-use terrain::{height, wall, Terrain, STEP, WALLS};
+use terrain::{height, height_shaped, wall, Shape, Terrain, STEP, WALLS};
 
 /// The height of the cell `(x, y)` of a superchunk's `terrain`, from
 /// its top left.
@@ -32,11 +32,16 @@ fn heights_are_settled_by_the_seed_and_the_cell() {
     }
 }
 
-/// The ground rolls: heights span most of their range over a
+/// A shape all hills: no plains, no base.
+const HILLS: Shape = Shape { weights: [168, 22, 61, 4], base: 0, plains: 0 };
+/// A shape all plains.
+const PLAINS: Shape = Shape { weights: [142, 19, 51, 3], base: 40, plains: 1 << 16 };
+
+/// The hills roll: heights span most of their range over a
 /// superchunk, and no cell is far from its neighbour's.
 #[test]
-fn the_ground_rolls() {
-    let terrain = Terrain::generate(1, WORLD_MIDDLE);
+fn the_hills_roll() {
+    let terrain = Terrain::generate_shaped(&HILLS, 1, WORLD_MIDDLE);
     let (mut low, mut high, mut steepest) = (u8::MAX, 0, 0);
     for y in 0..1024 {
         for x in 0..1024 {
@@ -57,7 +62,8 @@ fn the_ground_rolls() {
 #[test]
 fn walls_are_where_heights_are_more_than_a_step_apart() {
     let CellCartesian { x: left, y: top } = WORLD_MIDDLE.top_left().cartesian();
-    let terrain = Terrain::generate(1, WORLD_MIDDLE);
+    let terrain = Terrain::generate_shaped(&HILLS, 1, WORLD_MIDDLE);
+    let height = |seed, x, y| height_shaped(&HILLS, seed, x, y);
     for y in (0..1024).step_by(7).chain([1023]) {
         for x in (0..1024).step_by(5).chain([0, 1023]) {
             for (way, &(_, (dx, dy))) in WALLS.iter().enumerate() {
@@ -70,6 +76,16 @@ fn walls_are_where_heights_are_more_than_a_step_apart() {
     let counts = terrain.wall_counts();
     let share = counts.iter().sum::<u64>() as f64 / (2.0 * 1024.0 * 1024.0);
     assert!(share > 0.002 && share < 0.25, "{:.2}% of steps walled: {counts:?}", 100.0 * share);
+}
+
+/// The plains are all but flat: no wall on them, and no two cells
+/// beside one another more than a step apart.
+#[test]
+fn the_plains_have_no_walls() {
+    let terrain = Terrain::generate_shaped(&PLAINS, 1, WORLD_MIDDLE);
+    assert_eq!(terrain.wall_counts(), [0; 2]);
+    let heights: Vec<u8> = (0..1024).map(|x| at(&terrain, x, 500)).collect();
+    assert!(heights.windows(2).all(|pair| pair[0].abs_diff(pair[1]) <= 1), "a row of the plains: {heights:?}");
 }
 
 /// Flat ground has no walls; a cliff has them along it.

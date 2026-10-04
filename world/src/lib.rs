@@ -24,7 +24,7 @@ use background::{Background, Ticket};
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
 use chunk_storage::{ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
-use terrain::{Shape, Terrain, WALLS};
+use terrain::{Shape, Terrain, WALLS, WATER};
 use chunk_storage::mock::GRASS;
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
 use mc_rules::trees::{OLDEST, TREE, TREE_STAGE};
@@ -48,6 +48,9 @@ pub struct Generation {
     pub grass: Patches,
     /// How the trees lie.
     pub trees: Patches,
+    /// The height still water stands at: the ground under it is a lake,
+    /// as deep as it is lower.
+    pub water_level: u8,
 }
 
 impl Generation {
@@ -56,6 +59,7 @@ impl Generation {
         shape: Shape::DEFAULT,
         grass: Patches { cover: ONE * 951 / 1000, patch: 8, detail: ONE * 598 / 1000, scatter: ONE * 51 / 1000 },
         trees: Patches { cover: ONE * 60 / 1000, patch: 7, detail: ONE * 800 / 1000, scatter: ONE * 300 / 1000 },
+        water_level: 14,
     };
 }
 
@@ -133,10 +137,11 @@ impl World {
     }
 }
 
-/// Every layer type a world has: the grass's, the trees' and the walls'.
+/// Every layer type a world has: the grass's, the trees', the water's
+/// and the walls'.
 /// Dirt has none: it is a cell with nothing on it.
 fn layer_types() -> Vec<LayerType> {
-    [GRASS, TREE].into_iter().chain(TREE_STAGE).chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
+    [GRASS, TREE].into_iter().chain(TREE_STAGE).chain(WATER).chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
 }
 
 /// A world made from `seed`: its origin superchunk ([`WORLD_MIDDLE`])
@@ -174,8 +179,8 @@ pub fn generate_flocks(seed: u64, superchunks: &[SuperchunkIndex], sheep: usize)
 }
 
 /// The image of `superchunk` in a world made from `seed` as
-/// `generation` says: its terrain, and on it grass in patches -- dirt
-/// where there is none --
+/// `generation` says: its terrain, lakes where it is under the water's
+/// level, and on the rest grass in patches -- dirt where there is none --
 /// and trees in patches of their own, each of a stage drawn for its
 /// cell -- the same whenever it is made.
 pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: SuperchunkIndex, codec: &mut LayerCodec) -> SuperchunkImage {
@@ -183,14 +188,23 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
     let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     let trees_seed = seed ^ TREES_SALT;
     let (grass_under, trees_under) = (generation.grass.threshold(seed), generation.trees.threshold(trees_seed));
-    // The planes generated, each a bitmap a chunk: grass, trees and their stage's four.
-    let planes: [LayerType; 6] = [GRASS, TREE, TREE_STAGE[0], TREE_STAGE[1], TREE_STAGE[2], TREE_STAGE[3]];
+    // The planes generated, each a bitmap a chunk: grass, trees, their stage's four, and the water's eight.
+    let mut planes = vec![GRASS, TREE];
+    planes.extend(TREE_STAGE);
+    let water = planes.len();
+    planes.extend(WATER);
     let mut cells = vec![[0u64; bitmap::WORDS]; planes.len() * CHUNKS_IN_SUPERCHUNK];
     for place in 0..CHUNKS_IN_SUPERCHUNK * CELLS_IN_CHUNK {
         let (x, y) = cartesian_from_place(place);
         let (x, y) = (left + x, top + y);
         let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
         let mut set = |plane: usize| cells[plane * CHUNKS_IN_SUPERCHUNK + chunk][cell / bitmap::BITS_PER_WORD] |= 1 << (cell % bitmap::BITS_PER_WORD);
+        // A lake wherever the ground is under the water's level, as deep as it is lower: nothing grows under it.
+        let depth = generation.water_level.saturating_sub(terrain.height(place));
+        if depth > 0 {
+            (0..WATER.len()).filter(|bit| depth >> bit & 1 == 1).for_each(|bit| set(water + bit));
+            continue;
+        }
         if generation.grass.number(seed, x, y) < grass_under {
             set(0);
         }

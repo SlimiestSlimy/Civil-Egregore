@@ -39,18 +39,38 @@ pub const WALLS: [(LayerType, (i32, i32)); 2] = [(WALL_EAST, (1, 0)), (WALL_SOUT
 /// as a power of two. Broad hills, and rougher ground on them.
 const OCTAVES: [u32; 4] = [9, 7, 5, 3];
 
-/// How the heights are shaped: how much of a height each octave makes
-/// up, the broadest first -- 255 in all at most.
+/// How the heights are shaped. The ground everywhere is a base, rolling
+/// so broadly that it is all but flat; hills stand on it only where a
+/// mask, as broad, is over a threshold, rising from nothing at the
+/// threshold -- so the rest is plains. The base's share of a height and
+/// the hills' octaves' come to 255 in all at most.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Shape {
-    /// Each octave's share of a height.
+    /// Each hill octave's share of a height, the broadest first.
     pub weights: [u64; 4],
+    /// The base's share of a height: how high the plains roll.
+    pub base: u64,
+    /// The mask under which the ground is plains, of [`ONE`]: about the
+    /// share of the world that is.
+    pub plains: u64,
 }
+
+/// The cells between two points of the base and of the plains' mask,
+/// as a power of two.
+const BROAD: u32 = 11;
+/// How fast the hills rise past the plains' edge: to their whole height
+/// over this fraction of the mask.
+const FOOTHILLS: u64 = 4;
+
+/// A cell's water: how deep it stands over the ground, 0 none, a number
+/// over eight bitplanes, the lowest bit first.
+pub const WATER: [LayerType; 8] = [LayerType(24), LayerType(25), LayerType(26), LayerType(27), LayerType(28), LayerType(29), LayerType(30), LayerType(31)];
 
 impl Shape {
     /// The world's shape, as tuned by eye in the renderer's lab: broad
-    /// hills, little of the ridges, a good deal of bumps.
-    pub const DEFAULT: Self = Self { weights: [168, 22, 61, 4] };
+    /// hills, little of the ridges, a good deal of bumps, on half the
+    /// world; plains on the rest.
+    pub const DEFAULT: Self = Self { weights: [142, 19, 51, 3], base: 40, plains: ONE / 2 };
 }
 
 /// One: a fraction's whole, 16 bits.
@@ -92,8 +112,14 @@ pub fn height(seed: u64, x: u32, y: u32) -> Height {
 /// [`height`], in a world shaped as `shape` says: what a shape is tried
 /// out with before it is the world's.
 pub fn height_shaped(shape: &Shape, seed: u64, x: u32, y: u32) -> Height {
-    let parts: u64 = OCTAVES.iter().zip(shape.weights).enumerate().map(|(index, (&shift, weight))| noise(seed, index as u32, shift, x, y) * weight).sum();
-    (parts >> 16) as Height
+    let base = noise(seed, OCTAVES.len() as u32, BROAD, x, y) * shape.base;
+    // How much of the hills stands here: none on the plains.
+    let relief = (noise(seed, OCTAVES.len() as u32 + 1, BROAD, x, y).saturating_sub(shape.plains) * FOOTHILLS).min(ONE);
+    if relief == 0 {
+        return (base >> 16) as Height;
+    }
+    let hills: u64 = OCTAVES.iter().zip(shape.weights).enumerate().map(|(index, (&shift, weight))| noise(seed, index as u32, shift, x, y) * weight).sum();
+    ((base + ((hills * relief) >> 16)) >> 16) as Height
 }
 
 /// Whether two heights are too far apart to step between.

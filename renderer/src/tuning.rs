@@ -75,10 +75,16 @@ pub const TREE_PATCH: usize = 18;
 pub const TREE_DETAIL: usize = 19;
 /// How much each cell's own lot counts for trees.
 pub const TREE_SCATTER: usize = 20;
+/// About the share of the world that is plains.
+pub const PLAINS: usize = 21;
+/// How high the plains roll: the base's share of a height.
+pub const PLAINS_HEIGHT: usize = 22;
+/// The height still water stands at.
+pub const WATER_LEVEL: usize = 23;
 
 /// The numbers, in the order above; the shading's defaults are what was
 /// found by eye with the sliders.
-pub const TUNED: [Tuned; 21] = [
+pub const TUNED: [Tuned; 24] = [
     Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading },
     Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading },
     Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading },
@@ -100,6 +106,9 @@ pub const TUNED: [Tuned; 21] = [
     Tuned { name: "tree patch (2^)", default: 7.0, range: (1.0, 10.0), page: Page::Generation },
     Tuned { name: "tree detail", default: 0.8, range: (0.0, 2.0), page: Page::Generation },
     Tuned { name: "tree scatter", default: 0.3, range: (0.0, 2.0), page: Page::Generation },
+    Tuned { name: "plains", default: 0.5, range: (0.0, 1.0), page: Page::Generation },
+    Tuned { name: "plains height", default: 40.0, range: (0.0, 120.0), page: Page::Generation },
+    Tuned { name: "water level", default: 14.0, range: (0.0, 120.0), page: Page::Generation },
 ];
 
 /// Counts the changes to how the world is generated: what was made

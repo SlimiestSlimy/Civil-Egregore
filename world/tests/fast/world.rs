@@ -104,7 +104,7 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     first.info.name = "Nine fields".to_string();
     world::save(&folder, &mut first).expect("saved");
     let text = std::fs::read_to_string(folder.join("world")).expect("the world's file");
-    assert_eq!(text, "tilesim world 1\nname = Nine fields\nseed = 99\ntick = 0\nlayers = 2 3 4 5 6 7 8 9\n");
+    assert_eq!(text, "tilesim world 1\nname = Nine fields\nseed = 99\ntick = 0\nlayers = 2 3 4 5 6 7 24 25 26 27 28 29 30 31 8 9\n");
     let hot: String = first.arena.superchunk_indices().iter().map(|superchunk| format!("{:011x}\n", superchunk.0)).collect();
     assert_eq!(std::fs::read_to_string(folder.join("hot")).expect("the hot file"), format!("tilesim hot 2\n{hot}"), "the nine hot, none cooling or warming");
     let mut names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|entry| entry.unwrap().file_name().into_string().unwrap()).collect();
@@ -137,7 +137,8 @@ fn files_that_are_not_a_save_are_refused() {
 #[test]
 fn sheep_never_step_through_a_wall() {
     use std::collections::HashMap;
-    let seed = 5;
+    // A seed whose origin superchunk is hills, not plains: one with walls enough.
+    let seed = (1..).find(|&seed| terrain::Terrain::generate(seed, coordinates::WORLD_MIDDLE).wall_counts().iter().sum::<u64>() > 20_000).expect("a hilly origin");
     let mut made = world::generate(seed, 4_000);
     let high = |at: coordinates::CellIndex| {
         let cell = at.cartesian();
@@ -160,5 +161,6 @@ fn sheep_never_step_through_a_wall() {
             beside_walls += (0..9).any(|way| at.offset(way % 3 - 1, way / 3 - 1).is_some_and(|beside| terrain::wall(high(at), high(beside)))) as usize;
         }
     }
-    assert!(moved > 500 && beside_walls > 10_000, "{moved} steps, {beside_walls} sheep-ticks beside a wall");
+    // Few steps: on ground nearly all grass a sheep seldom has to walk.
+    assert!(moved > 100 && beside_walls > 10_000, "{moved} steps, {beside_walls} sheep-ticks beside a wall");
 }

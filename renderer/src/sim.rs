@@ -30,6 +30,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use crate::{lab, tuning};
 use mc_rules::trees::{TREE, TREE_STAGE};
+use terrain::WATER;
 use world::World;
 use utilities::rng::Rng;
 
@@ -39,6 +40,9 @@ pub const TARGET_PACE: u32 = 256;
 
 /// The seed of the world watched.
 pub const SEED: u64 = 1;
+
+/// The depth from which water hides what is under it: a power of two.
+pub const DEEP: u32 = 16;
 
 /// Ticks from one line of the census to the next.
 pub const CENSUS_EVERY: u64 = 1000;
@@ -145,6 +149,13 @@ pub struct Cells {
     /// Its trees' stages, a bitplane a bit, the lowest first, each laid
     /// out as the grass.
     pub stages: [Vec<u64>; 4],
+    /// The cells with water on them, however deep, laid out as the grass.
+    pub wet: Vec<u64>,
+    /// The low four bits of the water's depth, a bitplane a bit, each
+    /// laid out as the grass.
+    pub depths: [Vec<u64>; 4],
+    /// The cells with water [`DEEP`] deep or more: any higher bit set.
+    pub deep: Vec<u64>,
     /// The cells its sheep stand on, `(x, y)` from its top left.
     pub sheep: Vec<(u16, u16)>,
 }
@@ -322,7 +333,13 @@ fn copy(world: &World, ask: Ask) -> Vec<Cells> {
         let hot = world.entities.superchunk(superchunk).is_some();
         let planes = |layer_type: LayerType| if hot { layer(world, layer_type, superchunk) } else { Vec::new() };
         let sheep = if hot { sheep(world, superchunk) } else { Vec::new() };
-        copied.push(Cells { at: (x, y), hot, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages: TREE_STAGE.map(planes), sheep });
+        // The water's depth to its low four bits, and whether any above is set: past that it is drawn the same.
+        let (low, high) = WATER.split_at(DEEP.trailing_zeros() as usize);
+        let or = |all: Vec<u64>, plane: &Vec<u64>| if all.is_empty() { plane.clone() } else { all.iter().zip(plane).map(|(all, plane)| all | plane).collect() };
+        let depths: [Vec<u64>; 4] = std::array::from_fn(|bit| planes(low[bit]));
+        let deep = high.iter().map(|&plane| planes(plane)).fold(Vec::new(), |all, plane| or(all, &plane));
+        let wet = depths.iter().fold(deep.clone(), or);
+        copied.push(Cells { at: (x, y), hot, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages: TREE_STAGE.map(planes), wet, depths, deep, sheep });
     }
     copied
 }
