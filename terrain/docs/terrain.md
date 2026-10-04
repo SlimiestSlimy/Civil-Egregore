@@ -72,9 +72,10 @@ are mixed, each by how little farther its site is than the nearest: a
 ramp or a shore, or with a narrow edge a cliff, walled.
 
 A cell looks at the sites of the 25 squares about it, so any cell's
-height follows from the seed and the cell alone; a superchunk's terrain
-takes about 0.6 s so -- the sites near a superchunk are yet to be found
-once for all its cells.
+height follows from the seed and the cell alone. `Lands` keeps those
+sites from one cell to the next -- drawn once for a square, not once
+for a cell -- and takes no root of a site too far to count: a
+superchunk's terrain takes about 0.1 s (0.6 s without).
 
 To come: polygons within polygons, plains higher or lower than the one
 about them; open lines within a polygon, ridges and valleys; ranges

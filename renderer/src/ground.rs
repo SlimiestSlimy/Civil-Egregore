@@ -16,7 +16,8 @@
 
 use coordinates::SUPERCHUNK_SIDE_CELLS;
 use chunk_storage::Height;
-use terrain::{height_shaped, wall, Shape};
+use terrain::polygons::Lands;
+use terrain::{wall, Shape};
 
 /// Cells along a superchunk's side.
 pub const SIDE: usize = SUPERCHUNK_SIDE_CELLS as usize;
@@ -163,7 +164,8 @@ impl Ground {
 /// [`WIDE`] a side, row by row.
 fn heights(seed: u64, shape: &Shape, top_left: (u32, u32)) -> Vec<Height> {
     let (left, top) = (top_left.0.wrapping_sub(BEFORE as u32), top_left.1.wrapping_sub(BEFORE as u32));
-    (0..WIDE * WIDE).map(|index| height_shaped(shape, seed, left.wrapping_add((index % WIDE) as u32), top.wrapping_add((index / WIDE) as u32))).collect()
+    let mut lands = Lands::new(shape, seed);
+    (0..WIDE * WIDE).map(|index| lands.height(left.wrapping_add((index % WIDE) as u32), top.wrapping_add((index / WIDE) as u32))).collect()
 }
 
 /// `heights` smoothed: each the mean of those [`SMOOTHED_OVER`] cells

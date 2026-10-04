@@ -197,12 +197,12 @@ drawn, the view too goes back to where it started. No sheep,
 its rules -- grass and trees -- ticking as in any run, paused and paced
 by the same keys. Generation's sliders are shown from the start:
 
-- **The polygons** (`terrain::Shape`): how broad one is, how high the
-  plains stand over the ocean, the edge's width and how far borders
-  are bent. `P` draws their borders over the map.
-- **The ground's level**, the ocean's floor; **the ocean's depth** over
-  it, which sets the ocean's level, shown with the seed; and **the
-  ocean's share** of the polygons.
+- **The ocean** (`terrain::Shape`): its floor's level, the lowest
+  ground; its own level; and its share of the polygons.
+- **The land**: the highest a plain stands over the ocean; how broad a
+  polygon is; the ramp's width, the cells from a border the heights
+  about it are joined over; and how far borders are bent. `P` draws the
+  polygons' borders over the map.
 - **The grass**, and **the trees** (`world::patches`): each in patches,
   not scattered cell by cell. A cell's number is smooth noise as broad
   as a patch, finer noise on it (detail), and a lot drawn for the cell

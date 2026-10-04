@@ -111,8 +111,7 @@ pub fn height(seed: u64, x: u32, y: u32) -> Height {
 /// [`height`], in a world shaped as `shape` says: what a shape is tried
 /// out with before it is the world's.
 pub fn height_shaped(shape: &Shape, seed: u64, x: u32, y: u32) -> Height {
-    // The highest there is, whatever the shape would come to.
-    polygons::land(shape, seed, x, y).min(Height::MAX as u64) as Height
+    polygons::Lands::new(shape, seed).height(x, y)
 }
 
 /// Whether two heights are too far apart to step between.
@@ -138,14 +137,15 @@ impl Terrain {
     /// [`Terrain::generate`], in a world shaped as `shape` says.
     pub fn generate_shaped(shape: &Shape, seed: u64, superchunk: SuperchunkIndex) -> Self {
         let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
-        Self::from_heights(|x, y| height_shaped(shape, seed, left.wrapping_add_signed(x), top.wrapping_add_signed(y)))
+        let mut lands = polygons::Lands::new(shape, seed);
+        Self::from_heights(|x, y| lands.height(left.wrapping_add_signed(x), top.wrapping_add_signed(y)))
     }
 
     /// The terrain where `height_at` gives the height of the cell `x`
     /// across and `y` down from the superchunk's top left -- and of the
     /// cells a step past its edges, whose walls with its own are its
     /// neighbours' business too.
-    pub fn from_heights(height_at: impl Fn(i32, i32) -> Height) -> Self {
+    pub fn from_heights(mut height_at: impl FnMut(i32, i32) -> Height) -> Self {
         let side = SUPERCHUNK_SIDE_CELLS as i32;
         // The heights with a cell more all round, row by row: each read once.
         let wide = side as usize + 2;
