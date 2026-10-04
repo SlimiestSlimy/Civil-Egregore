@@ -70,6 +70,20 @@ grounds, near)`**: the picture. **`Cell`**: **`paint`**, a cell's pixels
 -- its edges, the shadow on it, its ground's tone (`TONES`).
 **`sheep`**: a sheep's shape (`SHEEP`) on its cell.
 
+## `tuning.rs`
+
+**`Tuned`** `{name, default, range}`; `TUNED`, the ten of them, and each
+one's place (`STEP_LIGHT` ... `TEXTURE`). **`Tuning`**: the numbers read
+together. **`path()`**: where they are kept. **`start()`**: defaults,
+then what was kept. **`now()`**, **`set(index, value)`**, **`keep()`**.
+
+## `sliders.rs`
+
+`MARGIN`, `ROW`, `TRACK`, `PANEL`: the layout. **`Fill`**, **`Named`**: a
+slider's filled part and its text. **`Dragged`**: the one being dragged.
+**`pointer_over(window)`**: whether the pointer is over them.
+**`setup`**: the sliders. **`slide`**: dragged, set back, kept, shown.
+
 ## `main.rs`
 
 `SPRITE_SIDE`, `PAN_SPEED`, `ZOOM_SPEED`, `WHEEL_ZOOM`, `SYNC_EVERY`
@@ -94,7 +108,8 @@ texts; **`heights`**: every cell's height written on it by `H`, from
 
 **`grouped(number)`**: its digits in threes. **`setup`**: the camera over the world's middle, the whole of it in
 view; an image a superchunk, dirt until the first frame; the text.
-**`steer`**: the view moved and zoomed. **`keys`**: pause and pace sent.
+**`steer`**: the view moved and zoomed. **`fullscreen`**: the window
+over the whole screen by `F`. **`keys`**: pause and pace sent.
 **`picture(side, pixels)`**, **`picture_of(size, pixels)`**: an image;
 `DIRT`, one pixel of it. **`show`**: the frame that came shown -- each
 superchunk's image, and the picture from near. **`ask`**: the next

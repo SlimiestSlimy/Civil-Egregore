@@ -22,11 +22,15 @@
 //! | arrows, WASD, or dragging with the left button | move the view |
 //! | the wheel, or `Q` and `E` | zoom |
 //! | space | pause, and go on |
-//! | `F` | tick flat out, or at the game's pace |
+//! | `T` | tick flat out, or at the game's pace |
+//! | `F` | the window over the whole screen, or not |
 //! | `[` and `]` | halve and double the pace |
 //! | `B` | show the superchunks' boundaries, or not, and near enough each one's Morton index and `(x, y)` |
 //! | `C` | the same of the chunks |
 //! | `H` | show every cell's height, from near enough to read them |
+//!
+//! The sliders at the top right tune the near view's shading
+//! ([`tuning`]): dragged with the left button, set back with the right.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -36,12 +40,15 @@ mod ground;
 mod near;
 mod paint;
 mod sim;
+mod sliders;
+mod tuning;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::Anchor;
+use bevy::window::{MonitorSelection, WindowMode};
 use coordinates::{place_from_cartesian, square_side, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
 use paint::Picture;
 use sim::{start, Ask, Near, Request, Viewport, SEED, TARGET_PACE};
@@ -243,6 +250,7 @@ fn main() {
     let (superchunks, flock) = (argument(1, 256) as u32, argument(2, 8000));
     let pace = Some(argument(3, TARGET_PACE as usize) as u32).filter(|&pace| pace > 0);
     let forced_hot = argument(5, 0) > 0;
+    tuning::start();
     let (requests, frames) = start(superchunks, flock, forced_hot);
     _ = requests.send(Request::Pace(pace));
     let watch_for = Some(argument(4, 0) as u64).filter(|&ticks| ticks > 0);
@@ -257,8 +265,9 @@ fn main() {
         .insert_resource(Sprites { side: square_side(superchunks), shown: sim::shown(superchunks), images: Vec::new(), sides: Vec::new() })
         .init_resource::<Seen>()
         .init_resource::<Boundaries>()
-        .add_systems(Startup, setup)
-        .add_systems(Update, (steer, keys, boundaries, labels, heights, show, ask, hud).chain())
+        .init_resource::<sliders::Dragged>()
+        .add_systems(Startup, (setup, sliders::setup))
+        .add_systems(Update, (fullscreen, sliders::slide, steer, keys, boundaries, labels, heights, show, ask, hud).chain())
         .run();
 }
 
@@ -343,9 +352,19 @@ fn steer(
     let up = held([KeyCode::KeyW, KeyCode::ArrowUp]) - held([KeyCode::KeyS, KeyCode::ArrowDown]);
     let step = PAN_SPEED * window.height() * view.scale * time.delta_secs();
     transform.translation += Vec3::new(across * step, up * step, 0.0);
-    if buttons.pressed(MouseButton::Left) {
+    if buttons.pressed(MouseButton::Left) && !sliders::pointer_over(&window) {
         // The world follows the pointer.
         transform.translation += Vec3::new(-motion.delta.x, motion.delta.y, 0.0) * view.scale;
+    }
+}
+
+/// Puts the window over the whole screen, or back, by its key.
+fn fullscreen(keys: Res<ButtonInput<KeyCode>>, mut window: Single<&mut Window>) {
+    if keys.just_pressed(KeyCode::KeyF) {
+        window.mode = match window.mode {
+            WindowMode::Windowed => WindowMode::BorderlessFullscreen(MonitorSelection::Current),
+            _ => WindowMode::Windowed,
+        };
     }
 }
 
@@ -355,7 +374,7 @@ fn keys(mut link: ResMut<Link>, keys: Res<ButtonInput<KeyCode>>) {
         link.paused = !link.paused;
         _ = link.requests.send(Request::Pause(link.paused));
     }
-    let pace = if keys.just_pressed(KeyCode::KeyF) {
+    let pace = if keys.just_pressed(KeyCode::KeyT) {
         if link.pace.is_some() { None } else { Some(TARGET_PACE) }
     } else if keys.just_pressed(KeyCode::BracketLeft) {
         Some((link.pace.unwrap_or(TARGET_PACE) / 2).max(1))
@@ -623,7 +642,7 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         pixels => format!("a cell {pixels} pixels a side"),
     };
     text.0 = format!(
-        "tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause   F: flat out   [ ]: pace   B: superchunks   C: chunks   H: heights",
+        "tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause   T: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights",
         grouped(seen.tick),
         grouped(seen.ticks_a_second as u64),
         grouped(seen.sheep as u64),
