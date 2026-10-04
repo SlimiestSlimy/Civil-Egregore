@@ -19,7 +19,7 @@ fn walled(terrain: &Terrain, way: usize, x: u32, y: u32) -> bool {
 }
 
 /// A shape of small polygons joined by cliffs: plenty of walls.
-const CLIFFS: Shape = Shape { span: 8, levels: 40, edge: 2, ..Shape::DEFAULT };
+const CLIFFS: Shape = Shape { span: 8, highest: 552, edge: 2, ..Shape::DEFAULT };
 
 /// The same seed gives the same heights, another seed others; a
 /// superchunk's heights are the world's, whichever superchunk is made.
@@ -86,7 +86,7 @@ fn a_cliff_is_walled_along_its_length() {
 fn polygons_are_ocean_or_plains_joined_by_ramps() {
     let shape = Shape { span: 10, ..Shape::DEFAULT };
     let row: Vec<u64> = (0..40_000).map(|x| terrain::polygons::land(&shape, 1, 2_000_000_000 + x, 2_000_000_000)).collect();
-    assert!(row.iter().all(|&high| (shape.ground as u64..=shape.ocean as u64 + 1 + shape.levels).contains(&high)));
+    assert!(row.iter().all(|&high| (shape.ground..=shape.highest.max(shape.ocean + 1)).contains(&(high as u16))));
     assert!(row.contains(&(shape.ground as u64)) && row.iter().any(|&high| high > shape.ocean as u64), "ocean and land both");
     assert!(row.windows(2).all(|pair| pair[0].abs_diff(pair[1]) <= 3), "no jump");
 }

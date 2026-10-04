@@ -64,7 +64,8 @@ borders and never overlap: a polygon is the cells nearer one site than
 any other, the sites one to each square of a grid `2^span` cells a
 side, placed by lot in the square's middle half. Each polygon is ocean
 -- its ground the lowest there is (`Shape::ground`) -- or land, a plain
-at a level of its own over the ocean's (`Shape::ocean`, `levels`); the
+at a level of its own between just over the ocean's and the highest
+(`Shape::ocean`, `highest`); the
 share that are ocean is `Shape::sea`. Broad noise moves a cell before
 its polygon is looked up, which bends the borders (`warp`). Within the
 edge's width of a border (`edge`) the levels of the polygons about it

@@ -75,7 +75,7 @@ fn shape(tuned: &tuning::Tuning) -> Shape {
         ocean: height(tuned[OCEAN_LEVEL]).max(ground),
         span: tuned[POLYGON_SIZE].round().clamp(6.0, 24.0) as u32,
         sea: (tuned[OCEAN_SHARE].clamp(0.0, 1.0) * ONE as f32) as u64,
-        levels: height(tuned[HIGHEST_PLAIN]) as u64,
+        highest: height(tuned[HIGHEST_PLAIN]),
         edge: tuned[RAMP_WIDTH].round().clamp(1.0, u16::MAX as f32) as u64,
         warp: (tuned[BORDER_BENDING].clamp(0.0, 4.0) * ONE as f32) as u64,
     }
