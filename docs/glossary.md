@@ -52,8 +52,8 @@ what they always do and are not listed.
 | **halo keeper** | an entity of a kind that keeps a halo (`HALO_KEEPERS`): people, to come; the sheep, for now | halo | important entity |
 | **origin** | the superchunk the world starts from, in its middle (`WORLD_MIDDLE`): a world is generated as it and its halo | superchunk | centre |
 | **cold state** | a cold superchunk's entities and random numbers, kept as a save keeps them (`World::cold`) | cold, save | |
-| **cooling** | a superchunk gone cold whose bitmaps the arena keeps as they were, until chunk storage holds its changes -- made hot again as it is if a halo reaches it before then (`BitmapArena::make_cold_superchunk`) | cold, warming, write back | |
-| **warming** | a superchunk a halo reached, not hot yet: made ready in the background, it turns hot at the tick it is due, `WARM_TICKS` on; until then writes to it are missed and entities sent there stay put | hot, halo, background, cooling | loading, pending |
+| **cooling** | a superchunk gone cold -- to the simulation, cold like any other -- whose bitmaps the arena keeps as they were, until chunk storage holds its changes -- made hot again as it is if a halo reaches it before then (`BitmapArena::make_cold_superchunk`) | cold, warming, write back | |
+| **warming** | a superchunk a halo reached, not hot yet: made ready in the background, it turns hot at the tick it is due, `WARM_TICKS` on; until then, to the simulation, it is cold like any other | hot, halo, background, cooling | loading, pending |
 | **background** | the threads doing the slow work off the tick: encoding the write-backs of superchunks gone cold, generating and decoding those warming (`world::background`) | warming, cooling | worker, loader |
 | **hot file** | a save's file naming its hot superchunks, and its warming ones with their due ticks (`HotSuperchunks`): made hot before a loaded world ticks | save, hot, warming | |
 | **shared image** | an image in the cold pool held behind a reference count, so a thread reads it as it was while the pool changes (`ChunkStorage::shared_image`) | image, background | |
