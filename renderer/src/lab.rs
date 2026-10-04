@@ -7,7 +7,7 @@
 //! world is made afresh and its ticks start from 0.
 
 use crate::sim::SEED;
-use crate::tuning::{self, GRASS_COVER, GROUND_LEVEL, OCEAN_DEPTH, OCEAN_SHARE, PATCH_DETAIL, PATCH_SIZE, POLYGON_EDGE, POLYGON_LEVELS, POLYGON_SIZE, POLYGON_WARP, SCATTER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
+use crate::tuning::{self, BORDER_BENDING, GRASS_COVER, GRASS_DETAIL, GRASS_PATCH, GRASS_SCATTER, HIGHEST_PLAIN, OCEAN_FLOOR, OCEAN_LEVEL, OCEAN_SHARE, POLYGON_SIZE, RAMP_WIDTH, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use terrain::Shape;
@@ -61,22 +61,22 @@ pub fn generation() -> Generation {
     let of_one = |share: f32| (share.clamp(0.0, 1024.0) * ONE as f32) as u64;
     let patches = |[cover, patch, detail, scatter]: [usize; 4]| Patches { cover: of_one(tuned[cover]), patch: tuned[patch].round().clamp(0.0, 16.0) as u32, detail: of_one(tuned[detail]), scatter: of_one(tuned[scatter]) };
     let shape = shape(&tuned);
-    Generation { shape, grass: patches([GRASS_COVER, PATCH_SIZE, PATCH_DETAIL, SCATTER]), trees: patches([TREE_COVER, TREE_PATCH, TREE_DETAIL, TREE_SCATTER]) }
+    Generation { shape, grass: patches([GRASS_COVER, GRASS_PATCH, GRASS_DETAIL, GRASS_SCATTER]), trees: patches([TREE_COVER, TREE_PATCH, TREE_DETAIL, TREE_SCATTER]) }
 }
 
 /// The heights' shape, as the sliders have it: what is typed held to
 /// what a height and the polygons can take.
 fn shape(tuned: &tuning::Tuning) -> Shape {
     let height = |tuned: f32| tuned.round().clamp(0.0, u16::MAX as f32) as u16;
-    let ground = height(tuned[GROUND_LEVEL]);
+    let ground = height(tuned[OCEAN_FLOOR]);
     Shape {
         ground,
-        // The ocean stands its depth over its floor.
-        ocean: ground.saturating_add(height(tuned[OCEAN_DEPTH])),
+        // No ocean under its own floor.
+        ocean: height(tuned[OCEAN_LEVEL]).max(ground),
         span: tuned[POLYGON_SIZE].round().clamp(6.0, 24.0) as u32,
         sea: (tuned[OCEAN_SHARE].clamp(0.0, 1.0) * ONE as f32) as u64,
-        levels: height(tuned[POLYGON_LEVELS]) as u64,
-        edge: tuned[POLYGON_EDGE].round().clamp(1.0, u16::MAX as f32) as u64,
-        warp: (tuned[POLYGON_WARP].clamp(0.0, 4.0) * ONE as f32) as u64,
+        levels: height(tuned[HIGHEST_PLAIN]) as u64,
+        edge: tuned[RAMP_WIDTH].round().clamp(1.0, u16::MAX as f32) as u64,
+        warp: (tuned[BORDER_BENDING].clamp(0.0, 4.0) * ONE as f32) as u64,
     }
 }

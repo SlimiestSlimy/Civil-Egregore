@@ -30,8 +30,10 @@ place)`**: a cell's, by its place in the superchunk; **`wall_counts()`**.
 
 ## `polygons.rs`
 
-**`land(shape, seed, x, y)`**: the land at a cell, its polygon's level
-mixed near a border with its neighbours'. **`polygon(shape, seed, x,
-y)`**: the cell's polygon's number, whether it is land, and about how
-far the cell is from its border. Private: **`Site`**, **`sites`** (the
-25 squares' sites, the nearest first).
+**`Lands`**: the land asked for cell after cell, the sites about the
+last cell kept -- **`new(shape, seed)`**, **`land(x, y)`** (the cell's
+polygon's level, mixed near a border with its neighbours'),
+**`height(x, y)`**, **`polygon(x, y)`** (the polygon's number, whether
+it is land, about how far the cell is from its border). **`land`**,
+**`polygon`**: the same for one cell alone. Private: **`Site`**,
+**`Lands::moved`**, **`Lands::squared`**.

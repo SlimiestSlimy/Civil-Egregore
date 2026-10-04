@@ -50,28 +50,28 @@ pub const RELIEF: usize = 6;
 /// How much the ground's pixels differ by lot.
 pub const TEXTURE: usize = 7;
 
-/// The cells along a square of the polygons' grid, as a power of two.
-pub const POLYGON_SIZE: usize = 8;
+/// The height of the ocean's floor: the lowest ground there is.
+pub const OCEAN_FLOOR: usize = 8;
+/// The height the ocean stands at.
+pub const OCEAN_LEVEL: usize = 9;
 /// The most a land polygon's plain stands over the ocean.
-pub const POLYGON_LEVELS: usize = 9;
-/// The cells from a border over which the levels about it are mixed.
-pub const POLYGON_EDGE: usize = 10;
-/// How far the polygons' borders are bent, beside a square's side.
-pub const POLYGON_WARP: usize = 11;
-/// The height the lowest ground is at.
-pub const GROUND_LEVEL: usize = 12;
+pub const HIGHEST_PLAIN: usize = 10;
 /// The share of the polygons that are ocean.
-pub const OCEAN_SHARE: usize = 13;
-/// How far under the ocean its floor is.
-pub const OCEAN_DEPTH: usize = 14;
+pub const OCEAN_SHARE: usize = 11;
+/// The cells along a square of the polygons' grid, as a power of two.
+pub const POLYGON_SIZE: usize = 12;
+/// The cells from a border over which the levels about it are mixed.
+pub const RAMP_WIDTH: usize = 13;
+/// How far the polygons' borders are bent, beside a square's side.
+pub const BORDER_BENDING: usize = 14;
 /// The share of the cells that are grass.
 pub const GRASS_COVER: usize = 15;
 /// The cells across a patch of grass, as a power of two.
-pub const PATCH_SIZE: usize = 16;
+pub const GRASS_PATCH: usize = 16;
 /// How much finer noise counts beside the patches'.
-pub const PATCH_DETAIL: usize = 17;
+pub const GRASS_DETAIL: usize = 17;
 /// How much each cell's own lot counts: grass scattered, not in patches.
-pub const SCATTER: usize = 18;
+pub const GRASS_SCATTER: usize = 18;
 /// The share of the cells that have a tree.
 pub const TREE_COVER: usize = 19;
 /// The cells across a patch of trees, as a power of two.
@@ -92,20 +92,20 @@ pub const TUNED: [Tuned; 23] = [
     Tuned { name: "shadow", default: 0.4, range: (0.0, 0.8), page: Page::Shading, what: "How much darker ground is under a cast shadow." },
     Tuned { name: "relief", default: 0.7, range: (0.0, 3.0), page: Page::Shading, what: "How strongly slopes are lit and heights tinted." },
     Tuned { name: "texture", default: 2.0, range: (0.0, 4.0), page: Page::Shading, what: "How much the ground's pixels differ from one another by lot." },
-    Tuned { name: "polygon size (2^)", default: 13.0, range: (6.0, 18.0), page: Page::Generation, what: "The land is polygons: closed shapes that share borders, each ocean or a plain at a level of its own. This is about how broad one is, 2 to this power in cells: 13 is 8 superchunks." },
-    Tuned { name: "polygon levels", default: 200.0, range: (0.0, 2048.0), page: Page::Generation, what: "How many heights over the ocean a land polygon's plain stands at most: each stands at a level of its own, drawn by lot, from just over the ocean to this." },
-    Tuned { name: "polygon edge", default: 2048.0, range: (1.0, 4096.0), page: Page::Generation, what: "How many cells from a border the levels of the polygons about it are mixed over: broad, and plains join by ramps and shores fall gently; narrow, and they join by cliffs. Half a polygon's breadth at most." },
-    Tuned { name: "polygon warp", default: 0.3, range: (0.0, 1.0), page: Page::Generation, what: "How far the polygons' borders are bent by noise, beside a polygon's breadth: 0 leaves them straight." },
-    Tuned { name: "ground level", default: 256.0, range: (0.0, 4096.0), page: Page::Generation, what: "The lowest height there is: the ocean's floor." },
-    Tuned { name: "ocean share", default: 0.5, range: (0.0, 1.0), page: Page::Generation, what: "The share of the polygons that are ocean." },
-    Tuned { name: "ocean depth", default: 255.0, range: (0.0, 4096.0), page: Page::Generation, what: "How many heights over its floor the ocean stands: its level is the ground level plus this, shown with the seed. Water keeps a depth to 255; deeper is drawn and kept as 255." },
-    Tuned { name: "grass cover", default: 0.95, range: (0.0, 1.0), page: Page::Generation, what: "The share of dry land that starts as grass." },
-    Tuned { name: "patch size (2^)", default: 8.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a patch of grass or of dirt is: 2 to this power, in cells." },
-    Tuned { name: "patch detail", default: 0.6, range: (0.0, 2.0), page: Page::Generation, what: "How ragged the patches' edges are: how much finer noise counts beside the patches'." },
-    Tuned { name: "scatter", default: 0.05, range: (0.0, 2.0), page: Page::Generation, what: "How much each cell's own lot counts: grass scattered cell by cell, not in patches." },
+    Tuned { name: "ocean floor level", default: 256.0, range: (0.0, 4096.0), page: Page::Generation, what: "The height of the ocean's floor, and the lowest ground in the world. Every ocean polygon is flat at this height; shores climb from it." },
+    Tuned { name: "ocean level", default: 511.0, range: (0.0, 8192.0), page: Page::Generation, what: "The height of the ocean's surface, the same all over the world. Ground under it is under water. Set under the floor, it is held to the floor: no ocean. Water keeps a depth to 255, so a floor more than 255 under this is drawn and kept as 255 deep." },
+    Tuned { name: "highest plain", default: 200.0, range: (0.0, 2048.0), page: Page::Generation, what: "How many heights over the ocean's level the highest land can be. Each land polygon is a flat plain at a height of its own, drawn by lot, from just over the ocean to this far over it." },
+    Tuned { name: "ocean share", default: 0.5, range: (0.0, 1.0), page: Page::Generation, what: "The share of the polygons that are ocean; the rest are land. 0 is all land, 1 all ocean. Land polygons that touch make one island." },
+    Tuned { name: "polygon size (2^)", default: 13.0, range: (6.0, 18.0), page: Page::Generation, what: "How broad one polygon is: 2 to this power, in cells. 10 is one superchunk, 13 is 8 superchunks, 16 is 64." },
+    Tuned { name: "ramp width", default: 2048.0, range: (1.0, 4096.0), page: Page::Generation, what: "How many cells from a border the heights on its two sides are joined over. Broad, and plains meet by gentle ramps and shores are shallow; a few cells, and they meet by cliffs. Half a polygon's breadth at most." },
+    Tuned { name: "border bending", default: 0.3, range: (0.0, 1.0), page: Page::Generation, what: "How far borders are pushed out of line by noise, as a share of a polygon's breadth. 0 leaves straight-sided polygons; more makes bays, headlands and winding borders." },
+    Tuned { name: "grass cover", default: 0.95, range: (0.0, 1.0), page: Page::Generation, what: "The share of dry land that starts as grass; the rest is dirt." },
+    Tuned { name: "grass patch size (2^)", default: 8.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a patch of grass or of dirt is: 2 to this power, in cells." },
+    Tuned { name: "grass patch detail", default: 0.6, range: (0.0, 2.0), page: Page::Generation, what: "How ragged the patches' edges are: how much finer noise counts beside the patches'." },
+    Tuned { name: "grass scatter", default: 0.05, range: (0.0, 2.0), page: Page::Generation, what: "How much each cell's own lot counts: grass scattered cell by cell, not in patches." },
     Tuned { name: "tree cover", default: 0.06, range: (0.0, 1.0), page: Page::Generation, what: "The share of dry land that starts with a tree." },
-    Tuned { name: "tree patch (2^)", default: 7.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a wood is: 2 to this power, in cells." },
-    Tuned { name: "tree detail", default: 0.8, range: (0.0, 2.0), page: Page::Generation, what: "How ragged the woods' edges are." },
+    Tuned { name: "tree patch size (2^)", default: 7.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a wood is: 2 to this power, in cells." },
+    Tuned { name: "tree patch detail", default: 0.8, range: (0.0, 2.0), page: Page::Generation, what: "How ragged the woods' edges are." },
     Tuned { name: "tree scatter", default: 0.3, range: (0.0, 2.0), page: Page::Generation, what: "How much each cell's own lot counts: lone trees, not woods." },
 ];
 

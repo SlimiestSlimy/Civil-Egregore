@@ -9,7 +9,7 @@
 use crate::paint::{tree_colour, WATER};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-use terrain::height_shaped;
+use terrain::polygons::Lands;
 use world::diagnostics::frames::{BROWN, GREEN};
 use world::Generation;
 
@@ -66,12 +66,11 @@ pub fn start() -> (Sender<Wanted>, Receiver<Drawn>) {
     (requests, maps)
 }
 
-/// The height of the cell in the middle of the pixel `(x, y)` of
-/// `wanted`, or `None` past the world's edges.
-fn height(wanted: &Wanted, x: i64, y: i64) -> Option<(u32, u32, u16)> {
+/// The cell in the middle of the pixel `(x, y)` of `wanted`, or `None`
+/// past the world's edges.
+fn cell(wanted: &Wanted, x: i64, y: i64) -> Option<(u32, u32)> {
     let cell = |first: i64, pixel: i64| u32::try_from(first + pixel * wanted.step as i64 + wanted.step as i64 / 2).ok();
-    let (x, y) = (cell(wanted.first.0, x)?, cell(wanted.first.1, y)?);
-    Some((x, y, height_shaped(&wanted.generation.shape, wanted.seed, x, y)))
+    Some((cell(wanted.first.0, x)?, cell(wanted.first.1, y)?))
 }
 
 /// The pixels of `wanted`: rows shared out among the machine's threads.
@@ -85,16 +84,18 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
     thread::scope(|scope| {
         for (part, rows) in pixels.chunks_mut(rows_each * width * 4).enumerate() {
             scope.spawn(move || {
+                let mut lands = Lands::new(&generation.shape, seed);
                 for (row, pixels) in rows.chunks_mut(width * 4).enumerate() {
                     let y = (part * rows_each + row) as i64;
                     // The height up and to the left of each pixel, the sun's side: what its slope is told by.
                     let mut before = None;
                     for (x, pixel) in pixels.chunks_mut(4).enumerate() {
-                        let Some((cell_x, cell_y, high)) = height(wanted, x as i64, y) else {
+                        let Some((cell_x, cell_y)) = cell(wanted, x as i64, y) else {
                             pixel.copy_from_slice(&[0, 0, 0, u8::MAX]);
                             before = None;
                             continue;
                         };
+                        let high = lands.height(cell_x, cell_y);
                         let shape = &generation.shape;
                         let (colour, light) = if high < shape.ocean {
                             (WATER, 1.0 - (1.0 - DEEP_LIGHT) * ((shape.ocean - high) as f32 / (shape.ocean - shape.ground).max(1) as f32).min(1.0))
@@ -106,7 +107,7 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
                             } else {
                                 BROWN
                             };
-                            let above = height(wanted, x as i64, y - 1).map_or(high, |(.., above)| above);
+                            let above = cell(wanted, x as i64, y - 1).map_or(high, |(x, y)| lands.height(x, y));
                             let lower = (above as f32 + before.unwrap_or(high) as f32) / 2.0;
                             let slope = (high as f32 - lower) / wanted.step as f32;
                             let tint = 0.8 + 0.3 * (high.saturating_sub(shape.ocean) as f32 / shape.levels.max(1) as f32).min(1.0);
@@ -114,7 +115,7 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
                         };
                         before = Some(high);
                         // A polygon's border, where the pixel is no farther from it than it is across.
-                        let on_border = wanted.borders && terrain::polygons::polygon(shape, seed, cell_x, cell_y).2 < wanted.step as u64;
+                        let on_border = wanted.borders && lands.polygon(cell_x, cell_y).2 < wanted.step as u64;
                         let light = if on_border { light * BORDER_LIGHT } else { light };
                         let lit = colour.map(|channel| (channel as f32 * light).min(255.0) as u8);
                         pixel.copy_from_slice(&[lit[0], lit[1], lit[2], u8::MAX]);
