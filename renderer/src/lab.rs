@@ -7,7 +7,7 @@
 //! world is made afresh and its ticks start from 0.
 
 use crate::sim::SEED;
-use crate::tuning::{self, COAST, GRASS_COVER, GROUND_LEVEL, HEIGHT_SPAN, HILLS, HILL_SINK, LAND_RISE, LAND_SPAN, OCEAN_DEPTH, OCEAN_SHARE, PATCH_DETAIL, PATCH_SIZE, RISE_SHARES, SCATTER, SHORE_SPAN, SHORE_WANDER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
+use crate::tuning::{self, COAST, GRASS_COVER, GROUND_LEVEL, DRY_HOLLOWS, HEIGHT_SPAN, HILLS, LAND_RISE, LAND_SPAN, OCEAN_DEPTH, OCEAN_SHARE, PATCH_DETAIL, PATCH_SIZE, RISE_SHARES, SCATTER, SHORE_SPAN, SHORE_WANDER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -75,15 +75,18 @@ static LAST: Mutex<Option<((u64, u64), Generation)>> = Mutex::new(None);
 /// Cells looked at to find the ocean's level.
 const SAMPLED: u64 = 1 << 14;
 
-/// The height `share` of the land of `shape` is under, in the world of
-/// `seed`: found from [`SAMPLED`] cells drawn over the world.
+/// The height `share` of the cells of `shape` are under, in the world
+/// of `seed` -- each one's ground, rise and hills, the hills whole
+/// everywhere: found from [`SAMPLED`] cells drawn over the world.
 fn ocean_level(shape: &Shape, seed: u64, share: f32) -> u16 {
-    let mut lands: Vec<u64> = (0..SAMPLED).map(|sample| mix(sample.wrapping_mul(GOLDEN_RATIO))).map(|drawn| shape.ground as u64 + terrain::rise(shape, seed, (drawn >> 32) as u32, drawn as u32)).collect();
-    lands.sort_unstable();
+    // With no ocean and no coast: nothing squeezed under a level, no hill held back from a shore.
+    let raw = Shape { ocean: 0, coast: 0, ..*shape };
+    let mut heights: Vec<u16> = (0..SAMPLED).map(|sample| mix(sample.wrapping_mul(GOLDEN_RATIO))).map(|drawn| terrain::height_shaped(&raw, seed, (drawn >> 32) as u32, drawn as u32)).collect();
+    heights.sort_unstable();
     match (share.clamp(0.0, 1.0) * SAMPLED as f32) as usize {
         0 => 0,
-        under if under >= lands.len() => u16::MAX,
-        under => lands[under].min(u16::MAX as u64) as u16,
+        under if under >= heights.len() => u16::MAX,
+        under => heights[under],
     }
 }
 
@@ -110,7 +113,7 @@ fn shape(tuned: &tuning::Tuning) -> Shape {
     let land = Shape {
         weights: [0; 14],
         ocean: 0,
-        sunk: (tuned[HILL_SINK].clamp(0.0, 1.0) * ONE as f32) as u64,
+        hollows: (tuned[DRY_HOLLOWS].clamp(0.0, 1.0) * ONE as f32) as u64,
         depth: tuned[OCEAN_DEPTH].round().clamp(0.0, u16::MAX as f32) as u64,
         coast: tuned[COAST].round().clamp(0.0, u16::MAX as f32) as u64,
         ground: height(tuned[GROUND_LEVEL]),

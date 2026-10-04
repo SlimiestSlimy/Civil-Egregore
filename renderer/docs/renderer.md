@@ -204,8 +204,10 @@ by the same keys. Generation's sliders are shown from the start:
   it, how broadly (a power of two of cells), and the share of each of
   the rise's five octaves.
 - **The ocean's share** of the world: its level is set to the height
-  that share of the land's rise is under (found from 16,384 cells
-  drawn over the world), and shown with the seed; **the ocean's depth**, how far under
+  that share of the cells -- ground, rise and hills together -- are
+  under (found from 16,384 cells drawn over the world), and shown
+  with the seed; how much of what is under it is **dry hollows**;
+  **the ocean's depth**, how far under
   it its deepest floor is; **the coast**, the heights of land the hills
   grow over; and how far and how broadly the line they begin at
   **wanders** about the shore.

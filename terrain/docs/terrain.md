@@ -71,9 +71,7 @@ finer shape the shores and add little slope.
 
 The **ocean** stands at one height all over the world (`Shape::ocean`):
 the land under it is the ocean's floor, the land over it islands, dozens
-to hundreds of superchunks each. Under the ocean the land falls gently:
-to `Shape::depth` under the ocean's level where the rise is lowest, not
-to the lowest ground. **Hills** stand on the islands: fourteen
+to hundreds of superchunks each. **Hills** stand on the islands: fourteen
 octaves, every power of two from 65,536 cells to 8, so that no one
 octave's grid shows; their shares are heights, and come to the highest
 a hill stands (the four broadest none, as worlds are by default). They grow from nothing to
@@ -85,10 +83,14 @@ there begin well inland, and no level band rings an island.
 With a coast of 0 the hills are whole everywhere, the ocean's floor
 too: simply added to the land's rise.
 
-A share of the hills' height may lie under the land (`Shape::sunk`):
-hollows as well as hills. The ocean is only where the land's rise is
-under its level (`under_ocean`): a hollow that goes under that level
-inland is dry.
+A height is the lowest ground, the land's rise and the hills, added:
+nothing is taken away, so none is under the lowest ground. What is
+under the ocean's level is squeezed so that the lowest ground lies
+`Shape::depth` under it.
+
+The ocean is over a cell under its level only where the land and a
+share of the hills' height (`Shape::hollows`) are under it too
+(`under_ocean`): the rest are dry hollows under the ocean's level.
 
 **Water** is a depth a cell: how far it stands over the ground, 0 none,
 eight bits over eight bitplanes (`WATER`) -- the ocean deeper than 255

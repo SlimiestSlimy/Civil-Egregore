@@ -55,8 +55,8 @@ pub const TEXTURE: usize = 7;
 pub const HILLS: usize = 8;
 /// The highest the hills stand: what their octaves make up together.
 pub const HEIGHT_SPAN: usize = 22;
-/// The share of the hills' height that lies under the land.
-pub const HILL_SINK: usize = 23;
+/// How much of the ground under the ocean's level is dry hollows.
+pub const DRY_HOLLOWS: usize = 23;
 /// The height the lowest ground is at.
 pub const GROUND_LEVEL: usize = 24;
 /// The most the land rises over the lowest ground.
@@ -117,18 +117,18 @@ pub const TUNED: [Tuned; 45] = [
     Tuned { name: "bumps (32)", default: 91.85, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the octave 32 cells across. Only its size beside the other six counts." },
     Tuned { name: "bumps (16)", default: 48.93, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the octave 16 cells across. Only its size beside the other six counts." },
     Tuned { name: "roughness (8)", default: 6.0, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the finest octave, 8 cells across: rough ground, many walls." },
-    Tuned { name: "height span", default: 255.0, range: (0.0, 16384.0), page: Page::Generation, what: "How high the hills stand over the land at most, in heights: what their octaves share out. Broad octaves take a great span without a wall; fine ones turn it all to walls." },
-    Tuned { name: "hill sink", default: 0.0, range: (0.0, 1.0), page: Page::Generation, what: "The share of the hills' height span that lies under the land: 0, and hills only stand on the land; 0.5, and they are as much hollows as hills. A hollow that goes under the ocean's level where the land is over it stays dry." },
-    Tuned { name: "ground level", default: 256.0, range: (0.0, 4096.0), page: Page::Generation, what: "The height of the lowest ground there is: everything stands on it." },
-    Tuned { name: "land rise", default: 1024.0, range: (0.0, 8192.0), page: Page::Generation, what: "How many heights the land rises over the lowest ground at most: the difference between the deepest ocean floor and the highest inland." },
+    Tuned { name: "height span", default: 255.0, range: (0.0, 16384.0), page: Page::Generation, what: "How many heights the hills add at most: what their octaves share out, 0 at their lowest and this where every octave peaks. Broad octaves take a great span without a wall; fine ones turn it all to walls." },
+    Tuned { name: "dry hollows", default: 0.0, range: (0.0, 1.0), page: Page::Generation, what: "How much of the ground under the ocean's level is dry: a cell under the level is ocean only where the land's rise plus this share of the height span is under it too. 0, and everything under the level is ocean; 1, and only where no hill could reach the level." },
+    Tuned { name: "ground level", default: 256.0, range: (0.0, 4096.0), page: Page::Generation, what: "The lowest height there is. A cell's height is this, plus the land's rise, plus the hills: nothing is ever taken away." },
+    Tuned { name: "land rise", default: 1024.0, range: (0.0, 8192.0), page: Page::Generation, what: "How many heights the land's rise adds at most: broad noise, 0 at its lowest and this at its highest." },
     Tuned { name: "land span", default: 14.0, range: (8.0, 20.0), page: Page::Generation, what: "How broad the land's rises are: 2 to this power in cells between the noise's points. 14 is 16 superchunks." },
     Tuned { name: "rise octave 1", default: 1.0, range: (0.0, 1.0), page: Page::Generation, what: "The share of the land's rise from its octave 1 of 5 -- the broadest, as broad as the land span says. Only its size beside the other four counts." },
     Tuned { name: "rise octave 2", default: 0.4, range: (0.0, 1.0), page: Page::Generation, what: "The share of the land's rise from its octave 2 of 5 -- half as broad as the first. Only its size beside the other four counts." },
     Tuned { name: "rise octave 3", default: 0.16, range: (0.0, 1.0), page: Page::Generation, what: "The share of the land's rise from its octave 3 of 5 -- a quarter as broad: bays and headlands. Only its size beside the other four counts." },
     Tuned { name: "rise octave 4", default: 0.064, range: (0.0, 1.0), page: Page::Generation, what: "The share of the land's rise from its octave 4 of 5 -- an eighth as broad: coves. Only its size beside the other four counts." },
     Tuned { name: "rise octave 5", default: 0.026, range: (0.0, 1.0), page: Page::Generation, what: "The share of the land's rise from its octave 5 of 5 -- a sixteenth as broad: a ragged shore, and steeper land. Only its size beside the other four counts." },
-    Tuned { name: "ocean share", default: 0.55, range: (0.0, 1.0), page: Page::Generation, what: "The share of the world that is under the ocean: the ocean's level is set to whatever height that much of the land's rise is under, so it holds whatever the rise's sliders say. The level it comes to is shown with the seed." },
-    Tuned { name: "ocean depth", default: 255.0, range: (0.0, 4096.0), page: Page::Generation, what: "How many heights under the ocean its deepest floor is: the land under the ocean falls gently to that, not all the way to the ground level. Water keeps a depth to 255; deeper is drawn and kept as 255." },
+    Tuned { name: "ocean share", default: 0.55, range: (0.0, 1.0), page: Page::Generation, what: "The share of the world's cells whose height -- ground, rise and hills together -- is under the ocean's level: the level is set to whatever height that many are under, and shown with the seed." },
+    Tuned { name: "ocean depth", default: 255.0, range: (0.0, 4096.0), page: Page::Generation, what: "How many heights under the ocean's level the lowest ground lies: everything under the level is squeezed to fit, so shores fall gently. More than the level is over the ground level changes nothing. Water keeps a depth to 255; deeper is drawn and kept as 255." },
     Tuned { name: "coast", default: 64.0, range: (0.0, 1024.0), page: Page::Generation, what: "How many heights over the ocean the land is where the hills reach their whole height: from the shore to there they grow, and under the ocean there are none. 0, and the hills are simply added to the land everywhere, the ocean's floor too." },
     Tuned { name: "shore wander", default: 1.0, range: (0.0, 4.0), page: Page::Generation, what: "How far the line the hills begin at wanders above and below the shore, in coasts: 0 leaves a level band round every island; more, and hills here stand out of the ocean and there begin well inland." },
     Tuned { name: "shore span (2^)", default: 10.0, range: (4.0, 14.0), page: Page::Generation, what: "How broad that wandering is: 2 to this power in cells between the noise's points." },
