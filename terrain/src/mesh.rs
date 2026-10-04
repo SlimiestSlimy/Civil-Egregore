@@ -166,7 +166,8 @@ impl Mesh {
             }
         } else {
             // Some raise or sink the land, by so much less each mesh finer.
-            let most = (1..self.depth).fold(shape.finer_height, |most, _| (most * shape.finer_fall) >> 16);
+            // Never by less than a height or two: every mesh counts.
+            let most = (1..self.depth).fold(shape.finer_height, |most, _| (most * shape.finer_fall) >> 16).max(2.min(shape.finer_height));
             let by = (((lot >> 48) * most) >> 16) as i64;
             let raised = mix(lot) & 0xFFFF < shape.raised;
             (0, if drawn >= shape.finer_share { 0 } else if raised { by } else { -by })
@@ -294,9 +295,8 @@ impl Lands {
         if broad.inland == 0 {
             return broad.height.max(self.shape.ground as i64) as u64;
         }
-        // No finer than the finest, and none that would move the land by less than a height: those are left out.
-        let moving = (0..FINER_MOST).take_while(|&finer| (0..finer).fold(self.shape.finer_height, |most, _| (most * self.shape.finer_fall) >> 16) > 0).count();
-        let depth = (self.shape.finer_depth as usize).min(moving).min((self.span - FINEST) as usize);
+        // No finer than the finest: a mesh that would be is left out.
+        let depth = (self.shape.finer_depth as usize).min(FINER_MOST).min((self.span - FINEST) as usize);
         let finer: i64 = self.finer.iter_mut().take(depth).map(|mesh| mesh.blended(&self.shape, self.seed, at).height).sum();
         (broad.height + ((finer * broad.inland as i64) >> 16)).max(self.shape.ground as i64) as u64
     }
