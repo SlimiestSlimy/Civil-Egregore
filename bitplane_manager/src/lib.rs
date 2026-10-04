@@ -56,7 +56,7 @@ pub use writes::{count_missed, WritesApplied, Shape, Write, WriteOp, WriteQueues
 
 use allocator::{Block, BlockPool};
 use bitmap::morton::morton_index;
-use bitmap::window::{left_columns, rows_from_morton, top_rows, window, WORD_TILE_SIDE};
+use bitmap::window::{in_word_tile, left_columns, rows_from_morton, top_rows, window, PLACE_IN_WORD_TILE, WORD_TILE_SIDE};
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use utilities::cache::prefetch;
 use utilities::hash;
@@ -514,11 +514,9 @@ impl Lookup {
     /// tile's index in the chunk, and only one across the chunk's edge
     /// looked up again.
     fn windows<const N: usize>(&self, directory: &[Superchunk], types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
-        let in_word = origin.0 & (BITS_PER_WORD as u64 - 1);
-        // The window's top left in its word tile: the even bits, and the odd ones.
-        let across = (in_word & 1 | in_word >> 1 & 2 | in_word >> 2 & 4) as u32;
-        let down = (in_word >> 1 & 1 | in_word >> 2 & 2 | in_word >> 3 & 4) as u32;
-        let first = CellIndex(origin.0 - in_word);
+        // The window's top left in its word tile.
+        let (across, down) = in_word_tile(origin.0);
+        let first = CellIndex(origin.0 & !PLACE_IN_WORD_TILE);
         let tile = first.place_in_chunk() / BITS_PER_WORD;
         let (x, y) = (tile & WORD_TILE_X, tile & WORD_TILE_Y);
         // The word tiles beside and below, in the chunk: a carry through the other coordinate's bits.

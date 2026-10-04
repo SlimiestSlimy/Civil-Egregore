@@ -14,6 +14,7 @@ use super::bucket::{place, Bucket, Put};
 use super::instructions::{Instructions, InstructionsApplied};
 use super::entity::{sorted, Attribute, AttributeType, EntityId, EntityRef, Header, NEVER};
 use super::wheel::{Wake, Wheel};
+use bitmap::window::{in_word_tile, PLACE_IN_WORD_TILE};
 use coordinates::{CellIndex, ChunkPosition, SuperchunkPosition, CHUNKS_IN_SUPERCHUNK};
 
 /// How many wakes ahead an entity is asked of memory.
@@ -367,17 +368,6 @@ impl Entities {
 /// Cells along the side of the most [`EntityReader::occupied`] reads at
 /// once: a row's bits.
 pub const OCCUPIED_SIDE: usize = 16;
-
-/// The bits of a Morton index that place a cell in its word tile.
-const PLACE_IN_WORD_TILE: u64 = 63;
-
-/// The column and row, in its word tile, of the cell whose Morton index
-/// -- or place in its chunk -- is `index`: its even bits, and its odd
-/// ones.
-const fn in_word_tile(index: u64) -> (u32, u32) {
-    let place = index & PLACE_IN_WORD_TILE;
-    ((place & 1 | place >> 1 & 2 | place >> 2 & 4) as u32, (place >> 1 & 1 | place >> 2 & 2 | place >> 3 & 4) as u32)
-}
 
 /// Reads entities from superchunks in a tick's first phase, across
 /// superchunks, as they were when the tick began: the entities' side of

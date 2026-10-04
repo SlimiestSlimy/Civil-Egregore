@@ -40,12 +40,14 @@ byte's bits (`SPREAD`). **`morton_coordinates(index)`**: undone
 ## `window.rs`
 
 `WORD_TILE_SIDE` (8): a word tile's side, and a window's.
+**`in_word_tile(index)`**: a cell's column and row in its word tile,
+from its Morton index (`PLACE_IN_WORD_TILE`).
 
-**`rows_from_morton(word)`**: an aligned 8x8 tile, one Morton-ordered
-word, row by row -- cell `(x, y)` at bit `y * 8 + x` -- by three delta
+**`rows_from_morton(word)`**: a word tile, one Morton-ordered word, row
+by row -- cell `(x, y)` at bit `y * 8 + x` -- by three delta
 swaps (`MORTON_TO_ROWS`, **`swap_index_bits`**, **`swap_mask`**);
 **`morton_from_rows(rows)`**: undone. **`left_columns(columns)`**,
 **`top_rows(rows)`**: the masks keeping a tile's first columns and rows.
-**`window(tiles, across, down)`**: the 8x8 window `(across, down)` into
-the 16x16 square of four tiles, row by row (**`beside`**: two tiles side
-by side, cut across).
+**`window(word_tiles, across, down)`**: the 8x8 window `(across, down)`
+into the 16x16 square of four word tiles, row by row (**`beside`**: two
+word tiles side by side, cut across).

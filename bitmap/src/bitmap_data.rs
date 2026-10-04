@@ -135,8 +135,8 @@ impl Bitmap {
 
     /// The set cells of a tile, each as its place in the tile's own
     /// Morton order, in that order.
-    pub fn set_cells_in_tile(&self, corner: (u8, u8), side: usize) -> impl Iterator<Item = usize> + '_ {
-        self.tile_words(corner, side).enumerate().flat_map(|(word_index, word)| {
+    pub fn set_cells_in_tile(&self, top_left: (u8, u8), side: usize) -> impl Iterator<Item = usize> + '_ {
+        self.tile_words(top_left, side).enumerate().flat_map(|(word_index, word)| {
             let mut remaining = word;
             std::iter::from_fn(move || {
                 (remaining != 0).then(|| {
