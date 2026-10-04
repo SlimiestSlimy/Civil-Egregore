@@ -1,5 +1,5 @@
 target/
-# What every crate's runs leave behind -- measurements, renders, and for
-# Tessera the seed, adversarial records and callgrind output: the working
+# What every crate's runs leave behind -- measurements, renders, the
+# workspace's seed (at the top), and for Tessera adversarial records and callgrind output: the working
 # copy's own, never moved by git (each crate's src/transient_data.rs).
 transient_data/

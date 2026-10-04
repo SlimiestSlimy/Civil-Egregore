@@ -16,6 +16,7 @@ what they always do and are not listed.
 |---|---|---|---|
 | **world** | everything simulated: every superchunk, its layers and its entities, and the tick it is at | made from a **seed**; saved as a **save** | map |
 | **seed** | the number a world is made from: every height, every superchunk's random numbers and every first flock follow from it | world, random stream | |
+| **seed rotation** | tests and tools taking their seed from one file for the whole workspace, `transient_data/seed`, rolled to a fresh one every 5 counted runs (`utilities::seed`) | seed | |
 | **cell** | the smallest unit of the world: one bit of each layer, one height, at most one entity | chunk, superchunk; found by its **cell index** | tile, pixel, square |
 | **chunk** | 256x256 cells: what a layer's **bitmap** covers | superchunk, layer, bucket | |
 | **superchunk** | 4x4 chunks, 1024x1024 cells: the unit the world is held, ticked, saved and loaded in, and the reach of the speed of light. One word, in types too (`Superchunk`) | chunk, turn, image | super chunk, `SuperChunk` |

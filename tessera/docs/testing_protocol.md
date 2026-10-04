@@ -13,16 +13,17 @@ command, run from `tessera/`; "Every command" lists them all, and
 
 ## Where the seed comes from
 
-`transient_data/seed` holds the seed base every seeded run uses, and how
-many runs have used it. Each run that draws from it counts one use;
-after 5 (`USES_BEFORE_THE_SEED_ROLLS`, `src/corpus/seed.rs`)
+`transient_data/seed`, at the top of the workspace and shared with every
+other crate (`utilities::seed`), holds the seed base every seeded run
+uses, and how many runs have used it. Each run that draws from it counts one use;
+after 5 (`USES_BEFORE_THE_SEED_ROLLS`, `utilities/src/seed.rs`)
 the next run rolls a fresh seed by itself and says so, so no corpus is
 held for longer than a few measure-and-compare cycles, and no one has to
 remember to move it.
 
-- `TESSERA_SEED=<seed>` picks a seed for one run and leaves the file alone,
+- `TILESIM_SEED=<seed>` picks a seed for one run and leaves the file alone,
   its count too, so pinning never holds a seed past its uses.
-- `TESSERA_SEED=fresh` draws a new seed for one run, likewise.
+- `TILESIM_SEED=fresh` draws a new seed for one run, likewise.
 - The fine tests use the file's seed, but a use is not counted for them:
   they run far more often than anything measured, and would roll the
   seed by themselves.
@@ -77,7 +78,7 @@ every run checks bitmaps never seen and a failure names the seed that
 reproduces it:
 
 ```
-TESSERA_SEED=fresh cargo test --release --test fast
+TILESIM_SEED=fresh cargo test --release --test fast
 ```
 
 Every tier's check (`tests/common`) examines each bitmap
@@ -146,7 +147,7 @@ cargo run --release --bin tessera_diagnostics -- instruction_count
 callgrind_annotate --inclusive=yes transient_data/callgrind/callgrind.encode.out | head -40
 ```
 
-Counts are compared on one seed: pin it (`TESSERA_SEED=<seed>`) when a
+Counts are compared on one seed: pin it (`TILESIM_SEED=<seed>`) when a
 comparison would straddle a roll. Saving a new adversarial bitmap
 changes the corpus too: count before and after it, apart from any code
 change.
@@ -208,8 +209,8 @@ the worst bitmaps, and a search's moves follow the seed: give each run a fresh
 one.
 
 ```
-TESSERA_SEED=fresh cargo run --release --bin adversarial -- 4000
-TESSERA_SEED=fresh cargo run --release --manifest-path external_benchmarks/Cargo.toml --bin adversarial -- 4000
+TILESIM_SEED=fresh cargo run --release --bin adversarial -- 4000
+TILESIM_SEED=fresh cargo run --release --manifest-path external_benchmarks/Cargo.toml --bin adversarial -- 4000
 ```
 
 Worst bitmaps move whenever a run beats them, so they are not what speed is
@@ -247,8 +248,8 @@ The fine tier checks every worst bitmap and saved bitmap; `instruction_count`,
 
 | variable | what it does |
 |---|---|
-| `TESSERA_SEED=<seed>` | this run's seed, the file left alone |
-| `TESSERA_SEED=fresh` | a fresh seed for this run, the file left alone |
+| `TILESIM_SEED=<seed>` | this run's seed, the file left alone |
+| `TILESIM_SEED=fresh` | a fresh seed for this run, the file left alone |
 | `TESSERA_DIAGNOSE=<path.pbm>` | one more bitmap for the tools that look at bitmaps |
 
 ## Every parameter
@@ -291,7 +292,7 @@ A seed base holds for 5 runs, then rolls. While it is held:
 - Iterate as much as the problem takes. Comparing two versions on the
   same seed is exactly what the seed is for: it is the only way to know
   a difference came from the code. A comparison must not straddle a
-  roll: run both sides on one seed -- pinned with `TESSERA_SEED=<seed>` if
+  roll: run both sides on one seed -- pinned with `TILESIM_SEED=<seed>` if
   it would -- and read the seed each side printed.
 
 Everything in this phase is a *hypothesis*. A change that helps here has
@@ -303,7 +304,7 @@ When the problems that corpus showed are solved, re-run the measurement
 on a seed never seen -- a fresh one, or wherever the file has rolled to:
 
 ```
-TESSERA_SEED=fresh cargo run --release --bin tessera_diagnostics -- measurement
+TILESIM_SEED=fresh cargo run --release --bin tessera_diagnostics -- measurement
 ```
 
 A change that is real holds its size on more than one unseen seed. A

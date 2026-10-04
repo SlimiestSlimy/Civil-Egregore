@@ -16,6 +16,9 @@ none.
 - **Transient data** (`transient_data.rs`): where a crate's runs leave
   what they make, `transient_data/` beside its `Cargo.toml`, out of git.
   Each crate names its own in its `src/transient_data.rs`.
+- **The seed** (`seed.rs`): the one seed every crate's tests and tools
+  start from, in the workspace's `transient_data/seed`, rolled every 5
+  counted runs; `TILESIM_SEED` picks one for a run.
 - **A seeded random source** (`rng.rs`), its whole state one word: every
   random number in TileSim comes from it.
 - **Hashing** (`hash.rs`): a key's slot in a table, by

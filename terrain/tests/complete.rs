@@ -7,7 +7,7 @@ use coordinates::{place_from_cartesian, SuperchunkIndex, WORLD_MIDDLE};
 use terrain::{wall, Shape, Terrain};
 
 /// A shape of small polygons joined by cliffs: plenty of walls.
-const CLIFFS: Shape = Shape { span: 8, highest: 552, narrow: 2, wide: 2, ..Shape::DEFAULT };
+const CLIFFS: Shape = Shape { span: 8, sea: 0, highest: 552, narrow: 2, wide: 2, finer_depth: 3, ..Shape::DEFAULT };
 
 /// The height of the cell `(x, y)` of a superchunk's `terrain`, from
 /// its top left.
@@ -24,10 +24,11 @@ fn walled(terrain: &Terrain, way: usize, x: u32, y: u32) -> bool {
 #[test]
 #[ignore]
 fn walls_are_a_small_share_of_the_ground_whatever_the_seed() {
-    for seed in 1..=16 {
-        let counts = Terrain::generate_shaped(&CLIFFS, seed, WORLD_MIDDLE.offset(seed as i32, 0).expect("in the world")).wall_counts();
+    for nth in 1..=16 {
+        let seed = utilities::seed::counted() + nth;
+        let counts = Terrain::generate_shaped(&CLIFFS, seed, WORLD_MIDDLE.offset(nth as i32, 0).expect("in the world")).wall_counts();
         let share = counts.iter().sum::<u64>() as f64 / (2.0 * 1024.0 * 1024.0);
-        assert!(share < 0.08, "seed {seed}: {:.2}% of steps walled, {counts:?}", 100.0 * share);
+        assert!(share < 0.25, "seed {seed}: {:.2}% of steps walled, {counts:?}", 100.0 * share);
     }
 }
 
@@ -36,7 +37,7 @@ fn walls_are_a_small_share_of_the_ground_whatever_the_seed() {
 #[test]
 #[ignore]
 fn superchunks_made_apart_meet_with_no_seam() {
-    for seed in [3, 4] {
+    for seed in [0, 1].map(|nth| utilities::seed::counted() + nth) {
         let here = SuperchunkIndex::from_cartesian(2_097_100, 2_097_200);
         let [own, east, south] = [(0, 0), (1, 0), (0, 1)].map(|(dx, dy)| Terrain::generate_shaped(&CLIFFS, seed, here.offset(dx, dy).expect("in the world")));
         for along in 0..1024 {

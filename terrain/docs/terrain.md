@@ -68,9 +68,10 @@ squares make a quad, cut by lot along one diagonal or the other into
 two triangles. A vertex is ocean (`Shape::sea` of them) -- at the
 lowest ground -- or land, at a height of its own.
 
-A share of the vertices (`Shape::clumping`) are land or ocean as the
-two by two squares they are among, not each by its own lot: land and
-ocean clump a little.
+Whether a vertex is ocean is its own lot mixed with smooth noise some
+vertices broad (`Shape::clumping`): land and ocean clump, with no
+blocks to show through. The more it counts, the less exactly the
+ocean's share is kept.
 
 Land is low by the ocean and higher inland. A land vertex's height is
 drawn between just over the ocean and the highest (`Shape::highest`):

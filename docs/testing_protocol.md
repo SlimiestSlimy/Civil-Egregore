@@ -53,6 +53,25 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `tessera` | fine | fast | complete |
 | `tilesim` (the root) | | commands | |
 
+## One seed, rolled every few runs
+
+No test or tool has a seed of its own written in it. Every seeded run,
+in whatever crate, starts from the one seed in `transient_data/seed`, at
+the top of the workspace and out of git (`utilities::seed`):
+
+- A run that counts (`counted()`) is one use; after 5 the next run rolls
+  a fresh seed by itself, so nothing passes for long on one seed alone.
+- A test that needs several seeds takes consecutive ones from it; one
+  that needs a kind of world -- land about the origin, say -- takes the
+  first seed from it that gives one.
+- `TILESIM_SEED=<seed>` picks a seed for one run and leaves the file
+  alone; `TILESIM_SEED=fresh` draws one for the run.
+- The first asking prints the seed, which use it is and where it came
+  from, so a failure names the seed that made it.
+
+A test must hold on any seed: what it asserts is a bound or an equality
+between two runs, never a number one seed happened to give.
+
 ## What is measured, and how
 
 Speed is not a test: it is measured by a tool and written down with the
