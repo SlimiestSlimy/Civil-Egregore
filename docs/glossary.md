@@ -126,7 +126,7 @@ what they always do and are not listed.
 | **move** | the instruction stepping an entity to a cell, or setting its next wake, attributes as they are | step, instruction | |
 | **edit** | the instruction setting or removing one attribute; and an entity's own attributes being changed in its rule (`EntityEdit`) | attribute | |
 | **step** | an entity moving to one of its eight neighbours | move, wall | |
-| **crossing** | an entity moving to another superchunk: put there, and removed here once the tick's instructions are applied, if it was (`Entities::settle_crossings`) | step | |
+| **crossing** | an entity moving to another superchunk: put there, and removed here once the tick's instructions are applied, if it was (`Simulation::settle_crossings`, each superchunk its own leavers) | step | |
 | **lost** | an entity put where no superchunk is hot | missed | |
 | **occupied** | a cell an entity stands on | entity | taken |
 | **flock** | sheep made together on a superchunk | sheep | |

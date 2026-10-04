@@ -94,7 +94,7 @@ impl Instructions {
     /// Queues putting `header`'s entity, with `attributes`, on its cell,
     /// crossing from `left`, a cell of another superchunk: put, it is
     /// removed from `left` once the tick's instructions are all applied
-    /// ([`Entities::settle_crossings`](super::Entities::settle_crossings)).
+    /// ([`SuperchunkEntities::settle_leavers`](super::SuperchunkEntities::settle_leavers)).
     pub fn cross(&mut self, header: Header, left: CellIndex, attributes: &[Attribute]) {
         self.push(header, header.at, Some(left), attributes);
     }
