@@ -66,7 +66,7 @@ impl Edge {
         let facing = self.towards.0 + self.towards.1;
         match self.rise {
             2.. => {
-                // A wall: a band on its lower cell, darkest at its foot -- less dark there if the sun is on the wall, and between the two at a corner that faces neither way.
+                // A wall: a band on its lower cell, darkest at its foot -- by one number if the wall faces away from the sun, by another if the sun is on it, and between the two at a corner that faces neither way.
                 let width = (4 + self.rise / 2).clamp(5, 7) as f32;
                 let foot = match facing {
                     ..0 => tuning[WALL_SHADE],
