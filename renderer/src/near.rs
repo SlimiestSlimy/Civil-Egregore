@@ -60,15 +60,15 @@ impl Edge {
         match self.rise {
             2.. if facing < 0 => {
                 // A wall in its own shade: a band, darkest at its foot.
-                let width = (1 + self.rise / 2).clamp(2, 4) as f32;
-                (1.0 + (0.5 * from / width - 0.58) * within(0.0, width), 1.0)
+                let width = (2 + self.rise / 2).clamp(3, 5) as f32;
+                (1.0 + (0.45 * from / width - 0.75) * within(0.0, width), 1.0)
             }
             // A wall the sun is on: a dark foot and, facing it, a bright line.
-            2.. => (1.0 - 0.38 * within(0.0, 1.0), 1.0 + if facing > 0 { 0.22 * within(1.0, 2.0) } else { 0.0 }),
+            2.. => (1.0 - 0.55 * within(0.0, 2.0), 1.0 + if facing > 0 { 0.3 * within(2.0, 3.0) } else { 0.0 }),
             1 if facing < 0 => (1.0 - 0.16 * within(0.0, 1.0), 1.0),
             1 if facing > 0 => (1.0, 1.0 + 0.08 * within(0.0, 1.0)),
             // The lip over a wall.
-            ..=-2 => (1.0, 1.0 + 0.18 * within(0.0, 1.0)),
+            ..=-2 => (1.0, 1.0 + 0.32 * within(0.0, 1.0)),
             _ => (1.0, 1.0),
         }
     }

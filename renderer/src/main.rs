@@ -25,6 +25,8 @@
 //! | space | pause, and go on |
 //! | `F` | tick flat out, or at the game's pace |
 //! | `[` and `]` | halve and double the pace |
+//! | `B` | show the superchunks' boundaries, or not |
+//! | `C` | show the chunks' boundaries, or not |
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -39,7 +41,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use coordinates::{square_side, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{square_side, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
 use paint::Picture;
 use sim::{start, Ask, Near, Request, Viewport, TARGET_PACE};
 use std::sync::mpsc::{Receiver, Sender};
@@ -151,6 +153,30 @@ struct Seen {
 #[derive(Component)]
 struct NearView;
 
+/// A boundary drawn over the world: a line between two rows or two
+/// columns of chunks, from one side of the world to the other.
+#[derive(Component)]
+struct Boundary {
+    /// Whether it is one of the superchunks' lines, or of the chunks'.
+    of_superchunks: bool,
+    /// Whether it runs across, or down.
+    across: bool,
+}
+
+/// Which boundaries are shown.
+#[derive(Resource, Default)]
+struct Boundaries {
+    /// The superchunks'.
+    superchunks: bool,
+    /// The chunks'.
+    chunks: bool,
+}
+
+/// A superchunks' boundary's colour, and its width in screen pixels.
+const SUPERCHUNK_LINE: (Color, f32) = (Color::srgba(1.0, 0.85, 0.2, 0.9), 2.0);
+/// A chunks' boundary's.
+const CHUNK_LINE: (Color, f32) = (Color::srgba(1.0, 1.0, 1.0, 0.45), 1.0);
+
 /// The text over the world.
 #[derive(Component)]
 struct Hud;
@@ -190,8 +216,9 @@ fn main() {
         .insert_resource(Link { requests, frames: Mutex::new(paint::start(frames)), waiting: false, since: SYNC_EVERY, asked: None, paused: false, pace, watch_for })
         .insert_resource(Sprites { side: square_side(superchunks), images: Vec::new(), sides: Vec::new() })
         .init_resource::<Seen>()
+        .init_resource::<Boundaries>()
         .add_systems(Startup, setup)
-        .add_systems(Update, (steer, keys, show, ask, hud).chain())
+        .add_systems(Update, (steer, keys, boundaries, show, ask, hud).chain())
         .run();
 }
 
@@ -230,6 +257,16 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, mut sprites:
         sprites.sides.push(1);
     }
     commands.spawn((Sprite { image: images.add(picture(1, DIRT.to_vec())), ..default() }, Transform::from_xyz(0.0, 0.0, 1.0), Visibility::Hidden, NearView));
+    // The boundaries, hidden until asked for: the chunks' under the superchunks'.
+    for (of_superchunks, apart, (colour, _), height) in [(false, CHUNK_SIDE as f32, CHUNK_LINE, 2.0), (true, SPRITE_SIDE, SUPERCHUNK_LINE, 3.0)] {
+        for line in 0..=(world_side / apart) as u32 {
+            let at = line as f32 * apart;
+            for (across, x, y) in [(true, world_side / 2.0, -at), (false, at, -world_side / 2.0)] {
+                let sprite = Sprite { color: colour, custom_size: Some(Vec2::ONE), ..default() };
+                commands.spawn((sprite, Transform::from_xyz(x, y, height), Visibility::Hidden, Boundary { of_superchunks, across }));
+            }
+        }
+    }
     commands.spawn((
         Text::new(""),
         Node { position_type: PositionType::Absolute, top: Val::Px(8.0), left: Val::Px(8.0), padding: UiRect::all(Val::Px(6.0)), ..default() },
@@ -283,6 +320,29 @@ fn keys(mut link: ResMut<Link>, keys: Res<ButtonInput<KeyCode>>) {
     };
     link.pace = pace;
     _ = link.requests.send(Request::Pace(pace));
+}
+
+/// Shows and hides the boundaries by their keys, and keeps those shown
+/// as wide on the screen however near the view is.
+fn boundaries(
+    mut shown: ResMut<Boundaries>,
+    mut lines: Query<(&Boundary, &mut Transform, &mut Visibility)>,
+    camera: Single<&Projection, With<Camera2d>>,
+    sprites: Res<Sprites>,
+    keys: Res<ButtonInput<KeyCode>>,
+) {
+    shown.superchunks ^= keys.just_pressed(KeyCode::KeyB);
+    shown.chunks ^= keys.just_pressed(KeyCode::KeyC);
+    let Projection::Orthographic(view) = *camera else {
+        return;
+    };
+    let world_side = sprites.side as f32 * SPRITE_SIDE;
+    for (boundary, mut transform, mut visibility) in &mut lines {
+        let (is_shown, (_, pixels)) = if boundary.of_superchunks { (shown.superchunks, SUPERCHUNK_LINE) } else { (shown.chunks, CHUNK_LINE) };
+        *visibility = if is_shown { Visibility::Visible } else { Visibility::Hidden };
+        let width = pixels * view.scale;
+        transform.scale = if boundary.across { Vec3::new(world_side, width, 1.0) } else { Vec3::new(width, world_side, 1.0) };
+    }
 }
 
 /// Shows the frame the simulation answered with, if it has: each
@@ -418,7 +478,7 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         pixels => format!("a cell {pixels} pixels a side"),
     };
     text.0 = format!(
-        "tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause   F: flat out   [ ]: pace",
+        "tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause   F: flat out   [ ]: pace   B: superchunks   C: chunks",
         grouped(seen.tick),
         grouped(seen.ticks_a_second as u64),
         grouped(seen.sheep as u64),
