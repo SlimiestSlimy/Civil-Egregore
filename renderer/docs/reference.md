@@ -79,9 +79,11 @@ then what was kept. **`now()`**, **`set(index, value)`**, **`keep()`**.
 
 ## `sliders.rs`
 
-`MARGIN`, `ROW`, `TRACK`, `PANEL`: the layout. **`Fill`**, **`Named`**: a
-slider's filled part and its text. **`Dragged`**: the one being dragged.
-**`pointer_over(window)`**: whether the pointer is over them.
+`MARGIN`, `ROW`, `TRACK`, `KNOB`, `PANEL`, `NAME`: the layout. **`Fill`**,
+**`Knob`**, **`Named`**: a slider's filled part, its knob and its text.
+**`Dragged`**: the one being dragged. **`held()`**: whether the left
+button went down over them and is still held -- the view is then not
+dragged; **`pointer_over(window)`**.
 **`setup`**: the sliders. **`slide`**: dragged, set back, kept, shown.
 
 ## `main.rs`
