@@ -24,7 +24,7 @@ fn keepers(world: &World) -> Vec<SuperchunkIndex> {
 /// never both; and the world has grown.
 #[test]
 fn the_hot_superchunks_are_the_halos() {
-    let mut world = world::generate(4, 4_000);
+    let mut world = world::generate(9, 4_000);
     assert_eq!(world.arena.superchunk_indices(), about([WORLD_MIDDLE].into_iter()), "the origin's halo");
     let mut moved = HaloChange::default();
     for _ in 0..6_000 {
@@ -51,7 +51,7 @@ fn the_hot_superchunks_are_the_halos() {
 /// it is due -- and then both hold.
 #[test]
 fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
-    let mut world = world::generate(4, 4_000);
+    let mut world = world::generate(9, 4_000);
     while world.warming().next().is_none() {
         assert!(world.entities.now() < 6_000, "the halos moved");
         world.tick();
@@ -78,7 +78,7 @@ fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
 /// again, cooling across a save and a load, it goes cold when due.
 #[test]
 fn a_superchunk_cooling_stays_hot_until_due() {
-    let mut world = world::generate(4, 1);
+    let mut world = world::generate(9, 1);
     let halo = world.arena.superchunk_indices();
     let sheep = world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).next().expect("the sheep");
     let take_away = |world: &mut World| {
@@ -119,7 +119,7 @@ fn a_superchunk_cooling_stays_hot_until_due() {
 /// lingering are kept; once flushed and let go, so decoded from its images.
 #[test]
 fn a_superchunk_gone_cold_comes_back_as_it_was() {
-    let mut world = world::generate(8, 2_000);
+    let mut world = world::generate(12, 2_000);
     for _ in 0..500 {
         world.tick();
     }
@@ -130,7 +130,7 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
         (cells, world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect(), world.simulation.random_states().collect())
     };
     let before = held(&world);
-    let mut twin = world::generate(8, 2_000);
+    let mut twin = world::generate(12, 2_000);
     for _ in 0..500 {
         twin.tick();
     }

@@ -40,21 +40,20 @@ pub const WALLS: [(LayerType, (i32, i32)); 2] = [(WALL_EAST, (1, 0)), (WALL_SOUT
 const OCTAVES: [u32; 4] = [9, 7, 5, 3];
 
 /// How the heights are shaped. The land rises and falls by far more
-/// than a hill over many superchunks ([`rise`]), too gently for a wall.
-/// On it the ground everywhere is a base, rolling
-/// so broadly that it is all but flat; hills stand on it only where a
-/// mask, as broad, is over a threshold, rising from nothing at the
-/// threshold -- so the rest is plains. The base's share of a height and
-/// the hills' octaves' come to 255 in all at most.
+/// than a hill over many superchunks ([`rise`]), too gently for a wall;
+/// what of it is under the ocean's level is the ocean's floor, what is
+/// over it islands, dozens to hundreds of superchunks each. Hills
+/// stand on the islands alone, rising from nothing at the shore to
+/// their whole height where the land is the coast's heights over the
+/// ocean. The hills' octaves' shares of a height come to 255 at most.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Shape {
     /// Each hill octave's share of a height, the broadest first.
     pub weights: [u64; 4],
-    /// The base's share of a height: how high the plains roll.
-    pub base: u64,
-    /// The mask under which the ground is plains, of [`ONE`]: about the
-    /// share of the world that is.
-    pub plains: u64,
+    /// The height the ocean stands at, all over the world.
+    pub ocean: Height,
+    /// How far over the ocean the land is where the hills are whole.
+    pub coast: u64,
     /// The height the lowest ground is at: what all the rest stands on.
     pub ground: Height,
     /// The most the land rises over the lowest ground, in heights.
@@ -64,22 +63,15 @@ pub struct Shape {
     pub rise_span: u32,
 }
 
-/// The cells between two points of the base and of the plains' mask,
-/// as a power of two.
-const BROAD: u32 = 11;
-/// How fast the hills rise past the plains' edge: to their whole height
-/// over this fraction of the mask.
-const FOOTHILLS: u64 = 4;
-
 /// A cell's water: how deep it stands over the ground, 0 none, a number
 /// over eight bitplanes, the lowest bit first.
 pub const WATER: [LayerType; 8] = [LayerType(24), LayerType(25), LayerType(26), LayerType(27), LayerType(28), LayerType(29), LayerType(30), LayerType(31)];
 
 impl Shape {
-    /// The world's shape, as tuned by eye in the renderer's lab: broad
-    /// hills, little of the ridges, a good deal of bumps, on half the
-    /// world; plains on the rest.
-    pub const DEFAULT: Self = Self { weights: [142, 19, 51, 3], base: 40, plains: ONE / 2, ground: 256, rise: 1024, rise_span: 14 };
+    /// The world's shape: islands some 16 superchunks across in an
+    /// ocean a little over half the world, hills as tuned by eye in the
+    /// renderer's lab.
+    pub const DEFAULT: Self = Self { weights: [168, 22, 61, 4], ocean: 800, coast: 64, ground: 256, rise: 1024, rise_span: 14 };
 }
 
 /// One: a fraction's whole, 16 bits.
@@ -116,7 +108,7 @@ pub fn noise(seed: u64, index: u32, shift: u32, x: u32, y: u32) -> u64 {
 /// `(x, y)`, in heights: noise far broader than a superchunk and far
 /// higher than a hill, with a quarter as much again a quarter as broad.
 pub fn rise(shape: &Shape, seed: u64, x: u32, y: u32) -> u64 {
-    let index = OCTAVES.len() as u32 + 2;
+    let index = OCTAVES.len() as u32;
     let span = shape.rise_span.clamp(2, 24);
     let land = 3 * noise(seed, index, span, x, y) + noise(seed, index + 1, span - 2, x, y);
     (land * shape.rise) >> 18
@@ -131,16 +123,15 @@ pub fn height(seed: u64, x: u32, y: u32) -> Height {
 /// [`height`], in a world shaped as `shape` says: what a shape is tried
 /// out with before it is the world's.
 pub fn height_shaped(shape: &Shape, seed: u64, x: u32, y: u32) -> Height {
-    let base = noise(seed, OCTAVES.len() as u32, BROAD, x, y) * shape.base;
-    // How much of the hills stands here: none on the plains.
-    let relief = (noise(seed, OCTAVES.len() as u32 + 1, BROAD, x, y).saturating_sub(shape.plains) * FOOTHILLS).min(ONE);
-    // The highest there is, whatever the shape would come to.
-    let over = |heights: u64| (shape.ground as u64 + rise(shape, seed, x, y) + heights).min(Height::MAX as u64) as Height;
+    let land = shape.ground as u64 + rise(shape, seed, x, y);
+    // How much of the hills stands here: none at the shore or under the ocean.
+    let relief = ((land.saturating_sub(shape.ocean as u64) << 16) / shape.coast.max(1)).min(ONE);
     if relief == 0 {
-        return over(base >> 16);
+        return land.min(Height::MAX as u64) as Height;
     }
     let hills: u64 = OCTAVES.iter().zip(shape.weights).enumerate().map(|(index, (&shift, weight))| noise(seed, index as u32, shift, x, y) * weight).sum();
-    over((base + ((hills * relief) >> 16)) >> 16)
+    // The highest there is, whatever the shape would come to.
+    (land + (((hills * relief) >> 16) >> 16)).min(Height::MAX as u64) as Height
 }
 
 /// Whether two heights are too far apart to step between.

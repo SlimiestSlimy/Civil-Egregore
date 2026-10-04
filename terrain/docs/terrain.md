@@ -60,34 +60,29 @@ the cells about the change are worked out again.
 | `tests/` | heights settled by seed and cell, walls where they should be |
 | `docs/` | this, and the reference, function by function |
 
-## Plains, hills and water
-
-The ground everywhere is a **base**: one octave 2,048 cells across,
-worth 40 of a height, so flat that a step comes every few dozen cells
-and a wall never. **Hills** -- the four octaves -- stand on it only
-where a mask, as broad, is past a threshold, and rise from nothing at
-the threshold to their whole height a quarter of the mask further on:
-foothills, not a cliff about every plain. With the threshold at a half,
-about half the world is plains.
-
-**Water** is a depth a cell: how far it stands over the ground, 0 none,
-eight bits over eight bitplanes (`WATER`). A world is generated with
-still water at one level: every cell lower than it is a lake, as deep
-as it is lower (`world::Generation::water_level`). Nothing grows or
-spreads under water. Water does not move yet.
-
-## Heights of 16 bits
+## Land, ocean and hills
 
 A height is 16 bits, 0 to 65,535. The lowest ground is at
-`Shape::ground`; on it the land rises (`rise`) by up to `Shape::rise`
-heights, as noise `2^rise_span` cells between points -- many
-superchunks -- with a quarter as much again a quarter as broad: too
-gentle for a wall, a step every ten cells or so at the steepest. The
-base, the plains and the hills stand on that, 255 heights at most.
+`Shape::ground`; on it the **land rises** (`rise`) by up to
+`Shape::rise` heights, as noise `2^rise_span` cells between points --
+many superchunks -- with a quarter as much again a quarter as broad: too
+gentle for a wall, a step every ten cells or so at the steepest.
+
+The **ocean** stands at one height all over the world (`Shape::ocean`):
+the land under it is the ocean's floor, the land over it islands, dozens
+to hundreds of superchunks each. **Hills** -- the four octaves, 255
+heights at most -- stand on the islands alone: none at the shore, their
+whole height where the land is `Shape::coast` heights over the ocean.
+So shores are level, the floor smooth, the inland rough.
+
+**Water** is a depth a cell: how far it stands over the ground, 0 none,
+eight bits over eight bitplanes (`WATER`) -- the ocean deeper than 255
+is kept as 255. Nothing grows or spreads under water. Water does not
+move yet. There are no lakes: no water over the ocean's level.
 
 The height map keeps a floor a chunk and a byte a cell over it; only a
 chunk whose heights span more than 255 -- a tall chunk -- keeps a map of
 16 bits a cell, after the bytes (see chunk storage).
 
-To come: plains level at heights of their own, mesas, ramps, cliffs --
+To come: plains level at heights of their own, lakes, mesas, ramps, cliffs --
 the generator as layers of noise, each with a curve and a mask.
