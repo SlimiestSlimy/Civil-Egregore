@@ -270,8 +270,8 @@ struct HeightLabel {
 const HEIGHT_LABELS: (u32, u32) = (96, 54);
 /// Screen pixels a cell is across before its height is written on it.
 const HEIGHT_FROM: f32 = 20.0;
-/// Screen pixels a height is across at its full size.
-const HEIGHT_WIDTH: f32 = 44.0;
+/// Screen pixels a height is across at its full size: five digits.
+const HEIGHT_WIDTH: f32 = 80.0;
 
 /// The text over the world.
 #[derive(Component)]
