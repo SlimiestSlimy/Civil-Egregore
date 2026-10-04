@@ -12,8 +12,7 @@
 //! `cargo run --release -p renderer -- [superchunks shown] [sheep a superchunk] [ticks a second, 0 flat out] [ticks to watch for] [1 to force every superchunk shown hot]`
 //!
 //! Forced hot, the world is loaded to be measured: every superchunk
-//! shown hot all the while, the sheep given a superchunk each, and grass
-//! growing everywhere.
+//! shown hot all the while, whatever its sheep come to.
 //!
 //! It runs until closed. The ticks to watch for are only shown: how far
 //! the run is from what whoever started it wanted seen.

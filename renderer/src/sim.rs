@@ -214,8 +214,8 @@ fn run(superchunks: u32, flock: usize, forced_hot: bool, asked: &Receiver<Reques
             }
         }
         if forced_hot {
-            // The halos are not moved: every superchunk shown stays hot, and grass grows on them all.
-            world::tick_rules_everywhere(&mut world.simulation, &mut world.arena, &mut world.entities, SEED);
+            // The halos are not moved: every superchunk shown stays hot.
+            world::tick_rules(&mut world.simulation, &mut world.arena, &mut world.entities, SEED);
         } else {
             world.tick();
         }

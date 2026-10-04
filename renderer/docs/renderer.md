@@ -14,7 +14,7 @@ The world is a generated one (`world::generate_flocks`, a flock on
 every superchunk shown): hot only in the halos about its sheep, so the window shows a square of superchunks
 about the world's origin, and those cold are black. Forced hot (the
 fifth argument), every superchunk shown is hot all the while, each
-with a flock, and grass grows everywhere: the world under full load,
+with a flock, whatever its sheep come to: the world under a fixed load,
 to be measured -- the census then carries the seconds and the pace
 held, 0 flat out.
 

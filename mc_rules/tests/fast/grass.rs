@@ -10,7 +10,7 @@ use chunk_storage::{ChunkStorage, LayerCodec};
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
 use simulation::entity_store::Entities;
 use simulation::Simulation;
-use mc_rules::grass::{grows_in, tick, DECAY_CHANCE, GROWING_CENTRE, GROWING_RADIUS, SPREAD_CHANCE};
+use mc_rules::grass::{tick, DECAY_CHANCE, SPREAD_CHANCE};
 
 /// The superchunk the tests run on: the world's origin, where grass
 /// grows.
@@ -95,13 +95,10 @@ fn every_cell_stays_dirt_or_grass() {
     assert!(growth > 1.0 && growth < (1000.0 * SPREAD_CHANCE).exp() * 1.1, "grew {growth:.2} times");
 }
 
-/// Grass grows only within its limit, for now: over the 5x5 superchunks
-/// about the origin, 300 ticks change grass in every one of the 3x3
-/// about it and in no superchunk the limit leaves out, and on no cell
-/// farther from its centre than its radius and the one step a spread
-/// takes.
+/// Grass grows wherever a superchunk is hot: over the 5x5 superchunks
+/// about the origin, 300 ticks change grass in every one.
 #[test]
-fn grass_grows_only_within_its_limit() {
+fn grass_grows_in_every_superchunk() {
     let (mut codec, mut arena, mut storage) = (LayerCodec::new(), BitmapArena::new(), ChunkStorage::new(1 << 12));
     let superchunks: Vec<SuperchunkIndex> = (-2..=2).flat_map(|dy| (-2..=2).map(move |dx| WORLD_MIDDLE.offset(dx, dy).expect("in the world"))).collect();
     for (seed, &superchunk) in superchunks.iter().enumerate() {
@@ -116,7 +113,6 @@ fn grass_grows_only_within_its_limit() {
         tick(&mut simulation, &mut arena, &mut entities, seed);
     }
     let after = grass(&arena);
-    let reach = GROWING_RADIUS as u64 + 2;
     let mut changed: Vec<CellCartesian> = Vec::new();
     for ((chunk, was), (same, is)) in before.iter().zip(&after) {
         assert_eq!(chunk, same);
@@ -126,16 +122,9 @@ fn grass_grows_only_within_its_limit() {
         }
     }
     assert!(changed.len() > 1000, "grass changed on {} cells", changed.len());
-    for cell in &changed {
-        let (dx, dy) = (cell.x.abs_diff(GROWING_CENTRE.x) as u64, cell.y.abs_diff(GROWING_CENTRE.y) as u64);
-        assert!(dx * dx + dy * dy <= reach * reach, "({}, {}) changed, outside the limit", cell.x, cell.y);
-    }
     let touched = |superchunk: SuperchunkIndex| changed.iter().any(|&cell| CellIndex::from(cell).superchunk() == superchunk);
     for &superchunk in &superchunks {
         let (x, y) = superchunk.cartesian();
-        let (middle, _) = WORLD_MIDDLE.cartesian();
-        let around_origin = x.abs_diff(middle) <= 1 && y.abs_diff(middle) <= 1;
-        assert!(!touched(superchunk) || grows_in(superchunk), "{x}, {y}: changed where grass does not grow");
-        assert!(touched(superchunk) || !around_origin, "{x}, {y}: around the origin, unchanged");
+        assert!(touched(superchunk), "{x}, {y}: unchanged");
     }
 }

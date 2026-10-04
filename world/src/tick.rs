@@ -47,13 +47,6 @@ pub fn tick_rules(simulation: &mut Simulation, arena: &mut BitmapArena, entities
     simulation.tick(arena, entities, seed, |turn, samples| TickCounts { grass: grass::rule(turn, samples), sheep: sheep::rule(turn) })
 }
 
-/// [`tick_rules`], with grass growing everywhere
-/// ([`grass::rule_everywhere`]): for a world forced hot, to measure it
-/// under full load.
-pub fn tick_rules_everywhere(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64) -> TickReport<TickCounts> {
-    simulation.tick(arena, entities, seed, |turn, samples| TickCounts { grass: grass::rule_everywhere(turn, samples), sheep: sheep::rule(turn) })
-}
-
 impl World {
     /// One tick of the rules over the hot superchunks, then the halos
     /// moved to where their keepers came to.
