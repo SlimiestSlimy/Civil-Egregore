@@ -133,9 +133,10 @@ as a patch, finer noise, and the cell's own lot;
 
 ## Generation
 
-**`Generation`** `{shape, grass, trees}`: how superchunks are generated;
+**`Generation`** `{shape, grass, trees, water_level}`: how superchunks are generated;
 `Generation::DEFAULT`, as tuned in the renderer's lab; `TREES_SALT`.
 **`generate_with(generation, seed)`**: a world with nothing hot yet,
 generated so. **`generate_image(generation, seed, superchunk, codec)`**:
-terrain, dirt, grass and trees with their stages. `World::generation`
+terrain, lakes where it is under the water's level, and on the rest
+grass and trees with their stages. `World::generation`
 is not saved: a world loaded goes on with the default.

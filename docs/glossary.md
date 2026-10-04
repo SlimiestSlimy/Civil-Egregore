@@ -28,6 +28,8 @@ what they always do and are not listed.
 | **Morton order** | the order of Morton indices: work is done and written in it, so memory is read forwards | sampling, wake | |
 | **height** | a cell's height, 0 to 255, from the seed alone (`terrain::height`) | wall, height map | elevation |
 | **dirt** | a cell with nothing on it: no layer of its own | grass | ground |
+| **water** | how deep water stands over a cell's ground, 0 none: a level over eight bitplanes (`terrain::WATER`) | level, lake | sea |
+| **plains** | the ground where no hills stand: the base alone, all but flat | shape | flats |
 | **tree** | a cell set in the layer `TREE`, with a **stage** | stage, patches | |
 | **stage** | how old a tree is, 0 to 15: a number kept over four bitplanes (`TREE_STAGE`), a bit each | tree, level | age, growth |
 | **level** | a number a cell holds over several bitplanes, the lowest bit first (`Turn::level`) | stage, bitplane | multi-bit plane |

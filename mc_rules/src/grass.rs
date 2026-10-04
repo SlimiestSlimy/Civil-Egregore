@@ -4,7 +4,8 @@
 //!
 //! - **Spreading**: a cell of grass tries to spread with
 //!   [`SPREAD_CHANCE`], onto one of its eight neighbours drawn at
-//!   random, if that one is dirt.
+//!   random, if that one is dirt -- a cell with no grass -- and not
+//!   under water.
 //! - **Decay**: a cell of grass with `k` of its eight neighbours grass
 //!   turns back to dirt with `k / 8` of [`DECAY_CHANCE`]: none with no
 //!   grass around, the whole chance with grass all round.
@@ -28,6 +29,7 @@ use bitplane_manager::{BitmapArena, Write, WriteOp};
 use simulation::entity_store::Entities;
 use simulation::{Simulation, Turn, TickReport};
 use chunk_storage::mock::GRASS;
+use terrain::WATER;
 use coordinates::{CellIndex, NEIGHBOURS};
 use std::ops::AddAssign;
 
@@ -84,7 +86,8 @@ pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> GrassCounts {
         };
         if spreading {
             // Dirt is a cell with no grass on it: no layer of its own.
-            if turn.holds(GRASS, neighbour) == Ok(false) {
+            // And grass does not spread under water; a world with no water layers has none.
+            if turn.holds(GRASS, neighbour) == Ok(false) && !matches!(turn.level(WATER, neighbour), Ok(1..)) {
                 turn.queue(GRASS, Write::cell(neighbour, WriteOp::Set));
                 spreads += 1;
             }

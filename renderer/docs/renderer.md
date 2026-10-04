@@ -178,7 +178,9 @@ by the same keys. Generation's sliders are shown from the start:
 - **The heights**: how much of a height each of the four octaves makes
   up beside the others -- hills 512 cells across, ridges 128, bumps 32,
   roughness 8 -- and the height span they come to together, 255 at
-  most (`terrain::Shape`).
+  most (`terrain::Shape`); how much of the world is plains, and how
+  high the plains roll.
+- **The water's level**: the ground under it is a lake.
 - **The grass**, and **the trees** (`world::patches`): each in patches,
   not scattered cell by cell. A cell's number is smooth noise as broad
   as a patch, finer noise on it (detail), and a lot drawn for the cell

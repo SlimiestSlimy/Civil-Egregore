@@ -42,7 +42,9 @@ ground of every hot superchunk of the frame made if missing, the fine
 parts of those longest unseen dropped (`FINE_KEPT`, 48).
 **`paint(cells, ground)`**: dirt, the grass over it, both lit, the
 sheep over that, a pixel each (`SHEEP_REACH`, none); **`opaque`**; `COLD`,
-black. `TREE_YOUNG`, `TREE_OLD`, **`tree_colour(stage)`**, **`stage_at(cells,
+black. `WATER`, `FILM`, **`depth_at(cells, word, bit)`**, **`under_water(colour,
+depth)`**: a colour seen through water, the less the deeper, none from
+`sim::DEEP` (16). `TREE_YOUNG`, `TREE_OLD`, **`tree_colour(stage)`**, **`stage_at(cells,
 word, bit)`**; **`counted(words, detail)`**: the cells set a tile.
 **`paint_far(cells, detail, ground)`**: a pixel a tile of cells
 `2^detail` a side, its grass counted from its run of bits, its colours
@@ -79,8 +81,8 @@ grounds, near)`**: the picture. **`Cell`**: **`paint`**, a cell's pixels
 ## `tuning.rs`
 
 **`Tuned`** `{name, default, range, page}`; **`Page`**: `Shading`,
-`Generation`; `TUNED`, the twenty-one of them, and each one's place
-(`STEP_LIGHT` ... `TEXTURE`, `HILLS` ... `TREE_SCATTER`). **`Tuning`**: the
+`Generation`; `TUNED`, the twenty-four of them, and each one's place
+(`STEP_LIGHT` ... `TEXTURE`, `HILLS` ... `WATER_LEVEL`). **`Tuning`**: the
 numbers read together. **`path()`**: where they are kept. **`start()`**:
 defaults, then what was kept. **`now()`**, **`set(index, value)`**,
 **`keep()`**. **`generation()`**: how many times how the world is

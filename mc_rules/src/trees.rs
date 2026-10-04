@@ -11,7 +11,7 @@
 //!   by 8 cells about it: the more there are the less likely it
 //!   spreads, never with [`CROWDED`] or more. If it does, a cell of
 //!   those 64 is drawn, and a tree of stage 0 is put there if there is
-//!   none.
+//!   none and the cell is not under water.
 //! - **Else it grows** a stage; or, at the oldest stage, dies one time
 //!   in [`DIE_ONE_IN`] -- the cell cleared, and its stage -- and lives
 //!   on otherwise.
@@ -22,6 +22,7 @@ use bitplane_manager::{Write, WriteOp};
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use simulation::Turn;
+use terrain::WATER;
 use std::ops::AddAssign;
 
 /// The cells a tree stands on.
@@ -111,6 +112,10 @@ fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) -> bool {
     let Some(onto) = corner.offset((drawn % AROUND) as i32, (drawn / AROUND) as i32).filter(|_| free) else {
         return false;
     };
+    // No tree under water.
+    if matches!(turn.level(WATER, onto), Ok(1..)) {
+        return false;
+    }
     turn.queue(TREE, Write::cell(onto, WriteOp::Set));
     true
 }

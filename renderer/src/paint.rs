@@ -14,7 +14,7 @@
 use crate::ground::{lit, Ground, COARSEST};
 use crate::near::{paint_near, PaintedNear};
 use crate::lab;
-use crate::sim::{Cells, Frame, CHUNK_WORDS};
+use crate::sim::{Cells, Frame, CHUNK_WORDS, DEEP};
 use bitmap::morton::morton_coordinates;
 use bitmap::BITS_PER_WORD;
 use coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
@@ -161,6 +161,27 @@ fn chunk_top_left(place: usize) -> (usize, usize) {
     (x as usize, y as usize)
 }
 
+/// Water.
+pub const WATER: [u8; 3] = [30, 92, 168];
+/// How much of what is under it a film of water hides, of [`DEEP`]:
+/// water one deep hides this and one more, and so on to all of it.
+const FILM: usize = 4;
+
+/// How deep the water at bit `bit` of word `word` of `cells`' bitmaps
+/// is, to [`DEEP`] at most.
+pub fn depth_at(cells: &Cells, word: usize, bit: u32) -> u32 {
+    if cells.deep[word] >> bit & 1 == 1 {
+        return DEEP;
+    }
+    (0..cells.depths.len()).map(|plane| ((cells.depths[plane][word] >> bit & 1) as u32) << plane).sum()
+}
+
+/// `colour` under water `depth` deep: the less of it seen the deeper,
+/// none from [`DEEP`].
+pub fn under_water(colour: [u8; 3], depth: u32) -> [u8; 3] {
+    mixed(colour, WATER, FILM + depth as usize, FILM + DEEP as usize)
+}
+
 /// A tree at its first stage, and at its last: darker as it ages.
 const TREE_YOUNG: [u8; 3] = [62, 128, 44];
 /// A tree at its last stage.
@@ -210,6 +231,18 @@ fn paint(cells: &Cells, ground: &Ground) -> Painted {
     }
     for (pixel, &factor) in pixels.iter_mut().zip(&ground.levels[0]) {
         *pixel = opaque(lit([pixel[0], pixel[1], pixel[2]], factor));
+    }
+    // Its water over the lit ground: the deeper, the less of the ground seen.
+    for (index, &word) in cells.wet.iter().enumerate() {
+        let (left, top) = chunk_top_left(index / CHUNK_WORDS);
+        let mut bits = word;
+        while bits != 0 {
+            let bit = bits.trailing_zeros();
+            let (x, y) = morton_coordinates(index % CHUNK_WORDS * BITS_PER_WORD + bit as usize);
+            let pixel = &mut pixels[(top + y as usize) * SIDE + left + x as usize];
+            *pixel = opaque(under_water([pixel[0], pixel[1], pixel[2]], depth_at(cells, index, bit)));
+            bits &= bits - 1;
+        }
     }
     let white = opaque(WHITE);
     for &(x, y) in &cells.sheep {
@@ -262,6 +295,7 @@ fn counted(words: &[u64], detail: u32) -> Vec<u16> {
 fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
     let (side, tile_cells) = (SIDE >> detail, 1usize << (2 * detail));
     let (grass, trees) = (counted(&cells.grass, detail), counted(&cells.trees, detail));
+    let (wet, deep) = (counted(&cells.wet, detail), counted(&cells.deep, detail));
     let mut sheep = vec![0u16; side * side];
     for &(x, y) in &cells.sheep {
         let at = (y as usize >> detail) * side + (x as usize >> detail);
@@ -269,9 +303,11 @@ fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
     }
     let sheep_cells = (2 * SHEEP_REACH + 1) * (2 * SHEEP_REACH + 1);
     let mut pixels = Vec::with_capacity(side * side * 4);
-    for (((&grass, &trees), &sheep), &factor) in grass.iter().zip(&trees).zip(&sheep).zip(&ground.levels[(detail as usize).min(COARSEST)]) {
+    for (index, &factor) in ground.levels[(detail as usize).min(COARSEST)].iter().enumerate() {
+        let (grass, trees, sheep) = (grass[index], trees[index], sheep[index]);
         let ground = mixed(mixed(BROWN, GREEN, grass as usize, tile_cells), tree_colour(OLDEST / 2), trees as usize, tile_cells);
-        let ground = lit(ground, factor);
+        // The water over the lit ground, by the share of the tile under it: shallow water half seen through.
+        let ground = mixed(lit(ground, factor), WATER, (wet[index] as usize + deep[index] as usize) / 2, tile_cells);
         pixels.extend_from_slice(&opaque(mixed(ground, WHITE, sheep as usize * sheep_cells, tile_cells)));
     }
     Painted { at: cells.at, cold: false, side: side as u32, pixels }

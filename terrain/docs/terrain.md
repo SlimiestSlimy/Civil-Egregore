@@ -59,3 +59,25 @@ the cells about the change are worked out again.
 | `src/lib.rs` | heights, walls, a superchunk's terrain |
 | `tests/` | heights settled by seed and cell, walls where they should be |
 | `docs/` | this, and the reference, function by function |
+
+## Plains, hills and water
+
+The ground everywhere is a **base**: one octave 2,048 cells across,
+worth 40 of a height, so flat that a step comes every few dozen cells
+and a wall never. **Hills** -- the four octaves -- stand on it only
+where a mask, as broad, is past a threshold, and rise from nothing at
+the threshold to their whole height a quarter of the mask further on:
+foothills, not a cliff about every plain. With the threshold at a half,
+about half the world is plains.
+
+**Water** is a depth a cell: how far it stands over the ground, 0 none,
+eight bits over eight bitplanes (`WATER`). A world is generated with
+still water at one level: every cell lower than it is a lake, as deep
+as it is lower (`world::Generation::water_level`). Nothing grows or
+spreads under water. Water does not move yet.
+
+## To come: a height a chunk
+
+A cell's height is a byte. A chunk is to have a height of its own, to
+which its cells' are added, so that heights vary by 16 bits over the
+world. Nothing of it is written yet.

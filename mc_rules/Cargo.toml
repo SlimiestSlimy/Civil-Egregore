@@ -11,3 +11,4 @@ coordinates = { path = "../coordinates" }
 bitplane_manager = { path = "../bitplane_manager" }
 chunk_storage = { path = "../chunk_storage" }
 utilities = { path = "../utilities" }
+terrain = { path = "../terrain" }
