@@ -48,9 +48,8 @@ pub struct Generation {
     pub grass: Patches,
     /// How the trees lie.
     pub trees: Patches,
-    /// How far over the land at a chunk's middle its still water
-    /// stands: the ground under that level is a lake, as deep as it is
-    /// lower.
+    /// How far over the land's rise still water stands: the ground
+    /// under that level is a lake, as deep as it is lower.
     pub water_level: Height,
 }
 
@@ -195,23 +194,16 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
     let water = planes.len();
     planes.extend(WATER);
     let mut cells = vec![[0u64; bitmap::WORDS]; planes.len() * CHUNKS_IN_SUPERCHUNK];
-    // Still water stands at one level all over a chunk: so far over the land at the chunk's middle.
-    let levels: Vec<Height> = (0..CHUNKS_IN_SUPERCHUNK)
-        .map(|chunk| {
-            let (x, y) = cartesian_from_place(chunk * CELLS_IN_CHUNK);
-            let middle = coordinates::CHUNK_SIDE as u32 / 2;
-            let land = generation.shape.ground as u64 + terrain::rise(&generation.shape, seed, left + x + middle, top + y + middle);
-            (land + generation.water_level as u64).min(Height::MAX as u64) as Height
-        })
-        .collect();
     for place in 0..CHUNKS_IN_SUPERCHUNK * CELLS_IN_CHUNK {
         let (x, y) = cartesian_from_place(place);
         let (x, y) = (left + x, top + y);
         let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
         let mut set = |plane: usize| cells[plane * CHUNKS_IN_SUPERCHUNK + chunk][cell / bitmap::BITS_PER_WORD] |= 1 << (cell % bitmap::BITS_PER_WORD);
         // A lake wherever the ground is under the water's level, as deep as it is lower: nothing grows under it.
-        // No deeper than its eight bits tell.
-        let depth = levels[chunk].saturating_sub(terrain.height(place)).min(u8::MAX as Height);
+        // The water's surface follows the land's rise -- until plains are level, where a lake has one level --
+        // and is no deeper than its eight bits tell.
+        let level = generation.shape.ground as u64 + terrain::rise(&generation.shape, seed, x, y) + generation.water_level as u64;
+        let depth = level.saturating_sub(terrain.height(place) as u64).min(u8::MAX as u64);
         if depth > 0 {
             (0..WATER.len()).filter(|bit| depth >> bit & 1 == 1).for_each(|bit| set(water + bit));
             continue;

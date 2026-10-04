@@ -180,8 +180,8 @@ by the same keys. Generation's sliders are shown from the start:
   roughness 8 -- and the height span they come to together, 255 at
   most (`terrain::Shape`); how much of the world is plains, and how
   high the plains roll.
-- **The water's level**: how far over the land at a chunk's middle its
-  still water stands; the ground under it is a lake.
+- **The water's level**: how far over the land's rise still water
+  stands; the ground under it is a lake.
 - **The ground's level**, **the land's rise** and **its span**: the
   lowest ground, how far the land rises over it, and how broadly (a
   power of two of cells).
