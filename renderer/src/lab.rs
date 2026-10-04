@@ -108,11 +108,11 @@ fn shape(tuned: &tuning::Tuning) -> Shape {
     // A height is 16 bits, whatever is typed: what the land and its hills would pass is held to the highest.
     let height = |tuned: f32| tuned.round().clamp(0.0, u16::MAX as f32) as u16;
     let land = Shape {
-        weights: [0; 11],
+        weights: [0; 14],
         ocean: 0,
         sunk: (tuned[HILL_SINK].clamp(0.0, 1.0) * ONE as f32) as u64,
         depth: tuned[OCEAN_DEPTH].round().clamp(0.0, u16::MAX as f32) as u64,
-        coast: tuned[COAST].round().clamp(1.0, u16::MAX as f32) as u64,
+        coast: tuned[COAST].round().clamp(0.0, u16::MAX as f32) as u64,
         ground: height(tuned[GROUND_LEVEL]),
         rise: height(tuned[LAND_RISE]) as u64,
         rise_span: tuned[LAND_SPAN].round().clamp(5.0, 24.0) as u32,
@@ -120,7 +120,7 @@ fn shape(tuned: &tuning::Tuning) -> Shape {
         shore: (tuned[SHORE_WANDER].clamp(0.0, 16.0) * ONE as f32) as u64,
         shore_span: tuned[SHORE_SPAN].round().clamp(2.0, 24.0) as u32,
     };
-    let shares: [f32; 11] = std::array::from_fn(|octave| tuned[HILLS + octave].max(0.0));
+    let shares: [f32; 14] = std::array::from_fn(|octave| tuned[HILLS + octave].max(0.0));
     let all: f32 = shares.iter().sum();
     if all <= 0.0 {
         return land;
