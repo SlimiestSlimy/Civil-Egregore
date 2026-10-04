@@ -100,6 +100,13 @@ again within the triangles of the mesh before, small variations at a
 time -- the lowest land a quarter as much as the highest, so
 differences compound inland.
 
+The broad mesh has a **weight** of one. Every vertex hands a share of
+the weight that reached it on to the meshes finer than its own -- a
+byte by lot, keeping back at most `Shape::weight` -- and each of those
+moves the land by its own heights times the weight that reached it. So
+where the parents keep much a plain stays mostly a plain and a ridge a
+ridge, and where they keep little the land is broken up in detail.
+
 Every cell's height follows from the seed and the cell alone, in whole
 numbers: the same whatever order cells or superchunks are made in. A
 cell on a line is in two triangles; it is always given to the first of

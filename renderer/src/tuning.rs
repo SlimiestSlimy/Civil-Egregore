@@ -84,28 +84,30 @@ pub const FINER_SHARE: usize = 22;
 pub const FINER_HEIGHT: usize = 23;
 /// How much of that each mesh finer does, beside the one before.
 pub const FINER_FALL: usize = 24;
+/// The most a vertex weighs against the meshes finer than its own.
+pub const PARENT_WEIGHT: usize = 25;
 /// The share of those that raise it.
-pub const RAISED_SHARE: usize = 25;
+pub const RAISED_SHARE: usize = 26;
 /// The share of the cells that are grass.
-pub const GRASS_COVER: usize = 26;
+pub const GRASS_COVER: usize = 27;
 /// The cells across a patch of grass, as a power of two.
-pub const GRASS_PATCH: usize = 27;
+pub const GRASS_PATCH: usize = 28;
 /// How much finer noise counts beside the patches'.
-pub const GRASS_DETAIL: usize = 28;
+pub const GRASS_DETAIL: usize = 29;
 /// How much each cell's own lot counts: grass scattered, not in patches.
-pub const GRASS_SCATTER: usize = 29;
+pub const GRASS_SCATTER: usize = 30;
 /// The share of the cells that have a tree.
-pub const TREE_COVER: usize = 30;
+pub const TREE_COVER: usize = 31;
 /// The cells across a patch of trees, as a power of two.
-pub const TREE_PATCH: usize = 31;
+pub const TREE_PATCH: usize = 32;
 /// How much finer noise counts beside the trees' patches'.
-pub const TREE_DETAIL: usize = 32;
+pub const TREE_DETAIL: usize = 33;
 /// How much each cell's own lot counts for trees.
-pub const TREE_SCATTER: usize = 33;
+pub const TREE_SCATTER: usize = 34;
 
 /// The numbers, in the order above; the shading's defaults are what was
 /// found by eye with the sliders.
-pub const TUNED: [Tuned; 34] = [
+pub const TUNED: [Tuned; 35] = [
     Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading, what: "How much lighter the border of a higher cell is where it faces the sun." },
     Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading, what: "How much darker the border of a higher cell is where it faces away from the sun." },
     Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading, what: "How dark the band at the foot of a wall is, on the side away from the sun." },
@@ -131,6 +133,7 @@ pub const TUNED: [Tuned; 34] = [
     Tuned { name: "finer mesh share", default: 0.7, range: (0.0, 1.0), page: Page::Generation, what: "The share of a finer mesh's points that raise or sink the land; the rest leave it as it is." },
     Tuned { name: "finer mesh height", default: 120.0, range: (0.0, 2048.0), page: Page::Generation, what: "How many heights a point of the first finer mesh raises or sinks the land at most, each by an amount of its own." },
     Tuned { name: "finer mesh falloff", default: 0.75, range: (0.0, 1.0), page: Page::Generation, what: "How much each finer mesh moves the land beside the one before: 0.5, and each does half as much; near 1, and the finest do as much as the broadest -- rough ground; near 0, and only the first counts." },
+    Tuned { name: "parent weight", default: 0.8, range: (0.0, 1.0), page: Page::Generation, what: "The top level has a weight of 1. Every point hands a share of the weight that reached it down to its subdivisions and keeps the rest; a subdivision moves the land by its own offset times the weight that reached it. This is the most a point may keep, each keeping from none to this by lot. Where the parents keep much, the ground keeps their shape -- a plain stays a plain, a ridge a ridge; where they keep little it is broken up in detail. 0, and every level moves the land freely everywhere." },
     Tuned { name: "raised share", default: 0.6, range: (0.0, 1.0), page: Page::Generation, what: "The share of those vertices that raise the land; the rest sink it. Land sunk under the ocean level fills with water." },
     Tuned { name: "grass cover", default: 0.95, range: (0.0, 1.0), page: Page::Generation, what: "The share of dry land that starts as grass; the rest is dirt." },
     Tuned { name: "grass patch size (2^)", default: 8.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a patch of grass or of dirt is: 2 to this power, in cells." },

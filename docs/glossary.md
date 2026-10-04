@@ -82,6 +82,7 @@ what they always do and are not listed.
 | **line** (the mesh's) | what joins two vertices and says how their heights are blended | blend, sigmoidness | edge, border |
 | **blend** | the share of a line's length, about its middle, the change from one end's height to the other's is spread over | line | ramp width, edge |
 | **sigmoidness** | the shape of the change across a blend: 1 an even slope, more a step between two levels | line, blend | hardness, sharpness |
+| **weight** (a vertex's) | how much a vertex holds the land about it against the meshes finer than its own | vertex, finer mesh | roughness |
 | **floor** | a chunk's lowest height, 16 bits: what its cells' bytes are counted from | height map | chunk height |
 | **tall chunk** | a chunk whose heights span more than 255: kept whole, 16 bits a cell, after the bytes | height map, floor | |
 | **layer codec** | encodes a layer for an image, and decodes it back, by Tessera (`LayerCodec`) | Tessera | |
