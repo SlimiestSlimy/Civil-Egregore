@@ -1,7 +1,8 @@
-//! The light on the ground: a superchunk's heights, worked out again
-//! here from the world's seed -- the simulation is asked for none of
-//! it -- and what they do to a cell's colour, seen from straight above
-//! with the sun to the top left.
+//! The light on the ground: a superchunk's heights -- brought by the
+//! first frame it is hot in, and past its edges, or if no frame brings
+//! them, worked out again here from the world's seed -- and what they
+//! do to a cell's colour, seen from straight above with the sun to the
+//! top left.
 //!
 //! - **Hillshade**: a slope facing the sun lighter, one facing away
 //!   darker, off the heights smoothed, in a few bands.
@@ -14,8 +15,9 @@
 //! Heights never change, so a superchunk's ground is made once and
 //! kept.
 
-use coordinates::SUPERCHUNK_SIDE_CELLS;
-use chunk_storage::Height;
+use coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS};
+use chunk_storage::{height_in, Height};
+use std::collections::HashMap;
 use terrain::mesh::Lands;
 use terrain::{wall, Shape};
 
@@ -126,9 +128,10 @@ impl Ground {
     }
 
     /// The ground of the superchunk whose top left cell is `top_left`,
-    /// in the world whose seed is `seed`, shaped as `shape` says.
-    pub fn generate(seed: u64, shape: &Shape, top_left: (u32, u32)) -> Self {
-        let heights = heights(seed, shape, top_left);
+    /// in the world whose seed is `seed`, shaped as `shape` says; the
+    /// heights `given` taken as they are.
+    pub fn generate(seed: u64, shape: &Shape, top_left: (u32, u32), given: &Given) -> Self {
+        let heights = heights(seed, shape, top_left, given);
         let smooth = smoothed(&smoothed(&heights.iter().map(|&height| height as f32).collect::<Vec<_>>()));
         let (lines, shadowed) = shadow_lines(&heights);
         let at = |x: usize, y: usize| (y + BEFORE) * WIDE + x + BEFORE;
@@ -160,9 +163,14 @@ impl Ground {
     }
 }
 
+/// Heights already worked out: a superchunk's height words
+/// ([`chunk_storage::height_in`]) by its top left cell.
+pub type Given<'a> = HashMap<(u32, u32), &'a [u64]>;
+
 /// The heights about the superchunk whose top left cell is `top_left`:
-/// [`WIDE`] a side, row by row.
-fn heights(seed: u64, shape: &Shape, top_left: (u32, u32)) -> Vec<Height> {
+/// [`WIDE`] a side, row by row. Those of a superchunk `given` are read;
+/// the others are worked out from the seed.
+fn heights(seed: u64, shape: &Shape, top_left: (u32, u32), given: &Given) -> Vec<Height> {
     let (left, top) = (top_left.0.wrapping_sub(BEFORE as u32), top_left.1.wrapping_sub(BEFORE as u32));
     // Rows shared out among the machine's threads: a cell's height is the same whoever works it out.
     let mut heights = vec![0; WIDE * WIDE];
@@ -172,8 +180,20 @@ fn heights(seed: u64, shape: &Shape, top_left: (u32, u32)) -> Vec<Height> {
         for (part, rows) in heights.chunks_mut(rows_each * WIDE).enumerate() {
             scope.spawn(move || {
                 let mut lands = Lands::new(shape, seed);
-                for (index, height) in rows.iter_mut().enumerate() {
-                    *height = lands.height(left.wrapping_add((index % WIDE) as u32), top.wrapping_add((part * rows_each + index / WIDE) as u32));
+                for (row, heights) in rows.chunks_mut(WIDE).enumerate() {
+                    let (y, mut across) = (top.wrapping_add((part * rows_each + row) as u32), 0);
+                    while across < WIDE {
+                        // The row's run within one superchunk.
+                        let x = left.wrapping_add(across as u32);
+                        let (in_x, in_y) = (x % SIDE as u32, y % SIDE as u32);
+                        let run = (SIDE - in_x as usize).min(WIDE - across);
+                        let cells = heights[across..across + run].iter_mut().zip(0u32..);
+                        match given.get(&(x - in_x, y - in_y)) {
+                            Some(words) => cells.for_each(|(height, along)| *height = height_in(words, place_from_cartesian(in_x + along, in_y))),
+                            None => cells.for_each(|(height, along)| *height = lands.height(x.wrapping_add(along), y)),
+                        }
+                        across += run;
+                    }
                 }
             });
         }

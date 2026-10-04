@@ -22,6 +22,7 @@ use bitplane_manager::BucketKey;
 use chunk_storage::mock::GRASS;
 use chunk_storage::LayerType;
 use coordinates::{square_side, CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE, WORLD_SIDE_SUPERCHUNKS};
+use std::collections::HashSet;
 use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -144,6 +145,10 @@ pub struct Cells {
     /// Its top left cell in the world, `(x, y)`: what its ground is
     /// worked out from.
     pub top_left: (u32, u32),
+    /// Its heights, as its image holds them (`chunk_storage::height_in`),
+    /// in the first frame it is hot in and empty in every other: the
+    /// painter is spared working them out again.
+    pub heights: Vec<u64>,
     /// Its trees, laid out as the grass.
     pub trees: Vec<u64>,
     /// Its trees' stages, a bitplane a bit, the lowest first, each laid
@@ -236,6 +241,8 @@ fn run(superchunks: u32, flock: usize, mode: Mode, asked: &Receiver<Request>, an
     let shown = shown(superchunks);
     let mut generation = tuning::generation();
     let mut world = made(mode, &shown, flock);
+    // The superchunks whose heights a frame has carried.
+    let mut sent = HashSet::new();
     let started = Instant::now();
     let (mut paused, mut pace, mut tick) = (false, Some(TARGET_PACE), 0u64);
     let mut census = census(superchunks, flock, mode);
@@ -245,6 +252,7 @@ fn run(superchunks: u32, flock: usize, mode: Mode, asked: &Receiver<Request>, an
             // Generated otherwise now: the world is made afresh, and its ticks start again.
             generation = tuning::generation();
             world = made(mode, &shown, flock);
+            sent.clear();
             (tick, last_frame_tick) = (0, 0);
         }
         // Paused, there is nothing to do until the window asks.
@@ -259,7 +267,7 @@ fn run(superchunks: u32, flock: usize, mode: Mode, asked: &Receiver<Request>, an
                     let elapsed = last_frame.elapsed().as_secs_f64();
                     let ticks_a_second = if elapsed > 0.0 { (tick - last_frame_tick) as f64 / elapsed } else { 0.0 };
                     (last_frame, last_frame_tick) = (asked_at, tick);
-                    let (sheep, grass, trees, cells) = (world.entities.len(), count(&world, GRASS), count(&world, TREE), copy(&world, ask));
+                    let (sheep, grass, trees, cells) = (world.entities.len(), count(&world, GRASS), count(&world, TREE), copy(&world, ask, &mut sent));
                     let sync_seconds = asked_at.elapsed().as_secs_f64();
                     let sync_share = if elapsed > 0.0 { sync_seconds / elapsed } else { 0.0 };
                     let frame = Frame { tick, ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, detail: ask.detail, near: ask.near, generation, cells };
@@ -345,7 +353,7 @@ fn count(world: &World, layer_type: LayerType) -> u64 {
 
 /// The superchunks of `world` that `ask` asks for, copied: each one's
 /// grass, words as they are, and its sheep's cells.
-fn copy(world: &World, ask: Ask) -> Vec<Cells> {
+fn copy(world: &World, ask: Ask, sent: &mut HashSet<SuperchunkIndex>) -> Vec<Cells> {
     let mut copied = Vec::new();
     for (x, y) in ask.asked() {
         let superchunk = SuperchunkIndex::from_cartesian(x, y);
@@ -360,7 +368,9 @@ fn copy(world: &World, ask: Ask) -> Vec<Cells> {
         let depths: [Vec<u64>; 4] = std::array::from_fn(|bit| planes(low[bit]));
         let deep = high.iter().map(|&plane| planes(plane)).fold(Vec::new(), |all, plane| or(all, &plane));
         let wet = depths.iter().fold(deep.clone(), or);
-        copied.push(Cells { at: (x, y), hot, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages: TREE_STAGE.map(planes), wet, depths, deep, sheep });
+        // Heights never change: sent the once, in the first frame the superchunk is hot in.
+        let heights = if hot && sent.insert(superchunk) { world.storage.image(superchunk).map_or(Vec::new(), |image| image.height_words().to_vec()) } else { Vec::new() };
+        copied.push(Cells { at: (x, y), hot, heights, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages: TREE_STAGE.map(planes), wet, depths, deep, sheep });
     }
     copied
 }

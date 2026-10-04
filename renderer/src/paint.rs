@@ -11,7 +11,7 @@
 //! `2^detail` a side is, in Morton order, a run of bits, so the grass
 //! in it is counted from the words without a cell looked at.
 
-use crate::ground::{lit, Ground, COARSEST};
+use crate::ground::{lit, Given, Ground, COARSEST};
 use crate::near::{paint_near, PaintedNear};
 use crate::lab;
 use crate::sim::{Cells, Frame, CHUNK_WORDS, DEEP};
@@ -85,8 +85,11 @@ fn ground(grounds: &mut HashMap<(u32, u32), Ground>, frame: &Frame, number: u64)
     let hot = || frame.cells.iter().filter(|cells| cells.hot).map(|cells| cells.top_left);
     let missing: Vec<(u32, u32)> = hot().filter(|top_left| grounds.get(top_left).is_none_or(|ground| fine && ground.fine.is_none())).collect();
     let (seed, shape) = (lab::seed(), lab::generation().shape);
+    // The heights the frame brings: those of the superchunks just turned hot.
+    let given: Given = frame.cells.iter().filter(|cells| !cells.heights.is_empty()).map(|cells| (cells.top_left, &cells.heights[..])).collect();
+    let given = &given;
     let made: Vec<Ground> = thread::scope(|scope| {
-        let making: Vec<_> = missing.iter().map(|&top_left| scope.spawn(move || Ground::generate(seed, &shape, top_left))).collect();
+        let making: Vec<_> = missing.iter().map(|&top_left| scope.spawn(move || Ground::generate(seed, &shape, top_left, given))).collect();
         making.into_iter().map(|making| making.join().expect("a superchunk's ground")).collect()
     });
     grounds.extend(missing.into_iter().zip(made));
