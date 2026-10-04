@@ -99,8 +99,8 @@ parts (8 MiB) for the 48 superchunks last seen.
   drawn at the edges: wherever a cell is higher than the one beside
   it, a thin line along the higher cell's border, light towards the
   sun and dark away; and under a wall a band 5 to 7 eighths of a cell on its lower
-  cell, darkest at its foot and fading from it -- less dark where the
-  sun is on the wall than where it faces away. Walls are drawn much
+  cell, darkest at its foot and fading from it, tuned apart for a
+  wall the sun is on and one facing away. Walls are drawn much
   the stronger: they are what cannot be crossed.
 
 **Corners.** A pixel takes one edge's doing, never two multiplied: the
@@ -144,6 +144,11 @@ one, the right sets it back to its default. The painter reads them
 each frame; they are kept when a slider is let go, in
 `transient_data/tuning.txt`, and taken up again the next run -- what
 is found by eye is then written into the code as the defaults.
+
+As tuned: the border lines 35% lighter and darker, a wall's band 49%
+darker at its foot facing away from the sun and 55% with the sun on
+it, fading by 80% across it, cast shadows 40% darker, 70% of the
+relief, and twice the texture.
 
 ## Layout
 

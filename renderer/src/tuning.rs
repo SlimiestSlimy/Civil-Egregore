@@ -39,13 +39,13 @@ pub const TEXTURE: usize = 7;
 /// The numbers, in the order above; the defaults are what was found by
 /// eye with the sliders.
 pub const TUNED: [Tuned; 8] = [
-    Tuned { name: "step light", default: 0.6, range: (0.0, 1.0) },
-    Tuned { name: "step dark", default: 0.45, range: (0.0, 0.8) },
-    Tuned { name: "wall shade", default: 0.7, range: (0.0, 1.0) },
-    Tuned { name: "wall lit", default: 0.45, range: (0.0, 1.0) },
-    Tuned { name: "wall fade", default: 1.0, range: (0.0, 1.5) },
+    Tuned { name: "step light", default: 0.35, range: (0.0, 1.0) },
+    Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8) },
+    Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0) },
+    Tuned { name: "wall lit", default: 0.55, range: (0.0, 1.0) },
+    Tuned { name: "wall fade", default: 0.8, range: (0.0, 1.5) },
     Tuned { name: "shadow", default: 0.4, range: (0.0, 0.8) },
-    Tuned { name: "relief", default: 1.2, range: (0.0, 3.0) },
+    Tuned { name: "relief", default: 0.7, range: (0.0, 3.0) },
     Tuned { name: "texture", default: 2.0, range: (0.0, 4.0) },
 ];
 
