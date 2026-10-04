@@ -46,7 +46,7 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `pathfinding` | pathfinding | | |
 | `utilities` | fixed_list, memory, rng, table | | |
 | `simulation` | dispatcher, entities, instructions | sampling, tick | |
-| `mc_rules` | | grass, and only in its circle | |
+| `mc_rules` | | grass, and only within its limit, for now | |
 | `entity_rules` | | sheep | |
 | `terrain` | | terrain | walls over many seeds; no seam between superchunks |
 | `world` | | halos: hot superchunks are the halos, a cold one comes back as it was; world: saves, loads, walls | a world stopped every 5,000 ticks; a flock lasting 300,000 |

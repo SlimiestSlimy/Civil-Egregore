@@ -1,6 +1,6 @@
 //! Grass over dirt: it spreads onto dirt at its chance, decays at its
 //! chance times its share of grass neighbours, and every cell stays dirt
-//! or grass -- and only in its circle.
+//! or grass -- and, for now, only within its limit.
 //!
 //! `cargo test`
 
@@ -95,12 +95,13 @@ fn every_cell_stays_dirt_or_grass() {
     assert!(growth > 1.0 && growth < (1000.0 * SPREAD_CHANCE).exp() * 1.1, "grew {growth:.2} times");
 }
 
-/// Grass grows only in its circle: over the 5x5 superchunks about the
-/// origin, 300 ticks change grass in every one of the 3x3 about it and
-/// in no superchunk the circle misses, and on no cell farther from its
-/// centre than its radius and the one step a spread takes.
+/// Grass grows only within its limit, for now: over the 5x5 superchunks
+/// about the origin, 300 ticks change grass in every one of the 3x3
+/// about it and in no superchunk the limit leaves out, and on no cell
+/// farther from its centre than its radius and the one step a spread
+/// takes.
 #[test]
-fn grass_grows_only_in_its_circle() {
+fn grass_grows_only_within_its_limit() {
     let (mut codec, mut arena, mut storage) = (LayerCodec::new(), BitmapArena::new(), ChunkStorage::new(1 << 12));
     let superchunks: Vec<SuperchunkIndex> = (-2..=2).flat_map(|dy| (-2..=2).map(move |dx| WORLD_MIDDLE.offset(dx, dy).expect("in the world"))).collect();
     for (seed, &superchunk) in superchunks.iter().enumerate() {
@@ -127,7 +128,7 @@ fn grass_grows_only_in_its_circle() {
     assert!(changed.len() > 1000, "grass changed on {} cells", changed.len());
     for cell in &changed {
         let (dx, dy) = (cell.x.abs_diff(GROWING_CENTRE.x) as u64, cell.y.abs_diff(GROWING_CENTRE.y) as u64);
-        assert!(dx * dx + dy * dy <= reach * reach, "({}, {}) changed, outside the circle", cell.x, cell.y);
+        assert!(dx * dx + dy * dy <= reach * reach, "({}, {}) changed, outside the limit", cell.x, cell.y);
     }
     let touched = |superchunk: SuperchunkIndex| changed.iter().any(|&cell| CellIndex::from(cell).superchunk() == superchunk);
     for &superchunk in &superchunks {

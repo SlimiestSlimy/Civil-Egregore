@@ -9,10 +9,13 @@
 //!   turns back to dirt with `k / 8` of [`DECAY_CHANCE`]: none with no
 //!   grass around, the whole chance with grass all round.
 //!
-//! Grass grows only in a circle three superchunks across about the
-//! middle of the world's origin superchunk ([`grows_at`]): a superchunk
-//! the circle misses samples nothing, and a cell of grass outside it
-//! never changes. Grass elsewhere lies as it was made.
+//! For now grass is ticked only within a small region -- three
+//! superchunks across, about the middle of the world's origin superchunk
+//! ([`grows_at`]). That is no part of the rule, only a limit on the
+//! present test: grass let spread without end would lead the sheep,
+//! their halos, and so the world, to grow without end. A superchunk the
+//! limit leaves out samples nothing, and a cell of grass outside it
+//! never changes: grass there lies as it was made.
 //!
 //! One sampling pass serves both, and no sample is wasted: every cell of
 //! grass is sampled with the two chances together, and each sample
@@ -42,15 +45,15 @@ pub const SPREAD_CHANCE: f64 = 0.000_01;
 /// turns back to dirt.
 pub const DECAY_CHANCE: f64 = 0.000_02;
 
-/// The middle of the circle grass grows in: the middle cell of the
-/// world's origin superchunk ([`WORLD_MIDDLE`]).
+/// The middle of the region grass is limited to, for now: the middle
+/// cell of the world's origin superchunk ([`WORLD_MIDDLE`]).
 pub const GROWING_CENTRE: CellCartesian = {
     // WORLD_MIDDLE's coordinates, in superchunks, are both this.
     let middle = WORLD_SIDE_SUPERCHUNKS / 2 * SUPERCHUNK_SIDE_CELLS + SUPERCHUNK_SIDE_CELLS / 2;
     CellCartesian { x: middle, y: middle }
 };
-/// The radius of the circle grass grows in, in cells: three superchunks
-/// across.
+/// How far from [`GROWING_CENTRE`] grass grows, for now, in cells: three
+/// superchunks across.
 pub const GROWING_RADIUS: u32 = 3 * SUPERCHUNK_SIDE_CELLS / 2;
 
 /// Whether grass grows at `cell`: no farther than [`GROWING_RADIUS`]
@@ -61,8 +64,8 @@ pub fn grows_at(cell: CellIndex) -> bool {
     dx * dx + dy * dy <= GROWING_RADIUS as u64 * GROWING_RADIUS as u64
 }
 
-/// Whether grass grows anywhere in `superchunk`: the circle reaches its
-/// nearest cell to [`GROWING_CENTRE`].
+/// Whether grass grows anywhere in `superchunk`: its nearest cell to
+/// [`GROWING_CENTRE`] is near enough.
 pub fn grows_in(superchunk: SuperchunkIndex) -> bool {
     let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     let nearest = |centre: u32, first: u32| centre.clamp(first, first + (SUPERCHUNK_SIDE_CELLS - 1));

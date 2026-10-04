@@ -1,5 +1,6 @@
 //! The world on disk: a folder. Its `world` file says what the world
-//! is, in text; `superchunks/` holds two files a superchunk, each named
+//! is, in text; its `hot` file which superchunks were hot, and which
+//! warming, also in text; `superchunks/` holds two files a superchunk, each named
 //! by its superchunk index -- 44 bits, in hexadecimal: `.image`, its cells,
 //! the image as the cold pool holds it, and `.state`, words that are whoever
 //! ticks the world's to make sense of -- its random numbers, its
@@ -15,6 +16,8 @@ use std::path::{Path, PathBuf};
 
 /// The world's file, in its folder.
 const WORLD_FILE: &str = "world";
+/// The hot superchunks' file, in the world's folder.
+const HOT_FILE: &str = "hot";
 /// The superchunks' folder, in the world's folder.
 const SUPERCHUNKS: &str = "superchunks";
 
@@ -56,6 +59,20 @@ pub fn read_world(folder: &Path) -> Result<WorldInfo, DiskError> {
     let path = folder.join(WORLD_FILE);
     let text = String::from_utf8(read(&path)?).map_err(|_| DiskError::Invalid(path.clone(), "not text".to_string()))?;
     WorldInfo::from_text(&text).map_err(|what| DiskError::Invalid(path, what))
+}
+
+/// Writes `hot` as `folder`'s hot file, the folder made if not
+/// there: how many bytes.
+pub fn write_hot(folder: &Path, hot: &HotSuperchunks) -> Result<u64, DiskError> {
+    make_folder(folder)?;
+    write(&folder.join(HOT_FILE), hot.to_text().as_bytes())
+}
+
+/// Which superchunks were hot in `folder`'s world: its hot file read.
+pub fn read_hot(folder: &Path) -> Result<HotSuperchunks, DiskError> {
+    let path = folder.join(HOT_FILE);
+    let text = String::from_utf8(read(&path)?).map_err(|_| DiskError::Invalid(path.clone(), "not text".to_string()))?;
+    HotSuperchunks::from_text(&text).map_err(|what| DiskError::Invalid(path, what))
 }
 
 /// Writes `image` as `superchunk`'s in `folder`: how many bytes.
@@ -152,23 +169,13 @@ pub struct WorldInfo {
     pub tick: u64,
     /// Its layer types: made hot on every chunk when it is loaded.
     pub layers: Vec<LayerType>,
-    /// The superchunks being made hot, sorted, each with the tick it
-    /// turns hot at: whoever ticks the world's business, as a state is.
-    /// None: no `loading` line.
-    pub loading: Vec<(SuperchunkIndex, u64)>,
 }
 
 impl WorldInfo {
     /// As the world's file holds it.
     fn to_text(&self) -> String {
         let layers: Vec<String> = self.layers.iter().map(|layer| layer.0.to_string()).collect();
-        let mut text = format!("{FIRST_LINE}\nname = {}\nseed = {}\ntick = {}\nlayers = {}\n", self.name.replace('\n', " "), self.seed, self.tick, layers.join(" "));
-        // Only a world with superchunks being made hot says so.
-        if !self.loading.is_empty() {
-            let loading: Vec<String> = self.loading.iter().map(|(superchunk, tick)| format!("{:x}@{tick}", superchunk.0)).collect();
-            text += &format!("loading = {}\n", loading.join(" "));
-        }
-        text
+        format!("{FIRST_LINE}\nname = {}\nseed = {}\ntick = {}\nlayers = {}\n", self.name.replace('\n', " "), self.seed, self.tick, layers.join(" "))
     }
 
     /// From the world's file's text, or what is wrong with it.
@@ -177,7 +184,7 @@ impl WorldInfo {
         if lines.next() != Some(FIRST_LINE) {
             return Err(format!("does not start with `{FIRST_LINE}`"));
         }
-        let (mut name, mut seed, mut tick, mut layers, mut loading) = (None, None, None, None, Vec::new());
+        let (mut name, mut seed, mut tick, mut layers) = (None, None, None, None);
         for line in lines.filter(|line| !line.trim().is_empty()) {
             let (key, value) = line.split_once('=').ok_or_else(|| format!("`{line}` is not `key = value`"))?;
             let (key, value) = (key.trim(), value.trim());
@@ -187,19 +194,56 @@ impl WorldInfo {
                 "seed" => seed = Some(number()?),
                 "tick" => tick = Some(number()?),
                 "layers" => layers = Some(value.split_whitespace().map(|layer| layer.parse().map(LayerType).map_err(|_| format!("`{layer}` is not a layer type"))).collect::<Result<Vec<_>, _>>()?),
-                "loading" => loading = value.split_whitespace().map(superchunk_at_tick).collect::<Result<Vec<_>, _>>()?,
                 // A key of a later format: passed over.
                 _ => {}
             }
         }
-        Ok(Self { name: name.ok_or("no name")?, seed: seed.ok_or("no seed")?, tick: tick.ok_or("no tick")?, layers: layers.ok_or("no layers")?, loading })
+        Ok(Self { name: name.ok_or("no name")?, seed: seed.ok_or("no seed")?, tick: tick.ok_or("no tick")?, layers: layers.ok_or("no layers")? })
     }
 }
 
-/// A superchunk with a tick, `index@tick` -- the index in hexadecimal,
-/// as superchunks' files are named -- or what is wrong with it.
-fn superchunk_at_tick(text: &str) -> Result<(SuperchunkIndex, u64), String> {
-    let wrong = || format!("`{text}` is not a superchunk index and a tick, `index@tick`");
-    let (index, tick) = text.split_once('@').ok_or_else(wrong)?;
-    Ok((SuperchunkIndex(u64::from_str_radix(index, 16).map_err(|_| wrong())?), tick.parse().map_err(|_| wrong())?))
+/// The hot file's first line: what the file is, and its format's number.
+const HOT_FIRST_LINE: &str = "tilesim hot 1";
+
+/// Which superchunks a world had hot when saved: made hot again as it is
+/// loaded, before it ticks. A line a superchunk, its index in
+/// hexadecimal; one warming followed by the tick it turns hot at.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct HotSuperchunks {
+    /// The hot superchunks, sorted.
+    pub hot: Vec<SuperchunkIndex>,
+    /// The superchunks warming, sorted, each with the tick it
+    /// turns hot at.
+    pub warming: Vec<(SuperchunkIndex, u64)>,
+}
+
+impl HotSuperchunks {
+    /// As the hot file holds it.
+    fn to_text(&self) -> String {
+        let hot = self.hot.iter().map(|superchunk| format!("{:011x}\n", superchunk.0));
+        let warming = self.warming.iter().map(|(superchunk, tick)| format!("{:011x} {tick}\n", superchunk.0));
+        std::iter::once(format!("{HOT_FIRST_LINE}\n")).chain(hot).chain(warming).collect()
+    }
+
+    /// From the hot file's text, or what is wrong with it.
+    fn from_text(text: &str) -> Result<Self, String> {
+        let mut lines = text.lines();
+        if lines.next() != Some(HOT_FIRST_LINE) {
+            return Err(format!("does not start with `{HOT_FIRST_LINE}`"));
+        }
+        let mut read = Self::default();
+        for line in lines.filter(|line| !line.trim().is_empty()) {
+            let wrong = || format!("`{line}` is not a superchunk index, and maybe a tick");
+            let mut words = line.split_whitespace();
+            let superchunk = SuperchunkIndex(u64::from_str_radix(words.next().ok_or_else(wrong)?, 16).map_err(|_| wrong())?);
+            match (words.next(), words.next()) {
+                (None, _) => read.hot.push(superchunk),
+                (Some(tick), None) => read.warming.push((superchunk, tick.parse().map_err(|_| wrong())?)),
+                _ => return Err(wrong()),
+            }
+        }
+        read.hot.sort_unstable();
+        read.warming.sort_unstable();
+        Ok(read)
+    }
 }

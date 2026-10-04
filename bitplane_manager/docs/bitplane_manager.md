@@ -51,6 +51,26 @@ until storage flushes its superchunk: evicted and made hot again before
 then, it is the bucket as it was. A dirty bucket must be written back
 before it is evicted.
 
+Writing back is in two halves, so the slow one -- encoding -- can be
+done off the tick: the dirty buckets are taken (`take_dirty`: their
+cells copied out, the buckets marked clean, one write-back more on its
+way), and, encoded wherever, put into the ring (`written_back`), in the
+order taken. `write_back` does both at once.
+
+## Cooling
+
+A superchunk is made cold as a whole at once (`make_cold_superchunk`):
+nothing encoded or flushed, its dirty buckets taken and handed back to
+be encoded, and its allocations set aside as they are, **cooling** --
+no longer hot, so the simulation neither reads nor ticks it, writes to
+it are missed, and the directory stays the hot superchunks exactly.
+It is let go, its blocks back in the pool, once storage holds its
+changes: none on its way, none waiting in the ring. Wanted hot again
+before then, it is held (`hold`) and made hot as it is, nothing decoded
+(`make_hot_again`); no longer wanted, let go (`let_go`). A superchunk
+made hot any other way has its bitmaps' cells decoded from storage, or
+given decoded (`make_hot_cells`) -- off the tick, say.
+
 ## Writes
 
 The only way cells change. A write is 12 bytes: its anchor cell's

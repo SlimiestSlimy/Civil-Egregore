@@ -206,6 +206,43 @@ fn evicted_bitmaps_wait_for_the_ring() {
     assert_eq!(arena.holds(LayerType(1), cell), Ok(true), "decoded from the cold pool");
 }
 
+/// A superchunk made cold as a whole hands back its changed bitmaps to
+/// encode, and is set aside, cooling: not hot, it is let go once its
+/// changes are flushed -- unless held, wanted hot again, when it is made
+/// hot as it was; let go, it is decoded from the cold pool.
+#[test]
+fn a_superchunk_cooling_waits_for_its_changes() {
+    let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
+    let mut storage = ChunkStorage::new(1 << 12);
+    let key = BucketKey { layer_type: LayerType(1), chunk: ChunkIndex::of(WORLD_MIDDLE, 9) };
+    let cell = cell_in(key.chunk, CELL);
+    arena.make_hot(key, None, &mut codec);
+    write(&mut arena, LayerType(1), WriteOp::Set, cell);
+
+    let dirty = arena.make_cold_superchunk(WORLD_MIDDLE);
+    assert_eq!(dirty.iter().map(|(key, cells)| (*key, **cells)).collect::<Vec<_>>(), vec![(key, one_cell(CELL))], "its one change, to encode");
+    assert_eq!((arena.len(), arena.cooling()), (0, 1), "cold, cooling");
+    assert_eq!(arena.holds(LayerType(1), cell), Err(NotHot(key)));
+    storage.flush_all(&mut flushed);
+    arena.flushed(&flushed);
+    assert_eq!(arena.cooling(), 1, "its change on its way: kept");
+
+    let encoded: Vec<(BucketKey, Vec<u64>)> = dirty.iter().map(|(key, cells)| (*key, codec.encode_layer(cells).to_vec())).collect();
+    arena.written_back(WORLD_MIDDLE, &encoded, &mut storage);
+    assert!(arena.hold(WORLD_MIDDLE), "cooling, so held");
+    storage.flush_all(&mut flushed);
+    arena.flushed(&flushed);
+    assert_eq!(arena.cooling(), 1, "flushed, but held");
+    assert!(arena.make_hot_again(WORLD_MIDDLE));
+    assert_eq!((arena.cooling(), arena.holds(LayerType(1), cell)), (0, Ok(true)), "hot as it was");
+
+    assert!(arena.make_cold_superchunk(WORLD_MIDDLE).is_empty(), "nothing changed since");
+    assert_eq!(arena.cooling(), 0, "nothing on its way or in the ring: let go at once");
+    assert!(!arena.make_hot_again(WORLD_MIDDLE));
+    arena.make_hot(key, storage.layer(key.chunk, key.layer_type), &mut codec);
+    assert_eq!(arena.holds(LayerType(1), cell), Ok(true), "decoded from the cold pool");
+}
+
 /// When writing back fills the ring, the superchunk at its tail is
 /// flushed, and its evicted bitmaps are released then.
 #[test]

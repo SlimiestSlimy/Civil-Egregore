@@ -10,16 +10,18 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
+pub mod background;
 pub mod diagnostics;
 pub mod halos;
 mod tick;
 pub mod transient_data;
 
-pub use halos::{HaloChange, HALO_KEEPERS};
+pub use halos::{HaloChange, HALO_KEEPERS, WARM_TICKS};
 pub use tick::{tick_rules, TickCounts, WorldTick};
 
+use background::{Background, Ticket};
 use bitplane_manager::BitmapArena;
-use chunk_storage::disk::{self, DiskError, WorldInfo};
+use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
 use chunk_storage::{ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
 use terrain::{Terrain, WALLS};
 use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
@@ -27,7 +29,7 @@ use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use entity_rules::sheep::flock;
 use simulation::entity_store::{saved, Entities};
 use simulation::Simulation;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::path::Path;
 use utilities::rng::Rng;
 
@@ -64,8 +66,13 @@ pub struct World {
     /// Each cold superchunk's state -- its entities and random numbers
     /// -- as a save keeps it ([`saved::encode_state`]).
     pub cold: BTreeMap<SuperchunkIndex, Vec<u64>>,
-    /// The codec that encodes and decodes its layers.
-    codec: LayerCodec,
+    /// The threads encoding, generating and decoding off the tick.
+    background: Background,
+    /// The superchunks warming, sorted ([`halos`]).
+    warming: Vec<halos::Warming>,
+    /// The write-backs of superchunks gone cold, each with its job,
+    /// being encoded in the background, in the order taken.
+    writing_back: VecDeque<(SuperchunkIndex, Ticket)>,
 }
 
 impl World {
@@ -75,7 +82,17 @@ impl World {
         let entities = Entities::at_tick(info.tick);
         // Every thread the machine has: the world's superchunks are not counted, as it grows.
         let simulation = Simulation::for_superchunks(usize::MAX);
-        Self { info, arena: BitmapArena::new(), storage: ChunkStorage::new(1 << 16), entities, simulation, cold: BTreeMap::new(), codec: LayerCodec::new() }
+        Self {
+            info,
+            arena: BitmapArena::new(),
+            storage: ChunkStorage::new(1 << 16),
+            entities,
+            simulation,
+            cold: BTreeMap::new(),
+            background: Background::new(),
+            warming: Vec::new(),
+            writing_back: VecDeque::new(),
+        }
     }
 }
 
@@ -86,22 +103,23 @@ fn layer_types() -> Vec<LayerType> {
 
 /// A world made from `seed`: its origin superchunk ([`WORLD_MIDDLE`])
 /// with a flock of `sheep` on it, and the superchunks of their halo
-/// about it. Every superchunk -- these, and those made as the sheep
+/// about it, all hot before it ticks. Every superchunk -- these, and those made as the sheep
 /// wander -- is its terrain, heights and the walls they make, and on
 /// it, for now, pasture: dirt, a third of it grass. Each from the seed
 /// and where it is ([`generate_image`]).
 pub fn generate(seed: u64, sheep: usize) -> World {
-    let mut world = World::empty(WorldInfo { name: String::new(), seed, tick: 0, layers: layer_types(), loading: Vec::new() });
+    let mut world = World::empty(WorldInfo { name: String::new(), seed, tick: 0, layers: layer_types() });
     world.keep_hot(&[WORLD_MIDDLE]);
     flock(&mut world.entities, WORLD_MIDDLE, sheep, &mut Rng::for_stream(!seed, WORLD_MIDDLE.0));
     world.entities.apply();
-    world.move_halos();
+    let halo = halos::about(std::iter::once(WORLD_MIDDLE));
+    world.keep_hot(&halo);
     world
 }
 
 /// The image of `superchunk` in a world made from `seed`: its terrain,
 /// and pasture on it -- the same whenever it is made.
-fn generate_image(seed: u64, superchunk: SuperchunkIndex, codec: &mut LayerCodec) -> SuperchunkImage {
+pub(crate) fn generate_image(seed: u64, superchunk: SuperchunkIndex, codec: &mut LayerCodec) -> SuperchunkImage {
     let own = Rng::for_stream(seed, superchunk.0).draw();
     let terrain = Terrain::generate(seed, superchunk);
     // Each way's walls, a layer a chunk that has any.
@@ -118,12 +136,11 @@ fn generate_image(seed: u64, superchunk: SuperchunkIndex, codec: &mut LayerCodec
 /// Saves `world` in `folder`, made if not there -- between two ticks.
 /// Every dirty bitmap is written back and the ring flushed first, so
 /// the cold pool's images are the world's cells; each superchunk's
-/// state is its live one if hot, as kept if cold.
+/// state is its live one if hot, as kept if cold; and which superchunks
+/// are hot, and which warming, in the hot file.
 pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
     let hot = world.arena.superchunk_indices();
-    for &superchunk in &hot {
-        world.arena.write_back(superchunk, &mut world.storage, &mut world.codec);
-    }
+    world.write_back_all();
     let mut flushed = Vec::new();
     world.storage.flush_all(&mut flushed);
     world.arena.flushed(&flushed);
@@ -138,7 +155,7 @@ pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
     for superchunk in world.storage.superchunks() {
         saved.bytes += disk::write_image(folder, superchunk, world.storage.image(superchunk).expect("a superchunk of the cold pool"))?;
         let (words, count) = match world.cold.get(&superchunk) {
-            Some(words) => (words.clone(), saved::entity_count(words)),
+            Some(words) => (words.clone(), saved::entity_count(words).expect("a cold superchunk's state, as it was kept")),
             None => {
                 let state = random.binary_search_by_key(&superchunk, |state| state.0).ok().map(|at| random[at].1);
                 saved::encode_state(state, world.entities.superchunk(superchunk))
@@ -148,30 +165,34 @@ pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
         saved.superchunks += 1;
         saved.entities += count;
     }
+    saved.bytes += disk::write_hot(folder, &HotSuperchunks { hot, warming: world.warming().collect() })?;
     // The world's file last: a save cut short leaves the one before it.
     saved.bytes += disk::write_world(folder, &WorldInfo { tick: world.entities.now(), ..world.info.clone() })?;
     Ok(saved)
 }
 
 /// Loads the world saved in `folder`: every superchunk's image into the
-/// cold pool and its state kept as a cold one's, then the halos about
-/// the entities that keep one made hot -- as it was when saved, to the
-/// cell and the random number.
+/// cold pool and its state kept as a cold one's; then the superchunks
+/// hot when it was saved made hot, before it ticks, and those warming
+/// warming again, each to turn hot when it was to -- as it was when
+/// saved, to the cell and the random number.
 pub fn load(folder: &Path) -> Result<World, DiskError> {
     let info = disk::read_world(folder)?;
+    let hot = disk::read_hot(folder)?;
     let mut world = World::empty(info);
-    let mut keepers = Vec::new();
+    let mut kept = 0;
     for superchunk in disk::saved_superchunks(folder)? {
         world.storage.insert(superchunk, disk::read_image(folder, superchunk)?);
         let (words, path) = disk::read_state(folder, superchunk)?;
-        if saved::holds_any(&words, &HALO_KEEPERS).map_err(|what| DiskError::Invalid(path, what.to_string()))? {
-            keepers.push(superchunk);
-        }
+        // Every state read whole now: it is decoded only when its superchunk turns hot.
+        kept += saved::entity_count(&words).map_err(|what| DiskError::Invalid(path, what.to_string()))?;
         world.cold.insert(superchunk, words);
     }
-    let kept: usize = world.cold.values().map(|words| saved::entity_count(words)).sum();
-    world.keep_hot(&halos::about(keepers.into_iter()));
-    let held = world.entities.len() + world.cold.values().map(|words| saved::entity_count(words)).sum::<usize>();
+    world.keep_hot(&hot.hot);
+    for (superchunk, due) in hot.warming {
+        world.start_warming(superchunk, due);
+    }
+    let held = world.entities.len() + world.cold.values().map(|words| saved::entity_count(words).expect("read whole")).sum::<usize>();
     if held != kept {
         return Err(DiskError::Invalid(folder.to_path_buf(), format!("{held} of {kept} entities put back: some on a cell taken")));
     }

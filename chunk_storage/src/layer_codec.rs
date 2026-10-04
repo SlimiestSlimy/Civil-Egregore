@@ -48,6 +48,16 @@ impl LayerCodec {
         self.stream.words()
     }
 
+    /// `cells` as a layer's words: encoded, or none where no cell is set
+    /// -- a type with no cell set has no layer.
+    pub fn encode_layer(&mut self, cells: &CellWords) -> &[u64] {
+        if cells.iter().all(|&word| word == 0) {
+            &[]
+        } else {
+            self.encode(cells)
+        }
+    }
+
     /// Decodes the bitmap whose encoding starts at `words` into `cells`,
     /// whatever they held before. What follows the encoding in `words`
     /// -- other bitmaps, say -- is read past, not decoded.

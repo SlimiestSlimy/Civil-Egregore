@@ -40,14 +40,6 @@ pub fn decode_state(words: &[u64], now: u64, entities: &mut Entities) -> Result<
     read(words, |header, attributes| entities.queue_put(Header { wake: header.wake.max(now), ..header }, attributes))
 }
 
-/// Whether the state file `words` holds an entity of one of `kinds`: or
-/// what is wrong with it.
-pub fn holds_any(words: &[u64], kinds: &[EntityType]) -> Result<bool, &'static str> {
-    let mut found = false;
-    read(words, |header, _| found |= kinds.contains(&header.kind))?;
-    Ok(found)
-}
-
 /// Reads the state file `words`, each entity handed to `each` with its
 /// attributes: what it held beside them, or what is wrong with it.
 fn read(words: &[u64], mut each: impl FnMut(Header, &[Attribute])) -> Result<SavedState, &'static str> {
@@ -69,8 +61,8 @@ fn read(words: &[u64], mut each: impl FnMut(Header, &[Attribute])) -> Result<Sav
     Ok(SavedState { random: (has_random == 1).then_some(random), entities: count as usize })
 }
 
-/// How many entities the state file `words` holds: none if it is not
-/// one.
-pub fn entity_count(words: &[u64]) -> usize {
-    read(words, |_, _| {}).map_or(0, |state| state.entities)
+/// How many entities the state file `words` holds, every one read: or
+/// what is wrong with it.
+pub fn entity_count(words: &[u64]) -> Result<usize, &'static str> {
+    read(words, |_, _| {}).map(|state| state.entities)
 }
