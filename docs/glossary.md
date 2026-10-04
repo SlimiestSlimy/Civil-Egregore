@@ -78,7 +78,6 @@ what they always do and are not listed.
 | **floor** | a chunk's lowest height, 16 bits: what its cells' bytes are counted from | height map | chunk height, base |
 | **tall chunk** | a chunk whose heights span more than 255: kept whole, 16 bits a cell, after the bytes | height map, floor | |
 | **rise** | how far the land stands over the lowest ground: noise many superchunks broad and far higher than a hill (`terrain::rise`) | height, shape | continent |
-| **still level** | the height a chunk's still water stands at: one for the whole chunk | water | water level (the lab's slider: the level over the land) |
 | **layer codec** | encodes a layer for an image, and decodes it back, by Tessera (`LayerCodec`) | Tessera | |
 | **encoded layer** | a layer's bitmap as Tessera encodes it: what images and the writeback ring hold | layer codec, image | bitmap (a bitmap is decoded) |
 | **layer table** | a chunk's list in an image of its layers' types and where their encoded layers start | image | bitmap table |
