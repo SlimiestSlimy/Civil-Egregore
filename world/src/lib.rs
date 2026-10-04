@@ -16,7 +16,7 @@ pub mod halos;
 mod tick;
 pub mod transient_data;
 
-pub use halos::{HaloChange, HALO_KEEPERS, WARM_TICKS};
+pub use halos::{HaloChange, COOL_TICKS, HALO_KEEPERS, WARM_TICKS};
 pub use tick::{tick_rules, TickCounts, WorldTick};
 
 use background::{Background, Ticket};
@@ -70,6 +70,9 @@ pub struct World {
     background: Background,
     /// The superchunks warming, sorted ([`halos`]).
     warming: Vec<halos::Warming>,
+    /// The hot superchunks cooling, sorted, each with the tick it goes
+    /// cold at ([`halos`]).
+    cooling: Vec<(SuperchunkIndex, u64)>,
     /// The write-backs of superchunks gone cold, each with its job,
     /// being encoded in the background, in the order taken.
     writing_back: VecDeque<(SuperchunkIndex, Ticket)>,
@@ -94,6 +97,7 @@ impl World {
             cold: BTreeMap::new(),
             background: Background::new(),
             warming: Vec::new(),
+            cooling: Vec::new(),
             writing_back: VecDeque::new(),
             flushing: Vec::new(),
         }
@@ -141,7 +145,7 @@ pub(crate) fn generate_image(seed: u64, superchunk: SuperchunkIndex, codec: &mut
 /// Every dirty bitmap is written back and the ring flushed first, so
 /// the cold pool's images are the world's cells; each superchunk's
 /// state is its live one if hot, as kept if cold; and which superchunks
-/// are hot, and which warming, in the hot file.
+/// are hot, which of them cooling, and which warming, in the hot file.
 pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
     let hot = world.arena.superchunk_indices();
     world.write_back_all();
@@ -167,7 +171,7 @@ pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
         saved.superchunks += 1;
         saved.entities += count;
     }
-    saved.bytes += disk::write_hot(folder, &HotSuperchunks { hot, warming: world.warming().collect() })?;
+    saved.bytes += disk::write_hot(folder, &HotSuperchunks { hot, cooling: world.cooling().collect(), warming: world.warming().collect() })?;
     // The world's file last: a save cut short leaves the one before it.
     saved.bytes += disk::write_world(folder, &WorldInfo { tick: world.entities.now(), ..world.info.clone() })?;
     Ok(saved)
@@ -175,9 +179,9 @@ pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
 
 /// Loads the world saved in `folder`: every superchunk's image into the
 /// cold pool and its state kept as a cold one's; then the superchunks
-/// hot when it was saved made hot, before it ticks, and those warming
-/// warming again, each to turn hot when it was to -- as it was when
-/// saved, to the cell and the random number.
+/// hot when it was saved made hot, before it ticks, those cooling
+/// cooling again and those warming warming again, each to turn when it
+/// was to -- as it was when saved, to the cell and the random number.
 pub fn load(folder: &Path) -> Result<World, DiskError> {
     let info = disk::read_world(folder)?;
     let hot = disk::read_hot(folder)?;
@@ -191,6 +195,7 @@ pub fn load(folder: &Path) -> Result<World, DiskError> {
         world.cold.insert(superchunk, words);
     }
     world.keep_hot(&hot.hot);
+    world.cooling = hot.cooling;
     for (superchunk, due) in hot.warming {
         world.start_warming(superchunk, due);
     }

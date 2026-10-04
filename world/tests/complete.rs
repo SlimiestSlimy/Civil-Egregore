@@ -9,14 +9,14 @@ use world::{transient_data, World};
 
 /// Every hot cell, every entity with its attributes, the tick, every
 /// random stream, every cold superchunk's kept state, and the
-/// superchunks warming with when each is due.
-type Everything = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, u64, Vec<(coordinates::SuperchunkIndex, u64)>, Vec<Vec<u64>>, Vec<(coordinates::SuperchunkIndex, u64)>);
+/// superchunks warming and cooling with when each is due.
+type Everything = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, u64, Vec<(coordinates::SuperchunkIndex, u64)>, Vec<Vec<u64>>, Vec<(coordinates::SuperchunkIndex, u64)>, Vec<(coordinates::SuperchunkIndex, u64)>);
 
 /// [`Everything`] `world` holds.
 fn everything(world: &World) -> Everything {
     let cells = [DIRT, GRASS].into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.cells().to_vec()).collect();
     let all = world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
-    (cells, all, world.entities.now(), world.simulation.random_states().collect(), world.cold.values().cloned().collect(), world.warming().collect())
+    (cells, all, world.entities.now(), world.simulation.random_states().collect(), world.cold.values().cloned().collect(), world.warming().collect(), world.cooling().collect())
 }
 
 /// A world run 30,000 ticks straight, and the same world saved and

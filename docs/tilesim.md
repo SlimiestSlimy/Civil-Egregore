@@ -103,7 +103,7 @@ The ring is cold writeback only: it is never read to make a bitmap
 hot. A bitmap with an entry in the ring is still in the bitplanes: an
 evicted bitmap's bucket stays allocated until its superchunk is
 flushed, and one made hot again before then is the bucket as it was --
-a superchunk gone cold as a whole likewise, cooling.
+a superchunk gone cold as a whole likewise, lingering.
 
 The ring is a sponge for writes into the cold pool. A superchunk is
 sequential even in memory, so changing one bitmap in place would mean

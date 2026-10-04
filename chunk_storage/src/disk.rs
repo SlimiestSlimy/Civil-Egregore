@@ -1,6 +1,6 @@
 //! The world on disk: a folder. Its `world` file says what the world
-//! is, in text; its `hot` file which superchunks were hot, and which
-//! warming, also in text; `superchunks/` holds two files a superchunk, each named
+//! is, in text; its `hot` file which superchunks were hot, which of them
+//! cooling, and which warming, also in text; `superchunks/` holds two files a superchunk, each named
 //! by its superchunk index -- 44 bits, in hexadecimal: `.image`, its cells,
 //! the image as the cold pool holds it, and `.state`, words that are whoever
 //! ticks the world's to make sense of -- its random numbers, its
@@ -203,25 +203,34 @@ impl WorldInfo {
 }
 
 /// The hot file's first line: what the file is, and its format's number.
-const HOT_FIRST_LINE: &str = "tilesim hot 1";
+const HOT_FIRST_LINE: &str = "tilesim hot 2";
 
 /// Which superchunks a world had hot when saved: made hot again as it is
 /// loaded, before it ticks. A line a superchunk, its index in
-/// hexadecimal; one warming followed by the tick it turns hot at.
+/// hexadecimal: alone if hot, followed by `cools` and the tick it goes
+/// cold at if hot and cooling, by `warms` and the tick it turns hot at
+/// if warming.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct HotSuperchunks {
     /// The hot superchunks, sorted.
     pub hot: Vec<SuperchunkIndex>,
-    /// The superchunks warming, sorted, each with the tick it
-    /// turns hot at.
+    /// The hot superchunks cooling, sorted, each with the tick it goes
+    /// cold at.
+    pub cooling: Vec<(SuperchunkIndex, u64)>,
+    /// The superchunks warming, sorted, each with the tick it turns hot
+    /// at.
     pub warming: Vec<(SuperchunkIndex, u64)>,
 }
 
 impl HotSuperchunks {
     /// As the hot file holds it.
     fn to_text(&self) -> String {
-        let hot = self.hot.iter().map(|superchunk| format!("{:011x}\n", superchunk.0));
-        let warming = self.warming.iter().map(|(superchunk, tick)| format!("{:011x} {tick}\n", superchunk.0));
+        let cools = |superchunk: &SuperchunkIndex| self.cooling.binary_search_by_key(superchunk, |&(cooling, _)| cooling).ok().map(|at| self.cooling[at].1);
+        let hot = self.hot.iter().map(|superchunk| match cools(superchunk) {
+            Some(tick) => format!("{:011x} cools {tick}\n", superchunk.0),
+            None => format!("{:011x}\n", superchunk.0),
+        });
+        let warming = self.warming.iter().map(|(superchunk, tick)| format!("{:011x} warms {tick}\n", superchunk.0));
         std::iter::once(format!("{HOT_FIRST_LINE}\n")).chain(hot).chain(warming).collect()
     }
 
@@ -233,16 +242,26 @@ impl HotSuperchunks {
         }
         let mut read = Self::default();
         for line in lines.filter(|line| !line.trim().is_empty()) {
-            let wrong = || format!("`{line}` is not a superchunk index, and maybe a tick");
+            let wrong = || format!("`{line}` is not a superchunk index, and maybe `cools` or `warms` and a tick");
             let mut words = line.split_whitespace();
             let superchunk = SuperchunkIndex(u64::from_str_radix(words.next().ok_or_else(wrong)?, 16).map_err(|_| wrong())?);
-            match (words.next(), words.next()) {
-                (None, _) => read.hot.push(superchunk),
-                (Some(tick), None) => read.warming.push((superchunk, tick.parse().map_err(|_| wrong())?)),
-                _ => return Err(wrong()),
+            let (turns, tick) = (words.next(), words.next());
+            let tick = || tick.and_then(|tick| tick.parse().ok()).ok_or_else(wrong);
+            match turns {
+                None => read.hot.push(superchunk),
+                Some("cools") => {
+                    read.hot.push(superchunk);
+                    read.cooling.push((superchunk, tick()?));
+                }
+                Some("warms") => read.warming.push((superchunk, tick()?)),
+                Some(_) => return Err(wrong()),
+            }
+            if words.next().is_some() {
+                return Err(wrong());
             }
         }
         read.hot.sort_unstable();
+        read.cooling.sort_unstable();
         read.warming.sort_unstable();
         Ok(read)
     }

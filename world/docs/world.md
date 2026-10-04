@@ -35,8 +35,12 @@ tick -- encoding, generating and decoding are the background's
 (`src/background.rs`): threads, one a core, each with its own codec,
 asleep while there is nothing to do.
 
-- **Going cold** is at once. A superchunk no halo reaches has its
-  state kept, and its bitmaps set aside, cooling
+- **Going cold** takes `COOL_TICKS` (256) ticks: a hot superchunk no
+  halo reaches is **cooling**, hot still -- ticked, read and written
+  like any other -- so a keeper stepping back and forth over an edge
+  does not make the superchunks behind it flicker cold and hot. A halo
+  reaching it again, it just stays hot. At the tick it is due it goes
+  cold: its state kept, and its bitmaps set aside, lingering
   (`BitmapArena::make_cold_superchunk`); its changed bitmaps, copied
   out, are encoded in the background and put into the writeback ring
   in the order they went cold. The ring flushes them when it needs the
@@ -44,10 +48,10 @@ asleep while there is nothing to do.
   background: the changes taken out of the ring, and the image
   rewritten with them on another thread (`Job::Flush`), a superchunk's
   flushes one after another. The newest cells are always on the hot
-  side: its bitmaps, hot or cooling, are held until the image holding
+  side: its bitmaps, hot or lingering, are held until the image holding
   their changes is in the cold pool, and only then let go.
 - **Coming hot** takes `WARM_TICKS` (256) ticks: the superchunk is
-  **warming**. Cooling still, it is held, to be made hot as it is,
+  **warming**. Lingering still, it is held, to be made hot as it is,
   nothing decoded; else its image -- generated first, if it was never
   made -- is decoded in the background. It turns hot at the tick it
   is due, its entities put back and its random numbers taken up,
@@ -55,9 +59,11 @@ asleep while there is nothing to do.
   same however fast the background is. Until then, to the simulation,
   it is a cold superchunk like any other: not ticked or read, writes
   to it missed, entities sent to it staying where they stood, its own
-  entities and random numbers kept cold. So is one cooling. Warming
-  and cooling are the world's bookkeeping, not the simulation's. A
-  keeper reaches a superchunk its halo has just reached no sooner than
+  entities and random numbers kept cold. A superchunk lingering is
+  cold the same way: lingering is only the arena keeping its bitmaps.
+  Cooling, warming and lingering are the world's bookkeeping, not the
+  simulation's: to it one cooling is hot, one warming or lingering
+  cold. A keeper reaches a superchunk its halo has just reached no sooner than
   it crosses its own -- 1,024 cells, a step every 64 ticks or more --
   so long after it has turned hot. A superchunk no halo wants any more
   stops warming. 256 ticks is short of what generating a superchunk
@@ -65,9 +71,11 @@ asleep while there is nothing to do.
   the tick waits for a superchunk generated: a stall taken for halos
   that follow their keepers closely.
 
-So between ticks the superchunks hot or warming are the halos,
-exactly, never both (`tests/fast/halos.rs`); a superchunk warming
-takes no write and no entity until it is due; and a superchunk gone
+So between ticks the superchunks hot and not cooling, or warming, are
+the halos, exactly, never both (`tests/fast/halos.rs`); a superchunk
+warming takes no write and no entity until it is due; one cooling
+stays hot until it is due, and for good if a halo reaches it again
+before; and a superchunk gone
 cold comes back as it was, to the cell, the entity and the random
 number.
 
@@ -95,7 +103,7 @@ A save is a folder (`chunk_storage::disk`, and
 | file | what it holds |
 |---|---|
 | `world` | text: the world's name, its seed, the tick it is at, its layer types |
-| `hot` | text: the hot superchunks, a line each, and the warming ones, each with the tick it turns hot at |
+| `hot` | text: the hot superchunks, a line each, those cooling with the tick each goes cold at, and the warming ones with the tick each turns hot at |
 | `superchunks/<index>.image` | a superchunk's cells and heights: its image, as the cold pool holds it |
 | `superchunks/<index>.state` | its random stream's state, its entities with their attributes |
 
@@ -117,8 +125,8 @@ hot file names, decoded on all the background's threads: every layer
 type of the world made hot on every chunk of them -- a type with no
 cell left on a superchunk has no stored layer, and must be hot all the
 same to be written to -- their entities put back at the world's tick,
-their random numbers taken up. The warming ones start warming again,
-each to turn hot at the tick it was to.
+their random numbers taken up. The cooling ones cool again, and the
+warming ones warm again, each to turn at the tick it was to.
 
 **A world loaded goes on as the one saved would have**, to the cell,
 the entity and the random number (`tests/world.rs`: 1,500 ticks,
@@ -139,7 +147,8 @@ to tick 4,000: the same cells, entities and random numbers). What makes it so:
 - **Nothing is half done between ticks**: a crossing is settled
   within its tick, so a save holds each entity once, on one cell.
 - **A superchunk turns hot at a tick fixed when a halo reaches it**,
-  not when the background is done, and the hot file keeps that tick.
+  not when the background is done, and cold at a tick fixed when the
+  halos leave it; the hot file keeps both.
 - An entity whose wake has passed when it is put back -- kept while
   its superchunk was cold -- wakes the tick it is put back.
 
@@ -159,5 +168,5 @@ save's folder.
 | `src/tick.rs` | the tick of every rule and entity, then the halos moved |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; frames; the diagnostics tool |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
-| `tests/` | the halos follow their keepers; a superchunk warming takes nothing until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; the files; refusals |
+| `tests/` | the halos follow their keepers; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; the files; refusals |
 | `docs/` | this, and the reference, function by function |

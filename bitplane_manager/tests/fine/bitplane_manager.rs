@@ -207,11 +207,11 @@ fn evicted_bitmaps_wait_for_the_ring() {
 }
 
 /// A superchunk made cold as a whole hands back its changed bitmaps to
-/// encode, and is set aside, cooling: not hot, it is let go once its
+/// encode, and is set aside, lingering: not hot, it is let go once its
 /// changes are flushed -- unless held, wanted hot again, when it is made
 /// hot as it was; let go, it is decoded from the cold pool.
 #[test]
-fn a_superchunk_cooling_waits_for_its_changes() {
+fn a_superchunk_lingering_waits_for_its_changes() {
     let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
     let mut storage = ChunkStorage::new(1 << 12);
     let key = BucketKey { layer_type: LayerType(1), chunk: ChunkIndex::of(WORLD_MIDDLE, 9) };
@@ -221,25 +221,25 @@ fn a_superchunk_cooling_waits_for_its_changes() {
 
     let dirty = arena.make_cold_superchunk(WORLD_MIDDLE);
     assert_eq!(dirty.iter().map(|(key, cells)| (*key, **cells)).collect::<Vec<_>>(), vec![(key, one_cell(CELL))], "its one change, to encode");
-    assert_eq!((arena.len(), arena.cooling()), (0, 1), "cold, cooling");
+    assert_eq!((arena.len(), arena.lingering()), (0, 1), "cold, lingering");
     assert_eq!(arena.holds(LayerType(1), cell), Err(NotHot(key)));
     storage.flush_all(&mut flushed);
     arena.flushed(&flushed);
-    assert_eq!(arena.cooling(), 1, "its change on its way: kept");
+    assert_eq!(arena.lingering(), 1, "its change on its way: kept");
 
     for (key, cells) in &dirty {
         assert!(storage.try_write_back(key.chunk, key.layer_type, codec.encode_layer(cells)));
     }
     arena.written_back(WORLD_MIDDLE, dirty.iter().map(|(key, _)| *key));
-    assert!(arena.hold(WORLD_MIDDLE), "cooling, so held");
+    assert!(arena.hold(WORLD_MIDDLE), "lingering, so held");
     storage.flush_all(&mut flushed);
     arena.flushed(&flushed);
-    assert_eq!(arena.cooling(), 1, "flushed, but held");
+    assert_eq!(arena.lingering(), 1, "flushed, but held");
     assert!(arena.make_hot_again(WORLD_MIDDLE));
-    assert_eq!((arena.cooling(), arena.holds(LayerType(1), cell)), (0, Ok(true)), "hot as it was");
+    assert_eq!((arena.lingering(), arena.holds(LayerType(1), cell)), (0, Ok(true)), "hot as it was");
 
     assert!(arena.make_cold_superchunk(WORLD_MIDDLE).is_empty(), "nothing changed since");
-    assert_eq!(arena.cooling(), 0, "nothing on its way or in the ring: let go at once");
+    assert_eq!(arena.lingering(), 0, "nothing on its way or in the ring: let go at once");
     assert!(!arena.make_hot_again(WORLD_MIDDLE));
     arena.make_hot(key, storage.layer(key.chunk, key.layer_type), &mut codec);
     assert_eq!(arena.holds(LayerType(1), cell), Ok(true), "decoded from the cold pool");

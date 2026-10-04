@@ -4,7 +4,7 @@
 //! The bitplane manager decodes layers from the cold pool, and writes
 //! the ones it changed back into the ring, encoded. The ring is never
 //! read to make a layer hot: a layer with an entry in the ring is still
-//! held in the bitmap arena, hot or cooling. When the ring is full, the
+//! held in the bitmap arena, hot or lingering. When the ring is full, the
 //! superchunk at its tail is flushed: its image rewritten once with all
 //! its entries, and those entries freed. The bitmap arena is told which
 //! superchunks were flushed, since only then may it drop their evicted

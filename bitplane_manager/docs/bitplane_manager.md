@@ -60,11 +60,11 @@ once. A bucket waiting is held until storage says its superchunk's
 image holds every change of it (`flushed`), however long the flush
 takes, wherever it is done.
 
-## Cooling
+## Lingering
 
 A superchunk is made cold as a whole at once (`make_cold_superchunk`):
 nothing encoded or flushed, its dirty buckets taken and handed back to
-be encoded, and its allocations set aside as they are, **cooling** --
+be encoded, and its allocations set aside as they are, **lingering** --
 no longer hot, so the simulation neither reads nor ticks it, writes to
 it are missed, and the directory stays the hot superchunks exactly.
 It is let go, its blocks back in the pool, once storage holds its

@@ -68,8 +68,9 @@ done with it.
 A world is a folder (`disk.rs`): `world`, text, a line a thing --
 `name`, `seed`, `tick`, `layers` -- under a first line saying what it
 is; `hot`, text, which superchunks were hot (`HotSuperchunks`), a line
-each, its index in hexadecimal -- one warming followed by the tick it
-turns hot at -- under a first line likewise; and `superchunks/`, two files a superchunk, named by its Morton
+each, its index in hexadecimal -- one cooling followed by `cools` and
+the tick it goes cold at, one warming by `warms` and the tick it turns
+hot at -- under a first line likewise; and `superchunks/`, two files a superchunk, named by its Morton
 index in 11 hexadecimal digits. `.image` is its image, word for word,
 checked when read (`from_words`). `.state` is words storage does not
 look into: whoever ticks the world keeps there what moves on the

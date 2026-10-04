@@ -45,7 +45,7 @@
 //!
 //! A superchunk made cold as a whole ([`BitmapArena::make_cold_superchunk`])
 //! leaves the directory at once, nothing encoded or flushed: its
-//! allocations are set aside, cooling, until chunk storage holds its
+//! allocations are set aside, lingering, until chunk storage holds its
 //! changes -- made hot again as they are if wanted before then.
 
 //! The design: `docs/bitplane_manager.md`; function by function:
@@ -578,14 +578,14 @@ impl Lookup {
 /// until chunk storage holds its changes, or for as long as it is
 /// wanted hot again, when it is made hot as it is, nothing decoded
 /// ([`BitmapArena::make_hot_again`]).
-struct Cooling {
+struct Lingering {
     /// The superchunk, as it was when it went cold.
     superchunk: Superchunk,
     /// Whether it is wanted hot again: kept until it is.
     wanted: bool,
 }
 
-impl Cooling {
+impl Lingering {
     /// Whether it can be let go: unwanted, and every change of it in
     /// chunk storage's cold pool -- none on its way, none in the ring.
     fn done(&self) -> bool {
@@ -600,7 +600,7 @@ pub struct BitmapArena {
     directory: Vec<Superchunk>,
     /// The superchunks gone cold whose allocations are kept, sorted by
     /// superchunk index.
-    cooling: Vec<Cooling>,
+    lingering: Vec<Lingering>,
     /// The arena's own lookups, remembering the last.
     lookup: Lookup,
     /// The blocks the allocations live in, taken and given back.
@@ -619,7 +619,7 @@ impl Default for BitmapArena {
 impl BitmapArena {
     /// An arena with no bitmap hot.
     pub fn new() -> Self {
-        Self { directory: Vec::new(), cooling: Vec::new(), lookup: Lookup::default(), block_pool: BlockPool::new(ALLOCATION_WORDS), queued: WriteQueues::default() }
+        Self { directory: Vec::new(), lingering: Vec::new(), lookup: Lookup::default(), block_pool: BlockPool::new(ALLOCATION_WORDS), queued: WriteQueues::default() }
     }
 
     /// Every allocation in use, superchunk by superchunk in Morton order,
@@ -746,60 +746,60 @@ impl BitmapArena {
     /// encoded or flushed: its dirty buckets taken
     /// ([`BitmapArena::take_dirty`]) and returned, to be encoded and
     /// [`BitmapArena::written_back`]; its allocations set aside as they
-    /// are, cooling, until chunk storage holds its changes -- and so
+    /// are, lingering, until chunk storage holds its changes -- and so
     /// longer, if it is wanted hot again ([`BitmapArena::hold`]).
     pub fn make_cold_superchunk(&mut self, superchunk: SuperchunkIndex) -> Vec<(BucketKey, Box<CellWords>)> {
         let dirty = self.take_dirty(superchunk);
         if let Ok(entry) = self.lookup.superchunk(&self.directory, superchunk) {
-            let cooling = Cooling { superchunk: self.directory.remove(entry), wanted: false };
-            let at = self.cooling_at(superchunk).expect_err("hot, so not cooling");
-            self.cooling.insert(at, cooling);
+            let lingering = Lingering { superchunk: self.directory.remove(entry), wanted: false };
+            let at = self.lingering_at(superchunk).expect_err("hot, so not lingering");
+            self.lingering.insert(at, lingering);
             self.lookup.forget();
             self.release_unused();
         }
         dirty
     }
 
-    /// Where `superchunk` is among the cooling, or would go.
-    fn cooling_at(&self, superchunk: SuperchunkIndex) -> Result<usize, usize> {
-        self.cooling.binary_search_by_key(&superchunk, |cooling| cooling.superchunk.index)
+    /// Where `superchunk` is among the lingering, or would go.
+    fn lingering_at(&self, superchunk: SuperchunkIndex) -> Result<usize, usize> {
+        self.lingering.binary_search_by_key(&superchunk, |lingering| lingering.superchunk.index)
     }
 
-    /// Wants `superchunk` hot again: if it is cooling, it is kept, to be
+    /// Wants `superchunk` hot again: if it is lingering, it is kept, to be
     /// made hot as it is ([`BitmapArena::make_hot_again`]). Whether it is.
     pub fn hold(&mut self, superchunk: SuperchunkIndex) -> bool {
-        let Ok(at) = self.cooling_at(superchunk) else {
+        let Ok(at) = self.lingering_at(superchunk) else {
             return false;
         };
-        self.cooling[at].wanted = true;
+        self.lingering[at].wanted = true;
         true
     }
 
     /// No longer wants `superchunk` hot again ([`BitmapArena::hold`]
-    /// undone): cooling, it is let go once chunk storage holds its
+    /// undone): lingering, it is let go once chunk storage holds its
     /// changes.
     pub fn let_go(&mut self, superchunk: SuperchunkIndex) {
-        if let Ok(at) = self.cooling_at(superchunk) {
-            self.cooling[at].wanted = false;
+        if let Ok(at) = self.lingering_at(superchunk) {
+            self.lingering[at].wanted = false;
             self.release_unused();
         }
     }
 
-    /// Makes `superchunk` hot again as it went cold, if it is cooling:
+    /// Makes `superchunk` hot again as it went cold, if it is lingering:
     /// whether it was.
     pub fn make_hot_again(&mut self, superchunk: SuperchunkIndex) -> bool {
-        let Ok(at) = self.cooling_at(superchunk) else {
+        let Ok(at) = self.lingering_at(superchunk) else {
             return false;
         };
-        let entry = self.lookup.superchunk(&self.directory, superchunk).expect_err("cooling, so not hot");
-        self.directory.insert(entry, self.cooling.remove(at).superchunk);
+        let entry = self.lookup.superchunk(&self.directory, superchunk).expect_err("lingering, so not hot");
+        self.directory.insert(entry, self.lingering.remove(at).superchunk);
         self.lookup.forget();
         true
     }
 
-    /// How many superchunks are cooling.
-    pub fn cooling(&self) -> usize {
-        self.cooling.len()
+    /// How many superchunks are lingering.
+    pub fn lingering(&self) -> usize {
+        self.lingering.len()
     }
 
     /// How many cells of `layer_type` are set over `superchunk`, in its
@@ -892,7 +892,7 @@ impl BitmapArena {
     /// waiting there -- held until storage tells they were flushed
     /// ([`BitmapArena::flushed`]) -- and one write-back fewer on its way.
     pub fn written_back(&mut self, superchunk: SuperchunkIndex, keys: impl Iterator<Item = BucketKey>) {
-        let entry = self.entry_mut(superchunk).expect("a superchunk written back is hot or cooling");
+        let entry = self.entry_mut(superchunk).expect("a superchunk written back is hot or lingering");
         for key in keys {
             let layer = entry.layer_index(key.layer_type).expect("a layer written back is in use");
             put(&mut entry.layers[layer].flags.in_ring, key.chunk.place(), true);
@@ -921,11 +921,11 @@ impl BitmapArena {
         dirty.len()
     }
 
-    /// `superchunk`, hot or cooling, to change.
+    /// `superchunk`, hot or lingering, to change.
     fn entry_mut(&mut self, superchunk: SuperchunkIndex) -> Option<&mut Superchunk> {
         match self.lookup.superchunk(&self.directory, superchunk) {
             Ok(entry) => Some(&mut self.directory[entry]),
-            Err(_) => self.cooling_at(superchunk).ok().map(|at| &mut self.cooling[at].superchunk),
+            Err(_) => self.lingering_at(superchunk).ok().map(|at| &mut self.lingering[at].superchunk),
         }
     }
 
@@ -947,10 +947,10 @@ impl BitmapArena {
 
     /// Releases every allocation with no bucket hot or waiting in the
     /// ring, its block back in the block pool, every superchunk left with
-    /// none, and every cooling superchunk done with.
+    /// none, and every lingering superchunk done with.
     fn release_unused(&mut self) {
         let block_pool = &mut self.block_pool;
-        for done in self.cooling.extract_if(.., |cooling| cooling.done()) {
+        for done in self.lingering.extract_if(.., |lingering| lingering.done()) {
             done.superchunk.layers.into_iter().for_each(|allocation| block_pool.release(allocation.block));
         }
         for entry in &mut self.directory {

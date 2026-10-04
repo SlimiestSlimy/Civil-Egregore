@@ -9,22 +9,26 @@
 //! nothing slow is done on the tick: the background
 //! ([`crate::background`]) does it.
 //!
-//! - A superchunk no halo reaches goes cold at once: its state kept, its
-//!   bitmaps set aside, cooling, and its changed ones encoded in the
-//!   background, then put into the writeback ring, which flushes them
-//!   when it needs the room: the image rewritten in the background,
-//!   the bitmaps held until it is in the cold pool.
+//! - A hot superchunk no halo reaches is **cooling** for [`COOL_TICKS`]
+//!   ticks: hot still, so a keeper stepping back and forth over a
+//!   superchunk's edge does not make the superchunks about it flicker
+//!   cold and hot. Should a halo reach it again, it stays hot; else it
+//!   goes cold at the tick it is due: its state kept, its bitmaps set
+//!   aside, lingering, and its changed ones encoded in the background,
+//!   then put into the writeback ring, which flushes them when it needs
+//!   the room: the image rewritten in the background, the bitmaps held
+//!   until it is in the cold pool.
 //! - A superchunk a halo reaches, not hot, is **warming** for
-//!   [`WARM_TICKS`] ticks: cooling, it is kept to be made hot as it is;
+//!   [`WARM_TICKS`] ticks: lingering, it is kept to be made hot as it is;
 //!   else its image -- generated, if it was never made -- is decoded in
 //!   the background. It turns hot at the tick it is due, waiting for the
 //!   background if need be, so the world is the same however fast the
 //!   background is. Until then it is, to the simulation, cold like any
 //!   other: writes to it are missed, and entities sent to it stay where
-//!   they stood. So is a superchunk cooling.
+//!   they stood. So is a superchunk lingering.
 //!
 //! So between ticks the hot superchunks are the halos less those
-//! warming.
+//! warming, and besides them those cooling.
 
 use crate::background::{Done, Job, Ticket};
 use crate::World;
@@ -47,6 +51,11 @@ pub const HALO_KEEPERS: [EntityType; 1] = [SHEEP];
 /// long after.
 pub const WARM_TICKS: u64 = 256;
 
+/// Ticks a hot superchunk no halo reaches is cooling before it goes
+/// cold: as long as one warming takes, so a keeper stepping back over
+/// the edge it just crossed finds the superchunks behind it still hot.
+pub const COOL_TICKS: u64 = 256;
+
 /// What moving the halos did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct HaloChange {
@@ -54,7 +63,7 @@ pub struct HaloChange {
     pub reached: usize,
     /// Superchunks made hot for the first time: generated.
     pub generated: usize,
-    /// Superchunks made hot again, as they were: cooling, or from storage.
+    /// Superchunks made hot again, as they were: lingering, or from storage.
     pub restored: usize,
     /// Superchunks gone cold.
     pub cooled: usize,
@@ -84,8 +93,8 @@ pub(crate) struct Warming {
 /// Where a warming superchunk's cells come from.
 #[derive(Clone, Copy, Debug)]
 enum WarmedFrom {
-    /// Its bitmaps, cooling: made hot as they are.
-    Cooling,
+    /// Its bitmaps, lingering: made hot as they are.
+    Lingering,
     /// The background, decoding its image: the job's ticket.
     Background(Ticket),
 }
@@ -106,20 +115,21 @@ impl World {
     }
 
     /// Moves the halos to where their keepers stand: the superchunks
-    /// they reach warming, hot [`WARM_TICKS`] on; the rest cold.
+    /// they reach warming, hot [`WARM_TICKS`] on; the rest cooling, cold
+    /// [`COOL_TICKS`] on.
     pub fn move_halos(&mut self) -> HaloChange {
         let wanted = about(self.keepers());
-        self.make_hot_within(&wanted, WARM_TICKS)
+        self.make_hot_within(&wanted, WARM_TICKS, COOL_TICKS)
     }
 
     /// Makes `wanted` -- sorted -- the hot superchunks now: every other
     /// one made cold, its state kept; every one of them not hot made
-    /// hot, cooling, from storage and its kept state, or generated --
+    /// hot, lingering, from storage and its kept state, or generated --
     /// those from the background made at once, on all its threads.
     /// What generating and loading start from; between two ticks,
     /// anything else needing superchunks hot a while may ask too.
     pub fn keep_hot(&mut self, wanted: &[SuperchunkIndex]) -> HaloChange {
-        self.make_hot_within(wanted, 0)
+        self.make_hot_within(wanted, 0, 0)
     }
 
     /// The superchunks warming, each with the tick it turns hot at.
@@ -127,15 +137,29 @@ impl World {
         self.warming.iter().map(|warming| (warming.superchunk, warming.due))
     }
 
+    /// The hot superchunks cooling, each with the tick it goes cold at.
+    pub fn cooling(&self) -> impl Iterator<Item = (SuperchunkIndex, u64)> + '_ {
+        self.cooling.iter().copied()
+    }
+
     /// Makes `wanted` -- sorted -- the superchunks hot or warming, each
-    /// warming hot within `ticks`: every other one made cold, or no
-    /// longer warming; then every one due made hot.
-    fn make_hot_within(&mut self, wanted: &[SuperchunkIndex], ticks: u64) -> HaloChange {
+    /// warming hot within `warm_ticks`, each other one hot cold within
+    /// `cool_ticks`: those no longer wanted no longer warming, and those
+    /// wanted again no longer cooling; then every one due made hot, or
+    /// cold.
+    fn make_hot_within(&mut self, wanted: &[SuperchunkIndex], warm_ticks: u64, cool_ticks: u64) -> HaloChange {
         self.land_write_backs(false);
         let (now, mut change) = (self.entities.now(), HaloChange::default());
         let hot = self.arena.superchunk_indices();
-        let random: Vec<(SuperchunkIndex, u64)> = self.simulation.random_states().collect();
+        self.cooling.retain(|(superchunk, _)| wanted.binary_search(superchunk).is_err());
+        self.cooling.iter_mut().for_each(|(_, due)| *due = (*due).min(now + cool_ticks));
         for &superchunk in hot.iter().filter(|superchunk| wanted.binary_search(superchunk).is_err()) {
+            if let Err(at) = self.cooling.binary_search_by_key(&superchunk, |&(cooling, _)| cooling) {
+                self.cooling.insert(at, (superchunk, now + cool_ticks));
+            }
+        }
+        let random: Vec<(SuperchunkIndex, u64)> = self.simulation.random_states().collect();
+        for (superchunk, _) in self.cooling.extract_if(.., |&mut (_, due)| due <= now) {
             let state = random.binary_search_by_key(&superchunk, |state| state.0).ok().map(|at| random[at].1);
             self.cold.insert(superchunk, saved::encode_state(state, self.entities.superchunk(superchunk)).0);
             let dirty = self.arena.make_cold_superchunk(superchunk);
@@ -146,14 +170,14 @@ impl World {
         }
         for unwanted in self.warming.extract_if(.., |warming| wanted.binary_search(&warming.superchunk).is_err()) {
             match unwanted.from {
-                WarmedFrom::Cooling => self.arena.let_go(unwanted.superchunk),
+                WarmedFrom::Lingering => self.arena.let_go(unwanted.superchunk),
                 WarmedFrom::Background(ticket) => self.background.forget(ticket),
             }
         }
-        self.warming.iter_mut().for_each(|warming| warming.due = warming.due.min(now + ticks));
+        self.warming.iter_mut().for_each(|warming| warming.due = warming.due.min(now + warm_ticks));
         for &superchunk in wanted.iter().filter(|superchunk| hot.binary_search(superchunk).is_err()) {
             if self.warming.binary_search_by_key(&superchunk, |warming| warming.superchunk).is_err() {
-                self.start_warming(superchunk, now + ticks);
+                self.start_warming(superchunk, now + warm_ticks);
                 change.reached += 1;
             }
         }
@@ -184,10 +208,10 @@ impl World {
     }
 
     /// Starts warming `superchunk`, to turn hot at tick `due`: kept as
-    /// it is if it is cooling, else sent to the background.
+    /// it is if it is lingering, else sent to the background.
     pub(crate) fn start_warming(&mut self, superchunk: SuperchunkIndex, due: u64) {
         let from = if self.arena.hold(superchunk) {
-            WarmedFrom::Cooling
+            WarmedFrom::Lingering
         } else {
             let job = Job::Warm { superchunk, image: self.storage.shared_image(superchunk), seed: self.info.seed, types: self.info.layers.clone() };
             WarmedFrom::Background(self.background.send(job))
@@ -201,7 +225,7 @@ impl World {
     /// `change`.
     fn finish_warming(&mut self, warming: &Warming, change: &mut HaloChange) {
         match warming.from {
-            WarmedFrom::Cooling => {
+            WarmedFrom::Lingering => {
                 self.arena.make_hot_again(warming.superchunk);
                 change.restored += 1;
             }
@@ -248,7 +272,7 @@ impl World {
     /// Takes the changes of the superchunk at the ring's tail out of it,
     /// to rewrite its image in the background -- its flush before, if
     /// still on its way, put in the cold pool first, so each rewrites the
-    /// image the one before made. Its buckets, hot or cooling, hold its
+    /// image the one before made. Its buckets, hot or lingering, hold its
     /// newest cells until the image is in ([`World::land_flushes`]).
     fn flush_tail(&mut self) {
         let superchunk = self.storage.tail_superchunk().expect("a full ring has a tail");
