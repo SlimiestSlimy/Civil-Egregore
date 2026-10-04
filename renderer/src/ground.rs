@@ -16,7 +16,7 @@
 
 use coordinates::SUPERCHUNK_SIDE_CELLS;
 use chunk_storage::Height;
-use terrain::polygons::Lands;
+use terrain::mesh::Lands;
 use terrain::{wall, Shape};
 
 /// Cells along a superchunk's side.

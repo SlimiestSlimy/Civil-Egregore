@@ -33,7 +33,7 @@
 //! | `B` | show the superchunks' boundaries, or not, and near enough each one's Morton index and `(x, y)` |
 //! | `C` | the same of the chunks |
 //! | `H` | show every cell's height, from near enough to read them |
-//! | `P` | draw the polygons' borders over the map |
+//! | `P` | draw the mesh's lines over the map |
 //! | `U` | the next page of sliders, or none: the near view's shading, and in the lab how the world is generated |
 
 // Every item is documented, private ones included; `cargo clippy`
@@ -226,7 +226,7 @@ struct MapLink {
     maps: Mutex<Receiver<map::Drawn>>,
     /// The last asked for.
     asked: Option<map::Wanted>,
-    /// Whether the polygons' borders are drawn over the map.
+    /// Whether the mesh's lines are drawn over the map.
     borders: bool,
 }
 
@@ -827,7 +827,7 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         pixels => format!("a cell {pixels} pixels a side"),
     };
     text.0 = format!(
-        "seed {:016x}   ocean at {}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   P: polygons (on the map)   U: sliders",
+        "seed {:016x}   ocean at {}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   P: lines (on the map)   U: sliders",
         lab::seed(),
         lab::generation().shape.ocean,
         grouped(seen.tick),

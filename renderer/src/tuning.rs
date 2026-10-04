@@ -54,60 +54,58 @@ pub const TEXTURE: usize = 7;
 pub const OCEAN_FLOOR: usize = 8;
 /// The height the ocean stands at.
 pub const OCEAN_LEVEL: usize = 9;
-/// The height the highest land polygon's plain may stand at.
-pub const HIGHEST_PLAIN: usize = 10;
-/// The share of the polygons that are ocean.
+/// The height the highest land vertex may be at.
+pub const HIGHEST_LAND: usize = 10;
+/// The share of the vertices that are ocean.
 pub const OCEAN_SHARE: usize = 11;
-/// The cells along a square of the polygons' grid, as a power of two.
-pub const POLYGON_SIZE: usize = 12;
-/// The cells the narrowest polygon's ramp is across.
-pub const NARROWEST_RAMP: usize = 13;
-/// The cells the widest polygon's ramp is across.
-pub const WIDEST_RAMP: usize = 14;
-/// How hard the softest polygon's ramp is.
-pub const SOFTEST_RAMP: usize = 15;
-/// How hard the hardest polygon's ramp is.
-pub const HARDEST_RAMP: usize = 16;
-/// How far the polygons' borders are bent, beside a square's side.
-pub const BORDER_BENDING: usize = 17;
-/// The grids of smaller polygons within the land ones.
-pub const INNER_DEPTH: usize = 18;
-/// The share of the smaller polygons that raise or sink the ground.
-pub const INNER_SHARE: usize = 19;
+/// The vertices from the ocean within which land is held low.
+pub const COAST_BREADTH: usize = 12;
+/// How low land beside the ocean is held.
+pub const COAST_LOWNESS: usize = 13;
+/// How much land and ocean clump.
+pub const CLUMPING: usize = 14;
+/// The cells along a square of the vertices' grid, as a power of two.
+pub const VERTEX_SPACING: usize = 15;
+/// The cells the narrowest line's blend is across.
+pub const NARROWEST_BLEND: usize = 16;
+/// The cells the widest line's blend is across.
+pub const WIDEST_BLEND: usize = 17;
+/// The least a line's sigmoidness is.
+pub const LEAST_SIGMOID: usize = 18;
+/// The most a line's sigmoidness is.
+pub const MOST_SIGMOID: usize = 19;
+/// How far the lines are bent, beside a square's side.
+pub const LINE_BENDING: usize = 20;
+/// The finer meshes on the land.
+pub const FINER_DEPTH: usize = 21;
+/// The share of a finer mesh's vertices that raise or sink the land.
+pub const FINER_SHARE: usize = 22;
 /// The most one of them raises or sinks it.
-pub const INNER_HEIGHT: usize = 20;
+pub const FINER_HEIGHT: usize = 23;
+/// How much of that each mesh finer does, beside the one before.
+pub const FINER_FALL: usize = 24;
 /// The share of those that raise it.
-pub const RAISED_SHARE: usize = 21;
-/// The lines a land polygon has at most.
-pub const LINES: usize = 22;
-/// The most a line raises or sinks the ground.
-pub const LINE_HEIGHT: usize = 23;
-/// The share of the lines that are ridges.
-pub const RIDGE_SHARE: usize = 24;
-/// The cells from it the narrowest line is gone at.
-pub const NARROWEST_LINE: usize = 25;
-/// The cells from it the widest line is gone at.
-pub const WIDEST_LINE: usize = 26;
+pub const RAISED_SHARE: usize = 25;
 /// The share of the cells that are grass.
-pub const GRASS_COVER: usize = 27;
+pub const GRASS_COVER: usize = 26;
 /// The cells across a patch of grass, as a power of two.
-pub const GRASS_PATCH: usize = 28;
+pub const GRASS_PATCH: usize = 27;
 /// How much finer noise counts beside the patches'.
-pub const GRASS_DETAIL: usize = 29;
+pub const GRASS_DETAIL: usize = 28;
 /// How much each cell's own lot counts: grass scattered, not in patches.
-pub const GRASS_SCATTER: usize = 30;
+pub const GRASS_SCATTER: usize = 29;
 /// The share of the cells that have a tree.
-pub const TREE_COVER: usize = 31;
+pub const TREE_COVER: usize = 30;
 /// The cells across a patch of trees, as a power of two.
-pub const TREE_PATCH: usize = 32;
+pub const TREE_PATCH: usize = 31;
 /// How much finer noise counts beside the trees' patches'.
-pub const TREE_DETAIL: usize = 33;
+pub const TREE_DETAIL: usize = 32;
 /// How much each cell's own lot counts for trees.
-pub const TREE_SCATTER: usize = 34;
+pub const TREE_SCATTER: usize = 33;
 
 /// The numbers, in the order above; the shading's defaults are what was
 /// found by eye with the sliders.
-pub const TUNED: [Tuned; 35] = [
+pub const TUNED: [Tuned; 34] = [
     Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading, what: "How much lighter the border of a higher cell is where it faces the sun." },
     Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading, what: "How much darker the border of a higher cell is where it faces away from the sun." },
     Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading, what: "How dark the band at the foot of a wall is, on the side away from the sun." },
@@ -116,25 +114,24 @@ pub const TUNED: [Tuned; 35] = [
     Tuned { name: "shadow", default: 0.4, range: (0.0, 0.8), page: Page::Shading, what: "How much darker ground is under a cast shadow." },
     Tuned { name: "relief", default: 0.7, range: (0.0, 3.0), page: Page::Shading, what: "How strongly slopes are lit and heights tinted." },
     Tuned { name: "texture", default: 2.0, range: (0.0, 4.0), page: Page::Shading, what: "How much the ground's pixels differ from one another by lot." },
-    Tuned { name: "ocean floor level", default: 256.0, range: (0.0, 4096.0), page: Page::Generation, what: "The height of the ocean's floor, and the lowest ground in the world. Every ocean polygon is flat at this height; shores climb from it." },
+    Tuned { name: "ocean floor level", default: 256.0, range: (0.0, 4096.0), page: Page::Generation, what: "The height of the ocean's floor, and the lowest ground in the world. Every ocean vertex is at this height." },
     Tuned { name: "ocean level", default: 511.0, range: (0.0, 8192.0), page: Page::Generation, what: "The height of the ocean's surface, the same all over the world. Ground under it is under water. Set under the floor, it is held to the floor: no ocean. Water keeps a depth to 255, so a floor more than 255 under this is drawn and kept as 255 deep." },
-    Tuned { name: "highest plain", default: 711.0, range: (0.0, 8192.0), page: Page::Generation, what: "The height of the highest land there can be. Each land polygon is a flat plain at a height of its own, drawn by lot, between just over the ocean level and this. At or under the ocean level, all land lies just over the ocean." },
-    Tuned { name: "ocean share", default: 0.5, range: (0.0, 1.0), page: Page::Generation, what: "The share of the polygons that are ocean; the rest are land. 0 is all land, 1 all ocean. Land polygons that touch make one island." },
-    Tuned { name: "polygon size (2^)", default: 13.0, range: (6.0, 18.0), page: Page::Generation, what: "How broad one polygon is: 2 to this power, in cells. 10 is one superchunk, 13 is 8 superchunks, 16 is 64." },
-    Tuned { name: "narrowest ramp", default: 4.0, range: (1.0, 4096.0), page: Page::Generation, what: "Every polygon has a ramp width of its own, drawn by lot between this and the widest ramp: how many cells its border's change of height is spread over. A polygon with a narrow ramp is ringed by cliffs -- a mesa if it stands high, a walled basin if low. Set both the same for one width everywhere." },
-    Tuned { name: "widest ramp", default: 2048.0, range: (1.0, 4096.0), page: Page::Generation, what: "The broadest ramp a polygon can draw: its border's change of height spread over this many cells, a gentle slope or a shallow shore. Half a polygon's breadth at most." },
-    Tuned { name: "softest ramp", default: 1.0, range: (1.0, 16.0), page: Page::Generation, what: "Every polygon also has a hardness of its own, drawn by lot between this and the hardest ramp: the shape of the change of height across its ramp. 1 is an even slope from one level to the other. Higher is more of a sigmoid: the two levels stay flat nearly to the border and the change is a step in the middle -- a cliff, even where the ramp is wide." },
-    Tuned { name: "hardest ramp", default: 8.0, range: (1.0, 16.0), page: Page::Generation, what: "The hardest a polygon's ramp can draw. Set both the same for one shape of ramp everywhere: 1 and 1 for slopes only, 16 and 16 for cliffs only." },
-    Tuned { name: "border bending", default: 0.3, range: (0.0, 1.0), page: Page::Generation, what: "How far borders are pushed out of line by noise, as a share of a polygon's breadth. 0 leaves straight-sided polygons; more makes bays, headlands and winding borders." },
-    Tuned { name: "inner polygon depth", default: 2.0, range: (0.0, 3.0), page: Page::Generation, what: "How many grids of smaller polygons lie inside the land polygons: each grid's polygons a quarter as broad as the one before, and each changing the ground by half as much: a big polygon cut into smaller ones, a small variation at a time. 0 for none: every land polygon one flat plain." },
-    Tuned { name: "inner polygon share", default: 0.7, range: (0.0, 1.0), page: Page::Generation, what: "The share of the smaller polygons that raise or sink the ground; the rest leave their polygon's plain as it is." },
-    Tuned { name: "inner polygon height", default: 120.0, range: (0.0, 2048.0), page: Page::Generation, what: "How many heights a smaller polygon raises or sinks the ground at most: each by an amount of its own, drawn by lot, and half as much for each grid finer." },
-    Tuned { name: "raised share", default: 0.6, range: (0.0, 1.0), page: Page::Generation, what: "The share of those smaller polygons that raise the ground -- plateaus, mesas; the rest sink it -- basins. One sunk under the ocean level fills with water." },
-    Tuned { name: "lines per polygon", default: 2.0, range: (0.0, 4.0), page: Page::Generation, what: "How many lines a land polygon has at most: each has from none to this many, by lot. A line is a chain of three segments about the polygon's middle: a ridge or a canyon." },
-    Tuned { name: "line height", default: 300.0, range: (0.0, 4096.0), page: Page::Generation, what: "How many heights a line raises the ground along it -- a ridge -- or sinks it -- a canyon -- at most: each by an amount of its own, drawn by lot." },
-    Tuned { name: "ridge share", default: 0.7, range: (0.0, 1.0), page: Page::Generation, what: "The share of the lines that are ridges; the rest are canyons. A canyon cut under the ocean level fills with water." },
-    Tuned { name: "narrowest line", default: 64.0, range: (1.0, 4096.0), page: Page::Generation, what: "Every line has a width of its own, drawn by lot between this and the widest line: how many cells from the line its rise or cut is gone. A narrow line is a wall-sided ridge or a slot canyon." },
-    Tuned { name: "widest line", default: 1024.0, range: (1.0, 4096.0), page: Page::Generation, what: "The broadest a line can draw: a mountain range with long flanks, or a wide valley." },
+    Tuned { name: "highest land", default: 711.0, range: (0.0, 8192.0), page: Page::Generation, what: "The height of the highest land there can be. Every land vertex carries a height of its own, drawn by lot, between just over the ocean level and this." },
+    Tuned { name: "ocean share", default: 0.5, range: (0.0, 1.0), page: Page::Generation, what: "The share of the vertices that are ocean; the rest are land. 0 is all land, 1 all ocean." },
+    Tuned { name: "coast breadth", default: 2.0, range: (0.0, 4.0), page: Page::Generation, what: "How many vertices from the ocean land is held low within. Past it, a land vertex is as likely at any height as another, up to the highest land. 0, and no land is held low." },
+    Tuned { name: "coast lowness", default: 2.5, range: (1.0, 16.0), page: Page::Generation, what: "How strongly land right beside the ocean is held low: each coast vertex draws a height of its own, small ones by far the most likely and the higher the less likely -- so coasts differ a little from one another and a few are high, sea cliffs where their lines' blends are narrow. 1 holds nothing low; 16 leaves high coasts very rare. It eases off each vertex further inland. The finer meshes vary the lowest land a quarter as much as the highest, so differences compound inland." },
+    Tuned { name: "clumping", default: 0.25, range: (0.0, 1.0), page: Page::Generation, what: "The share of vertices that are land or ocean together with the three others of their block of four, not each by its own lot. 0, and land is scattered vertex by vertex; more, and it gathers in fuller islands with fewer specks." },
+    Tuned { name: "vertex spacing (2^)", default: 13.0, range: (6.0, 18.0), page: Page::Generation, what: "How far apart the vertices are, and so about how long a line is: 2 to this power, in cells. 10 is one superchunk, 13 is 8 superchunks, 16 is 64. The ground at a vertex is at the vertex's height, and slopes from it along its lines to its neighbours'." },
+    Tuned { name: "narrowest blend", default: 0.25, range: (0.0, 1.0), page: Page::Generation, what: "A line joins two vertices and carries the ground from one's height to the other's. Every line has a blend of its own, drawn by lot between this and the widest blend: the share of the line, about its middle, the change of height is spread over. 1 is the whole line: one slope from vertex to vertex. Near 0 is a cliff at the line's middle with level ground either side." },
+    Tuned { name: "widest blend", default: 1.0, range: (0.0, 1.0), page: Page::Generation, what: "The widest blend a line can draw, as a share of its length. Set both to 1 for slopes everywhere and no level ground; both near 0 for plateaus and cliffs." },
+    Tuned { name: "least sigmoid", default: 1.0, range: (1.0, 16.0), page: Page::Generation, what: "Every line also has a sigmoidness of its own, drawn by lot between this and the most: the shape of the change across its blend. 1 is an even slope. Higher is more of an S: gentle at both ends of the blend and steep in the middle, to a step." },
+    Tuned { name: "most sigmoid", default: 3.0, range: (1.0, 16.0), page: Page::Generation, what: "The most sigmoid a line can draw. Set both the same for one shape everywhere: 1 and 1 for even slopes only, 16 and 16 for steps only." },
+    Tuned { name: "line bending", default: 0.3, range: (0.0, 1.0), page: Page::Generation, what: "How far the lines are pushed out of straight by noise, as a share of the vertex spacing. 0 leaves straight lines and triangles; more makes them wind." },
+    Tuned { name: "finer mesh depth", default: 9.0, range: (0.0, 10.0), page: Page::Generation, what: "How many finer meshes lie on the land: points spread again, half as far apart each time, inside the triangles of the mesh before, each raising or sinking the ground a little -- small variations at a time. None gets finer than 16 cells between points, so the shortest lines are 10 to 20 cells; and a mesh that would move the land by less than one height is left out. 0 for none: the land is the broad triangles alone." },
+    Tuned { name: "finer mesh share", default: 0.7, range: (0.0, 1.0), page: Page::Generation, what: "The share of a finer mesh's points that raise or sink the land; the rest leave it as it is." },
+    Tuned { name: "finer mesh height", default: 120.0, range: (0.0, 2048.0), page: Page::Generation, what: "How many heights a point of the first finer mesh raises or sinks the land at most, each by an amount of its own." },
+    Tuned { name: "finer mesh falloff", default: 0.5, range: (0.0, 1.0), page: Page::Generation, what: "How much each finer mesh moves the land beside the one before: 0.5, and each does half as much; near 1, and the finest do as much as the broadest -- rough ground; near 0, and only the first counts." },
+    Tuned { name: "raised share", default: 0.6, range: (0.0, 1.0), page: Page::Generation, what: "The share of those vertices that raise the land; the rest sink it. Land sunk under the ocean level fills with water." },
     Tuned { name: "grass cover", default: 0.95, range: (0.0, 1.0), page: Page::Generation, what: "The share of dry land that starts as grass; the rest is dirt." },
     Tuned { name: "grass patch size (2^)", default: 8.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a patch of grass or of dirt is: 2 to this power, in cells." },
     Tuned { name: "grass patch detail", default: 0.6, range: (0.0, 2.0), page: Page::Generation, what: "How ragged the patches' edges are: how much finer noise counts beside the patches'." },

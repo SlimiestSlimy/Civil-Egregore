@@ -198,11 +198,16 @@ its rules -- grass and trees -- ticking as in any run, paused and paced
 by the same keys. Generation's sliders are shown from the start:
 
 - **The ocean** (`terrain::Shape`): its floor's level, the lowest
-  ground; its own level; and its share of the polygons.
-- **The land**: the height of the highest plain; how broad a
-  polygon is; the ramp's width, the cells from a border the heights
-  about it are joined over; and how far borders are bent. `P` draws the
-  polygons' borders over the map.
+  ground; its own level; and its share of the vertices.
+- **The land**: the highest it may be; the coast's breadth, the
+  vertices from the ocean land is held low within, and how low; how
+  much land and ocean clump; and how far apart the
+  vertices are.
+- **The lines**: the narrowest and widest blend, the least and most
+  sigmoidness, and how far they are bent. `P` draws the lines over the
+  map.
+- **The finer meshes**: how many, the share of their vertices that
+  raise or sink the land, by how much, and the share that raise it.
 - **The grass**, and **the trees** (`world::patches`): each in patches,
   not scattered cell by cell. A cell's number is smooth noise as broad
   as a patch, finer noise on it (detail), and a lot drawn for the cell
