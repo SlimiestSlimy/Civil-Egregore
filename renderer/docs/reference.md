@@ -81,6 +81,9 @@ grounds, near)`**: the picture. **`Cell`**: **`paint`**, a cell's pixels
 is awaited, and the pause and pace last sent. **`Sprites`**: a sprite
 and its image a superchunk. **`Seen`**: what the last frame said. **`NearView`**: the picture from
 near's sprite. **`Hud`**: the text.
+**`Boundary`**: a line between chunks or superchunks; **`Boundaries`**:
+which are shown (`SUPERCHUNK_LINE`, `CHUNK_LINE`); **`boundaries`**:
+shown and hidden by `B` and `C`, as wide on the screen however near.
 
 **`grouped(number)`**: its digits in threes. **`setup`**: the camera over the world's middle, the whole of it in
 view; an image a superchunk, dirt until the first frame; the text.

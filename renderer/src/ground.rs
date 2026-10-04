@@ -48,7 +48,7 @@ const LINE_ONE: f32 = 64.0;
 /// What a cast shadow does to a colour: darker, and bluer.
 pub const SHADOW: [f32; 3] = [0.74, 0.77, 0.88];
 /// How much darker a pixel wholly of cliffs is.
-const CLIFF: f32 = 0.45;
+const CLIFF: f32 = 0.65;
 /// How much darker a pixel a contour passes.
 const CONTOUR: f32 = 0.86;
 /// The coarsest the ground is drawn: a pixel `2^6` cells a side.

@@ -95,9 +95,11 @@ parts (8 MiB) for the 48 superchunks last seen.
 - **From near** (`src/near.rs`), a cell 2, 4 or 8 pixels -- as many as
   the screen shows -- the cells in view are one picture, and height is
   drawn at the edges: a step of one a thin line, light towards the sun
-  and dark away; a wall a band 2 to 4 eighths of a cell on its lower
-  cell, darkest at its foot, or a dark foot and a bright line where the
-  sun is on it; and a light lip on its upper cell.
+  and dark away; a wall a band 3 to 5 eighths of a cell on its lower
+  cell, darkest at its foot, or a dark foot a quarter of a cell and a
+  bright line where the sun is on it; and a light lip on its upper
+  cell. Walls are drawn much the stronger: they are what cannot be
+  crossed.
 
 **Corners.** A pixel takes one edge's doing, never two multiplied: the
 darkest of the edges that darken it, and only if none does, the
@@ -122,6 +124,8 @@ pixels made here.
 | space | pause, and go on |
 | `F` | tick flat out, or at the game's pace (256 ticks a second) |
 | `[` and `]` | halve and double the pace |
+| `B` | show the superchunks' boundaries, or not |
+| `C` | show the chunks' boundaries, or not |
 
 ## Layout
 
