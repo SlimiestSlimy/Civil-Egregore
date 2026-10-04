@@ -1,7 +1,8 @@
 //! The world from near, a cell several pixels: one picture of the
 //! cells in view, where height is drawn at its edges -- a step of one
-//! a thin line, a wall a band on its lower cell and a lip on its upper
-//! -- over the ground's light ([`crate::ground`]).
+//! a thin line, light towards the sun and dark away, a wall a band on
+//! its lower cell, darkest at its foot -- under the cast shadows
+//! ([`crate::ground`]). How strongly is [`crate::tuning`]'s.
 //!
 //! Every pixel takes one edge's doing, never two multiplied: of the
 //! edges that darken it the darkest, and only if none does, of those
@@ -15,7 +16,7 @@
 
 use crate::ground::{shadow_drop, Fine, Ground, SIDE};
 use crate::sim::{Cells, Near};
-use crate::tuning::{self, Tuning, LIP, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_BRIGHT, WALL_FADE, WALL_FOOT, WALL_SHADE};
+use crate::tuning::{self, Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_SHADE};
 use bitmap::BITS_PER_WORD;
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;
@@ -63,17 +64,13 @@ impl Edge {
         // Down or to the right the neighbour's face is towards the sun; up or to the left, away.
         let facing = self.towards.0 + self.towards.1;
         match self.rise {
-            2.. if facing < 0 => {
-                // A wall in its own shade: a band, darkest at its foot.
+            2.. => {
+                // A wall, whichever way it faces: a band on its lower cell, darkest at its foot.
                 let width = (2 + self.rise / 2).clamp(3, 5) as f32;
                 (1.0 + (tuning[WALL_FADE] * from / width - tuning[WALL_SHADE]) * within(0.0, width), 1.0)
             }
-            // A wall the sun is on: a dark foot and, facing it, a bright line.
-            2.. => (1.0 - tuning[WALL_FOOT] * within(0.0, 2.0), 1.0 + if facing > 0 { tuning[WALL_BRIGHT] * within(2.0, 3.0) } else { 0.0 }),
             1 if facing < 0 => (1.0 - tuning[STEP_DARK] * within(0.0, 1.0), 1.0),
             1 if facing > 0 => (1.0, 1.0 + tuning[STEP_LIGHT] * within(0.0, 1.0)),
-            // The lip over a wall.
-            ..=-2 => (1.0, 1.0 + tuning[LIP] * within(0.0, 1.0)),
             _ => (1.0, 1.0),
         }
     }
@@ -141,8 +138,8 @@ impl Cell<'_> {
             let rise = rise_towards(towards);
             // A corner alone says nothing: one counts only for a wall, and only where the cells either side of it are no higher than this one -- where it joins their two bands.
             let corner = towards.0 != 0 && towards.1 != 0;
-            let joins = rise.abs() >= 2 && rise_towards((towards.0, 0)) <= 0 && rise_towards((0, towards.1)) <= 0;
-            if (rise >= 1 || rise <= -2) && (!corner || joins) {
+            let joins = rise >= 2 && rise_towards((towards.0, 0)) <= 0 && rise_towards((0, towards.1)) <= 0;
+            if rise >= 1 && (!corner || joins) {
                 edges[count] = Edge { towards, rise };
                 count += 1;
             }
