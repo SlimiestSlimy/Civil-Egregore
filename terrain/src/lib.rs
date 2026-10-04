@@ -36,9 +36,21 @@ pub const WALL_SOUTH: LayerType = LayerType(9);
 pub const WALLS: [(LayerType, (i32, i32)); 2] = [(WALL_EAST, (1, 0)), (WALL_SOUTH, (0, 1))];
 
 /// The heights' octaves: the cells between two of an octave's points,
-/// as a power of two, and how much of a height it makes up -- 255 in
-/// all. Broad hills, and rougher ground on them.
-const OCTAVES: [(u32, u64); 4] = [(9, 150), (7, 75), (5, 24), (3, 6)];
+/// as a power of two. Broad hills, and rougher ground on them.
+const OCTAVES: [u32; 4] = [9, 7, 5, 3];
+
+/// How the heights are shaped: how much of a height each octave makes
+/// up, the broadest first -- 255 in all at most.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Shape {
+    /// Each octave's share of a height.
+    pub weights: [u64; 4],
+}
+
+impl Shape {
+    /// The world's shape.
+    pub const DEFAULT: Self = Self { weights: [150, 75, 24, 6] };
+}
 
 /// One: a fraction's whole, 16 bits.
 const ONE: u64 = 1 << 16;
@@ -53,9 +65,11 @@ fn between(from: u64, to: u64, along: u64) -> u64 {
     (from * (ONE - along) + to * along) >> 16
 }
 
-/// One octave's part of the height of the cell at `(x, y)`, of [`ONE`]:
-/// its four points about the cell, eased between.
-fn octave(seed: u64, index: u32, shift: u32, x: u32, y: u32) -> u64 {
+/// Smooth noise at the cell `(x, y)`, of [`ONE`]: the four points
+/// about the cell of a grid `2^shift` cells apart, each a number
+/// settled by `seed` and `index`, eased between. One octave of a height;
+/// and what else is to lie in patches.
+pub fn noise(seed: u64, index: u32, shift: u32, x: u32, y: u32) -> u64 {
     let (left, top) = (x >> shift, y >> shift);
     let ease = |within: u32| {
         let along = ((within as u64) << 16) >> shift;
@@ -71,7 +85,13 @@ fn octave(seed: u64, index: u32, shift: u32, x: u32, y: u32) -> u64 {
 /// The height of the cell at `(x, y)` of the world whose seed is `seed`:
 /// whole numbers only, so the same on any machine.
 pub fn height(seed: u64, x: u32, y: u32) -> Height {
-    let parts: u64 = OCTAVES.iter().enumerate().map(|(index, &(shift, weight))| octave(seed, index as u32, shift, x, y) * weight).sum();
+    height_shaped(&Shape::DEFAULT, seed, x, y)
+}
+
+/// [`height`], in a world shaped as `shape` says: what a shape is tried
+/// out with before it is the world's.
+pub fn height_shaped(shape: &Shape, seed: u64, x: u32, y: u32) -> Height {
+    let parts: u64 = OCTAVES.iter().zip(shape.weights).enumerate().map(|(index, (&shift, weight))| noise(seed, index as u32, shift, x, y) * weight).sum();
     (parts >> 16) as Height
 }
 

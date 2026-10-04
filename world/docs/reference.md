@@ -122,3 +122,14 @@ flock, time a sample and a wake, rates, what is held and the census
 (**`census_table`**). **`video`**: one superchunk's frames, sheep on
 them if asked, on standard output, raw RGB, for ffmpeg; the census at
 every frame kept, unprinted, in `measurements/video.csv`.
+
+## `pasture.rs`
+
+Where grass lies in patches; tried out in the renderer's lab, not yet
+what `generate_image` uses. `ONE` (65,536), `SALT`, `SAMPLED` (16,384).
+**`Pasture`** `{patch, detail, scatter, threshold}`.
+**`number(pasture, seed, x, y)`**: a cell's number -- noise as broad as
+a patch, finer noise, and the cell's own lot. **`grows(pasture, seed,
+x, y)`**: whether it is under the threshold.
+**`threshold_for(pasture, seed, cover)`**: the threshold under which
+that share of the cells are grass.
