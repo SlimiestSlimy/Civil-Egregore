@@ -2039,6 +2039,7 @@ name = "coordinates"
 version = "0.1.0"
 dependencies = [
  "bitmap",
+ "utilities",
 ]
 
 [[package]]
@@ -3212,6 +3213,7 @@ dependencies = [
  "chunk_storage",
  "coordinates",
  "simulation",
+ "utilities",
 ]
 
 [[package]]
@@ -4653,6 +4655,7 @@ name = "tilesim"
 version = "0.1.0"
 dependencies = [
  "chunk_storage",
+ "utilities",
  "world",
 ]
 

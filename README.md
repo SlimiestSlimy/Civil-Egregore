@@ -15,6 +15,8 @@ spreading over dirt -- and the first entities: sheep eating it.
 | folder | what it is |
 |---|---|
 | [`docs/design_statements.md`](docs/design_statements.md) | the design statements |
+| [`docs/style_guide.md`](docs/style_guide.md) | how the code, tests and docs are written: every crate's folders, one word a thing, few tests made by generators |
+| [`docs/glossary.md`](docs/glossary.md) | every word of TileSim's own: what it means, what it relates to, and what it is never called |
 | [`docs/performance.md`](docs/performance.md) | what TileSim costs, measured: where memory takes over from the processor, what a tick is made of |
 | [`docs/testing_protocol.md`](docs/testing_protocol.md) | how TileSim is tested: diagnostics, tests and tools apart, and three tiers of test -- fine, fast, complete |
 | [`docs/tilesim.md`](docs/tilesim.md) | what TileSim is, and every decision about it so far: chunks, superchunks, layers, the simulation's plan |
@@ -34,17 +36,10 @@ spreading over dirt -- and the first entities: sheep eating it.
 | [`bitmap/`](bitmap/) | the 256x256 bitmap every layer is, laid out in Morton order |
 | [`utilities/`](utilities/) | general-purpose utilities: the table printer and measurement reports, a seeded random source, a fixed-capacity list, the process's memory |
 
-Every crate is laid out as Tessera is: `docs/` -- its design, and
-`reference.md`, function by function, which the code points to --
-`tests/`, and, where it has something to measure, `src/diagnostics/`,
-which gathers data and judges nothing, and `transient_data/`, out of
-git, which holds what runs leave behind. A program that prints what the
-diagnostics gather is kept with them, in `src/diagnostics/` -- the
-diagnostics tool in `tool/` -- and named in the crate's `Cargo.toml`:
-no crate has a `src/bin/`. `bitmap/`, `coordinates/` and
-`utilities/` measure nothing of their own yet, so have neither of the
-last two; `simulation/` gathers what its entities hold, but keeps
-nothing of its own.
+Every crate, the root too, has the same folders -- `docs/`, `src/`,
+`src/diagnostics/`, `src/transient_data.rs` naming a `transient_data/`
+kept out of git, and `tests/` -- as the
+[style guide](docs/style_guide.md) sets out; no crate has a `bin/`.
 
 Builds are for every x86-64 processor since about 2009
 (`.cargo/config.toml`, `target-cpu=x86-64-v2`): TileSim is a game, for

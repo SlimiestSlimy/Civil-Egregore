@@ -6,6 +6,4 @@ description = "TileSim's pathfinding: A* over an area of 16x16 cells kept as mas
 publish = false
 
 [dependencies]
-
-[dev-dependencies]
 utilities = { path = "../utilities" }

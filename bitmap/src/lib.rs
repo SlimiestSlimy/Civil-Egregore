@@ -8,6 +8,8 @@
 //! | `bitmap_drawing` | rectangles and circles, drawn by their shape |
 //! | [`morton`] | the Morton order the cells are laid out in, which any structure over the same cells can share |
 //! | [`window`] | windows: up to 8x8 cells at any cell, cut from the word tiles they overlap, each turned from Morton order into rows |
+//! | `diagnostics/` | data gathered, to be measured and tested on: none yet |
+//! | `transient_data` | the crate's `transient_data/`, out of git: what its runs leave behind |
 //!
 //! Nothing here decides anything. What to describe, at what size, in
 //! what order, is for whatever reads the bitmap.
@@ -21,7 +23,9 @@
 
 mod bitmap_data;
 mod bitmap_drawing;
+pub mod diagnostics;
 pub mod morton;
+pub mod transient_data;
 pub mod window;
 
 pub use bitmap_data::{Bitmap, CellWords};

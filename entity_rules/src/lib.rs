@@ -13,6 +13,7 @@
 //! | module | entity |
 //! |---|---|
 //! | `sheep` | sheep eating the grass, breeding, walking, starving: the first entity |
+//! | `transient_data` | the crate's `transient_data/`, out of git: what its runs leave behind |
 //!
 //! Beside them, as in every crate: `diagnostics/`, here the mock world
 //! they are ticked on; and the tests, in `tests/`.
@@ -26,3 +27,4 @@
 
 pub mod diagnostics;
 pub mod sheep;
+pub mod transient_data;

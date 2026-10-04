@@ -507,7 +507,7 @@ a step of one cell spreads nothing, the neighbourhood is read at once
 write queues remember 16 types, and a tick's wakes run in Morton order.
 A wake was then ~1,020 instructions, of which the neighbourhood ~250.
 (Those 16-entry caches, hashed, were later measured to cost more than
-they saved, once the window reads came: without them a tick is 6.6%
+they saved, once the window reads came: without them a tick is 6.5%
 fewer instructions. A lookup remembers the last superchunk alone, and
 a write finds its queue by a search of the few.)
 

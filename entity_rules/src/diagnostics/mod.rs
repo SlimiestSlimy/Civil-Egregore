@@ -1,6 +1,5 @@
 //! Diagnostics: what the entities are measured and tested on. They only
-//! gather: nothing here judges a result or prints one -- as in
-//! Tessera's.
+//! gather: nothing here judges a result or prints one.
 //!
 //! | file | what it is |
 //! |---|---|
