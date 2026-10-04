@@ -155,8 +155,8 @@ pub struct Frame {
     pub cells: Vec<Cells>,
 }
 
-/// Starts a world generated from [`SEED`], `flock` sheep on its origin
-/// superchunk, `superchunks` of them shown about it -- ticking on
+/// Starts a world generated from [`SEED`], `superchunks` of them shown
+/// about its origin, `flock` sheep on each -- ticking on
 /// every thread the machine has, on a thread of its own: where to send it requests,
 /// and where its frames come back. It stops once the requests' sender is
 /// dropped.
@@ -174,7 +174,7 @@ pub fn start(superchunks: u32, flock: usize, forced_hot: bool) -> (Sender<Reques
 /// wait for the next one's time.
 fn run(superchunks: u32, flock: usize, forced_hot: bool, asked: &Receiver<Request>, answers: &Sender<Frame>) {
     let shown = shown(superchunks);
-    let mut world = if forced_hot { forced(&shown, flock) } else { world::generate(SEED, flock) };
+    let mut world = if forced_hot { forced(&shown, flock) } else { world::generate_flocks(SEED, &shown, flock) };
     let started = Instant::now();
     let (mut paused, mut pace, mut tick) = (false, Some(TARGET_PACE), 0u64);
     let mut census = census(superchunks, flock, forced_hot);

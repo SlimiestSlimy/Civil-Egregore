@@ -3,13 +3,15 @@
 TileSim on the screen: a pasture ticking on a thread of its own, and a
 Bevy window showing it -- dirt brown, grass green, a sheep white -- on
 ground lit by its height (below). The world is a generated one
-(`world::generate`, seed 1).
+(`world::generate_flocks`, seed 1).
 
-`cargo run --release -p renderer -- [superchunks shown] [sheep] [ticks a second, 0 flat out] [ticks to watch for] [1 to force hot]`;
-49 superchunks shown, 4,000 sheep and 256 ticks a second if not said.
+`cargo run --release -p renderer -- [superchunks shown] [sheep a superchunk] [ticks a second, 0 flat out] [ticks to watch for] [1 to force hot]`;
+256 superchunks shown, 8,000 sheep on each and 256 ticks a second if
+not said: a flock that reaches the most the grass feeds, some 16,000 a
+superchunk, within 70,000 ticks, and has not eaten it bare before.
 
-The world is a generated one (`world::generate`): hot only in the
-halos about its sheep, so the window shows a square of superchunks
+The world is a generated one (`world::generate_flocks`, a flock on
+every superchunk shown): hot only in the halos about its sheep, so the window shows a square of superchunks
 about the world's origin, and those cold are black. Forced hot (the
 fifth argument), every superchunk shown is hot all the while, each
 with a flock, and grass grows everywhere: the world under full load,
@@ -105,7 +107,8 @@ parts (8 MiB) for the 48 superchunks last seen.
 darkest of the edges that darken it, and only if none does, the
 lightest of those that lighten it. A cast shadow and an edge's shade
 join the same way, the darker of the two. A cell higher only at a
-corner fills that corner's square. So bands turn corners as one
+corner fills that corner's square if it is a wall there, joining the
+bands either side; a step met only at a corner draws nothing. So bands turn corners as one
 outline, with no doubled patch and no gap.
 
 ## Still to come
@@ -124,8 +127,9 @@ pixels made here.
 | space | pause, and go on |
 | `F` | tick flat out, or at the game's pace (256 ticks a second) |
 | `[` and `]` | halve and double the pace |
-| `B` | show the superchunks' boundaries, or not; and once a superchunk is 260 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
+| `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |
+| `H` | every cell's height written on it, once a cell is 20 screen pixels across |
 
 ## Layout
 

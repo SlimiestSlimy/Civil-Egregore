@@ -86,8 +86,11 @@ which are shown (`SUPERCHUNK_LINE`, `CHUNK_LINE`); **`boundaries`**:
 shown and hidden by `B` and `C`, as wide on the screen however near.
 **`Label`**: one of `LABELS` (256) texts; **`labels`**: the superchunks
 and chunks in view named in their top left corners, from
-`LABELLED_FROM` (260) screen pixels across, a chunk's a line
-(`LABEL_LINE`) below.
+`LABELLED_FROM` (150) screen pixels across, smaller where there is
+less room than `LABEL_WIDTH` (420), a chunk's a line (`LABEL_LINE`)
+below. **`HeightLabel`**: one of a grid of `HEIGHT_LABELS` (96 by 54)
+texts; **`heights`**: every cell's height written on it by `H`, from
+`HEIGHT_FROM` (20) screen pixels a cell.
 
 **`grouped(number)`**: its digits in threes. **`setup`**: the camera over the world's middle, the whole of it in
 view; an image a superchunk, dirt until the first frame; the text.

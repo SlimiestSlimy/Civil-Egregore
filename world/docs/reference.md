@@ -12,7 +12,8 @@ superchunk's state as a save keeps it; **`writing_back`**, the
 write-backs of superchunks gone cold being encoded, in order;
 **`flushing`**, the superchunks whose images are being rewritten -- and
 **`World::empty(info)`**, what generating and loading start from;
-**`layer_types`**. **`generate(seed, sheep)`**: the origin
+**`layer_types`**. **`generate_flocks(seed, superchunks, sheep)`**: the
+same with a flock on each of `superchunks`. **`generate(seed, sheep)`**: the origin
 (`WORLD_MIDDLE`) hot, a flock of `sheep` on it, and its halo made hot.
 **`generate_image(seed, superchunk, codec)`**: a superchunk's terrain
 and pasture, from the seed and its superchunk index.
