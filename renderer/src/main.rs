@@ -359,7 +359,7 @@ fn main() {
         .init_resource::<Boundaries>()
         .init_resource::<sliders::Hands>()
         .add_systems(Startup, (setup, sliders::setup))
-        .add_systems(Update, (fullscreen, sliders::toggle, sliders::slide, sliders::tell, steer, keys, boundaries, labels, heights, show, ask, far, hud).chain())
+        .add_systems(Update, (fullscreen, sliders::toggle, sliders::scroll, sliders::slide, sliders::tell, recentre, steer, keys, boundaries, labels, heights, show, ask, far, hud).chain())
         .run();
 }
 
@@ -382,13 +382,8 @@ fn picture_of(size: (u32, u32), pixels: Vec<u8>) -> Image {
 /// one; the boundaries and the labels, hidden until asked for; and the
 /// text. A superchunk's image is made when its pixels first come.
 fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, sprites: Res<Sprites>, window: Single<&Window>) {
-    let square_side = sprites.side as f32 * SPRITE_SIDE;
-    let scale = (square_side / window.height().min(window.width())).min(FARTHEST);
-    commands.spawn((
-        Camera2d,
-        Projection::Orthographic(OrthographicProjection { scale, ..OrthographicProjection::default_2d() }),
-        Transform::from_xyz(square_side / 2.0, -square_side / 2.0, 0.0),
-    ));
+    let (scale, at) = first_view(&sprites, &window);
+    commands.spawn((Camera2d, Projection::Orthographic(OrthographicProjection { scale, ..OrthographicProjection::default_2d() }), Transform::from_translation(at)));
     commands.spawn((Sprite { image: images.add(picture(1, DIRT.to_vec())), ..default() }, Transform::from_xyz(0.0, 0.0, 1.0), Visibility::Hidden, NearView));
     commands.spawn((Sprite { image: images.add(picture(1, DIRT.to_vec())), ..default() }, Transform::from_xyz(0.0, 0.0, 1.0), Visibility::Hidden, MapView));
     // The chunks' boundaries under the superchunks'.
@@ -415,6 +410,25 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, sprites: Res
     ));
 }
 
+/// The view the window starts on: cells a screen pixel, and where on
+/// the plane its middle is -- the whole of the square about the
+/// world's origin in view.
+fn first_view(sprites: &Sprites, window: &Window) -> (f32, Vec3) {
+    let square_side = sprites.side as f32 * SPRITE_SIDE;
+    ((square_side / window.height().min(window.width())).min(FARTHEST), Vec3::new(square_side / 2.0, -square_side / 2.0, 0.0))
+}
+
+/// Puts the view back where it started, when the lab's seed is drawn again.
+fn recentre(camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>, sprites: Res<Sprites>, window: Single<&Window>) {
+    if !lab::view_reset() {
+        return;
+    }
+    let (mut transform, mut projection) = camera.into_inner();
+    if let Projection::Orthographic(view) = &mut *projection {
+        (view.scale, transform.translation) = first_view(&sprites, &window);
+    }
+}
+
 /// Moves and zooms the view: the keys, the wheel, and dragging.
 fn steer(
     camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>,
@@ -431,7 +445,9 @@ fn steer(
     };
     let held = |these: [KeyCode; 2]| keys.any_pressed(these) as i32 as f32;
     let nearer = held([KeyCode::KeyE, KeyCode::Equal]) - held([KeyCode::KeyQ, KeyCode::Minus]);
-    view.scale *= WHEEL_ZOOM.powf(scroll.delta.y) * ZOOM_SPEED.powf(-nearer * time.delta_secs());
+    // The wheel over the sliders scrolls them.
+    let wheel = if sliders::over(&window) { 0.0 } else { scroll.delta.y };
+    view.scale *= WHEEL_ZOOM.powf(wheel) * ZOOM_SPEED.powf(-nearer * time.delta_secs());
     view.scale = view.scale.clamp(0.02, MAP_FARTHEST);
     let across = held([KeyCode::KeyD, KeyCode::ArrowRight]) - held([KeyCode::KeyA, KeyCode::ArrowLeft]);
     let up = held([KeyCode::KeyW, KeyCode::ArrowUp]) - held([KeyCode::KeyS, KeyCode::ArrowDown]);

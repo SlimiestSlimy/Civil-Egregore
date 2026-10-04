@@ -40,7 +40,7 @@ pub enum Job {
         /// The world's seed.
         seed: u64,
         /// How the world's superchunks are generated.
-        generation: Generation,
+        generation: Box<Generation>,
         /// The layer types to decode.
         types: Vec<LayerType>,
     },

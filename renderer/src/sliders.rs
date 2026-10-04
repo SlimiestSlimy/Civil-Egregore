@@ -7,7 +7,8 @@
 //! draws the world's seed again. The pointer rested on a slider's row
 //! for a moment, and what the slider does is said beside it.
 //!
-//! `U` goes from one page to the next, and to none.
+//! `U` goes from one page to the next, and to none. A page longer than
+//! the window is scrolled by the wheel, the pointer over it.
 //!
 //! They are laid out by plain arithmetic -- a row each, a track of a
 //! fixed width against the window's right edge -- so where the pointer
@@ -16,7 +17,8 @@
 use crate::lab::reseed;
 use crate::tuning::{keep, now, set, Page, TUNED};
 use bevy::prelude::*;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use bevy::input::mouse::AccumulatedMouseScroll;
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
 /// Screen pixels from the window's top and right edges to the sliders.
 const MARGIN: f32 = 16.0;
@@ -42,6 +44,17 @@ const REST: f32 = 0.4;
 /// Screen pixels across what a slider does is said in, at most.
 const TIP: f32 = 380.0;
 
+/// Screen pixels a notch of the wheel scrolls a page.
+const NOTCH: f32 = 2.0 * ROW;
+
+/// Screen pixels the page shown is scrolled up by: an `f32`'s bits.
+static SCROLLED: AtomicU32 = AtomicU32::new(0);
+
+/// Screen pixels the page shown is scrolled up by.
+fn scrolled() -> f32 {
+    f32::from_bits(SCROLLED.load(Ordering::Relaxed))
+}
+
 /// The pages, in the order `U` goes through them: the first the lab
 /// starts on.
 const PAGES: [Page; 2] = [Page::Generation, Page::Shading];
@@ -59,6 +72,10 @@ static IN_LAB: AtomicBool = AtomicBool::new(false);
 /// Anything of the sliders, and the page it is on: shown and hidden with it.
 #[derive(Component)]
 pub struct Part(Page);
+
+/// How far down the window a part is, its page not scrolled.
+#[derive(Component)]
+pub struct Row(f32);
 
 /// A part of a slider that moves with its number.
 #[derive(Component)]
@@ -115,11 +132,30 @@ fn button_top(page: Page) -> f32 {
 }
 
 /// Whether the pointer is over the page shown.
-fn pointer_over(window: &Window) -> bool {
+pub fn over(window: &Window) -> bool {
     let Some((page, pointer)) = page().zip(window.cursor_position()) else {
         return false;
     };
-    pointer.x >= window.width() - MARGIN - PANEL && pointer.y <= button_top(page) + BUTTON + MARGIN
+    pointer.x >= window.width() - MARGIN - PANEL && pointer.y <= button_top(page) + BUTTON + MARGIN - scrolled()
+}
+
+/// Scrolls the page shown by the wheel, the pointer over it: no
+/// further than its last row at the window's foot.
+pub fn scroll(wheel: Res<AccumulatedMouseScroll>, window: Single<&Window>, mut parts: Query<(&Row, &mut Node)>) {
+    let Some(page) = page() else {
+        return;
+    };
+    let most = (button_top(page) + BUTTON + MARGIN - window.height()).max(0.0);
+    let moved = if over(&window) { wheel.delta.y * NOTCH } else { 0.0 };
+    let now = (scrolled() - moved).clamp(0.0, most);
+    if now != scrolled() {
+        SCROLLED.store(now.to_bits(), Ordering::Relaxed);
+    }
+    for (row, mut node) in &mut parts {
+        if node.top != Val::Px(row.0 - now) {
+            node.top = Val::Px(row.0 - now);
+        }
+    }
 }
 
 /// The sliders, a page over one dark panel: a name, a box with the
@@ -131,24 +167,24 @@ pub fn setup(mut commands: Commands) {
     // Bevy stacks them by `ZIndex`, not by the order they are made in: the panel under all, the knobs over all.
     for shown in PAGES {
         let visibility = if page() == Some(shown) { Visibility::Visible } else { Visibility::Hidden };
-        let part = || (visibility, Part(shown));
+        let part = |top: f32| (visibility, Part(shown), Row(top));
         let button = if shown == Page::Generation { BUTTON + 12.0 } else { 0.0 };
-        commands.spawn((placed(MARGIN - 8.0, MARGIN - 12.0, Val::Px(PANEL + 12.0), ROW * rows(shown).count() as f32 + 8.0 + button), BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)), ZIndex(0), part()));
+        commands.spawn((placed(MARGIN - 8.0, MARGIN - 12.0, Val::Px(PANEL + 12.0), ROW * rows(shown).count() as f32 + 8.0 + button), BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)), ZIndex(0), part(MARGIN - 8.0)));
         for (row, index) in rows(shown).enumerate() {
             // Each is set in the middle of its row's height.
             let middle = MARGIN + ROW * (row as f32 + 0.5) - 4.0;
             let within = |height: f32| middle - height / 2.0;
             let box_right = MARGIN + TRACK.0 + GAP;
-            commands.spawn((text(TUNED[index].name), placed(within(NAME * 1.2), box_right + BOX.0 + GAP, Val::Auto, NAME * 1.2), ZIndex(2), part()));
-            commands.spawn((placed(within(BOX.1), box_right, Val::Px(BOX.0), BOX.1), BackgroundColor(Color::srgb(0.16, 0.16, 0.16)), ZIndex(1), part()));
-            commands.spawn((text(""), placed(within(NAME * 1.2), box_right + 6.0, Val::Auto, NAME * 1.2), Valued(index), ZIndex(2), part()));
-            commands.spawn((placed(within(TRACK.1), MARGIN, Val::Px(TRACK.0), TRACK.1), BackgroundColor(Color::srgb(0.3, 0.3, 0.3)), ZIndex(1), part()));
-            commands.spawn((placed(within(TRACK.1), MARGIN, Val::Px(0.0), TRACK.1), BackgroundColor(Color::srgb(0.95, 0.8, 0.25)), Moved { index, knob: false }, ZIndex(2), part()));
-            commands.spawn((placed(within(KNOB.1), MARGIN, Val::Px(KNOB.0), KNOB.1), BackgroundColor(Color::WHITE), Moved { index, knob: true }, ZIndex(3), part()));
+            commands.spawn((text(TUNED[index].name), placed(within(NAME * 1.2), box_right + BOX.0 + GAP, Val::Auto, NAME * 1.2), ZIndex(2), part(within(NAME * 1.2))));
+            commands.spawn((placed(within(BOX.1), box_right, Val::Px(BOX.0), BOX.1), BackgroundColor(Color::srgb(0.16, 0.16, 0.16)), ZIndex(1), part(within(BOX.1))));
+            commands.spawn((text(""), placed(within(NAME * 1.2), box_right + 6.0, Val::Auto, NAME * 1.2), Valued(index), ZIndex(2), part(within(NAME * 1.2))));
+            commands.spawn((placed(within(TRACK.1), MARGIN, Val::Px(TRACK.0), TRACK.1), BackgroundColor(Color::srgb(0.3, 0.3, 0.3)), ZIndex(1), part(within(TRACK.1))));
+            commands.spawn((placed(within(TRACK.1), MARGIN, Val::Px(0.0), TRACK.1), BackgroundColor(Color::srgb(0.95, 0.8, 0.25)), Moved { index, knob: false }, ZIndex(2), part(within(TRACK.1))));
+            commands.spawn((placed(within(KNOB.1), MARGIN, Val::Px(KNOB.0), KNOB.1), BackgroundColor(Color::WHITE), Moved { index, knob: true }, ZIndex(3), part(within(KNOB.1))));
         }
         if shown == Page::Generation {
-            commands.spawn((placed(button_top(shown), MARGIN, Val::Px(TRACK.0), BUTTON), BackgroundColor(Color::srgb(0.2, 0.35, 0.6)), ZIndex(1), part()));
-            commands.spawn((text("regenerate, a random seed"), placed(button_top(shown) + 5.0, MARGIN + 12.0, Val::Auto, NAME * 1.2), ZIndex(2), part()));
+            commands.spawn((placed(button_top(shown), MARGIN, Val::Px(TRACK.0), BUTTON), BackgroundColor(Color::srgb(0.2, 0.35, 0.6)), ZIndex(1), part(button_top(shown))));
+            commands.spawn((text("regenerate, a random seed"), placed(button_top(shown) + 5.0, MARGIN + 12.0, Val::Auto, NAME * 1.2), ZIndex(2), part(button_top(shown) + 5.0)));
         }
     }
     let tip = Node { position_type: PositionType::Absolute, right: Val::Px(MARGIN + PANEL + 8.0), max_width: Val::Px(TIP), padding: UiRect::all(Val::Px(8.0)), ..default() };
@@ -212,10 +248,11 @@ pub fn slide(
     let box_left = track_left - GAP - BOX.0;
     let pointer = window.cursor_position();
     // The number whose row the pointer is on.
-    let on_row = pointer.filter(|pointer| pointer.y >= MARGIN).and_then(|pointer| rows(page).nth(((pointer.y - MARGIN) / ROW) as usize));
+    let pointer_down = |pointer: Vec2| pointer.y + scrolled();
+    let on_row = pointer.filter(|&pointer| pointer_down(pointer) >= MARGIN).and_then(|pointer| rows(page).nth(((pointer_down(pointer) - MARGIN) / ROW) as usize));
     let on_track = on_row.filter(|_| pointer.is_some_and(|pointer| pointer.x >= track_left - KNOB.0));
     let on_box = on_row.filter(|_| pointer.is_some_and(|pointer| (box_left..box_left + BOX.0).contains(&pointer.x)));
-    let on_button = page == Page::Generation && pointer.is_some_and(|pointer| pointer.x >= track_left && (button_top(page)..button_top(page) + BUTTON).contains(&pointer.y));
+    let on_button = page == Page::Generation && pointer.is_some_and(|pointer| pointer.x >= track_left && (button_top(page)..button_top(page) + BUTTON).contains(&pointer_down(pointer)));
 
     // What is being typed is set by Enter or a click anywhere, and left by Escape.
     let settles = keys.any_just_pressed([KeyCode::Enter, KeyCode::NumpadEnter]) || buttons.just_pressed(MouseButton::Left);
@@ -235,7 +272,7 @@ pub fn slide(
         }
     }
     if buttons.just_pressed(MouseButton::Left) {
-        HELD.store(pointer_over(&window), Ordering::Relaxed);
+        HELD.store(over(&window), Ordering::Relaxed);
         hands.dragged = on_track;
         hands.typed = on_box.map(|index| (index, String::new()));
         if on_button {
@@ -290,15 +327,15 @@ pub fn tell(mut hands: ResMut<Hands>, time: Res<Time>, window: Single<&Window>, 
     };
     hands.rested = (pointer.unwrap_or(Vec2::NEG_ONE), rested);
     // The row the pointer is on, of the page shown, and its number.
-    let on_panel = pointer.filter(|pointer| pointer.y >= MARGIN && pointer.x >= window.width() - MARGIN - PANEL);
-    let row = on_panel.map(|pointer| ((pointer.y - MARGIN) / ROW) as usize);
+    let on_panel = pointer.filter(|pointer| pointer.y + scrolled() >= MARGIN && pointer.x >= window.width() - MARGIN - PANEL);
+    let row = on_panel.map(|pointer| ((pointer.y + scrolled() - MARGIN) / ROW) as usize);
     let told = page().zip(row).and_then(|(page, row)| Some((row, rows(page).nth(row)?))).filter(|_| rested >= REST && hands.dragged.is_none());
     match told {
         Some((row, index)) => {
             if said.0 != TUNED[index].what {
                 said.0 = TUNED[index].what.to_string();
             }
-            node.top = Val::Px(MARGIN + ROW * row as f32);
+            node.top = Val::Px(MARGIN + ROW * row as f32 - scrolled());
             shown.set_if_neq(Visibility::Visible);
         }
         None => {

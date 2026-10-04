@@ -35,21 +35,22 @@ pub const WALL_SOUTH: LayerType = LayerType(9);
 /// The walls' layers, and the neighbour each is towards.
 pub const WALLS: [(LayerType, (i32, i32)); 2] = [(WALL_EAST, (1, 0)), (WALL_SOUTH, (0, 1))];
 
-/// The heights' octaves: the cells between two of an octave's points,
-/// as a power of two. Broad hills, and rougher ground on them.
-const OCTAVES: [u32; 4] = [9, 7, 5, 3];
-
+/// The hills' octaves: the cells between two of an octave's points,
+/// as a power of two -- every one from broad hills to rough ground, so
+/// that no one octave's grid shows through.
+const OCTAVES: [u32; 7] = [9, 8, 7, 6, 5, 4, 3];
 /// How the heights are shaped. The land rises and falls by far more
 /// than a hill over many superchunks ([`rise`]), too gently for a wall;
 /// what of it is under the ocean's level is the ocean's floor, what is
 /// over it islands, dozens to hundreds of superchunks each. Hills
-/// stand on the islands alone, rising from nothing at the shore to
-/// their whole height where the land is the coast's heights over the
-/// ocean. The hills' octaves' shares of a height come to 255 at most.
+/// stand on the islands, rising from nothing to their whole height
+/// over the coast's heights of land -- from the shore on average, but
+/// from under the ocean here and from well inland there, as broad
+/// noise says, so that no level band rings an island. The hills' octaves' shares of a height come to 255 at most.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Shape {
     /// Each hill octave's share of a height, the broadest first.
-    pub weights: [u64; 4],
+    pub weights: [u64; 7],
     /// The height the ocean stands at, all over the world.
     pub ocean: Height,
     /// How far over the ocean the land is where the hills are whole.
@@ -61,6 +62,15 @@ pub struct Shape {
     /// The cells between two points of the land's rise, as a power of
     /// two: at most 24.
     pub rise_span: u32,
+    /// The share each octave of the land's rise has, the broadest
+    /// first, each half as broad as the one before.
+    pub rise_shares: [u64; 5],
+    /// How far where the hills begin is moved up or down about the
+    /// shore, beside the coast's heights, of [`ONE`].
+    pub shore: u64,
+    /// The cells between two points of the noise that moves it, as a
+    /// power of two: at least 2.
+    pub shore_span: u32,
 }
 
 /// A cell's water: how deep it stands over the ground, 0 none, a number
@@ -71,7 +81,7 @@ impl Shape {
     /// The world's shape: islands some 16 superchunks across in an
     /// ocean a little over half the world, hills as tuned by eye in the
     /// renderer's lab.
-    pub const DEFAULT: Self = Self { weights: [168, 22, 61, 4], ocean: 800, coast: 64, ground: 256, rise: 1024, rise_span: 14 };
+    pub const DEFAULT: Self = Self { weights: [99, 58, 14, 25, 37, 20, 2], ocean: 800, coast: 64, ground: 256, rise: 1024, rise_span: 14, rise_shares: [625, 250, 100, 40, 16], shore: ONE, shore_span: 10 };
 }
 
 /// One: a fraction's whole, 16 bits.
@@ -106,12 +116,14 @@ pub fn noise(seed: u64, index: u32, shift: u32, x: u32, y: u32) -> u64 {
 
 /// How far the land has risen over the lowest ground at the cell
 /// `(x, y)`, in heights: noise far broader than a superchunk and far
-/// higher than a hill, with a quarter as much again a quarter as broad.
+/// higher than a hill, five octaves of it ([`Shape::rise_shares`]):
+/// the finer add shape to a shore.
 pub fn rise(shape: &Shape, seed: u64, x: u32, y: u32) -> u64 {
     let index = OCTAVES.len() as u32;
-    let span = shape.rise_span.clamp(2, 24);
-    let land = 3 * noise(seed, index, span, x, y) + noise(seed, index + 1, span - 2, x, y);
-    (land * shape.rise) >> 18
+    let shares = &shape.rise_shares;
+    let span = shape.rise_span.clamp(shares.len() as u32, 24);
+    let land: u64 = shares.iter().enumerate().map(|(octave, share)| share * noise(seed, index + octave as u32, span - octave as u32, x, y)).sum();
+    (land / shares.iter().sum::<u64>().max(1) * shape.rise) >> 16
 }
 
 /// The height of the cell at `(x, y)` of the world whose seed is `seed`:
@@ -124,8 +136,12 @@ pub fn height(seed: u64, x: u32, y: u32) -> Height {
 /// out with before it is the world's.
 pub fn height_shaped(shape: &Shape, seed: u64, x: u32, y: u32) -> Height {
     let land = shape.ground as u64 + rise(shape, seed, x, y);
-    // How much of the hills stands here: none at the shore or under the ocean.
-    let relief = ((land.saturating_sub(shape.ocean as u64) << 16) / shape.coast.max(1)).min(ONE);
+    // Where the hills begin: at the ocean's level, moved up or down by as much as this.
+    let index = (OCTAVES.len() + shape.rise_shares.len()) as u32;
+    let (span, wander) = (shape.shore_span.clamp(2, 24), (shape.coast * shape.shore) >> 16);
+    let moved = ((noise(seed, index, span, x, y) + noise(seed, index + 1, span - 2, x, y)) * wander) >> 16;
+    // How much of the hills stands here: none under where they begin.
+    let relief = (((land + moved).saturating_sub(shape.ocean as u64 + wander) << 16) / shape.coast.max(1)).min(ONE);
     if relief == 0 {
         return land.min(Height::MAX as u64) as Height;
     }

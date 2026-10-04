@@ -64,16 +64,20 @@ the cells about the change are worked out again.
 
 A height is 16 bits, 0 to 65,535. The lowest ground is at
 `Shape::ground`; on it the **land rises** (`rise`) by up to
-`Shape::rise` heights, as noise `2^rise_span` cells between points --
-many superchunks -- with a quarter as much again a quarter as broad: too
-gentle for a wall, a step every ten cells or so at the steepest.
+`Shape::rise` heights: five octaves of noise, the broadest
+`2^rise_span` cells between points -- many superchunks -- each next half
+as broad and of a smaller share (`Shape::rise_shares`), so that the
+finer shape the shores and add little slope.
 
 The **ocean** stands at one height all over the world (`Shape::ocean`):
 the land under it is the ocean's floor, the land over it islands, dozens
-to hundreds of superchunks each. **Hills** -- the four octaves, 255
-heights at most -- stand on the islands alone: none at the shore, their
-whole height where the land is `Shape::coast` heights over the ocean.
-So shores are level, the floor smooth, the inland rough.
+to hundreds of superchunks each. **Hills** stand on the islands: seven
+octaves, every power of two from 512 cells to 8, so that no one
+octave's grid shows; 255 heights at most. They grow from nothing to
+their whole height over `Shape::coast` heights of land, from a line
+that is the shore on average but wanders above and below it
+(`Shape::shore`, `shore_span`): hills here stand out of the ocean, and
+there begin well inland, and no level band rings an island.
 
 **Water** is a depth a cell: how far it stands over the ground, 0 none,
 eight bits over eight bitplanes (`WATER`) -- the ocean deeper than 255

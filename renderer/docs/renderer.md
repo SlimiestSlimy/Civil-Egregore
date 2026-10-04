@@ -166,7 +166,8 @@ found by eye is then written into the code as the defaults.
   cast shadows 40% darker, 70% of the relief, and twice the texture.
 - **Generation**, in the lab only: below.
 
-The pointer rested on a slider's row for a moment, and what the slider
+A page longer than the window is scrolled by the wheel, the pointer
+over it. The pointer rested on a slider's row for a moment, and what the slider
 does is said beside it (`Tuned::what`).
 
 ## The map
@@ -191,20 +192,20 @@ made and how it changes (`src/lab.rs`). The world starts as the
 superchunks shown, every one hot, and reaches wherever it is looked at:
 a superchunk that comes into view is generated, made hot and kept so,
 with no bound but memory (about 2.4 MiB each) -- until a slider of
-generation moves or the seed is drawn, when it starts over. No sheep,
+generation moves or the seed is drawn, when it starts over; the seed
+drawn, the view too goes back to where it started. No sheep,
 its rules -- grass and trees -- ticking as in any run, paused and paced
 by the same keys. Generation's sliders are shown from the start:
 
-- **The heights**: how much of a height each of the four octaves makes
-  up beside the others -- hills 512 cells across, ridges 128, bumps 32,
-  roughness 8 -- and the height span they come to together, 255 at
-  most (`terrain::Shape`).
-- **The ocean's level**: the land under it is the ocean's floor; and
-  **the coast**: how far over the ocean the land is where the hills are
-  whole.
-- **The ground's level**, **the land's rise** and **its span**: the
-  lowest ground, how far the land rises over it, and how broadly (a
-  power of two of cells).
+- **The hills**: how much of their height each of the seven octaves
+  makes up beside the others -- 512 cells across to 8 -- and the height
+  span they come to together, 255 at most (`terrain::Shape`).
+- **The land**: the lowest ground's level, how far the land rises over
+  it, how broadly (a power of two of cells), and the share of each of
+  the rise's five octaves.
+- **The ocean's level**; **the coast**, the heights of land the hills
+  grow over; and how far and how broadly the line they begin at
+  **wanders** about the shore.
 - **The grass**, and **the trees** (`world::patches`): each in patches,
   not scattered cell by cell. A cell's number is smooth noise as broad
   as a patch, finer noise on it (detail), and a lot drawn for the cell

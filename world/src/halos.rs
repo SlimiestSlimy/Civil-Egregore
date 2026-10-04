@@ -213,7 +213,7 @@ impl World {
         let from = if self.arena.hold(superchunk) {
             WarmedFrom::Lingering
         } else {
-            let job = Job::Warm { superchunk, image: self.storage.shared_image(superchunk), seed: self.info.seed, generation: self.generation, types: self.info.layers.clone() };
+            let job = Job::Warm { superchunk, image: self.storage.shared_image(superchunk), seed: self.info.seed, generation: Box::new(self.generation), types: self.info.layers.clone() };
             WarmedFrom::Background(self.background.send(job))
         };
         let at = self.warming.binary_search_by_key(&superchunk, |warming| warming.superchunk).expect_err("not warming");
