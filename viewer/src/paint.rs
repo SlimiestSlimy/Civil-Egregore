@@ -64,7 +64,15 @@ pub fn start(frames: Receiver<Frame>) -> Receiver<Picture> {
         .spawn(move || {
             for frame in frames {
                 let started = Instant::now();
-                let superchunks = frame.cells.iter().map(|cells| if frame.detail == 0 { paint(cells) } else { paint_far(cells, frame.detail) }).collect();
+                let superchunks = frame
+                    .cells
+                    .iter()
+                    .map(|cells| match (cells.hot, frame.detail) {
+                        (false, _) => Painted { at: cells.at, side: 1, pixels: opaque(COLD).to_vec() },
+                        (true, 0) => paint(cells),
+                        (true, detail) => paint_far(cells, detail),
+                    })
+                    .collect();
                 let picture = Picture {
                     tick: frame.tick,
                     ticks_a_second: frame.ticks_a_second,
@@ -90,6 +98,9 @@ fn chunk_top_left(place: usize) -> (usize, usize) {
     let (x, y) = cartesian_from_place(place * CELLS_IN_CHUNK);
     (x as usize, y as usize)
 }
+
+/// A cold superchunk: not ticked, its cells not held.
+const COLD: [u8; 3] = [0, 0, 0];
 
 /// `colour`, opaque.
 const fn opaque(colour: [u8; 3]) -> [u8; 4] {

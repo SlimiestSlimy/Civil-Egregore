@@ -112,6 +112,19 @@ pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> GrassCounts {
     }
     turn.sample(GRASS, SPREAD_CHANCE + DECAY_CHANCE, samples);
     samples.retain(|&cell| grows_at(cell));
+    spread_and_decay(turn, samples)
+}
+
+/// [`rule`], with grass growing everywhere: what a world is loaded with
+/// to measure it, every superchunk doing its full share.
+pub fn rule_everywhere(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> GrassCounts {
+    turn.sample(GRASS, SPREAD_CHANCE + DECAY_CHANCE, samples);
+    spread_and_decay(turn, samples)
+}
+
+/// Each of `samples` draws a neighbour, and whether it tries to spread
+/// or to decay, and queues the writes if the neighbour lets it.
+fn spread_and_decay(turn: &mut Turn, samples: &[CellIndex]) -> GrassCounts {
     let sampled = samples.len();
     let spread_share = SPREAD_CHANCE / (SPREAD_CHANCE + DECAY_CHANCE);
     let (mut spreads, mut decays) = (0, 0);

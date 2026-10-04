@@ -7,9 +7,16 @@ the world is a generated one (`world::generate_with`, seed 1), and its
 cliffs -- the cells keeping a wall to their east or south
 (`../terrain/`) -- are drawn darker, close up.
 
-`cargo run --release -p viewer -- [superchunks] [grass, thousandths] [sheep a superchunk] [ticks a second, 0 flat out] [ticks to watch for]`;
-16 superchunks, a third grass, 4,000 sheep each and 256
-ticks a second if not said.
+`cargo run --release -p viewer -- [superchunks shown] [sheep] [ticks a second, 0 flat out] [ticks to watch for] [1 to force hot]`;
+49 superchunks shown, 4,000 sheep and 256 ticks a second if not said.
+
+The world is a generated one (`world::generate`): hot only in the
+halos about its sheep, so the window shows a square of superchunks
+about the world's origin, and those cold are black. Forced hot (the
+fifth argument), every superchunk shown is hot all the while, each
+with a flock, and grass grows everywhere: the world under full load,
+to be measured -- the census then carries the seconds and the pace
+held, 0 flat out.
 
 It runs until it is closed: long runs are watched, not waited for. The
 ticks to watch for are only shown, beside the ticks run, so whoever
