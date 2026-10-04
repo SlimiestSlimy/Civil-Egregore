@@ -327,7 +327,7 @@ fn main() {
         .init_resource::<Boundaries>()
         .init_resource::<sliders::Hands>()
         .add_systems(Startup, (setup, sliders::setup))
-        .add_systems(Update, (fullscreen, sliders::toggle, sliders::slide, steer, keys, boundaries, labels, heights, show, ask, hud).chain())
+        .add_systems(Update, (fullscreen, sliders::toggle, sliders::slide, sliders::tell, steer, keys, boundaries, labels, heights, show, ask, hud).chain())
         .run();
 }
 

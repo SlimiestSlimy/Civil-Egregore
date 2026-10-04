@@ -196,8 +196,9 @@ pub enum Mode {
     Halos,
     /// The same, every superchunk shown hot all the while: a fixed load.
     ForcedHot,
-    /// The lab's ([`crate::lab`]): every superchunk shown hot, no
-    /// sheep, generated as the sliders say and made again when they change.
+    /// The lab's ([`crate::lab`]): every superchunk shown hot, and
+    /// every one looked at since, no sheep, generated as the sliders
+    /// say and made again when they change.
     Lab,
 }
 
@@ -248,6 +249,9 @@ fn run(superchunks: u32, flock: usize, mode: Mode, asked: &Receiver<Request>, an
             match request.take().map_or_else(|| asked.try_recv(), Ok) {
                 Ok(Request::Sync(ask)) => {
                     let asked_at = Instant::now();
+                    if mode == Mode::Lab {
+                        reach(&mut world, ask);
+                    }
                     let elapsed = last_frame.elapsed().as_secs_f64();
                     let ticks_a_second = if elapsed > 0.0 { (tick - last_frame_tick) as f64 / elapsed } else { 0.0 };
                     (last_frame, last_frame_tick) = (asked_at, tick);
@@ -315,6 +319,19 @@ fn forced(mut world: World, shown: &[SuperchunkIndex], flock: usize) -> World {
     }
     world.entities.apply();
     world
+}
+
+/// Makes hot, and keeps so, each superchunk `ask` asks for that is
+/// not: the lab's world reaches wherever it is looked at.
+fn reach(world: &mut World, ask: Ask) {
+    let mut wanted = world.arena.superchunk_indices();
+    let hot = wanted.len();
+    wanted.extend(ask.asked().map(|(x, y)| SuperchunkIndex::from_cartesian(x, y)));
+    wanted.sort_unstable();
+    wanted.dedup();
+    if wanted.len() > hot {
+        world.keep_hot(&wanted);
+    }
 }
 
 /// Cells of `layer_type` over every hot superchunk of `world`.

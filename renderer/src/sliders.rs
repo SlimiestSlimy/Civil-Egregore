@@ -4,7 +4,8 @@
 //! right, and kept when let go. Beside each, a box with its value: a
 //! click on it, and the value is typed -- digits and a point, Enter to
 //! set it, Escape to leave it. Under generation's page, a button that
-//! draws the world's seed again.
+//! draws the world's seed again. The pointer rested on a slider's row
+//! for a moment, and what the slider does is said beside it.
 //!
 //! `U` goes from one page to the next, and to none.
 //!
@@ -35,6 +36,11 @@ const PANEL: f32 = TRACK.0 + GAP + BOX.0 + GAP + 170.0;
 const NAME: f32 = 18.0;
 /// Screen pixels the button is high.
 const BUTTON: f32 = 32.0;
+
+/// Seconds the pointer rests on a row before what its slider does is said.
+const REST: f32 = 0.4;
+/// Screen pixels across what a slider does is said in, at most.
+const TIP: f32 = 380.0;
 
 /// The pages, in the order `U` goes through them: the first the lab
 /// starts on.
@@ -67,6 +73,10 @@ pub struct Moved {
 #[derive(Component)]
 pub struct Valued(usize);
 
+/// Where what a slider does is said.
+#[derive(Component)]
+pub struct Tip;
+
 /// What the pointer and the keys are doing with the sliders.
 #[derive(Resource, Default)]
 pub struct Hands {
@@ -74,6 +84,8 @@ pub struct Hands {
     dragged: Option<usize>,
     /// The number whose value is being typed, and what is typed so far.
     typed: Option<(usize, String)>,
+    /// Where the pointer last was, and the seconds it has rested there.
+    rested: (Vec2, f32),
 }
 
 /// The page shown, if one is.
@@ -139,6 +151,8 @@ pub fn setup(mut commands: Commands) {
             commands.spawn((text("regenerate, a random seed"), placed(button_top(shown) + 5.0, MARGIN + 12.0, Val::Auto, NAME * 1.2), ZIndex(2), part()));
         }
     }
+    let tip = Node { position_type: PositionType::Absolute, right: Val::Px(MARGIN + PANEL + 8.0), max_width: Val::Px(TIP), padding: UiRect::all(Val::Px(8.0)), ..default() };
+    commands.spawn((text(""), tip, BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.85)), ZIndex(4), Visibility::Hidden, Tip));
 }
 
 /// Goes to the next page, or to none after the last, by `U`.
@@ -261,6 +275,34 @@ pub fn slide(
         };
         if text.0 != value {
             text.0 = value;
+        }
+    }
+}
+
+/// Says what a slider does, beside its row, once the pointer has
+/// rested on it a moment -- and no more once it moves.
+pub fn tell(mut hands: ResMut<Hands>, time: Res<Time>, window: Single<&Window>, tip: Single<(&mut Text, &mut Node, &mut Visibility), With<Tip>>) {
+    let (mut said, mut node, mut shown) = tip.into_inner();
+    let pointer = window.cursor_position();
+    let rested = match pointer {
+        Some(pointer) if pointer == hands.rested.0 => hands.rested.1 + time.delta_secs(),
+        _ => 0.0,
+    };
+    hands.rested = (pointer.unwrap_or(Vec2::NEG_ONE), rested);
+    // The row the pointer is on, of the page shown, and its number.
+    let on_panel = pointer.filter(|pointer| pointer.y >= MARGIN && pointer.x >= window.width() - MARGIN - PANEL);
+    let row = on_panel.map(|pointer| ((pointer.y - MARGIN) / ROW) as usize);
+    let told = page().zip(row).and_then(|(page, row)| Some((row, rows(page).nth(row)?))).filter(|_| rested >= REST && hands.dragged.is_none());
+    match told {
+        Some((row, index)) => {
+            if said.0 != TUNED[index].what {
+                said.0 = TUNED[index].what.to_string();
+            }
+            node.top = Val::Px(MARGIN + ROW * row as f32);
+            shown.set_if_neq(Visibility::Visible);
+        }
+        None => {
+            shown.set_if_neq(Visibility::Hidden);
         }
     }
 }

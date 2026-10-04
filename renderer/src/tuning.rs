@@ -19,6 +19,8 @@ pub struct Tuned {
     pub range: (f32, f32),
     /// The page of sliders it is on.
     pub page: Page,
+    /// What it does, said to whoever rests the pointer on its slider.
+    pub what: &'static str,
 }
 
 /// A page of sliders: the numbers tuned together.
@@ -89,32 +91,32 @@ pub const LAND_SPAN: usize = 25;
 /// The numbers, in the order above; the shading's defaults are what was
 /// found by eye with the sliders.
 pub const TUNED: [Tuned; 26] = [
-    Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading },
-    Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading },
-    Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading },
-    Tuned { name: "wall lit", default: 0.55, range: (0.0, 1.0), page: Page::Shading },
-    Tuned { name: "wall fade", default: 0.8, range: (0.0, 1.5), page: Page::Shading },
-    Tuned { name: "shadow", default: 0.4, range: (0.0, 0.8), page: Page::Shading },
-    Tuned { name: "relief", default: 0.7, range: (0.0, 3.0), page: Page::Shading },
-    Tuned { name: "texture", default: 2.0, range: (0.0, 4.0), page: Page::Shading },
-    Tuned { name: "hills (512)", default: 255.0, range: (0.0, 255.0), page: Page::Generation },
-    Tuned { name: "ridges (128)", default: 33.64, range: (0.0, 255.0), page: Page::Generation },
-    Tuned { name: "bumps (32)", default: 91.85, range: (0.0, 255.0), page: Page::Generation },
-    Tuned { name: "roughness (8)", default: 6.0, range: (0.0, 255.0), page: Page::Generation },
-    Tuned { name: "height span", default: 255.0, range: (0.0, 255.0), page: Page::Generation },
-    Tuned { name: "grass cover", default: 0.95, range: (0.0, 1.0), page: Page::Generation },
-    Tuned { name: "patch size (2^)", default: 8.0, range: (1.0, 10.0), page: Page::Generation },
-    Tuned { name: "patch detail", default: 0.6, range: (0.0, 2.0), page: Page::Generation },
-    Tuned { name: "scatter", default: 0.05, range: (0.0, 2.0), page: Page::Generation },
-    Tuned { name: "tree cover", default: 0.06, range: (0.0, 1.0), page: Page::Generation },
-    Tuned { name: "tree patch (2^)", default: 7.0, range: (1.0, 10.0), page: Page::Generation },
-    Tuned { name: "tree detail", default: 0.8, range: (0.0, 2.0), page: Page::Generation },
-    Tuned { name: "tree scatter", default: 0.3, range: (0.0, 2.0), page: Page::Generation },
-    Tuned { name: "ocean level", default: 800.0, range: (0.0, 8192.0), page: Page::Generation },
-    Tuned { name: "coast", default: 64.0, range: (1.0, 1024.0), page: Page::Generation },
-    Tuned { name: "ground level", default: 256.0, range: (0.0, 4096.0), page: Page::Generation },
-    Tuned { name: "land rise", default: 1024.0, range: (0.0, 8192.0), page: Page::Generation },
-    Tuned { name: "land span", default: 14.0, range: (8.0, 20.0), page: Page::Generation },
+    Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading, what: "How much lighter the border of a higher cell is where it faces the sun." },
+    Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading, what: "How much darker the border of a higher cell is where it faces away from the sun." },
+    Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading, what: "How dark the band at the foot of a wall is, on the side away from the sun." },
+    Tuned { name: "wall lit", default: 0.55, range: (0.0, 1.0), page: Page::Shading, what: "How dark the band at the foot of a wall is, on the side the sun is on." },
+    Tuned { name: "wall fade", default: 0.8, range: (0.0, 1.5), page: Page::Shading, what: "How much of its darkness a wall's band has lost at its far edge." },
+    Tuned { name: "shadow", default: 0.4, range: (0.0, 0.8), page: Page::Shading, what: "How much darker ground is under a cast shadow." },
+    Tuned { name: "relief", default: 0.7, range: (0.0, 3.0), page: Page::Shading, what: "How strongly slopes are lit and heights tinted." },
+    Tuned { name: "texture", default: 2.0, range: (0.0, 4.0), page: Page::Shading, what: "How much the ground's pixels differ from one another by lot." },
+    Tuned { name: "hills (512)", default: 255.0, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the broadest octave, 512 cells across. Only its size beside the other three counts." },
+    Tuned { name: "ridges (128)", default: 33.64, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the octave 128 cells across." },
+    Tuned { name: "bumps (32)", default: 91.85, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the octave 32 cells across." },
+    Tuned { name: "roughness (8)", default: 6.0, range: (0.0, 255.0), page: Page::Generation, what: "The share of the hills' height from the finest octave, 8 cells across: rough ground, many walls." },
+    Tuned { name: "height span", default: 255.0, range: (0.0, 255.0), page: Page::Generation, what: "How high the hills stand over the land, in heights: 255 at most." },
+    Tuned { name: "grass cover", default: 0.95, range: (0.0, 1.0), page: Page::Generation, what: "The share of dry land that starts as grass." },
+    Tuned { name: "patch size (2^)", default: 8.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a patch of grass or of dirt is: 2 to this power, in cells." },
+    Tuned { name: "patch detail", default: 0.6, range: (0.0, 2.0), page: Page::Generation, what: "How ragged the patches' edges are: how much finer noise counts beside the patches'." },
+    Tuned { name: "scatter", default: 0.05, range: (0.0, 2.0), page: Page::Generation, what: "How much each cell's own lot counts: grass scattered cell by cell, not in patches." },
+    Tuned { name: "tree cover", default: 0.06, range: (0.0, 1.0), page: Page::Generation, what: "The share of dry land that starts with a tree." },
+    Tuned { name: "tree patch (2^)", default: 7.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a wood is: 2 to this power, in cells." },
+    Tuned { name: "tree detail", default: 0.8, range: (0.0, 2.0), page: Page::Generation, what: "How ragged the woods' edges are." },
+    Tuned { name: "tree scatter", default: 0.3, range: (0.0, 2.0), page: Page::Generation, what: "How much each cell's own lot counts: lone trees, not woods." },
+    Tuned { name: "ocean level", default: 800.0, range: (0.0, 8192.0), page: Page::Generation, what: "The height the ocean stands at, all over the world. Land under it is ocean floor; land over it, islands." },
+    Tuned { name: "coast", default: 64.0, range: (1.0, 1024.0), page: Page::Generation, what: "How many heights over the ocean the land is where the hills reach their whole height: from the shore to there they grow." },
+    Tuned { name: "ground level", default: 256.0, range: (0.0, 4096.0), page: Page::Generation, what: "The height of the lowest ground there is: everything stands on it." },
+    Tuned { name: "land rise", default: 1024.0, range: (0.0, 8192.0), page: Page::Generation, what: "How many heights the land rises over the lowest ground at most: the difference between the deepest ocean floor and the highest inland." },
+    Tuned { name: "land span", default: 14.0, range: (8.0, 20.0), page: Page::Generation, what: "How broad the land's rises are: 2 to this power in cells between the noise's points. 14 is 16 superchunks." },
 ];
 
 /// Counts the changes to how the world is generated: what was made

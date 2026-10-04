@@ -166,12 +166,18 @@ found by eye is then written into the code as the defaults.
   cast shadows 40% darker, 70% of the relief, and twice the texture.
 - **Generation**, in the lab only: below.
 
+The pointer rested on a slider's row for a moment, and what the slider
+does is said beside it (`Tuned::what`).
+
 ## The lab
 
 `cargo run --release -p renderer -- lab [superchunks shown]`, 64 (8 by
 8) if not said, is the renderer run to tune by eye how the world is
-made and how it changes (`src/lab.rs`). The world is of the superchunks
-shown and no more: every one hot from the start and kept so, no sheep,
+made and how it changes (`src/lab.rs`). The world starts as the
+superchunks shown, every one hot, and reaches wherever it is looked at:
+a superchunk that comes into view is generated, made hot and kept so,
+with no bound but memory (about 2.4 MiB each) -- until a slider of
+generation moves or the seed is drawn, when it starts over. No sheep,
 its rules -- grass and trees -- ticking as in any run, paused and paced
 by the same keys. Generation's sliders are shown from the start:
 
