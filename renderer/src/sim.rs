@@ -235,7 +235,7 @@ fn run(superchunks: u32, flock: usize, forced_hot: bool, asked: &Receiver<Reques
 
 /// The superchunks shown: `superchunks` of them in a square, row by row,
 /// the world's origin superchunk ([`WORLD_MIDDLE`]) in its middle.
-fn shown(superchunks: u32) -> Vec<SuperchunkIndex> {
+pub fn shown(superchunks: u32) -> Vec<SuperchunkIndex> {
     let (side, (x, y)) = (square_side(superchunks), WORLD_MIDDLE.cartesian());
     let (left, top) = (x - side / 2, y - side / 2);
     (0..side * side).map(|index| SuperchunkIndex::from_cartesian(left + index % side, top + index / side)).collect()

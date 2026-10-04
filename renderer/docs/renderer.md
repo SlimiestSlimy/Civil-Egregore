@@ -124,8 +124,8 @@ pixels made here.
 | space | pause, and go on |
 | `F` | tick flat out, or at the game's pace (256 ticks a second) |
 | `[` and `]` | halve and double the pace |
-| `B` | show the superchunks' boundaries, or not |
-| `C` | show the chunks' boundaries, or not |
+| `B` | show the superchunks' boundaries, or not; and once a superchunk is 260 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
+| `C` | the same of the chunks, their labels a line below |
 
 ## Layout
 

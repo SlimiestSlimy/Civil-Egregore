@@ -25,8 +25,8 @@
 //! | space | pause, and go on |
 //! | `F` | tick flat out, or at the game's pace |
 //! | `[` and `]` | halve and double the pace |
-//! | `B` | show the superchunks' boundaries, or not |
-//! | `C` | show the chunks' boundaries, or not |
+//! | `B` | show the superchunks' boundaries, or not, and near enough each one's Morton index and `(x, y)` |
+//! | `C` | the same of the chunks |
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -41,7 +41,8 @@ use bevy::asset::RenderAssetUsages;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use coordinates::{square_side, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
+use bevy::sprite::Anchor;
+use coordinates::{place_from_cartesian, square_side, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
 use paint::Picture;
 use sim::{start, Ask, Near, Request, Viewport, TARGET_PACE};
 use std::sync::mpsc::{Receiver, Sender};
@@ -116,6 +117,8 @@ struct Link {
 struct Sprites {
     /// Superchunks along the world's side.
     side: u32,
+    /// Which superchunk each is, row by row.
+    shown: Vec<SuperchunkIndex>,
     /// Each superchunk's image.
     images: Vec<Handle<Image>>,
     /// Pixels along each image's side, as last drawn.
@@ -177,6 +180,19 @@ const SUPERCHUNK_LINE: (Color, f32) = (Color::srgba(1.0, 0.85, 0.2, 0.9), 2.0);
 /// A chunks' boundary's.
 const CHUNK_LINE: (Color, f32) = (Color::srgba(1.0, 1.0, 1.0, 0.45), 1.0);
 
+/// A label in a superchunk's or a chunk's top left corner: one of a
+/// few, given to those in view.
+#[derive(Component)]
+struct Label;
+
+/// Labels there are: what a view can hold of them.
+const LABELS: usize = 256;
+/// Screen pixels a superchunk or a chunk is across before it is labelled.
+const LABELLED_FROM: f32 = 260.0;
+/// Screen pixels from a corner to its label, and from one line of
+/// labels to the next.
+const LABEL_LINE: f32 = 24.0;
+
 /// The text over the world.
 #[derive(Component)]
 struct Hud;
@@ -214,11 +230,11 @@ fn main() {
                 .set(WindowPlugin { primary_window: Some(Window { title: "TileSim".to_string(), ..default() }), ..default() }),
         )
         .insert_resource(Link { requests, frames: Mutex::new(paint::start(frames)), waiting: false, since: SYNC_EVERY, asked: None, paused: false, pace, watch_for })
-        .insert_resource(Sprites { side: square_side(superchunks), images: Vec::new(), sides: Vec::new() })
+        .insert_resource(Sprites { side: square_side(superchunks), shown: sim::shown(superchunks), images: Vec::new(), sides: Vec::new() })
         .init_resource::<Seen>()
         .init_resource::<Boundaries>()
         .add_systems(Startup, setup)
-        .add_systems(Update, (steer, keys, boundaries, show, ask, hud).chain())
+        .add_systems(Update, (steer, keys, boundaries, labels, show, ask, hud).chain())
         .run();
 }
 
@@ -266,6 +282,9 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, mut sprites:
                 commands.spawn((sprite, Transform::from_xyz(x, y, height), Visibility::Hidden, Boundary { of_superchunks, across }));
             }
         }
+    }
+    for _ in 0..LABELS {
+        commands.spawn((Text2d::new(""), Anchor::TOP_LEFT, Transform::from_xyz(0.0, 0.0, 4.0), Visibility::Hidden, Label));
     }
     commands.spawn((
         Text::new(""),
@@ -342,6 +361,64 @@ fn boundaries(
         *visibility = if is_shown { Visibility::Visible } else { Visibility::Hidden };
         let width = pixels * view.scale;
         transform.scale = if boundary.across { Vec3::new(world_side, width, 1.0) } else { Vec3::new(width, world_side, 1.0) };
+    }
+}
+
+/// The camera, and no label: both have a place.
+type CameraOnly = (With<Camera2d>, Without<Label>);
+
+/// Labels the superchunks and chunks in view whose boundaries are
+/// shown, once they are large enough on the screen: each one's Morton
+/// index and its `(x, y)`, in its top left corner -- a chunk's a line
+/// below, clear of its superchunk's.
+fn labels(
+    shown: Res<Boundaries>,
+    sprites: Res<Sprites>,
+    camera: Single<(&Transform, &Projection), CameraOnly>,
+    window: Single<&Window>,
+    mut labels: Query<(&mut Text2d, &mut Transform, &mut Visibility), With<Label>>,
+) {
+    let (transform, projection) = *camera;
+    let Projection::Orthographic(view) = projection else {
+        return;
+    };
+    let half = Vec2::new(window.width(), window.height()) * view.scale / 2.0;
+    let middle = Vec2::new(transform.translation.x, -transform.translation.y);
+    let chunks_a_side = sprites.side * SUPERCHUNK_SIDE as u32;
+    // The chunks in view, counted from the world's top left: every label is at a chunk's corner.
+    let chunk = |cells: f32| ((cells / CHUNK_SIDE as f32).floor().max(0.0) as u32).min(chunks_a_side - 1);
+    let (first, last) = ((chunk(middle.x - half.x), chunk(middle.y - half.y)), (chunk(middle.x + half.x), chunk(middle.y + half.y)));
+    let large = |cells: usize| cells as f32 / view.scale >= LABELLED_FROM;
+    let mut wanted = Vec::new();
+    for y in first.1..=last.1 {
+        for x in first.0..=last.0 {
+            let (within_x, within_y) = (x % SUPERCHUNK_SIDE as u32, y % SUPERCHUNK_SIDE as u32);
+            let superchunk = sprites.shown[((y / SUPERCHUNK_SIDE as u32) * sprites.side + x / SUPERCHUNK_SIDE as u32) as usize];
+            let (superchunk_x, superchunk_y) = superchunk.cartesian();
+            let corner = Vec2::new((x as usize * CHUNK_SIDE) as f32, -((y as usize * CHUNK_SIDE) as f32));
+            if shown.superchunks && large(SPRITE_SIDE as usize) && (within_x, within_y) == (0, 0) {
+                wanted.push((corner, 0.0, format!("superchunk {:011x} ({superchunk_x}, {superchunk_y})", superchunk.0)));
+            }
+            if shown.chunks && large(CHUNK_SIDE) {
+                let place = place_from_cartesian(within_x * CHUNK_SIDE as u32, within_y * CHUNK_SIDE as u32) / CELLS_IN_CHUNK;
+                let (chunk_x, chunk_y) = (superchunk_x * SUPERCHUNK_SIDE as u32 + within_x, superchunk_y * SUPERCHUNK_SIDE as u32 + within_y);
+                wanted.push((corner, 1.0, format!("chunk {:012x} ({chunk_x}, {chunk_y})", ChunkIndex::of(superchunk, place).0)));
+            }
+        }
+    }
+    let mut wanted = wanted.into_iter();
+    for (mut text, mut transform, mut visibility) in &mut labels {
+        let Some((corner, line, label)) = wanted.next() else {
+            *visibility = Visibility::Hidden;
+            continue;
+        };
+        if text.0 != label {
+            text.0 = label;
+        }
+        // As large on the screen however near the view is, and a little in from the corner.
+        let inset = Vec2::new(LABEL_LINE / 4.0, -LABEL_LINE / 4.0 - line * LABEL_LINE) * view.scale;
+        *transform = Transform::from_translation((corner + inset).extend(4.0)).with_scale(Vec3::splat(view.scale));
+        *visibility = Visibility::Visible;
     }
 }
 
