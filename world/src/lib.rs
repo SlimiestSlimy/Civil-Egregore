@@ -23,7 +23,7 @@ pub use tick::{tick_rules, TickCounts, WorldTick};
 use background::{Background, Ticket};
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
-use chunk_storage::{ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
+use chunk_storage::{ChunkStorage, Height, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
 use terrain::{Shape, Terrain, WALLS, WATER};
 use chunk_storage::mock::GRASS;
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
@@ -48,9 +48,10 @@ pub struct Generation {
     pub grass: Patches,
     /// How the trees lie.
     pub trees: Patches,
-    /// The height still water stands at: the ground under it is a lake,
-    /// as deep as it is lower.
-    pub water_level: u8,
+    /// How far over the land at a chunk's middle its still water
+    /// stands: the ground under that level is a lake, as deep as it is
+    /// lower.
+    pub water_level: Height,
 }
 
 impl Generation {
@@ -194,13 +195,23 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
     let water = planes.len();
     planes.extend(WATER);
     let mut cells = vec![[0u64; bitmap::WORDS]; planes.len() * CHUNKS_IN_SUPERCHUNK];
+    // Still water stands at one level all over a chunk: so far over the land at the chunk's middle.
+    let levels: Vec<Height> = (0..CHUNKS_IN_SUPERCHUNK)
+        .map(|chunk| {
+            let (x, y) = cartesian_from_place(chunk * CELLS_IN_CHUNK);
+            let middle = coordinates::CHUNK_SIDE as u32 / 2;
+            let land = generation.shape.ground as u64 + terrain::rise(&generation.shape, seed, left + x + middle, top + y + middle);
+            (land + generation.water_level as u64).min(Height::MAX as u64) as Height
+        })
+        .collect();
     for place in 0..CHUNKS_IN_SUPERCHUNK * CELLS_IN_CHUNK {
         let (x, y) = cartesian_from_place(place);
         let (x, y) = (left + x, top + y);
         let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
         let mut set = |plane: usize| cells[plane * CHUNKS_IN_SUPERCHUNK + chunk][cell / bitmap::BITS_PER_WORD] |= 1 << (cell % bitmap::BITS_PER_WORD);
         // A lake wherever the ground is under the water's level, as deep as it is lower: nothing grows under it.
-        let depth = generation.water_level.saturating_sub(terrain.height(place));
+        // No deeper than its eight bits tell.
+        let depth = levels[chunk].saturating_sub(terrain.height(place)).min(u8::MAX as Height);
         if depth > 0 {
             (0..WATER.len()).filter(|bit| depth >> bit & 1 == 1).for_each(|bit| set(water + bit));
             continue;

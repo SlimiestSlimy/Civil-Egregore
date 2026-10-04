@@ -19,12 +19,12 @@ pub mod transient_data;
 
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{Height, HeightMap, LayerType};
-use coordinates::{place_from_cartesian, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{cartesian_from_place, place_from_cartesian, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
 use utilities::hash::{mix, GOLDEN_RATIO};
 
 /// The most two cells beside one another may differ in height and still
 /// be stepped between.
-pub const STEP: u8 = 1;
+pub const STEP: Height = 1;
 
 /// A wall between a cell and the cell to its east: the layer of the
 /// cells that keep one.
@@ -39,7 +39,9 @@ pub const WALLS: [(LayerType, (i32, i32)); 2] = [(WALL_EAST, (1, 0)), (WALL_SOUT
 /// as a power of two. Broad hills, and rougher ground on them.
 const OCTAVES: [u32; 4] = [9, 7, 5, 3];
 
-/// How the heights are shaped. The ground everywhere is a base, rolling
+/// How the heights are shaped. The land rises and falls by far more
+/// than a hill over many superchunks ([`rise`]), too gently for a wall.
+/// On it the ground everywhere is a base, rolling
 /// so broadly that it is all but flat; hills stand on it only where a
 /// mask, as broad, is over a threshold, rising from nothing at the
 /// threshold -- so the rest is plains. The base's share of a height and
@@ -53,6 +55,13 @@ pub struct Shape {
     /// The mask under which the ground is plains, of [`ONE`]: about the
     /// share of the world that is.
     pub plains: u64,
+    /// The height the lowest ground is at: what all the rest stands on.
+    pub ground: Height,
+    /// The most the land rises over the lowest ground, in heights.
+    pub rise: u64,
+    /// The cells between two points of the land's rise, as a power of
+    /// two: at most 24.
+    pub rise_span: u32,
 }
 
 /// The cells between two points of the base and of the plains' mask,
@@ -70,7 +79,7 @@ impl Shape {
     /// The world's shape, as tuned by eye in the renderer's lab: broad
     /// hills, little of the ridges, a good deal of bumps, on half the
     /// world; plains on the rest.
-    pub const DEFAULT: Self = Self { weights: [142, 19, 51, 3], base: 40, plains: ONE / 2 };
+    pub const DEFAULT: Self = Self { weights: [142, 19, 51, 3], base: 40, plains: ONE / 2, ground: 256, rise: 1024, rise_span: 14 };
 }
 
 /// One: a fraction's whole, 16 bits.
@@ -103,6 +112,16 @@ pub fn noise(seed: u64, index: u32, shift: u32, x: u32, y: u32) -> u64 {
     between(upper, lower, down)
 }
 
+/// How far the land has risen over the lowest ground at the cell
+/// `(x, y)`, in heights: noise far broader than a superchunk and far
+/// higher than a hill, with a quarter as much again a quarter as broad.
+pub fn rise(shape: &Shape, seed: u64, x: u32, y: u32) -> u64 {
+    let index = OCTAVES.len() as u32 + 2;
+    let span = shape.rise_span.clamp(2, 24);
+    let land = 3 * noise(seed, index, span, x, y) + noise(seed, index + 1, span - 2, x, y);
+    (land * shape.rise) >> 18
+}
+
 /// The height of the cell at `(x, y)` of the world whose seed is `seed`:
 /// whole numbers only, so the same on any machine.
 pub fn height(seed: u64, x: u32, y: u32) -> Height {
@@ -115,11 +134,13 @@ pub fn height_shaped(shape: &Shape, seed: u64, x: u32, y: u32) -> Height {
     let base = noise(seed, OCTAVES.len() as u32, BROAD, x, y) * shape.base;
     // How much of the hills stands here: none on the plains.
     let relief = (noise(seed, OCTAVES.len() as u32 + 1, BROAD, x, y).saturating_sub(shape.plains) * FOOTHILLS).min(ONE);
+    // The highest there is, whatever the shape would come to.
+    let over = |heights: u64| (shape.ground as u64 + rise(shape, seed, x, y) + heights).min(Height::MAX as u64) as Height;
     if relief == 0 {
-        return (base >> 16) as Height;
+        return over(base >> 16);
     }
     let hills: u64 = OCTAVES.iter().zip(shape.weights).enumerate().map(|(index, (&shift, weight))| noise(seed, index as u32, shift, x, y) * weight).sum();
-    ((base + ((hills * relief) >> 16)) >> 16) as Height
+    over((base + ((hills * relief) >> 16)) >> 16)
 }
 
 /// Whether two heights are too far apart to step between.
@@ -163,13 +184,15 @@ impl Terrain {
             }
         }
         let at = |x: i32, y: i32| grid[(y + 1) as usize * wide + (x + 1) as usize];
-        let mut heights = HeightMap::default();
+        let heights = HeightMap::from_heights(|place| {
+            let (x, y) = cartesian_from_place(place);
+            at(x as i32, y as i32)
+        });
         let mut walls: [Box<[CellWords; CHUNKS_IN_SUPERCHUNK]>; 2] = std::array::from_fn(|_| Box::new([[0; WORDS]; CHUNKS_IN_SUPERCHUNK]));
         for y in 0..side {
             for x in 0..side {
                 let place = place_from_cartesian(x as u32, y as u32);
                 let here = at(x, y);
-                heights.set(place, here);
                 let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
                 for (way, &(_, (dx, dy))) in WALLS.iter().enumerate() {
                     if wall(here, at(x + dx, y + dy)) {

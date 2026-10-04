@@ -15,6 +15,7 @@
 //! kept.
 
 use coordinates::SUPERCHUNK_SIDE_CELLS;
+use chunk_storage::Height;
 use terrain::{height_shaped, wall, Shape};
 
 /// Cells along a superchunk's side.
@@ -43,8 +44,6 @@ const LIT_ONE: f32 = 80.0;
 const SHADOWED: u8 = 0x80;
 /// A colour's factor in a byte: this is one.
 pub const FACTOR_ONE: u32 = 128;
-/// A shadow line's height in 16 bits: this is one height.
-const LINE_ONE: f32 = 64.0;
 /// What a cast shadow does to a colour: darker, and bluer.
 pub const SHADOW: [f32; 3] = [0.6, 0.65, 0.82];
 /// How much darker a pixel wholly of cliffs is.
@@ -74,10 +73,10 @@ const fn contour_every(detail: usize) -> f32 {
 /// and the two finest levels.
 pub struct Fine {
     /// Its cells' heights, and a cell more all round, row by row.
-    heights: Vec<u8>,
+    heights: Vec<Height>,
     /// How high the shadow line stands over each, laid out as the
-    /// heights, of [`LINE_ONE`].
-    lines: Vec<u16>,
+    /// heights.
+    lines: Vec<f32>,
     /// Each cell's light, of [`LIT_ONE`] -- hillshade and tint -- and
     /// whether a shadow falls on it ([`SHADOWED`]).
     lit: Vec<u8>,
@@ -91,13 +90,13 @@ impl Fine {
     }
 
     /// The height of the cell `(x, y)`.
-    pub fn height(&self, x: isize, y: isize) -> u8 {
+    pub fn height(&self, x: isize, y: isize) -> Height {
         self.heights[Self::kept(x, y)]
     }
 
     /// How high the shadow line stands over the cell `(x, y)`, in heights.
     pub fn line(&self, x: isize, y: isize) -> f32 {
-        self.lines[Self::kept(x, y)] as f32 / LINE_ONE
+        self.lines[Self::kept(x, y)]
     }
 
     /// The light of the cell `(x, y)`: 1 flat ground's, shadows apart.
@@ -141,7 +140,7 @@ impl Ground {
                 let here = at(x, y);
                 let slope = HEIGHT_METRES / CELL_METRES / 2.0;
                 let (across, down) = ((smooth[here + 1] - smooth[here - 1]) * slope, (smooth[here + WIDE] - smooth[here - WIDE]) * slope);
-                let light = banded(1.0 + 0.9 * (sun.shade(across, down) - 1.0), 0.07).clamp(0.55, 1.35) * tint(heights[here]);
+                let light = banded(1.0 + 0.9 * (sun.shade(across, down) - 1.0), 0.07).clamp(0.55, 1.35) * tint(heights[here].saturating_sub(shape.ground) as f32 / (shape.rise + 255) as f32);
                 lit[y * SIDE + x] = (light * LIT_ONE).round() as u8 | if shadowed[here] { SHADOWED } else { 0 };
                 level.factors.push(if shadowed[here] { SHADOW.map(|shadow| shadow * light) } else { [light; 3] });
                 level.heights.push(heights[here] as f32);
@@ -155,14 +154,14 @@ impl Ground {
         }
         // What is kept: the superchunk's cells and one more all round.
         let kept = || (0..KEPT * KEPT).map(|index| (index / KEPT + BEFORE - 1) * WIDE + index % KEPT + BEFORE - 1);
-        let fine = Fine { heights: kept().map(|index| heights[index]).collect(), lines: kept().map(|index| (lines[index] * LINE_ONE).round() as u16).collect(), lit };
+        let fine = Fine { heights: kept().map(|index| heights[index]).collect(), lines: kept().map(|index| lines[index]).collect(), lit };
         Self { levels, fine: Some(fine), used: 0 }
     }
 }
 
 /// The heights about the superchunk whose top left cell is `top_left`:
 /// [`WIDE`] a side, row by row.
-fn heights(seed: u64, shape: &Shape, top_left: (u32, u32)) -> Vec<u8> {
+fn heights(seed: u64, shape: &Shape, top_left: (u32, u32)) -> Vec<Height> {
     let (left, top) = (top_left.0.wrapping_sub(BEFORE as u32), top_left.1.wrapping_sub(BEFORE as u32));
     (0..WIDE * WIDE).map(|index| height_shaped(shape, seed, left.wrapping_add((index % WIDE) as u32), top.wrapping_add((index / WIDE) as u32))).collect()
 }
@@ -196,7 +195,7 @@ fn smoothed(heights: &[f32]) -> Vec<f32> {
 /// height, or the line of the cell up the diagonal less
 /// [`shadow_drop`], whichever is higher -- and whether that line is
 /// over the cell: a shadow on it.
-fn shadow_lines(heights: &[u8]) -> (Vec<f32>, Vec<bool>) {
+fn shadow_lines(heights: &[Height]) -> (Vec<f32>, Vec<bool>) {
     let drop = shadow_drop();
     let (mut lines, mut shadowed) = (vec![0.0; WIDE * WIDE], vec![false; WIDE * WIDE]);
     for index in 0..WIDE * WIDE {
@@ -235,9 +234,10 @@ fn banded(light: f32, step: f32) -> f32 {
     1.0 + ((light - 1.0) / step).round() * step
 }
 
-/// The tint of ground `height` high: low a little darker, high a little lighter.
-fn tint(height: u8) -> f32 {
-    0.86 + 0.26 * (height as f32 / 255.0)
+/// The tint of ground `over` the lowest there is, as a share of the
+/// highest: low a little darker, high a little lighter.
+fn tint(over: f32) -> f32 {
+    0.86 + 0.26 * over.min(1.0)
 }
 
 /// The ground at one detail, before cliffs and contours: a pixel a tile of cells.

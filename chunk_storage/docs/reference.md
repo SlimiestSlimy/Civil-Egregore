@@ -4,11 +4,15 @@ The design is in `chunk_storage.md`.
 
 ## `height_map.rs`
 
-**`HeightMap`**: a superchunk's heights, 8 a word, Morton order over the
-whole superchunk. **`filled`**, **`from_words`**, **`get`**/**`set`**
-by chunk place and cell place, **`words`**. **`height_in(words, chunk,
-cell)`**: one height from an image's words. `HEIGHT_WORDS`: a height
-map's words.
+**`Height`**: 16 bits. **`HeightMap`**: a superchunk's heights -- 16
+chunk floors, a mask of the tall chunks, a byte a cell in Morton order,
+and each tall chunk's 16-bit map after. **`filled`**,
+**`from_heights(at)`** (settles floors and which chunks are tall),
+**`from_words`**, **`get`**, **`floor(chunk)`**, **`tall(chunk)`**,
+**`set`** (narrow chunks, within the floor's 255), **`words`**.
+**`height_in(words, place)`**: one height from an image's words.
+`HEIGHT_WORDS`: a map's words with no tall chunk; `TALL_WORDS`: a tall
+chunk's more; **`words_of(words)`**: a map's length from its start.
 
 ## `layer_codec.rs`
 

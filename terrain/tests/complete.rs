@@ -8,7 +8,7 @@ use terrain::{wall, Terrain};
 
 /// The height of the cell `(x, y)` of a superchunk's `terrain`, from
 /// its top left.
-fn at(terrain: &Terrain, x: u32, y: u32) -> u8 {
+fn at(terrain: &Terrain, x: u32, y: u32) -> u16 {
     terrain.height(place_from_cartesian(x, y))
 }
 

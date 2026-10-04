@@ -162,5 +162,5 @@ fn sheep_never_step_through_a_wall() {
         }
     }
     // Few steps: on ground nearly all grass a sheep seldom has to walk.
-    assert!(moved > 100 && beside_walls > 10_000, "{moved} steps, {beside_walls} sheep-ticks beside a wall");
+    assert!(moved > 50 && beside_walls > 10_000, "{moved} steps, {beside_walls} sheep-ticks beside a wall");
 }

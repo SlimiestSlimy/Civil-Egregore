@@ -20,8 +20,11 @@ A superchunk, in the cold pool and on disk alike, is one run of words, every
 part starting on a word:
 
 1. **the chunk table**: each of its 16 chunks' offset, in Morton order;
-2. **the height map**: 1024x1024 heights, raw, 8 a word, in Morton
-   order -- each chunk's one 64 KiB run (`HeightMap`);
+2. **the height map** (`HeightMap`): a floor of 16 bits for each
+   chunk, a mask of the tall chunks, then 1024x1024 bytes, 8 a word, in
+   Morton order -- each cell's height over its chunk's floor, each
+   chunk's one 64 KiB run; then, for each tall chunk (one whose heights
+   span more than 255), its heights whole, 16 bits a cell, 128 KiB;
 3. **its chunks**, in Morton order, each its layer count, its layer
    table -- a type and an offset per layer, sorted by type, the offset
    from the chunk's start -- and its encoded layers, in no order.
