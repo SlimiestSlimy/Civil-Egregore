@@ -67,8 +67,8 @@ impl Edge {
             }
             // A wall the sun is on: a dark foot and, facing it, a bright line.
             2.. => (1.0 - 0.55 * within(0.0, 2.0), 1.0 + if facing > 0 { 0.3 * within(2.0, 3.0) } else { 0.0 }),
-            1 if facing < 0 => (1.0 - 0.16 * within(0.0, 1.0), 1.0),
-            1 if facing > 0 => (1.0, 1.0 + 0.08 * within(0.0, 1.0)),
+            1 if facing < 0 => (1.0 - 0.26 * within(0.0, 1.0), 1.0),
+            1 if facing > 0 => (1.0, 1.0 + 0.16 * within(0.0, 1.0)),
             // The lip over a wall.
             ..=-2 => (1.0, 1.0 + 0.32 * within(0.0, 1.0)),
             _ => (1.0, 1.0),
