@@ -91,7 +91,7 @@ fn layer_types() -> Vec<LayerType> {
 /// it, for now, pasture: dirt, a third of it grass. Each from the seed
 /// and where it is ([`generate_image`]).
 pub fn generate(seed: u64, sheep: usize) -> World {
-    let mut world = World::empty(WorldInfo { name: String::new(), seed, tick: 0, layers: layer_types() });
+    let mut world = World::empty(WorldInfo { name: String::new(), seed, tick: 0, layers: layer_types(), loading: Vec::new() });
     world.keep_hot(&[WORLD_MIDDLE]);
     flock(&mut world.entities, WORLD_MIDDLE, sheep, &mut Rng::for_stream(!seed, WORLD_MIDDLE.0));
     world.entities.apply();
