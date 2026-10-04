@@ -324,6 +324,7 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, mut sprites:
     }
     commands.spawn((
         Text::new(""),
+        TextFont { font_size: FontSize::Px(13.0), ..default() },
         Node { position_type: PositionType::Absolute, top: Val::Px(8.0), left: Val::Px(8.0), padding: UiRect::all(Val::Px(6.0)), ..default() },
         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
         Hud,
@@ -352,7 +353,7 @@ fn steer(
     let up = held([KeyCode::KeyW, KeyCode::ArrowUp]) - held([KeyCode::KeyS, KeyCode::ArrowDown]);
     let step = PAN_SPEED * window.height() * view.scale * time.delta_secs();
     transform.translation += Vec3::new(across * step, up * step, 0.0);
-    if buttons.pressed(MouseButton::Left) && !sliders::pointer_over(&window) {
+    if buttons.pressed(MouseButton::Left) && !sliders::held() {
         // The world follows the pointer.
         transform.translation += Vec3::new(-motion.delta.x, motion.delta.y, 0.0) * view.scale;
     }
