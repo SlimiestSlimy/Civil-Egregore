@@ -121,9 +121,9 @@ fn entities_wake_at_their_tick() {
 }
 
 /// Walkers stepping right a cell a tick cross into the next superchunk,
-/// as whole copies, attributes and all -- the one left behind gone a
-/// tick later -- and at the edge of the hot superchunks stay, lost to
-/// nowhere.
+/// as whole copies, attributes and all -- the one left behind gone by
+/// the tick's end -- and at the edge of the hot superchunks stay, lost
+/// to nowhere.
 #[test]
 fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
     let (mut arena, mut entities) = world(2);
@@ -143,11 +143,10 @@ fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
         simulation.tick(&mut arena, &mut entities, tick, step);
         most = most.max(entities.len());
     }
-    assert_eq!(most, 2, "here and there for the tick it crossed in");
+    assert_eq!(most, 1, "never here and there at a tick's end");
     let right = SuperchunkIndex::from_cartesian(11, 10);
     let entity = entities.superchunk(right).and_then(|superchunk| superchunk.iter().next()).expect("in the right neighbour");
     assert_eq!((entity.header.at, entity.attribute(WOKEN)), (cell(start + 10, 100), Some(10)));
-    assert_eq!(entities.len(), 1, "the one left behind removed");
     for tick in 10..1100 {
         simulation.tick(&mut arena, &mut entities, tick, step);
     }
@@ -322,8 +321,8 @@ fn a_change_to_an_entity_that_moved_on_is_passed_over() {
 
 /// Entities never overlap: walkers crowded together, stepping at random
 /// onto each other's cells, across chunk and superchunk borders, and
-/// breeding onto cells drawn at random, stand one to a cell after every
-/// tick -- and the cells a turn reads as stood on, about any cell and
+/// breeding onto cells drawn at random, stand one to a cell, and each on
+/// one cell, after every tick -- and the cells a turn reads as stood on, about any cell and
 /// across those borders, are the cells they stand on.
 #[test]
 fn entities_never_overlap() {
@@ -357,10 +356,13 @@ fn entities_never_overlap() {
     for tick in 0..400 {
         let report = simulation.tick(&mut arena, &mut entities, tick, jostle);
         (stayed, refused) = (stayed + report.instructions_applied.stayed, refused + report.instructions_applied.refused);
-        crossed += entities.superchunks().iter().map(|superchunk| superchunk.crossings().len()).sum::<usize>();
+        crossed += report.instructions_applied.crossed;
         let mut cells: Vec<CellIndex> = entities.iter().map(|entity| entity.header.at).collect();
         cells.sort_unstable();
         assert!(cells.windows(2).all(|pair| pair[0] != pair[1]), "tick {tick}: two entities on a cell");
+        let mut ids: Vec<EntityId> = entities.iter().map(|entity| entity.header.id).collect();
+        ids.sort_unstable();
+        assert!(ids.windows(2).all(|pair| pair[0] != pair[1]), "tick {tick}: an entity on two cells");
         if tick % 50 == 0 {
             let reader = EntityReader::new(entities.superchunks());
             for at in 0..40u32 {

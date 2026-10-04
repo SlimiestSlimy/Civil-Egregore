@@ -33,5 +33,5 @@ mod wheel;
 
 pub use instructions::{Instructions, InstructionsApplied};
 pub use entity::{attribute, remove_attribute, set_attribute, Attribute, AttributeType, EntityEdit, EntityId, EntityRef, EntityType, Header, NEVER};
-pub use store::{Crossing, Entities, EntityReader, SuperchunkEntities, OCCUPIED_SIDE};
+pub use store::{Entities, EntityReader, SuperchunkEntities, OCCUPIED_SIDE};
 pub use wheel::{Wake, WHEEL_TICKS};

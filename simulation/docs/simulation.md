@@ -65,9 +65,11 @@ every step -- but can: `Turn::occupied` reads the cells
 entities stand on about a cell from the buckets, a word tile being a
 run of a bucket's places. No bitplane of them is kept: it cost
 a fifth of the ticks on 12 threads. Crossing to another
-superchunk, an entity is put there as new and stays here asleep a
-tick, until the next tick's first phase reads whether it arrived
-(`Crossing`): two superchunks changed apart tell each other nothing.
+superchunk, an entity is put there as new and changed here as if
+its cell there were taken; once the second phase is over, each one put
+there is removed here (`Entities::settle_crossings`). So its cell is
+never left for one it cannot have, and between ticks every entity
+stands on one cell.
 
 They tick in the same two phases as the cells. In the first, a
 superchunk's entities waking run the rule (`Turn::woken`) in

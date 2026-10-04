@@ -31,33 +31,19 @@ pub struct SuperchunkEntities {
     chunks: [Bucket; CHUNKS_IN_SUPERCHUNK],
     /// When each entity wakes.
     wheel: Wheel,
-    /// The entities crossing to another superchunk.
-    crossings: Vec<Crossing>,
+    /// The entities that crossed into it this tick, each with the cell
+    /// it left in another superchunk: to be removed from there
+    /// ([`Entities::settle_crossings`]).
+    arrived: Vec<(EntityId, CellIndex)>,
     /// Room for the attributes of an entity moving, with those it has,
     /// from one chunk's bucket to another's.
     carried: Vec<Attribute>,
 }
 
-/// An entity crossing to another superchunk: it asked, last tick, to be
-/// put there, and stays here, asleep, until this tick finds whether it
-/// was -- the cell it crossed to may have been taken. So a cell is
-/// never left for one that cannot be had, and the two superchunks,
-/// changed apart, need tell each other nothing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Crossing {
-    /// Its ID.
-    pub id: EntityId,
-    /// The cell it stands on, here.
-    pub at: CellIndex,
-    /// The cell it crossed to.
-    pub to: CellIndex,
-}
-
-
 impl SuperchunkEntities {
     /// No entities, in `superchunk`.
     pub fn new(superchunk: SuperchunkIndex) -> Self {
-        Self { index: superchunk, chunks: Default::default(), wheel: Wheel::default(), crossings: Vec::new(), carried: Vec::new() }
+        Self { index: superchunk, chunks: Default::default(), wheel: Wheel::default(), arrived: Vec::new(), carried: Vec::new() }
     }
 
     /// Which superchunk it is.
@@ -192,24 +178,10 @@ impl SuperchunkEntities {
         self.chunks[at.chunk().place()].remove(id, at)
     }
 
-    /// Notes that the entity whose ID is `id`, on `at`, is crossing to
-    /// `to`, a cell of another superchunk: to be settled next tick
-    /// ([`SuperchunkEntities::crossings`]).
-    pub(crate) fn cross(&mut self, id: EntityId, at: CellIndex, to: CellIndex) {
-        self.crossings.push(Crossing { id, at, to });
-    }
-
-    /// The entities that were crossing to another superchunk when the
-    /// last tick ended: each still stands here, asleep, until it is
-    /// known whether it arrived.
-    pub fn crossings(&self) -> &[Crossing] {
-        &self.crossings
-    }
-
-    /// Forgets the crossings: settled, each of them, in the tick's first
-    /// phase.
-    pub(crate) fn clear_crossings(&mut self) {
-        self.crossings.clear();
+    /// Notes that the entity whose ID is `id` crossed into this
+    /// superchunk from `left`, a cell of another.
+    pub(crate) fn arrived(&mut self, id: EntityId, left: CellIndex) {
+        self.arrived.push((id, left));
     }
 
     /// Passes `tick`, just run, on the wheel.
@@ -257,14 +229,17 @@ impl Entities {
         Self { now, ..Self::default() }
     }
 
-    /// Notes `crossing` again, as a save kept it: its entity stands in
-    /// a superchunk kept here. Whether it was.
-    pub fn restore_crossing(&mut self, crossing: Crossing) -> bool {
-        let Ok(at) = self.superchunks.binary_search_by_key(&crossing.at.superchunk(), SuperchunkEntities::index) else {
-            return false;
-        };
-        self.superchunks[at].cross(crossing.id, crossing.at, crossing.to);
-        true
+    /// Removes each entity that crossed into another superchunk from
+    /// the cell it left: until then it stood on both, so that, its new
+    /// cell taken, it stays where it stood. Run once the second phase
+    /// is over, so between ticks every entity stands on one cell.
+    pub(crate) fn settle_crossings(&mut self) {
+        let arrived: Vec<(EntityId, CellIndex)> = self.superchunks.iter_mut().flat_map(|superchunk| superchunk.arrived.drain(..)).collect();
+        for (id, left) in arrived {
+            if let Ok(at) = self.superchunks.binary_search_by_key(&left.superchunk(), SuperchunkEntities::index) {
+                self.superchunks[at].remove(id, left);
+            }
+        }
     }
 
     /// How many entities there are.
