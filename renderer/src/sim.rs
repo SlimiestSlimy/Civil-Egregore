@@ -151,6 +151,10 @@ pub struct Frame {
     pub detail: u32,
     /// The cells seen from near ([`Ask::near`]).
     pub near: Option<Near>,
+    /// How many times how the world is generated had changed
+    /// ([`crate::tuning::generation`]): the ground made under an
+    /// earlier count is made again.
+    pub generation: u64,
     /// The superchunks asked for.
     pub cells: Vec<Cells>,
 }
@@ -192,7 +196,7 @@ fn run(superchunks: u32, flock: usize, forced_hot: bool, asked: &Receiver<Reques
                     let (sheep, grass, cells) = (world.entities.len(), grass(&world), copy(&world, &shown, ask));
                     let sync_seconds = asked_at.elapsed().as_secs_f64();
                     let sync_share = if elapsed > 0.0 { sync_seconds / elapsed } else { 0.0 };
-                    let frame = Frame { tick, ticks_a_second, sheep, grass, sync_seconds, sync_share, detail: ask.detail, near: ask.near, cells };
+                    let frame = Frame { tick, ticks_a_second, sheep, grass, sync_seconds, sync_share, detail: ask.detail, near: ask.near, generation: crate::tuning::generation(), cells };
                     if answers.send(frame).is_err() {
                         return;
                     }

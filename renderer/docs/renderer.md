@@ -6,7 +6,7 @@ ground lit by its height (below). The world is a generated one
 (`world::generate_flocks`, seed 1).
 
 `cargo run --release -p renderer -- [superchunks shown] [sheep a superchunk] [ticks a second, 0 flat out] [ticks to watch for] [1 to force hot]`;
-256 superchunks shown, 8,000 sheep on each and 256 ticks a second if
+49 superchunks shown, 8,000 sheep on each and 256 ticks a second if
 not said: a flock that reaches the most the grass feeds, some 16,000 a
 superchunk, within 70,000 ticks, and has not eaten it bare before.
 
@@ -128,7 +128,7 @@ pixels made here.
 | space | pause, and go on |
 | `T` | tick flat out, or at the game's pace (256 ticks a second) |
 | `F` | the window over the whole screen, or not |
-| `U` | show the sliders, or not |
+| `U` | the next page of sliders, or none |
 | `[` and `]` | halve and double the pace |
 | `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |
@@ -136,21 +136,48 @@ pixels made here.
 
 ## Sliders
 
-Hidden until `U` is pressed: the shading is tuned, and they are kept
-for what is tuned next. At the window's top right, a slider each of the numbers the near
-view's shading is tuned by (`src/tuning.rs`): how light and dark a
-step's lines are, a wall's band facing away from the sun and towards
-it and how it fades, the cast shadows,
-how much relief and how much texture. The left button drags
-one, the right sets it back to its default. The painter reads them
-each frame; they are kept when a slider is let go, in
-`transient_data/tuning.txt`, and taken up again the next run -- what
-is found by eye is then written into the code as the defaults.
+At the window's top right, a page of sliders at a time, each a number
+of `src/tuning.rs`; `U` goes to the next page, and to none. The left
+button drags a knob, the right sets the number back to its default.
+Beside each is a box with its value: a click on it and the value is
+typed -- digits and a point, Enter to set it, Escape to leave it. The
+numbers are kept whenever one is settled, in
+`transient_data/tuning.txt`, and taken up again the next run -- what is
+found by eye is then written into the code as the defaults.
 
-As tuned: the border lines 35% lighter and darker, a wall's band 49%
-darker at its foot facing away from the sun and 55% with the sun on
-it, fading by 80% across it, cast shadows 40% darker, 70% of the
-relief, and twice the texture.
+- **Shading**: the near view's -- how light and dark the border lines
+  are, a wall's band facing away from the sun and towards it and how
+  it fades, the cast shadows, how much relief and how much texture.
+  The painter reads them each frame. As tuned: the border lines 35%
+  lighter and darker, a wall's band 49% darker at its foot facing away
+  from the sun and 55% with the sun on it, fading by 80% across it,
+  cast shadows 40% darker, 70% of the relief, and twice the texture.
+- **Generation**, in the lab only: below.
+
+## The lab
+
+`cargo run --release -p renderer -- lab [superchunks shown]`, 49 if not
+said, is a mode to tune by eye how the world is made (`src/lab.rs`). In
+place of the simulation a thread only generates: no sheep, no tick. A
+superchunk is generated the first time it is in view and kept from then
+on. Generation's sliders are shown from the start:
+
+- **The heights**: how much of a height each of the four octaves makes
+  up beside the others -- hills 512 cells across, ridges 128, bumps 32,
+  roughness 8 -- and the height span they come to together, 255 at
+  most (`terrain::Shape`, `terrain::height_shaped`).
+- **The grass** (`world::pasture`): in patches, not scattered cell by
+  cell. A cell's number is smooth noise as broad as a patch, finer
+  noise on it (patch detail), and a lot drawn for the cell alone
+  (scatter); it is grass under a threshold found, by looking at 16,384
+  cells, so that the share asked for (grass cover) is grass.
+- **The button** draws a new seed off the clock; the seed is shown in
+  the text.
+
+Whenever a slider of generation moves or the seed is drawn, all that
+was kept is dropped, the painter's ground with it, and what is in view
+is generated again. Worlds themselves are still made as before
+(`world::generate_image`): what is settled here is to be written there.
 
 ## Layout
 
@@ -160,7 +187,8 @@ relief, and twice the texture.
 | `src/paint.rs` | the painter's thread: cells into pixels |
 | `src/ground.rs` | the light on the ground: heights from the seed, hillshade, tint, cast shadows, cliffs and contours |
 | `src/tuning.rs` | the numbers the near view's shading is tuned by, kept between runs |
-| `src/sliders.rs` | the sliders that set them |
+| `src/sliders.rs` | the sliders that set them, their value boxes and the button |
+| `src/lab.rs` | the lab: a thread that only generates, in place of the simulation |
 | `src/near.rs` | the cells in view from near as one picture: steps and walls at their edges |
 | `src/main.rs` | the window: the camera, an image a superchunk, the keys, the text |
 | `docs/` | this, and the reference, function by function |

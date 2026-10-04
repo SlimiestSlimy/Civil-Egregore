@@ -15,7 +15,7 @@
 //! kept.
 
 use coordinates::SUPERCHUNK_SIDE_CELLS;
-use terrain::{height, wall};
+use terrain::{height_shaped, wall, Shape};
 
 /// Cells along a superchunk's side.
 pub const SIDE: usize = SUPERCHUNK_SIDE_CELLS as usize;
@@ -126,9 +126,9 @@ impl Ground {
     }
 
     /// The ground of the superchunk whose top left cell is `top_left`,
-    /// in the world whose seed is `seed`.
-    pub fn generate(seed: u64, top_left: (u32, u32)) -> Self {
-        let heights = heights(seed, top_left);
+    /// in the world whose seed is `seed`, shaped as `shape` says.
+    pub fn generate(seed: u64, shape: &Shape, top_left: (u32, u32)) -> Self {
+        let heights = heights(seed, shape, top_left);
         let smooth = smoothed(&smoothed(&heights.iter().map(|&height| height as f32).collect::<Vec<_>>()));
         let (lines, shadowed) = shadow_lines(&heights);
         let at = |x: usize, y: usize| (y + BEFORE) * WIDE + x + BEFORE;
@@ -162,9 +162,9 @@ impl Ground {
 
 /// The heights about the superchunk whose top left cell is `top_left`:
 /// [`WIDE`] a side, row by row.
-fn heights(seed: u64, top_left: (u32, u32)) -> Vec<u8> {
+fn heights(seed: u64, shape: &Shape, top_left: (u32, u32)) -> Vec<u8> {
     let (left, top) = (top_left.0.wrapping_sub(BEFORE as u32), top_left.1.wrapping_sub(BEFORE as u32));
-    (0..WIDE * WIDE).map(|index| height(seed, left.wrapping_add((index % WIDE) as u32), top.wrapping_add((index / WIDE) as u32))).collect()
+    (0..WIDE * WIDE).map(|index| height_shaped(shape, seed, left.wrapping_add((index % WIDE) as u32), top.wrapping_add((index / WIDE) as u32))).collect()
 }
 
 /// `heights` smoothed: each the mean of those [`SMOOTHED_OVER`] cells

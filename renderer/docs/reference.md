@@ -54,7 +54,7 @@ diagonal. **`contour_every(detail)`**.
 **`Fine`**: heights, shadow lines and light, a cell each --
 **`height(x, y)`**, **`line(x, y)`**, **`light(x, y)`**.
 **`Ground`** `{levels, fine, used}`: a level of factors a detail;
-**`generate(seed, top_left)`**; **`coarsen()`**: the fine parts dropped.
+**`generate(seed, shape, top_left)`**; **`coarsen()`**: the fine parts dropped.
 **`heights`**, **`smoothed`**, **`shadow_lines`**: the steps of making
 it. **`Sun`**: **`shade(across, down)`**, the light on a slope.
 **`banded`**, **`tint`**. **`Level`**: the ground at one detail --
@@ -72,20 +72,37 @@ grounds, near)`**: the picture. **`Cell`**: **`paint`**, a cell's pixels
 
 ## `tuning.rs`
 
-**`Tuned`** `{name, default, range}`; `TUNED`, the eight of them, and each
-one's place (`STEP_LIGHT` ... `TEXTURE`). **`Tuning`**: the numbers read
-together. **`path()`**: where they are kept. **`start()`**: defaults,
-then what was kept. **`now()`**, **`set(index, value)`**, **`keep()`**.
+**`Tuned`** `{name, default, range, page}`; **`Page`**: `Shading`,
+`Generation`; `TUNED`, the seventeen of them, and each one's place
+(`STEP_LIGHT` ... `TEXTURE`, `HILLS` ... `SCATTER`). **`Tuning`**: the
+numbers read together. **`path()`**: where they are kept. **`start()`**:
+defaults, then what was kept. **`now()`**, **`set(index, value)`**,
+**`keep()`**. **`generation()`**: how many times how the world is
+generated has changed; **`regenerate()`**: says it has.
 
 ## `sliders.rs`
 
-`MARGIN`, `ROW`, `TRACK`, `KNOB`, `PANEL`, `NAME`: the layout. **`Fill`**,
-**`Knob`**, **`Named`**: a slider's filled part, its knob and its text.
-**`Dragged`**: the one being dragged. **`held()`**: whether the left
-button went down over them and is still held -- the view is then not
-dragged; **`pointer_over(window)`**.
-**`Part`**: anything of them; **`toggle`**: shown and hidden by `U`.
-**`setup`**: the sliders, hidden. **`slide`**: dragged, set back, kept, shown.
+`MARGIN`, `ROW`, `TRACK`, `KNOB`, `BOX`, `GAP`, `PANEL`, `NAME`,
+`BUTTON`: the layout; `PAGES`, the order `U` goes through them.
+**`Part`**: anything of a page; **`Moved`**: a knob or a track's filled
+part; **`Valued`**: a value in its box. **`Hands`**: the slider dragged
+and the value being typed. **`page()`**, **`rows(page)`**,
+**`button_top(page)`**, **`pointer_over(window)`**.
+**`show_generation()`**: the lab's page shown from the start.
+**`held()`**: whether the left button went down over the sliders and is
+still held -- the view is then not dragged. **`setup`**: the pages.
+**`toggle`**: the next page by `U`. **`typed(key)`**: the digit or point
+a key types. **`slide`**: sliders dragged and set back, values typed,
+the button pressed, the numbers kept and shown.
+
+## `lab.rs`
+
+**`seed()`**: the seed the world is generated from now; **`reseed()`**:
+a new one, off the clock. **`shape()`**: the heights' shape as the
+sliders have it. **`pasture(seed)`**: how the grass lies, with its
+threshold. **`grass(pasture, seed, top_left)`**: a superchunk's grass,
+as words. **`start(superchunks)`**, **`run`**: the lab's thread;
+**`copy`**: the superchunks asked for, those not kept generated first.
 
 ## `main.rs`
 

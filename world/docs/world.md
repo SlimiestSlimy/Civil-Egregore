@@ -164,6 +164,7 @@ save's folder.
 | `src/halos.rs` | the hot superchunks: the halos about the entities that keep one, cooling and warming |
 | `src/background.rs` | the threads encoding, generating and decoding off the tick |
 | `src/tick.rs` | the tick of every rule and entity, then the halos moved |
+| `src/pasture.rs` | where grass lies in patches: tried out in the renderer's lab, not yet what worlds are made with |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; frames; the diagnostics tool |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
 | `tests/` | the halos follow their keepers; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; the files; refusals |

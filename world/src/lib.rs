@@ -13,6 +13,7 @@
 pub mod background;
 pub mod diagnostics;
 pub mod halos;
+pub mod pasture;
 mod tick;
 pub mod transient_data;
 

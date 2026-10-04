@@ -10,9 +10,12 @@ stepped between. `WALL_EAST`, `WALL_SOUTH` (layer types 8 and 9);
 of its own: `pathfinding::Walls::new` and
 `Turn::around_unwalled` bar it from the two. `OCTAVES`, `ONE`.
 
-**`height(seed, x, y)`**: a cell's height. Private: **`point`**, an
-octave's number at a point; **`between`**; **`octave`**, one octave's
-part. **`wall(a, b)`**: whether two heights are too far apart.
+**`Shape`** `{weights}`: how much of a height each octave makes up;
+`Shape::DEFAULT` (150, 75, 24, 6). **`height(seed, x, y)`**: a cell's
+height; **`height_shaped(shape, seed, x, y)`**: the same in a world
+shaped otherwise, to try a shape out. **`noise(seed, index, shift, x,
+y)`**: smooth noise, one octave of a height. Private: **`point`**, an
+octave's number at a point; **`between`**. **`wall(a, b)`**: whether two heights are too far apart.
 
 **`Terrain`** `{heights, walls}`: a superchunk's height map, and for
 each way each chunk's cells that keep a wall.

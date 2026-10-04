@@ -14,6 +14,10 @@
 //! Forced hot, the world is loaded to be measured: every superchunk
 //! shown hot all the while, whatever its sheep come to.
 //!
+//! `cargo run --release -p renderer -- lab [superchunks shown]` is the
+//! lab instead ([`lab`]): no sheep and no tick, only the world
+//! generated where it is looked at, with sliders for how.
+//!
 //! It runs until closed. The ticks to watch for are only shown: how far
 //! the run is from what whoever started it wanted seen.
 //!
@@ -28,13 +32,14 @@
 //! | `B` | show the superchunks' boundaries, or not, and near enough each one's Morton index and `(x, y)` |
 //! | `C` | the same of the chunks |
 //! | `H` | show every cell's height, from near enough to read them |
-//! | `U` | show the sliders that tune the near view's shading, or not |
+//! | `U` | the next page of sliders, or none: the near view's shading, and in the lab how the world is generated |
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 mod ground;
+mod lab;
 mod near;
 mod paint;
 mod sim;
@@ -49,7 +54,7 @@ use bevy::sprite::Anchor;
 use bevy::window::{MonitorSelection, WindowMode};
 use coordinates::{place_from_cartesian, square_side, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
 use paint::Picture;
-use sim::{start, Ask, Near, Request, Viewport, SEED, TARGET_PACE};
+use sim::{start, Ask, Near, Request, Viewport, TARGET_PACE};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use world::diagnostics::frames::BROWN;
@@ -241,15 +246,22 @@ fn grouped(number: u64) -> String {
 
 /// The `index`-th argument, or `default`.
 fn argument(index: usize, default: usize) -> usize {
-    std::env::args().nth(index).map_or(default, |argument| argument.parse().expect("a number"))
+    std::env::args().nth(index).and_then(|argument| argument.parse().ok()).unwrap_or(default)
 }
 
 fn main() {
-    let (superchunks, flock) = (argument(1, 256) as u32, argument(2, 8000));
+    tuning::start();
+    let in_lab = std::env::args().nth(1).is_some_and(|first| first == "lab");
+    // In the lab the only number is the superchunks shown, after the word.
+    let (superchunks, flock) = (argument(1 + in_lab as usize, 49) as u32, argument(2, 8000));
     let pace = Some(argument(3, TARGET_PACE as usize) as u32).filter(|&pace| pace > 0);
     let forced_hot = argument(5, 0) > 0;
-    tuning::start();
-    let (requests, frames) = start(superchunks, flock, forced_hot);
+    let (requests, frames) = if in_lab {
+        sliders::show_generation();
+        lab::start(superchunks)
+    } else {
+        start(superchunks, flock, forced_hot)
+    };
     _ = requests.send(Request::Pace(pace));
     let watch_for = Some(argument(4, 0) as u64).filter(|&ticks| ticks > 0);
     App::new()
@@ -263,7 +275,7 @@ fn main() {
         .insert_resource(Sprites { side: square_side(superchunks), shown: sim::shown(superchunks), images: Vec::new(), sides: Vec::new() })
         .init_resource::<Seen>()
         .init_resource::<Boundaries>()
-        .init_resource::<sliders::Dragged>()
+        .init_resource::<sliders::Hands>()
         .add_systems(Startup, (setup, sliders::setup))
         .add_systems(Update, (fullscreen, sliders::toggle, sliders::slide, steer, keys, boundaries, labels, heights, show, ask, hud).chain())
         .run();
@@ -434,6 +446,7 @@ fn heights(
     // The world's cell at the top left of the square shown.
     let corner = sprites.shown[0].top_left().cartesian();
     let size = view.scale * (1.0 / view.scale / HEIGHT_WIDTH).min(1.0);
+    let (seed, shape) = (lab::seed(), lab::shape());
     for (label, mut text, mut transform, mut visibility) in &mut labels {
         // The cell in view that is the label's: the first at or past the view's first whose place round the grid is its slot.
         let round = |first: u32, slot: u32, labels: u32| first + (slot + labels - first % labels) % labels;
@@ -442,7 +455,7 @@ fn heights(
             *visibility = Visibility::Hidden;
             continue;
         }
-        let height = terrain::height(SEED, corner.x + x, corner.y + y).to_string();
+        let height = terrain::height_shaped(&shape, seed, corner.x + x, corner.y + y).to_string();
         if text.0 != height {
             text.0 = height;
         }
@@ -641,7 +654,8 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         pixels => format!("a cell {pixels} pixels a side"),
     };
     text.0 = format!(
-        "tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause   T: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   U: sliders",
+        "seed {:016x}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   U: sliders",
+        lab::seed(),
         grouped(seen.tick),
         grouped(seen.ticks_a_second as u64),
         grouped(seen.sheep as u64),

@@ -13,7 +13,8 @@
 
 use crate::ground::{lit, Ground, COARSEST};
 use crate::near::{paint_near, PaintedNear};
-use crate::sim::{Cells, Frame, CHUNK_WORDS, SEED};
+use crate::lab;
+use crate::sim::{Cells, Frame, CHUNK_WORDS};
 use bitmap::morton::morton_coordinates;
 use bitmap::BITS_PER_WORD;
 use coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
@@ -73,8 +74,9 @@ fn ground(grounds: &mut HashMap<(u32, u32), Ground>, frame: &Frame, number: u64)
     let fine = frame.near.is_some() || frame.detail < 2;
     let hot = || frame.cells.iter().filter(|cells| cells.hot).map(|cells| cells.top_left);
     let missing: Vec<(u32, u32)> = hot().filter(|top_left| grounds.get(top_left).is_none_or(|ground| fine && ground.fine.is_none())).collect();
+    let (seed, shape) = (lab::seed(), lab::shape());
     let made: Vec<Ground> = thread::scope(|scope| {
-        let making: Vec<_> = missing.iter().map(|&top_left| scope.spawn(move || Ground::generate(SEED, top_left))).collect();
+        let making: Vec<_> = missing.iter().map(|&top_left| scope.spawn(move || Ground::generate(seed, &shape, top_left))).collect();
         making.into_iter().map(|making| making.join().expect("a superchunk's ground")).collect()
     });
     grounds.extend(missing.into_iter().zip(made));
@@ -97,9 +99,14 @@ pub fn start(frames: Receiver<Frame>) -> Receiver<Picture> {
     thread::Builder::new()
         .name("painter".to_string())
         .spawn(move || {
-            let mut grounds = HashMap::new();
+            let (mut grounds, mut generation) = (HashMap::new(), 0);
             for (number, frame) in frames.into_iter().enumerate() {
                 let started = Instant::now();
+                if frame.generation != generation {
+                    // The world is generated otherwise now: its ground is made again.
+                    grounds.clear();
+                    generation = frame.generation;
+                }
                 ground(&mut grounds, &frame, number as u64);
                 let superchunks = frame
                     .cells
