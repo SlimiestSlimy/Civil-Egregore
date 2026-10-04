@@ -13,7 +13,7 @@
 pub mod background;
 pub mod diagnostics;
 pub mod halos;
-pub mod pasture;
+pub mod patches;
 mod tick;
 pub mod transient_data;
 
@@ -24,9 +24,12 @@ use background::{Background, Ticket};
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
 use chunk_storage::{ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
-use terrain::{Terrain, WALLS};
-use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
-use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
+use terrain::{Shape, Terrain, WALLS};
+use chunk_storage::mock::{DIRT, GRASS};
+use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
+use mc_rules::trees::{OLDEST, TREE, TREE_STAGE};
+use patches::{Patches, ONE};
+use utilities::hash::mix;
 use entity_rules::sheep::flock;
 use simulation::entity_store::{saved, Entities};
 use simulation::Simulation;
@@ -34,8 +37,30 @@ use std::collections::{BTreeMap, VecDeque};
 use std::path::Path;
 use utilities::rng::Rng;
 
-/// Cells of grass drawn on a superchunk generated: a third of it, less those drawn twice.
-const GRASS_CELLS: usize = 400_000;
+/// How superchunks are generated: the heights' shape, and how the
+/// grass and the trees lie on them. Not saved with a world: one loaded
+/// goes on with [`Generation::DEFAULT`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Generation {
+    /// The heights' shape.
+    pub shape: Shape,
+    /// How the grass lies.
+    pub grass: Patches,
+    /// How the trees lie.
+    pub trees: Patches,
+}
+
+impl Generation {
+    /// How worlds are generated, as tuned by eye in the renderer's lab.
+    pub const DEFAULT: Self = Self {
+        shape: Shape::DEFAULT,
+        grass: Patches { cover: ONE * 951 / 1000, patch: 8, detail: ONE * 598 / 1000, scatter: ONE * 51 / 1000 },
+        trees: Patches { cover: ONE * 60 / 1000, patch: 7, detail: ONE * 800 / 1000, scatter: ONE * 300 / 1000 },
+    };
+}
+
+/// What keeps the trees' numbers apart from the grass's.
+const TREES_SALT: u64 = 0x7472_6565_735F_6C6F;
 /// Sheep the world's origin superchunk starts with, unless told.
 pub const FLOCK: usize = 4_000;
 
@@ -55,6 +80,8 @@ pub struct Saved {
 pub struct World {
     /// What the world is, and the tick it is at.
     pub info: WorldInfo,
+    /// How its superchunks are generated.
+    pub generation: Generation,
     /// Its hot bitmaps: every layer type of every hot superchunk.
     pub arena: BitmapArena,
     /// Every superchunk ever made, as stored: the cold ones' cells, and
@@ -85,12 +112,13 @@ pub struct World {
 impl World {
     /// A world with nothing in it, at `info`'s tick: what generating and
     /// loading start from.
-    fn empty(info: WorldInfo) -> Self {
+    fn empty(info: WorldInfo, generation: Generation) -> Self {
         let entities = Entities::at_tick(info.tick);
         // Every thread the machine has: the world's superchunks are not counted, as it grows.
         let simulation = Simulation::for_superchunks(usize::MAX);
         Self {
             info,
+            generation,
             arena: BitmapArena::new(),
             storage: ChunkStorage::new(1 << 16),
             entities,
@@ -105,9 +133,9 @@ impl World {
     }
 }
 
-/// Every layer type a world has: the pasture's and the walls'.
+/// Every layer type a world has: the pasture's, the trees' and the walls'.
 fn layer_types() -> Vec<LayerType> {
-    [DIRT, GRASS].into_iter().chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
+    [DIRT, GRASS, TREE].into_iter().chain(TREE_STAGE).chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
 }
 
 /// A world made from `seed`: its origin superchunk ([`WORLD_MIDDLE`])
@@ -120,11 +148,18 @@ pub fn generate(seed: u64, sheep: usize) -> World {
     generate_flocks(seed, &[WORLD_MIDDLE], sheep)
 }
 
+/// A world of `seed` with nothing in it yet, nothing hot, whose
+/// superchunks are generated as `generation` says: what a way of
+/// generating is tried out on.
+pub fn generate_with(generation: Generation, seed: u64) -> World {
+    World::empty(WorldInfo { name: String::new(), seed, tick: 0, layers: layer_types() }, generation)
+}
+
 /// A world made from `seed` as [`generate`] makes one, but with a
 /// flock of `sheep` on each of `superchunks`, and the halos about them
 /// all hot before it ticks.
 pub fn generate_flocks(seed: u64, superchunks: &[SuperchunkIndex], sheep: usize) -> World {
-    let mut world = World::empty(WorldInfo { name: String::new(), seed, tick: 0, layers: layer_types() });
+    let mut world = generate_with(Generation::DEFAULT, seed);
     let mut flocked = superchunks.to_vec();
     flocked.sort_unstable();
     world.keep_hot(&flocked);
@@ -137,20 +172,43 @@ pub fn generate_flocks(seed: u64, superchunks: &[SuperchunkIndex], sheep: usize)
     world
 }
 
-/// The image of `superchunk` in a world made from `seed`: its terrain,
-/// and pasture on it -- the same whenever it is made.
-pub(crate) fn generate_image(seed: u64, superchunk: SuperchunkIndex, codec: &mut LayerCodec) -> SuperchunkImage {
-    let own = Rng::for_stream(seed, superchunk.0).draw();
-    let terrain = Terrain::generate(seed, superchunk);
-    // Each way's walls, a layer a chunk that has any.
-    let mut walls: Vec<(usize, LayerType, Vec<u64>)> = Vec::new();
-    for (way, &(layer_type, _)) in WALLS.iter().enumerate() {
-        for (place, cells) in terrain.walls[way].iter().enumerate().filter(|(_, cells)| cells.iter().any(|&word| word != 0)) {
-            walls.push((place, layer_type, codec.encode(cells).to_vec()));
+/// The image of `superchunk` in a world made from `seed` as
+/// `generation` says: its terrain, and on it dirt, grass in patches,
+/// and trees in patches of their own, each of a stage drawn for its
+/// cell -- the same whenever it is made.
+pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: SuperchunkIndex, codec: &mut LayerCodec) -> SuperchunkImage {
+    let terrain = Terrain::generate_shaped(&generation.shape, seed, superchunk);
+    let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
+    let trees_seed = seed ^ TREES_SALT;
+    let (grass_under, trees_under) = (generation.grass.threshold(seed), generation.trees.threshold(trees_seed));
+    // The planes generated, each a bitmap a chunk: dirt, grass, trees and their stage's four.
+    let planes: [LayerType; 7] = [DIRT, GRASS, TREE, TREE_STAGE[0], TREE_STAGE[1], TREE_STAGE[2], TREE_STAGE[3]];
+    let mut cells = vec![[0u64; bitmap::WORDS]; planes.len() * CHUNKS_IN_SUPERCHUNK];
+    for place in 0..CHUNKS_IN_SUPERCHUNK * CELLS_IN_CHUNK {
+        let (x, y) = cartesian_from_place(place);
+        let (x, y) = (left + x, top + y);
+        let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
+        let mut set = |plane: usize| cells[plane * CHUNKS_IN_SUPERCHUNK + chunk][cell / bitmap::BITS_PER_WORD] |= 1 << (cell % bitmap::BITS_PER_WORD);
+        set(if generation.grass.number(seed, x, y) < grass_under { 1 } else { 0 });
+        if generation.trees.number(trees_seed, x, y) < trees_under {
+            set(2);
+            // Its stage: a lot of the cell's own.
+            let stage = mix(trees_seed ^ ((y as u64) << 32 | x as u64)) % (OLDEST as u64 + 1);
+            (0..TREE_STAGE.len()).filter(|bit| stage >> bit & 1 == 1).for_each(|bit| set(3 + bit));
         }
     }
-    let changes: Vec<LayerChange> = walls.iter().map(|(place, layer_type, words)| LayerChange { place: *place, layer_type: *layer_type, encoded: words }).collect();
-    grass_on_dirt(own, GRASS_CELLS, codec).with_heights(&terrain.heights).rewritten(&changes)
+    // A layer a chunk for each plane with a cell set on it, and for each way's walls.
+    let mut layers: Vec<(usize, LayerType, Vec<u64>)> = Vec::new();
+    for (index, cells) in cells.iter().enumerate().filter(|(_, cells)| cells.iter().any(|&word| word != 0)) {
+        layers.push((index % CHUNKS_IN_SUPERCHUNK, planes[index / CHUNKS_IN_SUPERCHUNK], codec.encode(cells).to_vec()));
+    }
+    for (way, &(layer_type, _)) in WALLS.iter().enumerate() {
+        for (place, cells) in terrain.walls[way].iter().enumerate().filter(|(_, cells)| cells.iter().any(|&word| word != 0)) {
+            layers.push((place, layer_type, codec.encode(cells).to_vec()));
+        }
+    }
+    let changes: Vec<LayerChange> = layers.iter().map(|(place, layer_type, words)| LayerChange { place: *place, layer_type: *layer_type, encoded: words }).collect();
+    SuperchunkImage::new(&terrain.heights).rewritten(&changes)
 }
 
 /// Saves `world` in `folder`, made if not there -- between two ticks.
@@ -197,7 +255,7 @@ pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
 pub fn load(folder: &Path) -> Result<World, DiskError> {
     let info = disk::read_world(folder)?;
     let hot = disk::read_hot(folder)?;
-    let mut world = World::empty(info);
+    let mut world = World::empty(info, Generation::DEFAULT);
     let mut kept = 0;
     for superchunk in disk::saved_superchunks(folder)? {
         world.storage.insert(superchunk, disk::read_image(folder, superchunk)?);

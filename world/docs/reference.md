@@ -123,13 +123,19 @@ flock, time a sample and a wake, rates, what is held and the census
 them if asked, on standard output, raw RGB, for ffmpeg; the census at
 every frame kept, unprinted, in `measurements/video.csv`.
 
-## `pasture.rs`
+## `patches.rs`
 
-Where grass lies in patches; tried out in the renderer's lab, not yet
-what `generate_image` uses. `ONE` (65,536), `SALT`, `SAMPLED` (16,384).
-**`Pasture`** `{patch, detail, scatter, threshold}`.
-**`number(pasture, seed, x, y)`**: a cell's number -- noise as broad as
-a patch, finer noise, and the cell's own lot. **`grows(pasture, seed,
-x, y)`**: whether it is under the threshold.
-**`threshold_for(pasture, seed, cover)`**: the threshold under which
-that share of the cells are grass.
+How something lies in patches when a superchunk is made. `ONE`
+(65,536), `SAMPLED` (16,384). **`Patches`** `{cover, patch, detail,
+scatter}`; **`number(seed, x, y)`**: a cell's number -- noise as broad
+as a patch, finer noise, and the cell's own lot;
+**`threshold(seed)`**: the number under which `cover` of the cells are.
+
+## Generation
+
+**`Generation`** `{shape, grass, trees}`: how superchunks are generated;
+`Generation::DEFAULT`, as tuned in the renderer's lab; `TREES_SALT`.
+**`generate_with(generation, seed)`**: a world with nothing hot yet,
+generated so. **`generate_image(generation, seed, superchunk, codec)`**:
+terrain, dirt, grass and trees with their stages. `World::generation`
+is not saved: a world loaded goes on with the default.

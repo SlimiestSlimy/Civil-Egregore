@@ -34,7 +34,7 @@ use crate::entity_store::{Attribute, AttributeType, Instructions, EntityEdit, En
 use pathfinding::{a_star, step_towards, Cell, Rows, Walls};
 use terrain::{WALL_EAST, WALL_SOUTH};
 use crate::sampling::sample_layer;
-use bitplane_manager::{count_missed, COARSEST_TILES_IN_CHUNK, WritesApplied, BitmapArena, NotHot, Reader, Shape, Superchunk, Window, Write, WriteQueues};
+use bitplane_manager::{count_missed, COARSEST_TILES_IN_CHUNK, WritesApplied, BitmapArena, NotHot, Reader, Shape, Superchunk, Window, Write, WriteOp, WriteQueues};
 use chunk_storage::LayerType;
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex};
 use std::ops::AddAssign;
@@ -395,6 +395,29 @@ impl<'a> Turn<'a> {
     /// Whether `layer_type` holds at `cell`, as the tick found it.
     pub fn holds(&self, layer_type: LayerType, cell: CellIndex) -> Result<bool, NotHot> {
         self.reader.holds(layer_type, cell)
+    }
+
+    /// The number kept at `cell` over `planes`, a bit a bitplane, the
+    /// lowest first, as the tick found it: what a cell holds more than
+    /// one bit of -- a tree's stage, say -- lies over as many
+    /// bitplanes as it has bits.
+    pub fn level<const N: usize>(&self, planes: [LayerType; N], cell: CellIndex) -> Result<u32, NotHot> {
+        let mut level = 0;
+        for (bit, plane) in planes.into_iter().enumerate() {
+            level |= (self.holds(plane, cell)? as u32) << bit;
+        }
+        Ok(level)
+    }
+
+    /// Queues the writes that turn the number at `cell` over `planes`
+    /// from `from` -- what [`Turn::level`] read -- to `to`: one for
+    /// each bit that differs.
+    pub fn queue_level<const N: usize>(&mut self, planes: [LayerType; N], cell: CellIndex, from: u32, to: u32) {
+        for (bit, plane) in planes.into_iter().enumerate() {
+            if (from ^ to) >> bit & 1 == 1 {
+                self.queue(plane, Write::cell(cell, if to >> bit & 1 == 1 { WriteOp::Set } else { WriteOp::Unset }));
+            }
+        }
     }
 
     /// Queues `write` to `layer_type`'s bitplane, applied in the second

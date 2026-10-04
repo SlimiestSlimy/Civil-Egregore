@@ -23,7 +23,9 @@ sync_share, detail, near, cells}`: with what answering took of the thread.
 
 **`shown(superchunks)`**: the superchunks shown, a square about the
 origin. **`forced(shown, flock)`**: a world with every one of them hot.
-**`start(superchunks, flock, forced_hot)`**: the pasture on a thread
+**`Mode`**: `Halos`, `ForcedHot`, `Lab`; **`made(mode, shown, flock)`**:
+the world a mode runs, made again in the lab when generation changes.
+**`count(world, layer_type)`**. **`start(superchunks, flock, mode)`**: the pasture on a thread
 of its own, ticking on every thread the machine has; where to send
 requests, where frames come back. **`run`**: that thread -- every
 request waiting read, each sync answered, a tick, and a sleep to the
@@ -40,7 +42,9 @@ ground of every hot superchunk of the frame made if missing, the fine
 parts of those longest unseen dropped (`FINE_KEPT`, 48).
 **`paint(cells, ground)`**: dirt, the grass over it, both lit, the
 sheep over that, a pixel each (`SHEEP_REACH`, none); **`opaque`**; `COLD`,
-black. **`paint_far(cells, detail, ground)`**: a pixel a tile of cells
+black. `TREE_YOUNG`, `TREE_OLD`, **`tree_colour(stage)`**, **`stage_at(cells,
+word, bit)`**; **`counted(words, detail)`**: the cells set a tile.
+**`paint_far(cells, detail, ground)`**: a pixel a tile of cells
 `2^detail` a side, its grass counted from its run of bits, its colours
 **`mixed`** and lit.
 
@@ -69,13 +73,14 @@ neighbour of another height; **`shading(from, span)`**: how dark and
 how light it makes a pixel that far in from it. **`paint_near(cells,
 grounds, near)`**: the picture. **`Cell`**: **`paint`**, a cell's pixels
 -- its edges, the shadow on it, its ground's tone (`TONES`).
+**`tree`**: a tree on its cell, a square larger and darker the older.
 **`sheep`**: a sheep's shape (`SHEEP`) on its cell.
 
 ## `tuning.rs`
 
 **`Tuned`** `{name, default, range, page}`; **`Page`**: `Shading`,
-`Generation`; `TUNED`, the seventeen of them, and each one's place
-(`STEP_LIGHT` ... `TEXTURE`, `HILLS` ... `SCATTER`). **`Tuning`**: the
+`Generation`; `TUNED`, the twenty-one of them, and each one's place
+(`STEP_LIGHT` ... `TEXTURE`, `HILLS` ... `TREE_SCATTER`). **`Tuning`**: the
 numbers read together. **`path()`**: where they are kept. **`start()`**:
 defaults, then what was kept. **`now()`**, **`set(index, value)`**,
 **`keep()`**. **`generation()`**: how many times how the world is
@@ -98,12 +103,11 @@ the button pressed, the numbers kept and shown.
 
 ## `lab.rs`
 
-**`seed()`**: the seed the world is generated from now; **`reseed()`**:
-a new one, off the clock. **`shape()`**: the heights' shape as the
-sliders have it. **`pasture(seed)`**: how the grass lies, with its
-threshold. **`grass(pasture, seed, top_left)`**: a superchunk's grass,
-as words. `KEPT` (2,048). **`start()`**, **`run`**: the lab's thread;
-**`copy`**: the superchunks asked for, those not kept generated first.
+**`run()`**: says the lab is what runs. **`seed()`**: the seed the world
+is generated from now; **`reseed()`**: a new one, off the clock.
+**`generation()`**: how the world is generated now -- the sliders' in
+the lab, `Generation::DEFAULT` otherwise; **`shape(tuned)`**: the
+heights' shape as the sliders have it.
 
 ## `main.rs`
 

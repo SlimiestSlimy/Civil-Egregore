@@ -10,6 +10,7 @@ simulation = { path = "../simulation" }
 entity_rules = { path = "../entity_rules" }
 utilities = { path = "../utilities" }
 world = { path = "../world" }
+mc_rules = { path = "../mc_rules" }
 terrain = { path = "../terrain" }
 coordinates = { path = "../coordinates" }
 bitmap = { path = "../bitmap" }

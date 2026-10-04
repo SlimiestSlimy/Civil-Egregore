@@ -48,8 +48,9 @@ pub struct Shape {
 }
 
 impl Shape {
-    /// The world's shape.
-    pub const DEFAULT: Self = Self { weights: [150, 75, 24, 6] };
+    /// The world's shape, as tuned by eye in the renderer's lab: broad
+    /// hills, little of the ridges, a good deal of bumps.
+    pub const DEFAULT: Self = Self { weights: [168, 22, 61, 4] };
 }
 
 /// One: a fraction's whole, 16 bits.
@@ -112,8 +113,13 @@ pub struct Terrain {
 impl Terrain {
     /// The terrain of `superchunk` in the world whose seed is `seed`.
     pub fn generate(seed: u64, superchunk: SuperchunkIndex) -> Self {
+        Self::generate_shaped(&Shape::DEFAULT, seed, superchunk)
+    }
+
+    /// [`Terrain::generate`], in a world shaped as `shape` says.
+    pub fn generate_shaped(shape: &Shape, seed: u64, superchunk: SuperchunkIndex) -> Self {
         let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
-        Self::from_heights(|x, y| height(seed, left.wrapping_add_signed(x), top.wrapping_add_signed(y)))
+        Self::from_heights(|x, y| height_shaped(shape, seed, left.wrapping_add_signed(x), top.wrapping_add_signed(y)))
     }
 
     /// The terrain where `height_at` gives the height of the cell `x`

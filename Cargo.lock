@@ -4192,6 +4192,7 @@ dependencies = [
  "chunk_storage",
  "coordinates",
  "entity_rules",
+ "mc_rules",
  "simulation",
  "terrain",
  "utilities",

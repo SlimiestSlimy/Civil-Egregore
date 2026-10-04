@@ -67,10 +67,18 @@ pub const PATCH_SIZE: usize = 14;
 pub const PATCH_DETAIL: usize = 15;
 /// How much each cell's own lot counts: grass scattered, not in patches.
 pub const SCATTER: usize = 16;
+/// The share of the cells that have a tree.
+pub const TREE_COVER: usize = 17;
+/// The cells across a patch of trees, as a power of two.
+pub const TREE_PATCH: usize = 18;
+/// How much finer noise counts beside the trees' patches'.
+pub const TREE_DETAIL: usize = 19;
+/// How much each cell's own lot counts for trees.
+pub const TREE_SCATTER: usize = 20;
 
 /// The numbers, in the order above; the shading's defaults are what was
 /// found by eye with the sliders.
-pub const TUNED: [Tuned; 17] = [
+pub const TUNED: [Tuned; 21] = [
     Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading },
     Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading },
     Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading },
@@ -79,15 +87,19 @@ pub const TUNED: [Tuned; 17] = [
     Tuned { name: "shadow", default: 0.4, range: (0.0, 0.8), page: Page::Shading },
     Tuned { name: "relief", default: 0.7, range: (0.0, 3.0), page: Page::Shading },
     Tuned { name: "texture", default: 2.0, range: (0.0, 4.0), page: Page::Shading },
-    Tuned { name: "hills (512)", default: 150.0, range: (0.0, 255.0), page: Page::Generation },
-    Tuned { name: "ridges (128)", default: 75.0, range: (0.0, 255.0), page: Page::Generation },
-    Tuned { name: "bumps (32)", default: 24.0, range: (0.0, 255.0), page: Page::Generation },
+    Tuned { name: "hills (512)", default: 255.0, range: (0.0, 255.0), page: Page::Generation },
+    Tuned { name: "ridges (128)", default: 33.64, range: (0.0, 255.0), page: Page::Generation },
+    Tuned { name: "bumps (32)", default: 91.85, range: (0.0, 255.0), page: Page::Generation },
     Tuned { name: "roughness (8)", default: 6.0, range: (0.0, 255.0), page: Page::Generation },
     Tuned { name: "height span", default: 255.0, range: (0.0, 255.0), page: Page::Generation },
-    Tuned { name: "grass cover", default: 0.38, range: (0.0, 1.0), page: Page::Generation },
-    Tuned { name: "patch size (2^)", default: 6.0, range: (1.0, 10.0), page: Page::Generation },
-    Tuned { name: "patch detail", default: 0.3, range: (0.0, 2.0), page: Page::Generation },
-    Tuned { name: "scatter", default: 0.1, range: (0.0, 2.0), page: Page::Generation },
+    Tuned { name: "grass cover", default: 0.95, range: (0.0, 1.0), page: Page::Generation },
+    Tuned { name: "patch size (2^)", default: 8.0, range: (1.0, 10.0), page: Page::Generation },
+    Tuned { name: "patch detail", default: 0.6, range: (0.0, 2.0), page: Page::Generation },
+    Tuned { name: "scatter", default: 0.05, range: (0.0, 2.0), page: Page::Generation },
+    Tuned { name: "tree cover", default: 0.06, range: (0.0, 1.0), page: Page::Generation },
+    Tuned { name: "tree patch (2^)", default: 7.0, range: (1.0, 10.0), page: Page::Generation },
+    Tuned { name: "tree detail", default: 0.8, range: (0.0, 2.0), page: Page::Generation },
+    Tuned { name: "tree scatter", default: 0.3, range: (0.0, 2.0), page: Page::Generation },
 ];
 
 /// Counts the changes to how the world is generated: what was made

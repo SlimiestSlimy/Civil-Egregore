@@ -27,6 +27,10 @@ what they always do and are not listed.
 | **cartesian** | `x` and `y`, counted from the world's or a superchunk's top left; only for geometry and drawing, and always named so: `CellCartesian`, `from_cartesian`, `cartesian()`, `place_from_cartesian` | Morton index | world cell, coordinates (alone) |
 | **Morton order** | the order of Morton indices: work is done and written in it, so memory is read forwards | sampling, wake | |
 | **height** | a cell's height, 0 to 255, from the seed alone (`terrain::height`) | wall, height map | elevation |
+| **tree** | a cell set in the layer `TREE`, with a **stage** | stage, patches | |
+| **stage** | how old a tree is, 0 to 15: a number kept over four bitplanes (`TREE_STAGE`), a bit each | tree, level | age, growth |
+| **level** | a number a cell holds over several bitplanes, the lowest bit first (`Turn::level`) | stage, bitplane | multi-bit plane |
+| **patches** | how grass and trees lie when a superchunk is generated: noise under a threshold, not cells scattered (`world::patches`) | generation | pasture |
 | **wall** | a bar between two cells across or down more than one apart in height; kept by the upper or left cell, in the layers `WALL_EAST` and `WALL_SOUTH`. A diagonal step has no wall of its own: it is open only when both ways round it are | step, terrain | cliff (the renderer's drawing of walls) |
 | **terrain** | a superchunk's heights and walls | height, wall | |
 
