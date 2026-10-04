@@ -16,7 +16,7 @@
 
 use crate::ground::{shadow_drop, Fine, Ground, SIDE};
 use crate::sim::{Cells, Near};
-use crate::tuning::{self, Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_SHADE};
+use crate::tuning::{self, Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LIT, WALL_SHADE};
 use bitmap::BITS_PER_WORD;
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;
@@ -65,9 +65,14 @@ impl Edge {
         let facing = self.towards.0 + self.towards.1;
         match self.rise {
             2.. => {
-                // A wall, whichever way it faces: a band on its lower cell, darkest at its foot.
-                let width = (2 + self.rise / 2).clamp(3, 5) as f32;
-                (1.0 + (tuning[WALL_FADE] * from / width - tuning[WALL_SHADE]) * within(0.0, width), 1.0)
+                // A wall: a band on its lower cell, darkest at its foot -- less dark there if the sun is on the wall, and between the two at a corner that faces neither way.
+                let width = (4 + self.rise / 2).clamp(5, 7) as f32;
+                let foot = match facing {
+                    ..0 => tuning[WALL_SHADE],
+                    0 => (tuning[WALL_SHADE] + tuning[WALL_LIT]) / 2.0,
+                    _ => tuning[WALL_LIT],
+                };
+                (1.0 - foot * (1.0 - tuning[WALL_FADE] * from / width).max(0.0) * within(0.0, width), 1.0)
             }
             1 if facing < 0 => (1.0 - tuning[STEP_DARK] * within(0.0, 1.0), 1.0),
             1 if facing > 0 => (1.0, 1.0 + tuning[STEP_LIGHT] * within(0.0, 1.0)),
