@@ -7,7 +7,7 @@
 //! world is made afresh and its ticks start from 0.
 
 use crate::sim::SEED;
-use crate::tuning::{self, CLUMPING, COAST_BREADTH, COAST_LOWNESS, FINER_DEPTH, FINER_FALL, FINER_HEIGHT, FINER_SHARE, GRASS_COVER, GRASS_DETAIL, GRASS_PATCH, GRASS_SCATTER, HIGHEST_LAND, LEAST_SIGMOID, LINE_BENDING, MOST_SIGMOID, NARROWEST_BLEND, OCEAN_FLOOR, OCEAN_LEVEL, OCEAN_SHARE, PARENT_WEIGHT, RAISED_SHARE, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER, VERTEX_SPACING, WIDEST_BLEND};
+use crate::tuning::{self, CLUMPING, COAST_BREADTH, COAST_LOWNESS, FINER_DEPTH, FINER_FALL, FINER_HEIGHT, FINER_SHARE, GRASS_COVER, GRASS_DETAIL, GRASS_PATCH, GRASS_SCATTER, HIGHEST_LAND, LEAST_SIGMOID, LINE_BENDING, MOST_SIGMOID, NARROWEST_BLEND, OCEAN_FLOOR, OCEAN_LEVEL, OCEAN_SHARE, WEIGHT_SPREAD, RAISED_SHARE, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER, VERTEX_SPACING, WIDEST_BLEND};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use terrain::mesh::SIGMOID_ONE;
@@ -89,7 +89,7 @@ fn shape(tuned: &tuning::Tuning) -> Shape {
         warp: (tuned[LINE_BENDING].clamp(0.0, 4.0) * ONE as f32) as u64,
         finer_depth: tuned[FINER_DEPTH].round().clamp(0.0, 10.0) as u32,
         finer_fall: share(tuned[FINER_FALL]),
-        weight: share(tuned[PARENT_WEIGHT]),
+        weight: share(tuned[WEIGHT_SPREAD]),
         finer_share: share(tuned[FINER_SHARE]),
         finer_height: height(tuned[FINER_HEIGHT]) as u64,
         raised: share(tuned[RAISED_SHARE]),
