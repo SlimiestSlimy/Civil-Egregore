@@ -181,7 +181,8 @@ impl Cell<'_> {
                     (false, false) => [bright; 3],
                 };
                 let (pixel_x, pixel_y) = (self.world.0 * pixels_a_cell as u64 + across as u64, self.world.1 * pixels_a_cell as u64 + down as u64);
-                let tone = TONES[(mix(pixel_x << 32 | pixel_y) >> 60) as usize] * light;
+                // Each mixed in whole: a world pixel's place takes more than 32 bits.
+                let tone = TONES[(mix(mix(pixel_x) ^ pixel_y) >> 60) as usize] * light;
                 let colour: [u8; 3] = std::array::from_fn(|channel| (self.colour[channel] as f32 * tone * shade[channel]).round().min(255.0) as u8);
                 pixels[(corner.1 + down) * width + corner.0 + across] = [colour[0], colour[1], colour[2], u8::MAX];
             }
