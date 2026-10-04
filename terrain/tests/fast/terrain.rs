@@ -18,8 +18,10 @@ fn walled(terrain: &Terrain, way: usize, x: u32, y: u32) -> bool {
     terrain.walled(way, place_from_cartesian(x, y))
 }
 
+/// A shape of plains joined by broad ramps and nothing within them: no walls.
+const RAMPS: Shape = Shape { narrow: 2048, wide: 2048, soft: 512, hard: 512, inner_depth: 0, lines: 0, ..Shape::DEFAULT };
 /// A shape of small polygons joined by cliffs: plenty of walls.
-const CLIFFS: Shape = Shape { span: 8, highest: 552, edge: 2, ..Shape::DEFAULT };
+const CLIFFS: Shape = Shape { span: 8, highest: 552, narrow: 2, wide: 2, ..Shape::DEFAULT };
 
 /// The same seed gives the same heights, another seed others; a
 /// superchunk's heights are the world's, whichever superchunk is made.
@@ -62,7 +64,7 @@ fn walls_are_where_heights_are_more_than_a_step_apart() {
 /// step apart.
 #[test]
 fn broad_edges_have_no_walls() {
-    let terrain = Terrain::generate(1, WORLD_MIDDLE);
+    let terrain = Terrain::generate_shaped(&RAMPS, 1, WORLD_MIDDLE);
     assert_eq!(terrain.wall_counts(), [0; 2]);
     let heights: Vec<u16> = (0..1024).map(|x| at(&terrain, x, 500)).collect();
     assert!(heights.windows(2).all(|pair| pair[0].abs_diff(pair[1]) <= 1), "a row: {heights:?}");
@@ -84,7 +86,7 @@ fn a_cliff_is_walled_along_its_length() {
 /// another -- a border crossed or not -- a ramp, never a jump.
 #[test]
 fn polygons_are_ocean_or_plains_joined_by_ramps() {
-    let shape = Shape { span: 10, ..Shape::DEFAULT };
+    let shape = Shape { span: 10, wide: 1024, narrow: 1024, ..RAMPS };
     let row: Vec<u64> = (0..40_000).map(|x| terrain::polygons::land(&shape, 1, 2_000_000_000 + x, 2_000_000_000)).collect();
     assert!(row.iter().all(|&high| (shape.ground..=shape.highest.max(shape.ocean + 1)).contains(&(high as u16))));
     assert!(row.contains(&(shape.ground as u64)) && row.iter().any(|&high| high > shape.ocean as u64), "ocean and land both");

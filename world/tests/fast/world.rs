@@ -138,7 +138,7 @@ fn files_that_are_not_a_save_are_refused() {
 fn sheep_never_step_through_a_wall() {
     use std::collections::HashMap;
     // Small polygons joined by cliffs, and a seed whose origin superchunk has walls enough.
-    let shape = terrain::Shape { span: 8, highest: 552, edge: 2, sea: 0, ..terrain::Shape::DEFAULT };
+    let shape = terrain::Shape { span: 8, highest: 552, narrow: 2, wide: 2, sea: 0, ..terrain::Shape::DEFAULT };
     let seed = (1..).find(|&seed| terrain::Terrain::generate_shaped(&shape, seed, coordinates::WORLD_MIDDLE).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
     let mut made = world::generate_flocks_with(world::Generation { shape, ..world::Generation::DEFAULT }, seed, &[coordinates::WORLD_MIDDLE], 4_000);
     let high = |at: coordinates::CellIndex| {
