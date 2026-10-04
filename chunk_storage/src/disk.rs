@@ -152,13 +152,23 @@ pub struct WorldInfo {
     pub tick: u64,
     /// Its layer types: made hot on every chunk when it is loaded.
     pub layers: Vec<LayerType>,
+    /// The superchunks being made hot, sorted, each with the tick it
+    /// turns hot at: whoever ticks the world's business, as a state is.
+    /// None: no `loading` line.
+    pub loading: Vec<(SuperchunkIndex, u64)>,
 }
 
 impl WorldInfo {
     /// As the world's file holds it.
     fn to_text(&self) -> String {
         let layers: Vec<String> = self.layers.iter().map(|layer| layer.0.to_string()).collect();
-        format!("{FIRST_LINE}\nname = {}\nseed = {}\ntick = {}\nlayers = {}\n", self.name.replace('\n', " "), self.seed, self.tick, layers.join(" "))
+        let mut text = format!("{FIRST_LINE}\nname = {}\nseed = {}\ntick = {}\nlayers = {}\n", self.name.replace('\n', " "), self.seed, self.tick, layers.join(" "));
+        // Only a world with superchunks being made hot says so.
+        if !self.loading.is_empty() {
+            let loading: Vec<String> = self.loading.iter().map(|(superchunk, tick)| format!("{:x}@{tick}", superchunk.0)).collect();
+            text += &format!("loading = {}\n", loading.join(" "));
+        }
+        text
     }
 
     /// From the world's file's text, or what is wrong with it.
@@ -167,7 +177,7 @@ impl WorldInfo {
         if lines.next() != Some(FIRST_LINE) {
             return Err(format!("does not start with `{FIRST_LINE}`"));
         }
-        let (mut name, mut seed, mut tick, mut layers) = (None, None, None, None);
+        let (mut name, mut seed, mut tick, mut layers, mut loading) = (None, None, None, None, Vec::new());
         for line in lines.filter(|line| !line.trim().is_empty()) {
             let (key, value) = line.split_once('=').ok_or_else(|| format!("`{line}` is not `key = value`"))?;
             let (key, value) = (key.trim(), value.trim());
@@ -177,10 +187,19 @@ impl WorldInfo {
                 "seed" => seed = Some(number()?),
                 "tick" => tick = Some(number()?),
                 "layers" => layers = Some(value.split_whitespace().map(|layer| layer.parse().map(LayerType).map_err(|_| format!("`{layer}` is not a layer type"))).collect::<Result<Vec<_>, _>>()?),
+                "loading" => loading = value.split_whitespace().map(superchunk_at_tick).collect::<Result<Vec<_>, _>>()?,
                 // A key of a later format: passed over.
                 _ => {}
             }
         }
-        Ok(Self { name: name.ok_or("no name")?, seed: seed.ok_or("no seed")?, tick: tick.ok_or("no tick")?, layers: layers.ok_or("no layers")? })
+        Ok(Self { name: name.ok_or("no name")?, seed: seed.ok_or("no seed")?, tick: tick.ok_or("no tick")?, layers: layers.ok_or("no layers")?, loading })
     }
+}
+
+/// A superchunk with a tick, `index@tick` -- the index in hexadecimal,
+/// as superchunks' files are named -- or what is wrong with it.
+fn superchunk_at_tick(text: &str) -> Result<(SuperchunkIndex, u64), String> {
+    let wrong = || format!("`{text}` is not a superchunk index and a tick, `index@tick`");
+    let (index, tick) = text.split_once('@').ok_or_else(wrong)?;
+    Ok((SuperchunkIndex(u64::from_str_radix(index, 16).map_err(|_| wrong())?), tick.parse().map_err(|_| wrong())?))
 }

@@ -14,11 +14,14 @@ use crate::height_map::HeightMap;
 use crate::layer_codec::LayerType;
 use crate::superchunk_image::{LayerChange, SuperchunkImage};
 use crate::writeback_ring::WritebackRing;
+use std::sync::Arc;
 
 /// The cold pool and the writeback ring.
 pub struct ChunkStorage {
-    /// Every superchunk's image, sorted by superchunk index.
-    pub(crate) cold_pool: Vec<(SuperchunkIndex, SuperchunkImage)>,
+    /// Every superchunk's image, sorted by superchunk index: shared, so
+    /// one is read off the tick -- decoded on another thread -- with
+    /// nothing copied. An image is never changed, only replaced.
+    pub(crate) cold_pool: Vec<(SuperchunkIndex, Arc<SuperchunkImage>)>,
     /// Changed layers, encoded, on their way to the cold pool.
     pub(crate) ring: WritebackRing,
 }
@@ -35,16 +38,13 @@ impl ChunkStorage {
     }
 
     /// Puts `image` in the cold pool as `superchunk` (read from disk, or
-    /// generated), returning the image it replaces, if any. Its entries
+    /// generated), in place of the one it had, if any. Its entries
     /// still in the ring are applied to the new image when it is
     /// flushed.
-    pub fn insert(&mut self, superchunk: SuperchunkIndex, image: SuperchunkImage) -> Option<SuperchunkImage> {
+    pub fn insert(&mut self, superchunk: SuperchunkIndex, image: SuperchunkImage) {
         match self.find(superchunk) {
-            Ok(at) => Some(std::mem::replace(&mut self.cold_pool[at].1, image)),
-            Err(at) => {
-                self.cold_pool.insert(at, (superchunk, image));
-                None
-            }
+            Ok(at) => self.cold_pool[at].1 = Arc::new(image),
+            Err(at) => self.cold_pool.insert(at, (superchunk, Arc::new(image))),
         }
     }
 
@@ -55,7 +55,13 @@ impl ChunkStorage {
 
     /// The image of `superchunk`, if the cold pool holds it.
     pub fn image(&self, superchunk: SuperchunkIndex) -> Option<&SuperchunkImage> {
-        self.find(superchunk).ok().map(|at| &self.cold_pool[at].1)
+        self.find(superchunk).ok().map(|at| &*self.cold_pool[at].1)
+    }
+
+    /// The image of `superchunk`, if the cold pool holds it, shared: to
+    /// read on another thread, as it is now.
+    pub fn shared_image(&self, superchunk: SuperchunkIndex) -> Option<Arc<SuperchunkImage>> {
+        self.find(superchunk).ok().map(|at| Arc::clone(&self.cold_pool[at].1))
     }
 
     /// The encoded layer of `layer_type` in `chunk`, if the cold pool has
