@@ -82,7 +82,9 @@ impl Lands {
                 // In the square's middle half: no site that counts is then past the 25.
                 let within = |bits: u64| side / 4 + (((bits & 0xFFFF) as i64 * (side / 2)) >> 16);
                 let land = (lot >> 32) & 0xFFFF >= self.shape.sea;
-                let level = if land { self.shape.ocean as u64 + 1 + (((lot >> 48) * self.shape.levels) >> 16) } else { self.shape.ground as u64 };
+                // A plain: from just over the ocean to the highest there may be.
+                let lowest = self.shape.ocean as u64 + 1;
+                let level = if land { lowest + (((lot >> 48) * (self.shape.highest as u64).saturating_sub(lowest)) >> 16) } else { self.shape.ground as u64 };
                 Site { at: (square_x * side + within(lot), square_y * side + within(lot >> 16)), land, level, lot }
             });
         }

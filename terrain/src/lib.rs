@@ -52,8 +52,9 @@ pub struct Shape {
     pub span: u32,
     /// The share of the polygons that are ocean, of [`ONE`].
     pub sea: u64,
-    /// The most a land polygon's plain stands over the ocean, in heights.
-    pub levels: u64,
+    /// The height the highest land polygon's plain may stand at: each
+    /// stands between just over the ocean and this.
+    pub highest: Height,
     /// The cells from a border over which the levels about it are
     /// mixed: half a square's side at most.
     pub edge: u64,
@@ -68,8 +69,8 @@ pub const WATER: [LayerType; 8] = [LayerType(24), LayerType(25), LayerType(26), 
 impl Shape {
     /// The world's shape: polygons 8 superchunks across, half of them
     /// ocean 255 deep -- as deep as water is kept -- the plains to 200
-    /// over it, joined by ramps 2,048 cells from a border.
-    pub const DEFAULT: Self = Self { ground: 256, ocean: 511, span: 13, sea: ONE / 2, levels: 200, edge: 2048, warp: ONE * 3 / 10 };
+    /// over it (711), joined by ramps 2,048 cells from a border.
+    pub const DEFAULT: Self = Self { ground: 256, ocean: 511, span: 13, sea: ONE / 2, highest: 711, edge: 2048, warp: ONE * 3 / 10 };
 }
 
 /// One: a fraction's whole, 16 bits.

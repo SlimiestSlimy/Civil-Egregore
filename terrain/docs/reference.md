@@ -10,9 +10,9 @@ stepped between. `WALL_EAST`, `WALL_SOUTH` (layer types 8 and 9);
 of its own: `pathfinding::Walls::new` and
 `Turn::around_unwalled` bar it from the two. `OCTAVES`, `ONE`.
 
-**`Shape`** `{ground, ocean, span, sea, levels, edge, warp}`: the
+**`Shape`** `{ground, ocean, span, sea, highest, edge, warp}`: the
 lowest ground and the ocean's height; the polygons' grid, the share of
-them that are ocean, the most a plain stands over the ocean, the cells
+them that are ocean, the height the highest plain may stand at, the cells
 levels are mixed over at a border, how far borders are bent.
 `Shape::DEFAULT`. `WATER` (layer types 24 to 31): a cell's water, its
 depth over eight bitplanes. **`height(seed, x, y)`**: a cell's height;

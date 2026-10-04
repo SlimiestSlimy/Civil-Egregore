@@ -110,7 +110,7 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
                             let above = cell(wanted, x as i64, y - 1).map_or(high, |(x, y)| lands.height(x, y));
                             let lower = (above as f32 + before.unwrap_or(high) as f32) / 2.0;
                             let slope = (high as f32 - lower) / wanted.step as f32;
-                            let tint = 0.8 + 0.3 * (high.saturating_sub(shape.ocean) as f32 / shape.levels.max(1) as f32).min(1.0);
+                            let tint = 0.8 + 0.3 * (high.saturating_sub(shape.ocean) as f32 / shape.highest.saturating_sub(shape.ocean).max(1) as f32).min(1.0);
                             (colour, tint * (1.0 + SLOPE_LIGHT * slope).clamp(0.55, 1.45))
                         };
                         before = Some(high);

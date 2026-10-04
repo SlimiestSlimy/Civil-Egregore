@@ -54,7 +54,7 @@ pub const TEXTURE: usize = 7;
 pub const OCEAN_FLOOR: usize = 8;
 /// The height the ocean stands at.
 pub const OCEAN_LEVEL: usize = 9;
-/// The most a land polygon's plain stands over the ocean.
+/// The height the highest land polygon's plain may stand at.
 pub const HIGHEST_PLAIN: usize = 10;
 /// The share of the polygons that are ocean.
 pub const OCEAN_SHARE: usize = 11;
@@ -94,7 +94,7 @@ pub const TUNED: [Tuned; 23] = [
     Tuned { name: "texture", default: 2.0, range: (0.0, 4.0), page: Page::Shading, what: "How much the ground's pixels differ from one another by lot." },
     Tuned { name: "ocean floor level", default: 256.0, range: (0.0, 4096.0), page: Page::Generation, what: "The height of the ocean's floor, and the lowest ground in the world. Every ocean polygon is flat at this height; shores climb from it." },
     Tuned { name: "ocean level", default: 511.0, range: (0.0, 8192.0), page: Page::Generation, what: "The height of the ocean's surface, the same all over the world. Ground under it is under water. Set under the floor, it is held to the floor: no ocean. Water keeps a depth to 255, so a floor more than 255 under this is drawn and kept as 255 deep." },
-    Tuned { name: "highest plain", default: 200.0, range: (0.0, 2048.0), page: Page::Generation, what: "How many heights over the ocean's level the highest land can be. Each land polygon is a flat plain at a height of its own, drawn by lot, from just over the ocean to this far over it." },
+    Tuned { name: "highest plain", default: 711.0, range: (0.0, 8192.0), page: Page::Generation, what: "The height of the highest land there can be. Each land polygon is a flat plain at a height of its own, drawn by lot, between just over the ocean level and this. At or under the ocean level, all land lies just over the ocean." },
     Tuned { name: "ocean share", default: 0.5, range: (0.0, 1.0), page: Page::Generation, what: "The share of the polygons that are ocean; the rest are land. 0 is all land, 1 all ocean. Land polygons that touch make one island." },
     Tuned { name: "polygon size (2^)", default: 13.0, range: (6.0, 18.0), page: Page::Generation, what: "How broad one polygon is: 2 to this power, in cells. 10 is one superchunk, 13 is 8 superchunks, 16 is 64." },
     Tuned { name: "ramp width", default: 2048.0, range: (1.0, 4096.0), page: Page::Generation, what: "How many cells from a border the heights on its two sides are joined over. Broad, and plains meet by gentle ramps and shores are shallow; a few cells, and they meet by cliffs. Half a polygon's breadth at most." },

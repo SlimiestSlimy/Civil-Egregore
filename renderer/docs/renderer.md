@@ -199,7 +199,7 @@ by the same keys. Generation's sliders are shown from the start:
 
 - **The ocean** (`terrain::Shape`): its floor's level, the lowest
   ground; its own level; and its share of the polygons.
-- **The land**: the highest a plain stands over the ocean; how broad a
+- **The land**: the height of the highest plain; how broad a
   polygon is; the ramp's width, the cells from a border the heights
   about it are joined over; and how far borders are bent. `P` draws the
   polygons' borders over the map.

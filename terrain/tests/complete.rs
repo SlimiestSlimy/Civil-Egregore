@@ -7,7 +7,7 @@ use coordinates::{place_from_cartesian, SuperchunkIndex, WORLD_MIDDLE};
 use terrain::{wall, Shape, Terrain};
 
 /// A shape of small polygons joined by cliffs: plenty of walls.
-const CLIFFS: Shape = Shape { span: 8, levels: 40, edge: 2, ..Shape::DEFAULT };
+const CLIFFS: Shape = Shape { span: 8, highest: 552, edge: 2, ..Shape::DEFAULT };
 
 /// The height of the cell `(x, y)` of a superchunk's `terrain`, from
 /// its top left.
