@@ -35,11 +35,9 @@ tile of `scale`, `2^scale` cells a side (to `COARSEST_SCALE`, 6), `cell`
 is in; **`tiles_holding(type, cell)`**: which of its chunk's 16 tiles of
 the coarsest scale (`COARSEST_TILES_IN_CHUNK`, 64x64 cells, four count
 tiles each) hold any, a bit each, off the counts --
-**`superchunk(superchunk)`**, remembering the last lookups.
+**`superchunk(superchunk)`**, remembering the last superchunk.
 
-**`Lookup`**: lookups remembering the last 16 (`REMEMBERED`, each in its
-**`slot`** by a hash of superchunk index and type), and the last
-superchunk alone; one a thread. **`superchunk`** an entry by superchunk
+**`Lookup`**: lookups remembering the last superchunk; one a thread. **`superchunk`** an entry by superchunk
 index; **`find`** an allocation by type and superchunk index, as a
 `LayerAt` (entry, index among its allocations); **`holds`** a cell, from
 its index's fields; **`windows`** up to 8x8 cells from the one to four
@@ -76,9 +74,8 @@ shape's cartesian rectangle and its cells; **`superchunks`**
 
 **`WritesApplied`** `{writes, changed, missed}`, added with `+=`.
 
-**`WriteQueues`**: a queue a layer type, the last 16 types written
-found again without a search, each in its slot of a small cache by a
-hash of the type (forgotten when a new queue moves the others):
+**`WriteQueues`**: a queue a layer type, sorted by type, found by a
+search of the few:
 **`push`**, **`len`**, **`is_empty`**, **`iter`**, **`clear`**.
 
 **`count_missed(superchunk, write, applied)`**: a write's cells in a

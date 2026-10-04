@@ -46,7 +46,7 @@ The Morton index is a cell's identity everywhere it is cheaper
 reads take them. Its superchunk, chunk and bit are bit fields -- shifts
 and masks, no coordinates -- and a neighbour is a step on the index
 itself, each coordinate's bits added apart (`CellIndex::offset`).
-Cartesian coordinates (`CartesianCell`) are kept where they are the
+Cartesian coordinates (`CellCartesian`) are kept where they are the
 cheaper: a rectangle's or a disc's geometry, and drawing.
 
 An aligned 8x8 square of cells is one word of a bitmap: a **tile**.
@@ -149,8 +149,8 @@ its words written sequentially as laid out in memory ("Saves", below).
 4. A small directory says which allocation holds which type over which
    superchunk: the superchunks in Morton order, each with its types
    sorted -- the one thing ever sorted, and it holds no bitmaps. The
-   last superchunk and type looked up are remembered, so runs of
-   lookups in one superchunk search nothing. The allocations
+   last superchunk looked up is remembered, so runs of lookups in
+   one superchunk search only its few types. The allocations
    lie wherever they were made; each one is a large run of memory in
    Morton order.
 5. The arena grows an allocation at a time. A bucket changed since it
@@ -506,6 +506,10 @@ a step of one cell spreads nothing, the neighbourhood is read at once
 (inside a chunk, one lookup and eight bits of one bucket), lookups and
 write queues remember 16 types, and a tick's wakes run in Morton order.
 A wake was then ~1,020 instructions, of which the neighbourhood ~250.
+(Those 16-entry caches, hashed, were later measured to cost more than
+they saved, once the window reads came: without them a tick is 6.6%
+fewer instructions. A lookup remembers the last superchunk alone, and
+a write finds its queue by a search of the few.)
 
 The neighbourhood is since a window: the sheep's 3x3, its own cell in
 the middle, read as one mask -- one bucket lookup and one to four

@@ -24,7 +24,7 @@ what they always do and are not listed.
 | **chunk index** | a chunk's Morton index in the world, 48 bits: its superchunk index, then its place (`ChunkIndex`) | superchunk index, cell index | position |
 | **cell index** | a cell's Morton index in the world, 64 bits: its chunk index, then its place (`CellIndex`) | chunk index, cartesian | address |
 | **place** | a Morton index inside the thing around it, as a `usize`: a chunk's in its superchunk (0 to 15), a cell's in its chunk (0 to 65,535), or a cell's in its superchunk (20 bits, `CellIndex::place_in_superchunk`) | chunk index, cell index | slot, offset, position |
-| **cartesian** | `x` and `y`, counted from the world's or a superchunk's top left; only for geometry and drawing, and always named so: `CartesianCell`, `from_cartesian`, `cartesian()`, `place_from_cartesian` | Morton index | world cell, coordinates (alone) |
+| **cartesian** | `x` and `y`, counted from the world's or a superchunk's top left; only for geometry and drawing, and always named so: `CellCartesian`, `from_cartesian`, `cartesian()`, `place_from_cartesian` | Morton index | world cell, coordinates (alone) |
 | **Morton order** | the order of Morton indices: work is done and written in it, so memory is read forwards | sampling, wake | |
 | **height** | a cell's height, 0 to 255, from the seed alone (`terrain::height`) | wall, height map | elevation |
 | **wall** | a bar between two cells across or down more than one apart in height; kept by the upper or left cell, in the layers `WALL_EAST` and `WALL_SOUTH`. A diagonal step has no wall of its own: it is open only when both ways round it are | step, terrain | cliff (the viewer's drawing of walls) |
@@ -69,7 +69,7 @@ what they always do and are not listed.
 | **allocation** | one layer type over one superchunk in the arena: one block of the block pool, a bucket a chunk | block, bucket | |
 | **bucket** | one chunk's hot layer: its words in its allocation, and its counts | layer, allocation | |
 | **directory** | the arena's list of hot superchunks, sorted by superchunk index, each with its allocations by layer type | lookup | |
-| **lookup** | finding a layer in the directory; a reader remembers its last sixteen | reader, directory | |
+| **lookup** | finding a layer in the directory; a reader remembers the last superchunk it found | reader, directory | |
 | **block** | an equal-size piece of memory from the allocator's block pool, owned by whoever holds it (`allocator::Block`) | block pool, allocation | (for anything that is not memory) |
 | **block pool** | the allocator's blocks, made, handed out, taken back (`BlockPool`). Never "pool" alone | block | |
 | **save** | a world on disk: a folder of a world file and every superchunk's image and state, named by superchunk index | image, world | directory (the arena's list) |
@@ -86,7 +86,7 @@ what they always do and are not listed.
 | **speed of light** | 1,024 cells a tick: nothing reaches past the superchunks next to its own; an entity is at most 256x256 cells | outbox, reach | |
 | **reach** | how far an entity's rule reads and acts: up to the speed of light | speed of light | |
 | **outbox** | a superchunk's queues of writes and instructions, a slot each for itself and its eight neighbours | write, instruction, slot | |
-| **slot** | one entry of a fixed array kept for a purpose: an outbox's, a neighbour each; the wheel's, a tick each; a cache's or hash table's, by a hash (`utilities::hash::slot`) | outbox, wheel, lookup | place |
+| **slot** | one entry of a fixed array kept for a purpose: an outbox's, a neighbour each; the wheel's, a tick each; a hash table's, by a hash (`utilities::hash::slot`) | outbox, wheel, lookup | place |
 | **write** | a change to cells, queued in the first phase and applied in the second: an operation on a shape, at a cell (`Write`) | outbox, apply | command |
 | **apply** | carry out a write or an instruction, in the second phase | write, instruction | carry out, execute |
 | **missed** | a write landing where no layer is hot: counted, and lost | write, lost | |

@@ -9,7 +9,7 @@ use bitplane_manager::{WritesApplied, BitmapArena, BucketKey, NotHot, Reader, Sh
 use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
 use chunk_storage::{ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
 use bitmap::morton::morton_index;
-use coordinates::{CartesianCell, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
+use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 
 /// A cell of a chunk, cartesian: across and down from its top left.
 const CELL: (u8, u8) = (3, 200);
@@ -326,8 +326,7 @@ fn counts_follow_every_change() {
 /// A window of cells read at once is its cells read one by one: at any
 /// cell, any size up to 8x8, inside a tile, across tiles, chunks and
 /// superchunks, at the world's corner, where some cells are not hot --
-/// with more superchunks and types read by turns than the lookups
-/// remembered.
+/// with superchunks and types read by turns.
 #[test]
 fn windows_read_at_once_are_the_cells_read_one_by_one() {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
@@ -346,7 +345,7 @@ fn windows_read_at_once_are_the_cells_read_one_by_one() {
     }
     let side = 5 * SUPERCHUNK_SIDE_CELLS;
     for at in 0..40_000u32 {
-        let cell = CartesianCell { x: (at * 7919) % side, y: (at * 104_729) % side };
+        let cell = CellCartesian { x: (at * 7919) % side, y: (at * 104_729) % side };
         arena.queue(if at % 3 == 0 { DIRT } else { GRASS }, Write::cell(cell.into(), WriteOp::Set));
     }
     arena.apply();
@@ -356,11 +355,11 @@ fn windows_read_at_once_are_the_cells_read_one_by_one() {
     origins.extend((0..3000u32).map(|at| ((at * 31_337) % (side - 8), (at * 7_717) % (side - 8))));
     for (number, (x, y)) in origins.into_iter().enumerate() {
         let (width, height) = (1 + number as u32 % 8, 1 + (number as u32 / 8) % 8);
-        let origin = CellIndex::from(CartesianCell { x, y });
+        let origin = CellIndex::from(CellCartesian { x, y });
         for layer_type in [GRASS, DIRT] {
             let mut expected = Window::default();
             for (dx, dy) in (0..height).flat_map(|dy| (0..width).map(move |dx| (dx, dy))) {
-                if let Ok(set) = reader.holds(layer_type, CellIndex::from(CartesianCell { x: x + dx, y: y + dy })) {
+                if let Ok(set) = reader.holds(layer_type, CellIndex::from(CellCartesian { x: x + dx, y: y + dy })) {
                     expected.hot |= 1 << (dy * 8 + dx);
                     expected.set |= (set as u64) << (dy * 8 + dx);
                 }
@@ -399,7 +398,7 @@ fn every_count_tile_counts_its_cells() {
     counted(&arena);
     let corner = WORLD_MIDDLE.top_left().cartesian();
     for at in 0..3000u32 {
-        let cell = CartesianCell { x: corner.x + (at * 7919) % 1000, y: corner.y + (at * 104_729) % 1000 };
+        let cell = CellCartesian { x: corner.x + (at * 7919) % 1000, y: corner.y + (at * 104_729) % 1000 };
         let op = [WriteOp::Set, WriteOp::Unset, WriteOp::Flip][at as usize % 3];
         let shape = match at % 50 {
             0 => Shape::Rect { width: 20, height: 9 },

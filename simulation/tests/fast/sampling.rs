@@ -8,7 +8,7 @@ use bitplane_manager::{BitmapArena, BucketKey, Shape, Write, WriteOp};
 use simulation::sample;
 use utilities::rng::Rng;
 use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CartesianCell, CellIndex, ChunkIndex};
+use coordinates::{CellCartesian, CellIndex, ChunkIndex};
 
 /// The layer type the tests sample.
 const STONE: LayerType = LayerType(4);
@@ -18,7 +18,7 @@ const STONE: LayerType = LayerType(4);
 fn rect(x: u32, y: u32, width: u32, height: u32) -> Vec<Write> {
     let piece = |start: u32, length: u32| (0..length.div_ceil(128)).map(move |at| (start + at * 128, (length - at * 128).min(128) as u8));
     piece(y, height)
-        .flat_map(|(y, height)| piece(x, width).map(move |(x, width)| Write { at: CartesianCell { x, y }.into(), op: WriteOp::Set, shape: Shape::Rect { width, height } }))
+        .flat_map(|(y, height)| piece(x, width).map(move |(x, width)| Write { at: CellCartesian { x, y }.into(), op: WriteOp::Set, shape: Shape::Rect { width, height } }))
         .collect()
 }
 
@@ -37,7 +37,7 @@ fn arena_with(chunks: &[ChunkIndex], writes: &[Write]) -> BitmapArena {
 }
 
 /// Every cell sampled, with `probability`.
-fn sampled(arena: &BitmapArena, probability: f64, seed: u64) -> Vec<CartesianCell> {
+fn sampled(arena: &BitmapArena, probability: f64, seed: u64) -> Vec<CellCartesian> {
     let mut cells = Vec::new();
     let count = sample(arena, STONE, probability, &mut Rng::new(seed), |cell| cells.push(cell.cartesian()));
     assert_eq!(count, cells.len());
@@ -46,7 +46,7 @@ fn sampled(arena: &BitmapArena, probability: f64, seed: u64) -> Vec<CartesianCel
 
 /// The chunk whose top left cell is `x` and `y` cells from the world's.
 fn chunk_at(x: u32, y: u32) -> ChunkIndex {
-    CellIndex::from(CartesianCell { x, y }).chunk()
+    CellIndex::from(CellCartesian { x, y }).chunk()
 }
 
 /// The chunks of the two superchunks the tests use, side by side.
@@ -59,9 +59,9 @@ fn two_superchunks() -> Vec<ChunkIndex> {
 #[test]
 fn certain_sampling_finds_every_set_cell_in_morton_order() {
     let writes = [
-        Write { at: CartesianCell { x: 102_900, y: 102_600 }.into(), op: WriteOp::Set, shape: Shape::Disc { radius: 40 } },
-        Write { at: CartesianCell { x: 103_300, y: 103_000 }.into(), op: WriteOp::Set, shape: Shape::Rect { width: 200, height: 3 } },
-        Write::cell(CartesianCell { x: 102_400, y: 102_400 }.into(), WriteOp::Set),
+        Write { at: CellCartesian { x: 102_900, y: 102_600 }.into(), op: WriteOp::Set, shape: Shape::Disc { radius: 40 } },
+        Write { at: CellCartesian { x: 103_300, y: 103_000 }.into(), op: WriteOp::Set, shape: Shape::Rect { width: 200, height: 3 } },
+        Write::cell(CellCartesian { x: 102_400, y: 102_400 }.into(), WriteOp::Set),
     ];
     let arena = arena_with(&two_superchunks(), &writes);
     let cells = sampled(&arena, 1.0, 1);

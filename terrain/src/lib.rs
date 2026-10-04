@@ -16,7 +16,7 @@
 
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{Height, HeightMap, LayerType};
-use coordinates::{place_from_cartesian, CartesianCell, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{place_from_cartesian, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
 use utilities::hash::{mix, GOLDEN_RATIO};
 
 /// The most two cells beside one another may differ in height and still
@@ -89,7 +89,7 @@ pub struct Terrain {
 impl Terrain {
     /// The terrain of `superchunk` in the world whose seed is `seed`.
     pub fn generate(seed: u64, superchunk: SuperchunkIndex) -> Self {
-        let CartesianCell { x: left, y: top } = superchunk.top_left().cartesian();
+        let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
         Self::from_heights(|x, y| height(seed, left.wrapping_add_signed(x), top.wrapping_add_signed(y)))
     }
 

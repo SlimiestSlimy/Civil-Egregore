@@ -16,8 +16,7 @@
 use crate::{contains, BitmapArena, SuperchunkLayer};
 use bitmap::morton::morton_index;
 use chunk_storage::LayerType;
-use utilities::hash::slot;
-use coordinates::{CartesianCell, CellIndex, SuperchunkIndex, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
 
 /// What a write does to each cell it covers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -122,40 +121,23 @@ impl std::ops::AddAssign for WritesApplied {
     }
 }
 
-/// Queues remembered: a cache of this many, by type.
-const REMEMBERED: usize = 16;
-
 /// Writes queued, a queue a layer type, sorted by type, each in the
-/// order queued. The last 16 types written to are found again without a
-/// search -- each in its slot of a small cache, by a hash of the type --
-/// since rules queue runs of writes to a few types, often by turns
-/// (grass, then dirt).
+/// order queued: a rule writes to few types, so finding one's queue is
+/// a search of a few.
 #[derive(Default)]
 pub struct WriteQueues {
     /// The queues, by type.
     queues: Vec<(LayerType, Vec<Write>)>,
-    /// Types written to, and their queue's index, each in its slot.
-    remembered: [Option<(LayerType, usize)>; REMEMBERED],
 }
 
 impl WriteQueues {
     /// Queues `write` into `layer_type`'s queue.
     pub fn push(&mut self, layer_type: LayerType, write: Write) {
-        let slot = slot(layer_type.0, REMEMBERED);
-        let queue = match self.remembered[slot] {
-            Some((remembered, queue)) if remembered == layer_type => queue,
-            _ => {
-                let queue = match self.queues.binary_search_by_key(&layer_type, |(queued, _)| *queued) {
-                    Ok(at) => at,
-                    Err(at) => {
-                        // The queues after it move up one: what is remembered of them is stale.
-                        self.queues.insert(at, (layer_type, Vec::new()));
-                        self.remembered = [None; REMEMBERED];
-                        at
-                    }
-                };
-                self.remembered[slot] = Some((layer_type, queue));
-                queue
+        let queue = match self.queues.binary_search_by_key(&layer_type, |(queued, _)| *queued) {
+            Ok(at) => at,
+            Err(at) => {
+                self.queues.insert(at, (layer_type, Vec::new()));
+                at
             }
         };
         self.queues[queue].1.push(write);
@@ -238,7 +220,7 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk: Super
         return;
     };
     // The bounds' part inside this superchunk.
-    let CartesianCell { x: first_x, y: first_y } = superchunk.top_left().cartesian();
+    let CellCartesian { x: first_x, y: first_y } = superchunk.top_left().cartesian();
     let (left, top) = (left.max(first_x), top.max(first_y));
     let (right, bottom) = (right.min(first_x + (SUPERCHUNK_SIDE_CELLS - 1)), bottom.min(first_y + (SUPERCHUNK_SIDE_CELLS - 1)));
     if left > right || top > bottom {
@@ -252,7 +234,7 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk: Super
             let (x0, y0) = (left.max(chunk_x * CHUNK_SIDE_U32), top.max(chunk_y * CHUNK_SIDE_U32));
             let (x1, y1) = (right.min(chunk_x * CHUNK_SIDE_U32 + (CHUNK_SIDE_U32 - 1)), bottom.min(chunk_y * CHUNK_SIDE_U32 + (CHUNK_SIDE_U32 - 1)));
             let covered = (y0..=y1).flat_map(|y| (x0..=x1).map(move |x| (x, y))).filter(|&(x, y)| write.covers(x, y));
-            let chunk = CellIndex::from(CartesianCell { x: x0, y: y0 }).chunk().place();
+            let chunk = CellIndex::from(CellCartesian { x: x0, y: y0 }).chunk().place();
             match layer.as_deref_mut() {
                 Some(layer) if contains(layer.flags.hot, chunk) => {
                     for (x, y) in covered {

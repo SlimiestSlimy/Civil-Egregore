@@ -14,9 +14,9 @@
 //! Which allocation holds which layer type over which superchunk is a
 //! small directory: the superchunks in use, sorted by superchunk index,
 //! and for each its allocations, sorted by layer type -- the one thing
-//! ever sorted, and it holds no bitmaps. The last 16 lookups are
-//! remembered, so the runs of lookups in a few superchunks and types
-//! that Morton-ordered work makes search nothing. The allocations lie
+//! ever sorted, and it holds no bitmaps. The last superchunk looked up
+//! is remembered, so the runs of lookups in one superchunk that
+//! Morton-ordered work makes search only its few types. The allocations lie
 //! wherever they were made; each is one run of memory in Morton order.
 //!
 //! The arena grows an allocation at a time, as a layer type turns hot
@@ -58,7 +58,6 @@ use allocator::{Block, BlockPool};
 use bitmap::window::{in_word_tile, left_columns, rows_from_morton, top_rows, window, PLACE_IN_WORD_TILE, WORD_TILE_SIDE};
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use utilities::cache::prefetch;
-use utilities::hash;
 use chunk_storage::{ChunkStorage, LayerCodec, LayerType};
 use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use std::cell::Cell;
@@ -414,50 +413,20 @@ fn word_tile(bucket: Option<&CellWords>, tile: usize) -> Window {
 /// its index among the entry's allocations.
 type LayerAt = (usize, usize);
 
-/// The key of a slot of the cache with nothing remembered: no
-/// superchunk has this index.
-const NOTHING_REMEMBERED: (u64, u64) = (u64::MAX, u64::MAX);
-/// A superchunk's lack of a layer type, remembered.
-const NO_LAYER: u32 = u32::MAX;
-
-/// Lookups remembered: a cache of this many, by superchunk and type.
-const REMEMBERED: usize = 16;
-
-/// Lookups in the directory, remembering the last [`REMEMBERED`]: runs of
-/// lookups in a few superchunks and types -- a rule reading grass and
-/// dirt by turns, the cells across a border -- search nothing. Each
-/// superchunk and type has one slot of the cache, by a hash of the two,
-/// so finding it there is one comparison. One a thread: each remembers
-/// its own.
+/// Lookups in the directory, remembering the last superchunk found:
+/// runs of lookups in one superchunk -- a rule reading grass and dirt
+/// by turns -- search nothing but its few layers. One a thread: each
+/// remembers its own.
+#[derive(Default)]
 struct Lookup {
-    /// The lookups remembered, each in its slot: the superchunk index
-    /// and the layer type looked up -- [`NOTHING_REMEMBERED`] where none
-    /// is...
-    keys: [Cell<(u64, u64)>; REMEMBERED],
-    /// ...and where each was found: its entry in the directory, and its
-    /// index among the entry's allocations, or [`NO_LAYER`].
-    found: [Cell<(u32, u32)>; REMEMBERED],
-    /// The last superchunk looked up alone, and its entry.
+    /// The last superchunk looked up, and its entry.
     superchunk: Cell<Option<(SuperchunkIndex, usize)>>,
 }
 
-impl Default for Lookup {
-    /// Nothing remembered.
-    fn default() -> Self {
-        Self { keys: std::array::from_fn(|_| Cell::new(NOTHING_REMEMBERED)), found: Default::default(), superchunk: Cell::new(None) }
-    }
-}
-
 impl Lookup {
-    /// Forgets every lookup: the directory's shape changed.
+    /// Forgets the superchunk remembered: the directory's shape changed.
     fn forget(&self) {
-        self.keys.iter().for_each(|key| key.set(NOTHING_REMEMBERED));
         self.superchunk.set(None);
-    }
-
-    /// The slot of the cache of `layer_type` over `superchunk`.
-    fn slot(superchunk: SuperchunkIndex, layer_type: LayerType) -> usize {
-        hash::slot(superchunk.0 ^ layer_type.0.rotate_left(32), REMEMBERED)
     }
 
     /// Where `superchunk` is in `directory`, or where it would go.
@@ -477,16 +446,8 @@ impl Lookup {
     /// Where the allocation for `layer_type` over `superchunk` is in
     /// `directory`, if in use.
     fn find(&self, directory: &[Superchunk], layer_type: LayerType, superchunk: SuperchunkIndex) -> Option<LayerAt> {
-        let slot = Self::slot(superchunk, layer_type);
-        if self.keys[slot].get() == (superchunk.0, layer_type.0) {
-            let (entry, layer) = self.found[slot].get();
-            return (layer != NO_LAYER).then_some((entry as usize, layer as usize));
-        }
         let entry = self.superchunk(directory, superchunk).ok()?;
-        let layer = directory[entry].layer_index(layer_type);
-        self.keys[slot].set((superchunk.0, layer_type.0));
-        self.found[slot].set((entry as u32, layer.map_or(NO_LAYER, |layer| layer as u32)));
-        layer.map(|layer| (entry, layer))
+        directory[entry].layer_index(layer_type).map(|layer| (entry, layer))
     }
 
     /// The window of `width` by `height` cells (each up to 8) whose top

@@ -25,10 +25,10 @@ past the world's edge.
 **`CellIndex(u64)`**: **`of(chunk, place)`**, **`superchunk`**,
 **`chunk`**, **`place`** (the low 16 bits: its bit in the chunk's
 words), **`place_in_superchunk`** (the low 20), **`cartesian`**, and
-`From<CartesianCell>`. **`offset(dx, dy)`**: the cell so far away, if
+`From<CellCartesian>`. **`offset(dx, dy)`**: the cell so far away, if
 in the world.
 
-**`CartesianCell`** `{x, y}`: a cell's cartesian coordinates.
+**`CellCartesian`** `{x, y}`: a cell's cartesian coordinates.
 
 **`place_from_cartesian(x, y)`**, **`cartesian_from_place(place)`**: a
 cell's place in its superchunk from how far across and down from the

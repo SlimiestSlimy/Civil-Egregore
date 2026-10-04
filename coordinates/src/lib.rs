@@ -11,7 +11,7 @@
 //! among a superchunk's.
 //!
 //! Morton indices are what everything is stored and worked in. A cell's
-//! cartesian coordinates -- its `x` and `y` -- are a [`CartesianCell`],
+//! cartesian coordinates -- its `x` and `y` -- are a [`CellCartesian`],
 //! kept for geometry and drawing: whatever is cartesian says so.
 //!
 //! Every coordinate is a non-negative integer, counted from the world's
@@ -201,7 +201,7 @@ const fn interleave(x: u32, y: u32) -> u64 {
 /// 16 for its place in its chunk -- its bit's index in the chunk's
 /// bitmap words -- 4 for its chunk's place in its superchunk, 44 for its
 /// superchunk's index. The parts are bit fields, so finding a cell's
-/// superchunk, chunk and bit takes shifts and masks; [`CartesianCell`]
+/// superchunk, chunk and bit takes shifts and masks; [`CellCartesian`]
 /// is the same cell as cartesian coordinates, for geometry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CellIndex(pub u64);
@@ -240,8 +240,8 @@ impl CellIndex {
     }
 
     /// The same cell as cartesian coordinates.
-    pub fn cartesian(self) -> CartesianCell {
-        CartesianCell { x: gather(self.0), y: gather(self.0 >> 1) }
+    pub fn cartesian(self) -> CellCartesian {
+        CellCartesian { x: gather(self.0), y: gather(self.0 >> 1) }
     }
 
     /// The cell `dx` across and `dy` down from this one, if it is in the
@@ -261,7 +261,7 @@ impl CellIndex {
 /// same cell's Morton index, what everything else uses, is a
 /// [`CellIndex`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct CartesianCell {
+pub struct CellCartesian {
     /// Cells from the world's left edge.
     pub x: u32,
     /// Cells from the world's top edge.
@@ -304,9 +304,9 @@ fn step(coordinate: u64, by: i32, lane: u64) -> Option<u64> {
     (!wrapped).then_some(moved)
 }
 
-impl From<CartesianCell> for CellIndex {
+impl From<CellCartesian> for CellIndex {
     /// The cell's Morton index.
-    fn from(cell: CartesianCell) -> Self {
+    fn from(cell: CellCartesian) -> Self {
         Self(interleave(cell.x, cell.y))
     }
 }

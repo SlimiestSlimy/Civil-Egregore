@@ -10,7 +10,7 @@
 
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CartesianCell, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use simulation::around::{self, CENTRE, RING};
 use simulation::entity_store::{Attribute, AttributeType, EntityEdit, Entities, EntityId, EntityType, Header, NEVER};
 use simulation::{Simulation, Turn};
@@ -46,7 +46,7 @@ fn world(side: u32) -> (BitmapArena, Entities) {
 
 /// The cell `(x, y)` cells from the top left of the superchunk `(10, 10)`.
 fn cell(x: u32, y: u32) -> CellIndex {
-    CartesianCell { x: 10 * SUPERCHUNK_SIDE_CELLS + x, y: 10 * SUPERCHUNK_SIDE_CELLS + y }.into()
+    CellCartesian { x: 10 * SUPERCHUNK_SIDE_CELLS + x, y: 10 * SUPERCHUNK_SIDE_CELLS + y }.into()
 }
 
 /// A walker with ID `id` on `at`, waking at `wake`.

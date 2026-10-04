@@ -6,7 +6,7 @@ use bitmap::BITS_PER_WORD;
 use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::mock::GRASS;
 use simulation::entity_store::Entities;
-use coordinates::{CartesianCell, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 
 /// Dirt's colour.
 pub const BROWN: [u8; 3] = [116, 80, 46];
@@ -25,7 +25,7 @@ pub const FRAME_BYTES: usize = (SUPERCHUNK_SIDE_CELLS * SUPERCHUNK_SIDE_CELLS * 
 /// green where grass holds.
 pub fn frame(arena: &BitmapArena, superchunk: SuperchunkIndex, pixels: &mut [u8]) {
     let side = SUPERCHUNK_SIDE_CELLS;
-    let CartesianCell { x: left, y: top } = superchunk.top_left().cartesian();
+    let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     for pixel in pixels.as_chunks_mut().0 {
         *pixel = BROWN;
     }
@@ -52,7 +52,7 @@ pub fn sheep(entities: &Entities, superchunk: SuperchunkIndex, pixels: &mut [u8]
         return;
     };
     let side = SUPERCHUNK_SIDE_CELLS;
-    let CartesianCell { x: left, y: top } = superchunk.top_left().cartesian();
+    let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     for entity in kept.iter() {
         let at = entity.header.at.cartesian();
         let (x, y) = (at.x - left, at.y - top);

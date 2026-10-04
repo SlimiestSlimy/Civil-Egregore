@@ -49,7 +49,7 @@
 
 use bitplane_manager::{BitmapArena, Write, WriteOp};
 use chunk_storage::mock::{DIRT, GRASS};
-use coordinates::{CartesianCell, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{CellCartesian, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use simulation::around::{self, CENTRE, RING};
 use terrain::{WALL_EAST, WALL_SOUTH};
 use simulation::entity_store::{Attribute, AttributeType, EntityEdit, Entities, EntityId, EntityType, Header};
@@ -254,13 +254,13 @@ fn next_step(turn: &mut Turn) -> u64 {
 /// half its cells' worth of them -- waking over the next [`STEP_TICKS`]
 /// ticks: put in the world by [`Entities::apply`].
 pub fn flock(entities: &mut Entities, superchunk: SuperchunkIndex, count: usize, random: &mut Rng) {
-    let CartesianCell { x: left, y: top } = superchunk.top_left().cartesian();
+    let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     let side = SUPERCHUNK_SIDE_CELLS as u64;
     assert!(count as u64 <= side * side / 2, "{count} sheep on a superchunk: too many to draw a cell each");
     let now = entities.now();
     let mut taken = HashSet::with_capacity(count);
     while taken.len() < count {
-        let at = CartesianCell { x: left + random.below(side) as u32, y: top + random.below(side) as u32 };
+        let at = CellCartesian { x: left + random.below(side) as u32, y: top + random.below(side) as u32 };
         // A cell drawn twice is drawn again: a cell holds one sheep.
         if !taken.insert((at.x, at.y)) {
             continue;
