@@ -55,9 +55,10 @@ pub struct Shape {
     /// The height the highest land vertex may be at: each is between
     /// just over the ocean and this.
     pub highest: Height,
-    /// The share of the vertices that are land or ocean as the two by
-    /// two squares they are among, not each by its own lot, of [`ONE`]:
-    /// how much land and ocean clump.
+    /// How much smooth noise, some vertices broad, counts beside a
+    /// vertex's own lot in whether it is land or ocean, of [`ONE`]: how
+    /// much land and ocean clump. The more, the less exactly the
+    /// ocean's share is kept.
     pub clumping: u64,
     /// The vertices from the ocean within which land is held low: 4
     /// at most; 0, and none is.

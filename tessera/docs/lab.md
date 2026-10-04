@@ -53,7 +53,7 @@ up with the power-of-two tiles. Every odd side from 3 to 31.
 
 **`seed.rs`**: the seed every run growing a corpus uses, kept in
 `transient_data/seed` with how many runs have used it.
-- **`seed_counted()`**: `TESSERA_SEED` if set (a number pins it, `fresh`
+- **`seed_counted()`**: `TILESIM_SEED` if set (a number pins it, `fresh`
   draws one; neither touches the file); else the file's seed, counted
   as a use -- rolled to a fresh one once used
   `USES_BEFORE_THE_SEED_ROLLS` times.

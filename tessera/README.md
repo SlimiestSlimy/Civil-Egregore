@@ -105,7 +105,7 @@ internals (`tests/unit/`). Every check covers the same ground:
 
 Sampled bitmaps come from a seed kept in `transient_data/seed`, outside git.
 It rolls by itself every five runs, so no corpus is measured against for
-long. `TESSERA_SEED=<seed>` pins a run, and `TESSERA_SEED=fresh` draws a
+long. `TILESIM_SEED=<seed>` pins a run, and `TILESIM_SEED=fresh` draws a
 new seed for one run. [`docs/testing_protocol.md`](docs/testing_protocol.md)
 is the whole protocol, with every command and every parameter.
 

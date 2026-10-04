@@ -5,7 +5,7 @@
 //! checkerboard and every saved adversarial bitmap
 //! (`external_benchmarks/adversarial/saved/`), encoded, then decoded,
 //! all in one Tessera. The seed rolls like every run's: counts are compared
-//! on one seed, pinned with `TESSERA_SEED=<seed>` when a comparison would
+//! on one seed, pinned with `TILESIM_SEED=<seed>` when a comparison would
 //! straddle a roll.
 //!
 //! Callgrind counts every instruction executed, the same on every run,
@@ -60,7 +60,7 @@ const NOISE_BITMAPS: u64 = 1;
 pub const CORPUS_TOOL: &str = "instruction_corpus";
 
 /// The variable the corpus' seed is pinned by, for both runs.
-const SEED_VARIABLE: &str = "TESSERA_SEED";
+const SEED_VARIABLE: &str = utilities::seed::VARIABLE;
 
 /// The two parts counted: a name, and the function callgrind collects
 /// inside, every call counted whole.

@@ -22,4 +22,5 @@ pub mod diagnostics;
 pub mod fixed_list;
 pub mod hash;
 pub mod rng;
+pub mod seed;
 pub mod transient_data;

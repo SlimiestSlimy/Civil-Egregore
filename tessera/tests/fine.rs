@@ -2,7 +2,7 @@
 //! every other run uses -- read without counting a use, as these run far
 //! more often than anything measured -- so a failure points at one
 //! small case, reproduced by pinning the seed it printed
-//! (`TESSERA_SEED=<seed>`). Each also pins down something specific the
+//! (`TILESIM_SEED=<seed>`). Each also pins down something specific the
 //! bitmap is meant to exercise.
 //!
 //! `cargo test --test fine`

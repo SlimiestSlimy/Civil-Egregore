@@ -45,6 +45,8 @@ use utilities::hash::{mix, GOLDEN_RATIO};
 const VERTICES_SALT: u64 = 0x706F_6C79_676F_6E73;
 /// The number the noise that bends the lines is drawn by, across; down is the next.
 const WARP_INDEX: u32 = 30;
+/// The number the noise land and ocean clump by is drawn by; its finer octave is the next.
+const CLUMP_INDEX: u32 = 40;
 /// The finer meshes there are at most.
 pub const FINER_MOST: usize = 10;
 /// The cells along a square of the finest grid there may be, as a
@@ -154,14 +156,19 @@ impl Mesh {
     }
 
     /// Whether the vertex of the square `(x, y)` of the broad grid is
-    /// ocean: by its own lot, or -- for a share of them, so that land
-    /// and ocean clump a little -- by the lot of the two by two squares
-    /// it is one of.
+    /// ocean: by its own lot, mixed -- so that land and ocean clump --
+    /// with smooth noise some vertices broad, which has no blocks to
+    /// show through.
     fn ocean(&self, shape: &Shape, seed: u64, (x, y): (i64, i64)) -> bool {
-        let lot = self.lot(seed, (x, y));
-        let clumped = (mix(lot) >> 32) & 0xFFFF < shape.clumping;
-        let by = if clumped { self.lot(seed ^ VERTICES_SALT, (x.div_euclid(2), y.div_euclid(2))) } else { lot };
-        (by >> 32) & 0xFFFF < shape.sea
+        let own = (self.lot(seed, (x, y)) >> 32) & 0xFFFF;
+        if shape.clumping == 0 {
+            return own < shape.sea;
+        }
+        // Two octaves, four vertices and two between points; spread about the half, for noise is mostly near it.
+        let (across, down) = (x as u32, y as u32);
+        let blobs = (2 * noise(seed, CLUMP_INDEX, 2, across, down) + noise(seed, CLUMP_INDEX + 1, 1, across, down)) / 3;
+        let blobs = ((blobs as i64 - (ONE / 2) as i64) * 2 + (ONE / 2) as i64).clamp(0, ONE as i64 - 1) as u64;
+        (own * (ONE - shape.clumping) + blobs * shape.clumping) >> 16 < shape.sea
     }
 
     /// The vertex of the square `(x, y)` of the grid.
