@@ -10,12 +10,14 @@ stepped between. `WALL_EAST`, `WALL_SOUTH` (layer types 8 and 9);
 of its own: `pathfinding::Walls::new` and
 `Turn::around_unwalled` bar it from the two. `OCTAVES`, `ONE`.
 
-**`Shape`** `{ground, ocean, span, sea, highest, edge, warp}`: the
-lowest ground and the ocean's height; the polygons' grid, the share of
-them that are ocean, the height the highest plain may stand at, the cells
-levels are mixed over at a border, how far borders are bent.
-`Shape::DEFAULT`. `WATER` (layer types 24 to 31): a cell's water, its
-depth over eight bitplanes. **`height(seed, x, y)`**: a cell's height;
+**`Shape`** `{ground, ocean, span, sea, highest, clumping, coast, coast_low, narrow, wide,
+soft, hard, warp, finer_depth, finer_share, finer_height, raised}`: the
+lowest ground and the ocean's height; the vertices' grid and the share
+of them that are ocean; the highest land, and the vertices from the
+ocean it is reached over; the lines' blends and sigmoidness, least and
+most; how far lines are bent; the finer meshes. `Shape::DEFAULT`.
+`WATER` (layer types 24 to 31): a cell's water, its depth over eight
+bitplanes. **`height(seed, x, y)`**: a cell's height;
 **`height_shaped(shape, seed, x, y)`**: the same in a world shaped
 otherwise. **`noise(seed, index, shift, x,
 y)`**: smooth noise, one octave of a height. Private: **`point`**, an
@@ -28,12 +30,13 @@ each way each chunk's cells that keep a wall.
 past the edges asked for too; **`height(place)`**, **`walled(way,
 place)`**: a cell's, by its place in the superchunk; **`wall_counts()`**.
 
-## `polygons.rs`
+## `mesh.rs`
 
-**`Lands`**: the land asked for cell after cell, the sites about the
-last cell kept -- **`new(shape, seed)`**, **`land(x, y)`** (the cell's
-polygon's level, mixed near a border with its neighbours'),
-**`height(x, y)`**, **`polygon(x, y)`** (the polygon's number, whether
-it is land, about how far the cell is from its border). **`land`**,
-**`polygon`**: the same for one cell alone. Private: **`Site`**,
-**`Lands::moved`**, **`Lands::squared`**.
+**`Lands`**: the land asked for cell after cell, the vertices about the
+last cell and its triangle kept -- **`new(shape, seed)`**, **`land(x,
+y)`**, **`height(x, y)`**, **`line(x, y)`** (how far inland the cell
+is, and about how far from the broad mesh's nearest line). **`land`**:
+the same for one cell alone. `SIGMOID_ONE`, `FINER_MOST`, `COAST_MOST`.
+Private: **`Vertex`**, **`Triangle`**, **`Blended`**, **`Mesh`**
+(`vertex`, `lot`, `triangle`, `locate`, `blended`), **`raised`**,
+**`width`**, **`area`**.

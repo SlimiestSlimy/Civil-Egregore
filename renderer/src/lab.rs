@@ -7,10 +7,10 @@
 //! world is made afresh and its ticks start from 0.
 
 use crate::sim::SEED;
-use crate::tuning::{self, BORDER_BENDING, GRASS_COVER, GRASS_DETAIL, GRASS_PATCH, GRASS_SCATTER, HIGHEST_PLAIN, INNER_DEPTH, INNER_HEIGHT, INNER_SHARE, LINES, LINE_HEIGHT, NARROWEST_LINE, HARDEST_RAMP, NARROWEST_RAMP, OCEAN_FLOOR, OCEAN_LEVEL, OCEAN_SHARE, POLYGON_SIZE, RAISED_SHARE, RIDGE_SHARE, SOFTEST_RAMP, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER, WIDEST_LINE, WIDEST_RAMP};
+use crate::tuning::{self, CLUMPING, COAST_BREADTH, COAST_LOWNESS, FINER_DEPTH, FINER_FALL, FINER_HEIGHT, FINER_SHARE, GRASS_COVER, GRASS_DETAIL, GRASS_PATCH, GRASS_SCATTER, HIGHEST_LAND, LEAST_SIGMOID, LINE_BENDING, MOST_SIGMOID, NARROWEST_BLEND, OCEAN_FLOOR, OCEAN_LEVEL, OCEAN_SHARE, RAISED_SHARE, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER, VERTEX_SPACING, WIDEST_BLEND};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
-use terrain::polygons::HARD_ONE;
+use terrain::mesh::SIGMOID_ONE;
 use terrain::Shape;
 use utilities::hash::mix;
 use world::patches::{Patches, ONE};
@@ -66,33 +66,31 @@ pub fn generation() -> Generation {
 }
 
 /// The heights' shape, as the sliders have it: what is typed held to
-/// what a height and the polygons can take.
+/// what a height and the mesh can take.
 fn shape(tuned: &tuning::Tuning) -> Shape {
     let height = |tuned: f32| tuned.round().clamp(0.0, u16::MAX as f32) as u16;
-    let cells = |tuned: f32| tuned.round().clamp(1.0, u16::MAX as f32) as u64;
     let share = |tuned: f32| (tuned.clamp(0.0, 1.0) * ONE as f32) as u64;
-    let hardness = |tuned: f32| (tuned.clamp(1.0, 16.0) * HARD_ONE as f32) as u64;
+    let sigmoid = |tuned: f32| (tuned.clamp(1.0, 16.0) * SIGMOID_ONE as f32) as u64;
     let ground = height(tuned[OCEAN_FLOOR]);
     Shape {
         ground,
         // No ocean under its own floor.
         ocean: height(tuned[OCEAN_LEVEL]).max(ground),
-        span: tuned[POLYGON_SIZE].round().clamp(6.0, 24.0) as u32,
+        span: tuned[VERTEX_SPACING].round().clamp(6.0, 24.0) as u32,
         sea: share(tuned[OCEAN_SHARE]),
-        highest: height(tuned[HIGHEST_PLAIN]),
-        narrow: cells(tuned[NARROWEST_RAMP]),
-        wide: cells(tuned[WIDEST_RAMP]),
-        soft: hardness(tuned[SOFTEST_RAMP]),
-        hard: hardness(tuned[HARDEST_RAMP]),
-        warp: (tuned[BORDER_BENDING].clamp(0.0, 4.0) * ONE as f32) as u64,
-        inner_depth: tuned[INNER_DEPTH].round().clamp(0.0, 3.0) as u32,
-        inner_share: share(tuned[INNER_SHARE]),
-        inner_height: height(tuned[INNER_HEIGHT]) as u64,
+        highest: height(tuned[HIGHEST_LAND]),
+        coast: tuned[COAST_BREADTH].round().clamp(0.0, 4.0) as u32,
+        coast_low: sigmoid(tuned[COAST_LOWNESS]),
+        clumping: share(tuned[CLUMPING]),
+        narrow: share(tuned[NARROWEST_BLEND]),
+        wide: share(tuned[WIDEST_BLEND]),
+        soft: sigmoid(tuned[LEAST_SIGMOID]),
+        hard: sigmoid(tuned[MOST_SIGMOID]),
+        warp: (tuned[LINE_BENDING].clamp(0.0, 4.0) * ONE as f32) as u64,
+        finer_depth: tuned[FINER_DEPTH].round().clamp(0.0, 10.0) as u32,
+        finer_fall: share(tuned[FINER_FALL]),
+        finer_share: share(tuned[FINER_SHARE]),
+        finer_height: height(tuned[FINER_HEIGHT]) as u64,
         raised: share(tuned[RAISED_SHARE]),
-        lines: tuned[LINES].round().clamp(0.0, 4.0) as u32,
-        line_height: height(tuned[LINE_HEIGHT]) as u64,
-        ridges: share(tuned[RIDGE_SHARE]),
-        line_narrow: cells(tuned[NARROWEST_LINE]),
-        line_wide: cells(tuned[WIDEST_LINE]),
     }
 }

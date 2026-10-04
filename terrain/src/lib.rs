@@ -17,7 +17,7 @@
 pub mod diagnostics;
 pub mod transient_data;
 
-pub mod polygons;
+pub mod mesh;
 
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{Height, HeightMap, LayerType};
@@ -37,62 +37,69 @@ pub const WALL_SOUTH: LayerType = LayerType(9);
 /// The walls' layers, and the neighbour each is towards.
 pub const WALLS: [(LayerType, (i32, i32)); 2] = [(WALL_EAST, (1, 0)), (WALL_SOUTH, (0, 1))];
 
-/// How the heights are shaped: the land as polygons ([`polygons`]) --
-/// closed shapes that share borders, each ocean, its ground the
-/// lowest there is, or land, a plain at a level of its own over the
-/// ocean's.
+/// How the heights are shaped: the land as a mesh ([`mesh`]) --
+/// vertices that carry heights, each ocean, at the lowest ground, or
+/// land, at a height of its own over the ocean's; and lines between
+/// them that carry how those heights are blended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Shape {
     /// The height the lowest ground is at: the ocean's floor.
     pub ground: Height,
     /// The height the ocean stands at, all over the world.
     pub ocean: Height,
-    /// The cells along a square of the polygons' sites' grid, as a
-    /// power of two, 6 to 24: about a polygon's breadth.
+    /// The cells along a square of the vertices' grid, as a power of
+    /// two, 6 to 24: about a line's length.
     pub span: u32,
-    /// The share of the polygons that are ocean, of [`ONE`].
+    /// The share of the vertices that are ocean, of [`ONE`].
     pub sea: u64,
-    /// The height the highest land polygon's plain may stand at: each
-    /// stands between just over the ocean and this.
+    /// The height the highest land vertex may be at: each is between
+    /// just over the ocean and this.
     pub highest: Height,
-    /// The cells the narrowest polygon's ramp is across: each polygon
-    /// has a ramp of its own, by lot, from this to the widest -- about
-    /// a narrow one cliffs, about a broad one slopes.
+    /// The share of the vertices that are land or ocean as the two by
+    /// two squares they are among, not each by its own lot, of [`ONE`]:
+    /// how much land and ocean clump.
+    pub clumping: u64,
+    /// The vertices from the ocean within which land is held low: 4
+    /// at most; 0, and none is.
+    pub coast: u32,
+    /// How low land beside the ocean is held, of
+    /// [`mesh::SIGMOID_ONE`]: the power its lot is raised to, so that
+    /// the higher a height the less likely. One, and it is not held;
+    /// less each vertex from the ocean, to one past the coast.
+    pub coast_low: u64,
+    /// The least share of its length a line's blend is, of [`ONE`]:
+    /// each line has a blend of its own, by lot, from this to the most
+    /// -- the share of the line, about its middle, the change from one
+    /// end's height to the other's is spread over. All of it, and the
+    /// line is one slope from vertex to vertex; little, and it is two
+    /// plains and a cliff.
     pub narrow: u64,
-    /// The cells the widest polygon's ramp is across: half a square's
-    /// side at most.
+    /// The most share of its length a line's blend is.
     pub wide: u64,
-    /// How hard the softest polygon's ramp is, of
-    /// [`polygons::HARD_ONE`]: each polygon has a hardness of its own,
-    /// by lot, from this to the hardest. One is an even slope; more, two
-    /// levels and a step between them.
+    /// The least a line's sigmoidness is, of [`mesh::SIGMOID_ONE`]:
+    /// each line has one of its own, by lot, from this to the most.
+    /// One is an even slope across the blend; more, two levels and a
+    /// step between them.
     pub soft: u64,
-    /// How hard the hardest polygon's ramp is: 16 at most.
+    /// The most a line's sigmoidness is: 16 at most.
     pub hard: u64,
-    /// How far the borders are bent, beside a square's side, of [`ONE`].
+    /// How far the lines are bent, beside a square's side, of [`ONE`].
     pub warp: u64,
-    /// The grids of smaller polygons within the land ones, each a
-    /// quarter the breadth of the one before: 3 at most.
-    pub inner_depth: u32,
-    /// The share of the smaller polygons that raise or sink the
-    /// ground, of [`ONE`].
-    pub inner_share: u64,
-    /// The most one of the broadest of them raises or sinks it, in
-    /// heights: half as much each grid finer.
-    pub inner_height: u64,
+    /// The finer meshes on the land, each with vertices half as far
+    /// apart as the one before: 10 at most, and none finer than 16
+    /// cells between vertices.
+    pub finer_depth: u32,
+    /// The share of a finer mesh's vertices that raise or sink the
+    /// land, of [`ONE`].
+    pub finer_share: u64,
+    /// The most a vertex of the broadest of them raises or sinks it,
+    /// in heights.
+    pub finer_height: u64,
+    /// How much of that each mesh finer does, beside the one before,
+    /// of [`ONE`].
+    pub finer_fall: u64,
     /// The share of those that raise it, of [`ONE`]: the rest sink it.
     pub raised: u64,
-    /// The lines a land polygon has at most: 4 at most.
-    pub lines: u32,
-    /// The most a line raises or sinks the ground, in heights.
-    pub line_height: u64,
-    /// The share of the lines that are ridges, of [`ONE`]: the rest
-    /// are canyons.
-    pub ridges: u64,
-    /// The cells from it the narrowest line is gone at.
-    pub line_narrow: u64,
-    /// The cells from it the widest line is gone at.
-    pub line_wide: u64,
 }
 
 /// A cell's water: how deep it stands over the ground, 0 none, a number
@@ -100,11 +107,11 @@ pub struct Shape {
 pub const WATER: [LayerType; 8] = [LayerType(24), LayerType(25), LayerType(26), LayerType(27), LayerType(28), LayerType(29), LayerType(30), LayerType(31)];
 
 impl Shape {
-    /// The world's shape: polygons 8 superchunks across, half of them
-    /// ocean 255 deep -- as deep as water is kept -- the plains to 200
-    /// over it (711), joined by ramps from 4 cells across to 2,048; within
-    /// the land, two grids of smaller polygons and up to two lines a polygon.
-    pub const DEFAULT: Self = Self { ground: 256, ocean: 511, span: 13, sea: ONE / 2, highest: 711, narrow: 4, wide: 2048, soft: polygons::HARD_ONE, hard: 8 * polygons::HARD_ONE, warp: ONE * 3 / 10, inner_depth: 2, inner_share: ONE * 7 / 10, inner_height: 120, raised: ONE * 3 / 5, lines: 2, line_height: 300, ridges: ONE * 7 / 10, line_narrow: 64, line_wide: 1024 };
+    /// The world's shape: vertices 8 superchunks apart, half of them
+    /// ocean 255 deep -- as deep as water is kept -- the land to 200
+    /// over it (711); lines blended over a quarter of their length to
+    /// all of it, from even slopes to gentle steps; finer meshes on the land down to lines 16 cells long.
+    pub const DEFAULT: Self = Self { ground: 256, ocean: 511, span: 13, sea: ONE / 2, highest: 711, clumping: ONE / 4, coast: 2, coast_low: 5 * mesh::SIGMOID_ONE / 2, narrow: ONE / 4, wide: ONE, soft: mesh::SIGMOID_ONE, hard: 3 * mesh::SIGMOID_ONE, warp: ONE * 3 / 10, finer_depth: 9, finer_share: ONE * 7 / 10, finer_height: 120, finer_fall: ONE / 2, raised: ONE * 3 / 5 };
 }
 
 /// One: a fraction's whole, 16 bits.
@@ -123,7 +130,7 @@ fn between(from: u64, to: u64, along: u64) -> u64 {
 /// Smooth noise at the cell `(x, y)`, of [`ONE`]: the four points
 /// about the cell of a grid `2^shift` cells apart, each a number
 /// settled by `seed` and `index`, eased between: what bends the
-/// polygons' borders, and what lies in patches lies by.
+/// mesh's lines, and what lies in patches lies by.
 pub fn noise(seed: u64, index: u32, shift: u32, x: u32, y: u32) -> u64 {
     let (left, top) = (x >> shift, y >> shift);
     let ease = |within: u32| {
@@ -146,7 +153,7 @@ pub fn height(seed: u64, x: u32, y: u32) -> Height {
 /// [`height`], in a world shaped as `shape` says: what a shape is tried
 /// out with before it is the world's.
 pub fn height_shaped(shape: &Shape, seed: u64, x: u32, y: u32) -> Height {
-    polygons::Lands::new(shape, seed).height(x, y)
+    mesh::Lands::new(shape, seed).height(x, y)
 }
 
 /// Whether two heights are too far apart to step between.
@@ -172,7 +179,7 @@ impl Terrain {
     /// [`Terrain::generate`], in a world shaped as `shape` says.
     pub fn generate_shaped(shape: &Shape, seed: u64, superchunk: SuperchunkIndex) -> Self {
         let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
-        let mut lands = polygons::Lands::new(shape, seed);
+        let mut lands = mesh::Lands::new(shape, seed);
         Self::from_heights(|x, y| lands.height(left.wrapping_add_signed(x), top.wrapping_add_signed(y)))
     }
 

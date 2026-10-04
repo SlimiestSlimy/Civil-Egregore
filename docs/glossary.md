@@ -26,11 +26,11 @@ what they always do and are not listed.
 | **place** | a Morton index inside the thing around it, as a `usize`: a chunk's in its superchunk (0 to 15), a cell's in its chunk (0 to 65,535), or a cell's in its superchunk (20 bits, `CellIndex::place_in_superchunk`) | chunk index, cell index | slot, offset, position |
 | **cartesian** | `x` and `y`, counted from the world's or a superchunk's top left; only for geometry and drawing, and always named so: `CellCartesian`, `from_cartesian`, `cartesian()`, `place_from_cartesian` | Morton index | world cell, coordinates (alone) |
 | **Morton order** | the order of Morton indices: work is done and written in it, so memory is read forwards | sampling, wake | |
-| **height** | a cell's height, 16 bits, 0 to 65,535, from the seed alone (`terrain::height`) | wall, height map, floor, polygon | elevation |
+| **height** | a cell's height, 16 bits, 0 to 65,535, from the seed alone (`terrain::height`) | wall, height map, floor, vertex | elevation |
 | **dirt** | a cell with nothing on it: no layer of its own | grass | ground |
 | **water** | how deep water stands over a cell's ground, 0 none: a level over eight bitplanes (`terrain::WATER`) | level, ocean | |
-| **ocean** | the water at one height all over the world (`Shape::ocean`): the land under it is its floor | water, island, polygon | sea |
-| **island** | land polygons that share borders, the ocean about them | ocean, polygon | continent |
+| **ocean** | the water at one height all over the world (`Shape::ocean`): the land under it is its floor | water, island, vertex | sea |
+| **island** | land about land vertices that are joined, the ocean about it | ocean, vertex | continent |
 | **tree** | a cell set in the layer `TREE`, with a **stage** | stage, patches | |
 | **stage** | how old a tree is, 0 to 15: a number kept over four bitplanes (`TREE_STAGE`), a bit each | tree, level | age, growth |
 | **level** | a number a cell holds over several bitplanes, the lowest bit first (`Turn::level`) | stage, bitplane | multi-bit plane |
@@ -77,9 +77,11 @@ what they always do and are not listed.
 | **image** | one superchunk as stored, one run of words, in memory as on disk: its height map and every chunk's encoded layers (`SuperchunkImage`) | chunk storage, save | |
 | **height map** | a superchunk's heights: a floor a chunk, a byte a cell over it, and a tall chunk's 16 bits a cell (`HeightMap`) | height, floor, tall chunk | |
 | **map** | the renderer's picture of the world from farther than its cells are drawn from: each pixel the cell in its middle as generated, nothing of the simulation read (`renderer/src/map.rs`) | detail, lab | overview, minimap |
-| **polygon** | a closed shape of the land: the cells nearer one site than any other, ocean or a plain at a level of its own (`terrain::polygons`) | site, edge, plain | region, plate, Voronoi cell |
-| **site** | the point a polygon is the cells nearest to: one to each square of a grid, by lot | polygon | |
-| **edge** (a polygon's) | the cells from a border over which the levels about it are mixed: a ramp, or narrow, a cliff | polygon | |
+| **mesh** | the land's shape: vertices joined by lines into triangles (`terrain::mesh`) | vertex, line | polygons, Voronoi |
+| **vertex** | a point of the mesh, one to each square of a grid: ocean, or land at a height of its own | mesh, line | site, node |
+| **line** (the mesh's) | what joins two vertices and says how their heights are blended | blend, sigmoidness | edge, border |
+| **blend** | the share of a line's length, about its middle, the change from one end's height to the other's is spread over | line | ramp width, edge |
+| **sigmoidness** | the shape of the change across a blend: 1 an even slope, more a step between two levels | line, blend | hardness, sharpness |
 | **floor** | a chunk's lowest height, 16 bits: what its cells' bytes are counted from | height map | chunk height |
 | **tall chunk** | a chunk whose heights span more than 255: kept whole, 16 bits a cell, after the bytes | height map, floor | |
 | **layer codec** | encodes a layer for an image, and decodes it back, by Tessera (`LayerCodec`) | Tessera | |

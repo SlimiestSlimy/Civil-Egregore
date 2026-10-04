@@ -19,7 +19,7 @@ fn walled(terrain: &Terrain, way: usize, x: u32, y: u32) -> bool {
 }
 
 /// A shape of plains joined by broad ramps and nothing within them: no walls.
-const RAMPS: Shape = Shape { narrow: 2048, wide: 2048, soft: 512, hard: 512, inner_depth: 0, lines: 0, ..Shape::DEFAULT };
+const RAMPS: Shape = Shape { narrow: 1 << 16, wide: 1 << 16, soft: 512, hard: 512, finer_depth: 0, ..Shape::DEFAULT };
 /// A shape of small polygons joined by cliffs: plenty of walls.
 const CLIFFS: Shape = Shape { span: 8, highest: 552, narrow: 2, wide: 2, ..Shape::DEFAULT };
 
@@ -81,14 +81,37 @@ fn a_cliff_is_walled_along_its_length() {
     assert!(!walled(&terrain, 0, 500, 77) && !walled(&terrain, 0, 498, 77));
 }
 
-/// The land as polygons: some ocean at the lowest ground, some plains
-/// over the ocean's level, and between any two cells beside one
-/// another -- a border crossed or not -- a ramp, never a jump.
+/// The land as a mesh: some ocean at the lowest ground, some land over
+/// the ocean's level, and between any two cells beside one another --
+/// a line crossed or not -- a slope, never a break.
 #[test]
-fn polygons_are_ocean_or_plains_joined_by_ramps() {
-    let shape = Shape { span: 10, wide: 1024, narrow: 1024, ..RAMPS };
-    let row: Vec<u64> = (0..40_000).map(|x| terrain::polygons::land(&shape, 1, 2_000_000_000 + x, 2_000_000_000)).collect();
+fn the_mesh_is_ocean_or_land_joined_by_slopes() {
+    let shape = Shape { span: 10, ..RAMPS };
+    let row: Vec<u64> = (0..40_000).map(|x| terrain::mesh::land(&shape, 1, 2_000_000_000 + x, 2_000_000_000)).collect();
     assert!(row.iter().all(|&high| (shape.ground..=shape.highest.max(shape.ocean + 1)).contains(&(high as u16))));
     assert!(row.contains(&(shape.ground as u64)) && row.iter().any(|&high| high > shape.ocean as u64), "ocean and land both");
-    assert!(row.windows(2).all(|pair| pair[0].abs_diff(pair[1]) <= 3), "no jump");
+    assert!(row.windows(2).all(|pair| pair[0].abs_diff(pair[1]) <= 6), "no break");
+}
+
+/// A cell's height is the same in whatever order cells are asked for:
+/// one after another along a row, back along it, each alone, or down
+/// columns -- cliffs, finer meshes and all.
+#[test]
+fn heights_are_the_same_in_whatever_order_they_are_asked_for() {
+    use terrain::mesh::Lands;
+    let (left, top, side) = (2_147_000_000u32, 2_147_100_000u32, 300u32);
+    let cells = || (0..side * side).map(|cell| (left + cell % side * 7, top + cell / side * 7));
+    let mut lands = Lands::new(&CLIFFS, 5);
+    let forwards: Vec<u16> = cells().map(|(x, y)| lands.height(x, y)).collect();
+    let mut lands = Lands::new(&CLIFFS, 5);
+    let mut backwards: Vec<u16> = cells().collect::<Vec<_>>().into_iter().rev().map(|(x, y)| lands.height(x, y)).collect();
+    backwards.reverse();
+    let mut lands = Lands::new(&CLIFFS, 5);
+    let mut columns = vec![0; forwards.len()];
+    for cell in 0..side * side {
+        let (across, down) = (cell / side, cell % side);
+        columns[(down * side + across) as usize] = lands.height(left + across * 7, top + down * 7);
+    }
+    let alone: Vec<u16> = cells().map(|(x, y)| height_shaped(&CLIFFS, 5, x, y)).collect();
+    assert!(forwards == backwards && forwards == columns && forwards == alone);
 }

@@ -57,34 +57,56 @@ the cells about the change are worked out again.
 | `tests/` | heights settled by seed and cell, walls where they should be |
 | `docs/` | this, and the reference, function by function |
 
-## The land as polygons
+## The land as a mesh
 
-`src/polygons.rs`. The world is cut into closed shapes that share
-borders and never overlap: a polygon is the cells nearer one site than
-any other, the sites one to each square of a grid `2^span` cells a
-side, placed by lot in the square's middle half. Each polygon is ocean
--- its ground the lowest there is (`Shape::ground`) -- or land, a plain
-at a level of its own between just over the ocean's and the highest
-(`Shape::ocean`, `highest`); the
-share that are ocean is `Shape::sea`. Broad noise moves a cell before
-its polygon is looked up, which bends the borders (`warp`). Within the
-edge's width of a border (`edge`) the levels of the polygons about it
-are mixed, each by how little farther its site is than the nearest: a
-ramp or a shore, or with a narrow edge a cliff, walled.
+`src/mesh.rs`: vertices that carry heights, joined by lines that carry
+how the heights are blended.
 
-A cell looks at the sites of the 25 squares about it, so any cell's
-height follows from the seed and the cell alone. `Lands` keeps those
-sites from one cell to the next -- drawn once for a square, not once
-for a cell -- and takes no root of a site too far to count: a
-superchunk's terrain takes about 0.1 s (0.6 s without).
+A **vertex** is one to each square of a grid `2^span` cells a side,
+placed by lot in the square's middle half; the four of neighbouring
+squares make a quad, cut by lot along one diagonal or the other into
+two triangles. A vertex is ocean (`Shape::sea` of them) -- at the
+lowest ground -- or land, at a height of its own.
 
-To come: polygons within polygons, plains higher or lower than the one
-about them; open lines within a polygon, ridges and valleys; ranges
-where two polygons meet; noise for the ground's detail.
+A share of the vertices (`Shape::clumping`) are land or ocean as the
+two by two squares they are among, not each by its own lot: land and
+ocean clump a little.
 
-The generator before this one -- a land's rise in octaves of noise,
-hills on it, a coast -- is gone; `noise` is kept for the borders and
-for what lies in patches.
+Land is low by the ocean and higher inland. A land vertex's height is
+drawn between just over the ocean and the highest (`Shape::highest`):
+past `Shape::coast` vertices from any ocean one, any height as likely
+as another; nearer, the higher the less likely (`Shape::coast_low`, the
+power the lot is raised to, the most beside the ocean) -- so most
+coasts are low, each by a little of its own, and a few are cliffs.
+
+A **line** joins two vertices. It has a **blend** -- the share of its
+length, about its middle, the change from one end's height to the
+other's is spread over: all of it, and the line is one slope from vertex
+to vertex -- and a **sigmoidness** -- 1 an even slope across the blend, more
+two levels and a step between -- each by lot between the shape's least
+and most. Along a line the height is its ends' blended so. Within a
+triangle each vertex's height counts by how near the cell is to it
+beside the nearer of the others, shaped by its two lines' blend and
+sigmoidness, each counting as the cell is nearer that line's other end:
+the ground slopes from vertex to vertex, level about a vertex only as
+far as its lines' blends leave it, and at a line two triangles agree.
+
+Broad noise moves a cell before its triangle is looked up, which bends
+the lines. **Finer meshes** (`finer_depth`, 10 at most), each with
+vertices half as far apart as the one before and none finer than 16
+cells -- nor any that would move the land by less than a height -- raise or sink the land by less each (`finer_fall`): points spread
+again within the triangles of the mesh before, small variations at a
+time -- the lowest land a quarter as much as the highest, so
+differences compound inland.
+
+Every cell's height follows from the seed and the cell alone, in whole
+numbers: the same whatever order cells or superchunks are made in. A
+cell on a line is in two triangles; it is always given to the first of
+them in a fixed order. `Lands` keeps the vertices about the last cell
+and its triangle; a superchunk's terrain takes about 0.1 s.
+
+To come: ridges and canyons as chains of lines; true subdivision of a
+triangle into its own smaller ones; noise for the ground's detail.
 
 **Water** is a depth a cell: how far it stands over the ground, 0 none,
 eight bits over eight bitplanes (`WATER`) -- the ocean deeper than 255
