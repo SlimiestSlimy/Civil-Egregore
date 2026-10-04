@@ -9,7 +9,7 @@
 //! a third thread turns into pixels ([`paint`]). The three share
 //! nothing else, so none waits on another.
 //!
-//! `cargo run --release -p renderer -- [superchunks shown] [sheep] [ticks a second, 0 flat out] [ticks to watch for] [1 to force every superchunk shown hot]`
+//! `cargo run --release -p renderer -- [superchunks shown] [sheep a superchunk] [ticks a second, 0 flat out] [ticks to watch for] [1 to force every superchunk shown hot]`
 //!
 //! Forced hot, the world is loaded to be measured: every superchunk
 //! shown hot all the while, the sheep given a superchunk each, and grass
@@ -27,6 +27,7 @@
 //! | `[` and `]` | halve and double the pace |
 //! | `B` | show the superchunks' boundaries, or not, and near enough each one's Morton index and `(x, y)` |
 //! | `C` | the same of the chunks |
+//! | `H` | show every cell's height, from near enough to read them |
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -44,7 +45,7 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::Anchor;
 use coordinates::{place_from_cartesian, square_side, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
 use paint::Picture;
-use sim::{start, Ask, Near, Request, Viewport, TARGET_PACE};
+use sim::{start, Ask, Near, Request, Viewport, SEED, TARGET_PACE};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use world::diagnostics::frames::BROWN;
@@ -173,6 +174,8 @@ struct Boundaries {
     superchunks: bool,
     /// The chunks'.
     chunks: bool,
+    /// Not a boundary, but shown as they are: every cell's height.
+    heights: bool,
 }
 
 /// A superchunks' boundary's colour, and its width in screen pixels.
@@ -185,13 +188,35 @@ const CHUNK_LINE: (Color, f32) = (Color::srgba(1.0, 1.0, 1.0, 0.45), 1.0);
 #[derive(Component)]
 struct Label;
 
+/// The camera, and no label: both have a place.
+type CameraOnly = (With<Camera2d>, Without<Label>, Without<HeightLabel>);
+
 /// Labels there are: what a view can hold of them.
 const LABELS: usize = 256;
 /// Screen pixels a superchunk or a chunk is across before it is labelled.
-const LABELLED_FROM: f32 = 260.0;
+const LABELLED_FROM: f32 = 150.0;
+/// Screen pixels a label is across at its full size: under that much
+/// room it is drawn smaller, to fit.
+const LABEL_WIDTH: f32 = 420.0;
 /// Screen pixels from a corner to its label, and from one line of
 /// labels to the next.
 const LABEL_LINE: f32 = 24.0;
+
+/// A cell's height, written on it: one of a grid of them, each given
+/// to the cell in view whose `(x, y)` is its own, counted round the
+/// grid -- so a cell keeps its text while the view moves.
+#[derive(Component)]
+struct HeightLabel {
+    /// Where it is in the grid.
+    slot: (u32, u32),
+}
+
+/// Height labels across and down: the most cells in view that are labelled.
+const HEIGHT_LABELS: (u32, u32) = (96, 54);
+/// Screen pixels a cell is across before its height is written on it.
+const HEIGHT_FROM: f32 = 20.0;
+/// Screen pixels a height is across at its full size.
+const HEIGHT_WIDTH: f32 = 44.0;
 
 /// The text over the world.
 #[derive(Component)]
@@ -216,7 +241,7 @@ fn argument(index: usize, default: usize) -> usize {
 }
 
 fn main() {
-    let (superchunks, flock) = (argument(1, 49) as u32, argument(2, 4000));
+    let (superchunks, flock) = (argument(1, 256) as u32, argument(2, 8000));
     let pace = Some(argument(3, TARGET_PACE as usize) as u32).filter(|&pace| pace > 0);
     let forced_hot = argument(5, 0) > 0;
     let (requests, frames) = start(superchunks, flock, forced_hot);
@@ -234,7 +259,7 @@ fn main() {
         .init_resource::<Seen>()
         .init_resource::<Boundaries>()
         .add_systems(Startup, setup)
-        .add_systems(Update, (steer, keys, boundaries, labels, show, ask, hud).chain())
+        .add_systems(Update, (steer, keys, boundaries, labels, heights, show, ask, hud).chain())
         .run();
 }
 
@@ -285,6 +310,9 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, mut sprites:
     }
     for _ in 0..LABELS {
         commands.spawn((Text2d::new(""), Anchor::TOP_LEFT, Transform::from_xyz(0.0, 0.0, 4.0), Visibility::Hidden, Label));
+    }
+    for slot in 0..HEIGHT_LABELS.0 * HEIGHT_LABELS.1 {
+        commands.spawn((Text2d::new(""), Transform::from_xyz(0.0, 0.0, 4.0), Visibility::Hidden, HeightLabel { slot: (slot % HEIGHT_LABELS.0, slot / HEIGHT_LABELS.0) }));
     }
     commands.spawn((
         Text::new(""),
@@ -364,8 +392,47 @@ fn boundaries(
     }
 }
 
-/// The camera, and no label: both have a place.
-type CameraOnly = (With<Camera2d>, Without<Label>);
+/// Writes every cell's height on it, by its key, once the cells are
+/// large enough on the screen to read it and few enough for the labels
+/// there are.
+fn heights(
+    mut shown: ResMut<Boundaries>,
+    sprites: Res<Sprites>,
+    keys: Res<ButtonInput<KeyCode>>,
+    camera: Single<(&Transform, &Projection), CameraOnly>,
+    window: Single<&Window>,
+    mut labels: Query<(&HeightLabel, &mut Text2d, &mut Transform, &mut Visibility)>,
+) {
+    shown.heights ^= keys.just_pressed(KeyCode::KeyH);
+    let (transform, projection) = *camera;
+    let Projection::Orthographic(view) = projection else {
+        return;
+    };
+    let half = Vec2::new(window.width(), window.height()) * view.scale / 2.0;
+    let middle = Vec2::new(transform.translation.x, -transform.translation.y);
+    let cells_a_side = sprites.side * SUPERCHUNK_SIDE_CELLS;
+    let cell = |cells: f32| (cells.floor().max(0.0) as u32).min(cells_a_side - 1);
+    let (first, last) = ((cell(middle.x - half.x), cell(middle.y - half.y)), (cell(middle.x + half.x), cell(middle.y + half.y)));
+    let readable = shown.heights && 1.0 / view.scale >= HEIGHT_FROM && last.0 - first.0 < HEIGHT_LABELS.0 && last.1 - first.1 < HEIGHT_LABELS.1;
+    // The world's cell at the top left of the square shown.
+    let corner = sprites.shown[0].top_left().cartesian();
+    let size = view.scale * (1.0 / view.scale / HEIGHT_WIDTH).min(1.0);
+    for (label, mut text, mut transform, mut visibility) in &mut labels {
+        // The cell in view that is the label's: the first at or past the view's first whose place round the grid is its slot.
+        let round = |first: u32, slot: u32, labels: u32| first + (slot + labels - first % labels) % labels;
+        let (x, y) = (round(first.0, label.slot.0, HEIGHT_LABELS.0), round(first.1, label.slot.1, HEIGHT_LABELS.1));
+        if !readable || x > last.0 || y > last.1 {
+            *visibility = Visibility::Hidden;
+            continue;
+        }
+        let height = terrain::height(SEED, corner.x + x, corner.y + y).to_string();
+        if text.0 != height {
+            text.0 = height;
+        }
+        *transform = Transform::from_xyz(x as f32 + 0.5, -(y as f32 + 0.5), 4.0).with_scale(Vec3::splat(size));
+        *visibility = Visibility::Visible;
+    }
+}
 
 /// Labels the superchunks and chunks in view whose boundaries are
 /// shown, once they are large enough on the screen: each one's Morton
@@ -388,7 +455,9 @@ fn labels(
     // The chunks in view, counted from the world's top left: every label is at a chunk's corner.
     let chunk = |cells: f32| ((cells / CHUNK_SIDE as f32).floor().max(0.0) as u32).min(chunks_a_side - 1);
     let (first, last) = ((chunk(middle.x - half.x), chunk(middle.y - half.y)), (chunk(middle.x + half.x), chunk(middle.y + half.y)));
-    let large = |cells: usize| cells as f32 / view.scale >= LABELLED_FROM;
+    // How large a label of something `cells` across is drawn, of its full size: none if there is no room to read it.
+    let fitted = |cells: usize| Some(cells as f32 / view.scale).filter(|&room| room >= LABELLED_FROM).map(|room| (room / LABEL_WIDTH).min(1.0));
+    let (superchunk_size, chunk_size) = (fitted(SPRITE_SIDE as usize).filter(|_| shown.superchunks), fitted(CHUNK_SIDE).filter(|_| shown.chunks));
     let mut wanted = Vec::new();
     for y in first.1..=last.1 {
         for x in first.0..=last.0 {
@@ -396,19 +465,19 @@ fn labels(
             let superchunk = sprites.shown[((y / SUPERCHUNK_SIDE as u32) * sprites.side + x / SUPERCHUNK_SIDE as u32) as usize];
             let (superchunk_x, superchunk_y) = superchunk.cartesian();
             let corner = Vec2::new((x as usize * CHUNK_SIDE) as f32, -((y as usize * CHUNK_SIDE) as f32));
-            if shown.superchunks && large(SPRITE_SIDE as usize) && (within_x, within_y) == (0, 0) {
-                wanted.push((corner, 0.0, format!("superchunk {:011x} ({superchunk_x}, {superchunk_y})", superchunk.0)));
+            if let Some(size) = superchunk_size.filter(|_| (within_x, within_y) == (0, 0)) {
+                wanted.push((corner, 0.0, size, format!("superchunk {:011x} ({superchunk_x}, {superchunk_y})", superchunk.0)));
             }
-            if shown.chunks && large(CHUNK_SIDE) {
+            if let Some(size) = chunk_size {
                 let place = place_from_cartesian(within_x * CHUNK_SIDE as u32, within_y * CHUNK_SIDE as u32) / CELLS_IN_CHUNK;
                 let (chunk_x, chunk_y) = (superchunk_x * SUPERCHUNK_SIDE as u32 + within_x, superchunk_y * SUPERCHUNK_SIDE as u32 + within_y);
-                wanted.push((corner, 1.0, format!("chunk {:012x} ({chunk_x}, {chunk_y})", ChunkIndex::of(superchunk, place).0)));
+                wanted.push((corner, superchunk_size.unwrap_or(0.0), size, format!("chunk {:012x} ({chunk_x}, {chunk_y})", ChunkIndex::of(superchunk, place).0)));
             }
         }
     }
     let mut wanted = wanted.into_iter();
     for (mut text, mut transform, mut visibility) in &mut labels {
-        let Some((corner, line, label)) = wanted.next() else {
+        let Some((corner, lines_above, size, label)) = wanted.next() else {
             *visibility = Visibility::Hidden;
             continue;
         };
@@ -416,8 +485,8 @@ fn labels(
             text.0 = label;
         }
         // As large on the screen however near the view is, and a little in from the corner.
-        let inset = Vec2::new(LABEL_LINE / 4.0, -LABEL_LINE / 4.0 - line * LABEL_LINE) * view.scale;
-        *transform = Transform::from_translation((corner + inset).extend(4.0)).with_scale(Vec3::splat(view.scale));
+        let inset = Vec2::new(LABEL_LINE / 4.0, -LABEL_LINE / 4.0 - lines_above * LABEL_LINE) * view.scale;
+        *transform = Transform::from_translation((corner + inset).extend(4.0)).with_scale(Vec3::splat(view.scale * size));
         *visibility = Visibility::Visible;
     }
 }
@@ -555,7 +624,7 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         pixels => format!("a cell {pixels} pixels a side"),
     };
     text.0 = format!(
-        "tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause   F: flat out   [ ]: pace   B: superchunks   C: chunks",
+        "tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause   F: flat out   [ ]: pace   B: superchunks   C: chunks   H: heights",
         grouped(seen.tick),
         grouped(seen.ticks_a_second as u64),
         grouped(seen.sheep as u64),

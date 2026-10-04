@@ -6,9 +6,11 @@
 //! Every pixel takes one edge's doing, never two multiplied: of the
 //! edges that darken it the darkest, and only if none does, of those
 //! that lighten it the lightest. A cast shadow and an edge's shade are
-//! joined the same way, the darker of the two. And a cell higher only
-//! at a corner fills that corner. So bands meet at corners as one
-//! outline, with no doubled patch and no gap.
+//! joined the same way, the darker of the two. A wall met only at a
+//! corner fills that corner, joining the bands either side of it; a
+//! step met only at a corner draws nothing, a dot alone saying
+//! nothing. So bands meet at corners as one outline, with no doubled
+//! patch and no gap.
 
 use crate::ground::{shadow_drop, Fine, Ground, SHADOW, SIDE};
 use crate::sim::{Cells, Near};
@@ -128,9 +130,13 @@ impl Cell<'_> {
         let (x, y) = (self.at.0 as isize, self.at.1 as isize);
         let here = self.fine.height(x, y);
         let (mut edges, mut count) = ([Edge::default(); 8], 0);
+        let rise_towards = |towards: (isize, isize)| self.fine.height(x + towards.0, y + towards.1) as i32 - here as i32;
         for towards in AROUND {
-            let rise = self.fine.height(x + towards.0, y + towards.1) as i32 - here as i32;
-            if rise >= 1 || rise <= -2 {
+            let rise = rise_towards(towards);
+            // A corner alone says nothing: one counts only for a wall, and only where the cells either side of it are no higher than this one -- where it joins their two bands.
+            let corner = towards.0 != 0 && towards.1 != 0;
+            let joins = rise.abs() >= 2 && rise_towards((towards.0, 0)) <= 0 && rise_towards((0, towards.1)) <= 0;
+            if (rise >= 1 || rise <= -2) && (!corner || joins) {
                 edges[count] = Edge { towards, rise };
                 count += 1;
             }

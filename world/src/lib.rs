@@ -116,11 +116,22 @@ fn layer_types() -> Vec<LayerType> {
 /// it, for now, pasture: dirt, a third of it grass. Each from the seed
 /// and where it is ([`generate_image`]).
 pub fn generate(seed: u64, sheep: usize) -> World {
+    generate_flocks(seed, &[WORLD_MIDDLE], sheep)
+}
+
+/// A world made from `seed` as [`generate`] makes one, but with a
+/// flock of `sheep` on each of `superchunks`, and the halos about them
+/// all hot before it ticks.
+pub fn generate_flocks(seed: u64, superchunks: &[SuperchunkIndex], sheep: usize) -> World {
     let mut world = World::empty(WorldInfo { name: String::new(), seed, tick: 0, layers: layer_types() });
-    world.keep_hot(&[WORLD_MIDDLE]);
-    flock(&mut world.entities, WORLD_MIDDLE, sheep, &mut Rng::for_stream(!seed, WORLD_MIDDLE.0));
+    let mut flocked = superchunks.to_vec();
+    flocked.sort_unstable();
+    world.keep_hot(&flocked);
+    for &superchunk in &flocked {
+        flock(&mut world.entities, superchunk, sheep, &mut Rng::for_stream(!seed, superchunk.0));
+    }
     world.entities.apply();
-    let halo = halos::about(std::iter::once(WORLD_MIDDLE));
+    let halo = halos::about(flocked.iter().copied());
     world.keep_hot(&halo);
     world
 }
