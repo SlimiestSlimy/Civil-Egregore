@@ -1,7 +1,8 @@
 //! The world from near, a cell several pixels: one picture of the
-//! cells in view, where height is drawn at its edges -- a step of one
-//! a thin line, light towards the sun and dark away, a wall a band on
-//! its lower cell, darkest at its foot -- under the cast shadows
+//! cells in view, where height is drawn at its edges -- a line along
+//! the border of the higher cell, light towards the sun and dark away,
+//! and under a wall a band on its lower cell, darkest at its foot --
+//! under the cast shadows
 //! ([`crate::ground`]). How strongly is [`crate::tuning`]'s.
 //!
 //! Every pixel takes one edge's doing, never two multiplied: of the
@@ -61,7 +62,7 @@ impl Edge {
     fn shading(self, from: f32, span: f32, tuning: &Tuning) -> (f32, f32) {
         // The share of the pixel within a band of the edge.
         let within = |nearest: f32, farthest: f32| ((from + span).min(farthest) - from.max(nearest)).max(0.0) / span;
-        // Down or to the right the neighbour's face is towards the sun; up or to the left, away.
+        // The sun is up and to the left: a neighbour down or to the right shows it its face, one up or to the left its back.
         let facing = self.towards.0 + self.towards.1;
         match self.rise {
             2.. => {
@@ -74,8 +75,9 @@ impl Edge {
                 };
                 (1.0 - foot * (1.0 - tuning[WALL_FADE] * from / width).max(0.0) * within(0.0, width), 1.0)
             }
-            1 if facing < 0 => (1.0 - tuning[STEP_DARK] * within(0.0, 1.0), 1.0),
-            1 if facing > 0 => (1.0, 1.0 + tuning[STEP_LIGHT] * within(0.0, 1.0)),
+            // The border of the higher cell: light where it looks to the sun, over a lower cell up or to the left; dark where it looks away.
+            ..=-1 if facing < 0 => (1.0, 1.0 + tuning[STEP_LIGHT] * within(0.0, 1.0)),
+            ..=-1 if facing > 0 => (1.0 - tuning[STEP_DARK] * within(0.0, 1.0), 1.0),
             _ => (1.0, 1.0),
         }
     }
@@ -144,7 +146,7 @@ impl Cell<'_> {
             // A corner alone says nothing: one counts only for a wall, and only where the cells either side of it are no higher than this one -- where it joins their two bands.
             let corner = towards.0 != 0 && towards.1 != 0;
             let joins = rise >= 2 && rise_towards((towards.0, 0)) <= 0 && rise_towards((0, towards.1)) <= 0;
-            if rise >= 1 && (!corner || joins) {
+            if (rise >= 2 || rise <= -1) && (!corner || joins) {
                 edges[count] = Edge { towards, rise };
                 count += 1;
             }

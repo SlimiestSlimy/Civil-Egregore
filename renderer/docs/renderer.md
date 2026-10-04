@@ -96,8 +96,9 @@ parts (8 MiB) for the 48 superchunks last seen.
   pixel, and a contour every 8, 16 or 32 heights.
 - **From near** (`src/near.rs`), a cell 2, 4 or 8 pixels -- as many as
   the screen shows -- the cells in view are one picture, and height is
-  drawn at the edges: a step of one a thin line, light towards the sun
-  and dark away; a wall a band 5 to 7 eighths of a cell on its lower
+  drawn at the edges: wherever a cell is higher than the one beside
+  it, a thin line along the higher cell's border, light towards the
+  sun and dark away; and under a wall a band 5 to 7 eighths of a cell on its lower
   cell, darkest at its foot and fading from it -- less dark where the
   sun is on the wall than where it faces away. Walls are drawn much
   the stronger: they are what cannot be crossed.
