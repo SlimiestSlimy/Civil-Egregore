@@ -128,6 +128,7 @@ pixels made here.
 | space | pause, and go on |
 | `T` | tick flat out, or at the game's pace (256 ticks a second) |
 | `F` | the window over the whole screen, or not |
+| `U` | show the sliders, or not |
 | `[` and `]` | halve and double the pace |
 | `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |
@@ -135,7 +136,8 @@ pixels made here.
 
 ## Sliders
 
-At the window's top right, a slider each of the numbers the near
+Hidden until `U` is pressed: the shading is tuned, and they are kept
+for what is tuned next. At the window's top right, a slider each of the numbers the near
 view's shading is tuned by (`src/tuning.rs`): how light and dark a
 step's lines are, a wall's band facing away from the sun and towards
 it and how it fades, the cast shadows,

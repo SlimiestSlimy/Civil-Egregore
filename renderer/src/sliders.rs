@@ -2,6 +2,9 @@
 //! [`crate::tuning`]: its knob dragged with the left button, set back
 //! to its default with the right, and kept when let go.
 //!
+//! They are hidden until asked for with `U`: the shading is tuned, and
+//! they are kept for what is tuned next.
+//!
 //! They are laid out by plain arithmetic -- a row each, a track of a
 //! fixed width against the window's right edge -- so where the pointer
 //! is on one is worked out from the same numbers, with no asking Bevy.
@@ -26,6 +29,13 @@ const NAME: f32 = 18.0;
 /// Whether the left button went down over the sliders and is still
 /// held: the view is then not dragged, wherever the pointer goes.
 static HELD: AtomicBool = AtomicBool::new(false);
+
+/// Whether the sliders are shown.
+static SHOWN: AtomicBool = AtomicBool::new(false);
+
+/// Anything of the sliders: shown and hidden with them.
+#[derive(Component)]
+pub struct Part;
 
 /// The filled part of the `.0`-th slider's track.
 #[derive(Component)]
@@ -57,21 +67,29 @@ fn pointer_over(window: &Window) -> bool {
 /// and a knob each.
 pub fn setup(mut commands: Commands) {
     let placed = |top: f32, right: f32, width: Val, height: f32| Node { position_type: PositionType::Absolute, top: Val::Px(top), right: Val::Px(right), width, height: Val::Px(height), ..default() };
-    commands.spawn((placed(MARGIN - 8.0, MARGIN - 12.0, Val::Px(PANEL + 12.0), ROW * TUNED.len() as f32 + 8.0), BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7))));
+    commands.spawn((placed(MARGIN - 8.0, MARGIN - 12.0, Val::Px(PANEL + 12.0), ROW * TUNED.len() as f32 + 8.0), BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)), Visibility::Hidden, Part));
     for index in 0..TUNED.len() {
         // Each is set in the middle of its row's height.
         let middle = MARGIN + ROW * (index as f32 + 0.5) - 4.0;
         let within = |height: f32| middle - height / 2.0;
-        commands.spawn((Text::new(""), TextFont { font_size: FontSize::Px(NAME), ..default() }, placed(within(NAME * 1.2), MARGIN + TRACK.0 + 16.0, Val::Auto, NAME * 1.2), Named(index)));
-        commands.spawn((placed(within(TRACK.1), MARGIN, Val::Px(TRACK.0), TRACK.1), BackgroundColor(Color::srgb(0.3, 0.3, 0.3))));
-        commands.spawn((placed(within(TRACK.1), MARGIN, Val::Px(0.0), TRACK.1), BackgroundColor(Color::srgb(0.95, 0.8, 0.25)), Fill(index)));
-        commands.spawn((placed(within(KNOB.1), MARGIN, Val::Px(KNOB.0), KNOB.1), BackgroundColor(Color::WHITE), Knob(index)));
+        commands.spawn((Text::new(""), TextFont { font_size: FontSize::Px(NAME), ..default() }, placed(within(NAME * 1.2), MARGIN + TRACK.0 + 16.0, Val::Auto, NAME * 1.2), Named(index), Visibility::Hidden, Part));
+        commands.spawn((placed(within(TRACK.1), MARGIN, Val::Px(TRACK.0), TRACK.1), BackgroundColor(Color::srgb(0.3, 0.3, 0.3)), Visibility::Hidden, Part));
+        commands.spawn((placed(within(TRACK.1), MARGIN, Val::Px(0.0), TRACK.1), BackgroundColor(Color::srgb(0.95, 0.8, 0.25)), Fill(index), Visibility::Hidden, Part));
+        commands.spawn((placed(within(KNOB.1), MARGIN, Val::Px(KNOB.0), KNOB.1), BackgroundColor(Color::WHITE), Knob(index), Visibility::Hidden, Part));
+    }
+}
+
+/// Shows the sliders, or hides them, by their key.
+pub fn toggle(keys: Res<ButtonInput<KeyCode>>, mut parts: Query<&mut Visibility, With<Part>>) {
+    if keys.just_pressed(KeyCode::KeyU) {
+        let shown = !SHOWN.fetch_xor(true, Ordering::Relaxed);
+        parts.iter_mut().for_each(|mut visibility| *visibility = if shown { Visibility::Visible } else { Visibility::Hidden });
     }
 }
 
 /// Moves the slider under the pointer with the left button, sets it
 /// back with the right, keeps the numbers when it is let go, and shows
-/// each as it is.
+/// each as it is -- while the sliders are shown.
 pub fn slide(
     mut dragged: ResMut<Dragged>,
     buttons: Res<ButtonInput<MouseButton>>,
@@ -81,6 +99,10 @@ pub fn slide(
     mut names: Query<(&Named, &mut Text)>,
     mut shown: Local<bool>,
 ) {
+    if !SHOWN.load(Ordering::Relaxed) {
+        HELD.store(false, Ordering::Relaxed);
+        return;
+    }
     let track_left = window.width() - MARGIN - TRACK.0;
     let pointer = window.cursor_position();
     // The slider whose row the pointer is on, if it is on its track.
