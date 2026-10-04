@@ -2,12 +2,11 @@
 //! brown, grass green; and its sheep, white, a few pixels across to be
 //! seen.
 
-use bitmap::morton::morton_coordinates;
 use bitmap::BITS_PER_WORD;
 use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::mock::GRASS;
 use simulation::entity_store::Entities;
-use coordinates::{ChunkPlace, ChunkPosition, SuperchunkPosition, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{CartesianCell, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 
 /// Dirt's colour.
 pub const BROWN: [u8; 3] = [116, 80, 46];
@@ -24,21 +23,22 @@ pub const FRAME_BYTES: usize = (SUPERCHUNK_SIDE_CELLS * SUPERCHUNK_SIDE_CELLS * 
 
 /// `superchunk`'s cells into `pixels` ([`FRAME_BYTES`] of them): brown,
 /// green where grass holds.
-pub fn frame(arena: &BitmapArena, superchunk: SuperchunkPosition, pixels: &mut [u8]) {
-    let side = SUPERCHUNK_SIDE_CELLS as usize;
+pub fn frame(arena: &BitmapArena, superchunk: SuperchunkIndex, pixels: &mut [u8]) {
+    let side = SUPERCHUNK_SIDE_CELLS;
+    let CartesianCell { x: left, y: top } = superchunk.top_left().cartesian();
     for pixel in pixels.as_chunks_mut().0 {
         *pixel = BROWN;
     }
-    for place in ChunkPlace::all() {
-        let Some(bucket) = arena.bucket(BucketKey { layer_type: GRASS, chunk: ChunkPosition::of(superchunk, place) }) else {
+    for chunk in superchunk.chunks() {
+        let Some(bucket) = arena.bucket(BucketKey { layer_type: GRASS, chunk }) else {
             continue;
         };
         for (word_index, &word) in bucket.cells().iter().enumerate() {
             let mut bits = word;
             while bits != 0 {
-                let (x, y) = morton_coordinates(word_index * BITS_PER_WORD + bits.trailing_zeros() as usize);
-                let (x, y) = (place.x() as usize * CHUNK_SIDE + x as usize, place.y() as usize * CHUNK_SIDE + y as usize);
-                pixels[(y * side + x) * 3..][..3].copy_from_slice(&GREEN);
+                let at = CellIndex::of(chunk, word_index * BITS_PER_WORD + bits.trailing_zeros() as usize).cartesian();
+                let (x, y) = (at.x - left, at.y - top);
+                pixels[(y * side + x) as usize * 3..][..3].copy_from_slice(&GREEN);
                 bits &= bits - 1;
             }
         }
@@ -47,12 +47,12 @@ pub fn frame(arena: &BitmapArena, superchunk: SuperchunkPosition, pixels: &mut [
 
 /// `superchunk`'s entities in `entities` drawn over `pixels`, a frame
 /// of it ([`frame`]): a white square each.
-pub fn sheep(entities: &Entities, superchunk: SuperchunkPosition, pixels: &mut [u8]) {
-    let Some(kept) = entities.superchunk(superchunk.morton_index()) else {
+pub fn sheep(entities: &Entities, superchunk: SuperchunkIndex, pixels: &mut [u8]) {
+    let Some(kept) = entities.superchunk(superchunk) else {
         return;
     };
     let side = SUPERCHUNK_SIDE_CELLS;
-    let (left, top) = (superchunk.x * side, superchunk.y * side);
+    let CartesianCell { x: left, y: top } = superchunk.top_left().cartesian();
     for entity in kept.iter() {
         let at = entity.header.at.cartesian();
         let (x, y) = (at.x - left, at.y - top);

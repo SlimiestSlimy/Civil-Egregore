@@ -1,21 +1,22 @@
 //! TileSim's coordinates: where things are.
 //!
-//! A cell anywhere in the world is a [`CartesianCell`]: its `x` and `y`.
-//! It lies in one superchunk ([`SuperchunkPosition`]), in one chunk of it
-//! ([`ChunkPlace`]), at one place in that chunk ([`CellPlace`]); the three
-//! together are its [`CellAddress`]. A chunk anywhere in the world is a
-//! [`ChunkPosition`]. [`CartesianCell::address`] and
-//! [`CartesianCell::from_address`] convert between the two.
+//! Every place in the world is a Morton index -- its coordinates' bits
+//! interleaved, `x` in the even bits -- one type a size: a
+//! [`SuperchunkIndex`] (44 bits), a [`ChunkIndex`] (48) and a
+//! [`CellIndex`] (64). Each is the next one's top bits: a cell's index
+//! is its chunk's and then 16 bits for its **place** in the chunk, a
+//! chunk's is its superchunk's and then 4 bits for its place in the
+//! superchunk. A place is a Morton index inside the thing it is in: a
+//! `usize`, the index of its bit in a bitmap's words, or of its chunk
+//! among a superchunk's.
+//!
+//! Morton indices are what everything is stored and worked in. A cell's
+//! cartesian coordinates -- its `x` and `y` -- are a [`CartesianCell`],
+//! kept for geometry and drawing: whatever is cartesian says so.
 //!
 //! Every coordinate is a non-negative integer, counted from the world's
 //! top left corner: x grows to the right and y downwards, as in a bitmap.
 //! The world starts roughly in the middle of both.
-//!
-//! A cell's coordinates are a `u32` each, so its Morton index is a `u64`
-//! ([`CellIndex`]), whose bits hold its address, from the lowest: 16 for
-//! its place in its chunk, 4 for its chunk's place in its superchunk,
-//! 44 for its superchunk. A **superchunk index** is a superchunk's Morton
-//! index, those top 44 bits: what identifies a superchunk in the code.
 //!
 //! The design: `docs/coordinates.md`; function by function:
 //! `docs/reference.md`.
@@ -23,8 +24,6 @@
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
-
-use bitmap::morton::{morton_coordinates, morton_index};
 
 /// Cells along a chunk's side: a chunk's layers are bitmaps, and a
 /// bitmap is this wide.
@@ -35,45 +34,108 @@ pub const SUPERCHUNK_SIDE: usize = 4;
 pub const CHUNKS_IN_SUPERCHUNK: usize = SUPERCHUNK_SIDE * SUPERCHUNK_SIDE;
 /// Cells along a superchunk's side.
 pub const SUPERCHUNK_SIDE_CELLS: u32 = (CHUNK_SIDE * SUPERCHUNK_SIDE) as u32;
+/// Cells in a chunk.
+pub const CELLS_IN_CHUNK: usize = CHUNK_SIDE * CHUNK_SIDE;
 /// Superchunks along the world's side: as many as leave a cell's
 /// coordinates a `u32` each.
 pub const WORLD_SIDE_SUPERCHUNKS: u32 = 1 << (u32::BITS - SUPERCHUNK_SIDE_CELLS.trailing_zeros());
+
+/// The superchunk roughly in the middle of the world, where it starts:
+/// as far from every edge as a superchunk can be.
+pub const WORLD_MIDDLE: SuperchunkIndex = SuperchunkIndex::from_cartesian(WORLD_SIDE_SUPERCHUNKS / 2, WORLD_SIDE_SUPERCHUNKS / 2);
+
+/// Superchunks along the side of the square `count` of them make.
+pub fn square_side(count: u32) -> u32 {
+    (count as f64).sqrt().ceil() as u32
+}
+
+/// `count` superchunks in a square from [`WORLD_MIDDLE`], row by row
+/// from its top left: how a world of that many is laid out.
+pub fn square_from_middle(count: u32) -> impl Iterator<Item = SuperchunkIndex> {
+    let (side, (x, y)) = (square_side(count), WORLD_MIDDLE.cartesian());
+    (0..count).map(move |index| SuperchunkIndex::from_cartesian(x + index % side, y + index / side))
+}
 
 /// A cell's eight neighbours, as offsets `(dx, dy)`, row by row from the
 /// top left.
 pub const NEIGHBOURS: [(i32, i32); 8] = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
 
-/// A chunk's side in cells, as a power of two: the low bits of a cell
-/// coordinate, which give its place in its chunk.
-const CHUNK_SIDE_BITS: u32 = CHUNK_SIDE.trailing_zeros();
-/// A superchunk's side in chunks, as a power of two: the low bits of a
-/// chunk coordinate, which give its place in its superchunk.
-const SUPERCHUNK_SIDE_BITS: u32 = SUPERCHUNK_SIDE.trailing_zeros();
+/// The bits of a cell's index giving its place in its chunk.
+const CELL_PLACE_BITS: u32 = CELLS_IN_CHUNK.trailing_zeros();
+/// The bits of a chunk's index giving its place in its superchunk.
+const CHUNK_PLACE_BITS: u32 = CHUNKS_IN_SUPERCHUNK.trailing_zeros();
+/// The bits of a cell's index below its superchunk's index: its chunk's
+/// place and its own.
+const CELL_PLACE_IN_SUPERCHUNK_BITS: u32 = CELL_PLACE_BITS + CHUNK_PLACE_BITS;
+/// The bits a superchunk index takes.
+const SUPERCHUNK_INDEX_BITS: u32 = u64::BITS - CELL_PLACE_IN_SUPERCHUNK_BITS;
 
-/// A superchunk's position in the world, counted in superchunks from
-/// the world's top left, each under [`WORLD_SIDE_SUPERCHUNKS`].
+/// A superchunk anywhere in the world, as its Morton index -- the top 44
+/// bits of its cells' -- which is what identifies a superchunk: what
+/// the directory, the cold pool and saves are sorted and named by.
+/// Neighbouring superchunks mostly get near indices.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct SuperchunkPosition {
-    /// Superchunks from the world's left edge.
-    pub x: u32,
-    /// Superchunks from the world's top edge.
-    pub y: u32,
-}
+pub struct SuperchunkIndex(pub u64);
 
-impl SuperchunkPosition {
-    /// The superchunk's index: its Morton index over the whole world --
-    /// its coordinates' bits interleaved, `x` in the even bits and `y` in
-    /// the odd ones -- which is the top 44 bits of its cells' Morton
-    /// indices. Neighbouring superchunks mostly get near indices.
-    pub fn morton_index(self) -> u64 {
-        debug_assert!(self.x < WORLD_SIDE_SUPERCHUNKS && self.y < WORLD_SIDE_SUPERCHUNKS, "{self:?} is outside the world");
-        interleave(self.x, self.y)
+impl SuperchunkIndex {
+    /// The superchunk `x` superchunks from the world's left edge and `y`
+    /// from its top -- cartesian, each under [`WORLD_SIDE_SUPERCHUNKS`].
+    pub const fn from_cartesian(x: u32, y: u32) -> Self {
+        debug_assert!(x < WORLD_SIDE_SUPERCHUNKS && y < WORLD_SIDE_SUPERCHUNKS, "a superchunk outside the world");
+        Self(interleave(x, y))
     }
 
-    /// The superchunk whose Morton index is `index`:
-    /// [`SuperchunkPosition::morton_index`] undone.
-    pub fn from_morton_index(index: u64) -> Self {
-        Self { x: gather(index), y: gather(index >> 1) }
+    /// Its cartesian coordinates, in superchunks:
+    /// [`SuperchunkIndex::from_cartesian`] undone.
+    pub fn cartesian(self) -> (u32, u32) {
+        (gather(self.0), gather(self.0 >> 1))
+    }
+
+    /// Its top left cell.
+    pub fn top_left(self) -> CellIndex {
+        CellIndex(self.0 << CELL_PLACE_IN_SUPERCHUNK_BITS)
+    }
+
+    /// Its chunks, in Morton order.
+    pub fn chunks(self) -> impl Iterator<Item = ChunkIndex> {
+        (0..CHUNKS_IN_SUPERCHUNK).map(move |place| ChunkIndex::of(self, place))
+    }
+
+    /// The superchunk `dx` across and `dy` down, if it is in the world:
+    /// stepped on the index, as [`CellIndex::offset`] steps a cell.
+    pub fn offset(self, dx: i32, dy: i32) -> Option<Self> {
+        let x = step(self.0 & X_BITS, dx, X_BITS)?;
+        let y = step(self.0 & Y_BITS, dy, Y_BITS)?;
+        let moved = x | y;
+        (moved >> SUPERCHUNK_INDEX_BITS == 0).then_some(Self(moved))
+    }
+}
+
+/// A chunk anywhere in the world, as its Morton index: its superchunk's
+/// index, then 4 bits for its place in the superchunk.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ChunkIndex(pub u64);
+
+impl ChunkIndex {
+    /// The chunk at `place` (0 to 15, in Morton order) in `superchunk`.
+    pub fn of(superchunk: SuperchunkIndex, place: usize) -> Self {
+        debug_assert!(place < CHUNKS_IN_SUPERCHUNK, "chunk place {place} is outside a superchunk");
+        Self(superchunk.0 << CHUNK_PLACE_BITS | place as u64)
+    }
+
+    /// The superchunk it is in.
+    pub fn superchunk(self) -> SuperchunkIndex {
+        SuperchunkIndex(self.0 >> CHUNK_PLACE_BITS)
+    }
+
+    /// Its place in its superchunk: 0 to 15, in Morton order.
+    pub fn place(self) -> usize {
+        (self.0 as usize) & (CHUNKS_IN_SUPERCHUNK - 1)
+    }
+
+    /// Its top left cell.
+    pub fn top_left(self) -> CellIndex {
+        CellIndex(self.0 << CELL_PLACE_BITS)
     }
 }
 
@@ -102,8 +164,14 @@ const SPREAD_STEPS: [(u32, u64); 5] = [
 ];
 
 /// `value`'s bits spread to every other bit: bit `i` to bit `2i`.
-fn spread(value: u32) -> u64 {
-    SPREAD_STEPS.iter().fold(value as u64, |spread, &(shift, mask)| (spread | spread << shift) & mask)
+const fn spread(value: u32) -> u64 {
+    let (mut spread, mut step) = (value as u64, 0);
+    while step < SPREAD_STEPS.len() {
+        let (shift, mask) = SPREAD_STEPS[step];
+        spread = (spread | spread << shift) & mask;
+        step += 1;
+    }
+    spread
 }
 
 /// The gather steps, narrowest first: [`SPREAD_STEPS`] undone, each
@@ -124,183 +192,9 @@ fn gather(value: u64) -> u32 {
 }
 
 /// `x` and `y`'s bits interleaved, `x` in the even bits.
-fn interleave(x: u32, y: u32) -> u64 {
+const fn interleave(x: u32, y: u32) -> u64 {
     spread(x) | spread(y) << 1
 }
-
-/// A chunk's place in its superchunk: 0 to 3 each way. Made only
-/// through [`ChunkPlace::new`] or [`ChunkPlace::from_index`], which hold
-/// it to that.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ChunkPlace {
-    /// Chunks from the superchunk's left edge.
-    x: u8,
-    /// Chunks from the superchunk's top edge.
-    y: u8,
-}
-
-impl ChunkPlace {
-    /// The chunk `x` chunks from its superchunk's left edge and `y` from
-    /// its top. A place outside the superchunk is a bug, and panics.
-    pub fn new(x: u8, y: u8) -> Self {
-        assert!((x as usize) < SUPERCHUNK_SIDE && (y as usize) < SUPERCHUNK_SIDE, "chunk ({x}, {y}) is outside a superchunk");
-        Self { x, y }
-    }
-
-    /// Chunks from the superchunk's left edge.
-    pub fn x(self) -> u8 {
-        self.x
-    }
-
-    /// Chunks from the superchunk's top edge.
-    pub fn y(self) -> u8 {
-        self.y
-    }
-
-    /// Where the chunk is among its superchunk's, in Morton order, as a
-    /// bitmap's cells are: every aligned square of chunks of a
-    /// power-of-two side is one run of indices.
-    pub fn index(self) -> usize {
-        morton_index(self.x, self.y)
-    }
-
-    /// The chunk place at `index` in Morton order: [`ChunkPlace::index`]
-    /// undone. An index past a superchunk's chunks is a bug, and panics.
-    pub fn from_index(index: usize) -> Self {
-        assert!(index < CHUNKS_IN_SUPERCHUNK, "chunk index {index} is outside a superchunk");
-        let (x, y) = morton_coordinates(index);
-        Self { x, y }
-    }
-
-    /// Every chunk place of a superchunk, in Morton order.
-    pub fn all() -> impl Iterator<Item = ChunkPlace> {
-        (0..CHUNKS_IN_SUPERCHUNK).map(Self::from_index)
-    }
-}
-
-/// A chunk's position in the world, counted in chunks from the world's
-/// top left: its superchunk's position times 4, plus its place in the
-/// superchunk.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ChunkPosition {
-    /// Chunks from the world's left edge.
-    pub x: u32,
-    /// Chunks from the world's top edge.
-    pub y: u32,
-}
-
-impl ChunkPosition {
-    /// The chunk at `place` in the superchunk at `superchunk`.
-    pub fn of(superchunk: SuperchunkPosition, place: ChunkPlace) -> Self {
-        let join = |superchunk: u32, place: u8| superchunk << SUPERCHUNK_SIDE_BITS | place as u32;
-        Self { x: join(superchunk.x, place.x), y: join(superchunk.y, place.y) }
-    }
-
-    /// The superchunk the chunk is in, and its place there:
-    /// [`ChunkPosition::of`] undone.
-    pub fn superchunk_and_place(self) -> (SuperchunkPosition, ChunkPlace) {
-        let place = |coordinate: u32| (coordinate % SUPERCHUNK_SIDE as u32) as u8;
-        (
-            SuperchunkPosition { x: self.x >> SUPERCHUNK_SIDE_BITS, y: self.y >> SUPERCHUNK_SIDE_BITS },
-            ChunkPlace::new(place(self.x), place(self.y)),
-        )
-    }
-
-    /// The chunk's Morton index over the whole world: the top 48 bits of
-    /// its cells' Morton indices.
-    pub fn morton_index(self) -> u64 {
-        interleave(self.x, self.y)
-    }
-
-    /// The chunk at `index` in Morton order: [`ChunkPosition::morton_index`]
-    /// undone.
-    pub fn from_morton_index(index: u64) -> Self {
-        Self { x: gather(index), y: gather(index >> 1) }
-    }
-}
-
-/// A cell's place in its chunk: the coordinates its bitmaps use. `u8`
-/// holds exactly a chunk's 256 cells a side, so every value is a cell.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct CellPlace {
-    /// Cells from the chunk's left edge.
-    pub x: u8,
-    /// Cells from the chunk's top edge.
-    pub y: u8,
-}
-
-/// Every part of a cell's address: its superchunk, its chunk there, and
-/// its place in that chunk.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct CellAddress {
-    /// The superchunk the cell is in.
-    pub superchunk: SuperchunkPosition,
-    /// The chunk of it the cell is in.
-    pub chunk: ChunkPlace,
-    /// The cell's place in that chunk.
-    pub cell: CellPlace,
-}
-
-/// A cell's cartesian coordinates: anywhere in the world, counted in
-/// cells from the world's top left. Every pair of `u32`s is a cell. The
-/// same cell's Morton index is [`CartesianCell::morton_index`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct CartesianCell {
-    /// Cells from the world's left edge.
-    pub x: u32,
-    /// Cells from the world's top edge.
-    pub y: u32,
-}
-
-impl CartesianCell {
-    /// Where the cell is, by cascade: its superchunk, its chunk there,
-    /// its place in the chunk.
-    pub fn address(self) -> CellAddress {
-        let (chunk, cell) = self.chunk_and_cell();
-        let (superchunk, chunk) = chunk.superchunk_and_place();
-        CellAddress { superchunk, chunk, cell }
-    }
-
-    /// The chunk the cell is in, anywhere in the world, and its place
-    /// in that chunk.
-    pub fn chunk_and_cell(self) -> (ChunkPosition, CellPlace) {
-        (
-            ChunkPosition { x: self.x >> CHUNK_SIDE_BITS, y: self.y >> CHUNK_SIDE_BITS },
-            CellPlace { x: self.x as u8, y: self.y as u8 },
-        )
-    }
-
-    /// The cell at `address`: [`CartesianCell::address`] undone.
-    pub fn from_address(address: CellAddress) -> Self {
-        let chunk = ChunkPosition::of(address.superchunk, address.chunk);
-        Self { x: chunk.x << CHUNK_SIDE_BITS | address.cell.x as u32, y: chunk.y << CHUNK_SIDE_BITS | address.cell.y as u32 }
-    }
-
-    /// The cell's Morton index over the whole world, which alone locates
-    /// it: from the lowest bit, 16 for its place in its chunk
-    /// ([`morton_index`] of its [`CellPlace`]), 4 for its chunk's place in
-    /// its superchunk ([`ChunkPlace::index`]), 44 for its superchunk's
-    /// index ([`SuperchunkPosition::morton_index`]).
-    pub fn morton_index(self) -> u64 {
-        interleave(self.x, self.y)
-    }
-
-    /// The cell at `index` in Morton order: [`CartesianCell::morton_index`]
-    /// undone.
-    pub fn from_morton_index(index: u64) -> Self {
-        Self { x: gather(index), y: gather(index >> 1) }
-    }
-}
-
-/// The bits of a Morton index holding x: the even ones.
-const X_BITS: u64 = alternating_runs(1);
-/// The bits of a Morton index holding y: the odd ones.
-const Y_BITS: u64 = !X_BITS;
-/// The low bits of a cell's Morton index: its place in its chunk.
-const PLACE_IN_CHUNK_BITS: u32 = 2 * CHUNK_SIDE_BITS;
-/// The low bits of a cell's Morton index below its superchunk's index:
-/// its chunk's place and its own.
-const PLACE_IN_SUPERCHUNK_BITS: u32 = PLACE_IN_CHUNK_BITS + 2 * SUPERCHUNK_SIDE_BITS;
 
 /// A cell anywhere in the world, as its Morton index: what locates it
 /// alone, and what the bitplanes are laid out by. From the lowest bit,
@@ -308,44 +202,46 @@ const PLACE_IN_SUPERCHUNK_BITS: u32 = PLACE_IN_CHUNK_BITS + 2 * SUPERCHUNK_SIDE_
 /// bitmap words -- 4 for its chunk's place in its superchunk, 44 for its
 /// superchunk's index. The parts are bit fields, so finding a cell's
 /// superchunk, chunk and bit takes shifts and masks; [`CartesianCell`]
-/// is the same cell as coordinates, for geometry.
+/// is the same cell as cartesian coordinates, for geometry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CellIndex(pub u64);
 
 impl CellIndex {
-    /// The index of the cell's superchunk
-    /// ([`SuperchunkPosition::morton_index`]).
-    pub fn superchunk_index(self) -> u64 {
-        self.0 >> PLACE_IN_SUPERCHUNK_BITS
+    /// The cell at `place` (in Morton order) in `chunk`.
+    pub fn of(chunk: ChunkIndex, place: usize) -> Self {
+        debug_assert!(place < CELLS_IN_CHUNK, "cell place {place} is outside a chunk");
+        Self(chunk.0 << CELL_PLACE_BITS | place as u64)
     }
 
-    /// The cell's chunk's place in its superchunk, as a Morton index
-    /// ([`ChunkPlace::index`]).
-    pub fn chunk_in_superchunk(self) -> usize {
-        ((self.0 >> PLACE_IN_CHUNK_BITS) as usize) & (CHUNKS_IN_SUPERCHUNK - 1)
+    /// The superchunk the cell is in.
+    #[inline]
+    pub fn superchunk(self) -> SuperchunkIndex {
+        SuperchunkIndex(self.0 >> CELL_PLACE_IN_SUPERCHUNK_BITS)
     }
 
-    /// The cell's place in its chunk, as a Morton index: its bit's index
-    /// in the chunk's bitmap words.
-    pub fn place_in_chunk(self) -> usize {
-        (self.0 & ((1 << PLACE_IN_CHUNK_BITS) - 1)) as usize
+    /// The chunk the cell is in.
+    #[inline]
+    pub fn chunk(self) -> ChunkIndex {
+        ChunkIndex(self.0 >> CELL_PLACE_BITS)
     }
 
-    /// The cell's chunk, anywhere in the world.
-    pub fn chunk(self) -> ChunkPosition {
-        ChunkPosition::from_morton_index(self.0 >> PLACE_IN_CHUNK_BITS)
+    /// The cell's place in its chunk, in Morton order: its bit's index in
+    /// the chunk's bitmap words.
+    #[inline]
+    pub fn place(self) -> usize {
+        (self.0 as usize) & (CELLS_IN_CHUNK - 1)
     }
 
-    /// The cell at `place_in_chunk` (a Morton index) of the chunk at
-    /// `chunk_in_superchunk` (a Morton index) of the superchunk whose
-    /// index is `superchunk_index`.
-    pub fn from_parts(superchunk_index: u64, chunk_in_superchunk: usize, place_in_chunk: usize) -> Self {
-        Self(superchunk_index << PLACE_IN_SUPERCHUNK_BITS | (chunk_in_superchunk as u64) << PLACE_IN_CHUNK_BITS | place_in_chunk as u64)
+    /// The cell's place in its superchunk, in Morton order: its chunk's
+    /// place, then its own.
+    #[inline]
+    pub fn place_in_superchunk(self) -> usize {
+        (self.0 as usize) & ((1 << CELL_PLACE_IN_SUPERCHUNK_BITS) - 1)
     }
 
     /// The same cell as cartesian coordinates.
     pub fn cartesian(self) -> CartesianCell {
-        CartesianCell::from_morton_index(self.0)
+        CartesianCell { x: gather(self.0), y: gather(self.0 >> 1) }
     }
 
     /// The cell `dx` across and `dy` down from this one, if it is in the
@@ -360,10 +256,41 @@ impl CellIndex {
     }
 }
 
+/// A cell's cartesian coordinates: counted in cells from the world's top
+/// left. Every pair of `u32`s is a cell. For geometry and drawing; the
+/// same cell's Morton index, what everything else uses, is a
+/// [`CellIndex`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CartesianCell {
+    /// Cells from the world's left edge.
+    pub x: u32,
+    /// Cells from the world's top edge.
+    pub y: u32,
+}
+
+/// The place in its superchunk ([`CellIndex::place_in_superchunk`]) of
+/// the cell `x` across and `y` down from the superchunk's top left.
+pub fn place_from_cartesian(x: u32, y: u32) -> usize {
+    debug_assert!(x < SUPERCHUNK_SIDE_CELLS && y < SUPERCHUNK_SIDE_CELLS, "a cell outside its superchunk");
+    interleave(x, y) as usize
+}
+
+/// How far across and down from its superchunk's top left the cell at
+/// `place` in it is: [`place_from_cartesian`] undone.
+pub fn cartesian_from_place(place: usize) -> (u32, u32) {
+    (gather(place as u64), gather(place as u64 >> 1))
+}
+
+/// The bits of a Morton index holding x: the even ones.
+const X_BITS: u64 = alternating_runs(1);
+/// The bits of a Morton index holding y: the odd ones.
+const Y_BITS: u64 = !X_BITS;
+
 /// `coordinate` -- one coordinate's bits of a Morton index, those in
-/// `lane` -- moved by `by`, if it stays in the world. A power of two (a
-/// step to a neighbour, to the next tile or chunk: by far the most
-/// common) spreads to a single bit, with no spreading steps.
+/// `lane` -- moved by `by`, unless it passes the top or bottom of the
+/// `u64`. A power of two (a step to a neighbour, to the next word tile
+/// or chunk: by far the most common) spreads to a single bit, with no
+/// spreading steps.
 fn step(coordinate: u64, by: i32, lane: u64) -> Option<u64> {
     let magnitude = by.unsigned_abs();
     if magnitude == 0 {
@@ -380,6 +307,6 @@ fn step(coordinate: u64, by: i32, lane: u64) -> Option<u64> {
 impl From<CartesianCell> for CellIndex {
     /// The cell's Morton index.
     fn from(cell: CartesianCell) -> Self {
-        Self(cell.morton_index())
+        Self(interleave(cell.x, cell.y))
     }
 }

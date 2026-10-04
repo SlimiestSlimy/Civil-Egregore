@@ -22,7 +22,7 @@ spreading over dirt -- and the first entities: sheep eating it.
 | [`world/`](world/) | the world as a whole: made from a seed, ticked -- rules and entities together -- saved and loaded; and its diagnostics tool |
 | [`mc_rules/`](mc_rules/) | the Monte Carlo rules of the cells, a file each: so far grass over dirt |
 | [`entity_rules/`](entity_rules/) | the entities, a file each: so far the sheep, eating the grass |
-| [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, cartesian and by Morton index |
+| [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |
 | [`chunk_storage/`](chunk_storage/) | chunks as stored, what loading and saving work on: height maps, the layer codec, superchunk images, the cold pool and the writeback ring |
 | [`terrain/`](terrain/) | every cell's height from the world's seed, and the walls between cells more than a step apart in height |
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |

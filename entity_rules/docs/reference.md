@@ -45,7 +45,7 @@ over the next `STEP_TICKS` ticks.
 
 ## `diagnostics/world.rs`
 
-**`World::grass_on_dirt(count, grass_cells)`**: a square of mock
+**`MockWorld::grass_on_dirt(count, grass_cells)`**: a square of mock
 superchunks from the world's middle, hot; **`grass()`**: cells of grass
 over them. **`with_sheep(count, grass_cells, sheep)`**: the same with a
 flock on each superchunk; **`sheep()`**: how many.

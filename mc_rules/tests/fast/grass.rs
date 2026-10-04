@@ -7,13 +7,13 @@
 use bitplane_manager::{BitmapArena, Shape, Write, WriteOp};
 use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
 use chunk_storage::{ChunkStorage, LayerCodec};
-use coordinates::{CartesianCell, ChunkPlace, ChunkPosition, SuperchunkPosition, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{CartesianCell, SuperchunkIndex};
 use simulation::entity_store::Entities;
 use simulation::Simulation;
 use mc_rules::grass::{tick, DECAY_CHANCE, SPREAD_CHANCE};
 
 /// The superchunk the tests run on.
-const SUPERCHUNK: SuperchunkPosition = SuperchunkPosition { x: 3, y: 3 };
+const SUPERCHUNK: SuperchunkIndex = SuperchunkIndex::from_cartesian(3, 3);
 
 /// Cells in a superchunk.
 const CELLS: u32 = 1 << 20;
@@ -23,8 +23,8 @@ const CELLS: u32 = 1 << 20;
 fn mock(grass_cells: usize) -> BitmapArena {
     let (mut codec, mut arena, mut storage) = (LayerCodec::new(), BitmapArena::new(), ChunkStorage::new(1 << 12));
     storage.insert(SUPERCHUNK, grass_on_dirt(5, grass_cells, &mut codec));
-    for place in ChunkPlace::all() {
-        arena.make_hot_layers(ChunkPosition::of(SUPERCHUNK, place), &[DIRT, GRASS], &storage, &mut codec);
+    for chunk in SUPERCHUNK.chunks() {
+        arena.make_hot_layers(chunk, &[DIRT, GRASS], &storage, &mut codec);
     }
     arena
 }
@@ -40,7 +40,7 @@ fn plant(arena: &mut BitmapArena, writes: impl Iterator<Item = (CartesianCell, S
 
 /// The superchunk's first cell, at its top left.
 fn origin() -> CartesianCell {
-    CartesianCell { x: SUPERCHUNK.x * SUPERCHUNK_SIDE_CELLS, y: SUPERCHUNK.y * SUPERCHUNK_SIDE_CELLS }
+    SUPERCHUNK.top_left().cartesian()
 }
 
 /// Grass alone, with no grass around, never decays: a lattice of grass

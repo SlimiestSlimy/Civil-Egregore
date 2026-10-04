@@ -17,7 +17,7 @@
 //! An image is never changed in place: changes to it make a new one
 //! ([`SuperchunkImage::rewritten`]).
 
-use coordinates::{CellPlace, ChunkPlace, CHUNKS_IN_SUPERCHUNK};
+use coordinates::CHUNKS_IN_SUPERCHUNK;
 use crate::height_map::{height_in, Height, HeightMap, HEIGHT_WORDS};
 use crate::layer_codec::LayerType;
 
@@ -33,11 +33,11 @@ const ENTRY_WORDS: usize = 2;
 pub struct InvalidImage(pub &'static str);
 
 /// A change to an image: the layer of `layer_type` in the chunk at
-/// `chunk` is now `encoded`, or is gone if `encoded` is empty.
+/// `place` is now `encoded`, or is gone if `encoded` is empty.
 #[derive(Clone, Copy, Debug)]
 pub struct LayerChange<'a> {
-    /// The chunk's Morton index in its superchunk.
-    pub chunk: usize,
+    /// The chunk's place in its superchunk.
+    pub place: usize,
     /// The layer's type.
     pub layer_type: LayerType,
     /// The layer, encoded; empty for no layer.
@@ -96,30 +96,31 @@ impl SuperchunkImage {
         &self.words[HEIGHTS_START..CHUNKS_START]
     }
 
-    /// The height of `cell` in the chunk at `chunk`.
-    pub fn height(&self, chunk: ChunkPlace, cell: CellPlace) -> Height {
-        height_in(self.height_words(), chunk, cell)
+    /// The height of the cell at `place` in the superchunk
+    /// ([`coordinates::CellIndex::place_in_superchunk`]).
+    pub fn height(&self, place: usize) -> Height {
+        height_in(self.height_words(), place)
     }
 
-    /// The words of the chunk at `index`, its layer count first.
-    fn chunk(&self, index: usize) -> &[u64] {
-        let end = if index + 1 < CHUNKS_IN_SUPERCHUNK { self.words[index + 1] as usize } else { self.words.len() };
-        &self.words[self.words[index] as usize..end]
+    /// The words of the chunk at `place`, its layer count first.
+    fn chunk(&self, place: usize) -> &[u64] {
+        let end = if place + 1 < CHUNKS_IN_SUPERCHUNK { self.words[place + 1] as usize } else { self.words.len() };
+        &self.words[self.words[place] as usize..end]
     }
 
-    /// The encoded layer of `layer_type` in the chunk at `chunk`, if it
+    /// The encoded layer of `layer_type` in the chunk at `place`, if it
     /// has one: its words from its first to its chunk's end, since its own
     /// end is where its stream ends.
-    pub fn layer(&self, chunk: ChunkPlace, layer_type: LayerType) -> Option<&[u64]> {
-        let words = self.chunk(chunk.index());
+    pub fn layer(&self, place: usize, layer_type: LayerType) -> Option<&[u64]> {
+        let words = self.chunk(place);
         let table = layer_table(words);
         let entry = table.binary_search_by_key(&layer_type.0, |entry| entry[0]).ok()?;
         Some(&words[table[entry][1] as usize..])
     }
 
-    /// The types of the chunk at `chunk`'s layers, sorted.
-    pub fn layer_types(&self, chunk: ChunkPlace) -> impl Iterator<Item = LayerType> + '_ {
-        layer_table(self.chunk(chunk.index())).iter().map(|entry| LayerType(entry[0]))
+    /// The types of the layers of the chunk at `place`, sorted.
+    pub fn layer_types(&self, place: usize) -> impl Iterator<Item = LayerType> + '_ {
+        layer_table(self.chunk(place)).iter().map(|entry| LayerType(entry[0]))
     }
 
     /// The image with `changes` made, in order: a later change to a
@@ -127,11 +128,11 @@ impl SuperchunkImage {
     /// image is not changed.
     pub fn rewritten(&self, changes: &[LayerChange]) -> Self {
         let mut chunks: [Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK] = Default::default();
-        for (index, layers) in chunks.iter_mut().enumerate() {
-            *layers = exact_layers(self.chunk(index));
+        for (place, layers) in chunks.iter_mut().enumerate() {
+            *layers = exact_layers(self.chunk(place));
         }
         for change in changes {
-            let layers = &mut chunks[change.chunk];
+            let layers = &mut chunks[change.place];
             match (layers.binary_search_by_key(&change.layer_type, |&(layer_type, _)| layer_type), change.encoded.is_empty()) {
                 (Ok(at), false) => layers[at].1 = change.encoded,
                 (Ok(at), true) => drop(layers.remove(at)),

@@ -7,20 +7,17 @@
 use bitplane_manager::{WritesApplied, BitmapArena, BucketKey, Shape, Write, WriteOp};
 use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
 use chunk_storage::{ChunkStorage, LayerCodec, LayerType};
-use coordinates::{CartesianCell, ChunkPlace, ChunkPosition, SuperchunkPosition, SUPERCHUNK_SIDE_CELLS, WORLD_SIDE_SUPERCHUNKS};
+use coordinates::{CartesianCell, CellIndex, WORLD_MIDDLE};
 
 /// The layer type the tests write.
 const STONE: LayerType = LayerType(9);
-
-/// A superchunk roughly in the middle of the world.
-const MIDDLE: SuperchunkPosition = SuperchunkPosition { x: WORLD_SIDE_SUPERCHUNKS / 2, y: WORLD_SIDE_SUPERCHUNKS / 2 };
 
 /// An arena with `STONE` hot and empty in every chunk holding one of
 /// `cells`.
 fn arena_over(cells: &[CartesianCell]) -> BitmapArena {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
     for cell in cells {
-        arena.make_hot(BucketKey { layer_type: STONE, chunk: cell.chunk_and_cell().0 }, None, &mut codec);
+        arena.make_hot(BucketKey { layer_type: STONE, chunk: CellIndex::from(*cell).chunk() }, None, &mut codec);
     }
     arena
 }
@@ -71,23 +68,23 @@ fn the_latest_write_wins() {
 
     stone(&mut arena, WriteOp::Flip, corner, Shape::Disc { radius: 2 });
     stone(&mut arena, WriteOp::Flip, corner, Shape::Disc { radius: 2 });
-    let before = arena.bucket(BucketKey { layer_type: STONE, chunk: corner.chunk_and_cell().0 }).expect("hot").count();
+    let before = arena.bucket(BucketKey { layer_type: STONE, chunk: CellIndex::from(corner).chunk() }).expect("hot").count();
     arena.apply();
-    assert_eq!(arena.bucket(BucketKey { layer_type: STONE, chunk: corner.chunk_and_cell().0 }).expect("hot").count(), before, "flipped twice");
+    assert_eq!(arena.bucket(BucketKey { layer_type: STONE, chunk: CellIndex::from(corner).chunk() }).expect("hot").count(), before, "flipped twice");
 }
 
 /// A rectangle across the corner where four superchunks meet sets its
 /// cells in all four, and no others.
 #[test]
 fn rectangles_cross_chunks_and_superchunks() {
-    let edge = MIDDLE.x * SUPERCHUNK_SIDE_CELLS;
+    let edge = WORLD_MIDDLE.top_left().cartesian().x;
     let corner = CartesianCell { x: edge - 3, y: edge - 2 };
     let cells = [corner, CartesianCell { x: edge, y: edge - 2 }, CartesianCell { x: edge - 3, y: edge }, CartesianCell { x: edge, y: edge }];
     let mut arena = arena_over(&cells);
     stone(&mut arena, WriteOp::Set, corner, Shape::Rect { width: 6, height: 5 });
     assert_eq!(arena.apply().changed, 30);
-    let superchunks = [MIDDLE.x - 1, MIDDLE.x].into_iter().flat_map(|y| [MIDDLE.x - 1, MIDDLE.x].map(|x| SuperchunkPosition { x, y }));
-    assert_eq!(superchunks.map(|superchunk| arena.superchunk_count(STONE, superchunk)).collect::<Vec<_>>(), [6, 6, 9, 9], "3 columns each side; 2 rows above, 3 below");
+    let superchunks = [(-1, -1), (0, -1), (-1, 0), (0, 0)].map(|(dx, dy)| WORLD_MIDDLE.offset(dx, dy).expect("in the world"));
+    assert_eq!(superchunks.map(|superchunk| arena.superchunk_count(STONE, superchunk)), [6, 6, 9, 9], "3 columns each side; 2 rows above, 3 below");
     for (x, y, held) in [(edge - 3, edge - 2, true), (edge + 2, edge + 2, true), (edge - 4, edge, false), (edge + 3, edge, false), (edge, edge - 3, false), (edge, edge + 3, false)] {
         assert_eq!(holds(&arena, x, y), held, "cell ({x}, {y})");
     }
@@ -124,16 +121,16 @@ fn grass_spreads_over_dirt() {
     let mut codec = LayerCodec::new();
     let mut arena = BitmapArena::new();
     let mut storage = ChunkStorage::new(1 << 12);
-    storage.insert(MIDDLE, grass_on_dirt(3, 8, &mut codec));
-    for place in ChunkPlace::all() {
-        arena.make_hot_layers(ChunkPosition::of(MIDDLE, place), &[DIRT, GRASS], &storage, &mut codec);
+    storage.insert(WORLD_MIDDLE, grass_on_dirt(3, 8, &mut codec));
+    for chunk in WORLD_MIDDLE.chunks() {
+        arena.make_hot_layers(chunk, &[DIRT, GRASS], &storage, &mut codec);
     }
-    let edge = MIDDLE.x * SUPERCHUNK_SIDE_CELLS;
-    let at = CartesianCell { x: edge + 256, y: edge + 256 };
+    let corner = WORLD_MIDDLE.top_left().cartesian();
+    let at = CartesianCell { x: corner.x + 256, y: corner.y + 256 };
     arena.queue(GRASS, Write { at: at.into(), op: WriteOp::Set, shape: Shape::Disc { radius: 10 } });
     arena.queue(DIRT, Write { at: at.into(), op: WriteOp::Unset, shape: Shape::Disc { radius: 10 } });
     let applied = arena.apply();
     assert_eq!(applied.missed, 0);
-    assert_eq!(arena.superchunk_count(GRASS, MIDDLE) + arena.superchunk_count(DIRT, MIDDLE), 1 << 20, "dirt or grass, never both");
-    assert!(arena.superchunk_count(GRASS, MIDDLE) >= 300, "a disc of radius 10 is over 300 cells");
+    assert_eq!(arena.superchunk_count(GRASS, WORLD_MIDDLE) + arena.superchunk_count(DIRT, WORLD_MIDDLE), 1 << 20, "dirt or grass, never both");
+    assert!(arena.superchunk_count(GRASS, WORLD_MIDDLE) >= 300, "a disc of radius 10 is over 300 cells");
 }

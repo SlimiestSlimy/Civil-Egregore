@@ -6,7 +6,7 @@ The design is in `simulation.md`.
 
 **`gap(random, log_unchosen)`**: set cells passed over before the next
 chosen, from `1 - unit()`, in `(0, 1]`. **`select(word, rank)`**: the
-`rank`-th set bit's position. **`sample_layer(superchunk_index, layer,
+`rank`-th set bit's position. **`sample_layer(superchunk, layer,
 probability, random, emit)`**: one superchunk's layer's chosen cells,
 in Morton order, found by the counts: the chunks', the count tiles',
 the words'. **`sample(arena, type,
@@ -79,8 +79,7 @@ their entities, passes each wheel's tick, then applies every outbox's
 writes and instructions; writes to superchunks not in use counted
 missed (`count_missed`), entities put there lost; the outboxes emptied;
 the entities' tick advanced. **`neighbours`**: the nine
-offsets in a fixed order. **`offset`**: a superchunk position moved, if
-in the world.
+offsets in a fixed order.
 
 ## `entity_store/`
 
@@ -129,7 +128,7 @@ if within `WHEEL_TICKS` of `earliest`, else the list further off --
 wakes by cell, then ID.
 
 **`store.rs`**: **`SuperchunkEntities`**: a bucket a chunk and a wheel;
-**`get(id, at)`**, **`iter`**, **`chunk(index)`**, **`woken(tick)`** and
+**`get(id, at)`**, **`iter`**, **`chunk(place)`**, **`woken(tick)`** and
 **`woken_prefetching(tick, prefetch)`** -- the wheel's slot, each wake
 found and still due, the entities `ENTITY_AHEAD` on asked of memory --
 **`put(earliest, header, from, attributes)`** -- within a chunk or from
@@ -140,13 +139,13 @@ first)`**, **`remove(id, at)`**, **`cross(id, at, to)`**, **`crossings`**
 the next tick, after `Entities::apply` for the tick about to run --
 **`counts`**. **`Entities`**: the tick about to run, the superchunks by
 superchunk index, and instructions queued outside a tick: **`now`**,
-**`len`**, **`superchunk(superchunk_index)`**, **`get(id, at)`**,
+**`len`**, **`superchunk(superchunk)`**, **`get(id, at)`**,
 **`align(superchunk_indices)`** -- added empty, dropped, how many
 entities dropped -- **`queue_put(header, attributes)`**,
 **`queue_remove(header)`**, **`queued`**, **`apply`** -- as the arena's
 `queue` and `apply` -- **`iter`**, **`advance`**. **`EntityReader`**:
 every superchunk's entities read in a tick, as the bitplanes' `Reader`:
-**`get(id, at)`**, **`chunk(position)`**, **`occupied(origin, width,
+**`get(id, at)`**, **`chunk(chunk)`**, **`occupied(origin, width,
 height)`** -- the cells entities stand on among up to 16x16
 (`OCCUPIED_SIDE`), a row a word, from the up to nine word tiles' runs of
 places (**`in_word_tile`**).

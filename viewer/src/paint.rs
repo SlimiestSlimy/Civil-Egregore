@@ -12,7 +12,7 @@
 use crate::sim::{Cells, Frame, CHUNK_WORDS};
 use bitmap::morton::morton_coordinates;
 use bitmap::BITS_PER_WORD;
-use coordinates::{ChunkPlace, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::Instant;
@@ -84,6 +84,13 @@ pub fn start(frames: Receiver<Frame>) -> Receiver<Picture> {
     pictures
 }
 
+/// How far across and down from its superchunk's top left the chunk at
+/// `place` starts, in cells.
+fn chunk_top_left(place: usize) -> (usize, usize) {
+    let (x, y) = cartesian_from_place(place * CELLS_IN_CHUNK);
+    (x as usize, y as usize)
+}
+
 /// `colour`, opaque.
 const fn opaque(colour: [u8; 3]) -> [u8; 4] {
     [colour[0], colour[1], colour[2], u8::MAX]
@@ -94,8 +101,8 @@ const fn opaque(colour: [u8; 3]) -> [u8; 4] {
 fn paint(cells: &Cells) -> Painted {
     let mut pixels = vec![opaque(BROWN); SIDE * SIDE];
     let green = opaque(GREEN);
-    for (place, chunk) in ChunkPlace::all().zip(cells.grass.as_chunks::<CHUNK_WORDS>().0) {
-        let (left, top) = (place.x() as usize * CHUNK_SIDE, place.y() as usize * CHUNK_SIDE);
+    for (place, chunk) in cells.grass.as_chunks::<CHUNK_WORDS>().0.iter().enumerate() {
+        let (left, top) = chunk_top_left(place);
         for (word_index, &word) in chunk.iter().enumerate() {
             let mut bits = word;
             while bits != 0 {
@@ -106,8 +113,8 @@ fn paint(cells: &Cells) -> Painted {
         }
     }
     // Cliffs over the ground: a cell keeping a wall, darkened.
-    for (place, chunk) in ChunkPlace::all().zip(cells.cliffs.as_chunks::<CHUNK_WORDS>().0) {
-        let (left, top) = (place.x() as usize * CHUNK_SIDE, place.y() as usize * CHUNK_SIDE);
+    for (place, chunk) in cells.cliffs.as_chunks::<CHUNK_WORDS>().0.iter().enumerate() {
+        let (left, top) = chunk_top_left(place);
         for (word_index, &word) in chunk.iter().enumerate() {
             let mut bits = word;
             while bits != 0 {
@@ -141,11 +148,12 @@ fn mixed(from: [u8; 3], to: [u8; 3], part: usize, whole: usize) -> [u8; 3] {
 /// tile -- counted from its run of bits -- and white mixed in by the
 /// sheep on it, each as many cells as it is drawn from near.
 fn paint_far(cells: &Cells, detail: u32) -> Painted {
-    let (side, chunk_side, tile_cells) = (SIDE >> detail, CHUNK_SIDE >> detail, 1usize << (2 * detail));
+    let (side, tile_cells) = (SIDE >> detail, 1usize << (2 * detail));
     let mut grass = vec![0u16; side * side];
-    for (place, chunk) in ChunkPlace::all().zip(cells.grass.as_chunks::<CHUNK_WORDS>().0) {
-        let (left, top) = (place.x() as usize * chunk_side, place.y() as usize * chunk_side);
-        for tile in 0..chunk_side * chunk_side {
+    for (place, chunk) in cells.grass.as_chunks::<CHUNK_WORDS>().0.iter().enumerate() {
+        let (left, top) = chunk_top_left(place);
+        let (left, top) = (left >> detail, top >> detail);
+        for tile in 0..CELLS_IN_CHUNK / tile_cells {
             let count: u32 = if tile_cells >= BITS_PER_WORD {
                 let words = tile_cells / BITS_PER_WORD;
                 chunk[tile * words..][..words].iter().map(|word| word.count_ones()).sum()

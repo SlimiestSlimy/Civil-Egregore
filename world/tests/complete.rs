@@ -51,7 +51,7 @@ fn a_flock_on_generated_ground_lasts() {
     for _ in 0..300_000 {
         world::tick(&mut made.simulation, &mut made.arena, &mut made.entities, 3);
     }
-    let grass: u64 = made.arena.superchunks().iter().map(|superchunk| made.arena.superchunk_count(GRASS, superchunk.position()) as u64).sum();
+    let grass: u64 = made.arena.superchunks().iter().map(|superchunk| made.arena.superchunk_count(GRASS, superchunk.index()) as u64).sum();
     let sheep = made.entities.len();
     assert!((500..200_000).contains(&sheep), "{sheep} sheep");
     assert!(grass > 4 * 1024 * 1024 / 20, "{grass} cells of grass");

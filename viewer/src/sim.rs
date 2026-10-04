@@ -22,7 +22,7 @@ use bitplane_manager::BucketKey;
 use chunk_storage::mock::GRASS;
 use chunk_storage::LayerType;
 use terrain::{WALL_EAST, WALL_SOUTH};
-use coordinates::{ChunkPlace, ChunkPosition, SuperchunkPosition, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS, WORLD_SIDE_SUPERCHUNKS};
+use coordinates::{square_from_middle, square_side, CartesianCell, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use simulation::Simulation;
 use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Write};
@@ -138,11 +138,6 @@ pub struct Frame {
     pub cells: Vec<Cells>,
 }
 
-/// Superchunks along the side of the square `superchunks` of them make.
-pub fn side(superchunks: u32) -> u32 {
-    (superchunks as f64).sqrt().ceil() as u32
-}
-
 /// Starts a pasture of `superchunks` superchunks -- grass on
 /// `thousandths` of the cells, `flock` sheep on each -- ticking on
 /// every thread the machine has, on a thread of its own: where to send it requests,
@@ -163,10 +158,7 @@ pub fn start(superchunks: u32, thousandths: usize, flock: usize) -> (Sender<Requ
 fn run(superchunks: u32, thousandths: usize, flock: usize, asked: &Receiver<Request>, answers: &Sender<Frame>) {
     // A world generated, terrain and all, held as the mock is: the superchunks row by row.
     let made = world::generate_with(SEED, superchunks, (1 << 20) * thousandths / 1000, flock);
-    let across = side(superchunks);
-    let middle = WORLD_SIDE_SUPERCHUNKS / 2;
-    let positions = (0..superchunks).map(|index| SuperchunkPosition { x: middle + index % across, y: middle + index / across }).collect();
-    let mut world = MockWorld { arena: made.arena, entities: made.entities, storage: made.storage, superchunks: positions };
+    let mut world = MockWorld { arena: made.arena, entities: made.entities, storage: made.storage, superchunks: square_from_middle(superchunks).collect() };
     let mut simulation = Simulation::for_superchunks(superchunks as usize);
     let (mut paused, mut pace, mut tick) = (false, Some(TARGET_PACE), 0u64);
     let mut census = census(superchunks, thousandths, flock);
@@ -222,7 +214,7 @@ fn run(superchunks: u32, thousandths: usize, flock: usize, asked: &Receiver<Requ
 /// The superchunks of `world` that `ask` asks for, copied: each one's
 /// grass, words as they are, and its sheep's cells.
 fn copy(world: &MockWorld, superchunks: u32, ask: Ask) -> Vec<Cells> {
-    let side = side(superchunks);
+    let side = square_side(superchunks);
     let (first, last) = (ask.viewport.first, ask.viewport.last);
     let in_view = (first.1..=last.1.min(side - 1)).flat_map(|y| (first.0..=last.0.min(side - 1)).map(move |x| (x, y)));
     let mut copied = Vec::new();
@@ -238,10 +230,10 @@ fn copy(world: &MockWorld, superchunks: u32, ask: Ask) -> Vec<Cells> {
 
 /// `superchunk`'s cells of `layer_type`: its chunks' words, one chunk
 /// after another.
-fn layer(world: &MockWorld, layer_type: LayerType, superchunk: SuperchunkPosition) -> Vec<u64> {
+fn layer(world: &MockWorld, layer_type: LayerType, superchunk: SuperchunkIndex) -> Vec<u64> {
     let mut words = Vec::with_capacity(CHUNKS_IN_SUPERCHUNK * CHUNK_WORDS);
-    for place in ChunkPlace::all() {
-        match world.arena.bucket(BucketKey { layer_type, chunk: ChunkPosition::of(superchunk, place) }) {
+    for chunk in superchunk.chunks() {
+        match world.arena.bucket(BucketKey { layer_type, chunk }) {
             Some(bucket) => words.extend_from_slice(bucket.cells()),
             None => words.resize(words.len() + CHUNK_WORDS, 0),
         }
@@ -250,11 +242,11 @@ fn layer(world: &MockWorld, layer_type: LayerType, superchunk: SuperchunkPositio
 }
 
 /// The cells `superchunk`'s sheep stand on, from its top left.
-fn sheep(world: &MockWorld, superchunk: SuperchunkPosition) -> Vec<(u16, u16)> {
-    let Some(kept) = world.entities.superchunk(superchunk.morton_index()) else {
+fn sheep(world: &MockWorld, superchunk: SuperchunkIndex) -> Vec<(u16, u16)> {
+    let Some(kept) = world.entities.superchunk(superchunk) else {
         return Vec::new();
     };
-    let (left, top) = (superchunk.x * SUPERCHUNK_SIDE_CELLS, superchunk.y * SUPERCHUNK_SIDE_CELLS);
+    let CartesianCell { x: left, y: top } = superchunk.top_left().cartesian();
     let mut cells = Vec::with_capacity(kept.len());
     for entity in kept.iter() {
         let at = entity.header.at.cartesian();

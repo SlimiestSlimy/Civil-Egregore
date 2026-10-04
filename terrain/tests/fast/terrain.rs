@@ -4,26 +4,26 @@
 //!
 //! `cargo test`
 
-use coordinates::{CellPlace, ChunkPlace, SuperchunkPosition, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{place_from_cartesian, CartesianCell, SuperchunkIndex, WORLD_MIDDLE};
 use terrain::{height, wall, Terrain, STEP, WALLS};
 
-/// The height of the cell `(x, y)` of a superchunk's `terrain`.
+/// The height of the cell `(x, y)` of a superchunk's `terrain`, from
+/// its top left.
 fn at(terrain: &Terrain, x: u32, y: u32) -> u8 {
-    terrain.heights.get(ChunkPlace::new((x / 256) as u8, (y / 256) as u8), CellPlace { x: x as u8, y: y as u8 })
+    terrain.height(place_from_cartesian(x, y))
 }
 
 /// Whether `terrain` keeps a wall the `way`-th way at the cell `(x, y)`.
 fn walled(terrain: &Terrain, way: usize, x: u32, y: u32) -> bool {
-    let place = bitmap::morton::morton_index(x as u8, y as u8);
-    terrain.walls[way][ChunkPlace::new((x / 256) as u8, (y / 256) as u8).index()][place / 64] >> (place % 64) & 1 == 1
+    terrain.walled(way, place_from_cartesian(x, y))
 }
 
 /// The same seed gives the same heights, another seed others; a
 /// superchunk's heights are the world's, whichever superchunk is made.
 #[test]
 fn heights_are_settled_by_the_seed_and_the_cell() {
-    let superchunk = SuperchunkPosition { x: 2_000_000, y: 2_000_001 };
-    let (left, top) = (superchunk.x * SUPERCHUNK_SIDE_CELLS, superchunk.y * SUPERCHUNK_SIDE_CELLS);
+    let superchunk = SuperchunkIndex::from_cartesian(2_000_000, 2_000_001);
+    let CartesianCell { x: left, y: top } = superchunk.top_left().cartesian();
     let (first, again, other) = (Terrain::generate(7, superchunk), Terrain::generate(7, superchunk), Terrain::generate(8, superchunk));
     assert!(first.heights == again.heights);
     assert!(first.heights != other.heights);
@@ -36,7 +36,7 @@ fn heights_are_settled_by_the_seed_and_the_cell() {
 /// superchunk, and no cell is far from its neighbour's.
 #[test]
 fn the_ground_rolls() {
-    let terrain = Terrain::generate(1, SuperchunkPosition { x: 2_097_152, y: 2_097_152 });
+    let terrain = Terrain::generate(1, WORLD_MIDDLE);
     let (mut low, mut high, mut steepest) = (u8::MAX, 0, 0);
     for y in 0..1024 {
         for x in 0..1024 {
@@ -56,9 +56,8 @@ fn the_ground_rolls() {
 /// and some of the ground is walled, most of it not.
 #[test]
 fn walls_are_where_heights_are_more_than_a_step_apart() {
-    let superchunk = SuperchunkPosition { x: 2_097_152, y: 2_097_152 };
-    let (left, top) = (superchunk.x * SUPERCHUNK_SIDE_CELLS, superchunk.y * SUPERCHUNK_SIDE_CELLS);
-    let terrain = Terrain::generate(1, superchunk);
+    let CartesianCell { x: left, y: top } = WORLD_MIDDLE.top_left().cartesian();
+    let terrain = Terrain::generate(1, WORLD_MIDDLE);
     for y in (0..1024).step_by(7).chain([1023]) {
         for x in (0..1024).step_by(5).chain([0, 1023]) {
             for (way, &(_, (dx, dy))) in WALLS.iter().enumerate() {

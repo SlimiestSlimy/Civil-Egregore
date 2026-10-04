@@ -8,7 +8,7 @@ use bitplane_manager::{BitmapArena, BucketKey, Shape, Write, WriteOp};
 use simulation::sample;
 use utilities::rng::Rng;
 use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CartesianCell, ChunkPosition};
+use coordinates::{CartesianCell, CellIndex, ChunkIndex};
 
 /// The layer type the tests sample.
 const STONE: LayerType = LayerType(4);
@@ -24,7 +24,7 @@ fn rect(x: u32, y: u32, width: u32, height: u32) -> Vec<Write> {
 
 /// An arena with `STONE` hot in the chunks at `chunks`, the cells of
 /// `writes` set.
-fn arena_with(chunks: &[ChunkPosition], writes: &[Write]) -> BitmapArena {
+fn arena_with(chunks: &[ChunkIndex], writes: &[Write]) -> BitmapArena {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
     for &chunk in chunks {
         arena.make_hot(BucketKey { layer_type: STONE, chunk }, None, &mut codec);
@@ -44,9 +44,14 @@ fn sampled(arena: &BitmapArena, probability: f64, seed: u64) -> Vec<CartesianCel
     cells
 }
 
+/// The chunk whose top left cell is `x` and `y` cells from the world's.
+fn chunk_at(x: u32, y: u32) -> ChunkIndex {
+    CellIndex::from(CartesianCell { x, y }).chunk()
+}
+
 /// The chunks of the two superchunks the tests use, side by side.
-fn two_superchunks() -> Vec<ChunkPosition> {
-    (0..4).flat_map(|y| (0..8).map(move |x| ChunkPosition { x: 400 + x, y: 400 + y })).collect()
+fn two_superchunks() -> Vec<ChunkIndex> {
+    (0..4).flat_map(|y| (0..8).map(move |x| chunk_at(102_400 + 256 * x, 102_400 + 256 * y))).collect()
 }
 
 /// At probability 1 every set cell comes once, in Morton order across
@@ -62,7 +67,7 @@ fn certain_sampling_finds_every_set_cell_in_morton_order() {
     let cells = sampled(&arena, 1.0, 1);
     let expected: usize = two_superchunks().iter().map(|&chunk| arena.bucket(BucketKey { layer_type: STONE, chunk }).expect("hot").count() as usize).sum();
     assert_eq!(cells.len(), expected);
-    assert!(cells.windows(2).all(|pair| pair[0].morton_index() < pair[1].morton_index()), "in Morton order, each once");
+    assert!(cells.windows(2).all(|pair| CellIndex::from(pair[0]) < CellIndex::from(pair[1])), "in Morton order, each once");
     assert!(cells.iter().all(|&cell| arena.holds(STONE, cell.into()) == Ok(true)), "only set cells");
     assert!(sampled(&arena, 0.0, 1).is_empty());
 }
@@ -72,13 +77,13 @@ fn certain_sampling_finds_every_set_cell_in_morton_order() {
 /// 10,486; every cell chosen is set, and they come in Morton order.
 #[test]
 fn each_cell_is_chosen_with_the_probability_asked() {
-    let chunks: Vec<ChunkPosition> = (0..4).flat_map(|y| (0..4).map(move |x| ChunkPosition { x: 400 + x, y: 400 + y })).collect();
+    let chunks: Vec<ChunkIndex> = (0..4).flat_map(|y| (0..4).map(move |x| chunk_at(102_400 + 256 * x, 102_400 + 256 * y))).collect();
     let arena = arena_with(&chunks, &rect(102_400, 102_400, 1024, 1024));
     for seed in 1..=3 {
         let cells = sampled(&arena, 0.01, seed);
         let (mean, deviation) = (1_048_576.0 * 0.01, (1_048_576.0f64 * 0.01 * 0.99).sqrt());
         assert!((cells.len() as f64 - mean).abs() < 5.0 * deviation, "seed {seed}: {} cells", cells.len());
-        assert!(cells.windows(2).all(|pair| pair[0].morton_index() < pair[1].morton_index()));
+        assert!(cells.windows(2).all(|pair| CellIndex::from(pair[0]) < CellIndex::from(pair[1])));
     }
 }
 
@@ -86,11 +91,11 @@ fn each_cell_is_chosen_with_the_probability_asked() {
 /// full and one a sixteenth full get them sixteen to one.
 #[test]
 fn chunks_are_weighted_by_their_counts() {
-    let (full, sparse) = (ChunkPosition { x: 400, y: 400 }, ChunkPosition { x: 401, y: 400 });
+    let (full, sparse) = (chunk_at(102_400, 102_400), chunk_at(102_656, 102_400));
     let writes = [rect(102_400, 102_400, 256, 256), rect(102_656, 102_400, 64, 64)].concat();
     let arena = arena_with(&[full, sparse], &writes);
     let cells = sampled(&arena, 0.05, 7);
-    let in_sparse = cells.iter().filter(|cell| cell.chunk_and_cell().0 == sparse).count() as f64;
+    let in_sparse = cells.iter().filter(|&&cell| CellIndex::from(cell).chunk() == sparse).count() as f64;
     let ratio = (cells.len() as f64 - in_sparse) / in_sparse;
     assert!((14.0..18.5).contains(&ratio), "{ratio:.2} to one");
 }
@@ -98,12 +103,12 @@ fn chunks_are_weighted_by_their_counts() {
 /// Only hot bitmaps are sampled: an evicted chunk's cells are not.
 #[test]
 fn only_hot_bitmaps_are_sampled() {
-    let (kept, evicted) = (ChunkPosition { x: 400, y: 400 }, ChunkPosition { x: 401, y: 400 });
+    let (kept, evicted) = (chunk_at(102_400, 102_400), chunk_at(102_656, 102_400));
     let mut arena = arena_with(&[kept, evicted], &rect(102_400, 102_400, 512, 4));
     assert_eq!(sampled(&arena, 1.0, 1).len(), 2048);
     let mut storage = chunk_storage::ChunkStorage::new(1 << 12);
-    arena.write_back(evicted.superchunk_and_place().0, &mut storage, &mut LayerCodec::new());
+    arena.write_back(evicted.superchunk(), &mut storage, &mut LayerCodec::new());
     assert!(arena.evict(BucketKey { layer_type: STONE, chunk: evicted }));
-    assert!(sampled(&arena, 1.0, 1).iter().all(|cell| cell.chunk_and_cell().0 == kept));
+    assert!(sampled(&arena, 1.0, 1).iter().all(|&cell| CellIndex::from(cell).chunk() == kept));
     assert_eq!(sampled(&arena, 1.0, 1).len(), 1024);
 }

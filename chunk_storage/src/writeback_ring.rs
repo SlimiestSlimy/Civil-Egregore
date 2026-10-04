@@ -16,7 +16,7 @@
 //! superchunk at the tail ([`WritebackRing::tail_superchunk`]) until it
 //! does.
 
-use coordinates::{ChunkPosition, SuperchunkPosition, CHUNKS_IN_SUPERCHUNK};
+use coordinates::{ChunkIndex, SuperchunkIndex};
 use crate::layer_codec::LayerType;
 use std::ops::Range;
 
@@ -27,14 +27,12 @@ const HEADER_WORDS: usize = 3;
 const WRAP: u64 = u64::MAX;
 /// The length word's bit saying an entry is dead.
 const DEAD: u64 = 1;
-/// The low bits of a chunk's Morton index: its place in its superchunk.
-const CHUNK_IN_SUPERCHUNK_BITS: u32 = CHUNKS_IN_SUPERCHUNK.trailing_zeros();
 
 /// A live entry of the ring.
 #[derive(Clone, Debug)]
 pub struct RingEntry {
-    /// Its chunk's Morton index in its superchunk.
-    pub chunk: usize,
+    /// Its chunk's place in its superchunk.
+    pub place: usize,
     /// Its layer's type.
     pub layer_type: LayerType,
     /// Where its encoded layer's words are in the ring.
@@ -87,7 +85,7 @@ impl WritebackRing {
 
     /// Appends `encoded` as the layer of `layer_type` in `chunk` (no
     /// words: no layer), if it fits. Returns whether it did.
-    pub fn push(&mut self, chunk: ChunkPosition, layer_type: LayerType, encoded: &[u64]) -> bool {
+    pub fn push(&mut self, chunk: ChunkIndex, layer_type: LayerType, encoded: &[u64]) -> bool {
         let size = HEADER_WORDS + encoded.len();
         let Some(at) = self.room_for(size) else {
             return false;
@@ -97,7 +95,7 @@ impl WritebackRing {
         } else if at < self.head && self.head < self.words.len() {
             self.words[self.head] = WRAP;
         }
-        self.words[at..at + HEADER_WORDS].copy_from_slice(&[chunk.morton_index(), layer_type.0, (encoded.len() as u64) << 1]);
+        self.words[at..at + HEADER_WORDS].copy_from_slice(&[chunk.0, layer_type.0, (encoded.len() as u64) << 1]);
         self.words[at + HEADER_WORDS..at + size].copy_from_slice(encoded);
         self.head = at + size;
         self.entries += 1;
@@ -123,32 +121,30 @@ impl WritebackRing {
     }
 
     /// Every entry, live or dead, oldest first: where each starts, its
-    /// chunk's Morton index in the world, its type, its length and
-    /// whether it is dead.
-    fn all_entries(&self) -> impl Iterator<Item = (usize, u64, LayerType, usize, bool)> + '_ {
+    /// chunk, its type, its length and whether it is dead.
+    fn all_entries(&self) -> impl Iterator<Item = (usize, ChunkIndex, LayerType, usize, bool)> + '_ {
         let mut at = self.tail;
         (0..self.entries).map(move |_| {
             let start = self.entry_start(at);
             let [chunk, layer_type, length] = [self.words[start], self.words[start + 1], self.words[start + 2]];
             let words = (length >> 1) as usize;
             at = start + HEADER_WORDS + words;
-            (start, chunk, LayerType(layer_type), words, length & DEAD != 0)
+            (start, ChunkIndex(chunk), LayerType(layer_type), words, length & DEAD != 0)
         })
     }
 
     /// The superchunk of the oldest live entry, if any.
-    pub fn tail_superchunk(&self) -> Option<SuperchunkPosition> {
+    pub fn tail_superchunk(&self) -> Option<SuperchunkIndex> {
         let (_, chunk, ..) = self.all_entries().find(|&(.., dead)| !dead)?;
-        Some(ChunkPosition::from_morton_index(chunk).superchunk_and_place().0)
+        Some(chunk.superchunk())
     }
 
     /// The live entries of `superchunk`, oldest first.
-    pub fn entries_of(&self, superchunk: SuperchunkPosition) -> Vec<RingEntry> {
-        let superchunk_index = superchunk.morton_index();
+    pub fn entries_of(&self, superchunk: SuperchunkIndex) -> Vec<RingEntry> {
         self.all_entries()
-            .filter(|&(_, chunk, .., dead)| !dead && chunk >> CHUNK_IN_SUPERCHUNK_BITS == superchunk_index)
+            .filter(|&(_, chunk, .., dead)| !dead && chunk.superchunk() == superchunk)
             .map(|(start, chunk, layer_type, words, _)| RingEntry {
-                chunk: (chunk & (CHUNKS_IN_SUPERCHUNK as u64 - 1)) as usize,
+                place: chunk.place(),
                 layer_type,
                 words: start + HEADER_WORDS..start + HEADER_WORDS + words,
             })
@@ -162,9 +158,8 @@ impl WritebackRing {
 
     /// Frees every entry of `superchunk`: marks them dead, and moves the
     /// tail past the dead entries at it.
-    pub fn release(&mut self, superchunk: SuperchunkPosition) {
-        let superchunk_index = superchunk.morton_index();
-        let starts: Vec<usize> = self.all_entries().filter(|&(_, chunk, ..)| chunk >> CHUNK_IN_SUPERCHUNK_BITS == superchunk_index).map(|(start, ..)| start).collect();
+    pub fn release(&mut self, superchunk: SuperchunkIndex) {
+        let starts: Vec<usize> = self.all_entries().filter(|&(_, chunk, ..)| chunk.superchunk() == superchunk).map(|(start, ..)| start).collect();
         for start in starts {
             self.words[start + 2] |= DEAD;
         }

@@ -16,16 +16,15 @@ what they always do and are not listed.
 |---|---|---|---|
 | **world** | everything simulated: every superchunk, its layers and its entities, and the tick it is at | made from a **seed**; saved as a **save** | map |
 | **seed** | the number a world is made from: every height, every superchunk's random numbers and every first flock follow from it | world, random stream | |
-| **cell** | the smallest place in the world: one bit of each layer, one height, at most one entity | chunk, superchunk; found by its **cell index** | tile, pixel, square |
+| **cell** | the smallest unit of the world: one bit of each layer, one height, at most one entity | chunk, superchunk; found by its **cell index** | tile, pixel, square |
 | **chunk** | 256x256 cells: what a layer's **bitmap** covers | superchunk, layer, bucket | |
 | **superchunk** | 4x4 chunks, 1024x1024 cells: the unit the world is held, ticked, saved and loaded in, and the reach of the speed of light. One word, in types too (`Superchunk`) | chunk, turn, image | super chunk, `SuperChunk` |
-| **position** | where a superchunk or chunk is in the world, counted in superchunks or chunks from the world's top left (`SuperchunkPosition`, `ChunkPosition`) | place, Morton index | coordinates |
-| **place** | where a chunk is in its superchunk, or a cell in its chunk (`ChunkPlace`, `CellPlace`) | position | slot, offset |
-| **address** | a cell's superchunk position, chunk place and cell place together (`CellAddress`) | | |
-| **cartesian cell** | a cell as its `x` and `y` in the world (`CartesianCell`): for geometry and drawing | cell index | world cell |
-| **Morton index** | a number made by interleaving `x`'s and `y`'s bits, `x` in the even ones: cells, chunks and superchunks are numbered and stored in this order | cell index, Morton order | `morton` alone |
-| **cell index** | a cell's Morton index in the world, 64 bits: 44 for its superchunk, 4 for its chunk, 16 for its cell (`CellIndex`) | Morton index | |
-| **superchunk index** | a superchunk's Morton index, 44 bits -- the top bits of its cells' -- what identifies a superchunk in the code (`CellIndex::superchunk_index`) | cell index, position | `morton` alone |
+| **Morton index** | a number made by interleaving `x`'s and `y`'s bits, `x` in the even ones: cells, chunks and superchunks are numbered and stored in this order. The default way to say where anything is | Morton order | `morton` alone |
+| **superchunk index** | a superchunk's Morton index in the world, 44 bits: what identifies a superchunk (`SuperchunkIndex`) | chunk index | position, `morton` alone |
+| **chunk index** | a chunk's Morton index in the world, 48 bits: its superchunk index, then its place (`ChunkIndex`) | superchunk index, cell index | position |
+| **cell index** | a cell's Morton index in the world, 64 bits: its chunk index, then its place (`CellIndex`) | chunk index, cartesian | address |
+| **place** | a Morton index inside the thing around it, as a `usize`: a chunk's in its superchunk (0 to 15), a cell's in its chunk (0 to 65,535), or a cell's in its superchunk (20 bits, `CellIndex::place_in_superchunk`) | chunk index, cell index | slot, offset, position |
+| **cartesian** | `x` and `y`, counted from the world's or a superchunk's top left; only for geometry and drawing, and always named so: `CartesianCell`, `from_cartesian`, `cartesian()`, `place_from_cartesian` | Morton index | world cell, coordinates (alone) |
 | **Morton order** | the order of Morton indices: work is done and written in it, so memory is read forwards | sampling, wake | |
 | **height** | a cell's height, 0 to 255, from the seed alone (`terrain::height`) | wall, height map | elevation |
 | **wall** | a bar between two cells across or down more than one apart in height; kept by the upper or left cell, in the layers `WALL_EAST` and `WALL_SOUTH`. A diagonal step has no wall of its own: it is open only when both ways round it are | step, terrain | cliff (the viewer's drawing of walls) |
@@ -69,7 +68,7 @@ what they always do and are not listed.
 | **bitmap arena** | the hot side: every hot layer, in allocations a superchunk and a layer type each (`BitmapArena`) | allocation, bucket, directory | |
 | **allocation** | one layer type over one superchunk in the arena: one block of the block pool, a bucket a chunk | block, bucket | |
 | **bucket** | one chunk's hot layer: its words in its allocation, and its counts | layer, allocation | |
-| **directory** | the arena's list of hot superchunks, sorted by Morton index, each with its allocations by layer type | lookup | |
+| **directory** | the arena's list of hot superchunks, sorted by superchunk index, each with its allocations by layer type | lookup | |
 | **lookup** | finding a layer in the directory; a reader remembers its last sixteen | reader, directory | |
 | **block** | an equal-size piece of memory from the allocator's block pool, owned by whoever holds it (`allocator::Block`) | block pool, allocation | (for anything that is not memory) |
 | **block pool** | the allocator's blocks, made, handed out, taken back (`BlockPool`). Never "pool" alone | block | |
@@ -93,7 +92,7 @@ what they always do and are not listed.
 | **missed** | a write landing where no layer is hot: counted, and lost | write, lost | |
 | **dispatcher** | the threads, started once and kept, each running a part of a job (`Dispatcher`) | part | |
 | **part** | one thread's share of a phase: a run of superchunks in Morton order | dispatcher | |
-| **random stream** | a superchunk's own random numbers, from the seed and its Morton index, kept tick to tick and by a save | seed | |
+| **random stream** | a superchunk's own random numbers, from the seed and its superchunk index, kept tick to tick and by a save | seed | |
 
 ## Sampling (Monte Carlo)
 
