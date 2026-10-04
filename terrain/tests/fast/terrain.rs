@@ -4,7 +4,7 @@
 //!
 //! `cargo test`
 
-use coordinates::{place_from_cartesian, CartesianCell, SuperchunkIndex, WORLD_MIDDLE};
+use coordinates::{place_from_cartesian, CellCartesian, SuperchunkIndex, WORLD_MIDDLE};
 use terrain::{height, wall, Terrain, STEP, WALLS};
 
 /// The height of the cell `(x, y)` of a superchunk's `terrain`, from
@@ -23,7 +23,7 @@ fn walled(terrain: &Terrain, way: usize, x: u32, y: u32) -> bool {
 #[test]
 fn heights_are_settled_by_the_seed_and_the_cell() {
     let superchunk = SuperchunkIndex::from_cartesian(2_000_000, 2_000_001);
-    let CartesianCell { x: left, y: top } = superchunk.top_left().cartesian();
+    let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     let (first, again, other) = (Terrain::generate(7, superchunk), Terrain::generate(7, superchunk), Terrain::generate(8, superchunk));
     assert!(first.heights == again.heights);
     assert!(first.heights != other.heights);
@@ -56,7 +56,7 @@ fn the_ground_rolls() {
 /// and some of the ground is walled, most of it not.
 #[test]
 fn walls_are_where_heights_are_more_than_a_step_apart() {
-    let CartesianCell { x: left, y: top } = WORLD_MIDDLE.top_left().cartesian();
+    let CellCartesian { x: left, y: top } = WORLD_MIDDLE.top_left().cartesian();
     let terrain = Terrain::generate(1, WORLD_MIDDLE);
     for y in (0..1024).step_by(7).chain([1023]) {
         for x in (0..1024).step_by(5).chain([0, 1023]) {

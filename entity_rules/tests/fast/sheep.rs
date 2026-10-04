@@ -7,7 +7,7 @@
 
 use bitplane_manager::{Write, WriteOp};
 use chunk_storage::mock::{DIRT, GRASS};
-use coordinates::CartesianCell;
+use coordinates::CellCartesian;
 use simulation::entity_store::{Attribute, EntityId, EntityRef, Header};
 use simulation::Simulation;
 use entity_rules::diagnostics::world::MockWorld;
@@ -69,7 +69,7 @@ fn hungry_sheep_walk_to_the_nearest_grass() {
     let mut world = MockWorld::grass_on_dirt(1, 0);
     let superchunk = world.superchunks[0];
     let corner = superchunk.top_left().cartesian();
-    let (sheep, grass) = (CartesianCell { x: corner.x + 500, y: corner.y + 500 }, CartesianCell { x: corner.x + 506, y: corner.y + 493 });
+    let (sheep, grass) = (CellCartesian { x: corner.x + 500, y: corner.y + 500 }, CellCartesian { x: corner.x + 506, y: corner.y + 493 });
     world.arena.queue(GRASS, Write::cell(grass.into(), WriteOp::Set));
     world.arena.queue(DIRT, Write::cell(grass.into(), WriteOp::Unset));
     world.arena.apply();
@@ -101,7 +101,7 @@ fn hungry_sheep_walk_to_grass_far_off() {
     let mut world = MockWorld::grass_on_dirt(4, 0);
     // The square's top left superchunk: the first, row by row.
     let corner = world.superchunks[0].top_left().cartesian();
-    let (sheep, grass) = (CartesianCell { x: corner.x + 900, y: corner.y + 700 }, CartesianCell { x: corner.x + 1050, y: corner.y + 800 });
+    let (sheep, grass) = (CellCartesian { x: corner.x + 900, y: corner.y + 700 }, CellCartesian { x: corner.x + 1050, y: corner.y + 800 });
     world.arena.queue(GRASS, Write::cell(grass.into(), WriteOp::Set));
     world.arena.queue(DIRT, Write::cell(grass.into(), WriteOp::Unset));
     world.arena.apply();
@@ -131,7 +131,7 @@ fn sheep_on_thin_pasture_roam_away() {
     let mut world = MockWorld::grass_on_dirt(1, 0);
     let superchunk = world.superchunks[0];
     let corner = superchunk.top_left().cartesian();
-    let start = CartesianCell { x: corner.x + 500, y: corner.y + 500 };
+    let start = CellCartesian { x: corner.x + 500, y: corner.y + 500 };
     world.arena.queue(GRASS, Write::cell(start.into(), WriteOp::Set));
     world.arena.queue(DIRT, Write::cell(start.into(), WriteOp::Unset));
     world.arena.apply();

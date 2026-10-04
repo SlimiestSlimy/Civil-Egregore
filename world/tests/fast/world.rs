@@ -9,7 +9,7 @@
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError};
 use chunk_storage::mock::{DIRT, GRASS};
-use coordinates::CartesianCell;
+use coordinates::CellCartesian;
 use entity_rules::diagnostics::world::MockWorld;
 use simulation::entity_store::{Attribute, Entities, Header};
 use simulation::Simulation;
@@ -148,7 +148,7 @@ fn sheep_never_step_through_a_wall() {
             if let Some(was) = stood.insert(sheep.header.id.0, at).filter(|&was| was != at) {
                 let (from, to) = (was.cartesian(), at.cartesian());
                 // The cells of each way round: the straight step's alone, or the diagonal's two corners.
-                let corners = [CartesianCell { x: to.x, y: from.y }, CartesianCell { x: from.x, y: to.y }];
+                let corners = [CellCartesian { x: to.x, y: from.y }, CellCartesian { x: from.x, y: to.y }];
                 let walled = corners.iter().any(|corner| terrain::wall(high(was), high((*corner).into())) || terrain::wall(high((*corner).into()), high(at)));
                 assert!(!walled, "from height {} to {}: {from:?} to {to:?}", high(was), high(at));
                 moved += 1;

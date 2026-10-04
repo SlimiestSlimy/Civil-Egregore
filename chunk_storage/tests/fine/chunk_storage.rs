@@ -6,7 +6,7 @@
 
 use bitmap::{Bitmap, CellWords, WORDS};
 use chunk_storage::{ChunkStorage, HeightMap, InvalidImage, LayerChange, LayerCodec, LayerType, SuperchunkImage, WritebackRing};
-use coordinates::{CartesianCell, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
+use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
 
 /// A cell of a chunk, cartesian: across and down from its top left.
 const CELL: (u8, u8) = (3, 200);
@@ -54,11 +54,11 @@ fn every_cell_has_its_own_height() {
         .chunks()
         .flat_map(|chunk| [(0, 0), (255, 0), (0, 255), (255, 255), (CELL.0 as u32, CELL.1 as u32), (128, 77)].map(|(x, y)| {
             let corner = chunk.top_left().cartesian();
-            CellIndex::from(CartesianCell { x: corner.x + x, y: corner.y + y })
+            CellIndex::from(CellCartesian { x: corner.x + x, y: corner.y + y })
         }))
         .collect();
     let height_of = |cell: CellIndex| {
-        let CartesianCell { x, y } = cell.cartesian();
+        let CellCartesian { x, y } = cell.cartesian();
         ((x - top_left.x) * 3 + (y - top_left.y) * 7) as u8
     };
     let mut heights = HeightMap::default();

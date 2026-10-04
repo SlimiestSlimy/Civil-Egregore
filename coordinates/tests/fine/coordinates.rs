@@ -5,7 +5,7 @@
 //! `cargo test`
 
 use bitmap::morton::morton_index;
-use coordinates::{cartesian_from_place, place_from_cartesian, CartesianCell, CellIndex, ChunkIndex, SuperchunkIndex, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE, WORLD_SIDE_SUPERCHUNKS};
+use coordinates::{cartesian_from_place, place_from_cartesian, CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE, WORLD_SIDE_SUPERCHUNKS};
 
 /// The cartesian coordinate, each way, of the superchunk in the middle
 /// of the world.
@@ -21,7 +21,7 @@ fn chunks_in_a_superchunk_go_in_morton_order() {
     let top_left = superchunk.top_left().cartesian();
     let places: Vec<usize> = [(0, 0), (1, 0), (0, 1), (1, 1), (2, 0), (0, 2), (3, 3)]
         .into_iter()
-        .map(|(x, y)| CellIndex::from(CartesianCell { x: top_left.x + x * chunk_side, y: top_left.y + y * chunk_side }).chunk().place())
+        .map(|(x, y)| CellIndex::from(CellCartesian { x: top_left.x + x * chunk_side, y: top_left.y + y * chunk_side }).chunk().place())
         .collect();
     assert_eq!(places, [0, 1, 2, 3, 4, 8, 15]);
     assert!(superchunk.chunks().enumerate().all(|(place, chunk)| chunk.place() == place && chunk.superchunk() == superchunk));
@@ -54,7 +54,7 @@ fn a_cells_index_nests_its_chunks_and_superchunks() {
     let coordinates: Vec<u32> = edges.iter().flat_map(|&edge| [edge, middle + edge, middle - edge - 1, u32::MAX - edge]).collect();
     for &x in &coordinates {
         for &y in &coordinates {
-            let cartesian = CartesianCell { x, y };
+            let cartesian = CellCartesian { x, y };
             let cell = CellIndex::from(cartesian);
             assert_eq!(cell.cartesian(), cartesian, "cell ({x}, {y})");
             let (chunk, superchunk) = (cell.chunk(), cell.superchunk());
@@ -72,9 +72,9 @@ fn a_cells_index_nests_its_chunks_and_superchunks() {
     }
     // The cell just up and left of the middle superchunk is the last of
     // everything in the superchunk up and left of it.
-    let last = CellIndex::from(CartesianCell { x: middle - 1, y: middle - 1 });
+    let last = CellIndex::from(CellCartesian { x: middle - 1, y: middle - 1 });
     assert_eq!((last.superchunk(), last.chunk().place(), last.place()), (SuperchunkIndex::from_cartesian(MIDDLE - 1, MIDDLE - 1), 15, 65535));
-    assert_eq!(CellIndex::from(CartesianCell { x: u32::MAX, y: u32::MAX }), CellIndex(u64::MAX));
+    assert_eq!(CellIndex::from(CellCartesian { x: u32::MAX, y: u32::MAX }), CellIndex(u64::MAX));
 }
 
 /// A cell's index steps to its neighbours on the index itself, as its
@@ -85,9 +85,9 @@ fn cell_indices_step_like_cartesian_coordinates() {
     let edge = MIDDLE * SUPERCHUNK_SIDE_CELLS;
     let cells = [(0, 0), (1, 0), (255, 256), (edge - 1, edge), (edge + 1023, edge + 1023), (u32::MAX, u32::MAX), (u32::MAX, 0), (0, u32::MAX), (12345, 678910), (1, 1), (254, 254), (300, 511), (257, 300), (100, 255)];
     for (x, y) in cells {
-        let index = CellIndex::from(CartesianCell { x, y });
+        let index = CellIndex::from(CellCartesian { x, y });
         for (dx, dy) in [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1), (0, 0), (-300, 77), (1024, -1025), (8, 0), (0, -8), (-8, 8), (256, 2), (-4, 64)] {
-            let expected = x.checked_add_signed(dx).zip(y.checked_add_signed(dy)).map(|(x, y)| CellIndex::from(CartesianCell { x, y }));
+            let expected = x.checked_add_signed(dx).zip(y.checked_add_signed(dy)).map(|(x, y)| CellIndex::from(CellCartesian { x, y }));
             assert_eq!(index.offset(dx, dy), expected, "({x}, {y}) by ({dx}, {dy})");
         }
     }

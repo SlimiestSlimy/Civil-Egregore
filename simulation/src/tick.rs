@@ -36,7 +36,7 @@ use terrain::{WALL_EAST, WALL_SOUTH};
 use crate::sampling::sample_layer;
 use bitplane_manager::{count_missed, COARSEST_TILES_IN_CHUNK, WritesApplied, BitmapArena, NotHot, Reader, Shape, Superchunk, Window, Write, WriteQueues};
 use chunk_storage::LayerType;
-use coordinates::{CartesianCell, CellIndex, ChunkIndex, SuperchunkIndex};
+use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex};
 use std::ops::AddAssign;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -295,7 +295,7 @@ impl<'a> Turn<'a> {
                 if across < 0 || down < 0 || across << chunk >= world || down << chunk >= world {
                     continue;
                 }
-                let first = CartesianCell { x: (across << (chunk + scale)) as u32, y: (down << (chunk + scale)) as u32 };
+                let first = CellCartesian { x: (across << (chunk + scale)) as u32, y: (down << (chunk + scale)) as u32 };
                 let Some(holding) = self.reader.tiles_holding(layer_type, first.into()) else {
                     continue;
                 };
@@ -323,7 +323,7 @@ impl<'a> Turn<'a> {
             if across < 0 || down < 0 || across >= world || down >= world {
                 continue;
             }
-            let cell = CartesianCell { x: (across << scale) as u32, y: (down << scale) as u32 };
+            let cell = CellCartesian { x: (across << scale) as u32, y: (down << scale) as u32 };
             let holds = self.reader.any_in_tile(layer_type, cell.into(), scale);
             area.set[y] |= ((holds == Some(true)) as u16) << x;
             area.hot[y] |= (holds.is_some() as u16) << x;

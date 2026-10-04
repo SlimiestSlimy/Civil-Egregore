@@ -27,7 +27,7 @@ borrow does -- and a step past the world's edge is refused.
 
 Morton indices are what everything is stored and worked in. Cartesian
 coordinates are kept for what they are cheaper at -- geometry, drawing
--- and whatever is cartesian says so: `CartesianCell`, a cell's `x` and
+-- and whatever is cartesian says so: `CellCartesian`, a cell's `x` and
 `y` in the world; `SuperchunkIndex::from_cartesian` and `cartesian`, a
 superchunk's in superchunks; `place_from_cartesian` and
 `cartesian_from_place`, a cell's from its superchunk's top left.

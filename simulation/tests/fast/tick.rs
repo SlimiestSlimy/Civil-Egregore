@@ -9,14 +9,14 @@ use bitplane_manager::{BitmapArena, BucketKey, Shape, Write, WriteOp};
 use simulation::entity_store::Entities;
 use simulation::{Simulation, Turn, AREA_CENTRE, AREA_SIDE};
 use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CartesianCell, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 
 /// The layer type the tests run on.
 const STONE: LayerType = LayerType(6);
 
 /// An arena with `STONE` hot over the `side` by `side` superchunks from
 /// `(10, 10)`, the cells `cells` set.
-fn arena(side: u32, cells: impl Iterator<Item = CartesianCell>) -> BitmapArena {
+fn arena(side: u32, cells: impl Iterator<Item = CellCartesian>) -> BitmapArena {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
     for y in 10..10 + side {
         for x in 10..10 + side {
@@ -31,7 +31,7 @@ fn arena(side: u32, cells: impl Iterator<Item = CartesianCell>) -> BitmapArena {
 }
 
 /// The top left cell of the superchunk `(x, y)`, cartesian.
-fn corner(x: u32, y: u32) -> CartesianCell {
+fn corner(x: u32, y: u32) -> CellCartesian {
     SuperchunkIndex::from_cartesian(x, y).top_left().cartesian()
 }
 
@@ -57,9 +57,9 @@ fn every_cell(arena: &BitmapArena) -> Vec<(BucketKey, Vec<u64>)> {
 
 /// Cells scattered over the 3x3 superchunks from `(10, 10)`, some on
 /// their borders.
-fn scattered() -> impl Iterator<Item = CartesianCell> {
+fn scattered() -> impl Iterator<Item = CellCartesian> {
     let start = corner(10, 10);
-    (0..3000u32).map(move |at| CartesianCell { x: start.x + (at * 7919) % 3072, y: start.y + (at * 104_729) % 3072 })
+    (0..3000u32).map(move |at| CellCartesian { x: start.x + (at * 7919) % 3072, y: start.y + (at * 104_729) % 3072 })
 }
 
 /// A tick comes out the same on one thread and on four: each
@@ -79,9 +79,9 @@ fn any_number_of_threads_ticks_the_same() {
 /// see the world as the tick found it, writes queued or not.
 #[test]
 fn writes_cross_borders_and_reads_see_the_tick_start() {
-    let edge = CartesianCell { x: corner(11, 10).x - 1, y: corner(10, 10).y + 500 };
+    let edge = CellCartesian { x: corner(11, 10).x - 1, y: corner(10, 10).y + 500 };
     let mut arena = arena(2, [edge].into_iter());
-    let across: CellIndex = CartesianCell { x: edge.x + 1, y: edge.y }.into();
+    let across: CellIndex = CellCartesian { x: edge.x + 1, y: edge.y }.into();
     let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), 0, |turn, samples| {
         turn.sample(STONE, 1.0, samples);
         for &cell in samples.iter() {
@@ -101,7 +101,7 @@ fn writes_cross_borders_and_reads_see_the_tick_start() {
 #[test]
 fn shapes_split_over_the_superchunks_they_cover() {
     let meet = corner(11, 11);
-    let mut arena = arena(2, [CartesianCell { x: meet.x - 1, y: meet.y - 1 }].into_iter());
+    let mut arena = arena(2, [CellCartesian { x: meet.x - 1, y: meet.y - 1 }].into_iter());
     let report = Simulation::new(2).tick(&mut arena, &mut Entities::new(), 0, |turn, samples| {
         turn.sample(STONE, 1.0, samples);
         for &cell in samples.iter() {
@@ -119,7 +119,7 @@ fn shapes_split_over_the_superchunks_they_cover() {
 /// counted.
 #[test]
 fn writes_to_cold_neighbours_are_missed() {
-    let edge = CartesianCell { x: corner(11, 10).x - 1, y: corner(10, 10).y + 3 };
+    let edge = CellCartesian { x: corner(11, 10).x - 1, y: corner(10, 10).y + 3 };
     let mut arena = arena(1, [edge].into_iter());
     let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), 0, |turn, samples| {
         turn.sample(STONE, 1.0, samples);
@@ -158,10 +158,10 @@ fn areas_read_at_once_are_the_cells_read_one_by_one() {
             return 0;
         }
         for (x, y) in centres {
-            let centre = CartesianCell { x: start.x + x, y: start.y + y };
+            let centre = CellCartesian { x: start.x + x, y: start.y + y };
             let area = turn.area(STONE, centre.into());
             for (across, down) in (0..AREA_SIDE as u32).flat_map(|down| (0..AREA_SIDE as u32).map(move |across| (across, down))) {
-                let cell = CartesianCell { x: centre.x + across - AREA_CENTRE as u32, y: centre.y + down - AREA_CENTRE as u32 };
+                let cell = CellCartesian { x: centre.x + across - AREA_CENTRE as u32, y: centre.y + down - AREA_CENTRE as u32 };
                 let held = turn.holds(STONE, cell.into());
                 let read = |rows: [u16; AREA_SIDE]| rows[down as usize] >> across & 1 == 1;
                 assert_eq!((read(area.hot), read(area.set)), (held.is_ok(), held == Ok(true)), "({across}, {down}) of the area about ({x}, {y})");

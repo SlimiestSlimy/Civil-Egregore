@@ -7,7 +7,7 @@
 use bitplane_manager::{BitmapArena, Shape, Write, WriteOp};
 use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
 use chunk_storage::{ChunkStorage, LayerCodec};
-use coordinates::{CartesianCell, SuperchunkIndex};
+use coordinates::{CellCartesian, SuperchunkIndex};
 use simulation::entity_store::Entities;
 use simulation::Simulation;
 use mc_rules::grass::{tick, DECAY_CHANCE, SPREAD_CHANCE};
@@ -30,7 +30,7 @@ fn mock(grass_cells: usize) -> BitmapArena {
 }
 
 /// Turns the cells of `writes`' shapes to grass.
-fn plant(arena: &mut BitmapArena, writes: impl Iterator<Item = (CartesianCell, Shape)>) {
+fn plant(arena: &mut BitmapArena, writes: impl Iterator<Item = (CellCartesian, Shape)>) {
     for (at, shape) in writes {
         arena.queue(GRASS, Write { at: at.into(), op: WriteOp::Set, shape });
         arena.queue(DIRT, Write { at: at.into(), op: WriteOp::Unset, shape });
@@ -39,7 +39,7 @@ fn plant(arena: &mut BitmapArena, writes: impl Iterator<Item = (CartesianCell, S
 }
 
 /// The superchunk's first cell, at its top left.
-fn origin() -> CartesianCell {
+fn origin() -> CellCartesian {
     SUPERCHUNK.top_left().cartesian()
 }
 
@@ -49,7 +49,7 @@ fn origin() -> CartesianCell {
 #[test]
 fn lone_grass_never_decays() {
     let mut arena = mock(0);
-    let cells = (0..512).flat_map(|y| (0..512).map(move |x| CartesianCell { x: origin().x + 2 * x, y: origin().y + 2 * y }));
+    let cells = (0..512).flat_map(|y| (0..512).map(move |x| CellCartesian { x: origin().x + 2 * x, y: origin().y + 2 * y }));
     plant(&mut arena, cells.map(|cell| (cell, Shape::Cell)));
     assert_eq!(arena.superchunk_count(GRASS, SUPERCHUNK), 512 * 512);
     let done = tick(&mut Simulation::new(1), &mut arena, &mut Entities::new(), 3).rules;
@@ -65,7 +65,7 @@ fn lone_grass_never_decays() {
 #[test]
 fn surrounded_grass_decays_at_its_chance() {
     let mut arena = mock(0);
-    let pieces = (0..8).flat_map(|y| (0..8).map(move |x| CartesianCell { x: origin().x + 128 * x, y: origin().y + 128 * y }));
+    let pieces = (0..8).flat_map(|y| (0..8).map(move |x| CellCartesian { x: origin().x + 128 * x, y: origin().y + 128 * y }));
     plant(&mut arena, pieces.map(|at| (at, Shape::Rect { width: 128, height: 128 })));
     assert_eq!(arena.superchunk_count(GRASS, SUPERCHUNK), CELLS);
     let done = tick(&mut Simulation::new(1), &mut arena, &mut Entities::new(), 4).rules;
