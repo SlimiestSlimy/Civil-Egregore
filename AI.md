@@ -19,10 +19,9 @@ Rules that hold whatever the task. The handoff, the style guide
 
 ## Measuring under full load
 
-The world is hot only in the halos about its keepers, and grass grows
-only in a circle about the origin: neither is a load. To measure, every
-superchunk is forced hot and grass grows everywhere -- the renderer's
-fifth argument:
+The world is hot only in the halos about its keepers, which move with
+them. To measure a fixed load, every superchunk shown is forced hot and
+kept so -- the renderer's fifth argument:
 
 ```sh
 cargo run --release -p renderer -- <superchunks> <sheep a superchunk> 0 0 1

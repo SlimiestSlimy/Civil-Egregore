@@ -79,11 +79,9 @@ before; and a superchunk gone
 cold comes back as it was, to the cell, the entity and the random
 number.
 
-Passive rules tick only where hot. Grass, for now, also only within
-three superchunks across of the origin's middle
-(`mc_rules::grass::grows_at`). That is no part of how worlds work,
-only a limit on this test: grass let spread without end would lead the
-sheep, their halos, and so the world, to grow without end. An entity
+Passive rules tick only where hot: grass grows on every hot superchunk,
+so the flock, its halos and the world may grow as far as it leads them.
+An entity
 kept cold whose wake passes wakes the tick its superchunk turns hot.
 
 Not yet: a halo is a fixed 3x3 whatever its keeper; and a keeper is
