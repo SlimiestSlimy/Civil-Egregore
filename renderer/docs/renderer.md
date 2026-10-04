@@ -97,11 +97,10 @@ parts (8 MiB) for the 48 superchunks last seen.
 - **From near** (`src/near.rs`), a cell 2, 4 or 8 pixels -- as many as
   the screen shows -- the cells in view are one picture, and height is
   drawn at the edges: a step of one a thin line, light towards the sun
-  and dark away; a wall, whichever way it faces, a band 3 to 5 eighths
-  of a cell on its lower cell, darkest at its foot and fading from it.
-  Walls are drawn much the stronger: they are what cannot be crossed.
-  The slopes' light and the heights' tint are left out from near
-  (`relief`, 0): the edges and the shadows say it there.
+  and dark away; a wall a band 5 to 7 eighths of a cell on its lower
+  cell, darkest at its foot and fading from it -- less dark where the
+  sun is on the wall than where it faces away. Walls are drawn much
+  the stronger: they are what cannot be crossed.
 
 **Corners.** A pixel takes one edge's doing, never two multiplied: the
 darkest of the edges that darken it, and only if none does, the
@@ -137,7 +136,8 @@ pixels made here.
 
 At the window's top right, a slider each of the numbers the near
 view's shading is tuned by (`src/tuning.rs`): how light and dark a
-step's lines are, a wall's band and how it fades, the cast shadows,
+step's lines are, a wall's band facing away from the sun and towards
+it and how it fades, the cast shadows,
 how much relief and how much texture. The left button drags
 one, the right sets it back to its default. The painter reads them
 each frame; they are kept when a slider is let go, in

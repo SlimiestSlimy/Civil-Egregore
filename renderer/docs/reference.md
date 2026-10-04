@@ -72,7 +72,7 @@ grounds, near)`**: the picture. **`Cell`**: **`paint`**, a cell's pixels
 
 ## `tuning.rs`
 
-**`Tuned`** `{name, default, range}`; `TUNED`, the seven of them, and each
+**`Tuned`** `{name, default, range}`; `TUNED`, the eight of them, and each
 one's place (`STEP_LIGHT` ... `TEXTURE`). **`Tuning`**: the numbers read
 together. **`path()`**: where they are kept. **`start()`**: defaults,
 then what was kept. **`now()`**, **`set(index, value)`**, **`keep()`**.
