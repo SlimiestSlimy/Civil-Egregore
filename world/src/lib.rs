@@ -17,7 +17,7 @@ mod tick;
 pub mod transient_data;
 
 pub use halos::{HaloChange, COOL_TICKS, HALO_KEEPERS, WARM_TICKS};
-pub use tick::{tick_rules, TickCounts, WorldTick};
+pub use tick::{tick_rules, tick_rules_everywhere, TickCounts, WorldTick};
 
 use background::{Background, Ticket};
 use bitplane_manager::BitmapArena;

@@ -22,15 +22,15 @@ use bitplane_manager::BucketKey;
 use chunk_storage::mock::GRASS;
 use chunk_storage::LayerType;
 use terrain::{WALL_EAST, WALL_SOUTH};
-use coordinates::{square_from_middle, square_side, CartesianCell, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
-use simulation::Simulation;
+use coordinates::{square_side, CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
 use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::thread;
 use std::time::{Duration, Instant};
-use entity_rules::diagnostics::world::MockWorld;
+use world::World;
+use utilities::rng::Rng;
 
 /// Ticks a second the simulation is held to unless told otherwise: the
 /// game's target.
@@ -52,12 +52,12 @@ pub fn census_path() -> PathBuf {
 
 /// Starts the census afresh: its file, with what was run and the
 /// columns' names. `None`, and no census kept, if it cannot be made.
-fn census(superchunks: u32, thousandths: usize, flock: usize) -> Option<BufWriter<File>> {
+fn census(superchunks: u32, flock: usize, forced_hot: bool) -> Option<BufWriter<File>> {
     let path = census_path();
     create_dir_all(path.parent()?).ok()?;
     let mut file = BufWriter::new(File::create(path).ok()?);
-    writeln!(file, "# viewer {superchunks} {thousandths} {flock}").ok()?;
-    writeln!(file, "tick,sheep,grass").ok()?;
+    writeln!(file, "# viewer {superchunks} {flock}{}", if forced_hot { " forced hot" } else { "" }).ok()?;
+    writeln!(file, "tick,seconds,pace,sheep,grass").ok()?;
     Some(file)
 }
 
@@ -106,6 +106,8 @@ pub enum Request {
 pub struct Cells {
     /// Where it is in the world's square, `(x, y)` from the top left.
     pub at: (u32, u32),
+    /// Whether it is hot: cold, it has no cells here, and is drawn dark.
+    pub hot: bool,
     /// Its grass: its 16 chunks' bitmaps one after another, in the
     /// chunks' Morton order, [`CHUNK_WORDS`] words each, in Morton order
     /// -- as the arena holds them. A chunk not hot is all clear.
@@ -138,30 +140,29 @@ pub struct Frame {
     pub cells: Vec<Cells>,
 }
 
-/// Starts a pasture of `superchunks` superchunks -- grass on
-/// `thousandths` of the cells, `flock` sheep on each -- ticking on
+/// Starts a world generated from [`SEED`], `flock` sheep on its origin
+/// superchunk, `superchunks` of them shown about it -- ticking on
 /// every thread the machine has, on a thread of its own: where to send it requests,
 /// and where its frames come back. It stops once the requests' sender is
 /// dropped.
-pub fn start(superchunks: u32, thousandths: usize, flock: usize) -> (Sender<Request>, Receiver<Frame>) {
+pub fn start(superchunks: u32, flock: usize, forced_hot: bool) -> (Sender<Request>, Receiver<Frame>) {
     let (requests, asked) = channel();
     let (answers, frames) = channel();
     thread::Builder::new()
         .name("simulation".to_string())
-        .spawn(move || run(superchunks, thousandths, flock, &asked, &answers))
+        .spawn(move || run(superchunks, flock, forced_hot, &asked, &answers))
         .expect("a thread for the simulation");
     (requests, frames)
 }
 
 /// The simulation's thread: requests read between ticks, a tick, and a
 /// wait for the next one's time.
-fn run(superchunks: u32, thousandths: usize, flock: usize, asked: &Receiver<Request>, answers: &Sender<Frame>) {
-    // A world generated, terrain and all, held as the mock is: the superchunks row by row.
-    let made = world::generate_with(SEED, superchunks, (1 << 20) * thousandths / 1000, flock);
-    let mut world = MockWorld { arena: made.arena, entities: made.entities, storage: made.storage, superchunks: square_from_middle(superchunks).collect() };
-    let mut simulation = Simulation::for_superchunks(superchunks as usize);
+fn run(superchunks: u32, flock: usize, forced_hot: bool, asked: &Receiver<Request>, answers: &Sender<Frame>) {
+    let shown = shown(superchunks);
+    let mut world = if forced_hot { forced(&shown, flock) } else { world::generate(SEED, flock) };
+    let started = Instant::now();
     let (mut paused, mut pace, mut tick) = (false, Some(TARGET_PACE), 0u64);
-    let mut census = census(superchunks, thousandths, flock);
+    let mut census = census(superchunks, flock, forced_hot);
     let (mut next_tick, mut last_frame, mut last_frame_tick) = (Instant::now(), Instant::now(), 0u64);
     loop {
         // Paused, there is nothing to do until the window asks.
@@ -173,7 +174,7 @@ fn run(superchunks: u32, thousandths: usize, flock: usize, asked: &Receiver<Requ
                     let elapsed = last_frame.elapsed().as_secs_f64();
                     let ticks_a_second = if elapsed > 0.0 { (tick - last_frame_tick) as f64 / elapsed } else { 0.0 };
                     (last_frame, last_frame_tick) = (asked_at, tick);
-                    let (sheep, grass, cells) = (world.entities.len(), world.grass(), copy(&world, superchunks, ask));
+                    let (sheep, grass, cells) = (world.entities.len(), grass(&world), copy(&world, &shown, ask));
                     let sync_seconds = asked_at.elapsed().as_secs_f64();
                     let sync_share = if elapsed > 0.0 { sync_seconds / elapsed } else { 0.0 };
                     let frame = Frame { tick, ticks_a_second, sheep, grass, sync_seconds, sync_share, detail: ask.detail, cells };
@@ -193,10 +194,16 @@ fn run(superchunks: u32, thousandths: usize, flock: usize, asked: &Receiver<Requ
         if tick.is_multiple_of(CENSUS_EVERY) {
             if let Some(file) = &mut census {
                 // A line lost is a line lost: the run goes on.
-                _ = writeln!(file, "{tick},{},{}", world.entities.len(), world.grass()).and_then(|()| file.flush());
+                // The pace it is held to, 0 flat out: only flat out do the seconds say what a tick costs.
+                _ = writeln!(file, "{tick},{:.3},{},{},{}", started.elapsed().as_secs_f64(), pace.unwrap_or(0), world.entities.len(), grass(&world)).and_then(|()| file.flush());
             }
         }
-        world::tick(&mut simulation, &mut world.arena, &mut world.entities, tick);
+        if forced_hot {
+            // The halos are not moved: every superchunk shown stays hot, and grass grows on them all.
+            world::tick_rules_everywhere(&mut world.simulation, &mut world.arena, &mut world.entities, SEED);
+        } else {
+            world.tick();
+        }
         tick += 1;
         if let Some(pace) = pace {
             next_tick += Duration::from_secs_f64(1.0 / pace as f64);
@@ -211,26 +218,59 @@ fn run(superchunks: u32, thousandths: usize, flock: usize, asked: &Receiver<Requ
     }
 }
 
+/// The superchunks shown: `superchunks` of them in a square, row by row,
+/// the world's origin superchunk ([`WORLD_MIDDLE`]) in its middle.
+fn shown(superchunks: u32) -> Vec<SuperchunkIndex> {
+    let (side, (x, y)) = (square_side(superchunks), WORLD_MIDDLE.cartesian());
+    let (left, top) = (x - side / 2, y - side / 2);
+    (0..side * side).map(|index| SuperchunkIndex::from_cartesian(left + index % side, top + index / side)).collect()
+}
+
+/// A world to measure under full load: every superchunk of `shown`
+/// hot and kept so, a flock of `flock` sheep on each.
+fn forced(shown: &[SuperchunkIndex], flock: usize) -> World {
+    let mut world = world::generate(SEED, 0);
+    let mut wanted = shown.to_vec();
+    wanted.sort_unstable();
+    world.keep_hot(&wanted);
+    for &superchunk in shown {
+        entity_rules::sheep::flock(&mut world.entities, superchunk, flock, &mut Rng::for_stream(!SEED, superchunk.0));
+    }
+    world.entities.apply();
+    world
+}
+
+/// Cells of grass over every hot superchunk of `world`.
+fn grass(world: &World) -> u64 {
+    world.arena.superchunk_indices().into_iter().map(|superchunk| world.arena.superchunk_count(GRASS, superchunk) as u64).sum()
+}
+
 /// The superchunks of `world` that `ask` asks for, copied: each one's
 /// grass, words as they are, and its sheep's cells.
-fn copy(world: &MockWorld, superchunks: u32, ask: Ask) -> Vec<Cells> {
-    let side = square_side(superchunks);
+fn copy(world: &World, shown: &[SuperchunkIndex], ask: Ask) -> Vec<Cells> {
+    let side = square_side(shown.len() as u32);
     let (first, last) = (ask.viewport.first, ask.viewport.last);
     let in_view = (first.1..=last.1.min(side - 1)).flat_map(|y| (first.0..=last.0.min(side - 1)).map(move |x| (x, y)));
     let mut copied = Vec::new();
     for (x, y) in in_view.skip(ask.skip as usize).take(ask.most as usize) {
-        if let Some(&superchunk) = world.superchunks.get((y * side + x) as usize) {
-            let mut cliffs = layer(world, WALL_EAST, superchunk);
-            cliffs.iter_mut().zip(layer(world, WALL_SOUTH, superchunk)).for_each(|(east, south)| *east |= south);
-            copied.push(Cells { at: (x, y), grass: layer(world, GRASS, superchunk), cliffs, sheep: sheep(world, superchunk) });
+        let Some(&superchunk) = shown.get((y * side + x) as usize) else {
+            continue;
+        };
+        // Hot if its entities are held; cold, there are no cells to copy.
+        if world.entities.superchunk(superchunk).is_none() {
+            copied.push(Cells { at: (x, y), hot: false, grass: Vec::new(), cliffs: Vec::new(), sheep: Vec::new() });
+            continue;
         }
+        let mut cliffs = layer(world, WALL_EAST, superchunk);
+        cliffs.iter_mut().zip(layer(world, WALL_SOUTH, superchunk)).for_each(|(east, south)| *east |= south);
+        copied.push(Cells { at: (x, y), hot: true, grass: layer(world, GRASS, superchunk), cliffs, sheep: sheep(world, superchunk) });
     }
     copied
 }
 
 /// `superchunk`'s cells of `layer_type`: its chunks' words, one chunk
 /// after another.
-fn layer(world: &MockWorld, layer_type: LayerType, superchunk: SuperchunkIndex) -> Vec<u64> {
+fn layer(world: &World, layer_type: LayerType, superchunk: SuperchunkIndex) -> Vec<u64> {
     let mut words = Vec::with_capacity(CHUNKS_IN_SUPERCHUNK * CHUNK_WORDS);
     for chunk in superchunk.chunks() {
         match world.arena.bucket(BucketKey { layer_type, chunk }) {
@@ -242,11 +282,11 @@ fn layer(world: &MockWorld, layer_type: LayerType, superchunk: SuperchunkIndex) 
 }
 
 /// The cells `superchunk`'s sheep stand on, from its top left.
-fn sheep(world: &MockWorld, superchunk: SuperchunkIndex) -> Vec<(u16, u16)> {
+fn sheep(world: &World, superchunk: SuperchunkIndex) -> Vec<(u16, u16)> {
     let Some(kept) = world.entities.superchunk(superchunk) else {
         return Vec::new();
     };
-    let CartesianCell { x: left, y: top } = superchunk.top_left().cartesian();
+    let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     let mut cells = Vec::with_capacity(kept.len());
     for entity in kept.iter() {
         let at = entity.header.at.cartesian();

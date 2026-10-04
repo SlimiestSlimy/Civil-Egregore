@@ -8,7 +8,11 @@
 //! a third thread turns into pixels ([`paint`]). The three share
 //! nothing else, so none waits on another.
 //!
-//! `cargo run --release -p viewer -- [superchunks] [grass, thousandths] [sheep a superchunk] [ticks a second, 0 flat out] [ticks to watch for]`
+//! `cargo run --release -p viewer -- [superchunks shown] [sheep] [ticks a second, 0 flat out] [ticks to watch for] [1 to force every superchunk shown hot]`
+//!
+//! Forced hot, the world is loaded to be measured: every superchunk
+//! shown hot all the while, the sheep given a superchunk each, and grass
+//! growing everywhere.
 //!
 //! It runs until closed. The ticks to watch for are only shown: how far
 //! the run is from what whoever started it wanted seen.
@@ -152,11 +156,12 @@ fn argument(index: usize, default: usize) -> usize {
 }
 
 fn main() {
-    let (superchunks, thousandths, flock) = (argument(1, 16) as u32, argument(2, 333), argument(3, 4000));
-    let pace = Some(argument(4, TARGET_PACE as usize) as u32).filter(|&pace| pace > 0);
-    let (requests, frames) = start(superchunks, thousandths, flock);
+    let (superchunks, flock) = (argument(1, 49) as u32, argument(2, 4000));
+    let pace = Some(argument(3, TARGET_PACE as usize) as u32).filter(|&pace| pace > 0);
+    let forced_hot = argument(5, 0) > 0;
+    let (requests, frames) = start(superchunks, flock, forced_hot);
     _ = requests.send(Request::Pace(pace));
-    let watch_for = Some(argument(5, 0) as u64).filter(|&ticks| ticks > 0);
+    let watch_for = Some(argument(4, 0) as u64).filter(|&ticks| ticks > 0);
     App::new()
         .add_plugins(
             DefaultPlugins

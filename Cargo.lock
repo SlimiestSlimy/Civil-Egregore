@@ -4940,6 +4940,7 @@ dependencies = [
  "entity_rules",
  "simulation",
  "terrain",
+ "utilities",
  "world",
 ]
 
