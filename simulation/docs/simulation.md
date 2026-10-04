@@ -218,9 +218,13 @@ all of them at once, the caller's thread doing the first part, and
 `run` returns only once every part has -- which is what lets a job
 borrow what the caller holds (the arena, the outboxes) and the one
 `unsafe` rests on. A part's panic is raised to the caller after every
-part is done. Each thread takes a contiguous run of superchunks, so it
-works through them in Morton order; how the work is split is arbitrary
-for now, to be weighed again.
+part is done. The superchunks are not split among the threads
+beforehand: each thread claims the next one not yet claimed (`CLAIMED`,
+one at a time), in Morton order, until none is left -- so no thread
+idles while another still has work. Split into a fixed run a thread, a
+thread whose run was light (the halos' empty rim, a thin flock) waited
+for the heaviest: 12 threads were 41% busy. What a superchunk's turn
+comes to does not depend on the thread that takes it.
 
 ## Layout
 
