@@ -67,7 +67,8 @@ fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
 
 /// Every superchunk made cold, then the origin's halo hot again: its
 /// cells, its sheep and their attributes, and its random numbers are as
-/// they were -- and it ticks on as it would have.
+/// they were -- and it ticks on as it would have. Once its bitmaps
+/// cooling are kept; once flushed and let go, so decoded from its images.
 #[test]
 fn a_superchunk_gone_cold_comes_back_as_it_was() {
     let mut world = world::generate(8, 2_000);
@@ -98,4 +99,17 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
         twin.tick();
     }
     assert!(held(&world) == held(&twin), "ticks on as it would have");
+
+    // Cold again, and saved: every change flushed into the images, the bitmaps cooling let go; made hot, decoded from those images.
+    let halos = world.arena.superchunk_indices();
+    assert!(world.warming().next().is_none() && halos == twin.arena.superchunk_indices(), "the two alike, none warming");
+    world.keep_hot(&[]);
+    world::save(&world::transient_data::saves().join("tests").join("gone_cold"), &mut world).expect("saved");
+    assert_eq!(world.arena.cooling(), 0, "flushed, so let go");
+    world.keep_hot(&halos);
+    for _ in 0..500 {
+        world.tick();
+        twin.tick();
+    }
+    assert!(held(&world) == held(&twin), "decoded as it was, and ticks on as it would have");
 }

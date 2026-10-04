@@ -54,8 +54,11 @@ before it is evicted.
 Writing back is in two halves, so the slow one -- encoding -- can be
 done off the tick: the dirty buckets are taken (`take_dirty`: their
 cells copied out, the buckets marked clean, one write-back more on its
-way), and, encoded wherever, put into the ring (`written_back`), in the
-order taken. `write_back` does both at once.
+way), and, encoded wherever, put into the ring by its caller and marked
+waiting (`written_back`), in the order taken. `write_back` does both at
+once. A bucket waiting is held until storage says its superchunk's
+image holds every change of it (`flushed`), however long the flush
+takes, wherever it is done.
 
 ## Cooling
 

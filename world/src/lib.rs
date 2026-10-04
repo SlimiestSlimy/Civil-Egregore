@@ -73,6 +73,9 @@ pub struct World {
     /// The write-backs of superchunks gone cold, each with its job,
     /// being encoded in the background, in the order taken.
     writing_back: VecDeque<(SuperchunkIndex, Ticket)>,
+    /// The superchunks whose changes were taken from the ring, each with
+    /// its job, their images being rewritten in the background.
+    flushing: Vec<(SuperchunkIndex, Ticket)>,
 }
 
 impl World {
@@ -92,6 +95,7 @@ impl World {
             background: Background::new(),
             warming: Vec::new(),
             writing_back: VecDeque::new(),
+            flushing: Vec::new(),
         }
     }
 }
@@ -141,9 +145,7 @@ pub(crate) fn generate_image(seed: u64, superchunk: SuperchunkIndex, codec: &mut
 pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
     let hot = world.arena.superchunk_indices();
     world.write_back_all();
-    let mut flushed = Vec::new();
-    world.storage.flush_all(&mut flushed);
-    world.arena.flushed(&flushed);
+    world.flush_all();
     for &superchunk in &hot {
         // One with no cell ever set has no image yet: saved all the same.
         if world.storage.image(superchunk).is_none() {

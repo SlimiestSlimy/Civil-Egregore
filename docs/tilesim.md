@@ -96,7 +96,8 @@ Chunk storage (`chunk_storage/`) is two parts in memory:
    the ring; it never touches the cold pool. A superchunk going cold
    fills the ring with its changed bitmaps, tagged -- encoded off the
    tick -- and is not flushed then: the ring flushes it when it needs
-   the room.
+   the room, the image rewritten off the tick, the bitmaps held until
+   it is in.
 
 The ring is cold writeback only: it is never read to make a bitmap
 hot. A bitmap with an entry in the ring is still in the bitplanes: an
@@ -820,7 +821,7 @@ its image and its entities and random numbers kept as a save keeps
 them. After every tick the halos move to where their keepers came to,
 nothing slow done on the tick: superchunks left go cold at once, their
 changes encoded in the background and flushed by the ring in its own
-time; superchunks reached are warming for 1,024 ticks -- decoded from
+time; superchunks reached are warming for 256 ticks -- decoded from
 storage in the background, or generated if never made -- and turn hot
 at that tick, not when the background is done, so the world is the
 same however fast it is. Until then writes to them are missed and
