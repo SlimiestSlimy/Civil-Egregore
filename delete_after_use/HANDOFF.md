@@ -1,7 +1,8 @@
 # Handoff
 
 Where the work stands, and what is left, for whoever picks it up next.
-Delete this file once it has been read and acted on.
+Delete this whole `delete_after_use/` folder once it has been read and
+acted on.
 
 ## State
 
@@ -61,11 +62,16 @@ naturally terraced. The proposed layers, by strength:
    cliffs throw shadows. Heights do not change yet, so each superchunk
    needs this only once.
 
-A throwaway render tool was written but **not built or run yet**. The
-user was sent its `Cargo.toml` and `src/main.rs`, and keeps it outside
-the repository. It is a standalone crate with a path dependency on
-`terrain` and `png = "0.18"`. Run it as
-`heightart [seed=4] [metres a height unit=1.0] [sun elevation°=35] [out folder]`.
+A throwaway render tool, `delete_after_use/heightart/`, was written but
+**not built or run yet**, so expect a compile error or two. It is a
+standalone crate (its own `[workspace]`, so not a member of the repo's)
+with a path dependency on `terrain` and `png = "0.18"`. Run it from its
+folder:
+
+```sh
+cd delete_after_use/heightart
+cargo run --release -- [seed=4] [metres a height unit=1.0] [sun elevation°=35] [out folder=target/renders]
+```
 
 It writes:
 - `0_texture` through `6_shadows_only`: a 128x96 cell patch (the one
