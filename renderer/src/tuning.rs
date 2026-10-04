@@ -84,8 +84,8 @@ pub const FINER_SHARE: usize = 22;
 pub const FINER_HEIGHT: usize = 23;
 /// How much of that each mesh finer does, beside the one before.
 pub const FINER_FALL: usize = 24;
-/// The most a vertex weighs against the meshes finer than its own.
-pub const PARENT_WEIGHT: usize = 25;
+/// How unevenly the weight is shared out among subdivisions.
+pub const WEIGHT_SPREAD: usize = 25;
 /// The share of those that raise it.
 pub const RAISED_SHARE: usize = 26;
 /// The share of the cells that are grass.
@@ -133,7 +133,7 @@ pub const TUNED: [Tuned; 35] = [
     Tuned { name: "finer mesh share", default: 0.7, range: (0.0, 1.0), page: Page::Generation, what: "The share of a finer mesh's points that raise or sink the land; the rest leave it as it is." },
     Tuned { name: "finer mesh height", default: 120.0, range: (0.0, 2048.0), page: Page::Generation, what: "How many heights a point of the first finer mesh raises or sinks the land at most, each by an amount of its own." },
     Tuned { name: "finer mesh falloff", default: 0.75, range: (0.0, 1.0), page: Page::Generation, what: "How much each finer mesh moves the land beside the one before: 0.5, and each does half as much; near 1, and the finest do as much as the broadest -- rough ground; near 0, and only the first counts." },
-    Tuned { name: "parent weight", default: 0.8, range: (0.0, 1.0), page: Page::Generation, what: "The top level has a weight of 1. Every point hands a share of the weight that reached it down to its subdivisions and keeps the rest; a subdivision moves the land by its own offset times the weight that reached it. This is the most a point may keep, each keeping from none to this by lot. Where the parents keep much, the ground keeps their shape -- a plain stays a plain, a ridge a ridge; where they keep little it is broken up in detail. 0, and every level moves the land freely everywhere." },
+    Tuned { name: "weight spread", default: 0.8, range: (0.0, 1.0), page: Page::Generation, what: "The top level has a weight of 1. The weight that reaches a subdivision point is shared out at random: each point draws a share of its own, by lot, between 1 minus this and 1, moves the land by its offset times that share, and hands the share on to its own subdivisions, where it is shared out again. So under some points the ground is broken up in detail and under others it keeps its parent's shape -- a plain stays a plain, a ridge a ridge. 0, and every point gets the whole weight: every level moves the land freely everywhere." },
     Tuned { name: "raised share", default: 0.6, range: (0.0, 1.0), page: Page::Generation, what: "The share of those vertices that raise the land; the rest sink it. Land sunk under the ocean level fills with water." },
     Tuned { name: "grass cover", default: 0.95, range: (0.0, 1.0), page: Page::Generation, what: "The share of dry land that starts as grass; the rest is dirt." },
     Tuned { name: "grass patch size (2^)", default: 8.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a patch of grass or of dirt is: 2 to this power, in cells." },

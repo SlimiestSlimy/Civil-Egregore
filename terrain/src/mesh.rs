@@ -30,10 +30,10 @@
 //! before, down to the finest there may be, raise or sink the land by
 //! less each: points spread again within the triangles of the mesh
 //! before, small variations at a time. The broad mesh has a weight of
-//! one; every vertex hands a share of the weight that reached it, a
-//! byte by lot, on to the meshes finer than its own, and each of
-//! those moves the land by its own heights times the weight that
-//! reached it -- so a plain stays mostly a plain and a
+//! one; the weight that reaches a vertex of a finer mesh is shared
+//! out by lot -- each takes a share of its own, a byte -- and a vertex
+//! moves the land by its height times its share, and hands that share
+//! on to its own subdivisions -- so a plain stays mostly a plain and a
 //! ridge a ridge, while what weighs little is broken up;
 //! and by less the lower the land stands: differences compound inland.
 
@@ -78,9 +78,9 @@ struct Vertex {
     /// Its height; of a finer mesh, how far it raises the land, or
     /// under 0 sinks it.
     height: i64,
-    /// The share of the weight that reached it that it hands on to the
-    /// meshes finer than its own, of [`ONE`]: the less, the more it
-    /// keeps the land about it as it is.
+    /// Its share of the weight that reached it, of [`ONE`], by lot: what
+    /// a finer mesh's vertex moves the land with, and what any vertex
+    /// hands on to the meshes finer than its own.
     free: u64,
     /// Its lot: what tells it from every other.
     lot: u64,
@@ -183,10 +183,11 @@ impl Mesh {
             let raised = mix(lot) & 0xFFFF < shape.raised;
             (0, if drawn >= shape.finer_share { 0 } else if raised { by } else { -by })
         };
-        // The share of the weight that reached it that it hands on to its subdivisions: a byte, by lot, of what
-        // the shape lets it keep back.
-        let kept = (mix(lot ^ VERTICES_SALT) >> 56) * shape.weight / 255;
-        let free = ONE - kept;
+        // Its share of the weight that reached it, a byte by lot: all of it, less up to what the shape says. A
+        // vertex of a finer mesh moves the land by so much of its height, and hands as much on to its own
+        // subdivisions; one of the broad mesh, whose weight is one, only hands it on.
+        let free = ONE - (mix(lot ^ VERTICES_SALT) >> 56) * shape.weight / 255;
+        let height = if self.depth == 0 { height } else { (height * free as i64) >> 16 };
         Vertex { at: (x * self.side + within(lot), y * self.side + within(lot >> 16)), inland, free, height, lot }
     }
 

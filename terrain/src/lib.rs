@@ -98,10 +98,9 @@ pub struct Shape {
     /// How much of that each mesh finer does, beside the one before,
     /// of [`ONE`]: never less than two heights, so every mesh counts.
     pub finer_fall: u64,
-    /// The most of the weight that reached it a vertex keeps back from
-    /// its subdivisions, of [`ONE`]: each keeps from none to this, a
-    /// byte by lot, and hands the rest on. None, and every mesh moves
-    /// the land freely.
+    /// How unevenly the weight that reaches a vertex is shared out, of
+    /// [`ONE`]: each takes a share of its own, a byte by lot, from one
+    /// less this to one. None, and every vertex has the whole weight.
     pub weight: u64,
     /// The share of those that raise it, of [`ONE`]: the rest sink it.
     pub raised: u64,
