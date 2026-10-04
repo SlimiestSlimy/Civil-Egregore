@@ -7,7 +7,7 @@
 //! world is made afresh and its ticks start from 0.
 
 use crate::sim::SEED;
-use crate::tuning::{self, COAST, GRASS_COVER, GROUND_LEVEL, HEIGHT_SPAN, HILLS, LAND_RISE, LAND_SPAN, OCEAN_SHARE, PATCH_DETAIL, PATCH_SIZE, RISE_SHARES, SCATTER, SHORE_SPAN, SHORE_WANDER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
+use crate::tuning::{self, COAST, GRASS_COVER, GROUND_LEVEL, HEIGHT_SPAN, HILLS, LAND_RISE, LAND_SPAN, OCEAN_DEPTH, OCEAN_SHARE, PATCH_DETAIL, PATCH_SIZE, RISE_SHARES, SCATTER, SHORE_SPAN, SHORE_WANDER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -103,13 +103,14 @@ fn from_sliders() -> Generation {
 /// and each hill octave's share of the height span, whole numbers that
 /// come to no more than the span.
 fn shape(tuned: &tuning::Tuning) -> Shape {
-    // The hills are a byte high at most, whatever is typed.
-    let span = tuned[HEIGHT_SPAN].round().clamp(0.0, 255.0) as u64;
+    // The hills are a height high at most, whatever is typed.
+    let span = tuned[HEIGHT_SPAN].round().clamp(0.0, u16::MAX as f32) as u64;
     // A height is 16 bits, whatever is typed: what the land and its hills would pass is held to the highest.
     let height = |tuned: f32| tuned.round().clamp(0.0, u16::MAX as f32) as u16;
     let land = Shape {
-        weights: [0; 7],
+        weights: [0; 11],
         ocean: 0,
+        depth: tuned[OCEAN_DEPTH].round().clamp(0.0, u16::MAX as f32) as u64,
         coast: tuned[COAST].round().clamp(1.0, u16::MAX as f32) as u64,
         ground: height(tuned[GROUND_LEVEL]),
         rise: height(tuned[LAND_RISE]) as u64,
@@ -118,7 +119,7 @@ fn shape(tuned: &tuning::Tuning) -> Shape {
         shore: (tuned[SHORE_WANDER].clamp(0.0, 16.0) * ONE as f32) as u64,
         shore_span: tuned[SHORE_SPAN].round().clamp(2.0, 24.0) as u32,
     };
-    let shares: [f32; 7] = std::array::from_fn(|octave| tuned[HILLS + octave].max(0.0));
+    let shares: [f32; 11] = std::array::from_fn(|octave| tuned[HILLS + octave].max(0.0));
     let all: f32 = shares.iter().sum();
     if all <= 0.0 {
         return land;
