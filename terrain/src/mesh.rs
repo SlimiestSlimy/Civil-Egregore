@@ -97,6 +97,9 @@ struct Triangle {
     blends: [u64; 3],
     /// Its lines' sigmoidness, of [`SIGMOID_ONE`], likewise.
     sigmoids: [u64; 3],
+    /// What a part of its area is multiplied by to be its share of the
+    /// whole ([`inverse`]).
+    inverse: u64,
 }
 
 /// What a mesh says of a cell.
@@ -115,6 +118,14 @@ struct Blended {
 /// Twice the area of the triangle `a`, `b`, `c`, signed by which way round it goes.
 fn area(a: (i64, i64), b: (i64, i64), c: (i64, i64)) -> i64 {
     (b.0 - a.0) * (c.1 - a.1) - (b.1 - a.1) * (c.0 - a.0)
+}
+
+/// What a part of a triangle's area is multiplied by, and then halved
+/// 46 times, to be its share of `whole`, of [`ONE`] -- a division done
+/// once for the triangle, not thrice for a cell; 0 where the triangle
+/// is too broad for that to be exact enough, and the division is done.
+fn inverse(whole: i64) -> u64 {
+    if whole.unsigned_abs() >> 40 == 0 { (1 << 62) / whole.unsigned_abs().max(1) } else { 0 }
 }
 
 /// A mesh: the vertices of one breadth of grid.
@@ -192,7 +203,7 @@ impl Mesh {
     }
 
     /// The triangle of `corners`, its lines' blends and sigmoidness drawn.
-    fn triangle(&self, shape: &Shape, corners: [usize; 3]) -> Triangle {
+    fn triangle(&self, shape: &Shape, corners: [usize; 3], inverse: u64) -> Triangle {
         let line = |from: usize| {
             // By its two ends, whichever is named first: the same seen from either triangle.
             let lot = mix(self.vertices[corners[from]].lot ^ self.vertices[corners[(from + 1) % 3]].lot);
@@ -200,7 +211,7 @@ impl Mesh {
             (blend, shape.soft + ((((lot >> 16) & 0xFFFF) * shape.hard.saturating_sub(shape.soft)) >> 16))
         };
         let lines = [line(0), line(1), line(2)];
-        Triangle { corners, blends: lines.map(|line| line.0), sigmoids: lines.map(|line| line.1.clamp(SIGMOID_ONE, SIGMOID_MOST)) }
+        Triangle { corners, blends: lines.map(|line| line.0), sigmoids: lines.map(|line| line.1.clamp(SIGMOID_ONE, SIGMOID_MOST)), inverse }
     }
 
     /// The triangle the cell `at`, moved, is in, and how near each of
@@ -212,21 +223,22 @@ impl Mesh {
             self.vertices = std::array::from_fn(|about| self.vertex(shape, seed, (square.0 + about as i64 % 3 - 1, square.1 + about as i64 / 3 - 1)));
         }
         // How near each corner, if the cell is within: each corner's share of the triangle's area.
-        let near = |corners: [usize; 3], strictly: bool| {
+        let near = |corners: [usize; 3], kept: Option<u64>| {
             let [a, b, c] = corners.map(|corner| self.vertices[corner].at);
             let (whole, first, second) = (area(a, b, c), area(at, b, c), area(a, at, c));
             let third = whole - first - second;
             // On a line, a cell is in both its triangles: only the first looked at in a fixed order may claim it, never the one kept.
-            let inside = |strictly: bool| whole != 0 && [first, second, third].iter().all(|&part| (part == 0 && !strictly) || (part != 0 && (part > 0) == (whole > 0)));
-            inside(strictly).then(|| {
-                // In 64 bits wherever that is room enough: all but the broadest meshes.
-                let share = |part: i64| if part.unsigned_abs() >> 47 == 0 { (part.unsigned_abs() << 16) / whole.unsigned_abs() } else { ((part.unsigned_abs() as u128 * ONE as u128) / whole.unsigned_abs() as u128) as u64 };
-                let (first, second) = (share(first), share(second));
-                [first, second, ONE.saturating_sub(first + second)]
+            let strictly = kept.is_some();
+            let inside = whole != 0 && [first, second, third].iter().all(|&part| (part == 0 && !strictly) || (part != 0 && (part > 0) == (whole > 0)));
+            inside.then(|| {
+                let inverse = kept.unwrap_or_else(|| inverse(whole));
+                let share = |part: i64| if inverse != 0 { (part.unsigned_abs() * inverse) >> 46 } else { ((part.unsigned_abs() as u128 * ONE as u128) / whole.unsigned_abs() as u128) as u64 };
+                let (first, second) = (share(first).min(ONE), share(second).min(ONE));
+                ([first, second, ONE.saturating_sub(first + second)], inverse)
             })
         };
         // The last cell's triangle, as likely as not.
-        if let Some((triangle, near)) = self.last.and_then(|last| Some((last, near(last.corners, true)?))) {
+        if let Some((triangle, (near, _))) = self.last.and_then(|last| Some((last, near(last.corners, Some(last.inverse))?))) {
             return (triangle, near);
         }
         for quad in 0..4 {
@@ -235,15 +247,15 @@ impl Mesh {
             // Cut along one diagonal or the other, by the quad's first vertex's lot.
             let halves = if self.vertices[here].lot >> 63 == 0 { [[here, east, far], [here, far, south]] } else { [[here, east, south], [east, far, south]] };
             for corners in halves {
-                if let Some(near) = near(corners, false) {
-                    let triangle = self.triangle(shape, corners);
+                if let Some((near, inverse)) = near(corners, None) {
+                    let triangle = self.triangle(shape, corners, inverse);
                     self.last = Some(triangle);
                     return (triangle, near);
                 }
             }
         }
         // In none, by a rounding: at the square's own vertex.
-        (Triangle { corners: [4; 3], blends: [ONE; 3], sigmoids: [SIGMOID_ONE; 3] }, [ONE, 0, 0])
+        (Triangle { corners: [4; 3], blends: [ONE; 3], sigmoids: [SIGMOID_ONE; 3], inverse: 0 }, [ONE, 0, 0])
     }
 
     /// What the mesh says of the cell `at`, moved.
@@ -253,15 +265,20 @@ impl Mesh {
         for corner in 0..3 {
             let (next, other) = ((corner + 1) % 3, (corner + 2) % 3);
             // Its two lines' blend and sigmoidness, each counting as the cell is nearer that line's other end.
-            let both = (near[next] + near[other]).max(1);
-            let mixed = |of: &[u64; 3]| if near[next] + near[other] == 0 { of[corner] } else { (of[corner] * near[next] + of[other] * near[other]) / both };
+            let towards = (near[next] << 16).checked_div(near[next] + near[other]).unwrap_or(ONE);
+            let mixed = |of: &[u64; 3]| (of[corner] * towards + of[other] * (ONE - towards)) >> 16;
             let (blend, sigmoid) = (mixed(&triangle.blends).max(1), mixed(&triangle.sigmoids));
             // How near this corner beside the nearer of the others: a half where the two are as near.
             let beside = (near[corner] << 16) / (near[corner] + near[next].max(near[other])).max(1);
             // The change is all within the blend, about the half.
             let along = (((beside as i64 - (ONE / 2) as i64 + (blend / 2) as i64) << 16) / blend as i64).clamp(0, ONE as i64) as u64;
-            let (towards, from) = (raised(along, sigmoid), raised(ONE - along, sigmoid));
-            let counts = (towards << 16) / (towards + from).max(1);
+            // Past the blend's ends, or on an even slope, there is no power to raise.
+            let counts = if along == 0 || along == ONE || sigmoid == SIGMOID_ONE {
+                along
+            } else {
+                let (rising, falling) = (raised(along, sigmoid), raised(ONE - along, sigmoid));
+                (rising << 16) / (rising + falling).max(1)
+            };
             let vertex = &self.vertices[triangle.corners[corner]];
             (heights, inlands, frees, counted) = (heights + counts as i64 * vertex.height, inlands + counts * vertex.inland, frees + counts * vertex.free, counted + counts);
         }

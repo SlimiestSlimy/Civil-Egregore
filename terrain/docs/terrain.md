@@ -112,7 +112,10 @@ Every cell's height follows from the seed and the cell alone, in whole
 numbers: the same whatever order cells or superchunks are made in. A
 cell on a line is in two triangles; it is always given to the first of
 them in a fixed order. `Lands` keeps the vertices about the last cell
-and its triangle; a superchunk's terrain takes about 0.1 s.
+and its triangle, with what a part of the triangle's area is
+multiplied by to be its share -- a division for a triangle, not three
+for a cell. With ten meshes a superchunk of land takes about 0.25 s,
+one of ocean 0.09 s.
 
 To come: ridges and canyons as chains of lines; true subdivision of a
 triangle into its own smaller ones; noise for the ground's detail.

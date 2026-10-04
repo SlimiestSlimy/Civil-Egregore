@@ -164,8 +164,21 @@ impl Ground {
 /// [`WIDE`] a side, row by row.
 fn heights(seed: u64, shape: &Shape, top_left: (u32, u32)) -> Vec<Height> {
     let (left, top) = (top_left.0.wrapping_sub(BEFORE as u32), top_left.1.wrapping_sub(BEFORE as u32));
-    let mut lands = Lands::new(shape, seed);
-    (0..WIDE * WIDE).map(|index| lands.height(left.wrapping_add((index % WIDE) as u32), top.wrapping_add((index / WIDE) as u32))).collect()
+    // Rows shared out among the machine's threads: a cell's height is the same whoever works it out.
+    let mut heights = vec![0; WIDE * WIDE];
+    let threads = std::thread::available_parallelism().map_or(1, |threads| threads.get());
+    let rows_each = WIDE.div_ceil(threads);
+    std::thread::scope(|scope| {
+        for (part, rows) in heights.chunks_mut(rows_each * WIDE).enumerate() {
+            scope.spawn(move || {
+                let mut lands = Lands::new(shape, seed);
+                for (index, height) in rows.iter_mut().enumerate() {
+                    *height = lands.height(left.wrapping_add((index % WIDE) as u32), top.wrapping_add((part * rows_each + index / WIDE) as u32));
+                }
+            });
+        }
+    });
+    heights
 }
 
 /// `heights` smoothed: each the mean of those [`SMOOTHED_OVER`] cells
