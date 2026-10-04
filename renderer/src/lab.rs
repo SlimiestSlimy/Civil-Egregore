@@ -3,15 +3,16 @@
 //! heights ([`shape`]) and where its grass lies ([`world::pasture`]).
 //!
 //! It answers the window as the simulation does ([`crate::sim`]): the
-//! superchunks asked for, each generated the first time it is in view
-//! and kept from then on. When a slider of generation moves, or the
+//! superchunks asked for, wherever in the world the view has gone,
+//! each generated the first time it is in view and kept from then on
+//! -- the farthest dropped past [`KEPT`] of them. When a slider of generation moves, or the
 //! seed is drawn again ([`reseed`]), all it kept is dropped and what
 //! is in view is generated afresh.
 
-use crate::sim::{shown, Ask, Cells, Frame, Request, CHUNK_WORDS, SEED};
+use crate::sim::{Ask, Cells, Frame, Request, CHUNK_WORDS, SEED};
 use crate::tuning::{self, BUMPS, GRASS_COVER, HEIGHT_SPAN, HILLS, PATCH_DETAIL, PATCH_SIZE, RIDGES, ROUGHNESS, SCATTER};
 use bitmap::BITS_PER_WORD;
-use coordinates::{cartesian_from_place, square_side, CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
+use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -20,6 +21,10 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use terrain::Shape;
 use utilities::hash::mix;
 use world::pasture::{grows, threshold_for, Pasture, ONE};
+
+/// Superchunks kept at most, 128 KiB each: past that, those out of
+/// view are dropped, to be generated again if looked at.
+const KEPT: usize = 2048;
 
 /// The seed the world is generated from, now.
 static SEED_NOW: AtomicU64 = AtomicU64::new(SEED);
@@ -40,12 +45,13 @@ pub fn reseed() {
 /// the height span, whole numbers that come to no more than it.
 pub fn shape() -> Shape {
     let tuned = tuning::now();
-    let shares = [tuned[HILLS], tuned[RIDGES], tuned[BUMPS], tuned[ROUGHNESS]];
+    let shares = [tuned[HILLS], tuned[RIDGES], tuned[BUMPS], tuned[ROUGHNESS]].map(|share| share.max(0.0));
     let all: f32 = shares.iter().sum();
     if all <= 0.0 {
         return Shape { weights: [0; 4] };
     }
-    let span = tuned[HEIGHT_SPAN].round() as u64;
+    // A height is a byte, whatever is typed.
+    let span = tuned[HEIGHT_SPAN].round().clamp(0.0, 255.0) as u64;
     let mut weights = shares.map(|share| (share / all * span as f32).round() as u64);
     // Rounded up together they may pass the span by one: the broadest gives it back.
     weights[0] -= (weights.iter().sum::<u64>().saturating_sub(span)).min(weights[0]);
@@ -55,8 +61,9 @@ pub fn shape() -> Shape {
 /// How the grass lies, as the sliders have it, in a world of `seed`.
 fn pasture(seed: u64) -> Pasture {
     let tuned = tuning::now();
-    let of_one = |share: f32| (share * ONE as f32) as u64;
-    let mut pasture = Pasture { patch: tuned[PATCH_SIZE].round() as u32, detail: of_one(tuned[PATCH_DETAIL]), scatter: of_one(tuned[SCATTER]), threshold: 0 };
+    let of_one = |share: f32| (share.clamp(0.0, 1024.0) * ONE as f32) as u64;
+    // What is typed is held to what the noise can take.
+    let mut pasture = Pasture { patch: tuned[PATCH_SIZE].round().clamp(0.0, 16.0) as u32, detail: of_one(tuned[PATCH_DETAIL]), scatter: of_one(tuned[SCATTER]), threshold: 0 };
     pasture.threshold = threshold_for(&pasture, seed, of_one(tuned[GRASS_COVER]));
     pasture
 }
@@ -68,29 +75,30 @@ fn grass(pasture: &Pasture, seed: u64, top_left: (u32, u32)) -> Vec<u64> {
     for (index, word) in words.iter_mut().enumerate() {
         for bit in 0..BITS_PER_WORD {
             let (x, y) = cartesian_from_place(index * BITS_PER_WORD + bit);
-            *word |= (grows(pasture, seed, top_left.0 + x, top_left.1 + y) as u64) << bit;
+            *word |= (grows(pasture, seed, top_left.0.wrapping_add(x), top_left.1.wrapping_add(y)) as u64) << bit;
         }
     }
     words
 }
 
-/// Starts the lab on a thread of its own, `superchunks` of them shown
-/// about the world's origin: where to send it requests, and where its
-/// frames come back. It stops once the requests' sender is dropped.
-pub fn start(superchunks: u32) -> (Sender<Request>, Receiver<Frame>) {
+/// Starts the lab on a thread of its own: where to send it requests,
+/// and where its frames come back. It stops once the requests' sender
+/// is dropped.
+pub fn start() -> (Sender<Request>, Receiver<Frame>) {
     let (requests, asked) = channel();
     let (answers, frames) = channel();
     thread::Builder::new()
         .name("lab".to_string())
-        .spawn(move || run(superchunks, &asked, &answers))
+        .spawn(move || run(&asked, &answers))
         .expect("a thread for the lab");
     (requests, frames)
 }
 
 /// The lab's thread: each frame asked for answered, from what is kept
-/// and what is generated for it.
-fn run(superchunks: u32, asked: &Receiver<Request>, answers: &Sender<Frame>) {
-    let shown = shown(superchunks);
+/// and what is generated for it. A change to how the world is
+/// generated -- a slider, a new seed -- and nothing is kept: all
+/// starts again.
+fn run(asked: &Receiver<Request>, answers: &Sender<Frame>) {
     let mut kept: HashMap<SuperchunkIndex, Vec<u64>> = HashMap::new();
     let mut generation = None;
     for request in asked {
@@ -104,7 +112,7 @@ fn run(superchunks: u32, asked: &Receiver<Request>, answers: &Sender<Frame>) {
             kept.clear();
             generation = Some(now);
         }
-        let cells = copy(&mut kept, &shown, ask);
+        let cells = copy(&mut kept, ask);
         let grass = kept.values().flatten().map(|word| word.count_ones() as u64).sum();
         let frame = Frame { tick: 0, ticks_a_second: 0.0, sheep: 0, grass, sync_seconds: asked_at.elapsed().as_secs_f64(), sync_share: 0.0, detail: ask.detail, near: ask.near, generation: now, cells };
         if answers.send(frame).is_err() {
@@ -115,17 +123,22 @@ fn run(superchunks: u32, asked: &Receiver<Request>, answers: &Sender<Frame>) {
 
 /// The superchunks `ask` asks for: those not `kept` generated first,
 /// each on a thread of its own.
-fn copy(kept: &mut HashMap<SuperchunkIndex, Vec<u64>>, shown: &[SuperchunkIndex], ask: Ask) -> Vec<Cells> {
-    let side = square_side(shown.len() as u32);
-    let (first, last) = (ask.viewport.first, ask.viewport.last);
-    let in_view = (first.1..=last.1.min(side - 1)).flat_map(|y| (first.0..=last.0.min(side - 1)).map(move |x| (x, y)));
-    let asked: Vec<((u32, u32), SuperchunkIndex)> = in_view.skip(ask.skip as usize).take(ask.most as usize).filter_map(|(x, y)| Some(((x, y), *shown.get((y * side + x) as usize)?))).collect();
+fn copy(kept: &mut HashMap<SuperchunkIndex, Vec<u64>>, ask: Ask) -> Vec<Cells> {
+    let asked: Vec<((u32, u32), SuperchunkIndex)> = ask.asked().map(|(x, y)| ((x, y), SuperchunkIndex::from_cartesian(x, y))).collect();
     let top_left = |superchunk: SuperchunkIndex| {
         let CellCartesian { x, y } = superchunk.top_left().cartesian();
         (x, y)
     };
     let missing: Vec<SuperchunkIndex> = asked.iter().map(|&(_, superchunk)| superchunk).filter(|superchunk| !kept.contains_key(superchunk)).collect();
     if !missing.is_empty() {
+        if kept.len() + missing.len() > KEPT {
+            // Too many kept: those out of view go.
+            let (first, last) = (ask.viewport.first, ask.viewport.last);
+            kept.retain(|superchunk, _| {
+                let (x, y) = superchunk.cartesian();
+                (first.0..=last.0).contains(&x) && (first.1..=last.1).contains(&y)
+            });
+        }
         let seed = seed();
         let pasture = pasture(seed);
         let made: Vec<Vec<u64>> = thread::scope(|scope| {

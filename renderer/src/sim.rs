@@ -21,7 +21,7 @@
 use bitplane_manager::BucketKey;
 use chunk_storage::mock::GRASS;
 use chunk_storage::LayerType;
-use coordinates::{square_side, CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
+use coordinates::{square_side, CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE, WORLD_SIDE_SUPERCHUNKS};
 use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -63,8 +63,8 @@ fn census(superchunks: u32, flock: usize, forced_hot: bool) -> Option<BufWriter<
 /// Words a chunk's bitmap takes.
 pub const CHUNK_WORDS: usize = bitmap::WORDS;
 
-/// The superchunks in view: a rectangle of them, counted from the top
-/// left of the world's square, both corners in it.
+/// The superchunks in view: a rectangle of them, each `(x, y)` in
+/// superchunks from the world's top left, both corners in it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Viewport {
     /// The top left superchunk, `(x, y)`.
@@ -96,12 +96,22 @@ pub struct Ask {
 /// Cells seen from near: a rectangle of them, each many pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Near {
-    /// The top left cell, `(x, y)` from the top left of the world's square.
+    /// The top left cell, `(x, y)` in the world.
     pub first: (u32, u32),
     /// Cells across and down.
     pub size: (u32, u32),
     /// Pixels along a cell's side: 2, 4 or 8.
     pub pixels_a_cell: u32,
+}
+
+impl Ask {
+    /// The superchunks it asks for, each `(x, y)` in the world: those
+    /// of the view, row by row, after the ones passed over.
+    pub fn asked(self) -> impl Iterator<Item = (u32, u32)> {
+        let (first, last) = (self.viewport.first, self.viewport.last);
+        let in_view = (first.1..=last.1.min(WORLD_SIDE_SUPERCHUNKS - 1)).flat_map(move |y| (first.0..=last.0.min(WORLD_SIDE_SUPERCHUNKS - 1)).map(move |x| (x, y)));
+        in_view.skip(self.skip as usize).take(self.most as usize)
+    }
 }
 
 /// What the window asks of the simulation.
@@ -117,7 +127,7 @@ pub enum Request {
 
 /// One superchunk's cells, as a tick left them.
 pub struct Cells {
-    /// Where it is in the world's square, `(x, y)` from the top left.
+    /// Where it is in the world, `(x, y)` in superchunks.
     pub at: (u32, u32),
     /// Whether it is hot: cold, it has no cells here, and is drawn dark.
     pub hot: bool,
@@ -193,7 +203,7 @@ fn run(superchunks: u32, flock: usize, forced_hot: bool, asked: &Receiver<Reques
                     let elapsed = last_frame.elapsed().as_secs_f64();
                     let ticks_a_second = if elapsed > 0.0 { (tick - last_frame_tick) as f64 / elapsed } else { 0.0 };
                     (last_frame, last_frame_tick) = (asked_at, tick);
-                    let (sheep, grass, cells) = (world.entities.len(), grass(&world), copy(&world, &shown, ask));
+                    let (sheep, grass, cells) = (world.entities.len(), grass(&world), copy(&world, ask));
                     let sync_seconds = asked_at.elapsed().as_secs_f64();
                     let sync_share = if elapsed > 0.0 { sync_seconds / elapsed } else { 0.0 };
                     let frame = Frame { tick, ticks_a_second, sheep, grass, sync_seconds, sync_share, detail: ask.detail, near: ask.near, generation: crate::tuning::generation(), cells };
@@ -266,15 +276,10 @@ fn grass(world: &World) -> u64 {
 
 /// The superchunks of `world` that `ask` asks for, copied: each one's
 /// grass, words as they are, and its sheep's cells.
-fn copy(world: &World, shown: &[SuperchunkIndex], ask: Ask) -> Vec<Cells> {
-    let side = square_side(shown.len() as u32);
-    let (first, last) = (ask.viewport.first, ask.viewport.last);
-    let in_view = (first.1..=last.1.min(side - 1)).flat_map(|y| (first.0..=last.0.min(side - 1)).map(move |x| (x, y)));
+fn copy(world: &World, ask: Ask) -> Vec<Cells> {
     let mut copied = Vec::new();
-    for (x, y) in in_view.skip(ask.skip as usize).take(ask.most as usize) {
-        let Some(&superchunk) = shown.get((y * side + x) as usize) else {
-            continue;
-        };
+    for (x, y) in ask.asked() {
+        let superchunk = SuperchunkIndex::from_cartesian(x, y);
         // Hot if its entities are held; cold, there are no cells to copy.
         let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
         let hot = world.entities.superchunk(superchunk).is_some();

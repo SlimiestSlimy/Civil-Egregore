@@ -246,7 +246,8 @@ pub fn slide(
     let numbers = now();
     for (part, mut node) in &mut moved {
         let (least, most) = TUNED[part.index].range;
-        let filled = TRACK.0 * (numbers[part.index] - least) / (most - least);
+        // A value typed past the slider's range leaves the knob at its end.
+        let filled = TRACK.0 * ((numbers[part.index] - least) / (most - least)).clamp(0.0, 1.0);
         // The filled part from the track's left, the knob's middle where it ends.
         let (width, right) = if part.knob { (KNOB.0, MARGIN + TRACK.0 - filled - KNOB.0 / 2.0) } else { (filled, MARGIN + TRACK.0 - filled) };
         if node.right != Val::Px(right) {

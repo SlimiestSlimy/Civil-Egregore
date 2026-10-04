@@ -56,6 +56,16 @@ window replaying writes would have to hold the world again and apply
 every one as the arena does, and one lost would leave it wrong for
 good.
 
+## The whole world
+
+The view is not held to the superchunks it starts on: it goes anywhere
+in the world, as far out as 32 cells a screen pixel. A superchunk has
+an image only once its pixels have come, and a cold one none: it is
+black. The plane the images lie on is counted from the corner of the
+square the view starts on, not from the world's -- the world is 2^32
+cells wide, more than the plane's numbers tell apart. Boundaries,
+labels and heights are laid over whatever is in view.
+
 ## Many superchunks
 
 A world of 1,024 superchunks -- 32,768 cells a side -- is seen whole,
@@ -140,7 +150,9 @@ At the window's top right, a page of sliders at a time, each a number
 of `src/tuning.rs`; `U` goes to the next page, and to none. The left
 button drags a knob, the right sets the number back to its default.
 Beside each is a box with its value: a click on it and the value is
-typed -- digits and a point, Enter to set it, Escape to leave it. The
+typed -- digits and a point, Enter to set it, Escape to leave it. A
+value typed may pass the slider's range, which is only what the knob
+reaches; the knob then stays at its end. The
 numbers are kept whenever one is settled, in
 `transient_data/tuning.txt`, and taken up again the next run -- what is
 found by eye is then written into the code as the defaults.
@@ -160,7 +172,10 @@ found by eye is then written into the code as the defaults.
 said, is a mode to tune by eye how the world is made (`src/lab.rs`). In
 place of the simulation a thread only generates: no sheep, no tick. A
 superchunk is generated the first time it is in view and kept from then
-on. Generation's sliders are shown from the start:
+on, wherever in the world the view goes: the number given is only the
+square the view starts on. Past 2,048 kept, those out of view are
+dropped, to be made again if looked at. Generation's sliders are shown
+from the start:
 
 - **The heights**: how much of a height each of the four octaves makes
   up beside the others -- hills 512 cells across, ridges 128, bumps 32,
@@ -174,8 +189,8 @@ on. Generation's sliders are shown from the start:
 - **The button** draws a new seed off the clock; the seed is shown in
   the text.
 
-Whenever a slider of generation moves or the seed is drawn, all that
-was kept is dropped, the painter's ground with it, and what is in view
+Whenever a slider of generation moves or the seed is drawn, all starts
+again from nothing but the sliders: all that was kept is dropped, the painter's ground with it, and what is in view
 is generated again. Worlds themselves are still made as before
 (`world::generate_image`): what is settled here is to be written there.
 

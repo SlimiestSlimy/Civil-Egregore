@@ -130,11 +130,11 @@ pub fn now() -> Tuning {
     std::array::from_fn(|index| f32::from_bits(VALUES[index].load(Ordering::Relaxed)))
 }
 
-/// Sets the `index`-th number, within its range; the world is to be
-/// generated again if it is one of generation's and has changed.
+/// Sets the `index`-th number -- to anything: its range is only what
+/// its slider reaches, and a value typed may pass it. The world is to
+/// be generated again if it is one of generation's and has changed.
 pub fn set(index: usize, value: f32) {
-    let (least, most) = TUNED[index].range;
-    let bits = value.clamp(least, most).to_bits();
+    let bits = if value.is_finite() { value } else { TUNED[index].default }.to_bits();
     if VALUES[index].swap(bits, Ordering::Relaxed) != bits && TUNED[index].page == Page::Generation {
         regenerate();
     }

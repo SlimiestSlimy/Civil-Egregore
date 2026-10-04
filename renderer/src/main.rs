@@ -52,9 +52,10 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::Anchor;
 use bevy::window::{MonitorSelection, WindowMode};
-use coordinates::{place_from_cartesian, square_side, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{place_from_cartesian, square_side, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 use paint::Picture;
 use sim::{start, Ask, Near, Request, Viewport, TARGET_PACE};
+use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use world::diagnostics::frames::BROWN;
@@ -71,6 +72,14 @@ const WHEEL_ZOOM: f32 = 0.85;
 /// Seconds from one frame asked for to the next, at least: no oftener
 /// than a screen shows them.
 const SYNC_EVERY: f32 = 1.0 / 60.0;
+/// The farthest the view goes: cells a screen pixel. Some 60
+/// superchunks across a screen, each of which may have to be made.
+const FARTHEST: f32 = 32.0;
+/// Screen pixels two boundaries are apart before they are drawn.
+const LINES_FROM: f32 = 6.0;
+/// Boundaries of a kind, across or down, there are sprites for: as
+/// many as a screen holds [`LINES_FROM`] apart.
+const LINES: u32 = 700;
 /// The coarsest the world is drawn: a pixel `2^6` cells a side, a
 /// superchunk 16 pixels.
 const COARSEST: u32 = 6;
@@ -86,6 +95,9 @@ const NEAR_PIXELS: u32 = 8;
 /// Cells past the view's edges painted from near: what a moving view
 /// shows before the next frame comes.
 const NEAR_MARGIN: f32 = 8.0;
+
+/// Superchunks' images kept at most: past that, those out of view go.
+const TILES_KEPT: usize = 4096;
 
 /// Superchunks a frame carries at most, drawn at `detail`: fewer the
 /// finer, a fine one being more to paint and to send to the graphics
@@ -122,17 +134,46 @@ struct Link {
     watch_for: Option<u64>,
 }
 
-/// The world as drawn: an image a superchunk, row by row.
+/// The world as drawn: an image a superchunk that has been in view,
+/// made when its first pixels come.
 #[derive(Resource)]
 struct Sprites {
-    /// Superchunks along the world's side.
+    /// The superchunk whose top left the plane's origin is, `(x, y)` in
+    /// the world: the plane is counted from near where the view starts,
+    /// the world being too wide for its numbers.
+    origin: [u32; 2],
+    /// Superchunks along the side of the square the view starts on.
     side: u32,
-    /// Which superchunk each is, row by row.
-    shown: Vec<SuperchunkIndex>,
-    /// Each superchunk's image.
-    images: Vec<Handle<Image>>,
-    /// Pixels along each image's side, as last drawn.
-    sides: Vec<u32>,
+    /// Each superchunk drawn, by where it is in the world: its sprite,
+    /// its image, and the pixels along the image's side.
+    tiles: HashMap<(u32, u32), (Entity, Handle<Image>, u32)>,
+}
+
+impl Sprites {
+    /// Those showing `superchunks` about the world's origin superchunk at first.
+    fn about_origin(superchunks: u32) -> Self {
+        let (side, (x, y)) = (square_side(superchunks), WORLD_MIDDLE.cartesian());
+        Self { origin: [x - side / 2, y - side / 2], side, tiles: HashMap::new() }
+    }
+
+    /// Where on the plane the cell `cell` cells from the world's edge
+    /// is, across (`axis` 0) or down (1).
+    fn plane(&self, cell: u32, axis: usize) -> f32 {
+        cell.wrapping_sub(self.origin[axis] * SUPERCHUNK_SIDE_CELLS) as i32 as f32
+    }
+
+    /// The cell at `plane` on the plane, across or down: the world's
+    /// first or last if it is past an edge.
+    fn cell(&self, plane: f32, axis: usize) -> u32 {
+        ((self.origin[axis] * SUPERCHUNK_SIDE_CELLS) as i64 + plane.floor() as i64).clamp(0, u32::MAX as i64) as u32
+    }
+
+    /// The cells in view, across and down: the first and the last.
+    fn in_view(&self, transform: &Transform, scale: f32, window: &Window) -> [(u32, u32); 2] {
+        let half = Vec2::new(window.width(), window.height()) * scale / 2.0;
+        let middle = [transform.translation.x, -transform.translation.y];
+        [0, 1].map(|axis| (self.cell(middle[axis] - half[axis], axis), self.cell(middle[axis] + half[axis], axis)))
+    }
 }
 
 /// What the last frame said of the world.
@@ -174,6 +215,8 @@ struct Boundary {
     of_superchunks: bool,
     /// Whether it runs across, or down.
     across: bool,
+    /// Which of those in view it is, counted from the first.
+    place: u32,
 }
 
 /// Which boundaries are shown.
@@ -198,7 +241,7 @@ const CHUNK_LINE: (Color, f32) = (Color::srgba(1.0, 1.0, 1.0, 0.45), 1.0);
 struct Label;
 
 /// The camera, and no label: both have a place.
-type CameraOnly = (With<Camera2d>, Without<Label>, Without<HeightLabel>);
+type CameraOnly = (With<Camera2d>, Without<Label>, Without<HeightLabel>, Without<Boundary>);
 
 /// Labels there are: what a view can hold of them.
 const LABELS: usize = 256;
@@ -258,7 +301,7 @@ fn main() {
     let forced_hot = argument(5, 0) > 0;
     let (requests, frames) = if in_lab {
         sliders::show_generation();
-        lab::start(superchunks)
+        lab::start()
     } else {
         start(superchunks, flock, forced_hot)
     };
@@ -272,7 +315,8 @@ fn main() {
                 .set(WindowPlugin { primary_window: Some(Window { title: "TileSim".to_string(), ..default() }), ..default() }),
         )
         .insert_resource(Link { requests, frames: Mutex::new(paint::start(frames)), waiting: false, since: SYNC_EVERY, asked: None, paused: false, pace, watch_for })
-        .insert_resource(Sprites { side: square_side(superchunks), shown: sim::shown(superchunks), images: Vec::new(), sides: Vec::new() })
+        .insert_resource(Sprites::about_origin(superchunks))
+        .insert_resource(ClearColor(Color::BLACK))
         .init_resource::<Seen>()
         .init_resource::<Boundaries>()
         .init_resource::<sliders::Hands>()
@@ -295,34 +339,25 @@ fn picture_of(size: (u32, u32), pixels: Vec<u8>) -> Image {
     Image::new(size, TextureDimension::D2, pixels, TextureFormat::Rgba8UnormSrgb, RenderAssetUsages::default())
 }
 
-/// The camera over the world's middle, the whole of it in view; an
-/// image a superchunk, dirt until the first frame comes; the picture
-/// from near, hidden until there is one; and the text.
-fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, mut sprites: ResMut<Sprites>, window: Single<&Window>) {
-    let world_side = sprites.side as f32 * SPRITE_SIDE;
-    let scale = world_side / window.height().min(window.width());
+/// The camera over the middle of the square the view starts on, the
+/// whole of it in view; the picture from near, hidden until there is
+/// one; the boundaries and the labels, hidden until asked for; and the
+/// text. A superchunk's image is made when its pixels first come.
+fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, sprites: Res<Sprites>, window: Single<&Window>) {
+    let square_side = sprites.side as f32 * SPRITE_SIDE;
+    let scale = (square_side / window.height().min(window.width())).min(FARTHEST);
     commands.spawn((
         Camera2d,
         Projection::Orthographic(OrthographicProjection { scale, ..OrthographicProjection::default_2d() }),
-        Transform::from_xyz(world_side / 2.0, -world_side / 2.0, 0.0),
+        Transform::from_xyz(square_side / 2.0, -square_side / 2.0, 0.0),
     ));
-    for index in 0..sprites.side * sprites.side {
-        let image = images.add(picture(1, DIRT.to_vec()));
-        let (x, y) = ((index % sprites.side) as f32, (index / sprites.side) as f32);
-        // A superchunk's side on the screen's plane whatever its image's; the world's y grows downwards, the plane's upwards.
-        let sprite = Sprite { image: image.clone(), custom_size: Some(Vec2::splat(SPRITE_SIDE)), ..default() };
-        commands.spawn((sprite, Transform::from_xyz((x + 0.5) * SPRITE_SIDE, -(y + 0.5) * SPRITE_SIDE, 0.0)));
-        sprites.images.push(image);
-        sprites.sides.push(1);
-    }
     commands.spawn((Sprite { image: images.add(picture(1, DIRT.to_vec())), ..default() }, Transform::from_xyz(0.0, 0.0, 1.0), Visibility::Hidden, NearView));
-    // The boundaries, hidden until asked for: the chunks' under the superchunks'.
-    for (of_superchunks, apart, (colour, _), height) in [(false, CHUNK_SIDE as f32, CHUNK_LINE, 2.0), (true, SPRITE_SIDE, SUPERCHUNK_LINE, 3.0)] {
-        for line in 0..=(world_side / apart) as u32 {
-            let at = line as f32 * apart;
-            for (across, x, y) in [(true, world_side / 2.0, -at), (false, at, -world_side / 2.0)] {
+    // The chunks' boundaries under the superchunks'.
+    for (of_superchunks, (colour, _), height) in [(false, CHUNK_LINE, 2.0), (true, SUPERCHUNK_LINE, 3.0)] {
+        for place in 0..LINES {
+            for across in [true, false] {
                 let sprite = Sprite { color: colour, custom_size: Some(Vec2::ONE), ..default() };
-                commands.spawn((sprite, Transform::from_xyz(x, y, height), Visibility::Hidden, Boundary { of_superchunks, across }));
+                commands.spawn((sprite, Transform::from_xyz(0.0, 0.0, height), Visibility::Hidden, Boundary { of_superchunks, across, place }));
             }
         }
     }
@@ -358,7 +393,7 @@ fn steer(
     let held = |these: [KeyCode; 2]| keys.any_pressed(these) as i32 as f32;
     let nearer = held([KeyCode::KeyE, KeyCode::Equal]) - held([KeyCode::KeyQ, KeyCode::Minus]);
     view.scale *= WHEEL_ZOOM.powf(scroll.delta.y) * ZOOM_SPEED.powf(-nearer * time.delta_secs());
-    view.scale = view.scale.clamp(0.02, 256.0);
+    view.scale = view.scale.clamp(0.02, FARTHEST);
     let across = held([KeyCode::KeyD, KeyCode::ArrowRight]) - held([KeyCode::KeyA, KeyCode::ArrowLeft]);
     let up = held([KeyCode::KeyW, KeyCode::ArrowUp]) - held([KeyCode::KeyS, KeyCode::ArrowDown]);
     let step = PAN_SPEED * window.height() * view.scale * time.delta_secs();
@@ -398,26 +433,41 @@ fn keys(mut link: ResMut<Link>, keys: Res<ButtonInput<KeyCode>>) {
     _ = link.requests.send(Request::Pace(pace));
 }
 
-/// Shows and hides the boundaries by their keys, and keeps those shown
-/// as wide on the screen however near the view is.
+/// Shows and hides the boundaries by their keys, and lays those shown
+/// over the lines in view, as wide on the screen however near the view
+/// is -- once the lines are far enough apart on it to be told apart.
 fn boundaries(
     mut shown: ResMut<Boundaries>,
     mut lines: Query<(&Boundary, &mut Transform, &mut Visibility)>,
-    camera: Single<&Projection, With<Camera2d>>,
-    sprites: Res<Sprites>,
+    camera: Single<(&Transform, &Projection), CameraOnly>,
+    window: Single<&Window>,
     keys: Res<ButtonInput<KeyCode>>,
 ) {
     shown.superchunks ^= keys.just_pressed(KeyCode::KeyB);
     shown.chunks ^= keys.just_pressed(KeyCode::KeyC);
-    let Projection::Orthographic(view) = *camera else {
+    let (camera, projection) = *camera;
+    let Projection::Orthographic(view) = projection else {
         return;
     };
-    let world_side = sprites.side as f32 * SPRITE_SIDE;
+    let half = Vec2::new(window.width(), window.height()) * view.scale / 2.0;
+    // The view's middle on the plane, across and down.
+    let middle = Vec2::new(camera.translation.x, -camera.translation.y);
     for (boundary, mut transform, mut visibility) in &mut lines {
-        let (is_shown, (_, pixels)) = if boundary.of_superchunks { (shown.superchunks, SUPERCHUNK_LINE) } else { (shown.chunks, CHUNK_LINE) };
-        *visibility = if is_shown { Visibility::Visible } else { Visibility::Hidden };
-        let width = pixels * view.scale;
-        transform.scale = if boundary.across { Vec3::new(world_side, width, 1.0) } else { Vec3::new(width, world_side, 1.0) };
+        let (is_shown, (_, pixels), apart) = if boundary.of_superchunks { (shown.superchunks, SUPERCHUNK_LINE, SPRITE_SIDE) } else { (shown.chunks, CHUNK_LINE, CHUNK_SIDE as f32) };
+        // A line across is one of those down the view, and the other way round.
+        let (along, over) = if boundary.across { (1, 0) } else { (0, 1) };
+        let at = (((middle[along] - half[along]) / apart).ceil() + boundary.place as f32) * apart;
+        if !is_shown || apart / view.scale < LINES_FROM || at > middle[along] + half[along] {
+            *visibility = Visibility::Hidden;
+            continue;
+        }
+        let (width, length) = (pixels * view.scale, 2.0 * half[over]);
+        *transform = if boundary.across {
+            Transform::from_xyz(middle.x, -at, transform.translation.z).with_scale(Vec3::new(length, width, 1.0))
+        } else {
+            Transform::from_xyz(at, -middle.y, transform.translation.z).with_scale(Vec3::new(width, length, 1.0))
+        };
+        *visibility = Visibility::Visible;
     }
 }
 
@@ -437,14 +487,9 @@ fn heights(
     let Projection::Orthographic(view) = projection else {
         return;
     };
-    let half = Vec2::new(window.width(), window.height()) * view.scale / 2.0;
-    let middle = Vec2::new(transform.translation.x, -transform.translation.y);
-    let cells_a_side = sprites.side * SUPERCHUNK_SIDE_CELLS;
-    let cell = |cells: f32| (cells.floor().max(0.0) as u32).min(cells_a_side - 1);
-    let (first, last) = ((cell(middle.x - half.x), cell(middle.y - half.y)), (cell(middle.x + half.x), cell(middle.y + half.y)));
+    let [(first_x, last_x), (first_y, last_y)] = sprites.in_view(transform, view.scale, &window);
+    let (first, last) = ((first_x, first_y), (last_x, last_y));
     let readable = shown.heights && 1.0 / view.scale >= HEIGHT_FROM && last.0 - first.0 < HEIGHT_LABELS.0 && last.1 - first.1 < HEIGHT_LABELS.1;
-    // The world's cell at the top left of the square shown.
-    let corner = sprites.shown[0].top_left().cartesian();
     let size = view.scale * (1.0 / view.scale / HEIGHT_WIDTH).min(1.0);
     let (seed, shape) = (lab::seed(), lab::shape());
     for (label, mut text, mut transform, mut visibility) in &mut labels {
@@ -455,11 +500,11 @@ fn heights(
             *visibility = Visibility::Hidden;
             continue;
         }
-        let height = terrain::height_shaped(&shape, seed, corner.x + x, corner.y + y).to_string();
+        let height = terrain::height_shaped(&shape, seed, x, y).to_string();
         if text.0 != height {
             text.0 = height;
         }
-        *transform = Transform::from_xyz(x as f32 + 0.5, -(y as f32 + 0.5), 4.0).with_scale(Vec3::splat(size));
+        *transform = Transform::from_xyz(sprites.plane(x, 0) + 0.5, -(sprites.plane(y, 1) + 0.5), 4.0).with_scale(Vec3::splat(size));
         *visibility = Visibility::Visible;
     }
 }
@@ -479,12 +524,9 @@ fn labels(
     let Projection::Orthographic(view) = projection else {
         return;
     };
-    let half = Vec2::new(window.width(), window.height()) * view.scale / 2.0;
-    let middle = Vec2::new(transform.translation.x, -transform.translation.y);
-    let chunks_a_side = sprites.side * SUPERCHUNK_SIDE as u32;
     // The chunks in view, counted from the world's top left: every label is at a chunk's corner.
-    let chunk = |cells: f32| ((cells / CHUNK_SIDE as f32).floor().max(0.0) as u32).min(chunks_a_side - 1);
-    let (first, last) = ((chunk(middle.x - half.x), chunk(middle.y - half.y)), (chunk(middle.x + half.x), chunk(middle.y + half.y)));
+    let [(first_x, last_x), (first_y, last_y)] = sprites.in_view(transform, view.scale, &window).map(|(first, last)| (first / CHUNK_SIDE as u32, last / CHUNK_SIDE as u32));
+    let (first, last) = ((first_x, first_y), (last_x, last_y));
     // How large a label of something `cells` across is drawn, of its full size: none if there is no room to read it.
     let fitted = |cells: usize| Some(cells as f32 / view.scale).filter(|&room| room >= LABELLED_FROM).map(|room| (room / LABEL_WIDTH).min(1.0));
     let (superchunk_size, chunk_size) = (fitted(SPRITE_SIDE as usize).filter(|_| shown.superchunks), fitted(CHUNK_SIDE).filter(|_| shown.chunks));
@@ -492,15 +534,15 @@ fn labels(
     for y in first.1..=last.1 {
         for x in first.0..=last.0 {
             let (within_x, within_y) = (x % SUPERCHUNK_SIDE as u32, y % SUPERCHUNK_SIDE as u32);
-            let superchunk = sprites.shown[((y / SUPERCHUNK_SIDE as u32) * sprites.side + x / SUPERCHUNK_SIDE as u32) as usize];
+            let superchunk = SuperchunkIndex::from_cartesian(x / SUPERCHUNK_SIDE as u32, y / SUPERCHUNK_SIDE as u32);
             let (superchunk_x, superchunk_y) = superchunk.cartesian();
-            let corner = Vec2::new((x as usize * CHUNK_SIDE) as f32, -((y as usize * CHUNK_SIDE) as f32));
+            let corner = Vec2::new(sprites.plane(x * CHUNK_SIDE as u32, 0), -sprites.plane(y * CHUNK_SIDE as u32, 1));
             if let Some(size) = superchunk_size.filter(|_| (within_x, within_y) == (0, 0)) {
                 wanted.push((corner, 0.0, size, format!("superchunk {:011x} ({superchunk_x}, {superchunk_y})", superchunk.0)));
             }
             if let Some(size) = chunk_size {
                 let place = place_from_cartesian(within_x * CHUNK_SIDE as u32, within_y * CHUNK_SIDE as u32) / CELLS_IN_CHUNK;
-                let (chunk_x, chunk_y) = (superchunk_x * SUPERCHUNK_SIDE as u32 + within_x, superchunk_y * SUPERCHUNK_SIDE as u32 + within_y);
+                let (chunk_x, chunk_y) = (x, y);
                 wanted.push((corner, superchunk_size.unwrap_or(0.0), size, format!("chunk {:012x} ({chunk_x}, {chunk_y})", ChunkIndex::of(superchunk, place).0)));
             }
         }
@@ -525,6 +567,7 @@ fn labels(
 /// superchunk's image, and the picture from near -- hidden once the
 /// view is no longer near.
 fn show(
+    mut commands: Commands,
     mut link: ResMut<Link>,
     mut sprites: ResMut<Sprites>,
     mut images: ResMut<Assets<Image>>,
@@ -552,11 +595,27 @@ fn show(
             paint_seconds: frame.paint_seconds,
         };
         for painted in frame.superchunks {
-            let index = (painted.at.1 * sprites.side + painted.at.0) as usize;
-            if let Some(mut image) = images.get_mut(&sprites.images[index]) {
-                *image = picture(painted.side, painted.pixels);
-                sprites.sides[index] = painted.side;
+            if painted.cold {
+                // Nothing to draw: what was drawn of it goes.
+                if let Some((sprite, ..)) = sprites.tiles.remove(&painted.at) {
+                    commands.entity(sprite).despawn();
+                }
+                continue;
             }
+            let (at, side) = (painted.at, painted.side);
+            if let Some((_, image, drawn)) = sprites.tiles.get_mut(&at) {
+                if let Some(mut image) = images.get_mut(&*image) {
+                    *image = picture(side, painted.pixels);
+                    *drawn = side;
+                }
+                continue;
+            }
+            // Its first pixels: a sprite a superchunk's side on the plane whatever its image's; the world's y grows downwards, the plane's upwards.
+            let image = images.add(picture(side, painted.pixels));
+            let sprite = Sprite { image: image.clone(), custom_size: Some(Vec2::splat(SPRITE_SIDE)), ..default() };
+            let middle = [0, 1].map(|axis| sprites.plane([at.0, at.1][axis] * SUPERCHUNK_SIDE_CELLS, axis) + SPRITE_SIDE / 2.0);
+            let sprite = commands.spawn((sprite, Transform::from_xyz(middle[0], -middle[1], 0.0))).id();
+            sprites.tiles.insert(at, (sprite, image, side));
         }
         if let Some(painted) = frame.near {
             let (first, size) = (painted.near.first, painted.near.size);
@@ -564,7 +623,7 @@ fn show(
                 *image = picture_of((size.0 * painted.near.pixels_a_cell, size.1 * painted.near.pixels_a_cell), painted.pixels);
             }
             // Over the cells it is of, a cell a unit whatever its pixels.
-            *near_transform = Transform::from_xyz(first.0 as f32 + size.0 as f32 / 2.0, -(first.1 as f32 + size.1 as f32 / 2.0), 1.0).with_scale(Vec3::new(1.0 / painted.near.pixels_a_cell as f32, 1.0 / painted.near.pixels_a_cell as f32, 1.0));
+            *near_transform = Transform::from_xyz(sprites.plane(first.0, 0) + size.0 as f32 / 2.0, -(sprites.plane(first.1, 1) + size.1 as f32 / 2.0), 1.0).with_scale(Vec3::new(1.0 / painted.near.pixels_a_cell as f32, 1.0 / painted.near.pixels_a_cell as f32, 1.0));
             if seen.near_pixels > 0 {
                 *near_visibility = Visibility::Visible;
             }
@@ -574,9 +633,9 @@ fn show(
 
 /// Asks the simulation for the next frame: the superchunks now in view.
 fn ask(
+    mut commands: Commands,
     mut link: ResMut<Link>,
     mut sprites: ResMut<Sprites>,
-    mut images: ResMut<Assets<Image>>,
     mut seen: ResMut<Seen>,
     camera: Single<(&Transform, &Projection), With<Camera2d>>,
     window: Single<&Window>,
@@ -590,25 +649,17 @@ fn ask(
     let Projection::Orthographic(view) = projection else {
         return;
     };
-    let half = Vec2::new(window.width(), window.height()) * view.scale / 2.0;
-    let middle = Vec2::new(transform.translation.x, -transform.translation.y);
-    let last = sprites.side as f32 - 1.0;
-    let superchunk = |cells: f32| (cells / SPRITE_SIDE).floor().clamp(0.0, last) as u32;
-    let (left, right, top, bottom) = (middle.x - half.x, middle.x + half.x, middle.y - half.y, middle.y + half.y);
-    if right < 0.0 || bottom < 0.0 || left > (last + 1.0) * SPRITE_SIDE || top > (last + 1.0) * SPRITE_SIDE {
-        // Nothing of the world in view: nothing to ask for.
-        return;
-    }
+    let [(left, right), (top, bottom)] = sprites.in_view(transform, view.scale, &window);
+    let superchunk = |cell: u32| cell / SUPERCHUNK_SIDE_CELLS;
     let viewport = Viewport { first: (superchunk(left), superchunk(top)), last: (superchunk(right), superchunk(bottom)) };
     // A pixel of the screen is `scale` cells: drawn no finer than that.
     let detail = (view.scale.max(1.0).log2().floor() as u32).min(COARSEST);
     let in_view = (viewport.last.0 - viewport.first.0 + 1) * (viewport.last.1 - viewport.first.1 + 1);
     // From near, the cells in view and a margin about them, as many pixels a cell as the screen shows.
-    let world_cells = sprites.side as f32 * SPRITE_SIDE;
-    let cell = |cells: f32| cells.clamp(0.0, world_cells) as u32;
+    let margin = NEAR_MARGIN as u32;
     let near = (view.scale <= NEAR_SCALE).then(|| {
-        let first = (cell((left - NEAR_MARGIN).floor()), cell((top - NEAR_MARGIN).floor()));
-        let size = (cell((right + NEAR_MARGIN).ceil()) - first.0, cell((bottom + NEAR_MARGIN).ceil()) - first.1);
+        let first = (left.saturating_sub(margin), top.saturating_sub(margin));
+        let size = (right.saturating_add(margin) - first.0 + 1, bottom.saturating_add(margin) - first.1 + 1);
         Near { first, size, pixels_a_cell: (1 << (1.0 / view.scale).log2().floor() as u32).min(NEAR_PIXELS) }
     });
     let near = near.filter(|near| near.size.0 > 0 && near.size.1 > 0);
@@ -621,17 +672,16 @@ fn ask(
     };
     let ask = Ask { viewport, detail, skip, most, near };
     (seen.in_view, seen.detail, seen.near_pixels) = (in_view, detail, near.map_or(0, |near| near.pixels_a_cell));
-    // Fine images of superchunks gone out of view are dropped: each is 4 MiB here and as much on the graphics card.
-    for index in 0..sprites.sides.len() {
-        let (x, y) = (index as u32 % sprites.side, index as u32 / sprites.side);
-        let out_of_view = x < viewport.first.0 || x > viewport.last.0 || y < viewport.first.1 || y > viewport.last.1;
-        if out_of_view && sprites.sides[index] > KEPT_SIDE {
-            if let Some(mut image) = images.get_mut(&sprites.images[index]) {
-                *image = picture(1, DIRT.to_vec());
-                sprites.sides[index] = 1;
-            }
+    // Fine images of superchunks gone out of view are dropped, each 4 MiB here and as much on the graphics card; and every one out of view, once there are very many.
+    let many = sprites.tiles.len() > TILES_KEPT;
+    sprites.tiles.retain(|&(x, y), (sprite, _, side)| {
+        let in_view = (viewport.first.0..=viewport.last.0).contains(&x) && (viewport.first.1..=viewport.last.1).contains(&y);
+        let kept = in_view || (*side <= KEPT_SIDE && !many);
+        if !kept {
+            commands.entity(*sprite).despawn();
         }
-    }
+        kept
+    });
     link.waiting = link.requests.send(Request::Sync(ask)).is_ok();
     link.asked = Some(ask);
     link.since = 0.0;
