@@ -84,6 +84,10 @@ near's sprite. **`Hud`**: the text.
 **`Boundary`**: a line between chunks or superchunks; **`Boundaries`**:
 which are shown (`SUPERCHUNK_LINE`, `CHUNK_LINE`); **`boundaries`**:
 shown and hidden by `B` and `C`, as wide on the screen however near.
+**`Label`**: one of `LABELS` (256) texts; **`labels`**: the superchunks
+and chunks in view named in their top left corners, from
+`LABELLED_FROM` (260) screen pixels across, a chunk's a line
+(`LABEL_LINE`) below.
 
 **`grouped(number)`**: its digits in threes. **`setup`**: the camera over the world's middle, the whole of it in
 view; an image a superchunk, dirt until the first frame; the text.
