@@ -76,8 +76,10 @@ thread; the first phase runs the rule on each, a `Reader` a thread, the
 outboxes a run each; the second, each thread its run of superchunks and
 their entities, passes each wheel's tick, then applies every outbox's
 writes and instructions; writes to superchunks not in use counted
-missed (`count_missed`), entities put there lost; the outboxes emptied;
-the entities' tick advanced. **`neighbours`**: the nine
+missed (`count_missed`), entities put there lost; the crossings settled
+(**`settle_crossings`**: each superchunk's arrivals taken, then each
+thread its run of superchunks, each removing its leavers from its
+neighbours' arrivals); the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
 offsets in a fixed order.
 
 ## `entity_store/`
@@ -133,7 +135,8 @@ found and still due, the entities `ENTITY_AHEAD` on asked of memory --
 **`put(earliest, header, from, attributes)`** -- within a chunk or from
 one to another (**`move_between`**), a `Put` -- **`in_word_tile(chunk,
 first)`**, **`remove(id, at)`**, **`arrived(id, left)`** -- an entity crossed in,
-noted --
+noted -- **`take_arrived(arrived)`**, **`settle_leavers(arrived)`** --
+those of a neighbour's arrivals that left this superchunk removed --
 **`pass(tick)`**, **`sort_wakes(tick)`** -- after the second phase for
 the next tick, after `Entities::apply` for the tick about to run --
 **`counts`**. **`Entities`**: the tick about to run, the superchunks by
@@ -142,8 +145,7 @@ superchunk index, and instructions queued outside a tick: **`now`**,
 **`align(superchunk_indices)`** -- added empty, dropped, how many
 entities dropped -- **`queue_put(header, attributes)`**,
 **`queue_remove(header)`**, **`queued`**, **`apply`** -- as the arena's
-`queue` and `apply` -- **`settle_crossings`** -- after the second
-phase, each entity that crossed removed from the cell it left --
+`queue` and `apply` --
 **`iter`**, **`advance`**. **`EntityReader`**:
 every superchunk's entities read in a tick, as the bitplanes' `Reader`:
 **`get(id, at)`**, **`chunk(chunk)`**, **`occupied(origin, width,

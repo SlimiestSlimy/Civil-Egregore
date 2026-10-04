@@ -67,7 +67,8 @@ run of a bucket's places. No bitplane of them is kept: it cost
 a fifth of the ticks on 12 threads. Crossing to another
 superchunk, an entity is put there as new and changed here as if
 its cell there were taken; once the second phase is over, each one put
-there is removed here (`Entities::settle_crossings`). So its cell is
+there is removed here, each superchunk removing its own leavers on
+the threads (`Simulation::settle_crossings`). So its cell is
 never left for one it cannot have, and between ticks every entity
 stands on one cell.
 

@@ -32,8 +32,8 @@ pub struct SuperchunkEntities {
     /// When each entity wakes.
     wheel: Wheel,
     /// The entities that crossed into it this tick, each with the cell
-    /// it left in another superchunk: to be removed from there
-    /// ([`Entities::settle_crossings`]).
+    /// it left in another superchunk: to be removed from there once
+    /// the second phase is over ([`SuperchunkEntities::settle_leavers`]).
     arrived: Vec<(EntityId, CellIndex)>,
     /// Room for the attributes of an entity moving, with those it has,
     /// from one chunk's bucket to another's.
@@ -184,6 +184,25 @@ impl SuperchunkEntities {
         self.arrived.push((id, left));
     }
 
+    /// Swaps the entities that crossed into it this tick, each with the
+    /// cell it left, for `arrived` -- empty, kept for its room.
+    pub(crate) fn take_arrived(&mut self, arrived: &mut Vec<(EntityId, CellIndex)>) {
+        std::mem::swap(&mut self.arrived, arrived);
+    }
+
+    /// Removes from the cells they left those of `arrived` -- the
+    /// entities that crossed into a neighbour this tick
+    /// ([`SuperchunkEntities::take_arrived`]) -- that left this
+    /// superchunk: until then each stood on both cells, so that, its new
+    /// cell taken, it stays where it stood. Once every superchunk has
+    /// settled its leavers, every entity stands on one cell.
+    pub(crate) fn settle_leavers(&mut self, arrived: &[(EntityId, CellIndex)]) {
+        let here = self.index;
+        for &(id, left) in arrived.iter().filter(|(_, left)| left.superchunk() == here) {
+            self.remove(id, left);
+        }
+    }
+
     /// Passes `tick`, just run, on the wheel.
     pub(crate) fn pass(&mut self, tick: u64) {
         self.wheel.pass(tick);
@@ -227,19 +246,6 @@ impl Entities {
     /// None, at tick `now`: what a save's entities are put back into.
     pub fn at_tick(now: u64) -> Self {
         Self { now, ..Self::default() }
-    }
-
-    /// Removes each entity that crossed into another superchunk from
-    /// the cell it left: until then it stood on both, so that, its new
-    /// cell taken, it stays where it stood. Run once the second phase
-    /// is over, so between ticks every entity stands on one cell.
-    pub(crate) fn settle_crossings(&mut self) {
-        let arrived: Vec<(EntityId, CellIndex)> = self.superchunks.iter_mut().flat_map(|superchunk| superchunk.arrived.drain(..)).collect();
-        for (id, left) in arrived {
-            if let Ok(at) = self.superchunks.binary_search_by_key(&left.superchunk(), SuperchunkEntities::index) {
-                self.superchunks[at].remove(id, left);
-            }
-        }
     }
 
     /// How many entities there are.

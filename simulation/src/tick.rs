@@ -541,7 +541,7 @@ impl<'a> Turn<'a> {
     /// Moving to a cell of another superchunk, it crosses: it is put
     /// there as new, and changed here too, as if its cell were taken.
     /// Once the second phase is over, the one here is removed if the
-    /// other was put ([`Entities::settle_crossings`]) -- so its cell
+    /// other was put ([`SuperchunkEntities::settle_leavers`]) -- so its cell
     /// is never left for one that cannot be had, and between ticks it
     /// stands on one cell.
     pub fn update(&mut self, before: &Header, after: Header, attributes: &[Attribute]) {
@@ -604,6 +604,9 @@ pub struct Simulation {
     /// Each superchunk's random stream, with its superchunk, in the
     /// arena's order: kept from tick to tick, and by a save.
     random: Vec<(SuperchunkIndex, Rng)>,
+    /// Each superchunk's entities crossed into it in a tick, with the
+    /// cells they left, in the arena's order: emptied after every tick.
+    arrived: Vec<Vec<(EntityId, CellIndex)>>,
 }
 
 /// The threads `superchunks` superchunks are ticked on unless told
@@ -626,7 +629,7 @@ impl Simulation {
     pub fn new(threads: usize) -> Self {
         let dispatcher = Dispatcher::new(threads);
         let samples = (0..dispatcher.threads()).map(|_| Mutex::new(Vec::new())).collect();
-        Self { dispatcher, outboxes: Vec::new(), samples, random: Vec::new() }
+        Self { dispatcher, outboxes: Vec::new(), samples, random: Vec::new(), arrived: Vec::new() }
     }
 
     /// Each superchunk's random stream as it stands: its superchunk and
@@ -751,7 +754,7 @@ impl Simulation {
             *applied_parts[part].lock().expect("a part's result") = (applied, instructions_applied);
         });
         drop(superchunks);
-        entities.settle_crossings();
+        self.settle_crossings(entities, superchunk_indices, per_part);
         let mut applied = WritesApplied::default();
         for part in applied_parts {
             let (writes, instructions) = part.into_inner().expect("a part's result");
@@ -777,6 +780,36 @@ impl Simulation {
         }
         entities.advance();
         TickReport { writes_applied: applied, instructions_applied, rules, computing: computed - start, applying: computed.elapsed() }
+    }
+
+    /// Removes each entity that crossed into another superchunk this
+    /// tick from the cell it left, each superchunk its own leavers
+    /// ([`SuperchunkEntities::settle_leavers`]), on the threads, the
+    /// superchunks split as for the second phase -- `per_part` a part.
+    fn settle_crossings(&mut self, entities: &mut Entities, superchunk_indices: &[SuperchunkIndex], per_part: usize) {
+        self.arrived.resize_with(superchunk_indices.len(), Vec::new);
+        let mut crossed = false;
+        for (superchunk, arrived) in entities.superchunks_mut().iter_mut().zip(&mut self.arrived) {
+            superchunk.take_arrived(arrived);
+            crossed |= !arrived.is_empty();
+        }
+        if crossed {
+            let arrived = &self.arrived;
+            let parts: Vec<Mutex<&mut [SuperchunkEntities]>> = entities.superchunks_mut().chunks_mut(per_part).map(Mutex::new).collect();
+            self.dispatcher.run(&|part| {
+                let Some(work) = parts.get(part) else {
+                    return;
+                };
+                for superchunk in work.lock().expect("a part's superchunks").iter_mut() {
+                    for (dx, dy) in neighbours() {
+                        if let Some(there) = superchunk.index().offset(dx, dy).and_then(|there| superchunk_indices.binary_search(&there).ok()) {
+                            superchunk.settle_leavers(&arrived[there]);
+                        }
+                    }
+                }
+            });
+            self.arrived.iter_mut().for_each(Vec::clear);
+        }
     }
 }
 
