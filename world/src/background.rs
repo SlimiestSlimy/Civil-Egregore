@@ -1,6 +1,7 @@
 //! The background: threads doing chunk storage's slow work off the
-//! tick -- encoding the changed layers of superchunks gone cold, and
-//! generating and decoding the superchunks warming. A thread a
+//! tick -- encoding the changed layers of superchunks gone cold,
+//! rewriting images with the changes flushed from the writeback ring,
+//! and generating and decoding the superchunks warming. A thread a
 //! core, each with its own codec, asleep while there is nothing to do.
 //!
 //! A job sent ([`Background::send`]) is a [`Ticket`]; what it made is
@@ -12,7 +13,7 @@
 use crate::generate_image;
 use bitmap::CellWords;
 use bitplane_manager::BucketKey;
-use chunk_storage::{LayerCodec, LayerType, SuperchunkImage};
+use chunk_storage::{Flush, LayerCodec, LayerType, SuperchunkImage};
 use coordinates::SuperchunkIndex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -25,6 +26,9 @@ pub enum Job {
     /// A superchunk's write-back to encode
     /// ([`bitplane_manager::BitmapArena::take_dirty`]).
     Encode(Vec<(BucketKey, Box<CellWords>)>),
+    /// A superchunk's changes taken from the ring, to rewrite its image
+    /// with ([`chunk_storage::ChunkStorage::take`]).
+    Flush(Flush),
     /// A superchunk to make hot: every layer of `types` of each of its
     /// chunks decoded from its `image` -- generated from `seed` first,
     /// if it has none.
@@ -45,6 +49,8 @@ pub enum Done {
     /// The write-back, encoded: each bucket's layer words
     /// ([`LayerCodec::encode_layer`]).
     Encoded(Vec<(BucketKey, Vec<u64>)>),
+    /// The image rewritten.
+    Flushed(SuperchunkImage),
     /// The superchunk's cells.
     Warmed {
         /// Its image, if it had none: generated.
@@ -62,6 +68,7 @@ impl Job {
     fn run(self, codec: &mut LayerCodec) -> Done {
         match self {
             Self::Encode(dirty) => Done::Encoded(dirty.into_iter().map(|(key, cells)| (key, codec.encode_layer(&cells).to_vec())).collect()),
+            Self::Flush(flush) => Done::Flushed(flush.rewritten()),
             Self::Warm { superchunk, image, seed, types } => {
                 let generated = image.is_none().then(|| generate_image(seed, superchunk, codec));
                 let image = generated.as_ref().or(image.as_deref()).expect("an image, kept or generated");

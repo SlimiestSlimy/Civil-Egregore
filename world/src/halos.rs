@@ -12,7 +12,8 @@
 //! - A superchunk no halo reaches goes cold at once: its state kept, its
 //!   bitmaps set aside, cooling, and its changed ones encoded in the
 //!   background, then put into the writeback ring, which flushes them
-//!   into its image when it needs the room.
+//!   when it needs the room: the image rewritten in the background,
+//!   the bitmaps held until it is in the cold pool.
 //! - A superchunk a halo reaches, not hot, is **warming** for
 //!   [`WARM_TICKS`] ticks: cooling, it is kept to be made hot as it is;
 //!   else its image -- generated, if it was never made -- is decoded in
@@ -38,11 +39,13 @@ use std::ops::AddAssign;
 pub const HALO_KEEPERS: [EntityType; 1] = [SHEEP];
 
 /// Ticks a superchunk a halo reaches is warming before it turns hot:
-/// the background's time to make it. A keeper reaches a superchunk its
+/// the background's time to make it. Kept short, so the halos follow
+/// their keepers closely: a superchunk generated takes the background
+/// longer, and the tick waits for it. A keeper reaches a superchunk its
 /// halo has just reached no sooner than it walks across its own, 1,024
 /// cells -- a sheep steps once in `STEP_TICKS` (64) ticks or more -- so
 /// long after.
-pub const WARM_TICKS: u64 = 1024;
+pub const WARM_TICKS: u64 = 256;
 
 /// What moving the halos did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -222,16 +225,75 @@ impl World {
 
     /// Puts the write-backs the background has encoded into the
     /// writeback ring, in the order they were taken -- each one waited
-    /// for, if `wait`, else up to the first not yet encoded.
+    /// for, if `wait`, else up to the first not yet encoded -- the
+    /// superchunk at the ring's tail sent to be flushed whenever it needs
+    /// the room; then puts the images flushed so far in the cold pool.
     pub(crate) fn land_write_backs(&mut self, wait: bool) {
         while let Some(&(superchunk, ticket)) = self.writing_back.front() {
             let done = if wait { Some(self.background.take(ticket)) } else { self.background.try_take(ticket) };
             let Some(Done::Encoded(encoded)) = done else {
                 break;
             };
-            self.arena.written_back(superchunk, &encoded, &mut self.storage);
+            for (key, words) in &encoded {
+                while !self.storage.try_write_back(key.chunk, key.layer_type, words) {
+                    self.flush_tail();
+                }
+            }
+            self.arena.written_back(superchunk, encoded.iter().map(|(key, _)| *key));
             self.writing_back.pop_front();
         }
+        self.land_flushes(wait);
+    }
+
+    /// Takes the changes of the superchunk at the ring's tail out of it,
+    /// to rewrite its image in the background -- its flush before, if
+    /// still on its way, put in the cold pool first, so each rewrites the
+    /// image the one before made. Its buckets, hot or cooling, hold its
+    /// newest cells until the image is in ([`World::land_flushes`]).
+    fn flush_tail(&mut self) {
+        let superchunk = self.storage.tail_superchunk().expect("a full ring has a tail");
+        if let Some(at) = self.flushing.iter().position(|&(flushing, _)| flushing == superchunk) {
+            let (_, ticket) = self.flushing.remove(at);
+            let Done::Flushed(image) = self.background.take(ticket) else {
+                unreachable!("a flush's job makes an image");
+            };
+            self.storage.insert(superchunk, image);
+        }
+        let flush = self.storage.take(superchunk).expect("the tail's changes");
+        self.flushing.push((superchunk, self.background.send(Job::Flush(flush))));
+    }
+
+    /// Puts the images the background has rewritten in the cold pool --
+    /// each waited for, if `wait` -- and tells the arena of each
+    /// superchunk with none of its changes left in the ring, so its
+    /// buckets waiting there may go.
+    fn land_flushes(&mut self, wait: bool) {
+        let mut flushed = Vec::new();
+        for (superchunk, ticket) in std::mem::take(&mut self.flushing) {
+            let done = if wait { Some(self.background.take(ticket)) } else { self.background.try_take(ticket) };
+            let Some(done) = done else {
+                self.flushing.push((superchunk, ticket));
+                continue;
+            };
+            let Done::Flushed(image) = done else {
+                unreachable!("a flush's job makes an image");
+            };
+            self.storage.insert(superchunk, image);
+            if !self.storage.holds_changes(superchunk) {
+                flushed.push(superchunk);
+            }
+        }
+        self.arena.flushed(&flushed);
+    }
+
+    /// Flushes every superchunk with changes in the ring, rewritten on
+    /// all the background's threads: the ring empty, and the cold pool's
+    /// images the cells written back.
+    pub(crate) fn flush_all(&mut self) {
+        while self.storage.tail_superchunk().is_some() {
+            self.flush_tail();
+        }
+        self.land_flushes(true);
     }
 
     /// Writes back every hot superchunk's changed bitmaps, encoded on

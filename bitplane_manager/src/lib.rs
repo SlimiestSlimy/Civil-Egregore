@@ -887,38 +887,38 @@ impl BitmapArena {
         dirty
     }
 
-    /// Puts a write-back of `superchunk` ([`BitmapArena::take_dirty`]),
-    /// its buckets `encoded` -- no words where no cell is set
-    /// ([`LayerCodec::encode_layer`]) -- into `storage`'s writeback ring,
-    /// each bucket marked waiting there; the superchunks the ring
-    /// flushes to make room are [`BitmapArena::flushed`].
-    pub fn written_back(&mut self, superchunk: SuperchunkIndex, encoded: &[(BucketKey, Vec<u64>)], storage: &mut ChunkStorage) {
-        let mut flushed = Vec::new();
-        for (key, words) in encoded {
-            storage.write_back(key.chunk, key.layer_type, words, &mut flushed);
-            // Flushed before this bitmap went in: it waits on.
-            flushed.drain(..).for_each(|done| self.leave_ring(done));
-            let entry = self.entry_mut(superchunk).expect("a superchunk written back is hot or cooling");
+    /// A write-back of `superchunk` ([`BitmapArena::take_dirty`]) is in
+    /// chunk storage's writeback ring: the buckets of `keys` marked
+    /// waiting there -- held until storage tells they were flushed
+    /// ([`BitmapArena::flushed`]) -- and one write-back fewer on its way.
+    pub fn written_back(&mut self, superchunk: SuperchunkIndex, keys: impl Iterator<Item = BucketKey>) {
+        let entry = self.entry_mut(superchunk).expect("a superchunk written back is hot or cooling");
+        for key in keys {
             let layer = entry.layer_index(key.layer_type).expect("a layer written back is in use");
             put(&mut entry.layers[layer].flags.in_ring, key.chunk.place(), true);
         }
-        let entry = self.entry_mut(superchunk).expect("a superchunk written back is hot or cooling");
         entry.on_their_way -= 1;
         self.release_unused();
     }
 
     /// Encodes every dirty bucket over `superchunk` and puts them into
     /// `storage`'s writeback ring, here and now
-    /// ([`BitmapArena::take_dirty`], then [`BitmapArena::written_back`]):
-    /// how many were written.
+    /// ([`BitmapArena::take_dirty`], then [`BitmapArena::written_back`]),
+    /// the superchunks the ring flushes here to make room
+    /// [`BitmapArena::flushed`]: how many were written.
     pub fn write_back(&mut self, superchunk: SuperchunkIndex, storage: &mut ChunkStorage, codec: &mut LayerCodec) -> usize {
         let dirty = self.take_dirty(superchunk);
         if dirty.is_empty() {
             return 0;
         }
-        let encoded: Vec<(BucketKey, Vec<u64>)> = dirty.iter().map(|(key, cells)| (*key, codec.encode_layer(cells).to_vec())).collect();
-        self.written_back(superchunk, &encoded, storage);
-        encoded.len()
+        let mut flushed = Vec::new();
+        for (key, cells) in &dirty {
+            storage.write_back(key.chunk, key.layer_type, codec.encode_layer(cells), &mut flushed);
+        }
+        // Flushed before the last bitmap went in: the superchunk written back waits on, all its bitmaps marked.
+        self.flushed(&flushed);
+        self.written_back(superchunk, dirty.iter().map(|(key, _)| *key));
+        dirty.len()
     }
 
     /// `superchunk`, hot or cooling, to change.
@@ -929,9 +929,9 @@ impl BitmapArena {
         }
     }
 
-    /// Chunk storage has flushed `superchunks` into its cold pool: their
-    /// buckets no longer wait in the ring, and the allocations left with
-    /// no hot bitmap are released.
+    /// Chunk storage has flushed `superchunks` into its cold pool, none
+    /// of their changes left in the ring: their buckets no longer wait
+    /// there, and the allocations left with no hot bitmap are released.
     pub fn flushed(&mut self, superchunks: &[SuperchunkIndex]) {
         superchunks.iter().for_each(|&superchunk| self.leave_ring(superchunk));
         self.release_unused();

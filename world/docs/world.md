@@ -39,10 +39,14 @@ asleep while there is nothing to do.
   state kept, and its bitmaps set aside, cooling
   (`BitmapArena::make_cold_superchunk`); its changed bitmaps, copied
   out, are encoded in the background and put into the writeback ring
-  in the order they went cold. The ring flushes them into its image
-  when it needs the room -- not when the superchunk goes cold. Its
-  bitmaps are let go once its image holds their changes.
-- **Coming hot** takes `WARM_TICKS` (1,024) ticks: the superchunk is
+  in the order they went cold. The ring flushes them when it needs the
+  room -- not when the superchunk goes cold -- and that too in the
+  background: the changes taken out of the ring, and the image
+  rewritten with them on another thread (`Job::Flush`), a superchunk's
+  flushes one after another. The newest cells are always on the hot
+  side: its bitmaps, hot or cooling, are held until the image holding
+  their changes is in the cold pool, and only then let go.
+- **Coming hot** takes `WARM_TICKS` (256) ticks: the superchunk is
   **warming**. Cooling still, it is held, to be made hot as it is,
   nothing decoded; else its image -- generated first, if it was never
   made -- is decoded in the background. It turns hot at the tick it
@@ -52,10 +56,14 @@ asleep while there is nothing to do.
   it is a cold superchunk like any other: not ticked or read, writes
   to it missed, entities sent to it staying where they stood, its own
   entities and random numbers kept cold. So is one cooling. Warming
-  and cooling are the world's bookkeeping, not the simulation's. A keeper reaches a superchunk its halo has just reached no
-  sooner than it crosses its own -- 1,024 cells, a step every 64 ticks
-  or more -- so long after it has turned hot. A superchunk no halo
-  wants any more stops warming.
+  and cooling are the world's bookkeeping, not the simulation's. A
+  keeper reaches a superchunk its halo has just reached no sooner than
+  it crosses its own -- 1,024 cells, a step every 64 ticks or more --
+  so long after it has turned hot. A superchunk no halo wants any more
+  stops warming. 256 ticks is short of what generating a superchunk
+  takes the background (about 120 ms, against some 40 ms of ticks), so
+  the tick waits for a superchunk generated: a stall taken for halos
+  that follow their keepers closely.
 
 So between ticks the superchunks hot or warming are the halos,
 exactly, never both (`tests/fast/halos.rs`); a superchunk warming

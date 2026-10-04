@@ -67,9 +67,10 @@ buckets taken and returned, its allocations cooling -- **`hold`**,
 **`superchunks_mut`**, for the simulation, and
 **`superchunk_indices`**, theirs; **`take_dirty(superchunk)`** -- the
 dirty buckets' cells copied out, marked clean, a write-back on its way
--- **`written_back(superchunk, encoded, storage)`** -- into the ring,
-each marked waiting, flushes reported as they come -- and
-**`write_back(superchunk, storage, codec)`**, both at once;
+-- **`written_back(superchunk, keys)`** -- the write-back in the ring:
+each bucket marked waiting, held until flushed -- and
+**`write_back(superchunk, storage, codec)`**, both at once, encoded and
+put in the ring here, flushes reported as they come;
 **`flushed`**; **`evict(key)`** -- an allocation with nothing hot or
 waiting released to the block pool. Private: **`allocation`** (found or
 made), **`hot`**, **`at`**/**`at_mut`**, **`entry_mut`** (hot or

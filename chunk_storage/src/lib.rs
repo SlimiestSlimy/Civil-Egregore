@@ -32,7 +32,7 @@ mod superchunk_image;
 pub mod transient_data;
 mod writeback_ring;
 
-pub use chunk_storage::ChunkStorage;
+pub use chunk_storage::{ChunkStorage, Flush};
 pub use height_map::{Height, HeightMap, HEIGHT_WORDS};
 pub use layer_codec::{LayerCodec, LayerType};
 pub use superchunk_image::{InvalidImage, LayerChange, SuperchunkImage};

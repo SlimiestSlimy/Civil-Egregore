@@ -227,8 +227,10 @@ fn a_superchunk_cooling_waits_for_its_changes() {
     arena.flushed(&flushed);
     assert_eq!(arena.cooling(), 1, "its change on its way: kept");
 
-    let encoded: Vec<(BucketKey, Vec<u64>)> = dirty.iter().map(|(key, cells)| (*key, codec.encode_layer(cells).to_vec())).collect();
-    arena.written_back(WORLD_MIDDLE, &encoded, &mut storage);
+    for (key, cells) in &dirty {
+        assert!(storage.try_write_back(key.chunk, key.layer_type, codec.encode_layer(cells)));
+    }
+    arena.written_back(WORLD_MIDDLE, dirty.iter().map(|(key, _)| *key));
     assert!(arena.hold(WORLD_MIDDLE), "cooling, so held");
     storage.flush_all(&mut flushed);
     arena.flushed(&flushed);

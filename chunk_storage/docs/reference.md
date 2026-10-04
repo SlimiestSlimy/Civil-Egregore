@@ -51,11 +51,18 @@ walking entries from the tail, over wrap markers.
 **`image(superchunk)`**, **`shared_image(superchunk)`** -- a handle to
 it, to read on another thread -- **`superchunks()`**, **`layer(chunk,
 type)`**: the cold pool, its images shared (`Arc`).
-**`write_back(chunk, type, encoded, flushed)`**: into the ring, the
-superchunk at its tail flushed until it fits, each added to `flushed`
--- before the encoded layer went in. **`flush(superchunk)`**: its image
-rewritten with its ring entries, which are freed; a superchunk not stored
-is made flat. **`flush_all`**, **`nothing_to_flush`**.
+**`try_write_back(chunk, type, encoded)`**: into the ring if it fits --
+an empty ring too small grown -- whether it went in.
+**`write_back(chunk, type, encoded, flushed)`**: the same, the
+superchunk at its tail flushed here until it fits, each added to
+`flushed` -- before the encoded layer went in. **`take(superchunk)`**:
+its ring entries copied out and freed, with its image as it was -- a
+**`Flush`** `{superchunk, image, changes}`, to be done on any thread
+(**`Flush::rewritten`**: the image with every change made; a
+superchunk not stored made flat); **`tail_superchunk`**,
+**`take_tail`**, **`holds_changes(superchunk)`**.
+**`flush(superchunk)`**: taken and rewritten here. **`flush_all`**,
+**`nothing_to_flush`**.
 
 ## `disk.rs`
 

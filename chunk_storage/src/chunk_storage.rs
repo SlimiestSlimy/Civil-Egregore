@@ -75,40 +75,70 @@ impl ChunkStorage {
     }
 
     /// Writes `encoded` back into the ring as the layer of `layer_type`
-    /// in `chunk` (no words: no layer), flushing the superchunk at the
-    /// ring's tail until it fits, and adding each one flushed to
+    /// in `chunk` (no words: no layer), if it fits -- an empty ring too
+    /// small grown until it does: whether it went in. If not, the
+    /// superchunk at the ring's tail is to be flushed first
+    /// ([`ChunkStorage::take_tail`]).
+    pub fn try_write_back(&mut self, chunk: ChunkIndex, layer_type: LayerType, encoded: &[u64]) -> bool {
+        while !self.ring.push(chunk, layer_type, encoded) {
+            if !self.ring.is_empty() {
+                return false;
+            }
+            self.ring.grow(self.ring.capacity().max(1) * 2);
+        }
+        true
+    }
+
+    /// [`ChunkStorage::try_write_back`], flushing the superchunk at the
+    /// ring's tail here until it fits, and adding each one flushed to
     /// `flushed`. Every superchunk was flushed before `encoded` went in,
     /// so its entries left in the ring are this one and later ones.
     pub fn write_back(&mut self, chunk: ChunkIndex, layer_type: LayerType, encoded: &[u64], flushed: &mut Vec<SuperchunkIndex>) {
-        while !self.ring.push(chunk, layer_type, encoded) {
-            match self.ring.tail_superchunk() {
-                Some(superchunk) => {
-                    self.flush(superchunk);
-                    flushed.push(superchunk);
-                }
-                None => self.ring.grow(self.ring.capacity().max(1) * 2),
-            }
+        while !self.try_write_back(chunk, layer_type, encoded) {
+            let flush = self.take_tail().expect("a full ring has a tail");
+            self.insert(flush.superchunk, flush.rewritten());
+            flushed.push(flush.superchunk);
         }
     }
 
-    /// Rewrites the image of `superchunk` with all its entries in the
-    /// ring, and frees them. Returns whether it had any. A superchunk the
-    /// cold pool does not hold is made, flat at height 0.
-    pub fn flush(&mut self, superchunk: SuperchunkIndex) -> bool {
+    /// Takes `superchunk`'s entries out of the ring, copied, with its
+    /// image as it is, to flush -- here or on another thread -- if it has
+    /// any: they are freed from the ring now. Until the image rewritten
+    /// with them is put in the cold pool, their newest cells are only in
+    /// the bitmap arena, which holds them that long.
+    pub fn take(&mut self, superchunk: SuperchunkIndex) -> Option<Flush> {
         let entries = self.ring.entries_of(superchunk);
         if entries.is_empty() {
-            return false;
+            return None;
         }
-        let changes: Vec<LayerChange> = entries
-            .iter()
-            .map(|entry| LayerChange { place: entry.place, layer_type: entry.layer_type, encoded: self.ring.encoded(entry) })
-            .collect();
-        let rewritten = match self.image(superchunk) {
-            Some(image) => image.rewritten(&changes),
-            None => SuperchunkImage::new(&HeightMap::default()).rewritten(&changes),
-        };
-        self.insert(superchunk, rewritten);
+        let changes = entries.iter().map(|entry| (entry.place, entry.layer_type, self.ring.encoded(entry).to_vec())).collect();
         self.ring.release(superchunk);
+        Some(Flush { superchunk, image: self.shared_image(superchunk), changes })
+    }
+
+    /// The superchunk at the ring's tail -- the one to flush to make room
+    /// -- if the ring holds any change.
+    pub fn tail_superchunk(&self) -> Option<SuperchunkIndex> {
+        self.ring.tail_superchunk()
+    }
+
+    /// [`ChunkStorage::take`] of the superchunk at the ring's tail.
+    pub fn take_tail(&mut self) -> Option<Flush> {
+        self.take(self.ring.tail_superchunk()?)
+    }
+
+    /// Whether the ring holds any change of `superchunk`.
+    pub fn holds_changes(&self, superchunk: SuperchunkIndex) -> bool {
+        !self.ring.entries_of(superchunk).is_empty()
+    }
+
+    /// Rewrites the image of `superchunk` with all its entries in the
+    /// ring, here, and frees them. Returns whether it had any.
+    pub fn flush(&mut self, superchunk: SuperchunkIndex) -> bool {
+        let Some(flush) = self.take(superchunk) else {
+            return false;
+        };
+        self.insert(superchunk, flush.rewritten());
         true
     }
 
@@ -124,5 +154,29 @@ impl ChunkStorage {
     /// Whether the ring holds no change.
     pub fn nothing_to_flush(&self) -> bool {
         self.ring.tail_superchunk().is_none()
+    }
+}
+
+/// A superchunk's entries taken out of the ring ([`ChunkStorage::take`]),
+/// with its image as it was: all a flush needs, so it can be done on any
+/// thread.
+pub struct Flush {
+    /// The superchunk.
+    pub superchunk: SuperchunkIndex,
+    /// Its image when the entries were taken, if it had one.
+    pub image: Option<Arc<SuperchunkImage>>,
+    /// Its entries, oldest first: each layer's chunk place, type and words.
+    pub changes: Vec<(usize, LayerType, Vec<u64>)>,
+}
+
+impl Flush {
+    /// The image with every change made: a superchunk with no image made,
+    /// flat at height 0.
+    pub fn rewritten(&self) -> SuperchunkImage {
+        let changes: Vec<LayerChange> = self.changes.iter().map(|(place, layer_type, encoded)| LayerChange { place: *place, layer_type: *layer_type, encoded }).collect();
+        match &self.image {
+            Some(image) => image.rewritten(&changes),
+            None => SuperchunkImage::new(&HeightMap::default()).rewritten(&changes),
+        }
     }
 }

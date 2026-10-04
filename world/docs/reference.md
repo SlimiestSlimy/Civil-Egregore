@@ -7,16 +7,17 @@ The design is in `world.md`.
 `GRASS_CELLS` (400,000): the grass a superchunk generated is given;
 `FLOCK` (4,000): the sheep the origin starts with, unless told.
 **`World`** `{info, arena, storage, entities, simulation, cold,
-background, warming, writing_back}` -- **`cold`**, each cold
+background, warming, writing_back, flushing}` -- **`cold`**, each cold
 superchunk's state as a save keeps it; **`writing_back`**, the
-write-backs of superchunks gone cold being encoded, in order -- and
+write-backs of superchunks gone cold being encoded, in order;
+**`flushing`**, the superchunks whose images are being rewritten -- and
 **`World::empty(info)`**, what generating and loading start from;
 **`layer_types`**. **`generate(seed, sheep)`**: the origin
 (`WORLD_MIDDLE`) hot, a flock of `sheep` on it, and its halo made hot.
 **`generate_image(seed, superchunk, codec)`**: a superchunk's terrain
 and pasture, from the seed and its superchunk index.
 **`save(folder, world)`**: every dirty bitmap written back
-(`World::write_back_all`), the ring flushed, then each superchunk's
+(`World::write_back_all`), the ring flushed (`World::flush_all`), then each superchunk's
 image and state -- live if hot, kept if cold -- the hot file, and the
 world's file last: a **`Saved`** `{superchunks, entities, bytes}`.
 **`load(folder)`**: every superchunk's image into the cold pool and its
@@ -27,7 +28,7 @@ the file and what is wrong.
 ## `halos.rs`
 
 `HALO_KEEPERS` (the sheep, for now): the kinds of entity that keep a
-halo. `WARM_TICKS` (1,024): the ticks a superchunk is warming.
+halo. `WARM_TICKS` (256): the ticks a superchunk is warming.
 **`HaloChange`** `{reached, generated, restored, cooled}`, added with
 `+=`. **`Warming`** `{superchunk, due, from}`, from a
 **`WarmedFrom`**: `Cooling`, or `Background(ticket)`.
@@ -50,15 +51,22 @@ them. **`World::start_warming(superchunk, due)`**: held if cooling
 as they were (`BitmapArena::make_hot_again`), or as the background made
 them (`BitmapArena::make_hot_cells`), its image put in the cold pool if
 generated. **`World::land_write_backs(wait)`**: the encoded write-backs
-put into the ring (`BitmapArena::written_back`), in order.
+put into the ring, in order (`ChunkStorage::try_write_back`, then
+`BitmapArena::written_back`), the tail flushed whenever it needs the
+room, then the flushes landed. **`World::flush_tail`**: the tail
+superchunk's changes taken (`ChunkStorage::take`) and sent to be
+flushed, its flush before landed first. **`World::land_flushes(wait)`**:
+the images rewritten put in the cold pool, the arena told of each with
+no change left in the ring (`BitmapArena::flushed`).
 **`World::write_back_all`**: every hot superchunk's dirty bitmaps sent
-to be encoded, and every write-back landed.
+to be encoded, and every write-back landed. **`World::flush_all`**:
+every superchunk with changes in the ring flushed, on all the threads.
 
 ## `background.rs`
 
-**`Job`**: `Encode(dirty)`, or `Warm {superchunk, image, seed,
-types}`; **`Job::run(codec)`**: a **`Done`** -- `Encoded(encoded)`,
-each bucket's layer words; `Warmed {generated, cells}`, every bitmap's
+**`Job`**: `Encode(dirty)`, `Flush(flush)`, or `Warm {superchunk,
+image, seed, types}`; **`Job::run(codec)`**: a **`Done`** --
+`Encoded(encoded)`, each bucket's layer words; `Flushed(image)`; `Warmed {generated, cells}`, every bitmap's
 cells, chunk by chunk, type by type, and the image if generated; or
 `Failed(said)`, a panic caught. **`Ticket`**: a job sent.
 **`Background::new`**: a thread a core, each with its own codec, taking
