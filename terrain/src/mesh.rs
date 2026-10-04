@@ -29,7 +29,12 @@
 //! Finer meshes, each with vertices half as far apart as the one
 //! before, down to the finest there may be, raise or sink the land by
 //! less each: points spread again within the triangles of the mesh
-//! before, small variations at a time,
+//! before, small variations at a time. The broad mesh has a weight of
+//! one; every vertex hands a share of the weight that reached it, a
+//! byte by lot, on to the meshes finer than its own, and each of
+//! those moves the land by its own heights times the weight that
+//! reached it -- so a plain stays mostly a plain and a
+//! ridge a ridge, while what weighs little is broken up;
 //! and by less the lower the land stands: differences compound inland.
 
 use crate::{noise, Shape, ONE};
@@ -73,6 +78,10 @@ struct Vertex {
     /// Its height; of a finer mesh, how far it raises the land, or
     /// under 0 sinks it.
     height: i64,
+    /// The share of the weight that reached it that it hands on to the
+    /// meshes finer than its own, of [`ONE`]: the less, the more it
+    /// keeps the land about it as it is.
+    free: u64,
     /// Its lot: what tells it from every other.
     lot: u64,
 }
@@ -97,6 +106,8 @@ struct Blended {
     /// How much the finer meshes vary the land there, of [`ONE`]: not
     /// at all in the ocean.
     inland: u64,
+    /// How much the meshes finer may move the land there, of [`ONE`].
+    free: u64,
     /// About how many cells the cell is from the nearest line.
     line: u64,
 }
@@ -172,7 +183,11 @@ impl Mesh {
             let raised = mix(lot) & 0xFFFF < shape.raised;
             (0, if drawn >= shape.finer_share { 0 } else if raised { by } else { -by })
         };
-        Vertex { at: (x * self.side + within(lot), y * self.side + within(lot >> 16)), inland, height, lot }
+        // The share of the weight that reached it that it hands on to its subdivisions: a byte, by lot, of what
+        // the shape lets it keep back.
+        let kept = (mix(lot ^ VERTICES_SALT) >> 56) * shape.weight / 255;
+        let free = ONE - kept;
+        Vertex { at: (x * self.side + within(lot), y * self.side + within(lot >> 16)), inland, free, height, lot }
     }
 
     /// The triangle of `corners`, its lines' blends and sigmoidness drawn.
@@ -233,7 +248,7 @@ impl Mesh {
     /// What the mesh says of the cell `at`, moved.
     fn blended(&mut self, shape: &Shape, seed: u64, at: (i64, i64)) -> Blended {
         let (triangle, near) = self.locate(shape, seed, at);
-        let (mut heights, mut inlands, mut counted) = (0i64, 0u64, 0u64);
+        let (mut heights, mut inlands, mut frees, mut counted) = (0i64, 0u64, 0u64, 0u64);
         for corner in 0..3 {
             let (next, other) = ((corner + 1) % 3, (corner + 2) % 3);
             // Its two lines' blend and sigmoidness, each counting as the cell is nearer that line's other end.
@@ -247,10 +262,10 @@ impl Mesh {
             let (towards, from) = (raised(along, sigmoid), raised(ONE - along, sigmoid));
             let counts = (towards << 16) / (towards + from).max(1);
             let vertex = &self.vertices[triangle.corners[corner]];
-            (heights, inlands, counted) = (heights + counts as i64 * vertex.height, inlands + counts * vertex.inland, counted + counts);
+            (heights, inlands, frees, counted) = (heights + counts as i64 * vertex.height, inlands + counts * vertex.inland, frees + counts * vertex.free, counted + counts);
         }
         let counted = counted.max(1);
-        Blended { height: heights / counted as i64, inland: inlands / counted, line: (near.iter().min().copied().unwrap_or(0) * self.side as u64) >> 16 }
+        Blended { height: heights / counted as i64, inland: inlands / counted, free: frees / counted, line: (near.iter().min().copied().unwrap_or(0) * self.side as u64) >> 16 }
     }
 }
 
@@ -297,8 +312,14 @@ impl Lands {
         }
         // No finer than the finest: a mesh that would be is left out.
         let depth = (self.shape.finer_depth as usize).min(FINER_MOST).min((self.span - FINEST) as usize);
-        let finer: i64 = self.finer.iter_mut().take(depth).map(|mesh| mesh.blended(&self.shape, self.seed, at).height).sum();
-        (broad.height + ((finer * broad.inland as i64) >> 16)).max(self.shape.ground as i64) as u64
+        // The broad mesh has the whole weight; each mesh hands a share of what reached it on to the next, and
+        // moves the land by its own heights times what reached it.
+        let (mut finer, mut free) = (0, (broad.inland * broad.free) >> 16);
+        for mesh in self.finer.iter_mut().take(depth) {
+            let blended = mesh.blended(&self.shape, self.seed, at);
+            (finer, free) = (finer + ((blended.height * free as i64) >> 16), (free * blended.free) >> 16);
+        }
+        (broad.height + finer).max(self.shape.ground as i64) as u64
     }
 
     /// The height of the cell `(x, y)`: its land, and no more than the
