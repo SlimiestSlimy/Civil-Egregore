@@ -91,9 +91,12 @@ world; a frame of one superchunk 111 us of the simulation's thread.
 
 The view is fully vertical, so height is shown by light alone, the sun
 to the top left and 35 degrees up; a cell is 2 m and a height 1 m
-(`src/ground.rs`). The painter works a superchunk's heights out itself,
-from the seed -- the simulation is asked for none -- once, on a thread
-a superchunk, and keeps them: the coarse levels for good, the fine
+(`src/ground.rs`). A superchunk's heights come with the first frame it is
+hot in, as its image holds them; the painter works out from the seed
+only the cells past its edges that no frame brought (138 before, for
+the shadows cast onto it, and 10 after) -- measured, 23 ms a
+superchunk's ground where working every height out again took 90 --
+once, on a thread a superchunk, and keeps them: the coarse levels for good, the fine
 parts (8 MiB) for the 48 superchunks last seen.
 
 - **Hillshade**: slopes facing the sun lighter, those facing away

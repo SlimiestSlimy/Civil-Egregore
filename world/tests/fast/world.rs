@@ -141,9 +141,15 @@ fn sheep_never_step_through_a_wall() {
     let shape = terrain::Shape { span: 8, highest: 552, narrow: 2, wide: 2, sea: 0, finer_depth: 3, ..terrain::Shape::DEFAULT };
     let seed = (utilities::seed::counted()..).find(|&seed| terrain::Terrain::generate_shaped(&shape, seed, coordinates::WORLD_MIDDLE).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
     let mut made = world::generate_flocks_with(world::Generation { shape, ..world::Generation::DEFAULT }, seed, &[coordinates::WORLD_MIDDLE], 4_000);
+    // The superchunk's heights and a cell more all round, worked out once: asked for at every sheep, every tick.
+    let (corner, side) = (coordinates::WORLD_MIDDLE.top_left().cartesian(), coordinates::SUPERCHUNK_SIDE_CELLS as usize + 2);
+    let mut lands = terrain::mesh::Lands::new(&shape, seed);
+    let heights: Vec<_> = (0..side * side).map(|index| lands.height(corner.x.wrapping_add((index % side) as u32).wrapping_sub(1), corner.y.wrapping_add((index / side) as u32).wrapping_sub(1))).collect();
     let high = |at: coordinates::CellIndex| {
         let cell = at.cartesian();
-        terrain::height_shaped(&shape, seed, cell.x, cell.y)
+        let (across, down) = (cell.x.wrapping_sub(corner.x).wrapping_add(1) as usize, cell.y.wrapping_sub(corner.y).wrapping_add(1) as usize);
+        // A sheep strayed past the superchunk: the generator asked.
+        if across < side && down < side { heights[down * side + across] } else { terrain::height_shaped(&shape, seed, cell.x, cell.y) }
     };
     let mut stood: HashMap<u64, coordinates::CellIndex> = made.entities.iter().map(|sheep| (sheep.header.id.0, sheep.header.at)).collect();
     let (mut moved, mut beside_walls) = (0, 0);
