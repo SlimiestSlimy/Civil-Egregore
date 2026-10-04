@@ -11,7 +11,7 @@ of its own: `pathfinding::Walls::new` and
 `Turn::around_unwalled` bar it from the two. `OCTAVES`, `ONE`.
 
 **`Shape`** `{ground, ocean, span, sea, highest, clumping, coast, coast_low, narrow, wide,
-soft, hard, warp, finer_depth, finer_share, finer_height, raised}`: the
+soft, hard, warp, finer_depth, finer_share, finer_height, raised, rough}`: the
 lowest ground and the ocean's height; the vertices' grid and the share
 of them that are ocean; the highest land, and the vertices from the
 ocean it is reached over; the lines' blends and sigmoidness, least and

@@ -19,8 +19,8 @@ fn keepers(world: &World) -> Vec<SuperchunkIndex> {
 
 /// A flock wandering off its origin for 6,000 ticks: after every tick
 /// the superchunks hot and not cooling, or warming, are the halos about
-/// the sheep, never both; every one warming turns hot, and every one
-/// cooling cold, when due; every superchunk ever made is hot or cold and
+/// the sheep, never both; every one warming turns hot, if still wanted,
+/// and every one cooling cold, when due; every superchunk ever made is hot or cold and
 /// never both; and the world has grown.
 #[test]
 fn the_hot_superchunks_are_the_halos() {
@@ -43,7 +43,8 @@ fn the_hot_superchunks_are_the_halos() {
         assert!(hot.iter().all(|superchunk| !world.cold.contains_key(superchunk)), "hot or cold, never both");
         assert_eq!(world.storage.superchunks().count(), hot.len() + world.cold.len(), "every superchunk made, hot or cold");
     }
-    assert!(moved.generated > 0 && moved.reached == moved.generated + moved.restored + world.warming().count(), "the halos moved, each superchunk reached loaded: {moved:?}");
+    // One reached may be left again while still warming, and so never loaded: no more loaded than reached.
+    assert!(moved.generated > 0 && moved.reached >= moved.generated + moved.restored + world.warming().count(), "the halos moved, none loaded unreached: {moved:?}");
 }
 
 /// A superchunk a halo reaches is warming for its time: a write to it is

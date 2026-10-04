@@ -105,6 +105,10 @@ pub struct Shape {
     pub weight: u64,
     /// The share of those that raise it, of [`ONE`]: the rest sink it.
     pub raised: u64,
+    /// How many heights noise a few cells broad raises the land by at
+    /// most, of [`ONE`]: what keeps a gentle slope's whole heights from
+    /// changing along long lines.
+    pub rough: u64,
 }
 
 /// A cell's water: how deep it stands over the ground, 0 none, a number
@@ -116,7 +120,7 @@ impl Shape {
     /// ocean 255 deep -- as deep as water is kept -- the land to 200
     /// over it (711); lines blended over a quarter of their length to
     /// all of it, from even slopes to gentle steps; finer meshes on the land down to lines 16 cells long.
-    pub const DEFAULT: Self = Self { ground: 256, ocean: 511, span: 13, sea: ONE / 2, highest: 711, clumping: ONE / 4, coast: 2, coast_low: 5 * mesh::SIGMOID_ONE / 2, narrow: ONE / 4, wide: ONE, soft: mesh::SIGMOID_ONE, hard: 3 * mesh::SIGMOID_ONE, warp: ONE * 3 / 10, finer_depth: 9, finer_share: ONE * 7 / 10, finer_height: 120, finer_fall: ONE * 3 / 4, weight: ONE * 4 / 5, raised: ONE * 3 / 5 };
+    pub const DEFAULT: Self = Self { ground: 256, ocean: 511, span: 13, sea: ONE / 2, highest: 711, clumping: ONE / 4, coast: 2, coast_low: 5 * mesh::SIGMOID_ONE / 2, narrow: ONE / 4, wide: ONE, soft: mesh::SIGMOID_ONE, hard: 3 * mesh::SIGMOID_ONE, warp: ONE * 3 / 10, finer_depth: 9, finer_share: ONE * 7 / 10, finer_height: 120, finer_fall: ONE * 3 / 4, weight: ONE * 4 / 5, raised: ONE * 3 / 5, rough: 2 * ONE };
 }
 
 /// One: a fraction's whole, 16 bits.
