@@ -50,51 +50,60 @@ pub const RELIEF: usize = 6;
 /// How much the ground's pixels differ by lot.
 pub const TEXTURE: usize = 7;
 
+/// The cells along a square of the polygons' grid, as a power of two;
+/// 0 for no polygons.
+pub const POLYGON_SIZE: usize = 8;
+/// The most a land polygon's plain stands over the ocean.
+pub const POLYGON_LEVELS: usize = 9;
+/// The cells from a border over which the levels about it are mixed.
+pub const POLYGON_EDGE: usize = 10;
+/// How far the polygons' borders are bent, beside a square's side.
+pub const POLYGON_WARP: usize = 11;
 /// The first of the hills' fourteen octaves, 65536 cells across to 8: how
 /// much of the hills' height each makes up beside the others.
-pub const HILLS: usize = 8;
+pub const HILLS: usize = 12;
 /// The highest the hills stand: what their octaves make up together.
-pub const HEIGHT_SPAN: usize = 22;
+pub const HEIGHT_SPAN: usize = 26;
 /// How much of the ground under the ocean's level is dry hollows.
-pub const DRY_HOLLOWS: usize = 23;
+pub const DRY_HOLLOWS: usize = 27;
 /// The height the lowest ground is at.
-pub const GROUND_LEVEL: usize = 24;
+pub const GROUND_LEVEL: usize = 28;
 /// The most the land rises over the lowest ground.
-pub const LAND_RISE: usize = 25;
+pub const LAND_RISE: usize = 29;
 /// The cells between two points of the land's rise, as a power of two.
-pub const LAND_SPAN: usize = 26;
+pub const LAND_SPAN: usize = 30;
 /// The first of the five octaves of the land's rise: each one's share.
-pub const RISE_SHARES: usize = 27;
+pub const RISE_SHARES: usize = 31;
 /// The share of the world that is under the ocean.
-pub const OCEAN_SHARE: usize = 32;
+pub const OCEAN_SHARE: usize = 36;
 /// How far under the ocean its deepest floor is.
-pub const OCEAN_DEPTH: usize = 33;
+pub const OCEAN_DEPTH: usize = 37;
 /// How many heights of land the hills grow to their whole height over.
-pub const COAST: usize = 34;
+pub const COAST: usize = 38;
 /// How far where the hills begin wanders about the shore, in coasts.
-pub const SHORE_WANDER: usize = 35;
+pub const SHORE_WANDER: usize = 39;
 /// The cells between two points of that wandering, as a power of two.
-pub const SHORE_SPAN: usize = 36;
+pub const SHORE_SPAN: usize = 40;
 /// The share of the cells that are grass.
-pub const GRASS_COVER: usize = 37;
+pub const GRASS_COVER: usize = 41;
 /// The cells across a patch of grass, as a power of two.
-pub const PATCH_SIZE: usize = 38;
+pub const PATCH_SIZE: usize = 42;
 /// How much finer noise counts beside the patches'.
-pub const PATCH_DETAIL: usize = 39;
+pub const PATCH_DETAIL: usize = 43;
 /// How much each cell's own lot counts: grass scattered, not in patches.
-pub const SCATTER: usize = 40;
+pub const SCATTER: usize = 44;
 /// The share of the cells that have a tree.
-pub const TREE_COVER: usize = 41;
+pub const TREE_COVER: usize = 45;
 /// The cells across a patch of trees, as a power of two.
-pub const TREE_PATCH: usize = 42;
+pub const TREE_PATCH: usize = 46;
 /// How much finer noise counts beside the trees' patches'.
-pub const TREE_DETAIL: usize = 43;
+pub const TREE_DETAIL: usize = 47;
 /// How much each cell's own lot counts for trees.
-pub const TREE_SCATTER: usize = 44;
+pub const TREE_SCATTER: usize = 48;
 
 /// The numbers, in the order above; the shading's defaults are what was
 /// found by eye with the sliders.
-pub const TUNED: [Tuned; 45] = [
+pub const TUNED: [Tuned; 49] = [
     Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading, what: "How much lighter the border of a higher cell is where it faces the sun." },
     Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading, what: "How much darker the border of a higher cell is where it faces away from the sun." },
     Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading, what: "How dark the band at the foot of a wall is, on the side away from the sun." },
@@ -103,6 +112,10 @@ pub const TUNED: [Tuned; 45] = [
     Tuned { name: "shadow", default: 0.4, range: (0.0, 0.8), page: Page::Shading, what: "How much darker ground is under a cast shadow." },
     Tuned { name: "relief", default: 0.7, range: (0.0, 3.0), page: Page::Shading, what: "How strongly slopes are lit and heights tinted." },
     Tuned { name: "texture", default: 2.0, range: (0.0, 4.0), page: Page::Shading, what: "How much the ground's pixels differ from one another by lot." },
+    Tuned { name: "polygon size (2^)", default: 13.0, range: (0.0, 18.0), page: Page::Generation, what: "The land as polygons: closed shapes that share borders, each ocean or a plain at a level of its own. This is about how broad one is, 2 to this power in cells: 13 is 8 superchunks. 0 for none: the land is then the old land rise. With polygons, the ocean's level is the ground level plus the ocean depth, and the ocean share is the share of polygons that are ocean." },
+    Tuned { name: "polygon levels", default: 200.0, range: (0.0, 2048.0), page: Page::Generation, what: "How many heights over the ocean a land polygon's plain stands at most: each stands at a level of its own, drawn by lot, from just over the ocean to this." },
+    Tuned { name: "polygon edge", default: 512.0, range: (1.0, 4096.0), page: Page::Generation, what: "How many cells from a border the levels of the polygons about it are mixed over: broad, and plains join by ramps and shores fall gently; narrow, and they join by cliffs. Half a polygon's breadth at most." },
+    Tuned { name: "polygon warp", default: 0.3, range: (0.0, 1.0), page: Page::Generation, what: "How far the polygons' borders are bent by noise, beside a polygon's breadth: 0 leaves them straight." },
     Tuned { name: "hills (65536)", default: 0.0, range: (0.0, 255.0), page: Page::Generation, what: "The height the hills' octave 65536 cells across adds at most, beside the others: the height span is shared out among them." },
     Tuned { name: "hills (32768)", default: 0.0, range: (0.0, 255.0), page: Page::Generation, what: "The height the hills' octave 32768 cells across adds at most, beside the others: the height span is shared out among them." },
     Tuned { name: "hills (16384)", default: 0.0, range: (0.0, 255.0), page: Page::Generation, what: "The height the hills' octave 16384 cells across adds at most, beside the others: the height span is shared out among them." },

@@ -7,10 +7,11 @@
 //! world is made afresh and its ticks start from 0.
 
 use crate::sim::SEED;
-use crate::tuning::{self, COAST, GRASS_COVER, GROUND_LEVEL, DRY_HOLLOWS, HEIGHT_SPAN, HILLS, LAND_RISE, LAND_SPAN, OCEAN_DEPTH, OCEAN_SHARE, PATCH_DETAIL, PATCH_SIZE, RISE_SHARES, SCATTER, SHORE_SPAN, SHORE_WANDER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
+use crate::tuning::{self, COAST, GRASS_COVER, GROUND_LEVEL, DRY_HOLLOWS, HEIGHT_SPAN, HILLS, LAND_RISE, LAND_SPAN, OCEAN_DEPTH, OCEAN_SHARE, PATCH_DETAIL, PATCH_SIZE, POLYGON_EDGE, POLYGON_LEVELS, POLYGON_SIZE, POLYGON_WARP, RISE_SHARES, SCATTER, SHORE_SPAN, SHORE_WANDER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
+use terrain::polygons::Polygons;
 use terrain::Shape;
 use utilities::hash::{mix, GOLDEN_RATIO};
 use world::patches::{Patches, ONE};
@@ -97,7 +98,9 @@ fn from_sliders() -> Generation {
     let of_one = |share: f32| (share.clamp(0.0, 1024.0) * ONE as f32) as u64;
     let patches = |[cover, patch, detail, scatter]: [usize; 4]| Patches { cover: of_one(tuned[cover]), patch: tuned[patch].round().clamp(0.0, 16.0) as u32, detail: of_one(tuned[detail]), scatter: of_one(tuned[scatter]) };
     let land = shape(&tuned);
-    let shape = Shape { ocean: ocean_level(&land, seed(), tuned[OCEAN_SHARE]), ..land };
+    // With polygons the ocean stands its depth over the lowest ground; without, where its share of the heights is under it.
+    let ocean = if land.polygons.span > 0 { (land.ground as u64 + land.depth).min(u16::MAX as u64) as u16 } else { ocean_level(&land, seed(), tuned[OCEAN_SHARE]) };
+    let shape = Shape { ocean, ..land };
     Generation { shape, grass: patches([GRASS_COVER, PATCH_SIZE, PATCH_DETAIL, SCATTER]), trees: patches([TREE_COVER, TREE_PATCH, TREE_DETAIL, TREE_SCATTER]) }
 }
 
@@ -122,6 +125,13 @@ fn shape(tuned: &tuning::Tuning) -> Shape {
         rise_shares: std::array::from_fn(|octave| (tuned[RISE_SHARES + octave].clamp(0.0, 16.0) * 1024.0) as u64),
         shore: (tuned[SHORE_WANDER].clamp(0.0, 16.0) * ONE as f32) as u64,
         shore_span: tuned[SHORE_SPAN].round().clamp(2.0, 24.0) as u32,
+        polygons: Polygons {
+            span: tuned[POLYGON_SIZE].round().clamp(0.0, 24.0) as u32,
+            ocean: (tuned[OCEAN_SHARE].clamp(0.0, 1.0) * ONE as f32) as u64,
+            levels: tuned[POLYGON_LEVELS].round().clamp(0.0, u16::MAX as f32) as u64,
+            edge: tuned[POLYGON_EDGE].round().clamp(1.0, u16::MAX as f32) as u64,
+            warp: (tuned[POLYGON_WARP].clamp(0.0, 4.0) * ONE as f32) as u64,
+        },
     };
     let shares: [f32; 14] = std::array::from_fn(|octave| tuned[HILLS + octave].max(0.0));
     let all: f32 = shares.iter().sum();

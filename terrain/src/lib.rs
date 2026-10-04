@@ -17,6 +17,8 @@
 pub mod diagnostics;
 pub mod transient_data;
 
+pub mod polygons;
+
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{Height, HeightMap, LayerType};
 use coordinates::{cartesian_from_place, place_from_cartesian, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
@@ -45,7 +47,8 @@ const RISE_INDEX: u32 = 7;
 /// The number the first octave of the shore's wandering is drawn by.
 const SHORE_INDEX: u32 = 12;
 
-/// How the heights are shaped. The land rises and falls by far more
+/// How the heights are shaped. The land is polygons ([`polygons`]), or
+/// -- as worlds are until those are tuned -- it rises and falls by far more
 /// than a hill over many superchunks ([`rise`]), too gently for a wall;
 /// what of it is under the ocean's level is the ocean's floor, what is
 /// over it islands, dozens to hundreds of superchunks each. Hills
@@ -87,6 +90,8 @@ pub struct Shape {
     /// The cells between two points of the noise that moves it, as a
     /// power of two: at least 2.
     pub shore_span: u32,
+    /// The land as polygons, in place of its rise, if there are any.
+    pub polygons: polygons::Polygons,
 }
 
 /// A cell's water: how deep it stands over the ground, 0 none, a number
@@ -97,7 +102,7 @@ impl Shape {
     /// The world's shape: islands some 16 superchunks across in an
     /// ocean a little over half the world, hills as tuned by eye in the
     /// renderer's lab.
-    pub const DEFAULT: Self = Self { weights: [0, 0, 0, 0, 0, 0, 0, 99, 58, 14, 25, 37, 20, 2], ocean: 800, hollows: 0, depth: 255, coast: 64, ground: 256, rise: 1024, rise_span: 14, rise_shares: [625, 250, 100, 40, 16], shore: ONE, shore_span: 10 };
+    pub const DEFAULT: Self = Self { weights: [0, 0, 0, 0, 0, 0, 0, 99, 58, 14, 25, 37, 20, 2], ocean: 800, hollows: 0, depth: 255, coast: 64, ground: 256, rise: 1024, rise_span: 14, rise_shares: [625, 250, 100, 40, 16], shore: ONE, shore_span: 10, polygons: polygons::Polygons::NONE };
 }
 
 /// One: a fraction's whole, 16 bits.
@@ -145,7 +150,7 @@ pub fn rise(shape: &Shape, seed: u64, x: u32, y: u32) -> u64 {
 /// The land at the cell `(x, y)` -- the lowest ground and the land's
 /// rise over it -- and how much of the hills stands there, of [`ONE`].
 fn land(shape: &Shape, seed: u64, x: u32, y: u32) -> (u64, u64) {
-    let land = shape.ground as u64 + rise(shape, seed, x, y);
+    let land = if shape.polygons.span > 0 { polygons::land(shape, seed, x, y) } else { shape.ground as u64 + rise(shape, seed, x, y) };
     if shape.coast == 0 {
         return (land, ONE);
     }
@@ -180,7 +185,8 @@ pub fn height_shaped(shape: &Shape, seed: u64, x: u32, y: u32) -> Height {
     let high = land + (((hills * relief) >> 16) >> 16);
     // Under the ocean's level the ground falls gently: the lowest there is, to the ocean's depth under it.
     let (ocean, lowest) = (shape.ocean as u64, shape.ground as u64);
-    let high = if high < ocean { ocean - (ocean - high) * shape.depth.min(ocean - lowest) / (ocean - lowest).max(1) } else { high };
+    // Polygons' ocean is at its depth already.
+    let high = if high < ocean && shape.polygons.span == 0 { ocean - (ocean - high) * shape.depth.min(ocean - lowest) / (ocean - lowest).max(1) } else { high };
     // The highest there is, whatever the shape would come to.
     high.min(Height::MAX as u64) as Height
 }

@@ -30,3 +30,14 @@ each way each chunk's cells that keep a wall.
 **`Terrain::from_heights(height_at)`**: from any heights, those a cell
 past the edges asked for too; **`height(place)`**, **`walled(way,
 place)`**: a cell's, by its place in the superchunk; **`wall_counts()`**.
+
+## `polygons.rs`
+
+**`Polygons`** `{span, ocean, levels, edge, warp}`: the sites' grid, the
+share of polygons that are ocean, the most a plain stands over the
+ocean, the cells levels are mixed over at a border, how far borders are
+bent; `Polygons::NONE`. **`land(shape, seed, x, y)`**: the land at a
+cell, its polygon's level mixed near a border with its neighbours'.
+**`polygon(shape, seed, x, y)`**: the cell's polygon's number, whether
+it is land, and about how far the cell is from its border. Private:
+**`Site`**, **`sites`** (the 25 squares' sites, the nearest first).

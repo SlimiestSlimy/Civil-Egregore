@@ -15,6 +15,8 @@ use world::Generation;
 
 /// How much of its light the deepest ocean keeps.
 const DEEP_LIGHT: f32 = 0.35;
+/// How much of its light a pixel on a polygon's border keeps.
+const BORDER_LIGHT: f32 = 0.25;
 /// How much lighter or darker a slope of one height a cell is drawn.
 const SLOPE_LIGHT: f32 = 2.5;
 
@@ -32,6 +34,8 @@ pub struct Wanted {
     pub seed: u64,
     /// How that world is generated.
     pub generation: Generation,
+    /// Whether the polygons' borders are drawn over it.
+    pub borders: bool,
 }
 
 /// A map drawn.
@@ -109,6 +113,9 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
                             (colour, tint * (1.0 + SLOPE_LIGHT * slope).clamp(0.55, 1.45))
                         };
                         before = Some(high);
+                        // A polygon's border, where the pixel is no farther from it than it is across.
+                        let on_border = wanted.borders && shape.polygons.span > 0 && terrain::polygons::polygon(shape, seed, cell_x, cell_y).2 < wanted.step as u64;
+                        let light = if on_border { light * BORDER_LIGHT } else { light };
                         let lit = colour.map(|channel| (channel as f32 * light).min(255.0) as u8);
                         pixel.copy_from_slice(&[lit[0], lit[1], lit[2], u8::MAX]);
                     }
