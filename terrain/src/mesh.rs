@@ -47,8 +47,6 @@ const VERTICES_SALT: u64 = 0x706F_6C79_676F_6E73;
 const WARP_INDEX: u32 = 30;
 /// The number the noise land and ocean clump by is drawn by; its finer octave is the next.
 const CLUMP_INDEX: u32 = 40;
-/// The number the noise that roughens the land is drawn by; its finer octave is the next.
-const ROUGH_INDEX: u32 = 50;
 /// The finer meshes there are at most.
 pub const FINER_MOST: usize = 10;
 /// The cells along a square of the finest grid there may be, as a
@@ -330,7 +328,7 @@ impl Lands {
 
     /// The land at the cell `(x, y)`, in heights: the broad mesh's
     /// height there, and what the finer meshes raise or sink it by, as
-    /// much of it as the land there stands high, roughened -- never under the lowest ground.
+    /// much of it as the land there stands high -- never under the lowest ground.
     pub fn land(&mut self, x: u32, y: u32) -> u64 {
         let at = self.moved(x, y);
         let broad = self.broad.blended(&self.shape, self.seed, at);
@@ -346,13 +344,8 @@ impl Lands {
             let blended = mesh.blended(&self.shape, self.seed, at);
             (finer, free) = (finer + blended.height * free as i64, (free * blended.free) >> 16);
         }
-        // Whole heights on a gentle slope change along long lines: noise a few cells broad, added before the
-        // heights are made whole, breaks those lines up. It only raises, so it floods nothing.
-        let rough = match self.shape.rough {
-            0 => 0,
-            rough => ((2 * noise(self.seed, ROUGH_INDEX, 4, x, y) + noise(self.seed, ROUGH_INDEX + 1, 2, x, y)) / 3 * rough) >> 16,
-        };
-        (broad.height + ((finer + rough as i64 + (ONE / 2) as i64) >> 16)).max(self.shape.ground as i64) as u64
+        // Summed in fractions and made whole once: a mesh at a time, each would leave its own steps in long lines.
+        (broad.height + ((finer + (ONE / 2) as i64) >> 16)).max(self.shape.ground as i64) as u64
     }
 
     /// The height of the cell `(x, y)`: its land, and no more than the

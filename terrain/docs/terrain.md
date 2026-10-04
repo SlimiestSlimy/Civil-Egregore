@@ -130,11 +130,9 @@ The height map keeps a floor a chunk and a byte a cell over it; only a
 chunk whose heights span more than 255 -- a tall chunk -- keeps a map of
 16 bits a cell, after the bytes (see chunk storage).
 
-### Roughness
+### Rounded once
 
-Heights are whole numbers, so on a gentle slope each one is a long band,
-and the bands' edges curve about the vertices: long streaks. Before a
-height is made whole, noise 16 and 4 cells broad raises it by up to
-`rough` heights (2 by default), so the edges break up. It only raises:
-no land is put under the ocean by it. What the finer meshes add is
-summed in 16-bit fractions and rounded once, not a mesh at a time.
+Heights are whole numbers. What the finer meshes add is summed in
+16-bit fractions and made whole once: rounded a mesh at a time, each
+left its own one-height steps along its own curved lines, and the ten
+together showed as long streaks on gentle slopes.
