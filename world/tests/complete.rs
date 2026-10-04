@@ -3,7 +3,7 @@
 //!
 //! `cargo test --release --test complete -- --ignored`
 
-use chunk_storage::mock::{DIRT, GRASS};
+use chunk_storage::mock::GRASS;
 use simulation::entity_store::{Attribute, Header};
 use world::{transient_data, World};
 
@@ -14,7 +14,7 @@ type Everything = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, u64, Vec<(coordinate
 
 /// [`Everything`] `world` holds.
 fn everything(world: &World) -> Everything {
-    let cells = [DIRT, GRASS].into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.cells().to_vec()).collect();
+    let cells = world.info.layers.clone().into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.cells().to_vec()).collect();
     let all = world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
     (cells, all, world.entities.now(), world.simulation.random_states().collect(), world.cold.values().cloned().collect(), world.warming().collect(), world.cooling().collect())
 }

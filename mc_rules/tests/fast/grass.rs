@@ -76,11 +76,11 @@ fn surrounded_grass_decays_at_its_chance() {
     assert_eq!(arena.superchunk_count(GRASS, SUPERCHUNK), CELLS - done.decays as u32);
 }
 
-/// Over 1,000 ticks every cell stays dirt or grass, the grass changes by
+/// Over 1,000 ticks the grass changes by
 /// no more than what spread and decayed, and scattered grass grows --
 /// at most by e, what spreading alone would make of it.
 #[test]
-fn every_cell_stays_dirt_or_grass() {
+fn grass_changes_by_what_spread_and_decayed() {
     let mut arena = mock(400);
     let start = arena.superchunk_count(GRASS, SUPERCHUNK);
     let (mut grass, mut simulation) = (start, Simulation::new(1));
@@ -88,7 +88,6 @@ fn every_cell_stays_dirt_or_grass() {
         let done = tick(&mut simulation, &mut arena, &mut Entities::new(), seed).rules;
         let now = arena.superchunk_count(GRASS, SUPERCHUNK);
         assert!(now + done.decays as u32 >= grass && now + done.decays as u32 <= grass + done.spreads as u32, "grown by what spread, less what decayed");
-        assert_eq!(now + arena.superchunk_count(DIRT, SUPERCHUNK), CELLS, "dirt or grass");
         grass = now;
     }
     let growth = grass as f64 / start as f64;

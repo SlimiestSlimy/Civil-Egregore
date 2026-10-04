@@ -27,7 +27,7 @@
 use bitplane_manager::{BitmapArena, Write, WriteOp};
 use simulation::entity_store::Entities;
 use simulation::{Simulation, Turn, TickReport};
-use chunk_storage::mock::{DIRT, GRASS};
+use chunk_storage::mock::GRASS;
 use coordinates::{CellIndex, NEIGHBOURS};
 use std::ops::AddAssign;
 
@@ -83,14 +83,13 @@ pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> GrassCounts {
             continue;
         };
         if spreading {
-            if turn.holds(DIRT, neighbour) == Ok(true) {
+            // Dirt is a cell with no grass on it: no layer of its own.
+            if turn.holds(GRASS, neighbour) == Ok(false) {
                 turn.queue(GRASS, Write::cell(neighbour, WriteOp::Set));
-                turn.queue(DIRT, Write::cell(neighbour, WriteOp::Unset));
                 spreads += 1;
             }
         } else if turn.holds(GRASS, neighbour) == Ok(true) {
             turn.queue(GRASS, Write::cell(cell, WriteOp::Unset));
-            turn.queue(DIRT, Write::cell(cell, WriteOp::Set));
             decays += 1;
         }
     }

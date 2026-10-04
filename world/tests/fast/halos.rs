@@ -5,7 +5,7 @@
 //!
 //! `cargo test`
 
-use chunk_storage::mock::{DIRT, GRASS};
+use chunk_storage::mock::GRASS;
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use bitplane_manager::{Write, WriteOp};
 use simulation::entity_store::{Attribute, EntityId, EntityType, Header, NEVER};
@@ -126,7 +126,7 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
     let halo = world.arena.superchunk_indices();
     type Held = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, Vec<(SuperchunkIndex, u64)>);
     let held = |world: &World| -> Held {
-        let cells = [DIRT, GRASS].into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.cells().to_vec()).collect();
+        let cells = world.info.layers.clone().into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.cells().to_vec()).collect();
         (cells, world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect(), world.simulation.random_states().collect())
     };
     let before = held(&world);

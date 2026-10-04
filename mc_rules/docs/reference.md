@@ -9,8 +9,9 @@ The design is in `mc_rules.md`.
 **`rule(turn, samples)`**: on one superchunk's turn, every cell of grass
 sampled at the two chances together; each draws a neighbour (one of the
 eight, stepped on the Morton index) and whether it spreads (in
-`SPREAD_CHANCE` of the sum) or decays: grass set and dirt cleared on a
-dirt neighbour, or the cell turned back to dirt beside a grass one.
+`SPREAD_CHANCE` of the sum) or decays: grass set on a
+neighbour with none, or its own cleared beside a grass one. Dirt is a
+cell with no grass: it has no layer.
 Returns **`GrassCounts`** `{sampled, spreads, decays}`, added with `+=`.
 
 **`tick(simulation, arena, entities, seed)`**: one tick of the rule over
