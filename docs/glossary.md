@@ -26,12 +26,11 @@ what they always do and are not listed.
 | **place** | a Morton index inside the thing around it, as a `usize`: a chunk's in its superchunk (0 to 15), a cell's in its chunk (0 to 65,535), or a cell's in its superchunk (20 bits, `CellIndex::place_in_superchunk`) | chunk index, cell index | slot, offset, position |
 | **cartesian** | `x` and `y`, counted from the world's or a superchunk's top left; only for geometry and drawing, and always named so: `CellCartesian`, `from_cartesian`, `cartesian()`, `place_from_cartesian` | Morton index | world cell, coordinates (alone) |
 | **Morton order** | the order of Morton indices: work is done and written in it, so memory is read forwards | sampling, wake | |
-| **height** | a cell's height, 16 bits, 0 to 65,535, from the seed alone (`terrain::height`) | wall, height map, floor, rise | elevation |
+| **height** | a cell's height, 16 bits, 0 to 65,535, from the seed alone (`terrain::height`) | wall, height map, floor, polygon | elevation |
 | **dirt** | a cell with nothing on it: no layer of its own | grass | ground |
 | **water** | how deep water stands over a cell's ground, 0 none: a level over eight bitplanes (`terrain::WATER`) | level, ocean | |
-| **ocean** | the water at one height all over the world (`Shape::ocean`): the land under it is its floor | water, island, rise | sea |
-| **island** | land over the ocean's level, dozens to hundreds of superchunks | ocean, rise, coast | continent |
-| **coast** | how far over the ocean the land is where the hills are whole: from the shore to there they grow | island, shape | |
+| **ocean** | the water at one height all over the world (`Shape::ocean`): the land under it is its floor | water, island, polygon | sea |
+| **island** | land polygons that share borders, the ocean about them | ocean, polygon | continent |
 | **tree** | a cell set in the layer `TREE`, with a **stage** | stage, patches | |
 | **stage** | how old a tree is, 0 to 15: a number kept over four bitplanes (`TREE_STAGE`), a bit each | tree, level | age, growth |
 | **level** | a number a cell holds over several bitplanes, the lowest bit first (`Turn::level`) | stage, bitplane | multi-bit plane |
@@ -83,7 +82,6 @@ what they always do and are not listed.
 | **edge** (a polygon's) | the cells from a border over which the levels about it are mixed: a ramp, or narrow, a cliff | polygon | |
 | **floor** | a chunk's lowest height, 16 bits: what its cells' bytes are counted from | height map | chunk height |
 | **tall chunk** | a chunk whose heights span more than 255: kept whole, 16 bits a cell, after the bytes | height map, floor | |
-| **rise** | how far the land stands over the lowest ground: noise many superchunks broad and far higher than a hill (`terrain::rise`) | height, shape | continent |
 | **layer codec** | encodes a layer for an image, and decodes it back, by Tessera (`LayerCodec`) | Tessera | |
 | **encoded layer** | a layer's bitmap as Tessera encodes it: what images and the writeback ring hold | layer codec, image | bitmap (a bitmap is decoded) |
 | **layer table** | a chunk's list in an image of its layers' types and where their encoded layers start | image | bitmap table |

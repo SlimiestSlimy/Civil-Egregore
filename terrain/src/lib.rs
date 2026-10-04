@@ -37,61 +37,28 @@ pub const WALL_SOUTH: LayerType = LayerType(9);
 /// The walls' layers, and the neighbour each is towards.
 pub const WALLS: [(LayerType, (i32, i32)); 2] = [(WALL_EAST, (1, 0)), (WALL_SOUTH, (0, 1))];
 
-/// The hills' octaves, each the cells between two of its points as a
-/// power of two, and the number its noise is drawn by: every one from
-/// hills 64 superchunks across to rough ground, so that no one
-/// octave's grid shows through.
-const OCTAVES: [(u32, u32); 14] = [(16, 26), (15, 25), (14, 24), (13, 23), (12, 22), (11, 21), (10, 20), (9, 0), (8, 1), (7, 2), (6, 3), (5, 4), (4, 5), (3, 6)];
-/// The number the first octave of the land's rise is drawn by.
-const RISE_INDEX: u32 = 7;
-/// The number the first octave of the shore's wandering is drawn by.
-const SHORE_INDEX: u32 = 12;
-
-/// How the heights are shaped. The land is polygons ([`polygons`]), or
-/// -- as worlds are until those are tuned -- it rises and falls by far more
-/// than a hill over many superchunks ([`rise`]), too gently for a wall;
-/// what of it is under the ocean's level is the ocean's floor, what is
-/// over it islands, dozens to hundreds of superchunks each. Hills
-/// stand on the islands, rising from nothing to their whole height
-/// over the coast's heights of land -- from the shore on average, but
-/// from under the ocean here and from well inland there, as broad
-/// noise says, so that no level band rings an island. The hills' octaves' shares are heights: together, the highest a hill stands.
+/// How the heights are shaped: the land as polygons ([`polygons`]) --
+/// closed shapes that share borders, each ocean, its ground the
+/// lowest there is, or land, a plain at a level of its own over the
+/// ocean's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Shape {
-    /// Each hill octave's share of a height, the broadest first.
-    pub weights: [u64; 14],
+    /// The height the lowest ground is at: the ocean's floor.
+    pub ground: Height,
     /// The height the ocean stands at, all over the world.
     pub ocean: Height,
-    /// How much of the ground under the ocean's level is dry hollows,
-    /// of [`ONE`]: a cell under that level is ocean only where the land
-    /// and this share of the hills' height are under it too. None, and
-    /// all of it is ocean.
-    pub hollows: u64,
-    /// How far under the ocean's level the lowest ground is: what is
-    /// under that level is squeezed so that the lowest lies this far
-    /// under it, and no further than it would have.
-    pub depth: u64,
-    /// How far over the ocean the land is where the hills are whole;
-    /// 0, and the hills are whole everywhere, the ocean's floor too.
-    pub coast: u64,
-    /// The height the lowest ground is at: what all the rest stands on.
-    pub ground: Height,
-    /// The most the land rises over the lowest ground, in heights.
-    pub rise: u64,
-    /// The cells between two points of the land's rise, as a power of
-    /// two: at most 24.
-    pub rise_span: u32,
-    /// The share each octave of the land's rise has, the broadest
-    /// first, each half as broad as the one before.
-    pub rise_shares: [u64; 5],
-    /// How far where the hills begin is moved up or down about the
-    /// shore, beside the coast's heights, of [`ONE`].
-    pub shore: u64,
-    /// The cells between two points of the noise that moves it, as a
-    /// power of two: at least 2.
-    pub shore_span: u32,
-    /// The land as polygons, in place of its rise, if there are any.
-    pub polygons: polygons::Polygons,
+    /// The cells along a square of the polygons' sites' grid, as a
+    /// power of two, 6 to 24: about a polygon's breadth.
+    pub span: u32,
+    /// The share of the polygons that are ocean, of [`ONE`].
+    pub sea: u64,
+    /// The most a land polygon's plain stands over the ocean, in heights.
+    pub levels: u64,
+    /// The cells from a border over which the levels about it are
+    /// mixed: half a square's side at most.
+    pub edge: u64,
+    /// How far the borders are bent, beside a square's side, of [`ONE`].
+    pub warp: u64,
 }
 
 /// A cell's water: how deep it stands over the ground, 0 none, a number
@@ -99,10 +66,10 @@ pub struct Shape {
 pub const WATER: [LayerType; 8] = [LayerType(24), LayerType(25), LayerType(26), LayerType(27), LayerType(28), LayerType(29), LayerType(30), LayerType(31)];
 
 impl Shape {
-    /// The world's shape: islands some 16 superchunks across in an
-    /// ocean a little over half the world, hills as tuned by eye in the
-    /// renderer's lab.
-    pub const DEFAULT: Self = Self { weights: [0, 0, 0, 0, 0, 0, 0, 99, 58, 14, 25, 37, 20, 2], ocean: 800, hollows: 0, depth: 255, coast: 64, ground: 256, rise: 1024, rise_span: 14, rise_shares: [625, 250, 100, 40, 16], shore: ONE, shore_span: 10, polygons: polygons::Polygons::NONE };
+    /// The world's shape: polygons 8 superchunks across, half of them
+    /// ocean 255 deep -- as deep as water is kept -- the plains to 200
+    /// over it, joined by ramps 2,048 cells from a border.
+    pub const DEFAULT: Self = Self { ground: 256, ocean: 511, span: 13, sea: ONE / 2, levels: 200, edge: 2048, warp: ONE * 3 / 10 };
 }
 
 /// One: a fraction's whole, 16 bits.
@@ -120,8 +87,8 @@ fn between(from: u64, to: u64, along: u64) -> u64 {
 
 /// Smooth noise at the cell `(x, y)`, of [`ONE`]: the four points
 /// about the cell of a grid `2^shift` cells apart, each a number
-/// settled by `seed` and `index`, eased between. One octave of a height;
-/// and what else is to lie in patches.
+/// settled by `seed` and `index`, eased between: what bends the
+/// polygons' borders, and what lies in patches lies by.
 pub fn noise(seed: u64, index: u32, shift: u32, x: u32, y: u32) -> u64 {
     let (left, top) = (x >> shift, y >> shift);
     let ease = |within: u32| {
@@ -135,41 +102,6 @@ pub fn noise(seed: u64, index: u32, shift: u32, x: u32, y: u32) -> u64 {
     between(upper, lower, down)
 }
 
-/// How far the land has risen over the lowest ground at the cell
-/// `(x, y)`, in heights: noise far broader than a superchunk and far
-/// higher than a hill, five octaves of it ([`Shape::rise_shares`]):
-/// the finer add shape to a shore.
-pub fn rise(shape: &Shape, seed: u64, x: u32, y: u32) -> u64 {
-    let index = RISE_INDEX;
-    let shares = &shape.rise_shares;
-    let span = shape.rise_span.clamp(shares.len() as u32, 24);
-    let land: u64 = shares.iter().enumerate().map(|(octave, share)| share * noise(seed, index + octave as u32, span - octave as u32, x, y)).sum();
-    (land / shares.iter().sum::<u64>().max(1) * shape.rise) >> 16
-}
-
-/// The land at the cell `(x, y)` -- the lowest ground and the land's
-/// rise over it -- and how much of the hills stands there, of [`ONE`].
-fn land(shape: &Shape, seed: u64, x: u32, y: u32) -> (u64, u64) {
-    let land = if shape.polygons.span > 0 { polygons::land(shape, seed, x, y) } else { shape.ground as u64 + rise(shape, seed, x, y) };
-    if shape.coast == 0 {
-        return (land, ONE);
-    }
-    // Where the hills begin: at the ocean's level, moved up or down by as much as this.
-    let (span, wander) = (shape.shore_span.clamp(2, 24), (shape.coast * shape.shore) >> 16);
-    let moved = ((noise(seed, SHORE_INDEX, span, x, y) + noise(seed, SHORE_INDEX + 1, span - 2, x, y)) * wander) >> 16;
-    // None under where they begin.
-    (land, (((land + moved).saturating_sub(shape.ocean as u64 + wander) << 16) / shape.coast).min(ONE))
-}
-
-/// Whether the ocean is over the cell `(x, y)` if its ground is under
-/// the ocean's level: only where the land and a share of the hills'
-/// height ([`Shape::hollows`]) are under it too -- else it is a dry hollow.
-pub fn under_ocean(shape: &Shape, seed: u64, x: u32, y: u32) -> bool {
-    let (land, relief) = land(shape, seed, x, y);
-    let hills = (((shape.weights.iter().sum::<u64>() * shape.hollows) >> 16) * relief) >> 16;
-    land + hills < shape.ocean as u64
-}
-
 /// The height of the cell at `(x, y)` of the world whose seed is `seed`:
 /// whole numbers only, so the same on any machine.
 pub fn height(seed: u64, x: u32, y: u32) -> Height {
@@ -177,18 +109,10 @@ pub fn height(seed: u64, x: u32, y: u32) -> Height {
 }
 
 /// [`height`], in a world shaped as `shape` says: what a shape is tried
-/// out with before it is the world's. The lowest ground, the land's
-/// rise and the hills, added: never under the lowest ground.
+/// out with before it is the world's.
 pub fn height_shaped(shape: &Shape, seed: u64, x: u32, y: u32) -> Height {
-    let (land, relief) = land(shape, seed, x, y);
-    let hills: u64 = if relief == 0 { 0 } else { OCTAVES.iter().zip(shape.weights).filter(|&(_, weight)| weight > 0).map(|(&(shift, index), weight)| noise(seed, index, shift, x, y) * weight).sum() };
-    let high = land + (((hills * relief) >> 16) >> 16);
-    // Under the ocean's level the ground falls gently: the lowest there is, to the ocean's depth under it.
-    let (ocean, lowest) = (shape.ocean as u64, shape.ground as u64);
-    // Polygons' ocean is at its depth already.
-    let high = if high < ocean && shape.polygons.span == 0 { ocean - (ocean - high) * shape.depth.min(ocean - lowest) / (ocean - lowest).max(1) } else { high };
     // The highest there is, whatever the shape would come to.
-    high.min(Height::MAX as u64) as Height
+    polygons::land(shape, seed, x, y).min(Height::MAX as u64) as Height
 }
 
 /// Whether two heights are too far apart to step between.

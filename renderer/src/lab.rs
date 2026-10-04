@@ -7,13 +7,11 @@
 //! world is made afresh and its ticks start from 0.
 
 use crate::sim::SEED;
-use crate::tuning::{self, COAST, GRASS_COVER, GROUND_LEVEL, DRY_HOLLOWS, HEIGHT_SPAN, HILLS, LAND_RISE, LAND_SPAN, OCEAN_DEPTH, OCEAN_SHARE, PATCH_DETAIL, PATCH_SIZE, POLYGON_EDGE, POLYGON_LEVELS, POLYGON_SIZE, POLYGON_WARP, RISE_SHARES, SCATTER, SHORE_SPAN, SHORE_WANDER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
+use crate::tuning::{self, GRASS_COVER, GROUND_LEVEL, OCEAN_DEPTH, OCEAN_SHARE, PATCH_DETAIL, PATCH_SIZE, POLYGON_EDGE, POLYGON_LEVELS, POLYGON_SIZE, POLYGON_WARP, SCATTER, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
-use terrain::polygons::Polygons;
 use terrain::Shape;
-use utilities::hash::{mix, GOLDEN_RATIO};
+use utilities::hash::mix;
 use world::patches::{Patches, ONE};
 use world::Generation;
 
@@ -58,89 +56,27 @@ pub fn generation() -> Generation {
     if !RUNNING.load(Ordering::Relaxed) {
         return Generation::DEFAULT;
     }
-    // Worked out once for each change: the ocean's level takes thousands of cells to find.
-    let key = (tuning::generation(), seed());
-    let mut last = LAST.lock().expect("the last generation");
-    if let Some((_, generation)) = last.filter(|&(made_for, _)| made_for == key) {
-        return generation;
-    }
-    let generation = from_sliders();
-    *last = Some((key, generation));
-    generation
-}
-
-/// The last generation worked out from the sliders, and the count of
-/// changes and the seed it was worked out for.
-static LAST: Mutex<Option<((u64, u64), Generation)>> = Mutex::new(None);
-
-/// Cells looked at to find the ocean's level.
-const SAMPLED: u64 = 1 << 14;
-
-/// The height `share` of the cells of `shape` are under, in the world
-/// of `seed` -- each one's ground, rise and hills, the hills whole
-/// everywhere: found from [`SAMPLED`] cells drawn over the world.
-fn ocean_level(shape: &Shape, seed: u64, share: f32) -> u16 {
-    // With no ocean and no coast: nothing squeezed under a level, no hill held back from a shore.
-    let raw = Shape { ocean: 0, coast: 0, ..*shape };
-    let mut heights: Vec<u16> = (0..SAMPLED).map(|sample| mix(sample.wrapping_mul(GOLDEN_RATIO))).map(|drawn| terrain::height_shaped(&raw, seed, (drawn >> 32) as u32, drawn as u32)).collect();
-    heights.sort_unstable();
-    match (share.clamp(0.0, 1.0) * SAMPLED as f32) as usize {
-        0 => 0,
-        under if under >= heights.len() => u16::MAX,
-        under => heights[under],
-    }
-}
-
-/// How the world is generated, as the sliders have it.
-fn from_sliders() -> Generation {
     let tuned = tuning::now();
     // What is typed is held to what the noise can take.
     let of_one = |share: f32| (share.clamp(0.0, 1024.0) * ONE as f32) as u64;
     let patches = |[cover, patch, detail, scatter]: [usize; 4]| Patches { cover: of_one(tuned[cover]), patch: tuned[patch].round().clamp(0.0, 16.0) as u32, detail: of_one(tuned[detail]), scatter: of_one(tuned[scatter]) };
-    let land = shape(&tuned);
-    // With polygons the ocean stands its depth over the lowest ground; without, where its share of the heights is under it.
-    let ocean = if land.polygons.span > 0 { (land.ground as u64 + land.depth).min(u16::MAX as u64) as u16 } else { ocean_level(&land, seed(), tuned[OCEAN_SHARE]) };
-    let shape = Shape { ocean, ..land };
+    let shape = shape(&tuned);
     Generation { shape, grass: patches([GRASS_COVER, PATCH_SIZE, PATCH_DETAIL, SCATTER]), trees: patches([TREE_COVER, TREE_PATCH, TREE_DETAIL, TREE_SCATTER]) }
 }
 
-/// The heights' shape, as the sliders have it, but for the ocean's
-/// level: the land,
-/// and each hill octave's share of the height span, whole numbers that
-/// come to no more than the span.
+/// The heights' shape, as the sliders have it: what is typed held to
+/// what a height and the polygons can take.
 fn shape(tuned: &tuning::Tuning) -> Shape {
-    // The hills are a height high at most, whatever is typed.
-    let span = tuned[HEIGHT_SPAN].round().clamp(0.0, u16::MAX as f32) as u64;
-    // A height is 16 bits, whatever is typed: what the land and its hills would pass is held to the highest.
     let height = |tuned: f32| tuned.round().clamp(0.0, u16::MAX as f32) as u16;
-    let land = Shape {
-        weights: [0; 14],
-        ocean: 0,
-        hollows: (tuned[DRY_HOLLOWS].clamp(0.0, 1.0) * ONE as f32) as u64,
-        depth: tuned[OCEAN_DEPTH].round().clamp(0.0, u16::MAX as f32) as u64,
-        coast: tuned[COAST].round().clamp(0.0, u16::MAX as f32) as u64,
-        ground: height(tuned[GROUND_LEVEL]),
-        rise: height(tuned[LAND_RISE]) as u64,
-        rise_span: tuned[LAND_SPAN].round().clamp(5.0, 24.0) as u32,
-        rise_shares: std::array::from_fn(|octave| (tuned[RISE_SHARES + octave].clamp(0.0, 16.0) * 1024.0) as u64),
-        shore: (tuned[SHORE_WANDER].clamp(0.0, 16.0) * ONE as f32) as u64,
-        shore_span: tuned[SHORE_SPAN].round().clamp(2.0, 24.0) as u32,
-        polygons: Polygons {
-            span: tuned[POLYGON_SIZE].round().clamp(0.0, 24.0) as u32,
-            ocean: (tuned[OCEAN_SHARE].clamp(0.0, 1.0) * ONE as f32) as u64,
-            levels: tuned[POLYGON_LEVELS].round().clamp(0.0, u16::MAX as f32) as u64,
-            edge: tuned[POLYGON_EDGE].round().clamp(1.0, u16::MAX as f32) as u64,
-            warp: (tuned[POLYGON_WARP].clamp(0.0, 4.0) * ONE as f32) as u64,
-        },
-    };
-    let shares: [f32; 14] = std::array::from_fn(|octave| tuned[HILLS + octave].max(0.0));
-    let all: f32 = shares.iter().sum();
-    if all <= 0.0 {
-        return land;
+    let ground = height(tuned[GROUND_LEVEL]);
+    Shape {
+        ground,
+        // The ocean stands its depth over its floor.
+        ocean: ground.saturating_add(height(tuned[OCEAN_DEPTH])),
+        span: tuned[POLYGON_SIZE].round().clamp(6.0, 24.0) as u32,
+        sea: (tuned[OCEAN_SHARE].clamp(0.0, 1.0) * ONE as f32) as u64,
+        levels: height(tuned[POLYGON_LEVELS]) as u64,
+        edge: tuned[POLYGON_EDGE].round().clamp(1.0, u16::MAX as f32) as u64,
+        warp: (tuned[POLYGON_WARP].clamp(0.0, 4.0) * ONE as f32) as u64,
     }
-    let mut weights = shares.map(|share| (share / all * span as f32).round() as u64);
-    // Rounded up together they may pass the span by a few: the largest gives them back.
-    let most = (0..weights.len()).max_by_key(|&octave| weights[octave]).unwrap_or(0);
-    weights[most] -= (weights.iter().sum::<u64>().saturating_sub(span)).min(weights[most]);
-    Shape { weights, ..land }
 }

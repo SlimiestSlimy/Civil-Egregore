@@ -140,7 +140,7 @@ impl Ground {
                 let here = at(x, y);
                 let slope = HEIGHT_METRES / CELL_METRES / 2.0;
                 let (across, down) = ((smooth[here + 1] - smooth[here - 1]) * slope, (smooth[here + WIDE] - smooth[here - WIDE]) * slope);
-                let light = banded(1.0 + 0.9 * (sun.shade(across, down) - 1.0), 0.07).clamp(0.55, 1.35) * tint(heights[here].saturating_sub(shape.ground) as f32 / (shape.rise + shape.weights.iter().sum::<u64>()).max(1) as f32);
+                let light = banded(1.0 + 0.9 * (sun.shade(across, down) - 1.0), 0.07).clamp(0.55, 1.35) * tint(heights[here].saturating_sub(shape.ground) as f32 / ((shape.ocean - shape.ground.min(shape.ocean)) as u64 + shape.levels).max(1) as f32);
                 lit[y * SIDE + x] = (light * LIT_ONE).round() as u8 | if shadowed[here] { SHADOWED } else { 0 };
                 level.factors.push(if shadowed[here] { SHADOW.map(|shadow| shadow * light) } else { [light; 3] });
                 level.heights.push(heights[here] as f32);
