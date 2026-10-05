@@ -37,7 +37,7 @@ use std::ops::AddAssign;
 pub const SPREAD_CHANCE: f64 = 0.000_01;
 /// The chance, each tick, that a cell of grass with grass all round
 /// turns back to dirt.
-pub const DECAY_CHANCE: f64 = 0.000_02;
+pub const DECAY_CHANCE: f64 = 0.000_005;
 
 /// What the rule did in a tick.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

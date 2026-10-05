@@ -27,6 +27,7 @@ use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, Instant};
 use crate::{lab, tuning};
@@ -39,8 +40,13 @@ use utilities::rng::Rng;
 /// game's target.
 pub const TARGET_PACE: u32 = 256;
 
-/// The seed of the world watched.
-pub const SEED: u64 = 1;
+/// The seed of the world watched: the workspace's, rolled every few
+/// runs (`utilities::seed`; `TILESIM_SEED` picks one), and from it the
+/// first whose world has land about its origin -- settled once a run.
+pub fn seed() -> u64 {
+    static SEED: OnceLock<u64> = OnceLock::new();
+    *SEED.get_or_init(|| world::seed_with_land(utilities::seed::counted(), &worldgen::Shape::DEFAULT))
+}
 
 /// The depth from which water hides what is under it: a power of two.
 pub const DEEP: u32 = 16;
@@ -208,7 +214,7 @@ pub enum Mode {
     Lab,
 }
 
-/// Starts a world generated from [`SEED`], `superchunks` of them shown
+/// Starts a world generated from [`seed`], `superchunks` of them shown
 /// about its origin, `flock` sheep on each -- ticking on
 /// every thread the machine has, on a thread of its own: where to send it requests,
 /// and where its frames come back. It stops once the requests' sender is
@@ -226,8 +232,8 @@ pub fn start(superchunks: u32, flock: usize, mode: Mode) -> (Sender<Request>, Re
 /// The world `mode` runs, `flock` sheep on each of `shown`.
 fn made(mode: Mode, shown: &[SuperchunkIndex], flock: usize) -> World {
     match mode {
-        Mode::Halos => world::generate_flocks(SEED, shown, flock),
-        Mode::ForcedHot => forced(world::generate(SEED, 0), shown, flock),
+        Mode::Halos => world::generate_flocks(seed(), shown, flock),
+        Mode::ForcedHot => forced(world::generate(seed(), 0), shown, flock),
         Mode::Lab => forced(world::generate_with(lab::generation(), lab::seed()), shown, 0),
     }
 }
@@ -328,7 +334,7 @@ fn forced(mut world: World, shown: &[SuperchunkIndex], flock: usize) -> World {
     wanted.sort_unstable();
     world.keep_hot(&wanted);
     for &superchunk in shown.iter().filter(|_| flock > 0) {
-        entity_rules::sheep::flock(&mut world.entities, superchunk, flock, &mut Rng::for_stream(!SEED, superchunk.0));
+        entity_rules::sheep::flock(&mut world.entities, superchunk, flock, &mut Rng::for_stream(!seed(), superchunk.0));
     }
     world.entities.apply();
     world
