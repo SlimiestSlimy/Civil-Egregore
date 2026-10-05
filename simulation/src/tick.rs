@@ -154,6 +154,31 @@ impl<'a> Turn<'a> {
         sample_layer(self.superchunk.index(), layer, probability, &mut self.random, &mut |cell| samples.push(cell))
     }
 
+    /// Runs `each` on every cell [`Turn::sample`] chooses of
+    /// `layer_type`, in Morton order, with what it counts: how many
+    /// were chosen, and the counts. A rule of the cells is written for
+    /// one cell; the going over them is here.
+    #[inline]
+    pub fn each_sampled<C: Default>(&mut self, layer_type: LayerType, probability: f64, samples: &mut Vec<CellIndex>, mut each: impl FnMut(&mut Self, CellIndex, &mut C)) -> (usize, C) {
+        let (sampled, mut counts) = (self.sample(layer_type, probability, samples), C::default());
+        for &cell in samples.iter() {
+            each(self, cell, &mut counts);
+        }
+        (sampled, counts)
+    }
+
+    /// Runs `each` on every entity of the superchunk waking this tick
+    /// ([`Turn::woken_reading`], of `layers`), with `state`: what the
+    /// rule counts, and whatever it keeps from one entity to the next.
+    /// A rule of the entities is written for one entity; the going
+    /// over them is here.
+    #[inline]
+    pub fn each_woken<const N: usize, S>(&mut self, layers: [LayerType; N], state: &mut S, mut each: impl FnMut(&mut Self, EntityRef<'a>, &mut S)) {
+        for entity in self.woken_reading(layers) {
+            each(self, entity, state);
+        }
+    }
+
     /// The window of `width` by `height` cells (each up to 8) whose top
     /// left cell is `origin`, of `layer_type`, row by row, as the tick
     /// found them: the cells around a cell, say, as masks.

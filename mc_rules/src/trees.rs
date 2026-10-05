@@ -69,29 +69,31 @@ impl AddAssign for TreeCounts {
 }
 
 /// The rule, on one superchunk's turn: every tree sampled with
-/// [`SAMPLE_CHANCE`], in Morton order, tries to spread or grows -- or,
-/// at the oldest stage, may die.
+/// [`SAMPLE_CHANCE`], in Morton order, each seen to by [`tree`].
 pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> TreeCounts {
-    turn.sample(TREE, SAMPLE_CHANCE, samples);
-    let mut counts = TreeCounts { sampled: samples.len(), ..TreeCounts::default() };
-    for &cell in samples.iter() {
-        let spreading = turn.random().unit() <= SPREAD_SHARE;
-        let Ok(stage) = turn.level(TREE_STAGE, cell) else {
-            continue;
-        };
-        if spreading {
-            counts.spreads += spread(turn, cell, stage) as usize;
-        } else if stage < OLDEST {
-            turn.queue_level(TREE_STAGE, cell, stage, stage + 1);
-            counts.grown += 1;
-        } else if turn.random().below(DIE_ONE_IN) == 0 {
-            turn.queue(TREE, Write::cell(cell, WriteOp::Unset));
-            // Its stage goes with it: the next tree there starts at 0.
-            turn.queue_level(TREE_STAGE, cell, stage, 0);
-            counts.died += 1;
-        }
+    let (sampled, counts) = turn.each_sampled(TREE, SAMPLE_CHANCE, samples, tree);
+    TreeCounts { sampled, ..counts }
+}
+
+/// The rule, on one tree sampled: it tries to spread or grows -- or, at
+/// the oldest stage, may die.
+#[inline]
+fn tree(turn: &mut Turn, cell: CellIndex, counts: &mut TreeCounts) {
+    let spreading = turn.random().unit() <= SPREAD_SHARE;
+    let Ok(stage) = turn.level(TREE_STAGE, cell) else {
+        return;
+    };
+    if spreading {
+        counts.spreads += spread(turn, cell, stage) as usize;
+    } else if stage < OLDEST {
+        turn.queue_level(TREE_STAGE, cell, stage, stage + 1);
+        counts.grown += 1;
+    } else if turn.random().below(DIE_ONE_IN) == 0 {
+        turn.queue(TREE, Write::cell(cell, WriteOp::Unset));
+        // Its stage goes with it: the next tree there starts at 0.
+        turn.queue_level(TREE_STAGE, cell, stage, 0);
+        counts.died += 1;
     }
-    counts
 }
 
 /// The tree at `cell`, `stage` old, tries to spread: whether it put one.

@@ -52,7 +52,7 @@ use chunk_storage::mock::GRASS;
 use coordinates::{CellCartesian, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use simulation::around::{self, CENTRE, RING};
 use terrain::{WALL_EAST, WALL_SOUTH};
-use simulation::entity_store::{Attribute, AttributeType, EntityEdit, Entities, EntityId, EntityType, Header};
+use simulation::entity_store::{Attribute, AttributeType, EntityEdit, EntityRef, Entities, EntityId, EntityType, Header};
 use simulation::{Simulation, Turn, TickReport};
 use std::collections::HashSet;
 use std::ops::AddAssign;
@@ -142,105 +142,118 @@ pub fn tick(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut
     simulation.tick(arena, entities, seed, |turn, _| rule(turn))
 }
 
-/// The rule, on one superchunk's turn: every sheep waking sees to what
-/// it woke for -- a meal, a lamb, growing up -- and sleeps again, as
-/// long as it can.
+/// What the rule keeps over a superchunk's turn: what the sheep did,
+/// and room for a sheep's attributes as they are changed, made once.
+#[derive(Default)]
+struct Flock {
+    /// What the sheep did.
+    done: SheepCounts,
+    /// Room for the attributes of the sheep being changed.
+    room: Vec<Attribute>,
+}
+
+/// The rule, on one superchunk's turn: every sheep waking, each seen to
+/// by [`wake`].
 pub fn rule(turn: &mut Turn) -> SheepCounts {
-    let mut done = SheepCounts::default();
-    let mut room = Vec::new();
-    let now = turn.now();
-    for sheep in turn.woken_reading([GRASS, WALL_EAST, WALL_SOUTH]) {
-        done.woken += 1;
-        let at = sheep.header.at;
-        let mut sheep = EntityEdit::of(sheep, &mut room);
-        let grass = turn.around(GRASS, at);
-        // The neighbours it may step to: on the hot bitplanes, no wall before them. Where entities stand is not read.
-        let mut steppable = grass.hot & RING & turn.around_unwalled(at);
-        let hungry_at = sheep.get(HUNGRY_AT).unwrap_or(now);
-        let roaming = sheep.get(ROAMING);
-        // On its way out of thin pasture it does not stop to eat.
-        let fed = now >= hungry_at && grass.set & CENTRE != 0 && roaming.is_none();
-        if !fed && now >= hungry_at + STARVE_TICKS {
-            turn.remove(sheep.header());
-            done.deaths += 1;
-            continue;
-        }
-        // The pasture about it, looked at as it eats: thin, it will leave when next hungry.
-        let lush = fed && turn.area(GRASS, at).count() >= LUSH_CELLS;
-        if fed {
-            turn.queue(GRASS, Write::cell(at, WriteOp::Unset));
-            sheep.set(HUNGRY_AT, now + MEAL_TICKS);
-            done.eaten += 1;
-            if let (false, Some(way)) = (lush, around::pick(turn.random(), steppable)) {
-                sheep.set(ROAMING, (now + MEAL_TICKS + ROAM_TICKS) << 4 | way as u64);
-            }
-        }
-        let hungry = !fed && now >= hungry_at;
-        // What it next has to wake for, were it to sleep as long as it can.
-        let mut needs = if fed { now + MEAL_TICKS } else { hungry_at };
-        let grown_at = sheep.get(LAMB);
-        match sheep.get(PREGNANT) {
-            Some(due) if now < due => needs = needs.min(due),
-            // Its lamb is born on a cell seen free beside it; with none, it waits a step's time more.
-            Some(_) => match turn.free_beside(at, steppable) {
-                Some(beside) => {
-                    sheep.unset(PREGNANT);
-                    // The lamb's cell is no longer one to step to.
-                    steppable &= !(1 << beside);
-                    let (cell, wake) = (around::cell(at, beside).expect("a hot neighbour is in the world"), next_step(turn));
-                    turn.spawn(SHEEP, cell, wake, &[Attribute { kind: HUNGRY_AT, value: now + MEAL_TICKS }, Attribute { kind: LAMB, value: now + LAMB_TICKS }]);
-                    done.births += 1;
-                }
-                None => needs = now,
-            },
-            None if lush && grown_at.is_none() && turn.random().below(CONCEIVE_ONE_IN) == 0 => {
-                sheep.set(PREGNANT, now + GESTATION_TICKS);
-                needs = needs.min(now + GESTATION_TICKS);
-            }
-            None => {}
-        }
-        match grown_at {
-            Some(grown_at) if now >= grown_at => _ = sheep.unset(LAMB),
-            Some(grown_at) => needs = needs.min(grown_at),
-            None => {}
-        }
-        // Hungry, it walks; satisfied, it stays, and sleeps until it needs something.
-        let way = if !hungry {
-            None
-        } else if let Some(roaming) = roaming {
-            // On the way it set off, until its time is up or it comes to the edge of the hot superchunks.
-            let way = 1 << (roaming & 15);
-            if now >= roaming >> 4 || steppable & way == 0 {
-                sheep.unset(ROAMING);
-            }
-            around::prefer(turn.random(), way, steppable)
-        } else if grass.set & steppable != 0 {
-            around::pick(turn.random(), grass.set & steppable)
-        } else if steppable == 0 {
-            // Hemmed in: no step to take, and no path to look for.
-            None
-        } else {
-            done.sought += 1;
-            match turn.seek(at, GRASS) {
-                Some(found) => {
-                    done.paths += 1;
-                    done.far += (found.scale > 0) as usize;
-                    Some(around::bit_of(at, found.to))
-                }
-                None => around::pick(turn.random(), steppable),
-            }
-        };
-        let to = way.and_then(|way| around::cell(at, way)).unwrap_or(at);
-        let wake = if hungry { next_step(turn) } else { next_step(turn).max(needs + turn.random().below(STEP_JITTER)) };
-        // Old age comes by the tick, not the wake: a long sleep is as much of a life as many short ones.
-        if turn.random().below(LIFE_TICKS) < wake - now {
-            turn.remove(sheep.header());
-            done.deaths += 1;
-            continue;
-        }
-        turn.commit(sheep, to, wake);
+    let mut flock = Flock::default();
+    turn.each_woken([GRASS, WALL_EAST, WALL_SOUTH], &mut flock, wake);
+    flock.done
+}
+
+/// The rule, on one sheep waking: it sees to what it woke for -- a
+/// meal, a lamb, growing up -- and sleeps again, as long as it can.
+#[inline]
+fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
+    let (done, room, now) = (&mut flock.done, &mut flock.room, turn.now());
+    done.woken += 1;
+    let at = sheep.header.at;
+    let mut sheep = EntityEdit::of(sheep, room);
+    let grass = turn.around(GRASS, at);
+    // The neighbours it may step to: on the hot bitplanes, no wall before them. Where entities stand is not read.
+    let mut steppable = grass.hot & RING & turn.around_unwalled(at);
+    let hungry_at = sheep.get(HUNGRY_AT).unwrap_or(now);
+    let roaming = sheep.get(ROAMING);
+    // On its way out of thin pasture it does not stop to eat.
+    let fed = now >= hungry_at && grass.set & CENTRE != 0 && roaming.is_none();
+    if !fed && now >= hungry_at + STARVE_TICKS {
+        turn.remove(sheep.header());
+        done.deaths += 1;
+        return;
     }
-    done
+    // The pasture about it, looked at as it eats: thin, it will leave when next hungry.
+    let lush = fed && turn.area(GRASS, at).count() >= LUSH_CELLS;
+    if fed {
+        turn.queue(GRASS, Write::cell(at, WriteOp::Unset));
+        sheep.set(HUNGRY_AT, now + MEAL_TICKS);
+        done.eaten += 1;
+        if let (false, Some(way)) = (lush, around::pick(turn.random(), steppable)) {
+            sheep.set(ROAMING, (now + MEAL_TICKS + ROAM_TICKS) << 4 | way as u64);
+        }
+    }
+    let hungry = !fed && now >= hungry_at;
+    // What it next has to wake for, were it to sleep as long as it can.
+    let mut needs = if fed { now + MEAL_TICKS } else { hungry_at };
+    let grown_at = sheep.get(LAMB);
+    match sheep.get(PREGNANT) {
+        Some(due) if now < due => needs = needs.min(due),
+        // Its lamb is born on a cell seen free beside it; with none, it waits a step's time more.
+        Some(_) => match turn.free_beside(at, steppable) {
+            Some(beside) => {
+                sheep.unset(PREGNANT);
+                // The lamb's cell is no longer one to step to.
+                steppable &= !(1 << beside);
+                let (cell, wake) = (around::cell(at, beside).expect("a hot neighbour is in the world"), next_step(turn));
+                turn.spawn(SHEEP, cell, wake, &[Attribute { kind: HUNGRY_AT, value: now + MEAL_TICKS }, Attribute { kind: LAMB, value: now + LAMB_TICKS }]);
+                done.births += 1;
+            }
+            None => needs = now,
+        },
+        None if lush && grown_at.is_none() && turn.random().below(CONCEIVE_ONE_IN) == 0 => {
+            sheep.set(PREGNANT, now + GESTATION_TICKS);
+            needs = needs.min(now + GESTATION_TICKS);
+        }
+        None => {}
+    }
+    match grown_at {
+        Some(grown_at) if now >= grown_at => _ = sheep.unset(LAMB),
+        Some(grown_at) => needs = needs.min(grown_at),
+        None => {}
+    }
+    // Hungry, it walks; satisfied, it stays, and sleeps until it needs something.
+    let way = if !hungry {
+        None
+    } else if let Some(roaming) = roaming {
+        // On the way it set off, until its time is up or it comes to the edge of the hot superchunks.
+        let way = 1 << (roaming & 15);
+        if now >= roaming >> 4 || steppable & way == 0 {
+            sheep.unset(ROAMING);
+        }
+        around::prefer(turn.random(), way, steppable)
+    } else if grass.set & steppable != 0 {
+        around::pick(turn.random(), grass.set & steppable)
+    } else if steppable == 0 {
+        // Hemmed in: no step to take, and no path to look for.
+        None
+    } else {
+        done.sought += 1;
+        match turn.seek(at, GRASS) {
+            Some(found) => {
+                done.paths += 1;
+                done.far += (found.scale > 0) as usize;
+                Some(around::bit_of(at, found.to))
+            }
+            None => around::pick(turn.random(), steppable),
+        }
+    };
+    let to = way.and_then(|way| around::cell(at, way)).unwrap_or(at);
+    let wake = if hungry { next_step(turn) } else { next_step(turn).max(needs + turn.random().below(STEP_JITTER)) };
+    // Old age comes by the tick, not the wake: a long sleep is as much of a life as many short ones.
+    if turn.random().below(LIFE_TICKS) < wake - now {
+        turn.remove(sheep.header());
+        done.deaths += 1;
+        return;
+    }
+    turn.commit(sheep, to, wake);
 }
 
 /// The tick a sheep taking a step now wakes next.
