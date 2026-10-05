@@ -34,7 +34,10 @@ what they always do and are not listed.
 | **island** | land about land vertices that are joined, the ocean about it | ocean, vertex | continent |
 | **tree** | a cell set in the layer `TREE`, with a **stage** | stage, patches | |
 | **stage** | how old a tree is, 0 to 15: a number kept over four bitplanes (`TREE_STAGE`), a bit each | tree, level | age, growth |
-| **level** | a number a cell holds over several bitplanes, the lowest bit first (`Turn::level`) | stage, bitplane | multi-bit plane |
+| **level** | a number a cell holds over several bitplanes, the lowest bit first (`Turn::level`): the water's depth, until it is a wide plane | wide plane, bitplane | |
+| **wide plane** | a bitplane of 2, 4, 8 or 16 bits a cell, a cell's number held together where it is hot and read or written whole (`Wide<W>`, `Turn::value`); cold, a layer a bit | width, value, level | multi-bit plane |
+| **width** | the bits a cell of a plane, in the plane's type: `Bits2`, `Bits4`, `Bits8`, `Bits16` | wide plane | |
+| **value** | the number a cell of a wide plane holds | wide plane | |
 | **patches** | how grass and trees lie when a superchunk is generated: noise under a threshold, not cells scattered (`world::patches`) | generation | pasture |
 | **wall** | a bar between two cells across or down more than one apart in height; kept by the upper or left cell, in the layers `WALL_EAST` and `WALL_SOUTH`. A diagonal step has no wall of its own: it is open only when both ways round it are | step, terrain | cliff (the renderer's drawing of walls) |
 | **terrain** | a superchunk's heights and walls | height, wall | |

@@ -34,8 +34,8 @@ use crate::entity_store::{Attribute, AttributeType, Instructions, EntityEdit, En
 use pathfinding::{a_star, step_towards, Cell, Rows, Walls};
 use terrain::{WALL_EAST, WALL_SOUTH};
 use crate::sampling::sample_layer;
-use bitplane_manager::{count_missed, COARSEST_TILES_IN_CHUNK, WritesApplied, BitmapArena, NotHot, Reader, Shape, Superchunk, Window, Write, WriteOp, WriteQueues};
-use chunk_storage::LayerType;
+use bitplane_manager::{count_missed, COARSEST_TILES_IN_CHUNK, WritesApplied, BitmapArena, NotHot, Reader, Shape, Superchunk, Window, Write, WriteQueues};
+use chunk_storage::{LayerType, Wide, Width};
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex};
 use std::ops::AddAssign;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -423,9 +423,9 @@ impl<'a> Turn<'a> {
     }
 
     /// The number kept at `cell` over `planes`, a bit a bitplane, the
-    /// lowest first, as the tick found it: what a cell holds more than
-    /// one bit of -- a tree's stage, say -- lies over as many
-    /// bitplanes as it has bits.
+    /// lowest first, as the tick found it: for a number kept over
+    /// separate layers, a read each -- the water's depth, for now. A
+    /// wide plane holds its number in one ([`Turn::value`]).
     pub fn level<const N: usize>(&self, planes: [LayerType; N], cell: CellIndex) -> Result<u32, NotHot> {
         let mut level = 0;
         for (bit, plane) in planes.into_iter().enumerate() {
@@ -434,15 +434,17 @@ impl<'a> Turn<'a> {
         Ok(level)
     }
 
-    /// Queues the writes that turn the number at `cell` over `planes`
-    /// from `from` -- what [`Turn::level`] read -- to `to`: one for
-    /// each bit that differs.
-    pub fn queue_level<const N: usize>(&mut self, planes: [LayerType; N], cell: CellIndex, from: u32, to: u32) {
-        for (bit, plane) in planes.into_iter().enumerate() {
-            if (from ^ to) >> bit & 1 == 1 {
-                self.queue(plane, Write::cell(cell, if to >> bit & 1 == 1 { WriteOp::Set } else { WriteOp::Unset }));
-            }
-        }
+    /// The number `plane` holds at `cell`, as the tick found it: one
+    /// read, whatever its width -- which is its type's.
+    #[inline]
+    pub fn value<W: Width>(&self, plane: Wide<W>, cell: CellIndex) -> Result<u32, NotHot> {
+        self.reader.value(plane, cell)
+    }
+
+    /// Queues the write that makes `value` the number `plane` holds at
+    /// `cell`.
+    pub fn queue_value<W: Width>(&mut self, plane: Wide<W>, cell: CellIndex, value: u32) {
+        self.queue(plane.layer_type(), Write::value(plane, cell, value));
     }
 
     /// Queues `write` to `layer_type`'s bitplane, applied in the second

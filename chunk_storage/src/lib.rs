@@ -30,10 +30,11 @@ mod layer_codec;
 pub mod mock;
 mod superchunk_image;
 pub mod transient_data;
+pub mod wide;
 mod writeback_ring;
 
 pub use chunk_storage::{ChunkStorage, Flush};
 pub use height_map::{height_in, Height, HeightMap, HEIGHT_WORDS, TALL_WORDS};
-pub use layer_codec::{LayerCodec, LayerType};
+pub use layer_codec::{Bits16, Bits2, Bits4, Bits8, LayerCodec, LayerType, Wide, Width};
 pub use superchunk_image::{InvalidImage, LayerChange, SuperchunkImage};
 pub use writeback_ring::{RingEntry, WritebackRing};

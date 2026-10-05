@@ -137,7 +137,7 @@ impl World {
 /// and the walls'.
 /// Dirt has none: it is a cell with nothing on it.
 fn layer_types() -> Vec<LayerType> {
-    [GRASS, TREE].into_iter().chain(TREE_STAGE).chain(WATER).chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
+    [GRASS, TREE, TREE_STAGE.layer_type()].into_iter().chain(WATER).chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
 }
 
 /// A world made from `seed`: its origin superchunk ([`WORLD_MIDDLE`])
@@ -191,7 +191,7 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
     let (grass_under, trees_under) = (generation.grass.threshold(seed), generation.trees.threshold(trees_seed));
     // The planes generated, each a bitmap a chunk: grass, trees, their stage's four, and the water's eight.
     let mut planes = vec![GRASS, TREE];
-    planes.extend(TREE_STAGE);
+    planes.extend(TREE_STAGE.layer_type().planes());
     let water = planes.len();
     planes.extend(WATER);
     let mut cells = vec![[0u64; bitmap::WORDS]; planes.len() * CHUNKS_IN_SUPERCHUNK];
@@ -214,7 +214,7 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
             set(1);
             // Its stage: a lot of the cell's own.
             let stage = mix(trees_seed ^ ((y as u64) << 32 | x as u64)) % (OLDEST as u64 + 1);
-            (0..TREE_STAGE.len()).filter(|bit| stage >> bit & 1 == 1).for_each(|bit| set(2 + bit));
+            (0..TREE_STAGE.layer_type().bits() as usize).filter(|bit| stage >> bit & 1 == 1).for_each(|bit| set(2 + bit));
         }
     }
     // A layer a chunk for each plane with a cell set on it, and for each way's walls.
@@ -263,7 +263,9 @@ pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
     }
     saved.bytes += disk::write_hot(folder, &HotSuperchunks { hot, cooling: world.cooling().collect(), warming: world.warming().collect() })?;
     // The world's file last: a save cut short leaves the one before it.
-    saved.bytes += disk::write_world(folder, &WorldInfo { tick: world.entities.now(), ..world.info.clone() })?;
+    // The layers a save lists are those it holds: a wide plane's, a bit each.
+    let layers = world.info.layers.iter().flat_map(|layer| layer.planes()).collect();
+    saved.bytes += disk::write_world(folder, &WorldInfo { tick: world.entities.now(), layers, ..world.info.clone() })?;
     Ok(saved)
 }
 
@@ -273,7 +275,8 @@ pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
 /// cooling again and those warming warming again, each to turn when it
 /// was to -- as it was when saved, to the cell and the random number.
 pub fn load(folder: &Path) -> Result<World, DiskError> {
-    let info = disk::read_world(folder)?;
+    // The layers made hot are the code's: a save lists what it was written with.
+    let info = WorldInfo { layers: layer_types(), ..disk::read_world(folder)? };
     let hot = disk::read_hot(folder)?;
     let mut world = World::empty(info, Generation::DEFAULT);
     let mut kept = 0;

@@ -7,7 +7,7 @@
 use bitmap::{Bitmap, CellWords, WORDS};
 use bitplane_manager::{WritesApplied, BitmapArena, BucketKey, NotHot, Reader, Shape, Window, Write, WriteOp, COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS};
 use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
-use chunk_storage::{ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
+use chunk_storage::{Bits16, Bits2, Bits4, Bits8, Wide, Width, ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
 use bitmap::morton::morton_index;
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 
@@ -220,7 +220,7 @@ fn a_superchunk_lingering_waits_for_its_changes() {
     write(&mut arena, LayerType(1), WriteOp::Set, cell);
 
     let dirty = arena.make_cold_superchunk(WORLD_MIDDLE);
-    assert_eq!(dirty.iter().map(|(key, cells)| (*key, **cells)).collect::<Vec<_>>(), vec![(key, one_cell(CELL))], "its one change, to encode");
+    assert_eq!(dirty.iter().map(|(key, cells)| (*key, cells.to_vec())).collect::<Vec<_>>(), vec![(key, one_cell(CELL).to_vec())], "its one change, to encode");
     assert_eq!((arena.len(), arena.lingering()), (0, 1), "cold, lingering");
     assert_eq!(arena.holds(LayerType(1), cell), Err(NotHot(key)));
     storage.flush_all(&mut flushed);
@@ -228,7 +228,7 @@ fn a_superchunk_lingering_waits_for_its_changes() {
     assert_eq!(arena.lingering(), 1, "its change on its way: kept");
 
     for (key, cells) in &dirty {
-        assert!(storage.try_write_back(key.chunk, key.layer_type, codec.encode_layer(cells)));
+        assert!(storage.try_write_back(key.chunk, key.layer_type, codec.encode_layer(cells[..].try_into().expect("a bitmap's words"))));
     }
     arena.written_back(WORLD_MIDDLE, dirty.iter().map(|(key, _)| *key));
     assert!(arena.hold(WORLD_MIDDLE), "lingering, so held");
@@ -448,4 +448,48 @@ fn every_count_tile_counts_its_cells() {
     }
     assert!(arena.apply().changed > 1000);
     counted(&arena);
+}
+
+/// A wide plane of `W`'s bits a cell holds a number a cell: written,
+/// read back whole, counted where it is not 0; written back, it is
+/// cold as its bits' bitmaps, a layer type each, and made hot again
+/// from them it holds what it held.
+fn a_wide_plane_holds_numbers<W: Width>(plane: Wide<W>) {
+    let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
+    let mut storage = ChunkStorage::new(1 << 12);
+    let (layer_type, chunk) = (plane.layer_type(), ChunkIndex::of(WORLD_MIDDLE, 9));
+    let key = BucketKey { layer_type, chunk };
+    assert_eq!(arena.make_hot_layers(chunk, &[layer_type], &storage, &mut codec), 1);
+    // Numbers over the plane's whole range, on cells of their own; one of them put again, one taken back to 0.
+    let numbers: Vec<(CellIndex, u32)> = (0..40).map(|nth: u32| (cell_in(chunk, ((nth * 37) as u8, (nth / 4 * 91) as u8)), 1 + nth.wrapping_mul(2_654_435_761) % plane.most())).collect();
+    let (emptied, _) = numbers[7];
+    for &(cell, number) in &numbers {
+        arena.queue(layer_type, Write::value(plane, cell, number));
+    }
+    arena.queue(layer_type, Write::value(plane, numbers[0].0, plane.most()));
+    arena.queue(layer_type, Write::value(plane, emptied, 0));
+    arena.apply();
+    let held = |arena: &BitmapArena| numbers.iter().map(|&(cell, _)| arena.value(plane, cell)).collect::<Vec<_>>();
+    let expected: Vec<_> = numbers.iter().enumerate().map(|(nth, &(_, number))| Ok(if nth == 0 { plane.most() } else if nth == 7 { 0 } else { number })).collect();
+    assert_eq!(held(&arena), expected, "{} bits a cell", W::BITS);
+    assert_eq!(arena.bucket(key).expect("hot").count(), 39, "the cells not at 0");
+
+    assert_eq!(arena.write_back(WORLD_MIDDLE, &mut storage, &mut codec), 1);
+    storage.flush_all(&mut flushed);
+    arena.flushed(&flushed);
+    assert!(layer_type.planes().any(|bit| storage.layer(chunk, bit).is_some()) && storage.layer(chunk, layer_type).is_none(), "cold as its bits' bitmaps");
+    assert!(arena.evict(key));
+    assert_eq!(arena.value(plane, emptied), Err(NotHot(key)));
+    assert_eq!(arena.make_hot_layers(chunk, &[layer_type], &storage, &mut codec), 1);
+    assert_eq!(held(&arena), expected, "{} bits a cell, from the cold pool", W::BITS);
+    assert_eq!(arena.bucket(key).expect("hot").count(), 39);
+}
+
+/// Planes of 2, 4, 8 and 16 bits a cell each hold their numbers, hot and cold.
+#[test]
+fn wide_planes_hold_numbers_at_every_width() {
+    a_wide_plane_holds_numbers(Wide::<Bits2>::new(40));
+    a_wide_plane_holds_numbers(Wide::<Bits4>::new(40));
+    a_wide_plane_holds_numbers(Wide::<Bits8>::new(40));
+    a_wide_plane_holds_numbers(Wide::<Bits16>::new(40));
 }

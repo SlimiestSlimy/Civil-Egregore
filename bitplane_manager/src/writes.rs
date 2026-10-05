@@ -15,7 +15,7 @@
 
 use crate::{contains, BitmapArena, SuperchunkLayer};
 use bitmap::morton::morton_index;
-use chunk_storage::LayerType;
+use chunk_storage::{LayerType, Wide, Width};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
 
 /// What a write does to each cell it covers.
@@ -27,6 +27,10 @@ pub enum WriteOp {
     Unset,
     /// Makes the cell set if it was clear, clear if it was set.
     Flip,
+    /// Makes the cell's number this: for a layer more than a bit a cell
+    /// wide, its low bits as many as the layer has. On a layer of a bit
+    /// a cell, set if it is not 0.
+    Put(u16),
 }
 
 /// The cells a write covers, from its anchor cell; the parts past the
@@ -64,12 +68,19 @@ pub struct Write {
     pub shape: Shape,
 }
 
-const _: () = assert!(size_of::<Write>() == 12, "a write is fixed in size, 12 bytes");
+const _: () = assert!(size_of::<Write>() == 16, "a write is fixed in size, 16 bytes");
 
 impl Write {
     /// `op` on the cell `at`.
     pub fn cell(at: CellIndex, op: WriteOp) -> Self {
         Self { at, op, shape: Shape::Cell }
+    }
+
+    /// `value` made the number of the cell `at`, of a wide plane: no
+    /// more than a plane of that width holds.
+    pub fn value<W: Width>(plane: Wide<W>, at: CellIndex, value: u32) -> Self {
+        debug_assert!(value <= plane.most(), "{value} in a plane of {} bits a cell", W::BITS);
+        Self { at, op: WriteOp::Put(value as u16), shape: Shape::Cell }
     }
 
     /// The smallest rectangle holding the write's cells: its first and
@@ -196,10 +207,17 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk: Super
         let at = layers.binary_search_by_key(&layer_type, |layer| layer.layer_type).ok()?;
         Some(&mut layers[at])
     });
-    let op = |layer: &SuperchunkLayer, chunk, cell| match write.op {
-        WriteOp::Set => true,
-        WriteOp::Unset => false,
-        WriteOp::Flip => !layer.get(chunk, cell),
+    // What the write does to one cell of a hot bucket: whether it changed.
+    let put = |layer: &mut SuperchunkLayer, chunk, cell| match (write.op, layer.layer_type.bits()) {
+        (WriteOp::Set, 1) => layer.put_cell(chunk, cell, true),
+        (WriteOp::Unset, 1) => layer.put_cell(chunk, cell, false),
+        (WriteOp::Flip, 1) => layer.put_cell(chunk, cell, !layer.get(chunk, cell)),
+        (WriteOp::Put(value), 1) => layer.put_cell(chunk, cell, value != 0),
+        (WriteOp::Put(value), _) => layer.put_value(chunk, cell, value as u32),
+        // A wide cell is given a number: set is 1, unset 0, and a flip sets a cell at 0 and clears any other.
+        (WriteOp::Set, _) => layer.put_value(chunk, cell, 1),
+        (WriteOp::Unset, _) => layer.put_value(chunk, cell, 0),
+        (WriteOp::Flip, _) => layer.put_value(chunk, cell, (layer.value(chunk, cell) == 0) as u32),
     };
     let at = { write.at };
     if write.shape == Shape::Cell {
@@ -209,8 +227,7 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk: Super
         let chunk = at.chunk().place();
         match layer {
             Some(layer) if contains(layer.flags.hot, chunk) => {
-                let set = op(layer, chunk, at.place());
-                applied.changed += layer.put_cell(chunk, at.place(), set) as u64;
+                applied.changed += put(layer, chunk, at.place()) as u64;
             }
             _ => applied.missed += 1,
         }
@@ -239,8 +256,7 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk: Super
                 Some(layer) if contains(layer.flags.hot, chunk) => {
                     for (x, y) in covered {
                         let cell = morton_index(x as u8, y as u8);
-                        let set = op(layer, chunk, cell);
-                        applied.changed += layer.put_cell(chunk, cell, set) as u64;
+                        applied.changed += put(layer, chunk, cell) as u64;
                     }
                 }
                 _ => applied.missed += covered.count() as u64,
