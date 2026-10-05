@@ -82,31 +82,39 @@ grounds, near)`**: the picture. **`Cell`**: **`paint`**, a cell's pixels
 
 ## `tuning.rs`
 
-**`Tuned`** `{name, default, range, page, what}` -- `what` the tooltip;
-**`Page`**: `Shading`, `Generation`; `TUNED`, the thirty-five of them,
-and each one's place (`STEP_LIGHT` ... `TEXTURE`, `OCEAN_FLOOR` ...
-`TREE_SCATTER`). **`Tuning`**: the
-numbers read together. **`path()`**: where they are kept. **`start()`**:
-defaults, then what was kept. **`now()`**, **`set(index, value)`**,
-**`keep()`**. **`generation()`**: how many times how the world is
-generated has changed; **`regenerate()`**: says it has.
+**`Tuned`** `{name, default, range, group, what}` -- `what` the tooltip;
+**`Group`**: `Shading`, `Land`, `Lines`, `Finer`, `Grass`, `Trees`,
+`Sheep` (`GROUPS`, in the menu's order), **`name()`** and
+**`generation()`** -- whether its numbers say how the world is made;
+`TUNED`, and each one's place (`STEP_LIGHT` ... `SHEEP`).
+**`Tuning`**: the numbers read together. **`start()`**: defaults, then
+what the machine's settings have. **`now()`**, **`set(index, value)`**,
+**`keep()`**: those changed written to the settings, the others' lines
+dropped. **`generation()`**: how many times how the world is generated
+has changed; **`regenerate()`**: says it has.
 
 ## `sliders.rs`
 
 `MARGIN`, `ROW`, `TRACK`, `KNOB`, `BOX`, `GAP`, `PANEL`, `NAME`,
-`BUTTON`: the layout; `PAGES`, the order `U` goes through them.
-**`Part`**: anything of a page; **`Moved`**: a knob or a track's filled
-part; **`Valued`**: a value in its box. **`Hands`**: the slider dragged
-and the value being typed. **`page()`**, **`rows(page)`**,
-**`button_top(page)`**, **`over(window)`**; **`Row`**, a part that
-scrolls with the panel (**`scroll`**); **`Tip`** and **`tell`**: what a
-slider does, said when the pointer rests on it.
-**`show_generation()`**: the lab's page shown from the start.
-**`held()`**: whether the left button went down over the sliders and is
-still held -- the view is then not dragged. **`setup`**: the pages.
-**`toggle`**: the next page by `U`. **`typed(key)`**: the digit or point
-a key types. **`slide`**: sliders dragged and set back, values typed,
-the button pressed, the numbers kept and shown.
+`CLOSED`: the layout. **`Shown`**: `Closed`, `Menu` or `Group(group)`
+-- what is on the screen, **`shown()`** and **`show(what)`**.
+**`Part`**: anything of the sliders, and what it is shown with;
+**`Moved`**: a knob or a track's filled part; **`Valued`**: a value in
+its box. **`Hands`**: the slider dragged and the value being typed.
+**`page()`**: the group shown; **`rows(group)`**; **`listed()`**: the
+groups the menu has; **`rows_under()`**, **`middle(row)`**,
+**`foot()`**, **`across()`**, **`over(window)`**,
+**`row_under(window)`**: the arithmetic of where things are. **`Row`**,
+a part that scrolls (**`scroll`**, which also shows the parts of what
+is shown and hides the rest); **`Tip`** and **`tell`**: what a slider
+does, said when the pointer rests on it. **`in_lab()`**: every group
+listed, the menu open from the start. **`held()`**: whether the left
+button went down over the sliders and is still held -- the view is then
+not dragged. **`setup`**: the button, the menu and the groups.
+**`toggle`**: the menu by `U`, or all closed. **`typed(key)`**: the
+digit or point a key types. **`slide`**: the menu and the groups
+opened and left, sliders dragged and set back, values typed, the lab's
+button pressed, the numbers kept and shown.
 
 ## `lab.rs`
 

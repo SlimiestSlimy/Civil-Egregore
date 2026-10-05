@@ -17,3 +17,5 @@ mod table;
 mod commands;
 #[path = "fine/dispatcher.rs"]
 mod dispatcher;
+#[path = "fine/settings.rs"]
+mod settings;

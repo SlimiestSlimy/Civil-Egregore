@@ -193,3 +193,4 @@ what they always do and are not listed.
 | **census** | a count of a population: the flock and grass over a run, or Tessera's nodes by kind | | |
 | **reading** | the process's memory read once (`MemoryTrack::read`) | | sample |
 | **tier** | a test's size: fine, fast or complete (`docs/testing_protocol.md`) | | |
+| **settings** | what a person has changed on this machine, kept from run to run: `settings.txt` in the folder `tilesim` where the system keeps a user's programs' data (`utilities::settings`); a setting left as the code has it has no line | slider, group | config, preferences, preset |

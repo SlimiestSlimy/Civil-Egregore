@@ -339,7 +339,7 @@ fn main() {
     };
     if in_lab {
         lab::run();
-        sliders::show_generation();
+        sliders::in_lab();
     }
     let (requests, frames) = start(superchunks, flock, mode);
     _ = requests.send(Request::Pace(pace));

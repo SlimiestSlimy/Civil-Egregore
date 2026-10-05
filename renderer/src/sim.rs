@@ -42,10 +42,11 @@ pub const TARGET_PACE: u32 = 256;
 
 /// The seed of the world watched: the workspace's, rolled every few
 /// runs (`utilities::seed`; `TILESIM_SEED` picks one), and from it the
-/// first whose world has land about its origin -- settled once a run.
+/// first whose world -- shaped as the lab's sliders have it, in the
+/// lab -- has land about its origin: settled once a run.
 pub fn seed() -> u64 {
     static SEED: OnceLock<u64> = OnceLock::new();
-    *SEED.get_or_init(|| server::seed_with_land(utilities::seed::counted(), &worldgen::Shape::DEFAULT))
+    *SEED.get_or_init(|| server::seed_with_land(utilities::seed::counted(), &lab::generation().shape))
 }
 
 /// The depth from which water hides what is under it: a power of two.
@@ -234,7 +235,7 @@ fn made(mode: Mode, shown: &[SuperchunkIndex], flock: usize) -> World {
     match mode {
         Mode::Halos => server::generate_flocks(seed(), shown, flock),
         Mode::ForcedHot => forced(server::generate(seed(), 0), shown, flock),
-        Mode::Lab => forced(server::generate_with(lab::generation(), lab::seed()), shown, 0),
+        Mode::Lab => forced(server::generate_with(lab::generation(), lab::seed()), shown, tuning::now()[tuning::SHEEP].max(0.0) as usize),
     }
 }
 

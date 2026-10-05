@@ -150,7 +150,7 @@ pixels made here.
 | space | pause, and go on |
 | `T` | tick flat out, or at the game's pace (256 ticks a second) |
 | `F` | the window over the whole screen, or not |
-| `U` | the next page of sliders, or none |
+| `U` | the sliders' menu, opened; whatever of them is open, closed |
 | `[` and `]` | halve and double the pace |
 | `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |
@@ -158,16 +158,25 @@ pixels made here.
 
 ## Sliders
 
-At the window's top right, a page of sliders at a time, each a number
-of `src/tuning.rs`; `U` goes to the next page, and to none. The left
-button drags a knob, the right sets the number back to its default.
-Beside each is a box with its value: a click on it and the value is
-typed -- digits and a point, Enter to set it, Escape to leave it. A
-value typed may pass the slider's range, which is only what the knob
-reaches; the knob then stays at its end. The
-numbers are kept whenever one is settled, in
-`transient_data/tuning.txt`, and taken up again the next run -- what is
-found by eye is then written into the code as the defaults.
+At the window's top right, the numbers of `src/tuning.rs`, in groups,
+one group on the screen at a time. Closed, there is one small button,
+`sliders`: a click on it, or `U`, opens the menu, which lists the
+groups a row each; a click on one opens it, and the first row of a
+group goes back to the menu. `U` closes whatever is open.
+
+In a group, the left button drags a knob, the right sets the number
+back to its default. Beside each is a box with its value: a click on
+it and the value is typed -- digits and a point, Enter to set it,
+Escape to leave it. A value typed may pass the slider's range, which
+is only what the knob reaches; the knob then stays at its end.
+
+The numbers changed are kept whenever one is settled, and taken up
+again the next run, in the machine's settings (`utilities::settings`):
+one file, `settings.txt`, in a folder `tilesim` where the system keeps
+what a user's programs hold -- `~/.local/share/tilesim` on Linux,
+`%LOCALAPPDATA%\tilesim` on Windows. A line a number, its name and its
+value; one left as the code has it has no line, so a default changed in
+the code reaches whoever never moved it.
 
 - **Shading**: the near view's -- how light and dark the border lines
   are, a wall's band facing away from the sun and towards it and how
@@ -176,9 +185,12 @@ found by eye is then written into the code as the defaults.
   lighter and darker, a wall's band 49% darker at its foot facing away
   from the sun and 55% with the sun on it, fading by 80% across it,
   cast shadows 40% darker, 70% of the relief, and twice the texture.
-- **Generation**, in the lab only: below.
+- **Ocean and land**, **mesh lines**, **finer meshes**, **grass**,
+  **trees**, **sheep**: how the world is generated, listed in the lab
+  only, where they are read: below. **Sheep** is how many each
+  superchunk the lab shows starts with -- none, unless set.
 
-A page longer than the window is scrolled by the wheel, the pointer
+What is longer than the window is scrolled by the wheel, the pointer
 over it. The pointer rested on a slider's row for a moment, and what the slider
 does is said beside it (`Tuned::what`).
 

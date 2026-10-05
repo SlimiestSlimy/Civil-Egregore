@@ -1,13 +1,13 @@
-//! What is tuned by eye: a few numbers the window's sliders
-//! ([`crate::sliders`]) set -- the near view's shading, which the
-//! painter reads each frame, and in the lab ([`crate::lab`]) how the
-//! world is generated -- with no lock between them. They are kept from one run to the next
-//! ([`path`]), so what was found by eye can be read back and written
-//! into the code as the defaults.
+//! What is tuned by eye: the numbers the window's sliders
+//! ([`crate::sliders`]) set, in groups -- the near view's shading,
+//! which the painter reads each frame, and in the lab ([`crate::lab`])
+//! how the world is generated -- with no lock between them. Those
+//! changed are kept from one run to the next in the machine's settings
+//! (`utilities::settings`), a line each; one left as the code has it
+//! has none.
 
-use std::fs::{create_dir_all, read_to_string, write};
-use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use utilities::settings::Settings;
 
 /// One number to tune.
 pub struct Tuned {
@@ -17,19 +17,55 @@ pub struct Tuned {
     pub default: f32,
     /// The least and the most a slider sets it to.
     pub range: (f32, f32),
-    /// The page of sliders it is on.
-    pub page: Page,
+    /// The group of sliders it is in.
+    pub group: Group,
     /// What it does, said to whoever rests the pointer on its slider.
     pub what: &'static str,
 }
 
-/// A page of sliders: the numbers tuned together.
+/// A group of sliders: the numbers tuned together, one group on the
+/// screen at a time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Page {
+pub enum Group {
     /// The near view's shading.
     Shading,
-    /// How the world is generated: its heights and its grass.
-    Generation,
+    /// The ocean and the land: their levels and their shares.
+    Land,
+    /// The mesh's lines: how they are blended and bent.
+    Lines,
+    /// The finer meshes on the land.
+    Finer,
+    /// The grass a world starts with.
+    Grass,
+    /// The trees a world starts with.
+    Trees,
+    /// The sheep a world starts with.
+    Sheep,
+}
+
+/// The groups, in the order the menu lists them.
+pub const GROUPS: [Group; 7] = [Group::Shading, Group::Land, Group::Lines, Group::Finer, Group::Grass, Group::Trees, Group::Sheep];
+
+impl Group {
+    /// Its name, as the menu has it.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Shading => "shading",
+            Self::Land => "ocean and land",
+            Self::Lines => "mesh lines",
+            Self::Finer => "finer meshes",
+            Self::Grass => "grass",
+            Self::Trees => "trees",
+            Self::Sheep => "sheep",
+        }
+    }
+
+    /// Whether its numbers say how the world is generated: changed,
+    /// the world is made again -- in the lab, the one place they are
+    /// read.
+    pub const fn generation(self) -> bool {
+        !matches!(self, Self::Shading)
+    }
 }
 
 /// How much lighter a step's line towards the sun is.
@@ -107,46 +143,49 @@ pub const TREE_SCATTER: usize = 34;
 /// How much longer a wall's band is for each height the wall rises,
 /// in eighths of a cell.
 pub const WALL_LENGTH: usize = 35;
+/// How many sheep each superchunk shown starts with, in the lab.
+pub const SHEEP: usize = 36;
 
 /// The numbers, in the order above; the shading's defaults are what was
 /// found by eye with the sliders.
-pub const TUNED: [Tuned; 36] = [
-    Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading, what: "How much lighter the border of a higher cell is where it faces the sun." },
-    Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading, what: "How much darker the border of a higher cell is where it faces away from the sun." },
-    Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading, what: "How dark the band at the foot of a wall is, on the side away from the sun." },
-    Tuned { name: "wall lit", default: 0.55, range: (0.0, 1.0), page: Page::Shading, what: "How dark the band at the foot of a wall is, on the side the sun is on." },
-    Tuned { name: "wall fade", default: 0.8, range: (0.0, 1.5), page: Page::Shading, what: "How much of its darkness a wall's band has lost at its far edge." },
-    Tuned { name: "shadow", default: 0.4, range: (0.0, 0.8), page: Page::Shading, what: "How much darker ground is under a cast shadow." },
-    Tuned { name: "relief", default: 0.7, range: (0.0, 3.0), page: Page::Shading, what: "How strongly slopes are lit and heights tinted." },
-    Tuned { name: "texture", default: 2.0, range: (0.0, 4.0), page: Page::Shading, what: "How much the ground's pixels differ from one another by lot." },
-    Tuned { name: "ocean floor level", default: 1023.0, range: (0.0, 4096.0), page: Page::Generation, what: "The height of the ocean's floor, and the lowest ground in the world. Every ocean vertex is at this height." },
-    Tuned { name: "ocean level", default: 16383.0, range: (0.0, 8192.0), page: Page::Generation, what: "The height of the ocean's surface, the same all over the world. Ground under it is under water. Set under the floor, it is held to the floor: no ocean." },
-    Tuned { name: "highest land", default: 65535.0, range: (0.0, 8192.0), page: Page::Generation, what: "The height of the highest land there can be. Every land vertex carries a height of its own, drawn by lot, between just over the ocean level and this." },
-    Tuned { name: "ocean share", default: 0.55, range: (0.0, 1.0), page: Page::Generation, what: "The share of the vertices that are ocean; the rest are land. 0 is all land, 1 all ocean." },
-    Tuned { name: "coast breadth", default: 4.0, range: (0.0, 4.0), page: Page::Generation, what: "How many vertices from the ocean land is held low within. Past it, a land vertex is as likely at any height as another, up to the highest land. 0, and no land is held low." },
-    Tuned { name: "coast lowness", default: 8.0, range: (1.0, 16.0), page: Page::Generation, what: "How strongly land right beside the ocean is held low: each coast vertex draws a height of its own, small ones by far the most likely and the higher the less likely -- so coasts differ a little from one another and a few are high, sea cliffs where their lines' blends are narrow. 1 holds nothing low; 16 leaves high coasts very rare. It eases off each vertex further inland. The finer meshes vary the lowest land a quarter as much as the highest, so differences compound inland." },
-    Tuned { name: "clumping", default: 0.901, range: (0.0, 1.0), page: Page::Generation, what: "How much land gathers into larger masses. Each vertex is land or ocean by its own lot mixed with a smooth pattern a few vertices broad: 0 is every vertex for itself, scattered; 1 is the smooth pattern alone, rounded masses with no specks. The more clumping, the less exactly the ocean share is kept." },
-    Tuned { name: "vertex spacing (2^)", default: 13.0, range: (6.0, 18.0), page: Page::Generation, what: "How far apart the vertices are, and so about how long a line is: 2 to this power, in cells. 10 is one superchunk, 13 is 8 superchunks, 16 is 64. The ground at a vertex is at the vertex's height, and slopes from it along its lines to its neighbours'." },
-    Tuned { name: "narrowest blend", default: 0.102, range: (0.0, 1.0), page: Page::Generation, what: "A line joins two vertices and carries the ground from one's height to the other's. Every line has a blend of its own, drawn by lot between this and the widest blend: the share of the line, about its middle, the change of height is spread over. 1 is the whole line: one slope from vertex to vertex. Near 0 is a cliff at the line's middle with level ground either side." },
-    Tuned { name: "widest blend", default: 1.0, range: (0.0, 1.0), page: Page::Generation, what: "The widest blend a line can draw, as a share of its length. Set both to 1 for slopes everywhere and no level ground; both near 0 for plateaus and cliffs." },
-    Tuned { name: "least sigmoid", default: 1.0, range: (1.0, 16.0), page: Page::Generation, what: "Every line also has a sigmoidness of its own, drawn by lot between this and the most: the shape of the change across its blend. 1 is an even slope. Higher is more of an S: gentle at both ends of the blend and steep in the middle, to a step." },
-    Tuned { name: "most sigmoid", default: 7.5, range: (1.0, 16.0), page: Page::Generation, what: "The most sigmoid a line can draw. Set both the same for one shape everywhere: 1 and 1 for even slopes only, 16 and 16 for steps only." },
-    Tuned { name: "line bending", default: 0.399, range: (0.0, 1.0), page: Page::Generation, what: "How far the lines are pushed out of straight by noise, as a share of the vertex spacing. 0 leaves straight lines and triangles; more makes them wind." },
-    Tuned { name: "finer mesh depth", default: 10.0, range: (0.0, 10.0), page: Page::Generation, what: "How many finer meshes lie on the land: points spread again, half as far apart each time, inside the triangles of the mesh before, each raising or sinking the ground a little -- small variations at a time. None gets finer than 16 cells between points, so the shortest lines are 10 to 20 cells. Every mesh moves the land, the finest by two heights at least. 0 for none: the land is the broad triangles alone." },
-    Tuned { name: "finer mesh share", default: 0.498, range: (0.0, 1.0), page: Page::Generation, what: "The share of a finer mesh's points that raise or sink the land; the rest leave it as it is." },
-    Tuned { name: "finer mesh height", default: 120.0, range: (0.0, 2048.0), page: Page::Generation, what: "How many heights a point of the first finer mesh raises or sinks the land at most, each by an amount of its own." },
-    Tuned { name: "finer mesh falloff", default: 0.95, range: (0.0, 1.0), page: Page::Generation, what: "How much each finer mesh moves the land beside the one before: 0.5, and each does half as much; near 1, and the finest do as much as the broadest -- rough ground; near 0, and only the first counts." },
-    Tuned { name: "weight spread", default: 0.704, range: (0.0, 1.0), page: Page::Generation, what: "The top level has a weight of 1. The weight that reaches a subdivision point is shared out at random: each point draws a share of its own, by lot, between 1 minus this and 1, moves the land by its offset times that share, and hands the share on to its own subdivisions, where it is shared out again. So under some points the ground is broken up in detail and under others it keeps its parent's shape -- a plain stays a plain, a ridge a ridge. 0, and every point gets the whole weight: every level moves the land freely everywhere." },
-    Tuned { name: "raised share", default: 0.6, range: (0.0, 1.0), page: Page::Generation, what: "The share of those vertices that raise the land; the rest sink it. Land sunk under the ocean level fills with water." },
-    Tuned { name: "grass cover", default: 1.0, range: (0.0, 1.0), page: Page::Generation, what: "The share of dry land that starts as grass; the rest is dirt." },
-    Tuned { name: "grass patch size (2^)", default: 10.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a patch of grass or of dirt is: 2 to this power, in cells." },
-    Tuned { name: "grass patch detail", default: 0.0, range: (0.0, 2.0), page: Page::Generation, what: "How ragged the patches' edges are: how much finer noise counts beside the patches'." },
-    Tuned { name: "grass scatter", default: 0.0, range: (0.0, 2.0), page: Page::Generation, what: "How much each cell's own lot counts: grass scattered cell by cell, not in patches." },
-    Tuned { name: "tree cover", default: 0.0, range: (0.0, 1.0), page: Page::Generation, what: "The share of dry land that starts with a tree." },
-    Tuned { name: "tree patch size (2^)", default: 1.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a wood is: 2 to this power, in cells." },
-    Tuned { name: "tree patch detail", default: 0.0, range: (0.0, 2.0), page: Page::Generation, what: "How ragged the woods' edges are." },
-    Tuned { name: "tree scatter", default: 0.0, range: (0.0, 2.0), page: Page::Generation, what: "How much each cell's own lot counts: lone trees, not woods." },
-    Tuned { name: "wall length", default: 0.5, range: (0.0, 2.0), page: Page::Shading, what: "How much longer the band at the foot of a wall is for each height the wall rises, in eighths of a cell: a high cliff's band runs over several cells, no darker for it." },
+pub const TUNED: [Tuned; 37] = [
+    Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), group: Group::Shading, what: "How much lighter the border of a higher cell is where it faces the sun." },
+    Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), group: Group::Shading, what: "How much darker the border of a higher cell is where it faces away from the sun." },
+    Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), group: Group::Shading, what: "How dark the band at the foot of a wall is, on the side away from the sun." },
+    Tuned { name: "wall lit", default: 0.55, range: (0.0, 1.0), group: Group::Shading, what: "How dark the band at the foot of a wall is, on the side the sun is on." },
+    Tuned { name: "wall fade", default: 0.8, range: (0.0, 1.5), group: Group::Shading, what: "How much of its darkness a wall's band has lost at its far edge." },
+    Tuned { name: "shadow", default: 0.4, range: (0.0, 0.8), group: Group::Shading, what: "How much darker ground is under a cast shadow." },
+    Tuned { name: "relief", default: 0.7, range: (0.0, 3.0), group: Group::Shading, what: "How strongly slopes are lit and heights tinted." },
+    Tuned { name: "texture", default: 2.0, range: (0.0, 4.0), group: Group::Shading, what: "How much the ground's pixels differ from one another by lot." },
+    Tuned { name: "ocean floor level", default: 1023.0, range: (0.0, 4096.0), group: Group::Land, what: "The height of the ocean's floor, and the lowest ground in the world. Every ocean vertex is at this height." },
+    Tuned { name: "ocean level", default: 16383.0, range: (0.0, 8192.0), group: Group::Land, what: "The height of the ocean's surface, the same all over the world. Ground under it is under water. Set under the floor, it is held to the floor: no ocean." },
+    Tuned { name: "highest land", default: 65535.0, range: (0.0, 8192.0), group: Group::Land, what: "The height of the highest land there can be. Every land vertex carries a height of its own, drawn by lot, between just over the ocean level and this." },
+    Tuned { name: "ocean share", default: 0.55, range: (0.0, 1.0), group: Group::Land, what: "The share of the vertices that are ocean; the rest are land. 0 is all land, 1 all ocean." },
+    Tuned { name: "coast breadth", default: 4.0, range: (0.0, 4.0), group: Group::Land, what: "How many vertices from the ocean land is held low within. Past it, a land vertex is as likely at any height as another, up to the highest land. 0, and no land is held low." },
+    Tuned { name: "coast lowness", default: 8.0, range: (1.0, 16.0), group: Group::Land, what: "How strongly land right beside the ocean is held low: each coast vertex draws a height of its own, small ones by far the most likely and the higher the less likely -- so coasts differ a little from one another and a few are high, sea cliffs where their lines' blends are narrow. 1 holds nothing low; 16 leaves high coasts very rare. It eases off each vertex further inland. The finer meshes vary the lowest land a quarter as much as the highest, so differences compound inland." },
+    Tuned { name: "clumping", default: 0.901, range: (0.0, 1.0), group: Group::Land, what: "How much land gathers into larger masses. Each vertex is land or ocean by its own lot mixed with a smooth pattern a few vertices broad: 0 is every vertex for itself, scattered; 1 is the smooth pattern alone, rounded masses with no specks. The more clumping, the less exactly the ocean share is kept." },
+    Tuned { name: "vertex spacing (2^)", default: 13.0, range: (6.0, 18.0), group: Group::Land, what: "How far apart the vertices are, and so about how long a line is: 2 to this power, in cells. 10 is one superchunk, 13 is 8 superchunks, 16 is 64. The ground at a vertex is at the vertex's height, and slopes from it along its lines to its neighbours'." },
+    Tuned { name: "narrowest blend", default: 0.102, range: (0.0, 1.0), group: Group::Lines, what: "A line joins two vertices and carries the ground from one's height to the other's. Every line has a blend of its own, drawn by lot between this and the widest blend: the share of the line, about its middle, the change of height is spread over. 1 is the whole line: one slope from vertex to vertex. Near 0 is a cliff at the line's middle with level ground either side." },
+    Tuned { name: "widest blend", default: 1.0, range: (0.0, 1.0), group: Group::Lines, what: "The widest blend a line can draw, as a share of its length. Set both to 1 for slopes everywhere and no level ground; both near 0 for plateaus and cliffs." },
+    Tuned { name: "least sigmoid", default: 1.0, range: (1.0, 16.0), group: Group::Lines, what: "Every line also has a sigmoidness of its own, drawn by lot between this and the most: the shape of the change across its blend. 1 is an even slope. Higher is more of an S: gentle at both ends of the blend and steep in the middle, to a step." },
+    Tuned { name: "most sigmoid", default: 7.5, range: (1.0, 16.0), group: Group::Lines, what: "The most sigmoid a line can draw. Set both the same for one shape everywhere: 1 and 1 for even slopes only, 16 and 16 for steps only." },
+    Tuned { name: "line bending", default: 0.399, range: (0.0, 1.0), group: Group::Lines, what: "How far the lines are pushed out of straight by noise, as a share of the vertex spacing. 0 leaves straight lines and triangles; more makes them wind." },
+    Tuned { name: "finer mesh depth", default: 10.0, range: (0.0, 10.0), group: Group::Finer, what: "How many finer meshes lie on the land: points spread again, half as far apart each time, inside the triangles of the mesh before, each raising or sinking the ground a little -- small variations at a time. None gets finer than 16 cells between points, so the shortest lines are 10 to 20 cells. Every mesh moves the land, the finest by two heights at least. 0 for none: the land is the broad triangles alone." },
+    Tuned { name: "finer mesh share", default: 0.498, range: (0.0, 1.0), group: Group::Finer, what: "The share of a finer mesh's points that raise or sink the land; the rest leave it as it is." },
+    Tuned { name: "finer mesh height", default: 120.0, range: (0.0, 2048.0), group: Group::Finer, what: "How many heights a point of the first finer mesh raises or sinks the land at most, each by an amount of its own." },
+    Tuned { name: "finer mesh falloff", default: 0.95, range: (0.0, 1.0), group: Group::Finer, what: "How much each finer mesh moves the land beside the one before: 0.5, and each does half as much; near 1, and the finest do as much as the broadest -- rough ground; near 0, and only the first counts." },
+    Tuned { name: "weight spread", default: 0.704, range: (0.0, 1.0), group: Group::Land, what: "The top level has a weight of 1. The weight that reaches a subdivision point is shared out at random: each point draws a share of its own, by lot, between 1 minus this and 1, moves the land by its offset times that share, and hands the share on to its own subdivisions, where it is shared out again. So under some points the ground is broken up in detail and under others it keeps its parent's shape -- a plain stays a plain, a ridge a ridge. 0, and every point gets the whole weight: every level moves the land freely everywhere." },
+    Tuned { name: "raised share", default: 0.6, range: (0.0, 1.0), group: Group::Land, what: "The share of those vertices that raise the land; the rest sink it. Land sunk under the ocean level fills with water." },
+    Tuned { name: "grass cover", default: 1.0, range: (0.0, 1.0), group: Group::Grass, what: "The share of dry land that starts as grass; the rest is dirt." },
+    Tuned { name: "grass patch size (2^)", default: 10.0, range: (1.0, 10.0), group: Group::Grass, what: "How broad a patch of grass or of dirt is: 2 to this power, in cells." },
+    Tuned { name: "grass patch detail", default: 0.0, range: (0.0, 2.0), group: Group::Grass, what: "How ragged the patches' edges are: how much finer noise counts beside the patches'." },
+    Tuned { name: "grass scatter", default: 0.0, range: (0.0, 2.0), group: Group::Grass, what: "How much each cell's own lot counts: grass scattered cell by cell, not in patches." },
+    Tuned { name: "tree cover", default: 0.0, range: (0.0, 1.0), group: Group::Trees, what: "The share of dry land that starts with a tree." },
+    Tuned { name: "tree patch size (2^)", default: 1.0, range: (1.0, 10.0), group: Group::Trees, what: "How broad a wood is: 2 to this power, in cells." },
+    Tuned { name: "tree patch detail", default: 0.0, range: (0.0, 2.0), group: Group::Trees, what: "How ragged the woods' edges are." },
+    Tuned { name: "tree scatter", default: 0.0, range: (0.0, 2.0), group: Group::Trees, what: "How much each cell's own lot counts: lone trees, not woods." },
+    Tuned { name: "wall length", default: 0.5, range: (0.0, 2.0), group: Group::Shading, what: "How much longer the band at the foot of a wall is for each height the wall rises, in eighths of a cell: a high cliff's band runs over several cells, no darker for it." },
+    Tuned { name: "sheep a superchunk", default: 0.0, range: (0.0, 16000.0), group: Group::Sheep, what: "How many sheep each superchunk the lab shows starts with, each on a cell of its own drawn by lot. None, and the lab is land alone." },
 ];
 
 /// Counts the changes to how the world is generated: what was made
@@ -169,18 +208,12 @@ static VALUES: [AtomicU32; TUNED.len()] = [const { AtomicU32::new(0) }; TUNED.le
 /// The numbers, read together.
 pub type Tuning = [f32; TUNED.len()];
 
-/// Where the numbers are kept between runs: a line each, its name and
-/// its value. Under the crate's folder, out of git.
-pub fn path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("transient_data/tuning.txt")
-}
-
-/// Sets every number to its default, then to what was kept, if any.
+/// Sets every number to its default, then to what the machine's
+/// settings have for it, if anything.
 pub fn start() {
-    let kept = read_to_string(path()).unwrap_or_default();
+    let kept = Settings::read();
     for (index, tuned) in TUNED.iter().enumerate() {
-        let kept = kept.lines().find_map(|line| line.strip_prefix(tuned.name)?.strip_prefix(" = ")?.trim().parse().ok());
-        set(index, kept.unwrap_or(tuned.default));
+        set(index, kept.number(tuned.name).unwrap_or(tuned.default));
     }
 }
 
@@ -194,16 +227,19 @@ pub fn now() -> Tuning {
 /// be generated again if it is one of generation's and has changed.
 pub fn set(index: usize, value: f32) {
     let bits = if value.is_finite() { value } else { TUNED[index].default }.to_bits();
-    if VALUES[index].swap(bits, Ordering::Relaxed) != bits && TUNED[index].page == Page::Generation {
+    if VALUES[index].swap(bits, Ordering::Relaxed) != bits && TUNED[index].group.generation() {
         regenerate();
     }
 }
 
-/// Keeps the numbers for the next run. A failure is let pass: they are
-/// then only not kept.
+/// Keeps the numbers changed for the next run, in the machine's
+/// settings: one as the code has it has no line there, and lines not
+/// these numbers' are left as they are. A failure is let pass: they
+/// are then only not kept.
 pub fn keep() {
-    let lines: String = TUNED.iter().zip(now()).map(|(tuned, value)| format!("{} = {value:.3}\n", tuned.name)).collect();
-    let path = path();
-    _ = path.parent().map(create_dir_all);
-    _ = write(path, lines);
+    let mut kept = Settings::read();
+    for (tuned, value) in TUNED.iter().zip(now()) {
+        kept.set(tuned.name, (value != tuned.default).then(|| format!("{value:.3}")));
+    }
+    _ = kept.write();
 }
