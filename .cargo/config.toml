@@ -1,22 +1,13 @@
-# TileSim is an x86-64 game, built for the x86-64 processors of the
-# last ten years or so, not the one it is built on: it is played on
-# many machines. x86-64-v3 brings, over v2's popcount, AVX2, and BMI1
-# and BMI2 -- the bit instructions bitplanes are counted, found and
-# taken apart with -- on every Intel since Haswell (2013) and every AMD
-# since Excavator (2015).
 [build]
 rustflags = ["-C", "target-cpu=x86-64-v3"]
 
-# `cargo windows` builds for Windows where `cargo build --release`
-# builds for the machine it runs on -- `cargo windows -p renderer` the
-# renderer -- into `target/x86_64-pc-windows-gnu/release/`. Cargo takes
-# no switch of a project's own, so it is a command: `cargo build`'s
-# other options follow it as they would that. What it builds is to be
-# handed on, so it carries no debug info or symbols: far smaller, and
-# no slower or faster. On Linux it needs MinGW's linker
-# (`mingw-w64-gcc`).
+
 [alias]
-windows = ["build", "--release", "--target", "x86_64-pc-windows-gnu", "--config", "profile.release.strip=true"]
+windows_rr = ["build", "--release", "--target", "x86_64-pc-windows-gnu", "-p", "renderer", "--config", "profile.release.strip=true"]
+linux_hd = ["build"]
+linux_rd = ["build", "-p", "renderer"]
+linux_rr = ["build", "--release", "-p", "renderer"]
+linux_hr = ["build", "--release"]
 
 [target.x86_64-pc-windows-gnu]
 linker = "x86_64-w64-mingw32-gcc"

@@ -13,8 +13,10 @@ mod walking {
     use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
     use chunk_storage::{LayerCodec, LayerType};
     use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-    use instructions::walking;
-    use instructions::{around, area, entities};
+    use instructions::read::{area, walking};
+    use instructions::write::entities;
+    use instructions::around;
+    use instructions::area::AREA_CENTRE;
     use entity_manager::{Entities, EntityId, EntityType, Header, NEVER};
     use instructions::{Simulation, Turn};
     use std::sync::Mutex;
@@ -71,7 +73,7 @@ mod walking {
                 let now = turn.now();
                 for entity in turn.woken() {
                     let at = entity.header.at;
-                    let passable = area::read(turn, STONE, at).hot;
+                    let passable = area::layer(turn, STONE, at).hot;
                     assert_eq!(walking::step_to(turn, at, at.offset(9, 0).unwrap(), &passable), None, "out of the area");
                     let next = walking::step_to(turn, at, to, &passable).expect("a way round");
                     turn.step(&entity.header, next, now + 1);
@@ -154,7 +156,7 @@ mod walking {
                         // The three cells east of it are behind the cliff.
                         assert_eq!(walking::around_unwalled(turn, at), around::ALL & !(1 << 2 | 1 << 5 | 1 << 8));
                     }
-                    let passable = area::read(turn, STONE, at).hot;
+                    let passable = area::layer(turn, STONE, at).hot;
                     let next = walking::step_to(turn, at, to, &passable).expect("a way through the gap");
                     assert!(walking::around_unwalled(turn, at) >> around::bit_of(at, next) & 1 == 1, "a step through a wall");
                     turn.step(&entity.header, next, now + 1);
@@ -199,7 +201,7 @@ mod walking {
                 for x in 1..63 {
                     let at = cell(x, y);
                     let (open, walls) = (walking::around_unwalled(turn, at), walking::area_walls(turn, at));
-                    let centre = pathfinding::Cell { x: area::AREA_CENTRE as u8, y: area::AREA_CENTRE as u8 };
+                    let centre = pathfinding::Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
                     for bit in (0..9).filter(|&bit| bit != 4) {
                         let (dx, dy) = (bit as i8 % 3 - 1, bit as i8 / 3 - 1);
                         assert_eq!(open >> bit & 1 == 1, !walls.bars_step(centre, dx, dy), "({x}, {y}) by ({dx}, {dy})");
@@ -223,7 +225,8 @@ mod area {
     use chunk_storage::{LayerCodec, LayerType};
     use coordinates::{CellCartesian, SuperchunkIndex};
     use entity_manager::Entities;
-    use instructions::area::{self, AREA_CENTRE, AREA_SIDE};
+    use instructions::area::{AREA_CENTRE, AREA_SIDE};
+    use instructions::read::area;
     use instructions::Simulation;
 
     /// The layer type the tests run on.
@@ -271,7 +274,7 @@ mod area {
             }
             for (x, y) in centres {
                 let centre = CellCartesian { x: start.x + x, y: start.y + y };
-                let area = area::read(turn, STONE, centre.into());
+                let area = area::layer(turn, STONE, centre.into());
                 for (across, down) in (0..AREA_SIDE as u32).flat_map(|down| (0..AREA_SIDE as u32).map(move |across| (across, down))) {
                     let cell = CellCartesian { x: centre.x + across - AREA_CENTRE as u32, y: centre.y + down - AREA_CENTRE as u32 };
                     let held = turn.holds(STONE, cell.into());
@@ -297,6 +300,7 @@ mod mask {
     use coordinates::{CellCartesian, CellIndex, SuperchunkIndex};
     use entity_manager::Entities;
     use instructions::mask::{self, Mask, SIDES};
+    use instructions::{read, write};
     use instructions::Simulation;
     use utilities::rng::Rng;
 
@@ -369,8 +373,8 @@ mod mask {
                 let (mut set_under, mut hot_under) = (Mask::empty(side), Mask::empty(side));
                 for (x, y) in origins {
                     let origin = cell(x, y);
-                    mask::read(turn, STONE, origin, &mut set, &mut hot);
-                    mask::read_under(turn, STONE, origin, &disc, &mut set_under, &mut hot_under);
+                    read::mask::layer(turn, STONE, origin, &mut set, &mut hot);
+                    read::mask::layer_under(turn, STONE, origin, &disc, &mut set_under, &mut hot_under);
                     for (across, down) in (0..side).flat_map(|down| (0..side).map(move |across| (across, down))) {
                         let held = turn.holds(STONE, mask::cell(origin, across, down).expect("in the world"));
                         assert_eq!((hot.get(across, down), set.get(across, down)), (held.is_ok(), held == Ok(true)), "({across}, {down}) of {side} from ({x}, {y})");
@@ -399,11 +403,11 @@ mod mask {
                 }
                 let mut before = before.lock().unwrap();
                 let (set, hot) = &mut *before;
-                mask::read(turn, STONE, origin, set, hot);
+                read::mask::layer(turn, STONE, origin, set, hot);
                 // The disc cleared, then a square in its middle set: the later write wins.
                 let mut middle = Mask::empty(side);
                 (side / 4..side / 2).flat_map(|y| (side / 4..side / 2).map(move |x| (x, y))).for_each(|(x, y)| middle.set(x, y, true));
-                mask::clear(turn, STONE, origin, &disc) + mask::set(turn, STONE, origin, &middle)
+                write::mask::clear(turn, STONE, origin, &disc) + write::mask::set(turn, STONE, origin, &middle)
             });
             assert!(writes.rules <= 2 * side as usize + 1, "{} writes for a disc and a square of {side}", writes.rules);
             assert_eq!(writes.writes_applied.missed, 0);
@@ -412,7 +416,7 @@ mod mask {
                     return 0;
                 }
                 let (mut set, mut hot) = (Mask::empty(side), Mask::empty(side));
-                mask::read(turn, STONE, origin, &mut set, &mut hot);
+                read::mask::layer(turn, STONE, origin, &mut set, &mut hot);
                 let before = &before.lock().unwrap().0;
                 for (x, y) in (0..side).flat_map(|y| (0..side).map(move |x| (x, y))) {
                     let middle = (side / 4..side / 2).contains(&x) && (side / 4..side / 2).contains(&y);

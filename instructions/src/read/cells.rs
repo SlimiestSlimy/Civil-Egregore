@@ -1,8 +1,8 @@
-//! The cells: what a rule asks of a layer at a cell and queues to it,
-//! and the going over the cells sampled -- a rule of the cells is
-//! written for one cell.
+//! The cells read: what a rule asks of a layer at a cell, the square
+//! about one, and the going over the cells sampled -- a rule of the
+//! cells is written for one cell.
 
-use bitplane_manager::{Window, Write, WriteOp};
+use bitplane_manager::Window;
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;
 use simulation::Turn;
@@ -40,29 +40,11 @@ pub fn lacks(turn: &Turn, layer_type: LayerType, cell: CellIndex) -> bool {
     turn.holds(layer_type, cell) == Ok(false)
 }
 
-/// Queues `layer_type` holding at `cell`.
-#[inline]
-pub fn set(turn: &mut Turn, layer_type: LayerType, cell: CellIndex) {
-    turn.queue(layer_type, Write::cell(cell, WriteOp::Set));
-}
-
-/// Queues `layer_type` no longer holding at `cell`.
-#[inline]
-pub fn clear(turn: &mut Turn, layer_type: LayerType, cell: CellIndex) {
-    turn.queue(layer_type, Write::cell(cell, WriteOp::Unset));
-}
-
 /// The number `plane` holds at `cell`, as the tick found it: none
 /// where it is not hot.
 #[inline]
 pub fn value<W: Width>(turn: &Turn, plane: Wide<W>, cell: CellIndex) -> Option<u32> {
     turn.value(plane, cell).ok()
-}
-
-/// Queues `value` as the number `plane` holds at `cell`.
-#[inline]
-pub fn set_value<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, value: u32) {
-    turn.queue(plane.layer_type(), Write::value(plane, cell, value));
 }
 
 /// The `side` by `side` cells (up to 8) of `layer_type` about `cell`

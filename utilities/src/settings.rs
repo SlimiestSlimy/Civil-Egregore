@@ -42,7 +42,7 @@ const DEFAULTS: &str = include_str!("../default_settings.csv");
 pub const WORLDS: &str = "worlds";
 /// Whether the machine's file is left alone: the settings are the
 /// default ones.
-const DEFAULTS_ONLY: bool = cfg!(feature = "default_settings");
+const FORCE_DEFAULTS: bool = cfg!(feature = "force_default_settings");
 
 /// The system's place for what a user's programs keep: where there is
 /// none to be found, the folder the program runs in.
@@ -121,7 +121,7 @@ impl Settings {
     /// copy of the default settings first if it has none, and the
     /// default ones for what its file lacks.
     pub fn read() -> Self {
-        if DEFAULTS_ONLY { Self::defaults() } else { Self::read_or_start(&file()) }
+        if FORCE_DEFAULTS { Self::defaults() } else { Self::read_or_start(&file()) }
     }
 
     /// The settings of the file at `path`, as [`Self::read`] has the
@@ -177,7 +177,7 @@ impl Settings {
     /// Writes the settings to the machine's file, its folder made if it
     /// is not there -- unless the machine's file is left alone.
     pub fn write(&self) -> io::Result<()> {
-        if DEFAULTS_ONLY {
+        if FORCE_DEFAULTS {
             return Ok(());
         }
         self.write_to(&file())

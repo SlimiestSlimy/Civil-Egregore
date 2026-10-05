@@ -6,9 +6,10 @@
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use pathfinding::{a_star, Cell, Rows, Walls};
-use crate::area::{self, AREA_CENTRE, AREA_SIDE, FARTHEST_SCALE};
+use super::{area, cells};
+use crate::area::{AREA_CENTRE, AREA_SIDE, FARTHEST_SCALE};
 use crate::around::{self, squeeze};
-use crate::{cells, Turn};
+use simulation::Turn;
 use worldgen::{WALL_EAST, WALL_SOUTH};
 
 // The area a turn reads is the area paths are found over.
@@ -47,16 +48,16 @@ pub fn around_unwalled(turn: &Turn, at: CellIndex) -> u16 {
 }
 
 /// The terrain's walls among the [`AREA_SIDE`] by [`AREA_SIDE`]
-/// cells around `centre`, laid out as an [`area::Area`] is: what paths
+/// cells around `centre`, laid out as an [`crate::area::Area`] is: what paths
 /// are found round.
 pub fn area_walls(turn: &Turn, centre: CellIndex) -> Walls {
-    let [east, south] = area::read_each(turn, [WALL_EAST, WALL_SOUTH], centre).map(|area| area.set);
+    let [east, south] = area::layers(turn, [WALL_EAST, WALL_SOUTH], centre).map(|area| area.set);
     Walls::new(east, south)
 }
 
 /// The cell to step to from `at` to come, by the shortest way, to
 /// the nearest of `goals` -- cells of the area around `at`, laid out
-/// as an [`area::Area`] is -- over the cells `passable`; no entity's cell
+/// as an [`crate::area::Area`] is -- over the cells `passable`; no entity's cell
 /// is walked on or to. One pathfinding step: no route is kept, the
 /// next asked afresh of the world as the next tick finds it. None if
 /// no goal can be come to.
@@ -73,7 +74,7 @@ pub fn step_towards(turn: &mut Turn, at: CellIndex, goals: &Rows, passable: &Row
 /// at: in the area around it, else over tiles by scale, as far as
 /// an entity reaches. None if there is none in reach.
 pub fn seek(turn: &mut Turn, at: CellIndex, layer_type: LayerType) -> Option<SoughtStep> {
-    let near = area::read(turn, layer_type, at);
+    let near = area::layer(turn, layer_type, at);
     if let Some(to) = step_towards(turn, at, &near.set, &near.hot) {
         return Some(SoughtStep { to, scale: 0 });
     }

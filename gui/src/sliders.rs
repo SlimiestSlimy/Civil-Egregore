@@ -166,7 +166,7 @@ fn rows(group: Group) -> impl Iterator<Item = usize> {
 
 /// The groups the menu lists: those of generation only in the lab.
 fn listed() -> impl Iterator<Item = Group> {
-    GROUPS.into_iter().filter(|group| !group.generation() || IN_LAB.load(Ordering::Relaxed))
+    GROUPS.into_iter()
 }
 
 /// The lab runs: the menu lists every group, and is open from the start.
