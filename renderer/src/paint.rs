@@ -23,7 +23,13 @@ use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::Instant;
 use mc_rules::trees::OLDEST;
-use world::diagnostics::frames::{BROWN, GREEN, WHITE};
+
+/// Dirt's colour.
+pub const BROWN: [u8; 3] = [116, 80, 46];
+/// Grass's colour.
+pub const GREEN: [u8; 3] = [72, 160, 56];
+/// A sheep's colour.
+pub const WHITE: [u8; 3] = [240, 240, 236];
 
 /// Pixels along a superchunk's side: a cell each.
 const SIDE: usize = SUPERCHUNK_SIDE_CELLS as usize;

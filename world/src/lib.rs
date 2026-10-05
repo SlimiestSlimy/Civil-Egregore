@@ -11,6 +11,7 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod background;
+pub mod commands;
 pub mod diagnostics;
 pub mod halos;
 pub mod patches;

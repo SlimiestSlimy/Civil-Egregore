@@ -131,7 +131,7 @@ it reads -- the sheep's grass and the four walls.
 
 | world | before | after |
 |---|---|---|
-| generated, 64 superchunks, walls (`tilesim run <dir> 30000`) | 13,236 ticks a second | 13,964 |
+| generated, 64 superchunks, walls (`tilesim world run <dir> 30000`) | 13,236 ticks a second | 13,964 |
 | mock, 400 superchunks, no walls (`tilesim world pasture 20000 333 4000 400 12`) | a wake 695 ns, 2,381 ticks a second | 645 ns, 2,375 |
 | mock, 64 superchunks, no walls | a wake 439 ns, 15,131 ticks a second | 477 ns, 14,566 |
 
@@ -147,7 +147,7 @@ the native build, the smaller count tiles and the cells asked for ahead; the
 figures below were taken before those.
 
 
-`tilesim new <dir> Perf 1 64`, `tilesim run <dir> 50000`: a generated
+`tilesim world new <dir> Perf 1 64`, `tilesim world run <dir> 50000`: a generated
 world, walls read by every hungry sheep, 10,399 ticks a second; the
 mock world of the same size without them
 (`tilesim world pasture 50000 333 4000 64 12`), 11,649. Generating a

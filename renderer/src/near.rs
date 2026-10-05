@@ -24,7 +24,7 @@ use coordinates::place_from_cartesian;
 use std::collections::HashMap;
 use utilities::hash::mix;
 use mc_rules::trees::OLDEST;
-use world::diagnostics::frames::{BROWN, GREEN, WHITE};
+use crate::paint::{BROWN, GREEN, WHITE};
 
 /// A cell's side in eighths: what edges are measured in, whatever the
 /// pixels a cell.

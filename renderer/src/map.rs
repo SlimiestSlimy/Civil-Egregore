@@ -10,7 +10,7 @@ use crate::paint::{tree_colour, WATER};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use terrain::mesh::Lands;
-use world::diagnostics::frames::{BROWN, GREEN};
+use crate::paint::{BROWN, GREEN};
 use world::Generation;
 
 /// How much of its light the deepest ocean keeps.
