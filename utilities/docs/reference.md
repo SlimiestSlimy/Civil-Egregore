@@ -87,3 +87,13 @@ raised after. **`queue(job)`**: done once by a worker when one is free,
 or at once where there is no worker. **`work`**: a worker's loop -- wait
 for work, a job run before one queued, do it, say so. Dropping it stops
 and joins the workers.
+
+## `settings.rs`
+
+The settings a person has changed on this machine: `FILE`
+(`settings.txt`) in `FOLDER` (`tilesim`) under the system's place for
+what a user's programs keep. **`folder()`**, **`file()`**.
+**`Settings`**: a name and a value a line -- **`read()`**,
+**`read_from(path)`**, **`get(name)`**, **`number::<T>(name)`**,
+**`set(name, value)`** (none takes the line out: the setting is as the
+code has it), **`write()`**, **`write_to(path)`**.
