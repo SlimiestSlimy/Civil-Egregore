@@ -10,7 +10,7 @@ there are to open. **`Worked`**: the set their work of a frame is in.
 ## `tuning.rs`
 
 `NAMES`: the numbers' names, each at its place, and the places
-(`STEP_LIGHT` ... `SHEEP`). **`Tuned`** `{name, range, group, what}`
+(`STEP_LIGHT` ... `SHEEP`). **`Tuned`** `{name, line, range, group, what}`
 -- `what` the tooltip -- and **`tuned(index)`**: a number as the
 sliders' file (`sliders.txt`, at the crate's root) has it.
 **`Group`**: `Shading`, `Land`, `Lines`, `Finer`, `Grass`, `Trees`,

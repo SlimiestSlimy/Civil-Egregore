@@ -1,4 +1,4 @@
-A slider a line, in the menu's order within its group: its number's name, the least and the most its knob reaches, its group, and what it does, said to whoever rests the pointer on it. Written by hand; what each number is unless set is in utilities/default_settings.txt.
+A slider a line, in any order; a group's sliders are shown in the order of their lines: its number's name, the least and the most its knob reaches, its group, and what it does, said to whoever rests the pointer on it. Written by hand; what each number is unless set is in utilities/default_settings.txt.
 
 step light | 0 | 1 | shading | How much lighter the border of a higher cell is where it faces the sun.
 step dark | 0 | 0.8 | shading | How much darker the border of a higher cell is where it faces away from the sun.

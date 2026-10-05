@@ -20,6 +20,9 @@ use utilities::settings::Settings;
 pub struct Tuned {
     /// Its name, as shown and as saved.
     pub name: &'static str,
+    /// Its line in the sliders' file: its group's sliders are in their
+    /// lines' order.
+    pub line: usize,
     /// The least and the most a slider sets it to.
     pub range: (f32, f32),
     /// The group of sliders it is in.
@@ -74,7 +77,9 @@ impl Group {
 }
 
 /// Names the numbers and their places among them: a constant each,
-/// and [`NAMES`].
+/// and [`NAMES`]. The places are for the code alone, which reads a
+/// number by its constant: no file is read by them, nor in their
+/// order.
 macro_rules! places {
     ($($place:ident $name:literal,)*) => {
         /// The numbers' names, as shown and as saved, each at its place.
@@ -139,11 +144,12 @@ pub fn tuned(index: usize) -> &'static Tuned {
     static TUNED: OnceLock<[Tuned; NAMES.len()]> = OnceLock::new();
     &TUNED.get_or_init(|| {
         NAMES.map(|name| {
-            let mut parts = SLIDERS.lines().find_map(|line| line.strip_prefix(name)?.strip_prefix(" | ")).expect("every number has a line in the sliders' file").splitn(4, " | ");
+            let (line, rest) = SLIDERS.lines().enumerate().find_map(|(line, said)| Some((line, said.strip_prefix(name)?.strip_prefix(" | ")?))).expect("every number has a line in the sliders' file");
+            let mut parts = rest.splitn(4, " | ");
             let mut part = || parts.next().expect("a slider's line has its range, its group and what it does");
             let range = [part(), part()].map(|end| end.parse().expect("a range's end is a number"));
             let group = part();
-            Tuned { name, range: (range[0], range[1]), group: GROUPS.into_iter().find(|listed| listed.name() == group).expect("a slider's group is one of the groups"), what: part() }
+            Tuned { name, line, range: (range[0], range[1]), group: GROUPS.into_iter().find(|listed| listed.name() == group).expect("a slider's group is one of the groups"), what: part() }
         })
     })[index]
 }
