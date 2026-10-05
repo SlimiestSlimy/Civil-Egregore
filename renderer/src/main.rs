@@ -34,7 +34,8 @@
 //! | `C` | the same of the chunks |
 //! | `H` | show every cell's height, from near enough to read them |
 //! | `P` | draw the mesh's lines over the map |
-//! | `U` | the next page of sliders, or none: the near view's shading, and in the lab how the world is generated |
+//! | `U` | the sliders' menu, or none: the near view's shading, and in the lab how the world is generated |
+//! | Escape | the options, or none: going on, opening a world of the worlds' folder, and leaving TileSim |
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -46,8 +47,6 @@ mod map;
 mod near;
 mod paint;
 mod sim;
-mod sliders;
-mod tuning;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
@@ -55,6 +54,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::Anchor;
 use bevy::window::{MonitorSelection, WindowMode};
+use gui::{options, sliders, tuning, Gui};
 use coordinates::{place_from_cartesian, square_side, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 use paint::Picture;
 use sim::{start, Ask, Mode, Near, Request, Viewport, TARGET_PACE};
@@ -360,9 +360,9 @@ fn main() {
         .insert_resource(ClearColor(Color::BLACK))
         .init_resource::<Seen>()
         .init_resource::<Boundaries>()
-        .init_resource::<sliders::Hands>()
-        .add_systems(Startup, (setup, sliders::setup))
-        .add_systems(Update, (fullscreen, sliders::toggle, sliders::scroll, sliders::slide, sliders::tell, recentre, steer, keys, boundaries, labels, heights, show, ask, far, hud).chain())
+        .add_plugins(Gui { worlds: || server::worlds_in(&utilities::settings::worlds()) })
+        .add_systems(Startup, setup)
+        .add_systems(Update, (fullscreen, open, recentre, steer, keys, boundaries, labels, heights, show, ask, far, hud).chain().after(gui::Worked))
         .run();
 }
 
@@ -421,7 +421,8 @@ fn first_view(sprites: &Sprites, window: &Window) -> (f32, Vec3) {
     ((square_side / window.height().min(window.width())).min(FARTHEST), Vec3::new(square_side / 2.0, -square_side / 2.0, 0.0))
 }
 
-/// Puts the view back where it started, when the lab's seed is drawn again.
+/// Puts the view back where it started, when the lab's seed is drawn
+/// again or a world is opened.
 fn recentre(camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>, sprites: Res<Sprites>, window: Single<&Window>) {
     if !lab::view_reset() {
         return;
@@ -429,6 +430,14 @@ fn recentre(camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>, s
     let (mut transform, mut projection) = camera.into_inner();
     if let Projection::Orthographic(view) = &mut *projection {
         (view.scale, transform.translation) = first_view(&sprites, &window);
+    }
+}
+
+/// Tells the simulation to open each world chosen in the options: a
+/// plain name, so one of the worlds' folder.
+fn open(mut chosen: MessageReader<options::Chosen>, link: Res<Link>) {
+    for world in chosen.read() {
+        _ = link.requests.send(Request::Open(utilities::settings::world(&world.0)));
     }
 }
 
@@ -441,6 +450,7 @@ fn steer(
     scroll: Res<AccumulatedMouseScroll>,
     window: Single<&Window>,
     time: Res<Time>,
+    options: Res<options::Options>,
 ) {
     let (mut transform, mut projection) = camera.into_inner();
     let Projection::Orthographic(view) = &mut *projection else {
@@ -448,15 +458,15 @@ fn steer(
     };
     let held = |these: [KeyCode; 2]| keys.any_pressed(these) as i32 as f32;
     let nearer = held([KeyCode::KeyE, KeyCode::Equal]) - held([KeyCode::KeyQ, KeyCode::Minus]);
-    // The wheel over the sliders scrolls them.
-    let wheel = if sliders::over(&window) { 0.0 } else { scroll.delta.y };
+    // The wheel over the sliders scrolls them; the options take it and the pointer.
+    let wheel = if sliders::over(&window) || options.open() { 0.0 } else { scroll.delta.y };
     view.scale *= WHEEL_ZOOM.powf(wheel) * ZOOM_SPEED.powf(-nearer * time.delta_secs());
     view.scale = view.scale.clamp(0.02, MAP_FARTHEST);
     let across = held([KeyCode::KeyD, KeyCode::ArrowRight]) - held([KeyCode::KeyA, KeyCode::ArrowLeft]);
     let up = held([KeyCode::KeyW, KeyCode::ArrowUp]) - held([KeyCode::KeyS, KeyCode::ArrowDown]);
     let step = PAN_SPEED * window.height() * view.scale * time.delta_secs();
     transform.translation += Vec3::new(across * step, up * step, 0.0);
-    if buttons.pressed(MouseButton::Left) && !sliders::held() {
+    if buttons.pressed(MouseButton::Left) && !sliders::held() && !options.open() {
         // The world follows the pointer.
         transform.translation += Vec3::new(-motion.delta.x, motion.delta.y, 0.0) * view.scale;
     }
@@ -826,8 +836,9 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         0 => format!("a pixel {} cell(s) a side", 1u32 << seen.detail),
         pixels => format!("a cell {pixels} pixels a side"),
     };
+    let refused = sim::refused().map_or(String::new(), |why| format!("not opened: {why}\n"));
     text.0 = format!(
-        "seed {:016x}   ocean at {}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   P: lines (on the map)   U: sliders",
+        "{refused}seed {:016x}   ocean at {}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   P: lines (on the map)   U: sliders",
         lab::seed(),
         lab::generation().shape.ocean,
         grouped(seen.tick),

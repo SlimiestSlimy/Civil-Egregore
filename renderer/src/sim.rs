@@ -27,7 +27,7 @@ use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 use crate::{lab, tuning};
@@ -129,7 +129,7 @@ impl Ask {
 }
 
 /// What the window asks of the simulation.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum Request {
     /// Some of the superchunks in view: answered with a [`Frame`].
     Sync(Ask),
@@ -137,6 +137,18 @@ pub enum Request {
     Pause(bool),
     /// Tick so many times a second, or flat out.
     Pace(Option<u32>),
+    /// Run the world saved in this folder, not the one run: hot in
+    /// its halos, as it was saved. Refused, the world run goes on
+    /// ([`refused`]).
+    Open(PathBuf),
+}
+
+/// Why the world last asked for was not opened, if it was not.
+static REFUSED: Mutex<Option<String>> = Mutex::new(None);
+
+/// Why the world last asked for was not opened, if it was not.
+pub fn refused() -> Option<String> {
+    REFUSED.lock().expect("why a world was refused").clone()
 }
 
 /// One superchunk's cells, as a tick left them.
@@ -245,7 +257,7 @@ const CATCH_UP: Duration = Duration::from_millis(250);
 
 /// The simulation's thread: requests read between ticks, a tick, and a
 /// wait for the next one's time.
-fn run(superchunks: u32, flock: usize, mode: Mode, asked: &Receiver<Request>, answers: &Sender<Frame>) {
+fn run(superchunks: u32, flock: usize, mut mode: Mode, asked: &Receiver<Request>, answers: &Sender<Frame>) {
     let shown = shown(superchunks);
     let mut generation = tuning::generation();
     let mut world = made(mode, &shown, flock);
@@ -285,6 +297,18 @@ fn run(superchunks: u32, flock: usize, mode: Mode, asked: &Receiver<Request>, an
                 }
                 Ok(Request::Pause(pause)) => (paused, next_tick) = (pause, Instant::now()),
                 Ok(Request::Pace(new)) => (pace, next_tick) = (new, Instant::now()),
+                Ok(Request::Open(folder)) => {
+                    let opened = server::load(&folder);
+                    *REFUSED.lock().expect("why a world was refused") = opened.as_ref().err().map(ToString::to_string);
+                    if let Ok(opened) = opened {
+                        // Run as it was saved: its halos moved, its ticks its own, and all of it sent again.
+                        (world, mode) = (opened, Mode::Halos);
+                        lab::opened(world.info.seed);
+                        generation = tuning::generation();
+                        sent.clear();
+                        (tick, last_frame_tick, next_tick) = (world.info.tick, world.info.tick, Instant::now());
+                    }
+                }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => return,
             }

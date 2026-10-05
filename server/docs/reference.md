@@ -23,6 +23,8 @@ and pasture, from the seed and its superchunk index.
 (`World::write_back_all`), the ring flushed (`World::flush_all`), then each superchunk's
 image and state -- live if hot, kept if cold -- the hot file, and the
 world's file last: a **`Saved`** `{superchunks, entities, bytes}`.
+**`worlds_in(folder)`**: the worlds saved in a folder, by their
+folders' names, sorted.
 **`load(folder)`**: every superchunk's image into the cold pool and its
 state, read whole, kept cold; then the hot file's hot superchunks made
 hot, its cooling ones cooling again and its warming ones warming again -- a `World`, or a `DiskError` naming
@@ -107,8 +109,9 @@ parameters and their defaults. `tilesim server new <folder> [name]
 of `sheep` on it, and its halo (**`new`**) -- and saved in the folder,
 which must not hold one. `tilesim server run <folder> [ticks]`: it
 loaded, ticked and saved again (**`run`**). `tilesim server info
-<folder>`: what its world file says (**`info`**). **`printed`**: a
-command run on its folder, its line printed. The diagnostics tools,
+<folder>`: what its world file says (**`info`**). A folder given as a plain name is one
+of the worlds' folder (`utilities::settings::world`); anything more is
+a path. **`printed`**: a command run on its folder, its line printed. The diagnostics tools,
 `throughput` and `pasture`, are listed there too.
 
 ## `diagnostics/tool.rs`

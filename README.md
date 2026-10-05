@@ -34,9 +34,9 @@ it and to tune its generation in.
 | [`instructions/`](instructions/) | what a rule is made of: small, varied pieces of behaviour -- so far walking -- each asking the simulation, the terrain and pathfinding for one thing |
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
 | [`renderer/`](renderer/) | TileSim on the screen: a Bevy window asking the simulation, on a thread of its own, for the cells in view; the lab, where how the world is generated is tuned by eye |
+| [`gui/`](gui/) | TileSim's menus, over whatever window shows it: the options Escape opens -- going on, opening a world, leaving -- the sliders, and the numbers they tune |
 | [`simulation/`](simulation/) | the simulation: Monte Carlo sampling, the two-phase tick and its outboxes, a superchunk's turn -- a bucket a chunk, a timer wheel a superchunk |
 | [`bitplane_manager/`](bitplane_manager/) | the hot bitplanes: layers decoded into the bitmap arena, where cells are read and written -- writes batched -- and written back; planes of one bit a cell, or 2, 4, 8 or 16 |
-| [`allocator/`](allocator/) | the allocator: equal-size blocks that never move, owned by their holder, taken back and handed out again |
 | [`tessera/`](tessera/) | Tessera, the lossless encoding of a 256x256 bitmap: a project of its own, with its own [README](tessera/README.md), tests, tools and docs |
 | [`bitmap/`](bitmap/) | the 256x256 bitmap every layer is, laid out in Morton order |
 | [`utilities/`](utilities/) | general-purpose utilities: the thread dispatcher, commands and their parameters, the one seed tests and tools run on, the table printer and measurement reports, a seeded random source, a fixed-capacity list, the process's memory |
@@ -53,7 +53,7 @@ Builds are for the x86-64 processors since about 2013 to 2015
 many machines. They are one cargo workspace: one lock file and one `target/`, here at
 the root, whichever folder cargo is run from, on the toolchain
 `rust-toolchain.toml` names. `cargo test` at the root tests every crate
-but the renderer, which brings Bevy and is asked for by name:
+but the renderer and its menus (`gui/`), which bring Bevy; the renderer is asked for by name:
 `cargo run --release -p renderer`. Run from a crate's folder, cargo keeps
 to that crate. Only the root and the renderer are programs: every other
 crate is a library, and its diagnostics tools are run through the root,
@@ -67,11 +67,12 @@ compare against never enter this build.
 
 Tessera depends on `bitmap/` and `utilities/` beside it; `coordinates/`
 on `bitmap/`; `chunk_storage/` on those and Tessera;
-`bitplane_manager/` on `chunk_storage/`, `coordinates/` and
-`allocator/`; `entity_manager/` on `coordinates/` and `bitmap/`; `simulation/` on
+`bitplane_manager/` on `chunk_storage/` and `coordinates/`;
+`entity_manager/` on `coordinates/` and `bitmap/`; `simulation/` on
 `bitplane_manager/` and `entity_manager/`; `instructions/` on
 `simulation/`, `pathfinding/` and `worldgen/`, which know nothing of
 one another and meet there; the rules, `mc_rules/` and `entity_rules/`,
 on `simulation/` and `instructions/`; `worldgen/` on `chunk_storage/` and
 `coordinates/`; `server/` on the rules, the entities and `worldgen/`;
-the program, `src/`, on `server/` and Tessera; the renderer on `server/`.
+the program, `src/`, on `server/` and Tessera; `gui/` on `utilities/`
+alone; the renderer on `server/` and `gui/`.

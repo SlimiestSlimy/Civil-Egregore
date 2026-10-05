@@ -10,6 +10,10 @@ server = { path = "server" }
 tessera = { path = "tessera" }
 utilities = { path = "utilities" }
 
+[features]
+# The machine's settings file is neither read nor written: the settings are the default ones.
+default_settings = ["utilities/default_settings"]
+
 # Every crate of TileSim, built together: one lock file and one `target/`
 # for them all, here, whichever crate's folder cargo is run from.
 # `cargo test` here tests every one but the renderer, which brings Bevy:
@@ -19,13 +23,13 @@ utilities = { path = "utilities" }
 [workspace]
 resolver = "2"
 members = [
-    "allocator",
     "bitmap",
     "bitplane_manager",
     "chunk_storage",
     "coordinates",
     "entity_manager",
     "entity_rules",
+    "gui",
     "instructions",
     "pathfinding",
     "mc_rules",
@@ -38,7 +42,6 @@ members = [
 ]
 default-members = [
     ".",
-    "allocator",
     "bitmap",
     "bitplane_manager",
     "chunk_storage",

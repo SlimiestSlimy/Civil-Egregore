@@ -20,10 +20,14 @@ none.
   a crate's commands and handed the rest. A crate's tools are functions
   listed with their parameters, each declared once with its default;
   the one program routes to a crate by name and knows none of its tools.
-- **Settings** (`settings.rs`): what a person has changed on this
-  machine, kept from run to run in one file in one folder of TileSim's
-  own, wherever the system keeps such -- overrides only, a line each,
-  shared by whatever has settings (so far the renderer's sliders).
+- **Settings** (`settings.rs`): this machine's settings, kept from run
+  to run in one file in one folder of TileSim's own, wherever the
+  system keeps such, a line each, shared by whatever has settings (so
+  far the renderer's sliders). The default settings are such a file
+  built into the program: copied to a machine that has none, never
+  over one that has, and all there is under the build feature
+  `default_settings`. The same folder holds the worlds, in `worlds`,
+  unless the settings name another folder for them.
 - **The seed** (`seed.rs`): the one seed every crate's tests and tools
   start from, in the workspace's `transient_data/seed`, rolled every 5
   counted runs; `TILESIM_SEED` picks one for a run.

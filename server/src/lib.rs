@@ -287,6 +287,18 @@ pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
     Ok(saved)
 }
 
+/// The worlds saved in `folder`, by their folders' names, sorted:
+/// each of its folders a world's file is read from. None if `folder`
+/// is not there.
+pub fn worlds_in(folder: &Path) -> Vec<String> {
+    let Ok(folders) = std::fs::read_dir(folder) else {
+        return Vec::new();
+    };
+    let mut worlds: Vec<String> = folders.flatten().filter(|within| disk::read_world(&within.path()).is_ok()).map(|within| within.file_name().to_string_lossy().into_owned()).collect();
+    worlds.sort_unstable();
+    worlds
+}
+
 /// Loads the world saved in `folder`: every superchunk's image into the
 /// cold pool and its state kept as a cold one's; then the superchunks
 /// hot when it was saved made hot, before it ticks, those cooling

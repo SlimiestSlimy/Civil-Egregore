@@ -76,7 +76,7 @@ what they always do and are not listed.
 | word | means | relates to | not |
 |---|---|---|---|
 | **chunk storage** | the cold side: the cold pool and the writeback ring (`ChunkStorage`) | image, ring | |
-| **cold pool** | chunk storage's superchunk images, one per superchunk stored. Never "pool" alone | image, block pool | |
+| **cold pool** | chunk storage's superchunk images, one per superchunk stored. Never "pool" alone | image | |
 | **image** | one superchunk as stored, one run of words, in memory as on disk: its height map and every chunk's encoded layers (`SuperchunkImage`) | chunk storage, save | |
 | **height map** | a superchunk's heights: a floor a chunk, a byte a cell over it, and a tall chunk's 16 bits a cell (`HeightMap`) | height, floor, tall chunk | |
 | **map** | the renderer's picture of the world from farther than its cells are drawn from: each pixel the cell in its middle as generated, nothing of the simulation read (`renderer/src/map.rs`) | detail, lab | overview, minimap |
@@ -100,8 +100,6 @@ what they always do and are not listed.
 | **bucket** | one chunk's hot layer: its words in its allocation, and its counts | layer, allocation | |
 | **directory** | the arena's list of hot superchunks, sorted by superchunk index, each with its allocations by layer type | lookup | |
 | **lookup** | finding a layer in the directory; a reader remembers the last superchunk it found | reader, directory | |
-| **block** | an equal-size piece of memory from the allocator's block pool, owned by whoever holds it (`allocator::Block`) | block pool, allocation | (for anything that is not memory) |
-| **block pool** | the allocator's blocks, made, handed out, taken back (`BlockPool`). Never "pool" alone | block | |
 | **save** | a world on disk: a folder of a world file and every superchunk's image and state, named by superchunk index | image, world | directory (the arena's list) |
 | **folder** | a folder of the file system: a save, or where measurements are kept | save | directory |
 
@@ -193,4 +191,7 @@ what they always do and are not listed.
 | **census** | a count of a population: the flock and grass over a run, or Tessera's nodes by kind | | |
 | **reading** | the process's memory read once (`MemoryTrack::read`) | | sample |
 | **tier** | a test's size: fine, fast or complete (`docs/testing_protocol.md`) | | |
-| **settings** | what a person has changed on this machine, kept from run to run: `settings.txt` in the folder `tilesim` where the system keeps a user's programs' data (`utilities::settings`); a setting left as the code has it has no line | slider, group | config, preferences, preset |
+| **settings** | this machine's settings, kept from run to run: `settings.txt` in the folder `tilesim` where the system keeps a user's programs' data (`utilities::settings`) | default settings, slider, group | config, preferences, preset |
+| **default settings** | every setting and what it is unless changed: a settings file built into the program, copied to a machine that has none; all there is under the build feature `default_settings` | settings | |
+| **options** | the menu Escape opens over the window: going on, opening a world of the worlds' folder, leaving TileSim (`gui::options`) | slider, worlds' folder | pause menu, main menu |
+| **worlds' folder** | where worlds are kept unless a path is given: `worlds` in the folder `tilesim`, or what the setting `worlds` names (`utilities::settings::worlds`) | save, settings | |

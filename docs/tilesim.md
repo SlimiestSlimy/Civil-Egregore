@@ -199,9 +199,9 @@ types asked for are decoded, and the chunk's other layers stay encoded.
 
 ### Built so far
 
-The in-memory structures and their API, in three projects: chunks as
-stored (`chunk_storage/`), the hot bitplanes (`bitplane_manager/`) and
-the allocator their buckets live in (`allocator/`): the coordinates and
+The in-memory structures and their API, in two projects: chunks as
+stored (`chunk_storage/`) and the hot bitplanes
+(`bitplane_manager/`): the coordinates and
 Morton indices between the world, a superchunk, a chunk and a cell; the
 height map; the layer codec; the superchunk image; the cold pool and
 the writeback ring; the bitmap arena. Nothing is read from or written
@@ -221,14 +221,13 @@ superchunks on disk.
 
 ### Memory
 
-- The custom allocator (`allocator/`) serves two projects only: chunk
-  storage (`chunk_storage/`, the cold area) and the bitplane manager
-  (`bitplane_manager/`, the hot bitmap area). Nothing else allocates
-  through it. Its first form is a block pool of equal-size blocks,
-  which the bitplane manager used until its buckets became a variable
-  array a superchunk; nothing uses it now. Chunk storage's images and
-  ring, and the arena's buckets, are plain allocations until the area
-  allocator below exists.
+- A custom allocator is to serve two projects only: chunk storage
+  (`chunk_storage/`, the cold area) and the bitplane manager
+  (`bitplane_manager/`, the hot bitmap area). There is none now: its
+  first form, a block pool of equal-size blocks, was removed once the
+  arena's buckets became a variable array a superchunk and nothing
+  used it. Chunk storage's images and ring, and the arena's buckets,
+  are plain allocations until the area allocator below exists.
 - A custom allocator per area, not one global allocator: the system is
   asked for large blocks, 256 MiB at a time, tracked in a list; inside
   them, allocations are runs of 256-byte units, the allocated intervals

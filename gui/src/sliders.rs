@@ -23,8 +23,7 @@
 //! fixed width against the window's right edge -- so where the pointer
 //! is on one is worked out from the same numbers, with no asking Bevy.
 
-use crate::lab::reseed;
-use crate::tuning::{keep, now, set, Group, GROUPS, TUNED};
+use crate::tuning::{keep, now, reseed, set, tuned, unless_set, Group, GROUPS, NAMES};
 use bevy::prelude::*;
 use bevy::input::mouse::AccumulatedMouseScroll;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
@@ -117,7 +116,7 @@ pub struct Row(f32);
 /// A part of a slider that moves with its number.
 #[derive(Component)]
 pub struct Moved {
-    /// The number's place in [`TUNED`].
+    /// The number's place in [`NAMES`].
     index: usize,
     /// Whether it is the knob, or the filled part of the track.
     knob: bool,
@@ -142,6 +141,13 @@ pub struct Hands {
     rested: (Vec2, f32),
 }
 
+impl Hands {
+    /// Whether a value is being typed.
+    pub fn typing(&self) -> bool {
+        self.typed.is_some()
+    }
+}
+
 /// The group shown, if one is.
 fn page() -> Option<Group> {
     match shown() {
@@ -150,9 +156,9 @@ fn page() -> Option<Group> {
     }
 }
 
-/// The numbers of `group`, by their places in [`TUNED`], a row each.
+/// The numbers of `group`, by their places in [`NAMES`], a row each.
 fn rows(group: Group) -> impl Iterator<Item = usize> {
-    (0..TUNED.len()).filter(move |&index| TUNED[index].group == group)
+    (0..NAMES.len()).filter(move |&index| tuned(index).group == group)
 }
 
 /// The groups the menu lists: those of generation only in the lab.
@@ -265,7 +271,7 @@ pub fn setup(mut commands: Commands) {
             // Each is set in the middle of its row's height, under the first row.
             let within = |height: f32| within(1 + row, height);
             let box_right = MARGIN + TRACK.0 + GAP;
-            commands.spawn((text(TUNED[index].name), placed(within(NAME * 1.2), box_right + BOX.0 + GAP, Val::Auto, NAME * 1.2), ZIndex(2), part(within(NAME * 1.2))));
+            commands.spawn((text(tuned(index).name), placed(within(NAME * 1.2), box_right + BOX.0 + GAP, Val::Auto, NAME * 1.2), ZIndex(2), part(within(NAME * 1.2))));
             commands.spawn((placed(within(BOX.1), box_right, Val::Px(BOX.0), BOX.1), BackgroundColor(Color::srgb(0.16, 0.16, 0.16)), ZIndex(1), part(within(BOX.1))));
             commands.spawn((text(""), placed(within(NAME * 1.2), box_right + 6.0, Val::Auto, NAME * 1.2), Valued(index), ZIndex(2), part(within(NAME * 1.2))));
             commands.spawn((placed(within(TRACK.1), MARGIN, Val::Px(TRACK.0), TRACK.1), BackgroundColor(Color::srgb(0.3, 0.3, 0.3)), ZIndex(1), part(within(TRACK.1))));
@@ -374,11 +380,11 @@ pub fn slide(
         HELD.store(false, Ordering::Relaxed);
     }
     if let (Some(index), Some(pointer)) = (hands.dragged, pointer) {
-        let (least, most) = TUNED[index].range;
+        let (least, most) = tuned(index).range;
         set(index, least + (most - least) * ((pointer.x - track_left) / TRACK.0).clamp(0.0, 1.0));
     }
     if let Some(index) = on_track.filter(|_| buttons.just_pressed(MouseButton::Right)) {
-        set(index, TUNED[index].default);
+        set(index, unless_set(index));
         keep();
     }
     if buttons.just_released(MouseButton::Left) && hands.dragged.take().is_some() {
@@ -387,7 +393,7 @@ pub fn slide(
 
     let numbers = now();
     for (part, mut node) in &mut moved {
-        let (least, most) = TUNED[part.index].range;
+        let (least, most) = tuned(part.index).range;
         // A value typed past the slider's range leaves the knob at its end.
         let filled = TRACK.0 * ((numbers[part.index] - least) / (most - least)).clamp(0.0, 1.0);
         // The filled part from the track's left, the knob's middle where it ends.
@@ -421,8 +427,8 @@ pub fn tell(mut hands: ResMut<Hands>, time: Res<Time>, window: Single<&Window>, 
     let told = page().zip(row_under(&window)).and_then(|(page, row)| Some((row, rows(page).nth(row.checked_sub(1)?)?))).filter(|_| rested >= REST && hands.dragged.is_none());
     match told {
         Some((row, index)) => {
-            if said.0 != TUNED[index].what {
-                said.0 = TUNED[index].what.to_string();
+            if said.0 != tuned(index).what {
+                said.0 = tuned(index).what.to_string();
             }
             node.top = Val::Px(MARGIN + ROW * row as f32 - scrolled());
             shown.set_if_neq(Visibility::Visible);

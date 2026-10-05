@@ -3,16 +3,16 @@
 //! from the start, no sheep, its rules ticking ([`crate::sim`]). What
 //! is here is what the sliders say of generation: the seed, the
 //! heights' shape, how the grass and the trees lie. When a slider of
-//! generation moves, or the seed is drawn again ([`reseed`]), the
-//! world is made afresh and its ticks start from 0.
+//! generation moves, or the seed is drawn again
+//! ([`tuning::reseed`]), the world is made afresh and its ticks start
+//! from 0. A world opened ([`opened`]) ends it: that world is as it
+//! was saved.
 
 use crate::sim;
 use crate::tuning::{self, CLUMPING, COAST_BREADTH, COAST_LOWNESS, FINER_DEPTH, FINER_FALL, FINER_HEIGHT, FINER_SHARE, GRASS_COVER, GRASS_DETAIL, GRASS_PATCH, GRASS_SCATTER, HIGHEST_LAND, LEAST_SIGMOID, LINE_BENDING, MOST_SIGMOID, NARROWEST_BLEND, OCEAN_FLOOR, OCEAN_LEVEL, OCEAN_SHARE, WEIGHT_SPREAD, RAISED_SHARE, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER, VERTEX_SPACING, WIDEST_BLEND};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 use worldgen::mesh::SIGMOID_ONE;
 use worldgen::Shape;
-use utilities::hash::mix;
 use worldgen::patches::Patches;
 use worldgen::ONE;
 use server::Generation;
@@ -20,40 +20,53 @@ use server::Generation;
 /// Whether the lab is what runs.
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// The seed drawn last, 0 while none was: the world is then generated
-/// from the run's own ([`sim::seed`]).
-static SEED_DRAWN: AtomicU64 = AtomicU64::new(0);
-
 /// Says the lab is what runs: generation is then the sliders'.
 pub fn run() {
     RUNNING.store(true, Ordering::Relaxed);
 }
 
-/// Whether the seed was drawn again and the view has not gone back to
-/// where it started since.
-static VIEW_RESET: AtomicBool = AtomicBool::new(false);
+/// Whether a world was opened: its seed is then the one, and the lab
+/// runs no more.
+static OPENED: AtomicBool = AtomicBool::new(false);
 
-/// Whether the view is to go back to where it started: once for each
-/// time the seed is drawn.
-pub fn view_reset() -> bool {
-    VIEW_RESET.swap(false, Ordering::Relaxed)
+/// The seed of the world opened last.
+static OPENED_SEED: AtomicU64 = AtomicU64::new(0);
+
+/// Says a world of `seed` was opened ([`sim::Request::Open`]): it is
+/// generated as worlds are, not as the sliders say, what was drawn of
+/// another is drawn again, and the view goes back to where it started.
+pub fn opened(seed: u64) {
+    OPENED_SEED.store(seed, Ordering::Relaxed);
+    OPENED.store(true, Ordering::Relaxed);
+    RUNNING.store(false, Ordering::Relaxed);
+    tuning::regenerate();
+    VIEW_RESET.store(true, Ordering::Relaxed);
 }
 
-/// The seed the world is generated from, now.
+/// Whether a world was opened and the view has not gone back to where
+/// it started since.
+static VIEW_RESET: AtomicBool = AtomicBool::new(false);
+
+/// The seed the view last started over.
+static VIEW_SEED: AtomicU64 = AtomicU64::new(0);
+
+/// Whether the view is to go back to where it started: once for each
+/// world opened, and each time the seed changes.
+pub fn view_reset() -> bool {
+    let seed = seed();
+    VIEW_RESET.swap(false, Ordering::Relaxed) | (VIEW_SEED.swap(seed, Ordering::Relaxed) != seed)
+}
+
+/// The seed the world is generated from, now: the opened world's, or
+/// the one drawn last in the lab, or the run's own.
 pub fn seed() -> u64 {
-    match SEED_DRAWN.load(Ordering::Relaxed) {
+    if OPENED.load(Ordering::Relaxed) {
+        return OPENED_SEED.load(Ordering::Relaxed);
+    }
+    match tuning::seed_drawn() {
         0 => sim::seed(),
         drawn => drawn,
     }
-}
-
-/// Draws a new seed, off the clock: the world is generated again, and
-/// the view goes back to where it started.
-pub fn reseed() {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |since| since.as_nanos() as u64);
-    SEED_DRAWN.store(mix(now).max(1), Ordering::Relaxed);
-    tuning::regenerate();
-    VIEW_RESET.store(true, Ordering::Relaxed);
 }
 
 /// How the world is generated now: as the sliders have it in the lab,
