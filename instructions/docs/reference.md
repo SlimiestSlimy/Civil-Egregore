@@ -1,6 +1,7 @@
 # Instructions: reference
 
-What a rule is made of: small pieces of behaviour, each asked on a
+What a rule is made of: small pieces of behaviour -- queries of the
+simulation and changes queued to it alike -- each asked on a
 superchunk's turn, built on the public parts of `simulation`,
 `worldgen` and `pathfinding`. A rule of the cells or of an entity puts
 a few together.

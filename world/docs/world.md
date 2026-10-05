@@ -67,14 +67,16 @@ asleep while there is nothing to do.
   simulation's: to it one cooling is hot, one warming or lingering
   cold. A keeper reaches a superchunk its halo has just reached no sooner than
   it crosses its own -- 1,024 cells, a step every 64 ticks or more --
-  so long after it has turned hot. A superchunk no halo wants any more
-  stops warming. 256 ticks is short of what generating a superchunk
+  so long after it has turned hot. A warming is never given up: a superchunk no halo
+  wants any more turns hot when it is due all the same, and is cooling
+  from then -- so what a warming does is one thing, whenever a save
+  falls in it. 256 ticks is short of what generating a superchunk
   takes the background (about 120 ms, against some 40 ms of ticks), so
   the tick waits for a superchunk generated: a stall taken for halos
   that follow their keepers closely.
 
-So between ticks the superchunks hot and not cooling, or warming, are
-the halos, exactly, never both (`tests/fast/halos.rs`); a superchunk
+So between ticks the superchunks hot and not cooling, or warming for a
+halo that is there still, are the halos, exactly, never both (`tests/fast/halos.rs`); a superchunk
 warming takes no write and no entity until it is due; one cooling
 stays hot until it is due, and for good if a halo reaches it again
 before; and a superchunk gone

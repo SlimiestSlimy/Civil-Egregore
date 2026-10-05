@@ -1,7 +1,7 @@
 //! TileSim's instructions: what a rule is made of. Each is one small
-//! thing asked on a superchunk's turn -- a step found, a cell sought,
-//! the neighbours open to walk to -- written once here, light, and
-//! many: a rule of the cells or of an entity (`../mc_rules`,
+//! thing on a superchunk's turn, a query of the simulation as much as
+//! a change queued to it -- a step found, a cell sought, the
+//! neighbours open to walk to -- written once here, light, and many: a rule of the cells or of an entity (`../mc_rules`,
 //! `../entity_rules`) is a few of them put together, and holds only
 //! what is its own.
 //!

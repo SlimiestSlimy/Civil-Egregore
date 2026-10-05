@@ -5,7 +5,7 @@
 //! `cargo test`
 
 use bitmap::{Bitmap, CellWords, WORDS};
-use chunk_storage::{ChunkStorage, HeightMap, InvalidImage, LayerChange, LayerCodec, LayerType, SuperchunkImage, WritebackRing};
+use chunk_storage::{ChunkMaps, ChunkStorage, HeightMap, InvalidImage, LayerChange, LayerCodec, LayerType, SuperchunkImage, WritebackRing};
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
 
 /// A cell of a chunk, cartesian: across and down from its top left.
@@ -103,6 +103,22 @@ fn heights_are_a_floor_a_chunk_or_a_map_where_a_chunk_is_tall() {
     let flat = read.with_heights(&HeightMap::filled(512));
     assert_eq!((flat.height(12_345), flat.words().len() + 2 * chunk_storage::TALL_WORDS), (512, read.words().len()));
     assert_eq!(&flat.layer(5, LayerType(2)).expect("the layer")[..3], &layer);
+    // Water on it: none in most chunks, shallow in one, deeper than a byte tells in another -- a map for each of the two, read back, and the rest as it was.
+    let depth_of = |place: usize| match place / CELLS {
+        3 => (place % 3000) as u16,
+        12 => (place % 7 == 0) as u16 * 200,
+        _ => 0,
+    };
+    assert_eq!((read.depth(21), read.water_words().len()), (0, 1), "no water yet");
+    let wet = SuperchunkImage::from_words(read.with_water(&ChunkMaps::from_numbers(depth_of)).words().into()).expect("an image with water");
+    assert_eq!(wet.water_words().len(), 1 + 3 * chunk_storage::MAP_WORDS, "a wide map and a narrow one");
+    for place in (0..16 * CELLS).step_by(997) {
+        assert_eq!((wet.depth(place), wet.height(place)), (depth_of(place), height_of(place)), "cell {place}");
+    }
+    assert_eq!(&wet.layer(5, LayerType(2)).expect("the layer")[..3], &layer);
+    // Changed, it keeps its water; with none anywhere, none is kept.
+    assert_eq!(wet.rewritten(&[]).with_heights(&heights), wet);
+    assert_eq!(wet.with_water(&ChunkMaps::default()), read);
 }
 
 /// An image's layers come out by type, one a type, however they went
@@ -130,7 +146,7 @@ fn images_hold_one_layer_a_type_in_type_order() {
     assert!(image.layer(place, LayerType(0)).is_none());
     assert!((0..16).filter(|&other| other != place).all(|other| image.layer_types(other).count() == 0));
     assert!((0..1 << 20).step_by(4099).all(|cell| image.height(cell) == 9));
-    assert_eq!(image.words()[0] as usize, 16 + chunk_storage::HEIGHT_WORDS, "the first chunk after the chunk table and heights");
+    assert_eq!(image.words()[0] as usize, 16 + chunk_storage::HEIGHT_WORDS + 1, "the first chunk after the chunk table, the heights and the word of no water");
 
     let read_back = SuperchunkImage::from_words(image.words().into()).expect("an image");
     assert_eq!(read_back, image);

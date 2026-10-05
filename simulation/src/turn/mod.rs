@@ -126,18 +126,6 @@ impl<'a> Turn<'a> {
         self.reader.holds(layer_type, cell)
     }
 
-    /// The number kept at `cell` over `planes`, a bit a bitplane, the
-    /// lowest first, as the tick found it: for a number kept over
-    /// separate layers, a read each -- the water's depth, for now. A
-    /// wide plane holds its number in one ([`Turn::value`]).
-    pub fn level<const N: usize>(&self, planes: [LayerType; N], cell: CellIndex) -> Result<u32, NotHot> {
-        let mut level = 0;
-        for (bit, plane) in planes.into_iter().enumerate() {
-            level |= (self.holds(plane, cell)? as u32) << bit;
-        }
-        Ok(level)
-    }
-
     /// The number `plane` holds at `cell`, as the tick found it: one
     /// read, whatever its width -- which is its type's.
     #[inline]

@@ -16,8 +16,8 @@ lowest ground and the ocean's height; the vertices' grid and the share
 of them that are ocean; the highest land, and the vertices from the
 ocean it is reached over; the lines' blends and sigmoidness, least and
 most; how far lines are bent; the finer meshes. `Shape::DEFAULT`.
-`WATER` (layer types 24 to 31): a cell's water, its depth over eight
-bitplanes. **`height(seed, x, y)`**: a cell's height;
+`WET` (layer type 24): the cells under water; how deep is the image's
+(`SuperchunkImage::depth`). **`height(seed, x, y)`**: a cell's height;
 **`height_shaped(shape, seed, x, y)`**: the same in a world shaped
 otherwise. **`Terrain::generate_shaped(shape, seed, superchunk)`**: a
 superchunk's heights and walls. **`noise(seed, index, shift, x,

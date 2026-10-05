@@ -29,7 +29,7 @@ use bitplane_manager::{BitmapArena, Write, WriteOp};
 use simulation::entity_store::Entities;
 use simulation::{Simulation, Turn, TickReport};
 use chunk_storage::mock::GRASS;
-use worldgen::WATER;
+use worldgen::WET;
 use coordinates::{CellIndex, NEIGHBOURS};
 use std::ops::AddAssign;
 
@@ -90,8 +90,8 @@ fn cell(turn: &mut Turn, cell: CellIndex, counts: &mut GrassCounts) {
     };
     if spreading {
         // Dirt is a cell with no grass on it: no layer of its own.
-        // And grass does not spread under water; a world with no water layers has none.
-        if turn.holds(GRASS, neighbour) == Ok(false) && !matches!(turn.level(WATER, neighbour), Ok(1..)) {
+        // And grass does not spread under water; a world with no water has none.
+        if turn.holds(GRASS, neighbour) == Ok(false) && turn.holds(WET, neighbour) != Ok(true) {
             turn.queue(GRASS, Write::cell(neighbour, WriteOp::Set));
             counts.spreads += 1;
         }

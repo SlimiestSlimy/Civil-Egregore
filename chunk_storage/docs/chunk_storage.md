@@ -25,7 +25,13 @@ part starting on a word:
    Morton order -- each cell's height over its chunk's floor, each
    chunk's one 64 KiB run; then, for each tall chunk (one whose heights
    span more than 255), its heights whole, 16 bits a cell, 128 KiB;
-3. **its chunks**, in Morton order, each its layer count, its layer
+3. **the water's depths** (`ChunkMaps`): sparse by chunk, since most
+   chunks have none -- a word saying which chunks have a map and which
+   of those are wide, then the maps in Morton order, 16 at the worst:
+   a byte a cell, 64 KiB, or 16 bits a cell, 128 KiB, where a chunk's
+   water is deeper than 255. The heights are not kept so: every cell
+   has one;
+4. **its chunks**, in Morton order, each its layer count, its layer
    table -- a type and an offset per layer, sorted by type, the offset
    from the chunk's start -- and its encoded layers, in no order.
 

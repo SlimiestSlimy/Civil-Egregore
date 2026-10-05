@@ -108,13 +108,14 @@ pub struct Shape {
     pub raised: u64,
 }
 
-/// A cell's water: how deep it stands over the ground, 0 none, a number
-/// over eight bitplanes, the lowest bit first.
-pub const WATER: [LayerType; 8] = [LayerType(24), LayerType(25), LayerType(26), LayerType(27), LayerType(28), LayerType(29), LayerType(30), LayerType(31)];
+/// The cells under water, however deep: what a rule asks. How deep is
+/// kept a map a chunk with water, in the superchunk's image
+/// (`chunk_storage::SuperchunkImage::depth`).
+pub const WET: LayerType = LayerType(24);
 
 impl Shape {
     /// The world's shape: vertices 8 superchunks apart, half of them
-    /// ocean 255 deep -- as deep as water is kept -- the land to 200
+    /// ocean 255 deep, the land to 200
     /// over it (711); lines blended over a quarter of their length to
     /// all of it, from even slopes to gentle steps; finer meshes on the land down to lines 16 cells long.
     pub const DEFAULT: Self = Self { ground: 256, ocean: 511, span: 13, sea: ONE / 2, highest: 711, clumping: ONE / 4, coast: 2, coast_low: 5 * mesh::SIGMOID_ONE / 2, narrow: ONE / 4, wide: ONE, soft: mesh::SIGMOID_ONE, hard: 3 * mesh::SIGMOID_ONE, warp: ONE * 3 / 10, finer_depth: 9, finer_share: ONE * 7 / 10, finer_height: 120, finer_fall: ONE * 3 / 4, weight: ONE * 4 / 5, raised: ONE * 3 / 5 };
