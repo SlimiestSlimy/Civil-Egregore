@@ -1,53 +1,48 @@
-# What TileSim costs, measured
+# What TileSim costs, and what was found measuring it
 
-The measurements in one place: each with the command that gave it, on
-the machine they were taken on -- a Ryzen 5 5600, 6 cores and 12
-threads, 32 MiB of L3 cache, 15 GiB of memory. The reasons behind each
-are in the design it belongs to, named beside it. How things are
-measured: `testing_protocol.md`.
+What measuring has shown, and the command that shows it. Figures are
+written only where they explain an optimization -- what it was before
+and after, on a Ryzen 5 5600 (6 cores, 12 threads) -- and nowhere else:
+a figure is one machine's on one day, and the latest are where the
+tools keep them (`<crate>/transient_data/measurements/`). The
+reasons behind each finding are in the design it belongs to, named
+beside it. How things are measured: `testing_protocol.md`.
 
 ## Where memory takes over from the processor
 
-`tilesim world pasture 50000 333 1000 <superchunks> 12` (`world/`): grass
-and sheep, 1,000 sheep a superchunk at the start, 50,000 ticks, every
-thread. A sample and a wake are the time of the thread doing them.
+`tilesim world pasture <ticks> 333 1000 <superchunks>`, the superchunks
+stepped from 16 to 1,024: grass and sheep, every thread. A sample and a
+wake are the time of the thread doing them.
 
-| superchunks | held, MiB | ticks a second | superchunk-ticks a second | a grass sample, ns | a sheep's wake, ns |
-|---|---|---|---|---|---|
-| 16 | 35 | 27,175 | 435,000 | 212 | 490 |
-| 64 | 128 | 15,981 | 1,023,000 | 232 | 501 |
-| 144 | 285 | 8,654 | 1,246,000 | 280 | 591 |
-| 256 | 500 | 4,554 | 1,166,000 | 363 | 729 |
-| 400 | 779 | 2,480 | 992,000 | 430 | 821 |
-| 576 | 1,119 | 1,686 | 971,000 | 491 | 912 |
-| 784 | 1,522 | 1,335 | 1,047,000 | 512 | 945 |
-| 1,024 | 1,985 | 1,038 | 1,063,000 | 530 | 991 |
+- **While the world fits the caches the processor is the limit**: a
+  sample and a wake cost the same however many superchunks there are,
+  and a few superchunks are too few to keep every thread busy.
+- **Past that memory takes over**: the work done a second peaks, and
+  what each sample and wake costs starts to climb -- every one is a
+  line of memory not in the caches.
+- **In a large world it is all memory**: a sample and a wake cost about
+  twice what they did and level off; nothing read is in a cache any
+  more, and more superchunks cost no more each.
 
-- **Up to 64 superchunks the processor is the limit**: a sample and a
-  wake cost what they cost at 16, and 16 is too few to keep 12 threads
-  busy -- the work a second still more than doubles to 64.
-- **Between 64 and 144 memory takes over**: 128 to 285 MiB held. The
-  work a second peaks at 144 and what each sample and wake costs starts
-  to climb -- every one is a line of memory not in the caches.
-- **By 576 it is all memory**: a sample costs 2.3 times what it did, a
-  wake 1.9 times, and both level off: nothing read is in a cache any
-  more, and more superchunks cost no more each. The work a second holds
-  near a million superchunk-ticks.
+So the tick's cost in a large world is what it waits for, not what it
+computes: what helps there is asking memory ahead (below), and touching
+fewer lines a sample and a wake.
 
-So the tick's cost past a hundred superchunks is what it waits for, not
-what it computes: what helps there is asking memory ahead (below), and
-touching fewer lines a sample and a wake.
+## The build's target
 
-## Built with a popcount instruction
+`.cargo/config.toml` builds for `x86-64-v3`: TileSim is a game, played
+on many machines, so not for the processor building it. Two things were
+found on the way:
 
-`.cargo/config.toml` builds for `x86-64-v2` -- every x86-64 processor
-since about 2009, since TileSim is a game, played on many machines --
-which has the popcount instruction. It was first built for `native`,
-the processor building it; the measurements below were taken then.
-Profiled at 400
-superchunks, over half the tick is the sampler (`sample_layer`), most
-of it walking a count tile's words counting their bits -- which the generic
-build did in software, having no popcount instruction to assume.
+- **The popcount instruction matters.** A generic build counts bits in
+  software, and the sampler (`sample_layer`) spends most of its time
+  counting a count tile's words: `x86-64-v2`, which has the
+  instruction, is clearly faster than generic and as fast as `native`.
+- **`x86-64-v3` over `v2` changes nothing yet**: the two are within
+  each other's spread on `tilesim world pasture`. It is the target for
+  the bit instructions (BMI1, BMI2) and AVX2, which nothing uses so far.
+
+The popcount, generic against `native`:
 
 `tilesim world pasture 20000 333 1000 <superchunks> 12`:
 
@@ -61,25 +56,10 @@ build did in software, having no popcount instruction to assume.
 A tenth more ticks a second at both sizes, and the same world to the
 cell: the two builds end 20,000 ticks with the same flock and grass.
 
-On the cloud machine the code is also worked on (a 4-core Xeon at 2.8
-GHz), `pasture 20000 333 1000 16 1` and `pasture 3000 333 1000 64 4`,
-three rounds each, put generic, `x86-64-v2`, `x86-64-v3` and `native`
-within the runs' own spread of each other (11,900 to 13,400 ticks a
-second, and 3,200 to 3,600). `x86-64-v2` keeps the popcount the gain
-above came from; it is to be measured again on the Ryzen.
-
-The build is now for `x86-64-v3` (AVX2, BMI1 and BMI2: Intel since
-Haswell, AMD since Excavator), for the bit instructions wide planes and
-what follows them can be written with. On the Ryzen 5 5600,
-`tilesim world pasture 20000 333 4000 16`, three rounds a build, twice
-over: `x86-64-v2` 31,454 to 33,047 ticks a second, `x86-64-v3` 32,438
-to 33,295 -- within each other's spread. Nothing yet uses what v3
-brings; nothing is lost by it either.
 
 Tried and not kept: asking memory ahead for the dirt beside each sample
-and for the word each write lands in. Nothing gained at 64 or 256
-superchunks (348 against 350 ns a sample): the sample's cost is in
-finding it, not in what the rule reads after.
+and for the word each write lands in. Nothing gained: the sample's cost
+is in finding it, not in what the rule reads after.
 
 ## Smaller count tiles
 
@@ -110,17 +90,13 @@ quarter off a sample: it helps where memory is the limit, which is
 where a large world is. The far search's tiles of 64x64 cells are now
 four count tiles each.
 
-The table at the top was taken before this and before the native
-build.
-
 ## What a tick is made of
 
-Profiled in the renderer (`perf record -p`, 64 superchunks, flat out) at
-the flock's peak, 700,000 sheep: the woken sheep's record 17%, its
-attributes 15%, the cells about it 10%, putting it back 12%, sampling
-grass 6%, pathfinding under 2%, painting and the window 9%. Woken
-entities are now asked of memory ahead: a wake 271 ns where it was 359
-(`simulation/docs/simulation.md`, "Woken entities are asked of memory
+Profiled in the renderer (`perf record -p`, flat out, at the flock's
+peak): most of a tick is the woken sheep -- its record, its attributes,
+the cells about it, putting it back -- then sampling grass; pathfinding
+is very little. Woken entities are asked of memory ahead: a wake 271 ns where it was
+359 (`simulation/docs/simulation.md`, "Woken entities are asked of memory
 ahead").
 
 ## The cells about a woken sheep, asked for ahead
@@ -142,21 +118,15 @@ walls are two layers now (`worldgen/docs/worldgen.md`).
 
 ## Terrain
 
-A generated 64-superchunk world now runs 13,964 ticks a second, with
-the native build, the smaller count tiles and the cells asked for ahead; the
-figures below were taken before those.
-
-
-`tilesim world new <dir> Perf 1 64`, `tilesim world run <dir> 50000`: a generated
-world, walls read by every hungry sheep, 10,399 ticks a second; the
-mock world of the same size without them
-(`tilesim world pasture 50000 333 4000 64 12`), 11,649. Generating a
-superchunk's heights and walls: 40 ms on one thread.
+A generated world, whose walls every hungry sheep reads
+(`tilesim world new <folder> Perf 1 64`, then `tilesim world run
+<folder> <ticks>`), runs somewhat slower than the mock world of the same
+size without them (`tilesim world pasture`).
 
 ## Saves
 
-64 superchunks, 256,000 sheep: 96 MiB written at tick 0, 115 MiB at
-tick 50,000 with 571,500 -- 1 MiB a superchunk of it heights, raw.
+A save's size is mostly its entities and its heights: the heights are
+kept raw, about a byte a cell.
 
 ## Inlining is fragile: hot lookups are marked
 
@@ -174,31 +144,12 @@ the count with no change of work is looked for there first.
 
 ## Under full load: every superchunk hot
 
-Measured in the renderer, every superchunk shown forced hot and grass
-growing everywhere (`cargo run --release -p renderer -- <superchunks>
-1000 0 0 1`), flat out on 12 threads, built for `x86-64-v2`; the rates
-are from the census, over the lines whose pace is 0. Each superchunk
-starts with 1,000 sheep, and the flock grows as the run goes.
-
-64 superchunks (8 x 8), 560 MiB resident:
-
-| tick | sheep | ticks a second |
-|---|---|---|
-| 25,000 | 98,884 | 14,006 |
-| 50,000 | 152,000 | 11,704 |
-| 100,000 | 318,000 | 9,513 |
-| 150,000 | 584,000 | 5,837 |
-| 200,000 | 782,000 | 3,078 |
-| 225,000 | 769,483 | 2,370 |
-
-1,024 superchunks (32 x 32), 2,585 MiB resident, 18 seconds to make:
-714 ticks a second at tick 1,000 (999,000 sheep), 926 to 943 from tick
-9,000 to 13,000, 724 at tick 49,000 (2.4 million sheep). This run was
-before the census kept the pace, so it is not known to be flat out
-throughout.
-
-65,536 superchunks (256 x 256) cannot be held hot: 2.5 MiB a
-superchunk is some 160 GiB.
+In the renderer, every superchunk shown forced hot and grass growing
+everywhere (`cargo run --release -p renderer -- <superchunks> 1000 0 0
+1`), flat out: the rates are from the census, over the lines whose pace
+is 0. The flock grows as the run goes, and the ticks a second fall as
+it does. A world of 256 x 256 superchunks cannot be held hot at all:
+it does not fit in memory.
 
 ## Superchunks claimed, not dealt out
 
@@ -224,5 +175,5 @@ parking at once, was tried on the same run and gained nothing: not kept.
 | the far search for grass | `simulation/docs/simulation.md`, "What a rule is given" |
 | the instructions of the apply phase | the same |
 | sampling, and count tiles | `tilesim.md`, "Sampling rarely, and count tiles" |
-| the flock's balance over two million ticks | `tilesim.md`, "Sheep leave thin pasture" |
-| Tessera's sizes and times | `tessera/docs/` |
+| the flock's balance over a long run | `tilesim.md`, "Sheep leave thin pasture" |
+| Tessera's sizes and times | `tessera/transient_data/measurements/`, by `tilesim tessera <tool>` |

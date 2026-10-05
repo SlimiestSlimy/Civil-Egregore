@@ -5,7 +5,7 @@
 //! the latest numbers are always there, and nowhere copied by hand.
 //!
 //! They are [`COMMANDS`], run by `tilesim tessera <tool>`
-//! ([`dispatch`]); every tool, what it prints and what it takes are in
+//! (`utilities::commands::program`); every tool, what it prints and what it takes are in
 //! that table, and printed by `tilesim tessera`.
 //!
 //! The bitmaps looked at are the adversarial worst bitmaps and saved bitmaps
@@ -32,9 +32,6 @@ mod timing;
 use crate::transient_data;
 use utilities::commands::{Command, Given, Parameter};
 use utilities::diagnostics::table::report::Report;
-
-/// How the tools are reached on the command line.
-const CALLED: &str = "tilesim tessera";
 
 /// Runs a tool that measures: it fills a report named as the tool,
 /// which is printed and kept.
@@ -93,8 +90,3 @@ pub const COMMANDS: [Command; 12] = [
         run: adversarial::save,
     },
 ];
-
-/// Runs the tool the first of `arguments` names, given the rest.
-pub fn dispatch(arguments: &[&str]) -> Result<(), String> {
-    utilities::commands::dispatch(CALLED, &COMMANDS, arguments)
-}

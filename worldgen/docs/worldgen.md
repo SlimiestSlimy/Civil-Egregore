@@ -12,8 +12,8 @@ generation. So a superchunk generated today and its neighbour
 generated next year meet with no seam, and a superchunk made again is
 the same.
 
-A height is 16 bits, 0 to 65,535: the level of the cell's polygon,
-mixed near a border with its neighbours' (below). All of it is whole
+A height is 16 bits, 0 to 65,535: what the mesh's vertices about the
+cell come to there (below). All of it is whole
 numbers, 16-bit fractions and whole square roots, so a world is the
 same on any machine.
 
@@ -43,10 +43,9 @@ Who reads them: the turn gives the neighbours no wall is before
 (`Turn::around_unwalled`) and the walls of the area about a cell
 (`area_walls`); the waves and A* of `../pathfinding/` go round them.
 
-Measured, three seeds: 0.7% of the steps across or down walled; 40 ms
-a superchunk to generate heights and walls, on one thread. Diagonal
-walls of their own, when there were any, were four layers where two
-do, and walled 4% of diagonals.
+How much of the ground is walled is the shape's doing: narrow, hard
+blends make cliffs, broad soft ones none. Diagonal walls of their own,
+when there were any, were four layers where two do.
 
 Not yet: heights do not change. When they do -- digging -- the walls of
 the cells about the change are worked out again.
@@ -55,7 +54,9 @@ the cells about the change are worked out again.
 
 | folder | what is in it |
 |---|---|
-| `src/lib.rs` | heights, walls, a superchunk's terrain |
+| `src/lib.rs` | the shape, heights, walls, a superchunk's terrain, the noise |
+| `src/mesh.rs` | the land as a mesh: what a height is worked out from |
+| `src/patches.rs` | how grass and trees lie when a superchunk is made |
 | `tests/` | heights settled by seed and cell, walls where they should be |
 | `docs/` | this, and the reference, function by function |
 
@@ -117,8 +118,7 @@ cell on a line is in two triangles; it is always given to the first of
 them in a fixed order. `Lands` keeps the vertices about the last cell
 and its triangle, with what a part of the triangle's area is
 multiplied by to be its share -- a division for a triangle, not three
-for a cell. With ten meshes a superchunk of land takes about 0.25 s,
-one of ocean 0.09 s.
+for a cell. Land costs more than ocean, which no finer mesh touches.
 
 To come: ridges and canyons as chains of lines; true subdivision of a
 triangle into its own smaller ones; noise for the ground's detail.

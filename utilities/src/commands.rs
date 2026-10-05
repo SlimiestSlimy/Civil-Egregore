@@ -5,8 +5,9 @@
 //! programs. It lists them as [`Command`]s, each with the
 //! [`Parameter`]s it takes -- a name and what it is if not given --
 //! and [`dispatch`] runs the one the first word names. The one program,
-//! `tilesim`, hands a crate everything after the crate's name and knows
-//! nothing of its tools.
+//! `tilesim`, is a list of the [`Crate`]s with commands handed to
+//! [`program`]: it knows nothing of a crate's tools, and `tilesim help`
+//! prints every command of every crate from the lists themselves.
 //!
 //! A parameter is declared once: its default is what the usage table
 //! shows, what the command reads ([`Given::number`]) and what its
@@ -138,5 +139,48 @@ pub fn dispatch(called: &str, commands: &[Command], arguments: &[&str]) -> Resul
     match named {
         Some((command, arguments)) => (command.run)(&Given { called, command, arguments }),
         None => Err(usage(called, commands)),
+    }
+}
+
+/// A crate with commands, as the program knows it: its name, and where
+/// to hand the rest of the line.
+#[derive(Clone, Copy)]
+pub struct Crate {
+    /// The word that names it.
+    pub name: &'static str,
+    /// What its commands are for, as the usage says it.
+    pub does: &'static str,
+    /// Its commands.
+    pub commands: &'static [Command],
+}
+
+/// The words that ask for help.
+pub const HELP: [&str; 3] = ["help", "--help", "-h"];
+
+/// Every command of every crate of `crates`, a table a crate: what
+/// `called help` prints.
+pub fn help(called: &str, crates: &[Crate]) -> String {
+    let mut text = format!("  {called} <crate> <command> [what it takes]: what is not given is what follows its `=`\n");
+    for one in crates {
+        text += &format!("\n  {}: {}\n{}", one.name, one.does, usage(&format!("{called} {}", one.name), one.commands));
+    }
+    text
+}
+
+/// The whole of a program called `called`: hands `arguments` -- the
+/// command line after the program's name -- to the crate of `crates`
+/// its first word names, as that crate's command and what it takes.
+/// With a word of [`HELP`], or none, or one that names no crate: every
+/// command there is ([`help`]), printed if asked for and else given as
+/// why not.
+pub fn program(called: &str, crates: &[Crate], arguments: &[&str]) -> Result<(), String> {
+    let named = arguments.split_first().and_then(|(name, rest)| crates.iter().find(|one| one.name == *name).map(|one| (one, rest)));
+    match named {
+        Some((one, rest)) => dispatch(&format!("{called} {}", one.name), one.commands, rest),
+        None if arguments.first().is_some_and(|word| HELP.contains(word)) => {
+            print!("{}", help(called, crates));
+            Ok(())
+        }
+        None => Err(help(called, crates)),
     }
 }

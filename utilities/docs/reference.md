@@ -35,7 +35,11 @@ the commands as a table. **`Given`**, what a command is run with:
 `name()`, `arguments()`, `given(name)` (if given), `text(name)` and
 `number(name)` (as given, or the default), `route()` (the words between
 the program and the command), `usage()`, `resolved()` (the line it ran
-on, defaults filled in: what a report records).
+on, defaults filled in: what a report records). **`Crate { name, does,
+commands }`** and **`program(called, crates, arguments)`**: a whole
+program -- the crate the first word names is handed the rest; `help`,
+`--help` or `-h` (`HELP`) prints **`help(called, crates)`**, every
+command of every crate.
 
 ## `rng.rs`
 

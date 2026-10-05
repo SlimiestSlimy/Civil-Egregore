@@ -27,6 +27,17 @@ kept so -- the renderer's fifth argument:
 cargo run --release -p renderer -- <superchunks> <sheep a superchunk> 0 0 1
 ```
 
+## Seeds, commands and figures
+
+- No test or tool has a seed written in it: all take the one in
+  `transient_data/seed`, rolled every five counted runs
+  (`utilities::seed`; `TILESIM_SEED=<seed>` or `=fresh` for one run). A
+  test must hold on any seed; check a changed test on several fresh ones.
+- Every command is run through the root program:
+  `cargo run --release -- help` lists them all.
+- A doc gives a performance figure only where it explains an
+  optimization, before and after; nowhere else.
+
 ## Renames
 
 Try to use the language server for renames, if easier: it follows a

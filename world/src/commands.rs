@@ -1,5 +1,5 @@
 //! The world's commands ([`COMMANDS`]), run by `tilesim world <command>`
-//! ([`dispatch`]): a world made in a folder, run and looked at -- each
+//! (`utilities::commands::program`): a world made in a folder, run and looked at -- each
 //! given the rest of the command line after its folder and giving the
 //! line to print, or why it could not -- and the diagnostics tools
 //! ([`crate::diagnostics::tool`]).
@@ -11,9 +11,6 @@ use chunk_storage::mock::GRASS;
 use std::path::Path;
 use std::time::Instant;
 use utilities::commands::{Command, Given, Parameter};
-
-/// How the commands are reached on the command line.
-const CALLED: &str = "tilesim world";
 
 /// A world's folder.
 const FOLDER: &str = "folder";
@@ -42,11 +39,6 @@ pub const COMMANDS: [Command; 5] = [
         run: pasture,
     },
 ];
-
-/// Runs the command the first of `arguments` names, given the rest.
-pub fn dispatch(arguments: &[&str]) -> Result<(), String> {
-    utilities::commands::dispatch(CALLED, &COMMANDS, arguments)
-}
 
 /// Runs `command` on the folder given and what follows it, and prints
 /// the line it gives.

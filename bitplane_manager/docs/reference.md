@@ -13,7 +13,7 @@ cell asked of a bitmap not hot.
 **`SuperchunkLayer`**: an allocation, one layer type over one
 superchunk -- its owned block, flags, counts less one, count tiles'
 counts, hot count. **`count`** / **`set_count`** a bucket's set cells;
-**`cells`** / **`cells_mut`** a bucket's words; **`get`** a cell by
+**`cells`** a bucket of a bit a cell as a bitmap's words, **`words`** / **`words_mut`** a bucket's words at any width; **`get`** a cell by
 Morton index; **`value`** and **`put_value`** the number of a wide layer's cell, read and put whole; **`put_cell`** a cell set or clear if not already, the
 bucket dirty and the counts moved by one: whether it changed.
 

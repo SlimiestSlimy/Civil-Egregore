@@ -22,7 +22,7 @@ reader has to wonder whether something is missing or was never needed
 
 | path | what it holds |
 |---|---|
-| `Cargo.toml` | the crate; a tool it has is named here as a `[[bin]]` |
+| `Cargo.toml` | the crate: a library, with no `[[bin]]` |
 | `docs/<crate>.md` | its design: what it is, and every decision with its reason |
 | `docs/reference.md` | every item, function by function, in the glossary's words; the code's comments point here |
 | `src/lib.rs` | a table of the crate's modules: one line each, what it is |
@@ -36,6 +36,10 @@ reader has to wonder whether something is missing or was never needed
   function in `src/diagnostics/tool`, listed among the crate's
   `COMMANDS` and run by `tilesim <crate> <tool>`; the root hands the
   crate the rest of the line and knows none of its tools.
+- A doc gives a performance figure only where it explains an
+  optimization: what it was before and after. Everywhere else it says
+  what was found and the command that measures it; the latest figures
+  are in `transient_data/measurements/`.
 - A rule is written for one cell or one entity; the loop over them is
   the simulation's (`Turn::each_sampled`, `Turn::each_woken`), inlined,
   so it costs nothing.
