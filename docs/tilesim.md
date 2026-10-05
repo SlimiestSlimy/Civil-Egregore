@@ -360,11 +360,11 @@ measurement below was taken at 0.3%.)
 
 What a write costs -- sampling, computing, applying -- and how many
 superchunks of grass a core keeps at the game's pace are what
-`tilesim world throughput` reports, at any number of superchunks and
+`tilesim server throughput` reports, at any number of superchunks and
 threads; a write is one cell set or cleared, a spread or a decay two.
 The tick is the same on any number of threads, and faster on more.
 
-`tilesim world throughput` also reports the memory held: the process's
+`tilesim server throughput` also reports the memory held: the process's
 peak and its average over the ticks (from `/proc/self/status`), and
 what the arena's blocks and storage's images take. Most of what is
 held is the stored images, and most of those the raw height maps.
@@ -478,7 +478,7 @@ superchunk owning its own storage keeps loading, evicting and saving a
 superchunk local, with no boundaries to shift between threads.
 
 What a sheep's wake, a grass sample and an applied change each cost is
-what `tilesim world pasture` reports. At first a wake cost several times
+what `tilesim server pasture` reports. At first a wake cost several times
 a sample.
 
 Why, counted (callgrind, one superchunk, 300 ticks): about 1,550
@@ -529,7 +529,7 @@ those a sample. The tile windows changed no time here: a wake stayed
 at 149, 194 and 384 ns over 1, 16 and 64 superchunks.
 
 Buckets sorted by cell and searched by their places, a sheep's wake,
-nanoseconds, one thread (`tilesim world pasture 3000 333 4000`):
+nanoseconds, one thread (`tilesim server pasture 3000 333 4000`):
 
 | superchunks | sorted by ID | sorted by cell |
 |---|---|---|
@@ -615,7 +615,7 @@ by the rules: a chunk's bucket has one record a cell.
 - **Sheep**: a lamb is born on a cell seen free beside its mother, who
   waits for one.
 
-Measured against the build before it (`tilesim world pasture`, 4,000
+Measured against the build before it (`tilesim server pasture`, 4,000
 sheep a superchunk): 16 superchunks on one thread, 20,000 ticks, 4.07
 seconds against 4.08, 3% more instructions; 64 superchunks on 12
 threads, about 5,300 ticks a second both, within what one run differs
@@ -635,7 +635,7 @@ them. Only a hungry sheep walks, a step every 64 ticks or so, to grass.
 Old age comes by the tick slept, not the wake. This is what the timer
 wheel was for: a tick costs the entities with something to do.
 
-Measured (`tilesim world pasture 20000 333 4000 64`, 12 threads): 88
+Measured (`tilesim server pasture 20000 333 4000 64`, 12 threads): 88
 wakes a tick where there were about 3,600, and 17,400 ticks a second
 against 5,300.
 
@@ -688,7 +688,7 @@ grass in it. It still takes one step a wake and keeps no route; a sheep
 walks 170 to 220 steps before it starves, so the far end of its reach
 it sees but never comes to.
 
-The flock is what it was (`tilesim world pasture 2000000 333 4000 4 3`):
+The flock is what it was (`tilesim server pasture 2000000 333 4000 4 3`):
 the same boom, crash and settling, to 10,319 sheep on 19% grass where
 it was 10,897 on 21% -- fewer starve in the trough, so the grass is
 kept a little shorter.
@@ -711,11 +711,11 @@ index: its image, and its state -- its random numbers, its entities.
 A world loaded goes on exactly as the one saved would have, which is
 why each superchunk's random numbers are now its own and kept from
 tick to tick, not made anew from a tick's seed. The whole of it:
-`world/docs/world.md`.
+`server/docs/server.md`.
 
 The code is where its parts are: the files in `chunk_storage::disk`,
 the entities' words in `simulation`, and the save itself, which needs
-them all, in `world/`. The `tilesim` crate is the program alone.
+them all, in `server/`. The `tilesim` crate is the program alone.
 
 ### Terrain and walls (built)
 
@@ -758,7 +758,7 @@ step with every change; sampling passes over count tiles by them, and
 counts the bits of one count tile's words at most (now 16 words: see
 `performance.md`).
 
-Measured (`tilesim world throughput`, grass at 0.003%, the same samples
+Measured (`tilesim server throughput`, grass at 0.003%, the same samples
 before and after), sampling alone, one thread, by the processor's
 counters:
 
@@ -800,7 +800,7 @@ is reached. People will keep halos; for now the sheep do, and the
 world starts as its origin superchunk, a flock on it, and the flock's
 halo. For this test only, grass is ticked only within three
 superchunks across of the origin's middle, so its spreading cannot
-grow the world without end. The whole of it: `world/docs/world.md`,
+grow the world without end. The whole of it: `server/docs/server.md`,
 "Halos".
 
 ## Simulation (the plan)

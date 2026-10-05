@@ -4208,9 +4208,9 @@ dependencies = [
  "coordinates",
  "entity_rules",
  "mc_rules",
+ "server",
  "simulation",
  "utilities",
- "world",
  "worldgen",
 ]
 
@@ -4349,6 +4349,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
+]
+
+[[package]]
+name = "server"
+version = "0.1.0"
+dependencies = [
+ "bitmap",
+ "bitplane_manager",
+ "chunk_storage",
+ "coordinates",
+ "entity_rules",
+ "mc_rules",
+ "simulation",
+ "utilities",
+ "worldgen",
 ]
 
 [[package]]
@@ -4674,9 +4689,9 @@ dependencies = [
 name = "tilesim"
 version = "0.1.0"
 dependencies = [
+ "server",
  "tessera",
  "utilities",
- "world",
 ]
 
 [[package]]
@@ -5726,21 +5741,6 @@ dependencies = [
  "wayland-client",
  "wayland-protocols",
  "wayland-protocols-wlr",
-]
-
-[[package]]
-name = "world"
-version = "0.1.0"
-dependencies = [
- "bitmap",
- "bitplane_manager",
- "chunk_storage",
- "coordinates",
- "entity_rules",
- "mc_rules",
- "simulation",
- "utilities",
- "worldgen",
 ]
 
 [[package]]

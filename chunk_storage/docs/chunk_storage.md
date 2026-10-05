@@ -58,7 +58,7 @@ when the world is saved.
 ## Shared images
 
 A superchunk warming is decoded on another thread, off the tick
-(`../../world/`, "Halos"), from its image in the cold pool, while the
+(`../../server/`, "Halos"), from its image in the cold pool, while the
 tick goes on changing the pool: other superchunks' images put in, and
 flushes putting rewritten ones in place of theirs. A thread cannot
 just borrow an image from a pool changed meanwhile -- a change may move
@@ -86,7 +86,7 @@ look into: whoever ticks the world keeps there what moves on the
 superchunk (`simulation`: its random numbers and entities). Words are
 eight bytes, the lowest first. A file is written beside itself and
 renamed, so one cut short never replaces a good one. What is saved
-when, and how it is read back: `../../world/docs/world.md`.
+when, and how it is read back: `../../server/docs/server.md`.
 
 ## The mock
 

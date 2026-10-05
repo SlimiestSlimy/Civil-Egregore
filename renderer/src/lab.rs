@@ -15,7 +15,7 @@ use worldgen::Shape;
 use utilities::hash::mix;
 use worldgen::patches::Patches;
 use worldgen::ONE;
-use world::Generation;
+use server::Generation;
 
 /// Whether the lab is what runs.
 static RUNNING: AtomicBool = AtomicBool::new(false);
