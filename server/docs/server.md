@@ -1,8 +1,9 @@
-# The world
+# The server
 
-The world as a whole: made from a seed, ticked, saved and loaded. It is
-the one crate that holds the hot bitmaps, the stored superchunks, the
-entities and the simulation together; the program (`../src/main.rs`)
+The world as a whole: made from a seed, ticked, saved and loaded. The
+server is the one crate that holds the hot bitmaps, the stored superchunks, the
+entities and the simulation together, and that makes the one thread
+dispatcher the tick and chunk storage's jobs share; the program (`../src/main.rs`)
 and the renderer (`../renderer/`) call it.
 
 ## Made from a seed
@@ -158,7 +159,7 @@ to tick 4,000: the same cells, entities and random numbers). What makes it so:
   its superchunk was cold -- wakes the tick it is put back.
 
 Most of a save is heights, kept raw, about a byte a cell; the layers
-and the entities are each a fraction of that (`tilesim world new`
+and the entities are each a fraction of that (`tilesim server new`
 says the bytes written).
 
 Not yet: superchunks no longer in the world are not removed from a

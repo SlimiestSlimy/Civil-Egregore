@@ -33,7 +33,7 @@ use std::time::{Duration, Instant};
 use crate::{lab, tuning};
 use mc_rules::trees::{TREE, TREE_STAGE};
 use worldgen::WET;
-use world::World;
+use server::World;
 use utilities::rng::Rng;
 
 /// Ticks a second the simulation is held to unless told otherwise: the
@@ -45,7 +45,7 @@ pub const TARGET_PACE: u32 = 256;
 /// first whose world has land about its origin -- settled once a run.
 pub fn seed() -> u64 {
     static SEED: OnceLock<u64> = OnceLock::new();
-    *SEED.get_or_init(|| world::seed_with_land(utilities::seed::counted(), &worldgen::Shape::DEFAULT))
+    *SEED.get_or_init(|| server::seed_with_land(utilities::seed::counted(), &worldgen::Shape::DEFAULT))
 }
 
 /// The depth from which water hides what is under it: a power of two.
@@ -232,9 +232,9 @@ pub fn start(superchunks: u32, flock: usize, mode: Mode) -> (Sender<Request>, Re
 /// The world `mode` runs, `flock` sheep on each of `shown`.
 fn made(mode: Mode, shown: &[SuperchunkIndex], flock: usize) -> World {
     match mode {
-        Mode::Halos => world::generate_flocks(seed(), shown, flock),
-        Mode::ForcedHot => forced(world::generate(seed(), 0), shown, flock),
-        Mode::Lab => forced(world::generate_with(lab::generation(), lab::seed()), shown, 0),
+        Mode::Halos => server::generate_flocks(seed(), shown, flock),
+        Mode::ForcedHot => forced(server::generate(seed(), 0), shown, flock),
+        Mode::Lab => forced(server::generate_with(lab::generation(), lab::seed()), shown, 0),
     }
 }
 
@@ -303,7 +303,7 @@ fn run(superchunks: u32, flock: usize, mode: Mode, asked: &Receiver<Request>, an
         } else {
             // The halos are not moved: every superchunk shown stays hot.
             let seed = world.info.seed;
-            world::tick_rules(&mut world.simulation, &mut world.arena, &mut world.entities, seed);
+            server::tick_rules(&mut world.simulation, &mut world.arena, &mut world.entities, seed);
         }
         tick += 1;
         if let Some(pace) = pace {

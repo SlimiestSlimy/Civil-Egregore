@@ -31,7 +31,7 @@ that carries least. The sheep's rule is 100 lines of what a sheep
 decides.
 
 A kind knows the cells it reads and writes, and no other rule. The world
-(`world/src/tick.rs`) is what runs the entities' rules and the cells' in
+(`server/src/tick.rs`) is what runs the entities' rules and the cells' in
 one tick.
 
 | file | entity |

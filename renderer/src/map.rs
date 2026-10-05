@@ -11,7 +11,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use worldgen::mesh::Lands;
 use crate::paint::{BROWN, GREEN};
-use world::Generation;
+use server::Generation;
 
 /// How much of its light the deepest ocean keeps.
 const DEEP_LIGHT: f32 = 0.35;
@@ -76,7 +76,7 @@ fn cell(wanted: &Wanted, x: i64, y: i64) -> Option<(u32, u32)> {
 /// The pixels of `wanted`: rows shared out among the machine's threads.
 fn draw(wanted: &Wanted) -> Vec<u8> {
     let (width, generation, seed) = (wanted.size.0 as usize, &wanted.generation, wanted.seed);
-    let trees_seed = seed ^ world::TREES_SALT;
+    let trees_seed = seed ^ server::TREES_SALT;
     let (grass_under, trees_under) = (generation.grass.threshold(seed), generation.trees.threshold(trees_seed));
     let mut pixels = vec![0u8; width * wanted.size.1 as usize * 4];
     let threads = thread::available_parallelism().map_or(1, |threads| threads.get());

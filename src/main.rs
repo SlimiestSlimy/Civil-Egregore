@@ -4,7 +4,7 @@
 //!
 //! `cargo run --release -- help`: every command of every crate, what
 //! each takes and what that is if not given.
-//! `cargo run --release -- world run <folder> [ticks]`
+//! `cargo run --release -- server run <folder> [ticks]`
 //! `cargo run --release -- tessera <tool> [...]`
 
 // Every item is documented, private ones included; `cargo clippy`
@@ -16,7 +16,7 @@ use utilities::commands::{program, Crate};
 
 /// The crates with commands.
 const CRATES: [Crate; 2] = [
-    Crate { name: "world", does: "a world made, run and looked at, and the world's diagnostics tools", commands: &world::commands::COMMANDS },
+    Crate { name: "server", does: "a world made, run and looked at, and the server's diagnostics tools", commands: &server::commands::COMMANDS },
     Crate { name: "tessera", does: "Tessera's diagnostics tools", commands: &tessera::diagnostics::tool::COMMANDS },
 ];
 

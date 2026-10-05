@@ -1,6 +1,6 @@
-//! The world's diagnostics tools: each runs a diagnostic, prints what
+//! The server's diagnostics tools: each runs a diagnostic, prints what
 //! it gathered and keeps it in `transient_data/measurements/`. They are
-//! among the world's commands ([`crate::commands`]), where their
+//! among the server's commands ([`crate::commands`]), where their
 //! parameters and what each is if not given are listed.
 //!
 //! Threads 0: every one the machine has, no more than the superchunks.

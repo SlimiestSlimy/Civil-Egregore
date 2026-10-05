@@ -9,8 +9,8 @@ use chunk_storage::mock::GRASS;
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use bitplane_manager::{Write, WriteOp};
 use simulation::entity_store::{Attribute, EntityId, EntityType, Header, NEVER};
-use world::halos::about;
-use world::{HaloChange, World, COOL_TICKS, HALO_KEEPERS, WARM_TICKS};
+use server::halos::about;
+use server::{HaloChange, World, COOL_TICKS, HALO_KEEPERS, WARM_TICKS};
 
 /// The superchunks holding an entity that keeps a halo.
 fn keepers(world: &World) -> Vec<SuperchunkIndex> {
@@ -24,7 +24,7 @@ fn keepers(world: &World) -> Vec<SuperchunkIndex> {
 /// never both; and the world has grown.
 #[test]
 fn the_hot_superchunks_are_the_halos() {
-    let mut world = world::generate(crate::land_seed(1), 4_000);
+    let mut world = server::generate(crate::land_seed(1), 4_000);
     assert_eq!(world.arena.superchunk_indices(), about([WORLD_MIDDLE].into_iter()), "the origin's halo");
     let mut moved = HaloChange::default();
     // 6,000 ticks at least, and on until a superchunk has been generated: on some seeds the flock is long in nearing an edge.
@@ -57,7 +57,7 @@ fn the_hot_superchunks_are_the_halos() {
 /// it is due -- still wanted or not -- and then both hold.
 #[test]
 fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
-    let mut world = world::generate(crate::land_seed(1), 4_000);
+    let mut world = server::generate(crate::land_seed(1), 4_000);
     let try_both = |world: &mut World, cell| {
         world.arena.queue(GRASS, Write::cell(cell, WriteOp::Flip));
         let missed = world.arena.apply().missed;
@@ -84,7 +84,7 @@ fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
 /// again, cooling across a save and a load, it goes cold when due.
 #[test]
 fn a_superchunk_cooling_stays_hot_until_due() {
-    let mut world = world::generate(crate::land_seed(1), 1);
+    let mut world = server::generate(crate::land_seed(1), 1);
     let halo = world.arena.superchunk_indices();
     let sheep = world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).next().expect("the sheep");
     let take_away = |world: &mut World| {
@@ -108,9 +108,9 @@ fn a_superchunk_cooling_stays_hot_until_due() {
 
     take_away(&mut world);
     let due = world.entities.now() + COOL_TICKS;
-    let folder = world::transient_data::saves().join("tests").join("cooling");
-    world::save(&folder, &mut world).expect("saved");
-    world = world::load(&folder).expect("loaded");
+    let folder = server::transient_data::saves().join("tests").join("cooling");
+    server::save(&folder, &mut world).expect("saved");
+    world = server::load(&folder).expect("loaded");
     assert!(cooling(&world) == halo && world.cooling().all(|(_, at)| at == due), "cooling as it was");
     let mut cooled = 0;
     while world.entities.now() < due {
@@ -126,7 +126,7 @@ fn a_superchunk_cooling_stays_hot_until_due() {
 /// lingering are kept; once flushed and let go, so decoded from its images.
 #[test]
 fn a_superchunk_gone_cold_comes_back_as_it_was() {
-    let mut world = world::generate(crate::land_seed(2), 2_000);
+    let mut world = server::generate(crate::land_seed(2), 2_000);
     for _ in 0..500 {
         world.tick();
     }
@@ -137,7 +137,7 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
         (cells, world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect(), world.simulation.random_states().collect())
     };
     let before = held(&world);
-    let mut twin = world::generate(crate::land_seed(2), 2_000);
+    let mut twin = server::generate(crate::land_seed(2), 2_000);
     for _ in 0..500 {
         twin.tick();
     }
@@ -168,7 +168,7 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
     let halos = world.arena.superchunk_indices();
     assert!(world.warming().next().is_none() && world.cooling().next().is_none() && halos == twin.arena.superchunk_indices(), "the two alike, none warming or cooling");
     world.keep_hot(&[]);
-    world::save(&world::transient_data::saves().join("tests").join("gone_cold"), &mut world).expect("saved");
+    server::save(&server::transient_data::saves().join("tests").join("gone_cold"), &mut world).expect("saved");
     assert_eq!(world.arena.lingering(), 0, "flushed, so let go");
     world.keep_hot(&halos);
     for _ in 0..500 {

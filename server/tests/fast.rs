@@ -14,5 +14,5 @@ mod world;
 /// run's tests ask for: found from the crate's seed, rolled every few
 /// runs (`utilities::seed`), so that nothing passes on one seed alone.
 fn land_seed(nth: u64) -> u64 {
-    ::world::seed_with_land(utilities::seed::counted().wrapping_add(nth.wrapping_mul(1_000_003)), &worldgen::Shape::DEFAULT)
+    ::server::seed_with_land(utilities::seed::counted().wrapping_add(nth.wrapping_mul(1_000_003)), &worldgen::Shape::DEFAULT)
 }

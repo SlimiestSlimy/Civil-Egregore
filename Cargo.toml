@@ -6,7 +6,7 @@ description = "TileSim, a 2D procedural simulation game: the program"
 publish = false
 
 [dependencies]
-world = { path = "world" }
+server = { path = "server" }
 tessera = { path = "tessera" }
 utilities = { path = "utilities" }
 
@@ -33,7 +33,7 @@ members = [
     "tessera",
     "utilities",
     "renderer",
-    "world",
+    "server",
 ]
 default-members = [
     ".",
@@ -49,7 +49,7 @@ default-members = [
     "worldgen",
     "tessera",
     "utilities",
-    "world",
+    "server",
 ]
 exclude = ["tessera/external_benchmarks"]
 

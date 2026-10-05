@@ -5,7 +5,7 @@
 
 use chunk_storage::mock::GRASS;
 use simulation::entity_store::{Attribute, Header};
-use world::{transient_data, World};
+use server::{transient_data, World};
 
 /// Every hot cell, every entity with its attributes, the tick, every
 /// random stream, every cold superchunk's kept state, and the
@@ -25,19 +25,19 @@ fn everything(world: &World) -> Everything {
 #[ignore]
 fn a_world_stopped_often_comes_to_the_same() {
     const UNTIL: u64 = 30_000;
-    let mut straight = world::generate(21, 4_000);
+    let mut straight = server::generate(21, 4_000);
     while straight.entities.now() < UNTIL {
         straight.tick();
     }
     let folder = transient_data::saves().join("tests").join("complete");
     let _ = std::fs::remove_dir_all(&folder);
-    let mut stopped = world::generate(21, 4_000);
+    let mut stopped = server::generate(21, 4_000);
     for stop in (5_000..=UNTIL).step_by(5_000) {
         while stopped.entities.now() < stop {
             stopped.tick();
         }
-        world::save(&folder, &mut stopped).expect("saved");
-        stopped = world::load(&folder).expect("loaded");
+        server::save(&folder, &mut stopped).expect("saved");
+        stopped = server::load(&folder).expect("loaded");
     }
     assert!(everything(&straight) == everything(&stopped), "the same at tick {UNTIL}");
 }
@@ -47,7 +47,7 @@ fn a_world_stopped_often_comes_to_the_same() {
 #[test]
 #[ignore]
 fn a_flock_on_generated_ground_lasts() {
-    let mut made = world::generate(3, 4_000);
+    let mut made = server::generate(3, 4_000);
     for _ in 0..300_000 {
         made.tick();
     }

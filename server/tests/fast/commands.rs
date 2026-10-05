@@ -2,8 +2,8 @@
 //! would.
 
 use std::fs;
-use world::commands::{info, new, run};
-use world::transient_data::saves;
+use server::commands::{info, new, run};
+use server::transient_data::saves;
 
 /// For worlds of ten sheep and of a thousand: made -- the origin and its
 /// halo, nine superchunks -- run twice, the second run going on from

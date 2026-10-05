@@ -156,7 +156,7 @@ fn images_in(folder: &Path) -> Result<Vec<SuperchunkIndex>, DiskError> {
 }
 
 /// The first line: what the file is, and its format's number.
-const FIRST_LINE: &str = "tilesim world 1";
+const FIRST_LINE: &str = "tilesim server 1";
 
 /// What a world is.
 #[derive(Clone, Debug, PartialEq, Eq)]

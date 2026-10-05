@@ -10,7 +10,7 @@ use chunk_storage::SuperchunkImage;
 use coordinates::{CellCartesian, SuperchunkIndex};
 use simulation::entity_store::{Attribute, Header};
 use std::path::PathBuf;
-use world::{self, transient_data, World};
+use server::{self, transient_data, World};
 
 /// A folder of its own for the test `name`, emptied.
 fn folder(name: &str) -> PathBuf {
@@ -38,15 +38,15 @@ fn everything(world: &World) -> Everything {
 #[test]
 fn a_world_loaded_goes_on_as_the_one_saved() {
     let folder = folder("goes_on");
-    let mut first = world::generate(crate::land_seed(0), 3_000);
+    let mut first = server::generate(crate::land_seed(0), 3_000);
     first.info.name = "Pasture".to_string();
     for _ in 0..1_500 {
         first.tick();
     }
-    let saved = world::save(&folder, &mut first).expect("saved");
+    let saved = server::save(&folder, &mut first).expect("saved");
     assert_eq!((saved.superchunks, saved.entities), (first.storage.superchunks().count(), first.entities.len()));
 
-    let mut second = world::load(&folder).expect("loaded");
+    let mut second = server::load(&folder).expect("loaded");
     assert_eq!((second.info.name.as_str(), second.info.seed, second.info.tick), ("Pasture", crate::land_seed(0), 1_500));
     assert_eq!(second.info.layers, first.info.layers);
     assert!(everything(&first) == everything(&second), "loaded as saved");
@@ -67,7 +67,7 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
 #[test]
 fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     // At least 4,000 ticks, and on until a superchunk has been warming: on some seeds the flock is long in nearing an edge.
-    let mut straight = world::generate(crate::land_seed(0), 4_000);
+    let mut straight = server::generate(crate::land_seed(0), 4_000);
     let mut warming = None;
     while straight.entities.now() < 4_000 || warming.is_none() {
         assert!(straight.entities.now() < 60_000, "a superchunk warming on the way");
@@ -79,7 +79,7 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     let (warming, until) = (warming.expect("seen above"), straight.entities.now());
 
     let folder = folder("mid_run");
-    let mut stopped = world::generate(crate::land_seed(0), 4_000);
+    let mut stopped = server::generate(crate::land_seed(0), 4_000);
     let mut stops = vec![1, 700, 701, 1_900, 3_333, warming, until];
     stops.sort_unstable();
     stops.dedup();
@@ -87,14 +87,14 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
         while stopped.entities.now() < stop {
             stopped.tick();
         }
-        world::save(&folder, &mut stopped).expect("saved");
+        server::save(&folder, &mut stopped).expect("saved");
         // What ran is dropped whole: the next stretch runs on what the files hold alone.
-        stopped = world::load(&folder).expect("loaded");
+        stopped = server::load(&folder).expect("loaded");
         assert_eq!(stopped.info.tick, stop);
     }
     assert!(straight.entities.len() > 4_000, "{} sheep: a flock that bred", straight.entities.len());
     // The one that ran straight saved too: a superchunk gone cold on the way has its last cells in the writeback ring until a save, or the ring's need of room, puts them in its image.
-    world::save(&folder.join("straight"), &mut straight).expect("saved");
+    server::save(&folder.join("straight"), &mut straight).expect("saved");
     assert!(everything(&straight) == everything(&stopped), "the same at tick {until}");
 }
 
@@ -103,11 +103,11 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
 #[test]
 fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let folder = folder("files");
-    let mut first = world::generate(99, 10);
+    let mut first = server::generate(99, 10);
     first.info.name = "Nine fields".to_string();
-    world::save(&folder, &mut first).expect("saved");
+    server::save(&folder, &mut first).expect("saved");
     let text = std::fs::read_to_string(folder.join("world")).expect("the world's file");
-    assert_eq!(text, "tilesim world 1\nname = Nine fields\nseed = 99\ntick = 0\nlayers = 2 3 4 5 6 7 24 8 9\n");
+    assert_eq!(text, "tilesim server 1\nname = Nine fields\nseed = 99\ntick = 0\nlayers = 2 3 4 5 6 7 24 8 9\n");
     let hot: String = first.arena.superchunk_indices().iter().map(|superchunk| format!("{:011x}\n", superchunk.0)).collect();
     assert_eq!(std::fs::read_to_string(folder.join("hot")).expect("the hot file"), format!("tilesim hot 2\n{hot}"), "the nine hot, none cooling or warming");
     let mut names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|entry| entry.unwrap().file_name().into_string().unwrap()).collect();
@@ -122,16 +122,16 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
 #[test]
 fn files_that_are_not_a_save_are_refused() {
     let folder = folder("refused");
-    assert!(matches!(world::load(&folder), Err(DiskError::Io(..))), "no such folder");
-    world::save(&folder, &mut world::generate(1, 10)).expect("saved");
+    assert!(matches!(server::load(&folder), Err(DiskError::Io(..))), "no such folder");
+    server::save(&folder, &mut server::generate(1, 10)).expect("saved");
     let state = std::fs::read_dir(folder.join("superchunks")).unwrap().map(|entry| entry.unwrap().path()).find(|path| path.extension().unwrap() == "state").unwrap();
     let whole = std::fs::read(&state).unwrap();
     std::fs::write(&state, &whole[..whole.len() - 8]).unwrap();
-    assert!(matches!(world::load(&folder), Err(DiskError::Invalid(path, what)) if path == state && what == "cut short"));
+    assert!(matches!(server::load(&folder), Err(DiskError::Invalid(path, what)) if path == state && what == "cut short"));
     std::fs::write(&state, &whole).unwrap();
-    assert!(world::load(&folder).is_ok());
+    assert!(server::load(&folder).is_ok());
     std::fs::write(folder.join("world"), "something else\n").unwrap();
-    assert!(matches!(world::load(&folder), Err(DiskError::Invalid(..))));
+    assert!(matches!(server::load(&folder), Err(DiskError::Invalid(..))));
 }
 
 /// In a world generated, the ground has walls, and no sheep ever steps
@@ -143,7 +143,7 @@ fn sheep_never_step_through_a_wall() {
     // Small polygons joined by cliffs, and a seed whose origin superchunk has walls enough.
     let shape = worldgen::Shape { span: 8, highest: 552, narrow: 2, wide: 2, sea: 0, finer_depth: 3, ..worldgen::Shape::DEFAULT };
     let seed = (utilities::seed::counted()..).find(|&seed| worldgen::Terrain::generate_shaped(&shape, seed, coordinates::WORLD_MIDDLE).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
-    let mut made = world::generate_flocks_with(world::Generation { shape, ..world::Generation::DEFAULT }, seed, &[coordinates::WORLD_MIDDLE], 4_000);
+    let mut made = server::generate_flocks_with(server::Generation { shape, ..server::Generation::DEFAULT }, seed, &[coordinates::WORLD_MIDDLE], 4_000);
     // The superchunk's heights and a cell more all round, worked out once: asked for at every sheep, every tick.
     let (corner, side) = (coordinates::WORLD_MIDDLE.top_left().cartesian(), coordinates::SUPERCHUNK_SIDE_CELLS as usize + 2);
     let mut lands = worldgen::mesh::Lands::new(&shape, seed);

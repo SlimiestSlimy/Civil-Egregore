@@ -101,12 +101,12 @@ a **`PastureRun`**.
 
 ## `commands.rs`
 
-**`COMMANDS`**: what `tilesim world <command>` runs, each with its
-parameters and their defaults. `tilesim world new <folder> [name]
+**`COMMANDS`**: what `tilesim server <command>` runs, each with its
+parameters and their defaults. `tilesim server new <folder> [name]
 [seed] [sheep]`: a world generated from the seed -- the origin, a flock
 of `sheep` on it, and its halo (**`new`**) -- and saved in the folder,
-which must not hold one. `tilesim world run <folder> [ticks]`: it
-loaded, ticked and saved again (**`run`**). `tilesim world info
+which must not hold one. `tilesim server run <folder> [ticks]`: it
+loaded, ticked and saved again (**`run`**). `tilesim server info
 <folder>`: what its world file says (**`info`**). **`printed`**: a
 command run on its folder, its line printed. The diagnostics tools,
 `throughput` and `pasture`, are listed there too.

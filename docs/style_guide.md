@@ -149,5 +149,5 @@ Some things are named by rule:
 - Speed is never a test. It is measured by a tool, and a number written
   down names the command that gave it.
 - The reference for the tick is the instructions callgrind counts for
-  `tilesim world pasture 300 333 4000 4 1`, less the same run with no
+  `tilesim server pasture 300 333 4000 4 1`, less the same run with no
   ticks. A change keeps within 1% of it, or says why not.

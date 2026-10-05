@@ -1,10 +1,12 @@
-//! TileSim's world as a whole: made from a seed ([`generate`]), ticked
+//! TileSim's server: the world as a whole, held by the one crate that
+//! puts the rest together -- which a renderer, or the program, is a
+//! client of. The world made from a seed ([`generate`]), ticked
 //! -- its cells' rules (`mc_rules/`) and its entities (`entity_rules/`)
 //! together, the superchunks hot only about the entities that keep a
 //! halo ([`halos`]) -- saved ([`save`]) and loaded ([`load`]) as it
 //! was, to the cell and the random number. Where a save's files are
 //! and what they hold: `chunk_storage::disk`. The design:
-//! `docs/world.md`; function by function: `docs/reference.md`.
+//! `docs/server.md`; function by function: `docs/reference.md`.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.

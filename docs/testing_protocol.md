@@ -17,7 +17,7 @@ encoding needs: its seed file, its adversarial searches.
   function, not a program: the crate lists its tools as commands
   (`utilities::commands`), each with the parameters it takes and what
   each is if not given, and `tilesim <crate> <tool> [parameters]` runs
-  one -- `cargo run --release -- world pasture 300 333 4000 4 1`.
+  one -- `cargo run --release -- server pasture 300 333 4000 4 1`.
   `cargo run --release -- help` lists every crate's commands and their
   parameters; a report says the line it ran on, defaults filled in.
 
@@ -55,7 +55,7 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `mc_rules` | | grass, and only within its limit, for now | |
 | `entity_rules` | | sheep | |
 | `worldgen` | | terrain | walls over many seeds; no seam between superchunks |
-| `world` | | halos: hot superchunks are the halos, a cold one comes back as it was; world: saves, loads, walls | a world stopped every 5,000 ticks; a flock lasting 300,000 |
+| `server` | | halos: hot superchunks are the halos, a cold one comes back as it was; world: saves, loads, walls | a world stopped every 5,000 ticks; a flock lasting 300,000 |
 | `tessera` | fine | fast | complete |
 | `tilesim` (the root) | | commands | |
 
@@ -81,7 +81,7 @@ between two runs, never a number one seed happened to give.
 ## What is measured, and how
 
 Speed is not a test: it is measured by a tool and written down with the
-command that gave it (`world`'s `tilesim world pasture` and `throughput`).
+command that gave it (`server`'s `tilesim server pasture` and `throughput`).
 A number in the docs names its command. While the renderer or another run
 is on the machine, times are skewed: the instructions counted
 (`perf stat -e instructions:u`) are not.

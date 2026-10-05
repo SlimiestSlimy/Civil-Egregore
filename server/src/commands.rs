@@ -1,4 +1,4 @@
-//! The world's commands ([`COMMANDS`]), run by `tilesim world <command>`
+//! The server's commands ([`COMMANDS`]), run by `tilesim server <command>`
 //! (`utilities::commands::program`): a world made in a folder, run and looked at -- each
 //! given the rest of the command line after its folder and giving the
 //! line to print, or why it could not -- and the diagnostics tools
@@ -15,7 +15,7 @@ use utilities::commands::{Command, Given, Parameter};
 /// A world's folder.
 const FOLDER: &str = "folder";
 
-/// The world's commands: a world made, run and looked at, and its
+/// The server's commands: a world made, run and looked at, and its
 /// diagnostics tools.
 pub const COMMANDS: [Command; 5] = [
     Command {

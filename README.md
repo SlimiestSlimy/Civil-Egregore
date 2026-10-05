@@ -24,7 +24,7 @@ it and to tune its generation in.
 | [`docs/testing_protocol.md`](docs/testing_protocol.md) | how TileSim is tested: diagnostics, tests and tools apart, and three tiers of test -- fine, fast, complete |
 | [`docs/tilesim.md`](docs/tilesim.md) | what TileSim is, and every decision about it so far: chunks, superchunks, layers, the simulation's plan |
 | [`src/`](src/) | the `tilesim` crate: the program, which is only the list of crates with commands -- `cargo run --release -- help` |
-| [`world/`](world/) | the world as a whole: made from a seed, ticked -- rules and entities together, hot only in the halos about the entities that matter -- saved and loaded; its commands and its diagnostics tools |
+| [`server/`](server/) | the world as a whole: made from a seed, ticked -- rules and entities together, hot only in the halos about the entities that matter -- saved and loaded; its commands and its diagnostics tools |
 | [`mc_rules/`](mc_rules/) | the Monte Carlo rules of the cells, a file each: grass over dirt, and trees |
 | [`entity_rules/`](entity_rules/) | the entities, a file each: so far the sheep, eating the grass |
 | [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |
@@ -56,7 +56,7 @@ but the renderer, which brings Bevy and is asked for by name:
 `cargo run --release -p renderer`. Run from a crate's folder, cargo keeps
 to that crate. Only the root and the renderer are programs: every other
 crate is a library, and its diagnostics tools are run through the root,
-by the crate's name -- `cargo run --release -- world pasture`,
+by the crate's name -- `cargo run --release -- server pasture`,
 `cargo run --release -- tessera measurement`.
 `cargo run --release -- help` lists every command of every crate, what
 each takes and what that is if not given: the list is made from the
@@ -71,5 +71,5 @@ on `bitmap/`; `chunk_storage/` on those and Tessera;
 `simulation/`, `pathfinding/` and `worldgen/`, which know nothing of
 one another and meet there; the rules, `mc_rules/` and `entity_rules/`,
 on `simulation/` and `instructions/`; `worldgen/` on `chunk_storage/` and
-`coordinates/`; `world/` on the rules, the entities and `worldgen/`;
-the program, `src/`, on `world/` and Tessera; the renderer on `world/`.
+`coordinates/`; `server/` on the rules, the entities and `worldgen/`;
+the program, `src/`, on `server/` and Tessera; the renderer on `server/`.
