@@ -130,8 +130,8 @@ are equal cells, so equal keys are equal patterns.
 
 **`number_for(bitmap, level, index)`**: the reserved number for all
 clear or all set; else the number the key already has, or the next
-one. The hash table is probed linearly from `key * HASH_MULTIPLIER`'s
-top bits; a slot holds a number only, and the key is read back off the
+one. The hash table is probed linearly from the key's slot
+(`utilities::hash::slot`); a slot holds a number only, and the key is read back off the
 tile that number first appeared at (`first_tile`) to compare. Finding
 a key already numbered marks the number as repeated.
 
@@ -303,7 +303,7 @@ goes to `write_word`.
 halves' counts from popcounts; counting, a 16-cell run is one lookup in
 `SHORT_RUN_BITS`.
 
-**`write(stream, bitmap, set_counts)`**: the set count in gamma of
+**`write(stream, bitmap, set_cells_before_each_word)`**: the set count in gamma of
 count + 1, then the whole bitmap as one run.
 
 **`read(reader, cells)`**, **`read_words`**, **`read_word`**: the

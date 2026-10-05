@@ -18,7 +18,7 @@ encoding needs: its seed file, its adversarial searches.
   (`utilities::commands`), each with the parameters it takes and what
   each is if not given, and `tilesim <crate> <tool> [parameters]` runs
   one -- `cargo run --release -- world pasture 300 333 4000 4 1`.
-  `cargo run --release -- <crate>` lists a crate's tools and their
+  `cargo run --release -- help` lists every crate's commands and their
   parameters; a report says the line it ran on, defaults filled in.
 
 ## Three tiers of test

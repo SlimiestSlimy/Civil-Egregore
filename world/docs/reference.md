@@ -4,7 +4,6 @@ The design is in `world.md`.
 
 ## `lib.rs`
 
-`GRASS_CELLS` (400,000): the grass a superchunk generated is given;
 `FLOCK` (4,000): the sheep the origin starts with, unless told.
 **`World`** `{info, arena, storage, entities, simulation, cold,
 background, warming, cooling, writing_back, flushing}` -- **`cold`**, each cold
@@ -113,8 +112,7 @@ a **`PastureRun`**.
 ## `commands.rs`
 
 **`COMMANDS`**: what `tilesim world <command>` runs, each with its
-parameters and their defaults; **`dispatch(arguments)`**: the one the
-first word names, run on the rest. `tilesim world new <folder> [name]
+parameters and their defaults. `tilesim world new <folder> [name]
 [seed] [sheep]`: a world generated from the seed -- the origin, a flock
 of `sheep` on it, and its halo (**`new`**) -- and saved in the folder,
 which must not hold one. `tilesim world run <folder> [ticks]`: it
@@ -135,8 +133,10 @@ flock, time a sample and a wake, rates, what is held and the census
 
 ## Generation
 
-**`Generation`** `{shape, grass, trees, water_level}`: how superchunks are generated;
-`Generation::DEFAULT`, as tuned in the renderer's lab; `TREES_SALT`.
+**`Generation`** `{shape, grass, trees}`: how superchunks are generated;
+`Generation::DEFAULT`; `TREES_SALT`.
+**`generate_flocks_with(generation, seed, superchunks, sheep)`**: a
+world generated so, a flock on each of the superchunks.
 **`generate_with(generation, seed)`**: a world with nothing hot yet,
 generated so. **`generate_image(generation, seed, superchunk, codec)`**:
 terrain, the ocean where it is under the ocean's level, and on the rest

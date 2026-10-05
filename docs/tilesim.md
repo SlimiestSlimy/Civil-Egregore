@@ -357,35 +357,16 @@ grass. (The chances were a hundred times these until the world was
 first seen on a screen, where grass at 0.3% a tick boils; every
 measurement below was taken at 0.3%.)
 
-Measured, ticking as fast as one core goes (`tilesim world throughput`,
-500 ticks, grass starting scattered over a third of the cells, near
-its balance), nanoseconds a write -- a write is one cell set or
-cleared; a spread or a decay is two:
-
-| superchunks | writes a tick | sampling | computing | applying | the tick | writes a second | ticks a second |
-|---|---|---|---|---|---|---|---|
-| 1 | 798 | 102 | 47 | 13 | 161 | 6.2 million | 7,780 |
-| 16 | 12,711 | 101 | 53 | 15 | 169 | 5.9 million | 467 |
-| 64 | 50,822 | 103 | 63 | 23 | 189 | 5.3 million | 104 |
-
-At the target of 256 ticks a second, one core keeps about 29
-superchunks of grass ticking.
-
-The same on the two-phase tick, on 1, 2 and 4 threads of a 4-core
-machine -- the same writes on each, the tick being the same on any
-number of threads -- ticks a second:
-
-| superchunks | writes a tick | 1 thread | 2 threads | 4 threads |
-|---|---|---|---|---|
-| 16 | 12,535 | 462 | 593 | 947 |
-| 64 | 50,149 | 104 | 171 | 307 |
+What a write costs -- sampling, computing, applying -- and how many
+superchunks of grass a core keeps at the game's pace are what
+`tilesim world throughput` reports, at any number of superchunks and
+threads; a write is one cell set or cleared, a spread or a decay two.
+The tick is the same on any number of threads, and faster on more.
 
 `tilesim world throughput` also reports the memory held: the process's
 peak and its average over the ticks (from `/proc/self/status`), and
-what the arena's blocks and storage's images take. At 64 superchunks
-on 4 threads: a peak of 99 MiB -- 16 MiB of arena blocks (two layers
-of 128 KiB a superchunk) and 79 MiB of stored images, most of it the
-1 MiB raw height map a superchunk.
+what the arena's blocks and storage's images take. Most of what is
+held is the stored images, and most of those the raw height maps.
 
 Threads kept between ticks (the simulation's dispatcher), against
 started afresh each phase, ticks a second:
@@ -397,12 +378,11 @@ started afresh each phase, ticks a second:
 | 64 | 2 | 171 | 185 |
 | 64 | 4 | 307 | 303 |
 
-Four threads tick 64 superchunks at 307 ticks a second, 15 million
-writes a second: about 75 superchunks at 256 ticks a second. Started
+Started
 afresh each phase, the threads cost a tick of 16 superchunks -- about
 2 ms -- a share of its time; kept, they no longer do.
 
-Sampling now costs the most, about 85 ns a sample: a logarithm a
+Sampling now costs the most: a logarithm a
 sample, the words' bits counted on the way, and the chosen word's bits
 cleared one by one to the one asked. Computing and applying find a
 cell's bucket through the directory -- superchunks by Morton index,
@@ -496,11 +476,9 @@ each one contiguous Morton-sorted region) were set aside for this: a
 superchunk owning its own storage keeps loading, evicting and saving a
 superchunk local, with no boundaries to shift between threads.
 
-Measured (`tilesim world pasture 3000 333 4000 16 1`: 16 superchunks, a
-third grass, 4,000 sheep each to start, one thread): 247 ticks a
-second, the sheep growing from 64,000 to 98,000 at about 1,050 wakes a
-tick; a sheep's wake cost 844 ns in the first phase -- grass's sample
-167 ns -- and applying a write or entity change 65 ns.
+What a sheep's wake, a grass sample and an applied change each cost is
+what `tilesim world pasture` reports. At first a wake cost several times
+a sample.
 
 Why, counted (callgrind, one superchunk, 300 ticks): about 1,550
 instructions a wake, nearly all reading the world -- five cell reads at
@@ -529,21 +507,9 @@ little while wakes are sparse -- some 66 a superchunk a tick, 16,000
 cells apart -- and each wake's binary search in its bucket, sorted by
 ID, touches lines nothing else does.
 
-Every figure above is from a virtual machine. On a machine of its own
-(a Ryzen 5 5600: 6 cores, 12 threads, 32 MiB of L3), the same runs,
-measured with the processor's counters (`perf`), not instruction
-counts alone:
-
-Grass (`tilesim world throughput 500 333`), ticks a second:
-
-| superchunks | 1 thread | 2 | 4 | 6 | 12 |
-|---|---|---|---|---|---|
-| 1 | 10,381 | - | - | - | - |
-| 16 | 636 | 1,236 | 2,318 | 2,583 | 3,034 |
-| 64 | 148 | 301 | 567 | 826 | 1,051 |
-
-One core keeps about 37 superchunks of grass at 256 ticks a second, six
-about 206. A write costs 121 ns over one superchunk and 132 over 64.
+The figures above are from a virtual machine; those below from a
+machine of its own (a Ryzen 5 5600: 6 cores, 12 threads), measured with
+the processor's counters (`perf`), not instruction counts alone.
 
 Where a pasture's time goes (`perf record`, 64 superchunks, one
 thread, buckets still sorted by ID), by share of each event:
@@ -753,14 +719,16 @@ them all, in `world/`. The `tilesim` crate is the program alone.
 ### Terrain and walls (built)
 
 Every cell has a height, from the world's seed and where the cell is
-(`worldgen/`): hills of four octaves of noise, the same on any machine,
+(`worldgen/`): islands in an ocean, their land a mesh of vertices that
+carry heights and lines that say how they are blended, in whole numbers
+alone -- the same on any machine and in whatever order it is made,
 seamless from superchunk to superchunk. Two cells beside one another
 -- across or down -- more than one apart in height have a wall between
 them: no step is taken through it. A diagonal step is open only when
 both ways round it are. The walls are two layers of bits, so rules read
 them as masks and never read a height; the pathfinding goes round
-them, and the sheep step through none. Under 1% of steps across or down
-are walled, in cliffs where the ground is steep. The whole of it:
+them, and the sheep step through none. Walls stand in cliffs, where
+the ground is steep. The whole of it:
 `worldgen/docs/worldgen.md`.
 
 ### Pathfinding (built, first form)

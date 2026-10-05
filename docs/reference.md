@@ -10,6 +10,7 @@ TileSim is and every decision about it: `tilesim.md`.
 
 ## `main.rs`
 
-**`CRATES`**: the crates with commands, by name -- `world`, `tessera`.
-**`main`**: the command line handed to `utilities::commands::dispatch`;
-a first word that names no crate prints them as a table.
+**`CRATES`**: the crates with commands, by name -- `world`, `tessera`
+-- each with its table of them. **`main`**: the command line handed to
+`utilities::commands::program`; `tilesim help` prints every command of
+every crate.

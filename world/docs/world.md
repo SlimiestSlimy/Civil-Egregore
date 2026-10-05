@@ -129,7 +129,7 @@ their random numbers taken up. The cooling ones cool again, and the
 warming ones warm again, each to turn at the tick it was to.
 
 **A world loaded goes on as the one saved would have**, to the cell,
-the entity and the random number (`tests/world.rs`: 1,500 ticks,
+the entity and the random number (`tests/fast/world.rs`: 1,500 ticks,
 saved, then 3,000 more on both; and a world saved and loaded seven
 times mid run -- at ticks 1, 700, 701, 1,900, 3,333 and 4,000, and the
 first tick a superchunk is warming, each
@@ -152,8 +152,9 @@ to tick 4,000: the same cells, entities and random numbers). What makes it so:
 - An entity whose wake has passed when it is put back -- kept while
   its superchunk was cold -- wakes the tick it is put back.
 
-Measured: 16 superchunks, 64,000 sheep: 24 MiB -- 1 MiB a superchunk of
-heights, raw, 250 KiB of layers, 260 KiB of entities.
+Most of a save is heights, kept raw, about a byte a cell; the layers
+and the entities are each a fraction of that (`tilesim world new`
+says the bytes written).
 
 Not yet: superchunks no longer in the world are not removed from a
 save's folder.

@@ -30,9 +30,9 @@ elsewhere lies as it was made, unless eaten.
 ## Trees: more than a bit a cell
 
 A tree is a cell set in `TREE`, with a stage of sixteen kept over four
-more bitplanes (`TREE_STAGE`): a number a cell lies over as many
-bitplanes as it has bits, read and written through
-`Turn::level` and `Turn::queue_level`. The bit that says a tree stands
+more bits (`TREE_STAGE`): a wide plane, four bits a cell, a cell's
+number held together and read and written whole through
+`Turn::value` and `Turn::queue_value`. The bit that says a tree stands
 there is a plane of its own, not stage 0: sampling the trees and
 counting those about one are then each one read of one plane, as for
 grass, where a tree found by any of four planes being set would take

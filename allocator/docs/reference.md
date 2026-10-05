@@ -18,7 +18,7 @@ first. A block of another size is a bug (checked in debug builds).
 
 **`BlockPool::blocks_made()`**: blocks made, released ones included.
 
-## `diagnostics/pool.rs`
+## `diagnostics/block_pool.rs`
 
 **`BlockPoolStats::of(block_pool)`**: the block pool's block size in bytes, blocks made,
 blocks waiting released. **`bytes_made()`**: the bytes of every block

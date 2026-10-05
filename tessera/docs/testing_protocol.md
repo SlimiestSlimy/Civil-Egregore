@@ -54,7 +54,7 @@ Three parts, kept apart:
 - **Tests** (`tests/`) judge what the diagnostics gather: pass or fail.
 - **Tools** (`src/diagnostics/tool/`, `src/diagnostics/tool/adversarial.rs`, and the external benchmarks' crate) print what
   the diagnostics gather, or search for bitmaps. Every tool prints its
-  results as tables, through the one table printer (`../utilities/src/table/`), and
+  results as tables, through the one table printer (`../utilities/src/diagnostics/table/`), and
   a tool that measures or searches keeps them
   (`transient_data/measurements/<tool>.csv`).
 
@@ -123,7 +123,7 @@ Every tool that measures -- these, the external benchmarks and the
 adversarial searches -- keeps
 its tables in `transient_data/measurements/<tool>.csv`, rewritten by every run,
 with the command, the seed and the commit it was measured on as the
-file's notes (`../utilities/src/table/report.rs`, published by
+file's notes (`../utilities/src/diagnostics/table/report.rs`, published by
 `src/transient_data.rs`). The latest numbers live there and
 nowhere else, and never in git: a measurement belongs to the working
 copy it was made in. A run on a fresh seed rewrites the file too, and

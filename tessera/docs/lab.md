@@ -112,7 +112,7 @@ encoders).
 
 **`Score`**: what a bitmap scored: the gap the search maximizes, and
 Tessera's bits. **`Effort`**: changes tried from each start, window and
-plane; **`from_arguments`** takes the plane's from the first argument.
+plane.
 
 **`anneal::anneal(start, area, iterations, rng, score)`**: simulated
 annealing: a random change inside `area`, kept if it raises the score,
@@ -169,8 +169,9 @@ worst bitmap to the saved bitmaps with a description and the worst bitmap's note
 
 ## `src/diagnostics/tool/`: one tool a file
 
-**`main`**: `TOOLS`, a table of every tool -- name, what it prints, its
-argument, its file -- run by name; with no name, the list. A tool that
+**`COMMANDS`**: every tool -- its name, what it takes and what it
+prints -- run by name through `utilities::commands` (`tilesim tessera
+<tool>`); with no name, the list. A tool that
 measures is given a `Report` and published with the run's seed.
 
 - **`measurement::run`**: a table a corpus generator, a row a parameter

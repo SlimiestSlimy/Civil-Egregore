@@ -83,9 +83,8 @@ which a pixel a cell cannot do: that would be 4 GiB of pixels a frame.
 - **A fine image is dropped when its superchunk leaves the view**: it
   is 4 MiB here and as much on the graphics card.
 
-Measured, 1,024 superchunks with 1,000 sheep each, flat out on 12
-threads: 150 ticks a second, 2.3 GiB held, 45 seconds to make the mock
-world; a frame of one superchunk 111 us of the simulation's thread.
+A frame of one superchunk takes very little of the simulation's
+thread, however large the world: the HUD says how much.
 
 ## Height, from straight above
 
@@ -194,7 +193,7 @@ the seed or generation has changed.
 made and how it changes (`src/lab.rs`). The world starts as the
 superchunks shown, every one hot, and reaches wherever it is looked at:
 a superchunk that comes into view is generated, made hot and kept so,
-with no bound but memory (about 2.4 MiB each) -- until a slider of
+with no bound but memory -- until a slider of
 generation moves or the seed is drawn, when it starts over; the seed
 drawn, the view too goes back to where it started. No sheep,
 its rules -- grass and trees -- ticking as in any run, paused and paced
@@ -210,7 +209,9 @@ by the same keys. Generation's sliders are shown from the start:
   sigmoidness, and how far they are bent. `P` draws the lines over the
   map.
 - **The finer meshes**: how many, the share of their vertices that
-  raise or sink the land, by how much, and the share that raise it.
+  raise or sink the land, by how much, how much less each finer mesh
+  does, how unevenly the weight is shared out among subdivisions, and
+  the share that raise the land.
 - **The grass**, and **the trees** (`worldgen::patches`): each in patches,
   not scattered cell by cell. A cell's number is smooth noise as broad
   as a patch, finer noise on it (detail), and a lot drawn for the cell
@@ -221,8 +222,11 @@ by the same keys. Generation's sliders are shown from the start:
 
 Whenever a slider of generation moves or the seed is drawn, the world
 is made afresh from nothing but the sliders, and its ticks start again
-from 0. What is settled here is written into `world::Generation::DEFAULT`
-and `worldgen::Shape::DEFAULT`, which every world is made with.
+from 0. A slider says what it does when the pointer rests on it, and
+the panel scrolls. The sliders start at the numbers last settled on
+(`tuning::TUNED`); `world::Generation::DEFAULT` and
+`worldgen::Shape::DEFAULT`, which a world made outside the lab uses,
+are not those yet.
 
 ## Layout
 
@@ -230,7 +234,7 @@ and `worldgen::Shape::DEFAULT`, which every world is made with.
 |---|---|
 | `src/sim.rs` | the simulation's thread: requests read between ticks, the cells in view copied when asked |
 | `src/paint.rs` | the painter's thread: cells into pixels |
-| `src/ground.rs` | the light on the ground: heights from the seed, hillshade, tint, cast shadows, cliffs and contours |
+| `src/ground.rs` | the light on the ground: heights as a frame brings them, hillshade, tint, cast shadows, cliffs and contours |
 | `src/tuning.rs` | the numbers the near view's shading is tuned by, kept between runs |
 | `src/sliders.rs` | the sliders that set them, their value boxes and the button |
 | `src/map.rs` | the map: the world from far, drawn from the generator alone |

@@ -8,10 +8,10 @@ The design is in `worldgen.md`.
 stepped between. `WALL_EAST`, `WALL_SOUTH` (layer types 8 and 9);
 `WALLS`: each with the neighbour it is towards. A diagonal has no wall
 of its own: `pathfinding::Walls::new` and
-`Turn::around_unwalled` bar it from the two. `OCTAVES`, `ONE`.
+`Turn::around_unwalled` bar it from the two. `ONE` (65,536): a fraction's whole.
 
 **`Shape`** `{ground, ocean, span, sea, highest, clumping, coast, coast_low, narrow, wide,
-soft, hard, warp, finer_depth, finer_share, finer_height, raised}`: the
+soft, hard, warp, finer_depth, finer_share, finer_height, finer_fall, weight, raised}`: the
 lowest ground and the ocean's height; the vertices' grid and the share
 of them that are ocean; the highest land, and the vertices from the
 ocean it is reached over; the lines' blends and sigmoidness, least and
@@ -19,7 +19,8 @@ most; how far lines are bent; the finer meshes. `Shape::DEFAULT`.
 `WATER` (layer types 24 to 31): a cell's water, its depth over eight
 bitplanes. **`height(seed, x, y)`**: a cell's height;
 **`height_shaped(shape, seed, x, y)`**: the same in a world shaped
-otherwise. **`noise(seed, index, shift, x,
+otherwise. **`Terrain::generate_shaped(shape, seed, superchunk)`**: a
+superchunk's heights and walls. **`noise(seed, index, shift, x,
 y)`**: smooth noise, one octave of a height. Private: **`point`**, an
 octave's number at a point; **`between`**. **`wall(a, b)`**: whether two heights are too far apart.
 
