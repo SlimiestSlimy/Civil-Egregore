@@ -1,7 +1,7 @@
 //! The fine tier: one case a test, made by hand, each pinning one behaviour -- instant.
 //! The tiers: `docs/testing_protocol.md`, at the repository's root.
 //!
-//! `cargo test --test fine`
+//! `cargo test -p gui --test fine`
 
-#[path = "fine/block_pool.rs"]
-mod block_pool;
+#[path = "fine/tuning.rs"]
+mod tuning;

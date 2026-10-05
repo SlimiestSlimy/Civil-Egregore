@@ -1,5 +1,7 @@
 //! The server's commands ([`COMMANDS`]), run by `tilesim server <command>`
-//! (`utilities::commands::program`): a world made in a folder, run and looked at -- each
+//! (`utilities::commands::program`): a world made in a folder -- a plain
+//! name one of the worlds' folder (`utilities::settings::world`), anything
+//! more a path -- run and looked at, each
 //! given the rest of the command line after its folder and giving the
 //! line to print, or why it could not -- and the diagnostics tools
 //! ([`crate::diagnostics::tool`]).
@@ -12,7 +14,7 @@ use std::path::Path;
 use std::time::Instant;
 use utilities::commands::{Command, Given, Parameter};
 
-/// A world's folder.
+/// A world's folder: a name in the worlds' folder, or a path.
 const FOLDER: &str = "folder";
 
 /// The server's commands: a world made, run and looked at, and its
@@ -44,7 +46,7 @@ pub const COMMANDS: [Command; 5] = [
 /// the line it gives.
 fn printed(given: &Given, command: impl FnOnce(&Path, &[&str]) -> Result<String, String>) -> Result<(), String> {
     let folder = given.text(FOLDER)?;
-    println!("{}", command(Path::new(folder), &given.arguments()[1..])?);
+    println!("{}", command(&utilities::settings::world(folder), &given.arguments()[1..])?);
     Ok(())
 }
 

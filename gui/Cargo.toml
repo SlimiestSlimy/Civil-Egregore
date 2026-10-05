@@ -1,0 +1,15 @@
+[package]
+name = "gui"
+version = "0.1.0"
+edition = "2021"
+description = "TileSim's menus, over whatever window shows it: the options Escape opens, the sliders, and the numbers they tune"
+publish = false
+
+[dependencies]
+utilities = { path = "../utilities" }
+# Bevy for its interface and the keys only.
+bevy = { version = "0.19", default-features = false, features = ["2d", "ui"] }
+
+[features]
+# The machine's settings file is neither read nor written: the settings are the default ones.
+default_settings = ["utilities/default_settings"]

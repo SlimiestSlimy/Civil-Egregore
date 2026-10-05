@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "General-purpose utilities: what diagnostics are made with (tables, reports, the process's memory), transient data, a seeded random source, a fixed-capacity list, the cache"
 publish = false
+
+[features]
+# The machine's settings file is neither read nor written: the settings are the default ones.
+default_settings = []

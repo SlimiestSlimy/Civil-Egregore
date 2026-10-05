@@ -151,48 +151,25 @@ pixels made here.
 | `T` | tick flat out, or at the game's pace (256 ticks a second) |
 | `F` | the window over the whole screen, or not |
 | `U` | the sliders' menu, opened; whatever of them is open, closed |
+| Escape | the options, opened or closed: going on, opening a world, leaving TileSim |
 | `[` and `]` | halve and double the pace |
 | `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |
 | `H` | every cell's height written on it, once a cell is 20 screen pixels across |
 
-## Sliders
+## Menus
 
-At the window's top right, the numbers of `src/tuning.rs`, in groups,
-one group on the screen at a time. Closed, there is one small button,
-`sliders`: a click on it, or `U`, opens the menu, which lists the
-groups a row each; a click on one opens it, and the first row of a
-group goes back to the menu. `U` closes whatever is open.
-
-In a group, the left button drags a knob, the right sets the number
-back to its default. Beside each is a box with its value: a click on
-it and the value is typed -- digits and a point, Enter to set it,
-Escape to leave it. A value typed may pass the slider's range, which
-is only what the knob reaches; the knob then stays at its end.
-
-The numbers changed are kept whenever one is settled, and taken up
-again the next run, in the machine's settings (`utilities::settings`):
-one file, `settings.txt`, in a folder `tilesim` where the system keeps
-what a user's programs hold -- `~/.local/share/tilesim` on Linux,
-`%LOCALAPPDATA%\tilesim` on Windows. A line a number, its name and its
-value; one left as the code has it has no line, so a default changed in
-the code reaches whoever never moved it.
-
-- **Shading**: the near view's -- how light and dark the border lines
-  are, a wall's band facing away from the sun and towards it and how
-  it fades, how much longer it is a height of wall, the cast shadows, how much relief and how much texture.
-  The painter reads them each frame. As tuned: the border lines 35%
-  lighter and darker, a wall's band 49% darker at its foot facing away
-  from the sun and 55% with the sun on it, fading by 80% across it,
-  cast shadows 40% darker, 70% of the relief, and twice the texture.
-- **Ocean and land**, **mesh lines**, **finer meshes**, **grass**,
-  **trees**, **sheep**: how the world is generated, listed in the lab
-  only, where they are read: below. **Sheep** is how many each
-  superchunk the lab shows starts with -- none, unless set.
-
-What is longer than the window is scrolled by the wheel, the pointer
-over it. The pointer rested on a slider's row for a moment, and what the slider
-does is said beside it (`Tuned::what`).
+The sliders at the window's top right and the options Escape opens are
+the `gui` crate's (`gui/docs/gui.md`), added to the window's app. The
+renderer reads the numbers the sliders tune, leaves the pointer and
+the wheel to a menu they are over, and opens the world chosen in the
+options: the simulation's thread loads it from the worlds' folder
+(`sim::Request::Open`) and runs it in place of the one run, hot in its
+halos, its ticks its own, the view back where it started. A world that
+cannot be read is refused, the reason on the first line of the text at
+the top left, and the world run goes on. A world opened is not saved
+back; opened from the lab, it ends the lab -- generation's sliders
+stay listed and do nothing.
 
 ## The map
 
@@ -246,7 +223,7 @@ Whenever a slider of generation moves or the seed is drawn, the world
 is made afresh from nothing but the sliders, and its ticks start again
 from 0. A slider says what it does when the pointer rests on it, and
 the panel scrolls. The sliders start at the numbers last settled on
-(`tuning::TUNED`); `server::Generation::DEFAULT` and
+(`gui::tuning`); `server::Generation::DEFAULT` and
 `worldgen::Shape::DEFAULT`, which a world made outside the lab uses,
 are not those yet.
 
@@ -257,10 +234,8 @@ are not those yet.
 | `src/sim.rs` | the simulation's thread: requests read between ticks, the cells in view copied when asked |
 | `src/paint.rs` | the painter's thread: cells into pixels |
 | `src/ground.rs` | the light on the ground: heights as a frame brings them, hillshade, tint, cast shadows, cliffs and contours |
-| `src/tuning.rs` | the numbers the near view's shading is tuned by, kept between runs |
-| `src/sliders.rs` | the sliders that set them, their value boxes and the button |
 | `src/map.rs` | the map: the world from far, drawn from the generator alone |
-| `src/lab.rs` | the lab: the seed and how the world is generated, as the sliders have it |
+| `src/lab.rs` | the lab: the seed and how the world is generated, as the sliders have it, or the opened world's |
 | `src/near.rs` | the cells in view from near as one picture: steps and walls at their edges |
 | `src/main.rs` | the window: the camera, an image a superchunk, the keys, the text |
 | `docs/` | this, and the reference, function by function |

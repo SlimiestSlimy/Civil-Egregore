@@ -9,6 +9,7 @@ publish = false
 simulation = { path = "../simulation" }
 entity_rules = { path = "../entity_rules" }
 utilities = { path = "../utilities" }
+gui = { path = "../gui" }
 server = { path = "../server" }
 mc_rules = { path = "../mc_rules" }
 worldgen = { path = "../worldgen" }
@@ -19,3 +20,6 @@ chunk_storage = { path = "../chunk_storage" }
 # Bevy for the window, the drawing and the keys only: no 3D, no audio.
 bevy = { version = "0.19", default-features = false, features = ["2d", "ui"] }
 
+[features]
+# The machine's settings file is neither read nor written: the settings are the default ones.
+default_settings = ["utilities/default_settings", "gui/default_settings"]

@@ -90,10 +90,18 @@ and joins the workers.
 
 ## `settings.rs`
 
-The settings a person has changed on this machine: `FILE`
-(`settings.txt`) in `FOLDER` (`tilesim`) under the system's place for
-what a user's programs keep. **`folder()`**, **`file()`**.
-**`Settings`**: a name and a value a line -- **`read()`**,
-**`read_from(path)`**, **`get(name)`**, **`number::<T>(name)`**,
-**`set(name, value)`** (none takes the line out: the setting is as the
-code has it), **`write()`**, **`write_to(path)`**.
+The settings of this machine: `FILE` (`settings.txt`) in `FOLDER`
+(`tilesim`) under the system's place for what a user's programs keep.
+**`folder()`**, **`file()`**. `default_settings.txt`, at the crate's root: every setting
+there is and what it is unless changed, built into the program.
+**`Settings`**: a name and a value a line -- **`defaults()`**,
+**`read()`** (the machine's file, given a copy of the default settings
+if it has none, and the default ones for what it lacks; the default
+ones alone under the feature `default_settings`),
+**`read_or_start(path)`** (the same of any file), **`read_from(path)`**
+(a file's lines and no more), **`get(name)`**, **`number::<T>(name)`**,
+**`set(name, value)`** (none takes the line out), **`write()`**,
+**`write_to(path)`**. `WORLDS`: the setting naming the folder worlds
+are kept in; **`worlds()`**: that folder, `worlds` in TileSim's unless
+set; **`world(named)`**, **`world_in(worlds, named)`**: where a world
+is kept -- a plain name in the worlds' folder, anything more a path.
