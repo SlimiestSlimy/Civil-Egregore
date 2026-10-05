@@ -127,9 +127,12 @@ fn a_superchunk_cooling_stays_hot_until_due() {
 #[test]
 fn a_superchunk_gone_cold_comes_back_as_it_was() {
     let mut world = server::generate(crate::land_seed(2), 2_000);
-    for _ in 0..500 {
+    // 500 ticks, and on to one with nothing warming or cooling: made cold and hot again by hand, one warming would not turn hot when it was due.
+    while world.entities.now() < 500 || world.warming().next().is_some() || world.cooling().next().is_some() {
+        assert!(world.entities.now() < 60_000, "the halos at rest");
         world.tick();
     }
+    let ticked = world.entities.now();
     let halo = world.arena.superchunk_indices();
     type Held = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, Vec<(SuperchunkIndex, u64)>);
     let held = |world: &World| -> Held {
@@ -138,7 +141,7 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
     };
     let before = held(&world);
     let mut twin = server::generate(crate::land_seed(2), 2_000);
-    for _ in 0..500 {
+    for _ in 0..ticked {
         twin.tick();
     }
 
