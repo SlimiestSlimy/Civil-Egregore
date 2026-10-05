@@ -1,5 +1,6 @@
-//! Entities: what stands on the cells -- sheep, people, buildings --
-//! beside the bitplanes, ticked with them.
+//! TileSim's entity manager: what stands on the cells -- sheep,
+//! people, buildings -- kept beside the bitplanes (`../bitplane_manager`)
+//! and ticked with them by the simulation (`../simulation`).
 //!
 //! An entity is a header -- a random 64-bit ID, a type, the cell it
 //! stands on, the tick it next wakes at -- and attributes, typed values
@@ -24,7 +25,12 @@
 //! | `store` | a superchunk's entities, and every superchunk's |
 //! | `instructions` | changes to entities, an instruction each -- put, move, edit, remove -- queued for a superchunk and applied by it |
 
+// Every item is documented, private ones included; `cargo clippy`
+// checks the private ones.
+#![warn(missing_docs, clippy::missing_docs_in_private_items)]
+
 mod bucket;
+pub mod diagnostics;
 mod instructions;
 mod entity;
 pub mod saved;

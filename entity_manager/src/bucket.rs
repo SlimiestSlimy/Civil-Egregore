@@ -20,7 +20,7 @@
 //! goes at the end of the list and the old run becomes garbage, which is
 //! swept out once there is as much garbage as attributes in use.
 
-use super::entity::{Attribute, AttributeType, EntityId, EntityRef, Header};
+use crate::entity::{Attribute, AttributeType, EntityId, EntityRef, Header};
 use coordinates::CellIndex;
 use utilities::cache::prefetch;
 

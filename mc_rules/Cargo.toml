@@ -6,6 +6,7 @@ description = "TileSim's Monte Carlo rules of the cells, a file each: so far gra
 publish = false
 
 [dependencies]
+entity_manager = { path = "../entity_manager" }
 simulation = { path = "../simulation" }
 coordinates = { path = "../coordinates" }
 bitplane_manager = { path = "../bitplane_manager" }

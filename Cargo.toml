@@ -24,6 +24,7 @@ members = [
     "bitplane_manager",
     "chunk_storage",
     "coordinates",
+    "entity_manager",
     "entity_rules",
     "instructions",
     "pathfinding",

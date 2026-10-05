@@ -1,0 +1,11 @@
+[package]
+name = "entity_manager"
+version = "0.1.0"
+edition = "2021"
+description = "TileSim's entities as kept: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied -- beside the bitplane manager's cells"
+publish = false
+
+[dependencies]
+bitmap = { path = "../bitmap" }
+coordinates = { path = "../coordinates" }
+utilities = { path = "../utilities" }

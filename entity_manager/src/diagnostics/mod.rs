@@ -1,4 +1,4 @@
-//! Diagnostics: data gathered from the simulation, one kind of data to
+//! Diagnostics: data gathered from the entities, one kind of data to
 //! a file. They only gather: nothing here judges a result or prints one
 //! -- as in Tessera's.
 //!

@@ -12,7 +12,7 @@ mod entities;
 
 pub use area::{Area, AREA_CENTRE, AREA_SIDE, FARTHEST_SCALE};
 
-use crate::entity_store::{EntityReader, EntityRef, Instructions, SuperchunkEntities};
+use entity_manager::{EntityReader, EntityRef, Instructions, SuperchunkEntities};
 use crate::sampling::sample_layer;
 use bitplane_manager::{NotHot, Reader, Shape, Superchunk, Window, Write, WriteQueues};
 use chunk_storage::{LayerType, Wide, Width};

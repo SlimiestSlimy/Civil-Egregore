@@ -8,7 +8,7 @@
 use chunk_storage::mock::GRASS;
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use bitplane_manager::{Write, WriteOp};
-use simulation::entity_store::{Attribute, EntityId, EntityType, Header, NEVER};
+use entity_manager::{Attribute, EntityId, EntityType, Header, NEVER};
 use server::halos::about;
 use server::{HaloChange, World, COOL_TICKS, HALO_KEEPERS, WARM_TICKS};
 

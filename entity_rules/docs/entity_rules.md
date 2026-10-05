@@ -6,7 +6,7 @@ the sheep.
 ## What is here, and what is not
 
 What an entity *is* belongs to the simulation
-(`simulation/src/entity_store/`): its header and attributes, the bucket
+(`entity_manager/src/`): its header and attributes, the bucket
 a chunk that keeps it sorted by cell, the timer wheel a superchunk that
 wakes it, the instructions it queues in a tick's first phase and the
 check, as each is applied in the second, that no two stand on one cell.

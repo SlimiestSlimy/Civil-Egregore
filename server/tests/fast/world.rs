@@ -8,7 +8,7 @@
 use chunk_storage::disk::{self, DiskError};
 use chunk_storage::SuperchunkImage;
 use coordinates::{CellCartesian, SuperchunkIndex};
-use simulation::entity_store::{Attribute, Header};
+use entity_manager::{Attribute, Header};
 use std::path::PathBuf;
 use server::{self, transient_data, World};
 

@@ -16,9 +16,9 @@
 //! world as the tick found it, so the second never reads another
 //! superchunk's entities while that one changes them.
 
-use super::bucket::Put;
-use super::entity::{Attribute, AttributeType, EntityId, Header};
-use super::store::SuperchunkEntities;
+use crate::bucket::Put;
+use crate::entity::{Attribute, AttributeType, EntityId, Header};
+use crate::store::SuperchunkEntities;
 use coordinates::CellIndex;
 use std::ops::AddAssign;
 
@@ -94,7 +94,7 @@ impl Instructions {
     /// Queues putting `header`'s entity, with `attributes`, on its cell,
     /// crossing from `left`, a cell of another superchunk: put, it is
     /// removed from `left` once the tick's instructions are all applied
-    /// ([`SuperchunkEntities::settle_leavers`](super::SuperchunkEntities::settle_leavers)).
+    /// ([`SuperchunkEntities::settle_leavers`](crate::SuperchunkEntities::settle_leavers)).
     pub fn cross(&mut self, header: Header, left: CellIndex, attributes: &[Attribute]) {
         self.push(header, header.at, Some(left), attributes);
     }

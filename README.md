@@ -26,6 +26,7 @@ it and to tune its generation in.
 | [`src/`](src/) | the `tilesim` crate: the program, which is only the list of crates with commands -- `cargo run --release -- help` |
 | [`server/`](server/) | the world as a whole: made from a seed, ticked -- rules and entities together, hot only in the halos about the entities that matter -- saved and loaded; its commands and its diagnostics tools |
 | [`mc_rules/`](mc_rules/) | the Monte Carlo rules of the cells, a file each: grass over dirt, and trees |
+| [`entity_manager/`](entity_manager/) | the entities as kept, beside the bitplane manager's cells: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied |
 | [`entity_rules/`](entity_rules/) | the entities, a file each: so far the sheep, eating the grass |
 | [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |
 | [`chunk_storage/`](chunk_storage/) | chunks as stored, what loading and saving work on: height maps, the layer codec, superchunk images, the cold pool and the writeback ring |
@@ -33,7 +34,7 @@ it and to tune its generation in.
 | [`instructions/`](instructions/) | what a rule is made of: small, varied pieces of behaviour -- so far walking -- each asking the simulation, the terrain and pathfinding for one thing |
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
 | [`renderer/`](renderer/) | TileSim on the screen: a Bevy window asking the simulation, on a thread of its own, for the cells in view; the lab, where how the world is generated is tuned by eye |
-| [`simulation/`](simulation/) | the simulation: Monte Carlo sampling, the two-phase tick and its outboxes, and the entities -- a bucket a chunk, a timer wheel a superchunk |
+| [`simulation/`](simulation/) | the simulation: Monte Carlo sampling, the two-phase tick and its outboxes, a superchunk's turn -- a bucket a chunk, a timer wheel a superchunk |
 | [`bitplane_manager/`](bitplane_manager/) | the hot bitplanes: layers decoded into the bitmap arena, where cells are read and written -- writes batched -- and written back; planes of one bit a cell, or 2, 4, 8 or 16 |
 | [`allocator/`](allocator/) | the allocator: equal-size blocks that never move, owned by their holder, taken back and handed out again |
 | [`tessera/`](tessera/) | Tessera, the lossless encoding of a 256x256 bitmap: a project of its own, with its own [README](tessera/README.md), tests, tools and docs |
@@ -67,7 +68,8 @@ compare against never enter this build.
 Tessera depends on `bitmap/` and `utilities/` beside it; `coordinates/`
 on `bitmap/`; `chunk_storage/` on those and Tessera;
 `bitplane_manager/` on `chunk_storage/`, `coordinates/` and
-`allocator/`; `simulation/` on `bitplane_manager/`; `instructions/` on
+`allocator/`; `entity_manager/` on `coordinates/` and `bitmap/`; `simulation/` on
+`bitplane_manager/` and `entity_manager/`; `instructions/` on
 `simulation/`, `pathfinding/` and `worldgen/`, which know nothing of
 one another and meet there; the rules, `mc_rules/` and `entity_rules/`,
 on `simulation/` and `instructions/`; `worldgen/` on `chunk_storage/` and

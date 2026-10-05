@@ -10,10 +10,10 @@
 //! superchunk's turn queues them. Queuing is the only way to change an
 //! entity.
 
-use super::bucket::{place, Bucket, Put};
-use super::instructions::{Instructions, InstructionsApplied};
-use super::entity::{sorted, Attribute, AttributeType, EntityId, EntityRef, Header, NEVER};
-use super::wheel::{Wake, Wheel};
+use crate::bucket::{place, Bucket, Put};
+use crate::instructions::{Instructions, InstructionsApplied};
+use crate::entity::{sorted, Attribute, AttributeType, EntityId, EntityRef, Header, NEVER};
+use crate::wheel::{Wake, Wheel};
 use bitmap::window::{in_word_tile, PLACE_IN_WORD_TILE};
 use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 
@@ -186,7 +186,7 @@ impl SuperchunkEntities {
 
     /// Swaps the entities that crossed into it this tick, each with the
     /// cell it left, for `arrived` -- empty, kept for its room.
-    pub(crate) fn take_arrived(&mut self, arrived: &mut Vec<(EntityId, CellIndex)>) {
+    pub fn take_arrived(&mut self, arrived: &mut Vec<(EntityId, CellIndex)>) {
         std::mem::swap(&mut self.arrived, arrived);
     }
 
@@ -196,7 +196,7 @@ impl SuperchunkEntities {
     /// superchunk: until then each stood on both cells, so that, its new
     /// cell taken, it stays where it stood. Once every superchunk has
     /// settled its leavers, every entity stands on one cell.
-    pub(crate) fn settle_leavers(&mut self, arrived: &[(EntityId, CellIndex)]) {
+    pub fn settle_leavers(&mut self, arrived: &[(EntityId, CellIndex)]) {
         let here = self.index;
         for &(id, left) in arrived.iter().filter(|(_, left)| left.superchunk() == here) {
             self.remove(id, left);
@@ -204,12 +204,12 @@ impl SuperchunkEntities {
     }
 
     /// Passes `tick`, just run, on the wheel.
-    pub(crate) fn pass(&mut self, tick: u64) {
+    pub fn pass(&mut self, tick: u64) {
         self.wheel.pass(tick);
     }
 
     /// Sorts the wakes of `tick`, every one filed, into Morton order.
-    pub(crate) fn sort_wakes(&mut self, tick: u64) {
+    pub fn sort_wakes(&mut self, tick: u64) {
         self.wheel.sort(tick);
     }
 
@@ -264,7 +264,7 @@ impl Entities {
     }
 
     /// The superchunks, by Morton index, to change.
-    pub(crate) fn superchunks_mut(&mut self) -> &mut [SuperchunkEntities] {
+    pub fn superchunks_mut(&mut self) -> &mut [SuperchunkEntities] {
         &mut self.superchunks
     }
 
@@ -334,7 +334,7 @@ impl Entities {
     }
 
     /// The tick just run is over: the next is about to run.
-    pub(crate) fn advance(&mut self) {
+    pub fn advance(&mut self) {
         self.now += 1;
     }
 }

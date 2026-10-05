@@ -45,7 +45,7 @@ for samples are kept between ticks.
 
 ## Entities
 
-`src/entity_store/`: what stands on the cells. An entity is a header -- a
+`../../entity_manager/src/`: what stands on the cells. An entity is a header -- a
 random 64-bit ID, a type, its cell, the tick it next wakes at -- and
 attributes, typed values added and removed at run time. A superchunk
 holds its entities in a bucket a chunk, sorted by cell -- Morton order
@@ -243,7 +243,7 @@ comes to does not depend on the thread that takes it.
 | `src/sampling.rs` | Monte Carlo sampling |
 | `src/tick.rs` | the two-phase tick |
 | `src/turn/` | a superchunk's turn: `mod` the turn and its outbox, `area` the cells about a cell, `entities` the entities read and the instructions queued |
-| `src/entity_store/` | entities: buckets, the timer wheel, the instructions queued |
+| `../entity_manager/` | the entities: buckets, the timer wheel, the instructions queued -- a crate of its own |
 | `src/around.rs` | the 3x3 cells about a cell, as nine bits |
 | `src/diagnostics/` | what the entities hold |
 | `tests/` | sampling, the tick, the entities, their instructions and the dispatcher, judged |

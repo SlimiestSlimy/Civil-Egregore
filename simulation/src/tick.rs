@@ -28,7 +28,7 @@
 //! numbers of its own, kept from tick to tick, so a tick comes out the
 //! same on any number of threads.
 
-use crate::entity_store::{Entities, EntityId, EntityReader, Instructions, InstructionsApplied, SuperchunkEntities};
+use entity_manager::{Entities, EntityId, EntityReader, Instructions, InstructionsApplied, SuperchunkEntities};
 use crate::turn::{slot, Outbox, Turn};
 use bitplane_manager::{count_missed, BitmapArena, Reader, Superchunk, WriteQueues, WritesApplied};
 use coordinates::{CellIndex, SuperchunkIndex};

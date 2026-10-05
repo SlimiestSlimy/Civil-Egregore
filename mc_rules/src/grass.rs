@@ -26,7 +26,7 @@
 //! spreading fills cells that were dirt.
 
 use bitplane_manager::{BitmapArena, Write, WriteOp};
-use simulation::entity_store::Entities;
+use entity_manager::Entities;
 use simulation::{Simulation, Turn, TickReport};
 use chunk_storage::mock::GRASS;
 use worldgen::WET;

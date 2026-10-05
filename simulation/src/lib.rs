@@ -1,14 +1,14 @@
 //! TileSim's simulation: the rules ticked over the hot bitplanes
 //! (`../bitplane_manager`), which it reads and writes only through the
-//! handles they give, and over the entities, which it holds.
+//! handles they give, and over the entities (`../entity_manager`),
+//! likewise.
 //!
 //! | file | what is in it |
 //! |---|---|
 //! | `sampling` | Monte Carlo sampling: every set cell chosen with one probability, in Morton order, none wasted |
 //! | `tick` | the tick: rules run superchunk by superchunk in two phases -- computing, writes queued for each superchunk they land in; applying, each superchunk its own |
 //! | `turn/` | a superchunk's turn in the first phase: what a rule reads and queues, the cells about a cell, the entities, and the outbox |
-//! | `entity_store/` | entities: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied in the tick |
-//! | `diagnostics/` | data gathered: what the entities hold |
+//! | `../entity_manager/` | entities: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied in the tick |
 //! | `transient_data` | the crate's `transient_data/`, out of git: what its runs leave behind |
 //!
 //! The design: `docs/simulation.md`; function by function:
@@ -19,8 +19,6 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod around;
-pub mod diagnostics;
-pub mod entity_store;
 mod sampling;
 mod tick;
 mod turn;

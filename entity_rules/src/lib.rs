@@ -5,7 +5,7 @@
 //! What an entity *is* -- its header and attributes, the bucket a chunk
 //! that keeps it, the timer wheel that wakes it, the instructions it
 //! queues -- is the
-//! simulation's (`simulation/src/entity_store/`), and knows no kind of
+//! simulation's (`entity_manager/src/`), and knows no kind of
 //! entity. What each kind *does* is here, and knows no other rule: the
 //! game (`src/`, `tilesim`) ticks them together with the rules of the
 //! cells.
