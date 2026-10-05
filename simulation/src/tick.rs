@@ -32,7 +32,7 @@ use crate::dispatcher::Dispatcher;
 use crate::around::{squeeze, Around};
 use crate::entity_store::{Attribute, AttributeType, Instructions, EntityEdit, Entities, InstructionsApplied, EntityId, EntityReader, EntityRef, EntityType, Header, SuperchunkEntities, OCCUPIED_SIDE};
 use pathfinding::{a_star, step_towards, Cell, Rows, Walls};
-use terrain::{WALL_EAST, WALL_SOUTH};
+use worldgen::{WALL_EAST, WALL_SOUTH};
 use crate::sampling::sample_layer;
 use bitplane_manager::{count_missed, COARSEST_TILES_IN_CHUNK, WritesApplied, BitmapArena, NotHot, Reader, Shape, Superchunk, Window, Write, WriteQueues};
 use chunk_storage::{LayerType, Wide, Width};

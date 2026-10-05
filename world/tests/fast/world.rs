@@ -139,18 +139,18 @@ fn files_that_are_not_a_save_are_refused() {
 fn sheep_never_step_through_a_wall() {
     use std::collections::HashMap;
     // Small polygons joined by cliffs, and a seed whose origin superchunk has walls enough.
-    let shape = terrain::Shape { span: 8, highest: 552, narrow: 2, wide: 2, sea: 0, finer_depth: 3, ..terrain::Shape::DEFAULT };
-    let seed = (utilities::seed::counted()..).find(|&seed| terrain::Terrain::generate_shaped(&shape, seed, coordinates::WORLD_MIDDLE).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
+    let shape = worldgen::Shape { span: 8, highest: 552, narrow: 2, wide: 2, sea: 0, finer_depth: 3, ..worldgen::Shape::DEFAULT };
+    let seed = (utilities::seed::counted()..).find(|&seed| worldgen::Terrain::generate_shaped(&shape, seed, coordinates::WORLD_MIDDLE).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
     let mut made = world::generate_flocks_with(world::Generation { shape, ..world::Generation::DEFAULT }, seed, &[coordinates::WORLD_MIDDLE], 4_000);
     // The superchunk's heights and a cell more all round, worked out once: asked for at every sheep, every tick.
     let (corner, side) = (coordinates::WORLD_MIDDLE.top_left().cartesian(), coordinates::SUPERCHUNK_SIDE_CELLS as usize + 2);
-    let mut lands = terrain::mesh::Lands::new(&shape, seed);
+    let mut lands = worldgen::mesh::Lands::new(&shape, seed);
     let heights: Vec<_> = (0..side * side).map(|index| lands.height(corner.x.wrapping_add((index % side) as u32).wrapping_sub(1), corner.y.wrapping_add((index / side) as u32).wrapping_sub(1))).collect();
     let high = |at: coordinates::CellIndex| {
         let cell = at.cartesian();
         let (across, down) = (cell.x.wrapping_sub(corner.x).wrapping_add(1) as usize, cell.y.wrapping_sub(corner.y).wrapping_add(1) as usize);
         // A sheep strayed past the superchunk: the generator asked.
-        if across < side && down < side { heights[down * side + across] } else { terrain::height_shaped(&shape, seed, cell.x, cell.y) }
+        if across < side && down < side { heights[down * side + across] } else { worldgen::height_shaped(&shape, seed, cell.x, cell.y) }
     };
     let mut stood: HashMap<u64, coordinates::CellIndex> = made.entities.iter().map(|sheep| (sheep.header.id.0, sheep.header.at)).collect();
     let (mut moved, mut beside_walls) = (0, 0);
@@ -162,11 +162,11 @@ fn sheep_never_step_through_a_wall() {
                 let (from, to) = (was.cartesian(), at.cartesian());
                 // The cells of each way round: the straight step's alone, or the diagonal's two corners.
                 let corners = [CellCartesian { x: to.x, y: from.y }, CellCartesian { x: from.x, y: to.y }];
-                let walled = corners.iter().any(|corner| terrain::wall(high(was), high((*corner).into())) || terrain::wall(high((*corner).into()), high(at)));
+                let walled = corners.iter().any(|corner| worldgen::wall(high(was), high((*corner).into())) || worldgen::wall(high((*corner).into()), high(at)));
                 assert!(!walled, "from height {} to {}: {from:?} to {to:?}", high(was), high(at));
                 moved += 1;
             }
-            beside_walls += (0..9).any(|way| at.offset(way % 3 - 1, way / 3 - 1).is_some_and(|beside| terrain::wall(high(at), high(beside)))) as usize;
+            beside_walls += (0..9).any(|way| at.offset(way % 3 - 1, way / 3 - 1).is_some_and(|beside| worldgen::wall(high(at), high(beside)))) as usize;
         }
     }
     // Few steps: on ground nearly all grass a sheep seldom has to walk.

@@ -22,7 +22,7 @@ use bitplane_manager::{Write, WriteOp};
 use chunk_storage::{Bits4, LayerType, Wide};
 use coordinates::CellIndex;
 use simulation::Turn;
-use terrain::WATER;
+use worldgen::WATER;
 use std::ops::AddAssign;
 
 /// The cells a tree stands on.

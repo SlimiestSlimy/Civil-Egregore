@@ -9,7 +9,7 @@
 use crate::paint::{tree_colour, WATER};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-use terrain::mesh::Lands;
+use worldgen::mesh::Lands;
 use crate::paint::{BROWN, GREEN};
 use world::Generation;
 

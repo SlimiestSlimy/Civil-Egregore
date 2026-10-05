@@ -138,7 +138,7 @@ it reads -- the sheep's grass and the four walls.
 Kept for the world that is played: 5% more ticks a second with walls
 to read. On the mock, which has no walls, asking for the wall layers,
 four then, that are not there is pure cost at 64 superchunks. The
-walls are two layers now (`terrain/docs/terrain.md`).
+walls are two layers now (`worldgen/docs/worldgen.md`).
 
 ## Terrain
 

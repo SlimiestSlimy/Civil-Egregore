@@ -133,14 +133,6 @@ and memory tables. **`pasture`**: runs `pasture::run` and publishes the
 flock, time a sample and a wake, rates, what is held and the census
 (**`census_table`**).
 
-## `patches.rs`
-
-How something lies in patches when a superchunk is made. `ONE`
-(65,536), `SAMPLED` (16,384). **`Patches`** `{cover, patch, detail,
-scatter}`; **`number(seed, x, y)`**: a cell's number -- noise as broad
-as a patch, finer noise, and the cell's own lot;
-**`threshold(seed)`**: the number under which `cover` of the cells are.
-
 ## Generation
 
 **`Generation`** `{shape, grass, trees, water_level}`: how superchunks are generated;

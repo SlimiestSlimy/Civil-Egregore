@@ -10,10 +10,11 @@ use crate::sim::SEED;
 use crate::tuning::{self, CLUMPING, COAST_BREADTH, COAST_LOWNESS, FINER_DEPTH, FINER_FALL, FINER_HEIGHT, FINER_SHARE, GRASS_COVER, GRASS_DETAIL, GRASS_PATCH, GRASS_SCATTER, HIGHEST_LAND, LEAST_SIGMOID, LINE_BENDING, MOST_SIGMOID, NARROWEST_BLEND, OCEAN_FLOOR, OCEAN_LEVEL, OCEAN_SHARE, WEIGHT_SPREAD, RAISED_SHARE, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER, VERTEX_SPACING, WIDEST_BLEND};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
-use terrain::mesh::SIGMOID_ONE;
-use terrain::Shape;
+use worldgen::mesh::SIGMOID_ONE;
+use worldgen::Shape;
 use utilities::hash::mix;
-use world::patches::{Patches, ONE};
+use worldgen::patches::Patches;
+use worldgen::ONE;
 use world::Generation;
 
 /// Whether the lab is what runs.

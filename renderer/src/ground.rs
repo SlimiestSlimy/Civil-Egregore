@@ -18,8 +18,8 @@
 use coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS};
 use chunk_storage::{height_in, Height};
 use std::collections::HashMap;
-use terrain::mesh::Lands;
-use terrain::{wall, Shape};
+use worldgen::mesh::Lands;
+use worldgen::{wall, Shape};
 
 /// Cells along a superchunk's side.
 pub const SIDE: usize = SUPERCHUNK_SIDE_CELLS as usize;

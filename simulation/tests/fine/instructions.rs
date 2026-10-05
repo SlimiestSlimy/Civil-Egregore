@@ -14,7 +14,7 @@ use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CEL
 use simulation::around::{self, CENTRE, RING};
 use simulation::entity_store::{Attribute, AttributeType, EntityEdit, Entities, EntityId, EntityType, Header, NEVER};
 use simulation::{Simulation, Turn};
-use terrain::{WALL_EAST, WALL_SOUTH};
+use worldgen::{WALL_EAST, WALL_SOUTH};
 use std::sync::Mutex;
 
 /// The layer type the arena holds: every cell hot, none set.

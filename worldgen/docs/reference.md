@@ -1,6 +1,6 @@
-# Terrain, function by function
+# World generation, function by function
 
-The design is in `terrain.md`.
+The design is in `worldgen.md`.
 
 ## `lib.rs`
 
@@ -40,3 +40,11 @@ the same for one cell alone. `SIGMOID_ONE`, `FINER_MOST`, `COAST_MOST`.
 Private: **`Vertex`**, **`Triangle`**, **`Blended`**, **`Mesh`**
 (`vertex`, `lot`, `triangle`, `locate`, `blended`), **`raised`**,
 **`width`**, **`area`**.
+
+## `patches.rs`
+
+How something lies in patches when a superchunk is made. `SAMPLED`
+(16,384); a fraction's whole is the crate's `ONE` (65,536). **`Patches`** `{cover, patch, detail,
+scatter}`; **`number(seed, x, y)`**: a cell's number -- noise as broad
+as a patch, finer noise, and the cell's own lot;
+**`threshold(seed)`**: the number under which `cover` of the cells are.

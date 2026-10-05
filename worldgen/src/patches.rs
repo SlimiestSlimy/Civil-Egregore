@@ -6,11 +6,10 @@
 //! found so that the share asked for do. Whole numbers only, as the
 //! heights, so the same on any machine.
 
-use terrain::noise;
+use crate::noise;
 use utilities::hash::{mix, GOLDEN_RATIO};
 
-/// One: a fraction's whole, 16 bits.
-pub const ONE: u64 = 1 << 16;
+use crate::ONE;
 
 /// Cells looked at to find a threshold.
 const SAMPLED: u64 = 1 << 14;

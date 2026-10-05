@@ -26,7 +26,7 @@ spreading over dirt -- and the first entities: sheep eating it.
 | [`entity_rules/`](entity_rules/) | the entities, a file each: so far the sheep, eating the grass |
 | [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |
 | [`chunk_storage/`](chunk_storage/) | chunks as stored, what loading and saving work on: height maps, the layer codec, superchunk images, the cold pool and the writeback ring |
-| [`terrain/`](terrain/) | every cell's height from the world's seed, and the walls between cells more than a step apart in height |
+| [`worldgen/`](worldgen/) | world generation: every cell's height from the world's seed, the walls between cells more than a step apart in height, and how grass and trees lie in patches |
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
 | [`renderer/`](renderer/) | TileSim on the screen: a Bevy window asking the simulation, on a thread of its own, for the cells in view |
 | [`simulation/`](simulation/) | the simulation: Monte Carlo sampling, the two-phase tick and its outboxes, the thread dispatcher, and the entities -- a bucket a chunk, a timer wheel a superchunk |

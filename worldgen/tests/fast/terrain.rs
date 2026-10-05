@@ -5,7 +5,7 @@
 //! `cargo test`
 
 use coordinates::{place_from_cartesian, CellCartesian, SuperchunkIndex, WORLD_MIDDLE};
-use terrain::{height_shaped, wall, Shape, Terrain, STEP, WALLS};
+use worldgen::{height_shaped, wall, Shape, Terrain, STEP, WALLS};
 
 /// The seed the run's tests grow their ground from: the crate's,
 /// rolled every few runs (`utilities::seed`), so that nothing passes on
@@ -95,7 +95,7 @@ fn a_cliff_is_walled_along_its_length() {
 #[test]
 fn the_mesh_is_ocean_or_land_joined_by_slopes() {
     let shape = Shape { span: 10, ..RAMPS };
-    let row: Vec<u64> = (0..40_000).map(|x| terrain::mesh::land(&shape, seed(), 2_000_000_000 + x, 2_000_000_000)).collect();
+    let row: Vec<u64> = (0..40_000).map(|x| worldgen::mesh::land(&shape, seed(), 2_000_000_000 + x, 2_000_000_000)).collect();
     assert!(row.iter().all(|&high| (shape.ground..=shape.highest.max(shape.ocean + 1)).contains(&(high as u16))));
     assert!(row.contains(&(shape.ground as u64)) && row.iter().any(|&high| high > shape.ocean as u64), "ocean and land both");
     assert!(row.windows(2).all(|pair| pair[0].abs_diff(pair[1]) <= 10), "no break");
@@ -106,7 +106,7 @@ fn the_mesh_is_ocean_or_land_joined_by_slopes() {
 /// columns -- cliffs, finer meshes and all.
 #[test]
 fn heights_are_the_same_in_whatever_order_they_are_asked_for() {
-    use terrain::mesh::Lands;
+    use worldgen::mesh::Lands;
     let (left, top, side) = (2_147_000_000u32, 2_147_100_000u32, 300u32);
     let cells = || (0..side * side).map(|cell| (left + cell % side * 7, top + cell / side * 7));
     let mut lands = Lands::new(&CLIFFS, seed());

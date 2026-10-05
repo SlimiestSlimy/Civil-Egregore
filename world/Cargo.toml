@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 bitmap = { path = "../bitmap" }
 mc_rules = { path = "../mc_rules" }
-terrain = { path = "../terrain" }
+worldgen = { path = "../worldgen" }
 entity_rules = { path = "../entity_rules" }
 simulation = { path = "../simulation" }
 coordinates = { path = "../coordinates" }

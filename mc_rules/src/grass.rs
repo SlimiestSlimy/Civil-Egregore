@@ -29,7 +29,7 @@ use bitplane_manager::{BitmapArena, Write, WriteOp};
 use simulation::entity_store::Entities;
 use simulation::{Simulation, Turn, TickReport};
 use chunk_storage::mock::GRASS;
-use terrain::WATER;
+use worldgen::WATER;
 use coordinates::{CellIndex, NEIGHBOURS};
 use std::ops::AddAssign;
 

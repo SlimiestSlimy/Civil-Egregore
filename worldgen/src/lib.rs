@@ -1,13 +1,13 @@
-//! TileSim's terrain: every cell's height, from the world's seed and
+//! TileSim's world generation. The terrain: every cell's height, from the world's seed and
 //! where the cell is, and nothing else ([`height`]) -- so a superchunk
 //! is the same whenever it is generated, and meets its neighbours with
 //! no seam -- and the **walls**: two cells beside one another, across
 //! or down, more than [`STEP`] apart in height cannot be stepped
 //! between ([`Terrain`]). A diagonal step has no wall of its own: it is
 //! open only when both ways round it, across then down and down then
-//! across, are.
+//! across, are. And how what grows on it lies ([`patches`]).
 //!
-//! The design: `docs/terrain.md`; function by function:
+//! The design: `docs/worldgen.md`; function by function:
 //! `docs/reference.md`.
 
 // Every item is documented, private ones included; `cargo clippy`
@@ -18,6 +18,7 @@ pub mod diagnostics;
 pub mod transient_data;
 
 pub mod mesh;
+pub mod patches;
 
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{Height, HeightMap, LayerType};
@@ -120,7 +121,7 @@ impl Shape {
 }
 
 /// One: a fraction's whole, 16 bits.
-const ONE: u64 = 1 << 16;
+pub const ONE: u64 = 1 << 16;
 
 /// A number settled by `seed`, an octave and a point of it: 16 bits.
 fn point(seed: u64, octave: u32, x: u32, y: u32) -> u64 {
