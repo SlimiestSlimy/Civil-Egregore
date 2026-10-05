@@ -12,7 +12,10 @@ in Morton order, found by the counts: the chunks', the count tiles',
 the words'. **`sample(arena, type,
 probability, random, emit)`**: every superchunk's, in Morton order.
 
-## `tick.rs`
+## `turn/`
+
+`mod.rs` the turn, its cells and its outbox; `area.rs` the cells about
+a cell; `entities.rs` the entities and their instructions.
 
 **`Outbox`**: nine `WriteQueues` and nine `Instructions`, by **`slot(dx,
 dy)`**.
@@ -47,19 +50,15 @@ reach. **`commit(edit, to, wake)`**: an `EntityEdit`'s entity moved if no
 attribute changed, else put whole. **`around(type, at)`**: the 3x3
 cells about `at`, an **`Around`** `{set, hot}` of nine bits;
 **`around_occupied(at)`**: those entities stand on;
-**`around_unwalled(at)`**: those no wall is before; **`area_walls(centre)`**:
-the area's walls, for paths;
 **`free_beside(at, open)`**: one of `open` none stands on, drawn.
 **`area_occupied(centre)`**: the entities on an area's cells.
-**`step_towards(at, goals, passable)`**, **`step_to(at, to,
-passable)`**: the cell to step to for the nearest goal, or for one
-cell, round the entities in the way. **`area_of_tiles(type, centre, scale)`**: an `Area` of the tiles of
+**`area_of_tiles(type, centre, scale)`**: an `Area` of the tiles of
 `scale` around `centre`, set where the type holds at any cell.
-**`seek(at, type)`**: the step to the nearest cell the type holds at,
-the area first, then tiles by scale, `FARTHEST_SCALE` (6) first and the
-finest that reach after -- a **`SoughtStep`** `{to, scale}`. **`Area::count`**.
+`FARTHEST_SCALE` (6) the coarsest. **`Area::count`**.
 **`slot_of`**: the slot of a
 superchunk, past the neighbours panicking.
+
+## `tick.rs`
 
 **`TickReport`** `{writes_applied, instructions_applied, rules,
 computing, applying}`.

@@ -67,6 +67,7 @@ Tessera depends on `bitmap/` and `utilities/` beside it; `coordinates/`
 on `bitmap/`; `chunk_storage/` on those and Tessera;
 `bitplane_manager/` on `chunk_storage/`, `coordinates/` and
 `allocator/`; `simulation/` on `bitplane_manager/`; `entity_rules/` on
-`simulation/` and `pathfinding/`; `worldgen/` on `chunk_storage/` and
+`simulation/`, `pathfinding/` and `worldgen/` -- where walking brings
+the three together, the simulation knowing neither of the other two; `worldgen/` on `chunk_storage/` and
 `coordinates/`; `world/` on the rules, the entities and `worldgen/`;
 the program, `src/`, on `world/` and Tessera; the renderer on `world/`.

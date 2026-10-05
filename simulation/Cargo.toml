@@ -10,6 +10,4 @@ bitmap = { path = "../bitmap" }
 bitplane_manager = { path = "../bitplane_manager" }
 chunk_storage = { path = "../chunk_storage" }
 coordinates = { path = "../coordinates" }
-pathfinding = { path = "../pathfinding" }
-worldgen = { path = "../worldgen" }
 utilities = { path = "../utilities" }
