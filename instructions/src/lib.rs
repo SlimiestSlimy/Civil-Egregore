@@ -16,6 +16,7 @@
 //! | `entities` | the going over the entities waking; one made, put to sleep, committed as changed, removed |
 //! | `around` | the 3x3 cells about a cell as nine bits: read, those entities stand on, one free, one picked |
 //! | `area` | the 16x16 cells about a cell, a row a word: read, those entities stand on, and the tiles further off |
+//! | `mask` | a square of cells as bits, 4 to 1,024 a side: a layer read into one, whole or under another, and set or cleared under one |
 //! | `walking` | the steps the terrain's walls leave open, the step towards a cell or the nearest of some, and towards the nearest of a layer's however far off in reach |
 //!
 //! A rule is written in these alone. The simulation under them reads
@@ -33,6 +34,7 @@ pub mod area;
 pub mod around;
 pub mod cells;
 pub mod entities;
+pub mod mask;
 pub mod walking;
 
 pub use simulation::{Simulation, TickReport, Turn};
