@@ -69,32 +69,34 @@ pub fn tick(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut
 }
 
 /// The rule, on one superchunk's turn: every cell of grass chosen with
-/// the chances of spreading and of decay together, in Morton order;
-/// each draws a neighbour, and whether it tries to spread or to decay,
-/// and queues the writes if the neighbour lets it.
+/// the chances of spreading and of decay together, in Morton order,
+/// each seen to by [`cell`].
 pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> GrassCounts {
-    turn.sample(GRASS, SPREAD_CHANCE + DECAY_CHANCE, samples);
-    let sampled = samples.len();
+    let (sampled, counts) = turn.each_sampled(GRASS, SPREAD_CHANCE + DECAY_CHANCE, samples, cell);
+    GrassCounts { sampled, ..counts }
+}
+
+/// The rule, on one cell of grass chosen: it draws a neighbour, and
+/// whether it tries to spread or to decay, and queues the write if the
+/// neighbour lets it.
+#[inline]
+fn cell(turn: &mut Turn, cell: CellIndex, counts: &mut GrassCounts) {
     let spread_share = SPREAD_CHANCE / (SPREAD_CHANCE + DECAY_CHANCE);
-    let (mut spreads, mut decays) = (0, 0);
-    for &cell in samples.iter() {
-        let (dx, dy) = NEIGHBOURS[turn.random().below(NEIGHBOURS.len() as u64) as usize];
-        let spreading = turn.random().unit() <= spread_share;
-        // Stepped on the Morton index itself: no cartesian coordinates.
-        let Some(neighbour) = cell.offset(dx, dy) else {
-            continue;
-        };
-        if spreading {
-            // Dirt is a cell with no grass on it: no layer of its own.
-            // And grass does not spread under water; a world with no water layers has none.
-            if turn.holds(GRASS, neighbour) == Ok(false) && !matches!(turn.level(WATER, neighbour), Ok(1..)) {
-                turn.queue(GRASS, Write::cell(neighbour, WriteOp::Set));
-                spreads += 1;
-            }
-        } else if turn.holds(GRASS, neighbour) == Ok(true) {
-            turn.queue(GRASS, Write::cell(cell, WriteOp::Unset));
-            decays += 1;
+    let (dx, dy) = NEIGHBOURS[turn.random().below(NEIGHBOURS.len() as u64) as usize];
+    let spreading = turn.random().unit() <= spread_share;
+    // Stepped on the Morton index itself: no cartesian coordinates.
+    let Some(neighbour) = cell.offset(dx, dy) else {
+        return;
+    };
+    if spreading {
+        // Dirt is a cell with no grass on it: no layer of its own.
+        // And grass does not spread under water; a world with no water layers has none.
+        if turn.holds(GRASS, neighbour) == Ok(false) && !matches!(turn.level(WATER, neighbour), Ok(1..)) {
+            turn.queue(GRASS, Write::cell(neighbour, WriteOp::Set));
+            counts.spreads += 1;
         }
+    } else if turn.holds(GRASS, neighbour) == Ok(true) {
+        turn.queue(GRASS, Write::cell(cell, WriteOp::Unset));
+        counts.decays += 1;
     }
-    GrassCounts { sampled, spreads, decays }
 }

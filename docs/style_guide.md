@@ -36,6 +36,9 @@ reader has to wonder whether something is missing or was never needed
   function in `src/diagnostics/tool`, listed among the crate's
   `COMMANDS` and run by `tilesim <crate> <tool>`; the root hands the
   crate the rest of the line and knows none of its tools.
+- A rule is written for one cell or one entity; the loop over them is
+  the simulation's (`Turn::each_sampled`, `Turn::each_woken`), inlined,
+  so it costs nothing.
 - A command's parameters are declared once, name and default
   (`utilities::commands::Parameter`): the usage, the parsing and the
   report's line all come from that. No crate reads `std::env::args`.

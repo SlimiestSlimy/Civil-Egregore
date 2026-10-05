@@ -6,7 +6,7 @@ The design is in `mc_rules.md`.
 
 `SPREAD_CHANCE` (0.001%), `DECAY_CHANCE` (0.002% with grass all round).
 
-**`rule(turn, samples)`**: on one superchunk's turn, every cell of grass
+**`rule(turn, samples)`**: hands **`cell`**, the rule for one cell of grass, to `Turn::each_sampled`, which goes over the cells. On one superchunk's turn, every cell of grass
 sampled at the two chances together; each draws a neighbour (one of the
 eight, stepped on the Morton index) and whether it spreads (in
 `SPREAD_CHANCE` of the sum) or decays: grass set on a
@@ -24,7 +24,7 @@ every superchunk in use, on the simulation's threads.
 first. `SAMPLE_CHANCE` (0.01%), `SPREAD_SHARE` (half), `SEEDS_FROM` (4),
 `CROWDED` (9), `DIE_ONE_IN` (4), `AROUND` (8).
 
-**`rule(turn, samples)`**: every tree sampled tries to spread or grows
+**`rule(turn, samples)`**: hands **`tree`**, the rule for one tree, to `Turn::each_sampled`. Every tree sampled tries to spread or grows
 a stage -- or at the oldest dies one time in four, its cell and its
 stage cleared. **`spread(turn, cell, stage)`**: the other trees in the
 8 by 8 cells about it counted from one window; with `n` of them it goes
