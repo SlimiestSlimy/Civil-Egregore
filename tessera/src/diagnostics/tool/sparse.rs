@@ -6,10 +6,10 @@
 //! stream is whichever the encoder picks from the greedy tiler's tiles;
 //! both encodings' bits are counted here at every density.
 
-use tessera::diagnostics::examination::Examination;
-use tessera::BitStream;
-use tessera::Tessera;
-use tessera::corpus::{grown, corpus_seed};
+use crate::diagnostics::examination::Examination;
+use crate::BitStream;
+use crate::Tessera;
+use crate::corpus::{grown, corpus_seed};
 use utilities::diagnostics::table::report::Report;
 use utilities::diagnostics::table::Table;
 use bitmap::{Bitmap, HEIGHT, WIDTH};

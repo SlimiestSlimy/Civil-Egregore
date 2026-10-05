@@ -1,45 +1,88 @@
-//! TileSim's diagnostics tool: a tool a command, as Tessera's.
+//! The world's diagnostics tools: each runs a diagnostic, prints what
+//! it gathered and keeps it in `transient_data/measurements/`. They are
+//! [`COMMANDS`], run by `tilesim world <tool>` ([`dispatch`]); every
+//! tool's parameters and what each is if not given are in that table,
+//! and printed by `tilesim world`.
 //!
-//! | command | what it does |
-//! |---|---|
-//! | `throughput [ticks] [grass, thousandths] [superchunks] [threads]` | ticks grass flat out and reports each phase's time, the writes a second, and the memory held; kept in `transient_data/measurements/` |
-//! | `pasture [ticks] [grass, thousandths] [sheep a superchunk] [superchunks] [threads]` | ticks grass and sheep flat out and reports the flock, what the sheep did, each rule's time -- a sheep's wake in nanoseconds -- and the memory held; kept in `transient_data/measurements/` |
-//! | `video [ticks] [grass cells] [ticks a frame] [sheep]` | grass and sheep on one superchunk as raw RGB frames, 1024x1024, on standard output, for ffmpeg |
+//! Threads 0: every one the machine has, no more than the superchunks.
 //!
-//! Threads not given, or 0: every one the machine has, no more than the
-//! superchunks.
-//!
-//! `cargo run --release --bin diagnostics -- <command> [arguments]`; a
-//! video: `... -- video | ffmpeg -f rawvideo -pix_fmt rgb24 -s 1024x1024 -r 30 -i - transient_data/renders/grass.mp4`.
-
-// Every item is documented, private ones included; `cargo clippy`
-// checks the private ones.
-#![warn(missing_docs, clippy::missing_docs_in_private_items)]
+//! A video: `cargo run --release -- world video | ffmpeg -f rawvideo -pix_fmt rgb24 -s 1024x1024 -r 30 -i - transient_data/renders/grass.mp4`.
 
 use std::io::Write;
 use std::time::Duration;
-use world::diagnostics::frames::{frame, sheep, FRAME_BYTES};
-use world::diagnostics::{pasture as pasture_run, throughput};
+use crate::diagnostics::frames::{frame, sheep, FRAME_BYTES};
+use crate::diagnostics::{pasture as pasture_run, throughput};
 use entity_rules::diagnostics::world::MockWorld;
 use simulation::{threads_for, Simulation};
-use world::transient_data::TRANSIENT_DATA;
+use crate::transient_data::TRANSIENT_DATA;
+use utilities::commands::{Command, Given, Parameter};
 use utilities::diagnostics::process_memory::mebibytes;
 use utilities::diagnostics::table::report::Report;
 use utilities::diagnostics::table::Table;
 
-/// The `index`-th argument after the command, or `default`.
-fn argument(arguments: &[String], index: usize, default: usize) -> usize {
-    arguments.get(index).map_or(default, |argument| argument.parse().expect("a number"))
+/// How the tools are reached on the command line.
+const CALLED: &str = "tilesim world";
+
+/// Ticks run.
+const TICKS: &str = "ticks";
+/// The share of the cells that start as grass, in thousandths.
+const GRASS: &str = "grass, thousandths";
+/// Superchunks ticked.
+const SUPERCHUNKS: &str = "superchunks";
+/// Threads ticking: 0, every one the machine has.
+const THREADS: &str = "threads";
+/// Sheep on each superchunk.
+const FLOCK: &str = "sheep a superchunk";
+/// Cells of grass the video's superchunk starts with.
+const GRASS_CELLS: &str = "grass cells";
+/// Ticks between two frames of the video.
+const EVERY: &str = "ticks a frame";
+/// Sheep in the video.
+const SHEEP: &str = "sheep";
+
+/// The world's tools.
+pub const COMMANDS: [Command; 3] = [
+    Command {
+        name: "throughput",
+        does: "ticks grass flat out: each phase's time, the writes a second, the memory held",
+        parameters: &[Parameter::new(TICKS, "500"), Parameter::new(GRASS, "333"), Parameter::new(SUPERCHUNKS, "16"), Parameter::new(THREADS, "0")],
+        run: throughput,
+    },
+    Command {
+        name: "pasture",
+        does: "ticks grass and sheep flat out: the flock, what the sheep did, each rule's time, the memory held",
+        parameters: &[Parameter::new(TICKS, "2000"), Parameter::new(GRASS, "333"), Parameter::new(FLOCK, "4000"), Parameter::new(SUPERCHUNKS, "16"), Parameter::new(THREADS, "0")],
+        run: pasture,
+    },
+    Command {
+        name: "video",
+        does: "grass and sheep on one superchunk as raw RGB frames, 1024x1024, on standard output, for ffmpeg",
+        parameters: &[Parameter::new(TICKS, "120000"), Parameter::new(GRASS_CELLS, "2000"), Parameter::new(EVERY, "256"), Parameter::new(SHEEP, "0")],
+        run: video,
+    },
+];
+
+/// Runs the tool the first of `arguments` names, given the rest.
+pub fn dispatch(arguments: &[&str]) -> Result<(), String> {
+    utilities::commands::dispatch(CALLED, &COMMANDS, arguments)
+}
+
+/// The threads asked for: every one the machine has, no more than
+/// `superchunks`, if 0.
+fn threads(given: &Given, superchunks: u32) -> Result<usize, String> {
+    Ok(match given.number(THREADS)? {
+        0 => threads_for(superchunks as usize),
+        threads => threads,
+    })
 }
 
 /// Ticks grass flat out and publishes what each phase took and the
 /// memory held.
-fn throughput(arguments: &[String]) {
-    let (ticks, thousandths, superchunks, threads) =
-        (argument(arguments, 0, 500), argument(arguments, 1, 333), argument(arguments, 2, 16) as u32, argument(arguments, 3, 0));
-    let threads = if threads == 0 { threads_for(superchunks as usize) } else { threads };
+fn throughput(given: &Given) -> Result<(), String> {
+    let (ticks, thousandths, superchunks): (usize, usize, u32) = (given.number(TICKS)?, given.number(GRASS)?, given.number(SUPERCHUNKS)?);
+    let threads = threads(given, superchunks)?;
     let run = throughput::run(ticks, thousandths, superchunks, threads);
-    let mut report = Report::new("throughput", &format!("diagnostics throughput {ticks} {thousandths} {superchunks} {threads}"));
+    let mut report = Report::new(given.name(), &given.resolved());
     report.note(format!(
         "{ticks} ticks over {superchunks} superchunk(s) on {threads} thread(s); grass {} -> {}; {} samples; {} cells missed past the superchunks used",
         run.grass.0, run.grass.1, run.sampled, run.missed
@@ -72,16 +115,16 @@ fn throughput(arguments: &[String]) {
     memory.row(&["storage ring".to_string(), mebibytes(run.storage.ring_bytes)]);
     report.add("memory", memory);
     TRANSIENT_DATA.publish(report);
+    Ok(())
 }
 
 /// Ticks grass and sheep flat out and publishes the flock, what the
 /// sheep did, each rule's time and the memory held.
-fn pasture(arguments: &[String]) {
-    let (ticks, thousandths, flock, superchunks, threads) =
-        (argument(arguments, 0, 2000), argument(arguments, 1, 333), argument(arguments, 2, 4000), argument(arguments, 3, 16) as u32, argument(arguments, 4, 0));
-    let threads = if threads == 0 { threads_for(superchunks as usize) } else { threads };
+fn pasture(given: &Given) -> Result<(), String> {
+    let (ticks, thousandths, flock, superchunks): (usize, usize, usize, u32) = (given.number(TICKS)?, given.number(GRASS)?, given.number(FLOCK)?, given.number(SUPERCHUNKS)?);
+    let threads = threads(given, superchunks)?;
     let run = pasture_run::run(ticks, thousandths, flock, superchunks, threads);
-    let mut report = Report::new("pasture", &format!("diagnostics pasture {ticks} {thousandths} {flock} {superchunks} {threads}"));
+    let mut report = Report::new(given.name(), &given.resolved());
     let sheep = run.done.sheep;
     report.note(format!(
         "{ticks} ticks over {superchunks} superchunk(s) on {threads} thread(s); sheep {} -> {}; grass {} -> {}; {} entities lost past the superchunks used",
@@ -121,6 +164,7 @@ fn pasture(arguments: &[String]) {
     report.add("held", memory);
     report.add("census", census_table(run.census.iter().map(|census| [census.tick as u64, census.sheep as u64, census.grass, census.woken as u64, census.births as u64, census.deaths as u64])));
     TRANSIENT_DATA.publish(report);
+    Ok(())
 }
 
 /// The flock and the grass over a run, a row a count: the tick, sheep,
@@ -140,8 +184,8 @@ fn share(part: Duration, whole: Duration) -> String {
 
 /// Writes grass and sheep on one superchunk as raw RGB frames on
 /// standard output.
-fn video(arguments: &[String]) {
-    let (ticks, grass_cells, every, flock) = (argument(arguments, 0, 120_000), argument(arguments, 1, 2000), argument(arguments, 2, 256), argument(arguments, 3, 0));
+fn video(given: &Given) -> Result<(), String> {
+    let (ticks, grass_cells, every, flock): (usize, usize, usize, usize) = (given.number(TICKS)?, given.number(GRASS_CELLS)?, given.number(EVERY)?, given.number(SHEEP)?);
     let mut world = MockWorld::with_sheep(1, grass_cells, flock);
     let superchunk = world.superchunks[0];
     let mut pixels = vec![0u8; FRAME_BYTES];
@@ -159,24 +203,12 @@ fn video(arguments: &[String]) {
                 eprintln!("tick {tick:>7}: grass {}, sheep {}", world.grass(), world.sheep());
             }
         }
-        since += world::tick_rules(&mut simulation, &mut world.arena, &mut world.entities, tick as u64).rules.sheep;
+        since += crate::tick_rules(&mut simulation, &mut world.arena, &mut world.entities, tick as u64).rules.sheep;
     }
     // Standard output is the video: the census is kept, not printed.
-    let mut report = Report::new("video", &format!("diagnostics video {ticks} {grass_cells} {every} {flock}"));
+    let mut report = Report::new(given.name(), &given.resolved());
     report.note(format!("one superchunk, a frame every {every} ticks: the flock and the grass at each"));
     report.add("census", census_table(rows.into_iter()));
     eprintln!("census kept in {}", report.keep(&TRANSIENT_DATA.measurements()).display());
-}
-
-/// Runs the command asked for, or lists them.
-fn main() {
-    let arguments: Vec<String> = std::env::args().skip(1).collect();
-    match arguments.first().map(String::as_str) {
-        Some("throughput") => throughput(&arguments[1..]),
-        Some("pasture") => pasture(&arguments[1..]),
-        Some("video") => video(&arguments[1..]),
-        _ => eprintln!(
-            "diagnostics throughput [ticks] [grass, thousandths] [superchunks] [threads]\ndiagnostics pasture [ticks] [grass, thousandths] [sheep a superchunk] [superchunks] [threads]\ndiagnostics video [ticks] [grass cells] [ticks a frame] [sheep]"
-        ),
-    }
+    Ok(())
 }

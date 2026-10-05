@@ -32,8 +32,8 @@ The tick instructions are callgrind's count for the reference run less
 the same run with no ticks:
 
 ```sh
-cargo build -q --release -p world --bin diagnostics
-ir() { valgrind --tool=callgrind --callgrind-out-file=/tmp/ir.cg.$1 target/release/diagnostics pasture $1 333 4000 4 1 2>&1 | grep Collected | awk '{print $4}'; }
+cargo build -q --release
+ir() { valgrind --tool=callgrind --callgrind-out-file=/tmp/ir.cg.$1 target/release/tilesim world pasture $1 333 4000 4 1 2>&1 | grep Collected | awk '{print $4}'; }
 a=$(ir 300); b=$(ir 0); echo "tick Ir: $((a - b))  (reference: 63611138)"
 ```
 

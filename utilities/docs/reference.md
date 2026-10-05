@@ -25,6 +25,18 @@ the reports kept.
 **`lines(text)`**, **`Table::to_csv`**, **`from_lines`**, **`from_csv`**
 (**`csv_field`**, **`csv_row`**: quoting).
 
+## `commands.rs`
+
+**`Parameter::new(name, default)`**: one thing a command takes, by its
+place. **`Command { name, does, parameters, run }`**. **`dispatch(called,
+commands, arguments)`**: runs the command the first argument names on
+the rest, or gives the usage as why not; **`usage(called, commands)`**:
+the commands as a table. **`Given`**, what a command is run with:
+`name()`, `arguments()`, `given(name)` (if given), `text(name)` and
+`number(name)` (as given, or the default), `route()` (the words between
+the program and the command), `usage()`, `resolved()` (the line it ran
+on, defaults filled in: what a report records).
+
 ## `rng.rs`
 
 **`Rng::new(seed)`**, **`for_stream(seed, stream)`** -- a source of its

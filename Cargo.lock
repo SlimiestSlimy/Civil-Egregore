@@ -4673,6 +4673,7 @@ name = "tilesim"
 version = "0.1.0"
 dependencies = [
  "chunk_storage",
+ "tessera",
  "utilities",
  "world",
 ]

@@ -1,10 +1,10 @@
 //! Tessera's bits on every shape, plan and line set on its own -- a
 //! family's total can hide a shape that costs more than it should.
 
-use tessera::diagnostics::measured::Measured;
-use tessera::diagnostics::RAW_CELLS;
-use tessera::Tessera;
-use tessera::corpus::{LINE_SETS, PLANS, SHAPES, SPARSE};
+use crate::diagnostics::measured::Measured;
+use crate::diagnostics::RAW_CELLS;
+use crate::Tessera;
+use crate::corpus::{LINE_SETS, PLANS, SHAPES, SPARSE};
 use utilities::diagnostics::table::report::Report;
 use utilities::diagnostics::table::Table;
 use bitmap::Bitmap;

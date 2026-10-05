@@ -4,7 +4,7 @@
 //! | under `transient_data/` | what it holds |
 //! |---|---|
 //! | `measurements/` | every measurement's latest tables, as CSV |
-//! | `renders/` | videos of the world ticking (`diagnostics video`) |
+//! | `renders/` | videos of the world ticking (`tilesim world video`) |
 //! | `saves/` | worlds saved, a folder each: the tests' |
 
 use std::path::PathBuf;

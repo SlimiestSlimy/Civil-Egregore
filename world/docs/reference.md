@@ -114,7 +114,12 @@ over it, `WHITE` squares.
 
 **`measurements()`**, **`renders()`**, **`saves()`**, **`publish(report)`**.
 
-## `diagnostics/tool/main.rs`
+## `diagnostics/tool.rs`
+
+**`COMMANDS`**: the tools, each with its parameters and their
+defaults; **`dispatch(arguments)`**: the one the first word names, run
+on the rest -- what `tilesim world` calls. **`threads`**: the threads
+asked for, every one if 0.
 
 **`throughput`**: runs `throughput::run` and publishes its time, rates
 and memory tables. **`pasture`**: runs `pasture::run` and publishes the

@@ -8,7 +8,7 @@ measured: `testing_protocol.md`.
 
 ## Where memory takes over from the processor
 
-`diagnostics pasture 50000 333 1000 <superchunks> 12` (`world/`): grass
+`tilesim world pasture 50000 333 1000 <superchunks> 12` (`world/`): grass
 and sheep, 1,000 sheep a superchunk at the start, 50,000 ticks, every
 thread. A sample and a wake are the time of the thread doing them.
 
@@ -49,7 +49,7 @@ superchunks, over half the tick is the sampler (`sample_layer`), most
 of it walking a count tile's words counting their bits -- which the generic
 build did in software, having no popcount instruction to assume.
 
-`diagnostics pasture 20000 333 1000 <superchunks> 12`:
+`tilesim world pasture 20000 333 1000 <superchunks> 12`:
 
 | superchunks | build | ticks a second | a grass sample, ns |
 |---|---|---|---|
@@ -82,7 +82,7 @@ The counts are now kept of count tiles of 16 words
 128 bytes of counts a bucket where there were 32, and a walk of two
 lines at most.
 
-`diagnostics pasture <ticks> 333 1000 <superchunks> 12`, both built
+`tilesim world pasture <ticks> 333 1000 <superchunks> 12`, both built
 native, the same world to the cell:
 
 | superchunks | count tiles of | ticks a second | a grass sample, ns | a sheep's wake, ns |
@@ -124,7 +124,7 @@ it reads -- the sheep's grass and the four walls.
 | world | before | after |
 |---|---|---|
 | generated, 64 superchunks, walls (`tilesim run <dir> 30000`) | 13,236 ticks a second | 13,964 |
-| mock, 400 superchunks, no walls (`diagnostics pasture 20000 333 4000 400 12`) | a wake 695 ns, 2,381 ticks a second | 645 ns, 2,375 |
+| mock, 400 superchunks, no walls (`tilesim world pasture 20000 333 4000 400 12`) | a wake 695 ns, 2,381 ticks a second | 645 ns, 2,375 |
 | mock, 64 superchunks, no walls | a wake 439 ns, 15,131 ticks a second | 477 ns, 14,566 |
 
 Kept for the world that is played: 5% more ticks a second with walls
@@ -142,7 +142,7 @@ figures below were taken before those.
 `tilesim new <dir> Perf 1 64`, `tilesim run <dir> 50000`: a generated
 world, walls read by every hungry sheep, 10,399 ticks a second; the
 mock world of the same size without them
-(`diagnostics pasture 50000 333 4000 64 12`), 11,649. Generating a
+(`tilesim world pasture 50000 333 4000 64 12`), 11,649. Generating a
 superchunk's heights and walls: 40 ms on one thread.
 
 ## Saves

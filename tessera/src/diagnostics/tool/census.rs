@@ -2,11 +2,11 @@
 //! nodes of each kind at each level -- the tree is made whichever stream
 //! is written -- and the bits written.
 
-use tessera::diagnostics::bitmaps::looked_at;
-use tessera::diagnostics::census::census;
-use tessera::BitStream;
-use tessera::tile::{Tile, FLOOR_LEVEL};
-use tessera::Tessera;
+use crate::diagnostics::bitmaps::looked_at;
+use crate::diagnostics::census::census;
+use crate::BitStream;
+use crate::tile::{Tile, FLOOR_LEVEL};
+use crate::Tessera;
 use utilities::diagnostics::table::report::Report;
 use utilities::diagnostics::table::Table;
 

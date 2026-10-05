@@ -116,9 +116,9 @@ them in `transient_data/measurements/`.
 
 | command | does |
 |---|---|
-| `cargo run --release --bin tessera_diagnostics` | lists the diagnostics tools: bits by generator and shape, node census, noise, sparse bitmaps, timing, instruction counts, PNG renders |
-| `cargo run --release --bin tessera_diagnostics -- show` | prints every kept measurement without measuring |
-| `cargo run --release --bin adversarial` | searches for the bitmaps Tessera does worst on against the raw cells |
+| `cargo run --release -- tessera` | lists the diagnostics tools: bits by generator and shape, node census, noise, sparse bitmaps, timing, instruction counts, PNG renders |
+| `cargo run --release -- tessera show` | prints every kept measurement without measuring |
+| `cargo run --release -- tessera adversarial` | searches for the bitmaps Tessera does worst on against the raw cells |
 | `cargo run --release --manifest-path external_benchmarks/Cargo.toml` | Tessera against CCITT G4, JBIG and zstd 3 and 19: bits and times, family by family |
 | `cargo run --release --manifest-path external_benchmarks/Cargo.toml --bin adversarial` | searches for the bitmaps Tessera does worst on against each of them |
 

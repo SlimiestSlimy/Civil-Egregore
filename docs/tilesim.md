@@ -356,7 +356,7 @@ grass. (The chances were a hundred times these until the world was
 first seen on a screen, where grass at 0.3% a tick boils; every
 measurement below was taken at 0.3%.)
 
-Measured, ticking as fast as one core goes (`diagnostics throughput`,
+Measured, ticking as fast as one core goes (`tilesim world throughput`,
 500 ticks, grass starting scattered over a third of the cells, near
 its balance), nanoseconds a write -- a write is one cell set or
 cleared; a spread or a decay is two:
@@ -379,7 +379,7 @@ number of threads -- ticks a second:
 | 16 | 12,535 | 462 | 593 | 947 |
 | 64 | 50,149 | 104 | 171 | 307 |
 
-`diagnostics throughput` also reports the memory held: the process's
+`tilesim world throughput` also reports the memory held: the process's
 peak and its average over the ticks (from `/proc/self/status`), and
 what the arena's blocks and storage's images take. At 64 superchunks
 on 4 threads: a peak of 99 MiB -- 16 MiB of arena blocks (two layers
@@ -495,7 +495,7 @@ each one contiguous Morton-sorted region) were set aside for this: a
 superchunk owning its own storage keeps loading, evicting and saving a
 superchunk local, with no boundaries to shift between threads.
 
-Measured (`diagnostics pasture 3000 333 4000 16 1`: 16 superchunks, a
+Measured (`tilesim world pasture 3000 333 4000 16 1`: 16 superchunks, a
 third grass, 4,000 sheep each to start, one thread): 247 ticks a
 second, the sheep growing from 64,000 to 98,000 at about 1,050 wakes a
 tick; a sheep's wake cost 844 ns in the first phase -- grass's sample
@@ -533,7 +533,7 @@ Every figure above is from a virtual machine. On a machine of its own
 measured with the processor's counters (`perf`), not instruction
 counts alone:
 
-Grass (`diagnostics throughput 500 333`), ticks a second:
+Grass (`tilesim world throughput 500 333`), ticks a second:
 
 | superchunks | 1 thread | 2 | 4 | 6 | 12 |
 |---|---|---|---|---|---|
@@ -561,7 +561,7 @@ those a sample. The tile windows changed no time here: a wake stayed
 at 149, 194 and 384 ns over 1, 16 and 64 superchunks.
 
 Buckets sorted by cell and searched by their places, a sheep's wake,
-nanoseconds, one thread (`diagnostics pasture 3000 333 4000`):
+nanoseconds, one thread (`tilesim world pasture 3000 333 4000`):
 
 | superchunks | sorted by ID | sorted by cell |
 |---|---|---|
@@ -647,7 +647,7 @@ by the rules: a chunk's bucket has one record a cell.
 - **Sheep**: a lamb is born on a cell seen free beside its mother, who
   waits for one.
 
-Measured against the build before it (`diagnostics pasture`, 4,000
+Measured against the build before it (`tilesim world pasture`, 4,000
 sheep a superchunk): 16 superchunks on one thread, 20,000 ticks, 4.07
 seconds against 4.08, 3% more instructions; 64 superchunks on 12
 threads, about 5,300 ticks a second both, within what one run differs
@@ -667,7 +667,7 @@ them. Only a hungry sheep walks, a step every 64 ticks or so, to grass.
 Old age comes by the tick slept, not the wake. This is what the timer
 wheel was for: a tick costs the entities with something to do.
 
-Measured (`diagnostics pasture 20000 333 4000 64`, 12 threads): 88
+Measured (`tilesim world pasture 20000 333 4000 64`, 12 threads): 88
 wakes a tick where there were about 3,600, and 17,400 ticks a second
 against 5,300.
 
@@ -720,7 +720,7 @@ grass in it. It still takes one step a wake and keeps no route; a sheep
 walks 170 to 220 steps before it starves, so the far end of its reach
 it sees but never comes to.
 
-The flock is what it was (`diagnostics pasture 2000000 333 4000 4 3`):
+The flock is what it was (`tilesim world pasture 2000000 333 4000 4 3`):
 the same boom, crash and settling, to 10,319 sheep on 19% grass where
 it was 10,897 on 21% -- fewer starve in the trough, so the grass is
 kept a little shorter.
@@ -788,7 +788,7 @@ step with every change; sampling passes over count tiles by them, and
 counts the bits of one count tile's words at most (now 16 words: see
 `performance.md`).
 
-Measured (`diagnostics throughput`, grass at 0.003%, the same samples
+Measured (`tilesim world throughput`, grass at 0.003%, the same samples
 before and after), sampling alone, one thread, by the processor's
 counters:
 

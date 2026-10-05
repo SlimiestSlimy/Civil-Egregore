@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 world = { path = "world" }
+tessera = { path = "tessera" }
 chunk_storage = { path = "chunk_storage" }
 utilities = { path = "utilities" }
 

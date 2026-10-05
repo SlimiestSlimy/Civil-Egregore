@@ -8,18 +8,19 @@
 //! profiler, nothing else busy:
 //!
 //! ```text
-//! cargo run --release --bin tessera_diagnostics -- timing
-//! cargo run --release --bin tessera_diagnostics -- timing 400
+//! cargo run --release -- tessera timing
+//! cargo run --release -- tessera timing 400
 //! ```
 //!
 //! The argument after the tool's name, if given, is how many bitmaps
 //! each generator makes.
 
-use tessera::diagnostics::adversarial::worst;
-use tessera::diagnostics::examination::first_difference;
-use tessera::BitStream;
-use tessera::Tessera;
-use tessera::corpus::{families, HowMany, TIMING_PER_GENERATOR};
+use crate::diagnostics::adversarial::worst;
+use crate::diagnostics::examination::first_difference;
+use crate::BitStream;
+use crate::Tessera;
+use crate::corpus::{families, HowMany};
+use utilities::commands::Given;
 use utilities::diagnostics::table::report::Report;
 use utilities::diagnostics::table::Table;
 use bitmap::Bitmap;
@@ -35,10 +36,13 @@ const TAIL_PERCENT: usize = 90;
 /// The median's percentile.
 const MEDIAN_PERCENT: usize = 50;
 
+/// The parameter: bitmaps grown from each generator.
+pub const PER_GENERATOR: &str = "bitmaps a generator";
+
 /// Builds the corpus, times encoding every bitmap of it once, then
 /// decoding, and reports both a family at a time.
-pub fn run(report: &mut Report) {
-    let per_generator = std::env::args().nth(2).map_or(TIMING_PER_GENERATOR, |count| count.parse().expect("a count"));
+pub fn run(report: &mut Report, given: &Given) -> Result<(), String> {
+    let per_generator: u64 = given.number(PER_GENERATOR)?;
     let families = families(HowMany::Each(per_generator));
 
     let (mut tessera, mut stream, mut back) = (Tessera::new(), BitStream::default(), Bitmap::new());
@@ -68,6 +72,7 @@ pub fn run(report: &mut Report) {
     table.row(&row(name, &mut encodes, &decodes));
     report.note(format!("{per_generator} bitmaps a generator, the saved adversarial bitmaps {SAVED_REPEATS} times each"));
     report.add("encode and decode times", table);
+    Ok(())
 }
 
 /// Encodes every bitmap of `bitmaps`, the family `name`, once, timing

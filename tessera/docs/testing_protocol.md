@@ -8,7 +8,8 @@ bitmaps rather than about the algorithm.
 
 So the protocol is two-phase, and the phases must not be mixed (see
 "Phase one" and "Phase two" below). Everything here runs from a cargo
-command, run from `tessera/`; "Every command" lists them all, and
+command -- the tests from `tessera/`, the tools from the workspace's
+root, whose program runs them (`tilesim tessera <tool>`); "Every command" lists them all, and
 "Every parameter" every number a test, tool or search is set by.
 
 ## Where the seed comes from
@@ -51,7 +52,7 @@ Three parts, kept apart:
   times over many, what a tree holds, what the tree above the top tiles
   costs -- and never judge or print it.
 - **Tests** (`tests/`) judge what the diagnostics gather: pass or fail.
-- **Tools** (`src/diagnostics/tool/`, `src/diagnostics/adversarial/main.rs`, and the external benchmarks' crate) print what
+- **Tools** (`src/diagnostics/tool/`, `src/diagnostics/tool/adversarial.rs`, and the external benchmarks' crate) print what
   the diagnostics gather, or search for bitmaps. Every tool prints its
   results as tables, through the one table printer (`../utilities/src/table/`), and
   a tool that measures or searches keeps them
@@ -93,7 +94,7 @@ One tool a file (`src/diagnostics/tool/`), each printing what the
 diagnostics gather, and each stopping if Tessera loses a cell:
 
 ```
-cargo run --release --bin tessera_diagnostics -- <tool> [<argument>]
+cargo run --release -- tessera <tool> [<argument>]
 ```
 
 | tool | prints | argument |
@@ -110,8 +111,8 @@ cargo run --release --bin tessera_diagnostics -- <tool> [<argument>]
 | `show` | the kept measurements, read back from `transient_data/measurements/` without measuring | a tool's name, for its alone |
 
 Run with no tool, or one not there, it prints this list as a table --
-each tool, what it prints, its argument and the file it keeps -- from
-`TOOLS` in `src/diagnostics/tool/main.rs`. `render` prints a table
+each tool, what it takes and what it prints -- from
+`COMMANDS` in `src/diagnostics/tool/mod.rs`. `render` prints a table
 of the images it wrote; `show` prints each kept report as it was
 published.
 
@@ -143,7 +144,7 @@ run's callgrind output is left in `transient_data/callgrind/`, to see
 where the instructions go:
 
 ```
-cargo run --release --bin tessera_diagnostics -- instruction_count
+cargo run --release -- tessera instruction_count
 callgrind_annotate --inclusive=yes transient_data/callgrind/callgrind.encode.out | head -40
 ```
 
@@ -160,8 +161,8 @@ nothing else busy. It prints the encode time's mean, median, 90th
 percentile and worst by family, and the decode mean:
 
 ```
-cargo run --release --bin tessera_diagnostics -- timing
-cargo run --release --bin tessera_diagnostics -- timing 400
+cargo run --release -- tessera timing
+cargo run --release -- tessera timing 400
 ```
 
 ### Against existing codecs
@@ -209,7 +210,7 @@ the worst bitmaps, and a search's moves follow the seed: give each run a fresh
 one.
 
 ```
-TILESIM_SEED=fresh cargo run --release --bin adversarial -- 4000
+TILESIM_SEED=fresh cargo run --release -- tessera adversarial 4000
 TILESIM_SEED=fresh cargo run --release --manifest-path external_benchmarks/Cargo.toml --bin adversarial -- 4000
 ```
 
@@ -222,7 +223,7 @@ is, with a line describing it and the worst bitmap's scores as comment lines
 table of what it saved, from which worst bitmap, and where:
 
 ```
-cargo run --release --bin adversarial -- save <worst> <name> "<description>"
+cargo run --release -- tessera adversarial_save <worst> <name> "<description>"
 ```
 
 The fine tier checks every worst bitmap and saved bitmap; `instruction_count`,
@@ -237,14 +238,14 @@ The fine tier checks every worst bitmap and saved bitmap; `instruction_count`,
 | every tier | `cargo test --release -- --include-ignored` |
 | lints | `cargo clippy --all-targets --release` |
 | the code's documentation | `cargo doc --no-deps --document-private-items` |
-| a diagnostics tool | `cargo run --release --bin tessera_diagnostics -- <tool> [<argument>]` |
-| the kept measurements | `cargo run --release --bin tessera_diagnostics -- show [<tool>]` |
-| the instruction count | `cargo run --release --bin tessera_diagnostics -- instruction_count` |
-| times | `cargo run --release --bin tessera_diagnostics -- timing [<bitmaps a generator>]` |
+| a diagnostics tool | `cargo run --release -- tessera <tool> [<argument>]` |
+| the kept measurements | `cargo run --release -- tessera show [<tool>]` |
+| the instruction count | `cargo run --release -- tessera instruction_count` |
+| times | `cargo run --release -- tessera timing [<bitmaps a generator>]` |
 | against existing codecs | `cargo run --release --manifest-path external_benchmarks/Cargo.toml [-- <bitmaps a generator>]` |
-| the search against the raw cells | `cargo run --release --bin adversarial [-- <changes>]` |
+| the search against the raw cells | `cargo run --release -- tessera adversarial [<changes>]` |
 | the searches against the codecs | `cargo run --release --manifest-path external_benchmarks/Cargo.toml --bin adversarial [-- <changes>]` |
-| saving a worst bitmap | `cargo run --release --bin adversarial -- save <worst> <name> "<description>"` |
+| saving a worst bitmap | `cargo run --release -- tessera adversarial_save <worst> <name> "<description>"` |
 
 | variable | what it does |
 |---|---|
@@ -304,7 +305,7 @@ When the problems that corpus showed are solved, re-run the measurement
 on a seed never seen -- a fresh one, or wherever the file has rolled to:
 
 ```
-TILESIM_SEED=fresh cargo run --release --bin tessera_diagnostics -- measurement
+TILESIM_SEED=fresh cargo run --release -- tessera measurement
 ```
 
 A change that is real holds its size on more than one unseen seed. A

@@ -11,10 +11,15 @@ encoding needs: its seed file, its adversarial searches.
   arena holds, what a tick took, a flock's census -- and never judge or
   print it.
 - **Tests** (`<crate>/tests/`) judge: pass or fail.
-- **Tools** (`<crate>/src/diagnostics/tool/`, named in the crate's
-  `Cargo.toml`; no crate has a `src/bin/`) print what the diagnostics
-  gather, as tables, and keep it in
-  `<crate>/transient_data/measurements/`, out of git.
+- **Tools** (`<crate>/src/diagnostics/tool`) print what the
+  diagnostics gather, as tables, and keep it in
+  `<crate>/transient_data/measurements/`, out of git. A tool is a
+  function, not a program: the crate lists its tools as commands
+  (`utilities::commands`), each with the parameters it takes and what
+  each is if not given, and `tilesim <crate> <tool> [parameters]` runs
+  one -- `cargo run --release -- world pasture 300 333 4000 4 1`.
+  `cargo run --release -- <crate>` lists a crate's tools and their
+  parameters; a report says the line it ran on, defaults filled in.
 
 ## Three tiers of test
 
@@ -75,7 +80,7 @@ between two runs, never a number one seed happened to give.
 ## What is measured, and how
 
 Speed is not a test: it is measured by a tool and written down with the
-command that gave it (`world`'s `diagnostics pasture` and `throughput`).
+command that gave it (`world`'s `tilesim world pasture` and `throughput`).
 A number in the docs names its command. While the renderer or another run
 is on the machine, times are skewed: the instructions counted
 (`perf stat -e instructions:u`) are not.
