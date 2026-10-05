@@ -19,7 +19,7 @@ fn keepers(world: &World) -> Vec<SuperchunkIndex> {
 
 /// A flock wandering off its origin for 6,000 ticks, or as many as it takes a halo to move: after every tick
 /// the superchunks hot and not cooling, or warming, are the halos about
-/// the sheep, never both; every one warming turns hot, if still wanted,
+/// the sheep, never both; every one warming turns hot, wanted still or not,
 /// and every one cooling cold, when due; every superchunk ever made is hot or cold and
 /// never both; and the world has grown.
 #[test]
@@ -36,22 +36,25 @@ fn the_hot_superchunks_are_the_halos() {
         let cooling: Vec<(SuperchunkIndex, u64)> = world.cooling().collect();
         assert!(cooling.iter().all(|(superchunk, _)| hot.binary_search(superchunk).is_ok()), "cooling, hot still");
         let staying = hot.iter().filter(|superchunk| cooling.binary_search_by_key(superchunk, |(cooling, _)| cooling).is_err());
-        let mut halos: Vec<SuperchunkIndex> = staying.copied().chain(warming.iter().map(|&(superchunk, _)| superchunk)).collect();
+        // A warming is never given up: one its halo has left is warming still, and no halo's.
+        let wanted = about(keepers(&world).into_iter());
+        let mut halos: Vec<SuperchunkIndex> = staying.copied().chain(warming.iter().map(|&(superchunk, _)| superchunk).filter(|superchunk| wanted.binary_search(superchunk).is_ok())).collect();
         halos.sort_unstable();
-        assert_eq!(halos, about(keepers(&world).into_iter()), "hot and not cooling, or warming, never both");
+        assert!(warming.iter().all(|(superchunk, _)| hot.binary_search(superchunk).is_err()), "warming, not hot yet");
+        assert_eq!(halos, wanted, "hot and not cooling, or warming, never both");
         let now = world.entities.now();
         let within = |due: &[(SuperchunkIndex, u64)], ticks: u64| due.iter().all(|&(_, due)| due > now && due <= now + ticks);
         assert!(within(&warming, WARM_TICKS) && within(&cooling, COOL_TICKS), "each due within its time");
         assert!(hot.iter().all(|superchunk| !world.cold.contains_key(superchunk)), "hot or cold, never both");
         assert_eq!(world.storage.superchunks().count(), hot.len() + world.cold.len(), "every superchunk made, hot or cold");
     }
-    // One reached may be left again while still warming, and so never loaded: no more loaded than reached.
-    assert!(moved.generated > 0 && moved.reached >= moved.generated + moved.restored + world.warming().count(), "the halos moved, none loaded unreached: {moved:?}");
+    // Every one reached turned hot, or is warming still: none is given up.
+    assert!(moved.generated > 0 && moved.reached == moved.generated + moved.restored + world.warming().count(), "the halos moved, every one reached made hot: {moved:?}");
 }
 
 /// A superchunk a halo reaches is warming for its time: a write to it is
 /// missed and an entity put there lost, until it turns hot at the tick
-/// it is due -- if it is still wanted then -- and then both hold.
+/// it is due -- still wanted or not -- and then both hold.
 #[test]
 fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
     let mut world = world::generate(crate::land_seed(1), 4_000);
@@ -61,23 +64,18 @@ fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
         world.entities.queue_put(Header { id: EntityId(u64::MAX), kind: EntityType(99), at: cell, wake: NEVER }, &[]);
         (missed, world.entities.apply().lost)
     };
-    // A warming followed to the tick it is due: one left before then -- its sheep gone back -- never turns hot, and the next is followed.
-    let cell = loop {
-        while world.warming().next().is_none() {
-            assert!(world.entities.now() < 20_000, "the halos moved");
-            world.tick();
-        }
-        let (superchunk, due) = world.warming().next().expect("one warming");
-        let cell = superchunk.chunks().next().expect("a chunk").top_left();
-        assert_eq!(try_both(&mut world, cell), (1, 1), "warming: the write missed, the entity lost");
-        while world.entities.now() < due {
-            assert!(world.arena.superchunk_indices().binary_search(&superchunk).is_err(), "not hot before it is due");
-            world.tick();
-        }
-        if world.arena.superchunk_indices().binary_search(&superchunk).is_ok() {
-            break cell;
-        }
-    };
+    while world.warming().next().is_none() {
+        assert!(world.entities.now() < 60_000, "the halos moved");
+        world.tick();
+    }
+    let (superchunk, due) = world.warming().next().expect("one warming");
+    let cell = superchunk.chunks().next().expect("a chunk").top_left();
+    assert_eq!(try_both(&mut world, cell), (1, 1), "warming: the write missed, the entity lost");
+    while world.entities.now() < due {
+        assert!(world.arena.superchunk_indices().binary_search(&superchunk).is_err(), "not hot before it is due");
+        world.tick();
+    }
+    assert!(world.arena.superchunk_indices().binary_search(&superchunk).is_ok(), "hot when due, its halo there still or gone");
     assert_eq!(try_both(&mut world, cell), (0, 0), "hot: both hold");
 }
 
@@ -102,7 +100,8 @@ fn a_superchunk_cooling_stays_hot_until_due() {
     while world.entities.now() < due - COOL_TICKS / 2 {
         world.tick();
     }
-    world.entities.queue_put(Header { wake: sheep.0.wake.max(world.entities.now()), ..sheep.0 }, &sheep.1);
+    // Back asleep over the tick that follows: awake, it might step over an edge and move its halo.
+    world.entities.queue_put(Header { wake: sheep.0.wake.max(world.entities.now() + 2), ..sheep.0 }, &sheep.1);
     world.entities.apply();
     let back = world.tick().halos;
     assert!(back == HaloChange::default() && world.cooling().next().is_none() && world.arena.superchunk_indices() == halo, "the sheep back: the halo hot as it was, nothing made");

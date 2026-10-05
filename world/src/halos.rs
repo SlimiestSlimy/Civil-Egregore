@@ -19,7 +19,9 @@
 //!   the room: the image rewritten in the background, the bitmaps held
 //!   until it is in the cold pool.
 //! - A superchunk a halo reaches, not hot, is **warming** for
-//!   [`WARM_TICKS`] ticks: lingering, it is kept to be made hot as it is;
+//!   [`WARM_TICKS`] ticks, and nothing stops it: its halo gone again, it
+//!   turns hot when due all the same, and is cooling from then.
+//!   Lingering, it is kept to be made hot as it is;
 //!   else its image -- generated, if it was never made -- is decoded in
 //!   the background. It turns hot at the tick it is due, waiting for the
 //!   background if need be, so the world is the same however fast the
@@ -28,7 +30,8 @@
 //!   they stood. So is a superchunk lingering.
 //!
 //! So between ticks the hot superchunks are the halos less those
-//! warming, and besides them those cooling.
+//! warming, and besides them those cooling; and one may be warming
+//! that no halo reaches any more.
 
 use crate::background::{Done, Job, Ticket};
 use crate::World;
@@ -129,7 +132,12 @@ impl World {
     /// What generating and loading start from; between two ticks,
     /// anything else needing superchunks hot a while may ask too.
     pub fn keep_hot(&mut self, wanted: &[SuperchunkIndex]) -> HaloChange {
-        self.make_hot_within(wanted, 0, 0)
+        let mut change = self.make_hot_within(wanted, 0, 0);
+        // One that was warming and is not wanted turned hot, as every warming does: cold now.
+        if !self.cooling.is_empty() {
+            change += self.make_hot_within(wanted, 0, 0);
+        }
+        change
     }
 
     /// The superchunks warming, each with the tick it turns hot at.
@@ -144,9 +152,11 @@ impl World {
 
     /// Makes `wanted` -- sorted -- the superchunks hot or warming, each
     /// warming hot within `warm_ticks`, each other one hot cold within
-    /// `cool_ticks`: those no longer wanted no longer warming, and those
-    /// wanted again no longer cooling; then every one due made hot, or
-    /// cold.
+    /// `cool_ticks`, and those wanted again no longer cooling; then
+    /// every one due made hot, or cold. A warming is never given up:
+    /// one no longer wanted turns hot when it is due all the same, and
+    /// is cooling from then -- so a superchunk's warming is one thing,
+    /// whenever a save falls in it.
     fn make_hot_within(&mut self, wanted: &[SuperchunkIndex], warm_ticks: u64, cool_ticks: u64) -> HaloChange {
         self.land_write_backs(false);
         let (now, mut change) = (self.entities.now(), HaloChange::default());
@@ -168,12 +178,6 @@ impl World {
             }
             change.cooled += 1;
         }
-        for unwanted in self.warming.extract_if(.., |warming| wanted.binary_search(&warming.superchunk).is_err()) {
-            match unwanted.from {
-                WarmedFrom::Lingering => self.arena.let_go(unwanted.superchunk),
-                WarmedFrom::Background(ticket) => self.background.forget(ticket),
-            }
-        }
         self.warming.iter_mut().for_each(|warming| warming.due = warming.due.min(now + warm_ticks));
         for &superchunk in wanted.iter().filter(|superchunk| hot.binary_search(superchunk).is_err()) {
             if self.warming.binary_search_by_key(&superchunk, |warming| warming.superchunk).is_err() {
@@ -187,6 +191,11 @@ impl World {
         }
         for warming in &due {
             self.finish_warming(warming, &mut change);
+            // One no halo reaches any more turned hot all the same, and is cooling from now.
+            if wanted.binary_search(&warming.superchunk).is_err() {
+                let at = self.cooling.binary_search_by_key(&warming.superchunk, |&(cooling, _)| cooling).expect_err("not hot till now");
+                self.cooling.insert(at, (warming.superchunk, now + cool_ticks));
+            }
         }
         let now_hot = self.arena.superchunk_indices();
         self.entities.align(&now_hot);

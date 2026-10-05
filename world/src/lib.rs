@@ -23,8 +23,8 @@ pub use tick::{tick_rules, TickCounts, WorldTick};
 use background::{Background, Ticket};
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
-use chunk_storage::{ChunkStorage, Height, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
-use worldgen::{Shape, Terrain, WALLS, WATER};
+use chunk_storage::{ChunkMaps, ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
+use worldgen::{Shape, Terrain, WALLS, WET};
 use chunk_storage::mock::GRASS;
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
 use mc_rules::trees::{OLDEST, TREE, TREE_STAGE};
@@ -138,7 +138,7 @@ impl World {
 /// and the walls'.
 /// Dirt has none: it is a cell with nothing on it.
 fn layer_types() -> Vec<LayerType> {
-    [GRASS, TREE, TREE_STAGE.layer_type()].into_iter().chain(WATER).chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
+    [GRASS, TREE, TREE_STAGE.layer_type(), WET].into_iter().chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
 }
 
 /// A world made from `seed`: its origin superchunk ([`WORLD_MIDDLE`])
@@ -203,22 +203,22 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
     let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     let trees_seed = seed ^ TREES_SALT;
     let (grass_under, trees_under) = (generation.grass.threshold(seed), generation.trees.threshold(trees_seed));
-    // The planes generated, each a bitmap a chunk: grass, trees, their stage's four, and the water's eight.
+    // The planes generated, each a bitmap a chunk: grass, trees, their stage's four, and the cells under water.
     let mut planes = vec![GRASS, TREE];
     planes.extend(TREE_STAGE.layer_type().planes());
-    let water = planes.len();
-    planes.extend(WATER);
+    let wet = planes.len();
+    planes.push(WET);
+    // The ocean wherever the ground is under its level, as deep as it is lower.
+    let depth_at = |place: usize| generation.shape.ocean.saturating_sub(terrain.height(place));
     let mut cells = vec![[0u64; bitmap::WORDS]; planes.len() * CHUNKS_IN_SUPERCHUNK];
     for place in 0..CHUNKS_IN_SUPERCHUNK * CELLS_IN_CHUNK {
         let (x, y) = cartesian_from_place(place);
         let (x, y) = (left + x, top + y);
         let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
         let mut set = |plane: usize| cells[plane * CHUNKS_IN_SUPERCHUNK + chunk][cell / bitmap::BITS_PER_WORD] |= 1 << (cell % bitmap::BITS_PER_WORD);
-        // The ocean wherever the ground is under its level, as deep as it is lower: nothing grows under it.
-        // No deeper than its eight bits tell.
-        let depth = generation.shape.ocean.saturating_sub(terrain.height(place)).min(u8::MAX as Height);
-        if depth > 0 {
-            (0..WATER.len()).filter(|bit| depth >> bit & 1 == 1).for_each(|bit| set(water + bit));
+        // Nothing grows under water.
+        if depth_at(place) > 0 {
+            set(wet);
             continue;
         }
         if generation.grass.number(seed, x, y) < grass_under {
@@ -242,7 +242,7 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
         }
     }
     let changes: Vec<LayerChange> = layers.iter().map(|(place, layer_type, words)| LayerChange { place: *place, layer_type: *layer_type, encoded: words }).collect();
-    SuperchunkImage::new(&terrain.heights).rewritten(&changes)
+    SuperchunkImage::new(&terrain.heights).with_water(&ChunkMaps::from_numbers(depth_at)).rewritten(&changes)
 }
 
 /// Saves `world` in `folder`, made if not there -- between two ticks.

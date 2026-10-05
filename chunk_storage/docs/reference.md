@@ -34,6 +34,15 @@ none where no cell is set. **`decode(words, cells)`**: the bitmap whose stream s
 checked to be an image (**`check_chunk`** each chunk: a table that fits,
 types sorted one a type, offsets inside the chunk and apart), else
 **`InvalidImage`**. **`words`**, **`height_words`**, **`height`**.
+**`with_water(depths)`**: the image with `ChunkMaps` its water's;
+**`water_words`**, **`depth(place)`**.
+
+## `chunk_maps.rs`
+
+**`ChunkMaps`**: a number a cell, a map only for the chunks with one
+not 0, wide (16 bits a cell) if one is over 255, else a byte a cell
+(`MAP_WORDS` words). **`from_numbers(number_at)`**, **`get(place)`**,
+**`words`**; **`number_in(words, place)`**, **`words_of(words)`**.
 **`layer(chunk, type)`**: an encoded layer's words, from its first to its
 chunk's end. **`layer_types(chunk)`**. **`rewritten(changes)`**: a new
 image with **`LayerChange`**s made in order, a later one to a layer

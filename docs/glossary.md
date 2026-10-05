@@ -29,12 +29,11 @@ what they always do and are not listed.
 | **Morton order** | the order of Morton indices: work is done and written in it, so memory is read forwards | sampling, wake | |
 | **height** | a cell's height, 16 bits, 0 to 65,535, from the seed alone (`worldgen::height`) | wall, height map, floor, vertex | elevation |
 | **dirt** | a cell with nothing on it: no layer of its own | grass | ground |
-| **water** | how deep water stands over a cell's ground, 0 none: a level over eight bitplanes (`worldgen::WATER`) | level, ocean | |
+| **water** | how deep water stands over a cell's ground, 0 none: kept in the superchunk's image (`SuperchunkImage::depth`), a map only for the chunks with water -- a byte a cell, 16 bits where it is deeper than 255 (`ChunkMaps`); and the cells under any, a bitplane the rules read (`worldgen::WET`) | height map, ocean | level |
 | **ocean** | the water at one height all over the world (`Shape::ocean`): the land under it is its floor | water, island, vertex | sea |
 | **island** | land about land vertices that are joined, the ocean about it | ocean, vertex | continent |
 | **tree** | a cell set in the layer `TREE`, with a **stage** | stage, patches | |
-| **stage** | how old a tree is, 0 to 15: a number kept over four bitplanes (`TREE_STAGE`), a bit each | tree, level | age, growth |
-| **level** | a number a cell holds over several bitplanes, the lowest bit first (`Turn::level`): the water's depth, until it is a wide plane | wide plane, bitplane | |
+| **stage** | how old a tree is, 0 to 15: a number kept over four bitplanes (`TREE_STAGE`), a bit each | tree | age, growth |
 | **wide plane** | a bitplane of 2, 4, 8 or 16 bits a cell, a cell's number held together where it is hot and read or written whole (`Wide<W>`, `Turn::value`); cold, a layer a bit | width, value, level | multi-bit plane |
 | **width** | the bits a cell of a plane, in the plane's type: `Bits2`, `Bits4`, `Bits8`, `Bits16` | wide plane | |
 | **value** | the number a cell of a wide plane holds | wide plane | |
@@ -66,7 +65,7 @@ what they always do and are not listed.
 | **cold state** | a cold superchunk's entities and random numbers, kept as a save keeps them (`World::cold`) | cold, save | |
 | **lingering** | a superchunk gone cold, done cooling -- to the simulation, cold like any other -- whose bitmaps the arena keeps as they were, until chunk storage holds its changes -- made hot again as it is if a halo reaches it before then (`BitmapArena::make_cold_superchunk`) | cold, warming, write back | |
 | **cooling** | a hot superchunk no halo reaches any more: hot still to the simulation, it goes cold at the tick it is due, `COOL_TICKS` on -- or stays hot if a halo reaches it again before; so a keeper stepping to and fro over an edge makes nothing flicker | hot, halo, warming, lingering | unloading |
-| **warming** | a superchunk a halo reached, not hot yet: made ready in the background, it turns hot at the tick it is due, `WARM_TICKS` on; until then, to the simulation, it is cold like any other | hot, halo, background, cooling, lingering | loading, pending |
+| **warming** | a superchunk a halo reached, not hot yet: made ready in the background, it turns hot at the tick it is due, `WARM_TICKS` on, whether a halo still reaches it or not -- a warming is never given up; until then, to the simulation, it is cold like any other | hot, halo, background, cooling, lingering | loading, pending |
 | **background** | the threads doing the slow work off the tick: encoding the write-backs of superchunks gone cold, rewriting images with the changes flushed, generating and decoding superchunks warming (`world::background`) | warming, lingering | worker, loader |
 | **hot file** | a save's file naming its hot superchunks, and its cooling and warming ones with their due ticks (`HotSuperchunks`): made hot before a loaded world ticks | save, hot, cooling, warming | |
 | **shared image** | an image in the cold pool held behind a reference count, so a thread reads it as it was while the pool changes (`ChunkStorage::shared_image`) | image, background | |
@@ -175,7 +174,6 @@ what they always do and are not listed.
 |---|---|---|---|
 | **Tessera** | the lossless encoding of a bitmap: a project of its own (`tessera/`) | layer codec | |
 | **stream** | the bits Tessera writes (`BitStream`) | | |
-| **level** | a Tessera tile's size: 0 the whole bitmap, 8 one cell, each half the side of the one before | tile | scale (the simulation's, the other way round) |
 | **floor** | Tessera's 4x4 tiles, the finest its tree holds a node at; a **floor tile** is one of them | tile, last pass | block |
 | **floor plan** | the floor tiles the tree leaves to the last pass: each a copy covers, with its source, and each residual one (`FloorPlan`) | floor, last pass | block plan |
 | **tree** | Tessera's quadtree of the bitmap: tiles, complex tiles and copies (`Tree`) | node, tile | |

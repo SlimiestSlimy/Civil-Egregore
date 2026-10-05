@@ -20,9 +20,9 @@
 
 use bitplane_manager::BucketKey;
 use chunk_storage::mock::GRASS;
-use chunk_storage::LayerType;
+use chunk_storage::{LayerType, SuperchunkImage};
 use coordinates::{square_side, CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE, WORLD_SIDE_SUPERCHUNKS};
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -32,7 +32,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use crate::{lab, tuning};
 use mc_rules::trees::{TREE, TREE_STAGE};
-use worldgen::WATER;
+use worldgen::WET;
 use world::World;
 use utilities::rng::Rng;
 
@@ -166,7 +166,7 @@ pub struct Cells {
     /// The low four bits of the water's depth, a bitplane a bit, each
     /// laid out as the grass.
     pub depths: [Vec<u64>; 4],
-    /// The cells with water [`DEEP`] deep or more: any higher bit set.
+    /// The cells with water [`DEEP`] deep or more.
     pub deep: Vec<u64>,
     /// The cells its sheep stand on, `(x, y)` from its top left.
     pub sheep: Vec<(u16, u16)>,
@@ -249,7 +249,7 @@ fn run(superchunks: u32, flock: usize, mode: Mode, asked: &Receiver<Request>, an
     let mut generation = tuning::generation();
     let mut world = made(mode, &shown, flock);
     // The superchunks whose heights a frame has carried.
-    let mut sent = HashSet::new();
+    let mut sent = HashMap::new();
     let started = Instant::now();
     let (mut paused, mut pace, mut tick) = (false, Some(TARGET_PACE), 0u64);
     let mut census = census(superchunks, flock, mode);
@@ -360,7 +360,7 @@ fn count(world: &World, layer_type: LayerType) -> u64 {
 
 /// The superchunks of `world` that `ask` asks for, copied: each one's
 /// grass, words as they are, and its sheep's cells.
-fn copy(world: &World, ask: Ask, sent: &mut HashSet<SuperchunkIndex>) -> Vec<Cells> {
+fn copy(world: &World, ask: Ask, sent: &mut HashMap<SuperchunkIndex, Water>) -> Vec<Cells> {
     let mut copied = Vec::new();
     for (x, y) in ask.asked() {
         let superchunk = SuperchunkIndex::from_cartesian(x, y);
@@ -369,17 +369,50 @@ fn copy(world: &World, ask: Ask, sent: &mut HashSet<SuperchunkIndex>) -> Vec<Cel
         let hot = world.entities.superchunk(superchunk).is_some();
         let planes = |layer_type: LayerType| if hot { layer(world, layer_type, superchunk) } else { Vec::new() };
         let sheep = if hot { sheep(world, superchunk) } else { Vec::new() };
-        // The water's depth to its low four bits, and whether any above is set: past that it is drawn the same.
-        let (low, high) = WATER.split_at(DEEP.trailing_zeros() as usize);
-        let or = |all: Vec<u64>, plane: &Vec<u64>| if all.is_empty() { plane.clone() } else { all.iter().zip(plane).map(|(all, plane)| all | plane).collect() };
-        let depths: [Vec<u64>; 4] = std::array::from_fn(|bit| planes(low[bit]));
-        let deep = high.iter().map(|&plane| planes(plane)).fold(Vec::new(), |all, plane| or(all, &plane));
-        let wet = depths.iter().fold(deep.clone(), or);
-        // Heights never change: sent the once, in the first frame the superchunk is hot in.
-        let heights = if hot && sent.insert(superchunk) { world.storage.image(superchunk).map_or(Vec::new(), |image| image.height_words().to_vec()) } else { Vec::new() };
+        // Heights never change: sent the once, in the first frame the superchunk is hot in. Nor does the water's depth, read off the image then and kept.
+        let image = world.storage.image(superchunk).filter(|_| hot && !sent.contains_key(&superchunk));
+        let heights = image.map_or(Vec::new(), |image| image.height_words().to_vec());
+        if hot {
+            sent.entry(superchunk).or_insert_with(|| Water::of(image));
+        }
+        let Water { depths, deep } = sent.get(&superchunk).filter(|_| hot).cloned().unwrap_or_default();
+        let wet = planes(WET);
         copied.push(Cells { at: (x, y), hot, heights, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages: planes(TREE_STAGE.layer_type()), wet, depths, deep, sheep });
     }
     copied
+}
+
+/// A superchunk's water as it is drawn, off its image: kept for every
+/// superchunk whose heights were sent.
+#[derive(Clone, Default)]
+struct Water {
+    /// The low four bits of its depth, a bitplane a bit, laid out as
+    /// the grass.
+    depths: [Vec<u64>; 4],
+    /// The cells [`DEEP`] deep or more.
+    deep: Vec<u64>,
+}
+
+impl Water {
+    /// The water of `image`: none of none, and of one with no water.
+    fn of(image: Option<&SuperchunkImage>) -> Self {
+        let words = CHUNKS_IN_SUPERCHUNK * CHUNK_WORDS;
+        let mut water = Self { depths: std::array::from_fn(|_| vec![0; words]), deep: vec![0; words] };
+        let Some(image) = image else {
+            return water;
+        };
+        for place in 0..words * u64::BITS as usize {
+            let (depth, word, bit) = (image.depth(place) as u32, place / u64::BITS as usize, place % u64::BITS as usize);
+            if depth >= DEEP {
+                water.deep[word] |= 1 << bit;
+                continue;
+            }
+            for (plane, depths) in water.depths.iter_mut().enumerate() {
+                depths[word] |= ((depth >> plane & 1) as u64) << bit;
+            }
+        }
+        water
+    }
 }
 
 /// `superchunk`'s cells of `layer_type`: its chunks' words, one chunk

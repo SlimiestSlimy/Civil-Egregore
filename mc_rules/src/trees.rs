@@ -22,7 +22,7 @@ use bitplane_manager::{Write, WriteOp};
 use chunk_storage::{Bits4, LayerType, Wide};
 use coordinates::CellIndex;
 use simulation::Turn;
-use worldgen::WATER;
+use worldgen::WET;
 use std::ops::AddAssign;
 
 /// The cells a tree stands on.
@@ -116,7 +116,7 @@ fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) -> bool {
         return false;
     };
     // No tree under water.
-    if matches!(turn.level(WATER, onto), Ok(1..)) {
+    if turn.holds(WET, onto) == Ok(true) {
         return false;
     }
     turn.queue(TREE, Write::cell(onto, WriteOp::Set));

@@ -123,9 +123,12 @@ for a cell. Land costs more than ocean, which no finer mesh touches.
 To come: ridges and canyons as chains of lines; true subdivision of a
 triangle into its own smaller ones; noise for the ground's detail.
 
-**Water** is a depth a cell: how far it stands over the ground, 0 none,
-eight bits over eight bitplanes (`WATER`) -- the ocean deeper than 255
-is kept as 255. Nothing grows or spreads under water. Water does not
+**Water** is a depth a cell: how far it stands over the ground, 0
+none, as deep as the ocean is. It is kept in the superchunk's image beside the heights
+(`SuperchunkImage::depth`), sparse by chunk: a map only for the chunks
+with water, a byte a cell, or 16 bits a cell where it is deeper than
+255 (`chunk_storage::ChunkMaps`). The rules ask only whether a cell is under
+any, of one bitplane (`WET`). Nothing grows or spreads under water. Water does not
 move yet.
 
 The height map keeps a floor a chunk and a byte a cell over it; only a
