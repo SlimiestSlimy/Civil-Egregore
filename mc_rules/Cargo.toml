@@ -1,7 +1,7 @@
 [package]
 name = "mc_rules"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "TileSim's Monte Carlo rules of the cells, a file each: so far grass spreading over dirt"
 publish = false
 

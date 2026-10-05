@@ -1,4 +1,4 @@
-//! The server's commands ([`COMMANDS`]), run by `tilesim server <command>`
+//! The server's commands ([`COMMANDS`]), run by `Civil_Egregore server <command>`
 //! (`utilities::commands::program`): a world made in a folder -- a plain
 //! name one of the worlds' folder (`utilities::settings::world`), anything
 //! more a path -- run and looked at, each

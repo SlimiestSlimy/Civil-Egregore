@@ -7,7 +7,7 @@
 //! queues -- is the
 //! simulation's (`entity_manager/src/`), and knows no kind of
 //! entity. What each kind *does* is here, and knows no other rule: the
-//! game (`src/`, `tilesim`) ticks them together with the rules of the
+//! game (`src/`, `Civil_Egregore`) ticks them together with the rules of the
 //! cells.
 //!
 //! | module | entity |

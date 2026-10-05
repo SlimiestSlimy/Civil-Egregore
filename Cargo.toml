@@ -1,9 +1,10 @@
 [package]
-name = "tilesim"
-version = "0.1.0"
-edition = "2021"
-description = "TileSim, a 2D procedural simulation game: the program"
-publish = false
+name = "Civil_Egregore"
+version = "0.5.0"
+edition = "2024"
+description = "Nudges to Civilization."
+authors = ["SlimiestSlimy", "Opus 5.5 high"]
+repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 
 [dependencies]
 server = { path = "server" }
@@ -11,17 +12,17 @@ tessera = { path = "tessera" }
 utilities = { path = "utilities" }
 
 [features]
-# The machine's settings file is neither read nor written: the settings are the default ones.
+# `--features default_settings`: run on the built-in defaults
+# (`utilities/default_settings.csv`), ignoring the machine's `settings.csv`.
 default_settings = ["utilities/default_settings"]
 
-# Every crate of TileSim, built together: one lock file and one `target/`
+# Every crate of Civil Egregore, built together: one lock file and one `target/`
 # for them all, here, whichever crate's folder cargo is run from.
 # `cargo test` here tests every one but the renderer, which brings Bevy:
 # `cargo run --release -p renderer` for that. Tessera's external
 # benchmarks stay a workspace of their own, so the codecs they compare
 # against never enter this build.
 [workspace]
-resolver = "2"
 members = [
     "bitmap",
     "bitplane_manager",

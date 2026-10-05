@@ -5,8 +5,8 @@
 //! programs. It lists them as [`Command`]s, each with the
 //! [`Parameter`]s it takes -- a name and what it is if not given --
 //! and [`dispatch`] runs the one the first word names. The one program,
-//! `tilesim`, is a list of the [`Crate`]s with commands handed to
-//! [`program`]: it knows nothing of a crate's tools, and `tilesim help`
+//! `Civil_Egregore`, is a list of the [`Crate`]s with commands handed to
+//! [`program`]: it knows nothing of a crate's tools, and `Civil_Egregore help`
 //! prints every command of every crate from the lists themselves.
 //!
 //! A parameter is declared once: its default is what the usage table

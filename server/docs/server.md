@@ -31,7 +31,7 @@ the simulation's (`../../simulation/docs/simulation.md`, "Halos"): the
 world lends them what it holds (`World::with_halos`) and tells them
 two things. The hot entity (`HOT_ENTITY`): people, to come; for now
 the sheep stand in. And the world's size, if it has one
-(`generate_sized`, `tilesim server new <folder> [seed] [sheep]
+(`generate_sized`, `Civil_Egregore server new <folder> [seed] [sheep]
 [side]`): so many superchunks along a side, a square about the origin,
 nothing ever made outside it; a save keeps it. What generates a
 superchunk never made is the server's, handed to the halos' jobs.
@@ -106,7 +106,7 @@ to tick 4,000: the same cells, entities and random numbers). What makes it so:
   its superchunk was cold -- wakes the tick it is put back.
 
 Most of a save is heights, kept raw, about a byte a cell; the layers
-and the entities are each a fraction of that (`tilesim server new`
+and the entities are each a fraction of that (`Civil_Egregore server new`
 says the bytes written).
 
 Not yet: superchunks no longer in the world are not removed from a

@@ -9,7 +9,7 @@
 //! | `measured.rs` | bits, cells set and encode time over many bitmaps |
 //! | `tree_stats.rs` | what a tree holds: tiles, complex tiles and their payloads, nodes naming children, cell lists |
 //! | `census.rs` | a tree's nodes, by kind and level |
-//! | `tool/` | the tools, functions `tilesim tessera` runs: one tool a file, printing and keeping what the files here gather |
+//! | `tool/` | the tools, functions `Civil_Egregore tessera` runs: one tool a file, printing and keeping what the files here gather |
 //! | `adversarial/` | searches for the bitmaps Tessera does worst on, by any score, and the PBM worst bitmaps and saved bitmaps they leave |
 //! | `bitmaps.rs` | the bitmaps a diagnostic looks at by name: adversarial worst bitmaps, saved bitmaps, one named by the caller |
 //! | `png.rs` | a bitmap as a PNG image |

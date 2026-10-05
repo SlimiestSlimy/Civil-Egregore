@@ -24,7 +24,7 @@ sliders its generation is tuned by.
 | [`docs/performance.md`](docs/performance.md) | what measuring TileSim has shown, and each optimization kept or thrown away: where memory takes over from the processor, what a tick is made of |
 | [`docs/testing_protocol.md`](docs/testing_protocol.md) | how TileSim is tested: diagnostics, tests and tools apart, and three tiers of test -- fine, fast, complete |
 | [`docs/tilesim.md`](docs/tilesim.md) | what TileSim is, and every decision about it so far: chunks, superchunks, layers, the simulation's plan |
-| [`src/`](src/) | the `tilesim` crate: the program, which is only the list of crates with commands -- `cargo run --release -- help` |
+| [`src/`](src/) | the `Civil_Egregore` crate: the program, which is only the list of crates with commands -- `cargo run --release -- help` |
 | [`server/`](server/) | the world as a whole: made from a seed, ticked -- rules and entities together -- saved and loaded as a folder whose name is the world's; which entity keeps the world hot; its commands and its diagnostics tools |
 | [`mc_rules/`](mc_rules/) | the Monte Carlo rules of the cells, a file each: grass over dirt, and trees |
 | [`entity_manager/`](entity_manager/) | the entities as kept, beside the bitplane manager's cells: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied |
