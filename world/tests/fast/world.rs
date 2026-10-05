@@ -62,24 +62,25 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
 }
 
 /// A world saved and loaded again and again mid run -- once while a
-/// superchunk is warming -- is, at a tick agreed, the world that ran
+/// superchunk is warming, always -- is, at a tick agreed, the world that ran
 /// straight to it: every cell, every entity, every random number.
 #[test]
 fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
-    const UNTIL: u64 = 4_000;
+    // At least 4,000 ticks, and on until a superchunk has been warming: on some seeds the flock is long in nearing an edge.
     let mut straight = world::generate(crate::land_seed(0), 4_000);
     let mut warming = None;
-    while straight.entities.now() < UNTIL {
+    while straight.entities.now() < 4_000 || warming.is_none() {
+        assert!(straight.entities.now() < 60_000, "a superchunk warming on the way");
         straight.tick();
         if warming.is_none() && straight.warming().next().is_some() {
             warming = Some(straight.entities.now());
         }
     }
-    let warming = warming.expect("a superchunk warming on the way");
+    let (warming, until) = (warming.expect("seen above"), straight.entities.now());
 
     let folder = folder("mid_run");
     let mut stopped = world::generate(crate::land_seed(0), 4_000);
-    let mut stops = vec![1, 700, 701, 1_900, 3_333, warming, UNTIL];
+    let mut stops = vec![1, 700, 701, 1_900, 3_333, warming, until];
     stops.sort_unstable();
     stops.dedup();
     for stop in stops {
@@ -92,7 +93,7 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
         assert_eq!(stopped.info.tick, stop);
     }
     assert!(straight.entities.len() > 4_000, "{} sheep: a flock that bred", straight.entities.len());
-    assert!(everything(&straight) == everything(&stopped), "the same at tick {UNTIL}");
+    assert!(everything(&straight) == everything(&stopped), "the same at tick {until}");
 }
 
 /// A save is a folder: a world file and a hot file in text, and two
