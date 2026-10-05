@@ -156,9 +156,12 @@ fn page() -> Option<Group> {
     }
 }
 
-/// The numbers of `group`, by their places in [`NAMES`], a row each.
+/// The numbers of `group`, by their places in [`NAMES`], a row each,
+/// in the order the sliders' file has them.
 fn rows(group: Group) -> impl Iterator<Item = usize> {
-    (0..NAMES.len()).filter(move |&index| tuned(index).group == group)
+    let mut rows: Vec<usize> = (0..NAMES.len()).filter(|&index| tuned(index).group == group).collect();
+    rows.sort_unstable_by_key(|&index| tuned(index).line);
+    rows.into_iter()
 }
 
 /// The groups the menu lists: those of generation only in the lab.

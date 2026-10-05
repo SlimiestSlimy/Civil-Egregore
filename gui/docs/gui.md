@@ -55,10 +55,13 @@ does is said beside it (`Tuned::what`).
 
 Neither is made by a program. `sliders.txt`, here at the crate's root:
 a line a slider -- its number's name, the least and the most its knob
-reaches, its group, and what it does. `utilities/default_settings.txt`:
+reaches, its group, and what it does; a group's sliders are shown in
+their lines' order. `utilities/default_settings.txt`:
 what each number is unless set. Both are built into the program;
 `src/tuning.rs` has only the numbers' names and places, and a test
-holds the two files to them.
+holds the two files to them. Lines are found by name, in whatever
+order they come: the places are how the code reads a number, nothing
+more.
 
 ## Options
 
