@@ -1,26 +1,25 @@
-//! The commands ([`COMMANDS`]): the program's own, each given the rest
-//! of the command line after its folder and giving the line to print --
-//! or why it could not -- and each crate's diagnostics tools, reached by
-//! the crate's name ([`dispatch`]).
+//! The world's commands ([`COMMANDS`]), run by `tilesim world <command>`
+//! ([`dispatch`]): a world made in a folder, run and looked at -- each
+//! given the rest of the command line after its folder and giving the
+//! line to print, or why it could not -- and the diagnostics tools
+//! ([`crate::diagnostics::tool`]).
 
+use crate::diagnostics::tool::{pasture, throughput, FLOCK, GRASS as GRASS_SHARE, SUPERCHUNKS, THREADS, TICKS};
+use crate::HaloChange;
 use chunk_storage::disk;
 use chunk_storage::mock::GRASS;
 use std::path::Path;
 use std::time::Instant;
 use utilities::commands::{Command, Given, Parameter};
-use world::HaloChange;
 
-/// The program's name: what its commands are reached by.
-const CALLED: &str = "tilesim";
+/// How the commands are reached on the command line.
+const CALLED: &str = "tilesim world";
 
 /// A world's folder.
 const FOLDER: &str = "folder";
-/// A crate's tool, and what the tool takes: handed on as given.
-const TOOL: &str = "tool, and what it takes";
 
-/// The program's commands: its own, and each crate's tools, reached by
-/// the crate's name and handed the rest of the line as it is -- which
-/// tools a crate has, and what they take, is the crate's to know.
+/// The world's commands: a world made, run and looked at, and its
+/// diagnostics tools.
 pub const COMMANDS: [Command; 5] = [
     Command {
         name: "new",
@@ -30,12 +29,21 @@ pub const COMMANDS: [Command; 5] = [
     },
     Command { name: "run", does: "loads the world in the folder, ticks it, and saves it", parameters: &[Parameter::new(FOLDER, ""), Parameter::new("ticks", "10000")], run: |given| printed(given, run) },
     Command { name: "info", does: "says what the world in the folder is", parameters: &[Parameter::new(FOLDER, "")], run: |given| printed(given, |folder, _| info(folder)) },
-    Command { name: "world", does: "the world's diagnostics tools; none named, they are listed", parameters: &[Parameter::new(TOOL, "")], run: |given| world::diagnostics::tool::dispatch(given.arguments()) },
-    Command { name: "tessera", does: "Tessera's diagnostics tools; none named, they are listed", parameters: &[Parameter::new(TOOL, "")], run: |given| tessera::diagnostics::tool::dispatch(given.arguments()) },
+    Command {
+        name: "throughput",
+        does: "ticks grass flat out: each phase's time, the writes a second, the memory held",
+        parameters: &[Parameter::new(TICKS, "500"), Parameter::new(GRASS_SHARE, "333"), Parameter::new(SUPERCHUNKS, "16"), Parameter::new(THREADS, "0")],
+        run: throughput,
+    },
+    Command {
+        name: "pasture",
+        does: "ticks grass and sheep flat out: the flock, what the sheep did, each rule's time, the memory held",
+        parameters: &[Parameter::new(TICKS, "2000"), Parameter::new(GRASS_SHARE, "333"), Parameter::new(FLOCK, "4000"), Parameter::new(SUPERCHUNKS, "16"), Parameter::new(THREADS, "0")],
+        run: pasture,
+    },
 ];
 
-/// Does what `arguments`, the command line after the program's name,
-/// asks: the command its first word names, given the rest.
+/// Runs the command the first of `arguments` names, given the rest.
 pub fn dispatch(arguments: &[&str]) -> Result<(), String> {
     utilities::commands::dispatch(CALLED, &COMMANDS, arguments)
 }
@@ -60,17 +68,17 @@ pub fn new(folder: &Path, rest: &[&str]) -> Result<String, String> {
         return Err(format!("{} is a world already", folder.display()));
     }
     let name = rest.first().copied().unwrap_or("World");
-    let (seed, sheep) = (number(rest.get(1), 1)?, number(rest.get(2), world::FLOCK as u64)? as usize);
-    let mut made = world::generate(seed, sheep);
+    let (seed, sheep) = (number(rest.get(1), 1)?, number(rest.get(2), crate::FLOCK as u64)? as usize);
+    let mut made = crate::generate(seed, sheep);
     made.info.name = name.to_string();
-    let saved = world::save(folder, &mut made).map_err(|error| error.to_string())?;
+    let saved = crate::save(folder, &mut made).map_err(|error| error.to_string())?;
     Ok(format!("{name}, seed {seed}: {} superchunks, {} entities, {} bytes in {}", saved.superchunks, saved.entities, saved.bytes, folder.display()))
 }
 
 /// Loads the world in `folder`, ticks it, and saves it.
 pub fn run(folder: &Path, rest: &[&str]) -> Result<String, String> {
     let ticks = number(rest.first(), 10_000)?;
-    let mut loaded = world::load(folder).map_err(|error| error.to_string())?;
+    let mut loaded = crate::load(folder).map_err(|error| error.to_string())?;
     let start = Instant::now();
     let mut halos = HaloChange::default();
     for _ in 0..ticks {
@@ -79,7 +87,7 @@ pub fn run(folder: &Path, rest: &[&str]) -> Result<String, String> {
     let seconds = start.elapsed().as_secs_f64();
     let hot = loaded.arena.superchunks().len();
     let grass: u64 = loaded.arena.superchunks().iter().map(|superchunk| loaded.arena.superchunk_count(GRASS, superchunk.index()) as u64).sum();
-    let saved = world::save(folder, &mut loaded).map_err(|error| error.to_string())?;
+    let saved = crate::save(folder, &mut loaded).map_err(|error| error.to_string())?;
     let (warming, cooling) = (loaded.warming().count(), loaded.cooling().count());
     let HaloChange { reached, generated, restored, cooled } = halos;
     Ok(format!(

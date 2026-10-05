@@ -2,13 +2,12 @@
 name = "tilesim"
 version = "0.1.0"
 edition = "2021"
-description = "TileSim, a 2D procedural simulation game: the program, and its diagnostics"
+description = "TileSim, a 2D procedural simulation game: the program"
 publish = false
 
 [dependencies]
 world = { path = "world" }
 tessera = { path = "tessera" }
-chunk_storage = { path = "chunk_storage" }
 utilities = { path = "utilities" }
 
 # Every crate of TileSim, built together: one lock file and one `target/`

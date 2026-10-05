@@ -105,28 +105,33 @@ rule, over every thread -- the memory, the entities' stats, and a
 **`Census`** of the flock and grass every `CENSUS_EVERY` (100) ticks:
 a **`PastureRun`**.
 
-**`frames::frame(arena, superchunk, pixels)`**: a superchunk as RGB
-pixels, dirt `BROWN`, grass `GREEN`; `FRAME_BYTES`.
-**`frames::sheep(entities, superchunk, pixels)`**: its entities drawn
-over it, `WHITE` squares.
 
 ## `transient_data.rs`
 
-**`measurements()`**, **`renders()`**, **`saves()`**, **`publish(report)`**.
+**`measurements()`**, **`saves()`**, **`publish(report)`**.
+
+## `commands.rs`
+
+**`COMMANDS`**: what `tilesim world <command>` runs, each with its
+parameters and their defaults; **`dispatch(arguments)`**: the one the
+first word names, run on the rest. `tilesim world new <folder> [name]
+[seed] [sheep]`: a world generated from the seed -- the origin, a flock
+of `sheep` on it, and its halo (**`new`**) -- and saved in the folder,
+which must not hold one. `tilesim world run <folder> [ticks]`: it
+loaded, ticked and saved again (**`run`**). `tilesim world info
+<folder>`: what its world file says (**`info`**). **`printed`**: a
+command run on its folder, its line printed. The diagnostics tools,
+`throughput` and `pasture`, are listed there too.
 
 ## `diagnostics/tool.rs`
 
-**`COMMANDS`**: the tools, each with its parameters and their
-defaults; **`dispatch(arguments)`**: the one the first word names, run
-on the rest -- what `tilesim world` calls. **`threads`**: the threads
+**`threads`**: the threads
 asked for, every one if 0.
 
 **`throughput`**: runs `throughput::run` and publishes its time, rates
 and memory tables. **`pasture`**: runs `pasture::run` and publishes the
 flock, time a sample and a wake, rates, what is held and the census
-(**`census_table`**). **`video`**: one superchunk's frames, sheep on
-them if asked, on standard output, raw RGB, for ffmpeg; the census at
-every frame kept, unprinted, in `measurements/video.csv`.
+(**`census_table`**).
 
 ## `patches.rs`
 

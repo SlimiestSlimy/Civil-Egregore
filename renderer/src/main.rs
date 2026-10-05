@@ -61,7 +61,7 @@ use sim::{start, Ask, Mode, Near, Request, Viewport, TARGET_PACE};
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
-use world::diagnostics::frames::BROWN;
+use crate::paint::BROWN;
 
 /// A superchunk's side on the screen's plane: a cell a unit.
 const SPRITE_SIDE: f32 = SUPERCHUNK_SIDE_CELLS as f32;

@@ -9,9 +9,7 @@
 //! | `throughput.rs` | grass ticked flat out: each phase's time, the writes, the memory held |
 //! | `pasture.rs` | grass and sheep ticked flat out: the flock, what the sheep did, each rule's time, the memory held |
 //! | `tool.rs` | the tools: each runs one of the others, prints and keeps what it gathers |
-//! | `frames.rs` | a superchunk's cells as RGB pixels, dirt brown and grass green, sheep white |
 
-pub mod frames;
 pub mod pasture;
 pub mod throughput;
 pub mod tool;
