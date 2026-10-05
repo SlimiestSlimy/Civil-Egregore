@@ -96,7 +96,7 @@ what they always do and are not listed.
 | **flush** | rewrite a superchunk's image with what waits for it in the ring | write back, image | |
 | **evict** | drop a hot layer from the arena; a dirty one must be written back first | hot | |
 | **bitmap arena** | the hot side: every hot layer, in allocations a superchunk and a layer type each (`BitmapArena`) | allocation, bucket, directory | |
-| **allocation** | one layer type over one superchunk in the arena: one block of the block pool, a bucket a chunk | block, bucket | |
+| **allocation** | one layer type over one superchunk in the arena: an array of buckets, one for each chunk with a cell set, in Morton order | bucket | |
 | **bucket** | one chunk's hot layer: its words in its allocation, and its counts | layer, allocation | |
 | **directory** | the arena's list of hot superchunks, sorted by superchunk index, each with its allocations by layer type | lookup | |
 | **lookup** | finding a layer in the directory; a reader remembers the last superchunk it found | reader, directory | |

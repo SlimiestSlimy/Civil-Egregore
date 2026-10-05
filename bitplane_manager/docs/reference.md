@@ -72,7 +72,7 @@ each bucket marked waiting, held until flushed -- and
 **`write_back(superchunk, storage, codec)`**, both at once, encoded and
 put in the ring here, flushes reported as they come;
 **`flushed`**; **`evict(key)`** -- an allocation with nothing hot or
-waiting released to the block pool. Private: **`allocation`** (found or
+waiting released. Private: **`allocation`** (found or
 made), **`hot`**, **`at`**/**`at_mut`**, **`entry_mut`** (hot or
 lingering), **`lingering_at`**, **`layers`**, **`layers_of`**,
 **`leave_ring`**, **`release_unused`** -- lingering superchunks done with
@@ -104,7 +104,7 @@ a tick, applied in order over every superchunk they land in.
 ## `diagnostics/arena.rs`
 
 **`ArenaStats::of(arena)`**: superchunks, allocations, hot bitmaps, the
-block pool's stats; **`bytes_in_use`**.
+buckets kept and their bytes.
 
 ## `transient_data.rs`
 

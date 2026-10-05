@@ -8,6 +8,5 @@ publish = false
 [dependencies]
 coordinates = { path = "../coordinates" }
 utilities = { path = "../utilities" }
-allocator = { path = "../allocator" }
 bitmap = { path = "../bitmap" }
 chunk_storage = { path = "../chunk_storage" }

@@ -1,10 +1,11 @@
 //! The bitplane manager: hot bitmaps decoded from chunk storage's cold
-//! pool, read and changed, written back into its ring, evicted -- and
-//! never moved.
+//! pool, read and changed, written back into its ring, evicted -- a
+//! bucket kept only for a chunk with cells.
 //!
 //! `cargo test`
 
 use bitmap::{Bitmap, CellWords, WORDS};
+use bitplane_manager::diagnostics::arena::ArenaStats;
 use bitplane_manager::{WritesApplied, BitmapArena, BucketKey, NotHot, Reader, Shape, Window, Write, WriteOp, COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS};
 use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
 use chunk_storage::{Bits16, Bits2, Bits4, Bits8, Wide, Width, ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
@@ -118,34 +119,48 @@ fn buckets_come_by_superchunk_then_type_then_chunk() {
     assert_eq!(arena.run(LayerType(5)).count(), 0);
 }
 
-/// A hot bitmap stays where it is while others turn hot and cold, in
-/// its superchunk and in new ones; and a superchunk's allocation freed
-/// is the next one used.
+/// A hot bitmap with no cell set keeps no bucket, and reads clear; the
+/// first cell set in it makes one, in its place among the others,
+/// which keep every cell of theirs; clearing a cell where there is no
+/// bucket makes none.
 #[test]
-fn hot_bitmaps_never_move() {
+fn a_bucket_is_kept_only_for_a_chunk_with_cells() {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
-    let key = |layer_type, chunk| BucketKey { layer_type: LayerType(layer_type), chunk: ChunkIndex(chunk) };
-    let first = key(5, 15);
-    arena.make_hot(first, None, &mut codec);
-    let address = |arena: &BitmapArena, key| arena.bucket(key).expect("hot").cells().as_ptr();
-    let before = address(&arena, first);
-    for layer_type in 0..8 {
-        for superchunk in 0..8 {
-            arena.make_hot(key(layer_type, superchunk * 16), None, &mut codec);
-            arena.make_hot(key(5, 12 + superchunk % 2), None, &mut codec);
-        }
+    let (plain, stage) = (LayerType(5), Wide::<Bits4>::new(40));
+    let chunk = |place: u64| ChunkIndex(place);
+    for place in 0..16 {
+        arena.make_hot(BucketKey { layer_type: plain, chunk: chunk(place) }, None, &mut codec);
+        arena.make_hot_cells(BucketKey { layer_type: stage.layer_type(), chunk: chunk(place) }, None);
     }
-    assert_eq!(address(&arena, first), before);
+    let held = |arena: &BitmapArena| {
+        let stats = ArenaStats::of(arena);
+        (stats.hot_bitmaps, stats.buckets, stats.bucket_bytes)
+    };
+    assert_eq!(held(&arena), (32, 0, 0), "hot, and nothing kept");
+    let cell = |place: u64, across: i32| chunk(place).top_left().offset(across, 3).expect("in the chunk");
+    assert_eq!((arena.holds(plain, cell(9, 5)), arena.value(stage, cell(9, 5))), (Ok(false), Ok(0)));
+    arena.queue(plain, Write::cell(cell(9, 5), WriteOp::Unset));
+    arena.queue(stage.layer_type(), Write::value(stage, cell(9, 5), 0));
+    assert_eq!((arena.apply().changed, held(&arena)), (0, (32, 0, 0)), "nothing cleared, nothing kept");
 
-    let lone = key(100, 1 << 30);
-    let encoded = codec.encode(&drawn()).to_vec();
-    arena.make_hot(lone, Some(&encoded), &mut codec);
-    let freed = address(&arena, lone);
-    assert!(arena.evict(lone));
-    let next = key(101, 1 << 30);
-    arena.make_hot(next, None, &mut codec);
-    assert_eq!(address(&arena, next), freed, "the freed allocation, reused");
-    assert!(arena.bucket(next).expect("hot").cells().iter().all(|&word| word == 0), "and cleared");
+    // Cells set chunk by chunk, out of Morton order: each bucket made between the ones there.
+    let mut set = Vec::new();
+    for (round, place) in [12, 3, 7, 0, 15].into_iter().enumerate() {
+        for across in 0..=round as i32 {
+            arena.queue(plain, Write::cell(cell(place, across), WriteOp::Set));
+            arena.queue(stage.layer_type(), Write::value(stage, cell(place, across), 9 + round as u32));
+            set.push((cell(place, across), 9 + round as u32));
+        }
+        assert_eq!(arena.apply().changed, 2 * (round as u64 + 1));
+        let bitmap = 8 * WORDS as u64;
+        assert_eq!(held(&arena), (32, 2 * (round + 1), (round as u64 + 1) * 5 * bitmap), "a bucket a chunk with cells, each as wide as its layer");
+        for &(cell, value) in &set {
+            assert_eq!((arena.holds(plain, cell), arena.value(stage, cell)), (Ok(true), Ok(value)), "kept as set, wherever its bucket went");
+        }
+        assert_eq!((arena.superchunk_count(plain, SuperchunkIndex(0)), arena.superchunk_count(stage.layer_type(), SuperchunkIndex(0))), (set.len() as u32, set.len() as u32));
+    }
+    assert_eq!(arena.bucket(BucketKey { layer_type: plain, chunk: chunk(7) }).expect("hot").count(), 3);
+    assert_eq!(arena.bucket(BucketKey { layer_type: plain, chunk: chunk(8) }).expect("hot, with no bucket").count(), 0);
 }
 
 /// Writing back encodes only what changed into the ring, and the cold pool
