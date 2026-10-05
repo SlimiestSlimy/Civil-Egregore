@@ -1,7 +1,8 @@
-# TileSim is an x86-64 game, built for every x86-64 processor of the
-# last fifteen years or so, not the one it is built on: it is played on
-# many machines. x86-64-v2 brings the popcount instruction the sampler
-# counts bits with (docs/performance.md) -- SSE4.2 and POPCNT, on every
-# Intel since Nehalem (2008) and every AMD since Bulldozer (2011).
+# TileSim is an x86-64 game, built for the x86-64 processors of the
+# last ten years or so, not the one it is built on: it is played on
+# many machines. x86-64-v3 brings, over v2's popcount, AVX2, and BMI1
+# and BMI2 -- the bit instructions bitplanes are counted, found and
+# taken apart with -- on every Intel since Haswell (2013) and every AMD
+# since Excavator (2015).
 [build]
-rustflags = ["-C", "target-cpu=x86-64-v2"]
+rustflags = ["-C", "target-cpu=x86-64-v3"]

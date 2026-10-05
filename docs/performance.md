@@ -68,6 +68,14 @@ within the runs' own spread of each other (11,900 to 13,400 ticks a
 second, and 3,200 to 3,600). `x86-64-v2` keeps the popcount the gain
 above came from; it is to be measured again on the Ryzen.
 
+The build is now for `x86-64-v3` (AVX2, BMI1 and BMI2: Intel since
+Haswell, AMD since Excavator), for the bit instructions wide planes and
+what follows them can be written with. On the Ryzen 5 5600,
+`tilesim world pasture 20000 333 4000 16`, three rounds a build, twice
+over: `x86-64-v2` 31,454 to 33,047 ticks a second, `x86-64-v3` 32,438
+to 33,295 -- within each other's spread. Nothing yet uses what v3
+brings; nothing is lost by it either.
+
 Tried and not kept: asking memory ahead for the dirt beside each sample
 and for the word each write lands in. Nothing gained at 64 or 256
 superchunks (348 against 350 ns a sample): the sample's cost is in
