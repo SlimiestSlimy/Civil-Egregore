@@ -3,11 +3,11 @@ rustflags = ["-C", "target-cpu=x86-64-v3"]
 
 
 [alias]
-windows_rr = ["build", "--release", "--target", "x86_64-pc-windows-gnu", "-p", "renderer", "--config", "profile.release.strip=true"]
-linux_hd = ["build"]
-linux_rd = ["build", "-p", "renderer"]
-linux_rr = ["build", "--release", "-p", "renderer"]
-linux_hr = ["build", "--release"]
+windows_rr = ["build", "--release", "--target", "x86_64-pc-windows-gnu", "--config", "profile.release.strip=true"]
+linux_hd = ["build", "--no-default-fetures"]
+linux_rd = ["build"]
+linux_rr = ["build", "--release"]
+linux_hr = ["build", "--release", "--no-default-fetures"]
 
 [target.x86_64-pc-windows-gnu]
 linker = "x86_64-w64-mingw32-gcc"
