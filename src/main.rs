@@ -24,7 +24,7 @@ const CRATES: [Crate; 2] = [
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
-    match program("tilesim", &CRATES, &arguments) {
+    match program("Civil_Egregore", &CRATES, &arguments) {
         Ok(()) => ExitCode::SUCCESS,
         Err(why) => {
             eprintln!("{why}");

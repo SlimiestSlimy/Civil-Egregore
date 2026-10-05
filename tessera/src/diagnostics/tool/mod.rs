@@ -4,9 +4,9 @@
 //! `transient_data/measurements/<tool>.csv`, replacing the last run's --
 //! the latest numbers are always there, and nowhere copied by hand.
 //!
-//! They are [`COMMANDS`], run by `tilesim tessera <tool>`
+//! They are [`COMMANDS`], run by `Civil_Egregore tessera <tool>`
 //! (`utilities::commands::program`); every tool, what it prints and what it takes are in
-//! that table, and printed by `tilesim tessera`.
+//! that table, and printed by `Civil_Egregore tessera`.
 //!
 //! The bitmaps looked at are the adversarial worst bitmaps and saved bitmaps
 //! (`transient_data/worst/`, `external_benchmarks/adversarial/saved/`), plus

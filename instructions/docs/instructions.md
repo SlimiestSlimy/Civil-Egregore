@@ -83,14 +83,14 @@ one is in the way. It says how far it had to look
 (`SoughtStep::scale`). No route is kept here either:
 each step asks again, and the nearer it comes the finer it sees.
 
-Measured (`tilesim server pasture`, 16 superchunks, 64,000 sheep, one
+Measured (`Civil_Egregore server pasture`, 16 superchunks, 64,000 sheep, one
 thread): on pasture a third grass nothing changes, no sheep looking
 further than its area; with no grass at all, every sheep seeking every
 step until it starves, 14,000 ticks take 9.1 s where they took 10.2
 without -- 4,700 instructions a search that finds nothing.
 
 Measured on the sheep, the first kind written on them
-(`tilesim server pasture 20000 333 4000 16 1`): the rule went from 363
+(`Civil_Egregore server pasture 20000 333 4000 16 1`): the rule went from 363
 lines to 266, its neighbourhood, path and attribute handling gone; of a
 million wakes 283,000 are put whole where all were; the run's
 instructions the same within 0.2% -- a wake is bound by memory, not by
@@ -101,6 +101,6 @@ what is carried.
 The neighbourhood, the area, the tiles further off, the entity made,
 put to sleep and committed, and the going over cells and entities were
 the turn's own; they are instructions now, the turn left with reads and
-writes. The tick's instructions (`tilesim server pasture 300 333 4000 4
+writes. The tick's instructions (`Civil_Egregore server pasture 300 333 4000 4
 1`, less the same run with no ticks) went from 53.86 million to 53.77,
 the world the same to the cell.

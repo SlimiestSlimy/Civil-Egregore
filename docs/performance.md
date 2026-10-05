@@ -10,7 +10,7 @@ beside it. How things are measured: `testing_protocol.md`.
 
 ## Where memory takes over from the processor
 
-`tilesim server pasture <ticks> 333 1000 <superchunks>`, the superchunks
+`Civil_Egregore server pasture <ticks> 333 1000 <superchunks>`, the superchunks
 stepped from 16 to 1,024: grass and sheep, every thread. A sample and a
 wake are the time of the thread doing them.
 
@@ -39,12 +39,12 @@ found on the way:
   counting a count tile's words: `x86-64-v2`, which has the
   instruction, is clearly faster than generic and as fast as `native`.
 - **`x86-64-v3` over `v2` changes nothing yet**: the two are within
-  each other's spread on `tilesim server pasture`. It is the target for
+  each other's spread on `Civil_Egregore server pasture`. It is the target for
   the bit instructions (BMI1, BMI2) and AVX2, which nothing uses so far.
 
 The popcount, generic against `native`:
 
-`tilesim server pasture 20000 333 1000 <superchunks> 12`:
+`Civil_Egregore server pasture 20000 333 1000 <superchunks> 12`:
 
 | superchunks | build | ticks a second | a grass sample, ns |
 |---|---|---|---|
@@ -70,7 +70,7 @@ The counts are now kept of count tiles of 16 words
 128 bytes of counts a bucket where there were 32, and a walk of two
 lines at most.
 
-`tilesim server pasture <ticks> 333 1000 <superchunks> 12`, both built
+`Civil_Egregore server pasture <ticks> 333 1000 <superchunks> 12`, both built
 native, the same world to the cell:
 
 | superchunks | count tiles of | ticks a second | a grass sample, ns | a sheep's wake, ns |
@@ -107,8 +107,8 @@ it reads -- the sheep's grass and the four walls.
 
 | world | before | after |
 |---|---|---|
-| generated, 64 superchunks, walls (`tilesim server run <dir> 30000`) | 13,236 ticks a second | 13,964 |
-| mock, 400 superchunks, no walls (`tilesim server pasture 20000 333 4000 400 12`) | a wake 695 ns, 2,381 ticks a second | 645 ns, 2,375 |
+| generated, 64 superchunks, walls (`Civil_Egregore server run <dir> 30000`) | 13,236 ticks a second | 13,964 |
+| mock, 400 superchunks, no walls (`Civil_Egregore server pasture 20000 333 4000 400 12`) | a wake 695 ns, 2,381 ticks a second | 645 ns, 2,375 |
 | mock, 64 superchunks, no walls | a wake 439 ns, 15,131 ticks a second | 477 ns, 14,566 |
 
 Kept for the world that is played: 5% more ticks a second with walls
@@ -119,9 +119,9 @@ walls are two layers now (`worldgen/docs/worldgen.md`).
 ## Terrain
 
 A generated world, whose walls every hungry sheep reads
-(`tilesim server new <folder> 1 64`, then `tilesim server run
+(`Civil_Egregore server new <folder> 1 64`, then `Civil_Egregore server run
 <folder> <ticks>`), runs somewhat slower than the mock world of the same
-size without them (`tilesim server pasture`).
+size without them (`Civil_Egregore server pasture`).
 
 ## Saves
 
@@ -179,9 +179,9 @@ count of the chunks before it that have one
 mostly empty -- the cells under water on land, the walls, the trees --
 cost what they hold.
 
-A generated world, 21 superchunks (`tilesim server new <folder> 106
-4000`, then `tilesim server run <folder> 30000`), and the mock pasture,
-where every chunk has cells (`tilesim server pasture 6000 333 4000
+A generated world, 21 superchunks (`Civil_Egregore server new <folder> 106
+4000`, then `Civil_Egregore server run <folder> 30000`), and the mock pasture,
+where every chunk has cells (`Civil_Egregore server pasture 6000 333 4000
 <superchunks>`):
 
 | what | a bucket a chunk | a bucket a chunk with cells |
@@ -204,4 +204,4 @@ ticks a second. A cache of the chunk last found was not needed.
 | the instructions of the apply phase | the same |
 | sampling, and count tiles | `tilesim.md`, "Sampling rarely, and count tiles" |
 | the flock's balance over a long run | `tilesim.md`, "Sheep leave thin pasture" |
-| Tessera's sizes and times | `tessera/transient_data/measurements/`, by `tilesim tessera <tool>` |
+| Tessera's sizes and times | `tessera/transient_data/measurements/`, by `Civil_Egregore tessera <tool>` |

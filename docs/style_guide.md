@@ -33,9 +33,9 @@ reader has to wonder whether something is missing or was never needed
 | `tests/tests.rs` | what the tiers' tests share, where they share anything: a module of each, no test program itself |
 
 - A crate is a library: no `[[bin]]`, no `bin/`, no `src/bin/`. Only
-  the root (`tilesim`) and the renderer are programs. A tool is a
+  the root (`Civil_Egregore`) and the renderer are programs. A tool is a
   function in `src/diagnostics/tool`, listed among the crate's
-  `COMMANDS` and run by `tilesim <crate> <tool>`; the root hands the
+  `COMMANDS` and run by `Civil_Egregore <crate> <tool>`; the root hands the
   crate the rest of the line and knows none of its tools.
 - A doc gives a performance figure only where it explains an
   optimization: what it was before and after. Everywhere else it says
@@ -154,5 +154,5 @@ Some things are named by rule:
 - Speed is never a test. It is measured by a tool, and a number written
   down names the command that gave it.
 - The reference for the tick is the instructions callgrind counts for
-  `tilesim server pasture 300 333 4000 4 1`, less the same run with no
+  `Civil_Egregore server pasture 300 333 4000 4 1`, less the same run with no
   ticks. A change keeps within 1% of it, or says why not.

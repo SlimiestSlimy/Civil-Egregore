@@ -70,13 +70,13 @@ a **`PastureRun`**.
 
 ## `commands.rs`
 
-**`COMMANDS`**: what `tilesim server <command>` runs, each with its
-parameters and their defaults. `tilesim server new <folder> [seed]
+**`COMMANDS`**: what `Civil_Egregore server <command>` runs, each with its
+parameters and their defaults. `Civil_Egregore server new <folder> [seed]
 [sheep] [side]`: a world generated from the seed -- the origin, a flock
 of `sheep` on it, and its halo (**`new`**), of `side` superchunks a
 side unless 0 -- and saved in the folder, which must not hold one and
-whose name is the world's (**`name`**). `tilesim server run <folder> [ticks]`: it
-loaded, ticked and saved again (**`run`**). `tilesim server info
+whose name is the world's (**`name`**). `Civil_Egregore server run <folder> [ticks]`: it
+loaded, ticked and saved again (**`run`**). `Civil_Egregore server info
 <folder>`: what its world file says (**`info`**). A folder given as a plain name is one
 of the worlds' folder (`utilities::settings::world`); anything more is
 a path. **`printed`**: a command run on its folder, its line printed. The diagnostics tools,

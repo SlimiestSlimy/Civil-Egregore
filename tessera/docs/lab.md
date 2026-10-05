@@ -164,13 +164,13 @@ each bitmap by **`score`** -- Tessera's bits less the raw cells of the
 area searched, not Tessera's bits alone, which noise maximizes for any
 encoder. Keeps the worst plane if it beats the worst kept, checks the
 worst bitmap round trips, and publishes what each search found.
-**`save`**: `tilesim tessera adversarial_save <worst> <name> <description>` copies a
+**`save`**: `Civil_Egregore tessera adversarial_save <worst> <name> <description>` copies a
 worst bitmap to the saved bitmaps with a description and the worst bitmap's notes.
 
 ## `src/diagnostics/tool/`: one tool a file
 
 **`COMMANDS`**: every tool -- its name, what it takes and what it
-prints -- run by name through `utilities::commands` (`tilesim tessera
+prints -- run by name through `utilities::commands` (`Civil_Egregore tessera
 <tool>`); with no name, the list. A tool that
 measures is given a `Report` and published with the run's seed.
 

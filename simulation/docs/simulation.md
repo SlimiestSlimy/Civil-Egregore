@@ -136,7 +136,7 @@ entity, which says where they are, having come by then.
 Finding where to ask searches the places alone, two bytes an entity,
 which stay in the caches.
 
-Measured (`tilesim server pasture 60000 333 4000 64 12`, the flock
+Measured (`Civil_Egregore server pasture 60000 333 4000 64 12`, the flock
 growing from 256,000): a wake 271 ns of a thread where it was 359;
 11,200 to 11,800 ticks a second where it was 11,000. Distances tried:
 4 and 2 without the first asked up front, 297 ns; 12 and 6, 286; 16 and
@@ -281,4 +281,4 @@ comes to does not depend on the thread that takes it.
 
 Its diagnostics only gather what the entities hold; it has no transient
 data of its own yet: the tick is measured by TileSim's
-(`tilesim server throughput`, `tilesim server pasture`), on its rules.
+(`Civil_Egregore server throughput`, `Civil_Egregore server pasture`), on its rules.

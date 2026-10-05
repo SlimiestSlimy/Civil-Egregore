@@ -9,7 +9,7 @@ bitmaps rather than about the algorithm.
 So the protocol is two-phase, and the phases must not be mixed (see
 "Phase one" and "Phase two" below). Everything here runs from a cargo
 command -- the tests from `tessera/`, the tools from the workspace's
-root, whose program runs them (`tilesim tessera <tool>`); "Every command" lists them all, and
+root, whose program runs them (`Civil_Egregore tessera <tool>`); "Every command" lists them all, and
 "Every parameter" every number a test, tool or search is set by.
 
 ## Where the seed comes from

@@ -1,7 +1,7 @@
 [package]
 name = "server"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "TileSim's server: the world as a whole, made from a seed, ticked -- its cells' rules and its entities together -- saved and loaded"
 publish = false
 
