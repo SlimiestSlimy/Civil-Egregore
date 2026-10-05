@@ -1,4 +1,4 @@
-//! TileSim's entities: every kind of entity the game has, a file each --
+//! Civil Egregore's entities: every kind of entity the game has, a file each --
 //! its rule, run on a superchunk's turn in a tick's first phase, the
 //! attributes it keeps, and how a world is given some to start with.
 //!

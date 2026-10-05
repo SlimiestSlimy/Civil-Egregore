@@ -1,4 +1,4 @@
-# For whoever works on TileSim with an AI
+# For whoever works on Civil Egregore with an AI
 
 Rules that hold whatever the task. The style guide
 (`docs/style_guide.md`) and the testing protocol
@@ -31,7 +31,7 @@ cargo run --release -p renderer -- <superchunks> <sheep a superchunk> 0 0 1
 
 - No test or tool has a seed written in it: all take the one in
   `transient_data/seed.csv`, rolled every five counted runs
-  (`utilities::seed`; `TILESIM_SEED=<seed>` or `=fresh` for one run). A
+  (`utilities::seed`; `Civil Egregore_SEED=<seed>` or `=fresh` for one run). A
   test must hold on any seed; check a changed test on several fresh ones.
 - Every command is run through the root program:
   `cargo run --release -- help` lists them all.
@@ -48,7 +48,7 @@ cargo run --release -p renderer -- <superchunks> <sheep a superchunk> 0 0 1
 - The default settings (`utilities/default_settings.csv`) and the
   sliders (`gui/sliders.csv`) are written by hand: nothing generates
   them.
-- Every text file TileSim keeps is CSV (`utilities::csv`), a first row
+- Every text file Civil Egregore keeps is CSV (`utilities::csv`), a first row
   naming its columns; a seed is written in hexadecimal
   (`utilities::seed::hex`).
 - A test's read before a commit is made: testing, committing and

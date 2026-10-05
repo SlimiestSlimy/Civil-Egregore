@@ -1,11 +1,11 @@
 //! The settings of this machine, kept from one run to the next: one
-//! file, in one folder of TileSim's own under the place the system
+//! file, in one folder of Civil Egregore's own under the place the system
 //! gives a user's programs for what they keep.
 //!
 //! | system | the folder |
 //! |---|---|
-//! | Linux and the like | `$XDG_DATA_HOME/tilesim`, or `~/.local/share/tilesim` |
-//! | Windows | `%LOCALAPPDATA%\tilesim`, or `%APPDATA%\tilesim` |
+//! | Linux and the like | `$XDG_DATA_HOME/Civil Egregore`, or `~/.local/share/Civil Egregore` |
+//! | Windows | `%LOCALAPPDATA%\Civil Egregore`, or `%APPDATA%\Civil Egregore` |
 //!
 //! The file ([`FILE`]) is CSV ([`crate::csv`]), a row a setting: its
 //! name, its value. The default settings (`default_settings.csv`, at the crate's root)
@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 /// The folder's name, under the system's place for what programs keep.
-pub const FOLDER: &str = "tilesim";
+pub const FOLDER: &str = "Civil Egregore";
 /// The file's name, in the folder.
 pub const FILE: &str = "settings.csv";
 /// The file's columns.
@@ -38,7 +38,7 @@ const COLUMNS: [&str; 2] = ["setting", "value"];
 /// unless changed.
 const DEFAULTS: &str = include_str!("../default_settings.csv");
 /// The setting naming the folder worlds are kept in: a path, taken
-/// from TileSim's folder unless it is a whole one.
+/// from Civil Egregore's folder unless it is a whole one.
 pub const WORLDS: &str = "worlds";
 /// Whether the machine's file is left alone: the settings are the
 /// default ones.
@@ -56,7 +56,7 @@ fn kept_by_programs() -> PathBuf {
     found.unwrap_or_else(|| PathBuf::from("."))
 }
 
-/// TileSim's folder on this machine.
+/// Civil Egregore's folder on this machine.
 pub fn folder() -> PathBuf {
     kept_by_programs().join(FOLDER)
 }
@@ -67,7 +67,7 @@ pub fn file() -> PathBuf {
 }
 
 /// The folder worlds are kept in, as the settings have it: `worlds`
-/// in TileSim's folder, unless set.
+/// in Civil Egregore's folder, unless set.
 pub fn worlds() -> PathBuf {
     folder().join(Settings::read().get(WORLDS).unwrap_or(WORLDS))
 }

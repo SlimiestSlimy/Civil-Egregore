@@ -26,7 +26,7 @@ A table as CSV and back: **`Table::to_csv`**, **`from_lines`**,
 
 ## `csv.rs`
 
-CSV, which every text file TileSim keeps is -- the seed, the settings,
+CSV, which every text file Civil Egregore keeps is -- the seed, the settings,
 the sliders, a world's file and its hot file, a measurement's report --
 a first row naming the columns. **`Line`**: a row, a divider
 (`DIVIDER`) or a note (`COMMENT`, `#`). **`lines(text)`**: every line;
@@ -100,7 +100,7 @@ and joins the workers.
 ## `settings.rs`
 
 The settings of this machine: `FILE` (`settings.csv`) in `FOLDER`
-(`tilesim`) under the system's place for what a user's programs keep.
+(`Civil Egregore`) under the system's place for what a user's programs keep.
 **`folder()`**, **`file()`**. `default_settings.csv`, at the crate's root: every setting
 there is and what it is unless changed, built into the program.
 **`Settings`**: a name and a value a row, under `setting,value` -- **`defaults()`**,
@@ -111,7 +111,7 @@ ones alone under the feature `default_settings`),
 (a file's lines and no more), **`get(name)`**, **`number::<T>(name)`**,
 **`set(name, value)`** (none takes the line out), **`write()`**,
 **`write_to(path)`**. `WORLDS`: the setting naming the folder worlds
-are kept in; **`worlds()`**: that folder, `worlds` in TileSim's unless
+are kept in; **`worlds()`**: that folder, `worlds` in Civil Egregore's unless
 set; **`world(named)`**, **`world_in(worlds, named)`**: where a world
 is kept -- a plain name in the worlds' folder, anything more a path;
 **`world_name(given)`**: a world's name as a folder may have it on

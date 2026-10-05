@@ -1,4 +1,4 @@
-//! TileSim on the screen: a pasture -- grass, dirt and sheep -- ticking
+//! Civil Egregore on the screen: a pasture -- grass, dirt and sheep -- ticking
 //! on a thread of its own, and a Bevy window showing it: dirt, grass
 //! and sheep, on ground lit by its height -- slopes shaded, cliffs
 //! casting shadows, and from near, steps and walls drawn at their edges.
@@ -35,7 +35,7 @@
 //! | `H` | show every cell's height, from near enough to read them |
 //! | `P` | draw the mesh's lines over the map |
 //! | `U` | the sliders' menu, or none: the near view's shading, and in the lab how the world is generated |
-//! | Escape | the options, or none: going on, saving the world, opening one of the worlds' folder, and leaving TileSim |
+//! | Escape | the options, or none: going on, saving the world, opening one of the worlds' folder, and leaving Civil Egregore |
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -831,7 +831,7 @@ pub fn render_main_lab() {
             DefaultPlugins
                 // A cell a pixel, sharp however near.
                 .set(ImagePlugin::default_nearest())
-                .set(WindowPlugin { primary_window: Some(Window { title: "TileSim".to_string(), ..default() }), ..default() }),
+                .set(WindowPlugin { primary_window: Some(Window { title: "Civil Egregore".to_string(), ..default() }), ..default() }),
         )
         .insert_resource(Link { requests, frames: Mutex::new(paint::start(frames)), waiting: false, since: SYNC_EVERY, asked: None, paused: false, pace })
         .insert_resource(Sprites::about_origin(superchunks))

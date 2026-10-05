@@ -2,7 +2,7 @@
 
 The world's chunks as stored: what loading and saving work on, and what
 the bitplane manager decodes from and writes back to. The decisions
-behind it are in `../../docs/tilesim.md`, "The world".
+behind it are in `../../docs/Civil Egregore.md`, "The world".
 
 Coordinates -- cells, chunks, superchunks, their Morton indices -- are
 the `coordinates` crate's (`../../coordinates/`).

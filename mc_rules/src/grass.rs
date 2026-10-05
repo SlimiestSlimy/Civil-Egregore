@@ -1,4 +1,4 @@
-//! Grass over dirt: TileSim's first rule. Each tick every cell of grass
+//! Grass over dirt: Civil Egregore's first rule. Each tick every cell of grass
 //! may spread onto a dirt neighbour, or decay back to dirt the more grass
 //! is around it:
 //!

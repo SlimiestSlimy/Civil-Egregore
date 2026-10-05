@@ -12,7 +12,7 @@ use coordinates::CellIndex;
 pub struct EntityId(pub u64);
 
 /// An entity's type: a type ID like a layer's, from the one `u64`
-/// namespace every type in TileSim is drawn from.
+/// namespace every type in Civil Egregore is drawn from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EntityType(pub u64);
 

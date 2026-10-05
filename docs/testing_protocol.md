@@ -1,4 +1,4 @@
-# How TileSim is tested
+# How Civil Egregore is tested
 
 One protocol for every crate, part of the
 [style guide](style_guide.md): few tests, each a generator of many
@@ -76,8 +76,8 @@ the top of the workspace and out of git (`utilities::seed`):
   first seed from it that gives one.
 - A seed is 64 bits, written everywhere in hexadecimal:
   `0x50921cc8cf51e5ba`, in the file, a world's, and whatever prints one.
-- `TILESIM_SEED=<seed>` picks a seed for one run and leaves the file
-  alone; `TILESIM_SEED=fresh` draws one for the run.
+- `Civil Egregore_SEED=<seed>` picks a seed for one run and leaves the file
+  alone; `Civil Egregore_SEED=fresh` draws one for the run.
 - The first asking prints the seed, which use it is and where it came
   from, so a failure names the seed that made it.
 

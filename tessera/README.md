@@ -1,6 +1,6 @@
 # Tessera
 
-A lossless encoding of a 256x256 bitmap, made for TileSim, where every
+A lossless encoding of a 256x256 bitmap, made for Civil Egregore, where every
 layer of a 256x256 chunk is one such bitmap. The game is still to come;
 Tessera is its first working part.
 
@@ -105,7 +105,7 @@ internals (`tests/unit/`). Every check covers the same ground:
 
 Sampled bitmaps come from a seed kept in `transient_data/seed.csv`, outside git.
 It rolls by itself every five runs, so no corpus is measured against for
-long. `TILESIM_SEED=<seed>` pins a run, and `TILESIM_SEED=fresh` draws a
+long. `Civil Egregore_SEED=<seed>` pins a run, and `Civil Egregore_SEED=fresh` draws a
 new seed for one run. [`docs/testing_protocol.md`](docs/testing_protocol.md)
 is the whole protocol, with every command and every parameter.
 

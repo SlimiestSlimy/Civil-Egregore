@@ -47,7 +47,7 @@ pub const FILE: &str = "seed.csv";
 const COLUMNS: [&str; 2] = ["seed", "uses"];
 
 /// The environment variable that picks a seed for one run.
-pub const VARIABLE: &str = "TILESIM_SEED";
+pub const VARIABLE: &str = "Civil Egregore_SEED";
 
 /// The file that keeps the seed and how many runs have used it: in the
 /// `transient_data/` of the workspace, the folder the crates are in.

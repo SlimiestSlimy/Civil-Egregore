@@ -302,9 +302,9 @@ mod settings {
 
     use utilities::settings::{file, folder, world_in, world_name, Settings, FILE, FOLDER, WORLDS};
 
-    /// The file is the one file in TileSim's one folder.
+    /// The file is the one file in Civil Egregore's one folder.
     #[test]
-    fn the_file_is_in_tilesims_folder() {
+    fn the_file_is_in_civil_egregores_folder() {
         assert!(folder().ends_with(FOLDER) && file() == folder().join(FILE));
     }
 

@@ -1,6 +1,6 @@
-# TileSim's style guide
+# Civil Egregore's style guide
 
-How TileSim's code, tests and docs are written. Code is for people to
+How Civil Egregore's code, tests and docs are written. Code is for people to
 understand first, so every rule here is one of the
 [design statements](design_statements.md) applied to the code itself.
 Each rule names the statement it comes from:
@@ -60,7 +60,7 @@ reader has to wonder whether something is missing or was never needed
 
 The [glossary](glossary.md) is the authority on names (#1, #2).
 
-- Every word of TileSim's own means one thing everywhere: in types,
+- Every word of Civil Egregore's own means one thing everywhere: in types,
   functions, variables, comments and docs.
 - Every thing has one word.
 - The glossary's "not" column lists the words a thing is never called.

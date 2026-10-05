@@ -1,4 +1,4 @@
-//! TileSim's world generation. The terrain: every cell's height, from the world's seed and
+//! Civil Egregore's world generation. The terrain: every cell's height, from the world's seed and
 //! where the cell is, and nothing else ([`height`]) -- so a superchunk
 //! is the same whenever it is generated, and meets its neighbours with
 //! no seam -- and the **walls**: two cells beside one another, across

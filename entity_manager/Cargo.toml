@@ -2,7 +2,7 @@
 name = "entity_manager"
 version = "0.1.0"
 edition = "2024"
-description = "TileSim's entities as kept: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied -- beside the bitplane manager's cells"
+description = "Civil Egregore's entities as kept: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied -- beside the bitplane manager's cells"
 publish = false
 
 [dependencies]

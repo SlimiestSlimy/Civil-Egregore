@@ -1,4 +1,4 @@
-//! TileSim's coordinates: where things are.
+//! Civil Egregore's coordinates: where things are.
 //!
 //! Every place in the world is a Morton index -- its coordinates' bits
 //! interleaved, `x` in the even bits -- one type a size: a

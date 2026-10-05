@@ -1,4 +1,4 @@
-//! CSV: what every text file TileSim keeps is written as -- a seed, the
+//! CSV: what every text file Civil Egregore keeps is written as -- a seed, the
 //! settings, the sliders, a world's file, a measurement's report -- so
 //! that one reader and one writer serve them all, and any of them opens
 //! in whatever reads tables. A file's first row names its columns.

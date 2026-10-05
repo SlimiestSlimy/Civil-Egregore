@@ -1,4 +1,4 @@
-//! Sheep on the grass: TileSim's first entity. A sheep sleeps until it
+//! Sheep on the grass: Civil Egregore's first entity. A sheep sleeps until it
 //! next needs something, and wakes for that alone:
 //!
 //! - **Rests while satisfied**: fed, it sleeps where it stands until it

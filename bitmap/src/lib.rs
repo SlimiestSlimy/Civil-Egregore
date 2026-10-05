@@ -1,4 +1,4 @@
-//! TileSim's bitmap: 256 by 256 cells, and everything that can be asked
+//! Civil Egregore's bitmap: 256 by 256 cells, and everything that can be asked
 //! of them or done to them. Every layer of a chunk is one; Tessera
 //! (`../tessera/`) encodes them.
 //!

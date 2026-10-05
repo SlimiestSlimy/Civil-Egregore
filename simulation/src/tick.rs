@@ -1,5 +1,5 @@
 //! The tick, superchunk by superchunk, in two phases, on the
-//! dispatcher's threads (`../../docs/tilesim.md`, "The tick").
+//! dispatcher's threads (`../../docs/Civil Egregore.md`, "The tick").
 //!
 //! 1. **Computing**: every superchunk runs the rule on itself -- samples
 //!    its own cells, reads any cell in reach, and queues writes. Nothing

@@ -1,4 +1,4 @@
-//! TileSim's rules of the cells: every rule the cells run by, a file
+//! Civil Egregore's rules of the cells: every rule the cells run by, a file
 //! each -- a tick of Monte Carlo sampling on a superchunk's turn, and
 //! the writes it queues. Entities are a crate of their own
 //! (`entity_rules/`); the world ticks both together (`server/`).

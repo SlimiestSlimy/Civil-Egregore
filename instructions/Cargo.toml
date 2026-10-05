@@ -2,7 +2,7 @@
 name = "instructions"
 version = "0.1.0"
 edition = "2024"
-description = "TileSim's instructions: what a rule is made of -- small, varied pieces of behaviour, each a function over the simulation's turn, and all a rule reaches the simulation through"
+description = "Civil Egregore's instructions: what a rule is made of -- small, varied pieces of behaviour, each a function over the simulation's turn, and all a rule reaches the simulation through"
 publish = false
 
 [dependencies]

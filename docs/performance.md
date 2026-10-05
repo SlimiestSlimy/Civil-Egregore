@@ -1,4 +1,4 @@
-# What TileSim costs, and what was found measuring it
+# What Civil Egregore costs, and what was found measuring it
 
 What measuring has shown, and the command that shows it. Figures are
 written only where they explain an optimization -- what it was before
@@ -30,7 +30,7 @@ fewer lines a sample and a wake.
 
 ## The build's target
 
-`.cargo/config.toml` builds for `x86-64-v3`: TileSim is a game, played
+`.cargo/config.toml` builds for `x86-64-v3`: Civil Egregore is a game, played
 on many machines, so not for the processor building it. Two things were
 found on the way:
 
@@ -202,6 +202,6 @@ ticks a second. A cache of the chunk last found was not needed.
 |---|---|
 | the far search for grass | `instructions/docs/instructions.md`, "What an entity's rule is given" |
 | the instructions of the apply phase | the same |
-| sampling, and count tiles | `tilesim.md`, "Sampling rarely, and count tiles" |
-| the flock's balance over a long run | `tilesim.md`, "Sheep leave thin pasture" |
+| sampling, and count tiles | `Civil Egregore.md`, "Sampling rarely, and count tiles" |
+| the flock's balance over a long run | `Civil Egregore.md`, "Sheep leave thin pasture" |
 | Tessera's sizes and times | `tessera/transient_data/measurements/`, by `Civil_Egregore tessera <tool>` |

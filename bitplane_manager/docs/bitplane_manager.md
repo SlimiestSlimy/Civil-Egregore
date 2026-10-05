@@ -2,7 +2,7 @@
 
 The hot bitplanes: the layers whose cells are being read and changed,
 decoded raw into the bitmap arena, and the one place with cells to read
-and change. The decisions behind it are in `../../docs/tilesim.md`,
+and change. The decisions behind it are in `../../docs/Civil Egregore.md`,
 "From the disk to the cells".
 
 ## The arena
