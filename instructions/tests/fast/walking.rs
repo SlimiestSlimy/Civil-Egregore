@@ -7,7 +7,7 @@
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_rules::walking;
+use instructions::walking;
 use simulation::around;
 use simulation::entity_store::{Entities, EntityId, EntityType, Header, NEVER};
 use simulation::{Simulation, Turn};

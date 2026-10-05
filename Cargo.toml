@@ -25,6 +25,7 @@ members = [
     "chunk_storage",
     "coordinates",
     "entity_rules",
+    "instructions",
     "pathfinding",
     "mc_rules",
     "simulation",

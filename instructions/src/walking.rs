@@ -1,8 +1,7 @@
 //! Walking: the steps an entity may take over the terrain, and the way
 //! to what it seeks -- a turn's cells read (`simulation`), the
 //! terrain's walls among them (`worldgen`), and paths found over them
-//! (`pathfinding`). The simulation knows none of the three together:
-//! a rule that walks asks here.
+//! (`pathfinding`): what a rule that walks asks.
 
 use chunk_storage::LayerType;
 use coordinates::CellIndex;

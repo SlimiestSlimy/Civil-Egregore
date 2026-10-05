@@ -30,6 +30,7 @@ it and to tune its generation in.
 | [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |
 | [`chunk_storage/`](chunk_storage/) | chunks as stored, what loading and saving work on: height maps, the layer codec, superchunk images, the cold pool and the writeback ring |
 | [`worldgen/`](worldgen/) | world generation: every cell's height from the world's seed, the walls between cells more than a step apart in height, and how grass and trees lie in patches |
+| [`instructions/`](instructions/) | what a rule is made of: small, varied pieces of behaviour -- so far walking -- each asking the simulation, the terrain and pathfinding for one thing |
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
 | [`renderer/`](renderer/) | TileSim on the screen: a Bevy window asking the simulation, on a thread of its own, for the cells in view; the lab, where how the world is generated is tuned by eye |
 | [`simulation/`](simulation/) | the simulation: Monte Carlo sampling, the two-phase tick and its outboxes, the thread dispatcher, and the entities -- a bucket a chunk, a timer wheel a superchunk |
@@ -66,8 +67,9 @@ compare against never enter this build.
 Tessera depends on `bitmap/` and `utilities/` beside it; `coordinates/`
 on `bitmap/`; `chunk_storage/` on those and Tessera;
 `bitplane_manager/` on `chunk_storage/`, `coordinates/` and
-`allocator/`; `simulation/` on `bitplane_manager/`; `entity_rules/` on
-`simulation/`, `pathfinding/` and `worldgen/` -- where walking brings
-the three together, the simulation knowing neither of the other two; `worldgen/` on `chunk_storage/` and
+`allocator/`; `simulation/` on `bitplane_manager/`; `instructions/` on
+`simulation/`, `pathfinding/` and `worldgen/`, which know nothing of
+one another and meet there; the rules, `mc_rules/` and `entity_rules/`,
+on `simulation/` and `instructions/`; `worldgen/` on `chunk_storage/` and
 `coordinates/`; `world/` on the rules, the entities and `worldgen/`;
 the program, `src/`, on `world/` and Tessera; the renderer on `world/`.

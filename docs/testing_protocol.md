@@ -48,6 +48,7 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `bitplane_manager` | bitplane_manager, writes | | |
 | `chunk_storage` | chunk_storage | | |
 | `coordinates` | coordinates | | |
+| `instructions` | | walking | |
 | `pathfinding` | pathfinding | | |
 | `utilities` | fixed_list, memory, rng, table | | |
 | `simulation` | dispatcher, entities, instructions | sampling, tick | |
