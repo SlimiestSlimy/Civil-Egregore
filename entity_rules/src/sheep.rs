@@ -51,6 +51,7 @@ use bitplane_manager::{BitmapArena, Write, WriteOp};
 use chunk_storage::mock::GRASS;
 use coordinates::{CellCartesian, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use simulation::around::{self, CENTRE, RING};
+use crate::walking;
 use worldgen::{WALL_EAST, WALL_SOUTH};
 use simulation::entity_store::{Attribute, AttributeType, EntityEdit, EntityRef, Entities, EntityId, EntityType, Header};
 use simulation::{Simulation, Turn, TickReport};
@@ -170,7 +171,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let mut sheep = EntityEdit::of(sheep, room);
     let grass = turn.around(GRASS, at);
     // The neighbours it may step to: on the hot bitplanes, no wall before them. Where entities stand is not read.
-    let mut steppable = grass.hot & RING & turn.around_unwalled(at);
+    let mut steppable = grass.hot & RING & walking::around_unwalled(turn, at);
     let hungry_at = sheep.get(HUNGRY_AT).unwrap_or(now);
     let roaming = sheep.get(ROAMING);
     // On its way out of thin pasture it does not stop to eat.
@@ -236,7 +237,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         None
     } else {
         done.sought += 1;
-        match turn.seek(at, GRASS) {
+        match walking::seek(turn, at, GRASS) {
             Some(found) => {
                 done.paths += 1;
                 done.far += (found.scale > 0) as usize;

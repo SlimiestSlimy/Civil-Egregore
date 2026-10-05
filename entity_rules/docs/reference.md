@@ -43,6 +43,19 @@ some way from its next meal, queued each on a cell of its own drawn at
 random, waking
 over the next `STEP_TICKS` ticks.
 
+## `walking.rs`
+
+What an entity that walks asks, of a turn: the simulation's cells, the
+terrain's walls and `pathfinding` met here. **`around_unwalled(turn,
+at)`**: the 3x3 cells about `at` no wall is before, nine bits.
+**`area_walls(turn, centre)`**: the area's walls, for paths.
+**`step_towards(turn, at, goals, passable)`**, **`step_to(turn, at, to,
+passable)`**: the cell to step to for the nearest goal, or for one
+cell, round the entities in the way. **`seek(turn, at, type)`**: the
+step to the nearest cell the type holds at, the area first, then tiles
+by scale, `FARTHEST_SCALE` first and the finest that reach after -- a
+**`SoughtStep`** `{to, scale}`.
+
 ## `diagnostics/world.rs`
 
 **`MockWorld::grass_on_dirt(count, grass_cells)`**: a square of mock

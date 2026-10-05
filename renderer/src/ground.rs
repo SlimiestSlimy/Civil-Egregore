@@ -17,7 +17,7 @@
 
 use coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS};
 use chunk_storage::{height_in, Height};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use worldgen::mesh::Lands;
 use worldgen::{wall, Shape};
 
@@ -229,18 +229,39 @@ fn smoothed(heights: &[f32]) -> Vec<f32> {
     down
 }
 
+/// Cells a shadow is followed over, down the diagonal: no more than
+/// are kept before a superchunk ([`BEFORE`]), so a shadow is the same
+/// whichever superchunk's ground it is worked out for, and none is cut
+/// where two meet.
+const SHADOW_REACH: usize = 128;
+const _: () = assert!(SHADOW_REACH <= BEFORE);
+
 /// How high the shadow line stands over each of `heights` -- its own
-/// height, or the line of the cell up the diagonal less
-/// [`shadow_drop`], whichever is higher -- and whether that line is
-/// over the cell: a shadow on it.
+/// height, or that of a cell up the diagonal, within [`SHADOW_REACH`],
+/// less [`shadow_drop`] a cell between, whichever is highest -- and
+/// whether that line is over the cell: a shadow on it.
 fn shadow_lines(heights: &[Height]) -> (Vec<f32>, Vec<bool>) {
     let drop = shadow_drop();
     let (mut lines, mut shadowed) = (vec![0.0; WIDE * WIDE], vec![false; WIDE * WIDE]);
-    for index in 0..WIDE * WIDE {
-        let here = heights[index] as f32;
-        let cast = if index >= WIDE && !index.is_multiple_of(WIDE) { lines[index - WIDE - 1] - drop } else { f32::MIN };
-        shadowed[index] = cast > here + 0.01;
-        lines[index] = cast.max(here);
+    // The cells of the diagonal that may yet cast the highest line: how far down it each is, and its height, the line of each lower than the one before it.
+    let mut casting: VecDeque<(usize, f32)> = VecDeque::new();
+    // A diagonal from each cell of the top row and of the left column.
+    for (left, top) in (0..WIDE).map(|left| (left, 0)).chain((1..WIDE).map(|top| (0, top))) {
+        casting.clear();
+        for along in 0..WIDE - left.max(top) {
+            let index = (top + along) * WIDE + left + along;
+            let here = heights[index] as f32;
+            let line_of = |(from, height): (usize, f32)| height - (along - from) as f32 * drop;
+            while casting.back().is_some_and(|&last| line_of(last) <= here) {
+                casting.pop_back();
+            }
+            casting.push_back((along, here));
+            if casting.front().is_some_and(|first| along - first.0 > SHADOW_REACH) {
+                casting.pop_front();
+            }
+            lines[index] = line_of(casting[0]);
+            shadowed[index] = lines[index] > here + 0.01;
+        }
     }
     (lines, shadowed)
 }

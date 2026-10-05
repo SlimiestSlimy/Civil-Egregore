@@ -127,20 +127,23 @@ ask.
 
 **The area about it, and the way**: `area` reads 16x16 cells of a layer
 as masks, `Area::count` how many are set, `area_occupied` the entities
-on them. `step_towards(at, goals, passable)` gives the cell to step to
-for the nearest goal, `step_to(at, to, passable)` for one cell -- waves
-and A* of `../../pathfinding/`, round the entities in the way, one step
-a wake.
+on them. The way over them is not the simulation's, which knows
+neither paths nor terrain: it is asked of
+`../../entity_rules/src/walking.rs`, free functions over a turn.
+`step_towards(turn, at, goals, passable)` gives the cell to step to
+for the nearest goal, `step_to(turn, at, to, passable)` for one cell --
+waves and A* of `../../pathfinding/`, round the entities in the way,
+one step a wake.
 
 **Walls**: the terrain's (`../../worldgen/`), two layers -- east and
 south -- read as any other; a diagonal is barred unless both ways round
-it are open. `around_unwalled(at)` is the neighbours of a cell no wall is before,
-nine bits to narrow a step's choices by; `area_walls(centre)` the
+it are open. `around_unwalled(turn, at)` is the neighbours of a cell no wall is before,
+nine bits to narrow a step's choices by; `area_walls(turn, centre)` the
 walls of the area, which `step_towards` and `step_to` go round by
 themselves. Where the wall layers are not hot, nothing bars. The far
 search sees no walls: the step it gives is not taken if one bars it.
 
-**Further off** (`seek(at, type)`): nothing found in the area, the same
+**Further off** (`walking::seek(turn, at, type)`): nothing found in the area, the same
 search is made over tiles of a scale, 16 by 16 of them
 (`area_of_tiles`), a tile a goal if the type holds at any of its
 cells. The coarsest scale first: tiles 64 cells a side, 1,024 cells
@@ -231,7 +234,8 @@ comes to does not depend on the thread that takes it.
 | folder | what is in it |
 |---|---|
 | `src/sampling.rs` | Monte Carlo sampling |
-| `src/tick.rs` | the two-phase tick, its outboxes, a superchunk's turn |
+| `src/tick.rs` | the two-phase tick |
+| `src/turn/` | a superchunk's turn: `mod` the turn and its outbox, `area` the cells about a cell, `entities` the entities read and the instructions queued |
 | `src/dispatcher.rs` | the threads |
 | `src/entity_store/` | entities: buckets, the timer wheel, the instructions queued |
 | `src/around.rs` | the 3x3 cells about a cell, as nine bits |

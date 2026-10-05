@@ -103,7 +103,10 @@ parts (8 MiB) for the 48 superchunks last seen.
 - **Hillshade**: slopes facing the sun lighter, those facing away
   darker, off the heights smoothed, in bands 7% apart.
 - **Tint**: high ground a little lighter than low.
-- **Cast shadows**: one sweep down the sun's diagonal; each cell keeps
+- **Cast shadows**: one sweep down the sun's diagonal, a shadow
+  followed 128 cells (`SHADOW_REACH`) and no further -- within what is
+  kept before a superchunk, so it is the same on both sides of where
+  two meet; each cell keeps
   how high the shadow line stands over it, so from near a shadow's
   edge is found within the cell, with no sweep over pixels.
 - **From a cell a pixel outwards**: cliffs darkened by the walls in the

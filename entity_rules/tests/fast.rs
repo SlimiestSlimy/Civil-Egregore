@@ -5,3 +5,5 @@
 
 #[path = "fast/sheep.rs"]
 mod sheep;
+#[path = "fast/walking.rs"]
+mod walking;
