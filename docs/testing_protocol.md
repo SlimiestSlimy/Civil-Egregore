@@ -23,9 +23,14 @@ encoding needs: its seed file, its adversarial searches.
 
 ## Three tiers of test
 
-Each tier is one folder in a crate's `tests/`, so one test program:
-`main.rs` names its topics, each a module of it, a file beside it
-(`tests/fast/sheep.rs`). A crate has the tiers it has tests for.
+Each tier is one file in a crate's `tests/`, so one test program:
+`fine.rs`, `fast.rs`, `complete.rs`, a topic a module in it
+(`mod sheep` in `tests/fast.rs`). A crate has the tiers it has tests
+for, and no others. What two tiers share -- a check, a world compared
+whole, a seed found -- is in `tests/tests.rs`, a module of each tier
+that uses it and no test program of its own (`[[test]] name = "tests"`,
+`test = false`, in the crate's `Cargo.toml`); a crate whose tiers share
+nothing has none.
 
 | tier | what runs | how long | command |
 |---|---|---|---|
@@ -61,7 +66,7 @@ takes long. A test that only prints belongs to none: it is a tool.
 ## One seed, rolled every few runs
 
 No test or tool has a seed of its own written in it. Every seeded run,
-in whatever crate, starts from the one seed in `transient_data/seed`, at
+in whatever crate, starts from the one seed in `transient_data/seed.csv`, at
 the top of the workspace and out of git (`utilities::seed`):
 
 - A run that counts (`counted()`) is one use; after 5 the next run rolls
@@ -69,6 +74,8 @@ the top of the workspace and out of git (`utilities::seed`):
 - A test that needs several seeds takes consecutive ones from it; one
   that needs a kind of world -- land about the origin, say -- takes the
   first seed from it that gives one.
+- A seed is 64 bits, written everywhere in hexadecimal:
+  `0x50921cc8cf51e5ba`, in the file, a world's, and whatever prints one.
 - `TILESIM_SEED=<seed>` picks a seed for one run and leaves the file
   alone; `TILESIM_SEED=fresh` draws one for the run.
 - The first asking prints the seed, which use it is and where it came

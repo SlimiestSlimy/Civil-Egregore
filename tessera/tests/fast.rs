@@ -1,16 +1,14 @@
-//! Fast tests: a small corpus from the seed in `transient_data/seed` --
+//! Fast tests: a small corpus from the seed in `transient_data/seed.csv` --
 //! every shape, sparse shape, plan and line set, at its `tested` count;
 //! and each family, and the saved bitmaps, turned every way round.
 //!
 //! `cargo test --test fast`
 
-mod common;
-mod turning;
+mod tests;
 
 use tessera::diagnostics::adversarial::worst;
 use tessera::corpus::{families, HowMany, LINE_SETS, PLANS, SHAPES, SPARSE};
-use common::check;
-use turning::check_turned_bits;
+use tests::{check, check_turned_bits};
 
 /// How far, in percent, a family's bits may move turned a quarter, a
 /// half or three quarters, at the tested counts -- as few as 6 bitmaps a
@@ -21,7 +19,7 @@ use turning::check_turned_bits;
 const MOST_TURNED_DRIFT_PERCENT: f64 = 5.0;
 
 /// Every shape and sparse shape, at its `tested` count, passes every check in
-/// `common::check`: covered, capped, costed as written, and decoded back,
+/// `tests::check`: covered, capped, costed as written, and decoded back,
 /// whatever follows its stream.
 #[test]
 fn every_shape_round_trips() {
@@ -33,7 +31,7 @@ fn every_shape_round_trips() {
 }
 
 /// Every city plan, at its `tested` count, passes every check in
-/// `common::check`: covered, capped, costed as written, and decoded back,
+/// `tests::check`: covered, capped, costed as written, and decoded back,
 /// whatever follows its stream.
 #[test]
 fn every_plan_round_trips() {
@@ -45,7 +43,7 @@ fn every_plan_round_trips() {
 }
 
 /// Every line set, at its `tested` count, passes every check in
-/// `common::check`: covered, capped, costed as written, and decoded back,
+/// `tests::check`: covered, capped, costed as written, and decoded back,
 /// whatever follows its stream.
 #[test]
 fn every_line_set_round_trips() {

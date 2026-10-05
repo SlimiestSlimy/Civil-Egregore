@@ -49,8 +49,8 @@ A save is a folder (`chunk_storage::disk`, and
 
 | file | what it holds |
 |---|---|
-| `world` | text: first a line saying what the file is and its format's number (`tilesim world 1`), then the world's seed, the tick it is at, its layer types, its side if it has a size, and how it is generated, a number a line |
-| `hot` | text: the hot superchunks, a line each, those cooling with the tick each goes cold at, and the warming ones with the tick each turns hot at |
+| `world.csv` | CSV, a row a thing, its name and what it is: the format's number, the world's seed in hexadecimal, the tick it is at, its layer types, its side if it has a size, and how it is generated, a number a row |
+| `hot.csv` | CSV: the hot superchunks, a row each, those cooling with the tick each goes cold at, and the warming ones with the tick each turns hot at |
 | `superchunks/<index>.image` | a superchunk's cells and heights: its image, as the cold pool holds it |
 | `superchunks/<index>.state` | its random stream's state, its entities with their attributes |
 
@@ -82,7 +82,7 @@ their random numbers taken up. The cooling ones cool again, and the
 warming ones warm again, each to turn at the tick it was to.
 
 **A world loaded goes on as the one saved would have**, to the cell,
-the entity and the random number (`tests/fast/world.rs`: 1,500 ticks,
+the entity and the random number (`world` in `tests/fast.rs`: 1,500 ticks,
 saved, then 3,000 more on both; and a world saved and loaded seven
 times mid run -- at ticks 1, 700, 701, 1,900, 3,333 and 4,000, and the
 first tick a superchunk is warming, each

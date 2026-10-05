@@ -103,7 +103,7 @@ internals (`tests/unit/`). Every check covers the same ground:
 - in debug builds, the encoder checks that the tree it writes takes the
   bits it counted.
 
-Sampled bitmaps come from a seed kept in `transient_data/seed`, outside git.
+Sampled bitmaps come from a seed kept in `transient_data/seed.csv`, outside git.
 It rolls by itself every five runs, so no corpus is measured against for
 long. `TILESIM_SEED=<seed>` pins a run, and `TILESIM_SEED=fresh` draws a
 new seed for one run. [`docs/testing_protocol.md`](docs/testing_protocol.md)

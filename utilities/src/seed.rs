@@ -18,7 +18,11 @@
 //! the run. A use may be left uncounted ([`uncounted`]): for quick
 //! checks run far more often than anything measured.
 //!
-//! The file is in the workspace's own `transient_data/`, beside the
+//! A seed is 64 bits, and written everywhere as they are: `0x` and 16
+//! hexadecimal digits ([`hex`]), read back with or without the `0x`
+//! ([`of_hex`]).
+//!
+//! The file is CSV ([`crate::csv`]), `seed,uses` and a row, in the workspace's own `transient_data/`, beside the
 //! crates and not tracked by git: a seed and its count belong to the
 //! working copy they were used in.
 
@@ -37,7 +41,10 @@ pub const USES_BEFORE_THE_SEED_ROLLS: u64 = 5;
 pub const FRESH: &str = "fresh";
 
 /// The file's name, in the workspace's transient data.
-pub const FILE: &str = "seed";
+pub const FILE: &str = "seed.csv";
+
+/// The file's columns.
+const COLUMNS: [&str; 2] = ["seed", "uses"];
 
 /// The environment variable that picks a seed for one run.
 pub const VARIABLE: &str = "TILESIM_SEED";
@@ -46,6 +53,18 @@ pub const VARIABLE: &str = "TILESIM_SEED";
 /// `transient_data/` of the workspace, the folder the crates are in.
 pub fn file() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join(crate::transient_data::FOLDER).join(FILE)
+}
+
+/// `seed` as it is written everywhere: `0x` and its 16 hexadecimal
+/// digits.
+pub fn hex(seed: u64) -> String {
+    format!("{seed:#018x}")
+}
+
+/// The seed `text` is, in hexadecimal, with or without `0x` before it.
+pub fn of_hex(text: &str) -> Option<u64> {
+    let text = text.trim();
+    u64::from_str_radix(text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")).unwrap_or(text), 16).ok()
 }
 
 /// Whether a run counts as a use of the file's seed.
@@ -106,7 +125,7 @@ fn settled(counted: Counted) -> &'static Settled {
     SETTLED.get_or_init(|| {
         let settled = settle(counted);
         let mut table = Table::new(&["seed", "use", "from"]).left_aligned(&["use", "from"]);
-        table.row(&[settled.seed.to_string(), settled.uses.clone(), settled.source.clone()]);
+        table.row(&[hex(settled.seed), settled.uses.clone(), settled.source.clone()]);
         let _ = write!(std::io::stderr(), "{}", table.rendered());
         settled
     })
@@ -121,20 +140,20 @@ fn settle(counted: Counted) -> Settled {
     if std::env::var(variable).is_ok_and(|value| value.trim() == FRESH) {
         return Settled { seed: fresh_seed(), fresh: true, uses: not_counted, source: "drawn for this run alone, not kept".to_string() };
     }
-    if let Some(seed) = std::env::var(variable).ok().and_then(|value| value.trim().parse::<u64>().ok()) {
+    if let Some(seed) = std::env::var(variable).ok().and_then(|value| of_hex(&value)) {
         return Settled { seed, fresh: false, uses: not_counted, source: format!("{variable}, for this run alone; the file left as it is") };
     }
     let held = std::fs::read_to_string(&file).ok();
-    let mut kept = held.iter().flat_map(|text| text.lines());
-    let last = kept.next().and_then(|line| line.trim().parse::<u64>().ok());
-    let uses = kept.next().and_then(|line| line.trim().parse::<u64>().ok()).unwrap_or(0);
+    let kept = held.as_deref().and_then(|text| crate::csv::rows_named(text).into_iter().next()).unwrap_or_default();
+    let last = kept.first().and_then(|seed| of_hex(seed));
+    let uses = kept.get(1).and_then(|uses| uses.trim().parse::<u64>().ok()).unwrap_or(0);
 
     let same_as_last = format!("{kept_at}: the same as the last run");
     let (seed, uses, uses_note, source) = match (last, counted) {
         (Some(last), Counted::No) => (last, uses, format!("not counted: {uses} of {USES_BEFORE_THE_SEED_ROLLS} so far"), same_as_last),
         (Some(last), Counted::Yes) if uses < USES_BEFORE_THE_SEED_ROLLS => (last, uses + 1, format!("{} of {USES_BEFORE_THE_SEED_ROLLS}", uses + 1), same_as_last),
         _ => {
-            let rolled = last.map_or(String::new(), |last| format!(": seed {last} was used {uses} times"));
+            let rolled = last.map_or(String::new(), |last| format!(": seed {} was used {uses} times", hex(last)));
             let uses = (counted == Counted::Yes) as u64;
             let uses_note = match counted {
                 Counted::Yes => format!("{uses} of {USES_BEFORE_THE_SEED_ROLLS}"),
@@ -146,6 +165,6 @@ fn settle(counted: Counted) -> Settled {
     if let Some(folder) = file.parent() {
         let _ = std::fs::create_dir_all(folder);
     }
-    let _ = std::fs::write(&file, format!("{seed}\n{uses}\n"));
+    let _ = std::fs::write(&file, crate::csv::row(&COLUMNS) + &crate::csv::row(&[hex(seed), uses.to_string()]));
     Settled { seed, fresh: false, uses: uses_note, source }
 }

@@ -35,16 +35,16 @@ sliders its generation is tuned by.
 | [`instructions/`](instructions/) | what a rule is made of: small, varied pieces of behaviour -- so far walking -- each asking the simulation, the terrain and pathfinding for one thing |
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
 | [`renderer/`](renderer/) | TileSim on the screen: a Bevy window asking the simulation, on a thread of its own, for the cells in view; the lab, where how the world is generated is tuned by eye |
-| [`gui/`](gui/) | TileSim's menus, over whatever window shows it: the options Escape opens -- going on, saving the world, under a name typed if it has none, opening one of the worlds' folder, leaving -- the sliders, written by hand in `gui/sliders.txt`, and the numbers they tune |
+| [`gui/`](gui/) | TileSim's menus, over whatever window shows it: the options Escape opens -- going on, saving the world, under a name typed if it has none, opening one of the worlds' folder, leaving -- the sliders, written by hand in `gui/sliders.csv`, and the numbers they tune |
 | [`simulation/`](simulation/) | the simulation: Monte Carlo sampling, the two-phase tick and its outboxes, a superchunk's turn -- a bucket a chunk, a timer wheel a superchunk; and what is hot: the halos about the hot entities, warming and cooling by the tick, within the world's size if it has one |
 | [`bitplane_manager/`](bitplane_manager/) | the hot bitplanes: layers decoded into the bitmap arena, where cells are read and written -- writes batched -- and written back; planes of one bit a cell, or 2, 4, 8 or 16 |
 | [`tessera/`](tessera/) | Tessera, the lossless encoding of a 256x256 bitmap: a project of its own, with its own [README](tessera/README.md), tests, tools and docs |
 | [`bitmap/`](bitmap/) | the 256x256 bitmap every layer is, laid out in Morton order |
-| [`utilities/`](utilities/) | general-purpose utilities: the thread dispatcher, commands and their parameters, the one seed tests and tools run on, the table printer and measurement reports, a seeded random source, a fixed-capacity list, the process's memory; and the settings: TileSim's one folder on a machine, the file of what is changed there, the defaults written by hand in `utilities/default_settings.txt`, and a world's folder from its name |
+| [`utilities/`](utilities/) | general-purpose utilities: the thread dispatcher, commands and their parameters, the one seed tests and tools run on, the table printer and measurement reports, a seeded random source, a fixed-capacity list, the process's memory; and the settings: TileSim's one folder on a machine, the file of what is changed there, the defaults written by hand in `utilities/default_settings.csv`, and a world's folder from its name |
 
 Every crate but the root has the same folders -- `docs/`, `src/`,
 `src/diagnostics/`, `src/transient_data.rs` naming a `transient_data/`
-kept out of git, and `tests/`, a folder a tier -- as the
+kept out of git, and `tests/`, a file a tier -- as the
 [style guide](docs/style_guide.md) sets out; no crate has a `bin/`.
 The root is `src/main.rs` and the shared `docs/`; its `transient_data/`
 holds the one seed every crate's tests and tools run on.

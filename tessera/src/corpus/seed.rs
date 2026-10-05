@@ -39,7 +39,7 @@
 /// The file that remembers the last seed a run used, and how many runs
 /// have used it, as the tables say it: under the workspace's
 /// folder, kept out of git ([`utilities::seed::file`]).
-pub const WHERE_THE_SEED_IS_KEPT: &str = "transient_data/seed";
+pub const WHERE_THE_SEED_IS_KEPT: &str = "transient_data/seed.csv";
 
 /// How many runs may use a seed from the file before the next run rolls
 /// a fresh one: a few measure-and-compare cycles on the same bitmaps --

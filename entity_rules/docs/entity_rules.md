@@ -60,5 +60,5 @@ turned back when it is applied if so.
 |---|---|
 | `src/sheep.rs` | the sheep |
 | `src/diagnostics/world.rs` | the mock world entities are ticked on: superchunks of dirt and grass, hot, with a flock if asked -- what the tests, the game's diagnostics and the renderer all start from |
-| `tests/fast/sheep.rs` | the sheep's tests |
+| `tests/fast.rs` | the sheep's tests |
 | `docs/` | this, and the reference, function by function |

@@ -30,7 +30,7 @@ cargo run --release -p renderer -- <superchunks> <sheep a superchunk> 0 0 1
 ## Seeds, commands and figures
 
 - No test or tool has a seed written in it: all take the one in
-  `transient_data/seed`, rolled every five counted runs
+  `transient_data/seed.csv`, rolled every five counted runs
   (`utilities::seed`; `TILESIM_SEED=<seed>` or `=fresh` for one run). A
   test must hold on any seed; check a changed test on several fresh ones.
 - Every command is run through the root program:
@@ -45,9 +45,12 @@ cargo run --release -p renderer -- <superchunks> <sheep a superchunk> 0 0 1
 - What is hot, and for how long, is the simulation's
   (`simulation::halos`); the server only says which entity keeps the
   world hot and hands over what generates a superchunk.
-- The default settings (`utilities/default_settings.txt`) and the
-  sliders (`gui/sliders.txt`) are written by hand: nothing generates
+- The default settings (`utilities/default_settings.csv`) and the
+  sliders (`gui/sliders.csv`) are written by hand: nothing generates
   them.
+- Every text file TileSim keeps is CSV (`utilities::csv`), a first row
+  naming its columns; a seed is written in hexadecimal
+  (`utilities::seed::hex`).
 - A test's read before a commit is made: testing, committing and
   pushing are never one command.
 

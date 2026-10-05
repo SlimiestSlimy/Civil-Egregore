@@ -14,7 +14,7 @@ root, whose program runs them (`tilesim tessera <tool>`); "Every command" lists 
 
 ## Where the seed comes from
 
-`transient_data/seed`, at the top of the workspace and shared with every
+`transient_data/seed.csv`, at the top of the workspace and shared with every
 other crate (`utilities::seed`), holds the seed base every seeded run
 uses, and how many runs have used it. Each run that draws from it counts one use;
 after 5 (`USES_BEFORE_THE_SEED_ROLLS`, `utilities/src/seed.rs`)
@@ -82,7 +82,7 @@ reproduces it:
 TILESIM_SEED=fresh cargo test --release --test fast
 ```
 
-Every tier's check (`tests/common`) examines each bitmap
+Every tier's check (`tests/tests.rs`) examines each bitmap
 (`diagnostics::examination`) and fails on more than the raw cells and
 1%, or a cell decoded wrong. Debug builds -- the fine and fast tiers,
 unless run in release -- also have the encoder check that the tree it
@@ -261,7 +261,7 @@ Each is set, beside its reason, at the place given.
 |---|---|---|
 | runs a seed serves before it rolls | 5 | `USES_BEFORE_THE_SEED_ROLLS`, `src/corpus/seed.rs` |
 | each generator's `tested` and `timed` bitmaps | per shape, sparse shape, plan and line set | `SHAPES`, `SPARSE` (`src/corpus/mod.rs`), `PLANS` (`city.rs`), `LINE_SETS` (`lines.rs`) |
-| the most any bitmap may take, every tier | the raw cells and 1% | `CAP_BITS`, `tests/common/mod.rs` |
+| the most any bitmap may take, every tier | the raw cells and 1% | `CAP_BITS`, `tests/tests.rs` |
 | a turned family's drift, fast tier | 5% | `MOST_TURNED_DRIFT_PERCENT`, `tests/fast.rs` |
 | a turned family's drift, complete tier | 2% | `MOST_TURNED_DRIFT_PERCENT`, `tests/complete.rs` |
 | the complete tier's second corpus | 4 bitmaps a shape and plan, from the seed plus 1,000,000 | `SECOND_CORPUS_EACH`, `SECOND_SEED_OFFSET`, `tests/complete.rs` |

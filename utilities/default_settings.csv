@@ -1,0 +1,39 @@
+setting,value
+worlds,./worlds
+step light,0.35
+step dark,0.35
+wall shade,0.49
+wall lit,0.55
+wall fade,0.8
+shadow,0.4
+relief,0.7
+texture,2.0
+ocean floor level,1023.0
+ocean level,16383.0
+highest land,65535.0
+ocean share,0.55
+coast breadth,4.0
+coast lowness,8.0
+clumping,0.901
+vertex spacing (2^),13.0
+narrowest blend,0.102
+widest blend,1.0
+least sigmoid,1.0
+most sigmoid,7.5
+line bending,0.399
+finer mesh depth,10.0
+finer mesh share,0.498
+finer mesh height,120.0
+finer mesh falloff,0.95
+weight spread,0.704
+raised share,0.6
+grass cover,1.0
+grass patch size (2^),10.0
+grass patch detail,0.0
+grass scatter,0.0
+tree cover,0.0
+tree patch size (2^),1.0
+tree patch detail,0.0
+tree scatter,0.0
+wall length,0.5
+sheep a superchunk,0.0

@@ -27,11 +27,11 @@ is only what the knob reaches; the knob then stays at its end.
 
 The numbers are kept whenever one is settled, and taken up again the
 next run, in the machine's settings (`utilities::settings`): one file,
-`settings.txt`, in a folder `tilesim` where the system keeps what a
+`settings.csv`, in a folder `tilesim` where the system keeps what a
 user's programs hold -- `~/.local/share/tilesim` on Linux,
 `%LOCALAPPDATA%\tilesim` on Windows. A line a number, its name and its
 value. What each is unless set is in the default settings
-(`utilities/default_settings.txt`), which a machine with no file
+(`utilities/default_settings.csv`), which a machine with no file
 is given a copy of. Built with `--features default_settings`, the
 renderer runs on the default settings alone and keeps nothing.
 
@@ -53,10 +53,10 @@ does is said beside it (`Tuned::what`).
 
 ## Two files written by hand
 
-Neither is made by a program. `sliders.txt`, here at the crate's root:
-a line a slider -- its number's name, the least and the most its knob
+Neither is made by a program. `sliders.csv`, here at the crate's root:
+CSV, a row a slider -- its number's name, the least and the most its knob
 reaches, its group, and what it does; a group's sliders are shown in
-their lines' order. `utilities/default_settings.txt`:
+their rows' order. `utilities/default_settings.csv`:
 what each number is unless set. Both are built into the program;
 `src/tuning.rs` has only the numbers' names and places, and a test
 holds the two files to them. Lines are found by name, in whatever
@@ -90,7 +90,7 @@ The list is asked for each time it is opened.
 | file | holds |
 |---|---|
 | `src/lib.rs` | `Gui`, the menus added to an app; `Worked` |
-| `sliders.txt` | the sliders, written by hand: each one's range, group and what it does |
+| `sliders.csv` | the sliders, written by hand: each one's range, group and what it does |
 | `src/tuning.rs` | the numbers tuned, by name and place, kept between runs; the seed drawn |
 | `src/sliders.rs` | the sliders that set them, their value boxes and the button |
 | `src/options.rs` | the options Escape opens: going on, saving the world, opening one, leaving |

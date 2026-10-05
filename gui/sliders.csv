@@ -1,0 +1,39 @@
+# A slider a row, in any order; a group's sliders are shown in the order of their rows: its number's name, the least and the most its knob reaches, its group, and what it does, said to whoever rests the pointer on it. Written by hand; what each number is unless set is in utilities/default_settings.csv.
+slider,least,most,group,does
+step light,0,1,shading,How much lighter the border of a higher cell is where it faces the sun.
+step dark,0,0.8,shading,How much darker the border of a higher cell is where it faces away from the sun.
+wall shade,0,1,shading,"How dark the band at the foot of a wall is, on the side away from the sun."
+wall lit,0,1,shading,"How dark the band at the foot of a wall is, on the side the sun is on."
+wall fade,0,1.5,shading,How much of its darkness a wall's band has lost at its far edge.
+shadow,0,0.8,shading,How much darker ground is under a cast shadow.
+relief,0,3,shading,How strongly slopes are lit and heights tinted.
+texture,0,4,shading,How much the ground's pixels differ from one another by lot.
+wall length,0,2,shading,"How much longer the band at the foot of a wall is for each height the wall rises, in eighths of a cell: a high cliff's band runs over several cells, no darker for it."
+ocean floor level,0,4096,ocean and land,"The height of the ocean's floor, and the lowest ground in the world. Every ocean vertex is at this height."
+ocean level,0,8192,ocean and land,"The height of the ocean's surface, the same all over the world. Ground under it is under water. Set under the floor, it is held to the floor: no ocean."
+highest land,0,8192,ocean and land,"The height of the highest land there can be. Every land vertex carries a height of its own, drawn by lot, between just over the ocean level and this."
+ocean share,0,1,ocean and land,"The share of the vertices that are ocean; the rest are land. 0 is all land, 1 all ocean."
+coast breadth,0,4,ocean and land,"How many vertices from the ocean land is held low within. Past it, a land vertex is as likely at any height as another, up to the highest land. 0, and no land is held low."
+coast lowness,1,16,ocean and land,"How strongly land right beside the ocean is held low: each coast vertex draws a height of its own, small ones by far the most likely and the higher the less likely -- so coasts differ a little from one another and a few are high, sea cliffs where their lines' blends are narrow. 1 holds nothing low; 16 leaves high coasts very rare. It eases off each vertex further inland. The finer meshes vary the lowest land a quarter as much as the highest, so differences compound inland."
+clumping,0,1,ocean and land,"How much land gathers into larger masses. Each vertex is land or ocean by its own lot mixed with a smooth pattern a few vertices broad: 0 is every vertex for itself, scattered; 1 is the smooth pattern alone, rounded masses with no specks. The more clumping, the less exactly the ocean share is kept."
+vertex spacing (2^),6,18,ocean and land,"How far apart the vertices are, and so about how long a line is: 2 to this power, in cells. 10 is one superchunk, 13 is 8 superchunks, 16 is 64. The ground at a vertex is at the vertex's height, and slopes from it along its lines to its neighbours'."
+weight spread,0,1,ocean and land,"The top level has a weight of 1. The weight that reaches a subdivision point is shared out at random: each point draws a share of its own, by lot, between 1 minus this and 1, moves the land by its offset times that share, and hands the share on to its own subdivisions, where it is shared out again. So under some points the ground is broken up in detail and under others it keeps its parent's shape -- a plain stays a plain, a ridge a ridge. 0, and every point gets the whole weight: every level moves the land freely everywhere."
+raised share,0,1,ocean and land,The share of those vertices that raise the land; the rest sink it. Land sunk under the ocean level fills with water.
+narrowest blend,0,1,mesh lines,"A line joins two vertices and carries the ground from one's height to the other's. Every line has a blend of its own, drawn by lot between this and the widest blend: the share of the line, about its middle, the change of height is spread over. 1 is the whole line: one slope from vertex to vertex. Near 0 is a cliff at the line's middle with level ground either side."
+widest blend,0,1,mesh lines,"The widest blend a line can draw, as a share of its length. Set both to 1 for slopes everywhere and no level ground; both near 0 for plateaus and cliffs."
+least sigmoid,1,16,mesh lines,"Every line also has a sigmoidness of its own, drawn by lot between this and the most: the shape of the change across its blend. 1 is an even slope. Higher is more of an S: gentle at both ends of the blend and steep in the middle, to a step."
+most sigmoid,1,16,mesh lines,"The most sigmoid a line can draw. Set both the same for one shape everywhere: 1 and 1 for even slopes only, 16 and 16 for steps only."
+line bending,0,1,mesh lines,"How far the lines are pushed out of straight by noise, as a share of the vertex spacing. 0 leaves straight lines and triangles; more makes them wind."
+finer mesh depth,0,10,finer meshes,"How many finer meshes lie on the land: points spread again, half as far apart each time, inside the triangles of the mesh before, each raising or sinking the ground a little -- small variations at a time. None gets finer than 16 cells between points, so the shortest lines are 10 to 20 cells. Every mesh moves the land, the finest by two heights at least. 0 for none: the land is the broad triangles alone."
+finer mesh share,0,1,finer meshes,The share of a finer mesh's points that raise or sink the land; the rest leave it as it is.
+finer mesh height,0,2048,finer meshes,"How many heights a point of the first finer mesh raises or sinks the land at most, each by an amount of its own."
+finer mesh falloff,0,1,finer meshes,"How much each finer mesh moves the land beside the one before: 0.5, and each does half as much; near 1, and the finest do as much as the broadest -- rough ground; near 0, and only the first counts."
+grass cover,0,1,grass,The share of dry land that starts as grass; the rest is dirt.
+grass patch size (2^),1,10,grass,"How broad a patch of grass or of dirt is: 2 to this power, in cells."
+grass patch detail,0,2,grass,How ragged the patches' edges are: how much finer noise counts beside the patches'.
+grass scatter,0,2,grass,"How much each cell's own lot counts: grass scattered cell by cell, not in patches."
+tree cover,0,1,trees,The share of dry land that starts with a tree.
+tree patch size (2^),1,10,trees,"How broad a wood is: 2 to this power, in cells."
+tree patch detail,0,2,trees,How ragged the woods' edges are.
+tree scatter,0,2,trees,"How much each cell's own lot counts: lone trees, not woods."
+sheep a superchunk,0,16000,sheep,"How many sheep each superchunk the lab shows starts with, each on a cell of its own drawn by lot. None, and the lab is land alone."

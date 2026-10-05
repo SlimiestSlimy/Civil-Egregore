@@ -5,15 +5,12 @@
 //!
 //! `cargo test --release --test complete -- --ignored`
 
-mod common;
-
-mod turning;
+mod tests;
 
 use tessera::diagnostics::adversarial::worst;
 use tessera::corpus::checkerboards::checkerboards;
 use tessera::corpus::{families, grown, one_laid_out, corpus_seed, HowMany, PLANS, SHAPES};
-use common::check;
-use turning::check_turned_bits;
+use tests::{check, check_turned_bits};
 
 /// How far from the measured seeds the second corpus starts.
 const SECOND_SEED_OFFSET: u64 = 1_000_000;
@@ -22,7 +19,7 @@ const SECOND_SEED_OFFSET: u64 = 1_000_000;
 const SECOND_CORPUS_EACH: u64 = 4;
 
 /// Every bitmap of every family, at its `timed` count, passes every check in
-/// `common::check`: covered, capped, costed as written, and decoded back,
+/// `tests::check`: covered, capped, costed as written, and decoded back,
 /// whatever follows its stream.
 #[test]
 #[ignore]
@@ -35,7 +32,7 @@ fn every_family_round_trips() {
 }
 
 /// A few bitmaps of every shape and plan from seeds the measurements
-/// never use, and each passes every check in `common::check`: covered,
+/// never use, and each passes every check in `tests::check`: covered,
 /// capped, costed as written, and decoded back,
 /// whatever follows its stream.
 #[test]
@@ -56,7 +53,7 @@ fn a_second_seed_base_round_trips() {
 }
 
 /// Every checkerboard of odd-sided squares passes every check in
-/// `common::check`: covered, capped, costed as written, and decoded back,
+/// `tests::check`: covered, capped, costed as written, and decoded back,
 /// whatever follows its stream.
 #[test]
 #[ignore]

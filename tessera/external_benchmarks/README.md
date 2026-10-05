@@ -28,7 +28,7 @@ apt-get install libjbig-dev
 
 Then, from `tessera/` -- the manifest path is relative to it -- in
 release, with nothing else busy. The corpus bitmaps use the seed held in
-`transient_data/seed`, as every other measurement does:
+`transient_data/seed.csv`, as every other measurement does:
 
 ```
 cargo run --release --manifest-path external_benchmarks/Cargo.toml

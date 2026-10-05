@@ -7,7 +7,7 @@
 //! busy:
 //!
 //! From `tessera/`, which the manifest path is relative to; the corpus bitmaps
-//! use the seed every other run does (`transient_data/seed`):
+//! use the seed every other run does (`transient_data/seed.csv`):
 //!
 //! ```text
 //! cargo run --release --manifest-path external_benchmarks/Cargo.toml
