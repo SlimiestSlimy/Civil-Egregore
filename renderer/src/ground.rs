@@ -347,3 +347,34 @@ impl Level {
 pub fn lit(colour: [u8; 3], factor: [u8; 3]) -> [u8; 3] {
     std::array::from_fn(|channel| (colour[channel] as u32 * factor[channel] as u32 / FACTOR_ONE).min(255) as u8)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Two superchunks side by side, and one below: the shadow lines
+    /// over the cells they both keep are the same from either; and the
+    /// heights a frame brings are the ones worked out from the seed.
+    #[test]
+    fn shadows_are_the_same_from_both_sides_of_an_edge() {
+        let shape = Shape::DEFAULT;
+        let seed = server::seed_with_land(utilities::seed::counted(), &shape);
+        let middle = coordinates::WORLD_MIDDLE.top_left().cartesian();
+        let (left, top, side) = (middle.x, middle.y, SIDE as u32);
+        let fine = |top_left: (u32, u32), given: &Given| Ground::generate(seed, &shape, top_left, given).fine.expect("made fine");
+        let (here, beside, below) = (fine((left, top), &Given::new()), fine((left + side, top), &Given::new()), fine((left, top + side), &Given::new()));
+        let mut differing = 0;
+        for along in 0..SIDE as isize {
+            for off in 0..MARGIN as isize {
+                differing += (here.line(SIDE as isize + off, along) != beside.line(off, along)) as usize;
+                differing += (here.line(along, SIDE as isize + off) != below.line(along, off)) as usize;
+            }
+        }
+        assert_eq!(differing, 0, "shadow lines unlike over an edge");
+        let world = server::generate_flocks(seed, &[coordinates::WORLD_MIDDLE], 1);
+        let image = world.storage.image(coordinates::WORLD_MIDDLE).expect("the origin's image");
+        let brought = fine((left, top), &[((left, top), image.height_words())].into_iter().collect());
+        let cells = || (0..SIDE as isize).flat_map(|y| (0..SIDE as isize).map(move |x| (x, y)));
+        assert!(cells().all(|(x, y)| brought.height(x, y) == here.height(x, y) && brought.line(x, y) == here.line(x, y)), "heights brought unlike those worked out");
+    }
+}
