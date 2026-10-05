@@ -7,16 +7,17 @@ authors = ["SlimiestSlimy", "Opus 5.5 high"]
 repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 
 [dependencies]
+gui = { path = "gui" }
+renderer = { path = "renderer", optional = true }
 server = { path = "server" }
 tessera = { path = "tessera" }
 utilities = { path = "utilities" }
-renderer = { path = "renderer", optional = true }
 
 [features]
 # `--features force_default_settings`: run on the built-in defaults
 # (`utilities/force_default_settings.csv`), ignoring the machine's `settings.csv`.
-renderer = ["dep:renderer"]
 force_default_settings = ["utilities/force_default_settings", "renderer?/force_default_settings"]
+default = ["renderer"]
 
 # Every crate of Civil Egregore, built together: one lock file and one `target/`
 # for them all, here, whichever crate's folder cargo is run from.
