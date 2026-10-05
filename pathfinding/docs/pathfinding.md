@@ -59,7 +59,7 @@ slope); and walkers larger than a cell.
 A cell that may not be walked on is a bit of `passable`. A **wall** is
 not a cell: it is between two cells, and bars the step from one to the
 other both ways, whatever the cells are -- the terrain's cliffs
-(`../terrain/`). Walls stand only east and south of cells, kept by the
+(`../worldgen/`). Walls stand only east and south of cells, kept by the
 upper or left cell of the two. A diagonal step has no wall of its own:
 it is open only when both ways round it -- across then down, down then
 across -- are. `Walls::new` takes the east and south masks and works out

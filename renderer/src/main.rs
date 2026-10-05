@@ -558,7 +558,7 @@ fn heights(
             *visibility = Visibility::Hidden;
             continue;
         }
-        let height = terrain::height_shaped(&shape, seed, x, y).to_string();
+        let height = worldgen::height_shaped(&shape, seed, x, y).to_string();
         if text.0 != height {
             text.0 = height;
         }

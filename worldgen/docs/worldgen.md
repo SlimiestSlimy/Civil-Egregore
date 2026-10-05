@@ -1,6 +1,8 @@
-# Terrain
+# World generation
 
-Every cell's height, and the walls heights make.
+Every cell's height, the walls heights make, and how what grows lies
+in patches (`src/patches.rs`). The crate was `terrain`; it is named for
+all it generates.
 
 ## Heights from the seed
 

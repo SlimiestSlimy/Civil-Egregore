@@ -13,7 +13,7 @@ flock's halo -- all hot before it ticks. Every superchunk's contents come from t
 and its superchunk index (`generate_image`), so a superchunk is the
 same whenever and in whatever order it is made: the world has no edge
 but the coordinates', and grows as the sheep wander. A superchunk is
-its terrain (`../terrain/`) -- heights, and the walls they make, four
+its terrain (`../worldgen/`) -- heights, and the walls they make, four
 layers -- and on it grass in patches, dirt being a cell with none and
 having no layer, and trees in patches of
 their own, each of a stage drawn for its cell (`Generation`, `patches`).

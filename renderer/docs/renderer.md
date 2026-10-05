@@ -200,7 +200,7 @@ drawn, the view too goes back to where it started. No sheep,
 its rules -- grass and trees -- ticking as in any run, paused and paced
 by the same keys. Generation's sliders are shown from the start:
 
-- **The ocean** (`terrain::Shape`): its floor's level, the lowest
+- **The ocean** (`worldgen::Shape`): its floor's level, the lowest
   ground; its own level; and its share of the vertices.
 - **The land**: the highest it may be; the coast's breadth, the
   vertices from the ocean land is held low within, and how low; how
@@ -211,7 +211,7 @@ by the same keys. Generation's sliders are shown from the start:
   map.
 - **The finer meshes**: how many, the share of their vertices that
   raise or sink the land, by how much, and the share that raise it.
-- **The grass**, and **the trees** (`world::patches`): each in patches,
+- **The grass**, and **the trees** (`worldgen::patches`): each in patches,
   not scattered cell by cell. A cell's number is smooth noise as broad
   as a patch, finer noise on it (detail), and a lot drawn for the cell
   alone (scatter); it has the thing under a threshold found, by looking
@@ -222,7 +222,7 @@ by the same keys. Generation's sliders are shown from the start:
 Whenever a slider of generation moves or the seed is drawn, the world
 is made afresh from nothing but the sliders, and its ticks start again
 from 0. What is settled here is written into `world::Generation::DEFAULT`
-and `terrain::Shape::DEFAULT`, which every world is made with.
+and `worldgen::Shape::DEFAULT`, which every world is made with.
 
 ## Layout
 

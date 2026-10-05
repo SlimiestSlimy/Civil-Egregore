@@ -51,7 +51,7 @@ use bitplane_manager::{BitmapArena, Write, WriteOp};
 use chunk_storage::mock::GRASS;
 use coordinates::{CellCartesian, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use simulation::around::{self, CENTRE, RING};
-use terrain::{WALL_EAST, WALL_SOUTH};
+use worldgen::{WALL_EAST, WALL_SOUTH};
 use simulation::entity_store::{Attribute, AttributeType, EntityEdit, EntityRef, Entities, EntityId, EntityType, Header};
 use simulation::{Simulation, Turn, TickReport};
 use std::collections::HashSet;

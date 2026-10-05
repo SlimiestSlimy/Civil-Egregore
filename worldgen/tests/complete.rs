@@ -4,7 +4,7 @@
 //! `cargo test --release --test complete -- --ignored`
 
 use coordinates::{place_from_cartesian, SuperchunkIndex, WORLD_MIDDLE};
-use terrain::{wall, Shape, Terrain};
+use worldgen::{wall, Shape, Terrain};
 
 /// A shape of small polygons joined by cliffs: plenty of walls.
 const CLIFFS: Shape = Shape { span: 8, sea: 0, highest: 552, narrow: 2, wide: 2, finer_depth: 3, ..Shape::DEFAULT };

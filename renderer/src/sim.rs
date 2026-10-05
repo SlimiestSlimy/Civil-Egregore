@@ -31,7 +31,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use crate::{lab, tuning};
 use mc_rules::trees::{TREE, TREE_STAGE};
-use terrain::WATER;
+use worldgen::WATER;
 use world::World;
 use utilities::rng::Rng;
 

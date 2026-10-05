@@ -46,7 +46,7 @@ top-down view. The scale: a cell is 2 m, drawn 8x8 px. People are 7 px
 stickmen. The game runs at 256 ticks a second.
 
 The terrain is 8-bit heights per cell. Neighbours mostly differ by 0 or
-1, and a difference over 1 is a wall (`terrain::wall`), so the ground is
+1, and a difference over 1 is a wall (`worldgen::wall`), so the ground is
 naturally terraced. The proposed layers, by strength:
 
 1. **Walls**, strong, since they matter to play. A dark band on the
@@ -65,7 +65,7 @@ naturally terraced. The proposed layers, by strength:
 A throwaway render tool, `delete_after_use/heightart/`, was written but
 **not built or run yet**, so expect a compile error or two. It is a
 standalone crate (its own `[workspace]`, so not a member of the repo's)
-with a path dependency on `terrain` and `png = "0.18"`. Run it from its
+with a path dependency on `terrain` (now `worldgen`) and `png = "0.18"`. Run it from its
 folder:
 
 ```sh
