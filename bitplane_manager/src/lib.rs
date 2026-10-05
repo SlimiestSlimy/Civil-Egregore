@@ -70,14 +70,7 @@ use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use std::cell::Cell;
 use writes::apply_in;
 
-/// Which bitmap a bucket holds: a layer type, in a chunk.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct BucketKey {
-    /// The layer's type.
-    pub layer_type: LayerType,
-    /// The chunk it is a layer of.
-    pub chunk: ChunkIndex,
-}
+pub use chunk_storage::BucketKey;
 
 /// A cell was asked of a bitmap that is not hot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

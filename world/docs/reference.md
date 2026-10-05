@@ -6,7 +6,7 @@ The design is in `world.md`.
 
 `FLOCK` (4,000): the sheep the origin starts with, unless told.
 **`World`** `{info, arena, storage, entities, simulation, cold,
-background, warming, cooling, writing_back, flushing}` -- **`cold`**, each cold
+jobs, warming, cooling, writing_back, flushing}` -- **`cold`**, each cold
 superchunk's state as a save keeps it; **`writing_back`**, the
 write-backs of superchunks gone cold being encoded, in order;
 **`flushing`**, the superchunks whose images are being rewritten -- and
@@ -35,7 +35,7 @@ halo. `WARM_TICKS` (256): the ticks a superchunk is warming;
 `COOL_TICKS` (256): the ticks one is cooling.
 **`HaloChange`** `{reached, generated, restored, cooled}`, added with
 `+=`. **`Warming`** `{superchunk, due, from}`, from a
-**`WarmedFrom`**: `Lingering`, or `Background(ticket)`.
+**`WarmedFrom`**: `Lingering`, or `Job(ticket)`.
 **`about(keepers)`**: the 3x3 superchunks about each, sorted, each
 once. **`World::keepers`**: the hot superchunks holding a keeper.
 **`World::move_halos`**: the halos moved to their keepers, those
@@ -53,9 +53,9 @@ the job forgotten); every one warming due no later than `warm_ticks`
 on; the wanted ones neither hot nor warming started; those due made hot, the
 entities aligned, the kept states put back and the random streams with
 them. **`World::start_warming(superchunk, due)`**: held if lingering
-(`BitmapArena::hold`), else sent to the background.
+(`BitmapArena::hold`), else sent as a job.
 **`World::finish_warming`**: a warming superchunk's bitmaps made hot -- again
-as they were (`BitmapArena::make_hot_again`), or as the background made
+as they were (`BitmapArena::make_hot_again`), or as its job made
 them (`BitmapArena::make_hot_cells`), its image put in the cold pool if
 generated. **`World::land_write_backs(wait)`**: the encoded write-backs
 put into the ring, in order (`ChunkStorage::try_write_back`, then
@@ -68,19 +68,6 @@ no change left in the ring (`BitmapArena::flushed`).
 **`World::write_back_all`**: every hot superchunk's dirty bitmaps sent
 to be encoded, and every write-back landed. **`World::flush_all`**:
 every superchunk with changes in the ring flushed, on all the threads.
-
-## `background.rs`
-
-**`Job`**: `Encode(dirty)`, `Flush(flush)`, or `Warm {superchunk,
-image, seed, types}`; **`Job::run(codec)`**: a **`Done`** --
-`Encoded(encoded)`, each bucket's layer words; `Flushed(image)`; `Warmed {generated, cells}`, every bitmap's
-cells, chunk by chunk, type by type, and the image if generated; or
-`Failed(said)`, a panic caught. **`Ticket`**: a job sent.
-**`Background::new`**: a thread a core, each with its own codec, taking
-jobs one at a time; **`send(job)`**, a ticket; **`try_take(ticket)`**;
-**`take(ticket)`**, waiting; **`forget(ticket)`**, what it makes
-dropped; **`keep`**, what is made kept until taken. **`checked`**: a
-job's panic carried on where it is taken. Dropped, the threads stop.
 
 ## `tick.rs`
 

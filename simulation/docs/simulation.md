@@ -216,6 +216,13 @@ machine has, unless there are fewer superchunks than threads -- a thread
 takes whole superchunks -- (`Simulation::for_superchunks`); a number is
 given only to measure one against another.
 
+The dispatcher is not the simulation's: it is `utilities::dispatcher`,
+and a simulation is given one (`Simulation::on`) that others may queue
+jobs on -- the world makes one for the tick and chunk storage's jobs
+alike. A thread busy with a queued job sits a phase out, and the phase
+is split among the rest: nothing in a tick counts on every part being
+run.
+
 The threads, started once and kept, parked between jobs: a job runs on
 all of them at once, the caller's thread doing the first part, and
 `run` returns only once every part has -- which is what lets a job
@@ -236,7 +243,6 @@ comes to does not depend on the thread that takes it.
 | `src/sampling.rs` | Monte Carlo sampling |
 | `src/tick.rs` | the two-phase tick |
 | `src/turn/` | a superchunk's turn: `mod` the turn and its outbox, `area` the cells about a cell, `entities` the entities read and the instructions queued |
-| `src/dispatcher.rs` | the threads |
 | `src/entity_store/` | entities: buckets, the timer wheel, the instructions queued |
 | `src/around.rs` | the 3x3 cells about a cell, as nine bits |
 | `src/diagnostics/` | what the entities hold |

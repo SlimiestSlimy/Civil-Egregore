@@ -174,3 +174,13 @@ impl Default for LayerCodec {
         Self::new()
     }
 }
+
+/// Which bitmap a bucket holds, hot, and which layer of an image it is
+/// encoded to: a layer type, in a chunk.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct BucketKey {
+    /// The layer's type.
+    pub layer_type: LayerType,
+    /// The chunk it is a layer of.
+    pub chunk: coordinates::ChunkIndex,
+}

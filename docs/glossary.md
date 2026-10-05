@@ -65,10 +65,10 @@ what they always do and are not listed.
 | **cold state** | a cold superchunk's entities and random numbers, kept as a save keeps them (`World::cold`) | cold, save | |
 | **lingering** | a superchunk gone cold, done cooling -- to the simulation, cold like any other -- whose bitmaps the arena keeps as they were, until chunk storage holds its changes -- made hot again as it is if a halo reaches it before then (`BitmapArena::make_cold_superchunk`) | cold, warming, write back | |
 | **cooling** | a hot superchunk no halo reaches any more: hot still to the simulation, it goes cold at the tick it is due, `COOL_TICKS` on -- or stays hot if a halo reaches it again before; so a keeper stepping to and fro over an edge makes nothing flicker | hot, halo, warming, lingering | unloading |
-| **warming** | a superchunk a halo reached, not hot yet: made ready in the background, it turns hot at the tick it is due, `WARM_TICKS` on, whether a halo still reaches it or not -- a warming is never given up; until then, to the simulation, it is cold like any other | hot, halo, background, cooling, lingering | loading, pending |
-| **background** | the threads doing the slow work off the tick: encoding the write-backs of superchunks gone cold, rewriting images with the changes flushed, generating and decoding superchunks warming (`world::background`) | warming, lingering | worker, loader |
+| **warming** | a superchunk a halo reached, not hot yet: made ready by a job, it turns hot at the tick it is due, `WARM_TICKS` on, whether a halo still reaches it or not -- a warming is never given up; until then, to the simulation, it is cold like any other | hot, halo, background, cooling, lingering | loading, pending |
+| **job** | a piece of work for the dispatcher's threads. One **run** is done on all at once, a part each: a tick's phase. One **queued** is done by whichever is free, off the tick: chunk storage's (`chunk_storage::jobs`) -- encoding the write-backs of superchunks gone cold, rewriting images with the changes flushed, generating and decoding superchunks warming | dispatcher, ticket, part | background, task |
 | **hot file** | a save's file naming its hot superchunks, and its cooling and warming ones with their due ticks (`HotSuperchunks`): made hot before a loaded world ticks | save, hot, cooling, warming | |
-| **shared image** | an image in the cold pool held behind a reference count, so a thread reads it as it was while the pool changes (`ChunkStorage::shared_image`) | image, background | |
+| **shared image** | an image in the cold pool held behind a reference count, so a thread reads it as it was while the pool changes (`ChunkStorage::shared_image`) | image, jond | |
 | **dirty** | a hot layer changed since it was decoded: it must be written back before it is evicted | write back | |
 
 ## Storage
@@ -120,8 +120,8 @@ what they always do and are not listed.
 | **write** | a change to cells, queued in the first phase and applied in the second: an operation on a shape, at a cell (`Write`) | outbox, apply | command |
 | **apply** | carry out a write or an instruction, in the second phase | write, instruction | carry out, execute |
 | **missed** | a write landing where no layer is hot: counted, and lost | write, lost | |
-| **dispatcher** | the threads, started once and kept, each running a part of a job (`Dispatcher`) | part | |
-| **part** | one thread's share of a phase: a run of superchunks in Morton order | dispatcher | |
+| **dispatcher** | the threads, started once and kept (`utilities::dispatcher::Dispatcher`): each runs a part of a job run, or a job queued; one set of them a world, the tick's and chunk storage's alike | part, job | thread pool, background |
+| **part** | one thread's share of a job run: in a tick's phase, the superchunks it claims | dispatcher, job | |
 | **random stream** | a superchunk's own random numbers, from the seed and its superchunk index, kept tick to tick and by a save | seed | |
 
 ## Sampling (Monte Carlo)

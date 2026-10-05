@@ -10,7 +10,6 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-pub mod background;
 pub mod commands;
 pub mod diagnostics;
 pub mod halos;
@@ -20,7 +19,7 @@ pub mod transient_data;
 pub use halos::{HaloChange, COOL_TICKS, HALO_KEEPERS, WARM_TICKS};
 pub use tick::{tick_rules, TickCounts, WorldTick};
 
-use background::{Background, Ticket};
+use chunk_storage::jobs::{Jobs, Ticket};
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
 use chunk_storage::{ChunkMaps, ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
@@ -36,6 +35,8 @@ use simulation::entity_store::{saved, Entities};
 use simulation::Simulation;
 use std::collections::{BTreeMap, VecDeque};
 use std::path::Path;
+use std::sync::Arc;
+use utilities::dispatcher::Dispatcher;
 use utilities::rng::Rng;
 
 /// How superchunks are generated: the heights' shape, and how the
@@ -96,17 +97,17 @@ pub struct World {
     /// -- as a save keeps it ([`saved::encode_state`]).
     pub cold: BTreeMap<SuperchunkIndex, Vec<u64>>,
     /// The threads encoding, generating and decoding off the tick.
-    background: Background,
+    jobs: Jobs,
     /// The superchunks warming, sorted ([`halos`]).
     warming: Vec<halos::Warming>,
     /// The hot superchunks cooling, sorted, each with the tick it goes
     /// cold at ([`halos`]).
     cooling: Vec<(SuperchunkIndex, u64)>,
     /// The write-backs of superchunks gone cold, each with its job,
-    /// being encoded in the background, in the order taken.
+    /// being encoded by chunk storage's jobs, in the order taken.
     writing_back: VecDeque<(SuperchunkIndex, Ticket)>,
     /// The superchunks whose changes were taken from the ring, each with
-    /// its job, their images being rewritten in the background.
+    /// its job, their images being rewritten by a job.
     flushing: Vec<(SuperchunkIndex, Ticket)>,
 }
 
@@ -115,8 +116,9 @@ impl World {
     /// loading start from.
     fn empty(info: WorldInfo, generation: Generation) -> Self {
         let entities = Entities::at_tick(info.tick);
-        // Every thread the machine has: the world's superchunks are not counted, as it grows.
-        let simulation = Simulation::for_superchunks(usize::MAX);
+        // Every thread the machine has, the world's superchunks not counted, as it grows: one set of them, the tick's and chunk storage's jobs' alike.
+        let dispatcher = Arc::new(Dispatcher::of_the_machine());
+        let simulation = Simulation::on(Arc::clone(&dispatcher));
         Self {
             info,
             generation,
@@ -125,7 +127,7 @@ impl World {
             entities,
             simulation,
             cold: BTreeMap::new(),
-            background: Background::new(),
+            jobs: Jobs::new(dispatcher),
             warming: Vec::new(),
             cooling: Vec::new(),
             writing_back: VecDeque::new(),

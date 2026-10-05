@@ -7,7 +7,6 @@
 //! | `sampling` | Monte Carlo sampling: every set cell chosen with one probability, in Morton order, none wasted |
 //! | `tick` | the tick: rules run superchunk by superchunk in two phases -- computing, writes queued for each superchunk they land in; applying, each superchunk its own |
 //! | `turn/` | a superchunk's turn in the first phase: what a rule reads and queues, the cells about a cell, the entities, and the outbox |
-//! | `dispatcher` | the threads, started once and kept, a job run on all at once |
 //! | `entity_store/` | entities: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied in the tick |
 //! | `diagnostics/` | data gathered: what the entities hold |
 //! | `transient_data` | the crate's `transient_data/`, out of git: what its runs leave behind |
@@ -21,14 +20,12 @@
 
 pub mod around;
 pub mod diagnostics;
-mod dispatcher;
 pub mod entity_store;
 mod sampling;
 mod tick;
 mod turn;
 pub mod transient_data;
 
-pub use dispatcher::Dispatcher;
 pub use sampling::{sample, sample_layer};
 pub use around::Around;
 pub use tick::{threads_for, Simulation, TickReport};
