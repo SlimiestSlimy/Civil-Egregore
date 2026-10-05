@@ -32,7 +32,7 @@ sliders its generation is tuned by.
 | [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |
 | [`chunk_storage/`](chunk_storage/) | chunks as stored, what loading and saving work on: height maps, the layer codec, superchunk images, the cold pool and the writeback ring |
 | [`worldgen/`](worldgen/) | world generation: every cell's height from the world's seed, the walls between cells more than a step apart in height, and how grass and trees lie in patches |
-| [`instructions/`](instructions/) | what a rule is made of: small, varied pieces of behaviour -- so far walking -- each asking the simulation, the terrain and pathfinding for one thing |
+| [`instructions/`](instructions/) | what a rule is made of, and all it reaches the simulation through: small functions over a superchunk's turn -- cells asked and set, the cells about a cell, entities made and committed, walking |
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
 | [`renderer/`](renderer/) | TileSim on the screen: a Bevy window asking the simulation, on a thread of its own, for the cells in view; the lab, where how the world is generated is tuned by eye |
 | [`gui/`](gui/) | TileSim's menus, over whatever window shows it: the options Escape opens -- going on, saving the world, under a name typed if it has none, opening one of the worlds' folder, leaving -- the sliders, written by hand in `gui/sliders.csv`, and the numbers they tune |
@@ -86,7 +86,7 @@ on `bitmap/`; `chunk_storage/` on those and Tessera;
 `bitplane_manager/` and `entity_manager/`; `instructions/` on
 `simulation/`, `pathfinding/` and `worldgen/`, which know nothing of
 one another and meet there; the rules, `mc_rules/` and `entity_rules/`,
-on `instructions/`, through which alone they are to reach the
+on `instructions/`, through which alone they reach the
 simulation; `worldgen/` on `chunk_storage/` and
 `coordinates/`; `server/` on the rules, the entities and `worldgen/`;
 the program, `src/`, on `server/` and Tessera; `gui/` on `utilities/`

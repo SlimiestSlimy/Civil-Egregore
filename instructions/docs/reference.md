@@ -1,10 +1,47 @@
 # Instructions: reference
 
 What a rule is made of: small pieces of behaviour -- queries of the
-simulation and changes queued to it alike -- each asked on a
-superchunk's turn, built on the public parts of `simulation`,
-`worldgen` and `pathfinding`. A rule of the cells or of an entity puts
-a few together.
+simulation and changes queued to it alike -- each a free function over
+a superchunk's `Turn`. The design: `instructions.md`. `lib.rs` hands on
+**`Turn`**, **`Simulation`** and **`TickReport`**, the simulation's.
+
+## `cells.rs`
+
+**`each_sampled(turn, type, probability, samples, each)`**: `each` run
+on every cell sampled, with its counts. **`hot(turn, type, cell)`**,
+**`holds`**, **`lacks`**: the cell read; **`set`**, **`clear`**: a write
+queued. **`value(turn, plane, cell)`**, **`set_value`**: a wide plane's
+number. **`square(turn, type, cell, side)`**: up to 8x8 cells about a
+cell as a `Window`, with their top left cell.
+
+## `entities.rs`
+
+**`each_woken(turn, layers, state, each)`**: `each` run on every entity
+waking. **`spawn(turn, kind, at, wake, attributes)`**: a new entity, its
+ID drawn and returned. **`sleep(turn, entity, wake)`**: a move to where
+it stands. **`commit(turn, edit, to, wake)`**: an `EntityEdit`'s entity
+moved if no attribute changed, else put whole. **`remove(turn,
+entity)`**.
+
+## `around.rs`
+
+The 3x3 cells about a cell as nine bits: **`CENTRE`**, **`RING`**,
+**`ALL`**; **`Around`** `{set, hot}`. **`read(turn, type, at)`**: one
+window, squeezed (**`squeeze`**). **`occupied(turn, at)`**: those
+entities stand on. **`free_beside(turn, at, open)`**: one of `open` none
+stands on, drawn. **`cell(at, bit)`**, **`bit_of(at, cell)`**: a bit and
+its cell. **`pick(random, choices)`**, **`prefer(random, wanted,
+open)`**: one drawn.
+
+## `area.rs`
+
+**`Area`** `{set, hot}`, a row a `u16`, `AREA_SIDE` (16) a side, its
+centre at `AREA_CENTRE`; **`Area::count`**. **`read(turn, type,
+centre)`**, **`read_each(turn, types, centre)`**: four windows.
+**`occupied(turn, centre)`**: the entities on its cells.
+**`of_tiles(turn, type, centre, scale)`**: the tiles of `scale` around
+`centre`, set where the type holds at any cell; `FARTHEST_SCALE` (6)
+the coarsest.
 
 ## `walking.rs`
 

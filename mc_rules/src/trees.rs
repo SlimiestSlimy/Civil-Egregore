@@ -1,7 +1,7 @@
 //! Trees: a rule of the cells with more than a bit a cell. A tree is a
 //! cell set in [`TREE`], and has a stage, 0 to [`OLDEST`], kept in
 //! [`TREE_STAGE`], a plane four bits a cell wide: a cell's stage is one
-//! read and one write ([`simulation::Turn::value`]).
+//! read and one write ([`cells::value`]).
 //!
 //! Each tick every tree is sampled with [`SAMPLE_CHANCE`], and a tree
 //! sampled does one thing, by lot:
@@ -18,10 +18,9 @@
 //!
 //! Trees stand on dirt and grass alike and change neither.
 
-use bitplane_manager::{Write, WriteOp};
 use chunk_storage::{Bits4, LayerType, Wide};
 use coordinates::CellIndex;
-use simulation::Turn;
+use instructions::{cells, Turn};
 use worldgen::WET;
 use std::ops::AddAssign;
 
@@ -72,7 +71,7 @@ impl AddAssign for TreeCounts {
 /// The rule, on one superchunk's turn: every tree sampled with
 /// [`SAMPLE_CHANCE`], in Morton order, each seen to by [`tree`].
 pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> TreeCounts {
-    let (sampled, counts) = turn.each_sampled(TREE, SAMPLE_CHANCE, samples, tree);
+    let (sampled, counts) = cells::each_sampled(turn, TREE, SAMPLE_CHANCE, samples, tree);
     TreeCounts { sampled, ..counts }
 }
 
@@ -81,29 +80,30 @@ pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> TreeCounts {
 #[inline]
 fn tree(turn: &mut Turn, cell: CellIndex, counts: &mut TreeCounts) {
     let spreading = turn.random().unit() <= SPREAD_SHARE;
-    let Ok(stage) = turn.value(TREE_STAGE, cell) else {
+    let Some(stage) = cells::value(turn, TREE_STAGE, cell) else {
         return;
     };
     if spreading {
         counts.spreads += spread(turn, cell, stage) as usize;
     } else if stage < OLDEST {
-        turn.queue_value(TREE_STAGE, cell, stage + 1);
+        cells::set_value(turn, TREE_STAGE, cell, stage + 1);
         counts.grown += 1;
     } else if turn.random().below(DIE_ONE_IN) == 0 {
-        turn.queue(TREE, Write::cell(cell, WriteOp::Unset));
+        cells::clear(turn, TREE, cell);
         // Its stage goes with it: the next tree there starts at 0.
-        turn.queue_value(TREE_STAGE, cell, 0);
+        cells::set_value(turn, TREE_STAGE, cell, 0);
         counts.died += 1;
     }
 }
 
 /// The tree at `cell`, `stage` old, tries to spread: whether it put one.
 fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) -> bool {
-    let reach = AROUND as i32 / 2;
-    let Some(corner) = cell.offset(-reach, -reach).filter(|_| stage >= SEEDS_FROM) else {
+    if stage < SEEDS_FROM {
+        return false;
+    }
+    let Some((corner, around)) = cells::square(turn, TREE, cell, AROUND) else {
         return false;
     };
-    let around = turn.window(TREE, corner, AROUND, AROUND);
     // Itself is one of those counted.
     let others = around.set.count_ones().saturating_sub(1);
     // The more trees about it, the less likely: never with as many as crowd it.
@@ -116,9 +116,9 @@ fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) -> bool {
         return false;
     };
     // No tree under water.
-    if turn.holds(WET, onto) == Ok(true) {
+    if cells::holds(turn, WET, onto) {
         return false;
     }
-    turn.queue(TREE, Write::cell(onto, WriteOp::Set));
+    cells::set(turn, TREE, onto);
     true
 }

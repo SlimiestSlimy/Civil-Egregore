@@ -15,7 +15,7 @@ mod grass {
     use chunk_storage::{ChunkStorage, LayerCodec};
     use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
     use entity_manager::Entities;
-    use simulation::Simulation;
+    use instructions::Simulation;
     use mc_rules::grass::{tick, DECAY_CHANCE, SPREAD_CHANCE};
 
     /// The superchunk the tests run on: the world's origin, where grass

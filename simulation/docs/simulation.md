@@ -85,23 +85,27 @@ superchunk passes its wheel's tick and applies the instructions. An
 entity moving to a neighbour goes as a whole copy made in the first
 phase. One put in a superchunk not hot is lost, and counted.
 
-An entity sees the world about it at once: `Turn::area`
-reads the 16x16 cells of a layer about a cell as masks, a row a word,
-which is what `../../pathfinding/` finds a way over. An entity takes
-one pathfinding step each time it ticks, and keeps no route.
+An entity sees the world about it at once: windows of a layer's
+cells as masks (`Turn::window`), which `../../instructions/` puts
+together into the area `../../pathfinding/` finds a way over. An entity
+takes one pathfinding step each time it ticks, and keeps no route.
 
 ### What a rule is given
 
-A kind of entity (`../../entity_rules/`) writes only what is its own: the
-rest is here, the same for every kind.
+The turn, and no more: cells and entities read as the tick found them,
+writes and instructions queued. What a rule makes of them -- the cells
+beside an entity, the area about it, the way to what it seeks, the
+instruction that carries least -- is not the simulation's: it is
+`../../instructions/` (`docs/instructions.md`), free functions over a
+turn, which the rules are written in and reach the simulation through.
 
-**Instructions**, one for each thing done to an entity, each carrying
-no more than it changes (`entity_store/instructions.rs`):
+**Instructions queued**, one for each thing done to an entity, each
+carrying no more than it changes (`../entity_manager/`):
 
 | instruction | queued by | what it does | carries |
 |---|---|---|---|
-| put | `spawn`, `put`, `update` | an entity made, or made anew whole | its attributes |
-| move | `step`, `sleep` | moved to a cell, or left where it stands, to wake at a tick; its attributes as they are | nothing |
+| put | `put`, `update` | an entity made, or made anew whole | its attributes |
+| move | `step` | moved to a cell, or left where it stands, to wake at a tick; its attributes as they are | nothing |
 | edit | `set_attribute`, `unset_attribute` | one attribute set or removed, of any entity in reach | the one value |
 | remove | `remove` | removed | nothing |
 
@@ -111,66 +115,6 @@ another superchunk, where it goes whole. An edit is how one entity acts
 on another: two wounding one in a tick each write their own attribute,
 where two whole copies would undo each other. Every instruction that
 puts an entity on a cell is checked as it is applied.
-
-**An entity being changed** (`EntityEdit`): its attributes read, set and
-removed as if already its own, nothing copied until one is changed, and
-`Turn::commit` picks the instruction -- a move if none was,
-else a put. A rule states what the entity is to be; what that costs is
-not its concern.
-
-**The cells beside it** (`around`): the 3x3 about a cell as nine bits,
-read in one window (`Turn::around`); sets of neighbours are
-masks narrowed with `&`, one drawn with `pick` or `prefer`.
-`around_occupied` gives those entities stand on, `free_beside` one that
-none does -- for what must have its cell, as a newborn; a step need not
-ask.
-
-**The area about it, and the way**: `area` reads 16x16 cells of a layer
-as masks, `Area::count` how many are set, `area_occupied` the entities
-on them. The way over them is not the simulation's, which knows
-neither paths nor terrain: it is asked of
-`../../instructions/src/walking.rs`, free functions over a turn.
-`step_towards(turn, at, goals, passable)` gives the cell to step to
-for the nearest goal, `step_to(turn, at, to, passable)` for one cell --
-waves and A* of `../../pathfinding/`, round the entities in the way,
-one step a wake.
-
-**Walls**: the terrain's (`../../worldgen/`), two layers -- east and
-south -- read as any other; a diagonal is barred unless both ways round
-it are open. `around_unwalled(turn, at)` is the neighbours of a cell no wall is before,
-nine bits to narrow a step's choices by; `area_walls(turn, centre)` the
-walls of the area, which `step_towards` and `step_to` go round by
-themselves. Where the wall layers are not hot, nothing bars. The far
-search sees no walls: the step it gives is not taken if one bars it.
-
-**Further off** (`walking::seek(turn, at, type)`): nothing found in the area, the same
-search is made over tiles of a scale, 16 by 16 of them
-(`area_of_tiles`), a tile a goal if the type holds at any of its
-cells. The coarsest scale first: tiles 64 cells a side, 1,024 cells
-across -- an entity's reach, and no further -- each four of the arena's
-count tiles, so it is read off their counts a chunk at a time with no
-cell looked at (`Reader::tiles_holding`), and says at once whether
-there is any in reach and how far off. Then the finest scale whose
-tiles reach so far -- 2 cells a side, 4, 8, 16, 32 -- and coarser until
-one sees it, each tile a run of bits in Morton order
-(`Reader::any_in_tile`). The step is towards the nearest tile holding
-any, over the tiles hot, entities not looked at: it is turned back if
-one is in the way. It says how far it had to look
-(`SoughtStep::scale`). No route is kept here either:
-each step asks again, and the nearer it comes the finer it sees.
-
-Measured (`tilesim server pasture`, 16 superchunks, 64,000 sheep, one
-thread): on pasture a third grass nothing changes, no sheep looking
-further than its area; with no grass at all, every sheep seeking every
-step until it starves, 14,000 ticks take 9.1 s where they took 10.2
-without -- 4,700 instructions a search that finds nothing.
-
-Measured on the sheep, the first kind written on them
-(`tilesim server pasture 20000 333 4000 16 1`): the rule went from 363
-lines to 266, its neighbourhood, path and attribute handling gone; of a
-million wakes 283,000 are put whole where all were; the run's
-instructions the same within 0.2% -- a wake is bound by memory, not by
-what is carried.
 
 ### Woken entities are asked of memory ahead
 
@@ -329,9 +273,8 @@ comes to does not depend on the thread that takes it.
 | `src/tick.rs` | the two-phase tick |
 | `src/hot.rs` | which superchunks are to be hot: the world's size, the hot entity |
 | `src/halos.rs` | the halos moved: warming and cooling, each due at a tick, by jobs off the tick |
-| `src/turn/` | a superchunk's turn: `mod` the turn and its outbox, `area` the cells about a cell, `entities` the entities read and the instructions queued |
+| `src/turn/` | a superchunk's turn: `mod` the turn, its cells and its outbox, `entities` the entities read and the instructions queued |
 | `../entity_manager/` | the entities: buckets, the timer wheel, the instructions queued -- a crate of its own |
-| `src/around.rs` | the 3x3 cells about a cell, as nine bits |
 | `src/diagnostics/` | what the entities hold |
 | `tests/` | sampling, the tick, the entities, their instructions and the dispatcher, judged |
 | `docs/` | this, and the reference, function by function |

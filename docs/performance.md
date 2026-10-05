@@ -200,7 +200,7 @@ ticks a second. A cache of the chunk last found was not needed.
 
 | what | where |
 |---|---|
-| the far search for grass | `simulation/docs/simulation.md`, "What a rule is given" |
+| the far search for grass | `instructions/docs/instructions.md`, "What an entity's rule is given" |
 | the instructions of the apply phase | the same |
 | sampling, and count tiles | `tilesim.md`, "Sampling rarely, and count tiles" |
 | the flock's balance over a long run | `tilesim.md`, "Sheep leave thin pasture" |

@@ -10,10 +10,13 @@ rustflags = ["-C", "target-cpu=x86-64-v3"]
 # `cargo windows` builds for Windows where `cargo build --release`
 # builds for the machine it runs on -- `cargo windows -p renderer` the
 # renderer -- into `target/x86_64-pc-windows-gnu/release/`. Cargo takes
-# no switch of a project's own, so it is a command. On Linux it needs
-# MinGW's linker (`mingw-w64-gcc`).
+# no switch of a project's own, so it is a command: `cargo build`'s
+# other options follow it as they would that. What it builds is to be
+# handed on, so it carries no debug info or symbols: far smaller, and
+# no slower or faster. On Linux it needs MinGW's linker
+# (`mingw-w64-gcc`).
 [alias]
-windows = "build --release --target x86_64-pc-windows-gnu"
+windows = ["build", "--release", "--target", "x86_64-pc-windows-gnu", "--config", "profile.release.strip=true"]
 
 [target.x86_64-pc-windows-gnu]
 linker = "x86_64-w64-mingw32-gcc"

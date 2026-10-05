@@ -4,7 +4,7 @@ How an entity finds its way: over an **area** of 16x16 cells about it,
 kept as masks, a row a `u16` -- all this crate knows of the world. What
 the cells are, which may be walked on and where the walker wants to go
 are for whoever calls it: an entity's turn reads the area of a layer
-about a cell (`simulation`'s `Turn::area`), and a rule hands
+about a cell (`instructions::area::read`), and a rule hands
 here the masks it made of it.
 
 ## A step a tick

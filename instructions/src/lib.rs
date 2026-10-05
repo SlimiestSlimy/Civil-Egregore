@@ -12,7 +12,16 @@
 //!
 //! | module | instructions |
 //! |---|---|
+//! | `cells` | a layer at a cell asked and queued, a wide plane's number, the square about a cell, the going over the cells sampled |
+//! | `entities` | the going over the entities waking; one made, put to sleep, committed as changed, removed |
+//! | `around` | the 3x3 cells about a cell as nine bits: read, those entities stand on, one free, one picked |
+//! | `area` | the 16x16 cells about a cell, a row a word: read, those entities stand on, and the tiles further off |
 //! | `walking` | the steps the terrain's walls leave open, the step towards a cell or the nearest of some, and towards the nearest of a layer's however far off in reach |
+//!
+//! A rule is written in these alone. The simulation under them reads
+//! and writes cells and entities and no more: its [`Turn`] is what
+//! every instruction is asked on, [`Simulation`] what ticks a rule,
+//! [`TickReport`] what a tick says it did.
 //!
 //! Function by function: `docs/reference.md`.
 
@@ -20,4 +29,10 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
+pub mod area;
+pub mod around;
+pub mod cells;
+pub mod entities;
 pub mod walking;
+
+pub use simulation::{Simulation, TickReport, Turn};

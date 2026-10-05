@@ -15,7 +15,7 @@ mod sheep {
     use chunk_storage::mock::{DIRT, GRASS};
     use coordinates::CellCartesian;
     use entity_manager::{Attribute, EntityId, EntityRef, Header};
-    use simulation::Simulation;
+    use instructions::Simulation;
     use entity_rules::diagnostics::world::MockWorld;
     use entity_rules::sheep::{rule, tick, SheepCounts, HUNGRY_AT, LAMB, MEAL_TICKS, PREGNANT, ROAMING, ROAM_TICKS, SHEEP, STARVE_TICKS, STEP_JITTER, STEP_TICKS};
 
