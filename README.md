@@ -41,8 +41,8 @@ Every crate, the root too, has the same folders -- `docs/`, `src/`,
 kept out of git, and `tests/` -- as the
 [style guide](docs/style_guide.md) sets out; no crate has a `bin/`.
 
-Builds are for every x86-64 processor since about 2009
-(`.cargo/config.toml`, `target-cpu=x86-64-v2`): TileSim is a game, for
+Builds are for the x86-64 processors since about 2013 to 2015
+(`.cargo/config.toml`, `target-cpu=x86-64-v3`): TileSim is a game, for
 many machines. They are one cargo workspace: one lock file and one `target/`, here at
 the root, whichever folder cargo is run from, on the toolchain
 `rust-toolchain.toml` names. `cargo test` at the root tests every crate
