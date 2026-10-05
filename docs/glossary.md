@@ -148,7 +148,7 @@ what they always do and are not listed.
 | **wake** | an entity's turn to act: at its wake tick, filed in its superchunk's wheel | wheel, sleep | |
 | **sleep** | an entity waiting, doing nothing and costing nothing, until it wakes | wake | |
 | **wheel** | a superchunk's timer wheel: a slot a tick for the next 1,024, the wakes due in each (`Wheel`); it **passes** a tick once the tick is run | wake | turn |
-| **instruction** | a change to an entity, queued in the first phase and applied in the second: put, move, edit, remove (`Instruction`, `Instructions`) | outbox, apply | command, change |
+| **instruction** | one small thing a rule asks or does on a turn. The simulation's own are the changes to an entity, queued in the first phase and applied in the second: put, move, edit, remove (`Instruction`, `Instructions`); the `instructions` crate holds those built on them and on the crates beside the simulation -- a step found, a cell sought (`instructions::walking`) -- which rules are put together from | outbox, apply, rule | command, change, action |
 | **put** | the instruction placing an entity whole, header and attributes | instruction | spawn (making one new, by a put) |
 | **move** | the instruction stepping an entity to a cell, or setting its next wake, attributes as they are | step, instruction | |
 | **edit** | the instruction setting or removing one attribute; and an entity's own attributes being changed in its rule (`EntityEdit`) | attribute | |

@@ -1,0 +1,17 @@
+[package]
+name = "instructions"
+version = "0.1.0"
+edition = "2021"
+description = "TileSim's instructions: what a rule is made of -- small, varied pieces of behaviour, each asking the simulation, the terrain and pathfinding for one thing"
+publish = false
+
+[dependencies]
+simulation = { path = "../simulation" }
+pathfinding = { path = "../pathfinding" }
+worldgen = { path = "../worldgen" }
+coordinates = { path = "../coordinates" }
+chunk_storage = { path = "../chunk_storage" }
+
+[dev-dependencies]
+bitplane_manager = { path = "../bitplane_manager" }
+utilities = { path = "../utilities" }

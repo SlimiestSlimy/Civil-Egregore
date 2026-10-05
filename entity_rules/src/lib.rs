@@ -13,7 +13,6 @@
 //! | module | entity |
 //! |---|---|
 //! | `sheep` | sheep eating the grass, breeding, walking, starving: the first entity |
-//! | `walking` | the steps the terrain's walls leave open, and the way to a cell or to the nearest of a layer's: what an entity that walks asks |
 //! | `transient_data` | the crate's `transient_data/`, out of git: what its runs leave behind |
 //!
 //! Beside them, as in every crate: `diagnostics/`, here the mock world
@@ -29,4 +28,3 @@
 pub mod diagnostics;
 pub mod sheep;
 pub mod transient_data;
-pub mod walking;

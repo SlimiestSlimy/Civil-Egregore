@@ -129,7 +129,7 @@ ask.
 as masks, `Area::count` how many are set, `area_occupied` the entities
 on them. The way over them is not the simulation's, which knows
 neither paths nor terrain: it is asked of
-`../../entity_rules/src/walking.rs`, free functions over a turn.
+`../../instructions/src/walking.rs`, free functions over a turn.
 `step_towards(turn, at, goals, passable)` gives the cell to step to
 for the nearest goal, `step_to(turn, at, to, passable)` for one cell --
 waves and A* of `../../pathfinding/`, round the entities in the way,
