@@ -29,7 +29,7 @@ reader has to wonder whether something is missing or was never needed
 | `src/diagnostics/` | code that gathers data and judges nothing: mock worlds, counts, censuses. A tool that prints them goes in `src/diagnostics/tool`, a function among the crate's commands |
 | `src/transient_data.rs` | names the crate's `transient_data/` folder, through `utilities::transient_data`, and says what goes where in it |
 | `transient_data/` | what runs leave behind: measurements, renders, saves. Never in git, never needed as an input |
-| `tests/<tier>.rs` | one test program per tier (fine, fast, complete), one module per topic in `tests/<tier>/<topic>.rs` |
+| `tests/<tier>/main.rs` | one test program per tier (fine, fast, complete), one module per topic beside it, `tests/<tier>/<topic>.rs`; a tier with no topics is the one file `tests/<tier>.rs` |
 
 - A crate is a library: no `[[bin]]`, no `bin/`, no `src/bin/`. Only
   the root (`tilesim`) and the renderer are programs. A tool is a

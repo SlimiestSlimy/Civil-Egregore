@@ -3,5 +3,4 @@
 //!
 //! `cargo test --test fast`
 
-#[path = "fast/walking.rs"]
 mod walking;

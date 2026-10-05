@@ -119,7 +119,7 @@ walls are two layers now (`worldgen/docs/worldgen.md`).
 ## Terrain
 
 A generated world, whose walls every hungry sheep reads
-(`tilesim server new <folder> Perf 1 64`, then `tilesim server run
+(`tilesim server new <folder> 1 64`, then `tilesim server run
 <folder> <ticks>`), runs somewhat slower than the mock world of the same
 size without them (`tilesim server pasture`).
 
@@ -179,7 +179,7 @@ count of the chunks before it that have one
 mostly empty -- the cells under water on land, the walls, the trees --
 cost what they hold.
 
-A generated world, 21 superchunks (`tilesim server new <folder> T 106
+A generated world, 21 superchunks (`tilesim server new <folder> 106
 4000`, then `tilesim server run <folder> 30000`), and the mock pasture,
 where every chunk has cells (`tilesim server pasture 6000 333 4000
 <superchunks>`):

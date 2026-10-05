@@ -3,5 +3,5 @@
 //!
 //! `cargo test --test fine`
 
-#[path = "fine/coordinates.rs"]
-mod coordinates;
+mod entities;
+mod instructions;

@@ -3,5 +3,4 @@
 //!
 //! `cargo test -p gui --test fine`
 
-#[path = "fine/tuning.rs"]
 mod tuning;

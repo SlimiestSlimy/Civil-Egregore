@@ -35,11 +35,14 @@
 //! | `H` | show every cell's height, from near enough to read them |
 //! | `P` | draw the mesh's lines over the map |
 //! | `U` | the sliders' menu, or none: the near view's shading, and in the lab how the world is generated |
-//! | Escape | the options, or none: going on, opening a world of the worlds' folder, and leaving TileSim |
+//! | Escape | the options, or none: going on, saving the world, opening one of the worlds' folder, and leaving TileSim |
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
+// On Windows a window alone: no console opened beside it, as one is
+// for a program that does not say so. It prints nothing.
+#![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod ground;
 mod lab;
@@ -433,11 +436,19 @@ fn recentre(camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>, s
     }
 }
 
-/// Tells the simulation to open each world chosen in the options: a
-/// plain name, so one of the worlds' folder.
-fn open(mut chosen: MessageReader<options::Chosen>, link: Res<Link>) {
+/// Tells the simulation to open each world chosen in the options and
+/// to save the world when they say, by name: worlds of the worlds'
+/// folder. Tells the options the name of the world run.
+fn open(mut chosen: MessageReader<options::Chosen>, mut save: MessageReader<options::Save>, mut options: ResMut<options::Options>, link: Res<Link>) {
     for world in chosen.read() {
-        _ = link.requests.send(Request::Open(utilities::settings::world(&world.0)));
+        _ = link.requests.send(Request::Open(world.0.clone()));
+    }
+    for world in save.read() {
+        _ = link.requests.send(Request::Save(world.0.clone()));
+    }
+    let named = sim::named();
+    if options.bypass_change_detection().named() != named.as_deref() {
+        options.name(named);
     }
 }
 
@@ -473,8 +484,8 @@ fn steer(
 }
 
 /// Puts the window over the whole screen, or back, by its key.
-fn fullscreen(keys: Res<ButtonInput<KeyCode>>, mut window: Single<&mut Window>) {
-    if keys.just_pressed(KeyCode::KeyF) {
+fn fullscreen(keys: Res<ButtonInput<KeyCode>>, mut window: Single<&mut Window>, options: Res<options::Options>) {
+    if keys.just_pressed(KeyCode::KeyF) && !options.open() {
         window.mode = match window.mode {
             WindowMode::Windowed => WindowMode::BorderlessFullscreen(MonitorSelection::Current),
             _ => WindowMode::Windowed,
@@ -483,7 +494,10 @@ fn fullscreen(keys: Res<ButtonInput<KeyCode>>, mut window: Single<&mut Window>) 
 }
 
 /// Pauses and paces the simulation.
-fn keys(mut link: ResMut<Link>, keys: Res<ButtonInput<KeyCode>>) {
+fn keys(mut link: ResMut<Link>, keys: Res<ButtonInput<KeyCode>>, options: Res<options::Options>) {
+    if options.open() {
+        return;
+    }
     if keys.just_pressed(KeyCode::Space) {
         link.paused = !link.paused;
         _ = link.requests.send(Request::Pause(link.paused));
@@ -836,9 +850,9 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         0 => format!("a pixel {} cell(s) a side", 1u32 << seen.detail),
         pixels => format!("a cell {pixels} pixels a side"),
     };
-    let refused = sim::refused().map_or(String::new(), |why| format!("not opened: {why}\n"));
+    let said = sim::said().map_or(String::new(), |said| format!("{said}\n"));
     text.0 = format!(
-        "{refused}seed {:016x}   ocean at {}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   P: lines (on the map)   U: sliders",
+        "{said}seed {:016x}   ocean at {}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   P: lines (on the map)   U: sliders",
         lab::seed(),
         lab::generation().shape.ocean,
         grouped(seen.tick),

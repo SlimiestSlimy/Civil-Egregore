@@ -3,5 +3,4 @@
 //!
 //! `cargo test --test fine`
 
-#[path = "fine/chunk_storage.rs"]
 mod chunk_storage;

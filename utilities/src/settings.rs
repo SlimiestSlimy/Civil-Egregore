@@ -79,10 +79,28 @@ pub fn world(named: &str) -> PathBuf {
 }
 
 /// Where the world named `named` is kept, the worlds' folder being
-/// `worlds`.
+/// `worlds`: a plain name as a folder may have it ([`world_name`]).
 pub fn world_in(worlds: &Path, named: &str) -> PathBuf {
     let path = Path::new(named);
-    if path.components().count() == 1 && path.is_relative() && named != "." && named != ".." { worlds.join(path) } else { path.to_path_buf() }
+    let plain = path.components().count() == 1 && path.is_relative() && named != "." && named != "..";
+    match world_name(named).filter(|_| plain) {
+        Some(name) => worlds.join(name),
+        None => path.to_path_buf(),
+    }
+}
+
+/// `given` as a world's name, which is its folder's: only what a
+/// folder may be named on Windows and on Linux alike -- letters,
+/// digits, spaces, `-`, `_` and `.`, no space or `.` at either end,
+/// and not a name Windows keeps for a device (`CON`, `COM1`, ...),
+/// which is given a `_` before it. `None` if nothing is left.
+pub fn world_name(given: &str) -> Option<String> {
+    let kept: String = given.chars().filter(|&letter| letter.is_alphanumeric() || " -_.".contains(letter)).collect();
+    let name = kept.trim_matches([' ', '.']);
+    let stem = name.split('.').next().unwrap_or(name).trim_end().to_ascii_uppercase();
+    let numbered = |device: &str| stem.strip_prefix(device).is_some_and(|number| matches!(number, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"));
+    let device = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL") || numbered("COM") || numbered("LPT");
+    (!name.is_empty()).then(|| if device { format!("_{name}") } else { name.to_string() })
 }
 
 /// Settings: each one's name and its value, as a file has them, in

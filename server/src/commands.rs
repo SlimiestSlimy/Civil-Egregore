@@ -22,8 +22,8 @@ const FOLDER: &str = "folder";
 pub const COMMANDS: [Command; 5] = [
     Command {
         name: "new",
-        does: "makes a world from a seed, a flock on its origin, and saves it in the folder",
-        parameters: &[Parameter::new(FOLDER, ""), Parameter::new("name", "World"), Parameter::new("seed", "1"), Parameter::new("sheep", "")],
+        does: "makes a world from a seed, a flock on its origin, and saves it in the folder; so many superchunks along a side, or 0 for as far as it goes",
+        parameters: &[Parameter::new(FOLDER, ""), Parameter::new("seed", "1"), Parameter::new("sheep", ""), Parameter::new("side", "0")],
         run: |given| printed(given, new),
     },
     Command { name: "run", does: "loads the world in the folder, ticks it, and saves it", parameters: &[Parameter::new(FOLDER, ""), Parameter::new("ticks", "10000")], run: |given| printed(given, run) },
@@ -50,23 +50,27 @@ fn printed(given: &Given, command: impl FnOnce(&Path, &[&str]) -> Result<String,
     Ok(())
 }
 
+/// The name of the world in `folder`: the folder's.
+fn name(folder: &Path) -> String {
+    folder.file_name().map_or_else(|| folder.display().to_string(), |name| name.to_string_lossy().into_owned())
+}
+
 /// `argument` as a number, or `default` if not given.
 fn number(argument: Option<&&str>, default: u64) -> Result<u64, String> {
     argument.map_or(Ok(default), |argument| argument.parse().map_err(|_| format!("`{argument}` is not a number")))
 }
 
 /// Makes a world from a seed, a flock on its origin, and saves it in
-/// `folder`.
+/// `folder`: of a size if given a side, in superchunks, that is not 0.
 pub fn new(folder: &Path, rest: &[&str]) -> Result<String, String> {
     if folder.join("world").exists() {
         return Err(format!("{} is a world already", folder.display()));
     }
-    let name = rest.first().copied().unwrap_or("World");
-    let (seed, sheep) = (number(rest.get(1), 1)?, number(rest.get(2), crate::FLOCK as u64)? as usize);
-    let mut made = crate::generate(seed, sheep);
-    made.info.name = name.to_string();
+    let (seed, sheep) = (number(rest.first(), 1)?, number(rest.get(1), crate::FLOCK as u64)? as usize);
+    let side = Some(number(rest.get(2), 0)? as u32).filter(|&side| side > 0);
+    let mut made = crate::flocked(crate::generate_sized(crate::Generation::DEFAULT, seed, side), &[coordinates::WORLD_MIDDLE], sheep);
     let saved = crate::save(folder, &mut made).map_err(|error| error.to_string())?;
-    Ok(format!("{name}, seed {seed}: {} superchunks, {} entities, {} bytes in {}", saved.superchunks, saved.entities, saved.bytes, folder.display()))
+    Ok(format!("{}, seed {seed}: {} superchunks, {} entities, {} bytes in {}", name(folder), saved.superchunks, saved.entities, saved.bytes, folder.display()))
 }
 
 /// Loads the world in `folder`, ticks it, and saves it.
@@ -86,7 +90,7 @@ pub fn run(folder: &Path, rest: &[&str]) -> Result<String, String> {
     let HaloChange { reached, generated, restored, cooled } = halos;
     Ok(format!(
         "{}: tick {} -> {}, {:.0} ticks a second; {} entities; {hot} of {} superchunks hot, {cooling} of them cooling, {warming} warming, {grass} cells of grass on them; superchunks {reached} reached, {generated} generated, {restored} restored, {cooled} cooled; {} bytes saved",
-        loaded.info.name,
+        name(folder),
         loaded.info.tick,
         loaded.entities.now(),
         ticks as f64 / seconds,
@@ -100,5 +104,6 @@ pub fn run(folder: &Path, rest: &[&str]) -> Result<String, String> {
 pub fn info(folder: &Path) -> Result<String, String> {
     let info = disk::read_world(folder).map_err(|error| error.to_string())?;
     let superchunks = disk::saved_superchunks(folder).map_err(|error| error.to_string())?;
-    Ok(format!("{}: seed {}, at tick {}, {} superchunks, layer types {:?}", info.name, info.seed, info.tick, superchunks.len(), info.layers.iter().map(|layer| layer.0).collect::<Vec<_>>()))
+    let size = info.side.map_or("of no size".to_string(), |side| format!("{side} superchunks a side"));
+    Ok(format!("{}: seed {}, at tick {}, {size}, {} superchunks, layer types {:?}", name(folder), info.seed, info.tick, superchunks.len(), info.layers.iter().map(|layer| layer.0).collect::<Vec<_>>()))
 }

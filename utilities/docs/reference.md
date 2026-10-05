@@ -104,4 +104,6 @@ ones alone under the feature `default_settings`),
 **`write_to(path)`**. `WORLDS`: the setting naming the folder worlds
 are kept in; **`worlds()`**: that folder, `worlds` in TileSim's unless
 set; **`world(named)`**, **`world_in(worlds, named)`**: where a world
-is kept -- a plain name in the worlds' folder, anything more a path.
+is kept -- a plain name in the worlds' folder, anything more a path;
+**`world_name(given)`**: a world's name as a folder may have it on
+Windows and Linux alike.

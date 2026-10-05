@@ -3,5 +3,4 @@
 //!
 //! `cargo test --test fast`
 
-#[path = "fast/sheep.rs"]
 mod sheep;

@@ -287,8 +287,8 @@ pub fn setup(mut commands: Commands) {
 }
 
 /// Opens the menu by `U`, the sliders closed; closes whatever is open.
-pub fn toggle(keys: Res<ButtonInput<KeyCode>>, hands: Res<Hands>) {
-    if keys.just_pressed(KeyCode::KeyU) && hands.typed.is_none() {
+pub fn toggle(keys: Res<ButtonInput<KeyCode>>, hands: Res<Hands>, options: Res<crate::options::Options>) {
+    if keys.just_pressed(KeyCode::KeyU) && hands.typed.is_none() && !options.open() {
         show(if shown() == Shown::Closed { Shown::Menu } else { Shown::Closed });
     }
 }

@@ -3,5 +3,5 @@
 //!
 //! `cargo test --test fast`
 
-#[path = "fast/terrain.rs"]
-mod terrain;
+mod sampling;
+mod tick;

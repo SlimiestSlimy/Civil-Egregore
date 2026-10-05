@@ -1,5 +1,7 @@
 # The toolchain every crate here is built with, on any machine: rustup
-# installs it on the first build.
+# installs it on the first build, and with it what building for Windows
+# from Linux needs (`cargo windows`, `.cargo/config.toml`).
 [toolchain]
 channel = "1.99.0"
 components = ["clippy", "rustfmt"]
+targets = ["x86_64-pc-windows-gnu"]

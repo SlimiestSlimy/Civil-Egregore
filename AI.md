@@ -1,6 +1,6 @@
 # For whoever works on TileSim with an AI
 
-Rules that hold whatever the task. The handoff, the style guide
+Rules that hold whatever the task. The style guide
 (`docs/style_guide.md`) and the testing protocol
 (`docs/testing_protocol.md`) say the rest.
 
@@ -19,7 +19,7 @@ Rules that hold whatever the task. The handoff, the style guide
 
 ## Measuring under full load
 
-The world is hot only in the halos about its keepers, which move with
+The world is hot only in the halos about its hot entities, which move with
 them. To measure a fixed load, every superchunk shown is forced hot and
 kept so -- the renderer's fifth argument:
 
@@ -37,6 +37,19 @@ cargo run --release -p renderer -- <superchunks> <sheep a superchunk> 0 0 1
   `cargo run --release -- help` lists them all.
 - A doc gives a performance figure only where it explains an
   optimization, before and after; nowhere else.
+
+## Where things go
+
+- A rule -- `entity_rules/`, `mc_rules/` -- reaches the simulation only
+  through `instructions/`: what it lacks is added there, not gone round.
+- What is hot, and for how long, is the simulation's
+  (`simulation::halos`); the server only says which entity keeps the
+  world hot and hands over what generates a superchunk.
+- The default settings (`utilities/default_settings.txt`) and the
+  sliders (`gui/sliders.txt`) are written by hand: nothing generates
+  them.
+- A test's read before a commit is made: testing, committing and
+  pushing are never one command.
 
 ## Renames
 

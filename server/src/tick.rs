@@ -53,7 +53,7 @@ pub fn tick_rules(simulation: &mut Simulation, arena: &mut BitmapArena, entities
 
 impl World {
     /// One tick of the rules over the hot superchunks, then the halos
-    /// moved to where their keepers came to.
+    /// moved to where the hot entities came to.
     pub fn tick(&mut self) -> WorldTick {
         let rules = tick_rules(&mut self.simulation, &mut self.arena, &mut self.entities, self.info.seed);
         WorldTick { rules, halos: self.move_halos() }

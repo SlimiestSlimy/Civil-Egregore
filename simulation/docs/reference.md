@@ -58,6 +58,55 @@ cells about `at`, an **`Around`** `{set, hot}` of nine bits;
 **`slot_of`**: the slot of a
 superchunk, past the neighbours panicking.
 
+## `hot.rs`
+
+**`Hot`** `{side, entity}`: the world's size and the hot entity --
+**`about(entity)`**, **`span()`**, **`within(superchunk)`**,
+**`wanted(entities)`**: the superchunks to be hot, or nothing where
+they are forced in a world of no size. **`about(of)`**: the 3x3
+superchunks about each, sorted, each once.
+
+## `halos.rs`
+
+**`Held`** `{arena, storage, entities, simulation, cold, layers,
+generate}`: the world's, lent for a call. **`Halos`** `{hot, jobs,
+warming, cooling, writing_back, flushing}`, **`new(hot,
+dispatcher)`**, **`restore_cooling(cooling)`**. `WARM_TICKS` (256): the ticks a superchunk is warming;
+`COOL_TICKS` (256): the ticks one is cooling.
+**`HaloChange`** `{reached, generated, restored, cooled}`, added with
+`+=`. **`Warming`** `{superchunk, due, from}`, from a
+**`WarmedFrom`**: `Lingering`, or `Job(ticket)`.
+**`Halos::move_to_hot_entities`**: the halos moved to the hot entities, those
+reached hot `WARM_TICKS` on, those left cold `COOL_TICKS` on.
+**`Halos::keep_hot(wanted)`**: `wanted` made the hot superchunks now.
+**`Halos::warming`**, **`Halos::cooling`**: the superchunks warming,
+and those cooling, each with its due tick. Both through
+**`Halos::make_hot_within(wanted, warm_ticks, cool_ticks)`**: the
+write-backs encoded landed; those cooling wanted again no longer
+cooling; every hot one not wanted cooling, due no later than
+`cool_ticks` on; those due made cold -- state kept, bitmaps lingering
+(`BitmapArena::make_cold_superchunk`), their dirty ones sent to be
+encoded; those warming not wanted dropped (`BitmapArena::let_go`, or
+the job forgotten); every one warming due no later than `warm_ticks`
+on; the wanted ones neither hot nor warming started; those due made hot, the
+entities aligned, the kept states put back and the random streams with
+them. **`Halos::start_warming(superchunk, due)`**: held if lingering
+(`BitmapArena::hold`), else sent as a job.
+**`Halos::finish_warming`**: a warming superchunk's bitmaps made hot -- again
+as they were (`BitmapArena::make_hot_again`), or as its job made
+them (`BitmapArena::make_hot_cells`), its image put in the cold pool if
+generated. **`Halos::land_write_backs(wait)`**: the encoded write-backs
+put into the ring, in order (`ChunkStorage::try_write_back`, then
+`BitmapArena::written_back`), the tail flushed whenever it needs the
+room, then the flushes landed. **`Halos::flush_tail`**: the tail
+superchunk's changes taken (`ChunkStorage::take`) and sent to be
+flushed, its flush before landed first. **`Halos::land_flushes(wait)`**:
+the images rewritten put in the cold pool, the arena told of each with
+no change left in the ring (`BitmapArena::flushed`).
+**`Halos::write_back_all`**: every hot superchunk's dirty bitmaps sent
+to be encoded, and every write-back landed. **`Halos::flush_all`**:
+every superchunk with changes in the ring flushed, on all the threads.
+
 ## `tick.rs`
 
 **`TickReport`** `{writes_applied, instructions_applied, rules,
