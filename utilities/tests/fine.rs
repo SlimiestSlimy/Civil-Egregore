@@ -13,3 +13,5 @@ mod process_memory;
 mod rng;
 #[path = "fine/table.rs"]
 mod table;
+#[path = "fine/commands.rs"]
+mod commands;

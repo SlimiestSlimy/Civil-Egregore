@@ -4,7 +4,7 @@
 //!
 //! | module | what it is |
 //! |---|---|
-//! | [`commands`] | the commands: `new`, `run`, `info` |
+//! | [`commands`] | the commands: `new`, `run`, `info`, and each crate's diagnostics tools, by the crate's name |
 //! | `diagnostics/` | data gathered, to be measured and tested on: none yet |
 //! | [`transient_data`] | the crate's `transient_data/`, out of git: the tests' worlds |
 //!

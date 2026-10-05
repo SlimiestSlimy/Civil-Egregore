@@ -17,12 +17,16 @@ its halo (**`new`**, `world::generate`) -- and saved in the folder,
 which must not hold one. `tilesim run <folder> [ticks]`:
 it loaded, ticked and saved again (**`run`**). `tilesim info
 <folder>`: what its world file says (**`info`**). **`number`**: an
-argument, or its default. **`USAGE`**: how to call the program.
+argument, or its default. **`COMMANDS`**: those three, and each
+crate's diagnostics tools under the crate's name (`world`, `tessera`),
+handed the rest of the line as it is. **`dispatch(arguments)`**: the
+command the first word names (`utilities::commands`). **`printed`**: a
+command run on its folder, its line printed.
 
 ## `main.rs`
 
-**`main`**: the command the command line names, its line printed;
-anything else prints `USAGE`.
+**`main`**: the command line handed to `commands::dispatch`; anything
+it does not name prints the commands as a table.
 
 ## `transient_data.rs`
 

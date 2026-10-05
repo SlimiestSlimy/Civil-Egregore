@@ -1,14 +1,52 @@
-//! The commands, each given the rest of the command line after its
-//! folder, and giving the line to print -- or why it could not.
+//! The commands ([`COMMANDS`]): the program's own, each given the rest
+//! of the command line after its folder and giving the line to print --
+//! or why it could not -- and each crate's diagnostics tools, reached by
+//! the crate's name ([`dispatch`]).
 
 use chunk_storage::disk;
 use chunk_storage::mock::GRASS;
 use std::path::Path;
 use std::time::Instant;
+use utilities::commands::{Command, Given, Parameter};
 use world::HaloChange;
 
-/// How to call the program.
-pub const USAGE: &str = "tilesim new <folder> [name] [seed] [sheep]\ntilesim run <folder> [ticks]\ntilesim info <folder>";
+/// The program's name: what its commands are reached by.
+const CALLED: &str = "tilesim";
+
+/// A world's folder.
+const FOLDER: &str = "folder";
+/// A crate's tool, and what the tool takes: handed on as given.
+const TOOL: &str = "tool, and what it takes";
+
+/// The program's commands: its own, and each crate's tools, reached by
+/// the crate's name and handed the rest of the line as it is -- which
+/// tools a crate has, and what they take, is the crate's to know.
+pub const COMMANDS: [Command; 5] = [
+    Command {
+        name: "new",
+        does: "makes a world from a seed, a flock on its origin, and saves it in the folder",
+        parameters: &[Parameter::new(FOLDER, ""), Parameter::new("name", "World"), Parameter::new("seed", "1"), Parameter::new("sheep", "")],
+        run: |given| printed(given, new),
+    },
+    Command { name: "run", does: "loads the world in the folder, ticks it, and saves it", parameters: &[Parameter::new(FOLDER, ""), Parameter::new("ticks", "10000")], run: |given| printed(given, run) },
+    Command { name: "info", does: "says what the world in the folder is", parameters: &[Parameter::new(FOLDER, "")], run: |given| printed(given, |folder, _| info(folder)) },
+    Command { name: "world", does: "the world's diagnostics tools; none named, they are listed", parameters: &[Parameter::new(TOOL, "")], run: |given| world::diagnostics::tool::dispatch(given.arguments()) },
+    Command { name: "tessera", does: "Tessera's diagnostics tools; none named, they are listed", parameters: &[Parameter::new(TOOL, "")], run: |given| tessera::diagnostics::tool::dispatch(given.arguments()) },
+];
+
+/// Does what `arguments`, the command line after the program's name,
+/// asks: the command its first word names, given the rest.
+pub fn dispatch(arguments: &[&str]) -> Result<(), String> {
+    utilities::commands::dispatch(CALLED, &COMMANDS, arguments)
+}
+
+/// Runs `command` on the folder given and what follows it, and prints
+/// the line it gives.
+fn printed(given: &Given, command: impl FnOnce(&Path, &[&str]) -> Result<String, String>) -> Result<(), String> {
+    let folder = given.text(FOLDER)?;
+    println!("{}", command(Path::new(folder), &given.arguments()[1..])?);
+    Ok(())
+}
 
 /// `argument` as a number, or `default` if not given.
 fn number(argument: Option<&&str>, default: u64) -> Result<u64, String> {

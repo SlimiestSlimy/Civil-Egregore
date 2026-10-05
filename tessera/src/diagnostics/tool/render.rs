@@ -1,12 +1,12 @@
 //! PNG images of the bitmaps looked at, written to
 //! `transient_data/renders/`.
 
-use tessera::diagnostics::bitmaps::looked_at;
-use tessera::diagnostics::png::png;
+use crate::diagnostics::bitmaps::looked_at;
+use crate::diagnostics::png::png;
 use std::fs;
 use utilities::diagnostics::table::Table;
 use std::path::Path;
-use tessera::transient_data;
+use crate::transient_data;
 
 /// Writes a PNG of every bitmap looked at, and prints a table of them:
 /// each bitmap, its cells set, and where its image went.

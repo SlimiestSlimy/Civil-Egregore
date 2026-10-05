@@ -16,6 +16,10 @@ none.
 - **Transient data** (`transient_data.rs`): where a crate's runs leave
   what they make, `transient_data/` beside its `Cargo.toml`, out of git.
   Each crate names its own in its `src/transient_data.rs`.
+- **Commands** (`commands.rs`): a command line's first word found among
+  a crate's commands and handed the rest. A crate's tools are functions
+  listed with their parameters, each declared once with its default;
+  the one program routes to a crate by name and knows none of its tools.
 - **The seed** (`seed.rs`): the one seed every crate's tests and tools
   start from, in the workspace's `transient_data/seed`, rolled every 5
   counted runs; `TILESIM_SEED` picks one for a run.

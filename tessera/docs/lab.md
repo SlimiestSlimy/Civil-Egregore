@@ -3,7 +3,7 @@
 What measures and tests Tessera rather than encodes: the corpus
 generators, the diagnostics -- the adversarial search among them --
 `transient_data`,
-and the tools beside them (`src/diagnostics/tool/`, `src/diagnostics/adversarial/main.rs`). `docs/testing_protocol.md` says how they
+and the tools beside them (`src/diagnostics/tool/`, `src/diagnostics/tool/adversarial.rs`). `docs/testing_protocol.md` says how they
 are used; this file says what each function does. The encoder is in
 `docs/reference.md`.
 
@@ -157,14 +157,14 @@ Paths under `transient_data/`, out of git: **`seed_file`**,
 **`publish(report)`**: notes the run's seed on the report, prints it,
 and keeps it as `measurements/<tool>.csv`, replacing the last.
 
-## `src/diagnostics/adversarial/main.rs`
+## `src/diagnostics/tool/adversarial.rs`
 
-**`main`**: the search against the raw cells: `search_at_once` scoring
+**`run`**: the search against the raw cells: `search_at_once` scoring
 each bitmap by **`score`** -- Tessera's bits less the raw cells of the
 area searched, not Tessera's bits alone, which noise maximizes for any
 encoder. Keeps the worst plane if it beats the worst kept, checks the
 worst bitmap round trips, and publishes what each search found.
-**`save`**: `adversarial save <worst> <name> <description>` copies a
+**`save`**: `tilesim tessera adversarial_save <worst> <name> <description>` copies a
 worst bitmap to the saved bitmaps with a description and the worst bitmap's notes.
 
 ## `src/diagnostics/tool/`: one tool a file

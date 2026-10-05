@@ -48,8 +48,11 @@ the root, whichever folder cargo is run from, on the toolchain
 `rust-toolchain.toml` names. `cargo test` at the root tests every crate
 but the renderer, which brings Bevy and is asked for by name:
 `cargo run --release -p renderer`. Run from a crate's folder, cargo keeps
-to that crate. Two crates have a `diagnostics` tool: the world's is
-`--bin diagnostics`, Tessera's `--bin tessera_diagnostics`. Tessera's
+to that crate. Only the root and the renderer are programs: every other
+crate is a library, and its diagnostics tools are run through the root,
+by the crate's name -- `cargo run --release -- world pasture`,
+`cargo run --release -- tessera measurement`; `cargo run --release`
+alone lists what there is. Tessera's
 external benchmarks are a workspace of their own, so the codecs they
 compare against never enter this build.
 

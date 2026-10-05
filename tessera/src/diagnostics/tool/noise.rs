@@ -2,10 +2,10 @@
 //! densities, against the raw cells: what Tessera pays where nothing
 //! compresses, or little does.
 
-use tessera::diagnostics::measured::Measured;
-use tessera::diagnostics::RAW_CELLS;
-use tessera::Tessera;
-use tessera::corpus::{grown, corpus_seed};
+use crate::diagnostics::measured::Measured;
+use crate::diagnostics::RAW_CELLS;
+use crate::Tessera;
+use crate::corpus::{grown, corpus_seed};
 use utilities::diagnostics::table::report::Report;
 use utilities::diagnostics::table::Table;
 

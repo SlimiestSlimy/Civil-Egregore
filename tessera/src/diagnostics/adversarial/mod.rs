@@ -1,7 +1,7 @@
 //! Adversarial bitmaps: searches for the bitmaps an encoder does worst
 //! on, by any score the caller gives -- Tessera against its raw cells, or
 //! against another encoder. Kept in the library so every search, in any
-//! crate, is the same search: `src/diagnostics/adversarial/main.rs` scores Tessera
+//! crate, is the same search: `src/diagnostics/tool/adversarial.rs` scores Tessera
 //! against the raw cells, `external_benchmarks/` scores it against the
 //! external codecs. See `docs/testing_protocol.md`.
 //!
@@ -54,18 +54,6 @@ pub struct Effort {
     pub window: u64,
     /// Changes tried on the whole plane, from each start.
     pub plane: u64,
-}
-
-impl Effort {
-    /// The default effort, but for the changes tried on the plane: the
-    /// program's first argument, if it has one.
-    pub fn from_arguments() -> Self {
-        let mut effort = Self::default();
-        if let Some(plane) = std::env::args().nth(1) {
-            effort.plane = plane.parse().expect("a number of changes");
-        }
-        effort
-    }
 }
 
 impl Default for Effort {

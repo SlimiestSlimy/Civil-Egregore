@@ -26,13 +26,19 @@ reader has to wonder whether something is missing or was never needed
 | `docs/<crate>.md` | its design: what it is, and every decision with its reason |
 | `docs/reference.md` | every item, function by function, in the glossary's words; the code's comments point here |
 | `src/lib.rs` | a table of the crate's modules: one line each, what it is |
-| `src/diagnostics/` | code that gathers data and judges nothing: mock worlds, counts, censuses. A tool that prints them goes in `src/diagnostics/tool/` |
+| `src/diagnostics/` | code that gathers data and judges nothing: mock worlds, counts, censuses. A tool that prints them goes in `src/diagnostics/tool`, a function among the crate's commands |
 | `src/transient_data.rs` | names the crate's `transient_data/` folder, through `utilities::transient_data`, and says what goes where in it |
 | `transient_data/` | what runs leave behind: measurements, renders, saves. Never in git, never needed as an input |
 | `tests/<tier>.rs` | one test program per tier (fine, fast, complete), one module per topic in `tests/<tier>/<topic>.rs` |
 
-- No crate has a `bin/` or a `src/bin/`. A program is a tool, and lives
-  in `src/diagnostics/tool/`.
+- A crate is a library: no `[[bin]]`, no `bin/`, no `src/bin/`. Only
+  the root (`tilesim`) and the renderer are programs. A tool is a
+  function in `src/diagnostics/tool`, listed among the crate's
+  `COMMANDS` and run by `tilesim <crate> <tool>`; the root hands the
+  crate the rest of the line and knows none of its tools.
+- A command's parameters are declared once, name and default
+  (`utilities::commands::Parameter`): the usage, the parsing and the
+  report's line all come from that. No crate reads `std::env::args`.
 - **`utilities/` is the shared top folder.** Code that two crates need
   goes there, once (#2). It is never copied into both.
 - A crate depends only on the crates below it. The README lists the
@@ -136,5 +142,5 @@ Some things are named by rule:
 - Speed is never a test. It is measured by a tool, and a number written
   down names the command that gave it.
 - The reference for the tick is the instructions callgrind counts for
-  `diagnostics pasture 300 333 4000 4 1`, less the same run with no
+  `tilesim world pasture 300 333 4000 4 1`, less the same run with no
   ticks. A change keeps within 1% of it, or says why not.

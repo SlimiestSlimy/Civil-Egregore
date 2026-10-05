@@ -87,7 +87,9 @@ fn median_micros(mut encode: impl FnMut()) -> f64 {
 /// worst bitmaps with both encoders' bits and times.
 fn main() {
     let seed = corpus_seed();
-    let effort = Effort::from_arguments();
+    // The changes tried on the plane from each start: the first argument, if given.
+    let plane = std::env::args().nth(1).map_or(Effort::default().plane, |plane| plane.parse().expect("a number of changes"));
+    let effort = Effort { plane, ..Effort::default() };
     let mut table = Table::new(&[
         "against",
         "worst gap\nthis run",

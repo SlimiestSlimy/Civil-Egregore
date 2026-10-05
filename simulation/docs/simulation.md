@@ -156,14 +156,14 @@ one is in the way. It says how far it had to look
 (`SoughtStep::scale`). No route is kept here either:
 each step asks again, and the nearer it comes the finer it sees.
 
-Measured (`diagnostics pasture`, 16 superchunks, 64,000 sheep, one
+Measured (`tilesim world pasture`, 16 superchunks, 64,000 sheep, one
 thread): on pasture a third grass nothing changes, no sheep looking
 further than its area; with no grass at all, every sheep seeking every
 step until it starves, 14,000 ticks take 9.1 s where they took 10.2
 without -- 4,700 instructions a search that finds nothing.
 
 Measured on the sheep, the first kind written on them
-(`diagnostics pasture 20000 333 4000 16 1`): the rule went from 363
+(`tilesim world pasture 20000 333 4000 16 1`): the rule went from 363
 lines to 266, its neighbourhood, path and attribute handling gone; of a
 million wakes 283,000 are put whole where all were; the run's
 instructions the same within 0.2% -- a wake is bound by memory, not by
@@ -189,7 +189,7 @@ entity, which says where they are, having come by then.
 Finding where to ask searches the places alone, two bytes an entity,
 which stay in the caches.
 
-Measured (`diagnostics pasture 60000 333 4000 64 12`, the flock
+Measured (`tilesim world pasture 60000 333 4000 64 12`, the flock
 growing from 256,000): a wake 271 ns of a thread where it was 359;
 11,200 to 11,800 ticks a second where it was 11,000. Distances tried:
 4 and 2 without the first asked up front, 297 ns; 12 and 6, 286; 16 and
@@ -241,4 +241,4 @@ comes to does not depend on the thread that takes it.
 
 Its diagnostics only gather what the entities hold; it has no transient
 data of its own yet: the tick is measured by TileSim's
-(`diagnostics throughput`, `diagnostics pasture`), on its rules.
+(`tilesim world throughput`, `tilesim world pasture`), on its rules.

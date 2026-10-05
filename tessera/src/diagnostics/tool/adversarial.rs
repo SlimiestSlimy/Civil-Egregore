@@ -1,7 +1,7 @@
 //! Adversarial bitmaps against the raw cells: a search for the bitmaps
 //! Tessera does worst on -- what it costs beyond the raw cells -- four
 //! searches at once, one a core, each from its own seed. The search
-//! itself is the library's (`tessera::diagnostics::adversarial`); this scores it. See
+//! itself is `diagnostics::adversarial`'s; this scores it. See
 //! `docs/testing_protocol.md`.
 //!
 //! The worst plane of all four is kept when it beats the worst kept so
@@ -10,47 +10,47 @@
 //! `transient_data/measurements/adversarial.csv`.
 //!
 //! ```text
-//! cargo run --release --bin adversarial
-//! cargo run --release --bin adversarial -- 4000
+//! cargo run --release -- tessera adversarial
+//! cargo run --release -- tessera adversarial 4000
 //! ```
 //!
-//! The argument, if given, is how many changes each search tries on the
-//! whole plane from each start.
-//!
-//! `save` keeps a worst bitmap as a named bitmap instead: copied to
-//! `external_benchmarks/adversarial/saved/`, where no search replaces
-//! it, under a name saying what it is, with a line describing it and the
-//! worst bitmap's own notes (what it scored) as its comment lines.
+//! `adversarial_save` keeps a worst bitmap as a named bitmap instead:
+//! copied to `external_benchmarks/adversarial/saved/`, where no search
+//! replaces it, under a name saying what it is, with a line describing
+//! it and the worst bitmap's own notes (what it scored) as its comment
+//! lines.
 //!
 //! ```text
-//! cargo run --release --bin adversarial -- save \
+//! cargo run --release -- tessera adversarial_save \
 //!     against_zstd3 near_repeated_half_vs_zstd3 "bottom half a near repeat of the top, ..."
 //! ```
 
-#![warn(missing_docs, clippy::missing_docs_in_private_items)]
-
-use tessera::diagnostics::adversarial::{worst, search_at_once, Effort, Score, SEARCHES_AT_ONCE};
-use tessera::diagnostics::examination::Examination;
-use tessera::encode;
-use tessera::BitStream;
-use tessera::tile::{cells_in_tile, Tile};
-use tessera::Tessera;
-use tessera::corpus::corpus_seed;
-use tessera::transient_data;
+use super::super::adversarial::{worst, search_at_once, Effort, Score, SEARCHES_AT_ONCE};
+use crate::diagnostics::examination::Examination;
+use crate::encode;
+use crate::BitStream;
+use crate::tile::{cells_in_tile, Tile};
+use crate::Tessera;
+use crate::corpus::corpus_seed;
+use crate::transient_data;
+use utilities::commands::Given;
 use utilities::diagnostics::table::report::Report;
 use utilities::diagnostics::table::Table;
 use bitmap::Bitmap;
 
-/// The command that saves a worst bitmap as a named bitmap.
-const SAVE: &str = "save";
+/// The parameter: how many changes each search tries on the whole plane from each start.
+pub const CHANGES: &str = "changes a plane start";
+/// The parameter: the worst bitmap saved.
+pub const FROM: &str = "worst";
+/// The parameter: what it is saved as.
+pub const NAME: &str = "saved name";
+/// The parameter: a line describing it.
+pub const DESCRIPTION: &str = "description";
 
-/// Copies the worst bitmap named by the first argument to the saved bitmap
-/// named by the second, described by the third.
-fn save(arguments: &[String]) {
-    let [from, name, description] = arguments else {
-        panic!("usage: adversarial save <worst> <saved name> <description>");
-    };
-    let bitmap = worst::read(from).unwrap_or_else(|| panic!("no worst bitmap named {from}"));
+/// Copies the worst bitmap named to the saved bitmap named, described.
+pub fn save(given: &Given) -> Result<(), String> {
+    let (from, name, description) = (given.text(FROM)?, given.text(NAME)?, given.text(DESCRIPTION)?);
+    let bitmap = worst::read(from).ok_or_else(|| format!("no worst bitmap named {from}"))?;
     let mut notes = vec![format!("{name}: {description}")];
     notes.extend(worst::notes_from(&worst::path(from)).into_iter().map(|note| format!("from worst {note}")));
     worst::save(name, &bitmap, &notes);
@@ -60,6 +60,7 @@ fn save(arguments: &[String]) {
     let file = file.strip_prefix(env!("CARGO_MANIFEST_DIR")).unwrap_or(&file);
     table.row(&[name, from, &bitmap.count_set().to_string(), &file.display().to_string(), description]);
     table.print();
+    Ok(())
 }
 
 /// What the worst bitmap is kept under.
@@ -76,13 +77,9 @@ fn score(bitmap: &Bitmap, area: Tile) -> Score {
 /// Runs the searches in parallel, keeps the worst bitmap if it beats the
 /// one kept, and reports what each search found and what the worst kept
 /// is now.
-fn main() {
-    let arguments: Vec<String> = std::env::args().skip(1).collect();
-    if arguments.first().is_some_and(|command| command == SAVE) {
-        return save(&arguments[1..]);
-    }
+pub fn run(given: &Given) -> Result<(), String> {
     let seed = corpus_seed();
-    let effort = Effort::from_arguments();
+    let effort = Effort { plane: given.number(CHANGES)?, ..Effort::default() };
     let kept = worst::read(WORST);
     let outcomes = search_at_once(seed, kept.clone(), effort, &|| score);
 
@@ -105,7 +102,7 @@ fn main() {
             outcome.worst.score.tessera_bits.to_string(),
         ]);
     }
-    let mut report = Report::new("adversarial", "cargo run --release --bin adversarial");
+    let mut report = Report::new(given.name(), &given.resolved());
     report.note(format!(
         "{SEARCHES_AT_ONCE} searches, {} changes a window start, {} a plane start; gap: Tessera's bits less the raw cells searched",
         effort.window, effort.plane
@@ -133,4 +130,5 @@ fn main() {
     ]);
     report.add("the worst kept, which round trips", table);
     transient_data::publish(report);
+    Ok(())
 }

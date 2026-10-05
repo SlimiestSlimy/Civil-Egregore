@@ -17,7 +17,7 @@
 //! installed (`apt-get install valgrind`):
 //!
 //! ```text
-//! cargo run --release --bin tessera_diagnostics -- instruction_count
+//! cargo run --release -- tessera instruction_count
 //! ```
 //!
 //! Each run's callgrind output is left in `transient_data/callgrind/`, to
@@ -32,15 +32,16 @@
 
 use std::path::Path;
 use std::process::Command;
-use tessera::diagnostics::adversarial::worst;
-use tessera::diagnostics::examination::first_difference;
-use tessera::diagnostics::RAW_CELLS;
-use tessera::transient_data;
-use tessera::BitStream;
-use tessera::Tessera;
-use tessera::corpus::checkerboards::checkerboard;
-use tessera::corpus::seed::seed_in_use;
-use tessera::corpus::{families, grown, corpus_seed, HowMany};
+use crate::diagnostics::adversarial::worst;
+use crate::diagnostics::examination::first_difference;
+use crate::diagnostics::RAW_CELLS;
+use crate::transient_data;
+use crate::BitStream;
+use crate::Tessera;
+use crate::corpus::checkerboards::checkerboard;
+use crate::corpus::seed::seed_in_use;
+use crate::corpus::{families, grown, corpus_seed, HowMany};
+use utilities::commands::Given;
 use utilities::diagnostics::table::report::Report;
 use utilities::diagnostics::table::Table;
 use bitmap::Bitmap;
@@ -92,7 +93,7 @@ pub fn run_corpus() {
 
 /// Counts the corpus' encoding and decoding instructions under
 /// callgrind, and reports them.
-pub fn run(report: &mut Report) {
+pub fn run(report: &mut Report, given: &Given) -> Result<(), String> {
     // The corpus built here settles the seed, counted as this run's use;
     // both callgrind runs are pinned to it.
     let bitmaps = corpus().len();
@@ -104,7 +105,7 @@ pub fn run(report: &mut Report) {
     let mut table = Table::new(&["part", "bitmaps", "instructions", "a bitmap", "a cell"]);
     for (part, function) in PARTS {
         let output = folder.join(format!("callgrind.{part}.out"));
-        let instructions = count(&tool, function, &output, seed);
+        let instructions = count(&tool, given, function, &output, seed);
         let a_bitmap = instructions / bitmaps as u64;
         table.row(&[
             part.to_string(),
@@ -119,16 +120,19 @@ pub fn run(report: &mut Report) {
          counted by callgrind, output in transient_data/callgrind/"
     ));
     report.add("instructions", table);
+    Ok(())
 }
 
 /// The instructions callgrind counts inside `function` while `tool` runs
-/// the corpus on `seed`, its output kept at `output`.
-fn count(tool: &Path, function: &str, output: &Path, seed: u64) -> u64 {
+/// the corpus on `seed`, reached as `given` was, its output kept at `output`.
+fn count(tool: &Path, given: &Given, function: &str, output: &Path, seed: u64) -> u64 {
     let ran = Command::new("valgrind")
         .arg("--tool=callgrind")
         .arg(format!("--callgrind-out-file={}", output.display()))
         .arg(format!("--toggle-collect={function}"))
         .arg(tool)
+        // Reached as this tool was: the program's own words before it.
+        .args(given.route())
         .arg(CORPUS_TOOL)
         .env(SEED_VARIABLE, seed.to_string())
         .output()

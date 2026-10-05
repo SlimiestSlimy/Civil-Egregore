@@ -360,7 +360,7 @@ them back.
 
 | file | written by | holds |
 |---|---|---|
-| `measurement.csv` | `cargo run --release --bin tessera_diagnostics -- measurement` | bits a bitmap by generator, checkerboards, saved adversarial bitmaps; what the trees hold |
+| `measurement.csv` | `cargo run --release -- tessera measurement` | bits a bitmap by generator, checkerboards, saved adversarial bitmaps; what the trees hold |
 | `census.csv` | `... -- census` | node kinds by level, for each bitmap looked at |
 | `per_shape.csv` | `... -- per_shape` | bits a bitmap and a cell set, shape by shape |
 | `noise.csv` | `... -- noise` | bits on noise at several densities |
@@ -368,5 +368,5 @@ them back.
 | `instruction_count.csv` | `... -- instruction_count` | instructions to encode and decode a corpus, by callgrind |
 | `sparse.csv` | `... -- sparse` | the tree against the binary count tree on sparse bitmaps |
 | `external_benchmarks.csv` | `cargo run --release --manifest-path external_benchmarks/Cargo.toml` | Tessera against G4, JBIG and zstd |
-| `adversarial.csv` | `cargo run --release --bin adversarial` | the last search against the raw cells |
+| `adversarial.csv` | `cargo run --release -- tessera adversarial` | the last search against the raw cells |
 | `external_adversarial.csv` | `... --manifest-path external_benchmarks/Cargo.toml --bin adversarial` | the last searches against the codecs |

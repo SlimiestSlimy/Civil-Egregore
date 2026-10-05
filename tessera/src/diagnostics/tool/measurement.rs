@@ -2,14 +2,14 @@
 //! table a generator and one row a parameter set, then what its trees
 //! are made of, family by family.
 
-use tessera::diagnostics::adversarial::worst;
-use tessera::diagnostics::measured::Measured;
-use tessera::diagnostics::tree_stats::TreeStats;
-use tessera::diagnostics::RAW_CELLS;
-use tessera::BitStream;
-use tessera::Tessera;
-use tessera::corpus::checkerboards::checkerboards;
-use tessera::corpus::{families, HowMany, LINE_SETS, PLANS, SHAPES, SPARSE};
+use crate::diagnostics::adversarial::worst;
+use crate::diagnostics::measured::Measured;
+use crate::diagnostics::tree_stats::TreeStats;
+use crate::diagnostics::RAW_CELLS;
+use crate::BitStream;
+use crate::Tessera;
+use crate::corpus::checkerboards::checkerboards;
+use crate::corpus::{families, HowMany, LINE_SETS, PLANS, SHAPES, SPARSE};
 use utilities::diagnostics::table::report::Report;
 use utilities::diagnostics::table::Table;
 use bitmap::Bitmap;
