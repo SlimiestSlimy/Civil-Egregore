@@ -60,7 +60,7 @@ use bevy::window::{MonitorSelection, WindowMode};
 use gui::{options, sliders, tuning, Gui};
 use coordinates::{place_from_cartesian, square_side, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 use paint::Picture;
-use sim::{start, Ask, Mode, Near, Request, Viewport, TARGET_PACE};
+use sim::{start, Ask, Near, Request, Viewport, TARGET_PACE};
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
@@ -141,9 +141,6 @@ struct Link {
     paused: bool,
     /// Ticks a second it is held to, or flat out.
     pace: Option<u32>,
-    /// Ticks the run is to be watched for, if whoever started it said:
-    /// shown, never stopped at.
-    watch_for: Option<u64>,
 }
 
 /// The world as drawn: an image a superchunk that has been in view,
@@ -322,51 +319,6 @@ fn grouped(number: u64) -> String {
         grouped.push(digit);
     }
     grouped
-}
-
-/// The `index`-th argument, or `default`.
-fn argument(index: usize, default: usize) -> usize {
-    std::env::args().nth(index).and_then(|argument| argument.parse().ok()).unwrap_or(default)
-}
-
-fn main() {
-    tuning::start();
-    let in_lab = std::env::args().nth(1).is_some_and(|first| first == "lab");
-    // In the lab the only number is the superchunks shown, after the word.
-    let (superchunks, flock) = (argument(1 + in_lab as usize, 64) as u32, argument(2, 8000));
-    let pace = Some(argument(3, TARGET_PACE as usize) as u32).filter(|&pace| pace > 0);
-    let mode = match (in_lab, argument(5, 0) > 0) {
-        (true, _) => Mode::Lab,
-        (false, true) => Mode::ForcedHot,
-        (false, false) => Mode::Halos,
-    };
-    if in_lab {
-        lab::run();
-        sliders::in_lab();
-    }
-    let (requests, frames) = start(superchunks, flock, mode);
-    _ = requests.send(Request::Pace(pace));
-    let watch_for = Some(argument(4, 0) as u64).filter(|&ticks| ticks > 0);
-    App::new()
-        .add_plugins(
-            DefaultPlugins
-                // A cell a pixel, sharp however near.
-                .set(ImagePlugin::default_nearest())
-                .set(WindowPlugin { primary_window: Some(Window { title: "TileSim".to_string(), ..default() }), ..default() }),
-        )
-        .insert_resource(Link { requests, frames: Mutex::new(paint::start(frames)), waiting: false, since: SYNC_EVERY, asked: None, paused: false, pace, watch_for })
-        .insert_resource(Sprites::about_origin(superchunks))
-        .insert_resource({
-            let (requests, maps) = map::start();
-            MapLink { requests, maps: Mutex::new(maps), asked: None, borders: false }
-        })
-        .insert_resource(ClearColor(Color::BLACK))
-        .init_resource::<Seen>()
-        .init_resource::<Boundaries>()
-        .add_plugins(Gui { worlds: || server::worlds_in(&utilities::settings::worlds()) })
-        .add_systems(Startup, setup)
-        .add_systems(Update, (fullscreen, open, recentre, steer, keys, boundaries, labels, heights, show, ask, far, hud).chain().after(gui::Worked))
-        .run();
 }
 
 /// Dirt, one pixel of it: a superchunk not drawn yet.
@@ -840,11 +792,6 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
         (false, Some(pace)) => format!("held to {pace} ticks a second"),
         (false, None) => "flat out".to_string(),
     };
-    let watched = match link.watch_for {
-        Some(ticks) if seen.tick >= ticks => format!("   watched for {} ticks, as asked: close when you like", grouped(ticks)),
-        Some(ticks) => format!("   of {} to watch for ({:.0}%)", grouped(ticks), 100.0 * seen.tick as f64 / ticks as f64),
-        None => String::new(),
-    };
     let drawn = match seen.near_pixels {
         0 if seen.map > 0 => format!("the map, a pixel {} cells a side", seen.map),
         0 => format!("a pixel {} cell(s) a side", 1u32 << seen.detail),
@@ -852,7 +799,7 @@ fn hud(mut text: Single<&mut Text, With<Hud>>, seen: Res<Seen>, link: Res<Link>)
     };
     let said = sim::said().map_or(String::new(), |said| format!("{said}\n"));
     text.0 = format!(
-        "{said}seed {}   ocean at {}   tick {}{watched}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   P: lines (on the map)   U: sliders",
+        "{said}seed {}   ocean at {}   tick {}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the simulation ({:.2}% of its time), {:.1} ms painting\nmove: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F: fullscreen   B: superchunks   C: chunks   H: heights   P: lines (on the map)   U: sliders",
         utilities::seed::hex(lab::seed()),
         lab::generation().shape.ocean,
         grouped(seen.tick),

@@ -67,13 +67,6 @@ impl Group {
             Self::Sheep => "sheep",
         }
     }
-
-    /// Whether its numbers say how the world is generated: changed,
-    /// the world is made again -- in the lab, the one place they are
-    /// read.
-    pub const fn generation(self) -> bool {
-        !matches!(self, Self::Shading)
-    }
 }
 
 /// Names the numbers and their places among them: a constant each,
@@ -222,7 +215,7 @@ pub fn now() -> Tuning {
 /// be generated again if it is one of generation's and has changed.
 pub fn set(index: usize, value: f32) {
     let bits = if value.is_finite() { value } else { unless_set(index) }.to_bits();
-    if VALUES[index].swap(bits, Ordering::Relaxed) != bits && tuned(index).group.generation() {
+    if VALUES[index].swap(bits, Ordering::Relaxed) != bits {
         regenerate();
     }
 }

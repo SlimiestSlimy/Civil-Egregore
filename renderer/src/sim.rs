@@ -65,11 +65,11 @@ pub fn census_path() -> PathBuf {
 
 /// Starts the census afresh: its file, with what was run and the
 /// columns' names. `None`, and no census kept, if it cannot be made.
-fn census(superchunks: u32, flock: usize, mode: Mode) -> Option<BufWriter<File>> {
+fn census(superchunks: u32) -> Option<BufWriter<File>> {
     let path = census_path();
     create_dir_all(path.parent()?).ok()?;
     let mut file = BufWriter::new(File::create(path).ok()?);
-    writeln!(file, "# renderer {superchunks} {flock} {mode:?}").ok()?;
+    writeln!(file, "# renderer {superchunks}").ok()?;
     writeln!(file, "tick,seconds,pace,sheep,grass").ok()?;
     Some(file)
 }
@@ -235,41 +235,24 @@ pub struct Frame {
     pub cells: Vec<Cells>,
 }
 
-/// What world is run.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Mode {
-    /// A flock on each superchunk shown, hot in the halos about its sheep.
-    Halos,
-    /// The same, every superchunk shown hot all the while: a fixed load.
-    ForcedHot,
-    /// The lab's ([`crate::lab`]): every superchunk shown hot, and
-    /// every one looked at since, no sheep, generated as the sliders
-    /// say and made again when they change.
-    Lab,
-}
-
 /// Starts a world generated from [`seed`], `superchunks` of them shown
 /// about its origin, `flock` sheep on each -- ticking on
 /// every thread the machine has, on a thread of its own: where to send it requests,
 /// and where its frames come back. It stops once the requests' sender is
 /// dropped.
-pub fn start(superchunks: u32, flock: usize, mode: Mode) -> (Sender<Request>, Receiver<Frame>) {
+pub fn start(superchunks: u32) -> (Sender<Request>, Receiver<Frame>) {
     let (requests, asked) = channel();
     let (answers, frames) = channel();
     thread::Builder::new()
         .name("simulation".to_string())
-        .spawn(move || run(superchunks, flock, mode, &asked, &answers))
+        .spawn(move || run(superchunks, &asked, &answers))
         .expect("a thread for the simulation");
     (requests, frames)
 }
 
-/// The world `mode` runs, `flock` sheep on each of `shown`.
-fn made(mode: Mode, shown: &[SuperchunkIndex], flock: usize) -> World {
-    match mode {
-        Mode::Halos => server::generate_flocks(seed(), shown, flock),
-        Mode::ForcedHot => forced(server::generate(seed(), 0), shown, flock),
-        Mode::Lab => forced(server::generate_with(lab::generation(), lab::seed()), shown, tuning::now()[tuning::SHEEP].max(0.0) as usize),
-    }
+
+fn made(shown: &[SuperchunkIndex]) -> World {
+    forced(server::generate_with(lab::generation(), lab::seed()), shown, tuning::now()[tuning::SHEEP].max(0.0) as usize)
 }
 
 /// How far behind its pace the simulation may fall and still catch up:
@@ -278,21 +261,21 @@ const CATCH_UP: Duration = Duration::from_millis(250);
 
 /// The simulation's thread: requests read between ticks, a tick, and a
 /// wait for the next one's time.
-fn run(superchunks: u32, flock: usize, mut mode: Mode, asked: &Receiver<Request>, answers: &Sender<Frame>) {
+fn run(superchunks: u32, asked: &Receiver<Request>, answers: &Sender<Frame>) {
     let shown = shown(superchunks);
     let mut generation = tuning::generation();
-    let mut world = made(mode, &shown, flock);
+    let mut world = made(&shown);
     // The superchunks whose heights a frame has carried.
     let mut sent = HashMap::new();
     let started = Instant::now();
     let (mut paused, mut pace, mut tick) = (false, Some(TARGET_PACE), 0u64);
-    let mut census = census(superchunks, flock, mode);
+    let mut census = census(superchunks);
     let (mut next_tick, mut last_frame, mut last_frame_tick) = (Instant::now(), Instant::now(), 0u64);
     loop {
-        if mode == Mode::Lab && generation != tuning::generation() {
+        if generation != tuning::generation() {
             // Generated otherwise now: the world is made afresh, and its ticks start again.
             generation = tuning::generation();
-            world = made(mode, &shown, flock);
+            world = made(&shown);
             sent.clear();
             (tick, last_frame_tick) = (0, 0);
         }
@@ -302,9 +285,7 @@ fn run(superchunks: u32, flock: usize, mut mode: Mode, asked: &Receiver<Request>
             match request.take().map_or_else(|| asked.try_recv(), Ok) {
                 Ok(Request::Sync(ask)) => {
                     let asked_at = Instant::now();
-                    if mode == Mode::Lab {
-                        reach(&mut world, ask);
-                    }
+                    reach(&mut world, ask);
                     let elapsed = last_frame.elapsed().as_secs_f64();
                     let ticks_a_second = if elapsed > 0.0 { (tick - last_frame_tick) as f64 / elapsed } else { 0.0 };
                     (last_frame, last_frame_tick) = (asked_at, tick);
@@ -321,7 +302,7 @@ fn run(superchunks: u32, flock: usize, mut mode: Mode, asked: &Receiver<Request>
                 Ok(Request::Open(name)) => match server::load(&utilities::settings::world(&name)) {
                     Ok(opened) => {
                         // Run as it was saved: its halos moved, its ticks its own, and all of it sent again.
-                        (world, mode) = (opened, Mode::Halos);
+                        world = opened;
                         lab::opened(world.info.seed);
                         generation = tuning::generation();
                         sent.clear();

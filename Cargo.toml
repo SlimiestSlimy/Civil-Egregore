@@ -10,11 +10,13 @@ repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 server = { path = "server" }
 tessera = { path = "tessera" }
 utilities = { path = "utilities" }
+renderer = { path = "renderer", optional = true }
 
 [features]
-# `--features default_settings`: run on the built-in defaults
-# (`utilities/default_settings.csv`), ignoring the machine's `settings.csv`.
-default_settings = ["utilities/default_settings"]
+# `--features force_default_settings`: run on the built-in defaults
+# (`utilities/force_default_settings.csv`), ignoring the machine's `settings.csv`.
+renderer = ["dep:renderer"]
+force_default_settings = ["utilities/force_default_settings", "renderer?/force_default_settings"]
 
 # Every crate of Civil Egregore, built together: one lock file and one `target/`
 # for them all, here, whichever crate's folder cargo is run from.

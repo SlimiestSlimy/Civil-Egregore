@@ -51,7 +51,7 @@ use bitplane_manager::BitmapArena;
 use chunk_storage::mock::GRASS;
 use coordinates::{CellCartesian, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use instructions::around::{self, CENTRE, RING};
-use instructions::{area, cells, entities, walking};
+use instructions::{read, write};
 use instructions::{Simulation, TickReport, Turn};
 use worldgen::{WALL_EAST, WALL_SOUTH};
 use entity_manager::{Attribute, AttributeType, EntityEdit, EntityRef, Entities, EntityId, EntityType, Header};
@@ -157,7 +157,7 @@ struct Flock {
 /// by [`wake`].
 pub fn rule(turn: &mut Turn) -> SheepCounts {
     let mut flock = Flock::default();
-    entities::each_woken(turn, [GRASS, WALL_EAST, WALL_SOUTH], &mut flock, wake);
+    read::entities::each_woken(turn, [GRASS, WALL_EAST, WALL_SOUTH], &mut flock, wake);
     flock.done
 }
 
@@ -169,22 +169,22 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     done.woken += 1;
     let at = sheep.header.at;
     let mut sheep = EntityEdit::of(sheep, room);
-    let grass = around::read(turn, GRASS, at);
+    let grass = read::around::layer(turn, GRASS, at);
     // The neighbours it may step to: on the hot bitplanes, no wall before them. Where entities stand is not read.
-    let mut steppable = grass.hot & RING & walking::around_unwalled(turn, at);
+    let mut steppable = grass.hot & RING & read::walking::around_unwalled(turn, at);
     let hungry_at = sheep.get(HUNGRY_AT).unwrap_or(now);
     let roaming = sheep.get(ROAMING);
     // On its way out of thin pasture it does not stop to eat.
     let fed = now >= hungry_at && grass.set & CENTRE != 0 && roaming.is_none();
     if !fed && now >= hungry_at + STARVE_TICKS {
-        entities::remove(turn, sheep.header());
+        write::entities::remove(turn, sheep.header());
         done.deaths += 1;
         return;
     }
     // The pasture about it, looked at as it eats: thin, it will leave when next hungry.
-    let lush = fed && area::read(turn, GRASS, at).count() >= LUSH_CELLS;
+    let lush = fed && read::area::layer(turn, GRASS, at).count() >= LUSH_CELLS;
     if fed {
-        cells::clear(turn, GRASS, at);
+        write::cells::clear(turn, GRASS, at);
         sheep.set(HUNGRY_AT, now + MEAL_TICKS);
         done.eaten += 1;
         if let (false, Some(way)) = (lush, around::pick(turn.random(), steppable)) {
@@ -198,13 +198,13 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     match sheep.get(PREGNANT) {
         Some(due) if now < due => needs = needs.min(due),
         // Its lamb is born on a cell seen free beside it; with none, it waits a step's time more.
-        Some(_) => match around::free_beside(turn, at, steppable) {
+        Some(_) => match read::around::free_beside(turn, at, steppable) {
             Some(beside) => {
                 sheep.unset(PREGNANT);
                 // The lamb's cell is no longer one to step to.
                 steppable &= !(1 << beside);
                 let (cell, wake) = (around::cell(at, beside).expect("a hot neighbour is in the world"), next_step(turn));
-                entities::spawn(turn, SHEEP, cell, wake, &[Attribute { kind: HUNGRY_AT, value: now + MEAL_TICKS }, Attribute { kind: LAMB, value: now + LAMB_TICKS }]);
+                write::entities::spawn(turn, SHEEP, cell, wake, &[Attribute { kind: HUNGRY_AT, value: now + MEAL_TICKS }, Attribute { kind: LAMB, value: now + LAMB_TICKS }]);
                 done.births += 1;
             }
             None => needs = now,
@@ -237,7 +237,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         None
     } else {
         done.sought += 1;
-        match walking::seek(turn, at, GRASS) {
+        match read::walking::seek(turn, at, GRASS) {
             Some(found) => {
                 done.paths += 1;
                 done.far += (found.scale > 0) as usize;
@@ -250,11 +250,11 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let wake = if hungry { next_step(turn) } else { next_step(turn).max(needs + turn.random().below(STEP_JITTER)) };
     // Old age comes by the tick, not the wake: a long sleep is as much of a life as many short ones.
     if turn.random().below(LIFE_TICKS) < wake - now {
-        entities::remove(turn, sheep.header());
+        write::entities::remove(turn, sheep.header());
         done.deaths += 1;
         return;
     }
-    entities::commit(turn, sheep, to, wake);
+    write::entities::commit(turn, sheep, to, wake);
 }
 
 /// The tick a sheep taking a step now wakes next.

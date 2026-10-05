@@ -3,7 +3,6 @@ name = "renderer"
 version = "0.1.0"
 edition = "2024"
 description = "TileSim on the screen: a Bevy window asking the simulation, on its own thread, for the cells in view"
-publish = false
 
 [dependencies]
 simulation = { path = "../simulation" }
@@ -22,4 +21,4 @@ bevy = { version = "0.19", default-features = false, features = ["2d", "ui"] }
 
 [features]
 # The machine's settings file is neither read nor written: the settings are the default ones.
-default_settings = ["utilities/default_settings", "gui/default_settings"]
+force_default_settings = ["utilities/force_default_settings"]

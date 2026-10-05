@@ -15,7 +15,7 @@ mod entities {
     use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
     use entity_manager::{Attribute, AttributeType, EntityEdit, Entities, EntityId, EntityType, Header, NEVER};
     use instructions::around::{self, CENTRE, RING};
-    use instructions::{entities, Simulation, Turn};
+    use instructions::{read, write, Simulation, Turn};
     use std::sync::Mutex;
 
     /// The layer type the arena holds: every cell hot, none set.
@@ -77,7 +77,7 @@ mod entities {
                     assert_eq!((edit.get(NAME), edit.get(MARK), edit.unset(MARK)), (Some(8), Some(1), Some(1)));
                 }
                 let to = entity.header.at.offset(1, 1).expect("in the world");
-                entities::commit(turn, edit, to, NEVER);
+                write::entities::commit(turn, edit, to, NEVER);
             }
             0
         });
@@ -102,12 +102,12 @@ mod entities {
         simulation.tick(&mut arena, &mut entities, 0, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             for entity in turn.woken() {
                 let at = entity.header.at;
-                let (stone, taken) = (around::read(turn, STONE, at), around::occupied(turn, at));
-                let free = (0..64).filter_map(|_| around::free_beside(turn, at, RING)).fold(0u16, |free, bit| free | 1 << bit);
-                let only = around::free_beside(turn, at, 1 << 0 | 1 << 5);
+                let (stone, taken) = (read::around::layer(turn, STONE, at), read::around::occupied(turn, at));
+                let free = (0..64).filter_map(|_| read::around::free_beside(turn, at, RING)).fold(0u16, |free, bit| free | 1 << bit);
+                let only = read::around::free_beside(turn, at, 1 << 0 | 1 << 5);
                 let cells: Vec<CellIndex> = [0, 5].iter().filter_map(|&bit| around::cell(at, bit)).collect();
                 seen.lock().unwrap().push((stone.set, stone.hot, taken, free, only, cells, around::bit_of(at, at.offset(-1, 1).unwrap())));
-                entities::sleep(turn, &entity.header, NEVER);
+                write::entities::sleep(turn, &entity.header, NEVER);
             }
             0
         });

@@ -27,7 +27,7 @@
 
 use bitplane_manager::BitmapArena;
 use entity_manager::Entities;
-use instructions::{cells, Simulation, TickReport, Turn};
+use instructions::{read, write, Simulation, TickReport, Turn};
 use chunk_storage::mock::GRASS;
 use worldgen::WET;
 use coordinates::{CellIndex, NEIGHBOURS};
@@ -72,7 +72,7 @@ pub fn tick(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut
 /// the chances of spreading and of decay together, in Morton order,
 /// each seen to by [`cell`].
 pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> GrassCounts {
-    let (sampled, counts) = cells::each_sampled(turn, GRASS, SPREAD_CHANCE + DECAY_CHANCE, samples, cell);
+    let (sampled, counts) = read::cells::each_sampled(turn, GRASS, SPREAD_CHANCE + DECAY_CHANCE, samples, cell);
     GrassCounts { sampled, ..counts }
 }
 
@@ -91,12 +91,12 @@ fn cell(turn: &mut Turn, cell: CellIndex, counts: &mut GrassCounts) {
     if spreading {
         // Dirt is a cell with no grass on it: no layer of its own.
         // And grass does not spread under water; a world with no water has none.
-        if cells::lacks(turn, GRASS, neighbour) && !cells::holds(turn, WET, neighbour) {
-            cells::set(turn, GRASS, neighbour);
+        if read::cells::lacks(turn, GRASS, neighbour) && !read::cells::holds(turn, WET, neighbour) {
+            write::cells::set(turn, GRASS, neighbour);
             counts.spreads += 1;
         }
-    } else if cells::holds(turn, GRASS, neighbour) {
-        cells::clear(turn, GRASS, cell);
+    } else if read::cells::holds(turn, GRASS, neighbour) {
+        write::cells::clear(turn, GRASS, cell);
         counts.decays += 1;
     }
 }

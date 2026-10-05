@@ -6,6 +6,7 @@ version = 4
 name = "Civil_Egregore"
 version = "0.5.0"
 dependencies = [
+ "renderer",
  "server",
  "tessera",
  "utilities",

@@ -12,4 +12,4 @@ bevy = { version = "0.19", default-features = false, features = ["2d", "ui"] }
 
 [features]
 # The machine's settings file is neither read nor written: the settings are the default ones.
-default_settings = ["utilities/default_settings"]
+force_default_settings = ["utilities/force_default_settings"]

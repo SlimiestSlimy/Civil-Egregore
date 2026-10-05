@@ -10,14 +10,21 @@
 //! queued -- the terrain's layers (`../worldgen`) and the paths of
 //! `../pathfinding`. None of those knows another; they meet here.
 //!
-//! | module | instructions |
+//! Instructions are kept by what they do to the turn:
+//!
+//! | folder | instructions |
 //! |---|---|
-//! | `cells` | a layer at a cell asked and queued, a wide plane's number, the square about a cell, the going over the cells sampled |
-//! | `entities` | the going over the entities waking; one made, put to sleep, committed as changed, removed |
-//! | `around` | the 3x3 cells about a cell as nine bits: read, those entities stand on, one free, one picked |
-//! | `area` | the 16x16 cells about a cell, a row a word: read, those entities stand on, and the tiles further off |
-//! | `mask` | a square of cells as bits, 4 to 1,024 a side: a layer read into one, whole or under another, and set or cleared under one |
-//! | `walking` | the steps the terrain's walls leave open, the step towards a cell or the nearest of some, and towards the nearest of a layer's however far off in reach |
+//! | `read/` | those that read, and queue nothing: cells, entities, the cells about a cell, the area, masks, walking |
+//! | `write/` | those that queue a change: cells, entities, masks |
+//!
+//! One that reads and queues at once will be `rw/`'s; there is none
+//! yet. Beside them, what they are asked in, no turn in it:
+//!
+//! | module | shape |
+//! |---|---|
+//! | `around` | the 3x3 cells about a cell as nine bits |
+//! | `area` | the 16x16 cells about a cell, a row a word |
+//! | `mask` | a square of cells as bits, 4 to 1,024 a side |
 //!
 //! A rule is written in these alone. The simulation under them reads
 //! and writes cells and entities and no more: its [`Turn`] is what
@@ -32,9 +39,8 @@
 
 pub mod area;
 pub mod around;
-pub mod cells;
-pub mod entities;
 pub mod mask;
-pub mod walking;
+pub mod read;
+pub mod write;
 
 pub use simulation::{Simulation, TickReport, Turn};
