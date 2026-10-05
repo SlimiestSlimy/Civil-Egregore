@@ -4,11 +4,11 @@
 //! numbers are always in a file and never copied into a document by
 //! hand.
 //!
-//! The file is the tables' CSV ([`super::csv`]) with two kinds of line
+//! The file is the tables' CSV ([`crate::csv`]) with two kinds of line
 //! around them: `# ` and a note, before the first table, and `## ` and
 //! a title, before each table.
 
-use super::csv::{lines, Line, COMMENT};
+use crate::csv::{lines, Line, COMMENT};
 use super::Table;
 use std::fs;
 use std::path::{Path, PathBuf};

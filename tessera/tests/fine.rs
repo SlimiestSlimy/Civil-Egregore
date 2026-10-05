@@ -7,10 +7,10 @@
 //!
 //! `cargo test --test fine`
 
-mod common;
+mod tests;
 
 use bitmap::Bitmap;
-use common::check;
+use tests::check;
 use tessera::diagnostics::examination::tree_of;
 use tessera::diagnostics::tree_stats::TreeStats;
 use tessera::encode;

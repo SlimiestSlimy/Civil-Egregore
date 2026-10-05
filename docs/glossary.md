@@ -15,8 +15,8 @@ what they always do and are not listed.
 | word | means | relates to | not |
 |---|---|---|---|
 | **world** | everything simulated: every superchunk, its layers and its entities, and the tick it is at | made from a **seed**; saved as a **save** | map |
-| **seed** | the number a world is made from: every height, every superchunk's random numbers and every first flock follow from it | world, random stream | |
-| **seed rotation** | tests and tools taking their seed from one file for the whole workspace, `transient_data/seed`, rolled to a fresh one every 5 counted runs (`utilities::seed`) | seed | |
+| **seed** | the number a world is made from, 64 bits, written in hexadecimal: every height, every superchunk's random numbers and every first flock follow from it | world, random stream | |
+| **seed rotation** | tests and tools taking their seed from one file for the whole workspace, `transient_data/seed.csv`, rolled to a fresh one every 5 counted runs (`utilities::seed`) | seed | |
 | **cell** | the smallest unit of the world: one bit of each layer, one height, at most one entity | chunk, superchunk; found by its **cell index** | tile, pixel, square |
 | **chunk** | 256x256 cells: what a layer's **bitmap** covers | superchunk, layer, bucket | |
 | **superchunk** | 4x4 chunks, 1024x1024 cells: the unit the world is held, ticked, saved and loaded in, and the reach of the speed of light. One word, in types too (`Superchunk`) | chunk, turn, image | super chunk, `SuperChunk` |
@@ -193,7 +193,7 @@ what they always do and are not listed.
 | **census** | a count of a population: the flock and grass over a run, or Tessera's nodes by kind | | |
 | **reading** | the process's memory read once (`MemoryTrack::read`) | | sample |
 | **tier** | a test's size: fine, fast or complete (`docs/testing_protocol.md`) | | |
-| **settings** | this machine's settings, kept from run to run: `settings.txt` in the folder `tilesim` where the system keeps a user's programs' data (`utilities::settings`) | default settings, slider, group | config, preferences, preset |
+| **settings** | this machine's settings, kept from run to run: `settings.csv` in the folder `tilesim` where the system keeps a user's programs' data (`utilities::settings`) | default settings, slider, group | config, preferences, preset |
 | **default settings** | every setting and what it is unless changed: a settings file built into the program, copied to a machine that has none; all there is under the build feature `default_settings` | settings | |
 | **options** | the menu Escape opens over the window: going on, saving the world, opening one of the worlds' folder, leaving TileSim (`gui::options`) | slider, worlds' folder | pause menu, main menu |
 | **worlds' folder** | where worlds are kept unless a path is given: `worlds` in the folder `tilesim`, or what the setting `worlds` names (`utilities::settings::worlds`) | save, settings | |

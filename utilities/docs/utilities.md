@@ -29,7 +29,7 @@ none.
   `default_settings`. The same folder holds the worlds, in `worlds`,
   unless the settings name another folder for them.
 - **The seed** (`seed.rs`): the one seed every crate's tests and tools
-  start from, in the workspace's `transient_data/seed`, rolled every 5
+  start from, in the workspace's `transient_data/seed.csv`, rolled every 5
   counted runs; `TILESIM_SEED` picks one for a run.
 - **A seeded random source** (`rng.rs`), its whole state one word: every
   random number in TileSim comes from it.

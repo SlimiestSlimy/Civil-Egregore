@@ -3,21 +3,10 @@
 //!
 //! `cargo test --release --test complete -- --ignored`
 
+mod tests;
+
 use chunk_storage::mock::GRASS;
-use entity_manager::{Attribute, Header};
-use server::{transient_data, World};
-
-/// Every hot cell, every entity with its attributes, the tick, every
-/// random stream, every cold superchunk's kept state, and the
-/// superchunks warming and cooling with when each is due.
-type Everything = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, u64, Vec<(coordinates::SuperchunkIndex, u64)>, Vec<Vec<u64>>, Vec<(coordinates::SuperchunkIndex, u64)>, Vec<(coordinates::SuperchunkIndex, u64)>);
-
-/// [`Everything`] `world` holds.
-fn everything(world: &World) -> Everything {
-    let cells = world.info.layers.clone().into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.words().to_vec()).collect();
-    let all = world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
-    (cells, all, world.entities.now(), world.simulation.random_states().collect(), world.cold.values().cloned().collect(), world.warming().collect(), world.cooling().collect())
-}
+use tests::{everything, folder};
 
 /// A world run 30,000 ticks straight, and the same world saved and
 /// loaded every 5,000: the same at the end.
@@ -29,8 +18,7 @@ fn a_world_stopped_often_comes_to_the_same() {
     while straight.entities.now() < UNTIL {
         straight.tick();
     }
-    let folder = transient_data::saves().join("tests").join("complete");
-    let _ = std::fs::remove_dir_all(&folder);
+    let folder = folder("complete");
     let mut stopped = server::generate(21, 4_000);
     for stop in (5_000..=UNTIL).step_by(5_000) {
         while stopped.entities.now() < stop {

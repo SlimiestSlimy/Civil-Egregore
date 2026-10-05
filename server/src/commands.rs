@@ -63,14 +63,15 @@ fn number(argument: Option<&&str>, default: u64) -> Result<u64, String> {
 /// Makes a world from a seed, a flock on its origin, and saves it in
 /// `folder`: of a size if given a side, in superchunks, that is not 0.
 pub fn new(folder: &Path, rest: &[&str]) -> Result<String, String> {
-    if folder.join("world").exists() {
+    if folder.join(disk::WORLD_FILE).exists() {
         return Err(format!("{} is a world already", folder.display()));
     }
-    let (seed, sheep) = (number(rest.first(), 1)?, number(rest.get(1), crate::FLOCK as u64)? as usize);
+    let seed = rest.first().map_or(Ok(1), |seed| utilities::seed::of_hex(seed).ok_or_else(|| format!("`{seed}` is not a seed: 64 bits, in hexadecimal")))?;
+    let sheep = number(rest.get(1), crate::FLOCK as u64)? as usize;
     let side = Some(number(rest.get(2), 0)? as u32).filter(|&side| side > 0);
     let mut made = crate::flocked(crate::generate_sized(crate::Generation::DEFAULT, seed, side), &[coordinates::WORLD_MIDDLE], sheep);
     let saved = crate::save(folder, &mut made).map_err(|error| error.to_string())?;
-    Ok(format!("{}, seed {seed}: {} superchunks, {} entities, {} bytes in {}", name(folder), saved.superchunks, saved.entities, saved.bytes, folder.display()))
+    Ok(format!("{}, seed {}: {} superchunks, {} entities, {} bytes in {}", name(folder), utilities::seed::hex(seed), saved.superchunks, saved.entities, saved.bytes, folder.display()))
 }
 
 /// Loads the world in `folder`, ticks it, and saves it.
@@ -105,5 +106,5 @@ pub fn info(folder: &Path) -> Result<String, String> {
     let info = disk::read_world(folder).map_err(|error| error.to_string())?;
     let superchunks = disk::saved_superchunks(folder).map_err(|error| error.to_string())?;
     let size = info.side.map_or("of no size".to_string(), |side| format!("{side} superchunks a side"));
-    Ok(format!("{}: seed {}, at tick {}, {size}, {} superchunks, layer types {:?}", name(folder), info.seed, info.tick, superchunks.len(), info.layers.iter().map(|layer| layer.0).collect::<Vec<_>>()))
+    Ok(format!("{}: seed {}, at tick {}, {size}, {} superchunks, layer types {:?}", name(folder), utilities::seed::hex(info.seed), info.tick, superchunks.len(), info.layers.iter().map(|layer| layer.0).collect::<Vec<_>>()))
 }

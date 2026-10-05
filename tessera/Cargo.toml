@@ -8,3 +8,8 @@ publish = false
 [dependencies]
 bitmap = { path = "../bitmap" }
 utilities = { path = "../utilities" }
+
+# What the tiers' tests share (`tests/tests.rs`): no test program of its own.
+[[test]]
+name = "tests"
+test = false

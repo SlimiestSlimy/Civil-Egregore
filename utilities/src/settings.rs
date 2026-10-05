@@ -7,8 +7,8 @@
 //! | Linux and the like | `$XDG_DATA_HOME/tilesim`, or `~/.local/share/tilesim` |
 //! | Windows | `%LOCALAPPDATA%\tilesim`, or `%APPDATA%\tilesim` |
 //!
-//! The file ([`FILE`]) is text, a line a setting: its name, ` = `, its
-//! value. The default settings (`default_settings.txt`, at the crate's root)
+//! The file ([`FILE`]) is CSV ([`crate::csv`]), a row a setting: its
+//! name, its value. The default settings (`default_settings.csv`, at the crate's root)
 //! are such a file, with every setting there is, built into the
 //! program: a machine with no file of its own is given a copy of it
 //! the first time the settings are read, and a setting the machine's
@@ -31,12 +31,12 @@ use std::str::FromStr;
 /// The folder's name, under the system's place for what programs keep.
 pub const FOLDER: &str = "tilesim";
 /// The file's name, in the folder.
-pub const FILE: &str = "settings.txt";
-/// What stands between a setting's name and its value.
-const IS: &str = " = ";
+pub const FILE: &str = "settings.csv";
+/// The file's columns.
+const COLUMNS: [&str; 2] = ["setting", "value"];
 /// The default settings: every setting there is, and what it is
 /// unless changed.
-const DEFAULTS: &str = include_str!("../default_settings.txt");
+const DEFAULTS: &str = include_str!("../default_settings.csv");
 /// The setting naming the folder worlds are kept in: a path, taken
 /// from TileSim's folder unless it is a whole one.
 pub const WORLDS: &str = "worlds";
@@ -144,10 +144,11 @@ impl Settings {
         Self::of(&read_to_string(path).unwrap_or_default())
     }
 
-    /// The settings `text` has, a line each: a line that is not a name
-    /// and a value is passed over.
+    /// The settings `text` has, a row each after the one naming the
+    /// columns: a row that is not a name and a value is passed over.
     fn of(text: &str) -> Self {
-        Self { lines: text.lines().filter_map(|line| line.split_once(IS)).map(|(name, value)| (name.trim().to_string(), value.trim().to_string())).collect() }
+        let named = |row: Vec<String>| <[String; 2]>::try_from(row).ok().map(|[name, value]| (name.trim().to_string(), value.trim().to_string()));
+        Self { lines: crate::csv::rows_named(text).into_iter().filter_map(named).collect() }
     }
 
     /// The value of the setting named `name`, if it has a line.
@@ -188,6 +189,6 @@ impl Settings {
         if let Some(folder) = path.parent() {
             create_dir_all(folder)?;
         }
-        write(path, self.lines.iter().map(|(name, value)| format!("{name}{IS}{value}\n")).collect::<String>())
+        write(path, crate::csv::row(&COLUMNS) + &self.lines.iter().map(|(name, value)| crate::csv::row(&[name, value])).collect::<String>())
     }
 }

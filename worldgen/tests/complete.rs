@@ -3,22 +3,14 @@
 //!
 //! `cargo test --release --test complete -- --ignored`
 
-use coordinates::{place_from_cartesian, SuperchunkIndex, WORLD_MIDDLE};
+mod tests;
+
+use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
+use tests::{at, walled};
 use worldgen::{wall, Shape, Terrain};
 
 /// A shape of small polygons joined by cliffs: plenty of walls.
 const CLIFFS: Shape = Shape { span: 8, sea: 0, highest: 552, narrow: 2, wide: 2, finer_depth: 3, ..Shape::DEFAULT };
-
-/// The height of the cell `(x, y)` of a superchunk's `terrain`, from
-/// its top left.
-fn at(terrain: &Terrain, x: u32, y: u32) -> u16 {
-    terrain.height(place_from_cartesian(x, y))
-}
-
-/// Whether `terrain` keeps a wall the `way`-th way at the cell `(x, y)`.
-fn walled(terrain: &Terrain, way: usize, x: u32, y: u32) -> bool {
-    terrain.walled(way, place_from_cartesian(x, y))
-}
 
 /// Whatever the seed, with narrow edges little of the ground is walled.
 #[test]

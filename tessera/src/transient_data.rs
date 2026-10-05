@@ -53,7 +53,7 @@ pub fn callgrind() -> PathBuf {
 /// publishes it in [`measurements`]: printed, and kept in its file.
 pub fn publish(mut report: Report) {
     if let Some((seed, fresh)) = seed_in_use() {
-        report.note(format!("seed {seed}{}", if fresh { ", fresh for this run" } else { "" }));
+        report.note(format!("seed {}{}", utilities::seed::hex(seed), if fresh { ", fresh for this run" } else { "" }));
     }
     TRANSIENT_DATA.publish(report);
 }

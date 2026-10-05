@@ -5,7 +5,7 @@
 //! lock between them.
 //!
 //! Only their names and places are here. What a slider reaches, its
-//! group and what it does are in the sliders' file (`sliders.txt`, at
+//! group and what it does are in the sliders' file (`sliders.csv`, at
 //! the crate's root), written by hand; what each number is unless set
 //! is in the default settings (`utilities::settings`), and what it was
 //! last set to is kept in the machine's, a line each.
@@ -134,22 +134,24 @@ places! {
     SHEEP "sheep a superchunk",
 }
 
-/// The sliders, as written by hand: a line each -- its number's name,
+/// The sliders, as written by hand, in CSV: a row each -- its number's name,
 /// the least and the most its knob reaches, its group, what it does.
-const SLIDERS: &str = include_str!("../sliders.txt");
+const SLIDERS: &str = include_str!("../sliders.csv");
 
 /// The `index`-th number, as the sliders' file has it, which has
 /// every one.
 pub fn tuned(index: usize) -> &'static Tuned {
     static TUNED: OnceLock<[Tuned; NAMES.len()]> = OnceLock::new();
     &TUNED.get_or_init(|| {
+        // Read once and kept as long as the program runs: what a slider does is said from it.
+        let rows: &'static [Vec<String>] = utilities::csv::rows_named(SLIDERS).leak();
         NAMES.map(|name| {
-            let (line, rest) = SLIDERS.lines().enumerate().find_map(|(line, said)| Some((line, said.strip_prefix(name)?.strip_prefix(" | ")?))).expect("every number has a line in the sliders' file");
-            let mut parts = rest.splitn(4, " | ");
-            let mut part = || parts.next().expect("a slider's line has its range, its group and what it does");
-            let range = [part(), part()].map(|end| end.parse().expect("a range's end is a number"));
-            let group = part();
-            Tuned { name, line, range: (range[0], range[1]), group: GROUPS.into_iter().find(|listed| listed.name() == group).expect("a slider's group is one of the groups"), what: part() }
+            let (line, row) = rows.iter().enumerate().find(|(_, row)| row[0] == name).expect("every number has a row in the sliders' file");
+            let [_, least, most, group, what] = &row[..] else {
+                panic!("a slider's row has its name, its range, its group and what it does");
+            };
+            let range = [least, most].map(|end| end.parse().expect("a range's end is a number"));
+            Tuned { name, line, range: (range[0], range[1]), group: GROUPS.into_iter().find(|listed| listed.name() == group).expect("a slider's group is one of the groups"), what }
         })
     })[index]
 }

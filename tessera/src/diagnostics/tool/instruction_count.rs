@@ -134,7 +134,7 @@ fn count(tool: &Path, given: &Given, function: &str, output: &Path, seed: u64) -
         // Reached as this tool was: the program's own words before it.
         .args(given.route())
         .arg(CORPUS_TOOL)
-        .env(SEED_VARIABLE, seed.to_string())
+        .env(SEED_VARIABLE, utilities::seed::hex(seed))
         .output()
         .expect("valgrind runs: it must be installed (apt-get install valgrind)");
     assert!(ran.status.success(), "callgrind's run failed:\n{}", String::from_utf8_lossy(&ran.stderr));
