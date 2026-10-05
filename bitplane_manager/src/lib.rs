@@ -4,12 +4,13 @@
 //! cells are read and changed: chunk storage holds whole encoded layers
 //! only.
 //!
-//! The arena is made of allocations, each a block of the allocator's
-//! block pool (`../allocator`) holding one layer type over one
-//! superchunk: a bucket for each of its 16 chunks, in the chunks' Morton
-//! order: by the chunk's place ([`ChunkIndex::place`]). A chunk's bucket is found
-//! in its allocation by its place, with no search, and a bucket never moves:
-//! making a bitmap hot or cold moves no other.
+//! The arena is made of allocations, each holding one layer type over
+//! one superchunk: an array of buckets, one for each of its chunks that
+//! has a cell set -- 16 at the most -- in the chunks' Morton order
+//! ([`ChunkIndex::place`]). A chunk with no cell set has no bucket: its
+//! cells are read as clear, and the first cell set in it makes it one,
+//! put in its place among the others. A chunk's bucket is found by how
+//! many chunks before it have one -- a count of bits, no search.
 //!
 //! Which allocation holds which layer type over which superchunk is a
 //! small directory: the superchunks in use, sorted by superchunk index,
@@ -20,9 +21,9 @@
 //! wherever they were made; each is one run of memory in Morton order.
 //!
 //! The arena grows an allocation at a time, as a layer type turns hot
-//! over a superchunk it had none of. An allocation none of whose chunks
-//! is hot or waiting in the ring (below) leaves the directory, and its
-//! block goes back to the block pool, which hands it out next.
+//! over a superchunk it had none of, and an allocation a bucket at a
+//! time. An allocation none of whose chunks is hot or waiting in the
+//! ring (below) leaves the directory, its buckets with it.
 //!
 //! Cells are changed by writes, batched (`writes`): queued, then applied
 //! in order. Each superchunk ([`Superchunk`]) owns its blocks, so
@@ -61,7 +62,6 @@ mod writes;
 
 pub use writes::{count_missed, WritesApplied, Shape, Write, WriteOp, WriteQueues};
 
-use allocator::{Block, BlockPool};
 use bitmap::window::{in_word_tile, left_columns, rows_from_morton, top_rows, window, PLACE_IN_WORD_TILE, WORD_TILE_SIDE};
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use utilities::cache::prefetch;
@@ -100,14 +100,12 @@ fn members(set: ChunkSet) -> impl Iterator<Item = usize> {
     (0..CHUNKS_IN_SUPERCHUNK).filter(move |&index| contains(set, index))
 }
 
-/// Words an allocation of a bit a cell takes: a bitmap's for every
-/// chunk of a superchunk. A wide one takes as many times that as it
-/// has bits a cell.
-const ALLOCATION_WORDS: usize = WORDS * CHUNKS_IN_SUPERCHUNK;
+/// The most bits a cell a layer has.
+const WIDEST: usize = 16;
 
-/// The widths a layer type may have, in bits a cell: 1, 2, 4, 8 and 16.
-/// A block pool each, its blocks that many bitmaps' a chunk.
-const WIDTHS: usize = 5;
+/// A bucket with no cell set, however wide: what a chunk with no bucket
+/// is read as.
+static NO_CELLS: [u64; WORDS * WIDEST] = [0; WORDS * WIDEST];
 
 /// Words in a count tile: the 32x32 cells whose set cells are counted,
 /// so sampling and the far search pass over an empty one whole. Two
@@ -145,16 +143,19 @@ struct ChunkFlags {
 
 const _: () = assert!(size_of::<ChunkFlags>() == 4 * size_of::<ChunkSet>(), "the four chunk sets packed together");
 
-/// An allocation: one layer type over one superchunk. Its block holds a
-/// bucket a chunk, by place -- only the hot ones and the ones
-/// waiting in the ring mean anything -- beside which chunks are hot,
-/// dirty and waiting, and the counts. It owns its block, so a
-/// superchunk's allocations are changed apart from every other's.
+/// An allocation: one layer type over one superchunk. It holds a bucket
+/// for each chunk that has needed one, in Morton order -- a chunk with
+/// none has no cell set -- beside which chunks are hot, dirty and
+/// waiting, and the counts. It owns its buckets, so a superchunk's
+/// allocations are changed apart from every other's.
 struct SuperchunkLayer {
     /// The layer's type.
     layer_type: LayerType,
-    /// The block holding the buckets.
-    block: Block,
+    /// The buckets of the chunks in `kept`, one after another in Morton
+    /// order: [`SuperchunkLayer::bucket_words`] words each.
+    buckets: Vec<u64>,
+    /// The chunks that have a bucket.
+    kept: ChunkSet,
     /// Which chunks are hot, dirty, waiting in the ring and non-empty.
     flags: ChunkFlags,
     /// How many cells each bucket has set, less one, by place --
@@ -188,15 +189,61 @@ impl SuperchunkLayer {
         WORDS * self.layer_type.bits() as usize
     }
 
-    /// The words of the bucket of the chunk at `chunk`, however wide.
-    fn words(&self, chunk: usize) -> &[u64] {
-        &self.block[chunk * self.bucket_words()..][..self.bucket_words()]
+    /// Where the bucket of the chunk at `chunk` starts among the
+    /// buckets, each `words` long, if it has one: after those of the
+    /// chunks before it.
+    #[inline]
+    fn start(&self, chunk: usize, words: usize) -> Option<usize> {
+        contains(self.kept, chunk).then(|| (self.kept & ((1 << chunk) - 1)).count_ones() as usize * words)
     }
 
-    /// The words of the bucket of the chunk at `chunk`, to change.
-    fn words_mut(&mut self, chunk: usize) -> &mut [u64] {
+    /// The words of the bucket of the chunk at `chunk`, however wide:
+    /// all clear, if it has none.
+    fn words(&self, chunk: usize) -> &[u64] {
         let words = self.bucket_words();
-        &mut self.block[chunk * words..][..words]
+        match self.start(chunk, words) {
+            Some(start) => &self.buckets[start..][..words],
+            None => &NO_CELLS[..words],
+        }
+    }
+
+    /// The bucket of the chunk at `chunk`, to change: made now, all
+    /// clear and its counts none, in its place among the others, if the
+    /// chunk had none.
+    fn keep(&mut self, chunk: usize) -> &mut [u64] {
+        let words = self.bucket_words();
+        if !contains(self.kept, chunk) {
+            put(&mut self.kept, chunk, true);
+            let (start, end) = (self.start(chunk, words).expect("kept now"), self.buckets.len());
+            self.buckets.reserve_exact(words);
+            self.buckets.resize(end + words, 0);
+            self.buckets.copy_within(start..end, start + words);
+            self.buckets[start..][..words].fill(0);
+            self.tile_counts[chunk] = [0; COUNT_TILES_IN_CHUNK];
+            self.set_count(chunk, 0);
+        }
+        let start = self.start(chunk, words).expect("kept");
+        &mut self.buckets[start..][..words]
+    }
+
+    /// Lets the bucket of the chunk at `chunk` go, if it has one: the
+    /// chunk has no cell set then.
+    fn let_bucket_go(&mut self, chunk: usize) {
+        let words = self.bucket_words();
+        if let Some(start) = self.start(chunk, words) {
+            self.buckets.drain(start..start + words);
+            put(&mut self.kept, chunk, false);
+        }
+        self.tile_counts[chunk] = [0; COUNT_TILES_IN_CHUNK];
+        self.set_count(chunk, 0);
+    }
+
+    /// Lets go the bucket of every chunk neither hot nor waiting in the
+    /// ring: nothing reads it any more.
+    fn let_unused_go(&mut self) {
+        for chunk in members(self.kept & !(self.flags.hot | self.flags.in_ring)) {
+            self.let_bucket_go(chunk);
+        }
     }
 
     /// The number at `cell`, in Morton order, of the bucket at `chunk`:
@@ -210,8 +257,11 @@ impl SuperchunkLayer {
     #[inline]
     fn value_of(&self, chunk: usize, cell: usize, bits: usize) -> u32 {
         debug_assert_eq!(bits, self.layer_type.bits() as usize, "a plane read at its own width");
+        let Some(start) = self.start(chunk, WORDS * bits) else {
+            return 0;
+        };
         let at = cell * bits;
-        (self.block[chunk * WORDS * bits + at / BITS_PER_WORD] >> (at % BITS_PER_WORD)) as u32 & ((1 << bits) - 1)
+        (self.buckets[start + at / BITS_PER_WORD] >> (at % BITS_PER_WORD)) as u32 & ((1 << bits) - 1)
     }
 
     /// Makes `value` the number at `cell`, in Morton order, of the hot
@@ -220,7 +270,16 @@ impl SuperchunkLayer {
     /// move if the cell came to 0 or left it. Whether it changed.
     fn put_value(&mut self, chunk: usize, cell: usize, value: u32) -> bool {
         let (bits, at) = (self.layer_type.bits() as usize, cell * self.layer_type.bits() as usize);
-        let (word, mask) = (&mut self.block[chunk * WORDS * bits + at / BITS_PER_WORD], (1u64 << bits) - 1);
+        // A chunk with no bucket holds 0 everywhere: it is given one only for another number.
+        let start = match self.start(chunk, WORDS * bits) {
+            Some(start) => start,
+            None if value as u64 & ((1u64 << bits) - 1) == 0 => return false,
+            None => {
+                self.keep(chunk);
+                self.start(chunk, WORDS * bits).expect("kept now")
+            }
+        };
+        let (word, mask) = (&mut self.buckets[start + at / BITS_PER_WORD], (1u64 << bits) - 1);
         let (was, value) = (*word >> (at % BITS_PER_WORD) & mask, value as u64 & mask);
         if was == value {
             return false;
@@ -242,15 +301,17 @@ impl SuperchunkLayer {
         true
     }
 
-    /// The bucket of the chunk at `chunk`, of a layer a bit a cell.
+    /// The bucket of the chunk at `chunk`, of a layer a bit a cell: all
+    /// clear, if it has none.
     fn cells(&self, chunk: usize) -> &CellWords {
-        self.block[chunk * WORDS..][..WORDS].try_into().expect("a bucket is a bitmap's words")
+        self.words(chunk).try_into().expect("a bucket is a bitmap's words")
     }
 
     /// Whether the cell at `cell`, in Morton order, of the bucket at
     /// `chunk` is set.
+    #[inline]
     fn get(&self, chunk: usize, cell: usize) -> bool {
-        self.cells(chunk)[cell / BITS_PER_WORD] >> (cell % BITS_PER_WORD) & 1 == 1
+        self.start(chunk, WORDS).is_some_and(|start| self.buckets[start + cell / BITS_PER_WORD] >> (cell % BITS_PER_WORD) & 1 == 1)
     }
 
     /// Makes the cell at `cell`, in Morton order, of the hot bucket at
@@ -258,8 +319,17 @@ impl SuperchunkLayer {
     /// dirty, and its count and the hot count move by one. Whether it
     /// changed.
     fn put_cell(&mut self, chunk: usize, cell: usize, set: bool) -> bool {
+        // A chunk with no bucket has no cell set: it is given one only to set one.
+        let start = match self.start(chunk, WORDS) {
+            Some(start) => start,
+            None if !set => return false,
+            None => {
+                self.keep(chunk);
+                self.start(chunk, WORDS).expect("kept now")
+            }
+        };
         // The one word read and written, found once.
-        let (word, bit) = (&mut self.block[chunk * WORDS + cell / BITS_PER_WORD], 1 << (cell % BITS_PER_WORD));
+        let (word, bit) = (&mut self.buckets[start + cell / BITS_PER_WORD], 1 << (cell % BITS_PER_WORD));
         if (*word & bit != 0) == set {
             return false;
         }
@@ -667,11 +737,6 @@ impl Lingering {
     }
 }
 
-/// Which block pool a layer of `layer_type` takes its block from.
-fn pool_of(layer_type: LayerType) -> usize {
-    layer_type.bits().trailing_zeros() as usize
-}
-
 /// The hot bitmaps, in allocations a superchunk each.
 pub struct BitmapArena {
     /// Every superchunk with a layer in use, sorted by superchunk index:
@@ -682,9 +747,6 @@ pub struct BitmapArena {
     lingering: Vec<Lingering>,
     /// The arena's own lookups, remembering the last.
     lookup: Lookup,
-    /// The blocks the allocations live in, taken and given back: a
-    /// pool a width, by the power of two of its bits a cell.
-    block_pools: [BlockPool; WIDTHS],
     /// Writes queued from outside a tick, not yet applied.
     queued: WriteQueues,
 }
@@ -699,7 +761,7 @@ impl Default for BitmapArena {
 impl BitmapArena {
     /// An arena with no bitmap hot.
     pub fn new() -> Self {
-        Self { directory: Vec::new(), lingering: Vec::new(), lookup: Lookup::default(), block_pools: std::array::from_fn(|width| BlockPool::new(ALLOCATION_WORDS << width)), queued: WriteQueues::default() }
+        Self { directory: Vec::new(), lingering: Vec::new(), lookup: Lookup::default(), queued: WriteQueues::default() }
     }
 
     /// Every allocation in use, superchunk by superchunk in Morton order,
@@ -747,7 +809,7 @@ impl BitmapArena {
     }
 
     /// The allocation for `layer_type` over `superchunk`: the one in
-    /// use, or else a new one, its block from the block pool.
+    /// use, or else a new one, with no bucket yet.
     fn allocation(&mut self, layer_type: LayerType, superchunk: SuperchunkIndex) -> LayerAt {
         if let Some(at) = self.lookup.find(&self.directory, layer_type, superchunk) {
             return at;
@@ -759,8 +821,7 @@ impl BitmapArena {
         });
         let layers = &mut self.directory[entry].layers;
         let layer = layers.binary_search_by_key(&layer_type, |layer| layer.layer_type).expect_err("not in use");
-        let block = self.block_pools[pool_of(layer_type)].allocate();
-        let new = SuperchunkLayer { layer_type, block, flags: ChunkFlags::default(), counts_less_one: [0; CHUNKS_IN_SUPERCHUNK], hot_count: 0, tile_counts: [[0; COUNT_TILES_IN_CHUNK]; CHUNKS_IN_SUPERCHUNK] };
+        let new = SuperchunkLayer { layer_type, buckets: Vec::new(), kept: 0, flags: ChunkFlags::default(), counts_less_one: [0; CHUNKS_IN_SUPERCHUNK], hot_count: 0, tile_counts: [[0; COUNT_TILES_IN_CHUNK]; CHUNKS_IN_SUPERCHUNK] };
         layers.insert(layer, new);
         (entry, layer)
     }
@@ -773,10 +834,7 @@ impl BitmapArena {
     /// hot now.
     pub fn make_hot(&mut self, key: BucketKey, layer: Option<&[u64]>, codec: &mut LayerCodec) -> bool {
         assert_eq!(key.layer_type.bits(), 1, "one encoded bitmap makes a layer of a bit a cell hot");
-        self.make_hot_with(key, |bucket| match layer {
-            Some(layer) => codec.decode(layer, bucket.try_into().expect("a bitmap's words")),
-            None => bucket.fill(0),
-        })
+        self.make_hot_with(key, layer.map(|layer| |bucket: &mut [u64]| codec.decode(layer, bucket.try_into().expect("a bitmap's words"))))
     }
 
     /// [`BitmapArena::make_hot`], the bucket's `cells` given, decoded
@@ -784,30 +842,33 @@ impl BitmapArena {
     /// bitmap's words, times the layer's bits a cell
     /// ([`chunk_storage::wide`]).
     pub fn make_hot_cells(&mut self, key: BucketKey, cells: Option<&[u64]>) -> bool {
-        self.make_hot_with(key, |bucket| match cells {
-            Some(cells) => bucket.copy_from_slice(cells),
-            None => bucket.fill(0),
-        })
+        self.make_hot_with(key, cells.map(|cells| |bucket: &mut [u64]| bucket.copy_from_slice(cells)))
     }
 
     /// Makes `key`'s bitmap hot, `fill` writing its cells into its
     /// bucket unless it is hot already or waiting in the ring, then
-    /// counted: whether it was made hot now.
-    fn make_hot_with(&mut self, key: BucketKey, fill: impl FnOnce(&mut [u64])) -> bool {
+    /// counted: whether it was made hot now. With no `fill` it has no
+    /// cell set, and no bucket.
+    fn make_hot_with(&mut self, key: BucketKey, fill: Option<impl FnOnce(&mut [u64])>) -> bool {
         let (at, chunk) = (self.allocation(key.layer_type, key.chunk.superchunk()), key.chunk.place());
         let allocation = self.at_mut(at);
         if contains(allocation.flags.hot, chunk) {
             return false;
         }
         if !contains(allocation.flags.in_ring, chunk) {
-            let bits = key.layer_type.bits();
-            let bucket = allocation.words_mut(chunk);
-            fill(bucket);
-            // A count tile's cells: as many times its words as the layer has bits a cell.
-            let tile_words = COUNT_TILE_WORDS * bits as usize;
-            let tile_counts: [u16; COUNT_TILES_IN_CHUNK] = std::array::from_fn(|tile| chunk_storage::wide::cells_set(&bucket[tile * tile_words..][..tile_words], bits) as u16);
-            allocation.tile_counts[chunk] = tile_counts;
-            allocation.set_count(chunk, tile_counts.iter().map(|&count| count as u32).sum());
+            match fill {
+                Some(fill) => {
+                    let bits = key.layer_type.bits();
+                    let bucket = allocation.keep(chunk);
+                    fill(bucket);
+                    // A count tile's cells: as many times its words as the layer has bits a cell.
+                    let tile_words = COUNT_TILE_WORDS * bits as usize;
+                    let tile_counts: [u16; COUNT_TILES_IN_CHUNK] = std::array::from_fn(|tile| chunk_storage::wide::cells_set(&bucket[tile * tile_words..][..tile_words], bits) as u16);
+                    allocation.tile_counts[chunk] = tile_counts;
+                    allocation.set_count(chunk, tile_counts.iter().map(|&count| count as u32).sum());
+                }
+                None => allocation.let_bucket_go(chunk),
+            }
         }
         put(&mut allocation.flags.hot, chunk, true);
         allocation.hot_count += allocation.count(chunk);
@@ -823,16 +884,21 @@ impl BitmapArena {
         let mut made = |arena: &mut Self, layer_type: LayerType| match layer_type.bits() {
             1 => arena.make_hot(BucketKey { layer_type, chunk }, storage.layer(chunk, layer_type), codec),
             // A wide layer: its planes decoded, a bit of every cell each.
-            bits => arena.make_hot_with(BucketKey { layer_type, chunk }, |bucket| {
-                bucket.fill(0);
-                let mut plane = [0; WORDS];
-                for bit in 0..bits {
-                    if let Some(layer) = storage.layer(chunk, layer_type.plane(bit)) {
-                        codec.decode(layer, &mut plane);
-                        chunk_storage::wide::spread(&plane, bits, bit, bucket);
+            bits => {
+                // With no plane kept, no cell holds a number: no bucket.
+                let any = (0..bits).any(|bit| storage.layer(chunk, layer_type.plane(bit)).is_some());
+                let fill = any.then_some(|bucket: &mut [u64]| {
+                    bucket.fill(0);
+                    let mut plane = [0; WORDS];
+                    for bit in 0..bits {
+                        if let Some(layer) = storage.layer(chunk, layer_type.plane(bit)) {
+                            codec.decode(layer, &mut plane);
+                            chunk_storage::wide::spread(&plane, bits, bit, bucket);
+                        }
                     }
-                }
-            }),
+                });
+                arena.make_hot_with(BucketKey { layer_type, chunk }, fill)
+            }
         };
         types.iter().filter(|&&layer_type| made(self, layer_type)).count()
     }
@@ -1051,22 +1117,20 @@ impl BitmapArena {
     /// ring.
     fn leave_ring(&mut self, superchunk: SuperchunkIndex) {
         if let Some(entry) = self.entry_mut(superchunk) {
-            entry.layers.iter_mut().for_each(|layer| layer.flags.in_ring = 0);
+            for layer in &mut entry.layers {
+                layer.flags.in_ring = 0;
+                layer.let_unused_go();
+            }
         }
     }
 
     /// Releases every allocation with no bucket hot or waiting in the
-    /// ring, its block back in the block pool, every superchunk left with
-    /// none, and every lingering superchunk done with.
+    /// ring, its buckets with it, every superchunk left with none, and
+    /// every lingering superchunk done with.
     fn release_unused(&mut self) {
-        let block_pools = &mut self.block_pools;
-        for done in self.lingering.extract_if(.., |lingering| lingering.done()) {
-            done.superchunk.layers.into_iter().for_each(|allocation| block_pools[pool_of(allocation.layer_type)].release(allocation.block));
-        }
+        self.lingering.retain(|lingering| !lingering.done());
         for entry in &mut self.directory {
-            let (kept, released): (Vec<_>, Vec<_>) = entry.layers.drain(..).partition(|allocation| allocation.flags.hot | allocation.flags.in_ring != 0);
-            entry.layers = kept;
-            released.into_iter().for_each(|allocation| block_pools[pool_of(allocation.layer_type)].release(allocation.block));
+            entry.layers.retain(|allocation| allocation.flags.hot | allocation.flags.in_ring != 0);
         }
         self.directory.retain(|entry| !entry.layers.is_empty());
         self.lookup.forget();
@@ -1074,8 +1138,8 @@ impl BitmapArena {
 
     /// Drops `key`'s bitmap from the hot ones: whether it was hot. Its
     /// bucket stays while it waits in the ring; its allocation, once no
-    /// bucket of it is hot or waiting, leaves the directory, its block
-    /// back in the block pool. Dropping a dirty bitmap would lose its changes,
+    /// bucket of it is hot or waiting, leaves the directory.
+    /// Dropping a dirty bitmap would lose its changes,
     /// and is a bug: write it back first.
     pub fn evict(&mut self, key: BucketKey) -> bool {
         let Some((at, chunk)) = self.hot(key) else {
@@ -1085,10 +1149,10 @@ impl BitmapArena {
         assert!(!contains(allocation.flags.dirty, chunk), "{key:?} changed and was not written back");
         put(&mut allocation.flags.hot, chunk, false);
         allocation.hot_count -= allocation.count(chunk);
+        allocation.let_unused_go();
         if allocation.flags.hot | allocation.flags.in_ring == 0 {
             let (entry, layer) = at;
-            let released = self.directory[entry].layers.remove(layer);
-            self.block_pools[pool_of(released.layer_type)].release(released.block);
+            self.directory[entry].layers.remove(layer);
             if self.directory[entry].layers.is_empty() {
                 self.directory.remove(entry);
             }

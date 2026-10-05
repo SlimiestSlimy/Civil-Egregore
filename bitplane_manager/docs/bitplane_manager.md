@@ -7,10 +7,15 @@ and change. The decisions behind it are in `../../docs/tilesim.md`,
 
 ## The arena
 
-Allocations, one a layer type over a superchunk: a block from the
-allocator's block pool holding a bucket -- a 256x256 bitmap -- for each
-of its 16 chunks, in their Morton order, found by index with no search.
-A bucket never moves once allocated. Each
+Allocations, one a layer type over a superchunk: an array of buckets
+-- a 256x256 bitmap each -- one for each of its chunks that has a cell
+set, 16 at the most, in their Morton order. A chunk with no cell set
+has no bucket and reads clear; the first cell set in it makes one, put
+in its place among the others (`SuperchunkLayer::keep`), so buckets
+after it move -- a superchunk owns its own, and changes them alone. A
+bucket is found by how many chunks before it have one: a count of bits
+(`start`), no search. One is let go when its chunk is neither hot nor
+waiting in the ring. Each
 allocation keeps four 16-bit chunk sets packed in 8 bytes (hot, dirty,
 waiting in the ring, non-empty), each bucket's count of set cells (a
 `u16` less one -- a stored layer has 1 to 65,536 -- beside the
@@ -23,7 +28,7 @@ weights sampling picks by, and what it passes over a bitmap by.
 (kept beside each), each with its allocations sorted by layer type.
 Lookups remember the last 16 superchunks and types found (`Lookup`, one
 a thread), so Morton-ordered work -- reading a few types by turns,
-across a border -- rarely searches. Each superchunk owns its blocks, so
+across a border -- rarely searches. Each superchunk owns its buckets, so
 superchunks are changed apart.
 
 **Windows**: up to 8x8 cells at any cell read at once
@@ -67,7 +72,7 @@ nothing encoded or flushed, its dirty buckets taken and handed back to
 be encoded, and its allocations set aside as they are, **lingering** --
 no longer hot, so the simulation neither reads nor ticks it, writes to
 it are missed, and the directory stays the hot superchunks exactly.
-It is let go, its blocks back in the pool, once storage holds its
+It is let go, its buckets with it, once storage holds its
 changes: none on its way, none waiting in the ring. Wanted hot again
 before then, it is held (`hold`) and made hot as it is, nothing decoded
 (`make_hot_again`); no longer wanted, let go (`let_go`). A superchunk
@@ -81,9 +86,8 @@ A layer type is a bit a cell, or wide: 2, 4, 8 or 16 bits a cell
 the plane's type). A wide plane's bucket holds a cell's whole number
 together, the cell at place `p` at bit `p` times the width: a tree's
 stage is one read and one write, where four bitmaps took four of each,
-in four places in memory. Its allocation is as many times a bitmap's
-words a chunk as it has bits, from a block pool of that size, one a
-width. Its counts are of the cells whose number is not 0.
+in four places in memory. Its buckets are as many times a bitmap's
+words as it has bits. Its counts are of the cells whose number is not 0.
 
 The width is in the type so that it is known where the plane is read:
 `value(plane, cell)` shifts and masks by constants, a number of one

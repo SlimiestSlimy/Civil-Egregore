@@ -145,11 +145,13 @@ its words written sequentially as laid out in memory ("Saves", below).
    (`bitplane_manager/`): its buckets hold the hot bitmaps, raw, one
    layer of one chunk each, decoded from the cold pool only when needed. The
    arena is the only place with a cell API.
-3. The arena is made of allocations the size of a superchunk: each holds
-   one layer type over one superchunk, a bucket for every one of its 16
-   chunks, in the chunks' Morton order, allocated whole. A chunk's bucket
-   is found by its Morton index in O(1): nothing inside an allocation is
-   ever sorted, and a bucket never moves once allocated.
+3. The arena is made of allocations, each one layer type over one
+   superchunk: an array of buckets, one for each of its chunks with a
+   cell set, 16 at the most, in the chunks' Morton order. A chunk with
+   none has no bucket and reads clear; a chunk's bucket is found in
+   O(1) by how many chunks before it have one. (Until measured, an
+   allocation held all 16 buckets, whole, and none ever moved: see
+   `performance.md`, "A bucket only for a chunk with cells".)
 4. A small directory says which allocation holds which type over which
    superchunk: the superchunks in Morton order, each with its types
    sorted -- the one thing ever sorted, and it holds no bitmaps. The
@@ -161,8 +163,7 @@ its words written sequentially as laid out in memory ("Saves", below).
    was decoded is dirty; writing back encodes it into the ring, no words
    if no cell is left set. A dirty bucket must be written back before
    it is evicted. An allocation with no bucket hot or waiting in the
-   ring leaves the directory, its block back in the block pool for the
-   next one needed.
+   ring leaves the directory, its buckets with it.
 6. Every bucket counts its set cells, kept in step with every change,
    and every allocation the set cells of its hot buckets together (a
    `u32`, up to 2^20): the weights sampling picks by. A bitmap with any
@@ -223,9 +224,11 @@ superchunks on disk.
 - The custom allocator (`allocator/`) serves two projects only: chunk
   storage (`chunk_storage/`, the cold area) and the bitplane manager
   (`bitplane_manager/`, the hot bitmap area). Nothing else allocates
-  through it. So far only the bitplane manager uses it, its first form:
-  a block pool of equal-size blocks. Chunk storage's images and ring are
-  plain allocations until the area allocator below exists.
+  through it. Its first form is a block pool of equal-size blocks,
+  which the bitplane manager used until its buckets became a variable
+  array a superchunk; nothing uses it now. Chunk storage's images and
+  ring, and the arena's buckets, are plain allocations until the area
+  allocator below exists.
 - A custom allocator per area, not one global allocator: the system is
   asked for large blocks, 256 MiB at a time, tracked in a list; inside
   them, allocations are runs of 256-byte units, the allocated intervals
@@ -235,8 +238,8 @@ superchunks on disk.
 - **The cold area** is chunk storage's cold pool and writeback ring.
   It may move data: a superchunk rewritten is written into new space,
   never resized in place.
-- **The hot bitmap area** never moves, which is why it is cut into
-  superchunk-sized allocations, at the cost of a lot of memory.
+- **The hot bitmap area** is cut into allocations a superchunk and a
+  layer type each, changed apart: a bucket moves only inside its own.
 
 ### The speed of light
 

@@ -67,8 +67,7 @@ pub(crate) fn throughput(given: &Given) -> Result<(), String> {
     let mut memory = Table::new(&["memory", "bytes"]).left_aligned(&["memory"]);
     memory.row(&["process, peak".to_string(), run.memory.peak().map_or_else(unknown, mebibytes)]);
     memory.row(&["process, average over the ticks".to_string(), run.memory.average().map_or_else(unknown, mebibytes)]);
-    memory.row(&[format!("arena blocks in use ({})", run.arena.allocations), mebibytes(run.arena.bytes_in_use())]);
-    memory.row(&[format!("arena blocks made ({})", run.arena.blocks_made), mebibytes(run.arena.bytes_made)]);
+    memory.row(&[format!("arena buckets kept ({} of {} hot bitmaps)", run.arena.buckets, run.arena.hot_bitmaps), mebibytes(run.arena.bucket_bytes)]);
     memory.row(&[format!("storage images ({})", run.storage.superchunks), mebibytes(run.storage.image_bytes)]);
     memory.row(&["storage ring".to_string(), mebibytes(run.storage.ring_bytes)]);
     report.add("memory", memory);

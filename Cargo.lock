@@ -1773,7 +1773,6 @@ dependencies = [
 name = "bitplane_manager"
 version = "0.1.0"
 dependencies = [
- "allocator",
  "bitmap",
  "chunk_storage",
  "coordinates",

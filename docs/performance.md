@@ -168,6 +168,34 @@ start, flat out (`cargo run --release -p renderer -- 256 8000 0`):
 Workers watching for the next job a moment before parking, instead of
 parking at once, was tried on the same run and gained nothing: not kept.
 
+## A bucket only for a chunk with cells
+
+An allocation held a bucket for each of its superchunk's 16 chunks,
+cleared whether or not a cell was ever set in it: every hot layer of
+every hot superchunk was memory written. Now it holds an array of
+buckets, one for each chunk with a cell set, a chunk's found by the
+count of the chunks before it that have one
+(`bitplane_manager/docs/bitplane_manager.md`, "The arena"). Layers
+mostly empty -- the cells under water on land, the walls, the trees --
+cost what they hold.
+
+A generated world, 21 superchunks (`tilesim server new <folder> T 106
+4000`, then `tilesim server run <folder> 30000`), and the mock pasture,
+where every chunk has cells (`tilesim server pasture 6000 333 4000
+<superchunks>`):
+
+| what | a bucket a chunk | a bucket a chunk with cells |
+|---|---|---|
+| the world, ticks a second | 6,530 | 7,320 |
+| the world, most memory held | 121 MiB | 112 MiB |
+| the pasture, 64 superchunks, ticks a second | 17,300 to 18,700 | 18,200 |
+| the pasture, 400 superchunks, ticks a second | 3,540 to 3,700 | 3,940 |
+| the tick's instructions (`pasture 300 333 4000 4 1`) | 20.03 million | 20.44 million |
+
+The count of bits is 2% more instructions where nothing is saved, and
+the time is no worse there; where chunks are empty it is a ninth more
+ticks a second. A cache of the chunk last found was not needed.
+
 ## Elsewhere
 
 | what | where |
