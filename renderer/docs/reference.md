@@ -4,8 +4,10 @@ The design is in `renderer.md`.
 
 ## `sim.rs`
 
-`TARGET_PACE` (256 ticks a second), `SEED` (1), `CHUNK_WORDS`, `CENSUS_EVERY`
-(1,000 ticks). **`census_path()`**: where the run's census is kept;
+`TARGET_PACE` (256 ticks a second), `CHUNK_WORDS`, `CENSUS_EVERY`
+(1,000 ticks). **`seed()`**: the seed of the world watched, the
+workspace's moved on to the first with land about the origin.
+**`census_path()`**: where the run's census is kept;
 **`census`**: its file, started afresh.
 
 **`Viewport`** `{first, last}`: the superchunks in view, a rectangle of

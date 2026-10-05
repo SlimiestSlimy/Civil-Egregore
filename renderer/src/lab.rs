@@ -6,7 +6,7 @@
 //! generation moves, or the seed is drawn again ([`reseed`]), the
 //! world is made afresh and its ticks start from 0.
 
-use crate::sim::SEED;
+use crate::sim;
 use crate::tuning::{self, CLUMPING, COAST_BREADTH, COAST_LOWNESS, FINER_DEPTH, FINER_FALL, FINER_HEIGHT, FINER_SHARE, GRASS_COVER, GRASS_DETAIL, GRASS_PATCH, GRASS_SCATTER, HIGHEST_LAND, LEAST_SIGMOID, LINE_BENDING, MOST_SIGMOID, NARROWEST_BLEND, OCEAN_FLOOR, OCEAN_LEVEL, OCEAN_SHARE, WEIGHT_SPREAD, RAISED_SHARE, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER, VERTEX_SPACING, WIDEST_BLEND};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -20,8 +20,9 @@ use world::Generation;
 /// Whether the lab is what runs.
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// The seed the world is generated from, now.
-static SEED_NOW: AtomicU64 = AtomicU64::new(SEED);
+/// The seed drawn last, 0 while none was: the world is then generated
+/// from the run's own ([`sim::seed`]).
+static SEED_DRAWN: AtomicU64 = AtomicU64::new(0);
 
 /// Says the lab is what runs: generation is then the sliders'.
 pub fn run() {
@@ -40,14 +41,17 @@ pub fn view_reset() -> bool {
 
 /// The seed the world is generated from, now.
 pub fn seed() -> u64 {
-    SEED_NOW.load(Ordering::Relaxed)
+    match SEED_DRAWN.load(Ordering::Relaxed) {
+        0 => sim::seed(),
+        drawn => drawn,
+    }
 }
 
 /// Draws a new seed, off the clock: the world is generated again, and
 /// the view goes back to where it started.
 pub fn reseed() {
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |since| since.as_nanos() as u64);
-    SEED_NOW.store(mix(now), Ordering::Relaxed);
+    SEED_DRAWN.store(mix(now).max(1), Ordering::Relaxed);
     tuning::regenerate();
     VIEW_RESET.store(true, Ordering::Relaxed);
 }

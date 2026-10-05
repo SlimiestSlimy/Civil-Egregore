@@ -3,7 +3,9 @@
 TileSim on the screen: a pasture ticking on a thread of its own, and a
 Bevy window showing it -- dirt brown, grass green, a sheep white -- on
 ground lit by its height (below). The world is a generated one
-(`world::generate_flocks`, seed 1).
+(`world::generate_flocks`), from the workspace's seed
+(`utilities::seed`, `TILESIM_SEED` to pick one): the first from it
+with land about the origin (`world::seed_with_land`).
 
 `cargo run --release -p renderer -- [superchunks shown] [sheep a superchunk] [ticks a second, 0 flat out] [ticks to watch for] [1 to force hot]`;
 64 superchunks shown, 8,000 sheep on each and 256 ticks a second if
@@ -110,18 +112,23 @@ parts (8 MiB) for the 48 superchunks last seen.
   the screen shows -- the cells in view are one picture, and height is
   drawn at the edges: wherever a cell is higher than the one beside
   it, a thin line along the higher cell's border, light towards the
-  sun and dark away; and under a wall a band 5 to 7 eighths of a cell on its lower
-  cell, darkest at its foot and fading from it, tuned apart for a
-  wall the sun is on and one facing away. Walls are drawn much
+  sun and dark away; and under a wall a band on the ground at its
+  foot, darkest there and fading from it, tuned apart for a
+  wall the sun is on and one facing away. The band is longer the
+  higher the wall -- 4 eighths of a cell and half an eighth a height
+  it rises, 5 at the least -- and no darker: a cliff's runs over the
+  cells before it, as far as 8 (`ground::MARGIN`), over ground that
+  does not itself drop by a wall. Walls are drawn much
   the stronger: they are what cannot be crossed.
 
 **Corners.** A pixel takes one edge's doing, never two multiplied: the
 darkest of the edges that darken it, and only if none does, the
 lightest of those that lighten it. A cast shadow darkens an edge's
 shade as it does the ground: a step's dark line lies in the shadow the
-step casts, and would be lost in it otherwise. A cell higher only at a
-corner fills that corner's square if it is a wall there, joining the
-bands either side; a step met only at a corner draws nothing. So bands turn corners as one
+step casts, and would be lost in it otherwise. A wall met only down
+a diagonal fills the corner's square, as far off as its band reaches,
+joining the bands either side -- if the cells either side are no
+higher and no wall is as near straight up or across; a step met only at a corner draws nothing. So bands turn corners as one
 outline, with no doubled patch and no gap.
 
 ## Still to come
@@ -161,7 +168,7 @@ found by eye is then written into the code as the defaults.
 
 - **Shading**: the near view's -- how light and dark the border lines
   are, a wall's band facing away from the sun and towards it and how
-  it fades, the cast shadows, how much relief and how much texture.
+  it fades, how much longer it is a height of wall, the cast shadows, how much relief and how much texture.
   The painter reads them each frame. As tuned: the border lines 35%
   lighter and darker, a wall's band 49% darker at its foot facing away
   from the sun and 55% with the sun on it, fading by 80% across it,

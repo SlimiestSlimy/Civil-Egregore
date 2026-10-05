@@ -4,7 +4,7 @@ The design is in `mc_rules.md`.
 
 ## `grass.rs`
 
-`SPREAD_CHANCE` (0.001%), `DECAY_CHANCE` (0.002% with grass all round).
+`SPREAD_CHANCE` (0.001%), `DECAY_CHANCE` (0.0005% with grass all round).
 
 **`rule(turn, samples)`**: hands **`cell`**, the rule for one cell of grass, to `Turn::each_sampled`, which goes over the cells. On one superchunk's turn, every cell of grass
 sampled at the two chances together; each draws a neighbour (one of the

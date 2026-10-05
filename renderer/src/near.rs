@@ -15,10 +15,10 @@
 //! nothing. So bands meet at corners as one outline, with no doubled
 //! patch and no gap.
 
-use crate::ground::{shadow_drop, Fine, Ground, SIDE};
+use crate::ground::{shadow_drop, Fine, Ground, MARGIN, SIDE};
 use crate::paint::{depth_at, stage_at, tree_colour, under_water};
 use crate::sim::{Cells, Near};
-use crate::tuning::{self, Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LIT, WALL_SHADE};
+use crate::tuning::{self, Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
 use bitmap::BITS_PER_WORD;
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;
@@ -53,8 +53,17 @@ pub struct PaintedNear {
 struct Edge {
     /// Towards the neighbour: across and down.
     towards: (isize, isize),
-    /// How much higher the neighbour is.
+    /// How much higher the neighbour is: for a wall, than the cell at
+    /// its foot.
     rise: i32,
+    /// How far off the wall is, in eighths: the cells between.
+    away: f32,
+}
+
+/// How long the band of a wall rising `rise` is, in eighths of a
+/// cell: no longer than is looked for it.
+fn band(rise: i32, tuning: &Tuning) -> f32 {
+    (4.0 + rise as f32 * tuning[WALL_LENGTH]).clamp(5.0, EIGHTHS * MARGIN as f32)
 }
 
 impl Edge {
@@ -69,7 +78,8 @@ impl Edge {
         match self.rise {
             2.. => {
                 // A wall: a band on its lower cell, darkest at its foot -- by one number if the wall faces away from the sun, by another if the sun is on it, and between the two at a corner that faces neither way.
-                let width = (4 + self.rise / 2).clamp(5, 7) as f32;
+                // The higher the wall the longer the band, over the cells before it, and no darker.
+                let (width, from) = (band(self.rise, tuning), from + self.away);
                 let foot = match facing {
                     ..0 => tuning[WALL_SHADE],
                     0 => (tuning[WALL_SHADE] + tuning[WALL_LIT]) / 2.0,
@@ -149,15 +159,32 @@ impl Cell<'_> {
     fn paint(&self, pixels: &mut [[u8; 4]], width: usize, corner: (usize, usize), pixels_a_cell: usize) {
         let (x, y) = (self.at.0 as isize, self.at.1 as isize);
         let here = self.fine.height(x, y);
-        let (mut edges, mut count) = ([Edge::default(); 8], 0);
+        let (mut edges, mut count) = ([Edge::default(); 12], 0);
+        let tuning = self.tuning;
         let rise_towards = |towards: (isize, isize)| self.fine.height(x + towards.0, y + towards.1) as i32 - here as i32;
+        // The wall met first going `towards`, over ground that does not drop as a wall would: how many cells off it stands and how much it rises, if its band reaches this cell.
+        let wall_towards = |towards: (isize, isize)| {
+            let step = |off: isize| rise_towards((towards.0 * off, towards.1 * off)) - rise_towards((towards.0 * (off - 1), towards.1 * (off - 1)));
+            let met = (1..=MARGIN as isize).find_map(|off| match step(off) {
+                2.. => Some(Some(off)),
+                ..=-2 => Some(None),
+                _ => None,
+            });
+            let off = met.flatten()?;
+            (((off - 1) as f32) * EIGHTHS < band(step(off), tuning)).then_some((off, step(off)))
+        };
         for towards in AROUND {
             let rise = rise_towards(towards);
-            // A corner alone says nothing: one counts only for a wall, and only where the cells either side of it are no higher than this one -- where it joins their two bands.
             let corner = towards.0 != 0 && towards.1 != 0;
-            let joins = rise >= 2 && rise_towards((towards.0, 0)) <= 0 && rise_towards((0, towards.1)) <= 0;
-            if (rise >= 2 || rise <= -1) && (!corner || joins) {
-                edges[count] = Edge { towards, rise };
+            if rise <= -1 && !corner {
+                edges[count] = Edge { towards, rise, away: 0.0 };
+                count += 1;
+            }
+            let Some((off, rise)) = wall_towards(towards) else { continue };
+            // A corner alone says nothing: one counts only where the cells either side of it are no higher than this one, and no wall is as near straight up or across -- where it joins their two bands.
+            let nearer = |straight: (isize, isize)| rise_towards(straight) > 0 || wall_towards(straight).is_some_and(|(straight_off, _)| straight_off <= off);
+            if !corner || !(nearer((towards.0, 0)) || nearer((0, towards.1))) {
+                edges[count] = Edge { towards, rise, away: (off - 1) as f32 * EIGHTHS };
                 count += 1;
             }
         }
@@ -165,7 +192,6 @@ impl Cell<'_> {
         let (drop, over) = (shadow_drop(), here as f32 + 0.01);
         let (diagonal, above, beside) = (self.fine.line(x - 1, y - 1) - over, self.fine.line(x, y - 1) - over, self.fine.line(x - 1, y) - over);
         let may_be_shadowed = diagonal.max(above).max(beside) > 0.0;
-        let tuning = self.tuning;
         let light = 1.0 + tuning[RELIEF] * (self.fine.light(self.at.0, self.at.1) - 1.0);
         // A cast shadow: darker, and bluer.
         let shadow = [1.0 - tuning[SHADOW], 1.0 - 0.885 * tuning[SHADOW], 1.0 - 0.46 * tuning[SHADOW]];

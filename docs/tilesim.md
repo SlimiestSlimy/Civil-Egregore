@@ -345,15 +345,16 @@ the rest of its superchunk.
 The first rule built on it is grass (`mc_rules/src/grass.rs`). Each tick a
 cell of grass tries to spread with a chance of 0.001%, onto one of its
 eight neighbours drawn at random, if that one is dirt; and turns back
-to dirt with `k / 8` of 0.002%, `k` its grass neighbours -- none alone,
-the whole 0.002% with grass all round. One sampling pass serves both, at
-0.003%: each sample draws one neighbour, and spreads (a third of the
-time) or decays (two thirds) if that neighbour lets it, so decay comes
+to dirt with `k / 8` of 0.0005%, `k` its grass neighbours -- none alone,
+the whole 0.0005% with grass all round. One sampling pass serves both, at
+0.0015%: each sample draws one neighbour, and spreads (two thirds of the
+time) or decays (a third) if that neighbour lets it, so decay comes
 at `k / 8` of its chance from one neighbour read, not eight. Every
 sample reads the world as the tick found it: the writes are applied at
 the tick's end. Spreading at `0.001% x (dirt share)` and decay at
-`0.002% x (grass share)` balance, roughly, at a third of the cells
-grass. (The chances were a hundred times these until the world was
+`0.0005% x (grass share)` balance, roughly, at two thirds of the cells
+grass. (Decay was 0.002%, and the balance a third: grazed, the grass
+then thinned year on year and the flock starved with it. The chances were a hundred times these until the world was
 first seen on a screen, where grass at 0.3% a tick boils; every
 measurement below was taken at 0.3%.)
 
@@ -650,8 +651,8 @@ nine cells a sheep stood amid telling it nothing of the pasture.
 
 Since, two things. Whether pasture is lush is asked of the 16x16 cells
 about the sheep -- a quarter of them grass -- read at a meal, once in
-6,912 ticks: grass left alone covers a third of the dirt and grows
-fastest covering a sixth, so the flock stops growing while the grass
+6,912 ticks: grass left alone covers two thirds of the dirt and grows
+fastest covering a third, so the flock stops growing while the grass
 still gains on it. And a sheep that eats where it is not lush leaves:
 hungry again, it walks one way for 3,456 ticks -- 48 steps or so --
 eating nothing, before it looks for grass (`ROAMING`, an attribute:

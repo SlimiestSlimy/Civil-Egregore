@@ -38,8 +38,11 @@ const BEFORE: usize = 138;
 const AFTER: usize = 10;
 /// Cells along the side of the heights worked on.
 const WIDE: usize = BEFORE + SIDE + AFTER;
-/// Cells along the side of what is kept of them: a cell more all round.
-const KEPT: usize = SIDE + 2;
+/// Cells kept of them past each side of the superchunk: as far as a
+/// wall's band is looked for.
+pub const MARGIN: usize = 8;
+/// Cells along the side of what is kept of them.
+const KEPT: usize = SIDE + 2 * MARGIN;
 
 /// A cell's light kept in seven bits: this is flat ground's, unshaded.
 const LIT_ONE: f32 = 80.0;
@@ -75,7 +78,7 @@ const fn contour_every(detail: usize) -> f32 {
 /// What is kept of a superchunk only while it is seen from near: 3 MiB
 /// and the two finest levels.
 pub struct Fine {
-    /// Its cells' heights, and a cell more all round, row by row.
+    /// Its cells' heights, and [`MARGIN`] cells more all round, row by row.
     heights: Vec<Height>,
     /// How high the shadow line stands over each, laid out as the
     /// heights.
@@ -86,10 +89,10 @@ pub struct Fine {
 }
 
 impl Fine {
-    /// Where the cell `(x, y)` from the top left is kept; -1 and
-    /// [`SIDE`] are the cells past the edges.
+    /// Where the cell `(x, y)` from the top left is kept: [`MARGIN`]
+    /// cells past each edge are.
     const fn kept(x: isize, y: isize) -> usize {
-        (y + 1) as usize * KEPT + (x + 1) as usize
+        (y + MARGIN as isize) as usize * KEPT + (x + MARGIN as isize) as usize
     }
 
     /// The height of the cell `(x, y)`.
@@ -156,8 +159,8 @@ impl Ground {
             levels.push(level.drawn(detail));
             level = level.halved();
         }
-        // What is kept: the superchunk's cells and one more all round.
-        let kept = || (0..KEPT * KEPT).map(|index| (index / KEPT + BEFORE - 1) * WIDE + index % KEPT + BEFORE - 1);
+        // What is kept: the superchunk's cells and the margin all round.
+        let kept = || (0..KEPT * KEPT).map(|index| (index / KEPT + BEFORE - MARGIN) * WIDE + index % KEPT + BEFORE - MARGIN);
         let fine = Fine { heights: kept().map(|index| heights[index]).collect(), lines: kept().map(|index| lines[index]).collect(), lit };
         Self { levels, fine: Some(fine), used: 0 }
     }

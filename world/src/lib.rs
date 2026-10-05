@@ -158,6 +158,19 @@ pub fn generate_with(generation: Generation, seed: u64) -> World {
     World::empty(WorldInfo { name: String::new(), seed, tick: 0, layers: layer_types() }, generation)
 }
 
+/// The first seed from `from` on whose world, shaped as `shape`, has
+/// land about its origin -- three superchunks each way: what a world is
+/// made from to be watched or tested with a flock on it, the seed
+/// otherwise as likely to give ocean there.
+pub fn seed_with_land(from: u64, shape: &Shape) -> u64 {
+    let (middle, side) = (WORLD_MIDDLE.top_left().cartesian(), coordinates::SUPERCHUNK_SIDE_CELLS as i32);
+    let land = |seed: &u64| {
+        let mut lands = worldgen::mesh::Lands::new(shape, *seed);
+        (-3i32..=3).all(|across| (-3i32..=3).all(|down| lands.height(middle.x.wrapping_add_signed(across * side), middle.y.wrapping_add_signed(down * side)) > shape.ocean))
+    };
+    (from..).find(land).expect("a seed with land about the origin")
+}
+
 /// A world made from `seed` as [`generate`] makes one, but with a
 /// flock of `sheep` on each of `superchunks`, and the halos about them
 /// all hot before it ticks.

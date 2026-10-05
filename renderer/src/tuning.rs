@@ -104,10 +104,13 @@ pub const TREE_PATCH: usize = 32;
 pub const TREE_DETAIL: usize = 33;
 /// How much each cell's own lot counts for trees.
 pub const TREE_SCATTER: usize = 34;
+/// How much longer a wall's band is for each height the wall rises,
+/// in eighths of a cell.
+pub const WALL_LENGTH: usize = 35;
 
 /// The numbers, in the order above; the shading's defaults are what was
 /// found by eye with the sliders.
-pub const TUNED: [Tuned; 35] = [
+pub const TUNED: [Tuned; 36] = [
     Tuned { name: "step light", default: 0.35, range: (0.0, 1.0), page: Page::Shading, what: "How much lighter the border of a higher cell is where it faces the sun." },
     Tuned { name: "step dark", default: 0.35, range: (0.0, 0.8), page: Page::Shading, what: "How much darker the border of a higher cell is where it faces away from the sun." },
     Tuned { name: "wall shade", default: 0.49, range: (0.0, 1.0), page: Page::Shading, what: "How dark the band at the foot of a wall is, on the side away from the sun." },
@@ -143,6 +146,7 @@ pub const TUNED: [Tuned; 35] = [
     Tuned { name: "tree patch size (2^)", default: 1.0, range: (1.0, 10.0), page: Page::Generation, what: "How broad a wood is: 2 to this power, in cells." },
     Tuned { name: "tree patch detail", default: 0.0, range: (0.0, 2.0), page: Page::Generation, what: "How ragged the woods' edges are." },
     Tuned { name: "tree scatter", default: 0.0, range: (0.0, 2.0), page: Page::Generation, what: "How much each cell's own lot counts: lone trees, not woods." },
+    Tuned { name: "wall length", default: 0.5, range: (0.0, 2.0), page: Page::Shading, what: "How much longer the band at the foot of a wall is for each height the wall rises, in eighths of a cell: a high cliff's band runs over several cells, no darker for it." },
 ];
 
 /// Counts the changes to how the world is generated: what was made
