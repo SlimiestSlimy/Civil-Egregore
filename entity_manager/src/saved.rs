@@ -5,8 +5,8 @@
 //! value.
 
 use coordinates::CellIndex;
-use super::entity::{Attribute, AttributeType, EntityId, EntityType, Header};
-use super::store::{Entities, SuperchunkEntities};
+use crate::entity::{Attribute, AttributeType, EntityId, EntityType, Header};
+use crate::store::{Entities, SuperchunkEntities};
 
 /// The first word: `TSstate` and the format's number, 2.
 const FIRST_WORD: u64 = u64::from_le_bytes(*b"TSstate\x02");

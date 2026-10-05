@@ -15,3 +15,4 @@ chunk_storage = { path = "../chunk_storage" }
 [dev-dependencies]
 bitplane_manager = { path = "../bitplane_manager" }
 utilities = { path = "../utilities" }
+entity_manager = { path = "../entity_manager" }

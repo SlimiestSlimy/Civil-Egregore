@@ -2,7 +2,7 @@
 //! instructions queued for them.
 
 use super::{slot, Turn};
-use crate::entity_store::{Attribute, AttributeType, EntityEdit, EntityId, EntityRef, EntityType, Header, SuperchunkEntities, OCCUPIED_SIDE};
+use entity_manager::{Attribute, AttributeType, EntityEdit, EntityId, EntityRef, EntityType, Header, SuperchunkEntities, OCCUPIED_SIDE};
 use bitplane_manager::Reader;
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, ChunkIndex};

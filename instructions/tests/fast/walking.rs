@@ -9,7 +9,7 @@ use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use instructions::walking;
 use simulation::around;
-use simulation::entity_store::{Entities, EntityId, EntityType, Header, NEVER};
+use entity_manager::{Entities, EntityId, EntityType, Header, NEVER};
 use simulation::{Simulation, Turn};
 use std::sync::Mutex;
 use worldgen::{WALL_EAST, WALL_SOUTH};

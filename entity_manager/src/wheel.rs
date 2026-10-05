@@ -16,7 +16,7 @@
 //! order: their buckets, the cells they read and the writes they queue
 //! all go forwards through memory, as the cells' sampling does.
 
-use super::entity::EntityId;
+use crate::entity::EntityId;
 use coordinates::CellIndex;
 
 /// Ticks the wheel holds a slot for.

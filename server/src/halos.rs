@@ -39,7 +39,7 @@ use chunk_storage::jobs::{Done, Job, Ticket};
 use crate::World;
 use coordinates::SuperchunkIndex;
 use entity_rules::sheep::SHEEP;
-use simulation::entity_store::{saved, EntityType};
+use entity_manager::{saved, EntityType};
 use std::ops::AddAssign;
 
 /// The kinds of entity that keep a halo: the ones that matter, about

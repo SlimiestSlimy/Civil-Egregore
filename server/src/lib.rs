@@ -33,7 +33,7 @@ use worldgen::patches::Patches;
 use worldgen::ONE;
 use utilities::hash::mix;
 use entity_rules::sheep::flock;
-use simulation::entity_store::{saved, Entities};
+use entity_manager::{saved, Entities};
 use simulation::Simulation;
 use std::collections::{BTreeMap, VecDeque};
 use std::path::Path;

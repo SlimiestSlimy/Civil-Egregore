@@ -2300,12 +2300,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "entity_manager"
+version = "0.1.0"
+dependencies = [
+ "bitmap",
+ "coordinates",
+ "utilities",
+]
+
+[[package]]
 name = "entity_rules"
 version = "0.1.0"
 dependencies = [
  "bitplane_manager",
  "chunk_storage",
  "coordinates",
+ "entity_manager",
  "instructions",
  "simulation",
  "utilities",
@@ -2995,6 +3005,7 @@ dependencies = [
  "bitplane_manager",
  "chunk_storage",
  "coordinates",
+ "entity_manager",
  "pathfinding",
  "simulation",
  "utilities",
@@ -3226,6 +3237,7 @@ dependencies = [
  "bitplane_manager",
  "chunk_storage",
  "coordinates",
+ "entity_manager",
  "simulation",
  "utilities",
  "worldgen",
@@ -4359,6 +4371,7 @@ dependencies = [
  "bitplane_manager",
  "chunk_storage",
  "coordinates",
+ "entity_manager",
  "entity_rules",
  "mc_rules",
  "simulation",
@@ -4411,6 +4424,7 @@ dependencies = [
  "bitplane_manager",
  "chunk_storage",
  "coordinates",
+ "entity_manager",
  "utilities",
 ]
 

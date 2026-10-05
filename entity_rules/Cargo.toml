@@ -6,6 +6,7 @@ description = "TileSim's rules of its entities, a kind a file: so far the sheep"
 publish = false
 
 [dependencies]
+entity_manager = { path = "../entity_manager" }
 simulation = { path = "../simulation" }
 worldgen = { path = "../worldgen" }
 instructions = { path = "../instructions" }

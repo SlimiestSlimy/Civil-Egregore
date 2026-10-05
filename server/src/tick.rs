@@ -10,7 +10,7 @@ use mc_rules::grass::{self, GrassCounts};
 use mc_rules::trees::{self, TreeCounts};
 use entity_rules::sheep::{self, SheepCounts};
 use bitplane_manager::BitmapArena;
-use simulation::entity_store::Entities;
+use entity_manager::Entities;
 use simulation::{Simulation, TickReport};
 use std::ops::AddAssign;
 

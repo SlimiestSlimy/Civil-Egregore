@@ -8,7 +8,7 @@ use bitplane_manager::{BitmapArena, Shape, Write, WriteOp};
 use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
 use chunk_storage::{ChunkStorage, LayerCodec};
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
-use simulation::entity_store::Entities;
+use entity_manager::Entities;
 use simulation::Simulation;
 use mc_rules::grass::{tick, DECAY_CHANCE, SPREAD_CHANCE};
 

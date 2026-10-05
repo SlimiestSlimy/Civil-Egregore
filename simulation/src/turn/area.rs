@@ -4,7 +4,7 @@
 
 use super::Turn;
 use crate::around::{squeeze, Around};
-use crate::entity_store::OCCUPIED_SIDE;
+use entity_manager::OCCUPIED_SIDE;
 use bitplane_manager::COARSEST_TILES_IN_CHUNK;
 use chunk_storage::LayerType;
 use coordinates::{CellCartesian, CellIndex};

@@ -4,7 +4,7 @@
 //! `cargo test --release --test complete -- --ignored`
 
 use chunk_storage::mock::GRASS;
-use simulation::entity_store::{Attribute, Header};
+use entity_manager::{Attribute, Header};
 use server::{transient_data, World};
 
 /// Every hot cell, every entity with its attributes, the tick, every

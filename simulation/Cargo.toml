@@ -6,6 +6,7 @@ description = "TileSim's simulation: Monte Carlo sampling, the two-phase tick an
 publish = false
 
 [dependencies]
+entity_manager = { path = "../entity_manager" }
 bitmap = { path = "../bitmap" }
 bitplane_manager = { path = "../bitplane_manager" }
 chunk_storage = { path = "../chunk_storage" }

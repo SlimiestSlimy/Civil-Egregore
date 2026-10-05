@@ -6,6 +6,7 @@ description = "TileSim's server: the world as a whole, made from a seed, ticked 
 publish = false
 
 [dependencies]
+entity_manager = { path = "../entity_manager" }
 bitmap = { path = "../bitmap" }
 mc_rules = { path = "../mc_rules" }
 worldgen = { path = "../worldgen" }

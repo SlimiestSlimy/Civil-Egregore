@@ -11,7 +11,7 @@ use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use simulation::around::{self, CENTRE, RING};
-use simulation::entity_store::{Attribute, AttributeType, EntityEdit, Entities, EntityId, EntityType, Header, NEVER};
+use entity_manager::{Attribute, AttributeType, EntityEdit, Entities, EntityId, EntityType, Header, NEVER};
 use simulation::{Simulation, Turn};
 use std::sync::Mutex;
 

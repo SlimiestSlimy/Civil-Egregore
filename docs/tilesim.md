@@ -405,7 +405,7 @@ The height map is ignored for now.
 ### Entities (built, first form)
 
 An entity is a capability unit, not necessarily alive. The first form
-is built in the simulation (`simulation/src/entity_store/`), with sheep on
+is built in the entity manager (`entity_manager/src/`), with sheep on
 it (`entity_rules/src/sheep.rs`):
 
 - **A record**: a header -- a random 64-bit ID, a type, the cell it

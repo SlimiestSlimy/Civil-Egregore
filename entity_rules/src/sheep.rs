@@ -53,7 +53,7 @@ use coordinates::{CellCartesian, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use simulation::around::{self, CENTRE, RING};
 use instructions::walking;
 use worldgen::{WALL_EAST, WALL_SOUTH};
-use simulation::entity_store::{Attribute, AttributeType, EntityEdit, EntityRef, Entities, EntityId, EntityType, Header};
+use entity_manager::{Attribute, AttributeType, EntityEdit, EntityRef, Entities, EntityId, EntityType, Header};
 use simulation::{Simulation, Turn, TickReport};
 use std::collections::HashSet;
 use std::ops::AddAssign;
