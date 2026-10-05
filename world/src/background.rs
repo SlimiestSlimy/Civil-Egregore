@@ -11,9 +11,8 @@
 //! same however fast the threads are.
 
 use crate::{generate_image, Generation};
-use bitmap::CellWords;
 use bitplane_manager::BucketKey;
-use chunk_storage::{Flush, LayerCodec, LayerType, SuperchunkImage};
+use chunk_storage::{wide, Flush, LayerCodec, LayerType, SuperchunkImage};
 use coordinates::SuperchunkIndex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -25,7 +24,7 @@ use std::thread::JoinHandle;
 pub enum Job {
     /// A superchunk's write-back to encode
     /// ([`bitplane_manager::BitmapArena::take_dirty`]).
-    Encode(Vec<(BucketKey, Box<CellWords>)>),
+    Encode(Vec<(BucketKey, Box<[u64]>)>),
     /// A superchunk's changes taken from the ring, to rewrite its image
     /// with ([`chunk_storage::ChunkStorage::take`]).
     Flush(Flush),
@@ -48,7 +47,8 @@ pub enum Job {
 
 /// What a job made.
 pub enum Done {
-    /// The write-back, encoded: each bucket's layer words
+    /// The write-back, encoded: each bucket's layer words, a wide
+    /// bucket's a plane at a time, under the planes' types
     /// ([`LayerCodec::encode_layer`]).
     Encoded(Vec<(BucketKey, Vec<u64>)>),
     /// The image rewritten.
@@ -59,7 +59,7 @@ pub enum Done {
         generated: Option<SuperchunkImage>,
         /// Each bitmap's cells, chunk by chunk, type by type: `None` for
         /// no cell set.
-        cells: Vec<(BucketKey, Option<Box<CellWords>>)>,
+        cells: Vec<(BucketKey, Option<Box<[u64]>>)>,
     },
     /// The job panicked, with what it said.
     Failed(String),
@@ -69,7 +69,17 @@ impl Job {
     /// Does the job, with `codec`.
     fn run(self, codec: &mut LayerCodec) -> Done {
         match self {
-            Self::Encode(dirty) => Done::Encoded(dirty.into_iter().map(|(key, cells)| (key, codec.encode_layer(&cells).to_vec())).collect()),
+            Self::Encode(dirty) => {
+                let mut encoded = Vec::with_capacity(dirty.len());
+                for (key, cells) in dirty {
+                    match key.layer_type.bits() {
+                        1 => encoded.push((key, codec.encode_layer(cells[..].try_into().expect("a bitmap's words")).to_vec())),
+                        // A wide bucket is encoded a plane at a time: its bits' bitmaps, each under its own type.
+                        bits => encoded.extend((0..bits).map(|bit| (BucketKey { layer_type: key.layer_type.plane(bit), chunk: key.chunk }, codec.encode_layer(&wide::plane(&cells, bits, bit)).to_vec()))),
+                    }
+                }
+                Done::Encoded(encoded)
+            }
             Self::Flush(flush) => Done::Flushed(flush.rewritten()),
             Self::Warm { superchunk, image, seed, generation, types } => {
                 let generated = image.is_none().then(|| generate_image(&generation, seed, superchunk, codec));
@@ -77,12 +87,15 @@ impl Job {
                 let mut cells = Vec::with_capacity(types.len() * superchunk.chunks().count());
                 for chunk in superchunk.chunks() {
                     for &layer_type in &types {
-                        let decoded = image.layer(chunk.place(), layer_type).map(|layer| {
-                            let mut bucket = Box::new([0; bitmap::WORDS]);
-                            codec.decode(layer, &mut bucket);
-                            bucket
-                        });
-                        cells.push((BucketKey { layer_type, chunk }, decoded));
+                        // A wide layer's planes decoded and put together: none of them there, no cell set.
+                        let (bits, mut plane, mut bucket) = (layer_type.bits(), [0; bitmap::WORDS], None);
+                        for bit in 0..bits {
+                            if let Some(layer) = image.layer(chunk.place(), layer_type.plane(bit)) {
+                                codec.decode(layer, &mut plane);
+                                wide::spread(&plane, bits, bit, bucket.get_or_insert_with(|| vec![0; bitmap::WORDS * bits as usize].into_boxed_slice()));
+                            }
+                        }
+                        cells.push((BucketKey { layer_type, chunk }, bucket));
                     }
                 }
                 Done::Warmed { generated, cells }

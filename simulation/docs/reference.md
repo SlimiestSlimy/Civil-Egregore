@@ -18,7 +18,7 @@ probability, random, emit)`**: every superchunk's, in Morton order.
 dy)`**.
 
 **`Turn`**: a superchunk's turn in the first phase:
-**`superchunk`**, **`random`**, **`sample(type, probability, samples)`**, **`each_sampled(type, probability, samples, each)`** (`each` run on every cell sampled: a rule is written for one cell, the loop is here), **`each_woken(layers, state, each)`** (the same for the entities waking)
+**`superchunk`**, **`random`**, **`sample(type, probability, samples)`**, **`value(plane, cell)`** and **`queue_value(plane, cell, value)`** (a wide plane's number, read and written whole), **`each_sampled(type, probability, samples, each)`** (`each` run on every cell sampled: a rule is written for one cell, the loop is here), **`each_woken(layers, state, each)`** (the same for the entities waking)
 of its own cells, **`holds(type, cell)`** anywhere, **`queue(type,
 write)`** -- into the slot of each superchunk it lands in.
 **`window(type, origin, width, height)`**: up to 8x8 cells from

@@ -27,7 +27,7 @@ type Everything = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, u64, Vec<(Superchunk
 
 /// [`Everything`] `world` holds.
 fn everything(world: &World) -> Everything {
-    let cells = world.info.layers.clone().into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.cells().to_vec()).collect();
+    let cells = world.info.layers.clone().into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.words().to_vec()).collect();
     let all = world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
     let cold = world.cold.iter().map(|(&superchunk, words)| (superchunk, world.storage.image(superchunk).expect("a cold superchunk's image").clone(), words.clone())).collect();
     (cells, all, world.entities.now(), world.simulation.random_states().collect(), cold, world.warming().collect(), world.cooling().collect())

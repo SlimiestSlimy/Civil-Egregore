@@ -16,7 +16,11 @@ chunk's more; **`words_of(words)`**: a map's length from its start.
 
 ## `layer_codec.rs`
 
-**`LayerType(u64)`**: what a layer represents.
+**`LayerType(u64)`**: what a layer represents; **`wide(first, bits)`** a type of 2, 4, 8 or 16 bits a cell, **`bits()`**, **`plane(bit)`** and **`planes()`** the one-bit types it is kept cold as, **`holds(plane)`**. **`Width`** (`Bits2`, `Bits4`, `Bits8`, `Bits16`) and **`Wide<W>`**: a wide plane with its width in its type -- `new(first)`, `layer_type()`, `most()`.
+
+## `wide.rs`
+
+**`spread(plane, bits, bit, wide)`**: a bitmap put into a wide bucket as one bit of every cell. **`plane(wide, bits, bit)`**: that bit of every cell, as a bitmap. **`cells_set(words, bits)`**: the cells whose number is not 0.
 
 **`LayerCodec`**: Tessera and its buffers, allocated once.
 **`encode(cells)`**: the bitmap's stream, as words, until the next

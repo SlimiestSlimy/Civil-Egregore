@@ -151,9 +151,10 @@ pub struct Cells {
     pub heights: Vec<u64>,
     /// Its trees, laid out as the grass.
     pub trees: Vec<u64>,
-    /// Its trees' stages, a bitplane a bit, the lowest first, each laid
-    /// out as the grass.
-    pub stages: [Vec<u64>; 4],
+    /// Its trees' stages, four bits a cell: its 16 chunks' buckets one
+    /// after another, a cell's stage at four times its place in its
+    /// chunk -- as the arena holds the plane.
+    pub stages: Vec<u64>,
     /// The cells with water on them, however deep, laid out as the grass.
     pub wet: Vec<u64>,
     /// The low four bits of the water's depth, a bitplane a bit, each
@@ -370,19 +371,21 @@ fn copy(world: &World, ask: Ask, sent: &mut HashSet<SuperchunkIndex>) -> Vec<Cel
         let wet = depths.iter().fold(deep.clone(), or);
         // Heights never change: sent the once, in the first frame the superchunk is hot in.
         let heights = if hot && sent.insert(superchunk) { world.storage.image(superchunk).map_or(Vec::new(), |image| image.height_words().to_vec()) } else { Vec::new() };
-        copied.push(Cells { at: (x, y), hot, heights, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages: TREE_STAGE.map(planes), wet, depths, deep, sheep });
+        copied.push(Cells { at: (x, y), hot, heights, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages: planes(TREE_STAGE.layer_type()), wet, depths, deep, sheep });
     }
     copied
 }
 
 /// `superchunk`'s cells of `layer_type`: its chunks' words, one chunk
-/// after another.
+/// after another -- of a wide type, as many times a bitmap's words a
+/// chunk as it has bits a cell.
 fn layer(world: &World, layer_type: LayerType, superchunk: SuperchunkIndex) -> Vec<u64> {
-    let mut words = Vec::with_capacity(CHUNKS_IN_SUPERCHUNK * CHUNK_WORDS);
+    let chunk_words = CHUNK_WORDS * layer_type.bits() as usize;
+    let mut words = Vec::with_capacity(CHUNKS_IN_SUPERCHUNK * chunk_words);
     for chunk in superchunk.chunks() {
         match world.arena.bucket(BucketKey { layer_type, chunk }) {
-            Some(bucket) => words.extend_from_slice(bucket.cells()),
-            None => words.resize(words.len() + CHUNK_WORDS, 0),
+            Some(bucket) => words.extend_from_slice(bucket.words()),
+            None => words.resize(words.len() + chunk_words, 0),
         }
     }
     words

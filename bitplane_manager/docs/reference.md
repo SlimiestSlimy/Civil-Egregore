@@ -14,7 +14,7 @@ cell asked of a bitmap not hot.
 superchunk -- its owned block, flags, counts less one, count tiles'
 counts, hot count. **`count`** / **`set_count`** a bucket's set cells;
 **`cells`** / **`cells_mut`** a bucket's words; **`get`** a cell by
-Morton index; **`put_cell`** a cell set or clear if not already, the
+Morton index; **`value`** and **`put_value`** the number of a wide layer's cell, read and put whole; **`put_cell`** a cell set or clear if not already, the
 bucket dirty and the counts moved by one: whether it changed.
 
 **`Superchunk`** `{index, layers, on_their_way}`: one superchunk,
@@ -109,3 +109,5 @@ block pool's stats; **`bytes_in_use`**.
 ## `transient_data.rs`
 
 **`measurements()`**, **`publish(report)`**: as in every crate.
+
+Wide planes: **`Reader::value(plane, cell)`** and **`BitmapArena::value`** read a cell's number; **`Write::value(plane, at, value)`** puts one (`WriteOp::Put`); **`Bucket::words()`** is a bucket's words at any width. `take_dirty` and `make_hot_cells` carry a bucket as a bitmap's words times its bits a cell; `written_back` takes a wide layer's planes' keys.

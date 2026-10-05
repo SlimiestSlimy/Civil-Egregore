@@ -74,10 +74,34 @@ before then, it is held (`hold`) and made hot as it is, nothing decoded
 made hot any other way has its bitmaps' cells decoded from storage, or
 given decoded (`make_hot_cells`) -- off the tick, say.
 
+## Wide planes
+
+A layer type is a bit a cell, or wide: 2, 4, 8 or 16 bits a cell
+(`chunk_storage::Wide<W>`, the width `W` -- `Bits2` to `Bits16` -- in
+the plane's type). A wide plane's bucket holds a cell's whole number
+together, the cell at place `p` at bit `p` times the width: a tree's
+stage is one read and one write, where four bitmaps took four of each,
+in four places in memory. Its allocation is as many times a bitmap's
+words a chunk as it has bits, from a block pool of that size, one a
+width. Its counts are of the cells whose number is not 0.
+
+The width is in the type so that it is known where the plane is read:
+`value(plane, cell)` shifts and masks by constants, a number of one
+width cannot be read as another, and a wide plane cannot be asked
+whether a cell is "set".
+
+Cold, a wide plane is as many layers of a bit a cell, the bit `b` of
+every cell under the layer type `first + b`, each encoded by Tessera
+as any bitmap is (`chunk_storage::wide`): storage, saves and the codec
+know bitmaps only. The planes are put together when a bucket turns hot
+and taken apart when it is written back, off the tick, passing over
+the cells set alone.
+
 ## Writes
 
-The only way cells change. A write is 12 bytes: its anchor cell's
-Morton index, an operation (set, unset, flip) and a shape (the cell, a
+The only way cells change. A write is 16 bytes: its anchor cell's
+Morton index, an operation (set, unset, flip, or put a number, for a
+wide plane) and a shape (the cell, a
 rectangle up to 255 a side, a disc up to radius 255); the layer type is
 its queue's. Queued writes change nothing until applied, and apply in
 order, the latest winning. A cell write finds its bit from the index

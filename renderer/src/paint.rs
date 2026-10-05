@@ -190,6 +190,9 @@ const TREE_YOUNG: [u8; 3] = [62, 128, 44];
 /// A tree at its last stage.
 const TREE_OLD: [u8; 3] = [14, 62, 30];
 
+/// Bits a cell of the trees' stage plane.
+const STAGE_BITS: usize = mc_rules::trees::TREE_STAGE.layer_type().bits() as usize;
+
 /// A tree's colour at `stage`.
 pub fn tree_colour(stage: u32) -> [u8; 3] {
     mixed(TREE_YOUNG, TREE_OLD, stage as usize, OLDEST as usize)
@@ -197,7 +200,9 @@ pub fn tree_colour(stage: u32) -> [u8; 3] {
 
 /// The stage of the tree at bit `bit` of word `word` of `cells`' bitmaps.
 pub fn stage_at(cells: &Cells, word: usize, bit: u32) -> u32 {
-    (0..cells.stages.len()).map(|plane| ((cells.stages[plane][word] >> bit & 1) as u32) << plane).sum()
+    // The cell's place among the superchunk's, and its stage's four bits there.
+    let at = (word * BITS_PER_WORD + bit as usize) * STAGE_BITS;
+    (cells.stages[at / BITS_PER_WORD] >> (at % BITS_PER_WORD)) as u32 & ((1 << STAGE_BITS) - 1)
 }
 
 /// `colour`, opaque.
