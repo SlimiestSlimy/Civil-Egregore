@@ -17,7 +17,7 @@ fn keepers(world: &World) -> Vec<SuperchunkIndex> {
     world.entities.superchunks().iter().filter(|superchunk| superchunk.iter().any(|entity| HALO_KEEPERS.contains(&entity.header.kind))).map(|superchunk| superchunk.index()).collect()
 }
 
-/// A flock wandering off its origin for 6,000 ticks: after every tick
+/// A flock wandering off its origin for 6,000 ticks, or as many as it takes a halo to move: after every tick
 /// the superchunks hot and not cooling, or warming, are the halos about
 /// the sheep, never both; every one warming turns hot, if still wanted,
 /// and every one cooling cold, when due; every superchunk ever made is hot or cold and
@@ -27,7 +27,9 @@ fn the_hot_superchunks_are_the_halos() {
     let mut world = world::generate(crate::land_seed(1), 4_000);
     assert_eq!(world.arena.superchunk_indices(), about([WORLD_MIDDLE].into_iter()), "the origin's halo");
     let mut moved = HaloChange::default();
-    for _ in 0..6_000 {
+    // 6,000 ticks at least, and on until a superchunk has been generated: on some seeds the flock is long in nearing an edge.
+    while world.entities.now() < 6_000 || moved.generated == 0 {
+        assert!(world.entities.now() < 60_000, "the halos moved");
         moved += world.tick().halos;
         let hot = world.arena.superchunk_indices();
         let warming: Vec<(SuperchunkIndex, u64)> = world.warming().collect();
@@ -49,29 +51,34 @@ fn the_hot_superchunks_are_the_halos() {
 
 /// A superchunk a halo reaches is warming for its time: a write to it is
 /// missed and an entity put there lost, until it turns hot at the tick
-/// it is due -- and then both hold.
+/// it is due -- if it is still wanted then -- and then both hold.
 #[test]
 fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
     let mut world = world::generate(crate::land_seed(1), 4_000);
-    while world.warming().next().is_none() {
-        assert!(world.entities.now() < 6_000, "the halos moved");
-        world.tick();
-    }
-    let (superchunk, due) = world.warming().next().expect("one warming");
-    let cell = superchunk.chunks().next().expect("a chunk").top_left();
-    let try_both = |world: &mut World| {
+    let try_both = |world: &mut World, cell| {
         world.arena.queue(GRASS, Write::cell(cell, WriteOp::Flip));
         let missed = world.arena.apply().missed;
         world.entities.queue_put(Header { id: EntityId(u64::MAX), kind: EntityType(99), at: cell, wake: NEVER }, &[]);
         (missed, world.entities.apply().lost)
     };
-    assert_eq!(try_both(&mut world), (1, 1), "warming: the write missed, the entity lost");
-    while world.entities.now() < due {
-        assert!(world.arena.superchunk_indices().binary_search(&superchunk).is_err(), "not hot before it is due");
-        world.tick();
-    }
-    assert!(world.arena.superchunk_indices().binary_search(&superchunk).is_ok(), "hot when due");
-    assert_eq!(try_both(&mut world), (0, 0), "hot: both hold");
+    // A warming followed to the tick it is due: one left before then -- its sheep gone back -- never turns hot, and the next is followed.
+    let cell = loop {
+        while world.warming().next().is_none() {
+            assert!(world.entities.now() < 20_000, "the halos moved");
+            world.tick();
+        }
+        let (superchunk, due) = world.warming().next().expect("one warming");
+        let cell = superchunk.chunks().next().expect("a chunk").top_left();
+        assert_eq!(try_both(&mut world, cell), (1, 1), "warming: the write missed, the entity lost");
+        while world.entities.now() < due {
+            assert!(world.arena.superchunk_indices().binary_search(&superchunk).is_err(), "not hot before it is due");
+            world.tick();
+        }
+        if world.arena.superchunk_indices().binary_search(&superchunk).is_ok() {
+            break cell;
+        }
+    };
+    assert_eq!(try_both(&mut world, cell), (0, 0), "hot: both hold");
 }
 
 /// A lone sheep taken away: its halo is cooling, hot still, for its
@@ -149,6 +156,15 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
     }
     assert!(held(&world) == held(&twin), "ticks on as it would have");
 
+    // On to a tick with nothing warming or cooling: on some seeds a sheep is by an edge just now.
+    let unsettled = |world: &World| world.warming().next().is_some() || world.cooling().next().is_some();
+    for _ in 0..20_000 {
+        if !unsettled(&world) {
+            break;
+        }
+        world.tick();
+        twin.tick();
+    }
     // Cold again, and saved: every change flushed into the images, the bitmaps lingering let go; made hot, decoded from those images.
     let halos = world.arena.superchunk_indices();
     assert!(world.warming().next().is_none() && world.cooling().next().is_none() && halos == twin.arena.superchunk_indices(), "the two alike, none warming or cooling");
