@@ -137,18 +137,39 @@ pub enum Request {
     Pause(bool),
     /// Tick so many times a second, or flat out.
     Pace(Option<u32>),
-    /// Run the world saved in this folder, not the one run: hot in
-    /// its halos, as it was saved. Refused, the world run goes on
-    /// ([`refused`]).
-    Open(PathBuf),
+    /// Run the world of this name in the worlds' folder, not the one
+    /// run: hot in its halos, as it was saved. Refused, the world run
+    /// goes on ([`said`]).
+    Open(String),
+    /// Save the world run under this name in the worlds' folder, its
+    /// name from then ([`named`]).
+    Save(String),
 }
 
-/// Why the world last asked for was not opened, if it was not.
-static REFUSED: Mutex<Option<String>> = Mutex::new(None);
+/// What opening or saving a world last came to, said to whoever watches.
+static SAID: Mutex<Option<String>> = Mutex::new(None);
 
-/// Why the world last asked for was not opened, if it was not.
-pub fn refused() -> Option<String> {
-    REFUSED.lock().expect("why a world was refused").clone()
+/// The name of the world run, if it is one of the worlds' folder.
+static NAMED: Mutex<Option<String>> = Mutex::new(None);
+
+/// What opening or saving a world last came to, if either was asked.
+pub fn said() -> Option<String> {
+    SAID.lock().expect("what was said").clone()
+}
+
+/// The name of the world run, if it is one of the worlds' folder:
+/// opened from it, or saved to it.
+pub fn named() -> Option<String> {
+    NAMED.lock().expect("the world's name").clone()
+}
+
+/// Notes what opening or saving a world came to, and the world's name
+/// if it has one now.
+fn say(said: String, named: Option<String>) {
+    *SAID.lock().expect("what was said") = Some(said);
+    if named.is_some() {
+        *NAMED.lock().expect("the world's name") = named;
+    }
 }
 
 /// One superchunk's cells, as a tick left them.
@@ -297,17 +318,24 @@ fn run(superchunks: u32, flock: usize, mut mode: Mode, asked: &Receiver<Request>
                 }
                 Ok(Request::Pause(pause)) => (paused, next_tick) = (pause, Instant::now()),
                 Ok(Request::Pace(new)) => (pace, next_tick) = (new, Instant::now()),
-                Ok(Request::Open(folder)) => {
-                    let opened = server::load(&folder);
-                    *REFUSED.lock().expect("why a world was refused") = opened.as_ref().err().map(ToString::to_string);
-                    if let Ok(opened) = opened {
+                Ok(Request::Open(name)) => match server::load(&utilities::settings::world(&name)) {
+                    Ok(opened) => {
                         // Run as it was saved: its halos moved, its ticks its own, and all of it sent again.
                         (world, mode) = (opened, Mode::Halos);
                         lab::opened(world.info.seed);
                         generation = tuning::generation();
                         sent.clear();
                         (tick, last_frame_tick, next_tick) = (world.info.tick, world.info.tick, Instant::now());
+                        say(format!("{name} opened"), Some(name));
                     }
+                    Err(why) => say(format!("{name} not opened: {why}"), None),
+                },
+                Ok(Request::Save(name)) => {
+                    match server::save(&utilities::settings::world(&name), &mut world) {
+                        Ok(saved) => say(format!("{name} saved at tick {}: {} superchunks, {} entities", world.entities.now(), saved.superchunks, saved.entities), Some(name)),
+                        Err(why) => say(format!("{name} not saved: {why}"), None),
+                    }
+                    next_tick = Instant::now();
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => return,
@@ -323,13 +351,8 @@ fn run(superchunks: u32, flock: usize, mut mode: Mode, asked: &Receiver<Request>
                 _ = writeln!(file, "{tick},{:.3},{},{},{}", started.elapsed().as_secs_f64(), pace.unwrap_or(0), world.entities.len(), count(&world, GRASS)).and_then(|()| file.flush());
             }
         }
-        if mode == Mode::Halos {
-            world.tick();
-        } else {
-            // The halos are not moved: every superchunk shown stays hot.
-            let seed = world.info.seed;
-            server::tick_rules(&mut world.simulation, &mut world.arena, &mut world.entities, seed);
-        }
+        // The halos moved, where the world has a hot entity: forced hot, every superchunk shown stays so.
+        world.tick();
         tick += 1;
         if let Some(pace) = pace {
             next_tick += Duration::from_secs_f64(1.0 / pace as f64);
@@ -355,6 +378,8 @@ pub fn shown(superchunks: u32) -> Vec<SuperchunkIndex> {
 /// `world` with every superchunk of `shown` hot and kept so, a flock
 /// of `flock` sheep on each: a fixed load, whatever the sheep come to.
 fn forced(mut world: World, shown: &[SuperchunkIndex], flock: usize) -> World {
+    // No hot entity: what is made hot here stays so, whatever the sheep come to.
+    world.halos.hot.entity = None;
     let mut wanted = shown.to_vec();
     wanted.sort_unstable();
     world.keep_hot(&wanted);

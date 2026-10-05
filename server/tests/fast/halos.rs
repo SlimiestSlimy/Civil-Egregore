@@ -9,12 +9,11 @@ use chunk_storage::mock::GRASS;
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use bitplane_manager::{Write, WriteOp};
 use entity_manager::{Attribute, EntityId, EntityType, Header, NEVER};
-use server::halos::about;
-use server::{HaloChange, World, COOL_TICKS, HALO_KEEPERS, WARM_TICKS};
+use server::{about, HaloChange, World, COOL_TICKS, HOT_ENTITY, WARM_TICKS};
 
-/// The superchunks holding an entity that keeps a halo.
-fn keepers(world: &World) -> Vec<SuperchunkIndex> {
-    world.entities.superchunks().iter().filter(|superchunk| superchunk.iter().any(|entity| HALO_KEEPERS.contains(&entity.header.kind))).map(|superchunk| superchunk.index()).collect()
+/// The superchunks holding a hot entity.
+fn hot_entities(world: &World) -> Vec<SuperchunkIndex> {
+    world.entities.superchunks().iter().filter(|superchunk| superchunk.iter().any(|entity| entity.header.kind == HOT_ENTITY)).map(|superchunk| superchunk.index()).collect()
 }
 
 /// A flock wandering off its origin for 6,000 ticks, or as many as it takes a halo to move: after every tick
@@ -37,7 +36,7 @@ fn the_hot_superchunks_are_the_halos() {
         assert!(cooling.iter().all(|(superchunk, _)| hot.binary_search(superchunk).is_ok()), "cooling, hot still");
         let staying = hot.iter().filter(|superchunk| cooling.binary_search_by_key(superchunk, |(cooling, _)| cooling).is_err());
         // A warming is never given up: one its halo has left is warming still, and no halo's.
-        let wanted = about(keepers(&world).into_iter());
+        let wanted = about(hot_entities(&world).into_iter());
         let mut halos: Vec<SuperchunkIndex> = staying.copied().chain(warming.iter().map(|&(superchunk, _)| superchunk).filter(|superchunk| wanted.binary_search(superchunk).is_ok())).collect();
         halos.sort_unstable();
         assert!(warming.iter().all(|(superchunk, _)| hot.binary_search(superchunk).is_err()), "warming, not hot yet");
@@ -179,4 +178,36 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
         twin.tick();
     }
     assert!(held(&world) == held(&twin), "decoded as it was, and ticks on as it would have");
+}
+
+/// A world of a size is never hot outside it, whoever wants it and
+/// whatever the flock does; a save keeps its size; and with
+/// no hot entity every superchunk of it is forced hot and stays so.
+#[test]
+fn a_world_of_a_size_is_hot_within_it_only() {
+    let side = 4;
+    let sized = server::generate_sized(server::Generation::DEFAULT, crate::land_seed(1), Some(side));
+    let mut world = server::flocked(sized, &[WORLD_MIDDLE], 4_000);
+    let halo = about([WORLD_MIDDLE].into_iter());
+    assert_eq!(world.arena.superchunk_indices(), halo, "the origin's halo, all of it within");
+    world.keep_hot(&about(halo.into_iter()));
+    let hot = world.arena.superchunk_indices();
+    assert!(hot.len() == (side * side) as usize && hot.iter().all(|&superchunk| world.halos.hot.within(superchunk)), "nothing made hot outside it, whoever wants it");
+    for _ in 0..2 * WARM_TICKS {
+        world.tick();
+        assert!(world.arena.superchunk_indices().into_iter().chain(world.warming().map(|(superchunk, _)| superchunk)).all(|superchunk| world.halos.hot.within(superchunk)));
+    }
+
+    let folder = server::transient_data::saves().join("tests").join("sized");
+    _ = std::fs::remove_dir_all(&folder);
+    server::save(&folder, &mut world).expect("saved");
+    let mut loaded = server::load(&folder).expect("loaded");
+    assert_eq!(loaded.halos.hot, world.halos.hot, "its size, kept");
+
+    loaded.halos.hot.entity = None;
+    for _ in 0..=WARM_TICKS {
+        loaded.tick();
+    }
+    assert_eq!(loaded.arena.superchunk_indices().len(), (side * side) as usize, "forced hot: all of it");
+    assert_eq!((loaded.warming().count(), loaded.cooling().count()), (0, 0));
 }

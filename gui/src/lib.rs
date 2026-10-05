@@ -6,7 +6,8 @@
 //! comes with [`Gui`]; what it has to say is read off it: the numbers
 //! ([`tuning::now`]), the seed drawn ([`tuning::seed_drawn`]), whether
 //! the options are open ([`options::Options::open`]), and a message
-//! for each world chosen to be opened ([`options::Chosen`]).
+//! for each world chosen to be opened ([`options::Chosen`]) and each
+//! time the world is to be saved ([`options::Save`]).
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -36,6 +37,7 @@ impl Plugin for Gui {
         app.init_resource::<sliders::Hands>()
             .insert_resource(options::Options::listing(self.worlds))
             .add_message::<options::Chosen>()
+            .add_message::<options::Save>()
             .add_systems(Startup, (sliders::setup, options::setup))
             .add_systems(Update, (options::work, sliders::toggle, sliders::scroll, sliders::slide, sliders::tell).chain().in_set(Worked));
     }

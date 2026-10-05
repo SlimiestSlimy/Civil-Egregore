@@ -151,7 +151,7 @@ pixels made here.
 | `T` | tick flat out, or at the game's pace (256 ticks a second) |
 | `F` | the window over the whole screen, or not |
 | `U` | the sliders' menu, opened; whatever of them is open, closed |
-| Escape | the options, opened or closed: going on, opening a world, leaving TileSim |
+| Escape | the options, opened or closed: going on, saving the world, opening one, leaving TileSim |
 | `[` and `]` | halve and double the pace |
 | `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |
@@ -167,9 +167,13 @@ options: the simulation's thread loads it from the worlds' folder
 (`sim::Request::Open`) and runs it in place of the one run, hot in its
 halos, its ticks its own, the view back where it started. A world that
 cannot be read is refused, the reason on the first line of the text at
-the top left, and the world run goes on. A world opened is not saved
-back; opened from the lab, it ends the lab -- generation's sliders
-stay listed and do nothing.
+the top left, and the world run goes on. Saving
+(`sim::Request::Save`) is on the simulation's thread too, between two
+ticks: the world written to its folder of the worlds' folder, under
+the name it was opened by or the one typed, how it is generated with
+it -- so a world tuned in the lab is saved as tuned. What either came
+to is said on that first line. A world opened from the lab ends the
+lab -- generation's sliders stay listed and do nothing.
 
 ## The map
 

@@ -3,7 +3,6 @@
 //!
 //! `cargo test --test fine`
 
-#[path = "fine/entities.rs"]
-mod entities;
-#[path = "fine/instructions.rs"]
-mod instructions;
+mod bitmap;
+mod morton;
+mod window;

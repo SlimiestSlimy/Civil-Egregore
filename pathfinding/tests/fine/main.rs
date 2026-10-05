@@ -3,7 +3,4 @@
 //!
 //! `cargo test --test fine`
 
-#[path = "fine/bitplane_manager.rs"]
-mod bitplane_manager;
-#[path = "fine/writes.rs"]
-mod writes;
+mod pathfinding;

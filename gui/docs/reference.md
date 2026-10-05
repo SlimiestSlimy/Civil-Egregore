@@ -53,10 +53,14 @@ button pressed, the numbers kept and shown.
 `ACROSS`, `ROW`, `WORDS`: the layout; `LISTED`: the worlds listed at a
 time; `ROWS`: the rows there are parts for. **`Does`**: what a click
 on a row does -- `Nothing`, `GoesOn`, `Lists`, `GoesBack`,
-`Opens(place)`, `Leaves`. **`Chosen(name)`**: the message for a world
-chosen. **`Options`**: whether they are open, the page shown, the
+`Saves`, `Names`, `Opens(place)`, `Leaves`. **`Chosen(name)`**: the
+message for a world chosen; **`Save(name)`**: for the world to be
+saved. **`Page`**: `First`, `Worlds`, `Naming`; `NAME`: the most
+letters a name has. **`Options`**: whether they are open, the page shown, the
 worlds listed and the first shown -- **`listing(lister)`**,
-**`open()`**, **`rows()`**. **`Shade`**, **`Bar`**, **`Says`**: the
+**`open()`**, **`named()`** and **`name(named)`**: the world run's
+name, as the window tells it; **`save_named(save)`**: the name typed
+saved under, unless none or taken; **`rows()`**. **`Shade`**, **`Bar`**, **`Says`**: the
 dimmed window, a row's bar, a row's words. **`setup`**: them, hidden.
 **`row_under(window, rows)`**: the row the pointer is on. **`work`**:
 opened and closed by Escape, unless it is leaving a value being typed;

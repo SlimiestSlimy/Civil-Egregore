@@ -3,5 +3,4 @@
 //!
 //! `cargo test --test fine`
 
-#[path = "fine/pathfinding.rs"]
-mod pathfinding;
+mod coordinates;

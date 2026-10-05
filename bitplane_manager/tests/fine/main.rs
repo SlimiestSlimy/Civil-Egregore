@@ -3,9 +3,5 @@
 //!
 //! `cargo test --test fine`
 
-#[path = "fine/bitmap.rs"]
-mod bitmap;
-#[path = "fine/morton.rs"]
-mod morton;
-#[path = "fine/window.rs"]
-mod window;
+mod bitplane_manager;
+mod writes;

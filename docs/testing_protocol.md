@@ -23,8 +23,8 @@ encoding needs: its seed file, its adversarial searches.
 
 ## Three tiers of test
 
-Each tier is one file in a crate's `tests/`, so one test program; a
-topic is a module of it, a file in the tier's folder
+Each tier is one folder in a crate's `tests/`, so one test program:
+`main.rs` names its topics, each a module of it, a file beside it
 (`tests/fast/sheep.rs`). A crate has the tiers it has tests for.
 
 | tier | what runs | how long | command |
@@ -34,7 +34,7 @@ topic is a module of it, a file in the tier's folder
 | complete | more superchunks, more seeds, far more ticks; `#[ignore]`d, and run in release | minutes at most | `cargo test --release --test complete -- --ignored` |
 
 Plain `cargo test`, at the root, runs fine and fast of every crate but
-the renderer. `cargo test --release -- --ignored` runs every complete
+the renderer and its menus (`gui`). `cargo test --release -- --ignored` runs every complete
 tier, Tessera's with them.
 
 A test belongs to the lowest tier it can be: by hand if one case shows
@@ -49,14 +49,14 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `coordinates` | coordinates | | |
 | `instructions` | | walking | |
 | `pathfinding` | pathfinding | | |
-| `utilities` | fixed_list, memory, rng, table | | |
-| `simulation` | dispatcher, entities, instructions | sampling, tick | |
+| `utilities` | commands, dispatcher, fixed_list, hash, process_memory, rng, settings, table | | |
+| `gui` | tuning (asked for by name: `cargo test -p gui`) | | |
+| `simulation` | entities, instructions | sampling, tick | |
 | `mc_rules` | | grass, and only within its limit, for now | |
 | `entity_rules` | | sheep | |
 | `worldgen` | | terrain | walls over many seeds; no seam between superchunks |
-| `server` | | halos: hot superchunks are the halos, a cold one comes back as it was; world: saves, loads, walls | a world stopped every 5,000 ticks; a flock lasting 300,000 |
+| `server` | | halos: hot superchunks are the halos, a cold one comes back as it was, a world of a size is hot within it only; world: saves, loads, walls; commands | a world stopped every 5,000 ticks; a flock lasting 300,000 |
 | `tessera` | fine | fast | complete |
-| `tilesim` (the root) | | commands | |
 
 ## One seed, rolled every few runs
 

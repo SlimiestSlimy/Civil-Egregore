@@ -39,7 +39,6 @@ fn everything(world: &World) -> Everything {
 fn a_world_loaded_goes_on_as_the_one_saved() {
     let folder = folder("goes_on");
     let mut first = server::generate(crate::land_seed(0), 3_000);
-    first.info.name = "Pasture".to_string();
     for _ in 0..1_500 {
         first.tick();
     }
@@ -47,7 +46,7 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
     assert_eq!((saved.superchunks, saved.entities), (first.storage.superchunks().count(), first.entities.len()));
 
     let mut second = server::load(&folder).expect("loaded");
-    assert_eq!((second.info.name.as_str(), second.info.seed, second.info.tick), ("Pasture", crate::land_seed(0), 1_500));
+    assert_eq!((second.info.seed, second.info.tick, second.generation), (crate::land_seed(0), 1_500, first.generation));
     assert_eq!(second.info.layers, first.info.layers);
     assert!(everything(&first) == everything(&second), "loaded as saved");
 
@@ -98,16 +97,17 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     assert!(everything(&straight) == everything(&stopped), "the same at tick {until}");
 }
 
-/// A save is a folder: a world file and a hot file in text, and two
+/// A save is a folder: a world file -- what it is made from and how
+/// it is generated -- and a hot file in text, and two
 /// files a superchunk named by its superchunk index in hexadecimal.
 #[test]
 fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let folder = folder("files");
     let mut first = server::generate(99, 10);
-    first.info.name = "Nine fields".to_string();
     server::save(&folder, &mut first).expect("saved");
     let text = std::fs::read_to_string(folder.join("world")).expect("the world's file");
-    assert_eq!(text, "tilesim world 1\nname = Nine fields\nseed = 99\ntick = 0\nlayers = 2 3 4 5 6 7 24 8 9\n");
+    let generation: String = first.generation.numbers().iter().map(|(name, value)| format!("generation {name} = {value}\n")).collect();
+    assert_eq!(text, format!("tilesim world 1\nseed = 99\ntick = 0\nlayers = 2 3 4 5 6 7 24 8 9\n{generation}"), "no name: the folder's");
     let hot: String = first.arena.superchunk_indices().iter().map(|superchunk| format!("{:011x}\n", superchunk.0)).collect();
     assert_eq!(std::fs::read_to_string(folder.join("hot")).expect("the hot file"), format!("tilesim hot 2\n{hot}"), "the nine hot, none cooling or warming");
     let mut names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|entry| entry.unwrap().file_name().into_string().unwrap()).collect();

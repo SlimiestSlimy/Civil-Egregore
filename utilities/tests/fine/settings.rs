@@ -4,7 +4,7 @@
 //!
 //! `cargo test`
 
-use utilities::settings::{file, folder, world_in, Settings, FILE, FOLDER, WORLDS};
+use utilities::settings::{file, folder, world_in, world_name, Settings, FILE, FOLDER, WORLDS};
 
 /// The file is the one file in TileSim's one folder.
 #[test]
@@ -59,6 +59,8 @@ fn the_default_settings_never_replace_a_machines() {
 fn a_world_named_plainly_is_in_the_worlds_folder() {
     let worlds = folder().join(WORLDS);
     assert_eq!(world_in(&worlds, "Meadow"), worlds.join("Meadow"));
+    assert_eq!(world_in(&worlds, " Up: the <hills>? "), worlds.join("Up the hills"), "only what a folder may be named");
+    assert_eq!((world_name("con.txt"), world_name("Lpt7"), world_name("Common"), world_name(" ./\\. ")), (Some("_con.txt".to_string()), Some("_Lpt7".to_string()), Some("Common".to_string()), None));
     let path = std::path::Path::new("some").join("where");
     assert_eq!(world_in(&worlds, path.to_str().expect("text")), path);
 }

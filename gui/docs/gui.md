@@ -66,9 +66,17 @@ more.
 ## Options
 
 Escape opens the options over the window's middle, and closes them: a
-row to go on, a row to open a world, a row to leave TileSim. While
+row to go on, a row to save the world, a row to open one, a row to
+leave TileSim. The keys are theirs while they are open. While
 they are open the view is not dragged or zoomed by the pointer; the
 world ticks on behind them.
+
+**Save** says the world is to be saved (`options::Save`) under the
+name the window gave for it (`Options::name`). A world with none yet
+is named first: the name typed, Enter or a click to save. A world's
+name is its folder's, so only what a folder may be named is typed
+(`utilities::settings::world_name`), and a name a world there is
+already has is refused. Saving it is the window's.
 
 **Open a world** lists the worlds there are -- as the window names
 them: the renderer, those saved in the worlds' folder
@@ -85,4 +93,4 @@ The list is asked for each time it is opened.
 | `sliders.txt` | the sliders, written by hand: each one's range, group and what it does |
 | `src/tuning.rs` | the numbers tuned, by name and place, kept between runs; the seed drawn |
 | `src/sliders.rs` | the sliders that set them, their value boxes and the button |
-| `src/options.rs` | the options Escape opens: going on, opening a world, leaving |
+| `src/options.rs` | the options Escape opens: going on, saving the world, opening one, leaving |

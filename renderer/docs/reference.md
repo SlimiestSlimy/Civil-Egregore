@@ -17,8 +17,10 @@ some of the superchunks in view, and how coarsely they will be drawn;
 **`asked()`**, those it asks for, each `(x, y)` in the world.
 **`Near`** `{first, size, pixels_a_cell}`: the cells seen from near.
 **`Request`**: `Sync(ask)`, `Pause(bool)`, `Pace(ticks a second, or
-flat out)`, `Open(folder)` -- the world saved there run in place of the
-one run; **`refused()`**: why the last was not opened, if it was not. **`Cells`** `{at, hot, top_left, grass, sheep}`: a superchunk's grass
+flat out)`, `Open(name)` -- that world of the worlds' folder run in place of
+the one run -- `Save(name)` -- the world run saved there;
+**`said()`**: what the last of either came to; **`named()`**: the
+name of the world run, if it has one; **`say(said, named)`**. **`Cells`** `{at, hot, top_left, grass, sheep}`: a superchunk's grass
 (**`layer`**), its 16 chunks' words one after another, its sheep's
 cells, and where it is in the world.
 **`Frame`** `{tick, ticks_a_second, sheep, grass, sync_seconds,

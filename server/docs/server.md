@@ -26,74 +26,15 @@ sequence a few draws apart -- two flocks came out with the same sheep.
 
 ## Halos
 
-Only the superchunks about the entities that matter are hot. An
-entity of a kind that keeps a halo (`HALO_KEEPERS`: people, to come;
-for now the sheep stand in) keeps its superchunk and the eight about
-it hot -- as far as anything reaches in a tick, the speed of light.
-Every other superchunk is cold: its cells in its image in chunk
-storage, its entities and random numbers kept as a save keeps them
-(`World::cold`). After every tick the halos move to where their
-keepers stand (`World::move_halos`), and nothing slow is done on the
-tick -- encoding, generating and decoding are chunk storage's jobs
-(`../../chunk_storage/src/jobs.rs`), queued on the one dispatcher the
-world makes (`utilities::dispatcher`) and gives the simulation too: a
-thread a core, the tick's and the jobs' alike, each with its own codec,
-asleep while there is nothing to do. A thread busy with a job sits a
-tick's phase out.
-
-- **Going cold** takes `COOL_TICKS` (256) ticks: a hot superchunk no
-  halo reaches is **cooling**, hot still -- ticked, read and written
-  like any other -- so a keeper stepping back and forth over an edge
-  does not make the superchunks behind it flicker cold and hot. A halo
-  reaching it again, it just stays hot. At the tick it is due it goes
-  cold: its state kept, and its bitmaps set aside, lingering
-  (`BitmapArena::make_cold_superchunk`); its changed bitmaps, copied
-  out, are encoded by a job and put into the writeback ring
-  in the order they went cold. The ring flushes them when it needs the
-  room -- not when the superchunk goes cold -- and that too in the
-  job: the changes taken out of the ring, and the image
-  rewritten with them on another thread (`Job::Flush`), a superchunk's
-  flushes one after another. The newest cells are always on the hot
-  side: its bitmaps, hot or lingering, are held until the image holding
-  their changes is in the cold pool, and only then let go.
-- **Coming hot** takes `WARM_TICKS` (256) ticks: the superchunk is
-  **warming**. Lingering still, it is held, to be made hot as it is,
-  nothing decoded; else its image -- generated first, if it was never
-  made -- is decoded by a job. It turns hot at the tick it
-  is due, its entities put back and its random numbers taken up,
-  waiting for the job if it is not done: so the world is the
-  same however fast the threads are. Until then, to the simulation,
-  it is a cold superchunk like any other: not ticked or read, writes
-  to it missed, entities sent to it staying where they stood, its own
-  entities and random numbers kept cold. A superchunk lingering is
-  cold the same way: lingering is only the arena keeping its bitmaps.
-  Cooling, warming and lingering are the world's bookkeeping, not the
-  simulation's: to it one cooling is hot, one warming or lingering
-  cold. A keeper reaches a superchunk its halo has just reached no sooner than
-  it crosses its own -- 1,024 cells, a step every 64 ticks or more --
-  so long after it has turned hot. A warming is never given up: a superchunk no halo
-  wants any more turns hot when it is due all the same, and is cooling
-  from then -- so what a warming does is one thing, whenever a save
-  falls in it. 256 ticks is short of what generating a superchunk
-  takes a job (about 120 ms, against some 40 ms of ticks), so
-  the tick waits for a superchunk generated: a stall taken for halos
-  that follow their keepers closely.
-
-So between ticks the superchunks hot and not cooling, or warming for a
-halo that is there still, are the halos, exactly, never both (`tests/fast/halos.rs`); a superchunk
-warming takes no write and no entity until it is due; one cooling
-stays hot until it is due, and for good if a halo reaches it again
-before; and a superchunk gone
-cold comes back as it was, to the cell, the entity and the random
-number.
-
-Passive rules tick only where hot: grass grows on every hot superchunk,
-so the flock, its halos and the world may grow as far as it leads them.
-An entity
-kept cold whose wake passes wakes the tick its superchunk turns hot.
-
-Not yet: a halo is a fixed 3x3 whatever its keeper; and a keeper is
-found by looking through each hot superchunk's entities for one.
+Only the superchunks about the hot entities are hot, and the halos are
+the simulation's (`../../simulation/docs/simulation.md`, "Halos"): the
+world lends them what it holds (`World::with_halos`) and tells them
+two things. The hot entity (`HOT_ENTITY`): people, to come; for now
+the sheep stand in. And the world's size, if it has one
+(`generate_sized`, `tilesim server new <folder> [seed] [sheep]
+[side]`): so many superchunks along a side, a square about the origin,
+nothing ever made outside it; a save keeps it. What generates a
+superchunk never made is the server's, handed to the halos' jobs.
 
 ## TickCounts
 
@@ -108,13 +49,19 @@ A save is a folder (`chunk_storage::disk`, and
 
 | file | what it holds |
 |---|---|
-| `world` | text: the world's name, its seed, the tick it is at, its layer types |
+| `world` | text: first a line saying what the file is and its format's number (`tilesim world 1`), then the world's seed, the tick it is at, its layer types, its side if it has a size, and how it is generated, a number a line |
 | `hot` | text: the hot superchunks, a line each, those cooling with the tick each goes cold at, and the warming ones with the tick each turns hot at |
 | `superchunks/<index>.image` | a superchunk's cells and heights: its image, as the cold pool holds it |
 | `superchunks/<index>.state` | its random stream's state, its entities with their attributes |
 
 `<index>` is the superchunk index, 44 bits, 11 hexadecimal
 digits: its name, and nothing else is.
+
+A world's name is its folder's, nothing in the files: only what a
+folder may be named on Windows and Linux alike
+(`utilities::settings::world_name`). How it is generated
+(`Generation::numbers`) is kept in its file, so one loaded goes on
+generating as it was made.
 
 **Saving** is between two ticks. Every dirty bitmap is written back --
 encoded on every thread, after every write-back still
@@ -170,10 +117,10 @@ save's folder.
 | folder | what is in it |
 |---|---|
 | `src/lib.rs` | generate, save, load |
-| `src/halos.rs` | the hot superchunks: the halos about the entities that keep one, cooling and warming |
+| `src/halos.rs` | the hot entity, and the world lent to the simulation's halos |
 | `src/tick.rs` | the tick of every rule and entity, then the halos moved |
 | `src/patches.rs` | how grass and trees lie in patches when a superchunk is made |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; the diagnostics tools |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
-| `tests/` | the halos follow their keepers; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; the files; refusals |
+| `tests/` | the halos follow their hot entities; a world of a size is hot within it only; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; the files; refusals |
 | `docs/` | this, and the reference, function by function |

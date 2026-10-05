@@ -18,10 +18,11 @@ pub mod halos;
 mod tick;
 pub mod transient_data;
 
-pub use halos::{HaloChange, COOL_TICKS, HALO_KEEPERS, WARM_TICKS};
+pub use halos::HOT_ENTITY;
+pub use simulation::hot::about;
+pub use simulation::{HaloChange, COOL_TICKS, WARM_TICKS};
 pub use tick::{tick_rules, TickCounts, WorldTick};
 
-use chunk_storage::jobs::{Jobs, Ticket};
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
 use chunk_storage::{ChunkMaps, ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
@@ -34,16 +35,16 @@ use worldgen::ONE;
 use utilities::hash::mix;
 use entity_rules::sheep::flock;
 use entity_manager::{saved, Entities};
-use simulation::Simulation;
-use std::collections::{BTreeMap, VecDeque};
+use simulation::{Halos, Hot, Simulation};
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 use utilities::dispatcher::Dispatcher;
 use utilities::rng::Rng;
 
 /// How superchunks are generated: the heights' shape, and how the
-/// grass and the trees lie on them. Not saved with a world: one loaded
-/// goes on with [`Generation::DEFAULT`].
+/// grass and the trees lie on them. Saved with a world, a number a
+/// line ([`Generation::numbers`]): one loaded goes on as it was made.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Generation {
     /// The heights' shape.
@@ -52,6 +53,61 @@ pub struct Generation {
     pub grass: Patches,
     /// How the trees lie.
     pub trees: Patches,
+}
+
+/// Gives [`Generation`] its numbers by name: read out, and put back.
+macro_rules! numbers {
+    ($($name:literal => $($field:ident).+,)*) => {
+        impl Generation {
+            /// Its numbers, each with its name: as a world's file keeps them.
+            pub fn numbers(&self) -> Vec<(String, u64)> {
+                vec![$(($name.to_string(), u64::from(self.$($field).+))),*]
+            }
+
+            /// As `numbers` say, each by its name: one not among them
+            /// as in [`Generation::DEFAULT`], one not known passed over.
+            pub fn of_numbers(numbers: &[(String, u64)]) -> Self {
+                let mut generation = Self::DEFAULT;
+                for (name, value) in numbers {
+                    match name.as_str() {
+                        $($name => generation.$($field).+ = *value as _,)*
+                        _ => {}
+                    }
+                }
+                generation
+            }
+        }
+    };
+}
+
+numbers! {
+    "ocean floor" => shape.ground,
+    "ocean level" => shape.ocean,
+    "vertex spacing" => shape.span,
+    "ocean share" => shape.sea,
+    "highest land" => shape.highest,
+    "clumping" => shape.clumping,
+    "coast breadth" => shape.coast,
+    "coast lowness" => shape.coast_low,
+    "narrowest blend" => shape.narrow,
+    "widest blend" => shape.wide,
+    "least sigmoid" => shape.soft,
+    "most sigmoid" => shape.hard,
+    "line bending" => shape.warp,
+    "finer mesh depth" => shape.finer_depth,
+    "finer mesh share" => shape.finer_share,
+    "finer mesh height" => shape.finer_height,
+    "finer mesh falloff" => shape.finer_fall,
+    "weight spread" => shape.weight,
+    "raised share" => shape.raised,
+    "grass cover" => grass.cover,
+    "grass patch size" => grass.patch,
+    "grass patch detail" => grass.detail,
+    "grass scatter" => grass.scatter,
+    "tree cover" => trees.cover,
+    "tree patch size" => trees.patch,
+    "tree patch detail" => trees.detail,
+    "tree scatter" => trees.scatter,
 }
 
 impl Generation {
@@ -98,19 +154,9 @@ pub struct World {
     /// Each cold superchunk's state -- its entities and random numbers
     /// -- as a save keeps it ([`saved::encode_state`]).
     pub cold: BTreeMap<SuperchunkIndex, Vec<u64>>,
-    /// The threads encoding, generating and decoding off the tick.
-    jobs: Jobs,
-    /// The superchunks warming, sorted ([`halos`]).
-    warming: Vec<halos::Warming>,
-    /// The hot superchunks cooling, sorted, each with the tick it goes
-    /// cold at ([`halos`]).
-    cooling: Vec<(SuperchunkIndex, u64)>,
-    /// The write-backs of superchunks gone cold, each with its job,
-    /// being encoded by chunk storage's jobs, in the order taken.
-    writing_back: VecDeque<(SuperchunkIndex, Ticket)>,
-    /// The superchunks whose changes were taken from the ring, each with
-    /// its job, their images being rewritten by a job.
-    flushing: Vec<(SuperchunkIndex, Ticket)>,
+    /// Its halos: the superchunks warming and cooling, and the jobs
+    /// making them (`simulation::halos`).
+    pub halos: Halos,
 }
 
 impl World {
@@ -121,6 +167,7 @@ impl World {
         // Every thread the machine has, the world's superchunks not counted, as it grows: one set of them, the tick's and chunk storage's jobs' alike.
         let dispatcher = Arc::new(Dispatcher::of_the_machine());
         let simulation = Simulation::on(Arc::clone(&dispatcher));
+        let halos = Halos::new(Hot { side: info.side, entity: Some(halos::HOT_ENTITY) }, dispatcher);
         Self {
             info,
             generation,
@@ -129,11 +176,7 @@ impl World {
             entities,
             simulation,
             cold: BTreeMap::new(),
-            jobs: Jobs::new(dispatcher),
-            warming: Vec::new(),
-            cooling: Vec::new(),
-            writing_back: VecDeque::new(),
-            flushing: Vec::new(),
+            halos,
         }
     }
 }
@@ -159,7 +202,14 @@ pub fn generate(seed: u64, sheep: usize) -> World {
 /// superchunks are generated as `generation` says: what a way of
 /// generating is tried out on.
 pub fn generate_with(generation: Generation, seed: u64) -> World {
-    World::empty(WorldInfo { name: String::new(), seed, tick: 0, layers: layer_types() }, generation)
+    generate_sized(generation, seed, None)
+}
+
+/// [`generate_with`], the world `side` superchunks along a side if it
+/// is given one: a square about its origin, nothing ever hot outside
+/// it. Kept by a save.
+pub fn generate_sized(generation: Generation, seed: u64, side: Option<u32>) -> World {
+    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, generation: generation.numbers() }, generation)
 }
 
 /// The first seed from `from` on whose world, shaped as `shape`, has
@@ -184,7 +234,13 @@ pub fn generate_flocks(seed: u64, superchunks: &[SuperchunkIndex], sheep: usize)
 
 /// [`generate_flocks`], in a world generated as `generation` says.
 pub fn generate_flocks_with(generation: Generation, seed: u64, superchunks: &[SuperchunkIndex], sheep: usize) -> World {
-    let mut world = generate_with(generation, seed);
+    flocked(generate_with(generation, seed), superchunks, sheep)
+}
+
+/// `world`, nothing in it yet, with a flock of `sheep` on each of
+/// `superchunks` and the halos about them hot, as far as it reaches.
+pub fn flocked(mut world: World, superchunks: &[SuperchunkIndex], sheep: usize) -> World {
+    let seed = world.info.seed;
     let mut flocked = superchunks.to_vec();
     flocked.sort_unstable();
     world.keep_hot(&flocked);
@@ -192,7 +248,7 @@ pub fn generate_flocks_with(generation: Generation, seed: u64, superchunks: &[Su
         flock(&mut world.entities, superchunk, sheep, &mut Rng::for_stream(!seed, superchunk.0));
     }
     world.entities.apply();
-    let halo = halos::about(flocked.iter().copied());
+    let halo = about(flocked.iter().copied());
     world.keep_hot(&halo);
     world
 }
@@ -256,8 +312,7 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
 /// are hot, which of them cooling, and which warming, in the hot file.
 pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
     let hot = world.arena.superchunk_indices();
-    world.write_back_all();
-    world.flush_all();
+    world.write_back_and_flush_all();
     for &superchunk in &hot {
         // One with no cell ever set has no image yet: saved all the same.
         if world.storage.image(superchunk).is_none() {
@@ -283,7 +338,7 @@ pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
     // The world's file last: a save cut short leaves the one before it.
     // The layers a save lists are those it holds: a wide plane's, a bit each.
     let layers = world.info.layers.iter().flat_map(|layer| layer.planes()).collect();
-    saved.bytes += disk::write_world(folder, &WorldInfo { tick: world.entities.now(), layers, ..world.info.clone() })?;
+    saved.bytes += disk::write_world(folder, &WorldInfo { tick: world.entities.now(), layers, generation: world.generation.numbers(), ..world.info.clone() })?;
     Ok(saved)
 }
 
@@ -308,7 +363,8 @@ pub fn load(folder: &Path) -> Result<World, DiskError> {
     // The layers made hot are the code's: a save lists what it was written with.
     let info = WorldInfo { layers: layer_types(), ..disk::read_world(folder)? };
     let hot = disk::read_hot(folder)?;
-    let mut world = World::empty(info, Generation::DEFAULT);
+    let generation = Generation::of_numbers(&info.generation);
+    let mut world = World::empty(info, generation);
     let mut kept = 0;
     for superchunk in disk::saved_superchunks(folder)? {
         world.storage.insert(superchunk, disk::read_image(folder, superchunk)?);
@@ -318,7 +374,7 @@ pub fn load(folder: &Path) -> Result<World, DiskError> {
         world.cold.insert(superchunk, words);
     }
     world.keep_hot(&hot.hot);
-    world.cooling = hot.cooling;
+    world.halos.restore_cooling(hot.cooling);
     for (superchunk, due) in hot.warming {
         world.start_warming(superchunk, due);
     }

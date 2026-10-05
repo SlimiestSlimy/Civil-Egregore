@@ -5,11 +5,9 @@ The design is in `world.md`.
 ## `lib.rs`
 
 `FLOCK` (4,000): the sheep the origin starts with, unless told.
-**`World`** `{info, arena, storage, entities, simulation, cold,
-jobs, warming, cooling, writing_back, flushing}` -- **`cold`**, each cold
-superchunk's state as a save keeps it; **`writing_back`**, the
-write-backs of superchunks gone cold being encoded, in order;
-**`flushing`**, the superchunks whose images are being rewritten -- and
+**`World`** `{info, generation, arena, storage, entities, simulation,
+cold, halos}` -- **`cold`**, each cold superchunk's state as a save
+keeps it; **`halos`**, the simulation's -- and
 **`World::empty(info)`**, what generating and loading start from;
 **`layer_types`**. **`seed_with_land(from, shape)`**: the first seed
 from `from` with land three superchunks each way about the origin --
@@ -19,8 +17,8 @@ same with a flock on each of `superchunks`. **`generate(seed, sheep)`**: the ori
 (`WORLD_MIDDLE`) hot, a flock of `sheep` on it, and its halo made hot.
 **`generate_image(seed, superchunk, codec)`**: a superchunk's terrain
 and pasture, from the seed and its superchunk index.
-**`save(folder, world)`**: every dirty bitmap written back
-(`World::write_back_all`), the ring flushed (`World::flush_all`), then each superchunk's
+**`save(folder, world)`**: every dirty bitmap written back and the
+ring flushed (`World::write_back_and_flush_all`), then each superchunk's
 image and state -- live if hot, kept if cold -- the hot file, and the
 world's file last: a **`Saved`** `{superchunks, entities, bytes}`.
 **`worlds_in(folder)`**: the worlds saved in a folder, by their
@@ -32,44 +30,13 @@ the file and what is wrong.
 
 ## `halos.rs`
 
-`HALO_KEEPERS` (the sheep, for now): the kinds of entity that keep a
-halo. `WARM_TICKS` (256): the ticks a superchunk is warming;
-`COOL_TICKS` (256): the ticks one is cooling.
-**`HaloChange`** `{reached, generated, restored, cooled}`, added with
-`+=`. **`Warming`** `{superchunk, due, from}`, from a
-**`WarmedFrom`**: `Lingering`, or `Job(ticket)`.
-**`about(keepers)`**: the 3x3 superchunks about each, sorted, each
-once. **`World::keepers`**: the hot superchunks holding a keeper.
-**`World::move_halos`**: the halos moved to their keepers, those
-reached hot `WARM_TICKS` on, those left cold `COOL_TICKS` on.
-**`World::keep_hot(wanted)`**: `wanted` made the hot superchunks now.
-**`World::warming`**, **`World::cooling`**: the superchunks warming,
-and those cooling, each with its due tick. Both through
-**`World::make_hot_within(wanted, warm_ticks, cool_ticks)`**: the
-write-backs encoded landed; those cooling wanted again no longer
-cooling; every hot one not wanted cooling, due no later than
-`cool_ticks` on; those due made cold -- state kept, bitmaps lingering
-(`BitmapArena::make_cold_superchunk`), their dirty ones sent to be
-encoded; those warming not wanted dropped (`BitmapArena::let_go`, or
-the job forgotten); every one warming due no later than `warm_ticks`
-on; the wanted ones neither hot nor warming started; those due made hot, the
-entities aligned, the kept states put back and the random streams with
-them. **`World::start_warming(superchunk, due)`**: held if lingering
-(`BitmapArena::hold`), else sent as a job.
-**`World::finish_warming`**: a warming superchunk's bitmaps made hot -- again
-as they were (`BitmapArena::make_hot_again`), or as its job made
-them (`BitmapArena::make_hot_cells`), its image put in the cold pool if
-generated. **`World::land_write_backs(wait)`**: the encoded write-backs
-put into the ring, in order (`ChunkStorage::try_write_back`, then
-`BitmapArena::written_back`), the tail flushed whenever it needs the
-room, then the flushes landed. **`World::flush_tail`**: the tail
-superchunk's changes taken (`ChunkStorage::take`) and sent to be
-flushed, its flush before landed first. **`World::land_flushes(wait)`**:
-the images rewritten put in the cold pool, the arena told of each with
-no change left in the ring (`BitmapArena::flushed`).
-**`World::write_back_all`**: every hot superchunk's dirty bitmaps sent
-to be encoded, and every write-back landed. **`World::flush_all`**:
-every superchunk with changes in the ring flushed, on all the threads.
+`HOT_ENTITY` (the sheep, for now). **`World::with_halos(work)`**: the
+simulation's halos given what the world holds, and what generates a
+superchunk never made. **`World::move_halos`**,
+**`World::keep_hot(wanted)`**, **`World::warming`**,
+**`World::cooling`**, **`World::start_warming(superchunk, due)`**,
+**`World::write_back_and_flush_all`**: each the halos' own
+(`../../simulation/docs/reference.md`, "`halos.rs`").
 
 ## `tick.rs`
 
@@ -104,10 +71,11 @@ a **`PastureRun`**.
 ## `commands.rs`
 
 **`COMMANDS`**: what `tilesim server <command>` runs, each with its
-parameters and their defaults. `tilesim server new <folder> [name]
-[seed] [sheep]`: a world generated from the seed -- the origin, a flock
-of `sheep` on it, and its halo (**`new`**) -- and saved in the folder,
-which must not hold one. `tilesim server run <folder> [ticks]`: it
+parameters and their defaults. `tilesim server new <folder> [seed]
+[sheep] [side]`: a world generated from the seed -- the origin, a flock
+of `sheep` on it, and its halo (**`new`**), of `side` superchunks a
+side unless 0 -- and saved in the folder, which must not hold one and
+whose name is the world's (**`name`**). `tilesim server run <folder> [ticks]`: it
 loaded, ticked and saved again (**`run`**). `tilesim server info
 <folder>`: what its world file says (**`info`**). A folder given as a plain name is one
 of the worlds' folder (`utilities::settings::world`); anything more is
@@ -127,7 +95,11 @@ flock, time a sample and a wake, rates, what is held and the census
 ## Generation
 
 **`Generation`** `{shape, grass, trees}`: how superchunks are generated;
-`Generation::DEFAULT`; `TREES_SALT`.
+`Generation::DEFAULT`; `TREES_SALT`; **`numbers()`** and
+**`of_numbers(numbers)`**: its numbers by name, as a world's file
+keeps them (`numbers!`). **`generate_sized(generation, seed, side)`**:
+a world of a size; **`flocked(world, superchunks, sheep)`**: flocks put
+on a world with nothing in it yet.
 **`generate_flocks_with(generation, seed, superchunks, sheep)`**: a
 world generated so, a flock on each of the superchunks.
 **`generate_with(generation, seed)`**: a world with nothing hot yet,
