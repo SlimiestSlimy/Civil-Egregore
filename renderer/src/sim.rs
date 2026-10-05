@@ -41,7 +41,7 @@ use utilities::rng::Rng;
 pub const TARGET_PACE: u32 = 256;
 
 /// The seed of the world watched: the workspace's, rolled every few
-/// runs (`utilities::seed`; `TILESIM_SEED` picks one), and from it the
+/// runs (`utilities::seed`; `Civil Egregore_SEED` picks one), and from it the
 /// first whose world -- shaped as the lab's sliders have it, in the
 /// lab -- has land about its origin: settled once a run.
 pub fn seed() -> u64 {

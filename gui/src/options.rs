@@ -1,6 +1,6 @@
 //! The options, over the middle of the window: opened and closed by
 //! Escape, a row each, clicked -- going on, saving the world, opening
-//! one, and leaving TileSim.
+//! one, and leaving Civil Egregore.
 //!
 //! Saving says the world is to be saved ([`Save`]) under the name the
 //! window gave for it ([`Options::name`]); a world with none yet is
@@ -53,7 +53,7 @@ enum Does {
     GoesBack,
     /// Chooses a world, by its place among those listed.
     Opens(usize),
-    /// Leaves TileSim.
+    /// Leaves Civil Egregore.
     Leaves,
 }
 
@@ -139,7 +139,7 @@ impl Options {
         match self.page {
             Page::First => {
                 let save = self.named.as_ref().map_or("save the world".to_string(), |named| format!("save {named}"));
-                return vec![("TileSim".to_string(), Does::Nothing), ("go on (Escape)".to_string(), Does::GoesOn), (save, Does::Saves), ("open a world".to_string(), Does::Lists), ("exit".to_string(), Does::Leaves)];
+                return vec![("Civil Egregore".to_string(), Does::Nothing), ("go on (Escape)".to_string(), Does::GoesOn), (save, Does::Saves), ("open a world".to_string(), Does::Lists), ("exit".to_string(), Does::Leaves)];
             }
             Page::Naming => {
                 let taken = self.taken.then(|| ("there is a world of that name".to_string(), Does::Nothing));

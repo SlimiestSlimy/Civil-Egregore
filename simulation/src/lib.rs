@@ -1,4 +1,4 @@
-//! TileSim's simulation: the rules ticked over the hot bitplanes
+//! Civil Egregore's simulation: the rules ticked over the hot bitplanes
 //! (`../bitplane_manager`), which it reads and writes only through the
 //! handles they give, and over the entities (`../entity_manager`),
 //! likewise.

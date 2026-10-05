@@ -1,6 +1,6 @@
-# TileSim
+# Civil Egregore
 
-What TileSim is, and every decision about it made so far, written down
+What Civil Egregore is, and every decision about it made so far, written down
 so that none is forgotten. What is built is marked as built; the rest is
 the plan. Every decision here is weighed against the
 [design statements](design_statements.md).
@@ -414,7 +414,7 @@ it (`entity_rules/src/sheep.rs`):
   stands on, the tick it next wakes at -- and attributes, typed values
   added and removed at run time (a sheep falls pregnant, a lamb grows
   up). Types, of entities and attributes alike, are `u64`s from the one
-  namespace every type in TileSim is drawn from, layers' included.
+  namespace every type in Civil Egregore is drawn from, layers' included.
 - **A bucket a chunk**: a superchunk holds its entities in a bucket for
   each of its 16 chunks -- a chunk may hold many single-cell entities --
   the headers sorted by cell, in Morton order, then by ID, the

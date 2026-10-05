@@ -2,7 +2,7 @@
 name = "chunk_storage"
 version = "0.1.0"
 edition = "2024"
-description = "TileSim's chunks as stored: coordinates, height maps, the layer codec, superchunk images, the cold pool and the writeback ring"
+description = "Civil Egregore's chunks as stored: coordinates, height maps, the layer codec, superchunk images, the cold pool and the writeback ring"
 publish = false
 
 [dependencies]

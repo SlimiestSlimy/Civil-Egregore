@@ -4,7 +4,7 @@ The rules ticked over the hot bitplanes. It reads and writes them only
 through the handles the bitplane manager gives: a superchunk's layers to
 read (`LayerView`), cells to read anywhere (`Reader`), and writes
 applied to one superchunk (`Superchunk::apply`). The decisions behind it
-are in `../../docs/tilesim.md`, "The speed of light", "The tick" and
+are in `../../docs/Civil Egregore.md`, "The speed of light", "The tick" and
 "Sampling".
 
 ## Sampling
@@ -151,7 +151,7 @@ the arena's writes are -- queuing is the only way to change an entity;
 in a tick, a turn reads entities in any hot superchunk as the tick found
 them (`entity`, `entities_in`, through an `EntityReader`, as cells
 through a `Reader`) and queues its instructions. The decisions behind it:
-`../../docs/tilesim.md`, "Entities".
+`../../docs/Civil Egregore.md`, "Entities".
 
 ## Halos
 
@@ -280,5 +280,5 @@ comes to does not depend on the thread that takes it.
 | `docs/` | this, and the reference, function by function |
 
 Its diagnostics only gather what the entities hold; it has no transient
-data of its own yet: the tick is measured by TileSim's
+data of its own yet: the tick is measured by Civil Egregore's
 (`Civil_Egregore server throughput`, `Civil_Egregore server pasture`), on its rules.

@@ -1,4 +1,4 @@
-//! TileSim's server: the world as a whole, held by the one crate that
+//! Civil Egregore's server: the world as a whole, held by the one crate that
 //! puts the rest together -- which a renderer, or the program, is a
 //! client of. The world made from a seed ([`generate`]), ticked
 //! -- its cells' rules (`mc_rules/`) and its entities (`entity_rules/`)

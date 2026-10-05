@@ -1,4 +1,4 @@
-//! TileSim, from the command line: the one program beside the
+//! Civil Egregore, from the command line: the one program beside the
 //! renderer. It holds nothing but which crates have commands; the rest
 //! is `utilities::commands`.
 //!

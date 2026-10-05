@@ -1,4 +1,4 @@
-//! TileSim's instructions: what a rule is made of. Each is one small
+//! Civil Egregore's instructions: what a rule is made of. Each is one small
 //! thing on a superchunk's turn, a query of the simulation as much as
 //! a change queued to it -- a step found, a cell sought, the
 //! neighbours open to walk to -- written once here, light, and many: a rule of the cells or of an entity (`../mc_rules`,

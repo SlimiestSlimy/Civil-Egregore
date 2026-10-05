@@ -1,4 +1,4 @@
-//! TileSim's entity manager: what stands on the cells -- sheep,
+//! Civil Egregore's entity manager: what stands on the cells -- sheep,
 //! people, buildings -- kept beside the bitplanes (`../bitplane_manager`)
 //! and ticked with them by the simulation (`../simulation`).
 //!

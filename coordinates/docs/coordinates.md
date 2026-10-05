@@ -1,8 +1,8 @@
 # Coordinates
 
-Where things are in TileSim's world: superchunks, chunks and cells.
+Where things are in Civil Egregore's world: superchunks, chunks and cells.
 Every crate that places anything uses them. The decisions behind them
-are in `../../docs/tilesim.md`, "The world".
+are in `../../docs/Civil Egregore.md`, "The world".
 
 Every place is a **Morton index** -- its coordinates' bits interleaved,
 `x` in the even bits -- one type a size, each nested in the next:

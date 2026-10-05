@@ -1,4 +1,4 @@
-//! TileSim's one random source: SplitMix64, seeded, whose whole state
+//! Civil Egregore's one random source: SplitMix64, seeded, whose whole state
 //! is one word, so whatever draws from it -- a test bitmap, a search --
 //! is settled by its seed alone, on every run and every machine.
 

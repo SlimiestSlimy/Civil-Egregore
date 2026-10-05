@@ -7,7 +7,7 @@
 //! No sample is wasted: the cells are not each tossed a coin, nor drawn
 //! and rejected. The set cells are ranked in Morton order, and the gap
 //! from one chosen rank to the next is drawn from the geometric law
-//! (`docs/tilesim.md`, "Sampling"): each set cell is then chosen with
+//! (`docs/Civil Egregore.md`, "Sampling"): each set cell is then chosen with
 //! the probability asked, and only the chosen ones are found. The
 //! counts find them: a layer type over a superchunk with no hot cell
 //! set is passed over whole, a chunk by its count, a count tile of 16 words by

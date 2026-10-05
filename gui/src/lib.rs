@@ -1,4 +1,4 @@
-//! TileSim's menus, laid over whatever window shows the world: the
+//! Civil Egregore's menus, laid over whatever window shows the world: the
 //! options Escape opens ([`options`]), the sliders ([`sliders`]) and
 //! the numbers they tune ([`tuning`]).
 //!

@@ -1,4 +1,4 @@
-//! TileSim's bitplane manager: the bitmap arena, the hot bitmaps, raw,
+//! Civil Egregore's bitplane manager: the bitmap arena, the hot bitmaps, raw,
 //! one a bucket -- the layers whose cells are being read or changed,
 //! decoded from chunk storage's cold pool and nothing more. It is where
 //! cells are read and changed: chunk storage holds whole encoded layers

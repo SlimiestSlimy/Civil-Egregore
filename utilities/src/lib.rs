@@ -1,4 +1,4 @@
-//! General-purpose utilities, shared by every crate in TileSim and
+//! General-purpose utilities, shared by every crate in Civil Egregore and
 //! owned by none.
 //!
 //! | module | what it is |
@@ -9,8 +9,8 @@
 //! | [`hash`] | a key's slot in a table, by Fibonacci hashing, and a word's bits mixed, SplitMix64's way |
 //! | [`fixed_list`] | a list of fixed capacity, allocated once, that never grows |
 //! | [`commands`] | a command line's first word found among a crate's commands and handed the rest; each command's parameters declared once |
-//! | [`csv`] | CSV, which every text file TileSim keeps is: rows read, a row written |
-//! | [`settings`] | the settings a person has changed on this machine: one file in TileSim's one folder, wherever the system keeps such |
+//! | [`csv`] | CSV, which every text file Civil Egregore keeps is: rows read, a row written |
+//! | [`settings`] | the settings a person has changed on this machine: one file in Civil Egregore's one folder, wherever the system keeps such |
 //! | [`seed`] | the one seed every crate's tests and tools start from, rolled every few runs |
 //! | [`dispatcher`] | the threads, started once and kept: a job run on all at once, a part each, and jobs queued for whichever is free |
 //! | [`cache`] | memory asked of the processor's caches ahead of its being read |

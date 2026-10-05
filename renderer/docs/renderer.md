@@ -1,10 +1,10 @@
 # The renderer
 
-TileSim on the screen: a pasture ticking on a thread of its own, and a
+Civil Egregore on the screen: a pasture ticking on a thread of its own, and a
 Bevy window showing it -- dirt brown, grass green, a sheep white -- on
 ground lit by its height (below). The world is a generated one
 (`server::generate_flocks`), from the workspace's seed
-(`utilities::seed`, `TILESIM_SEED` to pick one): the first from it
+(`utilities::seed`, `Civil Egregore_SEED` to pick one): the first from it
 with land about the origin (`server::seed_with_land`).
 
 `cargo run --release -p renderer -- [superchunks shown] [sheep a superchunk] [ticks a second, 0 flat out] [ticks to watch for] [1 to force hot]`;
@@ -151,7 +151,7 @@ pixels made here.
 | `T` | tick flat out, or at the game's pace (256 ticks a second) |
 | `F` | the window over the whole screen, or not |
 | `U` | the sliders' menu, opened; whatever of them is open, closed |
-| Escape | the options, opened or closed: going on, saving the world, opening one, leaving TileSim |
+| Escape | the options, opened or closed: going on, saving the world, opening one, leaving Civil Egregore |
 | `[` and `]` | halve and double the pace |
 | `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |

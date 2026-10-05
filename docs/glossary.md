@@ -1,6 +1,6 @@
-# TileSim's glossary
+# Civil Egregore's glossary
 
-Every word the code and the docs use for a thing of TileSim's own: what
+Every word the code and the docs use for a thing of Civil Egregore's own: what
 it means, and what it relates to. One word is one thing, everywhere --
 in type names, function names, variables, comments and docs. A word
 listed here is never used for anything else, and a thing listed here is
@@ -45,7 +45,7 @@ what they always do and are not listed.
 
 | word | means | relates to | not |
 |---|---|---|---|
-| **layer type** | what a layer holds -- dirt, grass, a wall -- as a `u64` from the one namespace every type in TileSim is drawn from (`LayerType`) | entity type, attribute type | |
+| **layer type** | what a layer holds -- dirt, grass, a wall -- as a `u64` from the one namespace every type in Civil Egregore is drawn from (`LayerType`) | entity type, attribute type | |
 | **layer** | one layer type over one chunk: a bitmap of which cells hold it | bitmap, bitplane | plane |
 | **bitplane** | one layer type over the whole world: every chunk's layer of that type | layer | |
 | **bitmap** | 256x256 bits in Morton order, a word a 8x8 tile (`bitmap::Bitmap`, `CellWords`) | layer, tile | |
@@ -193,7 +193,7 @@ what they always do and are not listed.
 | **census** | a count of a population: the flock and grass over a run, or Tessera's nodes by kind | | |
 | **reading** | the process's memory read once (`MemoryTrack::read`) | | sample |
 | **tier** | a test's size: fine, fast or complete (`docs/testing_protocol.md`) | | |
-| **settings** | this machine's settings, kept from run to run: `settings.csv` in the folder `tilesim` where the system keeps a user's programs' data (`utilities::settings`) | default settings, slider, group | config, preferences, preset |
+| **settings** | this machine's settings, kept from run to run: `settings.csv` in the folder `Civil Egregore` where the system keeps a user's programs' data (`utilities::settings`) | default settings, slider, group | config, preferences, preset |
 | **default settings** | every setting and what it is unless changed: a settings file built into the program, copied to a machine that has none; all there is under the build feature `default_settings` | settings | |
-| **options** | the menu Escape opens over the window: going on, saving the world, opening one of the worlds' folder, leaving TileSim (`gui::options`) | slider, worlds' folder | pause menu, main menu |
-| **worlds' folder** | where worlds are kept unless a path is given: `worlds` in the folder `tilesim`, or what the setting `worlds` names (`utilities::settings::worlds`) | save, settings | |
+| **options** | the menu Escape opens over the window: going on, saving the world, opening one of the worlds' folder, leaving Civil Egregore (`gui::options`) | slider, worlds' folder | pause menu, main menu |
+| **worlds' folder** | where worlds are kept unless a path is given: `worlds` in the folder `Civil Egregore`, or what the setting `worlds` names (`utilities::settings::worlds`) | save, settings | |

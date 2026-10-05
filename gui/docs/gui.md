@@ -1,6 +1,6 @@
 # gui
 
-TileSim's menus, laid over whatever window shows the world: the
+Civil Egregore's menus, laid over whatever window shows the world: the
 sliders, the numbers they tune, and the options Escape opens. It knows
 nothing of the world or of what draws it, and depends on Bevy's
 interface and on `utilities` alone. A window adds `Gui` to its app,
@@ -27,9 +27,9 @@ is only what the knob reaches; the knob then stays at its end.
 
 The numbers are kept whenever one is settled, and taken up again the
 next run, in the machine's settings (`utilities::settings`): one file,
-`settings.csv`, in a folder `tilesim` where the system keeps what a
-user's programs hold -- `~/.local/share/tilesim` on Linux,
-`%LOCALAPPDATA%\tilesim` on Windows. A line a number, its name and its
+`settings.csv`, in a folder `Civil Egregore` where the system keeps what a
+user's programs hold -- `~/.local/share/Civil Egregore` on Linux,
+`%LOCALAPPDATA%\Civil Egregore` on Windows. A line a number, its name and its
 value. What each is unless set is in the default settings
 (`utilities/default_settings.csv`), which a machine with no file
 is given a copy of. Built with `--features default_settings`, the
@@ -67,7 +67,7 @@ more.
 
 Escape opens the options over the window's middle, and closes them: a
 row to go on, a row to save the world, a row to open one, a row to
-leave TileSim. The keys are theirs while they are open. While
+leave Civil Egregore. The keys are theirs while they are open. While
 they are open the view is not dragged or zoomed by the pointer; the
 world ticks on behind them.
 

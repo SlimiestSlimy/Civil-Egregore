@@ -2,7 +2,7 @@
 name = "worldgen"
 version = "0.1.0"
 edition = "2024"
-description = "TileSim's world generation: every cell's height from the world's seed, the walls between cells too far apart in height to step between, and how what grows lies in patches"
+description = "Civil Egregore's world generation: every cell's height from the world's seed, the walls between cells too far apart in height to step between, and how what grows lies in patches"
 publish = false
 
 [dependencies]

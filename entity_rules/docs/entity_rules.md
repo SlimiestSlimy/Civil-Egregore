@@ -1,6 +1,6 @@
 # The entities
 
-Every kind of entity TileSim has, a file each. So far there is one:
+Every kind of entity Civil Egregore has, a file each. So far there is one:
 the sheep.
 
 ## What is here, and what is not
@@ -48,7 +48,7 @@ game's tick beside the others; its tests in `tests/`, a file a kind.
 
 The rule is told in full at the head of `src/sheep.rs`, and how it came
 to be -- what was measured, what was thrown away -- in
-`../docs/tilesim.md`. In short: a sheep sleeps until it next needs
+`../docs/Civil Egregore.md`. In short: a sheep sleeps until it next needs
 something, so a satisfied flock costs the tick nothing; only a hungry
 sheep walks, one pathfinding step a wake (`pathfinding/`), no route
 kept; and it steps without looking whether a cell is taken, the step

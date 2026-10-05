@@ -1,6 +1,6 @@
 # Utilities
 
-General-purpose utilities, shared by every crate in TileSim and owned by
+General-purpose utilities, shared by every crate in Civil Egregore and owned by
 none.
 
 - **Diagnostics** (`src/diagnostics/`), what every crate's diagnostics
@@ -21,7 +21,7 @@ none.
   listed with their parameters, each declared once with its default;
   the one program routes to a crate by name and knows none of its tools.
 - **Settings** (`settings.rs`): this machine's settings, kept from run
-  to run in one file in one folder of TileSim's own, wherever the
+  to run in one file in one folder of Civil Egregore's own, wherever the
   system keeps such, a line each, shared by whatever has settings (so
   far the renderer's sliders). The default settings are such a file
   built into the program: copied to a machine that has none, never
@@ -30,9 +30,9 @@ none.
   unless the settings name another folder for them.
 - **The seed** (`seed.rs`): the one seed every crate's tests and tools
   start from, in the workspace's `transient_data/seed.csv`, rolled every 5
-  counted runs; `TILESIM_SEED` picks one for a run.
+  counted runs; `Civil Egregore_SEED` picks one for a run.
 - **A seeded random source** (`rng.rs`), its whole state one word: every
-  random number in TileSim comes from it.
+  random number in Civil Egregore comes from it.
 - **Hashing** (`hash.rs`): a key's slot in a table, by
   Fibonacci hashing, and a word's bits mixed, SplitMix64's way.
 - **A fixed-capacity list** (`fixed_list.rs`), allocated once, never

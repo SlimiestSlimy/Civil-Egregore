@@ -1,4 +1,4 @@
-//! TileSim's pathfinding: A* over an **area**, 16x16 cells kept as
+//! Civil Egregore's pathfinding: A* over an **area**, 16x16 cells kept as
 //! masks -- a row a `u16`, cell `(x, y)` at bit `x` of row `y` -- which
 //! is all it knows of the world. What the cells are, which may be walked
 //! on and where the walker wants to go are for whoever calls it; an

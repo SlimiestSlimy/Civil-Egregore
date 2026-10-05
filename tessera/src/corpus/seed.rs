@@ -47,7 +47,7 @@ pub const WHERE_THE_SEED_IS_KEPT: &str = "transient_data/seed.csv";
 /// whole feature's worth.
 pub const USES_BEFORE_THE_SEED_ROLLS: u64 = utilities::seed::USES_BEFORE_THE_SEED_ROLLS;
 
-/// `TILESIM_SEED`'s value that draws a fresh seed for one run and leaves the
+/// `Civil Egregore_SEED`'s value that draws a fresh seed for one run and leaves the
 /// file alone: a check on bitmaps never seen, which moves nothing a
 /// measurement holds still -- what the fast tier runs on while the code
 /// changes.
@@ -55,10 +55,10 @@ pub const FRESH: &str = utilities::seed::FRESH;
 
 /// The seed every corpus bitmap starts from.
 ///
-/// `TILESIM_SEED` in the environment wins, so a run can be pinned to any
+/// `Civil Egregore_SEED` in the environment wins, so a run can be pinned to any
 /// bitmaps -- both sides of a comparison, say -- for that run alone:
 /// the file is left as it is, its count too, so pinning never holds a
-/// seed past its uses. `TILESIM_SEED=fresh` draws one for this run alone,
+/// seed past its uses. `Civil Egregore_SEED=fresh` draws one for this run alone,
 /// likewise. Otherwise the file's seed is used, and counted -- or, once
 /// it has been used [`USES_BEFORE_THE_SEED_ROLLS`] times, a fresh one
 /// is rolled in its place.
