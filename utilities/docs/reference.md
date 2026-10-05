@@ -76,3 +76,14 @@ its `env!("CARGO_MANIFEST_DIR")`; **`under(relative)`**,
 
 **`prefetch(value)`**: its line of memory asked for ahead of being read;
 the crate's one `unsafe` line, on a reference's address.
+
+## `dispatcher.rs`
+
+**`Dispatcher::new(threads)`**: `threads - 1` workers started and kept;
+**`of_the_machine()`**: every thread the machine has. **`threads`**.
+**`run(job)`**: part 0 here, the others on the workers not busy with a
+queued job; returns once every part started is done, a part's panic
+raised after. **`queue(job)`**: done once by a worker when one is free,
+or at once where there is no worker. **`work`**: a worker's loop -- wait
+for work, a job run before one queued, do it, say so. Dropping it stops
+and joins the workers.

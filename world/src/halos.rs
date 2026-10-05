@@ -6,26 +6,27 @@
 //! numbers kept as a save keeps them ([`crate::World::cold`]).
 //!
 //! The halos move after every tick ([`crate::World::tick`]), and
-//! nothing slow is done on the tick: the background
-//! ([`crate::background`]) does it.
+//! nothing slow is done on the tick: chunk storage's jobs
+//! ([`chunk_storage::jobs`]) do it, on the threads the tick has no use
+//! for just then.
 //!
 //! - A hot superchunk no halo reaches is **cooling** for [`COOL_TICKS`]
 //!   ticks: hot still, so a keeper stepping back and forth over a
 //!   superchunk's edge does not make the superchunks about it flicker
 //!   cold and hot. Should a halo reach it again, it stays hot; else it
 //!   goes cold at the tick it is due: its state kept, its bitmaps set
-//!   aside, lingering, and its changed ones encoded in the background,
+//!   aside, lingering, and its changed ones encoded by a job,
 //!   then put into the writeback ring, which flushes them when it needs
-//!   the room: the image rewritten in the background, the bitmaps held
+//!   the room: the image rewritten by a job, the bitmaps held
 //!   until it is in the cold pool.
 //! - A superchunk a halo reaches, not hot, is **warming** for
 //!   [`WARM_TICKS`] ticks, and nothing stops it: its halo gone again, it
 //!   turns hot when due all the same, and is cooling from then.
 //!   Lingering, it is kept to be made hot as it is;
 //!   else its image -- generated, if it was never made -- is decoded in
-//!   the background. It turns hot at the tick it is due, waiting for the
-//!   background if need be, so the world is the same however fast the
-//!   background is. Until then it is, to the simulation, cold like any
+//!   a job. It turns hot at the tick it is due, waiting for the job
+//!   if need be, so the world is the same however fast the threads
+//!   are. Until then it is, to the simulation, cold like any
 //!   other: writes to it are missed, and entities sent to it stay where
 //!   they stood. So is a superchunk lingering.
 //!
@@ -33,7 +34,8 @@
 //! warming, and besides them those cooling; and one may be warming
 //! that no halo reaches any more.
 
-use crate::background::{Done, Job, Ticket};
+use crate::generate_image;
+use chunk_storage::jobs::{Done, Job, Ticket};
 use crate::World;
 use coordinates::SuperchunkIndex;
 use entity_rules::sheep::SHEEP;
@@ -46,8 +48,8 @@ use std::ops::AddAssign;
 pub const HALO_KEEPERS: [EntityType; 1] = [SHEEP];
 
 /// Ticks a superchunk a halo reaches is warming before it turns hot:
-/// the background's time to make it. Kept short, so the halos follow
-/// their keepers closely: a superchunk generated takes the background
+/// a job's time to make it. Kept short, so the halos follow
+/// their keepers closely: a superchunk generated takes a job
 /// longer, and the tick waits for it. A keeper reaches a superchunk its
 /// halo has just reached no sooner than it walks across its own, 1,024
 /// cells -- a sheep steps once in `STEP_TICKS` (64) ticks or more -- so
@@ -98,8 +100,8 @@ pub(crate) struct Warming {
 enum WarmedFrom {
     /// Its bitmaps, lingering: made hot as they are.
     Lingering,
-    /// The background, decoding its image: the job's ticket.
-    Background(Ticket),
+    /// A job, decoding its image: its ticket.
+    Job(Ticket),
 }
 
 /// The halos about the superchunks `keepers` -- each one's own and its
@@ -128,7 +130,7 @@ impl World {
     /// Makes `wanted` -- sorted -- the hot superchunks now: every other
     /// one made cold, its state kept; every one of them not hot made
     /// hot, lingering, from storage and its kept state, or generated --
-    /// those from the background made at once, on all its threads.
+    /// those of jobs made at once, on every thread.
     /// What generating and loading start from; between two ticks,
     /// anything else needing superchunks hot a while may ask too.
     pub fn keep_hot(&mut self, wanted: &[SuperchunkIndex]) -> HaloChange {
@@ -174,7 +176,7 @@ impl World {
             self.cold.insert(superchunk, saved::encode_state(state, self.entities.superchunk(superchunk)).0);
             let dirty = self.arena.make_cold_superchunk(superchunk);
             if !dirty.is_empty() {
-                self.writing_back.push_back((superchunk, self.background.send(Job::Encode(dirty))));
+                self.writing_back.push_back((superchunk, self.jobs.send(Job::Encode(dirty))));
             }
             change.cooled += 1;
         }
@@ -217,20 +219,22 @@ impl World {
     }
 
     /// Starts warming `superchunk`, to turn hot at tick `due`: kept as
-    /// it is if it is lingering, else sent to the background.
+    /// it is if it is lingering, else sent as a job.
     pub(crate) fn start_warming(&mut self, superchunk: SuperchunkIndex, due: u64) {
         let from = if self.arena.hold(superchunk) {
             WarmedFrom::Lingering
         } else {
-            let job = Job::Warm { superchunk, image: self.storage.shared_image(superchunk), seed: self.info.seed, generation: Box::new(self.generation), types: self.info.layers.clone() };
-            WarmedFrom::Background(self.background.send(job))
+            let (seed, generation) = (self.info.seed, self.generation);
+            let generate = Box::new(move |codec: &mut chunk_storage::LayerCodec| generate_image(&generation, seed, superchunk, codec));
+            let job = Job::Warm { superchunk, image: self.storage.shared_image(superchunk), generate, types: self.info.layers.clone() };
+            WarmedFrom::Job(self.jobs.send(job))
         };
         let at = self.warming.binary_search_by_key(&superchunk, |warming| warming.superchunk).expect_err("not warming");
         self.warming.insert(at, Warming { superchunk, due, from });
     }
 
     /// Makes `warming`'s bitmaps hot -- as they were, or as the
-    /// background made them, waiting for it if need be -- counted in
+    /// job made them, waiting for it if need be -- counted in
     /// `change`.
     fn finish_warming(&mut self, warming: &Warming, change: &mut HaloChange) {
         match warming.from {
@@ -238,8 +242,8 @@ impl World {
                 self.arena.make_hot_again(warming.superchunk);
                 change.restored += 1;
             }
-            WarmedFrom::Background(ticket) => {
-                let Done::Warmed { generated, cells } = self.background.take(ticket) else {
+            WarmedFrom::Job(ticket) => {
+                let Done::Warmed { generated, cells } = self.jobs.take(ticket) else {
                     unreachable!("a warming's job makes a superchunk's cells");
                 };
                 match generated {
@@ -256,14 +260,14 @@ impl World {
         }
     }
 
-    /// Puts the write-backs the background has encoded into the
+    /// Puts the write-backs the jobs have encoded into the
     /// writeback ring, in the order they were taken -- each one waited
     /// for, if `wait`, else up to the first not yet encoded -- the
     /// superchunk at the ring's tail sent to be flushed whenever it needs
     /// the room; then puts the images flushed so far in the cold pool.
     pub(crate) fn land_write_backs(&mut self, wait: bool) {
         while let Some(&(superchunk, ticket)) = self.writing_back.front() {
-            let done = if wait { Some(self.background.take(ticket)) } else { self.background.try_take(ticket) };
+            let done = if wait { Some(self.jobs.take(ticket)) } else { self.jobs.try_take(ticket) };
             let Some(Done::Encoded(encoded)) = done else {
                 break;
             };
@@ -279,7 +283,7 @@ impl World {
     }
 
     /// Takes the changes of the superchunk at the ring's tail out of it,
-    /// to rewrite its image in the background -- its flush before, if
+    /// to rewrite its image by a job -- its flush before, if
     /// still on its way, put in the cold pool first, so each rewrites the
     /// image the one before made. Its buckets, hot or lingering, hold its
     /// newest cells until the image is in ([`World::land_flushes`]).
@@ -287,23 +291,23 @@ impl World {
         let superchunk = self.storage.tail_superchunk().expect("a full ring has a tail");
         if let Some(at) = self.flushing.iter().position(|&(flushing, _)| flushing == superchunk) {
             let (_, ticket) = self.flushing.remove(at);
-            let Done::Flushed(image) = self.background.take(ticket) else {
+            let Done::Flushed(image) = self.jobs.take(ticket) else {
                 unreachable!("a flush's job makes an image");
             };
             self.storage.insert(superchunk, image);
         }
         let flush = self.storage.take(superchunk).expect("the tail's changes");
-        self.flushing.push((superchunk, self.background.send(Job::Flush(flush))));
+        self.flushing.push((superchunk, self.jobs.send(Job::Flush(flush))));
     }
 
-    /// Puts the images the background has rewritten in the cold pool --
+    /// Puts the images the jobs have rewritten in the cold pool --
     /// each waited for, if `wait` -- and tells the arena of each
     /// superchunk with none of its changes left in the ring, so its
     /// buckets waiting there may go.
     fn land_flushes(&mut self, wait: bool) {
         let mut flushed = Vec::new();
         for (superchunk, ticket) in std::mem::take(&mut self.flushing) {
-            let done = if wait { Some(self.background.take(ticket)) } else { self.background.try_take(ticket) };
+            let done = if wait { Some(self.jobs.take(ticket)) } else { self.jobs.try_take(ticket) };
             let Some(done) = done else {
                 self.flushing.push((superchunk, ticket));
                 continue;
@@ -320,7 +324,7 @@ impl World {
     }
 
     /// Flushes every superchunk with changes in the ring, rewritten on
-    /// all the background's threads: the ring empty, and the cold pool's
+    /// every thread: the ring empty, and the cold pool's
     /// images the cells written back.
     pub(crate) fn flush_all(&mut self) {
         while self.storage.tail_superchunk().is_some() {
@@ -330,13 +334,13 @@ impl World {
     }
 
     /// Writes back every hot superchunk's changed bitmaps, encoded on
-    /// all the background's threads, and puts them, and every write-back
+    /// every thread, and puts them, and every write-back
     /// still on its way, into the writeback ring.
     pub(crate) fn write_back_all(&mut self) {
         for superchunk in self.arena.superchunk_indices() {
             let dirty = self.arena.take_dirty(superchunk);
             if !dirty.is_empty() {
-                self.writing_back.push_back((superchunk, self.background.send(Job::Encode(dirty))));
+                self.writing_back.push_back((superchunk, self.jobs.send(Job::Encode(dirty))));
             }
         }
         self.land_write_backs(true);

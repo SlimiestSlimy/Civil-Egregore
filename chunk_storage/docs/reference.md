@@ -109,3 +109,19 @@ the ring's bytes.
 ## `transient_data.rs`
 
 **`measurements()`**, **`publish(report)`**: as in every crate.
+
+## `jobs.rs`
+
+The slow work, done off the tick on the dispatcher's threads.
+**`Job`**: `Encode(dirty)`, `Flush(flush)`, or `Warm {superchunk,
+image, generate, types}` -- `generate` (**`Generate`**) the world's
+generator, called if there is no image; **`Job::run(codec)`**: a
+**`Done`** -- `Encoded(encoded)`, each bucket's layer words;
+`Flushed(image)`; `Warmed {generated, cells}`, every bitmap's cells,
+chunk by chunk, type by type, and the image if generated; or
+`Failed(said)`, a panic caught. **`Ticket`**: a job sent.
+**`Jobs::new(dispatcher)`**; **`send(job)`**, a ticket, the job queued
+on the dispatcher with the thread's own codec; **`try_take(ticket)`**;
+**`take(ticket)`**, waiting. **`checked`**: a job's panic carried on
+where it is taken. **`BucketKey`** `{layer_type, chunk}` (in
+`layer_codec.rs`): a layer of a chunk, hot or encoded.

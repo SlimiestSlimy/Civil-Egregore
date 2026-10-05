@@ -369,7 +369,7 @@ peak and its average over the ticks (from `/proc/self/status`), and
 what the arena's blocks and storage's images take. Most of what is
 held is the stored images, and most of those the raw height maps.
 
-Threads kept between ticks (the simulation's dispatcher), against
+Threads kept between ticks (the dispatcher, `utilities::dispatcher`), against
 started afresh each phase, ticks a second:
 
 | superchunks | threads | started each phase | kept |
@@ -790,10 +790,10 @@ reaches in a tick -- and every other superchunk is cold, its cells in
 its image and its entities and random numbers kept as a save keeps
 them. After every tick the halos move to where their keepers came to,
 nothing slow done on the tick: superchunks left go cold at once, their
-changes encoded in the background and flushed by the ring in its own
+changes encoded by a job and flushed by the ring in its own
 time; superchunks reached are warming for 256 ticks -- decoded from
-storage in the background, or generated if never made -- and turn hot
-at that tick, not when the background is done, so the world is the
+storage by a job, or generated if never made -- and turn hot
+at that tick, not when the job is done, so the world is the
 same however fast it is. Until then writes to them are missed and
 entities sent there stay put. The world has no size: it is made as it
 is reached. People will keep halos; for now the sheep do, and the

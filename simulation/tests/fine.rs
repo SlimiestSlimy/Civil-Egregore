@@ -3,8 +3,6 @@
 //!
 //! `cargo test --test fine`
 
-#[path = "fine/dispatcher.rs"]
-mod dispatcher;
 #[path = "fine/entities.rs"]
 mod entities;
 #[path = "fine/instructions.rs"]

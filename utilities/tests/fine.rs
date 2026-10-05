@@ -15,3 +15,5 @@ mod rng;
 mod table;
 #[path = "fine/commands.rs"]
 mod commands;
+#[path = "fine/dispatcher.rs"]
+mod dispatcher;

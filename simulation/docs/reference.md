@@ -175,11 +175,3 @@ puts them back into.
 
 **`EntityStats::of(entities)`**: superchunks, entities, attributes in
 use and as garbage, wakes filed.
-
-## `dispatcher.rs`
-
-**`Dispatcher::new(threads)`**: `threads - 1` workers started and kept.
-**`threads`**. **`run(job)`**: part 0 here, the others on the workers;
-returns once all are done, a part's panic raised after. **`work`**: a
-worker's loop -- wait for a new job, run its part, say so. Dropping it
-stops and joins the workers.

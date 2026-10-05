@@ -28,15 +28,15 @@
 //! numbers of its own, kept from tick to tick, so a tick comes out the
 //! same on any number of threads.
 
-use crate::dispatcher::Dispatcher;
 use crate::entity_store::{Entities, EntityId, EntityReader, Instructions, InstructionsApplied, SuperchunkEntities};
 use crate::turn::{slot, Outbox, Turn};
 use bitplane_manager::{count_missed, BitmapArena, Reader, Superchunk, WriteQueues, WritesApplied};
 use coordinates::{CellIndex, SuperchunkIndex};
 use std::ops::AddAssign;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use utilities::dispatcher::Dispatcher;
 use utilities::rng::Rng;
 
 /// Superchunks a thread claims at a time, of a tick's work.
@@ -66,8 +66,9 @@ pub struct TickReport<R> {
 /// tick reuses -- the outboxes, a superchunk each, and room for samples,
 /// a part each -- so a tick allocates nothing once they have grown.
 pub struct Simulation {
-    /// The threads.
-    dispatcher: Dispatcher,
+    /// The threads: its own, or shared with whatever else has work
+    /// for them.
+    dispatcher: Arc<Dispatcher>,
     /// The outboxes, a superchunk each, in the arena's order; emptied
     /// after every tick.
     outboxes: Vec<Outbox>,
@@ -99,7 +100,12 @@ impl Simulation {
     /// A simulation on `threads` threads, kept between ticks: a number
     /// given only to measure against another.
     pub fn new(threads: usize) -> Self {
-        let dispatcher = Dispatcher::new(threads);
+        Self::on(Arc::new(Dispatcher::new(threads)))
+    }
+
+    /// A simulation on `dispatcher`'s threads, which others may queue
+    /// jobs on too: a thread busy with one sits a tick's phase out.
+    pub fn on(dispatcher: Arc<Dispatcher>) -> Self {
         let samples = (0..dispatcher.threads()).map(|_| Mutex::new(Vec::new())).collect();
         Self { dispatcher, outboxes: Vec::new(), samples, random: Vec::new(), arrived: Vec::new() }
     }
