@@ -27,6 +27,7 @@ here, not gone round.
 | `entities` | each entity waking; one made, put to sleep, committed as changed, removed |
 | `around` | the 3x3 cells about a cell as nine bits |
 | `area` | the 16x16 cells about a cell, and the tiles further off |
+| `mask` | a square of a layer as bits, 4 to 1,024 cells a side, read whole or under a mask, and set or cleared under one |
 | `walking` | the steps walls leave open, the step towards a goal, the nearest of a layer in reach |
 
 ## The going over
@@ -95,6 +96,29 @@ lines to 266, its neighbourhood, path and attribute handling gone; of a
 million wakes 283,000 are put whole where all were; the run's
 instructions the same within 0.2% -- a wake is bound by memory, not by
 what is carried.
+
+## Masks
+
+A square of cells as bits (`mask::Mask`), its side a power of two from
+4 to 1,024 -- an entity's reach: the general form of what `around` and
+`area` are at 3 and 16. Sets of cells are masks put together with `&`,
+`|` and `!`, and a shape is a mask like any other: `Mask::disc`, the
+one made so far. A rule keeps its masks as room and reads into them;
+none is made a read.
+
+- **Read**: `mask::read` fills two masks from a layer, the cells it
+  holds at and the cells hot, a window of 8x8 at a time. `read_under`
+  reads only where another mask has cells, the windows it has none in
+  passed over.
+- **Written**: `mask::set` and `mask::clear` queue the mask's cells as
+  rectangles -- each row's runs of cells, a run the same in the rows
+  under it one rectangle with them, up to 255 cells a side -- so a
+  whole square is a few writes and a disc under two a row.
+
+Not yet: masks of the common shapes made once and shipped with the
+program, masks kept from one read to the next, and the same over the
+cells entities stand on. A large square is read a window at a time,
+which a read of whole chunks will better when a rule asks for one.
 
 ## Moved out of the simulation
 

@@ -56,7 +56,7 @@ what they always do and are not listed.
 | **window** | up to 8x8 cells at any cell, read out of the up to four words they overlap into one `u64`, row by row: bit `8y + x`. What rules read cells by (`Reader::window`) | around, area, tile | tile |
 | **around** | the 3x3 cells about a cell, nine bits, row by row: bit `3y + x`, the cell itself bit 4 (`Around`) | window, area | neighbourhood |
 | **area** | the 16x16 cells about a cell, a `u16` row each (`Area`, `Rows`): what an entity sees at once, and what paths are found over | around, window, pathfinding | |
-| **mask** | bits standing for cells, any shape: a window, an around, an area's rows | | |
+| **mask** | bits standing for cells, any shape: a window, an around, an area's rows; and the square of them, 4 to 1,024 cells a side, a layer is read into and written under (`instructions::mask::Mask`) | around, area, window | stencil |
 | **hot** | a layer decoded in the bitmap arena, read and written; a superchunk is hot when its layers are -- when a halo covers it and it is done warming, or while it is cooling. The simulation ticks the hot superchunks only | cold, arena, halo | held, loaded |
 | **cold** | a layer kept encoded in chunk storage, not readable cell by cell; a superchunk no halo covers, its layers so and its entities kept as its cold state | hot, image, cold state | |
 | **halo** | the 3x3 superchunks about a hot entity -- its own and the eight beside it -- kept hot (`simulation::halos`) | hot entity, hot | halo chunk |

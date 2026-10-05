@@ -43,6 +43,22 @@ centre)`**, **`read_each(turn, types, centre)`**: four windows.
 `centre`, set where the type holds at any cell; `FARTHEST_SCALE` (6)
 the coarsest.
 
+## `mask.rs`
+
+**`Mask`**: a square of cells a bit each, its side one of **`SIDES`**
+(4 to 1,024): **`empty(side)`**, **`full(side)`**, **`disc(side)`**;
+**`side`**, **`row(y)`**, **`get(x, y)`**, **`set(x, y, to)`**,
+**`clear`**, **`count`**, **`is_empty`**; **`and`**, **`or`**,
+**`and_not`** with another of its side; **`cells()`** the set ones,
+**`pick(random)`** one drawn. **`about(centre, side)`**: the top left
+cell of the square about a cell; **`cell(origin, x, y)`**: a cell of
+it. **`read(turn, type, origin, set, hot)`**: the square of a layer
+into two masks, a window a time; **`read_under(turn, type, origin,
+under, set, hot)`**: the cells `under` has alone, the windows it has
+none in not read. **`set(turn, type, origin, mask)`**, **`clear`**:
+writes queued for every cell of the mask, as rectangles (**`write`**,
+**`next`**) -- how many.
+
 ## `walking.rs`
 
 What an entity that walks asks, of a turn: the simulation's cells, the
