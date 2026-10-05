@@ -2,7 +2,7 @@
 //! instructions queued for them.
 
 use super::{slot, Turn};
-use entity_manager::{Attribute, AttributeType, EntityEdit, EntityId, EntityRef, EntityType, Header, SuperchunkEntities, OCCUPIED_SIDE};
+use entity_manager::{Attribute, AttributeType, EntityId, EntityRef, Header, SuperchunkEntities, OCCUPIED_SIDE};
 use bitplane_manager::Reader;
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, ChunkIndex};
@@ -66,22 +66,8 @@ impl<'a> Turn<'a> {
         self.outbox.instructions[slot].put(header, header.at, attributes);
     }
 
-    /// Queues making an entity of type `kind` on `at`, with
-    /// `attributes` sorted by type, to wake at `wake`: its ID, drawn
-    /// here. It is not made if an entity stands on the cell by then.
-    pub fn spawn(&mut self, kind: EntityType, at: CellIndex, wake: u64, attributes: &[Attribute]) -> EntityId {
-        let id = self.new_id();
-        self.put(Header { id, kind, at, wake }, attributes);
-        id
-    }
-
-    /// Queues `entity` sleeping where it stands until `wake`: its
-    /// attributes as they are, none carried.
-    pub fn sleep(&mut self, entity: &Header, wake: u64) {
-        self.step(entity, entity.at, wake);
-    }
-
-    /// Queues `entity` stepping to `to`, to wake at `wake`, its
+    /// Queues `entity` stepping to `to` -- its own cell to sleep where
+    /// it stands -- to wake at `wake`, its
     /// attributes as they are: none are carried, unless it crosses to
     /// another superchunk, where it goes whole
     /// ([`Turn::update`]). If an entity stands on `to` by then
@@ -99,7 +85,7 @@ impl<'a> Turn<'a> {
 
     /// Queues setting the attribute of type `kind` of `entity` -- any
     /// entity in reach, the rule's own or another -- to `value`. An
-    /// entity changing itself whole does so by [`Turn::commit`];
+    /// entity changing itself whole is [`Turn::update`]d;
     /// this is one entity acting on another: only the one attribute is
     /// written, so two acting on one in a tick do not undo each other.
     pub fn set_attribute(&mut self, entity: &Header, kind: AttributeType, value: u64) {
@@ -112,18 +98,6 @@ impl<'a> Turn<'a> {
     pub fn unset_attribute(&mut self, entity: &Header, kind: AttributeType) {
         let slot = self.slot_of(entity.at.superchunk());
         self.outbox.instructions[slot].edit(entity.id, entity.at, kind, None);
-    }
-
-    /// Queues what `edit`'s entity came to: on `to`, to wake at `wake`,
-    /// by the instruction that carries least -- moved or put to sleep
-    /// with the attributes it has if none was changed, else put whole.
-    pub fn commit(&mut self, edit: EntityEdit, to: CellIndex, wake: u64) {
-        let before = *edit.header();
-        if edit.edited() {
-            self.update(&before, Header { at: to, wake, ..before }, edit.attributes());
-        } else {
-            self.step(&before, to, wake);
-        }
     }
 
     /// Queues `before`'s entity becoming `after`, with `attributes`:

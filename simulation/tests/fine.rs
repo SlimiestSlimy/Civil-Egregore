@@ -392,19 +392,15 @@ mod instructions {
     //! What a rule does to entities, an instruction each: a step and a
     //! sleep carry no attributes and keep them, across chunks and
     //! superchunks; a step onto a taken cell is turned back; one entity
-    //! edits another, an attribute at a time; an entity changed is put
-    //! whole only if an attribute was; and the cells beside it, the free
-    //! ones among them, are asked of the turn.
+    //! edits another, an attribute at a time.
     //!
     //! `cargo test`
 
     use bitplane_manager::{BitmapArena, BucketKey};
     use chunk_storage::{LayerCodec, LayerType};
     use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-    use simulation::around::{self, CENTRE, RING};
-    use entity_manager::{Attribute, AttributeType, EntityEdit, Entities, EntityId, EntityType, Header, NEVER};
+    use entity_manager::{Attribute, AttributeType, Entities, EntityId, EntityType, Header, NEVER};
     use simulation::{Simulation, Turn};
-    use std::sync::Mutex;
 
     /// The layer type the arena holds: every cell hot, none set.
     const STONE: LayerType = LayerType(6);
@@ -517,7 +513,7 @@ mod instructions {
             for entity in turn.woken() {
                 let kind = if entity.header.id == EntityId(1) { MARK } else { SCAR };
                 turn.set_attribute(&target, kind, entity.header.id.0);
-                turn.sleep(&entity.header, NEVER);
+                turn.step(&entity.header, entity.header.at, NEVER);
             }
             0
         });
@@ -532,73 +528,11 @@ mod instructions {
             for entity in turn.woken() {
                 turn.unset_attribute(&target, MARK);
                 turn.set_attribute(&target, NAME, 8);
-                turn.sleep(&entity.header, NEVER);
+                turn.step(&entity.header, entity.header.at, NEVER);
             }
             0
         });
         let edited = entities.get(target.id, target.at).expect("where it stood");
         assert_eq!(edited.attributes, [Attribute { kind: NAME, value: 8 }, Attribute { kind: SCAR, value: 2 }]);
-    }
-
-    /// An entity its rule looks over and leaves as it was is moved, or put
-    /// to sleep, with nothing carried; one with an attribute changed is put
-    /// whole.
-    #[test]
-    fn an_entity_is_put_whole_only_if_an_attribute_changed() {
-        let (mut arena, mut entities) = world(1);
-        entities.queue_put(walker(1, cell(40, 30), 0), &[Attribute { kind: NAME, value: 7 }]);
-        entities.queue_put(walker(2, cell(40, 40), 0), &[Attribute { kind: NAME, value: 7 }]);
-        entities.apply();
-        let mut simulation = Simulation::new(1);
-        let report = simulation.tick(&mut arena, &mut entities, 0, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
-            let mut room = Vec::new();
-            for entity in turn.woken() {
-                let mut edit = EntityEdit::of(entity, &mut room);
-                // Set to what it is: no change. The second walker's is changed, and another added and removed.
-                edit.set(NAME, 7);
-                assert_eq!(edit.unset(MARK), None);
-                assert!(!edit.edited());
-                if entity.header.id == EntityId(2) {
-                    edit.set(NAME, 8);
-                    edit.set(MARK, 1);
-                    assert_eq!((edit.get(NAME), edit.get(MARK), edit.unset(MARK)), (Some(8), Some(1), Some(1)));
-                }
-                let to = entity.header.at.offset(1, 1).expect("in the world");
-                turn.commit(edit, to, NEVER);
-            }
-            0
-        });
-        assert_eq!((report.instructions_applied.moves, report.instructions_applied.puts), (1, 1));
-        assert_eq!(entities.get(EntityId(1), cell(41, 31)).expect("moved").attributes, [Attribute { kind: NAME, value: 7 }]);
-        assert_eq!(entities.get(EntityId(2), cell(41, 41)).expect("moved").attributes, [Attribute { kind: NAME, value: 8 }]);
-    }
-
-    /// The nine cells about an entity as bits: which entities stand on,
-    /// which are free among those open to it, and none when all are taken.
-    #[test]
-    fn the_cells_beside_an_entity_are_asked_as_masks() {
-        let (mut arena, mut entities) = world(1);
-        let at = cell(40, 30);
-        entities.queue_put(walker(1, at, 0), &[]);
-        // Up and left of it, and to its right.
-        entities.queue_put(walker(2, cell(39, 29), NEVER), &[]);
-        entities.queue_put(walker(3, cell(41, 30), NEVER), &[]);
-        entities.apply();
-        let seen = Mutex::new(Vec::new());
-        let mut simulation = Simulation::new(1);
-        simulation.tick(&mut arena, &mut entities, 0, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
-            for entity in turn.woken() {
-                let at = entity.header.at;
-                let (stone, taken) = (turn.around(STONE, at), turn.around_occupied(at));
-                let free = (0..64).filter_map(|_| turn.free_beside(at, RING)).fold(0u16, |free, bit| free | 1 << bit);
-                let only = turn.free_beside(at, 1 << 0 | 1 << 5);
-                let cells: Vec<CellIndex> = [0, 5].iter().filter_map(|&bit| around::cell(at, bit)).collect();
-                seen.lock().unwrap().push((stone.set, stone.hot, taken, free, only, cells, around::bit_of(at, at.offset(-1, 1).unwrap())));
-                turn.sleep(&entity.header, NEVER);
-            }
-            0
-        });
-        let taken = 1 << 0 | CENTRE | 1 << 5;
-        assert_eq!(*seen.lock().unwrap(), [(0, around::ALL, taken, RING & !taken, None, vec![cell(39, 29), cell(41, 30)], 6)]);
     }
 }

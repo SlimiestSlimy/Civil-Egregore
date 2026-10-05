@@ -3,16 +3,16 @@
 //!
 //! | file | what is in it |
 //! |---|---|
-//! | `mod` | the turn itself: its superchunk, its random numbers, sampling, the going over cells and entities, cells read and writes queued; and the outbox |
-//! | `area` | the cells about a cell: the 3x3 around it, the area of 16x16, the tiles further off, the cells entities stand on |
+//! | `mod` | the turn itself: its superchunk, its random numbers, sampling, cells read and writes queued; and the outbox |
 //! | `entities` | the entities woken and read, and the instructions queued for them |
+//!
+//! A turn reads and queues, and no more: what a rule makes of it --
+//! the cells about a cell, the way to one, an entity changed -- is
+//! `../../../instructions`.
 
-mod area;
 mod entities;
 
-pub use area::{Area, AREA_CENTRE, AREA_SIDE, FARTHEST_SCALE};
-
-use entity_manager::{EntityReader, EntityRef, Instructions, SuperchunkEntities};
+use entity_manager::{EntityReader, Instructions, SuperchunkEntities};
 use crate::sampling::sample_layer;
 use bitplane_manager::{NotHot, Reader, Shape, Superchunk, Window, Write, WriteQueues};
 use chunk_storage::{LayerType, Wide, Width};
@@ -82,31 +82,6 @@ impl<'a> Turn<'a> {
         sample_layer(self.superchunk.index(), layer, probability, &mut self.random, &mut |cell| samples.push(cell))
     }
 
-    /// Runs `each` on every cell [`Turn::sample`] chooses of
-    /// `layer_type`, in Morton order, with what it counts: how many
-    /// were chosen, and the counts. A rule of the cells is written for
-    /// one cell; the going over them is here.
-    #[inline]
-    pub fn each_sampled<C: Default>(&mut self, layer_type: LayerType, probability: f64, samples: &mut Vec<CellIndex>, mut each: impl FnMut(&mut Self, CellIndex, &mut C)) -> (usize, C) {
-        let (sampled, mut counts) = (self.sample(layer_type, probability, samples), C::default());
-        for &cell in samples.iter() {
-            each(self, cell, &mut counts);
-        }
-        (sampled, counts)
-    }
-
-    /// Runs `each` on every entity of the superchunk waking this tick
-    /// ([`Turn::woken_reading`], of `layers`), with `state`: what the
-    /// rule counts, and whatever it keeps from one entity to the next.
-    /// A rule of the entities is written for one entity; the going
-    /// over them is here.
-    #[inline]
-    pub fn each_woken<const N: usize, S>(&mut self, layers: [LayerType; N], state: &mut S, mut each: impl FnMut(&mut Self, EntityRef<'a>, &mut S)) {
-        for entity in self.woken_reading(layers) {
-            each(self, entity, state);
-        }
-    }
-
     /// The window of `width` by `height` cells (each up to 8) whose top
     /// left cell is `origin`, of `layer_type`, row by row, as the tick
     /// found them: the cells around a cell, say, as masks.
@@ -133,10 +108,17 @@ impl<'a> Turn<'a> {
         self.reader.value(plane, cell)
     }
 
-    /// Queues the write that makes `value` the number `plane` holds at
-    /// `cell`.
-    pub fn queue_value<W: Width>(&mut self, plane: Wide<W>, cell: CellIndex, value: u32) {
-        self.queue(plane.layer_type(), Write::value(plane, cell, value));
+    /// Whether `layer_type` holds at any cell of the tile of `scale`
+    /// that `cell` is in, as the tick found it: `None` if not hot.
+    pub fn any_in_tile(&self, layer_type: LayerType, cell: CellIndex, scale: u32) -> Option<bool> {
+        self.reader.any_in_tile(layer_type, cell, scale)
+    }
+
+    /// Which tiles of the coarsest scale in `cell`'s chunk `layer_type`
+    /// holds at any cell of, a bit each in Morton order, as the tick
+    /// found them: `None` if not hot.
+    pub fn tiles_holding(&self, layer_type: LayerType, cell: CellIndex) -> Option<u16> {
+        self.reader.tiles_holding(layer_type, cell)
     }
 
     /// Queues `write` to `layer_type`'s bitplane, applied in the second

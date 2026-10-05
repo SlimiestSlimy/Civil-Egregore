@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 entity_manager = { path = "../entity_manager" }
-simulation = { path = "../simulation" }
 worldgen = { path = "../worldgen" }
 instructions = { path = "../instructions" }
 coordinates = { path = "../coordinates" }

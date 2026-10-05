@@ -2,7 +2,7 @@
 name = "instructions"
 version = "0.1.0"
 edition = "2021"
-description = "TileSim's instructions: what a rule is made of -- small, varied pieces of behaviour, each asking the simulation, the terrain and pathfinding for one thing"
+description = "TileSim's instructions: what a rule is made of -- small, varied pieces of behaviour, each a function over the simulation's turn, and all a rule reaches the simulation through"
 publish = false
 
 [dependencies]
@@ -11,8 +11,6 @@ pathfinding = { path = "../pathfinding" }
 worldgen = { path = "../worldgen" }
 coordinates = { path = "../coordinates" }
 chunk_storage = { path = "../chunk_storage" }
-
-[dev-dependencies]
 bitplane_manager = { path = "../bitplane_manager" }
-utilities = { path = "../utilities" }
 entity_manager = { path = "../entity_manager" }
+utilities = { path = "../utilities" }

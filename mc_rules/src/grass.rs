@@ -18,16 +18,16 @@
 //! neighbour read rather than eight.
 //!
 //! The rule runs on each superchunk in a tick's first phase
-//! ([`simulation::Simulation::tick`]): its writes are queued as
+//! ([`Simulation::tick`]): its writes are queued as
 //! the samples come, in Morton order -- grass spreading over a border
 //! into the neighbour's queue -- and applied in the second phase, so
 //! every sample reads the world as the tick found it. The two never
 //! touch one cell in a tick: decay clears cells that were grass,
 //! spreading fills cells that were dirt.
 
-use bitplane_manager::{BitmapArena, Write, WriteOp};
+use bitplane_manager::BitmapArena;
 use entity_manager::Entities;
-use simulation::{Simulation, Turn, TickReport};
+use instructions::{cells, Simulation, TickReport, Turn};
 use chunk_storage::mock::GRASS;
 use worldgen::WET;
 use coordinates::{CellIndex, NEIGHBOURS};
@@ -72,7 +72,7 @@ pub fn tick(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut
 /// the chances of spreading and of decay together, in Morton order,
 /// each seen to by [`cell`].
 pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> GrassCounts {
-    let (sampled, counts) = turn.each_sampled(GRASS, SPREAD_CHANCE + DECAY_CHANCE, samples, cell);
+    let (sampled, counts) = cells::each_sampled(turn, GRASS, SPREAD_CHANCE + DECAY_CHANCE, samples, cell);
     GrassCounts { sampled, ..counts }
 }
 
@@ -91,12 +91,12 @@ fn cell(turn: &mut Turn, cell: CellIndex, counts: &mut GrassCounts) {
     if spreading {
         // Dirt is a cell with no grass on it: no layer of its own.
         // And grass does not spread under water; a world with no water has none.
-        if turn.holds(GRASS, neighbour) == Ok(false) && turn.holds(WET, neighbour) != Ok(true) {
-            turn.queue(GRASS, Write::cell(neighbour, WriteOp::Set));
+        if cells::lacks(turn, GRASS, neighbour) && !cells::holds(turn, WET, neighbour) {
+            cells::set(turn, GRASS, neighbour);
             counts.spreads += 1;
         }
-    } else if turn.holds(GRASS, neighbour) == Ok(true) {
-        turn.queue(GRASS, Write::cell(cell, WriteOp::Unset));
+    } else if cells::holds(turn, GRASS, neighbour) {
+        cells::clear(turn, GRASS, cell);
         counts.decays += 1;
     }
 }
