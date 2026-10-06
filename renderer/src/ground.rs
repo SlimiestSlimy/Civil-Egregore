@@ -371,7 +371,7 @@ mod tests {
             }
         }
         assert_eq!(differing, 0, "shadow lines unlike over an edge");
-        let world = server::generate_flocks(seed, &[coordinates::WORLD_MIDDLE], 1);
+        let world = server::start(server::Start { seed, flock: server::Flock::On(vec![coordinates::WORLD_MIDDLE], 1), ..server::Start::default() });
         let image = world.storage.image(coordinates::WORLD_MIDDLE).expect("the origin's image");
         let brought = fine((left, top), &[((left, top), image.height_words())].into_iter().collect());
         let cells = || (0..SIDE as isize).flat_map(|y| (0..SIDE as isize).map(move |x| (x, y)));

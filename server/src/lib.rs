@@ -188,26 +188,59 @@ fn layer_types() -> Vec<LayerType> {
     [GRASS, TREE, TREE_STAGE.layer_type(), WET].into_iter().chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
 }
 
-/// A world made from `seed`: its origin superchunk ([`WORLD_MIDDLE`])
-/// with a flock of `sheep` on it, and the superchunks of their halo
-/// about it, all hot before it ticks. Every superchunk -- these, and those made as the sheep
-/// wander -- is its terrain, heights and the walls they make, and on
-/// it, for now, pasture: dirt, a third of it grass. Each from the seed
-/// and where it is ([`generate_image`]).
-pub fn generate(seed: u64, sheep: usize) -> World {
-    generate_flocks(seed, &[WORLD_MIDDLE], sheep)
+/// How [`start`] gives a world its flock, if any: so many sheep on
+/// each superchunk named, and the halo about them hot before it ticks.
+pub enum Flock {
+    /// No sheep: nothing hot until something reaches it.
+    None,
+    /// So many sheep on each of these.
+    On(Vec<SuperchunkIndex>, usize),
+}
+
+/// What a world starts from, for [`start`]: `seed`, generated as
+/// `generation` says, `side` superchunks along a side if one is given
+/// -- a square about its origin, nothing ever hot outside it, kept by
+/// a save -- and `flock`'s sheep put on, their halo hot before it
+/// ticks.
+pub struct Start {
+    /// The seed its superchunks are generated from.
+    pub seed: u64,
+    /// How its superchunks are generated.
+    pub generation: Generation,
+    /// Superchunks along a side, if it is sized.
+    pub side: Option<u32>,
+    /// Its flock, if it has one.
+    pub flock: Flock,
+}
+
+impl Default for Start {
+    /// Seed 1, generated as [`Generation::DEFAULT`] says, no size to
+    /// it, a flock of [`FLOCK`] on its origin: what `new` makes unless
+    /// told otherwise.
+    fn default() -> Self {
+        Self { seed: 1, generation: Generation::DEFAULT, side: None, flock: Flock::On(vec![WORLD_MIDDLE], FLOCK) }
+    }
+}
+
+/// A world as `options` say: its superchunks generated, and `options`'
+/// flock, if it has one, put on and its halo hot before it ticks.
+/// Every superchunk -- these, and those made as a flock wanders -- is
+/// its terrain, heights and the walls they make, and on it, for now,
+/// pasture: dirt, a third of it grass. Each from the seed and where it
+/// is ([`generate_image`]).
+pub fn start(options: Start) -> World {
+    let world = generate_sized(options.generation, options.seed, options.side);
+    match options.flock {
+        Flock::None => world,
+        Flock::On(superchunks, sheep) => flocked(world, &superchunks, sheep),
+    }
 }
 
 /// A world of `seed` with nothing in it yet, nothing hot, whose
-/// superchunks are generated as `generation` says: what a way of
-/// generating is tried out on.
-pub fn generate_with(generation: Generation, seed: u64) -> World {
-    generate_sized(generation, seed, None)
-}
-
-/// [`generate_with`], the world `side` superchunks along a side if it
-/// is given one: a square about its origin, nothing ever hot outside
-/// it. Kept by a save.
+/// superchunks are generated as `generation` says, `side` superchunks
+/// along a side if one is given -- a square about its origin, nothing
+/// ever hot outside it, kept by a save: what [`start`] is built from,
+/// and what a way of generating is tried out on by itself.
 pub fn generate_sized(generation: Generation, seed: u64, side: Option<u32>) -> World {
     World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, generation: generation.numbers() }, generation)
 }
@@ -225,20 +258,10 @@ pub fn seed_with_land(from: u64, shape: &Shape) -> u64 {
     (from..).find(land).expect("a seed with land about the origin")
 }
 
-/// A world made from `seed` as [`generate`] makes one, but with a
-/// flock of `sheep` on each of `superchunks`, and the halos about them
-/// all hot before it ticks.
-pub fn generate_flocks(seed: u64, superchunks: &[SuperchunkIndex], sheep: usize) -> World {
-    generate_flocks_with(Generation::DEFAULT, seed, superchunks, sheep)
-}
-
-/// [`generate_flocks`], in a world generated as `generation` says.
-pub fn generate_flocks_with(generation: Generation, seed: u64, superchunks: &[SuperchunkIndex], sheep: usize) -> World {
-    flocked(generate_with(generation, seed), superchunks, sheep)
-}
-
 /// `world`, nothing in it yet, with a flock of `sheep` on each of
-/// `superchunks` and the halos about them hot, as far as it reaches.
+/// `superchunks` and the halos about them hot, as far as it reaches:
+/// what [`start`] is built from, and what a flock is tried out on by
+/// itself.
 pub fn flocked(mut world: World, superchunks: &[SuperchunkIndex], sheep: usize) -> World {
     let seed = world.info.seed;
     let mut flocked = superchunks.to_vec();

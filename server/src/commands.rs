@@ -69,7 +69,7 @@ pub fn new(folder: &Path, rest: &[&str]) -> Result<String, String> {
     let seed = rest.first().map_or(Ok(1), |seed| utilities::seed::of_hex(seed).ok_or_else(|| format!("`{seed}` is not a seed: 64 bits, in hexadecimal")))?;
     let sheep = number(rest.get(1), crate::FLOCK as u64)? as usize;
     let side = Some(number(rest.get(2), 0)? as u32).filter(|&side| side > 0);
-    let mut made = crate::flocked(crate::generate_sized(crate::Generation::DEFAULT, seed, side), &[coordinates::WORLD_MIDDLE], sheep);
+    let mut made = crate::start(crate::Start { seed, side, flock: crate::Flock::On(vec![coordinates::WORLD_MIDDLE], sheep), ..crate::Start::default() });
     let saved = crate::save(folder, &mut made).map_err(|error| error.to_string())?;
     Ok(format!("{}, seed {}: {} superchunks, {} entities, {} bytes in {}", name(folder), utilities::seed::hex(seed), saved.superchunks, saved.entities, saved.bytes, folder.display()))
 }

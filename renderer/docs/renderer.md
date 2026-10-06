@@ -3,7 +3,7 @@
 Civil Egregore on the screen: a pasture ticking on a thread of its own, and a
 Bevy window showing it -- dirt brown, grass green, a sheep white -- on
 ground lit by its height (below). The world is a generated one
-(`server::generate_flocks`), from the workspace's seed
+(`server::start`), from the workspace's seed
 (`utilities::seed`, `Civil Egregore_SEED` to pick one): the first from it
 with land about the origin (`server::seed_with_land`).
 
@@ -12,7 +12,7 @@ with land about the origin (`server::seed_with_land`).
 not said: a flock that reaches the most the grass feeds, some 16,000 a
 superchunk, within 70,000 ticks, and has not eaten it bare before.
 
-The world is a generated one (`server::generate_flocks`, a flock on
+The world is a generated one (`server::start`, a flock on
 every superchunk shown): hot only in the halos about its sheep, so the window shows a square of superchunks
 about the world's origin, and those cold are black. Forced hot (the
 fifth argument), every superchunk shown is hot all the while, each

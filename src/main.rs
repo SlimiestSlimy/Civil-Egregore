@@ -1,7 +1,9 @@
-//! Civil Egregore, from the command line: the one program beside the
-//! renderer. It holds nothing but which crates have commands; the rest
-//! is `utilities::commands`.
+//! Civil Egregore, from the command line: the one program, built with the
+//! renderer or without it (the `renderer` feature, on by default). It
+//! holds nothing but which crates have commands; the rest is
+//! `utilities::commands`.
 //!
+//! No arguments, built with the renderer: the lab ([`renderer::render_main_lab`]).
 //! `cargo run --release -- help`: every command of every crate, what
 //! each takes and what that is if not given.
 //! `cargo run --release -- server run <folder> [ticks]`
@@ -20,17 +22,19 @@ const CRATES: [Crate; 2] = [
     Crate { name: "tessera", does: "Tessera's diagnostics tools", commands: &tessera::diagnostics::tool::COMMANDS },
 ];
 
-/// Hands the command line to the crate its first word names, or says why not.
-/// needs updating for lab and renderer as the default changes.
+/// No arguments, built with the renderer: the lab, and nothing else
+/// run once it closes. Otherwise, hands the command line to the crate
+/// its first word names, or says why not.
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
-    
+
     #[cfg(feature = "renderer")]
-    if arguments.len() == 0 {
-        renderer::render_main_lab()
+    if arguments.is_empty() {
+        renderer::render_main_lab();
+        return ExitCode::SUCCESS;
     }
-    
+
     match program("Civil_Egregore", &CRATES, &arguments) {
         Ok(()) => ExitCode::SUCCESS,
         Err(why) => {
@@ -39,7 +43,3 @@ fn main() -> ExitCode {
         }
     }
 }
-
-
-
-

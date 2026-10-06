@@ -254,7 +254,8 @@ pub fn start(superchunks: u32) -> (Sender<Request>, Receiver<Frame>) {
 
 
 fn made(shown: &[SuperchunkIndex]) -> World {
-    forced(server::generate_with(lab::generation(), lab::seed()), shown, tuning::now()[tuning::SHEEP].max(0.0) as usize)
+    let world = server::start(server::Start { seed: lab::seed(), generation: lab::generation(), flock: server::Flock::None, ..server::Start::default() });
+    forced(world, shown, tuning::now()[tuning::SHEEP].max(0.0) as usize)
 }
 
 /// How far behind its pace the simulation may fall and still catch up:
