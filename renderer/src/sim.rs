@@ -22,6 +22,8 @@ use bitplane_manager::BucketKey;
 use chunk_storage::mock::GRASS;
 use chunk_storage::{LayerType, SuperchunkImage};
 use coordinates::{square_side, CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE, WORLD_SIDE_SUPERCHUNKS};
+use entity_rules::sheep;
+use gui::tuning::SHEEP;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Write};
