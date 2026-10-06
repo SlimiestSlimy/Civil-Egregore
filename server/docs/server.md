@@ -8,9 +8,11 @@ and the renderer (`../renderer/`) call it.
 
 ## Made from a seed
 
-`generate(seed, sheep)`: the world starts as its origin superchunk
-(`WORLD_MIDDLE`) with a flock on it, and the eight about it -- the
-flock's halo -- all hot before it ticks. Every superchunk's contents come from the world's seed
+`start(options)`: the one way a world starts, from a `Start`
+`{seed, generation, side, flock}`. Unless told otherwise
+(`Start::default`), it starts as its origin superchunk (`WORLD_MIDDLE`)
+with a flock on it, and the eight about it -- the flock's halo -- all
+hot before it ticks. Every superchunk's contents come from the world's seed
 and its superchunk index (`generate_image`), so a superchunk is the
 same whenever and in whatever order it is made: the world has no edge
 but the coordinates', and grows as the sheep wander. A superchunk is
@@ -31,7 +33,7 @@ the simulation's (`../../simulation/docs/simulation.md`, "Halos"): the
 world lends them what it holds (`World::with_halos`) and tells them
 two things. The hot entity (`HOT_ENTITY`): people, to come; for now
 the sheep stand in. And the world's size, if it has one
-(`generate_sized`, `Civil_Egregore server new <folder> [seed] [sheep]
+(`Start::side`, `Civil_Egregore server new <folder> [seed] [sheep]
 [side]`): so many superchunks along a side, a square about the origin,
 nothing ever made outside it; a save keeps it. What generates a
 superchunk never made is the server's, handed to the halos' jobs.
@@ -116,7 +118,7 @@ save's folder.
 
 | folder | what is in it |
 |---|---|
-| `src/lib.rs` | generate, save, load |
+| `src/lib.rs` | start, save, load |
 | `src/halos.rs` | the hot entity, and the world lent to the simulation's halos |
 | `src/tick.rs` | the tick of every rule and entity, then the halos moved |
 | `src/patches.rs` | how grass and trees lie in patches when a superchunk is made |

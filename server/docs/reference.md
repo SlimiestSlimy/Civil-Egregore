@@ -12,9 +12,10 @@ keeps it; **`halos`**, the simulation's -- and
 **`layer_types`**. **`seed_with_land(from, shape)`**: the first seed
 from `from` with land three superchunks each way about the origin --
 what the renderer and the tests make their worlds from.
-**`generate_flocks(seed, superchunks, sheep)`**: the
-same with a flock on each of `superchunks`. **`generate(seed, sheep)`**: the origin
-(`WORLD_MIDDLE`) hot, a flock of `sheep` on it, and its halo made hot.
+**`start(options)`**: a **`Start`** `{seed, generation, side, flock}`
+made into a world -- its **`Flock`**, `None` or `On(superchunks,
+sheep)`, put on and its halo hot; `Start::default()`: seed 1, the
+default generation, no size, `FLOCK` on the origin (`WORLD_MIDDLE`).
 **`generate_image(seed, superchunk, codec)`**: a superchunk's terrain
 and pasture, from the seed and its superchunk index.
 **`save(folder, world)`**: every dirty bitmap written back and the
@@ -98,12 +99,12 @@ flock, time a sample and a wake, rates, what is held and the census
 `Generation::DEFAULT`; `TREES_SALT`; **`numbers()`** and
 **`of_numbers(numbers)`**: its numbers by name, as a world's file
 keeps them (`numbers!`). **`generate_sized(generation, seed, side)`**:
-a world of a size; **`flocked(world, superchunks, sheep)`**: flocks put
-on a world with nothing in it yet.
-**`generate_flocks_with(generation, seed, superchunks, sheep)`**: a
-world generated so, a flock on each of the superchunks.
-**`generate_with(generation, seed)`**: a world with nothing hot yet,
-generated so. **`generate_image(generation, seed, superchunk, codec)`**:
+what `start` builds a world from, generated so, a size if given one,
+nothing hot yet -- and what a way of generating is tried out on by
+itself. **`flocked(world, superchunks, sheep)`**: what `start` builds a
+flock from, put on a world with nothing in it yet -- and what a flock
+is tried out on by itself.
+**`generate_image(generation, seed, superchunk, codec)`**:
 terrain, the ocean where it is under the ocean's level, and on the rest
 grass and trees with their stages. `World::generation`
 is not saved: a world loaded goes on with the default.

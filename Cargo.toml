@@ -7,7 +7,6 @@ authors = ["SlimiestSlimy", "Opus 5.5 high"]
 repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 
 [dependencies]
-gui = { path = "gui" }
 renderer = { path = "renderer", optional = true }
 server = { path = "server" }
 tessera = { path = "tessera" }

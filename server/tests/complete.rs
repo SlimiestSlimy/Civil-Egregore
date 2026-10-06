@@ -14,12 +14,12 @@ use tests::{everything, folder};
 #[ignore]
 fn a_world_stopped_often_comes_to_the_same() {
     const UNTIL: u64 = 30_000;
-    let mut straight = server::generate(21, 4_000);
+    let mut straight = server::start(server::Start { seed: 21, flock: server::Flock::On(vec![coordinates::WORLD_MIDDLE], 4_000), ..server::Start::default() });
     while straight.entities.now() < UNTIL {
         straight.tick();
     }
     let folder = folder("complete");
-    let mut stopped = server::generate(21, 4_000);
+    let mut stopped = server::start(server::Start { seed: 21, flock: server::Flock::On(vec![coordinates::WORLD_MIDDLE], 4_000), ..server::Start::default() });
     for stop in (5_000..=UNTIL).step_by(5_000) {
         while stopped.entities.now() < stop {
             stopped.tick();
@@ -35,7 +35,7 @@ fn a_world_stopped_often_comes_to_the_same() {
 #[test]
 #[ignore]
 fn a_flock_on_generated_ground_lasts() {
-    let mut made = server::generate(3, 4_000);
+    let mut made = server::start(server::Start { seed: 3, flock: server::Flock::On(vec![coordinates::WORLD_MIDDLE], 4_000), ..server::Start::default() });
     for _ in 0..300_000 {
         made.tick();
     }
