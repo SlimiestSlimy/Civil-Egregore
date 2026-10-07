@@ -15,15 +15,16 @@ there are to open. **`Worked`**: the set their work of a frame is in.
 sliders' file (`sliders.csv`, at the crate's root) has it.
 **`Group`**: `Shading`, `Land`, `Lines`, `Finer`, `Grass`, `Trees`,
 `Sheep` (`GROUPS`, in the menu's order), **`name()`** and
-**`generation()`** -- whether its numbers say how the world is made.
+**`lab_only()`** -- every group but shading.
 **`Tuning`**: the numbers read together. **`unless_set(index)`**: what a number is
 unless set, from the default settings. **`start()`**: what the
 machine's settings have. **`now()`**, **`set(index, value)`**,
 **`keep()`**: the numbers written to the settings, the others' lines
-dropped. **`generation()`**: how many times how the world is generated
-has changed; **`regenerate()`**: says it has. **`reseed()`**: a new
-seed drawn off the clock, the world to be generated again;
-**`seed_drawn()`**: it, 0 while none was.
+dropped. **`revision()`**: how many times how the world is generated
+has changed -- not a generation itself (`server::Generation`, the
+recipe), only a count of when one last changed; **`revise()`**: says
+it has. **`reseed()`**: a new seed drawn off the clock, the world to
+be generated again; **`seed_drawn()`**: it, 0 while none was.
 
 ## `sliders.rs`
 
@@ -34,7 +35,7 @@ seed drawn off the clock, the world to be generated again;
 **`Moved`**: a knob or a track's filled part; **`Valued`**: a value in
 its box. **`Hands`**: the slider dragged and the value being typed.
 **`page()`**: the group shown; **`rows(group)`**; **`listed()`**: the
-groups the menu has; **`rows_under()`**, **`middle(row)`**,
+groups the menu has -- lab-only ones only in the lab; **`rows_under()`**, **`middle(row)`**,
 **`foot()`**, **`across()`**, **`over(window)`**,
 **`row_under(window)`**: the arithmetic of where things are. **`Row`**,
 a part that scrolls (**`scroll`**, which also shows the parts of what

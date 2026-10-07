@@ -17,13 +17,17 @@ use utilities::commands::{Command, Given, Parameter};
 /// A world's folder: a name in the worlds' folder, or a path.
 const FOLDER: &str = "folder";
 
+/// Whether a world is made forced hot throughout, not about its
+/// flock's halo: 0, halo; anything else, forced.
+const FORCED: &str = "forced";
+
 /// The server's commands: a world made, run and looked at, and its
 /// diagnostics tools.
 pub const COMMANDS: [Command; 5] = [
     Command {
         name: "new",
-        does: "makes a world from a seed, a flock on its origin, and saves it in the folder; so many superchunks along a side, or 0 for as far as it goes",
-        parameters: &[Parameter::new(FOLDER, ""), Parameter::new("seed", "1"), Parameter::new("sheep", ""), Parameter::new("side", "0")],
+        does: "makes a world from a seed, a flock on its origin, and saves it in the folder; so many superchunks along a side, or 0 for as far as it goes; forced hot throughout if told, else about the flock's halo; on so many threads, or every one the machine has if 0",
+        parameters: &[Parameter::new(FOLDER, ""), Parameter::new("seed", "1"), Parameter::new("sheep", ""), Parameter::new("side", "0"), Parameter::new(FORCED, "0"), Parameter::new(THREADS, "0")],
         run: |given| printed(given, new),
     },
     Command { name: "run", does: "loads the world in the folder, ticks it, and saves it", parameters: &[Parameter::new(FOLDER, ""), Parameter::new("ticks", "10000")], run: |given| printed(given, run) },
@@ -61,7 +65,9 @@ fn number(argument: Option<&&str>, default: u64) -> Result<u64, String> {
 }
 
 /// Makes a world from a seed, a flock on its origin, and saves it in
-/// `folder`: of a size if given a side, in superchunks, that is not 0.
+/// `folder`: of a size if given a side, in superchunks, that is not 0;
+/// forced hot throughout if `forced` is not 0, else about the flock's
+/// halo; on `threads` threads, every one the machine has if 0.
 pub fn new(folder: &Path, rest: &[&str]) -> Result<String, String> {
     if folder.join(disk::WORLD_FILE).exists() {
         return Err(format!("{} is a world already", folder.display()));
@@ -69,7 +75,9 @@ pub fn new(folder: &Path, rest: &[&str]) -> Result<String, String> {
     let seed = rest.first().map_or(Ok(1), |seed| utilities::seed::of_hex(seed).ok_or_else(|| format!("`{seed}` is not a seed: 64 bits, in hexadecimal")))?;
     let sheep = number(rest.get(1), crate::FLOCK as u64)? as usize;
     let side = Some(number(rest.get(2), 0)? as u32).filter(|&side| side > 0);
-    let mut made = crate::start(crate::Start { seed, side, flock: crate::Flock::On(vec![coordinates::WORLD_MIDDLE], sheep), ..crate::Start::default() });
+    let forced = number(rest.get(3), 0)? != 0;
+    let threads = Some(number(rest.get(4), 0)? as usize).filter(|&threads| threads > 0);
+    let mut made = crate::start(crate::Start { seed, side, forced, threads, flock: crate::Flock::On(vec![coordinates::WORLD_MIDDLE], sheep), ..crate::Start::default() });
     let saved = crate::save(folder, &mut made).map_err(|error| error.to_string())?;
     Ok(format!("{}, seed {}: {} superchunks, {} entities, {} bytes in {}", name(folder), utilities::seed::hex(seed), saved.superchunks, saved.entities, saved.bytes, folder.display()))
 }

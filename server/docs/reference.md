@@ -8,14 +8,18 @@ The design is in `world.md`.
 **`World`** `{info, generation, arena, storage, entities, simulation,
 cold, halos}` -- **`cold`**, each cold superchunk's state as a save
 keeps it; **`halos`**, the simulation's -- and
-**`World::empty(info)`**, what generating and loading start from;
-**`layer_types`**. **`seed_with_land(from, shape)`**: the first seed
-from `from` with land three superchunks each way about the origin --
-what the renderer and the tests make their worlds from.
-**`start(options)`**: a **`Start`** `{seed, generation, side, flock}`
-made into a world -- its **`Flock`**, `None` or `On(superchunks,
-sheep)`, put on and its halo hot; `Start::default()`: seed 1, the
-default generation, no size, `FLOCK` on the origin (`WORLD_MIDDLE`).
+**`World::empty(info, generation, forced, threads)`**, what generating
+and loading start from; **`layer_types`**. **`seed_with_land(from,
+shape, near)`**: the first seed from `from` with land three
+superchunks each way about `near` -- what the renderer and the tests
+make their worlds from, a flock not bound to `WORLD_MIDDLE`.
+**`start(options)`**: a **`Start`** `{seed, generation, side, forced,
+threads, flock}` made into a world -- `forced`, every superchunk hot
+throughout instead of about the hot entity's halo; `threads`, every
+one the machine has if `None`; its **`Flock`**, `None` or
+`On(superchunks, sheep)`, put on and its halo hot;
+`Start::default()`: seed 1, the default generation, no size, about the
+halo, every thread, `FLOCK` on the origin (`WORLD_MIDDLE`).
 **`generate_image(seed, superchunk, codec)`**: a superchunk's terrain
 and pasture, from the seed and its superchunk index.
 **`save(folder, world)`**: every dirty bitmap written back and the
@@ -73,9 +77,11 @@ a **`PastureRun`**.
 
 **`COMMANDS`**: what `Civil_Egregore server <command>` runs, each with its
 parameters and their defaults. `Civil_Egregore server new <folder> [seed]
-[sheep] [side]`: a world generated from the seed -- the origin, a flock
-of `sheep` on it, and its halo (**`new`**), of `side` superchunks a
-side unless 0 -- and saved in the folder, which must not hold one and
+[sheep] [side] [forced] [threads]`: a world generated from the seed --
+the origin, a flock of `sheep` on it, and its halo (**`new`**), of
+`side` superchunks a side unless 0, forced hot throughout if `forced`
+is not 0, on `threads` threads or every one the machine has if 0 --
+and saved in the folder, which must not hold one and
 whose name is the world's (**`name`**). `Civil_Egregore server run <folder> [ticks]`: it
 loaded, ticked and saved again (**`run`**). `Civil_Egregore server info
 <folder>`: what its world file says (**`info`**). A folder given as a plain name is one

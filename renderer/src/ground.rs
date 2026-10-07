@@ -358,7 +358,7 @@ mod tests {
     #[test]
     fn shadows_are_the_same_from_both_sides_of_an_edge() {
         let shape = Shape::DEFAULT;
-        let seed = server::seed_with_land(utilities::seed::counted(), &shape);
+        let seed = server::seed_with_land(utilities::seed::counted(), &shape, coordinates::WORLD_MIDDLE);
         let middle = coordinates::WORLD_MIDDLE.top_left().cartesian();
         let (left, top, side) = (middle.x, middle.y, SIDE as u32);
         let fine = |top_left: (u32, u32), given: &Given| Ground::generate(seed, &shape, top_left, given).fine.expect("made fine");

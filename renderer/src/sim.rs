@@ -48,7 +48,7 @@ pub const TARGET_PACE: u32 = 256;
 /// lab -- has land about its origin: settled once a run.
 pub fn seed() -> u64 {
     static SEED: OnceLock<u64> = OnceLock::new();
-    *SEED.get_or_init(|| server::seed_with_land(utilities::seed::counted(), &lab::generation().shape))
+    *SEED.get_or_init(|| server::seed_with_land(utilities::seed::counted(), &lab::generation().shape, WORLD_MIDDLE))
 }
 
 /// The depth from which water hides what is under it: a power of two.
@@ -230,9 +230,9 @@ pub struct Frame {
     /// The cells seen from near ([`Ask::near`]).
     pub near: Option<Near>,
     /// How many times how the world is generated had changed
-    /// ([`crate::tuning::generation`]): the ground made under an
+    /// ([`crate::tuning::revision`]): the ground made under an
     /// earlier count is made again.
-    pub generation: u64,
+    pub revision: u64,
     /// The superchunks asked for.
     pub cells: Vec<Cells>,
 }
@@ -254,7 +254,7 @@ pub fn start(superchunks: u32) -> (Sender<Request>, Receiver<Frame>) {
 
 
 fn made(shown: &[SuperchunkIndex]) -> World {
-    let world = server::start(server::Start { seed: lab::seed(), generation: lab::generation(), flock: server::Flock::None, ..server::Start::default() });
+    let world = server::start(server::Start { seed: lab::seed(), generation: lab::generation(), forced: true, flock: server::Flock::None, ..server::Start::default() });
     forced(world, shown, tuning::now()[tuning::SHEEP].max(0.0) as usize)
 }
 
@@ -266,7 +266,7 @@ const CATCH_UP: Duration = Duration::from_millis(250);
 /// wait for the next one's time.
 fn run(superchunks: u32, asked: &Receiver<Request>, answers: &Sender<Frame>) {
     let shown = shown(superchunks);
-    let mut generation = tuning::generation();
+    let mut revision = tuning::revision();
     let mut world = made(&shown);
     // The superchunks whose heights a frame has carried.
     let mut sent = HashMap::new();
@@ -275,9 +275,9 @@ fn run(superchunks: u32, asked: &Receiver<Request>, answers: &Sender<Frame>) {
     let mut census = census(superchunks);
     let (mut next_tick, mut last_frame, mut last_frame_tick) = (Instant::now(), Instant::now(), 0u64);
     loop {
-        if generation != tuning::generation() {
+        if revision != tuning::revision() {
             // Generated otherwise now: the world is made afresh, and its ticks start again.
-            generation = tuning::generation();
+            revision = tuning::revision();
             world = made(&shown);
             sent.clear();
             (tick, last_frame_tick) = (0, 0);
@@ -295,7 +295,7 @@ fn run(superchunks: u32, asked: &Receiver<Request>, answers: &Sender<Frame>) {
                     let (sheep, grass, trees, cells) = (world.entities.len(), count(&world, GRASS), count(&world, TREE), copy(&world, ask, &mut sent));
                     let sync_seconds = asked_at.elapsed().as_secs_f64();
                     let sync_share = if elapsed > 0.0 { sync_seconds / elapsed } else { 0.0 };
-                    let frame = Frame { tick, ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, detail: ask.detail, near: ask.near, generation, cells };
+                    let frame = Frame { tick, ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, detail: ask.detail, near: ask.near, revision, cells };
                     if answers.send(frame).is_err() {
                         return;
                     }
@@ -307,7 +307,7 @@ fn run(superchunks: u32, asked: &Receiver<Request>, answers: &Sender<Frame>) {
                         // Run as it was saved: its halos moved, its ticks its own, and all of it sent again.
                         world = opened;
                         lab::opened(world.info.seed);
-                        generation = tuning::generation();
+                        revision = tuning::revision();
                         sent.clear();
                         (tick, last_frame_tick, next_tick) = (world.info.tick, world.info.tick, Instant::now());
                         say(format!("{name} opened"), Some(name));
@@ -362,8 +362,7 @@ pub fn shown(superchunks: u32) -> Vec<SuperchunkIndex> {
 /// `world` with every superchunk of `shown` hot and kept so, a flock
 /// of `flock` sheep on each: a fixed load, whatever the sheep come to.
 fn forced(mut world: World, shown: &[SuperchunkIndex], flock: usize) -> World {
-    // No hot entity: what is made hot here stays so, whatever the sheep come to.
-    world.halos.hot.entity = None;
+    // No hot entity, forced at `start`: what is made hot here stays so, whatever the sheep come to.
     let mut wanted = shown.to_vec();
     wanted.sort_unstable();
     world.keep_hot(&wanted);
