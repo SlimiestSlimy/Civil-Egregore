@@ -121,13 +121,13 @@ pub fn start(frames: Receiver<Frame>) -> Receiver<Picture> {
     thread::Builder::new()
         .name("painter".to_string())
         .spawn(move || {
-            let (mut grounds, mut generation) = (HashMap::new(), 0);
+            let (mut grounds, mut revision) = (HashMap::new(), 0);
             for (number, frame) in frames.into_iter().enumerate() {
                 let started = Instant::now();
-                if frame.generation != generation {
+                if frame.revision != revision {
                     // The world is generated otherwise now: its ground is made again.
                     grounds.clear();
-                    generation = frame.generation;
+                    revision = frame.revision;
                 }
                 ground(&mut grounds, &frame, number as u64);
                 let superchunks = frame

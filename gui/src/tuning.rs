@@ -67,6 +67,12 @@ impl Group {
             Self::Sheep => "sheep",
         }
     }
+
+    /// Whether it is shown only in the lab: every group but the near
+    /// view's shading, which always is.
+    pub const fn lab_only(self) -> bool {
+        !matches!(self, Self::Shading)
+    }
 }
 
 /// Names the numbers and their places among them: a constant each,
@@ -150,17 +156,19 @@ pub fn tuned(index: usize) -> &'static Tuned {
 }
 
 /// Counts the changes to how the world is generated: what was made
-/// under an earlier count is made again.
-static GENERATION: AtomicU64 = AtomicU64::new(0);
+/// under an earlier count is made again. Not a generation itself --
+/// `server::Generation`, the recipe -- only a count of when one last
+/// changed.
+static REVISION: AtomicU64 = AtomicU64::new(0);
 
 /// How many times how the world is generated has changed.
-pub fn generation() -> u64 {
-    GENERATION.load(Ordering::Relaxed)
+pub fn revision() -> u64 {
+    REVISION.load(Ordering::Relaxed)
 }
 
 /// Says that how the world is generated has changed.
-pub fn regenerate() {
-    GENERATION.fetch_add(1, Ordering::Relaxed);
+pub fn revise() {
+    REVISION.fetch_add(1, Ordering::Relaxed);
 }
 
 /// The seed drawn last, 0 while none was.
@@ -177,7 +185,7 @@ pub fn seed_drawn() -> u64 {
 pub fn reseed() {
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |since| since.as_nanos() as u64);
     SEED_DRAWN.store(mix(now).max(1), Ordering::Relaxed);
-    regenerate();
+    revise();
 }
 
 /// The numbers as they are now, each a float's bits.
@@ -216,7 +224,7 @@ pub fn now() -> Tuning {
 pub fn set(index: usize, value: f32) {
     let bits = if value.is_finite() { value } else { unless_set(index) }.to_bits();
     if VALUES[index].swap(bits, Ordering::Relaxed) != bits {
-        regenerate();
+        revise();
     }
 }
 

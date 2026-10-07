@@ -161,13 +161,17 @@ pub struct World {
 
 impl World {
     /// A world with nothing in it, at `info`'s tick: what generating and
-    /// loading start from.
-    fn empty(info: WorldInfo, generation: Generation) -> Self {
+    /// loading start from. `forced`, every superchunk `info.side` lets
+    /// hot is forced so, nothing tracking a halo; not, the halo is the
+    /// hot entity's. On `threads` threads, every one the machine has if
+    /// none is given.
+    fn empty(info: WorldInfo, generation: Generation, forced: bool, threads: Option<usize>) -> Self {
         let entities = Entities::at_tick(info.tick);
-        // Every thread the machine has, the world's superchunks not counted, as it grows: one set of them, the tick's and chunk storage's jobs' alike.
-        let dispatcher = Arc::new(Dispatcher::of_the_machine());
+        // The world's superchunks not counted, as it grows: one set of threads, the tick's and chunk storage's jobs' alike.
+        let dispatcher = Arc::new(threads.map_or_else(Dispatcher::of_the_machine, Dispatcher::new));
         let simulation = Simulation::on(Arc::clone(&dispatcher));
-        let halos = Halos::new(Hot { side: info.side, entity: Some(halos::HOT_ENTITY) }, dispatcher);
+        let entity = (!forced).then_some(halos::HOT_ENTITY);
+        let halos = Halos::new(Hot { side: info.side, entity }, dispatcher);
         Self {
             info,
             generation,
@@ -200,8 +204,9 @@ pub enum Flock {
 /// What a world starts from, for [`start`]: `seed`, generated as
 /// `generation` says, `side` superchunks along a side if one is given
 /// -- a square about its origin, nothing ever hot outside it, kept by
-/// a save -- and `flock`'s sheep put on, their halo hot before it
-/// ticks.
+/// a save -- `forced` hot throughout instead of about the hot entity's
+/// halo, ticking on `threads` threads, and `flock`'s sheep put on,
+/// their halo hot before it ticks.
 pub struct Start {
     /// The seed its superchunks are generated from.
     pub seed: u64,
@@ -209,16 +214,23 @@ pub struct Start {
     pub generation: Generation,
     /// Superchunks along a side, if it is sized.
     pub side: Option<u32>,
+    /// Forced hot throughout -- every superchunk of a size, or those
+    /// its holder makes hot of none -- instead of about the hot
+    /// entity's halo.
+    pub forced: bool,
+    /// Threads it ticks on, every one the machine has if none is given.
+    pub threads: Option<usize>,
     /// Its flock, if it has one.
     pub flock: Flock,
 }
 
 impl Default for Start {
     /// Seed 1, generated as [`Generation::DEFAULT`] says, no size to
-    /// it, a flock of [`FLOCK`] on its origin: what `new` makes unless
-    /// told otherwise.
+    /// it, about the hot entity's halo, every thread the machine has,
+    /// a flock of [`FLOCK`] on its origin: what `new` makes unless told
+    /// otherwise.
     fn default() -> Self {
-        Self { seed: 1, generation: Generation::DEFAULT, side: None, flock: Flock::On(vec![WORLD_MIDDLE], FLOCK) }
+        Self { seed: 1, generation: Generation::DEFAULT, side: None, forced: false, threads: None, flock: Flock::On(vec![WORLD_MIDDLE], FLOCK) }
     }
 }
 
@@ -229,7 +241,7 @@ impl Default for Start {
 /// pasture: dirt, a third of it grass. Each from the seed and where it
 /// is ([`generate_image`]).
 pub fn start(options: Start) -> World {
-    let world = generate_sized(options.generation, options.seed, options.side);
+    let world = generate_sized(options.generation, options.seed, options.side, options.forced, options.threads);
     match options.flock {
         Flock::None => world,
         Flock::On(superchunks, sheep) => flocked(world, &superchunks, sheep),
@@ -239,23 +251,26 @@ pub fn start(options: Start) -> World {
 /// A world of `seed` with nothing in it yet, nothing hot, whose
 /// superchunks are generated as `generation` says, `side` superchunks
 /// along a side if one is given -- a square about its origin, nothing
-/// ever hot outside it, kept by a save: what [`start`] is built from,
+/// ever hot outside it, kept by a save -- `forced` hot throughout
+/// instead of about the hot entity's halo, on `threads` threads, every
+/// one the machine has if none is given: what [`start`] is built from,
 /// and what a way of generating is tried out on by itself.
-pub fn generate_sized(generation: Generation, seed: u64, side: Option<u32>) -> World {
-    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, generation: generation.numbers() }, generation)
+pub fn generate_sized(generation: Generation, seed: u64, side: Option<u32>, forced: bool, threads: Option<usize>) -> World {
+    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, generation: generation.numbers() }, generation, forced, threads)
 }
 
 /// The first seed from `from` on whose world, shaped as `shape`, has
-/// land about its origin -- three superchunks each way: what a world is
+/// land about `near` -- three superchunks each way: what a world is
 /// made from to be watched or tested with a flock on it, the seed
-/// otherwise as likely to give ocean there.
-pub fn seed_with_land(from: u64, shape: &Shape) -> u64 {
-    let (middle, side) = (WORLD_MIDDLE.top_left().cartesian(), coordinates::SUPERCHUNK_SIDE_CELLS as i32);
+/// otherwise as likely to give ocean there. A flock need not start on
+/// [`WORLD_MIDDLE`]: `near` is wherever it is to.
+pub fn seed_with_land(from: u64, shape: &Shape, near: SuperchunkIndex) -> u64 {
+    let (middle, side) = (near.top_left().cartesian(), coordinates::SUPERCHUNK_SIDE_CELLS as i32);
     let land = |seed: &u64| {
         let mut lands = worldgen::mesh::Lands::new(shape, *seed);
         (-3i32..=3).all(|across| (-3i32..=3).all(|down| lands.height(middle.x.wrapping_add_signed(across * side), middle.y.wrapping_add_signed(down * side)) > shape.ocean))
     };
-    (from..).find(land).expect("a seed with land about the origin")
+    (from..).find(land).expect("a seed with land about where it is to")
 }
 
 /// `world`, nothing in it yet, with a flock of `sheep` on each of
@@ -387,7 +402,7 @@ pub fn load(folder: &Path) -> Result<World, DiskError> {
     let info = WorldInfo { layers: layer_types(), ..disk::read_world(folder)? };
     let hot = disk::read_hot(folder)?;
     let generation = Generation::of_numbers(&info.generation);
-    let mut world = World::empty(info, generation);
+    let mut world = World::empty(info, generation, false, None);
     let mut kept = 0;
     for superchunk in disk::saved_superchunks(folder)? {
         world.storage.insert(superchunk, disk::read_image(folder, superchunk)?);

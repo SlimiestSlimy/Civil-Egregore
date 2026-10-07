@@ -39,7 +39,7 @@ pub fn opened(seed: u64) {
     OPENED_SEED.store(seed, Ordering::Relaxed);
     OPENED.store(true, Ordering::Relaxed);
     RUNNING.store(false, Ordering::Relaxed);
-    tuning::regenerate();
+    tuning::revise();
     VIEW_RESET.store(true, Ordering::Relaxed);
 }
 
