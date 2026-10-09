@@ -7,9 +7,3 @@ publish = false
 
 [dependencies]
 instructions = { path = "../instructions" }
-entity_manager = { path = "../entity_manager" }
-coordinates = { path = "../coordinates" }
-bitplane_manager = { path = "../bitplane_manager" }
-chunk_storage = { path = "../chunk_storage" }
-utilities = { path = "../utilities" }
-worldgen = { path = "../worldgen" }

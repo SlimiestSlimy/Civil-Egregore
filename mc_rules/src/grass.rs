@@ -25,12 +25,12 @@
 //! touch one cell in a tick: decay clears cells that were grass,
 //! spreading fills cells that were dirt.
 
-use bitplane_manager::BitmapArena;
-use entity_manager::Entities;
+use instructions::handed_on::BitmapArena;
+use instructions::handed_on::Entities;
 use instructions::{read, write, Simulation, TickReport, Turn};
-use chunk_storage::mock::GRASS;
-use worldgen::WET;
-use coordinates::{CellIndex, NEIGHBOURS};
+use instructions::handed_on::GRASS;
+use instructions::handed_on::WET;
+use instructions::handed_on::{CellIndex, NEIGHBOURS};
 use std::ops::AddAssign;
 
 /// The chance, each tick, that a cell of grass tries to spread.

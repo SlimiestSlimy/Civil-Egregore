@@ -6,10 +6,4 @@ description = "Civil Egregore's rules of its entities, a kind a file: so far the
 publish = false
 
 [dependencies]
-entity_manager = { path = "../entity_manager" }
-worldgen = { path = "../worldgen" }
 instructions = { path = "../instructions" }
-coordinates = { path = "../coordinates" }
-utilities = { path = "../utilities" }
-bitplane_manager = { path = "../bitplane_manager" }
-chunk_storage = { path = "../chunk_storage" }

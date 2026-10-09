@@ -25,8 +25,9 @@
 //! | `around` | the 3x3 cells about a cell as nine bits |
 //! | `area` | the 16x16 cells about a cell, a row a word |
 //! | `mask` | a square of cells as bits, 4 to 1,024 a side |
+//! | `handed_on` | what the crates under these have that a rule names |
 //!
-//! A rule is written in these alone. The simulation under them reads
+//! A rule is written in these alone, and its crate depends on no other. The simulation under them reads
 //! and writes cells and entities and no more: its [`Turn`] is what
 //! every instruction is asked on, [`Simulation`] what ticks a rule,
 //! [`TickReport`] what a tick says it did.
@@ -39,6 +40,7 @@
 
 pub mod area;
 pub mod around;
+pub mod handed_on;
 pub mod mask;
 pub mod read;
 pub mod write;

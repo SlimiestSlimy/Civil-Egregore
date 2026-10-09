@@ -18,10 +18,10 @@
 //!
 //! Trees stand on dirt and grass alike and change neither.
 
-use chunk_storage::{Bits4, LayerType, Wide};
-use coordinates::CellIndex;
+use instructions::handed_on::{Bits4, LayerType, Wide};
+use instructions::handed_on::CellIndex;
 use instructions::{read, write, Turn};
-use worldgen::WET;
+use instructions::handed_on::WET;
 use std::ops::AddAssign;
 
 /// The cells a tree stands on.

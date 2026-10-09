@@ -1,0 +1,13 @@
+[package]
+name = "AI_SCRATCHPAD"
+version = "0.1.0"
+edition = "2024"
+description = "The AI's own scratchpad: probes of Civil Egregore, questions asked of a running host while working on it, and whatever else it tests with. Nothing may depend on this crate"
+publish = false
+
+# NOTHING DEPENDS ON THIS CRATE: it is no part of the program, and may be
+# deleted whole without anything else changing.
+[dependencies]
+coordinates = { path = "../coordinates" }
+server = { path = "../server" }
+utilities = { path = "../utilities" }
