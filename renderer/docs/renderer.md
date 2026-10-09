@@ -179,7 +179,9 @@ the menus say (`src/link.rs`): a world made (`Host::make_world`), the
 numbers it is made from read off the sliders then, and handed to the
 server to make sense of (`server::Start::from_tuning`); one opened from
 the worlds' folder (`Host::open_world`), run in place of the one run, hot in
-its halos, its ticks its own, the view put over it; the world run saved
+its halos, its ticks its own, the view put over it; the world run made
+again from its start (`Host::reset`) as a slider of how worlds are
+generated changes, the view left where it is; the world run saved
 (`Host::save_world`), on the host's thread between two ticks, under the
 name it was opened by or the one typed, how it is generated with it.
 What opening or saving came to is said on the first line of the text

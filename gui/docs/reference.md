@@ -59,7 +59,7 @@ worlds gone through by the wheel; the rows shown.
 
 `MARGIN`, `ROW`, `TRACK`, `KNOB`, `BOX`, `GAP`, `PANEL`, `CLOSED`,
 `NOTCH`: the layout. **`Shown`**: `Closed`, `Menu` or `Group(group)`.
-**`Offered`**: `Hidden`, `Everything`, `Shading`. **`Sliders`**: what
+**`Offered`**: `Hidden`, `Everything`, `Running`. **`Sliders`**: what
 is offered and shown, how far it is scrolled, whether the left button
 is held over it, the slider dragged, the value typed, where the pointer
 rested -- **`held()`**, **`typing()`**, **`over(window)`**,
@@ -78,8 +78,8 @@ wheel, and every part shown or hidden.
 `NAME`: the words' height; `TIP`. **`Valued`**: a value in its box;
 **`Moved`**: a knob or a track's filled part; **`Tip`**: where what a
 slider does is said. **`over_menus(z)`**: stacked over the menus.
-**`spawn`**: the button, the menu twice -- every group, and those that
-make no worlds -- and each group (**`spawn_group`**).
+**`spawn`**: the button, the menu twice -- every group, and all but those
+only of setting a world up -- and each group (**`spawn_group`**).
 
 ## `sliders/slide.rs`
 

@@ -52,21 +52,21 @@ loading nothing.
 **`Start::from_tuning(seed, tuning)`**: as a window's sliders have it
 (`utilities::tuning::Tuning`), from the seed given or one drawn; its
 camera loading superchunks only if it is not forced hot.
+**`Start::of_world(info, generation)`**: what a world opened started
+from, as far as its file says -- its sheep the camera's flock, or
+`FLOCK`.
 **`drawn_seed(generation)`**: a seed drawn at random, the first from
 it with land about the origin within `LAND_TRIES`, else the one drawn.
 
 ## `halos.rs`
 
-`HOT_ENTITY` (the sheep, for now). `CAMERA_SIDE` (8): superchunks
-along a side a camera loads at most. **`World::with_halos(work)`**: the
+`HOT_ENTITY` (the sheep, for now). **`World::with_halos(work)`**: the
 simulation's halos given what the world holds, and what generates a
 superchunk never made. **`World::move_halos`**: the halos moved, then,
 if the camera loads superchunks with sheep, a flock put
 (`put_flock`) on each the move generated that is in the viewport.
-**`World::keep_viewport(viewport)`**: nothing unless the camera loads
-superchunks; else the viewport -- none if the window renders none of
-the world's cells -- clamped to the world and to `CAMERA_SIDE` a side
-about its middle, handed to the halos (`Halos::keep_viewport`). The host calls it on each frame asked.
+The viewport is told to the halos themselves (`Halos::keep_viewport`),
+by the host on each frame asked.
 **`World::keep_hot(wanted)`**, **`World::warming`**,
 **`World::cooling`**, **`World::start_warming(superchunk, due)`**,
 **`World::write_back_and_flush_all`**: each the halos' own
@@ -155,7 +155,10 @@ yet, and where its frames come back; **`sync(ask)`** -- answered with
 a `Frame`, unless no world runs -- **`pause(paused)`**, **`pace(ticks
 a second, or flat out)`**, **`make_world(start)`**,
 **`open_world(name)`** -- that world of the worlds' folder run in
-place of the one run -- and **`save_world(name)`**. `Request`, private:
+place of the one run -- **`save_world(name)`**, and **`reset(tuning)`**
+-- the world run made again from its start, generated as the tuning
+has it now, a world of its own of no name; several asked between two
+ticks make it once, as the last says. `Request`, private:
 a call as sent. **`census_path()`**: where a run's census is kept
 (`transient_data/measurements/census.csv`); **`census(seed)`**: its
 file, started afresh for each world. **`Running`**: the world run, the
@@ -163,7 +166,7 @@ superchunks whose heights were sent, when it began, its census.
 **`HostThread`**: the world run if any, the worlds run so far, paused,
 the pace, the name, what was last said -- **`run`**: requests read between ticks, a tick, and a
 wait for the next one's time; paused or with no world, it waits for a
-request; **`run_world`**, **`save`**, **`frame(ask)`**, **`tick`**.
+request; **`run_world`**, **`run_in_place`**, **`reset_now`**, **`save`**, **`frame(ask)`**, **`tick`**.
 
 ## `host/frame.rs`
 

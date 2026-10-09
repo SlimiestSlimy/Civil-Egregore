@@ -48,9 +48,10 @@ kind)`**: an edit of any entity in reach; **`remove(header)`**.
 
 ## `hot.rs`
 
-**`Hot`**: `About {entity, side}` -- every entity of the kind keeps
-its halo hot, in a world of `side` superchunks a side if it has one --
-or `Forced {side}`: every superchunk of a world of that side hot,
+**`Hot`**: `About {entity, side, viewport}` -- every entity of the kind
+keeps its halo hot, in a world of `side` superchunks a side if it has
+one, and if `viewport` every superchunk of the viewport too, however
+many -- or `Forced {side}`: every superchunk of a world of that side hot,
 whatever its entities do; only a world with a side can be forced.
 **`about(entity)`**: a world of no size, about `entity`;
 **`side()`**, **`span()`**, **`within(superchunk)`**, **`all()`**:
@@ -60,13 +61,15 @@ superchunks about each, sorted, each once.
 
 ## `halos.rs`
 
-**`Held`** `{arena, storage, entities, simulation, cold, layers,
+**`Viewport`** `{first, last}`: what a renderer renders, in
+superchunks; **`contains(at)`**. **`Held`** `{arena, storage, entities, simulation, cold, layers,
 generate}`: the world's, lent for a call. **`Halos`** `{hot, jobs,
 warming, cooling, writing_back, flushing, viewport, generated}`, **`new(hot,
 dispatcher)`**, **`restore_cooling(cooling)`**.
 **`Halos::keep_viewport(viewport)`**: the viewport's superchunks --
 what a renderer renders -- kept sorted, wanted hot besides the halos
-from the next move on, in place of the last viewport's;
+from the next move on, in place of the last viewport's; nothing unless
+the world's hot has its viewport's superchunks hot;
 **`Halos::viewport`**: them. **`Halos::generated`**: the superchunks
 the last move or `keep_hot` generated -- made new by a job, not read
 back -- sorted. `WARM_TICKS` (256): the ticks a superchunk is warming;

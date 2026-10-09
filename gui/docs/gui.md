@@ -42,9 +42,10 @@ the groups offered a row each; a click on one opens it, and the first
 row of a group goes back to the menu. `U` closes whatever is open.
 
 Which groups are offered is the screen's: every one while a new world
-is set up; over a world only those that make no worlds -- the shading
--- as the rest are read when a world is made and do nothing after;
-none over the rest of the main menu, nor under the options.
+is set up; over a world all but the world's own, read only when a
+world is made (`Group::setup_only`) -- the shading, and how a world is
+generated, the world run made again from its start as one of those
+changes; none over the rest of the main menu, nor under the options.
 
 In a group, the left button drags a knob, the right sets the number
 back to its default. Beside each is a box with its value: a click on

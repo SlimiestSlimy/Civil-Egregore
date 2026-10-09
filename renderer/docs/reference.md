@@ -58,7 +58,7 @@ frame shown and the next asked for, the map; then the text.
 ## `link.rs`
 
 **`Link`** `{host, pictures, shading, waiting, since, asked, paused,
-pace}`: the host as the window holds it (`server::host::Host`) --
+pace, generation, first_view}`: the host as the window holds it (`server::host::Host`) --
 **`start()`**: the host and the painter started; **`forget_asked()`**:
 another world to run in place of the one run, no frame of the one
 before waited for. **`Seen`** `{frame, painted, paint_seconds,
@@ -67,7 +67,9 @@ drawn. **`menus`**: the worlds the menus make (`server::Start::from_tuning`
 of the seed and numbers they give), open and save, the host told; the
 options told the world run's name. **`keys`**: pause and pace, the
 host told. **`shading`**: the sliders' numbers (`gui::CurrentTuning`)
-sent to the painter whenever they change.
+sent to the painter whenever they change. **`generation`**: the host
+asked to make the world run again (`Host::reset`) whenever the sliders
+change how worlds are generated, the view left where it is.
 
 ## `frames.rs`
 

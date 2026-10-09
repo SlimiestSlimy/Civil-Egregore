@@ -6,13 +6,14 @@
 use crate::paint::Picture;
 use bevy::prelude::*;
 use gui::options::Options;
-use gui::{Captured, CurrentTuning, Make, Open, Save};
+use gui::{Captured, CurrentTuning, Make, Open, Save, Screen};
 use server::host::frame::{Ask, Frame};
 use server::host::{Host, TARGET_PACE};
 use server::Start;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 use utilities::tuning::Tuning;
+use worldgen::Generation;
 
 /// The host, as the window holds it: where to ask, where the answers
 /// come, and what it was last told.
@@ -35,6 +36,12 @@ pub struct Link {
     pub paused: bool,
     /// Ticks a second it is held to, or flat out.
     pub pace: Option<u32>,
+    /// How the sliders last had worlds generated: none until they are
+    /// first seen.
+    pub generation: Option<Generation>,
+    /// Whether the view is to be put over the next world shown: one
+    /// made or opened, not one remade.
+    pub first_view: bool,
 }
 
 impl Link {
@@ -43,7 +50,7 @@ impl Link {
     pub fn start() -> Self {
         let (host, frames) = Host::start();
         let (shading, tunings) = channel();
-        Self { host, pictures: Mutex::new(crate::paint::start(frames, tunings)), shading, waiting: false, since: f32::INFINITY, asked: None, paused: false, pace: Some(TARGET_PACE) }
+        Self { host, pictures: Mutex::new(crate::paint::start(frames, tunings)), shading, waiting: false, since: f32::INFINITY, asked: None, paused: false, pace: Some(TARGET_PACE), generation: None, first_view: true }
     }
 
     /// Forgets a frame asked of the world run: another is to run in its
@@ -79,10 +86,12 @@ pub fn menus(mut link: ResMut<Link>, mut make: MessageReader<Make>, mut open: Me
     for made in make.read() {
         _ = link.host.make_world(Start::from_tuning(made.seed, &made.tuning));
         link.forget_asked();
+        link.first_view = true;
     }
     for opened in open.read() {
         _ = link.host.open_world(opened.0.clone());
         link.forget_asked();
+        link.first_view = true;
     }
     for saved in save.read() {
         _ = link.host.save_world(saved.0.clone());
@@ -121,5 +130,21 @@ pub fn keys(mut link: ResMut<Link>, keys: Res<ButtonInput<KeyCode>>, captured: R
 pub fn shading(link: Res<Link>, tuning: Res<CurrentTuning>) {
     if tuning.is_changed() {
         _ = link.shading.send(tuning.0);
+    }
+}
+
+/// Has the host make the world run again whenever the sliders change
+/// how worlds are generated: from its start, the view left where it
+/// is. Compared with what the sliders last said, not with the world's
+/// own: a slider of the shading remakes no world opened of other
+/// numbers.
+pub fn generation(mut link: ResMut<Link>, tuning: Res<CurrentTuning>, screen: Res<Screen>, seen: Res<Seen>) {
+    if !tuning.is_changed() {
+        return;
+    }
+    let generation = Generation::from_tuning(&tuning.0);
+    if link.generation.replace(generation).is_some_and(|last| last != generation) && *screen == Screen::World && seen.frame.is_some() {
+        _ = link.host.reset(&tuning.0);
+        link.forget_asked();
     }
 }

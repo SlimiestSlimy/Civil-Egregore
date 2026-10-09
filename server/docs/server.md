@@ -56,9 +56,10 @@ A world without a size may have its **camera load superchunks**
 forced hot, all of which is hot anyway). It starts as any other: the
 origin, its flock and its halo. Then each frame a window asks of the
 host tells the world its **viewport**, whatever the window should
-render (`World::keep_viewport`; none in map mode): at most
-`CAMERA_SIDE` (8) superchunks along a side about its middle, kept hot
-besides the halos, generated as a halo's are if never made. Each
+render (`Halos::keep_viewport`; none in map mode): every superchunk
+of it kept hot besides the halos, however many -- which are hot is the
+simulation's to say, as the world's hot defines it (`hot_of`) --
+generated as a halo's are if never made. Each
 superchunk generated in the viewport gets `sheep` of its own
 (`World::put_flock`, the same flock whenever it is made); one generated
 only for a halo gets none, or the sheep's halos would generate more

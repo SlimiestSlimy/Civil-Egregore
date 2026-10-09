@@ -77,7 +77,7 @@ pub fn spawn(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
 /// view is no longer near. What was drawn of a superchunk of its
 /// viewport that is no longer hot goes. A frame of another world than
 /// the last drops what was drawn of that one, and puts the view over
-/// the new.
+/// the new if it was made or opened -- not if it is the last remade.
 #[allow(clippy::too_many_arguments)]
 pub fn show(
     mut commands: Commands,
@@ -101,8 +101,10 @@ pub fn show(
         for (_, (sprite, ..)) in sprites.tiles.drain() {
             commands.entity(sprite).despawn();
         }
-        let (mut transform, mut projection) = camera.into_inner();
-        first_view(picture.frame.side, &window, &mut transform, &mut projection);
+        if std::mem::take(&mut link.first_view) {
+            let (mut transform, mut projection) = camera.into_inner();
+            first_view(picture.frame.side, &window, &mut transform, &mut projection);
+        }
     }
     if let Some(viewport) = picture.frame.viewport {
         // Nothing to draw of a superchunk gone cold: what was drawn of it goes. The hot are row by row.
