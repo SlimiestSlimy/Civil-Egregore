@@ -6,8 +6,9 @@
 
 use super::spawn::{Moved, Valued};
 use super::{rows, Offered, Shown, Sliders, BOX, GAP, KNOB, MARGIN, TRACK};
+use crate::CurrentTuning;
 use bevy::prelude::*;
-use utilities::tuning::{keep, now, set, tuned, unless_set};
+use utilities::tuning::{keep, settled, tuned, unless_set};
 
 /// The digit or the point a key types, if it types one.
 fn typed(key: KeyCode) -> Option<char> {
@@ -31,7 +32,7 @@ fn typed(key: KeyCode) -> Option<char> {
 
 /// Works what is shown, as the module says, and shows each slider's
 /// knob and value as they are.
-pub fn slide(mut sliders: ResMut<Sliders>, buttons: Res<ButtonInput<MouseButton>>, keys: Res<ButtonInput<KeyCode>>, window: Single<&Window>, moved: Query<(&Moved, &mut Node)>, values: Query<(&Valued, &mut Text)>) {
+pub fn slide(mut sliders: ResMut<Sliders>, mut tuning: ResMut<CurrentTuning>, buttons: Res<ButtonInput<MouseButton>>, keys: Res<ButtonInput<KeyCode>>, window: Single<&Window>, moved: Query<(&Moved, &mut Node)>, values: Query<(&Valued, &mut Text)>) {
     if sliders.offered == Offered::Hidden {
         return;
     }
@@ -70,8 +71,8 @@ pub fn slide(mut sliders: ResMut<Sliders>, buttons: Res<ButtonInput<MouseButton>
             digits.pop();
         }
         if settles && let Ok(value) = digits.parse() {
-            set(*index, value);
-            keep();
+            tuning.0[*index] = settled(*index, value);
+            keep(&tuning.0);
         }
         if settles || keys.just_pressed(KeyCode::Escape) {
             sliders.typed = None;
@@ -87,22 +88,25 @@ pub fn slide(mut sliders: ResMut<Sliders>, buttons: Res<ButtonInput<MouseButton>
     }
     if let (Some(index), Some(pointer)) = (sliders.dragged, pointer) {
         let (least, most) = tuned(index).range;
-        set(index, least + (most - least) * ((pointer.x - track_left) / TRACK.0).clamp(0.0, 1.0));
+        let value = least + (most - least) * ((pointer.x - track_left) / TRACK.0).clamp(0.0, 1.0);
+        // Set only when it moves: the painter is sent the numbers each time they change.
+        if tuning.0[index] != value {
+            tuning.0[index] = value;
+        }
     }
     if let Some(index) = on_track.filter(|_| buttons.just_pressed(MouseButton::Right)) {
-        set(index, unless_set(index));
-        keep();
+        tuning.0[index] = unless_set(index);
+        keep(&tuning.0);
     }
     if buttons.just_released(MouseButton::Left) && sliders.dragged.take().is_some() {
-        keep();
+        keep(&tuning.0);
     }
-    show(&sliders, moved, values);
+    show(&sliders, &tuning.0, moved, values);
 }
 
 /// Each slider's knob and filled track where its number is, and its
 /// value in its box -- or what is being typed into it.
-fn show(sliders: &Sliders, mut moved: Query<(&Moved, &mut Node)>, mut values: Query<(&Valued, &mut Text)>) {
-    let numbers = now();
+fn show(sliders: &Sliders, numbers: &utilities::tuning::Tuning, mut moved: Query<(&Moved, &mut Node)>, mut values: Query<(&Valued, &mut Text)>) {
     for (part, mut node) in &mut moved {
         let (least, most) = tuned(part.index).range;
         // A value typed past the slider's range leaves the knob at its end.

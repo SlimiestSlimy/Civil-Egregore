@@ -194,6 +194,12 @@ what they always do and are not listed.
 | **reading** | the process's memory read once (`MemoryTrack::read`) | | sample |
 | **tier** | a test's size: fine, fast or complete (`docs/testing_protocol.md`) | | |
 | **settings** | this machine's settings, kept from run to run: `settings.csv` in the folder `Civil Egregore` where the system keeps a user's programs' data (`utilities::settings`) | default settings, slider, group | config, preferences, preset |
-| **default settings** | every setting and what it is unless changed: a settings file built into the program, copied to a machine that has none; all there is under the build feature `default_settings` | settings | |
-| **options** | the menu Escape opens over the window: going on, saving the world, opening one of the worlds' folder, leaving Civil Egregore (`gui::options`) | slider, worlds' folder | pause menu, main menu |
+| **default settings** | every setting and what it is unless changed: a settings file built into the program, copied to a machine that has none; all there is under the build feature `force_default_settings` | settings | |
+| **options** | the menu Escape opens over the window: going on, saving the world, opening one of the worlds' folder, leaving Civil Egregore (`gui::options`) | slider, worlds' folder, main menu | pause menu |
+| **main menu** | what the game opens on, nothing run behind it: a new world set up and made, a world opened, leaving (`gui::main_menu`) | options, slider, world start | title screen, launcher |
+| **tuning** | the numbers a slider sets, together: the near view's shading and how a new world is made (`utilities::tuning::Tuning`), a value held by whoever sets it -- the window's `gui::CurrentTuning` -- never a static | slider, group, settings, world start | config, parameters |
+| **slider** | one number of the tuning, set by a knob dragged or a value typed (`gui::sliders`; `utilities/sliders.csv`) | tuning, group | knob (a slider's part only) |
+| **group** | sliders shown together: shading, or one of those that make worlds (`utilities::tuning::Group`) | slider | tab, page |
+| **world start** | every number a new world starts from -- seed, generation, size, forced hot, sheep, threads, hot entity -- whoever gives them (`server::Start`); the server alone knows what they mean | tuning, forced hot, hot entity, world's size | world options, lab |
+| **host** | a world run on a thread of its own for a window, which calls it (`server::host::Host`) and is answered with the cells in view (`Frame`) | world start | sim, simulation thread |
 | **worlds' folder** | where worlds are kept unless a path is given: `worlds` in the folder `Civil Egregore`, or what the setting `worlds` names (`utilities::settings::worlds`) | save, settings | |

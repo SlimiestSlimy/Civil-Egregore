@@ -2,16 +2,16 @@
 //! window -- that asks it, never the other way round, for the cells in
 //! view.
 //!
-//! The client sends [`Request`]s; the host reads them between ticks.
-//! It starts with no world, and runs one once asked to make one
-//! ([`Request::New`]) or to open one saved ([`Request::Open`]). Each
-//! [`Request::Sync`] is answered with a [`Frame`]: the superchunks in
-//! view as the last tick left them, copied and nothing more
-//! ([`frame`]) -- so what is in view costs the ticks next to nothing,
-//! and a frame carries only so many superchunks, the client going
-//! round those in view. It sends nothing unasked, so it is the client
-//! that sets how often the world is drawn, and one that falls behind
-//! slows no tick.
+//! The client holds a [`Host`] and calls it; each call is sent to the
+//! host's thread, read there between ticks. It starts with no world,
+//! and runs one once asked to make one ([`Host::make_world`]) or to
+//! open one saved ([`Host::open_world`]). Each [`Host::sync`] is
+//! answered with a [`Frame`]: the superchunks in view as the last tick
+//! left them, copied and nothing more ([`frame`]) -- so what is in view
+//! costs the ticks next to nothing, and a frame carries only so many
+//! superchunks, the client going round those in view. It sends nothing
+//! unasked, so it is the client that sets how often the world is
+//! drawn, and one that falls behind slows no tick.
 //!
 //! It ticks at the pace asked, or flat out, until the client is gone,
 //! and keeps a census of the flock and the grass as it goes
@@ -43,9 +43,10 @@ pub const CENSUS_EVERY: u64 = 1000;
 /// ticks made late by a frame or a sleep are made up, a stall is not.
 const CATCH_UP: Duration = Duration::from_millis(250);
 
-/// What a client asks of the host.
+/// What a client asks of the host, sent to its thread by a [`Host`]'s
+/// calls.
 #[derive(Clone, Debug)]
-pub enum Request {
+enum Request {
     /// Some of the superchunks in view: answered with a [`Frame`] --
     /// unless no world runs, when nothing is.
     Sync(Ask),
@@ -83,14 +84,58 @@ fn census(seed: u64) -> Option<BufWriter<File>> {
     Some(file)
 }
 
-/// Starts the host on a thread of its own, no world run yet: where to
-/// send it requests, and where its frames come back. It stops once the
-/// requests' sender is dropped.
-pub fn start() -> (Sender<Request>, Receiver<Frame>) {
-    let (requests, asked) = channel();
-    let (answers, frames) = channel();
-    thread::Builder::new().name("host".to_string()).spawn(move || Host::default().run(&asked, &answers)).expect("a thread for the host");
-    (requests, frames)
+/// The host, as a client holds it: each call sent to the host's thread,
+/// done there between two ticks, in the order called. Each says whether
+/// the host was still there to be told.
+pub struct Host {
+    /// Where the calls go.
+    requests: Sender<Request>,
+}
+
+impl Host {
+    /// Starts the host on a thread of its own, no world run yet: the
+    /// host, and where its frames come back. It stops once the host is
+    /// dropped.
+    pub fn start() -> (Self, Receiver<Frame>) {
+        let (requests, asked) = channel();
+        let (answers, frames) = channel();
+        thread::Builder::new().name("host".to_string()).spawn(move || HostThread::default().run(&asked, &answers)).expect("a thread for the host");
+        (Self { requests }, frames)
+    }
+
+    /// Asks for some of the superchunks in view: answered with a
+    /// [`Frame`] -- unless no world runs, when nothing is.
+    pub fn sync(&self, ask: Ask) -> bool {
+        self.requests.send(Request::Sync(ask)).is_ok()
+    }
+
+    /// Stops ticking, or goes on.
+    pub fn pause(&self, paused: bool) -> bool {
+        self.requests.send(Request::Pause(paused)).is_ok()
+    }
+
+    /// Ticks so many times a second, or flat out.
+    pub fn pace(&self, pace: Option<u32>) -> bool {
+        self.requests.send(Request::Pace(pace)).is_ok()
+    }
+
+    /// Makes a world as `start` says, and runs it in place of any run.
+    pub fn make_world(&self, start: Start) -> bool {
+        self.requests.send(Request::New(start)).is_ok()
+    }
+
+    /// Runs the world named `name` in the worlds' folder in place of
+    /// any run: hot in its halos, as it was saved. Refused, the world
+    /// run goes on (the next frame's [`Frame::said`]).
+    pub fn open_world(&self, name: String) -> bool {
+        self.requests.send(Request::Open(name)).is_ok()
+    }
+
+    /// Saves the world run under `name` in the worlds' folder, its name
+    /// from then ([`Frame::named`]).
+    pub fn save_world(&self, name: String) -> bool {
+        self.requests.send(Request::Save(name)).is_ok()
+    }
 }
 
 /// The world run, and what goes with running it.
@@ -114,8 +159,8 @@ impl Running {
     }
 }
 
-/// The host's state between ticks.
-struct Host {
+/// The host's state between ticks, on its own thread.
+struct HostThread {
     /// The world run, if one is.
     running: Option<Running>,
     /// Counts the worlds run.
@@ -134,14 +179,14 @@ struct Host {
     last_frame: (Instant, u64),
 }
 
-impl Default for Host {
+impl Default for HostThread {
     /// No world, at the game's pace.
     fn default() -> Self {
         Self { running: None, worlds: 0, paused: false, pace: Some(TARGET_PACE), named: None, said: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0) }
     }
 }
 
-impl Host {
+impl HostThread {
     /// Requests read between ticks, a tick, and a wait for the next
     /// one's time -- until the client is gone.
     fn run(mut self, asked: &Receiver<Request>, answers: &Sender<Frame>) {

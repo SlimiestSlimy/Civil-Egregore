@@ -80,6 +80,6 @@ pub fn run() {
         .init_resource::<view::Sprites>()
         .init_resource::<overlays::Shown>()
         .add_systems(Startup, (view::spawn, frames::spawn, map::spawn, overlays::spawn, hud::spawn))
-        .add_systems(Update, (link::menus, world, hud::hud).chain().after(gui::Worked))
+        .add_systems(Update, (link::menus, link::shading, world, hud::hud).chain().after(gui::Worked))
         .run();
 }

@@ -35,7 +35,7 @@ The two share two queues and no memory.
 
 The window is the one that asks, never the host that sends: each
 time the window has shown a frame -- 60 times a second at most -- it
-sends the host the superchunks in view (`Request::Sync`), and the
+asks the host for the superchunks in view (`Host::sync`), and the
 host, between two ticks, answers with their cells as the last
 tick left them (a `Frame`). So the window sets how often the world is
 drawn; a window that falls behind slows no tick; one frame at most is
@@ -48,7 +48,10 @@ ever on its way; and what is not in view is never sent.
    sheep stand on. What is in view costs the ticks next to nothing,
    however much of it there is.
 2. **The painter** turns cells into pixels, lit by their height,
-   taking no time from the ticks or from the window's frames.
+   taking no time from the ticks or from the window's frames. The
+   shading the sliders set comes to it by a queue of its own, whenever
+   they change: the numbers are held by the window (`gui::CurrentTuning`)
+   and the painter's own copy, never in a static.
 3. **The window** shows the pixels, an image a superchunk.
 
 What is sent is what the cells are, not the writes that changed them: a
@@ -162,11 +165,12 @@ The main menu, the sliders at the window's top right and the options
 Escape opens are the `gui` crate's (`gui/docs/gui.md`), added to the
 window's app. The renderer leaves the pointer, the wheel and the keys
 to a menu that took them (`gui::Captured`), and tells the host what
-the menus say (`src/link.rs`): a world made (`Request::New`), the
-numbers it is made from read off the sliders then; one opened from the
-worlds' folder (`Request::Open`), run in place of the one run, hot in
+the menus say (`src/link.rs`): a world made (`Host::make_world`), the
+numbers it is made from read off the sliders then, and handed to the
+server to make sense of (`server::Start::from_tuning`); one opened from
+the worlds' folder (`Host::open_world`), run in place of the one run, hot in
 its halos, its ticks its own, the view put over it; the world run saved
-(`Request::Save`), on the host's thread between two ticks, under the
+(`Host::save_world`), on the host's thread between two ticks, under the
 name it was opened by or the one typed, how it is generated with it.
 What opening or saving came to is said on the first line of the text
 at the top left; a world that cannot be read is refused, and the world

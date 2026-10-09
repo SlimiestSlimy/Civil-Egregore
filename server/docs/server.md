@@ -9,7 +9,12 @@ and the renderer (`../renderer/`) call it.
 ## Made from a seed
 
 `start(options)`: the one way a world starts, from a `Start`
-`{seed, generation, size, threads, sheep}`. A world with a size has
+`{seed, generation, size, threads, sheep, hot_entity}`
+(`src/world_start.rs`) -- every number a world starts from, whoever
+gives it: the command line (`server new`), or a window's sliders
+(`Start::from_tuning`), the seed drawn with land about the origin if
+none is given (`drawn_seed`). What the numbers mean is the server's
+alone; a window only hands them over. A world with a size has
 sheep on every superchunk of it, and their halos -- the whole of it --
 hot before it ticks; or, forced hot, all of it hot throughout whatever
 they do. One with none has them on its origin superchunk
@@ -36,10 +41,11 @@ sequence a few draws apart -- two flocks came out with the same sheep.
 Only the superchunks about the hot entities are hot, and the halos are
 the simulation's (`../../simulation/docs/simulation.md`, "Halos"): the
 world lends them what it holds (`World::with_halos`) and tells them
-two things. The hot entity (`HOT_ENTITY`): people, to come; for now
-the sheep stand in. And the world's size, if it has one
+two things. The kind of entity it is hot about (`Start::hot_entity`,
+`HOT_ENTITY` unless told): people, to come; for now the sheep stand
+in, and a save keeps it. And the world's size, if it has one
 (`Start::size`, `Civil_Egregore server new <folder> [seed] [sheep]
-[side] [forced]`): so many superchunks along a side, a square about
+[side] [forced] [threads]`): so many superchunks along a side, a square about
 the origin, nothing ever made outside it -- and whether every one of
 them is forced hot throughout, which only a world with a side can be;
 a save keeps both. What generates a
@@ -124,9 +130,9 @@ save's folder.
 ## The host
 
 A world run for a window, on a thread of its own (`src/host/`): the
-window sends requests -- a world made or opened in place of the one
-run, the world saved, paused, paced, and the cells in view -- and the
-host reads them between ticks. It answers only the cells in view, as
+window holds a `Host` and calls it -- a world made or opened in place
+of the one run, the world saved, paused, paced, and the cells in view
+-- each call sent to the host's thread and done there between ticks. It answers only the cells in view, as
 the last tick left them, copied and nothing more, so what is in view
 costs the ticks next to nothing; it sends nothing unasked, so a window
 that falls behind slows no tick. It starts with no world, and waits
@@ -140,9 +146,10 @@ closed at any time leaves what it came to.
 | folder | what is in it |
 |---|---|
 | `src/lib.rs` | start, save, load |
+| `src/world_start.rs` | what a new world starts from: its size, its seed drawn with land, the sliders' numbers read |
 | `src/halos.rs` | the hot entity, and the world lent to the simulation's halos |
 | `src/tick.rs` | the tick of every rule and entity, then the halos moved |
-| `src/host/` | a world run on a thread of its own for a window: requests, frames, the census |
+| `src/host/` | a world run on a thread of its own for a window: the host's calls, frames, the census |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; the diagnostics tools |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
 | `tests/` | the halos follow their hot entities; a world of a size is hot within it only; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; the files; refusals |

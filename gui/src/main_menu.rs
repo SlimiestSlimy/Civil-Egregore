@@ -15,7 +15,7 @@
 
 use crate::rows::{self, Bar, Listing, Look, Row, Says, Shade};
 use crate::sliders::Sliders;
-use crate::{Make, Open, Screen};
+use crate::{CurrentTuning, Make, Open, Screen};
 use bevy::app::AppExit;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::AccumulatedMouseScroll;
@@ -114,6 +114,7 @@ pub fn work(
     mut menu: ResMut<MainMenu>,
     mut screen: ResMut<Screen>,
     sliders: Res<Sliders>,
+    tuning: Res<CurrentTuning>,
     keys: Res<ButtonInput<KeyCode>>,
     buttons: Res<ButtonInput<MouseButton>>,
     wheel: Res<AccumulatedMouseScroll>,
@@ -153,7 +154,7 @@ pub fn work(
         typed.clear();
     }
     if makes {
-        make.write(Make(menu.seed()));
+        make.write(Make { seed: menu.seed(), tuning: tuning.0 });
         *screen = Screen::World;
     }
     if shown && menu.page == Page::Worlds && !sliders.over(&window) {

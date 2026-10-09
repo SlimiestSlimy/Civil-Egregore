@@ -77,11 +77,7 @@ pub fn new(folder: &Path, rest: &[&str]) -> Result<String, String> {
     let seed = rest.first().map_or(Ok(1), |seed| utilities::seed::of_hex(seed).ok_or_else(|| format!("`{seed}` is not a seed: 64 bits, in hexadecimal")))?;
     let sheep = number(rest.get(1), crate::FLOCK as u64)? as usize;
     let forced = number(rest.get(3), 0)? != 0;
-    let size = match number(rest.get(2), 0)? as u32 {
-        0 if forced => return Err("only a world with a side can be forced hot".to_string()),
-        0 => crate::Size::Unlimited,
-        side => crate::Size::Limited { side, forced },
-    };
+    let size = crate::Size::of_side(number(rest.get(2), 0)? as u32, forced)?;
     let threads = Some(number(rest.get(4), 0)? as usize).filter(|&threads| threads > 0);
     let mut made = crate::start(crate::Start { seed, size, threads, sheep, ..crate::Start::default() });
     let saved = crate::save(folder, &mut made).map_err(|error| error.to_string())?;

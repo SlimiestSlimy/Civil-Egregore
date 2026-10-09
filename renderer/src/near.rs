@@ -3,7 +3,8 @@
 //! the border of the higher cell, light towards the sun and dark away,
 //! and under a wall a band on its lower cell, darkest at its foot --
 //! under the cast shadows
-//! ([`crate::ground`]). How strongly is `utilities::tuning`'s.
+//! ([`crate::ground`]). How strongly is the sliders' (`utilities::tuning`),
+//! as the painter was last sent them.
 //!
 //! Every pixel takes one edge's doing, never two multiplied: of the
 //! edges that darken it the darkest, and only if none does, of those
@@ -18,7 +19,7 @@
 use crate::ground::{shadow_drop, Fine, Ground, MARGIN, SIDE};
 use crate::paint::{depth_at, stage_at, tree_colour, under_water};
 use server::host::frame::{Cells, Near};
-use utilities::tuning::{self, Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
+use utilities::tuning::{Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
 use bitmap::BITS_PER_WORD;
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;
@@ -96,13 +97,12 @@ impl Edge {
 }
 
 /// The cells `near` asks for as one picture, from `cells` -- the
-/// superchunks they are in -- and their `grounds`. A cold superchunk,
-/// and one past the world shown, is black.
-pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: Near) -> PaintedNear {
+/// superchunks they are in -- and their `grounds`, shaded as `tuning`
+/// says. A cold superchunk, and one past the world shown, is black.
+pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: Near, tuning: &Tuning) -> PaintedNear {
     let pixels_a_cell = near.pixels_a_cell as usize;
     let (first, size) = ((near.first.0 as usize, near.first.1 as usize), (near.size.0 as usize, near.size.1 as usize));
     let width = size.0 * pixels_a_cell;
-    let tuning = tuning::now();
     let mut pixels = vec![[0, 0, 0, u8::MAX]; width * size.1 * pixels_a_cell];
     for cells in cells.iter().filter(|cells| cells.hot) {
         let Some(fine) = grounds.get(&cells.top_left).and_then(|ground| ground.fine.as_ref()) else {
@@ -117,7 +117,7 @@ pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: 
                 let (own_x, own_y) = (x - left, y - top);
                 let place = place_from_cartesian(own_x as u32, own_y as u32);
                 let grass = cells.grass[place / BITS_PER_WORD] >> (place % BITS_PER_WORD) & 1 == 1;
-                let cell = Cell { fine, tuning: &tuning, at: (own_x, own_y), world: (cells.top_left.0 as u64 + own_x as u64, cells.top_left.1 as u64 + own_y as u64), colour: if grass { GREEN } else { BROWN } };
+                let cell = Cell { fine, tuning, at: (own_x, own_y), world: (cells.top_left.0 as u64 + own_x as u64, cells.top_left.1 as u64 + own_y as u64), colour: if grass { GREEN } else { BROWN } };
                 let corner = ((x - first.0) * pixels_a_cell, (y - first.1) * pixels_a_cell);
                 let (word, bit) = (place / BITS_PER_WORD, (place % BITS_PER_WORD) as u32);
                 cell.paint(&mut pixels, width, corner, pixels_a_cell);

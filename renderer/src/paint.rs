@@ -22,6 +22,7 @@ use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::Instant;
+use utilities::tuning::Tuning;
 
 /// Dirt's colour.
 pub const BROWN: [u8; 3] = [116, 80, 46];
@@ -102,15 +103,20 @@ fn ground(grounds: &mut HashMap<(u32, u32), Ground>, frame: &Frame, number: u64)
 }
 
 /// Starts the painter's thread: every frame from `frames` painted, and
-/// sent on. It stops once either end is dropped.
-pub fn start(frames: Receiver<Frame>) -> Receiver<Picture> {
+/// sent on, shaded from near as the last of `tunings` says -- as the
+/// default settings do until one comes. It stops once either end is
+/// dropped.
+pub fn start(frames: Receiver<Frame>, tunings: Receiver<Tuning>) -> Receiver<Picture> {
     let (painted, pictures) = channel();
     thread::Builder::new()
         .name("painter".to_string())
         .spawn(move || {
-            let (mut grounds, mut world) = (HashMap::new(), 0);
+            let (mut grounds, mut world, mut tuning) = (HashMap::new(), 0, utilities::tuning::defaults());
             for (number, mut frame) in frames.into_iter().enumerate() {
                 let started = Instant::now();
+                if let Some(latest) = tunings.try_iter().last() {
+                    tuning = latest;
+                }
                 if frame.world != world {
                     // Another world: its ground is its own.
                     grounds.clear();
@@ -128,7 +134,7 @@ pub fn start(frames: Receiver<Frame>) -> Receiver<Picture> {
                         (true, None, detail) => Some(paint_far(cells, detail, &grounds[&cells.top_left])),
                     })
                     .collect();
-                let near = frame.near.map(|near| paint_near(&frame.cells, &grounds, near));
+                let near = frame.near.map(|near| paint_near(&frame.cells, &grounds, near, &tuning));
                 frame.cells = Vec::new();
                 let picture = Picture { frame, paint_seconds: started.elapsed().as_secs_f64(), superchunks, near };
                 if painted.send(picture).is_err() {

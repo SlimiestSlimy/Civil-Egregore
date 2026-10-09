@@ -83,7 +83,7 @@ superchunk not stored made flat); **`tail_superchunk`**,
 
 ## `disk.rs`
 
-**`WorldInfo`** `{seed, tick, layers, side, forced, generation}` -- `forced` only with a `side`, refused otherwise -- no name: a world's is its folder's --; **`DiskError`**: `Io(path,
+**`WorldInfo`** `{seed, tick, layers, side, forced, hot_entity, generation}` -- `forced` only with a `side`, refused otherwise; `hot_entity` a number, the runner knowing the kinds -- no name: a world's is its folder's --; **`DiskError`**: `Io(path,
 error)` or `Invalid(path, what)`. **`write_world(folder, info)`**,
 **`read_world(folder)`**; **`write_image(folder, superchunk,
 image)`**, **`read_image`**; **`write_state(folder, superchunk,
