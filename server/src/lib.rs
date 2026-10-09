@@ -150,7 +150,13 @@ pub fn start(options: Start) -> World {
         return world;
     }
     let on = if everywhere.is_empty() { vec![WORLD_MIDDLE] } else { everywhere };
-    flocked(world, &on, options.sheep)
+    let mut world = flocked(world, &on, options.sheep);
+    if world.info.camera_flock.is_some() {
+        // The halo about the starting flock is generated before the camera has seen anything: owed its flocks.
+        let owed: Vec<SuperchunkIndex> = world.entities.superchunks().iter().map(|kept| kept.index()).filter(|superchunk| !on.contains(superchunk)).collect();
+        world.owe_camera_flocks(&owed);
+    }
+    world
 }
 
 /// A world of `seed` with nothing in it yet, nothing hot, whose
@@ -164,7 +170,7 @@ pub fn generate_sized(generation: Generation, seed: u64, size: Size, hot_entity:
         Size::Unlimited => (None, false),
         Size::Limited { side, forced } => (Some(side), forced),
     };
-    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, forced, hot_entity: Some(hot_entity.0), camera_flock: None, generation: generation.numbers() }, generation, threads)
+    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, forced, hot_entity: Some(hot_entity.0), camera_flock: None, without_camera_flock: Vec::new(), generation: generation.numbers() }, generation, threads)
 }
 
 /// `world`, nothing in it yet, with a flock of `sheep` on each of

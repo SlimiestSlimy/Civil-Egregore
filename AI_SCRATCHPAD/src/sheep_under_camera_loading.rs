@@ -15,6 +15,10 @@ pub const SHEEP_A_SUPERCHUNK: &str = "sheep a superchunk";
 /// Superchunks along the side of the viewport asked for.
 pub const VIEWPORT_SIDE: &str = "viewport side";
 
+/// Ticks waited before the sheep are counted: the camera's superchunks
+/// are given their flocks as the halos move, a tick after they are asked.
+const TICKS_FOR_THE_CAMERA_TO_LOAD: u64 = 16;
+
 /// Runs the probe: a line a hot superchunk of the viewport, once every
 /// one of it is hot.
 pub fn run(given: &Given) -> Result<(), String> {
@@ -26,7 +30,7 @@ pub fn run(given: &Given) -> Result<(), String> {
     let viewport = Viewport { first, last: (first.0 + viewport_side.max(1) - 1, first.1 + viewport_side.max(1) - 1) };
     let (host, frames) = Host::start();
     host.make_world(Start::from_tuning(seed(given)?, &tuning));
-    let frame = frame_that(&host, &frames, Some(viewport), |frame| frame.hot.len() as u32 >= viewport_side * viewport_side && frame.cells.len() == frame.hot.len())?;
+    let frame = frame_that(&host, &frames, Some(viewport), |frame| frame.tick >= TICKS_FOR_THE_CAMERA_TO_LOAD && frame.hot.len() as u32 >= viewport_side * viewport_side && frame.cells.len() == frame.hot.len())?;
     println!("# seed {}, tick {}, {} sheep in the world", utilities::seed::hex(frame.seed), frame.tick, frame.sheep);
     println!("superchunk x,superchunk y,sheep");
     for cells in &frame.cells {
