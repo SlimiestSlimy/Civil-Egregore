@@ -47,17 +47,17 @@
 //! world as the tick found it: two sheep may eat one cell in a tick,
 //! which then changes once.
 
-use bitplane_manager::BitmapArena;
-use chunk_storage::mock::GRASS;
-use coordinates::{CellCartesian, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use instructions::handed_on::BitmapArena;
+use instructions::handed_on::GRASS;
+use instructions::handed_on::{CellCartesian, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use instructions::around::{self, CENTRE, RING};
 use instructions::{read, write};
 use instructions::{Simulation, TickReport, Turn};
-use worldgen::{WALL_EAST, WALL_SOUTH};
-use entity_manager::{Attribute, AttributeType, EntityEdit, EntityRef, Entities, EntityId, EntityType, Header};
+use instructions::handed_on::{WALL_EAST, WALL_SOUTH};
+use instructions::handed_on::{Attribute, AttributeType, EntityEdit, EntityRef, Entities, EntityId, EntityType, Header};
 use std::collections::HashSet;
 use std::ops::AddAssign;
-use utilities::rng::Rng;
+use instructions::handed_on::Rng;
 
 /// The sheep's type.
 pub const SHEEP: EntityType = EntityType(16);

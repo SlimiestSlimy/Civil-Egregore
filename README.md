@@ -39,6 +39,7 @@ sliders its generation is tuned by.
 | [`simulation/`](simulation/) | the simulation: Monte Carlo sampling, the two-phase tick and its outboxes, a superchunk's turn -- a bucket a chunk, a timer wheel a superchunk; and what is hot: the halos about the hot entities, warming and cooling by the tick, within the world's size if it has one |
 | [`bitplane_manager/`](bitplane_manager/) | the hot bitplanes: layers decoded into the bitmap arena, where cells are read and written -- writes batched -- and written back; planes of one bit a cell, or 2, 4, 8 or 16 |
 | [`tessera/`](tessera/) | Tessera, the lossless encoding of a 256x256 bitmap: a project of its own, with its own [README](tessera/README.md), tests, tools and docs |
+| [`AI_SCRATCHPAD/`](AI_SCRATCHPAD/) | the AI's own probes of a running world, used while working on the code: no part of the program, and nothing depends on it |
 | [`bitmap/`](bitmap/) | the 256x256 bitmap every layer is, laid out in Morton order |
 | [`utilities/`](utilities/) | general-purpose utilities: the thread dispatcher, commands and their parameters, the one seed tests and tools run on, the table printer and measurement reports, a seeded random source, a fixed-capacity list, the process's memory; and the settings: Civil Egregore's one folder on a machine, the file of what is changed there, the defaults written by hand in `utilities/default_settings.csv`, and a world's folder from its name |
 
@@ -89,7 +90,7 @@ on `bitmap/`; `chunk_storage/` on those and Tessera;
 `bitplane_manager/` and `entity_manager/`; `instructions/` on
 `simulation/`, `pathfinding/` and `worldgen/`, which know nothing of
 one another and meet there; the rules, `mc_rules/` and `entity_rules/`,
-on `instructions/`, through which alone they reach the
+on `instructions/` alone, through which they reach the
 simulation; `worldgen/` on `chunk_storage/` and
 `coordinates/`; `server/` on the rules, the entities and `worldgen/`;
 the program, `src/`, on `server/` and Tessera; `gui/` on `utilities/`

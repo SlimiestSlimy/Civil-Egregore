@@ -8,18 +8,18 @@ use std::time::Duration;
 use utilities::tuning::{defaults, OCEAN_FLOOR};
 use worldgen::Generation;
 
-/// The first frame the host answers with that `wanted` takes, asking
-/// again each second, for a minute at most.
+/// The first frame the host answers with that `wanted` takes. Each
+/// asked after what was called before it, so the host answers as soon
+/// as it has done that: waited for as long as a slow machine may take
+/// to make a world, never counted in tries.
 fn frame_that(host: &Host, frames: &Receiver<Frame>, wanted: impl Fn(&Frame) -> bool) -> Frame {
-    for _ in 0..60 {
+    loop {
         assert!(host.sync(Ask { viewport: None, detail: 0, skip: 0, most: 0, near: None }), "the host is there");
-        if let Ok(frame) = frames.recv_timeout(Duration::from_secs(1))
-            && wanted(&frame)
-        {
+        let frame = frames.recv_timeout(Duration::from_secs(1800)).expect("a frame of the world made");
+        if wanted(&frame) {
             return frame;
         }
     }
-    panic!("no such frame in a minute");
 }
 
 /// A world reset with another generation: made again from its start

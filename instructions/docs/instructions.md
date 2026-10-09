@@ -16,10 +16,13 @@ no further. Everything a rule would otherwise write for itself is
 here, once: a query is a plain call that reads the turn and answers in
 the rule's terms, a change one that queues what carries least.
 
-A rule reaches the simulation through instructions alone: `Turn`,
-`Simulation` and `TickReport` are handed on from here, and the rules'
-crates do not depend on the simulation. What a rule lacks is added
-here, not gone round.
+A rule depends on the instructions and on nothing else: its crate
+names no other in its `Cargo.toml`. `Turn`, `Simulation` and
+`TickReport` are handed on from here, and so is what the crates under
+the instructions have that a rule names (`handed_on`): where a cell and
+an entity are, what a layer and an attribute are, the world a rule is
+ticked on, the lot it draws. What a rule lacks is added here, not gone
+round.
 
 Instructions are kept by what they do to the world: those that only
 read it in `read/`, those that only queue a change in `write/`; one

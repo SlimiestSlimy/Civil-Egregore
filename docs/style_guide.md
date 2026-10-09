@@ -54,7 +54,9 @@ reader has to wonder whether something is missing or was never needed
 - **`utilities/` is the shared top folder.** Code that two crates need
   goes there, once (#2). It is never copied into both.
 - A crate depends only on the crates below it. The README lists the
-  order.
+  order. The rules' crates (`entity_rules`, `mc_rules`) depend on
+  `instructions` alone. Nothing depends on `AI_SCRATCHPAD`, the AI's
+  own probes, which is no part of the program.
 
 ## One word for one thing
 

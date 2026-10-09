@@ -2,13 +2,13 @@
 //! each of dirt with grass scattered on it, every chunk of both hot --
 //! and, if asked, a flock of sheep on each.
 
-use bitplane_manager::BitmapArena;
-use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
-use chunk_storage::{ChunkStorage, LayerCodec};
-use coordinates::{square_from_middle, SuperchunkIndex};
+use instructions::handed_on::BitmapArena;
+use instructions::handed_on::{grass_on_dirt, DIRT, GRASS};
+use instructions::handed_on::{ChunkStorage, LayerCodec};
+use instructions::handed_on::{square_from_middle, SuperchunkIndex};
 use crate::sheep::{flock, SHEEP};
-use entity_manager::Entities;
-use utilities::rng::Rng;
+use instructions::handed_on::Entities;
+use instructions::handed_on::Rng;
 
 /// A mock world: its hot bitmaps, its storage, and its superchunks.
 pub struct MockWorld {

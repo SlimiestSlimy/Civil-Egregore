@@ -42,6 +42,7 @@ members = [
     "utilities",
     "renderer",
     "server",
+    "AI_SCRATCHPAD",
 ]
 
 default-members = [

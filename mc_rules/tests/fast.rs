@@ -10,11 +10,11 @@ mod grass {
     //!
     //! `cargo test`
 
-    use bitplane_manager::{BitmapArena, Shape, Write, WriteOp};
-    use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
-    use chunk_storage::{ChunkStorage, LayerCodec};
-    use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
-    use entity_manager::Entities;
+    use instructions::handed_on::{BitmapArena, Shape, Write, WriteOp};
+    use instructions::handed_on::{grass_on_dirt, DIRT, GRASS};
+    use instructions::handed_on::{ChunkStorage, LayerCodec};
+    use instructions::handed_on::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
+    use instructions::handed_on::Entities;
     use instructions::Simulation;
     use mc_rules::grass::{tick, DECAY_CHANCE, SPREAD_CHANCE};
 
