@@ -60,9 +60,9 @@ what they always do and are not listed.
 | **hot** | a layer decoded in the bitmap arena, read and written; a superchunk is hot when its layers are -- when a halo covers it and it is done warming, or while it is cooling. The simulation ticks the hot superchunks only | cold, arena, halo | held, loaded |
 | **cold** | a layer kept encoded in chunk storage, not readable cell by cell; a superchunk no halo covers, its layers so and its entities kept as its cold state | hot, image, cold state | |
 | **halo** | the 3x3 superchunks about a hot entity -- its own and the eight beside it -- kept hot (`simulation::halos`) | hot entity, hot | halo chunk |
-| **hot entity** | an entity of the kind that keeps a halo (`simulation::Hot::entity`; the server's `HOT_ENTITY`): people, to come; the sheep, for now | halo, forced hot | halo keeper, important entity, chunk loader |
-| **forced hot** | superchunks hot with no hot entity keeping them so: every one of a world with a size, or those the world's holder makes hot (`Hot::entity` none) | hot entity, world's size | |
-| **world's size** | so many superchunks along a side, a square about the origin, nothing ever hot or made outside it (`Hot::side`); a world with none goes as far as coordinates reach | origin, halo | bounds, border, limit |
+| **hot entity** | an entity of the kind that keeps a halo (`simulation::Hot::About`; the server's `HOT_ENTITY`): people, to come; the sheep, for now | halo, forced hot | halo keeper, important entity, chunk loader |
+| **forced hot** | every superchunk of a world with a size hot throughout, no hot entity keeping them so (`Hot::Forced`); a world with none cannot be | hot entity, world's size | |
+| **world's size** | so many superchunks along a side, a square about the origin, nothing ever hot or made outside it (`Hot::side()`); a world with none goes as far as coordinates reach | origin, halo | bounds, border, limit |
 | **origin** | the superchunk the world starts from, in its middle (`WORLD_MIDDLE`): a world is generated as it and its halo | superchunk | centre |
 | **cold state** | a cold superchunk's entities and random numbers, kept as a save keeps them (`World::cold`) | cold, save | |
 | **lingering** | a superchunk gone cold, done cooling -- to the simulation, cold like any other -- whose bitmaps the arena keeps as they were, until chunk storage holds its changes -- made hot again as it is if a halo reaches it before then (`BitmapArena::make_cold_superchunk`) | cold, warming, write back | |
@@ -81,7 +81,7 @@ what they always do and are not listed.
 | **cold pool** | chunk storage's superchunk images, one per superchunk stored. Never "pool" alone | image | |
 | **image** | one superchunk as stored, one run of words, in memory as on disk: its height map and every chunk's encoded layers (`SuperchunkImage`) | chunk storage, save | |
 | **height map** | a superchunk's heights: a floor a chunk, a byte a cell over it, and a tall chunk's 16 bits a cell (`HeightMap`) | height, floor, tall chunk | |
-| **map** | the renderer's picture of the world from farther than its cells are drawn from: each pixel the cell in its middle as generated, nothing of the simulation read (`renderer/src/map.rs`) | detail, lab | overview, minimap |
+| **map** | the renderer's picture of the world from farther than its cells are drawn from: each pixel the cell in its middle as generated, nothing of the simulation read (`renderer/src/map.rs`) | detail | overview, minimap |
 | **mesh** | the land's shape: vertices joined by lines into triangles (`worldgen::mesh`) | vertex, line | polygons, Voronoi |
 | **vertex** | a point of the mesh, one to each square of a grid: ocean, or land at a height of its own | mesh, line | site, node |
 | **line** (the mesh's) | what joins two vertices and says how their heights are blended | blend, sigmoidness | edge, border |

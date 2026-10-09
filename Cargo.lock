@@ -4224,14 +4224,11 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bitmap",
- "bitplane_manager",
  "chunk_storage",
  "coordinates",
- "entity_rules",
  "gui",
  "mc_rules",
  "server",
- "simulation",
  "utilities",
  "worldgen",
 ]

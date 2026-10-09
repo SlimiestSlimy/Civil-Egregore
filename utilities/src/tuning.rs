@@ -1,20 +1,17 @@
-//! What is tuned by eye: the numbers the window's sliders
-//! ([`crate::sliders`]) set, in groups -- the near view's shading,
-//! which a painter reads each frame, and in the lab how the world is
-//! generated, its seed drawn again among them ([`reseed`]) -- with no
-//! lock between them.
+//! What is tuned by eye: the numbers a window's sliders set, in
+//! groups -- the near view's shading, which a painter reads each frame,
+//! and how a new world is made ([`Group::makes_worlds`]), read once
+//! when one is -- with no lock between them.
 //!
 //! Only their names and places are here. What a slider reaches, its
 //! group and what it does are in the sliders' file (`sliders.csv`, at
 //! the crate's root), written by hand; what each number is unless set
-//! is in the default settings (`utilities::settings`), and what it was
+//! is in the default settings ([`crate::settings`]), and what it was
 //! last set to is kept in the machine's, a line each.
 
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use crate::settings::Settings;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::OnceLock;
-use std::time::{SystemTime, UNIX_EPOCH};
-use utilities::hash::mix;
-use utilities::settings::Settings;
 
 /// One number to tune, as the sliders' file has it.
 pub struct Tuned {
@@ -37,6 +34,8 @@ pub struct Tuned {
 pub enum Group {
     /// The near view's shading.
     Shading,
+    /// The world's size, whether it is forced hot, and its sheep.
+    World,
     /// The ocean and the land: their levels and their shares.
     Land,
     /// The mesh's lines: how they are blended and bent.
@@ -47,30 +46,29 @@ pub enum Group {
     Grass,
     /// The trees a world starts with.
     Trees,
-    /// The sheep a world starts with.
-    Sheep,
 }
 
 /// The groups, in the order the menu lists them.
-pub const GROUPS: [Group; 7] = [Group::Shading, Group::Land, Group::Lines, Group::Finer, Group::Grass, Group::Trees, Group::Sheep];
+pub const GROUPS: [Group; 7] = [Group::Shading, Group::World, Group::Land, Group::Lines, Group::Finer, Group::Grass, Group::Trees];
 
 impl Group {
     /// Its name, as the menu has it.
     pub const fn name(self) -> &'static str {
         match self {
             Self::Shading => "shading",
+            Self::World => "world",
             Self::Land => "ocean and land",
             Self::Lines => "mesh lines",
             Self::Finer => "finer meshes",
             Self::Grass => "grass",
             Self::Trees => "trees",
-            Self::Sheep => "sheep",
         }
     }
 
-    /// Whether it is shown only in the lab: every group but the near
-    /// view's shading, which always is.
-    pub const fn lab_only(self) -> bool {
+    /// Whether it says how a new world is made: read when one is, and
+    /// shown only while one is being set up. Every group but the near
+    /// view's shading, which is shown while a world runs.
+    pub const fn makes_worlds(self) -> bool {
         !matches!(self, Self::Shading)
     }
 }
@@ -130,6 +128,8 @@ places! {
     TREE_DETAIL "tree patch detail",
     TREE_SCATTER "tree scatter",
     WALL_LENGTH "wall length",
+    WORLD_SIDE "world side",
+    FORCED_HOT "forced hot",
     SHEEP "sheep a superchunk",
 }
 
@@ -143,7 +143,7 @@ pub fn tuned(index: usize) -> &'static Tuned {
     static TUNED: OnceLock<[Tuned; NAMES.len()]> = OnceLock::new();
     &TUNED.get_or_init(|| {
         // Read once and kept as long as the program runs: what a slider does is said from it.
-        let rows: &'static [Vec<String>] = utilities::csv::rows_named(SLIDERS).leak();
+        let rows: &'static [Vec<String>] = crate::csv::rows_named(SLIDERS).leak();
         NAMES.map(|name| {
             let (line, row) = rows.iter().enumerate().find(|(_, row)| row[0] == name).expect("every number has a row in the sliders' file");
             let [_, least, most, group, what] = &row[..] else {
@@ -153,39 +153,6 @@ pub fn tuned(index: usize) -> &'static Tuned {
             Tuned { name, line, range: (range[0], range[1]), group: GROUPS.into_iter().find(|listed| listed.name() == group).expect("a slider's group is one of the groups"), what }
         })
     })[index]
-}
-
-/// Counts the changes to how the world is generated: what was made
-/// under an earlier count is made again. Not a generation itself --
-/// `server::Generation`, the recipe -- only a count of when one last
-/// changed.
-static REVISION: AtomicU64 = AtomicU64::new(0);
-
-/// How many times how the world is generated has changed.
-pub fn revision() -> u64 {
-    REVISION.load(Ordering::Relaxed)
-}
-
-/// Says that how the world is generated has changed.
-pub fn revise() {
-    REVISION.fetch_add(1, Ordering::Relaxed);
-}
-
-/// The seed drawn last, 0 while none was.
-static SEED_DRAWN: AtomicU64 = AtomicU64::new(0);
-
-/// The seed drawn last ([`reseed`]), 0 while none was: the world is
-/// then generated from the run's own.
-pub fn seed_drawn() -> u64 {
-    SEED_DRAWN.load(Ordering::Relaxed)
-}
-
-/// Draws a new seed, off the clock, never 0: the world is to be
-/// generated again.
-pub fn reseed() {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |since| since.as_nanos() as u64);
-    SEED_DRAWN.store(mix(now).max(1), Ordering::Relaxed);
-    revise();
 }
 
 /// The numbers as they are now, each a float's bits.
@@ -219,13 +186,10 @@ pub fn now() -> Tuning {
 }
 
 /// Sets the `index`-th number -- to anything: its range is only what
-/// its slider reaches, and a value typed may pass it. The world is to
-/// be generated again if it is one of generation's and has changed.
+/// its slider reaches, and a value typed may pass it.
 pub fn set(index: usize, value: f32) {
     let bits = if value.is_finite() { value } else { unless_set(index) }.to_bits();
-    if VALUES[index].swap(bits, Ordering::Relaxed) != bits {
-        revise();
-    }
+    VALUES[index].store(bits, Ordering::Relaxed);
 }
 
 /// Keeps the numbers for the next run, in the machine's settings:

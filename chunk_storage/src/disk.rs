@@ -176,6 +176,9 @@ pub struct WorldInfo {
     /// Superchunks along a side of it, if it has a size: a square
     /// about its origin, nothing ever made outside it.
     pub side: Option<u32>,
+    /// Whether every superchunk of it is hot throughout, whatever its
+    /// entities do: only one with a size can be.
+    pub forced: bool,
     /// How it is generated: numbers, each with its name, kept for
     /// whoever generates it, who knows what they mean.
     pub generation: Vec<(String, u64)>,
@@ -194,6 +197,7 @@ impl WorldInfo {
             ("layers".to_string(), layers.join(" ")),
         ];
         rows.extend(self.side.map(|side| ("side".to_string(), side.to_string())));
+        rows.extend(self.forced.then(|| ("forced".to_string(), "1".to_string())));
         rows.extend(self.generation.iter().map(|(name, value)| (format!("{GENERATION}{name}"), value.to_string())));
         csv::row(&WORLD_COLUMNS) + &rows.iter().map(|(name, is)| csv::row(&[name, is])).collect::<String>()
     }
@@ -204,7 +208,7 @@ impl WorldInfo {
         if rows.next().is_none_or(|columns| columns != WORLD_COLUMNS) || rows.next().is_none_or(|format| format != [FORMAT.0, FORMAT.1]) {
             return Err(format!("does not start with `{}` and `{},{}`", WORLD_COLUMNS.join(","), FORMAT.0, FORMAT.1));
         }
-        let (mut seed, mut tick, mut layers, mut side, mut generation) = (None, None, None, None, Vec::new());
+        let (mut seed, mut tick, mut layers, mut side, mut forced, mut generation) = (None, None, None, None, false, Vec::new());
         for row in rows {
             let [key, value] = &row[..] else {
                 return Err(format!("`{}` is not a name and what it is", row.join(",")));
@@ -216,12 +220,16 @@ impl WorldInfo {
                 "tick" => tick = Some(number()?),
                 "layers" => layers = Some(value.split_whitespace().map(|layer| layer.parse().map(LayerType).map_err(|_| format!("`{layer}` is not a layer type"))).collect::<Result<Vec<_>, _>>()?),
                 "side" => side = Some(value.parse().map_err(|_| format!("`{value}` is not a side"))?),
+                "forced" => forced = number()? != 0,
                 _ if key.starts_with(GENERATION) => generation.push((key[GENERATION.len()..].to_string(), number()?)),
                 // A name of another format: passed over.
                 _ => {}
             }
         }
-        Ok(Self { seed: seed.ok_or("no seed")?, tick: tick.ok_or("no tick")?, layers: layers.ok_or("no layers")?, side, generation })
+        if forced && side.is_none() {
+            return Err("forced hot, with no side to be hot to".to_string());
+        }
+        Ok(Self { seed: seed.ok_or("no seed")?, tick: tick.ok_or("no tick")?, layers: layers.ok_or("no layers")?, side, forced, generation })
     }
 }
 

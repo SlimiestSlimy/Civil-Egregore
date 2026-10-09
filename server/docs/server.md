@@ -9,17 +9,22 @@ and the renderer (`../renderer/`) call it.
 ## Made from a seed
 
 `start(options)`: the one way a world starts, from a `Start`
-`{seed, generation, side, flock}`. Unless told otherwise
-(`Start::default`), it starts as its origin superchunk (`WORLD_MIDDLE`)
-with a flock on it, and the eight about it -- the flock's halo -- all
-hot before it ticks. Every superchunk's contents come from the world's seed
+`{seed, generation, size, threads, sheep}`. A world with a size has
+sheep on every superchunk of it, and their halos -- the whole of it --
+hot before it ticks; or, forced hot, all of it hot throughout whatever
+they do. One with none has them on its origin superchunk
+(`WORLD_MIDDLE`) alone, as sheep everywhere would keep the whole of an
+endless world hot: the origin and the eight about it hot before it
+ticks. Unless told otherwise (`Start::default`), it has no size and
+4,000 sheep. Every superchunk's contents come from the world's seed
 and its superchunk index (`generate_image`), so a superchunk is the
 same whenever and in whatever order it is made: the world has no edge
 but the coordinates', and grows as the sheep wander. A superchunk is
 its terrain (`../worldgen/`) -- heights, and the walls they make, four
 layers -- and on it grass in patches, dirt being a cell with none and
 having no layer, and trees in patches of
-their own, each of a stage drawn for its cell (`Generation`, `patches`).
+their own, each of a stage drawn for its cell (`worldgen::Generation`,
+`worldgen::patches`).
 
 Each superchunk's random numbers are a stream of their own
 (`Rng::for_stream`): seeded by the seed moved along by the
@@ -33,9 +38,11 @@ the simulation's (`../../simulation/docs/simulation.md`, "Halos"): the
 world lends them what it holds (`World::with_halos`) and tells them
 two things. The hot entity (`HOT_ENTITY`): people, to come; for now
 the sheep stand in. And the world's size, if it has one
-(`Start::side`, `Civil_Egregore server new <folder> [seed] [sheep]
-[side]`): so many superchunks along a side, a square about the origin,
-nothing ever made outside it; a save keeps it. What generates a
+(`Start::size`, `Civil_Egregore server new <folder> [seed] [sheep]
+[side] [forced]`): so many superchunks along a side, a square about
+the origin, nothing ever made outside it -- and whether every one of
+them is forced hot throughout, which only a world with a side can be;
+a save keeps both. What generates a
 superchunk never made is the server's, handed to the halos' jobs.
 
 ## TickCounts
@@ -114,6 +121,20 @@ says the bytes written).
 Not yet: superchunks no longer in the world are not removed from a
 save's folder.
 
+## The host
+
+A world run for a window, on a thread of its own (`src/host/`): the
+window sends requests -- a world made or opened in place of the one
+run, the world saved, paused, paced, and the cells in view -- and the
+host reads them between ticks. It answers only the cells in view, as
+the last tick left them, copied and nothing more, so what is in view
+costs the ticks next to nothing; it sends nothing unasked, so a window
+that falls behind slows no tick. It starts with no world, and waits
+until asked for one. As a world runs it keeps a census -- the flock and
+the grass every 1,000 ticks, the seconds and the pace held -- in
+`transient_data/measurements/census.csv`, written as it goes, so a run
+closed at any time leaves what it came to.
+
 ## Layout
 
 | folder | what is in it |
@@ -121,7 +142,7 @@ save's folder.
 | `src/lib.rs` | start, save, load |
 | `src/halos.rs` | the hot entity, and the world lent to the simulation's halos |
 | `src/tick.rs` | the tick of every rule and entity, then the halos moved |
-| `src/patches.rs` | how grass and trees lie in patches when a superchunk is made |
+| `src/host/` | a world run on a thread of its own for a window: requests, frames, the census |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; the diagnostics tools |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
 | `tests/` | the halos follow their hot entities; a world of a size is hot within it only; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; the files; refusals |

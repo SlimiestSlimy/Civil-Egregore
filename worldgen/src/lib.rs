@@ -5,7 +5,8 @@
 //! or down, more than [`STEP`] apart in height cannot be stepped
 //! between ([`Terrain`]). A diagonal step has no wall of its own: it is
 //! open only when both ways round it, across then down and down then
-//! across, are. And how what grows on it lies ([`patches`]).
+//! across, are. How what grows on it lies ([`patches`]), and how a
+//! world is generated as a whole ([`generation`]).
 //!
 //! The design: `docs/worldgen.md`; function by function:
 //! `docs/reference.md`.
@@ -17,8 +18,11 @@
 pub mod diagnostics;
 pub mod transient_data;
 
+pub mod generation;
 pub mod mesh;
 pub mod patches;
+
+pub use generation::{has_land_about, seed_with_land, Generation, Growth, TREES_SALT};
 
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{Height, HeightMap, LayerType};

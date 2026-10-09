@@ -26,7 +26,7 @@ const FORCED: &str = "forced";
 pub const COMMANDS: [Command; 5] = [
     Command {
         name: "new",
-        does: "makes a world from a seed, a flock on its origin, and saves it in the folder; so many superchunks along a side, or 0 for as far as it goes; forced hot throughout if told, else about the flock's halo; on so many threads, or every one the machine has if 0",
+        does: "makes a world from a seed and saves it in the folder: so many superchunks along a side, or 0 for as far as it goes; so many sheep on every superchunk of a world with a side, on its origin of one without; forced hot throughout if told -- only with a side -- else about the sheep's halos; on so many threads, or every one the machine has if 0",
         parameters: &[Parameter::new(FOLDER, ""), Parameter::new("seed", "1"), Parameter::new("sheep", ""), Parameter::new("side", "0"), Parameter::new(FORCED, "0"), Parameter::new(THREADS, "0")],
         run: |given| printed(given, new),
     },
@@ -64,20 +64,26 @@ fn number(argument: Option<&&str>, default: u64) -> Result<u64, String> {
     argument.map_or(Ok(default), |argument| argument.parse().map_err(|_| format!("`{argument}` is not a number")))
 }
 
-/// Makes a world from a seed, a flock on its origin, and saves it in
-/// `folder`: of a size if given a side, in superchunks, that is not 0;
-/// forced hot throughout if `forced` is not 0, else about the flock's
-/// halo; on `threads` threads, every one the machine has if 0.
+/// Makes a world from a seed and saves it in `folder`: of a size if
+/// given a side, in superchunks, that is not 0; its sheep on every
+/// superchunk of it, or on its origin if it has no size; forced hot
+/// throughout if `forced` is not 0 -- only with a side -- else about
+/// the sheep's halos; on `threads` threads, every one the machine has
+/// if 0.
 pub fn new(folder: &Path, rest: &[&str]) -> Result<String, String> {
     if folder.join(disk::WORLD_FILE).exists() {
         return Err(format!("{} is a world already", folder.display()));
     }
     let seed = rest.first().map_or(Ok(1), |seed| utilities::seed::of_hex(seed).ok_or_else(|| format!("`{seed}` is not a seed: 64 bits, in hexadecimal")))?;
     let sheep = number(rest.get(1), crate::FLOCK as u64)? as usize;
-    let side = Some(number(rest.get(2), 0)? as u32).filter(|&side| side > 0);
     let forced = number(rest.get(3), 0)? != 0;
+    let size = match number(rest.get(2), 0)? as u32 {
+        0 if forced => return Err("only a world with a side can be forced hot".to_string()),
+        0 => crate::Size::Unlimited,
+        side => crate::Size::Limited { side, forced },
+    };
     let threads = Some(number(rest.get(4), 0)? as usize).filter(|&threads| threads > 0);
-    let mut made = crate::start(crate::Start { seed, side, forced, threads, flock: crate::Flock::On(vec![coordinates::WORLD_MIDDLE], sheep), ..crate::Start::default() });
+    let mut made = crate::start(crate::Start { seed, size, threads, sheep, ..crate::Start::default() });
     let saved = crate::save(folder, &mut made).map_err(|error| error.to_string())?;
     Ok(format!("{}, seed {}: {} superchunks, {} entities, {} bytes in {}", name(folder), utilities::seed::hex(seed), saved.superchunks, saved.entities, saved.bytes, folder.display()))
 }

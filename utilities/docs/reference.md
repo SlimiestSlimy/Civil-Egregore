@@ -106,7 +106,7 @@ there is and what it is unless changed, built into the program.
 **`Settings`**: a name and a value a row, under `setting,value` -- **`defaults()`**,
 **`read()`** (the machine's file, given a copy of the default settings
 if it has none, and the default ones for what it lacks; the default
-ones alone under the feature `default_settings`),
+ones alone under the feature `force_default_settings`),
 **`read_or_start(path)`** (the same of any file), **`read_from(path)`**
 (a file's lines and no more), **`get(name)`**, **`number::<T>(name)`**,
 **`set(name, value)`** (none takes the line out), **`write()`**,
@@ -116,3 +116,18 @@ set; **`world(named)`**, **`world_in(worlds, named)`**: where a world
 is kept -- a plain name in the worlds' folder, anything more a path;
 **`world_name(given)`**: a world's name as a folder may have it on
 Windows and Linux alike.
+
+## `tuning.rs`
+
+`NAMES`: the numbers' names, each at its place, and the places
+(`STEP_LIGHT` ... `SHEEP`), by **`places!`**. **`Tuned`** `{name,
+line, range, group, what}` -- `what` the tooltip -- and
+**`tuned(index)`**: a number as the sliders' file (`sliders.csv`, at
+the crate's root) has it. **`Group`**: `Shading`, `World`, `Land`,
+`Lines`, `Finer`, `Grass`, `Trees` (`GROUPS`, in the menu's order, the
+one that makes no worlds first), **`name()`** and
+**`makes_worlds()`** -- every group but shading. **`Tuning`**: the
+numbers read together. **`unless_set(index)`**: what a number is
+unless set, from the default settings. **`start()`**: what the
+machine's settings have. **`now()`**, **`set(index, value)`**,
+**`keep()`**: the numbers written to the machine's settings.

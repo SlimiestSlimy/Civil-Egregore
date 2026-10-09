@@ -15,6 +15,7 @@
 pub mod commands;
 pub mod diagnostics;
 pub mod halos;
+pub mod host;
 mod tick;
 pub mod transient_data;
 
@@ -26,13 +27,10 @@ pub use tick::{tick_rules, TickCounts, WorldTick};
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
 use chunk_storage::{ChunkMaps, ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
-use worldgen::{Shape, Terrain, WALLS, WET};
+use worldgen::{Generation, Terrain, WALLS, WET};
 use chunk_storage::mock::GRASS;
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
 use mc_rules::trees::{OLDEST, TREE, TREE_STAGE};
-use worldgen::patches::Patches;
-use worldgen::ONE;
-use utilities::hash::mix;
 use entity_rules::sheep::flock;
 use entity_manager::{saved, Entities};
 use simulation::{Halos, Hot, Simulation};
@@ -42,85 +40,6 @@ use std::sync::Arc;
 use utilities::dispatcher::Dispatcher;
 use utilities::rng::Rng;
 
-/// How superchunks are generated: the heights' shape, and how the
-/// grass and the trees lie on them. Saved with a world, a number a
-/// line ([`Generation::numbers`]): one loaded goes on as it was made.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Generation {
-    /// The heights' shape.
-    pub shape: Shape,
-    /// How the grass lies.
-    pub grass: Patches,
-    /// How the trees lie.
-    pub trees: Patches,
-}
-
-/// Gives [`Generation`] its numbers by name: read out, and put back.
-macro_rules! numbers {
-    ($($name:literal => $($field:ident).+,)*) => {
-        impl Generation {
-            /// Its numbers, each with its name: as a world's file keeps them.
-            pub fn numbers(&self) -> Vec<(String, u64)> {
-                vec![$(($name.to_string(), u64::from(self.$($field).+))),*]
-            }
-
-            /// As `numbers` say, each by its name: one not among them
-            /// as in [`Generation::DEFAULT`], one not known passed over.
-            pub fn of_numbers(numbers: &[(String, u64)]) -> Self {
-                let mut generation = Self::DEFAULT;
-                for (name, value) in numbers {
-                    match name.as_str() {
-                        $($name => generation.$($field).+ = *value as _,)*
-                        _ => {}
-                    }
-                }
-                generation
-            }
-        }
-    };
-}
-
-numbers! {
-    "ocean floor" => shape.ground,
-    "ocean level" => shape.ocean,
-    "vertex spacing" => shape.span,
-    "ocean share" => shape.sea,
-    "highest land" => shape.highest,
-    "clumping" => shape.clumping,
-    "coast breadth" => shape.coast,
-    "coast lowness" => shape.coast_low,
-    "narrowest blend" => shape.narrow,
-    "widest blend" => shape.wide,
-    "least sigmoid" => shape.soft,
-    "most sigmoid" => shape.hard,
-    "line bending" => shape.warp,
-    "finer mesh depth" => shape.finer_depth,
-    "finer mesh share" => shape.finer_share,
-    "finer mesh height" => shape.finer_height,
-    "finer mesh falloff" => shape.finer_fall,
-    "weight spread" => shape.weight,
-    "raised share" => shape.raised,
-    "grass cover" => grass.cover,
-    "grass patch size" => grass.patch,
-    "grass patch detail" => grass.detail,
-    "grass scatter" => grass.scatter,
-    "tree cover" => trees.cover,
-    "tree patch size" => trees.patch,
-    "tree patch detail" => trees.detail,
-    "tree scatter" => trees.scatter,
-}
-
-impl Generation {
-    /// How worlds are generated, as tuned by eye in the renderer's lab.
-    pub const DEFAULT: Self = Self {
-        shape: Shape::DEFAULT,
-        grass: Patches { cover: ONE * 951 / 1000, patch: 8, detail: ONE * 598 / 1000, scatter: ONE * 51 / 1000 },
-        trees: Patches { cover: ONE * 60 / 1000, patch: 7, detail: ONE * 800 / 1000, scatter: ONE * 300 / 1000 },
-    };
-}
-
-/// What keeps the trees' numbers apart from the grass's.
-pub const TREES_SALT: u64 = 0x7472_6565_735F_6C6F;
 /// Sheep the world's origin superchunk starts with, unless told.
 pub const FLOCK: usize = 4_000;
 
@@ -161,17 +80,18 @@ pub struct World {
 
 impl World {
     /// A world with nothing in it, at `info`'s tick: what generating and
-    /// loading start from. `forced`, every superchunk `info.side` lets
-    /// hot is forced so, nothing tracking a halo; not, the halo is the
-    /// hot entity's. On `threads` threads, every one the machine has if
-    /// none is given.
-    fn empty(info: WorldInfo, generation: Generation, forced: bool, threads: Option<usize>) -> Self {
+    /// loading start from. Hot as `info` says: forced hot throughout if
+    /// it has a size and is forced, else about the hot entity's halo. On
+    /// `threads` threads, every one the machine has if none is given.
+    fn empty(info: WorldInfo, generation: Generation, threads: Option<usize>) -> Self {
         let entities = Entities::at_tick(info.tick);
         // The world's superchunks not counted, as it grows: one set of threads, the tick's and chunk storage's jobs' alike.
         let dispatcher = Arc::new(threads.map_or_else(Dispatcher::of_the_machine, Dispatcher::new));
         let simulation = Simulation::on(Arc::clone(&dispatcher));
-        let entity = (!forced).then_some(halos::HOT_ENTITY);
-        let halos = Halos::new(Hot { side: info.side, entity }, dispatcher);
+        let hot = match (info.side, info.forced) {
+            (Some(side), true) => Hot::Forced { side },
+            (side, _) => Hot::About { entity: halos::HOT_ENTITY, side },
+        };
         Self {
             info,
             generation,
@@ -180,7 +100,7 @@ impl World {
             entities,
             simulation,
             cold: BTreeMap::new(),
-            halos,
+            halos: Halos::new(hot, dispatcher),
         }
     }
 }
@@ -192,85 +112,94 @@ fn layer_types() -> Vec<LayerType> {
     [GRASS, TREE, TREE_STAGE.layer_type(), WET].into_iter().chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
 }
 
-/// How [`start`] gives a world its flock, if any: so many sheep on
-/// each superchunk named, and the halo about them hot before it ticks.
-pub enum Flock {
-    /// No sheep: nothing hot until something reaches it.
-    None,
-    /// So many sheep on each of these.
-    On(Vec<SuperchunkIndex>, usize),
+/// How far a world reaches, and whether it is hot throughout.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Size {
+    /// No end: as far as coordinates reach, hot about its sheep.
+    Unlimited,
+    /// `side` superchunks along a side, a square about its origin --
+    /// nothing outside it ever made or hot -- hot about its sheep, or
+    /// `forced` hot throughout, whatever they do: only a world with an
+    /// end can be.
+    Limited {
+        /// Superchunks along a side.
+        side: u32,
+        /// Every superchunk of it hot throughout.
+        forced: bool,
+    },
+}
+
+impl Size {
+    /// As the sliders' numbers have it: a side of 0 is no limit, and
+    /// forced hot counts only with a side.
+    pub fn from_tuning(tuned: &utilities::tuning::Tuning) -> Self {
+        match tuned[utilities::tuning::WORLD_SIDE].round().max(0.0) as u32 {
+            0 => Self::Unlimited,
+            side => Self::Limited { side, forced: tuned[utilities::tuning::FORCED_HOT] >= 0.5 },
+        }
+    }
 }
 
 /// What a world starts from, for [`start`]: `seed`, generated as
-/// `generation` says, `side` superchunks along a side if one is given
-/// -- a square about its origin, nothing ever hot outside it, kept by
-/// a save -- `forced` hot throughout instead of about the hot entity's
-/// halo, ticking on `threads` threads, and `flock`'s sheep put on,
-/// their halo hot before it ticks.
+/// `generation` says, as far as `size` lets it reach, ticking on
+/// `threads` threads, and `sheep` on each superchunk of it -- every one
+/// of a world with a size; of one without, the origin's alone, as
+/// sheep everywhere would keep the whole of an endless world hot --
+/// their halos hot before it ticks.
+#[derive(Clone, Copy, Debug)]
 pub struct Start {
     /// The seed its superchunks are generated from.
     pub seed: u64,
     /// How its superchunks are generated.
     pub generation: Generation,
-    /// Superchunks along a side, if it is sized.
-    pub side: Option<u32>,
-    /// Forced hot throughout -- every superchunk of a size, or those
-    /// its holder makes hot of none -- instead of about the hot
-    /// entity's halo.
-    pub forced: bool,
+    /// How far it reaches, and whether it is forced hot.
+    pub size: Size,
     /// Threads it ticks on, every one the machine has if none is given.
     pub threads: Option<usize>,
-    /// Its flock, if it has one.
-    pub flock: Flock,
+    /// Sheep each superchunk it puts them on starts with.
+    pub sheep: usize,
 }
 
 impl Default for Start {
     /// Seed 1, generated as [`Generation::DEFAULT`] says, no size to
-    /// it, about the hot entity's halo, every thread the machine has,
-    /// a flock of [`FLOCK`] on its origin: what `new` makes unless told
-    /// otherwise.
+    /// it, every thread the machine has, a flock of [`FLOCK`] on its
+    /// origin: what `new` makes unless told otherwise.
     fn default() -> Self {
-        Self { seed: 1, generation: Generation::DEFAULT, side: None, forced: false, threads: None, flock: Flock::On(vec![WORLD_MIDDLE], FLOCK) }
+        Self { seed: 1, generation: Generation::DEFAULT, size: Size::Unlimited, threads: None, sheep: FLOCK }
     }
 }
 
-/// A world as `options` say: its superchunks generated, and `options`'
-/// flock, if it has one, put on and its halo hot before it ticks.
+/// A world as `options` say: generated as they say, its sheep put on
+/// and their halos hot before it ticks -- or, forced hot, all of it.
 /// Every superchunk -- these, and those made as a flock wanders -- is
-/// its terrain, heights and the walls they make, and on it, for now,
-/// pasture: dirt, a third of it grass. Each from the seed and where it
-/// is ([`generate_image`]).
+/// its terrain, heights and the walls they make, and on it grass and
+/// trees in patches. Each from the seed and where it is
+/// ([`generate_image`]).
 pub fn start(options: Start) -> World {
-    let world = generate_sized(options.generation, options.seed, options.side, options.forced, options.threads);
-    match options.flock {
-        Flock::None => world,
-        Flock::On(superchunks, sheep) => flocked(world, &superchunks, sheep),
+    let mut world = generate_sized(options.generation, options.seed, options.size, options.threads);
+    let everywhere = world.halos.hot.all();
+    if options.sheep == 0 {
+        // No sheep: nothing hot, unless all of it is forced so.
+        if matches!(options.size, Size::Limited { forced: true, .. }) {
+            world.keep_hot(&everywhere);
+        }
+        return world;
     }
+    let on = if everywhere.is_empty() { vec![WORLD_MIDDLE] } else { everywhere };
+    flocked(world, &on, options.sheep)
 }
 
 /// A world of `seed` with nothing in it yet, nothing hot, whose
-/// superchunks are generated as `generation` says, `side` superchunks
-/// along a side if one is given -- a square about its origin, nothing
-/// ever hot outside it, kept by a save -- `forced` hot throughout
-/// instead of about the hot entity's halo, on `threads` threads, every
-/// one the machine has if none is given: what [`start`] is built from,
-/// and what a way of generating is tried out on by itself.
-pub fn generate_sized(generation: Generation, seed: u64, side: Option<u32>, forced: bool, threads: Option<usize>) -> World {
-    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, generation: generation.numbers() }, generation, forced, threads)
-}
-
-/// The first seed from `from` on whose world, shaped as `shape`, has
-/// land about `near` -- three superchunks each way: what a world is
-/// made from to be watched or tested with a flock on it, the seed
-/// otherwise as likely to give ocean there. A flock need not start on
-/// [`WORLD_MIDDLE`]: `near` is wherever it is to.
-pub fn seed_with_land(from: u64, shape: &Shape, near: SuperchunkIndex) -> u64 {
-    let (middle, side) = (near.top_left().cartesian(), coordinates::SUPERCHUNK_SIDE_CELLS as i32);
-    let land = |seed: &u64| {
-        let mut lands = worldgen::mesh::Lands::new(shape, *seed);
-        (-3i32..=3).all(|across| (-3i32..=3).all(|down| lands.height(middle.x.wrapping_add_signed(across * side), middle.y.wrapping_add_signed(down * side)) > shape.ocean))
+/// superchunks are generated as `generation` says, as far as `size`
+/// lets it reach, on `threads` threads, every one the machine has if
+/// none is given: what [`start`] is built from, and what a way of
+/// generating is tried out on by itself.
+pub fn generate_sized(generation: Generation, seed: u64, size: Size, threads: Option<usize>) -> World {
+    let (side, forced) = match size {
+        Size::Unlimited => (None, false),
+        Size::Limited { side, forced } => (Some(side), forced),
     };
-    (from..).find(land).expect("a seed with land about where it is to")
+    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, forced, generation: generation.numbers() }, generation, threads)
 }
 
 /// `world`, nothing in it yet, with a flock of `sheep` on each of
@@ -299,8 +228,7 @@ pub fn flocked(mut world: World, superchunks: &[SuperchunkIndex], sheep: usize) 
 pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: SuperchunkIndex, codec: &mut LayerCodec) -> SuperchunkImage {
     let terrain = Terrain::generate_shaped(&generation.shape, seed, superchunk);
     let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
-    let trees_seed = seed ^ TREES_SALT;
-    let (grass_under, trees_under) = (generation.grass.threshold(seed), generation.trees.threshold(trees_seed));
+    let growth = generation.growth(seed);
     // The planes generated, each a bitmap a chunk: grass, trees, their stage's four, and the cells under water.
     let mut planes = vec![GRASS, TREE];
     planes.extend(TREE_STAGE.layer_type().planes());
@@ -319,13 +247,14 @@ pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: Sup
             set(wet);
             continue;
         }
-        if generation.grass.number(seed, x, y) < grass_under {
+        let grown = growth.at(x, y);
+        if grown.grass {
             set(0);
         }
-        if generation.trees.number(trees_seed, x, y) < trees_under {
+        if let Some(lot) = grown.tree {
             set(1);
             // Its stage: a lot of the cell's own.
-            let stage = mix(trees_seed ^ ((y as u64) << 32 | x as u64)) % (OLDEST as u64 + 1);
+            let stage = lot % (OLDEST as u64 + 1);
             (0..TREE_STAGE.layer_type().bits() as usize).filter(|bit| stage >> bit & 1 == 1).for_each(|bit| set(2 + bit));
         }
     }
@@ -402,7 +331,7 @@ pub fn load(folder: &Path) -> Result<World, DiskError> {
     let info = WorldInfo { layers: layer_types(), ..disk::read_world(folder)? };
     let hot = disk::read_hot(folder)?;
     let generation = Generation::of_numbers(&info.generation);
-    let mut world = World::empty(info, generation, false, None);
+    let mut world = World::empty(info, generation, None);
     let mut kept = 0;
     for superchunk in disk::saved_superchunks(folder)? {
         world.storage.insert(superchunk, disk::read_image(folder, superchunk)?);

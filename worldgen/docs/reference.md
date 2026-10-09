@@ -49,3 +49,16 @@ How something lies in patches when a superchunk is made. `SAMPLED`
 scatter}`; **`number(seed, x, y)`**: a cell's number -- noise as broad
 as a patch, finer noise, and the cell's own lot;
 **`threshold(seed)`**: the number under which `cover` of the cells are.
+
+## `generation.rs`
+
+`TREES_SALT`: what keeps the trees' numbers apart from the grass's.
+**`Generation`** `{shape, grass, trees}`; `Generation::DEFAULT`;
+**`numbers()`** and **`of_numbers(numbers)`**: its numbers by name, as
+a world's file keeps them (`numbers!`). **`from_tuning(tuned)`**: as
+the sliders have it (**`shape_from_tuning`**). **`growth(seed)`**: a
+**`Growth`**, the thresholds found once; **`Growth::at(x, y)`**: a
+**`Grown`** `{grass, tree}` -- the tree a lot, its stage drawn from it
+by whoever counts the stages. **`has_land_about(seed, shape, near)`**:
+land three superchunks each way about `near`; **`seed_with_land(from,
+shape, near)`**: the first seed from `from` that has.

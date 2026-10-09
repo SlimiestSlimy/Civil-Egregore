@@ -5,65 +5,86 @@ What each file holds. The design: `gui.md`.
 ## `lib.rs`
 
 **`Gui`** `{worlds}`: the menus, a plugin -- `worlds` names the worlds
-there are to open. **`Worked`**: the set their work of a frame is in.
+there are to open; building it starts the numbers tuned
+(`utilities::tuning::start`). **`Worked`**: the set their work of a
+frame is in. **`Screen`**: `MainMenu`, until a world is made or opened
+from it, then `World`. **`Make(seed)`**, **`Open(name)`**,
+**`Save(name)`**: the messages. **`Captured`** `{pointer, wheel,
+keys}`: what the menus took this frame. **`offer`**: the sliders
+offered as the screen has it. **`capture`**: `Captured`, last.
 
-## `tuning.rs`
+## `rows.rs`
 
-`NAMES`: the numbers' names, each at its place, and the places
-(`STEP_LIGHT` ... `SHEEP`). **`Tuned`** `{name, line, range, group, what}`
--- `what` the tooltip -- and **`tuned(index)`**: a number as the
-sliders' file (`sliders.csv`, at the crate's root) has it.
-**`Group`**: `Shading`, `Land`, `Lines`, `Finer`, `Grass`, `Trees`,
-`Sheep` (`GROUPS`, in the menu's order), **`name()`** and
-**`lab_only()`** -- every group but shading.
-**`Tuning`**: the numbers read together. **`unless_set(index)`**: what a number is
-unless set, from the default settings. **`start()`**: what the
-machine's settings have. **`now()`**, **`set(index, value)`**,
-**`keep()`**: the numbers written to the settings, the others' lines
-dropped. **`revision()`**: how many times how the world is generated
-has changed -- not a generation itself (`server::Generation`, the
-recipe), only a count of when one last changed; **`revise()`**: says
-it has. **`reseed()`**: a new seed drawn off the clock, the world to
-be generated again; **`seed_drawn()`**: it, 0 while none was.
+`ACROSS`, `HIGH`, `WORDS`: the layout; `LISTED`: the worlds listed at a
+time; `ROWS`: the rows there are parts for. **`Look`**: `Said`, `Back`,
+`Clicked`. **`Row<Does>`** `{says, look, does}` and **`Row::new`**.
+**`Shade`**, **`Bar`**, **`Says`**: the dimmed window, a row's bar, a
+row's words. **`spawn(commands, marker)`**: them, hidden, each marked
+as the menu's. **`under(window, rows)`**: the row the pointer is on.
+**`clicked(rows, window, buttons)`**: what the row just clicked does.
+**`show(open, rows, shade, bars, words)`**: the parts as the rows say.
+**`Listing`** `{worlds, first}`: **`of(lister)`**, **`rows(back,
+opens)`**, **`scroll(wheel)`**. **`type_into(line, typed, allowed,
+most)`**: keys typed into a line; whether Enter was pressed.
 
-## `sliders.rs`
+## `main_menu.rs`
 
-`MARGIN`, `ROW`, `TRACK`, `KNOB`, `BOX`, `GAP`, `PANEL`, `NAME`,
-`CLOSED`: the layout. **`Shown`**: `Closed`, `Menu` or `Group(group)`
--- what is on the screen, **`shown()`** and **`show(what)`**.
-**`Part`**: anything of the sliders, and what it is shown with;
-**`Moved`**: a knob or a track's filled part; **`Valued`**: a value in
-its box. **`Hands`**: the slider dragged and the value being typed.
-**`page()`**: the group shown; **`rows(group)`**; **`listed()`**: the
-groups the menu has -- lab-only ones only in the lab; **`rows_under()`**, **`middle(row)`**,
-**`foot()`**, **`across()`**, **`over(window)`**,
-**`row_under(window)`**: the arithmetic of where things are. **`Row`**,
-a part that scrolls (**`scroll`**, which also shows the parts of what
-is shown and hides the rest); **`Tip`** and **`tell`**: what a slider
-does, said when the pointer rests on it. **`in_lab()`**: every group
-listed, the menu open from the start. **`held()`**: whether the left
-button went down over the sliders and is still held -- the view is then
-not dragged. **`setup`**: the button, the menu and the groups.
-**`toggle`**: the menu by `U`, or all closed. **`typed(key)`**: the
-digit or point a key types. **`slide`**: the menu and the groups
-opened and left, sliders dragged and set back, values typed, the lab's
-button pressed, the numbers kept and shown.
+**`Does`**: `Nothing`, `SetsUp`, `Makes`, `Lists`, `GoesBack`,
+`Opens(place)`, `Leaves`. **`Page`**: `First`, `New`, `Worlds`.
+**`Part`**: marks its parts. **`MainMenu`**: the page, the seed typed,
+the worlds listed -- **`listing(lister)`**, **`setting_up()`**: whether
+a new world is being set up; **`seed()`**: the seed typed, if one is;
+**`rows()`**. **`spawn`**: its parts. **`work`**: a row clicked done,
+unless the pointer is the sliders'; a seed typed; the worlds gone
+through by the wheel; Escape back a page; the rows shown -- all while
+the window shows it.
 
 ## `options.rs`
 
-`ACROSS`, `ROW`, `WORDS`: the layout; `LISTED`: the worlds listed at a
-time; `ROWS`: the rows there are parts for. **`Does`**: what a click
-on a row does -- `Nothing`, `GoesOn`, `Lists`, `GoesBack`,
-`Saves`, `Names`, `Opens(place)`, `Leaves`. **`Chosen(name)`**: the
-message for a world chosen; **`Save(name)`**: for the world to be
-saved. **`Page`**: `First`, `Worlds`, `Naming`; `NAME`: the most
-letters a name has. **`Options`**: whether they are open, the page shown, the
-worlds listed and the first shown -- **`listing(lister)`**,
+`NAME`: the most letters a world's name has. **`Does`**: `Nothing`,
+`GoesOn`, `Saves`, `Names`, `Lists`, `GoesBack`, `Opens(place)`,
+`Leaves`. **`Page`**: `First`, `Worlds`, `Naming`. **`Part`**: marks
+its parts. **`Options`**: whether they are open, the page, the world's
+name, the name typed, the worlds listed -- **`listing(lister)`**,
 **`open()`**, **`named()`** and **`name(named)`**: the world run's
 name, as the window tells it; **`save_named(save)`**: the name typed
-saved under, unless none or taken; **`rows()`**. **`Shade`**, **`Bar`**, **`Says`**: the
-dimmed window, a row's bar, a row's words. **`setup`**: them, hidden.
-**`row_under(window, rows)`**: the row the pointer is on. **`work`**:
-opened and closed by Escape, unless it is leaving a value being typed;
-a row clicked done; the worlds gone through by the wheel; the rows
-shown as they are.
+saved under, unless none or taken; **`rows()`**. **`spawn`**: its
+parts. **`work`**: opened and closed by Escape over a world, unless a
+slider's value is being typed; a row clicked done; a name typed; the
+worlds gone through by the wheel; the rows shown.
+
+## `sliders/mod.rs`
+
+`MARGIN`, `ROW`, `TRACK`, `KNOB`, `BOX`, `GAP`, `PANEL`, `CLOSED`,
+`NOTCH`: the layout. **`Shown`**: `Closed`, `Menu` or `Group(group)`.
+**`Offered`**: `Hidden`, `Everything`, `Shading`. **`Sliders`**: what
+is offered and shown, how far it is scrolled, whether the left button
+is held over it, the slider dragged, the value typed, where the pointer
+rested -- **`held()`**, **`typing()`**, **`over(window)`**,
+**`offer(offered)`**: a group no longer offered closed;
+**`show(what)`**, **`listed()`**, **`page()`**, **`rows_under()`**,
+**`foot()`**, **`across()`**, **`row_under(window)`**: the arithmetic
+of where things are. **`rows(group)`**: a group's numbers in the
+sliders' file's order; **`middle(row)`**. **`Part`** `{shown,
+everything}`: anything of the sliders, what it is shown with, and
+whether only while every group is offered; **`Row`**: how far down it
+is. **`toggle`**: the menu by `U`, or all closed. **`scroll`**: by the
+wheel, and every part shown or hidden.
+
+## `sliders/spawn.rs`
+
+`NAME`: the words' height; `TIP`. **`Valued`**: a value in its box;
+**`Moved`**: a knob or a track's filled part; **`Tip`**: where what a
+slider does is said. **`over_menus(z)`**: stacked over the menus.
+**`spawn`**: the button, the menu twice -- every group, and those that
+make no worlds -- and each group (**`spawn_group`**).
+
+## `sliders/slide.rs`
+
+**`typed(key)`**: the digit or point a key types. **`slide`**: the menu
+and the groups opened and left, sliders dragged and set back, values
+typed, the numbers kept; **`show`**: knobs and values as they are.
+
+## `sliders/tell.rs`
+
+`REST`: seconds the pointer rests before a slider is told. **`tell`**.

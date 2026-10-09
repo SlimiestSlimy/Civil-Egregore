@@ -358,7 +358,7 @@ mod tests {
     #[test]
     fn shadows_are_the_same_from_both_sides_of_an_edge() {
         let shape = Shape::DEFAULT;
-        let seed = server::seed_with_land(utilities::seed::counted(), &shape, coordinates::WORLD_MIDDLE);
+        let seed = worldgen::seed_with_land(utilities::seed::counted(), &shape, coordinates::WORLD_MIDDLE);
         let middle = coordinates::WORLD_MIDDLE.top_left().cartesian();
         let (left, top, side) = (middle.x, middle.y, SIDE as u32);
         let fine = |top_left: (u32, u32), given: &Given| Ground::generate(seed, &shape, top_left, given).fine.expect("made fine");
@@ -371,7 +371,7 @@ mod tests {
             }
         }
         assert_eq!(differing, 0, "shadow lines unlike over an edge");
-        let world = server::start(server::Start { seed, flock: server::Flock::On(vec![coordinates::WORLD_MIDDLE], 1), ..server::Start::default() });
+        let world = server::start(server::Start { seed, sheep: 1, ..server::Start::default() });
         let image = world.storage.image(coordinates::WORLD_MIDDLE).expect("the origin's image");
         let brought = fine((left, top), &[((left, top), image.height_words())].into_iter().collect());
         let cells = || (0..SIDE as isize).flat_map(|y| (0..SIDE as isize).map(move |x| (x, y)));

@@ -26,8 +26,14 @@ none.
   far the renderer's sliders). The default settings are such a file
   built into the program: copied to a machine that has none, never
   over one that has, and all there is under the build feature
-  `default_settings`. The same folder holds the worlds, in `worlds`,
+  `force_default_settings`. The same folder holds the worlds, in `worlds`,
   unless the settings name another folder for them.
+- **What is tuned by eye** (`tuning.rs`): the numbers a window's
+  sliders set -- the near view's shading, read each frame, and how a
+  new world is made, read once when one is -- by name and place, with
+  no lock between them. What a slider reaches, its group and what it
+  does are in the sliders' file (`sliders.csv`, at the crate's root),
+  written by hand; what each is unless set is in the default settings.
 - **The seed** (`seed.rs`): the one seed every crate's tests and tools
   start from, in the workspace's `transient_data/seed.csv`, rolled every 5
   counted runs; `Civil Egregore_SEED` picks one for a run.

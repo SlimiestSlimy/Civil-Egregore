@@ -4,15 +4,25 @@
 //! generated -- its height from the seed, the ocean over it or grass,
 //! dirt or a tree on it -- so nothing is made hot to be looked at, and
 //! the world is seen as far out as islands are specks. A thread of its
-//! own draws the last map asked for, on every thread the machine has.
+//! own draws the last map asked for, on every thread the machine has
+//! ([`start`]); the window asks for one of what is in view, and lays
+//! it where it is of ([`far`]).
 
-use crate::paint::{tree_colour, WATER};
+use crate::frames::{picture_of, Laid, DIRT};
+use crate::link::Seen;
+use crate::paint::{tree_colour, BROWN, GREEN, WATER};
+use crate::view::{origin, FARTHEST};
+use bevy::prelude::*;
+use gui::Captured;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Mutex;
 use std::thread;
 use worldgen::mesh::Lands;
-use crate::paint::{BROWN, GREEN};
-use server::Generation;
+use worldgen::Generation;
 
+/// Pixels of the map past each of the view's edges: what a moving view
+/// shows before the next map comes.
+const MARGIN: i64 = 64;
 /// How much of its light the deepest ocean keeps.
 const DEEP_LIGHT: f32 = 0.35;
 /// How much of its light a pixel on a line of the mesh keeps.
@@ -76,8 +86,7 @@ fn cell(wanted: &Wanted, x: i64, y: i64) -> Option<(u32, u32)> {
 /// The pixels of `wanted`: rows shared out among the machine's threads.
 fn draw(wanted: &Wanted) -> Vec<u8> {
     let (width, generation, seed) = (wanted.size.0 as usize, &wanted.generation, wanted.seed);
-    let trees_seed = seed ^ server::TREES_SALT;
-    let (grass_under, trees_under) = (generation.grass.threshold(seed), generation.trees.threshold(trees_seed));
+    let growth = &generation.growth(seed);
     let mut pixels = vec![0u8; width * wanted.size.1 as usize * 4];
     let threads = thread::available_parallelism().map_or(1, |threads| threads.get());
     let rows_each = (wanted.size.1 as usize).div_ceil(threads).max(1);
@@ -100,12 +109,11 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
                         let (colour, light) = if high < shape.ocean {
                             (WATER, 1.0 - (1.0 - DEEP_LIGHT) * ((shape.ocean - high) as f32 / (shape.ocean - shape.ground).max(1) as f32).min(1.0))
                         } else {
-                            let colour = if generation.trees.number(trees_seed, cell_x, cell_y) < trees_under {
-                                tree_colour(8)
-                            } else if generation.grass.number(seed, cell_x, cell_y) < grass_under {
-                                GREEN
-                            } else {
-                                BROWN
+                            let grown = growth.at(cell_x, cell_y);
+                            let colour = match (grown.tree, grown.grass) {
+                                (Some(_), _) => tree_colour(8),
+                                (None, true) => GREEN,
+                                (None, false) => BROWN,
                             };
                             let above = cell(wanted, x as i64, y - 1).map_or(high, |(x, y)| lands.height(x, y));
                             let lower = (above as f32 + before.unwrap_or(high) as f32) / 2.0;
@@ -125,4 +133,96 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
         }
     });
     pixels
+}
+
+/// The map, as the window holds it: where to ask for one, where it
+/// comes back, and what was last asked for.
+#[derive(Resource)]
+pub struct MapLink {
+    /// Where the maps wanted go.
+    requests: Sender<Wanted>,
+    /// Where they come back, drawn.
+    maps: Mutex<Receiver<Drawn>>,
+    /// The last asked for.
+    asked: Option<Wanted>,
+    /// Whether the mesh's lines are drawn over the map.
+    borders: bool,
+}
+
+impl MapLink {
+    /// The map's thread, started, asked nothing yet.
+    pub fn start() -> Self {
+        let (requests, maps) = start();
+        Self { requests, maps: Mutex::new(maps), asked: None, borders: false }
+    }
+}
+
+/// The map's picture, over the superchunks' images.
+#[derive(Component)]
+pub struct MapView;
+
+/// The map's picture, hidden until there is one.
+pub fn spawn(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    commands.spawn((Sprite { image: images.add(picture_of((1, 1), DIRT.to_vec())), ..default() }, Transform::from_xyz(0.0, 0.0, 1.5), Visibility::Hidden, MapView));
+}
+
+/// Cells along a pixel's side of the map, the view `scale` cells a
+/// screen pixel: a power of two, no more than the screen's pixels'.
+fn map_step(scale: f32) -> u32 {
+    1 << scale.log2().floor() as u32
+}
+
+/// Shows the map of the world run from farther than the cells are drawn
+/// from: asks for one of what is in view when the view or the world has
+/// changed, and lays the last drawn where it is of. `P` draws the
+/// mesh's lines over it, or not.
+#[allow(clippy::too_many_arguments)]
+pub fn far(
+    mut link: ResMut<MapLink>,
+    mut seen: ResMut<Seen>,
+    keys: Res<ButtonInput<KeyCode>>,
+    captured: Res<Captured>,
+    mut images: ResMut<Assets<Image>>,
+    camera: Single<(&Transform, &Projection), With<Camera2d>>,
+    window: Single<&Window>,
+    map_view: Single<Laid, (With<MapView>, Without<Camera2d>)>,
+) {
+    let (sprite, mut transform, mut visibility) = map_view.into_inner();
+    link.borders ^= keys.just_pressed(KeyCode::KeyP) && !captured.keys;
+    let (camera, projection) = *camera;
+    let Projection::Orthographic(view) = projection else {
+        return;
+    };
+    let Some(world) = seen.frame.as_ref().map(|frame| (frame.seed, frame.generation)).filter(|_| view.scale > FARTHEST) else {
+        visibility.set_if_neq(Visibility::Hidden);
+        (link.asked, seen.map) = (None, 0);
+        return;
+    };
+    // The view's pixels and a margin, from a corner that is a whole number of pixels: the same cells whatever way it is moved.
+    let step = map_step(view.scale);
+    seen.map = step;
+    let half = Vec2::new(window.width(), window.height()) * view.scale / 2.0;
+    let corner = |axis: usize, middle: f32, half: f32| (origin(axis) as i64 + (middle - half).floor() as i64).div_euclid(step as i64) - MARGIN;
+    let first = (corner(0, camera.translation.x, half.x), corner(1, -camera.translation.y, half.y));
+    let pixels = |half: f32| (2.0 * half / step as f32).ceil() as u32 + 2 * MARGIN as u32 + 1;
+    let wanted = Wanted { first: (first.0 * step as i64, first.1 * step as i64), step, size: (pixels(half.x), pixels(half.y)), seed: world.0, generation: world.1, borders: link.borders };
+    // Not for every pixel the view moves: only once it is half the margin from what was asked for, or anything else differs.
+    let near_enough = |asked: &Wanted| {
+        let moved = |asked: i64, wanted: i64| (asked - wanted).abs() / step as i64 <= MARGIN / 2;
+        (asked.step, asked.size, asked.seed, asked.generation, asked.borders) == (wanted.step, wanted.size, wanted.seed, wanted.generation, wanted.borders) && moved(asked.first.0, wanted.first.0) && moved(asked.first.1, wanted.first.1)
+    };
+    if !link.asked.as_ref().is_some_and(near_enough) && link.requests.send(wanted).is_ok() {
+        link.asked = Some(wanted);
+    }
+    let drawn = link.maps.lock().expect("the maps' receiver").try_iter().last();
+    if let Some(drawn) = drawn {
+        let (wanted, size) = (drawn.wanted, drawn.wanted.size);
+        if let Some(mut image) = images.get_mut(&sprite.image) {
+            *image = picture_of(size, drawn.pixels);
+        }
+        // Over the cells it is of: a pixel `step` units.
+        let plane = |axis: usize, first: i64, pixels: u32| (first - origin(axis) as i64) as f32 + (pixels * wanted.step) as f32 / 2.0;
+        *transform = Transform::from_xyz(plane(0, wanted.first.0, size.0), -plane(1, wanted.first.1, size.1), 1.5).with_scale(Vec3::new(wanted.step as f32, wanted.step as f32, 1.0));
+        visibility.set_if_neq(Visibility::Visible);
+    }
 }

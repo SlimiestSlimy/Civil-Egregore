@@ -2,54 +2,18 @@
 
 The design is in `renderer.md`.
 
-## `sim.rs`
-
-`TARGET_PACE` (256 ticks a second), `CHUNK_WORDS`, `CENSUS_EVERY`
-(1,000 ticks). **`seed()`**: the seed of the world watched, the
-workspace's moved on to the first with land about the origin.
-**`census_path()`**: where the run's census is kept;
-**`census`**: its file, started afresh.
-
-**`Viewport`** `{first, last}`: the superchunks in view, a rectangle of
-them counted from the world's top left, both corners in it.
-**`Ask`** `{viewport, detail, skip, most, near}`: what a frame is to carry --
-some of the superchunks in view, and how coarsely they will be drawn;
-**`asked()`**, those it asks for, each `(x, y)` in the world.
-**`Near`** `{first, size, pixels_a_cell}`: the cells seen from near.
-**`Request`**: `Sync(ask)`, `Pause(bool)`, `Pace(ticks a second, or
-flat out)`, `Open(name)` -- that world of the worlds' folder run in place of
-the one run -- `Save(name)` -- the world run saved there;
-**`said()`**: what the last of either came to; **`named()`**: the
-name of the world run, if it has one; **`say(said, named)`**. **`Cells`** `{at, hot, top_left, grass, sheep}`: a superchunk's grass
-(**`layer`**), its 16 chunks' words one after another, its sheep's
-cells, and where it is in the world.
-**`Frame`** `{tick, ticks_a_second, sheep, grass, sync_seconds,
-sync_share, detail, near, cells}`: with what answering took of the thread.
-
-**`shown(superchunks)`**: the superchunks shown, a square about the
-origin. **`forced(shown, flock)`**: a world with every one of them hot.
-**`Mode`**: `Halos`, `ForcedHot`, `Lab`; **`made(mode, shown, flock)`**:
-the world a mode runs, made again in the lab when generation changes.
-**`count(world, layer_type)`**. **`start(superchunks, flock, mode)`**: the pasture on a thread
-of its own, ticking on every thread the machine has; where to send
-requests, where frames come back. **`run`**: that thread -- every
-request waiting read, each sync answered, a tick, and a sleep to the
-next one's time if paced; paused, it waits for a request.
-**`copy(world, superchunks, ask)`**: the superchunks asked for
-(**`grass`**, **`sheep`**).
-
 ## `paint.rs`
 
 **`Painted`** `{at, cold, side, pixels}`: a superchunk's pixels, four bytes each.
-**`Picture`**: a frame, painted. **`start(frames)`**: the painter's
-thread; where pictures come. **`ground(grounds, frame, number)`**: the
+**`Picture`** `{frame, paint_seconds, superchunks, near}`: a frame, painted -- the frame itself, its cells gone into the pixels. **`start(frames)`**: the painter's
+thread, the ground made again for each world run; where pictures come. **`ground(grounds, frame, number)`**: the
 ground of every hot superchunk of the frame made if missing, the fine
 parts of those longest unseen dropped (`FINE_KEPT`, 48).
 **`paint(cells, ground)`**: dirt, the grass over it, both lit, the
 sheep over that, a pixel each (`SHEEP_REACH`, none); **`opaque`**;
 `BROWN`, `GREEN`, `WHITE`: dirt's, grass's and a sheep's colours. `WATER`, `FILM`, **`depth_at(cells, word, bit)`**, **`under_water(colour,
 depth)`**: a colour seen through water, the less the deeper, none from
-`sim::DEEP` (16). `TREE_YOUNG`, `TREE_OLD`, **`tree_colour(stage)`**, **`stage_at(cells,
+`server::host::frame::DEEP` (16). `TREE_YOUNG`, `TREE_OLD`, **`tree_colour(stage)`**, **`stage_at(cells,
 word, bit)`**; **`counted(words, detail)`**: the cells set a tile.
 **`paint_far(cells, detail, ground)`**: a pixel a tile of cells
 `2^detail` a side, its grass counted from its run of bits, its colours
@@ -83,51 +47,89 @@ grounds, near)`**: the picture. **`Cell`**: **`paint`**, a cell's pixels
 **`tree`**: a tree on its cell, a square larger and darker the older.
 **`sheep`**: a sheep's shape (`SHEEP`) on its cell.
 
-## `lab.rs`
+## `lib.rs`
 
-**`run()`**: says the lab is what runs. **`seed()`**: the seed the world
-is generated from now -- the opened world's, or the one drawn in the
-lab (`gui::tuning::reseed`), or the run's. **`opened(seed)`**: says a
-world was opened: the lab runs no more, all is drawn again, the view
-goes back. **`view_reset()`**: whether the view is to go back to where
-it started.
-**`generation()`**: how the world is generated now -- the sliders' in
-the lab, `Generation::DEFAULT` otherwise; **`shape(tuned)`**: the
-heights' shape as the sliders have it.
+**`run()`**: the window opened on the main menu, run until it is
+closed: the menus (`gui::Gui`), the host's and the map's links, every
+part made at startup, and each frame the menus' worlds told the host,
+then -- only over a world -- the view steered, the overlays laid, the
+frame shown and the next asked for, the map; then the text.
 
-## `main.rs`
+## `link.rs`
 
-`SPRITE_SIDE`, `PAN_SPEED`, `ZOOM_SPEED`, `WHEEL_ZOOM`, `SYNC_EVERY`
-(a sixtieth of a second), `COARSEST` (6), `KEPT_SIDE` (64), `NEAR_SCALE`
-(half a cell a screen pixel), `NEAR_PIXELS` (8), `NEAR_MARGIN` (8 cells).
+`LAND_TRIES` (256). **`Link`** `{requests, pictures, waiting, since,
+asked, paused, pace}`: the host as the window holds it --
+**`start()`**: the host and the painter started; **`run(request)`**: a
+world in place of the one run, no frame of the one before waited for.
+**`Seen`** `{frame, painted, paint_seconds, in_view, detail,
+near_pixels, map}`: the last frame, and how it was drawn.
+**`start(seed)`**: what a world made from the menus starts from -- the
+seed given or one drawn with land about the origin, the rest from the
+sliders. **`menus`**: the worlds the menus make, open and save sent;
+the options told the world run's name. **`keys`**: pause and pace sent.
+
+## `frames.rs`
+
+`SYNC_EVERY` (a sixtieth of a second), `COARSEST` (6), `KEPT_SIDE`
+(64), `NEAR_SCALE` (half a cell a screen pixel), `NEAR_PIXELS` (8),
+`NEAR_MARGIN` (8 cells), `TILES_KEPT` (4,096).
 **`frame_holds(detail)`**: superchunks a frame carries at most.
+`DIRT`, one pixel of it; **`picture_of(size, pixels)`**: an image.
+**`Laid`**: what of a picture over the images is changed.
+**`NearView`**: the picture from near; **`spawn`**: it, hidden.
+**`show`**: the frame that came shown -- another world's dropping what
+was drawn of the last, the view put over it; each superchunk's image,
+and the picture from near. **`near(first, last, scale)`**: the cells
+seen from near, if the view is near. **`ask`**: the next frame asked
+for -- the superchunks the camera sees, how coarsely, on round them
+from the last, and from near the cells in view; fine images out of
+view dropped.
 
-**`Link`**: the requests' sender, the pictures' receiver, whether a frame
-is awaited, and the pause and pace last sent. **`Sprites`** `{origin,
-side, tiles}`: a sprite and its image a superchunk that has been in
-view, by where it is in the world; **`about_origin(superchunks)`**,
+## `view.rs`
+
+`SPRITE_SIDE`, `PAN_SPEED`, `ZOOM_SPEED`, `WHEEL_ZOOM`, `FARTHEST` (32
+cells a screen pixel), `MAP_FARTHEST` (4,096), `UNLIMITED_SEEN` (3).
+**`Sprites`** `{tiles}`: a sprite and its image a superchunk that has
+been in view, by where it is in the world; **`origin(axis)`**: the
+plane's origin, the origin superchunk's top left;
 **`plane(cell, axis)`** and **`cell(plane, axis)`** between the world's
 cells and the plane, **`in_view(transform, scale, window)`**.
-`FARTHEST` (32 cells a screen pixel), `LINES_FROM`, `LINES`, `TILES_KEPT`. **`Seen`**: what the last frame said. **`NearView`**: the picture from
-near's sprite. **`Hud`**: the text.
-**`Boundary`**: a line between chunks or superchunks; **`Boundaries`**:
-which are shown (`SUPERCHUNK_LINE`, `CHUNK_LINE`); **`boundaries`**:
-shown and hidden by `B` and `C`, as wide on the screen however near.
+**`spawn`**: the camera. **`first_view(side, window, transform,
+projection)`**: the view over the whole of a world of a side, or the
+origin's halo. **`steer`**: the view moved and zoomed, unless the
+menus took the keys, the wheel or the pointer. **`fullscreen`**: by
+`F11`.
+
+## `overlays.rs`
+
+`LINES_FROM`, `LINES`, `SUPERCHUNK_LINE`, `CHUNK_LINE`.
+**`Boundary`**: a line between chunks or superchunks; **`Shown`**: which
+of the overlays are shown; **`toggle`**: by `B`, `C` and `H`.
+**`boundaries`**: as wide on the screen however near.
 **`Label`**: one of `LABELS` (256) texts; **`labels`**: the superchunks
 and chunks in view named in their top left corners, from
 `LABELLED_FROM` (150) screen pixels across, smaller where there is
 less room than `LABEL_WIDTH` (420), a chunk's a line (`LABEL_LINE`)
 below. **`HeightLabel`**: one of a grid of `HEIGHT_LABELS` (96 by 54)
-texts; **`heights`**: every cell's height written on it by `H`, from
-`HEIGHT_FROM` (20) screen pixels a cell.
+texts; **`heights`**: every cell's height written on it, as the world
+run is generated, from `HEIGHT_FROM` (20) screen pixels a cell.
+**`spawn`**: them all, hidden.
 
-**`grouped(number)`**: its digits in threes. **`setup`**: the camera over the world's middle, the whole of it in
-view; an image a superchunk, dirt until the first frame; the text.
-**`steer`**: the view moved and zoomed. **`fullscreen`**: the window
-over the whole screen by `F`. **`keys`**: pause and pace sent.
-**`picture(side, pixels)`**, **`picture_of(size, pixels)`**: an image;
-`DIRT`, one pixel of it. **`show`**: the frame that came shown -- each
-superchunk's image, and the picture from near. **`ask`**: the next
-asked for -- the superchunks the camera sees, how coarsely, on round
-them from the last, and from near the cells in view; fine images out
-of view dropped. **`hud`**: the text written.
+## `hud.rs`
+
+**`Hud`**: the text; **`spawn`**. **`grouped(number)`**: its digits in
+threes. `KEYS`. **`hud`**: what the last frame said written, hidden
+over the main menu.
+
+## `map.rs`
+
+`MARGIN` (64 pixels), `DEEP_LIGHT`, `BORDER_LIGHT`, `SLOPE_LIGHT`.
+**`Wanted`** `{first, step, size, seed, generation, borders}`: a map
+asked for; **`Drawn`**: one drawn. **`start()`**: the map's thread.
+**`cell(wanted, x, y)`**: the cell in a pixel's middle;
+**`draw(wanted)`**: its pixels, rows shared among the machine's threads,
+what grows on a cell as `worldgen::Growth` says. **`MapLink`**: the
+window's side of the thread -- **`start()`**. **`MapView`**: its
+picture; **`spawn`**. **`map_step(scale)`**. **`far`**: from farther
+than `FARTHEST`, a map of the world run asked for and laid where it is
+of; `P` draws the mesh's lines.

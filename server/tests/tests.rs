@@ -36,5 +36,5 @@ pub fn everything(world: &World) -> Everything {
 /// run's tests ask for: found from the crate's seed, rolled every few
 /// runs (`utilities::seed`), so that nothing passes on one seed alone.
 pub fn land_seed(nth: u64) -> u64 {
-    server::seed_with_land(utilities::seed::counted().wrapping_add(nth.wrapping_mul(1_000_003)), &worldgen::Shape::DEFAULT, coordinates::WORLD_MIDDLE)
+    worldgen::seed_with_land(utilities::seed::counted().wrapping_add(nth.wrapping_mul(1_000_003)), &worldgen::Shape::DEFAULT, coordinates::WORLD_MIDDLE)
 }

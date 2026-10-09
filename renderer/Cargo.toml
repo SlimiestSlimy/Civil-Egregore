@@ -2,11 +2,9 @@
 name = "renderer"
 version = "0.1.0"
 edition = "2024"
-description = "Civil Egregore on the screen: a Bevy window asking the simulation, on its own thread, for the cells in view"
+description = "Civil Egregore on the screen: a Bevy window asking the server's host, on its own thread, for the cells in view"
 
 [dependencies]
-simulation = { path = "../simulation" }
-entity_rules = { path = "../entity_rules" }
 utilities = { path = "../utilities" }
 gui = { path = "../gui" }
 server = { path = "../server" }
@@ -14,7 +12,6 @@ mc_rules = { path = "../mc_rules" }
 worldgen = { path = "../worldgen" }
 coordinates = { path = "../coordinates" }
 bitmap = { path = "../bitmap" }
-bitplane_manager = { path = "../bitplane_manager" }
 chunk_storage = { path = "../chunk_storage" }
 # Bevy for the window, the drawing and the keys only: no 3D, no audio.
 bevy = { version = "0.19", default-features = false, features = ["2d", "ui"] }

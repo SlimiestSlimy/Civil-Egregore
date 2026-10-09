@@ -144,9 +144,9 @@ the count with no change of work is looked for there first.
 
 ## Under full load: every superchunk hot
 
-In the renderer, every superchunk shown forced hot and grass growing
-everywhere (`cargo run --release -p renderer -- <superchunks> 1000 0 0
-1`), flat out: the rates are from the census, over the lines whose pace
+In the renderer, every superchunk of a world with a side forced hot
+(made from the main menu, the sliders' world group: its side, forced
+hot, 1,000 sheep a superchunk; then `T`), flat out: the rates are from the census, over the lines whose pace
 is 0. The flock grows as the run goes, and the ticks a second fall as
 it does. A world of 256 x 256 superchunks cannot be held hot at all:
 it does not fit in memory.
@@ -158,7 +158,8 @@ thread; the threads with light runs then waited for the heaviest, and
 12 threads were 41% busy flat out. Now each thread claims the next
 superchunk not yet claimed. Measured in the renderer, 256 superchunks
 shown (324 hot with their halos' rim), 8,000 sheep on each at the
-start, flat out (`cargo run --release -p renderer -- 256 8000 0`):
+start, flat out (then `cargo run --release -p renderer -- 256 8000 0`,
+since replaced by the main menu's sliders):
 
 | ticks | sheep | dealt out | claimed |
 |---|---|---|---|

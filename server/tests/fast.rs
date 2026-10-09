@@ -64,7 +64,7 @@ mod halos {
     /// never both; and the world has grown.
     #[test]
     fn the_hot_superchunks_are_the_halos() {
-        let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), flock: server::Flock::On(vec![WORLD_MIDDLE], 4_000), ..server::Start::default() });
+        let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), sheep: 4_000, ..server::Start::default() });
         assert_eq!(world.arena.superchunk_indices(), about([WORLD_MIDDLE].into_iter()), "the origin's halo");
         let mut moved = HaloChange::default();
         // 6,000 ticks at least, and on until a superchunk has been generated: on some seeds the flock is long in nearing an edge.
@@ -97,7 +97,7 @@ mod halos {
     /// it is due -- still wanted or not -- and then both hold.
     #[test]
     fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
-        let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), flock: server::Flock::On(vec![WORLD_MIDDLE], 4_000), ..server::Start::default() });
+        let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), sheep: 4_000, ..server::Start::default() });
         let try_both = |world: &mut World, cell| {
             world.arena.queue(GRASS, Write::cell(cell, WriteOp::Flip));
             let missed = world.arena.apply().missed;
@@ -124,7 +124,7 @@ mod halos {
     /// again, cooling across a save and a load, it goes cold when due.
     #[test]
     fn a_superchunk_cooling_stays_hot_until_due() {
-        let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), flock: server::Flock::On(vec![WORLD_MIDDLE], 1), ..server::Start::default() });
+        let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), sheep: 1, ..server::Start::default() });
         let halo = world.arena.superchunk_indices();
         let sheep = world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).next().expect("the sheep");
         let take_away = |world: &mut World| {
@@ -166,7 +166,7 @@ mod halos {
     /// lingering are kept; once flushed and let go, so decoded from its images.
     #[test]
     fn a_superchunk_gone_cold_comes_back_as_it_was() {
-        let mut world = server::start(server::Start { seed: crate::tests::land_seed(2), flock: server::Flock::On(vec![WORLD_MIDDLE], 2_000), ..server::Start::default() });
+        let mut world = server::start(server::Start { seed: crate::tests::land_seed(2), sheep: 2_000, ..server::Start::default() });
         // 500 ticks, and on to one with nothing warming or cooling: made cold and hot again by hand, one warming would not turn hot when it was due.
         while world.entities.now() < 500 || world.warming().next().is_some() || world.cooling().next().is_some() {
             assert!(world.entities.now() < 60_000, "the halos at rest");
@@ -180,7 +180,7 @@ mod halos {
             (cells, world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect(), world.simulation.random_states().collect())
         };
         let before = held(&world);
-        let mut twin = server::start(server::Start { seed: crate::tests::land_seed(2), flock: server::Flock::On(vec![WORLD_MIDDLE], 2_000), ..server::Start::default() });
+        let mut twin = server::start(server::Start { seed: crate::tests::land_seed(2), sheep: 2_000, ..server::Start::default() });
         for _ in 0..ticked {
             twin.tick();
         }
@@ -221,34 +221,40 @@ mod halos {
         assert!(held(&world) == held(&twin), "decoded as it was, and ticks on as it would have");
     }
 
-    /// A world of a size is never hot outside it, whoever wants it and
-    /// whatever the flock does; a save keeps its size; and with
-    /// no hot entity every superchunk of it is forced hot and stays so.
+    /// A world of a size has sheep on every superchunk of it, and is
+    /// never hot outside it, whoever wants it and whatever the flock
+    /// does; a save keeps its size. Forced hot, all of it is hot with no
+    /// sheep at all, and stays so, saved and loaded.
     #[test]
     fn a_world_of_a_size_is_hot_within_it_only() {
         let side = 4;
-        let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), side: Some(side), flock: server::Flock::On(vec![WORLD_MIDDLE], 4_000), ..server::Start::default() });
-        let halo = about([WORLD_MIDDLE].into_iter());
-        assert_eq!(world.arena.superchunk_indices(), halo, "the origin's halo, all of it within");
-        world.keep_hot(&about(halo.into_iter()));
+        let size = server::Size::Limited { side, forced: false };
+        let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), size, sheep: 500, ..server::Start::default() });
         let hot = world.arena.superchunk_indices();
-        assert!(hot.len() == (side * side) as usize && hot.iter().all(|&superchunk| world.halos.hot.within(superchunk)), "nothing made hot outside it, whoever wants it");
+        assert!(hot.len() == (side * side) as usize && hot.iter().all(|&superchunk| world.halos.hot.within(superchunk)), "sheep everywhere in it: all of it hot, nothing outside it");
+        assert!(hot.iter().all(|&superchunk| world.entities.superchunk(superchunk).is_some_and(|kept| !kept.is_empty())), "sheep on every superchunk");
+        world.keep_hot(&about(hot.into_iter()));
+        assert_eq!(world.arena.superchunk_indices().len(), (side * side) as usize, "nothing made hot outside it, whoever wants it");
         for _ in 0..2 * WARM_TICKS {
             world.tick();
             assert!(world.arena.superchunk_indices().into_iter().chain(world.warming().map(|(superchunk, _)| superchunk)).all(|superchunk| world.halos.hot.within(superchunk)));
         }
-
         let folder = server::transient_data::saves().join("tests").join("sized");
         _ = std::fs::remove_dir_all(&folder);
         server::save(&folder, &mut world).expect("saved");
-        let mut loaded = server::load(&folder).expect("loaded");
-        assert_eq!(loaded.halos.hot, world.halos.hot, "its size, kept");
+        assert_eq!(server::load(&folder).expect("loaded").halos.hot, world.halos.hot, "its size, kept");
 
-        loaded.halos.hot.entity = None;
+        let forced = server::Size::Limited { side, forced: true };
+        let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), size: forced, sheep: 0, ..server::Start::default() });
+        assert_eq!(world.arena.superchunk_indices().len(), (side * side) as usize, "forced hot: all of it, no sheep needed");
+        _ = std::fs::remove_dir_all(&folder);
+        server::save(&folder, &mut world).expect("saved");
+        let mut loaded = server::load(&folder).expect("loaded");
+        assert_eq!(loaded.halos.hot, world.halos.hot, "forced, kept");
         for _ in 0..=WARM_TICKS {
             loaded.tick();
         }
-        assert_eq!(loaded.arena.superchunk_indices().len(), (side * side) as usize, "forced hot: all of it");
+        assert_eq!(loaded.arena.superchunk_indices().len(), (side * side) as usize, "forced hot: all of it, all the while");
         assert_eq!((loaded.warming().count(), loaded.cooling().count()), (0, 0));
     }
 }
@@ -270,7 +276,7 @@ mod world {
     #[test]
     fn a_world_loaded_goes_on_as_the_one_saved() {
         let folder = folder("goes_on");
-        let mut first = server::start(server::Start { seed: crate::tests::land_seed(0), flock: server::Flock::On(vec![coordinates::WORLD_MIDDLE], 3_000), ..server::Start::default() });
+        let mut first = server::start(server::Start { seed: crate::tests::land_seed(0), sheep: 3_000, ..server::Start::default() });
         for _ in 0..1_500 {
             first.tick();
         }
@@ -298,7 +304,7 @@ mod world {
     #[test]
     fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
         // At least 4,000 ticks, and on until a superchunk has been warming: on some seeds the flock is long in nearing an edge.
-        let mut straight = server::start(server::Start { seed: crate::tests::land_seed(0), flock: server::Flock::On(vec![coordinates::WORLD_MIDDLE], 4_000), ..server::Start::default() });
+        let mut straight = server::start(server::Start { seed: crate::tests::land_seed(0), sheep: 4_000, ..server::Start::default() });
         let mut warming = None;
         while straight.entities.now() < 4_000 || warming.is_none() {
             assert!(straight.entities.now() < 60_000, "a superchunk warming on the way");
@@ -310,7 +316,7 @@ mod world {
         let (warming, until) = (warming.expect("seen above"), straight.entities.now());
 
         let folder = folder("mid_run");
-        let mut stopped = server::start(server::Start { seed: crate::tests::land_seed(0), flock: server::Flock::On(vec![coordinates::WORLD_MIDDLE], 4_000), ..server::Start::default() });
+        let mut stopped = server::start(server::Start { seed: crate::tests::land_seed(0), sheep: 4_000, ..server::Start::default() });
         let mut stops = vec![1, 700, 701, 1_900, 3_333, warming, until];
         stops.sort_unstable();
         stops.dedup();
@@ -335,7 +341,7 @@ mod world {
     #[test]
     fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
         let folder = folder("files");
-        let mut first = server::start(server::Start { seed: 99, flock: server::Flock::On(vec![coordinates::WORLD_MIDDLE], 10), ..server::Start::default() });
+        let mut first = server::start(server::Start { seed: 99, sheep: 10, ..server::Start::default() });
         server::save(&folder, &mut first).expect("saved");
         let text = std::fs::read_to_string(folder.join("world.csv")).expect("the world's file");
         let generation: String = first.generation.numbers().iter().map(|(name, value)| format!("generation {name},{value}\n")).collect();
@@ -355,7 +361,7 @@ mod world {
     fn files_that_are_not_a_save_are_refused() {
         let folder = folder("refused");
         assert!(matches!(server::load(&folder), Err(DiskError::Io(..))), "no such folder");
-        server::save(&folder, &mut server::start(server::Start { seed: 1, flock: server::Flock::On(vec![coordinates::WORLD_MIDDLE], 10), ..server::Start::default() })).expect("saved");
+        server::save(&folder, &mut server::start(server::Start { seed: 1, sheep: 10, ..server::Start::default() })).expect("saved");
         let state = std::fs::read_dir(folder.join("superchunks")).unwrap().map(|entry| entry.unwrap().path()).find(|path| path.extension().unwrap() == "state").unwrap();
         let whole = std::fs::read(&state).unwrap();
         std::fs::write(&state, &whole[..whole.len() - 8]).unwrap();
@@ -375,7 +381,7 @@ mod world {
         // Small polygons joined by cliffs, and a seed whose origin superchunk has walls enough.
         let shape = worldgen::Shape { span: 8, highest: 552, narrow: 2, wide: 2, sea: 0, finer_depth: 3, ..worldgen::Shape::DEFAULT };
         let seed = (utilities::seed::counted()..).find(|&seed| worldgen::Terrain::generate_shaped(&shape, seed, coordinates::WORLD_MIDDLE).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
-        let mut made = server::start(server::Start { seed, generation: server::Generation { shape, ..server::Generation::DEFAULT }, flock: server::Flock::On(vec![coordinates::WORLD_MIDDLE], 4_000), ..server::Start::default() });
+        let mut made = server::start(server::Start { seed, generation: worldgen::Generation { shape, ..worldgen::Generation::DEFAULT }, sheep: 4_000, ..server::Start::default() });
         // The superchunk's heights and a cell more all round, worked out once: asked for at every sheep, every tick.
         let (corner, side) = (coordinates::WORLD_MIDDLE.top_left().cartesian(), coordinates::SUPERCHUNK_SIDE_CELLS as usize + 2);
         let mut lands = worldgen::mesh::Lands::new(&shape, seed);

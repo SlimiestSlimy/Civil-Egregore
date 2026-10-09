@@ -36,4 +36,6 @@ tree cover,0,1,trees,The share of dry land that starts with a tree.
 tree patch size (2^),1,10,trees,"How broad a wood is: 2 to this power, in cells."
 tree patch detail,0,2,trees,How ragged the woods' edges are.
 tree scatter,0,2,trees,"How much each cell's own lot counts: lone trees, not woods."
-sheep a superchunk,0,16000,sheep,"How many sheep each superchunk the lab shows starts with, each on a cell of its own drawn by lot. None, and the lab is land alone."
+world side,0,64,world,"How many superchunks along a side the world is, a square about its origin: nothing outside it is ever made or hot. 0 is no limit: as far as coordinates reach."
+forced hot,0,1,world,"1, and every superchunk of the world is hot from the start and kept so, whatever its sheep do: a fixed load. Only a world with a side can be: with none, it is hot about its sheep whatever this says."
+sheep a superchunk,0,16000,world,"How many sheep each superchunk starts with, each on a cell of its own drawn by lot: every superchunk of a world with a side; with none, the origin's alone, as sheep everywhere would keep the whole of an endless world hot."

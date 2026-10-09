@@ -48,10 +48,14 @@ kind)`**: an edit of any entity in reach; **`remove(header)`**.
 
 ## `hot.rs`
 
-**`Hot`** `{side, entity}`: the world's size and the hot entity --
-**`about(entity)`**, **`span()`**, **`within(superchunk)`**,
-**`wanted(entities)`**: the superchunks to be hot, or nothing where
-they are forced in a world of no size. **`about(of)`**: the 3x3
+**`Hot`**: `About {entity, side}` -- every entity of the kind keeps
+its halo hot, in a world of `side` superchunks a side if it has one --
+or `Forced {side}`: every superchunk of a world of that side hot,
+whatever its entities do; only a world with a side can be forced.
+**`about(entity)`**: a world of no size, about `entity`;
+**`side()`**, **`span()`**, **`within(superchunk)`**, **`all()`**:
+every superchunk of a world with a side, none of one without;
+**`wanted(entities)`**: the superchunks to be hot. **`about(of)`**: the 3x3
 superchunks about each, sorted, each once.
 
 ## `halos.rs`

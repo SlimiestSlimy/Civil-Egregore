@@ -4,22 +4,25 @@ The design is in `world.md`.
 
 ## `lib.rs`
 
-`FLOCK` (4,000): the sheep the origin starts with, unless told.
+`FLOCK` (4,000): the sheep a superchunk starts with, unless told.
 **`World`** `{info, generation, arena, storage, entities, simulation,
 cold, halos}` -- **`cold`**, each cold superchunk's state as a save
 keeps it; **`halos`**, the simulation's -- and
-**`World::empty(info, generation, forced, threads)`**, what generating
-and loading start from; **`layer_types`**. **`seed_with_land(from,
-shape, near)`**: the first seed from `from` with land three
-superchunks each way about `near` -- what the renderer and the tests
-make their worlds from, a flock not bound to `WORLD_MIDDLE`.
-**`start(options)`**: a **`Start`** `{seed, generation, side, forced,
-threads, flock}` made into a world -- `forced`, every superchunk hot
-throughout instead of about the hot entity's halo; `threads`, every
-one the machine has if `None`; its **`Flock`**, `None` or
-`On(superchunks, sheep)`, put on and its halo hot;
-`Start::default()`: seed 1, the default generation, no size, about the
-halo, every thread, `FLOCK` on the origin (`WORLD_MIDDLE`).
+**`World::empty(info, generation, threads)`**, what generating and
+loading start from, hot as `info` says: forced throughout if it has a
+side and is forced, else about the hot entity's halo; **`layer_types`**.
+**`Size`**: `Unlimited`, or `Limited {side, forced}` -- so many
+superchunks along a side, a square about the origin, and whether
+every one of them is hot throughout, which only a world with a side
+can be; **`Size::from_tuning(tuned)`**: as the sliders have it, a
+side of 0 no limit.
+**`start(options)`**: a **`Start`** `{seed, generation, size,
+threads, sheep}` made into a world -- `threads`, every one the machine
+has if `None`; `sheep` on every superchunk of a world with a side, on
+the origin (`WORLD_MIDDLE`) alone of one without, as sheep everywhere
+would keep the whole of an endless world hot; their halos hot, or, of
+a world forced hot, all of it. `Start::default()`: seed 1, the default
+generation, no size, every thread, `FLOCK` on the origin.
 **`generate_image(seed, superchunk, codec)`**: a superchunk's terrain
 and pasture, from the seed and its superchunk index.
 **`save(folder, world)`**: every dirty bitmap written back and the
@@ -101,16 +104,48 @@ flock, time a sample and a wake, rates, what is held and the census
 
 ## Generation
 
-**`Generation`** `{shape, grass, trees}`: how superchunks are generated;
-`Generation::DEFAULT`; `TREES_SALT`; **`numbers()`** and
-**`of_numbers(numbers)`**: its numbers by name, as a world's file
-keeps them (`numbers!`). **`generate_sized(generation, seed, side)`**:
-what `start` builds a world from, generated so, a size if given one,
-nothing hot yet -- and what a way of generating is tried out on by
-itself. **`flocked(world, superchunks, sheep)`**: what `start` builds a
-flock from, put on a world with nothing in it yet -- and what a flock
-is tried out on by itself.
-**`generate_image(generation, seed, superchunk, codec)`**:
+How a world is generated is `worldgen`'s (`worldgen::Generation`,
+saved with the world, a number a row). **`generate_sized(generation,
+seed, size, threads)`**: what `start` builds a world from, generated
+so, as far as its size lets it reach, nothing hot yet -- and what a way
+of generating is tried out on by itself. **`flocked(world,
+superchunks, sheep)`**: what `start` builds a flock from, put on a
+world with nothing in it yet -- and what a flock is tried out on by
+itself. **`generate_image(generation, seed, superchunk, codec)`**:
 terrain, the ocean where it is under the ocean's level, and on the rest
-grass and trees with their stages. `World::generation`
-is not saved: a world loaded goes on with the default.
+grass and trees with their stages, as `Generation::growth` says of
+each cell.
+
+## `host/mod.rs`
+
+A world run on a thread of its own for a client -- a window -- that
+asks it for the cells in view. `TARGET_PACE` (256 ticks a second),
+`CENSUS_EVERY` (1,000 ticks), `CATCH_UP`. **`Request`**: `Sync(ask)`
+-- answered with a `Frame`, unless no world runs -- `Pause(bool)`,
+`Pace(ticks a second, or flat out)`, `New(start)`, `Open(name)` -- that
+world of the worlds' folder run in place of the one run -- and
+`Save(name)`. **`census_path()`**: where a run's census is kept
+(`transient_data/measurements/census.csv`); **`census(seed)`**: its
+file, started afresh for each world. **`start()`**: the host on a
+thread named `host`, no world run yet; where to send requests, where
+frames come back. **`Running`**: the world run, the superchunks whose
+heights were sent, when it began, its census. **`Host`**: the world
+run if any, the worlds run so far, paused, the pace, the name, what
+was last said -- **`run`**: requests read between ticks, a tick, and a
+wait for the next one's time; paused or with no world, it waits for a
+request; **`run_world`**, **`save`**, **`frame(ask)`**, **`tick`**.
+
+## `host/frame.rs`
+
+`CHUNK_WORDS`, `DEEP` (16). **`Viewport`** `{first, last}`: the
+superchunks in view. **`Ask`** `{viewport, detail, skip, most, near}`:
+what a frame is to carry; **`asked()`**, those it asks for.
+**`Near`** `{first, size, pixels_a_cell}`: the cells seen from near.
+**`Cells`**: a superchunk's planes copied -- grass, trees, their
+stages, water -- its heights the first frame it is hot in, its
+sheep's cells. **`Frame`** `{world, seed, generation, side, tick,
+ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, detail,
+near, named, said, cells}`: `world` counts the worlds the host has
+run, so a client knows what it drew is of another. **`count(world,
+layer_type)`**; **`copy(world, ask, sent)`** (**`layer`**,
+**`sheep`**); **`Water`**: a superchunk's water off its image, kept.
