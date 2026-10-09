@@ -124,7 +124,7 @@ Windows and Linux alike.
 
 `NAMES`: the numbers' names, each at its place, and the places
 (`STEP_LIGHT` ... `SHEEP`), by **`places!`**. **`Tuned`** `{name,
-line, range, group, what}` -- `what` the tooltip -- and
+line, range, group, toggle, what}` -- `toggle` on or off, not dragged -- -- `what` the tooltip -- and
 **`tuned(index)`**: a number as the sliders' file (`sliders.csv`, at
 the crate's root) has it. **`Group`**: `Shading`, `Land`,
 `Lines`, `Finer`, `Grass`, `Trees`, `World` (`GROUPS`, in the menu's

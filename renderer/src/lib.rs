@@ -46,9 +46,6 @@
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
-// On Windows a window alone: no console opened beside it, as one is
-// for a program that does not say so. It prints nothing.
-#![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod frames;
 mod ground;

@@ -26,6 +26,9 @@ pub struct Tuned {
     pub range: (f32, f32),
     /// The group of sliders it is in.
     pub group: Group,
+    /// Whether it is a toggle: on or off, its range's ends, set by a
+    /// click and not dragged.
+    pub toggle: bool,
     /// What it does, said to whoever rests the pointer on its slider.
     pub what: &'static str,
 }
@@ -140,7 +143,8 @@ places! {
 }
 
 /// The sliders, as written by hand, in CSV: a row each -- its number's name,
-/// the least and the most its knob reaches, its group, what it does.
+/// the least and the most its knob reaches, its group, whether it is a
+/// slider or a toggle, what it does.
 const SLIDERS: &str = include_str!("../sliders.csv");
 
 /// The `index`-th number, as the sliders' file has it, which has
@@ -152,11 +156,16 @@ pub fn tuned(index: usize) -> &'static Tuned {
         let rows: &'static [Vec<String>] = crate::csv::rows_named(SLIDERS).leak();
         NAMES.map(|name| {
             let (line, row) = rows.iter().enumerate().find(|(_, row)| row[0] == name).expect("every number has a row in the sliders' file");
-            let [_, least, most, group, what] = &row[..] else {
-                panic!("a slider's row has its name, its range, its group and what it does");
+            let [_, least, most, group, kind, what] = &row[..] else {
+                panic!("a slider's row has its name, its range, its group, its kind and what it does");
             };
             let range = [least, most].map(|end| end.parse().expect("a range's end is a number"));
-            Tuned { name, line, range: (range[0], range[1]), group: GROUPS.into_iter().find(|listed| listed.name() == group).expect("a slider's group is one of the groups"), what }
+            let toggle = match kind.as_str() {
+                "toggle" => true,
+                "slider" => false,
+                other => panic!("a slider's kind is `slider` or `toggle`, not `{other}`"),
+            };
+            Tuned { name, line, range: (range[0], range[1]), toggle, group: GROUPS.into_iter().find(|listed| listed.name() == group).expect("a slider's group is one of the groups"), what }
         })
     })[index]
 }

@@ -54,9 +54,10 @@ Builds are for the x86-64 processors since about 2013 to 2015
 many machines. They are one cargo workspace: one lock file and one `target/`, here at
 the root, whichever folder cargo is run from, on the toolchain
 `rust-toolchain.toml` names. `cargo test` at the root tests every crate
-but the renderer and its menus (`gui/`), which bring Bevy; the renderer is asked for by name:
-`cargo run --release -p renderer`. Run from a crate's folder, cargo keeps
-to that crate. Only the root and the renderer are programs: every other
+but the renderer and its menus (`gui/`), which bring Bevy. Run from a
+crate's folder, cargo keeps to that crate. Only the root is a program
+-- `cargo run --release` with no more said opens the window, and
+`--no-default-features` builds it without the renderer: every other
 crate is a library, and its diagnostics tools are run through the root,
 by the crate's name -- `cargo run --release -- server pasture`,
 `cargo run --release -- tessera measurement`.
@@ -66,9 +67,11 @@ code, so it is never out of date. Tessera's
 external benchmarks are a workspace of their own, so the codecs they
 compare against never enter this build.
 
-`cargo windows` builds for Windows what `cargo build --release` builds
-for the machine it runs on -- `cargo windows -p renderer` the renderer
--- into `target/x86_64-pc-windows-gnu/release/`. Rust brings the
+`cargo windows_rr` builds for Windows what `cargo build --release`
+builds for the machine it runs on -- the one program, window and
+commands both -- into `target/x86_64-pc-windows-gnu/release/`. Started
+by a click it opens the window and lets go of the console Windows
+gives it; started with a command, it prints where it was typed. Rust brings the
 compiler and its own libraries for Windows (`rust-toolchain.toml`) but
 not Windows' own, which the link needs: on Linux **MinGW must be
 installed** -- `mingw-w64-gcc` on Arch, `gcc-mingw-w64-x86-64` on
