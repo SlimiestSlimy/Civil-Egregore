@@ -12,11 +12,11 @@ steps, `MEAL_TICKS` (6,912), `STARVE_TICKS` (13,824),
 `ROAM_TICKS` (3,456), `LIFE_TICKS` (172,800),
 `GESTATION_TICKS` (1,152), `LAMB_TICKS` (4,608).
 
-**`rule(turn)`**: hands **`wake`**, the rule for one sheep, to `entities::each_woken`, with a **`Flock`** (the counts, and room for attributes). Every sheep waking on the superchunk's turn sees to
+**`rule(turn)`**: hands **`wake`**, the rule for one sheep, to `read::entities::each_woken`, with a **`Flock`** (the counts, and room for attributes). Every sheep waking on the superchunk's turn sees to
 what it woke for and sleeps as long as it can. Hungry (past
 `HUNGRY_AT`) and on grass, it eats it, and is hungry again `MEAL_TICKS`
 on; hungry `STARVE_TICKS` with no meal, it dies. Its lamb due, it is
-born on a cell seen free beside it (`around::free_beside`),
+born on a cell seen free beside it (`read::around::free_beside`),
 or waited for; it falls pregnant on a meal on lush pasture
 (`LUSH_CELLS` of the area about it grass, `Area::count`; one in
 `CONCEIVE_ONE_IN`) if grown; a meal on pasture not lush, it is `ROAMING`
@@ -30,7 +30,7 @@ reaches (`Turn::seek`, one step a wake), else
 onto any hot neighbour (`around::pick`), without looking whether an
 entity stands there: the step is turned back if one does -- and wakes a
 step's time on (**`next_step`**). What it came to is queued by
-`entities::commit`: a move, unless an attribute changed. Before a
+`write::entities::commit`: a move, unless an attribute changed. Before a
 sleep it dies of old age at the sleep's ticks in `LIFE_TICKS`. Returns
 **`SheepCounts`** `{woken, eaten, births, deaths, sought, paths,
 far}` -- paths looked for, found, and found beyond the area -- added with `+=`.
