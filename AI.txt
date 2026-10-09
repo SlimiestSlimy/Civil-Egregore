@@ -17,10 +17,9 @@ LOCAL (the user's PC, has a screen)
   census.csv (ticks, the seconds they took, the pace, sheep, grass).
 
 REMOTE (cloud, no screen)
-  NEVER build, check, clippy or test gui or renderer -- nothing that
-  compiles Bevy. Renderer changes are made by reading and reviewing the
-  diff, and are compiled later on the local machine: say so in the
-  commit message and to the user.
+  gui and renderer: only `cargo check --offline -p gui` / `-p renderer`
+  (debug, no --release) is allowed. Never build, run, clippy or test
+  them remotely; the renderer is run on the local machine.
   Never `--workspace` (it builds Bevy). Per crate:
     cargo test   --release --offline -p <crate>
     cargo clippy --release --offline -p <crate> --all-targets
@@ -74,10 +73,14 @@ REMOTE (cloud, no screen)
 - A rule (entity_rules/, mc_rules/) reaches the simulation only
   through instructions/: what it lacks is added there.
 - What is hot and for how long is the simulation's (simulation::halos);
-  the server says which entity keeps the world hot, hands over what
-  generates a superchunk, and passes on the viewport if the camera
-  loads superchunks (World::keep_viewport, at most 8x8 about its
-  middle).
+  the server only defines it (server::hot_of -> simulation::Hot:
+  About { entity, side, viewport } or Forced), hands over what
+  generates a superchunk, and passes each frame's viewport to
+  Halos::keep_viewport. With Hot::About.viewport (the world's camera
+  loads superchunks) EVERY superchunk of the viewport is hot, unioned
+  with the entity halos, independent of them -- no cap (the old 8x8
+  CAMERA_SIDE was an unrequested invention, removed). Off: only the
+  entities make superchunks hot.
 - server owns a world's start (server::Start); the CLI and the gui
   both feed it.
 - The renderer asks the host (server::host) for frames; the host never
@@ -103,6 +106,54 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
 
 == OPEN THREADS ==
 
+- HANDOFF (remote session stopped mid-task; continue locally). User's
+  asks: (1) no viewport cap -- DONE, see WHERE THINGS GO; (2) hot
+  behaviour in simulation, defined by server -- DONE; (3) worldgen
+  sliders changed over a running world call a server reset() that
+  pulls the new worldgen numbers, the rest of the start as usual -- NO
+  slider-side generation/revision counter.
+  Done for (3):
+    server: Host::reset(&Tuning) -> Request::Reset(Box<Generation>);
+      host thread keeps the last one (self.reset), applies it after the
+      requests drained / before Save, dropped by New/Open
+      (HostThread::reset_now). Running keeps its `start: Start`;
+      opened worlds get Start::of_world(&info, generation) (sheep =
+      camera_flock or FLOCK). run_world drops the old world first.
+      Remade world: named None, said "the world remade from seed ...".
+      Frame.world (the per-run world counter, not a slider number)
+      bumps, so the renderer drops stale tiles.
+      Test: server/tests/fast.rs host::a_reset_makes_the_world_again_as_retuned (passes).
+    utilities::tuning: GROUPS reordered (World last); makes_worlds()
+      replaced by setup_only() (World only).
+    gui: Offered::Shading renamed Offered::Running (every group but
+      setup-only); spawn.rs menu counts/assert updated; lib.rs offer.
+      UNCHECKED: run `cargo check -p gui` first.
+  To do for (3):
+    renderer/src/link.rs: a system (all screens, after gui::Worked)
+      that on CurrentTuning change computes Generation::from_tuning;
+      if it differs from the last one so computed (keep it in Link,
+      first sight just stores it -- NOT compared with frame.generation,
+      or a shading slider would remake an opened world of other
+      numbers) and Screen::World and a world runs, calls
+      link.host.reset(&tuning.0) and link.forget_asked(). Register in
+      renderer/src/lib.rs next to link::shading.
+    renderer/src/frames.rs show(): a new Frame.world calls first_view
+      (moves the camera). After a reset the view should stay: e.g. a
+      Link flag set on reset, cleared on make/open, skipping first_view.
+    Docs still to fix: gui/docs/gui.md (~l.44 "only those that make no
+      worlds"), gui/docs/reference.md (Offered list), utilities/docs/
+      reference.md (makes_worlds, GROUPS order), server/docs/server.md
+      (~l.59 CAMERA_SIDE, keep_viewport) and reference.md (~l.60-69;
+      add Host::reset, Start::of_world, hot_of), simulation docs
+      (Viewport now in simulation::halos, Hot::About.viewport,
+      Hot::span pub), renderer docs, docs/glossary.md (viewport,
+      camera loading rows mention CAMERA_SIDE/World::keep_viewport;
+      group/tuning rows; maybe add "reset").
+    Then clippy per crate, cargo check gui/renderer, commit, push.
+  Tell the user: memory is ~3.7 MiB a hot superchunk (64 held 234 MiB,
+  docs/tilesim.md), so 10,000 viewport superchunks ~ 36 GiB; at the
+  farthest zoom the viewport is millions. Offer (don't impose) a cap
+  slider.
 - Renderer and gui changes since the last local build are uncompiled:
   build locally first, fix what the compiler says.
 - Area allocator: 256 MiB blocks, 256-byte units, sorted interval list,

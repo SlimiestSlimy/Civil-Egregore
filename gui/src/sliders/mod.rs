@@ -10,8 +10,9 @@
 //!   the menu ([`slide`]). Resting the pointer on a slider's row says
 //!   what it does ([`tell`]).
 //!
-//! The groups that say how a world is made are offered while one is
-//! being set up; over a world, only the rest. What is longer than the
+//! Every group is offered while a world is being set up; over a world
+//! running, all but those only of setting one up -- a slider of how it
+//! is generated making it again from its start. What is longer than the
 //! window is scrolled by the wheel, the pointer over it.
 //!
 //! All is laid out by plain arithmetic -- a row each, a track of a
@@ -70,8 +71,8 @@ pub enum Offered {
     Hidden,
     /// Every group: a world is being set up.
     Everything,
-    /// The groups that make no worlds: a world is shown.
-    Shading,
+    /// Every group but those only of setting a world up: a world runs.
+    Running,
 }
 
 /// The sliders: what of them is shown, and what the pointer and the
@@ -134,7 +135,7 @@ impl Sliders {
     /// The groups the menu lists.
     fn listed(&self) -> impl Iterator<Item = Group> + use<> {
         let everything = self.offered == Offered::Everything;
-        GROUPS.into_iter().filter(move |group| everything || !group.makes_worlds())
+        GROUPS.into_iter().filter(move |group| everything || !group.setup_only())
     }
 
     /// The group shown, if one is.

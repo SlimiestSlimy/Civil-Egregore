@@ -1,7 +1,8 @@
 //! What is tuned by eye: the numbers a window's sliders set, in
-//! groups -- the near view's shading, which a painter reads each frame,
-//! and how a new world is made ([`Group::makes_worlds`]), read once
-//! when one is. The numbers are a value ([`Tuning`]), held by whoever
+//! groups -- the near view's shading, which a painter reads each frame;
+//! how a world is generated, read when one is made, or made again
+//! while it runs; and what a world is set up with, read only when one
+//! is made ([`Group::setup_only`]). The numbers are a value ([`Tuning`]), held by whoever
 //! sets them and handed to whoever reads them: nothing of them is
 //! held here.
 //!
@@ -50,8 +51,9 @@ pub enum Group {
     Trees,
 }
 
-/// The groups, in the order the menu lists them.
-pub const GROUPS: [Group; 7] = [Group::Shading, Group::World, Group::Land, Group::Lines, Group::Finer, Group::Grass, Group::Trees];
+/// The groups, in the order the menu lists them: those only of
+/// setting a world up last.
+pub const GROUPS: [Group; 7] = [Group::Shading, Group::Land, Group::Lines, Group::Finer, Group::Grass, Group::Trees, Group::World];
 
 impl Group {
     /// Its name, as the menu has it.
@@ -67,11 +69,12 @@ impl Group {
         }
     }
 
-    /// Whether it says how a new world is made: read when one is, and
-    /// shown only while one is being set up. Every group but the near
-    /// view's shading, which is shown while a world runs.
-    pub const fn makes_worlds(self) -> bool {
-        !matches!(self, Self::Shading)
+    /// Whether it is only of setting a world up -- read when one is
+    /// made, and shown only then: the world's own group. The shading is
+    /// shown while a world runs, and so is how it is generated, the
+    /// world made again from its start as it changes.
+    pub const fn setup_only(self) -> bool {
+        matches!(self, Self::World)
     }
 }
 

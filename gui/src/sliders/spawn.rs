@@ -39,10 +39,10 @@ fn over_menus(z: i32) -> GlobalZIndex {
 /// filled part and a knob each.
 ///
 /// The menu is made twice -- its panel and first row -- once for every
-/// group, and once for those that make no worlds: listed first, they
-/// are the same rows in both.
+/// group, and once for those offered over a world running: listed
+/// first, they are the same rows in both.
 pub fn spawn(mut commands: Commands) {
-    debug_assert!(GROUPS.is_sorted_by_key(|group| group.makes_worlds()), "the groups that make no worlds are listed first");
+    debug_assert!(GROUPS.is_sorted_by_key(|group| group.setup_only()), "the groups only of setting a world up are listed last");
     let placed = |top: f32, right: f32, width: Val, height: f32| Node { position_type: PositionType::Absolute, top: Val::Px(top), right: Val::Px(right), width, height: Val::Px(height), ..default() };
     let text = |words: &str| (Text::new(words), TextFont { font_size: FontSize::Px(NAME), ..default() });
     let within = |row: usize, height: f32| middle(row) - height / 2.0;
@@ -59,13 +59,13 @@ pub fn spawn(mut commands: Commands) {
     let (head, entry) = (Color::srgb(0.22, 0.22, 0.22), Color::srgb(0.14, 0.14, 0.14));
     panel(&mut commands, Shown::Closed, None, CLOSED, 1);
     bar(&mut commands, Shown::Closed, None, 0, CLOSED, "sliders", head);
-    let shading = GROUPS.into_iter().filter(|group| !group.makes_worlds()).count();
-    for (everything, groups) in [(true, GROUPS.len()), (false, shading)] {
+    let running = GROUPS.into_iter().filter(|group| !group.setup_only()).count();
+    for (everything, groups) in [(true, GROUPS.len()), (false, running)] {
         panel(&mut commands, Shown::Menu, Some(everything), PANEL, 1 + groups);
         bar(&mut commands, Shown::Menu, Some(everything), 0, PANEL, "sliders: a group to open, here or U to close", head);
     }
     for (row, group) in GROUPS.into_iter().enumerate() {
-        bar(&mut commands, Shown::Menu, group.makes_worlds().then_some(true), 1 + row, PANEL, group.name(), entry);
+        bar(&mut commands, Shown::Menu, group.setup_only().then_some(true), 1 + row, PANEL, group.name(), entry);
     }
     for group in GROUPS {
         spawn_group(&mut commands, group);

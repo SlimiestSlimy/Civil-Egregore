@@ -1,13 +1,13 @@
 //! The world's halos: the simulation's (`simulation::halos`), lent
 //! what the world holds and what generates a superchunk never made --
-//! and, if its camera loads superchunks, told the viewport's, a flock
-//! put on each of them generated.
+//! and, if its camera loads superchunks, a flock put on each one
+//! generated in the viewport. Which are hot, the viewport's among them,
+//! is the simulation's to say, as the world's hot defines it.
 
-use crate::host::frame::Viewport;
 use crate::{generate_image, World};
 use chunk_storage::jobs::Generate;
 use chunk_storage::LayerCodec;
-use coordinates::{SuperchunkIndex, WORLD_SIDE_SUPERCHUNKS};
+use coordinates::SuperchunkIndex;
 use entity_manager::EntityType;
 use entity_rules::sheep::SHEEP;
 use simulation::halos::{HaloChange, Halos, Held};
@@ -16,11 +16,6 @@ use simulation::halos::{HaloChange, Halos, Held};
 /// matters, about which the world is ticked. For now the sheep -- the
 /// only kind there is -- stand in for the people to come.
 pub const HOT_ENTITY: EntityType = SHEEP;
-
-/// Superchunks along a side of the square of the viewport a camera
-/// loads at most, about its middle: a camera zoomed far out keeps no
-/// more than 64 hot for being seen.
-pub const CAMERA_SIDE: u32 = 8;
 
 impl World {
     /// Has the halos do `work` on what the world holds.
@@ -51,29 +46,6 @@ impl World {
             }
         }
         change
-    }
-
-    /// Keeps the superchunks of `viewport` -- what the renderer renders,
-    /// none if it renders none of the world's cells -- hot from the next
-    /// tick on, as a halo's are, in place of the last viewport's -- if
-    /// the world's camera loads superchunks: at most [`CAMERA_SIDE`]
-    /// along a side, about its middle, and none outside the world.
-    pub fn keep_viewport(&mut self, viewport: Option<Viewport>) {
-        if self.info.camera_flock.is_none() {
-            return;
-        }
-        let Some(viewport) = viewport else {
-            self.halos.keep_viewport(Vec::new());
-            return;
-        };
-        let span = |first: u32, last: u32| {
-            let last = last.min(WORLD_SIDE_SUPERCHUNKS - 1);
-            let first = first.min(last);
-            let start = ((first + last).div_ceil(2)).saturating_sub(CAMERA_SIDE / 2).max(first);
-            start..=last.min(start + CAMERA_SIDE - 1)
-        };
-        let (across, down) = (span(viewport.first.0, viewport.last.0), span(viewport.first.1, viewport.last.1));
-        self.halos.keep_viewport(down.flat_map(|y| across.clone().map(move |x| SuperchunkIndex::from_cartesian(x, y))).collect());
     }
 
     /// Makes `wanted` -- sorted -- the hot superchunks now, none

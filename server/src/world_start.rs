@@ -4,6 +4,7 @@
 //! knows what they mean.
 
 use crate::halos::HOT_ENTITY;
+use chunk_storage::disk::WorldInfo;
 use coordinates::WORLD_MIDDLE;
 use entity_manager::EntityType;
 use std::hash::{BuildHasher, RandomState};
@@ -54,7 +55,7 @@ impl Size {
 /// hot about the entities of the kind `hot_entity`, unless forced hot,
 /// their halos hot before it ticks; and, if `camera_loads`, about the
 /// viewport's superchunks too, each generated in the viewport given
-/// `sheep` of its own (`World::keep_viewport`).
+/// `sheep` of its own (`simulation::Halos::keep_viewport`).
 #[derive(Clone, Copy, Debug)]
 pub struct Start {
     /// The seed its superchunks are generated from.
@@ -99,6 +100,16 @@ impl Start {
         let size = Size::of_side(side, forced).expect("forced hot only with a side");
         let seed = seed.unwrap_or_else(|| drawn_seed(&generation));
         Self { seed, generation, size, sheep: tuning[SHEEP].max(0.0) as usize, camera_loads: !forced && tuning[CAMERA_LOADS] >= 0.5, ..Self::default() }
+    }
+
+    /// What the world `info` is of started from, as far as it says: its
+    /// seed, generation, size, hot entity and camera -- and the sheep
+    /// its camera puts on a superchunk, or if it puts none [`FLOCK`], as
+    /// a world's file keeps no other; on every thread the machine has.
+    pub fn of_world(info: &WorldInfo, generation: Generation) -> Self {
+        let size = Size::of_side(info.side.unwrap_or(0), info.forced).unwrap_or(Size::Unlimited);
+        let sheep = info.camera_flock.map_or(FLOCK, |sheep| sheep as usize);
+        Self { seed: info.seed, generation, size, sheep, hot_entity: info.hot_entity.map_or(HOT_ENTITY, EntityType), camera_loads: info.camera_flock.is_some(), ..Self::default() }
     }
 }
 
