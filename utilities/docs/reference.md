@@ -126,10 +126,11 @@ Windows and Linux alike.
 (`STEP_LIGHT` ... `SHEEP`), by **`places!`**. **`Tuned`** `{name,
 line, range, group, what}` -- `what` the tooltip -- and
 **`tuned(index)`**: a number as the sliders' file (`sliders.csv`, at
-the crate's root) has it. **`Group`**: `Shading`, `World`, `Land`,
-`Lines`, `Finer`, `Grass`, `Trees` (`GROUPS`, in the menu's order, the
-one that makes no worlds first), **`name()`** and
-**`makes_worlds()`** -- every group but shading. **`Tuning`**: the
+the crate's root) has it. **`Group`**: `Shading`, `Land`,
+`Lines`, `Finer`, `Grass`, `Trees`, `World` (`GROUPS`, in the menu's
+order, the world's own last), **`name()`** and
+**`setup_only()`** -- the world's group alone, read only when a world
+is made. **`Tuning`**: the
 numbers together, a value held by whoever sets them -- nothing of them
 is held here. **`unless_set(index)`**: what a number is unless set,
 from the default settings; **`defaults()`**: every one so.

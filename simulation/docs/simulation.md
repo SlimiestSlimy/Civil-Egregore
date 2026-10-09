@@ -230,8 +230,9 @@ Only a world with a size can be: one of none has no end to be hot to.
 
 **The viewport** (`Halos::keep_viewport`): whoever holds the world
 may name superchunks wanted hot besides the halos -- of what a
-renderer renders, if its camera loads
-superchunks (`../../server/docs/server.md`, "Halos") -- warmed and
+renderer renders, if the world's hot says so (`Hot::About.viewport`:
+its camera loads superchunks, `../../server/docs/server.md`, "Halos"),
+every one of them, however many -- warmed and
 cooled as a halo's are, generated if never made. A move says which
 superchunks it generated, made new rather than read back
 (`Halos::generated`), so the holder can put entities on them.
