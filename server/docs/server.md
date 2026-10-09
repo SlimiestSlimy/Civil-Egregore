@@ -9,7 +9,7 @@ and the renderer (`../renderer/`) call it.
 ## Made from a seed
 
 `start(options)`: the one way a world starts, from a `Start`
-`{seed, generation, size, threads, sheep, hot_entity}`
+`{seed, generation, size, threads, sheep, hot_entity, camera_loads}`
 (`src/world_start.rs`) -- every number a world starts from, whoever
 gives it: the command line (`server new`), or a window's sliders
 (`Start::from_tuning`), the seed drawn with land about the origin if
@@ -51,6 +51,22 @@ them is forced hot throughout, which only a world with a side can be;
 a save keeps both. What generates a
 superchunk never made is the server's, handed to the halos' jobs.
 
+A world without a size may have its **camera load superchunks**
+(`Start::camera_loads`, the slider `camera loads`; nothing to a world
+forced hot, all of which is hot anyway). It starts as any other: the
+origin, its flock and its halo. Then each frame a window asks of the
+host tells the world what is in view (`World::keep_in_view`): at most
+`CAMERA_SIDE` (8) superchunks along a side about the view's middle,
+kept hot besides the halos, generated as a halo's are if never made.
+Each superchunk generated while in view gets `sheep` of its own
+(`World::put_flock`, the same flock whenever it is made); one generated
+only for a halo gets none, or the sheep's halos would generate more
+sheep, and those more, without end. The sheep keep hot what was seen,
+so the slider for sheep is how heavy the world grows as the camera
+wanders: with none, what was in view cools once it is out of it. A
+save keeps the sheep per superchunk in view (`camera flock`); a world
+run with no window has no camera, and loads nothing by it.
+
 ## TickCounts
 
 `World::tick` runs every rule of the cells (`../mc_rules/`) and every
@@ -64,7 +80,7 @@ A save is a folder (`chunk_storage::disk`, and
 
 | file | what it holds |
 |---|---|
-| `world.csv` | CSV, a row a thing, its name and what it is: the format's number, the world's seed in hexadecimal, the tick it is at, its layer types, its side if it has a size, and how it is generated, a number a row |
+| `world.csv` | CSV, a row a thing, its name and what it is, in any order: the format's number, the world's seed in hexadecimal, the tick it is at, its layer types, its side if it has a size, the sheep each superchunk generated in view starts with if its camera loads superchunks, and how it is generated, a number a row |
 | `hot.csv` | CSV: the hot superchunks, a row each, those cooling with the tick each goes cold at, and the warming ones with the tick each turns hot at |
 | `superchunks/<index>.image` | a superchunk's cells and heights: its image, as the cold pool holds it |
 | `superchunks/<index>.state` | its random stream's state, its entities with their attributes |

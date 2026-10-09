@@ -350,6 +350,25 @@ mod settings {
         assert_eq!(read.get(name), Some(value), "what the file lacks, from the default settings");
     }
 
+    /// Settings are found by name, whatever the order of their lines:
+    /// the default settings' lines turned round are the same settings;
+    /// and a file's columns are found by name, whatever their order, one
+    /// it lacks empty.
+    #[test]
+    fn settings_are_found_by_name_in_any_order() {
+        let path = utilities::transient_data::TransientData::of(env!("CARGO_MANIFEST_DIR")).under("tests/settings").join("turned round");
+        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/default_settings.csv")).expect("the default settings");
+        let mut lines: Vec<&str> = text.lines().collect();
+        lines[1..].reverse();
+        std::fs::write(&path, lines.join("\n")).expect("written");
+        let (read, defaults) = (Settings::read_from(&path), Settings::defaults());
+        for name in utilities::tuning::NAMES.into_iter().chain([WORLDS]) {
+            assert_eq!(read.get(name), defaults.get(name), "{name}");
+        }
+        let rows = utilities::csv::rows_by_column("uses,seed\n3,0x1\n", &["seed", "uses", "never written"]);
+        assert_eq!(rows, [["0x1", "3", ""]]);
+    }
+
     /// A world named plainly is in the worlds' folder; a path is itself.
     #[test]
     fn a_world_named_plainly_is_in_the_worlds_folder() {

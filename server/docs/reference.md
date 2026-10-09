@@ -17,7 +17,12 @@ names, `HOT_ENTITY` if none (a save from before it was kept);
 superchunk of a world with a side, on the origin (`WORLD_MIDDLE`)
 alone of one without, as sheep everywhere would keep the whole of an
 endless world hot; their halos hot, or, of a world forced hot, all of
-it; generated, flocked: below ("Generation").
+it; generated, flocked: below ("Generation"); the sheep for each
+superchunk generated in view kept (`WorldInfo::camera_flock`) if its
+camera loads superchunks and it is not forced hot.
+**`World::put_flock(superchunk, sheep)`**: a flock queued on a
+superchunk, from its own stream of the seed's inverse -- the same
+flock whenever it is put.
 **`save(folder, world)`**: every dirty bitmap written back and the
 ring flushed (`World::write_back_and_flush_all`), then each superchunk's
 image and state -- live if hot, kept if cold -- the hot file, and the
@@ -39,19 +44,29 @@ forced}` -- so many superchunks along a side, a square about the
 origin, and whether every one of them is hot throughout;
 **`Size::of_side(side, forced)`**: a side of 0 no limit, refused if
 forced without a side, which only a world with one can be.
-**`Start`** `{seed, generation, size, threads, sheep, hot_entity}`;
+**`Start`** `{seed, generation, size, threads, sheep, hot_entity,
+camera_loads}`;
 `Start::default()`: seed 1, the default generation, no size, every
-thread, `FLOCK` on the origin, hot about `HOT_ENTITY`.
+thread, `FLOCK` on the origin, hot about `HOT_ENTITY`, its camera
+loading nothing.
 **`Start::from_tuning(seed, tuning)`**: as a window's sliders have it
-(`utilities::tuning::Tuning`), from the seed given or one drawn.
+(`utilities::tuning::Tuning`), from the seed given or one drawn; its
+camera loading superchunks only if it is not forced hot.
 **`drawn_seed(generation)`**: a seed drawn at random, the first from
 it with land about the origin within `LAND_TRIES`, else the one drawn.
 
 ## `halos.rs`
 
-`HOT_ENTITY` (the sheep, for now). **`World::with_halos(work)`**: the
+`HOT_ENTITY` (the sheep, for now). `CAMERA_SIDE` (8): superchunks
+along a side a camera loads at most. **`World::with_halos(work)`**: the
 simulation's halos given what the world holds, and what generates a
-superchunk never made. **`World::move_halos`**,
+superchunk never made. **`World::move_halos`**: the halos moved, then,
+if the camera loads superchunks with sheep, a flock put
+(`put_flock`) on each the move generated that is in view.
+**`World::keep_in_view(viewport)`**: nothing unless the camera loads
+superchunks; else the viewport, clamped to the world and to
+`CAMERA_SIDE` a side about its middle, handed to the halos
+(`Halos::keep_in_view`). The host calls it on each frame asked.
 **`World::keep_hot(wanted)`**, **`World::warming`**,
 **`World::cooling`**, **`World::start_warming(superchunk, due)`**,
 **`World::write_back_and_flush_all`**: each the halos' own

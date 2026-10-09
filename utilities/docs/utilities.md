@@ -23,7 +23,8 @@ none.
 - **Settings** (`settings.rs`): this machine's settings, kept from run
   to run in one file in one folder of Civil Egregore's own, wherever the
   system keeps such, a line each, shared by whatever has settings (so
-  far the renderer's sliders). The default settings are such a file
+  far the renderer's sliders), found by name in any order -- what the
+  file lacks is the default settings'. The default settings are such a file
   built into the program: copied to a machine that has none, never
   over one that has, and all there is under the build feature
   `force_default_settings`. The same folder holds the worlds, in `worlds`,

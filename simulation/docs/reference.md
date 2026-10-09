@@ -62,13 +62,19 @@ superchunks about each, sorted, each once.
 
 **`Held`** `{arena, storage, entities, simulation, cold, layers,
 generate}`: the world's, lent for a call. **`Halos`** `{hot, jobs,
-warming, cooling, writing_back, flushing}`, **`new(hot,
-dispatcher)`**, **`restore_cooling(cooling)`**. `WARM_TICKS` (256): the ticks a superchunk is warming;
+warming, cooling, writing_back, flushing, in_view, generated}`, **`new(hot,
+dispatcher)`**, **`restore_cooling(cooling)`**.
+**`Halos::keep_in_view(in_view)`**: the superchunks in view, kept
+sorted, wanted hot besides the halos from the next move on;
+**`Halos::in_view`**: them. **`Halos::generated`**: the superchunks
+the last move or `keep_hot` generated -- made new by a job, not read
+back -- sorted. `WARM_TICKS` (256): the ticks a superchunk is warming;
 `COOL_TICKS` (256): the ticks one is cooling.
 **`HaloChange`** `{reached, generated, restored, cooled}`, added with
 `+=`. **`Warming`** `{superchunk, due, from}`, from a
 **`WarmedFrom`**: `Lingering`, or `Job(ticket)`.
-**`Halos::move_to_hot_entities`**: the halos moved to the hot entities, those
+**`Halos::move_to_hot_entities`**: the halos, and the superchunks in
+view, moved to the hot entities, those
 reached hot `WARM_TICKS` on, those left cold `COOL_TICKS` on.
 **`Halos::keep_hot(wanted)`**: `wanted` made the hot superchunks now.
 **`Halos::warming`**, **`Halos::cooling`**: the superchunks warming,

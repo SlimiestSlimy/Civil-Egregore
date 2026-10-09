@@ -35,7 +35,8 @@ pub struct Tuned {
 pub enum Group {
     /// The near view's shading.
     Shading,
-    /// The world's size, whether it is forced hot, and its sheep.
+    /// The world's size, whether it is forced hot, whether its camera
+    /// loads superchunks, and its sheep.
     World,
     /// The ocean and the land: their levels and their shares.
     Land,
@@ -131,6 +132,7 @@ places! {
     WALL_LENGTH "wall length",
     WORLD_SIDE "world side",
     FORCED_HOT "forced hot",
+    CAMERA_LOADS "camera loads",
     SHEEP "sheep a superchunk",
 }
 

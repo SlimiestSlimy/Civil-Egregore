@@ -31,7 +31,9 @@ the sliders, a world's file and its hot file, a measurement's report --
 a first row naming the columns. **`Line`**: a row, a divider
 (`DIVIDER`) or a note (`COMMENT`, `#`). **`lines(text)`**: every line;
 **`rows(text)`**: the rows alone; **`rows_named(text)`**: those after
-the one naming the columns. **`row(fields)`**: a row written, a field
+the one naming the columns; **`rows_by_column(text, columns)`**: those
+rows, each the fields of the columns named, found by the first row
+whatever their order -- a column or field missing is empty. **`row(fields)`**: a row written, a field
 quoted where it has to be (**`field`**).
 
 ## `commands.rs`
@@ -103,7 +105,8 @@ The settings of this machine: `FILE` (`settings.csv`) in `FOLDER`
 (`Civil Egregore`) under the system's place for what a user's programs keep.
 **`folder()`**, **`file()`**. `default_settings.csv`, at the crate's root: every setting
 there is and what it is unless changed, built into the program.
-**`Settings`**: a name and a value a row, under `setting,value` -- **`defaults()`**,
+**`Settings`**: a name and a value a row, under `setting,value`, found
+by name in any order -- **`defaults()`**,
 **`read()`** (the machine's file, given a copy of the default settings
 if it has none, and the default ones for what it lacks; the default
 ones alone under the feature `force_default_settings`),

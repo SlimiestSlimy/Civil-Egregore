@@ -7,7 +7,7 @@ use crate::halos::HOT_ENTITY;
 use coordinates::WORLD_MIDDLE;
 use entity_manager::EntityType;
 use std::hash::{BuildHasher, RandomState};
-use utilities::tuning::{Tuning, FORCED_HOT, SHEEP, WORLD_SIDE};
+use utilities::tuning::{Tuning, CAMERA_LOADS, FORCED_HOT, SHEEP, WORLD_SIDE};
 use worldgen::{has_land_about, Generation};
 
 /// Sheep the world's origin superchunk starts with, unless told.
@@ -52,7 +52,9 @@ impl Size {
 /// of a world with a size; of one without, the origin's alone, as
 /// sheep everywhere would keep the whole of an endless world hot --
 /// hot about the entities of the kind `hot_entity`, unless forced hot,
-/// their halos hot before it ticks.
+/// their halos hot before it ticks; and, if `camera_loads`, about the
+/// superchunks in view too, each generated while in view given
+/// `sheep` of its own (`World::keep_in_view`).
 #[derive(Clone, Copy, Debug)]
 pub struct Start {
     /// The seed its superchunks are generated from.
@@ -67,30 +69,36 @@ pub struct Start {
     pub sheep: usize,
     /// The kind of entity it is hot about, unless forced hot.
     pub hot_entity: EntityType,
+    /// Whether its camera loads superchunks: those in view hot, and
+    /// each generated while in view given `sheep`. Nothing to a world
+    /// forced hot, all of which is, nor to one run with no window.
+    pub camera_loads: bool,
 }
 
 impl Default for Start {
     /// Seed 1, generated as [`Generation::DEFAULT`] says, no size to
     /// it, every thread the machine has, a flock of [`FLOCK`] on its
-    /// origin, hot about [`HOT_ENTITY`]: what `new` makes unless told
-    /// otherwise.
+    /// origin, hot about [`HOT_ENTITY`], its camera loading nothing:
+    /// what `new` makes unless told otherwise.
     fn default() -> Self {
-        Self { seed: 1, generation: Generation::DEFAULT, size: Size::Unlimited, threads: None, sheep: FLOCK, hot_entity: HOT_ENTITY }
+        Self { seed: 1, generation: Generation::DEFAULT, size: Size::Unlimited, threads: None, sheep: FLOCK, hot_entity: HOT_ENTITY, camera_loads: false }
     }
 }
 
 impl Start {
     /// As a window's sliders have it (`utilities::tuning`): how it is
     /// generated, its size -- a side of 0 none, and forced hot counting
-    /// only with a side -- and its sheep; from `seed`, or if none is
+    /// only with a side -- whether its camera loads superchunks, which
+    /// counts only if it is not forced hot, and its sheep; from `seed`, or if none is
     /// given one drawn at random ([`drawn_seed`]); on every thread the
     /// machine has.
     pub fn from_tuning(seed: Option<u64>, tuning: &Tuning) -> Self {
         let generation = Generation::from_tuning(tuning);
         let side = tuning[WORLD_SIDE].round().max(0.0) as u32;
-        let size = Size::of_side(side, side > 0 && tuning[FORCED_HOT] >= 0.5).expect("forced hot only with a side");
+        let forced = side > 0 && tuning[FORCED_HOT] >= 0.5;
+        let size = Size::of_side(side, forced).expect("forced hot only with a side");
         let seed = seed.unwrap_or_else(|| drawn_seed(&generation));
-        Self { seed, generation, size, sheep: tuning[SHEEP].max(0.0) as usize, ..Self::default() }
+        Self { seed, generation, size, sheep: tuning[SHEEP].max(0.0) as usize, camera_loads: !forced && tuning[CAMERA_LOADS] >= 0.5, ..Self::default() }
     }
 }
 
