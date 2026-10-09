@@ -20,7 +20,7 @@ mod tick;
 pub mod transient_data;
 mod world_start;
 
-pub use halos::{CAMERA_SIDE, HOT_ENTITY};
+pub use halos::HOT_ENTITY;
 pub use simulation::hot::about;
 pub use simulation::{HaloChange, COOL_TICKS, WARM_TICKS};
 pub use tick::{tick_rules, TickCounts, WorldTick};
@@ -79,19 +79,14 @@ pub struct World {
 
 impl World {
     /// A world with nothing in it, at `info`'s tick: what generating and
-    /// loading start from. Hot as `info` says: forced hot throughout if
-    /// it has a size and is forced, else about the halos of the kind of
-    /// entity it names ([`HOT_ENTITY`] if it names none). On `threads`
-    /// threads, every one the machine has if none is given.
+    /// loading start from. Hot as `info` says ([`hot_of`]). On
+    /// `threads` threads, every one the machine has if none is given.
     fn empty(info: WorldInfo, generation: Generation, threads: Option<usize>) -> Self {
         let entities = Entities::at_tick(info.tick);
         // The world's superchunks not counted, as it grows: one set of threads, the tick's and chunk storage's jobs' alike.
         let dispatcher = Arc::new(threads.map_or_else(Dispatcher::of_the_machine, Dispatcher::new));
         let simulation = Simulation::on(Arc::clone(&dispatcher));
-        let hot = match (info.side, info.forced) {
-            (Some(side), true) => Hot::Forced { side },
-            (side, _) => Hot::About { entity: info.hot_entity.map_or(HOT_ENTITY, EntityType), side },
-        };
+        let hot = hot_of(&info);
         Self {
             info,
             generation,
@@ -102,6 +97,18 @@ impl World {
             cold: BTreeMap::new(),
             halos: Halos::new(hot, dispatcher),
         }
+    }
+}
+
+/// Which of a world's superchunks are hot, as its `info` defines it
+/// for the simulation to keep: every one, if it has a size and is
+/// forced hot; else those about the entities of the kind it names
+/// ([`HOT_ENTITY`] if it names none) -- and, if its camera loads
+/// superchunks, the viewport's, however many.
+fn hot_of(info: &WorldInfo) -> Hot {
+    match (info.side, info.forced) {
+        (Some(side), true) => Hot::Forced { side },
+        (side, _) => Hot::About { entity: info.hot_entity.map_or(HOT_ENTITY, EntityType), side, viewport: info.camera_flock.is_some() },
     }
 }
 
@@ -127,12 +134,13 @@ fn layer_types() -> Vec<LayerType> {
 /// its terrain, heights and the walls they make, and on it grass and
 /// trees in patches. Each from the seed and where it is
 /// ([`generate_image`]). If its camera loads superchunks, and it is
-/// not forced hot, it keeps how many sheep a superchunk generated in
-/// view starts with.
+/// not forced hot, the viewport's superchunks are hot too, and it keeps
+/// how many sheep a superchunk generated in the viewport starts with.
 pub fn start(options: Start) -> World {
     let mut world = generate_sized(options.generation, options.seed, options.size, options.hot_entity, options.threads);
     let forced = matches!(options.size, Size::Limited { forced: true, .. });
     world.info.camera_flock = (options.camera_loads && !forced).then_some(options.sheep as u64);
+    world.halos.hot = hot_of(&world.info);
     let everywhere = world.halos.hot.all();
     if options.sheep == 0 {
         // No sheep: nothing hot, unless all of it is forced so.

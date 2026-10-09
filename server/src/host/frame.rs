@@ -10,6 +10,7 @@ use chunk_storage::mock::GRASS;
 use chunk_storage::{LayerType, SuperchunkImage};
 use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use mc_rules::trees::{TREE, TREE_STAGE};
+pub use simulation::halos::Viewport;
 use std::collections::HashMap;
 use worldgen::{Generation, WET};
 
@@ -18,24 +19,6 @@ pub const CHUNK_WORDS: usize = bitmap::WORDS;
 
 /// The depth from which water hides what is under it: a power of two.
 pub const DEEP: u32 = 16;
-
-/// What the renderer should render, in superchunks: a rectangle of
-/// them, each `(x, y)` in superchunks from the world's top left, both
-/// corners in it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Viewport {
-    /// The top left superchunk, `(x, y)`.
-    pub first: (u32, u32),
-    /// The bottom right one.
-    pub last: (u32, u32),
-}
-
-impl Viewport {
-    /// Whether `(x, y)`, in superchunks, is in it.
-    pub fn contains(self, (x, y): (u32, u32)) -> bool {
-        (self.first.0..=self.last.0).contains(&x) && (self.first.1..=self.last.1).contains(&y)
-    }
-}
 
 /// What a client wants of the world, one frame: some of the hot
 /// superchunks of its viewport -- as many as a frame may carry, the

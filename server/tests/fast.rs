@@ -51,7 +51,7 @@ mod halos {
     use bitplane_manager::{Write, WriteOp};
     use entity_manager::{Attribute, EntityId, EntityType, Header, NEVER};
     use server::host::frame::Viewport;
-    use server::{about, HaloChange, World, CAMERA_SIDE, COOL_TICKS, HOT_ENTITY, WARM_TICKS};
+    use server::{about, HaloChange, World, COOL_TICKS, HOT_ENTITY, WARM_TICKS};
 
     /// The superchunks holding a hot entity.
     fn hot_entities(world: &World) -> Vec<SuperchunkIndex> {
@@ -259,9 +259,8 @@ mod halos {
         assert_eq!((loaded.warming().count(), loaded.cooling().count()), (0, 0));
     }
 
-    /// A world whose camera loads superchunks: a viewport far wider than
-    /// [`CAMERA_SIDE`] keeps only so many a side about its middle, and
-    /// no viewport none; two superchunks of the viewport, far from the flock,
+    /// A world whose camera loads superchunks: a wide viewport is wanted
+    /// hot whole, every superchunk of it, and no viewport none; two superchunks of the viewport, far from the flock,
     /// turn hot as a halo's would, each generated in the viewport given
     /// a flock of its own, and those generated about them for those
     /// flocks' halos none. A save keeps its camera flock; a world whose
@@ -272,12 +271,12 @@ mod halos {
         let mut world = server::start(server::Start { seed: crate::tests::land_seed(2), sheep, camera_loads: true, ..server::Start::default() });
         assert_eq!(world.info.camera_flock, Some(sheep as u64));
         let (x, y) = WORLD_MIDDLE.cartesian();
-        world.keep_viewport(Some(Viewport { first: (x - 50, y - 50), last: (x + 50, y + 50) }));
+        world.halos.keep_viewport(Some(Viewport { first: (x - 50, y - 50), last: (x + 50, y + 50) }));
         let wide = world.halos.viewport();
-        assert!(wide.len() == (CAMERA_SIDE * CAMERA_SIDE) as usize && wide.contains(&WORLD_MIDDLE), "{} in the viewport", wide.len());
-        world.keep_viewport(None);
+        assert!(wide.len() == 101 * 101 && wide.contains(&WORLD_MIDDLE), "{} in the viewport", wide.len());
+        world.halos.keep_viewport(None);
         assert!(world.halos.viewport().is_empty(), "no viewport, nothing kept for it");
-        world.keep_viewport(Some(Viewport { first: (x + 10, y), last: (x + 11, y) }));
+        world.halos.keep_viewport(Some(Viewport { first: (x + 10, y), last: (x + 11, y) }));
         let viewport = [SuperchunkIndex::from_cartesian(x + 10, y), SuperchunkIndex::from_cartesian(x + 11, y)];
         let sheep_on = |world: &World, superchunk: SuperchunkIndex| world.entities.superchunk(superchunk).map_or(0, |kept| kept.iter().filter(|entity| entity.header.kind == HOT_ENTITY).count());
         let about_view = about(viewport.into_iter());
@@ -301,7 +300,7 @@ mod halos {
         assert_eq!(server::load(&folder).expect("loaded").info.camera_flock, Some(sheep as u64), "its camera flock, kept");
 
         let mut unseen = server::start(server::Start { seed: crate::tests::land_seed(2), sheep, ..server::Start::default() });
-        unseen.keep_viewport(Some(Viewport { first: (x + 10, y), last: (x + 11, y) }));
+        unseen.halos.keep_viewport(Some(Viewport { first: (x + 10, y), last: (x + 11, y) }));
         assert!(unseen.halos.viewport().is_empty() && unseen.info.camera_flock.is_none(), "its camera loads nothing");
     }
 }
@@ -484,5 +483,52 @@ mod world {
         }
         // Few steps: on ground nearly all grass a sheep seldom has to walk.
         assert!(moved > 50 && beside_walls > 10_000, "{moved} steps, {beside_walls} sheep-ticks beside a wall");
+    }
+}
+
+mod host {
+    //! The host: a world run on a thread of its own, asked for frames.
+
+    use server::host::frame::{Ask, Frame};
+    use server::host::Host;
+    use server::{Size, Start};
+    use std::sync::mpsc::Receiver;
+    use std::time::Duration;
+    use utilities::tuning::{defaults, OCEAN_FLOOR};
+    use worldgen::Generation;
+
+    /// The first frame the host answers with that `wanted` takes, asking
+    /// again each second, for a minute at most.
+    fn frame_that(host: &Host, frames: &Receiver<Frame>, wanted: impl Fn(&Frame) -> bool) -> Frame {
+        for _ in 0..60 {
+            assert!(host.sync(Ask { viewport: None, detail: 0, skip: 0, most: 0, near: None }), "the host is there");
+            if let Ok(frame) = frames.recv_timeout(Duration::from_secs(1))
+                && wanted(&frame)
+            {
+                return frame;
+            }
+        }
+        panic!("no such frame in a minute");
+    }
+
+    /// A world reset with another generation: made again from its start
+    /// -- its seed and its sheep -- as another world, generated as asked.
+    #[test]
+    fn a_reset_makes_the_world_again_as_retuned() {
+        let (host, frames) = Host::start();
+        // Paused, what a frame says is what the start made.
+        assert!(host.pause(true));
+        let start = Start { seed: crate::tests::land_seed(3), size: Size::Limited { side: 2, forced: false }, sheep: 3, ..Start::default() };
+        assert!(host.make_world(start));
+        let made = frame_that(&host, &frames, |_| true);
+        assert_eq!((made.seed, made.generation, made.sheep, made.tick), (start.seed, Generation::DEFAULT, 4 * 3, 0));
+        let mut tuning = defaults();
+        tuning[OCEAN_FLOOR] += 64.0;
+        let retuned = Generation::from_tuning(&tuning);
+        assert_ne!(retuned, Generation::DEFAULT);
+        assert!(host.reset(&tuning));
+        let reset = frame_that(&host, &frames, |frame| frame.generation == retuned);
+        assert!(reset.world > made.world, "another world");
+        assert_eq!((reset.seed, reset.sheep, reset.tick, reset.named), (start.seed, 4 * 3, 0, None));
     }
 }

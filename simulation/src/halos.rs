@@ -34,13 +34,14 @@
 //! warming, and besides them those cooling; and one may be warming
 //! that no halo reaches any more.
 //!
-//! Whoever holds the world may want more hot than the halos: the
-//! superchunks of the **viewport** ([`Halos::keep_viewport`]) -- what
-//! a renderer renders -- warming and cooling as a halo's do: a world
-//! whose camera loads superchunks made where it is looked at. And it is told which superchunks the
-//! halos' last move generated ([`Halos::generated`]), to put on them
-//! what a superchunk never made starts with.
-
+//! If the world's hot says so ([`Hot::viewport`]), the superchunks of
+//! the **viewport** -- what a renderer renders, told each frame
+//! ([`Halos::keep_viewport`]) -- are hot too, every one of them,
+//! warming and cooling as a halo's do: a world whose camera loads
+//! superchunks, made where it is looked at. Whoever holds the world is
+//! told which superchunks the halos' last move generated
+//! ([`Halos::generated`]), to put on them what a superchunk never made
+//! starts with.
 //!
 //! What they work on is whoever holds the world's ([`Held`]): the
 //! arena, chunk storage, the entities, the simulation and the cold
@@ -72,6 +73,24 @@ pub const WARM_TICKS: u64 = 256;
 /// cold: as long as one warming takes, so a hot entity stepping back over
 /// the edge it just crossed finds the superchunks behind it still hot.
 pub const COOL_TICKS: u64 = 256;
+
+/// What the renderer should render, in superchunks: a rectangle of
+/// them, each `(x, y)` in superchunks from the world's top left, both
+/// corners in it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Viewport {
+    /// The top left superchunk, `(x, y)`.
+    pub first: (u32, u32),
+    /// The bottom right one.
+    pub last: (u32, u32),
+}
+
+impl Viewport {
+    /// Whether `(x, y)`, in superchunks, is in it.
+    pub fn contains(self, (x, y): (u32, u32)) -> bool {
+        (self.first.0..=self.last.0).contains(&x) && (self.first.1..=self.last.1).contains(&y)
+    }
+}
 
 /// What moving the halos did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -118,8 +137,8 @@ pub struct Held<'a> {
 /// The halos: which superchunks are to be hot, those warming and
 /// cooling with the ticks they are due, and the jobs making them.
 pub struct Halos {
-    /// Which superchunks are to be hot: the world's size, and the hot
-    /// entity.
+    /// Which superchunks are to be hot: the world's size, the hot
+    /// entity, and whether the viewport's are.
     pub hot: Hot,
     /// The threads encoding, generating and decoding off the tick.
     jobs: Jobs,
@@ -134,7 +153,10 @@ pub struct Halos {
     /// The superchunks whose changes were taken from the ring, each with
     /// its job, their images being rewritten by a job.
     flushing: Vec<(SuperchunkIndex, Ticket)>,
-    /// The viewport's superchunks, sorted: wanted hot besides the halos.
+    /// The viewport last told, if the viewport's superchunks are hot.
+    told: Option<Viewport>,
+    /// Its superchunks within the world, sorted: wanted hot besides the
+    /// halos.
     viewport: Vec<SuperchunkIndex>,
     /// The superchunks the last move generated, sorted.
     generated: Vec<SuperchunkIndex>,
@@ -164,19 +186,32 @@ impl Halos {
     /// No halos yet, as `hot` says which superchunks are to be, their
     /// jobs on `dispatcher`'s threads.
     pub fn new(hot: Hot, dispatcher: Arc<Dispatcher>) -> Self {
-        Self { hot, jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing: Vec::new(), viewport: Vec::new(), generated: Vec::new() }
+        Self { hot, jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing: Vec::new(), told: None, viewport: Vec::new(), generated: Vec::new() }
     }
 
-    /// Wants the `viewport`'s superchunks hot from the next move on,
-    /// besides the halos, in place of the last viewport's: warming and
-    /// cooling as a halo's superchunks do, none outside the world's size.
-    pub fn keep_viewport(&mut self, mut viewport: Vec<SuperchunkIndex>) {
-        viewport.sort_unstable();
-        viewport.dedup();
-        self.viewport = viewport;
+    /// Takes `viewport` -- what the renderer renders now, none if it
+    /// renders none of the world's cells -- in place of the last: if
+    /// the viewport's superchunks are hot ([`Hot::viewport`]), every one
+    /// of it within the world is wanted hot from the next move on,
+    /// besides the halos, warming and cooling as a halo's superchunks
+    /// do. Else it is nothing to the halos.
+    pub fn keep_viewport(&mut self, viewport: Option<Viewport>) {
+        let viewport = viewport.filter(|_| self.hot.viewport());
+        if viewport == self.told {
+            return;
+        }
+        self.told = viewport;
+        self.viewport.clear();
+        if let Some(viewport) = viewport {
+            let span = self.hot.span();
+            let (across, down) = (viewport.first.0.max(span.start)..=viewport.last.0.min(span.end - 1), viewport.first.1.max(span.start)..=viewport.last.1.min(span.end - 1));
+            self.viewport.extend(down.flat_map(|y| across.clone().map(move |x| SuperchunkIndex::from_cartesian(x, y))));
+            self.viewport.sort_unstable();
+        }
     }
 
-    /// The viewport's superchunks, sorted ([`Halos::keep_viewport`]).
+    /// The viewport's superchunks within the world, sorted: none unless
+    /// they are hot ([`Halos::keep_viewport`]).
     pub fn viewport(&self) -> &[SuperchunkIndex] {
         &self.viewport
     }

@@ -1,8 +1,9 @@
 //! Which superchunks are to be hot: the world's size, if it has one,
-//! and the **hot entity** -- the kind of entity that keeps the
-//! superchunks about it hot, its **halo**. Whoever holds the world
-//! gives both ([`Hot`]) to its halos ([`crate::Halos`]), which make
-//! hot what is wanted ([`Hot::wanted`]).
+//! the **hot entity** -- the kind of entity that keeps the superchunks
+//! about it hot, its **halo** -- and whether the **viewport**'s
+//! superchunks are hot too. Whoever holds the world defines all of it
+//! ([`Hot`]); its halos ([`crate::Halos`]) make hot what is wanted
+//! ([`Hot::wanted`], [`crate::Halos::keep_viewport`]).
 
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE, WORLD_SIDE_SUPERCHUNKS};
 use entity_manager::{Entities, EntityType};
@@ -10,16 +11,20 @@ use entity_manager::{Entities, EntityType};
 /// Which superchunks are to be hot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hot {
-    /// Every entity of the kind `entity` keeps its halo hot; `side`,
-    /// if given, superchunks along a side of the world, a square with
-    /// the world's origin superchunk in its middle: nothing outside it
-    /// is ever hot, so nothing is made there and nothing goes there.
-    /// With none, as far as coordinates reach.
+    /// Every entity of the kind `entity` keeps its halo hot -- and, if
+    /// `viewport`, every superchunk of the viewport too, however many,
+    /// whatever the entities do; `side`, if given, superchunks along a
+    /// side of the world, a square with the world's origin superchunk
+    /// in its middle: nothing outside it is ever hot, so nothing is
+    /// made there and nothing goes there. With none, as far as
+    /// coordinates reach.
     About {
         /// The hot entity.
         entity: EntityType,
         /// Superchunks along a side of the world, if it has a size.
         side: Option<u32>,
+        /// Whether the viewport's superchunks are hot too.
+        viewport: bool,
     },
     /// Every superchunk of a world `side` superchunks along a side is
     /// hot, whatever its entities do: a fixed load. Only a world of a
@@ -31,9 +36,16 @@ pub enum Hot {
 }
 
 impl Hot {
-    /// A world of no size, hot about every entity of the kind `entity`.
+    /// A world of no size, hot about every entity of the kind `entity`
+    /// alone.
     pub const fn about(entity: EntityType) -> Self {
-        Self::About { entity, side: None }
+        Self::About { entity, side: None, viewport: false }
+    }
+
+    /// Whether the viewport's superchunks are hot too: never forced
+    /// hot, the whole of which is.
+    pub const fn viewport(&self) -> bool {
+        matches!(*self, Self::About { viewport: true, .. })
     }
 
     /// Superchunks along a side of the world, if it has a size.
@@ -46,7 +58,7 @@ impl Hot {
 
     /// The world's first column and row and the one past its last, of
     /// superchunks: both the same, the world being square.
-    fn span(&self) -> std::ops::Range<u32> {
+    pub fn span(&self) -> std::ops::Range<u32> {
         let side = self.side().unwrap_or(WORLD_SIDE_SUPERCHUNKS).min(WORLD_SIDE_SUPERCHUNKS);
         let first = WORLD_MIDDLE.cartesian().0 - side / 2;
         first..first + side

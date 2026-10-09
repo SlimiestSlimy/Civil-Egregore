@@ -89,12 +89,12 @@ pub struct Captured {
 }
 
 /// Offers the sliders as the screen has it: every group while a new
-/// world is set up, the rest over a world, none over the rest of the
-/// main menu or under the options.
+/// world is set up, all but those only of setting one up over a world,
+/// none over the rest of the main menu or under the options.
 fn offer(mut sliders: ResMut<sliders::Sliders>, screen: Res<Screen>, menu: Res<main_menu::MainMenu>, options: Res<options::Options>) {
     sliders.offer(match *screen {
         Screen::MainMenu if menu.setting_up() => sliders::Offered::Everything,
-        Screen::World if !options.open() => sliders::Offered::Shading,
+        Screen::World if !options.open() => sliders::Offered::Running,
         _ => sliders::Offered::Hidden,
     });
 }

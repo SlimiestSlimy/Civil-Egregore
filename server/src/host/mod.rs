@@ -5,7 +5,8 @@
 //! The client holds a [`Host`] and calls it; each call is sent to the
 //! host's thread, read there between ticks. It starts with no world,
 //! and runs one once asked to make one ([`Host::make_world`]) or to
-//! open one saved ([`Host::open_world`]). Each [`Host::sync`] is
+//! open one saved ([`Host::open_world`]) -- and makes the one run again
+//! from its start when its generation is retuned ([`Host::reset`]). Each [`Host::sync`] is
 //! answered with a [`Frame`]: the viewport's hot superchunks as the
 //! last tick left them, copied and nothing more ([`frame`]) -- so what
 //! is rendered costs the ticks next to nothing, and a frame carries
@@ -22,6 +23,8 @@
 pub mod frame;
 
 use crate::{Start, World};
+use utilities::tuning::Tuning;
+use worldgen::Generation;
 use chunk_storage::mock::GRASS;
 use frame::{copy, count, hot_in, Ask, Frame};
 use mc_rules::trees::TREE;
@@ -64,6 +67,9 @@ enum Request {
     /// Save the world run under this name in the worlds' folder, its
     /// name from then ([`Frame::named`]).
     Save(String),
+    /// Make the world run again from its start, generated as this says:
+    /// of many read between two ticks, the last alone.
+    Reset(Box<Generation>),
 }
 
 /// Where the census of a run is kept: the flock and the grass every
@@ -137,12 +143,24 @@ impl Host {
     pub fn save_world(&self, name: String) -> bool {
         self.requests.send(Request::Save(name)).is_ok()
     }
+
+    /// Makes the world run again from its start, its generation as
+    /// `tuning` has it now (`Generation::from_tuning`), the rest as it
+    /// started: its seed, size, sheep, hot entity and camera. A slider
+    /// dragged calls it each frame; between two ticks only the last
+    /// call is done.
+    pub fn reset(&self, tuning: &Tuning) -> bool {
+        self.requests.send(Request::Reset(Box::new(Generation::from_tuning(tuning)))).is_ok()
+    }
 }
 
 /// The world run, and what goes with running it.
 struct Running {
     /// The world.
     world: World,
+    /// What it started from, as far as is known: what it is made again
+    /// from when reset.
+    start: Start,
     /// The superchunks whose heights a frame has carried, each with its
     /// water as drawn.
     sent: HashMap<coordinates::SuperchunkIndex, frame::Water>,
@@ -153,10 +171,10 @@ struct Running {
 }
 
 impl Running {
-    /// `world`, starting to run.
-    fn of(world: World) -> Self {
+    /// `world`, started from `start`, starting to run.
+    fn of(start: Start, world: World) -> Self {
         let census = census(world.info.seed);
-        Self { world, sent: HashMap::new(), started: Instant::now(), census }
+        Self { world, start, sent: HashMap::new(), started: Instant::now(), census }
     }
 }
 
@@ -174,6 +192,9 @@ struct HostThread {
     named: Option<String>,
     /// What opening or saving a world last came to.
     said: Option<String>,
+    /// The generation the world run is to be made again with, before
+    /// the next tick, if it is to be.
+    reset: Option<Generation>,
     /// When the next tick is due.
     next_tick: Instant,
     /// When the last frame was answered, and the tick then.
@@ -183,7 +204,7 @@ struct HostThread {
 impl Default for HostThread {
     /// No world, at the game's pace.
     fn default() -> Self {
-        Self { running: None, worlds: 0, paused: false, pace: Some(TARGET_PACE), named: None, said: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0) }
+        Self { running: None, worlds: 0, paused: false, pace: Some(TARGET_PACE), named: None, said: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0) }
     }
 }
 
@@ -207,33 +228,57 @@ impl HostThread {
                     Ok(Request::Pace(pace)) => (self.pace, self.next_tick) = (pace, Instant::now()),
                     Ok(Request::New(start)) => {
                         self.said = Some(format!("a world made from seed {}", utilities::seed::hex(start.seed)));
-                        self.named = None;
-                        self.run_world(crate::start(start));
+                        (self.named, self.reset) = (None, None);
+                        self.run_world(start);
                     }
                     Ok(Request::Open(name)) => match crate::load(&utilities::settings::world(&name)) {
                         Ok(opened) => {
-                            (self.said, self.named) = (Some(format!("{name} opened")), Some(name));
-                            self.run_world(opened);
+                            (self.said, self.named, self.reset) = (Some(format!("{name} opened")), Some(name), None);
+                            self.run_in_place(Running::of(Start::of_world(&opened.info, opened.generation), opened));
                         }
                         Err(why) => self.said = Some(format!("{name} not opened: {why}")),
                     },
-                    Ok(Request::Save(name)) => self.save(name),
+                    Ok(Request::Save(name)) => {
+                        self.reset_now();
+                        self.save(name);
+                    }
+                    Ok(Request::Reset(generation)) => self.reset = Some(*generation),
                     Err(TryRecvError::Empty) => break,
                     Err(TryRecvError::Disconnected) => return,
                 }
             }
+            self.reset_now();
             if !self.paused {
                 self.tick();
             }
         }
     }
 
-    /// Runs `world` in place of any run, from its own tick.
-    fn run_world(&mut self, world: World) {
-        self.last_frame = (Instant::now(), world.entities.now());
-        self.running = Some(Running::of(world));
+    /// Makes a world as `start` says, and runs it in place of any run:
+    /// that one dropped first, not to hold both.
+    fn run_world(&mut self, start: Start) {
+        self.running = None;
+        self.run_in_place(Running::of(start, crate::start(start)));
+    }
+
+    /// Runs `running` in place of any run, from its world's own tick.
+    fn run_in_place(&mut self, running: Running) {
+        self.last_frame = (Instant::now(), running.world.entities.now());
+        self.running = Some(running);
         self.worlds += 1;
         self.next_tick = Instant::now();
+    }
+
+    /// Makes the world run again from its start, generated as last
+    /// asked, if it was asked to be: a world of its own from then, of
+    /// no name.
+    fn reset_now(&mut self) {
+        let (Some(generation), Some(running)) = (self.reset.take(), &self.running) else {
+            return;
+        };
+        let start = Start { generation, ..running.start };
+        (self.said, self.named) = (Some(format!("the world remade from seed {}, as the sliders have it", utilities::seed::hex(start.seed))), None);
+        self.run_world(start);
     }
 
     /// Saves the world run under `name`, if one runs.
@@ -257,7 +302,7 @@ impl HostThread {
     /// hot from then, if the world's camera loads superchunks.
     fn frame(&mut self, ask: Ask) -> Option<Frame> {
         let running = self.running.as_mut()?;
-        running.world.keep_viewport(ask.viewport);
+        running.world.halos.keep_viewport(ask.viewport);
         let world = &running.world;
         let asked_at = Instant::now();
         let (tick, elapsed) = (world.entities.now(), self.last_frame.0.elapsed().as_secs_f64());
