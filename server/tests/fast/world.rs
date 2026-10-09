@@ -112,7 +112,7 @@ fn a_world_file_is_read_in_any_order() {
     assert_eq!(disk::read_world(&folder).expect("read turned round"), saved);
     std::fs::write(&path, "world,is\nseed,0x7\n").expect("written");
     let bare = disk::read_world(&folder).expect("read with the seed alone");
-    assert_eq!(bare, disk::WorldInfo { seed: 7, tick: 0, layers: Vec::new(), side: None, forced: false, hot_entity: None, camera_flock: None, generation: Vec::new() });
+    assert_eq!(bare, disk::WorldInfo { seed: 7, tick: 0, layers: Vec::new(), side: None, forced: false, hot_entity: None, camera_flock: None, without_camera_flock: Vec::new(), generation: Vec::new() });
     assert_eq!(worldgen::Generation::of_numbers(&bare.generation).numbers(), worldgen::Generation::DEFAULT.numbers(), "generated as by default");
     for refused in ["world,is\ntick,3\n", "world,is\nseed,0x7\nseed,0x8\n", "world,is\nformat,1\nseed,0x7\n", "seed,0x7\nworld,is\n"] {
         std::fs::write(&path, refused).expect("written");

@@ -62,12 +62,16 @@ simulation's to say, as the world's hot defines it (`hot_of`) --
 generated as a halo's are if never made. Each
 superchunk generated in the viewport gets `sheep` of its own
 (`World::put_flock`, the same flock whenever it is made); one generated
-only for a halo gets none, or the sheep's halos would generate more
-sheep, and those more, without end. The sheep keep hot what was seen,
+only for a halo gets none while it is out of view, or the sheep's
+halos would generate more sheep, and those more, without end. It is
+owed its flock (`WorldInfo::without_camera_flock`) and given it once
+the viewport reaches it: the eight about the starting flock among
+them, generated before the camera has seen anything. The sheep keep hot what was seen,
 so the slider for sheep is how heavy the world grows as the camera
 wanders: with none, what was in the viewport cools once it is out of
 it. A save keeps the sheep per superchunk generated in the viewport
-(`camera flock`); a world
+(`camera flock`) and the superchunks still owed theirs
+(`without camera flock`); a world
 run with no window has no camera, and loads nothing by it.
 
 ## TickCounts

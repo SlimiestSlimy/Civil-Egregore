@@ -256,7 +256,18 @@ fn the_camera_loads_the_superchunks_of_the_viewport() {
     assert!(viewport.iter().all(|superchunk| world.arena.superchunk_indices().contains(superchunk)));
     let folder = crate::tests::folder("camera");
     server::save(&folder, &mut world).expect("saved");
-    assert_eq!(server::load(&folder).expect("loaded").info.camera_flock, Some(sheep as u64), "its camera flock, kept");
+    let loaded = server::load(&folder).expect("loaded");
+    assert_eq!(loaded.info.camera_flock, Some(sheep as u64), "its camera flock, kept");
+    // Those generated for a halo alone are owed their flocks, a save keeping which, and given them once the camera sees them.
+    let owed: Vec<SuperchunkIndex> = about_view.iter().copied().filter(|superchunk| world.info.without_camera_flock.contains(&superchunk.0)).collect();
+    assert!(!owed.is_empty() && loaded.info.without_camera_flock == world.info.without_camera_flock, "the flocks owed, kept");
+    world.halos.keep_viewport(Some(Viewport { first: (x + 9, y - 1), last: (x + 12, y + 1) }));
+    let given_at = world.entities.now() + 4 * WARM_TICKS;
+    while owed.iter().any(|superchunk| world.info.without_camera_flock.contains(&superchunk.0)) {
+        assert!(world.entities.now() < given_at, "the flocks owed given, the camera seeing them");
+        world.tick();
+    }
+    assert!(owed.iter().all(|&superchunk| sheep_on(&world, superchunk) > 0), "a flock on each the camera came to see");
 
     let mut unseen = server::start(server::Start { seed: crate::tests::land_seed(2), sheep, ..server::Start::default() });
     unseen.halos.keep_viewport(Some(Viewport { first: (x + 10, y), last: (x + 11, y) }));
