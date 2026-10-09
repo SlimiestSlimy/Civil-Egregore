@@ -116,14 +116,14 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
 
 == OPEN THREADS ==
 
-- Worldgen sliders over a running world: built, not yet tried by
-  hand. renderer link::generation calls Host::reset when
-  Generation::from_tuning of the sliders changes (compared with what
-  the sliders last said, kept in Link.generation); Link.first_view
-  moves the camera only for a world made or opened, not one remade.
-  To try in the window: drag a land slider over a world -- it should
-  be remade in place, the view kept; a shading slider must remake
-  nothing, also over an opened world of other numbers.
+- Trees drift after a world is made, whatever the tree sliders say:
+  the tree rule (mc_rules::trees) has a balance of its own, about 15%
+  of dry cells (CROWDED 9 of 64), so a denser cover thins and a
+  sparser one fills in over some 100,000 ticks. Measured through the
+  host: cover 0.5 -> 2.08 M trees at tick 0, 0.57 M by tick 350,000;
+  cover 0.01 -> 40 k, 495 k by tick 400,000. The reset itself is
+  instant. The user saw it as "trees sampled for removal"; what the
+  rule should do about it is theirs to say -- not changed.
 - Viewport hot has no cap: a hot superchunk is ~3.7 MiB (64 held
   234 MiB, docs/tilesim.md), so 10,000 in the viewport ~ 36 GiB, and
   the farthest zoom has millions. A cap slider was offered to the

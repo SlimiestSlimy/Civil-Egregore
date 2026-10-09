@@ -2,7 +2,8 @@
 //! or left; and in a group a knob dragged with the left button and kept
 //! when let go, set back to its default with the right, a value typed
 //! into its box -- digits and a point, Enter or a click to set it,
-//! Escape to leave it.
+//! Escape to leave it. A toggle is neither dragged nor typed: a click
+//! on it turns it on or off.
 
 use super::spawn::{Moved, Valued};
 use super::{rows, Offered, Shown, Sliders, BOX, GAP, KNOB, MARGIN, TRACK};
@@ -28,6 +29,13 @@ fn typed(key: KeyCode) -> Option<char> {
         return Some('.');
     }
     DIGITS.iter().position(|&(digit, numpad)| key == digit || key == numpad).map(|digit| (b'0' + digit as u8) as char)
+}
+
+/// Whether the toggle that is the `index`-th number is on at `value`:
+/// nearer its range's far end than its near one.
+fn turned_on(index: usize, value: f32) -> bool {
+    let (off, on) = tuned(index).range;
+    value >= (off + on) / 2.0
 }
 
 /// Works what is shown, as the module says, and shows each slider's
@@ -80,8 +88,14 @@ pub fn slide(mut sliders: ResMut<Sliders>, mut tuning: ResMut<CurrentTuning>, bu
     }
     if pressed {
         sliders.held = sliders.over(&window);
-        sliders.dragged = on_track;
-        sliders.typed = on_box.map(|index| (index, String::new()));
+        // A toggle is turned by the click itself, on its track or its box.
+        if let Some(index) = on_track.or(on_box).filter(|&index| tuned(index).toggle) {
+            let (off, on) = tuned(index).range;
+            tuning.0[index] = if turned_on(index, tuning.0[index]) { off } else { on };
+            keep(&tuning.0);
+        }
+        sliders.dragged = on_track.filter(|&index| !tuned(index).toggle);
+        sliders.typed = on_box.filter(|&index| !tuned(index).toggle).map(|index| (index, String::new()));
     }
     if !buttons.pressed(MouseButton::Left) {
         sliders.held = false;
@@ -120,6 +134,7 @@ fn show(sliders: &Sliders, numbers: &utilities::tuning::Tuning, mut moved: Query
     for (valued, mut text) in &mut values {
         let value = match &sliders.typed {
             Some((index, digits)) if *index == valued.0 => format!("{digits}_"),
+            _ if tuned(valued.0).toggle => if turned_on(valued.0, numbers[valued.0]) { "on" } else { "off" }.to_string(),
             _ => format!("{:.2}", numbers[valued.0]),
         };
         if text.0 != value {

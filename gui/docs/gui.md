@@ -47,7 +47,8 @@ world is made (`Group::setup_only`) -- the shading, and how a world is
 generated, the world run made again from its start as one of those
 changes; none over the rest of the main menu, nor under the options.
 
-In a group, the left button drags a knob, the right sets the number
+A **toggle** -- forced hot, camera loads -- is on or off: a click on
+it turns it, and its box says which. Of the rest, in a group, the left button drags a knob, the right sets the number
 back to its default. Beside each is a box with its value: a click on
 it and the value is typed -- digits and a point, Enter to set it,
 Escape to leave it. A value typed may pass the slider's range, which

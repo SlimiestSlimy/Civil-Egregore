@@ -22,6 +22,22 @@ const CRATES: [Crate; 2] = [
     Crate { name: "tessera", does: "Tessera's diagnostics tools", commands: &tessera::diagnostics::tool::COMMANDS },
 ];
 
+#[cfg(all(windows, feature = "renderer"))]
+unsafe extern "system" {
+    /// Windows' own: lets go of the console the program was given.
+    safe fn FreeConsole() -> i32;
+}
+
+/// On Windows, lets go of the console before the window opens: the one
+/// program is a console program, so that its commands print where they
+/// are typed, and Windows opens a console beside one started by a
+/// click, which the window has no use for. Elsewhere, nothing.
+#[cfg(feature = "renderer")]
+fn leave_the_console() {
+    #[cfg(windows)]
+    FreeConsole();
+}
+
 /// No arguments, built with the renderer: the window, and nothing else
 /// run once it closes. Otherwise, hands the command line to the crate
 /// its first word names, or says why not.
@@ -31,6 +47,7 @@ fn main() -> ExitCode {
 
     #[cfg(feature = "renderer")]
     if arguments.is_empty() {
+        leave_the_console();
         renderer::run();
         return ExitCode::SUCCESS;
     }

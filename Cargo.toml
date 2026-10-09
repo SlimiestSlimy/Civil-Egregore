@@ -20,8 +20,8 @@ default = ["renderer"]
 
 # Every crate of Civil Egregore, built together: one lock file and one `target/`
 # for them all, here, whichever crate's folder cargo is run from.
-# `cargo test` here tests every one but the renderer, which brings Bevy:
-# `cargo run --release -p renderer` for that. Tessera's external
+# `cargo test` here tests every one but the renderer and its menus,
+# which bring Bevy: `cargo run --release` opens the window. Tessera's external
 # benchmarks stay a workspace of their own, so the codecs they compare
 # against never enter this build.
 [workspace]

@@ -203,6 +203,7 @@ what they always do and are not listed.
 | **tuning** | the numbers a slider sets, together: the near view's shading and how a new world is made (`utilities::tuning::Tuning`), a value held by whoever sets it -- the window's `gui::CurrentTuning` -- never a static | slider, group, settings, world start | config, parameters |
 | **reset** | the world run made again from its start, generated as the sliders now have it: a world of its own of no name, the view left where it is (`Host::reset`) | world start, tuning, host | regenerate, reload, restart |
 | **slider** | one number of the tuning, set by a knob dragged or a value typed (`gui::sliders`; `utilities/sliders.csv`) | tuning, group | knob (a slider's part only) |
+| **toggle** | a slider that is only on or off, turned by a click: its `kind` in the sliders' file (`Tuned::toggle`) | slider, tuning | checkbox, switch, flag |
 | **group** | sliders shown together: shading, one of how a world is generated, or the world's own, read only when one is made (`utilities::tuning::Group`) | slider | tab, page |
 | **world start** | every number a new world starts from -- seed, generation, size, forced hot, sheep, threads, hot entity, camera loading -- whoever gives them (`server::Start`); the server alone knows what they mean | tuning, forced hot, hot entity, world's size | world options, lab |
 | **host** | a world run on a thread of its own for a window, which calls it (`server::host::Host`) and is answered with the cells of its viewport's hot superchunks (`Frame`) | world start | sim, simulation thread |
