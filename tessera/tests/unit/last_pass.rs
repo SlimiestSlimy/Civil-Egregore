@@ -1,7 +1,7 @@
 //! The last pass's fixed-point log2, which every price and probability
 //! table is built from.
 
-use crate::last_pass::{fixed_point_log2, FRACTION_BITS};
+use crate::last_pass::context_odds::{fixed_point_log2, FRACTION_BITS};
 
 /// The fixed-point `log2` is never above the true one, and under a
 /// hundredth of a bit below it, from 1 to past the most a context's

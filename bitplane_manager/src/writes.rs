@@ -13,7 +13,8 @@
 //! fields alone; a rectangle or a disc is laid out in cartesian
 //! coordinates, the cheaper for geometry.
 
-use crate::{contains, BitmapArena, SuperchunkLayer};
+use crate::superchunk_layer::SuperchunkLayer;
+use crate::{contains, BitmapArena};
 use bitmap::morton::morton_index;
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};

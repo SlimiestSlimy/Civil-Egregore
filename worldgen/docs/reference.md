@@ -33,6 +33,8 @@ place)`**: a cell's, by its place in the superchunk; **`wall_counts()`**.
 
 ## `mesh.rs`
 
+`Lands` and `land` are in `mesh/lands.rs`.
+
 **`Lands`**: the land asked for cell after cell, the vertices about the
 last cell and its triangle kept -- **`new(shape, seed)`**, **`land(x,
 y)`**, **`height(x, y)`**, **`line(x, y)`** (how far inland the cell

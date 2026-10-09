@@ -32,8 +32,15 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
+mod a_star;
 pub mod diagnostics;
 pub mod transient_data;
+mod walls;
+
+pub use a_star::a_star;
+pub use walls::Walls;
+
+use walls::spread;
 
 /// Cells along an area's side.
 pub const SIDE: usize = 16;
@@ -126,91 +133,6 @@ fn for_each(rows: &Rows, from: Cell, mut each: impl FnMut(Cell)) {
     }
 }
 
-/// The walls between cells of an area: steps that cannot be taken,
-/// whatever the cells either side are. A step is between two cells, so
-/// a wall is kept by the upper or left one of the two, a mask a way,
-/// and bars the step both ways. Walls stand east and south of cells
-/// only; a diagonal step is barred unless both ways round it -- across
-/// then down, and down then across -- are open, which [`Walls::new`]
-/// works out once, a mask a diagonal. None by default.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Walls {
-    /// Cells with a wall between them and the cell to their east.
-    east: Rows,
-    /// ...and the cell to their south.
-    south: Rows,
-    /// Cells whose step to the south-east is barred: a wall on either way
-    /// round it.
-    south_east: Rows,
-    /// ...to the south-west.
-    south_west: Rows,
-}
-
-impl Walls {
-    /// The walls `east` and `south` of the area's cells, and the diagonal
-    /// steps they bar: a cell's step down and east is barred by a wall
-    /// east of it or of the cell below, or south of it or of the cell
-    /// east -- its two ways round; down and west, likewise to the west.
-    pub const fn new(east: Rows, south: Rows) -> Self {
-        let (mut south_east, mut south_west) = ([0; SIDE], [0; SIDE]);
-        let mut y = 0;
-        while y < SIDE {
-            // The row below's walls east; past the area's last row, none: no step leaves the area.
-            let east_below = if y + 1 < SIDE { east[y + 1] } else { 0 };
-            south_east[y] = east[y] | east_below | south[y] | south[y] >> 1;
-            south_west[y] = (east[y] | east_below) << 1 | south[y] | south[y] << 1;
-            y += 1;
-        }
-        Self { east, south, south_east, south_west }
-    }
-
-    /// The walls east of the area's cells.
-    pub const fn east(&self) -> &Rows {
-        &self.east
-    }
-
-    /// The walls south of the area's cells.
-    pub const fn south(&self) -> &Rows {
-        &self.south
-    }
-
-    /// Whether a wall bars the step from `cell` to its neighbour `dx`
-    /// across and `dy` down, a cell of the area too.
-    pub const fn bars_step(&self, cell: Cell, dx: i8, dy: i8) -> bool {
-        // The upper of the two keeps the wall; of two on a row, the left.
-        let (keeper, dx) = if dy < 0 || dy == 0 && dx < 0 { (Cell { x: (cell.x as i8 + dx) as u8, y: (cell.y as i8 + dy) as u8 }, -dx) } else { (cell, dx) };
-        let rows = match (dx, dy != 0) {
-            (1, false) => &self.east,
-            (0, true) => &self.south,
-            (1, true) => &self.south_east,
-            _ => &self.south_west,
-        };
-        holds(rows, keeper)
-    }
-}
-
-/// `rows` and every neighbour of its cells no wall of `walls` is before:
-/// each row with the rows above and below it, a column each way.
-fn spread(rows: &Rows, walls: &Walls) -> Rows {
-    let mut wider = [0; SIDE];
-    let mut y = 0;
-    while y < SIDE {
-        let here = rows[y];
-        let mut row = here | (here & !walls.east[y]) << 1 | here >> 1 & !walls.east[y];
-        if y > 0 {
-            let above = rows[y - 1];
-            row |= above & !walls.south[y - 1] | (above & !walls.south_east[y - 1]) << 1 | (above & !walls.south_west[y - 1]) >> 1;
-        }
-        if y + 1 < SIDE {
-            let below = rows[y + 1];
-            row |= below & !walls.south[y] | below >> 1 & !walls.south_east[y] | below << 1 & !walls.south_west[y];
-        }
-        wider[y] = row;
-        y += 1;
-    }
-    wider
-}
-
 /// A search spreading from every goal at once: the cells within so many
 /// steps of a goal, over the cells that may be walked on, a step further
 /// each [`Wave::advance`].
@@ -286,116 +208,4 @@ pub fn step_towards(passable: &Rows, walls: &Walls, goals: &Rows, from: Cell, pi
         }
         steps += 1;
     }
-}
-
-/// The eight neighbours, as steps `(dx, dy)`.
-const STEPS: [(i8, i8); 8] = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
-
-/// Room in a search's queue: a cell is queued again each time a shorter
-/// way to it is found, from one neighbour after another at most.
-const QUEUE: usize = CELLS * STEPS.len();
-
-/// A search's queue: the cells to look at next, the one on the shortest
-/// path guessed first -- a binary heap in an array.
-struct Queue {
-    /// The entries: a path's guessed length, then its steps so far
-    /// counted down -- of two guessed equal, the further along first --
-    /// then the cell, packed so the least is the next.
-    entries: [u32; QUEUE],
-    /// How many there are.
-    len: usize,
-}
-
-impl Queue {
-    /// Queues the cell at `index`, `steps` steps along a path guessed
-    /// `guessed` steps long.
-    fn push(&mut self, guessed: u8, steps: u8, index: usize) {
-        debug_assert!(self.len < QUEUE, "a cell queued more often than it has neighbours");
-        let mut at = self.len;
-        self.entries[at] = (guessed as u32) << 16 | ((u8::MAX - steps) as u32) << 8 | index as u32;
-        self.len += 1;
-        while at > 0 && self.entries[at] < self.entries[(at - 1) / 2] {
-            self.entries.swap(at, (at - 1) / 2);
-            at = (at - 1) / 2;
-        }
-    }
-
-    /// Takes the next cell out: its index in the area, and the steps to
-    /// it when it was queued.
-    fn pop(&mut self) -> Option<(usize, u8)> {
-        if self.len == 0 {
-            return None;
-        }
-        let next = self.entries[0];
-        self.len -= 1;
-        self.entries[0] = self.entries[self.len];
-        let mut at = 0;
-        loop {
-            let (left, right) = (2 * at + 1, 2 * at + 2);
-            let mut least = at;
-            if left < self.len && self.entries[left] < self.entries[least] {
-                least = left;
-            }
-            if right < self.len && self.entries[right] < self.entries[least] {
-                least = right;
-            }
-            if least == at {
-                break;
-            }
-            self.entries.swap(at, least);
-            at = least;
-        }
-        Some(((next & 0xff) as usize, u8::MAX - (next >> 8 & 0xff) as u8))
-    }
-}
-
-/// The shortest path from `from` to `to` over the cells of `passable`,
-/// through no wall of `walls`, a step to any of the eight neighbours: its first step and its
-/// length, by A*. `from` and `to` themselves need not be passable -- a
-/// walker stands on one and wants the other. `None` if there is no way,
-/// or if they are one cell.
-///
-/// The search runs backwards, from `to`: each cell reached remembers
-/// the cell it was reached from, one step nearer `to`, so when `from`
-/// is reached what it remembers is the path's first step, with nothing
-/// to walk back along.
-pub fn a_star(passable: &Rows, walls: &Walls, from: Cell, to: Cell) -> Option<Path> {
-    if from == to {
-        return None;
-    }
-    // Steps from `to` to each cell, the shortest found so far.
-    let mut steps = [u8::MAX; CELLS];
-    // The cell each was reached from: one step nearer `to`.
-    let mut towards = [0u8; CELLS];
-    // The cells whose shortest path is settled.
-    let mut settled: Rows = [0; SIDE];
-    let mut queue = Queue { entries: [0; QUEUE], len: 0 };
-    steps[to.index()] = 0;
-    queue.push(steps_apart(to, from), 0, to.index());
-    while let Some((index, queued_at)) = queue.pop() {
-        let cell = Cell::at(index);
-        // Queued again since by a shorter way, and looked at then.
-        if holds(&settled, cell) || queued_at > steps[index] {
-            continue;
-        }
-        if cell == from {
-            return Some(Path { first: Cell::at(towards[index] as usize), steps: steps[index] });
-        }
-        settled[cell.y as usize] |= 1 << cell.x;
-        let further = steps[index] + 1;
-        for (dx, dy) in STEPS {
-            let (x, y) = (cell.x as i8 + dx, cell.y as i8 + dy);
-            if x < 0 || y < 0 || x >= SIDE as i8 || y >= SIDE as i8 {
-                continue;
-            }
-            let neighbour = Cell { x: x as u8, y: y as u8 };
-            if neighbour != from && !holds(passable, neighbour) || walls.bars_step(cell, dx, dy) || further >= steps[neighbour.index()] {
-                continue;
-            }
-            steps[neighbour.index()] = further;
-            towards[neighbour.index()] = index as u8;
-            queue.push(further + steps_apart(neighbour, from), further, neighbour.index());
-        }
-    }
-    None
 }

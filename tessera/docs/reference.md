@@ -314,6 +314,11 @@ down, each bit flipped); an 8-cell run is one table lookup.
 
 ## `last_pass.rs`
 
+With three files under it: `last_pass/context_odds.rs` (the weights,
+`fixed_point_log2`, `ContextOdds`), `last_pass/floor_plan.rs`
+(`FloorPlan`) and `last_pass/context_window.rs` (`Window` and its
+tables).
+
 **`fixed_point_log2(value)`**: log2 in 8 fraction bits: the whole part,
 and the fraction from the 8 bits under the leading one, squared a bit at
 a time. Builds the log2 table when compiling; never above the true

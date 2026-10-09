@@ -22,9 +22,9 @@ the next run rolls a fresh seed by itself and says so, so no corpus is
 held for longer than a few measure-and-compare cycles, and no one has to
 remember to move it.
 
-- `Civil Egregore_SEED=<seed>` picks a seed for one run and leaves the file alone,
+- `CIVIL_EGREGORE_SEED=<seed>` picks a seed for one run and leaves the file alone,
   its count too, so pinning never holds a seed past its uses.
-- `Civil Egregore_SEED=fresh` draws a new seed for one run, likewise.
+- `CIVIL_EGREGORE_SEED=fresh` draws a new seed for one run, likewise.
 - The fine tests use the file's seed, but a use is not counted for them:
   they run far more often than anything measured, and would roll the
   seed by themselves.
@@ -79,7 +79,7 @@ every run checks bitmaps never seen and a failure names the seed that
 reproduces it:
 
 ```
-Civil Egregore_SEED=fresh cargo test --release --test fast
+CIVIL_EGREGORE_SEED=fresh cargo test --release --test fast
 ```
 
 Every tier's check (`tests/tests.rs`) examines each bitmap
@@ -148,7 +148,7 @@ cargo run --release -- tessera instruction_count
 callgrind_annotate --inclusive=yes transient_data/callgrind/callgrind.encode.out | head -40
 ```
 
-Counts are compared on one seed: pin it (`Civil Egregore_SEED=<seed>`) when a
+Counts are compared on one seed: pin it (`CIVIL_EGREGORE_SEED=<seed>`) when a
 comparison would straddle a roll. Saving a new adversarial bitmap
 changes the corpus too: count before and after it, apart from any code
 change.
@@ -210,8 +210,8 @@ the worst bitmaps, and a search's moves follow the seed: give each run a fresh
 one.
 
 ```
-Civil Egregore_SEED=fresh cargo run --release -- tessera adversarial 4000
-Civil Egregore_SEED=fresh cargo run --release --manifest-path external_benchmarks/Cargo.toml --bin adversarial -- 4000
+CIVIL_EGREGORE_SEED=fresh cargo run --release -- tessera adversarial 4000
+CIVIL_EGREGORE_SEED=fresh cargo run --release --manifest-path external_benchmarks/Cargo.toml --bin adversarial -- 4000
 ```
 
 Worst bitmaps move whenever a run beats them, so they are not what speed is
@@ -249,8 +249,8 @@ The fine tier checks every worst bitmap and saved bitmap; `instruction_count`,
 
 | variable | what it does |
 |---|---|
-| `Civil Egregore_SEED=<seed>` | this run's seed, the file left alone |
-| `Civil Egregore_SEED=fresh` | a fresh seed for this run, the file left alone |
+| `CIVIL_EGREGORE_SEED=<seed>` | this run's seed, the file left alone |
+| `CIVIL_EGREGORE_SEED=fresh` | a fresh seed for this run, the file left alone |
 | `TESSERA_DIAGNOSE=<path.pbm>` | one more bitmap for the tools that look at bitmaps |
 
 ## Every parameter
@@ -293,7 +293,7 @@ A seed base holds for 5 runs, then rolls. While it is held:
 - Iterate as much as the problem takes. Comparing two versions on the
   same seed is exactly what the seed is for: it is the only way to know
   a difference came from the code. A comparison must not straddle a
-  roll: run both sides on one seed -- pinned with `Civil Egregore_SEED=<seed>` if
+  roll: run both sides on one seed -- pinned with `CIVIL_EGREGORE_SEED=<seed>` if
   it would -- and read the seed each side printed.
 
 Everything in this phase is a *hypothesis*. A change that helps here has
@@ -305,7 +305,7 @@ When the problems that corpus showed are solved, re-run the measurement
 on a seed never seen -- a fresh one, or wherever the file has rolled to:
 
 ```
-Civil Egregore_SEED=fresh cargo run --release -- tessera measurement
+CIVIL_EGREGORE_SEED=fresh cargo run --release -- tessera measurement
 ```
 
 A change that is real holds its size on more than one unseen seed. A

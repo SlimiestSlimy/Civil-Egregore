@@ -29,7 +29,7 @@ reader has to wonder whether something is missing or was never needed
 | `src/diagnostics/` | code that gathers data and judges nothing: mock worlds, counts, censuses. A tool that prints them goes in `src/diagnostics/tool`, a function among the crate's commands |
 | `src/transient_data.rs` | names the crate's `transient_data/` folder, through `utilities::transient_data`, and says what goes where in it |
 | `transient_data/` | what runs leave behind: measurements, renders, saves. Never in git, never needed as an input |
-| `tests/<tier>.rs` | one test program per tier -- `fine.rs`, `fast.rs`, `complete.rs` -- a module per topic in it; only the tiers the crate has tests for |
+| `tests/<tier>.rs` | one test program per tier -- `fine.rs`, `fast.rs`, `complete.rs` -- a module per topic in it, each a file in `tests/<tier>/` once the tier's would pass some 300 lines; only the tiers the crate has tests for |
 | `tests/tests.rs` | what the tiers' tests share, where they share anything: a module of each, no test program itself |
 
 - A crate is a library: no `[[bin]]`, no `bin/`, no `src/bin/`. Only

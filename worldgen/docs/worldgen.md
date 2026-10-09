@@ -68,7 +68,7 @@ map alike. A seed is found with land about where a flock is to stand
 | folder | what is in it |
 |---|---|
 | `src/lib.rs` | the shape, heights, walls, a superchunk's terrain, the noise |
-| `src/mesh.rs` | the land as a mesh: what a height is worked out from |
+| `src/mesh.rs` | the land as a mesh: what a height is worked out from; `mesh/lands.rs` the land asked of a cell at a time |
 | `src/patches.rs` | how grass and trees lie when a superchunk is made |
 | `src/generation.rs` | how a world is generated as a whole, saved with it; made from the sliders; what grows on a cell; a seed with land |
 | `tests/` | heights settled by seed and cell, walls where they should be |

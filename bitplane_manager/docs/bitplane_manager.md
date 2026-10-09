@@ -126,7 +126,13 @@ thread.
 
 | folder | what is in it |
 |---|---|
-| `src/lib.rs` | the arena: directory, allocations, lookups, making hot, writing back, evicting |
+| `src/lib.rs` | the crate's modules, the chunk sets, the count tiles' sizes |
+| `src/layer.rs` | an allocation: one layer type over one superchunk, its buckets and counts |
+| `src/superchunk.rs` | a superchunk and its layers as the simulation is handed them |
+| `src/reader.rs` | cells read wherever they lie: the reader, its windows, the lookups |
+| `src/arena.rs` | the arena: the directory and what is read off it |
+| `src/hot.rs` | bitmaps made hot and cold, superchunks lingering |
+| `src/write_back.rs` | dirty buckets written back, flushed and evicted |
 | `src/writes.rs` | writes, their queues, and applying them to a superchunk |
 | `src/diagnostics/` | what the arena holds, gathered |
 | `src/transient_data.rs` | where runs leave what they make, out of git |

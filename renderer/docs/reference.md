@@ -21,6 +21,9 @@ word, bit)`**; **`counted(words, detail)`**: the cells set a tile.
 
 ## `ground.rs`
 
+`smoothed`, `shadow_lines`, `Sun`, `banded` and `tint` are in
+`ground/light_and_shadow.rs`.
+
 `SIDE`, `CELL_METRES` (2), `HEIGHT_METRES` (1), `SUN_ELEVATION` (35),
 `SMOOTHED_OVER` (4), `BEFORE` (138) and `AFTER` (10) cells kept about a
 superchunk, `SHADOW`, `CLIFF`, `CONTOUR`, `COARSEST` (6).

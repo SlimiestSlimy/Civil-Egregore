@@ -5,7 +5,7 @@
 //! checkerboard and every saved adversarial bitmap
 //! (`external_benchmarks/adversarial/saved/`), encoded, then decoded,
 //! all in one Tessera. The seed rolls like every run's: counts are compared
-//! on one seed, pinned with `Civil Egregore_SEED=<seed>` when a comparison would
+//! on one seed, pinned with `CIVIL_EGREGORE_SEED=<seed>` when a comparison would
 //! straddle a roll.
 //!
 //! Callgrind counts every instruction executed, the same on every run,

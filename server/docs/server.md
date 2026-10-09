@@ -116,7 +116,7 @@ their random numbers taken up. The cooling ones cool again, and the
 warming ones warm again, each to turn at the tick it was to.
 
 **A world loaded goes on as the one saved would have**, to the cell,
-the entity and the random number (`world` in `tests/fast.rs`: 1,500 ticks,
+the entity and the random number (`tests/fast/world.rs`: 1,500 ticks,
 saved, then 3,000 more on both; and a world saved and loaded seven
 times mid run -- at ticks 1, 700, 701, 1,900, 3,333 and 4,000, and the
 first tick a superchunk is warming, each
@@ -170,7 +170,7 @@ closed at any time leaves what it came to.
 | `src/world_start.rs` | what a new world starts from: its size, its seed drawn with land, the sliders' numbers read |
 | `src/halos.rs` | the hot entity, and the world lent to the simulation's halos |
 | `src/tick.rs` | the tick of every rule and entity, then the halos moved |
-| `src/host/` | a world run on a thread of its own for a window: the host's calls, frames, the census |
+| `src/host/` | a world run on a thread of its own for a window: `mod` the host's calls and the census, `host_thread` the thread itself, `frame` what it answers |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; the diagnostics tools |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
 | `tests/` | the halos follow their hot entities; a world of a size is hot within it only; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; the files; refusals |

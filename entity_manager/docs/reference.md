@@ -51,7 +51,8 @@ if within `WHEEL_TICKS` of `earliest`, else the list further off --
 `WHEEL_TICKS` the wakes now in reach filed; **`sort(tick)`**: a tick's
 wakes by cell, then ID.
 
-**`store.rs`**: **`SuperchunkEntities`**: a bucket a chunk and a wheel;
+**`store.rs`** (with `store/world_entities.rs`, `Entities`, and
+`store/entity_reader.rs`, `EntityReader`): **`SuperchunkEntities`**: a bucket a chunk and a wheel;
 **`get(id, at)`**, **`iter`**, **`chunk(place)`**, **`woken(tick)`** and
 **`woken_prefetching(tick, prefetch)`** -- the wheel's slot, each wake
 found and still due, the entities `ENTITY_AHEAD` on asked of memory --

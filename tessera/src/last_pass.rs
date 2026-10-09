@@ -6,10 +6,19 @@
 //!
 //! Function by function: `docs/reference.md`, "`last_pass.rs`".
 
-use crate::arithmetic::{ClearProbability, Decoder, Encoder, FINISHING_BITS};
+pub(crate) mod context_odds;
+mod context_window;
+mod floor_plan;
+
+pub use context_odds::ContextOdds;
+pub use floor_plan::FloorPlan;
+
+use context_odds::FRACTION_BITS;
+use context_window::{WINDOW_PLACES, Window};
+
+use crate::arithmetic::{Decoder, Encoder, FINISHING_BITS};
 use crate::bit_stream::{BitReader, BitStream};
-use crate::tile::{cells_in_tile, copy_offset, tiles_across, tiles_in_level, Tile, CELLS, FLOOR_LEVEL};
-use bitmap::morton::morton_coordinates;
+use crate::tile::{cells_in_tile, tiles_in_level, Tile, CELLS, FLOOR_LEVEL};
 use bitmap::Bitmap;
 use utilities::fixed_list::FixedList;
 
@@ -19,101 +28,6 @@ use utilities::fixed_list::FixedList;
 pub const CONTEXT_CELLS: [(i8, i8); 6] = [(-1, -1), (0, -1), (-1, 0), (-2, -2), (0, -2), (-2, 0)];
 /// Contexts: one for every value the context cells can hold.
 const CONTEXTS: usize = 1 << CONTEXT_CELLS.len();
-
-/// A context's weight for clear and for set before any cell: a half, in
-/// units of half a cell...
-const UNSEEN_WEIGHT: u16 = 1;
-/// ...and what each cell coded in it adds to its value's: one cell.
-const CELL_WEIGHT: u16 = 2;
-/// The cells either value of a context counts at most: reaching it,
-/// both are halved. Residual cells are much the same all over a bitmap,
-/// so halving forgets what costs bits, the more the sooner; this is
-/// where it stops costing any the corpus shows.
-const HALVING_COUNT: u16 = 512;
-/// The weight that, reached, halves both.
-const HALVING_WEIGHT: u16 = UNSEEN_WEIGHT + CELL_WEIGHT * HALVING_COUNT;
-/// The most a context's two weights add up to when a cell is coded at
-/// them: both just under halving.
-const MOST_WEIGHT_TOTAL: usize = 2 * (HALVING_WEIGHT - CELL_WEIGHT) as usize;
-
-/// Bits of a fixed-point `log2` below the point: a 256th of a bit.
-pub(crate) const FRACTION_BITS: u32 = 8;
-
-/// `log2(value)` in [`FRACTION_BITS`] fixed point, `value` at least 1:
-/// its whole part, and its fraction from the mantissa's top
-/// [`FRACTION_BITS`] bits under its leading one, squared a fraction bit
-/// at a time.
-pub(crate) const fn fixed_point_log2(value: u64) -> u32 {
-    // The mantissa in 2.30 fixed point.
-    const POINT: u32 = 30;
-    let whole = value.ilog2();
-    let top = (value << (u64::BITS - 1 - whole)) >> (u64::BITS - 1 - FRACTION_BITS);
-    let mut mantissa = top << (POINT - FRACTION_BITS);
-    let mut fraction = 0;
-    let mut bit = 0;
-    while bit < FRACTION_BITS {
-        mantissa = (mantissa * mantissa) >> POINT;
-        fraction <<= 1;
-        if mantissa >= 2 << POINT {
-            mantissa >>= 1;
-            fraction |= 1;
-        }
-        bit += 1;
-    }
-    whole << FRACTION_BITS | fraction
-}
-
-/// `2^32` over every total a context's weights can add up to, and
-/// `log2` of every weight and total in fixed point: a probability is a
-/// lookup and a multiply, a price two lookups.
-static RECIPROCALS_AND_LOG2S: ([u32; MOST_WEIGHT_TOTAL + 1], [u16; MOST_WEIGHT_TOTAL + 1]) = {
-    let (mut reciprocals, mut log2s) = ([0; MOST_WEIGHT_TOTAL + 1], [0; MOST_WEIGHT_TOTAL + 1]);
-    let mut total = 1;
-    while total <= MOST_WEIGHT_TOTAL {
-        reciprocals[total] = ((1u64 << u32::BITS) / total as u64) as u32;
-        log2s[total] = fixed_point_log2(total as u64) as u16;
-        total += 1;
-    }
-    (reciprocals, log2s)
-};
-
-/// A context's odds: its weights for clear and for set, by the value.
-#[derive(Clone, Copy)]
-pub struct ContextOdds([u16; 2]);
-
-impl ContextOdds {
-    /// No cell coded in it: a half each.
-    const UNSEEN: Self = Self([UNSEEN_WEIGHT; 2]);
-
-    /// Its two weights added up.
-    #[inline]
-    fn total(self) -> usize {
-        (self.0[0] + self.0[1]) as usize
-    }
-
-    /// The probability a cell in it is clear: clear's share of `2^32`.
-    #[inline]
-    fn clear_probability(self) -> ClearProbability {
-        ClearProbability(self.0[0] as u32 * RECIPROCALS_AND_LOG2S.0[self.total()])
-    }
-
-    /// What a cell holding `value` costs in it, in fixed point.
-    #[inline]
-    fn cost(self, value: bool) -> u32 {
-        let log2s = &RECIPROCALS_AND_LOG2S.1;
-        (log2s[self.total()] - log2s[self.0[value as usize] as usize]) as u32
-    }
-
-    /// A cell holding `value` coded in it: its weight grows, and both
-    /// are halved -- counts rounded up -- if it reaches halving.
-    #[inline]
-    fn learn(&mut self, value: bool) {
-        self.0[value as usize] += CELL_WEIGHT;
-        if self.0[value as usize] == HALVING_WEIGHT {
-            self.0 = self.0.map(|weight| UNSEEN_WEIGHT + CELL_WEIGHT * ((weight - UNSEEN_WEIGHT) / CELL_WEIGHT).div_ceil(2));
-        }
-    }
-}
 
 /// The most bits the pass takes over one a residual cell
 /// (`docs/tessera.md`, "The odds").
@@ -232,60 +146,6 @@ impl Pricing {
     }
 }
 
-/// The last pass's input: the 4x4 floor tiles the tree leaves unsaid -- each
-/// floor tile a copy covers, and its source floor tile, and the residual floor tiles.
-/// Gathered by the quadtree writer and reader as they walk the tree,
-/// so encoding and decoding gather the same.
-pub struct FloorPlan {
-    /// Each floor tile's source while a copy covers it and it is not copied
-    /// yet; [`NO_SOURCE`] otherwise.
-    sources: Box<[FloorIndex; FLOOR_TILES]>,
-    /// The floor tiles the tree leaves unsaid: copied or residual.
-    unsaid: FloorSet,
-    /// The residual floor tiles not yet coded.
-    residual: FloorSet,
-}
-
-impl FloorPlan {
-    /// No floor tile planned.
-    pub fn new() -> Self {
-        Self { sources: Box::new([NO_SOURCE; FLOOR_TILES]), unsaid: [0; FLOOR_SET_WORDS], residual: [0; FLOOR_SET_WORDS] }
-    }
-
-    /// Forgets every floor tile planned: before the tree is walked.
-    pub fn clear(&mut self) {
-        self.sources.fill(NO_SOURCE);
-        self.unsaid = [0; FLOOR_SET_WORDS];
-        self.residual = [0; FLOOR_SET_WORDS];
-    }
-
-    /// Adds the residual floor tile `floor tile`.
-    pub fn add_residual_floor_tile(&mut self, floor_tile: Tile) {
-        insert(&mut self.residual, floor_tile.index());
-        insert(&mut self.unsaid, floor_tile.index());
-    }
-
-    /// The residual floor tiles, by Morton index, in that order.
-    pub fn residual_floor_tiles(&self, mut visit: impl FnMut(usize)) {
-        each_floor_tile(|word_index| self.residual[word_index], &mut visit);
-    }
-
-    /// Adds the floor tiles of `part` -- the copy at `copy`, or a child of it
-    /// the copy copies -- copied from the tile `far` and `direction`
-    /// name, counted in the copy's own sides: each floor tile from the floor tile
-    /// at the same place in the same-size tile that far away.
-    pub fn add_copied_floor_tiles(&mut self, copy: Tile, part: Tile, far: bool, direction: u8) {
-        let (dx, dy) = copy_offset(far, direction);
-        let reach = tiles_across(part.level - copy.level) as isize;
-        let source = Tile { level: part.level, x: (part.x as isize + dx * reach) as u8, y: (part.y as isize + dy * reach) as u8 };
-        let (first, source_first) = (part.first_cell() / FLOOR_TILE_CELLS, source.first_cell() / FLOOR_TILE_CELLS);
-        for place in 0..tiles_in_level(FLOOR_LEVEL - part.level) {
-            self.sources[first + place] = (source_first + place) as FloorIndex;
-            insert(&mut self.unsaid, first + place);
-        }
-    }
-}
-
 /// Room for the last pass, allocated once.
 pub struct LastPass {
     /// How far the pass is.
@@ -395,114 +255,3 @@ impl PassState {
         true
     }
 }
-
-/// A floor tile and the three floor tiles before it -- above left, above, left --
-/// as an 8x8 square of cells, a bit each, row after row: bit `8y + x`,
-/// the floor tile's own cells at `x`, `y` from 4 to 7. A floor tile off the bitmap
-/// is clear.
-struct Window(u64);
-
-/// Cells a window row: two floor tiles side by side.
-const WINDOW_SIDE: u32 = 2 * FLOOR_TILE_SIDE;
-
-/// A floor tile's first eight cells in Morton order -- its top two rows -- by
-/// their values, in a window's rows; the next eight are the same two
-/// rows lower.
-const FLOOR_TILE_ROWS: [u64; 1 << (FLOOR_TILE_CELLS / 2)] = {
-    let mut rows = [0; 1 << (FLOOR_TILE_CELLS / 2)];
-    let mut run = 0;
-    while run < rows.len() {
-        let mut index = 0;
-        while index < FLOOR_TILE_CELLS / 2 {
-            if run >> index & 1 == 1 {
-                let (x, y) = morton_coordinates(index);
-                rows[run] |= 1 << (y as u32 * WINDOW_SIDE + x as u32);
-            }
-            index += 1;
-        }
-        run += 1;
-    }
-    rows
-};
-
-/// How far left and up a context reaches, in cells: the square from
-/// that far up and left of a cell to the cell itself -- its
-/// neighbourhood -- holds all of its context.
-const CONTEXT_REACH: u32 = 2;
-/// A neighbourhood's side, in cells.
-const NEIGHBOURHOOD_SIDE: u32 = CONTEXT_REACH + 1;
-const _: () = {
-    let mut index = 0;
-    while index < CONTEXT_CELLS.len() {
-        let (dx, dy) = CONTEXT_CELLS[index];
-        assert!(dx <= 0 && dy <= 0 && -dx as u32 <= CONTEXT_REACH && -dy as u32 <= CONTEXT_REACH, "every context cell is in the neighbourhood");
-        index += 1;
-    }
-};
-
-/// Every neighbourhood's context, by its cells, a bit each, row after
-/// row: a bit for each of [`CONTEXT_CELLS`] set.
-const NEIGHBOURHOOD_CONTEXTS: [u8; 1 << (NEIGHBOURHOOD_SIDE * NEIGHBOURHOOD_SIDE)] = {
-    let mut contexts = [0; 1 << (NEIGHBOURHOOD_SIDE * NEIGHBOURHOOD_SIDE)];
-    let mut neighbourhood = 0;
-    while neighbourhood < contexts.len() {
-        let mut bit = 0;
-        while bit < CONTEXT_CELLS.len() {
-            let (dx, dy) = CONTEXT_CELLS[bit];
-            let x = (CONTEXT_REACH as i32 + dx as i32) as u32;
-            let y = (CONTEXT_REACH as i32 + dy as i32) as u32;
-            if neighbourhood >> (y * NEIGHBOURHOOD_SIDE + x) & 1 == 1 {
-                contexts[neighbourhood] |= 1 << bit;
-            }
-            bit += 1;
-        }
-        neighbourhood += 1;
-    }
-    contexts
-};
-
-impl Window {
-    /// The window of the floor tile at `index`, read off `cells`.
-    fn around(cells: &Bitmap, index: usize) -> Self {
-        let rows_of = |floor_tile: Option<usize>| {
-            floor_tile.map_or(0, |floor_tile| {
-                let run = cells.morton_run(floor_tile * FLOOR_TILE_CELLS, FLOOR_TILE_CELLS);
-                FLOOR_TILE_ROWS[run as usize & 0xFF] | FLOOR_TILE_ROWS[run as usize >> (FLOOR_TILE_CELLS / 2)] << (2 * WINDOW_SIDE)
-            })
-        };
-        // The floor tiles left and above, one step back in x or y: each a field
-        // of the Morton index, decremented in place.
-        let (x_bits, y_bits) = (index & FLOOR_X_BITS, index & FLOOR_Y_BITS);
-        let (x_before, y_before) = (x_bits.wrapping_sub(1) & FLOOR_X_BITS, y_bits.wrapping_sub(1) & FLOOR_Y_BITS);
-        let (has_left, has_above) = (x_bits != 0, y_bits != 0);
-        let floor_tile_row = FLOOR_TILE_SIDE * WINDOW_SIDE;
-        Self(
-            rows_of((has_left && has_above).then_some(x_before | y_before))
-                | rows_of(has_above.then_some(x_bits | y_before)) << FLOOR_TILE_SIDE
-                | rows_of(has_left.then_some(x_before | y_bits)) << floor_tile_row
-                | rows_of(Some(index)) << (floor_tile_row + FLOOR_TILE_SIDE),
-        )
-    }
-
-    /// The context of the floor tile's cell at `place` in its Morton order:
-    /// its neighbourhood's, three rows of the window.
-    #[inline]
-    fn context(&self, place: usize) -> usize {
-        let top_left = WINDOW_PLACES[place] - CONTEXT_REACH * (WINDOW_SIDE + 1);
-        let row = |dy: u32| (self.0 >> (top_left + dy * WINDOW_SIDE)) as usize & ((1 << NEIGHBOURHOOD_SIDE) - 1);
-        NEIGHBOURHOOD_CONTEXTS[row(0) | row(1) << NEIGHBOURHOOD_SIDE | row(2) << (2 * NEIGHBOURHOOD_SIDE)] as usize
-    }
-}
-
-/// Each of a floor tile's cells, by its place in the floor tile's Morton order:
-/// its bit in the window.
-const WINDOW_PLACES: [u32; FLOOR_TILE_CELLS] = {
-    let mut places = [0; FLOOR_TILE_CELLS];
-    let mut place = 0;
-    while place < FLOOR_TILE_CELLS {
-        let (x, y) = morton_coordinates(place);
-        places[place] = (FLOOR_TILE_SIDE + y as u32) * WINDOW_SIDE + FLOOR_TILE_SIDE + x as u32;
-        place += 1;
-    }
-    places
-};
