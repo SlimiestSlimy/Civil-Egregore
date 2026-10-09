@@ -335,8 +335,8 @@ mod world {
         assert!(everything(&straight) == everything(&stopped), "the same at tick {until}");
     }
 
-    /// A save is a folder: a world file -- what it is made from and how
-    /// it is generated -- and a hot file, both CSV, and two
+    /// A save is a folder: a world file -- what it is made from, the kind
+    /// of entity it is hot about, and how it is generated -- and a hot file, both CSV, and two
     /// files a superchunk named by its superchunk index in hexadecimal.
     #[test]
     fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
@@ -345,7 +345,7 @@ mod world {
         server::save(&folder, &mut first).expect("saved");
         let text = std::fs::read_to_string(folder.join("world.csv")).expect("the world's file");
         let generation: String = first.generation.numbers().iter().map(|(name, value)| format!("generation {name},{value}\n")).collect();
-        assert_eq!(text, format!("world,is\nformat,2\nseed,0x0000000000000063\ntick,0\nlayers,2 3 4 5 6 7 24 8 9\n{generation}"), "no name: the folder's");
+        assert_eq!(text, format!("world,is\nformat,2\nseed,0x0000000000000063\ntick,0\nlayers,2 3 4 5 6 7 24 8 9\nhot entity,{}\n{generation}", server::HOT_ENTITY.0), "no name: the folder's");
         let hot: String = first.arena.superchunk_indices().iter().map(|superchunk| format!("{:011x},hot,\n", superchunk.0)).collect();
         assert_eq!(std::fs::read_to_string(folder.join("hot.csv")).expect("the hot file"), format!("superchunk,is,until\n{hot}"), "the nine hot, none cooling or warming");
         let mut names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|entry| entry.unwrap().file_name().into_string().unwrap()).collect();

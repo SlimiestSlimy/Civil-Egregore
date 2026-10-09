@@ -1,7 +1,9 @@
 //! What is tuned by eye: the numbers a window's sliders set, in
 //! groups -- the near view's shading, which a painter reads each frame,
 //! and how a new world is made ([`Group::makes_worlds`]), read once
-//! when one is -- with no lock between them.
+//! when one is. The numbers are a value ([`Tuning`]), held by whoever
+//! sets them and handed to whoever reads them: nothing of them is
+//! held here.
 //!
 //! Only their names and places are here. What a slider reaches, its
 //! group and what it does are in the sliders' file (`sliders.csv`, at
@@ -10,7 +12,6 @@
 //! last set to is kept in the machine's, a line each.
 
 use crate::settings::Settings;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::OnceLock;
 
 /// One number to tune, as the sliders' file has it.
@@ -155,10 +156,7 @@ pub fn tuned(index: usize) -> &'static Tuned {
     })[index]
 }
 
-/// The numbers as they are now, each a float's bits.
-static VALUES: [AtomicU32; NAMES.len()] = [const { AtomicU32::new(0) }; NAMES.len()];
-
-/// The numbers, read together.
+/// The numbers, read together, each at its place.
 pub type Tuning = [f32; NAMES.len()];
 
 /// What the `index`-th number is unless set: what the default
@@ -171,33 +169,30 @@ pub fn unless_set(index: usize) -> f32 {
     })[index]
 }
 
-/// Sets every number to what the machine's settings have for it, or
-/// to its default.
-pub fn start() {
+/// Every number as the default settings have it.
+pub fn defaults() -> Tuning {
+    std::array::from_fn(unless_set)
+}
+
+/// Every number as the machine's settings have it, or its default.
+pub fn kept() -> Tuning {
     let kept = Settings::read();
-    for (index, name) in NAMES.into_iter().enumerate() {
-        set(index, kept.number(name).unwrap_or(unless_set(index)));
-    }
+    std::array::from_fn(|index| settled(index, kept.number(NAMES[index]).unwrap_or(f32::NAN)))
 }
 
-/// The numbers now.
-pub fn now() -> Tuning {
-    std::array::from_fn(|index| f32::from_bits(VALUES[index].load(Ordering::Relaxed)))
+/// What the `index`-th number is set to by `value` -- anything: its
+/// range is only what its slider reaches, and a value typed may pass
+/// it -- or its default if `value` is no number.
+pub fn settled(index: usize, value: f32) -> f32 {
+    if value.is_finite() { value } else { unless_set(index) }
 }
 
-/// Sets the `index`-th number -- to anything: its range is only what
-/// its slider reaches, and a value typed may pass it.
-pub fn set(index: usize, value: f32) {
-    let bits = if value.is_finite() { value } else { unless_set(index) }.to_bits();
-    VALUES[index].store(bits, Ordering::Relaxed);
-}
-
-/// Keeps the numbers for the next run, in the machine's settings:
-/// lines not these numbers' are left as they are. A failure is let
-/// pass: they are then only not kept.
-pub fn keep() {
+/// Keeps `tuning` for the next run, in the machine's settings: lines
+/// not these numbers' are left as they are. A failure is let pass:
+/// they are then only not kept.
+pub fn keep(tuning: &Tuning) {
     let mut kept = Settings::read();
-    for (name, value) in NAMES.into_iter().zip(now()) {
+    for (name, value) in NAMES.into_iter().zip(tuning) {
         kept.set(name, Some(format!("{value:.3}")));
     }
     _ = kept.write();

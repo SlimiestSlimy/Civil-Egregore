@@ -18,11 +18,13 @@ pub mod halos;
 pub mod host;
 mod tick;
 pub mod transient_data;
+mod world_start;
 
 pub use halos::HOT_ENTITY;
 pub use simulation::hot::about;
 pub use simulation::{HaloChange, COOL_TICKS, WARM_TICKS};
 pub use tick::{tick_rules, TickCounts, WorldTick};
+pub use world_start::{drawn_seed, Size, Start, FLOCK};
 
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
@@ -32,16 +34,13 @@ use chunk_storage::mock::GRASS;
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
 use mc_rules::trees::{OLDEST, TREE, TREE_STAGE};
 use entity_rules::sheep::flock;
-use entity_manager::{saved, Entities};
+use entity_manager::{saved, Entities, EntityType};
 use simulation::{Halos, Hot, Simulation};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 use utilities::dispatcher::Dispatcher;
 use utilities::rng::Rng;
-
-/// Sheep the world's origin superchunk starts with, unless told.
-pub const FLOCK: usize = 4_000;
 
 /// What a save wrote.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -81,8 +80,9 @@ pub struct World {
 impl World {
     /// A world with nothing in it, at `info`'s tick: what generating and
     /// loading start from. Hot as `info` says: forced hot throughout if
-    /// it has a size and is forced, else about the hot entity's halo. On
-    /// `threads` threads, every one the machine has if none is given.
+    /// it has a size and is forced, else about the halos of the kind of
+    /// entity it names ([`HOT_ENTITY`] if it names none). On `threads`
+    /// threads, every one the machine has if none is given.
     fn empty(info: WorldInfo, generation: Generation, threads: Option<usize>) -> Self {
         let entities = Entities::at_tick(info.tick);
         // The world's superchunks not counted, as it grows: one set of threads, the tick's and chunk storage's jobs' alike.
@@ -90,7 +90,7 @@ impl World {
         let simulation = Simulation::on(Arc::clone(&dispatcher));
         let hot = match (info.side, info.forced) {
             (Some(side), true) => Hot::Forced { side },
-            (side, _) => Hot::About { entity: halos::HOT_ENTITY, side },
+            (side, _) => Hot::About { entity: info.hot_entity.map_or(HOT_ENTITY, EntityType), side },
         };
         Self {
             info,
@@ -112,63 +112,6 @@ fn layer_types() -> Vec<LayerType> {
     [GRASS, TREE, TREE_STAGE.layer_type(), WET].into_iter().chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
 }
 
-/// How far a world reaches, and whether it is hot throughout.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Size {
-    /// No end: as far as coordinates reach, hot about its sheep.
-    Unlimited,
-    /// `side` superchunks along a side, a square about its origin --
-    /// nothing outside it ever made or hot -- hot about its sheep, or
-    /// `forced` hot throughout, whatever they do: only a world with an
-    /// end can be.
-    Limited {
-        /// Superchunks along a side.
-        side: u32,
-        /// Every superchunk of it hot throughout.
-        forced: bool,
-    },
-}
-
-impl Size {
-    /// As the sliders' numbers have it: a side of 0 is no limit, and
-    /// forced hot counts only with a side.
-    pub fn from_tuning(tuned: &utilities::tuning::Tuning) -> Self {
-        match tuned[utilities::tuning::WORLD_SIDE].round().max(0.0) as u32 {
-            0 => Self::Unlimited,
-            side => Self::Limited { side, forced: tuned[utilities::tuning::FORCED_HOT] >= 0.5 },
-        }
-    }
-}
-
-/// What a world starts from, for [`start`]: `seed`, generated as
-/// `generation` says, as far as `size` lets it reach, ticking on
-/// `threads` threads, and `sheep` on each superchunk of it -- every one
-/// of a world with a size; of one without, the origin's alone, as
-/// sheep everywhere would keep the whole of an endless world hot --
-/// their halos hot before it ticks.
-#[derive(Clone, Copy, Debug)]
-pub struct Start {
-    /// The seed its superchunks are generated from.
-    pub seed: u64,
-    /// How its superchunks are generated.
-    pub generation: Generation,
-    /// How far it reaches, and whether it is forced hot.
-    pub size: Size,
-    /// Threads it ticks on, every one the machine has if none is given.
-    pub threads: Option<usize>,
-    /// Sheep each superchunk it puts them on starts with.
-    pub sheep: usize,
-}
-
-impl Default for Start {
-    /// Seed 1, generated as [`Generation::DEFAULT`] says, no size to
-    /// it, every thread the machine has, a flock of [`FLOCK`] on its
-    /// origin: what `new` makes unless told otherwise.
-    fn default() -> Self {
-        Self { seed: 1, generation: Generation::DEFAULT, size: Size::Unlimited, threads: None, sheep: FLOCK }
-    }
-}
-
 /// A world as `options` say: generated as they say, its sheep put on
 /// and their halos hot before it ticks -- or, forced hot, all of it.
 /// Every superchunk -- these, and those made as a flock wanders -- is
@@ -176,7 +119,7 @@ impl Default for Start {
 /// trees in patches. Each from the seed and where it is
 /// ([`generate_image`]).
 pub fn start(options: Start) -> World {
-    let mut world = generate_sized(options.generation, options.seed, options.size, options.threads);
+    let mut world = generate_sized(options.generation, options.seed, options.size, options.hot_entity, options.threads);
     let everywhere = world.halos.hot.all();
     if options.sheep == 0 {
         // No sheep: nothing hot, unless all of it is forced so.
@@ -191,15 +134,16 @@ pub fn start(options: Start) -> World {
 
 /// A world of `seed` with nothing in it yet, nothing hot, whose
 /// superchunks are generated as `generation` says, as far as `size`
-/// lets it reach, on `threads` threads, every one the machine has if
-/// none is given: what [`start`] is built from, and what a way of
+/// lets it reach, hot about the entities of the kind `hot_entity`
+/// unless forced hot, on `threads` threads, every one the machine has
+/// if none is given: what [`start`] is built from, and what a way of
 /// generating is tried out on by itself.
-pub fn generate_sized(generation: Generation, seed: u64, size: Size, threads: Option<usize>) -> World {
+pub fn generate_sized(generation: Generation, seed: u64, size: Size, hot_entity: EntityType, threads: Option<usize>) -> World {
     let (side, forced) = match size {
         Size::Unlimited => (None, false),
         Size::Limited { side, forced } => (Some(side), forced),
     };
-    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, forced, generation: generation.numbers() }, generation, threads)
+    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, forced, hot_entity: Some(hot_entity.0), generation: generation.numbers() }, generation, threads)
 }
 
 /// `world`, nothing in it yet, with a flock of `sheep` on each of

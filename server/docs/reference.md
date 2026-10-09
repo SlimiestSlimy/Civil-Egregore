@@ -1,30 +1,23 @@
 # The world, function by function
 
-The design is in `world.md`.
+The design is in `server.md`.
 
 ## `lib.rs`
 
-`FLOCK` (4,000): the sheep a superchunk starts with, unless told.
 **`World`** `{info, generation, arena, storage, entities, simulation,
 cold, halos}` -- **`cold`**, each cold superchunk's state as a save
 keeps it; **`halos`**, the simulation's -- and
 **`World::empty(info, generation, threads)`**, what generating and
 loading start from, hot as `info` says: forced throughout if it has a
-side and is forced, else about the hot entity's halo; **`layer_types`**.
-**`Size`**: `Unlimited`, or `Limited {side, forced}` -- so many
-superchunks along a side, a square about the origin, and whether
-every one of them is hot throughout, which only a world with a side
-can be; **`Size::from_tuning(tuned)`**: as the sliders have it, a
-side of 0 no limit.
-**`start(options)`**: a **`Start`** `{seed, generation, size,
-threads, sheep}` made into a world -- `threads`, every one the machine
-has if `None`; `sheep` on every superchunk of a world with a side, on
-the origin (`WORLD_MIDDLE`) alone of one without, as sheep everywhere
-would keep the whole of an endless world hot; their halos hot, or, of
-a world forced hot, all of it. `Start::default()`: seed 1, the default
-generation, no size, every thread, `FLOCK` on the origin.
-**`generate_image(seed, superchunk, codec)`**: a superchunk's terrain
-and pasture, from the seed and its superchunk index.
+side and is forced, else about the halos of the kind of entity it
+names, `HOT_ENTITY` if none (a save from before it was kept);
+**`layer_types`**.
+**`start(options)`**: a `Start` (`world_start.rs`) made into a world
+-- `threads`, every one the machine has if `None`; `sheep` on every
+superchunk of a world with a side, on the origin (`WORLD_MIDDLE`)
+alone of one without, as sheep everywhere would keep the whole of an
+endless world hot; their halos hot, or, of a world forced hot, all of
+it; generated, flocked: below ("Generation").
 **`save(folder, world)`**: every dirty bitmap written back and the
 ring flushed (`World::write_back_and_flush_all`), then each superchunk's
 image and state -- live if hot, kept if cold -- the hot file, and the
@@ -35,6 +28,24 @@ folders' names, sorted.
 state, read whole, kept cold; then the hot file's hot superchunks made
 hot, its cooling ones cooling again and its warming ones warming again -- a `World`, or a `DiskError` naming
 the file and what is wrong.
+
+## `world_start.rs`
+
+What a new world starts from, whoever gives the numbers -- the command
+line or a window's sliders -- the server alone knowing what they mean.
+`FLOCK` (4,000): the sheep a superchunk starts with, unless told.
+`LAND_TRIES` (256). **`Size`**: `Unlimited`, or `Limited {side,
+forced}` -- so many superchunks along a side, a square about the
+origin, and whether every one of them is hot throughout;
+**`Size::of_side(side, forced)`**: a side of 0 no limit, refused if
+forced without a side, which only a world with one can be.
+**`Start`** `{seed, generation, size, threads, sheep, hot_entity}`;
+`Start::default()`: seed 1, the default generation, no size, every
+thread, `FLOCK` on the origin, hot about `HOT_ENTITY`.
+**`Start::from_tuning(seed, tuning)`**: as a window's sliders have it
+(`utilities::tuning::Tuning`), from the seed given or one drawn.
+**`drawn_seed(generation)`**: a seed drawn at random, the first from
+it with land about the origin within `LAND_TRIES`, else the one drawn.
 
 ## `halos.rs`
 
@@ -106,8 +117,9 @@ flock, time a sample and a wake, rates, what is held and the census
 
 How a world is generated is `worldgen`'s (`worldgen::Generation`,
 saved with the world, a number a row). **`generate_sized(generation,
-seed, size, threads)`**: what `start` builds a world from, generated
-so, as far as its size lets it reach, nothing hot yet -- and what a way
+seed, size, hot_entity, threads)`**: what `start` builds a world from,
+generated so, as far as its size lets it reach, nothing hot yet, to be
+hot about the entities of the kind `hot_entity` unless forced -- and what a way
 of generating is tried out on by itself. **`flocked(world,
 superchunks, sheep)`**: what `start` builds a flock from, put on a
 world with nothing in it yet -- and what a flock is tried out on by
@@ -120,18 +132,21 @@ each cell.
 
 A world run on a thread of its own for a client -- a window -- that
 asks it for the cells in view. `TARGET_PACE` (256 ticks a second),
-`CENSUS_EVERY` (1,000 ticks), `CATCH_UP`. **`Request`**: `Sync(ask)`
--- answered with a `Frame`, unless no world runs -- `Pause(bool)`,
-`Pace(ticks a second, or flat out)`, `New(start)`, `Open(name)` -- that
-world of the worlds' folder run in place of the one run -- and
-`Save(name)`. **`census_path()`**: where a run's census is kept
+`CENSUS_EVERY` (1,000 ticks), `CATCH_UP`. **`Host`**: the host as a
+client holds it, each call sent to its thread and done there between
+two ticks, each saying whether the host was still there --
+**`Host::start()`**: the host on a thread named `host`, no world run
+yet, and where its frames come back; **`sync(ask)`** -- answered with
+a `Frame`, unless no world runs -- **`pause(paused)`**, **`pace(ticks
+a second, or flat out)`**, **`make_world(start)`**,
+**`open_world(name)`** -- that world of the worlds' folder run in
+place of the one run -- and **`save_world(name)`**. `Request`, private:
+a call as sent. **`census_path()`**: where a run's census is kept
 (`transient_data/measurements/census.csv`); **`census(seed)`**: its
-file, started afresh for each world. **`start()`**: the host on a
-thread named `host`, no world run yet; where to send requests, where
-frames come back. **`Running`**: the world run, the superchunks whose
-heights were sent, when it began, its census. **`Host`**: the world
-run if any, the worlds run so far, paused, the pace, the name, what
-was last said -- **`run`**: requests read between ticks, a tick, and a
+file, started afresh for each world. **`Running`**: the world run, the
+superchunks whose heights were sent, when it began, its census.
+**`HostThread`**: the world run if any, the worlds run so far, paused,
+the pace, the name, what was last said -- **`run`**: requests read between ticks, a tick, and a
 wait for the next one's time; paused or with no world, it waits for a
 request; **`run_world`**, **`save`**, **`frame(ask)`**, **`tick`**.
 

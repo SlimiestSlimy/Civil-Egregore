@@ -5,11 +5,13 @@ What each file holds. The design: `gui.md`.
 ## `lib.rs`
 
 **`Gui`** `{worlds}`: the menus, a plugin -- `worlds` names the worlds
-there are to open; building it starts the numbers tuned
-(`utilities::tuning::start`). **`Worked`**: the set their work of a
-frame is in. **`Screen`**: `MainMenu`, until a world is made or opened
-from it, then `World`. **`Make(seed)`**, **`Open(name)`**,
-**`Save(name)`**: the messages. **`Captured`** `{pointer, wheel,
+there are to open; building it takes up the numbers tuned as the
+machine kept them. **`CurrentTuning`**: those numbers, a resource the
+sliders set and whatever draws reads (`utilities::tuning::Tuning`).
+**`Worked`**: the set their work of a frame is in. **`Screen`**:
+`MainMenu`, until a world is made or opened from it, then `World`.
+**`Make`** `{seed, tuning}`, **`Open(name)`**, **`Save(name)`**: the
+messages. **`Captured`** `{pointer, wheel,
 keys}`: what the menus took this frame. **`offer`**: the sliders
 offered as the screen has it. **`capture`**: `Captured`, last.
 
@@ -83,7 +85,8 @@ make no worlds -- and each group (**`spawn_group`**).
 
 **`typed(key)`**: the digit or point a key types. **`slide`**: the menu
 and the groups opened and left, sliders dragged and set back, values
-typed, the numbers kept; **`show`**: knobs and values as they are.
+typed -- into `CurrentTuning` -- the numbers kept; **`show`**: knobs
+and values as they are.
 
 ## `sliders/tell.rs`
 

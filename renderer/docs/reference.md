@@ -5,7 +5,7 @@ The design is in `renderer.md`.
 ## `paint.rs`
 
 **`Painted`** `{at, cold, side, pixels}`: a superchunk's pixels, four bytes each.
-**`Picture`** `{frame, paint_seconds, superchunks, near}`: a frame, painted -- the frame itself, its cells gone into the pixels. **`start(frames)`**: the painter's
+**`Picture`** `{frame, paint_seconds, superchunks, near}`: a frame, painted -- the frame itself, its cells gone into the pixels. **`start(frames, tunings)`**: the painter's
 thread, the ground made again for each world run; where pictures come. **`ground(grounds, frame, number)`**: the
 ground of every hot superchunk of the frame made if missing, the fine
 parts of those longest unseen dropped (`FINE_KEPT`, 48).
@@ -42,7 +42,7 @@ it. **`Sun`**: **`shade(across, down)`**, the light on a slope.
 **`PaintedNear`** `{near, pixels}`. **`Edge`** `{towards, rise}`: a
 neighbour of another height; **`shading(from, span)`**: how dark and
 how light it makes a pixel that far in from it. **`paint_near(cells,
-grounds, near)`**: the picture. **`Cell`**: **`paint`**, a cell's pixels
+grounds, near, tuning)`**: the picture, shaded as `tuning` says. **`Cell`**: **`paint`**, a cell's pixels
 -- its edges, the shadow on it, its ground's tone (`TONES`).
 **`tree`**: a tree on its cell, a square larger and darker the older.
 **`sheep`**: a sheep's shape (`SHEEP`) on its cell.
@@ -57,16 +57,17 @@ frame shown and the next asked for, the map; then the text.
 
 ## `link.rs`
 
-`LAND_TRIES` (256). **`Link`** `{requests, pictures, waiting, since,
-asked, paused, pace}`: the host as the window holds it --
-**`start()`**: the host and the painter started; **`run(request)`**: a
-world in place of the one run, no frame of the one before waited for.
-**`Seen`** `{frame, painted, paint_seconds, in_view, detail,
-near_pixels, map}`: the last frame, and how it was drawn.
-**`start(seed)`**: what a world made from the menus starts from -- the
-seed given or one drawn with land about the origin, the rest from the
-sliders. **`menus`**: the worlds the menus make, open and save sent;
-the options told the world run's name. **`keys`**: pause and pace sent.
+**`Link`** `{host, pictures, shading, waiting, since, asked, paused,
+pace}`: the host as the window holds it (`server::host::Host`) --
+**`start()`**: the host and the painter started; **`forget_asked()`**:
+another world to run in place of the one run, no frame of the one
+before waited for. **`Seen`** `{frame, painted, paint_seconds,
+in_view, detail, near_pixels, map}`: the last frame, and how it was
+drawn. **`menus`**: the worlds the menus make (`server::Start::from_tuning`
+of the seed and numbers they give), open and save, the host told; the
+options told the world run's name. **`keys`**: pause and pace, the
+host told. **`shading`**: the sliders' numbers (`gui::CurrentTuning`)
+sent to the painter whenever they change.
 
 ## `frames.rs`
 

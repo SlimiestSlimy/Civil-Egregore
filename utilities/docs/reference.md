@@ -127,7 +127,9 @@ the crate's root) has it. **`Group`**: `Shading`, `World`, `Land`,
 `Lines`, `Finer`, `Grass`, `Trees` (`GROUPS`, in the menu's order, the
 one that makes no worlds first), **`name()`** and
 **`makes_worlds()`** -- every group but shading. **`Tuning`**: the
-numbers read together. **`unless_set(index)`**: what a number is
-unless set, from the default settings. **`start()`**: what the
-machine's settings have. **`now()`**, **`set(index, value)`**,
-**`keep()`**: the numbers written to the machine's settings.
+numbers together, a value held by whoever sets them -- nothing of them
+is held here. **`unless_set(index)`**: what a number is unless set,
+from the default settings; **`defaults()`**: every one so.
+**`kept()`**: what the machine's settings have. **`settled(index,
+value)`**: a value set, or the default if it is no number.
+**`keep(tuning)`**: the numbers written to the machine's settings.

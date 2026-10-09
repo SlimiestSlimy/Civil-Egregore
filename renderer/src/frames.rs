@@ -11,7 +11,6 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use coordinates::SUPERCHUNK_SIDE_CELLS;
 use server::host::frame::{Ask, Near, Viewport};
-use server::host::Request;
 
 /// Seconds from one frame asked for to the next, at least: no oftener
 /// than a screen shows them.
@@ -194,6 +193,6 @@ pub fn ask(
         }
         kept
     });
-    link.waiting = link.requests.send(Request::Sync(ask)).is_ok();
+    link.waiting = link.host.sync(ask);
     (link.asked, link.since) = (Some(ask), 0.0);
 }

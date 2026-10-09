@@ -30,10 +30,11 @@ none.
   unless the settings name another folder for them.
 - **What is tuned by eye** (`tuning.rs`): the numbers a window's
   sliders set -- the near view's shading, read each frame, and how a
-  new world is made, read once when one is -- by name and place, with
-  no lock between them. What a slider reaches, its group and what it
-  does are in the sliders' file (`sliders.csv`, at the crate's root),
-  written by hand; what each is unless set is in the default settings.
+  new world is made, read once when one is -- by name and place: a
+  value handed about, nothing of it held in a static. What a slider
+  reaches, its group and what it does are in the sliders' file
+  (`sliders.csv`, at the crate's root), written by hand; what each is
+  unless set is in the default settings.
 - **The seed** (`seed.rs`): the one seed every crate's tests and tools
   start from, in the workspace's `transient_data/seed.csv`, rolled every 5
   counted runs; `Civil Egregore_SEED` picks one for a run.

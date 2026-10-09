@@ -24,8 +24,9 @@ window's middle: **new world**, **open a world**, **exit**.
 hexadecimal -- none typed, one is drawn at random -- and `U` opens the
 sliders, every group of them offered (below): the world's size, whether
 it is forced hot, its sheep, how it is generated. **Make the world**,
-or Enter, says it is to be made (`Make(seed)`); the window makes it as
-the sliders have it then, and shows it (`Screen::World`). Escape goes
+or Enter, says it is to be made (`Make`), with the seed and the
+sliders' numbers as they are then; the window has the server make it
+(`server::Start::from_tuning`), and shows it (`Screen::World`). Escape goes
 back a page.
 
 **Open a world** lists those there are, as the options do (below); a
@@ -34,8 +35,8 @@ shows it.
 
 ## Sliders
 
-At the window's top right, the numbers of `utilities::tuning`, in
-groups, one group on the screen at a time. Closed, there is one small
+At the window's top right, the numbers of `utilities::tuning` -- held
+as the resource `CurrentTuning`, nowhere else -- in groups, one group on the screen at a time. Closed, there is one small
 button, `sliders`: a click on it, or `U`, opens the menu, which lists
 the groups offered a row each; a click on one opens it, and the first
 row of a group goes back to the menu. `U` closes whatever is open.
