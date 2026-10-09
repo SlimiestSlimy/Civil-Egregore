@@ -18,17 +18,17 @@ const PAN_SPEED: f32 = 0.8;
 const ZOOM_SPEED: f32 = 2.0;
 /// How much nearer a notch of the wheel.
 const WHEEL_ZOOM: f32 = 0.85;
-/// The farthest the world's cells are drawn from: cells a screen
-/// pixel. Some 60 superchunks across a screen, each of which may have
-/// to be made. Farther, the map (`crate::map`) is what is shown.
-pub const FARTHEST: f32 = 32.0;
+/// The farthest a world is first seen from: cells a screen pixel.
+/// Some 60 superchunks across a screen.
+const FIRST_FARTHEST: f32 = 32.0;
 /// The farthest the view goes: cells a screen pixel, four superchunks.
-const MAP_FARTHEST: f32 = 4096.0;
+const FARTHEST: f32 = 4096.0;
 /// Superchunks along the side of what a world of no size is first
 /// seen of: its origin's halo.
 const UNLIMITED_SEEN: u32 = 3;
 
-/// The world as drawn: an image a superchunk that has been in view,
+/// The world as drawn: an image a superchunk that has been in the
+/// viewport,
 /// made when its first pixels come, on a plane counted from the top
 /// left of the world's origin superchunk -- the world being too wide
 /// for a float's numbers.
@@ -58,8 +58,9 @@ impl Sprites {
         (origin(axis) as i64 + plane.floor() as i64).clamp(0, u32::MAX as i64) as u32
     }
 
-    /// The cells in view, across and down: the first and the last.
-    pub fn in_view(&self, transform: &Transform, scale: f32, window: &Window) -> [(u32, u32); 2] {
+    /// The cells of the viewport -- what the camera shows -- across
+    /// and down: the first and the last.
+    pub fn viewport_cells(&self, transform: &Transform, scale: f32, window: &Window) -> [(u32, u32); 2] {
         let half = Vec2::new(window.width(), window.height()) * scale / 2.0;
         let middle = [transform.translation.x, -transform.translation.y];
         [0, 1].map(|axis| (self.cell(middle[axis] - half[axis], axis), self.cell(middle[axis] + half[axis], axis)))
@@ -80,7 +81,7 @@ pub fn first_view(side: Option<u32>, window: &Window, transform: &mut Transform,
     let middle = (side % 2) as f32 * SPRITE_SIDE / 2.0;
     let seen = side as f32 * SPRITE_SIDE;
     if let Projection::Orthographic(view) = projection {
-        view.scale = (seen / window.height().min(window.width())).min(FARTHEST);
+        view.scale = (seen / window.height().min(window.width())).min(FIRST_FARTHEST);
     }
     transform.translation = Vec3::new(middle, -middle, 0.0);
 }
@@ -106,7 +107,7 @@ pub fn steer(
     let nearer = held([KeyCode::KeyE, KeyCode::Equal]) - held([KeyCode::KeyQ, KeyCode::Minus]);
     let wheel = if captured.wheel { 0.0 } else { scroll.delta.y };
     view.scale *= WHEEL_ZOOM.powf(wheel) * ZOOM_SPEED.powf(-nearer * time.delta_secs());
-    view.scale = view.scale.clamp(0.02, MAP_FARTHEST);
+    view.scale = view.scale.clamp(0.02, FARTHEST);
     let across = held([KeyCode::KeyD, KeyCode::ArrowRight]) - held([KeyCode::KeyA, KeyCode::ArrowLeft]);
     let up = held([KeyCode::KeyW, KeyCode::ArrowUp]) - held([KeyCode::KeyS, KeyCode::ArrowDown]);
     let step = PAN_SPEED * window.height() * view.scale * time.delta_secs();

@@ -62,11 +62,12 @@ superchunks about each, sorted, each once.
 
 **`Held`** `{arena, storage, entities, simulation, cold, layers,
 generate}`: the world's, lent for a call. **`Halos`** `{hot, jobs,
-warming, cooling, writing_back, flushing, in_view, generated}`, **`new(hot,
+warming, cooling, writing_back, flushing, viewport, generated}`, **`new(hot,
 dispatcher)`**, **`restore_cooling(cooling)`**.
-**`Halos::keep_in_view(in_view)`**: the superchunks in view, kept
-sorted, wanted hot besides the halos from the next move on;
-**`Halos::in_view`**: them. **`Halos::generated`**: the superchunks
+**`Halos::keep_viewport(viewport)`**: the viewport's superchunks --
+what a renderer renders -- kept sorted, wanted hot besides the halos
+from the next move on, in place of the last viewport's;
+**`Halos::viewport`**: them. **`Halos::generated`**: the superchunks
 the last move or `keep_hot` generated -- made new by a job, not read
 back -- sorted. `WARM_TICKS` (256): the ticks a superchunk is warming;
 `COOL_TICKS` (256): the ticks one is cooling.

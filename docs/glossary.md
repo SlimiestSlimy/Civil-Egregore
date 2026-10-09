@@ -62,8 +62,8 @@ what they always do and are not listed.
 | **halo** | the 3x3 superchunks about a hot entity -- its own and the eight beside it -- kept hot (`simulation::halos`) | hot entity, hot | halo chunk |
 | **hot entity** | an entity of the kind that keeps a halo (`simulation::Hot::About`; the server's `HOT_ENTITY`): people, to come; the sheep, for now | halo, forced hot | halo keeper, important entity, chunk loader |
 | **forced hot** | every superchunk of a world with a size hot throughout, no hot entity keeping them so (`Hot::Forced`); a world with none cannot be | hot entity, world's size | |
-| **in view** | the superchunks a window's frame shows, as the host is asked them (`Viewport`); and, wanted hot besides the halos, those the halos keep for it (`Halos::keep_in_view`) | camera loading, halo, host | visible, on screen |
-| **camera loading** | a world without a size keeping hot the superchunks in view, at most `CAMERA_SIDE` (8) a side about the view's middle, generated if never made, each generated while in view given its own flock (`Start::camera_loads`, `World::keep_in_view`); a superchunk generated only for a halo gets none | in view, hot entity, world start, forced hot | chunk loading, render distance |
+| **viewport** | whatever the renderer should render, in superchunks (`server::host::frame::Viewport`): what a frame is asked for, none in **map mode**; and, wanted hot besides the halos, those the halos keep for it (`Halos::keep_viewport`). Not Bevy's camera `Viewport`, a rectangle of the window | camera loading, halo, host, map mode | in view, visible, on screen |
+| **camera loading** | a world without a size keeping hot the superchunks of the viewport, at most `CAMERA_SIDE` (8) a side about its middle, generated if never made, each generated in the viewport given its own flock (`Start::camera_loads`, `World::keep_viewport`); a superchunk generated only for a halo gets none | viewport, hot entity, world start, forced hot | chunk loading, render distance |
 | **world's size** | so many superchunks along a side, a square about the origin, nothing ever hot or made outside it (`Hot::side()`); a world with none goes as far as coordinates reach | origin, halo | bounds, border, limit |
 | **origin** | the superchunk the world starts from, in its middle (`WORLD_MIDDLE`): a world is generated as it and its halo | superchunk | centre |
 | **cold state** | a cold superchunk's entities and random numbers, kept as a save keeps them (`World::cold`) | cold, save | |
@@ -83,7 +83,8 @@ what they always do and are not listed.
 | **cold pool** | chunk storage's superchunk images, one per superchunk stored. Never "pool" alone | image | |
 | **image** | one superchunk as stored, one run of words, in memory as on disk: its height map and every chunk's encoded layers (`SuperchunkImage`) | chunk storage, save | |
 | **height map** | a superchunk's heights: a floor a chunk, a byte a cell over it, and a tall chunk's 16 bits a cell (`HeightMap`) | height, floor, tall chunk | |
-| **map** | the renderer's picture of the world from farther than its cells are drawn from: each pixel the cell in its middle as generated, nothing of the simulation read (`renderer/src/map.rs`) | detail | overview, minimap |
+| **map** | the renderer's picture of the world as generated: each pixel the cell in its middle, nothing of the simulation read (`renderer/src/map.rs`) | map mode, detail | overview, minimap |
+| **map mode** | the renderer drawing the map in place of the cells, at any zoom, toggled by `M`: its viewport none, so nothing is copied for it and its camera loads nothing | map, viewport | |
 | **mesh** | the land's shape: vertices joined by lines into triangles (`worldgen::mesh`) | vertex, line | polygons, Voronoi |
 | **vertex** | a point of the mesh, one to each square of a grid: ocean, or land at a height of its own | mesh, line | site, node |
 | **line** (the mesh's) | what joins two vertices and says how their heights are blended | blend, sigmoidness | edge, border |
@@ -203,5 +204,5 @@ what they always do and are not listed.
 | **slider** | one number of the tuning, set by a knob dragged or a value typed (`gui::sliders`; `utilities/sliders.csv`) | tuning, group | knob (a slider's part only) |
 | **group** | sliders shown together: shading, or one of those that make worlds (`utilities::tuning::Group`) | slider | tab, page |
 | **world start** | every number a new world starts from -- seed, generation, size, forced hot, sheep, threads, hot entity, camera loading -- whoever gives them (`server::Start`); the server alone knows what they mean | tuning, forced hot, hot entity, world's size | world options, lab |
-| **host** | a world run on a thread of its own for a window, which calls it (`server::host::Host`) and is answered with the cells in view (`Frame`) | world start | sim, simulation thread |
+| **host** | a world run on a thread of its own for a window, which calls it (`server::host::Host`) and is answered with the cells of its viewport's hot superchunks (`Frame`) | world start | sim, simulation thread |
 | **worlds' folder** | where worlds are kept unless a path is given: `worlds` in the folder `Civil Egregore`, or what the setting `worlds` names (`utilities::settings::worlds`) | save, settings | |

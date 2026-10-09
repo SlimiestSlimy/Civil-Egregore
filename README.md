@@ -34,7 +34,7 @@ sliders its generation is tuned by.
 | [`worldgen/`](worldgen/) | world generation: every cell's height from the world's seed, the walls between cells more than a step apart in height, and how grass and trees lie in patches |
 | [`instructions/`](instructions/) | what a rule is made of, and all it reaches the simulation through: small functions over a superchunk's turn -- cells asked and set, the cells about a cell, entities made and committed, walking |
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
-| [`renderer/`](renderer/) | Civil Egregore on the screen: a Bevy window, opening on the main menu, asking the server's host, on a thread of its own, for the cells in view |
+| [`renderer/`](renderer/) | Civil Egregore on the screen: a Bevy window, opening on the main menu, asking the server's host, on a thread of its own, for the cells of its viewport |
 | [`gui/`](gui/) | Civil Egregore's menus, over whatever window shows it, a part a module: the main menu -- a new world set up, one saved opened, leaving -- the options Escape opens over a world, and the sliders of the numbers `utilities::tuning` names |
 | [`simulation/`](simulation/) | the simulation: Monte Carlo sampling, the two-phase tick and its outboxes, a superchunk's turn -- a bucket a chunk, a timer wheel a superchunk; and what is hot: the halos about the hot entities, warming and cooling by the tick, within the world's size if it has one |
 | [`bitplane_manager/`](bitplane_manager/) | the hot bitplanes: layers decoded into the bitmap arena, where cells are read and written -- writes batched -- and written back; planes of one bit a cell, or 2, 4, 8 or 16 |

@@ -259,33 +259,35 @@ mod halos {
         assert_eq!((loaded.warming().count(), loaded.cooling().count()), (0, 0));
     }
 
-    /// A world whose camera loads superchunks: a view far wider than
-    /// [`CAMERA_SIDE`] keeps only so many a side about its middle; two
-    /// superchunks in view, far from the flock, turn hot as a halo's
-    /// would, each generated while in view given a flock of its own, and
-    /// those generated about them for those flocks' halos none. A save
-    /// keeps its camera flock; a world whose camera loads nothing keeps
-    /// nothing in view.
+    /// A world whose camera loads superchunks: a viewport far wider than
+    /// [`CAMERA_SIDE`] keeps only so many a side about its middle, and
+    /// no viewport none; two superchunks of the viewport, far from the flock,
+    /// turn hot as a halo's would, each generated in the viewport given
+    /// a flock of its own, and those generated about them for those
+    /// flocks' halos none. A save keeps its camera flock; a world whose
+    /// camera loads nothing keeps no viewport.
     #[test]
-    fn the_camera_loads_the_superchunks_in_view() {
+    fn the_camera_loads_the_superchunks_of_the_viewport() {
         let sheep = 20;
         let mut world = server::start(server::Start { seed: crate::tests::land_seed(2), sheep, camera_loads: true, ..server::Start::default() });
         assert_eq!(world.info.camera_flock, Some(sheep as u64));
         let (x, y) = WORLD_MIDDLE.cartesian();
-        world.keep_in_view(Viewport { first: (x - 50, y - 50), last: (x + 50, y + 50) });
-        let wide = world.halos.in_view();
-        assert!(wide.len() == (CAMERA_SIDE * CAMERA_SIDE) as usize && wide.contains(&WORLD_MIDDLE), "{} in view", wide.len());
-        world.keep_in_view(Viewport { first: (x + 10, y), last: (x + 11, y) });
-        let in_view = [SuperchunkIndex::from_cartesian(x + 10, y), SuperchunkIndex::from_cartesian(x + 11, y)];
+        world.keep_viewport(Some(Viewport { first: (x - 50, y - 50), last: (x + 50, y + 50) }));
+        let wide = world.halos.viewport();
+        assert!(wide.len() == (CAMERA_SIDE * CAMERA_SIDE) as usize && wide.contains(&WORLD_MIDDLE), "{} in the viewport", wide.len());
+        world.keep_viewport(None);
+        assert!(world.halos.viewport().is_empty(), "no viewport, nothing kept for it");
+        world.keep_viewport(Some(Viewport { first: (x + 10, y), last: (x + 11, y) }));
+        let viewport = [SuperchunkIndex::from_cartesian(x + 10, y), SuperchunkIndex::from_cartesian(x + 11, y)];
         let sheep_on = |world: &World, superchunk: SuperchunkIndex| world.entities.superchunk(superchunk).map_or(0, |kept| kept.iter().filter(|entity| entity.header.kind == HOT_ENTITY).count());
-        let about_view = about(in_view.into_iter());
+        let about_view = about(viewport.into_iter());
         let (mut seen, mut beside) = (0, 0);
         while seen < 2 || beside == 0 {
-            assert!(world.entities.now() < 4 * WARM_TICKS, "the halos about the flocks in view generated");
+            assert!(world.entities.now() < 4 * WARM_TICKS, "the halos about the flocks of the viewport generated");
             world.tick();
             for &superchunk in world.halos.generated() {
-                if in_view.contains(&superchunk) {
-                    assert_eq!(sheep_on(&world, superchunk), sheep, "generated in view: a flock of its own");
+                if viewport.contains(&superchunk) {
+                    assert_eq!(sheep_on(&world, superchunk), sheep, "generated in the viewport: a flock of its own");
                     seen += 1;
                 } else {
                     assert_eq!(sheep_on(&world, superchunk), 0, "generated for a halo alone: nothing on it");
@@ -293,14 +295,14 @@ mod halos {
                 }
             }
         }
-        assert!(in_view.iter().all(|superchunk| world.arena.superchunk_indices().contains(superchunk)));
+        assert!(viewport.iter().all(|superchunk| world.arena.superchunk_indices().contains(superchunk)));
         let folder = crate::tests::folder("camera");
         server::save(&folder, &mut world).expect("saved");
         assert_eq!(server::load(&folder).expect("loaded").info.camera_flock, Some(sheep as u64), "its camera flock, kept");
 
         let mut unseen = server::start(server::Start { seed: crate::tests::land_seed(2), sheep, ..server::Start::default() });
-        unseen.keep_in_view(Viewport { first: (x + 10, y), last: (x + 11, y) });
-        assert!(unseen.halos.in_view().is_empty() && unseen.info.camera_flock.is_none(), "its camera loads nothing");
+        unseen.keep_viewport(Some(Viewport { first: (x + 10, y), last: (x + 11, y) }));
+        assert!(unseen.halos.viewport().is_empty() && unseen.info.camera_flock.is_none(), "its camera loads nothing");
     }
 }
 

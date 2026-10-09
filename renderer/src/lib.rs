@@ -10,11 +10,12 @@
 //! saved is opened. Only then is the host asked for anything.
 //!
 //! The window is the one that asks: each time it has shown a frame, it
-//! asks the host for the superchunks in view ([`frames`]), and the
-//! host answers with their cells as its last tick left them, which a
-//! third thread turns into pixels ([`paint`]). The three share nothing
-//! else, so none waits on another. From farther than cells are drawn
-//! from, a fourth draws the map from generation alone ([`map`]).
+//! asks the host for the hot superchunks of its viewport -- whatever it
+//! should render ([`frames`]) -- and the host answers with their cells
+//! as its last tick left them, which a third thread turns into pixels
+//! ([`paint`]). The three share nothing else, so none waits on another.
+//! In map mode, at any zoom, a fourth draws the map from generation
+//! alone ([`map`]) and no cells are asked for.
 //!
 //! | module | what it is |
 //! |---|---|
@@ -37,6 +38,7 @@
 //! | `B` | show the superchunks' boundaries, or not, and near enough each one's Morton index and `(x, y)` |
 //! | `C` | the same of the chunks |
 //! | `H` | show every cell's height, from near enough to read them |
+//! | `M` | map mode, or not: the map in place of the cells, at any zoom |
 //! | `P` | draw the mesh's lines over the map |
 //! | `U` | the sliders' menu, or none: the near view's shading over a world, everything while one is made |
 //! | Escape | the options, or none: going on, saving the world, opening one of the worlds' folder, and leaving Civil Egregore |

@@ -56,8 +56,9 @@ pub const SHADOW: [f32; 3] = [0.6, 0.65, 0.82];
 const CLIFF: f32 = 0.65;
 /// How much darker a pixel a contour passes.
 const CONTOUR: f32 = 0.86;
-/// The coarsest the ground is drawn: a pixel `2^6` cells a side.
-pub const COARSEST: usize = 6;
+/// The coarsest the ground is drawn: a pixel `2^8` cells a side, a
+/// chunk.
+pub const COARSEST: usize = 8;
 /// The coarsest of the levels dropped with the fine parts.
 const FINE_LEVELS: usize = 2;
 
@@ -151,7 +152,7 @@ impl Ground {
                 lit[y * SIDE + x] = (light * LIT_ONE).round() as u8 | if shadowed[here] { SHADOWED } else { 0 };
                 level.factors.push(if shadowed[here] { SHADOW.map(|shadow| shadow * light) } else { [light; 3] });
                 level.heights.push(heights[here] as f32);
-                level.walls.push(wall(heights[here], heights[here + 1]) as u16 + wall(heights[here], heights[here + WIDE]) as u16);
+                level.walls.push(wall(heights[here], heights[here + 1]) as u32 + wall(heights[here], heights[here + WIDE]) as u32);
             }
         }
         let mut levels = Vec::with_capacity(COARSEST + 1);
@@ -307,8 +308,9 @@ struct Level {
     factors: Vec<[f32; 3]>,
     /// Its cells' mean height.
     heights: Vec<f32>,
-    /// The walls its cells keep.
-    walls: Vec<u16>,
+    /// The walls its cells keep: two a cell at most, so more than 16
+    /// bits hold over a chunk.
+    walls: Vec<u32>,
 }
 
 impl Level {

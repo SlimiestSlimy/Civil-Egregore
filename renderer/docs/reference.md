@@ -62,7 +62,7 @@ pace}`: the host as the window holds it (`server::host::Host`) --
 **`start()`**: the host and the painter started; **`forget_asked()`**:
 another world to run in place of the one run, no frame of the one
 before waited for. **`Seen`** `{frame, painted, paint_seconds,
-in_view, detail, near_pixels, map}`: the last frame, and how it was
+viewport_superchunks, detail, near_pixels, map}`: the last frame, and how it was
 drawn. **`menus`**: the worlds the menus make (`server::Start::from_tuning`
 of the seed and numbers they give), open and save, the host told; the
 options told the world run's name. **`keys`**: pause and pace, the
@@ -71,7 +71,8 @@ sent to the painter whenever they change.
 
 ## `frames.rs`
 
-`SYNC_EVERY` (a sixtieth of a second), `COARSEST` (6), `KEPT_SIDE`
+`SYNC_EVERY` (a sixtieth of a second), `COARSEST` (8), `COARSER_FROM`
+(2), `KEPT_SIDE`
 (64), `NEAR_SCALE` (half a cell a screen pixel), `NEAR_PIXELS` (8),
 `NEAR_MARGIN` (8 cells), `TILES_KEPT` (4,096).
 **`frame_holds(detail)`**: superchunks a frame carries at most.
@@ -79,22 +80,27 @@ sent to the painter whenever they change.
 **`Laid`**: what of a picture over the images is changed.
 **`NearView`**: the picture from near; **`spawn`**: it, hidden.
 **`show`**: the frame that came shown -- another world's dropping what
-was drawn of the last, the view put over it; each superchunk's image,
+was drawn of the last, the view put over it; what was drawn of a
+superchunk of the viewport gone cold dropped; each superchunk's image,
 and the picture from near. **`near(first, last, scale)`**: the cells
-seen from near, if the view is near. **`ask`**: the next frame asked
-for -- the superchunks the camera sees, how coarsely, on round them
-from the last, and from near the cells in view; fine images out of
-view dropped.
+seen from near, if the view is near. **`detail_at(scale)`**: how
+coarsely the world is drawn, coarser than the screen past
+`COARSER_FROM`. **`ask`**: the next frame asked for -- the viewport,
+none in map mode, how coarsely, on round its hot superchunks from the
+last, and from near its cells; fine images out of the viewport
+dropped.
 
 ## `view.rs`
 
-`SPRITE_SIDE`, `PAN_SPEED`, `ZOOM_SPEED`, `WHEEL_ZOOM`, `FARTHEST` (32
-cells a screen pixel), `MAP_FARTHEST` (4,096), `UNLIMITED_SEEN` (3).
+`SPRITE_SIDE`, `PAN_SPEED`, `ZOOM_SPEED`, `WHEEL_ZOOM`, `FIRST_FARTHEST`
+(32 cells a screen pixel, the farthest a world is first seen from),
+`FARTHEST` (4,096), `UNLIMITED_SEEN` (3).
 **`Sprites`** `{tiles}`: a sprite and its image a superchunk that has
-been in view, by where it is in the world; **`origin(axis)`**: the
+been in the viewport, by where it is in the world; **`origin(axis)`**: the
 plane's origin, the origin superchunk's top left;
 **`plane(cell, axis)`** and **`cell(plane, axis)`** between the world's
-cells and the plane, **`in_view(transform, scale, window)`**.
+cells and the plane, **`viewport_cells(transform, scale, window)`**:
+the cells the camera shows.
 **`spawn`**: the camera. **`first_view(side, window, transform,
 projection)`**: the view over the whole of a world of a side, or the
 origin's halo. **`steer`**: the view moved and zoomed, unless the
@@ -108,7 +114,7 @@ menus took the keys, the wheel or the pointer. **`fullscreen`**: by
 of the overlays are shown; **`toggle`**: by `B`, `C` and `H`.
 **`boundaries`**: as wide on the screen however near.
 **`Label`**: one of `LABELS` (256) texts; **`labels`**: the superchunks
-and chunks in view named in their top left corners, from
+and chunks the camera shows named in their top left corners, from
 `LABELLED_FROM` (150) screen pixels across, smaller where there is
 less room than `LABEL_WIDTH` (420), a chunk's a line (`LABEL_LINE`)
 below. **`HeightLabel`**: one of a grid of `HEIGHT_LABELS` (96 by 54)
@@ -130,7 +136,8 @@ asked for; **`Drawn`**: one drawn. **`start()`**: the map's thread.
 **`cell(wanted, x, y)`**: the cell in a pixel's middle;
 **`draw(wanted)`**: its pixels, rows shared among the machine's threads,
 what grows on a cell as `worldgen::Growth` says. **`MapLink`**: the
-window's side of the thread -- **`start()`**. **`MapView`**: its
-picture; **`spawn`**. **`map_step(scale)`**. **`far`**: from farther
-than `FARTHEST`, a map of the world run asked for and laid where it is
-of; `P` draws the mesh's lines.
+window's side of the thread -- **`start()`**, **`map_mode()`**.
+**`MapView`**: its picture; **`spawn`**. **`map_step(scale)`**, a cell
+at the finest. **`far`**: in map mode, which `M` turns on and off, a
+map of the world run asked for and laid where it is of; `P` draws the
+mesh's lines.

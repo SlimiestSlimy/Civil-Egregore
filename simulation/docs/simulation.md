@@ -228,8 +228,9 @@ where it stood. **Forced hot** (`Hot::Forced`): no halos; every
 superchunk of the world is hot and stays so, whatever its entities do.
 Only a world with a size can be: one of none has no end to be hot to.
 
-**In view** (`Halos::keep_in_view`): whoever holds the world may name
-superchunks wanted hot besides the halos -- a camera's, if it loads
+**The viewport** (`Halos::keep_viewport`): whoever holds the world
+may name superchunks wanted hot besides the halos -- of what a
+renderer renders, if its camera loads
 superchunks (`../../server/docs/server.md`, "Halos") -- warmed and
 cooled as a halo's are, generated if never made. A move says which
 superchunks it generated, made new rather than read back

@@ -1,11 +1,12 @@
 //! Cells into pixels, on a thread of its own: between the host
-//! (`server::host`), which only copies the cells in view, and the
-//! window, which only shows pixels. So drawing takes no time from the ticks, however much
-//! of the world is in view, and none from the window's frames.
+//! (`server::host`), which only copies the hot superchunks of the
+//! window's viewport, and the window, which only shows pixels. So
+//! drawing takes no time from the ticks, however much of the world is
+//! rendered, and none from the window's frames.
 //!
 //! A cell is a pixel: dirt brown, grass green, a sheep white, the
 //! ground in the light its height gives it ([`crate::ground`]). From
-//! near, a cell is several pixels and the cells in view are one
+//! near, a cell is several pixels and the viewport's cells are one
 //! picture ([`crate::near`]). From far off, where
 //! a pixel is many cells, it is their colours mixed: a tile of cells
 //! `2^detail` a side is, in Morton order, a run of bits, so the grass
@@ -42,8 +43,6 @@ const SHEEP_REACH: usize = 0;
 pub struct Painted {
     /// Where it is in the world, `(x, y)` in superchunks.
     pub at: (u32, u32),
-    /// Whether it is cold: nothing to draw, its pixels none.
-    pub cold: bool,
     /// Pixels along its side: its cells', halved `detail` times.
     pub side: u32,
     /// Its pixels, row by row: red, green, blue, opacity.
@@ -56,10 +55,9 @@ pub struct Picture {
     pub frame: Frame,
     /// What painting took of the painter's thread, in seconds.
     pub paint_seconds: f64,
-    /// The superchunks asked for, painted: seen from near, the cold
-    /// ones only.
+    /// The superchunks asked for, painted: none seen from near.
     pub superchunks: Vec<Painted>,
-    /// The cells in view, if they are seen from near.
+    /// The viewport's cells, if they are seen from near.
     pub near: Option<PaintedNear>,
 }
 
@@ -71,12 +69,12 @@ const GROUNDS_KEPT: usize = 2048;
 /// Frames a ground past [`GROUNDS_KEPT`] may go unseen before it goes.
 const UNSEEN_FRAMES: u64 = 256;
 
-/// Makes the ground of every hot superchunk of `frame` that has none
+/// Makes the ground of every superchunk of `frame` -- each hot -- that has none
 /// yet, or none fine enough -- each on a thread of its own -- and
 /// drops the fine parts of those longest unseen beyond [`FINE_KEPT`].
 fn ground(grounds: &mut HashMap<(u32, u32), Ground>, frame: &Frame, number: u64) {
     let fine = frame.near.is_some() || frame.detail < 2;
-    let hot = || frame.cells.iter().filter(|cells| cells.hot).map(|cells| cells.top_left);
+    let hot = || frame.cells.iter().map(|cells| cells.top_left);
     let missing: Vec<(u32, u32)> = hot().filter(|top_left| grounds.get(top_left).is_none_or(|ground| fine && ground.fine.is_none())).collect();
     let (seed, shape) = (frame.seed, frame.generation.shape);
     // The heights the frame brings: those of the superchunks just turned hot.
@@ -126,12 +124,11 @@ pub fn start(frames: Receiver<Frame>, tunings: Receiver<Tuning>) -> Receiver<Pic
                 let superchunks = frame
                     .cells
                     .iter()
-                    .filter_map(|cells| match (cells.hot, frame.near, frame.detail) {
-                        (false, _, _) => Some(Painted { at: cells.at, cold: true, side: 0, pixels: Vec::new() }),
-                        // From near the cells in view are one picture.
-                        (true, Some(_), _) => None,
-                        (true, None, 0) => Some(paint(cells, &grounds[&cells.top_left])),
-                        (true, None, detail) => Some(paint_far(cells, detail, &grounds[&cells.top_left])),
+                    .filter_map(|cells| match (frame.near, frame.detail) {
+                        // From near the viewport's cells are one picture.
+                        (Some(_), _) => None,
+                        (None, 0) => Some(paint(cells, &grounds[&cells.top_left])),
+                        (None, detail) => Some(paint_far(cells, detail, &grounds[&cells.top_left])),
                     })
                     .collect();
                 let near = frame.near.map(|near| paint_near(&frame.cells, &grounds, near, &tuning));
@@ -250,7 +247,7 @@ fn paint(cells: &Cells, ground: &Ground) -> Painted {
             }
         }
     }
-    Painted { at: cells.at, cold: false, side: SIDE as u32, pixels: pixels.into_flattened() }
+    Painted { at: cells.at, side: SIDE as u32, pixels: pixels.into_flattened() }
 }
 
 /// `from` and `to` mixed, `part` of `whole` of it `to`.
@@ -263,9 +260,9 @@ fn mixed(from: [u8; 3], to: [u8; 3], part: usize, whole: usize) -> [u8; 3] {
 /// superchunk's `words` -- its chunks' bitmaps one after another --
 /// row by row: each tile a run of bits in Morton order, counted from
 /// the words with no cell looked at.
-fn counted(words: &[u64], detail: u32) -> Vec<u16> {
+fn counted(words: &[u64], detail: u32) -> Vec<u32> {
     let (side, tile_cells) = (SIDE >> detail, 1usize << (2 * detail));
-    let mut counts = vec![0u16; side * side];
+    let mut counts = vec![0u32; side * side];
     for (place, chunk) in words.as_chunks::<CHUNK_WORDS>().0.iter().enumerate() {
         let (left, top) = chunk_top_left(place);
         let (left, top) = (left >> detail, top >> detail);
@@ -278,7 +275,7 @@ fn counted(words: &[u64], detail: u32) -> Vec<u16> {
                 (chunk[bit / BITS_PER_WORD] >> (bit % BITS_PER_WORD) & ((1 << tile_cells) - 1)).count_ones()
             };
             let (x, y) = morton_coordinates(tile);
-            counts[(top + y as usize) * side + left + x as usize] = count as u16;
+            counts[(top + y as usize) * side + left + x as usize] = count;
         }
     }
     counts
@@ -307,5 +304,5 @@ fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
         let ground = mixed(lit(ground, factor), WATER, (wet[index] as usize + deep[index] as usize) / 2, tile_cells);
         pixels.extend_from_slice(&opaque(mixed(ground, WHITE, sheep as usize * sheep_cells, tile_cells)));
     }
-    Painted { at: cells.at, cold: false, side: side as u32, pixels }
+    Painted { at: cells.at, side: side as u32, pixels }
 }

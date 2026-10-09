@@ -29,7 +29,7 @@ pub struct Link {
     /// Seconds since a frame was last asked for.
     pub since: f32,
     /// What was last asked for: the next frame goes on from it, round
-    /// the superchunks in view.
+    /// the viewport's hot superchunks.
     pub asked: Option<Ask>,
     /// Whether the world is paused.
     pub paused: bool,
@@ -63,8 +63,8 @@ pub struct Seen {
     pub painted: usize,
     /// Seconds of the painter's thread the frame took.
     pub paint_seconds: f64,
-    /// Superchunks in view.
-    pub in_view: u32,
+    /// Superchunks in the viewport: none in map mode.
+    pub viewport_superchunks: u32,
     /// How coarsely they are drawn: a pixel `2^detail` cells a side.
     pub detail: u32,
     /// Pixels along a cell's side, seen from near; 0 if not.

@@ -53,8 +53,8 @@ impl Size {
 /// sheep everywhere would keep the whole of an endless world hot --
 /// hot about the entities of the kind `hot_entity`, unless forced hot,
 /// their halos hot before it ticks; and, if `camera_loads`, about the
-/// superchunks in view too, each generated while in view given
-/// `sheep` of its own (`World::keep_in_view`).
+/// viewport's superchunks too, each generated in the viewport given
+/// `sheep` of its own (`World::keep_viewport`).
 #[derive(Clone, Copy, Debug)]
 pub struct Start {
     /// The seed its superchunks are generated from.
@@ -69,8 +69,8 @@ pub struct Start {
     pub sheep: usize,
     /// The kind of entity it is hot about, unless forced hot.
     pub hot_entity: EntityType,
-    /// Whether its camera loads superchunks: those in view hot, and
-    /// each generated while in view given `sheep`. Nothing to a world
+    /// Whether its camera loads superchunks: the viewport's hot, and
+    /// each generated in the viewport given `sheep`. Nothing to a world
     /// forced hot, all of which is, nor to one run with no window.
     pub camera_loads: bool,
 }

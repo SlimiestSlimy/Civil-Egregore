@@ -18,7 +18,7 @@ superchunk of a world with a side, on the origin (`WORLD_MIDDLE`)
 alone of one without, as sheep everywhere would keep the whole of an
 endless world hot; their halos hot, or, of a world forced hot, all of
 it; generated, flocked: below ("Generation"); the sheep for each
-superchunk generated in view kept (`WorldInfo::camera_flock`) if its
+superchunk generated in the viewport kept (`WorldInfo::camera_flock`) if its
 camera loads superchunks and it is not forced hot.
 **`World::put_flock(superchunk, sheep)`**: a flock queued on a
 superchunk, from its own stream of the seed's inverse -- the same
@@ -62,11 +62,11 @@ along a side a camera loads at most. **`World::with_halos(work)`**: the
 simulation's halos given what the world holds, and what generates a
 superchunk never made. **`World::move_halos`**: the halos moved, then,
 if the camera loads superchunks with sheep, a flock put
-(`put_flock`) on each the move generated that is in view.
-**`World::keep_in_view(viewport)`**: nothing unless the camera loads
-superchunks; else the viewport, clamped to the world and to
-`CAMERA_SIDE` a side about its middle, handed to the halos
-(`Halos::keep_in_view`). The host calls it on each frame asked.
+(`put_flock`) on each the move generated that is in the viewport.
+**`World::keep_viewport(viewport)`**: nothing unless the camera loads
+superchunks; else the viewport -- none if the window renders none of
+the world's cells -- clamped to the world and to `CAMERA_SIDE` a side
+about its middle, handed to the halos (`Halos::keep_viewport`). The host calls it on each frame asked.
 **`World::keep_hot(wanted)`**, **`World::warming`**,
 **`World::cooling`**, **`World::start_warming(superchunk, due)`**,
 **`World::write_back_and_flush_all`**: each the halos' own
@@ -146,7 +146,7 @@ each cell.
 ## `host/mod.rs`
 
 A world run on a thread of its own for a client -- a window -- that
-asks it for the cells in view. `TARGET_PACE` (256 ticks a second),
+asks it for the cells of its viewport. `TARGET_PACE` (256 ticks a second),
 `CENSUS_EVERY` (1,000 ticks), `CATCH_UP`. **`Host`**: the host as a
 client holds it, each call sent to its thread and done there between
 two ticks, each saying whether the host was still there --
@@ -167,15 +167,21 @@ request; **`run_world`**, **`save`**, **`frame(ask)`**, **`tick`**.
 
 ## `host/frame.rs`
 
-`CHUNK_WORDS`, `DEEP` (16). **`Viewport`** `{first, last}`: the
-superchunks in view. **`Ask`** `{viewport, detail, skip, most, near}`:
-what a frame is to carry; **`asked()`**, those it asks for.
+`CHUNK_WORDS`, `DEEP` (16). **`Viewport`** `{first, last}`: what the
+renderer should render, in superchunks -- not Bevy's camera viewport,
+a rectangle of the window -- **`contains(at)`**. **`Ask`** `{viewport,
+detail, skip, most, near}`: what a frame is to carry, `viewport` `None`
+when the client renders none of the world's cells (map mode); `skip`
+and `most` count the viewport's hot superchunks. **`hot_in(world,
+viewport)`**: those, row by row.
 **`Near`** `{first, size, pixels_a_cell}`: the cells seen from near.
-**`Cells`**: a superchunk's planes copied -- grass, trees, their
+**`Cells`**: a hot superchunk's planes copied -- grass, trees, their
 stages, water -- its heights the first frame it is hot in, its
 sheep's cells. **`Frame`** `{world, seed, generation, side, tick,
-ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, detail,
-near, named, said, cells}`: `world` counts the worlds the host has
-run, so a client knows what it drew is of another. **`count(world,
-layer_type)`**; **`copy(world, ask, sent)`** (**`layer`**,
+ticks_a_second, sheep, grass, trees, sync_seconds, sync_share,
+viewport, hot, detail, near, named, said, cells}`: `world` counts the
+worlds the host has run, so a client knows what it drew is of another;
+`hot`, every hot superchunk of the viewport, so a client knows what it
+drew there of any other has gone cold. **`count(world,
+layer_type)`**; **`copy(world, hot, ask, sent)`** (**`layer`**,
 **`sheep`**); **`Water`**: a superchunk's water off its image, kept.

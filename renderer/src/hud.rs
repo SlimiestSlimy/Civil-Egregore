@@ -29,7 +29,7 @@ pub fn spawn(mut commands: Commands) {
 }
 
 /// The keys, as the text says them.
-const KEYS: &str = "move: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F11: fullscreen   B: superchunks   C: chunks   H: heights   P: lines (on the map)   U: sliders   Escape: options";
+const KEYS: &str = "move: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F11: fullscreen   B: superchunks   C: chunks   H: heights   M: map   P: lines (on the map)   U: sliders   Escape: options";
 
 /// Writes what the last frame said over the world -- nothing over the
 /// main menu.
@@ -53,7 +53,7 @@ pub fn hud(hud: Single<(&mut Text, &mut Visibility), With<Hud>>, seen: Res<Seen>
     let said = frame.said.as_ref().map_or(String::new(), |said| format!("{said}\n"));
     let size = frame.side.map_or("no end".to_string(), |side| format!("{side} superchunks a side"));
     text.0 = format!(
-        "{said}seed {}   {size}   ocean at {}   tick {}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in view, {drawn}\na frame, {} of them: {:.0} us of the host ({:.2}% of its time), {:.1} ms painting\n{KEYS}",
+        "{said}seed {}   {size}   ocean at {}   tick {}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in the viewport, {} hot, {drawn}\na frame, {} of them: {:.0} us of the host ({:.2}% of its time), {:.1} ms painting\n{KEYS}",
         utilities::seed::hex(frame.seed),
         frame.generation.shape.ocean,
         grouped(frame.tick),
@@ -61,7 +61,8 @@ pub fn hud(hud: Single<(&mut Text, &mut Visibility), With<Hud>>, seen: Res<Seen>
         grouped(frame.sheep as u64),
         grouped(frame.grass),
         grouped(frame.trees),
-        seen.in_view,
+        seen.viewport_superchunks,
+        frame.hot.len(),
         seen.painted,
         frame.sync_seconds * 1e6,
         frame.sync_share * 100.0,

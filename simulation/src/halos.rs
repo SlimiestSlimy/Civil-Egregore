@@ -35,9 +35,9 @@
 //! that no halo reaches any more.
 //!
 //! Whoever holds the world may want more hot than the halos: the
-//! superchunks **in view** ([`Halos::keep_in_view`]), warming and
-//! cooling as a halo's do -- a world whose camera loads superchunks
-//! made where it is looked at. And it is told which superchunks the
+//! superchunks of the **viewport** ([`Halos::keep_viewport`]) -- what
+//! a renderer renders -- warming and cooling as a halo's do: a world
+//! whose camera loads superchunks made where it is looked at. And it is told which superchunks the
 //! halos' last move generated ([`Halos::generated`]), to put on them
 //! what a superchunk never made starts with.
 
@@ -134,8 +134,8 @@ pub struct Halos {
     /// The superchunks whose changes were taken from the ring, each with
     /// its job, their images being rewritten by a job.
     flushing: Vec<(SuperchunkIndex, Ticket)>,
-    /// The superchunks in view, sorted: wanted hot besides the halos.
-    in_view: Vec<SuperchunkIndex>,
+    /// The viewport's superchunks, sorted: wanted hot besides the halos.
+    viewport: Vec<SuperchunkIndex>,
     /// The superchunks the last move generated, sorted.
     generated: Vec<SuperchunkIndex>,
 }
@@ -164,21 +164,21 @@ impl Halos {
     /// No halos yet, as `hot` says which superchunks are to be, their
     /// jobs on `dispatcher`'s threads.
     pub fn new(hot: Hot, dispatcher: Arc<Dispatcher>) -> Self {
-        Self { hot, jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing: Vec::new(), in_view: Vec::new(), generated: Vec::new() }
+        Self { hot, jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing: Vec::new(), viewport: Vec::new(), generated: Vec::new() }
     }
 
-    /// Wants `in_view` hot from the next move on, besides the halos, in
-    /// place of those in view before: warming and cooling as a halo's
-    /// superchunks do, none outside the world's size.
-    pub fn keep_in_view(&mut self, mut in_view: Vec<SuperchunkIndex>) {
-        in_view.sort_unstable();
-        in_view.dedup();
-        self.in_view = in_view;
+    /// Wants the `viewport`'s superchunks hot from the next move on,
+    /// besides the halos, in place of the last viewport's: warming and
+    /// cooling as a halo's superchunks do, none outside the world's size.
+    pub fn keep_viewport(&mut self, mut viewport: Vec<SuperchunkIndex>) {
+        viewport.sort_unstable();
+        viewport.dedup();
+        self.viewport = viewport;
     }
 
-    /// The superchunks in view, sorted ([`Halos::keep_in_view`]).
-    pub fn in_view(&self) -> &[SuperchunkIndex] {
-        &self.in_view
+    /// The viewport's superchunks, sorted ([`Halos::keep_viewport`]).
+    pub fn viewport(&self) -> &[SuperchunkIndex] {
+        &self.viewport
     }
 
     /// The superchunks the last move -- or [`Halos::keep_hot`] --
@@ -194,13 +194,13 @@ impl Halos {
     }
 
     /// Moves the halos to where the hot entities stand
-    /// ([`Hot::wanted`]), with the superchunks in view: the superchunks
+    /// ([`Hot::wanted`]), with the viewport's superchunks: the superchunks
     /// reached warming, hot [`WARM_TICKS`] on; the rest cooling, cold
     /// [`COOL_TICKS`] on. Forced hot, it is the whole world all the while.
     pub fn move_to_hot_entities(&mut self, held: &mut Held<'_>) -> HaloChange {
         let mut wanted = self.hot.wanted(held.entities);
-        if !self.in_view.is_empty() {
-            wanted.extend_from_slice(&self.in_view);
+        if !self.viewport.is_empty() {
+            wanted.extend_from_slice(&self.viewport);
             wanted.sort_unstable();
             wanted.dedup();
         }

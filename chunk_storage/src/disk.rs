@@ -164,7 +164,7 @@ const FORMAT: (&str, &str) = ("format", "2");
 /// The name of the kind of entity a world is hot about, in its file.
 const HOT_ENTITY: &str = "hot entity";
 
-/// The name of the sheep each superchunk generated in view starts
+/// The name of the sheep each superchunk generated in the viewport starts
 /// with, in the file of a world whose camera loads superchunks.
 const CAMERA_FLOCK: &str = "camera flock";
 
@@ -190,9 +190,9 @@ pub struct WorldInfo {
     /// as a number: whoever runs it knows the kinds. None if its file
     /// says none: its runner's own then.
     pub hot_entity: Option<u64>,
-    /// If its camera loads superchunks -- those in view kept hot, and
+    /// If its camera loads superchunks -- the viewport's kept hot, and
     /// generated if never made, as a halo's are -- the sheep each
-    /// superchunk generated in view starts with; none if it does not.
+    /// superchunk generated in the viewport starts with; none if it does not.
     pub camera_flock: Option<u64>,
     /// How it is generated: numbers, each with its name, kept for
     /// whoever generates it, who knows what they mean -- read back

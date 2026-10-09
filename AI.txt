@@ -1,0 +1,117 @@
+AI WORKSPACE -- this file is the AI's own: its notes, rules and open
+threads for working on Civil Egregore, written for an AI first and a
+person second. The AI keeps it current and may rewrite it whole; a
+person reads it to see what the AI goes by. Plain text on purpose.
+
+Docs that say the rest: docs/style_guide.md, docs/testing_protocol.md,
+docs/glossary.md (one name per thing -- use its names, not the ones in
+its "not" column), docs/design_statements.md.
+
+
+== SESSIONS ==
+
+LOCAL (the user's PC, has a screen)
+  Bevy is built. The renderer is kept working, and running worlds are
+  tested and measured in it: `cargo run --release`, a world made from
+  the main menu. A run's census is server/transient_data/measurements/
+  census.csv (ticks, the seconds they took, the pace, sheep, grass).
+
+REMOTE (cloud, no screen)
+  NEVER build, check, clippy or test gui or renderer -- nothing that
+  compiles Bevy. Renderer changes are made by reading and reviewing the
+  diff, and are compiled later on the local machine: say so in the
+  commit message and to the user.
+  Never `--workspace` (it builds Bevy). Per crate:
+    cargo test   --release --offline -p <crate>
+    cargo clippy --release --offline -p <crate> --all-targets
+  The root crate without Bevy, after checking
+  `cargo tree -p Civil_Egregore --no-default-features --offline | grep -c bevy`
+  prints 0:
+    cargo clippy --release --offline -p Civil_Egregore --no-default-features --all-targets
+
+
+== ALWAYS ==
+
+- Never run `cargo fmt`; never `cargo clippy --fix` (both reformat).
+- Testing, committing and pushing are separate commands: a test's
+  output is read before the commit is made.
+- Clippy warnings are cleaned before a commit.
+- No test or tool has a seed written in it: all take the one in
+  transient_data/seed.csv, rolled every 5 counted runs
+  (utilities::seed; env `Civil Egregore_SEED=<hex>` or `=fresh` for one
+  run). A test holds on any seed; a changed test is checked on several
+  fresh ones.
+- Every command goes through the root program:
+  `cargo run --release -- help` lists them.
+- A doc gives a performance figure only where it explains an
+  optimization, before and after.
+- Renames: the language server where it is easier; folder names,
+  package names and prose by hand.
+
+
+== FILES ==
+
+- Every text file kept is CSV (utilities::csv): a first row naming the
+  columns; lines starting `#` are notes (a report's notes and `##`
+  table titles, the census's seed), `---` a table divider. Seeds are
+  written in hexadecimal (utilities::seed::hex). Settings and world
+  files are read by name, in any order, missing rows filled by
+  defaults.
+- Binary is fine for world data. A saved world is a folder:
+  world.csv (what it is), hot.csv (its hot, cooling and warming
+  superchunks), and superchunks/ with two files a superchunk, named by
+  its index in hex: <index>.image (its cells' layers, as the cold pool
+  holds them) and <index>.state (its random numbers and its entities,
+  attributes and all) -- terrain and entities kept apart.
+- Not CSV and fine: tessera's saved worst bitmaps (.pbm, an image
+  format), rendered .png, tool configs (.toml, .json).
+- utilities/default_settings.csv and utilities/sliders.csv are written
+  by hand; nothing generates them.
+
+
+== WHERE THINGS GO ==
+
+- A rule (entity_rules/, mc_rules/) reaches the simulation only
+  through instructions/: what it lacks is added there.
+- What is hot and for how long is the simulation's (simulation::halos);
+  the server says which entity keeps the world hot, hands over what
+  generates a superchunk, and passes on the viewport if the camera
+  loads superchunks (World::keep_viewport, at most 8x8 about its
+  middle).
+- server owns a world's start (server::Start); the CLI and the gui
+  both feed it.
+- The renderer asks the host (server::host) for frames; the host never
+  sends unasked.
+
+
+== WORDS (beyond the glossary) ==
+
+- viewport: whatever the renderer should render, in superchunks; none
+  in map mode. Everything else in the renderer uses Bevy's own terms.
+  Our viewport is not Bevy's camera `Viewport`.
+- map mode: toggled with M, at any zoom; no cells are asked for.
+
+
+== FULL LOAD ==
+
+The world is hot only about its hot entities. For a fixed load, make a
+world with a side forced hot: in the renderer, the main menu's new
+world, sliders' world group (side, forced hot, sheep a superchunk);
+headless, `cargo run --release -- server new <folder> <seed> <sheep>
+<side> 1`. Only a world with a side can be forced hot.
+
+
+== OPEN THREADS ==
+
+- Renderer and gui changes since the last local build are uncompiled:
+  build locally first, fix what the compiler says.
+- Area allocator: 256 MiB blocks, 256-byte units, sorted interval list,
+  owning handles (after the Tessera clean).
+- Tessera deep clean: settle the code, move abstraction boundaries
+  (the design statement on process and processee).
+- Read every file: one name per thing, generalize repeats.
+
+
+== SCRATCH ==
+
+(The AI's working notes go here; cleared when stale.)
