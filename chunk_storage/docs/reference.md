@@ -83,6 +83,9 @@ superchunk not stored made flat); **`tail_superchunk`**,
 
 ## `disk.rs`
 
+`WorldInfo` and `HotSuperchunks`, the two text files, are in
+`disk/world_files.rs`; reading and writing files in `disk.rs`.
+
 **`WorldInfo`** `{seed, tick, layers, side, forced, hot_entity, camera_flock, generation}` -- `forced` only with a `side`, refused otherwise; `hot_entity` a number, the runner knowing the kinds; `camera_flock` the sheep each superchunk generated in the viewport starts with, if its camera loads superchunks; `generation` sorted by name -- no name: a world's is its folder's --; read by its rows' names in any order, the header first, missing ones their defaults but the seed ("On disk" in `chunk_storage.md`); **`DiskError`**: `Io(path,
 error)` or `Invalid(path, what)`. **`write_world(folder, info)`**,
 **`read_world(folder)`**; **`write_image(folder, superchunk,

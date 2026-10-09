@@ -37,7 +37,7 @@ REMOTE (cloud, no screen)
 - Clippy warnings are cleaned before a commit.
 - No test or tool has a seed written in it: all take the one in
   transient_data/seed.csv, rolled every 5 counted runs
-  (utilities::seed; env `Civil Egregore_SEED=<hex>` or `=fresh` for one
+  (utilities::seed; env `CIVIL_EGREGORE_SEED=<hex>` or `=fresh` for one
   run). A test holds on any seed; a changed test is checked on several
   fresh ones.
 - Every command goes through the root program:
@@ -46,6 +46,16 @@ REMOTE (cloud, no screen)
   optimization, before and after.
 - Renames: the language server where it is easier; folder names,
   package names and prose by hand.
+- No file much past 300 lines: a longer one is split into child
+  modules by concern, public paths unchanged (a test tier's topics
+  into tests/<tier>/<topic>.rs, named by #[path]). After a split of
+  hot code, count instructions before and after: a function moved to
+  another module may stop being inlined (Window::around did).
+- Names are long, human and descriptive, and the glossary's:
+  context_odds, world_files, host_thread -- not odds, info, thread.
+- The renderer never stalls on the simulation: it asks for frames and
+  shows what comes, never waiting on the host, however far the
+  simulation is behind the viewport.
 
 
 == FILES ==

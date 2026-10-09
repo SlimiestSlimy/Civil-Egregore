@@ -10,12 +10,16 @@
 //! superchunk's turn queues them. Queuing is the only way to change an
 //! entity.
 
+mod entity_reader;
+mod world_entities;
+
+pub use entity_reader::{EntityReader, OCCUPIED_SIDE};
+pub use world_entities::Entities;
+
 use crate::bucket::{place, Bucket, Put};
-use crate::instructions::{Instructions, InstructionsApplied};
 use crate::entity::{sorted, Attribute, AttributeType, EntityId, EntityRef, Header, NEVER};
 use crate::wheel::{Wake, Wheel};
-use bitmap::window::{in_word_tile, PLACE_IN_WORD_TILE};
-use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
+use coordinates::{CellIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 
 /// How many wakes ahead an entity is asked of memory.
 const ENTITY_AHEAD: usize = 8;
@@ -217,199 +221,5 @@ impl SuperchunkEntities {
     pub(crate) fn counts(&self) -> (usize, usize, usize) {
         let (used, garbage) = self.chunks.iter().map(Bucket::attribute_counts).fold((0, 0), |(a, b), (c, d)| (a + c, b + d));
         (used, garbage, self.wheel.len())
-    }
-}
-
-/// Every superchunk's entities, in the bitmap arena's order -- by Morton
-/// index -- and the tick the world is at: the next to run.
-#[derive(Default)]
-pub struct Entities {
-    /// The tick about to run.
-    now: u64,
-    /// The superchunks, by Morton index.
-    superchunks: Vec<SuperchunkEntities>,
-    /// Instructions queued outside a tick, applied by [`Entities::apply`].
-    queued: Instructions,
-}
-
-impl Entities {
-    /// None, at tick 0.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// The tick about to run.
-    pub fn now(&self) -> u64 {
-        self.now
-    }
-
-    /// None, at tick `now`: what a save's entities are put back into.
-    pub fn at_tick(now: u64) -> Self {
-        Self { now, ..Self::default() }
-    }
-
-    /// How many entities there are.
-    pub fn len(&self) -> usize {
-        self.superchunks.iter().map(SuperchunkEntities::len).sum()
-    }
-
-    /// Whether there are none.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// The superchunks, by Morton index.
-    pub fn superchunks(&self) -> &[SuperchunkEntities] {
-        &self.superchunks
-    }
-
-    /// The superchunks, by Morton index, to change.
-    pub fn superchunks_mut(&mut self) -> &mut [SuperchunkEntities] {
-        &mut self.superchunks
-    }
-
-    /// `superchunk`'s entities, if kept here.
-    pub fn superchunk(&self, superchunk: SuperchunkIndex) -> Option<&SuperchunkEntities> {
-        EntityReader::new(&self.superchunks).superchunk(superchunk)
-    }
-
-    /// The entity whose ID is `id`, standing on `at`, if kept here.
-    pub fn get(&self, id: EntityId, at: CellIndex) -> Option<EntityRef<'_>> {
-        self.superchunk(at.superchunk())?.get(id, at)
-    }
-
-    /// Keeps exactly `superchunk_indices`, sorted:
-    /// those it lacked added empty, those not among them dropped with
-    /// their entities -- how many entities were dropped. Keeping them in
-    /// chunk storage when their bitmaps go cold is work to come.
-    pub fn align(&mut self, superchunk_indices: &[SuperchunkIndex]) -> usize {
-        if self.superchunks.len() == superchunk_indices.len() && self.superchunks.iter().zip(superchunk_indices).all(|(kept, &index)| kept.index == index) {
-            return 0;
-        }
-        let mut had = std::mem::take(&mut self.superchunks).into_iter().peekable();
-        let mut dropped = 0;
-        for &index in superchunk_indices {
-            while let Some(superchunk) = had.next_if(|superchunk| superchunk.index < index) {
-                dropped += superchunk.len();
-            }
-            let superchunk = had.next_if(|superchunk| superchunk.index == index).unwrap_or_else(|| SuperchunkEntities::new(index));
-            self.superchunks.push(superchunk);
-        }
-        dropped + had.map(|superchunk| superchunk.len()).sum::<usize>()
-    }
-
-    /// Queues putting `header`'s entity -- made, or changed where it
-    /// stands -- with `attributes` sorted by type, outside a tick:
-    /// setting up, say. It wakes at its wake tick, the tick about to run
-    /// or later. One to stand elsewhere is removed, and put there.
-    pub fn queue_put(&mut self, header: Header, attributes: &[Attribute]) {
-        self.queued.put(header, header.at, attributes);
-    }
-
-    /// Queues removing `header`'s entity, outside a tick.
-    pub fn queue_remove(&mut self, header: &Header) {
-        self.queued.remove(header.id, header.at);
-    }
-
-    /// How many instructions are queued.
-    pub fn queued(&self) -> usize {
-        self.queued.len()
-    }
-
-    /// Applies the instructions queued, in order, and empties the queue:
-    /// an entity put in a superchunk not kept here is lost, one put on a
-    /// cell another stands on refused.
-    pub fn apply(&mut self) -> InstructionsApplied {
-        let mut applied = InstructionsApplied::default();
-        self.queued.apply(&mut self.superchunks, self.now, &mut applied);
-        self.queued.clear();
-        let now = self.now;
-        self.superchunks.iter_mut().for_each(|superchunk| superchunk.sort_wakes(now));
-        applied
-    }
-
-    /// Every entity, superchunk by superchunk.
-    pub fn iter(&self) -> impl Iterator<Item = EntityRef<'_>> {
-        self.superchunks.iter().flat_map(SuperchunkEntities::iter)
-    }
-
-    /// The tick just run is over: the next is about to run.
-    pub fn advance(&mut self) {
-        self.now += 1;
-    }
-}
-
-/// Cells along the side of the most [`EntityReader::occupied`] reads at
-/// once: a row's bits.
-pub const OCCUPIED_SIDE: usize = 16;
-
-/// Reads entities from superchunks in a tick's first phase, across
-/// superchunks, as they were when the tick began: the entities' side of
-/// the bitplanes' reader.
-pub struct EntityReader<'a> {
-    /// The superchunks read, sorted by Morton index.
-    superchunks: &'a [SuperchunkEntities],
-}
-
-impl<'a> EntityReader<'a> {
-    /// A reader of `superchunks`: an [`Entities`]'s.
-    pub fn new(superchunks: &'a [SuperchunkEntities]) -> Self {
-        Self { superchunks }
-    }
-
-    /// `superchunk`'s entities, if read.
-    fn superchunk(&self, superchunk: SuperchunkIndex) -> Option<&'a SuperchunkEntities> {
-        let at = self.superchunks.binary_search_by_key(&superchunk, SuperchunkEntities::index).ok()?;
-        Some(&self.superchunks[at])
-    }
-
-    /// The entity whose ID is `id`, standing on `at`, if read.
-    pub fn get(&self, id: EntityId, at: CellIndex) -> Option<EntityRef<'a>> {
-        self.superchunk(at.superchunk())?.get(id, at)
-    }
-
-    /// The cells entities stand on among the `width` by `height` cells
-    /// (each up to 16) whose top left cell is `origin`, a row a word:
-    /// cell `(x, y)` from `origin` at bit `x` of row `y`. Found from the
-    /// buckets, which are sorted by cell: the cells lie on up to nine
-    /// word tiles, each a run of a bucket's places, so what is read is
-    /// the few entities there, not the cells. Where no superchunk is
-    /// read, no entity stands.
-    pub fn occupied(&self, origin: CellIndex, width: u32, height: u32) -> [u16; OCCUPIED_SIDE] {
-        debug_assert!(width as usize <= OCCUPIED_SIDE && height as usize <= OCCUPIED_SIDE, "more cells than a row's bits");
-        let mut rows = [0; OCCUPIED_SIDE];
-        let (across, down) = in_word_tile(origin.0);
-        let first = CellIndex(origin.0 & !PLACE_IN_WORD_TILE);
-        let mut last: Option<&SuperchunkEntities> = None;
-        for (tile_x, tile_y) in (0..3).flat_map(|tile_y| (0..3).map(move |tile_x| (tile_x, tile_y))) {
-            // Where the word tile's first cell is among the cells asked for: before them, by up to 7.
-            let (left, top) = (8 * tile_x - across as i32, 8 * tile_y - down as i32);
-            if left >= width as i32 || top >= height as i32 {
-                continue;
-            }
-            let Some(tile) = first.offset(8 * tile_x, 8 * tile_y) else {
-                continue;
-            };
-            if last.is_none_or(|last| last.index != tile.superchunk()) {
-                last = self.superchunk(tile.superchunk());
-            }
-            let Some(superchunk) = last else {
-                continue;
-            };
-            for &place in superchunk.in_word_tile(tile.chunk().place(), tile.place() as u16) {
-                let (x, y) = in_word_tile(place as u64);
-                let (x, y) = (left + x as i32, top + y as i32);
-                if x >= 0 && y >= 0 && x < width as i32 && y < height as i32 {
-                    rows[y as usize] |= 1 << x;
-                }
-            }
-        }
-        rows
-    }
-
-    /// The entities on `chunk`, in Morton order by cell, then by ID, if
-    /// its superchunk is read.
-    pub fn chunk(&self, chunk: ChunkIndex) -> Option<impl Iterator<Item = EntityRef<'a>> + 'a> {
-        Some(self.superchunk(chunk.superchunk())?.chunk(chunk.place()))
     }
 }

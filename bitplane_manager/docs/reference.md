@@ -8,7 +8,11 @@ The design is in `bitplane_manager.md`.
 cell asked of a bitmap not hot.
 
 **`ChunkSet`** (`u16`, a bit a chunk), **`contains`**, **`put`**,
-**`members`**. **`ChunkFlags`**: the four sets, packed in 8 bytes.
+**`members`**.
+
+## `layer.rs`
+
+**`ChunkFlags`**: a layer's four chunk sets, packed in 8 bytes.
 
 **`SuperchunkLayer`**: an allocation, one layer type over one
 superchunk -- its owned block, flags, counts less one, count tiles'
@@ -17,6 +21,9 @@ counts, hot count. **`count`** / **`set_count`** a bucket's set cells;
 Morton index; **`value`** and **`put_value`** the number of a wide layer's cell, read and put whole; **`put_cell`** a cell set or clear if not already, the
 bucket dirty and the counts moved by one: whether it changed.
 
+
+## `superchunk.rs`
+
 **`Superchunk`** `{index, layers, on_their_way}`: one superchunk,
 owning its allocations, and its write-backs taken not yet in the ring. **`index`**, **`layer(type)`** -- a
 **`LayerView`** (**`hot_count`**, **`is_hot(chunk)`**,
@@ -24,6 +31,13 @@ owning its allocations, and its write-backs taken not yet in the ring. **`index`
 set cells of each of its `COUNT_TILES_IN_CHUNK` count tiles of
 `COUNT_TILE_WORDS` words) -- and **`apply(type, write, applied)`**, the
 write's part in it. Private: **`layer_index`**.
+
+
+**`Bucket`**: a hot bitmap to read: **`count`**, **`get(place)`**,
+**`cells`**.
+
+
+## `reader.rs`
 
 **`Reader::new(superchunks)`**: **`holds(type, cell)`**,
 **`window(type, origin, width, height)`** -- a **`Window`** `{set, hot}`,
@@ -46,8 +60,12 @@ in it by index (`WORD_TILE_X`, `WORD_TILE_Y`, **`word_tile`**), one
 across its edge looked up again (**`word_tile_at`**); **`any_in_tile`**,
 **`tiles_holding`**; **`forget`** when the directory changes shape.
 
-**`Bucket`**: a hot bitmap to read: **`count`**, **`get(place)`**,
-**`cells`**.
+## `arena.rs`, `hot.rs`, `write_back.rs`
+
+The arena, its one type's methods over three files: `arena.rs` the
+directory and what is read off it, `hot.rs` bitmaps made hot and
+cold and the lingering superchunks, `write_back.rs` dirty buckets
+taken, put in the ring, flushed and evicted.
 
 **`Lingering`** `{superchunk, wanted}`: a superchunk gone cold, its
 allocations kept; **`done`**, whether it can be let go.

@@ -215,6 +215,6 @@ another world is run.
 | `src/hud.rs` | the text over the world |
 | `src/map.rs` | the map: the world from far, drawn from the generator alone |
 | `src/paint.rs` | the painter's thread: cells into pixels |
-| `src/ground.rs` | the light on the ground: heights as a frame brings them, hillshade, tint, cast shadows, cliffs and contours |
+| `src/ground.rs` | the light on the ground: heights as a frame brings them, hillshade, tint, cast shadows, cliffs and contours; `ground/light_and_shadow.rs` the smoothing, the shadows and the sun |
 | `src/near.rs` | the viewport's cells from near as one picture: steps and walls at their edges |
 | `docs/` | this, and the reference, function by function |

@@ -143,7 +143,9 @@ terrain, the ocean where it is under the ocean's level, and on the rest
 grass and trees with their stages, as `Generation::growth` says of
 each cell.
 
-## `host/mod.rs`
+## `host/mod.rs`, `host/host_thread.rs`
+
+`Running` and `HostThread` are in `host_thread.rs`, the rest in `mod.rs`.
 
 A world run on a thread of its own for a client -- a window -- that
 asks it for the cells of its viewport. `TARGET_PACE` (256 ticks a second),
@@ -157,8 +159,9 @@ a second, or flat out)`**, **`make_world(start)`**,
 **`open_world(name)`** -- that world of the worlds' folder run in
 place of the one run -- **`save_world(name)`**, and **`reset(tuning)`**
 -- the world run made again from its start, generated as the tuning
-has it now, a world of its own of no name; several asked between two
-ticks make it once, as the last says. `Request`, private:
+has it now, a world of its own of no name; several asked with no
+frame asked between make it once, as the last says; a frame asked
+after is of the world remade. `Request`, private:
 a call as sent. **`census_path()`**: where a run's census is kept
 (`transient_data/measurements/census.csv`); **`census(seed)`**: its
 file, started afresh for each world. **`Running`**: the world run, the

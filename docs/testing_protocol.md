@@ -25,7 +25,9 @@ encoding needs: its seed file, its adversarial searches.
 
 Each tier is one file in a crate's `tests/`, so one test program:
 `fine.rs`, `fast.rs`, `complete.rs`, a topic a module in it
-(`mod sheep` in `tests/fast.rs`). A crate has the tiers it has tests
+(`mod sheep` in `tests/fast.rs`) -- a file of its own in the tier's
+folder once the tier's file would pass some 300 lines
+(`tests/fast/halos.rs`, named by `#[path]` in `tests/fast.rs`). A crate has the tiers it has tests
 for, and no others. What two tiers share -- a check, a world compared
 whole, a seed found -- is in `tests/tests.rs`, a module of each tier
 that uses it and no test program of its own (`[[test]] name = "tests"`,
@@ -76,8 +78,8 @@ the top of the workspace and out of git (`utilities::seed`):
   first seed from it that gives one.
 - A seed is 64 bits, written everywhere in hexadecimal:
   `0x50921cc8cf51e5ba`, in the file, a world's, and whatever prints one.
-- `Civil Egregore_SEED=<seed>` picks a seed for one run and leaves the file
-  alone; `Civil Egregore_SEED=fresh` draws one for the run.
+- `CIVIL_EGREGORE_SEED=<seed>` picks a seed for one run and leaves the file
+  alone; `CIVIL_EGREGORE_SEED=fresh` draws one for the run.
 - The first asking prints the seed, which use it is and where it came
   from, so a failure names the seed that made it.
 

@@ -208,7 +208,7 @@ tick's phase out.
   that follow their hot entities closely.
 
 So between ticks the superchunks hot and not cooling, or warming for a
-halo that is there still, are the halos, exactly, never both (`halos` in `../../server/tests/fast.rs`); a superchunk
+halo that is there still, are the halos, exactly, never both (`../../server/tests/fast/halos.rs`); a superchunk
 warming takes no write and no entity until it is due; one cooling
 stays hot until it is due, and for good if a halo reaches it again
 before; and a superchunk gone
@@ -281,7 +281,7 @@ comes to does not depend on the thread that takes it.
 | `src/sampling.rs` | Monte Carlo sampling |
 | `src/tick.rs` | the two-phase tick |
 | `src/hot.rs` | which superchunks are to be hot: the world's size, the hot entity |
-| `src/halos.rs` | the halos moved: warming and cooling, each due at a tick, by jobs off the tick |
+| `src/halos.rs` | the halos moved: warming and cooling, each due at a tick, by jobs off the tick -- `halos/warming.rs` superchunks made hot and let cool, `halos/write_back.rs` write-backs and flushes landed |
 | `src/turn/` | a superchunk's turn: `mod` the turn, its cells and its outbox, `entities` the entities read and the instructions queued |
 | `../entity_manager/` | the entities: buckets, the timer wheel, the instructions queued -- a crate of its own |
 | `src/diagnostics/` | what the entities hold |

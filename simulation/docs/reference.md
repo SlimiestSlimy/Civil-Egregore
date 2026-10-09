@@ -61,6 +61,11 @@ superchunks about each, sorted, each once.
 
 ## `halos.rs`
 
+The halos' own methods lie in two files under it: `halos/warming.rs`
+(`make_hot_within`, `start_warming`, `finish_warming`) and
+`halos/write_back.rs` (`land_write_backs`, `flush_tail`,
+`land_flushes`, `flush_all`, `write_back_all`).
+
 **`Viewport`** `{first, last}`: what a renderer renders, in
 superchunks; **`contains(at)`**. **`Held`** `{arena, storage, entities, simulation, cold, layers,
 generate}`: the world's, lent for a call. **`Halos`** `{hot, jobs,

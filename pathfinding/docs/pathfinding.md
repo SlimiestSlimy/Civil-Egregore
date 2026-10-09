@@ -50,7 +50,9 @@ slope); and walkers larger than a cell.
 
 | folder | what is in it |
 |---|---|
-| `src/lib.rs` | areas, waves, a walker's step, the nearest cell, A* |
+| `src/lib.rs` | areas, waves, a walker's step, the nearest cell |
+| `src/walls.rs` | the walls between cells, and cells spread a step through them |
+| `src/a_star.rs` | A*: the shortest path between two cells |
 | `tests/` | each judged against a search of every cell |
 | `docs/` | this, and the reference, function by function |
 

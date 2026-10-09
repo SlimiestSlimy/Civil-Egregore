@@ -105,7 +105,7 @@ internals (`tests/unit/`). Every check covers the same ground:
 
 Sampled bitmaps come from a seed kept in `transient_data/seed.csv`, outside git.
 It rolls by itself every five runs, so no corpus is measured against for
-long. `Civil Egregore_SEED=<seed>` pins a run, and `Civil Egregore_SEED=fresh` draws a
+long. `CIVIL_EGREGORE_SEED=<seed>` pins a run, and `CIVIL_EGREGORE_SEED=fresh` draws a
 new seed for one run. [`docs/testing_protocol.md`](docs/testing_protocol.md)
 is the whole protocol, with every command and every parameter.
 

@@ -38,7 +38,7 @@ none.
   unless set is in the default settings.
 - **The seed** (`seed.rs`): the one seed every crate's tests and tools
   start from, in the workspace's `transient_data/seed.csv`, rolled every 5
-  counted runs; `Civil Egregore_SEED` picks one for a run.
+  counted runs; `CIVIL_EGREGORE_SEED` picks one for a run.
 - **A seeded random source** (`rng.rs`), its whole state one word: every
   random number in Civil Egregore comes from it.
 - **Hashing** (`hash.rs`): a key's slot in a table, by
