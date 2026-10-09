@@ -3,7 +3,7 @@
 //! the border of the higher cell, light towards the sun and dark away,
 //! and under a wall a band on its lower cell, darkest at its foot --
 //! under the cast shadows
-//! ([`crate::ground`]). How strongly is [`crate::tuning`]'s.
+//! ([`crate::ground`]). How strongly is `utilities::tuning`'s.
 //!
 //! Every pixel takes one edge's doing, never two multiplied: of the
 //! edges that darken it the darkest, and only if none does, of those
@@ -17,8 +17,8 @@
 
 use crate::ground::{shadow_drop, Fine, Ground, MARGIN, SIDE};
 use crate::paint::{depth_at, stage_at, tree_colour, under_water};
-use crate::sim::{Cells, Near};
-use crate::tuning::{self, Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
+use server::host::frame::{Cells, Near};
+use utilities::tuning::{self, Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
 use bitmap::BITS_PER_WORD;
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;

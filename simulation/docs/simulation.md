@@ -157,7 +157,7 @@ through a `Reader`) and queues its instructions. The decisions behind it:
 
 Only the superchunks about the entities that matter are hot
 (`src/hot.rs`, `src/halos.rs`). A **hot entity** -- one of the kind
-whoever holds the world names (`Hot::entity`) -- keeps its superchunk
+whoever holds the world names (`Hot::About`) -- keeps its superchunk
 and the eight about it hot -- as far as anything reaches in a tick, the speed of light.
 Every other superchunk is cold: its cells in its image in chunk
 storage, its entities and random numbers kept as a save keeps them
@@ -220,13 +220,13 @@ so the flock, its halos and the world may grow as far as it leads them.
 An entity
 kept cold whose wake passes wakes the tick its superchunk turns hot.
 
-**The world's size** (`Hot::side`): given one, the world is a square
+**The world's size** (`Hot::side()`): given one, the world is a square
 of so many superchunks along a side, its origin in the middle, and
 nothing outside it is ever hot, whoever wants it -- so nothing is made
 there and nothing goes there, an entity sent past the edge staying
-where it stood. **Forced hot** (`Hot::entity` none): no halos; every
-superchunk of a world with a size is hot and stays so, and in a world
-of none those its holder makes hot do.
+where it stood. **Forced hot** (`Hot::Forced`): no halos; every
+superchunk of the world is hot and stays so, whatever its entities do.
+Only a world with a size can be: one of none has no end to be hot to.
 
 The halos work on what the world's holder lends them for each call
 (`Held`): the arena, chunk storage, the entities, the tick's random

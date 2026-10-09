@@ -9,8 +9,9 @@ Rules that hold whatever the task. The style guide
 - **On the local machine** (the user's PC, which has a screen): Bevy is
   never skipped. The renderer is built and kept working, and **all
   further testing and measuring of the running world is done in the
-  renderer** -- `cargo run --release -p renderer -- ...`; its census
-  (`renderer/transient_data/measurements/census.csv`) carries the ticks
+  renderer** -- `cargo run --release`, a world made from its main menu;
+  the census of the world it runs
+  (`server/transient_data/measurements/census.csv`) carries the ticks
   and the seconds they took. The renderer may be closed and reopened as
   runs need.
 - **On a remote session** (the cloud, no screen): the renderer is not
@@ -20,12 +21,12 @@ Rules that hold whatever the task. The style guide
 ## Measuring under full load
 
 The world is hot only in the halos about its hot entities, which move with
-them. To measure a fixed load, every superchunk shown is forced hot and
-kept so -- the renderer's fifth argument:
-
-```sh
-cargo run --release -p renderer -- <superchunks> <sheep a superchunk> 0 0 1
-```
+them. To measure a fixed load, a world with a side is made forced hot,
+every superchunk of it hot throughout -- in the renderer, from the main
+menu's new world, the sliders' world group (its side, forced hot, the
+sheep a superchunk); without it,
+`cargo run --release -- server new <folder> <seed> <sheep> <side> 1`.
+Only a world with a side can be forced hot.
 
 ## Seeds, commands and figures
 
@@ -46,7 +47,7 @@ cargo run --release -p renderer -- <superchunks> <sheep a superchunk> 0 0 1
   (`simulation::halos`); the server only says which entity keeps the
   world hot and hands over what generates a superchunk.
 - The default settings (`utilities/default_settings.csv`) and the
-  sliders (`gui/sliders.csv`) are written by hand: nothing generates
+  sliders (`utilities/sliders.csv`) are written by hand: nothing generates
   them.
 - Every text file Civil Egregore keeps is CSV (`utilities::csv`), a first row
   naming its columns; a seed is written in hexadecimal

@@ -8,29 +8,46 @@ use coordinates::{SuperchunkIndex, WORLD_MIDDLE, WORLD_SIDE_SUPERCHUNKS};
 use entity_manager::{Entities, EntityType};
 
 /// Which superchunks are to be hot.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Hot {
-    /// Superchunks along a side of the world, a square with the
-    /// world's origin superchunk in its middle: nothing outside it is
-    /// ever hot, so nothing is made there and nothing goes there.
-    /// `None`: as far as coordinates reach.
-    pub side: Option<u32>,
-    /// The hot entity: every one of this kind keeps its halo hot.
-    /// `None`: superchunks are forced hot -- every one of a world with
-    /// a size; of one without, those its holder makes hot.
-    pub entity: Option<EntityType>,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Hot {
+    /// Every entity of the kind `entity` keeps its halo hot; `side`,
+    /// if given, superchunks along a side of the world, a square with
+    /// the world's origin superchunk in its middle: nothing outside it
+    /// is ever hot, so nothing is made there and nothing goes there.
+    /// With none, as far as coordinates reach.
+    About {
+        /// The hot entity.
+        entity: EntityType,
+        /// Superchunks along a side of the world, if it has a size.
+        side: Option<u32>,
+    },
+    /// Every superchunk of a world `side` superchunks along a side is
+    /// hot, whatever its entities do: a fixed load. Only a world of a
+    /// size can be forced: one of none has no end to be hot to.
+    Forced {
+        /// Superchunks along a side of the world.
+        side: u32,
+    },
 }
 
 impl Hot {
     /// A world of no size, hot about every entity of the kind `entity`.
     pub const fn about(entity: EntityType) -> Self {
-        Self { side: None, entity: Some(entity) }
+        Self::About { entity, side: None }
+    }
+
+    /// Superchunks along a side of the world, if it has a size.
+    pub const fn side(&self) -> Option<u32> {
+        match *self {
+            Self::About { side, .. } => side,
+            Self::Forced { side } => Some(side),
+        }
     }
 
     /// The world's first column and row and the one past its last, of
     /// superchunks: both the same, the world being square.
     fn span(&self) -> std::ops::Range<u32> {
-        let side = self.side.unwrap_or(WORLD_SIDE_SUPERCHUNKS).min(WORLD_SIDE_SUPERCHUNKS);
+        let side = self.side().unwrap_or(WORLD_SIDE_SUPERCHUNKS).min(WORLD_SIDE_SUPERCHUNKS);
         let first = WORLD_MIDDLE.cartesian().0 - side / 2;
         first..first + side
     }
@@ -41,22 +58,28 @@ impl Hot {
         span.contains(&x) && span.contains(&y)
     }
 
-    /// The superchunks to be hot, sorted, each once: the hot
-    /// entities' halos, or every superchunk of a world with a size if
-    /// they are forced -- none outside the world either way. `None`
-    /// where they are forced in a world of no size: those hot stay so.
-    pub fn wanted(&self, entities: &Entities) -> Option<Vec<SuperchunkIndex>> {
-        let mut wanted = match self.entity {
-            Some(hot) => about(entities.superchunks().iter().filter(|superchunk| superchunk.iter().any(|entity| entity.header.kind == hot)).map(|superchunk| superchunk.index())),
-            None => {
-                let span = self.side.map(|_| self.span())?;
-                let mut world: Vec<SuperchunkIndex> = span.clone().flat_map(|y| span.clone().map(move |x| SuperchunkIndex::from_cartesian(x, y))).collect();
-                world.sort_unstable();
-                world
-            }
+    /// Every superchunk of a world of a size, sorted; none of one of no
+    /// size, which has no end.
+    pub fn all(&self) -> Vec<SuperchunkIndex> {
+        if self.side().is_none() {
+            return Vec::new();
+        }
+        let span = self.span();
+        let mut world: Vec<SuperchunkIndex> = span.clone().flat_map(|y| span.clone().map(move |x| SuperchunkIndex::from_cartesian(x, y))).collect();
+        world.sort_unstable();
+        world
+    }
+
+    /// The superchunks to be hot, sorted, each once: the hot entities'
+    /// halos, or every superchunk of the world if they are forced --
+    /// none outside the world either way.
+    pub fn wanted(&self, entities: &Entities) -> Vec<SuperchunkIndex> {
+        let mut wanted = match *self {
+            Self::About { entity, .. } => about(entities.superchunks().iter().filter(|superchunk| superchunk.iter().any(|kept| kept.header.kind == entity)).map(|superchunk| superchunk.index())),
+            Self::Forced { .. } => self.all(),
         };
         wanted.retain(|&superchunk| self.within(superchunk));
-        Some(wanted)
+        wanted
     }
 }
 

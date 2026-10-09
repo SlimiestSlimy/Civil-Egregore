@@ -14,6 +14,7 @@
 //! | [`seed`] | the one seed every crate's tests and tools start from, rolled every few runs |
 //! | [`dispatcher`] | the threads, started once and kept: a job run on all at once, a part each, and jobs queued for whichever is free |
 //! | [`cache`] | memory asked of the processor's caches ahead of its being read |
+//! | [`tuning`] | the numbers tuned by eye -- the near view's shading, and how a new world is made -- each a slider's, kept in the settings |
 //!
 //! The design: `docs/utilities.md`; function by function:
 //! `docs/reference.md`.
@@ -33,3 +34,4 @@ pub mod rng;
 pub mod seed;
 pub mod settings;
 pub mod transient_data;
+pub mod tuning;

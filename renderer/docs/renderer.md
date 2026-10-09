@@ -1,51 +1,49 @@
 # The renderer
 
-Civil Egregore on the screen: a pasture ticking on a thread of its own, and a
-Bevy window showing it -- dirt brown, grass green, a sheep white -- on
-ground lit by its height (below). The world is a generated one
-(`server::start`), from the workspace's seed
-(`utilities::seed`, `Civil Egregore_SEED` to pick one): the first from it
-with land about the origin (`server::seed_with_land`).
+Civil Egregore on the screen: a Bevy window showing a world run by the
+host (`server::host`) on a thread of its own -- dirt brown, grass
+green, trees, water, a sheep white -- on ground lit by its height
+(below).
 
-`cargo run --release -p renderer -- [superchunks shown] [sheep a superchunk] [ticks a second, 0 flat out] [ticks to watch for] [1 to force hot]`;
-64 superchunks shown, 8,000 sheep on each and 256 ticks a second if
-not said: a flock that reaches the most the grass feeds, some 16,000 a
-superchunk, within 70,000 ticks, and has not eaten it bare before.
+`cargo run --release` with no arguments, or `cargo run --release -p
+renderer`, opens it on the main menu (`gui`): nothing runs until a
+world is made there or one saved is opened. A world made is as the
+sliders have it then (`gui/docs/gui.md`): its seed typed, or drawn at
+random -- the first from it with land about the origin, where the sheep
+start, if one is within 256 -- its size, whether it is forced hot, its
+sheep and how it is generated.
 
-The world is a generated one (`server::start`, a flock on
-every superchunk shown): hot only in the halos about its sheep, so the window shows a square of superchunks
-about the world's origin, and those cold are black. Forced hot (the
-fifth argument), every superchunk shown is hot all the while, each
-with a flock, whatever its sheep come to: the world under a fixed load,
-to be measured -- the census then carries the seconds and the pace
-held, 0 flat out.
+A world with a size is a square of superchunks about the origin, with
+sheep on every one; hot in the halos about them, or, forced, all of it
+hot all the while, whatever its sheep come to: the world under a fixed
+load, to be measured. A world with none has sheep on the origin alone.
+The view starts over the whole of a world with a size, and over the
+origin's halo of one without; the cold superchunks are black.
 
-It runs until it is closed: long runs are watched, not waited for. The
-ticks to watch for are only shown, beside the ticks run, so whoever
-watches knows how far the run is from what was to be seen. As it goes
-it keeps a census -- the flock and the grass every 1,000 ticks, in
-`transient_data/measurements/census.csv` -- so a run closed at any time
-leaves what it came to. And it shows what it costs: the time each
-frame takes of the simulation's thread, and of the painter's. It ticks on every thread the machine has, no more than the
-superchunks.
+It runs until it is closed: long runs are watched, not waited for. As a
+world runs the host keeps a census -- the flock and the grass every
+1,000 ticks, the seconds and the pace held, 0 flat out, in
+`server/transient_data/measurements/census.csv` -- so a run closed at
+any time leaves what it came to. And the text says what a frame costs:
+the time it takes of the host's thread, and of the painter's.
 
 ## The window asks
 
 Bevy is the window, the drawing and the keys, and nothing else: the
-world is not in its entities, and the simulation knows nothing of it.
+world is not in its entities, and the host knows nothing of it.
 The two share two queues and no memory.
 
-The window is the one that asks, never the simulation that sends: each
+The window is the one that asks, never the host that sends: each
 time the window has shown a frame -- 60 times a second at most -- it
-sends the simulation the superchunks in view (`Request::Sync`), and the
-simulation, between two ticks, answers with their cells as the last
+sends the host the superchunks in view (`Request::Sync`), and the
+host, between two ticks, answers with their cells as the last
 tick left them (a `Frame`). So the window sets how often the world is
 drawn; a window that falls behind slows no tick; one frame at most is
 ever on its way; and what is not in view is never sent.
 
 ## Three threads
 
-1. **The simulation** only copies: each superchunk in view as its
+1. **The host** only copies: each superchunk in view as its
    grass's words, as the arena holds them (128 KiB), and the cells its
    sheep stand on. What is in view costs the ticks next to nothing,
    however much of it there is.
@@ -80,12 +78,12 @@ which a pixel a cell cannot do: that would be 4 GiB of pixels a frame.
   with no cell looked at.
 - **A frame carries only so many superchunks** -- 8 drawn fine, 32
   coarse -- and the window goes round those in view, frame after frame.
-  So what a frame costs the simulation is the same however many are in
+  So what a frame costs the host is the same however many are in
   view; the whole view is drawn afresh in half a second at most.
 - **A fine image is dropped when its superchunk leaves the view**: it
   is 4 MiB here and as much on the graphics card.
 
-A frame of one superchunk takes very little of the simulation's
+A frame of one superchunk takes very little of the host's
 thread, however large the world: the HUD says how much.
 
 ## Height, from straight above
@@ -149,31 +147,30 @@ pixels made here.
 | the wheel, or `Q` and `E` | zoom |
 | space | pause, and go on |
 | `T` | tick flat out, or at the game's pace (256 ticks a second) |
-| `F` | the window over the whole screen, or not |
+| `F11` | the window over the whole screen, or not |
 | `U` | the sliders' menu, opened; whatever of them is open, closed |
 | Escape | the options, opened or closed: going on, saving the world, opening one, leaving Civil Egregore |
 | `[` and `]` | halve and double the pace |
 | `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |
 | `H` | every cell's height written on it, once a cell is 20 screen pixels across |
+| `P` | on the map, the mesh's lines drawn over it, or not |
 
 ## Menus
 
-The sliders at the window's top right and the options Escape opens are
-the `gui` crate's (`gui/docs/gui.md`), added to the window's app. The
-renderer reads the numbers the sliders tune, leaves the pointer and
-the wheel to a menu they are over, and opens the world chosen in the
-options: the simulation's thread loads it from the worlds' folder
-(`sim::Request::Open`) and runs it in place of the one run, hot in its
-halos, its ticks its own, the view back where it started. A world that
-cannot be read is refused, the reason on the first line of the text at
-the top left, and the world run goes on. Saving
-(`sim::Request::Save`) is on the simulation's thread too, between two
-ticks: the world written to its folder of the worlds' folder, under
-the name it was opened by or the one typed, how it is generated with
-it -- so a world tuned in the lab is saved as tuned. What either came
-to is said on that first line. A world opened from the lab ends the
-lab -- generation's sliders stay listed and do nothing.
+The main menu, the sliders at the window's top right and the options
+Escape opens are the `gui` crate's (`gui/docs/gui.md`), added to the
+window's app. The renderer leaves the pointer, the wheel and the keys
+to a menu that took them (`gui::Captured`), and tells the host what
+the menus say (`src/link.rs`): a world made (`Request::New`), the
+numbers it is made from read off the sliders then; one opened from the
+worlds' folder (`Request::Open`), run in place of the one run, hot in
+its halos, its ticks its own, the view put over it; the world run saved
+(`Request::Save`), on the host's thread between two ticks, under the
+name it was opened by or the one typed, how it is generated with it.
+What opening or saving came to is said on the first line of the text
+at the top left; a world that cannot be read is refused, and the world
+run goes on.
 
 ## The map
 
@@ -187,59 +184,20 @@ read, so it is how the world was generated, not how it has changed
 since. A thread of its own draws the last map asked for, its rows
 shared out among every thread the machine has; a new one is asked for
 when the view has moved 32 pixels, zoomed to another power of two, or
-the seed or generation has changed.
-
-## The lab
-
-`cargo run --release -p renderer -- lab [superchunks shown]`, 64 (8 by
-8) if not said, is the renderer run to tune by eye how the world is
-made and how it changes (`src/lab.rs`). The world starts as the
-superchunks shown, every one hot, and reaches wherever it is looked at:
-a superchunk that comes into view is generated, made hot and kept so,
-with no bound but memory -- until a slider of
-generation moves or the seed is drawn, when it starts over; the seed
-drawn, the view too goes back to where it started. No sheep,
-its rules -- grass and trees -- ticking as in any run, paused and paced
-by the same keys. Generation's sliders are shown from the start:
-
-- **The ocean** (`worldgen::Shape`): its floor's level, the lowest
-  ground; its own level; and its share of the vertices.
-- **The land**: the highest it may be; the coast's breadth, the
-  vertices from the ocean land is held low within, and how low; how
-  much land and ocean clump; and how far apart the
-  vertices are.
-- **The lines**: the narrowest and widest blend, the least and most
-  sigmoidness, and how far they are bent. `P` draws the lines over the
-  map.
-- **The finer meshes**: how many, the share of their vertices that
-  raise or sink the land, by how much, how much less each finer mesh
-  does, how unevenly the weight is shared out among subdivisions, and
-  the share that raise the land.
-- **The grass**, and **the trees** (`worldgen::patches`): each in patches,
-  not scattered cell by cell. A cell's number is smooth noise as broad
-  as a patch, finer noise on it (detail), and a lot drawn for the cell
-  alone (scatter); it has the thing under a threshold found, by looking
-  at 16,384 cells, so that the share asked for (cover) do.
-- **The button** draws a new seed off the clock; the seed is shown in
-  the text.
-
-Whenever a slider of generation moves or the seed is drawn, the world
-is made afresh from nothing but the sliders, and its ticks start again
-from 0. A slider says what it does when the pointer rests on it, and
-the panel scrolls. The sliders start at the numbers last settled on
-(`gui::tuning`); `server::Generation::DEFAULT` and
-`worldgen::Shape::DEFAULT`, which a world made outside the lab uses,
-are not those yet.
+another world is run.
 
 ## Layout
 
-| folder | what is in it |
+| file | what is in it |
 |---|---|
-| `src/sim.rs` | the simulation's thread: requests read between ticks, the cells in view copied when asked |
+| `src/lib.rs` | `run`: the window, its parts and its systems |
+| `src/link.rs` | the host as the window holds it: the menus' worlds made, opened and saved, paused and paced |
+| `src/frames.rs` | frames asked for and shown: an image a superchunk, the picture from near |
+| `src/view.rs` | the plane, the camera, where it starts for a world, steering it |
+| `src/overlays.rs` | boundaries, labels and heights over the world |
+| `src/hud.rs` | the text over the world |
+| `src/map.rs` | the map: the world from far, drawn from the generator alone |
 | `src/paint.rs` | the painter's thread: cells into pixels |
 | `src/ground.rs` | the light on the ground: heights as a frame brings them, hillshade, tint, cast shadows, cliffs and contours |
-| `src/map.rs` | the map: the world from far, drawn from the generator alone |
-| `src/lab.rs` | the lab: the seed and how the world is generated, as the sliders have it, or the opened world's |
 | `src/near.rs` | the cells in view from near as one picture: steps and walls at their edges |
-| `src/main.rs` | the window: the camera, an image a superchunk, the keys, the text |
 | `docs/` | this, and the reference, function by function |

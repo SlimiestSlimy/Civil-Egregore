@@ -1,6 +1,6 @@
-//! Cells into pixels, on a thread of its own: between the simulation,
-//! which only copies the cells in view, and the window, which only
-//! shows pixels. So drawing takes no time from the ticks, however much
+//! Cells into pixels, on a thread of its own: between the host
+//! (`server::host`), which only copies the cells in view, and the
+//! window, which only shows pixels. So drawing takes no time from the ticks, however much
 //! of the world is in view, and none from the window's frames.
 //!
 //! A cell is a pixel: dirt brown, grass green, a sheep white, the
@@ -13,16 +13,15 @@
 
 use crate::ground::{lit, Given, Ground, COARSEST};
 use crate::near::{paint_near, PaintedNear};
-use crate::lab;
-use crate::sim::{Cells, Frame, CHUNK_WORDS, DEEP};
 use bitmap::morton::morton_coordinates;
 use bitmap::BITS_PER_WORD;
 use coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
+use mc_rules::trees::OLDEST;
+use server::host::frame::{Cells, Frame, CHUNK_WORDS, DEEP};
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::Instant;
-use mc_rules::trees::OLDEST;
 
 /// Dirt's colour.
 pub const BROWN: [u8; 3] = [116, 80, 46];
@@ -52,20 +51,8 @@ pub struct Painted {
 
 /// A frame, painted.
 pub struct Picture {
-    /// Ticks run so far.
-    pub tick: u64,
-    /// Ticks a second, over the time since the frame before.
-    pub ticks_a_second: f64,
-    /// Sheep in the whole world.
-    pub sheep: usize,
-    /// Cells of grass in the whole world.
-    pub grass: u64,
-    /// Trees in the whole world.
-    pub trees: u64,
-    /// What answering took of the simulation's thread, in seconds.
-    pub sync_seconds: f64,
-    /// The share of the thread's time that is.
-    pub sync_share: f64,
+    /// The frame, its cells gone into the pixels.
+    pub frame: Frame,
     /// What painting took of the painter's thread, in seconds.
     pub paint_seconds: f64,
     /// The superchunks asked for, painted: seen from near, the cold
@@ -90,7 +77,7 @@ fn ground(grounds: &mut HashMap<(u32, u32), Ground>, frame: &Frame, number: u64)
     let fine = frame.near.is_some() || frame.detail < 2;
     let hot = || frame.cells.iter().filter(|cells| cells.hot).map(|cells| cells.top_left);
     let missing: Vec<(u32, u32)> = hot().filter(|top_left| grounds.get(top_left).is_none_or(|ground| fine && ground.fine.is_none())).collect();
-    let (seed, shape) = (lab::seed(), lab::generation().shape);
+    let (seed, shape) = (frame.seed, frame.generation.shape);
     // The heights the frame brings: those of the superchunks just turned hot.
     let given: Given = frame.cells.iter().filter(|cells| !cells.heights.is_empty()).map(|cells| (cells.top_left, &cells.heights[..])).collect();
     let given = &given;
@@ -121,13 +108,13 @@ pub fn start(frames: Receiver<Frame>) -> Receiver<Picture> {
     thread::Builder::new()
         .name("painter".to_string())
         .spawn(move || {
-            let (mut grounds, mut revision) = (HashMap::new(), 0);
-            for (number, frame) in frames.into_iter().enumerate() {
+            let (mut grounds, mut world) = (HashMap::new(), 0);
+            for (number, mut frame) in frames.into_iter().enumerate() {
                 let started = Instant::now();
-                if frame.revision != revision {
-                    // The world is generated otherwise now: its ground is made again.
+                if frame.world != world {
+                    // Another world: its ground is its own.
                     grounds.clear();
-                    revision = frame.revision;
+                    world = frame.world;
                 }
                 ground(&mut grounds, &frame, number as u64);
                 let superchunks = frame
@@ -142,18 +129,8 @@ pub fn start(frames: Receiver<Frame>) -> Receiver<Picture> {
                     })
                     .collect();
                 let near = frame.near.map(|near| paint_near(&frame.cells, &grounds, near));
-                let picture = Picture {
-                    tick: frame.tick,
-                    ticks_a_second: frame.ticks_a_second,
-                    sheep: frame.sheep,
-                    grass: frame.grass,
-                    trees: frame.trees,
-                    sync_seconds: frame.sync_seconds,
-                    sync_share: frame.sync_share,
-                    paint_seconds: started.elapsed().as_secs_f64(),
-                    superchunks,
-                    near,
-                };
+                frame.cells = Vec::new();
+                let picture = Picture { frame, paint_seconds: started.elapsed().as_secs_f64(), superchunks, near };
                 if painted.send(picture).is_err() {
                     return;
                 }

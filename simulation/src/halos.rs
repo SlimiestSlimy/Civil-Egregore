@@ -165,13 +165,10 @@ impl Halos {
     /// Moves the halos to where the hot entities stand
     /// ([`Hot::wanted`]): the superchunks
     /// reached warming, hot [`WARM_TICKS`] on; the rest cooling, cold
-    /// [`COOL_TICKS`] on. Where it says nothing -- superchunks forced
-    /// hot, in a world of no size -- nothing moves.
+    /// [`COOL_TICKS`] on. Forced hot, it is the whole world all the while.
     pub fn move_to_hot_entities(&mut self, held: &mut Held<'_>) -> HaloChange {
-        match self.hot.wanted(held.entities) {
-            Some(wanted) => self.make_hot_within(held, &wanted, WARM_TICKS, COOL_TICKS),
-            None => HaloChange::default(),
-        }
+        let wanted = self.hot.wanted(held.entities);
+        self.make_hot_within(held, &wanted, WARM_TICKS, COOL_TICKS)
     }
 
     /// Makes `wanted` -- sorted -- the hot superchunks now: every other
@@ -209,7 +206,7 @@ impl Halos {
     fn make_hot_within(&mut self, held: &mut Held<'_>, wanted: &[SuperchunkIndex], warm_ticks: u64, cool_ticks: u64) -> HaloChange {
         // Nothing outside the world's size, whoever wants it.
         let within: Vec<SuperchunkIndex>;
-        let wanted = match self.hot.side {
+        let wanted = match self.hot.side() {
             Some(_) => {
                 within = wanted.iter().copied().filter(|&superchunk| self.hot.within(superchunk)).collect();
                 &within[..]

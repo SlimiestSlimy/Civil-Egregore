@@ -3,7 +3,7 @@
 //! holds nothing but which crates have commands; the rest is
 //! `utilities::commands`.
 //!
-//! No arguments, built with the renderer: the lab ([`renderer::render_main_lab`]).
+//! No arguments, built with the renderer: the window, on its main menu ([`renderer::run`]).
 //! `cargo run --release -- help`: every command of every crate, what
 //! each takes and what that is if not given.
 //! `cargo run --release -- server run <folder> [ticks]`
@@ -22,7 +22,7 @@ const CRATES: [Crate; 2] = [
     Crate { name: "tessera", does: "Tessera's diagnostics tools", commands: &tessera::diagnostics::tool::COMMANDS },
 ];
 
-/// No arguments, built with the renderer: the lab, and nothing else
+/// No arguments, built with the renderer: the window, and nothing else
 /// run once it closes. Otherwise, hands the command line to the crate
 /// its first word names, or says why not.
 fn main() -> ExitCode {
@@ -31,7 +31,7 @@ fn main() -> ExitCode {
 
     #[cfg(feature = "renderer")]
     if arguments.is_empty() {
-        renderer::render_main_lab();
+        renderer::run();
         return ExitCode::SUCCESS;
     }
 

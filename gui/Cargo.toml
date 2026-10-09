@@ -2,7 +2,7 @@
 name = "gui"
 version = "0.1.0"
 edition = "2024"
-description = "Civil Egregore's menus, over whatever window shows it: the options Escape opens, the sliders, and the numbers they tune"
+description = "Civil Egregore's menus, over whatever window shows it: the main menu, the options Escape opens, and the sliders"
 publish = false
 
 [dependencies]

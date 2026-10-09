@@ -50,6 +50,19 @@ when there were any, were four layers where two do.
 Not yet: heights do not change. When they do -- digging -- the walls of
 the cells about the change are worked out again.
 
+## Generation
+
+How a world is generated as a whole is a `Generation`: the heights'
+shape, and how the grass and the trees lie on them -- saved with a
+world, a number a row, so one loaded goes on as it was made; made from
+the sliders' numbers (`utilities::tuning`) when a new world is set up
+(`Generation::from_tuning`), what is typed held to what a height, the
+mesh and the noise can take. What a dry cell starts with -- grass or
+dirt, and a tree or none -- is said once (`Generation::growth`, then
+`Growth::at`), for the superchunks generated and for the renderer's
+map alike. A seed is found with land about where a flock is to stand
+(`seed_with_land`, `has_land_about`).
+
 ## Layout
 
 | folder | what is in it |
@@ -57,6 +70,7 @@ the cells about the change are worked out again.
 | `src/lib.rs` | the shape, heights, walls, a superchunk's terrain, the noise |
 | `src/mesh.rs` | the land as a mesh: what a height is worked out from |
 | `src/patches.rs` | how grass and trees lie when a superchunk is made |
+| `src/generation.rs` | how a world is generated as a whole, saved with it; made from the sliders; what grows on a cell; a seed with land |
 | `tests/` | heights settled by seed and cell, walls where they should be |
 | `docs/` | this, and the reference, function by function |
 
