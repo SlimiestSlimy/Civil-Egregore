@@ -1,15 +1,16 @@
 //! The host: a world run on a thread of its own, for a client -- a
-//! window -- that asks it, never the other way round, for the cells in
-//! view.
+//! window -- that asks it, never the other way round, for the cells of
+//! its viewport: whatever it should render.
 //!
 //! The client holds a [`Host`] and calls it; each call is sent to the
 //! host's thread, read there between ticks. It starts with no world,
 //! and runs one once asked to make one ([`Host::make_world`]) or to
 //! open one saved ([`Host::open_world`]). Each [`Host::sync`] is
-//! answered with a [`Frame`]: the superchunks in view as the last tick
-//! left them, copied and nothing more ([`frame`]) -- so what is in view
-//! costs the ticks next to nothing, and a frame carries only so many
-//! superchunks, the client going round those in view. It sends nothing
+//! answered with a [`Frame`]: the viewport's hot superchunks as the
+//! last tick left them, copied and nothing more ([`frame`]) -- so what
+//! is rendered costs the ticks next to nothing, and a frame carries
+//! only so many superchunks, the client going round the viewport's.
+//! It sends nothing
 //! unasked, so it is the client that sets how often the world is
 //! drawn, and one that falls behind slows no tick.
 //!
@@ -22,7 +23,7 @@ pub mod frame;
 
 use crate::{Start, World};
 use chunk_storage::mock::GRASS;
-use frame::{copy, count, Ask, Frame};
+use frame::{copy, count, hot_in, Ask, Frame};
 use mc_rules::trees::TREE;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, File};
@@ -47,7 +48,7 @@ const CATCH_UP: Duration = Duration::from_millis(250);
 /// calls.
 #[derive(Clone, Debug)]
 enum Request {
-    /// Some of the superchunks in view: answered with a [`Frame`] --
+    /// Some of the viewport's superchunks: answered with a [`Frame`] --
     /// unless no world runs, when nothing is.
     Sync(Ask),
     /// Stop ticking, or go on.
@@ -103,7 +104,7 @@ impl Host {
         (Self { requests }, frames)
     }
 
-    /// Asks for some of the superchunks in view: answered with a
+    /// Asks for some of the viewport's superchunks: answered with a
     /// [`Frame`] -- unless no world runs, when nothing is.
     pub fn sync(&self, ask: Ask) -> bool {
         self.requests.send(Request::Sync(ask)).is_ok()
@@ -252,21 +253,22 @@ impl HostThread {
         self.next_tick = Instant::now();
     }
 
-    /// The frame `ask` asks for, if a world runs -- its view kept hot
-    /// from then, if the world's camera loads superchunks.
+    /// The frame `ask` asks for, if a world runs -- its viewport kept
+    /// hot from then, if the world's camera loads superchunks.
     fn frame(&mut self, ask: Ask) -> Option<Frame> {
         let running = self.running.as_mut()?;
-        running.world.keep_in_view(ask.viewport);
+        running.world.keep_viewport(ask.viewport);
         let world = &running.world;
         let asked_at = Instant::now();
         let (tick, elapsed) = (world.entities.now(), self.last_frame.0.elapsed().as_secs_f64());
         let ticks_a_second = if elapsed > 0.0 { (tick - self.last_frame.1) as f64 / elapsed } else { 0.0 };
         self.last_frame = (asked_at, tick);
-        let (sheep, grass, trees, cells) = (world.entities.len(), count(world, GRASS), count(world, TREE), copy(world, ask, &mut running.sent));
+        let hot = hot_in(world, ask.viewport);
+        let (sheep, grass, trees, cells) = (world.entities.len(), count(world, GRASS), count(world, TREE), copy(world, &hot, ask, &mut running.sent));
         let sync_seconds = asked_at.elapsed().as_secs_f64();
         let sync_share = if elapsed > 0.0 { sync_seconds / elapsed } else { 0.0 };
         let (named, said) = (self.named.clone(), self.said.clone());
-        Some(Frame { world: self.worlds, seed: world.info.seed, generation: world.generation, side: world.halos.hot.side(), tick, ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, detail: ask.detail, near: ask.near, named, said, cells })
+        Some(Frame { world: self.worlds, seed: world.info.seed, generation: world.generation, side: world.halos.hot.side(), tick, ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, viewport: ask.viewport, hot, detail: ask.detail, near: ask.near, named, said, cells })
     }
 
     /// A tick of the world run, its census written when due, and a wait

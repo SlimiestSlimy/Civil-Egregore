@@ -112,7 +112,7 @@ mod chunk_storage {
         // Water on it: none in most chunks, shallow in one, deeper than a byte tells in another -- a map for each of the two, read back, and the rest as it was.
         let depth_of = |place: usize| match place / CELLS {
             3 => (place % 3000) as u16,
-            12 => (place % 7 == 0) as u16 * 200,
+            12 => place.is_multiple_of(7) as u16 * 200,
             _ => 0,
         };
         assert_eq!((read.depth(21), read.water_words().len()), (0, 1), "no water yet");

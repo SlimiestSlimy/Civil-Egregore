@@ -1,5 +1,5 @@
-//! What a client asks of the world in view, and what it is answered
-//! with: the superchunks it asks for ([`Ask`]), copied as the last
+//! What a client asks of the world's viewport, and what it is answered
+//! with: the hot superchunks it asks for ([`Ask`]), copied as the last
 //! tick left them ([`Frame`]) -- their bitplanes' words as they are,
 //! and where their sheep stand. Copying is all the host does for a
 //! client: turning cells into pixels is the client's.
@@ -8,7 +8,7 @@ use crate::World;
 use bitplane_manager::BucketKey;
 use chunk_storage::mock::GRASS;
 use chunk_storage::{LayerType, SuperchunkImage};
-use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK, WORLD_SIDE_SUPERCHUNKS};
+use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use mc_rules::trees::{TREE, TREE_STAGE};
 use std::collections::HashMap;
 use worldgen::{Generation, WET};
@@ -19,8 +19,9 @@ pub const CHUNK_WORDS: usize = bitmap::WORDS;
 /// The depth from which water hides what is under it: a power of two.
 pub const DEEP: u32 = 16;
 
-/// The superchunks in view: a rectangle of them, each `(x, y)` in
-/// superchunks from the world's top left, both corners in it.
+/// What the renderer should render, in superchunks: a rectangle of
+/// them, each `(x, y)` in superchunks from the world's top left, both
+/// corners in it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Viewport {
     /// The top left superchunk, `(x, y)`.
@@ -29,22 +30,30 @@ pub struct Viewport {
     pub last: (u32, u32),
 }
 
-/// What a client wants of the world, one frame: some of the
-/// superchunks in view -- as many as a frame may carry, the client
-/// going round them frame after frame -- and how finely it will draw
-/// them.
+impl Viewport {
+    /// Whether `(x, y)`, in superchunks, is in it.
+    pub fn contains(self, (x, y): (u32, u32)) -> bool {
+        (self.first.0..=self.last.0).contains(&x) && (self.first.1..=self.last.1).contains(&y)
+    }
+}
+
+/// What a client wants of the world, one frame: some of the hot
+/// superchunks of its viewport -- as many as a frame may carry, the
+/// client going round them frame after frame -- and how finely it will
+/// draw them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Ask {
-    /// The superchunks in view.
-    pub viewport: Viewport,
+    /// What the client renders, none if it renders none of the world's
+    /// cells (its map, say, drawn from generation alone).
+    pub viewport: Option<Viewport>,
     /// How coarsely they are drawn: a pixel `2^detail` cells a side.
     /// Passed on in the frame; the host copies the same.
     pub detail: u32,
-    /// Superchunks of the view, row by row, to pass over first.
+    /// The viewport's hot superchunks, row by row, to pass over first.
     pub skip: u32,
     /// Superchunks to answer with, at most.
     pub most: u32,
-    /// The cells in view, if they are seen from near: drawn as one
+    /// The viewport's cells, if they are seen from near: drawn as one
     /// picture, a cell many pixels. Passed on in the frame.
     pub near: Option<Near>,
 }
@@ -60,22 +69,22 @@ pub struct Near {
     pub pixels_a_cell: u32,
 }
 
-impl Ask {
-    /// The superchunks it asks for, each `(x, y)` in the world: those
-    /// of the view, row by row, after the ones passed over.
-    pub fn asked(self) -> impl Iterator<Item = (u32, u32)> {
-        let (first, last) = (self.viewport.first, self.viewport.last);
-        let in_view = (first.1..=last.1.min(WORLD_SIDE_SUPERCHUNKS - 1)).flat_map(move |y| (first.0..=last.0.min(WORLD_SIDE_SUPERCHUNKS - 1)).map(move |x| (x, y)));
-        in_view.skip(self.skip as usize).take(self.most as usize)
-    }
+/// The hot superchunks of `world` in `viewport`, each `(x, y)` in the
+/// world, row by row: none if there is no viewport. Hot superchunks are
+/// few, however wide the viewport.
+pub(crate) fn hot_in(world: &World, viewport: Option<Viewport>) -> Vec<(u32, u32)> {
+    let Some(viewport) = viewport else {
+        return Vec::new();
+    };
+    let mut hot: Vec<(u32, u32)> = world.entities.superchunks().iter().map(|kept| kept.index().cartesian()).filter(|&at| viewport.contains(at)).collect();
+    hot.sort_unstable_by_key(|&(x, y)| (y, x));
+    hot
 }
 
-/// One superchunk's cells, as a tick left them.
+/// One hot superchunk's cells, as a tick left them.
 pub struct Cells {
     /// Where it is in the world, `(x, y)` in superchunks.
     pub at: (u32, u32),
-    /// Whether it is hot: cold, it has no cells here, and is drawn dark.
-    pub hot: bool,
     /// Its grass: its 16 chunks' bitmaps one after another, in the
     /// chunks' Morton order, [`CHUNK_WORDS`] words each, in Morton order
     /// -- as the arena holds them. A chunk not hot is all clear.
@@ -104,7 +113,7 @@ pub struct Cells {
     pub sheep: Vec<(u16, u16)>,
 }
 
-/// The world in view, as a tick left it.
+/// The world's viewport, as a tick left it.
 pub struct Frame {
     /// Counts the worlds the host has run: what a client made of an
     /// earlier one is made again.
@@ -131,6 +140,12 @@ pub struct Frame {
     pub sync_seconds: f64,
     /// The share of the thread's time that is, at the rate asked.
     pub sync_share: f64,
+    /// What the client renders ([`Ask::viewport`]).
+    pub viewport: Option<Viewport>,
+    /// Every hot superchunk of the viewport, row by row: the client
+    /// goes round them, and whatever else of the viewport it drew is
+    /// cold now.
+    pub hot: Vec<(u32, u32)>,
     /// How coarsely the client will draw them ([`Ask::detail`]).
     pub detail: u32,
     /// The cells seen from near ([`Ask::near`]).
@@ -149,27 +164,22 @@ pub(crate) fn count(world: &World, layer_type: LayerType) -> u64 {
     world.arena.superchunk_indices().into_iter().map(|superchunk| world.arena.superchunk_count(layer_type, superchunk) as u64).sum()
 }
 
-/// The superchunks of `world` that `ask` asks for, copied: each one's
-/// planes, words as they are, and its sheep's cells -- its heights and
-/// water only the first time it is copied hot, `sent` keeping which.
-pub(crate) fn copy(world: &World, ask: Ask, sent: &mut HashMap<SuperchunkIndex, Water>) -> Vec<Cells> {
+/// The superchunks of `hot` -- hot ones of `world` -- that `ask` asks
+/// for, copied: each one's planes, words as they are, and its sheep's
+/// cells -- its heights and water only the first time it is copied,
+/// `sent` keeping which.
+pub(crate) fn copy(world: &World, hot: &[(u32, u32)], ask: Ask, sent: &mut HashMap<SuperchunkIndex, Water>) -> Vec<Cells> {
     let mut copied = Vec::new();
-    for (x, y) in ask.asked() {
+    for &(x, y) in hot.iter().skip(ask.skip as usize).take(ask.most as usize) {
         let superchunk = SuperchunkIndex::from_cartesian(x, y);
-        // Hot if its entities are held; cold, there are no cells to copy.
         let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
-        let hot = world.entities.superchunk(superchunk).is_some();
-        let planes = |layer_type: LayerType| if hot { layer(world, layer_type, superchunk) } else { Vec::new() };
+        let planes = |layer_type: LayerType| layer(world, layer_type, superchunk);
         // Heights never change: sent the once, in the first frame the superchunk is hot in. Nor does the water's depth, read off the image then and kept.
-        let image = world.storage.image(superchunk).filter(|_| hot && !sent.contains_key(&superchunk));
+        let image = world.storage.image(superchunk).filter(|_| !sent.contains_key(&superchunk));
         let heights = image.map_or(Vec::new(), |image| image.height_words().to_vec());
-        if hot {
-            sent.entry(superchunk).or_insert_with(|| Water::of(image));
-        }
-        let Water { depths, deep } = sent.get(&superchunk).filter(|_| hot).cloned().unwrap_or_default();
+        let Water { depths, deep } = sent.entry(superchunk).or_insert_with(|| Water::of(image)).clone();
         copied.push(Cells {
             at: (x, y),
-            hot,
             heights,
             top_left: (left, top),
             grass: planes(GRASS),
@@ -178,7 +188,7 @@ pub(crate) fn copy(world: &World, ask: Ask, sent: &mut HashMap<SuperchunkIndex, 
             wet: planes(WET),
             depths,
             deep,
-            sheep: if hot { sheep(world, superchunk) } else { Vec::new() },
+            sheep: sheep(world, superchunk),
         });
     }
     copied

@@ -28,7 +28,7 @@ const LABEL_WIDTH: f32 = 420.0;
 /// Screen pixels from a corner to its label, and from one line of
 /// labels to the next.
 const LABEL_LINE: f32 = 24.0;
-/// Height labels across and down: the most cells in view that are labelled.
+/// Height labels across and down: the most cells the camera shows that are labelled.
 const HEIGHT_LABELS: (u32, u32) = (96, 54);
 /// Screen pixels a cell is across before its height is written on it.
 const HEIGHT_FROM: f32 = 20.0;
@@ -43,7 +43,7 @@ pub struct Boundary {
     of_superchunks: bool,
     /// Whether it runs across, or down.
     across: bool,
-    /// Which of those in view it is, counted from the first.
+    /// Which of those the camera shows it is, counted from the first.
     place: u32,
 }
 
@@ -59,12 +59,12 @@ pub struct Shown {
 }
 
 /// A label in a superchunk's or a chunk's top left corner: one of a
-/// few, given to those in view.
+/// few, given to those the camera shows.
 #[derive(Component)]
 pub struct Label;
 
 /// A cell's height, written on it: one of a grid of them, each given
-/// to the cell in view whose `(x, y)` is its own, counted round the
+/// to the cell the camera shows whose `(x, y)` is its own, counted round the
 /// grid -- so a cell keeps its text while the view moves.
 #[derive(Component)]
 pub struct HeightLabel {
@@ -103,7 +103,7 @@ pub fn toggle(mut shown: ResMut<Shown>, keys: Res<ButtonInput<KeyCode>>, capture
     }
 }
 
-/// Lays the boundaries shown over the lines in view, as wide on the
+/// Lays the boundaries shown over the lines the camera shows, as wide on the
 /// screen however near the view is -- once the lines are far enough
 /// apart on it to be told apart.
 pub fn boundaries(shown: Res<Shown>, mut lines: Query<(&Boundary, &mut Transform, &mut Visibility)>, camera: Single<(&Transform, &Projection), CameraOnly>, window: Single<&Window>) {
@@ -141,13 +141,13 @@ pub fn heights(shown: Res<Shown>, sprites: Res<Sprites>, seen: Res<Seen>, camera
     let Projection::Orthographic(view) = projection else {
         return;
     };
-    let [(first_x, last_x), (first_y, last_y)] = sprites.in_view(transform, view.scale, &window);
+    let [(first_x, last_x), (first_y, last_y)] = sprites.viewport_cells(transform, view.scale, &window);
     let (first, last) = ((first_x, first_y), (last_x, last_y));
     let readable = shown.heights && 1.0 / view.scale >= HEIGHT_FROM && last.0 - first.0 < HEIGHT_LABELS.0 && last.1 - first.1 < HEIGHT_LABELS.1;
     let size = view.scale * (1.0 / view.scale / HEIGHT_WIDTH).min(1.0);
     let of = seen.frame.as_ref().filter(|_| readable).map(|frame| (frame.seed, frame.generation.shape));
     for (label, mut text, mut transform, mut visibility) in &mut labels {
-        // The cell in view that is the label's: the first at or past the view's first whose place round the grid is its slot.
+        // The cell the camera shows that is the label's: the first at or past the view's first whose place round the grid is its slot.
         let round = |first: u32, slot: u32, labels: u32| first + (slot + labels - first % labels) % labels;
         let (x, y) = (round(first.0, label.slot.0, HEIGHT_LABELS.0), round(first.1, label.slot.1, HEIGHT_LABELS.1));
         let Some((seed, shape)) = of.filter(|_| x <= last.0 && y <= last.1) else {
@@ -163,7 +163,7 @@ pub fn heights(shown: Res<Shown>, sprites: Res<Sprites>, seen: Res<Seen>, camera
     }
 }
 
-/// Labels the superchunks and chunks in view whose boundaries are
+/// Labels the superchunks and chunks the camera shows whose boundaries are
 /// shown, once they are large enough on the screen: each one's Morton
 /// index and its `(x, y)`, in its top left corner -- a chunk's a line
 /// below, clear of its superchunk's.
@@ -172,8 +172,8 @@ pub fn labels(shown: Res<Shown>, sprites: Res<Sprites>, camera: Single<(&Transfo
     let Projection::Orthographic(view) = projection else {
         return;
     };
-    // The chunks in view, counted from the world's top left: every label is at a chunk's corner.
-    let [(first_x, last_x), (first_y, last_y)] = sprites.in_view(transform, view.scale, &window).map(|(first, last)| (first / CHUNK_SIDE as u32, last / CHUNK_SIDE as u32));
+    // The chunks the camera shows, counted from the world's top left: every label is at a chunk's corner.
+    let [(first_x, last_x), (first_y, last_y)] = sprites.viewport_cells(transform, view.scale, &window).map(|(first, last)| (first / CHUNK_SIDE as u32, last / CHUNK_SIDE as u32));
     // How large a label of something `cells` across is drawn, of its full size: none if there is no room to read it.
     let fitted = |cells: usize| Some(cells as f32 / view.scale).filter(|&room| room >= LABELLED_FROM).map(|room| (room / LABEL_WIDTH).min(1.0));
     let (superchunk_size, chunk_size) = (fitted(SPRITE_SIDE as usize).filter(|_| shown.superchunks), fitted(CHUNK_SIDE).filter(|_| shown.chunks));

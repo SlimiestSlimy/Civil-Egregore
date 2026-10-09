@@ -1,17 +1,17 @@
-//! The map: the world from farther than its cells are drawn from, a
-//! pixel of the screen 32 cells or more a side. It asks nothing of the
+//! The map: the world as generated, shown in place of its cells in map
+//! mode, which `M` turns on and off, at any zoom. It asks nothing of the
 //! simulation: a pixel is the cell in its middle, as that cell is
 //! generated -- its height from the seed, the ocean over it or grass,
 //! dirt or a tree on it -- so nothing is made hot to be looked at, and
 //! the world is seen as far out as islands are specks. A thread of its
 //! own draws the last map asked for, on every thread the machine has
-//! ([`start`]); the window asks for one of what is in view, and lays
-//! it where it is of ([`far`]).
+//! ([`start`]); the window asks for one of what the camera shows, and
+//! lays it where it is of ([`far`]).
 
 use crate::frames::{picture_of, Laid, DIRT};
 use crate::link::Seen;
 use crate::paint::{tree_colour, BROWN, GREEN, WATER};
-use crate::view::{origin, FARTHEST};
+use crate::view::origin;
 use bevy::prelude::*;
 use gui::Captured;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -136,7 +136,7 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
 }
 
 /// The map, as the window holds it: where to ask for one, where it
-/// comes back, and what was last asked for.
+/// comes back, what was last asked for, and whether it is shown.
 #[derive(Resource)]
 pub struct MapLink {
     /// Where the maps wanted go.
@@ -147,13 +147,21 @@ pub struct MapLink {
     asked: Option<Wanted>,
     /// Whether the mesh's lines are drawn over the map.
     borders: bool,
+    /// Whether the map is shown in place of the cells: map mode.
+    map_mode: bool,
 }
 
 impl MapLink {
-    /// The map's thread, started, asked nothing yet.
+    /// The map's thread, started, asked nothing yet, not shown.
     pub fn start() -> Self {
         let (requests, maps) = start();
-        Self { requests, maps: Mutex::new(maps), asked: None, borders: false }
+        Self { requests, maps: Mutex::new(maps), asked: None, borders: false, map_mode: false }
+    }
+
+    /// Whether the map is shown in place of the cells: then none of
+    /// them is asked for.
+    pub fn map_mode(&self) -> bool {
+        self.map_mode
     }
 }
 
@@ -167,15 +175,16 @@ pub fn spawn(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
 }
 
 /// Cells along a pixel's side of the map, the view `scale` cells a
-/// screen pixel: a power of two, no more than the screen's pixels'.
+/// screen pixel: a power of two, no more than the screen's pixels' --
+/// and from near, a cell a pixel.
 fn map_step(scale: f32) -> u32 {
-    1 << scale.log2().floor() as u32
+    1 << scale.max(1.0).log2().floor() as u32
 }
 
-/// Shows the map of the world run from farther than the cells are drawn
-/// from: asks for one of what is in view when the view or the world has
-/// changed, and lays the last drawn where it is of. `P` draws the
-/// mesh's lines over it, or not.
+/// Shows the map of the world run in map mode, which `M` turns on and
+/// off: asks for one of what the camera shows when the view or the
+/// world has changed, and lays the last drawn where it is of. `P`
+/// draws the mesh's lines over it, or not.
 #[allow(clippy::too_many_arguments)]
 pub fn far(
     mut link: ResMut<MapLink>,
@@ -189,11 +198,12 @@ pub fn far(
 ) {
     let (sprite, mut transform, mut visibility) = map_view.into_inner();
     link.borders ^= keys.just_pressed(KeyCode::KeyP) && !captured.keys;
+    link.map_mode ^= keys.just_pressed(KeyCode::KeyM) && !captured.keys;
     let (camera, projection) = *camera;
     let Projection::Orthographic(view) = projection else {
         return;
     };
-    let Some(world) = seen.frame.as_ref().map(|frame| (frame.seed, frame.generation)).filter(|_| view.scale > FARTHEST) else {
+    let Some(world) = seen.frame.as_ref().map(|frame| (frame.seed, frame.generation)).filter(|_| link.map_mode) else {
         visibility.set_if_neq(Visibility::Hidden);
         (link.asked, seen.map) = (None, 0);
         return;

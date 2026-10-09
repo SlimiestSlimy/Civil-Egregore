@@ -576,10 +576,10 @@ impl Lookup {
 
     /// Where `superchunk` is in `directory`, or where it would go.
     fn superchunk(&self, directory: &[Superchunk], superchunk: SuperchunkIndex) -> Result<usize, usize> {
-        if let Some((last, entry)) = self.superchunk.get() {
-            if last == superchunk {
-                return Ok(entry);
-            }
+        if let Some((last, entry)) = self.superchunk.get()
+            && last == superchunk
+        {
+            return Ok(entry);
         }
         let found = directory.binary_search_by_key(&superchunk, |entry| entry.index);
         if let Ok(entry) = found {

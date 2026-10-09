@@ -55,16 +55,18 @@ A world without a size may have its **camera load superchunks**
 (`Start::camera_loads`, the slider `camera loads`; nothing to a world
 forced hot, all of which is hot anyway). It starts as any other: the
 origin, its flock and its halo. Then each frame a window asks of the
-host tells the world what is in view (`World::keep_in_view`): at most
-`CAMERA_SIDE` (8) superchunks along a side about the view's middle,
-kept hot besides the halos, generated as a halo's are if never made.
-Each superchunk generated while in view gets `sheep` of its own
+host tells the world its **viewport**, whatever the window should
+render (`World::keep_viewport`; none in map mode): at most
+`CAMERA_SIDE` (8) superchunks along a side about its middle, kept hot
+besides the halos, generated as a halo's are if never made. Each
+superchunk generated in the viewport gets `sheep` of its own
 (`World::put_flock`, the same flock whenever it is made); one generated
 only for a halo gets none, or the sheep's halos would generate more
 sheep, and those more, without end. The sheep keep hot what was seen,
 so the slider for sheep is how heavy the world grows as the camera
-wanders: with none, what was in view cools once it is out of it. A
-save keeps the sheep per superchunk in view (`camera flock`); a world
+wanders: with none, what was in the viewport cools once it is out of
+it. A save keeps the sheep per superchunk generated in the viewport
+(`camera flock`); a world
 run with no window has no camera, and loads nothing by it.
 
 ## TickCounts
@@ -80,7 +82,7 @@ A save is a folder (`chunk_storage::disk`, and
 
 | file | what it holds |
 |---|---|
-| `world.csv` | CSV, a row a thing, its name and what it is, in any order: the format's number, the world's seed in hexadecimal, the tick it is at, its layer types, its side if it has a size, the sheep each superchunk generated in view starts with if its camera loads superchunks, and how it is generated, a number a row |
+| `world.csv` | CSV, a row a thing, its name and what it is, in any order: the format's number, the world's seed in hexadecimal, the tick it is at, its layer types, its side if it has a size, the sheep each superchunk generated in the viewport starts with if its camera loads superchunks, and how it is generated, a number a row |
 | `hot.csv` | CSV: the hot superchunks, a row each, those cooling with the tick each goes cold at, and the warming ones with the tick each turns hot at |
 | `superchunks/<index>.image` | a superchunk's cells and heights: its image, as the cold pool holds it |
 | `superchunks/<index>.state` | its random stream's state, its entities with their attributes |
@@ -147,10 +149,12 @@ save's folder.
 
 A world run for a window, on a thread of its own (`src/host/`): the
 window holds a `Host` and calls it -- a world made or opened in place
-of the one run, the world saved, paused, paced, and the cells in view
--- each call sent to the host's thread and done there between ticks. It answers only the cells in view, as
-the last tick left them, copied and nothing more, so what is in view
-costs the ticks next to nothing; it sends nothing unasked, so a window
+of the one run, the world saved, paused, paced, and the cells of its
+viewport -- each call sent to the host's thread and done there between
+ticks. It answers only the viewport's hot superchunks, as the last
+tick left them, copied and nothing more, so what is rendered costs the
+ticks next to nothing -- and with them which are hot, so a window
+drops what it drew of one gone cold; it sends nothing unasked, so a window
 that falls behind slows no tick. It starts with no world, and waits
 until asked for one. As a world runs it keeps a census -- the flock and
 the grass every 1,000 ticks, the seconds and the pace held -- in

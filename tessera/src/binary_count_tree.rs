@@ -182,11 +182,11 @@ fn write_word(stream: &mut impl Sink, run: u64, cells: usize, set: u64) {
     if set == 0 || set == cells as u64 {
         return;
     }
-    if cells == SHORT_RUN_CELLS {
-        if let Some(bits) = stream.counted() {
-            *bits += SHORT_RUN_BITS[run as usize] as u64;
-            return;
-        }
+    if cells == SHORT_RUN_CELLS
+        && let Some(bits) = stream.counted()
+    {
+        *bits += SHORT_RUN_BITS[run as usize] as u64;
+        return;
     }
     let half = cells / 2;
     let first_half = run & ((1 << half) - 1);

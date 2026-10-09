@@ -35,18 +35,22 @@ The two share two queues and no memory.
 
 The window is the one that asks, never the host that sends: each
 time the window has shown a frame -- 60 times a second at most -- it
-asks the host for the superchunks in view (`Host::sync`), and the
-host, between two ticks, answers with their cells as the last
-tick left them (a `Frame`). So the window sets how often the world is
-drawn; a window that falls behind slows no tick; one frame at most is
-ever on its way; and what is not in view is never sent.
+asks the host for the hot superchunks of its **viewport** -- whatever
+it should render, in superchunks; none in map mode -- (`Host::sync`),
+and the host, between two ticks, answers with their cells as the last
+tick left them, and which superchunks of the viewport are hot (a
+`Frame`). So the window sets how often the world is drawn; a window
+that falls behind slows no tick; one frame at most is ever on its way;
+and what is not in the viewport, or is cold, is never sent. "Viewport"
+is the world's word here, not Bevy's: a Bevy camera's `Viewport` is a
+rectangle of the window.
 
 ## Three threads
 
-1. **The host** only copies: each superchunk in view as its
-   grass's words, as the arena holds them (128 KiB), and the cells its
-   sheep stand on. What is in view costs the ticks next to nothing,
-   however much of it there is.
+1. **The host** only copies: each hot superchunk of the viewport as
+   its grass's words, as the arena holds them (128 KiB), and the cells
+   its sheep stand on. What is rendered costs the ticks next to
+   nothing, however much of it there is.
 2. **The painter** turns cells into pixels, lit by their height,
    taking no time from the ticks or from the window's frames. The
    shading the sliders set comes to it by a queue of its own, whenever
@@ -62,29 +66,34 @@ good.
 ## The whole world
 
 The view is not held to the superchunks it starts on: it goes anywhere
-in the world, as far out as 32 cells a screen pixel. A superchunk has
-an image only once its pixels have come, and a cold one none: it is
-black. The plane the images lie on is counted from the corner of the
-square the view starts on, not from the world's -- the world is 2^32
-cells wide, more than the plane's numbers tell apart. Boundaries,
-labels and heights are laid over whatever is in view.
+in the world, as far out as 4,096 cells a screen pixel. A superchunk
+has an image only once its pixels have come, and a cold one none: it
+is black, and what was drawn of one that went cold while in the
+viewport goes. The plane the images lie on is counted from the corner
+of the square the view starts on, not from the world's -- the world is
+2^32 cells wide, more than the plane's numbers tell apart. Boundaries,
+labels and heights are laid over whatever the camera shows.
 
 ## Many superchunks
 
 A world of 1,024 superchunks -- 32,768 cells a side -- is seen whole,
 which a pixel a cell cannot do: that would be 4 GiB of pixels a frame.
 
-- **From far off, a pixel is a tile of cells**, `2^detail` a side, as
-  many as a screen pixel covers, up to 64: the tile's colours mixed,
+- **From far off, a pixel is a tile of cells**, `2^detail` a side: as
+  many as a screen pixel covers up to 4 cells, and from there coarser
+  by a power of two for each further one the view goes out -- 16 cells
+  a pixel at 8 a screen pixel, 64 at 16, and a chunk, 256, from 32 on
+  (`frames::detail_at`): far out a superchunk is a few pixels, however
+  many there are. The tile's colours mixed,
   brown and green by its grass, white by its sheep. A tile is
   a run of bits in Morton order, so its grass is counted from the words
   with no cell looked at.
 - **A frame carries only so many superchunks** -- 8 drawn fine, 32
-  coarse -- and the window goes round those in view, frame after frame.
-  So what a frame costs the host is the same however many are in
-  view; the whole view is drawn afresh in half a second at most.
-- **A fine image is dropped when its superchunk leaves the view**: it
-  is 4 MiB here and as much on the graphics card.
+  coarse -- and the window goes round the viewport's hot ones, frame
+  after frame. So what a frame costs the host is the same however many
+  are in the viewport, and cold ones cost nothing.
+- **A fine image is dropped when its superchunk leaves the viewport**:
+  it is 4 MiB here and as much on the graphics card.
 
 A frame of one superchunk takes very little of the host's
 thread, however large the world: the HUD says how much.
@@ -113,7 +122,7 @@ parts (8 MiB) for the 48 superchunks last seen.
 - **From a cell a pixel outwards**: cliffs darkened by the walls in the
   pixel, and a contour every 8, 16 or 32 heights.
 - **From near** (`src/near.rs`), a cell 2, 4 or 8 pixels -- as many as
-  the screen shows -- the cells in view are one picture, and height is
+  the screen shows -- the viewport's cells are one picture, and height is
   drawn at the edges: wherever a cell is higher than the one beside
   it, a thin line along the higher cell's border, light towards the
   sun and dark away; and under a wall a band on the ground at its
@@ -157,6 +166,7 @@ pixels made here.
 | `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |
 | `H` | every cell's height written on it, once a cell is 20 screen pixels across |
+| `M` | map mode, or not: the map in place of the cells, at any zoom |
 | `P` | on the map, the mesh's lines drawn over it, or not |
 
 ## Menus
@@ -178,9 +188,10 @@ run goes on.
 
 ## The map
 
-From farther than 32 cells a screen pixel -- to 4,096, four superchunks
-a pixel -- the cells are no longer asked for: what shows is the map
-(`src/map.rs`). A pixel is the cell in its middle as that cell is
+In **map mode**, which `M` turns on and off at any zoom, the cells are
+no longer asked for -- the viewport is none, so the camera loads
+nothing either -- and what shows is the map (`src/map.rs`), a pixel no
+finer than a cell. A pixel is the cell in its middle as that cell is
 generated: its height from the seed, the ocean over it darker the
 deeper, or grass, dirt or a tree on it, lit by its slope and its
 height. Nothing is made hot to draw it and nothing of the simulation is
@@ -203,5 +214,5 @@ another world is run.
 | `src/map.rs` | the map: the world from far, drawn from the generator alone |
 | `src/paint.rs` | the painter's thread: cells into pixels |
 | `src/ground.rs` | the light on the ground: heights as a frame brings them, hillshade, tint, cast shadows, cliffs and contours |
-| `src/near.rs` | the cells in view from near as one picture: steps and walls at their edges |
+| `src/near.rs` | the viewport's cells from near as one picture: steps and walls at their edges |
 | `docs/` | this, and the reference, function by function |

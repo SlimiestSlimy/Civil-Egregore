@@ -124,11 +124,11 @@ fn count_subtree(bitmap: &Bitmap, set_cells_before_each_word: &SetCellsBeforeEac
         }
     }
     fewest_bits += node_bits(tree, bitmap, tile, node);
-    if node == Node::Divided || node == Node::Residual {
-        if let Some((complex_tile, bits)) = best_complex_tile(bitmap, set_cells_before_each_word, tree, tile, bound_size, fewest_bits) {
-            tree.set(tile, complex_tile);
-            fewest_bits = bits;
-        }
+    if (node == Node::Divided || node == Node::Residual)
+        && let Some((complex_tile, bits)) = best_complex_tile(bitmap, set_cells_before_each_word, tree, tile, bound_size, fewest_bits)
+    {
+        tree.set(tile, complex_tile);
+        fewest_bits = bits;
     }
     CountedSubtree { fewest_bits, bound_size }
 }

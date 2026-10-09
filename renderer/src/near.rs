@@ -1,5 +1,5 @@
 //! The world from near, a cell several pixels: one picture of the
-//! cells in view, where height is drawn at its edges -- a line along
+//! viewport's cells, where height is drawn at its edges -- a line along
 //! the border of the higher cell, light towards the sun and dark away,
 //! and under a wall a band on its lower cell, darkest at its foot --
 //! under the cast shadows
@@ -41,7 +41,7 @@ const TONES: [f32; 16] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.08, 1.08, 1.
 /// A sheep on a cell eight pixels a side, from above.
 const SHEEP: [&str; 8] = ["........", "........", "..####..", ".######.", ".######.", "..####..", "..#..#..", "........"];
 
-/// The cells in view from near, painted.
+/// The viewport's cells from near, painted.
 pub struct PaintedNear {
     /// What was asked for.
     pub near: Near,
@@ -104,7 +104,7 @@ pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: 
     let (first, size) = ((near.first.0 as usize, near.first.1 as usize), (near.size.0 as usize, near.size.1 as usize));
     let width = size.0 * pixels_a_cell;
     let mut pixels = vec![[0, 0, 0, u8::MAX]; width * size.1 * pixels_a_cell];
-    for cells in cells.iter().filter(|cells| cells.hot) {
+    for cells in cells {
         let Some(fine) = grounds.get(&cells.top_left).and_then(|ground| ground.fine.as_ref()) else {
             continue;
         };
