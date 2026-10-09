@@ -3,7 +3,7 @@
 //! is all it knows of the world. What the cells are, which may be walked
 //! on and where the walker wants to go are for whoever calls it; an
 //! entity's turn reads an area of the bitplanes around a cell
-//! (`instructions::area::read`) and hands it here.
+//! (`instructions::read::area::layer`) and hands it here.
 //!
 //! | what | what it does |
 //! |---|---|

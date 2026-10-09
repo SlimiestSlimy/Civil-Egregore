@@ -21,38 +21,48 @@ A rule reaches the simulation through instructions alone: `Turn`,
 crates do not depend on the simulation. What a rule lacks is added
 here, not gone round.
 
+Instructions are kept by what they do to the world: those that only
+read it in `read/`, those that only queue a change in `write/`; one
+that reads and queues a write in the same call would go in `rw/`, and
+none does yet. The shapes they answer in -- nine bits, an area, a mask
+-- are modules beside them.
+
 | module | what it answers |
 |---|---|
-| `cells` | does a layer hold at a cell, is the cell hot; set it, clear it; a wide plane's number; the square about a cell; each cell sampled |
-| `entities` | each entity waking; one made, put to sleep, committed as changed, removed |
-| `around` | the 3x3 cells about a cell as nine bits |
-| `area` | the 16x16 cells about a cell, and the tiles further off |
-| `mask` | a square of a layer as bits, 4 to 1,024 cells a side, read whole or under a mask, and set or cleared under one |
-| `walking` | the steps walls leave open, the step towards a goal, the nearest of a layer in reach |
+| `read::cells` | does a layer hold at a cell, is the cell hot; a wide plane's number; the square about a cell; each cell sampled |
+| `read::entities` | each entity waking |
+| `read::around` | the 3x3 cells about a cell as nine bits: a layer's, those entities stand on, a free one |
+| `read::area` | the 16x16 cells about a cell: a layer's, several at once, those entities stand on, and the tiles further off |
+| `read::mask` | a square of a layer as bits, 4 to 1,024 cells a side, whole or under a mask |
+| `read::walking` | the steps walls leave open, the step towards a goal, the nearest of a layer in reach |
+| `write::cells` | a cell set, cleared; a wide plane's number put |
+| `write::entities` | an entity made, put to sleep, committed as changed, removed |
+| `write::mask` | a layer set or cleared under a mask |
+| `around`, `area`, `mask` | the shapes: nine bits and how one is drawn, an area's masks, a mask and its sets |
 
 ## The going over
 
-A rule is written for one cell or one entity: `cells::each_sampled`
-and `entities::each_woken` go over them, inlined into the rule, so the
+A rule is written for one cell or one entity: `read::cells::each_sampled`
+and `read::entities::each_woken` go over them, inlined into the rule, so the
 loop costs nothing.
 
 ## What an entity's rule is given
 
 **An entity being changed** (`EntityEdit`): its attributes read, set and
 removed as if already its own, nothing copied until one is changed, and
-`entities::commit` picks the instruction -- a move if none was,
+`write::entities::commit` picks the instruction -- a move if none was,
 else a put. A rule states what the entity is to be; what that costs is
 not its concern.
 
 **The cells beside it** (`around`): the 3x3 about a cell as nine bits,
-read in one window (`around::read`); sets of neighbours are
+read in one window (`read::around::layer`); sets of neighbours are
 masks narrowed with `&`, one drawn with `pick` or `prefer`.
-`around::occupied` gives those entities stand on, `free_beside` one that
+`read::around::occupied` gives those entities stand on, `free_beside` one that
 none does -- for what must have its cell, as a newborn; a step need not
 ask.
 
-**The area about it, and the way**: `area::read` gives 16x16 cells of a
-layer as masks, `Area::count` how many are set, `area::occupied` the
+**The area about it, and the way**: `read::area::layer` gives 16x16 cells of a
+layer as masks, `Area::count` how many are set, `read::area::occupied` the
 entities on them. The way over them is `walking`'s, where the
 simulation's cells, the terrain's walls and `../../pathfinding/` meet.
 `step_towards(turn, at, goals, passable)` gives the cell to step to
@@ -68,9 +78,9 @@ walls of the area, which `step_towards` and `step_to` go round by
 themselves. Where the wall layers are not hot, nothing bars. The far
 search sees no walls: the step it gives is not taken if one bars it.
 
-**Further off** (`walking::seek(turn, at, type)`): nothing found in the area, the same
+**Further off** (`read::walking::seek(turn, at, type)`): nothing found in the area, the same
 search is made over tiles of a scale, 16 by 16 of them
-(`area::of_tiles`), a tile a goal if the type holds at any of its
+(`read::area::of_tiles`), a tile a goal if the type holds at any of its
 cells. The coarsest scale first: tiles 64 cells a side, 1,024 cells
 across -- an entity's reach, and no further -- each four of the arena's
 count tiles, so it is read off their counts a chunk at a time with no
@@ -106,11 +116,11 @@ A square of cells as bits (`mask::Mask`), its side a power of two from
 one made so far. A rule keeps its masks as room and reads into them;
 none is made a read.
 
-- **Read**: `mask::read` fills two masks from a layer, the cells it
+- **Read**: `read::mask::layer` fills two masks from a layer, the cells it
   holds at and the cells hot, a window of 8x8 at a time. `read_under`
   reads only where another mask has cells, the windows it has none in
   passed over.
-- **Written**: `mask::set` and `mask::clear` queue the mask's cells as
+- **Written**: `write::mask::set` and `write::mask::clear` queue the mask's cells as
   rectangles -- each row's runs of cells, a run the same in the rows
   under it one rectangle with them, up to 255 cells a side -- so a
   whole square is a few writes and a disc under two a row.
