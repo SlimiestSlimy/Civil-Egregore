@@ -33,6 +33,13 @@
 //! So between ticks the hot superchunks are the halos less those
 //! warming, and besides them those cooling; and one may be warming
 //! that no halo reaches any more.
+//!
+//! Whoever holds the world may want more hot than the halos: the
+//! superchunks **in view** ([`Halos::keep_in_view`]), warming and
+//! cooling as a halo's do -- a world whose camera loads superchunks
+//! made where it is looked at. And it is told which superchunks the
+//! halos' last move generated ([`Halos::generated`]), to put on them
+//! what a superchunk never made starts with.
 
 //!
 //! What they work on is whoever holds the world's ([`Held`]): the
@@ -127,6 +134,10 @@ pub struct Halos {
     /// The superchunks whose changes were taken from the ring, each with
     /// its job, their images being rewritten by a job.
     flushing: Vec<(SuperchunkIndex, Ticket)>,
+    /// The superchunks in view, sorted: wanted hot besides the halos.
+    in_view: Vec<SuperchunkIndex>,
+    /// The superchunks the last move generated, sorted.
+    generated: Vec<SuperchunkIndex>,
 }
 
 /// A superchunk warming: a halo reached it, and it turns hot at `due`.
@@ -153,7 +164,27 @@ impl Halos {
     /// No halos yet, as `hot` says which superchunks are to be, their
     /// jobs on `dispatcher`'s threads.
     pub fn new(hot: Hot, dispatcher: Arc<Dispatcher>) -> Self {
-        Self { hot, jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing: Vec::new() }
+        Self { hot, jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing: Vec::new(), in_view: Vec::new(), generated: Vec::new() }
+    }
+
+    /// Wants `in_view` hot from the next move on, besides the halos, in
+    /// place of those in view before: warming and cooling as a halo's
+    /// superchunks do, none outside the world's size.
+    pub fn keep_in_view(&mut self, mut in_view: Vec<SuperchunkIndex>) {
+        in_view.sort_unstable();
+        in_view.dedup();
+        self.in_view = in_view;
+    }
+
+    /// The superchunks in view, sorted ([`Halos::keep_in_view`]).
+    pub fn in_view(&self) -> &[SuperchunkIndex] {
+        &self.in_view
+    }
+
+    /// The superchunks the last move -- or [`Halos::keep_hot`] --
+    /// generated, sorted: made hot for the first time, nothing on them.
+    pub fn generated(&self) -> &[SuperchunkIndex] {
+        &self.generated
     }
 
     /// Takes up `cooling` -- sorted, each with the tick it goes cold
@@ -163,11 +194,17 @@ impl Halos {
     }
 
     /// Moves the halos to where the hot entities stand
-    /// ([`Hot::wanted`]): the superchunks
+    /// ([`Hot::wanted`]), with the superchunks in view: the superchunks
     /// reached warming, hot [`WARM_TICKS`] on; the rest cooling, cold
     /// [`COOL_TICKS`] on. Forced hot, it is the whole world all the while.
     pub fn move_to_hot_entities(&mut self, held: &mut Held<'_>) -> HaloChange {
-        let wanted = self.hot.wanted(held.entities);
+        let mut wanted = self.hot.wanted(held.entities);
+        if !self.in_view.is_empty() {
+            wanted.extend_from_slice(&self.in_view);
+            wanted.sort_unstable();
+            wanted.dedup();
+        }
+        self.generated.clear();
         self.make_hot_within(held, &wanted, WARM_TICKS, COOL_TICKS)
     }
 
@@ -178,6 +215,7 @@ impl Halos {
     /// What generating and loading start from; between two ticks,
     /// anything else needing superchunks hot a while may ask too.
     pub fn keep_hot(&mut self, held: &mut Held<'_>, wanted: &[SuperchunkIndex]) -> HaloChange {
+        self.generated.clear();
         let mut change = self.make_hot_within(held, wanted, 0, 0);
         // One that was warming and is not wanted turned hot, as every warming does: cold now.
         if !self.cooling.is_empty() {
@@ -300,6 +338,8 @@ impl Halos {
                 match generated {
                     Some(image) => {
                         held.storage.insert(warming.superchunk, image);
+                        let at = self.generated.binary_search(&warming.superchunk).expect_err("generated once");
+                        self.generated.insert(at, warming.superchunk);
                         change.generated += 1;
                     }
                     None => change.restored += 1,

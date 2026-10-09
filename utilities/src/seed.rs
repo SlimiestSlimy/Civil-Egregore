@@ -144,7 +144,7 @@ fn settle(counted: Counted) -> Settled {
         return Settled { seed, fresh: false, uses: not_counted, source: format!("{variable}, for this run alone; the file left as it is") };
     }
     let held = std::fs::read_to_string(&file).ok();
-    let kept = held.as_deref().and_then(|text| crate::csv::rows_named(text).into_iter().next()).unwrap_or_default();
+    let kept = held.as_deref().and_then(|text| crate::csv::rows_by_column(text, &COLUMNS).into_iter().next()).unwrap_or_default();
     let last = kept.first().and_then(|seed| of_hex(seed));
     let uses = kept.get(1).and_then(|uses| uses.trim().parse::<u64>().ok()).unwrap_or(0);
 

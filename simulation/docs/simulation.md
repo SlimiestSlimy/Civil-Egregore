@@ -228,6 +228,13 @@ where it stood. **Forced hot** (`Hot::Forced`): no halos; every
 superchunk of the world is hot and stays so, whatever its entities do.
 Only a world with a size can be: one of none has no end to be hot to.
 
+**In view** (`Halos::keep_in_view`): whoever holds the world may name
+superchunks wanted hot besides the halos -- a camera's, if it loads
+superchunks (`../../server/docs/server.md`, "Halos") -- warmed and
+cooled as a halo's are, generated if never made. A move says which
+superchunks it generated, made new rather than read back
+(`Halos::generated`), so the holder can put entities on them.
+
 The halos work on what the world's holder lends them for each call
 (`Held`): the arena, chunk storage, the entities, the tick's random
 streams, the cold states, and what generates a superchunk never made

@@ -16,7 +16,10 @@
 //! settings shares the one file: each reads the names it knows and,
 //! writing, leaves the others' lines as they are.
 //!
-//! Built with the feature `default_settings`, the machine's file is
+//! The settings are found by name: the lines, in a file and in the
+//! default settings alike, may be in any order.
+//!
+//! Built with the feature `force_default_settings`, the machine's file is
 //! neither read nor written: the settings are the default ones.
 //!
 //! The folder also holds the worlds, in a folder of their own

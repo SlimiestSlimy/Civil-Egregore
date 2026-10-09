@@ -20,7 +20,7 @@ mod tick;
 pub mod transient_data;
 mod world_start;
 
-pub use halos::HOT_ENTITY;
+pub use halos::{CAMERA_SIDE, HOT_ENTITY};
 pub use simulation::hot::about;
 pub use simulation::{HaloChange, COOL_TICKS, WARM_TICKS};
 pub use tick::{tick_rules, TickCounts, WorldTick};
@@ -105,6 +105,15 @@ impl World {
     }
 }
 
+impl World {
+    /// Queues a flock of `sheep` on `superchunk`, hot, drawn from a
+    /// random stream of its own: the same flock whenever it is put
+    /// there. Put in the world by `Entities::apply`.
+    pub(crate) fn put_flock(&mut self, superchunk: SuperchunkIndex, sheep: usize) {
+        flock(&mut self.entities, superchunk, sheep, &mut Rng::for_stream(!self.info.seed, superchunk.0));
+    }
+}
+
 /// Every layer type a world has: the grass's, the trees', the water's
 /// and the walls'.
 /// Dirt has none: it is a cell with nothing on it.
@@ -117,13 +126,17 @@ fn layer_types() -> Vec<LayerType> {
 /// Every superchunk -- these, and those made as a flock wanders -- is
 /// its terrain, heights and the walls they make, and on it grass and
 /// trees in patches. Each from the seed and where it is
-/// ([`generate_image`]).
+/// ([`generate_image`]). If its camera loads superchunks, and it is
+/// not forced hot, it keeps how many sheep a superchunk generated in
+/// view starts with.
 pub fn start(options: Start) -> World {
     let mut world = generate_sized(options.generation, options.seed, options.size, options.hot_entity, options.threads);
+    let forced = matches!(options.size, Size::Limited { forced: true, .. });
+    world.info.camera_flock = (options.camera_loads && !forced).then_some(options.sheep as u64);
     let everywhere = world.halos.hot.all();
     if options.sheep == 0 {
         // No sheep: nothing hot, unless all of it is forced so.
-        if matches!(options.size, Size::Limited { forced: true, .. }) {
+        if forced {
             world.keep_hot(&everywhere);
         }
         return world;
@@ -143,7 +156,7 @@ pub fn generate_sized(generation: Generation, seed: u64, size: Size, hot_entity:
         Size::Unlimited => (None, false),
         Size::Limited { side, forced } => (Some(side), forced),
     };
-    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, forced, hot_entity: Some(hot_entity.0), generation: generation.numbers() }, generation, threads)
+    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, forced, hot_entity: Some(hot_entity.0), camera_flock: None, generation: generation.numbers() }, generation, threads)
 }
 
 /// `world`, nothing in it yet, with a flock of `sheep` on each of
@@ -151,12 +164,11 @@ pub fn generate_sized(generation: Generation, seed: u64, size: Size, hot_entity:
 /// what [`start`] is built from, and what a flock is tried out on by
 /// itself.
 pub fn flocked(mut world: World, superchunks: &[SuperchunkIndex], sheep: usize) -> World {
-    let seed = world.info.seed;
     let mut flocked = superchunks.to_vec();
     flocked.sort_unstable();
     world.keep_hot(&flocked);
     for &superchunk in &flocked {
-        flock(&mut world.entities, superchunk, sheep, &mut Rng::for_stream(!seed, superchunk.0));
+        world.put_flock(superchunk, sheep);
     }
     world.entities.apply();
     let halo = about(flocked.iter().copied());

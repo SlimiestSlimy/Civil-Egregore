@@ -62,6 +62,8 @@ what they always do and are not listed.
 | **halo** | the 3x3 superchunks about a hot entity -- its own and the eight beside it -- kept hot (`simulation::halos`) | hot entity, hot | halo chunk |
 | **hot entity** | an entity of the kind that keeps a halo (`simulation::Hot::About`; the server's `HOT_ENTITY`): people, to come; the sheep, for now | halo, forced hot | halo keeper, important entity, chunk loader |
 | **forced hot** | every superchunk of a world with a size hot throughout, no hot entity keeping them so (`Hot::Forced`); a world with none cannot be | hot entity, world's size | |
+| **in view** | the superchunks a window's frame shows, as the host is asked them (`Viewport`); and, wanted hot besides the halos, those the halos keep for it (`Halos::keep_in_view`) | camera loading, halo, host | visible, on screen |
+| **camera loading** | a world without a size keeping hot the superchunks in view, at most `CAMERA_SIDE` (8) a side about the view's middle, generated if never made, each generated while in view given its own flock (`Start::camera_loads`, `World::keep_in_view`); a superchunk generated only for a halo gets none | in view, hot entity, world start, forced hot | chunk loading, render distance |
 | **world's size** | so many superchunks along a side, a square about the origin, nothing ever hot or made outside it (`Hot::side()`); a world with none goes as far as coordinates reach | origin, halo | bounds, border, limit |
 | **origin** | the superchunk the world starts from, in its middle (`WORLD_MIDDLE`): a world is generated as it and its halo | superchunk | centre |
 | **cold state** | a cold superchunk's entities and random numbers, kept as a save keeps them (`World::cold`) | cold, save | |
@@ -200,6 +202,6 @@ what they always do and are not listed.
 | **tuning** | the numbers a slider sets, together: the near view's shading and how a new world is made (`utilities::tuning::Tuning`), a value held by whoever sets it -- the window's `gui::CurrentTuning` -- never a static | slider, group, settings, world start | config, parameters |
 | **slider** | one number of the tuning, set by a knob dragged or a value typed (`gui::sliders`; `utilities/sliders.csv`) | tuning, group | knob (a slider's part only) |
 | **group** | sliders shown together: shading, or one of those that make worlds (`utilities::tuning::Group`) | slider | tab, page |
-| **world start** | every number a new world starts from -- seed, generation, size, forced hot, sheep, threads, hot entity -- whoever gives them (`server::Start`); the server alone knows what they mean | tuning, forced hot, hot entity, world's size | world options, lab |
+| **world start** | every number a new world starts from -- seed, generation, size, forced hot, sheep, threads, hot entity, camera loading -- whoever gives them (`server::Start`); the server alone knows what they mean | tuning, forced hot, hot entity, world's size | world options, lab |
 | **host** | a world run on a thread of its own for a window, which calls it (`server::host::Host`) and is answered with the cells in view (`Frame`) | world start | sim, simulation thread |
 | **worlds' folder** | where worlds are kept unless a path is given: `worlds` in the folder `Civil Egregore`, or what the setting `worlds` names (`utilities::settings::worlds`) | save, settings | |

@@ -4,8 +4,8 @@
 //! - **A new world** is set up on a page of its own: its seed typed in
 //!   hexadecimal, or none for one drawn at random, and the rest as the
 //!   sliders have it -- every group of them offered while it is set up,
-//!   `U` opening them: the world's size, whether it is forced hot, its
-//!   sheep, and how it is generated. Made, it is said ([`Make`]).
+//!   `U` opening them: the world's size, whether it is forced hot or
+//!   its camera loads superchunks, its sheep, and how it is generated. Made, it is said ([`Make`]).
 //! - **A world saved** is chosen from those there are
 //!   ([`crate::Gui::worlds`]), a row each, the wheel going through more
 //!   than fit: chosen, it is said ([`Open`]).
@@ -92,7 +92,7 @@ impl MainMenu {
                 Row::new("< back  |  a new world", Look::Back, Does::GoesBack),
                 Row::new(format!("seed 0x{}_", self.seed), Look::Said, Does::Nothing),
                 Row::new(if self.seed.is_empty() { "none typed: one drawn at random" } else { "in hexadecimal" }, Look::Said, Does::Nothing),
-                Row::new("U: its size, its sheep, its land", Look::Said, Does::Nothing),
+                Row::new("U: its size, its camera, its sheep, its land", Look::Said, Does::Nothing),
                 Row::new("make the world (Enter)", Look::Clicked, Does::Makes),
             ],
             Page::Worlds => self.listing.rows(Does::GoesBack, Does::Opens),

@@ -107,3 +107,15 @@ pub fn rows(text: &str) -> Vec<Vec<String>> {
 pub fn rows_named(text: &str) -> Vec<Vec<String>> {
     rows(text).into_iter().skip(1).collect()
 }
+
+/// The rows of `text` after the one naming its columns, each its
+/// fields of `columns`, in their order, whatever order the text has
+/// them in: a column the text lacks, or a field a row lacks, empty.
+pub fn rows_by_column(text: &str, columns: &[&str]) -> Vec<Vec<String>> {
+    let mut rows = rows(text).into_iter();
+    let Some(named) = rows.next() else {
+        return Vec::new();
+    };
+    let at: Vec<Option<usize>> = columns.iter().map(|column| named.iter().position(|name| name.trim() == *column)).collect();
+    rows.map(|row| at.iter().map(|at| at.and_then(|at| row.get(at)).cloned().unwrap_or_default()).collect()).collect()
+}

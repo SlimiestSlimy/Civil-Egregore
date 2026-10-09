@@ -252,9 +252,11 @@ impl HostThread {
         self.next_tick = Instant::now();
     }
 
-    /// The frame `ask` asks for, if a world runs.
+    /// The frame `ask` asks for, if a world runs -- its view kept hot
+    /// from then, if the world's camera loads superchunks.
     fn frame(&mut self, ask: Ask) -> Option<Frame> {
         let running = self.running.as_mut()?;
+        running.world.keep_in_view(ask.viewport);
         let world = &running.world;
         let asked_at = Instant::now();
         let (tick, elapsed) = (world.entities.now(), self.last_frame.0.elapsed().as_secs_f64());

@@ -50,7 +50,8 @@ mod halos {
     use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
     use bitplane_manager::{Write, WriteOp};
     use entity_manager::{Attribute, EntityId, EntityType, Header, NEVER};
-    use server::{about, HaloChange, World, COOL_TICKS, HOT_ENTITY, WARM_TICKS};
+    use server::host::frame::Viewport;
+    use server::{about, HaloChange, World, CAMERA_SIDE, COOL_TICKS, HOT_ENTITY, WARM_TICKS};
 
     /// The superchunks holding a hot entity.
     fn hot_entities(world: &World) -> Vec<SuperchunkIndex> {
@@ -257,6 +258,50 @@ mod halos {
         assert_eq!(loaded.arena.superchunk_indices().len(), (side * side) as usize, "forced hot: all of it, all the while");
         assert_eq!((loaded.warming().count(), loaded.cooling().count()), (0, 0));
     }
+
+    /// A world whose camera loads superchunks: a view far wider than
+    /// [`CAMERA_SIDE`] keeps only so many a side about its middle; two
+    /// superchunks in view, far from the flock, turn hot as a halo's
+    /// would, each generated while in view given a flock of its own, and
+    /// those generated about them for those flocks' halos none. A save
+    /// keeps its camera flock; a world whose camera loads nothing keeps
+    /// nothing in view.
+    #[test]
+    fn the_camera_loads_the_superchunks_in_view() {
+        let sheep = 20;
+        let mut world = server::start(server::Start { seed: crate::tests::land_seed(2), sheep, camera_loads: true, ..server::Start::default() });
+        assert_eq!(world.info.camera_flock, Some(sheep as u64));
+        let (x, y) = WORLD_MIDDLE.cartesian();
+        world.keep_in_view(Viewport { first: (x - 50, y - 50), last: (x + 50, y + 50) });
+        let wide = world.halos.in_view();
+        assert!(wide.len() == (CAMERA_SIDE * CAMERA_SIDE) as usize && wide.contains(&WORLD_MIDDLE), "{} in view", wide.len());
+        world.keep_in_view(Viewport { first: (x + 10, y), last: (x + 11, y) });
+        let in_view = [SuperchunkIndex::from_cartesian(x + 10, y), SuperchunkIndex::from_cartesian(x + 11, y)];
+        let sheep_on = |world: &World, superchunk: SuperchunkIndex| world.entities.superchunk(superchunk).map_or(0, |kept| kept.iter().filter(|entity| entity.header.kind == HOT_ENTITY).count());
+        let about_view = about(in_view.into_iter());
+        let (mut seen, mut beside) = (0, 0);
+        while seen < 2 || beside == 0 {
+            assert!(world.entities.now() < 4 * WARM_TICKS, "the halos about the flocks in view generated");
+            world.tick();
+            for &superchunk in world.halos.generated() {
+                if in_view.contains(&superchunk) {
+                    assert_eq!(sheep_on(&world, superchunk), sheep, "generated in view: a flock of its own");
+                    seen += 1;
+                } else {
+                    assert_eq!(sheep_on(&world, superchunk), 0, "generated for a halo alone: nothing on it");
+                    beside += usize::from(about_view.contains(&superchunk));
+                }
+            }
+        }
+        assert!(in_view.iter().all(|superchunk| world.arena.superchunk_indices().contains(superchunk)));
+        let folder = crate::tests::folder("camera");
+        server::save(&folder, &mut world).expect("saved");
+        assert_eq!(server::load(&folder).expect("loaded").info.camera_flock, Some(sheep as u64), "its camera flock, kept");
+
+        let mut unseen = server::start(server::Start { seed: crate::tests::land_seed(2), sheep, ..server::Start::default() });
+        unseen.keep_in_view(Viewport { first: (x + 10, y), last: (x + 11, y) });
+        assert!(unseen.halos.in_view().is_empty() && unseen.info.camera_flock.is_none(), "its camera loads nothing");
+    }
 }
 
 mod world {
@@ -354,6 +399,32 @@ mod world {
         assert_eq!(names, expected);
         assert_eq!(names.len(), 2 * 9, "the origin and its halo");
         assert_eq!(disk::saved_superchunks(&folder).unwrap(), first.arena.superchunk_indices());
+    }
+
+    /// A world's file is read whatever the order of its rows under the
+    /// one naming its columns, what it lacks as by default -- but its
+    /// seed, which it must have; a name said twice, or a format not the
+    /// one written, is refused.
+    #[test]
+    fn a_world_file_is_read_in_any_order() {
+        let folder = folder("any_order");
+        let mut world = server::start(server::Start { seed: 7, sheep: 10, camera_loads: true, ..server::Start::default() });
+        server::save(&folder, &mut world).expect("saved");
+        let saved = disk::read_world(&folder).expect("read");
+        let path = folder.join("world.csv");
+        let text = std::fs::read_to_string(&path).expect("the world's file");
+        let mut rows: Vec<&str> = text.lines().collect();
+        rows[1..].reverse();
+        std::fs::write(&path, rows.join("\n")).expect("written");
+        assert_eq!(disk::read_world(&folder).expect("read turned round"), saved);
+        std::fs::write(&path, "world,is\nseed,0x7\n").expect("written");
+        let bare = disk::read_world(&folder).expect("read with the seed alone");
+        assert_eq!(bare, disk::WorldInfo { seed: 7, tick: 0, layers: Vec::new(), side: None, forced: false, hot_entity: None, camera_flock: None, generation: Vec::new() });
+        assert_eq!(worldgen::Generation::of_numbers(&bare.generation).numbers(), worldgen::Generation::DEFAULT.numbers(), "generated as by default");
+        for refused in ["world,is\ntick,3\n", "world,is\nseed,0x7\nseed,0x8\n", "world,is\nformat,1\nseed,0x7\n", "seed,0x7\nworld,is\n"] {
+            std::fs::write(&path, refused).expect("written");
+            assert!(matches!(disk::read_world(&folder), Err(DiskError::Invalid(..))), "{refused}");
+        }
     }
 
     /// What is not a save is refused, saying which file and why.
