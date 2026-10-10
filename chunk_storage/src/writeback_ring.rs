@@ -1,20 +1,5 @@
 //! The writeback ring: changed layers, encoded, on their way to the
-//! cold pool -- a sponge for writes, so a superchunk's image is rewritten
-//! once for many of its layers rather than once per layer.
-//!
-//! A ring buffer of words. An entry is a header -- its chunk's Morton
-//! index in the world, its layer type, its length and whether it is
-//! dead -- then the encoded layer's words; an entry of no words says the
-//! layer is gone. Entries never wrap: one that does not fit before the end
-//! starts again at the start, a marker left where it would have gone.
-//! Entries are written at the head and freed from the tail: releasing a
-//! superchunk marks its entries dead, and the tail moves past dead
-//! entries.
-//!
-//! The ring grows only when empty and still too small for an entry:
-//! otherwise, when an entry does not fit, chunk storage rewrites the
-//! superchunk at the tail ([`WritebackRing::tail_superchunk`]) until it
-//! does.
+//! cold pool (`docs/chunk_storage.md`, "The ring's words").
 
 use coordinates::{ChunkIndex, SuperchunkIndex};
 use type_registry::LayerType;

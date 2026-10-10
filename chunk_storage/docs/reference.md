@@ -18,15 +18,15 @@ chunk's more; **`words_of(words)`**: a map's length from its start.
 
 `LayerType`, `Width` (`Bits2`, `Bits4`, `Bits8`, `Bits16`) and `Wide<W>` are the type registry's (`../../type_registry/docs/reference.md`), handed on from this crate's root as what a layer is of.
 
-## `wide.rs`
-
-**`spread(plane, bits, bit, wide)`**: a bitmap put into a wide bucket as one bit of every cell. **`plane(wide, bits, bit)`**: that bit of every cell, as a bitmap. **`cells_set(words, bits)`**: the cells whose number is not 0.
-
 **`LayerCodec`**: Tessera and its buffers, allocated once.
 **`encode(cells)`**: the bitmap's stream, as words, until the next
 encoding. **`encode_layer(cells)`**: as a layer's words -- encoded, or
 none where no cell is set. **`decode(words, cells)`**: the bitmap whose stream starts at
 `words`, at most `MOST_WORDS` of them read.
+
+## `wide.rs`
+
+**`spread(plane, bits, bit, wide)`**: a bitmap put into a wide bucket as one bit of every cell. **`plane(wide, bits, bit)`**: that bit of every cell, as a bitmap. **`cells_set(words, bits)`**: the cells whose number is not 0.
 
 ## `superchunk_image.rs`
 
@@ -68,7 +68,8 @@ walking entries from the tail, over wrap markers.
 
 ## `chunk_storage.rs`
 
-**`ChunkStorage::new(ring_words)`**. **`insert(superchunk, image)`**,
+**`ChunkStorage::new(ring_words)`**. `find(superchunk)`: where a
+superchunk is in the cold pool, or where it would go. **`insert(superchunk, image)`**,
 **`image(superchunk)`**, **`shared_image(superchunk)`** -- a handle to
 it, to read on another thread -- **`superchunks()`**, **`layer(chunk,
 type)`**: the cold pool, its images shared (`Arc`).

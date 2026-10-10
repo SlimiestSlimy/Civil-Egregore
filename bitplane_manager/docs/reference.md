@@ -10,6 +10,14 @@ cell asked of a bitmap not hot.
 **`ChunkSet`** (`u16`, a bit a chunk), **`contains`**, **`put`**,
 **`members`**.
 
+`COUNT_TILE_WORDS` (16), `COUNT_TILES_IN_CHUNK` (64),
+`COUNT_TILE_CELLS` (1,024: 32x32); `COARSEST_SCALE` (6),
+`COARSEST_TILES_IN_CHUNK` (16), `COUNTS_IN_COARSEST` (4: the count
+tiles in a tile of the coarsest scale, checked as the crate is built).
+`WIDEST` (16): the most bits a cell a layer has; `NO_CELLS`: a bucket
+with no cell set, as wide as any -- what a chunk with no bucket is
+read as, so a read needs no branch on whether there is one.
+
 ## `superchunk_layer.rs`
 
 **`ChunkFlags`**: a layer's four chunk sets, packed in 8 bytes.
@@ -20,6 +28,12 @@ counts, hot count. **`count`** / **`set_count`** a bucket's set cells;
 **`cells`** a bucket of a bit a cell as a bitmap's words, **`words`** / **`words_mut`** a bucket's words at any width; **`get`** a cell by
 Morton index; **`value`** and **`put_value`** the number of a wide layer's cell, read and put whole; **`put_cell`** a cell set or clear if not already, the
 bucket dirty and the counts moved by one: whether it changed.
+`bucket_words`: the words a bucket takes, a bitmap's times the bits a
+cell. `let_bucket_go(chunk)`: a chunk's bucket given up, the chunk
+then having no cell set; `let_unused_go`: the same of every chunk
+neither hot nor waiting in the ring. `value_of(chunk, cell, bits)`:
+`value` with the bits a cell given, for where the plane's width is
+known from its type.
 
 
 ## `superchunk.rs`
@@ -99,6 +113,8 @@ lingering), **`lingering_at`**, **`layers`**, **`layers_of`**,
 let go too.
 
 ## `writes.rs`
+
+`CHUNK_SIDE_U32`: a chunk's side as a coordinate, for the shapes.
 
 **`WriteOp`**, **`Shape`**, **`Write`** `{at, op, shape}` (packed, 12
 bytes); **`Write::cell(at, op)`**; **`bounds`** and **`covers`**: a

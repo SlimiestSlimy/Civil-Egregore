@@ -1,29 +1,9 @@
-//! Civil Egregore's entity manager: what stands on the cells -- sheep,
-//! people, buildings -- kept beside the bitplanes (`../bitplane_manager`)
-//! and ticked with them by the simulation (`../simulation`).
+//! Civil Egregore's entity manager: what stands on the cells, kept
+//! beside the bitplanes -- a bucket a chunk, one entity a cell, and a
+//! timer wheel a superchunk -- and changed by instructions queued.
 //!
-//! An entity is a header -- a random 64-bit ID, a type, the cell it
-//! stands on, the tick it next wakes at -- and attributes, typed values
-//! added and removed at run time. A superchunk holds its entities in a
-//! bucket a chunk, sorted by cell, one a cell at most -- entities never
-//! overlap -- and a timer wheel of when each wakes,
-//! so a tick costs the entities waking in it and nothing for the rest.
-//! An entity is found by its ID and cell: its cell's chunk's bucket,
-//! then its ID there -- never a search past its chunk -- which keeps it
-//! found however it moves, and a wake or instruction naming one that moved
-//! on or died passes it over.
-//!
-//! Entities change as cells do, in the tick's second phase: a rule
-//! queues an instruction in the first, into the outbox slot of the
-//! superchunk it lands in, and that superchunk applies it.
-//!
-//! | file | what is in it |
-//! |---|---|
-//! | `entity` | an entity: its header and its attributes; and one being changed by its rule |
-//! | `bucket` | a chunk's entities, sorted by cell, one a cell, their attributes beside them |
-//! | `wheel` | a superchunk's timer wheel |
-//! | `store` | a superchunk's entities, and every superchunk's |
-//! | `instructions` | changes to entities, an instruction each -- put, move, edit, remove -- queued for a superchunk and applied by it |
+//! The design: `docs/entity_manager.md`; function by function:
+//! `docs/reference.md`.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.

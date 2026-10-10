@@ -1,13 +1,6 @@
 //! Chunk storage's slow work, done off the tick on the dispatcher's
-//! threads (`utilities::dispatcher`): encoding the changed layers of
-//! superchunks gone cold, rewriting images with the changes flushed
-//! from the writeback ring, and generating and decoding the superchunks
-//! warming -- each thread with a codec of its own.
-//!
-//! A job sent ([`Jobs::send`]) is a [`Ticket`]; what it made is taken
-//! by it ([`Jobs::take`], waiting if not yet made, or
-//! [`Jobs::try_take`]). What a job makes depends on nothing but the
-//! job, so the world is the same however fast the threads are.
+//! threads: layers encoded, images rewritten, superchunks generated and
+//! decoded (`docs/chunk_storage.md`, "Jobs").
 
 use crate::layer_codec::BucketKey;
 use crate::{wide, Flush, LayerCodec, LayerType, SuperchunkImage};

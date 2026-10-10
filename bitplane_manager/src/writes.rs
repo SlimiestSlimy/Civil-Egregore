@@ -1,17 +1,6 @@
-//! Writes into the hot bitplanes, batched: the standard way cells are
-//! changed. A [`Write`] -- an operation over a shape of cells -- is
-//! queued for one layer type ([`BitmapArena::queue`]), into that type's
-//! queue, and nothing changes until [`BitmapArena::apply`] applies every
-//! queue, type by type, each write in the order queued: where writes to
-//! one bitplane overlap, the latest wins.
-//!
-//! The layer type is the queue's, not the write's, so a write is 12
-//! bytes: its anchor cell's Morton index, its operation and its shape,
-//! whose sides and radius are a byte each -- packed to 4-byte alignment,
-//! so the index's 8 bytes do not round the write up to 16. A larger area
-//! is several writes. A cell write finds its bit from the Morton index's
-//! fields alone; a rectangle or a disc is laid out in cartesian
-//! coordinates, the cheaper for geometry.
+//! Writes into the hot bitplanes, batched: the only way cells change.
+//! A [`Write`] is queued for a layer type ([`WriteQueues`]) and changes
+//! nothing until applied (`docs/bitplane_manager.md`, "Writes").
 
 use crate::superchunk_layer::SuperchunkLayer;
 use crate::{contains, BitmapArena};

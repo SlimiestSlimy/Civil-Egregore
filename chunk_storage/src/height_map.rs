@@ -1,21 +1,6 @@
-//! A superchunk's heights. A [`Height`] is 16 bits, but a chunk seldom
-//! spans more than 255 from its lowest ground to its highest: so each
-//! chunk has a **floor** -- its lowest height -- and each of its cells
-//! a byte over it. A chunk that does span more is **tall**, and has a
-//! map of its own, a whole height a cell, kept apart.
-//!
-//! | words | what they hold |
-//! |---|---|
-//! | 4 | the 16 chunks' floors, in Morton order, 4 a word |
-//! | 1 | which chunks are tall, a bit a chunk |
-//! | 131,072 | every cell's byte over its chunk's floor, 8 a word |
-//! | 16,384 a tall chunk | the tall chunks' maps, in Morton order: every cell's height, 4 a word |
-//!
-//! The cells are laid out in Morton order over the whole superchunk:
-//! chunk by chunk in their Morton order, and in each chunk in the Morton
-//! order its bitmaps use (`bitmap::morton`). So each chunk's heights
-//! are one run, and any aligned square of cells is one run of heights,
-//! as it is one run of bits in a layer.
+//! A superchunk's heights: a floor a chunk and a byte a cell over it,
+//! or a whole [`Height`] a cell where a chunk is tall
+//! (`docs/chunk_storage.md`, "The height map").
 
 use coordinates::{CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 

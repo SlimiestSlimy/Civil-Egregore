@@ -1,15 +1,5 @@
-//! What a layer is, and how its bitmap is encoded and decoded.
-//!
-//! A layer is a pair of a [`LayerType`] -- what it represents, from
-//! specific things to properties -- and a bitmap marking the cells where
-//! it holds, Tessera-encoded in 64-bit words. A Tessera stream ends
-//! itself, so an encoded bitmap's exact length is never kept: decoding
-//! reads from its first word, whatever follows its last.
-//!
-//! [`LayerCodec`] holds what encoding and decoding need, allocated once:
-//! a Tessera, its stream, and the bitmap it decodes into. Encoding reads
-//! a bitmap's cells from wherever they are held -- an arena's bucket,
-//! say -- and decoding writes them there.
+//! What a layer is, and how its bitmap is encoded and decoded
+//! (`docs/chunk_storage.md`, "Layers and their codec").
 
 use bitmap::{Bitmap, CellWords};
 use tessera::{BitStream, Tessera, MOST_BITS};

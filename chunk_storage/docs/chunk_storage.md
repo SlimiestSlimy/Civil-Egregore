@@ -14,6 +14,23 @@ a bitmap, Tessera-encoded in 64-bit words. A Tessera stream ends
 itself, so no length is kept: `LayerCodec::decode` reads from a
 bitmap's first word whatever follows its last.
 
+`LayerCodec` holds what encoding and decoding need, allocated once: a
+Tessera, its stream, and the bitmap it decodes into. Encoding reads a
+bitmap's cells from wherever they are held -- an arena's bucket, say --
+and decoding writes them there. A bitmap with no cell set has no layer
+at all: it encodes to no words.
+
+## Wide planes
+
+A wide plane (`../../type_registry/docs/type_registry.md`, "Width") is
+kept two ways. Hot, a cell's number is `bits` bits together, the cell
+at place `p` at bit `p * bits` of the bucket's words -- a word holds
+whole cells, `bits` being a power of two. Cold, it is `bits` bitmaps, a
+bit of every cell each, encoded as any layer. `wide.rs` goes between
+the two: `spread` puts a bitmap into a wide bucket as one bit of every
+cell, `plane` takes that bit of every cell out as a bitmap. Both pass
+over the cells set alone, so a plane mostly clear costs little.
+
 ## The superchunk image
 
 A superchunk, in the cold pool and on disk alike, is one run of words, every
@@ -38,6 +55,55 @@ part starting on a word:
 An image is never changed in place: `rewritten` makes a new one with
 changes made. `from_words` checks words read back are an image.
 
+In words:
+
+| words | what they hold |
+|---|---|
+| 16 | the chunk table: each chunk's offset in the image, in Morton order (the height map starts after it, `HEIGHTS_START`) |
+| `HEIGHT_WORDS`, and more if a chunk is tall | the height map, raw |
+| 1, and a map for each chunk with water | the water's depths |
+| the rest (from `CHUNKS_START` at the least) | each chunk in Morton order, its data together: its layer count, its layer table -- a type and an offset a layer (`ENTRY_WORDS`, 2), sorted by type -- then its encoded layers |
+
+An encoded layer's offset counts from its chunk's start, so a chunk
+moves whole. Encoded layers start on a word and lie in no particular
+order. No length is kept: an encoded layer runs from its offset to the
+next offset of its chunk, or the chunk's end; a chunk runs to the next
+chunk's offset, the last to the image's end.
+
+### The height map
+
+A `Height` is 16 bits, but a chunk seldom spans more than 255 (`SPAN`)
+from its lowest ground to its highest. So each chunk has a **floor** --
+its lowest height -- and each of its cells a byte over it. A chunk that
+does span more is **tall**, and has a map of its own, a whole height a
+cell, kept apart.
+
+| words | what they hold |
+|---|---|
+| 4 (`FLOOR_WORDS`) | the 16 chunks' floors, in Morton order, 4 a word (`HEIGHTS_IN_WORD`; read by `floor_in`) |
+| 1 (`TALL_WORD`) | which chunks are tall, a bit a chunk |
+| 131,072 (from `BYTES_START`) | every cell's byte over its chunk's floor, 8 a word (`BYTES_IN_WORD`) |
+| 16,384 a tall chunk | the tall chunks' maps, in Morton order: every cell's height, 4 a word |
+
+The cells are laid out in Morton order over the whole superchunk: chunk
+by chunk in their Morton order, and in each chunk in the Morton order
+its bitmaps use. So each chunk's heights are one run, and any aligned
+square of cells is one run of heights, as it is one run of bits in a
+layer.
+
+### The water's maps
+
+`ChunkMaps` is a number a cell kept only where there is any -- unlike
+the heights, which every cell has.
+
+| words | what they hold |
+|---|---|
+| 1 | which chunks have a map, a bit a chunk; and, 16 bits up (`WIDE_FROM`), which of those are wide |
+| 8,192 a chunk with a map, 16,384 if it is wide | the maps, in Morton order: every cell's number, a byte each, 8 a word -- or 16 bits each, 4 a word, in a wide one |
+
+A chunk is **wide** if any of its numbers is over 255. At worst 16
+maps; with none, one word.
+
 ## The cold pool and the writeback ring
 
 `ChunkStorage` holds the cold pool -- superchunk images by Morton index
@@ -54,6 +120,32 @@ written-back layer until its superchunk is flushed, and is told of
 every flush. So a superchunk gone cold is not flushed then: its
 changes wait in the ring, flushed when the ring needs the room, or
 when the world is saved.
+
+### The ring's words
+
+A ring buffer of words. An entry is a header of three words
+(`HEADER_WORDS`) -- its chunk's Morton index in the world, its layer
+type, its length and, in the length word's lowest bit (`DEAD`), whether
+it is dead -- then the encoded layer's words; an entry of no words says
+the layer is gone. Entries never wrap: one that does not fit before the
+end starts again at the start, a marker left where it would have gone
+(`WRAP`, a first word no chunk's index can be: a chunk's takes 48
+bits). Entries are written at the head and freed from the tail:
+releasing a superchunk marks its entries dead, and the tail moves past
+dead entries. So a superchunk's image is rewritten once for many of its
+layers, not once a layer.
+
+## Jobs
+
+The slow work is done off the tick, on the dispatcher's threads
+(`../../utilities/docs/utilities.md`, "The dispatcher"): encoding the
+changed layers of superchunks gone cold, rewriting images with the
+changes flushed from the ring, and generating and decoding the
+superchunks warming -- each thread with a codec of its own (`CODEC`, a
+thread's). A job sent (`Jobs::send`) is a `Ticket`; what it made is
+taken by it (`Jobs::take`, waiting if not yet made, or
+`Jobs::try_take`). What a job makes depends on nothing but the job, so
+the world is the same however fast the threads are.
 
 ## Shared images
 
@@ -74,7 +166,13 @@ done with it.
 
 ## On disk
 
-A world is a folder (`disk.rs`), its text files CSV (`utilities::csv`):
+A world is a folder (`disk.rs`), its text files CSV (`utilities::csv`).
+The names as the code has them: the folder of superchunks `SUPERCHUNKS`;
+the world file's columns `WORLD_COLUMNS` and its rows' names `FORMAT`
+(with the number written, 2), `HOT_ENTITY`, `CAMERA_FLOCK`,
+`WITHOUT_CAMERA_FLOCK`, `GENERATION` (what starts a generation number's
+name); the hot file's columns `HOT_COLUMNS` and what a superchunk is in
+it, `HOT`, `COOLING`, `WARMING`. The files:
 `world.csv`, a row a thing, its name and what it is -- `format`, the
 number of the format written; `seed`, in hexadecimal; `tick`;
 `layers`; `side`, if the world has a size, and `forced`, 1, if all of

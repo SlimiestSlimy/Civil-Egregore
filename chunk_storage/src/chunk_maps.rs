@@ -1,16 +1,6 @@
-//! A number a cell kept only where there is any: a superchunk's water,
-//! say, which most chunks have none of. Each chunk with a cell not 0
-//! has a map of its own, the others nothing -- unlike the heights
-//! (`height_map`), which every cell has.
-//!
-//! | words | what they hold |
-//! |---|---|
-//! | 1 | which chunks have a map, a bit a chunk; and, 16 bits up, which of those are wide |
-//! | 8,192 a chunk with a map, 16,384 if it is wide | the maps, in Morton order: every cell's number, a byte each, 8 a word -- or 16 bits each, 4 a word, in a wide one |
-//!
-//! A chunk is **wide** if any of its numbers is over 255. The cells of
-//! a map are in the Morton order its chunk's bitmaps use. At worst 16
-//! maps; with none, one word.
+//! A number a cell kept only where there is any: a map a chunk with a
+//! cell not 0, a byte a cell or 16 bits -- a superchunk's water
+//! (`docs/chunk_storage.md`, "The superchunk image").
 
 use coordinates::{CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 

@@ -1,54 +1,7 @@
-//! Civil Egregore's bitplane manager: the bitmap arena, the hot bitmaps, raw,
-//! one a bucket -- the layers whose cells are being read or changed,
-//! decoded from chunk storage's cold pool and nothing more. It is where
-//! cells are read and changed: chunk storage holds whole encoded layers
-//! only.
+//! Civil Egregore's bitplane manager: the bitmap arena -- the hot
+//! bitmaps, raw, one a bucket -- where cells are read and changed.
+//! Chunk storage holds whole encoded layers only.
 //!
-//! The arena is made of allocations, each holding one layer type over
-//! one superchunk: an array of buckets, one for each of its chunks that
-//! has a cell set -- 16 at the most -- in the chunks' Morton order
-//! ([`ChunkIndex::place`]). A chunk with no cell set has no bucket: its
-//! cells are read as clear, and the first cell set in it makes it one,
-//! put in its place among the others. A chunk's bucket is found by how
-//! many chunks before it have one -- a count of bits, no search.
-//!
-//! Which allocation holds which layer type over which superchunk is a
-//! small directory: the superchunks in use, sorted by superchunk index,
-//! and for each its allocations, sorted by layer type -- the one thing
-//! ever sorted, and it holds no bitmaps. The last superchunk looked up
-//! is remembered, so the runs of lookups in one superchunk that
-//! Morton-ordered work makes search only its few types. The allocations lie
-//! wherever they were made; each is one run of memory in Morton order.
-//!
-//! The arena grows an allocation at a time, as a layer type turns hot
-//! over a superchunk it had none of, and an allocation a bucket at a
-//! time. An allocation none of whose chunks is hot or waiting in the
-//! ring (below) leaves the directory, its buckets with it.
-//!
-//! Cells are changed by writes, batched (`writes`): queued, then applied
-//! in order. Each superchunk ([`Superchunk`]) owns its blocks, so
-//! superchunks are read and changed apart: the simulation
-//! (`../simulation`) samples and reads them on as many threads as it
-//! likes ([`LayerView`], [`Reader`]), and applies writes to each
-//! ([`Superchunk::apply`]).
-//!
-//! A bucket changed since it was decoded is dirty, and is written back
-//! into chunk storage's writeback ring (`../chunk_storage`) encoded --
-//! no words where no cell is set, since a type with no cell set has no
-//! layer -- in two halves, so encoding can be off the tick: taken
-//! ([`BitmapArena::take_dirty`]), then put in the ring
-//! ([`BitmapArena::written_back`]). A dirty bucket must be written back
-//! before it is evicted. The ring is never read to make a bitmap hot,
-//! so a bucket written back stays in its allocation, evicted or not,
-//! until chunk storage flushes its superchunk into the cold pool: a
-//! bitmap evicted and made hot again before then is the bucket as it
-//! was, not decoded.
-//!
-//! A superchunk made cold as a whole ([`BitmapArena::make_cold_superchunk`])
-//! leaves the directory at once, nothing encoded or flushed: its
-//! allocations are set aside, lingering, until chunk storage holds its
-//! changes -- made hot again as they are if wanted before then.
-
 //! The design: `docs/bitplane_manager.md`; function by function:
 //! `docs/reference.md`.
 

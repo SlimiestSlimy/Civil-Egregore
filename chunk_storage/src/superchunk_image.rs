@@ -1,22 +1,6 @@
 //! A superchunk as chunk storage holds it, in the cold pool and on disk
-//! alike: one run of 64-bit words, written to disk as it is in memory.
-//!
-//! | words | what they hold |
-//! |---|---|
-//! | 16 | the chunk table: each chunk's offset in the image, in Morton order |
-//! | [`HEIGHT_WORDS`], and more if a chunk is tall | the superchunk's height map, raw ([`HeightMap`]) |
-//! | 1, and a map for each chunk with water | the water's depths ([`ChunkMaps`]): a byte a cell in the chunks that have any, 16 bits in those deeper than 255 |
-//! | the rest | each chunk in Morton order, its data together: its layer count, its layer table -- a type and an offset per layer, sorted by type -- then its encoded layers |
-//!
-//! An encoded layer's offset counts from its chunk's start, so a chunk
-//! moves whole. Encoded layers start on a word and lie in no particular
-//! order. No length is kept, since a Tessera stream ends itself: an
-//! encoded layer runs from its offset to the next offset of its chunk,
-//! or the chunk's end. A chunk runs to the next chunk's offset, the last
-//! to the image's end.
-//!
-//! An image is never changed in place: changes to it make a new one
-//! ([`SuperchunkImage::rewritten`]).
+//! alike: one run of 64-bit words (`docs/chunk_storage.md`, "The
+//! superchunk image").
 
 use coordinates::CHUNKS_IN_SUPERCHUNK;
 use crate::chunk_maps::{self, number_in, ChunkMaps};

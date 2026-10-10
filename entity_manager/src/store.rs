@@ -1,14 +1,6 @@
-//! Where entities are kept: a superchunk's in a bucket a chunk, with
-//! its timer wheel ([`SuperchunkEntities`]), and every superchunk's, in
-//! the bitmap arena's order, with the tick the world is at
-//! ([`Entities`]) -- read in a tick across superchunks by an
-//! [`EntityReader`], as cells are by the bitplanes' reader.
-//!
-//! The API follows the bitplanes': outside a tick, instructions are
-//! queued ([`Entities::queue_put`], [`Entities::queue_remove`]) and
-//! applied ([`Entities::apply`]), as writes to cells are; in a tick, a
-//! superchunk's turn queues them. Queuing is the only way to change an
-//! entity.
+//! Where entities are kept: a superchunk's ([`SuperchunkEntities`]),
+//! every superchunk's ([`Entities`]), read in a tick by an
+//! [`EntityReader`] (`docs/entity_manager.md`, "The store").
 
 mod entity_reader;
 mod world_entities;
@@ -116,13 +108,10 @@ impl SuperchunkEntities {
         })
     }
 
-    /// Puts `header`'s entity, with `attributes` sorted by type -- or,
-    /// with none given, those it has: it is then not made if it is not
-    /// there -- which stood on `from`, a cell of this superchunk -- its own cell, if it
-    /// has not moved or is new -- and files its wake, no earlier than
-    /// `earliest`: what came of it. One whose cell is taken stays on
-    /// `from`, changed all the same, and wakes there; a new one is not
-    /// put.
+    /// Puts `header`'s entity, which stood on `from`, with `attributes`
+    /// sorted by type -- or, with none given, those it has -- and files
+    /// its wake, no earlier than `earliest`: what came of it
+    /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
     pub(crate) fn put(&mut self, earliest: u64, header: Header, from: CellIndex, attributes: Option<&[Attribute]>) -> Put {
         debug_assert_eq!(header.at.superchunk(), self.index, "an entity put in a superchunk it is not in");
         debug_assert_eq!(from.superchunk(), self.index, "an entity put from another superchunk: a crossing");
@@ -195,11 +184,9 @@ impl SuperchunkEntities {
     }
 
     /// Removes from the cells they left those of `arrived` -- the
-    /// entities that crossed into a neighbour this tick
-    /// ([`SuperchunkEntities::take_arrived`]) -- that left this
-    /// superchunk: until then each stood on both cells, so that, its new
-    /// cell taken, it stays where it stood. Once every superchunk has
-    /// settled its leavers, every entity stands on one cell.
+    /// entities that crossed into a neighbour this tick -- that left
+    /// this superchunk (`docs/entity_manager.md`, "Instructions",
+    /// Crossing a border).
     pub fn settle_leavers(&mut self, arrived: &[(EntityId, CellIndex)]) {
         let here = self.index;
         for &(id, left) in arrived.iter().filter(|(_, left)| left.superchunk() == here) {

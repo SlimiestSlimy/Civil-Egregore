@@ -37,11 +37,8 @@ impl<'a> EntityReader<'a> {
 
     /// The cells entities stand on among the `width` by `height` cells
     /// (each up to 16) whose top left cell is `origin`, a row a word:
-    /// cell `(x, y)` from `origin` at bit `x` of row `y`. Found from the
-    /// buckets, which are sorted by cell: the cells lie on up to nine
-    /// word tiles, each a run of a bucket's places, so what is read is
-    /// the few entities there, not the cells. Where no superchunk is
-    /// read, no entity stands.
+    /// cell `(x, y)` from `origin` at bit `x` of row `y`
+    /// (`docs/entity_manager.md`, "The store").
     pub fn occupied(&self, origin: CellIndex, width: u32, height: u32) -> [u16; OCCUPIED_SIDE] {
         debug_assert!(width as usize <= OCCUPIED_SIDE && height as usize <= OCCUPIED_SIDE, "more cells than a row's bits");
         let mut rows = [0; OCCUPIED_SIDE];

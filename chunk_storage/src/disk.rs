@@ -1,10 +1,6 @@
-//! The world on disk: a folder. Its world file (`world.csv`) says what the world
-//! is; its hot file (`hot.csv`) which superchunks were hot, which of them
-//! cooling, and which warming -- both CSV (`utilities::csv`); `superchunks/` holds two files a superchunk, each named
-//! by its superchunk index -- 44 bits, in hexadecimal: `.image`, its cells,
-//! the image as the cold pool holds it, and `.state`, words that are whoever
-//! ticks the world's to make sense of -- its random numbers, its
-//! entities. Design: `../docs/chunk_storage.md`, "On disk".
+//! The world on disk: a folder -- its world file, its hot file, and two
+//! files a superchunk, its image and its state (`docs/chunk_storage.md`,
+//! "On disk").
 
 mod world_files;
 pub use world_files::{HotSuperchunks, WorldInfo};
