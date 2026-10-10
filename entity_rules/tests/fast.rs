@@ -11,13 +11,11 @@ mod sheep {
     //!
     //! `cargo test`
 
-    use instructions::handed_on::{Write, WriteOp};
-    use instructions::handed_on::{DIRT, GRASS};
-    use instructions::handed_on::CellCartesian;
-    use instructions::handed_on::{Attribute, EntityId, EntityRef, Header};
-    use instructions::Simulation;
-    use entity_rules::diagnostics::world::MockWorld;
-    use entity_rules::sheep::{rule, tick, SheepCounts, HUNGRY_AT, LAMB, MEAL_TICKS, PREGNANT, ROAMING, ROAM_TICKS, SHEEP, STARVE_TICKS, STEP_JITTER, STEP_TICKS};
+    use entity_rules::diagnostics::world::mock_world_with_sheep;
+    use instructions::layers::GRASS;
+    use instructions::mock_world::MockWorld;
+    use instructions::{Attribute, CellCartesian, EntityId, EntityRef, Header};
+    use entity_rules::sheep::{rule, SheepCounts, HUNGRY_AT, LAMB, MEAL_TICKS, PREGNANT, ROAMING, ROAM_TICKS, SHEEP, STARVE_TICKS, STEP_JITTER, STEP_TICKS};
 
     /// Every sheep knows when it is next hungry, is a sheep, and is
     /// never both a lamb and pregnant.
@@ -31,14 +29,13 @@ mod sheep {
     /// starves at.
     #[test]
     fn sheep_without_grass_starve() {
-        let mut world = MockWorld::with_sheep(1, 0, 500);
-        let mut simulation = Simulation::new(1);
+        let mut world = mock_world_with_sheep(1, 0, 500);
         let (mut eaten, mut deaths) = (0, 0);
         for seed in 0..MEAL_TICKS + STARVE_TICKS + 2 * (STEP_TICKS + STEP_JITTER) {
-            let done = tick(&mut simulation, &mut world.arena, &mut world.entities, seed).rules;
+            let done = world.tick(seed, |turn, _| rule(turn)).rules;
             (eaten, deaths) = (eaten + done.eaten, deaths + done.deaths);
         }
-        assert_eq!((eaten, deaths, world.sheep()), (0, 500, 0));
+        assert_eq!((eaten, deaths, world.count_entities(SHEEP)), (0, 500, 0));
     }
 
     /// On grass, sheep eat -- each cell eaten turned to dirt -- breed, and
@@ -46,14 +43,13 @@ mod sheep {
     /// go, and no sheep walks off the hot superchunks.
     #[test]
     fn sheep_eat_breed_and_grow_up() {
-        let mut world = MockWorld::with_sheep(4, 300_000, 400);
-        let mut simulation = Simulation::new(2);
+        let mut world = mock_world_with_sheep(4, 300_000, 400).on_threads(2);
         let (mut eaten, mut births, mut lost, mut lambs_seen, mut pregnant_seen) = (0, 0, 0, false, false);
         for seed in 0..40_000 {
-            let report = tick(&mut simulation, &mut world.arena, &mut world.entities, seed);
+            let report = world.tick(seed, |turn, _| rule(turn));
             (eaten, births, lost) = (eaten + report.rules.eaten, births + report.rules.births, lost + report.instructions_applied.lost);
             if seed % 500 == 0 {
-                for sheep in world.entities.iter() {
+                for sheep in world.entities() {
                     well_formed(sheep);
                     lambs_seen |= sheep.attribute(LAMB).is_some();
                     pregnant_seen |= sheep.attribute(PREGNANT).is_some();
@@ -63,7 +59,7 @@ mod sheep {
         assert!(eaten > 5_000 && births > 100, "{eaten} eaten, {births} born");
         assert!(lambs_seen && pregnant_seen);
         assert_eq!(lost, 0, "no sheep walks off the hot superchunks");
-        assert!(world.entities.iter().any(|sheep| sheep.attribute(LAMB).is_none() && sheep.attribute(HUNGRY_AT).is_some()), "grown sheep");
+        assert!(world.entities().any(|sheep| sheep.attribute(LAMB).is_none() && sheep.attribute(HUNGRY_AT).is_some()), "grown sheep");
     }
 
     /// A hungry sheep with no grass beside it walks the shortest way to the
@@ -73,20 +69,16 @@ mod sheep {
     #[test]
     fn hungry_sheep_walk_to_the_nearest_grass() {
         let mut world = MockWorld::grass_on_dirt(1, 0);
-        let superchunk = world.superchunks[0];
+        let superchunk = world.superchunks()[0];
         let corner = superchunk.top_left().cartesian();
         let (sheep, grass) = (CellCartesian { x: corner.x + 500, y: corner.y + 500 }, CellCartesian { x: corner.x + 506, y: corner.y + 493 });
-        world.arena.queue(GRASS, Write::cell(grass.into(), WriteOp::Set));
-        world.arena.queue(DIRT, Write::cell(grass.into(), WriteOp::Unset));
-        world.arena.apply();
+        world.plant_grass(grass, 1, 1);
         let header = Header { id: EntityId(1), kind: SHEEP, at: sheep.into(), wake: 0 };
-        world.entities.queue_put(header, &[Attribute { kind: HUNGRY_AT, value: 0 }]);
-        world.entities.apply();
-        let mut simulation = Simulation::new(1);
+        world.put(header, &[Attribute { kind: HUNGRY_AT, value: 0 }]);
         let (mut done, mut ate_at) = (SheepCounts::default(), None);
         for seed in 0..12 * (STEP_TICKS + STEP_JITTER) {
             // The grass rule left out: the one cell of grass must stay until eaten.
-            let report = simulation.tick(&mut world.arena, &mut world.entities, seed, |turn, _| rule(turn));
+            let report = world.tick(seed, |turn, _| rule(turn));
             if report.rules.eaten > 0 && ate_at.is_none() {
                 ate_at = Some(done.woken);
             }
@@ -95,7 +87,7 @@ mod sheep {
         assert_eq!(done.eaten, 1, "the one cell of grass, eaten");
         assert_eq!(ate_at, Some(7), "seven steps to it, eaten on the wake after");
         assert_eq!((done.sought, done.paths), (6, 6), "a path found each step until the grass was beside it");
-        assert_eq!(world.grass(), 0);
+        assert_eq!(world.count(GRASS), 0);
     }
 
     /// A hungry sheep with no grass in the area about it looks further
@@ -104,20 +96,16 @@ mod sheep {
     /// most of what it can take before it starves -- and eats it.
     #[test]
     fn hungry_sheep_walk_to_grass_far_off() {
-        let mut world = MockWorld::grass_on_dirt(4, 0);
+        let mut world = MockWorld::grass_on_dirt(4, 0).on_threads(2);
         // The square's top left superchunk: the first, row by row.
-        let corner = world.superchunks[0].top_left().cartesian();
+        let corner = world.superchunks()[0].top_left().cartesian();
         let (sheep, grass) = (CellCartesian { x: corner.x + 900, y: corner.y + 700 }, CellCartesian { x: corner.x + 1050, y: corner.y + 800 });
-        world.arena.queue(GRASS, Write::cell(grass.into(), WriteOp::Set));
-        world.arena.queue(DIRT, Write::cell(grass.into(), WriteOp::Unset));
-        world.arena.apply();
+        world.plant_grass(grass, 1, 1);
         let header = Header { id: EntityId(1), kind: SHEEP, at: sheep.into(), wake: 0 };
-        world.entities.queue_put(header, &[Attribute { kind: HUNGRY_AT, value: 0 }]);
-        world.entities.apply();
-        let mut simulation = Simulation::new(2);
+        world.put(header, &[Attribute { kind: HUNGRY_AT, value: 0 }]);
         let (mut done, mut ate_at) = (SheepCounts::default(), None);
         for seed in 0..STARVE_TICKS {
-            let report = simulation.tick(&mut world.arena, &mut world.entities, seed, |turn, _| rule(turn));
+            let report = world.tick(seed, |turn, _| rule(turn));
             if report.rules.eaten > 0 && ate_at.is_none() {
                 ate_at = Some(done.woken);
             }
@@ -135,19 +123,15 @@ mod sheep {
     #[test]
     fn sheep_on_thin_pasture_roam_away() {
         let mut world = MockWorld::grass_on_dirt(1, 0);
-        let superchunk = world.superchunks[0];
+        let superchunk = world.superchunks()[0];
         let corner = superchunk.top_left().cartesian();
         let start = CellCartesian { x: corner.x + 500, y: corner.y + 500 };
-        world.arena.queue(GRASS, Write::cell(start.into(), WriteOp::Set));
-        world.arena.queue(DIRT, Write::cell(start.into(), WriteOp::Unset));
-        world.arena.apply();
-        world.entities.queue_put(Header { id: EntityId(1), kind: SHEEP, at: start.into(), wake: 0 }, &[Attribute { kind: HUNGRY_AT, value: 0 }]);
-        world.entities.apply();
-        let mut simulation = Simulation::new(1);
+        world.plant_grass(start, 1, 1);
+        world.put(Header { id: EntityId(1), kind: SHEEP, at: start.into(), wake: 0 }, &[Attribute { kind: HUNGRY_AT, value: 0 }]);
         let (mut eaten, mut set_off, mut came_to) = (0, false, None);
         for seed in 0..MEAL_TICKS + ROAM_TICKS + 4 * (STEP_TICKS + STEP_JITTER) {
-            eaten += tick(&mut simulation, &mut world.arena, &mut world.entities, seed).rules.eaten;
-            let sheep = world.entities.iter().next().expect("the sheep, alive");
+            eaten += world.tick(seed, |turn, _| rule(turn)).rules.eaten;
+            let sheep = world.entities().next().expect("the sheep, alive");
             let roaming = sheep.attribute(ROAMING).is_some();
             if set_off && !roaming && came_to.is_none() {
                 came_to = Some(sheep.header.at.cartesian());
@@ -166,11 +150,10 @@ mod sheep {
     #[test]
     fn any_number_of_threads_ticks_sheep_the_same() {
         let run = |threads| {
-            let mut world = MockWorld::with_sheep(4, 200_000, 300);
-            let mut simulation = Simulation::new(threads);
-            let reports: Vec<_> = (0..1500).map(|seed| tick(&mut simulation, &mut world.arena, &mut world.entities, seed)).map(|report| (report.rules, report.instructions_applied)).collect();
-            let sheep: Vec<_> = world.entities.iter().map(|sheep| (sheep.header, sheep.attributes.to_vec())).collect();
-            (reports, sheep, world.grass())
+            let mut world = mock_world_with_sheep(4, 200_000, 300).on_threads(threads);
+            let reports: Vec<_> = (0..1500).map(|seed| world.tick(seed, |turn, _| rule(turn))).map(|report| (report.rules, report.instructions_applied)).collect();
+            let sheep: Vec<_> = world.entities().map(|sheep| (sheep.header, sheep.attributes.to_vec())).collect();
+            (reports, sheep, world.count(GRASS))
         };
         let (one, four) = (run(1), run(4));
         assert!(!one.1.is_empty());
@@ -182,15 +165,14 @@ mod sheep {
     /// every tick checked.
     #[test]
     fn sheep_never_overlap() {
-        let mut world = MockWorld::with_sheep(4, 300_000, 60_000);
-        assert_eq!(world.sheep(), 240_000, "each on a cell of its own from the start");
-        let mut simulation = Simulation::new(4);
+        let mut world = mock_world_with_sheep(4, 300_000, 60_000).on_threads(4);
+        assert_eq!(world.count_entities(SHEEP), 240_000, "each on a cell of its own from the start");
         let (mut stayed, mut births) = (0, 0);
         for seed in 0..2_000 {
-            let report = tick(&mut simulation, &mut world.arena, &mut world.entities, seed);
+            let report = world.tick(seed, |turn, _| rule(turn));
             (stayed, births) = (stayed + report.instructions_applied.stayed, births + report.rules.births);
             if seed % 100 == 99 {
-                let mut cells: Vec<_> = world.entities.iter().map(|sheep| sheep.header.at).collect();
+                let mut cells: Vec<_> = world.entities().map(|sheep| sheep.header.at).collect();
                 cells.sort_unstable();
                 assert!(cells.windows(2).all(|pair| pair[0] != pair[1]), "tick {seed}: two sheep on a cell");
             }

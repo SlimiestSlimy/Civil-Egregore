@@ -4377,6 +4377,7 @@ dependencies = [
  "coordinates",
  "entity_manager",
  "entity_rules",
+ "instructions",
  "mc_rules",
  "simulation",
  "utilities",

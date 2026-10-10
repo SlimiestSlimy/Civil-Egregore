@@ -3,6 +3,6 @@
 //!
 //! | file | what it is |
 //! |---|---|
-//! | `world.rs` | a mock world to tick: superchunks of dirt with grass scattered on them, hot, and sheep on them if asked |
+//! | `world.rs` | the instructions' mock world with a flock of sheep on each superchunk |
 
 pub mod world;

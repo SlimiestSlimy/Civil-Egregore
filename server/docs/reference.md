@@ -82,8 +82,9 @@ the halos moved: a **`WorldTick`** `{rules, halos}`.
 
 ## `diagnostics/`
 
-The mock world they tick is the entities'
-(`entity_rules::diagnostics::world::MockWorld`).
+The mock world they tick is the instructions'
+(`instructions::mock_world::MockWorld`, with sheep by
+`entity_rules::diagnostics::world::mock_world_with_sheep`).
 
 **`throughput::run(ticks, thousandths, superchunks, threads)`**: grass
 ticked flat out: each phase's time, samples, writes, cells missed, the

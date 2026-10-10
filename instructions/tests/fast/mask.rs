@@ -10,7 +10,7 @@ use coordinates::{CellCartesian, CellIndex, SuperchunkIndex};
 use entity_manager::Entities;
 use instructions::mask::{self, Mask, SIDES};
 use instructions::{read, write};
-use instructions::Simulation;
+use simulation::Simulation;
 use utilities::rng::Rng;
 
 /// The layer type the tests run on.

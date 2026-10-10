@@ -3,13 +3,13 @@
 //! each phase's time, each rule's time in the first -- added up over
 //! the threads -- and the memory held.
 
-use entity_rules::diagnostics::world::MockWorld;
+use chunk_storage::mock::GRASS;
+use entity_rules::diagnostics::world::mock_world_with_sheep;
 use mc_rules::grass;
 use crate::TickCounts;
 use entity_rules::sheep;
 use entity_manager::diagnostics::entities::EntityStats;
 use entity_manager::InstructionsApplied;
-use simulation::Simulation;
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 use utilities::diagnostics::process_memory::MemoryTrack;
@@ -96,14 +96,13 @@ impl AddAssign for Timed {
 pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, threads: usize) -> PastureRun {
     let mut memory = MemoryTrack::default();
     memory.read();
-    let mut world = MockWorld::with_sheep(superchunks, (1 << 20) * thousandths / 1000, sheep);
-    let (start_sheep, start_grass) = (world.sheep(), world.grass());
+    let mut world = mock_world_with_sheep(superchunks, (1 << 20) * thousandths / 1000, sheep).on_threads(threads);
+    let (start_sheep, start_grass) = (world.count_entities(sheep::SHEEP), world.count(GRASS));
     let (mut timed, mut instructions, mut writes, mut computing, mut applying) = (Timed::default(), InstructionsApplied::default(), 0, Duration::ZERO, Duration::ZERO);
-    let mut simulation = Simulation::new(threads);
     let mut census = vec![Census { tick: 0, sheep: start_sheep, grass: start_grass, ..Census::default() }];
     let mut since = sheep::SheepCounts::default();
     for tick in 0..ticks {
-        let report = simulation.tick(&mut world.arena, &mut world.entities, tick as u64, |turn, samples| {
+        let report = world.tick(tick as u64, |turn, samples| {
             let start = Instant::now();
             let grass = grass::rule(turn, samples);
             let grassed = Instant::now();
@@ -113,7 +112,7 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
         timed += report.rules;
         since += report.rules.done.sheep;
         if (tick + 1) % CENSUS_EVERY == 0 || tick + 1 == ticks {
-            census.push(Census { tick: tick + 1, sheep: world.sheep(), grass: world.grass(), woken: since.woken, births: since.births, deaths: since.deaths });
+            census.push(Census { tick: tick + 1, sheep: world.count_entities(sheep::SHEEP), grass: world.count(GRASS), woken: since.woken, births: since.births, deaths: since.deaths });
             since = sheep::SheepCounts::default();
         }
         instructions += report.instructions_applied;
@@ -126,8 +125,8 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
         ticks,
         superchunks: superchunks as usize,
         threads,
-        sheep: (start_sheep, world.sheep()),
-        grass: (start_grass, world.grass()),
+        sheep: (start_sheep, world.count_entities(sheep::SHEEP)),
+        grass: (start_grass, world.count(GRASS)),
         done: timed.done,
         instructions,
         writes,
@@ -136,7 +135,7 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
         grass_time: timed.grass,
         sheep_time: timed.sheep,
         memory,
-        held: EntityStats::of(&world.entities),
+        held: EntityStats::of(world.held().1),
         census,
     }
 }

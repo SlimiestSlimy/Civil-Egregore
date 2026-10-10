@@ -12,6 +12,7 @@ mc_rules = { path = "../mc_rules" }
 worldgen = { path = "../worldgen" }
 entity_rules = { path = "../entity_rules" }
 simulation = { path = "../simulation" }
+instructions = { path = "../instructions" }
 coordinates = { path = "../coordinates" }
 utilities = { path = "../utilities" }
 bitplane_manager = { path = "../bitplane_manager" }

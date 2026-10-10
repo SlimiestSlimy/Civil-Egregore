@@ -34,6 +34,7 @@ use chunk_storage::mock::GRASS;
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
 use mc_rules::trees::{OLDEST, TREE, TREE_STAGE};
 use entity_rules::sheep::flock;
+use instructions::between_ticks::EntitiesBetweenTicks;
 use entity_manager::{saved, Entities, EntityType};
 use simulation::{Halos, Hot, Simulation};
 use std::collections::BTreeMap;
@@ -117,7 +118,7 @@ impl World {
     /// random stream of its own: the same flock whenever it is put
     /// there. Put in the world by `Entities::apply`.
     pub(crate) fn put_flock(&mut self, superchunk: SuperchunkIndex, sheep: usize) {
-        flock(&mut self.entities, superchunk, sheep, &mut Rng::for_stream(!self.info.seed, superchunk.0));
+        flock(&mut EntitiesBetweenTicks::of(&mut self.entities), superchunk, sheep, &mut Rng::for_stream(!self.info.seed, superchunk.0));
     }
 }
 

@@ -15,7 +15,8 @@ mod entities {
     use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
     use entity_manager::{Attribute, AttributeType, EntityEdit, Entities, EntityId, EntityType, Header, NEVER};
     use instructions::around::{self, CENTRE, RING};
-    use instructions::{read, write, Simulation, Turn};
+    use instructions::{read, write, Turn};
+    use simulation::Simulation;
     use std::sync::Mutex;
 
     /// The layer type the arena holds: every cell hot, none set.
