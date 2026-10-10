@@ -15,7 +15,7 @@ use entity_manager::{Entities, EntityId, EntityType, Header, NEVER};
 use instructions::Turn;
 use simulation::Simulation;
 use std::sync::Mutex;
-use worldgen::{WALL_EAST, WALL_SOUTH};
+use type_registry::{WALL_EAST, WALL_SOUTH};
 
 /// The layer type the arena holds: every cell hot, none set.
 const STONE: LayerType = LayerType(6);

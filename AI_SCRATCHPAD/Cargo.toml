@@ -8,6 +8,7 @@ publish = false
 # NOTHING DEPENDS ON THIS CRATE: it is no part of the program, and may be
 # deleted whole without anything else changing.
 [dependencies]
+type_registry = { path = "../type_registry" }
 coordinates = { path = "../coordinates" }
 server = { path = "../server" }
 utilities = { path = "../utilities" }

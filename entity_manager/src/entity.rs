@@ -3,6 +3,7 @@
 //! grow or shrink at run time.
 
 use coordinates::CellIndex;
+pub use type_registry::{AttributeType, EntityType};
 
 /// An entity's ID: drawn at random when it is made, from the random
 /// numbers of the superchunk making it, so the same on any number of
@@ -10,15 +11,6 @@ use coordinates::CellIndex;
 /// near each other sharing one is a chance of about one in 2^64 a pair.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EntityId(pub u64);
-
-/// An entity's type: a type ID like a layer's, from the one `u64`
-/// namespace every type in Civil Egregore is drawn from.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct EntityType(pub u64);
-
-/// An attribute's type, from the same namespace.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct AttributeType(pub u64);
 
 /// One attribute: its type and its value, a word whose meaning is the
 /// type's.

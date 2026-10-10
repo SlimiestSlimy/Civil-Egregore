@@ -3,7 +3,7 @@
 //! -- the process's, sampled every tick, and the arena's and storage's
 //! own.
 
-use worldgen::GRASS;
+use type_registry::GRASS;
 use crate::diagnostics::plain_world::{plain_world, superchunks as superchunks_of};
 use crate::host::frame::count;
 use crate::Chosen;

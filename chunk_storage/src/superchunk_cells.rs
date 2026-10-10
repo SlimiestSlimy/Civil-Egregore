@@ -3,7 +3,8 @@
 
 use crate::chunk_maps::ChunkMaps;
 use crate::height_map::HeightMap;
-use crate::layer_codec::{LayerCodec, LayerType};
+use crate::layer_codec::LayerCodec;
+use type_registry::LayerType;
 use crate::superchunk_image::{LayerChange, SuperchunkImage};
 use bitmap::CellWords;
 

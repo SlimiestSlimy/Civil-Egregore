@@ -3,7 +3,7 @@
 //! each phase's time, each rule's time in the first -- added up over
 //! the threads -- and the memory held.
 
-use worldgen::GRASS;
+use type_registry::GRASS;
 use crate::diagnostics::plain_world::{plain_world, superchunks as superchunks_of};
 use crate::host::frame::count;
 use crate::{Chosen, TickCounts};

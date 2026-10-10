@@ -7,7 +7,7 @@
 //!
 //! An instruction is built on what is public of the crates under it:
 //! the simulation's turn -- cells read, writes and entity instructions
-//! queued -- the terrain's layers (`../worldgen`) and the paths of
+//! queued -- the layers the type registry names (`../type_registry`) and the paths of
 //! `../pathfinding`. None of those knows another; they meet here.
 //!
 //! Instructions are kept by what they do to the turn:
@@ -45,6 +45,7 @@
 pub mod area;
 pub mod around;
 pub mod between_ticks;
+pub mod entity_types;
 pub mod layers;
 pub mod mask;
 pub mod read;

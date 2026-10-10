@@ -6,6 +6,7 @@ description = "Civil Egregore's server: the world as a whole, made from a seed, 
 publish = false
 
 [dependencies]
+type_registry = { path = "../type_registry" }
 entity_manager = { path = "../entity_manager" }
 bitmap = { path = "../bitmap" }
 mc_rules = { path = "../mc_rules" }

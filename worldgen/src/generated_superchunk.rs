@@ -2,17 +2,11 @@
 //! grows on it put on the layers a world has ([`layer_types`]). The
 //! image of them is storage's to make (`SuperchunkCells::image`).
 
-use crate::{Generation, Terrain, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WALLS, WET};
+use crate::{Generation, Terrain, WALLS};
+use type_registry::{GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{ChunkMaps, LayerType, SuperchunkCells};
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
-
-/// Every layer type a generated world has: the grass's, the trees',
-/// the water's and the walls'. Dirt has none: it is a cell with nothing
-/// on it.
-pub fn layer_types() -> Vec<LayerType> {
-    [GRASS, TREE, TREE_STAGE.layer_type(), WET].into_iter().chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
-}
 
 /// The cells of `superchunk` in a world made from `seed` as
 /// `generation` says: its terrain, the ocean where it is under the

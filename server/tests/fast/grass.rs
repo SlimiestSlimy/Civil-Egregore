@@ -6,7 +6,7 @@ use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, t
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex};
 use mc_rules::grass::{DECAYS, DECAY_CHANCE, SAMPLED, SPREADS, SPREAD_CHANCE};
 use server::World;
-use worldgen::GRASS;
+use type_registry::GRASS;
 
 /// Every chunk's grass in `world`, as its bitmap's words, the chunks in
 /// Morton order.

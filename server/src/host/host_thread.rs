@@ -4,8 +4,8 @@
 use crate::{Start, World};
 use super::{CATCH_UP, CENSUS_EVERY, FRAMES_SHARE, Request, TARGET_PACE, census};
 use super::frame::{self, Ask, Cells, Frame, copy, count, hot_in};
-use worldgen::GRASS;
-use worldgen::TREE;
+use type_registry::GRASS;
+use type_registry::TREE;
 use std::thread;
 use std::collections::HashMap;
 use std::fs::File;

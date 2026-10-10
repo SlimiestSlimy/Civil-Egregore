@@ -14,7 +14,7 @@
 
 use coordinates::{ChunkIndex, SuperchunkIndex};
 use crate::height_map::HeightMap;
-use crate::layer_codec::LayerType;
+use type_registry::LayerType;
 use crate::superchunk_image::{LayerChange, SuperchunkImage};
 use crate::writeback_ring::WritebackRing;
 use std::sync::Arc;

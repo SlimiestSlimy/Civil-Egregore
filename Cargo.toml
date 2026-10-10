@@ -39,6 +39,7 @@ members = [
     "simulation",
     "worldgen",
     "tessera",
+    "type_registry",
     "utilities",
     "renderer",
     "server",
@@ -57,6 +58,7 @@ default-members = [
     "simulation",
     "worldgen",
     "tessera",
+    "type_registry",
     "utilities",
     "server",
 ]

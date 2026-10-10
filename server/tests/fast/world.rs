@@ -79,11 +79,14 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
 #[test]
 fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let folder = folder("files");
-    let mut first = server::start(server::Start { seed: 99, sheep: 10, ..server::Start::default() });
+    let seed = crate::tests::land_seed(1);
+    let mut first = server::start(server::Start { seed, sheep: 10, ..server::Start::default() });
     server::save(&folder, &mut first).expect("saved");
     let text = std::fs::read_to_string(folder.join("world.csv")).expect("the world's file");
     let generation: String = first.generation.numbers().iter().map(|(name, value)| format!("generation {name},{value}\n")).collect();
-    assert_eq!(text, format!("world,is\nformat,2\nseed,0x0000000000000063\ntick,0\nlayers,2 3 4 5 6 7 24 8 9\nhot entity,{}\n{generation}", server::HOT_ENTITY.0), "no name: the folder's");
+    // Every layer the registry has, a wide plane as the layers it is kept cold as.
+    let layers: Vec<String> = type_registry::layer_types().into_iter().flat_map(|layer_type| layer_type.planes()).map(|plane| plane.0.to_string()).collect();
+    assert_eq!(text, format!("world,is\nformat,2\nseed,{}\ntick,0\nlayers,{}\nhot entity,{}\n{generation}", utilities::seed::hex(seed), layers.join(" "), server::HOT_ENTITY.0), "no name: the folder's");
     let hot: String = first.arena.superchunk_indices().iter().map(|superchunk| format!("{:011x},hot,\n", superchunk.0)).collect();
     assert_eq!(std::fs::read_to_string(folder.join("hot.csv")).expect("the hot file"), format!("superchunk,is,until\n{hot}"), "the nine hot, none cooling or warming");
     let mut names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|entry| entry.unwrap().file_name().into_string().unwrap()).collect();

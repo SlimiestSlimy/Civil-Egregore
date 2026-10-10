@@ -3,7 +3,8 @@
 
 use server::{Size, Start};
 use utilities::commands::Given;
-use worldgen::{Generation, GRASS, ONE, WALL_EAST, WALL_SOUTH, WET};
+use worldgen::{Generation, ONE};
+use type_registry::{GRASS, WALL_EAST, WALL_SOUTH, WET};
 
 /// The share of the plain's cells with grass, in thousandths.
 pub const GRASS_THOUSANDTHS: &str = "grass thousandths";

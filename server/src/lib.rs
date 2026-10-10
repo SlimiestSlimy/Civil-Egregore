@@ -166,7 +166,7 @@ pub fn generate_sized(generation: Generation, seed: u64, size: Size, hot_entity:
         Size::Unlimited => (None, false),
         Size::Limited { side, forced } => (Some(side), forced),
     };
-    World::empty(WorldInfo { seed, tick: 0, layers: worldgen::layer_types(), side, forced, hot_entity: Some(hot_entity.0), camera_flock: None, without_camera_flock: Vec::new(), generation: generation.numbers() }, generation, threads)
+    World::empty(WorldInfo { seed, tick: 0, layers: type_registry::layer_types(), side, forced, hot_entity: Some(hot_entity.0), camera_flock: None, without_camera_flock: Vec::new(), generation: generation.numbers() }, generation, threads)
 }
 
 /// `world`, nothing in it yet, with a flock of `sheep` on each of
@@ -242,7 +242,7 @@ pub fn worlds_in(folder: &Path) -> Vec<String> {
 /// was to -- as it was when saved, to the cell and the random number.
 pub fn load(folder: &Path) -> Result<World, DiskError> {
     // The layers made hot are the code's: a save lists what it was written with.
-    let info = WorldInfo { layers: worldgen::layer_types(), ..disk::read_world(folder)? };
+    let info = WorldInfo { layers: type_registry::layer_types(), ..disk::read_world(folder)? };
     let hot = disk::read_hot(folder)?;
     let generation = Generation::of_numbers(&info.generation);
     let mut world = World::empty(info, generation, None);

@@ -49,22 +49,10 @@
 
 use instructions::around::{self, CENTRE, RING};
 use instructions::between_ticks::EntitiesBetweenTicks;
+pub use instructions::entity_types::{HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
 use instructions::layers::{GRASS, WALL_EAST, WALL_SOUTH};
-use instructions::{read, write, Attribute, AttributeType, CellCartesian, EntityEdit, EntityId, EntityRef, EntityType, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
+use instructions::{read, write, Attribute, CellCartesian, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
-
-/// The sheep's type.
-pub const SHEEP: EntityType = EntityType(16);
-/// The tick a sheep is next hungry at.
-pub const HUNGRY_AT: AttributeType = AttributeType(17);
-/// The tick a pregnant sheep's lamb is due at.
-pub const PREGNANT: AttributeType = AttributeType(18);
-/// The tick a lamb is grown at.
-pub const LAMB: AttributeType = AttributeType(19);
-/// A sheep leaving thin pasture: the tick it roams until, times 16, and
-/// the neighbour it steps to -- its bit in the 3x3 cells about it. Set
-/// once, at the meal: a step on the way changes no attribute.
-pub const ROAMING: AttributeType = AttributeType(20);
 
 /// Ticks between a walking sheep's steps, at the least...
 pub const STEP_TICKS: u64 = 64;
