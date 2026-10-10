@@ -19,6 +19,13 @@ pub fn each_woken<'a, const N: usize, S>(turn: &mut Turn<'a>, layers: [LayerType
     }
 }
 
+/// Whether the entity whose ID is `id` stood on `at` -- any cell in
+/// reach -- as the tick found it.
+#[inline]
+pub fn stands(turn: &Turn, id: EntityId, at: CellIndex) -> bool {
+    turn.entity(id, at).is_some()
+}
+
 /// Queues making an entity of type `kind` on `at`, with `attributes`
 /// sorted by type, to wake at `wake`: its ID, drawn here. It is not
 /// made if an entity stands on the cell by then.

@@ -102,10 +102,19 @@ wakes are as far apart as its needs.
 The rule runs in a tick's first phase, as grass does, reading the
 world as the tick found it. No two sheep eat one cell: a sheep eats the
 cell it stands on, and a cell holds one entity. A cell a sheep eats may
-decay in the same tick, and is cleared once. Two lambs born onto one
-cell in a tick are one lamb -- the second is refused as it is put, its
-mother pregnant no more and its birth counted all the same
-(`../../server/docs/server.md`, "Two writes on one cell"). How it came to be -- what was measured, what was
+decay in the same tick, and is cleared once
+(`../../server/docs/server.md`, "Two writes on one cell").
+
+**A lamb is born once it is seen.** A lamb is put on a cell seen free,
+which another lamb or a stepping sheep may take first in the same
+tick: the put is then refused, and nothing in the tick tells its
+mother. So she does not take the put for a birth. She notes the lamb
+and the neighbour she put it on (`BEARING`, laid out as `Bearing`),
+stays where she is, and wakes the next tick: the lamb standing there,
+it is born -- counted, and she is pregnant no more; not there, she is
+pregnant and due as before, and puts it again when a cell beside her
+is free. A birth costs a wake more; none is lost and none counted that
+was not. How it came to be -- what was measured, what was
 thrown away -- is in `../../docs/civil_egregore.md`.
 
 ## Layout

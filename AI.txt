@@ -259,9 +259,8 @@ break; write a new ask here the moment it is made.
    cell"; server/tests/fast/double_writes.rs). Two sheep cannot eat one
    cell. Found: two lambs born onto one cell in a tick -> one refused,
    counted as born, mother no longer pregnant.
-6c. THE LOST LAMB (asked 2026-10-10: "we need to fix that lost born
-   lamb as well, add it to the list as well"): fix it -- the mother
-   stays pregnant until she has seen her lamb stand where she put it.
+6c. THE LOST LAMB: FIXED 2026-10-10 (BEARING; entity_rules.md, "A lamb
+   is born once it is seen").
 7. LAST STEP (asked 2026-10-09): go through ALL tests of the codebase;
    wherever a test has fixed cases that could be generated (seeded,
    randomized, from the seed file), make it generated.

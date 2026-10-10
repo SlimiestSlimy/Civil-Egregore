@@ -24,8 +24,8 @@ no attribute's): **`of_blocks(number, blocks)`**,
 attribute block; **`data_words(blocks)`**: the words of data so many
 blocks hold. **`Layout`**: how an attribute's data is laid out --
 `BLOCKS`, **`write(data)`**, **`read(data)`** -- had by `u64`, one
-number in the first word, and by **`Roaming`** `{until, neighbour}`,
-the first word and the second. **`Attribute<L>`**: an attribute, its
+number in the first word, and by **`Roaming`** `{until, neighbour}`
+and **`Bearing`** `{lamb, neighbour}`, the first word and the second. **`Attribute<L>`**: an attribute, its
 layout in its type: **`new(number)`**, **`attribute_type`**.
 
 ## `registry.rs`
@@ -38,7 +38,7 @@ the cells. **`registered!`**: the rows as written -- from each its
 constant and its row. **`REGISTRY`**: the table. The constants:
 `GRASS`, `TREE`, `TREE_STAGE`, `WALL_EAST`, `WALL_SOUTH`, `WET`, the
 cells'; `SHEEP`, the entity; `HUNGRY_AT`, `PREGNANT`, `LAMB`, `ROAMING`,
-its attributes; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
+`BEARING`, its attributes; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
 **`first_clash(registry)`**: the first row to take an ID or a name of
 one before it -- checked on `REGISTRY` as the crate is built.
 **`named(name)`**, **`of_id(id)`**: a row by its name, and by any ID it
