@@ -60,7 +60,7 @@ pub fn world_hash(world: &mut World) -> WorldHash {
     let mut cold = fold(0, world.cold.len() as u64);
     for (&superchunk, state) in &world.cold {
         cold = fold_all(fold(cold, superchunk.0), state);
-        cold = fold_all(cold, world.storage.image(superchunk).map_or(&[][..], |image| image.words()));
+        cold = fold_all(cold, world.storage.shared_image(superchunk).as_ref().map_or(&[][..], |image| image.words()));
     }
     WorldHash { tick: world.entities.now(), cells, entities, random_streams, halos, cold }
 }

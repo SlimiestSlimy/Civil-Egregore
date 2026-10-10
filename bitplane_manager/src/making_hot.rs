@@ -139,6 +139,12 @@ impl BitmapArena {
         true
     }
 
+    /// Whether `superchunk` is lingering: cold, its buckets kept until
+    /// chunk storage holds its changes.
+    pub fn lingers(&self, superchunk: SuperchunkIndex) -> bool {
+        self.lingering_at(superchunk).is_ok()
+    }
+
     /// How many superchunks are lingering.
     pub fn lingering(&self) -> usize {
         self.lingering.len()

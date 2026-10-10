@@ -230,7 +230,7 @@ SCA renaming are last". SO THE ORDER NOW: tests (task 7, DONE) ->
 review item 1 (the renderer asks the host for terrain: DONE
 2026-10-10, server/src/host/terrain.rs; map mode and the height
 labels not tried by hand in the window -- the user's to look at) ->
-cold pool paging (NEXT) -> the decay+eat case, compare-and-write, write groups -> GPU
+cold pool paging (DONE) -> the decay+eat case (NEXT), compare-and-write, write groups -> GPU
 LOD -> SCA rename.
 That is: (1) server::World -- DONE 2026-10-10; (2) docs
 finished; (3) tests finished -- task 7, and each crate testing itself;
@@ -283,9 +283,15 @@ break; write a new ask here the moment it is made.
    lib); read/ and write/ gone; repeats written once; tests share
    tests/tests.rs. The user may yet say whether Around/Area/Window as
    three {set, hot} shapes should be one.
-4. COLD POOL to disk once worlds get large (paging). Server tests'
-   remaining written seeds (21 and 3 in server/tests/complete.rs) from
-   the seed file. Optional: BMI2 pdep for select.
+4. COLD POOL PAGED TO DISK: DONE 2026-10-10 (chunk_storage/src/
+   paging.rs; chunk_storage.md "Paged to disk", server.md "The cold
+   pool paged"; server/tests/fast/paging.rs). A world keeps
+   COLD_POOL_BYTES_KEPT (2 GiB, my number -- the user's to set) of
+   cold images in memory, the rest in transient_data/paging/. Left:
+   page-out writes on the tick's thread (page-in is on the job's);
+   cold STATES (entities, random number) not paged; BMI2 pdep for
+   select not done (optional, and performance is not worked on now).
+   The written seeds in server/tests/complete.rs: already the run's.
 5. LOD ON THE GPU (renderer).
 6. Another day: optimizations, inlining.
 

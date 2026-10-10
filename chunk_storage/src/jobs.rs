@@ -3,7 +3,7 @@
 //! decoded (`docs/chunk_storage.md`, "Jobs").
 
 use crate::layer_codec::BucketKey;
-use crate::{wide, Flush, LayerCodec, LayerType, SuperchunkImage};
+use crate::{read_back, wide, Flush, LayerCodec, LayerType, Stored, SuperchunkImage};
 use coordinates::SuperchunkIndex;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -30,8 +30,9 @@ pub enum Job {
     Warm {
         /// The superchunk.
         superchunk: SuperchunkIndex,
-        /// Its image in the cold pool, if it has one.
-        image: Option<Arc<SuperchunkImage>>,
+        /// Its image as the cold pool has it, if it has one: read here,
+        /// off the tick, if it is paged to disk.
+        image: Option<Stored>,
         /// What generates it, if it has none.
         generate: Generate,
         /// The layer types to decode.
@@ -51,6 +52,9 @@ pub enum Done {
     Warmed {
         /// Its image, if it had none: generated.
         generated: Option<SuperchunkImage>,
+        /// Its image, if it was paged to disk: read back, to be in
+        /// memory again ([`crate::ChunkStorage::bring_in`]).
+        read: Option<SuperchunkImage>,
         /// Each bitmap's cells, chunk by chunk, type by type: `None` for
         /// no cell set.
         cells: Vec<(BucketKey, Option<Box<[u64]>>)>,
@@ -76,8 +80,13 @@ impl Job {
             }
             Self::Flush(flush) => Done::Flushed(flush.rewritten()),
             Self::Warm { superchunk, image, generate, types } => {
-                let generated = image.is_none().then(|| generate(codec));
-                let image = generated.as_ref().or(image.as_deref()).expect("an image, kept or generated");
+                let (mut generated, mut read, mut shared) = (None, None, None);
+                match image {
+                    None => generated = Some(generate(codec)),
+                    Some(Stored::InMemory(image)) => shared = Some(image),
+                    Some(Stored::OnDisk(folder)) => read = Some(read_back(&folder, superchunk)),
+                }
+                let image = generated.as_ref().or(read.as_ref()).or(shared.as_deref()).expect("an image, kept, read or generated");
                 let mut cells = Vec::with_capacity(types.len() * superchunk.chunks().count());
                 for chunk in superchunk.chunks() {
                     for &layer_type in &types {
@@ -92,7 +101,7 @@ impl Job {
                         cells.push((BucketKey { layer_type, chunk }, bucket));
                     }
                 }
-                Done::Warmed { generated, cells }
+                Done::Warmed { generated, read, cells }
             }
         }
     }

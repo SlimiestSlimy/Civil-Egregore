@@ -44,12 +44,13 @@ sequence a few draws apart -- two flocks came out with the same sheep.
 A world (`World`) is several parts that must agree: its hot bitmaps
 (the arena), every superchunk as stored, the hot superchunks'
 entities, the simulation's random numbers, each cold superchunk's
-state, and the halos. Three things are always so between two ticks,
+state, and the halos. Four things are always so between two ticks,
 and `World::broken_invariant` says which is not, if any:
 
 - the entities are held for exactly the hot superchunks -- those the
   arena has bitmaps of, in the same order;
 - no superchunk is both hot and cold;
+- no hot superchunk's image is paged to disk ("The cold pool paged");
 - every superchunk made is one or the other: as many stored as there
   are hot and cold together.
 
@@ -61,7 +62,7 @@ saved, or, between two ticks, by `World::put_entity`,
 `World::remove_entity` and `World::write_cells` -- each applied as it
 is called, and saying what came of it, as an entity or a cell off the
 hot superchunks is lost or missed, not put. A debug build checks the
-three after every tick (`World::tick`); the fast tier checks them at
+four after every tick (`World::tick`); the fast tier checks them at
 every tick and every load of a long run that warms and cools
 superchunks (`../tests/fast/world.rs`).
 
@@ -242,6 +243,31 @@ says the bytes written).
 Not yet: superchunks no longer in the world are not removed from a
 save's folder.
 
+## The cold pool paged
+
+A world keeps `COLD_POOL_BYTES_KEPT` bytes of its cold superchunks'
+images in memory, or as many as it is told
+(`World::keep_cold_pool_within`); after each tick the rest are paged
+to disk (`World::page_cold_pool_out`;
+`../chunk_storage/docs/chunk_storage.md`, "Paged to disk"), in a folder
+of the world's own under `transient_data/paging/`, gone with it. None
+of a superchunk hot, cooling, warming or lingering is paged, so what a
+tick or a frame reads of an image is in memory; a superchunk turning
+hot has its image read back by the job that decodes it, off the tick.
+If the disk refuses an image, the world says so once and pages no
+more.
+
+Paging changes nothing a world holds: one keeping no cold image in
+memory is, at every tick, save and load, the world that keeps them
+all (`tests/fast/paging.rs`). A world loaded reads and checks every
+image, and leaves in the save those past what it keeps
+(`load_keeping`): so the save it runs from is not to be removed under
+it.
+
+Not paged: a cold superchunk's state (its entities and random number,
+`World::cold`), small beside its image, and what is hot -- a world
+whose hot superchunks alone pass what it keeps holds them all the same.
+
 ## The host
 
 A world run for a window, on a thread of its own (`src/host/`): the
@@ -306,5 +332,5 @@ where that will be done, and no client changes for it.
 | `src/host/` | a world run on a thread of its own for a window: `mod` the host's calls and the census, `host_thread` the thread itself, `frame` what it answers, `terrain` the terrain a client asks of it, answered on a thread of its own |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; the diagnostics tools |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
-| `tests/` | the halos follow their hot entities; a world of a size is hot within it only; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; a world hashes the same however it is ticked; the files; refusals |
+| `tests/` | the halos follow their hot entities; a world of a size is hot within it only; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; a world hashes the same however it is ticked; a world paged to disk is the world kept in memory; the files; refusals |
 | `docs/` | this, and the reference, function by function |

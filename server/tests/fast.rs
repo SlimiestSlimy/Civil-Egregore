@@ -11,6 +11,9 @@ mod commands;
 #[path = "fast/halos.rs"]
 mod halos;
 
+#[path = "fast/paging.rs"]
+mod paging;
+
 #[path = "fast/world.rs"]
 mod world;
 

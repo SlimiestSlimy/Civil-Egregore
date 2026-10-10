@@ -47,6 +47,13 @@ impl World {
         &self.cold
     }
 
+    /// Has it keep `bytes_kept` bytes of its cold superchunks' images
+    /// in memory at most, in place of [`crate::COLD_POOL_BYTES_KEPT`]:
+    /// the rest paged to disk after each tick.
+    pub fn keep_cold_pool_within(&mut self, bytes_kept: u64) {
+        self.storage.keep_in_memory(bytes_kept);
+    }
+
     /// Its halos: the superchunks warming and cooling.
     pub fn halos(&self) -> &Halos {
         &self.halos
@@ -80,7 +87,8 @@ impl World {
 
     /// What is wrong between the world's parts, if anything is: the
     /// entities held for other superchunks than the hot ones, a
-    /// superchunk both hot and cold, or one made that is neither.
+    /// superchunk both hot and cold, a hot one whose image is paged to
+    /// disk, or one made that is neither.
     pub fn broken_invariant(&self) -> Option<String> {
         let hot = self.arena.superchunk_indices();
         let with_entities: Vec<SuperchunkIndex> = self.entities.superchunks().iter().map(|superchunk| superchunk.index()).collect();
@@ -89,6 +97,9 @@ impl World {
         }
         if let Some(both) = hot.iter().find(|superchunk| self.cold.contains_key(superchunk)) {
             return Some(format!("superchunk {} is hot and cold", both.0));
+        }
+        if let Some(paged) = hot.iter().find(|&&superchunk| self.storage.is_on_disk(superchunk)) {
+            return Some(format!("superchunk {} is hot, its image paged to disk", paged.0));
         }
         let made = self.storage.superchunks().count();
         (made != hot.len() + self.cold.len()).then(|| format!("{made} superchunks made, {} hot and {} cold", hot.len(), self.cold.len()))

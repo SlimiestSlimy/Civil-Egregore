@@ -28,7 +28,7 @@ pub type Everything = (Vec<u64>, Vec<(Header, Vec<AttributeBlock>)>, u64, Vec<(S
 pub fn everything(world: &World) -> Everything {
     let cells = world.info().layers.clone().into_iter().flat_map(|layer| world.arena().run(layer)).flat_map(|(_, bucket)| bucket.words().to_vec()).collect();
     let all = world.entities().iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
-    let cold = world.cold().iter().map(|(&superchunk, words)| (superchunk, world.storage().image(superchunk).expect("a cold superchunk's image").clone(), words.clone())).collect();
+    let cold = world.cold().iter().map(|(&superchunk, words)| (superchunk, SuperchunkImage::clone(&world.storage().shared_image(superchunk).expect("a cold superchunk's image")), words.clone())).collect();
     (cells, all, world.entities().now(), world.simulation().random_states().collect(), cold, world.warming().collect(), world.cooling().collect())
 }
 

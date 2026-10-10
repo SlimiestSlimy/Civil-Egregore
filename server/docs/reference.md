@@ -32,7 +32,10 @@ folders' names, sorted.
 **`load(folder)`**: every superchunk's image into the cold pool and its
 state, read whole, kept cold; then the hot file's hot superchunks made
 hot, its cooling ones cooling again and its warming ones warming again -- a `World`, or a `DiskError` naming
-the file and what is wrong.
+the file and what is wrong. **`load_keeping(folder, bytes_kept)`**: the
+same, keeping so many bytes of cold images in memory, the rest left in
+the save; `COLD_POOL_BYTES_KEPT` (2 GiB), what a world keeps unless
+told.
 
 ## `world_start.rs`
 
@@ -99,6 +102,9 @@ is called: **`World::put_entity(header, attributes)`** and
 **`World::remove_entity(header)`**, an `InstructionsApplied` each;
 **`World::write_cells(layer_type, writes)`**, a `WritesApplied`.
 **`World::keep_viewport(viewport)`**: the viewport told to the halos.
+**`World::keep_cold_pool_within(bytes_kept)`**: how many bytes of cold
+images it keeps in memory; **`World::page_cold_pool_out`**: the rest
+paged to disk, after each tick (`server.md`, "The cold pool paged").
 **`World::broken_invariant`**: what is wrong between the parts, in
 words, or `None`.
 
@@ -140,7 +146,8 @@ a **`PastureRun`**.
 ## `transient_data.rs`
 
 `TRANSIENT_DATA`: the crate's `transient_data/` folder.
-**`measurements()`**, **`saves()`**, **`publish(report)`**.
+**`measurements()`**, **`saves()`**, **`paging()`** -- where running
+worlds page their cold pools -- **`publish(report)`**.
 
 ## `world_hash.rs`
 

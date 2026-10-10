@@ -70,9 +70,12 @@ walking entries from the tail, over wrap markers.
 
 **`ChunkStorage::new(ring_words)`**. `find(superchunk)`: where a
 superchunk is in the cold pool, or where it would go. **`insert(superchunk, image)`**,
+**`holds(superchunk)`**,
 **`image(superchunk)`**, **`shared_image(superchunk)`** -- a handle to
-it, to read on another thread -- **`superchunks()`**, **`layer(chunk,
-type)`**: the cold pool, its images shared (`Arc`).
+it, to read on another thread, read here if it is paged to disk --
+**`superchunks()`**, **`layer(chunk,
+type)`**: the cold pool, its images shared (`Arc`); `image` and `layer`
+of one in memory, a panic at one on disk.
 **`try_write_back(chunk, type, encoded)`**: into the ring if it fits --
 an empty ring too small grown -- whether it went in.
 **`write_back(chunk, type, encoded, flushed)`**: the same, the
@@ -86,6 +89,30 @@ superchunk not stored made flat); **`tail_superchunk`**,
 **`flush(superchunk)`**: taken and rewritten here. **`flush_all`**,
 **`nothing_to_flush`**.
 
+## `paging.rs`
+
+The cold pool paged to disk (`chunk_storage.md`, "Paged to disk").
+`Kept`: where the pool keeps an image -- `InMemory(image)`, or
+`OnDisk(folder)`. **`Stored`**: the same, to hand to another thread;
+**`Stored::image(superchunk)`**: the image, read now if on disk.
+**`read_back(folder, superchunk)`**: a paged image read, a panic if it
+does not. `bytes_of(image)`. `PagingFolder`: a pool's own folder, its
+lock file beside it (`LOCK`), named by its process and a count
+(`FOLDERS_MADE`); `PagingFolder::under(root)` makes one, those left
+behind removed; dropped, it is removed. `Paging` `{root, folder,
+bytes_kept, bytes_in_memory, hand}`; `Paging::none()`.
+**`ChunkStorage::page_under(root, bytes_kept)`**: pages, under `root`,
+keeping so many bytes; **`keep_in_memory(bytes_kept)`**;
+**`stop_paging_out()`**; **`over_memory_kept()`**;
+**`bytes_in_memory()`**; **`is_on_disk(superchunk)`**; **`on_disk()`**,
+how many are. **`page_out(held)`**: images written and let go until no
+more are in memory than kept, none `held` says is held nor with
+changes in the ring -- how many, or the disk's refusal, the image
+still in memory. **`insert_on_disk(superchunk, folder)`**: an image
+left in a save. **`bring_in(superchunk, image)`**: one read back, in
+memory again. **`stored(superchunk)`**. **`save_image(folder,
+superchunk)`**: written from memory, or copied from where it is paged.
+
 ## `disk.rs`
 
 `WorldInfo` and `HotSuperchunks`, the two text files, are in
@@ -96,7 +123,8 @@ a world's folder.
 **`WorldInfo`** `{seed, tick, layers, side, forced, hot_entity, camera_flock, without_camera_flock, generation}` -- `forced` only with a `side`, refused otherwise; `hot_entity` a number, the runner knowing the kinds; `camera_flock` the sheep each superchunk generated in the viewport starts with, if its camera loads superchunks; `without_camera_flock` the superchunks generated out of its view, still owed theirs, sorted; `generation` sorted by name -- no name: a world's is its folder's --; read by its rows' names in any order, the header first, missing ones their defaults but the seed ("On disk" in `chunk_storage.md`); **`DiskError`**: `Io(path,
 error)` or `Invalid(path, what)`. **`write_world(folder, info)`**,
 **`read_world(folder)`**; **`write_image(folder, superchunk,
-image)`**, **`read_image`**; **`write_state(folder, superchunk,
+image)`**, **`read_image`**, **`copy_image(from, folder, superchunk)`**
+-- file to file, the same file left; **`write_state(folder, superchunk,
 words)`**, **`read_state`** -- the words, and the file's path;
 **`HotSuperchunks`** `{hot, cooling, warming}`, **`write_hot(folder, hot)`**,
 **`read_hot(folder)`**: the hot file;
@@ -107,7 +135,8 @@ Private: `superchunk_file`, `make_folder`, `write`, `write_words`,
 
 ## `diagnostics/storage.rs`
 
-**`StorageStats::of(storage)`**: superchunk images stored, their bytes,
+**`StorageStats::of(storage)`**: superchunk images stored, how many of
+them on disk, the bytes of those in memory,
 the ring's bytes.
 
 ## `transient_data.rs`
@@ -119,11 +148,13 @@ the ring's bytes.
 
 The slow work, done off the tick on the dispatcher's threads.
 **`Job`**: `Encode(dirty)`, `Flush(flush)`, or `Warm {superchunk,
-image, generate, types}` -- `generate` (**`Generate`**) the world's
+image, generate, types}` -- `image` as the pool has it (`Stored`), read
+by the job if on disk; `generate` (**`Generate`**) the world's
 generator, called if there is no image; **`Job::run(codec)`**: a
 **`Done`** -- `Encoded(encoded)`, each bucket's layer words;
-`Flushed(image)`; `Warmed {generated, cells}`, every bitmap's cells,
-chunk by chunk, type by type, and the image if generated; or
+`Flushed(image)`; `Warmed {generated, read, cells}`, every bitmap's cells,
+chunk by chunk, type by type, and the image if generated, or if read
+back from disk; or
 `Failed(said)`, a panic caught. **`Ticket`**: a job sent.
 **`Jobs::new(dispatcher)`**; **`send(job)`**, a ticket, the job queued
 on the dispatcher with the thread's own codec; **`try_take(ticket)`**;

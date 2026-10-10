@@ -79,6 +79,23 @@ pub fn write_image(folder: &Path, superchunk: SuperchunkIndex, image: &Superchun
     write_words(&superchunk_file(folder, superchunk, "image"), image.words())
 }
 
+/// Copies the image of `superchunk` from its file of the folder `from`
+/// to its file of `folder`: how many bytes. The same file -- `folder`
+/// is `from` -- is left as it is.
+pub fn copy_image(from: &Path, folder: &Path, superchunk: SuperchunkIndex) -> Result<u64, DiskError> {
+    let (kept, path) = (superchunk_file(from, superchunk, "image"), superchunk_file(folder, superchunk, "image"));
+    let io = |path: &Path| { let path = path.to_path_buf(); move |error| DiskError::Io(path, error) };
+    let same = matches!((from.canonicalize(), folder.canonicalize()), (Ok(from), Ok(folder)) if from == folder);
+    if same {
+        return Ok(fs::metadata(&kept).map_err(io(&kept))?.len());
+    }
+    make_folder(&folder.join(SUPERCHUNKS))?;
+    let beside = path.with_extension("writing");
+    let bytes = fs::copy(&kept, &beside).map_err(io(&kept))?;
+    fs::rename(&beside, &path).map_err(io(&path))?;
+    Ok(bytes)
+}
+
 /// The image of `superchunk` in `folder`, checked.
 pub fn read_image(folder: &Path, superchunk: SuperchunkIndex) -> Result<SuperchunkImage, DiskError> {
     let path = superchunk_file(folder, superchunk, "image");

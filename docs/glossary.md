@@ -75,6 +75,7 @@ what they always do and are not listed.
 | **job** | a piece of work for the dispatcher's threads. One **run** is done on all at once, a part each: a tick's phase. One **queued** is done by whichever is free, off the tick: chunk storage's (`chunk_storage::jobs`) -- encoding the write-backs of superchunks gone cold, rewriting images with the changes flushed, generating and decoding superchunks warming | dispatcher, ticket, part | background, task |
 | **hot file** | a save's file naming its hot superchunks, and its cooling and warming ones with their due ticks (`HotSuperchunks`): made hot before a loaded world ticks | save, hot, cooling, warming | |
 | **shared image** | an image in the cold pool held behind a reference count, so a thread reads it as it was while the pool changes (`ChunkStorage::shared_image`) | image, jond | |
+| **paged** | of an image of the cold pool: written to disk and let go from memory, the pool keeping only where it is, read back when its superchunk warms -- **paged out** past the bytes the pool keeps in memory (`ChunkStorage::page_out`); the folder a running world pages to is its **paging folder** | image, cold pool, cold | swapped, evicted, unloaded |
 | **dirty** | a hot layer changed since it was decoded: it must be written back before it is evicted | write back | |
 
 ## Storage
