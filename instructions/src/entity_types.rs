@@ -2,4 +2,4 @@
 //! an entity's rule names its own by, from the type registry
 //! (`../../type_registry/`).
 
-pub use type_registry::{HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
+pub use type_registry::{Roaming, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};

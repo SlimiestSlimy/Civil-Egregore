@@ -8,7 +8,7 @@
 use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{Attribute, AttributeType, Entities, EntityId, EntityType, Header, NEVER};
+use entity_manager::{Attribute, AttributeBlock, Entities, EntityId, EntityType, Header, NEVER};
 use simulation::{Simulation, Turn};
 
 /// The layer type the arena holds: every cell hot, none set.
@@ -16,11 +16,11 @@ const STONE: LayerType = LayerType(6);
 /// The entities' type.
 const WALKER: EntityType = EntityType(40);
 /// An attribute.
-const NAME: AttributeType = AttributeType(41);
+const NAME: Attribute<u64> = Attribute::new(41);
 /// Another.
-const MARK: AttributeType = AttributeType(42);
+const MARK: Attribute<u64> = Attribute::new(42);
 /// A third.
-const SCAR: AttributeType = AttributeType(43);
+const SCAR: Attribute<u64> = Attribute::new(43);
 
 /// An arena with a bitmap hot over the `side` by `side` superchunks from
 /// `(10, 10)`, and entities holding the same superchunks.
@@ -63,7 +63,7 @@ fn step_right(turn: &mut Turn, _: &mut Vec<CellIndex>) -> usize {
 #[test]
 fn a_step_carries_no_attributes_and_keeps_them() {
     let (mut arena, mut entities) = world(2);
-    let attributes = [Attribute { kind: NAME, value: 7 }, Attribute { kind: MARK, value: 9 }];
+    let attributes = [AttributeBlock::holding(NAME, 7), AttributeBlock::holding(MARK, 9)];
     // In a chunk, over a chunk's border, over a superchunk's.
     for (id, x) in [(1, 40), (2, 250), (3, 1020)] {
         entities.queue_put(walker(id, cell(x, 30), 0), &attributes);
@@ -90,7 +90,7 @@ fn a_step_carries_no_attributes_and_keeps_them() {
 #[test]
 fn a_step_onto_a_taken_cell_is_turned_back() {
     let (mut arena, mut entities) = world(1);
-    entities.queue_put(walker(1, cell(40, 30), 0), &[Attribute { kind: NAME, value: 1 }]);
+    entities.queue_put(walker(1, cell(40, 30), 0), &[AttributeBlock::holding(NAME, 1)]);
     entities.queue_put(walker(2, cell(41, 30), NEVER), &[]);
     entities.apply();
     let mut simulation = Simulation::new(1);
@@ -113,7 +113,7 @@ fn entities_edit_another_an_attribute_at_a_time() {
     let (mut arena, mut entities) = world(2);
     // The one edited, in another superchunk than one of the two editing it.
     let target = walker(9, cell(1030, 30), NEVER);
-    entities.queue_put(target, &[Attribute { kind: NAME, value: 7 }]);
+    entities.queue_put(target, &[AttributeBlock::holding(NAME, 7)]);
     entities.queue_put(walker(1, cell(1020, 30), 0), &[]);
     entities.queue_put(walker(2, cell(1040, 30), 0), &[]);
     entities.apply();
@@ -128,19 +128,19 @@ fn entities_edit_another_an_attribute_at_a_time() {
     });
     assert_eq!((report.instructions_applied.edits, report.instructions_applied.puts), (2, 0));
     let edited = entities.get(target.id, target.at).expect("where it stood");
-    assert_eq!(edited.attributes, [Attribute { kind: NAME, value: 7 }, Attribute { kind: MARK, value: 1 }, Attribute { kind: SCAR, value: 2 }]);
+    assert_eq!(edited.attributes, [AttributeBlock::holding(NAME, 7), AttributeBlock::holding(MARK, 1), AttributeBlock::holding(SCAR, 2)]);
     assert_eq!(edited.header, target);
 
     entities.queue_put(walker(3, cell(1031, 31), 1), &[]);
     entities.apply();
     simulation.tick(&mut arena, &mut entities, 1, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
-            turn.unset_attribute(&target, MARK);
+            turn.unset_attribute(&target, MARK.attribute_type());
             turn.set_attribute(&target, NAME, 8);
             turn.step(&entity.header, entity.header.at, NEVER);
         }
         0
     });
     let edited = entities.get(target.id, target.at).expect("where it stood");
-    assert_eq!(edited.attributes, [Attribute { kind: NAME, value: 8 }, Attribute { kind: SCAR, value: 2 }]);
+    assert_eq!(edited.attributes, [AttributeBlock::holding(NAME, 8), AttributeBlock::holding(SCAR, 2)]);
 }

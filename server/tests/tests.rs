@@ -7,7 +7,7 @@
 
 use chunk_storage::SuperchunkImage;
 use coordinates::SuperchunkIndex;
-use entity_manager::{Attribute, Header};
+use entity_manager::{AttributeBlock, Header};
 use server::{transient_data, World};
 use std::path::PathBuf;
 
@@ -22,7 +22,7 @@ pub fn folder(name: &str) -> PathBuf {
 /// the tick, every random stream, every cold superchunk's image and
 /// kept state, and the superchunks warming and cooling with when each is due: what
 /// two worlds the same hold the same.
-pub type Everything = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, u64, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, SuperchunkImage, Vec<u64>)>, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, u64)>);
+pub type Everything = (Vec<u64>, Vec<(Header, Vec<AttributeBlock>)>, u64, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, SuperchunkImage, Vec<u64>)>, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, u64)>);
 
 /// [`Everything`] `world` holds.
 pub fn everything(world: &World) -> Everything {
@@ -68,7 +68,7 @@ pub fn plant_grass(world: &mut World, at: coordinates::CellCartesian, width: u8,
 }
 
 /// Puts an entity on `world`, whole: there before the next tick.
-pub fn put_entity(world: &mut World, header: Header, attributes: &[Attribute]) {
+pub fn put_entity(world: &mut World, header: Header, attributes: &[AttributeBlock]) {
     world.entities.queue_put(header, attributes);
     world.entities.apply();
 }

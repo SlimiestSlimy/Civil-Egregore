@@ -3,7 +3,8 @@
 //! one entity, enforced here (`docs/entity_manager.md`, "A chunk's
 //! bucket").
 
-use crate::entity::{Attribute, AttributeType, EntityId, EntityRef, Header};
+use crate::attributes::{find_attribute, AttributeBlock, AttributeType};
+use crate::entity::{EntityId, EntityRef, Header};
 use coordinates::CellIndex;
 use utilities::cache::prefetch;
 
@@ -27,14 +28,14 @@ pub(crate) fn place(cell: CellIndex) -> u16 {
 }
 
 /// An entity as its bucket keeps it: its header, and where its
-/// attributes are in the bucket's attribute list.
+/// attributes' blocks are in the bucket's list of them.
 #[derive(Clone, Copy, Debug)]
 struct StoredEntity {
     /// The entity's fixed part.
     header: Header,
-    /// Where its attributes start in the attribute list.
+    /// Where its attributes' blocks start in the list.
     first: u32,
-    /// How many attributes it has.
+    /// How many blocks they are.
     count: u32,
 }
 
@@ -67,9 +68,9 @@ pub(crate) struct Bucket {
     tile_starts: [u32; SEARCH_TILES + 1],
     /// The entities, in the same order as `places`.
     stored: Vec<StoredEntity>,
-    /// Every entity's attributes, a run each, and garbage.
-    attributes: Vec<Attribute>,
-    /// How many of `attributes` belong to no entity.
+    /// Every entity's attributes, a run of blocks each, and garbage.
+    attributes: Vec<AttributeBlock>,
+    /// How many blocks of `attributes` belong to no entity.
     garbage: usize,
 }
 
@@ -79,7 +80,7 @@ impl Bucket {
         self.stored.len()
     }
 
-    /// The attributes in use, and the garbage.
+    /// The attributes' blocks in use, and the garbage.
     pub(crate) fn attribute_counts(&self) -> (usize, usize) {
         (self.attributes.len() - self.garbage, self.garbage)
     }
@@ -130,7 +131,7 @@ impl Bucket {
     /// Puts `header`'s entity, which stood on the cell at `was`, with
     /// `attributes` -- or, with none given, those it has
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
-    pub(crate) fn put(&mut self, header: Header, was: u16, attributes: Option<&[Attribute]>) -> Put {
+    pub(crate) fn put(&mut self, header: Header, was: u16, attributes: Option<&[AttributeBlock]>) -> Put {
         let to = place(header.at);
         let (index, put) = match (self.find(was, header.id), was == to) {
             (Ok(index), true) => (index, Put::InPlace),
@@ -161,9 +162,9 @@ impl Bucket {
     }
 
     /// Gives the entity at `index` `header`, and `attributes` if given:
-    /// written over its run when the number is the same, else as a new
+    /// written over its run when they are as many blocks, else as a new
     /// run at the end of the list.
-    fn rewrite(&mut self, index: usize, header: Header, attributes: Option<&[Attribute]>) {
+    fn rewrite(&mut self, index: usize, header: Header, attributes: Option<&[AttributeBlock]>) {
         let stored = &mut self.stored[index];
         stored.header = header;
         let Some(attributes) = attributes else {
@@ -181,33 +182,26 @@ impl Bucket {
     }
 
     /// Sets the attribute of type `kind` of the entity whose ID is `id`,
-    /// standing on the cell at `place`, to `value`, or removes it if
-    /// `value` is none. Returns whether the entity is here. A changed
-    /// value is written in place; an added or removed attribute makes
-    /// the entity's run anew at the end of the list.
-    pub(crate) fn edit(&mut self, id: EntityId, place: u16, kind: AttributeType, value: Option<u64>) -> bool {
+    /// standing on the cell at `place`, to `blocks`, or removes it if
+    /// they are none. Returns whether the entity is here. One as long
+    /// as it was is written in place; any other makes the entity's run
+    /// anew at the end of the list.
+    pub(crate) fn edit(&mut self, id: EntityId, place: u16, kind: AttributeType, blocks: &[AttributeBlock]) -> bool {
         let Ok(index) = self.find(place, id) else {
             return false;
         };
         let (first, count) = (self.stored[index].first as usize, self.stored[index].count as usize);
-        let found = self.attributes[first..first + count].binary_search_by_key(&kind, |attribute| attribute.kind);
-        let start = self.attributes.len();
-        match (found, value) {
-            (Ok(position), Some(value)) => {
-                self.attributes[first + position].value = value;
-                return true;
-            }
-            (Err(_), None) => return true,
-            (Ok(position), None) => {
-                self.attributes.extend_from_within(first..first + position);
-                self.attributes.extend_from_within(first + position + 1..first + count);
-            }
-            (Err(position), Some(value)) => {
-                self.attributes.extend_from_within(first..first + position);
-                self.attributes.push(Attribute { kind, value });
-                self.attributes.extend_from_within(first + position..first + count);
-            }
+        let (was, start) = match find_attribute(&self.attributes[first..first + count], kind) {
+            Ok(found) => (first + found.start..first + found.end, self.attributes.len()),
+            Err(at) => (first + at..first + at, self.attributes.len()),
+        };
+        if was.len() == blocks.len() {
+            self.attributes[was].copy_from_slice(blocks);
+            return true;
         }
+        self.attributes.extend_from_within(first..was.start);
+        self.attributes.extend_from_slice(blocks);
+        self.attributes.extend_from_within(was.end..first + count);
         let stored = &mut self.stored[index];
         (stored.first, stored.count) = (start as u32, (self.attributes.len() - start) as u32);
         self.garbage += count;
@@ -278,8 +272,8 @@ impl Bucket {
         EntityRef { header: stored.header, attributes: &self.attributes[first..first + stored.count as usize] }
     }
 
-    /// Sweeps the garbage out of the attribute list, once there is as
-    /// much garbage as attributes in use (and enough to be worth it).
+    /// Sweeps the garbage out of the list of blocks, once there is as
+    /// much garbage as blocks in use (and enough to be worth it).
     fn sweep(&mut self) {
         if self.garbage < 64 || self.garbage < self.attributes.len() - self.garbage {
             return;

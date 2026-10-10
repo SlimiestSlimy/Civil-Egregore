@@ -3,7 +3,8 @@
 //! (`docs/entity_manager.md`, "Instructions").
 
 use crate::bucket::Put;
-use crate::entity::{Attribute, AttributeType, EntityId, Header};
+use crate::attributes::{push_attribute, Attribute, AttributeBlock, AttributeType, Layout};
+use crate::entity::{EntityId, Header};
 use crate::store::SuperchunkEntities;
 use coordinates::CellIndex;
 use std::ops::AddAssign;
@@ -12,8 +13,8 @@ use std::ops::AddAssign;
 #[derive(Clone, Copy, Debug)]
 enum Instruction {
     /// Puts an entity -- in place of the one with its ID where it stood,
-    /// or new -- with the attributes `first..first + count` of the
-    /// queue's list.
+    /// or new -- with the attributes' blocks `first..first + count` of
+    /// the queue's list.
     Put {
         /// Its fixed part.
         header: Header,
@@ -24,9 +25,9 @@ enum Instruction {
         /// put here, it is removed from there once the tick's
         /// instructions are all applied.
         left: Option<CellIndex>,
-        /// Its attributes' first index.
+        /// Its attributes' first block.
         first: u32,
-        /// How many attributes it has.
+        /// How many blocks they are.
         count: u32,
     },
     /// Moves an entity to `header`'s cell, to wake at its tick, its
@@ -39,7 +40,8 @@ enum Instruction {
         from: CellIndex,
     },
     /// Sets one attribute of the entity whose ID is `id` standing on
-    /// `at`, or removes it.
+    /// `at` to the blocks `first..first + count` of the queue's list,
+    /// or with none removes it.
     Edit {
         /// Its ID.
         id: EntityId,
@@ -47,8 +49,10 @@ enum Instruction {
         at: CellIndex,
         /// The attribute's type.
         kind: AttributeType,
-        /// Its value, or none to remove it.
-        value: Option<u64>,
+        /// The attribute's first block.
+        first: u32,
+        /// How many blocks it is: none to remove it.
+        count: u32,
     },
     /// Removes the entity whose ID is `id` standing on `at`.
     Remove {
@@ -59,21 +63,21 @@ enum Instruction {
     },
 }
 
-/// Instructions queued for one superchunk, in order, and the attributes
-/// they carry.
+/// Instructions queued for one superchunk, in order, and the
+/// attributes' blocks they carry.
 #[derive(Default)]
 pub struct Instructions {
     /// The instructions.
     instructions: Vec<Instruction>,
-    /// The attributes the puts carry.
-    attributes: Vec<Attribute>,
+    /// The blocks the puts and the edits carry.
+    attributes: Vec<AttributeBlock>,
 }
 
 impl Instructions {
     /// Queues putting `header`'s entity, with `attributes`: in place of
     /// the one with its ID standing on `from`, a cell of its cell's
     /// superchunk -- its cell itself, if it has not moved or is new.
-    pub fn put(&mut self, header: Header, from: CellIndex, attributes: &[Attribute]) {
+    pub fn put(&mut self, header: Header, from: CellIndex, attributes: &[AttributeBlock]) {
         self.push(header, from, None, attributes);
     }
 
@@ -81,12 +85,12 @@ impl Instructions {
     /// crossing from `left`, a cell of another superchunk: put, it is
     /// removed from `left` once the tick's instructions are all applied
     /// ([`SuperchunkEntities::settle_leavers`](crate::SuperchunkEntities::settle_leavers)).
-    pub fn cross(&mut self, header: Header, left: CellIndex, attributes: &[Attribute]) {
+    pub fn cross(&mut self, header: Header, left: CellIndex, attributes: &[AttributeBlock]) {
         self.push(header, header.at, Some(left), attributes);
     }
 
     /// Queues a put.
-    fn push(&mut self, header: Header, from: CellIndex, left: Option<CellIndex>, attributes: &[Attribute]) {
+    fn push(&mut self, header: Header, from: CellIndex, left: Option<CellIndex>, attributes: &[AttributeBlock]) {
         debug_assert_eq!(header.at.superchunk(), from.superchunk(), "an entity put from another superchunk: a crossing");
         self.instructions.push(Instruction::Put { header, from, left, first: self.attributes.len() as u32, count: attributes.len() as u32 });
         self.attributes.extend_from_slice(attributes);
@@ -101,10 +105,27 @@ impl Instructions {
         self.instructions.push(Instruction::Move { header, from });
     }
 
-    /// Queues setting the attribute of type `kind` of the entity whose
-    /// ID is `id` standing on `at` to `value`, or with none removing it.
-    pub fn edit(&mut self, id: EntityId, at: CellIndex, kind: AttributeType, value: Option<u64>) {
-        self.instructions.push(Instruction::Edit { id, at, kind, value });
+    /// Queues setting `attribute` of the entity whose ID is `id`
+    /// standing on `at` to `value`.
+    pub fn set_attribute<L: Layout>(&mut self, id: EntityId, at: CellIndex, attribute: Attribute<L>, value: L) {
+        let first = self.attributes.len() as u32;
+        push_attribute(&mut self.attributes, attribute, value);
+        self.instructions.push(Instruction::Edit { id, at, kind: attribute.attribute_type(), first, count: L::BLOCKS as u32 });
+    }
+
+    /// Queues setting the attribute `attribute` is the blocks of, of
+    /// the entity whose ID is `id` standing on `at`: how one whose
+    /// size varies is set.
+    pub fn set_attribute_blocks(&mut self, id: EntityId, at: CellIndex, attribute: &[AttributeBlock]) {
+        debug_assert!(attribute.first().is_some_and(|first| first.blocks() == attribute.len()), "an attribute as long as its type or its block length says");
+        self.instructions.push(Instruction::Edit { id, at, kind: attribute[0].kind(), first: self.attributes.len() as u32, count: attribute.len() as u32 });
+        self.attributes.extend_from_slice(attribute);
+    }
+
+    /// Queues removing the attribute of type `kind` of the entity
+    /// whose ID is `id` standing on `at`.
+    pub fn unset_attribute(&mut self, id: EntityId, at: CellIndex, kind: AttributeType) {
+        self.instructions.push(Instruction::Edit { id, at, kind, first: 0, count: 0 });
     }
 
     /// Queues removing the entity whose ID is `id` standing on `at`.
@@ -167,7 +188,7 @@ impl Instructions {
                     Put::PassedOver => {}
                     _ => applied.moves += 1,
                 },
-                Instruction::Edit { id, at, kind, value } => applied.edits += superchunk.edit(id, at, kind, value) as usize,
+                Instruction::Edit { id, at, kind, first, count } => applied.edits += superchunk.edit(id, at, kind, &self.attributes[first as usize..(first + count) as usize]) as usize,
                 Instruction::Remove { id, at } => {
                     applied.removes += superchunk.remove(id, at) as usize;
                 }

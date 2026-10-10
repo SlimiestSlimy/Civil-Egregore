@@ -6,7 +6,7 @@
 
 use crate::tests::*;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{Entities, EntityId, EntityReader, Header, NEVER};
+use entity_manager::{AttributeBlock, Entities, EntityId, EntityReader, Header, NEVER};
 use simulation::{Simulation, Turn};
 use std::sync::Mutex;
 
@@ -70,7 +70,7 @@ fn entities_stay_in_morton_order_as_they_step() {
     let (mut arena, mut entities) = world(1);
     for id in 0..600u64 {
         let at = cell(200 + (id % 20) as u32 * 3, 240 + (id / 20) as u32 * 3);
-        entities.queue_put(walker(id + 1, at, 0), &[entity_manager::Attribute { kind: WOKEN, value: id }]);
+        entities.queue_put(walker(id + 1, at, 0), &[AttributeBlock::holding(WOKEN, id)]);
     }
     entities.apply();
     let mut simulation = Simulation::new(1);

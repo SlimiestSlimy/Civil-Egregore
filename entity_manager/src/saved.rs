@@ -2,11 +2,12 @@
 //! (`docs/entity_manager.md`, "Saved").
 
 use coordinates::CellIndex;
-use crate::entity::{Attribute, AttributeType, EntityId, EntityType, Header};
+use crate::attributes::{sorted, AttributeBlock, BLOCK_WORDS};
+use crate::entity::{EntityId, EntityType, Header};
 use crate::store::{Entities, SuperchunkEntities};
 
-/// The first word: `TSstate` and the format's number, 2.
-const FIRST_WORD: u64 = u64::from_le_bytes(*b"TSstate\x02");
+/// The first word: `TSstate` and the format's number, 3.
+const FIRST_WORD: u64 = u64::from_le_bytes(*b"TSstate\x03");
 
 /// What a state file held, beside the entities queued.
 pub struct SavedState {
@@ -25,7 +26,7 @@ pub fn encode_state(random: Option<u64>, entities: Option<&SuperchunkEntities>) 
     for entity in entities.into_iter().flat_map(SuperchunkEntities::iter) {
         let header = entity.header;
         words.extend([header.id.0, header.kind.0, header.at.0, header.wake, entity.attributes.len() as u64]);
-        words.extend(entity.attributes.iter().flat_map(|attribute| [attribute.kind.0, attribute.value]));
+        words.extend(entity.attributes.iter().flat_map(|block| block.0));
     }
     (words, count)
 }
@@ -39,7 +40,7 @@ pub fn decode_state(words: &[u64], now: u64, entities: &mut Entities) -> Result<
 
 /// Reads the state file `words`, each entity handed to `each` with its
 /// attributes: what it held beside them, or what is wrong with it.
-fn read(words: &[u64], mut each: impl FnMut(Header, &[Attribute])) -> Result<SavedState, &'static str> {
+fn read(words: &[u64], mut each: impl FnMut(Header, &[AttributeBlock])) -> Result<SavedState, &'static str> {
     let mut words = words.iter().copied();
     let mut next = || words.next().ok_or("cut short");
     if next()? != FIRST_WORD {
@@ -48,10 +49,17 @@ fn read(words: &[u64], mut each: impl FnMut(Header, &[Attribute])) -> Result<Sav
     let (has_random, random, count) = (next()?, next()?, next()?);
     let mut attributes = Vec::new();
     for _ in 0..count {
-        let (id, kind, at, wake, attribute_count) = (next()?, next()?, next()?, next()?, next()?);
+        let (id, kind, at, wake, block_count) = (next()?, next()?, next()?, next()?, next()?);
         attributes.clear();
-        for _ in 0..attribute_count {
-            attributes.push(Attribute { kind: AttributeType(next()?), value: next()? });
+        for _ in 0..block_count {
+            let mut block = AttributeBlock([0; BLOCK_WORDS]);
+            for word in &mut block.0 {
+                *word = next()?;
+            }
+            attributes.push(block);
+        }
+        if !sorted(&attributes) {
+            return Err("an entity's attributes are not whole ones sorted by type");
         }
         each(Header { id: EntityId(id), kind: EntityType(kind), at: CellIndex(at), wake }, &attributes);
     }

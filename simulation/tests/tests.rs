@@ -8,7 +8,7 @@
 use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{remove_attribute, set_attribute, AttributeType, Entities, EntityId, EntityType, Header};
+use entity_manager::{Attribute, Entities, EntityId, EntityType, Header, remove_attribute, set_attribute};
 use simulation::Turn;
 
 
@@ -17,9 +17,9 @@ pub const STONE: LayerType = LayerType(6);
 /// The entities' type.
 pub const WALKER: EntityType = EntityType(40);
 /// An attribute counting the times an entity woke.
-pub const WOKEN: AttributeType = AttributeType(41);
+pub const WOKEN: Attribute<u64> = Attribute::new(41);
 /// An attribute present every other time an entity woke.
-pub const ODD: AttributeType = AttributeType(42);
+pub const ODD: Attribute<u64> = Attribute::new(42);
 
 /// An arena with a bitmap hot over the `side` by `side` superchunks from
 /// `(10, 10)`, and entities holding the same superchunks.
@@ -56,7 +56,7 @@ pub fn count_and_flip(turn: &mut Turn, _: &mut Vec<CellIndex>) -> usize {
         attributes.clear();
         attributes.extend_from_slice(entity.attributes);
         set_attribute(&mut attributes, WOKEN, entity.attribute(WOKEN).unwrap_or(0) + 1);
-        if remove_attribute(&mut attributes, ODD).is_none() {
+        if !remove_attribute(&mut attributes, ODD.attribute_type()) {
             set_attribute(&mut attributes, ODD, 1);
         }
         turn.put(Header { wake: turn.now() + 1, ..entity.header }, &attributes);

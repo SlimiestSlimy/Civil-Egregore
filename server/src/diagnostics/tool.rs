@@ -120,7 +120,7 @@ pub(crate) fn pasture(given: &Given) -> Result<(), String> {
     memory.row(&["process, peak".to_string(), run.memory.peak().map_or_else(unknown, mebibytes)]);
     memory.row(&["process, average over the ticks".to_string(), run.memory.average().map_or_else(unknown, mebibytes)]);
     memory.row(&["entities".to_string(), run.held.entities.to_string()]);
-    memory.row(&["attributes in use, and garbage".to_string(), format!("{}, {}", run.held.attributes, run.held.garbage)]);
+    memory.row(&["attribute blocks in use, and garbage".to_string(), format!("{}, {}", run.held.attributes, run.held.garbage)]);
     memory.row(&["wakes filed".to_string(), run.held.wakes.to_string()]);
     report.add("held", memory);
     report.add("census", census_table(run.census.iter().map(|census| [census.tick as u64, census.sheep as u64, census.grass, census.woken as u64, census.births as u64, census.deaths as u64])));

@@ -9,6 +9,7 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
+mod attributes;
 mod bucket;
 pub mod diagnostics;
 mod instructions;
@@ -18,6 +19,7 @@ mod store;
 mod wheel;
 
 pub use instructions::{Instructions, InstructionsApplied};
-pub use entity::{attribute, remove_attribute, set_attribute, Attribute, AttributeType, EntityEdit, EntityId, EntityRef, EntityType, Header, NEVER};
+pub use attributes::{attribute, attribute_blocks, find_attribute, push_attribute, remove_attribute, set_attribute, set_attribute_blocks, sorted, Attribute, AttributeBlock, AttributeType, Layout, BLOCK_WORDS};
+pub use entity::{EntityEdit, EntityId, EntityRef, EntityType, Header, NEVER};
 pub use store::{Entities, EntityReader, SuperchunkEntities, OCCUPIED_SIDE};
 pub use wheel::{Wake, WHEEL_TICKS};

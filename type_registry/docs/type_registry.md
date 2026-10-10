@@ -44,21 +44,30 @@ codec know bitmaps only. A wide type keeps how wide it is in the type
 itself -- the power of two, in the bits from `WIDTH_SHIFT` (56) up,
 over its number -- so `bits` is read off the ID with no table; the
 width as a type (`Width::BITS`) is the same number known as the code
-is built. An attribute's value is a word: 64. An entity type
-holds nothing itself: 0.
+is built. An attribute's width is its data's bits, 448 in a block of
+its own ("Layouts"). An entity type holds nothing itself: 0.
 
 ## Layouts
 
-**Designed 2026-10-09 and not yet built** (the entity manager's
-"Attributes, a block each" tells the whole of it).
+An attribute is blocks of 64 bytes, its type in the first word
+(`../../entity_manager/docs/entity_manager.md`, "Attributes, a block
+each"). Its row says its layout beside its number: the type, in the
+code, of what its data holds -- a tick (`u64`); a tick and a neighbour
+(`Roaming`) -- as a wide plane's row says its width. The constant the
+row makes is typed by its layout (`Attribute`), as a wide plane's is by
+its width, so an attribute is read as its fields and one layout is
+never read as another.
 
-An attribute's row is to say its layout beside its ID: the type, in
-the code, of what its 56 bytes of data hold -- a tick; a tick and a
-neighbour -- as a wide plane's row says its width. The constant the
-row makes is then typed by its layout, as a wide plane's is by its
-width, so an attribute is read as its fields and one layout is never
-read as another. A layout says how many blocks it takes and how its
-fields lie in the data's words: words, not bytes, so the same on any
-machine. The ID's top byte holds the blocks less one, all ones for a
-size that varies; the table is checked as it is built for a row whose
-ID and layout disagree.
+A layout (`Layout`) says how many blocks it takes (`BLOCKS`) and how
+its fields lie in the data's words (`write`, `read`; `data_words`, how
+many words that is: all of its blocks' but the type): words, not
+bytes, so the same on any machine.
+
+**The ID's top byte is the blocks** (`AttributeType::of_blocks`,
+`blocks`): 1 to 254, all ones for a size that varies
+(`of_varying_size`), and **0 for an ID that is no attribute's**
+(`is_an_attributes`) -- the namespace is one, everything's, so a
+layer's or an entity type's ID read as an attribute's says so itself.
+A row is written with the number under the top byte (`number`); a
+number that reaches into it, or a layout of no blocks or of 255 or
+more, does not build.

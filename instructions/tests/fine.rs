@@ -13,7 +13,7 @@ mod entities {
     use bitplane_manager::{BitmapArena, BucketKey};
     use chunk_storage::{LayerCodec, LayerType};
     use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-    use entity_manager::{Attribute, AttributeType, EntityEdit, Entities, EntityId, EntityType, Header, NEVER};
+    use entity_manager::{Attribute, AttributeBlock, Entities, EntityEdit, EntityId, EntityType, Header, NEVER};
     use instructions::around::{self, CENTRE, RING};
     use instructions::{read, write, Turn};
     use simulation::Simulation;
@@ -24,9 +24,9 @@ mod entities {
     /// The entities' type.
     const WALKER: EntityType = EntityType(40);
     /// An attribute.
-    const NAME: AttributeType = AttributeType(41);
+    const NAME: Attribute<u64> = Attribute::new(41);
     /// Another.
-    const MARK: AttributeType = AttributeType(42);
+    const MARK: Attribute<u64> = Attribute::new(42);
 
     /// An arena with a bitmap hot over the `side` by `side` superchunks from
     /// `(10, 10)`, and entities holding the same superchunks.
@@ -60,8 +60,8 @@ mod entities {
     #[test]
     fn an_entity_is_put_whole_only_if_an_attribute_changed() {
         let (mut arena, mut entities) = world(1);
-        entities.queue_put(walker(1, cell(40, 30), 0), &[Attribute { kind: NAME, value: 7 }]);
-        entities.queue_put(walker(2, cell(40, 40), 0), &[Attribute { kind: NAME, value: 7 }]);
+        entities.queue_put(walker(1, cell(40, 30), 0), &[AttributeBlock::holding(NAME, 7)]);
+        entities.queue_put(walker(2, cell(40, 40), 0), &[AttributeBlock::holding(NAME, 7)]);
         entities.apply();
         let mut simulation = Simulation::new(1);
         let report = simulation.tick(&mut arena, &mut entities, 0, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
@@ -83,8 +83,8 @@ mod entities {
             0
         });
         assert_eq!((report.instructions_applied.moves, report.instructions_applied.puts), (1, 1));
-        assert_eq!(entities.get(EntityId(1), cell(41, 31)).expect("moved").attributes, [Attribute { kind: NAME, value: 7 }]);
-        assert_eq!(entities.get(EntityId(2), cell(41, 41)).expect("moved").attributes, [Attribute { kind: NAME, value: 8 }]);
+        assert_eq!(entities.get(EntityId(1), cell(41, 31)).expect("moved").attributes, [AttributeBlock::holding(NAME, 7)]);
+        assert_eq!(entities.get(EntityId(2), cell(41, 41)).expect("moved").attributes, [AttributeBlock::holding(NAME, 8)]);
     }
 
     /// The nine cells about an entity as bits: which entities stand on,

@@ -58,7 +58,7 @@ for samples are kept between ticks.
 
 `../../entity_manager/src/`: what stands on the cells. An entity is a header -- a
 random 64-bit ID, a type, its cell, the tick it next wakes at -- and
-attributes, typed values added and removed at run time. A superchunk
+attributes, typed blocks of 64 bytes added and removed at run time. A superchunk
 holds its entities in a bucket a chunk, sorted by cell -- Morton order
 -- then ID, attributes beside, and a timer wheel of when each wakes: a
 tick costs the entities waking in it. An entity is found by its cell
@@ -119,7 +119,7 @@ carrying no more than it changes (`../entity_manager/`):
 |---|---|---|---|
 | put | `put`, `update` | an entity made, or made anew whole | its attributes |
 | move | `step` | moved to a cell, or left where it stands, to wake at a tick; its attributes as they are | nothing |
-| edit | `set_attribute`, `unset_attribute` | one attribute set or removed, of any entity in reach | the one value |
+| edit | `set_attribute`, `set_attribute_blocks`, `unset_attribute` | one attribute set or removed, of any entity in reach | the one attribute's blocks, or none |
 | remove | `remove` | removed | nothing |
 
 A walking entity is a move a step: 32 bytes queued and none of its

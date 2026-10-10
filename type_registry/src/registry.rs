@@ -2,7 +2,8 @@
 //! once in [`registered!`] and checked as the crate is built
 //! ([`first_clash`]): `docs/type_registry.md`, "Why one table".
 
-use crate::type_ids::{AttributeType, Bits4, EntityType, LayerType, Wide, Width};
+use crate::layouts::{data_words, Attribute, Layout, Roaming};
+use crate::type_ids::{Bits4, EntityType, LayerType, Wide, Width};
 
 /// What a registered type is of.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -27,7 +28,7 @@ pub struct Registered {
     /// Its ID: for a wide plane, its first -- its lowest bit's layer.
     pub id: u64,
     /// Its width, in bits: what a cell of a layer or a wide plane
-    /// holds, what an attribute's value holds; 0 for an entity type,
+    /// holds, what an attribute's data holds; 0 for an entity type,
     /// which holds nothing itself.
     pub width: u32,
 }
@@ -54,7 +55,8 @@ impl Registered {
 
 /// Makes the registry: for each row, the constant the type is named by
 /// in the code -- a `LayerType`, a `Wide`, an `EntityType` or an
-/// `AttributeType` -- and its row in [`REGISTRY`].
+/// `Attribute` -- and its row in [`REGISTRY`]. A wide plane's row
+/// says its width, an attribute's its layout.
 macro_rules! registered {
     ($( $(#[$doc:meta])* $kind:ident $constant:ident $(<$width:ident>)? = $id:literal, $name:literal; )*) => {
         $( registered!(@constant [$(#[$doc])*] $kind $constant $id $($width)?); )*
@@ -67,11 +69,11 @@ macro_rules! registered {
     (@constant [$(#[$doc:meta])*] layer $constant:ident $id:literal) => { $(#[$doc])* pub const $constant: LayerType = LayerType($id); };
     (@constant [$(#[$doc:meta])*] wide $constant:ident $id:literal $width:ident) => { $(#[$doc])* pub const $constant: Wide<$width> = Wide::new($id); };
     (@constant [$(#[$doc:meta])*] entity $constant:ident $id:literal) => { $(#[$doc])* pub const $constant: EntityType = EntityType($id); };
-    (@constant [$(#[$doc:meta])*] attribute $constant:ident $id:literal) => { $(#[$doc])* pub const $constant: AttributeType = AttributeType($id); };
+    (@constant [$(#[$doc:meta])*] attribute $constant:ident $id:literal $layout:ident) => { $(#[$doc])* pub const $constant: Attribute<$layout> = Attribute::new($id); };
     (@row layer $name:literal $id:literal) => { Registered { name: $name, kind: Kind::Layer, id: $id, width: 1 } };
     (@row wide $name:literal $id:literal $width:ident) => { Registered { name: $name, kind: Kind::WidePlane, id: $id, width: <$width as Width>::BITS } };
     (@row entity $name:literal $id:literal) => { Registered { name: $name, kind: Kind::EntityType, id: $id, width: 0 } };
-    (@row attribute $name:literal $id:literal) => { Registered { name: $name, kind: Kind::Attribute, id: $id, width: u64::BITS } };
+    (@row attribute $name:literal $id:literal $layout:ident) => { Registered { name: $name, kind: Kind::Attribute, id: $id, width: data_words(<$layout as Layout>::BLOCKS) as u32 * u64::BITS } };
 }
 
 registered! {
@@ -93,15 +95,15 @@ registered! {
     /// The sheep's type.
     entity SHEEP = 16, "sheep";
     /// The tick a sheep is next hungry at.
-    attribute HUNGRY_AT = 17, "hungry at";
+    attribute HUNGRY_AT<u64> = 17, "hungry at";
     /// The tick a pregnant sheep's lamb is due at.
-    attribute PREGNANT = 18, "pregnant";
+    attribute PREGNANT<u64> = 18, "pregnant";
     /// The tick a lamb is grown at.
-    attribute LAMB = 19, "lamb";
-    /// A sheep leaving thin pasture: the tick it roams until, times 16, and
-    /// the neighbour it steps to -- its bit in the 3x3 cells about it. Set
-    /// once, at the meal: a step on the way changes no attribute.
-    attribute ROAMING = 20, "roaming";
+    attribute LAMB<u64> = 19, "lamb";
+    /// A sheep leaving thin pasture: the tick it roams until and the
+    /// neighbour it steps to. Set once, at the meal: a step on the way
+    /// changes no attribute.
+    attribute ROAMING<Roaming> = 20, "roaming";
     /// The cells under water, however deep: what a rule asks. How deep is
     /// kept a map a chunk with water, in the superchunk's image
     /// (`chunk_storage::SuperchunkImage::depth`).

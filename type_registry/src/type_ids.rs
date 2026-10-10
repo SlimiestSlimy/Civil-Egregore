@@ -108,6 +108,52 @@ impl<W: Width> Wide<W> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EntityType(pub u64);
 
-/// An attribute's type, from the same namespace.
+/// An attribute's type, from the same namespace. Its top byte says how
+/// many blocks an attribute of it takes -- none, and it is no
+/// attribute's (`docs/type_registry.md`, "Layouts").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct AttributeType(pub u64);
+
+impl AttributeType {
+    /// Where a type keeps how many blocks it takes: over its number.
+    const BLOCKS_SHIFT: u32 = 56;
+    /// What it keeps there if its size varies: its attribute's first
+    /// block then says its block length.
+    const SIZE_VARIES: u64 = 0xFF;
+
+    /// The type of number `number` whose attributes take `blocks`
+    /// blocks, 1 to 254.
+    pub const fn of_blocks(number: u64, blocks: usize) -> Self {
+        assert!(number >> Self::BLOCKS_SHIFT == 0 && blocks >= 1 && (blocks as u64) < Self::SIZE_VARIES, "an attribute is 1 to 254 blocks, its number under 2^56");
+        Self(number | (blocks as u64) << Self::BLOCKS_SHIFT)
+    }
+
+    /// The type of number `number` whose attributes vary in size.
+    pub const fn of_varying_size(number: u64) -> Self {
+        assert!(number >> Self::BLOCKS_SHIFT == 0, "an attribute's number is under 2^56");
+        Self(number | Self::SIZE_VARIES << Self::BLOCKS_SHIFT)
+    }
+
+    /// Blocks an attribute of it takes, or none if its size varies:
+    /// 0 for an ID that is no attribute's.
+    #[inline]
+    pub const fn blocks(self) -> Option<usize> {
+        match self.0 >> Self::BLOCKS_SHIFT {
+            Self::SIZE_VARIES => None,
+            blocks => Some(blocks as usize),
+        }
+    }
+
+    /// Whether it is an attribute's type at all: an ID whose top byte
+    /// is 0 is of something else, the one namespace being everything's.
+    #[inline]
+    pub const fn is_an_attributes(self) -> bool {
+        self.0 >> Self::BLOCKS_SHIFT != 0
+    }
+
+    /// Its number: its ID without its top byte, what its row in the
+    /// registry is written with.
+    pub const fn number(self) -> u64 {
+        self.0 & ((1 << Self::BLOCKS_SHIFT) - 1)
+    }
+}

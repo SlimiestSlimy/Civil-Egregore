@@ -93,8 +93,8 @@ alone:
 
 When it is next hungry (`HUNGRY_AT`), when its lamb is due
 (`PREGNANT`) and when it is grown (`LAMB`) are attributes, each a tick;
-the way it roams another (`ROAMING`: the tick it roams until, and in
-its low four bits which of the nine cells about it it heads for). All
+the way it roams another (`ROAMING`, laid out as `Roaming`: the tick
+it roams until, and which of the nine cells about it it heads for). All
 but the first are added and removed at run time, as attributes are
 meant to be. They are ticks, not counts of wakes, because a sheep's
 wakes are as far apart as its needs.

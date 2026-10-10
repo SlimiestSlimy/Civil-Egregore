@@ -10,9 +10,11 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod diagnostics;
+mod layouts;
 mod registry;
 pub mod transient_data;
 mod type_ids;
 
+pub use layouts::{data_words, Attribute, Layout, Roaming, BLOCK_WORDS};
 pub use registry::*;
 pub use type_ids::{AttributeType, Bits16, Bits2, Bits4, Bits8, EntityType, LayerType, Wide, Width};
