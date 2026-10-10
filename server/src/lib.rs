@@ -24,7 +24,7 @@ mod world_start;
 pub use halos::HOT_ENTITY;
 pub use simulation::hot::about;
 pub use simulation::{HaloChange, COOL_TICKS, WARM_TICKS};
-pub use rules::{Chosen, Rule, TickCounts, RULES};
+pub use rules::{Chosen, Rule, RulePlace, TickCounts, GRASS_RULE, RULES, SHEEP_RULE, TREES_RULE};
 pub use tick::WorldTick;
 pub use world_hash::{world_hash, WorldHash};
 pub use world_start::{drawn_seed, Size, Start, FLOCK};

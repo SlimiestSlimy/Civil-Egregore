@@ -6,7 +6,7 @@ use instructions::around::{self, CENTRE, RING};
 use instructions::entities::EntitiesBetweenTicks;
 pub use instructions::entity_types::{Roaming, BEARING, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
 use instructions::layers::{GRASS, WALL_EAST, WALL_SOUTH};
-use instructions::{area, cells, entities, walking, AttributeBlock, CellCartesian, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
+use instructions::{area, cells, entities, place_counted, walking, AttributeBlock, CellCartesian, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
 /// Ticks between a walking sheep's steps, at the least...
@@ -38,22 +38,23 @@ pub const GESTATION_TICKS: u64 = 1152;
 /// Ticks a lamb takes to grow.
 pub const LAMB_TICKS: u64 = 4608;
 
-/// What the rule counts, each named at its place in its [`RuleCounts`].
+/// What the rule counts, each named at its place in its
+/// [`RuleCounts`]: the one order, the places below worked out from it.
 pub const COUNTED: [&str; 7] = ["woken", "eaten", "births", "deaths", "sought", "paths", "far"];
 /// Sheep woken.
-pub const WOKEN: usize = 0;
+pub const WOKEN: usize = place_counted(&COUNTED, "woken");
 /// Cells of grass eaten.
-pub const EATEN: usize = 1;
+pub const EATEN: usize = place_counted(&COUNTED, "eaten");
 /// Lambs born.
-pub const BIRTHS: usize = 2;
+pub const BIRTHS: usize = place_counted(&COUNTED, "births");
 /// Sheep dead: starved, or of old age.
-pub const DEATHS: usize = 3;
+pub const DEATHS: usize = place_counted(&COUNTED, "deaths");
 /// Paths to grass looked for, by hungry sheep with none beside them.
-pub const SOUGHT: usize = 4;
+pub const SOUGHT: usize = place_counted(&COUNTED, "sought");
 /// Of those, found.
-pub const PATHS: usize = 5;
+pub const PATHS: usize = place_counted(&COUNTED, "paths");
 /// Of those found, the ones beyond the area about the sheep.
-pub const FAR: usize = 6;
+pub const FAR: usize = place_counted(&COUNTED, "far");
 
 /// What the rule keeps over a superchunk's turn: what the sheep did,
 /// and room for a sheep's attributes as they are changed, made once.

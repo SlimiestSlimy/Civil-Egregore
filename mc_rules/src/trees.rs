@@ -3,7 +3,7 @@
 //! at the oldest may die (`docs/mc_rules.md`, "Trees").
 
 use instructions::layers::{OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
-use instructions::{cells, CellIndex, Chance, RuleCounts, Turn};
+use instructions::{cells, place_counted, CellIndex, Chance, RuleCounts, Turn};
 
 /// The chance, each tick, that a tree is sampled.
 pub const SAMPLE_CHANCE: Chance = Chance::one_in(10_000);
@@ -18,16 +18,17 @@ pub const DIE_ONE_IN: u64 = 4;
 /// Cells along the side of the square about a tree it counts and spreads in.
 pub const AROUND: u32 = 8;
 
-/// What the rule counts, each named at its place in its [`RuleCounts`].
+/// What the rule counts, each named at its place in its
+/// [`RuleCounts`]: the one order, the places below worked out from it.
 pub const COUNTED: [&str; 4] = ["sampled", "spreads", "grown", "died"];
 /// Trees sampled.
-pub const SAMPLED: usize = 0;
+pub const SAMPLED: usize = place_counted(&COUNTED, "sampled");
 /// Trees put: two may be put on one cell, which then has one.
-pub const SPREADS: usize = 1;
+pub const SPREADS: usize = place_counted(&COUNTED, "spreads");
 /// Trees grown a stage.
-pub const GROWN: usize = 2;
+pub const GROWN: usize = place_counted(&COUNTED, "grown");
 /// Trees dead.
-pub const DIED: usize = 3;
+pub const DIED: usize = place_counted(&COUNTED, "died");
 
 /// The rule, on one superchunk's turn: every tree sampled with
 /// [`SAMPLE_CHANCE`], in Morton order, each seen to by [`tree`].

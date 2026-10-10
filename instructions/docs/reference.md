@@ -108,6 +108,9 @@ The words the instructions are asked in: `CellIndex`, `CellCartesian`,
 `EntityId`, `Header`, `EntityRef`, `EntityEdit`, `Turn`, `TickReport`,
 `Rng`, `Chance`.
 
+**`place_counted(counted, name)`**: the place of a name in a rule's
+list of what it counts, worked out as the rule is compiled -- a name
+not listed does not compile.
 **`RuleCounts`**: what a rule did, up to
 `COUNTS_OF_A_RULE` numbers, each at a place the rule names, added with
 `+=` -- one shape for every rule, so the server lists them all in one

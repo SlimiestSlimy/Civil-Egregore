@@ -3,7 +3,7 @@
 //! sampling pass for both (`docs/mc_rules.md`, "Grass").
 
 use instructions::layers::{GRASS, WET};
-use instructions::{cells, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
+use instructions::{cells, place_counted, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
 
 /// The chance, each tick, that a cell of grass tries to spread.
 pub const SPREAD_CHANCE: Chance = Chance::one_in(100_000);
@@ -14,15 +14,16 @@ pub const DECAY_CHANCE: Chance = Chance::one_in(200_000);
 /// to decay.
 pub const SAMPLE_CHANCE: Chance = SPREAD_CHANCE.plus(DECAY_CHANCE);
 
-/// What the rule counts, each named at its place in its [`RuleCounts`].
+/// What the rule counts, each named at its place in its
+/// [`RuleCounts`]: the one order, the places below worked out from it.
 pub const COUNTED: [&str; 3] = ["sampled", "spreads", "decays"];
 /// Cells of grass sampled.
-pub const SAMPLED: usize = 0;
+pub const SAMPLED: usize = place_counted(&COUNTED, "sampled");
 /// Spreads queued: two samples may spread onto one cell, which then
 /// changes once.
-pub const SPREADS: usize = 1;
+pub const SPREADS: usize = place_counted(&COUNTED, "spreads");
 /// Cells of grass turned back to dirt.
-pub const DECAYS: usize = 2;
+pub const DECAYS: usize = place_counted(&COUNTED, "decays");
 
 /// The rule, on one superchunk's turn: every cell of grass chosen with
 /// the chances of spreading and of decay together, in Morton order,
