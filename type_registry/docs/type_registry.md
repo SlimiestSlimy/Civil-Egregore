@@ -46,3 +46,19 @@ over its number -- so `bits` is read off the ID with no table; the
 width as a type (`Width::BITS`) is the same number known as the code
 is built. An attribute's value is a word: 64. An entity type
 holds nothing itself: 0.
+
+## Layouts
+
+**Designed 2026-10-09 and not yet built** (the entity manager's
+"Attributes, a block each" tells the whole of it).
+
+An attribute's row is to say its layout beside its ID: the type, in
+the code, of what its 56 bytes of data hold -- a tick; a tick and a
+neighbour -- as a wide plane's row says its width. The constant the
+row makes is then typed by its layout, as a wide plane's is by its
+width, so an attribute is read as its fields and one layout is never
+read as another. A layout says how many blocks it takes and how its
+fields lie in the data's words: words, not bytes, so the same on any
+machine. The ID's top byte holds the blocks less one, all ones for a
+size that varies; the table is checked as it is built for a row whose
+ID and layout disagree.

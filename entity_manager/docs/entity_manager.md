@@ -18,6 +18,62 @@ then its ID there -- never a search past its chunk. That keeps it found
 however it moves, and a wake or an instruction naming one that has
 moved on or died passes it over.
 
+## Attributes, a block each
+
+**Designed 2026-10-09 and not yet built**: until it is, an attribute is
+a type and one word, as the rest of this doc tells. What is written
+here is what the code is being changed to; this line goes when it is.
+
+An attribute is one or more **blocks** of 64 bytes -- eight words, a
+cache line, and aligned as one. The first word of an attribute's first
+block is its type, the one u64 ID every type in a world has. The rest
+is its data, 56 bytes in a block of its own: way more than the one
+word it had, so that what belongs together is one attribute -- where a
+sheep roams to and until when, not the two packed into a word.
+
+**Its layout is its type's, and fixed.** A type of attribute has a
+layout: what the data's words hold, field by field. The type registry
+says it, a row an attribute, and the layout is a type in the code, so
+an attribute is read and written as its fields and never as loose
+words (`../../type_registry/docs/type_registry.md`, "Layouts"). Every
+attribute of one type is laid out alike.
+
+**More than one block.** A layout that needs more than 56 bytes takes
+two blocks, or more: the blocks after the first are all data, eight
+words each, straight after the first block's seven -- so the data is
+one run of words, 7, 15, 23 and so on. How many blocks a type takes is
+said by its ID -- the ID's top byte, the blocks less one, as a layer
+type's top byte says how wide it is -- so nothing is looked up to step
+over an attribute, and the IDs there are, whose top byte is 0, are of
+one block.
+
+**Variable size.** Most attributes are of a fixed size. One whose
+size varies -- a short text, a short list -- has a top byte of all
+ones, and then its first block's second word is its **block length**:
+how many blocks it takes in all, one at least. Its data starts at the
+third word. None is registered yet; the walk over an entity's
+attributes honours a block length all the same, and a test makes one
+to say so.
+
+**An entity's attributes** are a run of blocks in its bucket's list,
+sorted by type, each type once. Finding one is a walk from the first:
+read the type, and either it is the one, or step over as many blocks
+as the type -- or the block length -- says. An entity has few
+attributes, and each step reads the one word.
+
+**What it costs.** A block is four times the 16 bytes an attribute
+took. A sheep has one to four: 64 to 256 bytes beside its 32-byte
+header. Blocks are copied whole when an entity is put, crosses or is
+saved; an edit of one attribute in place writes its block. The tick
+reference is counted before and after.
+
+**What changes with it.** An edit instruction carries the attribute's
+blocks, or none to remove it, in the instructions' list beside those
+the puts carry. A saved entity is its header's four words, how many
+blocks it has, and the blocks. The bucket's list, its garbage and its
+sweep count blocks where they counted attributes; an attribute put in
+place of one as long is written where it was.
+
 ## A chunk's bucket
 
 A superchunk holds its entities in a bucket a chunk: their headers,
