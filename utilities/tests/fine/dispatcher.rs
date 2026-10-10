@@ -2,7 +2,8 @@
 //! jobs, borrowing what the caller holds; a part's panic raised to the
 //! caller, after every part is done; jobs queued done once each, by
 //! the workers or, there being none, at once; and a worker busy with
-//! one sitting a job run out.
+//! one sitting a job run out; jobs run from several threads at once
+//! each whole, one after another; and a queued job running one.
 //!
 //! `cargo test`
 
@@ -107,4 +108,47 @@ fn a_worker_busy_with_a_queued_job_sits_a_run_out() {
             ran.fetch_add(1, Ordering::Relaxed);
         });
     }
+}
+
+/// Jobs run from several threads at once are each run whole, as if
+/// one after another: every part of each at most once, part 0 always,
+/// and no part of another's job.
+#[test]
+fn jobs_run_from_several_threads_are_each_whole() {
+    let dispatcher = Dispatcher::new(4);
+    std::thread::scope(|scope| {
+        for caller in 0..4usize {
+            let dispatcher = &dispatcher;
+            scope.spawn(move || {
+                for run in 0..500 {
+                    // What this run alone holds: a part that ran after it returned, or another run's, would be seen.
+                    let parts: Vec<AtomicUsize> = (0..4).map(|_| AtomicUsize::new(0)).collect();
+                    dispatcher.run(&|part| {
+                        parts[part].fetch_add(1, Ordering::Relaxed);
+                    });
+                    let ran: Vec<usize> = parts.iter().map(|part| part.load(Ordering::Relaxed)).collect();
+                    assert!(ran[0] == 1 && ran.iter().all(|&ran| ran <= 1), "caller {caller}, run {run}: {ran:?}");
+                }
+            });
+        }
+    });
+}
+
+/// A queued job may run a job itself: it is done, and does not wait
+/// for ever.
+#[test]
+fn a_queued_job_runs_a_job() {
+    let dispatcher = std::sync::Arc::new(Dispatcher::new(4));
+    let (done, said) = channel();
+    let within = std::sync::Arc::clone(&dispatcher);
+    dispatcher.queue(move || {
+        let parts = AtomicUsize::new(0);
+        within.run(&|_| {
+            parts.fetch_add(1, Ordering::Relaxed);
+        });
+        // Leaves the worker without the dispatcher: the test's is the last let go of.
+        done.send((parts.load(Ordering::Relaxed), within)).expect("the test waits");
+    });
+    let (parts, _within) = said.recv_timeout(std::time::Duration::from_secs(30)).expect("the queued job's run to end");
+    assert!((1..=4).contains(&parts), "{parts} parts");
 }

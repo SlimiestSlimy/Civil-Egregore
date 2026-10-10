@@ -5,7 +5,7 @@
 
 use std::collections::VecDeque;
 use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::thread::JoinHandle;
 
 /// A job run: once a part, given the part's number.
@@ -58,6 +58,8 @@ pub struct Dispatcher {
     shared: Arc<Shared>,
     /// The workers: one fewer than the threads, the caller's being one.
     workers: Vec<JoinHandle<()>>,
+    /// Held for the whole of a job run: one at a time, whoever calls.
+    one_run: Mutex<()>,
 }
 
 impl Dispatcher {
@@ -75,7 +77,7 @@ impl Dispatcher {
                 std::thread::spawn(move || work(&shared, part))
             })
             .collect();
-        Self { shared, workers }
+        Self { shared, workers, one_run: Mutex::new(()) }
     }
 
     /// A dispatcher of every thread the machine has.
@@ -91,15 +93,21 @@ impl Dispatcher {
 
     /// Runs `job` once a part, part 0 on this thread and each other on
     /// a worker not busy with a queued job, and returns once every part
-    /// started has finished: a part's panic is raised here, after.
+    /// started has finished: a part's panic is raised here, after. One
+    /// job is run at a time: a second caller waits for the first. A
+    /// job run must not itself call this -- it would wait on itself.
     pub fn run(&self, job: &(dyn Fn(usize) + Sync)) {
         if self.workers.is_empty() {
             job(0);
             return;
         }
+        // The state holds one job: two runs at once would hand a worker the wrong one, and one already let go of.
+        // A run that panicked left nothing half done behind the lock.
+        let _one_run = self.one_run.lock().unwrap_or_else(PoisonError::into_inner);
         // Safety: the lifetime is erased only for the workers to hold the
         // job while this call waits for them: it returns after the last
-        // has finished with it, so the job outlives every use.
+        // has finished with it, so the job outlives every use -- and
+        // no other call hands them another meanwhile (`one_run`).
         let erased: *const Job = unsafe { std::mem::transmute::<*const (dyn Fn(usize) + Sync + '_), *const Job>(job) };
         {
             let mut state = self.shared.state.lock().expect("the dispatcher's lock");

@@ -5,9 +5,6 @@
 //! The design: `docs/entity_rules.md`; function by function:
 //! `docs/reference.md`.
 
-//! What the entities are: `docs/entity_rules.md`; function by function:
-//! `docs/reference.md`.
-
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
