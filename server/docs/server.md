@@ -115,9 +115,14 @@ moves the halos. The rules are one table, `rules::RULES`: a name, what
 the rule counts, and its function, in the order a turn runs them --
 grass, trees, sheep. A rule added is a row added there; nothing else
 lists them. What a tick did is an array with a rule's counts at its
-place in the table, read by name (`TickCounts::count("sheep",
-"eaten")`), and a diagnostic or a test ticks only the rules it names
-(`Chosen::named(&["grass"])`).
+place in the table. Nothing is looked up by a name as a world runs: a
+rule's place is a constant made of its name as the server is compiled
+(`SHEEP_RULE`, `RulePlace::named`), and so is the place of each thing
+a rule counts, worked out from the one list of their names
+(`sheep::EATEN`, `instructions::place_counted`) -- a name that is not
+there does not compile. A tick's counts are read by them
+(`counts.of(SHEEP_RULE)[EATEN]`), and a diagnostic or a test ticks
+only the rules it picks (`Chosen::of(&[GRASS_RULE])`).
 
 ## The same on every machine
 

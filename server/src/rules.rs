@@ -1,6 +1,6 @@
 //! The rules a world ticks, in one table ([`RULES`]): a rule added is
 //! a row added here, and nowhere else. A tick's counts by rule
-//! ([`TickCounts`]), the rules picked by name ([`Chosen`])
+//! ([`TickCounts`]), the rules picked ([`Chosen`]) by their place ([`RulePlace`])
 //! (`docs/server.md`, "TickCounts").
 
 use coordinates::CellIndex;
@@ -27,13 +27,42 @@ pub const RULES: [Rule; 3] = [
     Rule { name: "sheep", counted: &entity_rules::sheep::COUNTED, rule: |turn, _| entity_rules::sheep::rule(turn) },
 ];
 
-/// The place in [`RULES`] of the rule named `name`.
-///
-/// # Panics
-/// If no rule is named so.
-pub fn place_of(name: &str) -> usize {
-    RULES.iter().position(|rule| rule.name == name).unwrap_or_else(|| panic!("no rule is named `{name}`"))
+/// A rule's place in [`RULES`]: what a rule is picked by, and its
+/// counts read by. Made of a name as the server is compiled
+/// ([`RulePlace::named`]), so a rule that is not there does not compile.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RulePlace(usize);
+
+impl RulePlace {
+    /// The place of the rule named `name`.
+    ///
+    /// # Panics
+    /// If no rule is named so -- for a constant, as it is compiled.
+    pub const fn named(name: &str) -> Self {
+        let names = {
+            let mut names = [""; RULES.len()];
+            let mut place = 0;
+            while place < RULES.len() {
+                names[place] = RULES[place].name;
+                place += 1;
+            }
+            names
+        };
+        Self(instructions::place_counted(&names, name))
+    }
+
+    /// The rule at this place.
+    pub const fn rule(self) -> &'static Rule {
+        &RULES[self.0]
+    }
 }
+
+/// The grass's rule.
+pub const GRASS_RULE: RulePlace = RulePlace::named("grass");
+/// The trees' rule.
+pub const TREES_RULE: RulePlace = RulePlace::named("trees");
+/// The sheep's rule.
+pub const SHEEP_RULE: RulePlace = RulePlace::named("sheep");
 
 /// What the rules did, in a tick or added up over many: each rule's
 /// counts at its place in [`RULES`], and how long each took, every
@@ -48,24 +77,14 @@ pub struct TickCounts {
 }
 
 impl TickCounts {
-    /// The counts of the rule named `rule`.
-    pub fn of(&self, rule: &str) -> RuleCounts {
-        self.counts[place_of(rule)]
+    /// The counts of `rule`, each at the place the rule names it by.
+    pub fn of(&self, rule: RulePlace) -> RuleCounts {
+        self.counts[rule.0]
     }
 
-    /// The time of the rule named `rule`.
-    pub fn time_of(&self, rule: &str) -> Duration {
-        self.times[place_of(rule)]
-    }
-
-    /// What the rule named `rule` counted under `counted`.
-    ///
-    /// # Panics
-    /// If the rule counts nothing named so.
-    pub fn count(&self, rule: &str, counted: &str) -> u64 {
-        let place = place_of(rule);
-        let at = RULES[place].counted.iter().position(|&name| name == counted).unwrap_or_else(|| panic!("the rule `{rule}` counts nothing named `{counted}`"));
-        self.counts[place][at]
+    /// The time of `rule`.
+    pub fn time_of(&self, rule: RulePlace) -> Duration {
+        self.times[rule.0]
     }
 }
 
@@ -79,7 +98,7 @@ impl AddAssign for TickCounts {
     }
 }
 
-/// Some of the rules, picked by name: what a tick of only those runs.
+/// Some of the rules: what a tick of only those runs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Chosen {
     /// Whether the rule at each place in [`RULES`] is run.
@@ -90,15 +109,11 @@ impl Chosen {
     /// Every rule: what a world's tick runs.
     pub const ALL: Self = Self { run: [true; RULES.len()] };
 
-    /// The rules named in `names`, run in the table's order whatever
-    /// theirs.
-    ///
-    /// # Panics
-    /// If no rule is named as one of them.
-    pub fn named(names: &[&str]) -> Self {
+    /// The rules `rules`, run in the table's order whatever theirs.
+    pub fn of(rules: &[RulePlace]) -> Self {
         let mut run = [false; RULES.len()];
-        for name in names {
-            run[place_of(name)] = true;
+        for rule in rules {
+            run[rule.0] = true;
         }
         Self { run }
     }

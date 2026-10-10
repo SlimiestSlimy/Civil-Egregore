@@ -48,6 +48,30 @@ pub mod entity_types {
 /// The most counts a rule keeps.
 pub const COUNTS_OF_A_RULE: usize = 8;
 
+/// The place of the count named `name` among `counted`, the names of
+/// what a rule counts in the order it keeps them: the one order, from
+/// which each place is worked out as the rule is compiled.
+///
+/// # Panics
+/// If nothing is named so -- for a constant, as it is compiled.
+pub const fn place_counted(counted: &[&str], name: &str) -> usize {
+    let mut place = 0;
+    while place < counted.len() {
+        let (one, other) = (counted[place].as_bytes(), name.as_bytes());
+        let mut same = one.len() == other.len();
+        let mut byte = 0;
+        while same && byte < one.len() {
+            same = one[byte] == other[byte];
+            byte += 1;
+        }
+        if same {
+            return place;
+        }
+        place += 1;
+    }
+    panic!("the rule counts nothing named so")
+}
+
 /// What a rule did, on a turn or added up over many: its counts, each
 /// at the place the rule names it by, the rest 0.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

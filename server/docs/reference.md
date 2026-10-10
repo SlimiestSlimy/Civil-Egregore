@@ -104,11 +104,14 @@ words, or `None`.
 
 **`RULES`**: every rule a world ticks, a **`Rule`** `{name, counted,
 rule}` each -- grass, trees, sheep -- in the order a turn runs them; the
-one list of them. **`place_of(name)`**: a rule's place in it.
+one list of them. **`RulePlace`**: a rule's place in it, made of its
+name as the server is compiled (**`RulePlace::named(name)`**, a name
+not there not compiling), **`RulePlace::rule`** the row there;
+**`GRASS_RULE`**, **`TREES_RULE`**, **`SHEEP_RULE`**: each rule's.
 **`TickCounts`** `{counts, times}`: each rule's `RuleCounts` and time at
-its place; **`of(rule)`**, **`time_of(rule)`** and **`count(rule,
-counted)`** read them by name. **`Chosen`**: some of the rules --
-**`ALL`**, or **`named(names)`** -- and a superchunk's turn of them,
+its place; **`of(rule)`** and **`time_of(rule)`** read them by place.
+**`Chosen`**: some of the rules --
+**`ALL`**, or **`of(rules)`** -- and a superchunk's turn of them,
 **`turn`**, or **`timed_turn`** with each one's time.
 
 ## `diagnostics/`
@@ -127,7 +130,7 @@ a **`Throughput`**.
 **`pasture::run(ticks, thousandths, sheep, superchunks, threads)`**:
 grass and sheep ticked flat out: the flock and grass over the run, what
 the sheep did, each phase's time and each rule's -- `Chosen::timed_turn`,
-over every thread, the rules picked by name (`RULES_TICKED`) -- the memory, the entities' stats, and a
+over every thread, the rules picked (`RULES_TICKED`) -- the memory, the entities' stats, and a
 **`Census`** of the flock and grass every `CENSUS_EVERY` (100) ticks:
 a **`PastureRun`**.
 

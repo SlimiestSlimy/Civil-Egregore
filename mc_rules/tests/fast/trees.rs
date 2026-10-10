@@ -53,7 +53,7 @@ fn trees_grow_a_stage_at_a_time_spread_and_die_of_age() {
     assert!(seeding > 0, "trees old enough to spread");
     let mut all = [0; 4];
     for tick in 0..400 {
-        let done = tick_rule(&mut world, "trees").rules;
+        let done = tick_rule(&mut world, server::TREES_RULE).rules;
         let after = stages(&world);
         let (mut grown, mut died, mut new) = (0, 0, 0);
         let mut was = before.iter().peekable();
@@ -97,7 +97,7 @@ fn crowded_trees_never_spread() {
     plant(&mut world, &everywhere, || OLDEST_TREE_STAGE);
     let (mut sampled, mut died) = (0, 0);
     for tick in 0..300 {
-        let done = tick_rule(&mut world, "trees").rules;
+        let done = tick_rule(&mut world, server::TREES_RULE).rules;
         assert_eq!(done[SPREADS], 0, "tick {tick}");
         (sampled, died) = (sampled + done[SAMPLED], died + done[DIED]);
     }

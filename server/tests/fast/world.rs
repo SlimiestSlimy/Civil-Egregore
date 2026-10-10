@@ -8,6 +8,7 @@
 use crate::tests::{everything, folder};
 use chunk_storage::disk::{self, DiskError};
 use coordinates::CellCartesian;
+use entity_rules::sheep::{BIRTHS, EATEN};
 
 /// Grass and sheep ticked, saved, and ticked on; the save loaded and
 /// ticked as far: the two are the same world.
@@ -30,7 +31,7 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
     for _ in 0..3_000 {
         let report = first.tick().rules;
         second.tick();
-        (eaten, born) = (eaten + report.rules.count("sheep", "eaten"), born + report.rules.count("sheep", "births"));
+        (eaten, born) = (eaten + report.rules.of(server::SHEEP_RULE)[EATEN], born + report.rules.of(server::SHEEP_RULE)[BIRTHS]);
     }
     assert!(eaten > 300 && born > 10, "{eaten} eaten, {born} born: a world doing something");
     assert!(everything(&first) == everything(&second), "the same 3,000 ticks on");

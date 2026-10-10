@@ -6,7 +6,7 @@
 use type_registry::GRASS;
 use crate::diagnostics::plain_world::{plain_world, superchunks as superchunks_of};
 use crate::host::frame::count;
-use crate::{Chosen, TickCounts};
+use crate::{Chosen, RulePlace, TickCounts, GRASS_RULE, SHEEP_RULE};
 use entity_rules::sheep::{BIRTHS, DEATHS, WOKEN};
 use entity_manager::diagnostics::entities::EntityStats;
 use entity_manager::InstructionsApplied;
@@ -67,8 +67,8 @@ pub struct Census {
     pub deaths: usize,
 }
 
-/// The rules the pasture ticks, by name.
-pub const RULES_TICKED: [&str; 2] = ["grass", "sheep"];
+/// The rules the pasture ticks.
+pub const RULES_TICKED: [RulePlace; 2] = [GRASS_RULE, SHEEP_RULE];
 
 /// Ticks grass and sheep `ticks` times over `superchunks` superchunks,
 /// grass drawn on `thousandths` of each one's cells and `sheep` sheep on
@@ -81,11 +81,11 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
     let (mut done, mut instructions, mut writes, mut computing, mut applying) = (TickCounts::default(), InstructionsApplied::default(), 0, Duration::ZERO, Duration::ZERO);
     let mut census = vec![Census { tick: 0, sheep: start_sheep, grass: start_grass, ..Census::default() }];
     let mut since = RuleCounts::default();
-    let chosen = Chosen::named(&RULES_TICKED);
+    let chosen = Chosen::of(&RULES_TICKED);
     for tick in 0..ticks {
         let report = world.tick_only(chosen, true);
         done += report.rules;
-        since += report.rules.of("sheep");
+        since += report.rules.of(SHEEP_RULE);
         if (tick + 1) % CENSUS_EVERY == 0 || tick + 1 == ticks {
             census.push(Census { tick: tick + 1, sheep: world.entities.len(), grass: count(&world, GRASS), woken: since[WOKEN] as usize, births: since[BIRTHS] as usize, deaths: since[DEATHS] as usize });
             since = RuleCounts::default();

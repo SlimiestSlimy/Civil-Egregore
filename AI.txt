@@ -333,15 +333,14 @@ Google Drive connector needs authorizing in claude.ai settings.
      methods, changed whole: put_entity, remove_entity, write_cells;
      server.md, "What a world holds together"; World::broken_invariant
      checked after a debug tick and by the fast tier).
-  4. Rule counts by string: RULES/place_of/TickCounts::count look up by
-     name and panic at run time; each rule has COUNTED names AND
-     separate index constants (WOKEN = 0 ...) -- two sources of truth
-     for one order. One per rule (an enum or a const table the indices
-     come from), wrong names a compile error.
-  5. (entity_manager has a fine tier since 2026-10-10: attributes.)
-     No tests in their own crates: entity_manager (~1.3k lines),
-     entity_rules, mc_rules. Check what simulation/server tests cover;
-     each crate tests itself (a fine tier at least).
+  4. Rule counts by string: DONE 2026-10-10 (a rule's count places
+     worked out from its COUNTED names as it is compiled,
+     instructions::place_counted; the server's rules picked by
+     RulePlace constants, GRASS_RULE ...; no lookup by name left).
+  5. Each crate testing itself: DONE 2026-10-10 for mc_rules and
+     entity_rules (their tests moved from the server's, trees' tests
+     written). entity_manager: a fine tier of attributes and the
+     first-free put; the rest still through the simulation's tests.
   6. Rule for the future: every `unsafe` has a test trying to break its
      safety comment's claim.
   7. DONE 2026-10-10.

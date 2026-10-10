@@ -49,14 +49,14 @@ pub fn run(ticks: usize, thousandths: usize, superchunks: u32, threads: usize) -
     let mut world = plain_world(superchunks, thousandths as u64 * worldgen::ONE / 1000, 0, threads);
     let start_grass = count(&world, GRASS);
     let (mut computing, mut applying, mut writes, mut sampled, mut missed) = (Duration::ZERO, Duration::ZERO, 0, 0, 0);
-    let chosen = Chosen::named(&["grass"]);
+    let chosen = Chosen::of(&[crate::GRASS_RULE]);
     for _ in 0..ticks {
         let report = world.tick_only(chosen, false);
         computing += report.computing;
         applying += report.applying;
         writes += report.writes_applied.writes;
         missed += report.writes_applied.missed;
-        sampled += report.rules.count("grass", "sampled") as usize;
+        sampled += report.rules.of(crate::GRASS_RULE)[mc_rules::grass::SAMPLED] as usize;
         memory.read();
     }
     Throughput {

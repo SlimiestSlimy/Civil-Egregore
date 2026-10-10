@@ -72,21 +72,21 @@ pub fn put_entity(world: &mut World, header: Header, attributes: &[AttributeBloc
     world.put_entity(header, attributes);
 }
 
-/// One tick of the rule named `rule` alone over `world`'s hot
+/// One tick of `rule` alone over `world`'s hot
 /// superchunks, its halos left where they are: the tick's report, the
 /// rule's counts alone in it.
-pub fn tick_rule(world: &mut World, rule: &str) -> simulation::TickReport<instructions::RuleCounts> {
-    let report = world.tick_only(server::Chosen::named(&[rule]), false);
+pub fn tick_rule(world: &mut World, rule: server::RulePlace) -> simulation::TickReport<instructions::RuleCounts> {
+    let report = world.tick_only(server::Chosen::of(&[rule]), false);
     simulation::TickReport { writes_applied: report.writes_applied, instructions_applied: report.instructions_applied, rules: report.rules.of(rule), computing: report.computing, applying: report.applying }
 }
 
 /// One tick of the sheep's rule alone over `world`'s hot superchunks,
 /// its halos left where they are.
 pub fn tick_sheep(world: &mut World) -> simulation::TickReport<instructions::RuleCounts> {
-    tick_rule(world, "sheep")
+    tick_rule(world, server::SHEEP_RULE)
 }
 
 /// One tick of the grass's rule alone over `world`'s hot superchunks.
 pub fn tick_grass(world: &mut World) -> simulation::TickReport<instructions::RuleCounts> {
-    tick_rule(world, "grass")
+    tick_rule(world, server::GRASS_RULE)
 }
