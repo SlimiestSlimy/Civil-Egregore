@@ -104,27 +104,49 @@ thread, however large the world: the HUD says how much.
 
 ## Height, from straight above
 
-The view is fully vertical, so height is shown by light alone, the sun
-to the top left and 35 degrees up; a cell is 2 m and a height 1 m
-(`src/ground.rs`). A superchunk's heights come with the first frame it is
+The view is fully vertical, so height is shown by light and colour
+alone, the sun to the top left (`src/ground.rs`, and
+`src/ground/relief.rs` for what a height does to a colour, the same
+from far, from near and on the map). The land as generated is level
+ground and faces many heights a cell steep, with little between
+(`AI_SCRATCHPAD how_steep_the_land_is`): what is drawn has to tell a
+plateau from the one beside it, and a rise of 1 from one of 64. A superchunk's heights come with the first frame it is
 hot in, as its image holds them; the painter works out from the seed
 only the cells past its edges that no frame brought (138 before, for
-the shadows cast onto it, and 10 after) -- measured, 23 ms a
+the shadows cast onto it, and 26 after, as far as the coast is looked
+for) -- measured, 23 ms a
 superchunk's ground where working every height out again took 90 --
 once, on a thread a superchunk, and keeps them: the coarse levels for good, the fine
 parts (8 MiB) for the 48 superchunks last seen.
 
-- **Hillshade**: slopes facing the sun lighter, those facing away
-  darker, off the heights smoothed, in bands 7% apart.
-- **Tint**: high ground a little lighter than low.
+- **Slope light**: slopes facing the sun lighter, those facing away
+  darker, those across it a little darker, off the heights smoothed,
+  in bands 5% apart -- by how steep, on a scale that halves at each
+  doubling of the rise, so gentle ground and the steepest face both
+  show.
+- **Height tint**: low ground dark and full, higher lighter and
+  warmer, the highest pale, in 40 bands from the ocean's level to the
+  highest land: two plateaus are told apart by their colour.
 - **Cast shadows**: one sweep down the sun's diagonal, a shadow
-  followed 128 cells (`SHADOW_REACH`) and no further -- within what is
+  line dropping 24 heights a cell -- far more than a sun would have
+  it, or steep land would be all shadow -- followed 128 cells
+  (`SHADOW_REACH`) and no further -- within what is
   kept before a superchunk, so it is the same on both sides of where
   two meet; each cell keeps
   how high the shadow line stands over it, so from near a shadow's
   edge is found within the cell, with no sweep over pixels.
-- **From a cell a pixel outwards**: cliffs darkened by the walls in the
-  pixel, and a contour every 8, 16 or 32 heights.
+- **From a cell a pixel outwards**: a contour every 128 heights where
+  a cell is a pixel, twice as many each time a pixel is twice as many
+  cells, so they lie as far apart on the screen at every detail; every
+  fifth darker; and where the ground is so steep they would lie under
+  8 pixels apart, only every fifth, then every twenty-fifth.
+- **The coast**: sand on the land beside water and foam on the water
+  beside it, a pixel wide at every detail, from how far each cell is
+  from the coast (24 cells at most); the water's light its depth's,
+  light over the shallows and dark over the deep, in 14 bands, and
+  the shallowest water already three quarters water's colour. Water
+  is taken to be the ocean's: ground under its level. A shadow falls
+  on the water, not on the ground under it.
 - **From near** (`src/near.rs`), a cell 2, 4 or 8 pixels -- as many as
   the screen shows -- the viewport's cells are one picture, and height is
   drawn at the edges: wherever a cell is higher than the one beside
@@ -219,6 +241,8 @@ another world is run.
 | `src/hud.rs` | the text over the world |
 | `src/map.rs` | the map: the world from far, drawn from the generator alone |
 | `src/paint.rs` | the painter's thread: cells into pixels |
-| `src/ground.rs` | the light on the ground: heights as a frame brings them, hillshade, tint, cast shadows, cliffs and contours; `ground/light_and_shadow.rs` the smoothing, the shadows and the sun |
+| `src/ground.rs` | the light on the ground: heights as a frame brings them, each cell's light and shadow; `ground/relief.rs` what a height does to a colour -- slope light, height tint, water's light, sand and foam; `ground/levels.rs` the ground at each detail, its contours and coast; `ground/light_and_shadow.rs` the smoothing, the shadows and how far the coast is |
 | `src/near.rs` | the viewport's cells from near as one picture: steps and walls at their edges |
+| `src/diagnostics/` | stills of a world at every zoom, painted with no window: `Civil_Egregore renderer stills` |
+| `src/transient_data.rs` | where the stills are kept: `transient_data/renders/` |
 | `docs/` | this, and the reference, function by function |

@@ -155,6 +155,20 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
     cargo run --release -p AI_SCRATCHPAD -- <command>
 
 
+== LOOKING AT WHAT IS DRAWN ==
+
+No screenshots: `cargo run --release -- renderer stills <seed hex>
+<cells east> <cells south> <farthest cells a pixel> <name>` paints one
+place of a world at every zoom (map, far, a cell a pixel, near) by the
+window's own painter, to renderer/transient_data/renders/<name>_*.png,
+some 15 s. Seed 0 is the counted one, which rolls: pin a seed to
+compare two shadings. What a height does to a colour is one file,
+renderer/src/ground/relief.rs, shared by far, near and map.
+`AI_SCRATCHPAD how_steep_the_land_is`: half the default land is level,
+a third walls (rise 2+), with rises past 64 -- shading has to span it.
+Seen in the stills: sheep stand on deep ocean cells (told to the user).
+
+
 == OPEN THREADS ==
 
 - Worldgen is what a world's making and wandering cost: callgrind,

@@ -8,6 +8,7 @@
 
 mod asking_the_host;
 mod sheep_under_camera_loading;
+mod how_steep_the_land_is;
 mod ticks_under_a_wide_viewport;
 mod tree_cover_over_ticks;
 mod what_a_generation_makes;
@@ -21,7 +22,13 @@ use utilities::commands::{dispatch, Command, Parameter};
 const SEED: &str = "seed";
 
 /// The probes.
-const COMMANDS: [Command; 6] = [
+const COMMANDS: [Command; 7] = [
+    Command {
+        name: "how_steep_the_land_is",
+        does: "prints the share of the land's cells at each rise to the next cell, over a square about the world's middle: what a shading of slopes has to tell apart",
+        parameters: &[Parameter::new(how_steep_the_land_is::SIDE, "16384"), Parameter::new(how_steep_the_land_is::EVERY, "16"), Parameter::new(SEED, "0")],
+        run: how_steep_the_land_is::run,
+    },
     Command {
         name: "tree_cover_over_ticks",
         does: "makes a world forced hot with the tree cover given, resets it to the second cover if one is given, and prints its trees and grass as it ticks flat out: whether a reset is whole at once, and where the tree rule takes a cover",

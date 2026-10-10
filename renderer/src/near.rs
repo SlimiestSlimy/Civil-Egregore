@@ -3,7 +3,9 @@
 //! the border of the higher cell, light towards the sun and dark away,
 //! and under a wall a band on its lower cell, darkest at its foot --
 //! under the cast shadows
-//! ([`crate::ground`]). How strongly is the sliders' (`utilities::tuning`),
+//! ([`crate::ground`]), on ground tinted by its height, sand where it
+//! meets water, the water lighter over the shallows and foam where it
+//! meets the land ([`crate::ground::relief`]). How strongly is the sliders' (`utilities::tuning`),
 //! as the painter was last sent them.
 //!
 //! Every pixel takes one edge's doing, never two multiplied: of the
@@ -16,9 +18,10 @@
 //! nothing. So bands meet at corners as one outline, with no doubled
 //! patch and no gap.
 
+use crate::ground::relief::{laid, tint_on_sand, water_light, FOAM, FOAM_MOST, PALE, SAND, SAND_MOST};
 use crate::ground::{shadow_drop, Fine, Ground, MARGIN, SIDE};
 use crate::paint::{depth_at, stage_at, tree_colour, under_water};
-use server::host::frame::{Cells, Near, OLDEST_TREE_STAGE, WORD_BITS};
+use server::host::frame::{Cells, Near, DEEP, OLDEST_TREE_STAGE, WORD_BITS};
 use utilities::tuning::{Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;
@@ -115,13 +118,11 @@ pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: 
                 let (own_x, own_y) = (x - left, y - top);
                 let place = place_from_cartesian(own_x as u32, own_y as u32);
                 let grass = cells.grass[place / WORD_BITS] >> (place % WORD_BITS) & 1 == 1;
-                let cell = Cell { fine, tuning, at: (own_x, own_y), world: (cells.top_left.0 as u64 + own_x as u64, cells.top_left.1 as u64 + own_y as u64), colour: if grass { GREEN } else { BROWN } };
-                let corner = ((x - first.0) * pixels_a_cell, (y - first.1) * pixels_a_cell);
                 let (word, bit) = (place / WORD_BITS, (place % WORD_BITS) as u32);
+                let water = (cells.wet[word] >> bit & 1 == 1).then(|| depth_at(cells, word, bit));
+                let cell = Cell { fine, tuning, at: (own_x, own_y), world: (cells.top_left.0 as u64 + own_x as u64, cells.top_left.1 as u64 + own_y as u64), colour: if grass { GREEN } else { BROWN }, water };
+                let corner = ((x - first.0) * pixels_a_cell, (y - first.1) * pixels_a_cell);
                 cell.paint(&mut pixels, width, corner, pixels_a_cell);
-                if cells.wet[word] >> bit & 1 == 1 {
-                    water(&mut pixels, width, corner, pixels_a_cell, depth_at(cells, word, bit));
-                }
                 if cells.trees[word] >> bit & 1 == 1 {
                     tree(&mut pixels, width, corner, pixels_a_cell, stage_at(cells, word, bit));
                 }
@@ -149,6 +150,8 @@ struct Cell<'a> {
     world: (u64, u64),
     /// Its colour: dirt's or grass's.
     colour: [u8; 3],
+    /// How deep the water over it is, if it is wet.
+    water: Option<u32>,
 }
 
 impl Cell<'_> {
@@ -186,8 +189,25 @@ impl Cell<'_> {
                 count += 1;
             }
         }
+        // Under deep water nothing of the ground shows, its edges neither.
+        if self.water.is_some_and(|depth| depth >= DEEP) {
+            count = 0;
+        }
+        // Its colour under its water; sand on the land beside the ocean, foam on the ocean beside the land; and what its height tints it, or its depth.
+        let ocean_within = |reach: isize, ocean: bool| (-reach..=reach).flat_map(|down| (-reach..=reach).map(move |across| (across, down))).any(|(across, down)| self.fine.under_ocean(x + across, y + down).is_some() == ocean);
+        let colour = self.water.map_or(self.colour, |depth| under_water(self.colour, depth));
+        let (colour, tinted) = match self.fine.under_ocean(x, y) {
+            Some(depth) => (if ocean_within(1, false) { laid(colour, FOAM, FOAM_MOST) } else { colour }, water_light(depth as f32, self.fine.deepest())),
+            None => {
+                let (tint, pale) = self.fine.tint(x, y);
+                let sand = if ocean_within(1, true) { SAND_MOST } else if ocean_within(2, true) { SAND_MOST / 2.0 } else { 0.0 };
+                (if sand >= pale { laid(colour, SAND, sand) } else { laid(colour, PALE, pale) }, tint_on_sand(tint, sand))
+            }
+        };
+        // Water is smooth: its pixels do not differ by lot as the ground's do.
+        let texture = if self.water.is_some() { 0.0 } else { tuning[TEXTURE] };
         // The shadow lines that reach the cell: down the diagonal, and from above and from the left.
-        let (drop, over) = (shadow_drop(), here as f32 + 0.01);
+        let (drop, over) = (shadow_drop(), self.fine.surface(x, y) as f32 + 0.01);
         let (diagonal, above, beside) = (self.fine.line(x - 1, y - 1) - over, self.fine.line(x, y - 1) - over, self.fine.line(x - 1, y) - over);
         let may_be_shadowed = diagonal.max(above).max(beside) > 0.0;
         let light = 1.0 + tuning[RELIEF] * (self.fine.light(self.at.0, self.at.1) - 1.0);
@@ -229,22 +249,10 @@ impl Cell<'_> {
                 };
                 let (pixel_x, pixel_y) = (self.world.0 * pixels_a_cell as u64 + across as u64, self.world.1 * pixels_a_cell as u64 + down as u64);
                 // Each mixed in whole: a world pixel's place takes more than 32 bits.
-                let tone = (1.0 + tuning[TEXTURE] * (TONES[(mix(mix(pixel_x) ^ pixel_y) >> 60) as usize] - 1.0)) * light;
-                let colour: [u8; 3] = std::array::from_fn(|channel| (self.colour[channel] as f32 * tone * shade[channel]).round().min(255.0) as u8);
+                let tone = (1.0 + texture * (TONES[(mix(mix(pixel_x) ^ pixel_y) >> 60) as usize] - 1.0)) * light;
+                let colour: [u8; 3] = std::array::from_fn(|channel| (colour[channel] as f32 * tone * tinted[channel] * shade[channel]).round().min(255.0) as u8);
                 pixels[(corner.1 + down) * width + corner.0 + across] = [colour[0], colour[1], colour[2], u8::MAX];
             }
-        }
-    }
-}
-
-/// Water `depth` deep over the cell whose top left pixel is at
-/// `corner`, already painted: the deeper, the less of the cell seen
-/// through it.
-fn water(pixels: &mut [[u8; 4]], width: usize, corner: (usize, usize), pixels_a_cell: usize, depth: u32) {
-    for down in 0..pixels_a_cell {
-        for pixel in &mut pixels[(corner.1 + down) * width + corner.0..][..pixels_a_cell] {
-            let seen = under_water([pixel[0], pixel[1], pixel[2]], depth);
-            *pixel = [seen[0], seen[1], seen[2], u8::MAX];
         }
     }
 }
