@@ -169,7 +169,7 @@ fn near(first: (u32, u32), last: (u32, u32), scale: f32) -> Option<Near> {
 /// pixel: a pixel `2^detail` cells a side. Near, no coarser than the
 /// screen; past [`COARSER_FROM`] halvings, coarser by as many again --
 /// far out, a superchunk is a few pixels however many there are.
-fn detail_at(scale: f32) -> u32 {
+pub fn detail_at(scale: f32) -> u32 {
     let halvings = scale.max(1.0).log2().floor() as u32;
     (halvings + halvings.saturating_sub(COARSER_FROM)).min(COARSEST)
 }

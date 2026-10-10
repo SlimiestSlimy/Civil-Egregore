@@ -149,9 +149,11 @@ fn chunk_top_left(place: usize) -> (usize, usize) {
 
 /// Water.
 pub const WATER: [u8; 3] = [30, 92, 168];
-/// How much of what is under it a film of water hides, of [`DEEP`]:
-/// water one deep hides this and one more, and so on to all of it.
-const FILM: usize = 4;
+/// How much of what is under it a film of water hides, beside the
+/// [`DEEP`] that hide all of it: water one deep hides this and one
+/// more, and so on -- three quarters from the first, so the shallowest
+/// water is told from wet ground.
+const FILM: usize = 44;
 
 /// How deep the water at bit `bit` of word `word` of `cells`' bitmaps
 /// is, to [`DEEP`] at most.
@@ -217,10 +219,7 @@ fn paint(cells: &Cells, ground: &Ground) -> Painted {
             bits &= bits - 1;
         }
     }
-    for (pixel, &factor) in pixels.iter_mut().zip(&ground.levels[0]) {
-        *pixel = opaque(lit([pixel[0], pixel[1], pixel[2]], factor));
-    }
-    // Its water over the lit ground: the deeper, the less of the ground seen.
+    // Its water over the ground: the deeper, the less of the ground seen.
     for (index, &word) in cells.wet.iter().enumerate() {
         let (left, top) = chunk_top_left(index / CHUNK_WORDS);
         let mut bits = word;
@@ -231,6 +230,10 @@ fn paint(cells: &Cells, ground: &Ground) -> Painted {
             *pixel = opaque(under_water([pixel[0], pixel[1], pixel[2]], depth_at(cells, index, bit)));
             bits &= bits - 1;
         }
+    }
+    // All of it in the ground's light: the land's its slope's and its height's, the water's its depth's.
+    for (pixel, &shade) in pixels.iter_mut().zip(&ground.levels[0]) {
+        *pixel = opaque(lit([pixel[0], pixel[1], pixel[2]], shade));
     }
     let white = opaque(WHITE);
     for &(x, y) in &cells.sheep {
@@ -291,11 +294,11 @@ fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
     }
     let sheep_cells = (2 * SHEEP_REACH + 1) * (2 * SHEEP_REACH + 1);
     let mut pixels = Vec::with_capacity(side * side * 4);
-    for (index, &factor) in ground.levels[(detail as usize).min(COARSEST)].iter().enumerate() {
+    for (index, &shade) in ground.levels[(detail as usize).min(COARSEST)].iter().enumerate() {
         let (grass, trees, sheep) = (grass[index], trees[index], sheep[index]);
         let ground = mixed(mixed(BROWN, GREEN, grass as usize, tile_cells), tree_colour(OLDEST_TREE_STAGE / 2), trees as usize, tile_cells);
-        // The water over the lit ground, by the share of the tile under it: shallow water half seen through.
-        let ground = mixed(lit(ground, factor), WATER, (wet[index] as usize + deep[index] as usize) / 2, tile_cells);
+        // The water over the ground, by the share of the tile under it, shallow water a quarter seen through; and all of it in the ground's light.
+        let ground = lit(mixed(ground, WATER, (3 * wet[index] as usize + deep[index] as usize) / 4, tile_cells), shade);
         pixels.extend_from_slice(&opaque(mixed(ground, WHITE, sheep as usize * sheep_cells, tile_cells)));
     }
     Painted { at: cells.at, side: side as u32, pixels }

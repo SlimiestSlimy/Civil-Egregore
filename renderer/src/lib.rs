@@ -47,6 +47,7 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
+pub mod diagnostics;
 mod frames;
 mod ground;
 mod hud;
@@ -55,6 +56,7 @@ mod map;
 mod near;
 mod overlays;
 mod paint;
+pub mod transient_data;
 mod view;
 
 use bevy::prelude::*;

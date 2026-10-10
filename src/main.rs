@@ -17,9 +17,11 @@ use std::process::ExitCode;
 use utilities::commands::{program, Crate};
 
 /// The crates with commands.
-const CRATES: [Crate; 2] = [
+const CRATES: &[Crate] = &[
     Crate { name: "server", does: "a world made, run and looked at, and the server's diagnostics tools", commands: &server::commands::COMMANDS },
     Crate { name: "tessera", does: "Tessera's diagnostics tools", commands: &tessera::diagnostics::tool::COMMANDS },
+    #[cfg(feature = "renderer")]
+    Crate { name: "renderer", does: "the renderer's diagnostics tools: what the window draws, with no window", commands: &renderer::diagnostics::tool::COMMANDS },
 ];
 
 #[cfg(all(windows, feature = "renderer"))]
@@ -52,7 +54,7 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    match program("Civil_Egregore", &CRATES, &arguments) {
+    match program("Civil_Egregore", CRATES, &arguments) {
         Ok(()) => ExitCode::SUCCESS,
         Err(why) => {
             eprintln!("{why}");

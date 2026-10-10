@@ -1,7 +1,7 @@
-//! The ground's light: heights smoothed, the shadows cliffs cast, the
-//! sun on a slope, and light in bands.
+//! The ground's light: heights smoothed, the shadows cliffs cast, how
+//! far the coast is, and light in bands.
 
-use super::{BEFORE, SMOOTHED_OVER, SUN_ELEVATION, WIDE, shadow_drop};
+use super::{BEFORE, COAST_REACH, SMOOTHED_OVER, WIDE, shadow_drop};
 use server::host::terrain_seen::Height;
 use std::collections::VecDeque;
 
@@ -67,35 +67,41 @@ pub(crate) fn shadow_lines(heights: &[Height]) -> (Vec<f32>, Vec<bool>) {
     (lines, shadowed)
 }
 
-/// The sun, to the top left.
-pub(crate) struct Sun {
-    /// Towards it: across, down and up.
-    towards: [f32; 3],
-}
-
-impl Sun {
-    /// The sun [`SUN_ELEVATION`] degrees up.
-    pub(crate) fn new() -> Self {
-        let elevation = SUN_ELEVATION.to_radians();
-        let flat = elevation.cos() / std::f32::consts::SQRT_2;
-        Self { towards: [-flat, -flat, elevation.sin()] }
+/// How far each cell is from the coast, in cells, [`COAST_REACH`] at
+/// most: a cell of land from the nearest under the ocean, one `under`
+/// it from the nearest of land -- across or down 1, diagonally the
+/// square root of 2.
+pub(crate) fn coast_distances(under: &[bool]) -> Vec<f32> {
+    let diagonal = std::f32::consts::SQRT_2;
+    let mut distances = vec![COAST_REACH + 1.0; WIDE * WIDE];
+    // What a cell is from the coast by way of the one `step` before it, `away` from it: a cell of the other kind is the coast itself.
+    let by = |distances: &[f32], here: usize, other: usize, away: f32| if under[here] == under[other] { distances[other] + away } else { away };
+    for y in 0..WIDE {
+        for x in 0..WIDE {
+            let here = y * WIDE + x;
+            let mut nearest = distances[here];
+            if x > 0 { nearest = nearest.min(by(&distances, here, here - 1, 1.0)); }
+            if y > 0 { nearest = nearest.min(by(&distances, here, here - WIDE, 1.0)); }
+            if x > 0 && y > 0 { nearest = nearest.min(by(&distances, here, here - WIDE - 1, diagonal)); }
+            if x + 1 < WIDE && y > 0 { nearest = nearest.min(by(&distances, here, here - WIDE + 1, diagonal)); }
+            distances[here] = nearest;
+        }
     }
-
-    /// The light on ground rising `across` and `down` a cell: 1 flat
-    /// ground's, more facing the sun.
-    pub(crate) fn shade(&self, across: f32, down: f32) -> f32 {
-        let lit = (-across * self.towards[0] - down * self.towards[1] + self.towards[2]) / (across * across + down * down + 1.0).sqrt();
-        lit.max(0.0) / self.towards[2]
+    for y in (0..WIDE).rev() {
+        for x in (0..WIDE).rev() {
+            let here = y * WIDE + x;
+            let mut nearest = distances[here];
+            if x + 1 < WIDE { nearest = nearest.min(by(&distances, here, here + 1, 1.0)); }
+            if y + 1 < WIDE { nearest = nearest.min(by(&distances, here, here + WIDE, 1.0)); }
+            if x + 1 < WIDE && y + 1 < WIDE { nearest = nearest.min(by(&distances, here, here + WIDE + 1, diagonal)); }
+            if x > 0 && y + 1 < WIDE { nearest = nearest.min(by(&distances, here, here + WIDE - 1, diagonal)); }
+            distances[here] = nearest;
+        }
     }
+    distances
 }
 
 /// `light` in bands `step` apart about 1: pixel art, not airbrushed.
 pub(crate) fn banded(light: f32, step: f32) -> f32 {
     1.0 + ((light - 1.0) / step).round() * step
-}
-
-/// The tint of ground `over` the lowest there is, as a share of the
-/// highest: low a little darker, high a little lighter.
-pub(crate) fn tint(over: f32) -> f32 {
-    0.86 + 0.26 * over.min(1.0)
 }

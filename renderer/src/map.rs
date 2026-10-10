@@ -10,6 +10,7 @@
 
 use crate::frames::{picture_of, Laid, DIRT};
 use crate::link::Seen;
+use crate::ground::relief::{laid, slope_light, tint, tint_on_sand, water_light, FOAM, FOAM_MOST, PALE, SAND, SAND_MOST};
 use crate::paint::{tree_colour, BROWN, GREEN, WATER};
 use crate::view::origin;
 use bevy::prelude::*;
@@ -22,12 +23,8 @@ use server::host::terrain_seen::{levels, Cover, CoverSeen, Generation, HeightsSe
 /// Pixels of the map past each of the view's edges: what a moving view
 /// shows before the next map comes.
 const MARGIN: i64 = 64;
-/// How much of its light the deepest ocean keeps.
-const DEEP_LIGHT: f32 = 0.35;
 /// How much of its light a pixel on a line of the mesh keeps.
 const BORDER_LIGHT: f32 = 0.25;
-/// How much lighter or darker a slope of one height a cell is drawn.
-const SLOPE_LIGHT: f32 = 2.5;
 
 /// A map asked for.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -83,7 +80,7 @@ fn cell(wanted: &Wanted, x: i64, y: i64) -> Option<(u32, u32)> {
 }
 
 /// The pixels of `wanted`: rows shared out among the machine's threads.
-fn draw(wanted: &Wanted) -> Vec<u8> {
+pub fn draw(wanted: &Wanted) -> Vec<u8> {
     let (width, generation, seed) = (wanted.size.0 as usize, &wanted.generation, wanted.seed);
     let (cover, levels) = (&CoverSeen::of(generation, seed), levels(generation));
     let mut pixels = vec![0u8; width * wanted.size.1 as usize * 4];
@@ -95,7 +92,7 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
                 let mut seen = HeightsSeen::of(generation, seed);
                 for (row, pixels) in rows.chunks_mut(width * 4).enumerate() {
                     let y = (part * rows_each + row) as i64;
-                    // The height up and to the left of each pixel, the sun's side: what its slope is told by.
+                    // The height of the pixel to the left of each.
                     let mut before = None;
                     for (x, pixel) in pixels.chunks_mut(4).enumerate() {
                         let Some((cell_x, cell_y)) = cell(wanted, x as i64, y) else {
@@ -104,25 +101,28 @@ fn draw(wanted: &Wanted) -> Vec<u8> {
                             continue;
                         };
                         let high = seen.height(cell_x, cell_y);
+                        // The pixels up and to the left of it, the sun's side: what its slope is told by, and whether the coast passes between.
+                        let above = cell(wanted, x as i64, y - 1).map_or(high, |(x, y)| seen.height(x, y));
+                        let beside = before.unwrap_or(high);
+                        let coast = |ocean: bool| (above < levels.ocean) == ocean || (beside < levels.ocean) == ocean;
                         let (colour, light) = if high < levels.ocean {
-                            (WATER, 1.0 - (1.0 - DEEP_LIGHT) * ((levels.ocean - high) as f32 / (levels.ocean - levels.ground).max(1) as f32).min(1.0))
+                            (if coast(false) { laid(WATER, FOAM, FOAM_MOST) } else { WATER }, water_light((levels.ocean - high) as f32, levels.ocean.saturating_sub(levels.ground) as f32))
                         } else {
                             let colour = match cover.cover(cell_x, cell_y) {
                                 Cover::Tree => tree_colour(8),
                                 Cover::Grass => GREEN,
                                 Cover::Dirt => BROWN,
                             };
-                            let above = cell(wanted, x as i64, y - 1).map_or(high, |(x, y)| seen.height(x, y));
-                            let lower = (above as f32 + before.unwrap_or(high) as f32) / 2.0;
-                            let slope = (high as f32 - lower) / wanted.step as f32;
-                            let tint = 0.8 + 0.3 * (high.saturating_sub(levels.ocean) as f32 / levels.highest.saturating_sub(levels.ocean).max(1) as f32).min(1.0);
-                            (colour, tint * (1.0 + SLOPE_LIGHT * slope).clamp(0.55, 1.45))
+                            let (tint, pale) = tint(high.saturating_sub(levels.ocean) as f32 / levels.highest.saturating_sub(levels.ocean).max(1) as f32);
+                            let (colour, tint) = if coast(true) { (laid(colour, SAND, SAND_MOST), tint_on_sand(tint, SAND_MOST)) } else { (laid(colour, PALE, pale), tint) };
+                            let slope = slope_light((high as f32 - beside as f32) / wanted.step as f32, (high as f32 - above as f32) / wanted.step as f32);
+                            (colour, tint.map(|tint| tint * slope))
                         };
                         before = Some(high);
                         // A line of the mesh, where the pixel is no farther from it than it is across.
                         let on_border = wanted.borders && seen.cells_from_a_mesh_line(cell_x, cell_y) < wanted.step as u64;
-                        let light = if on_border { light * BORDER_LIGHT } else { light };
-                        let lit = colour.map(|channel| (channel as f32 * light).min(255.0) as u8);
+                        let light = if on_border { light.map(|light| light * BORDER_LIGHT) } else { light };
+                        let lit: [u8; 3] = std::array::from_fn(|channel| (colour[channel] as f32 * light[channel]).min(255.0) as u8);
                         pixel.copy_from_slice(&[lit[0], lit[1], lit[2], u8::MAX]);
                     }
                 }

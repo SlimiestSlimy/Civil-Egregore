@@ -21,24 +21,48 @@ word, bit)`**; **`counted(words, detail)`**: the cells set a tile.
 
 ## `ground.rs`
 
-`smoothed`, `shadow_lines`, `Sun`, `banded` and `tint` are in
-`ground/light_and_shadow.rs`.
+`SIDE`, `SHADOW_DROP` (24 heights a cell down the diagonal),
+`LIGHT_BAND`, `COAST_REACH` (24 cells), `SMOOTHED_OVER` (4), `BEFORE`
+(138) and `AFTER` (26) cells kept about a superchunk, `SHADOW`,
+`COARSEST` (8). **`shadow_drop()`**.
+**`Shade`**: what a pixel's colour is drawn through -- what it is
+multiplied by, and what is laid over it first, pale, sand or foam and
+how much. **`lit(colour, shade)`**: a colour through a shade.
 
-`SIDE`, `CELL_METRES` (2), `HEIGHT_METRES` (1), `SUN_ELEVATION` (35),
-`SMOOTHED_OVER` (4), `BEFORE` (138) and `AFTER` (10) cells kept about a
-superchunk, `SHADOW`, `CLIFF`, `CONTOUR`, `COARSEST` (6).
-**`shadow_drop()`**: heights the shadow line drops a cell down the
-diagonal. **`contour_every(detail)`**.
+**`Fine`**: heights, shadow lines and light, a cell each, the ocean's
+level and the highest land -- **`height(x, y)`**, **`line(x, y)`**,
+**`light(x, y)`**, **`under_ocean(x, y)`**, **`surface(x, y)`**: what
+a shadow falls on, **`deepest()`**, **`tint(x, y)`**. **`share`**.
+**`Ground`** `{levels, fine, used}`: a level of shades a detail;
+**`generate(seed, generation, top_left, given)`**; **`coarsen()`**: the
+fine parts dropped. **`heights`**: the heights about a superchunk.
 
-**`Fine`**: heights, shadow lines and light, a cell each --
-**`height(x, y)`**, **`line(x, y)`**, **`light(x, y)`**.
-**`Ground`** `{levels, fine, used}`: a level of factors a detail;
-**`generate(seed, shape, top_left)`**; **`coarsen()`**: the fine parts dropped.
-**`heights`**, **`smoothed`**, **`shadow_lines`**: the steps of making
-it. **`Sun`**: **`shade(across, down)`**, the light on a slope.
-**`banded`**, **`tint`**. **`Level`**: the ground at one detail --
-**`halved()`**, **`drawn(detail)`** with cliffs and contours.
-**`lit(colour, factor)`**: a colour in a factor's light.
+### `ground/relief.rs`
+
+What a height does to a colour, wherever the world is drawn.
+**`slope_light(across, down)`**: the light on ground rising so many
+heights a cell (`STEEPEST`, `GENTLEST`, `TOWARDS_SUN`, `AWAY_FROM_SUN`,
+`ACROSS_SUN`). **`tint(share)`**: what a colour is multiplied by, and
+how much of it is `PALE`, that far from the ocean's level to the
+highest land (`TINTS`, `TINT_BANDS`). **`water_light(depth,
+deepest)`** (`SHALLOWEST`, `DEEPEST`, `SHALLOWS`, `WATER_BANDS`).
+`SAND`, `FOAM`, `SAND_MOST`, `FOAM_MOST`; **`tint_on_sand(tint,
+sand)`**; **`laid(from, to, part)`**.
+
+### `ground/levels.rs`
+
+**`Level`**: the ground at one detail -- each pixel's factor, its
+light untinted, how pale, its height, the share of it under the ocean,
+how far its nearest cell is from the coast -- **`halved()`**,
+**`drawn(detail)`**: contours (`CONTOUR`, `FIFTH_CONTOUR`,
+`CONTOUR_EVERY`, `CONTOURS_APART`), sand and foam.
+**`Shade::of(factor, over, part)`**.
+
+### `ground/light_and_shadow.rs`
+
+**`smoothed(heights)`**, **`shadow_lines(heights)`** (`SHADOW_REACH`),
+**`coast_distances(under)`**: cells from each cell to the coast,
+**`banded(light, step)`**.
 
 ## `near.rs`
 
@@ -46,7 +70,8 @@ it. **`Sun`**: **`shade(across, down)`**, the light on a slope.
 neighbour of another height; **`shading(from, span)`**: how dark and
 how light it makes a pixel that far in from it. **`paint_near(cells,
 grounds, near, tuning)`**: the picture, shaded as `tuning` says. **`Cell`**: **`paint`**, a cell's pixels
--- its edges, the shadow on it, its ground's tone (`TONES`).
+-- its edges, the shadow on it, its ground's tone (`TONES`), its
+height's tint, sand or foam beside the coast, its water's light.
 **`tree`**: a tree on its cell, a square larger and darker the older.
 **`sheep`**: a sheep's shape (`SHEEP`) on its cell.
 
@@ -147,3 +172,17 @@ window's side of the thread -- **`start()`**, **`map_mode()`**.
 at the finest. **`far`**: in map mode, which `M` turns on and off, a
 map of the world run asked for and laid where it is of; `P` draws the
 mesh's lines.
+
+## `diagnostics/`
+
+**`stills::Still`** `{name, size, pixels}`. **`stills::gather(seed,
+offset, farthest, keep)`**: one place of a world at every zoom -- the
+map at 64 and 16 cells a pixel, the cells from `farthest` cells a pixel
+to one, the cells from near at 2, 4 and 8 pixels a cell -- painted by
+the map's and the painter's own code from a host asked as the window
+asks it, each 1,024 by 768 as a screen would show it; **`answered`**,
+**`viewport_of`**. **`tool::COMMANDS`**: `stills`, each kept as a PNG.
+
+## `transient_data.rs`
+
+`TRANSIENT_DATA`; **`renders()`**: where stills are kept.
