@@ -12,7 +12,8 @@ use instructions::write::entities;
 use instructions::around;
 use instructions::area::AREA_CENTRE;
 use entity_manager::{Entities, EntityId, EntityType, Header, NEVER};
-use instructions::{Simulation, Turn};
+use instructions::Turn;
+use simulation::Simulation;
 use std::sync::Mutex;
 use worldgen::{WALL_EAST, WALL_SOUTH};
 

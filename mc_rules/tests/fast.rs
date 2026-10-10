@@ -10,44 +10,23 @@ mod grass {
     //!
     //! `cargo test`
 
-    use instructions::handed_on::{BitmapArena, Shape, Write, WriteOp};
-    use instructions::handed_on::{grass_on_dirt, DIRT, GRASS};
-    use instructions::handed_on::{ChunkStorage, LayerCodec};
-    use instructions::handed_on::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
-    use instructions::handed_on::Entities;
-    use instructions::Simulation;
-    use mc_rules::grass::{tick, DECAY_CHANCE, SPREAD_CHANCE};
-
-    /// The superchunk the tests run on: the world's origin, where grass
-    /// grows.
-    const SUPERCHUNK: SuperchunkIndex = WORLD_MIDDLE;
+    use instructions::layers::GRASS;
+    use instructions::mock_world::MockWorld;
+    use instructions::{CellCartesian, CellIndex, SuperchunkIndex};
+    use mc_rules::grass::{rule, DECAY_CHANCE, SPREAD_CHANCE};
 
     /// Cells in a superchunk.
-    const CELLS: u32 = 1 << 20;
+    const CELLS: u64 = 1 << 20;
 
-    /// An arena with the mock superchunk hot, `grass_cells` cells of grass
+    /// A mock world of one superchunk, `grass_cells` cells of grass
     /// scattered on its dirt.
-    fn mock(grass_cells: usize) -> BitmapArena {
-        let (mut codec, mut arena, mut storage) = (LayerCodec::new(), BitmapArena::new(), ChunkStorage::new(1 << 12));
-        storage.insert(SUPERCHUNK, grass_on_dirt(5, grass_cells, &mut codec));
-        for chunk in SUPERCHUNK.chunks() {
-            arena.make_hot_layers(chunk, &[DIRT, GRASS], &storage, &mut codec);
-        }
-        arena
+    fn mock(grass_cells: usize) -> MockWorld {
+        MockWorld::grass_on_dirt(1, grass_cells)
     }
 
-    /// Turns the cells of `writes`' shapes to grass.
-    fn plant(arena: &mut BitmapArena, writes: impl Iterator<Item = (CellCartesian, Shape)>) {
-        for (at, shape) in writes {
-            arena.queue(GRASS, Write { at: at.into(), op: WriteOp::Set, shape });
-            arena.queue(DIRT, Write { at: at.into(), op: WriteOp::Unset, shape });
-        }
-        assert_eq!(arena.apply().missed, 0);
-    }
-
-    /// The superchunk's first cell, at its top left.
-    fn origin() -> CellCartesian {
-        SUPERCHUNK.top_left().cartesian()
+    /// The first cell of `world`, at its top left.
+    fn origin(world: &MockWorld) -> CellCartesian {
+        world.superchunks()[0].top_left().cartesian()
     }
 
     /// Grass alone, with no grass around, never decays: a lattice of grass
@@ -55,11 +34,13 @@ mod grass {
     /// some -- for a tick.
     #[test]
     fn lone_grass_never_decays() {
-        let mut arena = mock(0);
-        let cells = (0..512).flat_map(|y| (0..512).map(move |x| CellCartesian { x: origin().x + 2 * x, y: origin().y + 2 * y }));
-        plant(&mut arena, cells.map(|cell| (cell, Shape::Cell)));
-        assert_eq!(arena.superchunk_count(GRASS, SUPERCHUNK), 512 * 512);
-        let done = tick(&mut Simulation::new(1), &mut arena, &mut Entities::new(), 3).rules;
+        let mut world = mock(0);
+        let origin = origin(&world);
+        for (x, y) in (0..512).flat_map(|y| (0..512).map(move |x| (x, y))) {
+            world.plant_grass(CellCartesian { x: origin.x + 2 * x, y: origin.y + 2 * y }, 1, 1);
+        }
+        assert_eq!(world.count(GRASS), 512 * 512);
+        let done = world.tick(3, rule).rules;
         assert!(done.sampled > 0);
         assert_eq!(done.decays, 0);
     }
@@ -71,15 +52,17 @@ mod grass {
     /// neighbours past it that are not hot.
     #[test]
     fn surrounded_grass_decays_at_its_chance() {
-        let mut arena = mock(0);
-        let pieces = (0..8).flat_map(|y| (0..8).map(move |x| CellCartesian { x: origin().x + 128 * x, y: origin().y + 128 * y }));
-        plant(&mut arena, pieces.map(|at| (at, Shape::Rect { width: 128, height: 128 })));
-        assert_eq!(arena.superchunk_count(GRASS, SUPERCHUNK), CELLS);
-        let done = tick(&mut Simulation::new(1), &mut arena, &mut Entities::new(), 4).rules;
+        let mut world = mock(0);
+        let origin = origin(&world);
+        for (x, y) in (0..8).flat_map(|y| (0..8).map(move |x| (x, y))) {
+            world.plant_grass(CellCartesian { x: origin.x + 128 * x, y: origin.y + 128 * y }, 128, 128);
+        }
+        assert_eq!(world.count(GRASS), CELLS);
+        let done = world.tick(4, rule).rules;
         let expected = CELLS as f64 * DECAY_CHANCE;
         assert_eq!(done.spreads, 0);
         assert!((done.decays as f64 - expected).abs() < 3.0 * expected.sqrt(), "{} decays, about {expected:.0} expected", done.decays);
-        assert_eq!(arena.superchunk_count(GRASS, SUPERCHUNK), CELLS - done.decays as u32);
+        assert_eq!(world.count(GRASS), CELLS - done.decays as u64);
     }
 
     /// Over 1,000 ticks the grass changes by
@@ -87,37 +70,31 @@ mod grass {
     /// at most by e, what spreading alone would make of it.
     #[test]
     fn grass_changes_by_what_spread_and_decayed() {
-        let mut arena = mock(400);
-        let start = arena.superchunk_count(GRASS, SUPERCHUNK);
-        let (mut grass, mut simulation) = (start, Simulation::new(1));
+        let mut world = mock(400);
+        let start = world.count(GRASS);
+        let mut grass = start;
         for seed in 0..1000 {
-            let done = tick(&mut simulation, &mut arena, &mut Entities::new(), seed).rules;
-            let now = arena.superchunk_count(GRASS, SUPERCHUNK);
-            assert!(now + done.decays as u32 >= grass && now + done.decays as u32 <= grass + done.spreads as u32, "grown by what spread, less what decayed");
+            let done = world.tick(seed, rule).rules;
+            let now = world.count(GRASS);
+            assert!(now + done.decays as u64 >= grass && now + done.decays as u64 <= grass + done.spreads as u64, "grown by what spread, less what decayed");
             grass = now;
         }
         let growth = grass as f64 / start as f64;
         assert!(growth > 1.0 && growth < (1000.0 * SPREAD_CHANCE).exp() * 1.1, "grew {growth:.2} times");
     }
 
-    /// Grass grows wherever a superchunk is hot: over the 5x5 superchunks
-    /// about the origin, 300 ticks change grass in every one.
+    /// Grass grows wherever a superchunk is hot: over 5x5 superchunks
+    /// from the origin, 300 ticks change grass in every one.
     #[test]
     fn grass_grows_in_every_superchunk() {
-        let (mut codec, mut arena, mut storage) = (LayerCodec::new(), BitmapArena::new(), ChunkStorage::new(1 << 12));
-        let superchunks: Vec<SuperchunkIndex> = (-2..=2).flat_map(|dy| (-2..=2).map(move |dx| WORLD_MIDDLE.offset(dx, dy).expect("in the world"))).collect();
-        for (seed, &superchunk) in superchunks.iter().enumerate() {
-            storage.insert(superchunk, grass_on_dirt(seed as u64, 300_000, &mut codec));
-            arena.make_hot_superchunk(superchunk, &[DIRT, GRASS], &storage, &mut codec);
-        }
+        let mut world = MockWorld::grass_on_dirt(25, 300_000).on_threads(2);
+        let superchunks: Vec<SuperchunkIndex> = world.superchunks().to_vec();
         // Every chunk's grass, as words.
-        let grass = |arena: &BitmapArena| -> Vec<(ChunkIndex, Vec<u64>)> { arena.run(GRASS).map(|(chunk, bucket)| (chunk, bucket.cells().to_vec())).collect() };
-        let before = grass(&arena);
-        let (mut simulation, mut entities) = (Simulation::new(2), Entities::new());
+        let before = world.words(GRASS);
         for seed in 0..300 {
-            tick(&mut simulation, &mut arena, &mut entities, seed);
+            world.tick(seed, rule);
         }
-        let after = grass(&arena);
+        let after = world.words(GRASS);
         let mut changed: Vec<CellCartesian> = Vec::new();
         for ((chunk, was), (same, is)) in before.iter().zip(&after) {
             assert_eq!(chunk, same);

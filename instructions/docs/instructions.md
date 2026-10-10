@@ -16,13 +16,18 @@ no further. Everything a rule would otherwise write for itself is
 here, once: a query is a plain call that reads the turn and answers in
 the rule's terms, a change one that queues what carries least.
 
-A rule depends on the instructions and on nothing else: its crate
-names no other in its `Cargo.toml`. `Turn`, `Simulation` and
-`TickReport` are handed on from here, and so is what the crates under
-the instructions have that a rule names (`handed_on`): where a cell and
-an entity are, what a layer and an attribute are, the world a rule is
-ticked on, the lot it draws. What a rule lacks is added here, not gone
-round.
+The instructions are the simulation's public API: all of it a rule
+sees. A rule depends on the instructions and on nothing else -- its
+crate names no other in its `Cargo.toml` -- and nothing that holds a
+world is named by them: not the hot bitmaps, the entities' store or the
+storage. What they are asked in is theirs to give, from the crate's
+root: where a cell and an entity are, what a layer and an attribute
+are, a turn, a tick's report, the lot drawn; the layers a world has
+before a rule adds its own are `layers`. Off a turn there are two
+things more: `between_ticks`, where a rule puts the entities a world
+starts with, lent by whoever runs the world; and `mock_world`, a world
+of grass on dirt that ticks a rule, for a rule's tests and tools. What
+a rule lacks is added here as an instruction, not gone round.
 
 Instructions are kept by what they do to the world: those that only
 read it in `read/`, those that only queue a change in `write/`; one

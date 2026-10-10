@@ -18,10 +18,8 @@
 //!
 //! Trees stand on dirt and grass alike and change neither.
 
-use instructions::handed_on::{Bits4, LayerType, Wide};
-use instructions::handed_on::CellIndex;
-use instructions::{read, write, Turn};
-use instructions::handed_on::WET;
+use instructions::layers::WET;
+use instructions::{read, write, Bits4, CellIndex, LayerType, Turn, Wide};
 use std::ops::AddAssign;
 
 /// The cells a tree stands on.

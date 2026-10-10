@@ -94,3 +94,31 @@ entity)`**.
 **`set(turn, type, origin, mask)`**, **`clear`**: writes queued for
 every cell of the mask, as rectangles (**`write`**, **`next`**) -- how
 many.
+
+## `between_ticks.rs`
+
+**`EntitiesBetweenTicks`**: the world's entities off any turn, lent by
+whoever runs the world (**`of`**). **`now()`**, **`put(header,
+attributes)`**: queued, in the world once the runner places them.
+
+## `layers.rs`
+
+`GRASS`, `DIRT`, `WET`, `WALL_EAST`, `WALL_SOUTH`: the layers a world
+has before a rule adds its own.
+
+## `mock_world.rs`
+
+**`MockWorld::grass_on_dirt(count, grass_cells)`**: superchunks of grass
+on dirt, all hot; **`on_threads`**. **`tick(seed, rule)`**: a
+`TickReport`. **`plant_grass(at, width, height)`**, **`put(header,
+attributes)`**, **`between_ticks()`** and **`settle()`**. Asked:
+**`superchunks()`**, **`count(type)`**, **`words(type)`**,
+**`entities()`**, **`count_entities(kind)`**; **`held()`** for whoever
+measures what holds a world.
+
+## The root
+
+The words the instructions are asked in: `CellIndex`, `CellCartesian`,
+`ChunkIndex`, `SuperchunkIndex`, `LayerType`, `Wide`, `Bits4`,
+`Attribute`, `AttributeType`, `EntityType`, `EntityId`, `Header`,
+`EntityRef`, `EntityEdit`, `Turn`, `TickReport`, `Rng`.

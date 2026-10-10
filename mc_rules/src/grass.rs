@@ -18,19 +18,15 @@
 //! neighbour read rather than eight.
 //!
 //! The rule runs on each superchunk in a tick's first phase
-//! ([`Simulation::tick`]): its writes are queued as
+//! (`Simulation::tick`): its writes are queued as
 //! the samples come, in Morton order -- grass spreading over a border
 //! into the neighbour's queue -- and applied in the second phase, so
 //! every sample reads the world as the tick found it. The two never
 //! touch one cell in a tick: decay clears cells that were grass,
 //! spreading fills cells that were dirt.
 
-use instructions::handed_on::BitmapArena;
-use instructions::handed_on::Entities;
-use instructions::{read, write, Simulation, TickReport, Turn};
-use instructions::handed_on::GRASS;
-use instructions::handed_on::WET;
-use instructions::handed_on::{CellIndex, NEIGHBOURS};
+use instructions::layers::{GRASS, WET};
+use instructions::{read, write, CellIndex, Turn, NEIGHBOURS};
 use std::ops::AddAssign;
 
 /// The chance, each tick, that a cell of grass tries to spread.
@@ -58,14 +54,6 @@ impl AddAssign for GrassCounts {
         self.spreads += other.spreads;
         self.decays += other.decays;
     }
-}
-
-/// One tick of grass over every superchunk with a bitmap in use, on
-/// `simulation`'s threads -- `seed`, the world's, seeding a superchunk's
-/// random stream the first tick it is in -- `entities` ticked with it,
-/// none of them woken by grass.
-pub fn tick(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64) -> TickReport<GrassCounts> {
-    simulation.tick(arena, entities, seed, rule)
 }
 
 /// The rule, on one superchunk's turn: every cell of grass chosen with

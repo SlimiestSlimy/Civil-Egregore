@@ -119,7 +119,11 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
 - The tree rule is separate from worldgen: a generated cover drifting
   to the rule's own balance is the simulation, not a fault.
 - No cap slider on the viewport's hot superchunks.
-- Rules depend on `instructions` alone (instructions::handed_on).
+- Rules depend on `instructions` alone, and the instructions are the
+  simulation's public API: they hand on no internals (no arena, no
+  entities' store, no storage). The user rejected a module that
+  re-exported those. Vocabulary types are at instructions' root.
+- World formats are not stabilized: no backwards compatibility kept.
 - AI.txt and the crate AI_SCRATCHPAD are the AI's to use freely.
   NOTHING MAY DEPEND ON AI_SCRATCHPAD. Probes go there as commands,
   not as temporary tests:

@@ -9,7 +9,7 @@ use coordinates::{CellCartesian, SuperchunkIndex};
 use entity_manager::Entities;
 use instructions::area::{AREA_CENTRE, AREA_SIDE};
 use instructions::read::area;
-use instructions::Simulation;
+use simulation::Simulation;
 
 /// The layer type the tests run on.
 const STONE: LayerType = LayerType(6);

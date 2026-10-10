@@ -47,17 +47,12 @@
 //! world as the tick found it: two sheep may eat one cell in a tick,
 //! which then changes once.
 
-use instructions::handed_on::BitmapArena;
-use instructions::handed_on::GRASS;
-use instructions::handed_on::{CellCartesian, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use instructions::around::{self, CENTRE, RING};
-use instructions::{read, write};
-use instructions::{Simulation, TickReport, Turn};
-use instructions::handed_on::{WALL_EAST, WALL_SOUTH};
-use instructions::handed_on::{Attribute, AttributeType, EntityEdit, EntityRef, Entities, EntityId, EntityType, Header};
+use instructions::between_ticks::EntitiesBetweenTicks;
+use instructions::layers::{GRASS, WALL_EAST, WALL_SOUTH};
+use instructions::{read, write, Attribute, AttributeType, CellCartesian, EntityEdit, EntityId, EntityRef, EntityType, Header, Rng, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 use std::ops::AddAssign;
-use instructions::handed_on::Rng;
 
 /// The sheep's type.
 pub const SHEEP: EntityType = EntityType(16);
@@ -133,14 +128,6 @@ impl AddAssign for SheepCounts {
         self.paths += other.paths;
         self.far += other.far;
     }
-}
-
-/// One tick of the sheep alone over every hot superchunk, on
-/// `simulation`'s threads -- `seed`, the world's, seeding a superchunk's
-/// random stream the first tick it is in: the cells change only as the
-/// sheep change them.
-pub fn tick(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64) -> TickReport<SheepCounts> {
-    simulation.tick(arena, entities, seed, |turn, _| rule(turn))
 }
 
 /// What the rule keeps over a superchunk's turn: what the sheep did,
@@ -265,8 +252,8 @@ fn next_step(turn: &mut Turn) -> u64 {
 /// Queues `count` grown sheep, each some way from its next meal, each
 /// on a cell of its own of `superchunk` drawn from `random` -- at most
 /// half its cells' worth of them -- waking over the next [`STEP_TICKS`]
-/// ticks: put in the world by [`Entities::apply`].
-pub fn flock(entities: &mut Entities, superchunk: SuperchunkIndex, count: usize, random: &mut Rng) {
+/// ticks: in the world once whoever runs it places what was put.
+pub fn flock(entities: &mut EntitiesBetweenTicks, superchunk: SuperchunkIndex, count: usize, random: &mut Rng) {
     let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     let side = SUPERCHUNK_SIDE_CELLS as u64;
     assert!(count as u64 <= side * side / 2, "{count} sheep on a superchunk: too many to draw a cell each");
@@ -279,6 +266,6 @@ pub fn flock(entities: &mut Entities, superchunk: SuperchunkIndex, count: usize,
             continue;
         }
         let header = Header { id: EntityId(random.draw()), kind: SHEEP, at: at.into(), wake: now + random.below(STEP_TICKS) };
-        entities.queue_put(header, &[Attribute { kind: HUNGRY_AT, value: now + random.below(MEAL_TICKS) }]);
+        entities.put(header, &[Attribute { kind: HUNGRY_AT, value: now + random.below(MEAL_TICKS) }]);
     }
 }
