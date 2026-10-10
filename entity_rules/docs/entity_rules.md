@@ -49,7 +49,7 @@ game's tick beside the others; its tests in the server's
 
 The rule is told in full at the head of `src/sheep.rs`, and how it came
 to be -- what was measured, what was thrown away -- in
-`../docs/Civil Egregore.md`. In short: a sheep sleeps until it next needs
+`../docs/civil_egregore.md`. In short: a sheep sleeps until it next needs
 something, so a satisfied flock costs the tick nothing; only a hungry
 sheep walks, one pathfinding step a wake (`pathfinding/`), no route
 kept; and it steps without looking whether a cell is taken, the step

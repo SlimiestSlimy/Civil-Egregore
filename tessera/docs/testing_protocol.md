@@ -259,7 +259,7 @@ Each is set, beside its reason, at the place given.
 
 | parameter | value | where |
 |---|---|---|
-| runs a seed serves before it rolls | 5 | `USES_BEFORE_THE_SEED_ROLLS`, `src/corpus/seed.rs` |
+| runs a seed serves before it rolls | 5 | `USES_BEFORE_THE_SEED_ROLLS`, `utilities/src/seed.rs` (handed on by `src/corpus/seed.rs`) |
 | each generator's `tested` and `timed` bitmaps | per shape, sparse shape, plan and line set | `SHAPES`, `SPARSE` (`src/corpus/mod.rs`), `PLANS` (`city.rs`), `LINE_SETS` (`lines.rs`) |
 | the most any bitmap may take, every tier | the raw cells and 1% | `CAP_BITS`, `tests/tests.rs` |
 | a turned family's drift, fast tier | 5% | `MOST_TURNED_DRIFT_PERCENT`, `tests/fast.rs` |

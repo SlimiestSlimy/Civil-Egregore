@@ -108,19 +108,19 @@ it reads -- the sheep's grass and the four walls.
 | world | before | after |
 |---|---|---|
 | generated, 64 superchunks, walls (`Civil_Egregore server run <dir> 30000`) | 13,236 ticks a second | 13,964 |
-| mock, 400 superchunks, no walls (`Civil_Egregore server pasture 20000 333 4000 400 12`) | a wake 695 ns, 2,381 ticks a second | 645 ns, 2,375 |
-| mock, 64 superchunks, no walls | a wake 439 ns, 15,131 ticks a second | 477 ns, 14,566 |
+| plain, 400 superchunks, no walls (`Civil_Egregore server pasture 20000 333 4000 400 12`) | a wake 695 ns, 2,381 ticks a second | 645 ns, 2,375 |
+| plain, 64 superchunks, no walls | a wake 439 ns, 15,131 ticks a second | 477 ns, 14,566 |
 
 Kept for the world that is played: 5% more ticks a second with walls
-to read. On the mock, which has no walls, asking for the wall layers,
+to read. On the plain, which has no walls, asking for the wall layers,
 four then, that are not there is pure cost at 64 superchunks. The
 walls are two layers now (`worldgen/docs/worldgen.md`).
 
 ## Terrain
 
 A generated world, whose walls every hungry sheep reads
-(`Civil_Egregore server new <folder> 1 64`, then `Civil_Egregore server run
-<folder> <ticks>`), runs somewhat slower than a plain of the same
+(`Civil_Egregore server new <folder> <seed> <sheep> 8`, a world 8
+superchunks a side, then `Civil_Egregore server run <folder> <ticks>`), runs somewhat slower than a plain of the same
 size without them (`Civil_Egregore server pasture`).
 
 ## Saves
@@ -129,6 +129,9 @@ A save's size is mostly its entities and its heights: the heights are
 kept raw, about a byte a cell.
 
 ## Inlining is fragile: hot lookups are marked
+
+Each count below is the tick's as it stood at that change, before and
+after: they are not one series, the tick having changed between them.
 
 Whether the compiler inlines a small function into its caller in
 another crate is its own call, and moves with changes nowhere near it.
@@ -148,6 +151,27 @@ grew, the map was left as calls draining the array, a layer at a time,
 and the tick went from 53.72 million instructions to 54.98 with no
 change of work. Built by index (`std::array::from_fn`) and marked
 `#[inline]`, the windows cost less than they did before: 49.95 million.
+
+## A chance without a float
+
+A rule's sampling drew its gaps with the machine's `ln`, which is not
+the same to the last bit on every machine. It is whole-number
+arithmetic now: a fixed-point `log2` of the draw over one of the
+chance, worked out once where the chance is written
+(`utilities/docs/utilities.md`, "The gap"). The logarithm was first
+made by squaring, a bit of the answer a squaring, 48 of them a gap;
+then by a table of 128 rows and a short series. The tick's
+instructions (`Civil_Egregore server pasture 300 333 4000 4 1`, less
+the same run with no ticks):
+
+| the gap's logarithm | instructions a tick's run |
+|---|---|
+| the machine's `ln`, a float | 58.50 million |
+| by squaring | 64.29 million |
+| by table and series | 58.74 million |
+
+The squaring is kept to build the table and to test it against
+(`utilities::fixed_point::log2_by_squaring`).
 
 ## Under full load: every superchunk hot
 
@@ -188,7 +212,7 @@ mostly empty -- the cells under water on land, the walls, the trees --
 cost what they hold.
 
 A generated world, 21 superchunks (`Civil_Egregore server new <folder> 106
-4000`, then `Civil_Egregore server run <folder> 30000`), and the mock pasture,
+4000`, then `Civil_Egregore server run <folder> 30000`), and the plain pasture,
 where every chunk has cells (`Civil_Egregore server pasture 6000 333 4000
 <superchunks>`):
 
@@ -210,6 +234,6 @@ ticks a second. A cache of the chunk last found was not needed.
 |---|---|
 | the far search for grass | `instructions/docs/instructions.md`, "What an entity's rule is given" |
 | the instructions of the apply phase | the same |
-| sampling, and count tiles | `Civil Egregore.md`, "Sampling rarely, and count tiles" |
-| the flock's balance over a long run | `Civil Egregore.md`, "Sheep leave thin pasture" |
+| sampling, and count tiles | `civil_egregore.md`, "Sampling rarely, and count tiles" |
+| the flock's balance over a long run | `civil_egregore.md`, "Sheep leave thin pasture" |
 | Tessera's sizes and times | `tessera/transient_data/measurements/`, by `Civil_Egregore tessera <tool>` |

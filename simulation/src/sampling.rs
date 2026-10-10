@@ -7,7 +7,7 @@
 //! No sample is wasted: the cells are not each tossed a coin, nor drawn
 //! and rejected. The set cells are ranked in Morton order, and the gap
 //! from one chosen rank to the next is drawn from the geometric law
-//! (`docs/Civil Egregore.md`, "Sampling"): each set cell is then chosen with
+//! (`docs/civil_egregore.md`, "Sampling"): each set cell is then chosen with
 //! the chance asked, and only the chosen ones are found. The gap is
 //! whole-number arithmetic (`utilities::chance::Chance::passed_over`):
 //! no float is in it, so the same cells are chosen on every machine. The

@@ -36,6 +36,28 @@ rows, each the fields of the columns named, found by the first row
 whatever their order -- a column or field missing is empty. **`row(fields)`**: a row written, a field
 quoted where it has to be (**`field`**).
 
+## `seed.rs`
+
+The one seed every seeded run starts from, kept in the workspace's
+`transient_data/seed.csv` (**`file()`**; `FILE` its name) with how many
+runs have used it. `VARIABLE`: `CIVIL_EGREGORE_SEED`, the environment
+variable that picks a seed for one run and leaves the file alone --
+a number in hexadecimal, or `FRESH` (`fresh`) for one drawn.
+`USES_BEFORE_THE_SEED_ROLLS` (5): the runs a seed serves before the
+next run rolls another.
+
+**`counted()`**: the run's seed, counted as a use: the variable's if
+set, else the file's, a fresh one rolled in its place once it is used
+up. **`uncounted()`**: the same seed, not counted -- the fine tests',
+which run too often to count; with no file yet one is rolled and kept
+at no uses. Either settles the seed once a process and says it in a
+one-row table on standard error: the seed, which use it is, where it
+came from. **`in_use()`**: the seed settled on and whether it was
+fresh, if any was asked for: what a measurement's report notes.
+
+**`hex(seed)`**: a seed as it is written everywhere, `0x` and 16
+hexadecimal digits; **`of_hex(text)`**: back, with or without the `0x`.
+
 ## `commands.rs`
 
 **`Parameter::new(name, default)`**: one thing a command takes, by its
@@ -108,6 +130,7 @@ says. **`MemoryTrack`**: **`read`** (one reading), **`average`**, **`peak`**.
 
 ## `transient_data.rs`
 
+`TRANSIENT_DATA`: the crate's `transient_data/` folder.
 **`TransientData::of(crate_folder)`**: a crate's `transient_data/`, from
 its `env!("CARGO_MANIFEST_DIR")`; **`under(relative)`**,
 **`measurements()`**, **`publish(report)`** -- printed, and kept as

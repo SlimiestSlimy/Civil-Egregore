@@ -33,3 +33,10 @@ walls east and south of cells, and the diagonals they bar, worked out
 from them (a wall on either way round); **`east`**, **`south`**,
 **`bars_step(cell, dx, dy)`**. `Wave::advance`,
 `step_towards` and `a_star` each take them after `passable`.
+
+## `diagnostics/`, `transient_data.rs`
+
+The folders every crate has (`../../docs/style_guide.md`, "One shape for
+every crate"). `diagnostics/mod.rs` gathers nothing yet.
+`transient_data::TRANSIENT_DATA` names the crate's `transient_data/`
+folder, where its runs would leave what they make.

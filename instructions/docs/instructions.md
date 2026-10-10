@@ -31,7 +31,7 @@ a rule lacks is added here as an instruction, not gone round.
 
 Instructions are kept by what they do to the world: those that only
 read it in `read/`, those that only queue a change in `write/`; one
-that reads and queues a write in the same call would go in `rw/`, and
+that reads and queues a write in the same call would go in a third, for reading and writing, and
 none does yet. The shapes they answer in -- nine bits, an area, a mask
 -- are modules beside them.
 
@@ -125,7 +125,7 @@ one made so far. A rule keeps its masks as room and reads into them;
 none is made a read.
 
 - **Read**: `read::mask::layer` fills two masks from a layer, the cells it
-  holds at and the cells hot, a window of 8x8 at a time. `read_under`
+  holds at and the cells hot, a window of 8x8 at a time. `read::mask::layer_under`
   reads only where another mask has cells, the windows it has none in
   passed over.
 - **Written**: `write::mask::set` and `write::mask::clear` queue the mask's cells as

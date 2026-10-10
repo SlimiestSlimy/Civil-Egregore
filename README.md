@@ -23,7 +23,7 @@ sliders its generation is tuned by.
 | [`docs/glossary.md`](docs/glossary.md) | every word of Civil Egregore's own: what it means, what it relates to, and what it is never called |
 | [`docs/performance.md`](docs/performance.md) | what measuring Civil Egregore has shown, and each optimization kept or thrown away: where memory takes over from the processor, what a tick is made of |
 | [`docs/testing_protocol.md`](docs/testing_protocol.md) | how Civil Egregore is tested: diagnostics, tests and tools apart, and three tiers of test -- fine, fast, complete |
-| [`docs/Civil Egregore.md`](docs/Civil Egregore.md) | what Civil Egregore is, and every decision about it so far: chunks, superchunks, layers, the simulation's plan |
+| [`docs/civil_egregore.md`](docs/civil_egregore.md) | what Civil Egregore is, and every decision about it so far: chunks, superchunks, layers, the simulation's plan |
 | [`src/`](src/) | the `Civil_Egregore` crate: the program, which is only the list of crates with commands -- `cargo run --release -- help` |
 | [`server/`](server/) | the world as a whole: made from a seed, ticked -- rules and entities together -- saved and loaded as a folder whose name is the world's; which entity keeps the world hot; its commands and its diagnostics tools |
 | [`mc_rules/`](mc_rules/) | the Monte Carlo rules of the cells, a file each: grass over dirt, and trees |
@@ -47,7 +47,7 @@ sliders its generation is tuned by.
 Every crate but the root has the same folders -- `docs/`, `src/`,
 `src/diagnostics/`, `src/transient_data.rs` naming a `transient_data/`
 kept out of git, and `tests/`, a file a tier -- as the
-[style guide](docs/style_guide.md) sets out; no crate has a `bin/`.
+[style guide](docs/style_guide.md) sets out; no crate has a folder of binaries.
 The rules' crates hold their rules alone: a rule is tried on a world,
 and every world is the server's to make, so their tests and tools are
 there.

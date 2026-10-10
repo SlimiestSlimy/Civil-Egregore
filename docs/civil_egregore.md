@@ -301,7 +301,7 @@ Two steps a tick:
    sorted: sampling emits them in Morton order already. Not yet:
    writing a word at a time rather than a cell.
 
-   Measured (a `write_order` example, since removed -- git keeps it --
+   Measured (a write-order example, since removed -- git keeps it --
    once Morton order was settled as sampling's: 100,000 random
    writes a run, nine in ten a single cell, 50 runs, dirt and grass hot
    everywhere), in nanoseconds a write, mean:
@@ -786,7 +786,7 @@ what is over is waiting on memory -- a third of sampling's time at 256
 superchunks before, more than half after: fewer words are read, but
 each is a jump the processor cannot fetch ahead of, where the scan was
 a walk it could. (Load latencies sampled directly would say so
-outright; they need the kernel's `perf_event_paranoid` lowered, which
+outright; they need the kernel's perf_event_paranoid setting lowered, which
 was left as it is.) The threads are worth little while a tick is small:
 at 16 superchunks a tick is 40 microseconds, about what handing it to
 12 threads and back costs.

@@ -24,7 +24,10 @@ word, bit)`**; **`counted(words, detail)`**: the cells set a tile.
 `SIDE`, `SHADOW_DROP` (24 heights a cell down the diagonal),
 `LIGHT_BAND`, `COAST_REACH` (24 cells), `SMOOTHED_OVER` (4), `BEFORE`
 (138) and `AFTER` (26) cells kept about a superchunk, `SHADOW`,
-`COARSEST` (8). **`shadow_drop()`**.
+`COARSEST` (8), `FACTOR_ONE` (128: a colour's factor is a byte, and
+this is one). **`shadow_drop()`**. **`Given`**: heights already worked
+out, a superchunk's height words by its top left cell, so `generate`
+makes none twice.
 **`Shade`**: what a pixel's colour is drawn through -- what it is
 multiplied by, and what is laid over it first, pale, sand or foam and
 how much. **`lit(colour, shade)`**: a colour through a shade.
@@ -161,7 +164,8 @@ over the main menu.
 
 ## `map.rs`
 
-`MARGIN` (64 pixels), `DEEP_LIGHT`, `BORDER_LIGHT`, `SLOPE_LIGHT`.
+`MARGIN` (64 pixels), `BORDER_LIGHT`; what a height does to a colour
+is `ground/relief.rs`'s.
 **`Wanted`** `{first, step, size, seed, generation, borders}`: a map
 asked for; **`Drawn`**: one drawn. **`start()`**: the map's thread.
 **`cell(wanted, x, y)`**: the cell in a pixel's middle;

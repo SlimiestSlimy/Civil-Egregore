@@ -117,4 +117,4 @@ the window's. The list is asked for each time it is opened.
 | `src/sliders/tell.rs` | what a slider does, said when the pointer rests on it |
 
 The numbers themselves, and the sliders' file written by hand, are
-`utilities`' (`src/tuning.rs`, `sliders.csv`).
+`utilities`' (`../utilities/src/tuning.rs`, `../utilities/sliders.csv`).

@@ -46,3 +46,10 @@ borrow; a result past the start is a step off the `u64`, refused. A
 step of none spreads nothing, and one of a power of two -- to a
 neighbour, the next word tile or chunk -- spreads to one bit, twice as
 far up, with no spreading steps.
+
+## `diagnostics/`, `transient_data.rs`
+
+The folders every crate has (`../../docs/style_guide.md`, "One shape for
+every crate"). `diagnostics/mod.rs` gathers nothing yet.
+`transient_data::TRANSIENT_DATA` names the crate's `transient_data/`
+folder, where its runs would leave what they make.

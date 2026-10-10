@@ -44,6 +44,14 @@ mode bit, then the binary count tree, or the tree and the last pass.
 
 ## `tile.rs`: tiles, copy offsets, pyramids
 
+The levels and counts everything else is sized by: `CELL_LEVEL` (8), a
+single cell's level, the finest there is; `FLOOR_LEVEL` (6), the 4x4
+floor, the finest tile the tree holds a node at and the finest a copy
+reads; `CHILDREN` (4), a tile's; `CELLS`, the bitmap's 65,536;
+`DIRECTIONS`, the directions a copy names, as many as there are near
+offsets; `WHOLE_BITMAP`, the tile at level 0. **`Tile::side_in_cells()`**:
+a tile's side, `2^(8 - level)` cells.
+
 **`copy_offset(far, direction)`**: the offset, in tiles of the copy's
 own size, of the tile a copy reads from. Every offset precedes the tile
 in reading order (above, or left in the same row), so decoding has
@@ -94,6 +102,12 @@ level `l` starts at `(4^l - 1) / 3` (`level_start`).
 quadtree grammar"). `Absent` is the default, so a fresh tree holds no
 nodes.
 
+**`Tree`**: the tree itself, a pyramid of nodes, a node a tile, from the
+whole bitmap down to the 4x4 floor. It is walked from the top: the
+nodes under a complex tile are stale (`docs/tessera.md`, "Stale
+nodes"). `BOUND_AT_THE_TOP`: the value bound before any flipping divide
+has flipped it -- clear.
+
 **`Node::has_children()`**: whether its children's nodes follow it in
 the stream: a divide, a flipping divide, or a copy naming children.
 Their children that are not `Absent` are nodes; the others are said by
@@ -105,6 +119,10 @@ complex tile: a tile that is not a divide stops the level. The 4x4 floor
 never divides, so there is always one.
 
 ## `set_cells_before_each_word.rs`
+
+**`SetCellsBeforeEachWord`**: the cells set before each of the bitmap's
+1,024 words, and in all: one pass over the bitmap, after which any run
+of whole words is counted by a subtraction.
 
 **`count(bitmap)`**: running totals: `set_before[i]` cells set in words
 `0..i`, `set_before[1024]` in all. Overwrites everything.
@@ -143,6 +161,10 @@ not repeat is never searched for a copy source.
 
 **`copy_source(tile, number)`**: the first copy offset, near before
 far, then by direction, whose tile has `number`: `(far, direction)`.
+
+`ALL_CLEAR` (0) and `ALL_SET` (1): the two patterns every level has,
+a tile with every cell clear and one with every cell set -- the numbers
+a plain tile's pattern is compared with.
 
 ## `greedy_tiler.rs`: the greedy tiling and the complex tiling
 
@@ -245,6 +267,12 @@ clears `plan`, reads every node and acts on it at once -- sets the
 cells a flipping or keeping divide binds inside (each unnamed child
 when the value bound inside is set), reads payloads and cell lists into
 `cells`, and fills `plan` the same way the writer did. Builds no tree.
+
+The widths the node's bits are counted with: `FLAG_WIDTH` (1), every
+one-bit choice; `START_LEVEL_WIDTH` (3), the bits naming the start
+level, whole bitmap to floor; `MOST_NODE_BITS`, the most one node takes
+with its payload aside -- a copy naming its children: leaf, copy, far,
+the direction, names-children, and a bit a child.
 
 ## `payload_writer.rs`: payloads and cell lists
 
@@ -386,6 +414,17 @@ field would underflow.
 left of the cell, packed into 9 bits, looked up in
 `NEIGHBOURHOOD_CONTEXTS`, which picks out the six context cells.
 
+`CONTEXT_CELLS`: where a cell's context reads, relative to the cell as
+`(dx, dy)`: top left, above and left, then the same three two cells
+away -- every one before the cell in Morton order, so the decoder has
+them. `FLOOR_TILES`: the 4x4 floor's tiles in the bitmap; a copy is 4x4
+or coarser, so a copy's own cells are always whole floor tiles, and the
+pass keeps what is residual a floor tile at a time
+(**`FloorPlan::residual_floor_tiles(visit)`**, `last_pass/floor_plan.rs`:
+each residual floor tile's Morton index, in order). `MOST_EXTRA_BITS`:
+the most the pass takes over one bit a residual cell
+(`docs/tessera.md`, "The odds").
+
 ## `arithmetic.rs`: the range coder
 
 **`ClearProbability::split(range)`**: where an interval of width
@@ -417,11 +456,17 @@ stream can end inside one.
 **`Decoder::decode(clear, reader)`**: the same split; the bit is
 whether the offset lies in the set part; widens as the encoder did.
 
+`FINISHING_BITS` (2): what `Encoder::finish` takes beyond what the
+coded bits carry -- the final interval always holds an aligned run of
+numbers named by at most two bits more than its width's `-log2`.
+
 ## `bit_stream.rs`
 
 **`BitStream`**: bits packed least significant first, 64 to a word,
 in a box sized at `MOST_BITS`; past the last bit written every bit is
 0, so pushing ORs into place.
+
+**`len()`**: the bits written so far; **`is_empty()`**: none yet.
 
 **`clear()`**: zeroes only the words written.
 

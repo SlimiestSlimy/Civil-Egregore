@@ -136,3 +136,11 @@ missed (`count_missed`), entities put there lost; the crossings settled
 thread its run of superchunks, each removing its leavers from its
 neighbours' arrivals); the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
 offsets in a fixed order.
+
+## `transient_data.rs`
+
+`transient_data::TRANSIENT_DATA` names the crate's `transient_data/`
+folder, where its runs would leave what they make; nothing is kept
+there yet. The simulation gathers no diagnostics of its own: what the
+entities hold is `../../entity_manager/`'s to gather, what the arena
+holds `../../bitplane_manager/`'s.

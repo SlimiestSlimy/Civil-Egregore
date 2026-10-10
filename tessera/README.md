@@ -1,8 +1,9 @@
 # Tessera
 
 A lossless encoding of a 256x256 bitmap, made for Civil Egregore, where every
-layer of a 256x256 chunk is one such bitmap. The game is still to come;
-Tessera is its first working part.
+layer of a 256x256 chunk is one such bitmap. It was the first part of
+Civil Egregore to work; the game's cold pool now keeps every superchunk
+not being simulated as Tessera images (`../chunk_storage/`).
 
 A tessera is one tile of a mosaic, and the word comes from the Greek for
 four, for its four corners. Tessera tiles a bitmap greedily, biggest
@@ -103,7 +104,9 @@ internals (`tests/unit/`). Every check covers the same ground:
 - in debug builds, the encoder checks that the tree it writes takes the
   bits it counted.
 
-Sampled bitmaps come from a seed kept in `transient_data/seed.csv`, outside git.
+Sampled bitmaps come from the seed every crate's runs share, kept by
+`utilities::seed` in the workspace's own `transient_data/seed.csv`
+(`../transient_data/seed.csv`), outside git.
 It rolls by itself every five runs, so no corpus is measured against for
 long. `CIVIL_EGREGORE_SEED=<seed>` pins a run, and `CIVIL_EGREGORE_SEED=fresh` draws a
 new seed for one run. [`docs/testing_protocol.md`](docs/testing_protocol.md)
@@ -133,16 +136,18 @@ tessera/
   src/                  the crate: the encoding, and what measures it
     diagnostics/        what gathers data, and beside it what prints it:
       tool/             the diagnostics tool, one tool a file
-      adversarial/      the adversarial search, and its program (main.rs)
-  tests/                the three tiers, and unit/: the private internals' unit tests
+      adversarial/      the adversarial search (its tool: tool/adversarial.rs)
+  tests/                the three tiers, allocations.rs (what the encoder
+                        allocates), and unit/: the private internals' unit tests
   docs/
     tessera.md          every step and every bit
     reference.md        the encoder, function by function
     lab.md              the lab and tools, function by function
     testing_protocol.md how a change gets measured
   external_benchmarks/  against G4, JBIG and zstd; the saved adversarial bitmaps
-  transient_data/       out of git: what runs leave behind -- the seed,
-                        measurements, adversarial worst bitmaps, renders, callgrind output
+  transient_data/       out of git: what runs leave behind -- measurements,
+                        adversarial worst bitmaps, renders, callgrind output
+                        (the seed is the workspace's: ../transient_data/seed.csv)
 ```
 
 [`src/lib.rs`](src/lib.rs) maps every module to its step. The

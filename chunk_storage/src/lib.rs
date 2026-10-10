@@ -1,4 +1,4 @@
-//! Civil Egregore's chunks as stored (`../docs/Civil Egregore.md`, "Chunk storage"):
+//! Civil Egregore's chunks as stored (`../docs/civil_egregore.md`, "Chunk storage"):
 //! the cold pool of superchunk images, each one run of words as on disk,
 //! and the writeback ring of changed bitmaps that feeds it. Nothing here
 //! touches the disk yet. Cells are read and changed in the bitplane
