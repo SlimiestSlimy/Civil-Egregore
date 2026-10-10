@@ -142,6 +142,13 @@ lookups on the hot path are marked `#[inline]` now -- `Bucket::get`,
 `Rng::draw` -- and the tick takes 67.78 million. A change that moves
 the count with no change of work is looked for there first.
 
+The same held for an array mapped by a closure. `Lookup::windows`
+read its layers with `types.map(...)`; once the instructions crate
+grew, the map was left as calls draining the array, a layer at a time,
+and the tick went from 53.72 million instructions to 54.98 with no
+change of work. Built by index (`std::array::from_fn`) and marked
+`#[inline]`, the windows cost less than they did before: 49.95 million.
+
 ## Under full load: every superchunk hot
 
 In the renderer, every superchunk of a world with a side forced hot

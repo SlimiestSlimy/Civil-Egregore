@@ -49,6 +49,7 @@ impl<'a> Reader<'a> {
     /// [`Reader::window`], of each of `types` at once: one window of
     /// cells read in several layers costs little more than in one, where
     /// it lies being worked out once.
+    #[inline]
     pub fn windows<const N: usize>(&self, types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
         self.lookup.windows(self.superchunks, types, origin, width, height)
     }
@@ -159,6 +160,7 @@ impl Lookup {
     /// once, the word tiles beside and below stepped to on the word
     /// tile's index in the chunk, and only one across the chunk's edge
     /// looked up again.
+    #[inline]
     fn windows<const N: usize>(&self, directory: &[Superchunk], types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
         // The window's top left in its word tile.
         let (across, down) = in_word_tile(origin.0);
@@ -170,7 +172,9 @@ impl Lookup {
         let (wide, tall) = (across + width > WORD_TILE_SIDE, down + height > WORD_TILE_SIDE);
         let side = WORD_TILE_SIDE as i32;
         let kept = left_columns(width) & top_rows(height);
-        types.map(|layer_type| {
+        // Built by index: an array mapped by a closure is drained through calls the optimizer leaves standing.
+        std::array::from_fn(|index| {
+            let layer_type = types[index];
             let bucket = self.bucket(directory, layer_type, first);
             let top_left = word_tile(bucket, tile);
             let (mut top_right, mut bottom_left, mut bottom_right) = (Window::default(), Window::default(), Window::default());
