@@ -4,6 +4,7 @@
 
 use crate::link::{Link, Seen};
 use crate::map::MapLink;
+use crate::mipmaps::{picture_with_mipmaps, MipmapsDue};
 use crate::paint::{Picture, BROWN};
 use crate::view::{first_view, Sprites, SPRITE_SIDE};
 use bevy::asset::RenderAssetUsages;
@@ -80,6 +81,7 @@ pub fn show(
     mut sprites: ResMut<Sprites>,
     mut images: ResMut<Assets<Image>>,
     mut seen: ResMut<Seen>,
+    mut due: ResMut<MipmapsDue>,
     near_view: Single<Laid, (With<NearView>, Without<Camera2d>)>,
     camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>,
     window: Single<&Window>,
@@ -119,15 +121,18 @@ pub fn show(
         (seen.frame, seen.painted, seen.paint_seconds) = (Some(picture.frame), seen.painted + picture.superchunks.len(), picture.paint_seconds);
         for painted in picture.superchunks {
             let (at, side) = (painted.at, painted.side);
+            // Its mipmaps are the graphics card's to make, each time its pixels change.
             if let Some((_, image, drawn)) = sprites.tiles.get_mut(&at) {
-                if let Some(mut image) = images.get_mut(&*image) {
-                    *image = picture_of((side, side), painted.pixels);
+                if let Some(mut picture) = images.get_mut(&*image) {
+                    *picture = picture_with_mipmaps(side, painted.pixels);
                     *drawn = side;
+                    due.0.push(image.id());
                 }
                 continue;
             }
             // Its first pixels: a sprite a superchunk's side on the plane whatever its image's; the world's y grows downwards, the plane's upwards.
-            let image = images.add(picture_of((side, side), painted.pixels));
+            let image = images.add(picture_with_mipmaps(side, painted.pixels));
+            due.0.push(image.id());
             let sprite = Sprite { image: image.clone(), custom_size: Some(Vec2::splat(SPRITE_SIDE)), ..default() };
             let middle = [0, 1].map(|axis| sprites.plane([at.0, at.1][axis] * SUPERCHUNK_SIDE_CELLS, axis) + SPRITE_SIDE / 2.0);
             let sprite = commands.spawn((sprite, Transform::from_xyz(middle[0], -middle[1], 0.0))).id();

@@ -111,6 +111,45 @@ which a pixel a cell cannot do: that would be 4 GiB of pixels a frame.
 A frame of one superchunk takes very little of the host's
 thread, however large the world: the HUD says how much.
 
+### Mipmaps made on the graphics card
+
+A superchunk's picture is rarely shown pixel for pixel: between two
+details the screen shows up to two of its pixels in one, and a picture
+painted for a nearer view stands, far smaller, until the frame for the
+farther one comes. Read one pixel in several, it shimmers as the view
+moves. So each picture has **mipmaps** -- itself halved again and
+again, down to one pixel -- and the graphics card blends the two
+nearest the size it is drawn at.
+
+The graphics card makes them, not the painter (`src/mipmaps.rs`). A
+picture is sent with room for its mipmaps (`picture_with_mipmaps`) and
+named as due (`MipmapsDue`) each time its pixels change; before the
+cameras draw, the card halves it level by level in two compute passes
+(Bevy's `mip_generation`, the single-pass downsampler). The painter
+paints and sends exactly what it did; a third more memory on the
+card. From near nothing changes: a pixel enlarged is still read sharp,
+and the picture from near has no mipmaps.
+
+Three things it rests on:
+
+- The card writes the halvings as plain numbers, and cannot write a
+  texture whose numbers are read as colours (sRGB). So the picture is
+  kept as numbers and drawn through a view that reads them as colours.
+  The halvings therefore average the numbers, not the light -- as the
+  painter's own mixing of a tile's colours does.
+- What makes the mipmaps is built by the card off the frame, and is
+  not there on the first frames: a picture waits (`Waiting`) until it
+  is, asked again each frame. A small picture is sent when the window
+  opens, so it is built while the menu shows.
+- A picture's detail is still the painter's (`frames::detail_at`): it
+  bounds what the host copies and what is kept, which mipmaps do not.
+  Far out, a tile of cells a pixel is still counted from the words.
+
+`Civil_Egregore renderer window_still [seed] [cells a screen pixel]
+[name]` opens the window on a world, takes what the card drew as a
+PNG, and closes it: the one check of the card's own work that needs no
+one at the screen (`src/diagnostics/window_still.rs`).
+
 ## Height, from straight above
 
 The view is fully vertical, so height is shown by light and colour
@@ -253,6 +292,7 @@ another world is run.
 | `src/lib.rs` | `run`: the window, its parts and its systems |
 | `src/link.rs` | the host as the window holds it: the menus' worlds made, opened and saved, paused and paced |
 | `src/frames.rs` | frames asked for and shown: an image a superchunk, the picture from near |
+| `src/mipmaps.rs` | the superchunks' pictures' mipmaps, made by the graphics card |
 | `src/view.rs` | the plane, the camera, where it starts for a world, steering it |
 | `src/overlays.rs` | boundaries, labels and heights over the world |
 | `src/hud.rs` | the text over the world |
@@ -260,6 +300,6 @@ another world is run.
 | `src/paint.rs` | the painter's thread: cells into pixels |
 | `src/ground.rs` | the light on the ground: heights as a frame brings them, each cell's light and shadow; `ground/relief.rs` what a height does to a colour -- slope light, height tint, water's light, sand and foam; `ground/levels.rs` the ground at each detail, its contours and coast; `ground/light_and_shadow.rs` the smoothing, the shadows and how far the coast is |
 | `src/near.rs` | the viewport's cells from near as one picture: steps and walls at their edges |
-| `src/diagnostics/` | stills of a world at every zoom, painted with no window: `Civil_Egregore renderer stills` |
+| `src/diagnostics/` | stills of a world at every zoom, painted with no window: `Civil_Egregore renderer stills`; and a still of the window itself, as the graphics card drew it: `renderer window_still` |
 | `src/transient_data.rs` | where the stills are kept: `transient_data/renders/` |
 | `docs/` | this, and the reference, function by function |

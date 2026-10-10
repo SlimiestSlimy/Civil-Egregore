@@ -87,6 +87,7 @@ what they always do and are not listed.
 | **cold pool** | chunk storage's superchunk images, one per superchunk stored. Never "pool" alone | image | |
 | **image** | one superchunk as stored, one run of words, in memory as on disk: its height map and every chunk's encoded layers (`SuperchunkImage`) | chunk storage, save | |
 | **height map** | a superchunk's heights: a floor a chunk, a byte a cell over it, and a tall chunk's 16 bits a cell (`HeightMap`) | height, floor, tall chunk | |
+| **mipmaps** | a picture halved again and again down to one pixel, kept with it, so that drawn smaller it is blended from the two nearest its size and does not shimmer. A superchunk's picture has them, made by the graphics card (`renderer/src/mipmaps.rs`) | picture, detail | mips, LOD, pyramid |
 | **map** | the renderer's picture of the world as generated: each pixel the cell in its middle, nothing of the simulation read (`renderer/src/map.rs`) | map mode, detail | overview, minimap |
 | **map mode** | the renderer drawing the map in place of the cells, at any zoom, toggled by `M`: its viewport none, so nothing is copied for it and its camera loads nothing | map, viewport | |
 | **mesh** | the land's shape: vertices joined by lines into triangles (`worldgen::mesh`) | vertex, line | polygons, Voronoi |

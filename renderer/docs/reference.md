@@ -99,10 +99,27 @@ height's tint, sand or foam beside the coast, its water's light.
 ## `lib.rs`
 
 **`run()`**: the window opened on the main menu, run until it is
-closed: the menus (`gui::Gui`), the host's and the map's links, every
+closed; `window()`: it, not yet run -- the menus (`gui::Gui`), the host's and the map's links, every
 part made at startup, and each frame the menus' worlds told the host,
 then -- only over a world -- the view steered, the overlays laid, the
 frame shown and the next asked for, the map; then the text.
+
+## `mipmaps.rs`
+
+`renderer.md`, "Mipmaps made on the graphics card".
+**`picture_with_mipmaps(side, pixels)`**: a superchunk's picture with
+room for its mipmaps -- kept as numbers the card may write, drawn
+through a view reading them as colours, sharp enlarged and blended
+made smaller. **`MipmapsDue`**: the pictures whose pixels changed
+this frame. **`Mipmaps`**: the plugin. `begin`: a frame begun with
+none due but, the first time, a small picture (`WarmUp`,
+`WARM_UP_SIDE` 4) that has the card build what makes mipmaps. On the
+card's side: `Waiting` `{pictures, asked_on}`, the pictures not yet
+done; `take`: the frame's due taken, every one waiting asked for;
+`make`: the mipmaps made before the cameras draw
+(`BEFORE_THE_CAMERAS`), a picture done once the card has it and what
+makes them is built -- not taken as built before mipmaps were asked on
+`ASKED_BEFORE` (2) frames -- and given up after `GIVEN_UP_AFTER` (600).
 
 ## `link.rs`
 
@@ -127,14 +144,16 @@ change how worlds are generated, the view left where it is.
 (64), `NEAR_SCALE` (half a cell a screen pixel), `NEAR_PIXELS` (8),
 `NEAR_MARGIN` (8 cells), `TILES_KEPT` (4,096).
 **`frame_holds(detail)`**: superchunks a frame carries at most.
-`DIRT`, one pixel of it; **`picture_of(size, pixels)`**: an image.
+`DIRT`, one pixel of it; **`picture_of(size, pixels)`**: an image
+with no mipmaps -- the picture from near, the map, a still.
 **`Laid`**: what of a picture over the images is changed.
 **`NearView`**: the picture from near; **`spawn`**: it, hidden.
 **`show`**: every frame that came shown, in the order they came, the
 host asked again once one says no more follow -- another world's dropping what
 was drawn of the last, the view put over it; what was drawn of a
 superchunk of the viewport gone cold dropped; each superchunk's image,
-and the picture from near. **`near(first, last, scale)`**: the cells
+and the picture from near; each superchunk's image named as due its
+mipmaps. **`near(first, last, scale)`**: the cells
 seen from near, if the view is near. **`detail_at(scale)`**: how
 coarsely the world is drawn, coarser than the screen past
 `COARSER_FROM`. **`ask`**: the next frame asked for -- the viewport,
@@ -213,7 +232,14 @@ generate) and `BETWEEN_ASKS` (200 ms before the host is asked again
 for superchunks not yet hot). **`tool::COMMANDS`**: `stills`, each kept
 as a PNG (`stills_tool`); its parameters' names `SEED` (in hex; 0 the
 counted one, moved on to one with land about the middle),
-`CELLS_EAST`, `CELLS_SOUTH`, `FARTHEST`, `NAMED`.
+`CELLS_EAST`, `CELLS_SOUTH`, `FARTHEST`, `NAMED`; and `window_still`
+(`window_still_tool`; `CELLS_A_PIXEL`): **`window_still::keep(seed,
+cells_a_pixel, path)`** opens the window on the world of a seed, holds
+the view at so many cells a screen pixel, keeps what the graphics card
+drew and closes it -- `Wanted` `{seed, cells_a_pixel, path,
+shown_for}`, `take` each frame, the still taken `SETTLED_AFTER` (300)
+frames after the world is first shown and the window closed
+`WRITTEN_AFTER` (90) later.
 
 ## `transient_data.rs`
 
