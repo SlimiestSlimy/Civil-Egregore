@@ -74,6 +74,26 @@ program -- the crate the first word names is handed the rest; `help`,
 `--help` or `-h` (`HELP`) prints **`help(called, crates)`**, every
 command of every crate.
 
+## `stale_docs.rs`
+
+**`COMMANDS`**: the program's `docs` commands, one: `stale [from
+commit]` (`FROM_COMMIT`, `HEAD` unless given), run by `run` -- the
+root, the files and the lines asked of **`git(folder, arguments)`**,
+what it prints or why it failed; the rows printed as a table, or a
+line saying there are none. **`Lines { first, last }`**: a stretch of
+a file's lines, from 1, both ends in it; `meet(other)`.
+**`changed_lines(diff)`**: each hunk of a `git diff -U0` as (file,
+lines now); a `+++` line is a file's only after a `---` line, and a
+removed file gives none. **`pointers(root, path, text)`**: (doc from
+the root, section or none) for each pointer in a source's comments,
+found from **`crate_of(root, path)`** or the root; **`spans(line)`**:
+what is in backticks; **`quoted_titles(after)`**: the titles quoted
+after a path, to the sentence's end, their own backticks left off. **`section_lines(text, title)`**: a section's
+lines, by **`heading_depth(line)`** (the `#`s of a heading), the whole
+doc if not there. **`untouched_sections(root, changed_files,
+diff)`**: the rows, sorted, each once. `WHOLE_DOC`: what a pointer
+with no section is listed as.
+
 ## `rng.rs`
 
 **`Rng::new(seed)`**, **`for_stream(seed, stream)`** -- a source of its

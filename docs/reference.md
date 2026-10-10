@@ -15,6 +15,6 @@ Civil Egregore is and every decision about it: `civil_egregore.md`.
 ## `main.rs`
 
 **`CRATES`**: the crates with commands, by name -- `server`, `tessera`,
-`renderer` -- each with its table of them. **`main`**: the command line handed to
+`docs` (utilities' `stale_docs`), `renderer` -- each with its table of them. **`main`**: the command line handed to
 `utilities::commands::program`; `Civil_Egregore help` prints every command of
 every crate.

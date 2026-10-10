@@ -31,6 +31,24 @@ REMOTE (cloud, no screen)
 
 == ALWAYS ==
 
+- EVERY COMMIT MESSAGE ENDS WITH "Decided on my own:" (the user,
+  2026-10-09): one line each, every choice the user did not ask for or
+  specify -- a new name, constant, threshold, limit, data layout, crate
+  or module boundary, fallback, cap, default, or behaviour beyond the
+  request -- what was chosen and why. If there is none: "Decided on my
+  own: nothing." (Above the Co-Authored-By line.)
+- BEFORE EACH COMMIT, `cargo run --release -- docs stale` (the user,
+  2026-10-09; `docs stale <from commit>` for more than the last
+  commit): every doc section the changed code's comments point at that
+  the change left untouched. Each section it lists is read, and either
+  updated or the commit says why it still holds. A list, not a test.
+- THIS FILE AND THE SCRATCHPAD ARE CLEANED UP AS I GO (the user,
+  2026-10-09). AI.txt: a task done is struck to a line or removed, a
+  note that no longer holds is deleted, nothing said twice; it stays
+  short enough to read whole after a break. The scratchpad
+  (AI_SCRATCHPAD the crate, and the session's scratch folder): a probe
+  or script is removed once what it was for is done or has moved to
+  where it belongs.
 - Never run `cargo fmt`; never `cargo clippy --fix` (both reformat).
 - CODE EXPLAINS ITSELF ROUGHLY, DOCS EXPLAIN THE CODE IN DETAIL (the
   user, 2026-10-09, "really seriously"). Names and short comments give

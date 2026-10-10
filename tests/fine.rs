@@ -168,8 +168,18 @@ impl Repository {
         };
         let headings: Vec<&str> = text.lines().filter(|line| line.starts_with('#') || line.starts_with("**")).map(|line| line.trim_start_matches(['#', '*', '`', ' ']).trim()).collect();
         let after = after.split_whitespace().collect::<Vec<_>>().join(" ");
-        let sentence = after.split(['`', '|', ')']).next().unwrap_or_default().split(". ").next().unwrap_or_default();
-        sentence.split('"').skip(1).step_by(2).filter(|title| !headings.iter().any(|heading| heading.starts_with(title))).map(str::to_string).collect()
+        let (mut missing, mut parts) = (Vec::new(), after.split('"'));
+        // A title's own backticks are left off; the titles end with the sentence, a bracket, or other code.
+        while let (Some(between), Some(title)) = (parts.next(), parts.next()) {
+            if between.contains(['`', '|', ')']) || between.contains(". ") {
+                break;
+            }
+            let title = title.trim_matches('`');
+            if !headings.iter().any(|heading| heading.starts_with(title)) {
+                missing.push(title.to_string());
+            }
+        }
+        missing
     }
 }
 
