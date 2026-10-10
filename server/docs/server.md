@@ -110,6 +110,31 @@ as they are.
 The world checked has no camera: a camera's superchunks are hot by
 where a person looks, which no seed says.
 
+## Two writes on one cell
+
+Rules read the world as the tick found it and queue their writes, so
+two may be queued for one cell in a tick. Which pairs there are, and
+what comes of each -- held by `tests/fast/double_writes.rs`, which sets
+a tick's counts against the cells that changed:
+
+| the two writes | can it happen | what comes of it |
+|---|---|---|
+| two sheep eating one cell | no: a sheep eats the cell it stands on, and a cell holds one entity | every cell eaten is a write and a cell changed |
+| grass spreading onto one cell twice | yes | set once; both spreads counted |
+| grass spreading onto a cell, the cell decaying or eaten | no: spreading fills cells that were dirt, decay and sheep clear cells that were grass | |
+| a cell decaying and eaten | yes, rarely | cleared once; a decay and a meal both counted |
+| two trees put on one cell | yes | one tree; both counted |
+| a tree put on a cell, the tree there dying | no: a tree is put where none stood | |
+| two entities stepping onto one cell | yes | the first applied takes it, the other stays where it stood and wakes as it was to |
+| two lambs born onto one cell | yes | the first applied is made, the second refused: **a lamb lost**, its birth counted and its mother pregnant no more |
+| two entities setting one attribute of a third | yes (no rule does yet) | the later applied is kept, the same one on any number of threads (`../../simulation/tests/fine/instructions.rs`) |
+
+No pair leaves a cell or an entity differing by the order threads ran
+in: writes of one kind on a cell come to the same whichever is first,
+and instructions are applied in one order. What is off is the counts --
+a spread, a decay or a birth counted that changed nothing -- and the
+lamb, which its mother cannot know was refused.
+
 ## Saved and loaded
 
 A save is a folder (`chunk_storage::disk`, and

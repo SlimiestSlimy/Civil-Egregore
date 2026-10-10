@@ -23,5 +23,8 @@ mod grass;
 #[path = "fast/sheep.rs"]
 mod sheep;
 
+#[path = "fast/double_writes.rs"]
+mod double_writes;
+
 #[path = "fast/world_hash.rs"]
 mod world_hash;

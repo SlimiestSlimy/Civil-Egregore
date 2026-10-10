@@ -144,3 +144,29 @@ fn entities_edit_another_an_attribute_at_a_time() {
     let edited = entities.get(target.id, target.at).expect("where it stood");
     assert_eq!(edited.attributes, [AttributeBlock::holding(NAME, 8), AttributeBlock::holding(SCAR, 2)]);
 }
+
+/// Two entities setting one attribute of a third in one tick: one of
+/// the two is kept -- the later applied -- and the same one on any
+/// number of threads.
+#[test]
+fn two_edits_of_one_attribute_keep_the_same_one_on_any_threads() {
+    let kept = [1, 4].map(|threads| {
+        let (mut arena, mut entities) = world(2);
+        // The one edited, and the two editing it from the two superchunks beside its border.
+        let target = walker(9, cell(1030, 30), NEVER);
+        entities.queue_put(target, &[]);
+        entities.queue_put(walker(1, cell(1020, 30), 0), &[]);
+        entities.queue_put(walker(2, cell(1040, 30), 0), &[]);
+        entities.apply();
+        let report = Simulation::new(threads).tick(&mut arena, &mut entities, 0, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+            for entity in turn.woken() {
+                turn.set_attribute(&target, NAME, entity.header.id.0);
+                turn.step(&entity.header, entity.header.at, NEVER);
+            }
+            0
+        });
+        assert_eq!(report.instructions_applied.edits, 2);
+        entities.get(target.id, target.at).expect("where it stood").attribute(NAME).expect("set")
+    });
+    assert!(kept[0] == kept[1] && [1, 2].contains(&kept[0]), "{kept:?}");
+}

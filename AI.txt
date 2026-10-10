@@ -255,17 +255,12 @@ break; write a new ask here the moment it is made.
 5. LOD ON THE GPU (renderer).
 6. Another day: optimizations, inlining.
 
-6b. DOUBLE WRITES (asked 2026-10-09, "after everything else"): the
-   user suspects double-write hazards are still in the sim --
-   "specifically i believe 2 sheeps can eat the same grass, check that
-   please". Known so far: the sheep rule reads the world as the tick
-   found it, so two sheep on... no: entities never overlap, so two
-   sheep are never on one cell and each eats only its own cell -- to
-   be VERIFIED by a test, with every other pair of writes that may
-   land on one cell in a tick (grass spread + spread, spread + eaten,
-   decay + eaten, tree put + put, edits of one entity by two). The
-   docs said "two sheep may eat one cell in a tick": check, and
-   correct whichever is wrong.
+6b. DOUBLE WRITES: CHECKED 2026-10-10 (server.md, "Two writes on one
+   cell"; server/tests/fast/double_writes.rs). Two sheep cannot eat one
+   cell. Found: two lambs born onto one cell in a tick -> one refused,
+   counted as born, mother no longer pregnant. NOT fixed: the user is
+   to say how (mother stays pregnant until she sees her lamb? count
+   births from what was applied?).
 7. LAST STEP (asked 2026-10-09): go through ALL tests of the codebase;
    wherever a test has fixed cases that could be generated (seeded,
    randomized, from the seed file), make it generated.
