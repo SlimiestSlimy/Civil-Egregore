@@ -1,47 +1,9 @@
 //! Civil Egregore on the screen: a Bevy window showing a world run by
-//! the host (`server::host`) on a thread of its own -- dirt, grass,
-//! trees, water and sheep, on ground lit by its height: slopes shaded,
-//! cliffs casting shadows, and from near, steps and walls drawn at
-//! their edges.
+//! the host (`server::host`) on a thread of its own. The window asks,
+//! the host copies, a third thread paints; a fourth draws the map.
 //!
-//! It opens on the main menu (`gui`): a world is made there, its seed
-//! typed or drawn and the rest as the sliders have it -- its size,
-//! whether it is forced hot, its sheep, how it is generated -- or one
-//! saved is opened. Only then is the host asked for anything.
-//!
-//! The window is the one that asks: each time it has shown a frame, it
-//! asks the host for the hot superchunks of its viewport -- whatever it
-//! should render ([`frames`]) -- and the host answers with their cells
-//! as its last tick left them, which a third thread turns into pixels
-//! ([`paint`]). The three share nothing else, so none waits on another.
-//! In map mode, at any zoom, a fourth draws the map from generation
-//! alone ([`map`]) and no cells are asked for.
-//!
-//! | module | what it is |
-//! |---|---|
-//! | [`link`] | the host as the window holds it: what the menus and the keys tell it |
-//! | [`frames`] | frames asked for and shown |
-//! | [`view`] | the plane, the camera, and steering it |
-//! | [`overlays`] | boundaries, labels and heights over the world |
-//! | [`hud`] | the text over the world |
-//! | [`map`] | the world from far off |
-//! | [`paint`], [`near`], [`ground`] | cells into pixels, on the painter's thread |
-//!
-//! | key | what it does |
-//! |---|---|
-//! | arrows, WASD, or dragging with the left button | move the view |
-//! | the wheel, or `Q` and `E` | zoom |
-//! | space | pause, and go on |
-//! | `T` | tick flat out, or at the game's pace |
-//! | `F11` | the window over the whole screen, or not |
-//! | `[` and `]` | halve and double the pace |
-//! | `B` | show the superchunks' boundaries, or not, and near enough each one's Morton index and `(x, y)` |
-//! | `C` | the same of the chunks |
-//! | `H` | show every cell's height, from near enough to read them |
-//! | `M` | map mode, or not: the map in place of the cells, at any zoom |
-//! | `P` | draw the mesh's lines over the map |
-//! | `U` | the sliders' menu, or none: the near view's shading over a world, everything while one is made |
-//! | Escape | the options, or none: going on, saving the world, opening one of the worlds' folder, and leaving Civil Egregore |
+//! The design, and the keys: `docs/renderer.md`; function by function:
+//! `docs/reference.md`.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.

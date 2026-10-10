@@ -33,14 +33,9 @@ fn over_menus(z: i32) -> GlobalZIndex {
     GlobalZIndex(20 + z)
 }
 
-/// The button, the menu and every group: each a dark panel, a first
-/// row saying what a click on it does, and under it the menu's groups
-/// or the group's sliders -- a name, a box with the value, a track, its
-/// filled part and a knob each.
-///
-/// The menu is made twice -- its panel and first row -- once for every
-/// group, and once for those offered over a world running: listed
-/// first, they are the same rows in both.
+/// The button, the menu -- made twice, for every group and for those
+/// offered over a world running -- and every group
+/// (`docs/gui.md`, "Sliders").
 pub fn spawn(mut commands: Commands) {
     debug_assert!(GROUPS.is_sorted_by_key(|group| group.setup_only()), "the groups only of setting a world up are listed last");
     let placed = |top: f32, right: f32, width: Val, height: f32| Node { position_type: PositionType::Absolute, top: Val::Px(top), right: Val::Px(right), width, height: Val::Px(height), ..default() };

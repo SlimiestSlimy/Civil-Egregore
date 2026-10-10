@@ -1,24 +1,6 @@
 //! Sliders over the window's top right corner, one a number of
-//! `utilities::tuning`, in groups ([`Group`]), one group on the screen
-//! at a time, opened from a menu -- a part a module.
-//!
-//! - **Closed**, there is one small button, `sliders`: a click on it,
-//!   or `U`, opens the menu.
-//! - **The menu** lists the groups offered ([`Offered`]), a row each: a
-//!   click on one opens it. A click on its first row, or `U`, closes it.
-//! - **A group** is its sliders, under a first row that goes back to
-//!   the menu ([`slide`]). Resting the pointer on a slider's row says
-//!   what it does ([`tell`]).
-//!
-//! Every group is offered while a world is being set up; over a world
-//! running, all but those only of setting one up -- a slider of how it
-//! is generated making it again from its start. What is longer than the
-//! window is scrolled by the wheel, the pointer over it.
-//!
-//! All is laid out by plain arithmetic -- a row each, a track of a
-//! fixed width against the window's right edge -- so where the pointer
-//! is on one is worked out from the same numbers, with no asking Bevy
-//! ([`spawn`]).
+//! `utilities::tuning`, in groups, one group on the screen at a time,
+//! opened from a menu (`docs/gui.md`, "Sliders").
 
 mod slide;
 mod spawn;

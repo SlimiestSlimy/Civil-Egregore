@@ -1,10 +1,6 @@
 //! A menu of rows over the middle of the window -- what the main menu
-//! and the options both are: a dimmed window, rows a bar each, a click
-//! on a row doing what it does. A menu says what its rows are each
-//! frame ([`Row`]); the parts are made once ([`spawn`]) and shown as
-//! they are said ([`show`]). What is shared beside: a list of the
-//! worlds there are, gone through by the wheel ([`Listing`]), and keys
-//! typed into a line ([`type_into`]).
+//! and the options both are -- with the worlds listed and keys typed
+//! into a line (`docs/gui.md`, "Rows").
 
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::ecs::query::QueryFilter;

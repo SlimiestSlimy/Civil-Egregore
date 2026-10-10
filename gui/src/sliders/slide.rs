@@ -1,9 +1,6 @@
-//! What a click on the sliders does: the menu opened, a group opened
-//! or left; and in a group a knob dragged with the left button and kept
-//! when let go, set back to its default with the right, a value typed
-//! into its box -- digits and a point, Enter or a click to set it,
-//! Escape to leave it. A toggle is neither dragged nor typed: a click
-//! on it turns it on or off.
+//! What a click on the sliders does: the menu and groups opened and
+//! left, a knob dragged, a value typed, a toggle turned
+//! (`docs/gui.md`, "Sliders").
 
 use super::spawn::{Moved, Valued};
 use super::{rows, Offered, Shown, Sliders, BOX, GAP, KNOB, MARGIN, TRACK};
