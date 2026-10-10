@@ -2,7 +2,7 @@
 //! once in [`registered!`] and checked as the crate is built
 //! ([`first_clash`]): `docs/type_registry.md`, "Why one table".
 
-use crate::layouts::{data_words, Attribute, Layout, Roaming};
+use crate::layouts::{data_words, Attribute, Bearing, Layout, Roaming};
 use crate::type_ids::{Bits4, EntityType, LayerType, Wide, Width};
 
 /// What a registered type is of.
@@ -104,6 +104,9 @@ registered! {
     /// neighbour it steps to. Set once, at the meal: a step on the way
     /// changes no attribute.
     attribute ROAMING<Roaming> = 20, "roaming";
+    /// A sheep whose lamb was put beside it last tick: which lamb, and
+    /// where. Pregnant still, until it has seen the lamb stand there.
+    attribute BEARING<Bearing> = 21, "bearing";
     /// The cells under water, however deep: what a rule asks. How deep is
     /// kept a map a chunk with water, in the superchunk's image
     /// (`chunk_storage::SuperchunkImage::depth`).

@@ -1,14 +1,15 @@
 //! Two writes on one cell in a tick: what a tick's counts say against
 //! the cells that changed. No two sheep eat one cell; a cell of grass
 //! spread onto twice, or decayed and eaten, changes once; a tree put
-//! twice is one tree; and two lambs born onto one cell are one lamb
+//! twice is one tree; and of two lambs put on one cell the one
+//! refused is born later
 //! (`docs/server.md`, "Two writes on one cell").
 
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, put_entity, tick_sheep};
 use bitplane_manager::Write;
 use coordinates::{CellCartesian, CellIndex};
 use entity_manager::{AttributeBlock, EntityId, Header, NEVER};
-use entity_rules::sheep::{BIRTHS, EATEN, HUNGRY_AT, LAMB, PREGNANT, SHEEP, STEP_TICKS};
+use entity_rules::sheep::{BEARING, BIRTHS, EATEN, HUNGRY_AT, LAMB, PREGNANT, SHEEP, STEP_JITTER, STEP_TICKS};
 use mc_rules::{grass, trees};
 use server::World;
 use std::collections::HashSet;
@@ -102,11 +103,12 @@ fn a_tree_put_twice_is_one_tree() {
     assert!(put > 0, "no tree spread");
 }
 
-/// Two lambs born onto one cell in a tick are one lamb: two sheep due
-/// with one free cell between them both put theirs on it, the second
-/// is refused -- and both count a birth and are pregnant no more.
+/// Two lambs put on one cell in a tick: the second is refused, and
+/// its mother, who does not see it stand there the tick after, is
+/// pregnant still -- no birth counted that was none -- and bears it
+/// once a cell beside her is free.
 #[test]
-fn two_lambs_born_onto_one_cell_are_one() {
+fn a_lamb_refused_its_cell_is_born_later() {
     let mut world = plain_world(1, 0, 0, 1);
     let (x, y) = (500, 500);
     for (id, mother) in [x, x + 2].into_iter().enumerate() {
@@ -114,14 +116,30 @@ fn two_lambs_born_onto_one_cell_are_one() {
         put_entity(&mut world, header, &[AttributeBlock::holding(HUNGRY_AT, 1), AttributeBlock::holding(PREGNANT, 0)]);
     }
     // Every cell beside either taken, but the one between them.
-    let beside = (x - 1..=x + 3).flat_map(|x| (y - 1..=y + 1).map(move |y| (x, y))).filter(|&at| ![(x, y), (x + 1, y), (x + 2, y)].contains(&at));
-    for (id, (x, y)) in beside.enumerate() {
-        let header = Header { id: EntityId(10 + id as u64), kind: SHEEP, at: cell(&world, x, y), wake: NEVER };
-        put_entity(&mut world, header, &[AttributeBlock::holding(HUNGRY_AT, 0)]);
+    let beside: Vec<(u32, u32)> = (x - 1..=x + 3).flat_map(|x| (y - 1..=y + 1).map(move |y| (x, y))).filter(|&at| ![(x, y), (x + 1, y), (x + 2, y)].contains(&at)).collect();
+    let blockers: Vec<Header> = beside.iter().enumerate().map(|(id, &(x, y))| Header { id: EntityId(10 + id as u64), kind: SHEEP, at: cell(&world, x, y), wake: NEVER }).collect();
+    for &blocker in &blockers {
+        put_entity(&mut world, blocker, &[AttributeBlock::holding(HUNGRY_AT, 0)]);
     }
+    let lambs = |world: &World| world.entities.iter().filter(|sheep| sheep.attribute(LAMB).is_some()).count();
+    let pregnant = |world: &World| world.entities.iter().filter(|sheep| sheep.attribute(PREGNANT).is_some()).count();
+    // Both put a lamb on the one cell: one is made, and no birth is counted before it is seen.
     let report = tick_sheep(&mut world, 0);
-    assert_eq!((report.rules[BIRTHS], report.instructions_applied.refused), (2, 1));
-    let lambs: Vec<CellIndex> = world.entities.iter().filter(|sheep| sheep.attribute(LAMB).is_some()).map(|sheep| sheep.header.at).collect();
-    assert_eq!(lambs, [cell(&world, x + 1, y)]);
-    assert!(world.entities.iter().all(|sheep| sheep.attribute(PREGNANT).is_none()));
+    assert_eq!((report.rules[BIRTHS], report.instructions_applied.refused, lambs(&world), pregnant(&world)), (0, 1, 1, 2));
+    // The tick after, one mother sees her lamb; the other does not, and has no cell to try again on.
+    let report = tick_sheep(&mut world, 1);
+    assert_eq!((report.rules[BIRTHS], lambs(&world), pregnant(&world)), (1, 1, 1));
+    // A cell freed beside each: the other's lamb is born, a step's wait and a tick on.
+    for &blocker in &blockers {
+        world.entities.queue_remove(&blocker);
+    }
+    world.entities.apply();
+    let (mut births, mut most_lambs) = (1, 1);
+    for seed in 2..2 + 2 * (STEP_TICKS + STEP_JITTER) {
+        births += tick_sheep(&mut world, seed).rules[BIRTHS];
+        // Seen as it is born: a lamb may die of old age at its first wake.
+        most_lambs = most_lambs.max(lambs(&world));
+    }
+    assert_eq!((births, most_lambs, pregnant(&world)), (2, 2, 0));
+    assert!(world.entities.iter().all(|sheep| sheep.attribute(BEARING).is_none()));
 }

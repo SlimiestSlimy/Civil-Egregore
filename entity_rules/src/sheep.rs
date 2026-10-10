@@ -4,7 +4,7 @@
 
 use instructions::around::{self, CENTRE, RING};
 use instructions::entities::EntitiesBetweenTicks;
-pub use instructions::entity_types::{Roaming, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
+pub use instructions::entity_types::{Bearing, Roaming, BEARING, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
 use instructions::layers::{GRASS, WALL_EAST, WALL_SOUTH};
 use instructions::{area, cells, entities, walking, AttributeBlock, CellCartesian, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
@@ -83,7 +83,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let mut sheep = EntityEdit::of(sheep, room);
     let grass = around::layer(turn, GRASS, at);
     // The neighbours it may step to: on the hot bitplanes, no wall before them. Where entities stand is not read.
-    let mut steppable = grass.hot & RING & walking::around_unwalled(turn, at);
+    let steppable = grass.hot & RING & walking::around_unwalled(turn, at);
     let hungry_at = sheep.get(HUNGRY_AT).unwrap_or(now);
     let roaming = sheep.get(ROAMING);
     // On its way out of thin pasture it does not stop to eat.
@@ -107,17 +107,25 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     // What it next has to wake for, were it to sleep as long as it can.
     let mut needs = if fed { now + MEAL_TICKS } else { hungry_at };
     let grown_at = sheep.get(LAMB);
+    // The lamb it put beside it last tick stands there, and is born; or its cell was taken first, and it is pregnant still.
+    if let Some(bearing) = sheep.unset(BEARING) {
+        let born = around::cell(at, bearing.neighbour).is_some_and(|cell| entities::stands(turn, EntityId(bearing.lamb), cell));
+        if born {
+            sheep.unset(PREGNANT);
+            done[BIRTHS] += 1;
+        }
+    }
+    // Whether it put a lamb this tick: it stays, and wakes the next to see it.
+    let mut bearing = false;
     match sheep.get(PREGNANT) {
         Some(due) if now < due => needs = needs.min(due),
-        // Its lamb is born on a cell seen free beside it; with none, it waits a step's time more.
+        // Its lamb is put on a cell seen free beside it; with none, it waits a step's time more.
         Some(_) => match around::free_beside(turn, at, steppable) {
             Some(beside) => {
-                sheep.unset(PREGNANT);
-                // The lamb's cell is no longer one to step to.
-                steppable &= !(1 << beside);
                 let (cell, wake) = (around::cell(at, beside).expect("a hot neighbour is in the world"), next_step(turn));
-                entities::spawn(turn, SHEEP, cell, wake, &[AttributeBlock::holding(HUNGRY_AT, now + MEAL_TICKS), AttributeBlock::holding(LAMB, now + LAMB_TICKS)]);
-                done[BIRTHS] += 1;
+                let lamb = entities::spawn(turn, SHEEP, cell, wake, &[AttributeBlock::holding(HUNGRY_AT, now + MEAL_TICKS), AttributeBlock::holding(LAMB, now + LAMB_TICKS)]);
+                sheep.set(BEARING, Bearing { lamb: lamb.0, neighbour: beside });
+                bearing = true;
             }
             None => needs = now,
         },
@@ -133,7 +141,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         None => {}
     }
     // Hungry, it walks; satisfied, it stays, and sleeps until it needs something.
-    let way = if !hungry {
+    let way = if !hungry || bearing {
         None
     } else if let Some(roaming) = roaming {
         // On the way it set off, until its time is up or it comes to the edge of the hot superchunks.
@@ -159,7 +167,13 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         }
     };
     let to = way.and_then(|way| around::cell(at, way)).unwrap_or(at);
-    let wake = if hungry { next_step(turn) } else { next_step(turn).max(needs + turn.random().below(STEP_JITTER)) };
+    let wake = if bearing {
+        now + 1
+    } else if hungry {
+        next_step(turn)
+    } else {
+        next_step(turn).max(needs + turn.random().below(STEP_JITTER))
+    };
     // Old age comes by the tick, not the wake: a long sleep is as much of a life as many short ones.
     if turn.random().below(LIFE_TICKS) < wake - now {
         entities::remove(turn, sheep.header());

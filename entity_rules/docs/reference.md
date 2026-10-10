@@ -5,8 +5,9 @@ The design is in `entity_rules.md`.
 ## `sheep.rs`
 
 `SHEEP`, and its attributes `HUNGRY_AT`, `PREGNANT`, `LAMB`, each a
-tick, and `ROAMING`, the tick it roams until and which way
-(`Roaming`);
+tick, `ROAMING`, the tick it roams until and which way
+(`Roaming`), and `BEARING`, the lamb it put last tick and where
+(`Bearing`);
 `STEP_TICKS` (64) and `STEP_JITTER` (16) between a walking sheep's
 steps, `MEAL_TICKS` (6,912), `STARVE_TICKS` (13,824),
 `LUSH_CELLS` (64, of the area's 256), `CONCEIVE_ONE_IN` (5),
@@ -17,8 +18,9 @@ steps, `MEAL_TICKS` (6,912), `STARVE_TICKS` (13,824),
 what it woke for and sleeps as long as it can. Hungry (past
 `HUNGRY_AT`) and on grass, it eats it, and is hungry again `MEAL_TICKS`
 on; hungry `STARVE_TICKS` with no meal, it dies. Its lamb due, it is
-born on a cell seen free beside it (`around::free_beside`),
-or waited for; it falls pregnant on a meal on lush pasture
+put on a cell seen free beside it (`around::free_beside`), or waited
+for, and born the tick after if it stands there (`BEARING`,
+`entities::stands`), else put again; it falls pregnant on a meal on lush pasture
 (`LUSH_CELLS` of the area about it grass, `Area::count`; one in
 `CONCEIVE_ONE_IN`) if grown; a meal on pasture not lush, it is `ROAMING`
 -- when next hungry it walks one way for `ROAM_TICKS`, eating nothing,

@@ -126,14 +126,16 @@ a tick's counts against the cells that changed:
 | two trees put on one cell | yes | one tree; both counted |
 | a tree put on a cell, the tree there dying | no: a tree is put where none stood | |
 | two entities stepping onto one cell | yes | the first applied takes it, the other stays where it stood and wakes as it was to |
-| two lambs born onto one cell | yes | the first applied is made, the second refused: **a lamb lost**, its birth counted and its mother pregnant no more |
+| two lambs put on one cell, or a lamb put where another sheep steps | yes | the first applied takes the cell, the lamb put after is refused -- and born later: its mother is pregnant until she has seen it stand (`../../entity_rules/docs/entity_rules.md`, "The sheep") |
 | two entities setting one attribute of a third | yes (no rule does yet) | the later applied is kept, the same one on any number of threads (`../../simulation/tests/fine/instructions.rs`) |
 
 No pair leaves a cell or an entity differing by the order threads ran
 in: writes of one kind on a cell come to the same whichever is first,
 and instructions are applied in one order. What is off is the counts --
-a spread, a decay or a birth counted that changed nothing -- and the
-lamb, which its mother cannot know was refused.
+a spread or a decay counted that changed nothing. A lamb refused was
+once lost, its birth counted and its mother pregnant no more: a rule
+cannot know in the tick what the second phase refuses, so the mother
+looks the tick after.
 
 ## Saved and loaded
 
