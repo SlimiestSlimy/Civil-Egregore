@@ -214,31 +214,43 @@ fn attributes_edited_in_any_order_are_those_last_set() {
     assert!((was.header, was.attributes) == (is.header, is.attributes));
 }
 
-/// A new entity put on the first free of some cells takes its own if
-/// it is free, the first free of the others if not -- those of
-/// another superchunk passed by -- and is refused only when every one
-/// is taken. An instruction for an entity that is not there is passed
-/// over, and counted.
+/// An entity is named, all a tick long, by the cell the tick found it
+/// on: an attribute written to it after it moved lands on it where it
+/// now stands, as does its removal; and that cell is no other's until
+/// the tick is over -- one stepping to it stays, one new is refused.
+/// Each instruction is applied as it is come to, none before another
+/// for its kind. An instruction for an entity that is not there is
+/// passed over, and counted.
 #[test]
-fn a_new_entity_is_put_on_the_first_free_cell() {
+fn an_entity_is_named_by_the_cell_the_tick_found_it_on() {
     let mut entities = world();
     let (wanted, second, third) = (cell(40, 30), cell(41, 30), cell(42, 30));
-    // Past the superchunk's west edge: in another superchunk.
-    let outside = cell(0, 30).offset(-1, 0).expect("in the world");
-    let apply = |entities: &mut Entities, id: u64, others: &[CellIndex]| {
-        let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
-        queue.put_on_the_first_free(walker(id, wanted), others, &[]);
-        queue.apply(entities.superchunks_mut(), 0, &mut applied);
-        (applied.puts, applied.beside, applied.refused)
-    };
-    assert_eq!(apply(&mut entities, 1, &[second, third]), (1, 0, 0));
-    assert_eq!(apply(&mut entities, 2, &[outside, second, third]), (1, 1, 0));
-    assert_eq!(apply(&mut entities, 3, &[second, third]), (1, 1, 0));
-    assert_eq!(apply(&mut entities, 4, &[outside, second, third]), (0, 0, 1));
-    for (id, at) in [(1, wanted), (2, second), (3, third)] {
-        assert_eq!(entities.get(EntityId(id), at).map(|entity| entity.header.at), Some(at));
-    }
-    assert_eq!(entities.len(), 3);
+    entities.queue_put(walker(1, wanted), &[]);
+    entities.queue_put(walker(2, second), &[]);
+    entities.apply();
+    let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
+    queue.move_entity(walker(1, third), wanted);
+    queue.set_attribute(EntityId(1), wanted, NAME, 7);
+    queue.move_entity(walker(2, wanted), second);
+    queue.put(walker(3, wanted), wanted, &[]);
+    queue.apply(entities.superchunks_mut(), 0, &mut applied);
+    assert_eq!((applied.moves, applied.edits, applied.stayed, applied.refused, applied.passed_over), (2, 1, 1, 1, 0));
+    assert_eq!(entities.get(EntityId(1), third).and_then(|moved| moved.attribute(NAME)), Some(7), "written where it moved to");
+    assert!(entities.get(EntityId(2), second).is_some() && entities.len() == 2, "the cell left is no other's this tick");
+    // Still the same tick: removed by the name it has in it, and nothing written to it after.
+    let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
+    queue.remove(EntityId(1), wanted);
+    queue.set_attribute(EntityId(1), wanted, NAME, 8);
+    queue.apply(entities.superchunks_mut(), 0, &mut applied);
+    assert_eq!((applied.removes, applied.passed_over, entities.len()), (1, 1, 1));
+    // The tick over, the cells are whoever comes to them.
+    entities.superchunks_mut().iter_mut().for_each(entity_manager::SuperchunkEntities::names_anew);
+    let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
+    queue.put(walker(3, wanted), wanted, &[]);
+    queue.put(walker(4, third), third, &[]);
+    queue.apply(entities.superchunks_mut(), 0, &mut applied);
+    assert_eq!((applied.puts, entities.len()), (2, 3));
+    entities.superchunks_mut().iter_mut().for_each(entity_manager::SuperchunkEntities::names_anew);
 
     let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
     queue.remove(EntityId(9), wanted);

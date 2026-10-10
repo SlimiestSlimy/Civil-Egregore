@@ -19,7 +19,9 @@ and their instructions; `conditional.rs` the compare-and-writes . What a rule ma
 `../../instructions/`.
 
 **`Outbox`**: nine `Instructions` and nine
-`Conditional`, by **`slot(dx, dy)`**.
+`Conditional`, by **`slot(dx, dy)`**, and for each where every
+author's part of the two begins (`segments`, a **`Segment`**
+`{author, steps, instructions}` each).
 
 **`Turn`**: a superchunk's turn in the first phase:
 **`superchunk`**, **`random`**, **`now`**, **`sample(type, chance,
@@ -38,9 +40,7 @@ the turn, so instructions can be queued while going through them;
 width, height)`** (the cells entities stand on, up to `OCCUPIED_SIDE`
 each way, a row a word: cell `(x, y)` from `origin` at bit `x` of row
 `y`). Entities written:
-**`new_id`**; **`put_on_the_first_free(header, others,
-attributes)`**: a new entity on its cell, or the first free of some
-others; **`put(header, attributes)`**: an entity made or changed
+**`new_id`**; **`put(header, attributes)`**: an entity made or changed
 where it stands, waking after this tick; **`update(before, after,
 attributes)`**: changed, and moved to its cell if that is free --
 staying if not; passed over if no longer where the tick found it -- or,
@@ -54,7 +54,11 @@ the rule's instructions are under holds too; `update` is these, one
 for each attribute changed (`set_attributes_changed`), then a move --
 or, to another superchunk, `cross`: put there whole, asleep where it
 stood, settled after; **`remove(header)`**.
-**`slot_of`**: the slot of a superchunk, past the neighbours panicking.
+**`slot_of`**: the slot of a superchunk, past the neighbours panicking;
+`slot_queued`: the same for something about to be queued, beginning
+the author's segment there. **`seeing_to(at)`**: the rule is seeing to
+what is on a cell -- the `author` of what it queues from here on
+(`simulation.md`, "One order, wherever the borders fall").
 `SLOTS` (9): an outbox's slots. A turn's fields: its `superchunk`, its
 `entities`, `now`, the thread's `reader` and `entity_reader`, its
 `outbox`, its `random`, the compare its instructions are queued
@@ -85,9 +89,9 @@ count's number, under `COUNTED_WHEN_APPLIED` (256) --
 (`NO_COUNT`: none). `Does`: what a step does -- `Write` (with what was `seen` at the cell),
 `Instructions {first, last}`, `Count`; `Step` `{compare, also, does,
 before}`; `Conditional` `{steps}`, what is queued for one superchunk
--- `clear`, `count_missed`, and `apply(superchunk, entities,
-instructions, earliest, applied)`: instructions and steps in the order
-queued. `queue_step(compare, lands, does)`: a step queued, its compare
+-- `clear`, `len`, `count_missed`, and `apply(steps, queued, superchunk,
+entities, instructions, earliest, applied)`: one author's instructions
+and steps in the order queued. `queue_step(compare, lands, does)`: a step queued, its compare
 in the superchunk it lands in. `Applied`: what a thread applied in the
 second phase.
 
@@ -184,7 +188,7 @@ applying}` -- `instructions_compared` the runs of instructions under a
 compare applied, and those refused.
 
 **`threads_for(superchunks)`**: every thread the machine has, no more
-than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived, turned_back}`:
+than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived, settled}`:
 the threads, and what a tick reuses -- an outbox a superchunk, room for
 samples a thread, each superchunk's random stream, and the entities
 crossed into each in a tick -- so a tick allocates nothing once they
@@ -201,14 +205,17 @@ seed, rule)`**: the entities aligned to the arena's superchunks (those
 dropped counted lost); the superchunks claimed by the threads one at a
 time (`CLAIMED`); the first phase runs the rule on each, a `Reader` a
 thread; the second, each thread the superchunks it claims and
-their entities, passes each wheel's tick, then applies every outbox's
-instructions and compare-and-writes; writes to superchunks not in use counted
+their entities, passes each wheel's tick, then applies what the nine
+outboxes hold for it, segment by segment in the order of their authors
+(`simulation.md`, "One order, wherever the borders fall"); writes to superchunks not in use counted
 missed (`Conditional::count_missed`), entities put there lost; the crossings settled
-(**`settle_crossings`**: each superchunk's arrivals taken, then each
+(**`settle_crossings`**, in `tick/crossings.rs`: each superchunk's arrivals taken, then each
 thread its run of superchunks, each removing its leavers from its
-neighbours' arrivals but for those written there meanwhile, which go
-to `turned_back` -- a `LeaversPart` a thread -- and each then taking
-back what it put of those: how many); the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
+neighbours' arrivals and noting what those written there meanwhile
+ended with, and those removed there, in its `Settled` -- a
+`LeaversPart` a thread -- each then giving the ones it was put what
+they have and taking back those turned back, how many; and every
+entity named anew); the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
 offsets in a fixed order.
 
 ## `transient_data.rs`

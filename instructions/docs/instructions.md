@@ -76,7 +76,8 @@ finds a way over, its side the same (asserted where the two meet).
 
 A rule is written for one cell or one entity: `cells::each_sampled`
 and `entities::each_woken` go over them, inlined into the rule, so the
-loop costs nothing. `each_woken` hands each entity waking, in Morton
+loop costs nothing; each says, as it comes to a cell or an entity,
+that the rule is seeing to it ("The same wherever the borders fall"). `each_woken` hands each entity waking, in Morton
 order by cell, with a state of the rule's -- what it counts, and
 whatever it keeps from one entity to the next -- and asks memory, a few
 wakes ahead, for the cells of the layers the rule says it reads
@@ -167,8 +168,47 @@ guarantees:
 - two writing two attributes of one entity both do; two writing one,
   the first applied does and the other is refused;
 - which is first is fixed, the same on any number of threads;
-- an entity crossing to another superchunk in the tick it is written
-  is turned back, and stays where it stood with what was written.
+- which is first does not hang on where the borders fall either: it
+  is the order of the writers' cells, read as a page is;
+- an entity moving in the tick it is written is written all the same,
+  where it now stands, and one crossing to another superchunk crosses
+  with what was written.
+
+## The same wherever the borders fall
+
+A world shifted is the same world. What an entity does must not hang
+on which chunk or superchunk it stands in, nor on a border running
+between it and what it acts on: the borders are how the world is
+kept, not something in it. Three things make it so
+(`../../simulation/docs/simulation.md`, "One order, wherever the
+borders fall"; `../../entity_manager/docs/entity_manager.md`,
+"Instructions", An entity's name in a tick):
+
+- what is queued is applied in the order of its authors' cells over
+  the whole world -- `each_woken` and `cells::each_sampled` say whom
+  the rule is seeing to (`Turn::seeing_to`) -- not in the order
+  superchunks are gone over in;
+- an entity is named, all a tick long, by the cell the tick found it
+  on, so a write finds it though it moved, and a cell stood on as the
+  tick began is no other's that tick;
+- an entity crossing a border takes with it what was written to it.
+
+The test of it (`../tests/fast/shifted.rs`) puts one flock on two
+worlds, on the second some cells east and south so that other borders
+cross it, ticks both, and holds every cell and every walker to be the
+same seen from the flock, tick after tick. All the test needs is in
+the test: the shift, a rule of its own -- walkers that die, eat, lay
+stone, write their neighbours, make others and step blind onto each
+other's cells, over and along the borders -- and one generator
+(`utilities::rng::Rng`) every chance in that rule is read from, by the
+tick and the walker, so that chance is the same in both worlds and
+what differs is the simulation's doing. Nothing outside the test is
+made for it.
+
+Not so yet, and not in the test: what draws from a superchunk's own
+random stream -- the sampling of cells, a sheep's lot, a new entity's
+ID -- is another draw where the borders fall otherwise; and a compare
+must still be in the superchunk of what it lets be written.
 
 ## Rules ask instructions, and nothing else
 
@@ -191,13 +231,11 @@ removed as if already its own, nothing copied until one is changed, and
 was, else a write of each attribute changed before it. A rule states what the entity is to be; what that costs is
 not its concern.
 
-**What must be made** (`entities::spawn_beside`): a new entity's cell
-may be taken between the rule seeing it free and the put being applied.
-One that must not be lost is put beside a cell with the neighbours it
-may stand on instead: the one wanted, else the first free of the
-others, as the put is applied; where it came to stand is asked the
-tick after (`entities::stands_beside`). A write tolerates what the
-rule could not see, where it can: the rule is not bent round it.
+**What must be made** (`entities::spawn`): a new entity's cell
+may be taken between the rule seeing it free and the put being applied,
+and the put is then refused -- nothing is put elsewhere for it. A rule
+that must not lose it asks the tick after whether it stands there
+(`entities::stands_beside`), and puts it again if not.
 
 **The cells beside it** (`around`): the 3x3 about a cell as nine bits,
 read in one window (`around::layer`); sets of neighbours are

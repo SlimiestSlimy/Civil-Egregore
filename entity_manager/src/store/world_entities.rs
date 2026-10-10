@@ -113,6 +113,7 @@ impl Entities {
         self.queued.clear();
         let now = self.now;
         self.superchunks.iter_mut().for_each(|superchunk| superchunk.sort_wakes(now));
+        self.superchunks.iter_mut().for_each(SuperchunkEntities::names_anew);
         applied
     }
 

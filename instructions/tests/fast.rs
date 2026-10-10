@@ -13,3 +13,6 @@ mod area;
 
 #[path = "fast/mask.rs"]
 mod mask;
+
+#[path = "fast/shifted.rs"]
+mod shifted;

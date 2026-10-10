@@ -145,12 +145,11 @@ fn a_lamb_refused_its_cell_is_born_later() {
     assert!(world.entities().iter().all(|sheep| sheep.attribute(BEARING).is_none()));
 }
 
-/// Two lambs put on one cell in a tick, another cell free beside both
-/// mothers: whichever cell each drew, both lambs are made that tick --
-/// the second on the other cell if its own was taken first -- and both
-/// born the tick after.
+/// Two mothers bearing in one tick, two cells free between them:
+/// whichever cell each drew, both lambs are born -- at once, or, the
+/// two having drawn one cell, the second a tick on, on the other.
 #[test]
-fn a_lamb_whose_cell_was_taken_is_put_beside_it() {
+fn a_lamb_whose_cell_was_taken_is_put_the_tick_after() {
     let mut world = plain_world(1, 0, 0, 1);
     let (x, y) = (500, 500);
     for (id, mother) in [x, x + 2].into_iter().enumerate() {
@@ -164,7 +163,8 @@ fn a_lamb_whose_cell_was_taken_is_put_beside_it() {
         put_entity(&mut world, header, &[AttributeBlock::holding(HUNGRY_AT, 0)]);
     }
     let made = tick_sheep(&mut world).instructions_applied;
-    assert_eq!((made.refused, world.entities().iter().filter(|sheep| sheep.attribute(LAMB).is_some()).count()), (0, 2));
-    assert_eq!(tick_sheep(&mut world).rules[BIRTHS], 2);
+    assert_eq!(made.refused + world.entities().iter().filter(|sheep| sheep.attribute(LAMB).is_some()).count(), 2, "each made, or refused its cell");
+    let births: u64 = (0..4).map(|_| tick_sheep(&mut world).rules[BIRTHS]).sum();
+    assert_eq!(births, 2);
     assert!(world.entities().iter().all(|sheep| sheep.attribute(PREGNANT).is_none() && sheep.attribute(BEARING).is_none()));
 }

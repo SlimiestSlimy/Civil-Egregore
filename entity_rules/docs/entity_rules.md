@@ -121,10 +121,7 @@ it, so a sheep due to bear at a meal bears at its next wake.
 
 **A lamb is born once it is seen.** A lamb is put on a cell seen free,
 which another lamb or a stepping sheep may take first in the same
-tick. Two things keep it from being lost. The put names the other
-neighbours its mother may step to, and the lamb is made on the first
-of them free if its own cell was taken (`entities::spawn_beside`). And
-should every one be taken, the put refused, nothing in the tick tells
+tick. The put refused, nothing in the tick tells
 its mother: so she does not take the put for a birth. She notes the
 lamb (`BEARING`, its ID), stays where she is, and wakes the next tick:
 the lamb standing beside her (`entities::stands_beside`), it is born --
