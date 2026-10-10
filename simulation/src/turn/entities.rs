@@ -1,8 +1,9 @@
 //! The entities in a turn: those woken, any in reach read, and the
 //! instructions queued for them.
 
+use super::conditional::Compare;
 use super::{slot, Turn};
-use entity_manager::{Attribute, AttributeBlock, AttributeType, EntityId, EntityRef, Header, Layout, SuperchunkEntities, OCCUPIED_SIDE};
+use entity_manager::{Attribute, AttributeBlock, EntityId, EntityRef, Header, Layout, SuperchunkEntities, OCCUPIED_SIDE};
 use bitplane_manager::Reader;
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, ChunkIndex};
@@ -84,28 +85,35 @@ impl<'a> Turn<'a> {
         }
     }
 
-    /// Queues setting `attribute` of `entity` -- any
-    /// entity in reach, the rule's own or another -- to `value`. An
-    /// entity changing itself whole is [`Turn::update`]d;
-    /// this is one entity acting on another: only the one attribute is
-    /// written, so two acting on one in a tick do not undo each other.
-    pub fn set_attribute<L: Layout>(&mut self, entity: &Header, attribute: Attribute<L>, value: L) {
-        let slot = self.slot_of(entity.at.superchunk());
-        self.outbox.instructions[slot].set_attribute(entity.id, entity.at, attribute, value);
+    /// Queues setting `attribute` of `entity` -- another than the
+    /// rule's own, any in reach -- to `value`, if it is still the
+    /// `seen` the rule read of it, or it still has none: a
+    /// compare-and-write, so of two setting one attribute in a tick
+    /// the first applied does and the other is refused. Whether it was
+    /// queued: not if the entity wakes this tick, for then it writes
+    /// itself whole ([`Turn::update`]) from what it was, and one of the
+    /// two would be lost -- it is asked again another tick. Of an
+    /// attribute one block long.
+    pub fn set_attribute<L: Layout>(&mut self, entity: &Header, attribute: Attribute<L>, seen: Option<L>, value: L) -> bool {
+        if entity.wake <= self.now {
+            return false;
+        }
+        let compare = Compare::Attribute { id: entity.id, at: entity.at, kind: attribute.attribute_type(), seen: seen.map(|seen| AttributeBlock::holding(attribute, seen)) };
+        self.queue_instruction_if(compare, entity.at, |instructions| instructions.set_attribute(entity.id, entity.at, attribute, value));
+        true
     }
 
-    /// [`Turn::set_attribute`], the attribute given as its blocks: how
-    /// one whose size varies is set.
-    pub fn set_attribute_blocks(&mut self, entity: &Header, attribute: &[AttributeBlock]) {
-        let slot = self.slot_of(entity.at.superchunk());
-        self.outbox.instructions[slot].set_attribute_blocks(entity.id, entity.at, attribute);
-    }
-
-    /// Queues removing the attribute of type `kind` of `entity`, any in
-    /// reach.
-    pub fn unset_attribute(&mut self, entity: &Header, kind: AttributeType) {
-        let slot = self.slot_of(entity.at.superchunk());
-        self.outbox.instructions[slot].unset_attribute(entity.id, entity.at, kind);
+    /// Queues removing `attribute` of `entity`, another in reach, if
+    /// it is still the `seen` the rule read of it: whether it was
+    /// queued, as [`Turn::set_attribute`] is.
+    pub fn unset_attribute<L: Layout>(&mut self, entity: &Header, attribute: Attribute<L>, seen: L) -> bool {
+        if entity.wake <= self.now {
+            return false;
+        }
+        let kind = attribute.attribute_type();
+        let compare = Compare::Attribute { id: entity.id, at: entity.at, kind, seen: Some(AttributeBlock::holding(attribute, seen)) };
+        self.queue_instruction_if(compare, entity.at, |instructions| instructions.unset_attribute(entity.id, entity.at, kind));
+        true
     }
 
     /// Queues `before`'s entity becoming `after`, with `attributes`:

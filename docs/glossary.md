@@ -76,8 +76,7 @@ what they always do and are not listed.
 | **hot file** | a save's file naming its hot superchunks, and its cooling and warming ones with their due ticks (`HotSuperchunks`): made hot before a loaded world ticks | save, hot, cooling, warming | |
 | **shared image** | an image in the cold pool held behind a reference count, so a thread reads it as it was while the pool changes (`ChunkStorage::shared_image`) | image, jond | |
 | **paged** | of an image of the cold pool: written to disk and let go from memory, the pool keeping only where it is, read back when its superchunk warms -- **paged out** past the bytes the pool keeps in memory (`ChunkStorage::page_out`); the folder a running world pages to is its **paging folder** | image, cold pool, cold | swapped, evicted, unloaded |
-| **compare-and-write** | a write to a cell that says what its rule saw there and is applied only if the cell still holds it -- **refused** otherwise, nothing happening, and counted (`Turn::queue_seen`; `cells::set`, `clear`, `set_value`) | write, group, tick | conditional write, CAS |
-| **group** | several things a rule queues as one -- compare-and-writes, entity instructions, counts -- applied all if every cell written is as the rule saw it, none otherwise; lands in one superchunk (`groups::start`, `groups::end`) | compare-and-write, instruction | transaction, batch |
+| **compare-and-write** | a write that says what its rule saw -- of the cell written, of another cell, or of an entity (a **compare**, `Compare`) -- and is applied only if that still holds when the write is come to: **refused** otherwise, nothing happening, and counted. A cell written -- always held against what was seen at that cell too, so no write lands on another's -- what an entity comes to, or a count (`Turn::queue_if`; `cells::set`, `clear`, `set_value`; `compare`) | write, instruction, tick | conditional write, CAS, group, transaction |
 | **dirty** | a hot layer changed since it was decoded: it must be written back before it is evicted | write back | |
 
 ## Storage
@@ -128,7 +127,8 @@ what they always do and are not listed.
 | **reach** | how far an entity's rule reads and acts: up to the speed of light | speed of light | |
 | **outbox** | a superchunk's queues of writes and instructions, a slot each for itself and its eight neighbours | write, instruction, slot | |
 | **slot** | one entry of a fixed array kept for a purpose: an outbox's, a neighbour each; the wheel's, a tick each; a hash table's, by a hash (`utilities::hash::slot`) | outbox, wheel, lookup | place |
-| **write** | a change to cells, queued in the first phase and applied in the second: an operation on a shape, at a cell (`Write`) | outbox, apply | command |
+| **write** | a change to cells: an operation on a shape, at a cell (`Write`), as the world is written between ticks. In a tick a rule writes a cell at a time, each a compare-and-write, queued in the first phase and applied in the second | outbox, apply, compare-and-write | command |
+| **write-after-write hazard** | two writes of one thing in one tick, the later landing on the first and what the first did lost, neither rule having seen the other. A tick has none: every write says what was seen of what it writes (`../simulation/docs/simulation.md`, "No write lands on another's") | compare-and-write, refused | WAW, lost update, race |
 | **apply** | carry out a write or an instruction, in the second phase | write, instruction | carry out, execute |
 | **missed** | a write landing where no layer is hot: counted, and lost | write, lost | |
 | **dispatcher** | the threads, started once and kept (`utilities::dispatcher::Dispatcher`): each runs a part of a job run, or a job queued; one set of them a world, the tick's and chunk storage's alike | part, job | thread pool, background |
@@ -218,7 +218,6 @@ what they always do and are not listed.
 | **reset** | the world run made again from its start, generated as the sliders now have it: a world of its own of no name, the view left where it is (`Host::reset`) | world start, tuning, host | regenerate, reload, restart |
 | **slider** | one number of the tuning, set by a knob dragged or a value typed (`gui::sliders`; `utilities/sliders.csv`) | tuning, group | knob (a slider's part only) |
 | **toggle** | a slider that is only on or off, turned by a click: its `kind` in the sliders' file (`Tuned::toggle`) | slider, tuning | checkbox, switch, flag |
-| **group** | sliders shown together: shading, one of how a world is generated, or the world's own, read only when one is made (`utilities::tuning::Group`) | slider | tab, page |
 | **world start** | every number a new world starts from -- seed, generation, size, forced hot, sheep, threads, hot entity, camera loading -- whoever gives them (`server::Start`); the server alone knows what they mean | tuning, forced hot, hot entity, world's size | world options, lab |
 | **host** | a world run on a thread of its own for a window, which calls it (`server::host::Host`) and is answered with the cells of its viewport's hot superchunks (`Frame`) | world start | sim, simulation thread |
 | **worlds' folder** | where worlds are kept unless a path is given: `worlds` in the folder `Civil Egregore`, or what the setting `worlds` names (`utilities::settings::worlds`) | save, settings | |

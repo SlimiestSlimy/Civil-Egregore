@@ -8,7 +8,7 @@ mod entities;
 
 use entity_manager::{EntityReader, Instructions, SuperchunkEntities};
 use crate::sampling::sample_layer;
-use bitplane_manager::{NotHot, Reader, Shape, Superchunk, Window, Write, WriteQueues};
+use bitplane_manager::{NotHot, Reader, Superchunk, Window};
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::{CellIndex, SuperchunkIndex};
 use utilities::chance::Chance;
@@ -23,18 +23,14 @@ pub(crate) fn slot(dx: i32, dy: i32) -> usize {
     ((dy + 1) * 3 + dx + 1) as usize
 }
 
-/// The writes and instructions a superchunk's rule queues in a tick, by
+/// The instructions and compare-and-writes a superchunk's rule queues in a tick, by
 /// the superchunk they land in: itself, or one of its eight neighbours.
 #[derive(Default)]
 pub(crate) struct Outbox {
-    /// Writes, a queue a superchunk, by [`slot`].
-    pub(crate) writes: [WriteQueues; SLOTS],
     /// Instructions, a queue a superchunk, by [`slot`].
     pub(crate) instructions: [Instructions; SLOTS],
-    /// Compare-and-writes and groups, a queue a superchunk, by [`slot`].
+    /// What is queued under compares, a queue a superchunk, by [`slot`].
     pub(crate) conditional: [conditional::Conditional; SLOTS],
-    /// The counts of the group being queued, until it is ended.
-    pub(crate) group_counts: Vec<u32>,
 }
 
 /// One superchunk's turn in a tick's first phase: what the rule sees and
@@ -56,8 +52,10 @@ pub struct Turn<'a> {
     pub(crate) outbox: &'a mut Outbox,
     /// The superchunk's random numbers this tick.
     pub(crate) random: Rng,
-    /// The group being queued, if one is.
-    pub(crate) open: Option<conditional::OpenGroup>,
+    /// The compare the entity instructions being queued are under, if
+    /// any, and how many each slot of the outbox held when those not
+    /// yet made a step began.
+    pub(crate) comparing: Option<(conditional::Compare, [u32; SLOTS])>,
     /// The number the rule's first count is counted under when
     /// applied ([`Turn::count_under`]).
     pub(crate) counted_from: u32,
@@ -125,22 +123,6 @@ impl<'a> Turn<'a> {
         self.reader.tiles_holding(layer_type, cell)
     }
 
-    /// Queues `write` to `layer_type`'s bitplane, applied in the second
-    /// phase by every superchunk it lands in. A write landing beyond the
-    /// superchunks next to this one is past the speed of light, and a
-    /// bug.
-    pub fn queue(&mut self, layer_type: LayerType, write: Write) {
-        if write.shape == Shape::Cell {
-            let slot = self.slot_of({ write.at }.superchunk());
-            self.outbox.writes[slot].push(layer_type, write);
-            return;
-        }
-        for superchunk in write.superchunks() {
-            let slot = self.slot_of(superchunk);
-            self.outbox.writes[slot].push(layer_type, write);
-        }
-    }
-
     /// The tick running.
     pub fn now(&self) -> u64 {
         self.now
@@ -149,12 +131,17 @@ impl<'a> Turn<'a> {
     /// The outbox slot of `superchunk`: this one or a neighbour. Farther
     /// is past the speed of light, and a bug.
     pub(crate) fn slot_of(&self, superchunk: SuperchunkIndex) -> usize {
-        if superchunk == self.superchunk.index() {
-            return slot(0, 0);
-        }
-        let ((x, y), (to_x, to_y)) = (self.superchunk.index().cartesian(), superchunk.cartesian());
-        let (dx, dy) = (to_x as i64 - x as i64, to_y as i64 - y as i64);
-        assert!(dx.abs() <= 1 && dy.abs() <= 1, "a write {dx}, {dy} superchunks away: past the speed of light");
-        slot(dx as i32, dy as i32)
+        slot_between(self.superchunk.index(), superchunk).unwrap_or_else(|| panic!("a write more than a superchunk away: past the speed of light"))
     }
+}
+
+/// The outbox slot, in the outbox of the superchunk `from`, of the
+/// superchunk `to`: itself or a neighbour, none farther.
+pub(crate) fn slot_between(from: SuperchunkIndex, to: SuperchunkIndex) -> Option<usize> {
+    if to == from {
+        return Some(slot(0, 0));
+    }
+    let ((x, y), (to_x, to_y)) = (from.cartesian(), to.cartesian());
+    let (dx, dy) = (to_x as i64 - x as i64, to_y as i64 - y as i64);
+    (dx.abs() <= 1 && dy.abs() <= 1).then(|| slot(dx as i32, dy as i32))
 }

@@ -105,9 +105,10 @@ fn a_step_onto_a_taken_cell_is_turned_back() {
     assert!(entities.get(EntityId(2), cell(41, 30)).is_some());
 }
 
-/// Entities edit another, an attribute each, in one tick: both land,
-/// neither undoing the other, and the one edited keeps what it had and
-/// when it wakes. An attribute is removed the same way.
+/// Entities edit another, an attribute each, in one tick, each saying
+/// what it saw of it: both land, neither undoing the other, and the
+/// one edited keeps what it had and when it wakes. An attribute is
+/// removed the same way. One awake this tick is not edited.
 #[test]
 fn entities_edit_another_an_attribute_at_a_time() {
     let (mut arena, mut entities) = world(2);
@@ -121,12 +122,13 @@ fn entities_edit_another_an_attribute_at_a_time() {
     let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
             let kind = if entity.header.id == EntityId(1) { MARK } else { SCAR };
-            turn.set_attribute(&target, kind, entity.header.id.0);
+            assert!(turn.set_attribute(&target, kind, None, entity.header.id.0));
+            assert!(!turn.set_attribute(&entity.header, kind, None, 0), "one awake this tick writes itself: not another's to edit");
             turn.step(&entity.header, entity.header.at, NEVER);
         }
         0
     });
-    assert_eq!((report.instructions_applied.edits, report.instructions_applied.puts), (2, 0));
+    assert_eq!((report.instructions_applied.edits, report.instructions_applied.puts, report.instructions_compared), (2, 0, (2, 0)));
     let edited = entities.get(target.id, target.at).expect("where it stood");
     assert_eq!(edited.attributes, [AttributeBlock::holding(NAME, 7), AttributeBlock::holding(MARK, 1), AttributeBlock::holding(SCAR, 2)]);
     assert_eq!(edited.header, target);
@@ -135,8 +137,8 @@ fn entities_edit_another_an_attribute_at_a_time() {
     entities.apply();
     simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
-            turn.unset_attribute(&target, MARK.attribute_type());
-            turn.set_attribute(&target, NAME, 8);
+            assert!(turn.unset_attribute(&target, MARK, 1));
+            assert!(turn.set_attribute(&target, NAME, Some(7), 8));
             turn.step(&entity.header, entity.header.at, NEVER);
         }
         0
@@ -145,11 +147,12 @@ fn entities_edit_another_an_attribute_at_a_time() {
     assert_eq!(edited.attributes, [AttributeBlock::holding(NAME, 8), AttributeBlock::holding(SCAR, 2)]);
 }
 
-/// Two entities setting one attribute of a third in one tick: one of
-/// the two is kept -- the later applied -- and the same one on any
-/// number of threads.
+/// Two entities setting one attribute of a third in one tick, both
+/// having seen it unset: the first applied is kept and the other
+/// refused -- neither written over -- the same one on any number of
+/// threads.
 #[test]
-fn two_edits_of_one_attribute_keep_the_same_one_on_any_threads() {
+fn of_two_edits_of_one_attribute_one_is_refused_the_same_on_any_threads() {
     let kept = [1, 4].map(|threads| {
         let (mut arena, mut entities) = world(2);
         // The one edited, and the two editing it from the two superchunks beside its border.
@@ -160,12 +163,12 @@ fn two_edits_of_one_attribute_keep_the_same_one_on_any_threads() {
         entities.apply();
         let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             for entity in turn.woken() {
-                turn.set_attribute(&target, NAME, entity.header.id.0);
+                turn.set_attribute(&target, NAME, None, entity.header.id.0);
                 turn.step(&entity.header, entity.header.at, NEVER);
             }
             0
         });
-        assert_eq!(report.instructions_applied.edits, 2);
+        assert_eq!((report.instructions_applied.edits, report.instructions_compared), (1, (1, 1)));
         entities.get(target.id, target.at).expect("where it stood").attribute(NAME).expect("set")
     });
     assert!(kept[0] == kept[1] && [1, 2].contains(&kept[0]), "{kept:?}");

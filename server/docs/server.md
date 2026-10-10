@@ -129,7 +129,7 @@ A rule's counts come from two places. What it counts as it runs is
 what its function returns. What hangs on a write being applied -- a
 spread, a decay, a meal, a birth seen at a meal -- the simulation
 counts as it applies it (`../simulation/docs/simulation.md`,
-"Compare-and-write and groups"), under numbers: a turn gives each rule
+"Compare-and-write"), under numbers: a turn gives each rule
 its own (`Turn::count_under`, a rule's place times
 `COUNTS_OF_A_RULE`), and after the tick they are added to the rule's
 counts (`rules::with_counts_applied`). So a count is what happened.
@@ -160,10 +160,10 @@ where a person looks, which no seed says.
 Rules read the world as the tick found it and queue their writes, so
 two may be queued for one cell in a tick. Every cell a rule writes is
 a compare-and-write, applied only if the cell is still as the rule saw
-it, and what hangs on it is grouped with it
-(`../simulation/docs/simulation.md`, "Compare-and-write and groups"):
+it, and what hangs on it is held against the same thing
+(`../simulation/docs/simulation.md`, "Compare-and-write"):
 of two such writes the first applied happens and the other is refused,
-whole, and counts nothing. Which pairs there are, and what comes of
+and counts nothing. Which pairs there are, and what comes of
 each -- held by `tests/fast/double_writes.rs`, which sets a tick's
 counts against the cells that changed and finds them the same, to the
 cell:
@@ -173,18 +173,24 @@ cell:
 | two sheep eating one cell | no: a sheep eats the cell it stands on, and a cell holds one entity | every cell eaten is a write and a cell changed |
 | grass spreading onto one cell twice | yes | set once, one spread counted; the other refused |
 | grass spreading onto a cell, the cell decaying or eaten | no: spreading fills cells that were dirt, decay and sheep clear cells that were grass | |
-| a cell decaying and eaten | yes, rarely | cleared once by the decay, applied first, and a decay counted; the meal refused whole -- the sheep not fed, nothing eaten counted, asleep a step and hungry still (`../entity_rules/tests/fast/sheep.rs`, where it is made to happen) |
+| a cell decaying and eaten | yes, rarely | cleared once by the decay, applied first, and a decay counted; every write of the meal refused -- the sheep not fed, nothing eaten counted, asleep a step and hungry still (`../entity_rules/tests/fast/sheep.rs`, where it is made to happen) |
 | two trees put on one cell | yes | one tree, one counted; the other refused |
 | a tree put on a cell, the tree there dying | no: a tree is put where none stood | |
-| a tree growing and dying | no: a tree is sampled once a tick; its death is a group, the tree and its stage as one | |
+| a tree growing and dying | no: a tree is sampled once a tick; dying, its stage goes if the tree still stands and the stage is as seen, then the tree | |
 | two entities stepping onto one cell | yes | the first applied takes it, the other stays where it stood and wakes as it was to |
 | two lambs put on one cell, or a lamb put where another sheep steps | yes | the first applied takes the cell; the lamb put after is made on another neighbour its mother may step to, or, every one taken, refused -- and born later: its mother is pregnant until she has seen it stand (`../entity_rules/docs/entity_rules.md`, "The sheep") |
-| two entities setting one attribute of a third | yes (no rule does yet) | the later applied is kept, the same one on any number of threads (`../simulation/tests/fine/instructions.rs`) |
+| two entities setting one attribute of a third | yes (no rule does yet) | the first applied is kept and the other refused, having seen the attribute as it no longer is: the same one on any number of threads (`../simulation/tests/fine/instructions.rs`) |
+| an entity's attribute set by another, the entity changing itself | no: one awake this tick is not another's to edit, and one asleep does not write itself | the edit is not queued, and asked again a later tick |
+| a sheep fed and put to sleep hungry | no: the two are under opposite compares of its grass | one is applied: the sheep is written once |
 
 No pair leaves a cell or an entity differing by the order threads ran
-in: everything is applied in one order. A lamb is not put in a group
-with what its mother comes to -- it may land in the next superchunk,
-and a group lands in one -- so its birth is still seen the tick after.
+in: everything is applied in one order. And no write lands on
+another's: nothing a rule queues can overwrite what another did in the
+same tick (`../simulation/docs/simulation.md`, "No write lands on
+another's"). A lamb's put is not held
+against what its mother comes to -- it may land in the next
+superchunk, and a compare is of the superchunk its write lands in --
+so its birth is still seen the tick after.
 
 ## Saved and loaded
 

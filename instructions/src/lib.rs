@@ -15,8 +15,8 @@
 pub mod area;
 pub mod around;
 pub mod cells;
+pub mod compare;
 pub mod entities;
-pub mod groups;
 pub mod mask;
 pub mod walking;
 

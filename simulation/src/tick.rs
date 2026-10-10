@@ -7,7 +7,7 @@
 use entity_manager::{Entities, EntityId, EntityReader, Instructions, InstructionsApplied, SuperchunkEntities};
 use crate::turn::conditional::{Applied, CountedWhenApplied, COUNTED_WHEN_APPLIED};
 use crate::turn::{slot, Outbox, Turn};
-use bitplane_manager::{count_missed, BitmapArena, Reader, Superchunk, WriteQueues, WritesApplied};
+use bitplane_manager::{BitmapArena, Reader, Superchunk, WritesApplied};
 use coordinates::{CellIndex, SuperchunkIndex};
 use std::ops::AddAssign;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -31,9 +31,10 @@ pub struct TickReport<R> {
     pub writes_applied: WritesApplied,
     /// What applying the instructions did.
     pub instructions_applied: InstructionsApplied,
-    /// Groups applied whole, and groups refused whole
-    /// (`docs/simulation.md`, "Compare-and-write and groups").
-    pub groups: (u64, u64),
+    /// Runs of entity instructions queued under a compare: those
+    /// applied, and those refused (`docs/simulation.md`,
+    /// "Compare-and-write").
+    pub instructions_compared: (u64, u64),
     /// What was counted as it was applied, by the number each rule's
     /// counts were given (`Turn::count_under`).
     pub counted_when_applied: CountedWhenApplied,
@@ -168,9 +169,9 @@ impl Simulation {
                 for (offset, (outbox, kept)) in outboxes.iter_mut().zip(random.iter_mut()).enumerate() {
                     let superchunk = &superchunks[first + offset];
                     let random = Rng::new(kept.1.state());
-                    let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random, open: None, counted_from: 0 };
+                    let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random, comparing: None, counted_from: 0 };
                     total += rule(&mut turn, &mut samples);
-                    assert!(turn.open.is_none(), "a group started and not ended");
+                    turn.close_instructions_compared();
                     // Where its random numbers have come to: the next tick goes on from there.
                     kept.1 = turn.random;
                 }
@@ -190,7 +191,7 @@ impl Simulation {
         let applied_parts: Vec<Mutex<Applied>> = (0..parts).map(|_| Mutex::new(Applied::default())).collect();
         let claimed = AtomicUsize::new(0);
         self.dispatcher.run(&|part| {
-            let (mut applied, mut fates) = (Applied::default(), Vec::new());
+            let mut applied = Applied::default();
             while let Some(work) = superchunks.get(claimed.fetch_add(1, Ordering::Relaxed)) {
                 let (ref mut superchunks, ref mut entity_superchunks) = *work.lock().expect("a piece's superchunks");
                 for (superchunk, entities) in superchunks.iter_mut().zip(entity_superchunks.iter_mut()) {
@@ -202,13 +203,7 @@ impl Simulation {
                         };
                         let outbox = &outboxes[source];
                         let from = slot(-dx, -dy);
-                        for (layer_type, writes) in outbox.writes[from].iter() {
-                            applied.writes.writes += writes.len();
-                            for &write in writes {
-                                superchunk.apply(layer_type, write, &mut applied.writes);
-                            }
-                        }
-                        outbox.conditional[from].apply(superchunk, entities, &outbox.instructions[from], now + 1, &mut fates, &mut applied);
+                        outbox.conditional[from].apply(superchunk, entities, &outbox.instructions[from], now + 1, &mut applied);
                     }
                     entities.sort_wakes(now + 1);
                 }
@@ -217,12 +212,12 @@ impl Simulation {
         });
         drop(superchunks);
         self.settle_crossings(entities, superchunk_indices, per_part);
-        let (mut applied, mut groups, mut counted_when_applied) = (WritesApplied::default(), (0, 0), [0; COUNTED_WHEN_APPLIED]);
+        let (mut applied, mut instructions_compared, mut counted_when_applied) = (WritesApplied::default(), (0, 0), [0; COUNTED_WHEN_APPLIED]);
         for part in applied_parts {
             let part = part.into_inner().expect("a part's result");
             applied += part.writes;
             instructions_applied += part.instructions;
-            groups = (groups.0 + part.groups_applied, groups.1 + part.groups_refused);
+            instructions_compared = (instructions_compared.0 + part.compared.0, instructions_compared.1 + part.compared.1);
             counted_when_applied.iter_mut().zip(part.counted).for_each(|(count, more)| *count += more);
         }
         // Writes landing where no bitmap is in use are missed.
@@ -232,20 +227,15 @@ impl Simulation {
                     continue;
                 };
                 if superchunk_indices.binary_search(&target).is_err() {
-                    for (_, writes) in outbox.writes[slot(dx, dy)].iter() {
-                        applied.writes += writes.len();
-                        writes.iter().for_each(|&write| count_missed(target, write, &mut applied));
-                    }
                     outbox.conditional[slot(dx, dy)].count_missed(&mut applied);
                     outbox.instructions[slot(dx, dy)].count_lost(&mut instructions_applied);
                 }
             }
-            outbox.writes.iter_mut().for_each(WriteQueues::clear);
             outbox.instructions.iter_mut().for_each(Instructions::clear);
             outbox.conditional.iter_mut().for_each(|conditional| conditional.clear());
         }
         entities.advance();
-        TickReport { writes_applied: applied, instructions_applied, groups, counted_when_applied, rules, computing: computed - start, applying: computed.elapsed() }
+        TickReport { writes_applied: applied, instructions_applied, instructions_compared, counted_when_applied, rules, computing: computed - start, applying: computed.elapsed() }
     }
 
     /// Removes each entity that crossed into another superchunk this

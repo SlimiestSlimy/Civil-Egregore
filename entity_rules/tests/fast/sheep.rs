@@ -185,7 +185,7 @@ fn sheep_never_overlap() {
 /// A sheep's meal lost to a decay, made to happen: a hungry sheep on a
 /// cell of grass, the sheep's rule run on a tick that first clears
 /// that very cell as grass decaying does. The cell is cleared once;
-/// the meal is refused whole -- nothing eaten is counted, the sheep is
+/// every write of the meal is refused -- nothing eaten is counted, the sheep is
 /// as hungry as it was and loses nothing it had -- and it sleeps a
 /// step and wakes to look again. On the cell beside it, a sheep whose
 /// grass stands eats as ever.
@@ -222,7 +222,7 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
         entity_rules::sheep::rule(turn)
     });
     assert_eq!((arena.holds(GRASS, decaying), arena.holds(GRASS, standing)), (Ok(false), Ok(false)));
-    assert_eq!((report.writes_applied.changed, report.writes_applied.refused, report.groups), (2, 1, (1, 1)), "one meal applied, one refused");
+    assert_eq!((report.writes_applied.changed, report.writes_applied.refused, report.instructions_compared), (2, 1, (2, 2)), "one meal applied, one refused: each sheep written once, fed or asleep a step");
     assert_eq!((report.counted_when_applied[0], report.counted_when_applied[8 + EATEN], report.rules[EATEN]), (1, 1, 0), "a decay and one meal, counted as applied");
     let sheep: Vec<_> = entities.iter().collect();
     // One may die of old age before so long a sleep as a meal's, on any seed: its death is its meal's, both or neither.

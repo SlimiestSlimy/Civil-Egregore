@@ -63,7 +63,7 @@ pub fn square(turn: &Turn, layer_type: LayerType, cell: CellIndex, side: u32) ->
 
 /// Queues `layer_type` holding at `cell`, which the rule saw it did
 /// not: a compare-and-write, applied only if it still does not
-/// (`docs/instructions.md`, "Compare-and-write and groups").
+/// (`docs/instructions.md`, "Compare-and-write").
 #[inline]
 pub fn set(turn: &mut Turn, layer_type: LayerType, cell: CellIndex) {
     turn.queue_seen(layer_type, cell, 0, 1, None);

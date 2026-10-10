@@ -15,13 +15,11 @@ emit)`**: every superchunk's, in Morton order.
 ## `turn/`
 
 `mod.rs` the turn, its cells and its outbox; `entities.rs` the entities
-and their instructions; `conditional.rs` the compare-and-writes and the
-groups. What a rule makes of them is
+and their instructions; `conditional.rs` the compare-and-writes . What a rule makes of them is
 `../../instructions/`.
 
-**`Outbox`**: nine `WriteQueues`, nine `Instructions` and nine
-`Conditional`, by **`slot(dx, dy)`**, and the counts of the group being
-queued.
+**`Outbox`**: nine `Instructions` and nine
+`Conditional`, by **`slot(dx, dy)`**.
 
 **`Turn`**: a superchunk's turn in the first phase:
 **`superchunk`**, **`random`**, **`now`**, **`sample(type, chance,
@@ -30,8 +28,8 @@ found them: **`holds(type, cell)`**, **`value(plane, cell)`** (a wide
 plane's number), **`window(type, origin, width, height)`** (up to 8x8
 cells as a `Window`), **`windows(types, ...)`** (of several types at
 once), **`any_in_tile(type, cell, scale)`**, **`tiles_holding(type,
-cell)`** (tiles holding any cell, off the counts). **`queue(type,
-write)`**: a write, into the slot of each superchunk it lands in.
+cell)`** (tiles holding any cell, off the counts). Cells are written
+by compare-and-writes alone (`conditional.rs`).
 Entities read: **`woken()`**, **`woken_reading(layers)`** (the cells
 about each asked of memory ahead) -- its entities waking this tick, in
 Morton order, borrowed from the world as the tick found it, not from
@@ -48,32 +46,44 @@ attributes)`**: changed, and moved to its cell if that is free --
 staying if not; passed over if no longer where the tick found it -- or,
 to another superchunk, crossing; **`step(entity, to, wake)`**: a move,
 no attributes carried -- whole, as `update`, to another superchunk;
-**`set_attribute(entity, attribute, value)`**,
-**`set_attribute_blocks(entity, attribute)`**, **`unset_attribute(entity,
-kind)`**: an edit of any entity in reach; **`remove(header)`**.
+**`set_attribute(entity, attribute, seen, value)`**,
+**`unset_attribute(entity, attribute, seen)`**: an edit of another
+entity in reach, applied if the attribute is still as seen; `false`,
+and nothing queued, if the entity wakes this tick;
+**`remove(header)`**.
 **`slot_of`**: the slot of a superchunk, past the neighbours panicking.
 `SLOTS` (9): an outbox's slots. A turn's fields: its `superchunk`, its
 `entities`, `now`, the thread's `reader` and `entity_reader`, its
-`outbox`, its `random`, the group `open` and the number its counts
-are `counted_from`.
+`outbox`, its `random`, the compare its instructions are queued
+under (`comparing`) and the number its counts are `counted_from`.
+`slot_between(from, to)`: the slot of one superchunk in another's
+outbox, none past the neighbours.
 
-`conditional.rs` (`simulation.md`, "Compare-and-write and groups").
-**`Turn::queue_seen(type, at, seen, value, counted)`**: a
-compare-and-write, with the count added if it is applied.
-**`Turn::group_start()`**, **`Turn::group_end()`**: what is queued
-between them one group; **`Turn::count_if_applied(place)`**: a count of
-the group's. **`Turn::count_under(first)`**: the number the rule's
-first count is counted under; `counted_number(place)`: a count's
-number, under `COUNTED_WHEN_APPLIED` (256) -- **`CountedWhenApplied`**,
-a tick's counts made as it applied. `Compared` `{layer_type, at, seen,
-value, group, count}` (`NO_GROUP`, `NO_COUNT`); `Group`
-`{instructions, counts}`; `Conditional` `{compared, groups, counts}`,
-what is queued for one superchunk -- `clear`, `count_missed`, and
-`apply(superchunk, entities, instructions, earliest, fates,
-applied)`: the compare-and-writes, the groups' fates, then the
-instructions, a refused group's left out. `OpenGroup`: how much each
-slot held when a group was started. `Applied`: what a thread applied
-in the second phase.
+`conditional.rs` (`simulation.md`, "Compare-and-write").
+**`Compare`**: what a write is held against -- `Cell {layer_type, at,
+seen}` or `Attribute {id, at, kind, seen}`; `Compare::at`, the cell it
+is on; `Compare::holds(superchunk, entities)`, whether it holds now.
+**`Turn::queue_if(compare, type, at, seen, value, counted)`**: a cell
+written if the compare holds and the cell is still as seen, with the
+count added then; **`Turn::queue_seen(type, at, seen, value,
+counted)`**: the same, held against the cell written alone.
+`queue_instruction_if(compare, lands, queue)`: one instruction under
+a compare of its own, as an edit of another entity is. **`Turn::count_if(compare, place)`**: a
+count. **`Turn::instructions_if(compare)`**,
+**`Turn::instructions_as_ever()`**: the entity instructions queued
+between them under the compare; `close_instructions_compared`: those
+queued so far made a step. **`Turn::count_under(first)`**: the number
+the rule's first count is counted under; `counted_number(place)`: a
+count's number, under `COUNTED_WHEN_APPLIED` (256) --
+**`CountedWhenApplied`**, a tick's counts made as it applied
+(`NO_COUNT`: none). `Does`: what a step does -- `Write` (with what was `seen` at the cell),
+`Instructions {first, last}`, `Count`; `Step` `{compare, does,
+before}`; `Conditional` `{steps}`, what is queued for one superchunk
+-- `clear`, `count_missed`, and `apply(superchunk, entities,
+instructions, earliest, applied)`: instructions and steps in the order
+queued. `queue_step(compare, lands, does)`: a step queued, its compare
+in the superchunk it lands in. `Applied`: what a thread applied in the
+second phase.
 
 ## `hot.rs`
 
@@ -162,9 +172,10 @@ many, or the disk's refusal.
 
 ## `tick.rs`
 
-**`TickReport`** `{writes_applied, instructions_applied, groups,
-counted_when_applied, rules, computing, applying}` -- `groups` those
-applied whole and those refused whole.
+**`TickReport`** `{writes_applied, instructions_applied,
+instructions_compared, counted_when_applied, rules, computing,
+applying}` -- `instructions_compared` the runs of instructions under a
+compare applied, and those refused.
 
 **`threads_for(superchunks)`**: every thread the machine has, no more
 than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived}`:
@@ -185,8 +196,8 @@ dropped counted lost); the superchunks claimed by the threads one at a
 time (`CLAIMED`); the first phase runs the rule on each, a `Reader` a
 thread; the second, each thread the superchunks it claims and
 their entities, passes each wheel's tick, then applies every outbox's
-writes and instructions; writes to superchunks not in use counted
-missed (`count_missed`), entities put there lost; the crossings settled
+instructions and compare-and-writes; writes to superchunks not in use counted
+missed (`Conditional::count_missed`), entities put there lost; the crossings settled
 (**`settle_crossings`**: each superchunk's arrivals taken, then each
 thread its run of superchunks, each removing its leavers from its
 neighbours' arrivals); the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine

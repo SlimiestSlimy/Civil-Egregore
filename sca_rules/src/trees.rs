@@ -3,7 +3,7 @@
 //! at the oldest may die (`docs/sca_rules.md`, "Trees").
 
 use instructions::layers::{OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
-use instructions::{cells, groups, place_counted, CellIndex, Chance, RuleCounts, Turn};
+use instructions::{cells, compare, place_counted, CellIndex, Chance, RuleCounts, Turn};
 
 /// The chance, each tick, that a tree is sampled.
 pub const SAMPLE_CHANCE: Chance = Chance::one_in(10_000);
@@ -52,12 +52,9 @@ fn tree(turn: &mut Turn, cell: CellIndex, _counts: &mut RuleCounts) {
     } else if stage < OLDEST_TREE_STAGE {
         cells::set_value_counted(turn, TREE_STAGE, cell, stage, stage + 1, GROWN);
     } else if turn.random().below(DIE_ONE_IN) == 0 {
-        // The tree and its stage go as one: the next tree there starts at 0.
-        groups::start(turn);
-        cells::clear(turn, TREE, cell);
-        cells::set_value(turn, TREE_STAGE, cell, stage, 0);
-        groups::count(turn, DIED);
-        groups::end(turn);
+        // Its stage goes with it, so the next tree there starts at 0: gone if the tree still stands, which is then cleared.
+        compare::write(turn, compare::holds(TREE, cell), TREE_STAGE.layer_type(), cell, stage, 0, None);
+        cells::clear_counted(turn, TREE, cell, DIED);
     }
 }
 

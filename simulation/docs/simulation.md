@@ -54,48 +54,85 @@ on any number of threads, and a save can keep them (`random_states`,
 `restore_random`). The outboxes and room
 for samples are kept between ticks.
 
-### Compare-and-write and groups
+### Compare-and-write
 
 Every rule reads the world as the tick found it, so two may each see
-a cell as it was and both queue a change of it. A **compare-and-write**
-(`Turn::queue_seen`) says what its rule saw at the cell and what it
-makes of it, and is applied only if the cell still holds what was
-seen: the first applied changes the cell, and every later one that
-saw the same is **refused** -- nothing happens, and it is counted
-(`WritesApplied::refused`). A layer of a bit a cell holds 1 or 0.
+a thing as it was and both queue a change that hangs on it. A
+**compare-and-write** says what its rule saw and is applied only if
+that still holds when the write is come to; otherwise it is
+**refused**: nothing happens, and it is counted
+(`WritesApplied::refused`, `TickReport::instructions_compared`).
 
-A **group** (`Turn::group_start`, `Turn::group_end`) is several things
-queued as one: compare-and-writes, entity instructions, counts. It is
-applied whole if every one of its compare-and-writes finds its cell as
-it was seen, and not at all otherwise: no cell of it written, no
-instruction of it applied, nothing of it counted. So what hangs on a
-write hangs on it where it is applied -- a rule cannot learn in the
-tick that a write of its was refused. A group lands in one superchunk
-(a panic otherwise): the thread applying a superchunk decides it
-alone, with nothing to agree with another. What must happen if the
-group does not -- an entity woken must be put to sleep again, or never
-wakes -- is queued before it, outside it, and stands if the group is
-refused; applied, the group's instruction comes after and is the one
-kept.
+What is compared and what is written need not be the same thing
+(`Compare`). A compare is of a cell -- the number a layer holds there,
+1 or 0 on a layer of a bit a cell -- or of an entity: that it still
+stands where it stood, with an attribute as it was seen, or without
+it. What hangs on it is a cell written (`Turn::queue_if`, which says
+what was seen at the cell written as well; `Turn::queue_seen`, held
+against that alone), what an
+entity comes to (every instruction queued from `Turn::instructions_if`
+to `Turn::instructions_as_ever`), or a count (`Turn::count_if`). So an
+entity changes itself on a compare of the ground, and the ground is
+changed on a compare of an entity.
 
-A count may hang on a write too: a compare-and-write outside a group
-names a count added if it is applied, and a group counts as it is
-applied (`Turn::count_if_applied`). These come back in the tick's
-report (`TickReport::counted_when_applied`), by numbers: whoever runs
-several rules on a turn gives each numbers of its own
-(`Turn::count_under`).
+There are no groups: each write is held against its own compare, when
+it is come to, and nothing is applied "together". What a rule wants
+to happen together it queues as writes that fail together -- all held
+against the one thing, the write that changes that thing last; or a
+chain, each held against what the one before wrote. A rule cannot
+learn in the tick that a write of its was refused, so what must
+happen all the same -- an entity woken must be put to sleep again, or
+never wakes -- is queued under the compare's opposite: the cell
+holding, the entity is fed; the cell lacking, it sleeps a step. One of
+the two is applied, and the entity is written once.
+
+#### No write lands on another's
+
+Two writes of one thing in one tick, the later silently winning, is a
+write-after-write hazard: what the first did is lost, and neither rule
+saw the other. A tick has none:
+
+- **A cell** is written only by a compare-and-write that says what
+  the rule saw at that cell, whatever else it is held against. The
+  first applied changes it; any other that saw the same is refused.
+  There is no plain write in a tick, and no shape: an area is its
+  cells, each a write of its own.
+- **An attribute of another entity** (`Turn::set_attribute`,
+  `unset_attribute`) is written only if it is still as the rule saw
+  it, or still absent: of two setting one, the first applied does.
+- **An entity awake this tick** writes itself whole, from what it was
+  as the tick found it; so another's edit of it is not queued at all
+  (`set_attribute` answers `false`), and is asked again a later tick.
+  An entity asleep is written by others alone, an attribute at a time.
+- **A cell an entity is put on or steps to** is checked as the
+  instruction is applied: taken, a step stays and a new entity goes to
+  the first free of its others, or is not put. Nothing is overwritten.
+- **A removal** takes the entity with whatever was written to it that
+  tick: an end, not a value lost to another.
+
+What a rule queues twice for its own entity is its own, in the order
+it queued them; the rules here do not (a sheep's two ends are under
+opposite compares). Between ticks the world is written by one hand at
+a time (`World::write_cells`, `put_entity`), in order.
+
+One limit: what a write is held against is in the superchunk the
+write lands in (a panic otherwise). The thread applying a superchunk
+reads no other, so nothing is agreed between superchunks.
+
+A count may hang on a write: `queue_if` names one added if the write
+is applied. These come back in the tick's report
+(`TickReport::counted_when_applied`), by numbers: whoever runs several
+rules on a turn gives each numbers of its own (`Turn::count_under`).
 
 The order, for each superchunk, from each neighbour's outbox in turn:
-its plain writes, layer by layer; then its compare-and-writes in the
-order queued, a group's together -- the group's fate decided there;
-then its instructions in the order queued, those of the groups refused
-left out. It is fixed, so what is applied and what refused is the same
-on any number of threads (`tests/fine/compare_and_write.rs`: drawn
-writes and groups against the same applied one after another; and a
-cell made to decay and be eaten in one tick).
-
-Plain writes (`Turn::queue`) are as before -- shapes, and whatever
-needs no look at the cell: the latest applied wins.
+its entity instructions and its compare-and-writes together, in the
+order the rule queued them,
+each compare read as it is come to -- so it sees what those before it
+did. It is fixed, so what is applied and what refused is the same on
+any number of threads (`tests/fine/compare_and_write.rs`: drawn writes
+held against their own cell or another, set against the same applied
+one after another; and a cell made to decay and be eaten in one
+tick).
 
 ## Entities
 
@@ -163,17 +200,18 @@ carrying no more than it changes (`../entity_manager/`):
 | put | `put`, `update` | an entity made, or made anew whole | its attributes |
 | put on the first free | `put_on_the_first_free` | a new entity made on its cell or, that taken, on the first free of some others | its attributes, and the other cells |
 | move | `step` | moved to a cell, or left where it stands, to wake at a tick; its attributes as they are | nothing |
-| edit | `set_attribute`, `set_attribute_blocks`, `unset_attribute` | one attribute set or removed, of any entity in reach | the one attribute's blocks, or none |
+| edit | `set_attribute`, `unset_attribute` | one attribute set or removed, of another entity in reach, asleep, if it is still as seen | the one attribute's blocks, or none |
 | remove | `remove` | removed | nothing |
 
 A walking entity is a move a step: 32 bytes queued and none of its
 attributes read or written, however many it has -- until it crosses to
 another superchunk, where it goes whole. An edit is how one entity acts
 on another: two wounding one in a tick each write their own attribute,
-where two whole copies would undo each other. Every instruction that
+where two whole copies would undo each other, and of two writing the
+same attribute one is refused. Every instruction that
 puts an entity on a cell is checked as it is applied. Instructions
-queued in a group are applied with it or not at all
-("Compare-and-write and groups").
+may be queued under a compare, applied only if it holds
+("Compare-and-write").
 
 ### Woken entities are asked of memory ahead
 

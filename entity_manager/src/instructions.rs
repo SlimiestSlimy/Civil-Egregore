@@ -188,7 +188,7 @@ impl Instructions {
     }
 
     /// [`Instructions::apply`], of those at `some` alone, counted from
-    /// the first queued: how a group of them refused is left out
+    /// the first queued: how those under a compare refused are left out
     /// (`docs/entity_manager.md`, "Instructions").
     pub fn apply_some(&self, some: std::ops::Range<usize>, superchunks: &mut [SuperchunkEntities], earliest: u64, applied: &mut InstructionsApplied) {
         for &instruction in &self.instructions[some] {

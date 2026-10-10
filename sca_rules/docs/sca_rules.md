@@ -47,8 +47,7 @@ the second phase, so every sample reads the world as the tick found
 it. The two never touch one cell in a tick: decay clears cells that
 were grass, spreading fills cells that were dirt. Each write says what
 the rule saw at its cell and is applied only if the cell is still so
-(`../../instructions/docs/instructions.md`, "Compare-and-write and
-groups"), and a spread or a decay is counted as it is applied: two
+(`../../instructions/docs/instructions.md`, "Compare-and-write"), and a spread or a decay is counted as it is applied: two
 samples spreading onto one cell are one cell set and one spread
 counted.
 
@@ -64,8 +63,9 @@ tree sampled does one thing, by lot:
   of those 64 is drawn, and a tree of stage 0 is put there if there is
   none and the cell is hot and not under water.
 - **Else it grows** a stage; or, at the oldest stage, dies one time in
-  `DIE_ONE_IN` -- the cell cleared, and its stage with it, as one
-  group, so the next tree there starts at 0 -- and lives on otherwise.
+  `DIE_ONE_IN` -- its stage put to 0 if the tree still stands, then
+  the cell cleared, so the next tree there starts at 0 -- and lives on
+  otherwise.
   What a tree does is counted as it is applied: a tree put where
   another was put first in the tick is refused, and not counted.
 

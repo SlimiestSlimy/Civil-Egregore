@@ -72,8 +72,8 @@ fn a_square_read_is_its_cells_read_one_by_one() {
     });
 }
 
-/// Cells set and cleared under a mask are the mask's, the rest left
-/// as they were, and a whole square or a disc takes few writes.
+/// Cells set and cleared under a mask are the mask's that were
+/// otherwise, the rest left as they were, no cell written twice.
 #[test]
 fn a_mask_written_is_read_back() {
     for side in [4, 64, 1024] {
@@ -88,13 +88,13 @@ fn a_mask_written_is_read_back() {
             let mut before = before.lock().unwrap();
             let (set, hot) = &mut *before;
             mask::layer(turn, STONE, origin, set, hot);
-            // The disc cleared, then a square in its middle set: the later write wins.
+            // The disc cleared where set, and a square in its middle set where clear: each cell written once, from what was seen.
             let mut middle = Mask::empty(side);
             (side / 4..side / 2).flat_map(|y| (side / 4..side / 2).map(move |x| (x, y))).for_each(|(x, y)| middle.set(x, y, true));
             mask::clear_under(turn, STONE, origin, &disc) + mask::set_under(turn, STONE, origin, &middle)
         });
-        assert!(writes.rules <= 2 * side as usize + 1, "{} writes for a disc and a square of {side}", writes.rules);
-        assert_eq!(writes.writes_applied.missed, 0);
+        assert_eq!((writes.writes_applied.missed, writes.writes_applied.refused), (0, 0));
+        assert_eq!(writes.writes_applied.changed, writes.rules as u64, "every write queued changes its cell");
         simulation.tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
             if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
                 return 0;
@@ -104,7 +104,7 @@ fn a_mask_written_is_read_back() {
             let before = &before.lock().unwrap().0;
             for (x, y) in (0..side).flat_map(|y| (0..side).map(move |x| (x, y))) {
                 let middle = (side / 4..side / 2).contains(&x) && (side / 4..side / 2).contains(&y);
-                let expected = middle || !disc.get(x, y) && before.get(x, y);
+                let expected = if middle { !before.get(x, y) } else { !disc.get(x, y) && before.get(x, y) };
                 assert_eq!(set.get(x, y), expected, "({x}, {y}) of {side}");
             }
             0

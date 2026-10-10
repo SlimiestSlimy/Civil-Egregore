@@ -230,13 +230,11 @@ SCA renaming are last". SO THE ORDER NOW: tests (task 7, DONE) ->
 review item 1 (the renderer asks the host for terrain: DONE
 2026-10-10, server/src/host/terrain.rs; map mode and the height
 labels not tried by hand in the window -- the user's to look at) ->
-cold pool paging (DONE) -> the decay+eat case, compare-and-write and
-write groups (DONE 2026-10-10, see below) -> GPU LOD (WAITS ON THE
-USER: no note says what it is to do -- mipmaps of the cells' pictures
-made by the graphics card, the cells' words sent to it and coloured
-by a shader, or the map; and nothing here can look at the window) ->
-SCA rename (DONE 2026-10-10). [the rest of this line is the order as first written:] compare-and-write, write groups -> GPU
-LOD -> SCA rename.
+cold pool paging (DONE) -> the decay+eat case and compare-and-write
+(DONE 2026-10-10, see below) -> SCA rename (DONE 2026-10-10) -> GPU
+LOD (NEXT; the user, 2026-10-10, verbatim: "yes, mipmaps but done on
+the gpu instead of the cpu" -- the painter still paints on the CPU,
+the graphics card makes the mipmaps of the superchunks' pictures).
 That is: (1) server::World -- DONE 2026-10-10; (2) docs
 finished; (3) tests finished -- task 7, and each crate testing itself;
 (4) cold pool paging (task 4); (5) GPU LOD (task 5).
@@ -258,20 +256,32 @@ group of writes can fail or succeed at the same time". That is: WRITE
 GROUPS -- a group-start and a group-end instruction; the writes
 between them all apply or none does (the meal: the grass cell cleared
 if still grass AND the sheep's hunger edited, as one).
-DONE 2026-10-10: every cell a rule writes is a compare-and-write
-(Turn::queue_seen; cells::set/clear/set_value say what was seen);
-groups::start/count/end; counts made as applied
-(TickReport::counted_when_applied, rules::with_counts_applied). The
-meal is a group, a tree's death is one. simulation.md and
-instructions.md, "Compare-and-write and groups"; server.md, "Two
-writes on one cell". Tests: simulation/tests/fine/compare_and_write.rs,
-entity_rules sheep a_meal_lost_to_a_decay_leaves_the_sheep_hungry.
-MINE, for the user to say: a group lands in ONE superchunk (so the
-lamb is not grouped with its mother; an eating sheep bears a wake
-later); what stands if a group is refused is queued before it; a
-group's fate is its cell writes alone (an entity instruction in it
-never refuses it). Tick reference 62.11 M, 58.77 M before (+5.7%):
-not chased.
+GROUPS WERE BUILT AND TAKEN OUT AGAIN. The user, 2026-10-10,
+verbatim: "regarding groups, i think we need to backtrack a bit, lets
+only do compare and writes, no groups, of course the compare target
+and the write target can be different things. so an entity can perform
+a write to its internal state based on the compare to the environment
+and the other way around as well. if an entity queued many writes they
+should fail as a chain of failed compares ion theory, and we skip
+complex inter-superchunk grouping semantics". And: "yeah, make sure we
+have no more WAW hazards".
+DONE 2026-10-10: no groups. A compare (simulation::Compare: a cell's
+number, or an entity's attribute) and what hangs on it (a cell written,
+entity instructions, a count) -- instructions::compare. NO
+WRITE-AFTER-WRITE HAZARD IN A TICK: no plain write and no shape
+(Turn::queue is gone; mask::set_under is cell by cell); every cell
+write says what was seen at that cell, whatever else it is held
+against; an attribute of another entity is set only if as seen, and
+not at all if that entity wakes this tick; a sheep is fed or put to
+sleep hungry under opposite compares, written once. simulation.md,
+"Compare-and-write" and "No write lands on another's"; server.md,
+"Two writes on one cell". Tests: simulation/tests/fine/
+compare_and_write.rs and instructions.rs, entity_rules sheep
+a_meal_lost_to_a_decay_leaves_the_sheep_hungry.
+MINE, for the user to say: a compare is in the superchunk its write
+lands in (so an eating sheep bears a wake later); an entity awake is
+not another's to edit that tick; a removal is not counted a hazard.
+Tick reference 62.27 M (58.77 M before compare-and-write): not chased.
 
 Asked by the user, in the order to do them. Read this first after any
 break; write a new ask here the moment it is made.
