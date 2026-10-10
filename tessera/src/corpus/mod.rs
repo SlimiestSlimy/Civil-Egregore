@@ -1,28 +1,9 @@
-//! The one source of corpus bitmaps, tests and measurements alike, so
-//! changing what anything runs on is a change here. Two exceptions: a
-//! fine test (`tests/fine.rs`) may draw one small bitmap by hand to
-//! pin a known case, never to measure; and [`checkerboards`] are drawn,
-//! the one family the same on every seed -- squares of an odd side never
-//! line up with the power-of-two grid, so one board exercises homogeneous
-//! tiles, cuts, copies and copies naming children at once.
+//! The one source of corpus bitmaps, tests and measurements alike:
+//! grown, sparse, laid out and drawn, each settled by its seed and its
+//! generator's parameters, nothing stored.
 //!
-//! A corpus bitmap is settled by its seed and its generator's parameters: the
-//! same ones give the same bitmap on every run and every machine.
-//! Nothing is stored; a corpus is grown again every time it is asked
-//! for. Four families of generator:
-//!
-//! - grown ([`SHAPES`], `generate.rs`): cells scattered or clustered to
-//!   a density;
-//! - sparse ([`SPARSE`]): grown too thin to be a shape at all;
-//! - laid out ([`PLANS`], `city.rs`): streets, blocks and courtyards on a
-//!   grid at an offset of its own, never on the quadtree's;
-//! - drawn ([`LINE_SETS`], `lines.rs`): lines, straight and diagonal,
-//!   thin and wide.
-//!
-//! `docs/testing_protocol.md` holds the rule for using them: fix with
-//! the seed held still, then check on a seed never seen.
-//!
-//! Function by function: `docs/lab.md`, "`corpus/`".
+//! How they are used: `docs/testing_protocol.md`. Function by
+//! function: `docs/lab.md`, "`corpus/`".
 
 pub mod checkerboards;
 mod city;
@@ -36,13 +17,9 @@ pub use seed::seed_uncounted;
 
 use bitmap::Bitmap;
 
-/// Where every corpus bitmap's seeds start, read from
-/// [`seed::WHERE_THE_SEED_IS_KEPT`] rather than written here, counted as
-/// a use of it ([`seed::seed_counted`]).
-///
-/// Nothing a measurement runs on is a constant in the code. Move the
-/// seed to ask whether a result was about an algorithm or about those
-/// particular bitmaps, and the run says which seed it used.
+/// Where every corpus bitmap's seeds start: the run's seed, counted
+/// as a use of it ([`seed::seed_counted`]). Nothing a measurement runs
+/// on is a constant in the code.
 pub fn corpus_seed() -> u64 {
     seed::seed_counted()
 }
@@ -130,13 +107,8 @@ pub struct Grown {
     cluster: f64,
 }
 
-/// `count` bitmaps from seeds `seed`, `seed + 1`, and so on.
-///
-/// `density` is the share of the 65536 cells set in each. `cluster` is
-/// how often a new cell lands beside one already set rather than
-/// anywhere at all: at 0 the cells are scattered and every one is its
-/// own rectangle, at 1 they only extend what is standing and the
-/// bitmap is a few solid blobs.
+/// `count` bitmaps from seeds `seed`, `seed + 1`, and so on, each
+/// grown to `density` at `cluster` ([`generate::one`]).
 pub fn grown(seed: u64, density: f64, cluster: f64, count: u64) -> Grown {
     Grown { seed, left: count, density, cluster }
 }
@@ -197,15 +169,9 @@ impl HowMany {
 /// enough, over every generator, for a steady mean and a tail.
 pub const TIMING_PER_GENERATOR: u64 = 100;
 
-/// Every family of corpus bitmaps, named, with `how_many` of each generator's.
-///
-/// Four families. Grown bitmaps are cells scattered or clustered to a
-/// density, which is what an algorithm is stressed on. Laid out ones
-/// are streets, blocks and courtyards on a grid at its own offset,
-/// which is structure the quadtree has to find rather than is handed.
-/// Drawn ones are lines, straight and diagonal, thin and wide. Sparse
-/// ones are grown too thin to be a shape at all. A result on one is a
-/// quarter of a result.
+/// Every family of corpus bitmaps, named, with `how_many` of each
+/// generator's: a result on one family is a quarter of a result
+/// (`docs/lab.md`, "`corpus/`").
 pub fn families(how_many: HowMany) -> Vec<(String, Vec<Bitmap>)> {
     vec![
         ("laid out like a city".to_string(), PLANS.iter().flat_map(|plan| plan.take(how_many.of(plan.timed, plan.tested))).collect()),

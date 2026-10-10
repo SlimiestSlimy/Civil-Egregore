@@ -1,29 +1,7 @@
-//! Adversarial bitmaps against the raw cells: a search for the bitmaps
-//! Tessera does worst on -- what it costs beyond the raw cells -- four
-//! searches at once, one a core, each from its own seed. The search
-//! itself is `diagnostics::adversarial`'s; this scores it. See
-//! `docs/testing_protocol.md`.
-//!
-//! The worst plane of all four is kept when it beats the worst kept so
-//! far, and the bitmap kept must still round trip. What each search
-//! found, and the worst kept, are printed and kept in
-//! `transient_data/measurements/adversarial.csv`.
-//!
-//! ```text
-//! cargo run --release -- tessera adversarial
-//! cargo run --release -- tessera adversarial 4000
-//! ```
-//!
-//! `adversarial_save` keeps a worst bitmap as a named bitmap instead:
-//! copied to `external_benchmarks/adversarial/saved/`, where no search
-//! replaces it, under a name saying what it is, with a line describing
-//! it and the worst bitmap's own notes (what it scored) as its comment
-//! lines.
-//!
-//! ```text
-//! cargo run --release -- tessera adversarial_save \
-//!     against_zstd3 near_repeated_half_vs_zstd3 "bottom half a near repeat of the top, ..."
-//! ```
+//! Adversarial bitmaps against the raw cells: the search scored by what
+//! Tessera costs beyond the raw cells, four searches at once, and a
+//! worst bitmap saved under a name
+//! (`docs/testing_protocol.md`, "Adversarial searches").
 
 use super::super::adversarial::{worst, search_at_once, Effort, Score, SEARCHES_AT_ONCE};
 use crate::diagnostics::examination::Examination;

@@ -1,34 +1,6 @@
 //! Instructions to encode and to decode a corpus, counted exactly by
-//! callgrind: `BITMAPS_PER_GENERATOR` bitmaps of every generator --
-//! grown shapes, sparse ones, city plans and line sets, weighted as the
-//! `timing` tool's corpus is -- and noise, from the seed, then a
-//! checkerboard and every saved adversarial bitmap
-//! (`external_benchmarks/adversarial/saved/`), encoded, then decoded,
-//! all in one Tessera. The seed rolls like every run's: counts are compared
-//! on one seed, pinned with `CIVIL_EGREGORE_SEED=<seed>` when a comparison would
-//! straddle a roll.
-//!
-//! Callgrind counts every instruction executed, the same on every run,
-//! where time varies with whatever else the machine does: speed is
-//! compared in instructions. The tool runs the corpus under callgrind
-//! twice, collecting only inside `Tessera::encode`, then only inside
-//! `Tessera::decode` -- building the corpus and checking it are not counted
-//! -- both on the one seed this run settled. It needs valgrind
-//! installed (`apt-get install valgrind`):
-//!
-//! ```text
-//! cargo run --release -- tessera instruction_count
-//! ```
-//!
-//! Each run's callgrind output is left in `transient_data/callgrind/`, to
-//! see where the instructions go:
-//!
-//! ```text
-//! callgrind_annotate --inclusive=yes transient_data/callgrind/callgrind.encode.out | head -40
-//! ```
-//!
-//! `instruction_corpus` runs the corpus alone, uncounted: what callgrind
-//! runs, and what to run under any other profiler.
+//! callgrind, on one seed; and the corpus alone, for any profiler
+//! (`docs/testing_protocol.md`, "Speed: instructions and time").
 
 use std::path::Path;
 use std::process::Command;

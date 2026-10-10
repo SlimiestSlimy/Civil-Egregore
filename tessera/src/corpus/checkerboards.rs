@@ -1,10 +1,6 @@
-//! Checkerboards: the one family drawn rather than grown, and a stress
-//! test for all of it. Squares of an odd side never line up with the
-//! power-of-two tiles the quadtree cuts along: tiles inside a square
-//! are homogeneous, tiles across a cut subdivide, and the pattern
-//! repeats at an offset no tile size matches exactly, so copies and
-//! copies naming children turn up everywhere. No seed: a checkerboard is
-//! settled by its square side alone.
+//! Checkerboards: the one family drawn rather than grown, settled by
+//! its square side alone -- odd sides never line up with the quadtree's
+//! tiles (`docs/lab.md`, "`corpus/`").
 
 use bitmap::Bitmap;
 

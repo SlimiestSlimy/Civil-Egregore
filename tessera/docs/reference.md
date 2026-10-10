@@ -42,6 +42,10 @@ nodes under a complex tile are stale.
 **`Tessera::decode(stream, bitmap)`**: clears `bitmap`, reads the
 mode bit, then the binary count tree, or the tree and the last pass.
 
+**Private to the file.** `TREE_STREAM` and `BINARY_COUNT_TREE_STREAM`: the
+stream's first bit, saying which of the two follows. `PERCENT`: a
+hundred, what a share is counted in.
+
 ## `tile.rs`: tiles, copy offsets, pyramids
 
 The levels and counts everything else is sized by: `CELL_LEVEL` (8), a
@@ -96,6 +100,13 @@ level `l` starts at `(4^l - 1) / 3` (`level_start`).
 - **`children`**, **`children_at`**: a tile's four children's
   elements, read as one slice of four.
 
+**Private to the file.** `NEAR_OFFSETS`: where a near copy reads from, by
+direction, in tiles of its own size -- the neighbours reading order
+puts before it: top left, above, top right, left. `FAR_OFFSETS`: where
+a far copy reads from, by direction, found by a search over offsets:
+the near offsets doubled lost several percent on cities and more on
+checkerboards.
+
 ## `tree.rs`: the tree
 
 **`Node`**: what the tree holds at a tile (`docs/tessera.md`, "The
@@ -132,6 +143,9 @@ subtraction. **`in_tile(tile)`**: the same for a tile of 8x8 or
 coarser, whose cells are a run of whole words; the binary count tree
 and the cell list pre-check use these.
 
+**Private to the file.** `WORD_CELLS`: the cells a word of the bitmap
+holds.
+
 ## `patterns.rs`: the pattern pyramid
 
 **`homogeneous_value_of(number)`**: `Some(false)` for 0, `Some(true)`
@@ -165,6 +179,19 @@ far, then by direction, whose tile has `number`: `(far, direction)`.
 `ALL_CLEAR` (0) and `ALL_SET` (1): the two patterns every level has,
 a tile with every cell clear and one with every cell set -- the numbers
 a plain tile's pattern is compared with.
+
+**Private to the file.** `LEVELS`: the levels numbered, the whole bitmap
+down to the 4x4 floor. `FLOOR_CELLS`: a 4x4's cells -- its pattern, one
+run of the bitmap. `FIRST_PATTERN`: the first number a pattern that is
+not homogeneous gets; `EMPTY_SLOT`: an empty slot, as no such pattern
+has number 0. `NUMBER_BITS`: the bits a number takes in a coarser
+tile's pattern; `CHILDREN_ALL_CLEAR` and `CHILDREN_ALL_SET`: a coarser
+tile's pattern when its four children are all clear, or all set.
+`SLOT_STARTS`: where each level's slots start, and where the finest
+one's end -- a power of two a level, at least twice its tiles, so a
+probe ends soon. `NUMBER_STARTS`: where each level's numbers start
+among every level's -- one for each of its tiles and the two
+homogeneous ones; `NUMBERS`: all of them together.
 
 ## `greedy_tiler.rs`: the greedy tiling and the complex tiling
 
@@ -228,6 +255,13 @@ set count could take (`cell_list_least_bits`) beats the best.
 **`all_2x2s_homogeneous(bitmap, tile)`**: a 4x4's 16 cells, one run,
 whose four quarters are its 2x2s: each all clear or all set.
 
+**Private to the file.** `Visit`: a tile the walk visits, and what it
+knows of it on the way down. `CountedSubtree`: what the complex tiling
+knows of a tile once it is through everything under it.
+`ALL_CHILDREN`: a child mask naming every child. `PLAIN_TILE`: a bind
+of the whole tile, a complex tile of its own size. `QUARTER`: a 2x2's
+cells, all set.
+
 ## `quadtree_writer.rs`: the tree's bits
 
 **`may_name_children(level)`**: whether a copy at `level` has a
@@ -273,6 +307,25 @@ one-bit choice; `START_LEVEL_WIDTH` (3), the bits naming the start
 level, whole bitmap to floor; `MOST_NODE_BITS`, the most one node takes
 with its payload aside -- a copy naming its children: leaf, copy, far,
 the direction, names-children, and a bit a child.
+
+**Private to the file.** The grammar's bits, by name. `LEAF` or
+`DIVIDE`: a node's first bit -- a leaf, a copy or a bind; or a divide,
+at the 4x4 floor a residual floor tile. `COPY` or `BIND`: after a
+leaf's first bit. `NAMES_CHILDREN`: whether a copy or a divide names
+its children, its child mask following -- every divide is 8x8 or
+coarser and so says it; a copy says it down to 8x8 only, a 4x4's
+children being finer than the tree. `BINDING_FLIPPED`: a divide naming
+its children flips the value bound above. `CHILD_IS_NODE`: a child
+mask's bit, a child in reading order -- a node of its own, following
+the parent's bits, or said by the parent. `PLAIN_TILE`: what a bind's
+size offset starts with for a plain tile, nothing more; else the size
+offset follows in truncated binary over those its level allows, finest
+first. `CELL_LIST`: a complex tile of 1x1 resolution says its cells as
+a cell list, else raw. `DIRECTION_WIDTH`: the bits naming a copy's
+direction. `push_flag(sink, value)` and `read_flag(reader)`: one flag
+written, read. `write_subtree_and_plan_last_pass` and
+`read_subtree_and_plan_last_pass`: a tile's node and everything under
+it, written and read, the reader told the value bound above.
 
 ## `payload_writer.rs`: payloads and cell lists
 
@@ -339,6 +392,15 @@ mirror. Shortcuts that read the same bits: a run all set is filled
 without reading; a run of one set cell reads its place at once
 (`read_lone_cell_place`: a bit a halving, the place from the top bit
 down, each bit flipped); an 8-cell run is one table lookup.
+
+**Private to the file.** `WORD_CELLS`: the cells a word of the bitmap
+holds, a run of the Morton order. `BYTE_CELLS`: a byte of cells, a run
+read back by one lookup in `BYTE_RUNS`; `ByteRun`: such a run as read
+back -- its cells, and how many bits saying them took.
+`SHORT_RUN_CELLS`: runs this short -- two bytes of cells, a quarter of
+a word -- are counted by a lookup in `SHORT_RUN_BITS`.
+`first_half_set(first, count)`: the cells set in the first half of the
+run of `count` words from `first`.
 
 ## `last_pass.rs`
 
@@ -425,6 +487,40 @@ each residual floor tile's Morton index, in order). `MOST_EXTRA_BITS`:
 the most the pass takes over one bit a residual cell
 (`docs/tessera.md`, "The odds").
 
+**Private to the file.** `CONTEXTS`: one for every value the context
+cells can hold. `FLOOR_TILE_CELLS` and `FLOOR_TILE_SIDE`: a floor
+tile's cells -- one run of the bitmap, in Morton order -- and its side.
+`FloorIndex`: a floor tile, by its Morton index among the floor tiles;
+`FloorSet`: one bit a floor tile, `FLOOR_SET_WORDS` words of them,
+`insert(set, index)` and `remove(set, index)`. `NO_SOURCE`: the source
+of a floor tile no copy covers, or one already copied. `FLOOR_X_BITS`
+and `FLOOR_Y_BITS`: a floor index's `x` bits, the even ones, and its
+`y` bits, the odd ones -- a neighbour's index is one of the two fields
+stepped in place. `PassState`: the copies waiting on their sources,
+and the contexts' odds.
+
+In `last_pass/context_odds.rs`: `UNSEEN_WEIGHT`, a context's weight for
+clear and for set before any cell -- a half, in units of half a cell --
+and `UNSEEN`, the odds made of it; `CELL_WEIGHT`, what each cell coded
+in a context adds to its value's. `HALVING_COUNT`: the cells either
+value counts at most -- reaching it (`HALVING_WEIGHT`, as a weight)
+both are halved; residual cells are much the same all over a bitmap,
+so forgetting costs bits, and this is where it stops costing any the
+corpus shows. `MOST_WEIGHT_TOTAL`: the most the two weights add up to
+when a cell is coded at them. `FRACTION_BITS`: the bits of a
+fixed-point `log2` below the point, a 256th of a bit; `POINT`: where
+the point is in the mantissa `fixed_point_log2` squares, 2.30. `RECIPROCALS_AND_LOG2S`: `2^32` over every total the weights can
+add up to, and `log2` of every weight and total -- a probability is a
+lookup and a multiply, a price two lookups.
+
+In `last_pass/context_window.rs`: `WINDOW_SIDE`, the cells of a window
+row, two floor tiles side by side. `CONTEXT_REACH`: how far left and
+up a context reaches -- the square from that far up and left of a cell
+to the cell itself, its neighbourhood, `NEIGHBOURHOOD_SIDE` cells a
+side, holds all of its context. `WINDOW_PLACES`: each of a floor
+tile's cells, by its place in the floor tile's Morton order, as its
+bit in the window.
+
 ## `arithmetic.rs`: the range coder
 
 **`ClearProbability::split(range)`**: where an interval of width
@@ -459,6 +555,14 @@ whether the offset lies in the set part; widens as the encoder did.
 `FINISHING_BITS` (2): what `Encoder::finish` takes beyond what the
 coded bits carry -- the final interval always holds an aligned run of
 numbers named by at most two bits more than its width's `-log2`.
+
+**Private to the file.** `WINDOW_BITS`: the bits of the window the
+interval's ends are held in; `TOP`: the width the interval is kept at
+or over, a byte under the window's. `BYTE_BITS`: the bits a byte takes
+in the stream. `ALL_ONES`: a byte a carry turns to `0x00`, carrying
+on. `REVERSED`: every byte with its bits in the other order -- bytes go
+to the stream highest bit first, so that the stream can end partway
+through one.
 
 ## `bit_stream.rs`
 
@@ -498,3 +602,9 @@ off the next word, whose leftover bits become the buffer. Zeros past
 the end. **`peek`**, **`skip`**: the same, for the binary count tree's
 table reads. **`unary`**, **`gamma`**, **`truncated_binary`**: the
 mirrors of the pushes.
+
+**Private to the file.** `WORD_BITS`, `BYTE_BITS`, `WORD_BYTES`: the bits
+of a word and of a byte, the bytes of a word. `MOST_WORDS`: the words
+the most bits a stream takes fill. `push(bit)`: one bit written.
+`low_bits(width)`: a word with its low `width` bits set, `width` at
+most a word.

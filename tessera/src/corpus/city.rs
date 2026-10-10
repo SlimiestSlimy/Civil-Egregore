@@ -1,17 +1,6 @@
-//! Bitmaps laid out the way the encoding is meant for.
-//!
-//! The grown corpus bitmaps are blobs and scattered cells, with no structure
-//! beyond their clustering. A city is structured throughout: streets
-//! run on a pitch, blocks fill what is between them, and courtyards are
-//! holes inside blocks. None of it is aligned to the quadtree: each
-//! city's grid starts at its own offset, and a courtyard sits anywhere
-//! in its block. A city aligned to the encoder's own tiles would
-//! measure the encoder on the one case it cannot find hard.
-//!
-//! These are not a claim about any real city. They are the shape the
-//! encoding was designed around, made the same way the grown bitmaps
-//! are: settled entirely by a seed and a plan, regenerated every time
-//! they are asked for, never stored.
+//! Bitmaps laid out the way the encoding is meant for: streets on a
+//! pitch, blocks between them, courtyards inside blocks, none of it
+//! aligned to the quadtree (`docs/lab.md`, "`corpus/`").
 
 use utilities::rng::Rng;
 use bitmap::Bitmap;
@@ -19,9 +8,6 @@ use bitmap::Bitmap;
 /// How a city is laid out: how far apart the streets run, how wide
 /// they are, how many courtyards a block is given and how big, and how
 /// often a block is a park.
-///
-/// The grid is shifted by a random offset in each city, so however the
-/// pitch divides the bitmap, the blocks do not land on tile corners.
 pub struct Plan {
     /// What a measurement calls it.
     pub name: &'static str,

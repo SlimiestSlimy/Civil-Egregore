@@ -1,21 +1,6 @@
 //! Adversarial bitmaps: searches for the bitmaps an encoder does worst
-//! on, by any score the caller gives -- Tessera against its raw cells, or
-//! against another encoder. Kept in the library so every search, in any
-//! crate, is the same search: `src/diagnostics/tool/adversarial.rs` scores Tessera
-//! against the raw cells, `external_benchmarks/` scores it against the
-//! external codecs. See `docs/testing_protocol.md`.
-//!
-//! Each search has two stages, each a simulated annealing (`anneal.rs`)
-//! over structure-aware changes (`moves.rs`):
-//!
-//! 1. One 64x64 window, in an otherwise clear bitmap, from a clear start
-//!    and from a noisy one: every change lands where it counts, and Tessera
-//!    reads a quadtree, so what is bad in a window is bad anywhere.
-//! 2. The whole plane: filled with the best window's sixteen variants
-//!    (`plane.rs`), from noise, and from the worst bitmap kept so
-//!    far, carried on from where the last run left it.
-//!
-//! The worst bitmaps are plain PBM images (`worst.rs`).
+//! on, by any score the caller gives -- a window first, then the whole
+//! plane, each a simulated annealing. See `docs/testing_protocol.md`.
 //!
 //! Function by function: `docs/lab.md`, "`diagnostics/adversarial/`".
 

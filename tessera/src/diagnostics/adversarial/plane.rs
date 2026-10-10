@@ -1,10 +1,6 @@
-//! From one adversarial window to the whole plane. Both encoders are
-//! quadtrees, so a bad window stays bad wherever it sits -- but sixteen
-//! copies of one window would just be copied. So each of the sixteen
-//! window positions gets its own one of the window's sixteen variants:
-//! four rotations, each mirrored or not, each inverted or not. Copies
-//! only ever translate, so none of the variants is a copy of another
-//! unless the window is itself symmetric.
+//! From one adversarial window to the whole plane: each of the sixteen
+//! window positions its own one of the window's sixteen variants, so
+//! none is a copy of another (`docs/lab.md`, "`diagnostics/adversarial/`").
 
 use crate::tile::Tile;
 use bitmap::Bitmap;

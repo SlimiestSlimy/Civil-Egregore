@@ -1,9 +1,6 @@
-//! A run of bits: written in order, read back in the same order.
-//! Multi-bit values go least significant bit first. Packed 64 to a
-//! word, bit `i` of the run bit `i % 64` of word `i / 64`. Besides plain
-//! values, the variable-length codes the grammar uses: unary, Elias
-//! gamma and truncated binary -- written to a [`Sink`]: the stream, or a
-//! [`Counter`] of the bits they would take.
+//! A run of bits, written in order and read back in the same order,
+//! packed 64 to a word, with the variable-length codes the grammar
+//! uses, written to a [`Sink`].
 //!
 //! Function by function: `docs/reference.md`, "`bit_stream.rs`".
 

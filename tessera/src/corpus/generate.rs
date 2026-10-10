@@ -1,11 +1,6 @@
-//! How a corpus is grown. Free functions over borrowed data: they own
-//! nothing, keep nothing between calls, and the whole of what they
-//! produce is settled by their arguments.
-//!
-//! Kept apart from [`crate::corpus`] so that the shapes worth
-//! measuring on and the machinery that draws them can be read and
-//! changed separately. What a corpus is made of is a decision; how a
-//! bitmap is filled is a mechanism.
+//! How a corpus is grown: free functions that keep nothing between
+//! calls, the whole of what they make settled by their arguments
+//! (`docs/lab.md`, "`corpus/`").
 
 use utilities::rng::Rng;
 use bitmap::{Bitmap, WIDTH};
@@ -16,22 +11,9 @@ const CELLS: usize = WIDTH * WIDTH;
 /// Guesses at a clear cell before scanning for one.
 const GUESSES_BEFORE_SCANNING: usize = 64;
 
-/// A bitmap grown from a seed.
-///
-/// The seed settles it entirely: the same three arguments give the same
-/// bitmap on every run and every machine.
-///
-/// `density` is the share of the cells that end up set.
-/// `cluster` is how often a new cell lands beside one already set
-/// rather than anywhere at all: at 0 the cells are scattered and every
-/// one of them is its own rectangle; at 1 they only ever extend what is
-/// already standing, so the bitmap comes out as a few solid blobs.
-/// Everything interesting is in between.
-///
-/// Cells beside the ones already set are kept **with repeats**, so a
-/// cell with three set neighbours is three times as likely to be taken
-/// as one with a single neighbour. That is the point: it is what makes
-/// a blob fill in rather than sprawl.
+/// A bitmap grown from a seed, which settles it entirely: `density`
+/// the share of the cells set, `cluster` how often a new cell lands
+/// beside one already set (`docs/lab.md`, "`corpus/`").
 pub(super) fn one(seed: u64, density: f64, cluster: f64) -> Bitmap {
     let wanted = (density.clamp(0.0, 1.0) * CELLS as f64) as usize;
     let cluster = cluster.clamp(0.0, 1.0);
@@ -77,12 +59,8 @@ pub(super) fn one(seed: u64, density: f64, cluster: f64) -> Bitmap {
     bitmap
 }
 
-/// Any cell still clear, found by guessing and then, once guessing stops
-/// paying, by looking.
-///
-/// Guessing answers nearly every draw, because a bitmap is usually far
-/// from full. The scan is there so that a density close to 1 still
-/// finishes rather than rolling dice forever.
+/// Any cell still clear, found by guessing and then, once guessing
+/// stops paying, by looking: so a density close to 1 still finishes.
 fn anywhere_clear(bitmap: &Bitmap, rng: &mut Rng) -> (u8, u8) {
     for _ in 0..GUESSES_BEFORE_SCANNING {
         let (x, y) = (rng.below(WIDTH as u64) as u8, rng.below(WIDTH as u64) as u8);
