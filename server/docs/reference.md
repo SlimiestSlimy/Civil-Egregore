@@ -233,7 +233,7 @@ answered from how the world is generated: a client names nothing under
 the server. `Generation` and `Height`, the words it is asked in.
 **`HeightsSeen::of(generation, seed)`**, a thread's own:
 **`height(x, y)`**, **`cells_from_a_mesh_line(x, y)`**.
-**`CoverSeen::of(generation, seed)`**, shared: **`cover(x, y)`**, a
+**`CoverSeen::of(generation, seed)`**, a copy to each thread, as it keeps the noise about the last cell: **`cover(x, y)`**, a
 **`Cover`** -- `Tree`, `Grass`, `Dirt`. **`levels(generation)`**:
 **`Levels`** `{ground, ocean, highest}`. **`walled(one, other)`**: a
 wall between two heights. **`height_in_frame(height_words, place)`**:

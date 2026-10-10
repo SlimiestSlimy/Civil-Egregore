@@ -75,6 +75,16 @@ found, from `SAMPLED` cells looked at, so that the share asked for
 machine. The trees' numbers are kept apart from the grass's by a salt
 (`TREES_SALT`).
 
+A superchunk asks every dry cell, so what a cell is asked costs. The
+noise keeps the four points about the last cell (`Noise`): the next
+cell is nearly always among the same, and the four are hashed once a
+square, not once a cell. And a cell's number is never divided out:
+its three parts weighed (`Patches::weighed`) are set against the
+threshold times what they weigh in all (`Patches::weights`), which
+says the same of every cell. Asked so, the grass and the trees of a
+superchunk of land took 0.34 G instructions where they had taken
+0.53 G.
+
 ## Layout
 
 | folder | what is in it |
@@ -114,7 +124,13 @@ length, about its middle, the change from one end's height to the
 other's is spread over: all of it, and the line is one slope from vertex
 to vertex -- and a **sigmoidness** -- 1 an even slope across the blend, more
 two levels and a step between -- each by lot between the shape's least
-and most. Along a line the height is its ends' blended so. Within a
+and most. The lot is not even: it is drawn a little towards the slope
+(`towards_the_slope`: halfway from the lot to its square, so in the lower half six times
+in ten), the blend towards the widest and
+the sigmoidness towards the least. Drawn evenly, six cells of land in
+ten lay dead level beside the next and the land was plateaus with
+cliffs between; so, a tenth of that level ground rises instead, and
+the steepest cliffs are fewer. Along a line the height is its ends' blended so. Within a
 triangle each vertex's height counts by how near the cell is to it
 beside the nearer of the others, shaped by its two lines' blend and
 sigmoidness, each counting as the cell is nearer that line's other end:
@@ -145,6 +161,29 @@ them in a fixed order. `Lands` keeps the vertices about the last cell
 and its triangle, with what a part of the triangle's area is
 multiplied by to be its share -- a division for a triangle, not three
 for a cell. Land costs more than ocean, which no finer mesh touches.
+
+### On a lattice
+
+The meshes are worked out at the points of a lattice alone -- every
+fourth cell across and down (`LATTICE`, in `src/mesh/lands.rs`), a
+sixteenth of the cells -- and a cell between has the four points'
+about it, each by how near it is (`between_the_lattice`). A point's
+land is kept in 16-bit fractions of a height and the cell's made whole
+once, for the reason below. The lattice lies on the world's cells, not
+a superchunk's, so a cell's height still follows from the seed and
+where the cell is alone, and superchunks meet with no seam; a cell on
+a point is that point's land and no other is worked out for it
+(`Lands::land`), and a whole square of cells works each point out once
+(`Lands::heights_of_a_square`, what a superchunk's terrain is made
+from).
+
+No line of a mesh is shorter than 16 cells, four steps of the lattice,
+so what lies between two points is a slope the points say: the land
+looks the same. Worked out at every cell, ten meshes were found, their
+triangles located and their corners blended a million times a
+superchunk, and that was nine tenths of generating one: 9.67 G
+instructions for a superchunk of land, 1.95 G on the lattice
+(`Civil_Egregore server new <folder> 1 0 1 1 1` under callgrind).
 
 To come: ridges and canyons as chains of lines; true subdivision of a
 triangle into its own smaller ones; noise for the ground's detail.

@@ -23,9 +23,10 @@ How deep water is over a `WET` cell is the image's
 (`SuperchunkImage::depth`). **`height(seed, x, y)`**: a cell's height;
 **`height_shaped(shape, seed, x, y)`**: the same in a world shaped
 otherwise. **`Terrain::generate_shaped(shape, seed, superchunk)`**: a
-superchunk's heights and walls. **`noise(seed, index, shift, x,
-y)`**: smooth noise, one octave of a height. Private: **`point`**, an
-octave's number at a point; **`between`**. **`wall(a, b)`**: whether two heights are too far apart.
+superchunk's heights and walls. **`Noise`**: smooth noise asked cell after cell, the four points
+about the last cell kept -- `new(seed, index, shift)`, `at(x, y)`;
+**`noise(seed, index, shift, x, y)`**: the same for one cell alone.
+Private: **`point`**, an octave's number at a point; **`between`**. **`wall(a, b)`**: whether two heights are too far apart.
 
 **`Terrain`** `{heights, walls}`: a superchunk's height map, and for
 each way each chunk's cells that keep a wall.
@@ -40,12 +41,22 @@ place)`**: a cell's, by its place in the superchunk; **`wall_counts()`**.
 
 **`Lands`**: the land asked for cell after cell, the vertices about the
 last cell and its triangle kept -- **`new(shape, seed)`**, **`land(x,
-y)`**, **`height(x, y)`**, **`line(x, y)`** (how far inland the cell
-is, and about how far from the broad mesh's nearest line). **`land`**:
+y)`** (the lattice's points about the cell blended, a point no share is
+taken from not worked out), **`height(x, y)`**,
+**`heights_of_a_square(left, top, side)`** (every cell's height, row by
+row, each point of the lattice worked out once), **`line(x, y)`** (how
+far inland the cell is, and about how far from the broad mesh's
+nearest line). Private to `mesh/lands.rs`: `LATTICE` (2) and
+`LATTICE_STEP` (4), the cells from a point of the lattice to the next,
+as a power of two and as cells; `Lands::at_the_lattice(x, y)`, the
+meshes' land at a point, in 16-bit fractions of a height;
+`between_the_lattice(points, across, down)`, a cell's land from the
+four points about it, made whole once. **`land`**:
 the same for one cell alone. `SIGMOID_ONE`, `FINER_MOST`, `COAST_MOST`.
 Private: **`Vertex`**, **`Triangle`**, **`Blended`**, **`Mesh`**
 (`new`, `lot`, `ocean`, `vertex`, `triangle`, `locate`, `blended`),
-**`raised`**, **`area`**; `inverse(whole)`: what a part of a
+**`raised`**, **`area`**; `towards_the_slope(lot)`: a line's lot drawn
+a little nearer nothing, halfway to its square; `inverse(whole)`: what a part of a
 triangle's area is multiplied by to be its share of the whole -- a
 division done once for the triangle, 0 where the triangle is too broad
 for that to be exact enough and the division is done a cell;
@@ -63,6 +74,10 @@ How something lies in patches when a superchunk is made. `SAMPLED`
 scatter}`; **`number(seed, x, y)`**: a cell's number -- noise as broad
 as a patch, finer noise, and the cell's own lot;
 **`threshold(seed)`**: the number under which `cover` of the cells are.
+For a superchunk's every cell (crate only): `noises(seed)`, the
+patches' noise and the finer, each kept cell after cell;
+`weighed(seed, broad, fine, x, y)`, the number before it is divided;
+`weights()`, what it is divided by.
 
 ## `generated_superchunk.rs`
 
@@ -82,7 +97,9 @@ its cells;
 **`numbers()`** and **`of_numbers(numbers)`**: its numbers by name, as
 a world's file keeps them (`numbers!`). **`from_tuning(tuned)`**: as
 the sliders have it (**`shape_from_tuning`**). **`growth(seed)`**: a
-**`Growth`**, the thresholds found once; **`Growth::at(x, y)`**: a
+**`Growth`**, the thresholds found once and the noises kept;
+**`Growth::at(x, y)`** (it keeps the noise about the cell, so each
+thread has a `Growth` of its own): a
 **`Grown`** `{grass, tree}` -- the tree a lot, its stage drawn from it
 by whoever counts the stages. **`has_land_about(seed, shape, near)`**:
 land three superchunks each way about `near`; **`seed_with_land(from,

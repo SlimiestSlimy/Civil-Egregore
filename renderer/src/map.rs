@@ -83,7 +83,8 @@ pub fn draw(wanted: &Wanted) -> Vec<u8> {
     thread::scope(|scope| {
         for (part, rows) in pixels.chunks_mut(rows_each * width * 4).enumerate() {
             scope.spawn(move || {
-                let mut seen = HeightsSeen::of(generation, seed);
+                // Each thread its own: both keep what they found about the last cell.
+                let (mut seen, mut cover) = (HeightsSeen::of(generation, seed), cover.clone());
                 for (row, pixels) in rows.chunks_mut(width * 4).enumerate() {
                     let y = (part * rows_each + row) as i64;
                     // The height of the pixel to the left of each.
