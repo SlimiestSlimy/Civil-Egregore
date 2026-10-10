@@ -2,7 +2,7 @@
 
 What a rule is made of. An instruction is one small thing asked or done
 on a superchunk's turn -- a free function over the simulation's `Turn`
--- and a rule of the cells or of an entity (`../../mc_rules/`,
+-- and a rule of the cells or of an entity (`../../sca_rules/`,
 `../../entity_rules/`) is a few of them put together, holding only what
 is its own. Function by function: `reference.md`.
 

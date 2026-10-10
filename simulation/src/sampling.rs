@@ -1,4 +1,4 @@
-//! Monte Carlo sampling of the hot bitplanes: every set cell of a layer
+//! The stochastic cell automaton's sampling of the hot bitplanes: every set cell of a layer
 //! type chosen with one chance, in Morton order, none wasted -- the gap
 //! to the next drawn in whole numbers, the counts finding it
 //! (`docs/simulation.md`, "Sampling").

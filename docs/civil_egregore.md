@@ -258,7 +258,7 @@ What follows:
 
 Two steps a tick:
 
-1. **Compute.** Small functions, one per action, sample by Monte Carlo
+1. **Compute.** Small functions, one per action, sample as a stochastic cell automaton (SCA) does
    over the action's main bit plane, where its cells are set; an action
    may also read other planes, and nearby entities by type. Every action
    has one of a fixed set of maximum ranges, from neighbouring cells up
@@ -343,7 +343,7 @@ count tile of 16 words -- 32x32 cells -- by its count, a word by its bits'
 count, and only the word holding a chosen cell is searched. A chunk is so sampled in proportion to its set cells against
 the rest of its superchunk.
 
-The first rule built on it is grass (`mc_rules/src/grass.rs`). Each tick a
+The first rule built on it is grass (`sca_rules/src/grass.rs`). Each tick a
 cell of grass tries to spread with a chance of 0.001%, onto one of its
 eight neighbours drawn at random, if that one is dirt; and turns back
 to dirt with `k / 8` of 0.0005%, `k` its grass neighbours -- none alone,
@@ -399,7 +399,7 @@ the perimeter to area ratio keeps synchronization rare. How overlapping
 updates between superchunks are handled -- a before and after copy
 would double the memory -- is decided once a system can have them.
 
-Monte Carlo sampling suits a GPU too.
+SCA sampling suits a GPU too.
 
 The height map is ignored for now.
 

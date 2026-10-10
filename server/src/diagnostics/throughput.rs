@@ -56,7 +56,7 @@ pub fn run(ticks: usize, thousandths: usize, superchunks: u32, threads: usize) -
         applying += report.applying;
         writes += report.writes_applied.writes;
         missed += report.writes_applied.missed;
-        sampled += report.rules.of(crate::GRASS_RULE)[mc_rules::grass::SAMPLED] as usize;
+        sampled += report.rules.of(crate::GRASS_RULE)[sca_rules::grass::SAMPLED] as usize;
         memory.read();
     }
     Throughput {

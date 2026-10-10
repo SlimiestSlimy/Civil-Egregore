@@ -1,6 +1,6 @@
 //! Trees: a cell set in [`TREE`] with a stage in [`TREE_STAGE`], four
 //! bits a cell. A tree sampled tries to spread, or grows a stage, or
-//! at the oldest may die (`docs/mc_rules.md`, "Trees").
+//! at the oldest may die (`docs/sca_rules.md`, "Trees").
 
 use instructions::layers::{OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
 use instructions::{cells, groups, place_counted, CellIndex, Chance, RuleCounts, Turn};

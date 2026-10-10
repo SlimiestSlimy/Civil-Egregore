@@ -4,7 +4,7 @@
 
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, tick_grass};
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex};
-use mc_rules::grass::{DECAYS, DECAY_CHANCE, SAMPLED, SPREADS, SPREAD_CHANCE};
+use sca_rules::grass::{DECAYS, DECAY_CHANCE, SAMPLED, SPREADS, SPREAD_CHANCE};
 use server::World;
 use type_registry::GRASS;
 

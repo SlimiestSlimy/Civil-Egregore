@@ -19,11 +19,11 @@ pub struct Rule {
 }
 
 /// Every rule a world ticks, in the order a turn runs them: the cells'
-/// (`mc_rules`), then the entities' (`entity_rules`), all reading the
+/// (`sca_rules`), then the entities' (`entity_rules`), all reading the
 /// world as the tick found it.
 pub const RULES: [Rule; 3] = [
-    Rule { name: "grass", counted: &mc_rules::grass::COUNTED, rule: mc_rules::grass::rule },
-    Rule { name: "trees", counted: &mc_rules::trees::COUNTED, rule: mc_rules::trees::rule },
+    Rule { name: "grass", counted: &sca_rules::grass::COUNTED, rule: sca_rules::grass::rule },
+    Rule { name: "trees", counted: &sca_rules::trees::COUNTED, rule: sca_rules::trees::rule },
     Rule { name: "sheep", counted: &entity_rules::sheep::COUNTED, rule: |turn, _| entity_rules::sheep::rule(turn) },
 ];
 

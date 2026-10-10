@@ -10,7 +10,7 @@ use bitplane_manager::Write;
 use coordinates::{CellCartesian, CellIndex};
 use entity_manager::{AttributeBlock, EntityId, Header, NEVER};
 use entity_rules::sheep::{BEARING, BIRTHS, EATEN, HUNGRY_AT, LAMB, PREGNANT, SHEEP, STEP_JITTER, STEP_TICKS};
-use mc_rules::{grass, trees};
+use sca_rules::{grass, trees};
 use server::World;
 use std::collections::HashSet;
 use type_registry::{TREE, TREE_STAGE};

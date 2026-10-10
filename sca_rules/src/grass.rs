@@ -1,6 +1,6 @@
 //! Grass over dirt: each tick a cell of grass may spread onto a dirt
 //! neighbour, or decay back to dirt the more grass is around it -- one
-//! sampling pass for both (`docs/mc_rules.md`, "Grass").
+//! sampling pass for both (`docs/sca_rules.md`, "Grass").
 
 use instructions::layers::{GRASS, WET};
 use instructions::{cells, place_counted, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};

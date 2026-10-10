@@ -105,7 +105,7 @@ REMOTE (cloud, no screen)
 
 == WHERE THINGS GO ==
 
-- A rule (entity_rules/, mc_rules/) reaches the simulation only
+- A rule (entity_rules/, sca_rules/) reaches the simulation only
   through instructions/: what it lacks is added there.
 - What is hot and for how long is the simulation's (simulation::halos);
   the server only defines it (server::hot_of -> simulation::Hot:
@@ -231,8 +231,11 @@ review item 1 (the renderer asks the host for terrain: DONE
 2026-10-10, server/src/host/terrain.rs; map mode and the height
 labels not tried by hand in the window -- the user's to look at) ->
 cold pool paging (DONE) -> the decay+eat case, compare-and-write and
-write groups (DONE 2026-10-10, see below) -> GPU LOD (NEXT) -> SCA
-rename. [the rest of this line is the order as first written:] compare-and-write, write groups -> GPU
+write groups (DONE 2026-10-10, see below) -> GPU LOD (WAITS ON THE
+USER: no note says what it is to do -- mipmaps of the cells' pictures
+made by the graphics card, the cells' words sent to it and coloured
+by a shader, or the map; and nothing here can look at the window) ->
+SCA rename (DONE 2026-10-10). [the rest of this line is the order as first written:] compare-and-write, write groups -> GPU
 LOD -> SCA rename.
 That is: (1) server::World -- DONE 2026-10-10; (2) docs
 finished; (3) tests finished -- task 7, and each crate testing itself;
@@ -326,6 +329,10 @@ break; write a new ask here the moment it is made.
    something". Then, verbatim: "SCA for stochastic cell automaton".
    So: Monte Carlo -> stochastic cell automaton, SCA for short;
    mc_rules -> sca_rules (crate, docs, glossary, every mention).
+   DONE 2026-10-10: the crate is sca_rules, its design
+   sca_rules/docs/sca_rules.md; the glossary has the word, Monte
+   Carlo among those not used. Done before GPU LOD, which waits on
+   the user saying what it is to be (see the order above).
 7. TESTS GENERATED: DONE 2026-10-10, every crate gone through. A case
    that can be drawn is drawn from the run's seed, beside the edges
    written by hand; new tests against the plainest working-out (writes
@@ -365,7 +372,7 @@ Google Drive connector needs authorizing in claude.ai settings.
      worked out from its COUNTED names as it is compiled,
      instructions::place_counted; the server's rules picked by
      RulePlace constants, GRASS_RULE ...; no lookup by name left).
-  5. Each crate testing itself: DONE 2026-10-10 for mc_rules and
+  5. Each crate testing itself: DONE 2026-10-10 for sca_rules (then mc_rules) and
      entity_rules (their tests moved from the server's, trees' tests
      written). entity_manager: a fine tier of attributes and the
      first-free put; the rest still through the simulation's tests.

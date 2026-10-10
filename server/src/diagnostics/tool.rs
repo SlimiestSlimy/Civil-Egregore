@@ -107,7 +107,7 @@ pub(crate) fn pasture(given: &Given) -> Result<(), String> {
     let mut phases = Table::new(&["time", "total ms", "share of the tick", "ns each"]).left_aligned(&["time"]);
     let per = |time: Duration, count: usize| if count == 0 { "-".to_string() } else { format!("{:.1}", time.as_nanos() as f64 / count as f64) };
     phases.row(&["computing".to_string(), format!("{:.1}", run.computing.as_secs_f64() * 1e3), share(run.computing, total), "-".to_string()]);
-    phases.row(&["  grass rule, a sample (all threads)".to_string(), format!("{:.1}", run.done.time_of(crate::GRASS_RULE).as_secs_f64() * 1e3), "-".to_string(), per(run.done.time_of(crate::GRASS_RULE), grass[mc_rules::grass::SAMPLED] as usize)]);
+    phases.row(&["  grass rule, a sample (all threads)".to_string(), format!("{:.1}", run.done.time_of(crate::GRASS_RULE).as_secs_f64() * 1e3), "-".to_string(), per(run.done.time_of(crate::GRASS_RULE), grass[sca_rules::grass::SAMPLED] as usize)]);
     phases.row(&["  sheep rule, a wake (all threads)".to_string(), format!("{:.1}", run.done.time_of(crate::SHEEP_RULE).as_secs_f64() * 1e3), "-".to_string(), per(run.done.time_of(crate::SHEEP_RULE), woken)]);
     phases.row(&["applying, a write or instruction".to_string(), format!("{:.1}", run.applying.as_secs_f64() * 1e3), share(run.applying, total), per(run.applying, run.writes + run.instructions.puts + run.instructions.moves + run.instructions.edits + run.instructions.removes)]);
     phases.row(&["the tick".to_string(), format!("{:.1}", total.as_secs_f64() * 1e3), share(total, total), "-".to_string()]);

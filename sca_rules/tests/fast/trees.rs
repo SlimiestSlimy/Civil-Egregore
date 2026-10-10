@@ -5,7 +5,7 @@
 use crate::tests::{first_superchunk, plain_world, tick_rule};
 use bitplane_manager::{Write, WriteOp};
 use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
-use mc_rules::trees::{DIED, GROWN, SAMPLED, SEEDS_FROM, SPREADS};
+use sca_rules::trees::{DIED, GROWN, SAMPLED, SEEDS_FROM, SPREADS};
 use server::World;
 use type_registry::{OLDEST_TREE_STAGE, TREE, TREE_STAGE};
 use utilities::rng::Rng;
