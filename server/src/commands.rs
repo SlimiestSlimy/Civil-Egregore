@@ -6,7 +6,7 @@
 //! line to print, or why it could not -- and the diagnostics tools
 //! ([`crate::diagnostics::tool`]).
 
-use crate::diagnostics::tool::{pasture, throughput, FLOCK, GRASS as GRASS_SHARE, SUPERCHUNKS, THREADS, TICKS};
+use crate::diagnostics::tool::{check, pasture, throughput, EVERY, FLOCK, GRASS as GRASS_SHARE, SEED, SHEEP, SUPERCHUNKS, THREADS, TICKS};
 use crate::HaloChange;
 use chunk_storage::disk;
 use worldgen::GRASS;
@@ -23,7 +23,7 @@ const FORCED: &str = "forced";
 
 /// The server's commands: a world made, run and looked at, and its
 /// diagnostics tools.
-pub const COMMANDS: [Command; 5] = [
+pub const COMMANDS: [Command; 6] = [
     Command {
         name: "new",
         does: "makes a world from a seed and saves it in the folder: so many superchunks along a side, or 0 for as far as it goes; so many sheep on every superchunk of a world with a side, on its origin of one without; forced hot throughout if told -- only with a side -- else about the sheep's halos; on so many threads, or every one the machine has if 0",
@@ -43,6 +43,12 @@ pub const COMMANDS: [Command; 5] = [
         does: "ticks grass and sheep flat out: the flock, what the sheep did, each rule's time, the memory held",
         parameters: &[Parameter::new(TICKS, "2000"), Parameter::new(GRASS_SHARE, "333"), Parameter::new(FLOCK, "4000"), Parameter::new(SUPERCHUNKS, "16"), Parameter::new(THREADS, "0")],
         run: pasture,
+    },
+    Command {
+        name: "check",
+        does: "ticks a world from a seed and prints its hash every so many ticks, part by part: the same rows on every machine and any number of threads, if the simulation is deterministic",
+        parameters: &[Parameter::new(SEED, "0"), Parameter::new(TICKS, "2000"), Parameter::new(EVERY, "100"), Parameter::new(SHEEP, "4000"), Parameter::new(THREADS, "0")],
+        run: check,
     },
 ];
 

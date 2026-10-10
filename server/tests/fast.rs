@@ -22,3 +22,6 @@ mod grass;
 
 #[path = "fast/sheep.rs"]
 mod sheep;
+
+#[path = "fast/world_hash.rs"]
+mod world_hash;

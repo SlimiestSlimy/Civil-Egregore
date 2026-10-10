@@ -24,6 +24,12 @@ pub(crate) const SUPERCHUNKS: &str = "superchunks";
 pub(crate) const THREADS: &str = "threads";
 /// Sheep on each superchunk.
 pub(crate) const FLOCK: &str = "sheep a superchunk";
+/// The seed of the world checked, in hexadecimal: 0, the run's own.
+pub(crate) const SEED: &str = "seed";
+/// Ticks between two hashes printed.
+pub(crate) const EVERY: &str = "ticks between hashes";
+/// Sheep the world checked starts with, on its origin.
+pub(crate) const SHEEP: &str = "sheep";
 
 /// The threads asked for: every one the machine has, no more than
 /// `superchunks`, if 0.
@@ -138,3 +144,35 @@ fn census_table(rows: impl Iterator<Item = [u64; 6]>) -> Table {
 fn share(part: Duration, whole: Duration) -> String {
     format!("{:.1}%", 100.0 * part.as_secs_f64() / whole.as_secs_f64())
 }
+
+/// Ticks a world from a seed -- as far as it goes, hot about its
+/// sheep, its camera loading nothing, as a camera's superchunks are
+/// not the simulation's to say -- and prints its hash
+/// ([`crate::world_hash`]) before the first tick and every so many
+/// after, a row each, part by part: the same rows on every machine and
+/// on any number of threads, or the simulation is not deterministic,
+/// the first part to differ saying where. Nothing printed says what
+/// machine it ran on, so two runs' rows are compared as they are.
+pub(crate) fn check(given: &Given) -> Result<(), String> {
+    let (ticks, every, sheep): (u64, u64, usize) = (given.number(TICKS)?, given.number(EVERY)?, given.number(SHEEP)?);
+    let text = given.text(SEED)?;
+    let seed = match utilities::seed::of_hex(text).ok_or_else(|| format!("`{text}` is not a seed: 64 bits, in hexadecimal"))? {
+        0 => utilities::seed::counted(),
+        seed => seed,
+    };
+    let threads = Some(given.number(THREADS)?).filter(|&threads: &usize| threads > 0);
+    let mut world = crate::start(crate::Start { seed, sheep, threads, ..crate::Start::default() });
+    println!("# seed {}, {sheep} sheep", utilities::seed::hex(seed));
+    println!("tick,world,cells,entities,random streams,halos,cold");
+    loop {
+        let hash = crate::world_hash(&mut world);
+        println!("{},{:016x},{:016x},{:016x},{:016x},{:016x},{:016x}", hash.tick, hash.whole(seed), hash.cells, hash.entities, hash.random_streams, hash.halos, hash.cold);
+        if hash.tick >= ticks {
+            return Ok(());
+        }
+        for _ in 0..every.max(1).min(ticks - hash.tick) {
+            world.tick();
+        }
+    }
+}
+

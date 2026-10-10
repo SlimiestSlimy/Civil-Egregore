@@ -104,6 +104,18 @@ a **`PastureRun`**.
 
 **`measurements()`**, **`saves()`**, **`publish(report)`**.
 
+## `world_hash.rs`
+
+**`world_hash(world)`**: the world's hash, a **`WorldHash`** `{tick,
+cells, entities, random_streams, halos, cold}` -- a word a part, each
+folded (`utilities::hash::fold`) from the part in Morton order: every
+hot bitmap of every layer type with its chunk and count; every entity's
+header and attributes; every random stream; the superchunks hot,
+warming and cooling with when each is due; every cold superchunk's
+state and image. The writeback ring is flushed first, as a save does.
+**`WorldHash::whole(seed)`**: the parts, the tick and the seed in one
+word.
+
 ## `commands.rs`
 
 **`COMMANDS`**: what `Civil_Egregore server <command>` runs, each with its
@@ -118,7 +130,7 @@ loaded, ticked and saved again (**`run`**). `Civil_Egregore server info
 <folder>`: what its world file says (**`info`**). A folder given as a plain name is one
 of the worlds' folder (`utilities::settings::world`); anything more is
 a path. **`printed`**: a command run on its folder, its line printed. The diagnostics tools,
-`throughput` and `pasture`, are listed there too.
+`throughput`, `pasture` and `check`, are listed there too.
 
 ## `diagnostics/tool.rs`
 
@@ -128,7 +140,11 @@ asked for, every one if 0.
 **`throughput`**: runs `throughput::run` and publishes its time, rates
 and memory tables. **`pasture`**: runs `pasture::run` and publishes the
 flock, time a sample and a wake, rates, what is held and the census
-(**`census_table`**).
+(**`census_table`**). **`check`**: `Civil_Egregore server check [seed]
+[ticks] [ticks between hashes] [sheep] [threads]` -- a world from the
+seed (0: the run's), its camera loading nothing, ticked and its hash
+printed before the first tick and every so many after, a row a hash,
+part by part, with nothing of the machine in it.
 
 ## Generation
 

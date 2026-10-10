@@ -1,7 +1,8 @@
-//! Hashing, two ways: a key to its slot in a table whose size is a power
-//! of two -- Fibonacci hashing, one multiplication -- and a word's bits
+//! Hashing, three ways: a key to its slot in a table whose size is a
+//! power of two -- Fibonacci hashing, one multiplication -- a word's bits
 //! mixed so every bit of it moves every bit of the result -- SplitMix64's
-//! finalizer, what [`crate::rng`] draws with.
+//! finalizer, what [`crate::rng`] draws with -- and many words folded
+//! into one ([`fold`]), the same on every machine.
 
 /// 2^64 over the golden ratio, odd: multiplying by it spreads a key's
 /// low bits into the high ones, which [`slot`] keeps. SplitMix64 steps
@@ -27,4 +28,19 @@ pub const fn mix(word: u64) -> u64 {
     let z = (word ^ (word >> 30)).wrapping_mul(MIX_1);
     let z = (z ^ (z >> 27)).wrapping_mul(MIX_2);
     z ^ (z >> 31)
+}
+
+/// `hash` with `word` folded in: the two mixed ([`mix`]), so the same
+/// words in another order give another hash. A hash of many words
+/// starts from any number -- 0 will do -- and folds each in turn.
+#[inline(always)]
+pub const fn fold(hash: u64, word: u64) -> u64 {
+    mix(hash.wrapping_add(GOLDEN_RATIO) ^ word)
+}
+
+/// `hash` with every one of `words` folded in ([`fold`]), after how
+/// many they are: two runs of words one after the other never hash as
+/// the same words split elsewhere.
+pub fn fold_all(hash: u64, words: &[u64]) -> u64 {
+    words.iter().fold(fold(hash, words.len() as u64), |hash, &word| fold(hash, word))
 }

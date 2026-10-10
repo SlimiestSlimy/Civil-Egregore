@@ -18,12 +18,14 @@ pub mod halos;
 pub mod host;
 mod tick;
 pub mod transient_data;
+mod world_hash;
 mod world_start;
 
 pub use halos::HOT_ENTITY;
 pub use simulation::hot::about;
 pub use simulation::{HaloChange, COOL_TICKS, WARM_TICKS};
 pub use tick::{tick_rules, TickCounts, WorldTick};
+pub use world_hash::{world_hash, WorldHash};
 pub use world_start::{drawn_seed, Size, Start, FLOCK};
 
 use bitplane_manager::BitmapArena;
