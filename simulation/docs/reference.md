@@ -4,13 +4,13 @@ The design is in `simulation.md`.
 
 ## `sampling.rs`
 
-**`gap(random, log_unchosen)`**: set cells passed over before the next
-chosen, from `1 - unit()`, in `(0, 1]`. **`select(word, rank)`**: the
-`rank`-th set bit's position. **`sample_layer(superchunk, layer,
-probability, random, emit)`**: one superchunk's layer's chosen cells,
-in Morton order, found by the counts: the chunks', the count tiles',
-the words'. **`sample(arena, type,
-probability, random, emit)`**: every superchunk's, in Morton order.
+**`select(word, rank)`**: the `rank`-th set bit's position.
+**`sample_layer(superchunk, layer, chance, random, emit)`**: one
+superchunk's layer's chosen cells, in Morton order -- the set cells
+passed over before each drawn by `Chance::passed_over` from one draw,
+none for a chance of always -- found by the counts: the chunks', the
+count tiles', the words'. **`sample(arena, type, chance, random,
+emit)`**: every superchunk's, in Morton order.
 
 ## `turn/`
 
@@ -22,7 +22,7 @@ and their instructions. What a rule makes of them is
 dy)`**.
 
 **`Turn`**: a superchunk's turn in the first phase:
-**`superchunk`**, **`random`**, **`now`**, **`sample(type, probability,
+**`superchunk`**, **`random`**, **`now`**, **`sample(type, chance,
 samples)`** of its own cells. Cells read, anywhere hot, as the tick
 found them: **`holds(type, cell)`**, **`value(plane, cell)`** (a wide
 plane's number), **`window(type, origin, width, height)`** (up to 8x8

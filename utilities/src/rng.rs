@@ -2,6 +2,7 @@
 //! is one word, so whatever draws from it -- a test bitmap, a search --
 //! is settled by its seed alone, on every run and every machine.
 
+use crate::chance::Chance;
 use crate::hash::{mix, GOLDEN_RATIO, MIX_1};
 
 /// The random source.
@@ -54,7 +55,22 @@ impl Rng {
         self.below(100) < percent
     }
 
-    /// A number in `[0, 1)`.
+    /// True with `chance`: the draw's high 32 bits under its parts.
+    #[inline]
+    pub fn chance(&mut self, chance: Chance) -> bool {
+        (self.draw() >> 32) < chance.parts()
+    }
+
+    /// True `part` times in `whole`: which of two things it is that
+    /// happens with `whole`, one of them with `part`. `whole` is not
+    /// never.
+    #[inline]
+    pub fn chance_among(&mut self, part: Chance, whole: Chance) -> bool {
+        self.below(whole.parts()) < part.parts()
+    }
+
+    /// A number in `[0, 1)`: a float, for what is not the simulation --
+    /// a test bitmap, a search. Nothing a world follows from draws one.
     pub fn unit(&mut self) -> f64 {
         (self.draw() >> (u64::BITS - f64::MANTISSA_DIGITS)) as f64 / (1u64 << f64::MANTISSA_DIGITS) as f64
     }

@@ -7,6 +7,8 @@
 //! | [`transient_data`] | where a crate's runs leave what they make, out of git |
 //! | [`rng`] | a seeded random source, whose whole state is one word |
 //! | [`hash`] | a key's slot in a table, by Fibonacci hashing, and a word's bits mixed, SplitMix64's way |
+//! | [`chance`] | how likely a thing is, as parts in 2^32: drawn against, and the gaps between what it chooses, in whole numbers |
+//! | [`fixed_point`] | a logarithm to base 2 in fixed point, by whole-number arithmetic alone |
 //! | [`fixed_list`] | a list of fixed capacity, allocated once, that never grows |
 //! | [`commands`] | a command line's first word found among a crate's commands and handed the rest; each command's parameters declared once |
 //! | [`csv`] | CSV, which every text file Civil Egregore keeps is: rows read, a row written |
@@ -24,11 +26,13 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod cache;
+pub mod chance;
 pub mod commands;
 pub mod csv;
 pub mod diagnostics;
 pub mod dispatcher;
 pub mod fixed_list;
+pub mod fixed_point;
 pub mod hash;
 pub mod rng;
 pub mod seed;

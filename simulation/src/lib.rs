@@ -5,7 +5,7 @@
 //!
 //! | file | what is in it |
 //! |---|---|
-//! | `sampling` | Monte Carlo sampling: every set cell chosen with one probability, in Morton order, none wasted |
+//! | `sampling` | Monte Carlo sampling: every set cell chosen with one chance, in Morton order, none wasted |
 //! | `hot` | which superchunks are to be hot: the world's size, and the hot entity, whose halos are |
 //! | `halos` | the halos moved: superchunks warming and cooling, each due at a tick, made hot and cold by jobs off the tick |
 //! | `tick` | the tick: rules run superchunk by superchunk in two phases -- computing, writes queued for each superchunk they land in; applying, each superchunk its own |

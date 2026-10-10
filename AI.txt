@@ -32,6 +32,13 @@ REMOTE (cloud, no screen)
 == ALWAYS ==
 
 - Never run `cargo fmt`; never `cargo clippy --fix` (both reformat).
+- CODE EXPLAINS ITSELF ROUGHLY, DOCS EXPLAIN THE CODE IN DETAIL (the
+  user, 2026-10-09, "really seriously"). Names and short comments give
+  the rough picture; docs/ carry the how and the why, and are current:
+  a change is not done until every doc describing what it touched --
+  the crate's docs/<crate>.md and docs/reference.md, the root docs/,
+  the README, the glossary, this file -- says what the code now does.
+  After a batch of changes, a pass over all docs against the code.
 - Testing, committing and pushing are separate commands: a test's
   output is read before the commit is made.
 - Clippy warnings are cleaned before a commit.
@@ -184,7 +191,11 @@ under their own names (told to the user: a shortcut, not a decision).
 `cargo run --release -- server check <seed hex> <ticks> [every]
 [sheep] [threads]` prints server::world_hash part by part (cells,
 entities, random streams, halos, cold) with nothing of the machine in
-the output: two machines' files are compared with cmp. Same rows on 1
+the output: two machines' files are compared with cmp. No float
+in what a world follows from: chances are utilities::chance::Chance
+(parts in 2^32), gaps a fixed-point log2 over another; the root
+clippy.toml forbids ln/exp/powf/sin/... and Rng::unit everywhere but
+the crates with an (empty) clippy.toml of their own. Same rows on 1
 thread and on all, hashed along the way or once (2026-10-09). The
 Linux/Windows comparison is the user's to run. No camera in it.
 
@@ -202,9 +213,12 @@ Linux/Windows comparison is the user's to run. No camera in it.
   tick of a 4-superchunk world with 8,000 sheep is ~0.33 M. The next
   optimization worth making is Mesh::blended.
 - The tick reference (pasture 300 333 4000 4 1 less the 0-tick run)
-  is 58.37 M instructions (8,680.05 M less 8,621.68 M) at 9303e37,
-  the pasture a plain the server starts. It was 49.95 M on the mock
-  pasture it replaced: another world, so the two do not compare.
+  is 58.74 M instructions (8,472.69 M less 8,413.95 M) with integer
+  sampling, 2026-10-09; 58.50 M just before it (rules table), 58.37 M
+  at 9303e37. A logarithm by 48 squarings made it 64.29 M: hence the
+  table and series in utilities::fixed_point.
+- ASKED 2026-10-09, NEXT: profile and really simplify worldgen ("waaay
+  too slow"); a little more mountain, a little less plateau.
 - A world's stored image of a cooled superchunk is behind its cells
   until the writeback ring is flushed (World::write_back_and_flush_all,
   as a save does): compare images only after it. The complete tier's

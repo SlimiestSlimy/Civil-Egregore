@@ -324,7 +324,7 @@ in the bitplane manager.
 ### Sampling (built)
 
 `simulation::sample` chooses every hot set cell of a layer type with
-one probability, each independently, and hands the chosen cells out in
+one chance, each independently, and hands the chosen cells out in
 Morton order: superchunk by superchunk, chunk by chunk, cell by cell.
 So the writes computed from them are queued in Morton order already,
 and never sorted.
@@ -332,8 +332,11 @@ and never sorted.
 No sample is wasted: no cell is tossed a coin, and no draw lands on a
 clear cell to be thrown away. The set cells are ranked in Morton order,
 and the gap from one chosen rank to the next is drawn from the
-geometric law -- `floor(ln(u) / ln(1 - p))`, `u` uniform in `(0, 1]` --
-which chooses each set cell with probability `p`, independently. The
+geometric law -- `floor(log(u) / log(1 - p))`, `u` uniform in `(0, 1]` --
+which chooses each set cell with chance `p`, independently. The chance
+is a whole number of parts in 2^32 and the gap a fixed-point logarithm
+over another, one division (`utilities::chance`): no float, so the same
+cells on every machine. The
 counts then find each chosen rank without a linear scan: a superchunk
 bitplane is passed over whole by its count, a chunk by its count, a
 count tile of 16 words -- 32x32 cells -- by its count, a word by its bits'

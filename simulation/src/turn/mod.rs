@@ -17,6 +17,7 @@ use crate::sampling::sample_layer;
 use bitplane_manager::{NotHot, Reader, Shape, Superchunk, Window, Write, WriteQueues};
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::{CellIndex, SuperchunkIndex};
+use utilities::chance::Chance;
 use utilities::rng::Rng;
 
 /// A superchunk's outbox slots: itself and its eight neighbours.
@@ -72,14 +73,14 @@ impl<'a> Turn<'a> {
     }
 
     /// Chooses each hot set cell of `layer_type` in this superchunk with
-    /// `probability`, independently, into `samples` -- emptied first --
+    /// `chance`, independently, into `samples` -- emptied first --
     /// in Morton order: how many.
-    pub fn sample(&mut self, layer_type: LayerType, probability: f64, samples: &mut Vec<CellIndex>) -> usize {
+    pub fn sample(&mut self, layer_type: LayerType, chance: Chance, samples: &mut Vec<CellIndex>) -> usize {
         samples.clear();
         let Some(layer) = self.superchunk.layer(layer_type) else {
             return 0;
         };
-        sample_layer(self.superchunk.index(), layer, probability, &mut self.random, &mut |cell| samples.push(cell))
+        sample_layer(self.superchunk.index(), layer, chance, &mut self.random, &mut |cell| samples.push(cell))
     }
 
     /// The window of `width` by `height` cells (each up to 8) whose top

@@ -6,14 +6,15 @@ use bitplane_manager::Window;
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;
 use simulation::Turn;
+use utilities::chance::Chance;
 
 /// Runs `each` on every hot set cell of `layer_type` in the turn's
-/// superchunk chosen with `probability`, independently, in Morton
+/// superchunk chosen with `chance`, independently, in Morton
 /// order, with what it counts: how many were chosen, and the counts.
 /// `samples` is room for them, emptied first.
 #[inline]
-pub fn each_sampled<C: Default>(turn: &mut Turn, layer_type: LayerType, probability: f64, samples: &mut Vec<CellIndex>, mut each: impl FnMut(&mut Turn, CellIndex, &mut C)) -> (usize, C) {
-    let (sampled, mut counts) = (turn.sample(layer_type, probability, samples), C::default());
+pub fn each_sampled<C: Default>(turn: &mut Turn, layer_type: LayerType, chance: Chance, samples: &mut Vec<CellIndex>, mut each: impl FnMut(&mut Turn, CellIndex, &mut C)) -> (usize, C) {
+    let (sampled, mut counts) = (turn.sample(layer_type, chance, samples), C::default());
     for &cell in samples.iter() {
         each(turn, cell, &mut counts);
     }

@@ -136,7 +136,9 @@ what they always do and are not listed.
 
 | word | means | relates to | not |
 |---|---|---|---|
-| **sampling** | choosing each set cell of a layer with one probability, independently, handed out in Morton order, by skipping over cells by their counts | sample, count | |
+| **chance** | how likely a thing is, as a whole number of parts in 2^32, never a float (`utilities::chance::Chance`): drawn against, added to another, and the gap between what it chooses drawn from it, all in whole numbers | sampling, random stream | probability, odds (Tessera's own word) |
+| **gap** | how many set cells sampling passes over before the next chosen one: drawn from the geometric law, a fixed-point logarithm over another (`Chance::passed_over`) | chance, sampling | skip |
+| **sampling** | choosing each set cell of a layer with one chance, independently, handed out in Morton order, by skipping over cells by their counts | sample, count | |
 | **sample** | a cell chosen by sampling. Only that | sampling | (memory readings, test bitmaps) |
 | **count** | how many cells a bucket, or a count tile of it, holds | sampling | |
 | **count tile** | a 32x32 tile of a bucket whose set cells are counted, for sampling to skip over | count, tile | block |

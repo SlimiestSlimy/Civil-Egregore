@@ -44,6 +44,8 @@ fn lone_grass_never_decays() {
 /// alone moves that many by; a little less, as cells on its edge see
 /// neighbours past it that are not hot.
 #[test]
+// What is expected is a float; nothing is drawn against it.
+#[allow(clippy::disallowed_methods)]
 fn surrounded_grass_decays_at_its_chance() {
     let mut world = plain_world(1, 0, 0, 1);
     let origin = origin(&world);
@@ -52,7 +54,7 @@ fn surrounded_grass_decays_at_its_chance() {
     }
     assert_eq!(cells_of_grass(&world), CELLS);
     let done = tick_grass(&mut world, 4).rules;
-    let expected = CELLS as f64 * DECAY_CHANCE;
+    let expected = CELLS as f64 * DECAY_CHANCE.fraction();
     assert_eq!(done[SPREADS], 0);
     assert!((done[DECAYS] as f64 - expected).abs() < 3.0 * expected.sqrt(), "{} decays, about {expected:.0} expected", done[DECAYS]);
     assert_eq!(cells_of_grass(&world), CELLS - done[DECAYS]);
@@ -60,8 +62,10 @@ fn surrounded_grass_decays_at_its_chance() {
 
 /// Over 1,000 ticks the grass changes by
 /// no more than what spread and decayed, and scattered grass grows --
-/// at most by e, what spreading alone would make of it.
+/// by no more than spreading alone would make of it.
 #[test]
+// What is expected is a float; nothing is drawn against it.
+#[allow(clippy::disallowed_methods)]
 fn grass_changes_by_what_spread_and_decayed() {
     let mut world = plain_world(1, 400, 0, 1);
     let start = cells_of_grass(&world);
@@ -73,7 +77,7 @@ fn grass_changes_by_what_spread_and_decayed() {
         grass = now;
     }
     let growth = grass as f64 / start as f64;
-    assert!(growth > 1.0 && growth < (1000.0 * SPREAD_CHANCE).exp() * 1.1, "grew {growth:.2} times");
+    assert!(growth > 1.0 && growth < (1.0 + 2.0 * 1000.0 * SPREAD_CHANCE.fraction()) * 1.1, "grew {growth:.2} times");
 }
 
 /// Grass grows wherever a superchunk is hot: over 5x5 superchunks

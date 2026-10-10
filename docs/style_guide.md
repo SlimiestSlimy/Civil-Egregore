@@ -125,8 +125,27 @@ Some things are named by rule:
   than 1% worse on the reference run. A cost of 1% or more stays only
   if it is written down beside what it buys.
 
+## The same on every machine
+
+- A world follows from its seed alone, to the bit, on any machine and
+  any number of threads (#2). `Civil_Egregore server check` prints a
+  world's hash to compare.
+- Nothing a world follows from is a float worked on by the machine's
+  maths library: no `ln`, `exp`, `powf`, `sin` or their like. A chance
+  is `utilities::chance::Chance`, a logarithm
+  `utilities::fixed_point::log2`. The workspace's `clippy.toml` forbids
+  the rest in every crate that has no `clippy.toml` of its own; only a
+  crate no world follows from has one.
+
 ## Comments
 
+- **Code explains itself roughly; the docs explain the code in
+  detail.** A name and a short comment say what a thing is. How it
+  works and why it is so are in `docs/`: the crate's `<crate>.md` for
+  the design, its `reference.md` item by item. The docs are part of a
+  change: it is not done until every doc that describes what it
+  touched says what the code now does (#1: a doc behind the code is an
+  unknown implied).
 - Every item is documented, private ones included
   (`missing_docs`, `clippy::missing_docs_in_private_items`).
 - A comment says what the thing is, in the glossary's words. It says
