@@ -8,6 +8,7 @@
 //! each takes and what that is if not given.
 //! `cargo run --release -- server run <folder> [ticks]`
 //! `cargo run --release -- tessera <tool> [...]`
+//! `cargo run --release -- docs stale [from commit]`
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -20,6 +21,7 @@ use utilities::commands::{program, Crate};
 const CRATES: &[Crate] = &[
     Crate { name: "server", does: "a world made, run and looked at, and the server's diagnostics tools", commands: &server::commands::COMMANDS },
     Crate { name: "tessera", does: "Tessera's diagnostics tools", commands: &tessera::diagnostics::tool::COMMANDS },
+    Crate { name: "docs", does: "the docs read against a change", commands: &utilities::stale_docs::COMMANDS },
     #[cfg(feature = "renderer")]
     Crate { name: "renderer", does: "the renderer's diagnostics tools: what the window draws, with no window", commands: &renderer::diagnostics::tool::COMMANDS },
 ];

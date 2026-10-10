@@ -57,6 +57,7 @@ none.
 | folder | what is in it |
 |---|---|
 | `src/` | the utilities above |
+| `src/stale_docs.rs` | the reading list of docs a change may have left stale |
 | `src/diagnostics/` | tables, reports, the process's memory |
 | `tests/` | each, judged |
 | `docs/` | this, and the reference, function by function |
@@ -79,6 +80,40 @@ given as the reason for failing otherwise.
 A parameter is declared once: its default is what the usage table
 shows, what the command reads (`Given::number`) and what its report
 says it ran on (`Given::resolved`). So the three cannot disagree.
+
+## Stale docs
+
+`Civil_Egregore docs stale [from commit]` (`src/stale_docs.rs`) is a
+reading list, made before a commit: the doc sections that may no
+longer say what the code does. The code's comments point at the docs
+that explain it -- a path in backticks, then the sections in quotes --
+so a source that changed names the sections to read again. The command
+asks git which files differ from the commit (the last one, `HEAD`,
+unless another is named; the working tree's changes are part of it),
+reads each changed source that is still there for the docs and
+sections its comments point at, and lists every such section none of
+whose lines the change touches: the file changed, the doc, the
+section. It fails nothing and judges nothing -- a section listed may
+well still hold; it is read, and updated or said to hold.
+
+How it is read:
+
+- **The change** is `git diff --name-only <from>` for the files and
+  `git diff -U0 <from>` for the lines: each hunk's lines as the file
+  now has them. Lines only removed count as the two they stood
+  between. A file not yet in git is not in a diff, so neither a new
+  source nor a new doc is seen until it is added (`git add -N`).
+- **A pointer** is read as the workspace's fine tier reads it
+  (`../docs/testing_protocol.md`, "The docs are tested too"): a
+  markdown path in a comment's backticks, found from the source's
+  crate or the root; then every title in quotes after it, to the end
+  of the sentence, the next comment line included. A pointer with no
+  title is to the whole doc.
+- **A section** is the lines from the heading its title begins to the
+  next heading as deep or less; for a reference's entry -- a line led
+  by bold -- to the next heading or line led by bold. A title the doc
+  has not is taken as the whole doc: whether it is there is the fine
+  tier's to say.
 
 ## CSV
 

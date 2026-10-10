@@ -149,6 +149,12 @@ comment writes in backticks is a doc that exists -- taken from the
 source's crate or the workspace's root, however many `../` it starts
 with -- and has each section the comment quotes after it.
 
+Whether a section still says what the code does no test can tell.
+Before a commit, `cargo run --release -- docs stale` lists the
+sections the changed code points at that the change left untouched
+(`../utilities/docs/utilities.md`, "Stale docs"): each is read, and
+updated or said in the commit to hold.
+
 ## What is measured, and how
 
 Speed is not a test: it is measured by a tool and written down with the
