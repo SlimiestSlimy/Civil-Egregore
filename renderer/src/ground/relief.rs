@@ -1,17 +1,6 @@
-//! Relief: what a height does to a colour, the same wherever the world
-//! is drawn -- its cells, from far and from near, and the map.
-//!
-//! - **Slope light** ([`slope_light`]): a slope lighter facing the sun,
-//!   darker facing away, a little darker across it, by how steep it is
-//!   -- told on a scale that halves at each doubling, the land being
-//!   level ground and faces many heights a cell steep, and little
-//!   between.
-//! - **Height tint** ([`tint`]): low ground dark and full, higher
-//!   lighter and warmer, the highest pale.
-//! - **Water** ([`water_light`]): light over the shallows, dark over
-//!   the deep, in bands.
-//! - **Coast**: [`SAND`] on the land beside water, [`FOAM`] on the
-//!   water beside land.
+//! Relief: what a height does to a colour, the same wherever the
+//! world is drawn -- slope light, height tint, water's light, sand and
+//! foam (`docs/renderer.md`, "Height, from straight above").
 
 /// The rise a cell from which a slope is lit, or darkened, no more.
 const STEEPEST: f32 = 64.0;

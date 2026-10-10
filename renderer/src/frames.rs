@@ -1,9 +1,6 @@
-//! Frames asked of the host and shown: each time the window has shown
-//! one, it asks for the hot superchunks of its viewport -- whatever it
-//! should render, none in map mode ([`crate::map`]) -- ([`ask`]), and
-//! lays what comes back painted where it is of ([`show`]): a
+//! Frames asked of the host ([`ask`]) and shown ([`show`]): a
 //! superchunk's image a sprite each, and from near one picture of the
-//! viewport's cells.
+//! viewport's cells (`docs/renderer.md`, "The window asks").
 
 use crate::link::{Link, Seen};
 use crate::map::MapLink;
@@ -73,13 +70,9 @@ pub fn spawn(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
 }
 
 /// Shows the frames the host answered with since the last shown, in
-/// the order they came -- an ask is answered a few superchunks a
-/// frame, and no other is made until its last has come: each
-/// superchunk's image, and the picture from near -- hidden once the
-/// view is no longer near. What was drawn of a superchunk of its
-/// viewport that is no longer hot goes. A frame of another world than
-/// the last drops what was drawn of that one, and puts the view over
-/// the new if it was made or opened -- not if it is the last remade.
+/// the order they came: each superchunk's image, and the picture from
+/// near; what went cold or is of another world dropped
+/// (`docs/reference.md`, "frames.rs").
 #[allow(clippy::too_many_arguments)]
 pub fn show(
     mut commands: Commands,

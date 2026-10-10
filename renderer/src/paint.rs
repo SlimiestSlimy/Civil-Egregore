@@ -1,16 +1,6 @@
-//! Cells into pixels, on a thread of its own: between the host
-//! (`server::host`), which only copies the hot superchunks of the
-//! window's viewport, and the window, which only shows pixels. So
-//! drawing takes no time from the ticks, however much of the world is
-//! rendered, and none from the window's frames.
-//!
-//! A cell is a pixel: dirt brown, grass green, a sheep white, the
-//! ground in the light its height gives it ([`crate::ground`]). From
-//! near, a cell is several pixels and the viewport's cells are one
-//! picture ([`crate::near`]). From far off, where
-//! a pixel is many cells, it is their colours mixed: a tile of cells
-//! `2^detail` a side is, in Morton order, a run of bits, so the grass
-//! in it is counted from the words without a cell looked at.
+//! Cells into pixels, on a thread of its own, between the host, which
+//! only copies, and the window, which only shows
+//! (`docs/renderer.md`, "Three threads" and "Many superchunks").
 
 use crate::ground::{lit, Given, Ground, COARSEST};
 use crate::near::{paint_near, PaintedNear};

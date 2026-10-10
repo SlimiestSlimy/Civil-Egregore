@@ -23,7 +23,8 @@ window's middle: **new world**, **open a world**, **exit**.
 **New world** is a page of its own. The seed is typed there in
 hexadecimal -- none typed, one is drawn at random -- and `U` opens the
 sliders, every group of them offered (below): the world's size, whether
-it is forced hot, its sheep, how it is generated. **Make the world**,
+it is forced hot or its camera loads superchunks, its sheep, how it is
+generated. **Make the world**,
 or Enter, says it is to be made (`Make`), with the seed and the
 sliders' numbers as they are then; the window has the server make it
 (`server::Start::from_tuning`), and shows it (`Screen::World`). Escape goes
@@ -32,6 +33,16 @@ back a page.
 **Open a world** lists those there are, as the options do (below); a
 click on one says it is to be opened (`Open(name)`), and the window
 shows it.
+
+## Rows
+
+What the main menu and the options are both made of: a dimmed window,
+rows a bar each over its middle, a click on a row doing what it does.
+A menu says what its rows are each frame (`Row`); the parts are made
+once (`rows::spawn`), hidden, and shown as the rows are said
+(`rows::show`). Shared beside: the list of the worlds there are, gone
+through by the wheel (`Listing`), and keys typed into a line
+(`type_into`).
 
 ## Sliders
 
@@ -78,6 +89,16 @@ the window runs on the default settings alone and keeps nothing.
 - **Ocean and land**, **mesh lines**, **finer meshes**, **grass**,
   **trees**: how the world is generated (`worldgen::Generation::from_tuning`).
 
+All of it is laid out by plain arithmetic -- a row each, a track of a
+fixed width against the window's right edge -- so where the pointer is
+on one is worked out from the same numbers, with no asking Bevy. Each
+panel is dark, its first row saying what a click on it does, and under
+it the menu's groups or the group's sliders: a name, a box with the
+value, a track, its filled part and a knob each. The menu is made
+twice -- its panel and first row -- once for every group, and once for
+those offered over a world running: listed first, they are the same
+rows in both.
+
 What is longer than the window is scrolled by the wheel, the pointer
 over it. The pointer rested on a slider's row for a moment, and what
 the slider does is said beside it (`Tuned::what`).
@@ -87,7 +108,8 @@ the slider does is said beside it (`Tuned::what`).
 Escape opens the options over a world, and closes them: a row to go
 on, a row to save the world, a row to open one, a row to leave Civil
 Egregore. While they are open the pointer, the wheel and the keys are
-theirs; the world ticks on behind them.
+theirs; the world ticks on behind them. Leaving is no more than
+closing the window does: it is here to be found.
 
 **Save** says the world is to be saved (`Save`) under the name the
 window gave for it (`Options::name`). A world with none yet is named

@@ -1,22 +1,7 @@
 //! The world from near, a cell several pixels: one picture of the
-//! viewport's cells, where height is drawn at its edges -- a line along
-//! the border of the higher cell, light towards the sun and dark away,
-//! and under a wall a band on its lower cell, darkest at its foot --
-//! under the cast shadows
-//! ([`crate::ground`]), on ground tinted by its height, sand where it
-//! meets water, the water lighter over the shallows and foam where it
-//! meets the land ([`crate::ground::relief`]). How strongly is the sliders' (`utilities::tuning`),
-//! as the painter was last sent them.
-//!
-//! Every pixel takes one edge's doing, never two multiplied: of the
-//! edges that darken it the darkest, and only if none does, of those
-//! that lighten it the lightest. A cast shadow falls over an edge's
-//! shade as over anything else -- a step's dark line lies in the
-//! shadow the step casts, and would be lost in it otherwise. A wall met only at a
-//! corner fills that corner, joining the bands either side of it; a
-//! step met only at a corner draws nothing, a dot alone saying
-//! nothing. So bands meet at corners as one outline, with no doubled
-//! patch and no gap.
+//! viewport's cells, height drawn at its edges -- a line at a step, a
+//! band under a wall (`docs/renderer.md`, "Height, from straight
+//! above" and "Corners").
 
 use crate::ground::relief::{laid, tint_on_sand, water_light, FOAM, FOAM_MOST, PALE, SAND, SAND_MOST};
 use crate::ground::{shadow_drop, Fine, Ground, MARGIN, SIDE};

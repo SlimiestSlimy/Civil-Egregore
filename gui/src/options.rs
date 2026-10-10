@@ -1,20 +1,6 @@
 //! The options, over a world: opened and closed by Escape, a row each
-//! ([`crate::rows`]) -- going on, saving the world, opening one, and
-//! leaving Civil Egregore.
-//!
-//! Saving says the world is to be saved ([`Save`]) under the name the
-//! window gave for it ([`Options::name`]); a world with none yet is
-//! named first, the name typed -- what a folder may be named
-//! (`utilities::settings::world_name`), the name being its folder's
-//! -- and not one a world there is has.
-//!
-//! Opening a world lists those there are ([`crate::Gui::worlds`]), a
-//! row each, the wheel going through more than fit: a click on one
-//! says it is to be opened ([`Open`]) and closes the options.
-//!
-//! While they are open the pointer, the wheel and the keys are theirs
-//! ([`crate::Captured`]); the world ticks on behind them. Leaving is no
-//! more than closing the window does: it is here to be found.
+//! -- going on, saving the world, opening one, leaving
+//! (`docs/gui.md`, "Options").
 
 use crate::rows::{self, Bar, Listing, Look, Row, Says, Shade};
 use crate::sliders::Sliders;

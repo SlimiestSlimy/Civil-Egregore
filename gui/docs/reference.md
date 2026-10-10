@@ -6,7 +6,7 @@ What each file holds. The design: `gui.md`.
 
 **`Gui`** `{worlds}`: the menus, a plugin -- `worlds` names the worlds
 there are to open; building it takes up the numbers tuned as the
-machine kept them. **`CurrentTuning`**: those numbers, a resource the
+machine kept them (`build`). **`CurrentTuning`**: those numbers, a resource the
 sliders set and whatever draws reads (`utilities::tuning::Tuning`).
 **`Worked`**: the set their work of a frame is in. **`Screen`**:
 `MainMenu`, until a world is made or opened from it, then `World`.
@@ -83,7 +83,10 @@ only of setting a world up -- and each group (**`spawn_group`**).
 
 ## `sliders/slide.rs`
 
-**`typed(key)`**: the digit or point a key types. **`slide`**: the menu
+**`typed(key)`**: the digit or point a key types, off `DIGITS`, each
+digit's key and its key on the number pad. `turned_on(index, value)`:
+whether a toggle is on -- nearer its range's far end than its near
+one. **`slide`**: the menu
 and the groups opened and left, sliders dragged and set back, values
 typed -- into `CurrentTuning` -- the numbers kept; **`show`**: knobs
 and values as they are.

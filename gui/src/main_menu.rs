@@ -1,17 +1,6 @@
-//! What the window opens on, before any world: a new world, a world
-//! saved, or leaving -- a row each ([`crate::rows`]).
-//!
-//! - **A new world** is set up on a page of its own: its seed typed in
-//!   hexadecimal, or none for one drawn at random, and the rest as the
-//!   sliders have it -- every group of them offered while it is set up,
-//!   `U` opening them: the world's size, whether it is forced hot or
-//!   its camera loads superchunks, its sheep, and how it is generated. Made, it is said ([`Make`]).
-//! - **A world saved** is chosen from those there are
-//!   ([`crate::Gui::worlds`]), a row each, the wheel going through more
-//!   than fit: chosen, it is said ([`Open`]).
-//!
-//! Either way the window then shows the world ([`Screen::World`]).
-//! Escape goes back a page.
+//! What the window opens on, before any world: a new world set up, a
+//! world saved opened, or leaving -- a row each
+//! (`docs/gui.md`, "The main menu").
 
 use crate::rows::{self, Bar, Listing, Look, Row, Says, Shade};
 use crate::sliders::Sliders;

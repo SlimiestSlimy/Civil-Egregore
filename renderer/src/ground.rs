@@ -1,23 +1,7 @@
-//! The light on the ground: a superchunk's heights -- brought by the
-//! first frame it is hot in, and past its edges, or if no frame brings
-//! them, worked out again here from the world's seed -- and what they
-//! do to a cell's colour, seen from straight above with the sun to the
-//! top left ([`relief`]).
-//!
-//! - **Slope light**: a slope facing the sun lighter, one facing away
-//!   darker, off the heights smoothed, in bands.
-//! - **Height tint**: low ground dark, higher lighter and warmer, the
-//!   highest pale.
-//! - **Cast shadows**: a sweep down the sun's diagonal, each cell
-//!   keeping how high the shadow line stands over it.
-//! - **Contours**, as far apart on the screen at every detail, every
-//!   fifth darker.
-//! - **The coast**: sand on the land beside water and foam on the
-//!   water beside it, a pixel wide at every detail; the water lighter
-//!   over the shallows and darker over the deep, in bands.
-//!
-//! Heights never change, so a superchunk's ground is made once and
-//! kept.
+//! The light on the ground: a superchunk's heights and what they do
+//! to a cell's colour, seen from straight above with the sun to the
+//! top left -- made once and kept, heights never changing
+//! (`docs/renderer.md`, "Height, from straight above").
 
 mod levels;
 mod light_and_shadow;

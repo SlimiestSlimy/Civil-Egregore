@@ -1,19 +1,9 @@
-//! Civil Egregore's menus, laid over whatever window shows the world,
-//! a part a module:
+//! Civil Egregore's menus, laid over whatever window shows the world:
+//! the main menu, the options, the sliders, and the rows the first two
+//! are made of. It knows nothing of the world or of what draws it.
 //!
-//! | module | what it is |
-//! |---|---|
-//! | [`main_menu`] | what the window opens on: a new world, a world saved, or leaving |
-//! | [`options`] | what Escape opens over a world: going on, saving it, opening another, leaving |
-//! | [`sliders`] | the numbers tuned by eye (`utilities::tuning`), a slider each, in groups |
-//! | [`rows`] | what the main menu and the options are both made of: rows a click each |
-//!
-//! It knows nothing of the world or of what draws it. What it is told
-//! comes with [`Gui`] and [`options::Options::name`]; what it has to
-//! say is read off it: which screen is up ([`Screen`]), what of the
-//! pointer, the wheel and the keys its menus took ([`Captured`]), the
-//! numbers its sliders set ([`CurrentTuning`]), and a message for each
-//! world to be made ([`Make`]), opened ([`Open`]) or saved ([`Save`]).
+//! The design: `docs/gui.md`; function by function:
+//! `docs/reference.md`.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.

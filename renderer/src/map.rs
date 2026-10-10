@@ -1,12 +1,6 @@
-//! The map: the world as generated, shown in place of its cells in map
-//! mode, which `M` turns on and off, at any zoom. It asks nothing of the
-//! simulation: a pixel is the cell in its middle, as that cell is
-//! generated -- its height from the seed, the ocean over it or grass,
-//! dirt or a tree on it -- so nothing is made hot to be looked at, and
-//! the world is seen as far out as islands are specks. A thread of its
-//! own draws the last map asked for, on every thread the machine has
-//! ([`start`]); the window asks for one of what the camera shows, and
-//! lays it where it is of ([`far`]).
+//! The map: the world as generated, shown in place of its cells in
+//! map mode, drawn on a thread of its own from the generator alone
+//! (`docs/renderer.md`, "The map").
 
 use crate::frames::{picture_of, Laid, DIRT};
 use crate::link::Seen;

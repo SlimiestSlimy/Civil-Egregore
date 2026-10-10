@@ -10,8 +10,8 @@ renderer`, opens it on the main menu (`gui`): nothing runs until a
 world is made there or one saved is opened. A world made is as the
 sliders have it then (`gui/docs/gui.md`): its seed typed, or drawn at
 random -- the first from it with land about the origin, where the sheep
-start, if one is within 256 -- its size, whether it is forced hot, its
-sheep and how it is generated.
+start, if one is within 256 -- its size, whether it is forced hot or
+its camera loads superchunks, its sheep and how it is generated.
 
 A world with a size is a square of superchunks about the origin, with
 sheep on every one; hot in the halos about them, or, forced, all of it
@@ -92,9 +92,11 @@ which a pixel a cell cannot do: that would be 4 GiB of pixels a frame.
   brown and green by its grass, white by its sheep. A tile is
   a run of bits in Morton order, so its grass is counted from the words
   with no cell looked at.
-- **A frame carries only so many superchunks** -- 8 drawn fine, 32
-  coarse -- and the window goes round the viewport's hot ones, frame
-  after frame. So what a frame costs the host is the same however many
+- **A frame carries only so many superchunks** -- 8 drawn at a cell
+  or two a pixel, 16 at four, 32 coarser (`frames::frame_holds`): a
+  fine one is more to paint and to send to the graphics card -- and the
+  window goes round the viewport's hot ones, frame after frame. From
+  near, every hot superchunk of the viewport is in the one picture. So what a frame costs the host is the same however many
   are in the viewport, and cold ones cost nothing.
 - **A fine image is dropped when its superchunk leaves the viewport**:
   it is 4 MiB here and as much on the graphics card.
@@ -116,8 +118,11 @@ only the cells past its edges that no frame brought (138 before, for
 the shadows cast onto it, and 26 after, as far as the coast is looked
 for) -- measured, 23 ms a
 superchunk's ground where working every height out again took 90 --
-once, on a thread a superchunk, and keeps them: the coarse levels for good, the fine
-parts (8 MiB) for the 48 superchunks last seen.
+once, on a thread a superchunk, and keeps them: the fine parts (8 MiB)
+for the 48 superchunks last seen (`FINE_KEPT`), the coarse levels for
+2,048 (`GROUNDS_KEPT`), past which those unseen for 256 frames go
+(`UNSEEN_FRAMES`). Heights never change, so a ground kept is never
+made again.
 
 - **Slope light**: slopes facing the sun lighter, those facing away
   darker, those across it a little darker, off the heights smoothed,
@@ -160,7 +165,8 @@ parts (8 MiB) for the 48 superchunks last seen.
   does not itself drop by a wall. Walls are drawn much
   the stronger: they are what cannot be crossed.
 
-**Corners.** A pixel takes one edge's doing, never two multiplied: the
+**Corners.** An edge is measured in eighths of a cell, whatever the
+pixels a cell. A pixel takes one edge's doing, never two multiplied: the
 darkest of the edges that darken it, and only if none does, the
 lightest of those that lighten it. A cast shadow darkens an edge's
 shade as it does the ground: a step's dark line lies in the shadow the

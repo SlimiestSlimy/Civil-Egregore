@@ -8,7 +8,10 @@ The design is in `renderer.md`.
 **`Picture`** `{frame, paint_seconds, superchunks, near}`: a frame, painted -- the frame itself, its cells gone into the pixels. **`start(frames, tunings)`**: the painter's
 thread, the ground made again for each world run; where pictures come. **`ground(grounds, frame, number)`**: the
 ground of every hot superchunk of the frame made if missing, the fine
-parts of those longest unseen dropped (`FINE_KEPT`, 48).
+parts of those longest unseen dropped (`FINE_KEPT`, 48), and past
+`GROUNDS_KEPT` (2,048) grounds those unseen `UNSEEN_FRAMES` (256)
+frames. `chunk_top_left(place)`: how far across and down from its
+superchunk's top left a chunk starts, in cells.
 **`paint(cells, ground)`**: dirt, the grass over it, both lit, the
 sheep over that, a pixel each (`SHEEP_REACH`, none); **`opaque`**;
 `BROWN`, `GREEN`, `WHITE`: dirt's, grass's and a sheep's colours. `WATER`, `FILM`, **`depth_at(cells, word, bit)`**, **`under_water(colour,
@@ -25,7 +28,14 @@ word, bit)`**; **`counted(words, detail)`**: the cells set a tile.
 `LIGHT_BAND`, `COAST_REACH` (24 cells), `SMOOTHED_OVER` (4), `BEFORE`
 (138) and `AFTER` (26) cells kept about a superchunk, `SHADOW`,
 `COARSEST` (8), `FACTOR_ONE` (128: a colour's factor is a byte, and
-this is one). **`shadow_drop()`**. **`Given`**: heights already worked
+this is one); `WIDE`, cells along the side of the heights worked on,
+those kept before and after with the superchunk's; `MARGIN` (8) and
+`KEPT`, what is kept of them past each side, as far as a wall's band
+is looked for; `LIT_ONE` (80), flat ground's light in the seven bits a
+cell's is kept in, and `SHADOWED`, the eighth, saying a shadow falls
+on it; `FINE_LEVELS` (2), the coarsest of the levels dropped with the
+fine parts; `Shade::PART_BITS` (6) and `Shade::WHOLE`, how much of
+what is laid over a colour. **`shadow_drop()`**. **`Given`**: heights already worked
 out, a superchunk's height words by its top left cell, so `generate`
 makes none twice.
 **`Shade`**: what a pixel's colour is drawn through -- what it is
@@ -58,7 +68,8 @@ sand)`**; **`laid(from, to, part)`**.
 light untinted, how pale, its height, the share of it under the ocean,
 how far its nearest cell is from the coast -- **`halved()`**,
 **`drawn(detail)`**: contours (`CONTOUR`, `FIFTH_CONTOUR`,
-`CONTOUR_EVERY`, `CONTOURS_APART`), sand and foam.
+`CONTOUR_EVERY`, `CONTOURS_APART`; `FIFTH`, 5, contours from one drawn
+darker to the next), sand and foam.
 **`Shade::of(factor, over, part)`**.
 
 ### `ground/light_and_shadow.rs`
@@ -68,6 +79,9 @@ how far its nearest cell is from the coast -- **`halved()`**,
 **`banded(light, step)`**.
 
 ## `near.rs`
+
+`EIGHTHS` (8): a cell's side in eighths, what edges are measured in;
+`AROUND`: the eight cells about a cell.
 
 **`PaintedNear`** `{near, pixels}`. **`Edge`** `{towards, rise}`: a
 neighbour of another height; **`shading(from, span)`**: how dark and
@@ -143,7 +157,9 @@ menus took the keys, the wheel or the pointer. **`fullscreen`**: by
 
 ## `overlays.rs`
 
-`LINES_FROM`, `LINES`, `SUPERCHUNK_LINE`, `CHUNK_LINE`.
+`LINES_FROM`, `LINES`, `SUPERCHUNK_LINE`, `CHUNK_LINE`; `HEIGHT_WIDTH`
+(80 screen pixels a height written at its full size, five digits);
+`CameraOnly`, the camera and none of the overlays' parts.
 **`Boundary`**: a line between chunks or superchunks; **`Shown`**: which
 of the overlays are shown; **`toggle`**: by `B`, `C` and `H`.
 **`boundaries`**: as wide on the screen however near.
@@ -185,7 +201,14 @@ map at 64 and 16 cells a pixel, the cells from `farthest` cells a pixel
 to one, the cells from near at 2, 4 and 8 pixels a cell -- painted by
 the map's and the painter's own code from a host asked as the window
 asks it, each 1,024 by 768 as a screen would show it; **`answered`**,
-**`viewport_of`**. **`tool::COMMANDS`**: `stills`, each kept as a PNG.
+**`viewport_of`**. Its constants: `SIZE`, `MAP_STEPS`, the stills'
+`NEAR_PIXELS` and `NEAR_MARGIN`, `SHEEP_A_SUPERCHUNK` (250),
+`WAITED_AT_MOST` (half an hour: a world's superchunks take a while to
+generate) and `BETWEEN_ASKS` (200 ms before the host is asked again
+for superchunks not yet hot). **`tool::COMMANDS`**: `stills`, each kept
+as a PNG (`stills_tool`); its parameters' names `SEED` (in hex; 0 the
+counted one, moved on to one with land about the middle),
+`CELLS_EAST`, `CELLS_SOUTH`, `FARTHEST`, `NAMED`.
 
 ## `transient_data.rs`
 
