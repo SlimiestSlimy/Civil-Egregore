@@ -1,9 +1,7 @@
 [package]
 name = "coordinates"
-version = "0.1.0"
 edition = "2024"
 description = "Civil Egregore's coordinates: cells, chunks and superchunks, by Morton index, and cartesian where named"
-publish = false
 
 [dependencies]
 

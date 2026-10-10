@@ -12,8 +12,18 @@ use bitmap::morton::morton_index;
 use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 
 
-/// A cell of a chunk, cartesian: across and down from its top left.
-pub const CELL: (u8, u8) = (3, 200);
+/// A cell of a chunk, cartesian: across and down from its top left --
+/// drawn from the run's seed, the same one all through a run.
+pub fn a_cell() -> (u8, u8) {
+    let drawn = utilities::rng::Rng::new(utilities::seed::counted()).draw();
+    (drawn as u8, (drawn >> 8) as u8)
+}
+
+/// A chunk's place in its superchunk, drawn from the run's seed: the
+/// same one all through a run.
+pub fn a_place() -> usize {
+    (utilities::rng::Rng::new(!utilities::seed::counted()).draw() % CHUNKS_IN_SUPERCHUNK as u64) as usize
+}
 
 /// The superchunk at the world's top left corner.
 pub const ORIGIN: SuperchunkIndex = SuperchunkIndex(0);

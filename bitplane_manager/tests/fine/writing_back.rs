@@ -15,16 +15,16 @@ use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
 #[test]
 fn changes_write_back_through_the_ring() {
     let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
-    let place = 14;
-    let mut storage = storage_with(ORIGIN, place, &[(LayerType(2), one_cell(CELL))], &mut codec);
+    let place = a_place();
+    let mut storage = storage_with(ORIGIN, place, &[(LayerType(2), one_cell(a_cell()))], &mut codec);
     let chunk = ChunkIndex::of(ORIGIN, place);
     let (new, cleared) = (BucketKey { layer_type: LayerType(1), chunk }, BucketKey { layer_type: LayerType(2), chunk });
 
     assert_eq!(arena.make_hot_layers(chunk, &[LayerType(1), LayerType(2)], &storage, &mut codec), 2);
     assert_eq!(arena.write_back(ORIGIN, &mut storage, &mut codec), 0, "nothing changed");
 
-    write(&mut arena, LayerType(1), WriteOp::Set, cell_in(chunk, CELL));
-    write(&mut arena, LayerType(2), WriteOp::Unset, cell_in(chunk, CELL));
+    write(&mut arena, LayerType(1), WriteOp::Set, cell_in(chunk, a_cell()));
+    write(&mut arena, LayerType(2), WriteOp::Unset, cell_in(chunk, a_cell()));
     assert_eq!(arena.write_back(ORIGIN, &mut storage, &mut codec), 2);
     assert!(storage.layer(chunk, LayerType(1)).is_none() && storage.layer(chunk, LayerType(2)).is_some(), "in the ring yet");
     storage.flush_all(&mut flushed);
@@ -32,7 +32,7 @@ fn changes_write_back_through_the_ring() {
     assert!(storage.layer(chunk, LayerType(2)).is_none(), "an empty layer leaves the chunk");
     let mut back = [0; WORDS];
     codec.decode(storage.layer(chunk, LayerType(1)).expect("the new layer"), &mut back);
-    assert_eq!(back, one_cell(CELL));
+    assert_eq!(back, one_cell(a_cell()));
 
     assert!(arena.evict(new) && arena.evict(cleared) && arena.is_empty());
     assert_eq!(arena.allocations(), 0, "nothing hot, nothing waiting");
@@ -47,8 +47,8 @@ fn changes_write_back_through_the_ring() {
 fn evicted_bitmaps_wait_for_the_ring() {
     let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
     let mut storage = ChunkStorage::new(1 << 12);
-    let key = BucketKey { layer_type: LayerType(1), chunk: ChunkIndex::of(WORLD_MIDDLE, 9) };
-    let cell = cell_in(key.chunk, CELL);
+    let key = BucketKey { layer_type: LayerType(1), chunk: ChunkIndex::of(WORLD_MIDDLE, a_place()) };
+    let cell = cell_in(key.chunk, a_cell());
     arena.make_hot(key, storage.layer(key.chunk, key.layer_type), &mut codec);
     write(&mut arena, LayerType(1), WriteOp::Set, cell);
     arena.write_back(WORLD_MIDDLE, &mut storage, &mut codec);
@@ -75,13 +75,13 @@ fn evicted_bitmaps_wait_for_the_ring() {
 fn a_superchunk_lingering_waits_for_its_changes() {
     let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
     let mut storage = ChunkStorage::new(1 << 12);
-    let key = BucketKey { layer_type: LayerType(1), chunk: ChunkIndex::of(WORLD_MIDDLE, 9) };
-    let cell = cell_in(key.chunk, CELL);
+    let key = BucketKey { layer_type: LayerType(1), chunk: ChunkIndex::of(WORLD_MIDDLE, a_place()) };
+    let cell = cell_in(key.chunk, a_cell());
     arena.make_hot(key, None, &mut codec);
     write(&mut arena, LayerType(1), WriteOp::Set, cell);
 
     let dirty = arena.make_cold_superchunk(WORLD_MIDDLE);
-    assert_eq!(dirty.iter().map(|(key, cells)| (*key, cells.to_vec())).collect::<Vec<_>>(), vec![(key, one_cell(CELL).to_vec())], "its one change, to encode");
+    assert_eq!(dirty.iter().map(|(key, cells)| (*key, cells.to_vec())).collect::<Vec<_>>(), vec![(key, one_cell(a_cell()).to_vec())], "its one change, to encode");
     assert_eq!((arena.len(), arena.lingering()), (0, 1), "cold, lingering");
     assert_eq!(arena.holds(LayerType(1), cell), Err(NotHot(key)));
     storage.flush_all(&mut flushed);
@@ -119,7 +119,7 @@ fn a_full_ring_releases_what_it_flushed() {
     let encoded = codec.encode(&drawn()).to_vec();
     for superchunk in [first, second] {
         arena.make_hot(key(superchunk), Some(&encoded), &mut codec);
-        write(&mut arena, LayerType(3), WriteOp::Set, cell_in(key(superchunk).chunk, CELL));
+        write(&mut arena, LayerType(3), WriteOp::Set, cell_in(key(superchunk).chunk, a_cell()));
     }
     arena.write_back(first, &mut storage, &mut codec);
     assert!(arena.evict(key(first)));
@@ -145,7 +145,7 @@ fn evicting_an_unwritten_change_panics() {
 fn only_the_types_asked_for_turn_hot() {
     let mut codec = LayerCodec::new();
     let mut arena = BitmapArena::new();
-    let place = 13;
+    let place = a_place();
     let layers: Vec<(LayerType, CellWords)> = [1, 2, 3].map(|layer_type| (LayerType(layer_type), drawn())).to_vec();
     let storage = storage_with(WORLD_MIDDLE, place, &layers, &mut codec);
     let chunk = ChunkIndex::of(WORLD_MIDDLE, place);

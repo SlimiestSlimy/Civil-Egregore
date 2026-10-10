@@ -1,4 +1,4 @@
-//! The fine tier: one case a test, made by hand, each pinning one behaviour -- instant.
+//! The fine tier: each test pins one behaviour, at the edges written by hand and at cases drawn from the run's seed -- instant.
 //! The tiers: `docs/testing_protocol.md`, at the repository's root.
 //!
 //! `cargo test --test fine`
@@ -13,6 +13,7 @@ mod chunk_storage {
     use bitmap::{Bitmap, CellWords, WORDS};
     use chunk_storage::{ChunkMaps, ChunkStorage, HeightMap, InvalidImage, LayerChange, LayerCodec, LayerType, SuperchunkImage, WritebackRing};
     use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
+    use utilities::rng::Rng;
 
     /// A cell of a chunk, cartesian: across and down from its top left.
     const CELL: (u8, u8) = (3, 200);
@@ -49,6 +50,77 @@ mod chunk_storage {
         let followed: Vec<u64> = [&encoded[..], &[u64::MAX; 4], codec.encode(&one_cell(CELL))].concat();
         assert_eq!(decoded(&mut codec, &followed), cells);
         assert_eq!(codec.encode(&[0; WORDS]).len(), 1);
+    }
+
+    /// Bitmaps drawn -- a few cells, most cells, rectangles and discs,
+    /// words of noise, runs of whole words, nothing and everything --
+    /// each come back from their encoding cell for cell, whatever
+    /// words follow, in any order through one codec.
+    #[test]
+    fn layers_drawn_decode_to_what_was_encoded() {
+        let mut random = Rng::new(utilities::seed::counted());
+        let mut codec = LayerCodec::new();
+        for case in 0..200 {
+            let mut bitmap = Bitmap::new();
+            let byte = |random: &mut Rng| random.below(256) as u8;
+            match case % 8 {
+                0 => (0..random.below(40)).for_each(|_| bitmap.set(byte(&mut random), byte(&mut random))),
+                1 => (0..random.below(40_000)).for_each(|_| bitmap.set(byte(&mut random), byte(&mut random))),
+                2 => (0..random.between(1, 6)).for_each(|_| {
+                    // Two corners anywhere, past the bitmap's edges too.
+                    let mut corner = || random.below(400) as i64 - 72;
+                    bitmap.set_rect(corner(), corner(), corner(), corner());
+                }),
+                3 => (0..random.between(1, 6)).for_each(|_| bitmap.set_circle(random.below(256) as i64, random.below(256) as i64, random.below(80) as i64)),
+                _ => {}
+            }
+            let mut cells = *bitmap.words();
+            match case % 8 {
+                4 => cells.iter_mut().for_each(|word| *word = random.draw()),
+                5 => cells.iter_mut().for_each(|word| *word = [0, u64::MAX, random.draw()][random.below(3) as usize]),
+                6 => cells = [u64::MAX; WORDS],
+                // All but a few cells set.
+                7 => cells.iter_mut().for_each(|word| *word = !(u64::from(random.below(50) == 0) << random.below(64))),
+                _ => {}
+            }
+            let encoded = codec.encode(&cells).to_vec();
+            let followed: Vec<u64> = [&encoded[..], &(0..random.below(5)).map(|_| random.draw()).collect::<Vec<_>>()].concat();
+            assert!(decoded(&mut codec, &followed) == cells, "case {case}: {} cells set, {} words encoded", cells.iter().map(|word| word.count_ones()).sum::<u32>(), encoded.len());
+        }
+    }
+
+    /// Heights drawn, a floor and a span a chunk: every cell's comes
+    /// back, from the map and from an image made with it, and a chunk
+    /// is tall exactly if its ground spans more than a byte.
+    #[test]
+    fn heights_drawn_come_back_and_a_chunk_is_tall_by_its_span() {
+        const CELLS: usize = 1 << 16;
+        let mut random = Rng::new(utilities::seed::counted());
+        for _ in 0..4 {
+            // Spans about a byte, where a chunk turns tall, and far past it.
+            let chunks: [(u16, u16); 16] = std::array::from_fn(|_| {
+                let span = [0, 1, 254, 255, 256, 257, random.below(256) as u16, random.below(60_000) as u16][random.below(8) as usize];
+                (random.below(u64::from(u16::MAX - span) + 1) as u16, span)
+            });
+            let noise = random.draw() | 1;
+            let height_of = |place: usize| {
+                let (floor, span) = chunks[place / CELLS];
+                // The floor and the top each on a cell, the rest anywhere between.
+                match place % CELLS {
+                    0 => floor,
+                    1 => floor + span,
+                    cell => floor + ((cell as u64).wrapping_mul(noise) >> 20) as u16 % (span + 1),
+                }
+            };
+            let heights = HeightMap::from_heights(height_of);
+            let image = SuperchunkImage::new(&heights);
+            for (chunk, &(floor, span)) in chunks.iter().enumerate() {
+                assert_eq!((heights.tall(chunk), heights.floor(chunk)), (span > 255, floor), "chunk {chunk}: a span of {span} from {floor}");
+            }
+            for place in (0..16).flat_map(|chunk| [0, 1, CELLS - 1].map(|cell| chunk * CELLS + cell)).chain((0..2_000).map(|_| random.below(16 * CELLS as u64) as usize)) {
+                assert_eq!((heights.get(place), image.height(place)), (height_of(place), height_of(place)), "place {place}");
+            }
+        }
     }
 
     /// Every cell has its own height, in the map and in an image made with

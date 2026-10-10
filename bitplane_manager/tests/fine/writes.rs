@@ -114,6 +114,65 @@ fn cold_bitmaps_are_missed() {
     assert!(arena.holds(STONE, CellCartesian { x: 256, y: 0 }.into()).is_err());
 }
 
+/// Writes drawn -- any op over any shape, about the corner where four
+/// superchunks meet, one of them not hot -- leave every cell as cells
+/// written one by one in the order queued would, and count what
+/// changed and what was missed as that does.
+#[test]
+fn writes_drawn_are_the_cells_written_one_by_one() {
+    use std::collections::HashSet;
+    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
+    let edge = WORLD_MIDDLE.top_left().cartesian().x;
+    // The chunks about the corner, each way; those up and left of it left cold.
+    let hot: Vec<CellCartesian> = (-2..2).flat_map(|down| (-2..2).map(move |across| (across, down))).filter(|&(across, down)| across >= 0 || down >= 0).map(|(across, down)| CellCartesian { x: edge.wrapping_add_signed(across * 256), y: edge.wrapping_add_signed(down * 256) }).collect();
+    let mut arena = arena_over(&hot);
+    let is_hot = |x: u32, y: u32| x >= edge || y >= edge;
+    let mut held: HashSet<(u32, u32)> = HashSet::new();
+    for batch in 0..40 {
+        let mut expected = WritesApplied::default();
+        for _ in 0..random.between(1, 30) {
+            let at = CellCartesian { x: edge - 400 + random.below(800) as u32, y: edge - 400 + random.below(800) as u32 };
+            let shape = match random.below(3) {
+                0 => Shape::Cell,
+                1 => Shape::Rect { width: random.below(40) as u8, height: random.below(40) as u8 },
+                _ => Shape::Disc { radius: random.below(20) as u8 },
+            };
+            let op = [WriteOp::Set, WriteOp::Unset, WriteOp::Flip][random.below(3) as usize];
+            let covered: Vec<(u32, u32)> = match shape {
+                Shape::Cell => vec![(at.x, at.y)],
+                Shape::Rect { width, height } => (0..u32::from(height)).flat_map(|down| (0..u32::from(width)).map(move |across| (at.x + across, at.y + down))).collect(),
+                Shape::Disc { radius } => {
+                    let radius = i32::from(radius);
+                    (-radius..=radius).flat_map(|down| (-radius..=radius).map(move |across| (across, down))).filter(|(across, down)| across * across + down * down <= radius * radius).map(|(across, down)| (at.x.wrapping_add_signed(across), at.y.wrapping_add_signed(down))).collect()
+                }
+            };
+            for cell in covered {
+                if !is_hot(cell.0, cell.1) {
+                    expected.missed += 1;
+                    continue;
+                }
+                let was = held.contains(&cell);
+                let becomes = match op {
+                    WriteOp::Set => true,
+                    WriteOp::Unset => false,
+                    _ => !was,
+                };
+                expected.changed += u64::from(was != becomes);
+                if becomes { held.insert(cell) } else { held.remove(&cell) };
+            }
+            expected.writes += 1;
+            stone(&mut arena, op, at, shape);
+        }
+        assert_eq!(arena.apply(), expected, "batch {batch}");
+        let counted: u32 = [(-1, 0), (0, -1), (0, 0)].iter().map(|&(across, down)| arena.superchunk_count(STONE, WORLD_MIDDLE.offset(across, down).expect("in the world"))).sum();
+        assert_eq!(counted as usize, held.len(), "batch {batch}");
+    }
+    assert!(held.len() > 1_000, "{} cells held", held.len());
+    for (x, y) in (edge - 460..edge + 460).flat_map(|y| (edge - 460..edge + 460).map(move |x| (x, y))).filter(|&(x, y)| is_hot(x, y)) {
+        assert_eq!(holds(&arena, x, y), held.contains(&(x, y)), "cell ({x}, {y})");
+    }
+}
+
 /// Grass spreading over the mock superchunk's dirt, as writes: a cell
 /// stays dirt or grass, and the counts keep up.
 #[test]
@@ -121,7 +180,7 @@ fn grass_spreads_over_dirt() {
     let mut codec = LayerCodec::new();
     let mut arena = BitmapArena::new();
     let mut storage = ChunkStorage::new(1 << 12);
-    storage.insert(WORLD_MIDDLE, grass_on_dirt(3, 8, &mut codec));
+    storage.insert(WORLD_MIDDLE, grass_on_dirt(utilities::seed::counted(), 8, &mut codec));
     for chunk in WORLD_MIDDLE.chunks() {
         arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
     }
