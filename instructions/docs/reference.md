@@ -23,7 +23,10 @@ up to 8x8 cells about a cell as a `Window`, with their top left cell.
 
 **`each_woken(turn, layers, state, each)`**: `each` run on every entity
 waking. **`stands(turn, id, at)`**: whether an entity stood on a
-cell. **`spawn(turn, kind, at, wake, attributes)`**: a new entity,
+cell; **`stands_beside(turn, id, centre, among)`**: which of the
+neighbours it stood on. **`spawn_beside(turn, kind, centre, wanted,
+open, wake, attributes)`**: a new entity on a neighbour or, that taken
+by then, on the first free of the others open. **`spawn(turn, kind, at, wake, attributes)`**: a new entity,
 its ID drawn and returned. **`sleep(turn, entity, wake)`**: a move to
 where it stands. **`commit(turn, edit, to, wake)`**: an `EntityEdit`'s
 entity moved if no attribute changed, else put whole. **`remove(turn,
@@ -96,7 +99,7 @@ cells entities stand on.
 `WET`, `WALL_EAST`, `WALL_SOUTH`: the layers a world's cells have, from
 the type registry (`../../type_registry/`). **`entity_types`**:
 `SHEEP`, and its attributes `HUNGRY_AT`, `PREGNANT`, `LAMB`, `ROAMING`
-and `BEARING` -- and `Roaming` and `Bearing`, the last two's layouts.
+and `BEARING` -- and `Roaming`, the layout of `ROAMING`.
 
 The words the instructions are asked in: `CellIndex`, `CellCartesian`,
 `SuperchunkIndex`, `NEIGHBOURS`, `SUPERCHUNK_SIDE_CELLS`, `LayerType`,

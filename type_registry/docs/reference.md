@@ -24,8 +24,8 @@ no attribute's): **`of_blocks(number, blocks)`**,
 attribute block; **`data_words(blocks)`**: the words of data so many
 blocks hold. **`Layout`**: how an attribute's data is laid out --
 `BLOCKS`, **`write(data)`**, **`read(data)`** -- had by `u64`, one
-number in the first word, and by **`Roaming`** `{until, neighbour}`
-and **`Bearing`** `{lamb, neighbour}`, the first word and the second. **`Attribute<L>`**: an attribute, its
+number in the first word, and by **`Roaming`** `{until, neighbour}`,
+the first word and the second. **`Attribute<L>`**: an attribute, its
 layout in its type: **`new(number)`**, **`attribute_type`**.
 
 ## `registry.rs`

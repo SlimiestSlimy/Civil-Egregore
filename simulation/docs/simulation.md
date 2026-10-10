@@ -118,6 +118,7 @@ carrying no more than it changes (`../entity_manager/`):
 | instruction | queued by | what it does | carries |
 |---|---|---|---|
 | put | `put`, `update` | an entity made, or made anew whole | its attributes |
+| put on the first free | `put_on_the_first_free` | a new entity made on its cell or, that taken, on the first free of some others | its attributes, and the other cells |
 | move | `step` | moved to a cell, or left where it stands, to wake at a tick; its attributes as they are | nothing |
 | edit | `set_attribute`, `set_attribute_blocks`, `unset_attribute` | one attribute set or removed, of any entity in reach | the one attribute's blocks, or none |
 | remove | `remove` | removed | nothing |

@@ -123,7 +123,7 @@ fn a_lamb_refused_its_cell_is_born_later() {
     }
     let lambs = |world: &World| world.entities.iter().filter(|sheep| sheep.attribute(LAMB).is_some()).count();
     let pregnant = |world: &World| world.entities.iter().filter(|sheep| sheep.attribute(PREGNANT).is_some()).count();
-    // Both put a lamb on the one cell: one is made, and no birth is counted before it is seen.
+    // Both put a lamb on the one cell, neither with another to put it on: one is made, and no birth is counted before it is seen.
     let report = tick_sheep(&mut world, 0);
     assert_eq!((report.rules[BIRTHS], report.instructions_applied.refused, lambs(&world), pregnant(&world)), (0, 1, 1, 2));
     // The tick after, one mother sees her lamb; the other does not, and has no cell to try again on.
@@ -142,4 +142,28 @@ fn a_lamb_refused_its_cell_is_born_later() {
     }
     assert_eq!((births, most_lambs, pregnant(&world)), (2, 2, 0));
     assert!(world.entities.iter().all(|sheep| sheep.attribute(BEARING).is_none()));
+}
+
+/// Two lambs put on one cell in a tick, another cell free beside both
+/// mothers: whichever cell each drew, both lambs are made that tick --
+/// the second on the other cell if its own was taken first -- and both
+/// born the tick after.
+#[test]
+fn a_lamb_whose_cell_was_taken_is_put_beside_it() {
+    let mut world = plain_world(1, 0, 0, 1);
+    let (x, y) = (500, 500);
+    for (id, mother) in [x, x + 2].into_iter().enumerate() {
+        let header = Header { id: EntityId(1 + id as u64), kind: SHEEP, at: cell(&world, mother, y), wake: 0 };
+        put_entity(&mut world, header, &[AttributeBlock::holding(HUNGRY_AT, 1), AttributeBlock::holding(PREGNANT, 0)]);
+    }
+    // Every cell beside either taken, but two between them.
+    let free = [(x, y), (x + 1, y), (x + 1, y + 1), (x + 2, y)];
+    for (id, (x, y)) in (x - 1..=x + 3).flat_map(|x| (y - 1..=y + 1).map(move |y| (x, y))).filter(|at| !free.contains(at)).enumerate() {
+        let header = Header { id: EntityId(10 + id as u64), kind: SHEEP, at: cell(&world, x, y), wake: NEVER };
+        put_entity(&mut world, header, &[AttributeBlock::holding(HUNGRY_AT, 0)]);
+    }
+    let made = tick_sheep(&mut world, 0).instructions_applied;
+    assert_eq!((made.refused, world.entities.iter().filter(|sheep| sheep.attribute(LAMB).is_some()).count()), (0, 2));
+    assert_eq!(tick_sheep(&mut world, 1).rules[BIRTHS], 2);
+    assert!(world.entities.iter().all(|sheep| sheep.attribute(PREGNANT).is_none() && sheep.attribute(BEARING).is_none()));
 }

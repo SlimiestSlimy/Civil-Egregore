@@ -42,7 +42,7 @@ pub mod layers {
 /// The types of entity a world has and the attributes they carry: what
 /// an entity's rule names its own by, from the type registry.
 pub mod entity_types {
-    pub use type_registry::{Bearing, Roaming, BEARING, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
+    pub use type_registry::{Roaming, BEARING, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
 }
 
 /// The most counts a rule keeps.

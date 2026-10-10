@@ -4,7 +4,7 @@
 
 use instructions::around::{self, CENTRE, RING};
 use instructions::entities::EntitiesBetweenTicks;
-pub use instructions::entity_types::{Bearing, Roaming, BEARING, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
+pub use instructions::entity_types::{Roaming, BEARING, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
 use instructions::layers::{GRASS, WALL_EAST, WALL_SOUTH};
 use instructions::{area, cells, entities, walking, AttributeBlock, CellCartesian, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
@@ -108,12 +108,11 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let mut needs = if fed { now + MEAL_TICKS } else { hungry_at };
     let grown_at = sheep.get(LAMB);
     // The lamb it put beside it last tick stands there, and is born; or its cell was taken first, and it is pregnant still.
-    if let Some(bearing) = sheep.unset(BEARING) {
-        let born = around::cell(at, bearing.neighbour).is_some_and(|cell| entities::stands(turn, EntityId(bearing.lamb), cell));
-        if born {
-            sheep.unset(PREGNANT);
-            done[BIRTHS] += 1;
-        }
+    if let Some(lamb) = sheep.unset(BEARING)
+        && entities::stands_beside(turn, EntityId(lamb), at, RING).is_some()
+    {
+        sheep.unset(PREGNANT);
+        done[BIRTHS] += 1;
     }
     // Whether it put a lamb this tick: it stays, and wakes the next to see it.
     let mut bearing = false;
@@ -122,9 +121,10 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         // Its lamb is put on a cell seen free beside it; with none, it waits a step's time more.
         Some(_) => match around::free_beside(turn, at, steppable) {
             Some(beside) => {
-                let (cell, wake) = (around::cell(at, beside).expect("a hot neighbour is in the world"), next_step(turn));
-                let lamb = entities::spawn(turn, SHEEP, cell, wake, &[AttributeBlock::holding(HUNGRY_AT, now + MEAL_TICKS), AttributeBlock::holding(LAMB, now + LAMB_TICKS)]);
-                sheep.set(BEARING, Bearing { lamb: lamb.0, neighbour: beside });
+                // Beside it on the cell drawn, or, that taken first, on another it may step to.
+                let wake = next_step(turn);
+                let lamb = entities::spawn_beside(turn, SHEEP, at, beside, steppable, wake, &[AttributeBlock::holding(HUNGRY_AT, now + MEAL_TICKS), AttributeBlock::holding(LAMB, now + LAMB_TICKS)]);
+                sheep.set(BEARING, lamb.0);
                 bearing = true;
             }
             None => needs = now,

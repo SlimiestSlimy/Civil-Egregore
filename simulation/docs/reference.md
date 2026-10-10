@@ -38,7 +38,9 @@ the turn, so instructions can be queued while going through them;
 width, height)`** (the cells entities stand on, up to `OCCUPIED_SIDE`
 each way, a row a word: cell `(x, y)` from `origin` at bit `x` of row
 `y`). Entities written:
-**`new_id`**; **`put(header, attributes)`**: an entity made or changed
+**`new_id`**; **`put_on_the_first_free(header, others,
+attributes)`**: a new entity on its cell, or the first free of some
+others; **`put(header, attributes)`**: an entity made or changed
 where it stands, waking after this tick; **`update(before, after,
 attributes)`**: changed, and moved to its cell if that is free --
 staying if not; passed over if no longer where the tick found it -- or,

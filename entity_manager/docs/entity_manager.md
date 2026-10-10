@@ -162,6 +162,7 @@ more than it changes (`Instruction`, the four):
 | move | an entity moved to another cell, or left where it is, to wake at another tick; its attributes as they are | nothing |
 | edit | one attribute of an entity set, or removed: by the entity itself or by another | the one attribute's blocks, or none |
 | remove | an entity removed | nothing |
+| put on the first free | a new entity put on its cell or, that taken, on the first free of some others | its attributes' blocks, and the other cells |
 
 Whatever puts an entity on a cell checks it as it is applied: a cell
 holds one entity, ever. An instruction carries all it needs: an entity
@@ -176,7 +177,21 @@ is in, in the order queued, every wake filed no earlier than the tick
 given. A put in a superchunk not there is lost; one of an entity no
 longer where it stood is passed over; a new entity on a cell another
 stands on is refused, and one moving to it stays where it stood,
-changed all the same, and wakes there.
+changed all the same, and wakes there. None of these is unseen: what
+was lost, refused, left where it stood and passed over is each counted
+in what applying did (`InstructionsApplied`).
+
+**Tolerating a cell taken.** A rule sees the world as the tick found
+it, and the cell it puts a new entity on may be taken by the time the
+put is applied -- by another new entity, or by one stepping there. A
+rule that must have its entity made says where else it may stand
+(`Instructions::put_on_the_first_free`): its own cell is tried, then
+each of the others in the order given, and it is refused only if every
+one is taken. The others are tried where the put is applied, in the
+superchunk of the cell wanted: one in another superchunk is passed by,
+that superchunk being another thread's while the tick is applied.
+Where it came to stand the rule asks the tick after
+(`InstructionsApplied::beside` counts them).
 
 **Crossing a border.** An entity crossing into a neighbouring
 superchunk is put there while it still stands on the cell it left: for

@@ -126,7 +126,7 @@ a tick's counts against the cells that changed:
 | two trees put on one cell | yes | one tree; both counted |
 | a tree put on a cell, the tree there dying | no: a tree is put where none stood | |
 | two entities stepping onto one cell | yes | the first applied takes it, the other stays where it stood and wakes as it was to |
-| two lambs put on one cell, or a lamb put where another sheep steps | yes | the first applied takes the cell, the lamb put after is refused -- and born later: its mother is pregnant until she has seen it stand (`../../entity_rules/docs/entity_rules.md`, "The sheep") |
+| two lambs put on one cell, or a lamb put where another sheep steps | yes | the first applied takes the cell; the lamb put after is made on another neighbour its mother may step to, or, every one taken, refused -- and born later: its mother is pregnant until she has seen it stand (`../../entity_rules/docs/entity_rules.md`, "The sheep") |
 | two entities setting one attribute of a third | yes (no rule does yet) | the later applied is kept, the same one on any number of threads (`../../simulation/tests/fine/instructions.rs`) |
 
 No pair leaves a cell or an entity differing by the order threads ran

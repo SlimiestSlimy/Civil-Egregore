@@ -60,6 +60,15 @@ impl<'a> Turn<'a> {
         self.outbox.instructions[slot].put(header, header.at, attributes);
     }
 
+    /// Queues putting `header`'s entity, new, with `attributes`, on its
+    /// cell or, that taken by then, on the first free of `others` in
+    /// its cell's superchunk: not put only if every one is taken.
+    pub fn put_on_the_first_free(&mut self, header: Header, others: &[CellIndex], attributes: &[AttributeBlock]) {
+        debug_assert!(header.wake > self.now, "an entity put to wake at tick {}, not after {}", header.wake, self.now);
+        let slot = self.slot_of(header.at.superchunk());
+        self.outbox.instructions[slot].put_on_the_first_free(header, others, attributes);
+    }
+
     /// Queues `entity` stepping to `to` -- its own cell to sleep where
     /// it stands -- to wake at `wake`, no attribute carried unless it
     /// crosses to another superchunk. If `to` is taken by then it
