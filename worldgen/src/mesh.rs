@@ -35,6 +35,14 @@ fn raised(share: u64, to: u64) -> u64 {
     (lower * (SIGMOID_ONE - part) + higher * part) / SIGMOID_ONE
 }
 
+/// A line's lot, of [`ONE`], drawn a little nearer nothing: halfway
+/// from the lot to its square. A line is by so much likelier a slope
+/// than a step, its blend wide than narrow -- more land that rises,
+/// less that lies level (`docs/worldgen.md`, "The land as a mesh").
+fn towards_the_slope(lot: u64) -> u64 {
+    (lot + ((lot * lot) >> 16)) / 2
+}
+
 /// A vertex.
 #[derive(Clone, Copy, Default)]
 struct Vertex {
@@ -181,8 +189,8 @@ impl Mesh {
         let line = |from: usize| {
             // By its two ends, whichever is named first: the same seen from either triangle.
             let lot = mix(self.vertices[corners[from]].lot ^ self.vertices[corners[(from + 1) % 3]].lot);
-            let blend = (shape.narrow + (((lot & 0xFFFF) * shape.wide.saturating_sub(shape.narrow)) >> 16)).clamp(1, ONE);
-            (blend, shape.soft + ((((lot >> 16) & 0xFFFF) * shape.hard.saturating_sub(shape.soft)) >> 16))
+            let blend = (shape.narrow + (((ONE - towards_the_slope(ONE - (lot & 0xFFFF))) * shape.wide.saturating_sub(shape.narrow)) >> 16)).clamp(1, ONE);
+            (blend, shape.soft + ((towards_the_slope((lot >> 16) & 0xFFFF) * shape.hard.saturating_sub(shape.soft)) >> 16))
         };
         let lines = [line(0), line(1), line(2)];
         Triangle { corners, blends: lines.map(|line| line.0), sigmoids: lines.map(|line| line.1.clamp(SIGMOID_ONE, SIGMOID_MOST)), inverse }

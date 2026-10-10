@@ -16,7 +16,7 @@ use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN
 pub fn generate_superchunk(generation: &Generation, seed: u64, superchunk: SuperchunkIndex) -> SuperchunkCells {
     let terrain = Terrain::generate_shaped(&generation.shape, seed, superchunk);
     let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
-    let growth = generation.growth(seed);
+    let mut growth = generation.growth(seed);
     // The planes generated, each a bitmap a chunk: grass, trees, their stage's four, and the cells under water.
     let mut planes = vec![GRASS, TREE];
     planes.extend(TREE_STAGE.layer_type().planes());

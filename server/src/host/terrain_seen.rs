@@ -46,8 +46,9 @@ pub enum Cover {
     Dirt,
 }
 
-/// What grows where in a world as it is generated: shared by every
-/// thread that asks.
+/// What grows where in a world as it is generated: a copy to each
+/// thread that asks, for it keeps the noise about the last cell.
+#[derive(Clone)]
 pub struct CoverSeen {
     /// What grows where.
     growth: Growth,
@@ -60,7 +61,7 @@ impl CoverSeen {
     }
 
     /// What the cell at `(x, y)` is generated with, were it dry.
-    pub fn cover(&self, x: u32, y: u32) -> Cover {
+    pub fn cover(&mut self, x: u32, y: u32) -> Cover {
         let grown = self.growth.at(x, y);
         match (grown.tree, grown.grass) {
             (Some(_), _) => Cover::Tree,

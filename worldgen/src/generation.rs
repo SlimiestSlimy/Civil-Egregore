@@ -5,7 +5,7 @@
 
 use crate::mesh::{Lands, SIGMOID_ONE};
 use crate::patches::Patches;
-use crate::{Shape, ONE};
+use crate::{Noise, Shape, ONE};
 use coordinates::{SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use utilities::hash::mix;
 use utilities::tuning::{self, Tuning};
@@ -113,7 +113,16 @@ impl Generation {
     /// found once, each cell then asked ([`Growth::at`]).
     pub fn growth(&self, seed: u64) -> Growth {
         let trees_seed = seed ^ TREES_SALT;
-        Growth { grass: self.grass, trees: self.trees, seed, trees_seed, grass_under: self.grass.threshold(seed), trees_under: self.trees.threshold(trees_seed) }
+        Growth {
+            grass: self.grass,
+            trees: self.trees,
+            seed,
+            trees_seed,
+            grass_noises: self.grass.noises(seed),
+            trees_noises: self.trees.noises(trees_seed),
+            grass_under: self.grass.threshold(seed) * self.grass.weights(),
+            trees_under: self.trees.threshold(trees_seed) * self.trees.weights(),
+        }
     }
 }
 
@@ -159,9 +168,14 @@ pub struct Growth {
     seed: u64,
     /// The trees' seed, apart from the grass's.
     trees_seed: u64,
-    /// A cell whose grass number is under this has grass.
+    /// The grass's noises, kept cell after cell.
+    grass_noises: [Noise; 2],
+    /// The trees'.
+    trees_noises: [Noise; 2],
+    /// A cell whose grass number, weighed ([`Patches::weighed`]), is
+    /// under this has grass: no division a cell.
     grass_under: u64,
-    /// A cell whose trees number is under this has a tree.
+    /// A cell whose trees number, weighed, is under this has a tree.
     trees_under: u64,
 }
 
@@ -177,9 +191,10 @@ pub struct Grown {
 
 impl Growth {
     /// What the dry cell at `(x, y)` starts with.
-    pub fn at(&self, x: u32, y: u32) -> Grown {
-        let grass = self.grass.number(self.seed, x, y) < self.grass_under;
-        let tree = (self.trees.number(self.trees_seed, x, y) < self.trees_under).then(|| mix(self.trees_seed ^ ((y as u64) << 32 | x as u64)));
+    pub fn at(&mut self, x: u32, y: u32) -> Grown {
+        let weighed = |patches: &Patches, noises: &mut [Noise; 2], seed: u64| patches.weighed(seed, noises[0].at(x, y), noises[1].at(x, y), x, y);
+        let grass = weighed(&self.grass, &mut self.grass_noises, self.seed) < self.grass_under;
+        let tree = (weighed(&self.trees, &mut self.trees_noises, self.trees_seed) < self.trees_under).then(|| mix(self.trees_seed ^ ((y as u64) << 32 | x as u64)));
         Grown { grass, tree }
     }
 }

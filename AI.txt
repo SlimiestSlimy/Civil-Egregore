@@ -227,8 +227,10 @@ break; write a new ask here the moment it is made.
    crate. Kept so by tests/fine.rs (every item, private too, named in
    its crate's docs; every pointer and name holds) and by `docs stale`
    before each commit (ALWAYS).
-2. WORLDGEN: profile and really simplify ("waaay too slow"); a little
-   more mountain, a little less plateau ("just a bit").
+2. WORLDGEN: DONE 2026-10-09 as far as: 6 times faster (OPEN
+   THREADS), and a line's blend and sigmoidness drawn a little towards
+   the slope (level land 59% -> 53%). The user is to say whether it is
+   fast enough and whether the land is right; vertex heights untouched.
 3. ENTITY ATTRIBUTES, NEW SHAPE (asked 2026-10-09). The type ID stays
    one u64 for everything. An attribute becomes a fixed-size block of
    64 bytes: the first 64 bits its type, the rest laid out as that
@@ -268,16 +270,19 @@ Google Drive connector needs authorizing in claude.ai settings.
 
 == OPEN THREADS ==
 
-- Worldgen is what a world's making and wandering cost: callgrind,
-  2026-10-09, one thread (transient_data/measurements/
-  profiles_2026-10-09/, with run.sh and every .out). Making a
-  superchunk is 2.5 to 4 G instructions, some 60% of it
-  worldgen::mesh::Mesh::blended and Mesh::locate's closure, then
-  coordinates::cartesian_from_place and HeightMap::get. A world with
-  no side run 3,000 ticks spent over 90% of its instructions
-  generating the 12 superchunks its halos reached. Against that a
-  tick of a 4-superchunk world with 8,000 sheep is ~0.33 M. The next
-  optimization worth making is Mesh::blended.
+- Worldgen, 2026-10-09: a superchunk of land (server new <folder> 1 0
+  1 1 1, callgrind) was 9.67 G instructions, nine tenths the mesh; it
+  is 1.77 G -- the meshes worked out on a lattice of every 4th cell
+  (mesh/lands.rs), the patches' noise kept. 36 superchunks: 3.9 s ->
+  0.67 s on all threads. What is left of 1.77 G: the mesh 44%
+  (Mesh::blended, locate, a vertex made again each square entered),
+  HeightMap::from_heights 15%, Tessera's encode 10%,
+  coordinates::cartesian_from_place 8%, the patches 19%. If more is
+  wanted: the vertices a square shares with the last kept; the broad
+  meshes on a coarser lattice than the fine. `server new` makes
+  Generation::DEFAULT, the window the sliders' (default_settings.csv:
+  highest land 65535, most sigmoid 7.5) -- the steepness probe
+  (AI_SCRATCHPAD how_steep_the_land_is) reads the sliders'.
 - The tick reference (pasture 300 333 4000 4 1 less the 0-tick run)
   is 58.74 M instructions (8,472.69 M less 8,413.95 M) with integer
   sampling, 2026-10-09; 58.50 M just before it (rules table), 58.37 M

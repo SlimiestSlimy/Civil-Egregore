@@ -122,21 +122,52 @@ fn between(from: u64, to: u64, along: u64) -> u64 {
     (from * (ONE - along) + to * along) >> 16
 }
 
-/// Smooth noise at the cell `(x, y)`, of [`ONE`]: the four points
-/// about the cell of a grid `2^shift` cells apart, each a number
-/// settled by `seed` and `index`, eased between: what bends the
-/// mesh's lines, and what lies in patches lies by.
+/// Smooth noise, of [`ONE`]: at a cell, the four points about it of
+/// a grid `2^shift` cells apart, each a number settled by `seed` and
+/// `index`, eased between -- what bends the mesh's lines, and what
+/// lies in patches lies by. Asked cell after cell, it keeps the points
+/// about the last: the next is nearly always among the same.
+#[derive(Clone, Copy, Debug)]
+pub struct Noise {
+    /// The world's seed.
+    seed: u64,
+    /// Which noise of the world's it is.
+    index: u32,
+    /// The cells from a point to the next, as a power of two.
+    shift: u32,
+    /// The square of the grid the points kept are about, if any are.
+    square: Option<(u32, u32)>,
+    /// Its points: top left, top right, bottom left, bottom right.
+    points: [u64; 4],
+}
+
+impl Noise {
+    /// The noise numbered `index` of the world of `seed`, its points
+    /// `2^shift` cells apart.
+    pub const fn new(seed: u64, index: u32, shift: u32) -> Self {
+        Self { seed, index, shift, square: None, points: [0; 4] }
+    }
+
+    /// The noise at the cell `(x, y)`.
+    pub fn at(&mut self, x: u32, y: u32) -> u64 {
+        let (left, top) = (x >> self.shift, y >> self.shift);
+        if self.square != Some((left, top)) {
+            let point = |east: u32, south: u32| point(self.seed, self.index, left.wrapping_add(east), top.wrapping_add(south));
+            (self.square, self.points) = (Some((left, top)), [point(0, 0), point(1, 0), point(0, 1), point(1, 1)]);
+        }
+        let ease = |within: u32| {
+            let along = ((within as u64) << 16) >> self.shift;
+            // Smoothstep: no crease at an octave's points.
+            (along * along * (3 * ONE - 2 * along)) >> 32
+        };
+        let (across, down) = (ease(x & ((1 << self.shift) - 1)), ease(y & ((1 << self.shift) - 1)));
+        between(between(self.points[0], self.points[1], across), between(self.points[2], self.points[3], across), down)
+    }
+}
+
+/// [`Noise`] at the cell `(x, y)`, for one cell alone.
 pub fn noise(seed: u64, index: u32, shift: u32, x: u32, y: u32) -> u64 {
-    let (left, top) = (x >> shift, y >> shift);
-    let ease = |within: u32| {
-        let along = ((within as u64) << 16) >> shift;
-        // Smoothstep: no crease at an octave's points.
-        (along * along * (3 * ONE - 2 * along)) >> 32
-    };
-    let (across, down) = (ease(x & ((1 << shift) - 1)), ease(y & ((1 << shift) - 1)));
-    let upper = between(point(seed, index, left, top), point(seed, index, left.wrapping_add(1), top), across);
-    let lower = between(point(seed, index, left, top.wrapping_add(1)), point(seed, index, left.wrapping_add(1), top.wrapping_add(1)), across);
-    between(upper, lower, down)
+    Noise::new(seed, index, shift).at(x, y)
 }
 
 /// The height of the cell at `(x, y)` of the world whose seed is `seed`:
@@ -174,8 +205,10 @@ impl Terrain {
     /// [`Terrain::generate`], in a world shaped as `shape` says.
     pub fn generate_shaped(shape: &Shape, seed: u64, superchunk: SuperchunkIndex) -> Self {
         let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
-        let mut lands = mesh::Lands::new(shape, seed);
-        Self::from_heights(|x, y| lands.height(left.wrapping_add_signed(x), top.wrapping_add_signed(y)))
+        // With a cell more all round, as the walls are told from.
+        let wide = SUPERCHUNK_SIDE_CELLS + 2;
+        let heights = mesh::Lands::new(shape, seed).heights_of_a_square(left.wrapping_sub(1), top.wrapping_sub(1), wide);
+        Self::from_heights(|x, y| heights[((y + 1) as u32 * wide + (x + 1) as u32) as usize])
     }
 
     /// The terrain where `height_at` gives the height of the cell `x`
