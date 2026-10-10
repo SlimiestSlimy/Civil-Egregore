@@ -16,6 +16,7 @@ pub mod halos;
 pub mod host;
 pub mod rules;
 mod tick;
+mod world_access;
 pub mod transient_data;
 mod world_hash;
 mod world_start;
@@ -24,7 +25,7 @@ pub use halos::HOT_ENTITY;
 pub use simulation::hot::about;
 pub use simulation::{HaloChange, COOL_TICKS, WARM_TICKS};
 pub use rules::{Chosen, Rule, TickCounts, RULES};
-pub use tick::{tick_chosen, tick_rules, WorldTick};
+pub use tick::WorldTick;
 pub use world_hash::{world_hash, WorldHash};
 pub use world_start::{drawn_seed, Size, Start, FLOCK};
 
@@ -58,24 +59,24 @@ pub struct Saved {
 /// the rest cold.
 pub struct World {
     /// What the world is, and the tick it is at.
-    pub info: WorldInfo,
+    pub(crate) info: WorldInfo,
     /// How its superchunks are generated.
-    pub generation: Generation,
+    pub(crate) generation: Generation,
     /// Its hot bitmaps: every layer type of every hot superchunk.
-    pub arena: BitmapArena,
+    pub(crate) arena: BitmapArena,
     /// Every superchunk ever made, as stored: the cold ones' cells, and
     /// the hot ones' as last written back.
-    pub storage: ChunkStorage,
+    pub(crate) storage: ChunkStorage,
     /// The hot superchunks' entities, at its tick.
-    pub entities: Entities,
+    pub(crate) entities: Entities,
     /// Its simulation: the hot superchunks' random numbers.
-    pub simulation: Simulation,
+    pub(crate) simulation: Simulation,
     /// Each cold superchunk's state -- its entities and random numbers
     /// -- as a save keeps it ([`saved::encode_state`]).
-    pub cold: BTreeMap<SuperchunkIndex, Vec<u64>>,
+    pub(crate) cold: BTreeMap<SuperchunkIndex, Vec<u64>>,
     /// Its halos: the superchunks warming and cooling, and the jobs
     /// making them (`simulation::halos`).
-    pub halos: Halos,
+    pub(crate) halos: Halos,
 }
 
 impl World {

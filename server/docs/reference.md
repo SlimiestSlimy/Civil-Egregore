@@ -6,7 +6,8 @@ The design is in `server.md`.
 
 **`World`** `{info, generation, arena, storage, entities, simulation,
 cold, halos}` -- **`cold`**, each cold superchunk's state as a save
-keeps it; **`halos`**, the simulation's -- and
+keeps it; **`halos`**, the simulation's; every one the server's own,
+read from outside by `world_access.rs`'s methods -- and
 **`World::empty(info, generation, threads)`**, what generating and
 loading start from, hot as `info` says: forced throughout if it has a
 side and is forced, else about the halos of the kind of entity it
@@ -68,8 +69,8 @@ if the camera loads superchunks with sheep, a flock put
 (`put_flock`) on each the move generated that is in the viewport.
 `owe_camera_flocks(superchunks)`: those generated out of view kept as
 owed their flock (`WorldInfo::without_camera_flock`).
-The viewport is told to the halos themselves (`Halos::keep_viewport`),
-by the host on each frame asked.
+The viewport is told to the halos (`World::keep_viewport`), by the
+host on each frame asked.
 **`World::keep_hot(wanted)`**, **`World::warming`**,
 **`World::cooling`**, **`World::start_warming(superchunk, due)`**,
 **`World::write_back_and_flush_all`**: each the halos' own
@@ -77,12 +78,27 @@ by the host on each frame asked.
 
 ## `tick.rs`
 
-**`tick_rules(simulation, arena, entities, seed)`**: every rule of
-`RULES` on each hot superchunk's turn, the halos left where they are;
-**`tick_chosen(.., chosen)`**: only the rules chosen.
+`tick_chosen(simulation, arena, entities, seed, chosen)`: the rules
+chosen of `RULES` on each hot superchunk's turn, the halos left where
+they are.
 **`World::tick`**: the rules, then the halos moved: a **`WorldTick`**
-`{rules, halos}`. **`World::tick_only(chosen, timed)`**: the rules
+`{rules, halos}`; in a debug build, `World::broken_invariant` checked
+after it. **`World::tick_only(chosen, timed)`**: the rules
 chosen alone, each one's time taken if `timed`, the halos not moved.
+
+## `world_access.rs`
+
+A world from outside the server (`server.md`, "What a world holds
+together"). Read: **`World::info`**, **`World::generation`**,
+**`World::arena`**, **`World::storage`**, **`World::entities`**,
+**`World::simulation`**, **`World::cold`**, **`World::halos`**, each
+part lent unchangeable. Changed between two ticks, each applied as it
+is called: **`World::put_entity(header, attributes)`** and
+**`World::remove_entity(header)`**, an `InstructionsApplied` each;
+**`World::write_cells(layer_type, writes)`**, a `WritesApplied`.
+**`World::keep_viewport(viewport)`**: the viewport told to the halos.
+**`World::broken_invariant`**: what is wrong between the parts, in
+words, or `None`.
 
 ## `rules.rs`
 

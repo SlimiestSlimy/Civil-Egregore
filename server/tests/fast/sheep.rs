@@ -24,11 +24,11 @@ fn well_formed(sheep: EntityRef) {
 fn sheep_without_grass_starve() {
     let mut world = plain_world(1, 0, 500, 1);
     let (mut eaten, mut deaths) = (0, 0);
-    for seed in 0..MEAL_TICKS + STARVE_TICKS + 2 * (STEP_TICKS + STEP_JITTER) {
-        let done = tick_sheep(&mut world, seed).rules;
+    for _ in 0..MEAL_TICKS + STARVE_TICKS + 2 * (STEP_TICKS + STEP_JITTER) {
+        let done = tick_sheep(&mut world).rules;
         (eaten, deaths) = (eaten + done[EATEN], deaths + done[DEATHS]);
     }
-    assert_eq!((eaten, deaths, world.entities.len()), (0, 500, 0));
+    assert_eq!((eaten, deaths, world.entities().len()), (0, 500, 0));
 }
 
 /// On grass, sheep eat -- each cell eaten turned to dirt -- breed, and
@@ -38,11 +38,11 @@ fn sheep_without_grass_starve() {
 fn sheep_eat_breed_and_grow_up() {
     let mut world = plain_world(4, 300_000, 400, 2);
     let (mut eaten, mut births, mut lost, mut lambs_seen, mut pregnant_seen) = (0, 0, 0, false, false);
-    for seed in 0..40_000 {
-        let report = tick_sheep(&mut world, seed);
+    for tick in 0..40_000 {
+        let report = tick_sheep(&mut world);
         (eaten, births, lost) = (eaten + report.rules[EATEN], births + report.rules[BIRTHS], lost + report.instructions_applied.lost);
-        if seed % 500 == 0 {
-            for sheep in world.entities.iter() {
+        if tick % 500 == 0 {
+            for sheep in world.entities().iter() {
                 well_formed(sheep);
                 lambs_seen |= sheep.attribute(LAMB).is_some();
                 pregnant_seen |= sheep.attribute(PREGNANT).is_some();
@@ -52,7 +52,7 @@ fn sheep_eat_breed_and_grow_up() {
     assert!(eaten > 5_000 && births > 100, "{eaten} eaten, {births} born");
     assert!(lambs_seen && pregnant_seen);
     assert_eq!(lost, 0, "no sheep walks off the hot superchunks");
-    assert!(world.entities.iter().any(|sheep| sheep.attribute(LAMB).is_none() && sheep.attribute(HUNGRY_AT).is_some()), "grown sheep");
+    assert!(world.entities().iter().any(|sheep| sheep.attribute(LAMB).is_none() && sheep.attribute(HUNGRY_AT).is_some()), "grown sheep");
 }
 
 /// A hungry sheep with no grass beside it walks the shortest way to the
@@ -69,9 +69,9 @@ fn hungry_sheep_walk_to_the_nearest_grass() {
     let header = Header { id: EntityId(1), kind: SHEEP, at: sheep.into(), wake: 0 };
     put_entity(&mut world, header, &[AttributeBlock::holding(HUNGRY_AT, 0)]);
     let (mut done, mut ate_at) = (instructions::RuleCounts::default(), None);
-    for seed in 0..12 * (STEP_TICKS + STEP_JITTER) {
+    for _ in 0..12 * (STEP_TICKS + STEP_JITTER) {
         // The grass rule left out: the one cell of grass must stay until eaten.
-        let report = tick_sheep(&mut world, seed);
+        let report = tick_sheep(&mut world);
         if report.rules[EATEN] > 0 && ate_at.is_none() {
             ate_at = Some(done[WOKEN]);
         }
@@ -97,8 +97,8 @@ fn hungry_sheep_walk_to_grass_far_off() {
     let header = Header { id: EntityId(1), kind: SHEEP, at: sheep.into(), wake: 0 };
     put_entity(&mut world, header, &[AttributeBlock::holding(HUNGRY_AT, 0)]);
     let (mut done, mut ate_at) = (instructions::RuleCounts::default(), None);
-    for seed in 0..STARVE_TICKS {
-        let report = tick_sheep(&mut world, seed);
+    for _ in 0..STARVE_TICKS {
+        let report = tick_sheep(&mut world);
         if report.rules[EATEN] > 0 && ate_at.is_none() {
             ate_at = Some(done[WOKEN]);
         }
@@ -122,9 +122,9 @@ fn sheep_on_thin_pasture_roam_away() {
     plant_grass(&mut world, start, 1, 1);
     put_entity(&mut world, Header { id: EntityId(1), kind: SHEEP, at: start.into(), wake: 0 }, &[AttributeBlock::holding(HUNGRY_AT, 0)]);
     let (mut eaten, mut set_off, mut came_to) = (0, false, None);
-    for seed in 0..MEAL_TICKS + ROAM_TICKS + 4 * (STEP_TICKS + STEP_JITTER) {
-        eaten += tick_sheep(&mut world, seed).rules[EATEN];
-        let sheep = world.entities.iter().next().expect("the sheep, alive");
+    for _ in 0..MEAL_TICKS + ROAM_TICKS + 4 * (STEP_TICKS + STEP_JITTER) {
+        eaten += tick_sheep(&mut world).rules[EATEN];
+        let sheep = world.entities().iter().next().expect("the sheep, alive");
         let roaming = sheep.attribute(ROAMING).is_some();
         if set_off && !roaming && came_to.is_none() {
             came_to = Some(sheep.header.at.cartesian());
@@ -144,8 +144,8 @@ fn sheep_on_thin_pasture_roam_away() {
 fn any_number_of_threads_ticks_sheep_the_same() {
     let run = |threads| {
         let mut world = plain_world(4, 200_000, 300, threads);
-        let reports: Vec<_> = (0..1500).map(|seed| tick_sheep(&mut world, seed)).map(|report| (report.rules, report.instructions_applied)).collect();
-        let sheep: Vec<_> = world.entities.iter().map(|sheep| (sheep.header, sheep.attributes.to_vec())).collect();
+        let reports: Vec<_> = (0..1500).map(|_| tick_sheep(&mut world)).map(|report| (report.rules, report.instructions_applied)).collect();
+        let sheep: Vec<_> = world.entities().iter().map(|sheep| (sheep.header, sheep.attributes.to_vec())).collect();
         (reports, sheep, cells_of_grass(&world))
     };
     let (one, four) = (run(1), run(4));
@@ -159,15 +159,15 @@ fn any_number_of_threads_ticks_sheep_the_same() {
 #[test]
 fn sheep_never_overlap() {
     let mut world = plain_world(4, 300_000, 60_000, 4);
-    assert_eq!(world.entities.len(), 240_000, "each on a cell of its own from the start");
+    assert_eq!(world.entities().len(), 240_000, "each on a cell of its own from the start");
     let (mut stayed, mut births) = (0, 0);
-    for seed in 0..2_000 {
-        let report = tick_sheep(&mut world, seed);
+    for tick in 0..2_000 {
+        let report = tick_sheep(&mut world);
         (stayed, births) = (stayed + report.instructions_applied.stayed, births + report.rules[BIRTHS]);
-        if seed % 100 == 99 {
-            let mut cells: Vec<_> = world.entities.iter().map(|sheep| sheep.header.at).collect();
+        if tick % 100 == 99 {
+            let mut cells: Vec<_> = world.entities().iter().map(|sheep| sheep.header.at).collect();
             cells.sort_unstable();
-            assert!(cells.windows(2).all(|pair| pair[0] != pair[1]), "tick {seed}: two sheep on a cell");
+            assert!(cells.windows(2).all(|pair| pair[0] != pair[1]), "tick {tick}: two sheep on a cell");
         }
     }
     assert!(stayed > 1_000, "{stayed} sheep found their cell taken, and stayed");

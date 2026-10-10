@@ -276,7 +276,7 @@ mod tests {
         }
         assert_eq!(differing, 0, "shadow lines unlike over an edge");
         let world = server::start(server::Start { seed, sheep: 1, ..server::Start::default() });
-        let image = world.storage.image(coordinates::WORLD_MIDDLE).expect("the origin's image");
+        let image = world.storage().image(coordinates::WORLD_MIDDLE).expect("the origin's image");
         let brought = fine((left, top), &[((left, top), image.height_words())].into_iter().collect());
         let cells = || (0..SIDE as isize).flat_map(|y| (0..SIDE as isize).map(move |x| (x, y)));
         assert!(cells().all(|(x, y)| brought.height(x, y) == here.height(x, y) && brought.line(x, y) == here.line(x, y)), "heights brought unlike those worked out");
