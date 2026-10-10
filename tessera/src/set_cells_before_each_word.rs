@@ -1,8 +1,6 @@
 //! How many of a bitmap's cells are set before each of its words, in
-//! Morton order: counted once a bitmap, then read by everything that
-//! needs a set count of a run of whole words -- the binary count tree, a half
-//! at a time, and a cell list's tile, 8x8 or coarser -- as one
-//! subtraction.
+//! Morton order: counted once a bitmap, a run of whole words' count
+//! then one subtraction.
 //!
 //! Function by function: `docs/reference.md`, "`set_cells_before_each_word.rs`".
 

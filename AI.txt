@@ -241,7 +241,7 @@ break; write a new ask here the moment it is made.
    utilities, bitplane_manager, chunk_storage, entity_manager (its
    design doc docs/entity_manager.md was missing: written),
    simulation, instructions, mc_rules, entity_rules, worldgen,
-   server, gui, renderer. Left: tessera, AI_SCRATCHPAD, src. When all are done, make
+   server, gui, renderer, tessera. Left: AI_SCRATCHPAD, src. When all are done, make
    tests/fine.rs's every_public_item test cover private items too
    (not trait-impl methods or tests). Commit a few crates at a time.
 2. WORLDGEN: profile and really simplify ("waaay too slow"); a little

@@ -76,6 +76,11 @@ runs have used it.
 - **`fresh_seed()`**: from the process's own randomness (the standard
   library's hasher keys).
 
+**Private to the files.** `GUESSES_BEFORE_SCANNING`
+(`generate.rs`): the guesses at a clear cell before scanning for one.
+`ORIENTATIONS` (`lines.rs`): the four ways a line runs -- across, down,
+and down either diagonal.
+
 ## `diagnostics/`: data gathered, never judged
 
 **`examination::Examination::of(tessera, stream, back, bitmap)`**:
@@ -113,6 +118,18 @@ and the PBM image `TESSERA_DIAGNOSE` names, if any: what `census` and
 with no library: the image data in stored (uncompressed) deflate blocks
 inside a zlib stream (`stored_zlib`, `adler32`), each PNG chunk with
 its CRC (`chunk`, `crc32`).
+
+**Private to the files.** `count_children(tree, tile)`
+(`tree_stats.rs`): counts every child of a tile that is a node. In
+`png.rs`: `SIDE`, the bitmap's side; `BLACK` and `WHITE`, the grey of a
+set cell and of a clear one; the PNG format's fixed values --
+`SIGNATURE`, `BIT_DEPTH` (8 bits a pixel), `GREYSCALE`, `DEFLATE` and
+`ADAPTIVE_FILTERING` (the only compression and filter methods there
+are), `NO_INTERLACE`, `NO_FILTER` (each row's filter type) --
+`CRC_POLYNOMIAL`, CRC-32's reversed polynomial; `ZLIB_HEADER`, deflate
+with a 32 KiB window, no dictionary, stored blocks; `ADLER_MODULUS`,
+Adler-32's, the largest prime under 2^16; `STORED_BLOCK`, the most one
+stored deflate block holds.
 
 ## `diagnostics/adversarial/`: searching for the bitmaps Tessera does worst on
 
@@ -173,9 +190,18 @@ file a saved bitmap of that name is.
 
 **`cell_rect(area)`**: a tile's cells as an inclusive rectangle.
 
+**Private to the files.** `VARIANTS` (`plane.rs`): the
+variants of a window that fill the plane, one a window position. In
+`worst.rs`: `SAVED`, where the saved bitmaps are kept, under the
+crate's folder; `MAGIC`, a plain PBM's first word; `worst_folder()` and
+`saved_folder()`; `every_in(folder)`, every PBM image in a folder that
+reads as a bitmap, each named by its file's stem, in name order;
+`write_to(path, bitmap, notes)`, a bitmap as a plain PBM image, each
+note a comment line, replacing any file there was.
+
 ## `transient_data.rs`
 
-Paths under `transient_data/` (`TRANSIENT_DATA`), out of git: **`seed_file`**,
+Paths under `transient_data/` (`TRANSIENT_DATA`), out of git:
 **`measurements`**, **`worst`**, **`renders`**, **`callgrind`**.
 **`publish(report)`**: notes the run's seed on the report, prints it,
 and keeps it as `measurements/<tool>.csv`, replacing the last.
@@ -191,6 +217,9 @@ The parameters of `save`, by name: `FROM` (the worst bitmap saved),
 `NAME` (what it is saved as), `DESCRIPTION` (a line describing it).
 **`save`**: `Civil_Egregore tessera adversarial_save <worst> <name> <description>` copies a
 worst bitmap to the saved bitmaps with a description and the worst bitmap's notes.
+
+**Private to the file.** `WORST`: the name the worst bitmap is kept
+under.
 
 ## `src/diagnostics/tool/`: one tool a file
 
@@ -227,6 +256,13 @@ measures is given a `Report` and published with the run's seed.
 - **`show::run`**: the kept reports, read back without measuring; `TOOL`
   its parameter, the one tool whose report is printed -- every one if
   not given.
+
+**Private to the files.** `SEED_VARIABLE`
+(`instruction_count.rs`): the variable the corpus' seed is pinned by,
+for both runs; `PARTS`: the two parts counted, to encode and to
+decode, each with the function callgrind is asked for.
+`percent_label(density)` (`sparse.rs`): a density as a percentage, no
+longer than it needs to be.
 
 ## `external_benchmarks/`: Tessera against other codecs
 

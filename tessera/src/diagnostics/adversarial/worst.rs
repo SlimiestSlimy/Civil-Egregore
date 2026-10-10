@@ -1,16 +1,6 @@
-//! Adversarial bitmaps kept as plain PBM images (`P1`: a header, then
-//! one row of `0`/`1` a line, `1` set), readable by any image viewer
-//! and by a diff. Two kinds:
-//!
-//! - the worst, in `transient_data/worst/`, out of git: the worst bitmap
-//!   found so far for each objective. A run starts from it and replaces
-//!   it only when it beats it, so the search keeps going across runs;
-//! - saved bitmaps, in `external_benchmarks/adversarial/saved/`: bitmaps
-//!   taken from the worst once a search has settled, named for what they
-//!   are and never replaced by a search. The benchmarks encode these, so
-//!   their inputs stay fixed while the worst move.
-//!
-//! Comment lines (`#`) carry notes: what a bitmap is, and what it scored.
+//! Adversarial bitmaps kept as plain PBM images: the worst found so
+//! far, replaced when beaten, and saved ones, never replaced
+//! (`docs/lab.md`, "`diagnostics/adversarial/`").
 
 use bitmap::{Bitmap, HEIGHT, WIDTH};
 use std::fs;

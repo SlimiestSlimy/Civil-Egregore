@@ -1,19 +1,6 @@
-//! Wall-clock time to encode, averaged over a large corpus: every
-//! generator's bitmaps -- grown shapes, sparse ones, city plans and line
-//! sets -- `corpus::TIMING_PER_GENERATOR` distinct bitmaps each, all
-//! built before any is timed, then each encoded once in one Tessera.
-//! Decoding is timed apart, after. The saved adversarial bitmaps
-//! (`external_benchmarks/adversarial/saved/`) get a row of their own,
-//! apart from the corpus'. Run it in release, on its own -- no
-//! profiler, nothing else busy:
-//!
-//! ```text
-//! cargo run --release -- tessera timing
-//! cargo run --release -- tessera timing 400
-//! ```
-//!
-//! The argument after the tool's name, if given, is how many bitmaps
-//! each generator makes.
+//! Wall-clock time to encode and to decode, averaged over a large
+//! corpus built before any of it is timed
+//! (`docs/testing_protocol.md`, "Speed: instructions and time").
 
 use crate::diagnostics::adversarial::worst;
 use crate::diagnostics::examination::first_difference;

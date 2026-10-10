@@ -1,10 +1,7 @@
-//! Tessera on sparse bitmaps -- the most common kind -- density by density,
-//! scattered and clustered: the tree's bits, the binary count tree's, what the
-//! stream takes (the fewer, and its mode bit), how many streams are count
-//! splits, and, for scattered cells, the least any encoding could take on
-//! average: log2 of how many ways the set cells could be placed. The
-//! stream is whichever the encoder picks from the greedy tiler's tiles;
-//! both encodings' bits are counted here at every density.
+//! Tessera on sparse bitmaps, density by density, scattered and
+//! clustered: the tree's bits, the binary count tree's, the stream's,
+//! and the least any encoding could take
+//! (`docs/lab.md`, "`src/diagnostics/tool/`").
 
 use crate::diagnostics::examination::Examination;
 use crate::BitStream;

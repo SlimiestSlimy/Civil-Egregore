@@ -109,11 +109,8 @@ impl Encoder {
     }
 
     /// Ends the stream: the fewest bits that keep every number they
-    /// start inside the final interval, whatever bits follow them -- the
-    /// bytes held back first, a carry into them if it takes one, then the
-    /// window's bits down to the last one not free. So the stream ends
-    /// itself: what follows it, zeros or another stream, decodes the
-    /// same.
+    /// start inside the final interval, whatever bits follow them -- so
+    /// the stream ends itself (`docs/reference.md`, "`arithmetic.rs`").
     pub fn finish(mut self, stream: &mut BitStream) {
         let end = self.low + self.range as u64;
         let (pinned, free_bits) = (0..=WINDOW_BITS)

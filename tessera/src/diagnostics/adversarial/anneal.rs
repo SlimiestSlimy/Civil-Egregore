@@ -1,13 +1,6 @@
-//! Simulated annealing: try a change, keep it if it raises the score,
-//! and early on sometimes keep one that lowers it -- less and less
-//! often as the search cools -- so it can climb out of a local best.
-//! The best bitmap seen is what it returns.
-//!
-//! The kinds of change learn: each is drawn in proportion to one plus
-//! the times it has raised the score, so a search leans on whatever is
-//! working on the bitmap in front of it.
-//!
-//! What is maximized is the caller's: any score of a bitmap.
+//! Simulated annealing over changes that learn: each kind drawn in
+//! proportion to one plus the times it has raised the score. What is
+//! maximized is the caller's (`docs/lab.md`, "`diagnostics/adversarial/`").
 
 use super::moves::CHANGES;
 use utilities::rng::Rng;

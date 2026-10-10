@@ -1,22 +1,7 @@
-//! Tessera's diagnostics tools: each prints what `tessera::diagnostics`
-//! gathers from Tessera, one tool a file. A tool that measures also
-//! keeps its tables, and what they were measured on, in
-//! `transient_data/measurements/<tool>.csv`, replacing the last run's --
-//! the latest numbers are always there, and nowhere copied by hand.
-//!
-//! They are [`COMMANDS`], run by `Civil_Egregore tessera <tool>`
-//! (`utilities::commands::program`); every tool, what it prints and what it takes are in
-//! that table, and printed by `Civil_Egregore tessera`.
-//!
-//! The bitmaps looked at are the adversarial worst bitmaps and saved bitmaps
-//! (`transient_data/worst/`, `external_benchmarks/adversarial/saved/`), plus
-//! any PBM image named in `TESSERA_DIAGNOSE`.
-//! Every tool stops if Tessera loses a cell.
-//!
-//! ```text
-//! cargo run --release -- tessera <tool>
-//! cargo run --release -- tessera show measurement
-//! ```
+//! Tessera's diagnostics tools ([`COMMANDS`]), run by `Civil_Egregore
+//! tessera <tool>`: each prints what `tessera::diagnostics` gathers,
+//! and a tool that measures keeps its tables
+//! (`docs/testing_protocol.md`, "The diagnostics tool").
 
 mod adversarial;
 mod census;
