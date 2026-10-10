@@ -57,6 +57,8 @@ given or one drawn; on every thread the machine has.
 **`Start::of_world(info, generation)`**: what a world opened started
 from, as far as its file says -- its sheep the camera's flock, or
 `FLOCK`.
+**`seed_with_land(from, generation)`**: the first seed from `from`
+with land about the origin.
 **`drawn_seed(generation)`**: a seed drawn at random, the first from
 it with land about the origin within `LAND_TRIES`, else the one drawn.
 
@@ -215,7 +217,9 @@ spare). **`Host`**: the host as a
 client holds it, each call sent to its thread and done there between
 two ticks, each saying whether the host was still there --
 **`Host::start()`**: the host on a thread named `host`, no world run
-yet, and where its frames come back; **`sync(ask)`** -- answered with
+yet, and where its frames come back; **`Host::terrain()`**: where its
+terrain is asked of (`host/terrain.rs`); `HostThread::telling(terrain)`:
+the thread's state, the terrain's thread told of each world run; **`sync(ask)`** -- answered with
 frames, the last with `more` unset, unless no world runs -- **`pause(paused)`**, **`pace(ticks
 a second, or flat out)`**, **`make_world(start)`**,
 **`open_world(name)`** -- that world of the worlds' folder run in
@@ -245,19 +249,28 @@ last tick's time at least, no limit while paused -- and those sent as a
 frame; seen from near, sent only once all are copied, being one
 picture; **`tick`**.
 
-## `host/terrain_seen.rs`
+## `host/terrain.rs`
 
-What a client asks of a world's terrain where no frame brings it,
-answered from how the world is generated: a client names nothing under
-the server. `Generation` and `Height`, the words it is asked in.
-**`HeightsSeen::of(generation, seed)`**, a thread's own:
-**`height(x, y)`**, **`cells_from_a_mesh_line(x, y)`**.
-**`CoverSeen::of(generation, seed)`**, a copy to each thread, as it keeps the noise about the last cell: **`cover(x, y)`**, a
-**`Cover`** -- `Tree`, `Grass`, `Dirt`. **`levels(generation)`**:
-**`Levels`** `{ground, ocean, highest}`. **`walled(one, other)`**: a
-wall between two heights. **`height_in_frame(height_words, place)`**:
-a cell's height from the words a frame brings.
-**`seed_with_land(from, generation, near)`**.
+What a client asks of a world's terrain where no frame brings it
+(`server.md`, "Terrain asked of the host"), answered on a thread named
+`terrain`. `Height`, the word heights come in. **`Levels`** `{ground,
+ocean, highest}`, the heights a world is drawn between
+(`Levels::of(generation)`); **`Cover`** -- `Ocean`, `Tree`, `Grass`,
+`Dirt` -- what a cell is generated with.
+**`HeightsAsk`** `{world, first, size, skipped}`: the heights of a
+rectangle of cells, those of the superchunks `skipped` passed by and
+answered as 0. **`MapAsk`** `{world, first, step, size, borders}`: a
+map, a pixel the cell in its middle; **`MapAnswer`** `{ask, levels,
+cells}`, a **`MapCell`** `{height, above, cover, on_a_mesh_line}` a
+pixel, none past the world's edges.
+**`TerrainAsker`**: where a client asks, a handle to clone --
+**`heights(ask)`**, **`map(ask)`**, each waiting for its answer on the
+caller's thread, none if the host is gone or runs another world.
+`TerrainRequest`: what the thread is sent -- `World`, by the host's
+own thread, of each world run; `Heights`; `Map`. `start()`: the
+thread; `run(asked)`: its loop. `shared_out(items, width, work)`: rows
+given out among the machine's threads. `heights(seed, generation,
+ask)` and `map(seed, generation, ask)`: the answers worked out.
 
 ## `host/frame.rs`
 
@@ -274,7 +287,8 @@ viewport)`**: those, row by row.
 **`Cells`**: a hot superchunk's planes copied -- grass, trees, their
 stages where a cell is a pixel or more, its water (a `Water`, shared,
 not copied again) -- its heights the first frame it is hot in, its
-sheep's cells. **`Frame`** `{world, seed, generation, side, tick,
+sheep's cells. **`height_in_frame(height_words, place)`**: a cell's
+height from those words. **`Frame`** `{world, seed, generation, levels, side, tick,
 ticks_a_second, sheep, grass, trees, sync_seconds, sync_share,
 viewport, hot, detail, near, named, said, more, cells}`: `world` counts the
 worlds the host has run, so a client knows what it drew is of another;

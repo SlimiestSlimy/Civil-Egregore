@@ -55,7 +55,7 @@ pub fn hud(hud: Single<(&mut Text, &mut Visibility), With<Hud>>, seen: Res<Seen>
     text.0 = format!(
         "{said}seed {}   {size}   ocean at {}   tick {}\n{} ticks a second ({pace})\n{} sheep   {} cells of grass   {} trees\n{} superchunk(s) in the viewport, {} hot, {drawn}\na frame, {} of them: {:.0} us of the host ({:.2}% of its time), {:.1} ms painting\n{KEYS}",
         utilities::seed::hex(frame.seed),
-        frame.generation.shape.ocean,
+        frame.levels.ocean,
         grouped(frame.tick),
         grouped(frame.ticks_a_second as u64),
         grouped(frame.sheep as u64),

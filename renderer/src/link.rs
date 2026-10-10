@@ -13,7 +13,7 @@ use server::Start;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 use utilities::tuning::Tuning;
-use server::host::terrain_seen::Generation;
+use server::Generation;
 
 /// The host, as the window holds it: where to ask, where the answers
 /// come, and what it was last told.
@@ -50,7 +50,8 @@ impl Link {
     pub fn start() -> Self {
         let (host, frames) = Host::start();
         let (shading, tunings) = channel();
-        Self { host, pictures: Mutex::new(crate::paint::start(frames, tunings)), shading, waiting: false, since: f32::INFINITY, asked: None, paused: false, pace: Some(TARGET_PACE), generation: None, first_view: true }
+        let pictures = Mutex::new(crate::paint::start(frames, tunings, host.terrain()));
+        Self { host, pictures, shading, waiting: false, since: f32::INFINITY, asked: None, paused: false, pace: Some(TARGET_PACE), generation: None, first_view: true }
     }
 
     /// Forgets a frame asked of the world run: another is to run in its

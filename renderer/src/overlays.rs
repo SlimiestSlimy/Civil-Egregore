@@ -2,7 +2,8 @@
 //! the chunks' boundaries ([`boundaries`]), their names in their
 //! corners ([`labels`]), and every cell's height on it ([`heights`]).
 
-use crate::link::Seen;
+use crate::link::{Link, Seen};
+use server::host::terrain::{Height, HeightsAsk};
 use crate::view::{Sprites, SPRITE_SIDE};
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
@@ -133,10 +134,15 @@ pub fn boundaries(shown: Res<Shown>, mut lines: Query<(&Boundary, &mut Transform
     }
 }
 
+/// The heights last asked of the host for the height labels: the
+/// world and the first cell they are of, and the heights.
+type HeightsAsked = Option<((u64, (u32, u32)), Vec<Height>)>;
+
 /// Writes every cell's height on it, as the world run is generated,
 /// once the cells are large enough on the screen to read it and few
 /// enough for the labels there are.
-pub fn heights(shown: Res<Shown>, sprites: Res<Sprites>, seen: Res<Seen>, camera: Single<(&Transform, &Projection), CameraOnly>, window: Single<&Window>, mut labels: Query<(&HeightLabel, &mut Text2d, &mut Transform, &mut Visibility)>) {
+#[allow(clippy::too_many_arguments)]
+pub fn heights(shown: Res<Shown>, sprites: Res<Sprites>, seen: Res<Seen>, link: Res<Link>, mut asked: Local<HeightsAsked>, camera: Single<(&Transform, &Projection), CameraOnly>, window: Single<&Window>, mut labels: Query<(&HeightLabel, &mut Text2d, &mut Transform, &mut Visibility)>) {
     let (transform, projection) = *camera;
     let Projection::Orthographic(view) = projection else {
         return;
@@ -145,16 +151,23 @@ pub fn heights(shown: Res<Shown>, sprites: Res<Sprites>, seen: Res<Seen>, camera
     let (first, last) = ((first_x, first_y), (last_x, last_y));
     let readable = shown.heights && 1.0 / view.scale >= HEIGHT_FROM && last.0 - first.0 < HEIGHT_LABELS.0 && last.1 - first.1 < HEIGHT_LABELS.1;
     let size = view.scale * (1.0 / view.scale / HEIGHT_WIDTH).min(1.0);
-    let of = seen.frame.as_ref().filter(|_| readable).map(|frame| (frame.seed, frame.generation));
+    let world = seen.frame.as_ref().filter(|_| readable).map(|frame| frame.world);
+    // The heights of the cells the labels may stand on, asked of the host once for a view: again only when it has moved, or the world is another.
+    if let Some(world) = world
+        && asked.as_ref().is_none_or(|(of, _)| *of != (world, first))
+    {
+        *asked = link.host.terrain().heights(HeightsAsk { world, first, size: HEIGHT_LABELS, skipped: Vec::new() }).map(|heights| ((world, first), heights));
+    }
+    let of = world.and(asked.as_ref()).filter(|(of, _)| of.1 == first).map(|(_, heights)| heights);
     for (label, mut text, mut transform, mut visibility) in &mut labels {
         // The cell the camera shows that is the label's: the first at or past the view's first whose place round the grid is its slot.
         let round = |first: u32, slot: u32, labels: u32| first + (slot + labels - first % labels) % labels;
         let (x, y) = (round(first.0, label.slot.0, HEIGHT_LABELS.0), round(first.1, label.slot.1, HEIGHT_LABELS.1));
-        let Some((seed, generation)) = of.filter(|_| x <= last.0 && y <= last.1) else {
+        let Some(heights) = of.filter(|_| x <= last.0 && y <= last.1) else {
             *visibility = Visibility::Hidden;
             continue;
         };
-        let height = server::host::terrain_seen::HeightsSeen::of(&generation, seed).height(x, y).to_string();
+        let height = heights[((y - first.1) * HEIGHT_LABELS.0 + x - first.0) as usize].to_string();
         if text.0 != height {
             text.0 = height;
         }

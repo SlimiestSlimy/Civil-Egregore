@@ -7,7 +7,7 @@ mod host_thread;
 use host_thread::HostThread;
 
 pub mod frame;
-pub mod terrain_seen;
+pub mod terrain;
 
 use crate::Start;
 use utilities::tuning::Tuning;
@@ -87,6 +87,8 @@ fn census(seed: u64) -> Option<BufWriter<File>> {
 pub struct Host {
     /// Where the calls go.
     requests: Sender<Request>,
+    /// Where the terrain is asked of.
+    terrain: terrain::TerrainAsker,
 }
 
 impl Host {
@@ -96,8 +98,16 @@ impl Host {
     pub fn start() -> (Self, Receiver<Frame>) {
         let (requests, asked) = channel();
         let (answers, frames) = channel();
-        thread::Builder::new().name("host".to_string()).spawn(move || HostThread::default().run(&asked, &answers)).expect("a thread for the host");
-        (Self { requests }, frames)
+        let terrain = terrain::start();
+        let told = terrain.clone();
+        thread::Builder::new().name("host".to_string()).spawn(move || HostThread::telling(told).run(&asked, &answers)).expect("a thread for the host");
+        (Self { requests, terrain: terrain::TerrainAsker { requests: terrain } }, frames)
+    }
+
+    /// Where the terrain of the world run is asked of, what no frame
+    /// brings: a handle of its own, for a thread that may wait.
+    pub fn terrain(&self) -> terrain::TerrainAsker {
+        self.terrain.clone()
     }
 
     /// Asks for some of the viewport's superchunks: answered with a

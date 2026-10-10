@@ -12,7 +12,8 @@ use relief::{slope_light, tint, water_light, FOAM, PALE, SAND};
 
 use coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashMap;
-use server::host::terrain_seen::{height_in_frame, levels, Generation, Height, HeightsSeen};
+use server::host::frame::height_in_frame;
+use server::host::terrain::{Height, HeightsAsk, Levels, TerrainAsker};
 
 /// Cells along a superchunk's side.
 pub const SIDE: usize = SUPERCHUNK_SIDE_CELLS as usize;
@@ -169,14 +170,21 @@ impl Ground {
     }
 
     /// The ground of the superchunk whose top left cell is `top_left`,
-    /// in the world whose seed is `seed`, generated as `generation` says; the
-    /// heights `given` taken as they are.
-    pub fn generate(seed: u64, generation: &Generation, top_left: (u32, u32), given: &Given) -> Self {
-        let heights = heights(seed, generation, top_left, given);
-        let levels = levels(generation);
+    /// in the world `world` the host runs, drawn between `levels`: the
+    /// heights `given` taken as they are, those about them asked of
+    /// the host -- which, running another world by now, is not
+    /// waited for: the ground is flat at the ocean's level, for the
+    /// one frame of a world gone.
+    pub fn ask(terrain: &TerrainAsker, world: u64, levels: Levels, top_left: (u32, u32), given: &Given) -> Self {
+        Self::of_heights(&heights(terrain, world, top_left, given).unwrap_or_else(|| vec![levels.ocean; WIDE * WIDE]), levels)
+    }
+
+    /// The ground of a superchunk and the cells about it whose heights
+    /// are `heights`, [`WIDE`] a side, row by row, drawn between `levels`.
+    fn of_heights(heights: &[Height], levels: Levels) -> Self {
         let (between, deepest) = ((levels.ocean, levels.highest), levels.ocean.saturating_sub(levels.ground) as f32);
         let smooth = smoothed(&smoothed(&heights.iter().map(|&height| height as f32).collect::<Vec<_>>()));
-        let (lines, shadowed) = shadow_lines(&heights);
+        let (lines, shadowed) = shadow_lines(heights);
         let to_coast = coast_distances(&heights.iter().map(|&height| height < levels.ocean).collect::<Vec<_>>());
         let at = |x: usize, y: usize| (y + BEFORE) * WIDE + x + BEFORE;
         // Each cell's light; and for the levels, what its colour is multiplied by, its height and how far the coast is.
@@ -218,38 +226,28 @@ impl Ground {
 /// ([`height_in_frame`]) by its top left cell.
 pub type Given<'a> = HashMap<(u32, u32), &'a [u64]>;
 
-/// The heights about the superchunk whose top left cell is `top_left`:
-/// [`WIDE`] a side, row by row. Those of a superchunk `given` are read;
-/// the others are worked out from the seed.
-fn heights(seed: u64, generation: &Generation, top_left: (u32, u32), given: &Given) -> Vec<Height> {
+/// The heights about the superchunk whose top left cell is `top_left`
+/// in the world `world`: [`WIDE`] a side, row by row. Those of a
+/// superchunk `given` are read; the others are asked of the host,
+/// which is told to pass the given ones by -- none if it runs another
+/// world by now.
+fn heights(terrain: &TerrainAsker, world: u64, top_left: (u32, u32), given: &Given) -> Option<Vec<Height>> {
     let (left, top) = (top_left.0.wrapping_sub(BEFORE as u32), top_left.1.wrapping_sub(BEFORE as u32));
-    // Rows shared out among the machine's threads: a cell's height is the same whoever works it out.
-    let mut heights = vec![0; WIDE * WIDE];
-    let threads = std::thread::available_parallelism().map_or(1, |threads| threads.get());
-    let rows_each = WIDE.div_ceil(threads);
-    std::thread::scope(|scope| {
-        for (part, rows) in heights.chunks_mut(rows_each * WIDE).enumerate() {
-            scope.spawn(move || {
-                let mut seen = HeightsSeen::of(generation, seed);
-                for (row, heights) in rows.chunks_mut(WIDE).enumerate() {
-                    let (y, mut across) = (top.wrapping_add((part * rows_each + row) as u32), 0);
-                    while across < WIDE {
-                        // The row's run within one superchunk.
-                        let x = left.wrapping_add(across as u32);
-                        let (in_x, in_y) = (x % SIDE as u32, y % SIDE as u32);
-                        let run = (SIDE - in_x as usize).min(WIDE - across);
-                        let cells = heights[across..across + run].iter_mut().zip(0u32..);
-                        match given.get(&(x - in_x, y - in_y)) {
-                            Some(words) => cells.for_each(|(height, along)| *height = height_in_frame(words, place_from_cartesian(in_x + along, in_y))),
-                            None => cells.for_each(|(height, along)| *height = seen.height(x.wrapping_add(along), y)),
-                        }
-                        across += run;
-                    }
-                }
-            });
+    let mut heights = terrain.heights(HeightsAsk { world, first: (left, top), size: (WIDE as u32, WIDE as u32), skipped: given.keys().copied().collect() })?;
+    for (row, heights) in heights.chunks_mut(WIDE).enumerate() {
+        let (y, mut across) = (top.wrapping_add(row as u32), 0);
+        while across < WIDE {
+            // The row's run within one superchunk.
+            let x = left.wrapping_add(across as u32);
+            let (in_x, in_y) = (x % SIDE as u32, y % SIDE as u32);
+            let run = (SIDE - in_x as usize).min(WIDE - across);
+            if let Some(words) = given.get(&(x - in_x, y - in_y)) {
+                heights[across..across + run].iter_mut().zip(0u32..).for_each(|(height, along)| *height = height_in_frame(words, place_from_cartesian(in_x + along, in_y)));
+            }
+            across += run;
         }
-    });
-    heights
+    }
+    Some(heights)
 }
 
 #[cfg(test)]
@@ -258,14 +256,18 @@ mod tests {
 
     /// Two superchunks side by side, and one below: the shadow lines
     /// over the cells they both keep are the same from either; and the
-    /// heights a frame brings are the ones worked out from the seed.
+    /// heights a frame brings are the ones the host answers when asked.
     #[test]
     fn shadows_are_the_same_from_both_sides_of_an_edge() {
-        let generation = Generation::DEFAULT;
-        let seed = server::host::terrain_seen::seed_with_land(utilities::seed::counted(), &generation, coordinates::WORLD_MIDDLE);
+        use server::host::frame::Ask;
+        let start = server::Start { seed: server::seed_with_land(utilities::seed::counted(), &server::Generation::DEFAULT), sheep: 1, ..server::Start::default() };
+        let (host, frames) = server::host::Host::start();
+        assert!(host.pause(true) && host.make_world(start) && host.sync(Ask { viewport: None, detail: 0, skip: 0, most: 0, near: None }));
+        let frame = frames.recv_timeout(std::time::Duration::from_secs(1800)).expect("a frame of the world made");
+        let terrain = host.terrain();
         let middle = coordinates::WORLD_MIDDLE.top_left().cartesian();
         let (left, top, side) = (middle.x, middle.y, SIDE as u32);
-        let fine = |top_left: (u32, u32), given: &Given| Ground::generate(seed, &generation, top_left, given).fine.expect("made fine");
+        let fine = |top_left: (u32, u32), given: &Given| Ground::ask(&terrain, frame.world, frame.levels, top_left, given).fine.expect("made fine");
         let (here, beside, below) = (fine((left, top), &Given::new()), fine((left + side, top), &Given::new()), fine((left, top + side), &Given::new()));
         let mut differing = 0;
         for along in 0..SIDE as isize {
@@ -275,10 +277,12 @@ mod tests {
             }
         }
         assert_eq!(differing, 0, "shadow lines unlike over an edge");
-        let world = server::start(server::Start { seed, sheep: 1, ..server::Start::default() });
+        let world = server::start(start);
         let image = world.storage().image(coordinates::WORLD_MIDDLE).expect("the origin's image");
         let brought = fine((left, top), &[((left, top), image.height_words())].into_iter().collect());
         let cells = || (0..SIDE as isize).flat_map(|y| (0..SIDE as isize).map(move |x| (x, y)));
-        assert!(cells().all(|(x, y)| brought.height(x, y) == here.height(x, y) && brought.line(x, y) == here.line(x, y)), "heights brought unlike those worked out");
+        assert!(cells().all(|(x, y)| brought.height(x, y) == here.height(x, y) && brought.line(x, y) == here.line(x, y)), "heights brought unlike those asked for");
+        // Asked of a world the host does not run: no answer, and a ground flat at the ocean's level.
+        assert!(heights(&terrain, frame.world + 1, (left, top), &Given::new()).is_none());
     }
 }

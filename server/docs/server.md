@@ -267,7 +267,30 @@ its generation is retuned (`Host::reset`). It ticks at the pace asked,
 or flat out, until the client is gone. As a world runs it keeps a census -- the flock and
 the grass every 1,000 ticks, the seconds and the pace held -- in
 `transient_data/measurements/census.csv`, written as it goes, so a run
-closed at any time leaves what it came to.
+closed at any time leaves what it came to. The ground no frame
+brings a client asks of it too, on another thread ("Terrain asked of
+the host").
+
+## Terrain asked of the host
+
+A frame brings what is hot. What a client draws past that -- the
+heights about a superchunk, which its shadows and its coast are
+worked out from, the whole of the ground for a map, a cell's height
+written on it -- it asks of the host too (`Host::terrain`,
+`src/host/terrain.rs`), and works none of it out itself: the server
+alone says what the world is, and a client holds no generator. The
+asks are answered on a thread of the host's own, so no tick waits for
+a map, and each call waits for its answer on the thread that made it
+-- a client asks what takes long from a thread that may wait. The
+host's thread tells the terrain's of each world it runs before it
+sends a frame of it, and an ask names its world (`Frame::world`): one
+of a world run no more is answered with nothing.
+
+What is answered is the terrain as the world is generated, a cell the
+same whoever works it out. Not yet: once anything changes the ground
+of a made superchunk, these answers must come from the world where it
+has one, and only past it from how it is generated; the asks are
+where that will be done, and no client changes for it.
 
 ## Layout
 
@@ -280,7 +303,7 @@ closed at any time leaves what it came to.
 | `src/rules.rs` | the table of the rules, a tick's counts by rule, the rules chosen by name |
 | `src/tick.rs` | the tick of every rule in the table, then the halos moved |
 | `src/world_access.rs` | a world from outside the server: its parts read, changed only whole, and what must hold between them |
-| `src/host/` | a world run on a thread of its own for a window: `mod` the host's calls and the census, `host_thread` the thread itself, `frame` what it answers |
+| `src/host/` | a world run on a thread of its own for a window: `mod` the host's calls and the census, `host_thread` the thread itself, `frame` what it answers, `terrain` the terrain a client asks of it, answered on a thread of its own |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; the diagnostics tools |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
 | `tests/` | the halos follow their hot entities; a world of a size is hot within it only; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; a world hashes the same however it is ticked; the files; refusals |
