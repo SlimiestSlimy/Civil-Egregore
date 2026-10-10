@@ -222,8 +222,7 @@ Linux/Windows comparison is the user's to run. No camera in it.
 
 ORDER (user, 2026-10-10, verbatim): "do it in this order: fix world
 struct, finish docs, finish tests, make cool pool paging, work on gpu
-LOD". That is: (1) server::World -- the review's item 3 under OPEN
-THREADS: fields private, invariants written and checked; (2) docs
+LOD". That is: (1) server::World -- DONE 2026-10-10; (2) docs
 finished; (3) tests finished -- task 7, and each crate testing itself;
 (4) cold pool paging (task 4); (5) GPU LOD (task 5).
 THEN (user, 2026-10-10, verbatim): "then we work on generating
@@ -236,6 +235,14 @@ counted -- to design (cells first; an entity's put already is one: a
 new entity is put only on a free cell). Note for the design: a rule
 still cannot learn in the tick that its write failed, so what hangs
 on the write (the sheep's meal) must hang on it where it is applied.
+User on that, 2026-10-10, verbatim: "exactly, thats the logic behind
+compare and write, if the write fails nothing happens, otherwise the
+write is valid, i believ e the last ingredient we need is write
+grouping markers (write group start and end instructions" so a whole
+group of writes can fail or succeed at the same time". That is: WRITE
+GROUPS -- a group-start and a group-end instruction; the writes
+between them all apply or none does (the meal: the grass cell cleared
+if still grass AND the sheep's hunger edited, as one).
 
 Asked by the user, in the order to do them. Read this first after any
 break; write a new ask here the moment it is made.
@@ -315,13 +322,10 @@ Google Drive connector needs authorizing in claude.ai settings.
      so in server.md as the client format.
   2. Dispatcher::run: DONE 2026-10-10 (one_run lock; tests of four
      threads running at once, and of a queued job calling run).
-  3. server::World has every field pub (arena, storage, entities,
-     simulation, cold, halos, info): the invariants between them (hot in
-     the arena <-> the halos <-> entities' superchunks <-> the cold
-     pool) are guarded by nothing. Write the invariants down in
-     server.md, make the fields private, methods for what callers do
-     (tests included; e.g. world.halos.keep_viewport goes through a
-     World method), a debug check of the invariants after a tick.
+  3. server::World: DONE 2026-10-10 (fields the server's own, read by
+     methods, changed whole: put_entity, remove_entity, write_cells;
+     server.md, "What a world holds together"; World::broken_invariant
+     checked after a debug tick and by the fast tier).
   4. Rule counts by string: RULES/place_of/TickCounts::count look up by
      name and panic at run time; each rule has COUNTED names AND
      separate index constants (WOKEN = 0 ...) -- two sources of truth

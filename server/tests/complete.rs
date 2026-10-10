@@ -16,13 +16,13 @@ fn a_world_stopped_often_comes_to_the_same() {
     const UNTIL: u64 = 30_000;
     let seed = land_seed(0);
     let mut straight = server::start(server::Start { seed, sheep: 4_000, ..server::Start::default() });
-    while straight.entities.now() < UNTIL {
+    while straight.entities().now() < UNTIL {
         straight.tick();
     }
     let folder = folder("complete");
     let mut stopped = server::start(server::Start { seed, sheep: 4_000, ..server::Start::default() });
     for stop in (5_000..=UNTIL).step_by(5_000) {
-        while stopped.entities.now() < stop {
+        while stopped.entities().now() < stop {
             stopped.tick();
         }
         server::save(&folder, &mut stopped).expect("saved");
@@ -42,8 +42,8 @@ fn a_flock_on_generated_ground_lasts() {
     for _ in 0..300_000 {
         made.tick();
     }
-    let grass: u64 = made.arena.superchunks().iter().map(|superchunk| made.arena.superchunk_count(GRASS, superchunk.index()) as u64).sum();
-    let sheep = made.entities.len();
+    let grass: u64 = made.arena().superchunks().iter().map(|superchunk| made.arena().superchunk_count(GRASS, superchunk.index()) as u64).sum();
+    let sheep = made.entities().len();
     assert!((500..200_000).contains(&sheep), "{sheep} sheep");
     assert!(grass > 4 * 1024 * 1024 / 20, "{grass} cells of grass");
 }

@@ -26,10 +26,10 @@ pub type Everything = (Vec<u64>, Vec<(Header, Vec<AttributeBlock>)>, u64, Vec<(S
 
 /// [`Everything`] `world` holds.
 pub fn everything(world: &World) -> Everything {
-    let cells = world.info.layers.clone().into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.words().to_vec()).collect();
-    let all = world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
-    let cold = world.cold.iter().map(|(&superchunk, words)| (superchunk, world.storage.image(superchunk).expect("a cold superchunk's image").clone(), words.clone())).collect();
-    (cells, all, world.entities.now(), world.simulation.random_states().collect(), cold, world.warming().collect(), world.cooling().collect())
+    let cells = world.info().layers.clone().into_iter().flat_map(|layer| world.arena().run(layer)).flat_map(|(_, bucket)| bucket.words().to_vec()).collect();
+    let all = world.entities().iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
+    let cold = world.cold().iter().map(|(&superchunk, words)| (superchunk, world.storage().image(superchunk).expect("a cold superchunk's image").clone(), words.clone())).collect();
+    (cells, all, world.entities().now(), world.simulation().random_states().collect(), cold, world.warming().collect(), world.cooling().collect())
 }
 
 /// A seed whose world has land about its origin, the `nth` such the
@@ -50,12 +50,12 @@ pub fn plain_world(superchunks: u32, grass_cells: u64, sheep: usize, threads: us
 
 /// The top left superchunk of `world`'s hot ones.
 pub fn first_superchunk(world: &World) -> SuperchunkIndex {
-    world.arena.superchunk_indices().into_iter().min_by_key(|superchunk| (superchunk.cartesian().1, superchunk.cartesian().0)).expect("a hot superchunk")
+    world.arena().superchunk_indices().into_iter().min_by_key(|superchunk| (superchunk.cartesian().1, superchunk.cartesian().0)).expect("a hot superchunk")
 }
 
 /// Cells of grass over `world`'s hot superchunks.
 pub fn cells_of_grass(world: &World) -> u64 {
-    world.arena.superchunk_indices().into_iter().map(|superchunk| world.arena.superchunk_count(type_registry::GRASS, superchunk) as u64).sum()
+    world.arena().superchunk_indices().into_iter().map(|superchunk| world.arena().superchunk_count(type_registry::GRASS, superchunk) as u64).sum()
 }
 
 /// Turns to grass the rectangle of cells `width` by `height` whose top
@@ -63,32 +63,30 @@ pub fn cells_of_grass(world: &World) -> u64 {
 pub fn plant_grass(world: &mut World, at: coordinates::CellCartesian, width: u8, height: u8) {
     use bitplane_manager::{Shape, Write, WriteOp};
     let shape = if (width, height) == (1, 1) { Shape::Cell } else { Shape::Rect { width, height } };
-    world.arena.queue(type_registry::GRASS, Write { at: at.into(), op: WriteOp::Set, shape });
-    assert_eq!(world.arena.apply().missed, 0, "grass planted off the hot superchunks");
+    let planted = world.write_cells(type_registry::GRASS, [Write { at: at.into(), op: WriteOp::Set, shape }]);
+    assert_eq!(planted.missed, 0, "grass planted off the hot superchunks");
 }
 
 /// Puts an entity on `world`, whole: there before the next tick.
 pub fn put_entity(world: &mut World, header: Header, attributes: &[AttributeBlock]) {
-    world.entities.queue_put(header, attributes);
-    world.entities.apply();
+    world.put_entity(header, attributes);
 }
 
 /// One tick of the rule named `rule` alone over `world`'s hot
 /// superchunks, its halos left where they are: the tick's report, the
-/// rule's counts alone in it; `seed` seeds a superchunk's random stream
-/// the first tick it is in.
-pub fn tick_rule(world: &mut World, seed: u64, rule: &str) -> simulation::TickReport<instructions::RuleCounts> {
-    let report = server::tick_chosen(&mut world.simulation, &mut world.arena, &mut world.entities, seed, server::Chosen::named(&[rule]));
+/// rule's counts alone in it.
+pub fn tick_rule(world: &mut World, rule: &str) -> simulation::TickReport<instructions::RuleCounts> {
+    let report = world.tick_only(server::Chosen::named(&[rule]), false);
     simulation::TickReport { writes_applied: report.writes_applied, instructions_applied: report.instructions_applied, rules: report.rules.of(rule), computing: report.computing, applying: report.applying }
 }
 
 /// One tick of the sheep's rule alone over `world`'s hot superchunks,
 /// its halos left where they are.
-pub fn tick_sheep(world: &mut World, seed: u64) -> simulation::TickReport<instructions::RuleCounts> {
-    tick_rule(world, seed, "sheep")
+pub fn tick_sheep(world: &mut World) -> simulation::TickReport<instructions::RuleCounts> {
+    tick_rule(world, "sheep")
 }
 
 /// One tick of the grass's rule alone over `world`'s hot superchunks.
-pub fn tick_grass(world: &mut World, seed: u64) -> simulation::TickReport<instructions::RuleCounts> {
-    tick_rule(world, seed, "grass")
+pub fn tick_grass(world: &mut World) -> simulation::TickReport<instructions::RuleCounts> {
+    tick_rule(world, "grass")
 }

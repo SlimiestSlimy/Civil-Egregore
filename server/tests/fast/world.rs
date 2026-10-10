@@ -19,11 +19,11 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
         first.tick();
     }
     let saved = server::save(&folder, &mut first).expect("saved");
-    assert_eq!((saved.superchunks, saved.entities), (first.storage.superchunks().count(), first.entities.len()));
+    assert_eq!((saved.superchunks, saved.entities), (first.storage().superchunks().count(), first.entities().len()));
 
     let mut second = server::load(&folder).expect("loaded");
-    assert_eq!((second.info.seed, second.info.tick, second.generation), (crate::tests::land_seed(0), 1_500, first.generation));
-    assert_eq!(second.info.layers, first.info.layers);
+    assert_eq!((second.info().seed, second.info().tick, second.generation()), (crate::tests::land_seed(0), 1_500, first.generation()));
+    assert_eq!(second.info().layers, first.info().layers);
     assert!(everything(&first) == everything(&second), "loaded as saved");
 
     let (mut eaten, mut born) = (0, 0);
@@ -38,20 +38,23 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
 
 /// A world saved and loaded again and again mid run -- once while a
 /// superchunk is warming, always -- is, at a tick agreed, the world that ran
-/// straight to it: every cell, every entity, every random number.
+/// straight to it: every cell, every entity, every random number. And
+/// at every tick and every load, what a world holds together holds
+/// (`docs/server.md`, "What a world holds together").
 #[test]
 fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     // At least 4,000 ticks, and on until a superchunk has been warming: on some seeds the flock is long in nearing an edge.
     let mut straight = server::start(server::Start { seed: crate::tests::land_seed(0), sheep: 4_000, ..server::Start::default() });
     let mut warming = None;
-    while straight.entities.now() < 4_000 || warming.is_none() {
-        assert!(straight.entities.now() < 60_000, "a superchunk warming on the way");
+    while straight.entities().now() < 4_000 || warming.is_none() {
+        assert!(straight.entities().now() < 60_000, "a superchunk warming on the way");
         straight.tick();
+        assert_eq!(straight.broken_invariant(), None, "at tick {}", straight.entities().now());
         if warming.is_none() && straight.warming().next().is_some() {
-            warming = Some(straight.entities.now());
+            warming = Some(straight.entities().now());
         }
     }
-    let (warming, until) = (warming.expect("seen above"), straight.entities.now());
+    let (warming, until) = (warming.expect("seen above"), straight.entities().now());
 
     let folder = folder("mid_run");
     let mut stopped = server::start(server::Start { seed: crate::tests::land_seed(0), sheep: 4_000, ..server::Start::default() });
@@ -59,15 +62,15 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     stops.sort_unstable();
     stops.dedup();
     for stop in stops {
-        while stopped.entities.now() < stop {
+        while stopped.entities().now() < stop {
             stopped.tick();
         }
         server::save(&folder, &mut stopped).expect("saved");
         // What ran is dropped whole: the next stretch runs on what the files hold alone.
         stopped = server::load(&folder).expect("loaded");
-        assert_eq!(stopped.info.tick, stop);
+        assert_eq!((stopped.info().tick, stopped.broken_invariant()), (stop, None));
     }
-    assert!(straight.entities.len() > 4_000, "{} sheep: a flock that bred", straight.entities.len());
+    assert!(straight.entities().len() > 4_000, "{} sheep: a flock that bred", straight.entities().len());
     // The one that ran straight saved too: a superchunk gone cold on the way has its last cells in the writeback ring until a save, or the ring's need of room, puts them in its image.
     server::save(&folder.join("straight"), &mut straight).expect("saved");
     assert!(everything(&straight) == everything(&stopped), "the same at tick {until}");
@@ -83,18 +86,18 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let mut first = server::start(server::Start { seed, sheep: 10, ..server::Start::default() });
     server::save(&folder, &mut first).expect("saved");
     let text = std::fs::read_to_string(folder.join("world.csv")).expect("the world's file");
-    let generation: String = first.generation.numbers().iter().map(|(name, value)| format!("generation {name},{value}\n")).collect();
+    let generation: String = first.generation().numbers().iter().map(|(name, value)| format!("generation {name},{value}\n")).collect();
     // Every layer the registry has, a wide plane as the layers it is kept cold as.
     let layers: Vec<String> = type_registry::layer_types().into_iter().flat_map(|layer_type| layer_type.planes()).map(|plane| plane.0.to_string()).collect();
     assert_eq!(text, format!("world,is\nformat,2\nseed,{}\ntick,0\nlayers,{}\nhot entity,{}\n{generation}", utilities::seed::hex(seed), layers.join(" "), server::HOT_ENTITY.0), "no name: the folder's");
-    let hot: String = first.arena.superchunk_indices().iter().map(|superchunk| format!("{:011x},hot,\n", superchunk.0)).collect();
+    let hot: String = first.arena().superchunk_indices().iter().map(|superchunk| format!("{:011x},hot,\n", superchunk.0)).collect();
     assert_eq!(std::fs::read_to_string(folder.join("hot.csv")).expect("the hot file"), format!("superchunk,is,until\n{hot}"), "the nine hot, none cooling or warming");
     let mut names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|entry| entry.unwrap().file_name().into_string().unwrap()).collect();
     names.sort();
     let expected: Vec<String> = disk::saved_superchunks(&folder).expect("listed").iter().flat_map(|superchunk| ["image", "state"].map(|kind| format!("{:011x}.{kind}", superchunk.0))).collect();
     assert_eq!(names, expected);
     assert_eq!(names.len(), 2 * 9, "the origin and its halo");
-    assert_eq!(disk::saved_superchunks(&folder).unwrap(), first.arena.superchunk_indices());
+    assert_eq!(disk::saved_superchunks(&folder).unwrap(), first.arena().superchunk_indices());
 }
 
 /// A world's file is read whatever the order of its rows under the
@@ -159,11 +162,11 @@ fn sheep_never_step_through_a_wall() {
         // A sheep strayed past the superchunk: the generator asked.
         if across < side && down < side { heights[down * side + across] } else { worldgen::height_shaped(&shape, seed, cell.x, cell.y) }
     };
-    let mut stood: HashMap<u64, coordinates::CellIndex> = made.entities.iter().map(|sheep| (sheep.header.id.0, sheep.header.at)).collect();
+    let mut stood: HashMap<u64, coordinates::CellIndex> = made.entities().iter().map(|sheep| (sheep.header.id.0, sheep.header.at)).collect();
     let (mut moved, mut beside_walls) = (0, 0);
     for _ in 0..1_500 {
         made.tick();
-        for sheep in made.entities.iter() {
+        for sheep in made.entities().iter() {
             let at = sheep.header.at;
             if let Some(was) = stood.insert(sheep.header.id.0, at).filter(|&was| was != at) {
                 let (from, to) = (was.cartesian(), at.cartesian());

@@ -11,7 +11,7 @@ use type_registry::GRASS;
 /// Every chunk's grass in `world`, as its bitmap's words, the chunks in
 /// Morton order.
 fn grass_words(world: &World) -> Vec<(ChunkIndex, Vec<u64>)> {
-    world.arena.run(GRASS).map(|(chunk, bucket)| (chunk, bucket.cells().to_vec())).collect()
+    world.arena().run(GRASS).map(|(chunk, bucket)| (chunk, bucket.cells().to_vec())).collect()
 }
 
 /// Cells in a superchunk.
@@ -33,7 +33,7 @@ fn lone_grass_never_decays() {
         plant_grass(&mut world, CellCartesian { x: origin.x + 2 * x, y: origin.y + 2 * y }, 1, 1);
     }
     assert_eq!(cells_of_grass(&world), 512 * 512);
-    let done = tick_grass(&mut world, 3).rules;
+    let done = tick_grass(&mut world).rules;
     assert!(done[SAMPLED] > 0);
     assert_eq!(done[DECAYS], 0);
 }
@@ -53,7 +53,7 @@ fn surrounded_grass_decays_at_its_chance() {
         plant_grass(&mut world, CellCartesian { x: origin.x + 128 * x, y: origin.y + 128 * y }, 128, 128);
     }
     assert_eq!(cells_of_grass(&world), CELLS);
-    let done = tick_grass(&mut world, 4).rules;
+    let done = tick_grass(&mut world).rules;
     let expected = CELLS as f64 * DECAY_CHANCE.fraction();
     assert_eq!(done[SPREADS], 0);
     assert!((done[DECAYS] as f64 - expected).abs() < 3.0 * expected.sqrt(), "{} decays, about {expected:.0} expected", done[DECAYS]);
@@ -70,8 +70,8 @@ fn grass_changes_by_what_spread_and_decayed() {
     let mut world = plain_world(1, 400, 0, 1);
     let start = cells_of_grass(&world);
     let mut grass = start;
-    for seed in 0..1000 {
-        let done = tick_grass(&mut world, seed).rules;
+    for _ in 0..1000 {
+        let done = tick_grass(&mut world).rules;
         let now = cells_of_grass(&world);
         assert!(now + done[DECAYS] >= grass && now + done[DECAYS] <= grass + done[SPREADS], "grown by what spread, less what decayed");
         grass = now;
@@ -85,10 +85,10 @@ fn grass_changes_by_what_spread_and_decayed() {
 #[test]
 fn grass_grows_in_every_superchunk() {
     let mut world = plain_world(25, 300_000, 0, 2);
-    let superchunks: Vec<SuperchunkIndex> = world.arena.superchunk_indices();
+    let superchunks: Vec<SuperchunkIndex> = world.arena().superchunk_indices();
         let before = grass_words(&world);
-    for seed in 0..300 {
-        tick_grass(&mut world, seed);
+    for _ in 0..300 {
+        tick_grass(&mut world);
     }
     let after = grass_words(&world);
     let mut changed: Vec<CellCartesian> = Vec::new();

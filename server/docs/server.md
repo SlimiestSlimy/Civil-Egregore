@@ -39,6 +39,36 @@ Each superchunk's random numbers are a stream of their own
 superchunk index, as they first were, two superchunks drew one
 sequence a few draws apart -- two flocks came out with the same sheep.
 
+## What a world holds together
+
+A world (`World`) is several parts that must agree: its hot bitmaps
+(the arena), every superchunk as stored, the hot superchunks'
+entities, the simulation's random numbers, each cold superchunk's
+state, and the halos. Three things are always so between two ticks,
+and `World::broken_invariant` says which is not, if any:
+
+- the entities are held for exactly the hot superchunks -- those the
+  arena has bitmaps of, in the same order;
+- no superchunk is both hot and cold;
+- every superchunk made is one or the other: as many stored as there
+  are hot and cold together.
+
+So the parts are not open to be changed one by one. Outside the
+server a world's parts are read (`World::arena`, `World::entities`
+and the others, each lent unchangeable) and the world is changed only
+whole: ticked (`World::tick`, `World::tick_only`), its halos moved,
+saved, or, between two ticks, by `World::put_entity`,
+`World::remove_entity` and `World::write_cells` -- each applied as it
+is called, and saying what came of it, as an entity or a cell off the
+hot superchunks is lost or missed, not put. A debug build checks the
+three after every tick (`World::tick`); the fast tier checks them at
+every tick and every load of a long run that warms and cools
+superchunks (`../tests/fast/world.rs`).
+
+Inside the server the parts are open to its own modules, which are
+what keeps them agreeing: the halos' moves (`World::with_halos`), the
+save and the load.
+
 ## Halos
 
 Only the superchunks about the hot entities are hot, and the halos are
@@ -242,6 +272,7 @@ closed at any time leaves what it came to.
 | `src/world_hash.rs` | a world's hash, part by part: what `check` prints |
 | `src/rules.rs` | the table of the rules, a tick's counts by rule, the rules chosen by name |
 | `src/tick.rs` | the tick of every rule in the table, then the halos moved |
+| `src/world_access.rs` | a world from outside the server: its parts read, changed only whole, and what must hold between them |
 | `src/host/` | a world run on a thread of its own for a window: `mod` the host's calls and the census, `host_thread` the thread itself, `frame` what it answers |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; the diagnostics tools |
 | `src/transient_data.rs` | where runs leave what they make, out of git |

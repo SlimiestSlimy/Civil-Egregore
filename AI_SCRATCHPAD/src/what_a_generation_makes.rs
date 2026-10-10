@@ -18,9 +18,9 @@ pub fn run(given: &Given) -> Result<(), String> {
     let world = server::start(Start { generation: Generation::plain(thousandths * ONE / 1000), size: Size::Limited { side, forced: true }, sheep: 0, ..Start::default() });
     println!("layer,cells");
     for (name, layer_type) in [("grass", GRASS), ("wet", WET), ("wall east", WALL_EAST), ("wall south", WALL_SOUTH)] {
-        let cells: u64 = world.arena.superchunk_indices().into_iter().map(|superchunk| world.arena.superchunk_count(layer_type, superchunk) as u64).sum();
+        let cells: u64 = world.arena().superchunk_indices().into_iter().map(|superchunk| world.arena().superchunk_count(layer_type, superchunk) as u64).sum();
         println!("{name},{cells}");
     }
-    println!("superchunks,{}", world.arena.superchunk_indices().len());
+    println!("superchunks,{}", world.arena().superchunk_indices().len());
     Ok(())
 }

@@ -17,16 +17,11 @@ pub struct WorldTick {
     pub halos: HaloChange,
 }
 
-/// One tick of every rule over every superchunk with a bitmap in
-/// use, on `simulation`'s threads -- `seed`, the world's, seeding a
+/// One tick of the rules `chosen` over every superchunk with a bitmap
+/// in use, on `simulation`'s threads -- `seed`, the world's, seeding a
 /// superchunk's random stream the first tick it is in. The halos are
-/// not moved: for a world forced hot, its superchunks hot all the while.
-pub fn tick_rules(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64) -> TickReport<TickCounts> {
-    tick_chosen(simulation, arena, entities, seed, Chosen::ALL)
-}
-
-/// One tick of the rules `chosen` alone, as [`tick_rules`] of all.
-pub fn tick_chosen(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64, chosen: Chosen) -> TickReport<TickCounts> {
+/// not moved.
+fn tick_chosen(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64, chosen: Chosen) -> TickReport<TickCounts> {
     simulation.tick(arena, entities, seed, |turn, samples| chosen.turn(turn, samples))
 }
 
@@ -34,8 +29,11 @@ impl World {
     /// One tick of the rules over the hot superchunks, then the halos
     /// moved to where the hot entities came to.
     pub fn tick(&mut self) -> WorldTick {
-        let rules = tick_rules(&mut self.simulation, &mut self.arena, &mut self.entities, self.info.seed);
-        WorldTick { rules, halos: self.move_halos() }
+        let rules = tick_chosen(&mut self.simulation, &mut self.arena, &mut self.entities, self.info.seed, Chosen::ALL);
+        let halos = self.move_halos();
+        // What a world holds together (`docs/server.md`), checked in a debug build.
+        debug_assert_eq!(self.broken_invariant(), None, "after tick {}", self.entities.now());
+        WorldTick { rules, halos }
     }
 
     /// One tick of the rules `chosen` alone over the hot superchunks,
