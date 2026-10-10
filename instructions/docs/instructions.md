@@ -95,10 +95,10 @@ Some counts cannot be made as the rule runs: whether a write happens
 is decided where it is applied. Those are counted as applied (below),
 and whoever runs the rules adds them to the same counts.
 
-## Compare-and-write and groups
+## Compare-and-write
 
 A rule reads the world as the tick found it, and another may change
-the same cell in the same tick. So every cell a rule writes is a
+the same thing in the same tick. So every cell a rule writes is a
 **compare-and-write**: the instruction says what the rule saw at the
 cell -- `cells::set`, that it was clear; `cells::clear`, that it was
 set; `cells::set_value`, the number it held -- and is applied only if
@@ -107,21 +107,38 @@ happens: of two rules clearing one cell, one does. Each has a form
 that counts (`set_counted`, `clear_counted`, `set_value_counted`): one
 added to the count named, if the write is applied.
 
-What must happen together is a **group**: `groups::start`, what the
-rule queues -- cells written, what an entity comes to
-(`entities::commit`, `remove`, ...), counts (`groups::count`) -- and
-`groups::end`. All of it is applied if every cell written in it is
-still as the rule saw it, and none of it otherwise. A sheep's meal is
-one: the grass cleared, the sheep fed, the meal counted, or nothing.
-A tree's death is one: the tree and its stage.
+What is compared need not be what is written (`compare`). A compare
+is of a cell (`compare::holds`, `lacks`, `value`) or of an entity's
+attribute (`compare::attribute`), and what hangs on it is a cell
+written (`compare::write`, which says what was seen at that cell
+too), a count (`compare::count`), or what an
+entity comes to: everything queued of entities from
+`compare::entities_from_here` to `compare::entities_as_ever`. A
+sheep's meal is all three: what the sheep comes to, and what it
+counts, held against the grass under it being there still; then the
+grass cleared, held against itself. Should the grass be gone, each is
+refused in turn. A tree's death is its stage put to 0 if the tree
+still stands and its stage is as seen, then the tree cleared.
 
-Two things a rule must see to. A group lands in one superchunk, so
-what may land in the next -- a lamb put beside its mother, a step over
-a border -- is not put in one. And an entity woken must be put back
-whether or not its group is applied: the rule queues, before the
-group, what stands if it is refused (`entities::sleep`), and in the
-group what replaces it. How it is applied, and in what order:
-`../../simulation/docs/simulation.md`, "Compare-and-write and groups".
+Nothing is applied together: each write has its own compare, read
+when the write is come to, in the order the rule queued. So a rule
+that wants several things to happen or not as one holds them all
+against the same thing and queues last the write that changes it --
+or chains them, each held against what the one before wrote.
+
+Two things a rule must see to. What a write is held against is in the
+superchunk the write lands in, so what may land in the next -- a lamb
+put beside its mother -- is not held against the ground under her.
+And an entity woken must be put back whatever is refused: the rule
+queues what it comes to under the compare, then what stands otherwise
+(`entities::sleep`) under the opposite one -- `holds`, then `lacks` --
+so one of the two is applied and the entity is written once.
+
+No write lands on another's: every cell written says what was seen
+there, an area's cells one by one (`mask::set_under`), and nothing a
+rule can queue overwrites what another did in the same tick. How it is
+applied, and every case:
+`../../simulation/docs/simulation.md`, "Compare-and-write".
 
 ## What an entity's rule is given
 
@@ -207,10 +224,10 @@ none is made a read: the largest is 128 KiB.
   holds at and the cells hot, a window of 8x8 at a time. `mask::layer_under`
   reads only where another mask has cells, the windows it has none in
   passed over.
-- **Written**: `mask::set_under` and `mask::clear_under` queue the mask's cells as
-  rectangles -- each row's runs of cells, a run the same in the rows
-  under it one rectangle with them, up to 255 cells a side -- so a
-  whole square is a few writes and a disc under two a row.
+- **Written**: `mask::set_under` and `mask::clear_under` queue the
+  mask's cells that the rule sees otherwise, each a compare-and-write
+  of its own: a cell another changes first is left as that one made
+  it.
 
 Not yet: masks of the common shapes made once and shipped with the
 program, masks kept from one read to the next, and the same over the

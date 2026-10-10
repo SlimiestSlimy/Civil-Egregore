@@ -105,8 +105,8 @@ edits carry in a list beside, and the cells a new entity may be put on
 **`move_entity(header, from)`**, **`set_attribute(id, at, attribute,
 value)`**, **`set_attribute_blocks(id, at, attribute)`**,
 **`unset_attribute(id, at, kind)`**, **`remove`**, **`apply_some(some, superchunks,
-earliest, applied)`** -- those at `some` alone, how a group refused is
-left out -- **`apply(superchunks, earliest,
+earliest, applied)`** -- those at `some` alone, how the instructions under a compare
+refused are left out -- **`apply(superchunks, earliest,
 applied)`** in order, each on its cell's superchunk (a put elsewhere
 lost, one of an entity no longer where it stood passed over, a new
 one on a cell taken refused, a mover to one staying),

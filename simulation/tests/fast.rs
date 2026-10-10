@@ -138,7 +138,7 @@ mod tick {
     //!
     //! `cargo test`
 
-    use bitplane_manager::{BitmapArena, BucketKey, Shape, Write, WriteOp};
+    use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
     use entity_manager::Entities;
     use simulation::{Simulation, Turn};
     use utilities::chance::Chance;
@@ -169,16 +169,17 @@ mod tick {
         SuperchunkIndex::from_cartesian(x, y).top_left().cartesian()
     }
 
-    /// Stone creeping: each cell sampled at 5% sets a random neighbour --
-    /// within the 3x3 around it -- or clears itself: how many it sampled.
+    /// Stone creeping: each cell sampled at 5% sets a random neighbour it
+    /// sees clear -- within the 3x3 around it -- or clears itself: how
+    /// many it sampled.
     fn creep(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> usize {
         let sampled = turn.sample(STONE, Chance::one_in(20), samples);
         for &cell in samples.iter() {
             let (dx, dy) = (turn.random().below(3) as i32 - 1, turn.random().below(3) as i32 - 1);
             if (dx, dy) == (0, 0) {
-                turn.queue(STONE, Write::cell(cell, WriteOp::Unset));
-            } else if let Some(neighbour) = cell.offset(dx, dy) {
-                turn.queue(STONE, Write::cell(neighbour, WriteOp::Set));
+                turn.queue_seen(STONE, cell, 1, 0, None);
+            } else if let Some(neighbour) = cell.offset(dx, dy).filter(|&neighbour| turn.holds(STONE, neighbour) == Ok(false)) {
+                turn.queue_seen(STONE, neighbour, 0, 1, None);
             }
         }
         sampled
@@ -224,7 +225,7 @@ mod tick {
             turn.sample(STONE, Chance::ALWAYS, samples);
             for &cell in samples.iter() {
                 let right = cell.offset(1, 0).expect("in the world");
-                turn.queue(STONE, Write::cell(right, WriteOp::Set));
+                turn.queue_seen(STONE, right, 0, 1, None);
                 assert_eq!(turn.holds(STONE, right), Ok(false), "still as the tick found it");
             }
             samples.len()
@@ -234,16 +235,21 @@ mod tick {
         assert_eq!(arena.superchunk_count(STONE, SuperchunkIndex::from_cartesian(11, 10)), 1);
     }
 
-    /// A rectangle straddling the corner four superchunks meet at lands in
-    /// all four, each applying its own part.
+    /// The cells of a square straddling the corner four superchunks meet
+    /// at, written one by one, land in all four, each applying its own.
     #[test]
-    fn shapes_split_over_the_superchunks_they_cover() {
+    fn writes_about_a_corner_land_in_the_four_superchunks() {
         let meet = corner(11, 11);
         let mut arena = arena(2, [CellCartesian { x: meet.x - 1, y: meet.y - 1 }].into_iter());
         let report = Simulation::new(2).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
             turn.sample(STONE, Chance::ALWAYS, samples);
             for &cell in samples.iter() {
-                turn.queue(STONE, Write { at: cell.offset(-1, -1).expect("in the world"), op: WriteOp::Set, shape: Shape::Rect { width: 4, height: 4 } });
+                for (x, y) in (-1..3).flat_map(|y| (-1..3).map(move |x| (x, y))) {
+                    let at = cell.offset(x, y).expect("in the world");
+                    if turn.holds(STONE, at) == Ok(false) {
+                        turn.queue_seen(STONE, at, 0, 1, None);
+                    }
+                }
             }
             0
         });
@@ -262,7 +268,7 @@ mod tick {
         let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
             turn.sample(STONE, Chance::ALWAYS, samples);
             for &cell in samples.iter() {
-                turn.queue(STONE, Write::cell(cell.offset(1, 0).expect("in the world"), WriteOp::Set));
+                turn.queue_seen(STONE, cell.offset(1, 0).expect("in the world"), 0, 1, None);
             }
             0
         });
@@ -277,7 +283,7 @@ mod tick {
         Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
             turn.sample(STONE, Chance::ALWAYS, samples);
             for &cell in samples.iter() {
-                turn.queue(STONE, Write::cell(cell.offset(2 * SUPERCHUNK_SIDE_CELLS as i32, 0).expect("in the world"), WriteOp::Set));
+                turn.queue_seen(STONE, cell.offset(2 * SUPERCHUNK_SIDE_CELLS as i32, 0).expect("in the world"), 0, 1, None);
             }
             0
         });

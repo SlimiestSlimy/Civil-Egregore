@@ -21,14 +21,19 @@ the cell seen clear, or set. **`set_value(turn, plane, cell, seen,
 value)`**: a wide plane's number put where `seen` was read.
 **`set_counted(turn, type, cell, counted)`**, **`clear_counted`**,
 **`set_value_counted`**: the same, one added to the rule's count
-`counted` if applied (`instructions.md`, "Compare-and-write and
-groups").
+`counted` if applied (`instructions.md`, "Compare-and-write").
 
-## `groups.rs`
+## `compare.rs`
 
-**`start(turn)`**, **`end(turn)`**: what is queued between them one
-group, applied all or none. **`count(turn, counted)`**: one added to
-the rule's count if the group is applied.
+**`Compare`**: the simulation's. **`holds(type, cell)`**, **`lacks`**,
+**`value(plane, cell, seen)`**: a cell as the rule saw it;
+**`attribute(entity, attribute, seen)`**: an entity standing where it
+stood, the attribute as seen, or none. **`write(turn, compare, type,
+cell, seen, value, counted)`**: a cell written if the compare holds
+and the cell is still as seen.
+**`count(turn, compare, counted)`**: a count. **`entities_from_here(turn,
+compare)`**, **`entities_as_ever(turn)`**: what is queued of entities
+between them under the compare.
 
 ## `entities.rs`
 
@@ -84,9 +89,9 @@ into two masks, a window a time; **`layer_under(turn, type, origin,
 under, set, hot)`**: the cells `under` has alone, the windows it has
 none in not read (**`read_where`**). `WINDOW` (8): cells along a
 window's side, the most a turn reads at once. **`set_under(turn, type,
-origin, mask)`**, **`clear_under`**: writes queued for every cell of
-the mask, as rectangles (**`write_under`**, **`next_cell`**) -- how
-many. `RECT` (255): the most cells along a rectangle's side.
+origin, mask)`**, **`clear_under`**: a compare-and-write queued for every hot cell of
+the mask seen otherwise (**`write_under`**, **`next_cell`**) -- how
+many.
 
 ## `walking.rs`
 
