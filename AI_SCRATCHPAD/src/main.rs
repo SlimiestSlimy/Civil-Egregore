@@ -9,6 +9,7 @@
 mod asking_the_host;
 mod sheep_under_camera_loading;
 mod tree_cover_over_ticks;
+mod where_sheep_go;
 
 use utilities::commands::{dispatch, Command, Parameter};
 
@@ -17,7 +18,7 @@ use utilities::commands::{dispatch, Command, Parameter};
 const SEED: &str = "seed";
 
 /// The probes.
-const COMMANDS: [Command; 2] = [
+const COMMANDS: [Command; 3] = [
     Command {
         name: "tree_cover_over_ticks",
         does: "makes a world forced hot with the tree cover given, resets it to the second cover if one is given, and prints its trees and grass as it ticks flat out: whether a reset is whole at once, and where the tree rule takes a cover",
@@ -33,8 +34,14 @@ const COMMANDS: [Command; 2] = [
     Command {
         name: "sheep_under_camera_loading",
         does: "makes a world with no side whose camera loads, asks for a square viewport about its middle, and prints the sheep on each superchunk hot in it: whether every superchunk generated in the viewport is given its flock",
-        parameters: &[Parameter::new(sheep_under_camera_loading::SHEEP_A_SUPERCHUNK, "10"), Parameter::new(sheep_under_camera_loading::VIEWPORT_SIDE, "6"), Parameter::new(SEED, "0")],
+        parameters: &[Parameter::new(sheep_under_camera_loading::SHEEP_A_SUPERCHUNK, "10"), Parameter::new(sheep_under_camera_loading::VIEWPORT_SIDE, "6"), Parameter::new(sheep_under_camera_loading::TICKS_WAITED, "16"), Parameter::new(SEED, "0")],
         run: sheep_under_camera_loading::run,
+    },
+    Command {
+        name: "where_sheep_go",
+        does: "makes a world with no side whose camera loads, keeps a square viewport about its middle, ticks it with no host between, and prints what its ticks say became of its entities: put, removed, lost, refused, born, dead",
+        parameters: &[Parameter::new(where_sheep_go::SHEEP_A_SUPERCHUNK, "250"), Parameter::new(where_sheep_go::VIEWPORT_SIDE, "5"), Parameter::new(where_sheep_go::TICKS, "600"), Parameter::new(SEED, "0")],
+        run: where_sheep_go::run,
     },
 ];
 
