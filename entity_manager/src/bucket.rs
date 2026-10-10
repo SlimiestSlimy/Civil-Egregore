@@ -57,6 +57,14 @@ pub(crate) enum Put {
     PassedOver,
 }
 
+impl Put {
+    /// What it is of an entity that was to move and was put where it
+    /// stood instead, its cell not to be come to: it stayed.
+    pub(crate) fn stayed(self) -> Self {
+        if self == Self::InPlace { Self::Stayed } else { self }
+    }
+}
+
 /// A chunk's entities.
 #[derive(Default)]
 pub(crate) struct Bucket {

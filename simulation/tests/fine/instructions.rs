@@ -209,11 +209,10 @@ fn an_entity_changing_itself_and_another_writing_it_both_stand() {
 }
 
 /// An entity crossing to another superchunk, written by another in the
-/// same tick, is turned back: it stays where it stood, asleep until
-/// its wake, with what was written to it -- nothing of it lost on the
-/// way. The tick after, written by none, it crosses with all of it.
+/// same tick, crosses with what was written to it: as one stepping
+/// within a superchunk does, whichever of the two is applied first.
 #[test]
-fn a_crossing_written_behind_is_turned_back() {
+fn a_crossing_written_behind_takes_what_was_written() {
     for threads in [1, 4] {
         let (mut arena, mut entities) = world(2);
         // On the last cell before the border, to step over it.
@@ -235,11 +234,6 @@ fn a_crossing_written_behind_is_turned_back() {
             }
             0
         };
-        let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), rule);
-        assert_eq!((report.instructions_applied.crossed, report.instructions_applied.turned_back, entities.len()), (1, 1, 2), "on {threads} threads");
-        assert!(entities.get(crosser.id, across).is_none(), "not across");
-        let stayed = entities.get(crosser.id, edge).expect("where it stood");
-        assert_eq!((stayed.attribute(NAME), stayed.attribute(MARK), stayed.header.wake), (Some(7), Some(1), 1), "written, and asleep a tick");
         let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), rule);
         assert_eq!((report.instructions_applied.crossed, report.instructions_applied.turned_back, entities.len()), (1, 0, 2), "on {threads} threads");
         assert!(entities.get(crosser.id, edge).is_none(), "gone from where it stood");

@@ -124,11 +124,11 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         // Eating, it bears at its next wake: a lamb may land in the next superchunk, where the grass under its mother cannot be held against it.
         Some(_) if fed => needs = now,
         // Its lamb is put on a cell seen free beside it; with none, it waits a step's time more.
-        Some(_) => match around::free_beside(turn, at, steppable) {
+        Some(_) => match around::free_beside(turn, at, steppable).and_then(|beside| around::cell(at, beside)) {
             Some(beside) => {
-                // Beside it on the cell drawn, or, that taken first, on another it may step to.
+                // Beside it on the cell drawn: that taken first, it is pregnant still, and tries the next tick.
                 let wake = next_step(turn);
-                let lamb = entities::spawn_beside(turn, SHEEP, at, beside, steppable, wake, &[AttributeBlock::holding(HUNGRY_AT, now + MEAL_TICKS), AttributeBlock::holding(LAMB, now + LAMB_TICKS)]);
+                let lamb = entities::spawn(turn, SHEEP, beside, wake, &[AttributeBlock::holding(HUNGRY_AT, now + MEAL_TICKS), AttributeBlock::holding(LAMB, now + LAMB_TICKS)]);
                 sheep.set(BEARING, lamb.0);
                 bearing = true;
             }

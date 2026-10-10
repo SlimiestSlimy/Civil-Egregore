@@ -43,9 +43,42 @@ sample costs the same few counts however rare samples are.
    past the speed of light (1024 cells a tick, a superchunk's side), and
    panics. Nothing changes, so the threads share the arena read-only.
 2. **Applying**: each superchunk applies what its own and its
-   neighbours' outboxes hold for it, in a fixed order, to its own
-   bitmaps only, so the threads change disjoint superchunks. Writes
-   landing where no bitmap is in use are counted missed.
+   neighbours' outboxes hold for it, in one order over the whole
+   world (below), to its own bitmaps only, so the threads change
+   disjoint superchunks. Writes landing where no bitmap is in use are
+   counted missed.
+
+### One order, wherever the borders fall
+
+What a tick does must not depend on where the borders of chunks and
+superchunks fall: a flock is the same flock a few cells east. Two
+things in a tick are settled by order -- of two compare-and-writes of
+one thing the first applied does, and of two entities stepping to one
+cell the first has it -- so the order cannot be the one the
+superchunks are gone over in, nor Morton order within one: both move
+with the borders.
+
+Everything queued has an **author**: the entity woken or the cell
+sampled that the rule was seeing to when it queued it
+(`Turn::seeing_to`, said by `../../instructions/` as it goes over
+them). An outbox notes where each author's part of each of its nine
+queues begins (`Segment`, begun by `slot_queued` at the first thing an
+author queues for a superchunk). A superchunk applying takes the
+segments its nine neighbours hold for it, sorts them by author -- the
+author's cell in reading order, rows down then cells across, which a
+shift of the whole world leaves as it is -- and applies each in turn,
+what one author queued in the order it queued it. So a tick comes to
+what it would had the world's authors been seen to one at a time from
+the top left, whichever superchunk each stands in. What is queued with
+no author named is the superchunk's rule's own, and comes first.
+
+Within that order every instruction is applied as it is come to: a
+cell written, an attribute written, an entity moved, made or removed
+are one stream, none before another for its kind.
+
+Held by a test that shifts a world (`../../instructions/tests/fast/shifted.rs`;
+`../../instructions/docs/instructions.md`, "The same wherever the
+borders fall"). The sort is paid every tick, and not measured yet.
 
 Each superchunk has random numbers of its own, kept from tick to tick
 (`Simulation`): first seeded from the seed and its superchunk index, then
@@ -112,17 +145,29 @@ saw the other. A tick has none:
   leaves the entity one that could be -- a rule that needs several
   of them to go together holds each against what the one before
   wrote, and they fail one after another.
-- **An entity crossing to another superchunk** is put there whole,
-  which what applies its old superchunk cannot hold against anything
-  there. So the crossing is settled after: it stands only if the
-  entity ended the tick where it left with the attributes it was put
-  with. Written there meanwhile by another, or removed, it is
-  **turned back** -- taken from where it was put, left where it stood,
-  asleep until its wake, with all that was written to it
-  (`InstructionsApplied::turned_back`) -- and crosses a later tick.
+- **Where an entity stands** is written the same way. A move says
+  the cell the rule saw it on, and is applied only if it stands there
+  still: of two moving one entity in a tick the first applied does,
+  the other is passed over. Moving and being written are two things
+  of it, and neither waits on the other: an attribute written to an
+  entity that already moved this tick lands on it where it now stands
+  (`../../entity_manager/docs/entity_manager.md`, "Instructions", An
+  entity's name in a tick).
+- **An entity crossing to another superchunk** is the same entity
+  moving: it is put there with what its rule knew, stays where it
+  stood for the rest of the tick -- where every write to it lands --
+  and, the tick applied, is removed there and given, where it came
+  to, what it ended the tick with. So it crosses with all that was
+  written to it, as one stepping within a superchunk does. Only one
+  removed where it stood meanwhile is **turned back**: what was put
+  is taken back (`InstructionsApplied::turned_back`).
 - **A cell an entity is put on or steps to** is checked as the
-  instruction is applied: taken, a step stays and a new entity goes to
-  the first free of its others, or is not put. Nothing is overwritten.
+  instruction is applied: another's, a step stays and a new entity is
+  not put. Nothing is overwritten. A cell an entity stood on as the
+  tick began is another's all that tick, though its entity left it or
+  was removed: it is that entity's name until the tick is over, and
+  whether it was left in time would depend on which side of a border
+  the one leaving went.
 - **A removal** takes the entity with whatever was written to it that
   tick: an end, not a value lost to another.
 
@@ -161,7 +206,9 @@ tick costs the entities waking in it. An entity is found by its cell
 and ID: its cell's place searched for in a list of the places alone,
 two bytes an entity, then its ID among those on the cell. A wake or
 instruction naming one no longer on that cell -- moved on, or dead -- is
-passed over.
+passed over; but for the length of a tick an instruction names an
+entity by the cell the tick found it on, and finds it wherever it
+moved to meanwhile.
 
 **Entities never overlap**: a cell holds one. A bucket has one entity
 a cell, and the superchunk an instruction lands in checks as it applies
@@ -176,8 +223,9 @@ not. No bitplane of them is kept: it cost
 a fifth of the ticks on 12 threads. Crossing to another
 superchunk, an entity is put there as new and changed here as if
 its cell there were taken; once the second phase is over, each one put
-there is removed here, each superchunk removing its own leavers on
-the threads (`Simulation::settle_crossings`). So its cell is
+there is removed here and given there what it ended the tick with,
+each superchunk settling its own leavers on
+the threads (`Simulation::settle_crossings`, `tick/crossings.rs`). So its cell is
 never left for one it cannot have, and between ticks every entity
 stands on one cell.
 
@@ -186,11 +234,9 @@ superchunk's entities waking run the rule (`Turn::woken`) in
 Morton order -- each tick's wakes sorted by cell, then ID, once all are
 filed -- so they read and write forwards through memory,
 and their instructions -- below -- are queued in the
-outbox slot of the superchunk they land in, in the Morton order of the
-cells the entities were found on, which is the order the buckets hold
-them in: the second phase goes forwards through each bucket, as writes
-do through a bitmap; in the second, each
-superchunk passes its wheel's tick and applies the instructions. An
+outbox slot of the superchunk they land in; in the second, each
+superchunk passes its wheel's tick and applies the instructions,
+author by author ("One order, wherever the borders fall"). An
 entity moving to a neighbour goes as a whole copy made in the first
 phase. One put in a superchunk not hot is lost, and counted.
 
@@ -214,7 +260,6 @@ carrying no more than it changes (`../entity_manager/`):
 | instruction | queued by | what it does | carries |
 |---|---|---|---|
 | put | `put`, a crossing | an entity made; or put whole in the superchunk it crosses to | its attributes |
-| put on the first free | `put_on_the_first_free` | a new entity made on its cell or, that taken, on the first free of some others | its attributes, and the other cells |
 | move | `step`, `update` | moved to a cell, or left where it stands, to wake at a tick; its attributes as they are | nothing |
 | edit | `set_attribute`, `unset_attribute`, `set_attribute_blocks`, `update` | one attribute set or removed, of any entity in reach -- the rule's own or another -- if it is still as seen | the one attribute's blocks, or none |
 | remove | `remove` | removed | nothing |
@@ -396,7 +441,8 @@ comes to does not depend on the thread that takes it.
 | `src/turn/` | a superchunk's turn: `mod` the turn, its cells and its outbox, `entities` the entities read and the instructions queued |
 | `../entity_manager/` | the entities: buckets, the timer wheel, the instructions queued -- a crate of its own |
 | `src/sampling.rs` | the cells a rule is given: a layer sampled by gaps drawn against a chance |
-| `src/tick.rs` | the tick: every hot superchunk's turn on the dispatcher's threads, then the writes and instructions applied |
+| `src/tick.rs` | the tick: every hot superchunk's turn on the dispatcher's threads, then the writes and instructions applied, author by author |
+| `src/tick/crossings.rs` | the tick's crossings settled: leavers removed, what was written to them sent after |
 | `src/transient_data.rs` | where runs would leave what they make; nothing yet |
 | `tests/` | sampling, the tick, the entities, their instructions and the dispatcher, judged |
 | `docs/` | this, and the reference, function by function |

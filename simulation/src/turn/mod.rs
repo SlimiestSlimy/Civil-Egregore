@@ -31,6 +31,24 @@ pub(crate) struct Outbox {
     pub(crate) instructions: [Instructions; SLOTS],
     /// What is queued under compares, a queue a superchunk, by [`slot`].
     pub(crate) conditional: [conditional::Conditional; SLOTS],
+    /// Where what each author queued begins in those queues, a list a
+    /// superchunk, by [`slot`], in the order queued.
+    pub(crate) segments: [Vec<Segment>; SLOTS],
+}
+
+/// Where what one author queued for a superchunk begins in the
+/// outbox's queues for it: all up to the next segment is that
+/// author's (`docs/simulation.md`, "One order, wherever the borders
+/// fall").
+#[derive(Clone, Copy)]
+pub(crate) struct Segment {
+    /// The author: its cell's place in reading order
+    /// ([`Turn::seeing_to`]), or 0 for the superchunk's rule itself.
+    pub(crate) author: u64,
+    /// The first of its steps.
+    pub(crate) steps: u32,
+    /// The first of its instructions.
+    pub(crate) instructions: u32,
 }
 
 /// One superchunk's turn in a tick's first phase: what the rule sees and
@@ -52,6 +70,9 @@ pub struct Turn<'a> {
     pub(crate) outbox: &'a mut Outbox,
     /// The superchunk's random numbers this tick.
     pub(crate) random: Rng,
+    /// Whom the rule is seeing to ([`Turn::seeing_to`]): what is
+    /// queued is that author's.
+    pub(crate) author: u64,
     /// The compare the entity instructions being queued are under, if
     /// any, and how many each slot of the outbox held when those not
     /// yet made a step began.
@@ -126,6 +147,33 @@ impl<'a> Turn<'a> {
     /// The tick running.
     pub fn now(&self) -> u64 {
         self.now
+    }
+
+    /// Says the rule is seeing to what is on the cell `at` from here
+    /// on -- an entity woken, a cell sampled: the author of all it
+    /// queues until another is named. What the tick queued is applied
+    /// author by author in the reading order of their cells -- rows
+    /// down, then cells across -- over the whole world, whichever
+    /// superchunk each is in (`docs/simulation.md`, "One order,
+    /// wherever the borders fall"). What is queued with no author
+    /// named is the superchunk's rule's own, applied before any
+    /// author's.
+    pub fn seeing_to(&mut self, at: CellIndex) {
+        self.close_instructions_compared();
+        let at = at.cartesian();
+        self.author = (u64::from(at.y) << 32 | u64::from(at.x)) + 1;
+    }
+
+    /// [`Turn::slot_of`], for something about to be queued there:
+    /// begins the author's segment in that slot's queues, if the last
+    /// begun there is another's.
+    pub(crate) fn slot_queued(&mut self, superchunk: SuperchunkIndex) -> usize {
+        let slot = self.slot_of(superchunk);
+        if self.outbox.segments[slot].last().is_none_or(|last| last.author != self.author) {
+            let (steps, instructions) = (self.outbox.conditional[slot].len() as u32, self.outbox.instructions[slot].len() as u32);
+            self.outbox.segments[slot].push(Segment { author: self.author, steps, instructions });
+        }
+        slot
     }
 
     /// The outbox slot of `superchunk`: this one or a neighbour. Farther

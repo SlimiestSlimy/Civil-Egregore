@@ -455,3 +455,30 @@ Google Drive connector needs authorizing in claude.ai settings.
 == SCRATCH ==
 
 (The AI's working notes go here; cleared when stale.)
+
+BORDERS (user, 2026-10-10): "cross superchunk behaviour should be
+entirely transparent and deterministic, as equal as possible to intra
+chunk processing"; the test: a world shifted comes to the same. DONE
+for what is not chance: instructions/tests/fast/shifted.rs (its own
+rule and one generator, all in the test file: "we dont want to
+contaminate the rest of the code just to run this test"). What made it
+pass: applied by author in reading order (Turn::seeing_to); an entity
+named all tick by the cell the tick found it on ("use the position of
+an entity as its ID for that tick"); one stream, "no instructions have
+precedence over another"; a crossing takes what was written.
+STILL BORDER-DEPENDENT, not done: every draw from a superchunk's own
+stream (SCA sampling, a sheep's lot, new_id); a compare must be in the
+superchunk of what it lets be written (sheep fed do not step for it);
+another removing an entity as it crosses (turned back).
+The user: "we actually want to avoid entity IDs even if randomly
+assigned ... we can add entity IDs later" -- EntityId is still in the
+code; not asked to take it out yet. ASK before doing so.
+The sort by author is paid every tick: tick reference not measured
+since.
+
+NEXT (user, 2026-10-10, verbatim): "lets make the new bitplane, the
+collision bitplane, where a 0 means free and 1 means occupied, for
+movement checks. trees for example should be a 1 in this bitplane";
+then: "WAIT, we actually have the wall plane for pathfinding already,
+lets just reuse that". So: no new plane; trees bar movement through
+the wall planes. IN WORK.

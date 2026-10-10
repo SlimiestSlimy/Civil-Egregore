@@ -117,7 +117,9 @@ and, if they changed, its attributes; with none given it keeps those it
 has, and is not made if it is not there. Its cell the same as it stood
 on: changed where it stands, or added if it is new and the cell is
 free. Another cell: moved there if no entity stands on it, else left
-where it was and changed all the same. What came of it is a `Put`.
+where it was and changed all the same. What came of it is a `Put`
+(one put where it stood because its cell was another's that tick is
+said to have stayed too, `Put::stayed`).
 
 **Attributes.** Each entity's attributes are a run of the bucket's
 list of blocks. They are rewritten in place when they stay as many
@@ -162,7 +164,6 @@ more than it changes (`Instruction`, the four):
 | move | an entity moved to another cell, or left where it is, to wake at another tick; its attributes as they are | nothing |
 | edit | one attribute of an entity set, or removed: by the entity itself or by another | the one attribute's blocks, or none |
 | remove | an entity removed | nothing |
-| put on the first free | a new entity put on its cell or, that taken, on the first free of some others | its attributes' blocks, and the other cells |
 
 Whatever puts an entity on a cell checks it as it is applied: a cell
 holds one entity, ever. An instruction carries all it needs: an entity
@@ -172,7 +173,8 @@ reads another superchunk's entities while that one changes them. A put
 and a crossing are queued by the one private `push`, a crossing naming
 the cell it left.
 
-Applied (`Instructions::apply`), each goes to the superchunk its cell
+Applied (`Instructions::apply`; `apply_some` for a part of the queue;
+`Instruction::lands` the cell that says which superchunk), each goes to the superchunk its cell
 is in, in the order queued, every wake filed no earlier than the tick
 given. A put in a superchunk not there is lost; one of an entity no
 longer where it stood is passed over; a new entity on a cell another
@@ -181,30 +183,47 @@ changed all the same, and wakes there. None of these is unseen: what
 was lost, refused, left where it stood and passed over is each counted
 in what applying did (`InstructionsApplied`).
 
-**Tolerating a cell taken.** A rule sees the world as the tick found
-it, and the cell it puts a new entity on may be taken by the time the
-put is applied -- by another new entity, or by one stepping there. A
-rule that must have its entity made says where else it may stand
-(`Instructions::put_on_the_first_free`): its own cell is tried, then
-each of the others in the order given, and it is refused only if every
-one is taken. The others are tried where the put is applied, in the
-superchunk of the cell wanted: one in another superchunk is passed by,
-that superchunk being another thread's while the tick is applied.
-Where it came to stand the rule asks the tick after
-(`InstructionsApplied::beside` counts them).
+**An entity's name in a tick.** No two entities stand on one cell,
+so within a tick the cell the tick found an entity on names it -- and
+goes on naming it until the tick is over, wherever it moves meanwhile
+(`store/named_in_a_tick.rs`). A superchunk keeps, for the tick alone,
+where each entity that left its cell now stands, or that it was
+removed (`now_on`); every instruction names its entity by the cell it
+was seen on and finds it through that (`get_named`, `put_named`,
+`edit_named`, `remove_named`). So instructions are one stream, each
+applied as it is come to, none before another for its kind: an
+attribute written to an entity that moved a moment before lands on it
+where it now stands, and its removal finds it there. What follows
+from the name:
+
+- Where an entity stands is written by compare-and-write, as its
+  attributes are: a move of one that already left the cell it was
+  seen on is passed over, so of two moving one entity the first
+  applied does.
+- A cell an entity stood on as the tick began is no other's that tick
+  (`named_or_taken`): one stepping to it stays, one new is refused,
+  though its entity left or was removed. Its being free would hang on
+  when the one leaving is taken off it, which over a border is after
+  the tick.
+- The tick over, every entity is named by the cell it stands on
+  (`names_anew`); applying a queue between ticks ends so too.
+
+The ID is still asked beside the cell, as it was. An entity made in a
+tick has no name in it: nothing saw it.
 
 **Crossing a border.** An entity crossing into a neighbouring
 superchunk is put there while it still stands on the cell it left: for
 the rest of the tick it stands on both, so that, its new cell taken, it
-stays where it stood. Each superchunk notes who arrived
-(`take_arrived`), and each then removes from the cells they left those
-that left it (`settle_leavers`) -- if it ended the tick there with the
-attributes it was put with (an `Arrival` carries their sum,
-`blocks_sum`). One written there meanwhile by another entity, or
-removed, is turned back instead: the superchunk it was put in takes it
-back (`settle_arrivals`), and it stays where it stood with what was
-written -- a crossing copies an entity whole, and must not copy over a
-write it did not see. Once every superchunk has settled, every entity
+stays where it stood -- and where it left, under the name it has this
+tick, is where every write to it lands. Each superchunk notes who
+arrived (`take_arrived`), and each then removes from the cells they
+left those that left it (`settle_leavers`); one that ended the tick
+there with other attributes than it was put with (an `Arrival` carries
+their sum, `blocks_sum`) has them sent after it (`Settled`), and the
+superchunk it was put in gives them to it (`settle_arrivals`). So an
+entity crosses with all that was written to it, exactly as one moving
+within a superchunk keeps it. One removed where it left meanwhile is
+turned back: the superchunk it was put in takes it back. Once every superchunk has settled, every entity
 stands on one cell.
 
 ## The store
@@ -217,7 +236,10 @@ are by the bitplanes' reader. The API follows the bitplanes': outside a
 tick, instructions are queued (`Entities::queue_put`, `queue_remove`)
 and applied (`Entities::apply`), as writes to cells are; in a tick, a
 superchunk's turn queues them. Queuing is the only way to change an
-entity.
+entity. While a queue is applied an entity is found by the cell it
+stood on when the applying began, wherever it moved since
+("Instructions", An entity's name in a tick); whether one stands on a
+cell now is `SuperchunkEntities::occupied`.
 
 **The cells entities stand on** (`EntityReader::occupied`): among up to
 16x16 cells from a top left cell, a row a word, cell `(x, y)` at bit
@@ -244,11 +266,11 @@ blocks are not whole attributes sorted by type is not read.
 | `src/attributes.rs` | an attribute's blocks: the walk over an entity's, and reading and writing one as its layout |
 | `src/bucket.rs` | a chunk's entities, sorted by cell, one a cell, their attributes beside them |
 | `src/wheel.rs` | a superchunk's timer wheel |
-| `src/store.rs`, `src/store/` | a superchunk's entities, every superchunk's, and the reader across them |
+| `src/store.rs`, `src/store/` | a superchunk's entities, every superchunk's, the reader across them, and an entity found by its name in a tick (`named_in_a_tick.rs`) |
 | `src/instructions.rs` | put, move, edit, remove: queued for a superchunk and applied by it |
 | `src/saved.rs` | a superchunk's state as a save's words |
 | `src/diagnostics/` | what the entities hold: entities, attribute blocks in use and as garbage, wakes filed |
-| `tests/fine.rs` | the fine tier: attributes of any length put, found, edited and saved |
+| `tests/fine.rs` | the fine tier: attributes of any length put, found, edited and saved; an entity named by the cell the tick found it on |
 | `docs/` | this, and the reference, function by function |
 
 It has no tests of its own: the entities are judged through the

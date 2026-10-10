@@ -75,7 +75,7 @@ impl Compare {
     fn holds(&self, superchunk: &Superchunk, entities: &SuperchunkEntities) -> bool {
         match *self {
             Self::Cell { layer_type, at, seen } => superchunk.value_at(layer_type, at) == Some(u32::from(seen)),
-            Self::Attribute { id, at, kind, seen, rest } => entities.get(id, at).is_some_and(|entity| {
+            Self::Attribute { id, at, kind, seen, rest } => entities.get_named(id, at).is_some_and(|entity| {
                 let now = attribute_blocks(entity.attributes, kind).and_then(|now| now.split_first());
                 now.map(|(first, _)| *first) == seen && blocks_sum(now.map_or(&[][..], |(_, rest)| rest)) == rest
             }),
@@ -161,6 +161,11 @@ impl Conditional {
         self.steps.clear();
     }
 
+    /// How many steps are queued.
+    pub(crate) fn len(&self) -> usize {
+        self.steps.len()
+    }
+
     /// Counts every write under a compare as missed: its superchunk is
     /// not hot.
     pub(crate) fn count_missed(&self, applied: &mut WritesApplied) {
@@ -168,14 +173,16 @@ impl Conditional {
         (applied.writes, applied.missed) = (applied.writes + writes, applied.missed + writes as u64);
     }
 
-    /// Applies `instructions` and the steps to `superchunk` and its
-    /// `entities`, after the plain writes of the same queue, all in
-    /// the order queued: an instruction under no compare as ever; a
-    /// step if its compare holds as it is come to -- so what one
-    /// applied changed, the next is held against.
-    pub(crate) fn apply(&self, superchunk: &mut Superchunk, entities: &mut SuperchunkEntities, instructions: &Instructions, earliest: u64, applied: &mut Applied) {
-        let mut next = 0;
-        for step in &self.steps {
+    /// Applies the steps at `steps` and those of `instructions` at
+    /// `queued` -- one author's ([`super::Segment`]) -- to
+    /// `superchunk` and its `entities`, in the order queued: an
+    /// instruction under no compare as ever; a step if its compare
+    /// holds as it is come to -- so what one applied changed, the
+    /// next is held against.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn apply(&self, steps: std::ops::Range<usize>, queued: std::ops::Range<usize>, superchunk: &mut Superchunk, entities: &mut SuperchunkEntities, instructions: &Instructions, earliest: u64, applied: &mut Applied) {
+        let mut next = queued.start;
+        for step in &self.steps[steps] {
             instructions.apply_some(next..step.before as usize, std::slice::from_mut(entities), earliest, &mut applied.instructions);
             next = step.before as usize;
             let holds = step.compare.holds(superchunk, entities) && step.also.is_none_or(|also| also.holds(superchunk, entities));
@@ -205,7 +212,7 @@ impl Conditional {
                 Does::Count(number) => applied.counted[number as usize] += u64::from(holds),
             }
         }
-        instructions.apply_some(next..instructions.len(), std::slice::from_mut(entities), earliest, &mut applied.instructions);
+        instructions.apply_some(next..queued.end, std::slice::from_mut(entities), earliest, &mut applied.instructions);
     }
 }
 
@@ -230,7 +237,7 @@ impl Turn<'_> {
     fn queue_step(&mut self, compare: Compare, lands: CellIndex, does: Does) {
         self.close_instructions_compared();
         assert_eq!(compare.at().superchunk(), lands.superchunk(), "a compare in another superchunk than what it lets be written");
-        let slot = self.slot_of(lands.superchunk());
+        let slot = self.slot_queued(lands.superchunk());
         let before = self.outbox.instructions[slot].len() as u32;
         self.outbox.conditional[slot].steps.push(Step { compare, also: None, does, before });
     }
@@ -263,7 +270,7 @@ impl Turn<'_> {
         for compare in also.iter().chain([&compare]) {
             assert_eq!(compare.at().superchunk(), lands.superchunk(), "a compare in another superchunk than what it lets be written");
         }
-        let slot = self.slot_of(lands.superchunk());
+        let slot = self.slot_queued(lands.superchunk());
         let first = self.outbox.instructions[slot].len() as u32;
         queue(&mut self.outbox.instructions[slot]);
         let last = self.outbox.instructions[slot].len() as u32;

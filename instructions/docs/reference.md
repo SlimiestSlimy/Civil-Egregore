@@ -48,9 +48,7 @@ and nothing else").
 **`each_woken(turn, layers, state, each)`**: `each` run on every entity
 waking. **`stands(turn, id, at)`**: whether an entity stood on a
 cell; **`stands_beside(turn, id, centre, among)`**: which of the
-neighbours it stood on. **`spawn_beside(turn, kind, centre, wanted,
-open, wake, attributes)`**: a new entity on a neighbour or, that taken
-by then, on the first free of the others open. **`spawn(turn, kind, at, wake, attributes)`**: a new entity,
+neighbours it stood on. **`spawn(turn, kind, at, wake, attributes)`**: a new entity,
 its ID drawn and returned. **`sleep(turn, entity, wake)`**: a move to
 where it stands. **`commit(turn, edit, to, wake)`**: an `EntityEdit`'s
 entity moved, each attribute changed written before, held against

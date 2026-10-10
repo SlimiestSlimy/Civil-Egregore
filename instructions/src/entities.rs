@@ -16,6 +16,7 @@ use simulation::Turn;
 #[inline]
 pub fn each_woken<'a, const N: usize, S>(turn: &mut Turn<'a>, layers: [LayerType; N], state: &mut S, mut each: impl FnMut(&mut Turn<'a>, EntityRef<'a>, &mut S)) {
     for entity in turn.woken_reading(layers) {
+        turn.seeing_to(entity.header.at);
         each(turn, entity, state);
     }
 }
@@ -34,29 +35,6 @@ pub fn stands(turn: &Turn, id: EntityId, at: CellIndex) -> bool {
 pub fn spawn(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attributes: &[AttributeBlock]) -> EntityId {
     let id = turn.new_id();
     turn.put(Header { id, kind, at, wake }, attributes);
-    id
-}
-
-/// Queues making an entity of type `kind` beside `centre`, with
-/// `attributes`, to wake at `wake`: on the neighbour at bit `wanted`
-/// of the nine about it or, that taken by then, on the first free of
-/// the others of `open` after it -- so that what must be made is not
-/// lost to a cell taken first. Its ID, drawn here; where it came to
-/// stand is asked the tick after ([`stands_beside`]).
-#[inline]
-pub fn spawn_beside(turn: &mut Turn, kind: EntityType, centre: CellIndex, wanted: u32, open: u16, wake: u64, attributes: &[AttributeBlock]) -> EntityId {
-    let id = turn.new_id();
-    let Some(at) = around::cell(centre, wanted) else {
-        return id;
-    };
-    // The others from the one wanted on, round the nine: no neighbour is always tried first.
-    let (mut others, mut count) = ([at; 8], 0);
-    for bit in (1..9).map(|after| (wanted + after) % 9).filter(|&bit| open >> bit & 1 == 1) {
-        if let Some(other) = around::cell(centre, bit) {
-            (others[count], count) = (other, count + 1);
-        }
-    }
-    turn.put_on_the_first_free(Header { id, kind, at, wake }, &others[..count], attributes);
     id
 }
 

@@ -2,7 +2,7 @@
 //! instructions queued for them.
 
 use super::conditional::Compare;
-use super::{slot, Turn};
+use super::Turn;
 use entity_manager::{attribute_blocks, each_attribute, push_attribute, Attribute, AttributeBlock, EntityId, EntityRef, Header, Layout, SuperchunkEntities, OCCUPIED_SIDE};
 use bitplane_manager::Reader;
 use chunk_storage::LayerType;
@@ -57,17 +57,8 @@ impl<'a> Turn<'a> {
     /// tick. A new one whose cell is taken by then is not put.
     pub fn put(&mut self, header: Header, attributes: &[AttributeBlock]) {
         debug_assert!(header.wake > self.now, "an entity put to wake at tick {}, not after {}", header.wake, self.now);
-        let slot = self.slot_of(header.at.superchunk());
+        let slot = self.slot_queued(header.at.superchunk());
         self.outbox.instructions[slot].put(header, header.at, attributes);
-    }
-
-    /// Queues putting `header`'s entity, new, with `attributes`, on its
-    /// cell or, that taken by then, on the first free of `others` in
-    /// its cell's superchunk: not put only if every one is taken.
-    pub fn put_on_the_first_free(&mut self, header: Header, others: &[CellIndex], attributes: &[AttributeBlock]) {
-        debug_assert!(header.wake > self.now, "an entity put to wake at tick {}, not after {}", header.wake, self.now);
-        let slot = self.slot_of(header.at.superchunk());
-        self.outbox.instructions[slot].put_on_the_first_free(header, others, attributes);
     }
 
     /// Queues `entity` stepping to `to` -- its own cell to sleep where
@@ -78,7 +69,7 @@ impl<'a> Turn<'a> {
         debug_assert!(wake > self.now, "an entity put to wake at tick {wake}, not after {}", self.now);
         let after = Header { at: to, wake, ..*entity };
         if entity.at.superchunk() == to.superchunk() {
-            let slot = self.slot_of(to.superchunk());
+            let slot = self.slot_queued(to.superchunk());
             self.outbox.instructions[slot].move_entity(after, entity.at);
         } else if let Some(whole) = self.entity_reader.get(entity.id, entity.at) {
             self.cross(entity, after, whole.attributes);
@@ -148,7 +139,7 @@ impl<'a> Turn<'a> {
         let seen = self.entity_reader.get(before.id, before.at).map_or(&[][..], |seen| seen.attributes);
         self.set_attributes_changed(before, seen, attributes);
         if before.at.superchunk() == after.at.superchunk() {
-            let slot = self.slot_of(after.at.superchunk());
+            let slot = self.slot_queued(after.at.superchunk());
             self.outbox.instructions[slot].move_entity(after, before.at);
         } else {
             self.cross(before, after, attributes);
@@ -163,14 +154,15 @@ impl<'a> Turn<'a> {
     /// else another changed it meanwhile, and it stays, asleep, with
     /// every change made to it (`SuperchunkEntities::settle_leavers`).
     fn cross(&mut self, before: &Header, after: Header, attributes: &[AttributeBlock]) {
-        let there = self.slot_of(after.at.superchunk());
+        let there = self.slot_queued(after.at.superchunk());
         self.outbox.instructions[there].cross(after, before.at, attributes);
-        self.outbox.instructions[slot(0, 0)].move_entity(Header { at: before.at, ..after }, before.at);
+        let here = self.slot_queued(before.at.superchunk());
+        self.outbox.instructions[here].move_entity(Header { at: before.at, ..after }, before.at);
     }
 
     /// Queues removing `header`'s entity.
     pub fn remove(&mut self, header: &Header) {
-        let slot = self.slot_of(header.at.superchunk());
+        let slot = self.slot_queued(header.at.superchunk());
         self.outbox.instructions[slot].remove(header.id, header.at);
     }
 }

@@ -3,6 +3,7 @@
 //! [`EntityReader`] (`docs/entity_manager.md`, "The store").
 
 mod entity_reader;
+mod named_in_a_tick;
 mod world_entities;
 
 pub use entity_reader::{EntityReader, OCCUPIED_SIDE};
@@ -35,6 +36,36 @@ pub struct Arrival {
     pub attributes: u64,
 }
 
+/// What a superchunk settled of the entities that left it over a
+/// border in a tick ([`SuperchunkEntities::settle_leavers`]), for the
+/// neighbours they were put in.
+#[derive(Default)]
+pub struct Settled {
+    /// Those removed where they left meanwhile: the crossing does not
+    /// stand.
+    pub turned_back: Vec<Arrival>,
+    /// Those that ended the tick with other attributes than they were
+    /// put with: each with its attributes' first block in
+    /// `attributes`, and how many.
+    pub changed: Vec<(Arrival, u32, u32)>,
+    /// The attributes of those changed.
+    pub attributes: Vec<AttributeBlock>,
+}
+
+impl Settled {
+    /// Whether nothing is to be settled.
+    pub fn is_empty(&self) -> bool {
+        self.turned_back.is_empty() && self.changed.is_empty()
+    }
+
+    /// Empties it, keeping its room.
+    pub fn clear(&mut self) {
+        self.turned_back.clear();
+        self.changed.clear();
+        self.attributes.clear();
+    }
+}
+
 /// A superchunk's entities: a bucket a chunk, in the chunks' Morton
 /// order, and when each wakes.
 pub struct SuperchunkEntities {
@@ -49,6 +80,11 @@ pub struct SuperchunkEntities {
     /// phase is over, or turned back
     /// ([`SuperchunkEntities::settle_leavers`]).
     arrived: Vec<Arrival>,
+    /// Where each entity that left the cell the tick found it on
+    /// stands now, by that cell -- its name for the tick: the cell it
+    /// moved to, or none, removed. Emptied when the tick is over
+    /// ([`SuperchunkEntities::names_anew`]).
+    left_this_tick: std::collections::HashMap<CellIndex, Option<CellIndex>>,
     /// Room for the attributes of an entity moving, with those it has,
     /// from one chunk's bucket to another's.
     carried: Vec<AttributeBlock>,
@@ -57,7 +93,7 @@ pub struct SuperchunkEntities {
 impl SuperchunkEntities {
     /// No entities, in `superchunk`.
     pub fn new(superchunk: SuperchunkIndex) -> Self {
-        Self { index: superchunk, chunks: Default::default(), wheel: Wheel::default(), arrived: Vec::new(), carried: Vec::new() }
+        Self { index: superchunk, chunks: Default::default(), wheel: Wheel::default(), arrived: Vec::new(), left_this_tick: Default::default(), carried: Vec::new() }
     }
 
     /// Which superchunk it is.
@@ -189,6 +225,12 @@ impl SuperchunkEntities {
         self.chunks[at.chunk().place()].remove(id, at)
     }
 
+    /// Whether an entity stands on `at`.
+    pub fn occupied(&self, at: CellIndex) -> bool {
+        debug_assert_eq!(at.superchunk(), self.index);
+        self.chunks[at.chunk().place()].occupied(place(at))
+    }
+
     /// Notes that an entity crossed into this superchunk.
     pub(crate) fn arrived(&mut self, arrival: Arrival) {
         self.arrived.push(arrival);
@@ -201,30 +243,43 @@ impl SuperchunkEntities {
     }
 
     /// Settles those of `arrived` -- the entities that crossed into a
-    /// neighbour this tick -- that left this superchunk: one that ended
-    /// the tick here with the attributes it was put there with is
-    /// removed from the cell it left; one changed here since by
-    /// another, or removed, is not -- it goes into `turned_back`, for
-    /// the neighbour to take back what it put
-    /// (`docs/entity_manager.md`, "Instructions", Crossing a border).
-    pub fn settle_leavers(&mut self, arrived: &[Arrival], turned_back: &mut Vec<Arrival>) {
+    /// neighbour this tick -- that left this superchunk, where each
+    /// stood, written to, until now: it is removed from the cell it
+    /// left, and what it has, if not what it was put there with, goes
+    /// into `settled` for the neighbour to give it -- every attribute
+    /// written to it in the tick crosses with it. One removed here
+    /// meanwhile goes there as turned back, for the neighbour to take
+    /// back what it put (`docs/entity_manager.md`, "Instructions",
+    /// Crossing a border).
+    pub fn settle_leavers(&mut self, arrived: &[Arrival], settled: &mut Settled) {
         let here = self.index;
         for &arrival in arrived.iter().filter(|arrival| arrival.left.superchunk() == here) {
-            let as_put = self.get(arrival.id, arrival.left).is_some_and(|left| crate::blocks_sum(left.attributes) == arrival.attributes);
-            if as_put {
-                self.remove(arrival.id, arrival.left);
-            } else {
-                turned_back.push(arrival);
+            match self.get(arrival.id, arrival.left) {
+                Some(left) => {
+                    if crate::blocks_sum(left.attributes) != arrival.attributes {
+                        let first = settled.attributes.len() as u32;
+                        settled.attributes.extend_from_slice(left.attributes);
+                        settled.changed.push((arrival, first, left.attributes.len() as u32));
+                    }
+                    self.remove(arrival.id, arrival.left);
+                }
+                None => settled.turned_back.push(arrival),
             }
         }
     }
 
-    /// Removes those of `turned_back` put in this superchunk: their
-    /// crossing did not stand
-    /// ([`SuperchunkEntities::settle_leavers`]). How many.
-    pub fn settle_arrivals(&mut self, turned_back: &[Arrival]) -> usize {
+    /// Settles, of what a neighbour `settled`, those put in this
+    /// superchunk: one changed where it left is given what it has; one
+    /// turned back is removed ([`SuperchunkEntities::settle_leavers`]).
+    /// How many were turned back.
+    pub fn settle_arrivals(&mut self, settled: &Settled) -> usize {
         let here = self.index;
-        turned_back.iter().filter(|arrival| arrival.at.superchunk() == here && self.remove(arrival.id, arrival.at)).count()
+        for &(arrival, first, count) in settled.changed.iter().filter(|(arrival, ..)| arrival.at.superchunk() == here) {
+            if let Some(header) = self.get(arrival.id, arrival.at).map(|put| put.header) {
+                self.chunks[arrival.at.chunk().place()].put(header, place(arrival.at), Some(&settled.attributes[first as usize..(first + count) as usize]));
+            }
+        }
+        settled.turned_back.iter().filter(|arrival| arrival.at.superchunk() == here && self.remove(arrival.id, arrival.at)).count()
     }
 
     /// Passes `tick`, just run, on the wheel.

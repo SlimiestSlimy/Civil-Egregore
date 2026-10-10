@@ -19,6 +19,7 @@ use utilities::chance::Chance;
 pub fn each_sampled<C: Default>(turn: &mut Turn, layer_type: LayerType, chance: Chance, samples: &mut Vec<CellIndex>, mut each: impl FnMut(&mut Turn, CellIndex, &mut C)) -> (usize, C) {
     let (sampled, mut counts) = (turn.sample(layer_type, chance, samples), C::default());
     for &cell in samples.iter() {
+        turn.seeing_to(cell);
         each(turn, cell, &mut counts);
     }
     (sampled, counts)
