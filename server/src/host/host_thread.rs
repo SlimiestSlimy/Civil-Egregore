@@ -5,7 +5,7 @@ use crate::{Start, World};
 use super::{CATCH_UP, CENSUS_EVERY, Request, TARGET_PACE, census};
 use super::frame::{self, Ask, Frame, copy, count, hot_in};
 use worldgen::GRASS;
-use mc_rules::trees::TREE;
+use worldgen::TREE;
 use std::thread;
 use std::collections::HashMap;
 use std::fs::File;

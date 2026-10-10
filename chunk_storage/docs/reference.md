@@ -43,6 +43,9 @@ types sorted one a type, offsets inside the chunk and apart), else
 not 0, wide (16 bits a cell) if one is over 255, else a byte a cell
 (`MAP_WORDS` words). **`from_numbers(number_at)`**, **`get(place)`**,
 **`words`**; **`number_in(words, place)`**, **`words_of(words)`**.
+**`SuperchunkCells`** `{heights, water_depths, layers}`
+(`superchunk_cells.rs`): a superchunk's cells as whoever makes them
+gives them; **`image(codec)`**: the image of them, every layer encoded.
 **`layer(chunk, type)`**: an encoded layer's words, from its first to its
 chunk's end. **`layer_types(chunk)`**. **`rewritten(changes)`**: a new
 image with **`LayerChange`**s made in order, a later one to a layer

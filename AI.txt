@@ -131,6 +131,13 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
   and tools are therefore the server's (server/tests/fast/sheep.rs,
   grass.rs; server/src/diagnostics/), on worldgen's
   Generation::plain: flat, dry, no walls, no trees.
+- The server is the starter and coordinator and generates nothing:
+  worldgen says what is on each cell (generate_superchunk ->
+  chunk_storage::SuperchunkCells), chunk_storage makes the image of
+  them and keeps it cold, the server passes finished images and
+  entity states between the managers and the disk. The renderer is to
+  query the simulation only through the server's API (TO DO: it still
+  names worldgen, chunk_storage and bitmap).
 - NOT KNOWING WHERE SOMETHING GOES: put it in `utilities` or in
   AI_SCRATCHPAD, TEMPORARILY (unless it really is a utility), and tell
   the user. What the program needs can only wait in `utilities`.
@@ -153,13 +160,13 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
   tick of a 4-superchunk world with 8,000 sheep is ~0.33 M. The next
   optimization worth making is Mesh::blended.
 - The tick reference (pasture 300 333 4000 4 1 less the 0-tick run)
-  was 49.95 M instructions on the old mock pasture; the pasture is now
-  a plain the server starts, and the reference is TO BE MEASURED AGAIN
-  on it before it is compared against.
-- Out of place still, for the user to settle: the renderer names
-  mc_rules (trees' OLDEST, TREE_STAGE), worldgen (Generation, Lands,
-  wall, height_shaped), chunk_storage (Height, height_in) and bitmap
-  directly instead of through the server's frames and Start.
+  is 58.37 M instructions (8,680.05 M less 8,621.68 M) at 9303e37,
+  the pasture a plain the server starts. It was 49.95 M on the mock
+  pasture it replaced: another world, so the two do not compare.
+- server/tests/complete.rs a_world_stopped_often_comes_to_the_same
+  FAILS, and did before 2026-10-09's work (fails at a0e9874): a world
+  saved and loaded every 5,000 ticks is not the one run straight.
+  Probe: AI_SCRATCHPAD where_a_stopped_world_parts.
 - A fresh flock loses ~2% at its first wake: old age is rolled for the
   whole sleep ahead (wake - now over LIFE_TICKS) and a fed sheep's
   first sleep is long. The rule as written; told to the user.

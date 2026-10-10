@@ -57,7 +57,10 @@ reader has to wonder whether something is missing or was never needed
   another's name goes there, however small. A world -- the program's, a
   test's, a tool's -- is made in one place, the server's `start`,
   whatever it is to be given as its `Start`: no crate makes a world of
-  its own.
+  its own. The server starts and coordinates, and generates nothing:
+  what is on a cell is `worldgen`'s to say, a superchunk's image
+  `chunk_storage`'s to make and keep, the server's to pass between
+  them, the simulation and the disk.
 - The rules' crates hold their rules alone: no diagnostics, no
   `transient_data`, no tests. A rule is tried on a world, so its tests
   and tools are the server's (`server/tests/fast/`,

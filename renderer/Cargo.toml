@@ -8,7 +8,6 @@ description = "Civil Egregore on the screen: a Bevy window asking the server's h
 utilities = { path = "../utilities" }
 gui = { path = "../gui" }
 server = { path = "../server" }
-mc_rules = { path = "../mc_rules" }
 worldgen = { path = "../worldgen" }
 coordinates = { path = "../coordinates" }
 bitmap = { path = "../bitmap" }

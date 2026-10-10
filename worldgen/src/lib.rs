@@ -5,8 +5,9 @@
 //! or down, more than [`STEP`] apart in height cannot be stepped
 //! between ([`Terrain`]). A diagonal step has no wall of its own: it is
 //! open only when both ways round it, across then down and down then
-//! across, are. How what grows on it lies ([`patches`]), and how a
-//! world is generated as a whole ([`generation`]).
+//! across, are. How what grows on it lies ([`patches`]), how a
+//! world is generated as a whole ([`generation`]), and a superchunk's
+//! cells made of both ([`generated_superchunk`]).
 //!
 //! The design: `docs/worldgen.md`; function by function:
 //! `docs/reference.md`.
@@ -18,14 +19,16 @@
 pub mod diagnostics;
 pub mod transient_data;
 
+pub mod generated_superchunk;
 pub mod generation;
 pub mod mesh;
 pub mod patches;
 
+pub use generated_superchunk::{generate_superchunk, layer_types};
 pub use generation::{has_land_about, seed_with_land, Generation, Growth, TREES_SALT};
 
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
-use chunk_storage::{Height, HeightMap, LayerType};
+use chunk_storage::{Bits4, Height, HeightMap, LayerType, Wide};
 use coordinates::{cartesian_from_place, place_from_cartesian, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
 use utilities::hash::{mix, GOLDEN_RATIO};
 
@@ -116,6 +119,15 @@ pub struct Shape {
 /// ground is dry, and the cells' rules grow and the sheep eat. A cell
 /// without it is dirt, which has no layer.
 pub const GRASS: LayerType = LayerType(2);
+
+/// The cells a tree stands on: what a superchunk is generated with in
+/// patches of their own, and the trees' rule ages, fells and seeds.
+pub const TREE: LayerType = LayerType(3);
+/// A tree's stage, 0 to [`OLDEST_TREE_STAGE`]: a plane four bits a cell
+/// wide, kept cold as the four layer types from 4 on, a bit each.
+pub const TREE_STAGE: Wide<Bits4> = Wide::new(4);
+/// The oldest stage a tree has: sixteen in all.
+pub const OLDEST_TREE_STAGE: u32 = 15;
 
 /// The cells under water, however deep: what a rule asks. How deep is
 /// kept a map a chunk with water, in the superchunk's image

@@ -103,8 +103,9 @@ attributes)`**: queued, in the world once the runner places them.
 
 ## `layers.rs`
 
-`GRASS`, `WET`, `WALL_EAST`, `WALL_SOUTH`: the layers a world has
-before a rule adds its own, the terrain's (`../../worldgen/`).
+`GRASS`, `TREE`, `TREE_STAGE` (and `OLDEST_TREE_STAGE`), `WET`,
+`WALL_EAST`, `WALL_SOUTH`: the layers a world has before a rule adds
+its own, the terrain's (`../../worldgen/`).
 
 ## The root
 

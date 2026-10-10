@@ -19,9 +19,9 @@ every superchunk in use, on the simulation's threads.
 
 ## `trees.rs`
 
-`TREE` (layer type 3): the cells a tree stands on. `TREE_STAGE` (4 to
-7): its stage, 0 to `OLDEST` (15), over four bitplanes, the lowest bit
-first. `SAMPLE_CHANCE` (0.01%), `SPREAD_SHARE` (half), `SEEDS_FROM` (4),
+The trees' layers are the terrain's (`instructions::layers`): `TREE`,
+the cells a tree stands on, and `TREE_STAGE`, its stage, 0 to
+`OLDEST_TREE_STAGE`. `SAMPLE_CHANCE` (0.01%), `SPREAD_SHARE` (half), `SEEDS_FROM` (4),
 `CROWDED` (9), `DIE_ONE_IN` (4), `AROUND` (8).
 
 **`rule(turn, samples)`**: hands **`tree`**, the rule for one tree, to `read::cells::each_sampled`. Every tree sampled tries to spread or grows

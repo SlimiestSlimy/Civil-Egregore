@@ -17,7 +17,9 @@ of them that are ocean; the highest land, and the vertices from the
 ocean it is reached over; the lines' blends and sigmoidness, least and
 most; how far lines are bent; the finer meshes. `Shape::DEFAULT`.
 `GRASS` (layer type 2): the cells grass is on, the terrain's own
-cover. `WET` (layer type 24): the cells under water; how deep is the image's
+cover. `TREE` (layer type 3): the cells a tree stands on;
+`TREE_STAGE` (4 to 7): its stage, 0 to `OLDEST_TREE_STAGE` (15), over
+four bitplanes, the lowest bit first. `WET` (layer type 24): the cells under water; how deep is the image's
 (`SuperchunkImage::depth`). **`height(seed, x, y)`**: a cell's height;
 **`height_shaped(shape, seed, x, y)`**: the same in a world shaped
 otherwise. **`Terrain::generate_shaped(shape, seed, superchunk)`**: a
@@ -52,6 +54,15 @@ How something lies in patches when a superchunk is made. `SAMPLED`
 scatter}`; **`number(seed, x, y)`**: a cell's number -- noise as broad
 as a patch, finer noise, and the cell's own lot;
 **`threshold(seed)`**: the number under which `cover` of the cells are.
+
+## `generated_superchunk.rs`
+
+**`layer_types()`**: every layer type a generated world has.
+**`generate_superchunk(generation, seed, superchunk)`**: its cells
+(`chunk_storage::SuperchunkCells`) -- terrain, the ocean where it is
+under the ocean's level, and on the rest grass and trees with their
+stages, as `Generation::growth` says of each cell. No image: that is
+storage's to make.
 
 ## `generation.rs`
 

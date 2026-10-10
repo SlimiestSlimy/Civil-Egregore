@@ -1,5 +1,5 @@
 //! Trees: a rule of the cells with more than a bit a cell. A tree is a
-//! cell set in [`TREE`], and has a stage, 0 to [`OLDEST`], kept in
+//! cell set in [`TREE`], and has a stage, 0 to [`OLDEST_TREE_STAGE`], kept in
 //! [`TREE_STAGE`], a plane four bits a cell wide: a cell's stage is one
 //! read and one write ([`read::cells::value`]).
 //!
@@ -18,17 +18,9 @@
 //!
 //! Trees stand on dirt and grass alike and change neither.
 
-use instructions::layers::WET;
-use instructions::{read, write, Bits4, CellIndex, LayerType, Turn, Wide};
+use instructions::layers::{OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
+use instructions::{read, write, CellIndex, Turn};
 use std::ops::AddAssign;
-
-/// The cells a tree stands on.
-pub const TREE: LayerType = LayerType(3);
-/// A tree's stage: a plane four bits a cell wide, kept cold as the
-/// four layer types from 4 on, a bit each.
-pub const TREE_STAGE: Wide<Bits4> = Wide::new(4);
-/// The oldest stage: sixteen in all.
-pub const OLDEST: u32 = 15;
 
 /// The chance, each tick, that a tree is sampled.
 pub const SAMPLE_CHANCE: f64 = 0.000_1;
@@ -83,7 +75,7 @@ fn tree(turn: &mut Turn, cell: CellIndex, counts: &mut TreeCounts) {
     };
     if spreading {
         counts.spreads += spread(turn, cell, stage) as usize;
-    } else if stage < OLDEST {
+    } else if stage < OLDEST_TREE_STAGE {
         write::cells::set_value(turn, TREE_STAGE, cell, stage + 1);
         counts.grown += 1;
     } else if turn.random().below(DIE_ONE_IN) == 0 {
