@@ -8,16 +8,34 @@ The simulation ticks them (`../../simulation/`); the design is in
 
 ## The store
 
-**`entity.rs`**: `EntityId` (a `u64`); `EntityType` and `AttributeType`,
-the type registry's (`../../type_registry/`), handed on;
-**`Attribute`** `{kind, value}`; **`Header`** `{id, kind, at, wake}`,
-`NEVER`; **`EntityRef`** `{header, attributes}` with
-**`attribute(kind)`**; free functions on a list sorted by type:
-**`attribute`**, **`set_attribute`** (added if absent),
-**`remove_attribute`**; **`sorted`**. **`EntityEdit::of(entity, room)`**: an
-entity being changed -- **`header`**, **`get(kind)`**, **`set(kind,
-value)`**, **`unset(kind)`**, **`attributes`**, **`edited`**: its
-attributes copied into `room` when first one changes, not before.
+**`entity.rs`**: `EntityId` (a `u64`); `EntityType`, the type
+registry's (`../../type_registry/`), handed on; **`Header`** `{id,
+kind, at, wake}`, `NEVER`; **`EntityRef`** `{header, attributes}` --
+its attributes' blocks -- with **`attribute(attribute)`**, what one
+holds as its layout, and **`attribute_blocks(kind)`**, one's blocks.
+**`EntityEdit::of(entity, room)`**: an entity being changed --
+**`header`**, **`get(attribute)`**, **`set(attribute, value)`**,
+**`set_blocks(attribute)`**, **`unset(attribute)`**, **`attributes`**,
+**`edited`**: its blocks copied into `room` (**`own`**) when first one
+changes, not before.
+
+**`attributes.rs`** (`entity_manager.md`, "Attributes, a block each"):
+`Attribute`, `AttributeType`, `Layout` and `BLOCK_WORDS`, the type
+registry's, handed on. **`AttributeBlock`**: eight words, aligned as a
+cache line; **`holding(attribute, value)`**, the one block of a layout
+that takes one (**`holding_one`**, the same unchecked);
+**`kind()`**, the type in its first word; **`blocks()`**, how many
+blocks the attribute it begins takes, by its type or its block length,
+one at least. On an entity's blocks, sorted by type:
+**`find_attribute(blocks, kind)`** -- the walk: an attribute's blocks,
+or where they would go -- **`attribute_blocks(blocks, kind)`**,
+**`attribute(blocks, attribute)`** (read as its layout),
+**`set_attribute_blocks(blocks, attribute)`** and
+**`set_attribute(blocks, attribute, value)`** (in place of the one of
+its type, or added), **`remove_attribute(blocks, kind)`** (whether it
+was there), **`push_attribute(blocks, attribute, value)`** (appended),
+**`sorted(blocks)`**: whole attributes, of attributes' types, in order,
+each type once.
 
 The 3x3 about a cell as nine bits is not kept here: it is an
 instruction's shape (`../../instructions/src/around.rs`).
@@ -27,7 +45,7 @@ instruction's shape (`../../instructions/src/around.rs`).
 their places alone in a list (`places`), which is what is searched,
 among one search tile's at a time (`SEARCH_TILES`, 16 of 64x64 cells,
 **`search_tile`**, `tile_starts`); beside it a **`StoredEntity`** each
-(its header, its attributes' first index and count); the attributes;
+(its header, its attributes' first block and how many); the blocks;
 the garbage count. **`get(id, at)`**, **`iter`**, **`occupied(place)`**,
 **`in_word_tile(first)`** (the places on a word tile, a run),
 **`put(header, was, attributes)`** -- with no attributes given, those it
@@ -35,12 +53,13 @@ has kept, and not made if not there -- a **`Put`**: `InPlace`; `Moved`
 (**`shift_entity`**) to its cell if that is another and free, else
 `Stayed`; `New` if it is not there, `was` is its cell and it is free,
 else `Refused`; `PassedOver` if it was to have moved and is not where it
-stood. **`rewrite`**: attributes in place when the count is the same,
+stood. **`rewrite`**: attributes in place when as many blocks,
 else a new run at the end. **`remove(id, at)`**, **`index_of(place)`**,
-**`find(place, id)`**, **`entity`**, **`edit(id, place, kind, value)`**
-(one attribute set in place, or the run made anew with it added or
-removed), **`prefetch_entity(at)`**, **`prefetch_attributes(at)`**:
-asked of memory ahead; **`sweep`** once garbage reaches the attributes
+**`find(place, id)`**, **`entity`**, **`edit(id, place, kind, blocks)`**
+(one attribute set in place if as long as it was, or the run made anew
+with it added, removed -- no blocks given -- or of another length),
+**`prefetch_entity(at)`**, **`prefetch_attributes(at)`**:
+asked of memory ahead; **`sweep`** once garbage reaches the blocks
 in use (and 64).
 
 **`wheel.rs`**: `WHEEL_TICKS` (1024); **`Wake`** `{id, at}`;
@@ -61,7 +80,7 @@ one to another (**`move_between`**), a `Put` -- **`in_word_tile(chunk,
 first)`**, **`remove(id, at)`**, **`arrived(id, left)`** -- an entity crossed in,
 noted -- **`take_arrived(arrived)`**, **`settle_leavers(arrived)`** --
 those of a neighbour's arrivals that left this superchunk removed --
-**`pass(tick)`**, **`sort_wakes(tick)`** -- after the second phase for
+**`edit(id, at, kind, blocks)`**, **`pass(tick)`**, **`sort_wakes(tick)`** -- after the second phase for
 the next tick, after `Entities::apply` for the tick about to run --
 **`counts`**. **`Entities`**: the tick about to run, the superchunks by
 superchunk index, and instructions queued outside a tick: **`now`**,
@@ -78,10 +97,12 @@ height)`** -- the cells entities stand on among up to 16x16
 places (**`in_word_tile`**).
 
 **`instructions.rs`**: **`Instructions`**: the instructions queued for one
-superchunk -- put, move, edit, remove -- the puts' attributes in a list
-beside: **`put(header, from, attributes)`**, **`cross(header, left,
-attributes)`**, **`move_entity(header, from)`**,
-**`edit(id, at, kind, value)`**, **`remove`**, **`apply(superchunks, earliest,
+superchunk -- put, move, edit, remove -- the blocks the puts and the
+edits carry in a list beside: **`put(header, from, attributes)`**,
+**`cross(header, left, attributes)`** (both by **`push`**),
+**`move_entity(header, from)`**, **`set_attribute(id, at, attribute,
+value)`**, **`set_attribute_blocks(id, at, attribute)`**,
+**`unset_attribute(id, at, kind)`**, **`remove`**, **`apply(superchunks, earliest,
 applied)`** in order, each on its cell's superchunk (a put elsewhere
 lost, one of an entity no longer where it stood passed over, a new
 one on a cell taken refused, a mover to one staying),
@@ -104,5 +125,5 @@ puts them back into.
 
 ## `diagnostics/entities.rs`
 
-**`EntityStats::of(entities)`**: superchunks, entities, attributes in
-use and as garbage, wakes filed.
+**`EntityStats::of(entities)`**: superchunks, entities, attribute
+blocks in use and as garbage, wakes filed.

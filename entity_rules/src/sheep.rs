@@ -4,9 +4,9 @@
 
 use instructions::around::{self, CENTRE, RING};
 use instructions::between_ticks::EntitiesBetweenTicks;
-pub use instructions::entity_types::{HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
+pub use instructions::entity_types::{Roaming, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
 use instructions::layers::{GRASS, WALL_EAST, WALL_SOUTH};
-use instructions::{read, write, Attribute, CellCartesian, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
+use instructions::{read, write, AttributeBlock, CellCartesian, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
 /// Ticks between a walking sheep's steps, at the least...
@@ -62,7 +62,7 @@ struct Flock {
     /// What the sheep did.
     done: RuleCounts,
     /// Room for the attributes of the sheep being changed.
-    room: Vec<Attribute>,
+    room: Vec<AttributeBlock>,
 }
 
 /// The rule, on one superchunk's turn: every sheep waking, each seen to
@@ -100,7 +100,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         sheep.set(HUNGRY_AT, now + MEAL_TICKS);
         done[EATEN] += 1;
         if let (false, Some(way)) = (lush, around::pick(turn.random(), steppable)) {
-            sheep.set(ROAMING, (now + MEAL_TICKS + ROAM_TICKS) << 4 | way as u64);
+            sheep.set(ROAMING, Roaming { until: now + MEAL_TICKS + ROAM_TICKS, neighbour: way });
         }
     }
     let hungry = !fed && now >= hungry_at;
@@ -116,7 +116,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
                 // The lamb's cell is no longer one to step to.
                 steppable &= !(1 << beside);
                 let (cell, wake) = (around::cell(at, beside).expect("a hot neighbour is in the world"), next_step(turn));
-                write::entities::spawn(turn, SHEEP, cell, wake, &[Attribute { kind: HUNGRY_AT, value: now + MEAL_TICKS }, Attribute { kind: LAMB, value: now + LAMB_TICKS }]);
+                write::entities::spawn(turn, SHEEP, cell, wake, &[AttributeBlock::holding(HUNGRY_AT, now + MEAL_TICKS), AttributeBlock::holding(LAMB, now + LAMB_TICKS)]);
                 done[BIRTHS] += 1;
             }
             None => needs = now,
@@ -137,8 +137,8 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         None
     } else if let Some(roaming) = roaming {
         // On the way it set off, until its time is up or it comes to the edge of the hot superchunks.
-        let way = 1 << (roaming & 15);
-        if now >= roaming >> 4 || steppable & way == 0 {
+        let way = 1 << roaming.neighbour;
+        if now >= roaming.until || steppable & way == 0 {
             sheep.unset(ROAMING);
         }
         around::prefer(turn.random(), way, steppable)
@@ -191,6 +191,6 @@ pub fn flock(entities: &mut EntitiesBetweenTicks, superchunk: SuperchunkIndex, c
             continue;
         }
         let header = Header { id: EntityId(random.draw()), kind: SHEEP, at: at.into(), wake: now + random.below(STEP_TICKS) };
-        entities.put(header, &[Attribute { kind: HUNGRY_AT, value: now + random.below(MEAL_TICKS) }]);
+        entities.put(header, &[AttributeBlock::holding(HUNGRY_AT, now + random.below(MEAL_TICKS))]);
     }
 }

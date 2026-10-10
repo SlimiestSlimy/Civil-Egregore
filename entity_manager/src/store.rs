@@ -9,7 +9,8 @@ pub use entity_reader::{EntityReader, OCCUPIED_SIDE};
 pub use world_entities::Entities;
 
 use crate::bucket::{place, Bucket, Put};
-use crate::entity::{sorted, Attribute, AttributeType, EntityId, EntityRef, Header, NEVER};
+use crate::attributes::{sorted, AttributeBlock, AttributeType};
+use crate::entity::{EntityId, EntityRef, Header, NEVER};
 use crate::wheel::{Wake, Wheel};
 use coordinates::{CellIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 
@@ -33,7 +34,7 @@ pub struct SuperchunkEntities {
     arrived: Vec<(EntityId, CellIndex)>,
     /// Room for the attributes of an entity moving, with those it has,
     /// from one chunk's bucket to another's.
-    carried: Vec<Attribute>,
+    carried: Vec<AttributeBlock>,
 }
 
 impl SuperchunkEntities {
@@ -112,10 +113,10 @@ impl SuperchunkEntities {
     /// sorted by type -- or, with none given, those it has -- and files
     /// its wake, no earlier than `earliest`: what came of it
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
-    pub(crate) fn put(&mut self, earliest: u64, header: Header, from: CellIndex, attributes: Option<&[Attribute]>) -> Put {
+    pub(crate) fn put(&mut self, earliest: u64, header: Header, from: CellIndex, attributes: Option<&[AttributeBlock]>) -> Put {
         debug_assert_eq!(header.at.superchunk(), self.index, "an entity put in a superchunk it is not in");
         debug_assert_eq!(from.superchunk(), self.index, "an entity put from another superchunk: a crossing");
-        debug_assert!(attributes.is_none_or(sorted), "attributes sorted by type, each type once");
+        debug_assert!(attributes.is_none_or(sorted), "attributes whole, sorted by type, each type once");
         let (origin, target) = (from.chunk().place(), header.at.chunk().place());
         let put = if origin == target {
             self.chunks[target].put(header, place(from), attributes)
@@ -150,11 +151,11 @@ impl SuperchunkEntities {
     }
 
     /// Sets the attribute of type `kind` of the entity whose ID is `id`
-    /// standing on `at` to `value`, or with none removes it: whether the
-    /// entity is there.
-    pub(crate) fn edit(&mut self, id: EntityId, at: CellIndex, kind: AttributeType, value: Option<u64>) -> bool {
+    /// standing on `at` to `blocks`, or with none removes it: whether
+    /// the entity is there.
+    pub(crate) fn edit(&mut self, id: EntityId, at: CellIndex, kind: AttributeType, blocks: &[AttributeBlock]) -> bool {
         debug_assert_eq!(at.superchunk(), self.index);
-        self.chunks[at.chunk().place()].edit(id, place(at), kind, value)
+        self.chunks[at.chunk().place()].edit(id, place(at), kind, blocks)
     }
 
     /// The places, in the chunk at `chunk`, of the entities standing on
@@ -204,7 +205,7 @@ impl SuperchunkEntities {
         self.wheel.sort(tick);
     }
 
-    /// Attributes in use, attributes left as garbage, and wakes filed.
+    /// Attributes' blocks in use, those left as garbage, and wakes filed.
     pub(crate) fn counts(&self) -> (usize, usize, usize) {
         let (used, garbage) = self.chunks.iter().map(Bucket::attribute_counts).fold((0, 0), |(a, b), (c, d)| (a + c, b + d));
         (used, garbage, self.wheel.len())

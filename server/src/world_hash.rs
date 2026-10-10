@@ -51,7 +51,7 @@ pub fn world_hash(world: &mut World) -> WorldHash {
     for entity in world.entities.iter() {
         let header = entity.header;
         entities = [header.id.0, header.kind.0, header.at.0, header.wake, entity.attributes.len() as u64].into_iter().fold(entities, fold);
-        entities = entity.attributes.iter().fold(entities, |hash, attribute| fold(fold(hash, attribute.kind.0), attribute.value));
+        entities = entity.attributes.iter().flat_map(|block| block.0).fold(entities, fold);
     }
     let random_streams = world.simulation.random_states().fold(0, |hash, (superchunk, state)| fold(fold(hash, superchunk.0), state));
     let due = |hash: u64, (superchunk, tick): (coordinates::SuperchunkIndex, u64)| fold(fold(hash, superchunk.0), tick);

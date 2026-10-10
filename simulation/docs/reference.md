@@ -44,7 +44,8 @@ attributes)`**: changed, and moved to its cell if that is free --
 staying if not; passed over if no longer where the tick found it -- or,
 to another superchunk, crossing; **`step(entity, to, wake)`**: a move,
 no attributes carried -- whole, as `update`, to another superchunk;
-**`set_attribute(entity, kind, value)`**, **`unset_attribute(entity,
+**`set_attribute(entity, attribute, value)`**,
+**`set_attribute_blocks(entity, attribute)`**, **`unset_attribute(entity,
 kind)`**: an edit of any entity in reach; **`remove(header)`**.
 **`slot_of`**: the slot of a superchunk, past the neighbours panicking.
 `SLOTS` (9): an outbox's slots. A turn's fields: its `superchunk`, its

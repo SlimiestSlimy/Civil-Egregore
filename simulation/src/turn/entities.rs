@@ -2,7 +2,7 @@
 //! instructions queued for them.
 
 use super::{slot, Turn};
-use entity_manager::{Attribute, AttributeType, EntityId, EntityRef, Header, SuperchunkEntities, OCCUPIED_SIDE};
+use entity_manager::{Attribute, AttributeBlock, AttributeType, EntityId, EntityRef, Header, Layout, SuperchunkEntities, OCCUPIED_SIDE};
 use bitplane_manager::Reader;
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, ChunkIndex};
@@ -54,7 +54,7 @@ impl<'a> Turn<'a> {
     /// Queues putting `header`'s entity -- made, or changed where it
     /// stands -- with `attributes`, sorted by type, to wake after this
     /// tick. A new one whose cell is taken by then is not put.
-    pub fn put(&mut self, header: Header, attributes: &[Attribute]) {
+    pub fn put(&mut self, header: Header, attributes: &[AttributeBlock]) {
         debug_assert!(header.wake > self.now, "an entity put to wake at tick {}, not after {}", header.wake, self.now);
         let slot = self.slot_of(header.at.superchunk());
         self.outbox.instructions[slot].put(header, header.at, attributes);
@@ -75,28 +75,35 @@ impl<'a> Turn<'a> {
         }
     }
 
-    /// Queues setting the attribute of type `kind` of `entity` -- any
+    /// Queues setting `attribute` of `entity` -- any
     /// entity in reach, the rule's own or another -- to `value`. An
     /// entity changing itself whole is [`Turn::update`]d;
     /// this is one entity acting on another: only the one attribute is
     /// written, so two acting on one in a tick do not undo each other.
-    pub fn set_attribute(&mut self, entity: &Header, kind: AttributeType, value: u64) {
+    pub fn set_attribute<L: Layout>(&mut self, entity: &Header, attribute: Attribute<L>, value: L) {
         let slot = self.slot_of(entity.at.superchunk());
-        self.outbox.instructions[slot].edit(entity.id, entity.at, kind, Some(value));
+        self.outbox.instructions[slot].set_attribute(entity.id, entity.at, attribute, value);
+    }
+
+    /// [`Turn::set_attribute`], the attribute given as its blocks: how
+    /// one whose size varies is set.
+    pub fn set_attribute_blocks(&mut self, entity: &Header, attribute: &[AttributeBlock]) {
+        let slot = self.slot_of(entity.at.superchunk());
+        self.outbox.instructions[slot].set_attribute_blocks(entity.id, entity.at, attribute);
     }
 
     /// Queues removing the attribute of type `kind` of `entity`, any in
     /// reach.
     pub fn unset_attribute(&mut self, entity: &Header, kind: AttributeType) {
         let slot = self.slot_of(entity.at.superchunk());
-        self.outbox.instructions[slot].edit(entity.id, entity.at, kind, None);
+        self.outbox.instructions[slot].unset_attribute(entity.id, entity.at, kind);
     }
 
     /// Queues `before`'s entity becoming `after`, with `attributes`:
     /// changed, and moved to its cell unless that is taken by then. To
     /// another superchunk it crosses (`docs/simulation.md`,
     /// "Entities").
-    pub fn update(&mut self, before: &Header, after: Header, attributes: &[Attribute]) {
+    pub fn update(&mut self, before: &Header, after: Header, attributes: &[AttributeBlock]) {
         debug_assert!(after.wake > self.now, "an entity put to wake at tick {}, not after {}", after.wake, self.now);
         let there = self.slot_of(after.at.superchunk());
         if before.at.superchunk() == after.at.superchunk() {

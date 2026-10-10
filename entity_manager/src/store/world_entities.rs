@@ -1,7 +1,8 @@
 //! Every superchunk's entities together: the world's, with what is
 //! queued to be put and removed.
 
-use crate::entity::{Attribute, EntityId, EntityRef, Header};
+use crate::attributes::AttributeBlock;
+use crate::entity::{EntityId, EntityRef, Header};
 use crate::instructions::{Instructions, InstructionsApplied};
 use super::SuperchunkEntities;
 use super::entity_reader::EntityReader;
@@ -89,7 +90,7 @@ impl Entities {
     /// stands -- with `attributes` sorted by type, outside a tick:
     /// setting up, say. It wakes at its wake tick, the tick about to run
     /// or later. One to stand elsewhere is removed, and put there.
-    pub fn queue_put(&mut self, header: Header, attributes: &[Attribute]) {
+    pub fn queue_put(&mut self, header: Header, attributes: &[AttributeBlock]) {
         self.queued.put(header, header.at, attributes);
     }
 

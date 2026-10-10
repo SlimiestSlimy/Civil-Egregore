@@ -4,7 +4,7 @@
 //!
 //! `cargo test --test fine`
 
-use type_registry::{first_clash, layer_types, named, of_id, Kind, Registered, GRASS, REGISTRY, TREE_STAGE};
+use type_registry::{data_words, first_clash, layer_types, named, of_id, AttributeType, Kind, Layout, Registered, Roaming, GRASS, HUNGRY_AT, REGISTRY, ROAMING, TREE_STAGE};
 
 /// A row of `kind` named `name` at `id`, `width` wide.
 fn row(name: &'static str, kind: Kind, id: u64, width: u32) -> Registered {
@@ -50,4 +50,28 @@ fn the_layer_types_are_the_layers_and_wide_planes() {
     assert_eq!(types.len(), REGISTRY.iter().filter(|registered| matches!(registered.kind, Kind::Layer | Kind::WidePlane)).count());
     assert!(types.contains(&GRASS) && types.contains(&TREE_STAGE.layer_type()));
     assert_eq!(TREE_STAGE.layer_type().bits(), named("tree stage").expect("registered").width);
+}
+
+/// An attribute's type says its blocks in its top byte and keeps its
+/// number under it; its row says its data's width; and a layout's
+/// fields come back from the words they were written to.
+#[test]
+fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
+    for blocks in [1, 2, 254] {
+        let kind = AttributeType::of_blocks(77, blocks);
+        assert_eq!((kind.blocks(), kind.number(), kind.0 >> 56, kind.is_an_attributes()), (Some(blocks), 77, blocks as u64, true));
+    }
+    let varying = AttributeType::of_varying_size(77);
+    assert_eq!((varying.blocks(), varying.number(), varying.is_an_attributes()), (None, 77, true));
+    // An ID whose top byte is 0 is of something else: the one namespace is everything's.
+    assert_eq!((AttributeType(GRASS.0).blocks(), AttributeType(GRASS.0).is_an_attributes()), (Some(0), false));
+    for (kind, name) in [(HUNGRY_AT.attribute_type(), "hungry at"), (ROAMING.attribute_type(), "roaming")] {
+        let row = named(name).expect("registered");
+        assert_eq!((kind.blocks(), row.id, row.width), (Some(1), kind.number(), data_words(1) as u32 * u64::BITS));
+        assert_eq!(of_id(kind.number()), Some(row));
+    }
+    let roaming = Roaming { until: 1 << 40, neighbour: 7 };
+    let mut data = [0; data_words(Roaming::BLOCKS)];
+    roaming.write(&mut data);
+    assert_eq!((Roaming::read(&data), data[2..].iter().sum::<u64>()), (roaming, 0));
 }

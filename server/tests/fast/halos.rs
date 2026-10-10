@@ -8,7 +8,7 @@
 use type_registry::GRASS;
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use bitplane_manager::{Write, WriteOp};
-use entity_manager::{Attribute, EntityId, EntityType, Header, NEVER};
+use entity_manager::{AttributeBlock, EntityId, EntityType, Header, NEVER};
 use server::host::frame::Viewport;
 use server::{about, HaloChange, World, COOL_TICKS, HOT_ENTITY, WARM_TICKS};
 
@@ -134,7 +134,7 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
     }
     let ticked = world.entities.now();
     let halo = world.arena.superchunk_indices();
-    type Held = (Vec<u64>, Vec<(Header, Vec<Attribute>)>, Vec<(SuperchunkIndex, u64)>);
+    type Held = (Vec<u64>, Vec<(Header, Vec<AttributeBlock>)>, Vec<(SuperchunkIndex, u64)>);
     let held = |world: &World| -> Held {
         let cells = world.info.layers.clone().into_iter().flat_map(|layer| world.arena.run(layer)).flat_map(|(_, bucket)| bucket.words().to_vec()).collect();
         (cells, world.entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect(), world.simulation.random_states().collect())

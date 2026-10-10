@@ -26,7 +26,7 @@ pub mod write;
 // lot drawn.
 pub use chunk_storage::{Bits4, LayerType, Wide};
 pub use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOURS, SUPERCHUNK_SIDE_CELLS};
-pub use entity_manager::{Attribute, AttributeType, EntityEdit, EntityId, EntityRef, EntityType, Header};
+pub use entity_manager::{Attribute, AttributeBlock, AttributeType, EntityEdit, EntityId, EntityRef, EntityType, Header, Layout};
 pub use rule_counts::{RuleCounts, COUNTS_OF_A_RULE};
 pub use simulation::{TickReport, Turn};
 pub use utilities::chance::Chance;

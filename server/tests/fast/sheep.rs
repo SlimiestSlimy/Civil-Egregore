@@ -7,7 +7,7 @@
 
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, put_entity, tick_sheep};
 use coordinates::CellCartesian;
-use entity_manager::{Attribute, EntityId, EntityRef, Header};
+use entity_manager::{AttributeBlock, EntityId, EntityRef, Header};
 use entity_rules::sheep::{BIRTHS, DEATHS, EATEN, FAR, PATHS, SOUGHT, WOKEN, HUNGRY_AT, LAMB, MEAL_TICKS, PREGNANT, ROAMING, ROAM_TICKS, SHEEP, STARVE_TICKS, STEP_JITTER, STEP_TICKS};
 
 /// Every sheep knows when it is next hungry, is a sheep, and is
@@ -67,7 +67,7 @@ fn hungry_sheep_walk_to_the_nearest_grass() {
     let (sheep, grass) = (CellCartesian { x: corner.x + 500, y: corner.y + 500 }, CellCartesian { x: corner.x + 506, y: corner.y + 493 });
     plant_grass(&mut world, grass, 1, 1);
     let header = Header { id: EntityId(1), kind: SHEEP, at: sheep.into(), wake: 0 };
-    put_entity(&mut world, header, &[Attribute { kind: HUNGRY_AT, value: 0 }]);
+    put_entity(&mut world, header, &[AttributeBlock::holding(HUNGRY_AT, 0)]);
     let (mut done, mut ate_at) = (instructions::RuleCounts::default(), None);
     for seed in 0..12 * (STEP_TICKS + STEP_JITTER) {
         // The grass rule left out: the one cell of grass must stay until eaten.
@@ -95,7 +95,7 @@ fn hungry_sheep_walk_to_grass_far_off() {
     let (sheep, grass) = (CellCartesian { x: corner.x + 900, y: corner.y + 700 }, CellCartesian { x: corner.x + 1050, y: corner.y + 800 });
     plant_grass(&mut world, grass, 1, 1);
     let header = Header { id: EntityId(1), kind: SHEEP, at: sheep.into(), wake: 0 };
-    put_entity(&mut world, header, &[Attribute { kind: HUNGRY_AT, value: 0 }]);
+    put_entity(&mut world, header, &[AttributeBlock::holding(HUNGRY_AT, 0)]);
     let (mut done, mut ate_at) = (instructions::RuleCounts::default(), None);
     for seed in 0..STARVE_TICKS {
         let report = tick_sheep(&mut world, seed);
@@ -120,7 +120,7 @@ fn sheep_on_thin_pasture_roam_away() {
     let corner = superchunk.top_left().cartesian();
     let start = CellCartesian { x: corner.x + 500, y: corner.y + 500 };
     plant_grass(&mut world, start, 1, 1);
-    put_entity(&mut world, Header { id: EntityId(1), kind: SHEEP, at: start.into(), wake: 0 }, &[Attribute { kind: HUNGRY_AT, value: 0 }]);
+    put_entity(&mut world, Header { id: EntityId(1), kind: SHEEP, at: start.into(), wake: 0 }, &[AttributeBlock::holding(HUNGRY_AT, 0)]);
     let (mut eaten, mut set_off, mut came_to) = (0, false, None);
     for seed in 0..MEAL_TICKS + ROAM_TICKS + 4 * (STEP_TICKS + STEP_JITTER) {
         eaten += tick_sheep(&mut world, seed).rules[EATEN];

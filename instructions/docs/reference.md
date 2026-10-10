@@ -112,14 +112,16 @@ type registry (`../../type_registry/`).
 
 ## `entity_types.rs`
 
-`SHEEP`, and its attributes `HUNGRY_AT`, `PREGNANT`, `LAMB`, `ROAMING`:
-the types of entity a world has, from the type registry.
+`SHEEP`, and its attributes `HUNGRY_AT`, `PREGNANT`, `LAMB`, `ROAMING`
+-- and `Roaming`, the last one's layout: the types of entity a world
+has, from the type registry.
 
 ## The root
 
 The words the instructions are asked in: `CellIndex`, `CellCartesian`,
 `SuperchunkIndex`, `NEIGHBOURS`, `SUPERCHUNK_SIDE_CELLS`, `LayerType`,
-`Wide`, `Bits4`, `Attribute`, `AttributeType`, `EntityType`,
+`Wide`, `Bits4`, `Attribute`, `AttributeBlock`, `AttributeType`,
+`Layout`, `EntityType`,
 `EntityId`, `Header`, `EntityRef`, `EntityEdit`, `Turn`, `TickReport`,
 `Rng`, `Chance`.
 

@@ -10,9 +10,9 @@ pub struct EntityStats {
     pub superchunks: usize,
     /// Entities.
     pub entities: usize,
-    /// Attributes the entities have.
+    /// Blocks of the attributes the entities have.
     pub attributes: usize,
-    /// Attributes no entity has any longer, not yet swept out.
+    /// Blocks no entity has any longer, not yet swept out.
     pub garbage: usize,
     /// Wakes filed, good or not.
     pub wakes: usize,

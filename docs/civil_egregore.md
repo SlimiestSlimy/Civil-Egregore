@@ -410,8 +410,8 @@ is built in the entity manager (`entity_manager/src/`), with sheep on
 it (`entity_rules/src/sheep.rs`):
 
 - **A record**: a header -- a random 64-bit ID, a type, the cell it
-  stands on, the tick it next wakes at -- and attributes, typed values
-  added and removed at run time (a sheep falls pregnant, a lamb grows
+  stands on, the tick it next wakes at -- and attributes, typed blocks
+  of 64 bytes added and removed at run time (a sheep falls pregnant, a lamb grows
   up). Types, of entities and attributes alike, are `u64`s from the one
   namespace every type in Civil Egregore is drawn from, layers' included.
 - **A bucket a chunk**: a superchunk holds its entities in a bucket for

@@ -2,14 +2,14 @@
 //! removed -- each by the instruction that carries least.
 
 use coordinates::CellIndex;
-use entity_manager::{Attribute, EntityEdit, EntityId, EntityType, Header};
+use entity_manager::{AttributeBlock, EntityEdit, EntityId, EntityType, Header};
 use simulation::Turn;
 
 /// Queues making an entity of type `kind` on `at`, with `attributes`
 /// sorted by type, to wake at `wake`: its ID, drawn here. It is not
 /// made if an entity stands on the cell by then.
 #[inline]
-pub fn spawn(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attributes: &[Attribute]) -> EntityId {
+pub fn spawn(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attributes: &[AttributeBlock]) -> EntityId {
     let id = turn.new_id();
     turn.put(Header { id, kind, at, wake }, attributes);
     id

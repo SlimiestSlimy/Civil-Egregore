@@ -6,7 +6,7 @@
 
 use crate::tests::*;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{EntityId, Header, WHEEL_TICKS};
+use entity_manager::{AttributeBlock, EntityId, Header, WHEEL_TICKS};
 use simulation::{Simulation, Turn};
 use std::sync::Mutex;
 
@@ -72,13 +72,13 @@ fn entities_wake_at_their_tick() {
 fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
     let (mut arena, mut entities) = world(2);
     let start = SUPERCHUNK_SIDE_CELLS - 3;
-    entities.queue_put(walker(9, cell(start, 100), 0), &[entity_manager::Attribute { kind: WOKEN, value: 0 }]);
+    entities.queue_put(walker(9, cell(start, 100), 0), &[AttributeBlock::holding(WOKEN, 0)]);
     entities.apply();
     let mut simulation = Simulation::new(2);
     let step = |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
             let after = Header { at: entity.header.at.offset(1, 0).unwrap(), wake: turn.now() + 1, ..entity.header };
-            turn.update(&entity.header, after, &[entity_manager::Attribute { kind: WOKEN, value: entity.attribute(WOKEN).unwrap() + 1 }]);
+            turn.update(&entity.header, after, &[AttributeBlock::holding(WOKEN, entity.attribute(WOKEN).unwrap() + 1)]);
         }
         0
     };

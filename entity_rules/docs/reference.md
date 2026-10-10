@@ -5,7 +5,8 @@ The design is in `entity_rules.md`.
 ## `sheep.rs`
 
 `SHEEP`, and its attributes `HUNGRY_AT`, `PREGNANT`, `LAMB`, each a
-tick, and `ROAMING`, the tick it roams until and which way;
+tick, and `ROAMING`, the tick it roams until and which way
+(`Roaming`);
 `STEP_TICKS` (64) and `STEP_JITTER` (16) between a walking sheep's
 steps, `MEAL_TICKS` (6,912), `STARVE_TICKS` (13,824),
 `LUSH_CELLS` (64, of the area's 256), `CONCEIVE_ONE_IN` (5),

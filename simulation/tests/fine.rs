@@ -13,3 +13,6 @@ mod entities_moving;
 
 #[path = "fine/instructions.rs"]
 mod instructions;
+
+#[path = "fine/attribute_blocks.rs"]
+mod attribute_blocks;

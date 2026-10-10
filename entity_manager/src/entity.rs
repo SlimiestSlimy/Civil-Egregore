@@ -1,9 +1,10 @@
 //! What an entity is: a header -- its ID, its type, its cell, when it
-//! next wakes -- and its attributes, a list of typed values that may
-//! grow or shrink at run time.
+//! next wakes -- and its attributes, a run of blocks that may grow or
+//! shrink at run time.
 
+use crate::attributes::{attribute_blocks, remove_attribute, set_attribute, set_attribute_blocks, Attribute, AttributeBlock, AttributeType, Layout};
 use coordinates::CellIndex;
-pub use type_registry::{AttributeType, EntityType};
+pub use type_registry::EntityType;
 
 /// An entity's ID: drawn at random when it is made, from the random
 /// numbers of the superchunk making it, so the same on any number of
@@ -11,16 +12,6 @@ pub use type_registry::{AttributeType, EntityType};
 /// near each other sharing one is a chance of about one in 2^64 a pair.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EntityId(pub u64);
-
-/// One attribute: its type and its value, a word whose meaning is the
-/// type's.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Attribute {
-    /// The attribute's type.
-    pub kind: AttributeType,
-    /// Its value.
-    pub value: u64,
-}
 
 /// The tick an entity that never wakes wakes at.
 pub const NEVER: u64 = u64::MAX;
@@ -43,14 +34,21 @@ pub struct Header {
 pub struct EntityRef<'a> {
     /// Its fixed part.
     pub header: Header,
-    /// Its attributes, sorted by type.
-    pub attributes: &'a [Attribute],
+    /// Its attributes' blocks, sorted by type.
+    pub attributes: &'a [AttributeBlock],
 }
 
-impl EntityRef<'_> {
-    /// The value of its attribute of type `kind`, if it has one.
-    pub fn attribute(&self, kind: AttributeType) -> Option<u64> {
-        attribute(self.attributes, kind)
+impl<'a> EntityRef<'a> {
+    /// What its attribute `attribute` holds, if it has it.
+    #[inline]
+    pub fn attribute<L: Layout>(&self, attribute: Attribute<L>) -> Option<L> {
+        crate::attributes::attribute(self.attributes, attribute)
+    }
+
+    /// The blocks of its attribute of type `kind`, if it has one: how
+    /// one whose size varies is read.
+    pub fn attribute_blocks(&self, kind: AttributeType) -> Option<&'a [AttributeBlock]> {
+        attribute_blocks(self.attributes, kind)
     }
 }
 
@@ -64,14 +62,14 @@ pub struct EntityEdit<'a, 'b> {
     entity: EntityRef<'a>,
     /// Its attributes as changed, once one is: the rule's room for them,
     /// used again for every entity.
-    changed: &'b mut Vec<Attribute>,
+    changed: &'b mut Vec<AttributeBlock>,
     /// Whether one was.
     edited: bool,
 }
 
 impl<'a, 'b> EntityEdit<'a, 'b> {
     /// `entity`, to be changed, with `room` for its attributes.
-    pub fn of(entity: EntityRef<'a>, room: &'b mut Vec<Attribute>) -> Self {
+    pub fn of(entity: EntityRef<'a>, room: &'b mut Vec<AttributeBlock>) -> Self {
         Self { entity, changed: room, edited: false }
     }
 
@@ -85,31 +83,41 @@ impl<'a, 'b> EntityEdit<'a, 'b> {
         self.edited
     }
 
-    /// Its attributes, as changed so far.
-    pub fn attributes(&self) -> &[Attribute] {
+    /// Its attributes' blocks, as changed so far.
+    pub fn attributes(&self) -> &[AttributeBlock] {
         if self.edited { self.changed } else { self.entity.attributes }
     }
 
-    /// The value of its attribute of type `kind`, as changed so far.
-    pub fn get(&self, kind: AttributeType) -> Option<u64> {
-        attribute(self.attributes(), kind)
+    /// What its attribute `attribute` holds, as changed so far.
+    #[inline]
+    pub fn get<L: Layout>(&self, attribute: Attribute<L>) -> Option<L> {
+        crate::attributes::attribute(self.attributes(), attribute)
     }
 
-    /// Sets its attribute of type `kind` to `value`.
-    pub fn set(&mut self, kind: AttributeType, value: u64) {
-        if self.get(kind) != Some(value) {
-            set_attribute(self.own(), kind, value);
+    /// Sets its attribute `attribute` to `value`.
+    #[inline]
+    pub fn set<L: Layout>(&mut self, attribute: Attribute<L>, value: L) {
+        if self.get(attribute) != Some(value) {
+            set_attribute(self.own(), attribute, value);
         }
     }
 
-    /// Removes its attribute of type `kind`: its value, if it had one.
-    pub fn unset(&mut self, kind: AttributeType) -> Option<u64> {
-        self.get(kind)?;
-        remove_attribute(self.own(), kind)
+    /// Sets the attribute `attribute` is the blocks of: how one whose
+    /// size varies is written.
+    pub fn set_blocks(&mut self, attribute: &[AttributeBlock]) {
+        set_attribute_blocks(self.own(), attribute);
+    }
+
+    /// Removes its attribute `attribute`: what it held, if it had it.
+    #[inline]
+    pub fn unset<L: Layout>(&mut self, attribute: Attribute<L>) -> Option<L> {
+        let held = self.get(attribute)?;
+        remove_attribute(self.own(), attribute.attribute_type());
+        Some(held)
     }
 
     /// Its attributes, copied to be changed if they have not been.
-    fn own(&mut self) -> &mut Vec<Attribute> {
+    fn own(&mut self) -> &mut Vec<AttributeBlock> {
         if !self.edited {
             self.changed.clear();
             self.changed.extend_from_slice(self.entity.attributes);
@@ -117,31 +125,4 @@ impl<'a, 'b> EntityEdit<'a, 'b> {
         }
         self.changed
     }
-}
-
-/// The value of the attribute of type `kind` in `attributes`, sorted by
-/// type, if there is one.
-pub fn attribute(attributes: &[Attribute], kind: AttributeType) -> Option<u64> {
-    attributes.binary_search_by_key(&kind, |attribute| attribute.kind).ok().map(|at| attributes[at].value)
-}
-
-/// Sets the attribute of type `kind` in `attributes`, sorted by type, to
-/// `value`: added if it had none.
-pub fn set_attribute(attributes: &mut Vec<Attribute>, kind: AttributeType, value: u64) {
-    match attributes.binary_search_by_key(&kind, |attribute| attribute.kind) {
-        Ok(at) => attributes[at].value = value,
-        Err(at) => attributes.insert(at, Attribute { kind, value }),
-    }
-}
-
-/// Removes the attribute of type `kind` from `attributes`, sorted by
-/// type: its value, if it had one.
-pub fn remove_attribute(attributes: &mut Vec<Attribute>, kind: AttributeType) -> Option<u64> {
-    let at = attributes.binary_search_by_key(&kind, |attribute| attribute.kind).ok()?;
-    Some(attributes.remove(at).value)
-}
-
-/// Whether `attributes` are sorted by type, each type once.
-pub(crate) fn sorted(attributes: &[Attribute]) -> bool {
-    attributes.windows(2).all(|pair| pair[0].kind < pair[1].kind)
 }

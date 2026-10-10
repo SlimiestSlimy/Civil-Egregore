@@ -10,8 +10,8 @@ what a rule is given: `../../simulation/docs/simulation.md`,
 
 A header and attributes. The header is a random 64-bit ID, a type, the
 cell it stands on, and the tick it next wakes at. Attributes are typed
-values, a word each, added and removed at run time. Types are the type
-registry's (`../../type_registry/`).
+blocks of 64 bytes, added and removed at run time ("Attributes, a block
+each"). Types are the type registry's (`../../type_registry/`).
 
 An entity is found by its ID and its cell: its cell's chunk's bucket,
 then its ID there -- never a search past its chunk. That keeps it found
@@ -20,12 +20,9 @@ moved on or died passes it over.
 
 ## Attributes, a block each
 
-**Designed 2026-10-09 and not yet built**: until it is, an attribute is
-a type and one word, as the rest of this doc tells. What is written
-here is what the code is being changed to; this line goes when it is.
-
 An attribute is one or more **blocks** of 64 bytes -- eight words, a
-cache line, and aligned as one. The first word of an attribute's first
+cache line, and aligned as one (`AttributeBlock`, `BLOCK_WORDS`). The
+first word of an attribute's first
 block is its type, the one u64 ID every type in a world has. The rest
 is its data, 56 bytes in a block of its own: way more than the one
 word it had, so that what belongs together is one attribute -- where a
@@ -42,32 +39,48 @@ attribute of one type is laid out alike.
 two blocks, or more: the blocks after the first are all data, eight
 words each, straight after the first block's seven -- so the data is
 one run of words, 7, 15, 23 and so on. How many blocks a type takes is
-said by its ID -- the ID's top byte, the blocks less one, as a layer
-type's top byte says how wide it is -- so nothing is looked up to step
-over an attribute, and the IDs there are, whose top byte is 0, are of
-one block.
+said by its ID -- the ID's top byte, as a layer type's top byte says
+how wide it is -- so nothing is looked up to step over an attribute
+(`AttributeBlock::blocks`). The types are one namespace, everything's:
+an ID whose top byte is 0 is **not an attribute's**, and a block that
+begins with one is no attribute (`sorted` says so of a run of blocks,
+and a saved entity with one is not read).
 
 **Variable size.** Most attributes are of a fixed size. One whose
 size varies -- a short text, a short list -- has a top byte of all
 ones, and then its first block's second word is its **block length**:
 how many blocks it takes in all, one at least. Its data starts at the
-third word. None is registered yet; the walk over an entity's
-attributes honours a block length all the same, and a test makes one
-to say so.
+third word. None is registered yet, and no layout is written for one:
+it is read and written as its blocks (`EntityRef::attribute_blocks`,
+`EntityEdit::set_blocks`, `Instructions::set_attribute_blocks`). The
+walk over an entity's attributes honours a block length all the same,
+and a test makes one to say so
+(`../../simulation/tests/fine/attribute_blocks.rs`).
 
 **An entity's attributes** are a run of blocks in its bucket's list,
-sorted by type, each type once. Finding one is a walk from the first:
-read the type, and either it is the one, or step over as many blocks
-as the type -- or the block length -- says. An entity has few
-attributes, and each step reads the one word.
+sorted by type, each type once. Finding one is a walk from the first
+(`find_attribute`): read the type, and either it is the one, or step
+over as many blocks as the type -- or the block length -- says. An
+entity has few attributes, and each step reads the one word. A block
+length that reaches past the entity's blocks is cut to them, so a walk
+never leaves them.
+
+**Read and written as fields.** `attribute(blocks, attribute)` reads
+one as its layout, `set_attribute` and `push_attribute` write one, and
+`AttributeBlock::holding(attribute, value)` makes the one block of a
+layout that takes one -- a layout of more does not build there. A
+layout of one block is read from its block and written to it where it
+lies; one of more is gathered into a run of words first.
 
 **What it costs.** A block is four times the 16 bytes an attribute
 took. A sheep has one to four: 64 to 256 bytes beside its 32-byte
 header. Blocks are copied whole when an entity is put, crosses or is
 saved; an edit of one attribute in place writes its block. The tick
-reference is counted before and after.
+reference (`../../docs/testing_protocol.md`), a word an attribute ->
+a block: 58.72 M instructions -> 59.33 M, the blocks copied where a
+sheep that ate is put whole.
 
-**What changes with it.** An edit instruction carries the attribute's
+**What changed with it.** An edit instruction carries the attribute's
 blocks, or none to remove it, in the instructions' list beside those
 the puts carry. A saved entity is its header's four words, how many
 blocks it has, and the blocks. The bucket's list, its garbage and its
@@ -107,11 +120,12 @@ free. Another cell: moved there if no entity stands on it, else left
 where it was and changed all the same. What came of it is a `Put`.
 
 **Attributes.** Each entity's attributes are a run of the bucket's
-attribute list. They are rewritten in place when their number stays the
-same. When the number changes -- an attribute added or removed, which
-is rare -- the new run goes at the end of the list and the old run
-becomes garbage, swept out once there is as much garbage as attributes
-in use (`attribute_counts`: the two).
+list of blocks. They are rewritten in place when they stay as many
+blocks. When that changes -- an attribute added or removed, or one of
+a varying size made longer or shorter, which is rare -- the new run
+goes at the end of the list and the old run becomes garbage, swept out
+once there is as much garbage as blocks in use (`attribute_counts`:
+the two).
 
 ## The timer wheel
 
@@ -146,7 +160,7 @@ more than it changes (`Instruction`, the four):
 |---|---|---|
 | put | an entity made, or made anew whole: header and attributes | its attributes |
 | move | an entity moved to another cell, or left where it is, to wake at another tick; its attributes as they are | nothing |
-| edit | one attribute of an entity set, or removed: by the entity itself or by another | the one value |
+| edit | one attribute of an entity set, or removed: by the entity itself or by another | the one attribute's blocks, or none |
 | remove | an entity removed | nothing |
 
 Whatever puts an entity on a cell checks it as it is applied: a cell
@@ -195,22 +209,24 @@ no superchunk is read, no entity stands.
 
 A superchunk's state is words a save keeps
 (`../../chunk_storage/docs/chunk_storage.md`, "On disk"): a first word
-saying what it is (`FIRST_WORD`: `TSstate` and the format's number, 2);
+saying what it is (`FIRST_WORD`: `TSstate` and the format's number, 3);
 whether it has random numbers, and their state; how many entities; then
-each entity -- its ID, type, cell, wake tick, how many attributes, and
-each attribute's type and value.
+each entity -- its ID, type, cell, wake tick, how many blocks its
+attributes are, and the blocks, eight words each. An entity whose
+blocks are not whole attributes sorted by type is not read.
 
 ## Layout
 
 | folder | what is in it |
 |---|---|
 | `src/entity.rs` | an entity: its header and its attributes; and one being changed by its rule |
+| `src/attributes.rs` | an attribute's blocks: the walk over an entity's, and reading and writing one as its layout |
 | `src/bucket.rs` | a chunk's entities, sorted by cell, one a cell, their attributes beside them |
 | `src/wheel.rs` | a superchunk's timer wheel |
 | `src/store.rs`, `src/store/` | a superchunk's entities, every superchunk's, and the reader across them |
 | `src/instructions.rs` | put, move, edit, remove: queued for a superchunk and applied by it |
 | `src/saved.rs` | a superchunk's state as a save's words |
-| `src/diagnostics/` | what the entities hold: entities, attributes in use and as garbage, wakes filed |
+| `src/diagnostics/` | what the entities hold: entities, attribute blocks in use and as garbage, wakes filed |
 | `docs/` | this, and the reference, function by function |
 
 It has no tests of its own: the entities are judged through the
