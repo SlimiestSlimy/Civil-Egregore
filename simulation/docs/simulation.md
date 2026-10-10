@@ -74,7 +74,9 @@ same; a new entity is not put. A rule need not look first -- few
 cells have an entity, and a step turned back costs less than looking
 every step -- but can: `Turn::occupied` reads the cells
 entities stand on about a cell from the buckets, a word tile being a
-run of a bucket's places. No bitplane of them is kept: it cost
+run of a bucket's places -- a few entities read, and only when asked:
+a step onto a taken cell is turned back as it is applied, asked or
+not. No bitplane of them is kept: it cost
 a fifth of the ticks on 12 threads. Crossing to another
 superchunk, an entity is put there as new and changed here as if
 its cell there were taken; once the second phase is over, each one put
@@ -289,18 +291,18 @@ comes to does not depend on the thread that takes it.
 
 | folder | what is in it |
 |---|---|
-| `src/sampling.rs` | Monte Carlo sampling |
-| `src/tick.rs` | the two-phase tick |
 | `src/hot.rs` | which superchunks are to be hot: the world's size, the hot entity |
 | `src/halos.rs` | the halos moved: warming and cooling, each due at a tick, by jobs off the tick -- `halos/warming.rs` superchunks made hot and let cool, `halos/write_back.rs` write-backs and flushes landed |
 | `src/turn/` | a superchunk's turn: `mod` the turn, its cells and its outbox, `entities` the entities read and the instructions queued |
 | `../entity_manager/` | the entities: buckets, the timer wheel, the instructions queued -- a crate of its own |
 | `src/sampling.rs` | the cells a rule is given: a layer sampled by gaps drawn against a chance |
 | `src/tick.rs` | the tick: every hot superchunk's turn on the dispatcher's threads, then the writes and instructions applied |
-| `src/transient_data.rs` | where runs would leave what they make; nothing yet. What the entities hold is gathered by `../entity_manager/`'s diagnostics |
+| `src/transient_data.rs` | where runs would leave what they make; nothing yet |
 | `tests/` | sampling, the tick, the entities, their instructions and the dispatcher, judged |
 | `docs/` | this, and the reference, function by function |
 
-Its diagnostics only gather what the entities hold; it has no transient
-data of its own yet: the tick is measured by Civil Egregore's
-(`Civil_Egregore server throughput`, `Civil_Egregore server pasture`), on its rules.
+It gathers no diagnostics and keeps no transient data of its own: what
+the entities hold is the entity manager's to gather, what the arena
+holds the bitplane manager's, and the tick is measured by the server's
+commands (`Civil_Egregore server throughput`, `Civil_Egregore server
+pasture`), on its rules.

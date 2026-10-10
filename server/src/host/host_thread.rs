@@ -204,11 +204,8 @@ impl HostThread {
     }
 
     /// Copies a little more of what is asked -- a superchunk at
-    /// least, and as many as the time to spare takes
-    /// ([`HostThread::time_for_frames`]) -- and gives them as a frame,
-    /// the ask answered once the last are given: answering costs each
-    /// tick a little, however much is asked, and nothing asked is left
-    /// out.
+    /// least, and as many as the time to spare takes -- and gives them
+    /// as a frame (`docs/server.md`, "The host").
     fn answer_a_little(&mut self) -> Option<Frame> {
         let until = self.time_for_frames().map(|time| Instant::now() + time);
         let (running, answering) = (self.running.as_mut()?, self.answering.as_mut()?);

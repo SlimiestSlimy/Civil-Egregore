@@ -5,8 +5,11 @@ The design is in `worldgen.md`.
 ## `lib.rs`
 
 `STEP` (1): the most two cells beside one another may differ and be
-stepped between. `WALL_EAST`, `WALL_SOUTH` (layer types 8 and 9);
-`WALLS`: each with the neighbour it is towards. A diagonal has no wall
+stepped between. `WALLS`: the walls' layers, `WALL_EAST` and
+`WALL_SOUTH`, each with the neighbour it is towards. The layers
+themselves -- the walls, `GRASS`, `TREE`, `TREE_STAGE`, `WET` -- are
+rows of the type registry (`../../type_registry/docs/type_registry.md`),
+not this crate's. A diagonal has no wall
 of its own: `pathfinding::Walls::new` and
 `instructions::read::walking::around_unwalled` bar it from the two. `ONE` (65,536): a fraction's whole.
 
@@ -16,10 +19,7 @@ lowest ground and the ocean's height; the vertices' grid and the share
 of them that are ocean; the highest land, and the vertices from the
 ocean it is reached over; the lines' blends and sigmoidness, least and
 most; how far lines are bent; the finer meshes. `Shape::DEFAULT`.
-`GRASS` (layer type 2): the cells grass is on, the terrain's own
-cover. `TREE` (layer type 3): the cells a tree stands on;
-`TREE_STAGE` (4 to 7): its stage, 0 to `OLDEST_TREE_STAGE` (15), over
-four bitplanes, the lowest bit first. `WET` (layer type 24): the cells under water; how deep is the image's
+How deep water is over a `WET` cell is the image's
 (`SuperchunkImage::depth`). **`height(seed, x, y)`**: a cell's height;
 **`height_shaped(shape, seed, x, y)`**: the same in a world shaped
 otherwise. **`Terrain::generate_shaped(shape, seed, superchunk)`**: a
@@ -44,8 +44,17 @@ y)`**, **`height(x, y)`**, **`line(x, y)`** (how far inland the cell
 is, and about how far from the broad mesh's nearest line). **`land`**:
 the same for one cell alone. `SIGMOID_ONE`, `FINER_MOST`, `COAST_MOST`.
 Private: **`Vertex`**, **`Triangle`**, **`Blended`**, **`Mesh`**
-(`vertex`, `lot`, `triangle`, `locate`, `blended`), **`raised`**,
-**`width`**, **`area`**.
+(`new`, `lot`, `ocean`, `vertex`, `triangle`, `locate`, `blended`),
+**`raised`**, **`area`**; `inverse(whole)`: what a part of a
+triangle's area is multiplied by to be its share of the whole -- a
+division done once for the triangle, 0 where the triangle is too broad
+for that to be exact enough and the division is done a cell;
+`Lands::moved(x, y)`: a cell moved by the broad noise that bends the
+lines. Constants: `VERTICES_SALT`, what the vertices are drawn by,
+apart from all else; `WARP_INDEX` (30) and `CLUMP_INDEX` (40), the
+numbers the bending and the clumping noise are drawn by; `FINEST` (4),
+the finest grid's square as a power of two, 16 cells; `SIGMOID_MOST`,
+16 times `SIGMOID_ONE`.
 
 ## `patches.rs`
 

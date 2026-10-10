@@ -47,15 +47,8 @@ impl Size {
     }
 }
 
-/// What a world starts from, for [`crate::start`]: `seed`, generated
-/// as `generation` says, as far as `size` lets it reach, ticking on
-/// `threads` threads, and `sheep` on each superchunk of it -- every one
-/// of a world with a size; of one without, the origin's alone, as
-/// sheep everywhere would keep the whole of an endless world hot --
-/// hot about the entities of the kind `hot_entity`, unless forced hot,
-/// their halos hot before it ticks; and, if `camera_loads`, about the
-/// viewport's superchunks too, each generated in the viewport given
-/// `sheep` of its own (`simulation::Halos::keep_viewport`).
+/// What a world starts from, for [`crate::start`]: every number,
+/// whoever gives it (`docs/server.md`, "Made from a seed").
 #[derive(Clone, Copy, Debug)]
 pub struct Start {
     /// The seed its superchunks are generated from.
@@ -87,12 +80,9 @@ impl Default for Start {
 }
 
 impl Start {
-    /// As a window's sliders have it (`utilities::tuning`): how it is
-    /// generated, its size -- a side of 0 none, and forced hot counting
-    /// only with a side -- whether its camera loads superchunks, which
-    /// counts only if it is not forced hot, and its sheep; from `seed`, or if none is
-    /// given one drawn at random ([`drawn_seed`]); on every thread the
-    /// machine has.
+    /// As a window's sliders have it (`utilities::tuning`), from
+    /// `seed` or one drawn ([`drawn_seed`]), on every thread
+    /// (`docs/reference.md`, "Start::from_tuning").
     pub fn from_tuning(seed: Option<u64>, tuning: &Tuning) -> Self {
         let generation = Generation::from_tuning(tuning);
         let side = tuning[WORLD_SIDE].round().max(0.0) as u32;

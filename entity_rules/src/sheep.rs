@@ -1,51 +1,6 @@
-//! Sheep on the grass: Civil Egregore's first entity. A sheep sleeps until it
-//! next needs something, and wakes for that alone:
-//!
-//! - **Rests while satisfied**: fed, it sleeps where it stands until it
-//!   is hungry again, [`MEAL_TICKS`] after its meal -- or until its lamb
-//!   is due, or it is grown, if that is sooner. It does not wake to
-//!   wander: a sheep with nothing to do costs nothing.
-//! - **Eats**: hungry and on grass, it eats it, the cell back to dirt.
-//!   Hungry and not, it walks, a step every [`STEP_TICKS`] ticks or so,
-//!   and starves [`STARVE_TICKS`] after it grew hungry.
-//! - **Breeds**: a grown sheep may fall pregnant on a meal taken on
-//!   lush pasture -- [`LUSH_CELLS`] of the 16 by 16 cells
-//!   about it grass -- at one in
-//!   [`CONCEIVE_ONE_IN`]; [`GESTATION_TICKS`] on, a lamb is born on a
-//!   free cell beside it, grown [`LAMB_TICKS`] after. So a flock on thin
-//!   grass stops growing before it strips it.
-//! - **Leaves thin pasture**: a meal taken where it is not lush, the
-//!   sheep sets off when next hungry, [`ROAM_TICKS`] of steps one way,
-//!   eating nothing on the way, and looks for grass where it comes to.
-//!   Without it lambs stay beside their mothers, a flock grazes its own
-//!   patch bare, and breeds no more though the world is green.
-//! - **Dies**: of hunger, or of old age, [`LIFE_TICKS`] of sleep to a
-//!   life on average, whatever it sleeps by.
-//! - **Never stands where another does**: a step onto a cell an entity
-//!   stands on is turned back as it is applied, and the sheep stays
-//!   where it is -- it does not look first, few cells having one; a
-//!   lamb is born on a cell seen free beside its mother, who waits for
-//!   one; and a path to grass goes round the entities in the way.
-//! - **Walks, hungry**: onto a neighbour with grass if there is one,
-//!   else a step along the shortest path to the nearest grass in the
-//!   16 by 16 cells about it (`pathfinding`'s
-//!   waves) -- one pathfinding step a wake, no route kept; with no
-//!   grass in reach, onto any neighbour. Never off the hot bitplanes.
-//!
-//! When it is next hungry, when its lamb is due and when it is grown
-//! are attributes, each a tick, and the way it roams another: all but
-//! the first added and removed at run time, as attributes are meant to
-//! be. They are ticks, not counts of
-//! wakes, because a sheep's wakes are as far apart as its needs.
-//!
-//! What is the sheep's own is here, and only that: the 3x3 cells about
-//! it, the area, the path, the cell seen free, the instruction that
-//! carries least are instructions (`../../instructions`), there for
-//! every entity, and all the rule asks the simulation through.
-//!
-//! The rule runs in a tick's first phase, as grass does, reading the
-//! world as the tick found it: two sheep may eat one cell in a tick,
-//! which then changes once.
+//! Sheep on the grass: a sheep sleeps until it next needs something --
+//! a meal, its lamb, growing up -- and wakes for that alone; hungry, it
+//! walks to grass, a step a wake (`docs/entity_rules.md`, "The sheep").
 
 use instructions::around::{self, CENTRE, RING};
 use instructions::between_ticks::EntitiesBetweenTicks;
@@ -64,11 +19,9 @@ pub const STEP_JITTER: u64 = 16;
 pub const MEAL_TICKS: u64 = 6912;
 /// Ticks a hungry sheep finds no meal in before it starves.
 pub const STARVE_TICKS: u64 = 13_824;
-/// Cells of grass among the 16 by 16 about a
-/// sheep for the pasture to be lush enough to breed on: a quarter of
-/// them. Grass left alone covers a third of the dirt, and grows fastest
-/// covering a sixth: so the flock stops growing while the grass still
-/// grows back faster than it is eaten, and never strips it.
+/// Cells of grass among the 16 by 16 about a sheep for the pasture
+/// to be lush enough to breed on: a quarter of them
+/// (`docs/entity_rules.md`, "The sheep").
 pub const LUSH_CELLS: u32 = 64;
 /// A grown sheep falls pregnant at one meal on lush pasture in this
 /// many.

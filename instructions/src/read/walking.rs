@@ -55,12 +55,10 @@ pub fn area_walls(turn: &Turn, centre: CellIndex) -> Walls {
     Walls::new(east, south)
 }
 
-/// The cell to step to from `at` to come, by the shortest way, to
-/// the nearest of `goals` -- cells of the area around `at`, laid out
-/// as an [`crate::area::Area`] is -- over the cells `passable`; no entity's cell
-/// is walked on or to. One pathfinding step: no route is kept, the
-/// next asked afresh of the world as the next tick finds it. None if
-/// no goal can be come to.
+/// The cell to step to from `at` for the nearest of `goals` -- cells
+/// of the area around `at` -- over the cells `passable`, round walls
+/// and entities; none if no goal can be come to. One step: no route
+/// is kept.
 pub fn step_towards(turn: &mut Turn, at: CellIndex, goals: &Rows, passable: &Rows) -> Option<CellIndex> {
     let occupied = area::occupied(turn, at);
     let passable: Rows = std::array::from_fn(|row| passable[row] & !occupied[row]);

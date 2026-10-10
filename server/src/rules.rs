@@ -1,9 +1,7 @@
-//! The rules a world ticks, in one table ([`RULES`]): each by name with
-//! what it counts and the function that runs it on a superchunk's turn.
-//! The tick runs them all, in the table's order; a diagnostic or a test
-//! picks some by name ([`Chosen`]). A tick's counts are an array, a
-//! rule's at its place in the table ([`TickCounts`]). A rule added is a
-//! row added here, and nowhere else.
+//! The rules a world ticks, in one table ([`RULES`]): a rule added is
+//! a row added here, and nowhere else. A tick's counts by rule
+//! ([`TickCounts`]), the rules picked by name ([`Chosen`])
+//! (`docs/server.md`, "TickCounts").
 
 use coordinates::CellIndex;
 use instructions::{RuleCounts, Turn};

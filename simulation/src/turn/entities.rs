@@ -39,12 +39,9 @@ impl<'a> Turn<'a> {
     }
 
     /// The cells entities stand on among the `width` by `height` cells
-    /// (each up to [`OCCUPIED_SIDE`]) whose top left cell is `origin` --
-    /// in any hot superchunk -- as the tick found them, a row a word:
-    /// cell `(x, y)` from `origin` at bit `x` of row `y`. Asked of the
-    /// entities themselves, a few of them read, so it costs what it
-    /// costs only when asked: a step onto a cell an entity stands on is
-    /// turned back as it is applied, asked or not.
+    /// (each up to [`OCCUPIED_SIDE`]) from `origin`, as the tick found
+    /// them: cell `(x, y)` at bit `x` of row `y`
+    /// (`docs/simulation.md`, "Entities").
     pub fn occupied(&self, origin: CellIndex, width: u32, height: u32) -> [u16; OCCUPIED_SIDE] {
         self.entity_reader.occupied(origin, width, height)
     }
@@ -55,11 +52,8 @@ impl<'a> Turn<'a> {
     }
 
     /// Queues putting `header`'s entity -- made, or changed where it
-    /// stands -- with `attributes`, sorted by type, in the superchunk
-    /// its cell is in. It wakes at its wake tick, which is after this
-    /// one. A new one whose cell another entity stands on by then is
-    /// not put: entities never overlap. One that moves is
-    /// [`Turn::update`]d.
+    /// stands -- with `attributes`, sorted by type, to wake after this
+    /// tick. A new one whose cell is taken by then is not put.
     pub fn put(&mut self, header: Header, attributes: &[Attribute]) {
         debug_assert!(header.wake > self.now, "an entity put to wake at tick {}, not after {}", header.wake, self.now);
         let slot = self.slot_of(header.at.superchunk());
@@ -67,11 +61,9 @@ impl<'a> Turn<'a> {
     }
 
     /// Queues `entity` stepping to `to` -- its own cell to sleep where
-    /// it stands -- to wake at `wake`, its
-    /// attributes as they are: none are carried, unless it crosses to
-    /// another superchunk, where it goes whole
-    /// ([`Turn::update`]). If an entity stands on `to` by then
-    /// it stays where it stood, and wakes at `wake` all the same.
+    /// it stands -- to wake at `wake`, no attribute carried unless it
+    /// crosses to another superchunk. If `to` is taken by then it
+    /// stays, and wakes at `wake` all the same.
     pub fn step(&mut self, entity: &Header, to: CellIndex, wake: u64) {
         debug_assert!(wake > self.now, "an entity put to wake at tick {wake}, not after {}", self.now);
         let after = Header { at: to, wake, ..*entity };
@@ -101,17 +93,9 @@ impl<'a> Turn<'a> {
     }
 
     /// Queues `before`'s entity becoming `after`, with `attributes`:
-    /// changed, and moved to its cell if that is another -- unless an
-    /// entity stands on it by then, when it stays where it stood,
-    /// changed all the same: entities never overlap. One no longer
-    /// where the tick found it is passed over.
-    ///
-    /// Moving to a cell of another superchunk, it crosses: it is put
-    /// there as new, and changed here too, as if its cell were taken.
-    /// Once the second phase is over, the one here is removed if the
-    /// other was put ([`SuperchunkEntities::settle_leavers`]) -- so its cell
-    /// is never left for one that cannot be had, and between ticks it
-    /// stands on one cell.
+    /// changed, and moved to its cell unless that is taken by then. To
+    /// another superchunk it crosses (`docs/simulation.md`,
+    /// "Entities").
     pub fn update(&mut self, before: &Header, after: Header, attributes: &[Attribute]) {
         debug_assert!(after.wake > self.now, "an entity put to wake at tick {}, not after {}", after.wake, self.now);
         let there = self.slot_of(after.at.superchunk());

@@ -10,7 +10,7 @@ keeps it; **`halos`**, the simulation's -- and
 **`World::empty(info, generation, threads)`**, what generating and
 loading start from, hot as `info` says: forced throughout if it has a
 side and is forced, else about the halos of the kind of entity it
-names, `HOT_ENTITY` if none (a save from before it was kept).
+names, `HOT_ENTITY` if none (**`hot_of(info)`**).
 **`start(options)`**: a `Start` (`world_start.rs`) made into a world
 -- `threads`, every one the machine has if `None`; `sheep` on every
 superchunk of a world with a side, on the origin (`WORLD_MIDDLE`)
@@ -49,8 +49,10 @@ camera_loads}`;
 thread, `FLOCK` on the origin, hot about `HOT_ENTITY`, its camera
 loading nothing.
 **`Start::from_tuning(seed, tuning)`**: as a window's sliders have it
-(`utilities::tuning::Tuning`), from the seed given or one drawn; its
-camera loading superchunks only if it is not forced hot.
+(`utilities::tuning::Tuning`): how it is generated, its size -- a side
+of 0 none, forced hot counting only with a side -- its sheep, and its
+camera loading superchunks only if it is not forced hot; from the seed
+given or one drawn; on every thread the machine has.
 **`Start::of_world(info, generation)`**: what a world opened started
 from, as far as its file says -- its sheep the camera's flock, or
 `FLOCK`.
@@ -64,6 +66,8 @@ simulation's halos given what the world holds, and what generates a
 superchunk never made. **`World::move_halos`**: the halos moved, then,
 if the camera loads superchunks with sheep, a flock put
 (`put_flock`) on each the move generated that is in the viewport.
+`owe_camera_flocks(superchunks)`: those generated out of view kept as
+owed their flock (`WorldInfo::without_camera_flock`).
 The viewport is told to the halos themselves (`Halos::keep_viewport`),
 by the host on each frame asked.
 **`World::keep_hot(wanted)`**, **`World::warming`**,
@@ -142,13 +146,19 @@ whose name is the world's (**`name`**). `Civil_Egregore server run <folder> [tic
 loaded, ticked and saved again (**`run`**). `Civil_Egregore server info
 <folder>`: what its world file says (**`info`**). A folder given as a plain name is one
 of the worlds' folder (`utilities::settings::world`); anything more is
-a path. **`printed`**: a command run on its folder, its line printed. The diagnostics tools,
+a path. **`printed`**: a command run on its folder, its line printed;
+`number`: an argument as a number, or its default. `FOLDER`, `FORCED`:
+the parameters' names. The diagnostics tools,
 `throughput`, `pasture` and `check`, are listed there too.
 
 ## `diagnostics/tool.rs`
 
-**`threads`**: the threads
-asked for, every one if 0.
+**`threads`**: the threads asked for, every one if 0, no more than
+the superchunks. The parameters' names: `TICKS`, `GRASS` (in
+thousandths), `SUPERCHUNKS`, `THREADS`, `FLOCK` (sheep a superchunk),
+`SEED` (in hexadecimal; 0 the run's own), `EVERY` (ticks between
+hashes), `SHEEP`. `share(part, whole)`: a share of a time as a report
+shows it.
 
 **`throughput`**: runs `throughput::run` and publishes its time, rates
 and memory tables. **`pasture`**: runs `pasture::run` and publishes the

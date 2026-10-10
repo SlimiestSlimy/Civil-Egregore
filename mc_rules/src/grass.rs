@@ -1,29 +1,6 @@
-//! Grass over dirt: Civil Egregore's first rule. Each tick every cell of grass
-//! may spread onto a dirt neighbour, or decay back to dirt the more grass
-//! is around it:
-//!
-//! - **Spreading**: a cell of grass tries to spread with
-//!   [`SPREAD_CHANCE`], onto one of its eight neighbours drawn at
-//!   random, if that one is dirt -- a cell with no grass -- and not
-//!   under water.
-//! - **Decay**: a cell of grass with `k` of its eight neighbours grass
-//!   turns back to dirt with `k / 8` of [`DECAY_CHANCE`]: none with no
-//!   grass around, the whole chance with grass all round.
-//!
-//! One sampling pass serves both, and no sample is wasted: every cell of
-//! grass is sampled with the two chances together, and each sample
-//! draws one neighbour and which of the two it tries -- spreading, in
-//! [`SPREAD_CHANCE`] of the sum, else decay. Decay so happens when the
-//! neighbour drawn is grass: `k / 8` of the time, as asked, from one
-//! neighbour read rather than eight.
-//!
-//! The rule runs on each superchunk in a tick's first phase
-//! (`Simulation::tick`): its writes are queued as
-//! the samples come, in Morton order -- grass spreading over a border
-//! into the neighbour's queue -- and applied in the second phase, so
-//! every sample reads the world as the tick found it. The two never
-//! touch one cell in a tick: decay clears cells that were grass,
-//! spreading fills cells that were dirt.
+//! Grass over dirt: each tick a cell of grass may spread onto a dirt
+//! neighbour, or decay back to dirt the more grass is around it -- one
+//! sampling pass for both (`docs/mc_rules.md`, "Grass").
 
 use instructions::layers::{GRASS, WET};
 use instructions::{read, write, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};

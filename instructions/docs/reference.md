@@ -3,7 +3,7 @@
 What a rule is made of: small pieces of behaviour -- queries of the
 simulation and changes queued to it alike -- each a free function over
 a superchunk's `Turn`. The design: `instructions.md`. `lib.rs` hands on
-**`Turn`**, **`Simulation`** and **`TickReport`**, the simulation's.
+**`Turn`** and **`TickReport`**, the simulation's.
 
 Instructions that only read are in `read/`, those that only queue a
 change in `write/`; the shapes they answer in are modules beside them.
@@ -27,7 +27,8 @@ y, to)`**, **`clear`**, **`count`**, **`is_empty`**; **`and`**,
 **`or`**, **`and_not`** with another of its side; **`cells()`** the set
 ones, **`pick(random)`** one drawn. **`about(centre, side)`**: the top
 left cell of the square about a cell; **`cell(origin, x, y)`**: a cell
-of it.
+of it. `WORD` (64): bits in a word of a row; `row_words`: words in a
+row.
 
 ## `read/cells.rs`
 
@@ -62,7 +63,8 @@ the area of one layer, or of several at once, four windows each.
 **`layer(turn, type, origin, set, hot)`**: the square of a layer into
 two masks, a window a time; **`layer_under(turn, type, origin, under,
 set, hot)`**: the cells `under` has alone, the windows it has none in
-not read (**`read_where`**).
+not read (**`read_where`**). `WINDOW` (8): cells along a window's
+side, the most a turn reads at once.
 
 ## `read/walking.rs`
 
@@ -94,7 +96,7 @@ entity)`**.
 
 **`set(turn, type, origin, mask)`**, **`clear`**: writes queued for
 every cell of the mask, as rectangles (**`write`**, **`next`**) -- how
-many.
+many. `RECT` (255): the most cells along a rectangle's side.
 
 ## `between_ticks.rs`
 
@@ -116,9 +118,10 @@ the types of entity a world has, from the type registry.
 ## The root
 
 The words the instructions are asked in: `CellIndex`, `CellCartesian`,
-`ChunkIndex`, `SuperchunkIndex`, `LayerType`, `Wide`, `Bits4`,
-`Attribute`, `AttributeType`, `EntityType`, `EntityId`, `Header`,
-`EntityRef`, `EntityEdit`, `Turn`, `TickReport`, `Rng`, `Chance`.
+`SuperchunkIndex`, `NEIGHBOURS`, `SUPERCHUNK_SIDE_CELLS`, `LayerType`,
+`Wide`, `Bits4`, `Attribute`, `AttributeType`, `EntityType`,
+`EntityId`, `Header`, `EntityRef`, `EntityEdit`, `Turn`, `TickReport`,
+`Rng`, `Chance`.
 
 **`RuleCounts`** (`rule_counts.rs`): what a rule did, up to
 `COUNTS_OF_A_RULE` numbers, each at a place the rule names, added with

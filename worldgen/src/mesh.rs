@@ -1,41 +1,6 @@
 //! The land as a mesh: vertices that carry heights, joined by lines
-//! that carry how the heights are blended.
-//!
-//! A vertex is one to each square of a grid, placed by lot in the
-//! square's middle half; the four of neighbouring squares make a
-//! quad, cut by lot along one diagonal or the other into two
-//! triangles. Every cell is in one triangle, found among the eight
-//! about its square, so its land follows from the seed and the cell
-//! alone. The cell is first moved by broad noise, which bends the lines.
-//!
-//! A vertex is ocean, at the lowest ground, or land, at a height of
-//! its own. A line has a blend, the share of its length the change
-//! from one end's height to the other's is spread over -- all of it,
-//! and the line is one slope from vertex to vertex -- and a sigmoidness, how much
-//! of a step that change is -- each by lot. Along a line the height is
-//! its two ends' blended so; within a triangle each vertex's height
-//! counts by how near the cell is to it beside the nearer of the
-//! others, shaped by its two lines' blend and sigmoidness, each
-//! counting as the cell is nearer that line's other end. So about a
-//! vertex the ground is a plain; across a line it is a ramp or a
-//! cliff; and at a line two triangles agree.
-//!
-//! Land is low by the ocean and higher inland: a land vertex's height
-//! is drawn between just over the ocean and the highest, any height
-//! as likely as another past the coast's breadth of vertices from the
-//! ocean, but the nearer the ocean the less likely the higher -- so
-//! most coasts are low, each by a little of its own, and a few are cliffs.
-//!
-//! Finer meshes, each with vertices half as far apart as the one
-//! before, down to the finest there may be, raise or sink the land by
-//! less each: points spread again within the triangles of the mesh
-//! before, small variations at a time. The broad mesh has a weight of
-//! one; the weight that reaches a vertex of a finer mesh is shared
-//! out by lot -- each takes a share of its own, a byte -- and a vertex
-//! moves the land by its height times its share, and hands that share
-//! on to its own subdivisions -- so a plain stays mostly a plain and a
-//! ridge a ridge, while what weighs little is broken up;
-//! and by less the lower the land stands: differences compound inland.
+//! that carry how the heights are blended; finer meshes on it, each
+//! moving the land by less (`docs/worldgen.md`, "The land as a mesh").
 
 mod lands;
 pub use lands::{Lands, land};

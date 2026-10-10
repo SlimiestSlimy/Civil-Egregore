@@ -1,13 +1,6 @@
-//! Masks: a square of cells as bits, read from a layer at once and
-//! written to one under it. A [`Mask`] is `side` by `side` cells --
-//! [`SIDES`], 4 to 1,024, an entity's reach -- a row a run of words,
-//! cell `(x, y)` from its top left at bit `x` of row `y`. Sets of cells
-//! are masks put together with `&`, `|` and `!`: the cells of a layer
-//! in a square (`read::mask`), those hot, those of a shape -- a disc,
-//! say -- and what is to be set or cleared (`write::mask`).
-//!
-//! A mask is room kept by the rule and read into, never made a read:
-//! the largest is 128 KiB.
+//! Masks: a square of cells as bits, [`SIDES`] a side, a row a run of
+//! words -- cell `(x, y)` from its top left at bit `x` of row `y`
+//! (`docs/instructions.md`, "Masks").
 
 use coordinates::CellIndex;
 use utilities::rng::Rng;

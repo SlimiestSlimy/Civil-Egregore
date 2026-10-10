@@ -1,10 +1,6 @@
-//! The server's commands ([`COMMANDS`]), run by `Civil_Egregore server <command>`
-//! (`utilities::commands::program`): a world made in a folder -- a plain
-//! name one of the worlds' folder (`utilities::settings::world`), anything
-//! more a path -- run and looked at, each
-//! given the rest of the command line after its folder and giving the
-//! line to print, or why it could not -- and the diagnostics tools
-//! ([`crate::diagnostics::tool`]).
+//! The server's commands ([`COMMANDS`]), run by `Civil_Egregore server
+//! <command>`: a world made in a folder, run and looked at, and the
+//! diagnostics tools (`docs/reference.md`, "commands.rs").
 
 use crate::diagnostics::tool::{check, pasture, throughput, EVERY, FLOCK, GRASS as GRASS_SHARE, SEED, SHEEP, SUPERCHUNKS, THREADS, TICKS};
 use crate::HaloChange;
@@ -70,12 +66,9 @@ fn number(argument: Option<&&str>, default: u64) -> Result<u64, String> {
     argument.map_or(Ok(default), |argument| argument.parse().map_err(|_| format!("`{argument}` is not a number")))
 }
 
-/// Makes a world from a seed and saves it in `folder`: of a size if
-/// given a side, in superchunks, that is not 0; its sheep on every
-/// superchunk of it, or on its origin if it has no size; forced hot
-/// throughout if `forced` is not 0 -- only with a side -- else about
-/// the sheep's halos; on `threads` threads, every one the machine has
-/// if 0.
+/// Makes a world from a seed and saves it in `folder`, as the rest of
+/// the line says: its sheep, side, whether forced hot, and threads
+/// (`docs/reference.md`, "commands.rs").
 pub fn new(folder: &Path, rest: &[&str]) -> Result<String, String> {
     if folder.join(disk::WORLD_FILE).exists() {
         return Err(format!("{} is a world already", folder.display()));

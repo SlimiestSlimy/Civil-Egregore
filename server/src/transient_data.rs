@@ -1,10 +1,6 @@
-//! `transient_data/`, under the crate's folder and kept out of git: what
-//! its runs leave behind ([`utilities::transient_data`]).
-//!
-//! | under `transient_data/` | what it holds |
-//! |---|---|
-//! | `measurements/` | every measurement's latest tables, as CSV |
-//! | `saves/` | worlds saved, a folder each: the tests' |
+//! `transient_data/`, under the crate's folder and kept out of git:
+//! `measurements/`, every measurement's latest tables, and `saves/`,
+//! the tests' worlds.
 
 use std::path::PathBuf;
 use utilities::transient_data::TransientData;
