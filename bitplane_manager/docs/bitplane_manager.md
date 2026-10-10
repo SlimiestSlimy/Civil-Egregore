@@ -26,9 +26,17 @@ weights sampling picks by, and what it passes over a bitmap by.
 
 **The directory**: the superchunks in use, sorted by superchunk index
 (kept beside each), each with its allocations sorted by layer type.
-Lookups remember the last 16 superchunks and types found (`Lookup`, one
-a thread), so Morton-ordered work -- reading a few types by turns,
-across a border -- rarely searches. Each superchunk owns its buckets, so
+It is the one thing ever sorted, and it holds no bitmaps: the
+allocations lie wherever they were made, each one run of memory in
+Morton order. A lookup remembers the last superchunk found (`Lookup`,
+one a thread), so the runs of lookups in one superchunk that
+Morton-ordered work makes -- a rule reading grass and dirt by turns --
+search only that superchunk's few types. (A hashed cache of 16
+superchunks and types was measured and removed: `../../docs/style_guide.md`,
+"One representation for one thing".) The arena grows an allocation at a
+time, as a layer type turns hot over a superchunk it had none of, and
+an allocation a bucket at a time; an allocation none of whose chunks is
+hot or waiting in the ring leaves the directory, its buckets with it. Each superchunk owns its buckets, so
 superchunks are changed apart.
 
 **Windows**: up to 8x8 cells at any cell read at once
@@ -37,7 +45,9 @@ and the cells in hot bitmaps. A window overlaps one to four word
 tiles, 8x8 cells a bitmap word each (`bitmap::window`); only those it
 reaches are read. Its bucket is looked up once, the word tiles beside
 and below stepped to on the word tile's index in the chunk, and only
-one across the chunk's edge looked up again. So the 3x3 cells around a
+one across the chunk's edge looked up again. Read of several layer
+types at once (`Reader::windows`), where the window lies among the word
+tiles is worked out once for all of them. So the 3x3 cells around a
 cell are one lookup, a word or two, and a few shifts and masks.
 
 **The far search**: whether a layer holds at any cell of a tile of a
@@ -49,11 +59,14 @@ only where they are not (`Reader::any_in_tile`); and which of a chunk's
 
 ## Making hot, writing back, evicting
 
-A bitmap is made hot decoded from chunk storage's cold pool, or empty.
+A bitmap is made hot decoded from chunk storage's cold pool, or empty:
+a type with no encoded layer in the chunk is a bitmap with no cell set.
+A bitmap already hot is left as it is, changes and all.
 A changed bucket is dirty; writing back encodes it into storage's ring
 -- no words where no cell is set -- and keeps it, waiting in the ring,
 until storage flushes its superchunk: evicted and made hot again before
-then, it is the bucket as it was. A dirty bucket must be written back
+then, it is the bucket as it was, not decoded -- the ring is never
+read to make a bitmap hot. A dirty bucket must be written back
 before it is evicted.
 
 Writing back is in two halves, so the slow one -- encoding -- can be
@@ -109,7 +122,13 @@ wide plane) and a shape (the cell, a
 rectangle up to 255 a side, a disc up to radius 255); the layer type is
 its queue's. Queued writes change nothing until applied, and apply in
 order, the latest winning. A cell write finds its bit from the index
-alone; shapes are laid out in cartesian coordinates.
+alone; shapes are laid out in cartesian coordinates, the cheaper for
+geometry (`CHUNK_SIDE_U32`: a chunk's side as a coordinate). The
+index's 8 bytes, the operation and the shape -- its sides and radius a
+byte each -- are packed to 4-byte alignment and come to 16; a larger
+area is several writes. The queues are a queue a layer type
+(`WriteQueues`), sorted by type: a rule writes to few types, so finding
+one's queue is a search of a few.
 
 ## What the simulation reads and changes
 

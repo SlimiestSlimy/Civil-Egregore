@@ -1,9 +1,6 @@
-//! `transient_data/`, under the crate's folder and kept out of git: what
-//! its runs leave behind ([`utilities::transient_data`]).
-//!
-//! | under `transient_data/` | what it holds |
-//! |---|---|
-//! | `measurements/` | every measurement's latest tables, as CSV |
+//! `transient_data/`, under the crate's folder and kept out of git: its
+//! measurements' latest tables, in `measurements/`
+//! ([`utilities::transient_data`]).
 
 use utilities::transient_data::TransientData;
 

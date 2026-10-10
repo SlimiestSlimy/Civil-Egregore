@@ -1,9 +1,6 @@
 //! A wide plane between hot and cold: hot, a cell's number is `bits`
-//! bits together, the cell at place `p` at bit `p * bits` of the words
-//! -- a word holds whole cells, `bits` being a power of two; cold, it
-//! is `bits` bitmaps, a bit of every cell each
-//! ([`crate::LayerType::wide`]). Both ways pass over the cells set
-//! alone, so a plane mostly clear costs little.
+//! bits together; cold, `bits` bitmaps, a bit of every cell each
+//! (`docs/chunk_storage.md`, "Wide planes").
 
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 

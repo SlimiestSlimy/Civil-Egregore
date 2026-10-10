@@ -220,7 +220,8 @@ break; write a new ask here the moment it is made.
    lists the items a crate's docs do not name (private too) and its
    comment blocks of 6+ lines; if lost, it is 40 lines of python.
    Crates done: coordinates, bitmap, type_registry, pathfinding,
-   utilities. Left: bitplane_manager, chunk_storage, entity_manager,
+   utilities, bitplane_manager, chunk_storage, entity_manager (its
+   design doc docs/entity_manager.md was missing: written). Left:
    simulation, instructions, mc_rules, entity_rules, worldgen, server,
    gui, renderer, tessera, AI_SCRATCHPAD, src. When all are done, make
    tests/fine.rs's every_public_item test cover private items too

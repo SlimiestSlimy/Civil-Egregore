@@ -1,24 +1,7 @@
 //! A chunk's entities: their headers, sorted by cell in Morton order,
-//! and their attributes, kept together in one list beside them.
-//!
-//! **A cell holds at most one entity.** An entity put on a cell another
-//! entity stands on is not put; one moving onto it stays where it was.
-//! This file is where that rule is enforced, whatever a rule asks for.
-//!
-//! An entity is found by its cell and its ID. Its cell's place in the
-//! chunk (16 bits) is searched for in a list holding only the places,
-//! two bytes per entity, which stays in the caches; the headers are not
-//! read until the place is found. Entities woken in Morton order are
-//! therefore found by walking forwards through the bucket, the same way
-//! cells sampled in Morton order are read forwards through a bitmap. An
-//! entity stepping to another cell of the same chunk shifts the entities
-//! between its old and new cell by one.
-//!
-//! Each entity's attributes are a run of the attribute list. They are
-//! rewritten in place when their number stays the same. When the number
-//! changes (an attribute added or removed, which is rare), the new run
-//! goes at the end of the list and the old run becomes garbage, which is
-//! swept out once there is as much garbage as attributes in use.
+//! and their attributes in one list beside them. A cell holds at most
+//! one entity, enforced here (`docs/entity_manager.md`, "A chunk's
+//! bucket").
 
 use crate::entity::{Attribute, AttributeType, EntityId, EntityRef, Header};
 use coordinates::CellIndex;
@@ -145,13 +128,8 @@ impl Bucket {
     }
 
     /// Puts `header`'s entity, which stood on the cell at `was`, with
-    /// `attributes` -- or, with none given, the attributes it has, and
-    /// only if it is here. Its cell is `header.at`:
-    ///
-    /// - the same cell as `was`: changed where it stands, or added if it
-    ///   is new and the cell is free;
-    /// - another cell: moved there if no entity stands on it, else left
-    ///   where it was and changed all the same.
+    /// `attributes` -- or, with none given, those it has
+    /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
     pub(crate) fn put(&mut self, header: Header, was: u16, attributes: Option<&[Attribute]>) -> Put {
         let to = place(header.at);
         let (index, put) = match (self.find(was, header.id), was == to) {

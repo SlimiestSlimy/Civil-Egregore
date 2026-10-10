@@ -1,8 +1,5 @@
-//! A superchunk's state, as words a save keeps (`chunk_storage::disk`).
-//! A first word saying what it is; whether it has random numbers, and
-//! their state; how many entities; then each entity -- its ID, type,
-//! cell, wake tick, how many attributes, and each attribute's type and
-//! value.
+//! A superchunk's state, as words a save keeps
+//! (`docs/entity_manager.md`, "Saved").
 
 use coordinates::CellIndex;
 use crate::entity::{Attribute, AttributeType, EntityId, EntityType, Header};

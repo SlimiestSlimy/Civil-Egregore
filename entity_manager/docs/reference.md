@@ -3,6 +3,7 @@
 The entities as kept, beside the bitplane manager's cells: a bucket a
 chunk, a timer wheel a superchunk, instructions queued and applied.
 The simulation ticks them (`../../simulation/`); the design is in
+`entity_manager.md`, and how a tick uses it in
 `../../simulation/docs/simulation.md`, "Entities".
 
 ## The store

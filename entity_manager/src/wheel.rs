@@ -1,20 +1,5 @@
-//! A superchunk's timer wheel: which entities wake at which tick, so a
-//! tick's work is the entities waking then, not every entity.
-//!
-//! A slot a tick for the next [`WHEEL_TICKS`] ticks, the tick's number
-//! modulo that its slot; a wake further off waits in a list beside them,
-//! filed into its slot once its tick is in reach, looked over every
-//! half of [`WHEEL_TICKS`]. A
-//! wake names its entity by ID and cell -- which finds it in its chunk's
-//! bucket -- and is only good if the entity still wakes at that tick:
-//! one that moved away, died or was woken for another tick is not
-//! found, or not due, and is passed over. Nothing is ever taken out of
-//! the wheel but the slot just passed.
-//!
-//! A tick's slot is sorted by cell -- Morton order -- then ID, before
-//! the tick runs ([`Wheel::sort`]), so the entities wake in Morton
-//! order: their buckets, the cells they read and the writes they queue
-//! all go forwards through memory, as the cells' sampling does.
+//! A superchunk's timer wheel: which entities wake at which tick
+//! (`docs/entity_manager.md`, "The timer wheel").
 
 use crate::entity::EntityId;
 use coordinates::CellIndex;

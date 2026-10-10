@@ -154,12 +154,7 @@ impl Lookup {
 
     /// The window of `width` by `height` cells (each up to 8) whose top
     /// left cell is `origin`, of each of `types` in `directory`, row by
-    /// row: put together from the up to four word tiles it overlaps,
-    /// only those it reaches read. Where the window lies among them is
-    /// worked out once, for every type; each type's bucket is looked up
-    /// once, the word tiles beside and below stepped to on the word
-    /// tile's index in the chunk, and only one across the chunk's edge
-    /// looked up again.
+    /// row (`docs/bitplane_manager.md`, "The arena", Windows).
     #[inline]
     fn windows<const N: usize>(&self, directory: &[Superchunk], types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
         // The window's top left in its word tile.

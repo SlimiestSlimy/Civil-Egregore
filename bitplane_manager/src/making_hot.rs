@@ -8,12 +8,9 @@ use chunk_storage::{BucketKey, ChunkStorage, LayerCodec, LayerType};
 use coordinates::{ChunkIndex, SuperchunkIndex};
 
 impl BitmapArena {
-    /// Makes `key`'s bitmap hot, decoding `layer` -- the encoded bitmap
-    /// of that type in the chunk, from its first word on, `None` if it
-    /// has none, which is a bitmap with no cell set. A bitmap already hot
-    /// is left as it is, changes and all, and one waiting in the ring is
-    /// made hot as its bucket holds it, not decoded: whether it was made
-    /// hot now.
+    /// Makes `key`'s bitmap hot, decoding `layer` -- its encoded bitmap,
+    /// `None` for one with no cell set: whether it was made hot now
+    /// (`docs/bitplane_manager.md`, "Making hot, writing back, evicting").
     pub fn make_hot(&mut self, key: BucketKey, layer: Option<&[u64]>, codec: &mut LayerCodec) -> bool {
         assert_eq!(key.layer_type.bits(), 1, "one encoded bitmap makes a layer of a bit a cell hot");
         self.make_hot_with(key, layer.map(|layer| |bucket: &mut [u64]| codec.decode(layer, bucket.try_into().expect("a bitmap's words"))))
@@ -90,12 +87,9 @@ impl BitmapArena {
         superchunk.chunks().map(|chunk| self.make_hot_layers(chunk, types, storage, codec)).sum()
     }
 
-    /// Makes every bitmap over `superchunk` cold at once, nothing
-    /// encoded or flushed: its dirty buckets taken
-    /// ([`BitmapArena::take_dirty`]) and returned, to be encoded and
-    /// [`BitmapArena::written_back`]; its allocations set aside as they
-    /// are, lingering, until chunk storage holds its changes -- and so
-    /// longer, if it is wanted hot again ([`BitmapArena::hold`]).
+    /// Makes every bitmap over `superchunk` cold at once: its dirty
+    /// buckets returned to be encoded, its allocations set aside,
+    /// lingering (`docs/bitplane_manager.md`, "Lingering").
     pub fn make_cold_superchunk(&mut self, superchunk: SuperchunkIndex) -> Vec<(BucketKey, Box<[u64]>)> {
         let dirty = self.take_dirty(superchunk);
         if let Ok(entry) = self.lookup.superchunk(&self.directory, superchunk) {

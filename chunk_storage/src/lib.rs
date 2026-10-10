@@ -1,22 +1,8 @@
-//! Civil Egregore's chunks as stored (`../docs/civil_egregore.md`, "Chunk storage"):
-//! the cold pool of superchunk images, each one run of words as on disk,
-//! and the writeback ring of changed bitmaps that feeds it. Nothing here
-//! touches the disk yet. Cells are read and changed in the bitplane
-//! manager (`../bitplane_manager`), never here.
+//! Civil Egregore's chunks as stored: the cold pool of superchunk
+//! images, each one run of words as on disk, and the writeback ring of
+//! changed bitmaps that feeds it. Cells are read and changed in the
+//! bitplane manager, never here.
 //!
-//! | file | what is in it |
-//! |---|---|
-//! | `chunk_maps` | a number a cell kept only in the chunks that have any: a map a chunk, a byte a cell or 16 bits, at most 16 -- the water's depths |
-//! | `jobs` | the slow work done off the tick, on the dispatcher's threads: layers encoded, images rewritten, superchunks decoded or generated |
-//! | `height_map` | a superchunk's heights: a floor a chunk and a byte a cell over it, or a whole height a cell where a chunk is tall |
-//! | `layer_codec` | what a layer is, and the codec that encodes and decodes its bitmap |
-//! | `superchunk_cells` | a superchunk's cells as whoever makes them gives them, and the image made of them |
-//! | `superchunk_image` | a superchunk's words: its chunk table, its height map, its chunks' bitmap tables and bitmaps |
-//! | `writeback_ring` | the ring of changed bitmaps, encoded, on their way to the cold pool |
-//! | `chunk_storage` | the cold pool and the ring together: what the bitplane manager reads from and writes back to |
-//! | `diagnostics/` | data gathered from storage, judged by the tests and printed by tools |
-//! | `transient_data` | where runs leave what they make, out of git |
-
 //! The design: `docs/chunk_storage.md`; function by function:
 //! `docs/reference.md`.
 

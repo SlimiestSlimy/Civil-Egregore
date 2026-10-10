@@ -79,14 +79,9 @@ impl WorldInfo {
         csv::row(&WORLD_COLUMNS) + &rows.iter().map(|(name, is)| csv::row(&[name, is])).collect::<String>()
     }
 
-    /// From the world's file's text, or what is wrong with it: its
-    /// rows in any order under the one naming the columns, each name
-    /// once, a name not known passed over. A row it lacks is as a world
-    /// with nothing said of it has it -- the format the one written,
-    /// tick 0, no layers, no size, not forced, no hot entity or camera
-    /// flock, no generation numbers -- but the seed, which nothing
-    /// stands in for: another would make the superchunks not yet made
-    /// unlike those that are.
+    /// From the world's file's text, or what is wrong with it: rows in
+    /// any order, a missing one its default, all but the seed
+    /// (`docs/chunk_storage.md`, "On disk").
     pub(crate) fn from_text(text: &str) -> Result<Self, String> {
         let mut rows = csv::rows(text).into_iter();
         if rows.next().is_none_or(|columns| columns != WORLD_COLUMNS) {
