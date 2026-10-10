@@ -198,8 +198,14 @@ superchunk is put there while it still stands on the cell it left: for
 the rest of the tick it stands on both, so that, its new cell taken, it
 stays where it stood. Each superchunk notes who arrived
 (`take_arrived`), and each then removes from the cells they left those
-that left it (`settle_leavers`). Once every superchunk has settled its
-leavers, every entity stands on one cell.
+that left it (`settle_leavers`) -- if it ended the tick there with the
+attributes it was put with (an `Arrival` carries their sum,
+`blocks_sum`). One written there meanwhile by another entity, or
+removed, is turned back instead: the superchunk it was put in takes it
+back (`settle_arrivals`), and it stays where it stood with what was
+written -- a crossing copies an entity whole, and must not copy over a
+write it did not see. Once every superchunk has settled, every entity
+stands on one cell.
 
 ## The store
 

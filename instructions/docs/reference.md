@@ -35,6 +35,14 @@ and the cell is still as seen.
 compare)`**, **`entities_as_ever(turn)`**: what is queued of entities
 between them under the compare.
 
+## `this_tick.rs`
+
+**`now(turn)`**: the tick running. **`random(turn)`**: the turn's
+superchunk's random numbers. **`superchunk(turn)`**: whose turn it is.
+What a rule asks of its turn that is neither a cell nor an entity:
+`this_tick` is the module (`instructions.md`, "Rules ask instructions,
+and nothing else").
+
 ## `entities.rs`
 
 **`each_woken(turn, layers, state, each)`**: `each` run on every entity
@@ -45,7 +53,10 @@ open, wake, attributes)`**: a new entity on a neighbour or, that taken
 by then, on the first free of the others open. **`spawn(turn, kind, at, wake, attributes)`**: a new entity,
 its ID drawn and returned. **`sleep(turn, entity, wake)`**: a move to
 where it stands. **`commit(turn, edit, to, wake)`**: an `EntityEdit`'s
-entity moved if no attribute changed, else put whole. **`remove(turn,
+entity moved, each attribute changed written before, held against
+what was seen of it. **`set_attribute_of(turn, other, attribute, seen,
+value)`**, **`unset_attribute_of(turn, other, attribute, seen)`**: an
+attribute of another entity written, if still as seen. **`remove(turn,
 entity)`**. **`EntitiesBetweenTicks`**: the world's entities off any
 turn, lent by whoever runs the world (**`of`**). **`now()`**,
 **`put(header, attributes)`**: queued, in the world once the runner

@@ -18,6 +18,7 @@ pub mod cells;
 pub mod compare;
 pub mod entities;
 pub mod mask;
+pub mod this_tick;
 pub mod walking;
 
 // The words the instructions are asked in: where a cell and an entity

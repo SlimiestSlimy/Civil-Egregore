@@ -47,10 +47,13 @@ staying if not; passed over if no longer where the tick found it -- or,
 to another superchunk, crossing; **`step(entity, to, wake)`**: a move,
 no attributes carried -- whole, as `update`, to another superchunk;
 **`set_attribute(entity, attribute, seen, value)`**,
-**`unset_attribute(entity, attribute, seen)`**: an edit of another
-entity in reach, applied if the attribute is still as seen; `false`,
-and nothing queued, if the entity wakes this tick;
-**`remove(header)`**.
+**`unset_attribute(entity, attribute, seen)`**,
+**`set_attribute_blocks(entity, seen, value)`**: an edit of any entity
+in reach, applied if the attribute is still as seen and the compare
+the rule's instructions are under holds too; `update` is these, one
+for each attribute changed (`set_attributes_changed`), then a move --
+or, to another superchunk, `cross`: put there whole, asleep where it
+stood, settled after; **`remove(header)`**.
 **`slot_of`**: the slot of a superchunk, past the neighbours panicking.
 `SLOTS` (9): an outbox's slots. A turn's fields: its `superchunk`, its
 `entities`, `now`, the thread's `reader` and `entity_reader`, its
@@ -67,8 +70,11 @@ is on; `Compare::holds(superchunk, entities)`, whether it holds now.
 written if the compare holds and the cell is still as seen, with the
 count added then; **`Turn::queue_seen(type, at, seen, value,
 counted)`**: the same, held against the cell written alone.
+**`Compare::attribute(id, at, kind, seen)`**: an attribute as its
+blocks were seen -- the first kept, the rest as a sum.
 `queue_instruction_if(compare, lands, queue)`: one instruction under
-a compare of its own, as an edit of another entity is. **`Turn::count_if(compare, place)`**: a
+a compare of its own and the rule's as well, as an edit of an
+attribute is. **`Turn::count_if(compare, place)`**: a
 count. **`Turn::instructions_if(compare)`**,
 **`Turn::instructions_as_ever()`**: the entity instructions queued
 between them under the compare; `close_instructions_compared`: those
@@ -77,7 +83,7 @@ the rule's first count is counted under; `counted_number(place)`: a
 count's number, under `COUNTED_WHEN_APPLIED` (256) --
 **`CountedWhenApplied`**, a tick's counts made as it applied
 (`NO_COUNT`: none). `Does`: what a step does -- `Write` (with what was `seen` at the cell),
-`Instructions {first, last}`, `Count`; `Step` `{compare, does,
+`Instructions {first, last}`, `Count`; `Step` `{compare, also, does,
 before}`; `Conditional` `{steps}`, what is queued for one superchunk
 -- `clear`, `count_missed`, and `apply(superchunk, entities,
 instructions, earliest, applied)`: instructions and steps in the order
@@ -178,7 +184,7 @@ applying}` -- `instructions_compared` the runs of instructions under a
 compare applied, and those refused.
 
 **`threads_for(superchunks)`**: every thread the machine has, no more
-than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived}`:
+than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived, turned_back}`:
 the threads, and what a tick reuses -- an outbox a superchunk, room for
 samples a thread, each superchunk's random stream, and the entities
 crossed into each in a tick -- so a tick allocates nothing once they
@@ -200,7 +206,9 @@ instructions and compare-and-writes; writes to superchunks not in use counted
 missed (`Conditional::count_missed`), entities put there lost; the crossings settled
 (**`settle_crossings`**: each superchunk's arrivals taken, then each
 thread its run of superchunks, each removing its leavers from its
-neighbours' arrivals); the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
+neighbours' arrivals but for those written there meanwhile, which go
+to `turned_back` -- a `LeaversPart` a thread -- and each then taking
+back what it put of those: how many); the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
 offsets in a fixed order.
 
 ## `transient_data.rs`

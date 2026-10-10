@@ -3,7 +3,7 @@
 //! at the oldest may die (`docs/sca_rules.md`, "Trees").
 
 use instructions::layers::{OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
-use instructions::{cells, compare, place_counted, CellIndex, Chance, RuleCounts, Turn};
+use instructions::{cells, compare, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn};
 
 /// The chance, each tick, that a tree is sampled.
 pub const SAMPLE_CHANCE: Chance = Chance::one_in(10_000);
@@ -43,7 +43,7 @@ pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
 /// the oldest stage, may die.
 #[inline]
 fn tree(turn: &mut Turn, cell: CellIndex, _counts: &mut RuleCounts) {
-    let spreading = turn.random().chance(SPREAD_SHARE);
+    let spreading = this_tick::random(turn).chance(SPREAD_SHARE);
     let Some(stage) = cells::value(turn, TREE_STAGE, cell) else {
         return;
     };
@@ -51,7 +51,7 @@ fn tree(turn: &mut Turn, cell: CellIndex, _counts: &mut RuleCounts) {
         spread(turn, cell, stage);
     } else if stage < OLDEST_TREE_STAGE {
         cells::set_value_counted(turn, TREE_STAGE, cell, stage, stage + 1, GROWN);
-    } else if turn.random().below(DIE_ONE_IN) == 0 {
+    } else if this_tick::random(turn).below(DIE_ONE_IN) == 0 {
         // Its stage goes with it, so the next tree there starts at 0: gone if the tree still stands, which is then cleared.
         compare::write(turn, compare::holds(TREE, cell), TREE_STAGE.layer_type(), cell, stage, 0, None);
         cells::clear_counted(turn, TREE, cell, DIED);
@@ -70,10 +70,10 @@ fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) {
     // Itself is one of those counted.
     let others = around.set.count_ones().saturating_sub(1);
     // The more trees about it, the less likely: never with as many as crowd it.
-    if turn.random().below(CROWDED as u64) < others as u64 {
+    if this_tick::random(turn).below(CROWDED as u64) < others as u64 {
         return;
     }
-    let drawn = turn.random().below((AROUND * AROUND) as u64) as u32;
+    let drawn = this_tick::random(turn).below((AROUND * AROUND) as u64) as u32;
     let free = around.hot >> drawn & 1 == 1 && around.set >> drawn & 1 == 0;
     let Some(onto) = corner.offset((drawn % AROUND) as i32, (drawn / AROUND) as i32).filter(|_| free) else {
         return;

@@ -82,6 +82,26 @@ pub fn find_attribute(blocks: &[AttributeBlock], kind: AttributeType) -> Result<
     Err(blocks.len())
 }
 
+/// A sum of `blocks`, the same for the same blocks in the same order:
+/// what two runs of attributes are told apart by where one of them is
+/// not at hand -- in another superchunk, or queued with a compare. Two
+/// that differ sum the same once in 2^64 or so.
+pub fn blocks_sum(blocks: &[AttributeBlock]) -> u64 {
+    blocks.iter().flat_map(|block| block.0).fold(0xcbf2_9ce4_8422_2325, |sum, word| (sum ^ word).wrapping_mul(0x0000_0100_0000_01b3).rotate_left(29))
+}
+
+/// The attributes in `blocks`, sorted by type, one after another: the
+/// blocks of each.
+pub fn each_attribute(blocks: &[AttributeBlock]) -> impl Iterator<Item = &[AttributeBlock]> {
+    let mut at = 0;
+    std::iter::from_fn(move || {
+        let first = blocks.get(at)?;
+        let attribute = &blocks[at..(at + first.blocks()).min(blocks.len())];
+        at += attribute.len();
+        Some(attribute)
+    })
+}
+
 /// The blocks of the attribute of type `kind` in `blocks`, sorted by
 /// type, if there is one.
 #[inline]

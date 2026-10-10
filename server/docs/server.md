@@ -180,7 +180,7 @@ cell:
 | two entities stepping onto one cell | yes | the first applied takes it, the other stays where it stood and wakes as it was to |
 | two lambs put on one cell, or a lamb put where another sheep steps | yes | the first applied takes the cell; the lamb put after is made on another neighbour its mother may step to, or, every one taken, refused -- and born later: its mother is pregnant until she has seen it stand (`../entity_rules/docs/entity_rules.md`, "The sheep") |
 | two entities setting one attribute of a third | yes (no rule does yet) | the first applied is kept and the other refused, having seen the attribute as it no longer is: the same one on any number of threads (`../simulation/tests/fine/instructions.rs`) |
-| an entity's attribute set by another, the entity changing itself | no: one awake this tick is not another's to edit, and one asleep does not write itself | the edit is not queued, and asked again a later tick |
+| an entity's attribute set by another, the entity changing itself | yes (no rule does yet) | both stand if they are of two attributes -- an entity is written an attribute at a time, never whole; of one attribute, the first applied and the other refused. Crossing to another superchunk in that tick, the entity is turned back and stays, with what was written (`../simulation/tests/fine/instructions.rs`) |
 | a sheep fed and put to sleep hungry | no: the two are under opposite compares of its grass | one is applied: the sheep is written once |
 
 No pair leaves a cell or an entity differing by the order threads ran

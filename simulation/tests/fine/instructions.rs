@@ -80,8 +80,8 @@ fn a_step_carries_no_attributes_and_keeps_them() {
         assert_eq!(entity.attributes, attributes);
     }
     assert_eq!(entities.len(), 3);
-    // Every step a move but the one over the superchunk's border: put there as new, and where it stood until settled.
-    assert_eq!((moves, puts), (29, 2));
+    // Every step a move; the one over the superchunk's border a put there as new besides, and a sleep where it stood until settled.
+    assert_eq!((moves, puts), (30, 1));
 }
 
 /// A step onto a cell an entity stands on is turned back as it is
@@ -108,7 +108,7 @@ fn a_step_onto_a_taken_cell_is_turned_back() {
 /// Entities edit another, an attribute each, in one tick, each saying
 /// what it saw of it: both land, neither undoing the other, and the
 /// one edited keeps what it had and when it wakes. An attribute is
-/// removed the same way. One awake this tick is not edited.
+/// removed the same way.
 #[test]
 fn entities_edit_another_an_attribute_at_a_time() {
     let (mut arena, mut entities) = world(2);
@@ -122,8 +122,7 @@ fn entities_edit_another_an_attribute_at_a_time() {
     let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
             let kind = if entity.header.id == EntityId(1) { MARK } else { SCAR };
-            assert!(turn.set_attribute(&target, kind, None, entity.header.id.0));
-            assert!(!turn.set_attribute(&entity.header, kind, None, 0), "one awake this tick writes itself: not another's to edit");
+            turn.set_attribute(&target, kind, None, entity.header.id.0);
             turn.step(&entity.header, entity.header.at, NEVER);
         }
         0
@@ -137,8 +136,8 @@ fn entities_edit_another_an_attribute_at_a_time() {
     entities.apply();
     simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
-            assert!(turn.unset_attribute(&target, MARK, 1));
-            assert!(turn.set_attribute(&target, NAME, Some(7), 8));
+            turn.unset_attribute(&target, MARK, 1);
+            turn.set_attribute(&target, NAME, Some(7), 8);
             turn.step(&entity.header, entity.header.at, NEVER);
         }
         0
@@ -172,4 +171,79 @@ fn of_two_edits_of_one_attribute_one_is_refused_the_same_on_any_threads() {
         entities.get(target.id, target.at).expect("where it stood").attribute(NAME).expect("set")
     });
     assert!(kept[0] == kept[1] && [1, 2].contains(&kept[0]), "{kept:?}");
+}
+
+/// An entity awake, changing itself, is written by another in the same
+/// tick: what the other writes of an attribute it left alone stands
+/// with its own change, and of the attribute both write one write is
+/// applied and the other refused -- the same one on any number of
+/// threads. It is never put whole over what another wrote.
+#[test]
+fn an_entity_changing_itself_and_another_writing_it_both_stand() {
+    let kept = [1, 4].map(|threads| {
+        let (mut arena, mut entities) = world(2);
+        // The one written, awake, in another superchunk than the one writing it.
+        let target = walker(9, cell(1030, 30), 0);
+        entities.queue_put(target, &[AttributeBlock::holding(NAME, 7)]);
+        entities.queue_put(walker(1, cell(1020, 30), 0), &[]);
+        entities.apply();
+        let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+            for entity in turn.woken() {
+                if entity.header.id == target.id {
+                    // Itself: its name changed, asleep from here on.
+                    turn.update(&entity.header, Header { wake: NEVER, ..entity.header }, &[AttributeBlock::holding(NAME, 8)]);
+                } else {
+                    turn.set_attribute(&target, MARK, None, 1);
+                    turn.set_attribute(&target, NAME, Some(7), 99);
+                    turn.step(&entity.header, entity.header.at, NEVER);
+                }
+            }
+            0
+        });
+        assert_eq!((report.instructions_applied.edits, report.instructions_compared), (2, (2, 1)), "the mark and one name applied, the other name refused");
+        let written = entities.get(target.id, target.at).expect("where it stood");
+        assert_eq!((written.attribute(MARK), written.header.wake), (Some(1), NEVER), "the other's mark, and its own sleep");
+        written.attribute(NAME).expect("named")
+    });
+    assert!(kept[0] == kept[1] && [8, 99].contains(&kept[0]), "{kept:?}");
+}
+
+/// An entity crossing to another superchunk, written by another in the
+/// same tick, is turned back: it stays where it stood, asleep until
+/// its wake, with what was written to it -- nothing of it lost on the
+/// way. The tick after, written by none, it crosses with all of it.
+#[test]
+fn a_crossing_written_behind_is_turned_back() {
+    for threads in [1, 4] {
+        let (mut arena, mut entities) = world(2);
+        // On the last cell before the border, to step over it.
+        let (edge, across) = (cell(SUPERCHUNK_SIDE_CELLS - 1, 30), cell(SUPERCHUNK_SIDE_CELLS, 30));
+        let crosser = walker(9, edge, 0);
+        entities.queue_put(crosser, &[AttributeBlock::holding(NAME, 7)]);
+        entities.queue_put(walker(1, cell(1000, 30), 0), &[]);
+        entities.apply();
+        let mut simulation = Simulation::new(threads);
+        let rule = |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+            let now = turn.now();
+            for entity in turn.woken() {
+                if entity.header.id == crosser.id {
+                    turn.step(&entity.header, across, now + 1);
+                } else {
+                    turn.set_attribute(&crosser, MARK, None, 1);
+                    turn.step(&entity.header, entity.header.at, NEVER);
+                }
+            }
+            0
+        };
+        let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), rule);
+        assert_eq!((report.instructions_applied.crossed, report.instructions_applied.turned_back, entities.len()), (1, 1, 2), "on {threads} threads");
+        assert!(entities.get(crosser.id, across).is_none(), "not across");
+        let stayed = entities.get(crosser.id, edge).expect("where it stood");
+        assert_eq!((stayed.attribute(NAME), stayed.attribute(MARK), stayed.header.wake), (Some(7), Some(1), 1), "written, and asleep a tick");
+        let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), rule);
+        assert_eq!((report.instructions_applied.crossed, report.instructions_applied.turned_back, entities.len()), (1, 0, 2), "on {threads} threads");
+        assert!(entities.get(crosser.id, edge).is_none(), "gone from where it stood");
+        let crossed = entities.get(crosser.id, across).expect("across");
+        assert_eq!((crossed.attribute(NAME), crossed.attribute(MARK)), (Some(7), Some(1)), "with all that was written to it");
+    }
 }

@@ -3,7 +3,7 @@
 //! sampling pass for both (`docs/sca_rules.md`, "Grass").
 
 use instructions::layers::{GRASS, WET};
-use instructions::{cells, place_counted, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
+use instructions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
 
 /// The chance, each tick, that a cell of grass tries to spread.
 pub const SPREAD_CHANCE: Chance = Chance::one_in(100_000);
@@ -39,8 +39,8 @@ pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
 /// neighbour lets it.
 #[inline]
 fn cell(turn: &mut Turn, cell: CellIndex, _counts: &mut RuleCounts) {
-    let (dx, dy) = NEIGHBOURS[turn.random().below(NEIGHBOURS.len() as u64) as usize];
-    let spreading = turn.random().chance_among(SPREAD_CHANCE, SAMPLE_CHANCE);
+    let (dx, dy) = NEIGHBOURS[this_tick::random(turn).below(NEIGHBOURS.len() as u64) as usize];
+    let spreading = this_tick::random(turn).chance_among(SPREAD_CHANCE, SAMPLE_CHANCE);
     // Stepped on the Morton index itself: no cartesian coordinates.
     let Some(neighbour) = cell.offset(dx, dy) else {
         return;

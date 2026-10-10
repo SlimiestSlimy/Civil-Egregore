@@ -140,12 +140,55 @@ rule can queue overwrites what another did in the same tick. How it is
 applied, and every case:
 `../../simulation/docs/simulation.md`, "Compare-and-write".
 
+### Every instruction atomic
+
+An instruction that writes is one compare and one write, applied
+whole or not at all, and leaves the cell or the entity as one that
+could be. There is nothing larger: no instruction writes two things
+that must agree. An entity with several things to change in a tick
+changes them by several instructions, and where they must go together
+the rule makes them fail together -- all held against the one thing,
+or each against what the one before wrote, so a refusal carries down
+the chain. That is the care a rule takes: to ask, of each instruction
+it queues, what the world is if this one is applied and the next
+refused.
+
+### One entity writing another
+
+An entity's own change (`entities::commit`) is such instructions: one
+for each attribute it changed, held against what it saw of that
+attribute, then a move. It is never put whole over itself. So another
+entity may write it in the same tick, awake or asleep
+(`entities::set_attribute_of`, `unset_attribute_of`), with these
+guarantees:
+
+- what is written of an attribute is applied only if the attribute is
+  still what the writer saw, so no write is lost under another;
+- two writing two attributes of one entity both do; two writing one,
+  the first applied does and the other is refused;
+- which is first is fixed, the same on any number of threads;
+- an entity crossing to another superchunk in the tick it is written
+  is turned back, and stays where it stood with what was written.
+
+## Rules ask instructions, and nothing else
+
+A rule depends on this crate alone, and asks its turn nothing itself:
+the turn is handed to an instruction. The tick and the superchunk's
+lot are instructions too (`this_tick::now`, `this_tick::random`), as
+cells, counts, compares and entities are. What a rule names of the
+crates under this one are the words instructions are asked in -- a
+cell, a layer, an entity's header, an attribute, the turn as a thing
+to hand on -- and nothing that holds a world. The repository's own
+tests hold it (`the_rules_ask_instructions_alone`): a rule's source
+that calls anything of its turn, or names a crate under this one,
+fails there.
+
 ## What an entity's rule is given
 
 **An entity being changed** (`EntityEdit`): its attributes read, set and
 removed as if already its own, nothing copied until one is changed, and
-`entities::commit` picks the instruction -- a move if none was,
-else a put. A rule states what the entity is to be; what that costs is
+`entities::commit` picks the instructions -- a move alone if none
+was, else a write of each attribute changed before it. A rule states what the entity is to be; what that costs is
 not its concern.
 
 **What must be made** (`entities::spawn_beside`): a new entity's cell

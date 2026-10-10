@@ -91,7 +91,7 @@ pub(crate) fn pasture(given: &Given) -> Result<(), String> {
         "{ticks} ticks over {superchunks} superchunk(s) on {threads} thread(s); sheep {} -> {}; grass {} -> {}; {} entities lost past the superchunks used",
         run.sheep.0, run.sheep.1, run.grass.0, run.grass.1, run.instructions.lost
     ));
-    let mut flock = Table::new(&["wakes", "wakes a tick", "eaten", "born", "died", "put whole", "moved or slept", "removed"]);
+    let mut flock = Table::new(&["wakes", "wakes a tick", "eaten", "born", "died", "put", "moved or slept", "removed"]);
     flock.row(&[
         woken.to_string(),
         format!("{:.1}", woken as f64 / ticks as f64),

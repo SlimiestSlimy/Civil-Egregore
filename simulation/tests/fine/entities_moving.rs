@@ -113,7 +113,7 @@ fn a_change_to_an_entity_that_moved_on_is_passed_over() {
         }
         0
     });
-    assert_eq!((report.instructions_applied.puts, entities.len()), (1, 1));
+    assert_eq!((report.instructions_applied.moves, report.instructions_applied.passed_over, entities.len()), (1, 1, 1));
     assert!(entities.get(EntityId(1), cell(51, 50)).is_some(), "the first move applied");
     let woken = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| turn.woken().count()).rules;
     assert_eq!(woken, 1);
