@@ -63,7 +63,10 @@ save keeps), **`draw`**, **`below`**, **`between`**, **`percent_chance`**,
 
 **`slot(key, slots)`**: a key's slot in a table of a power of two slots,
 by Fibonacci hashing (`GOLDEN_RATIO`). **`mix(word)`**: SplitMix64's
-finalizer (`MIX_1`, `MIX_2`).
+finalizer (`MIX_1`, `MIX_2`). **`fold(hash, word)`**: a hash with one
+word more folded in, the order telling; **`fold_all(hash, words)`**:
+with many, after how many they are -- what a world's hash is built on
+(`server::world_hash`).
 
 ## `fixed_list.rs`
 

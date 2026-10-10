@@ -106,6 +106,7 @@ what they always do and are not listed.
 | **bucket** | one chunk's hot layer: its words in its allocation, and its counts | layer, allocation | |
 | **directory** | the arena's list of hot superchunks, sorted by superchunk index, each with its allocations by layer type | lookup | |
 | **lookup** | finding a layer in the directory; a reader remembers the last superchunk it found | reader, directory | |
+| **world hash** | a world folded into a few 64-bit words, one a part -- hot bitmaps, entities, random streams, halos, cold pool -- the same wherever the same seed is ticked as far (`server::world_hash`, printed by `server check`) | world, seed | checksum, digest |
 | **save** | a world on disk: a folder of a world file and every superchunk's image and state, named by superchunk index | image, world | directory (the arena's list) |
 | **folder** | a folder of the file system: a save, or where measurements are kept | save | directory |
 

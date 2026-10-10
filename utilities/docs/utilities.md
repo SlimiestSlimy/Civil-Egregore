@@ -42,7 +42,8 @@ none.
 - **A seeded random source** (`rng.rs`), its whole state one word: every
   random number in Civil Egregore comes from it.
 - **Hashing** (`hash.rs`): a key's slot in a table, by
-  Fibonacci hashing, and a word's bits mixed, SplitMix64's way.
+  Fibonacci hashing, a word's bits mixed, SplitMix64's way, and many
+  words folded into one hash, the same on every machine.
 - **A fixed-capacity list** (`fixed_list.rs`), allocated once, never
   growing: for structures sized once and reused.
 - **The cache** (`cache.rs`): memory asked for ahead of its being read.

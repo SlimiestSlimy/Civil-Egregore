@@ -169,6 +169,16 @@ a third walls (rise 2+), with rises past 64 -- shading has to span it.
 Seen in the stills: sheep stand on deep ocean cells (told to the user).
 
 
+== DETERMINISM ==
+
+`cargo run --release -- server check <seed hex> <ticks> [every]
+[sheep] [threads]` prints server::world_hash part by part (cells,
+entities, random streams, halos, cold) with nothing of the machine in
+the output: two machines' files are compared with cmp. Same rows on 1
+thread and on all, hashed along the way or once (2026-10-09). The
+Linux/Windows comparison is the user's to run. No camera in it.
+
+
 == OPEN THREADS ==
 
 - Worldgen is what a world's making and wandering cost: callgrind,

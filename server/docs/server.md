@@ -80,6 +80,22 @@ run with no window has no camera, and loads nothing by it.
 kind of entity (`../entity_rules/`) on each hot superchunk's turn --
 grass, then sheep -- then moves the halos.
 
+## The same on every machine
+
+A world follows from its seed alone: the same seed ticked as far is the
+same world, to the bit, on any machine and any number of threads.
+`world_hash` says so in a few words -- one each for the hot bitmaps,
+the entities, the random streams, the halos and the cold pool -- and
+`Civil_Egregore server check <seed> <ticks>` prints them every so many
+ticks:
+
+    cargo run --release -- server check bd044074d908b399 20000 500 > linux.csv
+
+run on two machines and the two files compared; the first row to
+differ says at which tick they part, the first column of it in what.
+The world checked has no camera: a camera's superchunks are hot by
+where a person looks, which no seed says.
+
 ## Saved and loaded
 
 A save is a folder (`chunk_storage::disk`, and
@@ -173,9 +189,10 @@ closed at any time leaves what it came to.
 | `src/lib.rs` | start, save, load |
 | `src/world_start.rs` | what a new world starts from: its size, its seed drawn with land, the sliders' numbers read |
 | `src/halos.rs` | the hot entity, and the world lent to the simulation's halos |
+| `src/world_hash.rs` | a world's hash, part by part: what `check` prints |
 | `src/tick.rs` | the tick of every rule and entity, then the halos moved |
 | `src/host/` | a world run on a thread of its own for a window: `mod` the host's calls and the census, `host_thread` the thread itself, `frame` what it answers |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; the diagnostics tools |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
-| `tests/` | the halos follow their hot entities; a world of a size is hot within it only; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; the files; refusals |
+| `tests/` | the halos follow their hot entities; a world of a size is hot within it only; a superchunk warming takes nothing until due; one cooling stays hot until due; a superchunk gone cold comes back as it was; a world loaded goes on as the one saved; a world hashes the same however it is ticked; the files; refusals |
 | `docs/` | this, and the reference, function by function |
