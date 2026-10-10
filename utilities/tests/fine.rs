@@ -1,4 +1,4 @@
-//! The fine tier: one case a test, made by hand, each pinning one behaviour -- instant.
+//! The fine tier: each test pins one behaviour, at the edges written by hand and at cases drawn from the run's seed -- instant.
 //! The tiers: `docs/testing_protocol.md`, at the repository's root.
 //!
 //! `cargo test --test fine`

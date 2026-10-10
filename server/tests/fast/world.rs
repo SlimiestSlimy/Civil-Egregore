@@ -108,7 +108,8 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
 #[test]
 fn a_world_file_is_read_in_any_order() {
     let folder = folder("any_order");
-    let mut world = server::start(server::Start { seed: 7, sheep: 10, camera_loads: true, ..server::Start::default() });
+    let seed = crate::tests::land_seed(2);
+    let mut world = server::start(server::Start { seed, sheep: 10, camera_loads: true, ..server::Start::default() });
     server::save(&folder, &mut world).expect("saved");
     let saved = disk::read_world(&folder).expect("read");
     let path = folder.join("world.csv");
@@ -117,9 +118,9 @@ fn a_world_file_is_read_in_any_order() {
     rows[1..].reverse();
     std::fs::write(&path, rows.join("\n")).expect("written");
     assert_eq!(disk::read_world(&folder).expect("read turned round"), saved);
-    std::fs::write(&path, "world,is\nseed,0x7\n").expect("written");
+    std::fs::write(&path, format!("world,is\nseed,{}\n", utilities::seed::hex(seed))).expect("written");
     let bare = disk::read_world(&folder).expect("read with the seed alone");
-    assert_eq!(bare, disk::WorldInfo { seed: 7, tick: 0, layers: Vec::new(), side: None, forced: false, hot_entity: None, camera_flock: None, without_camera_flock: Vec::new(), generation: Vec::new() });
+    assert_eq!(bare, disk::WorldInfo { seed, tick: 0, layers: Vec::new(), side: None, forced: false, hot_entity: None, camera_flock: None, without_camera_flock: Vec::new(), generation: Vec::new() });
     assert_eq!(worldgen::Generation::of_numbers(&bare.generation).numbers(), worldgen::Generation::DEFAULT.numbers(), "generated as by default");
     for refused in ["world,is\ntick,3\n", "world,is\nseed,0x7\nseed,0x8\n", "world,is\nformat,1\nseed,0x7\n", "seed,0x7\nworld,is\n"] {
         std::fs::write(&path, refused).expect("written");
@@ -132,7 +133,7 @@ fn a_world_file_is_read_in_any_order() {
 fn files_that_are_not_a_save_are_refused() {
     let folder = folder("refused");
     assert!(matches!(server::load(&folder), Err(DiskError::Io(..))), "no such folder");
-    server::save(&folder, &mut server::start(server::Start { seed: 1, sheep: 10, ..server::Start::default() })).expect("saved");
+    server::save(&folder, &mut server::start(server::Start { seed: crate::tests::land_seed(4), sheep: 10, ..server::Start::default() })).expect("saved");
     let state = std::fs::read_dir(folder.join("superchunks")).unwrap().map(|entry| entry.unwrap().path()).find(|path| path.extension().unwrap() == "state").unwrap();
     let whole = std::fs::read(&state).unwrap();
     std::fs::write(&state, &whole[..whole.len() - 8]).unwrap();

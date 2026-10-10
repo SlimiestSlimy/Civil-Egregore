@@ -1,4 +1,4 @@
-//! The fine tier: one case a test, made by hand, each pinning one behaviour -- instant.
+//! The fine tier: each test pins one behaviour, at the edges written by hand and at cases drawn from the run's seed -- instant.
 //! The tiers: `docs/testing_protocol.md`, at the repository's root.
 //!
 //! `cargo test --test fine`
@@ -115,6 +115,48 @@ mod bitmap {
         bitmap.reset();
         assert_eq!(bitmap.count_set(), 0);
     }
+
+    /// Cells, rectangles and circles drawn and cleared one over
+    /// another, anywhere and past the bitmap's edges, leave every cell
+    /// as working each out by its coordinates does: a rectangle its
+    /// corners pulled onto the bitmap, a circle the cells no farther
+    /// than its radius from its centre.
+    #[test]
+    fn shapes_drawn_are_their_cells_worked_out_one_by_one() {
+        let mut random = utilities::rng::Rng::new(utilities::seed::counted());
+        for _ in 0..20 {
+            let (mut bitmap, mut model) = (Bitmap::new(), vec![false; WIDTH * HEIGHT]);
+            for _ in 0..random.between(1, 12) {
+                let setting = random.below(3) != 0;
+                let near = |random: &mut utilities::rng::Rng| random.below(400) as i64 - 72;
+                let covered: Box<dyn Fn(i64, i64) -> bool> = match random.below(3) {
+                    0 => {
+                        let (x, y) = (random.below(256) as u8, random.below(256) as u8);
+                        if setting { bitmap.set(x, y) } else { bitmap.unset(x, y) }
+                        Box::new(move |cell_x, cell_y| (cell_x, cell_y) == (i64::from(x), i64::from(y)))
+                    }
+                    1 => {
+                        let (first_x, first_y, second_x, second_y) = (near(&mut random), near(&mut random), near(&mut random), near(&mut random));
+                        if setting { bitmap.set_rect(first_x, first_y, second_x, second_y) } else { bitmap.unset_rect(first_x, first_y, second_x, second_y) }
+                        let onto = |coordinate: i64| coordinate.clamp(0, 255);
+                        Box::new(move |x, y| (onto(first_x.min(second_x))..=onto(first_x.max(second_x))).contains(&x) && (onto(first_y.min(second_y))..=onto(first_y.max(second_y))).contains(&y))
+                    }
+                    _ => {
+                        let (centre_x, centre_y, radius) = (near(&mut random), near(&mut random), random.below(120) as i64 - 4);
+                        if setting { bitmap.set_circle(centre_x, centre_y, radius) } else { bitmap.unset_circle(centre_x, centre_y, radius) }
+                        Box::new(move |x, y| radius >= 0 && (x - centre_x).pow(2) + (y - centre_y).pow(2) <= radius * radius)
+                    }
+                };
+                for (x, y) in (0..256i64).flat_map(|y| (0..256i64).map(move |x| (x, y))).filter(|&(x, y)| covered(x, y)) {
+                    model[y as usize * WIDTH + x as usize] = setting;
+                }
+            }
+            for (x, y) in (0..=255u8).flat_map(|y| (0..=255u8).map(move |x| (x, y))) {
+                assert_eq!(bitmap.get(x, y), model[y as usize * WIDTH + x as usize], "cell ({x}, {y})");
+            }
+            assert_eq!(bitmap.count_set() as usize, model.iter().filter(|&&set| set).count());
+        }
+    }
 }
 
 mod morton {
@@ -169,7 +211,7 @@ mod window {
     /// and back.
     #[test]
     fn morton_words_turn_into_rows_and_back() {
-        let mut random = Rng::new(7);
+        let mut random = Rng::new(utilities::seed::counted());
         for _ in 0..1000 {
             let word = random.draw();
             let rows = rows_from_morton(word);
@@ -183,7 +225,7 @@ mod window {
     /// A window at any offset into four tiles is the 8x8 cells there.
     #[test]
     fn windows_cut_the_cells_from_four_tiles() {
-        let mut random = Rng::new(9);
+        let mut random = Rng::new(utilities::seed::counted());
         for _ in 0..200 {
             let tiles = [[random.draw(), random.draw()], [random.draw(), random.draw()]];
             let cell = |x: u32, y: u32| at(tiles[(y / 8) as usize][(x / 8) as usize], x % 8, y % 8);

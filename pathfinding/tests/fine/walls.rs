@@ -113,7 +113,7 @@ fn walls_one_thick_in_any_direction_are_never_crossed() {
             }
         }
         // A* and a walker find no way across, from either side.
-        let mut rng = Rng::new(name.len() as u64);
+        let mut rng = Rng::new(utilities::seed::counted());
         for _ in 0..200 {
             let draw = |rng: &mut Rng| cell((rng.draw() % SIDE as u64) as u8, (rng.draw() % SIDE as u64) as u8);
             let (from, to) = (draw(&mut rng), draw(&mut rng));

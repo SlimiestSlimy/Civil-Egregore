@@ -35,7 +35,7 @@ mod entities {
         entities.queue_put(walker(2, cell(40, 40), 0), &[AttributeBlock::holding(NAME, 7)]);
         entities.apply();
         let mut simulation = Simulation::new(1);
-        let report = simulation.tick(&mut arena, &mut entities, 0, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             let mut room = Vec::new();
             for entity in turn.woken() {
                 let mut edit = EntityEdit::of(entity, &mut room);
@@ -71,7 +71,7 @@ mod entities {
         entities.apply();
         let seen = Mutex::new(Vec::new());
         let mut simulation = Simulation::new(1);
-        simulation.tick(&mut arena, &mut entities, 0, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             for entity in turn.woken() {
                 let at = entity.header.at;
                 let (stone, taken) = (around::layer(turn, STONE, at), around::occupied(turn, at));

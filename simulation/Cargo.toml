@@ -1,9 +1,7 @@
 [package]
 name = "simulation"
-version = "0.1.0"
 edition = "2024"
 description = "Civil Egregore's simulation: Monte Carlo sampling, the two-phase tick and its thread dispatcher"
-publish = false
 
 [dependencies]
 entity_manager = { path = "../entity_manager" }
