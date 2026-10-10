@@ -10,6 +10,7 @@
 //! | `jobs` | the slow work done off the tick, on the dispatcher's threads: layers encoded, images rewritten, superchunks decoded or generated |
 //! | `height_map` | a superchunk's heights: a floor a chunk and a byte a cell over it, or a whole height a cell where a chunk is tall |
 //! | `layer_codec` | what a layer is, and the codec that encodes and decodes its bitmap |
+//! | `superchunk_cells` | a superchunk's cells as whoever makes them gives them, and the image made of them |
 //! | `superchunk_image` | a superchunk's words: its chunk table, its height map, its chunks' bitmap tables and bitmaps |
 //! | `writeback_ring` | the ring of changed bitmaps, encoded, on their way to the cold pool |
 //! | `chunk_storage` | the cold pool and the ring together: what the bitplane manager reads from and writes back to |
@@ -30,6 +31,7 @@ mod chunk_maps;
 mod height_map;
 pub mod jobs;
 mod layer_codec;
+mod superchunk_cells;
 mod superchunk_image;
 pub mod transient_data;
 pub mod wide;
@@ -39,5 +41,6 @@ pub use chunk_storage::{ChunkStorage, Flush};
 pub use chunk_maps::{ChunkMaps, MAP_WORDS};
 pub use height_map::{height_in, Height, HeightMap, HEIGHT_WORDS, TALL_WORDS};
 pub use layer_codec::{Bits16, Bits2, Bits4, Bits8, BucketKey, LayerCodec, LayerType, Wide, Width};
+pub use superchunk_cells::SuperchunkCells;
 pub use superchunk_image::{InvalidImage, LayerChange, SuperchunkImage};
 pub use writeback_ring::{RingEntry, WritebackRing};

@@ -10,8 +10,7 @@ keeps it; **`halos`**, the simulation's -- and
 **`World::empty(info, generation, threads)`**, what generating and
 loading start from, hot as `info` says: forced throughout if it has a
 side and is forced, else about the halos of the kind of entity it
-names, `HOT_ENTITY` if none (a save from before it was kept);
-**`layer_types`**.
+names, `HOT_ENTITY` if none (a save from before it was kept).
 **`start(options)`**: a `Start` (`world_start.rs`) made into a world
 -- `threads`, every one the machine has if `None`; `sheep` on every
 superchunk of a world with a side, on the origin (`WORLD_MIDDLE`)
@@ -141,10 +140,10 @@ hot about the entities of the kind `hot_entity` unless forced -- and what a way
 of generating is tried out on by itself. **`flocked(world,
 superchunks, sheep)`**: what `start` builds a flock from, put on a
 world with nothing in it yet -- and what a flock is tried out on by
-itself. **`generate_image(generation, seed, superchunk, codec)`**:
-terrain, the ocean where it is under the ocean's level, and on the rest
-grass and trees with their stages, as `Generation::growth` says of
-each cell.
+itself. The server generates nothing: a superchunk's cells are
+`worldgen::generate_superchunk`'s, the image of them storage's
+(`chunk_storage::SuperchunkCells::image`); the server hands the one to
+the other where the halos ask for a superchunk.
 
 ## `host/mod.rs`, `host/host_thread.rs`
 

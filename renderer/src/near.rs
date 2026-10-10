@@ -24,7 +24,7 @@ use bitmap::BITS_PER_WORD;
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;
 use utilities::hash::mix;
-use mc_rules::trees::OLDEST;
+use worldgen::OLDEST_TREE_STAGE;
 use crate::paint::{BROWN, GREEN, WHITE};
 
 /// A cell's side in eighths: what edges are measured in, whatever the
@@ -256,7 +256,7 @@ fn water(pixels: &mut [[u8; 4]], width: usize, corner: (usize, usize), pixels_a_
 /// from three eighths of the cell to the whole of it.
 fn tree(pixels: &mut [[u8; 4]], width: usize, corner: (usize, usize), pixels_a_cell: usize, stage: u32) {
     let colour = tree_colour(stage);
-    let side = (pixels_a_cell * (3 + 5 * stage as usize / OLDEST as usize) / 8).max(1);
+    let side = (pixels_a_cell * (3 + 5 * stage as usize / OLDEST_TREE_STAGE as usize) / 8).max(1);
     let inset = (pixels_a_cell - side) / 2;
     for down in inset..inset + side {
         for across in inset..inset + side {

@@ -9,7 +9,7 @@ use bitplane_manager::BucketKey;
 use worldgen::GRASS;
 use chunk_storage::{LayerType, SuperchunkImage};
 use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
-use mc_rules::trees::{TREE, TREE_STAGE};
+use worldgen::{TREE, TREE_STAGE};
 pub use simulation::halos::Viewport;
 use std::collections::HashMap;
 use worldgen::{Generation, WET};

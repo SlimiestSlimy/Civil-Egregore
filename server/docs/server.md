@@ -22,7 +22,7 @@ they do. One with none has them on its origin superchunk
 endless world hot: the origin and the eight about it hot before it
 ticks. Unless told otherwise (`Start::default`), it has no size and
 4,000 sheep. Every superchunk's contents come from the world's seed
-and its superchunk index (`generate_image`), so a superchunk is the
+and its superchunk index (`worldgen::generate_superchunk`), so a superchunk is the
 same whenever and in whatever order it is made: the world has no edge
 but the coordinates', and grows as the sheep wander. A superchunk is
 its terrain (`../worldgen/`) -- heights, and the walls they make, four

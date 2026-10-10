@@ -28,11 +28,9 @@ pub use world_start::{drawn_seed, Size, Start, FLOCK};
 
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
-use chunk_storage::{ChunkMaps, ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
-use worldgen::{Generation, Terrain, WALLS, WET};
-use worldgen::GRASS;
-use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, WORLD_MIDDLE};
-use mc_rules::trees::{OLDEST, TREE, TREE_STAGE};
+use chunk_storage::{ChunkStorage, HeightMap, SuperchunkImage};
+use worldgen::Generation;
+use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use entity_rules::sheep::flock;
 use instructions::between_ticks::EntitiesBetweenTicks;
 use entity_manager::{saved, Entities, EntityType};
@@ -122,19 +120,12 @@ impl World {
     }
 }
 
-/// Every layer type a world has: the grass's, the trees', the water's
-/// and the walls'.
-/// Dirt has none: it is a cell with nothing on it.
-fn layer_types() -> Vec<LayerType> {
-    [GRASS, TREE, TREE_STAGE.layer_type(), WET].into_iter().chain(WALLS.map(|(layer_type, _)| layer_type)).collect()
-}
-
 /// A world as `options` say: generated as they say, its sheep put on
 /// and their halos hot before it ticks -- or, forced hot, all of it.
 /// Every superchunk -- these, and those made as a flock wanders -- is
 /// its terrain, heights and the walls they make, and on it grass and
 /// trees in patches. Each from the seed and where it is
-/// ([`generate_image`]). If its camera loads superchunks, and it is
+/// ([`worldgen::generate_superchunk`]). If its camera loads superchunks, and it is
 /// not forced hot, the viewport's superchunks are hot too, and it keeps
 /// how many sheep a superchunk generated in the viewport starts with.
 pub fn start(options: Start) -> World {
@@ -171,7 +162,7 @@ pub fn generate_sized(generation: Generation, seed: u64, size: Size, hot_entity:
         Size::Unlimited => (None, false),
         Size::Limited { side, forced } => (Some(side), forced),
     };
-    World::empty(WorldInfo { seed, tick: 0, layers: layer_types(), side, forced, hot_entity: Some(hot_entity.0), camera_flock: None, without_camera_flock: Vec::new(), generation: generation.numbers() }, generation, threads)
+    World::empty(WorldInfo { seed, tick: 0, layers: worldgen::layer_types(), side, forced, hot_entity: Some(hot_entity.0), camera_flock: None, without_camera_flock: Vec::new(), generation: generation.numbers() }, generation, threads)
 }
 
 /// `world`, nothing in it yet, with a flock of `sheep` on each of
@@ -189,58 +180,6 @@ pub fn flocked(mut world: World, superchunks: &[SuperchunkIndex], sheep: usize) 
     let halo = about(flocked.iter().copied());
     world.keep_hot(&halo);
     world
-}
-
-/// The image of `superchunk` in a world made from `seed` as
-/// `generation` says: its terrain, the ocean where it is under the
-/// ocean's level, and on the rest grass in patches -- dirt where there is none --
-/// and trees in patches of their own, each of a stage drawn for its
-/// cell -- the same whenever it is made.
-pub(crate) fn generate_image(generation: &Generation, seed: u64, superchunk: SuperchunkIndex, codec: &mut LayerCodec) -> SuperchunkImage {
-    let terrain = Terrain::generate_shaped(&generation.shape, seed, superchunk);
-    let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
-    let growth = generation.growth(seed);
-    // The planes generated, each a bitmap a chunk: grass, trees, their stage's four, and the cells under water.
-    let mut planes = vec![GRASS, TREE];
-    planes.extend(TREE_STAGE.layer_type().planes());
-    let wet = planes.len();
-    planes.push(WET);
-    // The ocean wherever the ground is under its level, as deep as it is lower.
-    let depth_at = |place: usize| generation.shape.ocean.saturating_sub(terrain.height(place));
-    let mut cells = vec![[0u64; bitmap::WORDS]; planes.len() * CHUNKS_IN_SUPERCHUNK];
-    for place in 0..CHUNKS_IN_SUPERCHUNK * CELLS_IN_CHUNK {
-        let (x, y) = cartesian_from_place(place);
-        let (x, y) = (left + x, top + y);
-        let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
-        let mut set = |plane: usize| cells[plane * CHUNKS_IN_SUPERCHUNK + chunk][cell / bitmap::BITS_PER_WORD] |= 1 << (cell % bitmap::BITS_PER_WORD);
-        // Nothing grows under water.
-        if depth_at(place) > 0 {
-            set(wet);
-            continue;
-        }
-        let grown = growth.at(x, y);
-        if grown.grass {
-            set(0);
-        }
-        if let Some(lot) = grown.tree {
-            set(1);
-            // Its stage: a lot of the cell's own.
-            let stage = lot % (OLDEST as u64 + 1);
-            (0..TREE_STAGE.layer_type().bits() as usize).filter(|bit| stage >> bit & 1 == 1).for_each(|bit| set(2 + bit));
-        }
-    }
-    // A layer a chunk for each plane with a cell set on it, and for each way's walls.
-    let mut layers: Vec<(usize, LayerType, Vec<u64>)> = Vec::new();
-    for (index, cells) in cells.iter().enumerate().filter(|(_, cells)| cells.iter().any(|&word| word != 0)) {
-        layers.push((index % CHUNKS_IN_SUPERCHUNK, planes[index / CHUNKS_IN_SUPERCHUNK], codec.encode(cells).to_vec()));
-    }
-    for (way, &(layer_type, _)) in WALLS.iter().enumerate() {
-        for (place, cells) in terrain.walls[way].iter().enumerate().filter(|(_, cells)| cells.iter().any(|&word| word != 0)) {
-            layers.push((place, layer_type, codec.encode(cells).to_vec()));
-        }
-    }
-    let changes: Vec<LayerChange> = layers.iter().map(|(place, layer_type, words)| LayerChange { place: *place, layer_type: *layer_type, encoded: words }).collect();
-    SuperchunkImage::new(&terrain.heights).with_water(&ChunkMaps::from_numbers(depth_at)).rewritten(&changes)
 }
 
 /// Saves `world` in `folder`, made if not there -- between two ticks.
@@ -299,7 +238,7 @@ pub fn worlds_in(folder: &Path) -> Vec<String> {
 /// was to -- as it was when saved, to the cell and the random number.
 pub fn load(folder: &Path) -> Result<World, DiskError> {
     // The layers made hot are the code's: a save lists what it was written with.
-    let info = WorldInfo { layers: layer_types(), ..disk::read_world(folder)? };
+    let info = WorldInfo { layers: worldgen::layer_types(), ..disk::read_world(folder)? };
     let hot = disk::read_hot(folder)?;
     let generation = Generation::of_numbers(&info.generation);
     let mut world = World::empty(info, generation, None);

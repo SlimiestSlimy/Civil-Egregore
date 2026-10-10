@@ -4225,7 +4225,6 @@ dependencies = [
  "chunk_storage",
  "coordinates",
  "gui",
- "mc_rules",
  "server",
  "utilities",
  "worldgen",

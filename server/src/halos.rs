@@ -4,7 +4,8 @@
 //! generated in the viewport. Which are hot, the viewport's among them,
 //! is the simulation's to say, as the world's hot defines it.
 
-use crate::{generate_image, World};
+use crate::World;
+use worldgen::generate_superchunk;
 use chunk_storage::jobs::Generate;
 use chunk_storage::LayerCodec;
 use coordinates::SuperchunkIndex;
@@ -21,7 +22,7 @@ impl World {
     /// Has the halos do `work` on what the world holds.
     fn with_halos<Done>(&mut self, work: impl FnOnce(&mut Halos, &mut Held<'_>) -> Done) -> Done {
         let (seed, generation) = (self.info.seed, self.generation);
-        let generate = move |superchunk: SuperchunkIndex| -> Generate { Box::new(move |codec: &mut LayerCodec| generate_image(&generation, seed, superchunk, codec)) };
+        let generate = move |superchunk: SuperchunkIndex| -> Generate { Box::new(move |codec: &mut LayerCodec| generate_superchunk(&generation, seed, superchunk).image(codec)) };
         let mut held = Held { arena: &mut self.arena, storage: &mut self.storage, entities: &mut self.entities, simulation: &mut self.simulation, cold: &mut self.cold, layers: &self.info.layers, generate: &generate };
         work(&mut self.halos, &mut held)
     }

@@ -17,7 +17,7 @@ use crate::near::{paint_near, PaintedNear};
 use bitmap::morton::morton_coordinates;
 use bitmap::BITS_PER_WORD;
 use coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
-use mc_rules::trees::OLDEST;
+use worldgen::OLDEST_TREE_STAGE;
 use server::host::frame::{Cells, Frame, CHUNK_WORDS, DEEP};
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
@@ -177,11 +177,11 @@ const TREE_YOUNG: [u8; 3] = [62, 128, 44];
 const TREE_OLD: [u8; 3] = [14, 62, 30];
 
 /// Bits a cell of the trees' stage plane.
-const STAGE_BITS: usize = mc_rules::trees::TREE_STAGE.layer_type().bits() as usize;
+const STAGE_BITS: usize = worldgen::TREE_STAGE.layer_type().bits() as usize;
 
 /// A tree's colour at `stage`.
 pub fn tree_colour(stage: u32) -> [u8; 3] {
-    mixed(TREE_YOUNG, TREE_OLD, stage as usize, OLDEST as usize)
+    mixed(TREE_YOUNG, TREE_OLD, stage as usize, OLDEST_TREE_STAGE as usize)
 }
 
 /// The stage of the tree at bit `bit` of word `word` of `cells`' bitmaps.
@@ -299,7 +299,7 @@ fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
     let mut pixels = Vec::with_capacity(side * side * 4);
     for (index, &factor) in ground.levels[(detail as usize).min(COARSEST)].iter().enumerate() {
         let (grass, trees, sheep) = (grass[index], trees[index], sheep[index]);
-        let ground = mixed(mixed(BROWN, GREEN, grass as usize, tile_cells), tree_colour(OLDEST / 2), trees as usize, tile_cells);
+        let ground = mixed(mixed(BROWN, GREEN, grass as usize, tile_cells), tree_colour(OLDEST_TREE_STAGE / 2), trees as usize, tile_cells);
         // The water over the lit ground, by the share of the tile under it: shallow water half seen through.
         let ground = mixed(lit(ground, factor), WATER, (wet[index] as usize + deep[index] as usize) / 2, tile_cells);
         pixels.extend_from_slice(&opaque(mixed(ground, WHITE, sheep as usize * sheep_cells, tile_cells)));
