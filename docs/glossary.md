@@ -45,6 +45,7 @@ what they always do and are not listed.
 
 | word | means | relates to | not |
 |---|---|---|---|
+| **type registry** | the one table of every type a world has -- layer, wide plane, entity type, attribute -- a row each: name, kind, ID, width; checked as it is built for two rows sharing an ID, a name, or a wide plane's range (`type_registry::REGISTRY`) | layer type, entity type, wide plane | type table |
 | **layer type** | what a layer holds -- dirt, grass, a wall -- as a `u64` from the one namespace every type in Civil Egregore is drawn from (`LayerType`) | entity type, attribute type | |
 | **layer** | one layer type over one chunk: a bitmap of which cells hold it | bitmap, bitplane | plane |
 | **bitplane** | one layer type over the whole world: every chunk's layer of that type | layer | |

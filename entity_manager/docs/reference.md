@@ -7,7 +7,8 @@ The simulation ticks them (`../../simulation/`); the design is in
 
 ## The store
 
-**`entity.rs`**: `EntityId`, `EntityType`, `AttributeType` (`u64`s);
+**`entity.rs`**: `EntityId` (a `u64`); `EntityType` and `AttributeType`,
+the type registry's (`../../type_registry/`), handed on;
 **`Attribute`** `{kind, value}`; **`Header`** `{id, kind, at, wake}`,
 `NEVER`; **`EntityRef`** `{header, attributes}` with
 **`attribute(kind)`**; free functions on a list sorted by type:

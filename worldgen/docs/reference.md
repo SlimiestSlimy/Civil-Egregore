@@ -57,7 +57,6 @@ as a patch, finer noise, and the cell's own lot;
 
 ## `generated_superchunk.rs`
 
-**`layer_types()`**: every layer type a generated world has.
 **`generate_superchunk(generation, seed, superchunk)`**: its cells
 (`chunk_storage::SuperchunkCells`) -- terrain, the ocean where it is
 under the ocean's level, and on the rest grass and trees with their

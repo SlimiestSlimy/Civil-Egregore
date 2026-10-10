@@ -21,7 +21,7 @@
 use coordinates::CHUNKS_IN_SUPERCHUNK;
 use crate::chunk_maps::{self, number_in, ChunkMaps};
 use crate::height_map::{height_in, words_of, Height, HeightMap, HEIGHT_WORDS};
-use crate::layer_codec::LayerType;
+use type_registry::LayerType;
 
 /// Where the height map starts: after the chunk table.
 const HEIGHTS_START: usize = CHUNKS_IN_SUPERCHUNK;

@@ -6,9 +6,9 @@ description = "Civil Egregore's instructions: what a rule is made of -- small, v
 publish = false
 
 [dependencies]
+type_registry = { path = "../type_registry" }
 simulation = { path = "../simulation" }
 pathfinding = { path = "../pathfinding" }
-worldgen = { path = "../worldgen" }
 coordinates = { path = "../coordinates" }
 chunk_storage = { path = "../chunk_storage" }
 bitplane_manager = { path = "../bitplane_manager" }

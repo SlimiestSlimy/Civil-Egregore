@@ -5,7 +5,7 @@
 
 mod tests;
 
-use worldgen::GRASS;
+use type_registry::GRASS;
 use tests::{everything, folder};
 
 /// A world run 30,000 ticks straight, and the same world saved and

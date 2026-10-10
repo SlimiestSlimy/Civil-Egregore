@@ -24,23 +24,18 @@ pub mod generation;
 pub mod mesh;
 pub mod patches;
 
-pub use generated_superchunk::{generate_superchunk, layer_types};
+pub use generated_superchunk::generate_superchunk;
 pub use generation::{has_land_about, seed_with_land, Generation, Growth, TREES_SALT};
 
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
-use chunk_storage::{Bits4, Height, HeightMap, LayerType, Wide};
+use chunk_storage::{Height, HeightMap, LayerType};
+use type_registry::{WALL_EAST, WALL_SOUTH};
 use coordinates::{cartesian_from_place, place_from_cartesian, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
 use utilities::hash::{mix, GOLDEN_RATIO};
 
 /// The most two cells beside one another may differ in height and still
 /// be stepped between.
 pub const STEP: Height = 1;
-
-/// A wall between a cell and the cell to its east: the layer of the
-/// cells that keep one.
-pub const WALL_EAST: LayerType = LayerType(8);
-/// ...to its south.
-pub const WALL_SOUTH: LayerType = LayerType(9);
 
 /// The walls' layers, and the neighbour each is towards.
 pub const WALLS: [(LayerType, (i32, i32)); 2] = [(WALL_EAST, (1, 0)), (WALL_SOUTH, (0, 1))];
@@ -114,25 +109,6 @@ pub struct Shape {
     /// The share of those that raise it, of [`ONE`]: the rest sink it.
     pub raised: u64,
 }
-
-/// Grass: what a superchunk is generated with in patches, where its
-/// ground is dry, and the cells' rules grow and the sheep eat. A cell
-/// without it is dirt, which has no layer.
-pub const GRASS: LayerType = LayerType(2);
-
-/// The cells a tree stands on: what a superchunk is generated with in
-/// patches of their own, and the trees' rule ages, fells and seeds.
-pub const TREE: LayerType = LayerType(3);
-/// A tree's stage, 0 to [`OLDEST_TREE_STAGE`]: a plane four bits a cell
-/// wide, kept cold as the four layer types from 4 on, a bit each.
-pub const TREE_STAGE: Wide<Bits4> = Wide::new(4);
-/// The oldest stage a tree has: sixteen in all.
-pub const OLDEST_TREE_STAGE: u32 = 15;
-
-/// The cells under water, however deep: what a rule asks. How deep is
-/// kept a map a chunk with water, in the superchunk's image
-/// (`chunk_storage::SuperchunkImage::depth`).
-pub const WET: LayerType = LayerType(24);
 
 impl Shape {
     /// The world's shape: vertices 8 superchunks apart, half of them

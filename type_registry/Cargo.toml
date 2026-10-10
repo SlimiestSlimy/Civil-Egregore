@@ -1,0 +1,10 @@
+[package]
+name = "type_registry"
+version = "0.1.0"
+edition = "2024"
+description = "Civil Egregore's type registry: every layer, wide plane, entity type and attribute, with its name, kind, ID and width, in one table"
+publish = false
+
+[dependencies]
+
+utilities = { path = "../utilities" }

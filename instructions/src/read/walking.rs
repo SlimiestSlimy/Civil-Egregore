@@ -10,7 +10,7 @@ use super::{area, cells};
 use crate::area::{AREA_CENTRE, AREA_SIDE, FARTHEST_SCALE};
 use crate::around::{self, squeeze};
 use simulation::Turn;
-use worldgen::{WALL_EAST, WALL_SOUTH};
+use type_registry::{WALL_EAST, WALL_SOUTH};
 
 // The area a turn reads is the area paths are found over.
 const _: () = assert!(pathfinding::SIDE == AREA_SIDE);

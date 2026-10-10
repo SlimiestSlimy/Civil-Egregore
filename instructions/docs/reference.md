@@ -104,8 +104,13 @@ attributes)`**: queued, in the world once the runner places them.
 ## `layers.rs`
 
 `GRASS`, `TREE`, `TREE_STAGE` (and `OLDEST_TREE_STAGE`), `WET`,
-`WALL_EAST`, `WALL_SOUTH`: the layers a world has before a rule adds
-its own, the terrain's (`../../worldgen/`).
+`WALL_EAST`, `WALL_SOUTH`: the layers a world's cells have, from the
+type registry (`../../type_registry/`).
+
+## `entity_types.rs`
+
+`SHEEP`, and its attributes `HUNGRY_AT`, `PREGNANT`, `LAMB`, `ROAMING`:
+the types of entity a world has, from the type registry.
 
 ## The root
 

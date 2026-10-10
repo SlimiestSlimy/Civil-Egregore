@@ -9,7 +9,7 @@
 use crate::diagnostics::tool::{check, pasture, throughput, EVERY, FLOCK, GRASS as GRASS_SHARE, SEED, SHEEP, SUPERCHUNKS, THREADS, TICKS};
 use crate::HaloChange;
 use chunk_storage::disk;
-use worldgen::GRASS;
+use type_registry::GRASS;
 use std::path::Path;
 use std::time::Instant;
 use utilities::commands::{Command, Given, Parameter};

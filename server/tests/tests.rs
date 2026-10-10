@@ -55,7 +55,7 @@ pub fn first_superchunk(world: &World) -> SuperchunkIndex {
 
 /// Cells of grass over `world`'s hot superchunks.
 pub fn cells_of_grass(world: &World) -> u64 {
-    world.arena.superchunk_indices().into_iter().map(|superchunk| world.arena.superchunk_count(worldgen::GRASS, superchunk) as u64).sum()
+    world.arena.superchunk_indices().into_iter().map(|superchunk| world.arena.superchunk_count(type_registry::GRASS, superchunk) as u64).sum()
 }
 
 /// Turns to grass the rectangle of cells `width` by `height` whose top
@@ -63,7 +63,7 @@ pub fn cells_of_grass(world: &World) -> u64 {
 pub fn plant_grass(world: &mut World, at: coordinates::CellCartesian, width: u8, height: u8) {
     use bitplane_manager::{Shape, Write, WriteOp};
     let shape = if (width, height) == (1, 1) { Shape::Cell } else { Shape::Rect { width, height } };
-    world.arena.queue(worldgen::GRASS, Write { at: at.into(), op: WriteOp::Set, shape });
+    world.arena.queue(type_registry::GRASS, Write { at: at.into(), op: WriteOp::Set, shape });
     assert_eq!(world.arena.apply().missed, 0, "grass planted off the hot superchunks");
 }
 

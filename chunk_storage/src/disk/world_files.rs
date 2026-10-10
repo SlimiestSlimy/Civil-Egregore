@@ -1,7 +1,7 @@
 //! A saved world's two text files: what the world is, and which of its
 //! superchunks were hot, cooling and warming.
 
-use crate::layer_codec::LayerType;
+use type_registry::LayerType;
 use coordinates::SuperchunkIndex;
 use utilities::csv;
 

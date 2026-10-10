@@ -16,7 +16,7 @@ chunk's more; **`words_of(words)`**: a map's length from its start.
 
 ## `layer_codec.rs`
 
-**`LayerType(u64)`**: what a layer represents; **`wide(first, bits)`** a type of 2, 4, 8 or 16 bits a cell, **`bits()`**, **`plane(bit)`** and **`planes()`** the one-bit types it is kept cold as, **`holds(plane)`**. **`Width`** (`Bits2`, `Bits4`, `Bits8`, `Bits16`) and **`Wide<W>`**: a wide plane with its width in its type -- `new(first)`, `layer_type()`, `most()`.
+`LayerType`, `Width` (`Bits2`, `Bits4`, `Bits8`, `Bits16`) and `Wide<W>` are the type registry's (`../../type_registry/docs/reference.md`), handed on from this crate's root as what a layer is of.
 
 ## `wide.rs`
 

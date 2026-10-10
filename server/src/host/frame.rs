@@ -7,14 +7,15 @@
 
 use crate::World;
 use bitplane_manager::BucketKey;
-use worldgen::GRASS;
+use type_registry::GRASS;
 use chunk_storage::{LayerType, SuperchunkImage};
 use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
-use worldgen::{TREE, TREE_STAGE};
+use type_registry::{TREE, TREE_STAGE};
 pub use simulation::halos::Viewport;
 use std::collections::HashMap;
 use std::sync::Arc;
-use worldgen::{Generation, WET};
+use worldgen::Generation;
+use type_registry::WET;
 
 /// Words a chunk's bitmap takes.
 pub const CHUNK_WORDS: usize = bitmap::WORDS;
@@ -26,7 +27,7 @@ pub const WORD_BITS: usize = bitmap::BITS_PER_WORD;
 pub const STAGE_BITS: usize = TREE_STAGE.layer_type().bits() as usize;
 
 /// The oldest stage a tree has.
-pub const OLDEST_TREE_STAGE: u32 = worldgen::OLDEST_TREE_STAGE;
+pub const OLDEST_TREE_STAGE: u32 = type_registry::OLDEST_TREE_STAGE;
 
 /// Where in its chunk, `(x, y)`, the cell is that the `bit`-th bit of
 /// a chunk's bitmap stands for: the bits are in Morton order.

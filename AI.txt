@@ -169,6 +169,16 @@ a third walls (rise 2+), with rises past 64 -- shading has to span it.
 Seen in the stills: sheep stand on deep ocean cells (told to the user).
 
 
+== TYPES AND RULES ==
+
+A new layer, wide plane, entity type or attribute is a row in
+type_registry/src/registry.rs (registered!): its constant comes from
+the row, and the build fails naming it if its IDs or name clash. A
+new rule is a row in server/src/rules.rs (RULES). chunk_storage and
+entity_manager still hand on LayerType/Wide/EntityType/AttributeType
+under their own names (told to the user: a shortcut, not a decision).
+
+
 == DETERMINISM ==
 
 `cargo run --release -- server check <seed hex> <ticks> [every]

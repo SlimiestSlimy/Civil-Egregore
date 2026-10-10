@@ -17,7 +17,7 @@
 //! does.
 
 use coordinates::{ChunkIndex, SuperchunkIndex};
-use crate::layer_codec::LayerType;
+use type_registry::LayerType;
 use std::ops::Range;
 
 /// Words an entry's header takes: its chunk, its type, its length.

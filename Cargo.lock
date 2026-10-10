@@ -10,6 +10,7 @@ dependencies = [
  "chunk_storage",
  "coordinates",
  "server",
+ "type_registry",
  "utilities",
  "worldgen",
 ]
@@ -1939,6 +1940,7 @@ dependencies = [
  "bitmap",
  "coordinates",
  "tessera",
+ "type_registry",
  "utilities",
 ]
 
@@ -2319,6 +2321,7 @@ version = "0.1.0"
 dependencies = [
  "bitmap",
  "coordinates",
+ "type_registry",
  "utilities",
 ]
 
@@ -3023,8 +3026,8 @@ dependencies = [
  "entity_manager",
  "pathfinding",
  "simulation",
+ "type_registry",
  "utilities",
- "worldgen",
 ]
 
 [[package]]
@@ -4379,6 +4382,7 @@ dependencies = [
  "instructions",
  "mc_rules",
  "simulation",
+ "type_registry",
  "utilities",
  "worldgen",
 ]
@@ -4884,6 +4888,13 @@ name = "ttf-parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2df906b07856748fa3f6e0ad0cbaa047052d4a7dd609e231c4f72cee8c36f31"
+
+[[package]]
+name = "type_registry"
+version = "0.1.0"
+dependencies = [
+ "utilities",
+]
 
 [[package]]
 name = "typeid"
@@ -5759,6 +5770,7 @@ dependencies = [
  "bitmap",
  "chunk_storage",
  "coordinates",
+ "type_registry",
  "utilities",
 ]
 

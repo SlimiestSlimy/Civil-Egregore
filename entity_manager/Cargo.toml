@@ -6,6 +6,7 @@ description = "Civil Egregore's entities as kept: a bucket a chunk, attributes a
 publish = false
 
 [dependencies]
+type_registry = { path = "../type_registry" }
 bitmap = { path = "../bitmap" }
 coordinates = { path = "../coordinates" }
 utilities = { path = "../utilities" }
