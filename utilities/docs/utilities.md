@@ -175,7 +175,10 @@ to do. They take two kinds of work.
   has finished its part. That is what lets a borrowed job be handed to
   threads that outlive it, and the crate's one `unsafe` beside the
   prefetch rests on it (`JobPointer`: the job's address, handed to the
-  workers for that long and no longer).
+  workers for that long and no longer). One job is run at a time: a
+  lock is held for the whole of `run`, so a second thread calling it
+  waits -- the state holds one job, and two at once would hand a worker
+  a job already let go of. A job run must not call `run` itself.
 - A job **queued** (`Dispatcher::queue`) is done by one worker,
   whenever one is free, the caller not waiting: chunk storage's slow
   work, off the tick.

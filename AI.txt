@@ -258,9 +258,10 @@ break; write a new ask here the moment it is made.
 6b. DOUBLE WRITES: CHECKED 2026-10-10 (server.md, "Two writes on one
    cell"; server/tests/fast/double_writes.rs). Two sheep cannot eat one
    cell. Found: two lambs born onto one cell in a tick -> one refused,
-   counted as born, mother no longer pregnant. NOT fixed: the user is
-   to say how (mother stays pregnant until she sees her lamb? count
-   births from what was applied?).
+   counted as born, mother no longer pregnant.
+6c. THE LOST LAMB (asked 2026-10-10: "we need to fix that lost born
+   lamb as well, add it to the list as well"): fix it -- the mother
+   stays pregnant until she has seen her lamb stand where she put it.
 7. LAST STEP (asked 2026-10-09): go through ALL tests of the codebase;
    wherever a test has fixed cases that could be generated (seeded,
    randomized, from the seed file), make it generated.
@@ -292,16 +293,8 @@ Google Drive connector needs authorizing in claude.ai settings.
      Start). The frames carry bitplane words in the storage's Morton
      layout: that is a choice (speed, one process), keep it, but say
      so in server.md as the client format.
-  2. Dispatcher::run (utilities/src/dispatcher.rs) is unsound as a safe
-     fn: it erases the job's lifetime, and Dispatcher is Sync, shared
-     in an Arc (the tick and chunk storage's jobs). Two threads calling
-     run at once overwrite job/generation/running: a worker runs a part
-     twice, `running` underflows (wraps in release, the waiter hangs or
-     returns early) and a job may be used after its run returned. Only
-     the tick thread calls run today: latent. Fix: a Mutex held for the
-     whole of run (or run only through a handle that is not Sync), and
-     a test of two threads running at once. Also: a queued job calling
-     run must not deadlock -- test it.
+  2. Dispatcher::run: DONE 2026-10-10 (one_run lock; tests of four
+     threads running at once, and of a queued job calling run).
   3. server::World has every field pub (arena, storage, entities,
      simulation, cold, halos, info): the invariants between them (hot in
      the arena <-> the halos <-> entities' superchunks <-> the cold
@@ -314,12 +307,13 @@ Google Drive connector needs authorizing in claude.ai settings.
      separate index constants (WOKEN = 0 ...) -- two sources of truth
      for one order. One per rule (an enum or a const table the indices
      come from), wrong names a compile error.
-  5. No tests in their own crates: entity_manager (~1.3k lines),
+  5. (entity_manager has a fine tier since 2026-10-10: attributes.)
+     No tests in their own crates: entity_manager (~1.3k lines),
      entity_rules, mc_rules. Check what simulation/server tests cover;
      each crate tests itself (a fine tier at least).
   6. Rule for the future: every `unsafe` has a test trying to break its
      safety comment's claim.
-  7. Small: entity_rules/src/lib.rs has its module doc twice.
+  7. DONE 2026-10-10.
 
 - Worldgen, 2026-10-09: a superchunk of land (server new <folder> 1 0
   1 1 1, callgrind) was 9.67 G instructions, nine tenths the mesh; it
