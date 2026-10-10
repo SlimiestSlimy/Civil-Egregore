@@ -17,6 +17,21 @@ use worldgen::{Generation, WET};
 /// Words a chunk's bitmap takes.
 pub const CHUNK_WORDS: usize = bitmap::WORDS;
 
+/// Bits a word of a bitmap holds.
+pub const WORD_BITS: usize = bitmap::BITS_PER_WORD;
+
+/// Bits a cell's stage takes in [`Cells::stages`].
+pub const STAGE_BITS: usize = TREE_STAGE.layer_type().bits() as usize;
+
+/// The oldest stage a tree has.
+pub const OLDEST_TREE_STAGE: u32 = worldgen::OLDEST_TREE_STAGE;
+
+/// Where in its chunk, `(x, y)`, the cell is that the `bit`-th bit of
+/// a chunk's bitmap stands for: the bits are in Morton order.
+pub const fn cell_of_bit(bit: usize) -> (u8, u8) {
+    bitmap::morton::morton_coordinates(bit)
+}
+
 /// The depth from which water hides what is under it: a power of two.
 pub const DEEP: u32 = 16;
 

@@ -18,13 +18,11 @@
 
 use crate::ground::{shadow_drop, Fine, Ground, MARGIN, SIDE};
 use crate::paint::{depth_at, stage_at, tree_colour, under_water};
-use server::host::frame::{Cells, Near};
+use server::host::frame::{Cells, Near, OLDEST_TREE_STAGE, WORD_BITS};
 use utilities::tuning::{Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
-use bitmap::BITS_PER_WORD;
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;
 use utilities::hash::mix;
-use worldgen::OLDEST_TREE_STAGE;
 use crate::paint::{BROWN, GREEN, WHITE};
 
 /// A cell's side in eighths: what edges are measured in, whatever the
@@ -116,10 +114,10 @@ pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: 
             for x in across.clone() {
                 let (own_x, own_y) = (x - left, y - top);
                 let place = place_from_cartesian(own_x as u32, own_y as u32);
-                let grass = cells.grass[place / BITS_PER_WORD] >> (place % BITS_PER_WORD) & 1 == 1;
+                let grass = cells.grass[place / WORD_BITS] >> (place % WORD_BITS) & 1 == 1;
                 let cell = Cell { fine, tuning, at: (own_x, own_y), world: (cells.top_left.0 as u64 + own_x as u64, cells.top_left.1 as u64 + own_y as u64), colour: if grass { GREEN } else { BROWN } };
                 let corner = ((x - first.0) * pixels_a_cell, (y - first.1) * pixels_a_cell);
-                let (word, bit) = (place / BITS_PER_WORD, (place % BITS_PER_WORD) as u32);
+                let (word, bit) = (place / WORD_BITS, (place % WORD_BITS) as u32);
                 cell.paint(&mut pixels, width, corner, pixels_a_cell);
                 if cells.wet[word] >> bit & 1 == 1 {
                     water(&mut pixels, width, corner, pixels_a_cell, depth_at(cells, word, bit));

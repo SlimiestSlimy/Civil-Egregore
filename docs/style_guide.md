@@ -60,7 +60,10 @@ reader has to wonder whether something is missing or was never needed
   its own. The server starts and coordinates, and generates nothing:
   what is on a cell is `worldgen`'s to say, a superchunk's image
   `chunk_storage`'s to make and keep, the server's to pass between
-  them, the simulation and the disk.
+  them, the simulation and the disk. A client -- the renderer -- asks
+  the server alone (`server::host`): its frames for what is hot, its
+  `terrain_seen` for the ground past it, and names no crate under it
+  but `coordinates` and `utilities`.
 - The rules' crates hold their rules alone: no diagnostics, no
   `transient_data`, no tests. A rule is tried on a world, so its tests
   and tools are the server's (`server/tests/fast/`,

@@ -12,3 +12,5 @@ coordinates = { path = "../coordinates" }
 server = { path = "../server" }
 utilities = { path = "../utilities" }
 worldgen = { path = "../worldgen" }
+bitmap = { path = "../bitmap" }
+chunk_storage = { path = "../chunk_storage" }

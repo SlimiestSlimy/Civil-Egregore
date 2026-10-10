@@ -2,7 +2,7 @@
 //! sun on a slope, and light in bands.
 
 use super::{BEFORE, SMOOTHED_OVER, SUN_ELEVATION, WIDE, shadow_drop};
-use chunk_storage::Height;
+use server::host::terrain_seen::Height;
 use std::collections::VecDeque;
 
 /// `heights` smoothed: each the mean of those [`SMOOTHED_OVER`] cells

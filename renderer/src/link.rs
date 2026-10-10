@@ -13,7 +13,7 @@ use server::Start;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 use utilities::tuning::Tuning;
-use worldgen::Generation;
+use server::host::terrain_seen::Generation;
 
 /// The host, as the window holds it: where to ask, where the answers
 /// come, and what it was last told.

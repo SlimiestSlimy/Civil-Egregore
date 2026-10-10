@@ -90,7 +90,7 @@ impl World {
     /// Writes back every hot superchunk's changed bitmaps, then
     /// flushes every superchunk with changes in the ring: the cold
     /// pool's images the cells as they are.
-    pub(crate) fn write_back_and_flush_all(&mut self) {
+    pub fn write_back_and_flush_all(&mut self) {
         self.with_halos(|halos, held| {
             halos.write_back_all(held);
             halos.flush_all(held);

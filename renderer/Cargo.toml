@@ -8,10 +8,7 @@ description = "Civil Egregore on the screen: a Bevy window asking the server's h
 utilities = { path = "../utilities" }
 gui = { path = "../gui" }
 server = { path = "../server" }
-worldgen = { path = "../worldgen" }
 coordinates = { path = "../coordinates" }
-bitmap = { path = "../bitmap" }
-chunk_storage = { path = "../chunk_storage" }
 # Bevy for the window, the drawing and the keys only: no 3D, no audio.
 bevy = { version = "0.19", default-features = false, features = ["2d", "ui"] }
 
