@@ -130,6 +130,13 @@ area is several writes. The queues are a queue a layer type
 (`WriteQueues`), sorted by type: a rule writes to few types, so finding
 one's queue is a search of a few.
 
+A write here asks nothing of the cell it lands on. One that is to be
+applied only if the cell is still as a rule saw it is the
+simulation's (`../../simulation/docs/simulation.md`, "Compare-and-write
+and groups"): it reads the cell as it is now (`Superchunk::value_at`),
+applies a plain write if that is what was seen, and counts the write
+refused otherwise (`WritesApplied::refused`).
+
 ## What the simulation reads and changes
 
 Sampling and the tick are the simulation's (`../../simulation/`). It

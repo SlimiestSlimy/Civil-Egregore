@@ -76,6 +76,8 @@ what they always do and are not listed.
 | **hot file** | a save's file naming its hot superchunks, and its cooling and warming ones with their due ticks (`HotSuperchunks`): made hot before a loaded world ticks | save, hot, cooling, warming | |
 | **shared image** | an image in the cold pool held behind a reference count, so a thread reads it as it was while the pool changes (`ChunkStorage::shared_image`) | image, jond | |
 | **paged** | of an image of the cold pool: written to disk and let go from memory, the pool keeping only where it is, read back when its superchunk warms -- **paged out** past the bytes the pool keeps in memory (`ChunkStorage::page_out`); the folder a running world pages to is its **paging folder** | image, cold pool, cold | swapped, evicted, unloaded |
+| **compare-and-write** | a write to a cell that says what its rule saw there and is applied only if the cell still holds it -- **refused** otherwise, nothing happening, and counted (`Turn::queue_seen`; `cells::set`, `clear`, `set_value`) | write, group, tick | conditional write, CAS |
+| **group** | several things a rule queues as one -- compare-and-writes, entity instructions, counts -- applied all if every cell written is as the rule saw it, none otherwise; lands in one superchunk (`groups::start`, `groups::end`) | compare-and-write, instruction | transaction, batch |
 | **dirty** | a hot layer changed since it was decoded: it must be written back before it is evicted | write back | |
 
 ## Storage

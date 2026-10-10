@@ -4,7 +4,7 @@
 //! (`docs/server.md`, "TickCounts").
 
 use coordinates::CellIndex;
-use instructions::{RuleCounts, Turn};
+use instructions::{RuleCounts, TickReport, Turn, COUNTS_OF_A_RULE};
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
@@ -88,6 +88,19 @@ impl TickCounts {
     }
 }
 
+/// `report`, each rule's counts with what the tick counted for it as
+/// it applied ([`Chosen::turn`] gives each rule its numbers): a write
+/// refused, or a group, is counted only if it happened
+/// (`docs/server.md`, "TickCounts").
+pub(crate) fn with_counts_applied(mut report: TickReport<TickCounts>) -> TickReport<TickCounts> {
+    for (place, counts) in report.rules.counts.iter_mut().enumerate() {
+        for (count, applied) in counts.0.iter_mut().zip(&report.counted_when_applied[place * COUNTS_OF_A_RULE..]) {
+            *count += applied;
+        }
+    }
+    report
+}
+
 impl AddAssign for TickCounts {
     /// Every rule's counts and time added to its like.
     fn add_assign(&mut self, other: Self) {
@@ -125,6 +138,7 @@ impl Chosen {
         let mut done = TickCounts::default();
         for (place, rule) in RULES.iter().enumerate() {
             if self.run[place] {
+                turn.count_under((place * COUNTS_OF_A_RULE) as u32);
                 done.counts[place] = (rule.rule)(turn, samples);
             }
         }
@@ -137,6 +151,7 @@ impl Chosen {
         for (place, rule) in RULES.iter().enumerate() {
             if self.run[place] {
                 let start = Instant::now();
+                turn.count_under((place * COUNTS_OF_A_RULE) as u32);
                 done.counts[place] = (rule.rule)(turn, samples);
                 done.times[place] = start.elapsed();
             }

@@ -19,10 +19,10 @@ pub const SAMPLE_CHANCE: Chance = SPREAD_CHANCE.plus(DECAY_CHANCE);
 pub const COUNTED: [&str; 3] = ["sampled", "spreads", "decays"];
 /// Cells of grass sampled.
 pub const SAMPLED: usize = place_counted(&COUNTED, "sampled");
-/// Spreads queued: two samples may spread onto one cell, which then
-/// changes once.
+/// Cells grass spread onto: counted as each is applied, so two
+/// samples spreading onto one cell are one spread.
 pub const SPREADS: usize = place_counted(&COUNTED, "spreads");
-/// Cells of grass turned back to dirt.
+/// Cells of grass turned back to dirt: counted as each is applied.
 pub const DECAYS: usize = place_counted(&COUNTED, "decays");
 
 /// The rule, on one superchunk's turn: every cell of grass chosen with
@@ -38,7 +38,7 @@ pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
 /// whether it tries to spread or to decay, and queues the write if the
 /// neighbour lets it.
 #[inline]
-fn cell(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
+fn cell(turn: &mut Turn, cell: CellIndex, _counts: &mut RuleCounts) {
     let (dx, dy) = NEIGHBOURS[turn.random().below(NEIGHBOURS.len() as u64) as usize];
     let spreading = turn.random().chance_among(SPREAD_CHANCE, SAMPLE_CHANCE);
     // Stepped on the Morton index itself: no cartesian coordinates.
@@ -49,11 +49,9 @@ fn cell(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
         // Dirt is a cell with no grass on it: no layer of its own.
         // And grass does not spread under water; a world with no water has none.
         if cells::lacks(turn, GRASS, neighbour) && !cells::holds(turn, WET, neighbour) {
-            cells::set(turn, GRASS, neighbour);
-            counts[SPREADS] += 1;
+            cells::set_counted(turn, GRASS, neighbour, SPREADS);
         }
     } else if cells::holds(turn, GRASS, neighbour) {
-        cells::clear(turn, GRASS, cell);
-        counts[DECAYS] += 1;
+        cells::clear_counted(turn, GRASS, cell, DECAYS);
     }
 }

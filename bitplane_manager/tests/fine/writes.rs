@@ -45,7 +45,7 @@ fn nothing_changes_until_applied() {
     let mut arena = arena_over(&[cell]);
     stone(&mut arena, WriteOp::Set, cell, Shape::Cell);
     assert_eq!((arena.queued(), holds(&arena, cell.x, cell.y)), (1, false));
-    assert_eq!(arena.apply(), WritesApplied { writes: 1, changed: 1, missed: 0 });
+    assert_eq!(arena.apply(), WritesApplied { writes: 1, changed: 1, missed: 0, refused: 0 });
     assert_eq!((arena.queued(), holds(&arena, cell.x, cell.y)), (0, true));
     assert_eq!(arena.apply(), WritesApplied::default(), "nothing left queued");
 }
@@ -110,7 +110,7 @@ fn discs_cover_their_radius() {
 fn cold_bitmaps_are_missed() {
     let mut arena = arena_over(&[CellCartesian { x: 0, y: 0 }]);
     stone(&mut arena, WriteOp::Set, CellCartesian { x: 250, y: 0 }, Shape::Rect { width: 10, height: 2 });
-    assert_eq!(arena.apply(), WritesApplied { writes: 1, changed: 12, missed: 8 });
+    assert_eq!(arena.apply(), WritesApplied { writes: 1, changed: 12, missed: 8, refused: 0 });
     assert!(arena.holds(STONE, CellCartesian { x: 256, y: 0 }.into()).is_err());
 }
 

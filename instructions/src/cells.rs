@@ -1,9 +1,11 @@
 //! The cells: what a rule asks of a layer at a cell and the square
 //! about one, the going over the cells sampled -- a rule of the cells
-//! is written for one cell -- and a cell written, each a write queued.
+//! is written for one cell -- and a cell written, each a
+//! compare-and-write queued: it says what the rule saw at the cell,
+//! and is applied only if the cell still holds it.
 
 use crate::mask::about;
-use bitplane_manager::{Window, Write, WriteOp};
+use bitplane_manager::Window;
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;
 use simulation::Turn;
@@ -59,20 +61,47 @@ pub fn square(turn: &Turn, layer_type: LayerType, cell: CellIndex, side: u32) ->
     Some((corner, turn.window(layer_type, corner, side, side)))
 }
 
-/// Queues `layer_type` holding at `cell`.
+/// Queues `layer_type` holding at `cell`, which the rule saw it did
+/// not: a compare-and-write, applied only if it still does not
+/// (`docs/instructions.md`, "Compare-and-write and groups").
 #[inline]
 pub fn set(turn: &mut Turn, layer_type: LayerType, cell: CellIndex) {
-    turn.queue(layer_type, Write::cell(cell, WriteOp::Set));
+    turn.queue_seen(layer_type, cell, 0, 1, None);
 }
 
-/// Queues `layer_type` no longer holding at `cell`.
+/// [`set`], adding one to the rule's count `counted` if it is applied.
+#[inline]
+pub fn set_counted(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, counted: usize) {
+    turn.queue_seen(layer_type, cell, 0, 1, Some(counted as u32));
+}
+
+/// Queues `layer_type` no longer holding at `cell`, which the rule saw
+/// it did: a compare-and-write, applied only if it still does.
 #[inline]
 pub fn clear(turn: &mut Turn, layer_type: LayerType, cell: CellIndex) {
-    turn.queue(layer_type, Write::cell(cell, WriteOp::Unset));
+    turn.queue_seen(layer_type, cell, 1, 0, None);
 }
 
-/// Queues `value` as the number `plane` holds at `cell`.
+/// [`clear`], adding one to the rule's count `counted` if it is
+/// applied.
 #[inline]
-pub fn set_value<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, value: u32) {
-    turn.queue(plane.layer_type(), Write::value(plane, cell, value));
+pub fn clear_counted(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, counted: usize) {
+    turn.queue_seen(layer_type, cell, 1, 0, Some(counted as u32));
+}
+
+/// Queues `value` as the number `plane` holds at `cell`, where the
+/// rule saw `seen`: a compare-and-write, applied only if the cell
+/// still holds `seen`.
+#[inline]
+pub fn set_value<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, seen: u32, value: u32) {
+    debug_assert!(value <= plane.most(), "{value} in a plane of {} bits a cell", W::BITS);
+    turn.queue_seen(plane.layer_type(), cell, seen, value, None);
+}
+
+/// [`set_value`], adding one to the rule's count `counted` if it is
+/// applied.
+#[inline]
+pub fn set_value_counted<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, seen: u32, value: u32, counted: usize) {
+    debug_assert!(value <= plane.most(), "{value} in a plane of {} bits a cell", W::BITS);
+    turn.queue_seen(plane.layer_type(), cell, seen, value, Some(counted as u32));
 }

@@ -3,7 +3,7 @@
 //! at the oldest may die (`docs/mc_rules.md`, "Trees").
 
 use instructions::layers::{OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
-use instructions::{cells, place_counted, CellIndex, Chance, RuleCounts, Turn};
+use instructions::{cells, groups, place_counted, CellIndex, Chance, RuleCounts, Turn};
 
 /// The chance, each tick, that a tree is sampled.
 pub const SAMPLE_CHANCE: Chance = Chance::one_in(10_000);
@@ -23,11 +23,12 @@ pub const AROUND: u32 = 8;
 pub const COUNTED: [&str; 4] = ["sampled", "spreads", "grown", "died"];
 /// Trees sampled.
 pub const SAMPLED: usize = place_counted(&COUNTED, "sampled");
-/// Trees put: two may be put on one cell, which then has one.
+/// Trees put: counted as each is applied, so two put on one cell are
+/// one.
 pub const SPREADS: usize = place_counted(&COUNTED, "spreads");
-/// Trees grown a stage.
+/// Trees grown a stage: counted as each is applied.
 pub const GROWN: usize = place_counted(&COUNTED, "grown");
-/// Trees dead.
+/// Trees dead: counted as each is applied.
 pub const DIED: usize = place_counted(&COUNTED, "died");
 
 /// The rule, on one superchunk's turn: every tree sampled with
@@ -41,47 +42,48 @@ pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
 /// The rule, on one tree sampled: it tries to spread or grows -- or, at
 /// the oldest stage, may die.
 #[inline]
-fn tree(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
+fn tree(turn: &mut Turn, cell: CellIndex, _counts: &mut RuleCounts) {
     let spreading = turn.random().chance(SPREAD_SHARE);
     let Some(stage) = cells::value(turn, TREE_STAGE, cell) else {
         return;
     };
     if spreading {
-        counts[SPREADS] += u64::from(spread(turn, cell, stage));
+        spread(turn, cell, stage);
     } else if stage < OLDEST_TREE_STAGE {
-        cells::set_value(turn, TREE_STAGE, cell, stage + 1);
-        counts[GROWN] += 1;
+        cells::set_value_counted(turn, TREE_STAGE, cell, stage, stage + 1, GROWN);
     } else if turn.random().below(DIE_ONE_IN) == 0 {
+        // The tree and its stage go as one: the next tree there starts at 0.
+        groups::start(turn);
         cells::clear(turn, TREE, cell);
-        // Its stage goes with it: the next tree there starts at 0.
-        cells::set_value(turn, TREE_STAGE, cell, 0);
-        counts[DIED] += 1;
+        cells::set_value(turn, TREE_STAGE, cell, stage, 0);
+        groups::count(turn, DIED);
+        groups::end(turn);
     }
 }
 
-/// The tree at `cell`, `stage` old, tries to spread: whether it put one.
-fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) -> bool {
+/// The tree at `cell`, `stage` old, tries to spread: one put where it
+/// may is counted as it is applied.
+fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) {
     if stage < SEEDS_FROM {
-        return false;
+        return;
     }
     let Some((corner, around)) = cells::square(turn, TREE, cell, AROUND) else {
-        return false;
+        return;
     };
     // Itself is one of those counted.
     let others = around.set.count_ones().saturating_sub(1);
     // The more trees about it, the less likely: never with as many as crowd it.
     if turn.random().below(CROWDED as u64) < others as u64 {
-        return false;
+        return;
     }
     let drawn = turn.random().below((AROUND * AROUND) as u64) as u32;
     let free = around.hot >> drawn & 1 == 1 && around.set >> drawn & 1 == 0;
     let Some(onto) = corner.offset((drawn % AROUND) as i32, (drawn / AROUND) as i32).filter(|_| free) else {
-        return false;
+        return;
     };
     // No tree under water.
     if cells::holds(turn, WET, onto) {
-        return false;
+        return;
     }
-    cells::set(turn, TREE, onto);
-    true
+    cells::set_counted(turn, TREE, onto, SPREADS);
 }

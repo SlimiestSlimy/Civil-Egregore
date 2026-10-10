@@ -54,6 +54,49 @@ on any number of threads, and a save can keep them (`random_states`,
 `restore_random`). The outboxes and room
 for samples are kept between ticks.
 
+### Compare-and-write and groups
+
+Every rule reads the world as the tick found it, so two may each see
+a cell as it was and both queue a change of it. A **compare-and-write**
+(`Turn::queue_seen`) says what its rule saw at the cell and what it
+makes of it, and is applied only if the cell still holds what was
+seen: the first applied changes the cell, and every later one that
+saw the same is **refused** -- nothing happens, and it is counted
+(`WritesApplied::refused`). A layer of a bit a cell holds 1 or 0.
+
+A **group** (`Turn::group_start`, `Turn::group_end`) is several things
+queued as one: compare-and-writes, entity instructions, counts. It is
+applied whole if every one of its compare-and-writes finds its cell as
+it was seen, and not at all otherwise: no cell of it written, no
+instruction of it applied, nothing of it counted. So what hangs on a
+write hangs on it where it is applied -- a rule cannot learn in the
+tick that a write of its was refused. A group lands in one superchunk
+(a panic otherwise): the thread applying a superchunk decides it
+alone, with nothing to agree with another. What must happen if the
+group does not -- an entity woken must be put to sleep again, or never
+wakes -- is queued before it, outside it, and stands if the group is
+refused; applied, the group's instruction comes after and is the one
+kept.
+
+A count may hang on a write too: a compare-and-write outside a group
+names a count added if it is applied, and a group counts as it is
+applied (`Turn::count_if_applied`). These come back in the tick's
+report (`TickReport::counted_when_applied`), by numbers: whoever runs
+several rules on a turn gives each numbers of its own
+(`Turn::count_under`).
+
+The order, for each superchunk, from each neighbour's outbox in turn:
+its plain writes, layer by layer; then its compare-and-writes in the
+order queued, a group's together -- the group's fate decided there;
+then its instructions in the order queued, those of the groups refused
+left out. It is fixed, so what is applied and what refused is the same
+on any number of threads (`tests/fine/compare_and_write.rs`: drawn
+writes and groups against the same applied one after another; and a
+cell made to decay and be eaten in one tick).
+
+Plain writes (`Turn::queue`) are as before -- shapes, and whatever
+needs no look at the cell: the latest applied wins.
+
 ## Entities
 
 `../../entity_manager/src/`: what stands on the cells. An entity is a header -- a
@@ -128,7 +171,9 @@ attributes read or written, however many it has -- until it crosses to
 another superchunk, where it goes whole. An edit is how one entity acts
 on another: two wounding one in a tick each write their own attribute,
 where two whole copies would undo each other. Every instruction that
-puts an entity on a cell is checked as it is applied.
+puts an entity on a cell is checked as it is applied. Instructions
+queued in a group are applied with it or not at all
+("Compare-and-write and groups").
 
 ### Woken entities are asked of memory ahead
 

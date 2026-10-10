@@ -104,8 +104,15 @@ wakes are as far apart as its needs.
 The rule runs in a tick's first phase, as grass does, reading the
 world as the tick found it. No two sheep eat one cell: a sheep eats the
 cell it stands on, and a cell holds one entity. A cell a sheep eats may
-decay in the same tick, and is cleared once
-(`../../server/docs/server.md`, "Two writes on one cell").
+decay in the same tick. So **a meal is a group**
+(`../../instructions/docs/instructions.md`, "Compare-and-write and
+groups"): the grass cleared if it is grass still, and with it all the
+sheep comes to that wake -- fed, roaming set, its age, a death of old
+age, the meal and what else is counted -- or none of it. Before the
+group the rule queues a sleep of a step, which stands if the meal is
+refused: the sheep wakes hungry as it was and looks again. A lamb may
+land in the next superchunk and a group lands in one, so a sheep due
+to bear at a meal bears at its next wake.
 
 **A lamb is born once it is seen.** A lamb is put on a cell seen free,
 which another lamb or a stepping sheep may take first in the same

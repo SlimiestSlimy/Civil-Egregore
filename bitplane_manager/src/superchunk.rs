@@ -6,7 +6,7 @@ use super::superchunk_layer::{SuperchunkLayer};
 use super::writes::{Write, WritesApplied, apply_in};
 use bitmap::{BITS_PER_WORD, CellWords};
 use chunk_storage::LayerType;
-use coordinates::SuperchunkIndex;
+use coordinates::{CellIndex, SuperchunkIndex};
 
 /// One hot bitmap, to read.
 pub struct Bucket<'a> {
@@ -69,6 +69,17 @@ impl Superchunk {
     /// Its layer of `layer_type`, to read, if it has one in use.
     pub fn layer(&self, layer_type: LayerType) -> Option<LayerView<'_>> {
         self.layer_index(layer_type).map(|layer| LayerView(&self.layers[layer]))
+    }
+
+    /// The number `layer_type` holds at `at`, a cell of this superchunk,
+    /// as it is now -- 1 or 0 on a layer of a bit a cell: none where
+    /// its bitmap is not hot. What a write that says what its rule saw
+    /// is held against (`docs/bitplane_manager.md`, "Writes").
+    pub fn value_at(&self, layer_type: LayerType, at: CellIndex) -> Option<u32> {
+        debug_assert_eq!(at.superchunk(), self.index, "a cell of another superchunk");
+        let layer = &self.layers[self.layer_index(layer_type)?];
+        let chunk = at.chunk().place();
+        contains(layer.flags.hot, chunk).then(|| layer.value(chunk, at.place()))
     }
 
     /// Applies the part of `write`, to `layer_type`'s bitplane, that

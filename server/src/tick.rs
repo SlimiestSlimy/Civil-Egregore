@@ -2,7 +2,7 @@
 //! hot superchunk's turn -- the cells' rules, then the entities', all
 //! reading the world as the tick found it -- then the halos moved.
 
-use crate::rules::{Chosen, TickCounts};
+use crate::rules::{with_counts_applied, Chosen, TickCounts};
 use crate::{HaloChange, World};
 use bitplane_manager::BitmapArena;
 use entity_manager::Entities;
@@ -22,7 +22,7 @@ pub struct WorldTick {
 /// superchunk's random stream the first tick it is in. The halos are
 /// not moved.
 fn tick_chosen(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64, chosen: Chosen) -> TickReport<TickCounts> {
-    simulation.tick(arena, entities, seed, |turn, samples| chosen.turn(turn, samples))
+    with_counts_applied(simulation.tick(arena, entities, seed, |turn, samples| chosen.turn(turn, samples)))
 }
 
 impl World {
@@ -43,7 +43,7 @@ impl World {
     pub fn tick_only(&mut self, chosen: Chosen, timed: bool) -> TickReport<TickCounts> {
         let (simulation, seed) = (&mut self.simulation, self.info.seed);
         match timed {
-            true => simulation.tick(&mut self.arena, &mut self.entities, seed, |turn, samples| chosen.timed_turn(turn, samples)),
+            true => with_counts_applied(simulation.tick(&mut self.arena, &mut self.entities, seed, |turn, samples| chosen.timed_turn(turn, samples))),
             false => tick_chosen(simulation, &mut self.arena, &mut self.entities, seed, chosen),
         }
     }

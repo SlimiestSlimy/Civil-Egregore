@@ -13,3 +13,6 @@ mod entities_moving;
 
 #[path = "fine/instructions.rs"]
 mod instructions;
+
+#[path = "fine/compare_and_write.rs"]
+mod compare_and_write;
