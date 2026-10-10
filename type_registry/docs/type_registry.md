@@ -53,7 +53,7 @@ An attribute is blocks of 64 bytes, its type in the first word
 (`../../entity_manager/docs/entity_manager.md`, "Attributes, a block
 each"). Its row says its layout beside its number: the type, in the
 code, of what its data holds -- a tick (`u64`); a tick and a neighbour
-(`Roaming`); a lamb and a neighbour (`Bearing`) -- as a wide plane's row says its width. The constant the
+(`Roaming`) -- as a wide plane's row says its width. The constant the
 row makes is typed by its layout (`Attribute`), as a wide plane's is by
 its width, so an attribute is read as its fields and one layout is
 never read as another.

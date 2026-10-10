@@ -64,29 +64,6 @@ impl Layout for Roaming {
     }
 }
 
-/// The lamb a sheep has put beside it and not yet seen standing: the
-/// layout of [`BEARING`](crate::BEARING).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Bearing {
-    /// The lamb's ID: the data's first word.
-    pub lamb: u64,
-    /// The neighbour it was put on, its bit in the 3x3 cells about
-    /// its mother: the second.
-    pub neighbour: u32,
-}
-
-impl Layout for Bearing {
-    const BLOCKS: usize = 1;
-
-    fn write(self, data: &mut [u64]) {
-        (data[0], data[1]) = (self.lamb, self.neighbour as u64);
-    }
-
-    fn read(data: &[u64]) -> Self {
-        Self { lamb: data[0], neighbour: data[1] as u32 }
-    }
-}
-
 /// An attribute, its layout in its type: read and written as its
 /// fields, and one layout never read as another.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

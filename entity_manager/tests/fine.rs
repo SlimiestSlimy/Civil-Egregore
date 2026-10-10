@@ -156,3 +156,37 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
     assert!(decode_state(&wrong, 4, &mut world()).is_err());
     assert!(decode_state(&words[..words.len() - 1], 4, &mut world()).is_err(), "cut short");
 }
+
+/// A new entity put on the first free of some cells takes its own if
+/// it is free, the first free of the others if not -- those of
+/// another superchunk passed by -- and is refused only when every one
+/// is taken. An instruction for an entity that is not there is passed
+/// over, and counted.
+#[test]
+fn a_new_entity_is_put_on_the_first_free_cell() {
+    let mut entities = world();
+    let (wanted, second, third) = (cell(40, 30), cell(41, 30), cell(42, 30));
+    // Past the superchunk's west edge: in another superchunk.
+    let outside = cell(0, 30).offset(-1, 0).expect("in the world");
+    let apply = |entities: &mut Entities, id: u64, others: &[CellIndex]| {
+        let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
+        queue.put_on_the_first_free(walker(id, wanted), others, &[]);
+        queue.apply(entities.superchunks_mut(), 0, &mut applied);
+        (applied.puts, applied.beside, applied.refused)
+    };
+    assert_eq!(apply(&mut entities, 1, &[second, third]), (1, 0, 0));
+    assert_eq!(apply(&mut entities, 2, &[outside, second, third]), (1, 1, 0));
+    assert_eq!(apply(&mut entities, 3, &[second, third]), (1, 1, 0));
+    assert_eq!(apply(&mut entities, 4, &[outside, second, third]), (0, 0, 1));
+    for (id, at) in [(1, wanted), (2, second), (3, third)] {
+        assert_eq!(entities.get(EntityId(id), at).map(|entity| entity.header.at), Some(at));
+    }
+    assert_eq!(entities.len(), 3);
+
+    let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
+    queue.remove(EntityId(9), wanted);
+    queue.unset_attribute(EntityId(1), second, NAME.attribute_type());
+    queue.move_entity(walker(3, wanted), second);
+    queue.apply(entities.superchunks_mut(), 0, &mut applied);
+    assert_eq!((applied.passed_over, applied.removes, applied.edits, applied.moves, entities.len()), (3, 0, 0, 0, 3));
+}

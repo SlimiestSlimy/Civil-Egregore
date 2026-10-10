@@ -57,7 +57,7 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `chunk_storage` | layers encoded and back, heights, images, the writeback ring | | |
 | `coordinates` | the indices nested, in Morton order, stepping as cartesian coordinates do | | |
 | `type_registry` | the clash check, the layer types, an attribute type's blocks and a layout's fields | | |
-| `entity_manager` | attributes of any length put, found, edited and saved | | |
+| `entity_manager` | attributes of any length put, found, edited and saved; a new entity put on the first free cell | | |
 | `pathfinding` | paths and waves; walls | | |
 | `utilities` | chance, commands, dispatcher, fixed_list, hash, process_memory, rng, settings, table, tuning | | |
 | `simulation` | entities moving, entities waking, their instructions | sampling, the tick, writes across borders | |

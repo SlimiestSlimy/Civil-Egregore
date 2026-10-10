@@ -98,7 +98,9 @@ places (**`in_word_tile`**).
 
 **`instructions.rs`**: **`Instructions`**: the instructions queued for one
 superchunk -- put, move, edit, remove -- the blocks the puts and the
-edits carry in a list beside: **`put(header, from, attributes)`**,
+edits carry in a list beside, and the cells a new entity may be put on
+(`cells`): **`put(header, from, attributes)`**,
+**`put_on_the_first_free(header, others, attributes)`**,
 **`cross(header, left, attributes)`** (both by **`push`**),
 **`move_entity(header, from)`**, **`set_attribute(id, at, attribute,
 value)`**, **`set_attribute_blocks(id, at, attribute)`**,
@@ -108,7 +110,8 @@ lost, one of an entity no longer where it stood passed over, a new
 one on a cell taken refused, a mover to one staying),
 **`count_lost`**, **`clear`**, **`len()`** and **`is_empty()`** -- how
 many are queued, whether none. **`InstructionsApplied`** `{puts, moves,
-edits, removes, lost, stayed, refused, crossed}`, added with `+=`.
+edits, removes, lost, stayed, refused, crossed, beside, passed_over}`,
+added with `+=`.
 
 **`Entities`** (`store/world_entities.rs`), the world's: **`len()`**,
 **`is_empty()`**, **`superchunks()`** -- its superchunks by Morton

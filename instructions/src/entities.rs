@@ -3,6 +3,7 @@
 //! instruction that carries least, and those put on the world between
 //! two ticks, on no superchunk's turn.
 
+use crate::around;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use entity_manager::{AttributeBlock, Entities, EntityEdit, EntityId, EntityRef, EntityType, Header};
@@ -34,6 +35,37 @@ pub fn spawn(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attrib
     let id = turn.new_id();
     turn.put(Header { id, kind, at, wake }, attributes);
     id
+}
+
+/// Queues making an entity of type `kind` beside `centre`, with
+/// `attributes`, to wake at `wake`: on the neighbour at bit `wanted`
+/// of the nine about it or, that taken by then, on the first free of
+/// the others of `open` after it -- so that what must be made is not
+/// lost to a cell taken first. Its ID, drawn here; where it came to
+/// stand is asked the tick after ([`stands_beside`]).
+#[inline]
+pub fn spawn_beside(turn: &mut Turn, kind: EntityType, centre: CellIndex, wanted: u32, open: u16, wake: u64, attributes: &[AttributeBlock]) -> EntityId {
+    let id = turn.new_id();
+    let Some(at) = around::cell(centre, wanted) else {
+        return id;
+    };
+    // The others from the one wanted on, round the nine: no neighbour is always tried first.
+    let (mut others, mut count) = ([at; 8], 0);
+    for bit in (1..9).map(|after| (wanted + after) % 9).filter(|&bit| open >> bit & 1 == 1) {
+        if let Some(other) = around::cell(centre, bit) {
+            (others[count], count) = (other, count + 1);
+        }
+    }
+    turn.put_on_the_first_free(Header { id, kind, at, wake }, &others[..count], attributes);
+    id
+}
+
+/// The bit, of the nine about `centre`, of the cell of `among` the
+/// entity whose ID is `id` stood on as the tick found it, if it stood
+/// on one.
+#[inline]
+pub fn stands_beside(turn: &Turn, id: EntityId, centre: CellIndex, among: u16) -> Option<u32> {
+    (0..9).filter(|&bit| among >> bit & 1 == 1).find(|&bit| around::cell(centre, bit).is_some_and(|cell| stands(turn, id, cell)))
 }
 
 /// Queues `entity` sleeping where it stands until `wake`: its

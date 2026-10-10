@@ -99,6 +99,14 @@ removed as if already its own, nothing copied until one is changed, and
 else a put. A rule states what the entity is to be; what that costs is
 not its concern.
 
+**What must be made** (`entities::spawn_beside`): a new entity's cell
+may be taken between the rule seeing it free and the put being applied.
+One that must not be lost is put beside a cell with the neighbours it
+may stand on instead: the one wanted, else the first free of the
+others, as the put is applied; where it came to stand is asked the
+tick after (`entities::stands_beside`). A write tolerates what the
+rule could not see, where it can: the rule is not bent round it.
+
 **The cells beside it** (`around`): the 3x3 about a cell as nine bits,
 read in one window (`around::layer`); sets of neighbours are
 masks narrowed with `&`, one drawn with `pick` or `prefer`.
