@@ -6,7 +6,7 @@
 mod tests;
 
 use type_registry::GRASS;
-use tests::{everything, folder};
+use tests::{everything, folder, land_seed};
 
 /// A world run 30,000 ticks straight, and the same world saved and
 /// loaded every 5,000: the same at the end.
@@ -14,12 +14,13 @@ use tests::{everything, folder};
 #[ignore]
 fn a_world_stopped_often_comes_to_the_same() {
     const UNTIL: u64 = 30_000;
-    let mut straight = server::start(server::Start { seed: 21, sheep: 4_000, ..server::Start::default() });
+    let seed = land_seed(0);
+    let mut straight = server::start(server::Start { seed, sheep: 4_000, ..server::Start::default() });
     while straight.entities.now() < UNTIL {
         straight.tick();
     }
     let folder = folder("complete");
-    let mut stopped = server::start(server::Start { seed: 21, sheep: 4_000, ..server::Start::default() });
+    let mut stopped = server::start(server::Start { seed, sheep: 4_000, ..server::Start::default() });
     for stop in (5_000..=UNTIL).step_by(5_000) {
         while stopped.entities.now() < stop {
             stopped.tick();
@@ -37,7 +38,7 @@ fn a_world_stopped_often_comes_to_the_same() {
 #[test]
 #[ignore]
 fn a_flock_on_generated_ground_lasts() {
-    let mut made = server::start(server::Start { seed: 3, sheep: 4_000, ..server::Start::default() });
+    let mut made = server::start(server::Start { seed: land_seed(1), sheep: 4_000, ..server::Start::default() });
     for _ in 0..300_000 {
         made.tick();
     }

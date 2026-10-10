@@ -100,8 +100,12 @@ meant to be. They are ticks, not counts of wakes, because a sheep's
 wakes are as far apart as its needs.
 
 The rule runs in a tick's first phase, as grass does, reading the
-world as the tick found it: two sheep may eat one cell in a tick, which
-then changes once. How it came to be -- what was measured, what was
+world as the tick found it. No two sheep eat one cell: a sheep eats the
+cell it stands on, and a cell holds one entity. A cell a sheep eats may
+decay in the same tick, and is cleared once. Two lambs born onto one
+cell in a tick are one lamb -- the second is refused as it is put, its
+mother pregnant no more and its birth counted all the same
+(`../../server/docs/server.md`, "Two writes on one cell"). How it came to be -- what was measured, what was
 thrown away -- is in `../../docs/civil_egregore.md`.
 
 ## Layout

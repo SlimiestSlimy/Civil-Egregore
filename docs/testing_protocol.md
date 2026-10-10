@@ -63,7 +63,7 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `simulation` | entities moving, entities waking, their instructions | sampling, the tick, writes across borders | |
 | `instructions` | an entity changed, the cells beside it | area, mask, walking | |
 | `worldgen` | | heights, walls, the mesh, superchunks made in any order | walls over many seeds; no seam between superchunks |
-| `server` | | grass and sheep (the rules, tried on a world); halos; the host; the world hash; world: saves, loads, walls; commands | a world stopped often coming to the same; a flock on generated ground lasting |
+| `server` | | grass and sheep (the rules, tried on a world); two writes on one cell; halos; the host; the world hash; world: saves, loads, walls; commands | a world stopped often coming to the same; a flock on generated ground lasting |
 | `tessera` | fine | fast | complete |
 
 `mc_rules`, `entity_rules`, `gui` and `renderer` have
