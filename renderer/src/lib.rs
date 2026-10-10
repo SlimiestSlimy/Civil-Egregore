@@ -28,6 +28,7 @@ use gui::{Gui, Screen};
 pub fn run() {
     // Only over a world: a world shown, steered and asked for.
     let world = (view::fullscreen, link::keys, view::steer, overlays::toggle, overlays::boundaries, overlays::labels, overlays::heights, frames::show, frames::ask, map::far).chain().run_if(resource_equals(Screen::World));
+    let link = link::Link::start();
     App::new()
         .add_plugins(
             DefaultPlugins
@@ -36,8 +37,8 @@ pub fn run() {
                 .set(WindowPlugin { primary_window: Some(Window { title: "Civil Egregore".to_string(), ..default() }), ..default() }),
         )
         .add_plugins(Gui { worlds: || server::worlds_in(&utilities::settings::worlds()) })
-        .insert_resource(link::Link::start())
-        .insert_resource(map::MapLink::start())
+        .insert_resource(map::MapLink::start(link.host.terrain()))
+        .insert_resource(link)
         .insert_resource(ClearColor(Color::BLACK))
         .init_resource::<link::Seen>()
         .init_resource::<view::Sprites>()

@@ -2,7 +2,7 @@
 //! far the coast is, and light in bands.
 
 use super::{BEFORE, COAST_REACH, SMOOTHED_OVER, WIDE, shadow_drop};
-use server::host::terrain_seen::Height;
+use server::host::terrain::Height;
 use std::collections::VecDeque;
 
 /// `heights` smoothed: each the mean of those [`SMOOTHED_OVER`] cells

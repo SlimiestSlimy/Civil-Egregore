@@ -8,7 +8,6 @@ use crate::map::{draw, Wanted};
 use crate::paint::{self, Picture};
 use coordinates::{SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 use server::host::frame::{Ask, Near, Viewport};
-use server::host::terrain_seen::seed_with_land;
 use server::host::Host;
 use server::Start;
 use std::sync::mpsc::{channel, Receiver};
@@ -79,24 +78,26 @@ pub fn gather(seed: Option<u64>, offset: (i64, i64), farthest: u32, mut keep: im
     let mut tuning = defaults();
     (tuning[WORLD_SIDE], tuning[CAMERA_LOADS], tuning[SHEEP]) = (0.0, 1.0, SHEEP_A_SUPERCHUNK);
     let start = Start::from_tuning(seed, &tuning);
-    let seed = seed.unwrap_or_else(|| seed_with_land(utilities::seed::counted(), &start.generation, WORLD_MIDDLE));
+    let seed = seed.unwrap_or_else(|| server::seed_with_land(utilities::seed::counted(), &start.generation));
     let start = Start { seed, ..start };
     let middle = WORLD_MIDDLE.top_left().cartesian();
     let centre = ((middle.x + SUPERCHUNK_SIDE_CELLS / 2) as i64 + offset.0, (middle.y + SUPERCHUNK_SIDE_CELLS / 2) as i64 + offset.1);
     // The top left cell of a still `scale` cells a pixel, a pixel `2^detail` cells: on a pixel's edge.
     let first_at = |cells: (u32, u32), tile: u32| (((centre.0 - cells.0 as i64 / 2) as u32) / tile * tile, ((centre.1 - cells.1 as i64 / 2) as u32) / tile * tile);
 
-    for step in MAP_STEPS {
-        let first = (centre.0 - (SIZE.0 * step) as i64 / 2, centre.1 - (SIZE.1 * step) as i64 / 2);
-        let pixels = draw(&Wanted { first, step, size: SIZE, seed, generation: start.generation, borders: false });
-        keep(Still { name: format!("0_map_{step:02}_cells_a_pixel"), size: SIZE, pixels })?;
-    }
-
     let (host, frames) = Host::start();
     let (_tunings, tunings_read) = channel();
-    let pictures = paint::start(frames, tunings_read);
+    let pictures = paint::start(frames, tunings_read, host.terrain());
     host.pace(None);
     host.make_world(start);
+
+    // The map is asked of the world run: the number the host gave it is in any frame of it.
+    let world = answered(&host, &pictures, Ask { viewport: None, detail: 0, skip: 0, most: 0, near: None }, 0)?.last().map_or(0, |picture| picture.frame.world);
+    for step in MAP_STEPS {
+        let first = (centre.0 - (SIZE.0 * step) as i64 / 2, centre.1 - (SIZE.1 * step) as i64 / 2);
+        let pixels = draw(&host.terrain(), &Wanted { first, step, size: SIZE, world, borders: false }).ok_or("the host runs another world")?;
+        keep(Still { name: format!("0_map_{step:02}_cells_a_pixel"), size: SIZE, pixels })?;
+    }
 
     // From far, and a cell a pixel: a picture a superchunk, laid side by side.
     let mut scale = farthest.max(1).next_power_of_two();

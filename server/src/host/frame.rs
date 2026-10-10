@@ -33,6 +33,12 @@ pub const fn cell_of_bit(bit: usize) -> (u8, u8) {
     bitmap::morton::morton_coordinates(bit)
 }
 
+/// The height of the cell at `place` in its superchunk, from the height
+/// words a frame brings ([`Cells::heights`]).
+pub fn height_in_frame(height_words: &[u64], place: usize) -> super::terrain::Height {
+    chunk_storage::height_in(height_words, place)
+}
+
 /// The depth from which water hides what is under it: a power of two.
 pub const DEEP: u32 = 16;
 
@@ -120,6 +126,8 @@ pub struct Frame {
     pub seed: u64,
     /// How it is generated.
     pub generation: Generation,
+    /// The heights it is drawn between.
+    pub levels: super::terrain::Levels,
     /// Superchunks along its side, a square about its origin, if it has
     /// a size.
     pub side: Option<u32>,

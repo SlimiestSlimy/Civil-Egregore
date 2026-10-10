@@ -103,6 +103,12 @@ impl Start {
     }
 }
 
+/// The first seed from `from` on whose world, generated as
+/// `generation` says, has land about the origin, where the sheep start.
+pub fn seed_with_land(from: u64, generation: &Generation) -> u64 {
+    worldgen::seed_with_land(from, &generation.shape, WORLD_MIDDLE)
+}
+
 /// A seed drawn at random: the first from it with land about the
 /// origin, where the sheep start, if one is within [`LAND_TRIES`] --
 /// else the one drawn.

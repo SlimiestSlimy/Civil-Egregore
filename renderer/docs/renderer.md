@@ -3,7 +3,10 @@
 Civil Egregore on the screen: a Bevy window showing a world run by the
 host (`server::host`) on a thread of its own -- dirt brown, grass
 green, trees, water, a sheep white -- on ground lit by its height
-(below).
+(below). Bevy draws through `wgpu`, which picks the graphics API as
+the window starts -- Vulkan here, and on Linux and Windows wherever
+there is a driver for it -- so no code of the renderer names one; the
+line Bevy logs as it starts (its adapter and its backend) says which.
 
 `cargo run --release` with no arguments, or `cargo run --release -p
 renderer`, opens it on the main menu (`gui`): nothing runs until a
@@ -62,6 +65,10 @@ rectangle of the window.
    and the painter's own copy, never in a static.
 3. **The window** shows the pixels, an image a superchunk.
 
+The host has a second thread, its terrain's, which the painter and the
+map ask for the ground no frame brings (`server/docs/server.md`, "Terrain asked
+of the host"); and the map has one that waits for it (below).
+
 What is sent is what the cells are, not the writes that changed them: a
 window replaying writes would have to hold the world again and apply
 every one as the arena does, and one lost would leave it wrong for
@@ -113,12 +120,12 @@ from far, from near and on the map). The land as generated is level
 ground and faces many heights a cell steep, with little between
 (`AI_SCRATCHPAD how_steep_the_land_is`): what is drawn has to tell a
 plateau from the one beside it, and a rise of 1 from one of 64. A superchunk's heights come with the first frame it is
-hot in, as its image holds them; the painter works out from the seed
-only the cells past its edges that no frame brought (138 before, for
+hot in, as its image holds them; the painter asks the host only for
+the cells past its edges that no frame brought (138 before, for
 the shadows cast onto it, and 26 after, as far as the coast is looked
-for) -- measured, 23 ms a
+for; `server/docs/server.md`, "Terrain asked of the host") -- measured, 23 ms a
 superchunk's ground where working every height out again took 90 --
-once, on a thread a superchunk, and keeps them: the fine parts (8 MiB)
+once, and keeps them: the fine parts (8 MiB)
 for the 48 superchunks last seen (`FINE_KEPT`), the coarse levels for
 2,048 (`GROUNDS_KEPT`), past which those unseen for 256 frames go
 (`UNSEEN_FRAMES`). Heights never change, so a ground kept is never
@@ -226,12 +233,16 @@ In **map mode**, which `M` turns on and off at any zoom, the cells are
 no longer asked for -- the viewport is none, so the camera loads
 nothing either -- and what shows is the map (`src/map.rs`), a pixel no
 finer than a cell. A pixel is the cell in its middle as that cell is
-generated: its height from the seed, the ocean over it darker the
+generated: its height, the ocean over it darker the
 deeper, or grass, dirt or a tree on it, lit by its slope and its
-height. Nothing is made hot to draw it and nothing of the simulation is
+height. Every cell of it is asked of the host (`server/docs/server.md`, "Terrain
+asked of the host"), which works it out on its terrain's thread, the
+rows shared out among every thread the machine has; the renderer
+holds no generator and only colours what it is answered. Nothing is
+made hot to draw it and nothing of the simulation is
 read, so it is how the world was generated, not how it has changed
-since. A thread of its own draws the last map asked for, its rows
-shared out among every thread the machine has; a new one is asked for
+since. A thread of its own asks for the last map wanted and waits for
+it, so the window never does; a new one is asked for
 when the view has moved 32 pixels, zoomed to another power of two, or
 another world is run.
 
@@ -245,7 +256,7 @@ another world is run.
 | `src/view.rs` | the plane, the camera, where it starts for a world, steering it |
 | `src/overlays.rs` | boundaries, labels and heights over the world |
 | `src/hud.rs` | the text over the world |
-| `src/map.rs` | the map: the world from far, drawn from the generator alone |
+| `src/map.rs` | the map: the world from far, as the host answers it is generated |
 | `src/paint.rs` | the painter's thread: cells into pixels |
 | `src/ground.rs` | the light on the ground: heights as a frame brings them, each cell's light and shadow; `ground/relief.rs` what a height does to a colour -- slope light, height tint, water's light, sand and foam; `ground/levels.rs` the ground at each detail, its contours and coast; `ground/light_and_shadow.rs` the smoothing, the shadows and how far the coast is |
 | `src/near.rs` | the viewport's cells from near as one picture: steps and walls at their edges |

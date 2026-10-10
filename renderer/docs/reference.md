@@ -5,8 +5,8 @@ The design is in `renderer.md`.
 ## `paint.rs`
 
 **`Painted`** `{at, cold, side, pixels}`: a superchunk's pixels, four bytes each.
-**`Picture`** `{frame, paint_seconds, superchunks, near}`: a frame, painted -- the frame itself, its cells gone into the pixels. **`start(frames, tunings)`**: the painter's
-thread, the ground made again for each world run; where pictures come. **`ground(grounds, frame, number)`**: the
+**`Picture`** `{frame, paint_seconds, superchunks, near}`: a frame, painted -- the frame itself, its cells gone into the pixels. **`start(frames, tunings, terrain)`**: the painter's
+thread, the ground made again for each world run; where pictures come. **`ground(grounds, terrain, frame, number)`**: the
 ground of every hot superchunk of the frame made if missing, the fine
 parts of those longest unseen dropped (`FINE_KEPT`, 48), and past
 `GROUNDS_KEPT` (2,048) grounds those unseen `UNSEEN_FRAMES` (256)
@@ -36,8 +36,8 @@ cell's is kept in, and `SHADOWED`, the eighth, saying a shadow falls
 on it; `FINE_LEVELS` (2), the coarsest of the levels dropped with the
 fine parts; `Shade::PART_BITS` (6) and `Shade::WHOLE`, how much of
 what is laid over a colour. **`shadow_drop()`**. **`Given`**: heights already worked
-out, a superchunk's height words by its top left cell, so `generate`
-makes none twice.
+out, a superchunk's height words by its top left cell, so `ask`
+asks for none twice.
 **`Shade`**: what a pixel's colour is drawn through -- what it is
 multiplied by, and what is laid over it first, pale, sand or foam and
 how much. **`lit(colour, shade)`**: a colour through a shade.
@@ -47,8 +47,12 @@ level and the highest land -- **`height(x, y)`**, **`line(x, y)`**,
 **`light(x, y)`**, **`under_ocean(x, y)`**, **`surface(x, y)`**: what
 a shadow falls on, **`deepest()`**, **`tint(x, y)`**. **`share`**.
 **`Ground`** `{levels, fine, used}`: a level of shades a detail;
-**`generate(seed, generation, top_left, given)`**; **`coarsen()`**: the
-fine parts dropped. **`heights`**: the heights about a superchunk.
+**`ask(terrain, world, levels, top_left, given)`**: a superchunk's
+ground, the heights about it asked of the host, flat at the ocean's
+level if the host runs another world by then; `of_heights`: it, of
+heights had; **`coarsen()`**: the
+fine parts dropped. **`heights(terrain, world, top_left, given)`**: the heights about a superchunk,
+those `given` laid over what the host answers of the rest.
 
 ### `ground/relief.rs`
 
@@ -168,8 +172,9 @@ and chunks the camera shows named in their top left corners, from
 `LABELLED_FROM` (150) screen pixels across, smaller where there is
 less room than `LABEL_WIDTH` (420), a chunk's a line (`LABEL_LINE`)
 below. **`HeightLabel`**: one of a grid of `HEIGHT_LABELS` (96 by 54)
-texts; **`heights`**: every cell's height written on it, as the world
-run is generated, from `HEIGHT_FROM` (20) screen pixels a cell.
+texts; `HeightsAsked`: the heights last asked of the host for them; **`heights`**: every cell's height written on it, as the host
+answers the world run is generated, asked again only when the view
+shows other cells, from `HEIGHT_FROM` (20) screen pixels a cell.
 **`spawn`**: them all, hidden.
 
 ## `hud.rs`
@@ -182,12 +187,12 @@ over the main menu.
 
 `MARGIN` (64 pixels), `BORDER_LIGHT`; what a height does to a colour
 is `ground/relief.rs`'s.
-**`Wanted`** `{first, step, size, seed, generation, borders}`: a map
-asked for; **`Drawn`**: one drawn. **`start()`**: the map's thread.
-**`cell(wanted, x, y)`**: the cell in a pixel's middle;
-**`draw(wanted)`**: its pixels, rows shared among the machine's threads,
-what grows on a cell as the server's `terrain_seen::CoverSeen` says. **`MapLink`**: the
-window's side of the thread -- **`start()`**, **`map_mode()`**.
+**`Wanted`** `{first, step, size, world, borders}`: a map
+asked for; **`Drawn`**: one drawn. **`start(terrain)`**: the map's thread.
+**`draw(terrain, wanted)`**: its pixels, each cell asked of the host
+(`server::host::terrain::MapAsk`) and coloured by its height and its
+`Cover`, none if the host runs another world. **`MapLink`**: the
+window's side of the thread -- **`start(terrain)`**, **`map_mode()`**.
 **`MapView`**: its picture; **`spawn`**. **`map_step(scale)`**, a cell
 at the finest. **`far`**: in map mode, which `M` turns on and off, a
 map of the world run asked for and laid where it is of; `P` draws the

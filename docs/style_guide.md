@@ -63,8 +63,11 @@ reader has to wonder whether something is missing or was never needed
   `chunk_storage`'s to make and keep, the server's to pass between
   them, the simulation and the disk. A client -- the renderer -- asks
   the server alone (`server::host`): its frames for what is hot, its
-  `terrain_seen` for the ground past it, and names no crate under it
-  but `coordinates` and `utilities`.
+  terrain asked of the host for the ground past it
+  (`host::terrain`), and names no crate under it but `coordinates` and
+  `utilities`. A client works out nothing of the world itself: it
+  holds no generator, and no type of `worldgen`'s but `Generation` as
+  the sliders' value it hands the host.
 - The rules' crates hold their rules alone: no diagnostics, no
   `transient_data`. A rule is tried on a world, and every world is the
   server's to make: its tools are the server's

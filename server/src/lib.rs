@@ -27,12 +27,12 @@ pub use simulation::{HaloChange, COOL_TICKS, WARM_TICKS};
 pub use rules::{Chosen, Rule, RulePlace, TickCounts, GRASS_RULE, RULES, SHEEP_RULE, TREES_RULE};
 pub use tick::WorldTick;
 pub use world_hash::{world_hash, WorldHash};
-pub use world_start::{drawn_seed, Size, Start, FLOCK};
+pub use world_start::{drawn_seed, seed_with_land, Size, Start, FLOCK};
 
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
 use chunk_storage::{ChunkStorage, HeightMap, SuperchunkImage};
-use worldgen::Generation;
+pub use worldgen::Generation;
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use entity_rules::sheep::flock;
 use instructions::entities::EntitiesBetweenTicks;

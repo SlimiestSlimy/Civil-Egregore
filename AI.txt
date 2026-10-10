@@ -226,9 +226,11 @@ ORDER (user, 2026-10-10, verbatim): "do it in this order: fix world
 struct, finish docs, finish tests, make cool pool paging, work on gpu
 LOD". Then, 2026-10-10, to the renderer's terrain generation (review
 item 1) going after the tests and before paging: "yes! GPU LOD and
-SCA renaming are last". SO THE ORDER NOW: tests (task 7, in hand) ->
-review item 1 (the renderer asks the host for terrain) -> cold pool
-paging -> the decay+eat case, compare-and-write, write groups -> GPU
+SCA renaming are last". SO THE ORDER NOW: tests (task 7, DONE) ->
+review item 1 (the renderer asks the host for terrain: DONE
+2026-10-10, server/src/host/terrain.rs; map mode and the height
+labels not tried by hand in the window -- the user's to look at) ->
+cold pool paging (NEXT) -> the decay+eat case, compare-and-write, write groups -> GPU
 LOD -> SCA rename.
 That is: (1) server::World -- DONE 2026-10-10; (2) docs
 finished; (3) tests finished -- task 7, and each crate testing itself;
@@ -324,20 +326,13 @@ Google Drive connector needs authorizing in claude.ai settings.
   Soundness and correctness only: performance is NOT worked on now
   (content first, then measure where the bottlenecks are), so nothing
   here is an optimization.
-  1. The renderer runs terrain generation: ground.rs (heights()),
-     map.rs (HeightsSeen, CoverSeen), overlays.rs (the height under the
-     pointer, HeightsSeen::of(..).height) call worldgen through
-     server::host::terrain_seen -- the client generating the world
-     itself. Wrong side of the boundary: the server alone knows the
-     world; the client asks the host and draws what comes back. Make
-     terrain past the hot superchunks, the map's heights and cover, and
-     the height under the pointer answers to host requests (like
-     Sync/Frame), and remove terrain_seen's generators from the
-     renderer's reach. The renderer should name no worldgen type
-     (Generation only as the sliders' value handed to Host::reset /
-     Start). The frames carry bitplane words in the storage's Morton
-     layout: that is a choice (speed, one process), keep it, but say
-     so in server.md as the client format.
+  1. The renderer ran terrain generation: DONE 2026-10-10. The
+     client asks the host (Host::terrain, a TerrainAsker; answered on
+     the host's "terrain" thread, server/src/host/terrain.rs) for the
+     heights past a frame's superchunks, the map's cells and the
+     heights written on cells; it holds no generator. Answers are the
+     terrain AS GENERATED: when the ground of a made superchunk can
+     change, they must come from the world (server.md says so).
   2. Dispatcher::run: DONE 2026-10-10 (one_run lock; tests of four
      threads running at once, and of a queued job calling run).
   3. server::World: DONE 2026-10-10 (fields the server's own, read by

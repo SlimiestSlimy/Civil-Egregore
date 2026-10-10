@@ -6,6 +6,7 @@ use crate::ground::{lit, Given, Ground, COARSEST};
 use crate::near::{paint_near, PaintedNear};
 use coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
 use server::host::frame::{cell_of_bit, Cells, Frame, CHUNK_WORDS, DEEP, OLDEST_TREE_STAGE, STAGE_BITS, WORD_BITS};
+use server::host::terrain::TerrainAsker;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
@@ -59,16 +60,16 @@ const UNSEEN_FRAMES: u64 = 256;
 /// Makes the ground of every superchunk of `frame` -- each hot -- that has none
 /// yet, or none fine enough -- each on a thread of its own -- and
 /// drops the fine parts of those longest unseen beyond [`FINE_KEPT`].
-fn ground(grounds: &mut HashMap<(u32, u32), Ground>, frame: &Frame, number: u64) {
+fn ground(grounds: &mut HashMap<(u32, u32), Ground>, terrain: &TerrainAsker, frame: &Frame, number: u64) {
     let fine = frame.near.is_some() || frame.detail < 2;
     let hot = || frame.cells.iter().map(|cells| cells.top_left);
     let missing: Vec<(u32, u32)> = hot().filter(|top_left| grounds.get(top_left).is_none_or(|ground| fine && ground.fine.is_none())).collect();
-    let (seed, generation) = (frame.seed, frame.generation);
+    let (world, levels) = (frame.world, frame.levels);
     // The heights the frame brings: those of the superchunks just turned hot.
     let given: Given = frame.cells.iter().filter(|cells| !cells.heights.is_empty()).map(|cells| (cells.top_left, &cells.heights[..])).collect();
     let given = &given;
     let made: Vec<Ground> = thread::scope(|scope| {
-        let making: Vec<_> = missing.iter().map(|&top_left| scope.spawn(move || Ground::generate(seed, &generation, top_left, given))).collect();
+        let making: Vec<_> = missing.iter().map(|&top_left| scope.spawn(move || Ground::ask(terrain, world, levels, top_left, given))).collect();
         making.into_iter().map(|making| making.join().expect("a superchunk's ground")).collect()
     });
     grounds.extend(missing.into_iter().zip(made));
@@ -89,9 +90,10 @@ fn ground(grounds: &mut HashMap<(u32, u32), Ground>, frame: &Frame, number: u64)
 
 /// Starts the painter's thread: every frame from `frames` painted, and
 /// sent on, shaded from near as the last of `tunings` says -- as the
-/// default settings do until one comes. It stops once either end is
+/// default settings do until one comes -- the heights about a
+/// superchunk asked of `terrain`. It stops once either end is
 /// dropped.
-pub fn start(frames: Receiver<Frame>, tunings: Receiver<Tuning>) -> Receiver<Picture> {
+pub fn start(frames: Receiver<Frame>, tunings: Receiver<Tuning>, terrain: TerrainAsker) -> Receiver<Picture> {
     let (painted, pictures) = channel();
     thread::Builder::new()
         .name("painter".to_string())
@@ -107,7 +109,7 @@ pub fn start(frames: Receiver<Frame>, tunings: Receiver<Tuning>) -> Receiver<Pic
                     grounds.clear();
                     world = frame.world;
                 }
-                ground(&mut grounds, &frame, number as u64);
+                ground(&mut grounds, &terrain, &frame, number as u64);
                 let superchunks = frame
                     .cells
                     .iter()

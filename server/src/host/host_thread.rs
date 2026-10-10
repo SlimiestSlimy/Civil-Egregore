@@ -4,6 +4,7 @@
 use crate::{Start, World};
 use super::{CATCH_UP, CENSUS_EVERY, FRAMES_SHARE, Request, TARGET_PACE, census};
 use super::frame::{self, Ask, Cells, Frame, copy, count, hot_in};
+use super::terrain::{Levels, TerrainRequest};
 use type_registry::GRASS;
 use type_registry::TREE;
 use std::thread;
@@ -85,12 +86,14 @@ pub(crate) struct HostThread {
     measured: (f64, f64, f64),
     /// What the last tick took.
     tick_took: Duration,
+    /// The terrain's thread, told of each world run.
+    terrain: Sender<TerrainRequest>,
 }
 
-impl Default for HostThread {
-    /// No world, at the game's pace.
-    fn default() -> Self {
-        Self { running: None, worlds: 0, paused: false, pace: Some(TARGET_PACE), named: None, said: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), answering: None, measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
+impl HostThread {
+    /// No world, at the game's pace; `terrain` told of each world run.
+    pub(crate) fn telling(terrain: Sender<TerrainRequest>) -> Self {
+        Self { terrain, running: None, worlds: 0, paused: false, pace: Some(TARGET_PACE), named: None, said: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), answering: None, measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
     }
 }
 
@@ -155,8 +158,10 @@ impl HostThread {
         self.last_frame = (Instant::now(), running.world.entities.now());
         // A frame half answered was of the world before.
         self.answering = None;
-        self.running = Some(running);
         self.worlds += 1;
+        // Told before any frame of this world is sent: an ask of it finds it known. The thread gone, there is no one to ask either.
+        _ = self.terrain.send(TerrainRequest::World(self.worlds, running.world.info.seed, Box::new(running.world.generation)));
+        self.running = Some(running);
         self.next_tick = Instant::now();
     }
 
@@ -234,7 +239,7 @@ impl HostThread {
         let (ticks_a_second, sync_seconds, sync_share) = self.measured;
         let (sheep, grass, trees) = (world.entities.len(), count(world, GRASS), count(world, TREE));
         let (named, said) = (self.named.clone(), self.said.clone());
-        Some(Frame { world: self.worlds, seed: world.info.seed, generation: world.generation, side: world.halos.hot.side(), tick, ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, viewport: ask.viewport, hot, detail: ask.detail, near: ask.near, named, said, more, cells })
+        Some(Frame { world: self.worlds, seed: world.info.seed, generation: world.generation, levels: Levels::of(&world.generation), side: world.halos.hot.side(), tick, ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, viewport: ask.viewport, hot, detail: ask.detail, near: ask.near, named, said, more, cells })
     }
 
     /// The time there is for copying a frame's superchunks before the
