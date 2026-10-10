@@ -1,10 +1,6 @@
 //! How something lies in patches when a superchunk is made -- grass,
-//! trees -- not scattered cell by cell. Every cell has a number, from
-//! the world's seed and where it is: smooth noise as broad as a patch,
-//! finer noise on it, and a lot drawn for the cell alone. The cells
-//! whose number is under a threshold have the thing; the threshold is
-//! found so that the share asked for do. Whole numbers only, as the
-//! heights, so the same on any machine.
+//! trees: a number a cell from noise and its own lot, under a
+//! threshold found for the share asked (`docs/worldgen.md`, "Patches").
 
 use crate::noise;
 use utilities::hash::{mix, GOLDEN_RATIO};

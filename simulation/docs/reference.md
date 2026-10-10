@@ -35,7 +35,9 @@ about each asked of memory ahead) -- its entities waking this tick, in
 Morton order, borrowed from the world as the tick found it, not from
 the turn, so instructions can be queued while going through them;
 **`entity(id, at)`**, **`entities_in(chunk)`**, **`occupied(origin,
-width, height)`** (the cells entities stand on). Entities written:
+width, height)`** (the cells entities stand on, up to `OCCUPIED_SIDE`
+each way, a row a word: cell `(x, y)` from `origin` at bit `x` of row
+`y`). Entities written:
 **`new_id`**; **`put(header, attributes)`**: an entity made or changed
 where it stands, waking after this tick; **`update(before, after,
 attributes)`**: changed, and moved to its cell if that is free --
@@ -45,6 +47,9 @@ no attributes carried -- whole, as `update`, to another superchunk;
 **`set_attribute(entity, kind, value)`**, **`unset_attribute(entity,
 kind)`**: an edit of any entity in reach; **`remove(header)`**.
 **`slot_of`**: the slot of a superchunk, past the neighbours panicking.
+`SLOTS` (9): an outbox's slots. A turn's fields: its `superchunk`, its
+`entities`, `now`, the thread's `reader` and `entity_reader`, its
+`outbox`, its `random`.
 
 ## `hot.rs`
 
@@ -54,6 +59,7 @@ one, and if `viewport` every superchunk of the viewport too, however
 many -- or `Forced {side}`: every superchunk of a world of that side hot,
 whatever its entities do; only a world with a side can be forced.
 **`about(entity)`**: a world of no size, about `entity`;
+**`viewport()`**: whether the viewport's superchunks are hot too;
 **`side()`**, **`span()`**, **`within(superchunk)`**, **`all()`**:
 every superchunk of a world with a side, none of one without;
 **`wanted(entities)`**: the superchunks to be hot. **`about(of)`**: the 3x3
@@ -69,7 +75,8 @@ The halos' own methods lie in two files under it: `halos/warming.rs`
 **`Viewport`** `{first, last}`: what a renderer renders, in
 superchunks; **`contains(at)`**. **`Held`** `{arena, storage, entities, simulation, cold, layers,
 generate}`: the world's, lent for a call. **`Halos`** `{hot, jobs,
-warming, cooling, writing_back, flushing, viewport, generated}`, **`new(hot,
+warming, cooling, writing_back, flushing, told, viewport, generated}`
+-- `told` the viewport last given, `viewport` its superchunks --, **`new(hot,
 dispatcher)`**, **`restore_cooling(cooling)`**.
 **`Halos::keep_viewport(viewport)`**: the viewport's superchunks --
 what a renderer renders -- kept sorted, wanted hot besides the halos
@@ -85,7 +92,14 @@ back -- sorted. `WARM_TICKS` (256): the ticks a superchunk is warming;
 **`Halos::move_to_hot_entities`**: the halos, and the superchunks in
 view, moved to the hot entities, those
 reached hot `WARM_TICKS` on, those left cold `COOL_TICKS` on.
-**`Halos::keep_hot(wanted)`**: `wanted` made the hot superchunks now.
+**`Halos::keep_hot(wanted)`**: `wanted` made the hot superchunks now,
+with no ticks to warm or cool in: every other one made cold, its state
+kept; every one of them not hot made hot -- lingering, from storage and
+its kept state, or generated -- the jobs waited for at once. One that
+was warming and is not wanted turns hot, as every warming does, and is
+made cold by a second pass. What generating and loading start from;
+between two ticks, anything else needing superchunks hot a while may
+ask too.
 **`Halos::warming`**, **`Halos::cooling`**: the superchunks warming,
 and those cooling, each with its due tick. Both through
 **`Halos::make_hot_within(wanted, warm_ticks, cool_ticks)`**: the
@@ -93,11 +107,12 @@ write-backs encoded landed; those cooling wanted again no longer
 cooling; every hot one not wanted cooling, due no later than
 `cool_ticks` on; those due made cold -- state kept, bitmaps lingering
 (`BitmapArena::make_cold_superchunk`), their dirty ones sent to be
-encoded; those warming not wanted dropped (`BitmapArena::let_go`, or
-the job forgotten); every one warming due no later than `warm_ticks`
-on; the wanted ones neither hot nor warming started; those due made hot, the
-entities aligned, the kept states put back and the random streams with
-them. **`Halos::start_warming(superchunk, due)`**: held if lingering
+encoded; every one warming due no later than `warm_ticks` on, wanted
+or not -- a warming is never given up; the wanted ones neither hot nor
+warming started; those due made hot, one of them no longer wanted
+cooling from then; the entities aligned, the kept states put back and
+the random streams with them. Wanted superchunks outside the world's
+size are passed over first. **`Halos::start_warming(superchunk, due)`**: held if lingering
 (`BitmapArena::hold`), else sent as a job.
 **`Halos::finish_warming`**: a warming superchunk's bitmaps made hot -- again
 as they were (`BitmapArena::make_hot_again`), or as its job made
@@ -120,9 +135,17 @@ every superchunk with changes in the ring flushed, on all the threads.
 computing, applying}`.
 
 **`threads_for(superchunks)`**: every thread the machine has, no more
-than the superchunks. **`Simulation::for_superchunks(superchunks)`**: on
+than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived}`:
+the threads, and what a tick reuses -- an outbox a superchunk, room for
+samples a thread, each superchunk's random stream, and the entities
+crossed into each in a tick -- so a tick allocates nothing once they
+have grown. **`Simulation::for_superchunks(superchunks)`**: on
 those; **`Simulation::new(threads)`**: on a number given, to measure
-against another; **`threads`**. **`random_states()`**: each
+against another; **`Simulation::on(dispatcher)`**: on threads others
+queue jobs on too; **`threads`**. `align_random(superchunks, seed)`:
+each superchunk given the stream it had, or a new one from the seed and
+its index. `PartOfTurns`: what a thread claims of the first phase --
+where its superchunks start, their outboxes, their random streams. **`random_states()`**: each
 superchunk's index and random stream's state; **`restore_random(
 states)`**: taken up, as a save kept them. **`tick(arena, entities,
 seed, rule)`**: the entities aligned to the arena's superchunks (those

@@ -1,9 +1,6 @@
 //! The server's diagnostics tools: each runs a diagnostic, prints what
-//! it gathered and keeps it in `transient_data/measurements/`. They are
-//! among the server's commands ([`crate::commands`]), where their
-//! parameters and what each is if not given are listed.
-//!
-//! Threads 0: every one the machine has, no more than the superchunks.
+//! it gathered and keeps it in `transient_data/measurements/`. They
+//! are among the server's commands ([`crate::commands`]).
 
 use std::time::Duration;
 use crate::diagnostics::{pasture as pasture_run, throughput};
@@ -146,14 +143,10 @@ fn share(part: Duration, whole: Duration) -> String {
     format!("{:.1}%", 100.0 * part.as_secs_f64() / whole.as_secs_f64())
 }
 
-/// Ticks a world from a seed -- as far as it goes, hot about its
-/// sheep, its camera loading nothing, as a camera's superchunks are
-/// not the simulation's to say -- and prints its hash
-/// ([`crate::world_hash`]) before the first tick and every so many
-/// after, a row each, part by part: the same rows on every machine and
-/// on any number of threads, or the simulation is not deterministic,
-/// the first part to differ saying where. Nothing printed says what
-/// machine it ran on, so two runs' rows are compared as they are.
+/// Ticks a world from a seed, its camera loading nothing, and prints
+/// its hash before the first tick and every so many after, part by
+/// part, nothing of the machine in it (`docs/server.md`, "The same on
+/// every machine").
 pub(crate) fn check(given: &Given) -> Result<(), String> {
     let (ticks, every, sheep): (u64, u64, usize) = (given.number(TICKS)?, given.number(EVERY)?, given.number(SHEEP)?);
     let text = given.text(SEED)?;

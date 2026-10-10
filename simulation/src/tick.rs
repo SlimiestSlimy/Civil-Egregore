@@ -1,32 +1,8 @@
-//! The tick, superchunk by superchunk, in two phases, on the
-//! dispatcher's threads (`../../docs/civil_egregore.md`, "The tick").
-//!
-//! 1. **Computing**: every superchunk runs the rule on itself -- samples
-//!    its own cells, reads any cell in reach, and queues writes. Nothing
-//!    changes in this phase, so every superchunk reads the world as the
-//!    tick found it, and the threads share the arena read-only. A write
-//!    is queued in its superchunk's outbox: nine queues, by where it
-//!    lands -- the superchunk itself or one of its eight neighbours,
-//!    never farther, the speed of light being a superchunk's side.
-//! 2. **Applying**: every superchunk applies the writes queued for it --
-//!    from its own outbox and its eight neighbours', in a fixed order --
-//!    to its own bitmaps only. The threads share the outboxes
-//!    read-only, and each changes only the superchunks it holds.
-//!
-//! Entities tick in the same two phases: in the first, the entities
-//! waking in a superchunk run the rule with its cells, reading the world
-//! as the tick found it, and queue instructions -- an entity put, moved,
-//! edited or removed -- in the outbox slot of the superchunk each lands
-//! in; in the second, each superchunk applies the instructions queued
-//! for it, beside its writes. An entity moving to a
-//! neighbour goes as a whole copy, made in the first phase.
-//!
-//! The threads hold contiguous runs of the superchunks, so each works
-//! through them in Morton order, and the outboxes need no
-//! synchronization: in the first phase each is written by its own
-//! superchunk alone, in the second only read. Each superchunk has random
-//! numbers of its own, kept from tick to tick, so a tick comes out the
-//! same on any number of threads.
+//! The tick, superchunk by superchunk, in two phases on the
+//! dispatcher's threads: computing, every superchunk's rule reading
+//! the world as the tick found it and queuing into its outbox; then
+//! applying, each superchunk what was queued for it
+//! (`docs/simulation.md`, "The tick" and "The dispatcher").
 
 use entity_manager::{Entities, EntityId, EntityReader, Instructions, InstructionsApplied, SuperchunkEntities};
 use crate::turn::{slot, Outbox, Turn};
@@ -144,12 +120,10 @@ impl Simulation {
         self.dispatcher.threads()
     }
 
-    /// One tick of `rule`, over every superchunk of `arena` and its
-    /// entities in `entities` -- made to hold the same superchunks: the
-    /// first phase runs `rule` on each superchunk -- with room for
-    /// samples -- and the second applies what they queued. `seed`, the
-    /// world's, seeds a superchunk's random numbers the first tick it
-    /// is in.
+    /// One tick of `rule` over every superchunk of `arena` and its
+    /// entities: `rule` run on each, with room for samples, then what
+    /// they queued applied. `seed`, the world's, seeds a superchunk's
+    /// random numbers the first tick it is in.
     pub fn tick<R, F>(&mut self, arena: &mut BitmapArena, entities: &mut Entities, seed: u64, rule: F) -> TickReport<R>
     where
         R: Default + AddAssign + Send,

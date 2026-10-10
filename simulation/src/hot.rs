@@ -1,9 +1,6 @@
-//! Which superchunks are to be hot: the world's size, if it has one,
-//! the **hot entity** -- the kind of entity that keeps the superchunks
-//! about it hot, its **halo** -- and whether the **viewport**'s
-//! superchunks are hot too. Whoever holds the world defines all of it
-//! ([`Hot`]); its halos ([`crate::Halos`]) make hot what is wanted
-//! ([`Hot::wanted`], [`crate::Halos::keep_viewport`]).
+//! Which superchunks are to be hot: the world's size, the hot entity
+//! whose halos are, and whether the viewport's are too
+//! (`docs/simulation.md`, "Halos").
 
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE, WORLD_SIDE_SUPERCHUNKS};
 use entity_manager::{Entities, EntityType};
@@ -12,12 +9,8 @@ use entity_manager::{Entities, EntityType};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hot {
     /// Every entity of the kind `entity` keeps its halo hot -- and, if
-    /// `viewport`, every superchunk of the viewport too, however many,
-    /// whatever the entities do; `side`, if given, superchunks along a
-    /// side of the world, a square with the world's origin superchunk
-    /// in its middle: nothing outside it is ever hot, so nothing is
-    /// made there and nothing goes there. With none, as far as
-    /// coordinates reach.
+    /// `viewport`, the viewport's superchunks too -- in a world of
+    /// `side` superchunks a side, or as far as coordinates reach.
     About {
         /// The hot entity.
         entity: EntityType,

@@ -1,14 +1,7 @@
 //! A superchunk's turn in a tick's first phase: what a rule sees and
-//! does there, and the outbox what it queues goes to.
-//!
-//! | file | what is in it |
-//! |---|---|
-//! | `mod` | the turn itself: its superchunk, its random numbers, sampling, cells read and writes queued; and the outbox |
-//! | `entities` | the entities woken and read, and the instructions queued for them |
-//!
-//! A turn reads and queues, and no more: what a rule makes of it --
-//! the cells about a cell, the way to one, an entity changed -- is
-//! `../../../instructions`.
+//! does there, and the outbox what it queues goes to. `entities` holds
+//! the entities read and the instructions queued
+//! (`docs/simulation.md`, "What a rule is given").
 
 mod entities;
 

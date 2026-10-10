@@ -1,52 +1,7 @@
-//! Halos: the superchunks kept hot. Every hot entity
-//! ([`crate::hot::Hot`]) keeps its own superchunk and the eight about
-//! it hot -- its **halo** -- so whatever it reaches in a tick, as far as
-//! the speed of light, is hot. Every other superchunk is cold: its
-//! cells in its image in chunk storage, its entities and random
-//! numbers kept as a save keeps them ([`Held::cold`]).
-//!
-//! The halos move after every tick ([`Halos::move_to_hot_entities`]), and
-//! nothing slow is done on the tick: chunk storage's jobs
-//! ([`chunk_storage::jobs`]) do it, on the threads the tick has no use
-//! for just then.
-//!
-//! - A hot superchunk no halo reaches is **cooling** for [`COOL_TICKS`]
-//!   ticks: hot still, so a hot entity stepping back and forth over a
-//!   superchunk's edge does not make the superchunks about it flicker
-//!   cold and hot. Should a halo reach it again, it stays hot; else it
-//!   goes cold at the tick it is due: its state kept, its bitmaps set
-//!   aside, lingering, and its changed ones encoded by a job,
-//!   then put into the writeback ring, which flushes them when it needs
-//!   the room: the image rewritten by a job, the bitmaps held
-//!   until it is in the cold pool.
-//! - A superchunk a halo reaches, not hot, is **warming** for
-//!   [`WARM_TICKS`] ticks, and nothing stops it: its halo gone again, it
-//!   turns hot when due all the same, and is cooling from then.
-//!   Lingering, it is kept to be made hot as it is;
-//!   else its image -- generated, if it was never made -- is decoded in
-//!   a job. It turns hot at the tick it is due, waiting for the job
-//!   if need be, so the world is the same however fast the threads
-//!   are. Until then it is, to the simulation, cold like any
-//!   other: writes to it are missed, and entities sent to it stay where
-//!   they stood. So is a superchunk lingering.
-//!
-//! So between ticks the hot superchunks are the halos less those
-//! warming, and besides them those cooling; and one may be warming
-//! that no halo reaches any more.
-//!
-//! If the world's hot says so ([`Hot::viewport`]), the superchunks of
-//! the **viewport** -- what a renderer renders, told each frame
-//! ([`Halos::keep_viewport`]) -- are hot too, every one of them,
-//! warming and cooling as a halo's do: a world whose camera loads
-//! superchunks, made where it is looked at. Whoever holds the world is
-//! told which superchunks the halos' last move generated
-//! ([`Halos::generated`]), to put on them what a superchunk never made
-//! starts with.
-//!
-//! What they work on is whoever holds the world's ([`Held`]): the
-//! arena, chunk storage, the entities, the simulation and the cold
-//! states, lent for each call, with what generates a superchunk never
-//! made -- the one thing of the world's making halos need.
+//! Halos: the superchunks kept hot about the hot entities, and the
+//! viewport's if the world says so -- warming and cooling, each due at
+//! a tick, the slow work done by chunk storage's jobs off the tick
+//! (`docs/simulation.md`, "Halos").
 
 mod warming;
 mod write_back;
@@ -63,13 +18,8 @@ use std::ops::AddAssign;
 use std::sync::Arc;
 use utilities::dispatcher::Dispatcher;
 
-/// Ticks a superchunk a halo reaches is warming before it turns hot:
-/// a job's time to make it. Kept short, so the halos follow
-/// their hot entities closely: a superchunk generated takes a job
-/// longer, and the tick waits for it. A hot entity reaches a superchunk its
-/// halo has just reached no sooner than it walks across its own, 1,024
-/// cells -- a sheep steps once in `STEP_TICKS` (64) ticks or more -- so
-/// long after.
+/// Ticks a superchunk a halo reaches is warming before it turns hot
+/// (`docs/simulation.md`, "Halos").
 pub const WARM_TICKS: u64 = 256;
 
 /// Ticks a hot superchunk no halo reaches is cooling before it goes
@@ -192,12 +142,10 @@ impl Halos {
         Self { hot, jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing: Vec::new(), told: None, viewport: Vec::new(), generated: Vec::new() }
     }
 
-    /// Takes `viewport` -- what the renderer renders now, none if it
-    /// renders none of the world's cells -- in place of the last: if
-    /// the viewport's superchunks are hot ([`Hot::viewport`]), every one
-    /// of it within the world is wanted hot from the next move on,
-    /// besides the halos, warming and cooling as a halo's superchunks
-    /// do. Else it is nothing to the halos.
+    /// Takes `viewport` -- what the renderer renders now, if any --
+    /// in place of the last: its superchunks within the world wanted
+    /// hot from the next move on, if the world's hot says so
+    /// ([`Hot::viewport`]); else nothing.
     pub fn keep_viewport(&mut self, viewport: Option<Viewport>) {
         let viewport = viewport.filter(|_| self.hot.viewport());
         if viewport == self.told {
@@ -246,12 +194,9 @@ impl Halos {
         self.make_hot_within(held, &wanted, WARM_TICKS, COOL_TICKS)
     }
 
-    /// Makes `wanted` -- sorted -- the hot superchunks now: every other
-    /// one made cold, its state kept; every one of them not hot made
-    /// hot, lingering, from storage and its kept state, or generated --
-    /// those of jobs made at once, on every thread.
-    /// What generating and loading start from; between two ticks,
-    /// anything else needing superchunks hot a while may ask too.
+    /// Makes `wanted` -- sorted -- the hot superchunks now, nothing
+    /// warming or cooling after: what generating and loading start
+    /// from (`docs/reference.md`, "Halos::keep_hot").
     pub fn keep_hot(&mut self, held: &mut Held<'_>, wanted: &[SuperchunkIndex]) -> HaloChange {
         self.generated.clear();
         let mut change = self.make_hot_within(held, wanted, 0, 0);

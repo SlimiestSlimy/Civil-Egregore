@@ -1,14 +1,6 @@
-//! The 3x3 cells around a cell, as nine bits: what an entity sees
-//! beside it, and where it may step. Row by row from the top left, the
-//! cell `(x, y)` -- each 0 to 2, the cell itself at `(1, 1)` -- at bit
-//! `3 * y + x`. A set of neighbours is a mask, narrowed with `&`: those
-//! with grass, those no entity stands on, those in the world hot. A
-//! neighbour chosen is a bit's index, turned into a cell only when it
-//! is stepped to.
-//!
-//! Read at once (`read::around`): a window of the bitplane from the
-//! cell up and left, its three rows of three squeezed together; no
-//! cell is looked at alone.
+//! The 3x3 cells around a cell as nine bits, row by row from the top
+//! left: cell `(x, y)` at bit `3 * y + x`, the cell itself at `(1, 1)`
+//! (`docs/instructions.md`, "The shapes").
 
 use coordinates::CellIndex;
 use utilities::rng::Rng;

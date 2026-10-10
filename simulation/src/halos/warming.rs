@@ -8,12 +8,9 @@ use entity_manager::saved;
 
 impl Halos {
     /// Makes `wanted` -- sorted -- the superchunks hot or warming, each
-    /// warming hot within `warm_ticks`, each other one hot cold within
-    /// `cool_ticks`, and those wanted again no longer cooling; then
-    /// every one due made hot, or cold. A warming is never given up:
-    /// one no longer wanted turns hot when it is due all the same, and
-    /// is cooling from then -- so a superchunk's warming is one thing,
-    /// whenever a save falls in it.
+    /// warming hot within `warm_ticks`, each other hot one cold within
+    /// `cool_ticks`; then every one due made hot, or cold. A warming is
+    /// never given up (`docs/reference.md`, "Halos::make_hot_within").
     pub(crate) fn make_hot_within(&mut self, held: &mut Held<'_>, wanted: &[SuperchunkIndex], warm_ticks: u64, cool_ticks: u64) -> HaloChange {
         // Nothing outside the world's size, whoever wants it.
         let within: Vec<SuperchunkIndex>;

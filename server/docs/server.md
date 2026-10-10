@@ -20,12 +20,15 @@ hot before it ticks; or, forced hot, all of it hot throughout whatever
 they do. One with none has them on its origin superchunk
 (`WORLD_MIDDLE`) alone, as sheep everywhere would keep the whole of an
 endless world hot: the origin and the eight about it hot before it
-ticks. Unless told otherwise (`Start::default`), it has no size and
-4,000 sheep. Every superchunk's contents come from the world's seed
+ticks. If its camera loads superchunks and it is not forced hot, the
+viewport's superchunks are hot too, and it keeps how many sheep a
+superchunk generated in the viewport starts with ("Halos", below).
+Unless told otherwise (`Start::default`), it has no size and 4,000
+sheep. Every superchunk's contents come from the world's seed
 and its superchunk index (`worldgen::generate_superchunk`), so a superchunk is the
 same whenever and in whatever order it is made: the world has no edge
 but the coordinates', and grows as the sheep wander. A superchunk is
-its terrain (`../worldgen/`) -- heights, and the walls they make, four
+its terrain (`../worldgen/`) -- heights, and the walls they make, two
 layers -- and on it grass in patches, dirt being a cell with none and
 having no layer, and trees in patches of
 their own, each of a stage drawn for its cell (`worldgen::Generation`,
@@ -91,7 +94,9 @@ place in the table, read by name (`TickCounts::count("sheep",
 A world follows from its seed alone: the same seed ticked as far is the
 same world, to the bit, on any machine and any number of threads.
 `world_hash` says so in a few words -- one each for the hot bitmaps,
-the entities, the random streams, the halos and the cold pool -- and
+the entities, the random streams, the halos and the cold pool, folded
+by nothing a machine could do its own way: no float, no pointer, no
+order but Morton's -- and
 `Civil_Egregore server check <seed> <ticks>` prints them every so many
 ticks:
 
@@ -99,6 +104,9 @@ ticks:
 
 run on two machines and the two files compared; the first row to
 differ says at which tick they part, the first column of it in what.
+The rows are the same on any number of threads too, and nothing
+printed says what machine it ran on, so two runs' files are compared
+as they are.
 The world checked has no camera: a camera's superchunks are hot by
 where a person looks, which no seed says.
 
@@ -178,12 +186,21 @@ A world run for a window, on a thread of its own (`src/host/`): the
 window holds a `Host` and calls it -- a world made or opened in place
 of the one run, the world saved, paused, paced, and the cells of its
 viewport -- each call sent to the host's thread and done there between
-ticks. It answers only the viewport's hot superchunks, as the last
-tick left them, copied and nothing more, so what is rendered costs the
-ticks next to nothing -- and with them which are hot, so a window
+ticks. It answers only the viewport's hot superchunks, each as a tick
+left it, copied and nothing more -- turning cells into pixels is the
+client's -- a few between two ticks, in the time the host has to spare
+or a small share of a tick's (`FRAMES_SHARE`), each few sent as a
+frame of their own, the last saying it is (`Frame::more`): so a
+frame's superchunks are not all of the one tick, answering costs each
+tick a little however much is asked, and nothing asked for is left
+out. What is rendered so costs the ticks next to nothing -- and with them which are hot, so a window
 drops what it drew of one gone cold; it sends nothing unasked, so a window
-that falls behind slows no tick. It starts with no world, and waits
-until asked for one. As a world runs it keeps a census -- the flock and
+that falls behind slows no tick, and it is the client that sets how
+often the world is drawn. It starts with no world, and waits until
+asked to make one (`Host::make_world`) or open one saved
+(`Host::open_world`); it makes the one run again from its start when
+its generation is retuned (`Host::reset`). It ticks at the pace asked,
+or flat out, until the client is gone. As a world runs it keeps a census -- the flock and
 the grass every 1,000 ticks, the seconds and the pace held -- in
 `transient_data/measurements/census.csv`, written as it goes, so a run
 closed at any time leaves what it came to.

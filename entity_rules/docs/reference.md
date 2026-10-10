@@ -26,7 +26,7 @@ it stays where it stands and wakes at the first of those ticks to come;
 hungry, it walks -- onto a grass neighbour, else a step to the nearest
 grass no entity stands on in the area about it, round the entities in
 the way, and with none there to the nearest further off, as far as it
-reaches (`Turn::seek`, one step a wake), else
+reaches (`read::walking::seek`, one step a wake), else
 onto any hot neighbour (`around::pick`), without looking whether an
 entity stands there: the step is turned back if one does -- and wakes a
 step's time on (**`next_step`**). What it came to is queued by
@@ -40,5 +40,5 @@ in **`COUNTED`**.
 
 **`flock(entities, superchunk, count, random)`**: grown sheep, each
 some way from its next meal, queued each on a cell of its own drawn at
-random, waking
-over the next `STEP_TICKS` ticks.
+random -- at most half the superchunk's cells' worth of them, more
+panicking -- waking over the next `STEP_TICKS` ticks.

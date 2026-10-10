@@ -1,11 +1,7 @@
-//! How a world is generated, as a whole: the heights' shape, and how
-//! the grass and the trees lie on them ([`Generation`]) -- saved with a
-//! world, a number a line, so one loaded goes on as it was made; made
-//! from the sliders' numbers when a new world is set up
-//! ([`Generation::from_tuning`]). What grows on a cell
-//! ([`Growth::at`]) is said here once, for the superchunks generated
-//! and for the map alike; and a seed is found with land where a flock
-//! is to stand ([`seed_with_land`]).
+//! How a world is generated, as a whole: the heights' shape and how
+//! grass and trees lie on them ([`Generation`]), saved with a world;
+//! what grows on a cell; a seed with land where a flock is to stand
+//! (`docs/worldgen.md`, "Generation").
 
 use crate::mesh::{Lands, SIGMOID_ONE};
 use crate::patches::Patches;

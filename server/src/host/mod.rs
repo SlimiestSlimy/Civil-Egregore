@@ -1,26 +1,7 @@
-//! The host: a world run on a thread of its own, for a client -- a
-//! window -- that asks it, never the other way round, for the cells of
-//! its viewport: whatever it should render.
-//!
-//! The client holds a [`Host`] and calls it; each call is sent to the
-//! host's thread, read there between ticks. It starts with no world,
-//! and runs one once asked to make one ([`Host::make_world`]) or to
-//! open one saved ([`Host::open_world`]) -- and makes the one run again
-//! from its start when its generation is retuned ([`Host::reset`]). Each [`Host::sync`] is
-//! answered with a [`Frame`]: the viewport's hot superchunks each as
-//! a tick left it, copied and nothing more ([`frame`]) -- a few
-//! between two ticks, in the time the host has to spare or a small
-//! share of a tick's, each few sent as a frame of their own, the last
-//! saying it is ([`Frame::more`]): so however much is asked, the ticks
-//! give up little to it, and nothing asked for is left out.
-//! It sends nothing
-//! unasked, so it is the client that sets how often the world is
-//! drawn, and one that falls behind slows no tick.
-//!
-//! It ticks at the pace asked, or flat out, until the client is gone,
-//! and keeps a census of the flock and the grass as it goes
-//! ([`census_path`]): what a long run came to is there once it is
-//! closed.
+//! The host: a world run on a thread of its own for a client -- a
+//! window -- that asks it for the cells of its viewport, never the
+//! other way round; each call is sent to the thread and done between
+//! ticks (`docs/server.md`, "The host").
 
 mod host_thread;
 use host_thread::HostThread;

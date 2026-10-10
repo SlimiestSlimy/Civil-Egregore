@@ -1,13 +1,7 @@
-//! Civil Egregore's world generation. The terrain: every cell's height, from the world's seed and
-//! where the cell is, and nothing else ([`height`]) -- so a superchunk
-//! is the same whenever it is generated, and meets its neighbours with
-//! no seam -- and the **walls**: two cells beside one another, across
-//! or down, more than [`STEP`] apart in height cannot be stepped
-//! between ([`Terrain`]). A diagonal step has no wall of its own: it is
-//! open only when both ways round it, across then down and down then
-//! across, are. How what grows on it lies ([`patches`]), how a
-//! world is generated as a whole ([`generation`]), and a superchunk's
-//! cells made of both ([`generated_superchunk`]).
+//! Civil Egregore's world generation: every cell's height, from the
+//! world's seed and where the cell is alone ([`height`]); the walls
+//! heights make ([`Terrain`]); how what grows lies ([`patches`]); how a
+//! world is generated as a whole ([`generation`]).
 //!
 //! The design: `docs/worldgen.md`; function by function:
 //! `docs/reference.md`.
@@ -72,11 +66,8 @@ pub struct Shape {
     /// less each vertex from the ocean, to one past the coast.
     pub coast_low: u64,
     /// The least share of its length a line's blend is, of [`ONE`]:
-    /// each line has a blend of its own, by lot, from this to the most
-    /// -- the share of the line, about its middle, the change from one
-    /// end's height to the other's is spread over. All of it, and the
-    /// line is one slope from vertex to vertex; little, and it is two
-    /// plains and a cliff.
+    /// little, and the line is two plains and a cliff
+    /// (`docs/worldgen.md`, "The land as a mesh").
     pub narrow: u64,
     /// The most share of its length a line's blend is.
     pub wide: u64,

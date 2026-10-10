@@ -63,6 +63,18 @@ dirt, and a tree or none -- is said once (`Generation::growth`, then
 map alike. A seed is found with land about where a flock is to stand
 (`seed_with_land`, `has_land_about`).
 
+## Patches
+
+Grass and trees are not scattered cell by cell: they lie in patches
+(`Patches`). Every cell has a number, from the world's seed and where
+it is: smooth noise as broad as a patch (`patch`), finer noise on it
+(`detail`), and a lot drawn for the cell alone (`scatter`). The cells
+whose number is under a threshold have the thing; the threshold is
+found, from `SAMPLED` cells looked at, so that the share asked for
+(`cover`) do. Whole numbers only, as the heights, so the same on any
+machine. The trees' numbers are kept apart from the grass's by a salt
+(`TREES_SALT`).
+
 ## Layout
 
 | folder | what is in it |

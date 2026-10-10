@@ -1,12 +1,10 @@
-//! Civil Egregore's server: the world as a whole, held by the one crate that
-//! puts the rest together -- which a renderer, or the program, is a
-//! client of. The world made from a seed ([`generate`]), ticked
-//! -- its cells' rules (`mc_rules/`) and its entities (`entity_rules/`)
-//! together, the superchunks hot only about the entities that keep a
-//! halo ([`halos`]) -- saved ([`save`]) and loaded ([`load`]) as it
-//! was, to the cell and the random number. Where a save's files are
-//! and what they hold: `chunk_storage::disk`. The design:
-//! `docs/server.md`; function by function: `docs/reference.md`.
+//! Civil Egregore's server: the world as a whole, held by the one
+//! crate that puts the rest together -- made from a seed ([`start`]),
+//! ticked, saved ([`save`]) and loaded ([`load`]) as it was. A
+//! renderer, or the program, is a client of it.
+//!
+//! The design: `docs/server.md`; function by function:
+//! `docs/reference.md`.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -124,14 +122,9 @@ impl World {
     }
 }
 
-/// A world as `options` say: generated as they say, its sheep put on
-/// and their halos hot before it ticks -- or, forced hot, all of it.
-/// Every superchunk -- these, and those made as a flock wanders -- is
-/// its terrain, heights and the walls they make, and on it grass and
-/// trees in patches. Each from the seed and where it is
-/// ([`worldgen::generate_superchunk`]). If its camera loads superchunks, and it is
-/// not forced hot, the viewport's superchunks are hot too, and it keeps
-/// how many sheep a superchunk generated in the viewport starts with.
+/// A world as `options` say: generated, its sheep put on and their
+/// halos hot before it ticks -- or, forced hot, all of it
+/// (`docs/server.md`, "Made from a seed").
 pub fn start(options: Start) -> World {
     let mut world = generate_sized(options.generation, options.seed, options.size, options.hot_entity, options.threads);
     let forced = matches!(options.size, Size::Limited { forced: true, .. });
@@ -155,12 +148,9 @@ pub fn start(options: Start) -> World {
     world
 }
 
-/// A world of `seed` with nothing in it yet, nothing hot, whose
-/// superchunks are generated as `generation` says, as far as `size`
-/// lets it reach, hot about the entities of the kind `hot_entity`
-/// unless forced hot, on `threads` threads, every one the machine has
-/// if none is given: what [`start`] is built from, and what a way of
-/// generating is tried out on by itself.
+/// A world of `seed` with nothing in it yet, nothing hot: what
+/// [`start`] is built from, and what a way of generating is tried out
+/// on by itself (`docs/reference.md`, "Generation").
 pub fn generate_sized(generation: Generation, seed: u64, size: Size, hot_entity: EntityType, threads: Option<usize>) -> World {
     let (side, forced) = match size {
         Size::Unlimited => (None, false),

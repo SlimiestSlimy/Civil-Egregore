@@ -1,22 +1,7 @@
-//! Monte Carlo sampling of the hot bitplanes (`../bitplane_manager`): every set cell of a layer
-//! type chosen with one chance, independently, and handed out in
-//! Morton order -- superchunk by superchunk, chunk by chunk, cell by
-//! cell -- so what is computed from the samples, and the writes it
-//! queues, come in that order already, never sorted.
-//!
-//! No sample is wasted: the cells are not each tossed a coin, nor drawn
-//! and rejected. The set cells are ranked in Morton order, and the gap
-//! from one chosen rank to the next is drawn from the geometric law
-//! (`docs/civil_egregore.md`, "Sampling"): each set cell is then chosen with
-//! the chance asked, and only the chosen ones are found. The gap is
-//! whole-number arithmetic (`utilities::chance::Chance::passed_over`):
-//! no float is in it, so the same cells are chosen on every machine. The
-//! counts find them: a layer type over a superchunk with no hot cell
-//! set is passed over whole, a chunk by its count, a count tile of 16 words by
-//! its count, a word by its bits' count, and only the word holding a chosen
-//! cell is searched. So a sample costs the same few counts however far
-//! from the last it is: the rarer the samples, the less of a bitmap is
-//! read at all.
+//! Monte Carlo sampling of the hot bitplanes: every set cell of a layer
+//! type chosen with one chance, in Morton order, none wasted -- the gap
+//! to the next drawn in whole numbers, the counts finding it
+//! (`docs/simulation.md`, "Sampling").
 
 use bitmap::BITS_PER_WORD;
 use bitplane_manager::{BitmapArena, LayerView, COUNT_TILE_WORDS};

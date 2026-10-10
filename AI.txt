@@ -221,9 +221,9 @@ break; write a new ask here the moment it is made.
    comment blocks of 6+ lines; if lost, it is 40 lines of python.
    Crates done: coordinates, bitmap, type_registry, pathfinding,
    utilities, bitplane_manager, chunk_storage, entity_manager (its
-   design doc docs/entity_manager.md was missing: written). Left:
-   simulation, instructions, mc_rules, entity_rules, worldgen, server,
-   gui, renderer, tessera, AI_SCRATCHPAD, src. When all are done, make
+   design doc docs/entity_manager.md was missing: written),
+   simulation, instructions, mc_rules, entity_rules, worldgen,
+   server. Left: gui, renderer, tessera, AI_SCRATCHPAD, src. When all are done, make
    tests/fine.rs's every_public_item test cover private items too
    (not trait-impl methods or tests). Commit a few crates at a time.
 2. WORLDGEN: profile and really simplify ("waaay too slow"); a little
@@ -243,6 +243,17 @@ break; write a new ask here the moment it is made.
 5. LOD ON THE GPU (renderer).
 6. Another day: optimizations, inlining.
 
+6b. DOUBLE WRITES (asked 2026-10-09, "after everything else"): the
+   user suspects double-write hazards are still in the sim --
+   "specifically i believe 2 sheeps can eat the same grass, check that
+   please". Known so far: the sheep rule reads the world as the tick
+   found it, so two sheep on... no: entities never overlap, so two
+   sheep are never on one cell and each eats only its own cell -- to
+   be VERIFIED by a test, with every other pair of writes that may
+   land on one cell in a tick (grass spread + spread, spread + eaten,
+   decay + eaten, tree put + put, edits of one entity by two). The
+   docs said "two sheep may eat one cell in a tick": check, and
+   correct whichever is wrong.
 7. LAST STEP (asked 2026-10-09): go through ALL tests of the codebase;
    wherever a test has fixed cases that could be generated (seeded,
    randomized, from the seed file), make it generated.

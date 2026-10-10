@@ -1,10 +1,6 @@
-//! A world's hash ([`world_hash`]): everything two worlds the same hold
-//! the same -- every hot bitmap, every entity, every random stream, the
-//! halos, the cold pool -- folded into a few words
-//! (`utilities::hash::fold`), by nothing a machine could do its own
-//! way: no float, no pointer, no order but Morton's. The same seed
-//! ticked as far on two machines hashes the same, or the simulation is
-//! not deterministic -- and which part's hash differs says where.
+//! A world's hash ([`world_hash`]): everything two worlds the same
+//! hold the same, folded into a few words by nothing a machine could
+//! do its own way (`docs/server.md`, "The same on every machine").
 
 use crate::World;
 use utilities::hash::{fold, fold_all};

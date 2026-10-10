@@ -1,9 +1,7 @@
-//! What a client asks of the world's viewport, and what it is answered
-//! with: the hot superchunks it asks for ([`Ask`]), each copied as a
-//! tick left it ([`Frame`]) -- their bitplanes' words as they are,
-//! and where their sheep stand -- a few between two ticks, so a frame's
-//! superchunks are not all of the one tick. Copying is all the host does for a
-//! client: turning cells into pixels is the client's.
+//! What a client asks of the world's viewport ([`Ask`]) and what it is
+//! answered with ([`Frame`]): the hot superchunks asked for, each
+//! copied as a tick left it and nothing more
+//! (`docs/server.md`, "The host").
 
 use crate::World;
 use bitplane_manager::BucketKey;
