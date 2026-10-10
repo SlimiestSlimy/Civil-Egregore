@@ -3,7 +3,7 @@
 //! sampling pass for both (`docs/mc_rules.md`, "Grass").
 
 use instructions::layers::{GRASS, WET};
-use instructions::{read, write, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
+use instructions::{cells, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
 
 /// The chance, each tick, that a cell of grass tries to spread.
 pub const SPREAD_CHANCE: Chance = Chance::one_in(100_000);
@@ -28,7 +28,7 @@ pub const DECAYS: usize = 2;
 /// the chances of spreading and of decay together, in Morton order,
 /// each seen to by [`cell`].
 pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
-    let (sampled, mut counts) = read::cells::each_sampled(turn, GRASS, SAMPLE_CHANCE, samples, cell);
+    let (sampled, mut counts) = cells::each_sampled(turn, GRASS, SAMPLE_CHANCE, samples, cell);
     counts[SAMPLED] = sampled as u64;
     counts
 }
@@ -47,12 +47,12 @@ fn cell(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
     if spreading {
         // Dirt is a cell with no grass on it: no layer of its own.
         // And grass does not spread under water; a world with no water has none.
-        if read::cells::lacks(turn, GRASS, neighbour) && !read::cells::holds(turn, WET, neighbour) {
-            write::cells::set(turn, GRASS, neighbour);
+        if cells::lacks(turn, GRASS, neighbour) && !cells::holds(turn, WET, neighbour) {
+            cells::set(turn, GRASS, neighbour);
             counts[SPREADS] += 1;
         }
-    } else if read::cells::holds(turn, GRASS, neighbour) {
-        write::cells::clear(turn, GRASS, cell);
+    } else if cells::holds(turn, GRASS, neighbour) {
+        cells::clear(turn, GRASS, cell);
         counts[DECAYS] += 1;
     }
 }

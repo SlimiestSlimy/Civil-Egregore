@@ -55,7 +55,7 @@ it is read and written as its blocks (`EntityRef::attribute_blocks`,
 `EntityEdit::set_blocks`, `Instructions::set_attribute_blocks`). The
 walk over an entity's attributes honours a block length all the same,
 and a test makes one to say so
-(`../../simulation/tests/fine/attribute_blocks.rs`).
+(`../tests/fine.rs`).
 
 **An entity's attributes** are a run of blocks in its bucket's list,
 sorted by type, each type once. Finding one is a walk from the first
@@ -227,6 +227,7 @@ blocks are not whole attributes sorted by type is not read.
 | `src/instructions.rs` | put, move, edit, remove: queued for a superchunk and applied by it |
 | `src/saved.rs` | a superchunk's state as a save's words |
 | `src/diagnostics/` | what the entities hold: entities, attribute blocks in use and as garbage, wakes filed |
+| `tests/fine.rs` | the fine tier: attributes of any length put, found, edited and saved |
 | `docs/` | this, and the reference, function by function |
 
 It has no tests of its own: the entities are judged through the

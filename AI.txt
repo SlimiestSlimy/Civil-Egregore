@@ -244,9 +244,11 @@ break; write a new ask here the moment it is made.
    entity_manager (attributes.rs); the ID's top byte is the block
    count, 0 = not an attribute, 0xFF = size varies (user's rule). Not
    done: a typed layout for a varying size (none registered yet).
-3b. INSTRUCTIONS CRATE CLEANUP (asked 2026-10-10, verbatim): "clean up
-   instructions crate, why does it have so many files? duplication
-   everywhere". Fewer files, no duplicated code; next after task 3.
+3b. INSTRUCTIONS CRATE CLEANUP: DONE 2026-10-10. 20 source files ->
+   7, a module a subject (cells, entities, around, area, mask, walking,
+   lib); read/ and write/ gone; repeats written once; tests share
+   tests/tests.rs. The user may yet say whether Around/Area/Window as
+   three {set, hot} shapes should be one.
 4. COLD POOL to disk once worlds get large (paging). Server tests'
    remaining written seeds (21 and 3 in server/tests/complete.rs) from
    the seed file. Optional: BMI2 pdep for select.

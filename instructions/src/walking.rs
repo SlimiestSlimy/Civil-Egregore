@@ -6,14 +6,30 @@
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use pathfinding::{a_star, Cell, Rows, Walls};
-use super::{area, cells};
-use crate::area::{AREA_CENTRE, AREA_SIDE, FARTHEST_SCALE};
+use crate::area::{self, AREA_CENTRE, AREA_SIDE, FARTHEST_SCALE};
 use crate::around::{self, squeeze};
+use crate::cells;
+use crate::mask::about;
 use simulation::Turn;
 use type_registry::{WALL_EAST, WALL_SOUTH};
 
 // The area a turn reads is the area paths are found over.
 const _: () = assert!(pathfinding::SIDE == AREA_SIDE);
+
+/// Where an entity stands in the area about it.
+const HERE: Cell = Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
+
+/// The cell of the world `cell` of the area about `at` is: none off
+/// the world.
+fn of_the_area(at: CellIndex, cell: Cell) -> Option<CellIndex> {
+    at.offset(cell.x as i32 - AREA_CENTRE as i32, cell.y as i32 - AREA_CENTRE as i32)
+}
+
+/// `rows` of the area about `at`, less the cells entities stand on.
+fn unoccupied(turn: &Turn, at: CellIndex, rows: [&Rows; 2]) -> [Rows; 2] {
+    let occupied = area::occupied(turn, at);
+    rows.map(|rows| std::array::from_fn(|row| rows[row] & !occupied[row]))
+}
 
 /// A step found by [`seek`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,10 +46,10 @@ pub struct SoughtStep {
 /// before -- its own among them. Where the wall layers are not hot,
 /// none bars.
 pub fn around_unwalled(turn: &Turn, at: CellIndex) -> u16 {
-    let Some(corner) = at.offset(-1, -1) else {
+    let Some(corner) = about(at, around::SIDE) else {
         return around::ALL;
     };
-    let [east, south] = turn.windows([WALL_EAST, WALL_SOUTH], corner, 3, 3).map(|window| squeeze(window.set));
+    let [east, south] = turn.windows([WALL_EAST, WALL_SOUTH], corner, around::SIDE, around::SIDE).map(|window| squeeze(window.set));
     // Whether the cell at `bit` of the nine keeps a wall east of it, or south.
     let (east_of, south_of) = (|bit: u16| east >> bit & 1, |bit: u16| south >> bit & 1);
     // A wall is kept by the upper or left cell of the two: the centre's own east and south, its neighbours' west and north.
@@ -60,12 +76,9 @@ pub fn area_walls(turn: &Turn, centre: CellIndex) -> Walls {
 /// and entities; none if no goal can be come to. One step: no route
 /// is kept.
 pub fn step_towards(turn: &mut Turn, at: CellIndex, goals: &Rows, passable: &Rows) -> Option<CellIndex> {
-    let occupied = area::occupied(turn, at);
-    let passable: Rows = std::array::from_fn(|row| passable[row] & !occupied[row]);
-    let goals: Rows = std::array::from_fn(|row| goals[row] & !occupied[row]);
-    let here = Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
-    let first = pathfinding::step_towards(&passable, &area_walls(turn, at), &goals, here, turn.random().draw())?.first;
-    at.offset(first.x as i32 - AREA_CENTRE as i32, first.y as i32 - AREA_CENTRE as i32)
+    let [passable, goals] = unoccupied(turn, at, [passable, goals]);
+    let first = pathfinding::step_towards(&passable, &area_walls(turn, at), &goals, HERE, turn.random().draw())?.first;
+    of_the_area(at, first)
 }
 
 /// The step from `at` towards the nearest cell `layer_type` holds
@@ -76,10 +89,9 @@ pub fn seek(turn: &mut Turn, at: CellIndex, layer_type: LayerType) -> Option<Sou
     if let Some(to) = step_towards(turn, at, &near.set, &near.hot) {
         return Some(SoughtStep { to, scale: 0 });
     }
-    let here = Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
     let mut tiles = area::of_tiles(turn, layer_type, at, FARTHEST_SCALE);
     let no_walls = Walls::default();
-    let mut path = pathfinding::step_towards(&tiles.hot, &no_walls, &tiles.set, here, turn.random().draw());
+    let mut path = pathfinding::step_towards(&tiles.hot, &no_walls, &tiles.set, HERE, turn.random().draw());
     // In its own tile alone, there is no tile to step towards: a finer scale sees where in it.
     let own = tiles.set[AREA_CENTRE] >> AREA_CENTRE & 1 == 1;
     // The nearest is at least this many cells off: a scale's tiles reach under nine tiles.
@@ -92,7 +104,7 @@ pub fn seek(turn: &mut Turn, at: CellIndex, layer_type: LayerType) -> Option<Sou
     while scale < FARTHEST_SCALE {
         if 9 << scale > least + 1 {
             tiles = area::of_tiles(turn, layer_type, at, scale);
-            if let Some(nearer) = pathfinding::step_towards(&tiles.hot, &no_walls, &tiles.set, here, turn.random().draw()) {
+            if let Some(nearer) = pathfinding::step_towards(&tiles.hot, &no_walls, &tiles.set, HERE, turn.random().draw()) {
                 path = Some(nearer);
                 break;
             }
@@ -101,7 +113,7 @@ pub fn seek(turn: &mut Turn, at: CellIndex, layer_type: LayerType) -> Option<Sou
     }
     let path = path?;
     // The cell beside it the way the tile is: stepped to if it is in the world hot.
-    let to = at.offset(path.first.x as i32 - AREA_CENTRE as i32, path.first.y as i32 - AREA_CENTRE as i32)?;
+    let to = of_the_area(at, path.first)?;
     // From far off no wall is seen: a step one bars is not taken.
     let open = around_unwalled(turn, at) >> around::bit_of(at, to) & 1 == 1;
     (open && cells::hot(turn, layer_type, to)).then_some(SoughtStep { to, scale })
@@ -118,9 +130,7 @@ pub fn step_to(turn: &mut Turn, at: CellIndex, to: CellIndex, passable: &Rows) -
     if !(0..AREA_SIDE as i64).contains(&across) || !(0..AREA_SIDE as i64).contains(&down) {
         return None;
     }
-    let occupied = area::occupied(turn, at);
-    let passable: Rows = std::array::from_fn(|row| passable[row] & !occupied[row]);
-    let here = Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
-    let first = a_star(&passable, &area_walls(turn, at), here, Cell { x: across as u8, y: down as u8 })?.first;
-    at.offset(first.x as i32 - AREA_CENTRE as i32, first.y as i32 - AREA_CENTRE as i32)
+    let [passable, _] = unoccupied(turn, at, [passable, passable]);
+    let first = a_star(&passable, &area_walls(turn, at), HERE, Cell { x: across as u8, y: down as u8 })?.first;
+    of_the_area(at, first)
 }

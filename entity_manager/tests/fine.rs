@@ -1,15 +1,34 @@
-//! Attributes of more blocks than one, and of a size that varies: put,
-//! found by a walk that steps over each as far as its type or its
-//! block length says, edited to another length, saved and read back
-//! (`entity_manager/docs/entity_manager.md`, "Attributes, a block each").
+//! The fine tier: attributes of more blocks than one, and of a size
+//! that varies -- put, found by a walk that steps over each as far as
+//! its type or its block length says, edited to another length, saved
+//! and read back (`docs/entity_manager.md`, "Attributes, a block each").
+//! The tiers: `docs/testing_protocol.md`, at the repository's root.
 //!
-//! `cargo test`
+//! `cargo test --test fine`
 
-use crate::tests::{cell, walker, world, WALKER};
-use coordinates::CellIndex;
+use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::saved::{decode_state, encode_state};
-use entity_manager::{find_attribute, push_attribute, sorted, Attribute, AttributeBlock, AttributeType, Layout, BLOCK_WORDS, NEVER};
-use simulation::{Simulation, Turn};
+use entity_manager::{find_attribute, push_attribute, sorted, Attribute, AttributeBlock, AttributeType, Entities, EntityId, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER};
+
+/// The entities' type.
+const WALKER: EntityType = EntityType(40);
+
+/// Entities holding the superchunk `(10, 10)`, none in it.
+fn world() -> Entities {
+    let mut entities = Entities::new();
+    assert_eq!(entities.align(&[SuperchunkIndex::from_cartesian(10, 10)]), 0);
+    entities
+}
+
+/// The cell `(x, y)` cells from the top left of the superchunk `(10, 10)`.
+fn cell(x: u32, y: u32) -> CellIndex {
+    CellCartesian { x: 10 * SUPERCHUNK_SIDE_CELLS + x, y: 10 * SUPERCHUNK_SIDE_CELLS + y }.into()
+}
+
+/// A walker with ID `id` on `at`, never waking.
+fn walker(id: u64, at: CellIndex) -> Header {
+    Header { id: EntityId(id), kind: WALKER, at, wake: NEVER }
+}
 
 /// A layout of two blocks: a number in its data's first word and one
 /// in its last, the second block's.
@@ -81,8 +100,8 @@ fn every_attribute_is_found_over_those_of_any_length() {
     assert!(!sorted(&[blocks[6], blocks[0]]), "out of order");
     assert!(!sorted(&[AttributeBlock([WALKER.0, 0, 0, 0, 0, 0, 0, 0])]), "a type whose top byte is 0 is no attribute's");
 
-    let (_, mut entities) = world(1);
-    let header = walker(1, cell(40, 30), NEVER);
+    let mut entities = world();
+    let header = walker(1, cell(40, 30));
     entities.queue_put(header, &blocks);
     entities.apply();
     let entity = entities.get(header.id, header.at).expect("put");
@@ -97,41 +116,35 @@ fn every_attribute_is_found_over_those_of_any_length() {
 /// wrong is not read.
 #[test]
 fn an_attribute_is_edited_to_any_length_and_saved() {
-    let (mut arena, mut entities) = world(1);
-    let target = walker(9, cell(40, 30), NEVER);
+    let mut entities = world();
+    let target = walker(9, cell(40, 30));
     entities.queue_put(target, &attributes());
-    entities.queue_put(walker(1, cell(50, 30), 0), &[]);
     entities.apply();
-    let mut simulation = Simulation::new(1);
-    let edits: [&(dyn Fn(&mut Turn) + Sync); 4] = [
-        &|turn| turn.set_attribute_blocks(&target, &varying(NOTE, &[6; 40])),
-        &|turn| turn.set_attribute_blocks(&target, &varying(NOTE, &[8; 2])),
-        &|turn| turn.set_attribute(&target, ENDS, BothEnds { first: 17, last: 19 }),
-        &|turn| turn.unset_attribute(&target, NAME.attribute_type()),
+    let edits: [&dyn Fn(&mut Instructions); 4] = [
+        &|queue| queue.set_attribute_blocks(target.id, target.at, &varying(NOTE, &[6; 40])),
+        &|queue| queue.set_attribute_blocks(target.id, target.at, &varying(NOTE, &[8; 2])),
+        &|queue| queue.set_attribute(target.id, target.at, ENDS, BothEnds { first: 17, last: 19 }),
+        &|queue| queue.unset_attribute(target.id, target.at, NAME.attribute_type()),
     ];
     for (tick, edit) in edits.into_iter().enumerate() {
-        let report = simulation.tick(&mut arena, &mut entities, tick as u64, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
-            for entity in turn.woken() {
-                edit(turn);
-                turn.step(&entity.header, entity.header.at, turn.now() + 1);
-            }
-            0
-        });
-        assert_eq!(report.instructions_applied.edits, 1, "tick {tick}");
+        let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
+        edit(&mut queue);
+        queue.apply(entities.superchunks_mut(), 0, &mut applied);
+        assert_eq!(applied.edits, 1, "edit {tick}");
         let edited = entities.get(target.id, target.at).expect("where it stood");
-        assert!(sorted(edited.attributes), "tick {tick}");
+        assert!(sorted(edited.attributes), "edit {tick}");
         let note = edited.attribute_blocks(NOTE).expect("the note");
-        assert_eq!((note.len(), note[0].0[2]), if tick == 0 { (6, 6) } else { (1, 8) }, "tick {tick}");
-        assert_eq!(edited.attribute(ENDS), Some(if tick < 2 { BothEnds { first: 11, last: 13 } } else { BothEnds { first: 17, last: 19 } }), "tick {tick}");
-        assert_eq!(edited.attribute(NAME), (tick < 3).then_some(7), "tick {tick}");
-        assert_eq!(edited.attribute_blocks(TAIL).map(|tail| tail[0].0[2]), Some(3), "tick {tick}");
+        assert_eq!((note.len(), note[0].0[2]), if tick == 0 { (6, 6) } else { (1, 8) }, "edit {tick}");
+        assert_eq!(edited.attribute(ENDS), Some(if tick < 2 { BothEnds { first: 11, last: 13 } } else { BothEnds { first: 17, last: 19 } }), "edit {tick}");
+        assert_eq!(edited.attribute(NAME), (tick < 3).then_some(7), "edit {tick}");
+        assert_eq!(edited.attribute_blocks(TAIL).map(|tail| tail[0].0[2]), Some(3), "edit {tick}");
     }
 
     let superchunk = target.at.superchunk();
     let (words, count) = encode_state(None, entities.superchunk(superchunk));
-    assert_eq!(count, 2);
-    let (_, mut read_back) = world(1);
-    assert_eq!(decode_state(&words, 4, &mut read_back).map(|state| state.entities), Ok(2));
+    assert_eq!(count, 1);
+    let mut read_back = world();
+    assert_eq!(decode_state(&words, 4, &mut read_back).map(|state| state.entities), Ok(1));
     read_back.apply();
     let (was, is) = (entities.get(target.id, target.at).expect("there"), read_back.get(target.id, target.at).expect("read back"));
     assert_eq!((was.header, was.attributes), (is.header, is.attributes));
@@ -140,6 +153,6 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
     let mut wrong = words.clone();
     let length = wrong.iter().position(|&word| word == NOTE.0).expect("the note's type") + 1;
     wrong[length] = 40;
-    assert!(decode_state(&wrong, 4, &mut world(1).1).is_err());
-    assert!(decode_state(&words[..words.len() - 1], 4, &mut world(1).1).is_err(), "cut short");
+    assert!(decode_state(&wrong, 4, &mut world()).is_err());
+    assert!(decode_state(&words[..words.len() - 1], 4, &mut world()).is_err(), "cut short");
 }

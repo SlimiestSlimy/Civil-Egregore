@@ -4,44 +4,18 @@
 //!
 //! `cargo test --test fast`
 
-use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
-use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CellCartesian, CellIndex, SuperchunkIndex};
+use crate::tests::{cell, STONE};
+use bitplane_manager::BitmapArena;
+use coordinates::SuperchunkIndex;
 use entity_manager::Entities;
 use instructions::mask::{self, Mask, SIDES};
-use instructions::{read, write};
 use simulation::Simulation;
 use utilities::rng::Rng;
-
-/// The layer type the tests run on.
-const STONE: LayerType = LayerType(6);
 
 /// An arena with `STONE` hot over the 3x3 superchunks from `(10, 10)`,
 /// cells scattered over them set, some on their borders.
 fn arena() -> BitmapArena {
-    let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
-    for (x, y) in (10..13).flat_map(|y| (10..13).map(move |x| (x, y))) {
-        for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
-            arena.make_hot(BucketKey { layer_type: STONE, chunk }, None, &mut codec);
-        }
-    }
-    let start = corner();
-    for at in 0..200_000u64 {
-        let cell = CellCartesian { x: start.x + (at * 7919 % 3072) as u32, y: start.y + (at * 104_729 % 3067) as u32 };
-        arena.queue(STONE, Write::cell(cell.into(), WriteOp::Set));
-    }
-    assert_eq!(arena.apply().missed, 0);
-    arena
-}
-
-/// The top left cell of the superchunk `(10, 10)`, cartesian.
-fn corner() -> CellCartesian {
-    SuperchunkIndex::from_cartesian(10, 10).top_left().cartesian()
-}
-
-/// The cell `(x, y)` cells from the top left of the superchunk `(10, 10)`.
-fn cell(x: u32, y: u32) -> CellIndex {
-    CellCartesian { x: corner().x + x, y: corner().y + y }.into()
+    crate::tests::arena(3, (0..200_000u64).map(|at| cell((at * 7919 % 3072) as u32, (at * 104_729 % 3067) as u32)))
 }
 
 /// A mask's own cells: full, a disc, and those drawn and listed are
@@ -82,8 +56,8 @@ fn a_square_read_is_its_cells_read_one_by_one() {
             let (mut set_under, mut hot_under) = (Mask::empty(side), Mask::empty(side));
             for (x, y) in origins {
                 let origin = cell(x, y);
-                read::mask::layer(turn, STONE, origin, &mut set, &mut hot);
-                read::mask::layer_under(turn, STONE, origin, &disc, &mut set_under, &mut hot_under);
+                mask::layer(turn, STONE, origin, &mut set, &mut hot);
+                mask::layer_under(turn, STONE, origin, &disc, &mut set_under, &mut hot_under);
                 for (across, down) in (0..side).flat_map(|down| (0..side).map(move |across| (across, down))) {
                     let held = turn.holds(STONE, mask::cell(origin, across, down).expect("in the world"));
                     assert_eq!((hot.get(across, down), set.get(across, down)), (held.is_ok(), held == Ok(true)), "({across}, {down}) of {side} from ({x}, {y})");
@@ -112,11 +86,11 @@ fn a_mask_written_is_read_back() {
             }
             let mut before = before.lock().unwrap();
             let (set, hot) = &mut *before;
-            read::mask::layer(turn, STONE, origin, set, hot);
+            mask::layer(turn, STONE, origin, set, hot);
             // The disc cleared, then a square in its middle set: the later write wins.
             let mut middle = Mask::empty(side);
             (side / 4..side / 2).flat_map(|y| (side / 4..side / 2).map(move |x| (x, y))).for_each(|(x, y)| middle.set(x, y, true));
-            write::mask::clear(turn, STONE, origin, &disc) + write::mask::set(turn, STONE, origin, &middle)
+            mask::clear_under(turn, STONE, origin, &disc) + mask::set_under(turn, STONE, origin, &middle)
         });
         assert!(writes.rules <= 2 * side as usize + 1, "{} writes for a disc and a square of {side}", writes.rules);
         assert_eq!(writes.writes_applied.missed, 0);
@@ -125,7 +99,7 @@ fn a_mask_written_is_read_back() {
                 return 0;
             }
             let (mut set, mut hot) = (Mask::empty(side), Mask::empty(side));
-            read::mask::layer(turn, STONE, origin, &mut set, &mut hot);
+            mask::layer(turn, STONE, origin, &mut set, &mut hot);
             let before = &before.lock().unwrap().0;
             for (x, y) in (0..side).flat_map(|y| (0..side).map(move |x| (x, y))) {
                 let middle = (side / 4..side / 2).contains(&x) && (side / 4..side / 2).contains(&y);

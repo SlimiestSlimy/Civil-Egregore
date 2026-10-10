@@ -4,48 +4,26 @@
 //!
 //! `cargo test --test fast`
 
+use crate::tests::{cell, walker, world, STONE};
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
-use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use instructions::read::{area, walking};
-use instructions::write::entities;
-use instructions::around;
-use instructions::area::AREA_CENTRE;
-use entity_manager::{Entities, EntityId, EntityType, Header, NEVER};
+use chunk_storage::LayerCodec;
+use coordinates::{CellIndex, SuperchunkIndex};
+use instructions::area::{self, AREA_CENTRE};
+use instructions::{around, entities, walking};
+use entity_manager::{EntityId, NEVER};
 use instructions::Turn;
 use simulation::Simulation;
 use std::sync::Mutex;
 use type_registry::{WALL_EAST, WALL_SOUTH};
 
-/// The layer type the arena holds: every cell hot, none set.
-const STONE: LayerType = LayerType(6);
-/// The entities' type.
-const WALKER: EntityType = EntityType(40);
-
-/// An arena with a bitmap hot over the `side` by `side` superchunks from
-/// `(10, 10)`, and entities holding the same superchunks.
-fn world(side: u32) -> (BitmapArena, Entities) {
-    let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
-    for y in 10..10 + side {
-        for x in 10..10 + side {
-            for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
-                arena.make_hot(BucketKey { layer_type: STONE, chunk }, None, &mut codec);
-            }
+/// Makes the wall layers hot over the superchunk `(10, 10)` of `arena`.
+fn with_walls_hot(arena: &mut BitmapArena) {
+    let mut codec = LayerCodec::new();
+    for layer_type in [WALL_EAST, WALL_SOUTH] {
+        for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {
+            arena.make_hot(BucketKey { layer_type, chunk }, None, &mut codec);
         }
     }
-    let mut entities = Entities::new();
-    assert_eq!(entities.align(&arena.superchunk_indices()), 0);
-    (arena, entities)
-}
-
-/// The cell `(x, y)` cells from the top left of the superchunk `(10, 10)`.
-fn cell(x: u32, y: u32) -> CellIndex {
-    CellCartesian { x: 10 * SUPERCHUNK_SIDE_CELLS + x, y: 10 * SUPERCHUNK_SIDE_CELLS + y }.into()
-}
-
-/// A walker with ID `id` on `at`, waking at `wake`.
-fn walker(id: u64, at: CellIndex, wake: u64) -> Header {
-    Header { id: EntityId(id), kind: WALKER, at, wake }
 }
 
 /// The way to a cell is found a step at a time, round what cannot be
@@ -126,12 +104,7 @@ fn a_cell_is_sought_further_and_further_off() {
 #[test]
 fn walls_of_the_terrain_bar_steps() {
     let (mut arena, mut entities) = world(1);
-    let mut codec = LayerCodec::new();
-    for layer_type in [WALL_EAST, WALL_SOUTH] {
-        for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {
-            arena.make_hot(BucketKey { layer_type, chunk }, None, &mut codec);
-        }
-    }
+    with_walls_hot(&mut arena);
     // A cliff between columns 41 and 42, rows 20 to 40, with a gap at row 33: walls east of column 41, which bar the diagonals across it too.
     for y in (20..=40).filter(|&y| y != 33) {
         arena.queue(WALL_EAST, Write::cell(cell(41, y), WriteOp::Set));
@@ -173,13 +146,8 @@ fn walls_of_the_terrain_bar_steps() {
 #[test]
 fn the_turn_and_pathfinding_bar_the_same_steps() {
     let (mut arena, mut entities) = world(1);
-    let mut codec = LayerCodec::new();
-    for layer_type in [WALL_EAST, WALL_SOUTH] {
-        for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {
-            arena.make_hot(BucketKey { layer_type, chunk }, None, &mut codec);
-        }
-    }
-    let mut random = utilities::rng::Rng::new(7);
+    with_walls_hot(&mut arena);
+    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
     for y in 0..64 {
         for x in 0..64 {
             for layer_type in [WALL_EAST, WALL_SOUTH] {

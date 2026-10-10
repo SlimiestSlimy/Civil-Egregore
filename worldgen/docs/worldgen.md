@@ -40,7 +40,7 @@ found from the heights beyond the edge, which are the world's, not the
 neighbour's to give.
 
 Who reads them: the turn gives the neighbours no wall is before
-(`instructions::read::walking::around_unwalled`) and the walls of the area about a cell
+(`instructions::walking::around_unwalled`) and the walls of the area about a cell
 (`area_walls`); the waves and A* of `../pathfinding/` go round them.
 
 How much of the ground is walled is the shape's doing: narrow, hard

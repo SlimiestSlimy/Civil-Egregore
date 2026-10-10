@@ -751,7 +751,7 @@ step is found by waves: every goal's front moved a cell at once, each
 row a few shifts and ors, the whole search's memory one line of cache;
 the walker steps into the first wave to come beside it. A* is there
 too, for one place to go. An entity's turn reads the area
-(`instructions::read::area::layer`), and the rule makes the masks: for a sheep,
+(`instructions::area::layer`), and the rule makes the masks: for a sheep,
 grass the goals, the bitplanes held what may be walked on -- but for
 the cells other entities stand on, which are in its way.
 

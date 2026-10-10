@@ -5,32 +5,10 @@ simulation and changes queued to it alike -- each a free function over
 a superchunk's `Turn`. The design: `instructions.md`. `lib.rs` hands on
 **`Turn`** and **`TickReport`**, the simulation's.
 
-Instructions that only read are in `read/`, those that only queue a
-change in `write/`; the shapes they answer in are modules beside them.
+A module a subject: its shape, what reads it and what queues a change
+to it together.
 
-## `around.rs`, `area.rs`, `mask.rs`: the shapes
-
-**`around`**: the 3x3 cells about a cell as nine bits -- **`CENTRE`**,
-**`RING`**, **`ALL`**; **`Around`** `{set, hot}`; **`squeeze`**: a
-window's 3x3 into nine bits. **`cell(at, bit)`**, **`bit_of(at,
-cell)`**: a bit and its cell. **`pick(random, choices)`**,
-**`prefer(random, wanted, open)`**: one drawn.
-
-**`area`**: **`Area`** `{set, hot}`, a row a `u16`, `AREA_SIDE` (16) a
-side, its centre at `AREA_CENTRE`; **`Area::count`**; `FARTHEST_SCALE`
-(6), the coarsest tiles asked of.
-
-**`mask`**: **`Mask`**, a square of cells a bit each, its side one of
-**`SIDES`** (4 to 1,024): **`empty(side)`**, **`full(side)`**,
-**`disc(side)`**; **`side`**, **`row(y)`**, **`get(x, y)`**, **`set(x,
-y, to)`**, **`clear`**, **`count`**, **`is_empty`**; **`and`**,
-**`or`**, **`and_not`** with another of its side; **`cells()`** the set
-ones, **`pick(random)`** one drawn. **`about(centre, side)`**: the top
-left cell of the square about a cell; **`cell(origin, x, y)`**: a cell
-of it. `WORD` (64): bits in a word of a row; `row_words`: words in a
-row.
-
-## `read/cells.rs`
+## `cells.rs`
 
 **`each_sampled(turn, type, chance, samples, each)`**: `each` run
 on every cell sampled -- each set cell of the type chosen with the
@@ -38,35 +16,64 @@ on every cell sampled -- each set cell of the type chosen with the
 **`holds`**, **`lacks`**: the cell read. **`value(turn, plane,
 cell)`**: a wide plane's number. **`square(turn, type, cell, side)`**:
 up to 8x8 cells about a cell as a `Window`, with their top left cell.
+**`set(turn, type, cell)`**, **`clear`**: a write queued.
+**`set_value(turn, plane, cell, value)`**: a wide plane's number put.
 
-## `read/entities.rs`
+## `entities.rs`
 
 **`each_woken(turn, layers, state, each)`**: `each` run on every entity
-waking.
+waking. **`spawn(turn, kind, at, wake, attributes)`**: a new entity,
+its ID drawn and returned. **`sleep(turn, entity, wake)`**: a move to
+where it stands. **`commit(turn, edit, to, wake)`**: an `EntityEdit`'s
+entity moved if no attribute changed, else put whole. **`remove(turn,
+entity)`**. **`EntitiesBetweenTicks`**: the world's entities off any
+turn, lent by whoever runs the world (**`of`**). **`now()`**,
+**`put(header, attributes)`**: queued, in the world once the runner
+places them.
 
-## `read/around.rs`
+## `around.rs`
 
-**`layer(turn, type, at)`**: the 3x3 cells of a layer about a cell, one
-window squeezed. **`occupied(turn, at)`**: those entities stand on.
-**`free_beside(turn, at, open)`**: one of `open` none stands on, drawn.
+The 3x3 cells about a cell as nine bits -- `SIDE` (3), **`CENTRE`**,
+**`RING`**, **`ALL`**; **`Around`** `{set, hot}`; **`squeeze`**: a
+window's 3x3 into nine bits. **`cell(at, bit)`**, **`bit_of(at,
+cell)`**: a bit and its cell. **`pick(random, choices)`**,
+**`prefer(random, wanted, open)`**: one drawn;
+**`set_bit_of_rank(bits, rank)`**: the set bit with so many under it,
+the crate's. **`layer(turn, type, at)`**: the 3x3 cells of a layer
+about a cell, one window squeezed. **`occupied(turn, at)`**: those
+entities stand on. **`free_beside(turn, at, open)`**: one of `open`
+none stands on, drawn.
 
-## `read/area.rs`
+## `area.rs`
 
-**`layer(turn, type, centre)`**, **`layers(turn, types, centre)`**:
-the area of one layer, or of several at once, four windows each.
-**`occupied(turn, centre)`**: the entities on its cells.
-**`of_tiles(turn, type, centre, scale)`**: the tiles of `scale` around
-`centre`, set where the type holds at any cell.
+**`Area`** `{set, hot}`, a row a `u16`, `AREA_SIDE` (16) a side, its
+centre at `AREA_CENTRE`; **`Area::count`**; `FARTHEST_SCALE` (6), the
+coarsest tiles asked of. **`layer(turn, type, centre)`**,
+**`layers(turn, types, centre)`**: the area of one layer, or of several
+at once, four windows each. **`occupied(turn, centre)`**: the entities
+on its cells. **`of_tiles(turn, type, centre, scale)`**: the tiles of
+`scale` around `centre`, set where the type holds at any cell.
 
-## `read/mask.rs`
+## `mask.rs`
 
-**`layer(turn, type, origin, set, hot)`**: the square of a layer into
-two masks, a window a time; **`layer_under(turn, type, origin, under,
-set, hot)`**: the cells `under` has alone, the windows it has none in
-not read (**`read_where`**). `WINDOW` (8): cells along a window's
-side, the most a turn reads at once.
+**`Mask`**, a square of cells a bit each, its side one of **`SIDES`**
+(4 to 1,024): **`empty(side)`**, **`full(side)`**, **`disc(side)`**;
+**`side`**, **`row(y)`**, **`get(x, y)`**, **`set(x, y, to)`**,
+**`clear`**, **`count`**, **`is_empty`**; **`and`**, **`or`**,
+**`and_not`** with another of its side (**`with`**); **`cells()`** the
+set ones, **`pick(random)`** one drawn. **`about(centre, side)`**: the
+top left cell of the square about a cell; **`cell(origin, x, y)`**: a
+cell of it. `WORD` (64): bits in a word of a row; `row_words`: words in
+a row. **`layer(turn, type, origin, set, hot)`**: the square of a layer
+into two masks, a window a time; **`layer_under(turn, type, origin,
+under, set, hot)`**: the cells `under` has alone, the windows it has
+none in not read (**`read_where`**). `WINDOW` (8): cells along a
+window's side, the most a turn reads at once. **`set_under(turn, type,
+origin, mask)`**, **`clear_under`**: writes queued for every cell of
+the mask, as rectangles (**`write_under`**, **`next_cell`**) -- how
+many. `RECT` (255): the most cells along a rectangle's side.
 
-## `read/walking.rs`
+## `walking.rs`
 
 What an entity that walks asks, of a turn: the simulation's cells, the
 terrain's walls and `pathfinding` met here. **`around_unwalled(turn,
@@ -77,46 +84,18 @@ passable)`**: the cell to step to for the nearest goal, or for one
 cell, round the entities in the way. **`seek(turn, at, type)`**: the
 step to the nearest cell the type holds at, the area first, then tiles
 by scale, `FARTHEST_SCALE` first and the finest that reach after -- a
-**`SoughtStep`** `{to, scale}`.
+**`SoughtStep`** `{to, scale}`. Its own: `HERE`, where an entity stands
+in its area; **`of_the_area(at, cell)`**, a cell of the area as the
+world's; **`unoccupied(turn, at, rows)`**, rows of the area less the
+cells entities stand on.
 
-## `write/cells.rs`
+## The root (`lib.rs`)
 
-**`set(turn, type, cell)`**, **`clear`**: a write queued.
-**`set_value(turn, plane, cell, value)`**: a wide plane's number put.
-
-## `write/entities.rs`
-
-**`spawn(turn, kind, at, wake, attributes)`**: a new entity, its ID
-drawn and returned. **`sleep(turn, entity, wake)`**: a move to where it
-stands. **`commit(turn, edit, to, wake)`**: an `EntityEdit`'s entity
-moved if no attribute changed, else put whole. **`remove(turn,
-entity)`**.
-
-## `write/mask.rs`
-
-**`set(turn, type, origin, mask)`**, **`clear`**: writes queued for
-every cell of the mask, as rectangles (**`write`**, **`next`**) -- how
-many. `RECT` (255): the most cells along a rectangle's side.
-
-## `between_ticks.rs`
-
-**`EntitiesBetweenTicks`**: the world's entities off any turn, lent by
-whoever runs the world (**`of`**). **`now()`**, **`put(header,
-attributes)`**: queued, in the world once the runner places them.
-
-## `layers.rs`
-
-`GRASS`, `TREE`, `TREE_STAGE` (and `OLDEST_TREE_STAGE`), `WET`,
-`WALL_EAST`, `WALL_SOUTH`: the layers a world's cells have, from the
-type registry (`../../type_registry/`).
-
-## `entity_types.rs`
-
+**`layers`**: `GRASS`, `TREE`, `TREE_STAGE` (and `OLDEST_TREE_STAGE`),
+`WET`, `WALL_EAST`, `WALL_SOUTH`: the layers a world's cells have, from
+the type registry (`../../type_registry/`). **`entity_types`**:
 `SHEEP`, and its attributes `HUNGRY_AT`, `PREGNANT`, `LAMB`, `ROAMING`
--- and `Roaming`, the last one's layout: the types of entity a world
-has, from the type registry.
-
-## The root
+-- and `Roaming`, the last one's layout.
 
 The words the instructions are asked in: `CellIndex`, `CellCartesian`,
 `SuperchunkIndex`, `NEIGHBOURS`, `SUPERCHUNK_SIDE_CELLS`, `LayerType`,
@@ -125,7 +104,7 @@ The words the instructions are asked in: `CellIndex`, `CellCartesian`,
 `EntityId`, `Header`, `EntityRef`, `EntityEdit`, `Turn`, `TickReport`,
 `Rng`, `Chance`.
 
-**`RuleCounts`** (`rule_counts.rs`): what a rule did, up to
+**`RuleCounts`**: what a rule did, up to
 `COUNTS_OF_A_RULE` numbers, each at a place the rule names, added with
 `+=` -- one shape for every rule, so the server lists them all in one
 table.

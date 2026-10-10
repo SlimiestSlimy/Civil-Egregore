@@ -11,7 +11,7 @@ themselves -- the walls, `GRASS`, `TREE`, `TREE_STAGE`, `WET` -- are
 rows of the type registry (`../../type_registry/docs/type_registry.md`),
 not this crate's. A diagonal has no wall
 of its own: `pathfinding::Walls::new` and
-`instructions::read::walking::around_unwalled` bar it from the two. `ONE` (65,536): a fraction's whole.
+`instructions::walking::around_unwalled` bar it from the two. `ONE` (65,536): a fraction's whole.
 
 **`Shape`** `{ground, ocean, span, sea, highest, clumping, coast, coast_low, narrow, wide,
 soft, hard, warp, finer_depth, finer_share, finer_height, finer_fall, weight, raised}`: the
