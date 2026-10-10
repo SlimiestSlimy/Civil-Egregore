@@ -48,6 +48,7 @@ pub mod between_ticks;
 pub mod layers;
 pub mod mask;
 pub mod read;
+mod rule_counts;
 pub mod write;
 
 // The words the instructions are asked in: where a cell and an entity
@@ -56,5 +57,6 @@ pub mod write;
 pub use chunk_storage::{Bits4, LayerType, Wide};
 pub use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOURS, SUPERCHUNK_SIDE_CELLS};
 pub use entity_manager::{Attribute, AttributeType, EntityEdit, EntityId, EntityRef, EntityType, Header};
+pub use rule_counts::{RuleCounts, COUNTS_OF_A_RULE};
 pub use simulation::{TickReport, Turn};
 pub use utilities::rng::Rng;

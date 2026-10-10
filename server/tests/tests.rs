@@ -73,13 +73,22 @@ pub fn put_entity(world: &mut World, header: Header, attributes: &[Attribute]) {
     world.entities.apply();
 }
 
+/// One tick of the rule named `rule` alone over `world`'s hot
+/// superchunks, its halos left where they are: the tick's report, the
+/// rule's counts alone in it; `seed` seeds a superchunk's random stream
+/// the first tick it is in.
+pub fn tick_rule(world: &mut World, seed: u64, rule: &str) -> simulation::TickReport<instructions::RuleCounts> {
+    let report = server::tick_chosen(&mut world.simulation, &mut world.arena, &mut world.entities, seed, server::Chosen::named(&[rule]));
+    simulation::TickReport { writes_applied: report.writes_applied, instructions_applied: report.instructions_applied, rules: report.rules.of(rule), computing: report.computing, applying: report.applying }
+}
+
 /// One tick of the sheep's rule alone over `world`'s hot superchunks,
 /// its halos left where they are.
-pub fn tick_sheep(world: &mut World, seed: u64) -> simulation::TickReport<entity_rules::sheep::SheepCounts> {
-    world.simulation.tick(&mut world.arena, &mut world.entities, seed, |turn, _| entity_rules::sheep::rule(turn))
+pub fn tick_sheep(world: &mut World, seed: u64) -> simulation::TickReport<instructions::RuleCounts> {
+    tick_rule(world, seed, "sheep")
 }
 
 /// One tick of the grass's rule alone over `world`'s hot superchunks.
-pub fn tick_grass(world: &mut World, seed: u64) -> simulation::TickReport<mc_rules::grass::GrassCounts> {
-    world.simulation.tick(&mut world.arena, &mut world.entities, seed, mc_rules::grass::rule)
+pub fn tick_grass(world: &mut World, seed: u64) -> simulation::TickReport<instructions::RuleCounts> {
+    tick_rule(world, seed, "grass")
 }

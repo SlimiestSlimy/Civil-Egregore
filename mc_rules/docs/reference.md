@@ -12,7 +12,8 @@ eight, stepped on the Morton index) and whether it spreads (in
 `SPREAD_CHANCE` of the sum) or decays: grass set on a
 neighbour with none, or its own cleared beside a grass one. Dirt is a
 cell with no grass: it has no layer.
-Returns **`GrassCounts`** `{sampled, spreads, decays}`, added with `+=`.
+Returns its `RuleCounts`, their places named **`SAMPLED`**,
+**`SPREADS`**, **`DECAYS`**, their names listed in **`COUNTED`**.
 
 **`tick(simulation, arena, entities, seed)`**: one tick of the rule over
 every superchunk in use, on the simulation's threads.
@@ -29,5 +30,6 @@ a stage -- or at the oldest dies one time in four, its cell and its
 stage cleared. **`spread(turn, cell, stage)`**: the other trees in the
 8 by 8 cells about it counted from one window; with `n` of them it goes
 on `1 - n/9` of the time, never with 9; a cell of the 64 is drawn and a
-tree put there if it has none. Returns **`TreeCounts`** `{sampled,
-spreads, grown, died}`.
+tree put there if it has none. Returns its `RuleCounts`, their
+places named **`SAMPLED`**, **`SPREADS`**, **`GROWN`**, **`DIED`**, their
+names listed in **`COUNTED`**.

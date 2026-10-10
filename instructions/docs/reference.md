@@ -113,3 +113,8 @@ The words the instructions are asked in: `CellIndex`, `CellCartesian`,
 `ChunkIndex`, `SuperchunkIndex`, `LayerType`, `Wide`, `Bits4`,
 `Attribute`, `AttributeType`, `EntityType`, `EntityId`, `Header`,
 `EntityRef`, `EntityEdit`, `Turn`, `TickReport`, `Rng`.
+
+**`RuleCounts`** (`rule_counts.rs`): what a rule did, up to
+`COUNTS_OF_A_RULE` numbers, each at a place the rule names, added with
+`+=` -- one shape for every rule, so the server lists them all in one
+table.

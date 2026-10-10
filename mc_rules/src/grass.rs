@@ -26,8 +26,7 @@
 //! spreading fills cells that were dirt.
 
 use instructions::layers::{GRASS, WET};
-use instructions::{read, write, CellIndex, Turn, NEIGHBOURS};
-use std::ops::AddAssign;
+use instructions::{read, write, CellIndex, RuleCounts, Turn, NEIGHBOURS};
 
 /// The chance, each tick, that a cell of grass tries to spread.
 pub const SPREAD_CHANCE: f64 = 0.000_01;
@@ -35,40 +34,30 @@ pub const SPREAD_CHANCE: f64 = 0.000_01;
 /// turns back to dirt.
 pub const DECAY_CHANCE: f64 = 0.000_005;
 
-/// What the rule did in a tick.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct GrassCounts {
-    /// Cells of grass sampled.
-    pub sampled: usize,
-    /// Spreads queued: two samples may spread onto one cell, which then
-    /// changes once.
-    pub spreads: usize,
-    /// Cells of grass turned back to dirt.
-    pub decays: usize,
-}
-
-impl AddAssign for GrassCounts {
-    /// Both added up.
-    fn add_assign(&mut self, other: Self) {
-        self.sampled += other.sampled;
-        self.spreads += other.spreads;
-        self.decays += other.decays;
-    }
-}
+/// What the rule counts, each named at its place in its [`RuleCounts`].
+pub const COUNTED: [&str; 3] = ["sampled", "spreads", "decays"];
+/// Cells of grass sampled.
+pub const SAMPLED: usize = 0;
+/// Spreads queued: two samples may spread onto one cell, which then
+/// changes once.
+pub const SPREADS: usize = 1;
+/// Cells of grass turned back to dirt.
+pub const DECAYS: usize = 2;
 
 /// The rule, on one superchunk's turn: every cell of grass chosen with
 /// the chances of spreading and of decay together, in Morton order,
 /// each seen to by [`cell`].
-pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> GrassCounts {
-    let (sampled, counts) = read::cells::each_sampled(turn, GRASS, SPREAD_CHANCE + DECAY_CHANCE, samples, cell);
-    GrassCounts { sampled, ..counts }
+pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
+    let (sampled, mut counts) = read::cells::each_sampled(turn, GRASS, SPREAD_CHANCE + DECAY_CHANCE, samples, cell);
+    counts[SAMPLED] = sampled as u64;
+    counts
 }
 
 /// The rule, on one cell of grass chosen: it draws a neighbour, and
 /// whether it tries to spread or to decay, and queues the write if the
 /// neighbour lets it.
 #[inline]
-fn cell(turn: &mut Turn, cell: CellIndex, counts: &mut GrassCounts) {
+fn cell(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
     let spread_share = SPREAD_CHANCE / (SPREAD_CHANCE + DECAY_CHANCE);
     let (dx, dy) = NEIGHBOURS[turn.random().below(NEIGHBOURS.len() as u64) as usize];
     let spreading = turn.random().unit() <= spread_share;
@@ -81,10 +70,10 @@ fn cell(turn: &mut Turn, cell: CellIndex, counts: &mut GrassCounts) {
         // And grass does not spread under water; a world with no water has none.
         if read::cells::lacks(turn, GRASS, neighbour) && !read::cells::holds(turn, WET, neighbour) {
             write::cells::set(turn, GRASS, neighbour);
-            counts.spreads += 1;
+            counts[SPREADS] += 1;
         }
     } else if read::cells::holds(turn, GRASS, neighbour) {
         write::cells::clear(turn, GRASS, cell);
-        counts.decays += 1;
+        counts[DECAYS] += 1;
     }
 }

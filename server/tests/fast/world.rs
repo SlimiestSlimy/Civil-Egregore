@@ -30,7 +30,7 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
     for _ in 0..3_000 {
         let report = first.tick().rules;
         second.tick();
-        (eaten, born) = (eaten + report.rules.sheep.eaten, born + report.rules.sheep.births);
+        (eaten, born) = (eaten + report.rules.count("sheep", "eaten"), born + report.rules.count("sheep", "births"));
     }
     assert!(eaten > 300 && born > 10, "{eaten} eaten, {born} born: a world doing something");
     assert!(everything(&first) == everything(&second), "the same 3,000 ticks on");

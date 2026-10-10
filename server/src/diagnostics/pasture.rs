@@ -6,13 +6,12 @@
 use worldgen::GRASS;
 use crate::diagnostics::plain_world::{plain_world, superchunks as superchunks_of};
 use crate::host::frame::count;
-use mc_rules::grass;
-use crate::TickCounts;
-use entity_rules::sheep;
+use crate::{Chosen, TickCounts};
+use entity_rules::sheep::{BIRTHS, DEATHS, WOKEN};
 use entity_manager::diagnostics::entities::EntityStats;
 use entity_manager::InstructionsApplied;
-use std::ops::AddAssign;
-use std::time::{Duration, Instant};
+use instructions::RuleCounts;
+use std::time::Duration;
 use utilities::diagnostics::process_memory::MemoryTrack;
 
 /// What a run did, and what it held.
@@ -28,7 +27,8 @@ pub struct PastureRun {
     pub sheep: (usize, usize),
     /// Cells of grass at the start, and at the end.
     pub grass: (u64, u64),
-    /// What grass and sheep did, added up.
+    /// What grass and sheep did, added up, and each rule's time over
+    /// every thread.
     pub done: TickCounts,
     /// What applying the instructions did, added up.
     pub instructions: InstructionsApplied,
@@ -38,10 +38,6 @@ pub struct PastureRun {
     pub computing: Duration,
     /// The second phase's time, added up.
     pub applying: Duration,
-    /// The grass rule's time, over every thread.
-    pub grass_time: Duration,
-    /// The sheep rule's time, over every thread.
-    pub sheep_time: Duration,
     /// The process's memory, read after every tick.
     pub memory: MemoryTrack,
     /// What the entities held at the end.
@@ -71,25 +67,8 @@ pub struct Census {
     pub deaths: usize,
 }
 
-/// What the rules did on a turn, and how long each took.
-#[derive(Clone, Copy, Default)]
-struct Timed {
-    /// What they did.
-    done: TickCounts,
-    /// The grass rule's time.
-    grass: Duration,
-    /// The sheep rule's time.
-    sheep: Duration,
-}
-
-impl AddAssign for Timed {
-    /// Both added up.
-    fn add_assign(&mut self, other: Self) {
-        self.done += other.done;
-        self.grass += other.grass;
-        self.sheep += other.sheep;
-    }
-}
+/// The rules the pasture ticks, by name.
+pub const RULES_TICKED: [&str; 2] = ["grass", "sheep"];
 
 /// Ticks grass and sheep `ticks` times over `superchunks` superchunks,
 /// grass drawn on `thousandths` of each one's cells and `sheep` sheep on
@@ -99,22 +78,17 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
     memory.read();
     let mut world = plain_world(superchunks, thousandths as u64 * worldgen::ONE / 1000, sheep, threads);
     let (start_sheep, start_grass) = (world.entities.len(), count(&world, GRASS));
-    let (mut timed, mut instructions, mut writes, mut computing, mut applying) = (Timed::default(), InstructionsApplied::default(), 0, Duration::ZERO, Duration::ZERO);
+    let (mut done, mut instructions, mut writes, mut computing, mut applying) = (TickCounts::default(), InstructionsApplied::default(), 0, Duration::ZERO, Duration::ZERO);
     let mut census = vec![Census { tick: 0, sheep: start_sheep, grass: start_grass, ..Census::default() }];
-    let mut since = sheep::SheepCounts::default();
+    let mut since = RuleCounts::default();
+    let chosen = Chosen::named(&RULES_TICKED);
     for tick in 0..ticks {
-        let report = world.simulation.tick(&mut world.arena, &mut world.entities, world.info.seed, |turn, samples| {
-            let start = Instant::now();
-            let grass = grass::rule(turn, samples);
-            let grassed = Instant::now();
-            let sheep = sheep::rule(turn);
-            Timed { done: TickCounts { grass, sheep, ..TickCounts::default() }, grass: grassed - start, sheep: grassed.elapsed() }
-        });
-        timed += report.rules;
-        since += report.rules.done.sheep;
+        let report = world.tick_only(chosen, true);
+        done += report.rules;
+        since += report.rules.of("sheep");
         if (tick + 1) % CENSUS_EVERY == 0 || tick + 1 == ticks {
-            census.push(Census { tick: tick + 1, sheep: world.entities.len(), grass: count(&world, GRASS), woken: since.woken, births: since.births, deaths: since.deaths });
-            since = sheep::SheepCounts::default();
+            census.push(Census { tick: tick + 1, sheep: world.entities.len(), grass: count(&world, GRASS), woken: since[WOKEN] as usize, births: since[BIRTHS] as usize, deaths: since[DEATHS] as usize });
+            since = RuleCounts::default();
         }
         instructions += report.instructions_applied;
         writes += report.writes_applied.writes;
@@ -128,13 +102,11 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
         threads,
         sheep: (start_sheep, world.entities.len()),
         grass: (start_grass, count(&world, GRASS)),
-        done: timed.done,
+        done,
         instructions,
         writes,
         computing,
         applying,
-        grass_time: timed.grass,
-        sheep_time: timed.sheep,
         memory,
         held: EntityStats::of(&world.entities),
         census,

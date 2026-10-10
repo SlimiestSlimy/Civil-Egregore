@@ -1,38 +1,12 @@
-//! The world's tick: every rule of the cells and every entity, on each
-//! hot superchunk's turn, then the halos moved. So far grass and sheep
-//! together: grass spreading and decaying over dirt (`mc_rules::grass`),
-//! sheep eating it (`entity_rules::sheep`), one tick running both on
-//! each superchunk -- the grass first, then the sheep, all reading the
-//! world as the tick found it.
+//! The world's tick: every rule of the table (`rules::RULES`) on each
+//! hot superchunk's turn -- the cells' rules, then the entities', all
+//! reading the world as the tick found it -- then the halos moved.
 
+use crate::rules::{Chosen, TickCounts};
 use crate::{HaloChange, World};
-use mc_rules::grass::{self, GrassCounts};
-use mc_rules::trees::{self, TreeCounts};
-use entity_rules::sheep::{self, SheepCounts};
 use bitplane_manager::BitmapArena;
 use entity_manager::Entities;
 use simulation::{Simulation, TickReport};
-use std::ops::AddAssign;
-
-/// What grass, trees and sheep did in a tick.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct TickCounts {
-    /// What the grass did.
-    pub grass: GrassCounts,
-    /// What the trees did.
-    pub trees: TreeCounts,
-    /// What the sheep did.
-    pub sheep: SheepCounts,
-}
-
-impl AddAssign for TickCounts {
-    /// Both added up.
-    fn add_assign(&mut self, other: Self) {
-        self.grass += other.grass;
-        self.trees += other.trees;
-        self.sheep += other.sheep;
-    }
-}
 
 /// What a world's tick did: the rules, then the halos moved.
 #[derive(Clone, Copy, Debug)]
@@ -43,12 +17,17 @@ pub struct WorldTick {
     pub halos: HaloChange,
 }
 
-/// One tick of grass and sheep over every superchunk with a bitmap in
+/// One tick of every rule over every superchunk with a bitmap in
 /// use, on `simulation`'s threads -- `seed`, the world's, seeding a
 /// superchunk's random stream the first tick it is in. The halos are
 /// not moved: for a world forced hot, its superchunks hot all the while.
 pub fn tick_rules(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64) -> TickReport<TickCounts> {
-    simulation.tick(arena, entities, seed, |turn, samples| TickCounts { grass: grass::rule(turn, samples), trees: trees::rule(turn, samples), sheep: sheep::rule(turn) })
+    tick_chosen(simulation, arena, entities, seed, Chosen::ALL)
+}
+
+/// One tick of the rules `chosen` alone, as [`tick_rules`] of all.
+pub fn tick_chosen(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64, chosen: Chosen) -> TickReport<TickCounts> {
+    simulation.tick(arena, entities, seed, |turn, samples| chosen.turn(turn, samples))
 }
 
 impl World {
@@ -57,5 +36,16 @@ impl World {
     pub fn tick(&mut self) -> WorldTick {
         let rules = tick_rules(&mut self.simulation, &mut self.arena, &mut self.entities, self.info.seed);
         WorldTick { rules, halos: self.move_halos() }
+    }
+
+    /// One tick of the rules `chosen` alone over the hot superchunks,
+    /// each one's time taken if `timed`, the halos left where they are:
+    /// a rule tried or measured by itself.
+    pub fn tick_only(&mut self, chosen: Chosen, timed: bool) -> TickReport<TickCounts> {
+        let (simulation, seed) = (&mut self.simulation, self.info.seed);
+        match timed {
+            true => simulation.tick(&mut self.arena, &mut self.entities, seed, |turn, samples| chosen.timed_turn(turn, samples)),
+            false => tick_chosen(simulation, &mut self.arena, &mut self.entities, seed, chosen),
+        }
     }
 }

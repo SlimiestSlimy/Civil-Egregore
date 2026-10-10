@@ -77,8 +77,14 @@ run with no window has no camera, and loads nothing by it.
 ## TickCounts
 
 `World::tick` runs every rule of the cells (`../mc_rules/`) and every
-kind of entity (`../entity_rules/`) on each hot superchunk's turn --
-grass, then sheep -- then moves the halos.
+kind of entity (`../entity_rules/`) on each hot superchunk's turn, then
+moves the halos. The rules are one table, `rules::RULES`: a name, what
+the rule counts, and its function, in the order a turn runs them --
+grass, trees, sheep. A rule added is a row added there; nothing else
+lists them. What a tick did is an array with a rule's counts at its
+place in the table, read by name (`TickCounts::count("sheep",
+"eaten")`), and a diagnostic or a test ticks only the rules it names
+(`Chosen::named(&["grass"])`).
 
 ## The same on every machine
 
@@ -190,7 +196,8 @@ closed at any time leaves what it came to.
 | `src/world_start.rs` | what a new world starts from: its size, its seed drawn with land, the sliders' numbers read |
 | `src/halos.rs` | the hot entity, and the world lent to the simulation's halos |
 | `src/world_hash.rs` | a world's hash, part by part: what `check` prints |
-| `src/tick.rs` | the tick of every rule and entity, then the halos moved |
+| `src/rules.rs` | the table of the rules, a tick's counts by rule, the rules chosen by name |
+| `src/tick.rs` | the tick of every rule in the table, then the halos moved |
 | `src/host/` | a world run on a thread of its own for a window: `mod` the host's calls and the census, `host_thread` the thread itself, `frame` what it answers |
 | `src/diagnostics/` | grass, and grass and sheep, ticked flat out and measured; the diagnostics tools |
 | `src/transient_data.rs` | where runs leave what they make, out of git |

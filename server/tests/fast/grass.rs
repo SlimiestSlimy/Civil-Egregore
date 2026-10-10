@@ -4,7 +4,7 @@
 
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, tick_grass};
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex};
-use mc_rules::grass::{DECAY_CHANCE, SPREAD_CHANCE};
+use mc_rules::grass::{DECAYS, DECAY_CHANCE, SAMPLED, SPREADS, SPREAD_CHANCE};
 use server::World;
 use worldgen::GRASS;
 
@@ -34,8 +34,8 @@ fn lone_grass_never_decays() {
     }
     assert_eq!(cells_of_grass(&world), 512 * 512);
     let done = tick_grass(&mut world, 3).rules;
-    assert!(done.sampled > 0);
-    assert_eq!(done.decays, 0);
+    assert!(done[SAMPLED] > 0);
+    assert_eq!(done[DECAYS], 0);
 }
 
 /// Grass with grass all round decays at the whole chance, and has no
@@ -53,9 +53,9 @@ fn surrounded_grass_decays_at_its_chance() {
     assert_eq!(cells_of_grass(&world), CELLS);
     let done = tick_grass(&mut world, 4).rules;
     let expected = CELLS as f64 * DECAY_CHANCE;
-    assert_eq!(done.spreads, 0);
-    assert!((done.decays as f64 - expected).abs() < 3.0 * expected.sqrt(), "{} decays, about {expected:.0} expected", done.decays);
-    assert_eq!(cells_of_grass(&world), CELLS - done.decays as u64);
+    assert_eq!(done[SPREADS], 0);
+    assert!((done[DECAYS] as f64 - expected).abs() < 3.0 * expected.sqrt(), "{} decays, about {expected:.0} expected", done[DECAYS]);
+    assert_eq!(cells_of_grass(&world), CELLS - done[DECAYS]);
 }
 
 /// Over 1,000 ticks the grass changes by
@@ -69,7 +69,7 @@ fn grass_changes_by_what_spread_and_decayed() {
     for seed in 0..1000 {
         let done = tick_grass(&mut world, seed).rules;
         let now = cells_of_grass(&world);
-        assert!(now + done.decays as u64 >= grass && now + done.decays as u64 <= grass + done.spreads as u64, "grown by what spread, less what decayed");
+        assert!(now + done[DECAYS] >= grass && now + done[DECAYS] <= grass + done[SPREADS], "grown by what spread, less what decayed");
         grass = now;
     }
     let growth = grass as f64 / start as f64;

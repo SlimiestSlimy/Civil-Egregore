@@ -6,7 +6,7 @@
 use worldgen::GRASS;
 use crate::diagnostics::plain_world::{plain_world, superchunks as superchunks_of};
 use crate::host::frame::count;
-use mc_rules::grass;
+use crate::Chosen;
 use bitplane_manager::diagnostics::arena::ArenaStats;
 use chunk_storage::diagnostics::storage::StorageStats;
 use std::time::Duration;
@@ -49,13 +49,14 @@ pub fn run(ticks: usize, thousandths: usize, superchunks: u32, threads: usize) -
     let mut world = plain_world(superchunks, thousandths as u64 * worldgen::ONE / 1000, 0, threads);
     let start_grass = count(&world, GRASS);
     let (mut computing, mut applying, mut writes, mut sampled, mut missed) = (Duration::ZERO, Duration::ZERO, 0, 0, 0);
+    let chosen = Chosen::named(&["grass"]);
     for _ in 0..ticks {
-        let report = world.simulation.tick(&mut world.arena, &mut world.entities, world.info.seed, grass::rule);
+        let report = world.tick_only(chosen, false);
         computing += report.computing;
         applying += report.applying;
         writes += report.writes_applied.writes;
         missed += report.writes_applied.missed;
-        sampled += report.rules.sampled;
+        sampled += report.rules.count("grass", "sampled") as usize;
         memory.read();
     }
     Throughput {
