@@ -136,12 +136,15 @@ something false of it: that takes reading. Something that is gone on
 purpose and still spoken of -- a module removed, a spelling never
 used -- is written without backticks.
 
-**Every public item is in its crate's docs**
-(`every_public_item_is_in_its_crates_docs`). Each crate with a `docs/`
-folder names, somewhere in its markdown, every `pub` function, type,
-constant and module of its sources: a reference goes function by
-function and leaves none out. A new public item fails the test until
-it is written up.
+**Every item is in its crate's docs**
+(`every_item_is_in_its_crates_docs`). Each crate with a `docs/`
+folder names, somewhere in its markdown, every function, type,
+constant and module of its sources, private ones too: a reference
+goes function by function and leaves none out, and a comment kept
+short can send its reader there. Not counted: what a trait makes a
+type have (the items of an `impl ... for` block), and the tests at a
+source's end (from its `#[cfg(test)]`). A new item fails the test
+until it is written up.
 
 **The code's pointers hold**
 (`the_code_points_at_docs_that_are_there`). Every markdown path a

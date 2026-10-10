@@ -17,4 +17,6 @@ Civil Egregore is and every decision about it: `civil_egregore.md`.
 **`CRATES`**: the crates with commands, by name -- `server`, `tessera`,
 `docs` (utilities' `stale_docs`), `renderer` -- each with its table of them. **`main`**: the command line handed to
 `utilities::commands::program`; `Civil_Egregore help` prints every command of
-every crate.
+every crate. **`leave_the_console`**: on Windows, built with the
+renderer, lets go of the console (`FreeConsole`) before the window
+opens; elsewhere nothing.

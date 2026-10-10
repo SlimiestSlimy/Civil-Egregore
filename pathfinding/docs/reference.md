@@ -5,7 +5,7 @@ The design is in `pathfinding.md`.
 ## `lib.rs`
 
 `SIDE` (16), `CELLS` (256, an area's). **`Rows`**: `[u16; SIDE]`, an area's cells of one kind,
-cell `(x, y)` at bit `x` of row `y`. **`Cell`** `{x, y}`. **`Path`**
+cell `(x, y)` at bit `x` of row `y`. **`Cell`** `{x, y}`, privately `index()`, its place row by row, and `at(index)`, the cell there. **`Path`**
 `{first, steps}`: a path's first cell after its start, and its length.
 
 **`holds(rows, cell)`**. **`steps_apart(a, b)`**: the greater of their

@@ -247,13 +247,29 @@ fn the_docs_name_what_is_there() {
     assert!(wrong.is_empty(), "{} places where the docs name what is not there:\n{}", wrong.len(), wrong.join("\n"));
 }
 
-/// The names `source` makes public: what follows `pub` and the kind of
-/// item, a name each.
-fn public_names(source: &str) -> Vec<&str> {
+/// The names of the items `source` has, private ones too: what
+/// follows the kind of item, a name each. Not what a trait makes a
+/// type have -- an `impl ... for` block's -- nor the tests at its end.
+fn item_names(source: &str) -> Vec<&str> {
     const KINDS: [&str; 8] = ["fn", "struct", "enum", "trait", "type", "const", "static", "mod"];
-    let mut names = Vec::new();
+    let (mut names, mut within_a_traits) = (Vec::new(), None);
     for line in source.lines() {
-        let mut words: Vec<&str> = line.trim_start().strip_prefix("pub ").unwrap_or_default().split_whitespace().collect();
+        let indented = line.len() - line.trim_start().len();
+        let line = line.trim_start();
+        if line.starts_with("#[cfg(test)]") {
+            break;
+        }
+        // A trait's block for a type runs to the brace closing it, as far in as it began.
+        if let Some(began) = within_a_traits {
+            within_a_traits = (indented != began || !line.starts_with('}')).then_some(began);
+            continue;
+        }
+        if line.starts_with("impl") && line.contains(" for ") && line.ends_with('{') {
+            within_a_traits = Some(indented);
+            continue;
+        }
+        let shown_to = line.strip_prefix("pub").map_or(line, |after| after.trim_start_matches(|letter: char| letter != ' ').trim_start());
+        let mut words: Vec<&str> = shown_to.split_whitespace().collect();
         while words.len() > 2 && ["const", "unsafe"].contains(&words[0]) && words[1] == "fn" || words.first() == Some(&"unsafe") {
             words.remove(0);
         }
@@ -263,13 +279,15 @@ fn public_names(source: &str) -> Vec<&str> {
             names.push(name.split(|letter: char| !(letter.is_ascii_alphanumeric() || letter == '_')).next().unwrap_or_default());
         }
     }
+    names.retain(|name| !name.is_empty() && *name != "_");
     names
 }
 
-/// Every crate with docs names in them every item it makes public: a
-/// reference goes function by function, and none is left out.
+/// Every crate with docs names in them every item it has, private
+/// ones too: a reference goes function by function, and none is left
+/// out.
 #[test]
-fn every_public_item_is_in_its_crates_docs() {
+fn every_item_is_in_its_crates_docs() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let repository = Repository::read(root);
     let mut missing = Vec::new();
@@ -282,10 +300,10 @@ fn every_public_item_is_in_its_crates_docs() {
         for source in &sources {
             let text = fs::read_to_string(source).expect("read");
             let shown = source.strip_prefix(root).expect("under the root").display().to_string();
-            missing.extend(public_names(&text).into_iter().filter(|name| !said.contains(name)).map(|name| format!("{shown}: `{name}`")));
+            missing.extend(item_names(&text).into_iter().filter(|name| !said.contains(name)).map(|name| format!("{shown}: `{name}`")));
         }
     }
-    assert!(missing.is_empty(), "{} public items no doc of their crate names:\n{}", missing.len(), missing.join("\n"));
+    assert!(missing.is_empty(), "{} items no doc of their crate names:\n{}", missing.len(), missing.join("\n"));
 }
 
 /// Every doc a comment in the code points at is there, and has the
