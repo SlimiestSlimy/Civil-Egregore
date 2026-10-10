@@ -94,7 +94,13 @@ REMOTE (cloud, no screen)
 - server owns a world's start (server::Start); the CLI and the gui
   both feed it.
 - The renderer asks the host (server::host) for frames; the host never
-  sends unasked.
+  sends unasked. An ask is answered a few superchunks at a time between
+  ticks (HostThread::answer_a_little, FRAMES_SHARE of a tick when there
+  is no time to spare), each few a Frame, the last with more = false;
+  the renderer shows every frame queued and asks again after the last.
+  Nothing asked is dropped or capped to spare the ticks. Measured by
+  `AI_SCRATCHPAD ticks_under_a_wide_viewport` (it waits for the world
+  to settle first, or the baseline reads the world's making).
 
 
 == WORDS (beyond the glossary) ==

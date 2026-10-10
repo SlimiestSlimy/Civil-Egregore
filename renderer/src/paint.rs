@@ -156,10 +156,10 @@ const FILM: usize = 4;
 /// How deep the water at bit `bit` of word `word` of `cells`' bitmaps
 /// is, to [`DEEP`] at most.
 pub fn depth_at(cells: &Cells, word: usize, bit: u32) -> u32 {
-    if cells.deep[word] >> bit & 1 == 1 {
+    if cells.water.deep[word] >> bit & 1 == 1 {
         return DEEP;
     }
-    (0..cells.depths.len()).map(|plane| ((cells.depths[plane][word] >> bit & 1) as u32) << plane).sum()
+    (0..cells.water.depths.len()).map(|plane| ((cells.water.depths[plane][word] >> bit & 1) as u32) << plane).sum()
 }
 
 /// `colour` under water `depth` deep: the less of it seen the deeper,
@@ -283,7 +283,7 @@ fn counted(words: &[u64], detail: u32) -> Vec<u32> {
 fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
     let (side, tile_cells) = (SIDE >> detail, 1usize << (2 * detail));
     let (grass, trees) = (counted(&cells.grass, detail), counted(&cells.trees, detail));
-    let (wet, deep) = (counted(&cells.wet, detail), counted(&cells.deep, detail));
+    let (wet, deep) = (counted(&cells.wet, detail), counted(&cells.water.deep, detail));
     let mut sheep = vec![0u16; side * side];
     for &(x, y) in &cells.sheep {
         let at = (y as usize >> detail) * side + (x as usize >> detail);
