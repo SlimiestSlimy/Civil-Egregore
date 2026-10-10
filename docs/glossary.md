@@ -38,6 +38,7 @@ what they always do and are not listed.
 | **width** | the bits a cell of a plane, in the plane's type: `Bits2`, `Bits4`, `Bits8`, `Bits16` | wide plane | |
 | **value** | the number a cell of a wide plane holds | wide plane | |
 | **patches** | how grass and trees lie when a superchunk is generated: noise under a threshold, not cells scattered (`worldgen::patches`) | generation | pasture |
+| **collision plane** | the layer `COLLISION`, a bit a cell: 1 where something stands that bars stepping there -- a tree -- 0 where the cell is free. What a movement check reads, whatever the thing is; kept by who puts the thing. Entities are not in it | wall, layer | occupancy plane, obstacle map, blocked plane |
 | **wall** | a bar between two cells across or down more than one apart in height; kept by the upper or left cell, in the layers `WALL_EAST` and `WALL_SOUTH`. A diagonal step has no wall of its own: it is open only when both ways round it are | step, terrain | cliff (the renderer's drawing of walls) |
 | **terrain** | a superchunk's heights and walls | height, wall | |
 

@@ -90,8 +90,9 @@ alone:
   cells about it, and with none there to the nearest further off, as
   far as it reaches (`walking::seek`) -- one pathfinding step a
   wake, no route kept; with no grass in reach, onto any neighbour.
-  Hemmed in, it stays. Never off the hot bitplanes, and never through a
-  wall.
+  Hemmed in, it stays. Never off the hot bitplanes, never through a
+  wall, and never onto a cell the collision plane holds -- a tree's
+  (`walking::around_steppable`).
 
 When it is next hungry (`HUNGRY_AT`), when its lamb is due
 (`PREGNANT`) and when it is grown (`LAMB`) are attributes, each a tick;

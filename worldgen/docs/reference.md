@@ -84,7 +84,8 @@ patches' noise and the finer, each kept cell after cell;
 **`generate_superchunk(generation, seed, superchunk)`**: its cells
 (`chunk_storage::SuperchunkCells`) -- terrain, the ocean where it is
 under the ocean's level, and on the rest grass and trees with their
-stages, as `Generation::growth` says of each cell. No image: that is
+stages, as `Generation::growth` says of each cell, each tree's cell set
+in the collision plane. No image: that is
 storage's to make.
 
 ## `generation.rs`

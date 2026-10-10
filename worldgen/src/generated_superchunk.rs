@@ -3,7 +3,7 @@
 //! image of them is storage's to make (`SuperchunkCells::image`).
 
 use crate::{Generation, Terrain, WALLS};
-use type_registry::{GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
+use type_registry::{COLLISION, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{ChunkMaps, LayerType, SuperchunkCells};
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
@@ -17,11 +17,13 @@ pub fn generate_superchunk(generation: &Generation, seed: u64, superchunk: Super
     let terrain = Terrain::generate_shaped(&generation.shape, seed, superchunk);
     let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     let mut growth = generation.growth(seed);
-    // The planes generated, each a bitmap a chunk: grass, trees, their stage's four, and the cells under water.
+    // The planes generated, each a bitmap a chunk: grass, trees, their stage's four, the cells under water, and the collision plane.
     let mut planes = vec![GRASS, TREE];
     planes.extend(TREE_STAGE.layer_type().planes());
     let wet = planes.len();
     planes.push(WET);
+    let collision = planes.len();
+    planes.push(COLLISION);
     // The ocean wherever the ground is under its level, as deep as it is lower.
     let depth_at = |place: usize| generation.shape.ocean.saturating_sub(terrain.height(place));
     let mut cells = vec![[0u64; WORDS]; planes.len() * CHUNKS_IN_SUPERCHUNK];
@@ -41,6 +43,8 @@ pub fn generate_superchunk(generation: &Generation, seed: u64, superchunk: Super
         }
         if let Some(lot) = grown.tree {
             set(1);
+            // Where a tree stands is not stepped on.
+            set(collision);
             // Its stage: a lot of the cell's own.
             let stage = lot % (OLDEST_TREE_STAGE as u64 + 1);
             (0..TREE_STAGE.layer_type().bits() as usize).filter(|bit| stage >> bit & 1 == 1).for_each(|bit| set(2 + bit));

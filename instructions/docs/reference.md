@@ -106,7 +106,9 @@ many.
 
 What an entity that walks asks, of a turn: the simulation's cells, the
 terrain's walls and `pathfinding` met here. **`around_unwalled(turn,
-at)`**: the 3x3 cells about `at` no wall is before, nine bits.
+at)`**: the 3x3 cells about `at` no wall is before, nine bits;
+**`around_steppable(turn, at)`**: those of them the collision plane
+does not hold.
 **`area_walls(turn, centre)`**: the area's walls, for paths.
 **`step_towards(turn, at, goals, passable)`**, **`step_to(turn, at, to,
 passable)`**: the cell to step to for the nearest goal, or for one
@@ -121,7 +123,7 @@ cells entities stand on.
 ## The root (`lib.rs`)
 
 **`layers`**: `GRASS`, `TREE`, `TREE_STAGE` (and `OLDEST_TREE_STAGE`),
-`WET`, `WALL_EAST`, `WALL_SOUTH`: the layers a world's cells have, from
+`WET`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`: the layers a world's cells have, from
 the type registry (`../../type_registry/`). **`entity_types`**:
 `SHEEP`, and its attributes `HUNGRY_AT`, `PREGNANT`, `LAMB`, `ROAMING`
 and `BEARING` -- and `Roaming`, the layout of `ROAMING`.

@@ -26,9 +26,10 @@ the cells a tree stands on, and `TREE_STAGE`, its stage, 0 to
 
 **`rule(turn, samples)`**: hands **`tree`**, the rule for one tree, to `cells::each_sampled`. Every tree sampled tries to spread or grows
 a stage -- or at the oldest dies one time in four, its cell and its
-stage cleared. **`spread(turn, cell, stage)`**: the other trees in the
+stage cleared, and its cell in the collision plane (`COLLISION`). **`spread(turn, cell, stage)`**: the other trees in the
 8 by 8 cells about it counted from one window; with `n` of them it goes
 on `1 - n/9` of the time, never with 9; a cell of the 64 is drawn and a
-tree put there if it has none. Returns its `RuleCounts`, their
+tree put there if it has none and the collision plane does not hold
+it, its cell set there too. Returns its `RuleCounts`, their
 places named **`SAMPLED`**, **`SPREADS`**, **`GROWN`**, **`DIED`**, their
 names listed in **`COUNTED`**.

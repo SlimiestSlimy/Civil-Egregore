@@ -155,6 +155,31 @@ as they are.
 The world checked has no camera: a camera's superchunks are hot by
 where a person looks, which no seed says.
 
+## The collision plane
+
+One layer, a bit a cell (`COLLISION`, in the type registry): 0 the
+cell is free to step on, 1 something stands there that bars it. It is
+what a movement check asks, whatever the thing is, so a walker reads
+one plane and not one for each kind of thing. The walls are another
+matter and stay the terrain's: they are on the edges between cells,
+two layers, and bar a step from one side.
+
+Who puts such a thing keeps the plane: a tree's cell is set as the
+tree is put -- by generation (`worldgen::generate_superchunk`) and by
+the trees' rule -- and cleared as it dies, by compare-and-write
+(`../../sca_rules/docs/sca_rules.md`, "Trees"). Entities are not in
+it: where they stand is asked of their buckets, and a step onto one
+is turned back as it is applied. Who walks reads it through
+`instructions::walking` (`around_steppable`; the paths leave its
+cells out): a sheep steps onto no cell it holds and bears no lamb on
+one, and seeks no grass under a tree.
+
+A sheep a world starts with may stand on a tree's cell, the flock
+being put by lot; it steps off, and none steps on. Held by
+`../tests/fast/collision.rs`: the plane is the trees' cells as a
+world is generated and after the trees' rule ran, and no sheep that
+stepped or was born stands on a cell it holds.
+
 ## Two writes on one cell
 
 Rules read the world as the tick found it and queue their writes, so

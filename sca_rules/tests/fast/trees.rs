@@ -7,7 +7,7 @@ use bitplane_manager::{Write, WriteOp};
 use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use sca_rules::trees::{DIED, GROWN, SAMPLED, SEEDS_FROM, SPREADS};
 use server::World;
-use type_registry::{OLDEST_TREE_STAGE, TREE, TREE_STAGE};
+use type_registry::{COLLISION, OLDEST_TREE_STAGE, TREE, TREE_STAGE};
 use utilities::rng::Rng;
 
 /// Every cell of `world`'s first superchunk, in rows.
@@ -20,16 +20,19 @@ fn cells(world: &World) -> impl Iterator<Item = CellIndex> + use<> {
 fn plant(world: &mut World, cells: &[CellIndex], mut stage: impl FnMut() -> u32) {
     let put = world.write_cells(TREE, cells.iter().map(|&at| Write::cell(at, WriteOp::Set)));
     let aged = world.write_cells(TREE_STAGE.layer_type(), cells.iter().map(|&at| Write::value(TREE_STAGE, at, stage())));
-    assert_eq!((put.missed, aged.missed), (0, 0), "trees planted off the hot superchunks");
+    let barred = world.write_cells(COLLISION, cells.iter().map(|&at| Write::cell(at, WriteOp::Set)));
+    assert_eq!((put.missed, aged.missed, barred.missed), (0, 0, 0), "trees planted off the hot superchunks");
 }
 
 /// The stage of every tree in `world`'s first superchunk -- and no
-/// cell without a tree has a stage.
+/// cell without a tree has a stage, and the collision plane holds the
+/// cells trees stand on and no other.
 fn stages(world: &World) -> Vec<(CellIndex, u32)> {
     let arena = world.arena();
     let mut stages = Vec::new();
     for cell in cells(world) {
         let stage = arena.value(TREE_STAGE, cell).expect("hot");
+        assert_eq!(arena.holds(COLLISION, cell), arena.holds(TREE, cell), "a tree bars its cell, and nothing else does");
         match arena.holds(TREE, cell).expect("hot") {
             true => stages.push((cell, stage)),
             false => assert_eq!(stage, 0, "a stage where no tree is"),

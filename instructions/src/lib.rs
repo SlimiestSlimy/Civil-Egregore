@@ -38,7 +38,7 @@ use std::ops::{AddAssign, Index, IndexMut};
 /// (`../../type_registry/`). A cell with nothing on it is dirt, which
 /// has no layer.
 pub mod layers {
-    pub use type_registry::{GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WALL_EAST, WALL_SOUTH, WET};
+    pub use type_registry::{COLLISION, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WALL_EAST, WALL_SOUTH, WET};
 }
 
 /// The types of entity a world has and the attributes they carry: what
