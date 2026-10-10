@@ -42,7 +42,8 @@ one tick.
 
 A new file in `src/`, named in `lib.rs`, with a type and attribute
 types not yet taken (sheep: 16, and 17 to 20); its rule called from the
-game's tick beside the others; its tests in `tests/`, a file a kind.
+game's tick beside the others; its tests in the server's
+(`../../server/tests/fast/`), a file a kind.
 
 ## The sheep
 
@@ -59,6 +60,4 @@ turned back when it is applied if so.
 | folder | what is in it |
 |---|---|
 | `src/sheep.rs` | the sheep |
-| `src/diagnostics/world.rs` | the mock world entities are ticked on: superchunks of dirt and grass, hot, with a flock if asked -- what the tests, the game's diagnostics and the renderer all start from |
-| `tests/fast.rs` | the sheep's tests |
 | `docs/` | this, and the reference, function by function |

@@ -46,7 +46,7 @@ pub struct WorldTick {
 /// One tick of grass and sheep over every superchunk with a bitmap in
 /// use, on `simulation`'s threads -- `seed`, the world's, seeding a
 /// superchunk's random stream the first tick it is in. The halos are
-/// not moved: for a mock world's superchunks, hot all the while.
+/// not moved: for a world forced hot, its superchunks hot all the while.
 pub fn tick_rules(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64) -> TickReport<TickCounts> {
     simulation.tick(arena, entities, seed, |turn, samples| TickCounts { grass: grass::rule(turn, samples), trees: trees::rule(turn, samples), sheep: sheep::rule(turn) })
 }

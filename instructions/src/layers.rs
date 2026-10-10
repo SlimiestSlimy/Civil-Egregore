@@ -1,5 +1,5 @@
-//! The layers a world has before any rule adds its own: what a rule
-//! reads and writes by name.
+//! The layers a world is generated with, before any rule adds its own:
+//! what a rule reads and writes by name. A cell with nothing on it is
+//! dirt, which has no layer.
 
-pub use chunk_storage::mock::{DIRT, GRASS};
-pub use worldgen::{WALL_EAST, WALL_SOUTH, WET};
+pub use worldgen::{GRASS, WALL_EAST, WALL_SOUTH, WET};

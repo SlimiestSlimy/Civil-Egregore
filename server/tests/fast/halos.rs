@@ -5,7 +5,7 @@
 //!
 //! `cargo test`
 
-use chunk_storage::mock::GRASS;
+use worldgen::GRASS;
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use bitplane_manager::{Write, WriteOp};
 use entity_manager::{Attribute, EntityId, EntityType, Header, NEVER};

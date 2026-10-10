@@ -5,11 +5,11 @@
 // A tier uses what it needs of it.
 #![allow(dead_code)]
 
-use bitmap::{Bitmap, CellWords};
+use bitmap::{Bitmap, CellWords, BITS_PER_WORD, WORDS};
 use bitplane_manager::{WritesApplied, BitmapArena, Write, WriteOp};
 use chunk_storage::{ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
 use bitmap::morton::morton_index;
-use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex};
+use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 
 
 /// A cell of a chunk, cartesian: across and down from its top left.
@@ -54,4 +54,36 @@ pub fn storage_with(superchunk: SuperchunkIndex, place: usize, layers: &[(LayerT
     let mut storage = ChunkStorage::new(1 << 12);
     storage.insert(superchunk, SuperchunkImage::new(&HeightMap::default()).rewritten(&changes));
     storage
+}
+
+/// The mock superchunk's dirt: every cell its grass is not on.
+pub const MOCK_DIRT: LayerType = LayerType(1);
+/// The mock superchunk's grass.
+pub const MOCK_GRASS: LayerType = LayerType(2);
+
+/// A superchunk of dirt, flat at height 0, with grass on `grass_cells`
+/// cells drawn at random from `seed` -- fewer if a cell is drawn twice.
+/// Each chunk has a dirt layer, and a grass layer if any grass fell on
+/// it.
+pub fn grass_on_dirt(seed: u64, grass_cells: usize, codec: &mut LayerCodec) -> SuperchunkImage {
+    let mut grass: [CellWords; CHUNKS_IN_SUPERCHUNK] = [[0; WORDS]; CHUNKS_IN_SUPERCHUNK];
+    let mut state = seed | 1;
+    for _ in 0..grass_cells {
+        // xorshift64*: enough for scattering cells.
+        state ^= state >> 12;
+        state ^= state << 25;
+        state ^= state >> 27;
+        let cell = state.wrapping_mul(0x2545_F491_4F6C_DD1D) >> 44;
+        let (chunk, place) = (cell as usize / CELLS_IN_CHUNK, cell as usize % CELLS_IN_CHUNK);
+        grass[chunk][place / BITS_PER_WORD] |= 1 << (place % BITS_PER_WORD);
+    }
+    let mut encoded: Vec<(usize, LayerType, Vec<u64>)> = Vec::new();
+    for (chunk, grass) in grass.iter().enumerate() {
+        encoded.push((chunk, MOCK_DIRT, codec.encode(&grass.map(|word| !word)).to_vec()));
+        if grass.iter().any(|&word| word != 0) {
+            encoded.push((chunk, MOCK_GRASS, codec.encode(grass).to_vec()));
+        }
+    }
+    let changes: Vec<LayerChange> = encoded.iter().map(|(chunk, layer_type, words)| LayerChange { place: *chunk, layer_type: *layer_type, encoded: words }).collect();
+    SuperchunkImage::new(&HeightMap::default()).rewritten(&changes)
 }

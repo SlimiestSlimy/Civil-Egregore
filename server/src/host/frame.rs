@@ -6,7 +6,7 @@
 
 use crate::World;
 use bitplane_manager::BucketKey;
-use chunk_storage::mock::GRASS;
+use worldgen::GRASS;
 use chunk_storage::{LayerType, SuperchunkImage};
 use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use mc_rules::trees::{TREE, TREE_STAGE};

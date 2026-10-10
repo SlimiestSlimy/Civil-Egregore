@@ -85,6 +85,15 @@ numbers! {
 }
 
 impl Generation {
+    /// A plain: dry land flat throughout, no ocean and no wall on it,
+    /// no trees, and grass scattered cell by cell on `grass_cover` of
+    /// [`ONE`] of its cells. What a rule is measured and tested on
+    /// alone, the terrain taking no part.
+    pub const fn plain(grass_cover: u64) -> Self {
+        let shape = Shape { ground: 0, ocean: 0, highest: 1, sea: 0, coast: 0, finer_depth: 0, ..Shape::DEFAULT };
+        Self { shape, grass: Patches { cover: grass_cover, patch: 1, detail: 0, scatter: 16 * ONE }, trees: Patches { cover: 0, patch: 1, detail: 0, scatter: 0 } }
+    }
+
     /// How worlds are generated unless told otherwise, as tuned by eye.
     pub const DEFAULT: Self = Self {
         shape: Shape::DEFAULT,

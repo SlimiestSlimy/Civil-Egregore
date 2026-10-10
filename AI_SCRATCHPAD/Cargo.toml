@@ -11,3 +11,4 @@ publish = false
 coordinates = { path = "../coordinates" }
 server = { path = "../server" }
 utilities = { path = "../utilities" }
+worldgen = { path = "../worldgen" }

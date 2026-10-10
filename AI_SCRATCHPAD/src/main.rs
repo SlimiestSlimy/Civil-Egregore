@@ -9,6 +9,7 @@
 mod asking_the_host;
 mod sheep_under_camera_loading;
 mod tree_cover_over_ticks;
+mod what_a_generation_makes;
 mod where_sheep_go;
 
 use utilities::commands::{dispatch, Command, Parameter};
@@ -18,7 +19,7 @@ use utilities::commands::{dispatch, Command, Parameter};
 const SEED: &str = "seed";
 
 /// The probes.
-const COMMANDS: [Command; 3] = [
+const COMMANDS: [Command; 4] = [
     Command {
         name: "tree_cover_over_ticks",
         does: "makes a world forced hot with the tree cover given, resets it to the second cover if one is given, and prints its trees and grass as it ticks flat out: whether a reset is whole at once, and where the tree rule takes a cover",
@@ -42,6 +43,12 @@ const COMMANDS: [Command; 3] = [
         does: "makes a world with no side whose camera loads, keeps a square viewport about its middle, ticks it with no host between, and prints what its ticks say became of its entities: put, removed, lost, refused, born, dead",
         parameters: &[Parameter::new(where_sheep_go::SHEEP_A_SUPERCHUNK, "250"), Parameter::new(where_sheep_go::VIEWPORT_SIDE, "5"), Parameter::new(where_sheep_go::TICKS, "600"), Parameter::new(SEED, "0")],
         run: where_sheep_go::run,
+    },
+    Command {
+        name: "what_a_generation_makes",
+        does: "makes a small world forced hot on a plain with grass on so many thousandths of its cells, and prints the cells of each layer: whether a plain is dry, flat and as grassy as asked",
+        parameters: &[Parameter::new(what_a_generation_makes::GRASS_THOUSANDTHS, "333"), Parameter::new(what_a_generation_makes::SIDE, "2")],
+        run: what_a_generation_makes::run,
     },
 ];
 

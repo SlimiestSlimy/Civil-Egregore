@@ -13,10 +13,10 @@
 //! | module | entity |
 //! |---|---|
 //! | `sheep` | sheep eating the grass, breeding, walking, starving: the first entity |
-//! | `transient_data` | the crate's `transient_data/`, out of git: what its runs leave behind |
 //!
-//! Beside them, as in every crate: `diagnostics/`, here the mock world
-//! they are ticked on; and the tests, in `tests/`.
+//! A rule sees the simulation through `instructions` alone, so it holds
+//! no world: the worlds its rules are tested and measured on are the
+//! server's (`server/tests/fast/sheep.rs`, `server/src/diagnostics/`).
 
 //! What the entities are: `docs/entity_rules.md`; function by function:
 //! `docs/reference.md`.
@@ -25,6 +25,4 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-pub mod diagnostics;
 pub mod sheep;
-pub mod transient_data;

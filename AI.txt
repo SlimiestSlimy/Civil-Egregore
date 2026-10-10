@@ -124,6 +124,16 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
   entities' store, no storage). The user rejected a module that
   re-exported those. Vocabulary types are at instructions' root.
 - World formats are not stabilized: no backwards compatibility kept.
+- A crate holds only what its name implies; mixing across crates is
+  forbidden. Every world -- the program's, a test's, a tool's -- is
+  made by server::start(Start { .. }), whatever it is to be: no mock
+  world anywhere (one in `instructions` was rejected). A rule's tests
+  and tools are therefore the server's (server/tests/fast/sheep.rs,
+  grass.rs; server/src/diagnostics/), on worldgen's
+  Generation::plain: flat, dry, no walls, no trees.
+- NOT KNOWING WHERE SOMETHING GOES: put it in `utilities` or in
+  AI_SCRATCHPAD, TEMPORARILY (unless it really is a utility), and tell
+  the user. What the program needs can only wait in `utilities`.
 - AI.txt and the crate AI_SCRATCHPAD are the AI's to use freely.
   NOTHING MAY DEPEND ON AI_SCRATCHPAD. Probes go there as commands,
   not as temporary tests:
@@ -143,7 +153,13 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
   tick of a 4-superchunk world with 8,000 sheep is ~0.33 M. The next
   optimization worth making is Mesh::blended.
 - The tick reference (pasture 300 333 4000 4 1 less the 0-tick run)
-  is 49.95 M instructions since Lookup::windows was built by index.
+  was 49.95 M instructions on the old mock pasture; the pasture is now
+  a plain the server starts, and the reference is TO BE MEASURED AGAIN
+  on it before it is compared against.
+- Out of place still, for the user to settle: the renderer names
+  mc_rules (trees' OLDEST, TREE_STAGE), worldgen (Generation, Lands,
+  wall, height_shaped), chunk_storage (Height, height_in) and bitmap
+  directly instead of through the server's frames and Start.
 - A fresh flock loses ~2% at its first wake: old age is rolled for the
   whole sleep ahead (wake - now over LIFE_TICKS) and a fed sheep's
   first sleep is long. The rule as written; told to the user.

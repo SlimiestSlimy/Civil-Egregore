@@ -171,10 +171,6 @@ its words written sequentially as laid out in memory ("Saves", below).
    the count less one, beside a bit a chunk saying whether any cell is
    set -- a hot bucket may be empty, though a stored layer never is.
 
-The mock superchunk (`chunk_storage::mock`) is the first world to try
-this on: two layer types, dirt and grass, dirt everywhere but a few
-cells of grass scattered at random.
-
 ### The tick budget
 
 The simulation is to run at 1 kHz -- a tick every millisecond -- with

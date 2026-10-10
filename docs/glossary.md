@@ -59,6 +59,7 @@ what they always do and are not listed.
 | **mask** | bits standing for cells, any shape: a window, an around, an area's rows; and the square of them, 4 to 1,024 cells a side, a layer is read into and written under (`instructions::mask::Mask`) | around, area, window | stencil |
 | **hot** | a layer decoded in the bitmap arena, read and written; a superchunk is hot when its layers are -- when a halo covers it and it is done warming, or while it is cooling. The simulation ticks the hot superchunks only | cold, arena, halo | held, loaded |
 | **cold** | a layer kept encoded in chunk storage, not readable cell by cell; a superchunk no halo covers, its layers so and its entities kept as its cold state | hot, image, cold state | |
+| **plain** | a world of flat dry land -- no ocean, no walls, no trees -- with grass scattered on it (`worldgen::Generation::plain`): what a rule is tried and measured on alone, started by the server as any world | | mock world, pasture world |
 | **halo** | the 3x3 superchunks about a hot entity -- its own and the eight beside it -- kept hot (`simulation::halos`) | hot entity, hot | halo chunk |
 | **hot entity** | an entity of the kind that keeps a halo (`simulation::Hot::About`; the server's `HOT_ENTITY`): people, to come; the sheep, for now | halo, forced hot | halo keeper, important entity, chunk loader |
 | **forced hot** | every superchunk of a world with a size hot throughout, no hot entity keeping them so (`Hot::Forced`); a world with none cannot be | hot entity, world's size | |

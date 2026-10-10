@@ -27,7 +27,6 @@
 //! | `mask` | a square of cells as bits, 4 to 1,024 a side |
 //! | `layers` | the layers a world has before a rule adds its own |
 //! | `between_ticks` | entities put on the world between two ticks |
-//! | `mock_world` | a world of grass on dirt to tick a rule on |
 //!
 //! A rule is written in these alone, and its crate depends on no other:
 //! the instructions are all of the simulation a rule sees. What holds a
@@ -48,7 +47,6 @@ pub mod around;
 pub mod between_ticks;
 pub mod layers;
 pub mod mask;
-pub mod mock_world;
 pub mod read;
 pub mod write;
 
@@ -56,8 +54,7 @@ pub mod write;
 // are, what a layer and an attribute are, a turn, a tick's report, the
 // lot drawn.
 pub use chunk_storage::{Bits4, LayerType, Wide};
-pub use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, NEIGHBOURS, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
+pub use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOURS, SUPERCHUNK_SIDE_CELLS};
 pub use entity_manager::{Attribute, AttributeType, EntityEdit, EntityId, EntityRef, EntityType, Header};
 pub use simulation::{TickReport, Turn};
 pub use utilities::rng::Rng;
-pub use utilities::transient_data::TransientData;

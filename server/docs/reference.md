@@ -76,15 +76,17 @@ by the host on each frame asked.
 
 **`tick_rules(simulation, arena, entities, seed)`**: grass
 (`mc_rules::grass::rule`) and then sheep (`entity_rules::sheep::rule`) on
-each hot superchunk's turn, the halos left -- for mock worlds;
+each hot superchunk's turn, the halos left where they are;
 **`TickCounts`** `{grass, sheep}`. **`World::tick`**: the rules, then
 the halos moved: a **`WorldTick`** `{rules, halos}`.
 
 ## `diagnostics/`
 
-The mock world they tick is the instructions'
-(`instructions::mock_world::MockWorld`, with sheep by
-`entity_rules::diagnostics::world::mock_world_with_sheep`).
+The world they tick is one the server starts as any other
+(`start`): **`plain_world::plain_world(superchunks, grass_cover, sheep,
+threads)`**, a plain (`worldgen::Generation::plain`) with a side,
+forced hot, so a rule is measured alone; **`plain_world::superchunks`**
+how many it holds hot.
 
 **`throughput::run(ticks, thousandths, superchunks, threads)`**: grass
 ticked flat out: each phase's time, samples, writes, cells missed, the

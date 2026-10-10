@@ -26,7 +26,7 @@ reader has to wonder whether something is missing or was never needed
 | `docs/<crate>.md` | its design: what it is, and every decision with its reason |
 | `docs/reference.md` | every item, function by function, in the glossary's words; the code's comments point here |
 | `src/lib.rs` | a table of the crate's modules: one line each, what it is |
-| `src/diagnostics/` | code that gathers data and judges nothing: mock worlds, counts, censuses. A tool that prints them goes in `src/diagnostics/tool`, a function among the crate's commands |
+| `src/diagnostics/` | code that gathers data and judges nothing: counts, censuses. A tool that prints them goes in `src/diagnostics/tool`, a function among the crate's commands |
 | `src/transient_data.rs` | names the crate's `transient_data/` folder, through `utilities::transient_data`, and says what goes where in it |
 | `transient_data/` | what runs leave behind: measurements, renders, saves. Never in git, never needed as an input |
 | `tests/<tier>.rs` | one test program per tier -- `fine.rs`, `fast.rs`, `complete.rs` -- a module per topic in it, each a file in `tests/<tier>/` once the tier's would pass some 300 lines; only the tiers the crate has tests for |
@@ -53,6 +53,15 @@ reader has to wonder whether something is missing or was never needed
   hexadecimal wherever it is written (`utilities::seed::hex`).
 - **`utilities/` is the shared top folder.** Code that two crates need
   goes there, once (#2). It is never copied into both.
+- A crate holds what its name says and nothing else: what belongs to
+  another's name goes there, however small. A world -- the program's, a
+  test's, a tool's -- is made in one place, the server's `start`,
+  whatever it is to be given as its `Start`: no crate makes a world of
+  its own.
+- The rules' crates hold their rules alone: no diagnostics, no
+  `transient_data`, no tests. A rule is tried on a world, so its tests
+  and tools are the server's (`server/tests/fast/`,
+  `server/src/diagnostics/`).
 - A crate depends only on the crates below it. The README lists the
   order. The rules' crates (`entity_rules`, `mc_rules`) depend on
   `instructions` alone. Nothing depends on `AI_SCRATCHPAD`, the AI's
