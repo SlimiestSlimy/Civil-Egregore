@@ -24,6 +24,7 @@ mod host_thread;
 use host_thread::HostThread;
 
 pub mod frame;
+pub mod terrain_seen;
 
 use crate::Start;
 use utilities::tuning::Tuning;

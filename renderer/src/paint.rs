@@ -14,11 +14,8 @@
 
 use crate::ground::{lit, Given, Ground, COARSEST};
 use crate::near::{paint_near, PaintedNear};
-use bitmap::morton::morton_coordinates;
-use bitmap::BITS_PER_WORD;
 use coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
-use worldgen::OLDEST_TREE_STAGE;
-use server::host::frame::{Cells, Frame, CHUNK_WORDS, DEEP};
+use server::host::frame::{cell_of_bit, Cells, Frame, CHUNK_WORDS, DEEP, OLDEST_TREE_STAGE, STAGE_BITS, WORD_BITS};
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
@@ -76,12 +73,12 @@ fn ground(grounds: &mut HashMap<(u32, u32), Ground>, frame: &Frame, number: u64)
     let fine = frame.near.is_some() || frame.detail < 2;
     let hot = || frame.cells.iter().map(|cells| cells.top_left);
     let missing: Vec<(u32, u32)> = hot().filter(|top_left| grounds.get(top_left).is_none_or(|ground| fine && ground.fine.is_none())).collect();
-    let (seed, shape) = (frame.seed, frame.generation.shape);
+    let (seed, generation) = (frame.seed, frame.generation);
     // The heights the frame brings: those of the superchunks just turned hot.
     let given: Given = frame.cells.iter().filter(|cells| !cells.heights.is_empty()).map(|cells| (cells.top_left, &cells.heights[..])).collect();
     let given = &given;
     let made: Vec<Ground> = thread::scope(|scope| {
-        let making: Vec<_> = missing.iter().map(|&top_left| scope.spawn(move || Ground::generate(seed, &shape, top_left, given))).collect();
+        let making: Vec<_> = missing.iter().map(|&top_left| scope.spawn(move || Ground::generate(seed, &generation, top_left, given))).collect();
         making.into_iter().map(|making| making.join().expect("a superchunk's ground")).collect()
     });
     grounds.extend(missing.into_iter().zip(made));
@@ -176,9 +173,6 @@ const TREE_YOUNG: [u8; 3] = [62, 128, 44];
 /// A tree at its last stage.
 const TREE_OLD: [u8; 3] = [14, 62, 30];
 
-/// Bits a cell of the trees' stage plane.
-const STAGE_BITS: usize = worldgen::TREE_STAGE.layer_type().bits() as usize;
-
 /// A tree's colour at `stage`.
 pub fn tree_colour(stage: u32) -> [u8; 3] {
     mixed(TREE_YOUNG, TREE_OLD, stage as usize, OLDEST_TREE_STAGE as usize)
@@ -187,8 +181,8 @@ pub fn tree_colour(stage: u32) -> [u8; 3] {
 /// The stage of the tree at bit `bit` of word `word` of `cells`' bitmaps.
 pub fn stage_at(cells: &Cells, word: usize, bit: u32) -> u32 {
     // The cell's place among the superchunk's, and its stage's four bits there.
-    let at = (word * BITS_PER_WORD + bit as usize) * STAGE_BITS;
-    (cells.stages[at / BITS_PER_WORD] >> (at % BITS_PER_WORD)) as u32 & ((1 << STAGE_BITS) - 1)
+    let at = (word * WORD_BITS + bit as usize) * STAGE_BITS;
+    (cells.stages[at / WORD_BITS] >> (at % WORD_BITS)) as u32 & ((1 << STAGE_BITS) - 1)
 }
 
 /// `colour`, opaque.
@@ -206,7 +200,7 @@ fn paint(cells: &Cells, ground: &Ground) -> Painted {
         for (word_index, &word) in chunk.iter().enumerate() {
             let mut bits = word;
             while bits != 0 {
-                let (x, y) = morton_coordinates(word_index * BITS_PER_WORD + bits.trailing_zeros() as usize);
+                let (x, y) = cell_of_bit(word_index * WORD_BITS + bits.trailing_zeros() as usize);
                 pixels[(top + y as usize) * SIDE + left + x as usize] = green;
                 bits &= bits - 1;
             }
@@ -218,7 +212,7 @@ fn paint(cells: &Cells, ground: &Ground) -> Painted {
         let mut bits = word;
         while bits != 0 {
             let bit = bits.trailing_zeros();
-            let (x, y) = morton_coordinates(index % CHUNK_WORDS * BITS_PER_WORD + bit as usize);
+            let (x, y) = cell_of_bit(index % CHUNK_WORDS * WORD_BITS + bit as usize);
             pixels[(top + y as usize) * SIDE + left + x as usize] = opaque(tree_colour(stage_at(cells, index, bit)));
             bits &= bits - 1;
         }
@@ -232,7 +226,7 @@ fn paint(cells: &Cells, ground: &Ground) -> Painted {
         let mut bits = word;
         while bits != 0 {
             let bit = bits.trailing_zeros();
-            let (x, y) = morton_coordinates(index % CHUNK_WORDS * BITS_PER_WORD + bit as usize);
+            let (x, y) = cell_of_bit(index % CHUNK_WORDS * WORD_BITS + bit as usize);
             let pixel = &mut pixels[(top + y as usize) * SIDE + left + x as usize];
             *pixel = opaque(under_water([pixel[0], pixel[1], pixel[2]], depth_at(cells, index, bit)));
             bits &= bits - 1;
@@ -267,14 +261,14 @@ fn counted(words: &[u64], detail: u32) -> Vec<u32> {
         let (left, top) = chunk_top_left(place);
         let (left, top) = (left >> detail, top >> detail);
         for tile in 0..CELLS_IN_CHUNK / tile_cells {
-            let count: u32 = if tile_cells >= BITS_PER_WORD {
-                let words = tile_cells / BITS_PER_WORD;
+            let count: u32 = if tile_cells >= WORD_BITS {
+                let words = tile_cells / WORD_BITS;
                 chunk[tile * words..][..words].iter().map(|word| word.count_ones()).sum()
             } else {
                 let bit = tile * tile_cells;
-                (chunk[bit / BITS_PER_WORD] >> (bit % BITS_PER_WORD) & ((1 << tile_cells) - 1)).count_ones()
+                (chunk[bit / WORD_BITS] >> (bit % WORD_BITS) & ((1 << tile_cells) - 1)).count_ones()
             };
-            let (x, y) = morton_coordinates(tile);
+            let (x, y) = cell_of_bit(tile);
             counts[(top + y as usize) * side + left + x as usize] = count;
         }
     }

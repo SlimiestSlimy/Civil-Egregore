@@ -140,7 +140,7 @@ over the main menu.
 asked for; **`Drawn`**: one drawn. **`start()`**: the map's thread.
 **`cell(wanted, x, y)`**: the cell in a pixel's middle;
 **`draw(wanted)`**: its pixels, rows shared among the machine's threads,
-what grows on a cell as `worldgen::Growth` says. **`MapLink`**: the
+what grows on a cell as the server's `terrain_seen::CoverSeen` says. **`MapLink`**: the
 window's side of the thread -- **`start()`**, **`map_mode()`**.
 **`MapView`**: its picture; **`spawn`**. **`map_step(scale)`**, a cell
 at the finest. **`far`**: in map mode, which `M` turns on and off, a

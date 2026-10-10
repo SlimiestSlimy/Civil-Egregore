@@ -135,9 +135,11 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
   worldgen says what is on each cell (generate_superchunk ->
   chunk_storage::SuperchunkCells), chunk_storage makes the image of
   them and keeps it cold, the server passes finished images and
-  entity states between the managers and the disk. The renderer is to
-  query the simulation only through the server's API (TO DO: it still
-  names worldgen, chunk_storage and bitmap).
+  entity states between the managers and the disk. The renderer
+  asks the server alone: server::host::frame for what is hot (its bit
+  layout included), server::host::terrain_seen for the ground and the
+  map where nothing is hot. It depends on server, gui, coordinates and
+  utilities, and on nothing under the server.
 - NOT KNOWING WHERE SOMETHING GOES: put it in `utilities` or in
   AI_SCRATCHPAD, TEMPORARILY (unless it really is a utility), and tell
   the user. What the program needs can only wait in `utilities`.
@@ -163,10 +165,10 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
   is 58.37 M instructions (8,680.05 M less 8,621.68 M) at 9303e37,
   the pasture a plain the server starts. It was 49.95 M on the mock
   pasture it replaced: another world, so the two do not compare.
-- server/tests/complete.rs a_world_stopped_often_comes_to_the_same
-  FAILS, and did before 2026-10-09's work (fails at a0e9874): a world
-  saved and loaded every 5,000 ticks is not the one run straight.
-  Probe: AI_SCRATCHPAD where_a_stopped_world_parts.
+- A world's stored image of a cooled superchunk is behind its cells
+  until the writeback ring is flushed (World::write_back_and_flush_all,
+  as a save does): compare images only after it. The complete tier's
+  save/load test failed for that alone, since before 2026-10-09.
 - A fresh flock loses ~2% at its first wake: old age is rolled for the
   whole sleep ahead (wake - now over LIFE_TICKS) and a fed sheep's
   first sleep is long. The rule as written; told to the user.

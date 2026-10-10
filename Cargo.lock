@@ -6,6 +6,8 @@ version = 4
 name = "AI_SCRATCHPAD"
 version = "0.1.0"
 dependencies = [
+ "bitmap",
+ "chunk_storage",
  "coordinates",
  "server",
  "utilities",
@@ -4221,13 +4223,10 @@ name = "renderer"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bitmap",
- "chunk_storage",
  "coordinates",
  "gui",
  "server",
  "utilities",
- "worldgen",
 ]
 
 [[package]]

@@ -173,9 +173,25 @@ the pace, the name, what was last said -- **`run`**: requests read between ticks
 wait for the next one's time; paused or with no world, it waits for a
 request; **`run_world`**, **`run_in_place`**, **`reset_now`**, **`save`**, **`frame(ask)`**, **`tick`**.
 
+## `host/terrain_seen.rs`
+
+What a client asks of a world's terrain where no frame brings it,
+answered from how the world is generated: a client names nothing under
+the server. `Generation` and `Height`, the words it is asked in.
+**`HeightsSeen::of(generation, seed)`**, a thread's own:
+**`height(x, y)`**, **`cells_from_a_mesh_line(x, y)`**.
+**`CoverSeen::of(generation, seed)`**, shared: **`cover(x, y)`**, a
+**`Cover`** -- `Tree`, `Grass`, `Dirt`. **`levels(generation)`**:
+**`Levels`** `{ground, ocean, highest}`. **`walled(one, other)`**: a
+wall between two heights. **`height_in_frame(height_words, place)`**:
+a cell's height from the words a frame brings.
+**`seed_with_land(from, generation, near)`**.
+
 ## `host/frame.rs`
 
-`CHUNK_WORDS`, `DEEP` (16). **`Viewport`** `{first, last}`: what the
+`CHUNK_WORDS`, `WORD_BITS`, `STAGE_BITS`, `OLDEST_TREE_STAGE`,
+**`cell_of_bit(bit)`** -- how a frame's bits lie, so a client asks no
+one else. `DEEP` (16). **`Viewport`** `{first, last}`: what the
 renderer should render, in superchunks -- not Bevy's camera viewport,
 a rectangle of the window -- **`contains(at)`**. **`Ask`** `{viewport,
 detail, skip, most, near}`: what a frame is to carry, `viewport` `None`

@@ -145,16 +145,16 @@ pub fn heights(shown: Res<Shown>, sprites: Res<Sprites>, seen: Res<Seen>, camera
     let (first, last) = ((first_x, first_y), (last_x, last_y));
     let readable = shown.heights && 1.0 / view.scale >= HEIGHT_FROM && last.0 - first.0 < HEIGHT_LABELS.0 && last.1 - first.1 < HEIGHT_LABELS.1;
     let size = view.scale * (1.0 / view.scale / HEIGHT_WIDTH).min(1.0);
-    let of = seen.frame.as_ref().filter(|_| readable).map(|frame| (frame.seed, frame.generation.shape));
+    let of = seen.frame.as_ref().filter(|_| readable).map(|frame| (frame.seed, frame.generation));
     for (label, mut text, mut transform, mut visibility) in &mut labels {
         // The cell the camera shows that is the label's: the first at or past the view's first whose place round the grid is its slot.
         let round = |first: u32, slot: u32, labels: u32| first + (slot + labels - first % labels) % labels;
         let (x, y) = (round(first.0, label.slot.0, HEIGHT_LABELS.0), round(first.1, label.slot.1, HEIGHT_LABELS.1));
-        let Some((seed, shape)) = of.filter(|_| x <= last.0 && y <= last.1) else {
+        let Some((seed, generation)) = of.filter(|_| x <= last.0 && y <= last.1) else {
             *visibility = Visibility::Hidden;
             continue;
         };
-        let height = worldgen::height_shaped(&shape, seed, x, y).to_string();
+        let height = server::host::terrain_seen::HeightsSeen::of(&generation, seed).height(x, y).to_string();
         if text.0 != height {
             text.0 = height;
         }

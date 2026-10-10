@@ -19,10 +19,8 @@ mod light_and_shadow;
 use light_and_shadow::{Sun, banded, shadow_lines, smoothed, tint};
 
 use coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS};
-use chunk_storage::{height_in, Height};
 use std::collections::HashMap;
-use worldgen::mesh::Lands;
-use worldgen::{wall, Shape};
+use server::host::terrain_seen::{height_in_frame, levels, walled, Generation, Height, HeightsSeen};
 
 /// Cells along a superchunk's side.
 pub const SIDE: usize = SUPERCHUNK_SIDE_CELLS as usize;
@@ -135,10 +133,11 @@ impl Ground {
     }
 
     /// The ground of the superchunk whose top left cell is `top_left`,
-    /// in the world whose seed is `seed`, shaped as `shape` says; the
+    /// in the world whose seed is `seed`, generated as `generation` says; the
     /// heights `given` taken as they are.
-    pub fn generate(seed: u64, shape: &Shape, top_left: (u32, u32), given: &Given) -> Self {
-        let heights = heights(seed, shape, top_left, given);
+    pub fn generate(seed: u64, generation: &Generation, top_left: (u32, u32), given: &Given) -> Self {
+        let heights = heights(seed, generation, top_left, given);
+        let levels = levels(generation);
         let smooth = smoothed(&smoothed(&heights.iter().map(|&height| height as f32).collect::<Vec<_>>()));
         let (lines, shadowed) = shadow_lines(&heights);
         let at = |x: usize, y: usize| (y + BEFORE) * WIDE + x + BEFORE;
@@ -151,11 +150,11 @@ impl Ground {
                 let here = at(x, y);
                 let slope = HEIGHT_METRES / CELL_METRES / 2.0;
                 let (across, down) = ((smooth[here + 1] - smooth[here - 1]) * slope, (smooth[here + WIDE] - smooth[here - WIDE]) * slope);
-                let light = banded(1.0 + 0.9 * (sun.shade(across, down) - 1.0), 0.07).clamp(0.55, 1.35) * tint(heights[here].saturating_sub(shape.ground) as f32 / shape.highest.saturating_sub(shape.ground).max(1) as f32);
+                let light = banded(1.0 + 0.9 * (sun.shade(across, down) - 1.0), 0.07).clamp(0.55, 1.35) * tint(heights[here].saturating_sub(levels.ground) as f32 / levels.highest.saturating_sub(levels.ground).max(1) as f32);
                 lit[y * SIDE + x] = (light * LIT_ONE).round() as u8 | if shadowed[here] { SHADOWED } else { 0 };
                 level.factors.push(if shadowed[here] { SHADOW.map(|shadow| shadow * light) } else { [light; 3] });
                 level.heights.push(heights[here] as f32);
-                level.walls.push(wall(heights[here], heights[here + 1]) as u32 + wall(heights[here], heights[here + WIDE]) as u32);
+                level.walls.push(walled(heights[here], heights[here + 1]) as u32 + walled(heights[here], heights[here + WIDE]) as u32);
             }
         }
         let mut levels = Vec::with_capacity(COARSEST + 1);
@@ -171,13 +170,13 @@ impl Ground {
 }
 
 /// Heights already worked out: a superchunk's height words
-/// ([`chunk_storage::height_in`]) by its top left cell.
+/// ([`height_in_frame`]) by its top left cell.
 pub type Given<'a> = HashMap<(u32, u32), &'a [u64]>;
 
 /// The heights about the superchunk whose top left cell is `top_left`:
 /// [`WIDE`] a side, row by row. Those of a superchunk `given` are read;
 /// the others are worked out from the seed.
-fn heights(seed: u64, shape: &Shape, top_left: (u32, u32), given: &Given) -> Vec<Height> {
+fn heights(seed: u64, generation: &Generation, top_left: (u32, u32), given: &Given) -> Vec<Height> {
     let (left, top) = (top_left.0.wrapping_sub(BEFORE as u32), top_left.1.wrapping_sub(BEFORE as u32));
     // Rows shared out among the machine's threads: a cell's height is the same whoever works it out.
     let mut heights = vec![0; WIDE * WIDE];
@@ -186,7 +185,7 @@ fn heights(seed: u64, shape: &Shape, top_left: (u32, u32), given: &Given) -> Vec
     std::thread::scope(|scope| {
         for (part, rows) in heights.chunks_mut(rows_each * WIDE).enumerate() {
             scope.spawn(move || {
-                let mut lands = Lands::new(shape, seed);
+                let mut seen = HeightsSeen::of(generation, seed);
                 for (row, heights) in rows.chunks_mut(WIDE).enumerate() {
                     let (y, mut across) = (top.wrapping_add((part * rows_each + row) as u32), 0);
                     while across < WIDE {
@@ -196,8 +195,8 @@ fn heights(seed: u64, shape: &Shape, top_left: (u32, u32), given: &Given) -> Vec
                         let run = (SIDE - in_x as usize).min(WIDE - across);
                         let cells = heights[across..across + run].iter_mut().zip(0u32..);
                         match given.get(&(x - in_x, y - in_y)) {
-                            Some(words) => cells.for_each(|(height, along)| *height = height_in(words, place_from_cartesian(in_x + along, in_y))),
-                            None => cells.for_each(|(height, along)| *height = lands.height(x.wrapping_add(along), y)),
+                            Some(words) => cells.for_each(|(height, along)| *height = height_in_frame(words, place_from_cartesian(in_x + along, in_y))),
+                            None => cells.for_each(|(height, along)| *height = seen.height(x.wrapping_add(along), y)),
                         }
                         across += run;
                     }
@@ -267,11 +266,11 @@ mod tests {
     /// heights a frame brings are the ones worked out from the seed.
     #[test]
     fn shadows_are_the_same_from_both_sides_of_an_edge() {
-        let shape = Shape::DEFAULT;
-        let seed = worldgen::seed_with_land(utilities::seed::counted(), &shape, coordinates::WORLD_MIDDLE);
+        let generation = Generation::DEFAULT;
+        let seed = server::host::terrain_seen::seed_with_land(utilities::seed::counted(), &generation, coordinates::WORLD_MIDDLE);
         let middle = coordinates::WORLD_MIDDLE.top_left().cartesian();
         let (left, top, side) = (middle.x, middle.y, SIDE as u32);
-        let fine = |top_left: (u32, u32), given: &Given| Ground::generate(seed, &shape, top_left, given).fine.expect("made fine");
+        let fine = |top_left: (u32, u32), given: &Given| Ground::generate(seed, &generation, top_left, given).fine.expect("made fine");
         let (here, beside, below) = (fine((left, top), &Given::new()), fine((left + side, top), &Given::new()), fine((left, top + side), &Given::new()));
         let mut differing = 0;
         for along in 0..SIDE as isize {

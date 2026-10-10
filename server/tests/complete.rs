@@ -27,6 +27,8 @@ fn a_world_stopped_often_comes_to_the_same() {
         server::save(&folder, &mut stopped).expect("saved");
         stopped = server::load(&folder).expect("loaded");
     }
+    // A cooled superchunk's last changes wait in the writeback ring: flushed, as a save's are, before the images are set side by side.
+    straight.write_back_and_flush_all();
     assert!(everything(&straight) == everything(&stopped), "the same at tick {UNTIL}");
 }
 
