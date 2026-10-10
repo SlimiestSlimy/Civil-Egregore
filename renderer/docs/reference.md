@@ -84,7 +84,8 @@ change how worlds are generated, the view left where it is.
 `DIRT`, one pixel of it; **`picture_of(size, pixels)`**: an image.
 **`Laid`**: what of a picture over the images is changed.
 **`NearView`**: the picture from near; **`spawn`**: it, hidden.
-**`show`**: the frame that came shown -- another world's dropping what
+**`show`**: every frame that came shown, in the order they came, the
+host asked again once one says no more follow -- another world's dropping what
 was drawn of the last, the view put over it; what was drawn of a
 superchunk of the viewport gone cold dropped; each superchunk's image,
 and the picture from near. **`near(first, last, scale)`**: the cells

@@ -37,10 +37,14 @@ The window is the one that asks, never the host that sends: each
 time the window has shown a frame -- 60 times a second at most -- it
 asks the host for the hot superchunks of its **viewport** -- whatever
 it should render, in superchunks; none in map mode -- (`Host::sync`),
-and the host, between two ticks, answers with their cells as the last
-tick left them, and which superchunks of the viewport are hot (a
-`Frame`). So the window sets how often the world is drawn; a window
-that falls behind slows no tick; one frame at most is ever on its way;
+and the host answers with their cells as a tick left them, and which
+superchunks of the viewport are hot -- a few superchunks between two
+ticks, each few a `Frame` of their own, so a wide viewport takes
+little of any one tick. The frames queue here: each one that has come
+is painted and laid over the images in turn, and the next ask goes
+once the last of an answer has (`Frame::more`). So the window sets how
+often the world is drawn; a window that falls behind slows no tick;
+one ask at most is ever being answered;
 and what is not in the viewport, or is cold, is never sent. "Viewport"
 is the world's word here, not Bevy's: a Bevy camera's `Viewport` is a
 rectangle of the window.

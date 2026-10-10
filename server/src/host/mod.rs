@@ -7,10 +7,12 @@
 //! and runs one once asked to make one ([`Host::make_world`]) or to
 //! open one saved ([`Host::open_world`]) -- and makes the one run again
 //! from its start when its generation is retuned ([`Host::reset`]). Each [`Host::sync`] is
-//! answered with a [`Frame`]: the viewport's hot superchunks as the
-//! last tick left them, copied and nothing more ([`frame`]) -- so what
-//! is rendered costs the ticks next to nothing, and a frame carries
-//! only so many superchunks, the client going round the viewport's.
+//! answered with a [`Frame`]: the viewport's hot superchunks each as
+//! a tick left it, copied and nothing more ([`frame`]) -- a few
+//! between two ticks, in the time the host has to spare or a small
+//! share of a tick's, each few sent as a frame of their own, the last
+//! saying it is ([`Frame::more`]): so however much is asked, the ticks
+//! give up little to it, and nothing asked for is left out.
 //! It sends nothing
 //! unasked, so it is the client that sets how often the world is
 //! drawn, and one that falls behind slows no tick.
@@ -43,6 +45,12 @@ pub const TARGET_PACE: u32 = 256;
 
 /// Ticks from one line of the census to the next.
 pub const CENSUS_EVERY: u64 = 1000;
+
+/// The share of a tick's time the host gives to copying a frame's
+/// superchunks before the next tick, when it has no time to spare: a
+/// frame is answered a little at a time, and costs the ticks this much
+/// however much is asked.
+const FRAMES_SHARE: f64 = 0.125;
 
 /// How far behind its pace the host may fall and still catch up:
 /// ticks made late by a frame or a sleep are made up, a stall is not.

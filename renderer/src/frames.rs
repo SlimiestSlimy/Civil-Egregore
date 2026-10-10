@@ -7,7 +7,7 @@
 
 use crate::link::{Link, Seen};
 use crate::map::MapLink;
-use crate::paint::BROWN;
+use crate::paint::{Picture, BROWN};
 use crate::view::{first_view, Sprites, SPRITE_SIDE};
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
@@ -72,7 +72,9 @@ pub fn spawn(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     commands.spawn((Sprite { image: images.add(picture_of((1, 1), DIRT.to_vec())), ..default() }, Transform::from_xyz(0.0, 0.0, 1.0), Visibility::Hidden, NearView));
 }
 
-/// Shows the frame the host answered with, if it has: each
+/// Shows the frames the host answered with since the last shown, in
+/// the order they came -- an ask is answered a few superchunks a
+/// frame, and no other is made until its last has come: each
 /// superchunk's image, and the picture from near -- hidden once the
 /// view is no longer near. What was drawn of a superchunk of its
 /// viewport that is no longer hot goes. A frame of another world than
@@ -93,56 +95,62 @@ pub fn show(
     if seen.near_pixels == 0 {
         *near_visibility = Visibility::Hidden;
     }
-    let Some(picture) = link.pictures.lock().expect("the pictures' receiver").try_iter().last() else {
-        return;
-    };
-    link.waiting = false;
-    if seen.frame.as_ref().is_none_or(|frame| frame.world != picture.frame.world) {
-        for (_, (sprite, ..)) in sprites.tiles.drain() {
-            commands.entity(sprite).despawn();
-        }
-        if std::mem::take(&mut link.first_view) {
-            let (mut transform, mut projection) = camera.into_inner();
-            first_view(picture.frame.side, &window, &mut transform, &mut projection);
-        }
+    let pictures: Vec<Picture> = link.pictures.lock().expect("the pictures' receiver").try_iter().collect();
+    let mut camera = Some(camera);
+    if !pictures.is_empty() {
+        seen.painted = 0;
     }
-    if let Some(viewport) = picture.frame.viewport {
-        // Nothing to draw of a superchunk gone cold: what was drawn of it goes. The hot are row by row.
-        let hot = &picture.frame.hot;
-        let cold: Vec<(u32, u32)> = sprites.tiles.keys().copied().filter(|&at| viewport.contains(at) && hot.binary_search_by_key(&(at.1, at.0), |&(x, y)| (y, x)).is_err()).collect();
-        for at in cold {
-            if let Some((sprite, ..)) = sprites.tiles.remove(&at) {
+    for picture in pictures {
+        link.waiting &= picture.frame.more;
+        if seen.frame.as_ref().is_none_or(|frame| frame.world != picture.frame.world) {
+            for (_, (sprite, ..)) in sprites.tiles.drain() {
                 commands.entity(sprite).despawn();
             }
-        }
-    }
-    (seen.frame, seen.painted, seen.paint_seconds) = (Some(picture.frame), picture.superchunks.len(), picture.paint_seconds);
-    for painted in picture.superchunks {
-        let (at, side) = (painted.at, painted.side);
-        if let Some((_, image, drawn)) = sprites.tiles.get_mut(&at) {
-            if let Some(mut image) = images.get_mut(&*image) {
-                *image = picture_of((side, side), painted.pixels);
-                *drawn = side;
+            if std::mem::take(&mut link.first_view)
+                && let Some(camera) = camera.take()
+            {
+                let (mut transform, mut projection) = camera.into_inner();
+                first_view(picture.frame.side, &window, &mut transform, &mut projection);
             }
-            continue;
         }
-        // Its first pixels: a sprite a superchunk's side on the plane whatever its image's; the world's y grows downwards, the plane's upwards.
-        let image = images.add(picture_of((side, side), painted.pixels));
-        let sprite = Sprite { image: image.clone(), custom_size: Some(Vec2::splat(SPRITE_SIDE)), ..default() };
-        let middle = [0, 1].map(|axis| sprites.plane([at.0, at.1][axis] * SUPERCHUNK_SIDE_CELLS, axis) + SPRITE_SIDE / 2.0);
-        let sprite = commands.spawn((sprite, Transform::from_xyz(middle[0], -middle[1], 0.0))).id();
-        sprites.tiles.insert(at, (sprite, image, side));
-    }
-    if let Some(painted) = picture.near {
-        let (first, size, pixels) = (painted.near.first, painted.near.size, painted.near.pixels_a_cell);
-        if let Some(mut image) = images.get_mut(&near_sprite.image) {
-            *image = picture_of((size.0 * pixels, size.1 * pixels), painted.pixels);
+        if let Some(viewport) = picture.frame.viewport {
+            // Nothing to draw of a superchunk gone cold: what was drawn of it goes. The hot are row by row.
+            let hot = &picture.frame.hot;
+            let cold: Vec<(u32, u32)> = sprites.tiles.keys().copied().filter(|&at| viewport.contains(at) && hot.binary_search_by_key(&(at.1, at.0), |&(x, y)| (y, x)).is_err()).collect();
+            for at in cold {
+                if let Some((sprite, ..)) = sprites.tiles.remove(&at) {
+                    commands.entity(sprite).despawn();
+                }
+            }
         }
-        // Over the cells it is of, a cell a unit whatever its pixels.
-        let middle = (sprites.plane(first.0, 0) + size.0 as f32 / 2.0, -(sprites.plane(first.1, 1) + size.1 as f32 / 2.0));
-        *near_transform = Transform::from_xyz(middle.0, middle.1, 1.0).with_scale(Vec3::new(1.0 / pixels as f32, 1.0 / pixels as f32, 1.0));
-        if seen.near_pixels > 0 {
-            *near_visibility = Visibility::Visible;
+        (seen.frame, seen.painted, seen.paint_seconds) = (Some(picture.frame), seen.painted + picture.superchunks.len(), picture.paint_seconds);
+        for painted in picture.superchunks {
+            let (at, side) = (painted.at, painted.side);
+            if let Some((_, image, drawn)) = sprites.tiles.get_mut(&at) {
+                if let Some(mut image) = images.get_mut(&*image) {
+                    *image = picture_of((side, side), painted.pixels);
+                    *drawn = side;
+                }
+                continue;
+            }
+            // Its first pixels: a sprite a superchunk's side on the plane whatever its image's; the world's y grows downwards, the plane's upwards.
+            let image = images.add(picture_of((side, side), painted.pixels));
+            let sprite = Sprite { image: image.clone(), custom_size: Some(Vec2::splat(SPRITE_SIDE)), ..default() };
+            let middle = [0, 1].map(|axis| sprites.plane([at.0, at.1][axis] * SUPERCHUNK_SIDE_CELLS, axis) + SPRITE_SIDE / 2.0);
+            let sprite = commands.spawn((sprite, Transform::from_xyz(middle[0], -middle[1], 0.0))).id();
+            sprites.tiles.insert(at, (sprite, image, side));
+        }
+        if let Some(painted) = picture.near {
+            let (first, size, pixels) = (painted.near.first, painted.near.size, painted.near.pixels_a_cell);
+            if let Some(mut image) = images.get_mut(&near_sprite.image) {
+                *image = picture_of((size.0 * pixels, size.1 * pixels), painted.pixels);
+            }
+            // Over the cells it is of, a cell a unit whatever its pixels.
+            let middle = (sprites.plane(first.0, 0) + size.0 as f32 / 2.0, -(sprites.plane(first.1, 1) + size.1 as f32 / 2.0));
+            *near_transform = Transform::from_xyz(middle.0, middle.1, 1.0).with_scale(Vec3::new(1.0 / pixels as f32, 1.0 / pixels as f32, 1.0));
+            if seen.near_pixels > 0 {
+                *near_visibility = Visibility::Visible;
+            }
         }
     }
 }

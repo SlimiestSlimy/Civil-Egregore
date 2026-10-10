@@ -8,6 +8,7 @@
 
 mod asking_the_host;
 mod sheep_under_camera_loading;
+mod ticks_under_a_wide_viewport;
 mod tree_cover_over_ticks;
 mod what_a_generation_makes;
 mod where_a_stopped_world_parts;
@@ -20,7 +21,7 @@ use utilities::commands::{dispatch, Command, Parameter};
 const SEED: &str = "seed";
 
 /// The probes.
-const COMMANDS: [Command; 5] = [
+const COMMANDS: [Command; 6] = [
     Command {
         name: "tree_cover_over_ticks",
         does: "makes a world forced hot with the tree cover given, resets it to the second cover if one is given, and prints its trees and grass as it ticks flat out: whether a reset is whole at once, and where the tree rule takes a cover",
@@ -38,6 +39,12 @@ const COMMANDS: [Command; 5] = [
         does: "makes a world with no side whose camera loads, asks for a square viewport about its middle, and prints the sheep on each superchunk hot in it: whether every superchunk generated in the viewport is given its flock",
         parameters: &[Parameter::new(sheep_under_camera_loading::SHEEP_A_SUPERCHUNK, "10"), Parameter::new(sheep_under_camera_loading::VIEWPORT_SIDE, "6"), Parameter::new(sheep_under_camera_loading::TICKS_WAITED, "16"), Parameter::new(SEED, "0")],
         run: sheep_under_camera_loading::run,
+    },
+    Command {
+        name: "ticks_under_a_wide_viewport",
+        does: "makes a world with no side whose camera loads, keeps a square viewport hot, and prints its ticks a second with no frame asked and with frames asked as a window asks: what answering a client costs the simulation",
+        parameters: &[Parameter::new(ticks_under_a_wide_viewport::VIEWPORT_SIDE, "12"), Parameter::new(ticks_under_a_wide_viewport::SECONDS, "10"), Parameter::new(ticks_under_a_wide_viewport::SUPERCHUNKS_A_FRAME, "32"), Parameter::new(ticks_under_a_wide_viewport::SHEEP_A_SUPERCHUNK, "250"), Parameter::new(ticks_under_a_wide_viewport::PACE, "0"), Parameter::new(SEED, "0")],
+        run: ticks_under_a_wide_viewport::run,
     },
     Command {
         name: "where_sheep_go",

@@ -151,12 +151,14 @@ the other where the halos ask for a superchunk.
 
 A world run on a thread of its own for a client -- a window -- that
 asks it for the cells of its viewport. `TARGET_PACE` (256 ticks a second),
-`CENSUS_EVERY` (1,000 ticks), `CATCH_UP`. **`Host`**: the host as a
+`CENSUS_EVERY` (1,000 ticks), `CATCH_UP`, `FRAMES_SHARE` (an eighth of
+a tick's time, what answering may take of it when the host has none to
+spare). **`Host`**: the host as a
 client holds it, each call sent to its thread and done there between
 two ticks, each saying whether the host was still there --
 **`Host::start()`**: the host on a thread named `host`, no world run
 yet, and where its frames come back; **`sync(ask)`** -- answered with
-a `Frame`, unless no world runs -- **`pause(paused)`**, **`pace(ticks
+frames, the last with `more` unset, unless no world runs -- **`pause(paused)`**, **`pace(ticks
 a second, or flat out)`**, **`make_world(start)`**,
 **`open_world(name)`** -- that world of the worlds' folder run in
 place of the one run -- **`save_world(name)`**, and **`reset(tuning)`**
@@ -168,10 +170,22 @@ a call as sent. **`census_path()`**: where a run's census is kept
 (`transient_data/measurements/census.csv`); **`census(seed)`**: its
 file, started afresh for each world. **`Running`**: the world run, the
 superchunks whose heights were sent, when it began, its census.
+**`Answering`**: an ask being answered -- what was asked, the
+viewport's hot superchunks then, those yet to copy, those copied and
+not yet sent, what copying has taken.
 **`HostThread`**: the world run if any, the worlds run so far, paused,
-the pace, the name, what was last said -- **`run`**: requests read between ticks, a tick, and a
-wait for the next one's time; paused or with no world, it waits for a
-request; **`run_world`**, **`run_in_place`**, **`reset_now`**, **`save`**, **`frame(ask)`**, **`tick`**.
+the pace, the name, what was last said, the ask being answered, what
+the last tick took -- **`run`**: requests read between ticks, a little
+of the ask answered, a tick, and a wait for the next one's time; paused
+or with no world, it waits for a request; **`run_world`**,
+**`run_in_place`** -- an ask half answered is dropped with the world it
+was of -- **`reset_now`**, **`save`**, **`begin_frame(ask)`**: the
+viewport kept hot, what is to copy listed; **`answer_a_little()`**: a
+superchunk copied at least, and more until **`time_for_frames()`** is
+up -- what is left before the next tick is due, `FRAMES_SHARE` of the
+last tick's time at least, no limit while paused -- and those sent as a
+frame; seen from near, sent only once all are copied, being one
+picture; **`tick`**.
 
 ## `host/terrain_seen.rs`
 
@@ -200,12 +214,16 @@ and `most` count the viewport's hot superchunks. **`hot_in(world,
 viewport)`**: those, row by row.
 **`Near`** `{first, size, pixels_a_cell}`: the cells seen from near.
 **`Cells`**: a hot superchunk's planes copied -- grass, trees, their
-stages, water -- its heights the first frame it is hot in, its
+stages where a cell is a pixel or more, its water (a `Water`, shared,
+not copied again) -- its heights the first frame it is hot in, its
 sheep's cells. **`Frame`** `{world, seed, generation, side, tick,
 ticks_a_second, sheep, grass, trees, sync_seconds, sync_share,
-viewport, hot, detail, near, named, said, cells}`: `world` counts the
+viewport, hot, detail, near, named, said, more, cells}`: `world` counts the
 worlds the host has run, so a client knows what it drew is of another;
 `hot`, every hot superchunk of the viewport, so a client knows what it
-drew there of any other has gone cold. **`count(world,
-layer_type)`**; **`copy(world, hot, ask, sent)`** (**`layer`**,
-**`sheep`**); **`Water`**: a superchunk's water off its image, kept.
+drew there of any other has gone cold; `more`, whether frames of the
+same ask are still to come. **`count(world,
+layer_type)`**; **`copy(world, superchunk, ask, sent)`**: one
+superchunk's `Cells`, none if it has gone cold since asked
+(**`layer`**, **`sheep`**); **`Water`** `{depths, deep}`: a
+superchunk's water off its image, read once and kept.

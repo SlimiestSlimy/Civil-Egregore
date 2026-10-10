@@ -1,7 +1,8 @@
 //! What a client asks of the world's viewport, and what it is answered
-//! with: the hot superchunks it asks for ([`Ask`]), copied as the last
-//! tick left them ([`Frame`]) -- their bitplanes' words as they are,
-//! and where their sheep stand. Copying is all the host does for a
+//! with: the hot superchunks it asks for ([`Ask`]), each copied as a
+//! tick left it ([`Frame`]) -- their bitplanes' words as they are,
+//! and where their sheep stand -- a few between two ticks, so a frame's
+//! superchunks are not all of the one tick. Copying is all the host does for a
 //! client: turning cells into pixels is the client's.
 
 use crate::World;
@@ -12,6 +13,7 @@ use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use worldgen::{TREE, TREE_STAGE};
 pub use simulation::halos::Viewport;
 use std::collections::HashMap;
+use std::sync::Arc;
 use worldgen::{Generation, WET};
 
 /// Words a chunk's bitmap takes.
@@ -98,15 +100,14 @@ pub struct Cells {
     pub trees: Vec<u64>,
     /// Its trees' stages, four bits a cell: its 16 chunks' buckets one
     /// after another, a cell's stage at four times its place in its
-    /// chunk -- as the arena holds the plane.
+    /// chunk -- as the arena holds the plane. Empty where no stage is
+    /// drawn: asked for coarser than a cell a pixel, and not from near.
     pub stages: Vec<u64>,
     /// The cells with water on them, however deep, laid out as the grass.
     pub wet: Vec<u64>,
-    /// The low four bits of the water's depth, a bitplane a bit, each
-    /// laid out as the grass.
-    pub depths: [Vec<u64>; 4],
-    /// The cells with water [`DEEP`] deep or more.
-    pub deep: Vec<u64>,
+    /// How deep its water is: never changing, so shared with every
+    /// frame it is in, not copied.
+    pub water: Arc<Water>,
     /// The cells its sheep stand on, `(x, y)` from its top left.
     pub sheep: Vec<(u16, u16)>,
 }
@@ -125,7 +126,8 @@ pub struct Frame {
     pub side: Option<u32>,
     /// Ticks run so far.
     pub tick: u64,
-    /// Ticks a second, over the time since the frame before.
+    /// Ticks a second, over the time between the last two asks
+    /// answered whole.
     pub ticks_a_second: f64,
     /// Sheep in the whole world.
     pub sheep: usize,
@@ -133,8 +135,8 @@ pub struct Frame {
     pub grass: u64,
     /// Trees in the whole world.
     pub trees: u64,
-    /// What answering took of the host's thread -- the counts and the
-    /// copy, all a client costs it -- in seconds.
+    /// What answering the last ask answered whole took of the host's
+    /// thread -- the copy, all a client costs it -- in seconds.
     pub sync_seconds: f64,
     /// The share of the thread's time that is, at the rate asked.
     pub sync_share: f64,
@@ -153,7 +155,10 @@ pub struct Frame {
     pub named: Option<String>,
     /// What opening or saving a world last came to, if either was asked.
     pub said: Option<String>,
-    /// The superchunks asked for.
+    /// Whether more of what was asked is to come, in frames after
+    /// this one: an ask is answered a few superchunks at a time.
+    pub more: bool,
+    /// Superchunks asked for: those copied since the frame before.
     pub cells: Vec<Cells>,
 }
 
@@ -162,45 +167,33 @@ pub(crate) fn count(world: &World, layer_type: LayerType) -> u64 {
     world.arena.superchunk_indices().into_iter().map(|superchunk| world.arena.superchunk_count(layer_type, superchunk) as u64).sum()
 }
 
-/// The superchunks of `hot` -- hot ones of `world` -- that `ask` asks
-/// for, copied: each one's planes, words as they are, and its sheep's
-/// cells -- its heights and water only the first time it is copied,
-/// `sent` keeping which.
-pub(crate) fn copy(world: &World, hot: &[(u32, u32)], ask: Ask, sent: &mut HashMap<SuperchunkIndex, Water>) -> Vec<Cells> {
-    let mut copied = Vec::new();
-    for &(x, y) in hot.iter().skip(ask.skip as usize).take(ask.most as usize) {
-        let superchunk = SuperchunkIndex::from_cartesian(x, y);
-        let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
-        let planes = |layer_type: LayerType| layer(world, layer_type, superchunk);
-        // Heights never change: sent the once, in the first frame the superchunk is hot in. Nor does the water's depth, read off the image then and kept.
-        let image = world.storage.image(superchunk).filter(|_| !sent.contains_key(&superchunk));
-        let heights = image.map_or(Vec::new(), |image| image.height_words().to_vec());
-        let Water { depths, deep } = sent.entry(superchunk).or_insert_with(|| Water::of(image)).clone();
-        copied.push(Cells {
-            at: (x, y),
-            heights,
-            top_left: (left, top),
-            grass: planes(GRASS),
-            trees: planes(TREE),
-            stages: planes(TREE_STAGE.layer_type()),
-            wet: planes(WET),
-            depths,
-            deep,
-            sheep: sheep(world, superchunk),
-        });
-    }
-    copied
+/// The superchunk at `(x, y)` of `world` copied as `ask` asks, if it
+/// is hot still: its planes, words as they are, and its sheep's cells
+/// -- its heights only the first time it is copied, its water read off
+/// its image then and shared from then on, `sent` keeping which.
+pub(crate) fn copy(world: &World, (x, y): (u32, u32), ask: Ask, sent: &mut HashMap<SuperchunkIndex, Arc<Water>>) -> Option<Cells> {
+    let superchunk = SuperchunkIndex::from_cartesian(x, y);
+    world.entities.superchunk(superchunk)?;
+    let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
+    let planes = |layer_type: LayerType| layer(world, layer_type, superchunk);
+    // Heights never change: sent the once, in the first frame the superchunk is hot in. Nor does the water's depth.
+    let image = world.storage.image(superchunk).filter(|_| !sent.contains_key(&superchunk));
+    let heights = image.map_or(Vec::new(), |image| image.height_words().to_vec());
+    let water = Arc::clone(sent.entry(superchunk).or_insert_with(|| Arc::new(Water::of(image))));
+    // A tree's stage is drawn only where a cell is a pixel or more.
+    let stages = if ask.near.is_some() || ask.detail == 0 { planes(TREE_STAGE.layer_type()) } else { Vec::new() };
+    Some(Cells { at: (x, y), heights, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages, wet: planes(WET), water, sheep: sheep(world, superchunk) })
 }
 
 /// A superchunk's water as a client draws it, off its image: kept for
 /// every superchunk whose heights were sent.
 #[derive(Clone, Default)]
-pub(crate) struct Water {
+pub struct Water {
     /// The low four bits of its depth, a bitplane a bit, laid out as
     /// the grass.
-    depths: [Vec<u64>; 4],
+    pub depths: [Vec<u64>; 4],
     /// The cells [`DEEP`] deep or more.
-    deep: Vec<u64>,
+    pub deep: Vec<u64>,
 }
 
 impl Water {
