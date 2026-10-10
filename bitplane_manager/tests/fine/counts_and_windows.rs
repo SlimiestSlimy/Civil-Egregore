@@ -6,7 +6,6 @@
 use crate::tests::*;
 use bitmap::CellWords;
 use bitplane_manager::{BitmapArena, BucketKey, NotHot, Reader, Shape, Window, Write, WriteOp, COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS};
-use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
 use chunk_storage::{Bits16, Bits2, Bits4, Bits8, Wide, Width, ChunkStorage, LayerCodec};
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 
@@ -20,13 +19,13 @@ fn every_bitmap_counts_its_cells() {
     let mut storage = ChunkStorage::new(1 << 12);
     storage.insert(WORLD_MIDDLE, grass_on_dirt(7, 8, &mut codec));
     for chunk in WORLD_MIDDLE.chunks() {
-        arena.make_hot_layers(chunk, &[DIRT, GRASS], &storage, &mut codec);
+        arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
     }
     let (mut full_chunks, mut grass) = (0, 0);
     for chunk in WORLD_MIDDLE.chunks() {
         let (dirt_bucket, grass_bucket) = (
-            arena.bucket(BucketKey { layer_type: DIRT, chunk }).expect("hot"),
-            arena.bucket(BucketKey { layer_type: GRASS, chunk }).expect("hot"),
+            arena.bucket(BucketKey { layer_type: MOCK_DIRT, chunk }).expect("hot"),
+            arena.bucket(BucketKey { layer_type: MOCK_GRASS, chunk }).expect("hot"),
         );
         let ones = |cells: &CellWords| cells.iter().map(|word| word.count_ones()).sum::<u32>();
         assert_eq!(dirt_bucket.count(), ones(dirt_bucket.cells()));
@@ -38,9 +37,9 @@ fn every_bitmap_counts_its_cells() {
     }
     assert!(full_chunks > 0, "a chunk with no grass: 65,536 cells of dirt");
     assert!((6..=8).contains(&grass), "about 8 cells of grass, {grass}");
-    assert_eq!(arena.superchunk_count(GRASS, WORLD_MIDDLE), grass);
-    assert_eq!(arena.superchunk_count(DIRT, WORLD_MIDDLE), (1 << 20) - grass);
-    assert_eq!(arena.superchunk_count(GRASS, ORIGIN), 0, "nothing hot there");
+    assert_eq!(arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), grass);
+    assert_eq!(arena.superchunk_count(MOCK_DIRT, WORLD_MIDDLE), (1 << 20) - grass);
+    assert_eq!(arena.superchunk_count(MOCK_GRASS, ORIGIN), 0, "nothing hot there");
 }
 
 /// Counts move by one a cell changed, not at all for a cell already so;
@@ -53,27 +52,27 @@ fn counts_follow_every_change() {
     let mut storage = ChunkStorage::new(1 << 12);
     storage.insert(WORLD_MIDDLE, grass_on_dirt(11, 0, &mut codec));
     let chunk = ChunkIndex::of(WORLD_MIDDLE, 11);
-    arena.make_hot_layers(chunk, &[DIRT, GRASS], &storage, &mut codec);
-    let (dirt, grass) = (BucketKey { layer_type: DIRT, chunk }, BucketKey { layer_type: GRASS, chunk });
+    arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
+    let (dirt, grass) = (BucketKey { layer_type: MOCK_DIRT, chunk }, BucketKey { layer_type: MOCK_GRASS, chunk });
     assert_eq!((arena.bucket(dirt).expect("hot").count(), arena.bucket(grass).expect("hot").count()), (1 << 16, 0));
 
     let cell = cell_in(chunk, CELL);
     for _ in 0..2 {
-        write(&mut arena, GRASS, WriteOp::Set, cell);
-        write(&mut arena, DIRT, WriteOp::Unset, cell);
+        write(&mut arena, MOCK_GRASS, WriteOp::Set, cell);
+        write(&mut arena, MOCK_DIRT, WriteOp::Unset, cell);
     }
     assert_eq!((arena.bucket(dirt).expect("hot").count(), arena.bucket(grass).expect("hot").count()), ((1 << 16) - 1, 1));
-    assert_eq!(arena.superchunk_count(GRASS, WORLD_MIDDLE), 1);
-    write(&mut arena, GRASS, WriteOp::Unset, cell);
-    write(&mut arena, DIRT, WriteOp::Set, cell);
+    assert_eq!(arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), 1);
+    write(&mut arena, MOCK_GRASS, WriteOp::Unset, cell);
+    write(&mut arena, MOCK_DIRT, WriteOp::Set, cell);
     assert_eq!((arena.bucket(dirt).expect("hot").count(), arena.bucket(grass).expect("hot").count()), (1 << 16, 0));
 
-    write(&mut arena, GRASS, WriteOp::Set, cell);
+    write(&mut arena, MOCK_GRASS, WriteOp::Set, cell);
     arena.write_back(WORLD_MIDDLE, &mut storage, &mut codec);
     assert!(arena.evict(grass));
-    assert_eq!(arena.superchunk_count(GRASS, WORLD_MIDDLE), 0, "evicted, waiting in the ring");
+    assert_eq!(arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), 0, "evicted, waiting in the ring");
     arena.make_hot(grass, None, &mut codec);
-    assert_eq!(arena.superchunk_count(GRASS, WORLD_MIDDLE), 1, "back as it was");
+    assert_eq!(arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), 1, "back as it was");
 }
 
 /// A window of cells read at once is its cells read one by one: at any
@@ -88,10 +87,10 @@ fn windows_read_at_once_are_the_cells_read_one_by_one() {
             for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
                 // Some chunks of grass left cold, and dirt over half the superchunks.
                 if !(x + y + chunk.place() as u32).is_multiple_of(7) {
-                    arena.make_hot(BucketKey { layer_type: GRASS, chunk }, None, &mut codec);
+                    arena.make_hot(BucketKey { layer_type: MOCK_GRASS, chunk }, None, &mut codec);
                 }
                 if (x + y).is_multiple_of(2) {
-                    arena.make_hot(BucketKey { layer_type: DIRT, chunk }, None, &mut codec);
+                    arena.make_hot(BucketKey { layer_type: MOCK_DIRT, chunk }, None, &mut codec);
                 }
             }
         }
@@ -99,7 +98,7 @@ fn windows_read_at_once_are_the_cells_read_one_by_one() {
     let side = 5 * SUPERCHUNK_SIDE_CELLS;
     for at in 0..40_000u32 {
         let cell = CellCartesian { x: (at * 7919) % side, y: (at * 104_729) % side };
-        arena.queue(if at % 3 == 0 { DIRT } else { GRASS }, Write::cell(cell.into(), WriteOp::Set));
+        arena.queue(if at % 3 == 0 { MOCK_DIRT } else { MOCK_GRASS }, Write::cell(cell.into(), WriteOp::Set));
     }
     arena.apply();
     let reader = Reader::new(arena.superchunks());
@@ -109,7 +108,7 @@ fn windows_read_at_once_are_the_cells_read_one_by_one() {
     for (number, (x, y)) in origins.into_iter().enumerate() {
         let (width, height) = (1 + number as u32 % 8, 1 + (number as u32 / 8) % 8);
         let origin = CellIndex::from(CellCartesian { x, y });
-        for layer_type in [GRASS, DIRT] {
+        for layer_type in [MOCK_GRASS, MOCK_DIRT] {
             let mut expected = Window::default();
             for (dx, dy) in (0..height).flat_map(|dy| (0..width).map(move |dx| (dx, dy))) {
                 if let Ok(set) = reader.holds(layer_type, CellIndex::from(CellCartesian { x: x + dx, y: y + dy })) {
@@ -132,11 +131,11 @@ fn every_count_tile_counts_its_cells() {
     let mut storage = ChunkStorage::new(1 << 12);
     storage.insert(WORLD_MIDDLE, grass_on_dirt(7, 300_000, &mut codec));
     for chunk in WORLD_MIDDLE.chunks() {
-        arena.make_hot_layers(chunk, &[DIRT, GRASS], &storage, &mut codec);
+        arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
     }
     let counted = |arena: &BitmapArena| {
         let superchunk = arena.superchunks().iter().find(|superchunk| superchunk.index() == WORLD_MIDDLE).expect("in use");
-        for layer_type in [DIRT, GRASS] {
+        for layer_type in [MOCK_DIRT, MOCK_GRASS] {
             let layer = superchunk.layer(layer_type).expect("hot");
             for chunk in 0..16 {
                 let (cells, tile_counts) = (layer.cells(chunk), layer.tile_counts(chunk));
@@ -158,7 +157,7 @@ fn every_count_tile_counts_its_cells() {
             1 => Shape::Disc { radius: 7 },
             _ => Shape::Cell,
         };
-        arena.queue(if at % 2 == 0 { GRASS } else { DIRT }, Write { at: cell.into(), op, shape });
+        arena.queue(if at % 2 == 0 { MOCK_GRASS } else { MOCK_DIRT }, Write { at: cell.into(), op, shape });
     }
     assert!(arena.apply().changed > 1000);
     counted(&arena);

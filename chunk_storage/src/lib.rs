@@ -13,7 +13,6 @@
 //! | `superchunk_image` | a superchunk's words: its chunk table, its height map, its chunks' bitmap tables and bitmaps |
 //! | `writeback_ring` | the ring of changed bitmaps, encoded, on their way to the cold pool |
 //! | `chunk_storage` | the cold pool and the ring together: what the bitplane manager reads from and writes back to |
-//! | `mock` | made-up superchunks to try the rest out on: dirt with grass scattered on it |
 //! | `diagnostics/` | data gathered from storage, judged by the tests and printed by tools |
 //! | `transient_data` | where runs leave what they make, out of git |
 
@@ -31,7 +30,6 @@ mod chunk_maps;
 mod height_map;
 pub mod jobs;
 mod layer_codec;
-pub mod mock;
 mod superchunk_image;
 pub mod transient_data;
 pub mod wide;

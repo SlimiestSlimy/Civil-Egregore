@@ -120,7 +120,7 @@ walls are two layers now (`worldgen/docs/worldgen.md`).
 
 A generated world, whose walls every hungry sheep reads
 (`Civil_Egregore server new <folder> 1 64`, then `Civil_Egregore server run
-<folder> <ticks>`), runs somewhat slower than the mock world of the same
+<folder> <ticks>`), runs somewhat slower than a plain of the same
 size without them (`Civil_Egregore server pasture`).
 
 ## Saves

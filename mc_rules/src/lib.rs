@@ -6,8 +6,11 @@
 //! | module | rule |
 //! |---|---|
 //! | `grass` | grass spreading over dirt, and decaying |
-//! | `diagnostics/` | data gathered, to be measured and tested on: none yet |
-//! | `transient_data` | the crate's `transient_data/`, out of git: what its runs leave behind |
+//! | `trees` | trees growing by stages, spreading and dying |
+//!
+//! A rule sees the simulation through `instructions` alone, so it holds
+//! no world: the worlds its rules are tested and measured on are the
+//! server's (`server/tests/fast/grass.rs`, `server/src/diagnostics/`).
 //!
 //! What the rules are: `docs/mc_rules.md`; function by function:
 //! `docs/reference.md`.
@@ -15,9 +18,6 @@
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
-
-pub mod diagnostics;
-pub mod transient_data;
 
 pub mod grass;
 pub mod trees;

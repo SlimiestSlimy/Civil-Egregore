@@ -112,6 +112,11 @@ pub struct Shape {
     pub raised: u64,
 }
 
+/// Grass: what a superchunk is generated with in patches, where its
+/// ground is dry, and the cells' rules grow and the sheep eat. A cell
+/// without it is dirt, which has no layer.
+pub const GRASS: LayerType = LayerType(2);
+
 /// The cells under water, however deep: what a rule asks. How deep is
 /// kept a map a chunk with water, in the superchunk's image
 /// (`chunk_storage::SuperchunkImage::depth`).

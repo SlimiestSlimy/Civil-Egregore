@@ -23,10 +23,10 @@ world is named by them: not the hot bitmaps, the entities' store or the
 storage. What they are asked in is theirs to give, from the crate's
 root: where a cell and an entity are, what a layer and an attribute
 are, a turn, a tick's report, the lot drawn; the layers a world has
-before a rule adds its own are `layers`. Off a turn there are two
-things more: `between_ticks`, where a rule puts the entities a world
-starts with, lent by whoever runs the world; and `mock_world`, a world
-of grass on dirt that ticks a rule, for a rule's tests and tools. What
+before a rule adds its own are `layers`. Off a turn there is one thing
+more: `between_ticks`, where a rule puts the entities a world starts
+with, lent by whoever runs the world. No world is made here: that is
+the server's (`../../server/`), a rule's tests and tools with it. What
 a rule lacks is added here as an instruction, not gone round.
 
 Instructions are kept by what they do to the world: those that only

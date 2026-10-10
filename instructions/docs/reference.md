@@ -103,18 +103,8 @@ attributes)`**: queued, in the world once the runner places them.
 
 ## `layers.rs`
 
-`GRASS`, `DIRT`, `WET`, `WALL_EAST`, `WALL_SOUTH`: the layers a world
-has before a rule adds its own.
-
-## `mock_world.rs`
-
-**`MockWorld::grass_on_dirt(count, grass_cells)`**: superchunks of grass
-on dirt, all hot; **`on_threads`**. **`tick(seed, rule)`**: a
-`TickReport`. **`plant_grass(at, width, height)`**, **`put(header,
-attributes)`**, **`between_ticks()`** and **`settle()`**. Asked:
-**`superchunks()`**, **`count(type)`**, **`words(type)`**,
-**`entities()`**, **`count_entities(kind)`**; **`held()`** for whoever
-measures what holds a world.
+`GRASS`, `WET`, `WALL_EAST`, `WALL_SOUTH`: the layers a world has
+before a rule adds its own, the terrain's (`../../worldgen/`).
 
 ## The root
 

@@ -24,7 +24,6 @@ elsewhere lies as it was made, unless eaten.
 |---|---|
 | `src/grass.rs` | grass over dirt |
 | `src/trees.rs` | trees: spreading by how crowded they stand, growing through sixteen stages, dying |
-| `tests/` | the rule's behaviour, judged |
 | `docs/` | this, and the reference, function by function |
 
 ## Trees: more than a bit a cell

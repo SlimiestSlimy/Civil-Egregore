@@ -102,17 +102,11 @@ eight bytes, the lowest first. A file is written beside itself and
 renamed, so one cut short never replaces a good one. What is saved
 when, and how it is read back: `../../server/docs/server.md`.
 
-## The mock
-
-`mock::grass_on_dirt` makes a superchunk of dirt with grass scattered on
-it, `DIRT` and `GRASS` its two layer types: the world everything is
-tried on until terrain is generated.
-
 ## Layout
 
 | folder | what is in it |
 |---|---|
-| `src/` | height map, layer codec, superchunk image, writeback ring, chunk storage, the world on disk, mock |
+| `src/` | height map, layer codec, superchunk image, writeback ring, chunk storage, the world on disk |
 | `src/diagnostics/` | what storage holds, gathered |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
 | `tests/` | every part's behaviour, judged |

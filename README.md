@@ -47,6 +47,9 @@ Every crate but the root has the same folders -- `docs/`, `src/`,
 `src/diagnostics/`, `src/transient_data.rs` naming a `transient_data/`
 kept out of git, and `tests/`, a file a tier -- as the
 [style guide](docs/style_guide.md) sets out; no crate has a `bin/`.
+The rules' crates hold their rules alone: a rule is tried on a world,
+and every world is the server's to make, so their tests and tools are
+there.
 The root is `src/main.rs` and the shared `docs/`; its `transient_data/`
 holds the one seed every crate's tests and tools run on.
 

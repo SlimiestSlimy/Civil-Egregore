@@ -1,10 +1,11 @@
-//! Grass ticked flat out over a mock world, on as many threads as
+//! Grass ticked flat out over a plain, on as many threads as
 //! asked: each phase's time, the samples and writes, and the memory held
 //! -- the process's, sampled every tick, and the arena's and storage's
 //! own.
 
-use chunk_storage::mock::GRASS;
-use instructions::mock_world::MockWorld;
+use worldgen::GRASS;
+use crate::diagnostics::plain_world::{plain_world, superchunks as superchunks_of};
+use crate::host::frame::count;
 use mc_rules::grass;
 use bitplane_manager::diagnostics::arena::ArenaStats;
 use chunk_storage::diagnostics::storage::StorageStats;
@@ -45,11 +46,11 @@ pub struct Throughput {
 pub fn run(ticks: usize, thousandths: usize, superchunks: u32, threads: usize) -> Throughput {
     let mut memory = MemoryTrack::default();
     memory.read();
-    let mut world = MockWorld::grass_on_dirt(superchunks, (1 << 20) * thousandths / 1000).on_threads(threads);
-    let start_grass = world.count(GRASS);
+    let mut world = plain_world(superchunks, thousandths as u64 * worldgen::ONE / 1000, 0, threads);
+    let start_grass = count(&world, GRASS);
     let (mut computing, mut applying, mut writes, mut sampled, mut missed) = (Duration::ZERO, Duration::ZERO, 0, 0, 0);
-    for tick in 0..ticks {
-        let report = world.tick(tick as u64, grass::rule);
+    for _ in 0..ticks {
+        let report = world.simulation.tick(&mut world.arena, &mut world.entities, world.info.seed, grass::rule);
         computing += report.computing;
         applying += report.applying;
         writes += report.writes_applied.writes;
@@ -59,16 +60,16 @@ pub fn run(ticks: usize, thousandths: usize, superchunks: u32, threads: usize) -
     }
     Throughput {
         ticks,
-        superchunks: superchunks as usize,
+        superchunks: superchunks_of(&world),
         threads,
-        grass: (start_grass, world.count(GRASS)),
+        grass: (start_grass, count(&world, GRASS)),
         sampled,
         writes,
         missed,
         computing,
         applying,
         memory,
-        arena: ArenaStats::of(world.held().0),
-        storage: StorageStats::of(world.held().2),
+        arena: ArenaStats::of(&world.arena),
+        storage: StorageStats::of(&world.storage),
     }
 }

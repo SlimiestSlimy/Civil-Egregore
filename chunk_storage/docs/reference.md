@@ -98,12 +98,6 @@ Private: `superchunk_file`, `make_folder`, `write`, `write_words`,
 `read`, `read_words`, `images_in`, `WorldInfo::to_text`, `from_text`,
 `HotSuperchunks::to_text`, `from_text`.
 
-## `mock.rs`
-
-**`grass_on_dirt(seed, grass_cells, codec)`**: a superchunk of `DIRT`,
-grass (`GRASS`) on cells drawn by xorshift64*, each chunk a dirt layer
-and a grass layer if any fell on it.
-
 ## `diagnostics/storage.rs`
 
 **`StorageStats::of(storage)`**: superchunk images stored, their bytes,

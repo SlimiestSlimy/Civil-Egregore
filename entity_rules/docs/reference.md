@@ -42,10 +42,3 @@ alone, the cells changing only as they change them.
 some way from its next meal, queued each on a cell of its own drawn at
 random, waking
 over the next `STEP_TICKS` ticks.
-
-## `diagnostics/world.rs`
-
-**`MockWorld::grass_on_dirt(count, grass_cells)`**: a square of mock
-superchunks from the world's middle, hot; **`grass()`**: cells of grass
-over them. **`with_sheep(count, grass_cells, sheep)`**: the same with a
-flock on each superchunk; **`sheep()`**: how many.

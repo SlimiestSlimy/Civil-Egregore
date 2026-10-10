@@ -16,3 +16,9 @@ mod world;
 
 #[path = "fast/host.rs"]
 mod host;
+
+#[path = "fast/grass.rs"]
+mod grass;
+
+#[path = "fast/sheep.rs"]
+mod sheep;

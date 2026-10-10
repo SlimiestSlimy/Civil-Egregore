@@ -16,7 +16,8 @@ lowest ground and the ocean's height; the vertices' grid and the share
 of them that are ocean; the highest land, and the vertices from the
 ocean it is reached over; the lines' blends and sigmoidness, least and
 most; how far lines are bent; the finer meshes. `Shape::DEFAULT`.
-`WET` (layer type 24): the cells under water; how deep is the image's
+`GRASS` (layer type 2): the cells grass is on, the terrain's own
+cover. `WET` (layer type 24): the cells under water; how deep is the image's
 (`SuperchunkImage::depth`). **`height(seed, x, y)`**: a cell's height;
 **`height_shaped(shape, seed, x, y)`**: the same in a world shaped
 otherwise. **`Terrain::generate_shaped(shape, seed, superchunk)`**: a
@@ -56,6 +57,9 @@ as a patch, finer noise, and the cell's own lot;
 
 `TREES_SALT`: what keeps the trees' numbers apart from the grass's.
 **`Generation`** `{shape, grass, trees}`; `Generation::DEFAULT`;
+**`Generation::plain(grass_cover)`**: a plain -- flat dry land, no
+ocean, no walls, no trees, grass scattered on `grass_cover` of `ONE` of
+its cells;
 **`numbers()`** and **`of_numbers(numbers)`**: its numbers by name, as
 a world's file keeps them (`numbers!`). **`from_tuning(tuned)`**: as
 the sliders have it (**`shape_from_tuning`**). **`growth(seed)`**: a

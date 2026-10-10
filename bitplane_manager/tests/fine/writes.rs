@@ -5,7 +5,7 @@
 //! `cargo test`
 
 use bitplane_manager::{WritesApplied, BitmapArena, BucketKey, Shape, Write, WriteOp};
-use chunk_storage::mock::{grass_on_dirt, DIRT, GRASS};
+use crate::tests::{grass_on_dirt, MOCK_DIRT, MOCK_GRASS};
 use chunk_storage::{ChunkStorage, LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, WORLD_MIDDLE};
 
@@ -123,14 +123,14 @@ fn grass_spreads_over_dirt() {
     let mut storage = ChunkStorage::new(1 << 12);
     storage.insert(WORLD_MIDDLE, grass_on_dirt(3, 8, &mut codec));
     for chunk in WORLD_MIDDLE.chunks() {
-        arena.make_hot_layers(chunk, &[DIRT, GRASS], &storage, &mut codec);
+        arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
     }
     let corner = WORLD_MIDDLE.top_left().cartesian();
     let at = CellCartesian { x: corner.x + 256, y: corner.y + 256 };
-    arena.queue(GRASS, Write { at: at.into(), op: WriteOp::Set, shape: Shape::Disc { radius: 10 } });
-    arena.queue(DIRT, Write { at: at.into(), op: WriteOp::Unset, shape: Shape::Disc { radius: 10 } });
+    arena.queue(MOCK_GRASS, Write { at: at.into(), op: WriteOp::Set, shape: Shape::Disc { radius: 10 } });
+    arena.queue(MOCK_DIRT, Write { at: at.into(), op: WriteOp::Unset, shape: Shape::Disc { radius: 10 } });
     let applied = arena.apply();
     assert_eq!(applied.missed, 0);
-    assert_eq!(arena.superchunk_count(GRASS, WORLD_MIDDLE) + arena.superchunk_count(DIRT, WORLD_MIDDLE), 1 << 20, "dirt or grass, never both");
-    assert!(arena.superchunk_count(GRASS, WORLD_MIDDLE) >= 300, "a disc of radius 10 is over 300 cells");
+    assert_eq!(arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE) + arena.superchunk_count(MOCK_DIRT, WORLD_MIDDLE), 1 << 20, "dirt or grass, never both");
+    assert!(arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE) >= 300, "a disc of radius 10 is over 300 cells");
 }
