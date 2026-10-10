@@ -23,6 +23,13 @@ mod terrain {
         utilities::seed::counted()
     }
 
+    /// A superchunk anywhere in the world but its last row and column,
+    /// drawn from the run's seed.
+    fn superchunk_drawn(random: &mut utilities::rng::Rng) -> SuperchunkIndex {
+        let last = u64::from(coordinates::WORLD_SIDE_SUPERCHUNKS) - 1;
+        SuperchunkIndex::from_cartesian(random.below(last) as u32, random.below(last) as u32)
+    }
+
     /// A shape of land and ocean little apart in height, joined by lines
     /// that slope their whole length, and nothing finer: no walls.
     const RAMPS: Shape = Shape { ground: 461, highest: 561, narrow: 1 << 16, wide: 1 << 16, soft: 512, hard: 512, finer_depth: 0, ..Shape::DEFAULT };
@@ -33,12 +40,15 @@ mod terrain {
     /// superchunk's heights are the world's, whichever superchunk is made.
     #[test]
     fn heights_are_settled_by_the_seed_and_the_cell() {
-        let superchunk = SuperchunkIndex::from_cartesian(2_000_000, 2_000_001);
+        let mut random = utilities::rng::Rng::new(seed());
+        let superchunk = superchunk_drawn(&mut random);
         let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
         let [first, again, other] = [seed(), seed(), seed() + 1].map(|seed| Terrain::generate_shaped(&CLIFFS, seed, superchunk));
         assert!(first.heights == again.heights);
         assert!(first.heights != other.heights);
-        for (x, y) in [(0, 0), (1023, 1023), (500, 3), (255, 256), (768, 511)] {
+        // Its corners, a chunk's border, and cells drawn.
+        let drawn: Vec<(u32, u32)> = (0..2_000).map(|_| (random.below(1024) as u32, random.below(1024) as u32)).collect();
+        for (x, y) in [(0, 0), (1023, 1023), (1023, 0), (255, 256)].into_iter().chain(drawn) {
             assert_eq!(at(&first, x, y), height_shaped(&CLIFFS, seed(), left + x, top + y));
         }
     }
@@ -105,8 +115,11 @@ mod terrain {
     #[test]
     fn heights_are_the_same_in_whatever_order_they_are_asked_for() {
         use worldgen::mesh::Lands;
-        let (left, top, side) = (2_147_000_000u32, 2_147_100_000u32, 300u32);
-        let cells = || (0..side * side).map(|cell| (left + cell % side * 7, top + cell / side * 7));
+        let mut random = utilities::rng::Rng::new(seed());
+        // A lattice of cells from a corner drawn, a few cells apart: over many of the mesh's lines.
+        let (side, apart) = (300u32, random.between(1, 12) as u32);
+        let (left, top) = (random.below((1 << 32) - u64::from(side * apart)) as u32, random.below((1 << 32) - u64::from(side * apart)) as u32);
+        let cells = || (0..side * side).map(|cell| (left + cell % side * apart, top + cell / side * apart));
         let mut lands = Lands::new(&CLIFFS, seed());
         let forwards: Vec<u16> = cells().map(|(x, y)| lands.height(x, y)).collect();
         let mut lands = Lands::new(&CLIFFS, seed());
@@ -116,7 +129,7 @@ mod terrain {
         let mut columns = vec![0; forwards.len()];
         for cell in 0..side * side {
             let (across, down) = (cell / side, cell % side);
-            columns[(down * side + across) as usize] = lands.height(left + across * 7, top + down * 7);
+            columns[(down * side + across) as usize] = lands.height(left + across * apart, top + down * apart);
         }
         let alone: Vec<u16> = cells().map(|(x, y)| height_shaped(&CLIFFS, seed(), x, y)).collect();
         assert!(forwards == backwards && forwards == columns && forwards == alone);
@@ -134,10 +147,12 @@ mod terrain {
         let in_order: Vec<Terrain> = about.iter().map(|&superchunk| made(superchunk)).collect();
         // Another order, drawn by lot: each then put back where it is in the first.
         let mut order: Vec<usize> = (0..about.len()).collect();
-        for last in (1..order.len()).rev() {
-            order.swap(last, (utilities::hash::mix(last as u64 ^ 0x5EED) % (last as u64 + 1)) as usize);
+        let mut random = utilities::rng::Rng::new(seed);
+        while order == (0..about.len()).collect::<Vec<_>>() {
+            for last in (1..order.len()).rev() {
+                order.swap(last, random.below(last as u64 + 1) as usize);
+            }
         }
-        assert_ne!(order, (0..about.len()).collect::<Vec<_>>(), "another order");
         let mut by_lot: Vec<Option<Terrain>> = (0..about.len()).map(|_| None).collect();
         for &which in &order {
             by_lot[which] = Some(made(about[which]));

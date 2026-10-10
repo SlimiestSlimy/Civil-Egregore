@@ -29,8 +29,11 @@ fn walls_are_a_small_share_of_the_ground_whatever_the_seed() {
 #[test]
 #[ignore]
 fn superchunks_made_apart_meet_with_no_seam() {
+    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
     for seed in [0, 1].map(|nth| utilities::seed::counted() + nth) {
-        let here = SuperchunkIndex::from_cartesian(2_097_100, 2_097_200);
+        // Anywhere with a superchunk east and south of it.
+        let last = u64::from(coordinates::WORLD_SIDE_SUPERCHUNKS) - 1;
+        let here = SuperchunkIndex::from_cartesian(random.below(last) as u32, random.below(last) as u32);
         let [own, east, south] = [(0, 0), (1, 0), (0, 1)].map(|(dx, dy)| Terrain::generate_shaped(&CLIFFS, seed, here.offset(dx, dy).expect("in the world")));
         for along in 0..1024 {
             assert_eq!(walled(&own, 0, 1023, along), wall(at(&own, 1023, along), at(&east, 0, along)), "east edge, row {along}");

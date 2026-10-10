@@ -157,6 +157,63 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
     assert!(decode_state(&words[..words.len() - 1], 4, &mut world()).is_err(), "cut short");
 }
 
+/// Attributes of types drawn -- one block, two, three, and of sizes
+/// that vary -- set, set again to another length and unset in an order
+/// drawn: after every edit the entity holds exactly those set and not
+/// unset since, each as last set, in the order of their types; an
+/// unset of one it has not changes nothing; and saved, it is read back
+/// the same.
+#[test]
+fn attributes_edited_in_any_order_are_those_last_set() {
+    use std::collections::BTreeMap;
+    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
+    let mut entities = world();
+    let target = walker(9, cell(random.below(1024) as u32, random.below(1024) as u32));
+    entities.queue_put(target, &[]);
+    entities.apply();
+    // Twelve types: numbers drawn, no two the same, eight of 1 to 3 blocks and four whose size varies.
+    let mut numbers = std::collections::BTreeSet::new();
+    while numbers.len() < 12 {
+        numbers.insert(1 + random.below(1 << 20));
+    }
+    let kinds: Vec<AttributeType> = numbers.into_iter().enumerate().map(|(nth, number)| if nth % 3 == 2 { AttributeType::of_varying_size(number) } else { AttributeType::of_blocks(number, 1 + nth % 4 % 3) }).collect();
+    let mut held: BTreeMap<u64, Vec<AttributeBlock>> = BTreeMap::new();
+    for edit in 0..400 {
+        let kind = kinds[random.below(kinds.len() as u64) as usize];
+        let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
+        if random.below(3) == 0 {
+            queue.unset_attribute(target.id, target.at, kind);
+            held.remove(&kind.0);
+        } else {
+            let blocks = match kind.blocks() {
+                Some(blocks) => {
+                    let mut words: Vec<u64> = (0..blocks * BLOCK_WORDS).map(|_| random.draw()).collect();
+                    words[0] = kind.0;
+                    words.as_chunks::<BLOCK_WORDS>().0.iter().map(|&block| AttributeBlock(block)).collect()
+                }
+                None => varying(kind, &(0..random.below(40)).map(|_| random.draw()).collect::<Vec<_>>()),
+            };
+            queue.set_attribute_blocks(target.id, target.at, &blocks);
+            held.insert(kind.0, blocks);
+        }
+        queue.apply(entities.superchunks_mut(), 0, &mut applied);
+        assert_eq!((applied.edits, applied.passed_over), (1, 0), "edit {edit}");
+        let edited = entities.get(target.id, target.at).expect("where it stood");
+        assert!(sorted(edited.attributes), "edit {edit}");
+        let expected: Vec<AttributeBlock> = held.values().flatten().copied().collect();
+        assert!(edited.attributes == expected.as_slice(), "edit {edit}: {} blocks held, {} expected", edited.attributes.len(), expected.len());
+        for &kind in &kinds {
+            assert_eq!(edited.attribute_blocks(kind), held.get(&kind.0).map(Vec::as_slice), "edit {edit}: {kind:?}");
+        }
+    }
+    let (words, count) = encode_state(None, entities.superchunk(target.at.superchunk()));
+    let mut read_back = world();
+    assert_eq!((count, decode_state(&words, 4, &mut read_back).map(|state| state.entities)), (1, Ok(1)));
+    read_back.apply();
+    let (was, is) = (entities.get(target.id, target.at).expect("there"), read_back.get(target.id, target.at).expect("read back"));
+    assert!((was.header, was.attributes) == (is.header, is.attributes));
+}
+
 /// A new entity put on the first free of some cells takes its own if
 /// it is free, the first free of the others if not -- those of
 /// another superchunk passed by -- and is refused only when every one

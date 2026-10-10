@@ -41,14 +41,14 @@ fn turns_read_entities_across_superchunks() {
 #[test]
 fn entities_wake_in_morton_order() {
     let (mut arena, mut entities) = world(1);
-    for id in 0..500u64 {
-        entities.queue_put(walker(1000 - id, cell(((id * 7919) % 1000) as u32, ((id * 104_729) % 1000) as u32), 0), &[]);
+    for (id, at) in (0..500u64).zip(cells_drawn(500, 1000)) {
+        entities.queue_put(walker(1000 - id, at, 0), &[]);
     }
     entities.apply();
     let mut simulation = Simulation::new(1);
     for tick in 0..3 {
         let order = Mutex::new(Vec::new());
-        simulation.tick(&mut arena, &mut entities, tick, |turn, _| {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
             for entity in turn.woken() {
                 order.lock().unwrap().push((entity.header.at, entity.header.id));
                 let at = entity.header.at.offset(1, 1).unwrap();
@@ -75,7 +75,7 @@ fn entities_stay_in_morton_order_as_they_step() {
     entities.apply();
     let mut simulation = Simulation::new(1);
     for tick in 0..200 {
-        simulation.tick(&mut arena, &mut entities, tick, |turn, _| {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
             for entity in turn.woken() {
                 let (dx, dy) = (turn.random().below(5) as i32 - 2, turn.random().below(5) as i32 - 2);
                 let after = Header { at: entity.header.at.offset(dx, dy).unwrap(), wake: turn.now() + 1, ..entity.header };
@@ -154,7 +154,7 @@ fn entities_never_overlap() {
     let mut simulation = Simulation::new(4);
     let (mut stayed, mut refused, mut crossed) = (0, 0, 0);
     for tick in 0..400 {
-        let report = simulation.tick(&mut arena, &mut entities, tick, jostle);
+        let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), jostle);
         (stayed, refused) = (stayed + report.instructions_applied.stayed, refused + report.instructions_applied.refused);
         crossed += report.instructions_applied.crossed;
         let mut cells: Vec<CellIndex> = entities.iter().map(|entity| entity.header.at).collect();
@@ -165,10 +165,11 @@ fn entities_never_overlap() {
         assert!(ids.windows(2).all(|pair| pair[0] != pair[1]), "tick {tick}: an entity on two cells");
         if tick % 50 == 0 {
             let reader = EntityReader::new(entities.superchunks());
-            for at in 0..40u32 {
+            let mut random = utilities::rng::Rng::new(utilities::seed::counted().wrapping_add(tick));
+            for _ in 0..40 {
                 // Areas of every size, about the corner the superchunks meet at and off it.
-                let (x, y) = (corner - 30 + (at * 7919) % 90, corner - 30 + (at * 104_729) % 90);
-                let (width, height) = (1 + at % 16, 1 + (at / 3) % 16);
+                let (x, y) = (corner - 30 + random.below(90) as u32, corner - 30 + random.below(90) as u32);
+                let (width, height) = (random.between(1, 16) as u32, random.between(1, 16) as u32);
                 let rows = reader.occupied(cell(x, y), width, height);
                 for (dx, dy) in (0..16).flat_map(|dy| (0..16).map(move |dx| (dx, dy))) {
                     let stood_on = dx < width && dy < height && cells.binary_search(&cell(x + dx, y + dy)).is_ok();

@@ -14,6 +14,7 @@ mod sampling {
     use simulation::sample;
     use utilities::chance::Chance;
     use utilities::rng::Rng;
+    use utilities::seed::counted;
     use chunk_storage::{LayerCodec, LayerType};
     use coordinates::{CellCartesian, CellIndex, ChunkIndex};
 
@@ -65,18 +66,26 @@ mod sampling {
     /// superchunks; at 0, none.
     #[test]
     fn certain_sampling_finds_every_set_cell_in_morton_order() {
-        let writes = [
-            Write { at: CellCartesian { x: 102_900, y: 102_600 }.into(), op: WriteOp::Set, shape: Shape::Disc { radius: 40 } },
-            Write { at: CellCartesian { x: 103_300, y: 103_000 }.into(), op: WriteOp::Set, shape: Shape::Rect { width: 200, height: 3 } },
-            Write::cell(CellCartesian { x: 102_400, y: 102_400 }.into(), WriteOp::Set),
-        ];
+        // The first cell of all, and discs, rectangles and cells drawn anywhere over the two superchunks, their border too.
+        let mut random = Rng::new(counted());
+        let mut writes = vec![Write::cell(CellCartesian { x: 102_400, y: 102_400 }.into(), WriteOp::Set)];
+        for _ in 0..40 {
+            // Far enough in that the widest shape stays on the two superchunks.
+            let at = CellCartesian { x: 102_400 + 60 + random.below(2048 - 60 - 256) as u32, y: 102_400 + 60 + random.below(1024 - 60 - 256) as u32 };
+            let shape = match random.below(3) {
+                0 => Shape::Disc { radius: random.below(60) as u8 },
+                1 => Shape::Rect { width: random.between(1, 255) as u8, height: random.between(1, 255) as u8 },
+                _ => Shape::Cell,
+            };
+            writes.push(Write { at: at.into(), op: WriteOp::Set, shape });
+        }
         let arena = arena_with(&two_superchunks(), &writes);
-        let cells = sampled(&arena, Chance::ALWAYS, 1);
+        let cells = sampled(&arena, Chance::ALWAYS, counted());
         let expected: usize = two_superchunks().iter().map(|&chunk| arena.bucket(BucketKey { layer_type: STONE, chunk }).expect("hot").count() as usize).sum();
         assert_eq!(cells.len(), expected);
         assert!(cells.windows(2).all(|pair| CellIndex::from(pair[0]) < CellIndex::from(pair[1])), "in Morton order, each once");
         assert!(cells.iter().all(|&cell| arena.holds(STONE, cell.into()) == Ok(true)), "only set cells");
-        assert!(sampled(&arena, Chance::NEVER, 1).is_empty());
+        assert!(sampled(&arena, Chance::NEVER, counted()).is_empty());
     }
 
     /// Each set cell is chosen with the probability asked: over a million
@@ -86,7 +95,7 @@ mod sampling {
     fn each_cell_is_chosen_with_the_probability_asked() {
         let chunks: Vec<ChunkIndex> = (0..4).flat_map(|y| (0..4).map(move |x| chunk_at(102_400 + 256 * x, 102_400 + 256 * y))).collect();
         let arena = arena_with(&chunks, &rect(102_400, 102_400, 1024, 1024));
-        for seed in 1..=3 {
+        for seed in (0..3).map(|nth| counted().wrapping_add(nth)) {
             let cells = sampled(&arena, Chance::one_in(100), seed);
             let (mean, deviation) = (1_048_576.0 * 0.01, (1_048_576.0f64 * 0.01 * 0.99).sqrt());
             assert!((cells.len() as f64 - mean).abs() < 5.0 * deviation, "seed {seed}: {} cells", cells.len());
@@ -101,7 +110,7 @@ mod sampling {
         let (full, sparse) = (chunk_at(102_400, 102_400), chunk_at(102_656, 102_400));
         let writes = [rect(102_400, 102_400, 256, 256), rect(102_656, 102_400, 64, 64)].concat();
         let arena = arena_with(&[full, sparse], &writes);
-        let cells = sampled(&arena, Chance::one_in(20), 7);
+        let cells = sampled(&arena, Chance::one_in(20), counted());
         let in_sparse = cells.iter().filter(|&&cell| CellIndex::from(cell).chunk() == sparse).count() as f64;
         let ratio = (cells.len() as f64 - in_sparse) / in_sparse;
         assert!((14.0..18.5).contains(&ratio), "{ratio:.2} to one");
@@ -112,12 +121,12 @@ mod sampling {
     fn only_hot_bitmaps_are_sampled() {
         let (kept, evicted) = (chunk_at(102_400, 102_400), chunk_at(102_656, 102_400));
         let mut arena = arena_with(&[kept, evicted], &rect(102_400, 102_400, 512, 4));
-        assert_eq!(sampled(&arena, Chance::ALWAYS, 1).len(), 2048);
+        assert_eq!(sampled(&arena, Chance::ALWAYS, counted()).len(), 2048);
         let mut storage = chunk_storage::ChunkStorage::new(1 << 12);
         arena.write_back(evicted.superchunk(), &mut storage, &mut LayerCodec::new());
         assert!(arena.evict(BucketKey { layer_type: STONE, chunk: evicted }));
-        assert!(sampled(&arena, Chance::ALWAYS, 1).iter().all(|&cell| CellIndex::from(cell).chunk() == kept));
-        assert_eq!(sampled(&arena, Chance::ALWAYS, 1).len(), 1024);
+        assert!(sampled(&arena, Chance::ALWAYS, counted()).iter().all(|&cell| CellIndex::from(cell).chunk() == kept));
+        assert_eq!(sampled(&arena, Chance::ALWAYS, counted()).len(), 1024);
     }
 }
 
@@ -183,8 +192,10 @@ mod tick {
     /// Cells scattered over the 3x3 superchunks from `(10, 10)`, some on
     /// their borders.
     fn scattered() -> impl Iterator<Item = CellCartesian> {
-        let start = corner(10, 10);
-        (0..3000u32).map(move |at| CellCartesian { x: start.x + (at * 7919) % 3072, y: start.y + (at * 104_729) % 3072 })
+        let (start, mut random) = (corner(10, 10), utilities::rng::Rng::new(utilities::seed::counted()));
+        // One in four on a superchunk's border, each way.
+        let mut coordinate = move || if random.below(4) == 0 { (random.below(4) * 1024).saturating_sub(random.below(2)).min(3071) as u32 } else { random.below(3072) as u32 };
+        (0..3000).map(move |_| CellCartesian { x: start.x + coordinate(), y: start.y + coordinate() })
     }
 
     /// A tick comes out the same on one thread and on four: each
@@ -193,9 +204,10 @@ mod tick {
     #[test]
     fn any_number_of_threads_ticks_the_same() {
         let (mut one, mut four) = (arena(3, scattered()), arena(3, scattered()));
-        for seed in 0..20 {
+        let seed = utilities::seed::counted();
+        for tick in 0..20 {
             let (a, b) = (Simulation::new(1).tick(&mut one, &mut Entities::new(), seed, creep), Simulation::new(4).tick(&mut four, &mut Entities::new(), seed, creep));
-            assert_eq!((a.rules, a.writes_applied), (b.rules, b.writes_applied), "tick {seed}");
+            assert_eq!((a.rules, a.writes_applied), (b.rules, b.writes_applied), "tick {tick}");
         }
         assert_eq!(every_cell(&one), every_cell(&four));
     }
@@ -204,10 +216,11 @@ mod tick {
     /// see the world as the tick found it, writes queued or not.
     #[test]
     fn writes_cross_borders_and_reads_see_the_tick_start() {
-        let edge = CellCartesian { x: corner(11, 10).x - 1, y: corner(10, 10).y + 500 };
+        // Any cell down the superchunk's east edge.
+        let edge = CellCartesian { x: corner(11, 10).x - 1, y: corner(10, 10).y + utilities::rng::Rng::new(utilities::seed::counted()).below(1024) as u32 };
         let mut arena = arena(2, [edge].into_iter());
         let across: CellIndex = CellCartesian { x: edge.x + 1, y: edge.y }.into();
-        let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), 0, |turn, samples| {
+        let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
             turn.sample(STONE, Chance::ALWAYS, samples);
             for &cell in samples.iter() {
                 let right = cell.offset(1, 0).expect("in the world");
@@ -227,7 +240,7 @@ mod tick {
     fn shapes_split_over_the_superchunks_they_cover() {
         let meet = corner(11, 11);
         let mut arena = arena(2, [CellCartesian { x: meet.x - 1, y: meet.y - 1 }].into_iter());
-        let report = Simulation::new(2).tick(&mut arena, &mut Entities::new(), 0, |turn, samples| {
+        let report = Simulation::new(2).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
             turn.sample(STONE, Chance::ALWAYS, samples);
             for &cell in samples.iter() {
                 turn.queue(STONE, Write { at: cell.offset(-1, -1).expect("in the world"), op: WriteOp::Set, shape: Shape::Rect { width: 4, height: 4 } });
@@ -244,9 +257,9 @@ mod tick {
     /// counted.
     #[test]
     fn writes_to_cold_neighbours_are_missed() {
-        let edge = CellCartesian { x: corner(11, 10).x - 1, y: corner(10, 10).y + 3 };
+        let edge = CellCartesian { x: corner(11, 10).x - 1, y: corner(10, 10).y + utilities::rng::Rng::new(utilities::seed::counted()).below(1024) as u32 };
         let mut arena = arena(1, [edge].into_iter());
-        let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), 0, |turn, samples| {
+        let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
             turn.sample(STONE, Chance::ALWAYS, samples);
             for &cell in samples.iter() {
                 turn.queue(STONE, Write::cell(cell.offset(1, 0).expect("in the world"), WriteOp::Set));
@@ -261,7 +274,7 @@ mod tick {
     #[should_panic(expected = "past the speed of light")]
     fn writes_past_the_speed_of_light_panic() {
         let mut arena = arena(1, [corner(10, 10)].into_iter());
-        Simulation::new(1).tick(&mut arena, &mut Entities::new(), 0, |turn, samples| {
+        Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
             turn.sample(STONE, Chance::ALWAYS, samples);
             for &cell in samples.iter() {
                 turn.queue(STONE, Write::cell(cell.offset(2 * SUPERCHUNK_SIDE_CELLS as i32, 0).expect("in the world"), WriteOp::Set));

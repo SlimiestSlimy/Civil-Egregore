@@ -224,10 +224,13 @@ Linux/Windows comparison is the user's to run. No camera in it.
 
 ORDER (user, 2026-10-10, verbatim): "do it in this order: fix world
 struct, finish docs, finish tests, make cool pool paging, work on gpu
-LOD". That is: (1) server::World -- DONE 2026-10-10; (3b, mine,
-told to the user 2026-10-10 when they asked about it: review item 1,
-the renderer generating terrain, after the tests and before paging,
-unless they say otherwise); (2) docs
+LOD". Then, 2026-10-10, to the renderer's terrain generation (review
+item 1) going after the tests and before paging: "yes! GPU LOD and
+SCA renaming are last". SO THE ORDER NOW: tests (task 7, in hand) ->
+review item 1 (the renderer asks the host for terrain) -> cold pool
+paging -> the decay+eat case, compare-and-write, write groups -> GPU
+LOD -> SCA rename.
+That is: (1) server::World -- DONE 2026-10-10; (2) docs
 finished; (3) tests finished -- task 7, and each crate testing itself;
 (4) cold pool paging (task 4); (5) GPU LOD (task 5).
 THEN (user, 2026-10-10, verbatim): "then we work on generating
@@ -299,9 +302,14 @@ break; write a new ask here the moment it is made.
    something". Then, verbatim: "SCA for stochastic cell automaton".
    So: Monte Carlo -> stochastic cell automaton, SCA for short;
    mc_rules -> sca_rules (crate, docs, glossary, every mention).
-7. LAST STEP (asked 2026-10-09): go through ALL tests of the codebase;
-   wherever a test has fixed cases that could be generated (seeded,
-   randomized, from the seed file), make it generated.
+7. TESTS GENERATED: DONE 2026-10-10, every crate gone through. A case
+   that can be drawn is drawn from the run's seed, beside the edges
+   written by hand; new tests against the plainest working-out (writes
+   cell by cell, shapes by coordinates, the codec and heights back,
+   paths by a full search over walls, a fixed list against a Vec,
+   attribute edits against those last set); no seed written as a
+   number left. Tessera's already drew from the seed file. Left as
+   they were: the lifecycle tests of hot bitmaps, the ring, halos.
 
 To tell the user at the end: chunk_storage/entity_manager still hand
 on the ID types (shortcut); TickCounts carries per-rule times; float
