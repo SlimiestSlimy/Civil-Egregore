@@ -85,7 +85,7 @@ impl Halos {
         let from = if held.arena.hold(superchunk) {
             WarmedFrom::Lingering
         } else {
-            let job = Job::Warm { superchunk, image: held.storage.shared_image(superchunk), generate: (held.generate)(superchunk), types: held.layers.to_vec() };
+            let job = Job::Warm { superchunk, image: held.storage.stored(superchunk), generate: (held.generate)(superchunk), types: held.layers.to_vec() };
             WarmedFrom::Job(self.jobs.send(job))
         };
         let at = self.warming.binary_search_by_key(&superchunk, |warming| warming.superchunk).expect_err("not warming");
@@ -102,9 +102,13 @@ impl Halos {
                 change.restored += 1;
             }
             WarmedFrom::Job(ticket) => {
-                let Done::Warmed { generated, cells } = self.jobs.take(ticket) else {
+                let Done::Warmed { generated, read, cells } = self.jobs.take(ticket) else {
                     unreachable!("a warming's job makes a superchunk's cells");
                 };
+                // Paged to disk: in memory again while it is hot.
+                if let Some(image) = read {
+                    held.storage.bring_in(warming.superchunk, image);
+                }
                 match generated {
                     Some(image) => {
                         held.storage.insert(warming.superchunk, image);

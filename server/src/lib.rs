@@ -55,6 +55,11 @@ pub struct Saved {
     pub bytes: u64,
 }
 
+/// Bytes of cold superchunks' images a world keeps in memory, unless
+/// told another number ([`World::keep_cold_pool_within`]): past it
+/// they are paged to disk (`docs/server.md`, "The cold pool paged").
+pub const COLD_POOL_BYTES_KEPT: u64 = 2 << 30;
+
 /// A world: its superchunks hot about the entities that keep a halo,
 /// the rest cold.
 pub struct World {
@@ -89,11 +94,13 @@ impl World {
         let dispatcher = Arc::new(threads.map_or_else(Dispatcher::of_the_machine, Dispatcher::new));
         let simulation = Simulation::on(Arc::clone(&dispatcher));
         let hot = hot_of(&info);
+        let mut storage = ChunkStorage::new(1 << 16);
+        storage.page_under(transient_data::paging(), COLD_POOL_BYTES_KEPT);
         Self {
             info,
             generation,
             arena: BitmapArena::new(),
-            storage: ChunkStorage::new(1 << 16),
+            storage,
             entities,
             simulation,
             cold: BTreeMap::new(),
@@ -178,6 +185,8 @@ pub fn flocked(mut world: World, superchunks: &[SuperchunkIndex], sheep: usize) 
 }
 
 /// Saves `world` in `folder`, made if not there -- between two ticks.
+/// An image paged to disk is copied there file to file, never read
+/// into memory.
 /// Every dirty bitmap is written back and the ring flushed first, so
 /// the cold pool's images are the world's cells; each superchunk's
 /// state is its live one if hot, as kept if cold; and which superchunks
@@ -187,14 +196,14 @@ pub fn save(folder: &Path, world: &mut World) -> Result<Saved, DiskError> {
     world.write_back_and_flush_all();
     for &superchunk in &hot {
         // One with no cell ever set has no image yet: saved all the same.
-        if world.storage.image(superchunk).is_none() {
+        if !world.storage.holds(superchunk) {
             world.storage.insert(superchunk, SuperchunkImage::new(&HeightMap::default()));
         }
     }
     let mut saved = Saved::default();
     let random: Vec<(SuperchunkIndex, u64)> = world.simulation.random_states().collect();
     for superchunk in world.storage.superchunks() {
-        saved.bytes += disk::write_image(folder, superchunk, world.storage.image(superchunk).expect("a superchunk of the cold pool"))?;
+        saved.bytes += world.storage.save_image(folder, superchunk)?;
         let (words, count) = match world.cold.get(&superchunk) {
             Some(words) => (words.clone(), saved::entity_count(words).expect("a cold superchunk's state, as it was kept")),
             None => {
@@ -232,14 +241,28 @@ pub fn worlds_in(folder: &Path) -> Vec<String> {
 /// cooling again and those warming warming again, each to turn when it
 /// was to -- as it was when saved, to the cell and the random number.
 pub fn load(folder: &Path) -> Result<World, DiskError> {
+    load_keeping(folder, COLD_POOL_BYTES_KEPT)
+}
+
+/// [`load`], the world keeping `bytes_kept` bytes of its cold
+/// superchunks' images in memory: every image is read and checked,
+/// and those past that many bytes are left in `folder`, read again
+/// when wanted -- so the save is not to be removed while the world
+/// runs.
+pub fn load_keeping(folder: &Path, bytes_kept: u64) -> Result<World, DiskError> {
     // The layers made hot are the code's: a save lists what it was written with.
     let info = WorldInfo { layers: type_registry::layer_types(), ..disk::read_world(folder)? };
     let hot = disk::read_hot(folder)?;
     let generation = Generation::of_numbers(&info.generation);
     let mut world = World::empty(info, generation, None);
-    let mut kept = 0;
+    world.storage.keep_in_memory(bytes_kept);
+    let (mut kept, saved_in) = (0, Arc::<Path>::from(folder));
     for superchunk in disk::saved_superchunks(folder)? {
-        world.storage.insert(superchunk, disk::read_image(folder, superchunk)?);
+        let image = disk::read_image(folder, superchunk)?;
+        match world.storage.over_memory_kept() {
+            true => world.storage.insert_on_disk(superchunk, &saved_in),
+            false => world.storage.insert(superchunk, image),
+        }
         let (words, path) = disk::read_state(folder, superchunk)?;
         // Every state read whole now: it is decoded only when its superchunk turns hot.
         kept += saved::entity_count(&words).map_err(|what| DiskError::Invalid(path, what.to_string()))?;

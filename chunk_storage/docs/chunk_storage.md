@@ -106,8 +106,8 @@ maps; with none, one word.
 
 ## The cold pool and the writeback ring
 
-`ChunkStorage` holds the cold pool -- superchunk images by Morton index
--- and the writeback ring (`WritebackRing`) of changed layers, encoded,
+`ChunkStorage` holds the cold pool -- superchunk images by Morton index,
+in memory or, past what it keeps there, on disk ("Paged to disk") -- and the writeback ring (`WritebackRing`) of changed layers, encoded,
 tagged with their chunk and type; an entry of no words says the layer
 is gone. Writing back appends to the ring, never touching the cold pool. The
 ring is a sponge: when an entry does not fit, the superchunk at its
@@ -162,7 +162,51 @@ when the last lets go. The thread is handed a handle
 changed in place, only replaced (`rewritten`), what the thread reads is
 the image as it was when handed over, whatever the pool does next; and
 an image replaced while a thread reads it lives on until that thread is
-done with it.
+done with it. An image paged to disk is handed over as the folder it
+is in, and the thread reads it ("Paged to disk").
+
+## Paged to disk
+
+A world grows for as long as it is walked, and every superchunk ever
+made has an image, a megabyte or so: kept all in memory, the cold
+pool is what a large world runs out of memory by. So the pool keeps
+only so many bytes of images in memory (`ChunkStorage::page_under`,
+`paging.rs`); past that, images are **paged out** -- written to a
+folder and let go -- and the pool keeps only where each is
+(`ChunkStorage::page_out`).
+
+Which go: any but those the caller says are held -- hot, or turning
+hot -- and those with changes waiting in the ring, which their flush
+needs. They are looked for round the pool from where the last look
+stopped, so each waits as long. Which are paged changes nothing the
+world holds: an image on disk is read back the same, word for word.
+
+Read back: a superchunk warming is handed to its job as the pool has
+it (`Stored`) -- the image, or the folder it is in -- and the job
+reads it, off the tick as it decodes it, and hands it back to be in
+memory again while it is hot (`ChunkStorage::bring_in`). Anything else
+that wants a paged image -- a flush, the world's hash -- reads it where
+it is asked for (`shared_image`), and it stays on disk; a save copies
+it file to file (`save_image`). `image` and `layer` lend from memory
+only, and panic at an image on disk: they are for a hot superchunk's.
+An image that does not read back is a panic naming the file: the world
+cannot go on without it.
+
+The folder is the pool's own, made under the folder it is given when
+the first image goes, laid out as a save's (below), and removed with
+the pool. Beside it is a lock file its process holds locked: a folder
+left behind by a process that died is known by its lock being free,
+and removed by the next pool to make one there.
+
+A world loaded need not be read into memory either: past what the
+pool keeps, its images are left in the save and marked as on disk
+there (`insert_on_disk`), read when wanted. Saved again to that
+folder, such an image is left as it is. So a save a running world was
+loaded from is not to be removed under it.
+
+Only images are paged. A cold superchunk's state -- its entities and
+random number -- is the server's, small, and stays in memory; and the
+pool's list of superchunks does too.
 
 ## On disk
 
@@ -204,7 +248,7 @@ when, and how it is read back: `../../server/docs/server.md`.
 
 | folder | what is in it |
 |---|---|
-| `src/` | height map, layer codec, superchunk image, writeback ring, chunk storage, the world on disk |
+| `src/` | height map, layer codec, superchunk image, writeback ring, chunk storage and its paging, the world on disk |
 | `src/diagnostics/` | what storage holds, gathered |
 | `src/transient_data.rs` | where runs leave what they make, out of git |
 | `tests/` | every part's behaviour, judged |

@@ -1,7 +1,9 @@
 //! Write-backs and flushes landed: what the jobs' threads encoded put
-//! in chunk storage's ring, and the ring's tail flushed.
+//! in chunk storage's ring, and the ring's tail flushed; and the cold
+//! pool's images paged out of memory.
 
 use super::{Halos, Held};
+use chunk_storage::disk::DiskError;
 use chunk_storage::jobs::{Done, Job};
 
 impl Halos {
@@ -89,5 +91,30 @@ impl Halos {
             }
         }
         self.land_write_backs(held, true);
+    }
+
+    /// Pages the cold pool's images out while more of them are in
+    /// memory than it keeps (`ChunkStorage::page_out`): how many went.
+    /// None of a superchunk hot -- cooling too -- warming or lingering
+    /// goes, so a hot superchunk's image is always in memory. If that
+    /// is not enough, the ring is flushed first -- a cold superchunk
+    /// whose changes wait there is held by them -- and the rest paged.
+    pub fn page_cold_pool_out(&mut self, held: &mut Held<'_>) -> Result<usize, DiskError> {
+        if !held.storage.over_memory_kept() {
+            return Ok(0);
+        }
+        let mut paged = self.page_out_unheld(held)?;
+        if held.storage.over_memory_kept() && !held.storage.nothing_to_flush() {
+            self.flush_all(held);
+            paged += self.page_out_unheld(held)?;
+        }
+        Ok(paged)
+    }
+
+    /// Pages out the images of the superchunks neither hot, warming
+    /// nor lingering, until the pool keeps no more than it may.
+    fn page_out_unheld(&self, held: &mut Held<'_>) -> Result<usize, DiskError> {
+        let (hot, arena, warming) = (held.arena.superchunk_indices(), &*held.arena, &self.warming);
+        held.storage.page_out(|superchunk| hot.binary_search(&superchunk).is_ok() || arena.lingers(superchunk) || warming.binary_search_by_key(&superchunk, |warming| warming.superchunk).is_ok())
     }
 }

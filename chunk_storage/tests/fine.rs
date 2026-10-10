@@ -326,3 +326,6 @@ mod chunk_storage {
         assert!(storage.layer(second, LayerType(1)).is_none(), "still in the ring");
     }
 }
+
+#[path = "fine/paging.rs"]
+mod paging;

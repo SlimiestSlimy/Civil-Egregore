@@ -67,6 +67,20 @@ impl World {
         self.with_halos(|halos, held| halos.keep_hot(held, wanted))
     }
 
+    /// Pages cold superchunks' images out of memory while the world
+    /// holds more of them than it keeps (`docs/server.md`, "The cold
+    /// pool paged"; `Halos::page_cold_pool_out`). If the disk refuses
+    /// one, it says so once and pages out no more.
+    pub fn page_cold_pool_out(&mut self) {
+        if !self.storage.over_memory_kept() {
+            return;
+        }
+        if let Err(error) = self.with_halos(|halos, held| halos.page_cold_pool_out(held)) {
+            eprintln!("The cold pool is no longer paged to disk, and grows in memory: {error}");
+            self.storage.stop_paging_out();
+        }
+    }
+
     /// The superchunks warming, each with the tick it turns hot at.
     pub fn warming(&self) -> impl Iterator<Item = (SuperchunkIndex, u64)> + '_ {
         self.halos.warming()

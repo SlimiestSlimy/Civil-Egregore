@@ -71,7 +71,7 @@ pub(crate) fn throughput(given: &Given) -> Result<(), String> {
     memory.row(&["process, peak".to_string(), run.memory.peak().map_or_else(unknown, mebibytes)]);
     memory.row(&["process, average over the ticks".to_string(), run.memory.average().map_or_else(unknown, mebibytes)]);
     memory.row(&[format!("arena buckets kept ({} of {} hot bitmaps)", run.arena.buckets, run.arena.hot_bitmaps), mebibytes(run.arena.bucket_bytes)]);
-    memory.row(&[format!("storage images ({})", run.storage.superchunks), mebibytes(run.storage.image_bytes)]);
+    memory.row(&[format!("storage images in memory ({} of {}, the rest paged to disk)", run.storage.superchunks - run.storage.on_disk, run.storage.superchunks), mebibytes(run.storage.image_bytes)]);
     memory.row(&["storage ring".to_string(), mebibytes(run.storage.ring_bytes)]);
     report.add("memory", memory);
     TRANSIENT_DATA.publish(report);

@@ -31,6 +31,7 @@ impl World {
     pub fn tick(&mut self) -> WorldTick {
         let rules = tick_chosen(&mut self.simulation, &mut self.arena, &mut self.entities, self.info.seed, Chosen::ALL);
         let halos = self.move_halos();
+        self.page_cold_pool_out();
         // What a world holds together (`docs/server.md`), checked in a debug build.
         debug_assert_eq!(self.broken_invariant(), None, "after tick {}", self.entities.now());
         WorldTick { rules, halos }

@@ -73,7 +73,8 @@ superchunks about each, sorted, each once.
 The halos' own methods lie in two files under it: `halos/warming.rs`
 (`make_hot_within`, `start_warming`, `finish_warming`) and
 `halos/write_back.rs` (`land_write_backs`, `flush_tail`,
-`land_flushes`, `flush_all`, `write_back_all`).
+`land_flushes`, `flush_all`, `write_back_all`, `page_cold_pool_out`,
+`page_out_unheld`).
 
 **`Viewport`** `{first, last}`: what a renderer renders, in
 superchunks; **`contains(at)`**. **`Held`** `{arena, storage, entities, simulation, cold, layers,
@@ -120,7 +121,7 @@ size are passed over first. **`Halos::start_warming(superchunk, due)`**: held if
 **`Halos::finish_warming`**: a warming superchunk's bitmaps made hot -- again
 as they were (`BitmapArena::make_hot_again`), or as its job made
 them (`BitmapArena::make_hot_cells`), its image put in the cold pool if
-generated. **`Halos::land_write_backs(wait)`**: the encoded write-backs
+generated, or if read back from disk (`ChunkStorage::bring_in`). **`Halos::land_write_backs(wait)`**: the encoded write-backs
 put into the ring, in order (`ChunkStorage::try_write_back`, then
 `BitmapArena::written_back`), the tail flushed whenever it needs the
 room, then the flushes landed. **`Halos::flush_tail`**: the tail
@@ -131,6 +132,12 @@ no change left in the ring (`BitmapArena::flushed`).
 **`Halos::write_back_all`**: every hot superchunk's dirty bitmaps sent
 to be encoded, and every write-back landed. **`Halos::flush_all`**:
 every superchunk with changes in the ring flushed, on all the threads.
+**`Halos::page_cold_pool_out`**: while the cold pool has more images in
+memory than it keeps, those of superchunks neither hot, warming nor
+lingering paged out (`Halos::page_out_unheld`,
+`ChunkStorage::page_out`) -- the ring flushed first if that is not
+enough, a cold superchunk's changes there holding its image -- how
+many, or the disk's refusal.
 
 ## `tick.rs`
 

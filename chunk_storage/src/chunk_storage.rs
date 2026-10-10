@@ -1,9 +1,11 @@
 //! Chunk storage: the cold pool of superchunk images and the writeback
 //! ring that feeds it (`docs/chunk_storage.md`, "The cold pool and the
-//! writeback ring", "Shared images").
+//! writeback ring", "Shared images"). Its images paged to disk:
+//! `paging.rs`.
 
 use coordinates::{ChunkIndex, SuperchunkIndex};
 use crate::height_map::HeightMap;
+use crate::paging::{bytes_of, Kept, Paging};
 use type_registry::LayerType;
 use crate::superchunk_image::{LayerChange, SuperchunkImage};
 use crate::writeback_ring::WritebackRing;
@@ -11,33 +13,42 @@ use std::sync::Arc;
 
 /// The cold pool and the writeback ring.
 pub struct ChunkStorage {
-    /// Every superchunk's image, sorted by superchunk index: shared, so
-    /// one is read off the tick -- decoded on another thread -- with
-    /// nothing copied. An image is never changed, only replaced.
-    pub(crate) cold_pool: Vec<(SuperchunkIndex, Arc<SuperchunkImage>)>,
+    /// Every superchunk's image, sorted by superchunk index: in
+    /// memory shared, so one is read off the tick -- decoded on
+    /// another thread -- with nothing copied; or paged to disk. An
+    /// image is never changed, only replaced.
+    pub(crate) cold_pool: Vec<(SuperchunkIndex, Kept)>,
     /// Changed layers, encoded, on their way to the cold pool.
     pub(crate) ring: WritebackRing,
+    /// How the pool is paged to disk, and the bytes it has in memory.
+    pub(crate) paging: Paging,
 }
 
 impl ChunkStorage {
     /// No superchunk stored, and a ring of `ring_words` words.
     pub fn new(ring_words: usize) -> Self {
-        Self { cold_pool: Vec::new(), ring: WritebackRing::new(ring_words) }
+        Self { cold_pool: Vec::new(), ring: WritebackRing::new(ring_words), paging: Paging::none() }
     }
 
     /// Where `superchunk` is in the cold pool, or where it would go.
-    fn find(&self, superchunk: SuperchunkIndex) -> Result<usize, usize> {
+    pub(crate) fn find(&self, superchunk: SuperchunkIndex) -> Result<usize, usize> {
         self.cold_pool.binary_search_by_key(&superchunk, |&(kept, _)| kept)
     }
 
     /// Puts `image` in the cold pool as `superchunk` (read from disk, or
-    /// generated), in place of the one it had, if any. Its entries
-    /// still in the ring are applied to the new image when it is
-    /// flushed.
+    /// generated), in memory, in place of the one it had, if any. Its
+    /// entries still in the ring are applied to the new image when it
+    /// is flushed.
     pub fn insert(&mut self, superchunk: SuperchunkIndex, image: SuperchunkImage) {
+        self.paging.bytes_in_memory += bytes_of(&image);
+        let kept = Kept::InMemory(Arc::new(image));
         match self.find(superchunk) {
-            Ok(at) => self.cold_pool[at].1 = Arc::new(image),
-            Err(at) => self.cold_pool.insert(at, (superchunk, Arc::new(image))),
+            Ok(at) => {
+                if let Kept::InMemory(before) = std::mem::replace(&mut self.cold_pool[at].1, kept) {
+                    self.paging.bytes_in_memory -= bytes_of(&before);
+                }
+            }
+            Err(at) => self.cold_pool.insert(at, (superchunk, kept)),
         }
     }
 
@@ -46,20 +57,34 @@ impl ChunkStorage {
         self.cold_pool.iter().map(|&(superchunk, _)| superchunk)
     }
 
-    /// The image of `superchunk`, if the cold pool holds it.
+    /// Whether the cold pool holds an image of `superchunk`, in memory
+    /// or on disk.
+    pub fn holds(&self, superchunk: SuperchunkIndex) -> bool {
+        self.find(superchunk).is_ok()
+    }
+
+    /// The image of `superchunk`, if the cold pool holds it -- in
+    /// memory, as a hot superchunk's is, and any where nothing is
+    /// paged. One paged to disk is not lent from here: a panic, the
+    /// caller's mistake ([`ChunkStorage::shared_image`] reads it).
     pub fn image(&self, superchunk: SuperchunkIndex) -> Option<&SuperchunkImage> {
-        self.find(superchunk).ok().map(|at| &*self.cold_pool[at].1)
+        self.find(superchunk).ok().map(|at| match &self.cold_pool[at].1 {
+            Kept::InMemory(image) => &**image,
+            Kept::OnDisk(_) => panic!("the image of superchunk {:x} is paged to disk: shared_image reads it", superchunk.0),
+        })
     }
 
     /// The image of `superchunk`, if the cold pool holds it, shared: to
-    /// read on another thread, as it is now.
+    /// read on another thread, as it is now. One paged to disk is read
+    /// here, and stays on disk.
     pub fn shared_image(&self, superchunk: SuperchunkIndex) -> Option<Arc<SuperchunkImage>> {
-        self.find(superchunk).ok().map(|at| Arc::clone(&self.cold_pool[at].1))
+        self.stored(superchunk).map(|stored| stored.image(superchunk))
     }
 
     /// The encoded layer of `layer_type` in `chunk`, if the cold pool has
     /// one: from its first word to its chunk's end
-    /// ([`SuperchunkImage::layer`]).
+    /// ([`SuperchunkImage::layer`]). Of an image in memory
+    /// ([`ChunkStorage::image`]).
     pub fn layer(&self, chunk: ChunkIndex, layer_type: LayerType) -> Option<&[u64]> {
         self.image(chunk.superchunk())?.layer(chunk.place(), layer_type)
     }
