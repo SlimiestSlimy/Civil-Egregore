@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "AI_SCRATCHPAD"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bitmap",
  "chunk_storage",
@@ -1780,14 +1780,14 @@ dependencies = [
 
 [[package]]
 name = "bitmap"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "utilities",
 ]
 
 [[package]]
 name = "bitplane_manager"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bitmap",
  "chunk_storage",
@@ -1935,7 +1935,7 @@ checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
 
 [[package]]
 name = "chunk_storage"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bitmap",
  "coordinates",
@@ -2052,7 +2052,7 @@ dependencies = [
 
 [[package]]
 name = "coordinates"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bitmap",
  "utilities",
@@ -2317,7 +2317,7 @@ dependencies = [
 
 [[package]]
 name = "entity_manager"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bitmap",
  "coordinates",
@@ -2327,7 +2327,7 @@ dependencies = [
 
 [[package]]
 name = "entity_rules"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bitplane_manager",
  "chunk_storage",
@@ -2736,7 +2736,7 @@ checksum = "b40ca9252762c466af32d0b1002e91e4e1bc5398f77455e55474deb466355ff5"
 
 [[package]]
 name = "gui"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bevy",
  "utilities",
@@ -3027,7 +3027,7 @@ dependencies = [
 
 [[package]]
 name = "instructions"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bitplane_manager",
  "chunk_storage",
@@ -3259,7 +3259,7 @@ dependencies = [
 
 [[package]]
 name = "mc_rules"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bitplane_manager",
  "chunk_storage",
@@ -3893,7 +3893,7 @@ dependencies = [
 
 [[package]]
 name = "pathfinding"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "utilities",
 ]

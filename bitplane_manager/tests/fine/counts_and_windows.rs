@@ -7,6 +7,8 @@ use crate::tests::*;
 use bitmap::CellWords;
 use bitplane_manager::{BitmapArena, BucketKey, NotHot, Reader, Shape, Window, Write, WriteOp, COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS};
 use chunk_storage::{Bits16, Bits2, Bits4, Bits8, Wide, Width, ChunkStorage, LayerCodec};
+use utilities::rng::Rng;
+use utilities::seed::counted;
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 
 /// The mock superchunk, made hot: every cell is dirt or grass, never
@@ -17,7 +19,7 @@ fn every_bitmap_counts_its_cells() {
     let mut codec = LayerCodec::new();
     let mut arena = BitmapArena::new();
     let mut storage = ChunkStorage::new(1 << 12);
-    storage.insert(WORLD_MIDDLE, grass_on_dirt(7, 8, &mut codec));
+    storage.insert(WORLD_MIDDLE, grass_on_dirt(counted(), 8, &mut codec));
     for chunk in WORLD_MIDDLE.chunks() {
         arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
     }
@@ -50,13 +52,14 @@ fn counts_follow_every_change() {
     let mut codec = LayerCodec::new();
     let mut arena = BitmapArena::new();
     let mut storage = ChunkStorage::new(1 << 12);
-    storage.insert(WORLD_MIDDLE, grass_on_dirt(11, 0, &mut codec));
-    let chunk = ChunkIndex::of(WORLD_MIDDLE, 11);
+    let mut random = Rng::new(counted());
+    storage.insert(WORLD_MIDDLE, grass_on_dirt(counted(), 0, &mut codec));
+    let chunk = ChunkIndex::of(WORLD_MIDDLE, random.below(16) as usize);
     arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
     let (dirt, grass) = (BucketKey { layer_type: MOCK_DIRT, chunk }, BucketKey { layer_type: MOCK_GRASS, chunk });
     assert_eq!((arena.bucket(dirt).expect("hot").count(), arena.bucket(grass).expect("hot").count()), (1 << 16, 0));
 
-    let cell = cell_in(chunk, CELL);
+    let cell = cell_in(chunk, (random.below(256) as u8, random.below(256) as u8));
     for _ in 0..2 {
         write(&mut arena, MOCK_GRASS, WriteOp::Set, cell);
         write(&mut arena, MOCK_DIRT, WriteOp::Unset, cell);
@@ -82,11 +85,12 @@ fn counts_follow_every_change() {
 #[test]
 fn windows_read_at_once_are_the_cells_read_one_by_one() {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
+    let mut random = Rng::new(counted());
     for y in 0..5 {
         for x in 0..5 {
             for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
                 // Some chunks of grass left cold, and dirt over half the superchunks.
-                if !(x + y + chunk.place() as u32).is_multiple_of(7) {
+                if random.below(7) != 0 {
                     arena.make_hot(BucketKey { layer_type: MOCK_GRASS, chunk }, None, &mut codec);
                 }
                 if (x + y).is_multiple_of(2) {
@@ -96,17 +100,22 @@ fn windows_read_at_once_are_the_cells_read_one_by_one() {
         }
     }
     let side = 5 * SUPERCHUNK_SIDE_CELLS;
-    for at in 0..40_000u32 {
-        let cell = CellCartesian { x: (at * 7919) % side, y: (at * 104_729) % side };
-        arena.queue(if at % 3 == 0 { MOCK_DIRT } else { MOCK_GRASS }, Write::cell(cell.into(), WriteOp::Set));
+    for _ in 0..40_000 {
+        // Half scattered, half crowded about one place: windows with one cell set, and with many.
+        let spread = if random.below(2) == 0 { side } else { 64 };
+        let cell = CellCartesian { x: random.below(u64::from(spread)) as u32, y: random.below(u64::from(spread)) as u32 };
+        arena.queue(if random.below(3) == 0 { MOCK_DIRT } else { MOCK_GRASS }, Write::cell(cell.into(), WriteOp::Set));
     }
     arena.apply();
     let reader = Reader::new(arena.superchunks());
     let edge = SUPERCHUNK_SIDE_CELLS;
     let mut origins = vec![(0, 0), (1, 1), (7, 7), (255, 255), (252, 3), (edge - 1, edge - 1), (edge - 4, edge - 5), (2 * edge, 3 * edge - 1), (side - 8, side - 8)];
-    origins.extend((0..3000u32).map(|at| ((at * 31_337) % (side - 8), (at * 7_717) % (side - 8))));
-    for (number, (x, y)) in origins.into_iter().enumerate() {
-        let (width, height) = (1 + number as u32 % 8, 1 + (number as u32 / 8) % 8);
+    origins.extend((0..3000).map(|at| {
+        let reach = u64::from(if at % 3 == 0 { 64 } else { side - 8 });
+        (random.below(reach) as u32, random.below(reach) as u32)
+    }));
+    for (x, y) in origins {
+        let (width, height) = (random.between(1, 8) as u32, random.between(1, 8) as u32);
         let origin = CellIndex::from(CellCartesian { x, y });
         for layer_type in [MOCK_GRASS, MOCK_DIRT] {
             let mut expected = Window::default();
@@ -129,7 +138,8 @@ fn every_count_tile_counts_its_cells() {
     let mut codec = LayerCodec::new();
     let mut arena = BitmapArena::new();
     let mut storage = ChunkStorage::new(1 << 12);
-    storage.insert(WORLD_MIDDLE, grass_on_dirt(7, 300_000, &mut codec));
+    let mut random = Rng::new(counted());
+    storage.insert(WORLD_MIDDLE, grass_on_dirt(counted(), 300_000, &mut codec));
     for chunk in WORLD_MIDDLE.chunks() {
         arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
     }
@@ -149,15 +159,15 @@ fn every_count_tile_counts_its_cells() {
     };
     counted(&arena);
     let corner = WORLD_MIDDLE.top_left().cartesian();
-    for at in 0..3000u32 {
-        let cell = CellCartesian { x: corner.x + (at * 7919) % 1000, y: corner.y + (at * 104_729) % 1000 };
-        let op = [WriteOp::Set, WriteOp::Unset, WriteOp::Flip][at as usize % 3];
-        let shape = match at % 50 {
-            0 => Shape::Rect { width: 20, height: 9 },
-            1 => Shape::Disc { radius: 7 },
+    for _ in 0..3000 {
+        let cell = CellCartesian { x: corner.x + random.below(1000) as u32, y: corner.y + random.below(1000) as u32 };
+        let op = [WriteOp::Set, WriteOp::Unset, WriteOp::Flip][random.below(3) as usize];
+        let shape = match random.below(50) {
+            0 => Shape::Rect { width: random.between(1, 40) as u8, height: random.between(1, 40) as u8 },
+            1 => Shape::Disc { radius: random.below(16) as u8 },
             _ => Shape::Cell,
         };
-        arena.queue(if at % 2 == 0 { MOCK_GRASS } else { MOCK_DIRT }, Write { at: cell.into(), op, shape });
+        arena.queue(if random.below(2) == 0 { MOCK_GRASS } else { MOCK_DIRT }, Write { at: cell.into(), op, shape });
     }
     assert!(arena.apply().changed > 1000);
     counted(&arena);
@@ -170,11 +180,16 @@ fn every_count_tile_counts_its_cells() {
 fn a_wide_plane_holds_numbers<W: Width>(plane: Wide<W>) {
     let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
     let mut storage = ChunkStorage::new(1 << 12);
-    let (layer_type, chunk) = (plane.layer_type(), ChunkIndex::of(WORLD_MIDDLE, 9));
+    let mut random = Rng::new(counted());
+    let (layer_type, chunk) = (plane.layer_type(), ChunkIndex::of(WORLD_MIDDLE, random.below(16) as usize));
     let key = BucketKey { layer_type, chunk };
     assert_eq!(arena.make_hot_layers(chunk, &[layer_type], &storage, &mut codec), 1);
     // Numbers over the plane's whole range, on cells of their own; one of them put again, one taken back to 0.
-    let numbers: Vec<(CellIndex, u32)> = (0..40).map(|nth: u32| (cell_in(chunk, ((nth * 37) as u8, (nth / 4 * 91) as u8)), 1 + nth.wrapping_mul(2_654_435_761) % plane.most())).collect();
+    let mut cells = std::collections::BTreeSet::new();
+    while cells.len() < 40 {
+        cells.insert(random.below(1 << 16) as usize);
+    }
+    let numbers: Vec<(CellIndex, u32)> = cells.into_iter().map(|place| (CellIndex::of(chunk, place), 1 + random.below(u64::from(plane.most())) as u32)).collect();
     let (emptied, _) = numbers[7];
     for &(cell, number) in &numbers {
         arena.queue(layer_type, Write::value(plane, cell, number));

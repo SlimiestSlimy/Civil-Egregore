@@ -1,6 +1,5 @@
 [package]
 name = "bitmap"
-version = "0.1.0"
 edition = "2024"
 description = "Civil Egregore's 256x256 bitmap, laid out in Morton order"
 

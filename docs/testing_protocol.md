@@ -36,7 +36,7 @@ nothing has none.
 
 | tier | what runs | how long | command |
 |---|---|---|---|
-| fine | one case a test, made by hand: a bitmap drawn, a cliff placed, two entities on two cells -- each pinning one behaviour | instant | `cargo test --test fine` |
+| fine | each test pinning one behaviour: the edges written by hand -- a bitmap drawn, a cliff placed, two entities on two cells -- and, wherever the cases can be made, cases drawn from the run's seed and judged against the plainest way of working the answer out (cells written one by one, a layer decoded) | instant | `cargo test --test fine` |
 | fast | small worlds grown from a seed and run a few thousand ticks: what the rules and the tick come to, judged within bounds or against a second run | seconds | `cargo test --test fast` |
 | complete | more superchunks, more seeds, far more ticks; `#[ignore]`d, and run in release | minutes at most | `cargo test --release --test complete -- --ignored` |
 
@@ -95,6 +95,12 @@ the top of the workspace and out of git (`utilities::seed`):
   alone; `CIVIL_EGREGORE_SEED=fresh` draws one for the run.
 - The first asking prints the seed, which use it is and where it came
   from, so a failure names the seed that made it.
+
+A case that can be drawn is drawn: a test's cells, sizes, shapes and
+orders come from the seed (`Rng::new(utilities::seed::counted())`),
+not from numbers written in it, so each roll of the seed tries others;
+what is written by hand is what a draw would seldom land on -- the
+world's corners, a chunk's border, a span of exactly a byte.
 
 A test must hold on any seed: what it asserts is a bound or an equality
 between two runs, never a number one seed happened to give.

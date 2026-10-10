@@ -1,9 +1,7 @@
 [package]
 name = "mc_rules"
-version = "0.1.0"
 edition = "2024"
 description = "Civil Egregore's Monte Carlo rules of the cells, a file each: so far grass spreading over dirt"
-publish = false
 
 [dependencies]
 instructions = { path = "../instructions" }
