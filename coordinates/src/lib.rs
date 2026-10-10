@@ -1,22 +1,7 @@
-//! Civil Egregore's coordinates: where things are.
-//!
-//! Every place in the world is a Morton index -- its coordinates' bits
-//! interleaved, `x` in the even bits -- one type a size: a
-//! [`SuperchunkIndex`] (44 bits), a [`ChunkIndex`] (48) and a
-//! [`CellIndex`] (64). Each is the next one's top bits: a cell's index
-//! is its chunk's and then 16 bits for its **place** in the chunk, a
-//! chunk's is its superchunk's and then 4 bits for its place in the
-//! superchunk. A place is a Morton index inside the thing it is in: a
-//! `usize`, the index of its bit in a bitmap's words, or of its chunk
-//! among a superchunk's.
-//!
-//! Morton indices are what everything is stored and worked in. A cell's
-//! cartesian coordinates -- its `x` and `y` -- are a [`CellCartesian`],
-//! kept for geometry and drawing: whatever is cartesian says so.
-//!
-//! Every coordinate is a non-negative integer, counted from the world's
-//! top left corner: x grows to the right and y downwards, as in a bitmap.
-//! The world starts roughly in the middle of both.
+//! Civil Egregore's coordinates: where things are. Every place is a
+//! Morton index -- [`SuperchunkIndex`], [`ChunkIndex`], [`CellIndex`],
+//! each the next one's top bits -- and whatever is cartesian says so
+//! ([`CellCartesian`]).
 //!
 //! The design: `docs/coordinates.md`; function by function:
 //! `docs/reference.md`.
@@ -74,10 +59,8 @@ const CELL_PLACE_IN_SUPERCHUNK_BITS: u32 = CELL_PLACE_BITS + CHUNK_PLACE_BITS;
 /// The bits a superchunk index takes.
 const SUPERCHUNK_INDEX_BITS: u32 = u64::BITS - CELL_PLACE_IN_SUPERCHUNK_BITS;
 
-/// A superchunk anywhere in the world, as its Morton index -- the top 44
-/// bits of its cells' -- which is what identifies a superchunk: what
-/// the directory, the cold pool and saves are sorted and named by.
-/// Neighbouring superchunks mostly get near indices.
+/// A superchunk anywhere in the world, as its Morton index: the top 44
+/// bits of its cells'.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SuperchunkIndex(pub u64);
 
@@ -200,13 +183,9 @@ const fn interleave(x: u32, y: u32) -> u64 {
     spread(x) | spread(y) << 1
 }
 
-/// A cell anywhere in the world, as its Morton index: what locates it
-/// alone, and what the bitplanes are laid out by. From the lowest bit,
-/// 16 for its place in its chunk -- its bit's index in the chunk's
-/// bitmap words -- 4 for its chunk's place in its superchunk, 44 for its
-/// superchunk's index. The parts are bit fields, so finding a cell's
-/// superchunk, chunk and bit takes shifts and masks; [`CellCartesian`]
-/// is the same cell as cartesian coordinates, for geometry.
+/// A cell anywhere in the world, as its Morton index: from the lowest
+/// bit, 16 for its place in its chunk, 4 for its chunk's place in its
+/// superchunk, 44 for its superchunk's index.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CellIndex(pub u64);
 
@@ -249,10 +228,7 @@ impl CellIndex {
     }
 
     /// The cell `dx` across and `dy` down from this one, if it is in the
-    /// world. Added on the Morton index itself, one coordinate's bits at a
-    /// time -- the other coordinate's bits filled with ones so a carry
-    /// passes over them, or cleared so a borrow does -- with no cartesian
-    /// coordinates made.
+    /// world: stepped on the index itself (`docs/reference.md`, "step").
     pub fn offset(self, dx: i32, dy: i32) -> Option<Self> {
         let x = step(self.0 & X_BITS, dx, X_BITS)?;
         let y = step(self.0 & Y_BITS, dy, Y_BITS)?;
@@ -292,9 +268,7 @@ const Y_BITS: u64 = !X_BITS;
 
 /// `coordinate` -- one coordinate's bits of a Morton index, those in
 /// `lane` -- moved by `by`, unless it passes the top or bottom of the
-/// `u64`. A power of two (a step to a neighbour, to the next word tile
-/// or chunk: by far the most common) spreads to a single bit, with no
-/// spreading steps.
+/// `u64` (`docs/reference.md`, "step").
 fn step(coordinate: u64, by: i32, lane: u64) -> Option<u64> {
     let magnitude = by.unsigned_abs();
     if magnitude == 0 {

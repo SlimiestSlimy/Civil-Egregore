@@ -8,14 +8,33 @@ chunk is one; Tessera encodes them, the bitplane manager holds them hot.
 
 The cells are laid out in Morton (Z) order: a cell's Morton index
 interleaves its coordinates' bits, x in the even bits, y in the odd.
+The first sixteen run
+
+```text
+ 0  1  4  5
+ 2  3  6  7
+ 8  9 12 13
+10 11 14 15
+```
+
+and the cell at Morton index `i` is bit `i % 64` of word `i / 64`.
 Every **tile** -- an aligned square whose side is a power of two -- is
 one contiguous run of indices, and its four quarters are four
-consecutive runs. So a tile of 8x8 or more is a run of words, and
+consecutive runs: a 4x4 tile sixteen bits, an 8x8 tile exactly one
+word, a bigger one whole words. A question about a whole tile is then a
+few word operations, not one a row. So a tile of 8x8 or more is a run of words, and
 anything laid out over the same cells (Tessera's pyramids, a
 superchunk's chunks, the world's cells) shares the order.
 
 Nothing here decides anything: what to describe, at what size, in what
-order, is for whatever reads the bitmap.
+order, is for whatever reads the bitmap. Nothing is sized at run time
+either -- a bitmap is always 256 by 256 -- which is what lets whatever
+reads it size everything once.
+
+What a bitmap is and what can be asked of it (`bitmap_data.rs`) is kept
+apart from what is done to it by shape (`bitmap_drawing.rs`): rectangles
+and circles, which take `i64` coordinates and clamp, so a caller can ask
+for a circle hanging off the edge without doing the arithmetic first.
 
 ## Windows
 
@@ -36,8 +55,6 @@ in a few shifts and masks.
 | `src/bitmap_drawing.rs` | rectangles and circles, drawn by their shape |
 | `src/morton.rs` | Morton indices and coordinates |
 | `src/window.rs` | windows: word tiles turned into rows, and windows cut from four of them |
+| `src/diagnostics/`, `src/transient_data.rs` | the folders every crate has; nothing is gathered or kept yet |
 | `tests/` | the bitmap, Morton order and windows, judged |
 | `docs/` | this, and the reference, function by function |
-
-It has no diagnostics or transient data: nothing in it is measured on
-its own.

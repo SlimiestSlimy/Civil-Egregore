@@ -1,20 +1,6 @@
-//! One table renderer for every measurement, so that a column means the
-//! same thing and looks the same wherever it is printed.
-//!
-//! What it enforces rather than leaves to the caller: a divider under
-//! the headings, a bar between columns, and a heading that names
-//! the whole of what the column holds. A column headed "bits" says
-//! neither whose bits nor per what; one headed "encoded bits a bitmap" does,
-//! and it is not the table's business to make that shorter.
-//!
-//! A heading with newlines in it stacks, so a long name costs height
-//! rather than width.
-//!
-//! A table is also kept as text, so a measurement is written once and
-//! read back rather than copied by hand: `csv.rs` writes and reads one
-//! table as CSV, and `report.rs` keeps a measurement's tables, with
-//! notes on what they were measured on, in one file of a folder its
-//! caller names.
+//! One table printer for every measurement, so that a column means and
+//! looks the same wherever it is printed (`docs/utilities.md`, "Tables
+//! and reports").
 
 pub mod csv;
 pub mod report;
@@ -119,11 +105,6 @@ impl Table {
 
     /// The table as printed: the headings in a ruled block, then the
     /// rows, every line ended.
-    ///
-    /// A divider above the headings as well as below them, because a tall
-    /// heading leaves blank cells over the short columns and without
-    /// something to close the top they read as empty rows of the table
-    /// rather than as part of its head.
     pub fn rendered(&self) -> String {
         let column_widths = self.column_widths();
         let heading_lines = self.headings.iter().map(Vec::len).max().unwrap_or(1);

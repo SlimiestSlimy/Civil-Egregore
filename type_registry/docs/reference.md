@@ -7,8 +7,8 @@ The design is in `type_registry.md`.
 **`LayerType(u64)`**: what a layer represents; **`wide(first, bits)`** a
 type of 2, 4, 8 or 16 bits a cell, **`bits`** how many, **`plane(bit)`**
 and **`planes`** the layers of a bit a cell it is kept cold as,
-**`holds(plane)`** whether one is its own. **`Width`**: a plane's width
-as a type -- **`Bits2`**, **`Bits4`**, **`Bits8`**, **`Bits16`**.
+**`holds(plane)`** whether one is its own. `WIDTH_SHIFT`: where a type keeps how wide it is. **`Width`**: a plane's width
+as a type, `BITS` bits a cell -- **`Bits2`**, **`Bits4`**, **`Bits8`**, **`Bits16`**.
 **`Wide<W>`**: a wide plane, its width in its type: **`new(first)`**,
 **`layer_type`**, **`most`** the most a cell of it holds.
 **`EntityType(u64)`**, **`AttributeType(u64)`**: an entity's type and an

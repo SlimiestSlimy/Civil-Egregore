@@ -10,6 +10,10 @@ The design is in `coordinates.md`.
 coordinates fit a `u32`), `WORLD_MIDDLE` (the superchunk the world
 starts at), `NEIGHBOURS` (a cell's eight, as offsets).
 
+The bit fields of an index, private: `CELL_PLACE_BITS` (16),
+`CHUNK_PLACE_BITS` (4), `CELL_PLACE_IN_SUPERCHUNK_BITS` (20, the two
+together), `SUPERCHUNK_INDEX_BITS` (44, what is left of a `u64`).
+
 **`square_side(count)`**, **`square_from_middle(count)`**: the side of
 the square `count` superchunks make -- the whole root of one less, and
 one, no float -- and those superchunks, row by row
@@ -39,7 +43,8 @@ superchunk's top left it is, and back.
 other bit and back, in five shift-and-mask steps each
 (`SPREAD_STEPS`, `GATHER_STEPS`, from `alternating_runs`).
 
-**`step`**: one coordinate's bits of a Morton index (its lane, `X_BITS`
+**`step`**. How a neighbour is found with no cartesian coordinates
+made: one coordinate's bits of a Morton index (its lane, `X_BITS`
 or `Y_BITS`) added to or taken from with the distance spread out, the
 other's bits filled with ones for a carry to pass, cleared for a
 borrow; a result past the start is a step off the `u64`, refused. A

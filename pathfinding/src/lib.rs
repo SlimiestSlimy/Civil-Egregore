@@ -1,32 +1,11 @@
-//! Civil Egregore's pathfinding: A* over an **area**, 16x16 cells kept as
+//! Civil Egregore's pathfinding: over an **area**, 16x16 cells kept as
 //! masks -- a row a `u16`, cell `(x, y)` at bit `x` of row `y` -- which
-//! is all it knows of the world. What the cells are, which may be walked
-//! on and where the walker wants to go are for whoever calls it; an
-//! entity's turn reads an area of the bitplanes around a cell
-//! (`instructions::read::area::layer`) and hands it here.
+//! is all it knows of the world. Waves from many goals ([`Wave`],
+//! [`step_towards`]), the nearest cell ([`nearest`]), and A* between two
+//! cells ([`a_star`]); nothing here allocates.
 //!
-//! | what | what it does |
-//! |---|---|
-//! | [`Wave`] | a search spreading from every goal at once, a cell further each step, the whole area's cells in a few word operations |
-//! | [`step_towards`] | a walker's next step to the nearest of many goals, by waves: what an entity asks each time it ticks |
-//! | [`nearest`] | the cell of a mask nearest another, in steps, nothing in the way counted |
-//! | [`a_star`] | the shortest path between two cells over the cells that may be walked on: its first step and its length |
-//!
-//! A walker takes a pathfinding step a tick of its own, and keeps no
-//! route: each time it asks only where to step next, the world having
-//! changed since it last asked. What that costs is waves: all of a
-//! search's memory is the cells reached, 32 bytes, beside the 32 of the
-//! cells that may be walked on -- one line of cache -- and a wave moves
-//! every reached cell's front at once, a row a few shifts and ors.
-//!
-//! A step is to any of a cell's eight neighbours, each costing one: the
-//! steps between two cells with nothing in the way are the greater of
-//! their distances across and down ([`steps_apart`]), which is what A*
-//! guesses the rest of a path by.
-//!
-//! Nothing here allocates: a search's working memory is a few arrays on
-//! the stack, the size of the area. The design: `docs/pathfinding.md`;
-//! function by function: `docs/reference.md`.
+//! The design: `docs/pathfinding.md`; function by function:
+//! `docs/reference.md`.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -170,12 +149,8 @@ impl Wave {
 
 /// A walker on `from`'s next step to the nearest cell of `goals` over
 /// the cells of `passable`, through no wall of `walls`, and how many
-/// steps away that goal is: waves
-/// spread from every goal until one comes beside the walker, which steps
-/// into it -- of the neighbours reached together, the `pick`-th, round
-/// and round, a random number, so walkers do not all lean one way.
-/// `from` itself need not be passable, nor is it a goal. `None` if no
-/// goal can be walked to.
+/// steps away that goal is; `None` if none can be walked to
+/// (`docs/pathfinding.md`, "Waves").
 pub fn step_towards(passable: &Rows, walls: &Walls, goals: &Rows, from: Cell, pick: u64) -> Option<Path> {
     let mut beside: Rows = [0; SIDE];
     beside[from.y as usize] = 1 << from.x;

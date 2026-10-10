@@ -4,7 +4,7 @@ The design is in `pathfinding.md`.
 
 ## `lib.rs`
 
-`SIDE` (16). **`Rows`**: `[u16; SIDE]`, an area's cells of one kind,
+`SIDE` (16), `CELLS` (256, an area's). **`Rows`**: `[u16; SIDE]`, an area's cells of one kind,
 cell `(x, y)` at bit `x` of row `y`. **`Cell`** `{x, y}`. **`Path`**
 `{first, steps}`: a path's first cell after its start, and its length.
 
@@ -12,10 +12,10 @@ cell `(x, y)` at bit `x` of row `y`. **`Cell`** `{x, y}`. **`Path`**
 distances across and down.
 
 **`Wave::from(goals)`**: a search with the goals alone reached;
-**`reached`**; **`advance(passable)`**: every passable neighbour of a
+**`reached`**; **`advance(passable, walls)`**: every passable neighbour of a
 reached cell reached (**`spread`**), whether any was.
 
-**`step_towards(passable, goals, from, pick)`**: waves from every goal
+**`step_towards(passable, walls, goals, from, pick)`**: waves from every goal
 until one comes beside `from`; the neighbour reached -- the `pick`-th
 of those reached together -- and the steps to the goal. `None` if no
 goal can be walked to.
@@ -24,15 +24,20 @@ goal can be walked to.
 nothing in the way counted, the `pick`-th of those equally near
 (**`for_each`**).
 
-**`a_star(passable, from, to)`**: the shortest path, searched backwards
-from `to` (**`Queue`**: a binary heap in an array, `push`, `pop`;
-`STEPS`, the eight neighbours). `None` if there is no way.
+## `a_star.rs`
+
+**`a_star(passable, walls, from, to)`**: the shortest path, searched
+backwards from `to` (**`Queue`**: a binary heap in an array of `QUEUE`
+entries, `push`, `pop`; `STEPS`, the eight neighbours). `None` if there is no way.
+
+## `walls.rs`
 
 **`Walls::new(east, south)`**: the steps that cannot be taken -- the
 walls east and south of cells, and the diagonals they bar, worked out
 from them (a wall on either way round); **`east`**, **`south`**,
 **`bars_step(cell, dx, dy)`**. `Wave::advance`,
-`step_towards` and `a_star` each take them after `passable`.
+`step_towards` and `a_star` each take them after `passable`;
+`Walls::default()` is none.
 
 ## `diagnostics/`, `transient_data.rs`
 

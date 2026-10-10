@@ -1,12 +1,6 @@
 //! A measurement's report: its tables, each titled, and notes on what
-//! they were measured on -- printed, and kept in a folder its caller
-//! names, one file a measurement, rewritten by every run, so the latest
-//! numbers are always in a file and never copied into a document by
-//! hand.
-//!
-//! The file is the tables' CSV ([`crate::csv`]) with two kinds of line
-//! around them: `# ` and a note, before the first table, and `## ` and
-//! a title, before each table.
+//! they were measured on -- printed, and kept as one CSV file
+//! (`docs/utilities.md`, "Tables and reports").
 
 use crate::csv::{lines, Line, COMMENT};
 use super::Table;

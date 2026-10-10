@@ -1,13 +1,5 @@
-//! CSV: what every text file Civil Egregore keeps is written as -- a seed, the
-//! settings, the sliders, a world's file, a measurement's report -- so
-//! that one reader and one writer serve them all, and any of them opens
-//! in whatever reads tables. A file's first row names its columns.
-//!
-//! A field is quoted -- inside `"`, with any `"` in it doubled -- when it
-//! holds a comma, a quote or a newline, or is a row's one field and empty, or could be read as
-//! one of the lines that are not rows: a divider (`---`, a table's), or
-//! a line starting with `#`, which is a note to whoever reads the file
-//! and no row. Everything else is written bare.
+//! CSV: what every text file Civil Egregore keeps is written as, a first
+//! row naming its columns (`docs/utilities.md`, "CSV").
 
 
 /// The line that marks a divider.

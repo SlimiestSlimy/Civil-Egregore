@@ -4,12 +4,8 @@
 use super::{Cell, Rows, SIDE, holds};
 
 /// The walls between cells of an area: steps that cannot be taken,
-/// whatever the cells either side are. A step is between two cells, so
-/// a wall is kept by the upper or left one of the two, a mask a way,
-/// and bars the step both ways. Walls stand east and south of cells
-/// only; a diagonal step is barred unless both ways round it -- across
-/// then down, and down then across -- are open, which [`Walls::new`]
-/// works out once, a mask a diagonal. None by default.
+/// whatever the cells either side are. None by default
+/// (`docs/pathfinding.md`, "Walls").
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Walls {
     /// Cells with a wall between them and the cell to their east.

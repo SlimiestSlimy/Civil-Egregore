@@ -1,15 +1,5 @@
-//! Windows: 8x8 cells at any cell, as one `u64`, row by row -- bit
-//! `y * 8 + x`, like a chess board -- where moving cells across is a
-//! shift and keeping columns is a mask.
-//!
-//! In Morton order an aligned 8x8 tile -- a word tile -- is one word of
-//! a bitmap, so it is read with one load. A window is cut from the up to
-//! four word tiles it overlaps: each is turned into rows, then they are
-//! shifted and masked together.
-//!
-//! Turning a Morton word into rows reorders its index bits -- `x0 y0 x1
-//! y1 x2 y2`, from the lowest, to `x0 x1 x2 y0 y1 y2` -- in three
-//! exchanges of two index bits, each a delta swap of the word's bits.
+//! Windows: 8x8 cells at any cell as one `u64`, row by row, cut from
+//! the word tiles they overlap (`docs/bitmap.md`, "Windows").
 
 /// Cells along a word tile's side, and a window's.
 pub const WORD_TILE_SIDE: u32 = 8;

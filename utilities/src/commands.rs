@@ -1,17 +1,6 @@
 //! Commands: what a command line asks for, found by its first word and
-//! handed the rest -- once, for every crate.
-//!
-//! A crate is a library: its diagnostics tools are functions, not
-//! programs. It lists them as [`Command`]s, each with the
-//! [`Parameter`]s it takes -- a name and what it is if not given --
-//! and [`dispatch`] runs the one the first word names. The one program,
-//! `Civil_Egregore`, is a list of the [`Crate`]s with commands handed to
-//! [`program`]: it knows nothing of a crate's tools, and `Civil_Egregore help`
-//! prints every command of every crate from the lists themselves.
-//!
-//! A parameter is declared once: its default is what the usage table
-//! shows, what the command reads ([`Given::number`]) and what its
-//! report says it ran on ([`Given::resolved`]).
+//! handed the rest -- once, for every crate (`docs/utilities.md`,
+//! "Commands").
 
 use crate::diagnostics::table::Table;
 use std::str::FromStr;
@@ -167,12 +156,9 @@ pub fn help(called: &str, crates: &[Crate]) -> String {
     text
 }
 
-/// The whole of a program called `called`: hands `arguments` -- the
-/// command line after the program's name -- to the crate of `crates`
-/// its first word names, as that crate's command and what it takes.
-/// With a word of [`HELP`], or none, or one that names no crate: every
-/// command there is ([`help`]), printed if asked for and else given as
-/// why not.
+/// The whole of a program called `called`: hands `arguments` to the
+/// crate of `crates` its first word names; with [`HELP`], no word or
+/// an unknown one, every command there is ([`help`]).
 pub fn program(called: &str, crates: &[Crate], arguments: &[&str]) -> Result<(), String> {
     let named = arguments.split_first().and_then(|(name, rest)| crates.iter().find(|one| one.name == *name).map(|one| (one, rest)));
     match named {

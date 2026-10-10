@@ -1,10 +1,5 @@
-//! Drawing on a bitmap: rectangles and circles, by their shape rather
-//! than their cells.
-//!
-//! These take `i64` and clamp, so a caller can ask for a circle hanging
-//! off the edge without doing the arithmetic first. They are things done
-//! *to* a bitmap, where [`bitmap_data`](super::bitmap_data) holds what a
-//! bitmap *is* and what can be asked of it.
+//! Drawing on a bitmap: rectangles and circles, by their shape, clamped
+//! to the bitmap (`docs/reference.md`, "bitmap_drawing.rs").
 
 use crate::{Bitmap, HEIGHT, WIDTH};
 

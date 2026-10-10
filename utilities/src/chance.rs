@@ -70,14 +70,9 @@ impl Chance {
     }
 
     /// How many things in a row are passed over before the next one
-    /// chosen, each chosen with this chance, independently: a gap of
-    /// the geometric law, from `draw`, any 64 bits. The gap is the
-    /// logarithm of a number in `(0, 1]` -- the draw's high bits -- over
-    /// the logarithm of the chance of not being chosen, rounded down:
-    /// both in fixed point, so one whole division.
-    ///
-    /// The chance is neither never nor always: those have no gap to
-    /// draw.
+    /// chosen, each chosen with this chance: a gap of the geometric law,
+    /// from `draw`, any 64 bits (`docs/utilities.md`, "The gap"). The
+    /// chance is neither never nor always: those have no gap.
     #[inline]
     pub fn passed_over(self, draw: u64) -> u64 {
         debug_assert!(!self.is_never() && !self.is_always(), "a chance in between");

@@ -1,29 +1,6 @@
-//! The settings of this machine, kept from one run to the next: one
-//! file, in one folder of Civil Egregore's own under the place the system
-//! gives a user's programs for what they keep.
-//!
-//! | system | the folder |
-//! |---|---|
-//! | Linux and the like | `$XDG_DATA_HOME/Civil Egregore`, or `~/.local/share/Civil Egregore` |
-//! | Windows | `%LOCALAPPDATA%\Civil Egregore`, or `%APPDATA%\Civil Egregore` |
-//!
-//! The file ([`FILE`]) is CSV ([`crate::csv`]), a row a setting: its
-//! name, its value. The default settings (`default_settings.csv`, at the crate's root)
-//! are such a file, with every setting there is, built into the
-//! program: a machine with no file of its own is given a copy of it
-//! the first time the settings are read, and a setting the machine's
-//! file lacks is as the default settings have it. Whatever has
-//! settings shares the one file: each reads the names it knows and,
-//! writing, leaves the others' lines as they are.
-//!
-//! The settings are found by name: the lines, in a file and in the
-//! default settings alike, may be in any order.
-//!
-//! Built with the feature `force_default_settings`, the machine's file is
-//! neither read nor written: the settings are the default ones.
-//!
-//! The folder also holds the worlds, in a folder of their own
-//! ([`worlds`]), unless the setting [`WORLDS`] names another.
+//! The settings of this machine, kept from one run to the next: one CSV
+//! file in Civil Egregore's own folder, which also holds the worlds
+//! (`docs/utilities.md`, "Settings").
 
 use std::env::var_os;
 use std::fs::{create_dir_all, read_to_string, write};
