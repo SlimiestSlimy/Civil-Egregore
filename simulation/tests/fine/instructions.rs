@@ -71,8 +71,8 @@ fn a_step_carries_no_attributes_and_keeps_them() {
     entities.apply();
     let mut simulation = Simulation::new(2);
     let (mut moves, mut puts) = (0, 0);
-    for seed in 0..10 {
-        let report = simulation.tick(&mut arena, &mut entities, seed, step_right);
+    for _ in 0..10 {
+        let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), step_right);
         (moves, puts) = (moves + report.instructions_applied.moves, puts + report.instructions_applied.puts);
     }
     for (id, x) in [(1, 50), (2, 260), (3, 1030)] {
@@ -95,8 +95,8 @@ fn a_step_onto_a_taken_cell_is_turned_back() {
     entities.apply();
     let mut simulation = Simulation::new(1);
     let (mut stayed, mut moves) = (0, 0);
-    for seed in 0..3 {
-        let report = simulation.tick(&mut arena, &mut entities, seed, step_right);
+    for _ in 0..3 {
+        let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), step_right);
         (stayed, moves) = (stayed + report.instructions_applied.stayed, moves + report.instructions_applied.moves);
     }
     assert_eq!((stayed, moves), (3, 3), "turned back each tick, and woken the next");

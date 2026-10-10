@@ -16,15 +16,19 @@ use std::sync::Mutex;
 #[test]
 fn attributes_come_and_go_at_run_time() {
     let (mut arena, mut entities) = world(1);
-    for id in 0..300 {
-        entities.queue_put(walker(id * 7919 + 1, cell(id as u32 % 200, 5 + id as u32 / 200), 0), &[]);
+    // IDs drawn, no two the same, on cells drawn.
+    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
+    let mut id = 0;
+    for at in cells_drawn(300, 1024) {
+        id += random.between(1, 10_000);
+        entities.queue_put(walker(id, at, 0), &[]);
     }
     assert_eq!(entities.queued(), 300);
     assert_eq!(entities.apply().puts, 300);
     assert_eq!((entities.len(), entities.queued()), (300, 0));
     let mut simulation = Simulation::new(1);
-    for tick in 1..=101u64 {
-        let report = simulation.tick(&mut arena, &mut entities, tick, count_and_flip);
+    for _ in 1..=101u64 {
+        let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), count_and_flip);
         assert_eq!((report.rules, report.instructions_applied.puts), (300, 300));
     }
     assert_eq!(entities.len(), 300);
@@ -47,8 +51,8 @@ fn entities_wake_at_their_tick() {
     entities.apply();
     let woken = Mutex::new(Vec::new());
     let mut simulation = Simulation::new(1);
-    for tick in 0..=far + 10 {
-        simulation.tick(&mut arena, &mut entities, tick, |turn, _| {
+    for _ in 0..=far + 10 {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
             for entity in turn.woken() {
                 woken.lock().unwrap().push((entity.header.id.0, turn.now()));
                 if entity.header.id == EntityId(3) {
@@ -83,16 +87,16 @@ fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
         0
     };
     let mut most = 0;
-    for tick in 0..10 {
-        simulation.tick(&mut arena, &mut entities, tick, step);
+    for _ in 0..10 {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), step);
         most = most.max(entities.len());
     }
     assert_eq!(most, 1, "never here and there at a tick's end");
     let right = SuperchunkIndex::from_cartesian(11, 10);
     let entity = entities.superchunk(right).and_then(|superchunk| superchunk.iter().next()).expect("in the right neighbour");
     assert_eq!((entity.header.at, entity.attribute(WOKEN)), (cell(start + 10, 100), Some(10)));
-    for tick in 10..1100 {
-        simulation.tick(&mut arena, &mut entities, tick, step);
+    for _ in 10..1100 {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), step);
     }
     let all: Vec<_> = entities.iter().map(|entity| entity.header.at).collect();
     assert_eq!(all, [cell(2 * SUPERCHUNK_SIDE_CELLS - 1, 100)], "at the edge of the hot superchunks, not lost past it");
@@ -124,12 +128,12 @@ fn any_number_of_threads_ticks_entities_the_same() {
     };
     let run = |threads| {
         let (mut arena, mut entities) = world(3);
-        for id in 0..2000u64 {
-            entities.queue_put(walker(id + 1, cell(((id * 7919) % 3072) as u32, ((id * 104_729) % 3072) as u32), id % 4), &[]);
+        for (id, at) in (0..2000u64).zip(cells_drawn(2000, 3072)) {
+            entities.queue_put(walker(id + 1, at, id % 4), &[]);
         }
         entities.apply();
         let mut simulation = Simulation::new(threads);
-        let changes: usize = (0..300).map(|tick| simulation.tick(&mut arena, &mut entities, tick, wander).rules).sum();
+        let changes: usize = (0..300).map(|_| simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), wander).rules).sum();
         let all: Vec<(Header, Vec<_>)> = entities.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
         (changes, all)
     };

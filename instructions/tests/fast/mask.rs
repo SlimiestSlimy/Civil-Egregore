@@ -15,7 +15,8 @@ use utilities::rng::Rng;
 /// An arena with `STONE` hot over the 3x3 superchunks from `(10, 10)`,
 /// cells scattered over them set, some on their borders.
 fn arena() -> BitmapArena {
-    crate::tests::arena(3, (0..200_000u64).map(|at| cell((at * 7919 % 3072) as u32, (at * 104_729 % 3067) as u32)))
+    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
+    crate::tests::arena(3, (0..200_000).map(move |_| cell(random.below(3072) as u32, random.below(3072) as u32)))
 }
 
 /// A mask's own cells: full, a disc, and those drawn and listed are
@@ -47,7 +48,7 @@ fn a_mask_holds_its_cells() {
 fn a_square_read_is_its_cells_read_one_by_one() {
     let mut arena = arena();
     let origins = [(300, 300), (1000, 1000), (2047, 5), (2900, 2900), (0, 1500)];
-    Simulation::new(1).tick(&mut arena, &mut Entities::new(), 0, |turn, _| {
+    Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }
@@ -80,7 +81,7 @@ fn a_mask_written_is_read_back() {
         let (origin, disc) = (cell(700, 900), Mask::disc(side));
         let before = std::sync::Mutex::new((Mask::empty(side), Mask::empty(side)));
         let mut simulation = Simulation::new(2);
-        let writes = simulation.tick(&mut arena, &mut Entities::new(), 0, |turn, _| {
+        let writes = simulation.tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
             if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
                 return 0;
             }
@@ -94,7 +95,7 @@ fn a_mask_written_is_read_back() {
         });
         assert!(writes.rules <= 2 * side as usize + 1, "{} writes for a disc and a square of {side}", writes.rules);
         assert_eq!(writes.writes_applied.missed, 0);
-        simulation.tick(&mut arena, &mut Entities::new(), 0, |turn, _| {
+        simulation.tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
             if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
                 return 0;
             }

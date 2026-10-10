@@ -45,3 +45,18 @@ pub fn cell(x: u32, y: u32) -> CellIndex {
 pub fn walker(id: u64, at: CellIndex, wake: u64) -> Header {
     Header { id: EntityId(id), kind: WALKER, at, wake }
 }
+
+/// `count` cells drawn from the run's seed, no two the same, each
+/// within `side` cells across and down of the superchunk `(10, 10)`'s
+/// top left: the same ones whenever asked in a run.
+pub fn cells_drawn(count: usize, side: u32) -> Vec<CellIndex> {
+    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
+    let mut cells = std::collections::BTreeSet::new();
+    while cells.len() < count {
+        cells.insert((random.below(u64::from(side)) as u32, random.below(u64::from(side)) as u32));
+    }
+    // In the order drawn in, not the set's: shuffled by a draw each.
+    let mut cells: Vec<(u64, CellIndex)> = cells.into_iter().map(|(x, y)| (random.draw(), cell(x, y))).collect();
+    cells.sort_unstable();
+    cells.into_iter().map(|(_, cell)| cell).collect()
+}

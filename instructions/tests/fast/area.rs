@@ -12,7 +12,8 @@ use simulation::Simulation;
 /// Cells scattered over the 3x3 superchunks from `(10, 10)`, some on
 /// their borders.
 fn scattered() -> impl Iterator<Item = CellIndex> {
-    (0..3000u32).map(|at| cell((at * 7919) % 3072, (at * 104_729) % 3072))
+    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
+    (0..3000).map(move |_| cell(random.below(3072) as u32, random.below(3072) as u32))
 }
 
 /// The area about a cell read at once is its cells read one by one:
@@ -23,7 +24,7 @@ fn areas_read_at_once_are_the_cells_read_one_by_one() {
     let mut arena = arena(3, scattered());
     let start = cell(0, 0).cartesian();
     let centres = [(300, 300), (1024, 1024), (1020, 1029), (5, 5), (2040, 2047), (1024, 3), (777, 1023)];
-    let checked = Simulation::new(1).tick(&mut arena, &mut Entities::new(), 0, |turn, _| {
+    let checked = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }

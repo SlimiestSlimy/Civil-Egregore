@@ -42,7 +42,7 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
     let mut simulation = Simulation::new(1);
     let mut steps = 0;
     while entities.get(EntityId(1), to).is_none() {
-        simulation.tick(&mut arena, &mut entities, steps, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             let now = turn.now();
             for entity in turn.woken() {
                 let at = entity.header.at;
@@ -116,7 +116,7 @@ fn walls_of_the_terrain_bar_steps() {
     let mut simulation = Simulation::new(1);
     let mut steps = 0;
     while entities.get(EntityId(1), to).is_none() {
-        simulation.tick(&mut arena, &mut entities, steps, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             let now = turn.now();
             for entity in turn.woken() {
                 let at = entity.header.at;
