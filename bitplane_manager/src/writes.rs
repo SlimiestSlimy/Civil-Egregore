@@ -111,6 +111,9 @@ pub struct WritesApplied {
     pub changed: u64,
     /// Cells covered in bitmaps that were not hot, so left unwritten.
     pub missed: u64,
+    /// Writes that said what their rule saw at the cell, and were not
+    /// applied: the cell no longer held it.
+    pub refused: u64,
 }
 
 impl std::ops::AddAssign for WritesApplied {
@@ -119,6 +122,7 @@ impl std::ops::AddAssign for WritesApplied {
         self.writes += other.writes;
         self.changed += other.changed;
         self.missed += other.missed;
+        self.refused += other.refused;
     }
 }
 

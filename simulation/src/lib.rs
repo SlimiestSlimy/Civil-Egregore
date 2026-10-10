@@ -20,4 +20,5 @@ pub use sampling::{sample, sample_layer};
 pub use halos::{HaloChange, Halos, Held, COOL_TICKS, WARM_TICKS};
 pub use hot::Hot;
 pub use tick::{threads_for, Simulation, TickReport};
+pub use turn::conditional::{CountedWhenApplied, COUNTED_WHEN_APPLIED};
 pub use turn::Turn;

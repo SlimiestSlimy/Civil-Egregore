@@ -6,7 +6,7 @@ use instructions::around::{self, CENTRE, RING};
 use instructions::entities::EntitiesBetweenTicks;
 pub use instructions::entity_types::{Roaming, BEARING, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
 use instructions::layers::{GRASS, WALL_EAST, WALL_SOUTH};
-use instructions::{area, cells, entities, place_counted, walking, AttributeBlock, CellCartesian, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
+use instructions::{area, cells, entities, groups, place_counted, walking, AttributeBlock, CellCartesian, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
 /// Ticks between a walking sheep's steps, at the least...
@@ -43,7 +43,7 @@ pub const LAMB_TICKS: u64 = 4608;
 pub const COUNTED: [&str; 7] = ["woken", "eaten", "births", "deaths", "sought", "paths", "far"];
 /// Sheep woken.
 pub const WOKEN: usize = place_counted(&COUNTED, "woken");
-/// Cells of grass eaten.
+/// Cells of grass eaten: counted as each meal is applied.
 pub const EATEN: usize = place_counted(&COUNTED, "eaten");
 /// Lambs born.
 pub const BIRTHS: usize = place_counted(&COUNTED, "births");
@@ -97,9 +97,14 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     // The pasture about it, looked at as it eats: thin, it will leave when next hungry.
     let lush = fed && area::layer(turn, GRASS, at).count() >= LUSH_CELLS;
     if fed {
+        // The meal is a group: the grass cleared, if it is grass still, and all the sheep comes to this wake, as one. Should the grass
+        // be gone by then -- decayed in this very tick -- none of it happens: the sheep sleeps a step, hungry as it was, and wakes to look again.
+        let hungry_still = next_step(turn);
+        entities::sleep(turn, sheep.header(), hungry_still);
+        groups::start(turn);
         cells::clear(turn, GRASS, at);
+        groups::count(turn, EATEN);
         sheep.set(HUNGRY_AT, now + MEAL_TICKS);
-        done[EATEN] += 1;
         if let (false, Some(way)) = (lush, around::pick(turn.random(), steppable)) {
             sheep.set(ROAMING, Roaming { until: now + MEAL_TICKS + ROAM_TICKS, neighbour: way });
         }
@@ -113,12 +118,14 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         && entities::stands_beside(turn, EntityId(lamb), at, RING).is_some()
     {
         sheep.unset(PREGNANT);
-        done[BIRTHS] += 1;
+        count(turn, done, fed, BIRTHS);
     }
     // Whether it put a lamb this tick: it stays, and wakes the next to see it.
     let mut bearing = false;
     match sheep.get(PREGNANT) {
         Some(due) if now < due => needs = needs.min(due),
+        // Eating, it bears at its next wake: a lamb may land in the next superchunk, and a meal is applied in one.
+        Some(_) if fed => needs = now,
         // Its lamb is put on a cell seen free beside it; with none, it waits a step's time more.
         Some(_) => match around::free_beside(turn, at, steppable) {
             Some(beside) => {
@@ -178,10 +185,23 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     // Old age comes by the tick, not the wake: a long sleep is as much of a life as many short ones.
     if turn.random().below(LIFE_TICKS) < wake - now {
         entities::remove(turn, sheep.header());
-        done[DEATHS] += 1;
-        return;
+        count(turn, done, fed, DEATHS);
+    } else {
+        entities::commit(turn, sheep, to, wake);
     }
-    entities::commit(turn, sheep, to, wake);
+    if fed {
+        groups::end(turn);
+    }
+}
+
+/// Counts one at `place` for a sheep's wake: as its meal's group is
+/// applied if it is `fed` -- what it did then happens with the meal or
+/// not at all -- else here.
+fn count(turn: &mut Turn, done: &mut RuleCounts, fed: bool, place: usize) {
+    match fed {
+        true => groups::count(turn, place),
+        false => done[place] += 1,
+    }
 }
 
 /// The tick a sheep taking a step now wakes next.

@@ -43,7 +43,8 @@ owning its allocations, and its write-backs taken not yet in the ring. **`index`
 **`LayerView`** (**`hot_count`**, **`is_hot(chunk)`**,
 **`count(chunk)`**, **`cells(chunk)`**, **`tile_counts(chunk)`** -- the
 set cells of each of its `COUNT_TILES_IN_CHUNK` count tiles of
-`COUNT_TILE_WORDS` words) -- and **`apply(type, write, applied)`**, the
+`COUNT_TILE_WORDS` words) -- **`value_at(type, at)`**, the number a
+cell holds now, none where not hot -- and **`apply(type, write, applied)`**, the
 write's part in it. Private: **`layer_index`**.
 
 
@@ -121,7 +122,9 @@ bytes); **`Write::cell(at, op)`**; **`bounds`** and **`covers`**: a
 shape's cartesian rectangle and its cells; **`superchunks`**
 (public, for routing): the superchunks a write lands in.
 
-**`WritesApplied`** `{writes, changed, missed}`, added with `+=`.
+**`WritesApplied`** `{writes, changed, missed, refused}`, added with `+=`
+-- `refused` the writes that said what their rule saw and found the
+cell otherwise (the simulation's compare-and-writes).
 
 **`WriteQueues`**: a queue a layer type, sorted by type, found by a
 search of the few:

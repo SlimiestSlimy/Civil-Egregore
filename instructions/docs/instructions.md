@@ -91,6 +91,38 @@ shape for every rule, so that all of them go in one table and their
 counts in one array. A rule names its counts -- a constant each, the
 count's place -- and lists the names in the same order.
 
+Some counts cannot be made as the rule runs: whether a write happens
+is decided where it is applied. Those are counted as applied (below),
+and whoever runs the rules adds them to the same counts.
+
+## Compare-and-write and groups
+
+A rule reads the world as the tick found it, and another may change
+the same cell in the same tick. So every cell a rule writes is a
+**compare-and-write**: the instruction says what the rule saw at the
+cell -- `cells::set`, that it was clear; `cells::clear`, that it was
+set; `cells::set_value`, the number it held -- and is applied only if
+the cell still holds that. Otherwise it is refused, and nothing
+happens: of two rules clearing one cell, one does. Each has a form
+that counts (`set_counted`, `clear_counted`, `set_value_counted`): one
+added to the count named, if the write is applied.
+
+What must happen together is a **group**: `groups::start`, what the
+rule queues -- cells written, what an entity comes to
+(`entities::commit`, `remove`, ...), counts (`groups::count`) -- and
+`groups::end`. All of it is applied if every cell written in it is
+still as the rule saw it, and none of it otherwise. A sheep's meal is
+one: the grass cleared, the sheep fed, the meal counted, or nothing.
+A tree's death is one: the tree and its stage.
+
+Two things a rule must see to. A group lands in one superchunk, so
+what may land in the next -- a lamb put beside its mother, a step over
+a border -- is not put in one. And an entity woken must be put back
+whether or not its group is applied: the rule queues, before the
+group, what stands if it is refused (`entities::sleep`), and in the
+group what replaces it. How it is applied, and in what order:
+`../../simulation/docs/simulation.md`, "Compare-and-write and groups".
+
 ## What an entity's rule is given
 
 **An entity being changed** (`EntityEdit`): its attributes read, set and

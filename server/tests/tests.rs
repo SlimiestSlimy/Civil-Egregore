@@ -77,7 +77,7 @@ pub fn put_entity(world: &mut World, header: Header, attributes: &[AttributeBloc
 /// rule's counts alone in it.
 pub fn tick_rule(world: &mut World, rule: server::RulePlace) -> simulation::TickReport<instructions::RuleCounts> {
     let report = world.tick_only(server::Chosen::of(&[rule]), false);
-    simulation::TickReport { writes_applied: report.writes_applied, instructions_applied: report.instructions_applied, rules: report.rules.of(rule), computing: report.computing, applying: report.applying }
+    simulation::TickReport { writes_applied: report.writes_applied, instructions_applied: report.instructions_applied, groups: report.groups, counted_when_applied: report.counted_when_applied, rules: report.rules.of(rule), computing: report.computing, applying: report.applying }
 }
 
 /// One tick of the sheep's rule alone over `world`'s hot superchunks,

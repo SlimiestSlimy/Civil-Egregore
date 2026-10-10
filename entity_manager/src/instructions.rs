@@ -184,7 +184,14 @@ impl Instructions {
     /// every wake filed no earlier than `earliest`; into `applied`
     /// (`docs/entity_manager.md`, "Instructions").
     pub fn apply(&self, superchunks: &mut [SuperchunkEntities], earliest: u64, applied: &mut InstructionsApplied) {
-        for &instruction in &self.instructions {
+        self.apply_some(0..self.instructions.len(), superchunks, earliest, applied);
+    }
+
+    /// [`Instructions::apply`], of those at `some` alone, counted from
+    /// the first queued: how a group of them refused is left out
+    /// (`docs/entity_manager.md`, "Instructions").
+    pub fn apply_some(&self, some: std::ops::Range<usize>, superchunks: &mut [SuperchunkEntities], earliest: u64, applied: &mut InstructionsApplied) {
+        for &instruction in &self.instructions[some] {
             let at = match instruction {
                 Instruction::Put { header, .. } | Instruction::PutOnTheFirstFree { header, .. } | Instruction::Move { header, .. } => header.at,
                 Instruction::Edit { at, .. } | Instruction::Remove { at, .. } => at,

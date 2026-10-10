@@ -15,11 +15,13 @@ emit)`**: every superchunk's, in Morton order.
 ## `turn/`
 
 `mod.rs` the turn, its cells and its outbox; `entities.rs` the entities
-and their instructions. What a rule makes of them is
+and their instructions; `conditional.rs` the compare-and-writes and the
+groups. What a rule makes of them is
 `../../instructions/`.
 
-**`Outbox`**: nine `WriteQueues` and nine `Instructions`, by **`slot(dx,
-dy)`**.
+**`Outbox`**: nine `WriteQueues`, nine `Instructions` and nine
+`Conditional`, by **`slot(dx, dy)`**, and the counts of the group being
+queued.
 
 **`Turn`**: a superchunk's turn in the first phase:
 **`superchunk`**, **`random`**, **`now`**, **`sample(type, chance,
@@ -52,7 +54,26 @@ kind)`**: an edit of any entity in reach; **`remove(header)`**.
 **`slot_of`**: the slot of a superchunk, past the neighbours panicking.
 `SLOTS` (9): an outbox's slots. A turn's fields: its `superchunk`, its
 `entities`, `now`, the thread's `reader` and `entity_reader`, its
-`outbox`, its `random`.
+`outbox`, its `random`, the group `open` and the number its counts
+are `counted_from`.
+
+`conditional.rs` (`simulation.md`, "Compare-and-write and groups").
+**`Turn::queue_seen(type, at, seen, value, counted)`**: a
+compare-and-write, with the count added if it is applied.
+**`Turn::group_start()`**, **`Turn::group_end()`**: what is queued
+between them one group; **`Turn::count_if_applied(place)`**: a count of
+the group's. **`Turn::count_under(first)`**: the number the rule's
+first count is counted under; `counted_number(place)`: a count's
+number, under `COUNTED_WHEN_APPLIED` (256) -- **`CountedWhenApplied`**,
+a tick's counts made as it applied. `Compared` `{layer_type, at, seen,
+value, group, count}` (`NO_GROUP`, `NO_COUNT`); `Group`
+`{instructions, counts}`; `Conditional` `{compared, groups, counts}`,
+what is queued for one superchunk -- `clear`, `count_missed`, and
+`apply(superchunk, entities, instructions, earliest, fates,
+applied)`: the compare-and-writes, the groups' fates, then the
+instructions, a refused group's left out. `OpenGroup`: how much each
+slot held when a group was started. `Applied`: what a thread applied
+in the second phase.
 
 ## `hot.rs`
 
@@ -141,8 +162,9 @@ many, or the disk's refusal.
 
 ## `tick.rs`
 
-**`TickReport`** `{writes_applied, instructions_applied, rules,
-computing, applying}`.
+**`TickReport`** `{writes_applied, instructions_applied, groups,
+counted_when_applied, rules, computing, applying}` -- `groups` those
+applied whole and those refused whole.
 
 **`threads_for(superchunks)`**: every thread the machine has, no more
 than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived}`:

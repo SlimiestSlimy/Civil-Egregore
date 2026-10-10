@@ -45,8 +45,12 @@ The writes are queued as the samples come, in Morton order -- grass
 spreading over a border into the neighbour's queue -- and applied in
 the second phase, so every sample reads the world as the tick found
 it. The two never touch one cell in a tick: decay clears cells that
-were grass, spreading fills cells that were dirt. Two samples may
-spread onto one cell, which then changes once.
+were grass, spreading fills cells that were dirt. Each write says what
+the rule saw at its cell and is applied only if the cell is still so
+(`../../instructions/docs/instructions.md`, "Compare-and-write and
+groups"), and a spread or a decay is counted as it is applied: two
+samples spreading onto one cell are one cell set and one spread
+counted.
 
 ## Trees
 
@@ -60,8 +64,10 @@ tree sampled does one thing, by lot:
   of those 64 is drawn, and a tree of stage 0 is put there if there is
   none and the cell is hot and not under water.
 - **Else it grows** a stage; or, at the oldest stage, dies one time in
-  `DIE_ONE_IN` -- the cell cleared, and its stage with it, so the next
-  tree there starts at 0 -- and lives on otherwise.
+  `DIE_ONE_IN` -- the cell cleared, and its stage with it, as one
+  group, so the next tree there starts at 0 -- and lives on otherwise.
+  What a tree does is counted as it is applied: a tree put where
+  another was put first in the tick is refused, and not counted.
 
 Trees stand on dirt and grass alike and change neither.
 
@@ -70,7 +76,7 @@ Trees stand on dirt and grass alike and change neither.
 A tree is a cell set in `TREE`, with a stage of sixteen kept over four
 more bits (`TREE_STAGE`): a wide plane, four bits a cell, a cell's
 number held together and read and written whole through
-`cells::value` and `cells::set_value`. The bit that says a tree stands
+`cells::value` and `cells::set_value` (which says the number it read). The bit that says a tree stands
 there is a plane of its own, not stage 0: sampling the trees and
 counting those about one are then each one read of one plane, as for
 grass, where a tree found by any of four planes being set would take

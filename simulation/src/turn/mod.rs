@@ -3,6 +3,7 @@
 //! the entities read and the instructions queued
 //! (`docs/simulation.md`, "What a rule is given").
 
+pub(crate) mod conditional;
 mod entities;
 
 use entity_manager::{EntityReader, Instructions, SuperchunkEntities};
@@ -30,6 +31,10 @@ pub(crate) struct Outbox {
     pub(crate) writes: [WriteQueues; SLOTS],
     /// Instructions, a queue a superchunk, by [`slot`].
     pub(crate) instructions: [Instructions; SLOTS],
+    /// Compare-and-writes and groups, a queue a superchunk, by [`slot`].
+    pub(crate) conditional: [conditional::Conditional; SLOTS],
+    /// The counts of the group being queued, until it is ended.
+    pub(crate) group_counts: Vec<u32>,
 }
 
 /// One superchunk's turn in a tick's first phase: what the rule sees and
@@ -51,6 +56,11 @@ pub struct Turn<'a> {
     pub(crate) outbox: &'a mut Outbox,
     /// The superchunk's random numbers this tick.
     pub(crate) random: Rng,
+    /// The group being queued, if one is.
+    pub(crate) open: Option<conditional::OpenGroup>,
+    /// The number the rule's first count is counted under when
+    /// applied ([`Turn::count_under`]).
+    pub(crate) counted_from: u32,
 }
 
 impl<'a> Turn<'a> {
@@ -138,7 +148,7 @@ impl<'a> Turn<'a> {
 
     /// The outbox slot of `superchunk`: this one or a neighbour. Farther
     /// is past the speed of light, and a bug.
-    fn slot_of(&self, superchunk: SuperchunkIndex) -> usize {
+    pub(crate) fn slot_of(&self, superchunk: SuperchunkIndex) -> usize {
         if superchunk == self.superchunk.index() {
             return slot(0, 0);
         }

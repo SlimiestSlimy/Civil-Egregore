@@ -16,8 +16,19 @@ on every cell sampled -- each set cell of the type chosen with the
 **`holds`**, **`lacks`**: the cell read. **`value(turn, plane,
 cell)`**: a wide plane's number. **`square(turn, type, cell, side)`**:
 up to 8x8 cells about a cell as a `Window`, with their top left cell.
-**`set(turn, type, cell)`**, **`clear`**: a write queued.
-**`set_value(turn, plane, cell, value)`**: a wide plane's number put.
+**`set(turn, type, cell)`**, **`clear`**: a compare-and-write queued,
+the cell seen clear, or set. **`set_value(turn, plane, cell, seen,
+value)`**: a wide plane's number put where `seen` was read.
+**`set_counted(turn, type, cell, counted)`**, **`clear_counted`**,
+**`set_value_counted`**: the same, one added to the rule's count
+`counted` if applied (`instructions.md`, "Compare-and-write and
+groups").
+
+## `groups.rs`
+
+**`start(turn)`**, **`end(turn)`**: what is queued between them one
+group, applied all or none. **`count(turn, counted)`**: one added to
+the rule's count if the group is applied.
 
 ## `entities.rs`
 

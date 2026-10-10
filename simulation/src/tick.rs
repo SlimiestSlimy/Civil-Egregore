@@ -5,6 +5,7 @@
 //! (`docs/simulation.md`, "The tick" and "The dispatcher").
 
 use entity_manager::{Entities, EntityId, EntityReader, Instructions, InstructionsApplied, SuperchunkEntities};
+use crate::turn::conditional::{Applied, CountedWhenApplied, COUNTED_WHEN_APPLIED};
 use crate::turn::{slot, Outbox, Turn};
 use bitplane_manager::{count_missed, BitmapArena, Reader, Superchunk, WriteQueues, WritesApplied};
 use coordinates::{CellIndex, SuperchunkIndex};
@@ -23,13 +24,19 @@ const CLAIMED: usize = 1;
 type PartOfTurns<'a> = (usize, &'a mut [Outbox], &'a mut [(SuperchunkIndex, Rng)]);
 
 /// What a tick did, and how long each phase took.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct TickReport<R> {
     /// What applying the writes did: a write landing in two superchunks
     /// counted in each.
     pub writes_applied: WritesApplied,
     /// What applying the instructions did.
     pub instructions_applied: InstructionsApplied,
+    /// Groups applied whole, and groups refused whole
+    /// (`docs/simulation.md`, "Compare-and-write and groups").
+    pub groups: (u64, u64),
+    /// What was counted as it was applied, by the number each rule's
+    /// counts were given (`Turn::count_under`).
+    pub counted_when_applied: CountedWhenApplied,
     /// What the rule returned, added up over the superchunks.
     pub rules: R,
     /// The first phase's time: sampling and computing.
@@ -161,8 +168,9 @@ impl Simulation {
                 for (offset, (outbox, kept)) in outboxes.iter_mut().zip(random.iter_mut()).enumerate() {
                     let superchunk = &superchunks[first + offset];
                     let random = Rng::new(kept.1.state());
-                    let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random };
+                    let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random, open: None, counted_from: 0 };
                     total += rule(&mut turn, &mut samples);
+                    assert!(turn.open.is_none(), "a group started and not ended");
                     // Where its random numbers have come to: the next tick goes on from there.
                     kept.1 = turn.random;
                 }
@@ -179,10 +187,10 @@ impl Simulation {
         let (superchunk_indices, outboxes) = (&superchunk_indices, &self.outboxes);
         let superchunks: Vec<Mutex<(&mut [Superchunk], &mut [SuperchunkEntities])>> =
             arena.superchunks_mut().chunks_mut(per_part).zip(entities.superchunks_mut().chunks_mut(per_part)).map(Mutex::new).collect();
-        let applied_parts: Vec<Mutex<(WritesApplied, InstructionsApplied)>> = (0..parts).map(|_| Mutex::new(Default::default())).collect();
+        let applied_parts: Vec<Mutex<Applied>> = (0..parts).map(|_| Mutex::new(Applied::default())).collect();
         let claimed = AtomicUsize::new(0);
         self.dispatcher.run(&|part| {
-            let (mut applied, mut instructions_applied) = (WritesApplied::default(), InstructionsApplied::default());
+            let (mut applied, mut fates) = (Applied::default(), Vec::new());
             while let Some(work) = superchunks.get(claimed.fetch_add(1, Ordering::Relaxed)) {
                 let (ref mut superchunks, ref mut entity_superchunks) = *work.lock().expect("a piece's superchunks");
                 for (superchunk, entities) in superchunks.iter_mut().zip(entity_superchunks.iter_mut()) {
@@ -193,26 +201,29 @@ impl Simulation {
                             continue;
                         };
                         let outbox = &outboxes[source];
-                        for (layer_type, writes) in outbox.writes[slot(-dx, -dy)].iter() {
-                            applied.writes += writes.len();
+                        let from = slot(-dx, -dy);
+                        for (layer_type, writes) in outbox.writes[from].iter() {
+                            applied.writes.writes += writes.len();
                             for &write in writes {
-                                superchunk.apply(layer_type, write, &mut applied);
+                                superchunk.apply(layer_type, write, &mut applied.writes);
                             }
                         }
-                        outbox.instructions[slot(-dx, -dy)].apply(std::slice::from_mut(entities), now + 1, &mut instructions_applied);
+                        outbox.conditional[from].apply(superchunk, entities, &outbox.instructions[from], now + 1, &mut fates, &mut applied);
                     }
                     entities.sort_wakes(now + 1);
                 }
             }
-            *applied_parts[part].lock().expect("a part's result") = (applied, instructions_applied);
+            *applied_parts[part].lock().expect("a part's result") = applied;
         });
         drop(superchunks);
         self.settle_crossings(entities, superchunk_indices, per_part);
-        let mut applied = WritesApplied::default();
+        let (mut applied, mut groups, mut counted_when_applied) = (WritesApplied::default(), (0, 0), [0; COUNTED_WHEN_APPLIED]);
         for part in applied_parts {
-            let (writes, instructions) = part.into_inner().expect("a part's result");
-            applied += writes;
-            instructions_applied += instructions;
+            let part = part.into_inner().expect("a part's result");
+            applied += part.writes;
+            instructions_applied += part.instructions;
+            groups = (groups.0 + part.groups_applied, groups.1 + part.groups_refused);
+            counted_when_applied.iter_mut().zip(part.counted).for_each(|(count, more)| *count += more);
         }
         // Writes landing where no bitmap is in use are missed.
         for (source, outbox) in self.outboxes.iter_mut().enumerate() {
@@ -225,14 +236,16 @@ impl Simulation {
                         applied.writes += writes.len();
                         writes.iter().for_each(|&write| count_missed(target, write, &mut applied));
                     }
+                    outbox.conditional[slot(dx, dy)].count_missed(&mut applied);
                     outbox.instructions[slot(dx, dy)].count_lost(&mut instructions_applied);
                 }
             }
             outbox.writes.iter_mut().for_each(WriteQueues::clear);
             outbox.instructions.iter_mut().for_each(Instructions::clear);
+            outbox.conditional.iter_mut().for_each(|conditional| conditional.clear());
         }
         entities.advance();
-        TickReport { writes_applied: applied, instructions_applied, rules, computing: computed - start, applying: computed.elapsed() }
+        TickReport { writes_applied: applied, instructions_applied, groups, counted_when_applied, rules, computing: computed - start, applying: computed.elapsed() }
     }
 
     /// Removes each entity that crossed into another superchunk this

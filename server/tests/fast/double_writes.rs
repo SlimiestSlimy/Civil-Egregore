@@ -1,8 +1,8 @@
-//! Two writes on one cell in a tick: what a tick's counts say against
-//! the cells that changed. No two sheep eat one cell; a cell of grass
-//! spread onto twice, or decayed and eaten, changes once; a tree put
-//! twice is one tree; and of two lambs put on one cell the one
-//! refused is born later
+//! Two writes on one cell in a tick: a tick's counts are the cells
+//! that changed, to the cell. No two sheep eat one cell; a cell of
+//! grass spread onto twice is one spread, one decayed and eaten is one
+//! of the two; a tree put twice is one tree put; and of two lambs put
+//! on one cell the one refused is born later
 //! (`docs/server.md`, "Two writes on one cell").
 
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, put_entity, tick_sheep};
@@ -58,10 +58,13 @@ fn no_two_sheep_eat_one_cell() {
     assert_eq!(cells_of_grass(&world), before - eaten);
 }
 
-/// Grass and sheep together: every tick, no more cells are set than
-/// spreads were counted, and of the cells cleared there are no fewer
-/// than decayed, no fewer than were eaten, and no more than both -- a
-/// cell both decayed and eaten is cleared once.
+/// Grass and sheep together: every tick, the cells set are the spreads
+/// counted and the cells cleared the decays and the meals counted
+/// together, exactly -- a write is counted as it is applied, and one
+/// that finds its cell changed since its rule saw it is refused, and
+/// counts nothing. Two writes meet on a cell seldom: the meeting is
+/// made to happen in the simulation's own tests and the sheep's
+/// (`a_meal_lost_to_a_decay_leaves_the_sheep_hungry`).
 #[test]
 fn grass_spread_decayed_and_eaten_changes_once_a_cell() {
     let mut world = plain_world(1, 1 << 19, 20_000, 2);
@@ -71,14 +74,16 @@ fn grass_spread_decayed_and_eaten_changes_once_a_cell() {
         let report = world.tick_only(chosen(), false);
         let (grass, sheep) = (report.rules.of(server::GRASS_RULE), report.rules.of(server::SHEEP_RULE));
         let (set, cleared) = set_and_cleared(report.writes_applied.changed, cells_of_grass(&world) as i64 - before as i64);
-        assert!(set <= grass[grass::SPREADS], "tick {tick}: {set} cells set");
+        assert_eq!(set, grass[grass::SPREADS], "tick {tick}: cells set, spreads counted");
         let (decays, eaten) = (grass[grass::DECAYS], sheep[EATEN]);
-        assert!(cleared >= decays.max(eaten) && cleared <= decays + eaten, "tick {tick}: {cleared} cells cleared, {decays} decayed, {eaten} eaten");
+        assert_eq!(cleared, decays + eaten, "tick {tick}: cells cleared, {decays} decayed and {eaten} eaten");
+        assert_eq!(report.writes_applied.writes as u64, report.writes_applied.changed + report.writes_applied.refused, "tick {tick}: a write changes its cell, or is refused");
     }
 }
 
-/// Trees alone: every tick, the trees there are grow by no more than
-/// were put, less those that died -- two put on one cell are one tree.
+/// Trees alone: every tick, the trees there are grow by exactly those
+/// counted put, less those that died -- two put on one cell are one
+/// tree, and one put counted.
 #[test]
 fn a_tree_put_twice_is_one_tree() {
     let mut world = plain_world(1, 0, 0, 2);
@@ -94,7 +99,7 @@ fn a_tree_put_twice_is_one_tree() {
         let before = trees_there(&world);
         let done = world.tick_only(server::Chosen::of(&[server::TREES_RULE]), false).rules.of(server::TREES_RULE);
         let set = trees_there(&world) + done[trees::DIED] - before;
-        assert!(set <= done[trees::SPREADS], "tick {tick}: {set} trees more, {} put", done[trees::SPREADS]);
+        assert_eq!(set, done[trees::SPREADS], "tick {tick}: trees more, trees put");
         put += set;
     }
     assert!(put > 0, "no tree spread");
