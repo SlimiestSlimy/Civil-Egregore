@@ -86,7 +86,7 @@ alone:
 - **Walks, hungry**: onto a neighbour with grass if there is one, else
   a step along the shortest path to the nearest grass in the 16 by 16
   cells about it, and with none there to the nearest further off, as
-  far as it reaches (`read::walking::seek`) -- one pathfinding step a
+  far as it reaches (`walking::seek`) -- one pathfinding step a
   wake, no route kept; with no grass in reach, onto any neighbour.
   Hemmed in, it stays. Never off the hot bitplanes, and never through a
   wall.

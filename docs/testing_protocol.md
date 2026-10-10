@@ -56,7 +56,8 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `bitplane_manager` | counts and windows; hot bitmaps; writes; writing back through the ring | | |
 | `chunk_storage` | layers encoded and back, heights, images, the writeback ring | | |
 | `coordinates` | the indices nested, in Morton order, stepping as cartesian coordinates do | | |
-| `type_registry` | the clash check, the layer types | | |
+| `type_registry` | the clash check, the layer types, an attribute type's blocks and a layout's fields | | |
+| `entity_manager` | attributes of any length put, found, edited and saved | | |
 | `pathfinding` | paths and waves; walls | | |
 | `utilities` | chance, commands, dispatcher, fixed_list, hash, process_memory, rng, settings, table, tuning | | |
 | `simulation` | entities moving, entities waking, their instructions | sampling, the tick, writes across borders | |
@@ -65,9 +66,9 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `server` | | grass and sheep (the rules, tried on a world); halos; the host; the world hash; world: saves, loads, walls; commands | a world stopped often coming to the same; a flock on generated ground lasting |
 | `tessera` | fine | fast | complete |
 
-`entity_manager`, `mc_rules`, `entity_rules`, `gui` and `renderer` have
-no test program. The entities' store is judged through the simulation's
-tests, the rules through the server's (a rule is tried on a world, and
+`mc_rules`, `entity_rules`, `gui` and `renderer` have
+no test program. The rest of the entities' store is judged through the
+simulation's tests, the rules through the server's (a rule is tried on a world, and
 every world is the server's to make), the sliders' numbers by
 `utilities`' `tuning`. The renderer is judged by eye: in the window,
 and in its stills (`Civil_Egregore renderer stills`).

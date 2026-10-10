@@ -3,7 +3,7 @@
 //! at the oldest may die (`docs/mc_rules.md`, "Trees").
 
 use instructions::layers::{OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
-use instructions::{read, write, CellIndex, Chance, RuleCounts, Turn};
+use instructions::{cells, CellIndex, Chance, RuleCounts, Turn};
 
 /// The chance, each tick, that a tree is sampled.
 pub const SAMPLE_CHANCE: Chance = Chance::one_in(10_000);
@@ -32,7 +32,7 @@ pub const DIED: usize = 3;
 /// The rule, on one superchunk's turn: every tree sampled with
 /// [`SAMPLE_CHANCE`], in Morton order, each seen to by [`tree`].
 pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
-    let (sampled, mut counts) = read::cells::each_sampled(turn, TREE, SAMPLE_CHANCE, samples, tree);
+    let (sampled, mut counts) = cells::each_sampled(turn, TREE, SAMPLE_CHANCE, samples, tree);
     counts[SAMPLED] = sampled as u64;
     counts
 }
@@ -42,18 +42,18 @@ pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
 #[inline]
 fn tree(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
     let spreading = turn.random().chance(SPREAD_SHARE);
-    let Some(stage) = read::cells::value(turn, TREE_STAGE, cell) else {
+    let Some(stage) = cells::value(turn, TREE_STAGE, cell) else {
         return;
     };
     if spreading {
         counts[SPREADS] += u64::from(spread(turn, cell, stage));
     } else if stage < OLDEST_TREE_STAGE {
-        write::cells::set_value(turn, TREE_STAGE, cell, stage + 1);
+        cells::set_value(turn, TREE_STAGE, cell, stage + 1);
         counts[GROWN] += 1;
     } else if turn.random().below(DIE_ONE_IN) == 0 {
-        write::cells::clear(turn, TREE, cell);
+        cells::clear(turn, TREE, cell);
         // Its stage goes with it: the next tree there starts at 0.
-        write::cells::set_value(turn, TREE_STAGE, cell, 0);
+        cells::set_value(turn, TREE_STAGE, cell, 0);
         counts[DIED] += 1;
     }
 }
@@ -63,7 +63,7 @@ fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) -> bool {
     if stage < SEEDS_FROM {
         return false;
     }
-    let Some((corner, around)) = read::cells::square(turn, TREE, cell, AROUND) else {
+    let Some((corner, around)) = cells::square(turn, TREE, cell, AROUND) else {
         return false;
     };
     // Itself is one of those counted.
@@ -78,9 +78,9 @@ fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) -> bool {
         return false;
     };
     // No tree under water.
-    if read::cells::holds(turn, WET, onto) {
+    if cells::holds(turn, WET, onto) {
         return false;
     }
-    write::cells::set(turn, TREE, onto);
+    cells::set(turn, TREE, onto);
     true
 }

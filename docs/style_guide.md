@@ -43,7 +43,7 @@ reader has to wonder whether something is missing or was never needed
   what was found and the command that measures it; the latest figures
   are in `transient_data/measurements/`.
 - A rule is written for one cell or one entity; the loop over them is
-  an instruction (`read::cells::each_sampled`, `read::entities::each_woken`), inlined,
+  an instruction (`cells::each_sampled`, `entities::each_woken`), inlined,
   so it costs nothing.
 - A command's parameters are declared once, name and default
   (`utilities::commands::Parameter`): the usage, the parsing and the

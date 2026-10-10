@@ -1,8 +1,9 @@
-//! The cells read: what a rule asks of a layer at a cell, the square
-//! about one, and the going over the cells sampled -- a rule of the
-//! cells is written for one cell.
+//! The cells: what a rule asks of a layer at a cell and the square
+//! about one, the going over the cells sampled -- a rule of the cells
+//! is written for one cell -- and a cell written, each a write queued.
 
-use bitplane_manager::Window;
+use crate::mask::about;
+use bitplane_manager::{Window, Write, WriteOp};
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;
 use simulation::Turn;
@@ -54,7 +55,24 @@ pub fn value<W: Width>(turn: &Turn, plane: Wide<W>, cell: CellIndex) -> Option<u
 /// at the world's edge.
 #[inline]
 pub fn square(turn: &Turn, layer_type: LayerType, cell: CellIndex, side: u32) -> Option<(CellIndex, Window)> {
-    let reach = side as i32 / 2;
-    let corner = cell.offset(-reach, -reach)?;
+    let corner = about(cell, side)?;
     Some((corner, turn.window(layer_type, corner, side, side)))
+}
+
+/// Queues `layer_type` holding at `cell`.
+#[inline]
+pub fn set(turn: &mut Turn, layer_type: LayerType, cell: CellIndex) {
+    turn.queue(layer_type, Write::cell(cell, WriteOp::Set));
+}
+
+/// Queues `layer_type` no longer holding at `cell`.
+#[inline]
+pub fn clear(turn: &mut Turn, layer_type: LayerType, cell: CellIndex) {
+    turn.queue(layer_type, Write::cell(cell, WriteOp::Unset));
+}
+
+/// Queues `value` as the number `plane` holds at `cell`.
+#[inline]
+pub fn set_value<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, value: u32) {
+    turn.queue(plane.layer_type(), Write::value(plane, cell, value));
 }

@@ -3,6 +3,8 @@
 //!
 //! `cargo test --test fast`
 
+mod tests;
+
 #[path = "fast/walking.rs"]
 mod walking;
 

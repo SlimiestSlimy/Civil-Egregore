@@ -8,7 +8,7 @@ The design is in `mc_rules.md`.
 with grass all round), `SAMPLE_CHANCE` (the two together): each a
 `Chance`, parts in 2^32, no float.
 
-**`rule(turn, samples)`**: hands **`cell`**, the rule for one cell of grass, to `read::cells::each_sampled`, which goes over the cells. On one superchunk's turn, every cell of grass
+**`rule(turn, samples)`**: hands **`cell`**, the rule for one cell of grass, to `cells::each_sampled`, which goes over the cells. On one superchunk's turn, every cell of grass
 sampled at the two chances together; each draws a neighbour (one of the
 eight, stepped on the Morton index) and whether it spreads (in
 `SPREAD_CHANCE` of the sum, `Rng::chance_among`) or decays: grass set on a
@@ -24,7 +24,7 @@ the cells a tree stands on, and `TREE_STAGE`, its stage, 0 to
 `OLDEST_TREE_STAGE`. `SAMPLE_CHANCE` (once in 10,000), `SPREAD_SHARE` (`Chance::HALF`), `SEEDS_FROM` (4),
 `CROWDED` (9), `DIE_ONE_IN` (4), `AROUND` (8).
 
-**`rule(turn, samples)`**: hands **`tree`**, the rule for one tree, to `read::cells::each_sampled`. Every tree sampled tries to spread or grows
+**`rule(turn, samples)`**: hands **`tree`**, the rule for one tree, to `cells::each_sampled`. Every tree sampled tries to spread or grows
 a stage -- or at the oldest dies one time in four, its cell and its
 stage cleared. **`spread(turn, cell, stage)`**: the other trees in the
 8 by 8 cells about it counted from one window; with `n` of them it goes

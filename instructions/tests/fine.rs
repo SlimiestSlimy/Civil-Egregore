@@ -3,6 +3,8 @@
 //!
 //! `cargo test --test fine`
 
+mod tests;
+
 mod entities {
     //! What an entity comes to, and the cells beside it: one changed is
     //! put whole only if an attribute was, and the nine cells about it,
@@ -10,49 +12,18 @@ mod entities {
     //!
     //! `cargo test --test fine`
 
-    use bitplane_manager::{BitmapArena, BucketKey};
-    use chunk_storage::{LayerCodec, LayerType};
-    use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-    use entity_manager::{Attribute, AttributeBlock, Entities, EntityEdit, EntityId, EntityType, Header, NEVER};
+    use crate::tests::{cell, walker, world, STONE};
+    use coordinates::CellIndex;
+    use entity_manager::{Attribute, AttributeBlock, EntityEdit, EntityId, NEVER};
     use instructions::around::{self, CENTRE, RING};
-    use instructions::{read, write, Turn};
+    use instructions::{entities, Turn};
     use simulation::Simulation;
     use std::sync::Mutex;
 
-    /// The layer type the arena holds: every cell hot, none set.
-    const STONE: LayerType = LayerType(6);
-    /// The entities' type.
-    const WALKER: EntityType = EntityType(40);
     /// An attribute.
     const NAME: Attribute<u64> = Attribute::new(41);
     /// Another.
     const MARK: Attribute<u64> = Attribute::new(42);
-
-    /// An arena with a bitmap hot over the `side` by `side` superchunks from
-    /// `(10, 10)`, and entities holding the same superchunks.
-    fn world(side: u32) -> (BitmapArena, Entities) {
-        let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
-        for y in 10..10 + side {
-            for x in 10..10 + side {
-                for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
-                    arena.make_hot(BucketKey { layer_type: STONE, chunk }, None, &mut codec);
-                }
-            }
-        }
-        let mut entities = Entities::new();
-        assert_eq!(entities.align(&arena.superchunk_indices()), 0);
-        (arena, entities)
-    }
-
-    /// The cell `(x, y)` cells from the top left of the superchunk `(10, 10)`.
-    fn cell(x: u32, y: u32) -> CellIndex {
-        CellCartesian { x: 10 * SUPERCHUNK_SIDE_CELLS + x, y: 10 * SUPERCHUNK_SIDE_CELLS + y }.into()
-    }
-
-    /// A walker with ID `id` on `at`, waking at `wake`.
-    fn walker(id: u64, at: CellIndex, wake: u64) -> Header {
-        Header { id: EntityId(id), kind: WALKER, at, wake }
-    }
 
     /// An entity its rule looks over and leaves as it was is moved, or put
     /// to sleep, with nothing carried; one with an attribute changed is put
@@ -78,7 +49,7 @@ mod entities {
                     assert_eq!((edit.get(NAME), edit.get(MARK), edit.unset(MARK)), (Some(8), Some(1), Some(1)));
                 }
                 let to = entity.header.at.offset(1, 1).expect("in the world");
-                write::entities::commit(turn, edit, to, NEVER);
+                entities::commit(turn, edit, to, NEVER);
             }
             0
         });
@@ -103,12 +74,12 @@ mod entities {
         simulation.tick(&mut arena, &mut entities, 0, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             for entity in turn.woken() {
                 let at = entity.header.at;
-                let (stone, taken) = (read::around::layer(turn, STONE, at), read::around::occupied(turn, at));
-                let free = (0..64).filter_map(|_| read::around::free_beside(turn, at, RING)).fold(0u16, |free, bit| free | 1 << bit);
-                let only = read::around::free_beside(turn, at, 1 << 0 | 1 << 5);
+                let (stone, taken) = (around::layer(turn, STONE, at), around::occupied(turn, at));
+                let free = (0..64).filter_map(|_| around::free_beside(turn, at, RING)).fold(0u16, |free, bit| free | 1 << bit);
+                let only = around::free_beside(turn, at, 1 << 0 | 1 << 5);
                 let cells: Vec<CellIndex> = [0, 5].iter().filter_map(|&bit| around::cell(at, bit)).collect();
                 seen.lock().unwrap().push((stone.set, stone.hot, taken, free, only, cells, around::bit_of(at, at.offset(-1, 1).unwrap())));
-                write::entities::sleep(turn, &entity.header, NEVER);
+                entities::sleep(turn, &entity.header, NEVER);
             }
             0
         });

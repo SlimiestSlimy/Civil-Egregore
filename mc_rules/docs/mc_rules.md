@@ -69,7 +69,7 @@ Trees stand on dirt and grass alike and change neither.
 A tree is a cell set in `TREE`, with a stage of sixteen kept over four
 more bits (`TREE_STAGE`): a wide plane, four bits a cell, a cell's
 number held together and read and written whole through
-`read::cells::value` and `write::cells::set_value`. The bit that says a tree stands
+`cells::value` and `cells::set_value`. The bit that says a tree stands
 there is a plane of its own, not stage 0: sampling the trees and
 counting those about one are then each one read of one plane, as for
 grass, where a tree found by any of four planes being set would take
