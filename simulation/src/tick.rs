@@ -4,7 +4,7 @@
 //! applying, each superchunk what was queued for it
 //! (`docs/simulation.md`, "The tick" and "The dispatcher").
 
-use entity_manager::{Entities, EntityId, EntityReader, Instructions, InstructionsApplied, SuperchunkEntities};
+use entity_manager::{Arrival, Entities, EntityReader, Instructions, InstructionsApplied, SuperchunkEntities};
 use crate::turn::conditional::{Applied, CountedWhenApplied, COUNTED_WHEN_APPLIED};
 use crate::turn::{slot, Outbox, Turn};
 use bitplane_manager::{BitmapArena, Reader, Superchunk, WritesApplied};
@@ -63,7 +63,10 @@ pub struct Simulation {
     random: Vec<(SuperchunkIndex, Rng)>,
     /// Each superchunk's entities crossed into it in a tick, with the
     /// cells they left, in the arena's order: emptied after every tick.
-    arrived: Vec<Vec<(EntityId, CellIndex)>>,
+    arrived: Vec<Vec<Arrival>>,
+    /// Of those, the ones turned back, by the superchunk each left:
+    /// kept for their room.
+    turned_back: Vec<Vec<Arrival>>,
 }
 
 /// The threads `superchunks` superchunks are ticked on unless told
@@ -91,7 +94,7 @@ impl Simulation {
     /// jobs on too: a thread busy with one sits a tick's phase out.
     pub fn on(dispatcher: Arc<Dispatcher>) -> Self {
         let samples = (0..dispatcher.threads()).map(|_| Mutex::new(Vec::new())).collect();
-        Self { dispatcher, outboxes: Vec::new(), samples, random: Vec::new(), arrived: Vec::new() }
+        Self { dispatcher, outboxes: Vec::new(), samples, random: Vec::new(), arrived: Vec::new(), turned_back: Vec::new() }
     }
 
     /// Each superchunk's random stream as it stands: its superchunk and
@@ -211,7 +214,7 @@ impl Simulation {
             *applied_parts[part].lock().expect("a part's result") = applied;
         });
         drop(superchunks);
-        self.settle_crossings(entities, superchunk_indices, per_part);
+        instructions_applied.turned_back += self.settle_crossings(entities, superchunk_indices, per_part);
         let (mut applied, mut instructions_compared, mut counted_when_applied) = (WritesApplied::default(), (0, 0), [0; COUNTED_WHEN_APPLIED]);
         for part in applied_parts {
             let part = part.into_inner().expect("a part's result");
@@ -238,36 +241,66 @@ impl Simulation {
         TickReport { writes_applied: applied, instructions_applied, instructions_compared, counted_when_applied, rules, computing: computed - start, applying: computed.elapsed() }
     }
 
-    /// Removes each entity that crossed into another superchunk this
-    /// tick from the cell it left, each superchunk its own leavers
-    /// ([`SuperchunkEntities::settle_leavers`]), on the threads, the
-    /// superchunks split as for the second phase -- `per_part` a part.
-    fn settle_crossings(&mut self, entities: &mut Entities, superchunk_indices: &[SuperchunkIndex], per_part: usize) {
+    /// Settles the tick's crossings, on the threads, the superchunks
+    /// split as for the second phase -- `per_part` a part: each
+    /// superchunk removes its leavers from the cells they left, but for
+    /// those another changed there meanwhile
+    /// ([`SuperchunkEntities::settle_leavers`]); then each takes back
+    /// what it put of those ([`SuperchunkEntities::settle_arrivals`]).
+    /// How many were turned back.
+    fn settle_crossings(&mut self, entities: &mut Entities, superchunk_indices: &[SuperchunkIndex], per_part: usize) -> usize {
         self.arrived.resize_with(superchunk_indices.len(), Vec::new);
+        self.turned_back.resize_with(superchunk_indices.len(), Vec::new);
         let mut crossed = false;
         for (superchunk, arrived) in entities.superchunks_mut().iter_mut().zip(&mut self.arrived) {
             superchunk.take_arrived(arrived);
             crossed |= !arrived.is_empty();
         }
-        if crossed {
-            let arrived = &self.arrived;
-            let parts: Vec<Mutex<&mut [SuperchunkEntities]>> = entities.superchunks_mut().chunks_mut(per_part).map(Mutex::new).collect();
+        if !crossed {
+            return 0;
+        }
+        let arrived = &self.arrived;
+        let neighbour = |here: SuperchunkIndex, (dx, dy): (i32, i32)| here.offset(dx, dy).and_then(|there| superchunk_indices.binary_search(&there).ok());
+        {
+            let parts: Vec<Mutex<LeaversPart>> = entities.superchunks_mut().chunks_mut(per_part).zip(self.turned_back.chunks_mut(per_part)).map(Mutex::new).collect();
             let claimed = AtomicUsize::new(0);
             self.dispatcher.run(&|_| {
                 while let Some(work) = parts.get(claimed.fetch_add(1, Ordering::Relaxed)) {
-                    for superchunk in work.lock().expect("a piece's superchunks").iter_mut() {
-                        for (dx, dy) in neighbours() {
-                            if let Some(there) = superchunk.index().offset(dx, dy).and_then(|there| superchunk_indices.binary_search(&there).ok()) {
-                                superchunk.settle_leavers(&arrived[there]);
-                            }
+                    let (superchunks, turned_back) = &mut *work.lock().expect("a piece's superchunks");
+                    for (superchunk, turned_back) in superchunks.iter_mut().zip(turned_back.iter_mut()) {
+                        let here = superchunk.index();
+                        for there in neighbours().filter_map(|offset| neighbour(here, offset)) {
+                            superchunk.settle_leavers(&arrived[there], turned_back);
                         }
                     }
                 }
             });
-            self.arrived.iter_mut().for_each(Vec::clear);
         }
+        let mut taken_back = 0;
+        if self.turned_back.iter().any(|turned_back| !turned_back.is_empty()) {
+            let turned_back = &self.turned_back;
+            let parts: Vec<Mutex<&mut [SuperchunkEntities]>> = entities.superchunks_mut().chunks_mut(per_part).map(Mutex::new).collect();
+            let (claimed, counted) = (AtomicUsize::new(0), AtomicUsize::new(0));
+            self.dispatcher.run(&|_| {
+                while let Some(work) = parts.get(claimed.fetch_add(1, Ordering::Relaxed)) {
+                    for superchunk in work.lock().expect("a piece's superchunks").iter_mut() {
+                        let here = superchunk.index();
+                        for there in neighbours().filter_map(|offset| neighbour(here, offset)) {
+                            counted.fetch_add(superchunk.settle_arrivals(&turned_back[there]), Ordering::Relaxed);
+                        }
+                    }
+                }
+            });
+            taken_back = counted.into_inner();
+        }
+        self.arrived.iter_mut().chain(&mut self.turned_back).for_each(Vec::clear);
+        taken_back
     }
 }
+
+/// A part of the superchunks' entities, and where those of each
+/// turned back from a crossing go.
+type LeaversPart<'a> = (&'a mut [SuperchunkEntities], &'a mut [Vec<Arrival>]);
 
 /// A superchunk's own place and its eight neighbours', as offsets, in a
 /// fixed order: the order the second phase applies their writes in.

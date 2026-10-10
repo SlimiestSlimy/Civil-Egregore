@@ -111,7 +111,12 @@ The code says little about itself and sends its reader to the docs
 ([style guide](style_guide.md), "Comments"), so the docs have to be
 right and the way to them has to hold. The workspace's own fine tier,
 `tests/fine.rs` at the root (`cargo test --test fine`), reads every
-markdown file and every source and judges three things.
+markdown file and every source and judges three things -- and a
+fourth of the sources alone: that a rule asks instructions and nothing
+else (`the_rules_ask_instructions_alone`: no rule's source calls
+anything of its turn, or names a crate under the instructions;
+`../instructions/docs/instructions.md`, "Rules ask instructions, and
+nothing else").
 
 **What the docs name is there** (`the_docs_name_what_is_there`). In
 every markdown file, outside its fenced blocks:

@@ -278,10 +278,30 @@ sleep hungry under opposite compares, written once. simulation.md,
 "Two writes on one cell". Tests: simulation/tests/fine/
 compare_and_write.rs and instructions.rs, entity_rules sheep
 a_meal_lost_to_a_decay_leaves_the_sheep_hungry.
+THEN (user, 2026-10-10, verbatim): "cell writes counts, etc. should
+be abstracted to instructuctions as well, no direct access to the
+simulation internals never from rules (excluding the necessary data
+types for the instructions of course)"; "if they need multiple
+mutations in a tick the idea is to have a cascading failure of compare
+and writes as necessary. every instruction must be atomic and leave
+the entity or cell in a consistent state ... (basically were
+simulating atomic CAS instructions lol)"; "entity to entity writes can
+happen in the same tick, as i explained before, we need certain
+guarantees". DONE 2026-10-10: rules call nothing of the turn
+(instructions::this_tick; root test the_rules_ask_instructions_alone);
+an entity is written an attribute at a time, never whole
+(Turn::update is those writes and a move; entities::set_attribute_of
+for another's), so awake or not it may be written by another in the
+tick; a crossing written behind is turned back
+(SuperchunkEntities::settle_leavers, settle_arrivals). instructions.md,
+"Every instruction atomic", "One entity writing another", "Rules ask
+instructions, and nothing else".
 MINE, for the user to say: a compare is in the superchunk its write
-lands in (so an eating sheep bears a wake later); an entity awake is
-not another's to edit that tick; a removal is not counted a hazard.
-Tick reference 62.27 M (58.77 M before compare-and-write): not chased.
+lands in (so an eating sheep bears a wake later); a crossing written
+behind is turned back, not carried over with the write; a removal is
+not counted a hazard; an attribute of several blocks is compared by
+its first block and a sum of the rest.
+Tick reference 62.98 M (58.77 M before compare-and-write): not chased.
 
 Asked by the user, in the order to do them. Read this first after any
 break; write a new ask here the moment it is made.

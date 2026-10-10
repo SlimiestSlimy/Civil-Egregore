@@ -128,6 +128,7 @@ what they always do and are not listed.
 | **reach** | how far an entity's rule reads and acts: up to the speed of light | speed of light | |
 | **outbox** | a superchunk's queues of writes and instructions, a slot each for itself and its eight neighbours | write, instruction, slot | |
 | **slot** | one entry of a fixed array kept for a purpose: an outbox's, a neighbour each; the wheel's, a tick each; a hash table's, by a hash (`utilities::hash::slot`) | outbox, wheel, lookup | place |
+| **turned back** | of an entity crossing to another superchunk: taken from where it was put and left where it stood, because another wrote to it, or removed it, in the same tick. Also of a step onto a taken cell: the stepper stays | crossing, compare-and-write | bounced, rolled back |
 | **write** | a change to cells: an operation on a shape, at a cell (`Write`), as the world is written between ticks. In a tick a rule writes a cell at a time, each a compare-and-write, queued in the first phase and applied in the second | outbox, apply, compare-and-write | command |
 | **write-after-write hazard** | two writes of one thing in one tick, the later landing on the first and what the first did lost, neither rule having seen the other. A tick has none: every write says what was seen of what it writes (`../simulation/docs/simulation.md`, "No write lands on another's") | compare-and-write, refused | WAW, lost update, race |
 | **apply** | carry out a write or an instruction, in the second phase | write, instruction | carry out, execute |

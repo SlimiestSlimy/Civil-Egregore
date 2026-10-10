@@ -7,7 +7,7 @@ mod tests;
 
 mod entities {
     //! What an entity comes to, and the cells beside it: one changed is
-    //! put whole only if an attribute was, and the nine cells about it,
+    //! written only the attributes changed, and the nine cells about it,
     //! the free ones among them, are asked as masks.
     //!
     //! `cargo test --test fine`
@@ -26,10 +26,11 @@ mod entities {
     const MARK: Attribute<u64> = Attribute::new(42);
 
     /// An entity its rule looks over and leaves as it was is moved, or put
-    /// to sleep, with nothing carried; one with an attribute changed is put
-    /// whole.
+    /// to sleep, with nothing carried; one with an attribute changed has
+    /// that attribute written, held against what was seen of it, and is
+    /// moved the same -- never put whole.
     #[test]
-    fn an_entity_is_put_whole_only_if_an_attribute_changed() {
+    fn an_entity_is_written_only_the_attributes_changed() {
         let (mut arena, mut entities) = world(1);
         entities.queue_put(walker(1, cell(40, 30), 0), &[AttributeBlock::holding(NAME, 7)]);
         entities.queue_put(walker(2, cell(40, 40), 0), &[AttributeBlock::holding(NAME, 7)]);
@@ -53,7 +54,7 @@ mod entities {
             }
             0
         });
-        assert_eq!((report.instructions_applied.moves, report.instructions_applied.puts), (1, 1));
+        assert_eq!((report.instructions_applied.moves, report.instructions_applied.puts, report.instructions_applied.edits, report.instructions_compared), (2, 0, 1, (1, 0)));
         assert_eq!(entities.get(EntityId(1), cell(41, 31)).expect("moved").attributes, [AttributeBlock::holding(NAME, 7)]);
         assert_eq!(entities.get(EntityId(2), cell(41, 41)).expect("moved").attributes, [AttributeBlock::holding(NAME, 8)]);
     }

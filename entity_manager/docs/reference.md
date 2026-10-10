@@ -27,7 +27,9 @@ that takes one (**`holding_one`**, the same unchecked);
 **`kind()`**, the type in its first word; **`blocks()`**, how many
 blocks the attribute it begins takes, by its type or its block length,
 one at least. On an entity's blocks, sorted by type:
-**`find_attribute(blocks, kind)`** -- the walk: an attribute's blocks,
+**`blocks_sum(blocks)`** -- a sum of blocks, the same for the same
+blocks; **`each_attribute(blocks)`** -- the attributes one after
+another; **`find_attribute(blocks, kind)`** -- the walk: an attribute's blocks,
 or where they would go -- **`attribute_blocks(blocks, kind)`**,
 **`attribute(blocks, attribute)`** (read as its layout),
 **`set_attribute_blocks(blocks, attribute)`** and
@@ -77,9 +79,13 @@ wakes by cell, then ID.
 found and still due, the entities `ENTITY_AHEAD` on asked of memory --
 **`put(earliest, header, from, attributes)`** -- within a chunk or from
 one to another (**`move_between`**), a `Put` -- **`in_word_tile(chunk,
-first)`**, **`remove(id, at)`**, **`arrived(id, left)`** -- an entity crossed in,
-noted -- **`take_arrived(arrived)`**, **`settle_leavers(arrived)`** --
-those of a neighbour's arrivals that left this superchunk removed --
+first)`**, **`remove(id, at)`**, **`arrived(arrival)`** -- an entity crossed in,
+noted, an **`Arrival`** `{id, left, at, attributes}`, the last the sum
+of the attributes it was put with -- **`take_arrived(arrived)`**,
+**`settle_leavers(arrived, turned_back)`** -- those of a neighbour's
+arrivals that left this superchunk removed if they ended the tick here
+with those attributes, else turned back -- **`settle_arrivals(turned_back)`**
+-- those put here and turned back removed --
 **`edit(id, at, kind, blocks)`**, **`pass(tick)`**, **`sort_wakes(tick)`** -- after the second phase for
 the next tick, after `Entities::apply` for the tick about to run --
 **`counts`**. **`Entities`**: the tick about to run, the superchunks by

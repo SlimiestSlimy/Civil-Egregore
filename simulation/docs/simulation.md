@@ -97,13 +97,29 @@ saw the other. A tick has none:
   first applied changes it; any other that saw the same is refused.
   There is no plain write in a tick, and no shape: an area is its
   cells, each a write of its own.
-- **An attribute of another entity** (`Turn::set_attribute`,
-  `unset_attribute`) is written only if it is still as the rule saw
-  it, or still absent: of two setting one, the first applied does.
-- **An entity awake this tick** writes itself whole, from what it was
-  as the tick found it; so another's edit of it is not queued at all
-  (`set_attribute` answers `false`), and is asked again a later tick.
-  An entity asleep is written by others alone, an attribute at a time.
+- **An entity is written an attribute at a time**, never whole. Each
+  attribute write (`Turn::set_attribute`, `unset_attribute`,
+  `set_attribute_blocks`) says what the rule saw of that attribute and
+  is applied only if it is still so, or still absent: of two writing
+  one attribute, the first applied does and the other is refused; two
+  writing two attributes both do. This holds whoever writes -- the
+  entity itself, awake, or another, in the same tick.
+- **An entity changing itself** (`Turn::update`) is those writes, one
+  for each attribute that differs from what the tick found, then a
+  move, which carries nothing. So what another writes to it in the
+  tick stands beside its own change, and each of its writes is
+  applied or refused by itself: every instruction is atomic, and
+  leaves the entity one that could be -- a rule that needs several
+  of them to go together holds each against what the one before
+  wrote, and they fail one after another.
+- **An entity crossing to another superchunk** is put there whole,
+  which what applies its old superchunk cannot hold against anything
+  there. So the crossing is settled after: it stands only if the
+  entity ended the tick where it left with the attributes it was put
+  with. Written there meanwhile by another, or removed, it is
+  **turned back** -- taken from where it was put, left where it stood,
+  asleep until its wake, with all that was written to it
+  (`InstructionsApplied::turned_back`) -- and crosses a later tick.
 - **A cell an entity is put on or steps to** is checked as the
   instruction is applied: taken, a step stays and a new entity goes to
   the first free of its others, or is not put. Nothing is overwritten.
@@ -197,18 +213,18 @@ carrying no more than it changes (`../entity_manager/`):
 
 | instruction | queued by | what it does | carries |
 |---|---|---|---|
-| put | `put`, `update` | an entity made, or made anew whole | its attributes |
+| put | `put`, a crossing | an entity made; or put whole in the superchunk it crosses to | its attributes |
 | put on the first free | `put_on_the_first_free` | a new entity made on its cell or, that taken, on the first free of some others | its attributes, and the other cells |
-| move | `step` | moved to a cell, or left where it stands, to wake at a tick; its attributes as they are | nothing |
-| edit | `set_attribute`, `unset_attribute` | one attribute set or removed, of another entity in reach, asleep, if it is still as seen | the one attribute's blocks, or none |
+| move | `step`, `update` | moved to a cell, or left where it stands, to wake at a tick; its attributes as they are | nothing |
+| edit | `set_attribute`, `unset_attribute`, `set_attribute_blocks`, `update` | one attribute set or removed, of any entity in reach -- the rule's own or another -- if it is still as seen | the one attribute's blocks, or none |
 | remove | `remove` | removed | nothing |
 
 A walking entity is a move a step: 32 bytes queued and none of its
 attributes read or written, however many it has -- until it crosses to
-another superchunk, where it goes whole. An edit is how one entity acts
-on another: two wounding one in a tick each write their own attribute,
-where two whole copies would undo each other, and of two writing the
-same attribute one is refused. Every instruction that
+another superchunk, where it goes whole. An edit is how an entity is
+changed, by itself or by another: two wounding one in a tick each
+write their own attribute, where two whole copies would undo each
+other, and of two writing the same attribute one is refused. Every instruction that
 puts an entity on a cell is checked as it is applied. Instructions
 may be queued under a compare, applied only if it holds
 ("Compare-and-write").

@@ -78,7 +78,7 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
             turn.step(&header, header.at, now + 1);
             turn.instructions_as_ever();
             turn.queue_seen(STONE, header.at, 1, 0, Some(EATEN));
-            let fed = Compare::Attribute { id: header.id, at: header.at, kind: FED.attribute_type(), seen: Some(AttributeBlock::holding(FED, 1)) };
+            let fed = Compare::attribute(header.id, header.at, FED.attribute_type(), Some(&[AttributeBlock::holding(FED, 1)]));
             turn.queue_if(fed, STONE, mark(header.at), 0, 1, None);
         }
         0

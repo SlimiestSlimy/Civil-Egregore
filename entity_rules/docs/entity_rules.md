@@ -111,8 +111,11 @@ of old age -- and what it counts are held against the grass under it
 being there still when they are applied, and the grass is cleared
 last, the meal counted with it. After them, and before the grass is
 cleared, the rule queues a sleep of a step held against the grass
-being gone: one of the two is applied and the sheep is written once
--- refused its meal, it wakes hungry as it was and looks again. A lamb may land in the next
+being gone: one of the two is applied -- refused its meal, it wakes
+hungry as it was and looks again. What a sheep comes to is written an
+attribute at a time, each held against what the rule saw of it, then
+the sheep moved or put to sleep: it is never put whole, so what
+another entity wrote to it in the tick would stand. A lamb may land in the next
 superchunk, where the grass under its mother cannot be held against
 it, so a sheep due to bear at a meal bears at its next wake.
 

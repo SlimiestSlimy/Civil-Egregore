@@ -6,7 +6,7 @@ use instructions::around::{self, CENTRE, RING};
 use instructions::entities::EntitiesBetweenTicks;
 pub use instructions::entity_types::{Roaming, BEARING, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
 use instructions::layers::{GRASS, WALL_EAST, WALL_SOUTH};
-use instructions::{area, cells, compare, entities, place_counted, walking, AttributeBlock, CellCartesian, CellIndex, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
+use instructions::{area, cells, compare, entities, place_counted, this_tick, walking, AttributeBlock, CellCartesian, CellIndex, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
 /// Ticks between a walking sheep's steps, at the least...
@@ -78,7 +78,7 @@ pub fn rule(turn: &mut Turn) -> RuleCounts {
 /// meal, a lamb, growing up -- and sleeps again, as long as it can.
 #[inline]
 fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
-    let (done, room, now) = (&mut flock.done, &mut flock.room, turn.now());
+    let (done, room, now) = (&mut flock.done, &mut flock.room, this_tick::now(turn));
     done[WOKEN] += 1;
     let (at, before) = (sheep.header.at, sheep.header);
     let mut sheep = EntityEdit::of(sheep, room);
@@ -102,7 +102,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         // what is held against the grass being gone does instead: the sheep sleeps a step, hungry as it was, and wakes to look again.
         compare::entities_from_here(turn, compare::holds(GRASS, at));
         sheep.set(HUNGRY_AT, now + MEAL_TICKS);
-        if let (false, Some(way)) = (lush, around::pick(turn.random(), steppable)) {
+        if let (false, Some(way)) = (lush, around::pick(this_tick::random(turn), steppable)) {
             sheep.set(ROAMING, Roaming { until: now + MEAL_TICKS + ROAM_TICKS, neighbour: way });
         }
     }
@@ -134,7 +134,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
             }
             None => needs = now,
         },
-        None if lush && grown_at.is_none() && turn.random().below(CONCEIVE_ONE_IN) == 0 => {
+        None if lush && grown_at.is_none() && this_tick::random(turn).below(CONCEIVE_ONE_IN) == 0 => {
             sheep.set(PREGNANT, now + GESTATION_TICKS);
             needs = needs.min(now + GESTATION_TICKS);
         }
@@ -154,9 +154,9 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         if now >= roaming.until || steppable & way == 0 {
             sheep.unset(ROAMING);
         }
-        around::prefer(turn.random(), way, steppable)
+        around::prefer(this_tick::random(turn), way, steppable)
     } else if grass.set & steppable != 0 {
-        around::pick(turn.random(), grass.set & steppable)
+        around::pick(this_tick::random(turn), grass.set & steppable)
     } else if steppable == 0 {
         // Hemmed in: no step to take, and no path to look for.
         None
@@ -168,7 +168,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
                 done[FAR] += u64::from(found.scale > 0);
                 Some(around::bit_of(at, found.to))
             }
-            None => around::pick(turn.random(), steppable),
+            None => around::pick(this_tick::random(turn), steppable),
         }
     };
     let to = way.and_then(|way| around::cell(at, way)).unwrap_or(at);
@@ -177,10 +177,10 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     } else if hungry {
         next_step(turn)
     } else {
-        next_step(turn).max(needs + turn.random().below(STEP_JITTER))
+        next_step(turn).max(needs + this_tick::random(turn).below(STEP_JITTER))
     };
     // Old age comes by the tick, not the wake: a long sleep is as much of a life as many short ones.
-    if turn.random().below(LIFE_TICKS) < wake - now {
+    if this_tick::random(turn).below(LIFE_TICKS) < wake - now {
         entities::remove(turn, sheep.header());
         count(turn, done, fed.then_some(at), DEATHS);
     } else {
@@ -208,7 +208,7 @@ fn count(turn: &mut Turn, done: &mut RuleCounts, fed: Option<CellIndex>, place: 
 
 /// The tick a sheep taking a step now wakes next.
 fn next_step(turn: &mut Turn) -> u64 {
-    turn.now() + STEP_TICKS + turn.random().below(STEP_JITTER)
+    this_tick::now(turn) + STEP_TICKS + this_tick::random(turn).below(STEP_JITTER)
 }
 
 /// Queues `count` grown sheep, each some way from its next meal, each

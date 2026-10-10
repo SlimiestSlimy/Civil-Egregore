@@ -5,7 +5,7 @@
 
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;
-use entity_manager::{Attribute, AttributeBlock, Header, Layout};
+use entity_manager::{push_attribute, Attribute, Header, Layout};
 pub use simulation::Compare;
 use simulation::Turn;
 
@@ -28,12 +28,12 @@ pub fn value<W: Width>(plane: Wide<W>, cell: CellIndex, seen: u32) -> Compare {
 }
 
 /// `entity` still stands where it stood, its `attribute` what the
-/// rule `seen` -- or it still has none, if it saw none. Of an
-/// attribute one block long.
+/// rule `seen` -- or it still has none, if it saw none.
 #[inline]
 pub fn attribute<L: Layout>(entity: &Header, attribute: Attribute<L>, seen: Option<L>) -> Compare {
-    debug_assert_eq!(L::BLOCKS, 1, "an attribute compared is one block long");
-    Compare::Attribute { id: entity.id, at: entity.at, kind: attribute.attribute_type(), seen: seen.map(|seen| AttributeBlock::holding(attribute, seen)) }
+    let mut blocks = Vec::new();
+    seen.into_iter().for_each(|seen| push_attribute(&mut blocks, attribute, seen));
+    Compare::attribute(entity.id, entity.at, attribute.attribute_type(), seen.map(|_| &blocks[..]))
 }
 
 /// Queues the number of `layer_type` at `cell` becoming `value` if

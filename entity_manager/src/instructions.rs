@@ -216,7 +216,8 @@ impl Instructions {
                         Put::PassedOver => applied.passed_over += 1,
                     }
                     if let (Some(left), Put::New) = (left, put) {
-                        superchunk.arrived(header.id, left);
+                        let attributes = crate::blocks_sum(&self.attributes[first as usize..(first + count) as usize]);
+                        superchunk.arrived(crate::Arrival { id: header.id, left, at: header.at, attributes });
                         applied.crossed += 1;
                     }
                 }
@@ -281,6 +282,9 @@ pub struct InstructionsApplied {
     /// Instructions for an entity no longer where it stood -- moved on,
     /// or removed, earlier in the tick: not applied.
     pub passed_over: usize,
+    /// Of the entities that crossed, those turned back: the one left
+    /// behind was changed by another, or removed, in the same tick.
+    pub turned_back: usize,
 }
 
 impl AddAssign for InstructionsApplied {
@@ -296,5 +300,6 @@ impl AddAssign for InstructionsApplied {
         self.crossed += other.crossed;
         self.beside += other.beside;
         self.passed_over += other.passed_over;
+        self.turned_back += other.turned_back;
     }
 }

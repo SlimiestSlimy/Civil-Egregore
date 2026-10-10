@@ -3,7 +3,7 @@
 
 use super::conditional::Compare;
 use super::{slot, Turn};
-use entity_manager::{Attribute, AttributeBlock, EntityId, EntityRef, Header, Layout, SuperchunkEntities, OCCUPIED_SIDE};
+use entity_manager::{attribute_blocks, each_attribute, push_attribute, Attribute, AttributeBlock, EntityId, EntityRef, Header, Layout, SuperchunkEntities, OCCUPIED_SIDE};
 use bitplane_manager::Reader;
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, ChunkIndex};
@@ -71,9 +71,9 @@ impl<'a> Turn<'a> {
     }
 
     /// Queues `entity` stepping to `to` -- its own cell to sleep where
-    /// it stands -- to wake at `wake`, no attribute carried unless it
-    /// crosses to another superchunk. If `to` is taken by then it
-    /// stays, and wakes at `wake` all the same.
+    /// it stands -- to wake at `wake`, its attributes as they are. If
+    /// `to` is taken by then it stays, and wakes at `wake` all the
+    /// same. To another superchunk it crosses ([`Turn::update`]).
     pub fn step(&mut self, entity: &Header, to: CellIndex, wake: u64) {
         debug_assert!(wake > self.now, "an entity put to wake at tick {wake}, not after {}", self.now);
         let after = Header { at: to, wake, ..*entity };
@@ -81,54 +81,91 @@ impl<'a> Turn<'a> {
             let slot = self.slot_of(to.superchunk());
             self.outbox.instructions[slot].move_entity(after, entity.at);
         } else if let Some(whole) = self.entity_reader.get(entity.id, entity.at) {
-            self.update(entity, after, whole.attributes);
+            self.cross(entity, after, whole.attributes);
         }
     }
 
-    /// Queues setting `attribute` of `entity` -- another than the
-    /// rule's own, any in reach -- to `value`, if it is still the
-    /// `seen` the rule read of it, or it still has none: a
-    /// compare-and-write, so of two setting one attribute in a tick
-    /// the first applied does and the other is refused. Whether it was
-    /// queued: not if the entity wakes this tick, for then it writes
-    /// itself whole ([`Turn::update`]) from what it was, and one of the
-    /// two would be lost -- it is asked again another tick. Of an
-    /// attribute one block long.
-    pub fn set_attribute<L: Layout>(&mut self, entity: &Header, attribute: Attribute<L>, seen: Option<L>, value: L) -> bool {
-        if entity.wake <= self.now {
-            return false;
-        }
-        let compare = Compare::Attribute { id: entity.id, at: entity.at, kind: attribute.attribute_type(), seen: seen.map(|seen| AttributeBlock::holding(attribute, seen)) };
-        self.queue_instruction_if(compare, entity.at, |instructions| instructions.set_attribute(entity.id, entity.at, attribute, value));
-        true
+    /// Queues the attribute `seen` of `entity` -- any in reach, the
+    /// rule's own or another -- becoming `value`: both the blocks of
+    /// one attribute, either none -- not there before, or removed. A
+    /// compare-and-write: applied only if the attribute is still as
+    /// seen, and the compare the rule's instructions are under holds
+    /// too. So of two writing one attribute of one entity in a tick the
+    /// first applied does and the other is refused, and two writing two
+    /// attributes both do: an entity is written an attribute at a
+    /// time, never whole, and no write lands on another's.
+    pub fn set_attribute_blocks(&mut self, entity: &Header, seen: Option<&[AttributeBlock]>, value: Option<&[AttributeBlock]>) {
+        let kind = value.or(seen).expect("an attribute seen or set")[0].kind();
+        let compare = Compare::attribute(entity.id, entity.at, kind, seen);
+        self.queue_instruction_if(compare, entity.at, |instructions| match value {
+            Some(value) => instructions.set_attribute_blocks(entity.id, entity.at, value),
+            None => instructions.unset_attribute(entity.id, entity.at, kind),
+        });
     }
 
-    /// Queues removing `attribute` of `entity`, another in reach, if
-    /// it is still the `seen` the rule read of it: whether it was
-    /// queued, as [`Turn::set_attribute`] is.
-    pub fn unset_attribute<L: Layout>(&mut self, entity: &Header, attribute: Attribute<L>, seen: L) -> bool {
-        if entity.wake <= self.now {
-            return false;
+    /// [`Turn::set_attribute_blocks`], of an attribute by its layout:
+    /// `attribute` of `entity` set to `value`, if it is still the
+    /// `seen` the rule read of it, or still has none.
+    pub fn set_attribute<L: Layout>(&mut self, entity: &Header, attribute: Attribute<L>, seen: Option<L>, value: L) {
+        let (mut was, mut is) = (Vec::new(), Vec::new());
+        seen.into_iter().for_each(|seen| push_attribute(&mut was, attribute, seen));
+        push_attribute(&mut is, attribute, value);
+        self.set_attribute_blocks(entity, seen.map(|_| &was[..]), Some(&is));
+    }
+
+    /// Queues removing `attribute` of `entity`, if it is still the
+    /// `seen` the rule read of it.
+    pub fn unset_attribute<L: Layout>(&mut self, entity: &Header, attribute: Attribute<L>, seen: L) {
+        let mut was = Vec::new();
+        push_attribute(&mut was, attribute, seen);
+        self.set_attribute_blocks(entity, Some(&was), None);
+    }
+
+    /// Queues every attribute that differs between `seen` and
+    /// `attributes` -- both sorted by type -- of `entity` becoming as
+    /// in `attributes`, each a compare-and-write of its own.
+    fn set_attributes_changed(&mut self, entity: &Header, seen: &[AttributeBlock], attributes: &[AttributeBlock]) {
+        for value in each_attribute(attributes) {
+            let was = attribute_blocks(seen, value[0].kind());
+            if was != Some(value) {
+                self.set_attribute_blocks(entity, was, Some(value));
+            }
         }
-        let kind = attribute.attribute_type();
-        let compare = Compare::Attribute { id: entity.id, at: entity.at, kind, seen: Some(AttributeBlock::holding(attribute, seen)) };
-        self.queue_instruction_if(compare, entity.at, |instructions| instructions.unset_attribute(entity.id, entity.at, kind));
-        true
+        for was in each_attribute(seen).filter(|was| attribute_blocks(attributes, was[0].kind()).is_none()) {
+            self.set_attribute_blocks(entity, Some(was), None);
+        }
     }
 
     /// Queues `before`'s entity becoming `after`, with `attributes`:
-    /// changed, and moved to its cell unless that is taken by then. To
-    /// another superchunk it crosses (`docs/simulation.md`,
-    /// "Entities").
+    /// each attribute that differs from what the tick found a
+    /// compare-and-write of its own ([`Turn::set_attribute_blocks`]),
+    /// then moved to its cell unless that is taken by then. It is
+    /// never put whole over itself, so what another entity writes to
+    /// it in the same tick is not lost. To another superchunk it
+    /// crosses (`docs/simulation.md`, "Entities").
     pub fn update(&mut self, before: &Header, after: Header, attributes: &[AttributeBlock]) {
         debug_assert!(after.wake > self.now, "an entity put to wake at tick {}, not after {}", after.wake, self.now);
-        let there = self.slot_of(after.at.superchunk());
+        let seen = self.entity_reader.get(before.id, before.at).map_or(&[][..], |seen| seen.attributes);
+        self.set_attributes_changed(before, seen, attributes);
         if before.at.superchunk() == after.at.superchunk() {
-            self.outbox.instructions[there].put(after, before.at, attributes);
+            let slot = self.slot_of(after.at.superchunk());
+            self.outbox.instructions[slot].move_entity(after, before.at);
         } else {
-            self.outbox.instructions[there].cross(after, before.at, attributes);
-            self.outbox.instructions[slot(0, 0)].put(Header { at: before.at, ..after }, before.at, attributes);
+            self.cross(before, after, attributes);
         }
+    }
+
+    /// Queues `before`'s entity crossing to `after`'s cell, in another
+    /// superchunk, with `attributes` -- what it is to have by then,
+    /// its changes queued where it stands: put there whole, and here
+    /// put to sleep where it stands until its wake. The crossing
+    /// stands only if it ends the tick here with those attributes --
+    /// else another changed it meanwhile, and it stays, asleep, with
+    /// every change made to it (`SuperchunkEntities::settle_leavers`).
+    fn cross(&mut self, before: &Header, after: Header, attributes: &[AttributeBlock]) {
+        let there = self.slot_of(after.at.superchunk());
+        self.outbox.instructions[there].cross(after, before.at, attributes);
+        self.outbox.instructions[slot(0, 0)].move_entity(Header { at: before.at, ..after }, before.at);
     }
 
     /// Queues removing `header`'s entity.

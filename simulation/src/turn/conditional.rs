@@ -8,7 +8,7 @@ use super::Turn;
 use bitplane_manager::{Superchunk, Write, WriteOp, WritesApplied};
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{AttributeBlock, AttributeType, EntityId, Instructions, InstructionsApplied, SuperchunkEntities};
+use entity_manager::{attribute_blocks, blocks_sum, AttributeBlock, AttributeType, EntityId, Instructions, InstructionsApplied, SuperchunkEntities};
 
 /// A write that counts nothing.
 const NO_COUNT: u32 = u32::MAX;
@@ -36,8 +36,8 @@ pub enum Compare {
         seen: u16,
     },
     /// The entity `id` stands on `at`, and its attribute of type
-    /// `kind` is `seen` -- or it has none, if none was seen. Of an
-    /// attribute one block long.
+    /// `kind` is as seen -- or it has none, if none was seen
+    /// ([`Compare::attribute`]).
     Attribute {
         /// The entity.
         id: EntityId,
@@ -45,12 +45,23 @@ pub enum Compare {
         at: CellIndex,
         /// The attribute's type.
         kind: AttributeType,
-        /// The attribute as the rule saw it, if it had one.
+        /// The attribute's first block as the rule saw it, if it had
+        /// the attribute.
         seen: Option<AttributeBlock>,
+        /// The sum of its blocks after the first: of none, for an
+        /// attribute one block long.
+        rest: u64,
     },
 }
 
 impl Compare {
+    /// The entity `id` stands on `at`, its attribute of type `kind`
+    /// the blocks `seen`, or none.
+    pub fn attribute(id: EntityId, at: CellIndex, kind: AttributeType, seen: Option<&[AttributeBlock]>) -> Self {
+        let (first, rest) = seen.and_then(|seen| seen.split_first()).map_or((None, &[][..]), |(first, rest)| (Some(*first), rest));
+        Self::Attribute { id, at, kind, seen: first, rest: blocks_sum(rest) }
+    }
+
     /// The cell what is compared is on.
     fn at(&self) -> CellIndex {
         match *self {
@@ -64,7 +75,10 @@ impl Compare {
     fn holds(&self, superchunk: &Superchunk, entities: &SuperchunkEntities) -> bool {
         match *self {
             Self::Cell { layer_type, at, seen } => superchunk.value_at(layer_type, at) == Some(u32::from(seen)),
-            Self::Attribute { id, at, kind, seen } => entities.get(id, at).is_some_and(|entity| entity.attributes.iter().find(|block| block.kind() == kind).copied() == seen),
+            Self::Attribute { id, at, kind, seen, rest } => entities.get(id, at).is_some_and(|entity| {
+                let now = attribute_blocks(entity.attributes, kind).and_then(|now| now.split_first());
+                now.map(|(first, _)| *first) == seen && blocks_sum(now.map_or(&[][..], |(_, rest)| rest)) == rest
+            }),
         }
     }
 }
@@ -107,6 +121,8 @@ enum Does {
 pub(crate) struct Step {
     /// What it is held against.
     compare: Compare,
+    /// What it is held against as well, if anything: both must hold.
+    also: Option<Compare>,
     /// What it does.
     does: Does,
     /// Instructions queued before it.
@@ -162,7 +178,7 @@ impl Conditional {
         for step in &self.steps {
             instructions.apply_some(next..step.before as usize, std::slice::from_mut(entities), earliest, &mut applied.instructions);
             next = step.before as usize;
-            let holds = step.compare.holds(superchunk, entities);
+            let holds = step.compare.holds(superchunk, entities) && step.also.is_none_or(|also| also.holds(superchunk, entities));
             match step.does {
                 Does::Write { layer_type, at, seen, value, count } => {
                     applied.writes.writes += 1;
@@ -216,7 +232,7 @@ impl Turn<'_> {
         assert_eq!(compare.at().superchunk(), lands.superchunk(), "a compare in another superchunk than what it lets be written");
         let slot = self.slot_of(lands.superchunk());
         let before = self.outbox.instructions[slot].len() as u32;
-        self.outbox.conditional[slot].steps.push(Step { compare, does, before });
+        self.outbox.conditional[slot].steps.push(Step { compare, also: None, does, before });
     }
 
     /// Queues the number of `layer_type` at `at` becoming `value` if
@@ -238,16 +254,20 @@ impl Turn<'_> {
     }
 
     /// Queues one entity instruction, by `queue`, for the superchunk
-    /// of `lands`, under `compare` alone -- whatever compare the
-    /// rule's own instructions are being queued under.
+    /// of `lands`, under `compare` -- and under the compare the rule's
+    /// instructions are being queued under as well, if there is one:
+    /// both must hold.
     pub(crate) fn queue_instruction_if(&mut self, compare: Compare, lands: CellIndex, queue: impl FnOnce(&mut Instructions)) {
         self.close_instructions_compared();
-        assert_eq!(compare.at().superchunk(), lands.superchunk(), "a compare in another superchunk than what it lets be written");
+        let also = self.comparing.map(|(also, _)| also);
+        for compare in also.iter().chain([&compare]) {
+            assert_eq!(compare.at().superchunk(), lands.superchunk(), "a compare in another superchunk than what it lets be written");
+        }
         let slot = self.slot_of(lands.superchunk());
         let first = self.outbox.instructions[slot].len() as u32;
         queue(&mut self.outbox.instructions[slot]);
         let last = self.outbox.instructions[slot].len() as u32;
-        self.outbox.conditional[slot].steps.push(Step { compare, does: Does::Instructions { first, last }, before: first });
+        self.outbox.conditional[slot].steps.push(Step { compare, also, does: Does::Instructions { first, last }, before: first });
         if let Some((_, from)) = &mut self.comparing {
             from[slot] = last;
         }
@@ -288,7 +308,7 @@ impl Turn<'_> {
             let last = self.outbox.instructions[slot].len() as u32;
             if last != *from {
                 assert_eq!(Some(slot), lands, "an instruction under a compare in another superchunk");
-                self.outbox.conditional[slot].steps.push(Step { compare: *compare, does: Does::Instructions { first: *from, last }, before: *from });
+                self.outbox.conditional[slot].steps.push(Step { compare: *compare, also: None, does: Does::Instructions { first: *from, last }, before: *from });
                 *from = last;
             }
         }
