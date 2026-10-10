@@ -18,13 +18,36 @@ const FARTHEST: &str = "cells a pixel at the farthest";
 /// What the stills' files are named after.
 const NAMED: &str = "name";
 
+/// Cells a screen pixel the window's still is taken at.
+const CELLS_A_PIXEL: &str = "cells a screen pixel";
+
 /// The renderer's tools.
-pub const COMMANDS: [Command; 1] = [Command {
+pub const COMMANDS: [Command; 2] = [Command {
     name: "stills",
     does: "paints one place of a world at every zoom -- the map, the cells from far, a cell a pixel, the cells from near -- with no window, and keeps each as a PNG under the renderer's transient_data/renders/",
     parameters: &[Parameter::new(SEED, "0"), Parameter::new(CELLS_EAST, "0"), Parameter::new(CELLS_SOUTH, "0"), Parameter::new(FARTHEST, "8"), Parameter::new(NAMED, "still")],
     run: stills_tool,
+}, Command {
+    name: "window_still",
+    does: "opens the window on a world, the view so many cells a screen pixel over its middle, keeps what the graphics card drew -- the pictures' mipmaps among it -- as a PNG under the renderer's transient_data/renders/, and closes it",
+    parameters: &[Parameter::new(SEED, "0"), Parameter::new(CELLS_A_PIXEL, "1.5"), Parameter::new(NAMED, "window")],
+    run: window_still_tool,
 }];
+
+/// Opens the window, keeps its still and closes it, a line printed for
+/// the file.
+fn window_still_tool(given: &Given) -> Result<(), String> {
+    let text = given.text(SEED)?;
+    let seed = utilities::seed::of_hex(text).ok_or_else(|| format!("`{text}` is no seed in hex"))?;
+    let seed = if seed == 0 { utilities::seed::counted() } else { seed };
+    let cells_a_pixel: f32 = given.number(CELLS_A_PIXEL)?;
+    let (folder, named) = (renders(), given.text(NAMED)?);
+    std::fs::create_dir_all(&folder).map_err(|why| format!("{}: {why}", folder.display()))?;
+    let path = folder.join(format!("{named}_{cells_a_pixel}.png"));
+    super::window_still::keep(seed, cells_a_pixel, path.clone());
+    println!("still,file\nwindow,{}\n# seed {}", path.display(), utilities::seed::hex(seed));
+    Ok(())
+}
 
 /// Paints the stills and keeps them, a line printed for each.
 fn stills_tool(given: &Given) -> Result<(), String> {

@@ -232,9 +232,9 @@ review item 1 (the renderer asks the host for terrain: DONE
 labels not tried by hand in the window -- the user's to look at) ->
 cold pool paging (DONE) -> the decay+eat case and compare-and-write
 (DONE 2026-10-10, see below) -> SCA rename (DONE 2026-10-10) -> GPU
-LOD (NEXT; the user, 2026-10-10, verbatim: "yes, mipmaps but done on
-the gpu instead of the cpu" -- the painter still paints on the CPU,
-the graphics card makes the mipmaps of the superchunks' pictures).
+LOD (DONE 2026-10-10; the user, verbatim: "yes, mipmaps but done on
+the gpu instead of the cpu" -- see task 5). THE ORDER IS DONE: what
+is left is task 6, another day, and what the user says next.
 That is: (1) server::World -- DONE 2026-10-10; (2) docs
 finished; (3) tests finished -- task 7, and each crate testing itself;
 (4) cold pool paging (task 4); (5) GPU LOD (task 5).
@@ -321,7 +321,18 @@ break; write a new ask here the moment it is made.
    cold STATES (entities, random number) not paged; BMI2 pdep for
    select not done (optional, and performance is not worked on now).
    The written seeds in server/tests/complete.rs: already the run's.
-5. LOD ON THE GPU (renderer).
+5. LOD ON THE GPU (renderer): DONE 2026-10-10. Each superchunk's
+   picture has mipmaps the graphics card makes (renderer/src/
+   mipmaps.rs; Bevy's mip_generation, compute), blended when the
+   picture is drawn smaller; sharp enlarged, as before. renderer.md,
+   "Mipmaps made on the graphics card". Checked with no one at the
+   screen: `Civil_Egregore renderer window_still [seed] [cells a
+   screen pixel] [name]` opens the window on a world, keeps what the
+   card drew as a PNG and closes it. MINE, for the user to say: the
+   painter's detail steps (frames::detail_at, paint_far) stay -- they
+   bound what the host copies and what is kept, far out; painting
+   fine farther out and leaving more to the card is one constant.
+   NOT seen by eye in a moving window: whether the shimmer is gone.
 6. Another day: optimizations, inlining.
 
 6b. DOUBLE WRITES: CHECKED 2026-10-10 (server.md, "Two writes on one
@@ -341,8 +352,7 @@ break; write a new ask here the moment it is made.
    mc_rules -> sca_rules (crate, docs, glossary, every mention).
    DONE 2026-10-10: the crate is sca_rules, its design
    sca_rules/docs/sca_rules.md; the glossary has the word, Monte
-   Carlo among those not used. Done before GPU LOD, which waits on
-   the user saying what it is to be (see the order above).
+   Carlo among those not used.
 7. TESTS GENERATED: DONE 2026-10-10, every crate gone through. A case
    that can be drawn is drawn from the run's seed, beside the edges
    written by hand; new tests against the plainest working-out (writes
