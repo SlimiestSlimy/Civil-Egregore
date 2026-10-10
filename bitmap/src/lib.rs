@@ -1,19 +1,6 @@
-//! Civil Egregore's bitmap: 256 by 256 cells, and everything that can be asked
-//! of them or done to them. Every layer of a chunk is one; Tessera
-//! (`../tessera/`) encodes them.
+//! Civil Egregore's bitmap: 256 by 256 cells, and everything that can be
+//! asked of them or done to them. Every layer of a chunk is one.
 //!
-//! | file | what is in it |
-//! |---|---|
-//! | `bitmap_data` | what a bitmap is, its Morton-order layout, and what can be asked of a cell or a tile |
-//! | `bitmap_drawing` | rectangles and circles, drawn by their shape |
-//! | [`morton`] | the Morton order the cells are laid out in, which any structure over the same cells can share |
-//! | [`window`] | windows: up to 8x8 cells at any cell, cut from the word tiles they overlap, each turned from Morton order into rows |
-//! | `diagnostics/` | data gathered, to be measured and tested on: none yet |
-//! | `transient_data` | the crate's `transient_data/`, out of git: what its runs leave behind |
-//!
-//! Nothing here decides anything. What to describe, at what size, in
-//! what order, is for whatever reads the bitmap.
-
 //! The design: `docs/bitmap.md`; function by function:
 //! `docs/reference.md`.
 
@@ -30,8 +17,7 @@ pub mod window;
 
 pub use bitmap_data::{Bitmap, CellWords};
 
-/// The bitmap is always this wide... Nothing is sized at run time,
-/// which is what lets whatever reads it size everything once.
+/// The bitmap is always this wide...
 pub const WIDTH: usize = 256;
 /// ...and this tall.
 pub const HEIGHT: usize = 256;

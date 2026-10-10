@@ -65,15 +65,9 @@ impl Queue {
 }
 
 /// The shortest path from `from` to `to` over the cells of `passable`,
-/// through no wall of `walls`, a step to any of the eight neighbours: its first step and its
-/// length, by A*. `from` and `to` themselves need not be passable -- a
-/// walker stands on one and wants the other. `None` if there is no way,
-/// or if they are one cell.
-///
-/// The search runs backwards, from `to`: each cell reached remembers
-/// the cell it was reached from, one step nearer `to`, so when `from`
-/// is reached what it remembers is the path's first step, with nothing
-/// to walk back along.
+/// through no wall of `walls`: its first step and its length. `None`
+/// if there is no way, or if they are one cell (`docs/pathfinding.md`,
+/// "A*").
 pub fn a_star(passable: &Rows, walls: &Walls, from: Cell, to: Cell) -> Option<Path> {
     if from == to {
         return None;

@@ -3,15 +3,9 @@
 //! ([`AttributeType`]) -- each a `u64` from the one namespace, in a type
 //! of its own so that one is never passed for another.
 
-/// What a layer represents: a `u64` naming anything from a specific
-/// thing to a property. What each value means is the registry's to
-/// say ([`crate::REGISTRY`]); two layers of a chunk never share one.
-///
-/// A type may be wide ([`LayerType::wide`]): 2, 4, 8 or 16 bits a cell
-/// where it is hot, one bucket holding a cell's whole number. Cold, it
-/// is as many layers of a bit a cell, the bit `b` of every cell the
-/// layer of type `first + b` ([`LayerType::plane`]): storage and the
-/// codec know bitmaps only.
+/// What a layer represents: a `u64` the registry gives a meaning
+/// ([`crate::REGISTRY`]). It may be wide, 2 to 16 bits a cell
+/// (`docs/type_registry.md`, "Width").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LayerType(pub u64);
 

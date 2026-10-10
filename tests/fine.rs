@@ -166,7 +166,7 @@ impl Repository {
         let Some(text) = self.found(file, path).and_then(|there| fs::read_to_string(there).ok()) else {
             return Vec::new();
         };
-        let headings: Vec<&str> = text.lines().filter(|line| line.starts_with('#') || line.starts_with("**")).map(|line| line.trim_start_matches(['#', '*']).trim()).collect();
+        let headings: Vec<&str> = text.lines().filter(|line| line.starts_with('#') || line.starts_with("**")).map(|line| line.trim_start_matches(['#', '*', '`', ' ']).trim()).collect();
         let after = after.split_whitespace().collect::<Vec<_>>().join(" ");
         let sentence = after.split(['`', '|', ')']).next().unwrap_or_default().split(". ").next().unwrap_or_default();
         sentence.split('"').skip(1).step_by(2).filter(|title| !headings.iter().any(|heading| heading.starts_with(title))).map(str::to_string).collect()

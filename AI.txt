@@ -216,8 +216,15 @@ break; write a new ask here the moment it is made.
    says in detail what the code does, and nothing it no longer does;
    (b) long comments in the code are cut to a line or three and their
    substance moved to the docs, the comment pointing there
-   (`docs/x.md`, "Section"). Crates read so far: (none). Commit a
-   crate at a time.
+   (`docs/x.md`, "Section"). Helper: scratchpad crate.py <crate>
+   lists the items a crate's docs do not name (private too) and its
+   comment blocks of 6+ lines; if lost, it is 40 lines of python.
+   Crates done: coordinates, bitmap, type_registry, pathfinding,
+   utilities. Left: bitplane_manager, chunk_storage, entity_manager,
+   simulation, instructions, mc_rules, entity_rules, worldgen, server,
+   gui, renderer, tessera, AI_SCRATCHPAD, src. When all are done, make
+   tests/fine.rs's every_public_item test cover private items too
+   (not trait-impl methods or tests). Commit a few crates at a time.
 2. WORLDGEN: profile and really simplify ("waaay too slow"); a little
    more mountain, a little less plateau ("just a bit").
 3. ENTITY ATTRIBUTES, NEW SHAPE (asked 2026-10-09). The type ID stays
@@ -234,6 +241,10 @@ break; write a new ask here the moment it is made.
    the seed file. Optional: BMI2 pdep for select.
 5. LOD ON THE GPU (renderer).
 6. Another day: optimizations, inlining.
+
+7. LAST STEP (asked 2026-10-09): go through ALL tests of the codebase;
+   wherever a test has fixed cases that could be generated (seeded,
+   randomized, from the seed file), make it generated.
 
 To tell the user at the end: chunk_storage/entity_manager still hand
 on the ID types (shortcut); TickCounts carries per-rule times; float

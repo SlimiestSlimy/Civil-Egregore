@@ -1,22 +1,7 @@
-//! The thread dispatcher: worker threads started once and kept, parked
-//! while there is nothing to do, and the two kinds of work they take.
-//!
-//! - A job **run** ([`Dispatcher::run`]) is done on every thread at
-//!   once, a part each, the caller's thread doing the first: a tick's
-//!   phase. It borrows what the caller holds, for no longer than `run`
-//!   takes: `run` does not return -- not even when a part panics --
-//!   until every worker has finished its part. That is what lets a
-//!   borrowed job be handed to threads that outlive it, and the one
-//!   `unsafe` here rests on it.
-//! - A job **queued** ([`Dispatcher::queue`]) is done by one worker,
-//!   whenever one is free, the caller not waiting: chunk storage's slow
-//!   work, off the tick.
-//!
-//! One set of threads does both, so neither crowds the other out of
-//! the machine: a worker takes a job run before one queued, and one
-//! busy with a queued job sits a run out -- the run is then split
-//! among the others. A job run must so not count on every part being
-//! run: only on part 0, and on each other at most once.
+//! The thread dispatcher: worker threads started once and kept, a job
+//! run on all at once ([`Dispatcher::run`]) and jobs queued for
+//! whichever is free ([`Dispatcher::queue`]): `docs/utilities.md`,
+//! "The dispatcher".
 
 use std::collections::VecDeque;
 use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};

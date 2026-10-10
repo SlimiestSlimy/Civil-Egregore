@@ -1,15 +1,6 @@
-//! The bitmap itself: 256 by 256 bits, packed into machine words.
-//!
-//! In [Morton order](crate::morton): the cell at Morton index `i` is bit
-//! `i % 64` of word `i / 64`. Every tile -- an aligned square whose side
-//! is a power of two -- is then one contiguous run of bits: a 4x4 tile
-//! sixteen bits, an 8x8 tile exactly one word, a bigger one whole words.
-//! So a question about a whole tile is a few word operations, not one
-//! per row.
-//!
-//! The drawing methods (`bitmap_drawing.rs`) take `i64` and clamp, so a
-//! caller can ask for a circle hanging off the edge without doing the
-//! arithmetic first.
+//! The bitmap itself: 256 by 256 bits in Morton order, the cell at
+//! Morton index `i` bit `i % 64` of word `i / 64`, so a tile is a run
+//! of bits (`docs/bitmap.md`, "Morton order").
 
 use crate::morton::morton_index;
 use crate::{BITS_PER_WORD, WORDS};

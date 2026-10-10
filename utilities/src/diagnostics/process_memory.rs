@@ -1,9 +1,5 @@
-//! The process's memory, as the system counts it: what it holds in
-//! physical memory now, and the most it has held. Read from
-//! `/proc/self/status`, so only on Linux; elsewhere nothing is known.
-//!
-//! [`MemoryTrack`] reads it again and again over a run, for the peak
-//! and the average.
+//! The process's memory as the system counts it, now and at its peak,
+//! and tracked over a run: from `/proc/self/status`, so only on Linux.
 
 /// What the process holds in physical memory, in bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

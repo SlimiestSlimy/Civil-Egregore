@@ -23,13 +23,9 @@ const SERIES_ONE_BITS: u32 = 62;
 const ONE_OVER_LN_2: i128 = 6_653_256_548_922_161_245;
 
 /// The logarithm to base 2 of `value`, times 2^`fraction_bits`, by
-/// squaring: its whole part where `value`'s highest bit is, then a bit
-/// of fraction a squaring -- `value` over that power of two, in
-/// `[1, 2)`, squared is 2 or more exactly when the next bit is 1. The
-/// squares are kept in 128 bits, so the result is the true logarithm's
-/// to about a part in 2^56. Slow -- a multiplication a bit: what
-/// [`log2`]'s tables are made with as the crate is built, and what it
-/// is tested against.
+/// squaring, a bit of fraction a squaring: slow, what [`log2`]'s tables
+/// are made with and what it is tested against (`docs/utilities.md`,
+/// "Fixed point").
 ///
 /// # Panics
 /// If `value` is 0, or the whole part and `fraction_bits` do not fit
@@ -90,13 +86,9 @@ const fn times(one: i128, other: i128) -> i128 {
     (one * other) >> SERIES_ONE_BITS
 }
 
-/// The logarithm to base 2 of `value`, times 2^[`LOG2_FRACTION_BITS`]:
-/// its whole part where `value`'s highest bit is; its fraction from the
-/// tables' row the next [`TABLE_BITS`] bits pick -- the logarithm of
-/// the row's middle -- and a short series for what `value` is off that
-/// middle by, under a part in 256. A few multiplications, whole numbers
-/// all: the same on every machine, and the true logarithm's to a part
-/// in 2^47. A power of two's is exact.
+/// The logarithm to base 2 of `value`, times 2^[`LOG2_FRACTION_BITS`],
+/// by table and series: whole numbers all, the same on every machine,
+/// a power of two's exact (`docs/utilities.md`, "Fixed point").
 ///
 /// # Panics
 /// If `value` is 0, which has no logarithm.

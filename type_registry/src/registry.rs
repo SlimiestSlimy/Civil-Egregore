@@ -1,10 +1,6 @@
-//! The table ([`REGISTRY`]): every type a world has, a row each -- its
-//! name, its kind, its ID and its width -- written once, in
-//! [`registered!`], which makes the row and the constant the code
-//! names the type by together: no type is used that is not listed.
-//! The rows are checked as the crate is built ([`first_clash`]): two
-//! sharing an ID or a name, or a wide plane's cold planes reaching into
-//! another row's, is an error, not a world quietly wrong.
+//! The table ([`REGISTRY`]): every type a world has, a row each, written
+//! once in [`registered!`] and checked as the crate is built
+//! ([`first_clash`]): `docs/type_registry.md`, "Why one table".
 
 use crate::type_ids::{AttributeType, Bits4, EntityType, LayerType, Wide, Width};
 

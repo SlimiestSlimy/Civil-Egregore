@@ -20,7 +20,8 @@ cells)`** the run's bits (at most a word), **`set_in_morton_run`**,
 
 Tiles (aligned squares whose side is a power of two), by top-left
 corner and side: **`tile_words`** / **`tile_words_mut`**,
-**`set_in_small_tile`**, **`set_cells_in_tile`** (each set cell's place
+**`set_in_small_tile`** (a tile of less than a word, masked by
+`low_bits_mask`), **`set_cells_in_tile`** (each set cell's place
 in the tile, in Morton order), **`set_in_tile`**, **`set_tile`**.
 
 ## `bitmap_drawing.rs`

@@ -1,17 +1,6 @@
-//! Morton (Z) order: a square plane's cells numbered by interleaving the
-//! bits of their coordinates, `x` in the even bits and `y` in the odd
-//! ones. The first sixteen run
-//!
-//! ```text
-//!  0  1  4  5
-//!  2  3  6  7
-//!  8  9 12 13
-//! 10 11 14 15
-//! ```
-//!
-//! so every aligned square of a power-of-two side is one contiguous run,
-//! and a square's four quarters are four consecutive runs. The bitmap
-//! and every level of every pyramid are laid out this way.
+//! Morton (Z) order: a square plane's cells numbered by interleaving
+//! their coordinates' bits, `x` in the even ones (`docs/bitmap.md`,
+//! "Morton order").
 
 /// Every byte with its bits spread to every other bit: bit `i` to bit
 /// `2i`. A table, since this is asked of every coordinate read.

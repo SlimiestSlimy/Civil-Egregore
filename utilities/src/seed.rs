@@ -1,30 +1,6 @@
-//! The seed: what every crate's tests and tools grow their worlds,
-//! bitmaps or whatever else from -- not a constant in the code, but one
-//! number in one file for the whole workspace ([`file`]), so that using
-//! the same one twice is a thing seen and using another costs no edit.
-//!
-//! Reusing a seed is what comparing two versions of the code needs:
-//! holding what is tested still while the code moves. But a seed held
-//! for long becomes the only one every change was ever tried on, and
-//! what passes may pass on that seed alone. So the file keeps, with the
-//! seed, how many runs have used it, and after
-//! [`USES_BEFORE_THE_SEED_ROLLS`] the next run rolls a fresh one by
-//! itself. The first asking of a run settles the seed, and a one-row
-//! table on standard error says which it is, which use of it the run
-//! is and where it came from -- so a failure names the seed that made it.
-//!
-//! [`VARIABLE`] in the environment picks a seed for one run and leaves
-//! the file alone, its count too; [`FRESH`] as its value draws one for
-//! the run. A use may be left uncounted ([`uncounted`]): for quick
-//! checks run far more often than anything measured.
-//!
-//! A seed is 64 bits, and written everywhere as they are: `0x` and 16
-//! hexadecimal digits ([`hex`]), read back with or without the `0x`
-//! ([`of_hex`]).
-//!
-//! The file is CSV ([`crate::csv`]), `seed,uses` and a row, in the workspace's own `transient_data/`, beside the
-//! crates and not tracked by git: a seed and its count belong to the
-//! working copy they were used in.
+//! The seed: the one number every crate's tests and tools grow what
+//! they run on from, kept in one file and rolled every few runs
+//! (`docs/utilities.md`, "The seed").
 
 use crate::diagnostics::table::Table;
 use std::path::PathBuf;

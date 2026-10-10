@@ -1,11 +1,6 @@
 //! A crate's transient data: `transient_data/`, beside its `Cargo.toml`
-//! and kept out of git -- what its runs leave behind, one folder a kind.
-//! Nothing there is an input the code needs; a fresh checkout has none of
-//! it, and the first run that needs a part makes it.
-//!
-//! Every crate names its own with [`TransientData::of`] in its
-//! `src/transient_data.rs`; its measurements go to `measurements/`, one
-//! CSV a tool ([`TransientData::publish`]).
+//! and kept out of git -- what its runs leave behind
+//! (`docs/utilities.md`, "Transient data").
 
 use crate::diagnostics::table::report::Report;
 use std::path::{Path, PathBuf};

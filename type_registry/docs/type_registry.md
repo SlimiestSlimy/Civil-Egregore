@@ -37,5 +37,12 @@ under their own names, as what a layer and an entity are made of.
 ## Width
 
 A layer is a bit a cell: width 1. A wide plane is 2, 4, 8 or 16, and
-takes as many IDs. An attribute's value is a word: 64. An entity type
+takes as many IDs. Hot, one bucket holds each cell's whole number.
+Cold, it is as many layers of a bit a cell, the bit `b` of every cell
+the layer of type `first + b` (`LayerType::plane`): storage and the
+codec know bitmaps only. A wide type keeps how wide it is in the type
+itself -- the power of two, in the bits from `WIDTH_SHIFT` (56) up,
+over its number -- so `bits` is read off the ID with no table; the
+width as a type (`Width::BITS`) is the same number known as the code
+is built. An attribute's value is a word: 64. An entity type
 holds nothing itself: 0.

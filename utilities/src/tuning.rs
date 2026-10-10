@@ -1,16 +1,6 @@
-//! What is tuned by eye: the numbers a window's sliders set, in
-//! groups -- the near view's shading, which a painter reads each frame;
-//! how a world is generated, read when one is made, or made again
-//! while it runs; and what a world is set up with, read only when one
-//! is made ([`Group::setup_only`]). The numbers are a value ([`Tuning`]), held by whoever
-//! sets them and handed to whoever reads them: nothing of them is
-//! held here.
-//!
-//! Only their names and places are here. What a slider reaches, its
-//! group and what it does are in the sliders' file (`sliders.csv`, at
-//! the crate's root), written by hand; what each number is unless set
-//! is in the default settings ([`crate::settings`]), and what it was
-//! last set to is kept in the machine's, a line each.
+//! What is tuned by eye: the numbers a window's sliders set, by name and
+//! place, a value ([`Tuning`]) handed about (`docs/utilities.md`, "What
+//! is tuned by eye").
 
 use crate::settings::Settings;
 use std::sync::OnceLock;

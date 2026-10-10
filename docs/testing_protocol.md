@@ -127,7 +127,8 @@ every markdown file, outside its fenced blocks:
   (`NAMES_NOT_OURS`).
 - A section sent to is there. After a path to a markdown file, each
   title in quotes up to the sentence's end has to begin one of that
-  file's headings, or one of its paragraphs that starts in bold.
+  file's headings, or one of its paragraphs that starts in bold (a
+  reference's entry: `**`name`**`, found by the name alone).
 
 This catches a file moved, an item renamed or removed, a section
 retitled. It does not catch a doc that names a thing rightly and says
