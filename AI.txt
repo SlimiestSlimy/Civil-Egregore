@@ -132,6 +132,21 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
 
 == OPEN THREADS ==
 
+- Worldgen is what a world's making and wandering cost: callgrind,
+  2026-10-09, one thread (transient_data/measurements/
+  profiles_2026-10-09/, with run.sh and every .out). Making a
+  superchunk is 2.5 to 4 G instructions, some 60% of it
+  worldgen::mesh::Mesh::blended and Mesh::locate's closure, then
+  coordinates::cartesian_from_place and HeightMap::get. A world with
+  no side run 3,000 ticks spent over 90% of its instructions
+  generating the 12 superchunks its halos reached. Against that a
+  tick of a 4-superchunk world with 8,000 sheep is ~0.33 M. The next
+  optimization worth making is Mesh::blended.
+- The tick reference (pasture 300 333 4000 4 1 less the 0-tick run)
+  is 49.95 M instructions since Lookup::windows was built by index.
+- A fresh flock loses ~2% at its first wake: old age is rolled for the
+  whole sleep ahead (wake - now over LIFE_TICKS) and a fed sheep's
+  first sleep is long. The rule as written; told to the user.
 - Area allocator: 256 MiB blocks, 256-byte units, sorted interval list,
   owning handles (after the Tessera clean).
 - Tessera deep clean: settle the code, move abstraction boundaries
