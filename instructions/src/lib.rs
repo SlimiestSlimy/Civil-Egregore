@@ -60,4 +60,5 @@ pub use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOURS, SUP
 pub use entity_manager::{Attribute, AttributeType, EntityEdit, EntityId, EntityRef, EntityType, Header};
 pub use rule_counts::{RuleCounts, COUNTS_OF_A_RULE};
 pub use simulation::{TickReport, Turn};
+pub use utilities::chance::Chance;
 pub use utilities::rng::Rng;

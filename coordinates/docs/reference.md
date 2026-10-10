@@ -11,7 +11,8 @@ coordinates fit a `u32`), `WORLD_MIDDLE` (the superchunk the world
 starts at), `NEIGHBOURS` (a cell's eight, as offsets).
 
 **`square_side(count)`**, **`square_from_middle(count)`**: the side of
-the square `count` superchunks make, and those superchunks, row by row
+the square `count` superchunks make -- the whole root of one less, and
+one, no float -- and those superchunks, row by row
 from `WORLD_MIDDLE`: how a world of that many is laid out.
 
 **`SuperchunkIndex(u64)`**: **`from_cartesian(x, y)`** and

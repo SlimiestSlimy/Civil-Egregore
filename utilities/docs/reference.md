@@ -56,8 +56,35 @@ command of every crate.
 
 **`Rng::new(seed)`**, **`for_stream(seed, stream)`** -- a source of its
 own for a stream of a seed, its state mixed -- **`state()`** (what a
-save keeps), **`draw`**, **`below`**, **`between`**, **`percent_chance`**,
-**`unit`**.
+save keeps), **`draw`**, **`below`**, **`between`**, **`percent_chance`**;
+**`chance(chance)`**: true with a `Chance`, the draw's high 32 bits
+under its parts; **`chance_among(part, whole)`**: true `part` times in
+`whole`; **`unit`**: a float in `[0, 1)`, for what is not the
+simulation -- forbidden to it (`clippy.toml`).
+
+## `chance.rs`
+
+**`PARTS`** (2^32): what a chance is out of. **`Chance`**: so many
+parts, and the negated logarithm of the chance it does not happen,
+worked out where it is made. **`NEVER`**, **`ALWAYS`**, **`HALF`**;
+**`of_parts(parts)`**, no more than all; **`one_in(times)`**, to the
+nearest part; **`plus(other)`**, of two that never both happen;
+**`parts`**, **`is_never`**, **`is_always`**. **`passed_over(draw)`**:
+the things passed over before the next chosen, a gap of the geometric
+law from a draw's high 53 bits (`DRAW_BITS`) -- one division.
+**`fraction`**: the chance as a float, for a report or a test's
+expectation alone.
+
+## `fixed_point.rs`
+
+**`LOG2_FRACTION_BITS`** (48). **`log2(value)`**: the logarithm to base
+2, times 2^48 -- the whole part from the highest bit, the fraction from
+a row of **`MIDDLE_LOG2`** and **`ONE_OVER_MIDDLE`** (`ROWS`, 128,
+picked by `TABLE_BITS`, 7; each row's **`middle`**) and a series to the
+sixth power (**`times`**, `SERIES_ONE_BITS`, `ONE_OVER_LN_2`), kept in
+`TABLE_FRACTION_BITS` (56) until rounded.
+**`log2_by_squaring(value, fraction_bits)`**: the same a bit a
+squaring: what the tables are made with and `log2` tested against.
 
 ## `hash.rs`
 

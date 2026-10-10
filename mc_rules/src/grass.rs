@@ -26,13 +26,16 @@
 //! spreading fills cells that were dirt.
 
 use instructions::layers::{GRASS, WET};
-use instructions::{read, write, CellIndex, RuleCounts, Turn, NEIGHBOURS};
+use instructions::{read, write, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
 
 /// The chance, each tick, that a cell of grass tries to spread.
-pub const SPREAD_CHANCE: f64 = 0.000_01;
+pub const SPREAD_CHANCE: Chance = Chance::one_in(100_000);
 /// The chance, each tick, that a cell of grass with grass all round
 /// turns back to dirt.
-pub const DECAY_CHANCE: f64 = 0.000_005;
+pub const DECAY_CHANCE: Chance = Chance::one_in(200_000);
+/// The chance, each tick, that a cell of grass is sampled: to spread or
+/// to decay.
+pub const SAMPLE_CHANCE: Chance = SPREAD_CHANCE.plus(DECAY_CHANCE);
 
 /// What the rule counts, each named at its place in its [`RuleCounts`].
 pub const COUNTED: [&str; 3] = ["sampled", "spreads", "decays"];
@@ -48,7 +51,7 @@ pub const DECAYS: usize = 2;
 /// the chances of spreading and of decay together, in Morton order,
 /// each seen to by [`cell`].
 pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
-    let (sampled, mut counts) = read::cells::each_sampled(turn, GRASS, SPREAD_CHANCE + DECAY_CHANCE, samples, cell);
+    let (sampled, mut counts) = read::cells::each_sampled(turn, GRASS, SAMPLE_CHANCE, samples, cell);
     counts[SAMPLED] = sampled as u64;
     counts
 }
@@ -58,9 +61,8 @@ pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
 /// neighbour lets it.
 #[inline]
 fn cell(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
-    let spread_share = SPREAD_CHANCE / (SPREAD_CHANCE + DECAY_CHANCE);
     let (dx, dy) = NEIGHBOURS[turn.random().below(NEIGHBOURS.len() as u64) as usize];
-    let spreading = turn.random().unit() <= spread_share;
+    let spreading = turn.random().chance_among(SPREAD_CHANCE, SAMPLE_CHANCE);
     // Stepped on the Morton index itself: no cartesian coordinates.
     let Some(neighbour) = cell.offset(dx, dy) else {
         return;

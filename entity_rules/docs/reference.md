@@ -37,8 +37,6 @@ its `RuleCounts`, their places named **`WOKEN`**, **`EATEN`**,
 looked for, found, and found beyond the area -- and their names listed
 in **`COUNTED`**.
 
-**`tick(simulation, arena, entities, seed)`**: one tick of the sheep
-alone, the cells changing only as they change them.
 
 **`flock(entities, superchunk, count, random)`**: grown sheep, each
 some way from its next meal, queued each on a cell of its own drawn at

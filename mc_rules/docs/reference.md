@@ -4,25 +4,24 @@ The design is in `mc_rules.md`.
 
 ## `grass.rs`
 
-`SPREAD_CHANCE` (0.001%), `DECAY_CHANCE` (0.0005% with grass all round).
+`SPREAD_CHANCE` (once in 100,000), `DECAY_CHANCE` (once in 200,000,
+with grass all round), `SAMPLE_CHANCE` (the two together): each a
+`Chance`, parts in 2^32, no float.
 
 **`rule(turn, samples)`**: hands **`cell`**, the rule for one cell of grass, to `read::cells::each_sampled`, which goes over the cells. On one superchunk's turn, every cell of grass
 sampled at the two chances together; each draws a neighbour (one of the
 eight, stepped on the Morton index) and whether it spreads (in
-`SPREAD_CHANCE` of the sum) or decays: grass set on a
+`SPREAD_CHANCE` of the sum, `Rng::chance_among`) or decays: grass set on a
 neighbour with none, or its own cleared beside a grass one. Dirt is a
 cell with no grass: it has no layer.
 Returns its `RuleCounts`, their places named **`SAMPLED`**,
 **`SPREADS`**, **`DECAYS`**, their names listed in **`COUNTED`**.
 
-**`tick(simulation, arena, entities, seed)`**: one tick of the rule over
-every superchunk in use, on the simulation's threads.
-
 ## `trees.rs`
 
 The trees' layers are the terrain's (`instructions::layers`): `TREE`,
 the cells a tree stands on, and `TREE_STAGE`, its stage, 0 to
-`OLDEST_TREE_STAGE`. `SAMPLE_CHANCE` (0.01%), `SPREAD_SHARE` (half), `SEEDS_FROM` (4),
+`OLDEST_TREE_STAGE`. `SAMPLE_CHANCE` (once in 10,000), `SPREAD_SHARE` (`Chance::HALF`), `SEEDS_FROM` (4),
 `CROWDED` (9), `DIE_ONE_IN` (4), `AROUND` (8).
 
 **`rule(turn, samples)`**: hands **`tree`**, the rule for one tree, to `read::cells::each_sampled`. Every tree sampled tries to spread or grows

@@ -49,7 +49,8 @@ pub const WORLD_MIDDLE: SuperchunkIndex = SuperchunkIndex::from_cartesian(WORLD_
 
 /// Superchunks along the side of the square `count` of them make.
 pub fn square_side(count: u32) -> u32 {
-    (count as f64).sqrt().ceil() as u32
+    // The whole root of one less, and one: the least side whose square holds them.
+    if count == 0 { 0 } else { (count - 1).isqrt() + 1 }
 }
 
 /// `count` superchunks in a square from [`WORLD_MIDDLE`], row by row

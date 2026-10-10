@@ -9,13 +9,24 @@ are in `../../docs/Civil Egregore.md`, "The speed of light", "The tick" and
 
 ## Sampling
 
-Every hot set cell of a layer chosen with one probability,
-independently, handed out in Morton order, so the writes computed from
-the samples are queued in Morton order and never sorted. No sample is
-wasted: the set cells are ranked in Morton order, and the gap from one
-chosen rank to the next is drawn from the geometric law --
-`floor(ln(u) / ln(1 - p))`, `u` uniform in `(0, 1]` -- which chooses
-each set cell with probability `p`. The counts find each chosen rank
+Every hot set cell of a layer chosen with one chance
+(`utilities::chance::Chance`, parts in 2^32), independently, handed out
+in Morton order, so the writes computed from the samples are queued in
+Morton order and never sorted. No sample is wasted: the set cells are
+ranked in Morton order, and the gap from one chosen rank to the next is
+drawn from the geometric law -- `floor(log(u) / log(1 - p))`, `u`
+uniform in `(0, 1]` -- which chooses each set cell with chance `p`.
+
+The gap is whole-number arithmetic, `Chance::passed_over`: a
+fixed-point logarithm of the draw over one of the chance, worked out
+once where the chance is made; one division a sample. No float is in
+it, so the same cells are chosen on every machine -- with `ln` they
+were whatever each machine's maths library rounded to
+(`../../utilities/docs/utilities.md`, "Chances" and "Fixed point", for
+how and how precisely). A chance of always passes none over and takes
+every set cell; of never, none, and nothing is drawn.
+
+The counts find each chosen rank
 without a scan: a superchunk's layer passed over whole by its count, a
 chunk by its count, a count tile of 16 words by its count, a word by its
 bits' count, and only the word holding a chosen cell searched -- so a

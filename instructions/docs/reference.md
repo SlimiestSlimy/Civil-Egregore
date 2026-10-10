@@ -31,8 +31,9 @@ of it.
 
 ## `read/cells.rs`
 
-**`each_sampled(turn, type, probability, samples, each)`**: `each` run
-on every cell sampled, with its counts. **`hot(turn, type, cell)`**,
+**`each_sampled(turn, type, chance, samples, each)`**: `each` run
+on every cell sampled -- each set cell of the type chosen with the
+`Chance`, independently -- with its counts. **`hot(turn, type, cell)`**,
 **`holds`**, **`lacks`**: the cell read. **`value(turn, plane,
 cell)`**: a wide plane's number. **`square(turn, type, cell, side)`**:
 up to 8x8 cells about a cell as a `Window`, with their top left cell.
@@ -117,7 +118,7 @@ the types of entity a world has, from the type registry.
 The words the instructions are asked in: `CellIndex`, `CellCartesian`,
 `ChunkIndex`, `SuperchunkIndex`, `LayerType`, `Wide`, `Bits4`,
 `Attribute`, `AttributeType`, `EntityType`, `EntityId`, `Header`,
-`EntityRef`, `EntityEdit`, `Turn`, `TickReport`, `Rng`.
+`EntityRef`, `EntityEdit`, `Turn`, `TickReport`, `Rng`, `Chance`.
 
 **`RuleCounts`** (`rule_counts.rs`): what a rule did, up to
 `COUNTS_OF_A_RULE` numbers, each at a place the rule names, added with

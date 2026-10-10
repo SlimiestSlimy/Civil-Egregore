@@ -19,12 +19,12 @@
 //! Trees stand on dirt and grass alike and change neither.
 
 use instructions::layers::{OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
-use instructions::{read, write, CellIndex, RuleCounts, Turn};
+use instructions::{read, write, CellIndex, Chance, RuleCounts, Turn};
 
 /// The chance, each tick, that a tree is sampled.
-pub const SAMPLE_CHANCE: f64 = 0.000_1;
+pub const SAMPLE_CHANCE: Chance = Chance::one_in(10_000);
 /// The share of a tree's samples it tries to spread in; it grows in the rest.
-pub const SPREAD_SHARE: f64 = 0.5;
+pub const SPREAD_SHARE: Chance = Chance::HALF;
 /// The stage from which a tree spreads.
 pub const SEEDS_FROM: u32 = 4;
 /// The other trees about a tree at which it never spreads.
@@ -57,7 +57,7 @@ pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
 /// the oldest stage, may die.
 #[inline]
 fn tree(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
-    let spreading = turn.random().unit() <= SPREAD_SHARE;
+    let spreading = turn.random().chance(SPREAD_SHARE);
     let Some(stage) = read::cells::value(turn, TREE_STAGE, cell) else {
         return;
     };
