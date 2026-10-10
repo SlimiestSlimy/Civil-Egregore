@@ -4,7 +4,7 @@
 //! `cargo test --test fast`
 
 mod sampling {
-    //! Monte Carlo sampling: every set cell chosen with the probability
+    //! SCA sampling: every set cell chosen with the probability
     //! asked, only set cells, each once, in Morton order, weighted across
     //! chunks by their counts, and only hot bitmaps.
     //!

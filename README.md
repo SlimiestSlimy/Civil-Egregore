@@ -7,7 +7,8 @@ Civil Egregore is a 2D procedural simulation game. The world is cut into
 256x256 chunks, each held as layers of bitmaps, and the simulation is
 built to run in parallel. What exists so far: the encoding of those
 layers, chunk storage, the hot bitplanes -- a bit a cell or wider --
-with their batched writes and Monte Carlo sampling; the rules running
+with their batched writes and the sampling of a stochastic cell
+automaton (SCA); the rules running
 on them -- grass spreading over dirt, trees growing -- and the first
 entities, sheep eating the grass; a world generated from a seed as
 islands in an ocean, heights and walls and all; worlds saved and
@@ -26,7 +27,7 @@ sliders its generation is tuned by.
 | [`docs/civil_egregore.md`](docs/civil_egregore.md) | what Civil Egregore is, and every decision about it so far: chunks, superchunks, layers, the simulation's plan |
 | [`src/`](src/) | the `Civil_Egregore` crate: the program, which is only the list of crates with commands -- `cargo run --release -- help` |
 | [`server/`](server/) | the world as a whole: made from a seed, ticked -- rules and entities together -- saved and loaded as a folder whose name is the world's; which entity keeps the world hot; its commands and its diagnostics tools |
-| [`mc_rules/`](mc_rules/) | the Monte Carlo rules of the cells, a file each: grass over dirt, and trees |
+| [`sca_rules/`](sca_rules/) | the rules of the cells, a stochastic cell automaton (SCA), a file each: grass over dirt, and trees |
 | [`entity_manager/`](entity_manager/) | the entities as kept, beside the bitplane manager's cells: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied |
 | [`entity_rules/`](entity_rules/) | the entities, a file each: so far the sheep, eating the grass |
 | [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |
@@ -36,7 +37,7 @@ sliders its generation is tuned by.
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
 | [`renderer/`](renderer/) | Civil Egregore on the screen: a Bevy window, opening on the main menu, asking the server's host, on a thread of its own, for the cells of its viewport |
 | [`gui/`](gui/) | Civil Egregore's menus, over whatever window shows it, a part a module: the main menu -- a new world set up, one saved opened, leaving -- the options Escape opens over a world, and the sliders of the numbers `utilities::tuning` names |
-| [`simulation/`](simulation/) | the simulation: Monte Carlo sampling, the two-phase tick and its outboxes, a superchunk's turn -- a bucket a chunk, a timer wheel a superchunk; and what is hot: the halos about the hot entities, warming and cooling by the tick, within the world's size if it has one |
+| [`simulation/`](simulation/) | the simulation: SCA sampling, the two-phase tick and its outboxes, a superchunk's turn -- a bucket a chunk, a timer wheel a superchunk; and what is hot: the halos about the hot entities, warming and cooling by the tick, within the world's size if it has one |
 | [`bitplane_manager/`](bitplane_manager/) | the hot bitplanes: layers decoded into the bitmap arena, where cells are read and written -- writes batched -- and written back; planes of one bit a cell, or 2, 4, 8 or 16 |
 | [`tessera/`](tessera/) | Tessera, the lossless encoding of a 256x256 bitmap: a project of its own, with its own [README](tessera/README.md), tests, tools and docs |
 | [`AI_SCRATCHPAD/`](AI_SCRATCHPAD/) | the AI's own probes of a running world, used while working on the code: no part of the program, and nothing depends on it |
@@ -94,7 +95,7 @@ type on it; Tessera depends on `bitmap/` and `utilities/` beside it;
 `entity_manager/` on `coordinates/` and `bitmap/`; `simulation/` on
 `bitplane_manager/` and `entity_manager/`; `instructions/` on
 `simulation/` and `pathfinding/`, which know nothing of one another
-and meet there; the rules, `mc_rules/` and `entity_rules/`,
+and meet there; the rules, `sca_rules/` and `entity_rules/`,
 on `instructions/` alone, through which they reach the
 simulation; `worldgen/` on `chunk_storage/` and
 `coordinates/`; `server/` on the rules, the entities and `worldgen/`;

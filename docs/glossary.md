@@ -123,7 +123,7 @@ what they always do and are not listed.
 | **turn** | one superchunk's part of the first phase: what a rule is given (`Turn`) | rule, superchunk | |
 | **rule table** | the one list of the rules a world ticks, each with its name, the names of its counts, and its function (`server::RULES`) | rule, rule counts | registry |
 | **rule counts** | what a rule did on a turn or over many: a few numbers, each at a place the rule names (`instructions::RuleCounts`); a tick's are an array of them, a rule's at its place in the rule table (`server::TickCounts`) | rule table | stats |
-| **rule** | what decides what changes: a Monte Carlo rule of the cells (`mc_rules`), or an entity's rule (`entity_rules`) | turn, sampling | |
+| **rule** | what decides what changes: a rule of the cells, the stochastic cell automaton's (`sca_rules`), or an entity's rule (`entity_rules`) | turn, sampling | |
 | **speed of light** | 1,024 cells a tick: nothing reaches past the superchunks next to its own; an entity is at most 256x256 cells | outbox, reach | |
 | **reach** | how far an entity's rule reads and acts: up to the speed of light | speed of light | |
 | **outbox** | a superchunk's queues of writes and instructions, a slot each for itself and its eight neighbours | write, instruction, slot | |
@@ -135,10 +135,11 @@ what they always do and are not listed.
 | **part** | one thread's share of a job run: in a tick's phase, the superchunks it claims | dispatcher, job | |
 | **random stream** | a superchunk's own random numbers, from the seed and its superchunk index, kept tick to tick and by a save | seed | |
 
-## Sampling (Monte Carlo)
+## Sampling (the stochastic cell automaton)
 
 | word | means | relates to | not |
 |---|---|---|---|
+| **stochastic cell automaton**, **SCA** | what the rules of the cells are: cells on a grid changed by local rules, each cell sampled at a chance a tick, not every cell every tick (`sca_rules`, `simulation::sample`) | sampling, chance, rule | Monte Carlo, cellular automaton, MC |
 | **chance** | how likely a thing is, as a whole number of parts in 2^32, never a float (`utilities::chance::Chance`): drawn against, added to another, and the gap between what it chooses drawn from it, all in whole numbers | sampling, random stream | probability, odds (Tessera's own word) |
 | **gap** | how many set cells sampling passes over before the next chosen one: drawn from the geometric law, a fixed-point logarithm over another (`Chance::passed_over`) | chance, sampling | skip |
 | **sampling** | choosing each set cell of a layer with one chance, independently, handed out in Morton order, by skipping over cells by their counts | sample, count | |

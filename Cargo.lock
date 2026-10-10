@@ -3258,22 +3258,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mc_rules"
-version = "0.0.0"
-dependencies = [
- "bitplane_manager",
- "chunk_storage",
- "coordinates",
- "entity_manager",
- "instructions",
- "server",
- "simulation",
- "type_registry",
- "utilities",
- "worldgen",
-]
-
-[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4321,6 +4305,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "sca_rules"
+version = "0.0.0"
+dependencies = [
+ "bitplane_manager",
+ "chunk_storage",
+ "coordinates",
+ "entity_manager",
+ "instructions",
+ "server",
+ "simulation",
+ "type_registry",
+ "utilities",
+ "worldgen",
+]
+
+[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4398,7 +4398,7 @@ dependencies = [
  "entity_manager",
  "entity_rules",
  "instructions",
- "mc_rules",
+ "sca_rules",
  "simulation",
  "type_registry",
  "utilities",

@@ -1,8 +1,8 @@
-//! Civil Egregore's rules of the cells, a file each: a tick of Monte
-//! Carlo sampling on a superchunk's turn, and the writes it queues,
+//! Civil Egregore's rules of the cells, a stochastic cell automaton
+//! (SCA), a file each: a tick of its sampling on a superchunk's turn, and the writes it queues,
 //! through `instructions` alone.
 //!
-//! What the rules are: `docs/mc_rules.md`; function by function:
+//! What the rules are: `docs/sca_rules.md`; function by function:
 //! `docs/reference.md`.
 
 // Every item is documented, private ones included; `cargo clippy`

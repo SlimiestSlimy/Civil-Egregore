@@ -1,7 +1,7 @@
 [package]
 name = "simulation"
 edition = "2024"
-description = "Civil Egregore's simulation: Monte Carlo sampling, the two-phase tick and its thread dispatcher"
+description = "Civil Egregore's simulation: the sampling of a stochastic cell automaton (SCA), the two-phase tick and its thread dispatcher"
 
 [dependencies]
 entity_manager = { path = "../entity_manager" }

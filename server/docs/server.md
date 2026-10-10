@@ -110,7 +110,7 @@ run with no window has no camera, and loads nothing by it.
 
 ## TickCounts
 
-`World::tick` runs every rule of the cells (`../mc_rules/`) and every
+`World::tick` runs every rule of the cells (`../sca_rules/`) and every
 kind of entity (`../entity_rules/`) on each hot superchunk's turn, then
 moves the halos. The rules are one table, `rules::RULES`: a name, what
 the rule counts, and its function, in the order a turn runs them --

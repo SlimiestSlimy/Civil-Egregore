@@ -72,10 +72,10 @@ reader has to wonder whether something is missing or was never needed
   `transient_data`. A rule is tried on a world, and every world is the
   server's to make: its tools are the server's
   (`server/src/diagnostics/`), and its tests, its own crate's
-  (`mc_rules/tests/`, `entity_rules/tests/`), run on a world the
+  (`sca_rules/tests/`, `entity_rules/tests/`), run on a world the
   server makes -- the server a dependency of the tests alone.
 - A crate depends only on the crates below it. The README lists the
-  order. The rules' crates (`entity_rules`, `mc_rules`) depend on
+  order. The rules' crates (`entity_rules`, `sca_rules`) depend on
   `instructions` alone. Nothing depends on `AI_SCRATCHPAD`, the AI's
   own probes, which is no part of the program.
 
