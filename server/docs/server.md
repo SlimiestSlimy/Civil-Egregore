@@ -245,7 +245,9 @@ of the one run, the world saved, paused, paced, and the cells of its
 viewport -- each call sent to the host's thread and done there between
 ticks. It answers only the viewport's hot superchunks, each as a tick
 left it, copied and nothing more -- turning cells into pixels is the
-client's -- a few between two ticks, in the time the host has to spare
+client's; a layer's words go as the storage holds them, in Morton
+order (`Cells`), and that layout is the client's format, chosen: one
+process, and no word turned round for a window -- a few between two ticks, in the time the host has to spare
 or a small share of a tick's (`FRAMES_SHARE`), each few sent as a
 frame of their own, the last saying it is (`Frame::more`): so a
 frame's superchunks are not all of the one tick, answering costs each

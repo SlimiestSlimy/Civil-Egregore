@@ -33,8 +33,10 @@ decides.
 A kind knows the cells it reads and writes, and no other rule. The
 server is what runs the entities' rules and the cells' in one tick,
 each a row of its table of rules (`server::RULES`). A rule holds no
-world: the worlds it is tested and measured on are the server's
-(`../../server/tests/fast/`).
+world: the worlds it is tested and measured on are the server's to
+make -- its tests here (`../tests/fast/`), the server a dependency of
+the tests alone, and what they share the server's own tests'
+(`../../server/tests/tests.rs`).
 
 | file | entity |
 |---|---|
@@ -46,8 +48,8 @@ A new file in `src/`, named in `lib.rs`; its type and its attributes'
 types rows of the type registry
 (`../../type_registry/docs/type_registry.md`), which refuses a number
 taken, handed to it by `instructions::entity_types`; its rule a row of
-the server's table beside the others; its tests in the server's
-(`../../server/tests/fast/`), a file a kind.
+the server's table beside the others; its tests in `../tests/fast/`,
+a file a kind.
 
 ## The sheep
 
@@ -124,4 +126,5 @@ thrown away -- is in `../../docs/civil_egregore.md`.
 | folder | what is in it |
 |---|---|
 | `src/sheep.rs` | the sheep |
+| `tests/fast/` | each kind's rule alone on a plain the server makes, a file a kind |
 | `docs/` | this, and the reference, function by function |

@@ -158,10 +158,12 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
 - A crate holds only what its name implies; mixing across crates is
   forbidden. Every world -- the program's, a test's, a tool's -- is
   made by server::start(Start { .. }), whatever it is to be: no mock
-  world anywhere (one in `instructions` was rejected). A rule's tests
-  and tools are therefore the server's (server/tests/fast/sheep.rs,
-  grass.rs; server/src/diagnostics/), on worldgen's
-  Generation::plain: flat, dry, no walls, no trees.
+  world anywhere (one in `instructions` was rejected). A rule's tools
+  are therefore the server's (server/src/diagnostics/); its tests are
+  its own crate's since 2026-10-10 (review item 5), on a world the
+  server makes -- `server` a dev-dependency, the helpers the server's
+  tests/tests.rs by #[path] -- on worldgen's Generation::plain: flat,
+  dry, no walls, no trees.
 - The server is the starter and coordinator and generates nothing:
   worldgen says what is on each cell (generate_superchunk ->
   chunk_storage::SuperchunkCells), chunk_storage makes the image of
@@ -289,6 +291,11 @@ break; write a new ask here the moment it is made.
    entity may be put on the first free of some cells
    (put_on_the_first_free, entities::spawn_beside), and instructions
    passed over are counted. The rest is compare-and-write (ORDER, 6).
+8. LOWEST PRIORITY OF ALL (user, 2026-10-10, verbatim): "rename monte
+   carlo to the more proper terminology, i believe is stochastic
+   something". Then, verbatim: "SCA for stochastic cell automaton".
+   So: Monte Carlo -> stochastic cell automaton, SCA for short;
+   mc_rules -> sca_rules (crate, docs, glossary, every mention).
 7. LAST STEP (asked 2026-10-09): go through ALL tests of the codebase;
    wherever a test has fixed cases that could be generated (seeded,
    randomized, from the seed file), make it generated.

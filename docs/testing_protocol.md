@@ -63,13 +63,18 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `simulation` | entities moving, entities waking, their instructions | sampling, the tick, writes across borders | |
 | `instructions` | an entity changed, the cells beside it | area, mask, walking | |
 | `worldgen` | | heights, walls, the mesh, superchunks made in any order | walls over many seeds; no seam between superchunks |
-| `server` | | grass and sheep (the rules, tried on a world); two writes on one cell; halos; the host; the world hash; world: saves, loads, walls; commands | a world stopped often coming to the same; a flock on generated ground lasting |
+| `mc_rules` | | grass; trees -- each rule alone on a plain | |
+| `entity_rules` | | the sheep alone on a plain | |
+| `server` | | two writes on one cell; halos; the host; the world hash; world: saves, loads, walls; commands | a world stopped often coming to the same; a flock on generated ground lasting |
 | `tessera` | fine | fast | complete |
 
-`mc_rules`, `entity_rules`, `gui` and `renderer` have
+`gui` and `renderer` have
 no test program. The rest of the entities' store is judged through the
-simulation's tests, the rules through the server's (a rule is tried on a world, and
-every world is the server's to make), the sliders' numbers by
+simulation's tests. A rule is tried on a world, and every world is the
+server's to make: the rules' crates test themselves on one, the server
+a dependency of their tests alone, and what such tests share is the
+server's (`server/tests/tests.rs`, a module of theirs by `#[path]`).
+The sliders' numbers are judged by
 `utilities`' `tuning`. The renderer is judged by eye: in the window,
 and in its stills (`Civil_Egregore renderer stills`).
 

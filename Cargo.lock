@@ -2329,7 +2329,16 @@ dependencies = [
 name = "entity_rules"
 version = "0.1.0"
 dependencies = [
+ "bitplane_manager",
+ "chunk_storage",
+ "coordinates",
+ "entity_manager",
  "instructions",
+ "server",
+ "simulation",
+ "type_registry",
+ "utilities",
+ "worldgen",
 ]
 
 [[package]]
@@ -3252,7 +3261,16 @@ dependencies = [
 name = "mc_rules"
 version = "0.1.0"
 dependencies = [
+ "bitplane_manager",
+ "chunk_storage",
+ "coordinates",
+ "entity_manager",
  "instructions",
+ "server",
+ "simulation",
+ "type_registry",
+ "utilities",
+ "worldgen",
 ]
 
 [[package]]
