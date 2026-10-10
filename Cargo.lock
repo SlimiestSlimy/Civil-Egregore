@@ -4241,7 +4241,7 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "renderer"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bevy",
  "coordinates",
@@ -4389,7 +4389,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bitmap",
  "bitplane_manager",
@@ -4444,7 +4444,7 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
 name = "simulation"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bitmap",
  "bitplane_manager",
@@ -4670,7 +4670,7 @@ dependencies = [
 
 [[package]]
 name = "tessera"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "bitmap",
  "utilities",
@@ -4909,7 +4909,7 @@ checksum = "d2df906b07856748fa3f6e0ad0cbaa047052d4a7dd609e231c4f72cee8c36f31"
 
 [[package]]
 name = "type_registry"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "utilities",
 ]
@@ -4958,7 +4958,7 @@ checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
 
 [[package]]
 name = "utilities"
-version = "0.1.0"
+version = "0.0.0"
 
 [[package]]
 name = "uuid"
@@ -5783,7 +5783,7 @@ dependencies = [
 
 [[package]]
 name = "worldgen"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bitmap",
  "chunk_storage",

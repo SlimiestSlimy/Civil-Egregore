@@ -20,7 +20,7 @@ fn turns_read_entities_across_superchunks() {
     entities.queue_put(right, &[]);
     entities.apply();
     let seen = Mutex::new(Vec::new());
-    Simulation::new(2).tick(&mut arena, &mut entities, 0, |turn, _| {
+    Simulation::new(2).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
         for entity in turn.woken() {
             let neighbour = entity.header.at.offset(1, 0).unwrap();
             let by_id = turn.entity(EntityId(2), neighbour).map(|other| other.header);
@@ -104,7 +104,7 @@ fn a_change_to_an_entity_that_moved_on_is_passed_over() {
     entities.queue_put(walker(1, cell(50, 50), 0), &[]);
     entities.apply();
     let mut simulation = Simulation::new(1);
-    let report = simulation.tick(&mut arena, &mut entities, 0, |turn, _| {
+    let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
         for entity in turn.woken() {
             for step in [1, 2] {
                 let after = Header { at: entity.header.at.offset(step, 0).unwrap(), wake: turn.now() + 1, ..entity.header };
@@ -115,7 +115,7 @@ fn a_change_to_an_entity_that_moved_on_is_passed_over() {
     });
     assert_eq!((report.instructions_applied.puts, entities.len()), (1, 1));
     assert!(entities.get(EntityId(1), cell(51, 50)).is_some(), "the first move applied");
-    let woken = simulation.tick(&mut arena, &mut entities, 1, |turn, _| turn.woken().count()).rules;
+    let woken = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| turn.woken().count()).rules;
     assert_eq!(woken, 1);
 }
 

@@ -19,9 +19,16 @@ pub fn cell(x: u8, y: u8) -> Cell {
     Cell { x, y }
 }
 
-/// The steps of the shortest path from `from` to `to` over `passable`,
-/// by a search of every cell, ring after ring: what A* is judged by.
-pub fn searched(passable: &Rows, from: Cell, to: Cell) -> Option<u8> {
+/// Walls drawn: about one step in eight barred each way.
+pub fn walls_drawn(random: &mut utilities::rng::Rng) -> Walls {
+    let mut rows = || std::array::from_fn(|_| (random.draw() & random.draw() >> 16 & random.draw() >> 32) as u16);
+    Walls::new(rows(), rows())
+}
+
+/// The steps of the shortest path from `from` to `to` over `passable`
+/// and through no wall of `walls`, by a search of every cell, ring
+/// after ring: what A* and the waves are judged by.
+pub fn searched(passable: &Rows, walls: &Walls, from: Cell, to: Cell) -> Option<u8> {
     let mut reached = vec![vec![false; SIDE]; SIDE];
     reached[from.y as usize][from.x as usize] = true;
     let mut ring = vec![from];
@@ -30,7 +37,7 @@ pub fn searched(passable: &Rows, from: Cell, to: Cell) -> Option<u8> {
         for at in ring {
             for (dx, dy) in (-1..=1).flat_map(|dy| (-1..=1).map(move |dx| (dx, dy))) {
                 let (x, y) = (at.x as i32 + dx, at.y as i32 + dy);
-                if x < 0 || y < 0 || x >= SIDE as i32 || y >= SIDE as i32 || reached[y as usize][x as usize] {
+                if x < 0 || y < 0 || x >= SIDE as i32 || y >= SIDE as i32 || reached[y as usize][x as usize] || walls.bars_step(at, dx as i8, dy as i8) {
                     continue;
                 }
                 let neighbour = cell(x as u8, y as u8);

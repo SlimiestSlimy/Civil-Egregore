@@ -159,7 +159,7 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
     }
     arena.apply();
     let checked = Mutex::new(0);
-    Simulation::new(1).tick(&mut arena, &mut entities, 0, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for y in 1..63 {
             for x in 1..63 {
                 let at = cell(x, y);

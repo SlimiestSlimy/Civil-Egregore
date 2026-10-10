@@ -1,6 +1,5 @@
 [package]
 name = "renderer"
-version = "0.1.0"
 edition = "2024"
 description = "Civil Egregore on the screen: a Bevy window asking the server's host, on its own thread, for the cells of its viewport"
 

@@ -118,7 +118,7 @@ fn entities_edit_another_an_attribute_at_a_time() {
     entities.queue_put(walker(2, cell(1040, 30), 0), &[]);
     entities.apply();
     let mut simulation = Simulation::new(2);
-    let report = simulation.tick(&mut arena, &mut entities, 0, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
             let kind = if entity.header.id == EntityId(1) { MARK } else { SCAR };
             turn.set_attribute(&target, kind, entity.header.id.0);
@@ -133,7 +133,7 @@ fn entities_edit_another_an_attribute_at_a_time() {
 
     entities.queue_put(walker(3, cell(1031, 31), 1), &[]);
     entities.apply();
-    simulation.tick(&mut arena, &mut entities, 1, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
             turn.unset_attribute(&target, MARK.attribute_type());
             turn.set_attribute(&target, NAME, 8);
@@ -158,7 +158,7 @@ fn two_edits_of_one_attribute_keep_the_same_one_on_any_threads() {
         entities.queue_put(walker(1, cell(1020, 30), 0), &[]);
         entities.queue_put(walker(2, cell(1040, 30), 0), &[]);
         entities.apply();
-        let report = Simulation::new(threads).tick(&mut arena, &mut entities, 0, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             for entity in turn.woken() {
                 turn.set_attribute(&target, NAME, entity.header.id.0);
                 turn.step(&entity.header, entity.header.at, NEVER);

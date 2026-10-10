@@ -224,7 +224,10 @@ Linux/Windows comparison is the user's to run. No camera in it.
 
 ORDER (user, 2026-10-10, verbatim): "do it in this order: fix world
 struct, finish docs, finish tests, make cool pool paging, work on gpu
-LOD". That is: (1) server::World -- DONE 2026-10-10; (2) docs
+LOD". That is: (1) server::World -- DONE 2026-10-10; (3b, mine,
+told to the user 2026-10-10 when they asked about it: review item 1,
+the renderer generating terrain, after the tests and before paging,
+unless they say otherwise); (2) docs
 finished; (3) tests finished -- task 7, and each crate testing itself;
 (4) cold pool paging (task 4); (5) GPU LOD (task 5).
 THEN (user, 2026-10-10, verbatim): "then we work on generating

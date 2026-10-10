@@ -51,7 +51,10 @@ fn a_chance_is_its_parts() {
     assert_eq!(Chance::HALF.plus(Chance::HALF).plus(Chance::HALF), Chance::ALWAYS);
     assert_eq!(Chance::of_parts(PARTS + 5), Chance::ALWAYS);
     assert!(Chance::NEVER.is_never() && Chance::ALWAYS.is_always() && !Chance::HALF.is_never() && !Chance::HALF.is_always());
-    for times in [3, 10, 1_000, 100_000, 200_000, 10_000_000] {
+    let mut random = Rng::new(utilities::seed::counted());
+    // Once in a few times and once in very many, and numbers of times drawn of every size between.
+    let drawn: Vec<u64> = (0..1_000).map(|_| 1 + (random.draw() >> random.between(40, 63))).collect();
+    for times in [3, 10, 1_000, 100_000, 200_000, 10_000_000].into_iter().chain(drawn) {
         let chance = Chance::one_in(times);
         assert!((chance.fraction() * times as f64 - 1.0).abs() < times as f64 / PARTS as f64, "once in {times}");
     }
