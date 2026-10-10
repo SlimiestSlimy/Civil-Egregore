@@ -36,7 +36,7 @@ width the bits of its data; **`ids`** how many
 IDs it takes from `id` on, **`layer_type`** its layer type if it is of
 the cells. **`registered!`**: the rows as written -- from each its
 constant and its row. **`REGISTRY`**: the table. The constants:
-`GRASS`, `TREE`, `TREE_STAGE`, `WALL_EAST`, `WALL_SOUTH`, `WET`, the
+`GRASS`, `TREE`, `TREE_STAGE`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`, `WET`, the
 cells'; `SHEEP`, the entity; `HUNGRY_AT`, `PREGNANT`, `LAMB`, `ROAMING`,
 `BEARING`, its attributes; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
 **`first_clash(registry)`**: the first row to take an ID or a name of

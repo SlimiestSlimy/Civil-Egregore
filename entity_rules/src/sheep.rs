@@ -5,7 +5,7 @@
 use instructions::around::{self, CENTRE, RING};
 use instructions::entities::EntitiesBetweenTicks;
 pub use instructions::entity_types::{Roaming, BEARING, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
-use instructions::layers::{GRASS, WALL_EAST, WALL_SOUTH};
+use instructions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
 use instructions::{area, cells, compare, entities, place_counted, this_tick, walking, AttributeBlock, CellCartesian, CellIndex, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
@@ -70,7 +70,7 @@ struct Flock {
 /// by [`wake`].
 pub fn rule(turn: &mut Turn) -> RuleCounts {
     let mut flock = Flock::default();
-    entities::each_woken(turn, [GRASS, WALL_EAST, WALL_SOUTH], &mut flock, wake);
+    entities::each_woken(turn, [GRASS, WALL_EAST, WALL_SOUTH, COLLISION], &mut flock, wake);
     flock.done
 }
 
@@ -84,7 +84,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let mut sheep = EntityEdit::of(sheep, room);
     let grass = around::layer(turn, GRASS, at);
     // The neighbours it may step to: on the hot bitplanes, no wall before them. Where entities stand is not read.
-    let steppable = grass.hot & RING & walking::around_unwalled(turn, at);
+    let steppable = grass.hot & RING & walking::around_steppable(turn, at);
     let hungry_at = sheep.get(HUNGRY_AT).unwrap_or(now);
     let roaming = sheep.get(ROAMING);
     // On its way out of thin pasture it does not stop to eat.

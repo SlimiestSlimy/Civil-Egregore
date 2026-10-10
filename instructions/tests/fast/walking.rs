@@ -14,7 +14,7 @@ use entity_manager::{EntityId, NEVER};
 use instructions::Turn;
 use simulation::Simulation;
 use std::sync::Mutex;
-use type_registry::{WALL_EAST, WALL_SOUTH};
+use type_registry::{COLLISION, WALL_EAST, WALL_SOUTH};
 
 /// Makes the wall layers hot over the superchunk `(10, 10)` of `arena`.
 fn with_walls_hot(arena: &mut BitmapArena) {
@@ -57,6 +57,48 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
         assert!(steps <= 8, "no way found in the steps it takes");
     }
     // Down past the wall's end and up again: two cells across, one down, one up, the diagonals counted once.
+    assert_eq!(steps, 4);
+}
+
+/// What the collision plane holds is not stepped on: a neighbour it
+/// holds is not among those a step may be taken to, and the way to a
+/// cell goes round a row of them as it does round entities.
+#[test]
+fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
+    let (mut arena, mut entities) = world(1);
+    let mut codec = LayerCodec::new();
+    for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {
+        arena.make_hot(BucketKey { layer_type: COLLISION, chunk }, None, &mut codec);
+    }
+    let (from, to) = (cell(40, 30), cell(44, 30));
+    // Trees, say, across the straight way: open only below.
+    for y in 23..=30 {
+        arena.queue(COLLISION, Write::cell(cell(42, y), WriteOp::Set));
+    }
+    arena.queue(COLLISION, Write::cell(cell(41, 29), WriteOp::Set));
+    arena.apply();
+    entities.queue_put(walker(1, from, 0), &[]);
+    entities.apply();
+    let mut simulation = Simulation::new(1);
+    let mut steps = 0;
+    while entities.get(EntityId(1), to).is_none() {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+            let now = turn.now();
+            for entity in turn.woken() {
+                let at = entity.header.at;
+                if at == from {
+                    // The neighbour up and to the east is held, the others are free.
+                    assert_eq!(walking::around_steppable(turn, at), around::ALL & !(1 << around::bit_of(at, cell(41, 29))));
+                }
+                let next = walking::step_to(turn, at, to, &area::layer(turn, STONE, at).hot).expect("a way round");
+                assert_eq!(turn.holds(COLLISION, next), Ok(false), "a step onto what the collision plane holds");
+                turn.step(&entity.header, next, now + 1);
+            }
+            0
+        });
+        steps += 1;
+        assert!(steps <= 8, "no way found in the steps it takes");
+    }
     assert_eq!(steps, 4);
 }
 

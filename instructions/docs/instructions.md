@@ -259,7 +259,16 @@ south -- read as any other; a diagonal is barred unless both ways round
 it are open. `around_unwalled(turn, at)` is the neighbours of a cell no wall is before,
 nine bits to narrow a step's choices by; `area_walls(turn, centre)` the
 walls of the area, which `step_towards` and `step_to` go round by
-themselves. Where the wall layers are not hot, nothing bars. The far
+themselves. Where the wall layers are not hot, nothing bars.
+
+**What stands in the way**: the collision plane (`COLLISION`), a bit a
+cell -- 1 where something stands that bars stepping there, a tree for
+one (`../../server/docs/server.md`, "The collision plane"). A walker
+asks one thing whatever the thing is: `around_steppable(turn, at)` is
+the neighbours no wall is before and the plane does not hold;
+`step_towards` and `step_to` leave the cells it holds out of what may
+be walked on and of what may be gone to, as they do the cells entities
+stand on. The far
 search sees no walls: the step it gives is not taken if one bars it.
 
 **Further off** (`walking::seek(turn, at, type)`): nothing found in the area, the same

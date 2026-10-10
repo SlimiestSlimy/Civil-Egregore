@@ -2,7 +2,7 @@
 //! bits a cell. A tree sampled tries to spread, or grows a stage, or
 //! at the oldest may die (`docs/sca_rules.md`, "Trees").
 
-use instructions::layers::{OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
+use instructions::layers::{COLLISION, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
 use instructions::{cells, compare, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn};
 
 /// The chance, each tick, that a tree is sampled.
@@ -54,6 +54,8 @@ fn tree(turn: &mut Turn, cell: CellIndex, _counts: &mut RuleCounts) {
     } else if this_tick::random(turn).below(DIE_ONE_IN) == 0 {
         // Its stage goes with it, so the next tree there starts at 0: gone if the tree still stands, which is then cleared.
         compare::write(turn, compare::holds(TREE, cell), TREE_STAGE.layer_type(), cell, stage, 0, None);
+        // And its cell is free to step on again, if it is the tree that held it.
+        compare::write(turn, compare::holds(TREE, cell), COLLISION, cell, 1, 0, None);
         cells::clear_counted(turn, TREE, cell, DIED);
     }
 }
@@ -78,9 +80,11 @@ fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) {
     let Some(onto) = corner.offset((drawn % AROUND) as i32, (drawn / AROUND) as i32).filter(|_| free) else {
         return;
     };
-    // No tree under water.
-    if cells::holds(turn, WET, onto) {
+    // No tree under water, nor where something stands already.
+    if cells::holds(turn, WET, onto) || cells::holds(turn, COLLISION, onto) {
         return;
     }
     cells::set_counted(turn, TREE, onto, SPREADS);
+    // Where a tree stands is not stepped on: held against the tree being there, whichever of two put it.
+    compare::write(turn, compare::holds(TREE, onto), COLLISION, onto, 0, 1, None);
 }

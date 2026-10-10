@@ -61,7 +61,8 @@ tree sampled does one thing, by lot:
   about it (`AROUND`), one window read: the more there are the less
   likely it spreads, never with `CROWDED` or more. If it does, a cell
   of those 64 is drawn, and a tree of stage 0 is put there if there is
-  none and the cell is hot and not under water.
+  none and the cell is hot, not under water, and not held in the
+  collision plane by something else standing there.
 - **Else it grows** a stage; or, at the oldest stage, dies one time in
   `DIE_ONE_IN` -- its stage put to 0 if the tree still stands, then
   the cell cleared, so the next tree there starts at 0 -- and lives on
@@ -70,6 +71,13 @@ tree sampled does one thing, by lot:
   another was put first in the tick is refused, and not counted.
 
 Trees stand on dirt and grass alike and change neither.
+
+**A tree bars its cell.** Where a tree stands is not stepped on: its
+cell is set in the collision plane (`COLLISION`;
+`../../server/docs/server.md`, "The collision plane") as it is put,
+and cleared as it dies -- each a compare-and-write held against the
+tree being there, so of two trees put on one cell in a tick the cell
+is set once, and a cell is cleared only by the tree that held it.
 
 ## Trees: more than a bit a cell
 

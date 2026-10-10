@@ -92,6 +92,11 @@ registered! {
     layer WALL_EAST = 8, "wall east";
     /// ...to its south.
     layer WALL_SOUTH = 9, "wall south";
+    /// The collision plane: the cells something stands on that bars
+    /// stepping there -- a tree. 0 is free, 1 is taken: what a
+    /// movement check asks, whatever the thing is. Who puts such a
+    /// thing sets its cell, and clears it when the thing goes.
+    layer COLLISION = 10, "collision";
     /// The sheep's type.
     entity SHEEP = 16, "sheep";
     /// The tick a sheep is next hungry at.

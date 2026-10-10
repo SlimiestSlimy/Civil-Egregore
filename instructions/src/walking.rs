@@ -11,7 +11,7 @@ use crate::around::{self, squeeze};
 use crate::cells;
 use crate::mask::about;
 use simulation::Turn;
-use type_registry::{WALL_EAST, WALL_SOUTH};
+use type_registry::{COLLISION, WALL_EAST, WALL_SOUTH};
 
 // The area a turn reads is the area paths are found over.
 const _: () = assert!(pathfinding::SIDE == AREA_SIDE);
@@ -25,10 +25,11 @@ fn of_the_area(at: CellIndex, cell: Cell) -> Option<CellIndex> {
     at.offset(cell.x as i32 - AREA_CENTRE as i32, cell.y as i32 - AREA_CENTRE as i32)
 }
 
-/// `rows` of the area about `at`, less the cells entities stand on.
+/// `rows` of the area about `at`, less the cells entities stand on
+/// and those the collision plane holds.
 fn unoccupied(turn: &Turn, at: CellIndex, rows: [&Rows; 2]) -> [Rows; 2] {
-    let occupied = area::occupied(turn, at);
-    rows.map(|rows| std::array::from_fn(|row| rows[row] & !occupied[row]))
+    let (occupied, collision) = (area::occupied(turn, at), area::layer(turn, COLLISION, at).set);
+    rows.map(|rows| std::array::from_fn(|row| rows[row] & !occupied[row] & !collision[row]))
 }
 
 /// A step found by [`seek`].
@@ -61,6 +62,15 @@ pub fn around_unwalled(turn: &Turn, at: CellIndex) -> u16 {
     let to_north_west = to_west | to_north | south_of(0) | east_of(0);
     let barred = to_north_west | to_north << 1 | to_north_east << 2 | to_west << 3 | to_east << 5 | to_south_west << 6 | to_south << 7 | to_south_east << 8;
     around::ALL & !barred
+}
+
+/// Which of the 3x3 cells around `at` may be stepped to from it,
+/// nine bits: those no wall of the terrain is before
+/// ([`around_unwalled`]) and the collision plane does not hold --
+/// nothing stands there that bars a step. Entities are not looked at:
+/// a step onto one is turned back as it is applied.
+pub fn around_steppable(turn: &Turn, at: CellIndex) -> u16 {
+    around_unwalled(turn, at) & !around::layer(turn, COLLISION, at).set
 }
 
 /// The terrain's walls among the [`AREA_SIDE`] by [`AREA_SIDE`]
@@ -114,8 +124,8 @@ pub fn seek(turn: &mut Turn, at: CellIndex, layer_type: LayerType) -> Option<Sou
     let path = path?;
     // The cell beside it the way the tile is: stepped to if it is in the world hot.
     let to = of_the_area(at, path.first)?;
-    // From far off no wall is seen: a step one bars is not taken.
-    let open = around_unwalled(turn, at) >> around::bit_of(at, to) & 1 == 1;
+    // From far off no wall is seen, nor what stands in the way: a step either bars is not taken.
+    let open = around_steppable(turn, at) >> around::bit_of(at, to) & 1 == 1;
     (open && cells::hot(turn, layer_type, to)).then_some(SoughtStep { to, scale })
 }
 

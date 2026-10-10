@@ -25,3 +25,6 @@ mod double_writes;
 
 #[path = "fast/world_hash.rs"]
 mod world_hash;
+
+#[path = "fast/collision.rs"]
+mod collision;

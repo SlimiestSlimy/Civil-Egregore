@@ -476,9 +476,11 @@ code; not asked to take it out yet. ASK before doing so.
 The sort by author is paid every tick: tick reference not measured
 since.
 
-NEXT (user, 2026-10-10, verbatim): "lets make the new bitplane, the
-collision bitplane, where a 0 means free and 1 means occupied, for
-movement checks. trees for example should be a 1 in this bitplane";
-then: "WAIT, we actually have the wall plane for pathfinding already,
-lets just reuse that". So: no new plane; trees bar movement through
-the wall planes. IN WORK.
+COLLISION PLANE (user, 2026-10-10): "the collision bitplane, where a
+0 means free and 1 means occupied, for movement checks. trees for
+example should be a 1"; then "reuse the wall plane"; then, the walls
+being edges not cells, chose the per-cell plane. DONE: layer COLLISION
+(type registry 10); trees set it put and clear it dead (worldgen and
+the trees' rule); walking::around_steppable and the paths read it; the
+sheep use it. Not in it: entities. A flock is still put by lot, so a
+sheep may start on a tree's cell (it steps off).
