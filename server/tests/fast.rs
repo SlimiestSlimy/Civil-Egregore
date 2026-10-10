@@ -17,12 +17,6 @@ mod world;
 #[path = "fast/host.rs"]
 mod host;
 
-#[path = "fast/grass.rs"]
-mod grass;
-
-#[path = "fast/sheep.rs"]
-mod sheep;
-
 #[path = "fast/double_writes.rs"]
 mod double_writes;
 

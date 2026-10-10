@@ -7,3 +7,16 @@ publish = false
 
 [dependencies]
 instructions = { path = "../instructions" }
+
+# Its tests alone: a rule is tried on a world, and every world is the
+# server's to make (`docs/testing_protocol.md`, at the repository's root).
+[dev-dependencies]
+server = { path = "../server" }
+simulation = { path = "../simulation" }
+worldgen = { path = "../worldgen" }
+coordinates = { path = "../coordinates" }
+chunk_storage = { path = "../chunk_storage" }
+bitplane_manager = { path = "../bitplane_manager" }
+entity_manager = { path = "../entity_manager" }
+type_registry = { path = "../type_registry" }
+utilities = { path = "../utilities" }

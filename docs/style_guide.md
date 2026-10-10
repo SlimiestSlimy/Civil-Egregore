@@ -66,9 +66,11 @@ reader has to wonder whether something is missing or was never needed
   `terrain_seen` for the ground past it, and names no crate under it
   but `coordinates` and `utilities`.
 - The rules' crates hold their rules alone: no diagnostics, no
-  `transient_data`, no tests. A rule is tried on a world, so its tests
-  and tools are the server's (`server/tests/fast/`,
-  `server/src/diagnostics/`).
+  `transient_data`. A rule is tried on a world, and every world is the
+  server's to make: its tools are the server's
+  (`server/src/diagnostics/`), and its tests, its own crate's
+  (`mc_rules/tests/`, `entity_rules/tests/`), run on a world the
+  server makes -- the server a dependency of the tests alone.
 - A crate depends only on the crates below it. The README lists the
   order. The rules' crates (`entity_rules`, `mc_rules`) depend on
   `instructions` alone. Nothing depends on `AI_SCRATCHPAD`, the AI's

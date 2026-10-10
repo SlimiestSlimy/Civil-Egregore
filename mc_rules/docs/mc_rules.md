@@ -18,6 +18,7 @@ the entities' rules, in one table (`server::RULES`).
 |---|---|
 | `src/grass.rs` | grass over dirt |
 | `src/trees.rs` | trees: spreading by how crowded they stand, growing through sixteen stages, dying |
+| `tests/fast/` | each rule alone on a plain the server makes, a file a rule |
 | `docs/` | this, and the reference, function by function |
 
 ## Grass
