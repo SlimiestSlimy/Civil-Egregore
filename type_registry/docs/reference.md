@@ -32,4 +32,5 @@ wide plane's whole: what the server lists a world's layers from.
 
 ## `diagnostics/`, `transient_data.rs`
 
-Nothing gathered, nothing kept yet.
+Nothing gathered, nothing kept yet; `TRANSIENT_DATA` names the
+folder all the same.

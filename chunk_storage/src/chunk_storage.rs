@@ -1,5 +1,5 @@
 //! Chunk storage: the cold pool of superchunk images and the writeback
-//! ring that feeds it (`../docs/Civil Egregore.md`, "Chunk storage").
+//! ring that feeds it (`../docs/civil_egregore.md`, "Chunk storage").
 //!
 //! The bitplane manager decodes layers from the cold pool, and writes
 //! the ones it changed back into the ring, encoded. The ring is never

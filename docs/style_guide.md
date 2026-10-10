@@ -32,7 +32,8 @@ reader has to wonder whether something is missing or was never needed
 | `tests/<tier>.rs` | one test program per tier -- `fine.rs`, `fast.rs`, `complete.rs` -- a module per topic in it, each a file in `tests/<tier>/` once the tier's would pass some 300 lines; only the tiers the crate has tests for |
 | `tests/tests.rs` | what the tiers' tests share, where they share anything: a module of each, no test program itself |
 
-- A crate is a library: no `[[bin]]`, no `bin/`, no `src/bin/`. Only
+- A crate is a library: no `[[bin]]` and no folder of binaries, under the
+  crate or under its sources. Only
   the root (`Civil_Egregore`) and the renderer are programs. A tool is a
   function in `src/diagnostics/tool`, listed among the crate's
   `COMMANDS` and run by `Civil_Egregore <crate> <tool>`; the root hands the

@@ -200,6 +200,48 @@ thread and on all, hashed along the way or once (2026-10-09). The
 Linux/Windows comparison is the user's to run. No camera in it.
 
 
+== TASKS (the list; kept current, done ones struck off) ==
+
+Asked by the user, in the order to do them. Read this first after any
+break; write a new ask here the moment it is made.
+
+1. DOCS, ALL OF THEM AGAINST ALL THE CODE (in progress, 2026-10-09).
+   The user: "you need to go through ALL the codebase"; "few comments
+   on code, links to docs". Done: tests/fine.rs (root) -- every doc's
+   links, backticked paths, names and quoted sections exist; every pub
+   item is named in its crate's docs; every doc a code comment points
+   at exists (docs/testing_protocol.md, "The docs are tested too").
+   Known drift fixed. STILL OWED: read every source file, crate by
+   crate, against its docs/<crate>.md and reference.md: (a) the doc
+   says in detail what the code does, and nothing it no longer does;
+   (b) long comments in the code are cut to a line or three and their
+   substance moved to the docs, the comment pointing there
+   (`docs/x.md`, "Section"). Crates read so far: (none). Commit a
+   crate at a time.
+2. WORLDGEN: profile and really simplify ("waaay too slow"); a little
+   more mountain, a little less plateau ("just a bit").
+3. ENTITY ATTRIBUTES, NEW SHAPE (asked 2026-10-09). The type ID stays
+   one u64 for everything. An attribute becomes a fixed-size block of
+   64 bytes: the first 64 bits its type, the rest laid out as that
+   type's layout says -- the layout fixed per type (a row of the type
+   registry). Needing more room, an attribute takes 2 (or more) 64-byte
+   blocks; the first block then also holds the block length where one
+   is needed. Most attribute data is fixed size; some will later be
+   small but variable size -- be ready for it. Design it in
+   entity_manager + type_registry, write the design in the docs first.
+4. COLD POOL to disk once worlds get large (paging). Server tests'
+   remaining written seeds (21 and 3 in server/tests/complete.rs) from
+   the seed file. Optional: BMI2 pdep for select.
+5. LOD ON THE GPU (renderer).
+6. Another day: optimizations, inlining.
+
+To tell the user at the end: chunk_storage/entity_manager still hand
+on the ID types (shortcut); TickCounts carries per-rule times; float
+sqrt is allowed by the lint; tessera's own 8-bit fixed_point_log2
+untouched; Linux/Windows `server check` comparison is theirs; the
+Google Drive connector needs authorizing in claude.ai settings.
+
+
 == OPEN THREADS ==
 
 - Worldgen is what a world's making and wandering cost: callgrind,
@@ -217,8 +259,6 @@ Linux/Windows comparison is the user's to run. No camera in it.
   sampling, 2026-10-09; 58.50 M just before it (rules table), 58.37 M
   at 9303e37. A logarithm by 48 squarings made it 64.29 M: hence the
   table and series in utilities::fixed_point.
-- ASKED 2026-10-09, NEXT: profile and really simplify worldgen ("waaay
-  too slow"); a little more mountain, a little less plateau.
 - A world's stored image of a cooled superchunk is behind its cells
   until the writeback ring is flushed (World::write_back_and_flush_all,
   as a save does): compare images only after it. The complete tier's

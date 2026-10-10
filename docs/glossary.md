@@ -19,7 +19,7 @@ what they always do and are not listed.
 | **seed rotation** | tests and tools taking their seed from one file for the whole workspace, `transient_data/seed.csv`, rolled to a fresh one every 5 counted runs (`utilities::seed`) | seed | |
 | **cell** | the smallest unit of the world: one bit of each layer, one height, at most one entity | chunk, superchunk; found by its **cell index** | tile, pixel, square |
 | **chunk** | 256x256 cells: what a layer's **bitmap** covers | superchunk, layer, bucket | |
-| **superchunk** | 4x4 chunks, 1024x1024 cells: the unit the world is held, ticked, saved and loaded in, and the reach of the speed of light. One word, in types too (`Superchunk`) | chunk, turn, image | super chunk, `SuperChunk` |
+| **superchunk** | 4x4 chunks, 1024x1024 cells: the unit the world is held, ticked, saved and loaded in, and the reach of the speed of light. One word, in types too (`Superchunk`) | chunk, turn, image | super chunk, SuperChunk |
 | **Morton index** | a number made by interleaving `x`'s and `y`'s bits, `x` in the even ones: cells, chunks and superchunks are numbered and stored in this order. The default way to say where anything is | Morton order | `morton` alone |
 | **superchunk index** | a superchunk's Morton index in the world, 44 bits: what identifies a superchunk (`SuperchunkIndex`) | chunk index | position, `morton` alone |
 | **chunk index** | a chunk's Morton index in the world, 48 bits: its superchunk index, then its place (`ChunkIndex`) | superchunk index, cell index | position |
@@ -152,7 +152,7 @@ what they always do and are not listed.
 | **entity ID** | an entity's 64-bit number, drawn from its superchunk's random stream (`EntityId`) | entity | |
 | **entity type** | what an entity is -- a sheep -- from the one type namespace (`EntityType`) | layer type | kind (only as the field holding it) |
 | **attribute** | a typed value an entity has: added and removed as it goes (`Attribute`, `AttributeType`) | entity | property, component |
-| **entity store** | where entities are kept: a bucket a chunk, a wheel a superchunk (`simulation::entity_store`, `Entities`) | bucket, wheel | |
+| **entity store** | where entities are kept: a bucket a chunk, a wheel a superchunk (`entity_manager::Entities`) | bucket, wheel | |
 | **entity bucket** | one chunk's entities, sorted by cell then ID, their attributes beside them | entity store | (the arena's bucket is a layer's) |
 | **wake** | an entity's turn to act: at its wake tick, filed in its superchunk's wheel | wheel, sleep | |
 | **sleep** | an entity waiting, doing nothing and costing nothing, until it wakes | wake | |

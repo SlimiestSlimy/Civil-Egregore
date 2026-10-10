@@ -114,6 +114,7 @@ a **`PastureRun`**.
 
 ## `transient_data.rs`
 
+`TRANSIENT_DATA`: the crate's `transient_data/` folder.
 **`measurements()`**, **`saves()`**, **`publish(report)`**.
 
 ## `world_hash.rs`

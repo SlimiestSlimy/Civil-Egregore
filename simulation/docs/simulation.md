@@ -4,7 +4,7 @@ The rules ticked over the hot bitplanes. It reads and writes them only
 through the handles the bitplane manager gives: a superchunk's layers to
 read (`LayerView`), cells to read anywhere (`Reader`), and writes
 applied to one superchunk (`Superchunk::apply`). The decisions behind it
-are in `../../docs/Civil Egregore.md`, "The speed of light", "The tick" and
+are in `../../docs/civil_egregore.md`, "The speed of light", "The tick" and
 "Sampling".
 
 ## Sampling
@@ -107,7 +107,7 @@ The turn, and no more: cells and entities read as the tick found them,
 writes and instructions queued. What a rule makes of them -- the cells
 beside an entity, the area about it, the way to what it seeks, the
 instruction that carries least -- is not the simulation's: it is
-`../../instructions/` (`docs/instructions.md`), free functions over a
+`../../instructions/` (`../../instructions/docs/instructions.md`), free functions over a
 turn, which the rules are written in and reach the simulation through.
 
 **Instructions queued**, one for each thing done to an entity, each
@@ -162,7 +162,7 @@ the arena's writes are -- queuing is the only way to change an entity;
 in a tick, a turn reads entities in any hot superchunk as the tick found
 them (`entity`, `entities_in`, through an `EntityReader`, as cells
 through a `Reader`) and queues its instructions. The decisions behind it:
-`../../docs/Civil Egregore.md`, "Entities".
+`../../docs/civil_egregore.md`, "Entities".
 
 ## Halos
 
@@ -295,7 +295,9 @@ comes to does not depend on the thread that takes it.
 | `src/halos.rs` | the halos moved: warming and cooling, each due at a tick, by jobs off the tick -- `halos/warming.rs` superchunks made hot and let cool, `halos/write_back.rs` write-backs and flushes landed |
 | `src/turn/` | a superchunk's turn: `mod` the turn, its cells and its outbox, `entities` the entities read and the instructions queued |
 | `../entity_manager/` | the entities: buckets, the timer wheel, the instructions queued -- a crate of its own |
-| `src/diagnostics/` | what the entities hold |
+| `src/sampling.rs` | the cells a rule is given: a layer sampled by gaps drawn against a chance |
+| `src/tick.rs` | the tick: every hot superchunk's turn on the dispatcher's threads, then the writes and instructions applied |
+| `src/transient_data.rs` | where runs would leave what they make; nothing yet. What the entities hold is gathered by `../entity_manager/`'s diagnostics |
 | `tests/` | sampling, the tick, the entities, their instructions and the dispatcher, judged |
 | `docs/` | this, and the reference, function by function |
 

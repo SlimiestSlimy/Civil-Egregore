@@ -9,7 +9,7 @@ other rule and no entity; the world's tick (`server/`) runs them
 together with the entities (`entity_rules/`).
 
 So far one: grass spreading over dirt and decaying
-(`../docs/Civil Egregore.md`, "Sampling"), where a halo keeps it hot
+(`../docs/civil_egregore.md`, "Sampling"), where a halo keeps it hot
 (`../server/docs/server.md`, "Halos"). For now, too, only within three
 superchunks across of the middle of the world's origin superchunk: no
 part of the rule, a limit on the present test, since grass let spread

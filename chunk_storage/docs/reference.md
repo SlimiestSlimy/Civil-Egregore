@@ -34,7 +34,8 @@ none where no cell is set. **`decode(words, cells)`**: the bitmap whose stream s
 checked to be an image (**`check_chunk`** each chunk: a table that fits,
 types sorted one a type, offsets inside the chunk and apart), else
 **`InvalidImage`**. **`words`**, **`height_words`**, **`height`**.
-**`with_water(depths)`**: the image with `ChunkMaps` its water's;
+**`with_heights(heights)`**: the image with those its heights, its
+layers as they are. **`with_water(depths)`**: the image with `ChunkMaps` its water's;
 **`water_words`**, **`depth(place)`**.
 
 ## `chunk_maps.rs`
@@ -88,6 +89,8 @@ superchunk not stored made flat); **`tail_superchunk`**,
 
 `WorldInfo` and `HotSuperchunks`, the two text files, are in
 `disk/world_files.rs`; reading and writing files in `disk.rs`.
+`WORLD_FILE` (`world.csv`) and `HOT_FILE` (`hot.csv`): their names in
+a world's folder.
 
 **`WorldInfo`** `{seed, tick, layers, side, forced, hot_entity, camera_flock, without_camera_flock, generation}` -- `forced` only with a `side`, refused otherwise; `hot_entity` a number, the runner knowing the kinds; `camera_flock` the sheep each superchunk generated in the viewport starts with, if its camera loads superchunks; `without_camera_flock` the superchunks generated out of its view, still owed theirs, sorted; `generation` sorted by name -- no name: a world's is its folder's --; read by its rows' names in any order, the header first, missing ones their defaults but the seed ("On disk" in `chunk_storage.md`); **`DiskError`**: `Io(path,
 error)` or `Invalid(path, what)`. **`write_world(folder, info)`**,
@@ -108,6 +111,7 @@ the ring's bytes.
 
 ## `transient_data.rs`
 
+`TRANSIENT_DATA`: the crate's `transient_data/` folder.
 **`measurements()`**, **`publish(report)`**: as in every crate.
 
 ## `jobs.rs`

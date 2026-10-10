@@ -10,7 +10,7 @@ cell asked of a bitmap not hot.
 **`ChunkSet`** (`u16`, a bit a chunk), **`contains`**, **`put`**,
 **`members`**.
 
-## `layer.rs`
+## `superchunk_layer.rs`
 
 **`ChunkFlags`**: a layer's four chunk sets, packed in 8 bytes.
 
@@ -50,6 +50,8 @@ is in; **`tiles_holding(type, cell)`**: which of its chunk's 16 tiles of
 the coarsest scale (`COARSEST_TILES_IN_CHUNK`, 64x64 cells, four count
 tiles each) hold any, a bit each, off the counts --
 **`superchunk(superchunk)`**, remembering the last superchunk.
+**`prefetch(type, cell)`**: asks memory for the word `cell` is in ahead
+of its being read; nothing if its bitmap is not hot.
 
 **`Lookup`**: lookups remembering the last superchunk; one a thread. **`superchunk`** an entry by superchunk
 index; **`find`** an allocation by type and superchunk index, as a
@@ -60,10 +62,10 @@ in it by index (`WORD_TILE_X`, `WORD_TILE_Y`, **`word_tile`**), one
 across its edge looked up again (**`word_tile_at`**); **`any_in_tile`**,
 **`tiles_holding`**; **`forget`** when the directory changes shape.
 
-## `arena.rs`, `hot.rs`, `write_back.rs`
+## `arena.rs`, `making_hot.rs`, `write_back.rs`
 
 The arena, its one type's methods over three files: `arena.rs` the
-directory and what is read off it, `hot.rs` bitmaps made hot and
+directory and what is read off it, `making_hot.rs` bitmaps made hot and
 cold and the lingering superchunks, `write_back.rs` dirty buckets
 taken, put in the ring, flushed and evicted.
 
@@ -126,6 +128,7 @@ buckets kept and their bytes.
 
 ## `transient_data.rs`
 
+`TRANSIENT_DATA`: the crate's `transient_data/` folder.
 **`measurements()`**, **`publish(report)`**: as in every crate.
 
 Wide planes: **`Reader::value(plane, cell)`** and **`BitmapArena::value`** read a cell's number; **`Write::value(plane, at, value)`** puts one (`WriteOp::Put`); **`Bucket::words()`** is a bucket's words at any width. `take_dirty` and `make_hot_cells` carry a bucket as a bitmap's words times its bits a cell; `written_back` takes a wide layer's planes' keys.
