@@ -117,6 +117,8 @@ what they always do and are not listed.
 | **tick** | one step of the simulation: every hot superchunk's turn, then every write and instruction applied | phase, turn | step (an entity's move), frame |
 | **phase** | half a tick: the **first** computes -- rules read the world as the tick found it and queue writes and instructions; the **second** applies them | tick | |
 | **turn** | one superchunk's part of the first phase: what a rule is given (`Turn`) | rule, superchunk | |
+| **rule table** | the one list of the rules a world ticks, each with its name, the names of its counts, and its function (`server::RULES`) | rule, rule counts | registry |
+| **rule counts** | what a rule did on a turn or over many: a few numbers, each at a place the rule names (`instructions::RuleCounts`); a tick's are an array of them, a rule's at its place in the rule table (`server::TickCounts`) | rule table | stats |
 | **rule** | what decides what changes: a Monte Carlo rule of the cells (`mc_rules`), or an entity's rule (`entity_rules`) | turn, sampling | |
 | **speed of light** | 1,024 cells a tick: nothing reaches past the superchunks next to its own; an entity is at most 256x256 cells | outbox, reach | |
 | **reach** | how far an entity's rule reads and acts: up to the speed of light | speed of light | |

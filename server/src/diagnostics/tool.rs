@@ -88,18 +88,19 @@ pub(crate) fn pasture(given: &Given) -> Result<(), String> {
     let threads = threads(given, superchunks)?;
     let run = pasture_run::run(ticks, thousandths, flock, superchunks, threads);
     let mut report = Report::new(given.name(), &given.resolved());
-    let sheep = run.done.sheep;
+    let counted = |rule: &str, counted: &str| run.done.count(rule, counted) as usize;
+    let woken = counted("sheep", "woken");
     report.note(format!(
         "{ticks} ticks over {superchunks} superchunk(s) on {threads} thread(s); sheep {} -> {}; grass {} -> {}; {} entities lost past the superchunks used",
         run.sheep.0, run.sheep.1, run.grass.0, run.grass.1, run.instructions.lost
     ));
     let mut flock = Table::new(&["wakes", "wakes a tick", "eaten", "born", "died", "put whole", "moved or slept", "removed"]);
     flock.row(&[
-        sheep.woken.to_string(),
-        format!("{:.1}", sheep.woken as f64 / ticks as f64),
-        sheep.eaten.to_string(),
-        sheep.births.to_string(),
-        sheep.deaths.to_string(),
+        woken.to_string(),
+        format!("{:.1}", woken as f64 / ticks as f64),
+        counted("sheep", "eaten").to_string(),
+        counted("sheep", "births").to_string(),
+        counted("sheep", "deaths").to_string(),
         run.instructions.puts.to_string(),
         run.instructions.moves.to_string(),
         run.instructions.removes.to_string(),
@@ -109,13 +110,13 @@ pub(crate) fn pasture(given: &Given) -> Result<(), String> {
     let mut phases = Table::new(&["time", "total ms", "share of the tick", "ns each"]).left_aligned(&["time"]);
     let per = |time: Duration, count: usize| if count == 0 { "-".to_string() } else { format!("{:.1}", time.as_nanos() as f64 / count as f64) };
     phases.row(&["computing".to_string(), format!("{:.1}", run.computing.as_secs_f64() * 1e3), share(run.computing, total), "-".to_string()]);
-    phases.row(&["  grass rule, a sample (all threads)".to_string(), format!("{:.1}", run.grass_time.as_secs_f64() * 1e3), "-".to_string(), per(run.grass_time, run.done.grass.sampled)]);
-    phases.row(&["  sheep rule, a wake (all threads)".to_string(), format!("{:.1}", run.sheep_time.as_secs_f64() * 1e3), "-".to_string(), per(run.sheep_time, sheep.woken)]);
+    phases.row(&["  grass rule, a sample (all threads)".to_string(), format!("{:.1}", run.done.time_of("grass").as_secs_f64() * 1e3), "-".to_string(), per(run.done.time_of("grass"), counted("grass", "sampled"))]);
+    phases.row(&["  sheep rule, a wake (all threads)".to_string(), format!("{:.1}", run.done.time_of("sheep").as_secs_f64() * 1e3), "-".to_string(), per(run.done.time_of("sheep"), woken)]);
     phases.row(&["applying, a write or instruction".to_string(), format!("{:.1}", run.applying.as_secs_f64() * 1e3), share(run.applying, total), per(run.applying, run.writes + run.instructions.puts + run.instructions.moves + run.instructions.edits + run.instructions.removes)]);
     phases.row(&["the tick".to_string(), format!("{:.1}", total.as_secs_f64() * 1e3), share(total, total), "-".to_string()]);
     report.add("time", phases);
     let mut rates = Table::new(&["ticks a second", "wakes a second"]);
-    rates.row(&[format!("{:.0}", ticks as f64 / total.as_secs_f64()), format!("{:.2} million", sheep.woken as f64 / total.as_secs_f64() / 1e6)]);
+    rates.row(&[format!("{:.0}", ticks as f64 / total.as_secs_f64()), format!("{:.2} million", woken as f64 / total.as_secs_f64() / 1e6)]);
     report.add("rates", rates);
     let unknown = || "unknown".to_string();
     let mut memory = Table::new(&["memory", "amount"]).left_aligned(&["memory"]);

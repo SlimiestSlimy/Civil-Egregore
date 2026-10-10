@@ -50,9 +50,8 @@
 use instructions::around::{self, CENTRE, RING};
 use instructions::between_ticks::EntitiesBetweenTicks;
 use instructions::layers::{GRASS, WALL_EAST, WALL_SOUTH};
-use instructions::{read, write, Attribute, AttributeType, CellCartesian, EntityEdit, EntityId, EntityRef, EntityType, Header, Rng, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
+use instructions::{read, write, Attribute, AttributeType, CellCartesian, EntityEdit, EntityId, EntityRef, EntityType, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
-use std::ops::AddAssign;
 
 /// The sheep's type.
 pub const SHEEP: EntityType = EntityType(16);
@@ -98,51 +97,36 @@ pub const GESTATION_TICKS: u64 = 1152;
 /// Ticks a lamb takes to grow.
 pub const LAMB_TICKS: u64 = 4608;
 
-/// What the sheep did in a tick.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct SheepCounts {
-    /// Sheep woken.
-    pub woken: usize,
-    /// Cells of grass eaten.
-    pub eaten: usize,
-    /// Lambs born.
-    pub births: usize,
-    /// Sheep dead: starved, or of old age.
-    pub deaths: usize,
-    /// Paths to grass looked for, by hungry sheep with none beside them.
-    pub sought: usize,
-    /// Of those, found.
-    pub paths: usize,
-    /// Of those found, the ones beyond the area about the sheep.
-    pub far: usize,
-}
-
-impl AddAssign for SheepCounts {
-    /// Both added up.
-    fn add_assign(&mut self, other: Self) {
-        self.woken += other.woken;
-        self.eaten += other.eaten;
-        self.births += other.births;
-        self.deaths += other.deaths;
-        self.sought += other.sought;
-        self.paths += other.paths;
-        self.far += other.far;
-    }
-}
+/// What the rule counts, each named at its place in its [`RuleCounts`].
+pub const COUNTED: [&str; 7] = ["woken", "eaten", "births", "deaths", "sought", "paths", "far"];
+/// Sheep woken.
+pub const WOKEN: usize = 0;
+/// Cells of grass eaten.
+pub const EATEN: usize = 1;
+/// Lambs born.
+pub const BIRTHS: usize = 2;
+/// Sheep dead: starved, or of old age.
+pub const DEATHS: usize = 3;
+/// Paths to grass looked for, by hungry sheep with none beside them.
+pub const SOUGHT: usize = 4;
+/// Of those, found.
+pub const PATHS: usize = 5;
+/// Of those found, the ones beyond the area about the sheep.
+pub const FAR: usize = 6;
 
 /// What the rule keeps over a superchunk's turn: what the sheep did,
 /// and room for a sheep's attributes as they are changed, made once.
 #[derive(Default)]
 struct Flock {
     /// What the sheep did.
-    done: SheepCounts,
+    done: RuleCounts,
     /// Room for the attributes of the sheep being changed.
     room: Vec<Attribute>,
 }
 
 /// The rule, on one superchunk's turn: every sheep waking, each seen to
 /// by [`wake`].
-pub fn rule(turn: &mut Turn) -> SheepCounts {
+pub fn rule(turn: &mut Turn) -> RuleCounts {
     let mut flock = Flock::default();
     read::entities::each_woken(turn, [GRASS, WALL_EAST, WALL_SOUTH], &mut flock, wake);
     flock.done
@@ -153,7 +137,7 @@ pub fn rule(turn: &mut Turn) -> SheepCounts {
 #[inline]
 fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let (done, room, now) = (&mut flock.done, &mut flock.room, turn.now());
-    done.woken += 1;
+    done[WOKEN] += 1;
     let at = sheep.header.at;
     let mut sheep = EntityEdit::of(sheep, room);
     let grass = read::around::layer(turn, GRASS, at);
@@ -165,7 +149,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let fed = now >= hungry_at && grass.set & CENTRE != 0 && roaming.is_none();
     if !fed && now >= hungry_at + STARVE_TICKS {
         write::entities::remove(turn, sheep.header());
-        done.deaths += 1;
+        done[DEATHS] += 1;
         return;
     }
     // The pasture about it, looked at as it eats: thin, it will leave when next hungry.
@@ -173,7 +157,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     if fed {
         write::cells::clear(turn, GRASS, at);
         sheep.set(HUNGRY_AT, now + MEAL_TICKS);
-        done.eaten += 1;
+        done[EATEN] += 1;
         if let (false, Some(way)) = (lush, around::pick(turn.random(), steppable)) {
             sheep.set(ROAMING, (now + MEAL_TICKS + ROAM_TICKS) << 4 | way as u64);
         }
@@ -192,7 +176,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
                 steppable &= !(1 << beside);
                 let (cell, wake) = (around::cell(at, beside).expect("a hot neighbour is in the world"), next_step(turn));
                 write::entities::spawn(turn, SHEEP, cell, wake, &[Attribute { kind: HUNGRY_AT, value: now + MEAL_TICKS }, Attribute { kind: LAMB, value: now + LAMB_TICKS }]);
-                done.births += 1;
+                done[BIRTHS] += 1;
             }
             None => needs = now,
         },
@@ -223,11 +207,11 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         // Hemmed in: no step to take, and no path to look for.
         None
     } else {
-        done.sought += 1;
+        done[SOUGHT] += 1;
         match read::walking::seek(turn, at, GRASS) {
             Some(found) => {
-                done.paths += 1;
-                done.far += (found.scale > 0) as usize;
+                done[PATHS] += 1;
+                done[FAR] += u64::from(found.scale > 0);
                 Some(around::bit_of(at, found.to))
             }
             None => around::pick(turn.random(), steppable),
@@ -238,7 +222,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     // Old age comes by the tick, not the wake: a long sleep is as much of a life as many short ones.
     if turn.random().below(LIFE_TICKS) < wake - now {
         write::entities::remove(turn, sheep.header());
-        done.deaths += 1;
+        done[DEATHS] += 1;
         return;
     }
     write::entities::commit(turn, sheep, to, wake);

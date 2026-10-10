@@ -19,8 +19,7 @@
 //! Trees stand on dirt and grass alike and change neither.
 
 use instructions::layers::{OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
-use instructions::{read, write, CellIndex, Turn};
-use std::ops::AddAssign;
+use instructions::{read, write, CellIndex, RuleCounts, Turn};
 
 /// The chance, each tick, that a tree is sampled.
 pub const SAMPLE_CHANCE: f64 = 0.000_1;
@@ -35,54 +34,43 @@ pub const DIE_ONE_IN: u64 = 4;
 /// Cells along the side of the square about a tree it counts and spreads in.
 pub const AROUND: u32 = 8;
 
-/// What the rule did in a tick.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct TreeCounts {
-    /// Trees sampled.
-    pub sampled: usize,
-    /// Trees put: two may be put on one cell, which then has one.
-    pub spreads: usize,
-    /// Trees grown a stage.
-    pub grown: usize,
-    /// Trees dead.
-    pub died: usize,
-}
-
-impl AddAssign for TreeCounts {
-    /// All added up.
-    fn add_assign(&mut self, other: Self) {
-        self.sampled += other.sampled;
-        self.spreads += other.spreads;
-        self.grown += other.grown;
-        self.died += other.died;
-    }
-}
+/// What the rule counts, each named at its place in its [`RuleCounts`].
+pub const COUNTED: [&str; 4] = ["sampled", "spreads", "grown", "died"];
+/// Trees sampled.
+pub const SAMPLED: usize = 0;
+/// Trees put: two may be put on one cell, which then has one.
+pub const SPREADS: usize = 1;
+/// Trees grown a stage.
+pub const GROWN: usize = 2;
+/// Trees dead.
+pub const DIED: usize = 3;
 
 /// The rule, on one superchunk's turn: every tree sampled with
 /// [`SAMPLE_CHANCE`], in Morton order, each seen to by [`tree`].
-pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> TreeCounts {
-    let (sampled, counts) = read::cells::each_sampled(turn, TREE, SAMPLE_CHANCE, samples, tree);
-    TreeCounts { sampled, ..counts }
+pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
+    let (sampled, mut counts) = read::cells::each_sampled(turn, TREE, SAMPLE_CHANCE, samples, tree);
+    counts[SAMPLED] = sampled as u64;
+    counts
 }
 
 /// The rule, on one tree sampled: it tries to spread or grows -- or, at
 /// the oldest stage, may die.
 #[inline]
-fn tree(turn: &mut Turn, cell: CellIndex, counts: &mut TreeCounts) {
+fn tree(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
     let spreading = turn.random().unit() <= SPREAD_SHARE;
     let Some(stage) = read::cells::value(turn, TREE_STAGE, cell) else {
         return;
     };
     if spreading {
-        counts.spreads += spread(turn, cell, stage) as usize;
+        counts[SPREADS] += u64::from(spread(turn, cell, stage));
     } else if stage < OLDEST_TREE_STAGE {
         write::cells::set_value(turn, TREE_STAGE, cell, stage + 1);
-        counts.grown += 1;
+        counts[GROWN] += 1;
     } else if turn.random().below(DIE_ONE_IN) == 0 {
         write::cells::clear(turn, TREE, cell);
         // Its stage goes with it: the next tree there starts at 0.
         write::cells::set_value(turn, TREE_STAGE, cell, 0);
-        counts.died += 1;
+        counts[DIED] += 1;
     }
 }
 

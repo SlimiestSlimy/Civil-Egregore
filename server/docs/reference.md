@@ -73,11 +73,23 @@ by the host on each frame asked.
 
 ## `tick.rs`
 
-**`tick_rules(simulation, arena, entities, seed)`**: grass
-(`mc_rules::grass::rule`) and then sheep (`entity_rules::sheep::rule`) on
-each hot superchunk's turn, the halos left where they are;
-**`TickCounts`** `{grass, sheep}`. **`World::tick`**: the rules, then
-the halos moved: a **`WorldTick`** `{rules, halos}`.
+**`tick_rules(simulation, arena, entities, seed)`**: every rule of
+`RULES` on each hot superchunk's turn, the halos left where they are;
+**`tick_chosen(.., chosen)`**: only the rules chosen.
+**`World::tick`**: the rules, then the halos moved: a **`WorldTick`**
+`{rules, halos}`. **`World::tick_only(chosen, timed)`**: the rules
+chosen alone, each one's time taken if `timed`, the halos not moved.
+
+## `rules.rs`
+
+**`RULES`**: every rule a world ticks, a **`Rule`** `{name, counted,
+rule}` each -- grass, trees, sheep -- in the order a turn runs them; the
+one list of them. **`place_of(name)`**: a rule's place in it.
+**`TickCounts`** `{counts, times}`: each rule's `RuleCounts` and time at
+its place; **`of(rule)`**, **`time_of(rule)`** and **`count(rule,
+counted)`** read them by name. **`Chosen`**: some of the rules --
+**`ALL`**, or **`named(names)`** -- and a superchunk's turn of them,
+**`turn`**, or **`timed_turn`** with each one's time.
 
 ## `diagnostics/`
 
@@ -94,8 +106,8 @@ a **`Throughput`**.
 
 **`pasture::run(ticks, thousandths, sheep, superchunks, threads)`**:
 grass and sheep ticked flat out: the flock and grass over the run, what
-the sheep did, each phase's time and each rule's -- timed inside the
-rule, over every thread -- the memory, the entities' stats, and a
+the sheep did, each phase's time and each rule's -- `Chosen::timed_turn`,
+over every thread, the rules picked by name (`RULES_TICKED`) -- the memory, the entities' stats, and a
 **`Census`** of the flock and grass every `CENSUS_EVERY` (100) ticks:
 a **`PastureRun`**.
 

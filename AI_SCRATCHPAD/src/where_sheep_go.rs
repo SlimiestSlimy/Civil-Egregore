@@ -35,8 +35,8 @@ pub fn run(given: &Given) -> Result<(), String> {
     let (mut puts, mut removes, mut lost, mut stayed, mut refused, mut crossed, mut births, mut deaths) = (0, 0, 0, 0, 0, 0, 0, 0);
     for tick in 1..=ticks {
         let report = world.tick().rules;
-        let (applied, done) = (report.instructions_applied, report.rules.sheep);
-        (puts, removes, lost, stayed, refused, crossed, births, deaths) = (puts + applied.puts, removes + applied.removes, lost + applied.lost, stayed + applied.stayed, refused + applied.refused, crossed + applied.crossed, births + done.births, deaths + done.deaths);
+        let (applied, done) = (report.instructions_applied, report.rules);
+        (puts, removes, lost, stayed, refused, crossed, births, deaths) = (puts + applied.puts, removes + applied.removes, lost + applied.lost, stayed + applied.stayed, refused + applied.refused, crossed + applied.crossed, births + done.count("sheep", "births"), deaths + done.count("sheep", "deaths"));
         if tick % (ticks / LINES).max(1) == 0 {
             println!("{tick},{},{},{puts},{removes},{lost},{stayed},{refused},{crossed},{births},{deaths}", world.entities.len(), world.entities.superchunks().len());
             (puts, removes, lost, stayed, refused, crossed, births, deaths) = (0, 0, 0, 0, 0, 0, 0, 0);
