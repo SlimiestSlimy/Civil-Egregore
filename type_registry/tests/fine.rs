@@ -4,11 +4,12 @@
 //!
 //! `cargo test --test fine`
 
-use type_registry::{data_words, first_clash, layer_types, named, of_number, AttributeType, EntityType, Kind, Layout, LayerType, Registered, SheepState, GRASS, NUMBERS, REGISTRY, SHEEP, SHEEP_STATE, TREE_STAGE};
+use type_registry::{data_words, default_attribute_of, first_clash, first_default_amiss, layer_types, named, of_number, AttributeType, EntityType, Kind, Layout, LayerType, Registered, SheepState, GRASS, NUMBERS, REGISTRY, SHEEP, SHEEP_STATE, TREE_STAGE};
+use utilities::rng::Rng;
 
 /// A row of `kind` named `name` at `number`, `width` wide.
 fn row(name: &'static str, kind: Kind, number: u64, width: u32) -> Registered {
-    Registered { name, kind, number, width, varies_in_size: false }
+    Registered { name, kind, number, width, varies_in_size: false, default_attribute: 0 }
 }
 
 /// The registry has no clash; every row is found by its name and by
@@ -44,6 +45,50 @@ fn the_check_finds_every_clash_and_the_registry_has_none() {
 
 /// The layer types are every layer and wide plane, a wide plane's with
 /// its width, and each is found again in a constant.
+/// A sheep's default attribute is its state, and a type with none
+/// registered has none. In a table drawn from the seed -- entity
+/// types and attributes at numbers of its choosing, some attributes
+/// varying in size -- a default naming a fixed attribute of the table
+/// is sound, and one naming a number the table has not, an attribute
+/// whose size varies, or put on a row that is no entity type's, is
+/// caught at its row.
+#[test]
+fn a_default_attribute_is_an_attribute_of_a_fixed_size_of_the_table() {
+    assert_eq!(first_default_amiss(REGISTRY), None);
+    assert_eq!(default_attribute_of(SHEEP), named("sheep state"));
+    assert_eq!(default_attribute_of(EntityType::of(200_000)), None, "a type not registered");
+    assert!(REGISTRY.iter().all(|registered| registered.kind == Kind::EntityType || registered.default_attribute == 0));
+    let mut random = Rng::new(utilities::seed::counted());
+    for _ in 0..200 {
+        let rows = 4 + random.below(12) as usize;
+        // Numbers apart, each row an entity type or an attribute, the first two one of each: there is always one of either to name.
+        let mut table: Vec<Registered> = (0..rows)
+            .map(|at| {
+                let attribute = at == 1 || (at != 0 && random.below(2) == 0);
+                Registered { varies_in_size: attribute && at != 1 && random.below(3) == 0, ..row("drawn", if attribute { Kind::Attribute } else { Kind::EntityType }, 100 + 10 * at as u64 + random.below(10), 64) }
+            })
+            .collect();
+        assert_eq!(first_default_amiss(&table), None, "none has a default");
+        let of_kind = |table: &[Registered], kind: Kind, varying: bool, random: &mut Rng| {
+            let found: Vec<usize> = (0..table.len()).filter(|&at| table[at].kind == kind && table[at].varies_in_size == varying).collect();
+            (!found.is_empty()).then(|| found[random.below(found.len() as u64) as usize])
+        };
+        let entity = of_kind(&table, Kind::EntityType, false, &mut random).expect("the first row");
+        let fixed = of_kind(&table, Kind::Attribute, false, &mut random).expect("the second row");
+        table[entity].default_attribute = table[fixed].number;
+        assert_eq!(first_default_amiss(&table), None, "an attribute of a fixed size of the table");
+        // Amiss, each in its way: a number no row has, an attribute whose size varies, a row that is no entity type's.
+        let varying = of_kind(&table, Kind::Attribute, true, &mut random);
+        let amiss = [Some((entity, 5)), varying.map(|varying| (entity, table[varying].number)), Some((fixed, table[fixed].number))];
+        for (at, default) in amiss.into_iter().flatten() {
+            let mut table = table.clone();
+            table[at].default_attribute = default;
+            // The entity type's own default being sound, the one amiss is the row changed.
+            assert_eq!(first_default_amiss(&table), Some(at), "row {at} given {default}");
+        }
+    }
+}
+
 #[test]
 fn the_layer_types_are_the_layers_and_wide_planes() {
     let types = layer_types();
