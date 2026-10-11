@@ -11,7 +11,7 @@ use entity_manager::saved::{decode_state, encode_state};
 use entity_manager::{find_attribute, push_attribute, sorted, Attribute, AttributeBlock, AttributeType, Entities, EntityId, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER};
 
 /// The entities' type.
-const WALKER: EntityType = EntityType(40);
+const WALKER: EntityType = EntityType::of(40);
 
 /// Entities holding the superchunk `(10, 10)`, none in it.
 fn world() -> Entities {
@@ -52,8 +52,8 @@ impl Layout for BothEnds {
     }
 }
 
-/// An attribute of one block: its number the highest, its ID the lowest.
-const NAME: Attribute<u64> = Attribute::new(49);
+/// An attribute of one block: its number the lowest, so the first of an entity's.
+const NAME: Attribute<u64> = Attribute::new(39);
 /// One of two blocks.
 const ENDS: Attribute<BothEnds> = Attribute::new(41);
 /// One whose size varies.
@@ -95,10 +95,11 @@ fn every_attribute_is_found_over_those_of_any_length() {
     assert_eq!(find_attribute(&blocks, ENDS.attribute_type()), Ok(1..3));
     assert_eq!(find_attribute(&blocks, NOTE), Ok(3..6));
     assert_eq!(find_attribute(&blocks, TAIL), Ok(6..7));
-    assert_eq!(find_attribute(&blocks, Attribute::<u64>::new(50).attribute_type()), Err(1), "between the one-block types and the two-block");
+    assert_eq!(find_attribute(&blocks, Attribute::<u64>::new(40).attribute_type()), Err(1), "between the first and the second, by number");
+    assert_eq!(find_attribute(&blocks, Attribute::<u64>::new(50).attribute_type()), Err(7), "after them all");
     assert!(!sorted(&blocks[..5]), "an attribute cut short");
     assert!(!sorted(&[blocks[6], blocks[0]]), "out of order");
-    assert!(!sorted(&[AttributeBlock([WALKER.0, 0, 0, 0, 0, 0, 0, 0])]), "a type whose top byte is 0 is no attribute's");
+    assert!(!sorted(&[AttributeBlock([WALKER.0, 0, 0, 0, 0, 0, 0, 0])]), "an entity type is no attribute's");
 
     let mut entities = world();
     let header = walker(1, cell(40, 30));

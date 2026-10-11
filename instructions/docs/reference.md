@@ -152,8 +152,7 @@ held)`**, rows without them.
 **`layers`**: `GRASS`, `TREE`, `TREE_STAGE` (and `OLDEST_TREE_STAGE`),
 `WET`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`: the layers a world's cells have, from
 the type registry (`../../type_registry/`). **`entity_types`**:
-`SHEEP`, and its attributes `HUNGRY_AT`, `PREGNANT`, `LAMB`, `ROAMING`
-and `BEARING` -- and `Roaming`, the layout of `ROAMING`.
+`SHEEP`, and its one attribute `SHEEP_STATE` -- and `SheepState`, its layout.
 
 The words the instructions are asked in: `CellIndex`, `CellCartesian`,
 `SuperchunkIndex`, `NEIGHBOURS`, `SUPERCHUNK_SIDE_CELLS`, `LayerType`,

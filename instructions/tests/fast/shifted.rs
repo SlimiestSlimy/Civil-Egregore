@@ -16,12 +16,12 @@ use crate::tests::{cell, walker, world, STONE, WALKER};
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{AttributeBlock, Entities, EntityId, Header, InstructionsApplied};
+use entity_manager::{Attribute, AttributeBlock, Entities, EntityId, Header, InstructionsApplied};
 use instructions::around::{self, About, Cells};
 use instructions::{cells, compare, Turn};
 use simulation::Simulation;
 use std::collections::BTreeSet;
-use type_registry::{COLLISION, HUNGRY_AT};
+use type_registry::COLLISION;
 use utilities::rng::Rng;
 
 /// Superchunks along the side of the world.
@@ -33,6 +33,8 @@ const PASTURE: u32 = 240;
 const FLOCK: usize = 8000;
 /// Ticks run.
 const TICKS: u64 = 300;
+/// What a walker counts: its meals, and what its neighbours count on it.
+const COUNTED: Attribute<u64> = Attribute::new(41);
 /// Cells past the pasture, each way, that what came of it is read on:
 /// further than a walker comes in the ticks run.
 const READ_PAST: i64 = 320;
@@ -84,19 +86,19 @@ fn flock(turn: &mut Turn, seed: u64) -> u64 {
             turn.remove(&header);
             continue;
         }
-        let meals = entity.attribute(HUNGRY_AT);
+        let meals = entity.attribute(COUNTED);
         if !(stone.set & about.centre()).is_empty() {
             // The meal is counted only if the stone is there still: another on its way here may not eat it, but one counting on this one may.
             compare::entities_from_here(turn, compare::holds(STONE, at));
-            turn.set_attribute(&header, HUNGRY_AT, meals, meals.unwrap_or(0) + 1);
+            turn.set_attribute(&header, COUNTED, meals, meals.unwrap_or(0) + 1);
             compare::entities_as_ever(turn);
             cells::clear(turn, STONE, at);
         } else if let Some(beside) = way_drawn(&mut drawn, &about, open.without(stone.set)).filter(|_| chance < 40).and_then(|bit| around::cell(at, bit)) {
             cells::set(turn, STONE, beside);
         }
         if let Some(other) = way_drawn(&mut drawn, &about, taken).and_then(|bit| around::cell(at, bit)).and_then(|beside| standing(turn, beside)) {
-            let seen = other.attribute(HUNGRY_AT);
-            turn.set_attribute(&other.header, HUNGRY_AT, seen, seen.unwrap_or(0) + 1000);
+            let seen = other.attribute(COUNTED);
+            turn.set_attribute(&other.header, COUNTED, seen, seen.unwrap_or(0) + 1000);
         }
         if let Some(beside) = way_drawn(&mut drawn, &about, open.without(taken)).filter(|_| chance < 9).and_then(|bit| around::cell(at, bit)) {
             turn.put(Header { id: EntityId(drawn.draw()), kind: WALKER, at: beside, wake: now + 1 + drawn.below(3) }, &[]);

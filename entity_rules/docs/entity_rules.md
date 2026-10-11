@@ -95,12 +95,12 @@ alone:
   wall, and never onto a cell the collision plane holds -- a tree's
   (`walking::around_steppable`).
 
-When it is next hungry (`HUNGRY_AT`), when its lamb is due
-(`PREGNANT`) and when it is grown (`LAMB`) are attributes, each a tick;
-the way it roams another (`ROAMING`, laid out as `Roaming`: the tick
-it roams until, and which of the nine cells about it it heads for). All
-but the first are added and removed at run time, as attributes are
-meant to be. They are ticks, not counts of wakes, because a sheep's
+All a sheep keeps is one attribute, one block (`SHEEP_STATE`, laid out
+as `SheepState`): when it is next hungry, when its lamb is due, when
+it is grown, the tick it roams until and which of the nine cells about
+it it heads for, each a field. A tick of 0 is none -- not pregnant, no
+lamb, not roaming -- so what comes and goes at run time is a field
+written, not a block added and taken away. They are ticks, not counts of wakes, because a sheep's
 wakes are as far apart as its needs.
 
 The rule runs in a tick's first phase, as grass does, reading the
@@ -125,7 +125,7 @@ it, so a sheep due to bear at a meal bears at its next wake.
 which another lamb or a stepping sheep may take first in the same
 tick. The put refused, nothing in the tick tells
 its mother: so she does not take the put for a birth. She notes the
-lamb (`BEARING`, its ID), stays where she is, and wakes the next tick:
+lamb (the `bearing` of her `SheepState`, its ID), stays where she is, and wakes the next tick:
 the lamb standing beside her (`entities::stands_beside`), it is born --
 counted, and she is pregnant no more; not there, she is pregnant and
 due as before, and puts it again when a cell beside her is free. A birth costs a wake more; none is lost and none counted that

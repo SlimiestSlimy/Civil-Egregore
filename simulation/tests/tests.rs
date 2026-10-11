@@ -13,9 +13,9 @@ use simulation::Turn;
 
 
 /// The layer type the arena holds: none of its cells are read.
-pub const STONE: LayerType = LayerType(6);
+pub const STONE: LayerType = LayerType::of_a_bit(6);
 /// The entities' type.
-pub const WALKER: EntityType = EntityType(40);
+pub const WALKER: EntityType = EntityType::of(40);
 /// An attribute counting the times an entity woke.
 pub const WOKEN: Attribute<u64> = Attribute::new(41);
 /// An attribute present every other time an entity woke.

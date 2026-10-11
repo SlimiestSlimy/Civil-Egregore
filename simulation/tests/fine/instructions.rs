@@ -12,9 +12,9 @@ use entity_manager::{Attribute, AttributeBlock, Entities, EntityId, EntityType, 
 use simulation::{Simulation, Turn};
 
 /// The layer type the arena holds: every cell hot, none set.
-const STONE: LayerType = LayerType(6);
+const STONE: LayerType = LayerType::of_a_bit(6);
 /// The entities' type.
-const WALKER: EntityType = EntityType(40);
+const WALKER: EntityType = EntityType::of(40);
 /// An attribute.
 const NAME: Attribute<u64> = Attribute::new(41);
 /// Another.

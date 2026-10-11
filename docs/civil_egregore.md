@@ -656,7 +656,7 @@ about the sheep -- a quarter of them grass -- read at a meal, once in
 fastest covering a third, so the flock stops growing while the grass
 still gains on it. And a sheep that eats where it is not lush leaves:
 hungry again, it walks one way for 3,456 ticks -- 48 steps or so --
-eating nothing, before it looks for grass (`ROAMING`, an attribute:
+eating nothing, before it looks for grass (fields of its `SheepState`:
 the tick it roams until and the way, set once, so a step on the way
 changes nothing but its cell).
 
