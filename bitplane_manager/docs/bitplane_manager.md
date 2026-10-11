@@ -67,7 +67,10 @@ small tiles, are a lookup, four shifts of a bitmap word and an AND --
 and whether a layer holds at any of them a compare with 0. A larger
 aligned tile, 8 cells a side to a chunk's 256, is handed over as the
 words it is (`Reader::aligned_tile`): a mask of its side is ANDed with
-them where they lie. A window gives the same cells row by row, and pays
+them where they lie. Four of them two by two
+(`Reader::aligned_tiles_two_by_two`) are what a square of their side
+put down anywhere lies in: the area about a cell is read so, its
+bitmap looked up once. A window gives the same cells row by row, and pays
 for the turning; what does not need rows asks for the tiles.
 
 **The far search**: whether a layer holds at any cell of a tile of a

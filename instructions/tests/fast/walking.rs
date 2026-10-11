@@ -39,7 +39,15 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
         entities.queue_put(walker(10 + y as u64, cell(42, y), NEVER), &[]);
     }
     entities.apply();
+    // The entities are kept in the collision plane, as a world keeps them: each put there holds its cell.
+    let mut codec = LayerCodec::new();
+    for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {
+        arena.make_hot(BucketKey { layer_type: COLLISION, chunk }, None, &mut codec);
+    }
+    entities.iter().for_each(|entity| arena.queue(COLLISION, Write::cell(entity.header.at, WriteOp::Set)));
+    arena.apply();
     let mut simulation = Simulation::new(1);
+    simulation.keep_entities_in(COLLISION);
     let mut steps = 0;
     while entities.get(EntityId(1), to).is_none() {
         simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {

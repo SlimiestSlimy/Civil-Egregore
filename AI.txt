@@ -237,8 +237,18 @@ and masks in Morton order.
 IN ORDER NOW:
 
 A. PATHFINDING TO MORTON ORDER (user, 2026-10-11: "next fix
-   pathfinding to morton order"). Today: instructions::area is 16x16
-   rows read by windows, pathfinding::Rows/Walls a u16 a row.
+   pathfinding to morton order"). FIRST PART DONE: the area is read
+   off the four aligned tiles of 16 it lies in (a lookup a layer),
+   what is in the way from the collision plane and the walls at once,
+   the entity store not read. Sparse pasture (`pasture 1000 20 4000 4
+   1`), a wake: 368 ns -> 297. LEFT, AND PUT TO THE USER: the search
+   itself (pathfinding::Rows, Wave, Walls, a_star) is still rows, the
+   tiles' words turned into rows for it. A wave in Morton order is a
+   step east as three masked shifts a word and a carry into the next
+   word tile, twelve passes a spread with walls and diagonals, over 16
+   words: by my count 3 to 4 times a rows spread. Profile now (sparse):
+   turning to rows ~1.5%, the search ~0.85%, lookups ~0.7%. Not built,
+   not measured: ask, or build it and measure both.
 
 B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    instructions from scratch lmao"; "were basically building a VM
@@ -354,7 +364,10 @@ paged; page-out on the tick's thread.
 - The persistent settings, "~/.local/share/Civil Egregore/" (settings
   and saved worlds), may be deleted whenever needed ("i dont care for
   anything there"). Its settings.csv had sheep a superchunk 0, which
-  is why the window's world had none; removed 2026-10-11.
+  is why the window's world had none; removed 2026-10-11. BUT there
+  is a flag for it, which the user pointed out after: the feature
+  `force_default_settings` (utilities/src/settings.rs) leaves the
+  machine's file alone. Use the flag; do not delete.
 
 
 == OPEN THREADS ==

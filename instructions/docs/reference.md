@@ -101,8 +101,9 @@ tiles, the cells of `under` alone, a `SmallTiles` (`instructions.md`,
 centre at `AREA_CENTRE`; **`Area::count`**; `FARTHEST_SCALE` (6), the
 coarsest tiles asked of. **`layer(turn, type, centre)`**,
 **`layers(turn, types, centre)`**: the area of one layer, or of several
-at once, four windows each. **`occupied(turn, centre)`**: the entities
-on its cells. **`of_tiles(turn, type, centre, scale)`**: the tiles of
+at once, off the four aligned tiles of 16 it lies in (`TILE_CELLS`: the
+cells of one), their words turned into rows; at the world's edge, a
+window a quarter (**`layers_at_the_edge`**). **`of_tiles(turn, type, centre, scale)`**: the tiles of
 `scale` around `centre`, set where the type holds at any cell.
 
 ## `mask.rs`
@@ -142,8 +143,9 @@ step to the nearest cell the type holds at, the area first, then tiles
 by scale, `FARTHEST_SCALE` first and the finest that reach after -- a
 **`SoughtStep`** `{to, scale}`. Its own: `HERE`, where an entity stands
 in its area; **`of_the_area(at, cell)`**, a cell of the area as the
-world's; **`unoccupied(turn, at, rows)`**, rows of the area less the
-cells entities stand on.
+world's; **`in_the_way(turn, at)`**, the cells of the area the
+collision plane holds and its walls, read at once; **`less(rows,
+held)`**, rows without them.
 
 ## The root (`lib.rs`)
 

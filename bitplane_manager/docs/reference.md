@@ -78,7 +78,9 @@ place (`PLACE_X`, `PLACE_Y`, `BESIDE`, `BELOW`); over a chunk's edge,
 each tile `wanted` has a cell in looked up
 (**`small_tiles_over_chunks`**). **`aligned_tile(type, cell, side)`**:
 the words of the aligned tile of 8 to 256 cells a side a cell is in, as
-they lie. **`SMALL_TILE_SIDE`** (4),
+they lie; **`aligned_tiles_two_by_two(types, first, side)`**: four of
+them, two by two, of each type -- a lookup a type where they lie in one
+chunk. **`SMALL_TILE_SIDE`** (4),
 **`SMALL_TILE_CELLS`** (16), **`SMALL_TILES_TOGETHER`** (4).
 
 **`Lookup`**: lookups remembering the last superchunk; one a thread. **`superchunk`** an entry by superchunk

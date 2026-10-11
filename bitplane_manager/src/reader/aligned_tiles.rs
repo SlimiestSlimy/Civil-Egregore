@@ -76,6 +76,35 @@ impl<'a> Reader<'a> {
         self.lookup.bucket(self.superchunks, layer_type, cell).map(|words| &words[first / BITS_PER_WORD..][..cells / BITS_PER_WORD])
     }
 
+    /// The four aligned tiles `side` cells a side (8 to half a
+    /// chunk's), two by two, the first of which begins at `first`, of
+    /// each of `types`: each tile's words as they lie, or none where
+    /// its bitmap is not hot or it is past the world's edge. Where
+    /// they lie in one chunk its bitmap is looked up once, the tiles
+    /// beside and below stepped to on the place in it.
+    #[inline]
+    pub fn aligned_tiles_two_by_two<const N: usize>(&self, types: [LayerType; N], first: CellIndex, side: u32) -> [[Option<&'a [u64]>; 4]; N] {
+        debug_assert!(side.is_power_of_two() && (8..WIDTH as u32).contains(&side), "aligned tiles {side} cells a side, two by two");
+        let cells = (side * side) as usize;
+        let place = first.place();
+        debug_assert!(place & (cells - 1) == 0, "aligned tiles read from a cell that begins none");
+        let words = cells / BITS_PER_WORD;
+        let (beside, below) = (((place | PLACE_Y) + cells) & PLACE_X, ((place | PLACE_X) + 2 * cells) & PLACE_Y);
+        if beside > place & PLACE_X && below > place & PLACE_Y {
+            let places = [place, beside | place & PLACE_Y, place & PLACE_X | below, beside | below];
+            return types.map(|layer_type| {
+                let bucket = self.lookup.bucket(self.superchunks, layer_type, first);
+                places.map(|place| bucket.map(|cells| &cells[place / BITS_PER_WORD..][..words]))
+            });
+        }
+        types.map(|layer_type| {
+            std::array::from_fn(|tile| {
+                let begins = first.offset((side * (tile as u32 & 1)) as i32, (side * (tile as u32 >> 1)) as i32)?;
+                self.lookup.bucket(self.superchunks, layer_type, begins).map(|cells| &cells[begins.place() / BITS_PER_WORD..][..words])
+            })
+        })
+    }
+
     /// [`Reader::small_tiles`], where the four do not lie in one
     /// chunk: each tile `wanted` has a cell in looked up by itself.
     #[cold]
