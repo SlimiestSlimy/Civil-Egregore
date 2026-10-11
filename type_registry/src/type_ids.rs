@@ -26,6 +26,9 @@ pub enum Kind {
 
 /// Where an ID keeps its kind: its first byte, over its number.
 const KIND_SHIFT: u32 = 56;
+/// Bits of a plane's ID's last byte that say its bits a cell; those
+/// above say its tile size ([`LayerType::tile_scale`]).
+const WIDTH_BITS: u32 = 5;
 /// Bits of an ID's last byte, its size, under its number.
 const SIZE_BITS: u32 = 8;
 /// The most an ID's last byte holds.
@@ -69,13 +72,40 @@ impl LayerType {
     /// The type of `bits` bits a cell -- 1, 2, 4, 8 or 16 -- whose
     /// planes are the layers of the numbers `first` on.
     pub const fn wide(first: u64, bits: u32) -> Self {
-        assert!(bits.is_power_of_two() && bits <= 16, "a plane is 1, 2, 4, 8 or 16 bits a cell");
-        Self(type_id(Kind::Layer, first, bits as u64))
+        Self::of_tiles(first, bits, 0)
     }
 
-    /// Bits a cell, its ID's last byte: 1 unless the type is wide.
+    /// The type of `bits` bits a tile, the tiles `2^tile_scale` cells
+    /// a side: a number for every such tile of the world, not for
+    /// every cell (`docs/type_registry.md`, "Tile size"). A scale of
+    /// 0 is a plane of cells, as every plane was.
+    pub const fn of_tiles(first: u64, bits: u32, tile_scale: u32) -> Self {
+        assert!(bits.is_power_of_two() && bits <= 16, "a plane is 1, 2, 4, 8 or 16 bits a cell");
+        assert!(tile_scale < 1 << (SIZE_BITS - WIDTH_BITS), "a plane's tile size is said in three bits");
+        Self(type_id(Kind::Layer, first, (tile_scale as u64) << WIDTH_BITS | bits as u64))
+    }
+
+    /// Bits a cell -- or a tile -- from its ID's last byte: 1 unless
+    /// the type is wide.
     pub const fn bits(self) -> u32 {
-        size_of(self.0) as u32
+        (size_of(self.0) & ((1 << WIDTH_BITS) - 1)) as u32
+    }
+
+    /// Its tile size, as a scale: its tiles are `2^scale` cells a
+    /// side. 0 for a plane of cells; 3 for one of 8 by 8 tiles.
+    pub const fn tile_scale(self) -> u32 {
+        (size_of(self.0) >> WIDTH_BITS) as u32
+    }
+
+    /// Cells along a side of one of its tiles: its tile size.
+    pub const fn tile_side(self) -> u32 {
+        1 << self.tile_scale()
+    }
+
+    /// How many places a cell's place in its chunk, in Morton order,
+    /// is shifted by to give its tile's: two a scale.
+    pub const fn tile_shift(self) -> u32 {
+        2 * self.tile_scale()
     }
 
     /// Its number: a wide plane's first, its lowest bit's layer's.
@@ -147,7 +177,14 @@ pub struct Wide<W: Width> {
 impl<W: Width> Wide<W> {
     /// The plane whose bits are kept cold as the types `first` on.
     pub const fn new(first: u64) -> Self {
-        Self { layer_type: LayerType::wide(first, W::BITS), width: std::marker::PhantomData }
+        Self::of_tiles(first, 0)
+    }
+
+    /// The plane of a number a tile, the tiles `2^tile_scale` cells a
+    /// side ([`LayerType::of_tiles`]), whose bits are kept cold as
+    /// the types `first` on.
+    pub const fn of_tiles(first: u64, tile_scale: u32) -> Self {
+        Self { layer_type: LayerType::of_tiles(first, W::BITS, tile_scale), width: std::marker::PhantomData }
     }
 
     /// Its layer type: what it is made hot, and found in the arena, by.

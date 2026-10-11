@@ -286,6 +286,11 @@ ask)` and `map(seed, generation, ask)`: the answers worked out.
 ## `host/frame.rs`
 
 `CHUNK_WORDS`, `WORD_BITS`, `STAGE_BITS`, `OLDEST_TREE_STAGE`,
+`CLOUD_BITS`, `CLOUD_TILE_SHIFT`, `DEEPEST_CLOUD` -- the cloud
+plane's width, tile size and most, off its type in the registry --
+**`cloud_over(clouds, tile)`**, a tile's cloud in `Cells::clouds`
+(the plane's buckets as the arena holds them, empty where a
+superchunk has no cloud),
 **`cell_of_bit(bit)`** -- how a frame's bits lie, so a client asks no
 one else. `DEEP` (16). **`Viewport`** `{first, last}`: what the
 renderer should render, in superchunks -- not Bevy's camera viewport,

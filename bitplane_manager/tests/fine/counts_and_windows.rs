@@ -185,11 +185,15 @@ fn a_wide_plane_holds_numbers<W: Width>(plane: Wide<W>) {
     let key = BucketKey { layer_type, chunk };
     assert_eq!(arena.make_hot_layers(chunk, &[layer_type], &storage, &mut codec), 1);
     // Numbers over the plane's whole range, on cells of their own; one of them put again, one taken back to 0.
-    let mut cells = std::collections::BTreeSet::new();
-    while cells.len() < 40 {
-        cells.insert(random.below(1 << 16) as usize);
+    // Of a plane of tiles, on tiles of their own: a cell drawn in each, and another of the same tile to read it by.
+    let shift = layer_type.tile_shift();
+    let mut tiles = std::collections::BTreeSet::new();
+    while tiles.len() < 40 {
+        tiles.insert(random.below(1 << (16 - shift)) as usize);
     }
-    let numbers: Vec<(CellIndex, u32)> = cells.into_iter().map(|place| (CellIndex::of(chunk, place), 1 + random.below(u64::from(plane.most())) as u32)).collect();
+    let in_tile = |tile: usize, random: &mut Rng| CellIndex::of(chunk, tile << shift | random.below(1 << shift) as usize);
+    let numbers: Vec<(CellIndex, u32)> = tiles.iter().map(|&tile| (in_tile(tile, &mut random), 1 + random.below(u64::from(plane.most())) as u32)).collect();
+    let same_tiles: Vec<CellIndex> = tiles.iter().map(|&tile| in_tile(tile, &mut random)).collect();
     let (emptied, _) = numbers[7];
     for &(cell, number) in &numbers {
         arena.queue(layer_type, Write::value(plane, cell, number));
@@ -200,7 +204,9 @@ fn a_wide_plane_holds_numbers<W: Width>(plane: Wide<W>) {
     let held = |arena: &BitmapArena| numbers.iter().map(|&(cell, _)| arena.value(plane, cell)).collect::<Vec<_>>();
     let expected: Vec<_> = numbers.iter().enumerate().map(|(nth, &(_, number))| Ok(if nth == 0 { plane.most() } else if nth == 7 { 0 } else { number })).collect();
     assert_eq!(held(&arena), expected, "{} bits a cell", W::BITS);
+    assert_eq!(same_tiles.iter().map(|&cell| arena.value(plane, cell)).collect::<Vec<_>>(), expected, "every cell of a tile reads the tile's number");
     assert_eq!(arena.bucket(key).expect("hot").count(), 39, "the cells not at 0");
+    assert_eq!(arena.bucket(key).expect("hot").words().len(), (1024 * W::BITS as usize) >> shift, "a bitmap's words a bit, over a tile's cells");
 
     assert_eq!(arena.write_back(WORLD_MIDDLE, &mut storage, &mut codec), 1);
     storage.flush_all(&mut flushed);
@@ -211,6 +217,15 @@ fn a_wide_plane_holds_numbers<W: Width>(plane: Wide<W>) {
     assert_eq!(arena.make_hot_layers(chunk, &[layer_type], &storage, &mut codec), 1);
     assert_eq!(held(&arena), expected, "{} bits a cell, from the cold pool", W::BITS);
     assert_eq!(arena.bucket(key).expect("hot").count(), 39);
+}
+
+/// A plane of tiles 8 by 8 cells holds a number a tile, read at any
+/// cell of the tile, in a bucket a sixty-fourth of a plane of cells';
+/// hot and cold, as any wide plane.
+#[test]
+fn planes_of_tiles_hold_a_number_a_tile() {
+    a_wide_plane_holds_numbers(Wide::<Bits4>::of_tiles(40, 3));
+    a_wide_plane_holds_numbers(Wide::<Bits16>::of_tiles(40, 3));
 }
 
 /// Planes of 2, 4, 8 and 16 bits a cell each hold their numbers, hot and cold.

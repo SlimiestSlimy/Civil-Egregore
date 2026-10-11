@@ -95,7 +95,7 @@ impl Job {
                         for bit in 0..bits {
                             if let Some(layer) = image.layer(chunk.place(), layer_type.plane(bit)) {
                                 codec.decode(layer, &mut plane);
-                                wide::spread(&plane, bits, bit, bucket.get_or_insert_with(|| vec![0; bitmap::WORDS * bits as usize].into_boxed_slice()));
+                                wide::spread(&plane, bits, bit, bucket.get_or_insert_with(|| vec![0; wide::bucket_words(layer_type)].into_boxed_slice()));
                             }
                         }
                         cells.push((BucketKey { layer_type, chunk }, bucket));

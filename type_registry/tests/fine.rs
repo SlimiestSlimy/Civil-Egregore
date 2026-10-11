@@ -9,7 +9,7 @@ use utilities::rng::Rng;
 
 /// A row registering `registration`, named `name` at `number`, `width` wide.
 fn row(name: &'static str, registration: Registration, number: u64, width: u32) -> Registered {
-    Registered { name, registration, number, width, varies_in_size: false, default_attribute: 0, master: 0 }
+    Registered { name, registration, number, width, tile_scale: 0, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// The registry has no clash; every row is found by its name and by

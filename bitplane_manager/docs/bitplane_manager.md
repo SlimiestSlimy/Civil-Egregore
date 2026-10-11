@@ -137,6 +137,17 @@ know bitmaps only. The planes are put together when a bucket turns hot
 and taken apart when it is written back, off the tick, passing over
 the cells set alone.
 
+A wide plane may hold a number a **tile** and not a cell
+(`../../type_registry/docs/type_registry.md`, "Tile size"): the clouds and the climate, a tile
+8 by 8 cells. Its bucket is as much the smaller -- a bitmap's words a
+bit, over a tile's cells (`chunk_storage::wide::bucket_words`): 512
+bytes a chunk for the clouds where a plane of cells four bits wide
+takes 32 KiB -- and it is read and written at a cell as any plane is,
+the cell's place shifted to its tile's. Its counts are of the tiles
+whose number is not 0, by count tile as ever. Cold it is its bits'
+bitmaps too, the tiles the first cells of each in Morton order and
+the rest clear, which costs the codec nothing.
+
 ## Writes
 
 The only way cells change. A write is 16 bytes: its anchor cell's

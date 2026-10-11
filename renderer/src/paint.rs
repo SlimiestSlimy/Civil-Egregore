@@ -5,7 +5,7 @@
 use crate::ground::{lit, Given, Ground, COARSEST};
 use crate::near::{paint_near, PaintedNear};
 use coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
-use server::host::frame::{cell_of_bit, Cells, Frame, CHUNK_WORDS, DEEP, OLDEST_TREE_STAGE, STAGE_BITS, WORD_BITS};
+use server::host::frame::{cell_of_bit, cloud_over, Cells, Frame, CHUNK_WORDS, CLOUD_TILE_SHIFT, DEEP, DEEPEST_CLOUD, OLDEST_TREE_STAGE, STAGE_BITS, WORD_BITS};
 use server::host::terrain::TerrainAsker;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
@@ -179,6 +179,31 @@ pub fn stage_at(cells: &Cells, word: usize, bit: u32) -> u32 {
     (cells.stages[at / WORD_BITS] >> (at % WORD_BITS)) as u32 & ((1 << STAGE_BITS) - 1)
 }
 
+/// What a cloud's shadow darkens towards: dark, and a little blue.
+const CLOUD_SHADOW: [u8; 3] = [18, 22, 40];
+/// How much of what is under it the deepest cloud's shadow leaves: a
+/// half -- the ground is still read under it.
+const SEEN_UNDER_DEEPEST_CLOUD: usize = 2;
+
+/// `colour` in the shadow of `cloud` of `whole`: none at 0, the
+/// deepest at `whole` -- [`DEEPEST_CLOUD`], or as many times it as
+/// the clouds added up.
+pub fn under_cloud(colour: [u8; 3], cloud: usize, whole: usize) -> [u8; 3] {
+    mixed(colour, CLOUD_SHADOW, cloud, SEEN_UNDER_DEEPEST_CLOUD * whole)
+}
+
+/// Every tile of `cells` with a cloud over it: where its top left
+/// cell is from the superchunk's, `(x, y)`, how many cells it is a
+/// side, and its cloud -- the tiles those of the cloud plane, its tile
+/// size the type registry's.
+pub fn each_cloud(cells: &Cells, mut shadow: impl FnMut((usize, usize), usize, u32)) {
+    let (tiles_a_chunk, side) = (CELLS_IN_CHUNK >> CLOUD_TILE_SHIFT, 1usize << (CLOUD_TILE_SHIFT / 2));
+    for tile in (0..cells.clouds.len() * WORD_BITS / server::host::frame::CLOUD_BITS).filter(|&tile| cloud_over(&cells.clouds, tile) != 0) {
+        let ((left, top), (x, y)) = (chunk_top_left(tile / tiles_a_chunk), cell_of_bit((tile % tiles_a_chunk) << CLOUD_TILE_SHIFT));
+        shadow((left + x as usize, top + y as usize), side, cloud_over(&cells.clouds, tile));
+    }
+}
+
 /// `colour`, opaque.
 const fn opaque(colour: [u8; 3]) -> [u8; 4] {
     [colour[0], colour[1], colour[2], u8::MAX]
@@ -236,6 +261,12 @@ fn paint(cells: &Cells, ground: &Ground) -> Painted {
             }
         }
     }
+    // The clouds' shadows over all of it, the sheep too.
+    each_cloud(cells, |(left, top), side, cloud| {
+        for pixel in (top..top + side).flat_map(|y| (left..left + side).map(move |x| y * SIDE + x)) {
+            pixels[pixel] = opaque(under_cloud([pixels[pixel][0], pixels[pixel][1], pixels[pixel][2]], cloud as usize, DEEPEST_CLOUD as usize));
+        }
+    });
     Painted { at: cells.at, side: SIDE as u32, pixels: pixels.into_flattened() }
 }
 
@@ -284,6 +315,14 @@ fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
         let at = (y as usize >> detail) * side + (x as usize >> detail);
         sheep[at] = sheep[at].saturating_add(1);
     }
+    // The cloud over each pixel's cells, added up: a tile's cloud once for every cell of it under the pixel.
+    let mut clouds = vec![0usize; if cells.clouds.is_empty() { 0 } else { side * side }];
+    each_cloud(cells, |(left, top), tile_side, cloud| {
+        let (pixels_a_side, cells_each) = ((tile_side >> detail).max(1), tile_side.min(1 << detail));
+        for pixel in ((top >> detail)..(top >> detail) + pixels_a_side).flat_map(|y| ((left >> detail)..(left >> detail) + pixels_a_side).map(move |x| y * side + x)) {
+            clouds[pixel] += cloud as usize * cells_each * cells_each;
+        }
+    });
     let sheep_cells = (2 * SHEEP_REACH + 1) * (2 * SHEEP_REACH + 1);
     let mut pixels = Vec::with_capacity(side * side * 4);
     for (index, &shade) in ground.levels[(detail as usize).min(COARSEST)].iter().enumerate() {
@@ -291,7 +330,8 @@ fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
         let ground = mixed(mixed(BROWN, GREEN, grass as usize, tile_cells), tree_colour(OLDEST_TREE_STAGE / 2), trees as usize, tile_cells);
         // The water over the ground, by the share of the tile under it, shallow water a quarter seen through; and all of it in the ground's light.
         let ground = lit(mixed(ground, WATER, (3 * wet[index] as usize + deep[index] as usize) / 4, tile_cells), shade);
-        pixels.extend_from_slice(&opaque(mixed(ground, WHITE, sheep as usize * sheep_cells, tile_cells)));
+        let pixel = mixed(ground, WHITE, sheep as usize * sheep_cells, tile_cells);
+        pixels.extend_from_slice(&opaque(clouds.get(index).map_or(pixel, |&cloud| under_cloud(pixel, cloud, DEEPEST_CLOUD as usize * tile_cells))));
     }
     Painted { at: cells.at, side: side as u32, pixels }
 }

@@ -5,8 +5,8 @@
 
 use crate::ground::relief::{laid, tint_on_sand, water_light, FOAM, FOAM_MOST, PALE, SAND, SAND_MOST};
 use crate::ground::{shadow_drop, Fine, Ground, MARGIN, SIDE};
-use crate::paint::{depth_at, stage_at, tree_colour, under_water};
-use server::host::frame::{Cells, Near, DEEP, OLDEST_TREE_STAGE, WORD_BITS};
+use crate::paint::{depth_at, each_cloud, stage_at, tree_colour, under_cloud, under_water};
+use server::host::frame::{Cells, Near, DEEP, DEEPEST_CLOUD, OLDEST_TREE_STAGE, WORD_BITS};
 use utilities::tuning::{Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;
@@ -119,6 +119,16 @@ pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: 
                 sheep(&mut pixels, width, ((x - first.0) * pixels_a_cell, (y - first.1) * pixels_a_cell), pixels_a_cell);
             }
         }
+        // The clouds' shadows over all of it: each tile's, over those of its cells that are in the picture.
+        each_cloud(cells, |(tile_left, tile_top), side, cloud| {
+            let (tile_across, tile_down) = (across.start.max(left + tile_left)..across.end.min(left + tile_left + side), down.start.max(top + tile_top)..down.end.min(top + tile_top + side));
+            let rows = (tile_down.start - first.1) * pixels_a_cell..(tile_down.end.max(tile_down.start) - first.1) * pixels_a_cell;
+            let columns = (tile_across.start - first.0) * pixels_a_cell..(tile_across.end.max(tile_across.start) - first.0) * pixels_a_cell;
+            for pixel in rows.flat_map(|row| columns.clone().map(move |column| row * width + column)) {
+                let colour = under_cloud([pixels[pixel][0], pixels[pixel][1], pixels[pixel][2]], cloud as usize, DEEPEST_CLOUD as usize);
+                pixels[pixel] = [colour[0], colour[1], colour[2], u8::MAX];
+            }
+        });
     }
     PaintedNear { near, pixels: pixels.into_flattened() }
 }

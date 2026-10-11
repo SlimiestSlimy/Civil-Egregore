@@ -222,6 +222,24 @@ joining the bands either side -- if the cells either side are no
 higher and no wall is as near straight up or across; a step met only at a corner draws nothing. So bands turn corners as one
 outline, with no doubled patch and no gap.
 
+## Clouds
+
+A cloud casts a shadow on what is under it: the ground, the water, a
+tree, a sheep alike. The cloud plane holds a number a tile 8 by 8
+cells, 0 for no cloud to 15 for the deepest shadow, and a frame
+brings a superchunk's clouds as the arena holds them
+(`Cells::clouds`, read by `cloud_over`; none sent where it has none).
+The painter goes through the tiles with a cloud (`each_cloud`) and
+darkens their pixels towards a dark blue (`under_cloud`), by the
+cloud's share of the deepest, which leaves half of what is under it
+seen: last, over everything else drawn. From far, a pixel being many
+cells, it is darkened by the cloud over its cells added up; from
+near, a tile's shadow is over as many pixels as its cells take.
+
+How the clouds are laid out -- four bits, a tile 8 by 8 -- the
+renderer does not say: it is the cloud plane's type in the registry
+(`server::host::frame::CLOUD_BITS`, `CLOUD_TILE_SHIFT`).
+
 ## Still to come
 
 The words of every superchunk a frame carries are still copied whole,

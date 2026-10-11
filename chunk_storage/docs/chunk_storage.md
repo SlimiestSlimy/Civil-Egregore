@@ -31,6 +31,15 @@ the two: `spread` puts a bitmap into a wide bucket as one bit of every
 cell, `plane` takes that bit of every cell out as a bitmap. Both pass
 over the cells set alone, so a plane mostly clear costs little.
 
+A plane of tiles (`../../type_registry/docs/type_registry.md`, "Tile
+size") holds a number a tile: its hot bucket is the shorter by a
+tile's cells (`wide::bucket_words`), and cold it is its bits' bitmaps
+all the same, the tiles each bitmap's first cells in Morton order and
+the rest of it clear -- so storage, saves and the codec know bitmaps
+only still, and no format was added for it. Raw tiles in the
+superchunk's image would be less to encode once the weather fills
+them; that is to be measured then.
+
 ## The superchunk image
 
 A superchunk, in the cold pool and on disk alike, is one run of words, every

@@ -26,7 +26,7 @@ none where no cell is set. **`decode(words, cells)`**: the bitmap whose stream s
 
 ## `wide.rs`
 
-**`spread(plane, bits, bit, wide)`**: a bitmap put into a wide bucket as one bit of every cell. **`plane(wide, bits, bit)`**: that bit of every cell, as a bitmap. **`cells_set(words, bits)`**: the cells whose number is not 0.
+**`bucket_words(layer_type)`**: the words a chunk's hot bucket takes -- a bitmap's a bit, over the cells of a tile of the plane's tile size. **`spread(plane, bits, bit, wide)`**: a bitmap put into a wide bucket as one bit of every cell. **`plane(wide, bits, bit)`**: that bit of every cell, as a bitmap. **`cells_set(words, bits)`**: the cells whose number is not 0.
 
 ## `superchunk_image.rs`
 

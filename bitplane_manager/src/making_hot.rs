@@ -40,8 +40,9 @@ impl BitmapArena {
                     let bits = key.layer_type.bits();
                     let bucket = allocation.keep(chunk);
                     fill(bucket);
-                    // A count tile's cells: as many times its words as the layer has bits a cell.
-                    let tile_words = COUNT_TILE_WORDS * bits as usize;
+                    // A count tile's cells: as many times its words as the layer has bits a cell -- over its tile's cells, of a plane of tiles.
+                    let tile_words = (COUNT_TILE_WORDS * bits as usize) >> key.layer_type.tile_shift();
+                    assert!(tile_words > 0, "a plane of tiles has a word a count tile at the least");
                     let tile_counts: [u16; COUNT_TILES_IN_CHUNK] = std::array::from_fn(|tile| chunk_storage::wide::cells_set(&bucket[tile * tile_words..][..tile_words], bits) as u16);
                     allocation.tile_counts[chunk] = tile_counts;
                     allocation.set_count(chunk, tile_counts.iter().map(|&count| count as u32).sum());

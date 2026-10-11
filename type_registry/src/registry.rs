@@ -3,7 +3,7 @@
 //! ([`first_clash`]): `docs/type_registry.md`, "Why one table".
 
 use crate::layouts::{Attribute, Layout, SheepState, BLOCK_WORDS};
-use crate::type_ids::{AttributeType, Bits4, EntityRuleType, EntityType, LayerType, ScaRuleType, Wide, Width};
+use crate::type_ids::{AttributeType, Bits16, Bits4, EntityRuleType, EntityType, LayerType, ScaRuleType, Wide, Width};
 
 /// What a row registers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,6 +37,9 @@ pub struct Registered {
     /// for an entity type, which holds nothing itself, and for an
     /// attribute whose size varies.
     pub width: u32,
+    /// A plane's tile size, as a scale: its tiles are `2^tile_scale`
+    /// cells a side, 0 a plane of cells. 0 for anything else.
+    pub tile_scale: u32,
     /// Whether it is an attribute whose size varies: each of it then
     /// says its own length, in the last four bits of its first word.
     pub varies_in_size: bool,
@@ -71,7 +74,7 @@ impl Registered {
     /// with its width -- if it is a layer or a wide plane.
     pub const fn layer_type(&self) -> Option<LayerType> {
         match self.registration {
-            Registration::Layer | Registration::WidePlane => Some(LayerType::wide(self.number, self.width)),
+            Registration::Layer | Registration::WidePlane => Some(LayerType::of_tiles(self.number, self.width, self.tile_scale)),
             _ => None,
         }
     }
@@ -79,32 +82,32 @@ impl Registered {
 
 /// A row of a layer of a bit a cell.
 const fn layer(name: &'static str, layer_type: LayerType) -> Registered {
-    Registered { name, registration: Registration::Layer, number: layer_type.number(), width: 1, varies_in_size: false, default_attribute: 0, master: 0 }
+    Registered { name, registration: Registration::Layer, number: layer_type.number(), width: 1, tile_scale: 0, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// A row of a wide plane.
 const fn wide<W: Width>(name: &'static str, plane: Wide<W>) -> Registered {
-    Registered { name, registration: Registration::WidePlane, number: plane.layer_type().number(), width: W::BITS, varies_in_size: false, default_attribute: 0, master: 0 }
+    Registered { name, registration: Registration::WidePlane, number: plane.layer_type().number(), width: W::BITS, tile_scale: plane.layer_type().tile_scale(), varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// A row of an entity type, with no default attribute.
 const fn entity(name: &'static str, entity_type: EntityType) -> Registered {
-    Registered { name, registration: Registration::EntityType, number: entity_type.number(), width: 0, varies_in_size: false, default_attribute: 0, master: 0 }
+    Registered { name, registration: Registration::EntityType, number: entity_type.number(), width: 0, tile_scale: 0, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// A row of a rule of the cells, its master the layer `master`.
 const fn sca_rule(name: &'static str, rule: ScaRuleType, master: LayerType) -> Registered {
-    Registered { name, registration: Registration::ScaRule, number: rule.number(), width: 0, varies_in_size: false, default_attribute: 0, master: master.number() }
+    Registered { name, registration: Registration::ScaRule, number: rule.number(), width: 0, tile_scale: 0, varies_in_size: false, default_attribute: 0, master: master.number() }
 }
 
 /// A row of a rule of an entity, its master the entity type `master`.
 const fn entity_rule(name: &'static str, rule: EntityRuleType, master: EntityType) -> Registered {
-    Registered { name, registration: Registration::EntityRule, number: rule.number(), width: 0, varies_in_size: false, default_attribute: 0, master: master.number() }
+    Registered { name, registration: Registration::EntityRule, number: rule.number(), width: 0, tile_scale: 0, varies_in_size: false, default_attribute: 0, master: master.number() }
 }
 
 /// A row of an attribute.
 const fn attribute<L: Layout>(name: &'static str, attribute: Attribute<L>) -> Registered {
-    Registered { name, registration: Registration::Attribute, number: attribute.attribute_type().number(), width: L::WORDS as u32 * u64::BITS, varies_in_size: false, default_attribute: 0, master: 0 }
+    Registered { name, registration: Registration::Attribute, number: attribute.attribute_type().number(), width: L::WORDS as u32 * u64::BITS, tile_scale: 0, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// Grass: what a superchunk is generated with in patches, where its
@@ -138,6 +141,16 @@ pub const SHEEP_STATE: Attribute<SheepState> = Attribute::new(17);
 /// (`chunk_storage::SuperchunkImage::depth`).
 pub const WET: LayerType = LayerType::of_a_bit(24);
 
+/// The tile size of the weather's planes, as a scale: tiles 8 by 8
+/// cells.
+pub const WEATHER_TILE_SCALE: u32 = 3;
+/// The clouds: a number a tile 8 by 8 cells, 0 no cloud to 15 the
+/// deepest shadow a cloud casts.
+pub const CLOUD: Wide<Bits4> = Wide::of_tiles(40, WEATHER_TILE_SCALE);
+/// The climate: sixteen bits a tile 8 by 8 cells -- humidity,
+/// temperature and wind kept together, one read for all three.
+pub const CLIMATE: Wide<Bits16> = Wide::of_tiles(44, WEATHER_TILE_SCALE);
+
 /// The grass's rule: its master the grass.
 pub const RULE_OF_GRASS: ScaRuleType = ScaRuleType::of(32);
 /// The trees' rule: its master the cells a tree stands on.
@@ -161,6 +174,8 @@ pub const REGISTRY: &[Registered] = &[
     sca_rule("grass rule", RULE_OF_GRASS, GRASS),
     sca_rule("trees rule", RULE_OF_TREES, TREE),
     entity_rule("sheep rule", RULE_OF_SHEEP, SHEEP),
+    wide("cloud", CLOUD),
+    wide("climate", CLIMATE),
 ];
 
 /// The oldest stage a tree has: sixteen in all.

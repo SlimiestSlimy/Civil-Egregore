@@ -2,13 +2,23 @@
 //! bits together; cold, `bits` bitmaps, a bit of every cell each
 //! (`docs/chunk_storage.md`, "Wide planes").
 
+use crate::LayerType;
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
+
+/// Words the hot bucket of a chunk takes, of `layer_type`: a
+/// bitmap's, times its bits, over the cells of one of its tiles -- a
+/// number a tile, however many cells a tile is.
+pub const fn bucket_words(layer_type: LayerType) -> usize {
+    (WORDS * layer_type.bits() as usize) >> layer_type.tile_shift()
+}
 
 /// Puts `plane`, the bit `bit` of every cell, into `wide`, of `bits`
 /// bits a cell: where `plane` has a cell set, that bit of the cell.
+/// Of a plane of tiles, `wide` is as much shorter and the tiles are
+/// `plane`'s first cells, in Morton order: no more of it is read.
 pub fn spread(plane: &CellWords, bits: u32, bit: u32, wide: &mut [u64]) {
-    debug_assert_eq!(wide.len(), WORDS * bits as usize, "a wide bucket");
-    for (index, &word) in plane.iter().enumerate() {
+    debug_assert!(wide.len() <= WORDS * bits as usize && wide.len().is_multiple_of(bits as usize), "a wide bucket");
+    for (index, &word) in plane[..wide.len() / bits as usize].iter().enumerate() {
         let mut left = word;
         while left != 0 {
             let at = (index * BITS_PER_WORD + left.trailing_zeros() as usize) * bits as usize + bit as usize;
@@ -19,9 +29,10 @@ pub fn spread(plane: &CellWords, bits: u32, bit: u32, wide: &mut [u64]) {
 }
 
 /// The bit `bit` of every cell of `wide`, of `bits` bits a cell, as a
-/// bitmap: [`spread`] undone.
+/// bitmap: [`spread`] undone. Of a plane of tiles, the tiles are the
+/// bitmap's first cells and the rest of it is clear.
 pub fn plane(wide: &[u64], bits: u32, bit: u32) -> Box<CellWords> {
-    debug_assert_eq!(wide.len(), WORDS * bits as usize, "a wide bucket");
+    debug_assert!(wide.len() <= WORDS * bits as usize, "a wide bucket");
     let mut plane = Box::new([0; WORDS]);
     // The lowest bit of every cell of a word.
     let lowest = u64::MAX / ((1u64 << bits) - 1).max(1);

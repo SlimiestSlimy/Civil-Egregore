@@ -342,7 +342,23 @@ optimization reasons lol, basically a single \"climate\" plane". So
 two planes at the 8x8 scale: the cloud plane, 4 bits; the climate
 plane, 16 bits = humidity 4 + temperature 8 + wind 4 (a vector in 4
 bits, and which bits are whose: to be asked). Not
-said yet: what makes and moves them. Details only so far: do not
+said yet: what makes and moves them.
+ANSWERED 2026-10-11 (asked): "Scale in the type" -- a plane's
+registration says its scale (1x1 or 8x8); its hot bucket is 1024 x
+bits a chunk in the same arena; reads, compares, writes take a world
+cell and address place >> 6 (Morton); cold, raw in the superchunk
+image, not through Tessera. "Both planes" registered and stored now:
+cloud (4 bits) and climate (16 bits, one number, members named when
+the layout is given). And: "also, \"coarse cells\" have a name, tiles
+lmao" -- NEVER "coarse cell": the plane holds a number a TILE (the
+aligned tile 8 cells a side); glossary first. "the climate plane is
+at the 8x8 tile size, all planes up to now used a 1x1 tile size
+logically"; "now the idea of the type registry is make the other
+systems use it to not have t0o hotwire stuff around eh" -- the tile
+size is the registration's and the type's; storage, arena, frame and
+renderer take it from there, nothing wired by hand. The word is a
+plane's TILE SIZE: 1x1 for every plane
+before, 8x8 for cloud and climate. Details only so far: do not
 build beyond "plane and shadow" before the user says so.
 WAITING: mask / word-of-cells instructions ("this will have to wait
 for now haha, too much complex stuff"); Morton pathfinding (branch
@@ -469,7 +485,7 @@ RULES AND TIME
   drifts and the user is using it. Border probe: `AI_SCRATCHPAD
   acts_over_a_border side every stepping ticks threads crossing`.
   The scratch folder is a small tmpfs: one or two binaries at most.
-- The check's last line now: 600,cefae6934aac104e,708d986ad043fb37,
+- The check's last line now: 600,7d9edf1b90f99e48,14d65fe66d7651c7,
   5c7b75f20c6ba45a,abbfe87d131ea892,40d474e53b88bbd1,e220a8397b1dcdaf
 - Borders of chunks and superchunks are invisible to what is not
   chance; chance may hang on them ("rngs per superchunk were the plan
@@ -486,6 +502,22 @@ RULES AND TIME
 
 
 == OPEN THREADS ==
+- CLOUDS, built 2026-10-11 ("plane and shadow only"): CLOUD and
+  CLIMATE registered at tile size 8x8, kept by the arena, saved,
+  the clouds sent in the frame and drawn as shadow. NOT as answered
+  on one point: cold they are their bits' bitmaps through Tessera
+  (tiles in each bitmap's first cells), not raw in the image -- no
+  format added; told to the user, theirs to overrule. Cost: +0.8%
+  processor instructions a tick from the tile shift in every wide
+  read, +1.8% from two more planes a superchunk (lookup). The shadow
+  was NOT seen in the renderer: nothing fills the clouds. To see it:
+  a world with clouds written (World::write_cells) saved, opened by
+  its path. Nothing says yet what makes or moves weather, nor how the
+  climate's 16 bits are laid out.
+- SIMPLIFICATION, so far: simulation 3178 -> 3059 lines, dead
+  functions out of three crates. Not yet read for it: entity_manager,
+  server, utilities, chunk_storage, bitplane_manager, actions,
+  renderer.
 - THE FLOCK DIES OUT (found 2026-10-11, told to the user): `server
   pasture 300000 333 4000 4 0` on the measuring seed -- 16,000 sheep
   rise past 150,000, the grass goes to 0, the last sheep dies about
