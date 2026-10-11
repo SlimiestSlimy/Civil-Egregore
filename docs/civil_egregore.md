@@ -674,11 +674,12 @@ The sheep did everything by one instruction -- the whole entity put
 again, attributes and all, each wake -- and held in its own file what
 every entity will want: the nine cells beside it as bits, a free one
 for a lamb, the path to grass round the others. All of it is now
-shared (`instructions/docs/instructions.md`): the simulation's four
-instructions -- put, move, edit, remove -- the neighbourhood and
-the path asked as instructions on the turn, and `EntityEdit`, which picks the instruction
-from what changed. An entity acts on another by an edit, an attribute
-at a time. The sheep, written on them again, is a third shorter and
+shared (`instructions/docs/instructions.md`): what the simulation
+queues for an entity -- made, moved, written, removed -- the neighbourhood and
+the path asked as instructions on the turn. An entity acts on another by a write, an attribute
+at a time. (Since then the simulation's instructions are 24 bytes
+each, compares and writes and nothing else, every write under a
+compare: `simulation/docs/simulation.md`, "Instructions".) The sheep, written on them again, is a third shorter and
 does what it did.
 
 ### Grass looked for as far as a sheep reaches

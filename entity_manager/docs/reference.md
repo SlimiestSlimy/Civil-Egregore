@@ -13,11 +13,8 @@ registry's (`../../type_registry/`), handed on; **`Header`** `{kind,
 at, wake}`, `NEVER` -- no ID, the cell names it; **`EntityRef`** `{header, attributes}` --
 its attributes' blocks -- with **`attribute(attribute)`**, what one
 holds as its layout, and **`attribute_blocks(kind)`**, one's blocks.
-**`EntityEdit::of(entity, room)`**: an entity being changed --
-**`header`**, **`get(attribute)`**, **`set(attribute, value)`**,
-**`set_blocks(attribute)`**, **`unset(attribute)`**, **`attributes`**,
-**`edited`**: its blocks copied into `room` (**`own`**) when first one
-changes, not before.
+An entity is not copied to be changed: what is written of it is
+written to the store, a word or two at a time.
 
 **`attributes.rs`** (`entity_manager.md`, "Attributes, a block each"):
 `Attribute`, `AttributeType`, `Layout` and `BLOCK_WORDS`, the type
@@ -31,7 +28,10 @@ one at least. On an entity's blocks, sorted by type:
 blocks; **`attribute_seen(blocks)`** -- what a compare carries of one
 attribute, 64 bits: that sum, or `NO_ATTRIBUTE` of none; **`each_attribute(blocks)`** -- the attributes one after
 another; **`find_attribute(blocks, kind)`** -- the walk: an attribute's blocks,
-or where they would go -- **`attribute_blocks(blocks, kind)`**,
+or where they would go; **`find_attribute_numbered(blocks, number)`**,
+the same by its type's number alone, what an instruction names one
+by; **`attribute_words(blocks, offset)`**, an attribute's words from
+one counted after its first -- **`attribute_blocks(blocks, kind)`**,
 **`attribute(blocks, attribute)`** (read as its layout),
 **`set_attribute_blocks(blocks, attribute)`** and
 **`set_attribute(blocks, attribute, value)`** (in place of the one of
@@ -61,7 +61,9 @@ else a new run at the end. **`remove(at)`**, **`index_of(place)`**,
 **`find(place)`**, **`entity`**, **`edit(place, kind, blocks)`**
 (one attribute set in place if as long as it was, or the run made anew
 with it added, removed -- no blocks given -- or of another length),
-**`prefetch_entity(at)`**, **`prefetch_attributes(at)`**:
+**`write_words(place, number, offset, words)`** (words of an
+attribute written in place, nothing moved), **`set_wake(place,
+wake)`**, **`prefetch_entity(at)`**, **`prefetch_attributes(at)`**:
 asked of memory ahead; **`sweep`** once garbage reaches the blocks
 in use (and 64).
 
@@ -94,7 +96,13 @@ attributes}`, **`is_empty`**, **`clear`**) -- **`settle_arrivals(settled)`**
 **`occupied(at)`**, and in `store/named_in_a_tick.rs`, the mod
 `named_in_a_tick`, an entity found by the cell the tick found it on
 (`left_this_tick`): `now_on`, `named_or_taken`, **`get_named(stood)`**,
-`make_named`, `put_named`, `edit_named`, `remove_named`,
+**`make_named`**, **`put_named`**, **`move_named(earliest, stood, to,
+collision)`** (moved, all else of it as it is), **`wake_named(earliest,
+stood, wake)`** (its wake set and filed: a write to the wheel),
+**`write_attribute_words_named(stood, number, offset, words)`**,
+**`edit_named`**, **`remove_named`**,
+**`free_for_a_new_entity(at, collision)`** (what a making is held
+against),
 **`names_anew(collision)`** -- and the collision plane as lent to
 them, **`CollisionCells`** (`held`, `hold`, `free`), what the puts and
 moves ask and keep, the cells `vacated` cleared in it when the tick is
@@ -130,7 +138,7 @@ lost, one of an entity no longer where it stood passed over, a new
 one on a cell taken refused, a mover to one staying),
 **`count_lost`**, **`clear`**, **`len()`** and **`is_empty()`** -- how
 many are queued, whether none. **`InstructionsApplied`** `{puts, moves,
-edits, removes, lost, stayed, refused, crossed, passed_over, turned_back}`,
+edits, wakes, removes, lost, stayed, refused, crossed, passed_over, turned_back}`,
 added with `+=`.
 
 **`Entities`** (`store/world_entities.rs`), the world's: **`len()`**,

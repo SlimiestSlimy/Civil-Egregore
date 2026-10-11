@@ -225,8 +225,11 @@ pub struct InstructionsApplied {
     /// Entities moved, or set to wake at another tick, their attributes
     /// as they were.
     pub moves: usize,
-    /// Attributes set or removed, one at a time.
+    /// Writes to attributes: words written, an attribute given or
+    /// taken, each an instruction.
     pub edits: usize,
+    /// Wakes written to the wheel.
+    pub wakes: usize,
     /// Entities removed: died, or moved out of their chunk.
     pub removes: usize,
     /// Entities put in a superchunk holding no entities, so lost.
@@ -252,6 +255,7 @@ impl AddAssign for InstructionsApplied {
         self.puts += other.puts;
         self.moves += other.moves;
         self.edits += other.edits;
+        self.wakes += other.wakes;
         self.removes += other.removes;
         self.lost += other.lost;
         self.stayed += other.stayed;

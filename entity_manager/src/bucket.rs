@@ -3,7 +3,7 @@
 //! one entity, enforced here (`docs/entity_manager.md`, "A chunk's
 //! bucket").
 
-use crate::attributes::{find_attribute, AttributeBlock, AttributeType};
+use crate::attributes::{find_attribute, find_attribute_numbered, AttributeBlock, AttributeType, BLOCK_WORDS};
 use crate::entity::{EntityRef, Header};
 use coordinates::CellIndex;
 use utilities::cache::prefetch;
@@ -41,7 +41,7 @@ struct StoredEntity {
 
 /// What putting an entity in a bucket did.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Put {
+pub enum Put {
     /// It is new, and now stands on its cell.
     New,
     /// It was changed where it stands.
@@ -221,6 +221,39 @@ impl Bucket {
         (stored.first, stored.count) = (start as u32, (self.attributes.len() - start) as u32);
         self.garbage += count;
         self.sweep();
+        true
+    }
+
+    /// Writes `words` over those of the attribute whose type's number
+    /// is `number`, of the entity standing on the cell at `place`,
+    /// from the word `offset` after its first on: in place, nothing
+    /// moved. Whether it was written -- not if nobody stands there,
+    /// it has no such attribute, or the words reach past it.
+    pub(crate) fn write_words(&mut self, place: u16, number: u64, offset: usize, words: &[u64]) -> bool {
+        let Ok(index) = self.find(place) else {
+            return false;
+        };
+        let (first, count) = (self.stored[index].first as usize, self.stored[index].count as usize);
+        let Some(found) = find_attribute_numbered(&self.attributes[first..first + count], number) else {
+            return false;
+        };
+        if 1 + offset + words.len() > found.len() * BLOCK_WORDS {
+            return false;
+        }
+        for (nth, &word) in words.iter().enumerate() {
+            let at = 1 + offset + nth;
+            self.attributes[first + found.start + at / BLOCK_WORDS].0[at % BLOCK_WORDS] = word;
+        }
+        true
+    }
+
+    /// Sets the tick the entity standing on the cell at `place` next
+    /// wakes at: whether one stands there.
+    pub(crate) fn set_wake(&mut self, place: u16, wake: u64) -> bool {
+        let Ok(index) = self.find(place) else {
+            return false;
+        };
+        self.stored[index].header.wake = wake;
         true
     }
 

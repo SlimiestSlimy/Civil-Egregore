@@ -87,10 +87,10 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
     assert_eq!((arena.holds(STONE, mark(decaying)), arena.holds(STONE, mark(eaten))), (Ok(false), Ok(true)), "a mark by the one fed alone");
     let applied = report.writes_applied;
     assert_eq!((applied.writes, applied.changed, applied.refused), (5, 3, 2), "the meal on the cell decayed and its mark, refused");
-    // Every write's compare is an instruction: the decay's holds; the eater fed holds five of its six (fed, nothing seen of the
-    // attribute it sets, its meal's cell, its attribute, its mark's cell; not asleep); the other one of four come to (asleep; not fed, its meal's cell, its attribute -- the
+    // Every write's compare is an instruction: the decay's holds; the eater fed holds six of its seven (fed, nothing seen of the
+    // attribute it sets, itself there to be put to sleep, its meal's cell, its attribute, its mark's cell; not asleep); the other one of four come to (asleep; not fed, its meal's cell, its attribute -- the
     // mark's cell, within that, never come to).
-    assert_eq!(report.instructions_compared, (7, 4), "one eater fed, one asleep a tick: each written once");
+    assert_eq!(report.instructions_compared, (9, 4), "one eater fed, one asleep a tick: each written once");
     assert_eq!((report.counted_when_applied[DECAYED as usize], report.counted_when_applied[EATEN as usize]), (1, 1));
     let (hungry, fed) = (entities.get(decaying).expect("where it stood"), entities.get(eaten).expect("where it stood"));
     assert_eq!((hungry.attribute(FED), hungry.header.wake), (None, 1), "nothing of its meal happened: asleep a tick");

@@ -7,7 +7,9 @@
 
 use super::SuperchunkEntities;
 use crate::attributes::{AttributeBlock, AttributeType};
-use crate::bucket::Put;
+use crate::bucket::{place, Put};
+use crate::entity::NEVER;
+use crate::wheel::Wake;
 use crate::entity::{EntityRef, Header};
 use coordinates::CellIndex;
 
@@ -56,7 +58,7 @@ impl SuperchunkEntities {
     /// or refused, the cell another's this tick, or one `collision`
     /// holds, whatever stands there. Made, its cell is set in
     /// `collision`.
-    pub(crate) fn make_named(&mut self, earliest: u64, header: Header, attributes: &[AttributeBlock], collision: &mut impl CollisionCells) -> Put {
+    pub fn make_named(&mut self, earliest: u64, header: Header, attributes: &[AttributeBlock], collision: &mut impl CollisionCells) -> Put {
         if self.named_or_taken(header.at) || collision.held(header.at) {
             return Put::Refused;
         }
@@ -77,7 +79,7 @@ impl SuperchunkEntities {
     /// to one `collision` holds, whatever stands there: it stays. The
     /// cell it comes to is set in `collision`, and the one it left is
     /// cleared when the tick is over.
-    pub(crate) fn put_named(&mut self, earliest: u64, header: Header, stood: CellIndex, attributes: Option<&[AttributeBlock]>, collision: &mut impl CollisionCells) -> Put {
+    pub fn put_named(&mut self, earliest: u64, header: Header, stood: CellIndex, attributes: Option<&[AttributeBlock]>, collision: &mut impl CollisionCells) -> Put {
         if self.left_this_tick.contains_key(&stood) || !self.occupied(stood) {
             return Put::PassedOver;
         }
@@ -96,14 +98,56 @@ impl SuperchunkEntities {
     /// Sets the attribute of type `kind` of the entity the tick found
     /// on `stood` to `blocks`, or with none removes it: whether the
     /// entity is there.
-    pub(crate) fn edit_named(&mut self, stood: CellIndex, kind: AttributeType, blocks: &[AttributeBlock]) -> bool {
+    pub fn edit_named(&mut self, stood: CellIndex, kind: AttributeType, blocks: &[AttributeBlock]) -> bool {
         self.now_on(stood).is_some_and(|now_on| self.edit(now_on, kind, blocks))
+    }
+
+    /// Moves the entity the tick found on `stood` to `to`, a cell of
+    /// its superchunk, all else of it as it is
+    /// ([`SuperchunkEntities::put_named`]): its wake, if it is still
+    /// to come, is filed where it now stands -- one already passed is
+    /// not, whatever writes its next one files that.
+    pub fn move_named(&mut self, earliest: u64, stood: CellIndex, to: CellIndex, collision: &mut impl CollisionCells) -> Put {
+        let Some(header) = self.get(stood).map(|entity| entity.header) else {
+            return Put::PassedOver;
+        };
+        self.put_named(earliest, Header { at: to, ..header }, stood, None, collision)
+    }
+
+    /// Sets the tick the entity the tick found on `stood` next wakes
+    /// at to `wake`, no earlier than `earliest`, and files it on the
+    /// wheel where the entity stands now: a write to the wheel, as
+    /// another is to an attribute. Whether the entity is there.
+    pub fn wake_named(&mut self, earliest: u64, stood: CellIndex, wake: u64) -> bool {
+        let Some(now_on) = self.now_on(stood).filter(|&now_on| self.chunks[now_on.chunk().place()].set_wake(place(now_on), wake)) else {
+            return false;
+        };
+        if wake != NEVER {
+            self.wheel.file(earliest, wake, Wake { at: now_on });
+        }
+        true
+    }
+
+    /// Writes `words` over those of the attribute whose type's number
+    /// is `number`, of the entity the tick found on `stood`, from the
+    /// word `offset` after its first on: whether it was written -- the
+    /// entity there, the attribute its, the words within it.
+    pub fn write_attribute_words_named(&mut self, stood: CellIndex, number: u64, offset: usize, words: &[u64]) -> bool {
+        self.now_on(stood).is_some_and(|now_on| self.chunks[now_on.chunk().place()].write_words(place(now_on), number, offset, words))
+    }
+
+    /// Whether `at` is free for an entity to be made on: no entity
+    /// stands on it, it is no entity's name this tick, and
+    /// `collision` does not hold it
+    /// ([`SuperchunkEntities::make_named`] refuses on any other).
+    pub fn free_for_a_new_entity(&self, at: CellIndex, collision: &impl CollisionCells) -> bool {
+        !self.named_or_taken(at) && !collision.held(at)
     }
 
     /// Removes the entity the tick found on `stood`: whether it was
     /// there. Its cell is its name until the tick is over, and no
     /// other's.
-    pub(crate) fn remove_named(&mut self, stood: CellIndex) -> bool {
+    pub fn remove_named(&mut self, stood: CellIndex) -> bool {
         let Some(now_on) = self.now_on(stood).filter(|&now_on| self.remove(now_on)) else {
             return false;
         };

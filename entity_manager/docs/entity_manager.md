@@ -57,7 +57,7 @@ ones, and then its first block's second word is its **block length**:
 how many blocks it takes in all, one at least. Its data starts at the
 third word. None is registered yet, and no layout is written for one:
 it is read and written as its blocks (`EntityRef::attribute_blocks`,
-`EntityEdit::set_blocks`, `Instructions::set_attribute_blocks`). The
+`Instructions::set_attribute_blocks`). The
 walk over an entity's attributes honours a block length all the same,
 and a test makes one to say so
 (`../tests/fine.rs`).
@@ -174,6 +174,19 @@ more than it changes (`Instruction`, the four):
 | move | an entity moved to another cell, or left where it is, to wake at another tick; its attributes as they are | nothing |
 | edit | one attribute of an entity set, or removed: by the entity itself or by another | the one attribute's blocks, or none |
 | remove | an entity removed | nothing |
+
+**In a tick the queue is the simulation's**, not this one: its
+instructions are 24 bytes each, compares and writes in one stream
+(`../../simulation/docs/simulation.md`, "Instructions"), and each
+that is of an entity is applied by one function of the store, the
+entity named by the cell the tick found it on -- made (`make_named`),
+moved with nothing else of it changed (`move_named`), its wake
+written to the wheel (`wake_named`), a word or two of an attribute
+written in place (`write_attribute_words_named`), an attribute given
+or taken (`edit_named`), removed (`remove_named`); what a compare
+asks is `get_named` and `free_for_a_new_entity`. The queue here
+(`Instructions`) is what is queued between ticks -- a world set up, a
+save read back -- and what follows holds for both.
 
 Whatever puts an entity on a cell checks it as it is applied: a cell
 holds one entity, ever. An instruction carries all it needs: an entity

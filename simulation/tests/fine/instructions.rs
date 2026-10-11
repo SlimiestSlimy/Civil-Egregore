@@ -86,8 +86,8 @@ fn a_step_carries_no_attributes_and_keeps_them() {
         assert_eq!(entity.attributes, attributes);
     }
     assert_eq!(entities.len(), 3);
-    // Every step a move; the one over the superchunk's border a put there as new besides, and a sleep where it stood until settled.
-    assert_eq!((moves, puts), (30, 1));
+    // Every step a move, but the one over the superchunk's border: a put there as new, and a wake written where it stood until settled.
+    assert_eq!((moves, puts), (29, 1));
 }
 
 /// A step onto a cell an entity stands on is turned back as it is
@@ -133,7 +133,8 @@ fn entities_edit_another_an_attribute_at_a_time() {
         }
         0
     });
-    assert_eq!((report.instructions_applied.edits, report.instructions_applied.puts, report.instructions_compared), (2, 0, (2, 0)));
+    // Each edit an attribute given and its word written, under a compare of none being seen; each editor's sleep under a compare of its being there.
+    assert_eq!((report.instructions_applied.edits, report.instructions_applied.puts, report.instructions_compared), (4, 0, (4, 0)));
     let edited = entities.get(target.at).expect("where it stood");
     assert_eq!(edited.attributes, [AttributeBlock::holding(NAME, 7), AttributeBlock::holding(MARK, 1), AttributeBlock::holding(SCAR, 2)]);
     assert_eq!(edited.header, target);
@@ -173,7 +174,8 @@ fn of_two_edits_of_one_attribute_one_is_refused_the_same_on_any_threads() {
             }
             0
         });
-        assert_eq!((report.instructions_applied.edits, report.instructions_compared), (1, (1, 1)));
+        // The attribute given and its word written, once; the two sleeps' compares hold beside the one edit's.
+        assert_eq!((report.instructions_applied.edits, report.instructions_compared), (2, (3, 1)));
         entities.get(target.at).expect("where it stood").attribute(NAME).expect("set")
     });
     assert!(kept[0] == kept[1] && [1, 2].contains(&kept[0]), "{kept:?}");
@@ -206,7 +208,7 @@ fn an_entity_changing_itself_and_another_writing_it_both_stand() {
             }
             0
         });
-        assert_eq!((report.instructions_applied.edits, report.instructions_compared), (2, (2, 1)), "the mark and one name applied, the other name refused");
+        assert_eq!((report.instructions_applied.edits, report.instructions_compared), (3, (4, 1)), "the mark given and written and one name written, the other name refused; the two sleeps' compares hold");
         let written = entities.get(target.at).expect("where it stood");
         assert_eq!((written.attribute(MARK), written.header.wake), (Some(1), NEVER), "the other's mark, and its own sleep");
         written.attribute(NAME).expect("named")
@@ -246,4 +248,40 @@ fn a_crossing_written_behind_takes_what_was_written() {
         let crossed = entities.get(across).expect("across");
         assert_eq!((crossed.attribute(NAME), crossed.attribute(MARK)), (Some(7), Some(1)), "with all that was written to it");
     }
+}
+
+/// Two entities writing two fields of one attribute of a third in one
+/// tick, each held against the words it writes alone: both land,
+/// where two writes of the whole attribute would have one refused.
+/// One held against words that are no longer so is refused; and
+/// sixteen bytes are the most one instruction writes.
+#[test]
+fn two_fields_of_one_attribute_are_written_by_two_in_a_tick() {
+    let (mut arena, mut entities) = world(2);
+    let target = walker(cell(1030, 30), NEVER);
+    // An attribute of one block: seven words of data, the first four 1 to 4.
+    let mut block = AttributeBlock::holding(NAME, 1);
+    block.0[2..5].copy_from_slice(&[2, 3, 4]);
+    entities.queue_put(target, &[block]);
+    entities.queue_put(walker(cell(1020, 30), 0), &[]);
+    entities.queue_put(walker(cell(1040, 30), 0), &[]);
+    entities.apply();
+    let kind = NAME.attribute_type();
+    let report = Simulation::new(2).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        for entity in turn.woken() {
+            if number(entity.header.at, cell(1020, 30)) == 1 {
+                // The first word, and the two after it seen wrongly.
+                turn.set_attribute_words(&target, kind, 0, &[1], &[10]);
+                turn.set_attribute_words(&target, kind, 1, &[2, 9], &[70, 80]);
+            } else {
+                // The third and fourth: sixteen bytes at once.
+                turn.set_attribute_words(&target, kind, 2, &[3, 4], &[30, 40]);
+            }
+            turn.step(&entity.header, entity.header.at, NEVER);
+        }
+        0
+    });
+    // Two word writes land and one is refused; the two sleeps' compares hold beside them.
+    assert_eq!((report.instructions_applied.edits, report.instructions_compared), (2, (4, 1)));
+    assert_eq!(entities.get(target.at).expect("where it stood").attributes[0].0[1..5], [10, 2, 30, 40]);
 }

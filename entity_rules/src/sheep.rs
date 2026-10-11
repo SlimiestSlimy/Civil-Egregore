@@ -7,7 +7,7 @@ use instructions::entities::EntitiesBetweenTicks;
 pub use instructions::entity_types::{SheepState, SHEEP, SHEEP_STATE};
 use instructions::simulation_time::SimulationTime;
 use instructions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
-use instructions::{area, cells, compare, entities, place_counted, this_tick, walking, AttributeBlock, CellCartesian, CellIndex, EntityEdit, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
+use instructions::{area, cells, compare, entities, place_counted, this_tick, walking, AttributeBlock, CellCartesian, CellIndex, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
 /// Every time below is said in simulation time, and is ticks only
@@ -61,14 +61,11 @@ pub const PATHS: usize = place_counted(&COUNTED, "paths");
 /// Of those found, the ones beyond the area about the sheep.
 pub const FAR: usize = place_counted(&COUNTED, "far");
 
-/// What the rule keeps over a superchunk's turn: what the sheep did,
-/// and room for a sheep's attributes as they are changed, made once.
+/// What the rule keeps over a superchunk's turn: what the sheep did.
 #[derive(Default)]
 struct Flock {
     /// What the sheep did.
     done: RuleCounts,
-    /// Room for the attributes of the sheep being changed.
-    room: Vec<AttributeBlock>,
 }
 
 /// The rule, on one superchunk's turn: every sheep waking, each seen to
@@ -83,22 +80,22 @@ pub fn rule(turn: &mut Turn) -> RuleCounts {
 /// meal, a lamb, growing up -- and sleeps again, as long as it can.
 #[inline]
 fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
-    let (done, room, now) = (&mut flock.done, &mut flock.room, this_tick::now(turn));
+    let (done, now) = (&mut flock.done, this_tick::now(turn));
     done[WOKEN] += 1;
     let (at, before) = (sheep.header.at, sheep.header);
-    let mut sheep = EntityEdit::of(sheep, room);
     let about = around::about(at);
     let grass = around::layer(turn, GRASS, &about);
     // The neighbours it may step to: on the hot bitplanes, nothing standing there, no wall before them.
     let steppable = grass.hot & walking::around_steppable(turn, &about);
     // All it keeps, as the tick found it, and as this wake leaves it: written once, if it changed.
-    let was = sheep.get(SHEEP_STATE).unwrap_or(SheepState { hungry_at: now, ..SheepState::default() });
+    let seen = sheep.attribute(SHEEP_STATE);
+    let was = seen.unwrap_or(SheepState { hungry_at: now, ..SheepState::default() });
     let mut state = was;
     let (hungry_at, roaming) = (was.hungry_at, was.roaming_until != 0);
     // On its way out of thin pasture it does not stop to eat.
     let fed = now >= hungry_at && !(grass.set & about.centre()).is_empty() && !roaming;
     if !fed && now >= hungry_at + STARVE_TICKS {
-        entities::remove(turn, sheep.header());
+        entities::remove(turn, &before);
         done[DEATHS] += 1;
         return;
     }
@@ -192,13 +189,14 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     };
     // Old age comes by the tick, not the wake: a long sleep is as much of a life as many short ones.
     if this_tick::random(turn).below(LIFE_TICKS) < wake - now {
-        entities::remove(turn, sheep.header());
+        entities::remove(turn, &before);
         count(turn, done, fed.then_some(at), DEATHS);
     } else {
+        // Written from where it is worked out, the words that changed alone: nothing of the sheep is copied to be changed.
         if state != was {
-            sheep.set(SHEEP_STATE, state);
+            entities::set_attribute_of(turn, &before, SHEEP_STATE, seen, state);
         }
-        entities::commit(turn, sheep, to, wake);
+        entities::step(turn, &before, to, wake);
     }
     if fed {
         // One of the two is applied, never both: the sheep is written once.

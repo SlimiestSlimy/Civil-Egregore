@@ -143,7 +143,8 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
 
     let cooled = world.keep_hot(&[]);
     assert_eq!((cooled.cooled, world.arena().superchunk_indices().len(), world.entities().len()), (halo.len(), 0, 0), "all cold");
-    assert_eq!(world.cold().len(), halo.len());
+    // Those the halo left on its way here are cold too, on a seed whose sheep walked it off them.
+    assert!(halo.iter().all(|superchunk| world.cold().contains_key(superchunk)), "every one of the halo's kept cold");
     let restored = world.keep_hot(&halo);
     assert_eq!((restored.restored, restored.generated), (halo.len(), 0), "restored as they were, none generated");
     assert!(held(&world) == before, "as it was");

@@ -166,9 +166,10 @@ refused.
 
 ### One entity writing another
 
-An entity's own change (`entities::commit`) is such instructions: one
-for each attribute it changed, held against what it saw of that
-attribute, then a move. It is never put whole over itself. So another
+An entity's own change (`entities::set_attribute_of`, then
+`entities::step`) is such instructions: for each attribute it
+changed, the words that differ, held against what it saw of that
+attribute, then a move and its wake. It is never put whole over itself. So another
 entity may write it in the same tick, awake or asleep
 (`entities::set_attribute_of`, `unset_attribute_of`), with these
 guarantees:
@@ -243,11 +244,13 @@ fails there.
 
 ## What an entity's rule is given
 
-**An entity being changed** (`EntityEdit`): its attributes read, set and
-removed as if already its own, nothing copied until one is changed, and
-`entities::commit` picks the instructions -- a move alone if none
-was, else a write of each attribute changed before it. A rule states what the entity is to be; what that costs is
-not its concern.
+**An entity being changed**: a rule reads what it keeps
+(`EntityRef::attribute`), works out what it is to keep in a value of
+its own, and writes that if it differs (`entities::set_attribute_of`)
+-- the words that changed, held against what was seen of the
+attribute -- then has it step or stay (`entities::step`). Nothing of
+the entity is copied to be changed. A rule states what the entity is
+to be; what that costs is not its concern.
 
 **What must be made** (`entities::spawn`): a new entity's cell
 may be taken between the rule seeing it free and the put being applied,

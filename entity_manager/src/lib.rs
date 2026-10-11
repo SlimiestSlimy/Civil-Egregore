@@ -18,8 +18,9 @@ pub mod saved;
 mod store;
 mod wheel;
 
+pub use bucket::Put;
 pub use instructions::{Instructions, InstructionsApplied};
-pub use attributes::{attribute, attribute_blocks, attribute_seen, blocks_sum, each_attribute, find_attribute, push_attribute, remove_attribute, set_attribute, set_attribute_blocks, sorted, Attribute, AttributeBlock, AttributeType, Layout, BLOCK_WORDS, NO_ATTRIBUTE};
-pub use entity::{EntityEdit, EntityRef, EntityType, Header, NEVER};
+pub use attributes::{attribute, attribute_blocks, attribute_seen, blocks_sum, each_attribute, attribute_words, find_attribute, find_attribute_numbered, push_attribute, remove_attribute, set_attribute, set_attribute_blocks, sorted, Attribute, AttributeBlock, AttributeType, Layout, BLOCK_WORDS, NO_ATTRIBUTE};
+pub use entity::{EntityRef, EntityType, Header, NEVER};
 pub use store::{Arrival, CollisionCells, Entities, EntityReader, Settled, SuperchunkEntities, OCCUPIED_SIDE};
 pub use wheel::{Wake, WHEEL_TICKS};

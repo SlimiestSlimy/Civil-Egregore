@@ -89,6 +89,45 @@ on any number of threads, and a save can keep them (`random_states`,
 `restore_random`). The outboxes and room
 for samples are kept between ticks.
 
+### Instructions
+
+All a rule's turn queues is instructions, one stream a superchunk it
+writes to (`turn/instruction.rs`). An instruction is **24 bytes**:
+its first two the **opcode**, the other twenty-two what that opcode
+needs and nothing else -- sixteen bits, thirty-two, and two words.
+There are compares, writes, and the end of a compare, and no more:
+whatever a rule means by a run of them -- a meal, a step, a birth --
+is not an instruction's to know. They are shaped by what the
+simulation can do cheaply, and come in three families, the opcode's
+high byte, by what they are of:
+
+| family | compares | writes |
+|---|---|---|
+| plane and plane | a cell's number on a layer | a cell's number on a layer |
+| plane and entity | a cell free for an entity to be made on; an entity there still | an entity made, moved, removed, crossing in -- each with the collision plane |
+| entity and entity | an attribute by its sum; one word or two of it | one word or two of an attribute; an attribute given or taken; a wake, written to the wheel |
+
+A cell is named by its place in the superchunk the instruction lands
+in, twenty bits. An entity is named by the cell the tick found it on.
+An attribute is named by its type's number, in sixteen bits, and a
+word of it by its offset after the first, in twelve: so one
+instruction compares or writes **sixteen bytes of an attribute at the
+most**, two words, and an attribute's number is under 65,536 for an
+instruction to name it. Not everything has a mask or a constant:
+each opcode takes what it needs of the room. When an entity next
+wakes is a write like another -- to its superchunk's timer wheel,
+not to an attribute or a plane -- and a move does not set it.
+
+Only a crossing carries more than its 24 bytes: the entity whole, its
+blocks in a list beside the queue, since the superchunk it comes to
+holds nothing of it.
+
+**The hard rule: every write lies under a compare**, in whichever
+superchunk's queue it is queued -- its own or a neighbour's. No
+instruction that writes is held against nothing, and queuing one
+under no compare panics (`Turn::queue`). What has nothing else to be
+held against is held against the entity it is of being there still.
+
 ### Compare-and-write
 
 Every rule reads the world as the tick found it, so two may each see
@@ -101,8 +140,10 @@ that still holds when the write is come to; otherwise it is
 **A compare is an instruction of its own** (`Compare`,
 `Turn::compare_from_here`), queued in order with the writes. It is of
 a cell -- the number a layer holds there, 1 or 0 on a layer of a bit
-a cell -- or of an entity: that it still stands where it stood, with
-an attribute as it was seen, or without it. If it does not hold when
+a cell; or that an entity may be made on it -- or of an entity: that
+it is there still, wherever it stands now; that an attribute of it is
+as it was seen, or that it has none; that a word or two of an
+attribute are as seen. If it does not hold when
 it is come to, everything its author queued after it is skipped --
 cells written, what entities come to, counts alike -- up to the
 end of the compare (`Turn::compare_end`).
@@ -112,13 +153,16 @@ an entity. A compare a rule gives takes the place of the one it gave
 before.
 
 **A write is a write and nothing else**: a layer, a cell, a number;
-an entity, an attribute, its blocks. It carries no compare. What it
-is held against -- the cell still as the rule saw it, the attribute
-still as seen -- is a compare queued before it, and the write is
-under that: `Turn::queue_seen` queues the two, a compare of the cell
-and the write; an attribute set queues a compare of the attribute and
-the edit. A compare carries what was seen in 64 bits at the most --
-of an attribute, a sum of its blocks
+an entity, an attribute, a word or two of it; a wake. It carries no
+compare. What it is held against -- the cell still as the rule saw
+it, the attribute still as seen, the entity there still -- is a
+compare queued before it, and the write is under that:
+`Turn::queue_seen` queues the two, a compare of the cell and the
+write; an attribute set queues a compare of the attribute and, under
+it, the words that changed, sixteen bytes an instruction; a step
+queues a compare of the entity being there, its move and its wake. A
+compare carries what was seen in sixteen bytes at the most -- of a
+whole attribute, a sum of its blocks
 (`entity_manager::attribute_seen`), never a block. What is written is
 in order already, author by author, which is all this takes.
 
@@ -134,10 +178,10 @@ lies in its queue; one closed is popped, and what is under it is the
 queue's end less where it lies -- those within it, closed before it,
 among them. That is kept beside the queue, not in it -- an
 instruction's room is for what it compares and writes: a list, one
-entry a compare, of how many steps are under it and how many compares
+entry a compare, of how many instructions are under it and how many compares
 are within it. An entry is kept for a compare as it is opened, so the
 list is in the order the compares are come to; one that does not hold
-passes over its steps in the queue and over the entries of the
+passes over its instructions in the queue and over the entries of the
 compares within it in the list.
 
 Everything under a compare lands in the compare's superchunk: a
@@ -172,9 +216,11 @@ saw the other. A tick has none:
   one attribute, the first applied does and the other is refused; two
   writing two attributes both do. This holds whoever writes -- the
   entity itself, awake, or another, in the same tick.
-- **An entity changing itself** (`Turn::update`) is those writes, one
-  for each attribute that differs from what the tick found, then a
-  move, which carries nothing. So what another writes to it in the
+- **An entity changing itself** (`Turn::update`, or a
+  `set_attribute` and a `step`) is those writes, one compare for each
+  attribute that differs from what the tick found and under it the
+  words that changed, then a move, which carries nothing, and its
+  wake. Nothing of it is copied to be changed. So what another writes to it in the
   tick stands beside its own change, and each of its writes is
   applied or refused by itself: every instruction is atomic, and
   leaves the entity one that could be -- a rule that needs several
@@ -196,9 +242,11 @@ saw the other. A tick has none:
   written to it, as one stepping within a superchunk does. Only one
   removed where it stood meanwhile is **turned back**: what was put
   is taken back (`InstructionsApplied::turned_back`).
-- **A cell an entity is put on or steps to** is checked as the
-  instruction is applied: another's, a step stays and a new entity is
-  not put. Nothing is overwritten. A cell an entity stood on as the
+- **A cell an entity is made on** is a compare of its being free,
+  queued before the making and all that follows of it -- its
+  attributes given and written: another's, none of it happens. **A
+  cell stepped to** is checked as the move is applied: another's, the
+  step stays. Nothing is overwritten. A cell an entity stood on as the
   tick began is another's all that tick, though its entity left it or
   was removed: it is that entity's name until the tick is over, and
   whether it was left in time would depend on which side of a border
@@ -221,7 +269,7 @@ is applied. These come back in the tick's report
 rules on a turn gives each numbers of its own (`Turn::count_under`).
 
 The order, for each superchunk, from each neighbour's outbox in turn:
-its entity instructions and its compare-and-writes together, in the
+its instructions in the one stream, in the
 order the rule queued them,
 each compare read as it is come to -- so it sees what those before it
 did. It is fixed, so what is applied and what refused is the same on
@@ -307,25 +355,26 @@ instruction that carries least -- is not the simulation's: it is
 `../../instructions/` (`../../instructions/docs/instructions.md`), free functions over a
 turn, which the rules are written in and reach the simulation through.
 
-**Instructions queued**, one for each thing done to an entity, each
-carrying no more than it changes (`../entity_manager/`):
+**What is queued for an entity**, each a compare and the writes
+under it ("Instructions"), carrying no more than it changes:
 
-| instruction | queued by | what it does | carries |
-|---|---|---|---|
-| put | `put`, a crossing | an entity made, on a cell nobody stands on; so too in the superchunk it crosses to | its attributes |
-| move | `step`, `update` | moved to a cell, or left where it stands, to wake at a tick; its attributes as they are | nothing |
-| edit | `set_attribute`, `unset_attribute`, `set_attribute_blocks`, `update` | one attribute set or removed, of any entity in reach -- the rule's own or another -- if it is still as seen | the one attribute's blocks, or none |
-| remove | `remove` | removed | nothing |
+| queued by | the compare | under it |
+|---|---|---|
+| `put` (`make` ... `made`) | the cell free for an entity | the entity made; each attribute given, its words written |
+| `step`, `update` | the entity there still | a move, if to another cell; its wake written |
+| a crossing | the cell free, in the superchunk crossed to; the entity there still, where it stood | there, the entity made whole; here, its wake written |
+| `set_attribute`, `unset_attribute`, `set_attribute_blocks`, `update` | the attribute as seen, or none seen | the words that differ, two an instruction; or the attribute given and written, or taken |
+| `remove` | the entity there still | removed |
 
-A walking entity is a move a step: 32 bytes queued and none of its
+A walking entity is four instructions a step, 96 bytes -- a compare,
+a move, a wake, the compare's end -- and none of its
 attributes read or written, however many it has -- until it crosses to
-another superchunk, where it goes whole. An edit is how an entity is
-changed, by itself or by another: two wounding one in a tick each
+another superchunk, where it goes whole. An entity is
+changed, by itself or by another, a word or two at a time under a
+compare of the attribute: two wounding one in a tick each
 write their own attribute, where two whole copies would undo each
-other, and of two writing the same attribute one is refused. Every instruction that
-puts an entity on a cell is checked as it is applied. Instructions
-may be queued under a compare, applied only if it holds
-("Compare-and-write").
+other, and of two writing the same attribute one is refused
+("Compare-and-write"; "Instructions").
 
 ### Woken entities are asked of memory ahead
 
@@ -335,7 +384,7 @@ superchunk, each where nothing has read since it last woke. Profiled in
 the renderer at the flock's peak (700,000 sheep on 64 superchunks, `perf`,
 2,400 ticks a second), a third of the time was two reads waiting for
 memory: the woken entity itself (`Bucket::get`, 17%) and its
-attributes (`EntityEdit::get`, 15%). Pathfinding, far search and all, was
+attributes (read then through a copy kept to change them, 15%). Pathfinding, far search and all, was
 under 2%.
 
 The wakes due in a tick are known before any is seen to
