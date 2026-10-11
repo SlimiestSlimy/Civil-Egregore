@@ -140,7 +140,7 @@ a **`Throughput`**.
 
 **`pasture::run(ticks, thousandths, sheep, superchunks, threads)`**:
 grass and sheep ticked flat out: the flock and grass over the run, what
-the sheep did, each phase's time and each rule's -- `Chosen::timed_turn`,
+the sheep did, the acts over a border applied, each phase's time and each rule's -- `Chosen::timed_turn`,
 over every thread, the rules picked (`RULES_TICKED`) -- the memory, the entities' stats, and a
 **`Census`** of the flock and grass every `CENSUS_EVERY` (100) ticks:
 a **`PastureRun`**.

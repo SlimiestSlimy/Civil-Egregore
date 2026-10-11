@@ -88,8 +88,8 @@ pub(crate) fn pasture(given: &Given) -> Result<(), String> {
     let (grass, sheep) = (run.done.of(crate::GRASS_RULE), run.done.of(crate::SHEEP_RULE));
     let woken = sheep[entity_rules::sheep::WOKEN] as usize;
     report.note(format!(
-        "{ticks} ticks over {superchunks} superchunk(s) on {threads} thread(s); sheep {} -> {}; grass {} -> {}; {} entities lost past the superchunks used",
-        run.sheep.0, run.sheep.1, run.grass.0, run.grass.1, run.instructions.lost
+        "{ticks} ticks over {superchunks} superchunk(s) on {threads} thread(s); sheep {} -> {}; grass {} -> {}; {} entities lost past the superchunks used; {} acts over a border",
+        run.sheep.0, run.sheep.1, run.grass.0, run.grass.1, run.instructions.lost, run.acts_over_a_border
     ));
     let mut flock = Table::new(&["wakes", "wakes a tick", "eaten", "born", "died", "put", "moved", "wakes written", "removed"]);
     flock.row(&[

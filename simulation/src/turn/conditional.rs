@@ -281,9 +281,9 @@ impl Turn<'_> {
     /// applied only if `compare` holds when it is come to: skipped
     /// otherwise, up to the next compare given or
     /// [`Turn::compare_end`]. One given takes the place of the one
-    /// before. What is queued for another superchunk meanwhile makes
-    /// the author's act one over a border
-    /// (`docs/simulation.md`, "An act over a border").
+    /// before. It gates what is queued for another superchunk
+    /// meanwhile too: all an author queues for more than one is
+    /// applied as one (`docs/simulation.md`, "An act over a border").
     pub fn compare_from_here(&mut self, compare: Compare) {
         self.compare_end();
         self.comparing = Some(compare);

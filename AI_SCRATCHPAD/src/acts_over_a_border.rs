@@ -3,6 +3,8 @@
 //! the cell east of it and counting that on itself under the one
 //! compare, every tick -- over the border, or the same lines moved
 //! away from it -- with others only stepping inside each superchunk.
+//! Or, `crossing`, each of a line stepping to that cell and back the
+//! next tick: over the border every tick, with no compare of its own.
 
 use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
@@ -21,6 +23,10 @@ pub const STEPPING: &str = "stepping";
 pub const TICKS: &str = "ticks";
 /// Threads of the second run, the first being on one: 0 for all there are.
 pub const THREADS: &str = "threads";
+
+/// Whether those of a line step over their border and back instead
+/// of flipping the cell beyond it: 1 if so.
+pub const CROSSING: &str = "crossing";
 
 /// The layer flipped.
 const STONE: LayerType = LayerType::of_a_bit(6);
@@ -69,8 +75,8 @@ fn world(side: u32, every: u32, stepping: u32, away: u32) -> (BitmapArena, Entit
 /// One superchunk's turn: one of a line flips the cell beside it --
 /// east if it stands west of its border, west if east -- and counts
 /// that on itself, under the compare of the cell; all wake next tick
-/// where they stand.
-fn turn_of(turn: &mut Turn) -> u64 {
+/// where they stand. If `crossing`, it steps to that cell instead.
+fn turn_of(turn: &mut Turn, crossing: bool) -> u64 {
     let now = turn.now();
     for entity in turn.woken() {
         let header = entity.header;
@@ -79,6 +85,10 @@ fn turn_of(turn: &mut Turn) -> u64 {
             let at = header.at.cartesian();
             // Those put west of their border have an odd x less the border's, those east an even one: the world's cells begin even.
             let beside: CellIndex = CellCartesian { x: if at.x % 2 == 1 { at.x + 1 } else { at.x - 1 }, y: at.y }.into();
+            if crossing {
+                turn.step(&header, beside, now + 1);
+                continue;
+            }
             let seen = u32::from(turn.holds(STONE, beside) == Ok(true));
             turn.compare_from_here(Compare::Cell { layer_type: STONE, at: beside, seen: seen as u16 });
             turn.queue_seen(STONE, beside, seen, 1 - seen, None);
@@ -95,14 +105,14 @@ fn turn_of(turn: &mut Turn) -> u64 {
 pub fn run(given: &Given) -> Result<(), String> {
     let (side, every, stepping, ticks): (u32, u32, u32, u64) = (given.number(SIDE)?, given.number(EVERY)?, given.number(STEPPING)?, given.number(TICKS)?);
     println!("lines,threads,acts over a border a tick,applying us a tick,computing us a tick,compares held a tick,compares not a tick");
-    let threads: usize = given.number(THREADS)?;
+    let (threads, crossing): (usize, u32) = (given.number(THREADS)?, given.number(CROSSING)?);
     for threads in [1, if threads == 0 { simulation::threads_for((side * side) as usize) } else { threads }] {
         for (name, away) in [("away from the border", AWAY), ("over the border", 0)] {
             let (mut arena, mut entities) = world(side, every, stepping, away);
             let mut simulation = Simulation::new(threads);
             let (mut acts, mut applying, mut computing, mut compared) = (0, std::time::Duration::ZERO, std::time::Duration::ZERO, (0, 0));
             for tick in 0..ticks + 20 {
-                let report = simulation.tick(&mut arena, &mut entities, 1, |turn: &mut Turn, _: &mut Vec<CellIndex>| turn_of(turn));
+                let report = simulation.tick(&mut arena, &mut entities, 1, |turn: &mut Turn, _: &mut Vec<CellIndex>| turn_of(turn, crossing == 1));
                 // The first ticks grow the queues: not counted.
                 if tick >= 20 {
                     (acts, applying, computing) = (acts + report.acts_over_a_border, applying + report.applying, computing + report.computing);
