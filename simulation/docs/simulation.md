@@ -50,13 +50,15 @@ sample costs the same few counts however rare samples are.
 
 ### One order, wherever the borders fall
 
-What a tick does must not depend on where the borders of chunks and
-superchunks fall: a flock is the same flock a few cells east. Two
-things in a tick are settled by order -- of two compare-and-writes of
-one thing the first applied does, and of two entities stepping to one
-cell the first has it -- so the order cannot be the one the
-superchunks are gone over in, nor Morton order within one: both move
-with the borders.
+What a tick does must not depend on how the superchunks are gone
+over, nor on which side of a border a thing stands: the borders are
+how the world is kept, not something in it. Two things in a tick are
+settled by order -- of two compare-and-writes of one thing the first
+applied does, and of two entities stepping to one cell the first has
+it -- so the order cannot be the one the superchunks are applied in.
+It is the **Morton order of the world's cells**: one order over the
+whole world, the one cells, chunks and superchunks are numbered and
+kept in, and the one a rule is handed its entities and cells in.
 
 Everything queued has an **author**: the entity woken or the cell
 sampled that the rule was seeing to when it queued it
@@ -65,22 +67,36 @@ them). An outbox notes where each author's part of each of its nine
 queues begins (`Segment`, begun by `queue_landing_in` at the first thing an
 author queues for a superchunk). A superchunk applying takes the
 segments its nine neighbours hold for it, sorts them by author -- the
-author's cell in reading order, rows down then cells across, which a
-shift of the whole world leaves as it is -- and applies each in turn,
-what one author queued in the order it queued it. So a tick comes to
-what it would had the world's authors been seen to one at a time from
-the top left, whichever superchunk each stands in. What is queued with
-no author named is the superchunk's rule's own, and comes first.
+Morton index of the author's cell -- and applies each in turn, what
+one author queued in the order it queued it. So a tick comes to what
+it would had the world's authors been seen to one at a time in Morton
+order, whichever superchunk each stands in. What is queued with no
+author named is the superchunk's rule's own, and comes first.
+
+**The invariant every border is resolved by**: an entity's name in a
+tick -- its origin cell as the tick began, a Morton index -- is its
+place in the world's one order, and of two authors the one of the
+lower name has
+all it queued applied first, in whichever superchunks either stands or
+what they queued lands. Nothing a border does may break that; where
+splitting an author's instructions between superchunks would, they are
+kept together and the superchunks wait for one another at its place
+in the order ("An act over a border": what the tenth queue is for).
 
 Within that order every instruction is applied as it is come to: a
 cell written, an attribute written, an entity moved, made or removed
 are one stream, none before another for its kind.
 
-Held by a test that shifts a world (`../../instructions/tests/fast/shifted.rs`;
+Held by a test of a flock over the corner of four superchunks, the
+same on one thread as on all (`../../instructions/tests/fast/flock_over_borders.rs`;
 `../../instructions/docs/instructions.md`, "The same wherever the
-borders fall"). The sort is paid every tick, and not measured yet. What is
-drawn is another matter, and meant to be: each superchunk has its own
-random stream, so where chance comes in, a border does too.
+borders fall"). A world shifted whole some cells is another world:
+Morton order is not kept by a shift, so of two contending the other
+may come first there. The order was once reading order, rows down,
+which a shift keeps; it gave way to the one order everything else in
+the world is in. The sort is paid every tick, and not measured yet.
+What is drawn is another matter, and meant to be: each superchunk has
+its own random stream, so where chance comes in, a border does too.
 
 Each superchunk has random numbers of its own, kept from tick to tick
 (`Simulation`): first seeded from the seed and its superchunk index, then
@@ -136,7 +152,7 @@ all of them (`LandingInSeveral`, `Landing::of_slot` giving each
 instruction its superchunk), moves each on past it and lets it go on.
 Every superchunk has applied all that comes before the act in the
 world's order, and none anything after it: the act falls where it
-would had the world been applied by one thread from the top left. No
+would had the world been applied by one thread in Morton order. No
 two superchunks can wait for each other, their lists being in one
 order: of all the acts waited at, the first in that order has every
 superchunk it lands in free to come to it.
@@ -189,10 +205,10 @@ in eight cells of border, or fewer, cost nothing that could be
 measured. Probed by `AI_SCRATCHPAD acts_over_a_border`; held by
 `tests/fine/acts_over_a_border.rs` (whole or not at all, on any
 border; a crowd contending over four superchunks' corner the same on
-any number of threads) and by the shifted world of
-`../../instructions/tests/fast/shifted.rs`, whose flock makes entities
-and lays stone under compares over whatever borders the shift leaves
-it on. A tick counts its acts (`TickReport::acts_over_a_border`).
+any number of threads) and by the flock of
+`../../instructions/tests/fast/flock_over_borders.rs`, which makes
+entities and lays stone under compares over the borders the seed
+puts it on. A tick counts its acts (`TickReport::acts_over_a_border`).
 
 What it does not do: an act that lands in a superchunk past the
 author's neighbours is past the speed of light, as any write is; and

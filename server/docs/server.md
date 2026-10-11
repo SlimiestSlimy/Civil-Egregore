@@ -190,7 +190,7 @@ under a tree. So between ticks the plane holds the cells trees and
 entities stand on, and no other. Held by `../tests/fast/collision.rs`
 -- as a world is generated and flocked, through the sheep stepping,
 being born and dying, and after the trees' rule ran -- and by the
-shifted world's test, where it is the same on both worlds.
+test of a flock over borders (`../../instructions/tests/fast/flock_over_borders.rs`), where it is the same on both worlds.
 
 Each thing is one cell so far. One of more cells is a mask over the
 plane -- free under all of it, then set under all of it -- which

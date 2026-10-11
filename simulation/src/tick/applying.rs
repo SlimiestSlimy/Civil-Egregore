@@ -96,7 +96,7 @@ fn slots() -> impl Iterator<Item = (usize, (i32, i32))> {
 impl Phase<'_, '_> {
     /// Gathers into `order` what is queued for the superchunk at
     /// `here`, in the order it is applied in: author by author in the
-    /// reading order of their cells, whichever superchunk each is in
+    /// Morton order of their cells, whichever superchunk each is in
     /// -- the same order in every superchunk, which is what lets one
     /// wait for another. Of one author, what it queued for the
     /// superchunk alone before its act over a border.

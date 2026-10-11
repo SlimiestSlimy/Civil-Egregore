@@ -429,6 +429,37 @@ threads`.
   in order dispatching to each respective superchunk?" -- yes; and
   "in theory all writes should be gated, i never said anything about
   naked wriites lmao": there are none, I had worded it badly.
+- NOW (the user, 2026-10-11, after I explained that an author went to
+  the tenth queue only when a compare of one superchunk gated
+  something landing in another): "ok, now do it as i stated from the
+  beggining instead, if the queues ANY type of instruction to multiple
+  superchunk queues. all its instructions for that entitiy are moved
+  to the tenth queue". So: the second superchunk queue an author
+  queues anything for sends ALL it queued this tick to the tenth
+  queue, compares or no. My narrower trigger is to go.
+  "ask before applying" / "or writing": NOT WRITTEN YET, waiting for
+  the user's go. Settled since: what is queued with no author named is
+  treated as any author's ("yeah i agree, no exception").
+- INVARIANT, the user, 2026-10-11: "the entity id (origin coordinate
+  that tick) is literally the global world execution order, the morton
+  order. write that down as an invariant for interchunk boundary
+  resolution. lower entitiy id should get its instructions executed
+  first. (thatas what the tent queue is for lmao)". Written in
+  simulation.md, "One order, wherever the borders fall". The order
+  was reading order (for the shifted-world test); the user: "yeah,
+  same on any number of threads is fine, morton order is supreme in
+  global world execution order"; "it contradicts a little what i said
+  yesterday, but i was half asleep lmao". DONE: author = Morton index
+  of its cell (Turn::seeing_to); shifted.rs became
+  flock_over_borders.rs (one thread against all). A world shifted is
+  no longer held to be the same world.
+- Entities over several superchunks, the user, 2026-10-11: "lets keep
+  one rule"; "multi superchunk spanning entities have an origin
+  coordinate at one specific chunk, thats the owner, the origin chunk
+  for large entities will be dynamically calculated to be roughly in
+  the center coordinate of the entity". So: one owner, where its
+  origin is; its place in the order is its origin; it waits for every
+  superchunk it queues for, as any author does. Not built.
 - STANDING, the user, 2026-10-11: "hey hey, tests should be seed
   genereated when possible". Done for the two border tests; holds for
   every test from here on.
