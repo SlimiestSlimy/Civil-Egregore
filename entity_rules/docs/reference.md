@@ -7,11 +7,14 @@ The design is in `entity_rules.md`.
 `SHEEP`, and its one attribute `SHEEP_STATE`, laid out as `SheepState`:
 when it is next hungry, when its lamb is due, when it is grown, the
 tick it roams until and which way, the lamb it put last tick;
-`STEP_TICKS` (64) and `STEP_JITTER` (16) between a walking sheep's
-steps, `MEAL_TICKS` (6,912), `STARVE_TICKS` (13,824),
-`LUSH_CELLS` (64, of the area's 256), `CONCEIVE_ONE_IN` (5),
-`ROAM_TICKS` (3,456), `LIFE_TICKS` (172,800),
-`GESTATION_TICKS` (1,152), `LAMB_TICKS` (4,608).
+its times, each said in seconds of the simulation
+(`SimulationTime`) and a constant of ticks once worked out, here with
+its ticks at 256 a second: `STEP_TICKS` (0.25 s, 64) and `STEP_JITTER`
+(a sixteenth, 16) between a walking sheep's steps, `MEAL_TICKS` (27 s,
+6,912), `STARVE_TICKS` (54 s, 13,824), `ROAM_TICKS` (13.5 s, 3,456),
+`LIFE_TICKS` (675 s, 172,800), `GESTATION_TICKS` (4.5 s, 1,152),
+`LAMB_TICKS` (18 s, 4,608); and `LUSH_CELLS` (64, of the area's 256),
+`CONCEIVE_ONE_IN` (5).
 
 **`rule(turn)`**: hands **`wake`**, the rule for one sheep, to `entities::each_woken`, with a **`Flock`** (the counts, and room for attributes). Every sheep waking on the superchunk's turn sees to
 what it woke for and sleeps as long as it can. Hungry (past

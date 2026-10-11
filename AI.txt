@@ -394,7 +394,17 @@ C. TYPE ID: "you actually poisoned the first byte of the typeid by
    (SHEEP_STATE, SheepState; a tick of 0 = none). Same census as
    before on one seed; wake and apply no slower.
 
-D. QUEUED: "we want sheep to wander more and sleep less haha"; and
+D. TICK RATE, DONE 2026-10-11 (the user: "work on the tickrate
+   simulation-second invariance stuff to have it ready ... because
+   instructions will depend on that"): simulation/src/simulation_time.rs
+   -- TICKS_A_SIMULATION_SECOND = 256, SimulationTime::seconds /
+   milliseconds -> ticks, chance_a_tick for a mean simulation time;
+   rules get it as instructions::simulation_time. Sheep times, grass
+   and tree mean times, halos' warm/cool, the host's pace all said so.
+   Same hashes as before. The mean times are the old chances exactly
+   (390.625 s, 781.25 s, 39.062 s): ugly numbers, the user may round.
+   The table's "time" operand form is to be a SimulationTime.
+   STILL QUEUED: "we want sheep to wander more and sleep less haha"; and
    rules independent of the tick rate: "more constants: ticks per
    simulation second = 256 and now thing like grass spreading are
    determined by a random draw to a 'mean sim time to' ... so the

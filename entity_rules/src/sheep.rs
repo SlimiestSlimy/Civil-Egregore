@@ -5,20 +5,25 @@
 use instructions::around;
 use instructions::entities::EntitiesBetweenTicks;
 pub use instructions::entity_types::{SheepState, SHEEP, SHEEP_STATE};
+use instructions::simulation_time::SimulationTime;
 use instructions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
 use instructions::{area, cells, compare, entities, place_counted, this_tick, walking, AttributeBlock, CellCartesian, CellIndex, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
-/// Ticks between a walking sheep's steps, at the least...
-pub const STEP_TICKS: u64 = 64;
-/// ...and up to this many more, drawn each wake, so the flock's wakes
-/// spread over the ticks.
-pub const STEP_JITTER: u64 = 16;
+/// Every time below is said in simulation time, and is ticks only
+/// once worked out: the same sheep at any tick rate.
+///
+/// Ticks between a walking sheep's steps, at the least: a quarter of
+/// a second...
+pub const STEP_TICKS: u64 = SimulationTime::milliseconds(250).ticks();
+/// ...and up to this many more, a sixteenth of a second, drawn each
+/// wake, so the flock's wakes spread over the ticks.
+pub const STEP_JITTER: u64 = SimulationTime::milliseconds(62).ticks();
 /// Ticks after a meal a sheep is hungry again at: until then it eats
 /// nothing, though it stands on grass, and sleeps.
-pub const MEAL_TICKS: u64 = 6912;
+pub const MEAL_TICKS: u64 = SimulationTime::seconds(27).ticks();
 /// Ticks a hungry sheep finds no meal in before it starves.
-pub const STARVE_TICKS: u64 = 13_824;
+pub const STARVE_TICKS: u64 = SimulationTime::seconds(54).ticks();
 /// Cells of grass among the 16 by 16 about a sheep for the pasture
 /// to be lush enough to breed on: a quarter of them
 /// (`docs/entity_rules.md`, "The sheep").
@@ -28,15 +33,15 @@ pub const LUSH_CELLS: u32 = 64;
 pub const CONCEIVE_ONE_IN: u64 = 5;
 /// Ticks of sleep to a sheep's life, on average: before a sleep of so
 /// many ticks it dies of old age at so many in these.
-pub const LIFE_TICKS: u64 = 172_800;
+pub const LIFE_TICKS: u64 = SimulationTime::seconds(675).ticks();
 /// Ticks a sheep that ate on thin pasture walks for, one way, once it
 /// is hungry again, before it looks for grass: 48 steps or so, out of
 /// the patch its flock has grazed.
-pub const ROAM_TICKS: u64 = 3456;
+pub const ROAM_TICKS: u64 = SimulationTime::milliseconds(13_500).ticks();
 /// Ticks from falling pregnant to giving birth.
-pub const GESTATION_TICKS: u64 = 1152;
+pub const GESTATION_TICKS: u64 = SimulationTime::milliseconds(4_500).ticks();
 /// Ticks a lamb takes to grow.
-pub const LAMB_TICKS: u64 = 4608;
+pub const LAMB_TICKS: u64 = SimulationTime::seconds(18).ticks();
 
 /// What the rule counts, each named at its place in its
 /// [`RuleCounts`]: the one order, the places below worked out from it.

@@ -220,7 +220,7 @@ the other where the halos ask for a superchunk.
 `Running` and `HostThread` are in `host_thread.rs`, the rest in `mod.rs`.
 
 A world run on a thread of its own for a client -- a window -- that
-asks it for the cells of its viewport. `TARGET_PACE` (256 ticks a second),
+asks it for the cells of its viewport. `TARGET_PACE` (the tick rate, `TICKS_A_SIMULATION_SECOND`: a second of the simulation in a second),
 `CENSUS_EVERY` (1,000 ticks), `CATCH_UP`, `FRAMES_SHARE` (an eighth of
 a tick's time, what answering may take of it when the host has none to
 spare). **`Host`**: the host as a

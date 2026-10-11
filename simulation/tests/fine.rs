@@ -16,3 +16,6 @@ mod instructions;
 
 #[path = "fine/compare_and_write.rs"]
 mod compare_and_write;
+
+#[path = "fine/simulation_time.rs"]
+mod simulation_time;

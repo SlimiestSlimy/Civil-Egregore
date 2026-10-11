@@ -135,8 +135,8 @@ from the next move on, in place of the last viewport's; nothing unless
 the world's hot has its viewport's superchunks hot;
 **`Halos::viewport`**: them. **`Halos::generated`**: the superchunks
 the last move or `keep_hot` generated -- made new by a job, not read
-back -- sorted. `WARM_TICKS` (256): the ticks a superchunk is warming;
-`COOL_TICKS` (256): the ticks one is cooling.
+back -- sorted. `WARM_TICKS`: the ticks a superchunk is warming;
+`COOL_TICKS`: the ticks one is cooling -- a second of the simulation each.
 **`HaloChange`** `{reached, generated, restored, cooled}`, added with
 `+=`. **`Warming`** `{superchunk, due, from}`, from a
 **`WarmedFrom`**: `Lingering`, or `Job(ticket)`.
@@ -225,6 +225,16 @@ they have and taking back those turned back, how many; and every
 entity named anew, the cells left cleared in the collision plane);
 the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
 offsets in a fixed order.
+
+## `simulation_time.rs`
+
+`simulation.md`, "Simulation time". **`simulation_time`**, the module.
+**`TICKS_A_SIMULATION_SECOND`** (256): the tick rate, written there
+alone; `MILLISECONDS_A_SECOND`. **`SimulationTime`**: a length of
+simulation time, kept as its ticks: **`seconds(seconds)`**,
+**`milliseconds(milliseconds)`** to the nearest tick and one at least,
+**`ticks`**, **`chance_a_tick`** the chance each tick of a thing that
+takes so long on average.
 
 ## `transient_data.rs`
 

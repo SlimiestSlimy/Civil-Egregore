@@ -101,7 +101,10 @@ it is grown, the tick it roams until and which of the nine cells about
 it it heads for, each a field. A tick of 0 is none -- not pregnant, no
 lamb, not roaming -- so what comes and goes at run time is a field
 written, not a block added and taken away. They are ticks, not counts of wakes, because a sheep's
-wakes are as far apart as its needs.
+wakes are as far apart as its needs; and every time the rule adds to a
+tick is said in seconds of the simulation
+(`../../simulation/docs/simulation.md`, "Simulation time"), so it is
+the same sheep at any tick rate.
 
 The rule runs in a tick's first phase, as grass does, reading the
 world as the tick found it. No two sheep eat one cell: a sheep eats the

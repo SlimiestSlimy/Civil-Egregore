@@ -49,6 +49,13 @@ pub mod entity_types {
     pub use type_registry::{SheepState, SHEEP, SHEEP_STATE};
 }
 
+/// Simulation time: a rule says how long a thing takes in seconds of
+/// the simulation, never in ticks, so it is the same rule at any tick
+/// rate (`../../simulation/docs/simulation.md`, "Simulation time").
+pub mod simulation_time {
+    pub use simulation::simulation_time::{SimulationTime, TICKS_A_SIMULATION_SECOND};
+}
+
 /// The most counts a rule keeps.
 pub const COUNTS_OF_A_RULE: usize = 8;
 
