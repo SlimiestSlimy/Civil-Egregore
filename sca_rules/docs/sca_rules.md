@@ -68,8 +68,9 @@ tree sampled does one thing, by lot:
   of those 64 is drawn, and a tree of stage 0 is put there if there is
   none and the cell is hot, not under water, and not held in the
   collision plane by something else standing there.
-- **Else it grows** a stage; or, at the oldest stage, dies one time in
-  `DIE_ONE_IN` -- its stage put to 0 if the tree still stands, then
+- **Else it grows** a stage (`GROW_SHARE` of its samples); or, at the
+  oldest stage, may die -- once in `MEAN_TIME_TO_DIE` of standing
+  there on average, `DIE_CHANCE` a sample -- its stage put to 0 if the tree still stands, then
   the cell cleared, so the next tree there starts at 0 -- and lives on
   otherwise.
   What a tree does is counted as it is applied: a tree put where

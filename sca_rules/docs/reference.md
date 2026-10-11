@@ -24,8 +24,8 @@ Returns its `RuleCounts`, their places named **`SAMPLED`**,
 
 The trees' layers are the terrain's (`instructions::layers`): `TREE`,
 the cells a tree stands on, and `TREE_STAGE`, its stage, 0 to
-`OLDEST_TREE_STAGE`. `MEAN_TIME_TO_SAMPLE` (39.062 seconds of the simulation) and the `SAMPLE_CHANCE` worked out from it (once in 10,000 ticks at 256 a second), `SPREAD_SHARE` (`Chance::HALF`), `SEEDS_FROM` (4),
-`CROWDED` (9), `DIE_ONE_IN` (4), `AROUND` (8).
+`OLDEST_TREE_STAGE`. `MEAN_TIME_TO_SAMPLE` (39.062 seconds of the simulation) and the `SAMPLE_CHANCE` worked out from it, `SPREAD_SHARE` and `GROW_SHARE` (`Chance::HALF` each), `SEEDS_FROM` (4),
+`CROWDED` (9 trees), `MEAN_TIME_TO_DIE` (312.5 seconds at the oldest stage) and the `DIE_CHANCE` a sample worked out from it, `AROUND` (8).
 
 **`rule(turn, samples)`**: hands **`tree`**, the rule for one tree, to `cells::each_sampled`. Every tree sampled tries to spread or grows
 a stage -- or at the oldest dies one time in four, its cell and its

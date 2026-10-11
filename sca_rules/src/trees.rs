@@ -14,12 +14,19 @@ pub const MEAN_TIME_TO_SAMPLE: SimulationTime = SimulationTime::milliseconds(39_
 pub const SAMPLE_CHANCE: Chance = MEAN_TIME_TO_SAMPLE.chance_a_tick();
 /// The share of a tree's samples it tries to spread in; it grows in the rest.
 pub const SPREAD_SHARE: Chance = Chance::HALF;
+/// The rest: the share of its samples a tree grows in, or at the
+/// oldest stage may die in.
+pub const GROW_SHARE: Chance = Chance::HALF;
 /// The stage from which a tree spreads.
 pub const SEEDS_FROM: u32 = 4;
 /// The other trees about a tree at which it never spreads.
 pub const CROWDED: u32 = 9;
-/// A tree at the oldest stage dies one sample in this many of those it does not spread in.
-pub const DIE_ONE_IN: u64 = 4;
+/// The simulation time a tree stands at the oldest stage before it
+/// dies, on average.
+pub const MEAN_TIME_TO_DIE: SimulationTime = SimulationTime::milliseconds(312_500);
+/// The chance, each sample of a tree at the oldest stage, that it
+/// dies: drawn among the samples it does not spread in.
+pub const DIE_CHANCE: Chance = MEAN_TIME_TO_DIE.chance_each(MEAN_TIME_TO_SAMPLE);
 /// Cells along the side of the square about a tree it counts and spreads in.
 pub const AROUND: u32 = 8;
 
@@ -56,7 +63,7 @@ fn tree(turn: &mut Turn, cell: CellIndex, _counts: &mut RuleCounts) {
         spread(turn, cell, stage);
     } else if stage < OLDEST_TREE_STAGE {
         cells::set_value_counted(turn, TREE_STAGE, cell, stage, stage + 1, GROWN);
-    } else if this_tick::random(turn).below(DIE_ONE_IN) == 0 {
+    } else if this_tick::random(turn).chance_among(DIE_CHANCE, GROW_SHARE) {
         // Its stage goes with it, so the next tree there starts at 0: gone if the tree still stands, which is then cleared.
         compare::write(turn, compare::holds(TREE, cell), TREE_STAGE.layer_type(), cell, stage, 0, None);
         // And its cell is free to step on again, if it is the tree that held it.

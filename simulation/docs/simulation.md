@@ -584,9 +584,16 @@ long it takes on average. Its chance each tick is once in that time's
 ticks (`SimulationTime::chance_a_tick`), so tick by tick it happens
 that long apart on average whatever a tick is -- grass spreads as fast
 at any rate, drawn more often and less likely each time, or the other
-way. A chance that is of an event, not of a tick -- one meal in five,
-half a tree's samples -- says nothing of time and is a chance as it
-was.
+way. A thing that may happen only when something else does -- a
+sheep falls pregnant at a meal, a tree dies at a sample -- says its
+mean simulation time too, and its chance each such time is worked out
+from the two times (`SimulationTime::chance_each`): the tick rate is
+in neither. A share that says nothing of time -- half a tree's
+samples -- or a count -- the trees that crowd one -- is as it was.
+
+No rule says the tick rate or a number of ticks: a rule's times are
+`SimulationTime`s, and a rule is the same rule whatever a second of
+the simulation is defined as.
 
 What is coarser at a lower rate is only what a tick is: nothing takes
 less than one, and two times closer than a tick are the same. The

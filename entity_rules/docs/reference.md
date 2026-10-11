@@ -8,13 +8,14 @@ The design is in `entity_rules.md`.
 when it is next hungry, when its lamb is due, when it is grown, the
 tick it roams until and which way;
 its times, each said in seconds of the simulation
-(`SimulationTime`) and a constant of ticks once worked out, here with
-its ticks at 256 a second: `STEP_TICKS` (0.25 s, 64) and `STEP_JITTER`
-(a sixteenth, 16) between a walking sheep's steps, `MEAL_TICKS` (27 s,
-6,912), `STARVE_TICKS` (54 s, 13,824), `ROAM_TICKS` (13.5 s, 3,456),
-`LIFE_TICKS` (675 s, 172,800), `GESTATION_TICKS` (4.5 s, 1,152),
-`LAMB_TICKS` (18 s, 4,608); and `LUSH_CELLS` (64, of the area's 256),
-`CONCEIVE_ONE_IN` (5).
+(`SimulationTime`) and a constant of ticks once worked out, whatever
+the tick rate: `STEP_TICKS` (0.25 s) and `STEP_JITTER`
+(a sixteenth) between a walking sheep's steps, `MEAL` and `MEAL_TICKS`
+(27 s), `STARVE_TICKS` (54 s), `ROAM_TICKS` (13.5 s),
+`LIFE_TICKS` (675 s), `GESTATION_TICKS` (4.5 s),
+`LAMB_TICKS` (18 s); `LUSH_CELLS` (64, of the area's 256); and
+`MEAN_TIME_TO_CONCEIVE` (135 s of eating on lush pasture) with the
+`CONCEIVE_CHANCE` a meal worked out from it and `MEAL`.
 
 **`rule(turn)`**: hands **`wake`**, the rule for one sheep, to `entities::each_woken`, with a **`Flock`** (the counts). Every sheep waking on the superchunk's turn sees to
 what it woke for and sleeps as long as it can. Hungry (past
@@ -25,8 +26,8 @@ the lamb made, the mother no longer pregnant and the birth counted
 under one compare of her state and one of the cell being free,
 `entities::make` to `entities::made`) -- that cell taken first, none
 of it happens, and she bears at her next wake; it falls pregnant on a meal on lush pasture
-(`LUSH_CELLS` of the area about it grass, `Area::count`; one in
-`CONCEIVE_ONE_IN`) if grown; a meal on pasture not lush, it roams
+(`LUSH_CELLS` of the area about it grass, `Area::count`; with
+`CONCEIVE_CHANCE`) if grown; a meal on pasture not lush, it roams
 -- when next hungry it walks one way for `ROAM_TICKS`, eating nothing,
 before it looks for grass; a lamb past its tick is grown. Satisfied,
 it stays where it stands and wakes at the first of those ticks to come;
