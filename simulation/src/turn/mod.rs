@@ -73,10 +73,10 @@ pub struct Turn<'a> {
     /// Whom the rule is seeing to ([`Turn::seeing_to`]): what is
     /// queued is that author's.
     pub(crate) author: u64,
-    /// The compare the entity instructions being queued are under, if
-    /// any, and how many each slot of the outbox held when those not
-    /// yet made a step began.
-    pub(crate) comparing: Option<(conditional::Compare, [u32; SLOTS])>,
+    /// The compare what is being queued is under, if any, and which
+    /// step of its superchunk's queue it is: where what is queued
+    /// under it is noted.
+    pub(crate) comparing: Option<(conditional::Compare, u32)>,
     /// The number the rule's first count is counted under when
     /// applied ([`Turn::count_under`]).
     pub(crate) counted_from: u32,
@@ -183,7 +183,7 @@ impl<'a> Turn<'a> {
     /// named is the superchunk's rule's own, applied before any
     /// author's.
     pub fn seeing_to(&mut self, at: CellIndex) {
-        self.close_instructions_compared();
+        self.compare_end();
         let at = at.cartesian();
         self.author = (u64::from(at.y) << 32 | u64::from(at.x)) + 1;
     }
@@ -193,6 +193,7 @@ impl<'a> Turn<'a> {
     /// begun there is another's.
     pub(crate) fn slot_queued(&mut self, superchunk: SuperchunkIndex) -> usize {
         let slot = self.slot_of(superchunk);
+        assert!(self.comparing.is_none_or(|(compare, _)| compare.at().superchunk() == superchunk), "queued under a compare in another superchunk");
         if self.outbox.segments[slot].last().is_none_or(|last| last.author != self.author) {
             let (steps, instructions) = (self.outbox.conditional[slot].len() as u32, self.outbox.instructions[slot].len() as u32);
             self.outbox.segments[slot].push(Segment { author: self.author, steps, instructions });

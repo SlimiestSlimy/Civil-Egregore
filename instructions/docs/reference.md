@@ -32,9 +32,9 @@ value)`**: a wide plane's number put where `seen` was read.
 stood, the attribute as seen, or none. **`write(turn, compare, type,
 cell, seen, value, counted)`**: a cell written if the compare holds
 and the cell is still as seen.
-**`count(turn, compare, counted)`**: a count. **`entities_from_here(turn,
-compare)`**, **`entities_as_ever(turn)`**: what is queued of entities
-between them under the compare.
+**`count(turn, compare, counted)`**: a count. **`from_here(turn,
+compare)`**, **`end(turn)`**: what is queued between them --
+cells, entities, counts -- skipped if the compare does not hold.
 
 ## `this_tick.rs`
 

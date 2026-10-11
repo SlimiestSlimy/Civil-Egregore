@@ -90,6 +90,18 @@ pub fn blocks_sum(blocks: &[AttributeBlock]) -> u64 {
     blocks.iter().flat_map(|block| block.0).fold(0xcbf2_9ce4_8422_2325, |sum, word| (sum ^ word).wrapping_mul(0x0000_0100_0000_01b3).rotate_left(29))
 }
 
+/// What is seen of an entity that has no such attribute
+/// ([`attribute_seen`]).
+pub const NO_ATTRIBUTE: u64 = 0;
+
+/// What a rule saw of one attribute, in 64 bits: [`NO_ATTRIBUTE`] of
+/// none, else the sum of its blocks ([`blocks_sum`]) -- what a
+/// compare carries of it, and what it is held against as it is
+/// applied. Never a block.
+pub fn attribute_seen(blocks: Option<&[AttributeBlock]>) -> u64 {
+    blocks.map_or(NO_ATTRIBUTE, |blocks| blocks_sum(blocks).max(NO_ATTRIBUTE + 1))
+}
+
 /// The attributes in `blocks`, sorted by type, one after another: the
 /// blocks of each.
 pub fn each_attribute(blocks: &[AttributeBlock]) -> impl Iterator<Item = &[AttributeBlock]> {

@@ -54,7 +54,7 @@ mod entities {
             }
             0
         });
-        assert_eq!((report.instructions_applied.moves, report.instructions_applied.puts, report.instructions_applied.edits, report.instructions_compared), (2, 0, 1, (1, 0)));
+        assert_eq!((report.instructions_applied.moves, report.instructions_applied.puts, report.instructions_applied.edits, report.instructions_applied.edits_refused), (2, 0, 1, 0));
         assert_eq!(entities.get(EntityId(1), cell(41, 31)).expect("moved").attributes, [AttributeBlock::holding(NAME, 7)]);
         assert_eq!(entities.get(EntityId(2), cell(41, 41)).expect("moved").attributes, [AttributeBlock::holding(NAME, 8)]);
     }

@@ -108,7 +108,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         // All the sheep comes to this wake hangs on the grass being there still when it is applied: each thing queued from here is held
         // against it, and the grass cleared last. Should it be gone by then -- decayed in this very tick -- none of it happens, and
         // what is held against the grass being gone does instead: the sheep sleeps a step, hungry as it was, and wakes to look again.
-        compare::entities_from_here(turn, compare::holds(GRASS, at));
+        compare::from_here(turn, compare::holds(GRASS, at));
         state.hungry_at = now + MEAL_TICKS;
         if let (false, Some(way)) = (lush, around::pick(this_tick::random(turn), &about, steppable)) {
             (state.roaming_until, state.roaming_neighbour) = (now + MEAL_TICKS + ROAM_TICKS, way);
@@ -202,9 +202,9 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     if fed {
         // One of the two is applied, never both: the sheep is written once.
         let hungry_still = next_step(turn);
-        compare::entities_from_here(turn, compare::lacks(GRASS, at));
+        compare::from_here(turn, compare::lacks(GRASS, at));
         entities::sleep(turn, &before, hungry_still);
-        compare::entities_as_ever(turn);
+        compare::end(turn);
         cells::clear_counted(turn, GRASS, at, EATEN);
     }
 }

@@ -1,7 +1,8 @@
-//! Compares: what a write is held against as it is applied -- a cell
-//! or an entity as the rule saw it, the one written or another -- and
-//! what is done only if one holds: a cell written, what an entity
-//! comes to, a count (`docs/instructions.md`, "Compare-and-write").
+//! Compares: what a rule saw -- of a cell or of an entity -- queued
+//! as an instruction of its own. If it no longer holds when it is
+//! come to, what the rule queued after it is skipped, up to its next
+//! compare or the end of the compare: one compare, any number of
+//! writes (`docs/instructions.md`, "Compare-and-write").
 
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;
@@ -52,17 +53,17 @@ pub fn count(turn: &mut Turn, compare: Compare, counted: usize) {
     turn.count_if(compare, counted as u32);
 }
 
-/// From here on, what the rule queues of entities
-/// (`entities::commit`, `remove`, ...) is under `compare`: applied
-/// only if it holds when come to. They land in the compare's
-/// superchunk.
+/// From here on, what the rule queues -- cells written, what
+/// entities come to, counts -- is under `compare`: skipped if it does
+/// not hold when come to, up to the next compare given or [`end`].
+/// All of it lands in the compare's superchunk.
 #[inline]
-pub fn entities_from_here(turn: &mut Turn, compare: Compare) {
-    turn.instructions_if(compare);
+pub fn from_here(turn: &mut Turn, compare: Compare) {
+    turn.compare_from_here(compare);
 }
 
-/// From here on, what the rule queues of entities is under no compare.
+/// From here on, what the rule queues is under no compare.
 #[inline]
-pub fn entities_as_ever(turn: &mut Turn) {
-    turn.instructions_as_ever();
+pub fn end(turn: &mut Turn) {
+    turn.compare_end();
 }

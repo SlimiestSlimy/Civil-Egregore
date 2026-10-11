@@ -358,6 +358,101 @@ B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    invariance stuff to have it ready"; "because instructions will
    depend on that". So: registry first, then D's tick rate part.
 
+   THE USER'S PROPOSAL (2026-10-11), replacing my two halves of the
+   flags: "we need to respect the 2 phase tick"; "we have 3 kinds of
+   instructions now, basically phase one is flag instructions and
+   compute instructions on internal state only. combined with the
+   write producing/queuing instructions then phase 2 proceed. writes
+   can compare and write based on internal state or the current
+   latest simulation state of external stuff."; "flag/compare and
+   flag: writes allowed at phase 1, individual to each entity";
+   "compute/compare and compute: writes allowed at phase 1,
+   individual to each entity"; "to bridge phase one and phase 2 we
+   have a specific kind of instruction: compare and produce
+   write/compare and write". Asked me to analyze it. My two
+   conditions, put to the user, unanswered: phase 1 writes only what
+   no other entity reads (the flags), and a phase-2 write may leave
+   whether it applied in a flag. Also the apply order is rows, not
+   Morton (simulation.md, "One order, wherever the borders fall"):
+   told the user, who thought Morton.
+
+   THE USER'S SECOND PROPOSAL (2026-10-11), over the one above: "lets
+   keep go back a little more to the current model, we also have flag
+   and compute instructions, but those are queued to phase 2 as
+   normal. then the compare and produce instructions, add
+   instructions at the end of the apply queue as it is evaluated,
+   producing compare and writes, in your example, its easy to solve,
+   queue a compare and write that compares and writes the grass
+   status, result into one of the flags, then another write dependant
+   on that flag satisfies the hunger or watever". My answer: yes,
+   with two things -- what reads neighbours is still worked out in
+   phase 1 and queued as its result; "the end of the queue" has to be
+   a next round, exchanged between superchunks and sorted by author,
+   or a border shows. Unanswered.
+
+   THE USER STEPS BACK (2026-10-11): "honestly i think were
+   overcomplicating stuff, lets revert back to the model we have,
+   rule reads world state through approved function calls. then
+   produces the compare and writes accordingly. we have everything we
+   need already tbh. why we were doing this again?" So: NO VM, no
+   programs as data, no compute opcodes, no rounds; the table in
+   delete_after_use is superseded. What is left of B is what started
+   it, put to the user and waiting for a yes: instructions of one
+   small fixed size (no attribute block carried, a compare of 64 bits
+   at most), a write able to hang on an earlier write's outcome
+   without carrying its compare, and no private copy of the entity
+   (Flock.room / EntityEdit). The design below is NOT to be built.
+
+   THE USER'S DECISION (2026-10-11), TO BUILD: "since we schedule
+   writes in order already, lets use that to our advantage, lets
+   emmit compare instructions separately of the write instructions,
+   is basically the group idea but simplified so basically we have a
+   compare instruction, if the compare fails, it skips all queued
+   writes until the next compare instruction or a finish skipping
+   instruction. this gives us room to have better compare
+   instructions, and better write instructions now that they are
+   separate".
+
+   And: "but otherwise everything else stays the same and we do the
+   fixes we already agreed on" -- the fixes: instructions small and
+   of a fixed size, no attribute block carried, a compare of 64 bits
+   at most; no private copy of the entity (Flock.room / EntityEdit),
+   fields written to the store.
+
+   And: "this change is a superset of what we have already, the
+   extra capacity is gating multiple writes behind a single compare";
+   "separating them now gives a lot more space for write payloads and
+   compare payloads, or rather, make instructions smaller, we have to
+   test that as well, but probably 24 bytes per instruction is
+   plenty."; "a good optimization is, as the apply queue fills up, it
+   tracks where the compares and skips are in a separate smaller
+   array of offsets. so on a compare fail it can jump tothe next
+   relevant instruction instead of skipping one by one. is a little
+   extra processing on the queue side. but i think its worth it".
+
+   BUILT 2026-10-11: the compare is a step of its own in the queue
+   (Turn::compare_from_here / compare_end; compare::from_here / end);
+   one that fails jumps over all under it (noted on it as queued);
+   an attribute edit carries its own compare, 64 bits
+   (attribute_seen); a step is 48 bytes at the most (was 448), a
+   compare 40 (was 192). Same census; a dense wake 213 -> 197 ns,
+   applied 120 -> 110.
+   STILL TO DO of the fixes: instructions to about 24 bytes ("probably
+   24 bytes per instruction is plenty", "we have to test that") --
+   the entity instruction is still 64 (a put carries its header), a
+   step 48; and no private copy of the entity (Flock.room,
+   EntityEdit): fields written to the store.
+   OPEN QUESTION to the user: a write under a compare must land in
+   the compare's superchunk (asserted, as before today). So a write
+   to a NEIGHBOURING cell under a compare works inside a superchunk
+   and panics at a border: not transparent. Tighten to "only the
+   compare's own cell" (loses compare-of-another-cell, which
+   simulation/tests/fine/compare_and_write.rs tests on purpose), or
+   leave. The user: "compares dont write nothing"; "compares only
+   compare 2 things [or more] and report the result to the apply
+   job, thats it" -- told them I worded it badly and tightened
+   nothing.
+
    MY DESIGN FROM THAT (to build in steps, each green and committed):
    1. Type IDs: first byte the supertype (C below), functions
       registered; the general attribute, type 0x00FFFFFF..., first of

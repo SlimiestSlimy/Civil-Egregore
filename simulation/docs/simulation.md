@@ -98,23 +98,41 @@ that still holds when the write is come to; otherwise it is
 **refused**: nothing happens, and it is counted
 (`WritesApplied::refused`, `TickReport::instructions_compared`).
 
-What is compared and what is written need not be the same thing
-(`Compare`). A compare is of a cell -- the number a layer holds there,
-1 or 0 on a layer of a bit a cell -- or of an entity: that it still
-stands where it stood, with an attribute as it was seen, or without
-it. What hangs on it is a cell written (`Turn::queue_if`, which says
-what was seen at the cell written as well; `Turn::queue_seen`, held
-against that alone), what an
-entity comes to (every instruction queued from `Turn::instructions_if`
-to `Turn::instructions_as_ever`), or a count (`Turn::count_if`). So an
-entity changes itself on a compare of the ground, and the ground is
-changed on a compare of an entity.
+**A compare is an instruction of its own** (`Compare`,
+`Turn::compare_from_here`), queued in order with the writes. It is of
+a cell -- the number a layer holds there, 1 or 0 on a layer of a bit
+a cell -- or of an entity: that it still stands where it stood, with
+an attribute as it was seen, or without it. If it does not hold when
+it is come to, everything its author queued after it is skipped --
+cells written, what entities come to, counts alike -- up to the
+author's next compare or the end of the compare (`Turn::compare_end`).
+So one compare lets any number of writes be: an entity changes itself
+on a compare of the ground, and the ground is changed on a compare of
+an entity. Compares do not nest; one given takes the place of the one
+before. `Turn::queue_if` and `Turn::count_if` are the short way to
+one write or one count under a compare.
 
-There are no groups: each write is held against its own compare, when
-it is come to, and nothing is applied "together". What a rule wants
-to happen together it queues as writes that fail together -- all held
-against the one thing, the write that changes that thing last; or a
-chain, each held against what the one before wrote. A rule cannot
+What is written is in order already, author by author, which is all
+this takes: nothing is carried by a write but what it writes. A
+compare carries what was seen in 64 bits at the most -- of an
+attribute, a sum of its blocks (`entity_manager::attribute_seen`),
+never a block -- and a write carries none but **of what it writes**:
+a cell written says what was seen at that cell
+(`Turn::queue_seen`), an attribute written what was seen of that
+attribute, each held against that as it is come to, under a compare
+or not ("No write lands on another's").
+
+As a compare is queued it notes how much is under it, so one that
+does not hold is jumped over at once, not step by step.
+
+Everything under a compare lands in the compare's superchunk: a
+superchunk applying reads no other, so a write across a border could
+not be held against it, and queuing one is refused as the rule runs.
+
+Nothing is applied "together" beyond that: what is under a compare
+is skipped or not as the compare is come to, and each write under it
+is still held against its own. A chain is compares in turn, each of
+what the writes before it wrote. A rule cannot
 learn in the tick that a write of its was refused, so what must
 happen all the same -- an entity woken must be put to sleep again, or
 never wakes -- is queued under the compare's opposite: the cell

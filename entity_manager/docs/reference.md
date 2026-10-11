@@ -28,7 +28,8 @@ that takes one (**`holding_one`**, the same unchecked);
 blocks the attribute it begins takes, by its type or its block length,
 one at least. On an entity's blocks, sorted by type:
 **`blocks_sum(blocks)`** -- a sum of blocks, the same for the same
-blocks; **`each_attribute(blocks)`** -- the attributes one after
+blocks; **`attribute_seen(blocks)`** -- what a compare carries of one
+attribute, 64 bits: that sum, or `NO_ATTRIBUTE` of none; **`each_attribute(blocks)`** -- the attributes one after
 another; **`find_attribute(blocks, kind)`** -- the walk: an attribute's blocks,
 or where they would go -- **`attribute_blocks(blocks, kind)`**,
 **`attribute(blocks, attribute)`** (read as its layout),
@@ -118,7 +119,9 @@ edits carry in a list beside (an `Instruction`'s cell, `lands`): **`put(header, 
 **`cross(header, left, attributes)`** (both by **`push`**),
 **`move_entity(header, from)`**, **`set_attribute(id, at, attribute,
 value)`**, **`set_attribute_blocks(id, at, attribute)`**,
-**`unset_attribute(id, at, kind)`**, **`remove`**, **`apply_some(some, superchunks,
+**`unset_attribute(id, at, kind)`**, **`set_attribute_if_seen(id, at, kind, seen, value)`** -- an
+attribute set or removed only if it is still what was seen of it, the
+edit's own compare, refused otherwise -- **`remove`**, **`apply_some(some, superchunks,
 earliest, applied)`** -- those at `some` alone, how the instructions under a compare
 refused are left out -- **`apply(superchunks, earliest,
 applied)`** in order, each on its cell's superchunk (a put elsewhere
@@ -126,7 +129,7 @@ lost, one of an entity no longer where it stood passed over, a new
 one on a cell taken refused, a mover to one staying),
 **`count_lost`**, **`clear`**, **`len()`** and **`is_empty()`** -- how
 many are queued, whether none. **`InstructionsApplied`** `{puts, moves,
-edits, removes, lost, stayed, refused, crossed, passed_over, turned_back}`,
+edits, edits_refused, removes, lost, stayed, refused, crossed, passed_over, turned_back}`,
 added with `+=`.
 
 **`Entities`** (`store/world_entities.rs`), the world's: **`len()`**,
