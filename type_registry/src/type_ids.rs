@@ -3,14 +3,14 @@
 //! ([`AttributeType`]) -- each a `u64` from the one namespace, in a type
 //! of its own so that one is never passed for another.
 //!
-//! Every ID is laid out alike: its first byte its [`Supertype`], its
+//! Every ID is laid out alike: its first byte its [`Kind`], its
 //! last its size -- bits a cell of a plane, blocks of an attribute --
 //! and its number between (`docs/type_registry.md`, "The bytes of an ID").
 
 /// What an ID is of, kept in its first byte.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
-pub enum Supertype {
+pub enum Kind {
     /// An attribute of an entity.
     Attribute = 0x00,
     /// A layer or a wide plane: a bitplane of cells.
@@ -24,19 +24,19 @@ pub enum Supertype {
     EntityRule = 0x04,
 }
 
-/// Where an ID keeps its supertype: its first byte, over its number.
-const SUPERTYPE_SHIFT: u32 = 56;
+/// Where an ID keeps its kind: its first byte, over its number.
+const KIND_SHIFT: u32 = 56;
 /// Bits of an ID's last byte, its size, under its number.
 const SIZE_BITS: u32 = 8;
 /// The most an ID's last byte holds.
 const SIZE_MOST: u64 = (1 << SIZE_BITS) - 1;
 /// Numbers an ID can have: those of the six bytes between.
-pub const NUMBERS: u64 = 1 << (SUPERTYPE_SHIFT - SIZE_BITS);
+pub const NUMBERS: u64 = 1 << (KIND_SHIFT - SIZE_BITS);
 
-/// The ID of number `number`, of `supertype`, whose size is `size`.
-const fn type_id(supertype: Supertype, number: u64, size: u64) -> u64 {
+/// The ID of number `number`, of `kind`, whose size is `size`.
+const fn type_id(kind: Kind, number: u64, size: u64) -> u64 {
     assert!(number < NUMBERS && size <= SIZE_MOST, "an ID's number is under 2^48, its size a byte");
-    (supertype as u64) << SUPERTYPE_SHIFT | number << SIZE_BITS | size
+    (kind as u64) << KIND_SHIFT | number << SIZE_BITS | size
 }
 
 /// The number of `id`: what its row in the registry is written with.
@@ -49,9 +49,9 @@ const fn size_of(id: u64) -> u64 {
     id & SIZE_MOST
 }
 
-/// Whether `id` is of `supertype`.
-const fn is_of(id: u64, supertype: Supertype) -> bool {
-    id >> SUPERTYPE_SHIFT == supertype as u64
+/// Whether `id` is of `kind`.
+const fn is_of(id: u64, kind: Kind) -> bool {
+    id >> KIND_SHIFT == kind as u64
 }
 
 /// What a layer represents: a `u64` the registry gives a meaning
@@ -70,7 +70,7 @@ impl LayerType {
     /// planes are the layers of the numbers `first` on.
     pub const fn wide(first: u64, bits: u32) -> Self {
         assert!(bits.is_power_of_two() && bits <= 16, "a plane is 1, 2, 4, 8 or 16 bits a cell");
-        Self(type_id(Supertype::Layer, first, bits as u64))
+        Self(type_id(Kind::Layer, first, bits as u64))
     }
 
     /// Bits a cell, its ID's last byte: 1 unless the type is wide.
@@ -170,7 +170,7 @@ pub struct EntityType(pub u64);
 impl EntityType {
     /// The entity type of number `number`.
     pub const fn of(number: u64) -> Self {
-        Self(type_id(Supertype::EntityType, number, 0))
+        Self(type_id(Kind::EntityType, number, 0))
     }
 
     /// Its number.
@@ -180,7 +180,7 @@ impl EntityType {
 }
 
 /// A rule of the cells (`docs/type_registry.md`, "Rules"): an ID
-/// from the one namespace, of its own supertype. It has no size: its
+/// from the one namespace, of its own kind. It has no size: its
 /// last byte is 0.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ScaRuleType(pub u64);
@@ -188,7 +188,7 @@ pub struct ScaRuleType(pub u64);
 impl ScaRuleType {
     /// The rule of the cells of number `number`.
     pub const fn of(number: u64) -> Self {
-        Self(type_id(Supertype::ScaRule, number, 0))
+        Self(type_id(Kind::ScaRule, number, 0))
     }
 
     /// Its number.
@@ -198,7 +198,7 @@ impl ScaRuleType {
 }
 
 /// A rule of an entity (`docs/type_registry.md`, "Rules"): an ID
-/// from the one namespace, of its own supertype. It has no size: its
+/// from the one namespace, of its own kind. It has no size: its
 /// last byte is 0.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EntityRuleType(pub u64);
@@ -206,7 +206,7 @@ pub struct EntityRuleType(pub u64);
 impl EntityRuleType {
     /// The rule of an entity of number `number`.
     pub const fn of(number: u64) -> Self {
-        Self(type_id(Supertype::EntityRule, number, 0))
+        Self(type_id(Kind::EntityRule, number, 0))
     }
 
     /// Its number.
@@ -216,7 +216,7 @@ impl EntityRuleType {
 }
 
 /// An attribute's type, from the same namespace, laid out its own
-/// way under the supertype: its number in the 52 bits after it, and
+/// way under the kind: its number in the 52 bits after it, and
 /// in its last four how many blocks an attribute of it takes, less
 /// one -- 1 to 16. A type of a fixed size says its size there, set
 /// as it is registered. One whose size varies is registered with the
@@ -230,14 +230,14 @@ pub struct AttributeType(pub u64);
 /// Bits of an attribute's ID that are its blocks, less one.
 const ATTRIBUTE_SIZE_BITS: u32 = 4;
 /// Numbers an attribute can have: those of the 52 bits between.
-pub const ATTRIBUTE_NUMBERS: u64 = 1 << (SUPERTYPE_SHIFT - ATTRIBUTE_SIZE_BITS);
+pub const ATTRIBUTE_NUMBERS: u64 = 1 << (KIND_SHIFT - ATTRIBUTE_SIZE_BITS);
 
 impl AttributeType {
     /// The type of number `number` whose attributes take `blocks`
     /// blocks, 1 to 16.
     pub const fn of_blocks(number: u64, blocks: usize) -> Self {
         assert!(number < ATTRIBUTE_NUMBERS && blocks >= 1 && blocks <= crate::layouts::ATTRIBUTE_BLOCKS_MOST, "an attribute's number is under 2^52, and it is 1 to 16 blocks");
-        Self((Supertype::Attribute as u64) << SUPERTYPE_SHIFT | number << ATTRIBUTE_SIZE_BITS | (blocks as u64 - 1))
+        Self((Kind::Attribute as u64) << KIND_SHIFT | number << ATTRIBUTE_SIZE_BITS | (blocks as u64 - 1))
     }
 
     /// The type of number `number` whose attributes vary in size: its
@@ -273,7 +273,7 @@ impl AttributeType {
     /// everything's, and 0 nobody's.
     #[inline]
     pub const fn is_an_attributes(self) -> bool {
-        is_of(self.0, Supertype::Attribute) && self.number() != 0
+        is_of(self.0, Kind::Attribute) && self.number() != 0
     }
 
     /// Its number: what its row in the registry is written with.
