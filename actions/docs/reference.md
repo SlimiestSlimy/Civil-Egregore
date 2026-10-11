@@ -25,11 +25,11 @@ value)`**: a wide plane's number put where `seen` was read.
 `counted` if applied (`actions.md`, "Compare-and-write"). All are
 **`seen_becoming(turn, type, cell, seen, value, counted)`**: a compare
 of the cell as seen, the write and the compare's end, queued at once
-(`instructions::compare::with_writes`).
+(`compares_and_writes::compare::with_writes`).
 
 ## `compare.rs`
 
-Handed on from `../../instructions/` (its `reference.md`):
+Handed on from `../../compares_and_writes/` (its `reference.md`):
 `Compare`, `holds`, `lacks`, `value`, `attribute`, `from_here`, `end`
 -- an instruction each. Here, what is made of several: **`write(turn, compare, type,
 cell, seen, value, counted)`**: a cell written if the compare holds

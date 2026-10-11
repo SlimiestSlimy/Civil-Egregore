@@ -2,7 +2,7 @@
 //! as an instruction of its own. If it no longer holds when it is
 //! come to, what the rule queued after it is skipped, up to its next
 //! compare or the end of the compare: one compare, any number of
-//! writes (`docs/instructions.md`, "Compares").
+//! writes (`docs/compares_and_writes.md`, "Compares").
 
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;

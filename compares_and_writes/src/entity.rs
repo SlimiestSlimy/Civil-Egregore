@@ -1,6 +1,6 @@
 //! Writes of an entity whole: made, moved, removed, crossing to
 //! another superchunk -- each one instruction
-//! (`docs/instructions.md`, "Writes").
+//! (`docs/compares_and_writes.md`, "Writes").
 
 use coordinates::CellIndex;
 use entity_manager::{AttributeBlock, Header};

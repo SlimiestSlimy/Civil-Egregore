@@ -33,7 +33,7 @@ sliders its generation is tuned by.
 | [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |
 | [`chunk_storage/`](chunk_storage/) | chunks as stored, what loading and saving work on: height maps, the layer codec, superchunk images, the cold pool and the writeback ring |
 | [`worldgen/`](worldgen/) | world generation: every cell's height from the world's seed, the walls between cells more than a step apart in height, and how grass and trees lie in patches |
-| [`instructions/`](instructions/) | what a turn queues for a tick's second phase, one function an instruction: a compare, a write, the end of a compare |
+| [`compares_and_writes/`](compares_and_writes/) | what a turn queues for a tick's second phase, one function an instruction: a compare, a write, the end of a compare |
 | [`actions/`](actions/) | what a rule is made of, and all it reaches the simulation through: every read of a turn and every change made of several instructions -- cells asked and set, the cells about a cell, entities made and committed, walking |
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
 | [`renderer/`](renderer/) | Civil Egregore on the screen: a Bevy window, opening on the main menu, asking the server's host, on a thread of its own, for the cells of its viewport |
@@ -94,8 +94,8 @@ type on it; Tessera depends on `bitmap/` and `utilities/` beside it;
 `coordinates/` on `bitmap/`; `chunk_storage/` on those and Tessera;
 `bitplane_manager/` on `chunk_storage/` and `coordinates/`;
 `entity_manager/` on `coordinates/` and `bitmap/`; `simulation/` on
-`bitplane_manager/` and `entity_manager/`; `instructions/` on
-`simulation/`; `actions/` on `instructions/`,
+`bitplane_manager/` and `entity_manager/`; `compares_and_writes/` on
+`simulation/`; `actions/` on `compares_and_writes/`,
 `simulation/` and `pathfinding/`, the last two knowing nothing of one
 another and meeting there; the rules, `sca_rules/` and `entity_rules/`,
 on `actions/` alone, through which they reach the

@@ -7,7 +7,7 @@
 use bitplane_manager::Window;
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;
-use instructions::{compare, Write};
+use compares_and_writes::{compare, Write};
 use simulation::Turn;
 use utilities::chance::Chance;
 

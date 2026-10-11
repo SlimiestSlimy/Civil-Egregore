@@ -1,12 +1,12 @@
 //! Compares, and what is made of one and a write: a compare is an
-//! instruction (`../instructions/`), handed on here as a rule asks
+//! instruction (`../compares_and_writes/`), handed on here as a rule asks
 //! for it; a write under a compare of something else, and a count
 //! under one, are several (`docs/actions.md`, "Compare-and-write").
 
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use instructions::compare::{close, open};
-pub use instructions::compare::{attribute, end, from_here, holds, lacks, value, Compare};
+use compares_and_writes::compare::{close, open};
+pub use compares_and_writes::compare::{attribute, end, from_here, holds, lacks, value, Compare};
 use simulation::Turn;
 
 /// Queues the number of `layer_type` at `cell` becoming `value` if
@@ -24,5 +24,5 @@ pub fn write(turn: &mut Turn, compare: Compare, layer_type: LayerType, cell: Cel
 /// is come to.
 #[inline]
 pub fn count(turn: &mut Turn, compare: Compare, counted: usize) {
-    instructions::compare::with_writes(turn, compare, &[instructions::Write::Count(counted as u32)]);
+    compares_and_writes::compare::with_writes(turn, compare, &[compares_and_writes::Write::Count(counted as u32)]);
 }

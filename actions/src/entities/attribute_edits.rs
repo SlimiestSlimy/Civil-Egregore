@@ -5,7 +5,7 @@
 
 use coordinates::CellIndex;
 use entity_manager::{attribute_blocks, attribute_bytes, each_attribute, words_sum, Attribute, AttributeBlock, AttributeType, Header, Layout, Member, WholeAttribute, ATTRIBUTE_WORDS_MOST, BLOCK_WORDS, NO_ATTRIBUTE};
-use instructions::{compare, write, Write};
+use compares_and_writes::{compare, write, Write};
 use simulation::Turn;
 
 /// Queues each of `members` that differs between `was` and `is`,

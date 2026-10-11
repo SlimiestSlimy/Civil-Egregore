@@ -1,4 +1,4 @@
-# Instructions
+# Compares and writes
 
 What a turn queues for a tick's second phase, one function an
 instruction: a compare, a write, the end of a compare. Nothing here is

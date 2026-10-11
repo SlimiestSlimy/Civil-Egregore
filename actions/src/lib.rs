@@ -1,6 +1,6 @@
 //! Civil Egregore's actions: what a rule is made of. Each is one
 //! small thing asked or done on a superchunk's turn -- a read, or a
-//! change made of several instructions (`../instructions/`: a
+//! change made of several instructions (`../compares_and_writes/`: a
 //! compare, a write, the end of a compare); a rule is a few of them
 //! put together, and its crate depends on this one alone. A module a
 //! subject -- the cells, the entities, the nine cells about one, the

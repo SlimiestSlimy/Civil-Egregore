@@ -34,7 +34,7 @@ members = [
     "entity_rules",
     "gui",
     "actions",
-    "instructions",
+    "compares_and_writes",
     "pathfinding",
     "sca_rules",
     "simulation",
