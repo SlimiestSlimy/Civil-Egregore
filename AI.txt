@@ -609,6 +609,8 @@ threads`.
   them up if needed for the rule." So: dormancy is a state, not a
   fault; no count, no guard. To come (not asked for yet): rules that
   sample entities as the cells are sampled, maybe only the dormant.
+- Sheep roaming: DONE (ROAM_TICKS 27 s; MEAN_TIME_TO_ROAM 54 s on lush
+  pasture). check hash now ends 600,7c13edff92f5d70f,acb69968c95fdcb4,fecb18dba5bea4ec,6b2e44078bde7624,cbbe5c62e1e5fae6,e220a8397b1dcdaf
 - Neighbour picking: DONE. Ways are numbered in Morton order of
   where they lead (HERE is 3; around::NORTH_WEST .. SOUTH_EAST), and
   around::pick draws by the ways' order, the same wherever the cell
@@ -616,7 +618,60 @@ threads`.
   `server check 0 600 200 4000 0` on the measuring seed now ends
   600,7c13edff92f5d70f,acb69968c95fdcb4,fecb18dba5bea4ec,6b2e44078bde7624,cbbe5c62e1e5fae6,e220a8397b1dcdaf
 
+- Fragile collision test: DONE (e3c5a54).
+- CROSSING AS ONE MOVE, 2026-10-11. I found the settling step is what
+  lets later same-tick writes to a crossed entity land, and asked.
+  The user: "ok, since the origin morton id for the entitiy last for
+  the entire tick, if an entity crosses a superchunk and another rule
+  tries to write to that entity id the writes should go to the tenth
+  queue. so no settlement step is needed in theory, check my logic".
+  My check, told to the user: holds, with one gap -- at queue time
+  nobody knows the entity will cross. Proposed (NOT yet confirmed by
+  the user): turns note (author, entity named that is not itself);
+  crossings note (name, destination); between the phases, an author
+  later in Morton order naming a crosser has its segment promoted to
+  an act over both superchunks, named outright (the destination may
+  be two superchunks from the writer, no outbox slot). Then the move
+  is real at the act (one MoveEntity for any step, actions::step no
+  longer telling a border), names resolve across superchunks in an
+  act, and crossings.rs, Arrival, Settled, settle_leavers/arrivals,
+  kept_sum, cross_entity and its carried blocks go. Tests that hold
+  it: simulation/tests/fine/entities_moving.rs,
+  actions/tests/fast/flock_over_borders.rs (walkers write to others).
+  CONFIRMED by the user: "yeah, we just need a separate structure to
+  track what entities crossed to properly redirect writes, thats
+  pretty much it". Then: "instead of redirecting straight to the 10th
+  queue, lets redirect writes to the right queue first if possible,
+  otherwise we do the same extraction to the 10th queue"; "based on
+  the same conditions, as soon as the simulation detects the same
+  autor writing to 2 queues it write and compares go straight to the
+  10th queue". Told to the user: a crossing queued may be refused as
+  it is applied (its cell taken), the entity then staying; so one who
+  writes to an entity that queued a crossing needs both superchunks
+  -- two queues, so the tenth by that same rule, every time. "The
+  right queue alone" is only safe if the crossing is known to stand,
+  which is known only as it is applied. The user: "that shouldnt
+  happen, the simulation should route the dispatched instructions to
+  the entity id automagically if it already crossed or if it hasnt
+  crossed yet." RESOLVED, the plan now: the redirect is decided AS
+  THE CROSSING IS APPLIED (the act holds S and D, both stopped at the
+  crosser's place in the world order, the crossing known to stand):
+  there, every later author naming the crosser (found by a structure
+  built from what turns note: who names an entity not itself) has its
+  segment re-pointed -- into D's order alone if it lands nowhere else
+  ("the right queue"), else made an act over all it lands in and D
+  (the tenth queue's way). A crossing refused re-points nothing. No
+  settling, one copy of the entity. To do after the sheep.
+
 == OPEN THREADS ==
+- THE FLOCK DIES OUT (found 2026-10-11, told to the user, not mine to
+  rebalance unasked): `server pasture 300000 333 4000 4 0` on the
+  measuring seed -- sheep 16,000 rise past 150,000, grass goes to 0
+  about tick 222,000, the last sheep dies about 240,000. The same on
+  this morning's build (scratchpad `base`, ~e2dc19d) and before the
+  roaming change; docs/civil_egregore.md said it settled near 10,000.
+  Cause not looked for. Roaming more (ROAM 27 s, off lush pasture one
+  meal in two) moved the peak from tick 159,000 to 203,000, no more.
 - Limits known: another removing an entity as it crosses turns it
   back; entities of one cell only.
 - A world's stored image of a cooled superchunk is behind its cells

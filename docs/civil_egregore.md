@@ -662,16 +662,21 @@ about the sheep -- a quarter of them grass -- read at a meal, once in
 6,912 ticks: grass left alone covers two thirds of the dirt and grows
 fastest covering a third, so the flock stops growing while the grass
 still gains on it. And a sheep that eats where it is not lush leaves:
-hungry again, it walks one way for 3,456 ticks -- 48 steps or so --
-eating nothing, before it looks for grass (fields of its `SheepState`:
+hungry again, it walks one way for `ROAM_TICKS` -- 96 steps or so --
+eating nothing, before it looks for grass; off lush pasture it sets
+off too, now and then (fields of its `SheepState`:
 the tick it roams until and the way, set once, so a step on the way
 changes nothing but its cell).
 
-Measured, headless, 4 superchunks from 4,000 sheep each, 2 million
-ticks: the flock rises to 43,800, falls to 2,900, and comes round to
-about 10,000 with the grass near a fifth of the cells, the swings
-smaller each time. Without the roaming the same run ends at 232 sheep
-and falling; at one in three and no roaming, at none.
+Measured when the roaming was first written, headless, 4 superchunks
+from 4,000 sheep each, 2 million ticks: the flock rose to 43,800, fell
+to 2,900, and came round to about 10,000 with the grass near a fifth
+of the cells; without the roaming the same run ended at 232 sheep and
+falling. **That no longer holds** (found 2026-10-11, cause not yet
+known, and not the roaming's change of that day -- the build of that
+morning does the same): `server pasture 300000 333 4000 4 0` has the
+flock rise past 150,000, strip the grass to nothing, and die out by
+tick 240,000 or so. The balance is to be found again.
 
 ### An instruction for each thing done to an entity
 

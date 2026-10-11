@@ -39,10 +39,17 @@ pub const CONCEIVE_CHANCE: Chance = MEAN_TIME_TO_CONCEIVE.chance_each(MEAL);
 /// Ticks of sleep to a sheep's life, on average: before a sleep of so
 /// many ticks it dies of old age at so many in these.
 pub const LIFE_TICKS: u64 = SimulationTime::seconds(675).ticks();
-/// Ticks a sheep that ate on thin pasture walks for, one way, once it
-/// is hungry again, before it looks for grass: 48 steps or so, out of
+/// Ticks a sheep that set off roaming walks for, one way, once it is
+/// hungry again, before it looks for grass: 96 steps or so, out of
 /// the patch its flock has grazed.
-pub const ROAM_TICKS: u64 = SimulationTime::milliseconds(13_500).ticks();
+pub const ROAM_TICKS: u64 = SimulationTime::seconds(27).ticks();
+/// The simulation time a sheep eating on lush pasture takes to set
+/// off roaming all the same, on average: on thin pasture it sets off
+/// at every meal.
+pub const MEAN_TIME_TO_ROAM: SimulationTime = SimulationTime::seconds(54);
+/// The chance, each meal on lush pasture, that the sheep sets off
+/// roaming when next hungry.
+pub const ROAM_CHANCE: Chance = MEAN_TIME_TO_ROAM.chance_each(MEAL);
 /// Ticks from falling pregnant to giving birth.
 pub const GESTATION_TICKS: u64 = SimulationTime::milliseconds(4_500).ticks();
 /// Ticks a lamb takes to grow.
@@ -97,14 +104,14 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let was = seen.unwrap_or(SheepState { hungry_at: now, ..SheepState::default() });
     let mut state = was;
     let (hungry_at, roaming) = (was.hungry_at, was.roaming_until != 0);
-    // On its way out of thin pasture it does not stop to eat.
+    // On its way, roaming, it does not stop to eat.
     let fed = now >= hungry_at && !(grass.set & about.centre()).is_empty() && !roaming;
     if !fed && now >= hungry_at + STARVE_TICKS {
         entities::remove(turn, &before);
         done[DEATHS] += 1;
         return;
     }
-    // The pasture about it, looked at as it eats: thin, it will leave when next hungry.
+    // The pasture about it, looked at as it eats: thin, it will leave when next hungry; lush, it may.
     let lush = fed && area::layer(turn, GRASS, at).count() >= LUSH_CELLS;
     if fed {
         // All the sheep comes to this wake hangs on the grass being there still when it is applied: each thing queued from here is held
@@ -112,7 +119,9 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         // what is held against the grass being gone does instead: the sheep sleeps a step, hungry as it was, and wakes to look again.
         compare::from_here(turn, compare::holds(GRASS, at));
         state.hungry_at = now + MEAL_TICKS;
-        if let (false, Some(way)) = (lush, around::pick(this_tick::random(turn), &about, steppable)) {
+        // Off thin pasture always; off lush, now and then: a flock spreads over the land it could stay on.
+        let roams = !lush || this_tick::random(turn).chance(ROAM_CHANCE);
+        if let (true, Some(way)) = (roams, around::pick(this_tick::random(turn), &about, steppable)) {
             (state.roaming_until, state.roaming_neighbour) = (now + MEAL_TICKS + ROAM_TICKS, way);
         }
     }
