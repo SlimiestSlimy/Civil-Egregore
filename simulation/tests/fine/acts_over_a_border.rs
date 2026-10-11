@@ -35,10 +35,10 @@ fn an_act_over_a_border_happens_whole_or_not_at_all() {
         let report = Simulation::new(2).tick(&mut arena, &mut entities, random.draw(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             for entity in turn.woken() {
                 turn.seeing_to(entity.header.at);
-                turn.make(walker(beside, NEVER), &[AttributeBlock::holding(TAG, 5)]);
-                turn.set_attribute(&entity.header, WOKEN, None, 1);
-                turn.made();
-                turn.step(&entity.header, entity.header.at, NEVER);
+                crate::tests::make(turn, walker(beside, NEVER), &[AttributeBlock::holding(TAG, 5)]);
+                actions::entities::set_attribute_of(turn, &entity.header, WOKEN, None, 1);
+                actions::entities::made(turn);
+                actions::entities::step(turn, &entity.header, entity.header.at, NEVER);
             }
             0
         });
@@ -83,19 +83,19 @@ fn flip_what_is_about(turn: &mut Turn, seed: u64) -> u64 {
         let (header, at) = (entity.header, entity.header.at.cartesian());
         turn.seeing_to(header.at);
         if Rng::for_stream(seed ^ now, u64::from(at.y) << 32 | u64::from(at.x)).below(3) != 0 {
-            turn.step(&header, header.at, now + 1);
+            actions::entities::step(turn, &header, header.at, now + 1);
             continue;
         }
         let seen = |turn: &Turn, x: u32, y: u32| (CellIndex::from(coordinates::CellCartesian { x, y }), u32::from(turn.holds(STONE, coordinates::CellCartesian { x, y }.into()) == Ok(true)));
         let (east, south, past) = (seen(turn, at.x + 1, at.y), seen(turn, at.x, at.y + 1), seen(turn, at.x + 1, at.y + 2));
         turn.compare_from_here(Compare::Cell { layer_type: STONE, at: east.0, seen: east.1 as u16 });
-        turn.queue_if(Compare::Cell { layer_type: STONE, at: south.0, seen: south.1 as u16 }, STONE, past.0, past.1, 1 - past.1, None);
-        turn.queue_seen(STONE, south.0, south.1, 1 - south.1, None);
-        turn.queue_seen(STONE, east.0, east.1, 1 - east.1, None);
+        actions::compare::write(turn, Compare::Cell { layer_type: STONE, at: south.0, seen: south.1 as u16 }, STONE, past.0, past.1, 1 - past.1, None);
+        actions::cells::seen_becoming(turn, STONE, south.0, south.1, 1 - south.1, None);
+        actions::cells::seen_becoming(turn, STONE, east.0, east.1, 1 - east.1, None);
         let counted = entity.attribute(WOKEN);
-        turn.set_attribute(&header, WOKEN, counted, counted.unwrap_or(0) + 1);
+        actions::entities::set_attribute_of(turn, &header, WOKEN, counted, counted.unwrap_or(0) + 1);
         turn.compare_end();
-        turn.step(&header, header.at, now + 1);
+        actions::entities::step(turn, &header, header.at, now + 1);
     }
     0
 }

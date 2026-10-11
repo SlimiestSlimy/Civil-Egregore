@@ -177,9 +177,9 @@ mod tick {
         for &cell in samples.iter() {
             let (dx, dy) = (turn.random().below(3) as i32 - 1, turn.random().below(3) as i32 - 1);
             if (dx, dy) == (0, 0) {
-                turn.queue_seen(STONE, cell, 1, 0, None);
+                actions::cells::seen_becoming(turn, STONE, cell, 1, 0, None);
             } else if let Some(neighbour) = cell.offset(dx, dy).filter(|&neighbour| turn.holds(STONE, neighbour) == Ok(false)) {
-                turn.queue_seen(STONE, neighbour, 0, 1, None);
+                actions::cells::seen_becoming(turn, STONE, neighbour, 0, 1, None);
             }
         }
         sampled
@@ -225,7 +225,7 @@ mod tick {
             turn.sample(STONE, Chance::ALWAYS, samples);
             for &cell in samples.iter() {
                 let right = cell.offset(1, 0).expect("in the world");
-                turn.queue_seen(STONE, right, 0, 1, None);
+                actions::cells::seen_becoming(turn, STONE, right, 0, 1, None);
                 assert_eq!(turn.holds(STONE, right), Ok(false), "still as the tick found it");
             }
             samples.len()
@@ -247,7 +247,7 @@ mod tick {
                 for (x, y) in (-1..3).flat_map(|y| (-1..3).map(move |x| (x, y))) {
                     let at = cell.offset(x, y).expect("in the world");
                     if turn.holds(STONE, at) == Ok(false) {
-                        turn.queue_seen(STONE, at, 0, 1, None);
+                        actions::cells::seen_becoming(turn, STONE, at, 0, 1, None);
                     }
                 }
             }
@@ -268,7 +268,7 @@ mod tick {
         let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
             turn.sample(STONE, Chance::ALWAYS, samples);
             for &cell in samples.iter() {
-                turn.queue_seen(STONE, cell.offset(1, 0).expect("in the world"), 0, 1, None);
+                actions::cells::seen_becoming(turn, STONE, cell.offset(1, 0).expect("in the world"), 0, 1, None);
             }
             0
         });
@@ -283,7 +283,7 @@ mod tick {
         Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
             turn.sample(STONE, Chance::ALWAYS, samples);
             for &cell in samples.iter() {
-                turn.queue_seen(STONE, cell.offset(2 * SUPERCHUNK_SIDE_CELLS as i32, 0).expect("in the world"), 0, 1, None);
+                actions::cells::seen_becoming(turn, STONE, cell.offset(2 * SUPERCHUNK_SIDE_CELLS as i32, 0).expect("in the world"), 0, 1, None);
             }
             0
         });

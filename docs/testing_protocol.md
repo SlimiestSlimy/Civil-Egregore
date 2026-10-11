@@ -75,6 +75,9 @@ simulation's tests. A rule is tried on a world, and every world is the
 server's to make: the rules' crates test themselves on one, the server
 a dependency of their tests alone, and what such tests share is the
 server's (`server/tests/tests.rs`, a module of theirs by `#[path]`).
+The simulation's tests say what a turn queues as a rule says it, by
+the actions, a dependency of its tests alone; the instructions' own
+tests queue an instruction at a time.
 The sliders' numbers are judged by
 `utilities`' `tuning`. The renderer is judged by eye: in the window,
 and in its stills (`Civil_Egregore renderer stills`).

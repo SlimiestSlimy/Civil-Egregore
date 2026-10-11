@@ -7,6 +7,7 @@ pub(crate) mod apply;
 pub(crate) mod conditional;
 mod entities;
 pub(crate) mod instruction;
+pub(crate) mod one_instruction;
 
 use entity_manager::{EntityReader, SuperchunkEntities};
 use crate::sampling::sample_layer;
@@ -114,7 +115,17 @@ pub struct Turn<'a> {
     /// Where the author began queuing, if it has: the one superchunk
     /// all it queued so far is for.
     pub(crate) author_began: Option<AuthorBegan>,
+    /// The superchunk the author's last instruction landed in, the
+    /// queue it went to and that superchunk's slot: the next for the
+    /// same superchunk goes there with nothing looked up again.
+    /// `NO_SUPERCHUNK` until the author queues, and after its
+    /// instructions go across.
+    pub(crate) landed_last: (SuperchunkIndex, u8, u8),
 }
+
+/// No superchunk: what [`Turn::landed_last`] holds before an author
+/// queues anything.
+pub(crate) const NO_SUPERCHUNK: SuperchunkIndex = SuperchunkIndex(u64::MAX);
 
 /// Where an author began queuing: the slot of the superchunk, and
 /// how much that slot's queue held before it -- all after is the
@@ -237,6 +248,7 @@ impl<'a> Turn<'a> {
         self.author = at.0 + 1;
         self.across = false;
         self.author_began = None;
+        self.landed_last.0 = NO_SUPERCHUNK;
     }
 
     /// The queue of the outbox the author's next instruction goes
@@ -248,6 +260,10 @@ impl<'a> Turn<'a> {
     /// last begun is another's.
     #[inline]
     pub(crate) fn queue_landing_in(&mut self, superchunk: SuperchunkIndex) -> (usize, usize) {
+        // Most of what an author queues lands where the last did: a compare, its write, its end.
+        if superchunk == self.landed_last.0 {
+            return (self.landed_last.1 as usize, self.landed_last.2 as usize);
+        }
         let slot = self.slot_of(superchunk);
         if !self.across {
             match self.author_began {
@@ -270,6 +286,7 @@ impl<'a> Turn<'a> {
         if queue == ACROSS {
             self.outbox.across.last_mut().expect("the segment's").lands |= 1 << slot;
         }
+        self.landed_last = (superchunk, queue as u8, slot as u8);
         (queue, slot)
     }
 
@@ -304,6 +321,7 @@ impl<'a> Turn<'a> {
             *open = conditional::CompareOpen { instruction: open.instruction - began.instructions + instructions, gated: open.gated - began.gated + gated, carried_before: open.carried_before - began.carried + carried, queue: ACROSS as u8, ..*open };
         }
         self.across = true;
+        self.landed_last.0 = NO_SUPERCHUNK;
     }
 
     /// The outbox slot of `superchunk`: this one or a neighbour. Farther

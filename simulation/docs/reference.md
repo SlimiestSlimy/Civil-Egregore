@@ -44,40 +44,34 @@ the turn, so instructions can be queued while going through them;
 **`entity_on(at)`** (the entity the tick found on a cell: its name for the tick), **`entities_in(chunk)`**, **`occupied(origin,
 width, height)`** (the cells entities stand on, up to `OCCUPIED_SIDE`
 each way, a row a word: cell `(x, y)` from `origin` at bit `x` of row
-`y`). Entities written:
-**`put(header, attributes)`**: an entity made, on a cell free for one
-by then, waking after this tick -- a compare of the cell, the entity
-made, each attribute given and its words written; **`make(header,
-attributes)`** the same with the compare left open, what is queued
-until **`made()`** happening only if the entity is made;
-**`step(entity, to, wake)`**: under a compare of the entity being
-there still, a move if `to` is another cell, and its wake written --
-to another superchunk, a crossing; **`update(before, after,
-attributes)`**: each attribute that differs written
-(`set_attributes_changed`), then the step, or the crossing with what
-it is to have;
-**`set_attribute(entity, attribute, seen, value)`**,
-**`unset_attribute(entity, attribute, seen)`**,
-**`set_attribute_blocks(entity, seen, value)`**: a write to an
-attribute of any entity in reach, under a compare of the attribute
-being still as seen: each member of its layout that differs, its
-bytes and no more (`queue_members_differing`: of blocks with no
-layout at hand, each word that differs), or the attribute whole, a
-write in bulk (`queue_attribute_whole`), or taken -- a layout laid
-out where it is queued from, nothing copied; `cross`: made there whole under a compare of the cell
-free, its blocks carried beside that queue after a block of its type
-and wake, and asleep where it stood, settled after;
-**`set_attribute_member(entity, kind, member, seen, value)`**: one
-member of an attribute, held against that member alone -- two
-writing two members of one attribute both do;
-**`remove(header)`**: under a compare of its being there still.
+`y`).
+
+**Queued, an instruction a function** (`turn/one_instruction.rs`;
+`simulation.md`, "Instructions"): **`compare_open(compare)`**,
+**`compare_close()`**: a compare queued, open until closed, one within
+another; **`write_cell(type, at, value, counted)`**;
+**`count(place)`**, landing where the compare open last does;
+**`make_entity(header)`**; **`move_entity(from, to)`**, within a
+superchunk; **`remove_entity(at)`**; **`cross_entity(left, after,
+default, attributes)`**: the entity made in another superchunk, its
+blocks carried beside the queue after a block of its type and wake;
+**`write_attribute_member(at, kind, member, value)`**;
+**`write_attribute(at, attribute)`**: an attribute whole, its blocks
+carried; **`remove_attribute(at, kind)`**; **`write_wake(at, wake)`**.
+**`compare_with_writes(compare, writes)`**: a compare, the writes
+under it and its end at once, the queue found once -- every write
+landing in the compare's superchunk; **`Write`**: a write as a value,
+those that carry no blocks (`instruction_of`: the instruction it is
+queued as and the cell it lands on). What is made of several --
+an entity stepping, crossing, an attribute edited member by member --
+is `../../actions/`.
 **`slot_of`**: the slot of a superchunk, past the neighbours panicking;
 `queue_landing_in(superchunk)`: the queue something about to be queued
 goes to, and its slot -- the slot's own queue, or the queue of acts
 over a border (`ACROSS`, the outbox's tenth) once the author's act is
 one, which it becomes here at the first thing queued for a second
 superchunk, whatever it is (`AuthorBegan`: the slot the author began
-in and what its queue held before; `go_across`: all the author
+in and what its queue held before; `landed_last`, the superchunk, queue and slot of the author's last instruction, so the next for the same superchunk looks nothing up, `NO_SUPERCHUNK` until it queues; `go_across`: all the author
 queued moved there, `Across` `{lands, arrived}` kept beside its
 segment; `simulation.md`,
 "An act over a border"); `slot_home`: the slot of the outbox's own
@@ -131,16 +125,8 @@ panics; `open(at, instruction)`, `open_compare(compare)`,
 compares open (`CompareOpen`, `NONE` an empty one), one within another up to `COMPARES_WITHIN` (4), and
 popped, what is under it -- the queue's end less where it lies, and
 the compares within it -- noted beside the queue (`Gated` `{instructions,
-compares_within, writes}`, 8 bytes a compare); `queue_under(at,
-compare, writes)`: a compare, its writes and its end at once, the
-queue found once.
-**`Turn::queue_if(compare, type, at, seen, value, counted)`**: the
-compare, within it a compare of the cell as seen, within that the
-write, with the count added if it is come to; **`Turn::queue_seen(type, at, seen, value,
-counted)`**: a compare of the cell as seen and the write under it,
-under the compare the rule is under as well, if any.
-**`Turn::count_if(compare, place)`**: a
-count. **`Turn::count_under(first)`**: the number
+compares_within, writes}`, 8 bytes a compare).
+**`Turn::count_under(first)`**: the number
 the rule's first count is counted under; `counted_number(place)`: a
 count's number, under `COUNTED_WHEN_APPLIED` (256) --
 **`CountedWhenApplied`**, a tick's counts made as it applied.

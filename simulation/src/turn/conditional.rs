@@ -7,7 +7,7 @@
 //! held against is a compare queued before it
 //! (`docs/simulation.md`, "Compare-and-write").
 
-use super::instruction::{Instruction, NO_COUNT};
+use super::instruction::Instruction;
 use super::Turn;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
@@ -117,7 +117,7 @@ impl Compare {
     }
 
     /// The instruction it is queued as.
-    fn instruction(&self) -> Instruction {
+    pub(crate) fn instruction(&self) -> Instruction {
         match *self {
             Self::Cell { layer_type, at, seen } => Instruction::compare_cell(layer_type, at, seen),
             Self::CellFree { at } => Instruction::compare_cell_free(at),
@@ -192,7 +192,7 @@ impl Turn<'_> {
     }
 
     /// The number the rule's count `place` is counted under.
-    fn counted_number(&self, place: u32) -> u32 {
+    pub(crate) fn counted_number(&self, place: u32) -> u32 {
         let number = self.counted_from + place;
         assert!((number as usize) < COUNTED_WHEN_APPLIED, "count {place} from {}: more than a tick counts when applied", self.counted_from);
         number
@@ -203,11 +203,13 @@ impl Turn<'_> {
     /// under a compare, whichever superchunk's queue it goes to: no
     /// write is held against nothing
     /// (`docs/simulation.md`, "Compare-and-write", the hard rule).
-    pub(crate) fn queue(&mut self, lands: CellIndex, instruction: Instruction) {
+    #[inline]
+    pub(crate) fn queue(&mut self, lands: CellIndex, instruction: Instruction) -> usize {
         assert!(self.compares_open_count > 0 || !instruction.is_a_write(), "a write under no compare: {:?}", instruction.opcode);
         let (queue, slot) = self.queue_landing_in(lands.superchunk());
         self.writes_queued += u32::from(instruction.opcode == super::instruction::Opcode::WriteCell);
         self.outbox.queues[queue].instructions.push(instruction.landing_in(slot));
+        queue
     }
 
     /// Carries `blocks` beside the queue an instruction landing in
@@ -217,24 +219,6 @@ impl Turn<'_> {
         let carried = &mut self.outbox.queues[queue].carried;
         carried.extend_from_slice(blocks);
         (carried.len() - blocks.len()) as u32
-    }
-
-    /// Queues the compare `compare`, of the cell `at`, the `writes`
-    /// under it and its end, at once: what [`Turn::open`], a
-    /// [`Turn::queue`] each and [`Turn::close_compare`] come to, the
-    /// queue found once -- most of what a rule queues is one compare
-    /// and a write or two.
-    #[inline]
-    pub(crate) fn queue_under(&mut self, at: CellIndex, compare: Instruction, writes: &[Instruction]) {
-        debug_assert!(compare.is_a_compare() && writes.iter().all(Instruction::is_a_write));
-        let (queue, slot) = self.queue_landing_in(at.superchunk());
-        let cell_writes = writes.iter().filter(|write| write.opcode == super::instruction::Opcode::WriteCell).count();
-        self.writes_queued += cell_writes as u32;
-        let queue = &mut self.outbox.queues[queue];
-        queue.gated.push(Gated { instructions: writes.len() as u32, compares_within: 0, writes: cell_writes as u16 });
-        queue.instructions.push(compare.landing_in(slot));
-        queue.instructions.extend(writes.iter().map(|write| write.landing_in(slot)));
-        queue.instructions.push(Instruction::compare_end().landing_in(slot));
     }
 
     /// Queues `compare`, open from here ([`Turn::open`]).
@@ -248,9 +232,8 @@ impl Turn<'_> {
     /// pushed on the turn's small stack of compares open.
     pub(crate) fn open(&mut self, at: CellIndex, instruction: Instruction) {
         debug_assert!(instruction.is_a_compare());
-        self.queue(at, instruction);
         // Where the instruction went: its slot's queue, or that of acts over a border.
-        let index = if self.across { super::ACROSS } else { self.slot_of(at.superchunk()) };
+        let index = self.queue(at, instruction);
         let queue = &mut self.outbox.queues[index];
         // Its place among what is under each compare is kept now, in the order the compares are come to, and filled as it is closed.
         let open = CompareOpen { at, instruction: queue.instructions.len() as u32 - 1, gated: queue.gated.len() as u32, writes_before: self.writes_queued, carried_before: queue.carried.len() as u32, queue: index as u8 };
@@ -295,35 +278,5 @@ impl Turn<'_> {
         if self.comparing.take().is_some() {
             self.close_compare();
         }
-    }
-
-    /// Queues the number of `layer_type` at `at` becoming `value` if
-    /// it is still the `seen` the rule read there, and `compare` --
-    /// of anything else in its superchunk -- holds too, when they are
-    /// come to: two compares, one within the other, then the write.
-    /// Applied, it adds one to the count `counted`, if one is given.
-    pub fn queue_if(&mut self, compare: Compare, layer_type: LayerType, at: CellIndex, seen: u32, value: u32, counted: Option<u32>) {
-        self.open_compare(compare);
-        self.queue_seen(layer_type, at, seen, value, counted);
-        self.close_compare();
-    }
-
-    /// Queues the number of `layer_type` at `at` becoming `value` if
-    /// it is still the `seen` the rule read there: a compare of the
-    /// cell, then the write -- so none lands on another's -- under
-    /// whatever compare the rule is queuing under as well.
-    pub fn queue_seen(&mut self, layer_type: LayerType, at: CellIndex, seen: u32, value: u32, counted: Option<u32>) {
-        debug_assert!(seen != value, "a write that changes nothing");
-        let count = counted.map_or(NO_COUNT, |place| u64::from(self.counted_number(place)));
-        self.queue_under(at, Instruction::compare_cell(layer_type, at, seen as u16), &[Instruction::write_cell(layer_type, at, value as u16, count)]);
-    }
-
-    /// Adds one to the rule's count `place` if `compare` holds when it
-    /// is come to, and whatever compare the rule is queuing under.
-    pub fn count_if(&mut self, compare: Compare, place: u32) {
-        let number = self.counted_number(place);
-        self.open_compare(compare);
-        self.queue(compare.at(), Instruction::count(number));
-        self.close_compare();
     }
 }

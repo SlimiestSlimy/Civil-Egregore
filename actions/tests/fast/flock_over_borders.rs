@@ -95,14 +95,14 @@ fn flock(turn: &mut Turn, seed: u64, shift: (u32, u32)) -> u64 {
         let (open, taken) = (stone.hot & about.ring(), around::layer(turn, COLLISION, &about).set & about.ring());
         let chance = drawn.below(100);
         if chance < 4 {
-            turn.remove(&header);
+            actions::entities::remove(turn, &header);
             continue;
         }
         let meals = entity.attribute(COUNTED);
         if !(stone.set & about.centre()).is_empty() {
             // The meal is counted only if the stone is there still: another on its way here may not eat it, but one counting on this one may.
             compare::from_here(turn, compare::holds(STONE, at));
-            turn.set_attribute(&header, COUNTED, meals, meals.unwrap_or(0) + 1);
+            actions::entities::set_attribute_of(turn, &header, COUNTED, meals, meals.unwrap_or(0) + 1);
             compare::end(turn);
             cells::clear(turn, STONE, at);
         } else if let Some(beside) = way_drawn(&mut drawn, &about, open.without(stone.set)).filter(|_| chance < 40).and_then(|bit| around::cell(at, bit)) {
@@ -110,22 +110,22 @@ fn flock(turn: &mut Turn, seed: u64, shift: (u32, u32)) -> u64 {
             let laid = entity.attribute(LAID);
             compare::from_here(turn, compare::lacks(STONE, beside));
             cells::set(turn, STONE, beside);
-            turn.set_attribute(&header, LAID, laid, laid.unwrap_or(0) + 1);
+            actions::entities::set_attribute_of(turn, &header, LAID, laid, laid.unwrap_or(0) + 1);
             compare::end(turn);
         }
         if let Some(other) = way_drawn(&mut drawn, &about, taken).and_then(|bit| around::cell(at, bit)).and_then(|beside| standing(turn, beside)) {
             let seen = other.attribute(COUNTED);
-            turn.set_attribute(&other.header, COUNTED, seen, seen.unwrap_or(0) + 1000);
+            actions::entities::set_attribute_of(turn, &other.header, COUNTED, seen, seen.unwrap_or(0) + 1000);
         }
         if let Some(beside) = way_drawn(&mut drawn, &about, open.without(taken)).filter(|_| chance < 9).and_then(|bit| around::cell(at, bit)) {
             // Made and counted, or neither.
             let made = entity.attribute(MADE);
-            turn.make(Header { kind: WALKER, at: beside, wake: now + 1 + drawn.below(3) }, &[]);
-            turn.set_attribute(&header, MADE, made, made.unwrap_or(0) + 1);
-            turn.made();
+            crate::tests::make(turn, Header { kind: WALKER, at: beside, wake: now + 1 + drawn.below(3) }, &[]);
+            actions::entities::set_attribute_of(turn, &header, MADE, made, made.unwrap_or(0) + 1);
+            actions::entities::made(turn);
         }
         let to = way_drawn(&mut drawn, &about, open).and_then(|bit| around::cell(at, bit)).unwrap_or(at);
-        turn.step(&header, to, now + 1 + drawn.below(3));
+        actions::entities::step(turn, &header, to, now + 1 + drawn.below(3));
     }
     0
 }

@@ -34,10 +34,10 @@ fn a_write_is_applied_only_where_the_cell_is_as_it_was_seen() {
     set(&mut arena, &[cleared]);
     let report = Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         turn.count_under(10);
-        turn.queue_seen(STONE, twice, 0, 1, Some(DECAYED));
-        turn.queue_seen(STONE, twice, 0, 1, Some(DECAYED));
-        turn.queue_seen(STONE, never_set, 1, 0, Some(EATEN));
-        turn.queue_seen(STONE, cleared, 1, 0, None);
+        actions::cells::seen_becoming(turn, STONE, twice, 0, 1, Some(DECAYED as usize));
+        actions::cells::seen_becoming(turn, STONE, twice, 0, 1, Some(DECAYED as usize));
+        actions::cells::seen_becoming(turn, STONE, never_set, 1, 0, Some(EATEN as usize));
+        actions::cells::seen_becoming(turn, STONE, cleared, 1, 0, None);
         0
     });
     let applied = report.writes_applied;
@@ -68,18 +68,18 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
     entities.apply();
     let mark = |at: CellIndex| at.offset(1, 0).expect("in the world");
     let report = Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
-        turn.queue_seen(STONE, decaying, 1, 0, Some(DECAYED));
+        actions::cells::seen_becoming(turn, STONE, decaying, 1, 0, Some(DECAYED as usize));
         for eater in turn.woken() {
             let (now, header) = (turn.now(), eater.header);
             // Fed if the cell still holds, asleep a tick if it does not: one of the two, the eater written once.
             turn.compare_from_here(Compare::Cell { layer_type: STONE, at: header.at, seen: 1 });
-            turn.update(&header, entity_manager::Header { wake: now + 100, ..header }, &[AttributeBlock::holding(FED, 1)]);
+            actions::entities::update(turn, &header, entity_manager::Header { wake: now + 100, ..header }, &[AttributeBlock::holding(FED, 1)]);
             turn.compare_from_here(Compare::Cell { layer_type: STONE, at: header.at, seen: 0 });
-            turn.step(&header, header.at, now + 1);
+            actions::entities::step(turn, &header, header.at, now + 1);
             turn.compare_end();
-            turn.queue_seen(STONE, header.at, 1, 0, Some(EATEN));
+            actions::cells::seen_becoming(turn, STONE, header.at, 1, 0, Some(EATEN as usize));
             let fed = Compare::attribute(header.at, FED.attribute_type(), Some(&[AttributeBlock::holding(FED, 1)]));
-            turn.queue_if(fed, STONE, mark(header.at), 0, 1, None);
+            actions::compare::write(turn, fed, STONE, mark(header.at), 0, 1, None);
         }
         0
     });
@@ -150,7 +150,7 @@ fn drawn_writes_come_to_the_same_as_applied_in_order() {
             let superchunk = turn.superchunk();
             attempts(&cells, superchunk, |flipped, compared| {
                 let compare = Compare::Cell { layer_type: STONE, at: compared.0, seen: u16::from(compared.1) };
-                turn.queue_if(compare, STONE, flipped.0, u32::from(flipped.1), u32::from(!flipped.1), Some(u32::from(flipped.0 != compared.0)));
+                actions::compare::write(turn, compare, STONE, flipped.0, u32::from(flipped.1), u32::from(!flipped.1), Some(usize::from(flipped.0 != compared.0)));
             });
             0
         });
