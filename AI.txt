@@ -408,26 +408,27 @@ Probe: `AI_SCRATCHPAD acts_over_a_border side every stepping ticks
 threads`.
 
 --- THEN ---
-- THE DEFAULT ATTRIBUTE (the user, 2026-10-11): "on the type registry,
-  for entities add an optional \"default atribute\" that is always
-  present if the entity exists so it avoids the 8 bytes of typeid at
-  the beggining, but it has to be fixed size". DONE in the registry:
-  Registered::default_attribute, with_default, first_default_amiss at
-  build, default_attribute_of; the sheep's is SHEEP_STATE. NOT DONE:
-  the store still keeps the type word. ASKED OF THE USER before I
-  build it, the cut being theirs: (1) outside the store, is the
-  default attribute still named by its type ID like any other (rules
-  and instructions unchanged, the store dropping the word), or is it
-  the entity's own bytes, named by offset alone? (2) an entity's
-  blocks are handed about whole in many places (save, hash, crossing,
-  tests copying them): with the default kept without its type, a run
-  of blocks no longer says what its first blocks are -- so either
-  EntityRef gives the default apart from the rest, or a run always
-  goes with its entity type. (3) made with none given, it is zeroes?
-  What I read of the code for it: bucket.rs (edit, write_bytes, make),
-  entity.rs (EntityRef::attribute), store.rs (sorted asserts),
-  saved.rs, simulation turn/apply.rs (holds, MakeEntity) and
-  turn/entities.rs (set_attributes_changed, cross).
+- THE DEFAULT ATTRIBUTE, BUILT (2026-10-11). The user: "on the type
+  registry, for entities add an optional \"default atribute\" that is
+  always present if the entity exists so it avoids the 8 bytes of
+  typeid at the beggining, but it has to be fixed size"; "if no
+  default atribute is present then we simply dont have nothing, we can
+  still add atributes dynamically lol, those do have to pay for the 8
+  bytes of typeid"; "yeah, most stuff will have a default one, so
+  better make a special case for it". ("idk what are you talking about
+  runs": my word for an entity's list of blocks -- do not use it to
+  the user.) Registry: Registered::default_attribute, with_default,
+  first_default_amiss, default_of. Store: the bucket keeps it first
+  without its type, zeroes if not given; outside the bucket it is
+  named by its type like any other (entity_manager.md, "The default
+  attribute"). The sheep's state is five words: three blocks either
+  way, nothing saved for it; measured the same within noise.
+- Of the border queue the user asked "in what order are you applying
+  the extra queue?" and "so you keep the position of the original
+  destionation queue per insutrution in the tenth queue and drain it
+  in order dispatching to each respective superchunk?" -- yes; and
+  "in theory all writes should be gated, i never said anything about
+  naked wriites lmao": there are none, I had worded it badly.
 - STANDING, the user, 2026-10-11: "hey hey, tests should be seed
   genereated when possible". Done for the two border tests; holds for
   every test from here on.

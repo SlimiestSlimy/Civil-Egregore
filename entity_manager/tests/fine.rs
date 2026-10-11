@@ -8,7 +8,7 @@
 
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::saved::{decode_state, encode_state};
-use entity_manager::{find_attribute, push_attribute, sorted, Attribute, AttributeBlock, AttributeType, Entities, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER};
+use entity_manager::{default_kept, may_be_given, WholeAttribute, find_attribute, push_attribute, sorted, Attribute, AttributeBlock, AttributeType, Entities, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER};
 
 /// The entities' type.
 const WALKER: EntityType = EntityType::of(40);
@@ -263,4 +263,101 @@ fn an_entity_is_named_by_the_cell_the_tick_found_it_on() {
     queue.move_entity(walker(second), nobodys);
     queue.apply(entities.superchunks_mut(), 0, &mut applied);
     assert_eq!((applied.passed_over, applied.removes, applied.edits, applied.moves, entities.len()), (3, 0, 0, 0, 3));
+}
+
+/// A sheep, whose type is registered with a default attribute -- its
+/// state -- has it always: given with its type like any attribute,
+/// or not given and zeroes; kept first and without its type, so a
+/// sheep with nothing else is its data's blocks and no more; read,
+/// compared and written whole or a member at a time by its type as
+/// any other, wherever it sorts among the others; never removed;
+/// moved to another chunk and saved with the sheep. States, the
+/// attributes about them and the edits are drawn from the seed.
+#[test]
+fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
+    use type_registry::{SheepState, SHEEP, SHEEP_STATE};
+    use utilities::rng::Rng;
+    /// An attribute sorting before the sheep's state, and one after.
+    const BEFORE: Attribute<u64> = Attribute::new(11);
+    let default = default_kept(SHEEP).expect("registered with one");
+    assert_eq!((default.kind, default.words, default.blocks), (SHEEP_STATE.attribute_type(), SheepState::WORDS, SheepState::WORDS.div_ceil(BLOCK_WORDS)));
+    assert_eq!(default_kept(WALKER), None);
+    let mut random = Rng::new(utilities::seed::counted());
+    let drawn = |random: &mut Rng| SheepState { hungry_at: random.draw(), lamb_due_at: random.draw(), grown_at: random.draw(), roaming_until: random.draw(), roaming_neighbour: random.draw() as u32 };
+    for round in 0..200 {
+        let mut entities = world();
+        let at = cell(random.below(200) as u32, random.below(200) as u32);
+        let sheep = Header { kind: SHEEP, at, wake: NEVER };
+        // Given its state or not, with an attribute before it by type, one after, both or neither.
+        let (state, given, before, after) = (drawn(&mut random), random.below(2) == 0, random.below(2) == 0, random.below(2) == 0);
+        let mut attributes = Vec::new();
+        if before {
+            push_attribute(&mut attributes, BEFORE, 5);
+        }
+        if given {
+            push_attribute(&mut attributes, SHEEP_STATE, state);
+        }
+        if after {
+            push_attribute(&mut attributes, NAME, 7);
+        }
+        assert!(may_be_given(SHEEP, &attributes));
+        entities.queue_put(sheep, &attributes);
+        entities.apply();
+        let mut holds = if given { state } else { SheepState::default() };
+        let put = entities.get(at).expect("put");
+        // Kept: its data's blocks, then the others with their types -- a block each here.
+        assert_eq!(put.kept().len(), default.blocks + usize::from(before) + usize::from(after), "round {round}");
+        assert_eq!(put.attributes.len(), usize::from(before) + usize::from(after));
+        // Its first word is its data's first, no type before it.
+        assert_eq!(put.kept()[0].0[0], holds.hungry_at, "round {round}");
+        assert_eq!((put.attribute(SHEEP_STATE), put.attribute(BEFORE), put.attribute(NAME)), (Some(holds), before.then_some(5), after.then_some(7)), "round {round}");
+        assert_eq!(put.default_attribute().as_deref(), Some(&*WholeAttribute::holding(SHEEP_STATE, holds)));
+        assert_eq!(put.attribute_seen(SHEEP_STATE.attribute_type()), entity_manager::attribute_seen(Some(&WholeAttribute::holding(SHEEP_STATE, holds))));
+        // Edits drawn: the state whole, a member of it, its removal -- refused -- and the others', which leave it be.
+        for edit in 0..8 {
+            let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
+            let now_at = entities.iter().next().expect("the one sheep").header.at;
+            let chosen = random.below(5);
+            match chosen {
+                0 => {
+                    holds = drawn(&mut random);
+                    queue.set_attribute(now_at, SHEEP_STATE, holds);
+                }
+                1 => {
+                    let (member, value) = (random.below(SheepState::MEMBERS.len() as u64) as usize, random.draw());
+                    let member = SheepState::MEMBERS[member];
+                    // Where the member lies in the attribute, its type counted: as an instruction says it.
+                    let superchunk = entities.superchunks_mut().iter_mut().next().expect("the one");
+                    assert!(superchunk.write_attribute_bytes_named(now_at, SHEEP_STATE.attribute_type(), usize::from(member.offset), usize::from(member.bytes), value));
+                    let mut words = [0; SheepState::WORDS];
+                    holds.write(&mut words);
+                    let (word, first, mask) = (usize::from(member.offset) / 8 - 1, usize::from(member.offset) % 8 * 8, u64::MAX >> (64 - u32::from(member.bytes) * 8));
+                    words[word] = words[word] & !(mask << first) | (value & mask) << first;
+                    holds = SheepState::read(&words);
+                    assert_eq!(entities.get(now_at).expect("there").attribute_member(SHEEP_STATE.attribute_type(), usize::from(member.offset), usize::from(member.bytes)), Some(value & mask));
+                }
+                2 => queue.unset_attribute(now_at, SHEEP_STATE.attribute_type()),
+                3 => queue.set_attribute(now_at, NAME, 100 + edit),
+                // To a cell of another chunk as often as not: all it has goes with it.
+                _ => queue.move_entity(Header { at: cell(random.below(600) as u32, random.below(600) as u32), ..sheep }, now_at),
+            }
+            queue.apply(entities.superchunks_mut(), 0, &mut applied);
+            // The tick over: it is named by where it stands now.
+            entities.superchunks_mut().iter_mut().for_each(|superchunk| superchunk.names_anew(&mut ()));
+            // Its removal alone is passed over: a default attribute is never taken.
+            assert_eq!(applied.passed_over, usize::from(chosen == 2), "round {round}, edit {edit}");
+            let edited = entities.iter().next().expect("the one sheep");
+            assert_eq!(edited.attribute(SHEEP_STATE), Some(holds), "round {round}, edit {edit}");
+            assert!(sorted(edited.attributes) && edited.kept().len() == default.blocks + edited.attributes.len(), "round {round}, edit {edit}");
+            assert_eq!(edited.attribute(BEFORE), before.then_some(5), "round {round}, edit {edit}");
+        }
+        // Saved and read back: the same sheep, kept the same.
+        let was = entities.iter().next().expect("the one sheep");
+        let (words, count) = encode_state(None, entities.superchunk(was.header.at.superchunk()));
+        let mut read_back = world();
+        assert_eq!((count, decode_state(&words, 0, &mut read_back).map(|state| state.entities)), (1, Ok(1)));
+        read_back.apply();
+        let is = read_back.get(was.header.at).expect("read back");
+        assert_eq!((was.header, was.kept()), (is.header, is.kept()), "round {round}");
+    }
 }

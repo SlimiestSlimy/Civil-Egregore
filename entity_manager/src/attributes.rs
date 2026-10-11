@@ -4,6 +4,92 @@
 
 use std::ops::Range;
 pub use type_registry::{Attribute, AttributeType, Layout, Member, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};
+use type_registry::EntityType;
+
+/// An entity type's default attribute as a bucket keeps it: first of
+/// the entity's blocks, its data alone -- every entity of the type
+/// has it and it is always as long, so it does not say its type
+/// (`docs/entity_manager.md`, "The default attribute").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DefaultKept {
+    /// Its type, as it is named everywhere but where it is kept.
+    pub kind: AttributeType,
+    /// The words its data is.
+    pub words: usize,
+    /// The blocks it is kept in: its data's, no word of type before.
+    pub blocks: usize,
+}
+
+/// The default attribute of entities of type `kind`, if the type is
+/// registered with one.
+#[inline]
+pub fn default_kept(kind: EntityType) -> Option<DefaultKept> {
+    let (kind, words) = type_registry::default_of(kind)?;
+    Some(DefaultKept { kind, words, blocks: words.div_ceil(BLOCK_WORDS) })
+}
+
+/// The word at `word` of `blocks`, one after another.
+#[inline]
+fn word_of(blocks: &[AttributeBlock], word: usize) -> u64 {
+    blocks[word / BLOCK_WORDS].0[word % BLOCK_WORDS]
+}
+
+/// Appends to `kept` the blocks of an entity of type `kind` given
+/// `attributes`, sorted by type, as a bucket keeps them: its default
+/// attribute first, without its type -- zeroes if it is not among
+/// those given -- then the others as they are.
+pub fn keep(kind: EntityType, attributes: &[AttributeBlock], kept: &mut Vec<AttributeBlock>) {
+    let Some(default) = default_kept(kind) else {
+        return kept.extend_from_slice(attributes);
+    };
+    let first = kept.len();
+    kept.resize(first + default.blocks, AttributeBlock([0; BLOCK_WORDS]));
+    for attribute in each_attribute(attributes) {
+        if attribute[0].kind().identity() == default.kind.identity() {
+            write_default(&mut kept[first..first + default.blocks], default, attribute);
+        } else {
+            kept.extend_from_slice(attribute);
+        }
+    }
+}
+
+/// Writes over the default attribute `kept` -- a bucket's, of the
+/// kind `default` -- the data of `given`, the same attribute with its
+/// type before it: whether `given` is as long as that takes.
+pub(crate) fn write_default(kept: &mut [AttributeBlock], default: DefaultKept, given: &[AttributeBlock]) -> bool {
+    if given.len() != default.kind.blocks() {
+        return false;
+    }
+    for word in 0..default.words {
+        kept[word / BLOCK_WORDS].0[word % BLOCK_WORDS] = word_of(given, word + 1);
+    }
+    true
+}
+
+/// What is seen of the default attribute `kept` -- a bucket's, of
+/// the kind `default` -- in 64 bits: [`attribute_seen`] of it with
+/// its type before it, summed where it lies, nothing laid out.
+#[inline]
+pub(crate) fn default_seen(default: DefaultKept, kept: &[AttributeBlock]) -> u64 {
+    let data = kept.iter().flat_map(|block| block.0).take(default.words);
+    // As long as it is given: its type, its data, and nothing to the end of its last block.
+    let words = std::iter::once(default.kind.0).chain(data).chain(std::iter::repeat(0)).take(default.kind.blocks() * BLOCK_WORDS);
+    words.fold(0xcbf2_9ce4_8422_2325, |sum: u64, word| (sum ^ word).wrapping_mul(0x0000_0100_0000_01b3).rotate_left(29)).max(NO_ATTRIBUTE + 1)
+}
+
+/// Whether `attributes` are ones an entity of type `kind` may be
+/// given: whole ones, each of a type that is an attribute's, each
+/// type once, sorted by type but for the type's default attribute,
+/// which may come anywhere among them.
+pub fn may_be_given(kind: EntityType, attributes: &[AttributeBlock]) -> bool {
+    let Some(default) = default_kept(kind) else {
+        return sorted(attributes);
+    };
+    let mut kept = Vec::new();
+    keep(kind, attributes, &mut kept);
+    let defaults: Vec<usize> = each_attribute(attributes).filter(|attribute| attribute[0].kind().identity() == default.kind.identity()).map(<[_]>::len).collect();
+    sorted(&kept[default.blocks..]) && defaults.len() <= 1 && defaults.iter().all(|&blocks| blocks == default.kind.blocks())
+}
 
 /// A block of an attribute: two words, sixteen bytes, aligned as
 /// such. An attribute's first block has its type in its first word,
@@ -66,6 +152,21 @@ impl WholeAttribute {
     }
 }
 
+impl WholeAttribute {
+    /// The default attribute `kept` -- a bucket's, of the kind
+    /// `default` -- with its type before it, as it is given and
+    /// compared everywhere else.
+    #[inline]
+    pub(crate) fn of_default(default: DefaultKept, kept: &[AttributeBlock]) -> Self {
+        let (mut blocks, count) = ([AttributeBlock([0; BLOCK_WORDS]); ATTRIBUTE_BLOCKS_MOST], default.kind.blocks());
+        blocks[0].0[0] = default.kind.0;
+        for word in 0..default.words {
+            blocks[(word + 1) / BLOCK_WORDS].0[(word + 1) % BLOCK_WORDS] = word_of(kept, word);
+        }
+        Self { blocks, count }
+    }
+}
+
 impl std::ops::Deref for WholeAttribute {
     type Target = [AttributeBlock];
 
@@ -100,11 +201,19 @@ pub fn attribute_bytes(blocks: &[AttributeBlock], offset: usize, bytes: usize) -
 /// in one word of it.
 #[inline]
 pub fn write_attribute_bytes(blocks: &mut [AttributeBlock], offset: usize, bytes: usize, value: u64) -> bool {
+    offset >= 8 && write_bytes(blocks, offset, bytes, value)
+}
+
+/// Writes the low `bytes` bytes of `value` over those from the byte
+/// `offset` of `blocks`, in place, whatever they are: whether it was
+/// written -- not if they do not lie in one word of them.
+#[inline]
+pub(crate) fn write_bytes(blocks: &mut [AttributeBlock], offset: usize, bytes: usize, value: u64) -> bool {
     let (word, first) = (offset / 8, offset % 8);
     let Some(block) = blocks.get_mut(word / BLOCK_WORDS) else {
         return false;
     };
-    if word == 0 || bytes == 0 || first + bytes > 8 {
+    if bytes == 0 || first + bytes > 8 {
         return false;
     }
     let mask = (u64::MAX >> (64 - bytes * 8)) << (first * 8);

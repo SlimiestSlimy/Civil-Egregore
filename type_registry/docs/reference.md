@@ -50,7 +50,7 @@ cells'; `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, three blocks; **`
 **`first_clash(registry)`**: the first row to take a number or a name of
 one before it -- checked on `REGISTRY` as the crate is built, as is
 **`first_default_amiss(registry)`**: the first row whose default attribute is no attribute of a fixed size of the table, or that has one and is no entity type's.
-**`default_attribute_of(entity_type)`**: the row of its default attribute, if it has one.
+**`default_attribute_of(entity_type)`**: the row of its default attribute, if it has one; **`default_of(entity_type)`**: its type and the words of its data, from `DEFAULTS`, worked out as the crate is built.
 **`named(name)`**, **`of_number(number)`**: a row by its name, and by any number it
 takes. **`layer_types()`**: every layer type a world's cells have, a
 wide plane's whole: what the server lists a world's layers from.

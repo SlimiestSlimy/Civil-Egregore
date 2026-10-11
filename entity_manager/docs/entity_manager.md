@@ -30,7 +30,8 @@ aligned as such (`AttributeBlock`, `BLOCK_WORDS`,
 `ATTRIBUTE_BLOCKS_MOST`): 256 bytes at the most, and what is larger
 is to be kept elsewhere, the attribute saying where. The first word
 of an attribute's first block is its type, the one u64 ID every type
-in a world has. The rest is its data, so that what belongs together
+in a world has -- but for an entity type's default attribute, kept
+without it ("The default attribute"). The rest is its data, so that what belongs together
 is one attribute -- where a sheep roams to and until when, not the
 two packed into a word. Blocks were 64 bytes, a cache line each,
 until an attribute came to be written a member at a time: a number
@@ -74,6 +75,7 @@ and a test makes one to say so
 (`../tests/fine.rs`).
 
 **An entity's attributes** are a run of blocks in its bucket's list,
+its type's default attribute first if it has one, the others after it
 sorted by type, each type once. Finding one is a walk from the first
 (`find_attribute`): read the type, and either it is the one, or step
 over as many blocks as its first word says. An
@@ -103,6 +105,50 @@ instructions' list beside those the puts carry. A saved entity is its header's f
 blocks it has, and the blocks. The bucket's list, its garbage and its
 sweep count blocks where they counted attributes; an attribute put in
 place of one as long is written where it was.
+
+## The default attribute
+
+An entity type may be registered with one attribute every entity of
+it has for as long as it is, of a fixed size
+(`../../type_registry/docs/type_registry.md`, "Layouts"): a sheep's
+state. Most types will have one, so it is a case of its own, and only
+here. **A bucket keeps it first of the entity's blocks, without its
+type** (`DefaultKept`, `default_kept`): it is always there and always
+as long, so the eight bytes saying what it is are not kept, and it is
+found with no walk. The other attributes follow it, each beginning
+with its type as before; a type with no default attribute has only
+those.
+
+**Outside the bucket nothing knows.** The default attribute is named
+by its type like any other, wherever an entity is given attributes,
+read, compared or written:
+
+- given: among an entity's attributes, with its type before it
+  (`keep` turns what is given into what is kept, `write_default` the
+  one attribute, `word_of` reading it); not given, it is zeroes. It
+  may come anywhere among those given, which are otherwise sorted by
+  type (`may_be_given`);
+- read: `EntityRef::attribute` reads it by its layout as any other
+  (`EntityRef::default_kept`, `default_if`: the registry is asked only
+  of an entity that has such blocks); `EntityRef::default_attribute`
+  gives it with its type before it (`WholeAttribute::of_default`),
+  which is how it is saved, and carried over a border;
+- compared: `EntityRef::attribute_seen` is of it as it would be given
+  (`default_seen`, summed where it lies), `EntityRef::attribute_member`
+  of a member by its offset counted from the type, as an instruction
+  says it;
+- written: whole, its data over what is kept; a member, where it
+  lies. Removing it is passed over: it is never taken.
+
+`EntityRef::attributes` are the others; `EntityRef::kept`, all the
+blocks as kept -- what two entities are told apart by, and what is
+summed of one that crosses (`SuperchunkEntities::kept_sum`).
+
+**What it costs, and saves.** A type whose data is an even number of
+words is a block shorter an entity: the type word would have begun a
+block of its own. A sheep's state is five words, three blocks either
+way, so for the sheep nothing is saved in memory; `server pasture`
+measured the same within what runs differ by, before and after.
 
 ## A chunk's bucket
 
@@ -268,7 +314,7 @@ tick, is where every write to it lands. Each superchunk notes who
 arrived (`take_arrived`), and each then removes from the cells they
 left those that left it (`settle_leavers`); one that ended the tick
 there with other attributes than it was put with (an `Arrival` carries
-their sum, `blocks_sum`) has them sent after it (`Settled`), and the
+sum as they are kept, `kept_sum`, `blocks_sum`) has them sent after it (`Settled`), and the
 superchunk it was put in gives them to it (`settle_arrivals`). So an
 entity crosses with all that was written to it, exactly as one moving
 within a superchunk keeps it. One removed where it left meanwhile is
@@ -304,8 +350,10 @@ A superchunk's state is words a save keeps
 saying what it is (`FIRST_WORD`: `TSstate` and the format's number, 5);
 whether it has random numbers, and their state; how many entities; then
 each entity -- its type, cell, wake tick, how many blocks its
-attributes are, and the blocks, two words each. An entity whose
-blocks are not whole attributes sorted by type is not read.
+attributes are, and the blocks, two words each: its type's default
+attribute first, with its type before it as a file must say what its
+blocks are, then the others. An entity whose blocks are not whole
+attributes sorted by type (`may_be_given`) is not read.
 
 ## Layout
 

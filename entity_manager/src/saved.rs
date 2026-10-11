@@ -2,7 +2,7 @@
 //! (`docs/entity_manager.md`, "Saved").
 
 use coordinates::CellIndex;
-use crate::attributes::{sorted, AttributeBlock, BLOCK_WORDS};
+use crate::attributes::{may_be_given, AttributeBlock, BLOCK_WORDS};
 use crate::entity::{EntityType, Header};
 use crate::store::{Entities, SuperchunkEntities};
 
@@ -25,8 +25,11 @@ pub fn encode_state(random: Option<u64>, entities: Option<&SuperchunkEntities>) 
     let mut words = vec![FIRST_WORD, random.is_some() as u64, random.unwrap_or(0), count as u64];
     for entity in entities.into_iter().flat_map(SuperchunkEntities::iter) {
         let header = entity.header;
-        words.extend([header.kind.0, header.at.0, header.wake, entity.attributes.len() as u64]);
-        words.extend(entity.attributes.iter().flat_map(|block| block.0));
+        // Its type's default attribute first, its type before it as any other's: a file says what each of its blocks is.
+        let default = entity.default_attribute();
+        let default = default.as_deref().unwrap_or(&[]);
+        words.extend([header.kind.0, header.at.0, header.wake, (default.len() + entity.attributes.len()) as u64]);
+        words.extend(default.iter().chain(entity.attributes).flat_map(|block| block.0));
     }
     (words, count)
 }
@@ -58,7 +61,7 @@ fn read(words: &[u64], mut each: impl FnMut(Header, &[AttributeBlock])) -> Resul
             }
             attributes.push(block);
         }
-        if !sorted(&attributes) {
+        if !may_be_given(EntityType(kind), &attributes) {
             return Err("an entity's attributes are not whole ones sorted by type");
         }
         each(Header { kind: EntityType(kind), at: CellIndex(at), wake }, &attributes);
