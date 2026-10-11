@@ -167,6 +167,7 @@ what they always do and are not listed.
 | **entity** | a thing on the cells -- a sheep -- on one cell, never two on one: its header and its attributes | header, attribute, bucket | record, object, agent |
 | **header** | an entity's fixed part: its type, cell and wake tick (`Header`); it has no ID, its cell names it | entity, name in a tick | |
 | **entity type** | what an entity is -- a sheep -- from the one type namespace (`EntityType`) | layer type | kind (only as the field holding it) |
+| **attribute list** | all the attributes of one entity as kept: their blocks one after another among its bucket's blocks, the type's default attribute first, the others sorted by type | attribute, attribute block, bucket | run, array |
 | **attribute** | a typed value an entity has, one or more attribute blocks laid out as its type's layout says: added and removed as it goes (`Attribute`, `AttributeType`) | entity, attribute block, layout | property, component |
 | **attribute block** | 16 bytes of an attribute, two words; an attribute is 1 to 16 of them: the first block's first word the attribute's type, the rest its data (`AttributeBlock`) | attribute, block length | slot, cell (a cell is the world's) |
 | **layout** | what an attribute's data holds, field by field in its words, the same for every attribute of its type (`Layout`) | attribute, type registry | schema, format |

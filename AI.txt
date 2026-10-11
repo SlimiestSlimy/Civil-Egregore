@@ -511,9 +511,8 @@ threads`.
   step, crossing, make, attribute edits, update are in actions.
 - RENAME, the user 2026-10-11: "run is a bad name for the atributes
   of an entity, a better name is \"atribute_list or array or
-  watever". To do after the actions crate: every `run` of an entity's
-  attribute blocks in entity_manager (code, docs, glossary) becomes
-  attribute list.
+  watever". DONE: "attribute list" in entity_manager's comments and
+  docs and the glossary (no identifier was named run).
 - RULES IN THE REGISTRY, the user 2026-10-11: "every rule has a master
   entity type or plane, regardless of what planes or entities the rule
   reads or writes". So a rule's row names its one master. Not built.

@@ -82,7 +82,7 @@ pub(crate) struct Bucket {
     tile_starts: [u32; SEARCH_TILES + 1],
     /// The entities, in the same order as `places`.
     stored: Vec<StoredEntity>,
-    /// Every entity's attributes, a run of blocks each, and garbage.
+    /// Every entity's attribute list, one after another, and garbage.
     attributes: Vec<AttributeBlock>,
     /// How many blocks of `attributes` belong to no entity.
     garbage: usize,
@@ -195,8 +195,8 @@ impl Bucket {
     }
 
     /// Gives the entity at `index` `header`, and `attributes` if given:
-    /// written over its run when they are as many blocks, else as a new
-    /// run at the end of the list.
+    /// written over its attribute list when they are as many blocks,
+    /// else as a new attribute list at the end of the bucket's blocks.
     fn rewrite(&mut self, index: usize, header: Header, attributes: Option<&[AttributeBlock]>) {
         let stored = &mut self.stored[index];
         stored.header = header;
@@ -217,8 +217,8 @@ impl Bucket {
     /// Sets the attribute of type `kind` of the entity standing on the
     /// cell at `place` to `blocks`, or removes it if they are none.
     /// Returns whether an entity stands there. One as long as it was
-    /// is written in place; any other makes the entity's run anew at
-    /// the end of the list.
+    /// is written in place; any other makes the entity's attribute
+    /// list anew at the end of the bucket's blocks.
     pub(crate) fn edit(&mut self, place: u16, kind: AttributeType, blocks: &[AttributeBlock]) -> bool {
         let Ok(index) = self.find(place) else {
             return false;
