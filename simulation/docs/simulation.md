@@ -253,7 +253,7 @@ enough, since what is queued for the entity lies in the order of the
 superchunk it left.
 
 **The move is one instruction, and one move.** A rule queues a move
-(`Turn::move_entity`; `actions::entities::step`) and does not know
+(`Write::MoveEntity`; `actions::entities::step`) and does not know
 whether the cell is over a border. If it is, the instruction is a
 crossing (`Instruction::cross_entity`: it lands where the entity
 stood, the cell it comes to beside it), and the author lands in both
@@ -391,9 +391,10 @@ an entity, an attribute, a member of it; a wake. It carries no
 compare. What it is held against -- the cell still as the rule saw
 it, the attribute still as seen, the entity there still -- is a
 compare queued before it, and the write is under that. The turn
-queues each as an instruction of its own -- a function an instruction
-(`Turn::compare_open`, `write_cell`, `write_wake`, `compare_close`
-and the rest, `turn/one_instruction.rs`) -- and what is made of
+queues each as an instruction of its own -- a compare opened, a
+write said whole, the compare closed
+(`Turn::compare_open`, `Turn::write` of a `Write`, `compare_close`,
+`turn/one_instruction.rs`) -- and what is made of
 several is not the simulation's but an action's
 (`../../actions/docs/actions.md`): a cell set is a compare of the
 cell and the write; an attribute set a compare of the attribute and,
@@ -498,7 +499,7 @@ it queued them; the rules here do not (a sheep's two ends are under
 opposite compares). Between ticks the world is written by one hand at
 a time (`World::write_cells`, `put_entity`), in order.
 
-A count may hang on a write: `Turn::write_cell` names one added if
+A count may hang on a write: `Write::Cell` names one added if
 the write is applied. These come back in the tick's report
 (`TickReport::counted_when_applied`), by numbers: whoever runs several
 rules on a turn gives each numbers of its own (`Turn::count_under`).
@@ -533,7 +534,7 @@ a cell, and the superchunk an instruction lands in checks as it applies
 it: a mover whose cell is taken stays where it stood, changed all the
 same; a new entity is not put. A rule need not look first -- few
 cells have an entity, and a step turned back costs less than looking
-every step -- but can: `Turn::occupied` reads the cells
+every step -- but can: `EntityReader::occupied` reads the cells
 entities stand on about a cell from the buckets, a word tile being a
 run of a bucket's places -- a few entities read, and only when asked:
 a step onto a taken cell is turned back as it is applied, asked or
@@ -800,8 +801,8 @@ all of them at once, the caller's thread doing the first part, and
 borrow what the caller holds (the arena, the outboxes) and the one
 `unsafe` rests on. A part's panic is raised to the caller after every
 part is done. The superchunks are not split among the threads
-beforehand: each thread claims the next one not yet claimed (`CLAIMED`,
-one at a time), in Morton order, until none is left -- so no thread
+beforehand: each thread claims the next one not yet claimed,
+one at a time, in Morton order, until none is left -- so no thread
 idles while another still has work. Split into a fixed run a thread, a
 thread whose run was light (the halos' empty rim, a thin flock) waited
 for the heaviest: 12 threads were 41% busy. What a superchunk's turn

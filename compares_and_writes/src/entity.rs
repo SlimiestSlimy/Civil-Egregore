@@ -4,24 +4,24 @@
 
 use coordinates::CellIndex;
 use entity_manager::Header;
-use simulation::Turn;
+use simulation::{Turn, Write};
 
 /// Queues an entity made as `header` says: of its type, on its cell,
 /// to wake at its wake.
 #[inline]
 pub fn make(turn: &mut Turn, header: Header) {
-    turn.make_entity(header);
+    turn.write(Write::MakeEntity(header));
 }
 
 /// Queues the entity the tick found on `from` moved to `to`, a cell
 /// of its superchunk or of another.
 #[inline]
 pub fn move_to(turn: &mut Turn, from: CellIndex, to: CellIndex) {
-    turn.move_entity(from, to);
+    turn.write(Write::MoveEntity { from, to });
 }
 
 /// Queues the entity the tick found on `at` removed.
 #[inline]
 pub fn remove(turn: &mut Turn, at: CellIndex) {
-    turn.remove_entity(at);
+    turn.write(Write::RemoveEntity(at));
 }

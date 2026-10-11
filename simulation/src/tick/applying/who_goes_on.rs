@@ -6,7 +6,6 @@
 //! and then sleeps (`docs/simulation.md`, "An act over a border").
 
 use super::Phase;
-use crate::turn::SLOTS;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
@@ -97,10 +96,10 @@ impl Phase<'_, '_> {
     /// another thread has what is waited for, and is given all this
     /// one kept: what waits on one another is one thread's, since
     /// passing it between two at every act costs more than the act.
-    pub(super) fn after_waiting(&self, waited_for: [Option<usize>; SLOTS], part: usize) -> Option<usize> {
+    pub(super) fn after_waiting(&self, waited_for: Vec<usize>, part: usize) -> Option<usize> {
         let anyones = self.let_go_on.len() - 1;
         let mut anothers = None;
-        for other in waited_for.into_iter().flatten() {
+        for other in waited_for {
             let whose = self.whose[other].load(Ordering::SeqCst);
             if whose != part && whose != anyones {
                 anothers = Some(whose);

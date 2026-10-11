@@ -68,7 +68,7 @@ impl Phase<'_, '_> {
                     continue;
                 }
                 let outbox = &self.outboxes[source as usize];
-                if from as usize == ACROSS && self.landed_in(source as usize, outbox.across[segment as usize].lands).0.contains(&Some(came_to)) {
+                if from as usize == ACROSS && self.landed_in(source as usize, outbox.across[segment as usize].lands).contains(&Some(came_to)) {
                     // It lands there already.
                     continue;
                 }
@@ -80,7 +80,7 @@ impl Phase<'_, '_> {
                     }
                     None => {
                         let (queue, segments) = (&outbox.queues[from as usize], &outbox.segments[from as usize]);
-                        let some = segments[segment as usize].instructions as usize..segments.get(segment as usize + 1).map_or(queue.len(), |next| next.instructions as usize);
+                        let some = segments[segment as usize].instructions as usize..segments.get(segment as usize + 1).map_or(queue.instructions.len(), |next| next.instructions as usize);
                         // Of that entity alone, it has nothing to do with the superchunk it was queued for any more.
                         let alone = queue.names_alone(some, stood);
                         repointed.insert((source, from, segment), Repointed { also: if alone { vec![came_to] } else { vec![left, came_to] }, arrived: Default::default() });
