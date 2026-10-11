@@ -7,12 +7,12 @@
 
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, put_entity, tick_sheep};
 use coordinates::CellCartesian;
-use entity_manager::{AttributeBlock, EntityRef, Header};
+use entity_manager::{EntityRef, Header, WholeAttribute};
 use entity_rules::sheep::{BIRTHS, DEATHS, EATEN, FAR, PATHS, SOUGHT, WOKEN, MEAL_TICKS, ROAM_TICKS, SHEEP, SHEEP_STATE, STARVE_TICKS, SheepState, STEP_JITTER, STEP_TICKS};
 
-/// The one block of a sheep next hungry at `hungry_at`, in the middle of nothing.
-fn hungry_at(hungry_at: u64) -> [AttributeBlock; 1] {
-    [AttributeBlock::holding(SHEEP_STATE, SheepState { hungry_at, ..SheepState::default() })]
+/// The state of a sheep next hungry at `hungry_at`, in the middle of nothing.
+fn hungry_at(hungry_at: u64) -> WholeAttribute {
+    WholeAttribute::holding(SHEEP_STATE, SheepState { hungry_at, ..SheepState::default() })
 }
 
 /// What `sheep` keeps: every sheep has its block.

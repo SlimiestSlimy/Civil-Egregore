@@ -61,7 +61,7 @@ fn the_layer_types_are_the_layers_and_wide_planes() {
 fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
     let mut random = utilities::rng::Rng::new(utilities::seed::counted());
     // The fewest blocks and the most, and every count between with a number drawn: any that fits between the two bytes.
-    for blocks in 1..=254 {
+    for blocks in 1..=type_registry::ATTRIBUTE_BLOCKS_MOST {
         let number = random.below(NUMBERS);
         let kind = AttributeType::of_blocks(number, blocks);
         assert_eq!((kind.blocks(), kind.number(), kind.0 & 0xFF, kind.0 >> 56, kind.is_an_attributes()), (Some(blocks), number, blocks as u64, 0x00, true));
@@ -79,13 +79,16 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
         assert_eq!((AttributeType(other).blocks(), AttributeType(other).is_an_attributes()), (Some(0), false));
     }
     let (kind, row) = (SHEEP_STATE.attribute_type(), named("sheep state").expect("registered"));
-    assert_eq!((kind.blocks(), row.number, row.width), (Some(1), kind.number(), data_words(1) as u32 * u64::BITS));
+    assert_eq!((kind.blocks(), row.number, row.width), (Some(4), kind.number(), data_words(4) as u32 * u64::BITS));
     assert_eq!(of_number(kind.number()), Some(row));
     for _ in 0..100 {
         let state = SheepState { hungry_at: random.draw(), lamb_due_at: random.draw(), grown_at: random.draw(), roaming_until: random.draw(), bearing_neighbour: random.draw() as u32, mother_neighbour: random.draw() as u32, roaming_neighbour: random.draw() as u32 };
         let mut data = [0; data_words(SheepState::BLOCKS)];
         state.write(&mut data);
         assert_eq!((SheepState::read(&data), data[6..].iter().sum::<u64>()), (state, 0));
+        // Each member is where the layout says: its bytes, read alone, are the field's.
+        let members: Vec<u64> = SheepState::MEMBERS.iter().map(|member| member.of(&data)).collect();
+        assert_eq!(members, [state.hungry_at, state.lamb_due_at, state.grown_at, state.roaming_until, u64::from(state.bearing_neighbour), u64::from(state.mother_neighbour), u64::from(state.roaming_neighbour)]);
         let (number, mut word) = (random.draw(), [0; data_words(<u64 as Layout>::BLOCKS)]);
         number.write(&mut word);
         assert_eq!((<u64 as Layout>::read(&word), word[1..].iter().sum::<u64>()), (number, 0));

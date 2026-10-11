@@ -128,12 +128,12 @@ impl SuperchunkEntities {
         true
     }
 
-    /// Writes `words` over those of the attribute whose type's number
-    /// is `number`, of the entity the tick found on `stood`, from the
-    /// word `offset` after its first on: whether it was written -- the
-    /// entity there, the attribute its, the words within it.
-    pub fn write_attribute_words_named(&mut self, stood: CellIndex, number: u64, offset: usize, words: &[u64]) -> bool {
-        self.now_on(stood).is_some_and(|now_on| self.chunks[now_on.chunk().place()].write_words(place(now_on), number, offset, words))
+    /// Writes the low `bytes` bytes of `value` over the member from
+    /// the byte `offset` of the attribute of type `kind`, of the
+    /// entity the tick found on `stood`: whether it was written --
+    /// the entity there, the attribute its, the member within it.
+    pub fn write_attribute_bytes_named(&mut self, stood: CellIndex, kind: AttributeType, offset: usize, bytes: usize, value: u64) -> bool {
+        self.now_on(stood).is_some_and(|now_on| self.chunks[now_on.chunk().place()].write_bytes(place(now_on), kind, offset, bytes, value))
     }
 
     /// Whether `at` is free for an entity to be made on: no entity

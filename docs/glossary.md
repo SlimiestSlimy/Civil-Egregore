@@ -166,8 +166,9 @@ what they always do and are not listed.
 | **header** | an entity's fixed part: its type, cell and wake tick (`Header`); it has no ID, its cell names it | entity, name in a tick | |
 | **entity type** | what an entity is -- a sheep -- from the one type namespace (`EntityType`) | layer type | kind (only as the field holding it) |
 | **attribute** | a typed value an entity has, one or more attribute blocks laid out as its type's layout says: added and removed as it goes (`Attribute`, `AttributeType`) | entity, attribute block, layout | property, component |
-| **attribute block** | 64 bytes of an attribute, eight words: the first block's first word the attribute's type, the rest its data (`AttributeBlock`) | attribute, block length | slot, cell (a cell is the world's) |
+| **attribute block** | 16 bytes of an attribute, two words; an attribute is 1 to 16 of them: the first block's first word the attribute's type, the rest its data (`AttributeBlock`) | attribute, block length | slot, cell (a cell is the world's) |
 | **layout** | what an attribute's data holds, field by field in its words, the same for every attribute of its type (`Layout`) | attribute, type registry | schema, format |
+| **member** | one field of an attribute's layout, by where its bytes lie: its first byte, counted from the attribute's, and how many it is, 1 to 8. What an instruction reads or writes of an attribute; what it means is its definer's (`Member`, `Layout::MEMBERS`) | attribute, layout, instruction | field (in prose of a layout it is the same thing), slot |
 | **block length** | how many blocks an attribute whose size varies takes, in its first block's second word | attribute block | size, count |
 | **entity store** | where entities are kept: a bucket a chunk, a wheel a superchunk (`entity_manager::Entities`) | bucket, wheel | |
 | **entity bucket** | one chunk's entities, sorted by cell, their attributes beside them | entity store | (the arena's bucket is a layer's) |
@@ -180,7 +181,7 @@ what they always do and are not listed.
 | **instruction** | one small thing a rule asks or does on a turn. The simulation's own are 24 bytes each, queued in the first phase and applied in the second: a compare, a write, or the end of a compare, of plane and plane, plane and entity, or entity and entity, and blind to what a rule means by them (`Instruction`); the `instructions` crate holds every other, each a function over a turn -- a cell asked or set, the cells about one, an entity committed, a step found -- which rules are written in and reach the simulation through, a module a subject | outbox, apply, rule | command, change, action |
 | **put** | the instruction placing an entity whole, header and attributes | instruction | spawn (making one new, by a put) |
 | **move** | the instruction stepping an entity to a cell, or setting its next wake, attributes as they are | step, instruction | |
-| **edit** | a write to an attribute: a word or two of it written, the attribute given or taken (`InstructionsApplied::edits`) | attribute, instruction | |
+| **edit** | a write to an attribute: a member of it written, the attribute given whole or taken (`InstructionsApplied::edits`) | attribute, instruction | |
 | **step** | an entity moving to one of its eight neighbours | move, wall | |
 | **crossing** | an entity moving to another superchunk: put there, and removed here once the tick's instructions are applied, if it was (`Simulation::settle_crossings`, each superchunk its own leavers) | step | |
 | **lost** | an entity put where no superchunk is hot | missed | |

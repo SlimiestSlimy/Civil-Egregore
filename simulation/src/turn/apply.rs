@@ -8,7 +8,7 @@ use super::instruction::{Instruction, Opcode, NO_COUNT};
 use bitplane_manager::{Superchunk, Write, WriteOp, WritesApplied};
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{attribute_seen, attribute_words, blocks_sum, find_attribute_numbered, Arrival, AttributeBlock, AttributeType, CollisionCells, EntityType, Header, InstructionsApplied, Put, SuperchunkEntities, BLOCK_WORDS};
+use entity_manager::{attribute_blocks, attribute_bytes, attribute_seen, blocks_sum, Arrival, AttributeType, CollisionCells, EntityType, Header, InstructionsApplied, Put, SuperchunkEntities};
 
 /// A superchunk's collision plane as its entities keep it while their
 /// instructions are applied: `layer` of `superchunk`, or none -- a
@@ -66,31 +66,19 @@ impl Default for Applied {
 /// `superchunk` and its `entities`: not where the cell is not hot,
 /// nor if the entity no longer stands anywhere.
 fn holds(instruction: &Instruction, at: CellIndex, superchunk: &mut Superchunk, entities: &SuperchunkEntities, collision: Option<LayerType>) -> bool {
-    let attribute = || {
-        let entity = entities.get_named(at)?;
-        Some(find_attribute_numbered(entity.attributes, u64::from(instruction.small)).map(|found| &entity.attributes[found]))
-    };
+    // The attribute of type `kind` of the entity: none within if it has none, none at all if it is gone.
+    let attribute = |kind: u64| Some(attribute_blocks(entities.get_named(at)?.attributes, AttributeType(kind)));
     match instruction.opcode {
         Opcode::CompareCell => superchunk.value_at(LayerType(instruction.first), at) == Some(u32::from(instruction.small)),
         Opcode::CompareCellFree => entities.free_for_a_new_entity(at, &Standing { superchunk, layer: collision }),
         Opcode::CompareEntity => entities.get_named(at).is_some_and(|entity| entity.header.kind.0 == instruction.first),
-        Opcode::CompareAttribute => attribute().is_some_and(|blocks| attribute_seen(blocks) == instruction.first),
-        Opcode::CompareAttributeWord => attribute().flatten().is_some_and(|blocks| attribute_words(blocks, instruction.word_offset()).next() == Some(instruction.first)),
-        Opcode::CompareAttributeWords => attribute().flatten().is_some_and(|blocks| attribute_words(blocks, instruction.word_offset()).take(2).eq([instruction.first, instruction.second])),
+        Opcode::CompareAttribute => attribute(instruction.second).is_some_and(|blocks| attribute_seen(blocks) == instruction.first),
+        Opcode::CompareAttributeMember => {
+            let (offset, bytes) = instruction.member();
+            attribute(instruction.first).flatten().and_then(|blocks| attribute_bytes(blocks, offset, bytes)) == Some(instruction.second)
+        }
         _ => unreachable!("no compare"),
     }
-}
-
-/// `blocks` blocks of the attribute of type `kind`, every word of its
-/// data 0: its type in its first word, and, its size varying, how
-/// many blocks it is in its second.
-fn empty_attribute(kind: AttributeType, blocks: usize) -> Vec<AttributeBlock> {
-    let mut empty = vec![AttributeBlock([0; BLOCK_WORDS]); blocks];
-    empty[0].0[0] = kind.0;
-    if kind.blocks().is_none() {
-        empty[0].0[1] = blocks as u64;
-    }
-    empty
 }
 
 impl Queue {
@@ -124,7 +112,7 @@ impl Queue {
             match instruction.opcode {
                 Opcode::CompareEnd => {}
                 Opcode::Count => applied.counted[instruction.first as usize] += 1,
-                Opcode::CompareCell | Opcode::CompareCellFree | Opcode::CompareEntity | Opcode::CompareAttribute | Opcode::CompareAttributeWord | Opcode::CompareAttributeWords => {
+                Opcode::CompareCell | Opcode::CompareCellFree | Opcode::CompareEntity | Opcode::CompareAttribute | Opcode::CompareAttributeMember => {
                     let gated = self.gated[compares];
                     compares += 1;
                     if holds(instruction, at, superchunk, entities, collision) {
@@ -182,11 +170,17 @@ impl Queue {
                     true => done.wakes += 1,
                     false => done.passed_over += 1,
                 },
-                Opcode::WriteAttributeWord | Opcode::WriteAttributeWords | Opcode::AddAttribute | Opcode::RemoveAttribute => {
+                Opcode::WriteAttributeMember | Opcode::WriteAttribute | Opcode::RemoveAttribute => {
                     let written = match instruction.opcode {
-                        Opcode::WriteAttributeWord => entities.write_attribute_words_named(at, u64::from(instruction.small), instruction.word_offset(), &[instruction.first]),
-                        Opcode::WriteAttributeWords => entities.write_attribute_words_named(at, u64::from(instruction.small), instruction.word_offset(), &[instruction.first, instruction.second]),
-                        Opcode::AddAttribute => entities.edit_named(at, AttributeType(instruction.first), &empty_attribute(AttributeType(instruction.first), instruction.second as usize)),
+                        Opcode::WriteAttributeMember => {
+                            let (offset, bytes) = instruction.member();
+                            entities.write_attribute_bytes_named(at, AttributeType(instruction.first), offset, bytes, instruction.second)
+                        }
+                        Opcode::WriteAttribute => {
+                            let (first, count) = ((instruction.second >> 32) as usize, instruction.second as u32 as usize);
+                            let attribute = &self.carried[first..first + count];
+                            entities.edit_named(at, attribute[0].kind(), attribute)
+                        }
                         _ => entities.edit_named(at, AttributeType(instruction.first), &[]),
                     };
                     match written {

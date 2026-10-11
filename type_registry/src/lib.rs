@@ -15,6 +15,6 @@ mod registry;
 pub mod transient_data;
 mod type_ids;
 
-pub use layouts::{data_words, Attribute, Layout, SheepState, BLOCK_WORDS};
+pub use layouts::{data_words, Attribute, Layout, Member, SheepState, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};
 pub use registry::*;
 pub use type_ids::{AttributeType, Bits16, Bits2, Bits4, Bits8, EntityType, LayerType, Supertype, Wide, Width, NUMBERS};

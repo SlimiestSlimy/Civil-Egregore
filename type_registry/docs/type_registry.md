@@ -15,7 +15,7 @@ Every ID is laid out alike, whatever it is of:
 |---|---|
 | the first (the highest) | its **supertype** (`Supertype`): `0x00` an attribute, `0x01` a layer or a wide plane, `0x02` an entity type |
 | the six between | its **number**: what its row in the registry is written with (`NUMBERS`, how many there are) |
-| the last (the lowest) | its **size**: bits a cell of a plane -- 1, 2, 4, 8 or 16; blocks of an attribute -- 1 to 254, all ones for a size that varies; 0 of an entity type, which holds nothing |
+| the last (the lowest) | its **size**: bits a cell of a plane -- 1, 2, 4, 8 or 16; blocks of an attribute -- 1 to 16, all ones for a size that varies; 0 of an entity type, which holds nothing |
 
 So what an ID is of, and how big the thing is, is read off the ID with
 no table, the same way for a plane as for an attribute; and a number
@@ -36,9 +36,12 @@ kept a world quietly wrong.
 In one table every row is beside the others, and the table is checked
 as the crate is built (`first_clash`, in a `const`): two rows sharing
 a number or a name, or a wide plane's cold planes reaching into another
-row's, stops the build, naming the row. A type is added as a row and
-nowhere else; `registered!` makes its constant from the same line, so
-no type is in use that is not listed.
+row's, stops the build, naming the row. A type is added as its
+constant and its row, both written by hand in `registry.rs`, the row
+made from the constant (`layer`, `wide`, `entity`, `attribute`) so
+the two cannot say different numbers. No macro makes them: the
+table is to be one a world is given as it runs -- types a mod
+brings, beside these -- and is written as plainly as that will be.
 
 ## Why its own crate
 
@@ -65,7 +68,7 @@ its own ("Layouts"). An entity type holds nothing itself: 0.
 
 ## Layouts
 
-An attribute is blocks of 64 bytes, its type in the first word
+An attribute is blocks of 16 bytes, its type in the first word
 (`../../entity_manager/docs/entity_manager.md`, "Attributes, a block
 each"). Its row says its layout beside its number: the type, in the
 code, of what its data holds -- a number (`u64`); all a sheep keeps
@@ -74,21 +77,32 @@ row makes is typed by its layout (`Attribute`), as a wide plane's is by
 its width, so an attribute is read as its fields and one layout is
 never read as another.
 
-A layout (`Layout`) says how many blocks it takes (`BLOCKS`) and how
-its fields lie in the data's words (`write`, `read`; `data_words`, how
-many words that is: all of its blocks' but the type): words, not
-bytes, so the same on any machine.
+A layout (`Layout`) says how many words of data it holds (`WORDS`;
+`BLOCKS`, the blocks that takes with its type before it, 16 at the
+most: `ATTRIBUTE_BLOCKS_MOST`, `ATTRIBUTE_WORDS_MOST`, `BLOCK_BYTES`)
+and how its fields lie in those words (`write`, `read`; `data_words`,
+how many words so many blocks hold: all but the type): words, not a
+machine's bytes, so the same on any machine.
+
+**Its members** (`MEMBERS`, each a `Member`): every field by where
+its bytes lie -- its first byte, counted from the attribute's first,
+and how many it is, 1 to 8, within one word (`Member::word`, a whole
+word of the data; `Member::within`, some bytes of one; `Member::of`,
+what it holds in the data). This is what an instruction is given to
+write a field: the layout is its definer's, and the simulation is
+told bytes (`../../simulation/docs/simulation.md`, "Instructions").
 
 **What one kind of entity keeps is one layout**, not an attribute a
-field: a block is 64 bytes whatever it holds, so five ticks kept as
-five attributes are five blocks, and kept as the fields of one
+field: every attribute begins with its type, eight bytes, and is
+walked over to find another, so five ticks kept as five attributes
+are five types and five steps, and kept as the fields of one
 (`SheepState`) they are one. A field that is a tick is 0 when the
 entity is not in the middle of that. An attribute of its own is for
 what only some entities of a kind carry and is big enough to be worth
 a block.
 
 **The ID's last byte is the blocks** (`AttributeType::of_blocks`,
-`blocks`): 1 to 254, all ones for a size that varies
+`blocks`): 1 to 16, all ones for a size that varies
 (`of_varying_size`). **An ID of another supertype is no attribute's**
 (`is_an_attributes`), nor is one whose last byte is 0 -- the namespace
 is one, everything's, so a layer's or an entity type's ID read as an

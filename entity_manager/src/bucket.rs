@@ -3,10 +3,13 @@
 //! one entity, enforced here (`docs/entity_manager.md`, "A chunk's
 //! bucket").
 
-use crate::attributes::{find_attribute, find_attribute_numbered, AttributeBlock, AttributeType, BLOCK_WORDS};
+use crate::attributes::{find_attribute, write_attribute_bytes, AttributeBlock, AttributeType};
 use crate::entity::{EntityRef, Header};
 use coordinates::CellIndex;
 use utilities::cache::prefetch;
+
+/// Attribute blocks in a cache line.
+const CACHE_LINE_BLOCKS: usize = 64 / crate::attributes::BLOCK_BYTES;
 
 /// The chunk is searched in 64x64 tiles of cells: a place is first
 /// narrowed to its tile, whose places are a run of the sorted list.
@@ -108,10 +111,19 @@ impl Bucket {
     }
 
     /// Asks memory ahead for the attributes of the entity standing on
-    /// `at`. This reads the entity, so ask for it first.
+    /// `at`: its first block, and the one a cache line on, blocks of
+    /// sixteen bytes lying over two lines as often as not. This reads
+    /// the entity, so ask for it first.
     pub(crate) fn prefetch_attributes(&self, at: CellIndex) {
-        if let Some(first) = self.stored.get(self.index_of(place(at)).0).and_then(|stored| self.attributes.get(stored.first as usize)) {
+        let Some(stored) = self.stored.get(self.index_of(place(at)).0) else {
+            return;
+        };
+        let (first, last) = (stored.first as usize, (stored.first as usize + stored.count as usize).saturating_sub(1));
+        if let Some(first) = self.attributes.get(first) {
             prefetch(first);
+        }
+        if let Some(farther) = self.attributes.get(last.min(first + CACHE_LINE_BLOCKS - 1)).filter(|_| last > first) {
+            prefetch(farther);
         }
     }
 
@@ -224,27 +236,20 @@ impl Bucket {
         true
     }
 
-    /// Writes `words` over those of the attribute whose type's number
-    /// is `number`, of the entity standing on the cell at `place`,
-    /// from the word `offset` after its first on: in place, nothing
+    /// Writes the low `bytes` bytes of `value` over the member from
+    /// the byte `offset` of the attribute of type `kind`, of the
+    /// entity standing on the cell at `place`: in place, nothing
     /// moved. Whether it was written -- not if nobody stands there,
-    /// it has no such attribute, or the words reach past it.
-    pub(crate) fn write_words(&mut self, place: u16, number: u64, offset: usize, words: &[u64]) -> bool {
+    /// it has no such attribute, or the member is not within it.
+    pub(crate) fn write_bytes(&mut self, place: u16, kind: AttributeType, offset: usize, bytes: usize, value: u64) -> bool {
         let Ok(index) = self.find(place) else {
             return false;
         };
         let (first, count) = (self.stored[index].first as usize, self.stored[index].count as usize);
-        let Some(found) = find_attribute_numbered(&self.attributes[first..first + count], number) else {
+        let Ok(found) = find_attribute(&self.attributes[first..first + count], kind) else {
             return false;
         };
-        if 1 + offset + words.len() > found.len() * BLOCK_WORDS {
-            return false;
-        }
-        for (nth, &word) in words.iter().enumerate() {
-            let at = 1 + offset + nth;
-            self.attributes[first + found.start + at / BLOCK_WORDS].0[at % BLOCK_WORDS] = word;
-        }
-        true
+        write_attribute_bytes(&mut self.attributes[first + found.start..first + found.end], offset, bytes, value)
     }
 
     /// Sets the tick the entity standing on the cell at `place` next

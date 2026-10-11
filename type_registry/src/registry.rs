@@ -1,5 +1,5 @@
-//! The table ([`REGISTRY`]): every type a world has, a row each, written
-//! once in [`registered!`] and checked as the crate is built
+//! The table ([`REGISTRY`]): every type a world has, its constant and
+//! its row written by hand, and checked as the crate is built
 //! ([`first_clash`]): `docs/type_registry.md`, "Why one table".
 
 use crate::layouts::{data_words, Attribute, Layout, SheepState};
@@ -54,61 +54,71 @@ impl Registered {
     }
 }
 
-/// Makes the registry: for each row, the constant the type is named by
-/// in the code -- a `LayerType`, a `Wide`, an `EntityType` or an
-/// `Attribute` -- and its row in [`REGISTRY`]. A wide plane's row
-/// says its width, an attribute's its layout.
-macro_rules! registered {
-    ($( $(#[$doc:meta])* $kind:ident $constant:ident $(<$width:ident>)? = $id:literal, $name:literal; )*) => {
-        $( registered!(@constant [$(#[$doc])*] $kind $constant $id $($width)?); )*
-
-        /// Every type a world has: the layers and wide planes of its
-        /// cells, the types of its entities and their attributes. In
-        /// the order written, which is the order of their numbers.
-        pub const REGISTRY: &[Registered] = &[ $( registered!(@row $kind $name $id $($width)?) ),* ];
-    };
-    (@constant [$(#[$doc:meta])*] layer $constant:ident $id:literal) => { $(#[$doc])* pub const $constant: LayerType = LayerType::of_a_bit($id); };
-    (@constant [$(#[$doc:meta])*] wide $constant:ident $id:literal $width:ident) => { $(#[$doc])* pub const $constant: Wide<$width> = Wide::new($id); };
-    (@constant [$(#[$doc:meta])*] entity $constant:ident $id:literal) => { $(#[$doc])* pub const $constant: EntityType = EntityType::of($id); };
-    (@constant [$(#[$doc:meta])*] attribute $constant:ident $id:literal $layout:ident) => { $(#[$doc])* pub const $constant: Attribute<$layout> = Attribute::new($id); };
-    (@row layer $name:literal $id:literal) => { Registered { name: $name, kind: Kind::Layer, number: $id, width: 1 } };
-    (@row wide $name:literal $id:literal $width:ident) => { Registered { name: $name, kind: Kind::WidePlane, number: $id, width: <$width as Width>::BITS } };
-    (@row entity $name:literal $id:literal) => { Registered { name: $name, kind: Kind::EntityType, number: $id, width: 0 } };
-    (@row attribute $name:literal $id:literal $layout:ident) => { Registered { name: $name, kind: Kind::Attribute, number: $id, width: data_words(<$layout as Layout>::BLOCKS) as u32 * u64::BITS } };
+/// A row of a layer of a bit a cell.
+const fn layer(name: &'static str, layer_type: LayerType) -> Registered {
+    Registered { name, kind: Kind::Layer, number: layer_type.number(), width: 1 }
 }
 
-registered! {
-    /// Grass: what a superchunk is generated with in patches, where its
-    /// ground is dry, and the cells' rules grow and the sheep eat. A cell
-    /// without it is dirt, which has no layer.
-    layer GRASS = 2, "grass";
-    /// The cells a tree stands on: what a superchunk is generated with in
-    /// patches of their own, and the trees' rule ages, fells and seeds.
-    layer TREE = 3, "tree";
-    /// A tree's stage, 0 to [`OLDEST_TREE_STAGE`]: a plane four bits a cell
-    /// wide, kept cold as the four layer types from 4 on, a bit each.
-    wide TREE_STAGE<Bits4> = 4, "tree stage";
-    /// A wall between a cell and the cell to its east: the layer of the
-    /// cells that keep one.
-    layer WALL_EAST = 8, "wall east";
-    /// ...to its south.
-    layer WALL_SOUTH = 9, "wall south";
-    /// The collision plane: the cells something stands on that bars
-    /// stepping there -- a tree. 0 is free, 1 is taken: what a
-    /// movement check asks, whatever the thing is. Who puts such a
-    /// thing sets its cell, and clears it when the thing goes.
-    layer COLLISION = 10, "collision";
-    /// The sheep's type.
-    entity SHEEP = 16, "sheep";
-    /// All a sheep keeps, in one block: when it is next hungry, and
-    /// what it is in the middle of -- carrying a lamb, bearing it,
-    /// growing up, leaving thin pasture.
-    attribute SHEEP_STATE<SheepState> = 17, "sheep state";
-    /// The cells under water, however deep: what a rule asks. How deep is
-    /// kept a map a chunk with water, in the superchunk's image
-    /// (`chunk_storage::SuperchunkImage::depth`).
-    layer WET = 24, "wet";
+/// A row of a wide plane.
+const fn wide<W: Width>(name: &'static str, plane: Wide<W>) -> Registered {
+    Registered { name, kind: Kind::WidePlane, number: plane.layer_type().number(), width: W::BITS }
 }
+
+/// A row of an entity type.
+const fn entity(name: &'static str, entity_type: EntityType) -> Registered {
+    Registered { name, kind: Kind::EntityType, number: entity_type.number(), width: 0 }
+}
+
+/// A row of an attribute.
+const fn attribute<L: Layout>(name: &'static str, attribute: Attribute<L>) -> Registered {
+    Registered { name, kind: Kind::Attribute, number: attribute.attribute_type().number(), width: data_words(L::BLOCKS) as u32 * u64::BITS }
+}
+
+/// Grass: what a superchunk is generated with in patches, where its
+/// ground is dry, and the cells' rules grow and the sheep eat. A cell
+/// without it is dirt, which has no layer.
+pub const GRASS: LayerType = LayerType::of_a_bit(2);
+/// The cells a tree stands on: what a superchunk is generated with in
+/// patches of their own, and the trees' rule ages, fells and seeds.
+pub const TREE: LayerType = LayerType::of_a_bit(3);
+/// A tree's stage, 0 to [`OLDEST_TREE_STAGE`]: a plane four bits a cell
+/// wide, kept cold as the four layer types from 4 on, a bit each.
+pub const TREE_STAGE: Wide<Bits4> = Wide::new(4);
+/// A wall between a cell and the cell to its east: the layer of the
+/// cells that keep one.
+pub const WALL_EAST: LayerType = LayerType::of_a_bit(8);
+/// ...to its south.
+pub const WALL_SOUTH: LayerType = LayerType::of_a_bit(9);
+/// The collision plane: the cells something stands on that bars
+/// stepping there -- a tree. 0 is free, 1 is taken: what a
+/// movement check asks, whatever the thing is. Who puts such a
+/// thing sets its cell, and clears it when the thing goes.
+pub const COLLISION: LayerType = LayerType::of_a_bit(10);
+/// The sheep's type.
+pub const SHEEP: EntityType = EntityType::of(16);
+/// All a sheep keeps: when it is next hungry, and what it is in the
+/// middle of -- carrying a lamb, bearing it, growing up, leaving thin
+/// pasture.
+pub const SHEEP_STATE: Attribute<SheepState> = Attribute::new(17);
+/// The cells under water, however deep: what a rule asks. How deep is
+/// kept a map a chunk with water, in the superchunk's image
+/// (`chunk_storage::SuperchunkImage::depth`).
+pub const WET: LayerType = LayerType::of_a_bit(24);
+
+/// Every type a world has: the layers and wide planes of its cells,
+/// the types of its entities and their attributes, a row each beside
+/// its constant above. In the order of their numbers.
+pub const REGISTRY: &[Registered] = &[
+    layer("grass", GRASS),
+    layer("tree", TREE),
+    wide("tree stage", TREE_STAGE),
+    layer("wall east", WALL_EAST),
+    layer("wall south", WALL_SOUTH),
+    layer("collision", COLLISION),
+    entity("sheep", SHEEP),
+    attribute("sheep state", SHEEP_STATE),
+    layer("wet", WET),
+];
 
 /// The oldest stage a tree has: sixteen in all.
 pub const OLDEST_TREE_STAGE: u32 = TREE_STAGE.most();

@@ -7,7 +7,7 @@ use instructions::entities::EntitiesBetweenTicks;
 pub use instructions::entity_types::{SheepState, SHEEP, SHEEP_STATE};
 use instructions::simulation_time::SimulationTime;
 use instructions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
-use instructions::{area, cells, compare, entities, place_counted, this_tick, walking, AttributeBlock, CellCartesian, CellIndex, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
+use instructions::{WholeAttribute, area, cells, compare, entities, place_counted, this_tick, walking, CellCartesian, CellIndex, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
 /// Every time below is said in simulation time, and is ticks only
@@ -136,7 +136,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
                 let wake = next_step(turn);
                 let way = around::way_of(at, beside);
                 let born = SheepState { hungry_at: now + MEAL_TICKS, grown_at: now + LAMB_TICKS, mother_neighbour: around::way_of(beside, at) + 1, ..SheepState::default() };
-                entities::spawn(turn, SHEEP, beside, wake, &[AttributeBlock::holding(SHEEP_STATE, born)]);
+                entities::spawn(turn, SHEEP, beside, wake, &WholeAttribute::holding(SHEEP_STATE, born));
                 state.bearing_neighbour = way + 1;
                 bearing = true;
             }
@@ -255,6 +255,6 @@ pub fn flock(entities: &mut EntitiesBetweenTicks, superchunk: SuperchunkIndex, c
             continue;
         }
         let header = Header { kind: SHEEP, at: at.into(), wake: now + random.below(STEP_TICKS) };
-        put += usize::from(entities.put(header, &[AttributeBlock::holding(SHEEP_STATE, SheepState { hungry_at: now + random.below(MEAL_TICKS), ..SheepState::default() })]));
+        put += usize::from(entities.put(header, &WholeAttribute::holding(SHEEP_STATE, SheepState { hungry_at: now + random.below(MEAL_TICKS), ..SheepState::default() })));
     }
 }

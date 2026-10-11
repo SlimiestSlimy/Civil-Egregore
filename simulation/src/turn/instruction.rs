@@ -7,7 +7,7 @@
 
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, SuperchunkIndex};
-use entity_manager::AttributeType;
+use entity_manager::{AttributeType, Member};
 
 /// What an instruction does: its first two bytes. The high byte is
 /// its family -- 0 neither compares nor writes the world, 1 plane and
@@ -45,23 +45,23 @@ pub(crate) enum Opcode {
     /// attributes the blocks carried beside the queue from the one
     /// `second`'s high half numbers, as many as its low half and one.
     CrossEntity = 0x0204,
-    /// Holds if the attribute numbered `small`, of the entity the
+    /// Holds if the attribute of the type `second`, of the entity the
     /// tick found on the cell, sums to `first` -- or it has none, of
     /// `NO_ATTRIBUTE`.
     CompareAttribute = 0x0300,
-    /// Holds if the word of that attribute at the offset is `first`.
-    CompareAttributeWord = 0x0301,
-    /// Holds if the two words from the offset are `first` and `second`.
-    CompareAttributeWords = 0x0302,
-    /// Writes `first` to the word of that attribute at the offset.
-    WriteAttributeWord = 0x0303,
-    /// Writes `first` and `second` to the two words from the offset:
-    /// sixteen bytes, the most one instruction writes of an attribute.
-    WriteAttributeWords = 0x0304,
-    /// Gives the entity the attribute of the type `first`, `second`
-    /// blocks of it, every word of its data 0 -- in place of the one
-    /// it has, if it has one.
-    AddAttribute = 0x0305,
+    /// Holds if a member of the attribute of the type `first` holds
+    /// `second`: the member `small` says, its first byte in its low
+    /// byte, how many bytes it is in its high.
+    CompareAttributeMember = 0x0301,
+    /// Writes `second` to a member of the attribute of the type
+    /// `first`, the member said likewise: its bytes and no more, eight
+    /// at the most.
+    WriteAttributeMember = 0x0303,
+    /// Gives the entity an attribute whole, in place of the one of
+    /// its type if it has one: the blocks carried beside the queue
+    /// from the one `second`'s high half numbers, as many as its low
+    /// half. A write in bulk.
+    WriteAttribute = 0x0304,
     /// Takes the attribute of the type `first` from the entity.
     RemoveAttribute = 0x0306,
     /// Sets the tick the entity next wakes at to `first`: a write to
@@ -72,13 +72,8 @@ pub(crate) enum Opcode {
 /// What a write counts under when it counts nothing.
 pub(crate) const NO_COUNT: u64 = u64::MAX;
 /// The bits of an instruction's `place` that are the cell's place in
-/// its superchunk; those above are a word's offset in an attribute.
+/// its superchunk.
 const PLACE_BITS: u32 = 20;
-/// The most an attribute's number may be for an instruction to name
-/// it: it has sixteen bits for it.
-pub(crate) const ATTRIBUTE_NUMBER_MOST: u64 = u16::MAX as u64;
-/// The most a word's offset in an attribute may be.
-pub(crate) const WORD_OFFSET_MOST: usize = (1 << (u32::BITS - PLACE_BITS)) - 1;
 
 /// One instruction (the module's docs): its opcode, sixteen bits and
 /// thirty-two beside it, and two words -- each what the opcode says.
@@ -87,10 +82,9 @@ pub(crate) const WORD_OFFSET_MOST: usize = (1 << (u32::BITS - PLACE_BITS)) - 1;
 pub(crate) struct Instruction {
     /// What it does.
     pub(crate) opcode: Opcode,
-    /// A cell's number, or an attribute's.
+    /// A cell's number, or which member of an attribute.
     pub(crate) small: u16,
-    /// The cell's place in the superchunk it lands in, and, above
-    /// that, a word's offset in an attribute.
+    /// The cell's place in the superchunk it lands in.
     place: u32,
     /// The first word.
     pub(crate) first: u64,
@@ -105,13 +99,6 @@ impl Instruction {
     /// One of `opcode` on the cell `at`, all else 0.
     fn on(opcode: Opcode, at: CellIndex) -> Self {
         Self { opcode, small: 0, place: at.place_in_superchunk() as u32, first: 0, second: 0 }
-    }
-
-    /// One of `opcode` of the words from `offset` of the attribute
-    /// `kind` of the entity on `at`.
-    fn of_attribute(opcode: Opcode, at: CellIndex, kind: AttributeType, offset: usize) -> Self {
-        assert!(kind.number() <= ATTRIBUTE_NUMBER_MOST && offset <= WORD_OFFSET_MOST, "attribute {} at word {offset}: past what an instruction names", kind.number());
-        Self { small: kind.number() as u16, place: at.place_in_superchunk() as u32 | (offset as u32) << PLACE_BITS, ..Self::on(opcode, at) }
     }
 
     /// The end of a compare.
@@ -170,33 +157,25 @@ impl Instruction {
 
     /// Whether the attribute `kind` of the entity on `at` sums to `seen`.
     pub(crate) fn compare_attribute(at: CellIndex, kind: AttributeType, seen: u64) -> Self {
-        Self { first: seen, ..Self::of_attribute(Opcode::CompareAttribute, at, kind, 0) }
+        Self { first: seen, second: kind.0, ..Self::on(Opcode::CompareAttribute, at) }
     }
 
-    /// Whether the words from `offset` of the attribute `kind` of the
-    /// entity on `at` are `words`: one or two.
-    pub(crate) fn compare_attribute_words(at: CellIndex, kind: AttributeType, offset: usize, words: &[u64]) -> Self {
-        Self::of_words(Opcode::CompareAttributeWord, Opcode::CompareAttributeWords, at, kind, offset, words)
+    /// Whether `member` of the attribute `kind` of the entity on `at`
+    /// holds `seen`.
+    pub(crate) fn compare_attribute_member(at: CellIndex, kind: AttributeType, member: Member, seen: u64) -> Self {
+        Self { small: u16::from(member.offset) | u16::from(member.bytes) << 8, first: kind.0, second: seen, ..Self::on(Opcode::CompareAttributeMember, at) }
     }
 
-    /// `words`, one or two, written from `offset` of the attribute
-    /// `kind` of the entity on `at`.
-    pub(crate) fn write_attribute_words(at: CellIndex, kind: AttributeType, offset: usize, words: &[u64]) -> Self {
-        Self::of_words(Opcode::WriteAttributeWord, Opcode::WriteAttributeWords, at, kind, offset, words)
+    /// `value` written to `member` of the attribute `kind` of the
+    /// entity on `at`.
+    pub(crate) fn write_attribute_member(at: CellIndex, kind: AttributeType, member: Member, value: u64) -> Self {
+        Self { opcode: Opcode::WriteAttributeMember, ..Self::compare_attribute_member(at, kind, member, value) }
     }
 
-    /// One of the opcode `of_one` or `of_two`, as `words` is one or two.
-    fn of_words(of_one: Opcode, of_two: Opcode, at: CellIndex, kind: AttributeType, offset: usize, words: &[u64]) -> Self {
-        match *words {
-            [first] => Self { first, ..Self::of_attribute(of_one, at, kind, offset) },
-            [first, second] => Self { first, second, ..Self::of_attribute(of_two, at, kind, offset) },
-            _ => panic!("{} words in one instruction: it has room for two", words.len()),
-        }
-    }
-
-    /// The entity on `at` given `blocks` blocks of the attribute `kind`.
-    pub(crate) fn add_attribute(at: CellIndex, kind: AttributeType, blocks: usize) -> Self {
-        Self { first: kind.0, second: blocks as u64, ..Self::on(Opcode::AddAttribute, at) }
+    /// The entity on `at` given the attribute that is the `count`
+    /// blocks carried from `carried_first` on.
+    pub(crate) fn write_attribute(at: CellIndex, carried_first: u32, count: u32) -> Self {
+        Self { second: u64::from(carried_first) << 32 | u64::from(count), ..Self::on(Opcode::WriteAttribute, at) }
     }
 
     /// The attribute `kind` taken from the entity on `at`.
@@ -212,7 +191,7 @@ impl Instruction {
     /// The cell it is of, in `superchunk`, which it lands in.
     #[inline]
     pub(crate) fn at(&self, superchunk: SuperchunkIndex) -> CellIndex {
-        CellIndex(superchunk.top_left().0 | u64::from(self.place & ((1 << PLACE_BITS) - 1)))
+        CellIndex(superchunk.top_left().0 | u64::from(self.place))
     }
 
     /// The cell of `superchunk` its first word is the place of.
@@ -221,10 +200,11 @@ impl Instruction {
         CellIndex(superchunk.top_left().0 | self.first)
     }
 
-    /// The offset of the word of an attribute it is of.
+    /// The member of an attribute it is of: its first byte, and how
+    /// many bytes it is.
     #[inline]
-    pub(crate) fn word_offset(&self) -> usize {
-        (self.place >> PLACE_BITS) as usize
+    pub(crate) fn member(&self) -> (usize, usize) {
+        (usize::from(self.small & 0xFF), usize::from(self.small >> 8))
     }
 
     /// Whether it writes the world -- a plane, an entity, the wheel:
@@ -237,6 +217,6 @@ impl Instruction {
     /// Whether it is a compare: what follows it is under it.
     #[inline]
     pub(crate) fn is_a_compare(&self) -> bool {
-        matches!(self.opcode, Opcode::CompareCell | Opcode::CompareCellFree | Opcode::CompareEntity | Opcode::CompareAttribute | Opcode::CompareAttributeWord | Opcode::CompareAttributeWords)
+        matches!(self.opcode, Opcode::CompareCell | Opcode::CompareCellFree | Opcode::CompareEntity | Opcode::CompareAttribute | Opcode::CompareAttributeMember)
     }
 }
