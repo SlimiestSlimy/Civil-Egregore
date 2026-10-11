@@ -88,7 +88,8 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
                 let at = entity.header.at;
                 if at == from {
                     // The neighbour up and to the east is held, the others are free.
-                    assert_eq!(walking::around_steppable(turn, at), around::ALL & !(1 << around::bit_of(at, cell(41, 29))));
+                    let about = around::about(at);
+                    assert_eq!(walking::around_steppable(turn, &about), about.ring().without(about.towards(around::way_of(at, cell(41, 29)))));
                 }
                 let next = walking::step_to(turn, at, to, &area::layer(turn, STONE, at).hot).expect("a way round");
                 assert_eq!(turn.holds(COLLISION, next), Ok(false), "a step onto what the collision plane holds");
@@ -164,11 +165,13 @@ fn walls_of_the_terrain_bar_steps() {
                 let at = entity.header.at;
                 if at == from {
                     // The three cells east of it are behind the cliff.
-                    assert_eq!(walking::around_unwalled(turn, at), around::ALL & !(1 << 2 | 1 << 5 | 1 << 8));
+                    let about = around::about(at);
+                    assert_eq!(walking::around_unwalled(turn, &about), about.nine().without(about.towards(2) | about.towards(5) | about.towards(8)));
                 }
                 let passable = area::layer(turn, STONE, at).hot;
                 let next = walking::step_to(turn, at, to, &passable).expect("a way through the gap");
-                assert!(walking::around_unwalled(turn, at) >> around::bit_of(at, next) & 1 == 1, "a step through a wall");
+                let about = around::about(at);
+                assert!(!(walking::around_unwalled(turn, &about) & about.towards(around::way_of(at, next))).is_empty(), "a step through a wall");
                 turn.step(&entity.header, next, now + 1);
             }
             0
@@ -205,11 +208,11 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
         for y in 1..63 {
             for x in 1..63 {
                 let at = cell(x, y);
-                let (open, walls) = (walking::around_unwalled(turn, at), walking::area_walls(turn, at));
+                let (open, walls) = (walking::around_unwalled(turn, &around::about(at)), walking::area_walls(turn, at));
                 let centre = pathfinding::Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
                 for bit in (0..9).filter(|&bit| bit != 4) {
                     let (dx, dy) = (bit as i8 % 3 - 1, bit as i8 / 3 - 1);
-                    assert_eq!(open >> bit & 1 == 1, !walls.bars_step(centre, dx, dy), "({x}, {y}) by ({dx}, {dy})");
+                    assert_eq!(!(open & around::about(at).towards(bit)).is_empty(), !walls.bars_step(centre, dx, dy), "({x}, {y}) by ({dx}, {dy})");
                     *checked.lock().unwrap() += 1;
                 }
             }

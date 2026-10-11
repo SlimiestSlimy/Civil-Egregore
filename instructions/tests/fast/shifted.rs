@@ -17,7 +17,7 @@ use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{AttributeBlock, Entities, EntityId, Header, InstructionsApplied};
-use instructions::around::{self, CENTRE, RING};
+use instructions::around::{self, About, Cells};
 use instructions::{cells, compare, Turn};
 use simulation::Simulation;
 use std::collections::BTreeSet;
@@ -55,6 +55,16 @@ fn standing<'a>(turn: &Turn<'a>, at: CellIndex) -> Option<entity_manager::Entity
     turn.entities_in(at.chunk())?.find(|entity| entity.header.at == at)
 }
 
+/// The way to one of `choices`, cells `about` a cell, drawn from
+/// `drawn` by the ways' own order -- not by how the cells lie in their
+/// tiles, as `around::pick` draws: here the same draw must come to the
+/// same neighbour wherever the tiles' edges fall, the draws being what
+/// the test takes out of what it compares.
+fn way_drawn(drawn: &mut Rng, about: &About, choices: Cells) -> Option<u32> {
+    let ways: Vec<u32> = (0..around::WAYS).filter(|&way| !(choices & about.towards(way)).is_empty()).collect();
+    (!ways.is_empty()).then(|| ways[drawn.below(ways.len() as u64) as usize])
+}
+
 /// One superchunk's turn of the flock's rule: each walker woken may
 /// die; eats the stone under it, counting the meal, or lays one beside
 /// it; counts on a neighbour too; may make another beside it; and
@@ -66,31 +76,32 @@ fn flock(turn: &mut Turn, seed: u64) -> u64 {
         let (header, at) = (entity.header, entity.header.at);
         turn.seeing_to(at);
         let mut drawn = drawn_for(seed, now, header.id);
-        let stone = around::layer(turn, STONE, at);
-        let (open, taken) = (stone.hot & RING, around::occupied(turn, at) & RING);
+        let about = around::about(at);
+        let stone = around::layer(turn, STONE, &about);
+        let (open, taken) = (stone.hot & about.ring(), around::layer(turn, COLLISION, &about).set & about.ring());
         let chance = drawn.below(100);
         if chance < 4 {
             turn.remove(&header);
             continue;
         }
         let meals = entity.attribute(HUNGRY_AT);
-        if stone.set & CENTRE != 0 {
+        if !(stone.set & about.centre()).is_empty() {
             // The meal is counted only if the stone is there still: another on its way here may not eat it, but one counting on this one may.
             compare::entities_from_here(turn, compare::holds(STONE, at));
             turn.set_attribute(&header, HUNGRY_AT, meals, meals.unwrap_or(0) + 1);
             compare::entities_as_ever(turn);
             cells::clear(turn, STONE, at);
-        } else if let Some(beside) = around::pick(&mut drawn, open & !stone.set).filter(|_| chance < 40).and_then(|bit| around::cell(at, bit)) {
+        } else if let Some(beside) = way_drawn(&mut drawn, &about, open.without(stone.set)).filter(|_| chance < 40).and_then(|bit| around::cell(at, bit)) {
             cells::set(turn, STONE, beside);
         }
-        if let Some(other) = around::pick(&mut drawn, taken).and_then(|bit| around::cell(at, bit)).and_then(|beside| standing(turn, beside)) {
+        if let Some(other) = way_drawn(&mut drawn, &about, taken).and_then(|bit| around::cell(at, bit)).and_then(|beside| standing(turn, beside)) {
             let seen = other.attribute(HUNGRY_AT);
             turn.set_attribute(&other.header, HUNGRY_AT, seen, seen.unwrap_or(0) + 1000);
         }
-        if let Some(beside) = around::pick(&mut drawn, open & !taken).filter(|_| chance < 9).and_then(|bit| around::cell(at, bit)) {
+        if let Some(beside) = way_drawn(&mut drawn, &about, open.without(taken)).filter(|_| chance < 9).and_then(|bit| around::cell(at, bit)) {
             turn.put(Header { id: EntityId(drawn.draw()), kind: WALKER, at: beside, wake: now + 1 + drawn.below(3) }, &[]);
         }
-        let to = around::pick(&mut drawn, open).and_then(|bit| around::cell(at, bit)).unwrap_or(at);
+        let to = way_drawn(&mut drawn, &about, open).and_then(|bit| around::cell(at, bit)).unwrap_or(at);
         turn.step(&header, to, now + 1 + drawn.below(3));
     }
     0

@@ -128,6 +128,13 @@ impl<'a> Turn<'a> {
         self.reader.small_tiles(types, first, wanted)
     }
 
+    /// The words of the aligned tile `side` cells a side (8 to a
+    /// chunk's) that `cell` is in, of `layer_type`, as the tick found
+    /// them, in Morton order: none if its bitmap is not hot.
+    pub fn aligned_tile(&self, layer_type: LayerType, cell: CellIndex, side: u32) -> Option<&[u64]> {
+        self.reader.aligned_tile(layer_type, cell, side)
+    }
+
     /// Whether `layer_type` holds at `cell`, as the tick found it.
     pub fn holds(&self, layer_type: LayerType, cell: CellIndex) -> Result<bool, NotHot> {
         self.reader.holds(layer_type, cell)

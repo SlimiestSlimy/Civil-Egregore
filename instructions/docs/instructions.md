@@ -57,14 +57,19 @@ cells entities stand on.
 
 ## The shapes
 
-**Nine bits** (`around`): the 3x3 cells around a cell, row by row from
-the top left, the cell `(x, y)` -- each 0 to 2, the cell itself at
-`(1, 1)` -- at bit `3 * y + x`. A set of neighbours is a mask, narrowed
-with `&`: those with grass, those no entity stands on, those in the
-world hot. A neighbour chosen is a bit's index, turned into a cell only
-when it is stepped to. They are read at once (`around::layer`), off
-the small tiles about the cell ("The small tiles about a cell"); no
-cell is looked at alone.
+**The cells about a cell** (`around`): it and its eight neighbours, a
+set of them a word of bits (`Cells`) in Morton order -- as they lie in
+the small tiles of their bitmaps ("The small tiles about a cell"),
+nothing turned into rows. What is about a cell is asked once
+(`around::about`), and every set made with it: the cell
+(`About::centre`), its neighbours (`ring`), both (`nine`), the one a
+way off (`towards`). A layer's is read at once (`around::layer`); sets
+are narrowed with `&`, joined with `|`, taken from with `without`, and
+asked `is_empty`: those with grass, those nothing stands on, those in
+the world hot. A neighbour is named by its **way** -- 0 to 8, row by
+row from the top left, the cell itself `HERE` (4) -- only when one is
+drawn or kept: a way is the same wherever the cell is, where a set's
+bits go by how the tiles fall about it.
 
 **An area** (`area`): the 16x16 cells about a cell, a row a `u16`, the
 cell itself at `AREA_CENTRE` each way -- what `../../pathfinding/`
@@ -209,6 +214,11 @@ Chance is another matter, and meant to be: each superchunk draws from
 a random stream of its own -- the sampling of cells, a sheep's lot, a
 new entity's ID -- so what is drawn is another draw where the borders
 fall otherwise. What must not see a border is what is not chance.
+The same of a neighbour drawn (`around::pick`): which one a draw comes
+to goes by how the cells about a cell lie in their small tiles, in
+Morton order; each is as likely wherever the tiles fall. The test's
+walkers draw by the ways' own order instead, in the test's file, as
+they draw from its generator.
 
 Not so yet: a compare must still be in the superchunk of what it lets
 be written.
@@ -240,12 +250,14 @@ and the put is then refused -- nothing is put elsewhere for it. A rule
 that must not lose it asks the tick after whether it stands there
 (`entities::stands_beside`), and puts it again if not.
 
-**The cells beside it** (`around`): the 3x3 about a cell as nine bits,
-read at once (`around::layer`); sets of neighbours are
-masks narrowed with `&`, one drawn with `pick` or `prefer`.
-`around::occupied` gives those entities stand on, `free_beside` one that
-none does -- for what must have its cell, as a newborn; a step need not
-ask.
+**The cells beside it** (`around`): sets of the cells about a cell,
+read at once (`around::layer`), narrowed with `&`; the way to one
+drawn with `pick` or `prefer`, a way a cell with `around::cell`. A
+draw falls on any of those chosen among as likely as on another; which
+one a given draw comes to goes by how the cells lie in their tiles --
+as the lot itself goes by the superchunk. What must have its cell, as
+a newborn, is put on one of those open to a step: the collision plane
+holds what stands there.
 
 **The area about it, and the way**: `area::layer` gives 16x16 cells of a
 layer as masks, `Area::count` how many are set, `area::occupied` the
@@ -259,12 +271,14 @@ one step a wake.
 
 **Walls**: the terrain's (`../../worldgen/`), two layers -- east and
 south -- read as any other; a diagonal is barred unless both ways round
-it are open. `around_unwalled(turn, at)` is the neighbours of a cell no wall is before,
-nine bits to narrow a step's choices by; `area_walls(turn, centre)` the
+it are open. `around_unwalled(turn, about)` is the cells about a cell no wall is before,
+a set to narrow a step's choices by -- the walls' tiles asked a cell at
+a time as they lie, and not at all where they hold nothing; `area_walls(turn, centre)` the
 walls of the area, which `step_towards` and `step_to` go round by
 themselves. Where the wall layers are not hot, nothing bars.
-`around_steppable(turn, at)` is those of them the collision plane does
-not hold: the plane is asked first, and a cell hemmed in reads no wall.
+`around_steppable(turn, about)` is the neighbours the collision plane
+does not hold and no wall bars: the plane is asked first -- the ring
+ANDed with its tiles -- and a cell hemmed in reads no wall.
 
 **What stands in the way**: the collision plane (`COLLISION`), a bit a
 cell -- 1 where something stands that bars stepping there, a tree or
@@ -309,35 +323,38 @@ what is carried.
 
 ## Masks
 
-A square of cells as bits (`mask::Mask`), its side a power of two from
-4 to 1,024 -- an entity's reach: the general form of what `around` and
-`area` are at 3 and 16. Sets of cells are masks put together with `&`,
+An aligned tile's cells as bits (`mask::Mask`), its side a power of
+two from 4 to 1,024 -- a small tile to a superchunk, an entity's
+reach -- in Morton order: the cell `(x, y)` from the tile's top left at
+the bit whose index is the two interleaved, which is how the tile lies
+in its bitmap, one run of bits. A mask of 8 is a word, of 16 four, of
+256 a chunk's bitmap. Sets of cells are masks put together with `&`,
 `|` and `!`, and a shape is a mask like any other: `Mask::disc`, the
-one made so far. A row is a run of words, cell `(x, y)` from the mask's top left at bit
-`x` of row `y`. A rule keeps its masks as room and reads into them;
-none is made a read: the largest is 128 KiB.
+one made so far. A mask stands for the tile of its side a cell is in
+(`mask::tile`); a rule keeps its masks as room and reads into them:
+the largest is 128 KiB.
 
 - **Read**: `mask::layer` fills two masks from a layer, the cells it
-  holds at and the cells hot, a window of 8x8 at a time. `mask::layer_under`
-  reads only where another mask has cells, the windows it has none in
-  passed over.
+  holds at and the cells hot -- the tile's words copied as they lie, a
+  chunk a run for the tiles of several. `mask::layer_under` keeps the
+  cells another mask has.
+- **Asked**: `mask::any_under` says whether a layer holds at any cell
+  of a mask: the tile's words ANDed with the mask's where they lie,
+  nothing copied, and the result asked whether it is anything.
 - **Written**: `mask::set_under` and `mask::clear_under` queue the
   mask's cells that the rule sees otherwise, each a compare-and-write
   of its own: a cell another changes first is left as that one made
-  it.
+  it. A set bit is its cell: its index added to the tile's first
+  cell's.
 
-Not yet: masks of the common shapes made once and shipped with the
-program, masks kept from one read to the next, and the same over the
-cells entities stand on. A large square is read a window at a time,
-which a read of whole chunks will better when a rule asks for one.
-
-Not yet, either: these masks lie row by row from any cell, where the
-bitmaps lie in Morton order by aligned tiles -- so a read turns and
-cuts. What is about one cell no longer does ("The small tiles about a
-cell"); a shape of many cells, put down anywhere, is to be composed by
-an instruction into the aligned tiles it touches, however many, as the
-ring about a cell is into its one to four. Left until entities of more
-than a cell are built.
+Not yet: a shape of many cells put down anywhere touches several
+aligned tiles, and is a mask in each -- composed by an instruction,
+however many they are, as the ring about a cell is into its one to
+four ("The small tiles about a cell"); it waits for entities of more
+than a cell. Nor masks of the common shapes made once and shipped with
+the program, nor masks kept from one read to the next. The area (16x16
+about a cell, what paths are found over) is still rows, read by
+windows.
 
 ## The small tiles about a cell
 
@@ -354,23 +371,31 @@ For one cell: it and its eight neighbours lie in one, two or four
 small tiles -- 4x4 cells, 16 bits. `tiles_about::of(at)` takes the four
 small tiles, two by two, they can lie in: its own, the one to the left
 if it is on its tile's left column, else the one to the right, and so
-up and down. The four are one word, in Morton order over their 8x8
-cells, and for each place the cell can have in them the ring about it
-is a word made as the program is compiled (`TilesAbout::ring`, with
-the cell `TilesAbout::nine`). A layer is read under that mask
-(`tiles_about::layer`): only the tiles the mask has a cell in are
-looked up -- one for a cell in the middle of its tile, two on an edge,
-four in a corner -- each a shift of a bitmap word, and the lot ANDed
-with the mask. Whether a sheep can move at all is the ring ANDed with
-the collision plane's tiles, and one compare.
+up and down -- a step on the cell's index, no coordinate worked out.
+The four are one word, in Morton order over their 8x8 cells, and for
+each place the cell can have in them the ring about it is a word made
+as the program is compiled (`About::ring_word`, with the cell
+`nine_word`). A layer is read under that mask (`tiles_about::layer`):
+where the four lie in one chunk, its bitmap is looked up once and each
+tile is a shift of one of its words, the lot ANDed with the mask.
+Whether a sheep can move at all is the ring ANDed with the collision
+plane's tiles, and one compare.
 
-What is drawn among the neighbours, or kept as a way to walk, cannot
-hang on how the tiles fall about the cell -- the same world a few cells
-over must come to the same ("The same wherever the borders fall"). So
-the word is turned into the nine bits of `around`
-(`TilesAbout::as_nine`), row by row whichever tiles they came from,
-only when a neighbour is to be told from another; what asks only
-whether there is any, or none, stays with the word.
+The word stays a word all the way to the rule (`around::Cells`): no
+set of cells is turned into rows. A neighbour is told from another by
+its way, and a way is a bit of the word by a table (`About::way_word`)
+and back by the two places (`way_of_bit`) -- asked for the one cell
+drawn or kept, never for a set. One drawn is the set bit of a rank, in
+the word's own order: so which neighbour a given draw comes to goes by
+how the tiles fall about the cell. That is the lot's, as a superchunk
+having a lot of its own is; nothing but the draw hangs on it. A test
+that takes the draws out of what it compares draws by the ways' order
+itself (`../tests/fast/shifted.rs`).
+
+Before and after, by `Civil_Egregore server pasture 1000 333 4000 4 1`,
+a sheep's wake: 233 ns reading windows turned into rows; 272 ns with
+the tiles first read a lookup each and turned into nine bits a cell at
+a time; 198 ns with a lookup a layer and nothing turned.
 
 ## Moved out of the simulation
 

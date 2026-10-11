@@ -38,12 +38,11 @@ pub fn spawn(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attrib
     id
 }
 
-/// The bit, of the nine about `centre`, of the cell of `among` the
-/// entity whose ID is `id` stood on as the tick found it, if it stood
-/// on one.
+/// The way from `centre` to the neighbour the entity whose ID is `id`
+/// stood on as the tick found it, if it stood on one.
 #[inline]
-pub fn stands_beside(turn: &Turn, id: EntityId, centre: CellIndex, among: u16) -> Option<u32> {
-    (0..9).filter(|&bit| among >> bit & 1 == 1).find(|&bit| around::cell(centre, bit).is_some_and(|cell| stands(turn, id, cell)))
+pub fn stands_beside(turn: &Turn, id: EntityId, centre: CellIndex) -> Option<u32> {
+    (0..around::WAYS).filter(|&way| way != around::HERE).find(|&way| around::cell(centre, way).is_some_and(|cell| stands(turn, id, cell)))
 }
 
 /// Queues `entity` sleeping where it stands until `wake`: its

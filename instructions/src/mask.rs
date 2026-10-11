@@ -1,30 +1,34 @@
-//! Masks: a square of cells as bits, [`SIDES`] a side, a row a run of
-//! words -- cell `(x, y)` from its top left at bit `x` of row `y` -- a
-//! square of a layer read into them, whole or under another, and a
-//! layer written under one (`docs/instructions.md`, "Masks").
+//! Masks: an aligned tile's cells as bits, [`SIDES`] a side, in
+//! Morton order -- as the tile lies in its bitmap, one run of bits --
+//! so a layer is read into one by copying words, asked under one with
+//! an AND, and written under one a set bit a cell
+//! (`docs/instructions.md`, "Masks").
 
 use crate::around::set_bit_of_rank;
+use bitplane_manager::{SMALL_TILE_CELLS, SMALL_TILE_SIDE};
 use chunk_storage::LayerType;
-use coordinates::CellIndex;
+use coordinates::{cartesian_from_place, place_from_cartesian, CellIndex, CHUNK_SIDE};
 use simulation::Turn;
+use std::ops::Range;
 use utilities::rng::Rng;
 
-/// The sides a mask comes in: powers of two from 4 to an entity's
-/// reach.
+/// The sides a mask comes in: powers of two from a small tile's 4 to
+/// a superchunk's, an entity's reach.
 pub const SIDES: [u32; 9] = [4, 8, 16, 32, 64, 128, 256, 512, 1024];
 
-/// Bits in a word of a mask's row.
+/// Bits in a word of a mask.
 const WORD: u32 = u64::BITS;
-/// Cells along the side of a window, the most a turn reads at once.
-const WINDOW: u32 = 8;
+/// The bits of a small tile, the one mask that is less than a word.
+const SMALL_TILE: u64 = (1 << SMALL_TILE_CELLS) - 1;
 
-/// A square of cells, a bit each.
+/// An aligned tile of cells, a bit each: the cell `(x, y)` from the
+/// tile's top left at the bit whose index is the two interleaved.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Mask {
     /// Cells along its side: one of [`SIDES`].
     side: u32,
-    /// Its rows, top to bottom, each [`Mask::row_words`] words, a cell's
-    /// bit clear past the side.
+    /// Its cells in Morton order, a cell's bit clear past the tile's --
+    /// which only a small tile's word has any past.
     words: Vec<u64>,
 }
 
@@ -32,26 +36,22 @@ impl Mask {
     /// A mask `side` cells a side, no cell set.
     pub fn empty(side: u32) -> Self {
         assert!(SIDES.contains(&side), "a mask {side} cells a side: not one of {SIDES:?}");
-        Self { side, words: vec![0; (side.div_ceil(WORD) * side) as usize] }
+        Self { side, words: vec![0; (side * side).div_ceil(WORD) as usize] }
     }
 
     /// A mask `side` cells a side, every cell set.
     pub fn full(side: u32) -> Self {
         let mut mask = Self::empty(side);
-        let row = mask.row_words();
-        for (at, word) in mask.words.iter_mut().enumerate() {
-            let before = (at % row) as u32 * WORD;
-            *word = if side - before >= WORD { u64::MAX } else { (1 << (side - before)) - 1 };
-        }
+        mask.words.fill(if side == SMALL_TILE_SIDE { SMALL_TILE } else { u64::MAX });
         mask
     }
 
     /// A mask `side` cells a side, the cells set whose centres are no
-    /// farther than half the side from the square's: the disc that
+    /// farther than half the side from the tile's: the disc that
     /// fills it.
     pub fn disc(side: u32) -> Self {
         let mut mask = Self::empty(side);
-        // In half cells, from the square's centre to a cell's.
+        // In half cells, from the tile's centre to a cell's.
         let reach = side as i64 * side as i64;
         for (x, y) in (0..side).flat_map(|y| (0..side).map(move |x| (x, y))) {
             let (dx, dy) = (2 * x as i64 + 1 - side as i64, 2 * y as i64 + 1 - side as i64);
@@ -67,27 +67,24 @@ impl Mask {
         self.side
     }
 
-    /// Words in a row.
-    fn row_words(&self) -> usize {
-        self.side.div_ceil(WORD) as usize
-    }
-
-    /// Row `y`, its cells from the left a bit each.
-    pub fn row(&self, y: u32) -> &[u64] {
-        let row = self.row_words();
-        &self.words[y as usize * row..][..row]
+    /// Its cells in Morton order, a word 8x8 of them: as the tile's
+    /// lie in a bitmap.
+    pub fn words(&self) -> &[u64] {
+        &self.words
     }
 
     /// Whether the cell `(x, y)` is set.
     pub fn get(&self, x: u32, y: u32) -> bool {
-        self.row(y)[(x / WORD) as usize] >> (x % WORD) & 1 == 1
+        let bit = place_from_cartesian(x, y);
+        self.words[bit / WORD as usize] >> (bit % WORD as usize) & 1 == 1
     }
 
     /// Makes the cell `(x, y)` set, or clear.
     pub fn set(&mut self, x: u32, y: u32, to: bool) {
         debug_assert!(x < self.side && y < self.side, "({x}, {y}) of a mask {} a side", self.side);
-        let word = &mut self.words[y as usize * self.side.div_ceil(WORD) as usize + (x / WORD) as usize];
-        *word = *word & !(1 << (x % WORD)) | (to as u64) << (x % WORD);
+        let bit = place_from_cartesian(x, y);
+        let word = &mut self.words[bit / WORD as usize];
+        *word = *word & !(1 << (bit % WORD as usize)) | (to as u64) << (bit % WORD as usize);
     }
 
     /// Clears every cell.
@@ -128,13 +125,17 @@ impl Mask {
         }
     }
 
-    /// The set cells, `(x, y)`, row by row.
-    pub fn cells(&self) -> impl Iterator<Item = (u32, u32)> + '_ {
-        let row = self.row_words();
+    /// The set cells' bits, in Morton order: each its cell's place in
+    /// the tile.
+    fn bits(&self) -> impl Iterator<Item = usize> + '_ {
         self.words.iter().enumerate().flat_map(move |(at, &word)| {
-            let (x, y) = ((at % row) as u32 * WORD, (at / row) as u32);
-            std::iter::successors((word != 0).then_some(word), |&left| Some(left & (left - 1)).filter(|&left| left != 0)).map(move |left| (x + left.trailing_zeros(), y))
+            std::iter::successors((word != 0).then_some(word), |&left| Some(left & (left - 1)).filter(|&left| left != 0)).map(move |left| at * WORD as usize + left.trailing_zeros() as usize)
         })
+    }
+
+    /// The set cells, `(x, y)`, in Morton order.
+    pub fn cells(&self) -> impl Iterator<Item = (u32, u32)> + '_ {
+        self.bits().map(cartesian_from_place)
     }
 
     /// One of the set cells, `(x, y)`, drawn from `random`: none if
@@ -145,113 +146,124 @@ impl Mask {
             return None;
         }
         let mut rank = random.below(count as u64) as u32;
-        let row = self.row_words();
         for (at, &word) in self.words.iter().enumerate() {
             if rank >= word.count_ones() {
                 rank -= word.count_ones();
                 continue;
             }
-            return Some(((at % row) as u32 * WORD + set_bit_of_rank(word, rank), (at / row) as u32));
+            return Some(cartesian_from_place(at * WORD as usize + set_bit_of_rank(word, rank) as usize));
         }
         None
     }
 }
 
-/// The cell `(x, y)` of the square whose top left cell is `origin`:
-/// none past the world's edge.
-pub fn cell(origin: CellIndex, x: u32, y: u32) -> Option<CellIndex> {
-    origin.offset(x as i32, y as i32)
+/// The first cell -- the top left one -- of the aligned tile `side`
+/// cells a side that `at` is in: the tile a mask of that side stands
+/// for there.
+pub fn tile(at: CellIndex, side: u32) -> CellIndex {
+    CellIndex(at.0 & !(u64::from(side) * u64::from(side) - 1))
 }
 
-/// Reads the square of `layer_type` whose top left cell is `origin`,
-/// as the tick found it, into `set` -- the cells it holds at -- and
-/// `hot` -- those in hot bitmaps: in the world, and read. Both of one
-/// side, the square's.
-pub fn layer(turn: &Turn, layer_type: LayerType, origin: CellIndex, set: &mut Mask, hot: &mut Mask) {
-    read_where(turn, layer_type, origin, None, set, hot);
+/// The cell `(x, y)` of the tile whose first cell is `first`.
+pub fn cell(first: CellIndex, x: u32, y: u32) -> CellIndex {
+    CellIndex(first.0 | place_from_cartesian(x, y) as u64)
+}
+
+/// The tile `side` cells a side (8 at least) whose first cell is
+/// `first`, of `layer_type`, as the tick found it: each run of its
+/// words as it lies in a bitmap -- the whole of it in one chunk, or a
+/// chunk a run -- with where the run goes in a mask's words. None of a
+/// run's words, where its bitmap is not hot.
+fn runs<'t>(turn: &'t Turn, layer_type: LayerType, first: CellIndex, side: u32) -> impl Iterator<Item = (Range<usize>, Option<&'t [u64]>)> {
+    let part = side.min(CHUNK_SIDE as u32);
+    let (words, chunks) = ((part * part / WORD) as usize, (side / part) * (side / part));
+    // A chunk's cells are 16 bits of a cell's index: the chunks of a tile follow one another above them.
+    (0..chunks as usize).map(move |chunk| (chunk * words..(chunk + 1) * words, turn.aligned_tile(layer_type, CellIndex(first.0 + ((chunk as u64) << (2 * CHUNK_SIDE.trailing_zeros()))), part)))
+}
+
+/// Reads the aligned tile of `layer_type` that `at` is in, as the tick
+/// found it, into `set` -- the cells it holds at -- and `hot` -- those
+/// in hot bitmaps: in the world, and read. Both of one side, the
+/// tile's: its words copied as they lie.
+pub fn layer(turn: &Turn, layer_type: LayerType, at: CellIndex, set: &mut Mask, hot: &mut Mask) {
+    read_where(turn, layer_type, at, None, set, hot);
 }
 
 /// [`layer`], of the cells set in `under` alone: the rest are left
-/// clear in `set` and `hot`, and the parts of the square `under` has no
-/// cell in are not read at all.
-pub fn layer_under(turn: &Turn, layer_type: LayerType, origin: CellIndex, under: &Mask, set: &mut Mask, hot: &mut Mask) {
-    read_where(turn, layer_type, origin, Some(under), set, hot);
+/// clear in `set` and `hot`.
+pub fn layer_under(turn: &Turn, layer_type: LayerType, at: CellIndex, under: &Mask, set: &mut Mask, hot: &mut Mask) {
+    read_where(turn, layer_type, at, Some(under), set, hot);
 }
 
-/// [`layer`], under `under` if there is one: a window a time.
-fn read_where(turn: &Turn, layer_type: LayerType, origin: CellIndex, under: Option<&Mask>, set: &mut Mask, hot: &mut Mask) {
+/// [`layer`], under `under` if there is one.
+fn read_where(turn: &Turn, layer_type: LayerType, at: CellIndex, under: Option<&Mask>, set: &mut Mask, hot: &mut Mask) {
     let side = set.side;
     assert!(hot.side == side && under.is_none_or(|under| under.side == side), "masks of two sides");
-    set.clear();
-    hot.clear();
-    let (row, across) = (set.row_words(), WINDOW.min(side));
-    for (x, y) in (0..side).step_by(WINDOW as usize).flat_map(|y| (0..side).step_by(WINDOW as usize).map(move |x| (x, y))) {
-        let (word, shift) = ((x / WORD) as usize, x % WORD);
-        let rows = (y..(y + WINDOW).min(side)).map(|y| y as usize * row + word);
-        // The window's cells under the mask, as a window lays them out: a row a byte.
-        let wanted = under.map_or(u64::MAX, |under| rows.clone().enumerate().fold(0, |wanted, (down, at)| wanted | (under.words[at] >> shift & 0xff) << (8 * down)));
-        if wanted == 0 {
-            continue;
+    let first = tile(at, side);
+    if side == SMALL_TILE_SIDE {
+        let [tiles] = turn.small_tiles([layer_type], first, under.map_or(SMALL_TILE, |under| under.words[0]));
+        (set.words[0], hot.words[0]) = (tiles.set, tiles.hot);
+        return;
+    }
+    for (run, words) in runs(turn, layer_type, first, side) {
+        match words {
+            Some(words) => {
+                set.words[run.clone()].copy_from_slice(words);
+                hot.words[run].fill(u64::MAX);
+            }
+            None => {
+                set.words[run.clone()].fill(0);
+                hot.words[run].fill(0);
+            }
         }
-        // A window past the world's edge is left clear, and not hot.
-        let Some(corner) = origin.offset(x as i32, y as i32) else {
-            continue;
-        };
-        let window = turn.window(layer_type, corner, across, across);
-        for (down, at) in rows.enumerate() {
-            set.words[at] |= ((window.set & wanted) >> (8 * down) & 0xff) << shift;
-            hot.words[at] |= ((window.hot & wanted) >> (8 * down) & 0xff) << shift;
-        }
+    }
+    if let Some(under) = under {
+        set.and(under);
+        hot.and(under);
     }
 }
 
-/// Queues `layer_type` holding at every cell set in `mask`, the square
-/// whose top left cell is `origin`, that the rule sees clear: how many
-/// writes, a compare-and-write each.
-pub fn set_under(turn: &mut Turn, layer_type: LayerType, origin: CellIndex, mask: &Mask) -> usize {
-    write_under(turn, layer_type, origin, mask, true)
+/// Whether `layer_type` holds, as the tick found it, at any cell set
+/// in `mask`, the aligned tile `at` is in: the tile's words ANDed with
+/// the mask's as they lie, and asked whether anything is left. Nothing
+/// is copied.
+pub fn any_under(turn: &Turn, layer_type: LayerType, at: CellIndex, mask: &Mask) -> bool {
+    let first = tile(at, mask.side);
+    if mask.side == SMALL_TILE_SIDE {
+        let [tiles] = turn.small_tiles([layer_type], first, mask.words[0]);
+        return tiles.set != 0;
+    }
+    runs(turn, layer_type, first, mask.side).any(|(run, words)| words.is_some_and(|words| words.iter().zip(&mask.words[run]).any(|(held, wanted)| held & wanted != 0)))
+}
+
+/// Queues `layer_type` holding at every cell set in `mask`, the
+/// aligned tile `at` is in, that the rule sees clear: how many writes,
+/// a compare-and-write each.
+pub fn set_under(turn: &mut Turn, layer_type: LayerType, at: CellIndex, mask: &Mask) -> usize {
+    write_under(turn, layer_type, at, mask, true)
 }
 
 /// Queues `layer_type` no longer holding at any cell set in `mask`,
-/// the square whose top left cell is `origin`, that the rule sees set:
-/// how many writes, a compare-and-write each.
-pub fn clear_under(turn: &mut Turn, layer_type: LayerType, origin: CellIndex, mask: &Mask) -> usize {
-    write_under(turn, layer_type, origin, mask, false)
+/// the aligned tile `at` is in, that the rule sees set: how many
+/// writes, a compare-and-write each.
+pub fn clear_under(turn: &mut Turn, layer_type: LayerType, at: CellIndex, mask: &Mask) -> usize {
+    write_under(turn, layer_type, at, mask, false)
 }
 
 /// Queues every hot cell set in `mask` that does not hold `layer_type`
 /// as `holding` says becoming so, each a compare-and-write of what the
 /// rule saw there -- no cell written over another's write. How many.
-fn write_under(turn: &mut Turn, layer_type: LayerType, origin: CellIndex, mask: &Mask, holding: bool) -> usize {
+/// A set bit is its cell: its index added to the tile's first cell's.
+fn write_under(turn: &mut Turn, layer_type: LayerType, at: CellIndex, mask: &Mask, holding: bool) -> usize {
+    let first = tile(at, mask.side);
     let mut queued = 0;
-    for y in 0..mask.side {
-        let mut x = 0;
-        while let Some(set) = next_cell(mask, y, x, true) {
-            x = set + 1;
-            // A cell past the world's edge, or not hot, is not written.
-            let Some(at) = origin.offset(set as i32, y as i32) else {
-                continue;
-            };
-            if turn.holds(layer_type, at) == Ok(!holding) {
-                turn.queue_seen(layer_type, at, u32::from(!holding), u32::from(holding), None);
-                queued += 1;
-            }
+    for bit in mask.bits() {
+        let at = CellIndex(first.0 | bit as u64);
+        // A cell not hot is not written.
+        if turn.holds(layer_type, at) == Ok(!holding) {
+            turn.queue_seen(layer_type, at, u32::from(!holding), u32::from(holding), None);
+            queued += 1;
         }
     }
     queued
-}
-
-/// The first cell of row `y` of `mask`, from `x` on, that is set --
-/// or, `set` false, that is clear: none if the row has none.
-fn next_cell(mask: &Mask, y: u32, x: u32, set: bool) -> Option<u32> {
-    let row = mask.row(y);
-    let mut at = x;
-    while at < mask.side {
-        let word = if set { row[(at / WORD) as usize] } else { !row[(at / WORD) as usize] } >> (at % WORD);
-        if word != 0 {
-            return Some(at + word.trailing_zeros()).filter(|&found| found < mask.side);
-        }
-        at = (at / WORD + 1) * WORD;
-    }
-    None
 }

@@ -1,7 +1,8 @@
-//! The nine cells about a cell: read through the aligned small tiles
-//! they lie in, they are the cells read one by one, however the
-//! tiles' edges fall about the cell; and what may be stepped to is
-//! what no wall bars less what the collision plane holds.
+//! The cells about a cell: read as the aligned small tiles they lie
+//! in, they are the cells read one by one, however the tiles' edges
+//! fall about the cell; what may be stepped to is what no wall bars
+//! less what the collision plane holds; and one drawn is one of those
+//! chosen among, each as likely.
 //!
 //! `cargo test --test fast`
 
@@ -35,13 +36,25 @@ fn the_nine_about_a_cell_are_its_cells_read_one_by_one() {
         let mut set_cells = 0;
         for (x, y) in cells_every_way() {
             let at = cell(x, y);
-            let nine = around::layer(turn, STONE, at);
-            for bit in 0..9 {
-                let held = around::cell(at, bit).map(|cell| turn.holds(STONE, cell));
+            let about = around::about(at);
+            let nine = around::layer(turn, STONE, &about);
+            for way in 0..around::WAYS {
+                let held = around::cell(at, way).map(|cell| turn.holds(STONE, cell));
                 let (hot, set) = (matches!(held, Some(Ok(_))), held == Some(Ok(true)));
-                assert_eq!((nine.hot >> bit & 1 == 1, nine.set >> bit & 1 == 1), (hot, set), "bit {bit} about ({x}, {y})");
+                let towards = about.towards(way);
+                assert_eq!((!(nine.hot & towards).is_empty(), !(nine.set & towards).is_empty()), (hot, set), "the way {way} from ({x}, {y})");
+                assert_eq!((towards.count(), around::way_of(at, around::cell(at, way).unwrap())), (1, way));
                 set_cells += usize::from(set);
             }
+            assert_eq!((about.nine().count(), about.ring().count(), about.centre(), nine.set.count()), (9, 8, about.towards(around::HERE), (nine.set & about.nine()).count()));
+            // One drawn among those set is one of them, and with draws enough each is drawn.
+            let mut drawn = around::Cells::default();
+            for _ in 0..40 * nine.set.count() {
+                let way = around::pick(turn.random(), &about, nine.set).expect("one of those set");
+                assert!(!(nine.set & about.towards(way)).is_empty(), "drawn out of those chosen among");
+                drawn = drawn | about.towards(way);
+            }
+            assert!(nine.set.is_empty() && around::pick(turn.random(), &about, nine.set).is_none() || drawn == nine.set, "every one of those set drawn, about ({x}, {y})");
         }
         set_cells
     });
@@ -66,19 +79,20 @@ fn what_may_be_stepped_to_is_the_unwalled_less_the_held() {
     }
     // One cell hemmed in whatever was drawn.
     let hemmed: CellIndex = cell(1023, 1024);
-    (0..9).filter(|&bit| bit != 4).for_each(|bit| arena.queue(COLLISION, Write::cell(around::cell(hemmed, bit).unwrap(), WriteOp::Set)));
+    (0..around::WAYS).filter(|&bit| bit != around::HERE).for_each(|bit| arena.queue(COLLISION, Write::cell(around::cell(hemmed, bit).unwrap(), WriteOp::Set)));
     assert_eq!(arena.apply().missed, 0);
     let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }
-        assert_eq!(walking::around_steppable(turn, hemmed) & around::RING, 0, "hemmed in");
+        assert!(walking::around_steppable(turn, &around::about(hemmed)).is_empty(), "hemmed in");
         let mut open = 0;
         for (x, y) in cells_every_way() {
             let at = cell(x, y);
-            let (steppable, held) = (walking::around_steppable(turn, at), around::layer(turn, COLLISION, at));
-            assert_eq!(steppable, walking::around_unwalled(turn, at) & !held.set, "about ({x}, {y})");
-            open += (steppable & around::RING).count_ones() as usize;
+            let about = around::about(at);
+            let (steppable, held) = (walking::around_steppable(turn, &about), around::layer(turn, COLLISION, &about));
+            assert_eq!(steppable, (walking::around_unwalled(turn, &about) & about.ring()).without(held.set), "about ({x}, {y})");
+            open += steppable.count() as usize;
         }
         open
     });

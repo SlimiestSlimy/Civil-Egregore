@@ -15,7 +15,7 @@ mod entities {
     use crate::tests::{cell, walker, world, STONE};
     use coordinates::CellIndex;
     use entity_manager::{Attribute, AttributeBlock, EntityEdit, EntityId, NEVER};
-    use instructions::around::{self, CENTRE, RING};
+    use instructions::around;
     use instructions::{entities, Turn};
     use simulation::Simulation;
     use std::sync::Mutex;
@@ -59,32 +59,31 @@ mod entities {
         assert_eq!(entities.get(EntityId(2), cell(41, 41)).expect("moved").attributes, [AttributeBlock::holding(NAME, 8)]);
     }
 
-    /// The nine cells about an entity as bits: which entities stand on,
-    /// which are free among those open to it, and none when all are taken.
+    /// The cells about an entity: the layer's among them, the ways to
+    /// each, and one drawn among those chosen.
     #[test]
-    fn the_cells_beside_an_entity_are_asked_as_masks() {
+    fn the_cells_beside_an_entity_are_asked_as_sets() {
         let (mut arena, mut entities) = world(1);
         let at = cell(40, 30);
         entities.queue_put(walker(1, at, 0), &[]);
-        // Up and left of it, and to its right.
-        entities.queue_put(walker(2, cell(39, 29), NEVER), &[]);
-        entities.queue_put(walker(3, cell(41, 30), NEVER), &[]);
         entities.apply();
         let seen = Mutex::new(Vec::new());
         let mut simulation = Simulation::new(1);
         simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             for entity in turn.woken() {
                 let at = entity.header.at;
-                let (stone, taken) = (around::layer(turn, STONE, at), around::occupied(turn, at));
-                let free = (0..64).filter_map(|_| around::free_beside(turn, at, RING)).fold(0u16, |free, bit| free | 1 << bit);
-                let only = around::free_beside(turn, at, 1 << 0 | 1 << 5);
-                let cells: Vec<CellIndex> = [0, 5].iter().filter_map(|&bit| around::cell(at, bit)).collect();
-                seen.lock().unwrap().push((stone.set, stone.hot, taken, free, only, cells, around::bit_of(at, at.offset(-1, 1).unwrap())));
+                let about = around::about(at);
+                let stone = around::layer(turn, STONE, &about);
+                // Up and left of it, and to its right: the two chosen among.
+                let two = about.towards(0) | about.towards(5);
+                let drawn = (0..64).filter_map(|_| around::pick(turn.random(), &about, two)).fold(0u16, |drawn, way| drawn | 1 << way);
+                let none = around::pick(turn.random(), &about, two.without(two));
+                let cells: Vec<CellIndex> = [0, 5].iter().filter_map(|&way| around::cell(at, way)).collect();
+                seen.lock().unwrap().push((stone.set.count(), stone.hot == about.nine(), drawn, none, cells, around::way_of(at, at.offset(-1, 1).unwrap())));
                 entities::sleep(turn, &entity.header, NEVER);
             }
             0
         });
-        let taken = 1 << 0 | CENTRE | 1 << 5;
-        assert_eq!(*seen.lock().unwrap(), [(0, around::ALL, taken, RING & !taken, None, vec![cell(39, 29), cell(41, 30)], 6)]);
+        assert_eq!(*seen.lock().unwrap(), [(0, true, 1 << 0 | 1 << 5, None, vec![cell(39, 29), cell(41, 30)], 6)]);
     }
 }

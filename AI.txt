@@ -537,19 +537,40 @@ again, rules dont touch the simulation, we abstract it for the rules,
 and this is a potentially very cheap abstraction".
 Also: "remember we want to avoid composing masks manually lol",
 "because there can be the need of a variable amount of them".
-DONE 2026-10-11 FOR ONE CELL: the four aligned small tiles (4x4) about
-a cell as one word in Morton order (Reader::small_tiles,
-Turn::small_tiles; instructions::tiles_about, the crate's own -- no
-rule sees it); around::layer and walking::around_unwalled read off
-them, around_steppable asks the collision plane first and reads no
-wall where the ring is wholly held. The nine bits stay what rules see
-(as_nine), so a pick does not hang on how tiles fall. The sheep's rule
-unchanged. NOT DONE: instructions::mask::Mask is still row by row at
-any origin; a shape of many cells composed into however many aligned
-tiles waits for the user's details on entities of more than a cell.
-area (16x16, for pathfinding) still reads windows. Cost not measured.
+DONE 2026-10-11, MORTON ALL THE WAY ("morton order everywhere";
+"cartesian coordinates should only be used where they are cheaper than
+morton order ... oitherwise morton order is default"; "simplify most
+cell operations to masked bitwise ops basically, super cheap, super
+fast"):
+- Reader::small_tiles (four aligned 4x4 tiles, two by two, one word in
+  Morton order; one bitmap lookup a layer, tiles stepped to on the
+  place), Reader::aligned_tile (8 to 256: the bitmap's words).
+- instructions::around: the cells about a cell are a word
+  (around::Cells), never rows. about(at) -> About; centre/ring/nine/
+  towards(way); layer; pick and prefer give a WAY (0 to 8, HERE 4), the
+  one name that does not hang on alignment. The nine-bit form, squeeze,
+  occupied and free_beside are gone. A draw's neighbour goes by tile
+  alignment (chance, allowed); the shifted test draws by ways in its
+  own file.
+- walking::around_unwalled/around_steppable take &About, give Cells.
+- instructions::mask::Mask is an aligned tile in Morton order: read by
+  copying words, any_under an AND, written a set bit a cell.
+- MEASURED (pasture 1000 333 4000 4 1, a sheep's wake): 233 ns at
+  d5e8273, 272 at 865bb33 (a lookup a tile, nine bits gathered a cell
+  at a time: SLOWER, committed unmeasured -- do not do that again),
+  about 200 now. Tick reference (pasture 300 333 4000 4 1 less 0):
+  90.85 M at d5e8273, 88.17 M at 865bb33, 71.82 M now. It was 62.98 M
+  at 98fbc06: the border and collision commits cost what is left.
+  perf record -e cycles:u works here (paranoid 2): use it.
+NOT DONE: a shape of many cells composed into however many aligned
+tiles (waits for the user on multi-celled entities); the area (16x16,
+pathfinding) is still rows read by windows.
 SEEN, NOT CHASED: `renderer window_still` shows 0 sheep, on d5e8273
 too -- to ask the user whether the still's world is meant to have any.
+On Flock.room / EntityEdit (a private copy of the entity edited, then
+diffed into writes) the user, verbatim: "hmmm, me dont likey that, we
+should be writing to the entity store instead of writing twice" -- for
+the redesign: no local copy, writes go to the store as applied.
 
 NEXT: INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically
 redesinging instructions from scratch lmao"). ASKED 2026-10-11, NOT
@@ -625,3 +646,18 @@ better". Assert the sizes in the code as it is built.
 And: "from the beggining we shouldve only carried tops 64 bits of
 compare payload" -- a compare carries 64 bits at the most, never a
 block.
+THEN (user, 2026-10-11, verbatim): "basically we will only use the
+first 128 bits after the type for the bitflags, so the bitflag offsets
+is a nice round 7 bits of offset + the bit to compare to. or we can
+also have two sets of 8 bit instruction parameters comparing 2
+bitflags directly, were basically building a VM machine". To my three
+questions: block count -- "block count would be the last byte for the
+flagged attribute types on the registry"; the entity's name -- "we
+already decided that entity ID is its origin position at tick start
+and stays constant through the tick". (Payloads: not answered.)
+ON 865bb33 (user, verbatim): "where is the profiling? benchmarks?" --
+MEASURE what a change costs or saves before saying it is done. And:
+"we need the masks to be morton, otherwise were not reaping any
+performance benefits at all. i think you might want to re-read tessera
+code a bit to remember what a tile is" -- Mask TO BE MORTON, ALIGNED
+TILES, NOW; not left for later.

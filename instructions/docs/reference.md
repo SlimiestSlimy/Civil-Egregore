@@ -65,31 +65,35 @@ places them.
 
 ## `around.rs`
 
-The 3x3 cells about a cell as nine bits -- `SIDE` (3), **`CENTRE`**,
-**`RING`**, **`ALL`**; **`Around`** `{set, hot}`. **`cell(at, bit)`**, **`bit_of(at,
-cell)`**: a bit and its cell. **`pick(random, choices)`**,
-**`prefer(random, wanted, open)`**: one drawn;
-**`set_bit_of_rank(bits, rank)`**: the set bit with so many under it,
-the crate's. **`layer(turn, type, at)`**: the 3x3 cells of a layer
-about a cell, off the small tiles about it (`tiles_about.rs`). **`occupied(turn, at)`**: those
-entities stand on. **`free_beside(turn, at, open)`**: one of `open`
-none stands on, drawn.
+The cells about a cell, a set of them a word of bits in Morton order:
+**`Cells`** (`&`, `|`, **`without`**, **`is_empty`**, **`count`**);
+**`Around`** `{set, hot}`. `WAYS` (9), **`HERE`** (4): the ways from a
+cell to the nine about it, row by row. **`about(at)`**: an **`About`**
+(`tiles_about.rs`), of which **`centre()`**, **`ring()`**,
+**`nine()`**, **`towards(way)`** are sets. **`cell(at, way)`**,
+**`way_of(at, cell)`**: a way and its cell. **`pick(random, about,
+choices)`**, **`prefer(random, about, wanted, open)`**: the way to one
+drawn; **`set_bit_of_rank(bits, rank)`**: the set bit with so many
+under it, the crate's. **`layer(turn, type, about)`**: a layer's cells
+about a cell, the small tiles they lie in read as they lie.
 
 ## `tiles_about.rs`
 
-The crate's own: no rule sees it. The four small tiles, two by two, a
-cell and its neighbours lie in, as one word in Morton order over their
-8x8 cells (`SQUARE_SIDE`, `SQUARE_CELLS`; **`bit_at(x, y)`** a cell's
-bit, **`across_and_down(bit)`** back). **`TilesAbout`**: the first
-tile's first cell, and the cell's bit; **`of(at)`** takes them.
-**`centre()`**, **`nine()`**, **`ring()`**: the cell, it and its
-neighbours in the world, the neighbours alone, as bits of the word --
-from `NINE_OF`, made as the program is compiled. **`as_nine(cells)`**:
-the word's cells as the nine bits of `around` (`NINE`), by `ABOUT`,
-each neighbour's bit for each place the cell can have. **`layer(turn,
-type, about, under)`**, **`layers(turn, types, about, under)`**: a
-layer in the tiles, the cells of `under` alone, a `SmallTiles`
-(`instructions.md`, "The small tiles about a cell").
+The crate's own, but for the name of what is about a cell. The four
+small tiles, two by two, a cell and its neighbours lie in, as one word
+in Morton order over their 8x8 cells (`SQUARE_SIDE`, `SQUARE_CELLS`;
+**`bit_at(x, y)`** a cell's bit, **`across_and_down(bit)`** back;
+`TILE`, `X_BITS`, `Y_BITS`: the parts of a cell's index).
+**`About`**: the first tile's first cell, and the cell's bit;
+**`of(at)`** takes them. **`centre_word()`**, **`nine_word()`**,
+**`ring_word()`**: the cell, it and its neighbours in the world, the
+neighbours alone, as bits of the word -- from `NINE_OF`, made as the
+program is compiled; **`way_word(way)`**: the one cell a way off, by
+`ABOUT`, each of the nine's (`NINE`) bit for each place the cell can
+have; **`way_of_bit(bit)`**: back. **`layer(turn, type, about,
+under)`**, **`layers(turn, types, about, under)`**: a layer in the
+tiles, the cells of `under` alone, a `SmallTiles` (`instructions.md`,
+"The small tiles about a cell").
 
 ## `area.rs`
 
@@ -103,32 +107,33 @@ on its cells. **`of_tiles(turn, type, centre, scale)`**: the tiles of
 
 ## `mask.rs`
 
-**`Mask`**, a square of cells a bit each, its side one of **`SIDES`**
-(4 to 1,024): **`empty(side)`**, **`full(side)`**, **`disc(side)`**;
-**`side`**, **`row(y)`**, **`get(x, y)`**, **`set(x, y, to)`**,
-**`clear`**, **`count`**, **`is_empty`**; **`and`**, **`or`**,
-**`and_not`** with another of its side (**`with`**); **`cells()`** the
-set ones, **`pick(random)`** one drawn. **`about(centre, side)`**: the
-top left cell of the square about a cell; **`cell(origin, x, y)`**: a
-cell of it. `WORD` (64): bits in a word of a row; `row_words`: words in
-a row. **`layer(turn, type, origin, set, hot)`**: the square of a layer
-into two masks, a window a time; **`layer_under(turn, type, origin,
-under, set, hot)`**: the cells `under` has alone, the windows it has
-none in not read (**`read_where`**). `WINDOW` (8): cells along a
-window's side, the most a turn reads at once. **`set_under(turn, type,
-origin, mask)`**, **`clear_under`**: a compare-and-write queued for every hot cell of
-the mask seen otherwise (**`write_under`**, **`next_cell`**) -- how
-many.
+**`Mask`**, an aligned tile's cells a bit each in Morton order, its
+side one of **`SIDES`** (4 to 1,024): **`empty(side)`**,
+**`full(side)`**, **`disc(side)`**; **`side`**, **`words`**, **`get(x,
+y)`**, **`set(x, y, to)`**, **`clear`**, **`count`**, **`is_empty`**;
+**`and`**, **`or`**, **`and_not`** with another of its side
+(**`with`**); **`cells()`** the set ones (**`bits`**, their places),
+**`pick(random)`** one drawn. `WORD` (64): bits in a word;
+`SMALL_TILE`: the bits of the one mask less than a word.
+**`tile(at, side)`**: the first cell of the aligned tile a cell is in;
+**`cell(first, x, y)`**: a cell of it. **`layer(turn, type, at, set,
+hot)`**: the tile of a layer into two masks, its words copied
+(**`runs`**: a tile's words as they lie, a chunk a run);
+**`layer_under(turn, type, at, under, set, hot)`**: the cells `under`
+has alone (**`read_where`**). **`any_under(turn, type, at, mask)`**:
+whether the layer holds at any cell of the mask, the words ANDed as
+they lie. **`set_under(turn, type, at, mask)`**, **`clear_under`**: a
+compare-and-write queued for every hot cell of the mask seen otherwise
+(**`write_under`**) -- how many.
 
 ## `walking.rs`
 
 What an entity that walks asks, of a turn: the simulation's cells, the
 terrain's walls and `pathfinding` met here. **`around_unwalled(turn,
-at)`**: the 3x3 cells about `at` no wall is before, nine bits;
-**`around_steppable(turn, at)`**: those of them the collision plane
-does not hold, the plane asked first and no wall read where it holds
-the whole ring (**`unwalled_in(turn, about)`**: the walls, of the small
-tiles already taken).
+about)`**: the cells about a cell no wall is before, a set;
+**`around_steppable(turn, about)`**: its neighbours the collision plane
+does not hold and no wall bars, the plane asked first and no wall read
+where it holds the whole ring.
 **`area_walls(turn, centre)`**: the area's walls, for paths.
 **`step_towards(turn, at, goals, passable)`**, **`step_to(turn, at, to,
 passable)`**: the cell to step to for the nearest goal, or for one

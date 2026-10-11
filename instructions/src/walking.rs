@@ -7,8 +7,8 @@ use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use pathfinding::{a_star, Cell, Rows, Walls};
 use crate::area::{self, AREA_CENTRE, AREA_SIDE, FARTHEST_SCALE};
-use crate::around;
-use crate::tiles_about::{self, TilesAbout};
+use crate::around::{self, About, Cells};
+use crate::tiles_about;
 use crate::cells;
 use simulation::Turn;
 use type_registry::{COLLISION, WALL_EAST, WALL_SOUTH};
@@ -42,19 +42,18 @@ pub struct SoughtStep {
     pub scale: u32,
 }
 
-/// Which of the 3x3 cells around `at` may be stepped to from it,
-/// nine bits ([`crate::around`]): those no wall of the terrain is
-/// before -- its own among them. Where the wall layers are not hot,
-/// none bars.
-pub fn around_unwalled(turn: &Turn, at: CellIndex) -> u16 {
-    unwalled_in(turn, &tiles_about::of(at))
-}
-
-/// [`around_unwalled`], of the cell the small tiles `about` are about.
-fn unwalled_in(turn: &Turn, about: &TilesAbout) -> u16 {
-    let [east, south] = tiles_about::layers(turn, [WALL_EAST, WALL_SOUTH], about, about.nine()).map(|tiles| about.as_nine(tiles.set));
-    // Whether the cell at `bit` of the nine keeps a wall east of it, or south.
-    let (east_of, south_of) = (|bit: u16| east >> bit & 1, |bit: u16| south >> bit & 1);
+/// Which of the cells `about` a cell may be stepped to from it, for
+/// the terrain's walls: those none is before -- its own among them. A
+/// diagonal is barred unless both ways round it are open. Where the
+/// wall layers are not hot, none bars; the walls' tiles are asked a
+/// cell at a time as they lie, and not at all where they hold nothing.
+pub fn around_unwalled(turn: &Turn, about: &About) -> Cells {
+    let [east, south] = tiles_about::layers(turn, [WALL_EAST, WALL_SOUTH], about, about.nine_word()).map(|tiles| tiles.set);
+    if east | south == 0 {
+        return about.nine();
+    }
+    // Whether the cell `way` from it keeps a wall east of it, or south.
+    let (east_of, south_of) = (|way: u32| east & about.way_word(way) != 0, |way: u32| south & about.way_word(way) != 0);
     // A wall is kept by the upper or left cell of the two: the centre's own east and south, its neighbours' west and north.
     let (to_east, to_west, to_south, to_north) = (east_of(4), east_of(3), south_of(4), south_of(1));
     // A diagonal is barred unless both ways round it are open.
@@ -62,24 +61,22 @@ fn unwalled_in(turn: &Turn, about: &TilesAbout) -> u16 {
     let to_south_west = to_west | to_south | south_of(3) | east_of(6);
     let to_north_east = to_east | to_north | south_of(2) | east_of(1);
     let to_north_west = to_west | to_north | south_of(0) | east_of(0);
-    let barred = to_north_west | to_north << 1 | to_north_east << 2 | to_west << 3 | to_east << 5 | to_south_west << 6 | to_south << 7 | to_south_east << 8;
-    around::ALL & !barred
+    let barred = [(to_north_west, 0), (to_north, 1), (to_north_east, 2), (to_west, 3), (to_east, 5), (to_south_west, 6), (to_south, 7), (to_south_east, 8)];
+    Cells(barred.iter().fold(about.nine_word(), |open, &(barred, way)| if barred { open & !about.way_word(way) } else { open }))
 }
 
-/// Which of the 3x3 cells around `at` may be stepped to from it,
-/// nine bits: those no wall of the terrain is before
-/// ([`around_unwalled`]) and the collision plane does not hold --
-/// nothing stands there that bars a step. Entities are not looked at:
-/// a step onto one is turned back as it is applied. The collision
-/// plane is asked first, the ring about the cell against its small
-/// tiles: hemmed in, there is no step, and no wall is read.
-pub fn around_steppable(turn: &Turn, at: CellIndex) -> u16 {
-    let about = tiles_about::of(at);
-    let free = about.nine() & !tiles_about::layer(turn, COLLISION, &about, about.nine()).set;
-    if free & about.ring() == 0 {
-        return about.as_nine(free);
+/// Which of the neighbours `about` a cell may be stepped to from it:
+/// those the collision plane does not hold -- nothing stands there
+/// that bars a step -- and no wall of the terrain is before
+/// ([`around_unwalled`]). The plane is asked first, the ring about
+/// the cell ANDed with its tiles: hemmed in, there is no step, and no
+/// wall is read.
+pub fn around_steppable(turn: &Turn, about: &About) -> Cells {
+    let free = about.ring_word() & !tiles_about::layer(turn, COLLISION, about, about.ring_word()).set;
+    if free == 0 {
+        return Cells::default();
     }
-    unwalled_in(turn, &about) & about.as_nine(free)
+    Cells(free) & around_unwalled(turn, about)
 }
 
 /// The terrain's walls among the [`AREA_SIDE`] by [`AREA_SIDE`]
@@ -134,7 +131,8 @@ pub fn seek(turn: &mut Turn, at: CellIndex, layer_type: LayerType) -> Option<Sou
     // The cell beside it the way the tile is: stepped to if it is in the world hot.
     let to = of_the_area(at, path.first)?;
     // From far off no wall is seen, nor what stands in the way: a step either bars is not taken.
-    let open = around_steppable(turn, at) >> around::bit_of(at, to) & 1 == 1;
+    let about = around::about(at);
+    let open = !(around_steppable(turn, &about) & about.towards(around::way_of(at, to))).is_empty();
     (open && cells::hot(turn, layer_type, to)).then_some(SoughtStep { to, scale })
 }
 

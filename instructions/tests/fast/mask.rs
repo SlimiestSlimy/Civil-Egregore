@@ -1,6 +1,7 @@
-//! Masks: a square read at once is its cells read one by one, whole
-//! or under another mask; what is set and cleared under a mask is
-//! the mask, in a few rectangles; and a mask's own cells.
+//! Masks: an aligned tile read at once is its cells read one by one,
+//! whole or under another mask; whether a layer holds under a mask is
+//! whether it holds at any of the mask's cells; what is set and
+//! cleared under a mask is the mask; and a mask's own cells.
 //!
 //! `cargo test --test fast`
 
@@ -41,31 +42,40 @@ fn a_mask_holds_its_cells() {
     }
 }
 
-/// A square read into a mask is its cells read one by one -- inside a
-/// superchunk, across borders, off the hot superchunks -- and read
-/// under a mask, those of them the mask has.
+/// An aligned tile read into a mask is its cells read one by one --
+/// inside a chunk, a chunk whole, several chunks, off the hot
+/// superchunks -- and read under a mask, those of them the mask has;
+/// and a layer holds under a mask if it holds at any cell of it.
 #[test]
-fn a_square_read_is_its_cells_read_one_by_one() {
+fn a_tile_read_is_its_cells_read_one_by_one() {
     let mut arena = arena();
     let origins = [(300, 300), (1000, 1000), (2047, 5), (2900, 2900), (0, 1500)];
     Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }
-        for side in [4, 8, 16, 64, 256] {
+        for side in [4, 8, 16, 64, 256, 512] {
             let (mut set, mut hot, disc) = (Mask::empty(side), Mask::empty(side), Mask::disc(side));
             let (mut set_under, mut hot_under) = (Mask::empty(side), Mask::empty(side));
             for (x, y) in origins {
-                let origin = cell(x, y);
-                mask::layer(turn, STONE, origin, &mut set, &mut hot);
-                mask::layer_under(turn, STONE, origin, &disc, &mut set_under, &mut hot_under);
+                let (at, first) = (cell(x, y), mask::tile(cell(x, y), side));
+                assert_eq!((first.cartesian().x % side, first.cartesian().y % side, mask::tile(first, side)), (0, 0, first), "a tile is aligned");
+                mask::layer(turn, STONE, at, &mut set, &mut hot);
+                mask::layer_under(turn, STONE, at, &disc, &mut set_under, &mut hot_under);
                 for (across, down) in (0..side).flat_map(|down| (0..side).map(move |across| (across, down))) {
-                    let held = turn.holds(STONE, mask::cell(origin, across, down).expect("in the world"));
+                    let held = turn.holds(STONE, mask::cell(first, across, down));
                     assert_eq!((hot.get(across, down), set.get(across, down)), (held.is_ok(), held == Ok(true)), "({across}, {down}) of {side} from ({x}, {y})");
                 }
                 set.and(&disc);
                 hot.and(&disc);
                 assert_eq!((&set_under, &hot_under), (&set, &hot), "{side} from ({x}, {y}), under a disc");
+                assert_eq!(mask::any_under(turn, STONE, at, &disc), !set.is_empty(), "{side} from ({x}, {y}): any under a disc");
+                // Under one cell of it: whether that cell is held.
+                if let Some((across, down)) = disc.pick(turn.random()) {
+                    let mut one = Mask::empty(side);
+                    one.set(across, down, true);
+                    assert_eq!(mask::any_under(turn, STONE, at, &one), set.get(across, down), "{side} from ({x}, {y}): under ({across}, {down})");
+                }
             }
         }
         1
