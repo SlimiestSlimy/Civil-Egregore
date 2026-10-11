@@ -247,7 +247,7 @@ four, which the counting already allows.
 All a rule's turn queues is instructions, one stream a superchunk it
 writes to (`turn/instruction.rs`), each by a function of the turn
 that queues that one and nothing else (`turn/one_instruction.rs`;
-`../../instructions/` hands them on, and `../../actions/` puts them
+`../../compares_and_writes/` hands them on, and `../../actions/` puts them
 together). An instruction is **24 bytes**:
 its first two the **opcode**, the other twenty-two what that opcode
 needs and nothing else -- sixteen bits, thirty-two, and two words.

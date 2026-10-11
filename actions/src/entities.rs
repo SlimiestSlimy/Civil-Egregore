@@ -10,7 +10,7 @@ pub use attribute_edits::{set_attribute_blocks, set_attribute_member, set_attrib
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use entity_manager::{each_attribute, AttributeBlock, Entities, EntityRef, EntityType, Header};
-use instructions::{compare, entity, write, Write};
+use compares_and_writes::{compare, entity, write, Write};
 use simulation::Turn;
 
 /// Runs `each` on every entity of the turn's superchunk waking this

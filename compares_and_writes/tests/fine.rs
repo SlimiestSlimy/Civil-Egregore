@@ -8,7 +8,7 @@ use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::Entities;
-use instructions::{compare, write, Turn, Write};
+use compares_and_writes::{compare, write, Turn, Write};
 use simulation::Simulation;
 use utilities::rng::Rng;
 

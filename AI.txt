@@ -513,6 +513,21 @@ threads`.
   of an entity, a better name is \"atribute_list or array or
   watever". DONE: "attribute list" in entity_manager's comments and
   docs and the glossary (no identifier was named run).
+- BEFORE CLIMATE, the user's answers 2026-10-11 (asked): do
+  neighbour picking the same wherever tiles fall; the fragile
+  collision test; a crossing as one move; sheep "Roam further and
+  more often"; the rule's row holds "Name and master only". Mask
+  instructions: "this will have to wait for now haha, too much
+  complex stuff". Morton pathfinding: not picked, after climate.
+  Order I take: the crate's name, rule kinds, neighbour picking,
+  collision test, crossing as one move, sheep roaming.
+- NAME, the user 2026-10-11, of the instructions crate:
+  "compares_and_writes might be good, that basically what we have
+  there now lmao". DONE: the crate is `compares_and_writes`.
+- RULE KINDS, the user 2026-10-11: "kinds are the first byte of the
+  typeid, what weve been calling supertypes so far, in this case we
+  want 2 new supertypes/kinds, for SCA rules and Entity rules". So
+  two new first-byte values, not one with two kinds under it.
 - RULES IN THE REGISTRY, the user 2026-10-11: "every rule has a master
   entity type or plane, regardless of what planes or entities the rule
   reads or writes". So a rule's row names its one master. Not built.

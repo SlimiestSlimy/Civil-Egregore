@@ -1,6 +1,6 @@
 //! Writes: a cell, an entity's attribute or wake, a count -- each one
 //! instruction, applied only if every compare open as it was queued
-//! holds when it is come to (`docs/instructions.md`, "Writes").
+//! holds when it is come to (`docs/compares_and_writes.md`, "Writes").
 
 use chunk_storage::LayerType;
 use coordinates::CellIndex;

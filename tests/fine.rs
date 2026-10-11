@@ -350,7 +350,7 @@ const RULES_CRATES: [&str; 2] = ["sca_rules", "entity_rules"];
 #[test]
 fn the_rules_ask_actions_alone() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let under = ["instructions::", "simulation::", "bitplane_manager::", "entity_manager::", "chunk_storage::", "coordinates::", "type_registry::", "utilities::", "pathfinding::", "worldgen::", "server::"];
+    let under = ["compares_and_writes::", "simulation::", "bitplane_manager::", "entity_manager::", "chunk_storage::", "coordinates::", "type_registry::", "utilities::", "pathfinding::", "worldgen::", "server::"];
     let mut wrong = Vec::new();
     for rules in RULES_CRATES {
         let mut sources = Vec::new();

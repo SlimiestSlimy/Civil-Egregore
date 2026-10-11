@@ -12,8 +12,8 @@ The simulation (`../../simulation/`) reads and writes cells and
 entities, and ticks: its turn hands out windows of a layer, a cell's
 bit or number, the entities waking and standing, and queues
 instructions. What it queues, one function an instruction -- a
-compare, a write, the end of a compare -- is `../../instructions/`
-(`../../instructions/docs/instructions.md`). Everything else a rule
+compare, a write, the end of a compare -- is `../../compares_and_writes/`
+(`../../compares_and_writes/docs/compares_and_writes.md`). Everything else a rule
 would otherwise write for itself is here, once, and is an action:
 
 - **every read**: a query is a plain call that reads the turn and
@@ -427,9 +427,9 @@ Then what is made of several instructions: a cell set if it was
 clear, an entity made with its attributes, a step, a crossing, an
 attribute edited member by member, an entity changed whole. The turn
 built each itself; it now queues single instructions
-(`../../instructions/`), and these are built here from them. A tick of
+(`../../compares_and_writes/`), and these are built here from them. A tick of
 `pasture 1000 333 4000 4 1`, less the same run with no ticks, went
 from 131.8 million of the processor's instructions to 140.1 with each
 queued by a call of its own, and to 134.4 with a compare and its
-writes queued in one call (`instructions::compare::with_writes`); the
+writes queued in one call (`compares_and_writes::compare::with_writes`); the
 world the same to the cell.

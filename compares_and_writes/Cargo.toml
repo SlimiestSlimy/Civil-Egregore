@@ -1,7 +1,7 @@
 [package]
-name = "instructions"
+name = "compares_and_writes"
 edition = "2024"
-description = "Civil Egregore's instructions: the few things a rule's turn queues for a tick's second phase -- a compare, a write, the end of a compare -- each one function, over the simulation's turn; what actions are made of"
+description = "Civil Egregore's compares and writes, its instructions: the few things a rule's turn queues for a tick's second phase -- a compare, a write, the end of a compare -- each one function, over the simulation's turn; what actions are made of"
 
 [dependencies]
 simulation = { path = "../simulation" }

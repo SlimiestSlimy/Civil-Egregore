@@ -1,11 +1,11 @@
-# Instructions: reference
+# Compares and writes: reference
 
-Function by function. The design: `instructions.md`. `lib.rs` hands on
+Function by function. The design: `compares_and_writes.md`. `lib.rs` hands on
 the simulation's `Turn`, which every function is over.
 
 ## `compare.rs`
 
-`instructions.md`, "Compares". **`Compare`**: the simulation's, what a
+`compares_and_writes.md`, "Compares". **`Compare`**: the simulation's, what a
 rule saw. **`holds(layer_type, cell)`**, **`lacks(layer_type, cell)`**:
 of a layer of a bit a cell; **`value(plane, cell, seen)`**: of the
 number a wide plane holds; **`cell_free(cell)`**: an entity may be
@@ -18,18 +18,18 @@ queued, open until closed, one within another.
 **`from_here(turn, compare)`**: queued, taking the place of the one
 given before; **`end(turn)`**: its end.
 **`with_writes(turn, compare, writes)`**: the compare, the writes and
-its end in one call (`instructions.md`, "A compare and its writes at
+its end in one call (`compares_and_writes.md`, "A compare and its writes at
 once"); `lib.rs` hands on **`Write`**, a write as a value.
 
 ## `write.rs`
 
-`instructions.md`, "Writes". **`cell(turn, layer_type, cell, value,
+`compares_and_writes.md`, "Writes". **`cell(turn, layer_type, cell, value,
 counted)`**; **`count(turn, counted)`**; **`attribute_member(turn, at,
 kind, member, value)`**; **`attribute_whole(turn, at, attribute)`**;
 **`attribute_removed(turn, at, kind)`**; **`wake(turn, at, wake)`**.
 
 ## `entity.rs`
 
-`instructions.md`, "Writes". **`make(turn, header)`**;
+`compares_and_writes.md`, "Writes". **`make(turn, header)`**;
 **`move_to(turn, from, to)`**; **`remove(turn, at)`**;
 **`cross(turn, left, after, default, attributes)`**.
