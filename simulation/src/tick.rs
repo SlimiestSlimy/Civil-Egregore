@@ -6,8 +6,9 @@
 
 mod crossings;
 
-use entity_manager::{Arrival, Entities, EntityReader, Instructions, InstructionsApplied, Settled, SuperchunkEntities};
-use crate::turn::conditional::{Applied, CountedWhenApplied, Standing, COUNTED_WHEN_APPLIED};
+use entity_manager::{Arrival, Entities, EntityReader, InstructionsApplied, Settled, SuperchunkEntities};
+use crate::turn::apply::{Applied, Standing};
+use crate::turn::conditional::{CountedWhenApplied, COUNTED_WHEN_APPLIED};
 use crate::turn::{slot, Outbox, Turn};
 use bitplane_manager::{BitmapArena, Reader, Superchunk, WritesApplied};
 use chunk_storage::LayerType;
@@ -228,10 +229,10 @@ impl Simulation {
                     order.sort_by_key(|segment| segment.0);
                     for (_, source, from, segment) in order.drain(..) {
                         let (outbox, from, segment) = (&outboxes[source as usize], from as usize, segment as usize);
-                        let (steps, queued) = (&outbox.conditional[from], &outbox.instructions[from]);
+                        let queue = &outbox.queues[from];
                         let (begun, next) = (outbox.segments[from][segment], outbox.segments[from].get(segment + 1));
-                        let ends = next.map_or((steps.len(), queued.len()), |next| (next.steps as usize, next.instructions as usize));
-                        steps.apply(begun.steps as usize..ends.0, begun.instructions as usize..ends.1, begun.compares as usize, superchunk, entities, queued, now + 1, collision, &mut applied);
+                        let end = next.map_or(queue.len(), |next| next.instructions as usize);
+                        queue.apply(begun.instructions as usize..end, begun.compares as usize, superchunk, entities, now + 1, collision, &mut applied);
                     }
                     entities.sort_wakes(now + 1);
                 }
@@ -259,12 +260,10 @@ impl Simulation {
                     continue;
                 };
                 if superchunk_indices.binary_search(&target).is_err() {
-                    outbox.conditional[slot(dx, dy)].count_missed(&mut applied);
-                    outbox.instructions[slot(dx, dy)].count_lost(&mut instructions_applied);
+                    outbox.queues[slot(dx, dy)].count_missed(&mut applied, &mut instructions_applied);
                 }
             }
-            outbox.instructions.iter_mut().for_each(Instructions::clear);
-            outbox.conditional.iter_mut().for_each(|conditional| conditional.clear());
+            outbox.queues.iter_mut().for_each(|queue| queue.clear());
             outbox.segments.iter_mut().for_each(Vec::clear);
         }
         entities.advance();

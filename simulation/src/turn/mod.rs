@@ -3,10 +3,12 @@
 //! the entities read and the instructions queued
 //! (`docs/simulation.md`, "What a rule is given").
 
+pub(crate) mod apply;
 pub(crate) mod conditional;
 mod entities;
+pub(crate) mod instruction;
 
-use entity_manager::{EntityReader, Instructions, SuperchunkEntities};
+use entity_manager::{EntityReader, SuperchunkEntities};
 use crate::sampling::sample_layer;
 use bitplane_manager::{NotHot, Reader, SmallTiles, Superchunk, Window};
 use chunk_storage::{LayerType, Wide, Width};
@@ -23,14 +25,12 @@ pub(crate) fn slot(dx: i32, dy: i32) -> usize {
     ((dy + 1) * 3 + dx + 1) as usize
 }
 
-/// The instructions and compare-and-writes a superchunk's rule queues in a tick, by
-/// the superchunk they land in: itself, or one of its eight neighbours.
+/// The instructions a superchunk's rule queues in a tick, by the
+/// superchunk they land in: itself, or one of its eight neighbours.
 #[derive(Default)]
 pub(crate) struct Outbox {
-    /// Instructions, a queue a superchunk, by [`slot`].
-    pub(crate) instructions: [Instructions; SLOTS],
-    /// What is queued under compares, a queue a superchunk, by [`slot`].
-    pub(crate) conditional: [conditional::Conditional; SLOTS],
+    /// The instructions, a queue a superchunk, by [`slot`].
+    pub(crate) queues: [conditional::Queue; SLOTS],
     /// Where what each author queued begins in those queues, a list a
     /// superchunk, by [`slot`], in the order queued.
     pub(crate) segments: [Vec<Segment>; SLOTS],
@@ -45,12 +45,10 @@ pub(crate) struct Segment {
     /// The author: its cell's place in reading order
     /// ([`Turn::seeing_to`]), or 0 for the superchunk's rule itself.
     pub(crate) author: u64,
-    /// The first of its steps.
-    pub(crate) steps: u32,
     /// The first of its instructions.
     pub(crate) instructions: u32,
     /// The first of its compares, among what is noted of each beside
-    /// the steps.
+    /// the instructions.
     pub(crate) compares: u32,
 }
 
@@ -203,8 +201,8 @@ impl<'a> Turn<'a> {
         let slot = self.slot_of(superchunk);
         assert!(self.comparing.is_none_or(|compare| compare.at().superchunk() == superchunk), "queued under a compare in another superchunk");
         if self.outbox.segments[slot].last().is_none_or(|last| last.author != self.author) {
-            let (steps, instructions, compares) = (self.outbox.conditional[slot].len() as u32, self.outbox.instructions[slot].len() as u32, self.outbox.conditional[slot].compares() as u32);
-            self.outbox.segments[slot].push(Segment { author: self.author, steps, instructions, compares });
+            let (instructions, compares) = (self.outbox.queues[slot].len() as u32, self.outbox.queues[slot].compares() as u32);
+            self.outbox.segments[slot].push(Segment { author: self.author, instructions, compares });
         }
         slot
     }

@@ -25,7 +25,7 @@ fn attributes_come_and_go_at_run_time() {
     let mut simulation = Simulation::new(1);
     for _ in 1..=101u64 {
         let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), count_and_flip);
-        assert_eq!((report.rules, report.instructions_applied.moves), (300, 300));
+        assert_eq!((report.rules, report.instructions_applied.wakes), (300, 300));
     }
     assert_eq!(entities.len(), 300);
     for entity in entities.iter() {

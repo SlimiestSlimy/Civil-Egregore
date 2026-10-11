@@ -14,7 +14,7 @@ mod entities {
 
     use crate::tests::{cell, walker, world, STONE};
     use coordinates::CellIndex;
-    use entity_manager::{Attribute, AttributeBlock, EntityEdit, NEVER};
+    use entity_manager::{Attribute, AttributeBlock, NEVER};
     use instructions::around;
     use instructions::{entities, Turn};
     use simulation::Simulation;
@@ -22,8 +22,6 @@ mod entities {
 
     /// An attribute.
     const NAME: Attribute<u64> = Attribute::new(41);
-    /// Another.
-    const MARK: Attribute<u64> = Attribute::new(42);
 
     /// An entity its rule looks over and leaves as it was is moved, or put
     /// to sleep, with nothing carried; one with an attribute changed has
@@ -37,24 +35,17 @@ mod entities {
         entities.apply();
         let mut simulation = Simulation::new(1);
         let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
-            let mut room = Vec::new();
             for entity in turn.woken() {
-                let mut edit = EntityEdit::of(entity, &mut room);
-                // Set to what it is: no change. The second walker's is changed, and another added and removed.
-                edit.set(NAME, 7);
-                assert_eq!(edit.unset(MARK), None);
-                assert!(!edit.edited());
+                // The first is left as it was; the second walker's name is changed.
                 if entity.header.at == cell(40, 40) {
-                    edit.set(NAME, 8);
-                    edit.set(MARK, 1);
-                    assert_eq!((edit.get(NAME), edit.get(MARK), edit.unset(MARK)), (Some(8), Some(1), Some(1)));
+                    entities::set_attribute_of(turn, &entity.header, NAME, entity.attribute(NAME), 8);
                 }
                 let to = entity.header.at.offset(1, 1).expect("in the world");
-                entities::commit(turn, edit, to, NEVER);
+                entities::step(turn, &entity.header, to, NEVER);
             }
             0
         });
-        assert_eq!((report.instructions_applied.moves, report.instructions_applied.puts, report.instructions_applied.edits, report.instructions_compared), (2, 0, 1, (1, 0)));
+        assert_eq!((report.instructions_applied.moves, report.instructions_applied.puts, report.instructions_applied.edits, report.instructions_compared), (2, 0, 1, (3, 0)));
         assert_eq!(entities.get(cell(41, 31)).expect("moved").attributes, [AttributeBlock::holding(NAME, 7)]);
         assert_eq!(entities.get(cell(41, 41)).expect("moved").attributes, [AttributeBlock::holding(NAME, 8)]);
     }

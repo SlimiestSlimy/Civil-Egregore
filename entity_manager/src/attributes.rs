@@ -82,6 +82,29 @@ pub fn find_attribute(blocks: &[AttributeBlock], kind: AttributeType) -> Result<
     Err(blocks.len())
 }
 
+/// Where the attribute whose type's number is `number` is in
+/// `blocks`, an entity's, sorted by type: its blocks, if it is there.
+/// The walk of [`find_attribute`], by the number alone -- what an
+/// instruction has room to name an attribute by.
+#[inline]
+pub fn find_attribute_numbered(blocks: &[AttributeBlock], number: u64) -> Option<Range<usize>> {
+    let mut at = 0;
+    while let Some(first) = blocks.get(at) {
+        if first.kind().number() >= number {
+            return (first.kind().number() == number).then(|| at..(at + first.blocks()).min(blocks.len()));
+        }
+        at += first.blocks();
+    }
+    None
+}
+
+/// The words of the attribute `blocks` is, from the one `offset`
+/// after its first -- its type -- on: its data, its blocks one after
+/// another.
+pub fn attribute_words(blocks: &[AttributeBlock], offset: usize) -> impl Iterator<Item = u64> + '_ {
+    blocks.iter().flat_map(|block| block.0).skip(1 + offset)
+}
+
 /// A sum of `blocks`, the same for the same blocks in the same order:
 /// what two runs of attributes are told apart by where one of them is
 /// not at hand -- in another superchunk, or queued with a compare. Two

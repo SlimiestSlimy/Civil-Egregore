@@ -514,6 +514,67 @@ B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    And: "we probably need some compare and read instructions for
    the wheels, but honestly not right now, only the schedule wakeup
    write instruction is necessary for now".
+   The user asked: "why do you make lambs remember their
+   offspring?" ANSWERED: the mother remembers where she put the lamb
+   (and the lamb the way back) only because a put can be refused and
+   nothing tells her; a compare "the lamb's cell is free" gating the
+   make AND her not-pregnant write would remove it all, but her write
+   and the lamb's cell can be in two superchunks, and what is under a
+   compare must land in the compare's superchunk. WAITING on the
+   user's call on that limit; if lifted, delete bearing_neighbour,
+   mother_neighbour, lamb_put_stands and the extra wake.
+   DONE (c077937): EntityId removed everywhere.
+   THE USER'S CALL (2026-10-11): "aight fair, so lambs only
+   remembers the position of the offspring to double check birth on
+   the next tick, that can be solved, gate birth itself lmao. also, on
+   the outgoing queues to other superchunks. the same situation
+   applies, every write must be gated by a compare including on
+   neighboring chunk queues, thats a hard rule we should write
+   somewhere. and should solve the issue".
+   HARD RULE: EVERY WRITE IS UNDER A COMPARE, in every queue, a
+   neighbour's too (asserted where instructions are queued).
+   CORRECTED by the user: "on the contrary, births should not be
+   lost, they should be retried, i never said otherwise". So the
+   birth stays as it is (the mother looks the tick after, retries)
+   until gating can cover it. TOLD THE USER what is missing: her
+   not-pregnant write must hang on the make, which is gated in
+   ANOTHER superchunk's queue when the lamb lands over a border, and
+   a queue cannot see how a compare in another came out. PROPOSED,
+   NOT BUILT, WAITING: a compare's outcome visible to the neighbour
+   after the apply -- writes hanging on a compare of another queue
+   applied in a short pass after all superchunks applied; crossings
+   (put there, settle here) become one use of it.
+   The user again: "gating the birth writes on the neighbor
+   superchunk queues solves the double explicit double check,
+   because when the neighboring chunk processes the gated writes for
+   the birth it can either succeed completetly or fail completely.
+   so the pregnant entity only stops being pregnant when the child
+   is born, otherwise is like nothing happened". TOLD: true in one
+   superchunk; over a border the neighbour does not hold the
+   mother's data. PLAN SAID TO THE USER (do after the stream is
+   green, unless they object): the mother queues only the gated
+   birth and remembers nothing; the LAMB on its first wake, the tick
+   after, writes its mother not-pregnant (entity writes entity,
+   gated, works over borders); the mother does not retry before
+   that can have landed. Same-superchunk births could be fully
+   under one compare -- but keep ONE way, borders invisible.
+   The user: "not exacly, you see, the real restriction is that
+   every entity can only interact with one apply queue at a time.
+   thats what we have to take advantage of". MY READING, told: in a
+   tick all an entity queues goes to ONE queue, so one compare gates
+   it all; a birth over a border goes whole to the neighbour's, the
+   mother writes nothing of herself, the lamb tells her on its first
+   wake. ASKED (WAITING): is her own next wake exempt (a write to
+   her own wheel = a second queue), else who wakes her after a
+   refused birth?
+   The user: "lets go back for a moment, how did we solve the issues
+   with entities crossing chunk boundaries last time?" ANSWERED: made
+   there under cell-free, asleep here, then settle_crossings after
+   every superchunk applied removes the original (or turns back).
+   OFFERED (WAITING for "yes"): make that after-pass general -- a
+   write at home that happens only if a make in the neighbour did --
+   for crossings and births both; then delete bearing_neighbour,
+   mother_neighbour, lamb_put_stands.
    ORDER NOW: (1) EntityId removed everywhere -- an entity is named
    by the cell the tick found it on; (2) the instruction set as the
    three families, 24 bytes, attribute writes of 16 bytes at the

@@ -7,14 +7,12 @@
 //! held against is a compare queued before it
 //! (`docs/simulation.md`, "Compare-and-write").
 
+use super::instruction::{Instruction, NO_COUNT};
 use super::Turn;
-use bitplane_manager::{Superchunk, Write, WriteOp, WritesApplied};
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{attribute_blocks, attribute_seen, AttributeBlock, AttributeType, CollisionCells, Instructions, InstructionsApplied, SuperchunkEntities};
+use entity_manager::{attribute_seen, AttributeBlock, AttributeType};
 
-/// A write that counts nothing.
-const NO_COUNT: u32 = u32::MAX;
 /// As many compares as are open at once, one within another: the
 /// rule's, one a write is queued under, the write's own.
 pub(crate) const COMPARES_WITHIN: usize = 4;
@@ -24,8 +22,8 @@ pub(crate) const COMPARES_WITHIN: usize = 4;
 pub(crate) struct CompareOpen {
     /// The cell it is of.
     at: CellIndex,
-    /// Which step of its superchunk's queue it is.
-    step: u32,
+    /// Which instruction of its superchunk's queue it is.
+    instruction: u32,
     /// Which of the queue's [`Gated`] is its.
     gated: u32,
     /// Writes of cells the turn had queued when it was opened.
@@ -34,7 +32,7 @@ pub(crate) struct CompareOpen {
 
 impl CompareOpen {
     /// None: what a stack with nothing open holds.
-    pub(crate) const NONE: Self = Self { at: CellIndex(0), step: 0, gated: 0, writes_before: 0 };
+    pub(crate) const NONE: Self = Self { at: CellIndex(0), instruction: 0, gated: 0, writes_before: 0 };
 }
 /// As many numbers as a tick counts when applied
 /// ([`Turn::count_under`]): a count's is under this.
@@ -46,8 +44,8 @@ pub type CountedWhenApplied = [u64; COUNTED_WHEN_APPLIED];
 
 /// What a rule saw, held against what is there as the compare is
 /// come to: of a cell or of an entity, in the superchunk what it
-/// lets be written lands in. 64 bits of what was seen at the most:
-/// never a block.
+/// lets be written lands in. Sixteen bytes of what was seen at the
+/// most: never a block.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Compare {
     /// The number `layer_type` holds at `at` is `seen` -- 1 or 0 on a
@@ -59,6 +57,20 @@ pub enum Compare {
         at: CellIndex,
         /// What the rule saw there.
         seen: u16,
+    },
+    /// The entity of type `kind` the tick found on `at` is there
+    /// still, wherever it stands now.
+    Entity {
+        /// The cell the tick found it on: its name.
+        at: CellIndex,
+        /// Its type.
+        kind: entity_manager::EntityType,
+    },
+    /// An entity may be made on `at`: nobody stands on it, it is
+    /// nobody's name this tick, the collision plane does not hold it.
+    CellFree {
+        /// The cell.
+        at: CellIndex,
     },
     /// The entity the tick found on `at` is there still, wherever it
     /// stands now, and its attribute of type `kind` is as seen -- or
@@ -72,6 +84,21 @@ pub enum Compare {
         /// (`entity_manager::attribute_seen`).
         seen: u64,
     },
+    /// The entity the tick found on `at` has the attribute of type
+    /// `kind`, and its words from `offset` -- counted after its
+    /// first, its type -- are `words`, the first `count` of them.
+    AttributeWords {
+        /// The cell the tick found it on: its name.
+        at: CellIndex,
+        /// The attribute's type.
+        kind: AttributeType,
+        /// The first word's offset.
+        offset: u16,
+        /// How many words: one or two.
+        count: u16,
+        /// The words as the rule saw them.
+        words: [u64; 2],
+    },
 }
 
 impl Compare {
@@ -81,150 +108,74 @@ impl Compare {
         Self::Attribute { at, kind, seen: attribute_seen(seen) }
     }
 
+    /// The entity the tick found on `at`, the words of its attribute
+    /// of type `kind` from `offset` the one or two `words`.
+    pub fn attribute_words(at: CellIndex, kind: AttributeType, offset: usize, words: &[u64]) -> Self {
+        assert!((1..=2).contains(&words.len()), "{} words in one compare: it has room for two", words.len());
+        Self::AttributeWords { at, kind, offset: offset as u16, count: words.len() as u16, words: [words[0], words.get(1).copied().unwrap_or(0)] }
+    }
+
     /// The cell what is compared is on.
     pub(crate) fn at(&self) -> CellIndex {
         match *self {
-            Self::Cell { at, .. } | Self::Attribute { at, .. } => at,
+            Self::Cell { at, .. } | Self::CellFree { at } | Self::Entity { at, .. } | Self::Attribute { at, .. } | Self::AttributeWords { at, .. } => at,
         }
     }
 
-    /// Whether it holds now, in `superchunk` and its `entities`: not
-    /// where the cell is not hot, nor if the entity no longer stands
-    /// there.
-    fn holds(&self, superchunk: &Superchunk, entities: &SuperchunkEntities) -> bool {
+    /// The instruction it is queued as.
+    fn instruction(&self) -> Instruction {
         match *self {
-            Self::Cell { layer_type, at, seen } => superchunk.value_at(layer_type, at) == Some(u32::from(seen)),
-            Self::Attribute { at, kind, seen } => entities.get_named(at).is_some_and(|entity| attribute_seen(attribute_blocks(entity.attributes, kind)) == seen),
+            Self::Cell { layer_type, at, seen } => Instruction::compare_cell(layer_type, at, seen),
+            Self::CellFree { at } => Instruction::compare_cell_free(at),
+            Self::Entity { at, kind } => Instruction::compare_entity(at, kind.0),
+            Self::Attribute { at, kind, seen } => Instruction::compare_attribute(at, kind, seen),
+            Self::AttributeWords { at, kind, offset, count, words } => Instruction::compare_attribute_words(at, kind, offset as usize, &words[..count as usize]),
         }
     }
 }
 
-/// A superchunk's collision plane as its entities keep it while their
-/// instructions are applied: `layer` of `superchunk`, or none -- a
-/// world with no such plane (`docs/simulation.md`, "Entities").
-pub(crate) struct Standing<'a> {
-    /// The superchunk.
-    pub(crate) superchunk: &'a mut Superchunk,
-    /// The collision plane's layer, if entities are kept in one.
-    pub(crate) layer: Option<LayerType>,
-}
-
-impl Standing<'_> {
-    /// Writes `to` at `at` of the plane, if there is one. Not counted
-    /// among the tick's writes: it is part of the entity's instruction.
-    fn write(&mut self, at: CellIndex, to: WriteOp) {
-        if let Some(layer) = self.layer {
-            self.superchunk.apply(layer, Write::cell(at, to), &mut WritesApplied::default());
-        }
-    }
-}
-
-impl CollisionCells for Standing<'_> {
-    fn held(&self, at: CellIndex) -> bool {
-        self.layer.is_some_and(|layer| self.superchunk.value_at(layer, at) == Some(1))
-    }
-
-    fn hold(&mut self, at: CellIndex) {
-        self.write(at, WriteOp::Set);
-    }
-
-    fn free(&mut self, at: CellIndex) {
-        self.write(at, WriteOp::Unset);
-    }
-}
-
-/// What a step is.
-#[derive(Clone, Copy)]
-enum Does {
-    /// A compare: if it does not hold as it is come to, what its
-    /// author queued after it for the superchunk is skipped, up to
-    /// its [`Does::CompareEnd`]. One may lie within another: skipped
-    /// with it, and skipping no more than its own.
-    Compare(Compare),
-    /// The end of a compare: what follows is not under it.
-    CompareEnd,
-    /// Makes the number of a layer at a cell `value`, and counts
-    /// `count` if not [`NO_COUNT`]. A write and nothing else: what
-    /// the rule saw at the cell is a compare queued before it.
-    Write {
-        /// The layer.
-        layer_type: LayerType,
-        /// The cell.
-        at: CellIndex,
-        /// What it holds after.
-        value: u16,
-        /// What is counted.
-        count: u32,
-    },
-    /// Counts one under a number.
-    Count(u32),
-}
-
-/// A step queued: what it is, and how many of its queue's entity
-/// instructions were queued before it -- come to before it.
-#[derive(Clone, Copy)]
-pub(crate) struct Step {
-    /// What it is.
-    does: Does,
-    /// Instructions queued before it.
-    before: u32,
-}
-
-/// What is under one compare, kept beside the steps and not in them
-/// -- a step's room is for what it compares and writes: one of these
-/// a compare, in the order the compares are queued, so read in the
-/// order they are come to.
+/// What is under one compare, kept beside the instructions and not in
+/// them -- an instruction's room is for what it compares and writes:
+/// one of these a compare, in the order the compares are queued, so
+/// read in the order they are come to.
 #[derive(Clone, Copy, Default)]
 pub(crate) struct Gated {
-    /// The steps after the compare that are under it, up to its end:
-    /// what it jumps over if it does not hold.
-    steps: u32,
+    /// The instructions after the compare that are under it, up to
+    /// its end: what it jumps over if it does not hold.
+    pub(crate) instructions: u32,
     /// The compares within it: as many of these are passed over with
     /// it.
-    compares_within: u16,
-    /// How many of the steps under it are writes of cells: counted
-    /// as refused when jumped over.
-    writes: u16,
+    pub(crate) compares_within: u16,
+    /// How many of the instructions under it are writes of cells:
+    /// counted as refused when jumped over.
+    pub(crate) writes: u16,
 }
 
-// A step is small whatever it is: no compare carries a block.
-const _: () = assert!(size_of::<Step>() <= 48 && size_of::<Compare>() <= 40 && size_of::<Gated>() == 8);
+// A compare is small whatever it is of, and what is under one is noted in eight bytes.
+const _: () = assert!(size_of::<Compare>() <= 40 && size_of::<Gated>() == 8);
 
-/// What a superchunk's rule queues for one superchunk beside its
-/// entity instructions -- compares, cell writes, counts -- in the
-/// order queued.
+/// What a superchunk's rule queues for one superchunk: instructions
+/// in the order queued, what is under each compare among them, and
+/// the blocks the crossings carry.
 #[derive(Default)]
-pub(crate) struct Conditional {
-    /// The steps.
-    steps: Vec<Step>,
+pub(crate) struct Queue {
+    /// The instructions.
+    pub(crate) instructions: Vec<Instruction>,
     /// What is under each compare among them, a compare each, in
     /// the order queued.
-    gated: Vec<Gated>,
+    pub(crate) gated: Vec<Gated>,
+    /// What the entities crossing are made with: for each, a block
+    /// whose first two words are its type and its wake, then its
+    /// attributes'.
+    pub(crate) carried: Vec<AttributeBlock>,
 }
 
-/// What a thread applied in a tick's second phase.
-pub(crate) struct Applied {
-    /// What applying the writes did.
-    pub(crate) writes: WritesApplied,
-    /// What applying the instructions did.
-    pub(crate) instructions: InstructionsApplied,
-    /// Compares come to that held, and that did not.
-    pub(crate) compared: (u64, u64),
-    /// What was counted as it was applied.
-    pub(crate) counted: CountedWhenApplied,
-}
-
-impl Default for Applied {
-    fn default() -> Self {
-        Self { writes: Default::default(), instructions: Default::default(), compared: (0, 0), counted: [0; COUNTED_WHEN_APPLIED] }
-    }
-}
-
-impl Conditional {
+impl Queue {
     /// Empties it, keeping its room.
     pub(crate) fn clear(&mut self) {
-        self.steps.clear();
+        self.instructions.clear();
         self.gated.clear();
+        self.carried.clear();
     }
 
     /// How many compares are queued.
@@ -232,65 +183,9 @@ impl Conditional {
         self.gated.len()
     }
 
-    /// How many steps are queued.
+    /// How many instructions are queued.
     pub(crate) fn len(&self) -> usize {
-        self.steps.len()
-    }
-
-    /// Counts every write under a compare as missed: its superchunk is
-    /// not hot.
-    pub(crate) fn count_missed(&self, applied: &mut WritesApplied) {
-        let writes = self.steps.iter().filter(|step| matches!(step.does, Does::Write { .. })).count();
-        (applied.writes, applied.missed) = (applied.writes + writes, applied.missed + writes as u64);
-    }
-
-    /// Applies the steps at `steps` and those of `instructions` at
-    /// `queued` -- one author's ([`super::Segment`]), whose compares
-    /// are those from `compares` on -- to
-    /// `superchunk` and its `entities`, in the order queued, each as
-    /// it is come to. A compare that does not hold has what follows
-    /// skipped, writes, instructions and counts alike, up to the next
-    /// compare or the end of the compare: so what one applied
-    /// changed, the next compare is held against. `collision` is the
-    /// layer entities are kept in, if the world has one ([`Standing`]).
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn apply(&self, steps: std::ops::Range<usize>, queued: std::ops::Range<usize>, mut compares: usize, superchunk: &mut Superchunk, entities: &mut SuperchunkEntities, instructions: &Instructions, earliest: u64, collision: Option<LayerType>, applied: &mut Applied) {
-        let (mut next, mut at_step, last_step) = (queued.start, steps.start, steps.end);
-        while at_step < last_step {
-            let step = &self.steps[at_step];
-            at_step += 1;
-            instructions.apply_some(next..step.before as usize, std::slice::from_mut(entities), earliest, &mut applied.instructions, &mut Standing { superchunk, layer: collision });
-            next = step.before as usize;
-            match step.does {
-                Does::Compare(compare) => {
-                    let gated = self.gated[compares];
-                    compares += 1;
-                    if compare.holds(superchunk, entities) {
-                        applied.compared.0 += 1;
-                        continue;
-                    }
-                    applied.compared.1 += 1;
-                    // Over all that is under it at once: to its end, or the end of what the author queued.
-                    (at_step, compares) = (at_step + gated.steps as usize, compares + gated.compares_within as usize);
-                    (applied.writes.writes, applied.writes.refused) = (applied.writes.writes + gated.writes as usize, applied.writes.refused + u64::from(gated.writes));
-                    next = self.steps[..last_step].get(at_step).map_or(queued.end, |after| after.before as usize);
-                }
-                Does::CompareEnd => {}
-                Does::Write { layer_type, at, value, count } => {
-                    applied.writes.writes += 1;
-                    if superchunk.value_at(layer_type, at).is_none() {
-                        applied.writes.missed += 1;
-                    } else {
-                        superchunk.apply(layer_type, Write::cell(at, WriteOp::Put(value)), &mut applied.writes);
-                        if count != NO_COUNT {
-                            applied.counted[count as usize] += 1;
-                        }
-                    }
-                }
-                Does::Count(number) => applied.counted[number as usize] += 1,
-            }
-        }
-        instructions.apply_some(next..queued.end, std::slice::from_mut(entities), earliest, &mut applied.instructions, &mut Standing { superchunk, layer: collision });
+        self.instructions.len()
     }
 }
 
@@ -309,25 +204,53 @@ impl Turn<'_> {
         number
     }
 
-    /// Queues `does` for the superchunk of the cell `lands`, after
-    /// whatever its author queued before.
-    fn queue_step(&mut self, lands: CellIndex, does: Does) {
-        debug_assert!(self.compares_open[..self.compares_open_count].iter().all(|open| open.at.superchunk() == lands.superchunk()), "a step under a compare of another superchunk");
+    /// Queues `instruction` for the superchunk of the cell `lands`,
+    /// after whatever its author queued before. One that writes lies
+    /// under a compare, whichever superchunk's queue it goes to: no
+    /// write is held against nothing
+    /// (`docs/simulation.md`, "Compare-and-write", the hard rule).
+    pub(crate) fn queue(&mut self, lands: CellIndex, instruction: Instruction) {
+        assert!(self.compares_open_count > 0 || !instruction.is_a_write(), "a write under no compare: {:?}", instruction.opcode);
+        debug_assert!(self.compares_open[..self.compares_open_count].iter().all(|open| open.at.superchunk() == lands.superchunk()), "an instruction under a compare of another superchunk");
         let slot = self.slot_queued(lands.superchunk());
-        let before = self.outbox.instructions[slot].len() as u32;
-        self.writes_queued += u32::from(matches!(does, Does::Write { .. }));
-        self.outbox.conditional[slot].steps.push(Step { does, before });
+        self.writes_queued += u32::from(instruction.opcode == super::instruction::Opcode::WriteCell);
+        self.outbox.queues[slot].instructions.push(instruction);
     }
 
-    /// Queues `compare`, open from here: what is queued until it is
-    /// closed is under it, and under every compare open already.
-    /// Where it lies in its queue is pushed on the turn's small stack
-    /// of compares open.
+    /// Queues the compare `compare`, of the cell `at`, the `writes`
+    /// under it and its end, at once: what [`Turn::open`], a
+    /// [`Turn::queue`] each and [`Turn::close_compare`] come to, the
+    /// queue found once -- most of what a rule queues is one compare
+    /// and a write or two.
+    #[inline]
+    pub(crate) fn queue_under(&mut self, at: CellIndex, compare: Instruction, writes: &[Instruction]) {
+        debug_assert!(compare.is_a_compare() && writes.iter().all(Instruction::is_a_write));
+        debug_assert!(self.compares_open[..self.compares_open_count].iter().all(|open| open.at.superchunk() == at.superchunk()), "an instruction under a compare of another superchunk");
+        let slot = self.slot_queued(at.superchunk());
+        let cell_writes = writes.iter().filter(|write| write.opcode == super::instruction::Opcode::WriteCell).count();
+        self.writes_queued += cell_writes as u32;
+        let queue = &mut self.outbox.queues[slot];
+        queue.gated.push(Gated { instructions: writes.len() as u32, compares_within: 0, writes: cell_writes as u16 });
+        queue.instructions.push(compare);
+        queue.instructions.extend_from_slice(writes);
+        queue.instructions.push(Instruction::compare_end());
+    }
+
+    /// Queues `compare`, open from here ([`Turn::open`]).
     pub(crate) fn open_compare(&mut self, compare: Compare) {
-        self.queue_step(compare.at(), Does::Compare(compare));
-        let queue = &mut self.outbox.conditional[self.slot_of(compare.at().superchunk())];
+        self.open(compare.at(), compare.instruction());
+    }
+
+    /// Queues the compare `instruction`, of the cell `at`, open from
+    /// here: what is queued until it is closed is under it, and under
+    /// every compare open already. Where it lies in its queue is
+    /// pushed on the turn's small stack of compares open.
+    pub(crate) fn open(&mut self, at: CellIndex, instruction: Instruction) {
+        debug_assert!(instruction.is_a_compare());
+        self.queue(at, instruction);
+        let queue = &mut self.outbox.queues[self.slot_of(at.superchunk())];
         // Its place among what is under each compare is kept now, in the order the compares are come to, and filled as it is closed.
-        let open = CompareOpen { at: compare.at(), step: queue.steps.len() as u32 - 1, gated: queue.gated.len() as u32, writes_before: self.writes_queued };
+        let open = CompareOpen { at, instruction: queue.instructions.len() as u32 - 1, gated: queue.gated.len() as u32, writes_before: self.writes_queued };
         queue.gated.push(Gated::default());
         assert!(self.compares_open_count < COMPARES_WITHIN, "more compares one within another than a turn keeps");
         self.compares_open[self.compares_open_count] = open;
@@ -343,11 +266,11 @@ impl Turn<'_> {
     pub(crate) fn close_compare(&mut self) {
         self.compares_open_count -= 1;
         let open = self.compares_open[self.compares_open_count];
-        let queue = &mut self.outbox.conditional[self.slot_of(open.at.superchunk())];
+        let queue = &mut self.outbox.queues[self.slot_of(open.at.superchunk())];
         let compares_within = u16::try_from(queue.gated.len() - open.gated as usize - 1).expect("more compares within one than is noted");
         let writes = u16::try_from(self.writes_queued - open.writes_before).expect("more writes under one compare than is noted");
-        queue.gated[open.gated as usize] = Gated { steps: queue.steps.len() as u32 - open.step - 1, compares_within, writes };
-        self.queue_step(open.at, Does::CompareEnd);
+        queue.gated[open.gated as usize] = Gated { instructions: queue.instructions.len() as u32 - open.instruction - 1, compares_within, writes };
+        self.queue(open.at, Instruction::compare_end());
     }
 
     /// From here on, what the rule queues for the compare's
@@ -389,10 +312,8 @@ impl Turn<'_> {
     /// whatever compare the rule is queuing under as well.
     pub fn queue_seen(&mut self, layer_type: LayerType, at: CellIndex, seen: u32, value: u32, counted: Option<u32>) {
         debug_assert!(seen != value, "a write that changes nothing");
-        let count = counted.map_or(NO_COUNT, |place| self.counted_number(place));
-        self.open_compare(Compare::Cell { layer_type, at, seen: seen as u16 });
-        self.queue_step(at, Does::Write { layer_type, at, value: value as u16, count });
-        self.close_compare();
+        let count = counted.map_or(NO_COUNT, |place| u64::from(self.counted_number(place)));
+        self.queue_under(at, Instruction::compare_cell(layer_type, at, seen as u16), &[Instruction::write_cell(layer_type, at, value as u16, count)]);
     }
 
     /// Adds one to the rule's count `place` if `compare` holds when it
@@ -400,7 +321,7 @@ impl Turn<'_> {
     pub fn count_if(&mut self, compare: Compare, place: u32) {
         let number = self.counted_number(place);
         self.open_compare(compare);
-        self.queue_step(compare.at(), Does::Count(number));
+        self.queue(compare.at(), Instruction::count(number));
         self.close_compare();
     }
 }

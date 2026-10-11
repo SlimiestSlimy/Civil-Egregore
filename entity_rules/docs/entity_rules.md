@@ -26,8 +26,8 @@ What every kind needs is an instruction, and not written again here
 (`../instructions/docs/instructions.md`): the 3x3
 cells beside an entity as masks, the area about it, a free cell for a
 newborn, the step towards a goal round whatever is in the way, and
-`EntityEdit`, which takes what an entity is to be and queues the instruction
-that carries least. The sheep's rule is 100 lines of what a sheep
+the writes of what an entity comes to (`entities::set_attribute_of`,
+`entities::step`), which queue no more than changed. The sheep's rule is 100 lines of what a sheep
 decides.
 
 A kind knows the cells it reads and writes, and no other rule. The
@@ -117,10 +117,12 @@ being there still when they are applied, and the grass is cleared
 last, the meal counted with it. After them, and before the grass is
 cleared, the rule queues a sleep of a step held against the grass
 being gone: one of the two is applied -- refused its meal, it wakes
-hungry as it was and looks again. What a sheep comes to is written an
-attribute at a time, each held against what the rule saw of it, then
-the sheep moved or put to sleep: it is never put whole, so what
-another entity wrote to it in the tick would stand. A lamb may land in the next
+hungry as it was and looks again. What a sheep comes to is worked out
+in a `SheepState` of the rule's own, and written if it differs from
+what the tick found: the words that changed, held against what the
+rule saw of the attribute, then the sheep moved or put to sleep. No
+copy of the sheep is kept to be changed, and it is never put whole,
+so what another entity wrote to it in the tick would stand. A lamb may land in the next
 superchunk, where the grass under its mother cannot be held against
 it, so a sheep due to bear at a meal bears at its next wake.
 

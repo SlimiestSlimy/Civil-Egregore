@@ -10,7 +10,8 @@ pub use entity_reader::{EntityReader, OCCUPIED_SIDE};
 pub use named_in_a_tick::CollisionCells;
 pub use world_entities::Entities;
 
-use crate::bucket::{place, Bucket, Put};
+use crate::bucket::{place, Bucket};
+pub use crate::bucket::Put;
 use crate::attributes::{sorted, AttributeBlock, AttributeType};
 use crate::entity::{EntityRef, Header, NEVER};
 use crate::wheel::{Wake, Wheel};
@@ -180,8 +181,8 @@ impl SuperchunkEntities {
 
     /// Gives the entity standing on `from` `header` -- its cell, when
     /// it wakes -- and `attributes` sorted by type, or, with none
-    /// given, leaves it those it has; and files its wake, no earlier
-    /// than `earliest`: what came of it
+    /// given, leaves it those it has; and files its wake, if it is
+    /// `earliest` or later: what came of it
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
     pub(crate) fn put(&mut self, earliest: u64, header: Header, from: CellIndex, attributes: Option<&[AttributeBlock]>) -> Put {
         debug_assert_eq!(header.at.superchunk(), self.index, "an entity put in a superchunk it is not in");
@@ -199,7 +200,8 @@ impl SuperchunkEntities {
             Put::PassedOver
         };
         let stands = if put == Put::Stayed { from } else { header.at };
-        if !matches!(put, Put::Refused | Put::PassedOver) && header.wake != NEVER {
+        // A wake already passed is not filed again: whatever sets its next one files that.
+        if !matches!(put, Put::Refused | Put::PassedOver) && header.wake != NEVER && header.wake >= earliest {
             self.wheel.file(earliest, header.wake, Wake { at: stands });
         }
         put
@@ -247,8 +249,10 @@ impl SuperchunkEntities {
         self.chunks[at.chunk().place()].occupied(place(at))
     }
 
-    /// Notes that an entity crossed into this superchunk.
-    pub(crate) fn arrived(&mut self, arrival: Arrival) {
+    /// Notes that an entity crossed into this superchunk: put here by
+    /// whoever applies a crossing, to be settled when the tick's
+    /// instructions are all applied.
+    pub fn arrived(&mut self, arrival: Arrival) {
         self.arrived.push(arrival);
     }
 

@@ -17,7 +17,7 @@ its ticks at 256 a second: `STEP_TICKS` (0.25 s, 64) and `STEP_JITTER`
 `LAMB_TICKS` (18 s, 4,608); and `LUSH_CELLS` (64, of the area's 256),
 `CONCEIVE_ONE_IN` (5).
 
-**`rule(turn)`**: hands **`wake`**, the rule for one sheep, to `entities::each_woken`, with a **`Flock`** (the counts, and room for attributes). Every sheep waking on the superchunk's turn sees to
+**`rule(turn)`**: hands **`wake`**, the rule for one sheep, to `entities::each_woken`, with a **`Flock`** (the counts). Every sheep waking on the superchunk's turn sees to
 what it woke for and sleeps as long as it can. Hungry (past
 its `hungry_at`) and on grass, it eats it, and is hungry again `MEAL_TICKS`
 on; hungry `STARVE_TICKS` with no meal, it dies. Its lamb due, it is
@@ -40,7 +40,7 @@ collision plane holds, so none a tree or another sheep stood on as the
 tick found it; two stepping for one cell in a tick, the second is
 turned back -- and wakes a
 step's time on (**`next_step`**). What it came to is queued by
-`entities::commit`: a move, unless an attribute changed. Before a
+`entities::set_attribute_of`, if its state changed, and `entities::step`. Before a
 sleep it dies of old age at the sleep's ticks in `LIFE_TICKS`. Returns
 its `RuleCounts`, their places named **`WOKEN`**, **`EATEN`**,
 **`BIRTHS`**, **`DEATHS`**, **`SOUGHT`**, **`PATHS`**, **`FAR`** -- paths

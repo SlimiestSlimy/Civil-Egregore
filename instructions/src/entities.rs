@@ -5,7 +5,7 @@
 
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{Attribute, AttributeBlock, Entities, EntityEdit, EntityRef, EntityType, Header, Layout};
+use entity_manager::{Attribute, AttributeBlock, Entities, EntityRef, EntityType, Header, Layout};
 use simulation::Turn;
 
 /// Runs `each` on every entity of the turn's superchunk waking this
@@ -43,19 +43,13 @@ pub fn sleep(turn: &mut Turn, entity: &Header, wake: u64) {
     turn.step(entity, entity.at, wake);
 }
 
-/// Queues what `edit`'s entity came to: on `to`, to wake at `wake`
-/// -- each attribute changed a compare-and-write of its own, held
-/// against what the rule saw of it, then the entity moved or put to
-/// sleep. It is not put whole over itself: what another writes to it
-/// in the same tick stands.
+/// Queues `entity` stepping to `to` -- its own cell to stay where it
+/// stands -- to wake at `wake`: its attributes as they are, none
+/// carried. Its cell taken by then, it stays, and wakes at `wake`
+/// all the same.
 #[inline]
-pub fn commit(turn: &mut Turn, edit: EntityEdit, to: CellIndex, wake: u64) {
-    let before = *edit.header();
-    if edit.edited() {
-        turn.update(&before, Header { at: to, wake, ..before }, edit.attributes());
-    } else {
-        turn.step(&before, to, wake);
-    }
+pub fn step(turn: &mut Turn, entity: &Header, to: CellIndex, wake: u64) {
+    turn.step(entity, to, wake);
 }
 
 /// Queues removing `entity`.
@@ -64,8 +58,8 @@ pub fn remove(turn: &mut Turn, entity: &Header) {
     turn.remove(entity);
 }
 
-/// Queues `attribute` of `other` -- another entity than the rule's
-/// own, any in reach -- becoming `value`, if it is still the `seen`
+/// Queues `attribute` of `other` -- the rule's own entity or
+/// another, any in reach -- becoming `value`, if it is still the `seen`
 /// the rule read of it, or it still has none: how one entity acts on
 /// another. Applied or refused whole, whatever else is written to
 /// `other` in the tick -- by itself, awake, or by a third

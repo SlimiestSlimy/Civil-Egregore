@@ -14,14 +14,14 @@ emit)`**: every superchunk's, in Morton order.
 
 ## `turn/`
 
-`mod.rs` the turn, its cells and its outbox; `entities.rs` the entities
-and their instructions; `conditional.rs` the compare-and-writes . What a rule makes of them is
-`../../instructions/`.
+`mod.rs` the turn, its cells and its outbox; `instruction.rs` the
+instruction; `conditional.rs` the compares and the queue;
+`entities.rs` what is queued for entities; `apply.rs` the queue
+applied. What a rule makes of them is `../../instructions/`.
 
-**`Outbox`**: nine `Instructions` and nine
-`Conditional`, by **`slot(dx, dy)`**, and for each where every
-author's part of the two begins (`segments`, a **`Segment`**
-`{author, steps, instructions, compares}` each).
+**`Outbox`**: nine queues (`queues`, a `Queue` each), by **`slot(dx,
+dy)`**, and for each where every author's part begins (`segments`, a
+**`Segment`** `{author, instructions, compares}` each).
 
 **`Turn`**: a superchunk's turn in the first phase:
 **`superchunk`**, **`random`**, **`now`**, **`sample(type, chance,
@@ -45,20 +45,31 @@ the turn, so instructions can be queued while going through them;
 width, height)`** (the cells entities stand on, up to `OCCUPIED_SIDE`
 each way, a row a word: cell `(x, y)` from `origin` at bit `x` of row
 `y`). Entities written:
-**`put(header, attributes)`**: an entity made, on a cell nobody
-stands on by then, waking after this tick; **`update(before, after,
-attributes)`**: changed, and moved to its cell if that is free --
-staying if not; passed over if no longer where the tick found it -- or,
-to another superchunk, crossing; **`step(entity, to, wake)`**: a move,
-no attributes carried -- whole, as `update`, to another superchunk;
+**`put(header, attributes)`**: an entity made, on a cell free for one
+by then, waking after this tick -- a compare of the cell, the entity
+made, each attribute given and its words written; **`make(header,
+attributes)`** the same with the compare left open, what is queued
+until **`made()`** happening only if the entity is made;
+**`step(entity, to, wake)`**: under a compare of the entity being
+there still, a move if `to` is another cell, and its wake written --
+to another superchunk, a crossing; **`update(before, after,
+attributes)`**: each attribute that differs written
+(`set_attributes_changed`), then the step, or the crossing with what
+it is to have;
 **`set_attribute(entity, attribute, seen, value)`**,
 **`unset_attribute(entity, attribute, seen)`**,
-**`set_attribute_blocks(entity, seen, value)`**: an edit of any entity
-in reach, applied if the attribute is still as seen and the compare
-the rule's instructions are under holds too; `update` is these, one
-for each attribute changed (`set_attributes_changed`), then a move --
-or, to another superchunk, `cross`: put there whole, asleep where it
-stood, settled after; **`remove(header)`**.
+**`set_attribute_blocks(entity, seen, value)`**: a write to an
+attribute of any entity in reach, under a compare of the attribute
+being still as seen: the words that differ, two an instruction
+(`queue_words_differing`), or the attribute given and written, or
+taken -- a layout of one block laid out where it is queued from,
+nothing copied; `cross`: made there whole under a compare of the cell
+free, its blocks carried beside that queue after a block of its type
+and wake, and asleep where it stood, settled after;
+**`set_attribute_words(entity, kind, offset, seen, value)`**: a word
+or two of an attribute, held against those words alone -- two
+writing two fields of one attribute both do;
+**`remove(header)`**: under a compare of its being there still.
 **`slot_of`**: the slot of a superchunk, past the neighbours panicking;
 `slot_queued`: the same for something about to be queued, beginning
 the author's segment there. **`seeing_to(at)`**: the rule is seeing to
@@ -71,37 +82,72 @@ under (`comparing`) and the number its counts are `counted_from`.
 `slot_between(from, to)`: the slot of one superchunk in another's
 outbox, none past the neighbours.
 
+`instruction.rs` (`simulation.md`, "Instructions"). **`Instruction`**:
+24 bytes -- its `opcode`, sixteen bits (`small`), thirty-two (`place`:
+the cell's place in its superchunk in `PLACE_BITS`, 20, a word's
+offset above them) and two words (`first`, `second`). **`Opcode`**,
+its first two bytes, the high one its family: `CompareEnd`, `Count`;
+`CompareCell`, `WriteCell`; `CompareCellFree`, `CompareEntity`,
+`MakeEntity`, `MoveEntity`, `RemoveEntity`, `CrossEntity`;
+`CompareAttribute`, `CompareAttributeWord`, `CompareAttributeWords`,
+`WriteAttributeWord`, `WriteAttributeWords`, `AddAttribute`,
+`RemoveAttribute`, `WriteWake`. One made by the function of its name
+-- `compare_end`, `count`, `compare_cell`, `write_cell`,
+`compare_cell_free`, `compare_entity`, `make_entity`, `move_entity`,
+`remove_entity`, `cross_entity`, `compare_attribute`,
+`compare_attribute_words` and `write_attribute_words` (of one word or
+two: `of_words`), `add_attribute`, `remove_attribute`, `write_wake` --
+over `on` (an opcode on a cell) and `of_attribute` (of a word of an
+attribute: its number at most `ATTRIBUTE_NUMBER_MOST`, the offset
+`WORD_OFFSET_MOST`). Read back: `at(superchunk)` its cell,
+`to(superchunk)` the cell its first word is the place of,
+`word_offset()`, `is_a_compare()`, `is_a_write()`. `NO_COUNT`: what a
+write counts under when it counts nothing.
+
 `conditional.rs` (`simulation.md`, "Compare-and-write").
-**`Compare`**: what a rule saw, an instruction of its own -- `Cell {layer_type, at,
-seen}` or `Attribute {id, at, kind, seen}`, 64 bits of what was seen at the most; `Compare::at`, the cell it
-is on; `Compare::holds(superchunk, entities)`, whether it holds now.
+**`Compare`**: what a rule saw -- `Cell {layer_type, at, seen}`,
+`CellFree {at}`, `Entity {at, kind}`, `Attribute {at, kind, seen}`,
+`AttributeWords {at, kind, offset, count, words}` -- sixteen bytes of
+what was seen at the most; `Compare::at`, the cell it is on;
+`Compare::instruction`, what it is queued as;
+**`Compare::attribute(at, kind, seen)`**: an attribute as its blocks
+were seen, their sum; **`Compare::attribute_words(at, kind, offset,
+words)`**: a word or two of one.
 **`Turn::compare_from_here(compare)`**: from here on what the rule
 queues for the compare's superchunk is skipped if the compare does
 not hold when come to; **`Turn::compare_end()`**: no more.
-`queue_step(lands, does)`: a step queued; `open_compare(compare)`,
+`queue(lands, instruction)`: one queued -- a write under no compare
+panics; `open(at, instruction)`, `open_compare(compare)`,
 `close_compare()`: a compare queued and pushed on the turn's stack of
 compares open (`CompareOpen`, `NONE` an empty one), one within another up to `COMPARES_WITHIN` (4), and
 popped, what is under it -- the queue's end less where it lies, and
-the compares within it -- noted beside the queue (`Gated` `{steps,
-compares_within, writes}`, 8 bytes a compare).
+the compares within it -- noted beside the queue (`Gated` `{instructions,
+compares_within, writes}`, 8 bytes a compare); `queue_under(at,
+compare, writes)`: a compare, its writes and its end at once, the
+queue found once.
 **`Turn::queue_if(compare, type, at, seen, value, counted)`**: the
 compare, within it a compare of the cell as seen, within that the
 write, with the count added if it is come to; **`Turn::queue_seen(type, at, seen, value,
 counted)`**: a compare of the cell as seen and the write under it,
 under the compare the rule is under as well, if any.
-**`Compare::attribute(id, at, kind, seen)`**: an attribute as its
-blocks were seen, their sum. **`Turn::count_if(compare, place)`**: a
+**`Turn::count_if(compare, place)`**: a
 count. **`Turn::count_under(first)`**: the number
 the rule's first count is counted under; `counted_number(place)`: a
 count's number, under `COUNTED_WHEN_APPLIED` (256) --
-**`CountedWhenApplied`**, a tick's counts made as it applied
-(`NO_COUNT`: none). `Does`: what a step is -- `Compare`, `CompareEnd`, `Write` (a layer, a cell, the number it holds after: no compare),
-`Count`; `Step` `{does, before}`, 48 bytes at the most, nothing in it of what is under it; `Conditional` `{steps, gated}`, what is queued for one superchunk
--- `clear`, `len`, `compares`, `count_missed`, and `apply(steps, queued, superchunk,
-entities, instructions, earliest, applied)`: one author's instructions
-and steps in the order queued, the entities' collision plane lent as a **`Standing`**
-`{superchunk, layer}` (its `write`). `queue_step(compare, lands, does)`: a step queued, its compare
-in the superchunk it lands in. `Applied`: what a thread applied in the
+**`CountedWhenApplied`**, a tick's counts made as it applied.
+`Queue` `{instructions, gated, carried}`: what is queued for one
+superchunk, and the blocks its crossings carry -- `clear`, `len`,
+`compares`.
+
+`apply.rs`: `Queue::apply(some, compares, superchunk, entities,
+earliest, collision, applied)`: one author's instructions in the
+order queued, each by its opcode, a compare that does not hold
+(`holds`) jumping over what is under it -- a cell not free counted as
+an entity refused -- the entities' collision plane lent as a
+**`Standing`** `{superchunk, layer}` (its `write`);
+`Queue::count_missed`: writes of cells missed and entities lost, of a
+queue for a superchunk not hot; `empty_attribute(kind, blocks)`: what
+an attribute given holds; `Applied`: what a thread applied in the
 second phase.
 
 ## `hot.rs`
@@ -218,7 +264,7 @@ thread; the second, each thread the superchunks it claims and
 their entities, passes each wheel's tick, then applies what the nine
 outboxes hold for it, segment by segment in the order of their authors
 (`simulation.md`, "One order, wherever the borders fall"); writes to superchunks not in use counted
-missed (`Conditional::count_missed`), entities put there lost; the crossings settled
+missed, entities made there lost (`Queue::count_missed`); the crossings settled
 (**`settle_crossings`**, in `tick/crossings.rs`: each superchunk's arrivals taken, then each
 thread its run of superchunks, each removing its leavers from its
 neighbours' arrivals and noting what those written there meanwhile
