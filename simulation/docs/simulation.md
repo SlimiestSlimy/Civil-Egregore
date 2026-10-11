@@ -132,7 +132,13 @@ once, not step by step. How much that is costs nothing as things are
 queued: the turn keeps a small stack of the compares open, where each
 lies in its queue; one closed is popped, and what is under it is the
 queue's end less where it lies -- those within it, closed before it,
-among them -- noted on the compare then.
+among them. That is kept beside the queue, not in it -- an
+instruction's room is for what it compares and writes: a list, one
+entry a compare, of how many steps are under it and how many compares
+are within it. An entry is kept for a compare as it is opened, so the
+list is in the order the compares are come to; one that does not hold
+passes over its steps in the queue and over the entries of the
+compares within it in the list.
 
 Everything under a compare lands in the compare's superchunk: a
 superchunk applying reads no other, so a write across a border could

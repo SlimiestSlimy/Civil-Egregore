@@ -21,7 +21,7 @@ and their instructions; `conditional.rs` the compare-and-writes . What a rule ma
 **`Outbox`**: nine `Instructions` and nine
 `Conditional`, by **`slot(dx, dy)`**, and for each where every
 author's part of the two begins (`segments`, a **`Segment`**
-`{author, steps, instructions}` each).
+`{author, steps, instructions, compares}` each).
 
 **`Turn`**: a superchunk's turn in the first phase:
 **`superchunk`**, **`random`**, **`now`**, **`sample(type, chance,
@@ -80,9 +80,10 @@ queues for the compare's superchunk is skipped if the compare does
 not hold when come to; **`Turn::compare_end()`**: no more.
 `queue_step(lands, does)`: a step queued; `open_compare(compare)`,
 `close_compare()`: a compare queued and pushed on the turn's stack of
-compares open, one within another up to `COMPARES_WITHIN` (4), and
-popped, what is under it -- the queue's end less where it lies --
-noted on it.
+compares open (`CompareOpen`, `NONE` an empty one), one within another up to `COMPARES_WITHIN` (4), and
+popped, what is under it -- the queue's end less where it lies, and
+the compares within it -- noted beside the queue (`Gated` `{steps,
+compares_within, writes}`, 8 bytes a compare).
 **`Turn::queue_if(compare, type, at, seen, value, counted)`**: the
 compare, within it a compare of the cell as seen, within that the
 write, with the count added if it is come to; **`Turn::queue_seen(type, at, seen, value,
@@ -95,8 +96,8 @@ the rule's first count is counted under; `counted_number(place)`: a
 count's number, under `COUNTED_WHEN_APPLIED` (256) --
 **`CountedWhenApplied`**, a tick's counts made as it applied
 (`NO_COUNT`: none). `Does`: what a step is -- `Compare`, `CompareEnd`, `Write` (a layer, a cell, the number it holds after: no compare),
-`Count`; `Step` `{does, before, under, writes_under}`, 48 bytes at the most, the last two what a compare that does not hold jumps over; `Conditional` `{steps}`, what is queued for one superchunk
--- `clear`, `len`, `count_missed`, and `apply(steps, queued, superchunk,
+`Count`; `Step` `{does, before}`, 48 bytes at the most, nothing in it of what is under it; `Conditional` `{steps, gated}`, what is queued for one superchunk
+-- `clear`, `len`, `compares`, `count_missed`, and `apply(steps, queued, superchunk,
 entities, instructions, earliest, applied)`: one author's instructions
 and steps in the order queued, the entities' collision plane lent as a **`Standing`**
 `{superchunk, layer}` (its `write`). `queue_step(compare, lands, does)`: a step queued, its compare

@@ -49,6 +49,9 @@ pub(crate) struct Segment {
     pub(crate) steps: u32,
     /// The first of its instructions.
     pub(crate) instructions: u32,
+    /// The first of its compares, among what is noted of each beside
+    /// the steps.
+    pub(crate) compares: u32,
 }
 
 /// One superchunk's turn in a tick's first phase: what the rule sees and
@@ -75,10 +78,8 @@ pub struct Turn<'a> {
     pub(crate) author: u64,
     /// The compare the rule is queuing under, if any.
     pub(crate) comparing: Option<conditional::Compare>,
-    /// The stack of compares open, the outermost first: the cell each
-    /// is of, which step of its superchunk's queue it is, and how
-    /// many writes of cells the turn had queued by then.
-    pub(crate) compares_open: [(CellIndex, u32, u32); conditional::COMPARES_WITHIN],
+    /// The stack of compares open, the outermost first.
+    pub(crate) compares_open: [conditional::CompareOpen; conditional::COMPARES_WITHIN],
     /// How many are open.
     pub(crate) compares_open_count: usize,
     /// Writes of cells queued this turn: what a compare closing
@@ -202,8 +203,8 @@ impl<'a> Turn<'a> {
         let slot = self.slot_of(superchunk);
         assert!(self.comparing.is_none_or(|compare| compare.at().superchunk() == superchunk), "queued under a compare in another superchunk");
         if self.outbox.segments[slot].last().is_none_or(|last| last.author != self.author) {
-            let (steps, instructions) = (self.outbox.conditional[slot].len() as u32, self.outbox.instructions[slot].len() as u32);
-            self.outbox.segments[slot].push(Segment { author: self.author, steps, instructions });
+            let (steps, instructions, compares) = (self.outbox.conditional[slot].len() as u32, self.outbox.instructions[slot].len() as u32, self.outbox.conditional[slot].compares() as u32);
+            self.outbox.segments[slot].push(Segment { author: self.author, steps, instructions, compares });
         }
         slot
     }

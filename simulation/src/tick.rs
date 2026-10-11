@@ -187,7 +187,7 @@ impl Simulation {
                 for (offset, (outbox, kept)) in outboxes.iter_mut().zip(random.iter_mut()).enumerate() {
                     let superchunk = &superchunks[first + offset];
                     let random = Rng::new(kept.1.state());
-                    let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random, author: 0, comparing: None, compares_open: [(CellIndex(0), 0, 0); crate::turn::conditional::COMPARES_WITHIN], compares_open_count: 0, writes_queued: 0, counted_from: 0 };
+                    let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random, author: 0, comparing: None, compares_open: [crate::turn::conditional::CompareOpen::NONE; crate::turn::conditional::COMPARES_WITHIN], compares_open_count: 0, writes_queued: 0, counted_from: 0 };
                     total += rule(&mut turn, &mut samples);
                     turn.compare_end();
                     // Where its random numbers have come to: the next tick goes on from there.
@@ -231,7 +231,7 @@ impl Simulation {
                         let (steps, queued) = (&outbox.conditional[from], &outbox.instructions[from]);
                         let (begun, next) = (outbox.segments[from][segment], outbox.segments[from].get(segment + 1));
                         let ends = next.map_or((steps.len(), queued.len()), |next| (next.steps as usize, next.instructions as usize));
-                        steps.apply(begun.steps as usize..ends.0, begun.instructions as usize..ends.1, superchunk, entities, queued, now + 1, collision, &mut applied);
+                        steps.apply(begun.steps as usize..ends.0, begun.instructions as usize..ends.1, begun.compares as usize, superchunk, entities, queued, now + 1, collision, &mut applied);
                     }
                     entities.sort_wakes(now + 1);
                 }
