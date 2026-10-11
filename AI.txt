@@ -617,12 +617,6 @@ threads`.
   600,7c13edff92f5d70f,acb69968c95fdcb4,fecb18dba5bea4ec,6b2e44078bde7624,cbbe5c62e1e5fae6,e220a8397b1dcdaf
 
 == OPEN THREADS ==
-- server fast test collision::trees_bar_their_cells_and_no_sheep_steps_onto_one
-  failed once in a whole-workspace run at "stepped > 0" and passed
-  three reruns: it hangs on the seed (few sheep hungry off grass in
-  400 ticks). Not from the registry change (census the same as
-  09193e7). To make hold on any seed.
-
 - Limits known: another removing an entity as it crosses turns it
   back; entities of one cell only.
 - A world's stored image of a cooled superchunk is behind its cells
