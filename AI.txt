@@ -600,6 +600,22 @@ threads`.
   wide plane, which share a first byte): told to the user, a rename
   theirs to ask for.
 
+- 2026-10-11, the user, of entities with no wake ahead (I had said a
+  rule forgetting to put one back leaves it asleep for good, and
+  offered a count to catch it): "no, actually, entities going
+  permanently to sleep is fine if no wake are detected, you see, we
+  will have rules that sample entities in the SCA rules style
+  potentially filtering for dormant entities for sampling. waking
+  them up if needed for the rule." So: dormancy is a state, not a
+  fault; no count, no guard. To come (not asked for yet): rules that
+  sample entities as the cells are sampled, maybe only the dormant.
+- Neighbour picking: DONE. Ways are numbered in Morton order of
+  where they lead (HERE is 3; around::NORTH_WEST .. SOUTH_EAST), and
+  around::pick draws by the ways' order, the same wherever the cell
+  lies in its tiles. World hashes changed with it, as meant:
+  `server check 0 600 200 4000 0` on the measuring seed now ends
+  600,7c13edff92f5d70f,acb69968c95fdcb4,fecb18dba5bea4ec,6b2e44078bde7624,cbbe5c62e1e5fae6,e220a8397b1dcdaf
+
 == OPEN THREADS ==
 - server fast test collision::trees_bar_their_cells_and_no_sheep_steps_onto_one
   failed once in a whole-workspace run at "stepped > 0" and passed

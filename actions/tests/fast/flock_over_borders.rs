@@ -16,7 +16,7 @@ use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, AttributeBlock, Entities, Header, InstructionsApplied};
-use actions::around::{self, About, Cells};
+use actions::around;
 use actions::{cells, compare, Turn};
 use simulation::Simulation;
 use std::collections::BTreeSet;
@@ -68,14 +68,6 @@ fn standing<'a>(turn: &Turn<'a>, at: CellIndex) -> Option<entity_manager::Entity
     turn.entities_in(at.chunk())?.find(|entity| entity.header.at == at)
 }
 
-/// The way to one of `choices`, cells `about` a cell, drawn from
-/// `drawn` by the ways' own order -- not by how the cells lie in their
-/// tiles, as `around::pick` draws.
-fn way_drawn(drawn: &mut Rng, about: &About, choices: Cells) -> Option<u32> {
-    let ways: Vec<u32> = (0..around::WAYS).filter(|&way| !(choices & about.towards(way)).is_empty()).collect();
-    (!ways.is_empty()).then(|| ways[drawn.below(ways.len() as u64) as usize])
-}
-
 /// One superchunk's turn of the flock's rule: each walker woken may
 /// die; eats the stone under it, counting the meal, or lays one beside
 /// it, counting that on itself only if it is laid; counts on a
@@ -105,7 +97,7 @@ fn flock(turn: &mut Turn, seed: u64, shift: (u32, u32)) -> u64 {
             actions::entities::set_attribute_of(turn, &header, COUNTED, meals, meals.unwrap_or(0) + 1);
             compare::end(turn);
             cells::clear(turn, STONE, at);
-        } else if let Some(beside) = way_drawn(&mut drawn, &about, open.without(stone.set)).filter(|_| chance < 40).and_then(|bit| around::cell(at, bit)) {
+        } else if let Some(beside) = around::pick(&mut drawn, &about, open.without(stone.set)).filter(|_| chance < 40).and_then(|bit| around::cell(at, bit)) {
             // Laid and counted, or neither: the cell may be another's stone by then, whichever side of a border it is on.
             let laid = entity.attribute(LAID);
             compare::from_here(turn, compare::lacks(STONE, beside));
@@ -113,18 +105,18 @@ fn flock(turn: &mut Turn, seed: u64, shift: (u32, u32)) -> u64 {
             actions::entities::set_attribute_of(turn, &header, LAID, laid, laid.unwrap_or(0) + 1);
             compare::end(turn);
         }
-        if let Some(other) = way_drawn(&mut drawn, &about, taken).and_then(|bit| around::cell(at, bit)).and_then(|beside| standing(turn, beside)) {
+        if let Some(other) = around::pick(&mut drawn, &about, taken).and_then(|bit| around::cell(at, bit)).and_then(|beside| standing(turn, beside)) {
             let seen = other.attribute(COUNTED);
             actions::entities::set_attribute_of(turn, &other.header, COUNTED, seen, seen.unwrap_or(0) + 1000);
         }
-        if let Some(beside) = way_drawn(&mut drawn, &about, open.without(taken)).filter(|_| chance < 9).and_then(|bit| around::cell(at, bit)) {
+        if let Some(beside) = around::pick(&mut drawn, &about, open.without(taken)).filter(|_| chance < 9).and_then(|bit| around::cell(at, bit)) {
             // Made and counted, or neither.
             let made = entity.attribute(MADE);
             crate::tests::make(turn, Header { kind: WALKER, at: beside, wake: now + 1 + drawn.below(3) }, &[]);
             actions::entities::set_attribute_of(turn, &header, MADE, made, made.unwrap_or(0) + 1);
             actions::entities::made(turn);
         }
-        let to = way_drawn(&mut drawn, &about, open).and_then(|bit| around::cell(at, bit)).unwrap_or(at);
+        let to = around::pick(&mut drawn, &about, open).and_then(|bit| around::cell(at, bit)).unwrap_or(at);
         actions::entities::step(turn, &header, to, now + 1 + drawn.below(3));
     }
     0

@@ -66,10 +66,10 @@ mod entities {
                 let about = around::about(at);
                 let stone = around::layer(turn, STONE, &about);
                 // Up and left of it, and to its right: the two chosen among.
-                let two = about.towards(0) | about.towards(5);
+                let two = about.towards(around::NORTH_WEST) | about.towards(around::EAST);
                 let drawn = (0..64).filter_map(|_| around::pick(turn.random(), &about, two)).fold(0u16, |drawn, way| drawn | 1 << way);
                 let none = around::pick(turn.random(), &about, two.without(two));
-                let cells: Vec<CellIndex> = [0, 5].iter().filter_map(|&way| around::cell(at, way)).collect();
+                let cells: Vec<CellIndex> = [around::NORTH_WEST, around::EAST].iter().filter_map(|&way| around::cell(at, way)).collect();
                 seen.lock().unwrap().push((stone.set.count(), stone.hot == about.nine(), drawn, none, cells, around::way_of(at, at.offset(-1, 1).unwrap())));
                 entities::sleep(turn, &entity.header, NEVER);
             }

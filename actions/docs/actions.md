@@ -74,8 +74,10 @@ nothing turned into rows. What is about a cell is asked once
 way off (`towards`). A layer's is read at once (`around::layer`); sets
 are narrowed with `&`, joined with `|`, taken from with `without`, and
 asked `is_empty`: those with grass, those nothing stands on, those in
-the world hot. A neighbour is named by its **way** -- 0 to 8, row by
-row from the top left, the cell itself `HERE` (4) -- only when one is
+the world hot. A neighbour is named by its **way** -- 0 to 8, in
+Morton order of where they lead (`NORTH_WEST`, `NORTH`, `WEST`, the
+cell itself `HERE` (3), `NORTH_EAST`, `EAST`, `SOUTH_WEST`, `SOUTH`,
+`SOUTH_EAST`) -- only when one is
 drawn or kept: a way is the same wherever the cell is, where a set's
 bits go by how the tiles fall about it.
 
@@ -229,11 +231,10 @@ Chance is another matter, and meant to be: each superchunk draws from
 a random stream of its own -- the sampling of cells, a sheep's lot
 -- so what is drawn is another draw where the borders
 fall otherwise. What must not see a border is what is not chance.
-The same of a neighbour drawn (`around::pick`): which one a draw comes
-to goes by how the cells about a cell lie in their small tiles, in
-Morton order; each is as likely wherever the tiles fall. The test's
-walkers draw by the ways' own order instead, in the test's file, as
-they draw from its generator.
+A neighbour drawn (`around::pick`) is not chance of that kind: which
+one a draw comes to goes by the ways' own order, so it is the same
+neighbour wherever the tiles and the borders fall about the cell. The
+test's walkers draw theirs with it, from the test's generator.
 
 ## Rules ask actions, and nothing else
 
@@ -401,13 +402,15 @@ plane's tiles, and one compare.
 The word stays a word all the way to the rule (`around::Cells`): no
 set of cells is turned into rows. A neighbour is told from another by
 its way, and a way is a bit of the word by a table (`About::way_word`)
-and back by the two places (`way_of_bit`) -- asked for the one cell
-drawn or kept, never for a set. One drawn is the set bit of a rank, in
-the word's own order: so which neighbour a given draw comes to goes by
-how the tiles fall about the cell. That is the lot's, as a superchunk
-having a lot of its own is; nothing but the draw hangs on it. A test
-that takes the draws out of what it compares draws by the ways' order
-itself (`../tests/fast/flock_over_borders.rs`).
+-- asked for the one cell kept, never for a set. The ways are numbered
+in Morton order of where they lead (`WAY_OFFSETS`; `WAY_AT`, the way
+to each of the nine row by row). One drawn is not the set bit of a
+rank in the word's order, which would go by how the tiles fall about
+the cell: the set is turned into ways, a bit a way (`About::ways_of`,
+nine shifts by the same table), and the one drawn is the way of that
+rank. So a draw comes to the same neighbour wherever the cell lies
+in its tiles -- no exception at a tile's, a chunk's or a superchunk's
+edge.
 
 Before and after, by `Civil_Egregore server pasture 1000 333 4000 4 1`,
 a sheep's wake: 233 ns reading windows turned into rows; 272 ns with

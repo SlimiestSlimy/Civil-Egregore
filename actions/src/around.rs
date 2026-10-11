@@ -3,7 +3,7 @@
 //! bitmaps -- a layer's, what is open among them, one drawn -- and the
 //! ways from the cell to each (`docs/actions.md`, "The shapes").
 
-use crate::tiles_about;
+use crate::tiles_about::{self, WAY_AT, WAY_OFFSETS};
 pub use crate::tiles_about::About;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
@@ -11,13 +11,30 @@ use simulation::Turn;
 use std::ops::{BitAnd, BitOr};
 use utilities::rng::Rng;
 
-/// The ways from a cell: to each of the nine about it, numbered row
-/// by row from the top left -- the way `3 * down + across`, each 0 to
-/// 2. The name of a neighbour that stays the same wherever the cell
-/// is: what is kept of one from tick to tick.
+/// The ways from a cell: to each of the nine about it, numbered in
+/// Morton order of where they lead -- up and left, up, left, the cell
+/// itself, up and right, right, down and left, down, down and right.
+/// The name of a neighbour that stays the same wherever the cell is:
+/// what is drawn, and what is kept of one from tick to tick.
 pub const WAYS: u32 = 9;
+/// The way up and left.
+pub const NORTH_WEST: u32 = 0;
+/// The way up.
+pub const NORTH: u32 = 1;
+/// The way left.
+pub const WEST: u32 = 2;
 /// The way from a cell to itself: the middle of the nine.
-pub const HERE: u32 = 4;
+pub const HERE: u32 = 3;
+/// The way up and right.
+pub const NORTH_EAST: u32 = 4;
+/// The way right.
+pub const EAST: u32 = 5;
+/// The way down and left.
+pub const SOUTH_WEST: u32 = 6;
+/// The way down.
+pub const SOUTH: u32 = 7;
+/// The way down and right.
+pub const SOUTH_EAST: u32 = 8;
 
 /// Some of the cells about a cell: a set of them, a bit each, put
 /// together with `&` and `|`. Of the cell it was asked about alone.
@@ -108,24 +125,27 @@ impl About {
 
 /// The cell `way` from `at`: none off the world.
 pub fn cell(at: CellIndex, way: u32) -> Option<CellIndex> {
-    at.offset(way as i32 % 3 - 1, way as i32 / 3 - 1)
+    let (across, down) = WAY_OFFSETS[way as usize];
+    at.offset(across as i32 - 1, down as i32 - 1)
 }
 
 /// The way from `at` to `cell`, one of the nine about it.
 pub fn way_of(at: CellIndex, cell: CellIndex) -> u32 {
     let (at, cell) = (at.cartesian(), cell.cartesian());
-    (cell.y + 1 - at.y) * 3 + cell.x + 1 - at.x
+    u32::from(WAY_AT[((cell.y + 1 - at.y) * 3 + cell.x + 1 - at.x) as usize])
 }
 
 /// The way to one of `choices`, cells `about` a cell, drawn from
 /// `random`: none if there is none to choose, and then nothing is
-/// drawn. Which a draw comes to goes by how the cells lie in their
-/// tiles: any is as likely as another.
+/// drawn. Any is as likely as another, and which a draw comes to goes
+/// by the ways' own order -- Morton order -- so it is the same
+/// neighbour wherever the cell lies in its tiles.
 pub fn pick(random: &mut Rng, about: &About, choices: Cells) -> Option<u32> {
     if choices.is_empty() {
         return None;
     }
-    Some(about.way_of_bit(set_bit_of_rank(choices.0, random.below(choices.count() as u64) as u32)))
+    let ways = about.ways_of(choices.0);
+    Some(set_bit_of_rank(u64::from(ways), random.below(u64::from(ways.count_ones())) as u32))
 }
 
 /// The set bit of `bits` with `rank` set bits under it.
