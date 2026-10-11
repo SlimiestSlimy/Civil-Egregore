@@ -8,7 +8,7 @@ use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::Entities;
-use instructions::{compare, Turn};
+use instructions::{compare, write, Turn, Write};
 use simulation::Simulation;
 use utilities::rng::Rng;
 
@@ -37,9 +37,11 @@ fn what_is_queued_from_a_compare_to_its_end_hangs_on_it() {
         Simulation::new(1).tick(&mut arena, &mut entities, 1, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             // The compare says the cell holds stone, or lacks it: it lacks it.
             compare::from_here(turn, if holding { compare::lacks(STONE, seen) } else { compare::holds(STONE, seen) });
-            turn.queue_seen(STONE, under, 0, 1, None);
+            compare::with_writes(turn, compare::lacks(STONE, under), &[Write::Cell { layer_type: STONE, at: under, value: 1, counted: None }]);
             compare::end(turn);
-            turn.queue_seen(STONE, after, 0, 1, None);
+            compare::open(turn, compare::lacks(STONE, after));
+            write::cell(turn, STONE, after, 1, None);
+            compare::close(turn);
             0
         });
         assert_eq!((arena.holds(STONE, under), arena.holds(STONE, after)), (Ok(holding), Ok(true)), "holding: {holding}");

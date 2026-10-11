@@ -15,3 +15,8 @@ utilities = { path = "../utilities" }
 [[test]]
 name = "tests"
 test = false
+
+# Its tests alone: what a turn queues is said there as a rule says it,
+# by the actions, which are made of the instructions the tests are of.
+[dev-dependencies]
+actions = { path = "../actions" }

@@ -22,4 +22,5 @@ pub use halos::{HaloChange, Halos, Held, COOL_TICKS, WARM_TICKS};
 pub use hot::Hot;
 pub use tick::{threads_for, Simulation, TickReport};
 pub use turn::conditional::{Compare, CountedWhenApplied, COUNTED_WHEN_APPLIED};
+pub use turn::one_instruction::Write;
 pub use turn::Turn;

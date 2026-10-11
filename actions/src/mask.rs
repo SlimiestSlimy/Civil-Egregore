@@ -261,7 +261,7 @@ fn write_under(turn: &mut Turn, layer_type: LayerType, at: CellIndex, mask: &Mas
         let at = CellIndex(first.0 | bit as u64);
         // A cell not hot is not written.
         if turn.holds(layer_type, at) == Ok(!holding) {
-            turn.queue_seen(layer_type, at, u32::from(!holding), u32::from(holding), None);
+            crate::cells::seen_becoming(turn, layer_type, at, u32::from(!holding), u32::from(holding), None);
             queued += 1;
         }
     }

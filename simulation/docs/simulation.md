@@ -140,7 +140,10 @@ acts for the superchunk applying. The tenth queue has a segment an
 author like the others, and beside each an `Across`: the slots it
 lands in (`lands`, the author's own superchunk always among them,
 `slot_home`) and how many of those superchunks have come to it
-(`arrived`). What is queued with no author named is one author's
+(`arrived`). The turn remembers where the author's last instruction
+landed (`landed_last`), so the next for the same superchunk -- most
+are -- goes to the same queue with nothing looked up; forgotten as the
+next author is named and as its instructions go across. What is queued with no author named is one author's
 like any other. Only an author that queues over a border pays: one
 whose instructions are all for one superchunk queues as before.
 
@@ -242,7 +245,10 @@ four, which the counting already allows.
 ### Instructions
 
 All a rule's turn queues is instructions, one stream a superchunk it
-writes to (`turn/instruction.rs`). An instruction is **24 bytes**:
+writes to (`turn/instruction.rs`), each by a function of the turn
+that queues that one and nothing else (`turn/one_instruction.rs`;
+`../../instructions/` hands them on, and `../../actions/` puts them
+together). An instruction is **24 bytes**:
 its first two the **opcode**, the other twenty-two what that opcode
 needs and nothing else -- sixteen bits, thirty-two, and two words.
 An instruction knows no attribute and no layout: whoever defines an
@@ -313,20 +319,27 @@ before.
 an entity, an attribute, a member of it; a wake. It carries no
 compare. What it is held against -- the cell still as the rule saw
 it, the attribute still as seen, the entity there still -- is a
-compare queued before it, and the write is under that:
-`Turn::queue_seen` queues the two, a compare of the cell and the
-write; an attribute set queues a compare of the attribute and, under
-it, the members that changed, each its bytes and no more; a step
-queues a compare of the entity being there, its move and its wake. A
+compare queued before it, and the write is under that. The turn
+queues each as an instruction of its own -- a function an instruction
+(`Turn::compare_open`, `write_cell`, `write_wake`, `compare_close`
+and the rest, `turn/one_instruction.rs`) -- and what is made of
+several is not the simulation's but an action's
+(`../../actions/docs/actions.md`): a cell set is a compare of the
+cell and the write; an attribute set a compare of the attribute and,
+under it, the members that changed, each its bytes and no more; a
+step a compare of the entity being there, its move and its wake. A
+compare and writes that land in its own superchunk are queued in one
+call (`Turn::compare_with_writes`, the writes as values, `Write`): the
+queue is found once, which is most of what queuing costs. A
 compare carries what was seen in eight bytes at the most -- of a
 whole attribute, a sum of its blocks
 (`entity_manager::attribute_seen`), never a block. What is written is
 in order already, author by author, which is all this takes.
 
 **One compare lies within another** where a write has its own under
-the rule's: skipped with the outer, skipping no more than its own.
-`Turn::queue_if` and `Turn::count_if` are the short way to one write
-or one count under a compare, the write's own within it.
+the rule's: skipped with the outer, skipping no more than its own
+(`actions::compare::write`, a write under a compare of something
+else, its own within it).
 
 A compare that does not hold jumps over all that is under it at
 once, not step by step. How much that is costs nothing as things are
@@ -368,14 +381,14 @@ saw the other. A tick has none:
   There is no plain write in a tick, and no shape: an area is its
   cells, each a write of its own.
 - **An entity is written an attribute at a time**, never whole. Each
-  attribute write (`Turn::set_attribute`, `unset_attribute`,
-  `set_attribute_blocks`) says what the rule saw of that attribute and
+  attribute write (`actions::entities::set_attribute_of`,
+  `unset_attribute_of`, `set_attribute_blocks`) says what the rule saw of that attribute and
   is applied only if it is still so, or still absent: of two writing
   one attribute, the first applied does and the other is refused; two
   writing two attributes both do. This holds whoever writes -- the
   entity itself, awake, or another, in the same tick.
-- **An entity changing itself** (`Turn::update`, or a
-  `set_attribute` and a `step`) is those writes, one compare for each
+- **An entity changing itself** (`actions::entities::update`, or a
+  `set_attribute_of` and a `step`) is those writes, one compare for each
   attribute that differs from what the tick found and under it the
   words that changed, then a move, which carries nothing, and its
   wake. Nothing of it is copied to be changed. So what another writes to it in the
@@ -417,8 +430,8 @@ it queued them; the rules here do not (a sheep's two ends are under
 opposite compares). Between ticks the world is written by one hand at
 a time (`World::write_cells`, `put_entity`), in order.
 
-A count may hang on a write: `queue_if` names one added if the write
-is applied. These come back in the tick's report
+A count may hang on a write: `Turn::write_cell` names one added if
+the write is applied. These come back in the tick's report
 (`TickReport::counted_when_applied`), by numbers: whoever runs several
 rules on a turn gives each numbers of its own (`Turn::count_under`).
 
@@ -510,14 +523,16 @@ instruction that carries least -- is not the simulation's: it is
 turn, which the rules are written in and reach the simulation through.
 
 **What is queued for an entity**, each a compare and the writes
-under it ("Instructions"), carrying no more than it changes:
+under it ("Instructions"), carrying no more than it changes. The
+simulation queues each instruction (`turn/one_instruction.rs`); which
+go together is the actions' (`actions::entities`), named here:
 
-| queued by | the compare | under it |
+| the action | the compare | under it |
 |---|---|---|
-| `put` (`make` ... `made`) | the cell free for an entity | the entity made; each attribute given, its words written |
+| `spawn` (`make` ... `made`) | the cell free for an entity | the entity made; each attribute given, its words written |
 | `step`, `update` | the entity there still | a move, if to another cell; its wake written |
 | a crossing | the cell free, in the superchunk crossed to; the entity there still, where it stood | there, the entity made whole; here, its wake written |
-| `set_attribute`, `unset_attribute`, `set_attribute_blocks`, `update` | the attribute as seen, or none seen | the words that differ, two an instruction; or the attribute given and written, or taken |
+| `set_attribute_of`, `unset_attribute_of`, `set_attribute_blocks`, `update` | the attribute as seen, or none seen | the words that differ, two an instruction; or the attribute given and written, or taken |
 | `remove` | the entity there still | removed |
 
 A walking entity is four instructions a step, 96 bytes -- a compare,
@@ -728,7 +743,7 @@ comes to does not depend on the thread that takes it.
 |---|---|
 | `src/hot.rs` | which superchunks are to be hot: the world's size, the hot entity |
 | `src/halos.rs` | the halos moved: warming and cooling, each due at a tick, by jobs off the tick -- `halos/warming.rs` superchunks made hot and let cool, `halos/write_back.rs` write-backs and flushes landed |
-| `src/turn/` | a superchunk's turn: `mod` the turn, its cells and its outbox, `entities` the entities read and the instructions queued |
+| `src/turn/` | a superchunk's turn: `mod` the turn, its cells and its outbox, `entities` the entities read, `conditional` the compares and the queues, `one_instruction` what is queued, a function an instruction, `instruction` the instruction itself, `apply` its applying |
 | `../entity_manager/` | the entities: buckets, the timer wheel, the instructions queued -- a crate of its own |
 | `src/simulation_time.rs` | simulation time: the tick rate, a time as its ticks, a mean time as a chance a tick |
 | `src/sampling.rs` | the cells a rule is given: a layer sampled by gaps drawn against a chance |

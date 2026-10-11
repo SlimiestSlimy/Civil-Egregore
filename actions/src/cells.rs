@@ -7,6 +7,7 @@
 use bitplane_manager::Window;
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;
+use instructions::{compare, Write};
 use simulation::Turn;
 use utilities::chance::Chance;
 
@@ -61,32 +62,43 @@ pub fn square(turn: &Turn, layer_type: LayerType, cell: CellIndex, side: u32) ->
     Some((corner, turn.window(layer_type, corner, side, side)))
 }
 
+/// Queues the number of `layer_type` at `cell` becoming `value` if it
+/// is still the `seen` the rule read there: three instructions -- a
+/// compare of the cell, the write, the compare's end, queued at once -- so none lands
+/// on another's, under whatever compare the rule is queuing under as
+/// well. One added to the rule's count `counted` if it is applied.
+#[inline]
+pub fn seen_becoming(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, seen: u32, value: u32, counted: Option<usize>) {
+    debug_assert!(seen != value, "a write that changes nothing");
+    compare::with_writes(turn, compare::Compare::Cell { layer_type, at: cell, seen: seen as u16 }, &[Write::Cell { layer_type, at: cell, value, counted: counted.map(|place| place as u32) }]);
+}
+
 /// Queues `layer_type` holding at `cell`, which the rule saw it did
 /// not: a compare-and-write, applied only if it still does not
 /// (`docs/actions.md`, "Compare-and-write").
 #[inline]
 pub fn set(turn: &mut Turn, layer_type: LayerType, cell: CellIndex) {
-    turn.queue_seen(layer_type, cell, 0, 1, None);
+    seen_becoming(turn, layer_type, cell, 0, 1, None);
 }
 
 /// [`set`], adding one to the rule's count `counted` if it is applied.
 #[inline]
 pub fn set_counted(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, counted: usize) {
-    turn.queue_seen(layer_type, cell, 0, 1, Some(counted as u32));
+    seen_becoming(turn, layer_type, cell, 0, 1, Some(counted));
 }
 
 /// Queues `layer_type` no longer holding at `cell`, which the rule saw
 /// it did: a compare-and-write, applied only if it still does.
 #[inline]
 pub fn clear(turn: &mut Turn, layer_type: LayerType, cell: CellIndex) {
-    turn.queue_seen(layer_type, cell, 1, 0, None);
+    seen_becoming(turn, layer_type, cell, 1, 0, None);
 }
 
 /// [`clear`], adding one to the rule's count `counted` if it is
 /// applied.
 #[inline]
 pub fn clear_counted(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, counted: usize) {
-    turn.queue_seen(layer_type, cell, 1, 0, Some(counted as u32));
+    seen_becoming(turn, layer_type, cell, 1, 0, Some(counted));
 }
 
 /// Queues `value` as the number `plane` holds at `cell`, where the
@@ -95,7 +107,7 @@ pub fn clear_counted(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, co
 #[inline]
 pub fn set_value<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, seen: u32, value: u32) {
     debug_assert!(value <= plane.most(), "{value} in a plane of {} bits a cell", W::BITS);
-    turn.queue_seen(plane.layer_type(), cell, seen, value, None);
+    seen_becoming(turn, plane.layer_type(), cell, seen, value, None);
 }
 
 /// [`set_value`], adding one to the rule's count `counted` if it is
@@ -103,7 +115,7 @@ pub fn set_value<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, see
 #[inline]
 pub fn set_value_counted<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, seen: u32, value: u32, counted: usize) {
     debug_assert!(value <= plane.most(), "{value} in a plane of {} bits a cell", W::BITS);
-    turn.queue_seen(plane.layer_type(), cell, seen, value, Some(counted as u32));
+    seen_becoming(turn, plane.layer_type(), cell, seen, value, Some(counted));
 }
 
 /// The top left cell of the square `side` cells a side about `centre`

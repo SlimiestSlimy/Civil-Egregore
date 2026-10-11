@@ -61,7 +61,7 @@ pub fn count_and_flip(turn: &mut Turn, _: &mut Vec<CellIndex>) -> usize {
         if !remove_attribute(&mut attributes, ODD.attribute_type()) {
             set_attribute(&mut attributes, ODD, 1);
         }
-        turn.update(&entity.header, Header { wake: turn.now() + 1, ..entity.header }, &attributes);
+        actions::entities::update(turn, &entity.header, Header { wake: turn.now() + 1, ..entity.header }, &attributes);
         woken += 1;
     }
     woken
@@ -80,4 +80,16 @@ pub fn cells_drawn(count: usize, side: u32) -> Vec<CellIndex> {
     let mut cells: Vec<(u64, CellIndex)> = cells.into_iter().map(|(x, y)| (random.draw(), cell(x, y))).collect();
     cells.sort_unstable();
     cells.into_iter().map(|(_, cell)| cell).collect()
+}
+
+/// Queues an entity made as `header` says, with `attributes`, if its
+/// cell is free by then.
+pub fn put(turn: &mut simulation::Turn, header: Header, attributes: &[entity_manager::AttributeBlock]) {
+    actions::entities::spawn(turn, header.kind, header.at, header.wake, attributes);
+}
+
+/// [`put`], the compare of its cell left open until
+/// `actions::entities::made`.
+pub fn make(turn: &mut simulation::Turn, header: Header, attributes: &[entity_manager::AttributeBlock]) {
+    actions::entities::make(turn, header.kind, header.at, header.wake, attributes);
 }

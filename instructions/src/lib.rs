@@ -11,5 +11,7 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod compare;
+pub mod entity;
+pub mod write;
 
-pub use simulation::Turn;
+pub use simulation::{Turn, Write};

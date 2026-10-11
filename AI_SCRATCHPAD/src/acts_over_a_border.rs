@@ -10,6 +10,7 @@ use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, Entities, EntityType, Header};
+use actions::{cells, entities};
 use simulation::{Compare, Simulation, Turn};
 use utilities::commands::Given;
 
@@ -86,16 +87,16 @@ fn turn_of(turn: &mut Turn, crossing: bool) -> u64 {
             // Those put west of their border have an odd x less the border's, those east an even one: the world's cells begin even.
             let beside: CellIndex = CellCartesian { x: if at.x % 2 == 1 { at.x + 1 } else { at.x - 1 }, y: at.y }.into();
             if crossing {
-                turn.step(&header, beside, now + 1);
+                entities::step(turn, &header, beside, now + 1);
                 continue;
             }
             let seen = u32::from(turn.holds(STONE, beside) == Ok(true));
             turn.compare_from_here(Compare::Cell { layer_type: STONE, at: beside, seen: seen as u16 });
-            turn.queue_seen(STONE, beside, seen, 1 - seen, None);
-            turn.set_attribute(&header, COUNTED, Some(counted), counted + 1);
+            if seen == 1 { cells::clear(turn, STONE, beside) } else { cells::set(turn, STONE, beside) }
+            entities::set_attribute_of(turn, &header, COUNTED, Some(counted), counted + 1);
             turn.compare_end();
         }
-        turn.step(&header, header.at, now + 1);
+        entities::step(turn, &header, header.at, now + 1);
     }
     0
 }

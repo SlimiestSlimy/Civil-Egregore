@@ -22,7 +22,10 @@ the cell seen clear, or set. **`set_value(turn, plane, cell, seen,
 value)`**: a wide plane's number put where `seen` was read.
 **`set_counted(turn, type, cell, counted)`**, **`clear_counted`**,
 **`set_value_counted`**: the same, one added to the rule's count
-`counted` if applied (`actions.md`, "Compare-and-write").
+`counted` if applied (`actions.md`, "Compare-and-write"). All are
+**`seen_becoming(turn, type, cell, seen, value, counted)`**: a compare
+of the cell as seen, the write and the compare's end, queued at once
+(`instructions::compare::with_writes`).
 
 ## `compare.rs`
 
@@ -48,11 +51,28 @@ waking. **`on(turn, at)`**: the entity that stood on a cell as the
 tick found it -- the cell its name for the tick, there being no ID.
 **`spawn(turn, kind, at, wake, attributes)`**: a new entity. **`make(turn, kind, at, wake, attributes)`**
 and **`made(turn)`**: the same, what is queued between them happening only if the entity is made. **`sleep(turn, entity, wake)`**: a move to
-where it stands. **`step(turn, entity, to, wake)`**: a move to a
-cell, or none to its own, and its wake. **`set_attribute_of(turn, other, attribute, seen,
+where it stands. **`step(turn, entity, to, wake)`**: under a compare
+of the entity being there still, a move to a cell, or none to its
+own, and its wake -- to another superchunk a crossing (`cross`: made
+there whole under a compare of the cell being free, with all it has,
+and asleep where it stood under a compare of its being there,
+settled after the tick). **`remove(turn, entity)`**, under a compare
+of its being there still.
+
+`entities/attribute_edits.rs` (`attribute_edits`), handed on by
+`entities`: **`set_attribute_of(turn, other, attribute, seen,
 value)`**, **`unset_attribute_of(turn, other, attribute, seen)`**: an
-attribute of another entity written, if still as seen. **`remove(turn,
-entity)`**. **`EntitiesBetweenTicks`**: the world's entities off any
+attribute of any entity in reach written by its layout, if still as
+seen -- each member that differs, its bytes and no more, or the
+attribute whole if it had none; **`set_attribute_blocks(turn, entity,
+seen, value)`**: the same of blocks with no layout at hand, each word
+that differs (`members_differing`), the attribute whole, or taken;
+**`set_attribute_member(turn, entity, kind, member, seen, value)`**:
+one member, held against that member alone -- two writing two members
+of one attribute both do; **`update(turn, before, after,
+attributes)`**: each attribute that differs written
+(`set_attributes_changed`), then the step, or the crossing with what
+it is to have. **`EntitiesBetweenTicks`**: the world's entities off any
 turn, lent by whoever runs the world (**`of`**; **`where_free(free)`**,
 putting only on cells the world's collision plane does not hold;
 **`cells_put()`**, the cells put on, for the runner to set there). **`now()`**,

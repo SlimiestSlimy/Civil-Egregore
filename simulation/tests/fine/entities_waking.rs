@@ -53,9 +53,9 @@ fn entities_wake_at_their_tick() {
             for entity in turn.woken() {
                 woken.lock().unwrap().push((entity.header.at, turn.now()));
                 if entity.header.at == third {
-                    turn.remove(&entity.header);
+                    actions::entities::remove(turn, &entity.header);
                 } else if entity.header.at == first && turn.now() == 5 {
-                    turn.step(&entity.header, first, 40);
+                    actions::entities::step(turn, &entity.header, first, 40);
                 }
             }
             0
@@ -79,7 +79,7 @@ fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
     let step = |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
             let after = Header { at: entity.header.at.offset(1, 0).unwrap(), wake: turn.now() + 1, ..entity.header };
-            turn.update(&entity.header, after, &[AttributeBlock::holding(WOKEN, entity.attribute(WOKEN).unwrap() + 1)]);
+            actions::entities::update(turn, &entity.header, after, &[AttributeBlock::holding(WOKEN, entity.attribute(WOKEN).unwrap() + 1)]);
         }
         0
     };
@@ -111,12 +111,12 @@ fn any_number_of_threads_ticks_entities_the_same() {
             let at = header.at.offset(dx * 7, dy * 7).unwrap();
             let wake = turn.now() + 1 + turn.random().below(5);
             match turn.random().below(40) {
-                0 => turn.remove(&header),
+                0 => actions::entities::remove(turn, &header),
                 1 => {
-                    turn.put(Header { at, wake, ..header }, &[]);
-                    turn.step(&header, header.at, turn.now() + 3);
+                    crate::tests::put(turn, Header { at, wake, ..header }, &[]);
+                    actions::entities::step(turn, &header, header.at, turn.now() + 3);
                 }
-                _ => turn.update(&header, Header { at, wake, ..header }, entity.attributes),
+                _ => actions::entities::update(turn, &header, Header { at, wake, ..header }, entity.attributes),
             }
             changes += 1;
         }

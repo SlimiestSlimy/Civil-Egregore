@@ -33,10 +33,36 @@ queued after it is skipped, up to the end of the compare
 (`compare::end`) or the next compare given. Every write lies under
 one: none is held against nothing.
 
-## What is here yet
+A compare within another is opened and closed in turn
+(`compare::open`, `compare::close`): skipped with the outer, skipping
+no more than its own. The compares there are: of a cell (`holds`,
+`lacks`, `value`), of a cell being free for an entity (`cell_free`),
+of an entity being there still (`entity`), of an attribute whole
+(`attribute`, `attribute_blocks`) or of one member of it
+(`attribute_member`).
 
-The compares, and their end. The writes -- a cell, a member of an
-attribute, an entity made, moved or removed, a wake, a count -- are
-still queued by the simulation's turn in groups, a compare and its
-writes at once (`Turn::queue_seen`, `step`), and are asked of it by the
-actions; they are to be one function each here.
+## Writes
+
+Each a function, each one instruction, applied only if every compare
+open as it was queued holds when it is come to:
+
+- a cell (`write::cell`), with a count added as it is applied if one
+  is named; a count alone (`write::count`);
+- an entity's attribute -- one member (`write::attribute_member`),
+  the attribute whole (`write::attribute_whole`, its blocks carried
+  beside the instruction) or taken (`write::attribute_removed`) --
+  and its wake (`write::wake`);
+- an entity whole (`entity`): made (`entity::make`), moved within its
+  superchunk (`entity::move_to`), removed (`entity::remove`), made in
+  another superchunk as it crosses (`entity::cross`).
+
+## A compare and its writes at once
+
+Most of what is queued is one compare and a write or two, all in one
+superchunk. `compare::with_writes` queues the compare, the writes and
+the end in one call, the writes said as values (`Write`): the same
+instructions as opening, writing and closing one at a time, the queue
+found once. Before it, with every instruction queued by a call of its
+own, a tick of the sheep's pasture took 6% more of the processor's
+instructions than with the simulation grouping them itself; with it,
+2% more.

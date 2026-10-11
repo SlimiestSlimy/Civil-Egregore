@@ -57,7 +57,7 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
                 let passable = area::layer(turn, STONE, at).hot;
                 assert_eq!(walking::step_to(turn, at, at.offset(9, 0).unwrap(), &passable), None, "out of the area");
                 let next = walking::step_to(turn, at, to, &passable).expect("a way round");
-                turn.step(&entity.header, next, now + 1);
+                actions::entities::step(turn, &entity.header, next, now + 1);
             }
             0
         });
@@ -101,7 +101,7 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
                 }
                 let next = walking::step_to(turn, at, to, &area::layer(turn, STONE, at).hot).expect("a way round");
                 assert_eq!(turn.holds(COLLISION, next), Ok(false), "a step onto what the collision plane holds");
-                turn.step(&entity.header, next, now + 1);
+                actions::entities::step(turn, &entity.header, next, now + 1);
             }
             0
         });
@@ -180,7 +180,7 @@ fn walls_of_the_terrain_bar_steps() {
                 let next = walking::step_to(turn, at, to, &passable).expect("a way through the gap");
                 let about = around::about(at);
                 assert!(!(walking::around_unwalled(turn, &about) & about.towards(around::way_of(at, next))).is_empty(), "a step through a wall");
-                turn.step(&entity.header, next, now + 1);
+                actions::entities::step(turn, &entity.header, next, now + 1);
             }
             0
         });

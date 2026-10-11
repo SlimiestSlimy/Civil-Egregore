@@ -6,6 +6,7 @@ version = 4
 name = "AI_SCRATCHPAD"
 version = "0.0.0"
 dependencies = [
+ "actions",
  "bitmap",
  "bitplane_manager",
  "chunk_storage",
@@ -4463,6 +4464,7 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 name = "simulation"
 version = "0.0.0"
 dependencies = [
+ "actions",
  "bitmap",
  "bitplane_manager",
  "chunk_storage",

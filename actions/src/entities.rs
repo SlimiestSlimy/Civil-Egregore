@@ -3,9 +3,14 @@
 //! instruction that carries least, and those put on the world between
 //! two ticks, on no superchunk's turn.
 
+mod attribute_edits;
+
+pub use attribute_edits::{set_attribute_blocks, set_attribute_member, set_attribute_of, unset_attribute_of, update};
+
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{Attribute, AttributeBlock, Entities, EntityRef, EntityType, Header, Layout};
+use entity_manager::{each_attribute, AttributeBlock, Entities, EntityRef, EntityType, Header};
+use instructions::{compare, entity, write, Write};
 use simulation::Turn;
 
 /// Runs `each` on every entity of the turn's superchunk waking this
@@ -33,7 +38,8 @@ pub fn on<'a>(turn: &Turn<'a>, at: CellIndex) -> Option<EntityRef<'a>> {
 /// taken by then.
 #[inline]
 pub fn spawn(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attributes: &[AttributeBlock]) {
-    turn.put(Header { kind, at, wake }, attributes);
+    make(turn, kind, at, wake, attributes);
+    made(turn);
 }
 
 /// [`spawn`], the compare of the entity's cell left open: what the
@@ -44,21 +50,25 @@ pub fn spawn(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attrib
 /// a lamb born and its mother no longer pregnant.
 #[inline]
 pub fn make(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attributes: &[AttributeBlock]) {
-    turn.make(Header { kind, at, wake }, attributes);
+    compare::open(turn, compare::cell_free(at));
+    entity::make(turn, Header { kind, at, wake });
+    for attribute in each_attribute(attributes) {
+        write::attribute_whole(turn, at, attribute);
+    }
 }
 
 /// Ends what [`make`] began: what the rule queues from here does not
 /// hang on the entity being made.
 #[inline]
 pub fn made(turn: &mut Turn) {
-    turn.made();
+    compare::close(turn);
 }
 
 /// Queues `entity` sleeping where it stands until `wake`: its
 /// attributes as they are, none carried.
 #[inline]
 pub fn sleep(turn: &mut Turn, entity: &Header, wake: u64) {
-    turn.step(entity, entity.at, wake);
+    step(turn, entity, entity.at, wake);
 }
 
 /// Queues `entity` stepping to `to` -- its own cell to stay where it
@@ -67,31 +77,39 @@ pub fn sleep(turn: &mut Turn, entity: &Header, wake: u64) {
 /// all the same.
 #[inline]
 pub fn step(turn: &mut Turn, entity: &Header, to: CellIndex, wake: u64) {
-    turn.step(entity, to, wake);
+    if entity.at.superchunk() != to.superchunk() {
+        // All it has goes with it, its type's default attribute too, each with its type as an entity is given them.
+        if let Some(whole) = on(turn, entity.at) {
+            let default = whole.default_attribute();
+            cross(turn, entity, Header { at: to, wake, ..*entity }, default.as_deref().unwrap_or(&[]), whole.attributes);
+        }
+        return;
+    }
+    let both = [Write::MoveEntity { from: entity.at, to }, Write::Wake { at: entity.at, wake }];
+    // Sleeping where it stands, it is not moved.
+    compare::with_writes(turn, compare::entity(entity), &both[usize::from(to == entity.at)..]);
+}
+
+/// Queues `before`'s entity crossing to `after`'s cell, in another
+/// superchunk, with `default` and `attributes` -- its type's default
+/// attribute, if it has one and it is not among the others, and the
+/// others: made there whole, under a compare of that cell being
+/// free; and here, under a compare of its being there still, put to
+/// sleep where it stands until its wake. The crossing stands only if
+/// it ends the tick here with those attributes -- else another
+/// changed it meanwhile, and it stays, asleep, with every change
+/// made to it (`../../simulation/docs/simulation.md`, "Entities").
+pub(crate) fn cross(turn: &mut Turn, before: &Header, after: Header, default: &[AttributeBlock], attributes: &[AttributeBlock]) {
+    compare::open(turn, compare::cell_free(after.at));
+    entity::cross(turn, before.at, after, default, attributes);
+    compare::close(turn);
+    compare::with_writes(turn, compare::entity(before), &[Write::Wake { at: before.at, wake: after.wake }]);
 }
 
 /// Queues removing `entity`.
 #[inline]
 pub fn remove(turn: &mut Turn, entity: &Header) {
-    turn.remove(entity);
-}
-
-/// Queues `attribute` of `other` -- the rule's own entity or
-/// another, any in reach -- becoming `value`, if it is still the `seen`
-/// the rule read of it, or it still has none: how one entity acts on
-/// another. Applied or refused whole, whatever else is written to
-/// `other` in the tick -- by itself, awake, or by a third
-/// (`docs/actions.md`, "One entity writing another").
-#[inline]
-pub fn set_attribute_of<L: Layout>(turn: &mut Turn, other: &Header, attribute: Attribute<L>, seen: Option<L>, value: L) {
-    turn.set_attribute(other, attribute, seen, value);
-}
-
-/// Queues removing `attribute` of `other`, another entity in reach,
-/// if it is still the `seen` the rule read of it.
-#[inline]
-pub fn unset_attribute_of<L: Layout>(turn: &mut Turn, other: &Header, attribute: Attribute<L>, seen: L) {
-    turn.unset_attribute(other, attribute, seen);
+    compare::with_writes(turn, compare::entity(entity), &[Write::RemoveEntity(entity.at)]);
 }
 
 /// The world's entities between two ticks: where a rule puts the ones a

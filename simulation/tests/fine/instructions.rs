@@ -58,7 +58,7 @@ fn number(at: CellIndex, first: CellIndex) -> u64 {
 fn step_right(turn: &mut Turn, _: &mut Vec<CellIndex>) -> usize {
     let now = turn.now();
     for entity in turn.woken() {
-        turn.step(&entity.header, entity.header.at.offset(1, 0).expect("in the world"), now + 1);
+        actions::entities::step(turn, &entity.header, entity.header.at.offset(1, 0).expect("in the world"), now + 1);
     }
     0
 }
@@ -128,8 +128,8 @@ fn entities_edit_another_an_attribute_at_a_time() {
     let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
             let number = number(entity.header.at, cell(1020, 30));
-            turn.set_attribute(&target, if number == 1 { MARK } else { SCAR }, None, number);
-            turn.step(&entity.header, entity.header.at, NEVER);
+            actions::entities::set_attribute_of(turn, &target, if number == 1 { MARK } else { SCAR }, None, number);
+            actions::entities::step(turn, &entity.header, entity.header.at, NEVER);
         }
         0
     });
@@ -143,9 +143,9 @@ fn entities_edit_another_an_attribute_at_a_time() {
     entities.apply();
     simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
-            turn.unset_attribute(&target, MARK, 1);
-            turn.set_attribute(&target, NAME, Some(7), 8);
-            turn.step(&entity.header, entity.header.at, NEVER);
+            actions::entities::unset_attribute_of(turn, &target, MARK, 1);
+            actions::entities::set_attribute_of(turn, &target, NAME, Some(7), 8);
+            actions::entities::step(turn, &entity.header, entity.header.at, NEVER);
         }
         0
     });
@@ -169,8 +169,8 @@ fn of_two_edits_of_one_attribute_one_is_refused_the_same_on_any_threads() {
         entities.apply();
         let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             for entity in turn.woken() {
-                turn.set_attribute(&target, NAME, None, number(entity.header.at, cell(1020, 30)));
-                turn.step(&entity.header, entity.header.at, NEVER);
+                actions::entities::set_attribute_of(turn, &target, NAME, None, number(entity.header.at, cell(1020, 30)));
+                actions::entities::step(turn, &entity.header, entity.header.at, NEVER);
             }
             0
         });
@@ -199,11 +199,11 @@ fn an_entity_changing_itself_and_another_writing_it_both_stand() {
             for entity in turn.woken() {
                 if entity.header.at == target.at {
                     // Itself: its name changed, asleep from here on.
-                    turn.update(&entity.header, Header { wake: NEVER, ..entity.header }, &[AttributeBlock::holding(NAME, 8)]);
+                    actions::entities::update(turn, &entity.header, Header { wake: NEVER, ..entity.header }, &[AttributeBlock::holding(NAME, 8)]);
                 } else {
-                    turn.set_attribute(&target, MARK, None, 1);
-                    turn.set_attribute(&target, NAME, Some(7), 99);
-                    turn.step(&entity.header, entity.header.at, NEVER);
+                    actions::entities::set_attribute_of(turn, &target, MARK, None, 1);
+                    actions::entities::set_attribute_of(turn, &target, NAME, Some(7), 99);
+                    actions::entities::step(turn, &entity.header, entity.header.at, NEVER);
                 }
             }
             0
@@ -234,10 +234,10 @@ fn a_crossing_written_behind_takes_what_was_written() {
             let now = turn.now();
             for entity in turn.woken() {
                 if entity.header.at == crosser.at {
-                    turn.step(&entity.header, across, now + 1);
+                    actions::entities::step(turn, &entity.header, across, now + 1);
                 } else {
-                    turn.set_attribute(&crosser, MARK, None, 1);
-                    turn.step(&entity.header, entity.header.at, NEVER);
+                    actions::entities::set_attribute_of(turn, &crosser, MARK, None, 1);
+                    actions::entities::step(turn, &entity.header, entity.header.at, NEVER);
                 }
             }
             0
@@ -270,13 +270,13 @@ fn two_fields_of_one_attribute_are_written_by_two_in_a_tick() {
         for entity in turn.woken() {
             if number(entity.header.at, cell(1020, 30)) == 1 {
                 // The first member, and the one after it seen wrongly.
-                turn.set_attribute_member(&target, kind, low, 1, 10);
-                turn.set_attribute_member(&target, kind, middle, 9, 70);
+                actions::entities::set_attribute_member(turn, &target, kind, low, 1, 10);
+                actions::entities::set_attribute_member(turn, &target, kind, middle, 9, 70);
             } else {
                 // The last: the two bytes beside the one refused.
-                turn.set_attribute_member(&target, kind, high, 3, 30);
+                actions::entities::set_attribute_member(turn, &target, kind, high, 3, 30);
             }
-            turn.step(&entity.header, entity.header.at, NEVER);
+            actions::entities::step(turn, &entity.header, entity.header.at, NEVER);
         }
         0
     });

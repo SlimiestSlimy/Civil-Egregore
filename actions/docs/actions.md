@@ -422,3 +422,14 @@ the turn's own; they are actions now, the turn left with reads and
 writes. The tick's instructions (`Civil_Egregore server pasture 300 333 4000 4
 1`, less the same run with no ticks) went from 53.86 million to 53.77,
 the world the same to the cell.
+
+Then what is made of several instructions: a cell set if it was
+clear, an entity made with its attributes, a step, a crossing, an
+attribute edited member by member, an entity changed whole. The turn
+built each itself; it now queues single instructions
+(`../../instructions/`), and these are built here from them. A tick of
+`pasture 1000 333 4000 4 1`, less the same run with no ticks, went
+from 131.8 million of the processor's instructions to 140.1 with each
+queued by a call of its own, and to 134.4 with a compare and its
+writes queued in one call (`instructions::compare::with_writes`); the
+world the same to the cell.

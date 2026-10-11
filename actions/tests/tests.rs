@@ -60,3 +60,15 @@ pub fn cells_drawn(count: usize, side: u32) -> Vec<CellIndex> {
     cells.sort_unstable();
     cells.into_iter().map(|(_, cell)| cell).collect()
 }
+
+/// Queues an entity made as `header` says, with `attributes`, if its
+/// cell is free by then.
+pub fn put(turn: &mut simulation::Turn, header: Header, attributes: &[entity_manager::AttributeBlock]) {
+    actions::entities::spawn(turn, header.kind, header.at, header.wake, attributes);
+}
+
+/// [`put`], the compare of its cell left open until
+/// `actions::entities::made`.
+pub fn make(turn: &mut simulation::Turn, header: Header, attributes: &[entity_manager::AttributeBlock]) {
+    actions::entities::make(turn, header.kind, header.at, header.wake, attributes);
+}

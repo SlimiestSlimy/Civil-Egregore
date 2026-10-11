@@ -25,7 +25,7 @@ fn turns_read_entities_across_superchunks() {
             let neighbour = entity.header.at.offset(1, 0).unwrap();
             let by_cell = turn.entity_on(neighbour).map(|other| other.header);
             let in_chunk: Vec<_> = turn.entities_in(neighbour.chunk()).expect("hot").map(|other| other.header.at).collect();
-            turn.remove(&entity.header);
+            actions::entities::remove(turn, &entity.header);
             seen.lock().unwrap().push((by_cell, in_chunk, turn.entity_on(entity.header.at).is_some()));
         }
         0
@@ -52,7 +52,7 @@ fn entities_wake_in_morton_order() {
             for entity in turn.woken() {
                 order.lock().unwrap().push(entity.header.at);
                 let at = entity.header.at.offset(1, 1).unwrap();
-                turn.update(&entity.header, Header { at, wake: turn.now() + 1, ..entity.header }, &[]);
+                actions::entities::update(turn, &entity.header, Header { at, wake: turn.now() + 1, ..entity.header }, &[]);
             }
             0
         });
@@ -79,7 +79,7 @@ fn entities_stay_in_morton_order_as_they_step() {
             for entity in turn.woken() {
                 let (dx, dy) = (turn.random().below(5) as i32 - 2, turn.random().below(5) as i32 - 2);
                 let after = Header { at: entity.header.at.offset(dx, dy).unwrap(), wake: turn.now() + 1, ..entity.header };
-                turn.update(&entity.header, after, entity.attributes);
+                actions::entities::update(turn, &entity.header, after, entity.attributes);
             }
             0
         });
@@ -109,7 +109,7 @@ fn a_change_to_an_entity_that_moved_on_is_passed_over() {
         for entity in turn.woken() {
             for step in [1, 2] {
                 let after = Header { at: entity.header.at.offset(step, 0).unwrap(), wake: turn.now() + 1, ..entity.header };
-                turn.update(&entity.header, after, &[]);
+                actions::entities::update(turn, &entity.header, after, &[]);
             }
         }
         0
@@ -143,11 +143,11 @@ fn entities_never_overlap() {
             let header = entity.header;
             let (dx, dy) = (turn.random().below(3) as i32 - 1, turn.random().below(3) as i32 - 1);
             let wake = turn.now() + 1 + turn.random().below(3);
-            turn.update(&header, Header { at: header.at.offset(dx, dy).unwrap(), wake, ..header }, entity.attributes);
+            actions::entities::update(turn, &header, Header { at: header.at.offset(dx, dy).unwrap(), wake, ..header }, entity.attributes);
             if turn.random().below(50) == 0 {
                 let born = header.at.offset(turn.random().below(5) as i32 - 2, turn.random().below(5) as i32 - 2).unwrap();
                 let tag = 1000 + turn.random().draw();
-                turn.put(Header { at: born, wake, ..header }, &[AttributeBlock::holding(TAG, tag)]);
+                crate::tests::put(turn, Header { at: born, wake, ..header }, &[AttributeBlock::holding(TAG, tag)]);
             }
         }
         0
