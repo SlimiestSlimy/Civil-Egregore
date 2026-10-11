@@ -318,8 +318,12 @@ order: "Words, simplify, clouds".
 SUGGESTED, not asked ("i said probably, thats not an ask, is a
    suggestion"): "we should probably have a modular absrtaction for
    redirecting writes and compares to the right entities based on the
-   provided entity id". To weigh during 3, and build only if it makes
-   the code smaller or plainer; say what was found. It would be one
+   provided entity id". Taken up lightly 2026-10-11: the second
+   phase's routing state is one type, `Following`
+   (tick/applying/following.rs). Not done: the finding itself
+   (LandingInSeveral::of_named; entity_manager's left_this_tick,
+   crossed_to, named_from_abroad) is still where it was -- to weigh
+   when entity_manager is simplified. It would be one
    module that says where the entity
    of a name stands now -- today spread over entity_manager
    (left_this_tick, crossed_to, named_from_abroad), turn/landing.rs

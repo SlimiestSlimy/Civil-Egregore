@@ -4,10 +4,11 @@
 //! (`docs/simulation.md`, "An entity over a border").
 
 use super::{Applying, Phase};
-use crate::turn::ACROSS;
+use crate::turn::{Outbox, ACROSS};
 use coordinates::{CellIndex, SuperchunkIndex};
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::{Arc, Mutex};
 
 /// What became of a segment that names an entity that crossed a
 /// border before the segment was come to.
@@ -23,7 +24,42 @@ pub(super) struct Repointed {
     pub(super) arrived: Arc<AtomicU8>,
 }
 
-impl Phase<'_, '_> {
+/// Where what is queued for an entity goes when the entity is not
+/// where the tick found it: all the second phase keeps of entities
+/// named by others and of segments re-pointed after them, in one
+/// place. An instruction names an entity by the cell the tick found
+/// it on; this is what has that name reach the entity in whichever
+/// superchunk it stands by then.
+pub(super) struct Following {
+    /// The entities an author that is not the entity itself named
+    /// this tick, each with those authors: by the cell the tick found
+    /// it on. What is looked at as an entity crosses a border.
+    named_by_others: HashMap<CellIndex, Vec<u64>>,
+    /// Whether any segment was repointed this tick: read before the
+    /// map is.
+    any_repointed: AtomicBool,
+    /// The segments an entity that crossed a border had follow it, by
+    /// outbox, queue and segment.
+    repointed: Mutex<HashMap<(u32, u32, u32), Repointed>>,
+}
+
+impl Following {
+    /// Nothing re-pointed yet, of a tick whose `outboxes` say who
+    /// named whom.
+    pub(super) fn of_what_was_queued(outboxes: &[Outbox]) -> Self {
+        let mut named_by_others: HashMap<CellIndex, Vec<u64>> = HashMap::new();
+        for &(named, author) in outboxes.iter().flat_map(|outbox| &outbox.named_by_others) {
+            named_by_others.entry(named).or_default().push(author);
+        }
+        Self { named_by_others, any_repointed: AtomicBool::new(false), repointed: Mutex::new(HashMap::new()) }
+    }
+
+    /// Whether no author named an entity other than itself this
+    /// tick: then nothing follows any entity.
+    pub(super) fn nobody_named_another(&self) -> bool {
+        self.named_by_others.is_empty()
+    }
+
     /// What became of the segment `segment` of the queue `from` of
     /// the outbox at `source`, if an entity it names crossed a border
     /// before it was come to. Nearly always nothing, asked with one
@@ -35,6 +71,9 @@ impl Phase<'_, '_> {
         }
         self.repointed.lock().expect("the segments repointed").get(&(source, from, segment)).cloned()
     }
+}
+
+impl Phase<'_, '_> {
 
     /// Has what other authors queued for the entities that `crossed`
     /// a border follow them, as the act that had them cross is
@@ -51,7 +90,7 @@ impl Phase<'_, '_> {
     pub(super) fn have_follow(&self, crossed: &[(CellIndex, CellIndex)], held: &mut [(usize, &mut Applying)]) {
         let place_of = |superchunk: SuperchunkIndex| self.superchunk_indices.binary_search(&superchunk).expect("a superchunk held");
         for &(stood, to) in crossed {
-            let Some(authors) = self.named_by_others.get(&stood) else {
+            let Some(authors) = self.following.named_by_others.get(&stood) else {
                 continue;
             };
             let (left, came_to) = (place_of(stood.superchunk()), place_of(to.superchunk()));
@@ -59,7 +98,7 @@ impl Phase<'_, '_> {
             let later = |author: u64| author > stood.0 + 1 && authors.contains(&author);
             let leaving = &mut *held.iter_mut().find(|(place, _)| *place == left).expect("the superchunk it left is held").1;
             let mut following = Vec::new();
-            let mut repointed = self.repointed.lock().expect("the segments repointed");
+            let mut repointed = self.following.repointed.lock().expect("the segments repointed");
             let mut at = leaving.next + 1;
             while let Some(&entry) = leaving.order.get(at) {
                 let (author, source, from, segment) = entry;
@@ -94,7 +133,7 @@ impl Phase<'_, '_> {
             }
             drop(repointed);
             if !following.is_empty() {
-                self.any_repointed.store(true, Ordering::SeqCst);
+                self.following.any_repointed.store(true, Ordering::SeqCst);
                 let coming = &mut *held.iter_mut().find(|(place, _)| *place == came_to).expect("the superchunk it came to is held").1;
                 for entry in following {
                     // After every segment of an author no later than its own: it has come to none of them yet.

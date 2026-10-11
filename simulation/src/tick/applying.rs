@@ -10,13 +10,12 @@ use crate::turn::landing::{LandingInOne, LandingInSeveral};
 use crate::turn::{slot, slot_between, slots, Outbox, ACROSS, SLOTS};
 use bitplane_manager::Superchunk;
 use chunk_storage::LayerType;
-use coordinates::{CellIndex, SuperchunkIndex};
+use coordinates::SuperchunkIndex;
 use entity_manager::SuperchunkEntities;
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Condvar, Mutex, MutexGuard};
 use utilities::dispatcher::Dispatcher;
-use following::Repointed;
+use following::Following;
 use who_goes_on::{LetGoOn, LONGEST_REST};
 
 mod following;
@@ -89,16 +88,9 @@ struct Phase<'a, 'b> {
     now: u64,
     /// The layer entities are kept in, if the world has one.
     collision: Option<LayerType>,
-    /// The entities an author that is not the entity itself named
-    /// this tick, each with those authors: by the cell the tick found
-    /// it on. What is looked at as an entity crosses a border.
-    named_by_others: HashMap<CellIndex, Vec<u64>>,
-    /// Whether any segment was repointed this tick: read before the
-    /// map is.
-    any_repointed: AtomicBool,
-    /// The segments an entity that crossed a border had follow it, by
-    /// outbox, queue and segment.
-    repointed: Mutex<HashMap<(u32, u32, u32), Repointed>>,
+    /// What has the instructions naming an entity follow it over a
+    /// border.
+    following: Following,
 }
 
 impl Phase<'_, '_> {
@@ -155,7 +147,7 @@ impl Phase<'_, '_> {
             let queue = &outbox.queues[from];
             let (begun, next) = (outbox.segments[from][segment], outbox.segments[from].get(segment + 1));
             let some = begun.instructions as usize..next.map_or(queue.instructions.len(), |next| next.instructions as usize);
-            let repointed = self.repointed_of(source, from as u32, segment as u32);
+            let repointed = self.following.repointed_of(source, from as u32, segment as u32);
             if from != ACROSS && repointed.is_none() {
                 self.give_up_those_kept(part);
                 queue.apply(some, begun.compares as usize, &mut LandingInOne { superchunk: applying.superchunk, entities: applying.entities }, self.now + 1, self.collision, applied);
@@ -199,7 +191,7 @@ impl Phase<'_, '_> {
             let crossed = std::mem::take(&mut landing.crossed);
             drop(landing);
             applied.acts_over_a_border += u64::from(places.len() > 1);
-            if !crossed.is_empty() && !self.named_by_others.is_empty() {
+            if !crossed.is_empty() && !self.following.nobody_named_another() {
                 // Each superchunk held, by where it is among them all: what an entity that crossed has follow it is in their orders.
                 let mut held: Vec<(usize, &mut Applying)> = others.iter_mut().map(|(other, guard)| (*other, &mut **guard)).collect();
                 held.push((here, &mut *applying));
@@ -264,12 +256,7 @@ pub(crate) fn apply_what_was_queued(dispatcher: &Dispatcher, superchunks: &mut [
         superchunks.iter_mut().zip(entities).zip(&mut room.orders).map(|((superchunk, entities), order)| Mutex::new(Applying { superchunk, entities, order, next: 0, begun: false })).collect();
     let (asleep, woken, sleeping) = (Mutex::new(()), Condvar::new(), AtomicUsize::new(0));
     let (to_begin, any_acts, done) = (AtomicUsize::new(count), outboxes.iter().any(|outbox| !outbox.across.is_empty()), AtomicUsize::new(0));
-    let mut named_by_others: HashMap<CellIndex, Vec<u64>> = HashMap::new();
-    for &(named, author) in outboxes.iter().flat_map(|outbox| &outbox.named_by_others) {
-        named_by_others.entry(named).or_default().push(author);
-    }
-    let (any_repointed, repointed) = (AtomicBool::new(false), Mutex::new(HashMap::new()));
-    let phase = Phase { applying: &applying, superchunk_indices, outboxes, to_go_on: &room.to_go_on, let_go_on: &room.let_go_on, lying: &room.lying, whose: &room.whose, asleep, woken, sleeping, to_begin, any_acts, done, now, collision, named_by_others, any_repointed, repointed };
+    let phase = Phase { applying: &applying, superchunk_indices, outboxes, to_go_on: &room.to_go_on, let_go_on: &room.let_go_on, lying: &room.lying, whose: &room.whose, asleep, woken, sleeping, to_begin, any_acts, done, now, collision, following: Following::of_what_was_queued(outboxes) };
     let applied_parts: Vec<Mutex<Applied>> = (0..dispatcher.threads()).map(|_| Mutex::new(Applied::default())).collect();
     dispatcher.run(&|part| {
         let mut applied = Applied::default();
