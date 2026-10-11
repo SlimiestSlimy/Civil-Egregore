@@ -43,7 +43,7 @@ was there), **`push_attribute(blocks, attribute, value)`** (appended),
 each type once.
 
 The 3x3 about a cell as nine bits is not kept here: it is an
-instruction's shape (`../../instructions/src/around.rs`).
+instruction's shape (`../../actions/src/around.rs`).
 
 **`bucket.rs`**: **`place(cell)`**: a cell's place in its chunk, a
 `u16`. **`Bucket`**: the chunk's entities, one a cell, sorted by cell:

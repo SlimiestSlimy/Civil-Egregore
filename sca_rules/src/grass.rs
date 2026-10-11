@@ -2,9 +2,9 @@
 //! neighbour, or decay back to dirt the more grass is around it -- one
 //! sampling pass for both (`docs/sca_rules.md`, "Grass").
 
-use instructions::layers::{GRASS, WET};
-use instructions::simulation_time::SimulationTime;
-use instructions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
+use actions::layers::{GRASS, WET};
+use actions::simulation_time::SimulationTime;
+use actions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
 
 /// The simulation time a cell of grass takes, on average, to try to
 /// spread: what its chance each tick is worked out from, so the grass

@@ -1,0 +1,21 @@
+[package]
+name = "actions"
+edition = "2024"
+description = "Civil Egregore's actions: what a rule is made of -- all a turn is asked, and every piece of behaviour made of several instructions, each a function over the simulation's turn; all a rule reaches the simulation through"
+
+[dependencies]
+instructions = { path = "../instructions" }
+type_registry = { path = "../type_registry" }
+simulation = { path = "../simulation" }
+pathfinding = { path = "../pathfinding" }
+coordinates = { path = "../coordinates" }
+chunk_storage = { path = "../chunk_storage" }
+bitplane_manager = { path = "../bitplane_manager" }
+bitmap = { path = "../bitmap" }
+entity_manager = { path = "../entity_manager" }
+utilities = { path = "../utilities" }
+
+# What the tiers' tests share (`tests/tests.rs`): no test program of its own.
+[[test]]
+name = "tests"
+test = false

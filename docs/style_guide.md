@@ -76,7 +76,7 @@ reader has to wonder whether something is missing or was never needed
   server makes -- the server a dependency of the tests alone.
 - A crate depends only on the crates below it. The README lists the
   order. The rules' crates (`entity_rules`, `sca_rules`) depend on
-  `instructions` alone. Nothing depends on `AI_SCRATCHPAD`, the AI's
+  `actions` alone. Nothing depends on `AI_SCRATCHPAD`, the AI's
   own probes, which is no part of the program.
 
 ## One word for one thing

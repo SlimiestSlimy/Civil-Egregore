@@ -491,6 +491,22 @@ threads`.
   rule kinds, idk"; "that way we can also add fields on the entities
   and planes to register the used rules"; "what do you think of
   this?". Not to build until the user says how.
+- THE ACTIONS CRATE, decided by the user 2026-10-11 (asked):
+  reads: "option 1 and 3 are basically the same, because \"reads\"
+  are basically abstracted function calls into the simulation. id say
+  make them actions, so they are clearly separate from instructions".
+  Depth: two stages, both now -- 1: make the crate, move the modules,
+  rules depend on actions alone, commit; 2: lift step, crossing, make
+  and attribute edits out of the simulation into actions so
+  instructions exposes single instructions only, measure, commit.
+  STAGE 1 DONE: crate `actions` is what `instructions` was; the new
+  `instructions` holds the compares alone so far. Also the user: "oh
+  and the other reason to make reads actions is so rules can depend
+  only on the actions crate lmao"; "instructions crate probably needs
+  a better name lol" (kept for now; names to suggest). STAGE 2 next.
+- RULES IN THE REGISTRY, the user 2026-10-11: "every rule has a master
+  entity type or plane, regardless of what planes or entities the rule
+  reads or writes". So a rule's row names its one master. Not built.
 - NEXT, the user, 2026-10-11, after the border work was pushed
   (b5d7802): "good, now were going to work on climate!". Nothing said
   of it yet: wait for what the user wants of it.

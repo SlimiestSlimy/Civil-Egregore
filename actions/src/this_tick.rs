@@ -1,6 +1,6 @@
 //! The tick a rule is run in, and its superchunk's lot: what a rule
 //! asks of its turn that is neither a cell nor an entity
-//! (`docs/instructions.md`, "Rules ask instructions, and nothing else").
+//! (`docs/actions.md`, "Rules ask actions, and nothing else").
 
 use coordinates::SuperchunkIndex;
 use simulation::Turn;

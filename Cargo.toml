@@ -33,6 +33,7 @@ members = [
     "entity_manager",
     "entity_rules",
     "gui",
+    "actions",
     "instructions",
     "pathfinding",
     "sca_rules",

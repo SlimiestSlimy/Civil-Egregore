@@ -17,7 +17,7 @@ emit)`**: every superchunk's, in Morton order.
 `mod.rs` the turn, its cells and its outbox; `instruction.rs` the
 instruction; `conditional.rs` the compares and the queue;
 `entities.rs` what is queued for entities; `apply.rs` the queue
-applied. What a rule makes of them is `../../instructions/`.
+applied. What a rule makes of them is `../../actions/`.
 
 **`Outbox`**: nine queues (`queues`, a `Queue` each), by **`slot(dx,
 dy)`**, and for each where every author's part begins (`segments`, a

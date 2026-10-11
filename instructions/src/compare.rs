@@ -2,7 +2,7 @@
 //! as an instruction of its own. If it no longer holds when it is
 //! come to, what the rule queued after it is skipped, up to its next
 //! compare or the end of the compare: one compare, any number of
-//! writes (`docs/instructions.md`, "Compare-and-write").
+//! writes (`docs/instructions.md`, "Compares").
 
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;
@@ -35,22 +35,6 @@ pub fn attribute<L: Layout>(entity: &Header, attribute: Attribute<L>, seen: Opti
     let mut blocks = Vec::new();
     seen.into_iter().for_each(|seen| push_attribute(&mut blocks, attribute, seen));
     Compare::attribute(entity.at, attribute.attribute_type(), seen.map(|_| &blocks[..]))
-}
-
-/// Queues the number of `layer_type` at `cell` becoming `value` if
-/// it is still the `seen` the rule read there and `compare` holds too
-/// when the write is come to: one added to the rule's count `counted`
-/// then, if one is given. The compare is of the cell's superchunk.
-#[inline]
-pub fn write(turn: &mut Turn, compare: Compare, layer_type: LayerType, cell: CellIndex, seen: u32, value: u32, counted: Option<usize>) {
-    turn.queue_if(compare, layer_type, cell, seen, value, counted.map(|place| place as u32));
-}
-
-/// Adds one to the rule's count `counted` if `compare` holds when it
-/// is come to.
-#[inline]
-pub fn count(turn: &mut Turn, compare: Compare, counted: usize) {
-    turn.count_if(compare, counted as u32);
 }
 
 /// From here on, what the rule queues -- cells written, what

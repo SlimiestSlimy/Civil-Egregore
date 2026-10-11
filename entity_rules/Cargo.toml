@@ -4,7 +4,7 @@ edition = "2024"
 description = "Civil Egregore's rules of its entities, a kind a file: so far the sheep"
 
 [dependencies]
-instructions = { path = "../instructions" }
+actions = { path = "../actions" }
 
 # Its tests alone: a rule is tried on a world, and every world is the
 # server's to make (`docs/testing_protocol.md`, at the repository's root).

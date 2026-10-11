@@ -11,7 +11,7 @@ use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
 use coordinates::{CellIndex, SuperchunkIndex};
 use entity_manager::Entities;
-use instructions::{around, walking};
+use actions::{around, walking};
 use simulation::Simulation;
 use type_registry::{COLLISION, WALL_EAST, WALL_SOUTH};
 use utilities::rng::Rng;

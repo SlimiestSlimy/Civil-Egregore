@@ -115,6 +115,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "actions"
+version = "0.0.0"
+dependencies = [
+ "bitmap",
+ "bitplane_manager",
+ "chunk_storage",
+ "coordinates",
+ "entity_manager",
+ "instructions",
+ "pathfinding",
+ "simulation",
+ "type_registry",
+ "utilities",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2332,11 +2348,11 @@ dependencies = [
 name = "entity_rules"
 version = "0.0.0"
 dependencies = [
+ "actions",
  "bitplane_manager",
  "chunk_storage",
  "coordinates",
  "entity_manager",
- "instructions",
  "server",
  "simulation",
  "type_registry",
@@ -3032,14 +3048,11 @@ dependencies = [
 name = "instructions"
 version = "0.0.0"
 dependencies = [
- "bitmap",
  "bitplane_manager",
  "chunk_storage",
  "coordinates",
  "entity_manager",
- "pathfinding",
  "simulation",
- "type_registry",
  "utilities",
 ]
 
@@ -4312,11 +4325,11 @@ dependencies = [
 name = "sca_rules"
 version = "0.0.0"
 dependencies = [
+ "actions",
  "bitplane_manager",
  "chunk_storage",
  "coordinates",
  "entity_manager",
- "instructions",
  "server",
  "simulation",
  "type_registry",
@@ -4395,13 +4408,13 @@ dependencies = [
 name = "server"
 version = "0.0.0"
 dependencies = [
+ "actions",
  "bitmap",
  "bitplane_manager",
  "chunk_storage",
  "coordinates",
  "entity_manager",
  "entity_rules",
- "instructions",
  "sca_rules",
  "simulation",
  "type_registry",

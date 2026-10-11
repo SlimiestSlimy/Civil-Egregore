@@ -11,7 +11,7 @@ use simulation::Turn;
 /// Runs `each` on every entity of the turn's superchunk waking this
 /// tick, in Morton order, with `state`, the cells of `layers` about
 /// each asked of memory ahead. One that is to wake again must be put
-/// back with a later wake tick (`docs/instructions.md`, "The going over").
+/// back with a later wake tick (`docs/actions.md`, "The going over").
 #[inline]
 pub fn each_woken<'a, const N: usize, S>(turn: &mut Turn<'a>, layers: [LayerType; N], state: &mut S, mut each: impl FnMut(&mut Turn<'a>, EntityRef<'a>, &mut S)) {
     for entity in turn.woken_reading(layers) {
@@ -81,7 +81,7 @@ pub fn remove(turn: &mut Turn, entity: &Header) {
 /// the rule read of it, or it still has none: how one entity acts on
 /// another. Applied or refused whole, whatever else is written to
 /// `other` in the tick -- by itself, awake, or by a third
-/// (`docs/instructions.md`, "One entity writing another").
+/// (`docs/actions.md`, "One entity writing another").
 #[inline]
 pub fn set_attribute_of<L: Layout>(turn: &mut Turn, other: &Header, attribute: Attribute<L>, seen: Option<L>, value: L) {
     turn.set_attribute(other, attribute, seen, value);

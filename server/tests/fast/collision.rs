@@ -66,7 +66,7 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     }
     assert!(stepped > 0, "{stepped} steps, {born} lamb-ticks");
     // The trees after the sheep: a sheep whose wake passes with its rule not run never wakes again.
-    let mut done = instructions::RuleCounts::default();
+    let mut done = actions::RuleCounts::default();
     for _ in 0..2000 {
         done += tick_rule(&mut world, server::TREES_RULE).rules;
     }

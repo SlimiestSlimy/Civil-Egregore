@@ -2,12 +2,12 @@
 //! a meal, its lamb, growing up -- and wakes for that alone; hungry, it
 //! walks to grass, a step a wake (`docs/entity_rules.md`, "The sheep").
 
-use instructions::around;
-use instructions::entities::EntitiesBetweenTicks;
-pub use instructions::entity_types::{SheepState, SHEEP, SHEEP_STATE};
-use instructions::simulation_time::SimulationTime;
-use instructions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
-use instructions::{WholeAttribute, Chance, area, cells, compare, entities, place_counted, this_tick, walking, CellCartesian, CellIndex, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
+use actions::around;
+use actions::entities::EntitiesBetweenTicks;
+pub use actions::entity_types::{SheepState, SHEEP, SHEEP_STATE};
+use actions::simulation_time::SimulationTime;
+use actions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
+use actions::{WholeAttribute, Chance, area, cells, compare, entities, place_counted, this_tick, walking, CellCartesian, CellIndex, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
 /// Every time below is said in simulation time, and is ticks only

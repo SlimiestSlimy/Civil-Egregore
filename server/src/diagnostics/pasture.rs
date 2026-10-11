@@ -10,7 +10,7 @@ use crate::{Chosen, RulePlace, TickCounts, GRASS_RULE, SHEEP_RULE};
 use entity_rules::sheep::{BIRTHS, DEATHS, WOKEN};
 use entity_manager::diagnostics::entities::EntityStats;
 use entity_manager::InstructionsApplied;
-use instructions::RuleCounts;
+use actions::RuleCounts;
 use std::time::Duration;
 use utilities::diagnostics::process_memory::MemoryTrack;
 
