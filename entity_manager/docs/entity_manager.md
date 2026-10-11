@@ -142,8 +142,8 @@ read, compared or written:
   lies. Removing it is passed over: it is never taken.
 
 `EntityRef::attributes` are the others; `EntityRef::kept`, all the
-blocks as kept -- what two entities are told apart by, and what is
-summed of one that crosses (`SuperchunkEntities::kept_sum`).
+blocks as kept -- what two entities are told apart by, and what
+goes with one that crosses a border.
 
 **What it costs, and saves.** A type whose data is an even number of
 words is a block shorter an entity: the type word would have begun a
@@ -253,8 +253,7 @@ holds one entity, ever. An instruction carries all it needs: an entity
 moving to a neighbouring superchunk goes as a whole copy, made in the
 first phase from the world as the tick found it, so the second never
 reads another superchunk's entities while that one changes them. A put
-and a crossing are queued by the one private `push`, a crossing naming
-the cell it left.
+is queued by the one private `push`.
 
 Applied (`Instructions::apply`; `apply_some` for a part of the queue;
 `Instruction::lands` the cell that says which superchunk), each goes to the superchunk its cell
@@ -304,24 +303,25 @@ the collision plane of the superchunk it lands in (`CollisionCells`:
 `held`, `hold`, `free`; `()` is none). Then no entity is put on or
 moved to a cell it holds -- whatever holds it, an entity or not -- the
 cell one comes to is set in it, and the cells left or removed from
-(`vacated`) are cleared when the tick is over (`names_anew`), as a
-leaver's is when its crossing is settled. The buckets' own check
+(`vacated`) are cleared when the tick is over (`names_anew`), the cell one left
+over a border among them. The buckets' own check
 stays: a cell holds one entity whether or not a plane is kept.
 
 **Crossing a border.** An entity crossing into a neighbouring
-superchunk is put there while it still stands on the cell it left: for
-the rest of the tick it stands on both, so that, its new cell taken, it
-stays where it stood -- and where it left, under the name it has this
-tick, is where every write to it lands. Each superchunk notes who
-arrived (`take_arrived`), and each then removes from the cells they
-left those that left it (`settle_leavers`); one that ended the tick
-there with other attributes than it was put with (an `Arrival` carries
-sum as they are kept, `kept_sum`, `blocks_sum`) has them sent after it (`Settled`), and the
-superchunk it was put in gives them to it (`settle_arrivals`). So an
-entity crosses with all that was written to it, exactly as one moving
-within a superchunk keeps it. One removed where it left meanwhile is
-turned back: the superchunk it was put in takes it back. Once every superchunk has settled, every entity
-stands on one cell.
+superchunk is moved once, by whoever holds both
+(`SuperchunkEntities::cross_named`): taken from the bucket it stood
+in, put in a bucket of the other superchunk with all it has at that
+moment, as kept, and its wake filed there. Its cell there another's
+this tick, or held in that superchunk's collision plane, it stays. Its
+name for the tick -- the cell the tick found it on -- is then noted in
+both superchunks: where it left, as gone to a cell of another
+(`crossed_to`), so nothing there takes the name for a cell of its
+own; where it came to, as the entity standing there
+(`named_from_abroad`), so what names it finds it. The cell it left is
+cleared in the collision plane when the tick is over, as one moved
+from is. Having what others queued for it applied where it now stands
+is the simulation's (`../../simulation/docs/simulation.md`, "An
+entity over a border"). At no time is an entity on two cells.
 
 ## The store
 

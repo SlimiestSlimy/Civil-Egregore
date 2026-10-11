@@ -40,7 +40,69 @@ impl SuperchunkEntities {
     /// Where the entity the tick found on `stood` stands now: there
     /// still, on the cell it moved to, or -- removed -- nowhere.
     fn now_on(&self, stood: CellIndex) -> Option<CellIndex> {
-        self.left_this_tick.get(&stood).map_or(Some(stood), |now_on| *now_on)
+        match self.left_this_tick.get(&stood) {
+            // Where it went, if that is here: one that crossed a border is the other superchunk's.
+            Some(now_on) => now_on.filter(|now_on| now_on.superchunk() == self.index),
+            None => {
+                debug_assert_eq!(stood.superchunk(), self.index, "an entity named in a superchunk it neither stood in nor came to");
+                Some(stood)
+            }
+        }
+    }
+
+    /// The superchunk the entity the tick found on `stood` crossed
+    /// to, if it left this one over a border this tick: what is
+    /// queued for it lands there
+    /// (`docs/entity_manager.md`, "Instructions", Crossing a border).
+    pub fn crossed_to(&self, stood: CellIndex) -> Option<coordinates::SuperchunkIndex> {
+        let now_on = (*self.left_this_tick.get(&stood)?)?;
+        Some(now_on.superchunk()).filter(|&superchunk| superchunk != self.index)
+    }
+
+    /// Whether the entity the tick found on `stood`, a cell of
+    /// another superchunk, crossed into this one this tick and is
+    /// named here still -- standing, or removed since.
+    pub fn named_from_abroad(&self, stood: CellIndex) -> bool {
+        stood.superchunk() != self.index && self.left_this_tick.contains_key(&stood)
+    }
+
+    /// Moves the entity the tick found on `stood`, standing there
+    /// still, to `to`, a cell of `into`, another superchunk: all it
+    /// has goes with it, as it is now, and its wake, if still to come,
+    /// is filed there. It is passed over if it already left `stood`
+    /// this tick, and stays if `to` is another's this tick or one
+    /// `collision`, `into`'s plane, holds. Crossed, its name finds it
+    /// in `into` for the rest of the tick, `to` is set in `collision`
+    /// and the cell it left is cleared when the tick is over
+    /// (`docs/entity_manager.md`, "Instructions", Crossing a border).
+    pub fn cross_named(&mut self, into: &mut SuperchunkEntities, earliest: u64, stood: CellIndex, to: CellIndex, collision: &mut impl CollisionCells) -> Put {
+        debug_assert!(stood.superchunk() == self.index && to.superchunk() == into.index && self.index != into.index, "a crossing within a superchunk: a move");
+        if self.left_this_tick.contains_key(&stood) {
+            return Put::PassedOver;
+        }
+        let Some(entity) = self.get(stood) else {
+            return Put::PassedOver;
+        };
+        if into.named_or_taken(to) || collision.held(to) {
+            return Put::Stayed;
+        }
+        let header = Header { at: to, ..entity.header };
+        // Those it has go with it as this superchunk kept them.
+        let mut carried = std::mem::take(&mut into.carried);
+        carried.clear();
+        carried.extend_from_slice(entity.kept);
+        let put = into.chunks[to.chunk().place()].make(header, &carried);
+        into.carried = carried;
+        debug_assert_eq!(put, Put::New, "a cell seen free");
+        if header.wake != NEVER && header.wake >= earliest {
+            into.wheel.file(earliest, header.wake, Wake { at: to });
+        }
+        self.remove(stood);
+        self.left_this_tick.insert(stood, Some(to));
+        self.vacated.push(stood);
+        into.left_this_tick.insert(stood, Some(to));
+        collision.hold(to);
+        Put::Moved
     }
 
     /// Whether `at` is another's this tick: an entity stands on it, or

@@ -5,9 +5,8 @@
 //! (`docs/simulation.md`, "The tick" and "The dispatcher").
 
 mod applying;
-mod crossings;
 
-use entity_manager::{Arrival, Entities, EntityReader, InstructionsApplied, Settled};
+use entity_manager::{Entities, EntityReader, InstructionsApplied};
 use crate::turn::apply::Standing;
 use crate::turn::conditional::{CountedWhenApplied, COUNTED_WHEN_APPLIED};
 use crate::turn::{slot, Outbox, Turn};
@@ -70,12 +69,6 @@ pub struct Simulation {
     /// Each superchunk's random stream, with its superchunk, in the
     /// arena's order: kept from tick to tick, and by a save.
     random: Vec<(SuperchunkIndex, Rng)>,
-    /// Each superchunk's entities crossed into it in a tick, with the
-    /// cells they left, in the arena's order: emptied after every tick.
-    arrived: Vec<Vec<Arrival>>,
-    /// What each superchunk settled of those that left it, in the
-    /// arena's order: kept for its room.
-    settled: Vec<Settled>,
     /// The layer entities are kept in, if the world has one
     /// ([`Simulation::keep_entities_in`]).
     collision: Option<LayerType>,
@@ -108,7 +101,7 @@ impl Simulation {
     /// jobs on too: a thread busy with one sits a tick's phase out.
     pub fn on(dispatcher: Arc<Dispatcher>) -> Self {
         let samples = (0..dispatcher.threads()).map(|_| Mutex::new(Vec::new())).collect();
-        Self { dispatcher, outboxes: Vec::new(), samples, random: Vec::new(), arrived: Vec::new(), settled: Vec::new(), collision: None, applying_room: applying::Room::default() }
+        Self { dispatcher, outboxes: Vec::new(), samples, random: Vec::new(), collision: None, applying_room: applying::Room::default() }
     }
 
     /// From here on the entities are kept in `collision_plane`, a
@@ -213,7 +206,6 @@ impl Simulation {
 
         let (superchunk_indices, collision) = (&superchunk_indices, self.collision);
         let applied_parts = applying::apply_what_was_queued(&self.dispatcher, arena.superchunks_mut(), entities.superchunks_mut(), &mut self.applying_room, superchunk_indices, &self.outboxes, now, collision);
-        instructions_applied.turned_back += self.settle_crossings(entities, superchunk_indices, per_part);
         // The tick over: every entity named by the cell it stands on now, the cells left cleared in the collision plane.
         for (superchunk, entities) in arena.superchunks_mut().iter_mut().zip(entities.superchunks_mut()) {
             entities.names_anew(&mut Standing { superchunk, layer: collision });
@@ -239,6 +231,7 @@ impl Simulation {
             outbox.queues.iter_mut().for_each(|queue| queue.clear());
             outbox.segments.iter_mut().for_each(Vec::clear);
             outbox.across.clear();
+            outbox.named_by_others.clear();
         }
         entities.advance();
         TickReport { writes_applied: applied, instructions_applied, instructions_compared, counted_when_applied, acts_over_a_border, rules, computing: computed - start, applying: computed.elapsed() }

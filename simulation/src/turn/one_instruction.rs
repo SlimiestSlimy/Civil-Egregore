@@ -7,7 +7,7 @@ use super::instruction::{Instruction, NO_COUNT};
 use super::Turn;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{AttributeBlock, AttributeType, Header, Member, BLOCK_WORDS};
+use entity_manager::{AttributeBlock, AttributeType, Header, Member};
 
 impl Turn<'_> {
     /// Queues the compare `compare`, open from here: what is queued
@@ -50,33 +50,34 @@ impl Turn<'_> {
         self.queue(header.at, Instruction::make_entity(header.at, header.kind.0, header.wake));
     }
 
-    /// Queues the entity the tick found on `from` moved to `to`, a
-    /// cell of the same superchunk.
+    /// Queues the entity the tick found on `from` moved to `to`, in
+    /// its superchunk or in another: one instruction either way, the
+    /// border a rule's to cross without knowing of it. Over a border
+    /// the author lands in both superchunks, so the move is one act
+    /// (`docs/simulation.md`, "An act over a border").
     #[inline]
     pub fn move_entity(&mut self, from: CellIndex, to: CellIndex) {
-        self.queue(from, Instruction::move_entity(from, to));
+        if from.superchunk() != to.superchunk() {
+            self.queue_landing_in(to.superchunk());
+        }
+        self.queue(from, Self::move_instruction(from, to));
+    }
+
+    /// The instruction that moves the entity the tick found on `from`
+    /// to `to`: a move within a superchunk, a crossing between two.
+    #[inline]
+    fn move_instruction(from: CellIndex, to: CellIndex) -> Instruction {
+        if from.superchunk() == to.superchunk() {
+            Instruction::move_entity(from, to)
+        } else {
+            Instruction::cross_entity(from, to)
+        }
     }
 
     /// Queues the entity the tick found on `at` removed.
     #[inline]
     pub fn remove_entity(&mut self, at: CellIndex) {
         self.queue(at, Instruction::remove_entity(at));
-    }
-
-    /// Queues the entity the tick found on `left` made on `after`'s
-    /// cell, in another superchunk, of `after`'s type and to wake at
-    /// its wake, with `default` and `attributes`: its type's default
-    /// attribute, if it has one and it is not among the others, and
-    /// the others. One instruction, the blocks carried beside it.
-    pub fn cross_entity(&mut self, left: CellIndex, after: Header, default: &[AttributeBlock], attributes: &[AttributeBlock]) {
-        debug_assert!(after.wake > self.now, "an entity crossing to wake at tick {}, not after {}", after.wake, self.now);
-        // Its type and its wake in a block before its attributes': an instruction has no room for them beside the cell it left.
-        let mut head = AttributeBlock([0; BLOCK_WORDS]);
-        (head.0[0], head.0[1]) = (after.kind.0, after.wake);
-        let first = self.carry(after.at, &[head]);
-        self.carry(after.at, default);
-        self.carry(after.at, attributes);
-        self.queue(after.at, Instruction::cross_entity(after.at, left, first, (default.len() + attributes.len()) as u32));
     }
 
     /// Queues `member` of the attribute of type `kind` of the entity
@@ -176,7 +177,7 @@ impl Turn<'_> {
             Write::Cell { layer_type, at, value, counted } => (Some(at), Instruction::write_cell(layer_type, at, value as u16, counted.map_or(NO_COUNT, |place| u64::from(self.counted_number(place))))),
             Write::Count(place) => (None, Instruction::count(self.counted_number(place))),
             Write::MakeEntity(header) => (Some(header.at), Instruction::make_entity(header.at, header.kind.0, header.wake)),
-            Write::MoveEntity { from, to } => (Some(from), Instruction::move_entity(from, to)),
+            Write::MoveEntity { from, to } => (Some(from), Self::move_instruction(from, to)),
             Write::RemoveEntity(at) => (Some(at), Instruction::remove_entity(at)),
             Write::AttributeMember { at, kind, member, value } => (Some(at), Instruction::write_attribute_member(at, kind, member, value)),
             Write::RemoveAttribute { at, kind } => (Some(at), Instruction::remove_attribute(at, kind)),
@@ -193,13 +194,32 @@ impl Turn<'_> {
     #[inline]
     pub fn compare_with_writes(&mut self, compare: super::conditional::Compare, writes: &[Write]) {
         let at = compare.at();
+        // A move over a border lands its author in two superchunks: queued an instruction at a time, as what goes to the queue of acts is.
+        if writes.iter().any(|write| matches!(write, Write::MoveEntity { from, to } if from.superchunk() != to.superchunk())) {
+            self.compare_open(compare);
+            for &write in writes {
+                match write {
+                    Write::MoveEntity { from, to } => self.move_entity(from, to),
+                    _ => {
+                        let (lands, instruction) = self.instruction_of(write);
+                        self.queue(lands.unwrap_or(at), instruction);
+                    }
+                }
+            }
+            self.compare_close();
+            return;
+        }
         let (queue, slot) = self.queue_landing_in(at.superchunk());
+        self.note_named(at, compare.instruction());
         let (mut cell_writes, counted_before) = (0, self.outbox.queues[queue].instructions.len());
         self.outbox.queues[queue].instructions.push(compare.instruction().landing_in(slot));
         for &write in writes {
             let (lands, instruction) = self.instruction_of(write);
             debug_assert!(lands.is_none_or(|lands| lands.superchunk() == at.superchunk()), "a write of a compare's group landing in another superchunk");
             cell_writes += u32::from(matches!(write, Write::Cell { .. }));
+            if let Some(lands) = lands {
+                self.note_named(lands, instruction);
+            }
             self.outbox.queues[queue].instructions.push(instruction.landing_in(slot));
         }
         self.writes_queued += cell_writes;

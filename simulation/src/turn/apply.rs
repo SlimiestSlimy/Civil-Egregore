@@ -5,10 +5,11 @@
 
 use super::conditional::{CountedWhenApplied, Queue, COUNTED_WHEN_APPLIED};
 use super::instruction::{Instruction, Opcode, NO_COUNT};
+use super::landing::Landing;
 use bitplane_manager::{Superchunk, Write, WriteOp, WritesApplied};
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{Arrival, AttributeType, CollisionCells, EntityType, Header, InstructionsApplied, Put, SuperchunkEntities};
+use entity_manager::{AttributeType, CollisionCells, EntityType, Header, InstructionsApplied, Put, SuperchunkEntities};
 
 /// A superchunk's collision plane as its entities keep it while their
 /// instructions are applied: `layer` of `superchunk`, or none -- a
@@ -83,45 +84,6 @@ fn holds(instruction: &Instruction, at: CellIndex, superchunk: &mut Superchunk, 
     }
 }
 
-/// Where instructions land as they are applied: the superchunk of
-/// an outbox slot and its entities, if it is hot.
-pub(crate) trait Landing {
-    /// The superchunk of the slot `slot` of the outbox the
-    /// instructions were queued in, and its entities.
-    fn of_slot(&mut self, slot: usize) -> Option<(&mut Superchunk, &mut SuperchunkEntities)>;
-}
-
-/// One superchunk, all a queue's instructions landing in it: the
-/// queue of a slot.
-pub(crate) struct LandingInOne<'a> {
-    /// The superchunk.
-    pub(crate) superchunk: &'a mut Superchunk,
-    /// Its entities.
-    pub(crate) entities: &'a mut SuperchunkEntities,
-}
-
-impl Landing for LandingInOne<'_> {
-    #[inline]
-    fn of_slot(&mut self, _: usize) -> Option<(&mut Superchunk, &mut SuperchunkEntities)> {
-        Some((self.superchunk, self.entities))
-    }
-}
-
-/// The superchunks an act over a border lands in, by outbox slot:
-/// none at a slot whose superchunk is not hot, or that the act does
-/// not reach.
-pub(crate) struct LandingInSeveral<'a> {
-    /// The superchunk of each slot, and its entities.
-    pub(crate) lands: [Option<(&'a mut Superchunk, &'a mut SuperchunkEntities)>; super::SLOTS],
-}
-
-impl Landing for LandingInSeveral<'_> {
-    #[inline]
-    fn of_slot(&mut self, slot: usize) -> Option<(&mut Superchunk, &mut SuperchunkEntities)> {
-        self.lands[slot].as_mut().map(|(superchunk, entities)| (&mut **superchunk, &mut **entities))
-    }
-}
-
 impl Queue {
     /// Counts every write of a cell as missed, and every entity to be
     /// made as lost: the superchunk they land in is not hot.
@@ -129,7 +91,19 @@ impl Queue {
         let count = |opcodes: &[Opcode]| self.instructions.iter().filter(|instruction| opcodes.contains(&instruction.opcode)).count();
         let writes = count(&[Opcode::WriteCell]);
         (applied.writes, applied.missed) = (applied.writes + writes, applied.missed + writes as u64);
-        instructions.lost += count(&[Opcode::MakeEntity, Opcode::CrossEntity]);
+        instructions.lost += count(&[Opcode::MakeEntity]);
+    }
+
+    /// Whether the instructions at `some`, queued for one superchunk,
+    /// are of the entity named by `stood` alone: each names it, and
+    /// none moves it, or is a count or a compare's end. Such a
+    /// segment follows the entity whole, if it crosses a border.
+    pub(crate) fn names_alone(&self, some: std::ops::Range<usize>, stood: CellIndex) -> bool {
+        self.instructions[some].iter().all(|instruction| match instruction.opcode {
+            Opcode::CompareEnd | Opcode::Count => true,
+            Opcode::MoveEntity | Opcode::CrossEntity => false,
+            _ => instruction.names_an_entity() && instruction.at(stood.superchunk()) == stood,
+        })
     }
 
     /// Jumps over all that is under the compare `instruction`, which
@@ -157,26 +131,48 @@ impl Queue {
     /// hold, and a write landing in one is missed. Every wake is
     /// filed no earlier than `earliest`; `collision` is the layer
     /// entities are kept in, if the world has one ([`Standing`]).
-    pub(crate) fn apply(&self, some: std::ops::Range<usize>, mut compares: usize, lands: &mut impl Landing, earliest: u64, collision: Option<LayerType>, applied: &mut Applied) {
+    pub(crate) fn apply<L: Landing>(&self, some: std::ops::Range<usize>, mut compares: usize, lands: &mut L, earliest: u64, collision: Option<LayerType>, applied: &mut Applied) {
         let (mut next, end) = (some.start, some.end);
         while next < end {
             let instruction = &self.instructions[next];
             next += 1;
+            if L::SEVERAL && instruction.opcode == Opcode::CrossEntity {
+                // The one instruction of two superchunks: the entity leaves one and stands in the other at once, with all it has.
+                let crossing = lands.of_crossing(instruction).map(|(at, to, from, into)| (at, to, from.1.cross_named(into.1, earliest, at, to, &mut Standing { superchunk: into.0, layer: collision })));
+                let done = &mut applied.instructions;
+                match crossing {
+                    Some((at, to, Put::Moved)) => {
+                        (done.moves, done.crossed) = (done.moves + 1, done.crossed + 1);
+                        lands.crossed(at, to);
+                    }
+                    Some((_, _, Put::Stayed)) => (done.moves, done.stayed) = (done.moves + 1, done.stayed + 1),
+                    Some(_) => done.passed_over += 1,
+                    // The superchunk it would come to is not hot: it stays.
+                    None => done.lost += 1,
+                }
+                continue;
+            }
             // One match an instruction where every slot's superchunk is hot, as in a queue of one slot: all but acts over a border.
-            let Some((superchunk, entities)) = lands.of_slot(instruction.slot()) else {
+            let landed = if L::SEVERAL && instruction.names_an_entity() {
+                lands.of_named(instruction)
+            } else {
+                lands.of_slot(instruction.slot()).map(|(superchunk, entities)| {
+                    let at = instruction.at(superchunk.index());
+                    (superchunk, entities, at)
+                })
+            };
+            let Some((superchunk, entities, at)) = landed else {
                 // Its superchunk not hot: a compare does not hold, a cell's write is missed, an entity to be made lost, anything else of nobody.
                 match instruction.opcode {
                     Opcode::CompareEnd => {}
                     Opcode::Count => applied.counted[instruction.first as usize] += 1,
                     Opcode::WriteCell => (applied.writes.writes, applied.writes.missed) = (applied.writes.writes + 1, applied.writes.missed + 1),
-                    Opcode::MakeEntity | Opcode::CrossEntity => applied.instructions.lost += 1,
+                    Opcode::MakeEntity => applied.instructions.lost += 1,
                     _ if instruction.is_a_compare() => self.jump_over(instruction, &mut next, &mut compares, applied),
                     _ => applied.instructions.passed_over += 1,
                 }
                 continue;
             };
-            let here = superchunk.index();
-            let at = instruction.at(here);
             let done = &mut applied.instructions;
             match instruction.opcode {
                 Opcode::CompareEnd => {}
@@ -208,19 +204,10 @@ impl Queue {
                         _ => done.refused += 1,
                     }
                 }
-                Opcode::CrossEntity => {
-                    let (first, count) = ((instruction.second >> 32) as usize, instruction.second as u32 as usize);
-                    let (head, attributes) = (self.carried[first].0, &self.carried[first + 1..first + 1 + count]);
-                    let header = Header { kind: EntityType(head[0]), at, wake: head[1] };
-                    match entities.make_named(earliest, header, attributes, &mut Standing { superchunk, layer: collision }) {
-                        Put::New => {
-                            entities.arrived(Arrival { left: CellIndex(instruction.first), at, attributes: entities.kept_sum(at) });
-                            (done.puts, done.crossed) = (done.puts + 1, done.crossed + 1);
-                        }
-                        _ => done.refused += 1,
-                    }
-                }
-                Opcode::MoveEntity => match entities.move_named(earliest, at, instruction.to(here), &mut Standing { superchunk, layer: collision }) {
+                // In a slot's queue: its author landed in one superchunk, so it crosses to none.
+                Opcode::CrossEntity => done.passed_over += 1,
+                // The cell it is moved to is one of the superchunk it is named in.
+                Opcode::MoveEntity => match entities.move_named(earliest, at, instruction.to(at.superchunk()), &mut Standing { superchunk, layer: collision }) {
                     Put::Stayed => (done.moves, done.stayed) = (done.moves + 1, done.stayed + 1),
                     Put::PassedOver => done.passed_over += 1,
                     _ => done.moves += 1,

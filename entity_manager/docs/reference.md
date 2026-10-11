@@ -86,15 +86,7 @@ found and still due, the entities `ENTITY_AHEAD` on asked of memory --
 **`put(earliest, header, from, attributes)`** -- of the one standing on
 `from`, within a chunk or from one to another (**`move_between`**), a
 `Put` -- **`in_word_tile(chunk,
-first)`**, **`remove(at)`**, **`arrived(arrival)`** -- an entity crossed in,
-noted, an **`Arrival`** `{left, at, attributes}`, the last the sum
-of the attributes it was put with -- **`take_arrived(arrived)`**,
-**`settle_leavers(arrived, settled)`** -- those of a neighbour's
-arrivals that left this superchunk removed, what each ended the tick
-with noted if it is not what it was put with, one removed here
-meanwhile noted as turned back (**`Settled`** `{turned_back, changed,
-attributes}`, **`is_empty`**, **`clear`**) -- **`settle_arrivals(settled)`**
--- those put here given what they have, those turned back removed --
+first)`**, **`remove(at)`**,
 **`occupied(at)`**, and in `store/named_in_a_tick.rs`, the mod
 `named_in_a_tick`, an entity found by the cell the tick found it on
 (`left_this_tick`): `now_on`, `named_or_taken`, **`get_named(stood)`**,
@@ -102,7 +94,7 @@ attributes}`, **`is_empty`**, **`clear`**) -- **`settle_arrivals(settled)`**
 collision)`** (moved, all else of it as it is), **`wake_named(earliest,
 stood, wake)`** (its wake set and filed: a write to the wheel),
 **`write_attribute_bytes_named(stood, kind, offset, bytes, value)`**,
-**`edit_named`**, **`remove_named`**,
+**`edit_named`**, **`remove_named`**, **`cross_named(into, earliest, stood, to, collision)`** (moved to a cell of another superchunk, whole), **`crossed_to(stood)`** (the superchunk it crossed to this tick), **`named_from_abroad(stood)`** (whether it crossed into this one),
 **`free_for_a_new_entity(at, collision)`** (what a making is held
 against),
 **`names_anew(collision)`** -- and the collision plane as lent to
@@ -128,7 +120,7 @@ places (**`in_word_tile`**).
 **`instructions.rs`**: **`Instructions`**: the instructions queued for one
 superchunk -- put, move, edit, remove -- the blocks the puts and the
 edits carry in a list beside (an `Instruction`'s cell, `lands`): **`put(header, attributes)`** -- an entity made --
-**`cross(header, left, attributes)`** (both by **`push`**),
+(by **`push`**),
 **`move_entity(header, from)`**, **`set_attribute(at, attribute,
 value)`**, **`set_attribute_blocks(at, attribute)`**,
 **`unset_attribute(at, kind)`**, **`remove(at)`** -- each of the entity
@@ -140,7 +132,7 @@ lost, one of an entity no longer where it stood passed over, a new
 one on a cell taken refused, a mover to one staying),
 **`count_lost`**, **`clear`**, **`len()`** and **`is_empty()`** -- how
 many are queued, whether none. **`InstructionsApplied`** `{puts, moves,
-edits, wakes, removes, lost, stayed, refused, crossed, passed_over, turned_back}`,
+edits, wakes, removes, lost, stayed, refused, crossed, passed_over}`,
 added with `+=`.
 
 **`Entities`** (`store/world_entities.rs`), the world's: **`len()`**,

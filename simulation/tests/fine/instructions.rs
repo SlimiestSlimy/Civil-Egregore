@@ -86,8 +86,8 @@ fn a_step_carries_no_attributes_and_keeps_them() {
         assert_eq!(entity.attributes, attributes);
     }
     assert_eq!(entities.len(), 3);
-    // Every step a move, but the one over the superchunk's border: a put there as new, and a wake written where it stood until settled.
-    assert_eq!((moves, puts), (29, 1));
+    // Every step a move, the one over the superchunk's border as any other: nothing is put.
+    assert_eq!((moves, puts), (30, 0));
 }
 
 /// A step onto a cell an entity stands on is turned back as it is
@@ -243,7 +243,7 @@ fn a_crossing_written_behind_takes_what_was_written() {
             0
         };
         let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), rule);
-        assert_eq!((report.instructions_applied.crossed, report.instructions_applied.turned_back, entities.len()), (1, 0, 2), "on {threads} threads");
+        assert_eq!((report.instructions_applied.crossed, entities.len()), (1, 2), "on {threads} threads");
         assert!(entities.get(edge).is_none(), "gone from where it stood");
         let crossed = entities.get(across).expect("across");
         assert_eq!((crossed.attribute(NAME), crossed.attribute(MARK)), (Some(7), Some(1)), "with all that was written to it");

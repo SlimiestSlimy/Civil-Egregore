@@ -22,3 +22,6 @@ mod simulation_time;
 
 #[path = "fine/acts_over_a_border.rs"]
 mod acts_over_a_border;
+
+#[path = "fine/entity_over_a_border.rs"]
+mod entity_over_a_border;
