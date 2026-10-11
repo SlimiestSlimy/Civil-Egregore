@@ -61,7 +61,9 @@ whole: ticked (`World::tick`, `World::tick_only`), its halos moved,
 saved, or, between two ticks, by `World::put_entity`,
 `World::remove_entity` and `World::write_cells` -- each applied as it
 is called, and saying what came of it, as an entity or a cell off the
-hot superchunks is lost or missed, not put. A debug build checks the
+hot superchunks is lost or missed, not put. An entity put or removed
+so has its cell set or cleared in the collision plane with it ("The
+collision plane"). A debug build checks the
 four after every tick (`World::tick`); the fast tier checks them at
 every tick and every load of a long run that warms and cools
 superchunks (`../tests/fast/world.rs`).
@@ -164,21 +166,37 @@ one plane and not one for each kind of thing. The walls are another
 matter and stay the terrain's: they are on the edges between cells,
 two layers, and bar a step from one side.
 
-Who puts such a thing keeps the plane: a tree's cell is set as the
-tree is put -- by generation (`worldgen::generate_superchunk`) and by
-the trees' rule -- and cleared as it dies, by compare-and-write
-(`../../sca_rules/docs/sca_rules.md`, "Trees"). Entities are not in
-it: where they stand is asked of their buckets, and a step onto one
-is turned back as it is applied. Who walks reads it through
-`instructions::walking` (`around_steppable`; the paths leave its
-cells out): a sheep steps onto no cell it holds and bears no lamb on
-one, and seeks no grass under a tree.
+Everything that can collide is in it, and who puts a thing keeps
+it there:
 
-A sheep a world starts with may stand on a tree's cell, the flock
-being put by lot; it steps off, and none steps on. Held by
-`../tests/fast/collision.rs`: the plane is the trees' cells as a
-world is generated and after the trees' rule ran, and no sheep that
-stepped or was born stands on a cell it holds.
+- **A tree**'s cell is set as the tree is put -- by generation
+  (`worldgen::generate_superchunk`) and by the trees' rule, which puts
+  one only if the cell is still free there as the write is applied --
+  and cleared as it dies, by compare-and-write
+  (`../../sca_rules/docs/sca_rules.md`, "Trees").
+- **An entity**'s cell is kept by the instructions that put, move and
+  remove it, in the simulation (`Simulation::keep_entities_in`;
+  `../../simulation/docs/simulation.md`, "Entities"): set as it comes
+  to a cell, which it does only if the plane does not hold it, and
+  cleared, where it left, when the tick is over. Between ticks the
+  world does the same by hand: `World::put_entity` refuses a cell held
+  for another and sets the one put on, `remove_entity` clears, and a
+  flock is put only on cells free there (`put_flock`).
+
+Who walks reads it through `instructions::walking`
+(`around_steppable`; the paths leave its cells out): a sheep steps
+onto no cell it holds and bears no lamb on one, and seeks no grass
+under a tree. So between ticks the plane holds the cells trees and
+entities stand on, and no other. Held by `../tests/fast/collision.rs`
+-- as a world is generated and flocked, through the sheep stepping,
+being born and dying, and after the trees' rule ran -- and by the
+shifted world's test, where it is the same on both worlds.
+
+Each thing is one cell so far. One of more cells is a mask over the
+plane -- free under all of it, then set under all of it -- which
+`instructions::mask` writes cell by cell today; an entity of more
+than a cell is not kept yet, nor a mask held or set as one thing over
+a border.
 
 ## Two writes on one cell
 

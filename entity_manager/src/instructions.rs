@@ -5,7 +5,7 @@
 use crate::bucket::Put;
 use crate::attributes::{push_attribute, Attribute, AttributeBlock, AttributeType, Layout};
 use crate::entity::{EntityId, Header};
-use crate::store::SuperchunkEntities;
+use crate::store::{CollisionCells, SuperchunkEntities};
 use coordinates::CellIndex;
 use std::ops::AddAssign;
 
@@ -164,7 +164,7 @@ impl Instructions {
     /// every wake filed no earlier than `earliest`; into `applied`
     /// (`docs/entity_manager.md`, "Instructions").
     pub fn apply(&self, superchunks: &mut [SuperchunkEntities], earliest: u64, applied: &mut InstructionsApplied) {
-        self.apply_some(0..self.instructions.len(), superchunks, earliest, applied);
+        self.apply_some(0..self.instructions.len(), superchunks, earliest, applied, &mut ());
     }
 
     /// [`Instructions::apply`], of those at `some` alone, counted from
@@ -172,8 +172,11 @@ impl Instructions {
     /// (`docs/entity_manager.md`, "Instructions"). Each as it is come
     /// to, whatever it does -- none before another for its kind: the
     /// entity it names is found wherever those before it moved it
-    /// (`SuperchunkEntities::get_named`).
-    pub fn apply_some(&self, some: std::ops::Range<usize>, superchunks: &mut [SuperchunkEntities], earliest: u64, applied: &mut InstructionsApplied) {
+    /// (`SuperchunkEntities::get_named`). `collision` is the collision
+    /// plane of the superchunk they land in, if they are all one's
+    /// and it keeps one: no entity comes to a cell it holds, and
+    /// where entities stand is kept in it.
+    pub fn apply_some(&self, some: std::ops::Range<usize>, superchunks: &mut [SuperchunkEntities], earliest: u64, applied: &mut InstructionsApplied, collision: &mut impl CollisionCells) {
         for &instruction in &self.instructions[some] {
             let superchunk = instruction.lands().superchunk();
             let found = match superchunks {
@@ -188,7 +191,7 @@ impl Instructions {
             match instruction {
                 Instruction::Put { header, from, left, first, count } => {
                     let attributes = &self.attributes[first as usize..(first + count) as usize];
-                    let put = superchunk.put_named(earliest, header, from, Some(attributes));
+                    let put = superchunk.put_named(earliest, header, from, Some(attributes), collision);
                     match put {
                         Put::New | Put::InPlace | Put::Moved => applied.puts += 1,
                         Put::Stayed => (applied.puts, applied.stayed) = (applied.puts + 1, applied.stayed + 1),
@@ -200,7 +203,7 @@ impl Instructions {
                         applied.crossed += 1;
                     }
                 }
-                Instruction::Move { header, from } => match superchunk.put_named(earliest, header, from, None) {
+                Instruction::Move { header, from } => match superchunk.put_named(earliest, header, from, None, collision) {
                     Put::Stayed => (applied.moves, applied.stayed) = (applied.moves + 1, applied.stayed + 1),
                     Put::PassedOver => applied.passed_over += 1,
                     _ => applied.moves += 1,

@@ -84,7 +84,8 @@ fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) {
     if cells::holds(turn, WET, onto) || cells::holds(turn, COLLISION, onto) {
         return;
     }
-    cells::set_counted(turn, TREE, onto, SPREADS);
-    // Where a tree stands is not stepped on: held against the tree being there, whichever of two put it.
-    compare::write(turn, compare::holds(TREE, onto), COLLISION, onto, 0, 1, None);
+    // The tree is put only if its cell is still free in the collision plane -- of two trees, or a tree and a sheep stepping there, the
+    // first applied has it -- and then holds it: where a tree stands is not stepped on.
+    compare::write(turn, compare::lacks(COLLISION, onto), TREE, onto, 0, 1, Some(SPREADS));
+    cells::set(turn, COLLISION, onto);
 }

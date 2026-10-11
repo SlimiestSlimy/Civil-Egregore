@@ -21,8 +21,7 @@ impl Simulation {
     /// it was put what they ended the tick with where they left, and
     /// takes back any removed there meanwhile
     /// ([`SuperchunkEntities::settle_arrivals`]) -- how many those
-    /// were. And the tick over, every entity is named by the cell it
-    /// stands on now.
+    /// were.
     pub(super) fn settle_crossings(&mut self, entities: &mut Entities, superchunk_indices: &[SuperchunkIndex], per_part: usize) -> usize {
         self.arrived.resize_with(superchunk_indices.len(), Vec::new);
         self.settled.resize_with(superchunk_indices.len(), Settled::default);
@@ -32,7 +31,6 @@ impl Simulation {
             crossed |= !arrived.is_empty();
         }
         if !crossed {
-            entities.superchunks_mut().iter_mut().for_each(SuperchunkEntities::names_anew);
             return 0;
         }
         let arrived = &self.arrived;
@@ -71,7 +69,6 @@ impl Simulation {
         }
         self.arrived.iter_mut().for_each(Vec::clear);
         self.settled.iter_mut().for_each(Settled::clear);
-        entities.superchunks_mut().iter_mut().for_each(SuperchunkEntities::names_anew);
         taken_back
     }
 }

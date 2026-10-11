@@ -30,8 +30,10 @@ hungry, it walks -- onto a grass neighbour, else a step to the nearest
 grass no entity stands on in the area about it, round the entities in
 the way, and with none there to the nearest further off, as far as it
 reaches (`walking::seek`, one step a wake), else
-onto any hot neighbour (`around::pick`), without looking whether an
-entity stands there: the step is turned back if one does -- and wakes a
+onto any neighbour it may step to (`around::pick`) -- none the
+collision plane holds, so none a tree or another sheep stood on as the
+tick found it; two stepping for one cell in a tick, the second is
+turned back -- and wakes a
 step's time on (**`next_step`**). What it came to is queued by
 `entities::commit`: a move, unless an attribute changed. Before a
 sleep it dies of old age at the sleep's ticks in `LIFE_TICKS`. Returns

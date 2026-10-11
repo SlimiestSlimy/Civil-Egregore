@@ -168,17 +168,18 @@ fn any_number_of_threads_ticks_sheep_the_same() {
 fn sheep_never_overlap() {
     let mut world = plain_world(4, 300_000, 60_000, 4);
     assert_eq!(world.entities().len(), 240_000, "each on a cell of its own from the start");
-    let (mut stayed, mut births) = (0, 0);
+    let (mut moved, mut births) = (0, 0);
     for tick in 0..2_000 {
         let report = tick_sheep(&mut world);
-        (stayed, births) = (stayed + report.instructions_applied.stayed, births + report.rules[BIRTHS]);
+        (moved, births) = (moved + report.instructions_applied.moves, births + report.rules[BIRTHS]);
         if tick % 100 == 99 {
             let mut cells: Vec<_> = world.entities().iter().map(|sheep| sheep.header.at).collect();
             cells.sort_unstable();
             assert!(cells.windows(2).all(|pair| pair[0] != pair[1]), "tick {tick}: two sheep on a cell");
         }
     }
-    assert!(stayed > 1_000, "{stayed} sheep found their cell taken, and stayed");
+    // They see where the others stand, in the collision plane, and seldom step for one cell in one tick: stepping is what is asked for.
+    assert!(moved > 10_000, "{moved} moves");
     assert!(births > 0);
 }
 

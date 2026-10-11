@@ -80,9 +80,10 @@ alone:
   on average: before a sleep of so many ticks it dies at so many in
   `LIFE_TICKS`, so a long sleep is as much of a life as many short
   ones.
-- **Never stands where another does**: a step onto a cell an entity
-  stands on is turned back as it is applied, and the sheep stays where
-  it is -- it does not look first, few cells having one; a lamb is born
+- **Never stands where another does**: it steps only to cells the
+  collision plane does not hold, where no sheep stood as the tick
+  found it; of two stepping for one cell in a tick the second is
+  turned back as it is applied, and stays where it is; a lamb is born
   on a cell seen free beside its mother, who waits a step's time for
   one; and a path to grass goes round the entities in the way.
 - **Walks, hungry**: onto a neighbour with grass if there is one, else

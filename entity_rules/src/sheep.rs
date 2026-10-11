@@ -214,20 +214,24 @@ fn next_step(turn: &mut Turn) -> u64 {
 /// Queues `count` grown sheep, each some way from its next meal, each
 /// on a cell of its own of `superchunk` drawn from `random` -- at most
 /// half its cells' worth of them -- waking over the next [`STEP_TICKS`]
-/// ticks: in the world once whoever runs it places what was put.
+/// ticks: in the world once whoever runs it places what was put. A
+/// cell that is not free -- a tree's -- is drawn again; fewer are put
+/// only where a superchunk has almost no free cell left.
 pub fn flock(entities: &mut EntitiesBetweenTicks, superchunk: SuperchunkIndex, count: usize, random: &mut Rng) {
     let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
     let side = SUPERCHUNK_SIDE_CELLS as u64;
     assert!(count as u64 <= side * side / 2, "{count} sheep on a superchunk: too many to draw a cell each");
     let now = entities.now();
     let mut taken = HashSet::with_capacity(count);
-    while taken.len() < count {
+    let (mut put, mut draws_left) = (0, 16 * count as u64 + side * side);
+    while put < count && draws_left > 0 {
+        draws_left -= 1;
         let at = CellCartesian { x: left + random.below(side) as u32, y: top + random.below(side) as u32 };
         // A cell drawn twice is drawn again: a cell holds one sheep.
         if !taken.insert((at.x, at.y)) {
             continue;
         }
         let header = Header { id: EntityId(random.draw()), kind: SHEEP, at: at.into(), wake: now + random.below(STEP_TICKS) };
-        entities.put(header, &[AttributeBlock::holding(HUNGRY_AT, now + random.below(MEAL_TICKS))]);
+        put += usize::from(entities.put(header, &[AttributeBlock::holding(HUNGRY_AT, now + random.below(MEAL_TICKS))]));
     }
 }

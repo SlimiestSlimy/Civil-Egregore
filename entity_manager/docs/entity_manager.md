@@ -211,6 +211,15 @@ from the name:
 The ID is still asked beside the cell, as it was. An entity made in a
 tick has no name in it: nothing saw it.
 
+**Entities in the collision plane.** Whoever applies a queue may lend
+the collision plane of the superchunk it lands in (`CollisionCells`:
+`held`, `hold`, `free`; `()` is none). Then no entity is put on or
+moved to a cell it holds -- whatever holds it, an entity or not -- the
+cell one comes to is set in it, and the cells left or removed from
+(`vacated`) are cleared when the tick is over (`names_anew`), as a
+leaver's is when its crossing is settled. The buckets' own check
+stays: a cell holds one entity whether or not a plane is kept.
+
 **Crossing a border.** An entity crossing into a neighbouring
 superchunk is put there while it still stands on the cell it left: for
 the rest of the tick it stands on both, so that, its new cell taken, it

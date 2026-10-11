@@ -98,13 +98,30 @@ pub fn unset_attribute_of<L: Layout>(turn: &mut Turn, other: &Header, attribute:
 pub struct EntitiesBetweenTicks<'a> {
     /// The world's entities.
     entities: &'a mut Entities,
+    /// Whether a cell is free to put an entity on: not held in the
+    /// world's collision plane. Every cell, if none is given.
+    free: Option<&'a dyn Fn(CellIndex) -> bool>,
+    /// The cells entities were put on: for whoever runs the world to
+    /// set in its collision plane.
+    cells_put: Vec<CellIndex>,
 }
 
 impl<'a> EntitiesBetweenTicks<'a> {
     /// Those of a world whose entities are `entities`: made by whoever
     /// runs the world, never by a rule.
     pub fn of(entities: &'a mut Entities) -> Self {
-        Self { entities }
+        Self { entities, free: None, cells_put: Vec::new() }
+    }
+
+    /// The same, putting an entity only on a cell `free` says is
+    /// free: one the world's collision plane does not hold.
+    pub fn where_free(self, free: &'a dyn Fn(CellIndex) -> bool) -> Self {
+        Self { free: Some(free), ..self }
+    }
+
+    /// The cells entities were put on, in the order put.
+    pub fn cells_put(&self) -> &[CellIndex] {
+        &self.cells_put
     }
 
     /// The tick the world is at.
@@ -113,8 +130,14 @@ impl<'a> EntitiesBetweenTicks<'a> {
     }
 
     /// Queues a put of an entity whole, header and attributes: in the
-    /// world once whoever runs it places what was put.
-    pub fn put(&mut self, header: Header, attributes: &[AttributeBlock]) {
+    /// world once whoever runs it places what was put. Not queued, and
+    /// false, if its cell is not free.
+    pub fn put(&mut self, header: Header, attributes: &[AttributeBlock]) -> bool {
+        if self.free.is_some_and(|free| !free(header.at)) {
+            return false;
+        }
         self.entities.queue_put(header, attributes);
+        self.cells_put.push(header.at);
+        true
     }
 }
