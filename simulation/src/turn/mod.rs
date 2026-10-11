@@ -135,6 +135,14 @@ impl<'a> Turn<'a> {
         self.reader.aligned_tile(layer_type, cell, side)
     }
 
+    /// The four aligned tiles `side` cells a side, two by two from the
+    /// one beginning at `first`, of each of `types`, as the tick found
+    /// them: each tile's words as they lie, none where not hot.
+    #[inline]
+    pub fn aligned_tiles_two_by_two<const N: usize>(&self, types: [LayerType; N], first: CellIndex, side: u32) -> [[Option<&[u64]>; 4]; N] {
+        self.reader.aligned_tiles_two_by_two(types, first, side)
+    }
+
     /// Whether `layer_type` holds at `cell`, as the tick found it.
     pub fn holds(&self, layer_type: LayerType, cell: CellIndex) -> Result<bool, NotHot> {
         self.reader.holds(layer_type, cell)

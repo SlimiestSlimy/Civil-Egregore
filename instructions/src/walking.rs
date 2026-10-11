@@ -25,11 +25,17 @@ fn of_the_area(at: CellIndex, cell: Cell) -> Option<CellIndex> {
     at.offset(cell.x as i32 - AREA_CENTRE as i32, cell.y as i32 - AREA_CENTRE as i32)
 }
 
-/// `rows` of the area about `at`, less the cells entities stand on
-/// and those the collision plane holds.
-fn unoccupied(turn: &Turn, at: CellIndex, rows: [&Rows; 2]) -> [Rows; 2] {
-    let (occupied, collision) = (area::occupied(turn, at), area::layer(turn, COLLISION, at).set);
-    rows.map(|rows| std::array::from_fn(|row| rows[row] & !occupied[row] & !collision[row]))
+/// What is in the way in the area about `at`, read at once: the
+/// cells the collision plane holds -- what stands there, entities
+/// among it -- and the terrain's walls.
+fn in_the_way(turn: &Turn, at: CellIndex) -> (Rows, Walls) {
+    let [held, east, south] = area::layers(turn, [COLLISION, WALL_EAST, WALL_SOUTH], at).map(|area| area.set);
+    (held, Walls::new(east, south))
+}
+
+/// `rows` less the cells of `held`.
+fn less(rows: &Rows, held: &Rows) -> Rows {
+    std::array::from_fn(|row| rows[row] & !held[row])
 }
 
 /// A step found by [`seek`].
@@ -89,11 +95,11 @@ pub fn area_walls(turn: &Turn, centre: CellIndex) -> Walls {
 
 /// The cell to step to from `at` for the nearest of `goals` -- cells
 /// of the area around `at` -- over the cells `passable`, round walls
-/// and entities; none if no goal can be come to. One step: no route
+/// and what the collision plane holds; none if no goal can be come to. One step: no route
 /// is kept.
 pub fn step_towards(turn: &mut Turn, at: CellIndex, goals: &Rows, passable: &Rows) -> Option<CellIndex> {
-    let [passable, goals] = unoccupied(turn, at, [passable, goals]);
-    let first = pathfinding::step_towards(&passable, &area_walls(turn, at), &goals, HERE, turn.random().draw())?.first;
+    let (held, walls) = in_the_way(turn, at);
+    let first = pathfinding::step_towards(&less(passable, &held), &walls, &less(goals, &held), HERE, turn.random().draw())?.first;
     of_the_area(at, first)
 }
 
@@ -138,7 +144,7 @@ pub fn seek(turn: &mut Turn, at: CellIndex, layer_type: LayerType) -> Option<Sou
 
 /// The cell to step to from `at` to come, by the shortest way, to
 /// `to` -- a cell of the area around `at` -- over the cells
-/// `passable`, no entity's cell walked on. None if `to` is out of
+/// `passable`, no cell the collision plane holds walked on. None if `to` is out of
 /// the area, or cannot be come to.
 pub fn step_to(turn: &mut Turn, at: CellIndex, to: CellIndex, passable: &Rows) -> Option<CellIndex> {
     let (from, target) = (at.cartesian(), to.cartesian());
@@ -147,7 +153,7 @@ pub fn step_to(turn: &mut Turn, at: CellIndex, to: CellIndex, passable: &Rows) -
     if !(0..AREA_SIDE as i64).contains(&across) || !(0..AREA_SIDE as i64).contains(&down) {
         return None;
     }
-    let [passable, _] = unoccupied(turn, at, [passable, passable]);
-    let first = a_star(&passable, &area_walls(turn, at), HERE, Cell { x: across as u8, y: down as u8 })?.first;
+    let (held, walls) = in_the_way(turn, at);
+    let first = a_star(&less(passable, &held), &walls, HERE, Cell { x: across as u8, y: down as u8 })?.first;
     of_the_area(at, first)
 }

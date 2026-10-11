@@ -10,6 +10,7 @@ pathfinding = { path = "../pathfinding" }
 coordinates = { path = "../coordinates" }
 chunk_storage = { path = "../chunk_storage" }
 bitplane_manager = { path = "../bitplane_manager" }
+bitmap = { path = "../bitmap" }
 entity_manager = { path = "../entity_manager" }
 utilities = { path = "../utilities" }
 

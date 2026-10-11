@@ -3029,6 +3029,7 @@ dependencies = [
 name = "instructions"
 version = "0.0.0"
 dependencies = [
+ "bitmap",
  "bitplane_manager",
  "chunk_storage",
  "coordinates",

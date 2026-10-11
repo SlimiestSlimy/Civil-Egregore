@@ -74,8 +74,12 @@ bits go by how the tiles fall about it.
 **An area** (`area`): the 16x16 cells about a cell, a row a `u16`, the
 cell itself at `AREA_CENTRE` each way -- what `../../pathfinding/`
 finds a way over, its side the same (asserted where the two meet).
+It is read off the four aligned tiles of 16 it lies in, two by two,
+taken as they lie -- a lookup a layer -- and only then turned into
+rows, the word tiles it reaches alone: rows are what a wave spreads
+over cheaply, a row shifted and its neighbours ORed in.
 
-**A mask** (`mask`): any square from 4 to 1,024 cells a side, below.
+**A mask** (`mask`): an aligned tile from 4 to 1,024 cells a side, below.
 
 ## The going over
 
@@ -260,12 +264,11 @@ a newborn, is put on one of those open to a step: the collision plane
 holds what stands there.
 
 **The area about it, and the way**: `area::layer` gives 16x16 cells of a
-layer as masks, `Area::count` how many are set, `area::occupied` the
-entities on them. The way over them is `walking`'s, where the
+layer as masks, `Area::count` how many are set. The way over them is `walking`'s, where the
 simulation's cells, the terrain's walls and `../../pathfinding/` meet.
 `step_towards(turn, at, goals, passable)` gives the cell to step to
-for the nearest goal by the shortest way -- no entity's cell walked on
-or to, none if no goal can be come to -- `step_to(turn, at, to, passable)` for one cell --
+for the nearest goal by the shortest way -- no cell the collision
+plane holds walked on or to, the plane and the walls read at once, none if no goal can be come to -- `step_to(turn, at, to, passable)` for one cell --
 waves and A* of `../../pathfinding/`, round the entities in the way,
 one step a wake.
 

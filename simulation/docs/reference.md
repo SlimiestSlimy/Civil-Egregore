@@ -32,7 +32,8 @@ cells as a `Window`), **`windows(types, ...)`** (of several types at
 once), **`small_tiles(types, first, wanted)`** (four aligned small
 tiles, two by two, as a word in Morton order: the cells of a mask),
 **`aligned_tile(type, cell, side)`** (a larger aligned tile's words, as
-they lie),
+they lie), **`aligned_tiles_two_by_two(types, first, side)`** (four of
+them, two by two),
 **`any_in_tile(type, cell, scale)`**, **`tiles_holding(type,
 cell)`** (tiles holding any cell, off the counts). Cells are written
 by compare-and-writes alone (`conditional.rs`).
