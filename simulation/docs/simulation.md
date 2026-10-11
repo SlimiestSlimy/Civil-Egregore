@@ -105,25 +105,31 @@ a cell -- or of an entity: that it still stands where it stood, with
 an attribute as it was seen, or without it. If it does not hold when
 it is come to, everything its author queued after it is skipped --
 cells written, what entities come to, counts alike -- up to the
-author's next compare or the end of the compare (`Turn::compare_end`).
+end of the compare (`Turn::compare_end`).
 So one compare lets any number of writes be: an entity changes itself
 on a compare of the ground, and the ground is changed on a compare of
-an entity. Compares do not nest; one given takes the place of the one
-before. `Turn::queue_if` and `Turn::count_if` are the short way to
-one write or one count under a compare.
+an entity. A compare a rule gives takes the place of the one it gave
+before.
 
-What is written is in order already, author by author, which is all
-this takes: nothing is carried by a write but what it writes. A
-compare carries what was seen in 64 bits at the most -- of an
-attribute, a sum of its blocks (`entity_manager::attribute_seen`),
-never a block -- and a write carries none but **of what it writes**:
-a cell written says what was seen at that cell
-(`Turn::queue_seen`), an attribute written what was seen of that
-attribute, each held against that as it is come to, under a compare
-or not ("No write lands on another's").
+**A write is a write and nothing else**: a layer, a cell, a number;
+an entity, an attribute, its blocks. It carries no compare. What it
+is held against -- the cell still as the rule saw it, the attribute
+still as seen -- is a compare queued before it, and the write is
+under that: `Turn::queue_seen` queues the two, a compare of the cell
+and the write; an attribute set queues a compare of the attribute and
+the edit. A compare carries what was seen in 64 bits at the most --
+of an attribute, a sum of its blocks
+(`entity_manager::attribute_seen`), never a block. What is written is
+in order already, author by author, which is all this takes.
 
-As a compare is queued it notes how much is under it, so one that
-does not hold is jumped over at once, not step by step.
+**One compare lies within another** where a write has its own under
+the rule's: skipped with the outer, skipping no more than its own.
+`Turn::queue_if` and `Turn::count_if` are the short way to one write
+or one count under a compare, the write's own within it.
+
+As a compare is queued it notes how much is under it, those within
+it too, so one that does not hold is jumped over at once, not step
+by step.
 
 Everything under a compare lands in the compare's superchunk: a
 superchunk applying reads no other, so a write across a border could
@@ -145,9 +151,9 @@ Two writes of one thing in one tick, the later silently winning, is a
 write-after-write hazard: what the first did is lost, and neither rule
 saw the other. A tick has none:
 
-- **A cell** is written only by a compare-and-write that says what
-  the rule saw at that cell, whatever else it is held against. The
-  first applied changes it; any other that saw the same is refused.
+- **A cell** is written only under a compare of what the rule saw
+  at that cell, queued before the write, whatever else it is under.
+  The first applied changes it; any other that saw the same is skipped.
   There is no plain write in a tick, and no shape: an area is its
   cells, each a write of its own.
 - **An entity is written an attribute at a time**, never whole. Each

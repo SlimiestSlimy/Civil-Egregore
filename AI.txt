@@ -453,6 +453,39 @@ B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    job, thats it" -- told them I worded it badly and tightened
    nothing.
 
+   THE USER, on bf8513f's "writes carry no compare except of what
+   they write" (2026-10-11): "no, bad, no more comparisons on writes
+   bro. emmit more compares instructions instead. writes should be
+   limited to 16 bytes at a time. at most (for attributes that is)".
+   So: a write is a write and nothing else; what it was held against
+   is a compare instruction queued before it; an attribute write
+   carries 16 bytes of the attribute at the most.
+
+   BUILT 2026-10-11: no write carries a compare. A cell write is a
+   layer, a cell, a number; what was seen there is a compare step
+   queued before it (queue_seen queues both); an attribute set is a
+   compare of the attribute and the edit under it. Compares lie one
+   within another (open_compare / close_compare, up to 4), each
+   noting what is under it. Same census; a wake 196-199 ns, applied
+   113-115, a grass sample 158-162 (a step more a write).
+   STILL TO DO: attribute writes of 16 bytes at the most (today an
+   edit carries the attribute's blocks in the queue's list beside);
+   instructions of about 24 bytes; no private copy of the entity.
+
+   THE USER'S DIRECTION (2026-10-11), NEXT: "the simulation
+   instruction set is being reduced to a family of writes, and a
+   family of compare instructions (and the stop skip instruction),
+   higher level behaviour composed of many writes and comparison is
+   no longer instructions, were going to move that to a crate named
+   actions, instructions is basically the dependency of actions. and
+   actions represent more higher level behaviour with more
+   complicated compare and write instruction patterns for us".
+   My reading, put to the user, waiting: instructions = the compares,
+   the writes, the end of a compare, and the reads a rule is allowed;
+   actions = what is in instructions today that is many of them
+   (cells::set as compare + write, entities::commit, spawn, sleep,
+   walking, seek, around, area, mask); rules depend on actions.
+
    MY DESIGN FROM THAT (to build in steps, each green and committed):
    1. Type IDs: first byte the supertype (C below), functions
       registered; the general attribute, type 0x00FFFFFF..., first of

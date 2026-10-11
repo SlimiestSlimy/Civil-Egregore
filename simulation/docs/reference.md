@@ -78,21 +78,21 @@ is on; `Compare::holds(superchunk, entities)`, whether it holds now.
 **`Turn::compare_from_here(compare)`**: from here on what the rule
 queues for the compare's superchunk is skipped if the compare does
 not hold when come to; **`Turn::compare_end()`**: no more.
-`queue_step(lands, does)`: a step queued, noted on the compare it is
-under; `queue_under(compare, lands, does)`: one step under a compare
-alone, the compare the rule was under taken up again after.
-**`Turn::queue_if(compare, type, at, seen, value, counted)`**: a cell
-written if the compare holds and the cell is still as seen, with the
-count added then; **`Turn::queue_seen(type, at, seen, value,
-counted)`**: a cell written if it is still as seen, and the compare the
-rule is under, if any, holds.
+`queue_step(lands, does)`: a step queued, noted on every compare it is
+under; `open_compare(compare)`, `close_compare()`: a compare queued
+and open, one within another up to `COMPARES_WITHIN` (4), and closed.
+**`Turn::queue_if(compare, type, at, seen, value, counted)`**: the
+compare, within it a compare of the cell as seen, within that the
+write, with the count added if it is come to; **`Turn::queue_seen(type, at, seen, value,
+counted)`**: a compare of the cell as seen and the write under it,
+under the compare the rule is under as well, if any.
 **`Compare::attribute(id, at, kind, seen)`**: an attribute as its
 blocks were seen, their sum. **`Turn::count_if(compare, place)`**: a
 count. **`Turn::count_under(first)`**: the number
 the rule's first count is counted under; `counted_number(place)`: a
 count's number, under `COUNTED_WHEN_APPLIED` (256) --
 **`CountedWhenApplied`**, a tick's counts made as it applied
-(`NO_COUNT`: none). `Does`: what a step is -- `Compare`, `CompareEnd`, `Write` (with what was `seen` at the cell),
+(`NO_COUNT`: none). `Does`: what a step is -- `Compare`, `CompareEnd`, `Write` (a layer, a cell, the number it holds after: no compare),
 `Count`; `Step` `{does, before, under, writes_under}`, 48 bytes at the most, the last two what a compare that does not hold jumps over; `Conditional` `{steps}`, what is queued for one superchunk
 -- `clear`, `len`, `count_missed`, and `apply(steps, queued, superchunk,
 entities, instructions, earliest, applied)`: one author's instructions

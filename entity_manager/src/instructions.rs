@@ -3,7 +3,7 @@
 //! (`docs/entity_manager.md`, "Instructions").
 
 use crate::bucket::Put;
-use crate::attributes::{attribute_blocks, attribute_seen, push_attribute, Attribute, AttributeBlock, AttributeType, Layout};
+use crate::attributes::{push_attribute, Attribute, AttributeBlock, AttributeType, Layout};
 use crate::entity::{EntityId, Header};
 use crate::store::{CollisionCells, SuperchunkEntities};
 use coordinates::CellIndex;
@@ -53,10 +53,6 @@ enum Instruction {
         first: u32,
         /// How many blocks it is: none to remove it.
         count: u32,
-        /// What the rule saw of the attribute, if the edit is a
-        /// compare-and-write ([`attribute_seen`]): applied only if
-        /// the attribute is that still.
-        seen: Option<u64>,
     },
     /// Removes the entity whose ID is `id` standing on `at`.
     Remove {
@@ -124,7 +120,7 @@ impl Instructions {
     pub fn set_attribute<L: Layout>(&mut self, id: EntityId, at: CellIndex, attribute: Attribute<L>, value: L) {
         let first = self.attributes.len() as u32;
         push_attribute(&mut self.attributes, attribute, value);
-        self.instructions.push(Instruction::Edit { id, at, kind: attribute.attribute_type(), first, count: L::BLOCKS as u32, seen: None });
+        self.instructions.push(Instruction::Edit { id, at, kind: attribute.attribute_type(), first, count: L::BLOCKS as u32 });
     }
 
     /// Queues setting the attribute `attribute` is the blocks of, of
@@ -132,25 +128,14 @@ impl Instructions {
     /// size varies is set.
     pub fn set_attribute_blocks(&mut self, id: EntityId, at: CellIndex, attribute: &[AttributeBlock]) {
         debug_assert!(attribute.first().is_some_and(|first| first.blocks() == attribute.len()), "an attribute as long as its type or its block length says");
-        self.instructions.push(Instruction::Edit { id, at, kind: attribute[0].kind(), first: self.attributes.len() as u32, count: attribute.len() as u32, seen: None });
+        self.instructions.push(Instruction::Edit { id, at, kind: attribute[0].kind(), first: self.attributes.len() as u32, count: attribute.len() as u32 });
         self.attributes.extend_from_slice(attribute);
-    }
-
-    /// Queues the attribute of type `kind` of the entity whose ID is
-    /// `id` standing on `at` becoming the blocks `value`, or with none
-    /// removed -- if it is still what the rule `seen` of it
-    /// ([`attribute_seen`]) when the edit is come to: a
-    /// compare-and-write, its compare 64 bits.
-    pub fn set_attribute_if_seen(&mut self, id: EntityId, at: CellIndex, kind: AttributeType, seen: u64, value: Option<&[AttributeBlock]>) {
-        let value = value.unwrap_or(&[]);
-        self.instructions.push(Instruction::Edit { id, at, kind, first: self.attributes.len() as u32, count: value.len() as u32, seen: Some(seen) });
-        self.attributes.extend_from_slice(value);
     }
 
     /// Queues removing the attribute of type `kind` of the entity
     /// whose ID is `id` standing on `at`.
     pub fn unset_attribute(&mut self, id: EntityId, at: CellIndex, kind: AttributeType) {
-        self.instructions.push(Instruction::Edit { id, at, kind, first: 0, count: 0, seen: None });
+        self.instructions.push(Instruction::Edit { id, at, kind, first: 0, count: 0 });
     }
 
     /// Queues removing the entity whose ID is `id` standing on `at`.
@@ -223,17 +208,10 @@ impl Instructions {
                     Put::PassedOver => applied.passed_over += 1,
                     _ => applied.moves += 1,
                 },
-                Instruction::Edit { id, at, kind, first, count, seen } => {
-                    // Its own compare first: the attribute as the rule saw it, or the edit is refused.
-                    let as_seen = seen.is_none_or(|seen| superchunk.get_named(id, at).is_some_and(|entity| attribute_seen(attribute_blocks(entity.attributes, kind)) == seen));
-                    if !as_seen {
-                        applied.edits_refused += 1;
-                    } else if superchunk.edit_named(id, at, kind, &self.attributes[first as usize..(first + count) as usize]) {
-                        applied.edits += 1;
-                    } else {
-                        applied.passed_over += 1;
-                    }
-                }
+                Instruction::Edit { id, at, kind, first, count } => match superchunk.edit_named(id, at, kind, &self.attributes[first as usize..(first + count) as usize]) {
+                    true => applied.edits += 1,
+                    false => applied.passed_over += 1,
+                },
                 Instruction::Remove { id, at } => match superchunk.remove_named(id, at) {
                     true => applied.removes += 1,
                     false => applied.passed_over += 1,
@@ -258,9 +236,6 @@ pub struct InstructionsApplied {
     pub moves: usize,
     /// Attributes set or removed, one at a time.
     pub edits: usize,
-    /// Attributes not set or removed: no longer what the rule that
-    /// queued the edit saw, or their entity gone.
-    pub edits_refused: usize,
     /// Entities removed: died, or moved out of their chunk.
     pub removes: usize,
     /// Entities put in a superchunk holding no entities, so lost.
@@ -286,7 +261,6 @@ impl AddAssign for InstructionsApplied {
         self.puts += other.puts;
         self.moves += other.moves;
         self.edits += other.edits;
-        self.edits_refused += other.edits_refused;
         self.removes += other.removes;
         self.lost += other.lost;
         self.stayed += other.stayed;
