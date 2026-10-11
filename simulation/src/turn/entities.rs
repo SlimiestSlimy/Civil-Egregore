@@ -2,7 +2,8 @@
 //! instructions queued for them.
 
 use super::Turn;
-use entity_manager::{attribute_blocks, attribute_seen, each_attribute, push_attribute, Attribute, AttributeBlock, EntityId, EntityRef, Header, Layout, SuperchunkEntities, OCCUPIED_SIDE};
+use super::conditional::Compare;
+use entity_manager::{attribute_blocks, each_attribute, push_attribute, Attribute, AttributeBlock, EntityId, EntityRef, Header, Layout, SuperchunkEntities, OCCUPIED_SIDE};
 use bitplane_manager::Reader;
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, ChunkIndex};
@@ -86,8 +87,14 @@ impl<'a> Turn<'a> {
     /// time, never whole, and no write lands on another's.
     pub fn set_attribute_blocks(&mut self, entity: &Header, seen: Option<&[AttributeBlock]>, value: Option<&[AttributeBlock]>) {
         let kind = value.or(seen).expect("an attribute seen or set")[0].kind();
+        // What was seen of it a compare, then the write under it: a write carries none.
+        self.open_compare(Compare::attribute(entity.id, entity.at, kind, seen));
         let slot = self.slot_queued(entity.at.superchunk());
-        self.outbox.instructions[slot].set_attribute_if_seen(entity.id, entity.at, kind, attribute_seen(seen), value);
+        match value {
+            Some(value) => self.outbox.instructions[slot].set_attribute_blocks(entity.id, entity.at, value),
+            None => self.outbox.instructions[slot].unset_attribute(entity.id, entity.at, kind),
+        }
+        self.close_compare();
     }
 
     /// [`Turn::set_attribute_blocks`], of an attribute by its layout:

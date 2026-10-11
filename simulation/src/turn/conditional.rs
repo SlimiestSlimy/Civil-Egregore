@@ -3,7 +3,8 @@
 //! no longer holds when it is come to, everything the same author
 //! queued after it for the superchunk is skipped, up to its next
 //! compare or the end of the compare. So one compare lets any number
-//! of writes be, and a write carries no compare but of what it writes
+//! of writes be, and a write is a write and nothing else: what it is
+//! held against is a compare queued before it
 //! (`docs/simulation.md`, "Compare-and-write").
 
 use super::Turn;
@@ -14,6 +15,9 @@ use entity_manager::{attribute_blocks, attribute_seen, AttributeBlock, Attribute
 
 /// A write that counts nothing.
 const NO_COUNT: u32 = u32::MAX;
+/// As many compares as are open at once, one within another: the
+/// rule's, one a write is queued under, the write's own.
+pub(crate) const COMPARES_WITHIN: usize = 4;
 /// As many numbers as a tick counts when applied
 /// ([`Turn::count_under`]): a count's is under this.
 pub const COUNTED_WHEN_APPLIED: usize = 256;
@@ -118,21 +122,19 @@ impl CollisionCells for Standing<'_> {
 enum Does {
     /// A compare: if it does not hold as it is come to, what its
     /// author queued after it for the superchunk is skipped, up to
-    /// the author's next compare or [`Does::CompareEnd`].
+    /// its [`Does::CompareEnd`]. One may lie within another: skipped
+    /// with it, and skipping no more than its own.
     Compare(Compare),
-    /// The end of a compare: what follows is skipped no more.
+    /// The end of a compare: what follows is not under it.
     CompareEnd,
-    /// Makes the number of a layer at a cell `value`, if it is still
-    /// the `seen` the rule read there -- a compare of its own, of
-    /// what it writes, so no write lands on another's -- and counts
-    /// `count` if not [`NO_COUNT`].
+    /// Makes the number of a layer at a cell `value`, and counts
+    /// `count` if not [`NO_COUNT`]. A write and nothing else: what
+    /// the rule saw at the cell is a compare queued before it.
     Write {
         /// The layer.
         layer_type: LayerType,
         /// The cell.
         at: CellIndex,
-        /// What the rule saw there.
-        seen: u16,
         /// What it holds after.
         value: u16,
         /// What is counted.
@@ -151,7 +153,7 @@ pub(crate) struct Step {
     /// Instructions queued before it.
     before: u32,
     /// Of a compare, the steps after it that are under it -- up to
-    /// its author's next compare or the end of the compare -- noted
+    /// its end, those of the compares within it among them -- noted
     /// as they are queued: what a compare that does not hold jumps
     /// over at once, not step by step.
     under: u16,
@@ -231,23 +233,21 @@ impl Conditional {
                         continue;
                     }
                     applied.compared.1 += 1;
-                    // Over all that is under it at once: to the author's next compare, the end of this one, or the end of what the author queued.
+                    // Over all that is under it at once: to its end, or the end of what the author queued.
                     at_step += step.under as usize;
                     (applied.writes.writes, applied.writes.refused) = (applied.writes.writes + step.writes_under as usize, applied.writes.refused + u64::from(step.writes_under));
                     next = self.steps[..last_step].get(at_step).map_or(queued.end, |after| after.before as usize);
                 }
                 Does::CompareEnd => {}
-                Does::Write { layer_type, at, seen, value, count } => {
+                Does::Write { layer_type, at, value, count } => {
                     applied.writes.writes += 1;
-                    if superchunk.value_at(layer_type, at) == Some(u32::from(seen)) {
+                    if superchunk.value_at(layer_type, at).is_none() {
+                        applied.writes.missed += 1;
+                    } else {
                         superchunk.apply(layer_type, Write::cell(at, WriteOp::Put(value)), &mut applied.writes);
                         if count != NO_COUNT {
                             applied.counted[count as usize] += 1;
                         }
-                    } else if superchunk.value_at(layer_type, at).is_none() {
-                        applied.writes.missed += 1;
-                    } else {
-                        applied.writes.refused += 1;
                     }
                 }
                 Does::Count(number) => applied.counted[number as usize] += 1,
@@ -273,13 +273,14 @@ impl Turn<'_> {
     }
 
     /// Queues `does` for the superchunk of the cell `lands`, after
-    /// whatever its author queued before.
+    /// whatever its author queued before, noted on every compare it
+    /// is under: what one that does not hold jumps over.
     fn queue_step(&mut self, lands: CellIndex, does: Does) {
         let slot = self.slot_queued(lands.superchunk());
         let before = self.outbox.instructions[slot].len() as u32;
         let steps = &mut self.outbox.conditional[slot].steps;
-        // Noted on the compare it is under, if any: what a compare that fails jumps over.
-        if let (Some((_, compare)), false) = (self.comparing, matches!(does, Does::Compare(_) | Does::CompareEnd)) {
+        for &(at, compare) in &self.compares_open[..self.compares_open_count] {
+            debug_assert_eq!(at.superchunk(), lands.superchunk(), "a step under a compare of another superchunk");
             let compare = &mut steps[compare as usize];
             compare.under = compare.under.checked_add(1).expect("more under one compare than a compare notes");
             compare.writes_under += u16::from(matches!(does, Does::Write { .. }));
@@ -287,70 +288,76 @@ impl Turn<'_> {
         steps.push(Step { does, before, under: 0, writes_under: 0 });
     }
 
+    /// Queues `compare`, open from here: what is queued until it is
+    /// closed is under it, and under every compare open already.
+    pub(crate) fn open_compare(&mut self, compare: Compare) {
+        self.queue_step(compare.at(), Does::Compare(compare));
+        let slot = self.slot_of(compare.at().superchunk());
+        let step = self.outbox.conditional[slot].steps.len() as u32 - 1;
+        assert!(self.compares_open_count < COMPARES_WITHIN, "more compares one within another than a turn keeps");
+        self.compares_open[self.compares_open_count] = (compare.at(), step);
+        self.compares_open_count += 1;
+    }
+
+    /// Closes the compare opened last: what is queued from here is
+    /// not under it.
+    pub(crate) fn close_compare(&mut self) {
+        self.compares_open_count -= 1;
+        let (at, _) = self.compares_open[self.compares_open_count];
+        self.queue_step(at, Does::CompareEnd);
+    }
+
     /// From here on, what the rule queues for the compare's
     /// superchunk -- cell writes, entity instructions, counts -- is
     /// applied only if `compare` holds when it is come to: skipped
     /// otherwise, up to the next compare given or
-    /// [`Turn::compare_end`]. Compares do not nest: one given takes
-    /// the place of the one before. Nothing may be queued for another
-    /// superchunk meanwhile: a superchunk applying reads no other, so
-    /// it could not be held against the compare.
+    /// [`Turn::compare_end`]. One given takes the place of the one
+    /// before. Nothing may be queued for another superchunk
+    /// meanwhile: a superchunk applying reads no other, so it could
+    /// not be held against the compare.
     pub fn compare_from_here(&mut self, compare: Compare) {
-        self.comparing = None;
-        self.queue_step(compare.at(), Does::Compare(compare));
-        let slot = self.slot_of(compare.at().superchunk());
-        self.comparing = Some((compare, self.outbox.conditional[slot].steps.len() as u32 - 1));
+        self.compare_end();
+        self.comparing = Some(compare);
+        self.open_compare(compare);
     }
 
     /// From here on, what the rule queues is under no compare.
     pub fn compare_end(&mut self) {
-        if let Some((compare, _)) = self.comparing.take() {
-            self.queue_step(compare.at(), Does::CompareEnd);
-        }
-    }
-
-    /// Queues `does`, landing on `lands`, under `compare` alone, and
-    /// takes up again the compare the rule was queuing under, if it
-    /// was under another: held anew when come to.
-    fn queue_under(&mut self, compare: Compare, lands: CellIndex, does: Does) {
-        assert_eq!(compare.at().superchunk(), lands.superchunk(), "a compare in another superchunk than what it lets be written");
-        if self.comparing.is_some_and(|(under, _)| under == compare) {
-            return self.queue_step(lands, does);
-        }
-        let under = self.comparing.map(|(under, _)| under);
-        self.compare_from_here(compare);
-        self.queue_step(lands, does);
-        self.compare_end();
-        if let Some(under) = under {
-            self.compare_from_here(under);
+        if self.comparing.take().is_some() {
+            self.close_compare();
         }
     }
 
     /// Queues the number of `layer_type` at `at` becoming `value` if
     /// it is still the `seen` the rule read there, and `compare` --
-    /// of anything else in its superchunk -- holds too, when the write
-    /// is come to. Refused otherwise, and nothing happens. Applied, it
-    /// adds one to the count `counted`, if one is given. Every write of
-    /// a cell says what was seen there: none lands on another's.
+    /// of anything else in its superchunk -- holds too, when they are
+    /// come to: two compares, one within the other, then the write.
+    /// Applied, it adds one to the count `counted`, if one is given.
     pub fn queue_if(&mut self, compare: Compare, layer_type: LayerType, at: CellIndex, seen: u32, value: u32, counted: Option<u32>) {
-        debug_assert!(seen != value, "a write that changes nothing");
-        let count = counted.map_or(NO_COUNT, |place| self.counted_number(place));
-        self.queue_under(compare, at, Does::Write { layer_type, at, seen: seen as u16, value: value as u16, count });
+        assert_eq!(compare.at().superchunk(), at.superchunk(), "a compare in another superchunk than what it lets be written");
+        self.open_compare(compare);
+        self.queue_seen(layer_type, at, seen, value, counted);
+        self.close_compare();
     }
 
     /// Queues the number of `layer_type` at `at` becoming `value` if
-    /// it is still the `seen` the rule read there -- and, if the rule
-    /// is queuing under a compare of the cell's superchunk, that holds.
+    /// it is still the `seen` the rule read there: a compare of the
+    /// cell, then the write -- so none lands on another's -- under
+    /// whatever compare the rule is queuing under as well.
     pub fn queue_seen(&mut self, layer_type: LayerType, at: CellIndex, seen: u32, value: u32, counted: Option<u32>) {
         debug_assert!(seen != value, "a write that changes nothing");
         let count = counted.map_or(NO_COUNT, |place| self.counted_number(place));
-        self.queue_step(at, Does::Write { layer_type, at, seen: seen as u16, value: value as u16, count });
+        self.open_compare(Compare::Cell { layer_type, at, seen: seen as u16 });
+        self.queue_step(at, Does::Write { layer_type, at, value: value as u16, count });
+        self.close_compare();
     }
 
     /// Adds one to the rule's count `place` if `compare` holds when it
-    /// is come to.
+    /// is come to, and whatever compare the rule is queuing under.
     pub fn count_if(&mut self, compare: Compare, place: u32) {
         let number = self.counted_number(place);
-        self.queue_under(compare, compare.at(), Does::Count(number));
+        self.open_compare(compare);
+        self.queue_step(compare.at(), Does::Count(number));
+        self.close_compare();
     }
 }

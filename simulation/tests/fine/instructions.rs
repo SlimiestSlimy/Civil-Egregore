@@ -127,7 +127,7 @@ fn entities_edit_another_an_attribute_at_a_time() {
         }
         0
     });
-    assert_eq!((report.instructions_applied.edits, report.instructions_applied.puts, report.instructions_applied.edits_refused), (2, 0, 0));
+    assert_eq!((report.instructions_applied.edits, report.instructions_applied.puts, report.instructions_compared), (2, 0, (2, 0)));
     let edited = entities.get(target.id, target.at).expect("where it stood");
     assert_eq!(edited.attributes, [AttributeBlock::holding(NAME, 7), AttributeBlock::holding(MARK, 1), AttributeBlock::holding(SCAR, 2)]);
     assert_eq!(edited.header, target);
@@ -167,7 +167,7 @@ fn of_two_edits_of_one_attribute_one_is_refused_the_same_on_any_threads() {
             }
             0
         });
-        assert_eq!((report.instructions_applied.edits, report.instructions_applied.edits_refused), (1, 1));
+        assert_eq!((report.instructions_applied.edits, report.instructions_compared), (1, (1, 1)));
         entities.get(target.id, target.at).expect("where it stood").attribute(NAME).expect("set")
     });
     assert!(kept[0] == kept[1] && [1, 2].contains(&kept[0]), "{kept:?}");
@@ -200,7 +200,7 @@ fn an_entity_changing_itself_and_another_writing_it_both_stand() {
             }
             0
         });
-        assert_eq!((report.instructions_applied.edits, report.instructions_applied.edits_refused), (2, 1), "the mark and one name applied, the other name refused");
+        assert_eq!((report.instructions_applied.edits, report.instructions_compared), (2, (2, 1)), "the mark and one name applied, the other name refused");
         let written = entities.get(target.id, target.at).expect("where it stood");
         assert_eq!((written.attribute(MARK), written.header.wake), (Some(1), NEVER), "the other's mark, and its own sleep");
         written.attribute(NAME).expect("named")

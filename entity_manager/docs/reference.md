@@ -119,9 +119,7 @@ edits carry in a list beside (an `Instruction`'s cell, `lands`): **`put(header, 
 **`cross(header, left, attributes)`** (both by **`push`**),
 **`move_entity(header, from)`**, **`set_attribute(id, at, attribute,
 value)`**, **`set_attribute_blocks(id, at, attribute)`**,
-**`unset_attribute(id, at, kind)`**, **`set_attribute_if_seen(id, at, kind, seen, value)`** -- an
-attribute set or removed only if it is still what was seen of it, the
-edit's own compare, refused otherwise -- **`remove`**, **`apply_some(some, superchunks,
+**`unset_attribute(id, at, kind)`**, **`remove`**, **`apply_some(some, superchunks,
 earliest, applied)`** -- those at `some` alone, how the instructions under a compare
 refused are left out -- **`apply(superchunks, earliest,
 applied)`** in order, each on its cell's superchunk (a put elsewhere
@@ -129,7 +127,7 @@ lost, one of an entity no longer where it stood passed over, a new
 one on a cell taken refused, a mover to one staying),
 **`count_lost`**, **`clear`**, **`len()`** and **`is_empty()`** -- how
 many are queued, whether none. **`InstructionsApplied`** `{puts, moves,
-edits, edits_refused, removes, lost, stayed, refused, crossed, passed_over, turned_back}`,
+edits, removes, lost, stayed, refused, crossed, passed_over, turned_back}`,
 added with `+=`.
 
 **`Entities`** (`store/world_entities.rs`), the world's: **`len()`**,
