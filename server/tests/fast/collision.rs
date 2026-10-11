@@ -35,7 +35,10 @@ fn what_stands_and_no_other(world: &World) -> (bool, u64) {
 /// the trees' and the sheep's cells as it is made, no sheep put on a
 /// tree; the sheep ticked among them, it is so after every stretch,
 /// and every sheep that stepped or was born stands on no tree's cell;
-/// and it is so still after the trees' rule ran.
+/// and it is so still after the trees' rule ran. The sheep are ticked
+/// until some have stepped, however few are hungry off grass at first
+/// on the seed's land: one that ate has no grass under it, and steps
+/// when it is hungry again, a meal later.
 #[test]
 fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     let mut world = server::start(Start { seed: land_seed(0), sheep: 4000, ..Start::default() });
@@ -46,9 +49,12 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     tag_sheep(&mut world);
     let mut stood: HashMap<u64, CellIndex> = world.entities().iter().map(|sheep| (tag(&sheep).expect("tagged"), sheep.header.at)).collect();
     let (mut stepped, mut born) = (0, 0);
-    for tick in 0..400 {
+    // A stretch at the least; and on, to the first step: within two meals, as no grass grows back with the sheep's rule alone run.
+    let (stretch, mut tick) = (400, 0);
+    while tick < stretch || stepped == 0 && tick < 2 * entity_rules::sheep::MEAL_TICKS {
         tick_sheep(&mut world);
-        if tick % 50 == 49 {
+        tick += 1;
+        if tick % 50 == 0 && tick <= stretch {
             assert!(what_stands_and_no_other(&world).0, "after tick {tick} of the sheep");
         }
         for sheep in world.entities().iter() {
@@ -64,7 +70,8 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
             }
         }
     }
-    assert!(stepped > 0, "{stepped} steps, {born} lamb-ticks");
+    assert!(stepped > 0, "{stepped} steps, {born} lamb-ticks in {tick} ticks");
+    assert!(what_stands_and_no_other(&world).0, "after {tick} ticks of the sheep");
     // The trees after the sheep: a sheep whose wake passes with its rule not run never wakes again.
     let mut done = actions::RuleCounts::default();
     for _ in 0..2000 {
