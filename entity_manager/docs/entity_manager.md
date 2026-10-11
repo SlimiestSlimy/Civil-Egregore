@@ -94,14 +94,12 @@ and written where it lies (`attribute_bytes`,
 **What it costs.** A sheep's one attribute is four blocks, 64 bytes
 beside its 24-byte header, and not aligned to a cache line: it is
 asked of memory ahead a line and the next. Blocks are copied whole when an entity is put, crosses or is
-saved; an edit of one attribute in place writes its block. The tick
-reference (`../../docs/testing_protocol.md`), a word an attribute ->
-a block: 58.72 M instructions -> 59.33 M, the blocks copied where a
-sheep that ate is put whole.
+saved; a member written in a tick is written where it lies, nothing
+copied.
 
-**What changed with it.** An edit instruction carries the attribute's
-blocks, or none to remove it, in the instructions' list beside those
-the puts carry. A saved entity is its header's four words, how many
+**Edits between ticks.** An edit instruction of this crate's queue
+carries the attribute's blocks, or none to remove it, in the
+instructions' list beside those the puts carry. A saved entity is its header's four words, how many
 blocks it has, and the blocks. The bucket's list, its garbage and its
 sweep count blocks where they counted attributes; an attribute put in
 place of one as long is written where it was.

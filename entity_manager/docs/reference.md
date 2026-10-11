@@ -14,7 +14,7 @@ at, wake}`, `NEVER` -- no ID, the cell names it; **`EntityRef`** `{header, attri
 its attributes' blocks -- with **`attribute(attribute)`**, what one
 holds as its layout, and **`attribute_blocks(kind)`**, one's blocks.
 An entity is not copied to be changed: what is written of it is
-written to the store, a word or two at a time.
+written to the store, a member at a time.
 
 **`attributes.rs`** (`entity_manager.md`, "Attributes, a block each"):
 `Attribute`, `AttributeType`, `Layout`, `Member` and `BLOCK_WORDS`,
