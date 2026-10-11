@@ -260,7 +260,9 @@ phase. One put in a superchunk not hot is lost, and counted.
 
 An entity sees the world about it at once: windows of a layer's
 cells as masks (`Turn::window`), which `../../instructions/` puts
-together into the area `../../pathfinding/` finds a way over. An entity
+together into the area `../../pathfinding/` finds a way over; and, for
+what is right about a cell, the aligned small tiles it lies in as they
+lie in their bitmaps (`Turn::small_tiles`), under a mask. An entity
 takes one pathfinding step each time it ticks, and keeps no route.
 
 ### What a rule is given

@@ -513,3 +513,115 @@ QUEUED, after the collision plane and instructions (user, verbatim):
    rate". (The message was cut off mid-sentence at "so the ru"; the
    next one finished it.) Not designed yet: ask what is unclear when
    it is come to.
+
+MASKS AS ALIGNED MORTON TILES, 2026-10-11 (user, verbatim):
+"the masks, like, the point is to provide a way to quickly check stuff
+with bitwise computation, for example imagine movement, we want to
+evaluate wether any of the 8 possible single cell movements are
+possible, masks are like tiles, aligned, so they play nice with morton
+order at any size. now, for simple single celled things like sheep, we
+simply draw a 3x3 hollow ring of set bits on the mask. which gets
+tested against the same part of the morton region on the collision
+bitmap for example, alignment of masks as tiles helps here, masked OR
+is basically an aligned OR with the mask, and another OR of the
+result, and we get in 2 instructions weter a move is at all possible
+for a sheep from minimum 4x4 (16 bits of mask) and upwards in nice
+power of 2 numers". "on the single celled thing any case is 1-4 masks
+top"; "we need to make rules as cheap as possible, and morton and
+tiles make things really simple for area checks"; "as long as we keep
+tiles aligned to correspondly sized morton regions, thats the reason
+we need 1-4 masks for single celled stuff"; "the instructions should
+compose the mask, for now we have only single celled stuff, but later
+when we have multicelled entities im gonna get into details"; "once
+again, rules dont touch the simulation, we abstract it for the rules,
+and this is a potentially very cheap abstraction".
+Also: "remember we want to avoid composing masks manually lol",
+"because there can be the need of a variable amount of them".
+DONE 2026-10-11 FOR ONE CELL: the four aligned small tiles (4x4) about
+a cell as one word in Morton order (Reader::small_tiles,
+Turn::small_tiles; instructions::tiles_about, the crate's own -- no
+rule sees it); around::layer and walking::around_unwalled read off
+them, around_steppable asks the collision plane first and reads no
+wall where the ring is wholly held. The nine bits stay what rules see
+(as_nine), so a pick does not hang on how tiles fall. The sheep's rule
+unchanged. NOT DONE: instructions::mask::Mask is still row by row at
+any origin; a shape of many cells composed into however many aligned
+tiles waits for the user's details on entities of more than a cell.
+area (16x16, for pathfinding) still reads windows. Cost not measured.
+SEEN, NOT CHASED: `renderer window_still` shows 0 sheep, on d5e8273
+too -- to ask the user whether the still's world is meant to have any.
+
+NEXT: INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically
+redesinging instructions from scratch lmao"). ASKED 2026-10-11, NOT
+BUILT (user, verbatim):
+"instructions are function calls with parameters ... compare and write
+already does 2 compares to write, i think thats actually the key to
+the whole thing, ok, so imagine rules being composed of functions that
+either apply totally or fail entirely, kinda like groups as we had
+before, but we want a way to fail as soon as possible if were going to
+fail. so i propose this, lets separate compare, compute, and write, so
+entity rules change the following way: first rules try to queue all
+comparations and computation upfront, so now reading is part of the
+apply queue, now, computation is instructions that call functions
+specified by the rules. both comparations and computations can write
+to entity atributes, special in the sense of their purpose, basically
+were going to have a typeID0x00FFFFFF... as the first attribute of
+every entity. to hold general data for all entities. on that attribute
+block comparations and computations write bitflags that later write
+steps compare and write." ("im half asleep so do as many questions as
+you want".)
+ANSWERED 2026-10-11 (user, verbatim, to my questions by number). TO
+BUILD AFTER THE MASKS ("11: yes masks first"):
+1 when compares and computes run: "yes, now everything runs at apply
+  time."
+2 what a compute may do: "its limited still to the pulic API
+  simulation, reading state or attributes only. the special part
+  honestly is the instruction that passses the arguments, we need a
+  concrete set of instructions with flexible parameters, like
+  specifying 2 bitplanes or an entityref for the function. what i mean
+  is, even this functions are contrained by the limited instruction
+  set, and thats on purpose, we want the available instructions to be
+  efficient and then do the rules with them. then profiling."
+3 naming a function: "yes, same as everything else, we have a single
+  global typeid registry where everything registers. however you
+  actually poisoned the first byte of the typeid by encoding length
+  there, we would actually would like the first byte of the typeID to
+  be a kind of 'supertype' be it entity, function, atribute, etc. were
+  not going to have that many tbh". SO: the type ID's first byte to
+  become the supertype, the length out of it -- a task of its own.
+4 flags scratch or lasting: "no, flags are defined specifically at
+  compile time, however some dynamicity is allowed by using atributes
+  as a way to store bit flag offsets dynamically if needed for
+  example".
+5 another entity at my flags: "no, the flags of the first superblock
+  are private to each entity for inter-entity comms we need to use
+  extra atributes. probably well have a special 'entity_channel'
+  atribute lmao. things for the future."
+6 what a failed compare fails: "the whole idea of the flags is that
+  only the writes that test that flag fail, so we can have
+  compartmentalized failures and safe entity states, still kinda
+  enforced by the programmer, but with a much better model."
+7 today's compares: "not exactly, now writes specifically test only
+  the bitflags produced by compares and computations. so writes
+  themselves become simpler but we have more instructions"
+8 cells with no entity: "yes, entity only and bitplane only
+  instructions should be different."
+9 a flag here letting a write over a border: "we have a test just for
+  that" (instructions/tests/fast/shifted.rs).
+10 the general attribute beyond flags: "not for now. proably yes in
+  the future."
+And: "the functions callabe by instructions must have a defined set
+of signatures as implied before. and all compare, compute and write
+have no precedence on one another, an entity can queue them in any
+order, what matters is unlocking the hability to skip as much writes
+as possible, in fact, we probably want all instructions to have both
+unconditional and flag offset conditional variants".
+SIZE, A HARD REQUIREMENT OF IT (user, 2026-10-11, verbatim, on being
+told a conditional step is 448 bytes -- Compare 192, two a step, the
+seen attribute block inside it; an entity instruction 64; a cell write
+16): "HOLY FUCK, that should not have worked like that from the
+beggining, instructions should be like, 16-32 bytes tops"; "less is
+better". Assert the sizes in the code as it is built.
+And: "from the beggining we shouldve only carried tops 64 bits of
+compare payload" -- a compare carries 64 bits at the most, never a
+block.

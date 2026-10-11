@@ -8,6 +8,9 @@ mod tests;
 #[path = "fast/walking.rs"]
 mod walking;
 
+#[path = "fast/around.rs"]
+mod around;
+
 #[path = "fast/area.rs"]
 mod area;
 

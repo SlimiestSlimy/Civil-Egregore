@@ -3,7 +3,8 @@
 //! -- a layer's, those entities stand on, one free among them, and one
 //! drawn (`docs/instructions.md`, "The shapes").
 
-use crate::mask::about;
+use crate::cells::corner_about;
+use crate::tiles_about;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use simulation::Turn;
@@ -25,13 +26,6 @@ pub struct Around {
     pub set: u16,
     /// The cells in hot bitmaps: in the world, and read.
     pub hot: u16,
-}
-
-/// A window of 3x3 cells, row by row a byte each, as nine bits: row
-/// `r`'s three cells, at bits `8r` to `8r + 2`, to bits `3r` to
-/// `3r + 2`.
-pub const fn squeeze(rows: u64) -> u16 {
-    (rows & 0o7 | rows >> 5 & 0o70 | rows >> 10 & 0o700) as u16
 }
 
 /// The cell at bit `bit` of the nine around `at`: none off the world.
@@ -69,13 +63,12 @@ pub fn prefer(random: &mut Rng, wanted: u16, open: u16) -> Option<u32> {
 }
 
 /// The 3x3 cells around `at`, of `layer_type`, as the tick found
-/// them: one window read. At the world's edge, none.
+/// them: the small tiles about it read ([`crate::tiles_about`]), the
+/// one to four the nine lie in.
 pub fn layer(turn: &Turn, layer_type: LayerType, at: CellIndex) -> Around {
-    let Some(corner) = about(at, SIDE) else {
-        return Around::default();
-    };
-    let window = turn.window(layer_type, corner, SIDE, SIDE);
-    Around { set: squeeze(window.set), hot: squeeze(window.hot) }
+    let about = tiles_about::of(at);
+    let tiles = tiles_about::layer(turn, layer_type, &about, about.nine());
+    Around { set: about.as_nine(tiles.set), hot: about.as_nine(tiles.hot) }
 }
 
 /// Which of the 3x3 cells around `at` an entity stands on, as the
@@ -83,7 +76,7 @@ pub fn layer(turn: &Turn, layer_type: LayerType, at: CellIndex) -> Around {
 /// Asked when a cell must be had, not before a step, which is turned
 /// back if its cell is taken.
 pub fn occupied(turn: &Turn, at: CellIndex) -> u16 {
-    about(at, SIDE).map_or(0, |corner| {
+    corner_about(at, SIDE).map_or(0, |corner| {
         let rows = turn.occupied(corner, SIDE, SIDE);
         rows[0] | rows[1] << 3 | rows[2] << 6
     })

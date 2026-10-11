@@ -157,13 +157,6 @@ impl Mask {
     }
 }
 
-/// The top left cell of the square `side` cells a side about `centre`
-/// -- it `side / 2` across and down: none past the world's edge.
-pub fn about(centre: CellIndex, side: u32) -> Option<CellIndex> {
-    let reach = side as i32 / 2;
-    centre.offset(-reach, -reach)
-}
-
 /// The cell `(x, y)` of the square whose top left cell is `origin`:
 /// none past the world's edge.
 pub fn cell(origin: CellIndex, x: u32, y: u32) -> Option<CellIndex> {

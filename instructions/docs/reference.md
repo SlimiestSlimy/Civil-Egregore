@@ -15,7 +15,8 @@ on every cell sampled -- each set cell of the type chosen with the
 `Chance`, independently -- with its counts. **`hot(turn, type, cell)`**,
 **`holds`**, **`lacks`**: the cell read. **`value(turn, plane,
 cell)`**: a wide plane's number. **`square(turn, type, cell, side)`**:
-up to 8x8 cells about a cell as a `Window`, with their top left cell.
+up to 8x8 cells about a cell as a `Window`, with their top left cell;
+**`corner_about(centre, side)`**: that cell, of a square of any side.
 **`set(turn, type, cell)`**, **`clear`**: a compare-and-write queued,
 the cell seen clear, or set. **`set_value(turn, plane, cell, seen,
 value)`**: a wide plane's number put where `seen` was read.
@@ -65,15 +66,30 @@ places them.
 ## `around.rs`
 
 The 3x3 cells about a cell as nine bits -- `SIDE` (3), **`CENTRE`**,
-**`RING`**, **`ALL`**; **`Around`** `{set, hot}`; **`squeeze`**: a
-window's 3x3 into nine bits. **`cell(at, bit)`**, **`bit_of(at,
+**`RING`**, **`ALL`**; **`Around`** `{set, hot}`. **`cell(at, bit)`**, **`bit_of(at,
 cell)`**: a bit and its cell. **`pick(random, choices)`**,
 **`prefer(random, wanted, open)`**: one drawn;
 **`set_bit_of_rank(bits, rank)`**: the set bit with so many under it,
 the crate's. **`layer(turn, type, at)`**: the 3x3 cells of a layer
-about a cell, one window squeezed. **`occupied(turn, at)`**: those
+about a cell, off the small tiles about it (`tiles_about.rs`). **`occupied(turn, at)`**: those
 entities stand on. **`free_beside(turn, at, open)`**: one of `open`
 none stands on, drawn.
+
+## `tiles_about.rs`
+
+The crate's own: no rule sees it. The four small tiles, two by two, a
+cell and its neighbours lie in, as one word in Morton order over their
+8x8 cells (`SQUARE_SIDE`, `SQUARE_CELLS`; **`bit_at(x, y)`** a cell's
+bit, **`across_and_down(bit)`** back). **`TilesAbout`**: the first
+tile's first cell, and the cell's bit; **`of(at)`** takes them.
+**`centre()`**, **`nine()`**, **`ring()`**: the cell, it and its
+neighbours in the world, the neighbours alone, as bits of the word --
+from `NINE_OF`, made as the program is compiled. **`as_nine(cells)`**:
+the word's cells as the nine bits of `around` (`NINE`), by `ABOUT`,
+each neighbour's bit for each place the cell can have. **`layer(turn,
+type, about, under)`**, **`layers(turn, types, about, under)`**: a
+layer in the tiles, the cells of `under` alone, a `SmallTiles`
+(`instructions.md`, "The small tiles about a cell").
 
 ## `area.rs`
 
@@ -110,7 +126,9 @@ What an entity that walks asks, of a turn: the simulation's cells, the
 terrain's walls and `pathfinding` met here. **`around_unwalled(turn,
 at)`**: the 3x3 cells about `at` no wall is before, nine bits;
 **`around_steppable(turn, at)`**: those of them the collision plane
-does not hold.
+does not hold, the plane asked first and no wall read where it holds
+the whole ring (**`unwalled_in(turn, about)`**: the walls, of the small
+tiles already taken).
 **`area_walls(turn, centre)`**: the area's walls, for paths.
 **`step_towards(turn, at, goals, passable)`**, **`step_to(turn, at, to,
 passable)`**: the cell to step to for the nearest goal, or for one

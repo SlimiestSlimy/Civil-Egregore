@@ -20,6 +20,7 @@ mod write_back;
 mod writes;
 
 pub use arena::BitmapArena;
+pub use reader::aligned_tiles::{SmallTiles, SMALL_TILES_TOGETHER, SMALL_TILE_CELLS, SMALL_TILE_SIDE};
 pub use reader::{Reader, Window};
 pub use superchunk::{Bucket, LayerView, Superchunk};
 pub use writes::{count_missed, WritesApplied, Shape, Write, WriteOp, WriteQueues};

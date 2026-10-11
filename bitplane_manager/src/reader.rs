@@ -1,6 +1,8 @@
 //! Cells read wherever they lie: a reader over the superchunks, the
 //! windows it reads, and the lookups in the directory behind it.
 
+pub(crate) mod aligned_tiles;
+
 use super::{COARSEST_SCALE, COUNTS_IN_COARSEST, COUNT_TILE_CELLS, NotHot, contains};
 use super::superchunk::Superchunk;
 use bitmap::{BITS_PER_WORD, CellWords};

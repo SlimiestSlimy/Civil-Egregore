@@ -7,9 +7,9 @@ use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use pathfinding::{a_star, Cell, Rows, Walls};
 use crate::area::{self, AREA_CENTRE, AREA_SIDE, FARTHEST_SCALE};
-use crate::around::{self, squeeze};
+use crate::around;
+use crate::tiles_about::{self, TilesAbout};
 use crate::cells;
-use crate::mask::about;
 use simulation::Turn;
 use type_registry::{COLLISION, WALL_EAST, WALL_SOUTH};
 
@@ -47,10 +47,12 @@ pub struct SoughtStep {
 /// before -- its own among them. Where the wall layers are not hot,
 /// none bars.
 pub fn around_unwalled(turn: &Turn, at: CellIndex) -> u16 {
-    let Some(corner) = about(at, around::SIDE) else {
-        return around::ALL;
-    };
-    let [east, south] = turn.windows([WALL_EAST, WALL_SOUTH], corner, around::SIDE, around::SIDE).map(|window| squeeze(window.set));
+    unwalled_in(turn, &tiles_about::of(at))
+}
+
+/// [`around_unwalled`], of the cell the small tiles `about` are about.
+fn unwalled_in(turn: &Turn, about: &TilesAbout) -> u16 {
+    let [east, south] = tiles_about::layers(turn, [WALL_EAST, WALL_SOUTH], about, about.nine()).map(|tiles| about.as_nine(tiles.set));
     // Whether the cell at `bit` of the nine keeps a wall east of it, or south.
     let (east_of, south_of) = (|bit: u16| east >> bit & 1, |bit: u16| south >> bit & 1);
     // A wall is kept by the upper or left cell of the two: the centre's own east and south, its neighbours' west and north.
@@ -68,9 +70,16 @@ pub fn around_unwalled(turn: &Turn, at: CellIndex) -> u16 {
 /// nine bits: those no wall of the terrain is before
 /// ([`around_unwalled`]) and the collision plane does not hold --
 /// nothing stands there that bars a step. Entities are not looked at:
-/// a step onto one is turned back as it is applied.
+/// a step onto one is turned back as it is applied. The collision
+/// plane is asked first, the ring about the cell against its small
+/// tiles: hemmed in, there is no step, and no wall is read.
 pub fn around_steppable(turn: &Turn, at: CellIndex) -> u16 {
-    around_unwalled(turn, at) & !around::layer(turn, COLLISION, at).set
+    let about = tiles_about::of(at);
+    let free = about.nine() & !tiles_about::layer(turn, COLLISION, &about, about.nine()).set;
+    if free & about.ring() == 0 {
+        return about.as_nine(free);
+    }
+    unwalled_in(turn, &about) & about.as_nine(free)
 }
 
 /// The terrain's walls among the [`AREA_SIDE`] by [`AREA_SIDE`]

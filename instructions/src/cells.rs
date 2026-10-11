@@ -4,7 +4,6 @@
 //! compare-and-write queued: it says what the rule saw at the cell,
 //! and is applied only if the cell still holds it.
 
-use crate::mask::about;
 use bitplane_manager::Window;
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;
@@ -58,7 +57,7 @@ pub fn value<W: Width>(turn: &Turn, plane: Wide<W>, cell: CellIndex) -> Option<u
 /// at the world's edge.
 #[inline]
 pub fn square(turn: &Turn, layer_type: LayerType, cell: CellIndex, side: u32) -> Option<(CellIndex, Window)> {
-    let corner = about(cell, side)?;
+    let corner = corner_about(cell, side)?;
     Some((corner, turn.window(layer_type, corner, side, side)))
 }
 
@@ -105,4 +104,11 @@ pub fn set_value<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, see
 pub fn set_value_counted<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, seen: u32, value: u32, counted: usize) {
     debug_assert!(value <= plane.most(), "{value} in a plane of {} bits a cell", W::BITS);
     turn.queue_seen(plane.layer_type(), cell, seen, value, Some(counted as u32));
+}
+
+/// The top left cell of the square `side` cells a side about `centre`
+/// -- it `side / 2` across and down: none past the world's edge.
+pub fn corner_about(centre: CellIndex, side: u32) -> Option<CellIndex> {
+    let reach = side as i32 / 2;
+    centre.offset(-reach, -reach)
 }

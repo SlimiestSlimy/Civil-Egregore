@@ -50,6 +50,22 @@ types at once (`Reader::windows`), where the window lies among the word
 tiles is worked out once for all of them. So the 3x3 cells around a
 cell are one lookup, a word or two, and a few shifts and masks.
 
+**Aligned tiles**: a tile whose side is a power of two and whose corner
+is a multiple of its side is, in Morton order, one run of bits of its
+chunk's bitmap -- nothing to turn into rows, nothing to cut. The
+smallest read so is the small tile, 4x4 cells and 16 bits
+(`SMALL_TILE_SIDE`, `SMALL_TILE_CELLS`); four of them, two by two from
+any aligned small tile, are read as one word (`Reader::small_tiles`, a
+`SmallTiles` -- the cells set, and the cells hot), each tile 16 bits of
+it as it lies in its bitmap, the word itself in Morton order over the
+8x8 cells they make. Whoever asks says which cells are wanted, as a
+mask in the same order: a tile the mask has no cell in is not looked
+up, and the rest is ANDed with it. So a cell and its eight neighbours,
+which lie in one to four small tiles, are one to four shifts of a
+bitmap word and an AND -- and whether a layer holds at any of them a
+compare with 0. A window gives the same cells row by row, and pays
+for the turning; what does not need rows asks for the tiles.
+
 **The far search**: whether a layer holds at any cell of a tile of a
 given scale -- `2^scale` cells a side, up to `COARSEST_SCALE` (6) --
 read off the count tiles' counts where they are 0, and off the words
