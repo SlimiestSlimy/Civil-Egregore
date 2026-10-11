@@ -122,7 +122,7 @@ place in the table. Nothing is looked up by a name as a world runs: a
 rule's place is a constant made of its name as the server is compiled
 (`SHEEP_RULE`, `RulePlace::named`), and so is the place of each thing
 a rule counts, worked out from the one list of their names
-(`sheep::EATEN`, `instructions::place_counted`) -- a name that is not
+(`sheep::EATEN`, `actions::place_counted`) -- a name that is not
 there does not compile. A tick's counts are read by them
 (`counts.of(SHEEP_RULE)[EATEN]`), and a diagnostic or a test ticks
 only the rules it picks (`Chosen::of(&[GRASS_RULE])`).
@@ -183,18 +183,18 @@ it there:
   for another and sets the one put on, `remove_entity` clears, and a
   flock is put only on cells free there (`put_flock`).
 
-Who walks reads it through `instructions::walking`
+Who walks reads it through `actions::walking`
 (`around_steppable`; the paths leave its cells out): a sheep steps
 onto no cell it holds and bears no lamb on one, and seeks no grass
 under a tree. So between ticks the plane holds the cells trees and
 entities stand on, and no other. Held by `../tests/fast/collision.rs`
 -- as a world is generated and flocked, through the sheep stepping,
 being born and dying, and after the trees' rule ran -- and by the
-test of a flock over borders (`../../instructions/tests/fast/flock_over_borders.rs`), where it is the same on both worlds.
+test of a flock over borders (`../../actions/tests/fast/flock_over_borders.rs`), where it is the same on both worlds.
 
 Each thing is one cell so far. One of more cells is a mask over the
 plane -- free under all of it, then set under all of it -- which
-`instructions::mask` writes cell by cell today; an entity of more
+`actions::mask` writes cell by cell today; an entity of more
 than a cell is not kept yet, nor a mask held or set as one thing over
 a border.
 

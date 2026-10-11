@@ -1,20 +1,14 @@
 [package]
 name = "instructions"
 edition = "2024"
-description = "Civil Egregore's instructions: what a rule is made of -- small, varied pieces of behaviour, each a function over the simulation's turn, and all a rule reaches the simulation through"
+description = "Civil Egregore's instructions: the few things a rule's turn queues for a tick's second phase -- a compare, a write, the end of a compare -- each one function, over the simulation's turn; what actions are made of"
 
 [dependencies]
-type_registry = { path = "../type_registry" }
 simulation = { path = "../simulation" }
-pathfinding = { path = "../pathfinding" }
 coordinates = { path = "../coordinates" }
 chunk_storage = { path = "../chunk_storage" }
-bitplane_manager = { path = "../bitplane_manager" }
-bitmap = { path = "../bitmap" }
 entity_manager = { path = "../entity_manager" }
-utilities = { path = "../utilities" }
 
-# What the tiers' tests share (`tests/tests.rs`): no test program of its own.
-[[test]]
-name = "tests"
-test = false
+[dev-dependencies]
+bitplane_manager = { path = "../bitplane_manager" }
+utilities = { path = "../utilities" }

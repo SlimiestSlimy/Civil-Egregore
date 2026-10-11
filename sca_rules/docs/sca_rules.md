@@ -51,7 +51,7 @@ the second phase, so every sample reads the world as the tick found
 it. The two never touch one cell in a tick: decay clears cells that
 were grass, spreading fills cells that were dirt. Each write says what
 the rule saw at its cell and is applied only if the cell is still so
-(`../../instructions/docs/instructions.md`, "Compare-and-write"), and a spread or a decay is counted as it is applied: two
+(`../../actions/docs/actions.md`, "Compare-and-write"), and a spread or a decay is counted as it is applied: two
 samples spreading onto one cell are one cell set and one spread
 counted.
 

@@ -2,7 +2,7 @@
 //! same on one thread as on all of them, tick after tick: what it
 //! queues is applied in the one order of the world, Morton order of
 //! its authors' cells, however the superchunks are gone over
-//! (`docs/instructions.md`, "The same wherever the borders fall").
+//! (`docs/actions.md`, "The same wherever the borders fall").
 //!
 //! All of it is the test's own, and nothing outside it is made for it:
 //! where the flock is put, drawn from the seed so that other borders
@@ -16,8 +16,8 @@ use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, AttributeBlock, Entities, Header, InstructionsApplied};
-use instructions::around::{self, About, Cells};
-use instructions::{cells, compare, Turn};
+use actions::around::{self, About, Cells};
+use actions::{cells, compare, Turn};
 use simulation::Simulation;
 use std::collections::BTreeSet;
 use type_registry::COLLISION;

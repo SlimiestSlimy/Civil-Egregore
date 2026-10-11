@@ -62,7 +62,7 @@ kept in, and the one a rule is handed its entities and cells in.
 
 Everything queued has an **author**: the entity woken or the cell
 sampled that the rule was seeing to when it queued it
-(`Turn::seeing_to`, said by `../../instructions/` as it goes over
+(`Turn::seeing_to`, said by `../../actions/` as it goes over
 them). An outbox notes where each author's part of each of its nine
 queues begins (`Segment`, begun by `queue_landing_in` at the first thing an
 author queues for a superchunk). A superchunk applying takes the
@@ -88,8 +88,8 @@ cell written, an attribute written, an entity moved, made or removed
 are one stream, none before another for its kind.
 
 Held by a test of a flock over the corner of four superchunks, the
-same on one thread as on all (`../../instructions/tests/fast/flock_over_borders.rs`;
-`../../instructions/docs/instructions.md`, "The same wherever the
+same on one thread as on all (`../../actions/tests/fast/flock_over_borders.rs`;
+`../../actions/docs/actions.md`, "The same wherever the
 borders fall"). A world shifted whole some cells is another world:
 Morton order is not kept by a shift, so of two contending the other
 may come first there. The order was once reading order, rows down,
@@ -227,7 +227,7 @@ it applied. Held by
 `tests/fine/acts_over_a_border.rs` (whole or not at all, on any
 border; a crowd contending over four superchunks' corner the same on
 any number of threads) and by the flock of
-`../../instructions/tests/fast/flock_over_borders.rs`, which makes
+`../../actions/tests/fast/flock_over_borders.rs`, which makes
 entities and lays stone under compares over the borders the seed
 puts it on. A tick counts its acts (`TickReport::acts_over_a_border`).
 
@@ -494,7 +494,7 @@ entity moving to a neighbour goes as a whole copy made in the first
 phase. One put in a superchunk not hot is lost, and counted.
 
 An entity sees the world about it at once: windows of a layer's
-cells as masks (`Turn::window`), which `../../instructions/` puts
+cells as masks (`Turn::window`), which `../../actions/` puts
 together into the area `../../pathfinding/` finds a way over; and, for
 what is right about a cell, the aligned small tiles it lies in as they
 lie in their bitmaps (`Turn::small_tiles`), under a mask. An entity
@@ -506,7 +506,7 @@ The turn, and no more: cells and entities read as the tick found them,
 writes and instructions queued. What a rule makes of them -- the cells
 beside an entity, the area about it, the way to what it seeks, the
 instruction that carries least -- is not the simulation's: it is
-`../../instructions/` (`../../instructions/docs/instructions.md`), free functions over a
+`../../actions/` (`../../actions/docs/actions.md`), free functions over a
 turn, which the rules are written in and reach the simulation through.
 
 **What is queued for an entity**, each a compare and the writes

@@ -6,7 +6,7 @@
 use crate::tests::{arena, cell, STONE};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex};
 use entity_manager::Entities;
-use instructions::area::{self, AREA_CENTRE, AREA_SIDE};
+use actions::area::{self, AREA_CENTRE, AREA_SIDE};
 use simulation::Simulation;
 
 /// Cells scattered over the 3x3 superchunks from `(10, 10)`, some on

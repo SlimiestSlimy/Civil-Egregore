@@ -146,7 +146,7 @@ lookups on the hot path are marked `#[inline]` now -- `Bucket::get`,
 the count with no change of work is looked for there first.
 
 The same held for an array mapped by a closure. `Lookup::windows`
-read its layers with `types.map(...)`; once the instructions crate
+read its layers with `types.map(...)`; once the actions crate (then named instructions)
 grew, the map was left as calls draining the array, a layer at a time,
 and the tick went from 53.72 million instructions to 54.98 with no
 change of work. Built by index (`std::array::from_fn`) and marked
@@ -232,7 +232,7 @@ ticks a second. A cache of the chunk last found was not needed.
 
 | what | where |
 |---|---|
-| the far search for grass | `instructions/docs/instructions.md`, "What an entity's rule is given" |
+| the far search for grass | `actions/docs/actions.md`, "What an entity's rule is given" |
 | the instructions of the apply phase | the same |
 | sampling, and count tiles | `civil_egregore.md`, "Sampling rarely, and count tiles" |
 | the flock's balance over a long run | `civil_egregore.md`, "Sheep leave thin pasture" |

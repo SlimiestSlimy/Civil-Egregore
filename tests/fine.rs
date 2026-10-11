@@ -339,18 +339,18 @@ fn the_code_points_at_docs_that_are_there() {
 }
 
 /// The crates rules are written in: what they depend on is
-/// `instructions` alone, and they ask their turn nothing themselves.
+/// `actions` alone, and they ask their turn nothing themselves.
 const RULES_CRATES: [&str; 2] = ["sca_rules", "entity_rules"];
 
-/// A rule asks instructions, and nothing else: no rule's source calls
+/// A rule asks actions, and nothing else: no rule's source calls
 /// anything of its turn's own -- the turn is handed on to an
-/// instruction, never asked -- nor names a crate under the
-/// instructions (`instructions/docs/instructions.md`, "Rules ask
-/// instructions, and nothing else").
+/// action, never asked -- nor names a crate under the
+/// actions (`actions/docs/actions.md`, "Rules ask
+/// actions, and nothing else").
 #[test]
-fn the_rules_ask_instructions_alone() {
+fn the_rules_ask_actions_alone() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let under = ["simulation::", "bitplane_manager::", "entity_manager::", "chunk_storage::", "coordinates::", "type_registry::", "utilities::", "pathfinding::", "worldgen::", "server::"];
+    let under = ["instructions::", "simulation::", "bitplane_manager::", "entity_manager::", "chunk_storage::", "coordinates::", "type_registry::", "utilities::", "pathfinding::", "worldgen::", "server::"];
     let mut wrong = Vec::new();
     for rules in RULES_CRATES {
         let mut sources = Vec::new();
@@ -365,11 +365,11 @@ fn the_rules_ask_instructions_alone() {
                 if code.contains("turn.") {
                     wrong.push(format!("{shown}:{}: asks its turn itself: `{}`", number + 1, code.trim()));
                 }
-                if let Some(named) = under.iter().find(|named| code.contains(**named) && !code.contains(&format!("instructions::{named}"))) {
-                    wrong.push(format!("{shown}:{}: names `{}`, under the instructions", number + 1, named.trim_end_matches(':')));
+                if let Some(named) = under.iter().find(|named| code.contains(**named) && !code.contains(&format!("actions::{named}"))) {
+                    wrong.push(format!("{shown}:{}: names `{}`, under the actions", number + 1, named.trim_end_matches(':')));
                 }
             }
         }
     }
-    assert!(wrong.is_empty(), "{} places where a rule reaches past the instructions:\n{}", wrong.len(), wrong.join("\n"));
+    assert!(wrong.is_empty(), "{} places where a rule reaches past the actions:\n{}", wrong.len(), wrong.join("\n"));
 }

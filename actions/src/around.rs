@@ -1,7 +1,7 @@
 //! The cells about a cell: it and its eight neighbours, as bits of
 //! the small tiles they lie in, in Morton order as they lie in their
 //! bitmaps -- a layer's, what is open among them, one drawn -- and the
-//! ways from the cell to each (`docs/instructions.md`, "The shapes").
+//! ways from the cell to each (`docs/actions.md`, "The shapes").
 
 use crate::tiles_about;
 pub use crate::tiles_about::About;

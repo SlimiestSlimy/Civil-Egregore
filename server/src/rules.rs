@@ -4,7 +4,7 @@
 //! (`docs/server.md`, "TickCounts").
 
 use coordinates::CellIndex;
-use instructions::{RuleCounts, TickReport, Turn, COUNTS_OF_A_RULE};
+use actions::{RuleCounts, TickReport, Turn, COUNTS_OF_A_RULE};
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
@@ -48,7 +48,7 @@ impl RulePlace {
             }
             names
         };
-        Self(instructions::place_counted(&names, name))
+        Self(actions::place_counted(&names, name))
     }
 
     /// The rule at this place.

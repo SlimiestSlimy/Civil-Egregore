@@ -35,7 +35,7 @@ use chunk_storage::{ChunkStorage, HeightMap, SuperchunkImage};
 pub use worldgen::Generation;
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use entity_rules::sheep::flock;
-use instructions::entities::EntitiesBetweenTicks;
+use actions::entities::EntitiesBetweenTicks;
 use entity_manager::{saved, Entities, EntityType};
 use simulation::{Halos, Hot, Simulation};
 use std::collections::BTreeMap;

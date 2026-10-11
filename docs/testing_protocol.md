@@ -61,7 +61,8 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `pathfinding` | paths and waves; walls | | |
 | `utilities` | chance, commands, dispatcher, fixed_list, hash, process_memory, rng, settings, table, tuning | | |
 | `simulation` | entities moving, entities waking, their instructions | sampling, the tick, writes across borders | |
-| `instructions` | an entity changed, the cells beside it | the nine about a cell off its small tiles, area, mask, walking -- round walls, entities and what the collision plane holds; a flock over borders coming to the same on any number of threads | |
+| `instructions` | what is queued from a compare to its end | | |
+| `actions` | an entity changed, the cells beside it | the nine about a cell off its small tiles, area, mask, walking -- round walls, entities and what the collision plane holds; a flock over borders coming to the same on any number of threads | |
 | `worldgen` | | heights, walls, the mesh, superchunks made in any order | walls over many seeds; no seam between superchunks |
 | `sca_rules` | | grass; trees -- each rule alone on a plain | |
 | `entity_rules` | | the sheep alone on a plain | |
@@ -112,10 +113,10 @@ The code says little about itself and sends its reader to the docs
 right and the way to them has to hold. The workspace's own fine tier,
 `tests/fine.rs` at the root (`cargo test --test fine`), reads every
 markdown file and every source and judges three things -- and a
-fourth of the sources alone: that a rule asks instructions and nothing
-else (`the_rules_ask_instructions_alone`: no rule's source calls
-anything of its turn, or names a crate under the instructions;
-`../instructions/docs/instructions.md`, "Rules ask instructions, and
+fourth of the sources alone: that a rule asks actions and nothing
+else (`the_rules_ask_actions_alone`: no rule's source calls
+anything of its turn, or names a crate under the actions;
+`../actions/docs/actions.md`, "Rules ask actions, and
 nothing else").
 
 **What the docs name is there** (`the_docs_name_what_is_there`). In

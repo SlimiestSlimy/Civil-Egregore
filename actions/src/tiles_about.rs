@@ -2,7 +2,7 @@
 //! two, that it and its eight neighbours lie in, as one word of bits
 //! in Morton order -- each tile 16 bits, as it lies in its bitmap --
 //! so what is about a cell is asked of a layer with an AND, and whether
-//! there is any of it with a compare (`docs/instructions.md`, "The
+//! there is any of it with a compare (`docs/actions.md`, "The
 //! small tiles about a cell").
 
 use bitplane_manager::{SmallTiles, SMALL_TILE_CELLS, SMALL_TILE_SIDE};

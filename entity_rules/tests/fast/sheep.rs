@@ -78,7 +78,7 @@ fn hungry_sheep_walk_to_the_nearest_grass() {
     plant_grass(&mut world, grass, 1, 1);
     let header = Header { kind: SHEEP, at: sheep.into(), wake: 0 };
     put_entity(&mut world, header, &hungry_at(0));
-    let (mut done, mut ate_at) = (instructions::RuleCounts::default(), None);
+    let (mut done, mut ate_at) = (actions::RuleCounts::default(), None);
     for _ in 0..12 * (STEP_TICKS + STEP_JITTER) {
         // The grass rule left out: the one cell of grass must stay until eaten.
         let report = tick_sheep(&mut world);
@@ -106,7 +106,7 @@ fn hungry_sheep_walk_to_grass_far_off() {
     plant_grass(&mut world, grass, 1, 1);
     let header = Header { kind: SHEEP, at: sheep.into(), wake: 0 };
     put_entity(&mut world, header, &hungry_at(0));
-    let (mut done, mut ate_at) = (instructions::RuleCounts::default(), None);
+    let (mut done, mut ate_at) = (actions::RuleCounts::default(), None);
     for _ in 0..STARVE_TICKS {
         let report = tick_sheep(&mut world);
         if report.rules[EATEN] > 0 && ate_at.is_none() {
@@ -208,7 +208,7 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
     use coordinates::CellIndex;
     use entity_manager::Entities;
-    use instructions::cells;
+    use actions::cells;
     use type_registry::{GRASS, WALL_EAST, WALL_SOUTH};
     let superchunk = coordinates::WORLD_MIDDLE;
     let (mut codec, mut arena, mut entities) = (chunk_storage::LayerCodec::new(), BitmapArena::new(), Entities::new());
@@ -229,7 +229,7 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     entities.queue_put(Header { kind: SHEEP, at: standing, wake: 0 }, &hungry_at(was_hungry_at));
     entities.apply();
     let mut simulation = simulation::Simulation::new(1);
-    let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut instructions::Turn, _: &mut Vec<CellIndex>| {
+    let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut actions::Turn, _: &mut Vec<CellIndex>| {
         // The decay first, counted under 0; the sheep's counts from 8 on.
         cells::clear_counted(turn, GRASS, decaying, 0);
         turn.count_under(8);

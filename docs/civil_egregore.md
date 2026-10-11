@@ -679,7 +679,7 @@ The sheep did everything by one instruction -- the whole entity put
 again, attributes and all, each wake -- and held in its own file what
 every entity will want: the nine cells beside it as bits, a free one
 for a lamb, the path to grass round the others. All of it is now
-shared (`instructions/docs/instructions.md`): what the simulation
+shared (`actions/docs/actions.md`): what the simulation
 queues for an entity -- made, moved, written, removed -- the neighbourhood and
 the path asked as instructions on the turn. An entity acts on another by a write, an attribute
 at a time. (Since then the simulation's instructions are 24 bytes
@@ -759,7 +759,7 @@ step is found by waves: every goal's front moved a cell at once, each
 row a few shifts and ors, the whole search's memory one line of cache;
 the walker steps into the first wave to come beside it. A* is there
 too, for one place to go. An entity's turn reads the area
-(`instructions::area::layer`), and the rule makes the masks: for a sheep,
+(`actions::area::layer`), and the rule makes the masks: for a sheep,
 grass the goals, the bitplanes held what may be walked on -- but for
 the cells other entities stand on, which are in its way.
 

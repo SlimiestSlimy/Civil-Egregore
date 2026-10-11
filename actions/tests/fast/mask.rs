@@ -9,7 +9,7 @@ use crate::tests::{cell, STONE};
 use bitplane_manager::BitmapArena;
 use coordinates::SuperchunkIndex;
 use entity_manager::Entities;
-use instructions::mask::{self, Mask, SIDES};
+use actions::mask::{self, Mask, SIDES};
 use simulation::Simulation;
 use utilities::rng::Rng;
 

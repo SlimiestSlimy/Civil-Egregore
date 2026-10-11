@@ -22,7 +22,7 @@ Returns its `RuleCounts`, their places named **`SAMPLED`**,
 
 ## `trees.rs`
 
-The trees' layers are the terrain's (`instructions::layers`): `TREE`,
+The trees' layers are the terrain's (`actions::layers`): `TREE`,
 the cells a tree stands on, and `TREE_STAGE`, its stage, 0 to
 `OLDEST_TREE_STAGE`. `MEAN_TIME_TO_SAMPLE` (39.062 seconds of the simulation) and the `SAMPLE_CHANCE` worked out from it, `SPREAD_SHARE` and `GROW_SHARE` (`Chance::HALF` each), `SEEDS_FROM` (4),
 `CROWDED` (9 trees), `MEAN_TIME_TO_DIE` (312.5 seconds at the oldest stage) and the `DIE_CHANCE` a sample worked out from it, `AROUND` (8).

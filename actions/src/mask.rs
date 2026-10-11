@@ -2,7 +2,7 @@
 //! Morton order -- as the tile lies in its bitmap, one run of bits --
 //! so a layer is read into one by copying words, asked under one with
 //! an AND, and written under one a set bit a cell
-//! (`docs/instructions.md`, "Masks").
+//! (`docs/actions.md`, "Masks").
 
 use crate::around::set_bit_of_rank;
 use bitplane_manager::{SMALL_TILE_CELLS, SMALL_TILE_SIDE};

@@ -23,7 +23,7 @@ What each kind *does* is here: a file a kind, holding
 - how a world is given some to start with.
 
 What every kind needs is an instruction, and not written again here
-(`../instructions/docs/instructions.md`): the 3x3
+(`../actions/docs/actions.md`): the 3x3
 cells beside an entity as masks, the area about it, a free cell for a
 newborn, the step towards a goal round whatever is in the way, and
 the writes of what an entity comes to (`entities::set_attribute_of`,
@@ -47,7 +47,7 @@ the tests alone, and what they share the server's own tests'
 A new file in `src/`, named in `lib.rs`; its type and its attributes'
 types rows of the type registry
 (`../../type_registry/docs/type_registry.md`), which refuses a number
-taken, handed to it by `instructions::entity_types`; its rule a row of
+taken, handed to it by `actions::entity_types`; its rule a row of
 the server's table beside the others; its tests in `../tests/fast/`,
 a file a kind.
 
@@ -111,7 +111,7 @@ The rule runs in a tick's first phase, as grass does, reading the
 world as the tick found it. No two sheep eat one cell: a sheep eats the
 cell it stands on, and a cell holds one entity. A cell a sheep eats may
 decay in the same tick. So **a meal hangs on the grass**
-(`../../instructions/docs/instructions.md`, "Compare-and-write"):
+(`../../actions/docs/actions.md`, "Compare-and-write"):
 all the sheep comes to that wake -- fed, roaming set, its age, a death
 of old age -- and what it counts are held against the grass under it
 being there still when they are applied, and the grass is cleared

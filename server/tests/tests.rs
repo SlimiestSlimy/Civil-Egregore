@@ -96,18 +96,18 @@ pub fn tag(sheep: &EntityRef) -> Option<u64> {
 /// One tick of `rule` alone over `world`'s hot
 /// superchunks, its halos left where they are: the tick's report, the
 /// rule's counts alone in it.
-pub fn tick_rule(world: &mut World, rule: server::RulePlace) -> simulation::TickReport<instructions::RuleCounts> {
+pub fn tick_rule(world: &mut World, rule: server::RulePlace) -> simulation::TickReport<actions::RuleCounts> {
     let report = world.tick_only(server::Chosen::of(&[rule]), false);
     simulation::TickReport { writes_applied: report.writes_applied, instructions_applied: report.instructions_applied, instructions_compared: report.instructions_compared, counted_when_applied: report.counted_when_applied, rules: report.rules.of(rule), computing: report.computing, applying: report.applying, acts_over_a_border: report.acts_over_a_border }
 }
 
 /// One tick of the sheep's rule alone over `world`'s hot superchunks,
 /// its halos left where they are.
-pub fn tick_sheep(world: &mut World) -> simulation::TickReport<instructions::RuleCounts> {
+pub fn tick_sheep(world: &mut World) -> simulation::TickReport<actions::RuleCounts> {
     tick_rule(world, server::SHEEP_RULE)
 }
 
 /// One tick of the grass's rule alone over `world`'s hot superchunks.
-pub fn tick_grass(world: &mut World) -> simulation::TickReport<instructions::RuleCounts> {
+pub fn tick_grass(world: &mut World) -> simulation::TickReport<actions::RuleCounts> {
     tick_rule(world, server::GRASS_RULE)
 }
