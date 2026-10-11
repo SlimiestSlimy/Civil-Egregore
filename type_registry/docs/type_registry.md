@@ -108,6 +108,19 @@ entity is not in the middle of that. An attribute of its own is for
 what only some entities of a kind carry and is big enough to be worth
 a block.
 
+**An entity type may register a default attribute**
+(`Registered::default_attribute`, given a row by `with_default`): the
+one attribute every entity of the type has for as long as it is. It
+has to be of a fixed size -- only an attribute with a layout can be
+given, and the build fails, naming the type, if a row's default is no
+attribute of the table, one whose size varies, or the row is no entity
+type's (`first_default_amiss`). What it is for: where an entity of the
+type is kept, an attribute that is always there and always as long
+need not say what it is, so the eight bytes of its type at its
+beginning can go. The sheep's is its state (`default_attribute_of`).
+The registry says it; the entities' store does not use it yet, and
+keeps the type word still.
+
 **What an attribute's type registers**: its name, its supertype, whether
 its size varies (`Registered::varies_in_size`), and its size if it
 does not. **The ID's last four bits are the length**

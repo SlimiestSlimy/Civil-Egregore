@@ -36,6 +36,11 @@ pub struct Registered {
     /// Whether it is an attribute whose size varies: each of it then
     /// says its own length, in the last four bits of its first word.
     pub varies_in_size: bool,
+    /// An entity type's default attribute, by its number: the one
+    /// every entity of the type has for as long as it is, of a fixed
+    /// size -- so that it need not say its type where it is kept. 0
+    /// for an entity type with none, and for anything else.
+    pub default_attribute: u64,
 }
 
 impl Registered {
@@ -46,6 +51,12 @@ impl Registered {
             Kind::WidePlane => self.width as u64,
             _ => 1,
         }
+    }
+
+    /// The row, an entity type's, with `default` the attribute every
+    /// entity of the type has: one with a layout, so of a fixed size.
+    pub const fn with_default<L: Layout>(self, default: Attribute<L>) -> Self {
+        Self { default_attribute: default.attribute_type().number(), ..self }
     }
 
     /// Its layer type, as the hot bitmaps know it -- a wide plane's
@@ -60,22 +71,22 @@ impl Registered {
 
 /// A row of a layer of a bit a cell.
 const fn layer(name: &'static str, layer_type: LayerType) -> Registered {
-    Registered { name, kind: Kind::Layer, number: layer_type.number(), width: 1, varies_in_size: false }
+    Registered { name, kind: Kind::Layer, number: layer_type.number(), width: 1, varies_in_size: false, default_attribute: 0 }
 }
 
 /// A row of a wide plane.
 const fn wide<W: Width>(name: &'static str, plane: Wide<W>) -> Registered {
-    Registered { name, kind: Kind::WidePlane, number: plane.layer_type().number(), width: W::BITS, varies_in_size: false }
+    Registered { name, kind: Kind::WidePlane, number: plane.layer_type().number(), width: W::BITS, varies_in_size: false, default_attribute: 0 }
 }
 
-/// A row of an entity type.
+/// A row of an entity type, with no default attribute.
 const fn entity(name: &'static str, entity_type: EntityType) -> Registered {
-    Registered { name, kind: Kind::EntityType, number: entity_type.number(), width: 0, varies_in_size: false }
+    Registered { name, kind: Kind::EntityType, number: entity_type.number(), width: 0, varies_in_size: false, default_attribute: 0 }
 }
 
 /// A row of an attribute.
 const fn attribute<L: Layout>(name: &'static str, attribute: Attribute<L>) -> Registered {
-    Registered { name, kind: Kind::Attribute, number: attribute.attribute_type().number(), width: data_words(L::BLOCKS) as u32 * u64::BITS, varies_in_size: false }
+    Registered { name, kind: Kind::Attribute, number: attribute.attribute_type().number(), width: data_words(L::BLOCKS) as u32 * u64::BITS, varies_in_size: false, default_attribute: 0 }
 }
 
 /// Grass: what a superchunk is generated with in patches, where its
@@ -119,7 +130,7 @@ pub const REGISTRY: &[Registered] = &[
     layer("wall east", WALL_EAST),
     layer("wall south", WALL_SOUTH),
     layer("collision", COLLISION),
-    entity("sheep", SHEEP),
+    entity("sheep", SHEEP).with_default(SHEEP_STATE),
     attribute("sheep state", SHEEP_STATE),
     layer("wet", WET),
 ];
@@ -157,10 +168,37 @@ pub const fn first_clash(registry: &[Registered]) -> Option<usize> {
     None
 }
 
+/// The first row of `registry` whose default attribute is amiss, if
+/// any is: it names no attribute of the registry, or one whose size
+/// varies -- or the row is no entity type's, and has one.
+pub const fn first_default_amiss(registry: &[Registered]) -> Option<usize> {
+    let mut row = 0;
+    while row < registry.len() {
+        let default = registry[row].default_attribute;
+        if default != 0 {
+            let (mut other, mut sound) = (0, false);
+            while other < registry.len() {
+                let attribute = &registry[other];
+                sound |= matches!(attribute.kind, Kind::Attribute) && attribute.number == default && !attribute.varies_in_size;
+                other += 1;
+            }
+            if !sound || !matches!(registry[row].kind, Kind::EntityType) {
+                return Some(row);
+            }
+        }
+        row += 1;
+    }
+    None
+}
+
 // The build fails here, naming the type, if a row of the registry
-// takes a number or a name another before it has.
+// takes a number or a name another before it has, or its default
+// attribute is none of the registry's of a fixed size.
 const _: () = {
     if let Some(row) = first_clash(REGISTRY) {
+        panic!("{}", REGISTRY[row].name)
+    }
+    if let Some(row) = first_default_amiss(REGISTRY) {
         panic!("{}", REGISTRY[row].name)
     }
 };
@@ -174,6 +212,13 @@ pub fn named(name: &str) -> Option<&'static Registered> {
 /// any of its cold planes'.
 pub fn of_number(number: u64) -> Option<&'static Registered> {
     REGISTRY.iter().find(|registered| (registered.number..registered.number + registered.numbers()).contains(&number))
+}
+
+/// The row of the default attribute of `entity_type`, if it is
+/// registered with one: the attribute every entity of the type has.
+pub fn default_attribute_of(entity_type: EntityType) -> Option<&'static Registered> {
+    let default = REGISTRY.iter().find(|registered| registered.kind == Kind::EntityType && registered.number == entity_type.number())?.default_attribute;
+    REGISTRY.iter().find(|registered| default != 0 && registered.kind == Kind::Attribute && registered.number == default)
 }
 
 /// Every layer type a world's cells have, as the hot bitmaps know

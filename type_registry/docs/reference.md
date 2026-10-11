@@ -41,14 +41,16 @@ layout in its type: **`new(number)`**, **`attribute_type`**. **`Member`** `{offs
 ## `registry.rs`
 
 **`Kind`**: `Layer`, `WidePlane`, `EntityType`, `Attribute`.
-**`Registered`** `{name, kind, number, width, varies_in_size}`: a row, an attribute's
-width the bits of its data; **`numbers`** how many
+**`Registered`** `{name, kind, number, width, varies_in_size, default_attribute}`: a row, an attribute's
+width the bits of its data, an entity type's `default_attribute` the number of the attribute every entity of it has (0: none; **`with_default(attribute)`** gives a row one); **`numbers`** how many
 numbers it takes from `number` on, **`layer_type`** its layer type if it is of
 the cells. `layer`, `wide`, `entity`, `attribute`: a row made from its constant. **`REGISTRY`**: the table, written by hand. The constants:
 `GRASS`, `TREE`, `TREE_STAGE`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`, `WET`, the
 cells'; `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, three blocks; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
 **`first_clash(registry)`**: the first row to take a number or a name of
-one before it -- checked on `REGISTRY` as the crate is built.
+one before it -- checked on `REGISTRY` as the crate is built, as is
+**`first_default_amiss(registry)`**: the first row whose default attribute is no attribute of a fixed size of the table, or that has one and is no entity type's.
+**`default_attribute_of(entity_type)`**: the row of its default attribute, if it has one.
 **`named(name)`**, **`of_number(number)`**: a row by its name, and by any number it
 takes. **`layer_types()`**: every layer type a world's cells have, a
 wide plane's whole: what the server lists a world's layers from.

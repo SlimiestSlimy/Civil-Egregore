@@ -370,20 +370,16 @@ OPEN, SAID TO THE USER, NOT DECIDED:
   the member compare is there (Turn::set_attribute_member). Which is
   the default was asked and not answered.
 
---- BUILT: AN ENTITY'S ACT OVER A BORDER (2026-10-11) ---
+--- BUILT: AN ENTITY'S ACT OVER A BORDER (2026-10-11, e2dc19d) ---
 The user: "we make actions and instructions completely oblivious to
-superchunk boundaries"; "the real restriction is that every entity can
-only interact with one apply queue at a time"; their design: "when an
-entity tries to write to a second queue in the same tick, all its
-instructions are filtered from the first queue into a separate queue
-just for that entity ... evaluated in order as normal but the
-instruction gets dispatched to the relevant superchunk. there will
-have to be a mutex ... shared by up to 4 superchunks"; "try mine
-first, make adversarial tests to see worst case behaviour for
-profiling, and then decide to keep it or try something else ...
-superchunk trasnparency for deterministic actions is critical"; of my
-storing the queues back to back, "it wasnt just a tent queue, i said
-per entity" / "but its a decent starting point".
+superchunk boundaries"; their design, an entity writing to a second
+queue has "a separate queue just for that entity ... evaluated in
+order as normal but the instruction gets dispatched to the relevant
+superchunk ... a mutex ... shared by up to 4 superchunks"; "try mine
+first, make adversarial tests ... then decide to keep it or try
+something else ... superchunk trasnparency for deterministic actions
+is critical"; "it wasnt just a tent queue, i said per entity" / "but
+its a decent starting point". The whole of it is in the commit.
 KEPT, the user's design, with these of mine (told, not confirmed):
 - an author goes to the separate queue only when a compare of one
   superchunk gates something landing in another, not for any write to
@@ -415,8 +411,23 @@ threads`.
 - THE DEFAULT ATTRIBUTE (the user, 2026-10-11): "on the type registry,
   for entities add an optional \"default atribute\" that is always
   present if the entity exists so it avoids the 8 bytes of typeid at
-  the beggining, but it has to be fixed size". NEXT. (Of the act
-  over a border: "rememeber to profile" -- done.)
+  the beggining, but it has to be fixed size". DONE in the registry:
+  Registered::default_attribute, with_default, first_default_amiss at
+  build, default_attribute_of; the sheep's is SHEEP_STATE. NOT DONE:
+  the store still keeps the type word. ASKED OF THE USER before I
+  build it, the cut being theirs: (1) outside the store, is the
+  default attribute still named by its type ID like any other (rules
+  and instructions unchanged, the store dropping the word), or is it
+  the entity's own bytes, named by offset alone? (2) an entity's
+  blocks are handed about whole in many places (save, hash, crossing,
+  tests copying them): with the default kept without its type, a run
+  of blocks no longer says what its first blocks are -- so either
+  EntityRef gives the default apart from the rest, or a run always
+  goes with its entity type. (3) made with none given, it is zeroes?
+  What I read of the code for it: bucket.rs (edit, write_bytes, make),
+  entity.rs (EntityRef::attribute), store.rs (sorted asserts),
+  saved.rs, simulation turn/apply.rs (holds, MakeEntity) and
+  turn/entities.rs (set_attributes_changed, cross).
 - STANDING, the user, 2026-10-11: "hey hey, tests should be seed
   genereated when possible". Done for the two border tests; holds for
   every test from here on.
