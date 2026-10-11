@@ -113,9 +113,10 @@ words, or `None`.
 
 ## `rules.rs`
 
-**`RULES`**: every rule a world ticks, a **`Rule`** `{name, counted,
+**`RULES`**: every rule a world ticks, a **`Rule`** `{name, registered, counted,
 rule}` each -- grass, trees, sheep -- in the order a turn runs them; the
-one list of them. **`RulePlace`**: a rule's place in it, made of its
+one list of them. `registered` is its ID in the type registry:
+**`Rule::registered`** its row there, **`Rule::master`** its master's. **`RulePlace`**: a rule's place in it, made of its
 name as the server is compiled (**`RulePlace::named(name)`**, a name
 not there not compiling), **`RulePlace::rule`** the row there;
 **`GRASS_RULE`**, **`TREES_RULE`**, **`SHEEP_RULE`**: each rule's.

@@ -12,6 +12,9 @@ use std::time::{Duration, Instant};
 pub struct Rule {
     /// Its name: what it is picked by.
     pub name: &'static str,
+    /// Its ID in the type registry: a rule of the cells' or of an
+    /// entity's, whose row says its master.
+    pub registered: u64,
     /// What it counts, each named at its place in its counts.
     pub counted: &'static [&'static str],
     /// The rule, on one superchunk's turn, with room for samples.
@@ -22,10 +25,40 @@ pub struct Rule {
 /// (`sca_rules`), then the entities' (`entity_rules`), all reading the
 /// world as the tick found it.
 pub const RULES: [Rule; 3] = [
-    Rule { name: "grass", counted: &sca_rules::grass::COUNTED, rule: sca_rules::grass::rule },
-    Rule { name: "trees", counted: &sca_rules::trees::COUNTED, rule: sca_rules::trees::rule },
-    Rule { name: "sheep", counted: &entity_rules::sheep::COUNTED, rule: |turn, _| entity_rules::sheep::rule(turn) },
+    Rule { name: "grass", registered: type_registry::RULE_OF_GRASS.0, counted: &sca_rules::grass::COUNTED, rule: sca_rules::grass::rule },
+    Rule { name: "trees", registered: type_registry::RULE_OF_TREES.0, counted: &sca_rules::trees::COUNTED, rule: sca_rules::trees::rule },
+    Rule { name: "sheep", registered: type_registry::RULE_OF_SHEEP.0, counted: &entity_rules::sheep::COUNTED, rule: |turn, _| entity_rules::sheep::rule(turn) },
 ];
+
+impl Rule {
+    /// Its row in the type registry: its name there, and its master.
+    pub fn registered(&self) -> &'static type_registry::Registered {
+        type_registry::rule_of_id(self.registered).expect("checked as the server is built")
+    }
+
+    /// Its master's row in the type registry: the one plane or type of
+    /// entity it is of, whatever else it reads or writes.
+    pub fn master(&self) -> &'static type_registry::Registered {
+        type_registry::master_of(self.registered()).expect("checked as the registry is built")
+    }
+}
+
+// The build fails here, naming the rule, if a rule of the table is
+// not registered or two are registered as one; and if a rule is
+// registered that the table has not.
+const _: () = {
+    let mut place = 0;
+    while place < RULES.len() {
+        let mut before = 0;
+        while before < place {
+            assert!(RULES[before].registered != RULES[place].registered, "{}", RULES[place].name);
+            before += 1;
+        }
+        assert!(type_registry::rule_of_id(RULES[place].registered).is_some(), "{}", RULES[place].name);
+        place += 1;
+    }
+    assert!(RULES.len() == type_registry::RULES_REGISTERED, "a rule is registered that the server does not tick");
+};
 
 /// A rule's place in [`RULES`]: what a rule is picked by, and its
 /// counts read by. Made of a name as the server is compiled

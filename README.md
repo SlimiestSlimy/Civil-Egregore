@@ -42,7 +42,7 @@ sliders its generation is tuned by.
 | [`bitplane_manager/`](bitplane_manager/) | the hot bitplanes: layers decoded into the bitmap arena, where cells are read and written -- writes batched -- and written back; planes of one bit a cell, or 2, 4, 8 or 16 |
 | [`tessera/`](tessera/) | Tessera, the lossless encoding of a 256x256 bitmap: a project of its own, with its own [README](tessera/README.md), tests, tools and docs |
 | [`AI_SCRATCHPAD/`](AI_SCRATCHPAD/) | the AI's own probes of a running world, used while working on the code: no part of the program, and nothing depends on it |
-| [`type_registry/`](type_registry/) | the one table of every type a world has -- layer, wide plane, entity type, attribute -- each with its name, kind, ID and width, and the build failing on any two that clash |
+| [`type_registry/`](type_registry/) | the one table of every type a world has -- layer, wide plane, entity type, attribute, rule -- each with its name, kind, ID and width, and the build failing on any two that clash |
 | [`bitmap/`](bitmap/) | the 256x256 bitmap every layer is, laid out in Morton order |
 | [`utilities/`](utilities/) | general-purpose utilities: the thread dispatcher, commands and their parameters, the one seed tests and tools run on, the table printer and measurement reports, a seeded random source, a fixed-capacity list, the process's memory; and the settings: Civil Egregore's one folder on a machine, the file of what is changed there, the defaults written by hand in `utilities/default_settings.csv`, and a world's folder from its name |
 

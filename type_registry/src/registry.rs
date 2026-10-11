@@ -3,7 +3,7 @@
 //! ([`first_clash`]): `docs/type_registry.md`, "Why one table".
 
 use crate::layouts::{Attribute, Layout, SheepState, BLOCK_WORDS};
-use crate::type_ids::{AttributeType, Bits4, EntityType, LayerType, Wide, Width};
+use crate::type_ids::{AttributeType, Bits4, EntityRuleType, EntityType, LayerType, ScaRuleType, Wide, Width};
 
 /// What a registered type is of.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,6 +16,10 @@ pub enum Kind {
     EntityType,
     /// An attribute of an entity.
     Attribute,
+    /// A rule of the cells: its master a layer or a wide plane.
+    ScaRule,
+    /// A rule of an entity: its master a type of entity.
+    EntityRule,
 }
 
 /// One row of the registry: a type a world has.
@@ -41,6 +45,10 @@ pub struct Registered {
     /// size -- so that it need not say its type where it is kept. 0
     /// for an entity type with none, and for anything else.
     pub default_attribute: u64,
+    /// A rule's master, by its number: the one plane a rule of the
+    /// cells is of, the one type of entity an entity's rule is of,
+    /// whatever else the rule reads or writes. 0 for anything else.
+    pub master: u64,
 }
 
 impl Registered {
@@ -71,22 +79,32 @@ impl Registered {
 
 /// A row of a layer of a bit a cell.
 const fn layer(name: &'static str, layer_type: LayerType) -> Registered {
-    Registered { name, kind: Kind::Layer, number: layer_type.number(), width: 1, varies_in_size: false, default_attribute: 0 }
+    Registered { name, kind: Kind::Layer, number: layer_type.number(), width: 1, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// A row of a wide plane.
 const fn wide<W: Width>(name: &'static str, plane: Wide<W>) -> Registered {
-    Registered { name, kind: Kind::WidePlane, number: plane.layer_type().number(), width: W::BITS, varies_in_size: false, default_attribute: 0 }
+    Registered { name, kind: Kind::WidePlane, number: plane.layer_type().number(), width: W::BITS, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// A row of an entity type, with no default attribute.
 const fn entity(name: &'static str, entity_type: EntityType) -> Registered {
-    Registered { name, kind: Kind::EntityType, number: entity_type.number(), width: 0, varies_in_size: false, default_attribute: 0 }
+    Registered { name, kind: Kind::EntityType, number: entity_type.number(), width: 0, varies_in_size: false, default_attribute: 0, master: 0 }
+}
+
+/// A row of a rule of the cells, its master the layer `master`.
+const fn sca_rule(name: &'static str, rule: ScaRuleType, master: LayerType) -> Registered {
+    Registered { name, kind: Kind::ScaRule, number: rule.number(), width: 0, varies_in_size: false, default_attribute: 0, master: master.number() }
+}
+
+/// A row of a rule of an entity, its master the entity type `master`.
+const fn entity_rule(name: &'static str, rule: EntityRuleType, master: EntityType) -> Registered {
+    Registered { name, kind: Kind::EntityRule, number: rule.number(), width: 0, varies_in_size: false, default_attribute: 0, master: master.number() }
 }
 
 /// A row of an attribute.
 const fn attribute<L: Layout>(name: &'static str, attribute: Attribute<L>) -> Registered {
-    Registered { name, kind: Kind::Attribute, number: attribute.attribute_type().number(), width: L::WORDS as u32 * u64::BITS, varies_in_size: false, default_attribute: 0 }
+    Registered { name, kind: Kind::Attribute, number: attribute.attribute_type().number(), width: L::WORDS as u32 * u64::BITS, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// Grass: what a superchunk is generated with in patches, where its
@@ -120,6 +138,13 @@ pub const SHEEP_STATE: Attribute<SheepState> = Attribute::new(17);
 /// (`chunk_storage::SuperchunkImage::depth`).
 pub const WET: LayerType = LayerType::of_a_bit(24);
 
+/// The grass's rule: its master the grass.
+pub const RULE_OF_GRASS: ScaRuleType = ScaRuleType::of(32);
+/// The trees' rule: its master the cells a tree stands on.
+pub const RULE_OF_TREES: ScaRuleType = ScaRuleType::of(33);
+/// The sheep's rule: its master the sheep.
+pub const RULE_OF_SHEEP: EntityRuleType = EntityRuleType::of(34);
+
 /// Every type a world has: the layers and wide planes of its cells,
 /// the types of its entities and their attributes, a row each beside
 /// its constant above. In the order of their numbers.
@@ -133,6 +158,9 @@ pub const REGISTRY: &[Registered] = &[
     entity("sheep", SHEEP).with_default(SHEEP_STATE),
     attribute("sheep state", SHEEP_STATE),
     layer("wet", WET),
+    sca_rule("grass rule", RULE_OF_GRASS, GRASS),
+    sca_rule("trees rule", RULE_OF_TREES, TREE),
+    entity_rule("sheep rule", RULE_OF_SHEEP, SHEEP),
 ];
 
 /// The oldest stage a tree has: sixteen in all.
@@ -191,9 +219,36 @@ pub const fn first_default_amiss(registry: &[Registered]) -> Option<usize> {
     None
 }
 
+/// The first row of `registry` whose master is amiss, if any is: a
+/// rule of the cells whose master is no layer or wide plane of the
+/// registry, a rule of an entity whose master is no entity type of
+/// it -- or a row that is no rule, and has one.
+pub const fn first_master_amiss(registry: &[Registered]) -> Option<usize> {
+    let mut row = 0;
+    while row < registry.len() {
+        let (rule, mut other, mut sound) = (&registry[row], 0, false);
+        while other < registry.len() {
+            let master = &registry[other];
+            sound |= master.number == rule.master
+                && match rule.kind {
+                    Kind::ScaRule => matches!(master.kind, Kind::Layer | Kind::WidePlane),
+                    Kind::EntityRule => matches!(master.kind, Kind::EntityType),
+                    _ => false,
+                };
+            other += 1;
+        }
+        if matches!(rule.kind, Kind::ScaRule | Kind::EntityRule) != sound || (!sound && rule.master != 0) {
+            return Some(row);
+        }
+        row += 1;
+    }
+    None
+}
+
 // The build fails here, naming the type, if a row of the registry
-// takes a number or a name another before it has, or its default
-// attribute is none of the registry's of a fixed size.
+// takes a number or a name another before it has, its default
+// attribute is none of the registry's of a fixed size, or its master
+// is none of the registry's of the kind its rule is of.
 const _: () = {
     if let Some(row) = first_clash(REGISTRY) {
         panic!("{}", REGISTRY[row].name)
@@ -201,7 +256,52 @@ const _: () = {
     if let Some(row) = first_default_amiss(REGISTRY) {
         panic!("{}", REGISTRY[row].name)
     }
+    if let Some(row) = first_master_amiss(REGISTRY) {
+        panic!("{}", REGISTRY[row].name)
+    }
 };
+
+/// The row of the rule whose ID is `id` -- a rule of the cells or of
+/// an entity -- if it is registered: `None` of any other ID.
+pub const fn rule_of_id(id: u64) -> Option<&'static Registered> {
+    let (cells, entity, mut row) = (ScaRuleType(id), EntityRuleType(id), 0);
+    while row < REGISTRY.len() {
+        let registered = &REGISTRY[row];
+        let same = match registered.kind {
+            Kind::ScaRule => ScaRuleType::of(registered.number).0 == cells.0,
+            Kind::EntityRule => EntityRuleType::of(registered.number).0 == entity.0,
+            _ => false,
+        };
+        if same {
+            return Some(registered);
+        }
+        row += 1;
+    }
+    None
+}
+
+/// How many rules are registered, of the cells and of entities.
+pub const RULES_REGISTERED: usize = {
+    let (mut count, mut row) = (0, 0);
+    while row < REGISTRY.len() {
+        count += matches!(REGISTRY[row].kind, Kind::ScaRule | Kind::EntityRule) as usize;
+        row += 1;
+    }
+    count
+};
+
+/// The row of the master of the rule `rule`, a row of the registry:
+/// the plane or the type of entity it is of.
+pub fn master_of(rule: &Registered) -> Option<&'static Registered> {
+    REGISTRY.iter().find(|registered| rule.master != 0 && registered.number == rule.master && !matches!(registered.kind, Kind::ScaRule | Kind::EntityRule | Kind::Attribute))
+}
+
+/// The rules whose master is the row `master`: those of a plane, or
+/// of a type of entity.
+pub fn rules_of(master: &Registered) -> impl Iterator<Item = &'static Registered> {
+    let number = master.number;
+    REGISTRY.iter().filter(move |registered| matches!(registered.kind, Kind::ScaRule | Kind::EntityRule) && registered.master == number)
+}
 
 /// The row of the type named `name`, if one is.
 pub fn named(name: &str) -> Option<&'static Registered> {

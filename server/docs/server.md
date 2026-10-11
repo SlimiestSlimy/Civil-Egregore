@@ -114,7 +114,10 @@ run with no window has no camera, and loads nothing by it.
 
 `World::tick` runs every rule of the cells (`../sca_rules/`) and every
 kind of entity (`../entity_rules/`) on each hot superchunk's turn, then
-moves the halos. The rules are one table, `rules::RULES`: a name, what
+moves the halos. The rules are one table, `rules::RULES`: a name, the rule's ID in the
+type registry -- whose row says the rule's master
+(`../../type_registry/docs/type_registry.md`, "Rules"; the build
+fails if the two tables do not hold the same rules) -- what
 the rule counts, and its function, in the order a turn runs them --
 grass, trees, sheep. A rule added is a row added there; nothing else
 lists them. What a tick did is an array with a rule's counts at its

@@ -54,7 +54,7 @@ one run of words, 1, 3, 5 and so on, 31 at the most. How many blocks an attribut
 said by its first word -- the type's last four bits, the blocks less
 one -- so nothing is looked up to step over an attribute
 (`AttributeBlock::blocks`). The types are one namespace, everything's:
-an ID of another supertype, or whose number is 0, is **not an attribute's**, and a block that
+an ID of another kind, or whose number is 0, is **not an attribute's**, and a block that
 begins with one is no attribute (`sorted` says so of an attribute list,
 and a saved entity with one is not read).
 
