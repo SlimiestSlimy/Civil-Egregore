@@ -3,13 +3,21 @@
 //! sampling pass for both (`docs/sca_rules.md`, "Grass").
 
 use instructions::layers::{GRASS, WET};
+use instructions::simulation_time::SimulationTime;
 use instructions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
 
+/// The simulation time a cell of grass takes, on average, to try to
+/// spread: what its chance each tick is worked out from, so the grass
+/// grows as fast at any tick rate.
+pub const MEAN_TIME_TO_SPREAD: SimulationTime = SimulationTime::milliseconds(390_625);
+/// The simulation time a cell of grass with grass all round takes, on
+/// average, to turn back to dirt.
+pub const MEAN_TIME_TO_DECAY: SimulationTime = SimulationTime::milliseconds(781_250);
 /// The chance, each tick, that a cell of grass tries to spread.
-pub const SPREAD_CHANCE: Chance = Chance::one_in(100_000);
+pub const SPREAD_CHANCE: Chance = MEAN_TIME_TO_SPREAD.chance_a_tick();
 /// The chance, each tick, that a cell of grass with grass all round
 /// turns back to dirt.
-pub const DECAY_CHANCE: Chance = Chance::one_in(200_000);
+pub const DECAY_CHANCE: Chance = MEAN_TIME_TO_DECAY.chance_a_tick();
 /// The chance, each tick, that a cell of grass is sampled: to spread or
 /// to decay.
 pub const SAMPLE_CHANCE: Chance = SPREAD_CHANCE.plus(DECAY_CHANCE);

@@ -21,8 +21,8 @@ use std::thread;
 use std::time::Duration;
 
 /// Ticks a second a world is held to unless told otherwise: the
-/// game's target.
-pub const TARGET_PACE: u32 = 256;
+/// game's target, a second of the simulation in a second.
+pub const TARGET_PACE: u32 = simulation::simulation_time::TICKS_A_SIMULATION_SECOND as u32;
 
 /// Ticks from one line of the census to the next.
 pub const CENSUS_EVERY: u64 = 1000;

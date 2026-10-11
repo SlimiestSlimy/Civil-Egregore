@@ -12,6 +12,7 @@
 pub mod halos;
 pub mod hot;
 mod sampling;
+pub mod simulation_time;
 mod tick;
 mod turn;
 pub mod transient_data;

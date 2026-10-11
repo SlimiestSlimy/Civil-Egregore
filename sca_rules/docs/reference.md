@@ -4,8 +4,11 @@ The design is in `sca_rules.md`.
 
 ## `grass.rs`
 
-`SPREAD_CHANCE` (once in 100,000), `DECAY_CHANCE` (once in 200,000,
-with grass all round), `SAMPLE_CHANCE` (the two together): each a
+`MEAN_TIME_TO_SPREAD` (390.625 seconds of the simulation) and
+`MEAN_TIME_TO_DECAY` (781.25, with grass all round): what
+`SPREAD_CHANCE` and `DECAY_CHANCE` are worked out from
+(`SimulationTime::chance_a_tick`; once in 100,000 ticks and in 200,000
+at 256 ticks a second); `SAMPLE_CHANCE` (the two together): each a
 `Chance`, parts in 2^32, no float.
 
 **`rule(turn, samples)`**: hands **`cell`**, the rule for one cell of grass, to `cells::each_sampled`, which goes over the cells. On one superchunk's turn, every cell of grass
@@ -21,7 +24,7 @@ Returns its `RuleCounts`, their places named **`SAMPLED`**,
 
 The trees' layers are the terrain's (`instructions::layers`): `TREE`,
 the cells a tree stands on, and `TREE_STAGE`, its stage, 0 to
-`OLDEST_TREE_STAGE`. `SAMPLE_CHANCE` (once in 10,000), `SPREAD_SHARE` (`Chance::HALF`), `SEEDS_FROM` (4),
+`OLDEST_TREE_STAGE`. `MEAN_TIME_TO_SAMPLE` (39.062 seconds of the simulation) and the `SAMPLE_CHANCE` worked out from it (once in 10,000 ticks at 256 a second), `SPREAD_SHARE` (`Chance::HALF`), `SEEDS_FROM` (4),
 `CROWDED` (9), `DIE_ONE_IN` (4), `AROUND` (8).
 
 **`rule(turn, samples)`**: hands **`tree`**, the rule for one tree, to `cells::each_sampled`. Every tree sampled tries to spread or grows

@@ -12,6 +12,7 @@ use bitplane_manager::BitmapArena;
 use chunk_storage::jobs::{Generate, Jobs, Ticket};
 use chunk_storage::{ChunkStorage, LayerType};
 use coordinates::SuperchunkIndex;
+use crate::simulation_time::SimulationTime;
 use entity_manager::Entities;
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::AddAssign;
@@ -20,12 +21,12 @@ use utilities::dispatcher::Dispatcher;
 
 /// Ticks a superchunk a halo reaches is warming before it turns hot
 /// (`docs/simulation.md`, "Halos").
-pub const WARM_TICKS: u64 = 256;
+pub const WARM_TICKS: u64 = SimulationTime::seconds(1).ticks();
 
 /// Ticks a hot superchunk no halo reaches is cooling before it goes
 /// cold: as long as one warming takes, so a hot entity stepping back over
 /// the edge it just crossed finds the superchunks behind it still hot.
-pub const COOL_TICKS: u64 = 256;
+pub const COOL_TICKS: u64 = SimulationTime::seconds(1).ticks();
 
 /// What the renderer should render, in superchunks: a rectangle of
 /// them, each `(x, y)` in superchunks from the world's top left, both

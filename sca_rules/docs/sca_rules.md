@@ -26,11 +26,15 @@ the entities' rules, in one table (`server::RULES`).
 Each tick every cell of grass may spread onto a dirt neighbour, or
 decay back to dirt the more grass is around it:
 
-- **Spreading**: a cell of grass tries to spread with `SPREAD_CHANCE`,
+- **Spreading**: a cell of grass tries to spread with `SPREAD_CHANCE`
+  -- once in `MEAN_TIME_TO_SPREAD` on average, a time of the
+  simulation, so as fast at any tick rate
+  (`../../simulation/docs/simulation.md`, "Simulation time") --
   onto one of its eight neighbours drawn at random, if that one is dirt
   -- a cell with no grass: dirt has no layer -- and not under water.
 - **Decay**: a cell of grass with `k` of its eight neighbours grass
-  turns back to dirt with `k / 8` of `DECAY_CHANCE`: none with no grass
+  turns back to dirt with `k / 8` of `DECAY_CHANCE` (once in
+  `MEAN_TIME_TO_DECAY` on average): none with no grass
   around, the whole chance with grass all round.
 
 One sampling pass serves both, and no sample is wasted: every cell of
@@ -53,7 +57,8 @@ counted.
 
 ## Trees
 
-Each tick every tree is sampled with the trees' `SAMPLE_CHANCE`, and a
+Each tick every tree is sampled with the trees' `SAMPLE_CHANCE` --
+once in `MEAN_TIME_TO_SAMPLE` of the simulation on average -- and a
 tree sampled does one thing, by lot:
 
 - **It tries to spread**, in `SPREAD_SHARE` of its samples, if it is at

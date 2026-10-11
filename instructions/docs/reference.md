@@ -153,6 +153,9 @@ held)`**, rows without them.
 `WET`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`: the layers a world's cells have, from
 the type registry (`../../type_registry/`). **`entity_types`**:
 `SHEEP`, and its one attribute `SHEEP_STATE` -- and `SheepState`, its layout.
+**`simulation_time`**: `SimulationTime` and `TICKS_A_SIMULATION_SECOND`,
+what a rule says its times and its mean times in
+(`../../simulation/docs/simulation.md`, "Simulation time").
 
 The words the instructions are asked in: `CellIndex`, `CellCartesian`,
 `SuperchunkIndex`, `NEIGHBOURS`, `SUPERCHUNK_SIDE_CELLS`, `LayerType`,

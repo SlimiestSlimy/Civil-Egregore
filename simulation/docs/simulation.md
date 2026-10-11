@@ -331,6 +331,33 @@ them (`entity`, `entities_in`, through an `EntityReader`, as cells
 through a `Reader`) and queues its instructions. The decisions behind it:
 `../../docs/civil_egregore.md`, "Entities".
 
+## Simulation time
+
+Nothing says how long a thing takes in ticks. It says it in seconds of
+the simulation (`SimulationTime::seconds`, `milliseconds`), and that is
+turned to ticks in one place, by the one constant that is the tick
+rate: `TICKS_A_SIMULATION_SECOND`, 256. A time is kept as the ticks it
+takes at that rate, the nearest whole number and one at least, worked
+out as the code is built: a rule's times cost nothing at run time, and
+a rule written so is the same rule at another tick rate -- a sheep
+hungry again 27 seconds after a meal is so at 256 ticks a second or
+at 64.
+
+A thing that happens by chance says its **mean simulation time**: how
+long it takes on average. Its chance each tick is once in that time's
+ticks (`SimulationTime::chance_a_tick`), so tick by tick it happens
+that long apart on average whatever a tick is -- grass spreads as fast
+at any rate, drawn more often and less likely each time, or the other
+way. A chance that is of an event, not of a tick -- one meal in five,
+half a tree's samples -- says nothing of time and is a chance as it
+was.
+
+What is coarser at a lower rate is only what a tick is: nothing takes
+less than one, and two times closer than a tick are the same. The
+times the simulation itself keeps are said so too (`WARM_TICKS`,
+`COOL_TICKS`, a second each), and the pace a host holds a world to is
+the tick rate: a second of the simulation in a second.
+
 ## Halos
 
 Only the superchunks about the entities that matter are hot
@@ -348,7 +375,7 @@ thread a core, the tick's and the jobs' alike, each with its own codec,
 asleep while there is nothing to do. A thread busy with a job sits a
 tick's phase out.
 
-- **Going cold** takes `COOL_TICKS` (256) ticks: a hot superchunk no
+- **Going cold** takes `COOL_TICKS` ticks, a second of the simulation: a hot superchunk no
   halo reaches is **cooling**, hot still -- ticked, read and written
   like any other -- so a hot entity stepping back and forth over an edge
   does not make the superchunks behind it flicker cold and hot. A halo
@@ -363,7 +390,7 @@ tick's phase out.
   flushes one after another. The newest cells are always on the hot
   side: its bitmaps, hot or lingering, are held until the image holding
   their changes is in the cold pool, and only then let go.
-- **Coming hot** takes `WARM_TICKS` (256) ticks: the superchunk is
+- **Coming hot** takes `WARM_TICKS` ticks, a second of the simulation: the superchunk is
   **warming**. Lingering still, it is held, to be made hot as it is,
   nothing decoded; else its image -- generated first, if it was never
   made -- is decoded by a job. It turns hot at the tick it
@@ -460,6 +487,7 @@ comes to does not depend on the thread that takes it.
 | `src/halos.rs` | the halos moved: warming and cooling, each due at a tick, by jobs off the tick -- `halos/warming.rs` superchunks made hot and let cool, `halos/write_back.rs` write-backs and flushes landed |
 | `src/turn/` | a superchunk's turn: `mod` the turn, its cells and its outbox, `entities` the entities read and the instructions queued |
 | `../entity_manager/` | the entities: buckets, the timer wheel, the instructions queued -- a crate of its own |
+| `src/simulation_time.rs` | simulation time: the tick rate, a time as its ticks, a mean time as a chance a tick |
 | `src/sampling.rs` | the cells a rule is given: a layer sampled by gaps drawn against a chance |
 | `src/tick.rs` | the tick: every hot superchunk's turn on the dispatcher's threads, then the writes and instructions applied, author by author |
 | `src/tick/crossings.rs` | the tick's crossings settled: leavers removed, what was written to them sent after |
