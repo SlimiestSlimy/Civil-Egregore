@@ -20,7 +20,7 @@ mod wheel;
 
 pub use bucket::Put;
 pub use instructions::{Instructions, InstructionsApplied};
-pub use attributes::{attribute, attribute_blocks, attribute_seen, blocks_sum, each_attribute, attribute_bytes, find_attribute, push_attribute, remove_attribute, set_attribute, set_attribute_blocks, sorted, words_sum, write_attribute_bytes, Attribute, AttributeBlock, AttributeType, Layout, Member, WholeAttribute, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS, NO_ATTRIBUTE};
+pub use attributes::{attribute, attribute_blocks, default_kept, keep, may_be_given, DefaultKept, attribute_seen, blocks_sum, each_attribute, attribute_bytes, find_attribute, push_attribute, remove_attribute, set_attribute, set_attribute_blocks, sorted, words_sum, write_attribute_bytes, Attribute, AttributeBlock, AttributeType, Layout, Member, WholeAttribute, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS, NO_ATTRIBUTE};
 pub use entity::{EntityRef, EntityType, Header, NEVER};
 pub use store::{Arrival, CollisionCells, Entities, EntityReader, Settled, SuperchunkEntities, OCCUPIED_SIDE};
 pub use wheel::{Wake, WHEEL_TICKS};

@@ -12,7 +12,7 @@ pub use world_entities::Entities;
 
 use crate::bucket::{place, Bucket};
 pub use crate::bucket::Put;
-use crate::attributes::{sorted, AttributeBlock, AttributeType};
+use crate::attributes::{keep, may_be_given, AttributeBlock, AttributeType};
 use crate::entity::{EntityRef, Header, NEVER};
 use crate::wheel::{Wake, Wheel};
 use coordinates::{CellIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
@@ -167,12 +167,15 @@ impl SuperchunkEntities {
     }
 
     /// Makes `header`'s entity on its cell, with `attributes` sorted
-    /// by type, and files its wake, no earlier than `earliest`: new,
-    /// or refused, an entity standing there.
+    /// by type -- its type's default attribute among them or, not
+    /// given, zeroes -- and files its wake, no earlier than
+    /// `earliest`: new, or refused, an entity standing there.
     pub(crate) fn make(&mut self, earliest: u64, header: Header, attributes: &[AttributeBlock]) -> Put {
         debug_assert_eq!(header.at.superchunk(), self.index, "an entity made in a superchunk it is not in");
-        debug_assert!(sorted(attributes), "attributes whole, sorted by type, each type once");
-        let put = self.chunks[header.at.chunk().place()].make(header, attributes);
+        debug_assert!(may_be_given(header.kind, attributes), "attributes whole, sorted by type, each type once");
+        self.carried.clear();
+        keep(header.kind, attributes, &mut self.carried);
+        let put = self.chunks[header.at.chunk().place()].make(header, &self.carried);
         if put == Put::New && header.wake != NEVER {
             self.wheel.file(earliest, header.wake, Wake { at: header.at });
         }
@@ -180,21 +183,19 @@ impl SuperchunkEntities {
     }
 
     /// Gives the entity standing on `from` `header` -- its cell, when
-    /// it wakes -- and `attributes` sorted by type, or, with none
-    /// given, leaves it those it has; and files its wake, if it is
-    /// `earliest` or later: what came of it
+    /// it wakes -- leaving it the attributes it has; and files its
+    /// wake, if it is `earliest` or later: what came of it
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
-    pub(crate) fn put(&mut self, earliest: u64, header: Header, from: CellIndex, attributes: Option<&[AttributeBlock]>) -> Put {
+    pub(crate) fn put(&mut self, earliest: u64, header: Header, from: CellIndex) -> Put {
         debug_assert_eq!(header.at.superchunk(), self.index, "an entity put in a superchunk it is not in");
         debug_assert_eq!(from.superchunk(), self.index, "an entity put from another superchunk: a crossing");
-        debug_assert!(attributes.is_none_or(sorted), "attributes whole, sorted by type, each type once");
         let (origin, target) = (from.chunk().place(), header.at.chunk().place());
         let put = if origin == target {
-            self.chunks[target].put(header, place(from), attributes)
+            self.chunks[target].put(header, place(from), None)
         } else if let Some(stood) = self.chunks[origin].get(from) {
-            // Those it has go with it to the other bucket.
+            // Those it has go with it to the other bucket, as that one kept them.
             self.carried.clear();
-            self.carried.extend_from_slice(attributes.unwrap_or(stood.attributes));
+            self.carried.extend_from_slice(stood.kept);
             self.move_between(origin, target, header, from)
         } else {
             Put::PassedOver
@@ -249,6 +250,14 @@ impl SuperchunkEntities {
         self.chunks[at.chunk().place()].occupied(place(at))
     }
 
+    /// The sum of all the entity standing on `at` holds, as it is
+    /// kept ([`EntityRef::kept`]): what one put here as it crossed is
+    /// noted with ([`Arrival::attributes`]), and what it is held
+    /// against where it left. 0 if nobody stands there.
+    pub fn kept_sum(&self, at: CellIndex) -> u64 {
+        self.get(at).map_or(0, |entity| crate::blocks_sum(entity.kept))
+    }
+
     /// Notes that an entity crossed into this superchunk: put here by
     /// whoever applies a crossing, to be settled when the tick's
     /// instructions are all applied.
@@ -276,10 +285,10 @@ impl SuperchunkEntities {
         for &arrival in arrived.iter().filter(|arrival| arrival.left.superchunk() == here) {
             match self.get(arrival.left) {
                 Some(left) => {
-                    if crate::blocks_sum(left.attributes) != arrival.attributes {
+                    if crate::blocks_sum(left.kept) != arrival.attributes {
                         let first = settled.attributes.len() as u32;
-                        settled.attributes.extend_from_slice(left.attributes);
-                        settled.changed.push((arrival, first, left.attributes.len() as u32));
+                        settled.attributes.extend_from_slice(left.kept);
+                        settled.changed.push((arrival, first, left.kept.len() as u32));
                     }
                     self.remove(arrival.left);
                     self.vacated.push(arrival.left);

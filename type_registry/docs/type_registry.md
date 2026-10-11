@@ -120,8 +120,11 @@ type's (`first_default_amiss`). What it is for: where an entity of the
 type is kept, an attribute that is always there and always as long
 need not say what it is, so the eight bytes of its type at its
 beginning can go. The sheep's is its state (`default_attribute_of`).
-The registry says it; the entities' store does not use it yet, and
-keeps the type word still.
+The entities' store keeps it so (`default_of`: its type and the words
+of its data, from a few rows worked out as the crate is built,
+`DEFAULTS`; `../../entity_manager/docs/entity_manager.md`, "The
+default attribute"). An attribute's row says the bits of its data
+exactly, its layout's words, for that.
 
 **What an attribute's type registers**: its name, its supertype, whether
 its size varies (`Registered::varies_in_size`), and its size if it

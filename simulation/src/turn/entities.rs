@@ -100,7 +100,9 @@ impl<'a> Turn<'a> {
                 self.queue_under(entity.at, there, &[Instruction::move_entity(entity.at, to), sleeps]);
             }
         } else if let Some(whole) = self.entity_reader.get(entity.at) {
-            self.cross(entity, Header { at: to, wake, ..*entity }, whole.attributes);
+            // All it has goes with it, its type's default attribute too, each with its type as an entity is given them.
+            let default = whole.default_attribute();
+            self.cross(entity, Header { at: to, wake, ..*entity }, default.as_deref().unwrap_or(&[]), whole.attributes);
         }
     }
 
@@ -186,8 +188,11 @@ impl<'a> Turn<'a> {
     /// `attributes` -- both sorted by type -- of `entity` becoming as
     /// in `attributes`, each a compare-and-write of its own.
     fn set_attributes_changed(&mut self, entity: &Header, seen: &[AttributeBlock], attributes: &[AttributeBlock]) {
+        // The type's default attribute is not among those seen, being kept apart: seen as it would be given.
+        let default = self.entity_reader.get(entity.at).and_then(|seen| seen.default_attribute());
+        let default = default.as_deref().filter(|default| !seen.is_empty() || !default.is_empty());
         for value in each_attribute(attributes) {
-            let was = attribute_blocks(seen, value[0].kind());
+            let was = default.filter(|default| default[0].kind().identity() == value[0].kind().identity()).or_else(|| attribute_blocks(seen, value[0].kind()));
             if was != Some(value) {
                 self.set_attribute_blocks(entity, was, Some(value));
             }
@@ -212,12 +217,17 @@ impl<'a> Turn<'a> {
         if before.at.superchunk() == after.at.superchunk() {
             self.step(before, after.at, after.wake);
         } else {
-            self.cross(before, after, attributes);
+            // Its type's default attribute goes with it as the tick found it, unless it is among those given.
+            let default = self.entity_reader.get(before.at).and_then(|seen| seen.default_attribute());
+            let default = default.as_deref().filter(|default| attribute_blocks(attributes, default[0].kind()).is_none());
+            self.cross(before, after, default.unwrap_or(&[]), attributes);
         }
     }
 
     /// Queues `before`'s entity crossing to `after`'s cell, in another
-    /// superchunk, with `attributes` -- what it is to have by then,
+    /// superchunk, with `default` and `attributes` -- its type's
+    /// default attribute, if it has one and it is not among the
+    /// others, and the others: what it is to have by then,
     /// its changes queued where it stands: made there whole, under a
     /// compare of that cell being free, in that superchunk's queue;
     /// and here, under a compare of its being there still, put to
@@ -225,14 +235,15 @@ impl<'a> Turn<'a> {
     /// only if it ends the tick here with those attributes -- else
     /// another changed it meanwhile, and it stays, asleep, with every
     /// change made to it (`SuperchunkEntities::settle_leavers`).
-    fn cross(&mut self, before: &Header, after: Header, attributes: &[AttributeBlock]) {
+    fn cross(&mut self, before: &Header, after: Header, default: &[AttributeBlock], attributes: &[AttributeBlock]) {
         self.open(after.at, Instruction::compare_cell_free(after.at));
         // Its type and its wake in a block before its attributes': an instruction has no room for them beside the cell it left.
         let mut head = AttributeBlock([0; BLOCK_WORDS]);
         (head.0[0], head.0[1]) = (after.kind.0, after.wake);
         let first = self.carry(after.at, &[head]);
+        self.carry(after.at, default);
         self.carry(after.at, attributes);
-        self.queue(after.at, Instruction::cross_entity(after.at, before.at, first, attributes.len() as u32));
+        self.queue(after.at, Instruction::cross_entity(after.at, before.at, first, (default.len() + attributes.len()) as u32));
         self.close_compare();
         self.queue_under(before.at, Instruction::compare_entity(before.at, before.kind.0), &[Instruction::write_wake(before.at, after.wake)]);
     }

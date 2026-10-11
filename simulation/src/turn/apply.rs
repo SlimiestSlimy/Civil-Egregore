@@ -8,7 +8,7 @@ use super::instruction::{Instruction, Opcode, NO_COUNT};
 use bitplane_manager::{Superchunk, Write, WriteOp, WritesApplied};
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{attribute_blocks, attribute_bytes, attribute_seen, blocks_sum, Arrival, AttributeType, CollisionCells, EntityType, Header, InstructionsApplied, Put, SuperchunkEntities};
+use entity_manager::{Arrival, AttributeType, CollisionCells, EntityType, Header, InstructionsApplied, Put, SuperchunkEntities};
 
 /// A superchunk's collision plane as its entities keep it while their
 /// instructions are applied: `layer` of `superchunk`, or none -- a
@@ -69,16 +69,15 @@ impl Default for Applied {
 /// nor if the entity no longer stands anywhere.
 fn holds(instruction: &Instruction, at: CellIndex, superchunk: &mut Superchunk, entities: &mut SuperchunkEntities, collision: Option<LayerType>) -> bool {
     let entities = &*entities;
-    // The attribute of type `kind` of the entity: none within if it has none, none at all if it is gone.
-    let attribute = |kind: u64| Some(attribute_blocks(entities.get_named(at)?.attributes, AttributeType(kind)));
     match instruction.opcode {
         Opcode::CompareCell => superchunk.value_at(LayerType(instruction.first), at) == Some(u32::from(instruction.small)),
         Opcode::CompareCellFree => entities.free_for_a_new_entity(at, &Standing { superchunk, layer: collision }),
         Opcode::CompareEntity => entities.get_named(at).is_some_and(|entity| entity.header.kind.0 == instruction.first),
-        Opcode::CompareAttribute => attribute(instruction.second).is_some_and(|blocks| attribute_seen(blocks) == instruction.first),
+        // Gone, it holds against nothing; there, against what is seen of the attribute, none seen of one it has not.
+        Opcode::CompareAttribute => entities.get_named(at).is_some_and(|entity| entity.attribute_seen(AttributeType(instruction.second)) == instruction.first),
         Opcode::CompareAttributeMember => {
             let (offset, bytes) = instruction.member();
-            attribute(instruction.first).flatten().and_then(|blocks| attribute_bytes(blocks, offset, bytes)) == Some(instruction.second)
+            entities.get_named(at).and_then(|entity| entity.attribute_member(AttributeType(instruction.first), offset, bytes)) == Some(instruction.second)
         }
         _ => unreachable!("no compare"),
     }
@@ -215,7 +214,7 @@ impl Queue {
                     let header = Header { kind: EntityType(head[0]), at, wake: head[1] };
                     match entities.make_named(earliest, header, attributes, &mut Standing { superchunk, layer: collision }) {
                         Put::New => {
-                            entities.arrived(Arrival { left: CellIndex(instruction.first), at, attributes: blocks_sum(attributes) });
+                            entities.arrived(Arrival { left: CellIndex(instruction.first), at, attributes: entities.kept_sum(at) });
                             (done.puts, done.crossed) = (done.puts + 1, done.crossed + 1);
                         }
                         _ => done.refused += 1,

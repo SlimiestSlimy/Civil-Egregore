@@ -190,11 +190,11 @@ impl Instructions {
                         Put::PassedOver => applied.passed_over += 1,
                     }
                     if let (Some(left), Put::New) = (left, put) {
-                        superchunk.arrived(crate::Arrival { left, at: header.at, attributes: crate::blocks_sum(attributes) });
+                        superchunk.arrived(crate::Arrival { left, at: header.at, attributes: superchunk.kept_sum(header.at) });
                         applied.crossed += 1;
                     }
                 }
-                Instruction::Move { header, from } => match superchunk.put_named(earliest, header, from, None, collision) {
+                Instruction::Move { header, from } => match superchunk.put_named(earliest, header, from, collision) {
                     Put::Stayed => (applied.moves, applied.stayed) = (applied.moves + 1, applied.stayed + 1),
                     Put::PassedOver => applied.passed_over += 1,
                     _ => applied.moves += 1,

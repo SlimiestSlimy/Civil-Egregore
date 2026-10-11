@@ -70,8 +70,7 @@ impl SuperchunkEntities {
     }
 
     /// Moves the entity the tick found on `stood` to `header`'s cell,
-    /// to wake at its tick, with `attributes` -- or, with none given,
-    /// those it has -- its cell being `stood` if it is to stay where
+    /// to wake at its tick, with the attributes it has, its cell being `stood` if it is to stay where
     /// it is. Where it stands is written as anything is, by
     /// compare-and-write: one that already left `stood` this tick is
     /// passed over -- of two moving one entity, the first applied
@@ -79,14 +78,14 @@ impl SuperchunkEntities {
     /// to one `collision` holds, whatever stands there: it stays. The
     /// cell it comes to is set in `collision`, and the one it left is
     /// cleared when the tick is over.
-    pub fn put_named(&mut self, earliest: u64, header: Header, stood: CellIndex, attributes: Option<&[AttributeBlock]>, collision: &mut impl CollisionCells) -> Put {
+    pub fn put_named(&mut self, earliest: u64, header: Header, stood: CellIndex, collision: &mut impl CollisionCells) -> Put {
         if self.left_this_tick.contains_key(&stood) || !self.occupied(stood) {
             return Put::PassedOver;
         }
         if header.at != stood && (self.named_or_taken(header.at) || collision.held(header.at)) {
-            return self.put(earliest, Header { at: stood, ..header }, stood, attributes).stayed();
+            return self.put(earliest, Header { at: stood, ..header }, stood).stayed();
         }
-        let (to, put) = (header.at, self.put(earliest, header, stood, attributes));
+        let (to, put) = (header.at, self.put(earliest, header, stood));
         if put == Put::Moved {
             self.left_this_tick.insert(stood, Some(to));
             collision.hold(to);
@@ -111,7 +110,7 @@ impl SuperchunkEntities {
         let Some(header) = self.get(stood).map(|entity| entity.header) else {
             return Put::PassedOver;
         };
-        self.put_named(earliest, Header { at: to, ..header }, stood, None, collision)
+        self.put_named(earliest, Header { at: to, ..header }, stood, collision)
     }
 
     /// Sets the tick the entity the tick found on `stood` next wakes

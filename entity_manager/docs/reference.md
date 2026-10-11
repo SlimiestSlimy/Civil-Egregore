@@ -10,7 +10,7 @@ The simulation ticks them (`../../simulation/`); the design is in
 
 **`entity.rs`**: `EntityType`, the type
 registry's (`../../type_registry/`), handed on; **`Header`** `{kind,
-at, wake}`, `NEVER` -- no ID, the cell names it; **`EntityRef`** `{header, attributes}` --
+at, wake}`, `NEVER` -- no ID, the cell names it; **`EntityRef`** `{header, attributes, kept}` (`attributes` all but its type's default; **`default_attribute()`**, **`attribute_seen(kind)`**, **`attribute_member(kind, offset, bytes)`**, **`kept()`**; `entity_manager.md`, "The default attribute") --
 its attributes' blocks -- with **`attribute(attribute)`**, what one
 holds as its layout, and **`attribute_blocks(kind)`**, one's blocks.
 An entity is not copied to be changed: what is written of it is
@@ -53,7 +53,7 @@ among one search tile's at a time (`SEARCH_TILES`, 16 of 64x64 cells,
 (its header, its attributes' first block and how many); the blocks;
 the garbage count. **`get(at)`**, **`iter`**, **`occupied(place)`**,
 **`in_word_tile(first)`** (the places on a word tile, a run),
-**`make(header, attributes)`** -- a **`Put`**: `New`, or `Refused`, an
+**`make(header, attributes)`** (the attributes as a bucket keeps them, `keep`) -- a **`Put`**: `New`, or `Refused`, an
 entity standing there -- and **`put(header, was, attributes)`**, of
 the entity standing on `was`, with no attributes given those it has
 kept: `InPlace`; `Moved` (**`shift_entity`**) to its cell if that is

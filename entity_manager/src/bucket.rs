@@ -3,7 +3,7 @@
 //! one entity, enforced here (`docs/entity_manager.md`, "A chunk's
 //! bucket").
 
-use crate::attributes::{find_attribute, write_attribute_bytes, AttributeBlock, AttributeType};
+use crate::attributes::{default_kept, find_attribute, write_attribute_bytes, write_bytes, write_default, AttributeBlock, AttributeType};
 use crate::entity::{EntityRef, Header};
 use coordinates::CellIndex;
 use utilities::cache::prefetch;
@@ -36,10 +36,13 @@ pub(crate) fn place(cell: CellIndex) -> u16 {
 struct StoredEntity {
     /// The entity's fixed part.
     header: Header,
-    /// Where its attributes' blocks start in the list.
+    /// Where its blocks start in the list.
     first: u32,
     /// How many blocks they are.
-    count: u32,
+    count: u16,
+    /// How many of them, the first, are its type's default
+    /// attribute, kept without its type: 0 if its type has none.
+    default_blocks: u16,
 }
 
 /// What putting an entity in a bucket did.
@@ -148,7 +151,8 @@ impl Bucket {
         self.index_of(place).1
     }
 
-    /// Makes `header`'s entity on its cell, with `attributes`: new, or
+    /// Makes `header`'s entity on its cell, with `attributes` as a
+    /// bucket keeps them ([`crate::attributes::keep`]): new, or
     /// refused, an entity standing there
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
     pub(crate) fn make(&mut self, header: Header, attributes: &[AttributeBlock]) -> Put {
@@ -158,7 +162,9 @@ impl Bucket {
         };
         self.places.insert(index, to);
         self.tile_starts[search_tile(to) + 1..].iter_mut().for_each(|start| *start += 1);
-        self.stored.insert(index, StoredEntity { header, first: self.attributes.len() as u32, count: attributes.len() as u32 });
+        let default_blocks = default_kept(header.kind).map_or(0, |default| default.blocks as u16);
+        debug_assert!(attributes.len() >= default_blocks as usize && attributes.len() <= u16::MAX as usize, "an entity's blocks as a bucket keeps them");
+        self.stored.insert(index, StoredEntity { header, first: self.attributes.len() as u32, count: attributes.len() as u16, default_blocks });
         self.attributes.extend_from_slice(attributes);
         Put::New
     }
@@ -203,7 +209,7 @@ impl Bucket {
             return;
         }
         self.garbage += stored.count as usize;
-        (stored.first, stored.count) = (self.attributes.len() as u32, attributes.len() as u32);
+        (stored.first, stored.count) = (self.attributes.len() as u32, attributes.len() as u16);
         self.attributes.extend_from_slice(attributes);
         self.sweep();
     }
@@ -218,9 +224,14 @@ impl Bucket {
             return false;
         };
         let (first, count) = (self.stored[index].first as usize, self.stored[index].count as usize);
-        let (was, start) = match find_attribute(&self.attributes[first..first + count], kind) {
-            Ok(found) => (first + found.start..first + found.end, self.attributes.len()),
-            Err(at) => (first + at..first + at, self.attributes.len()),
+        // The type's default attribute is written where it is kept, its type left off, and never removed.
+        let others = first + self.stored[index].default_blocks as usize;
+        if let Some(default) = default_kept(self.stored[index].header.kind).filter(|default| others > first && default.kind.identity() == kind.identity()) {
+            return write_default(&mut self.attributes[first..others], default, blocks);
+        }
+        let (was, start) = match find_attribute(&self.attributes[others..first + count], kind) {
+            Ok(found) => (others + found.start..others + found.end, self.attributes.len()),
+            Err(at) => (others + at..others + at, self.attributes.len()),
         };
         if was.len() == blocks.len() {
             self.attributes[was].copy_from_slice(blocks);
@@ -230,7 +241,7 @@ impl Bucket {
         self.attributes.extend_from_slice(blocks);
         self.attributes.extend_from_within(was.end..first + count);
         let stored = &mut self.stored[index];
-        (stored.first, stored.count) = (start as u32, (self.attributes.len() - start) as u32);
+        (stored.first, stored.count) = (start as u32, (self.attributes.len() - start) as u16);
         self.garbage += count;
         self.sweep();
         true
@@ -246,10 +257,15 @@ impl Bucket {
             return false;
         };
         let (first, count) = (self.stored[index].first as usize, self.stored[index].count as usize);
-        let Ok(found) = find_attribute(&self.attributes[first..first + count], kind) else {
+        let others = first + self.stored[index].default_blocks as usize;
+        // A member of the type's default attribute is where it would be were its type kept before it.
+        if others > first && default_kept(self.stored[index].header.kind).is_some_and(|default| default.kind.identity() == kind.identity()) {
+            return offset >= 8 && write_bytes(&mut self.attributes[first..others], offset - 8, bytes, value);
+        }
+        let Ok(found) = find_attribute(&self.attributes[others..first + count], kind) else {
             return false;
         };
-        write_attribute_bytes(&mut self.attributes[first + found.start..first + found.end], offset, bytes, value)
+        write_attribute_bytes(&mut self.attributes[others + found.start..others + found.end], offset, bytes, value)
     }
 
     /// Sets the tick the entity standing on the cell at `place` next
@@ -320,7 +336,8 @@ impl Bucket {
     #[inline]
     fn entity(&self, stored: &StoredEntity) -> EntityRef<'_> {
         let first = stored.first as usize;
-        EntityRef { header: stored.header, attributes: &self.attributes[first..first + stored.count as usize] }
+        let kept = &self.attributes[first..first + stored.count as usize];
+        EntityRef { header: stored.header, attributes: &kept[stored.default_blocks as usize..], kept }
     }
 
     /// Sweeps the garbage out of the list of blocks, once there is as

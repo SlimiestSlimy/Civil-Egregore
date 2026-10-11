@@ -2,8 +2,8 @@
 //! its row written by hand, and checked as the crate is built
 //! ([`first_clash`]): `docs/type_registry.md`, "Why one table".
 
-use crate::layouts::{data_words, Attribute, Layout, SheepState};
-use crate::type_ids::{Bits4, EntityType, LayerType, Wide, Width};
+use crate::layouts::{Attribute, Layout, SheepState, BLOCK_WORDS};
+use crate::type_ids::{AttributeType, Bits4, EntityType, LayerType, Wide, Width};
 
 /// What a registered type is of.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,7 +86,7 @@ const fn entity(name: &'static str, entity_type: EntityType) -> Registered {
 
 /// A row of an attribute.
 const fn attribute<L: Layout>(name: &'static str, attribute: Attribute<L>) -> Registered {
-    Registered { name, kind: Kind::Attribute, number: attribute.attribute_type().number(), width: data_words(L::BLOCKS) as u32 * u64::BITS, varies_in_size: false, default_attribute: 0 }
+    Registered { name, kind: Kind::Attribute, number: attribute.attribute_type().number(), width: L::WORDS as u32 * u64::BITS, varies_in_size: false, default_attribute: 0 }
 }
 
 /// Grass: what a superchunk is generated with in patches, where its
@@ -212,6 +212,44 @@ pub fn named(name: &str) -> Option<&'static Registered> {
 /// any of its cold planes'.
 pub fn of_number(number: u64) -> Option<&'static Registered> {
     REGISTRY.iter().find(|registered| (registered.number..registered.number + registered.numbers()).contains(&number))
+}
+
+/// The entity types registered with a default attribute, each with
+/// that attribute's type and the words its data is, and how many
+/// there are: worked out once, as the crate is built, so that asking
+/// of one is a look down a few rows and no walk of the registry.
+const DEFAULTS: ([(u64, AttributeType, usize); REGISTRY.len()], usize) = {
+    let (mut defaults, mut count, mut row) = ([(0, AttributeType(0), 0); REGISTRY.len()], 0, 0);
+    while row < REGISTRY.len() {
+        let registered = &REGISTRY[row];
+        let mut other = 0;
+        while other < REGISTRY.len() && matches!(registered.kind, Kind::EntityType) && registered.default_attribute != 0 {
+            let attribute = &REGISTRY[other];
+            if matches!(attribute.kind, Kind::Attribute) && attribute.number == registered.default_attribute {
+                let words = (attribute.width / u64::BITS) as usize;
+                defaults[count] = (registered.number, AttributeType::of_blocks(attribute.number, (1 + words).div_ceil(BLOCK_WORDS)), words);
+                count += 1;
+            }
+            other += 1;
+        }
+        row += 1;
+    }
+    (defaults, count)
+};
+
+/// The default attribute of `entity_type`, if it is registered with
+/// one: its type, as any attribute of it would say it, and the words
+/// its data is.
+#[inline]
+pub const fn default_of(entity_type: EntityType) -> Option<(AttributeType, usize)> {
+    let (number, mut row) = (entity_type.number(), 0);
+    while row < DEFAULTS.1 {
+        if DEFAULTS.0[row].0 == number {
+            return Some((DEFAULTS.0[row].1, DEFAULTS.0[row].2));
+        }
+        row += 1;
+    }
+    None
 }
 
 /// The row of the default attribute of `entity_type`, if it is
