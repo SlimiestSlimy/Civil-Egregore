@@ -7,7 +7,7 @@ use instructions::entities::EntitiesBetweenTicks;
 pub use instructions::entity_types::{SheepState, SHEEP, SHEEP_STATE};
 use instructions::simulation_time::SimulationTime;
 use instructions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
-use instructions::{WholeAttribute, area, cells, compare, entities, place_counted, this_tick, walking, CellCartesian, CellIndex, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
+use instructions::{WholeAttribute, Chance, area, cells, compare, entities, place_counted, this_tick, walking, CellCartesian, CellIndex, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
 /// Every time below is said in simulation time, and is ticks only
@@ -21,16 +21,21 @@ pub const STEP_TICKS: u64 = SimulationTime::milliseconds(250).ticks();
 pub const STEP_JITTER: u64 = SimulationTime::milliseconds(62).ticks();
 /// Ticks after a meal a sheep is hungry again at: until then it eats
 /// nothing, though it stands on grass, and sleeps.
-pub const MEAL_TICKS: u64 = SimulationTime::seconds(27).ticks();
+pub const MEAL_TICKS: u64 = MEAL.ticks();
+/// The simulation time from a meal to being hungry again.
+pub const MEAL: SimulationTime = SimulationTime::seconds(27);
 /// Ticks a hungry sheep finds no meal in before it starves.
 pub const STARVE_TICKS: u64 = SimulationTime::seconds(54).ticks();
 /// Cells of grass among the 16 by 16 about a sheep for the pasture
 /// to be lush enough to breed on: a quarter of them
 /// (`docs/entity_rules.md`, "The sheep").
 pub const LUSH_CELLS: u32 = 64;
-/// A grown sheep falls pregnant at one meal on lush pasture in this
-/// many.
-pub const CONCEIVE_ONE_IN: u64 = 5;
+/// The simulation time a grown sheep eating on lush pasture takes to
+/// fall pregnant, on average.
+pub const MEAN_TIME_TO_CONCEIVE: SimulationTime = SimulationTime::seconds(135);
+/// The chance, each meal of a grown sheep on lush pasture, that it
+/// falls pregnant.
+pub const CONCEIVE_CHANCE: Chance = MEAN_TIME_TO_CONCEIVE.chance_each(MEAL);
 /// Ticks of sleep to a sheep's life, on average: before a sleep of so
 /// many ticks it dies of old age at so many in these.
 pub const LIFE_TICKS: u64 = SimulationTime::seconds(675).ticks();
@@ -127,7 +132,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
             bearing = around::pick(this_tick::random(turn), &about, steppable).and_then(|beside| around::cell(at, beside));
             needs = now;
         }
-        None if lush && grown_at.is_none() && this_tick::random(turn).below(CONCEIVE_ONE_IN) == 0 => {
+        None if lush && grown_at.is_none() && this_tick::random(turn).chance(CONCEIVE_CHANCE) => {
             state.lamb_due_at = now + GESTATION_TICKS;
             needs = needs.min(now + GESTATION_TICKS);
         }

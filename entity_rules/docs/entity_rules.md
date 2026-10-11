@@ -66,7 +66,8 @@ alone:
   the ticks; it starves `STARVE_TICKS` after it grew hungry.
 - **Breeds**: a grown sheep may fall pregnant on a meal taken on lush
   pasture -- `LUSH_CELLS` of the 16 by 16 cells about it grass, a
-  quarter of them -- at one in `CONCEIVE_ONE_IN`; `GESTATION_TICKS` on,
+  quarter of them -- once in `MEAN_TIME_TO_CONCEIVE` of such eating on
+  average (`CONCEIVE_CHANCE` a meal); `GESTATION_TICKS` on,
   a lamb is born on a free cell beside it, grown `LAMB_TICKS` after.
   Grass left alone covers a third of the dirt and grows fastest
   covering a sixth: so a flock stops growing while the grass still

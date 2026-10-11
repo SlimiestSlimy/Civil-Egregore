@@ -476,6 +476,24 @@ threads`.
   the 99% percent of cases, there will always be worst cases no matter
   what we do, but we to avoid write hazards or inconsisntent entity
   states over everything".
+- NOW, the user, 2026-10-11: "but finish any previous tasks first,
+  and finish moving those 3 one in N things that still need porting
+  to the mean simulation time, rules should also be agnostic to what
+  the sim-second is defined as". DONE for the two that are chances:
+  trees MEAN_TIME_TO_DIE/DIE_CHANCE, sheep MEAN_TIME_TO_CONCEIVE/
+  CONCEIVE_CHANCE (SimulationTime::chance_each). CROWDED is a count
+  of trees, not a chance over time: left, told to the user. All tests
+  pass with the tick rate set to 100 (tried, put back to 256).
+  "finish any previous tasks first": still open below -- the actions
+  crate, mask instructions, the parked items.
+- ASKED MY VIEW, the user, 2026-10-11: "on the type registry, rules
+  should also register there under a new \"rule\" kind or maybe 2
+  rule kinds, idk"; "that way we can also add fields on the entities
+  and planes to register the used rules"; "what do you think of
+  this?". Not to build until the user says how.
+- NEXT, the user, 2026-10-11, after the border work was pushed
+  (b5d7802): "good, now were going to work on climate!". Nothing said
+  of it yet: wait for what the user wants of it.
 - STANDING, the user, 2026-10-11: "hey hey, tests should be seed
   genereated when possible". Done for the two border tests; holds for
   every test from here on.

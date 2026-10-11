@@ -44,4 +44,12 @@ impl SimulationTime {
     pub const fn chance_a_tick(self) -> Chance {
         Chance::one_in(self.ticks)
     }
+
+    /// The chance, each time something happens that happens once in
+    /// `every` on average -- a meal, a sample -- of a thing that
+    /// takes this long on average: `every` of this, the tick rate
+    /// in neither; always, if this is no longer than `every`.
+    pub const fn chance_each(self, every: Self) -> Chance {
+        Chance::of_parts((every.ticks as u128 * utilities::chance::PARTS as u128 / self.ticks as u128) as u64)
+    }
 }
