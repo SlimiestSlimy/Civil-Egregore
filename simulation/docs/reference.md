@@ -72,8 +72,14 @@ member of an attribute, held against that member alone -- two
 writing two members of one attribute both do;
 **`remove(header)`**: under a compare of its being there still.
 **`slot_of`**: the slot of a superchunk, past the neighbours panicking;
-`slot_queued`: the same for something about to be queued, beginning
-the author's segment there. **`seeing_to(at)`**: the rule is seeing to
+`queue_landing_in(superchunk)`: the queue something about to be queued
+goes to, and its slot -- the slot's own queue, or the queue of acts
+over a border (`ACROSS`, the outbox's tenth) once the author's act is
+one, which it becomes here if a compare of another superchunk is open
+(`go_across`: all from the outermost open compare on moved there,
+`Across` `{lands, arrived}` kept beside its segment; `simulation.md`,
+"An act over a border"); `slot_home`: the slot of the outbox's own
+superchunk. **`seeing_to(at)`**: the rule is seeing to
 what is on a cell -- the `author` of what it queues from here on
 (`simulation.md`, "One order, wherever the borders fall").
 `SLOTS` (9): an outbox's slots. A turn's fields: its `superchunk`, its
@@ -100,7 +106,10 @@ bytes it is, in `small`), `write_attribute` (an attribute whole, its
 blocks carried), `remove_attribute`, `write_wake` -- over `on` (an
 opcode on a cell). Read back: `at(superchunk)` its cell,
 `to(superchunk)` the cell its first word is the place of,
-`member()`, `is_a_compare()`, `is_a_write()`. `NO_COUNT`: what a
+`member()`, `is_a_compare()`, `is_a_write()`; `landing_in(slot)` and
+`slot()`: the outbox slot of the superchunk it lands in, four bits of
+`place`; `carried_moved_by(moved)`: the same with what it carries
+beside the queue that much further on. `NO_COUNT`: what a
 write counts under when it counts nothing.
 
 `conditional.rs` (`simulation.md`, "Compare-and-write").
@@ -112,7 +121,7 @@ what was seen at the most; `Compare::at`, the cell it is on;
 **`Compare::attribute(at, kind, seen)`**: an attribute as its blocks
 were seen, their sum.
 **`Turn::compare_from_here(compare)`**: from here on what the rule
-queues for the compare's superchunk is skipped if the compare does
+queues, for whichever superchunk, is skipped if the compare does
 not hold when come to; **`Turn::compare_end()`**: no more.
 `queue(lands, instruction)`: one queued -- a write under no compare
 panics; `open(at, instruction)`, `open_compare(compare)`,
@@ -236,11 +245,12 @@ many, or the disk's refusal.
 
 **`TickReport`** `{writes_applied, instructions_applied,
 instructions_compared, counted_when_applied, rules, computing,
-applying}` -- `instructions_compared` the compares come to that held,
-and those that did not.
+applying, acts_over_a_border}` -- `instructions_compared` the compares come to that held,
+and those that did not; `acts_over_a_border` the authors whose
+instructions were applied to several superchunks at once.
 
 **`threads_for(superchunks)`**: every thread the machine has, no more
-than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived, settled, collision}`:
+than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived, settled, collision, applying_room}`:
 the threads, and what a tick reuses -- an outbox a superchunk, room for
 samples a thread, each superchunk's random stream, and the entities
 crossed into each in a tick -- so a tick allocates nothing once they
@@ -271,6 +281,39 @@ they have and taking back those turned back, how many; and every
 entity named anew, the cells left cleared in the collision plane);
 the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
 offsets in a fixed order.
+
+`tick/applying.rs` (`simulation.md`, "An act over a border"): the
+second phase. **`apply_what_was_queued(dispatcher, superchunks,
+entities, room, superchunk_indices, outboxes, now, collision)`**: what
+each thread applied. `Room`: what it keeps from tick to tick.
+`Applying`: a superchunk as it applies -- itself, its entities, its
+`order`, the `next` of it, whether it has `begun`. `Phase`: what every
+thread is given. `Segmented`: an author's segment queued for a
+superchunk -- the author, whose outbox, which queue, which segment.
+`slots()`: the nine offsets by outbox slot. `Phase::gather(here,
+order)`: what is queued for a superchunk, sorted by author;
+`landed_in(source, lands)`: the hot superchunks an act lands in, and
+how many; `go_on(here, part, applied)`: applies down a superchunk's
+order until it is done or waits at an act, then the superchunks it may
+be waiting for.
+
+`tick/applying/who_goes_on.rs`: which thread goes on with which
+superchunk. `LetGoOn` `{list, lying}`: superchunks let go on after an
+act, a thread's or anyone's -- `put`, `pop`, `take` (one no thread
+took up first), `empty`. On `Phase`: `next_for(part)`, a thread's next
+superchunk -- its own kept, one not begun (`begin`), anyone's
+(`anyones`); `take_up(superchunk, part)`; `let_lie(superchunk, of)`;
+`after_waiting(waited_for, part)`: the superchunk waited for, if the
+thread can take it up, else all it kept given to the thread that has
+it; `give_up_those_kept(part)`; `is_something_to_do(part)`, `sleep`,
+`wake(all)`. `LONGEST_REST`: the longest a thread rests between two
+looks before it sleeps.
+
+In `turn/apply.rs`: `Landing`, where instructions land as they are
+applied (`of_slot(slot)`: a slot's superchunk and entities, if hot) --
+`LandingInOne`, a slot's queue, and `LandingInSeveral`, an act over a
+border; `Queue::jump_over`: over all under a compare that does not
+hold.
 
 ## `simulation_time.rs`
 

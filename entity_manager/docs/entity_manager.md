@@ -91,7 +91,7 @@ into a run of words first, on the stack too. A member alone is read
 and written where it lies (`attribute_bytes`,
 `write_attribute_bytes`).
 
-**What it costs.** A sheep's one attribute is four blocks, 64 bytes
+**What it costs.** A sheep's one attribute is three blocks, 48 bytes
 beside its 24-byte header, and not aligned to a cache line: it is
 asked of memory ahead a line and the next. Blocks are copied whole when an entity is put, crosses or is
 saved; a member written in a tick is written where it lies, nothing

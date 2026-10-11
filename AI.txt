@@ -363,46 +363,63 @@ registration". BUILT: an attribute's ID is supertype (8 bits), number
 (52), blocks less one (4); a varying type registers the four bits 0
 and each attribute of it keeps its length there
 (AttributeType::with_blocks, identity); Registered::varies_in_size.
-Planes and entity types keep their IDs. MY READING to check with the
-user: "less one" (so 16 blocks fit four bits); number 0 is no
-attribute's.
+Planes and entity types keep their IDs. CONFIRMED by the user: "yes, less one"; number 0 = "type id all
+zeores" is no attribute's; default compare: "both are fine by me".
 OPEN, SAID TO THE USER, NOT DECIDED:
 - Whole-attribute compare (by sum) is still what set_attribute queues;
   the member compare is there (Turn::set_attribute_member). Which is
   the default was asked and not answered.
 
---- NEXT: AN ENTITY'S ACT OVER A BORDER ---
-The user: "settle crossings is the secret sauce we need to make
-actions superchunk agnostic"; multi cell entities soon, "that span
-multiple superchunks. up to 4 if in the corners and never more"; "we
-make actions and instructions completely oblivious to superchunk
-boundaries"; "the real restriction is that every entity can only
-interact with one apply queue at a time. thats what we have to take
-advantage of". Their proposal: "when an entity tries to write to a
-second queue in the same tick, all its instructions are filtered from
-the first queue into a separate queue just for that entity, then we
-continue gathering the instructions for that entity into that queue
-so the global neighbor queues stay parallel ... the instruction queue
-for that entity gets evaluated in order as normal but the instruction
-gets dispatched to the relevant superchunk. there will have to be a
-mutex in the entity instruction queue. shared by up to 4 superchunks.
-there might be a better solution". (Earlier: "execute their
-instructions one queue at a time. in queue destination superchunk
-morton order".)
-MY OPINION, GIVEN, NOT ANSWERED: apply such an entity's instructions
-in the order it queued them (destination order would write the mother
-before the lamb's cell is checked, half the time), and not in a pass
-after (who wins a cell would hang on a border): each superchunk
-applies its authors in the one global order and waits at such an
-author until every superchunk it touches has reached it -- cannot
-deadlock, the order being the same in all. A mutex alone does not
-give that order. Then a birth is "cell free -> make lamb, write
-mother", a crossing "cell free -> make there, remove here": delete
-bearing_neighbour, mother_neighbour, lamb_put_stands, the extra wake,
-settle_crossings. Cost unknown until measured: superchunks no longer
-apply independently. DO NOT BUILD before the user says which.
+--- BUILT: AN ENTITY'S ACT OVER A BORDER (2026-10-11) ---
+The user: "we make actions and instructions completely oblivious to
+superchunk boundaries"; "the real restriction is that every entity can
+only interact with one apply queue at a time"; their design: "when an
+entity tries to write to a second queue in the same tick, all its
+instructions are filtered from the first queue into a separate queue
+just for that entity ... evaluated in order as normal but the
+instruction gets dispatched to the relevant superchunk. there will
+have to be a mutex ... shared by up to 4 superchunks"; "try mine
+first, make adversarial tests to see worst case behaviour for
+profiling, and then decide to keep it or try something else ...
+superchunk trasnparency for deterministic actions is critical"; of my
+storing the queues back to back, "it wasnt just a tent queue, i said
+per entity" / "but its a decent starting point".
+KEPT, the user's design, with these of mine (told, not confirmed):
+- an author goes to the separate queue only when a compare of one
+  superchunk gates something landing in another, not for any write to
+  a second queue: ungated writes to a neighbour need no order beyond
+  the one all share;
+- the per-entity queues lie back to back in the outbox's tenth queue,
+  a segment and an arrival count each;
+- order: every superchunk goes down one list sorted by author and
+  waits at such an author until all it lands in have come; the last
+  applies it holding the others (the mutex). No deadlock;
+- threads: what waits together becomes one thread's (who_goes_on.rs).
+  Without it the worst case was 3.4x the same acts off the border on
+  12 threads; with it 1.4x. Found by counting, not guessing: an empty
+  segment left behind by the move made every act look like other work;
+- a destination not hot: the compare fails, the write is missed.
+- births are on it: `bear` in sheep.rs; bearing_neighbour,
+  mother_neighbour, lamb_put_stands and the wake to look are gone;
+  SheepState is 3 blocks.
+OPEN, said in the commit: ordinary applying is slower by what the
+second phase now carries (sparse one thread +4%, 16 and 64 superchunks
+on all threads +7% and +9% of applying, +3 to 4% of the tick). Not
+found where yet; a tick with any act has idle threads rest and sleep
+instead of leaving. settle_crossings still stands: a crossing is an
+act now but the entity's move over the border is still settled after.
+Probe: `AI_SCRATCHPAD acts_over_a_border side every stepping ticks
+threads`.
 
 --- THEN ---
+- THE DEFAULT ATTRIBUTE (the user, 2026-10-11): "on the type registry,
+  for entities add an optional \"default atribute\" that is always
+  present if the entity exists so it avoids the 8 bytes of typeid at
+  the beggining, but it has to be fixed size". NEXT. (Of the act
+  over a border: "rememeber to profile" -- done.)
+- STANDING, the user, 2026-10-11: "hey hey, tests should be seed
+  genereated when possible". Done for the two border tests; holds for
+  every test from here on.
 - The `actions` crate: what in `instructions` is many instructions
   (cells::set, spawn, step, walking, seek, around, area, mask) moves
   there; "rules would depend on actions alone".
@@ -464,10 +481,8 @@ apply independently. DO NOT BUILD before the user says which.
   400 ticks). Not from the registry change (census the same as
   09193e7). To make hold on any seed.
 
-- Limits known: a compare must be in the superchunk of what it lets be
-  written (a panic otherwise); another removing an entity as it
-  crosses turns it back; entities of one cell only. All three go with
-  "an entity's act over a border" above.
+- Limits known: another removing an entity as it crosses turns it
+  back; entities of one cell only.
 - A world's stored image of a cooled superchunk is behind its cells
   until the writeback ring is flushed (World::write_back_and_flush_all):
   compare images only after it.

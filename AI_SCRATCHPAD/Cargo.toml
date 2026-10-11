@@ -13,3 +13,6 @@ utilities = { path = "../utilities" }
 worldgen = { path = "../worldgen" }
 bitmap = { path = "../bitmap" }
 chunk_storage = { path = "../chunk_storage" }
+simulation = { path = "../simulation" }
+bitplane_manager = { path = "../bitplane_manager" }
+entity_manager = { path = "../entity_manager" }

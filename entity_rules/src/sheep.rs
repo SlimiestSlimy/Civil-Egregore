@@ -115,33 +115,18 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     // What it next has to wake for, were it to sleep as long as it can.
     let mut needs = if fed { now + MEAL_TICKS } else { hungry_at };
     let grown_at = (was.grown_at != 0).then_some(was.grown_at);
-    // The lamb it put beside it last tick stands there, and is born; or its cell was taken first, and it is pregnant still.
-    if was.bearing_neighbour != 0 {
-        state.bearing_neighbour = 0;
-        if lamb_put_stands(turn, at, was.bearing_neighbour - 1) {
-            state.lamb_due_at = 0;
-            count(turn, done, fed.then_some(at), BIRTHS);
-        }
-    }
-    // Whether it put a lamb this tick: it stays, and wakes the next to see it.
-    let mut bearing = false;
+    // The cell it bears its lamb on this tick, if it does: it stays where it is, the cell not to be the one it steps to.
+    let mut bearing = None;
     match (state.lamb_due_at != 0).then_some(state.lamb_due_at) {
         Some(due) if now < due => needs = needs.min(due),
-        // Eating, it bears at its next wake: a lamb may land in the next superchunk, where the grass under its mother cannot be held against it.
+        // Eating, it bears at its next wake: the meal is one thing to happen whole, the birth another.
         Some(_) if fed => needs = now,
-        // Its lamb is put on a cell seen free beside it; with none, it waits a step's time more.
-        Some(_) => match around::pick(this_tick::random(turn), &about, steppable).and_then(|beside| around::cell(at, beside)) {
-            Some(beside) => {
-                // Beside it on the cell drawn: that taken first, it is pregnant still, and tries the next tick.
-                let wake = next_step(turn);
-                let way = around::way_of(at, beside);
-                let born = SheepState { hungry_at: now + MEAL_TICKS, grown_at: now + LAMB_TICKS, mother_neighbour: around::way_of(beside, at) + 1, ..SheepState::default() };
-                entities::spawn(turn, SHEEP, beside, wake, &WholeAttribute::holding(SHEEP_STATE, born));
-                state.bearing_neighbour = way + 1;
-                bearing = true;
-            }
-            None => needs = now,
-        },
+        // Its lamb is born on a cell seen free beside it, drawn here and queued last ([`bear`]); with none free, or that one taken
+        // first, it is pregnant still, and tries again a step's time on.
+        Some(_) => {
+            bearing = around::pick(this_tick::random(turn), &about, steppable).and_then(|beside| around::cell(at, beside));
+            needs = now;
+        }
         None if lush && grown_at.is_none() && this_tick::random(turn).below(CONCEIVE_ONE_IN) == 0 => {
             state.lamb_due_at = now + GESTATION_TICKS;
             needs = needs.min(now + GESTATION_TICKS);
@@ -154,7 +139,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         None => {}
     }
     // Hungry, it walks; satisfied, it stays, and sleeps until it needs something.
-    let way = if !hungry || bearing {
+    let way = if !hungry || bearing.is_some() {
         None
     } else if roaming {
         // On the way it set off, until its time is up or it comes to the edge of the hot superchunks.
@@ -180,9 +165,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         }
     };
     let to = way.and_then(|way| around::cell(at, way)).unwrap_or(at);
-    let wake = if bearing {
-        now + 1
-    } else if hungry {
+    let wake = if hungry {
         next_step(turn)
     } else {
         next_step(turn).max(needs + this_tick::random(turn).below(STEP_JITTER))
@@ -197,6 +180,9 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
             entities::set_attribute_of(turn, &before, SHEEP_STATE, seen, state);
         }
         entities::step(turn, &before, to, wake);
+        if let Some(beside) = bearing {
+            bear(turn, &before, state, beside);
+        }
     }
     if fed {
         // One of the two is applied, never both: the sheep is written once.
@@ -208,15 +194,23 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     }
 }
 
-/// Whether the lamb the sheep on `at` put last tick, on its
-/// neighbour `way`, stands there: a lamb put that tick, and put by
-/// the sheep on `at` -- not another's, put on the same cell first,
-/// nor a sheep that stepped there.
-fn lamb_put_stands(turn: &Turn, at: CellIndex, way: u32) -> bool {
-    let put_last_tick = this_tick::now(turn) - 1 + LAMB_TICKS;
-    around::cell(at, way)
-        .and_then(|beside| entities::on(turn, beside).filter(|lamb| lamb.header.kind == SHEEP)?.attribute(SHEEP_STATE).map(|lamb| (beside, lamb)))
-        .is_some_and(|(beside, lamb)| lamb.grown_at == put_last_tick && lamb.mother_neighbour == around::way_of(beside, at) + 1)
+/// Queues the sheep `mother`, whose state is `state` once what its
+/// wake queued is applied, bearing its lamb on `beside`: the lamb
+/// made, the mother no longer pregnant and the birth counted, all of
+/// it or none -- under one compare of the mother being as this wake
+/// left it and, within it, one of the lamb's cell being free. So no
+/// lamb is born twice and none is lost, whichever superchunk its
+/// cell is in: the cell taken first, the mother is pregnant still.
+fn bear(turn: &mut Turn, mother: &Header, state: SheepState, beside: CellIndex) {
+    let now = this_tick::now(turn);
+    let (wake, born) = (next_step(turn), SheepState { hungry_at: now + MEAL_TICKS, grown_at: now + LAMB_TICKS, ..SheepState::default() });
+    let delivered = SheepState { lamb_due_at: 0, ..state };
+    compare::from_here(turn, compare::attribute(mother, SHEEP_STATE, Some(state)));
+    entities::make(turn, SHEEP, beside, wake, &WholeAttribute::holding(SHEEP_STATE, born));
+    entities::set_attribute_of(turn, mother, SHEEP_STATE, Some(state), delivered);
+    compare::count(turn, compare::attribute(mother, SHEEP_STATE, Some(delivered)), BIRTHS);
+    entities::made(turn);
+    compare::end(turn);
 }
 
 /// Counts one at `place` for the wake of a sheep: if it is `fed`, on

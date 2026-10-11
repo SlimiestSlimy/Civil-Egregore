@@ -49,7 +49,8 @@ and nothing else").
 **`each_woken(turn, layers, state, each)`**: `each` run on every entity
 waking. **`on(turn, at)`**: the entity that stood on a cell as the
 tick found it -- the cell its name for the tick, there being no ID.
-**`spawn(turn, kind, at, wake, attributes)`**: a new entity. **`sleep(turn, entity, wake)`**: a move to
+**`spawn(turn, kind, at, wake, attributes)`**: a new entity. **`make(turn, kind, at, wake, attributes)`**
+and **`made(turn)`**: the same, what is queued between them happening only if the entity is made. **`sleep(turn, entity, wake)`**: a move to
 where it stands. **`step(turn, entity, to, wake)`**: a move to a
 cell, or none to its own, and its wake. **`set_attribute_of(turn, other, attribute, seen,
 value)`**, **`unset_attribute_of(turn, other, attribute, seen)`**: an

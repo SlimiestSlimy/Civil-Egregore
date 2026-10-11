@@ -7,9 +7,12 @@ name = "AI_SCRATCHPAD"
 version = "0.0.0"
 dependencies = [
  "bitmap",
+ "bitplane_manager",
  "chunk_storage",
  "coordinates",
+ "entity_manager",
  "server",
+ "simulation",
  "type_registry",
  "utilities",
  "worldgen",

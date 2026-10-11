@@ -447,8 +447,12 @@ it (`entity_rules/src/sheep.rs`):
   changes to one entity in a tick, the first to move it wins. Entities
   once had a random 64-bit ID beside the cell; it named nothing the
   cell did not, cost a word an entity and a draw a birth, and is gone.
-  What must know an entity again a tick later keeps what tells it in an
-  attribute: a mother her lamb's neighbour, the lamb the way back.
+  What had to know an entity again a tick later kept what told it in an
+  attribute -- a mother her lamb's neighbour, the lamb the way back --
+  until a compare could gate what lands over a border, and a birth
+  became one thing in one tick (`simulation/docs/simulation.md`, "An
+  act over a border"): the two members, the wake to look and the
+  looking are gone.
 - **A timer wheel a superchunk**: most entities wait most of the time
   -- a person walking steps a cell every 128 ticks or so -- so a tick
   costs the entities waking in it, and nothing for the rest. The wheel
@@ -616,7 +620,8 @@ by the rules: a chunk's bucket has one record a cell.
   acted on in both.) One walking to the edge of the superchunks held
   stays there.
 - **Sheep**: a lamb is born on a cell seen free beside its mother, who
-  waits for one.
+  waits for one; made and counted, and she no longer pregnant, under
+  one compare of that cell -- all of it or none.
 
 Measured against the build before it (`Civil_Egregore server pasture`, 4,000
 sheep a superchunk): 16 superchunks on one thread, 20,000 ticks, 4.07

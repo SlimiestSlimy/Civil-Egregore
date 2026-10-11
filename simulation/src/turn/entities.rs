@@ -75,10 +75,7 @@ impl<'a> Turn<'a> {
     /// Queues the entity on `at` given `attribute` whole, its blocks
     /// carried beside the queue: under whatever compare is open.
     fn queue_attribute_whole(&mut self, at: CellIndex, attribute: &[AttributeBlock]) {
-        let slot = self.slot_queued(at.superchunk());
-        let carried = &mut self.outbox.queues[slot].carried;
-        let first = carried.len() as u32;
-        carried.extend_from_slice(attribute);
+        let first = self.carry(at, attribute);
         self.queue(at, Instruction::write_attribute(at, first, attribute.len() as u32));
     }
 
@@ -229,15 +226,12 @@ impl<'a> Turn<'a> {
     /// another changed it meanwhile, and it stays, asleep, with every
     /// change made to it (`SuperchunkEntities::settle_leavers`).
     fn cross(&mut self, before: &Header, after: Header, attributes: &[AttributeBlock]) {
-        let there = self.slot_queued(after.at.superchunk());
-        let carried = &mut self.outbox.queues[there].carried;
-        let first = carried.len() as u32;
+        self.open(after.at, Instruction::compare_cell_free(after.at));
         // Its type and its wake in a block before its attributes': an instruction has no room for them beside the cell it left.
         let mut head = AttributeBlock([0; BLOCK_WORDS]);
         (head.0[0], head.0[1]) = (after.kind.0, after.wake);
-        carried.push(head);
-        carried.extend_from_slice(attributes);
-        self.open(after.at, Instruction::compare_cell_free(after.at));
+        let first = self.carry(after.at, &[head]);
+        self.carry(after.at, attributes);
         self.queue(after.at, Instruction::cross_entity(after.at, before.at, first, attributes.len() as u32));
         self.close_compare();
         self.queue_under(before.at, Instruction::compare_entity(before.at, before.kind.0), &[Instruction::write_wake(before.at, after.wake)]);
