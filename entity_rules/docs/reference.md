@@ -17,7 +17,7 @@ steps, `MEAL_TICKS` (6,912), `STARVE_TICKS` (13,824),
 what it woke for and sleeps as long as it can. Hungry (past
 `HUNGRY_AT`) and on grass, it eats it, and is hungry again `MEAL_TICKS`
 on; hungry `STARVE_TICKS` with no meal, it dies. Its lamb due, it is
-put on a cell seen free beside it (`around::free_beside`,
+put on a cell open to a step beside it (`around::pick`,
 `entities::spawn`) -- or waited for, and born the tick after if
 it stands beside it (`BEARING`, `entities::stands_beside`), else put
 again; it falls pregnant on a meal on lush pasture

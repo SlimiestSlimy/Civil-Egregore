@@ -1,51 +1,131 @@
-//! The 3x3 cells around a cell as nine bits, row by row from the top
-//! left: cell `(x, y)` at bit `3 * y + x`, the cell itself at `(1, 1)`
-//! -- a layer's, those entities stand on, one free among them, and one
-//! drawn (`docs/instructions.md`, "The shapes").
+//! The cells about a cell: it and its eight neighbours, as bits of
+//! the small tiles they lie in, in Morton order as they lie in their
+//! bitmaps -- a layer's, what is open among them, one drawn -- and the
+//! ways from the cell to each (`docs/instructions.md`, "The shapes").
 
-use crate::cells::corner_about;
 use crate::tiles_about;
+pub use crate::tiles_about::About;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use simulation::Turn;
+use std::ops::{BitAnd, BitOr};
 use utilities::rng::Rng;
 
-/// Cells along the side of the nine.
-pub const SIDE: u32 = 3;
-/// The cell itself: the middle of the nine.
-pub const CENTRE: u16 = 1 << 4;
-/// All nine.
-pub const ALL: u16 = 0o777;
-/// The eight neighbours.
-pub const RING: u16 = ALL & !CENTRE;
+/// The ways from a cell: to each of the nine about it, numbered row
+/// by row from the top left -- the way `3 * down + across`, each 0 to
+/// 2. The name of a neighbour that stays the same wherever the cell
+/// is: what is kept of one from tick to tick.
+pub const WAYS: u32 = 9;
+/// The way from a cell to itself: the middle of the nine.
+pub const HERE: u32 = 4;
 
-/// The 3x3 cells around a cell, of one layer type.
+/// Some of the cells about a cell: a set of them, a bit each, put
+/// together with `&` and `|`. Of the cell it was asked about alone.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Cells(pub(crate) u64);
+
+impl Cells {
+    /// Whether it has no cell.
+    #[inline]
+    pub fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    /// How many cells it has.
+    #[inline]
+    pub fn count(self) -> u32 {
+        self.0.count_ones()
+    }
+
+    /// Its cells that `other` has not.
+    #[inline]
+    pub fn without(self, other: Cells) -> Cells {
+        Cells(self.0 & !other.0)
+    }
+}
+
+impl BitAnd for Cells {
+    type Output = Cells;
+
+    /// The cells both have.
+    #[inline]
+    fn bitand(self, other: Cells) -> Cells {
+        Cells(self.0 & other.0)
+    }
+}
+
+impl BitOr for Cells {
+    type Output = Cells;
+
+    /// The cells either has.
+    #[inline]
+    fn bitor(self, other: Cells) -> Cells {
+        Cells(self.0 | other.0)
+    }
+}
+
+/// The cells about a cell, of one layer type.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Around {
     /// The cells the type holds at.
-    pub set: u16,
+    pub set: Cells,
     /// The cells in hot bitmaps: in the world, and read.
-    pub hot: u16,
+    pub hot: Cells,
 }
 
-/// The cell at bit `bit` of the nine around `at`: none off the world.
-pub fn cell(at: CellIndex, bit: u32) -> Option<CellIndex> {
-    at.offset(bit as i32 % 3 - 1, bit as i32 / 3 - 1)
+/// What is about `at`: asked once, and every set of cells about it
+/// made and read with it.
+#[inline]
+pub fn about(at: CellIndex) -> About {
+    tiles_about::of(at)
 }
 
-/// The bit of `cell`, one of the nine around `at`.
-pub fn bit_of(at: CellIndex, cell: CellIndex) -> u32 {
+impl About {
+    /// The cell itself.
+    #[inline]
+    pub fn centre(&self) -> Cells {
+        Cells(self.centre_word())
+    }
+
+    /// Its eight neighbours, those in the world.
+    #[inline]
+    pub fn ring(&self) -> Cells {
+        Cells(self.ring_word())
+    }
+
+    /// The cell and its neighbours.
+    #[inline]
+    pub fn nine(&self) -> Cells {
+        Cells(self.nine_word())
+    }
+
+    /// The one cell `way` from it: none, off the world.
+    #[inline]
+    pub fn towards(&self, way: u32) -> Cells {
+        Cells(self.way_word(way))
+    }
+}
+
+/// The cell `way` from `at`: none off the world.
+pub fn cell(at: CellIndex, way: u32) -> Option<CellIndex> {
+    at.offset(way as i32 % 3 - 1, way as i32 / 3 - 1)
+}
+
+/// The way from `at` to `cell`, one of the nine about it.
+pub fn way_of(at: CellIndex, cell: CellIndex) -> u32 {
     let (at, cell) = (at.cartesian(), cell.cartesian());
     (cell.y + 1 - at.y) * 3 + cell.x + 1 - at.x
 }
 
-/// The bit of one of `choices`, drawn from `random`: none if there is
-/// none to choose, and then nothing is drawn.
-pub fn pick(random: &mut Rng, choices: u16) -> Option<u32> {
-    if choices == 0 {
+/// The way to one of `choices`, cells `about` a cell, drawn from
+/// `random`: none if there is none to choose, and then nothing is
+/// drawn. Which a draw comes to goes by how the cells lie in their
+/// tiles: any is as likely as another.
+pub fn pick(random: &mut Rng, about: &About, choices: Cells) -> Option<u32> {
+    if choices.is_empty() {
         return None;
     }
-    Some(set_bit_of_rank(choices as u64, random.below(choices.count_ones() as u64) as u32))
+    Some(about.way_of_bit(set_bit_of_rank(choices.0, random.below(choices.count() as u64) as u32)))
 }
 
 /// The set bit of `bits` with `rank` set bits under it.
@@ -58,34 +138,15 @@ pub(crate) fn set_bit_of_rank(bits: u64, rank: u32) -> u32 {
 
 /// One of `wanted` among `open`, if any is, else any of `open`: where
 /// to step when some neighbours are better than others.
-pub fn prefer(random: &mut Rng, wanted: u16, open: u16) -> Option<u32> {
-    pick(random, if wanted & open != 0 { wanted & open } else { open })
+pub fn prefer(random: &mut Rng, about: &About, wanted: Cells, open: Cells) -> Option<u32> {
+    pick(random, about, if (wanted & open).is_empty() { open } else { wanted & open })
 }
 
-/// The 3x3 cells around `at`, of `layer_type`, as the tick found
-/// them: the small tiles about it read ([`crate::tiles_about`]), the
-/// one to four the nine lie in.
-pub fn layer(turn: &Turn, layer_type: LayerType, at: CellIndex) -> Around {
-    let about = tiles_about::of(at);
-    let tiles = tiles_about::layer(turn, layer_type, &about, about.nine());
-    Around { set: about.as_nine(tiles.set), hot: about.as_nine(tiles.hot) }
-}
-
-/// Which of the 3x3 cells around `at` an entity stands on, as the
-/// tick found them -- `at`'s own among them, if one stands there.
-/// Asked when a cell must be had, not before a step, which is turned
-/// back if its cell is taken.
-pub fn occupied(turn: &Turn, at: CellIndex) -> u16 {
-    corner_about(at, SIDE).map_or(0, |corner| {
-        let rows = turn.occupied(corner, SIDE, SIDE);
-        rows[0] | rows[1] << 3 | rows[2] << 6
-    })
-}
-
-/// One of the neighbours of `at` among `open` that no entity stood on
-/// as the tick found them, drawn at random: where to make an entity,
-/// which must have its cell. None if every one is taken.
-pub fn free_beside(turn: &mut Turn, at: CellIndex, open: u16) -> Option<u32> {
-    let free = open & !occupied(turn, at);
-    pick(turn.random(), free)
+/// The cells `about` a cell, of `layer_type`, as the tick found them:
+/// the one to four small tiles they lie in read as they lie
+/// ([`crate::tiles_about`]), under the nine.
+#[inline]
+pub fn layer(turn: &Turn, layer_type: LayerType, about: &About) -> Around {
+    let tiles = tiles_about::layer(turn, layer_type, about, about.nine_word());
+    Around { set: Cells(tiles.set), hot: Cells(tiles.hot) }
 }

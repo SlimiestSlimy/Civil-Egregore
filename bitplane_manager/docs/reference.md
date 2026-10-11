@@ -72,8 +72,13 @@ of its being read; nothing if its bitmap is not hot.
 first, wanted)`** of a `Reader` -- the four small tiles, two by two,
 from the one beginning at `first`, of each type, as a **`SmallTiles`**
 `{set, hot}`: a word in Morton order over their 8x8 cells, a tile 16
-bits of it (`SMALL_TILE`), only the tiles `wanted` has a cell in looked
-up, and its cells alone kept. **`SMALL_TILE_SIDE`** (4),
+bits of it (`SMALL_TILE`), its cells alone kept: in one chunk, the
+bitmap looked up once and the tiles beside and below stepped to on the
+place (`PLACE_X`, `PLACE_Y`, `BESIDE`, `BELOW`); over a chunk's edge,
+each tile `wanted` has a cell in looked up
+(**`small_tiles_over_chunks`**). **`aligned_tile(type, cell, side)`**:
+the words of the aligned tile of 8 to 256 cells a side a cell is in, as
+they lie. **`SMALL_TILE_SIDE`** (4),
 **`SMALL_TILE_CELLS`** (16), **`SMALL_TILES_TOGETHER`** (4).
 
 **`Lookup`**: lookups remembering the last superchunk; one a thread. **`superchunk`** an entry by superchunk

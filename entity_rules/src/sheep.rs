@@ -2,7 +2,7 @@
 //! a meal, its lamb, growing up -- and wakes for that alone; hungry, it
 //! walks to grass, a step a wake (`docs/entity_rules.md`, "The sheep").
 
-use instructions::around::{self, CENTRE, RING};
+use instructions::around;
 use instructions::entities::EntitiesBetweenTicks;
 pub use instructions::entity_types::{Roaming, BEARING, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
 use instructions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
@@ -82,13 +82,14 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     done[WOKEN] += 1;
     let (at, before) = (sheep.header.at, sheep.header);
     let mut sheep = EntityEdit::of(sheep, room);
-    let grass = around::layer(turn, GRASS, at);
-    // The neighbours it may step to: on the hot bitplanes, no wall before them. Where entities stand is not read.
-    let steppable = grass.hot & RING & walking::around_steppable(turn, at);
+    let about = around::about(at);
+    let grass = around::layer(turn, GRASS, &about);
+    // The neighbours it may step to: on the hot bitplanes, nothing standing there, no wall before them.
+    let steppable = grass.hot & walking::around_steppable(turn, &about);
     let hungry_at = sheep.get(HUNGRY_AT).unwrap_or(now);
     let roaming = sheep.get(ROAMING);
     // On its way out of thin pasture it does not stop to eat.
-    let fed = now >= hungry_at && grass.set & CENTRE != 0 && roaming.is_none();
+    let fed = now >= hungry_at && !(grass.set & about.centre()).is_empty() && roaming.is_none();
     if !fed && now >= hungry_at + STARVE_TICKS {
         entities::remove(turn, sheep.header());
         done[DEATHS] += 1;
@@ -102,7 +103,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         // what is held against the grass being gone does instead: the sheep sleeps a step, hungry as it was, and wakes to look again.
         compare::entities_from_here(turn, compare::holds(GRASS, at));
         sheep.set(HUNGRY_AT, now + MEAL_TICKS);
-        if let (false, Some(way)) = (lush, around::pick(this_tick::random(turn), steppable)) {
+        if let (false, Some(way)) = (lush, around::pick(this_tick::random(turn), &about, steppable)) {
             sheep.set(ROAMING, Roaming { until: now + MEAL_TICKS + ROAM_TICKS, neighbour: way });
         }
     }
@@ -112,7 +113,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let grown_at = sheep.get(LAMB);
     // The lamb it put beside it last tick stands there, and is born; or its cell was taken first, and it is pregnant still.
     if let Some(lamb) = sheep.unset(BEARING)
-        && entities::stands_beside(turn, EntityId(lamb), at, RING).is_some()
+        && entities::stands_beside(turn, EntityId(lamb), at).is_some()
     {
         sheep.unset(PREGNANT);
         count(turn, done, fed.then_some(at), BIRTHS);
@@ -124,7 +125,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         // Eating, it bears at its next wake: a lamb may land in the next superchunk, where the grass under its mother cannot be held against it.
         Some(_) if fed => needs = now,
         // Its lamb is put on a cell seen free beside it; with none, it waits a step's time more.
-        Some(_) => match around::free_beside(turn, at, steppable).and_then(|beside| around::cell(at, beside)) {
+        Some(_) => match around::pick(this_tick::random(turn), &about, steppable).and_then(|beside| around::cell(at, beside)) {
             Some(beside) => {
                 // Beside it on the cell drawn: that taken first, it is pregnant still, and tries the next tick.
                 let wake = next_step(turn);
@@ -150,14 +151,14 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         None
     } else if let Some(roaming) = roaming {
         // On the way it set off, until its time is up or it comes to the edge of the hot superchunks.
-        let way = 1 << roaming.neighbour;
-        if now >= roaming.until || steppable & way == 0 {
+        let way = about.towards(roaming.neighbour);
+        if now >= roaming.until || (steppable & way).is_empty() {
             sheep.unset(ROAMING);
         }
-        around::prefer(this_tick::random(turn), way, steppable)
-    } else if grass.set & steppable != 0 {
-        around::pick(this_tick::random(turn), grass.set & steppable)
-    } else if steppable == 0 {
+        around::prefer(this_tick::random(turn), &about, way, steppable)
+    } else if !(grass.set & steppable).is_empty() {
+        around::pick(this_tick::random(turn), &about, grass.set & steppable)
+    } else if steppable.is_empty() {
         // Hemmed in: no step to take, and no path to look for.
         None
     } else {
@@ -166,9 +167,9 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
             Some(found) => {
                 done[PATHS] += 1;
                 done[FAR] += u64::from(found.scale > 0);
-                Some(around::bit_of(at, found.to))
+                Some(around::way_of(at, found.to))
             }
-            None => around::pick(this_tick::random(turn), steppable),
+            None => around::pick(this_tick::random(turn), &about, steppable),
         }
     };
     let to = way.and_then(|way| around::cell(at, way)).unwrap_or(at);

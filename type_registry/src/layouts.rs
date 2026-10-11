@@ -47,8 +47,8 @@ impl Layout for u64 {
 pub struct Roaming {
     /// The tick it roams until: the data's first word.
     pub until: u64,
-    /// The neighbour it steps to, its bit in the 3x3 cells about it:
-    /// the second.
+    /// The neighbour it steps to, by its way -- which of the nine
+    /// cells about it, row by row: the second.
     pub neighbour: u32,
 }
 

@@ -59,11 +59,15 @@ any aligned small tile, are read as one word (`Reader::small_tiles`, a
 `SmallTiles` -- the cells set, and the cells hot), each tile 16 bits of
 it as it lies in its bitmap, the word itself in Morton order over the
 8x8 cells they make. Whoever asks says which cells are wanted, as a
-mask in the same order: a tile the mask has no cell in is not looked
-up, and the rest is ANDed with it. So a cell and its eight neighbours,
-which lie in one to four small tiles, are one to four shifts of a
-bitmap word and an AND -- and whether a layer holds at any of them a
-compare with 0. A window gives the same cells row by row, and pays
+mask in the same order, and what is read is ANDed with it. Where the
+four lie in one chunk -- all but at its far edges -- its bitmap is
+looked up once, and the tiles beside and below are a step on the place
+in it. So a cell and its eight neighbours, which lie in one to four
+small tiles, are a lookup, four shifts of a bitmap word and an AND --
+and whether a layer holds at any of them a compare with 0. A larger
+aligned tile, 8 cells a side to a chunk's 256, is handed over as the
+words it is (`Reader::aligned_tile`): a mask of its side is ANDed with
+them where they lie. A window gives the same cells row by row, and pays
 for the turning; what does not need rows asks for the tiles.
 
 **The far search**: whether a layer holds at any cell of a tile of a
