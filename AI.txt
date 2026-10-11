@@ -480,11 +480,19 @@ B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    actions, instructions is basically the dependency of actions. and
    actions represent more higher level behaviour with more
    complicated compare and write instruction patterns for us".
+   THE NESTING, the user: "fair way of doing it, but i would model
+   the accounting of nesting as a small stack, we push the offsets of
+   compares when encountering them, on finding a skip instruction we
+   save the current tail of the queue minus the popped offset from
+   the stack, that gives the length of that specific compare gated
+   instruction stream". DONE so: close_compare pops and notes the
+   length on the compare itself (not a list read backwards: two
+   compares side by side pop in another order than they are met).
+   NEXT: the fixes (16-byte attribute writes, ~24-byte instructions,
+   no private copy), then the actions crate.
    ANSWERED: "no, rules would depend on actions alone. first do the
    fixes to the instructions. but before anything i want to know how
-   youre doing the nested comparisons" -- explained; WAIT for the
-   user's word on the nesting before the fixes (16-byte attribute
-   writes, ~24-byte instructions, no private copy), then actions.
+   youre doing the nested comparisons" -- explained, see above.
    My reading of the split: instructions = the compares,
    the writes, the end of a compare, and the reads a rule is allowed;
    actions = what is in instructions today that is many of them

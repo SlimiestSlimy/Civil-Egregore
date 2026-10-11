@@ -75,12 +75,15 @@ pub struct Turn<'a> {
     pub(crate) author: u64,
     /// The compare the rule is queuing under, if any.
     pub(crate) comparing: Option<conditional::Compare>,
-    /// The compares open, the outermost first: the cell each is of,
-    /// and which step of its superchunk's queue it is -- where what
-    /// is queued under it is noted.
-    pub(crate) compares_open: [(CellIndex, u32); conditional::COMPARES_WITHIN],
+    /// The stack of compares open, the outermost first: the cell each
+    /// is of, which step of its superchunk's queue it is, and how
+    /// many writes of cells the turn had queued by then.
+    pub(crate) compares_open: [(CellIndex, u32, u32); conditional::COMPARES_WITHIN],
     /// How many are open.
     pub(crate) compares_open_count: usize,
+    /// Writes of cells queued this turn: what a compare closing
+    /// counts those under it from.
+    pub(crate) writes_queued: u32,
     /// The number the rule's first count is counted under when
     /// applied ([`Turn::count_under`]).
     pub(crate) counted_from: u32,
