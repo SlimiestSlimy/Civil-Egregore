@@ -4,7 +4,7 @@ Every type a world has is a `u64` from one namespace: a layer of its
 cells, a wide plane, a type of entity, an attribute an entity carries,
 a rule of the cells, a rule of an entity.
 This crate is where they are all written down, once: one table,
-`REGISTRY`, a row a type -- its name, its kind, its number and its width --
+`REGISTRY`, a row a type -- its name, its registration, its number and its width --
 and the types the IDs are of (`LayerType`, `Wide`, `EntityType`,
 `AttributeType`, `ScaRuleType`, `EntityRuleType`). Function by function: `reference.md`.
 
@@ -12,15 +12,15 @@ and the types the IDs are of (`LayerType`, `Wide`, `EntityType`,
 
 **The first byte of a type ID is the kind of the type ID.** Every ID
 has its kind first, and the kind says how the rest is laid out and
-what a type of it registers. (In the code the first byte is
-`Supertype`, the name it had; `Kind` there is a row's kind, which also
-tells a layer from a wide plane -- two kinds of row under one first
-byte, as both are planes of the cells.) A plane's, an entity type's
+what a type of it registers (`Kind`). What a row registers is its
+**registration** (`Registration`), which also tells a layer from a
+wide plane -- two registrations under one kind, as both are planes of
+the cells. A plane's, an entity type's
 and a rule's:
 
 | byte | holds |
 |---|---|
-| the first (the highest) | its **kind** (`Supertype`): `0x00` an attribute, `0x01` a layer or a wide plane, `0x02` an entity type, `0x03` a rule of the cells, `0x04` a rule of an entity |
+| the first (the highest) | its **kind** (`Kind`): `0x00` an attribute, `0x01` a layer or a wide plane, `0x02` an entity type, `0x03` a rule of the cells, `0x04` a rule of an entity |
 | the six between | its **number**: what its row in the registry is written with (`NUMBERS`, how many there are) |
 | the last (the lowest) | its **size**: bits a cell of a plane -- 1, 2, 4, 8 or 16; 0 of an entity type and of a rule, which hold nothing |
 
@@ -62,8 +62,8 @@ brings, beside these -- and is written as plainly as that will be.
 
 A rule is registered as a type is: a row, an ID of its own kind -- a
 rule of the cells, the stochastic cell automaton's (`ScaRuleType`,
-`Kind::ScaRule`), or a rule of an entity (`EntityRuleType`,
-`Kind::EntityRule`).
+`Registration::ScaRule`), or a rule of an entity (`EntityRuleType`,
+`Registration::EntityRule`).
 
 **Every rule has one master** (`Registered::master`, its number): the
 one plane a rule of the cells is of, the one type of entity an
@@ -159,7 +159,7 @@ of its data, from a few rows worked out as the crate is built,
 default attribute"). An attribute's row says the bits of its data
 exactly, its layout's words, for that.
 
-**What an attribute's type registers**: its name, its kind, whether
+**What an attribute's type registers**: its name, its registration, whether
 its size varies (`Registered::varies_in_size`), and its size if it
 does not. **The ID's last four bits are the length**
 (`AttributeType::of_blocks`, `blocks`): of a fixed type its size, set

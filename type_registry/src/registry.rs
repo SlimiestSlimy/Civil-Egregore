@@ -5,9 +5,9 @@
 use crate::layouts::{Attribute, Layout, SheepState, BLOCK_WORDS};
 use crate::type_ids::{AttributeType, Bits4, EntityRuleType, EntityType, LayerType, ScaRuleType, Wide, Width};
 
-/// What a registered type is of.
+/// What a row registers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kind {
+pub enum Registration {
     /// A layer: a bit a cell.
     Layer,
     /// A wide plane: a number a cell, kept cold as a layer a bit.
@@ -28,7 +28,7 @@ pub struct Registered {
     /// Its name, in words.
     pub name: &'static str,
     /// What it is of.
-    pub kind: Kind,
+    pub registration: Registration,
     /// Its number, what its ID keeps between its first byte and its
     /// last: for a wide plane, its first -- its lowest bit's layer's.
     pub number: u64,
@@ -55,8 +55,8 @@ impl Registered {
     /// How many numbers it takes, from [`Registered::number`] on: a wide
     /// plane one a bit, its cold planes'; anything else one.
     pub const fn numbers(&self) -> u64 {
-        match self.kind {
-            Kind::WidePlane => self.width as u64,
+        match self.registration {
+            Registration::WidePlane => self.width as u64,
             _ => 1,
         }
     }
@@ -70,8 +70,8 @@ impl Registered {
     /// Its layer type, as the hot bitmaps know it -- a wide plane's
     /// with its width -- if it is a layer or a wide plane.
     pub const fn layer_type(&self) -> Option<LayerType> {
-        match self.kind {
-            Kind::Layer | Kind::WidePlane => Some(LayerType::wide(self.number, self.width)),
+        match self.registration {
+            Registration::Layer | Registration::WidePlane => Some(LayerType::wide(self.number, self.width)),
             _ => None,
         }
     }
@@ -79,32 +79,32 @@ impl Registered {
 
 /// A row of a layer of a bit a cell.
 const fn layer(name: &'static str, layer_type: LayerType) -> Registered {
-    Registered { name, kind: Kind::Layer, number: layer_type.number(), width: 1, varies_in_size: false, default_attribute: 0, master: 0 }
+    Registered { name, registration: Registration::Layer, number: layer_type.number(), width: 1, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// A row of a wide plane.
 const fn wide<W: Width>(name: &'static str, plane: Wide<W>) -> Registered {
-    Registered { name, kind: Kind::WidePlane, number: plane.layer_type().number(), width: W::BITS, varies_in_size: false, default_attribute: 0, master: 0 }
+    Registered { name, registration: Registration::WidePlane, number: plane.layer_type().number(), width: W::BITS, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// A row of an entity type, with no default attribute.
 const fn entity(name: &'static str, entity_type: EntityType) -> Registered {
-    Registered { name, kind: Kind::EntityType, number: entity_type.number(), width: 0, varies_in_size: false, default_attribute: 0, master: 0 }
+    Registered { name, registration: Registration::EntityType, number: entity_type.number(), width: 0, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// A row of a rule of the cells, its master the layer `master`.
 const fn sca_rule(name: &'static str, rule: ScaRuleType, master: LayerType) -> Registered {
-    Registered { name, kind: Kind::ScaRule, number: rule.number(), width: 0, varies_in_size: false, default_attribute: 0, master: master.number() }
+    Registered { name, registration: Registration::ScaRule, number: rule.number(), width: 0, varies_in_size: false, default_attribute: 0, master: master.number() }
 }
 
 /// A row of a rule of an entity, its master the entity type `master`.
 const fn entity_rule(name: &'static str, rule: EntityRuleType, master: EntityType) -> Registered {
-    Registered { name, kind: Kind::EntityRule, number: rule.number(), width: 0, varies_in_size: false, default_attribute: 0, master: master.number() }
+    Registered { name, registration: Registration::EntityRule, number: rule.number(), width: 0, varies_in_size: false, default_attribute: 0, master: master.number() }
 }
 
 /// A row of an attribute.
 const fn attribute<L: Layout>(name: &'static str, attribute: Attribute<L>) -> Registered {
-    Registered { name, kind: Kind::Attribute, number: attribute.attribute_type().number(), width: L::WORDS as u32 * u64::BITS, varies_in_size: false, default_attribute: 0, master: 0 }
+    Registered { name, registration: Registration::Attribute, number: attribute.attribute_type().number(), width: L::WORDS as u32 * u64::BITS, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// Grass: what a superchunk is generated with in patches, where its
@@ -207,10 +207,10 @@ pub const fn first_default_amiss(registry: &[Registered]) -> Option<usize> {
             let (mut other, mut sound) = (0, false);
             while other < registry.len() {
                 let attribute = &registry[other];
-                sound |= matches!(attribute.kind, Kind::Attribute) && attribute.number == default && !attribute.varies_in_size;
+                sound |= matches!(attribute.registration, Registration::Attribute) && attribute.number == default && !attribute.varies_in_size;
                 other += 1;
             }
-            if !sound || !matches!(registry[row].kind, Kind::EntityType) {
+            if !sound || !matches!(registry[row].registration, Registration::EntityType) {
                 return Some(row);
             }
         }
@@ -230,14 +230,14 @@ pub const fn first_master_amiss(registry: &[Registered]) -> Option<usize> {
         while other < registry.len() {
             let master = &registry[other];
             sound |= master.number == rule.master
-                && match rule.kind {
-                    Kind::ScaRule => matches!(master.kind, Kind::Layer | Kind::WidePlane),
-                    Kind::EntityRule => matches!(master.kind, Kind::EntityType),
+                && match rule.registration {
+                    Registration::ScaRule => matches!(master.registration, Registration::Layer | Registration::WidePlane),
+                    Registration::EntityRule => matches!(master.registration, Registration::EntityType),
                     _ => false,
                 };
             other += 1;
         }
-        if matches!(rule.kind, Kind::ScaRule | Kind::EntityRule) != sound || (!sound && rule.master != 0) {
+        if matches!(rule.registration, Registration::ScaRule | Registration::EntityRule) != sound || (!sound && rule.master != 0) {
             return Some(row);
         }
         row += 1;
@@ -267,9 +267,9 @@ pub const fn rule_of_id(id: u64) -> Option<&'static Registered> {
     let (cells, entity, mut row) = (ScaRuleType(id), EntityRuleType(id), 0);
     while row < REGISTRY.len() {
         let registered = &REGISTRY[row];
-        let same = match registered.kind {
-            Kind::ScaRule => ScaRuleType::of(registered.number).0 == cells.0,
-            Kind::EntityRule => EntityRuleType::of(registered.number).0 == entity.0,
+        let same = match registered.registration {
+            Registration::ScaRule => ScaRuleType::of(registered.number).0 == cells.0,
+            Registration::EntityRule => EntityRuleType::of(registered.number).0 == entity.0,
             _ => false,
         };
         if same {
@@ -284,7 +284,7 @@ pub const fn rule_of_id(id: u64) -> Option<&'static Registered> {
 pub const RULES_REGISTERED: usize = {
     let (mut count, mut row) = (0, 0);
     while row < REGISTRY.len() {
-        count += matches!(REGISTRY[row].kind, Kind::ScaRule | Kind::EntityRule) as usize;
+        count += matches!(REGISTRY[row].registration, Registration::ScaRule | Registration::EntityRule) as usize;
         row += 1;
     }
     count
@@ -293,14 +293,14 @@ pub const RULES_REGISTERED: usize = {
 /// The row of the master of the rule `rule`, a row of the registry:
 /// the plane or the type of entity it is of.
 pub fn master_of(rule: &Registered) -> Option<&'static Registered> {
-    REGISTRY.iter().find(|registered| rule.master != 0 && registered.number == rule.master && !matches!(registered.kind, Kind::ScaRule | Kind::EntityRule | Kind::Attribute))
+    REGISTRY.iter().find(|registered| rule.master != 0 && registered.number == rule.master && !matches!(registered.registration, Registration::ScaRule | Registration::EntityRule | Registration::Attribute))
 }
 
 /// The rules whose master is the row `master`: those of a plane, or
 /// of a type of entity.
 pub fn rules_of(master: &Registered) -> impl Iterator<Item = &'static Registered> {
     let number = master.number;
-    REGISTRY.iter().filter(move |registered| matches!(registered.kind, Kind::ScaRule | Kind::EntityRule) && registered.master == number)
+    REGISTRY.iter().filter(move |registered| matches!(registered.registration, Registration::ScaRule | Registration::EntityRule) && registered.master == number)
 }
 
 /// The row of the type named `name`, if one is.
@@ -323,9 +323,9 @@ const DEFAULTS: ([(u64, AttributeType, usize); REGISTRY.len()], usize) = {
     while row < REGISTRY.len() {
         let registered = &REGISTRY[row];
         let mut other = 0;
-        while other < REGISTRY.len() && matches!(registered.kind, Kind::EntityType) && registered.default_attribute != 0 {
+        while other < REGISTRY.len() && matches!(registered.registration, Registration::EntityType) && registered.default_attribute != 0 {
             let attribute = &REGISTRY[other];
-            if matches!(attribute.kind, Kind::Attribute) && attribute.number == registered.default_attribute {
+            if matches!(attribute.registration, Registration::Attribute) && attribute.number == registered.default_attribute {
                 let words = (attribute.width / u64::BITS) as usize;
                 defaults[count] = (registered.number, AttributeType::of_blocks(attribute.number, (1 + words).div_ceil(BLOCK_WORDS)), words);
                 count += 1;
@@ -355,8 +355,8 @@ pub const fn default_of(entity_type: EntityType) -> Option<(AttributeType, usize
 /// The row of the default attribute of `entity_type`, if it is
 /// registered with one: the attribute every entity of the type has.
 pub fn default_attribute_of(entity_type: EntityType) -> Option<&'static Registered> {
-    let default = REGISTRY.iter().find(|registered| registered.kind == Kind::EntityType && registered.number == entity_type.number())?.default_attribute;
-    REGISTRY.iter().find(|registered| default != 0 && registered.kind == Kind::Attribute && registered.number == default)
+    let default = REGISTRY.iter().find(|registered| registered.registration == Registration::EntityType && registered.number == entity_type.number())?.default_attribute;
+    REGISTRY.iter().find(|registered| default != 0 && registered.registration == Registration::Attribute && registered.number == default)
 }
 
 /// Every layer type a world's cells have, as the hot bitmaps know

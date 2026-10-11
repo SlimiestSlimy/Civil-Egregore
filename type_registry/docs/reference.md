@@ -4,11 +4,11 @@ The design is in `type_registry.md`.
 
 ## `type_ids.rs`
 
-`type_registry.md`, "The bytes of an ID". **`Supertype`**: the kind of an ID,
+`type_registry.md`, "The bytes of an ID". **`Kind`**: the kind of an ID,
 its first byte -- `Attribute`, `Layer`, `EntityType`, `ScaRule`, `EntityRule`.
-`SUPERTYPE_SHIFT`, `SIZE_BITS`, `SIZE_MOST`: where the first byte and
+`KIND_SHIFT`, `SIZE_BITS`, `SIZE_MOST`: where the first byte and
 the last lie; **`NUMBERS`**: how many numbers the six bytes between
-hold. `type_id(supertype, number, size)` makes an ID; `number_of`,
+hold. `type_id(kind, number, size)` makes an ID; `number_of`,
 `size_of`, `is_of` read one.
 **`LayerType(u64)`**: what a layer represents; **`of_a_bit(number)`** a
 layer, a bit a cell; **`wide(first, bits)`** a
@@ -40,8 +40,8 @@ layout in its type: **`new(number)`**, **`attribute_type`**. **`Member`** `{offs
 
 ## `registry.rs`
 
-**`Kind`**: `Layer`, `WidePlane`, `EntityType`, `Attribute`, `ScaRule`, `EntityRule`.
-**`Registered`** `{name, kind, number, width, varies_in_size, default_attribute, master}`: a row, a rule's `master` the number of the one plane or type of entity it is of (0: no rule), an attribute's
+**`Registration`**: what a row registers -- `Layer`, `WidePlane`, `EntityType`, `Attribute`, `ScaRule`, `EntityRule`.
+**`Registered`** `{name, registration, number, width, varies_in_size, default_attribute, master}`: a row, a rule's `master` the number of the one plane or type of entity it is of (0: no rule), an attribute's
 width the bits of its data, an entity type's `default_attribute` the number of the attribute every entity of it has (0: none; **`with_default(attribute)`** gives a row one); **`numbers`** how many
 numbers it takes from `number` on, **`layer_type`** its layer type if it is of
 the cells. `layer`, `wide`, `entity`, `attribute`, `sca_rule`, `entity_rule`: a row made from its constant. **`REGISTRY`**: the table, written by hand. The constants:

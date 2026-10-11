@@ -46,8 +46,8 @@ what they always do and are not listed.
 
 | word | means | relates to | not |
 |---|---|---|---|
-| **type registry** | the one table of every type a world has -- layer, wide plane, entity type, attribute -- and each rule, of the cells or of an entity, with its master -- a row each: name, kind, number, width; checked as it is built for two rows sharing a number, a name, or a wide plane's range (`type_registry::REGISTRY`) | layer type, entity type, wide plane, type ID | type table |
-| **type ID** | the `u64` a type is known by: its first byte its **kind** (`Supertype` in the code: attribute, layer, entity type, rule of the cells, rule of an entity), its last its **size** (a plane's bits a cell, an attribute's blocks), the six between its **number**, what its row is written with | type registry, layer type | |
+| **type registry** | the one table of every type a world has -- layer, wide plane, entity type, attribute -- and each rule, of the cells or of an entity, with its master -- a row each: name, registration (what the row registers: `Registration`), number, width; checked as it is built for two rows sharing a number, a name, or a wide plane's range (`type_registry::REGISTRY`) | layer type, entity type, wide plane, type ID | type table |
+| **type ID** | the `u64` a type is known by: its first byte its **kind** (`Kind`: attribute, layer, entity type, rule of the cells, rule of an entity), its last its **size** (a plane's bits a cell, an attribute's blocks), the six between its **number**, what its row is written with | type registry, layer type | |
 | **layer type** | what a layer holds -- dirt, grass, a wall -- as a `u64` from the one namespace every type in Civil Egregore is drawn from (`LayerType`) | entity type, attribute type | |
 | **layer** | one layer type over one chunk: a bitmap of which cells hold it | bitmap, bitplane | plane |
 | **bitplane** | one layer type over the whole world: every chunk's layer of that type | layer | |

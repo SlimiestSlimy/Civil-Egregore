@@ -4,12 +4,12 @@
 //!
 //! `cargo test --test fine`
 
-use type_registry::{data_words, default_attribute_of, first_clash, first_default_amiss, first_master_amiss, layer_types, master_of, named, of_number, rule_of_id, rules_of, AttributeType, EntityRuleType, EntityType, Kind, Layout, LayerType, Registered, ScaRuleType, SheepState, GRASS, NUMBERS, REGISTRY, RULES_REGISTERED, RULE_OF_GRASS, RULE_OF_SHEEP, RULE_OF_TREES, SHEEP, SHEEP_STATE, TREE, TREE_STAGE};
+use type_registry::{data_words, default_attribute_of, first_clash, first_default_amiss, first_master_amiss, layer_types, master_of, named, of_number, rule_of_id, rules_of, AttributeType, EntityRuleType, EntityType, Registration, Layout, LayerType, Registered, ScaRuleType, SheepState, GRASS, NUMBERS, REGISTRY, RULES_REGISTERED, RULE_OF_GRASS, RULE_OF_SHEEP, RULE_OF_TREES, SHEEP, SHEEP_STATE, TREE, TREE_STAGE};
 use utilities::rng::Rng;
 
-/// A row of `kind` named `name` at `number`, `width` wide.
-fn row(name: &'static str, kind: Kind, number: u64, width: u32) -> Registered {
-    Registered { name, kind, number, width, varies_in_size: false, default_attribute: 0, master: 0 }
+/// A row registering `registration`, named `name` at `number`, `width` wide.
+fn row(name: &'static str, registration: Registration, number: u64, width: u32) -> Registered {
+    Registered { name, registration, number, width, varies_in_size: false, default_attribute: 0, master: 0 }
 }
 
 /// The registry has no clash; every row is found by its name and by
@@ -29,9 +29,9 @@ fn the_check_finds_every_clash_and_the_registry_has_none() {
     let taken: u64 = REGISTRY.iter().map(Registered::numbers).sum();
     assert_eq!((0..1_000).filter(|&number| of_number(number).is_some()).count() as u64, taken);
 
-    let sound = [row("a", Kind::Layer, 2, 1), row("b", Kind::WidePlane, 4, 4), row("c", Kind::Layer, 8, 1), row("d", Kind::EntityType, 3, 0), row("e", Kind::Attribute, 9, 64)];
+    let sound = [row("a", Registration::Layer, 2, 1), row("b", Registration::WidePlane, 4, 4), row("c", Registration::Layer, 8, 1), row("d", Registration::EntityType, 3, 0), row("e", Registration::Attribute, 9, 64)];
     assert_eq!(first_clash(&sound), None);
-    let clashing = [row("f", Kind::Layer, 4, 1), row("f", Kind::Layer, 7, 1), row("f", Kind::WidePlane, 6, 2), row("f", Kind::Attribute, 3, 64), row("f", Kind::WidePlane, 0, 16), row("a", Kind::Layer, 100, 1), row("f", Kind::WidePlane, 1, 2)];
+    let clashing = [row("f", Registration::Layer, 4, 1), row("f", Registration::Layer, 7, 1), row("f", Registration::WidePlane, 6, 2), row("f", Registration::Attribute, 3, 64), row("f", Registration::WidePlane, 0, 16), row("a", Registration::Layer, 100, 1), row("f", Registration::WidePlane, 1, 2)];
     for clash in clashing {
         for at in 0..=sound.len() {
             let mut table = sound.to_vec();
@@ -40,7 +40,7 @@ fn the_check_finds_every_clash_and_the_registry_has_none() {
             assert!(found >= at.min(1), "{clash:?} at {at}: caught at {found}");
         }
     }
-    assert_eq!(first_clash(&[row("b", Kind::WidePlane, 4, 4), row("f", Kind::Layer, 8, 1), row("g", Kind::Layer, 3, 1)]), None, "beside a wide plane, not in it");
+    assert_eq!(first_clash(&[row("b", Registration::WidePlane, 4, 4), row("f", Registration::Layer, 8, 1), row("g", Registration::Layer, 3, 1)]), None, "beside a wide plane, not in it");
 }
 
 /// The layer types are every layer and wide plane, a wide plane's with
@@ -57,7 +57,7 @@ fn a_default_attribute_is_an_attribute_of_a_fixed_size_of_the_table() {
     assert_eq!(first_default_amiss(REGISTRY), None);
     assert_eq!(default_attribute_of(SHEEP), named("sheep state"));
     assert_eq!(default_attribute_of(EntityType::of(200_000)), None, "a type not registered");
-    assert!(REGISTRY.iter().all(|registered| registered.kind == Kind::EntityType || registered.default_attribute == 0));
+    assert!(REGISTRY.iter().all(|registered| registered.registration == Registration::EntityType || registered.default_attribute == 0));
     let mut random = Rng::new(utilities::seed::counted());
     for _ in 0..200 {
         let rows = 4 + random.below(12) as usize;
@@ -65,20 +65,20 @@ fn a_default_attribute_is_an_attribute_of_a_fixed_size_of_the_table() {
         let mut table: Vec<Registered> = (0..rows)
             .map(|at| {
                 let attribute = at == 1 || (at != 0 && random.below(2) == 0);
-                Registered { varies_in_size: attribute && at != 1 && random.below(3) == 0, ..row("drawn", if attribute { Kind::Attribute } else { Kind::EntityType }, 100 + 10 * at as u64 + random.below(10), 64) }
+                Registered { varies_in_size: attribute && at != 1 && random.below(3) == 0, ..row("drawn", if attribute { Registration::Attribute } else { Registration::EntityType }, 100 + 10 * at as u64 + random.below(10), 64) }
             })
             .collect();
         assert_eq!(first_default_amiss(&table), None, "none has a default");
-        let of_kind = |table: &[Registered], kind: Kind, varying: bool, random: &mut Rng| {
-            let found: Vec<usize> = (0..table.len()).filter(|&at| table[at].kind == kind && table[at].varies_in_size == varying).collect();
+        let of_kind = |table: &[Registered], registration: Registration, varying: bool, random: &mut Rng| {
+            let found: Vec<usize> = (0..table.len()).filter(|&at| table[at].registration == registration && table[at].varies_in_size == varying).collect();
             (!found.is_empty()).then(|| found[random.below(found.len() as u64) as usize])
         };
-        let entity = of_kind(&table, Kind::EntityType, false, &mut random).expect("the first row");
-        let fixed = of_kind(&table, Kind::Attribute, false, &mut random).expect("the second row");
+        let entity = of_kind(&table, Registration::EntityType, false, &mut random).expect("the first row");
+        let fixed = of_kind(&table, Registration::Attribute, false, &mut random).expect("the second row");
         table[entity].default_attribute = table[fixed].number;
         assert_eq!(first_default_amiss(&table), None, "an attribute of a fixed size of the table");
         // Amiss, each in its way: a number no row has, an attribute whose size varies, a row that is no entity type's.
-        let varying = of_kind(&table, Kind::Attribute, true, &mut random);
+        let varying = of_kind(&table, Registration::Attribute, true, &mut random);
         let amiss = [Some((entity, 5)), varying.map(|varying| (entity, table[varying].number)), Some((fixed, table[fixed].number))];
         for (at, default) in amiss.into_iter().flatten() {
             let mut table = table.clone();
@@ -115,7 +115,7 @@ fn a_rule_has_one_master_of_the_kind_its_rule_is_of() {
     // A rule's number read as the other kind's, or as a plane's, is no rule's ID.
     assert_eq!((rule_of_id(EntityRuleType::of(RULE_OF_GRASS.number()).0), rule_of_id(ScaRuleType::of(RULE_OF_SHEEP.number()).0), rule_of_id(GRASS.0), rule_of_id(SHEEP.0)), (None, None, None, None));
     for registered in REGISTRY {
-        let rule = matches!(registered.kind, Kind::ScaRule | Kind::EntityRule);
+        let rule = matches!(registered.registration, Registration::ScaRule | Registration::EntityRule);
         assert_eq!((registered.master != 0, master_of(registered).is_some()), (rule, rule), "{}", registered.name);
         assert_eq!(rules_of(registered).count(), rules.iter().filter(|rule| rule.2 == registered.number).count(), "{}", registered.name);
     }
@@ -123,23 +123,23 @@ fn a_rule_has_one_master_of_the_kind_its_rule_is_of() {
     for _ in 0..200 {
         let rows = 5 + random.below(12) as usize;
         // Numbers apart; the first four a layer, a wide plane, an entity type and an attribute: there is always one of each to name.
-        let kinds = [Kind::Layer, Kind::WidePlane, Kind::EntityType, Kind::Attribute];
+        let kinds = [Registration::Layer, Registration::WidePlane, Registration::EntityType, Registration::Attribute];
         let mut table: Vec<Registered> = (0..rows).map(|at| row("drawn", kinds[if at < 4 { at } else { random.below(4) as usize }], 100 + 10 * at as u64 + random.below(6), 1)).collect();
         assert_eq!(first_master_amiss(&table), None, "no rule, no master");
-        let of_kind = |table: &[Registered], kind: Kind, random: &mut Rng| {
-            let found: Vec<u64> = table.iter().filter(|registered| registered.kind == kind).map(|registered| registered.number).collect();
+        let of_kind = |table: &[Registered], registration: Registration, random: &mut Rng| {
+            let found: Vec<u64> = table.iter().filter(|registered| registered.registration == registration).map(|registered| registered.number).collect();
             found[random.below(found.len() as u64) as usize]
         };
-        let (layer, wide, entity, attribute) = (of_kind(&table, Kind::Layer, &mut random), of_kind(&table, Kind::WidePlane, &mut random), of_kind(&table, Kind::EntityType, &mut random), of_kind(&table, Kind::Attribute, &mut random));
-        let rule = |kind, master| Registered { master, ..row("a rule", kind, 5, 0) };
+        let (layer, wide, entity, attribute) = (of_kind(&table, Registration::Layer, &mut random), of_kind(&table, Registration::WidePlane, &mut random), of_kind(&table, Registration::EntityType, &mut random), of_kind(&table, Registration::Attribute, &mut random));
+        let rule = |registration, master| Registered { master, ..row("a rule", registration, 5, 0) };
         // Sound: a rule of the cells of a layer or of a wide plane, an entity's of an entity type. Put anywhere among the rows.
-        for sound in [rule(Kind::ScaRule, layer), rule(Kind::ScaRule, wide), rule(Kind::EntityRule, entity)] {
+        for sound in [rule(Registration::ScaRule, layer), rule(Registration::ScaRule, wide), rule(Registration::EntityRule, entity)] {
             let mut with = table.clone();
             with.insert(random.below(rows as u64 + 1) as usize, sound);
             assert_eq!(first_master_amiss(&with), None, "{sound:?}");
         }
         // Amiss, each in its way: of the other kind, an attribute, a number no row has, none, its own number.
-        let amiss = [rule(Kind::ScaRule, entity), rule(Kind::EntityRule, layer), rule(Kind::EntityRule, wide), rule(Kind::ScaRule, attribute), rule(Kind::EntityRule, attribute), rule(Kind::ScaRule, 7), rule(Kind::EntityRule, 0), rule(Kind::ScaRule, 5)];
+        let amiss = [rule(Registration::ScaRule, entity), rule(Registration::EntityRule, layer), rule(Registration::EntityRule, wide), rule(Registration::ScaRule, attribute), rule(Registration::EntityRule, attribute), rule(Registration::ScaRule, 7), rule(Registration::EntityRule, 0), rule(Registration::ScaRule, 5)];
         for amiss in amiss {
             let at = random.below(rows as u64 + 1) as usize;
             let mut with = table.clone();
@@ -156,7 +156,7 @@ fn a_rule_has_one_master_of_the_kind_its_rule_is_of() {
 #[test]
 fn the_layer_types_are_the_layers_and_wide_planes() {
     let types = layer_types();
-    assert_eq!(types.len(), REGISTRY.iter().filter(|registered| matches!(registered.kind, Kind::Layer | Kind::WidePlane)).count());
+    assert_eq!(types.len(), REGISTRY.iter().filter(|registered| matches!(registered.registration, Registration::Layer | Registration::WidePlane)).count());
     assert!(types.contains(&GRASS) && types.contains(&TREE_STAGE.layer_type()));
     assert_eq!(TREE_STAGE.layer_type().bits(), named("tree stage").expect("registered").width);
 }
@@ -185,7 +185,7 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
         let entity = EntityType::of(number);
         assert_eq!((entity.number(), entity.0 & 0xFF, entity.0 >> 56), (number, 0, 0x02));
     }
-    // An ID of another supertype is no attribute's: the one namespace is everything's.
+    // An ID of another kind is no attribute's: the one namespace is everything's.
     for other in [GRASS.0, SHEEP.0, TREE_STAGE.layer_type().0, 0] {
         assert!(!AttributeType(other).is_an_attributes());
     }

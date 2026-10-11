@@ -309,13 +309,25 @@ NOW, the user, 2026-10-11, in this order:
 5. "also, type registry could use some better words haha, i hope the
    glossary is updated, thats what must be updated first before any
    docs" -- RULE: the glossary first, then the docs.
+ANSWERED 2026-10-11 (asked): `Supertype` -> `Kind`, the row's enum
+`Kind` -> `Registration`, glossary first; moments (wake, hungry_at,
+now) stay ticks, lengths alone are simulation time; clouds: "Plane
+and shadow only" for the first step (registered at the 8x8 scale,
+stored, saved, drawn; empty until the weather rule is described);
+order: "Words, simplify, clouds".
 THEN: climate ("good, now were going to work on climate!"). Said
 2026-10-11: "ok, now here is the climate stuff, we have a new
 wideplane, of 4 bits per cell as well, its the cloud layer, this
 simply casts a shadow with differing intensity based on the number,
 where 0 is no cloud and 15 is max cloud shadow, but this bitplane
 works in 8x8 sections of the world, ie each cell in this plane covers
-an 8x8 area of the world". Not said yet: what makes and moves clouds.
+an 8x8 area of the world". "im just giving details for now. for each
+8x8 area we have another 3 wideplanes, humidity and temperature. and
+a wind vector, all 4 bits wide (except temperature which is 8)". So
+four planes at the 8x8 scale: cloud 4, humidity 4, temperature 8,
+wind 4 (a vector in 4 bits: how it is laid out to be asked). Not
+said yet: what makes and moves them. Details only so far: do not
+build beyond "plane and shadow" before the user says so.
 WAITING: mask / word-of-cells instructions ("this will have to wait
 for now haha, too much complex stuff"); Morton pathfinding (branch
 wip/morton-search, pathfinding/src/morton.rs, tested equal to the
@@ -411,8 +423,8 @@ ATTRIBUTES AND TYPES
   supertypes so far"; rules are two kinds, SCA rules and entity
   rules; "every rule has a master entity type or plane, regardless of
   what planes or entities the rule reads or writes". In the code the
-  first byte's enum is still `Supertype` and `Kind` a row's kind:
-  told to the user, a rename theirs to ask for.
+  first byte's enum is `Kind`, and what a row registers its
+  `Registration` (renamed 2026-10-11, the user's answer).
 - OPEN, asked, not answered: whether the whole-attribute compare (by
   sum) or the member compare is set_attribute's default ("both are
   fine by me").
