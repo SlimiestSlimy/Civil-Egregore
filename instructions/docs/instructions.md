@@ -185,16 +185,16 @@ guarantees:
 
 ## The same wherever the borders fall
 
-A world shifted is the same world. What an entity does must not hang
-on which chunk or superchunk it stands in, nor on a border running
-between it and what it acts on: the borders are how the world is
-kept, not something in it. Three things make it so
+What an entity does must not hang on which chunk or superchunk it
+stands in, nor on a border running between it and what it acts on,
+nor on how many threads the tick is run on: the borders are how the
+world is kept, not something in it. Three things make it so
 (`../../simulation/docs/simulation.md`, "One order, wherever the
 borders fall"; `../../entity_manager/docs/entity_manager.md`,
 "Instructions", An entity's name in a tick):
 
-- what is queued is applied in the order of its authors' cells over
-  the whole world -- `each_woken` and `cells::each_sampled` say whom
+- what is queued is applied in the Morton order of its authors' cells
+  over the whole world -- `each_woken` and `cells::each_sampled` say whom
   the rule is seeing to (`Turn::seeing_to`) -- not in the order
   superchunks are gone over in;
 - an entity is named, all a tick long, by the cell the tick found it
@@ -202,18 +202,19 @@ borders fall"; `../../entity_manager/docs/entity_manager.md`,
   tick began is no other's that tick;
 - an entity crossing a border takes with it what was written to it.
 
-The test of it (`../tests/fast/shifted.rs`) puts one flock on two
-worlds, on the second some cells east and south so that other borders
-cross it, ticks both, and holds every cell and every walker to be the
-same seen from the flock, tick after tick. All the test needs is in
-the test: the shift, a rule of its own -- walkers that die, eat, lay
+The test of it (`../tests/fast/flock_over_borders.rs`) puts one flock
+on two worlds, over the corner four superchunks meet at and a way
+east and south of it drawn from the seed, ticks one on one thread and
+the other on all, and holds every cell and every walker to be the
+same, tick after tick. (A world shifted whole is not held to be the
+same world: Morton order is not kept by a shift.) All the test needs
+is in the test: where the flock is put, a rule of its own -- walkers that die, eat, lay
 stone and count it under a compare of the cell beside them, write
 their neighbours, make others and count that under the compare of the
 cell being free, and step blind onto each other's cells, over and
 along the borders -- and one generator
 (`utilities::rng::Rng`) every chance in that rule is read from, by the
-tick and the walker, so that chance is the same in both worlds and
-what differs is the simulation's doing. Nothing outside the test is
+tick and the walker. Nothing outside the test is
 made for it.
 
 Chance is another matter, and meant to be: each superchunk draws from
@@ -225,9 +226,6 @@ to goes by how the cells about a cell lie in their small tiles, in
 Morton order; each is as likely wherever the tiles fall. The test's
 walkers draw by the ways' own order instead, in the test's file, as
 they draw from its generator.
-
-Not so yet: a compare must still be in the superchunk of what it lets
-be written.
 
 ## Rules ask instructions, and nothing else
 
@@ -401,7 +399,7 @@ the word's own order: so which neighbour a given draw comes to goes by
 how the tiles fall about the cell. That is the lot's, as a superchunk
 having a lot of its own is; nothing but the draw hangs on it. A test
 that takes the draws out of what it compares draws by the ways' order
-itself (`../tests/fast/shifted.rs`).
+itself (`../tests/fast/flock_over_borders.rs`).
 
 Before and after, by `Civil_Egregore server pasture 1000 333 4000 4 1`,
 a sheep's wake: 233 ns reading windows turned into rows; 272 ns with

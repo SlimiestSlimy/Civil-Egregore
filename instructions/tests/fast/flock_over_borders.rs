@@ -1,16 +1,15 @@
-//! A world shifted is the same world: a flock put some cells east and
-//! south comes to the same, tick after tick, seen from itself -- so
-//! the borders of chunks and superchunks, which the shift moves across
-//! it, change nothing of what is not chance
+//! A flock over the borders of chunks and superchunks comes to the
+//! same on one thread as on all of them, tick after tick: what it
+//! queues is applied in the one order of the world, Morton order of
+//! its authors' cells, however the superchunks are gone over
 //! (`docs/instructions.md`, "The same wherever the borders fall").
 //!
 //! All of it is the test's own, and nothing outside it is made for it:
-//! the shift, the flock's rule, and the one generator every chance of
-//! the rule is read from -- by the tick and the entity, not as the
-//! next number of a stream, since the order entities are seen to in is
-//! the superchunks' and so moves with the borders too.
+//! where the flock is put, drawn from the seed so that other borders
+//! cross it every run, the flock's rule, and the one generator every
+//! chance of the rule is read from, by the tick and the entity.
 //!
-//! `cargo test --test fast shifted`
+//! `cargo test --test fast flock_over_borders`
 
 use crate::tests::{cell, walker, world, STONE, WALKER};
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
@@ -26,8 +25,8 @@ use utilities::rng::Rng;
 
 /// Superchunks along the side of the world.
 const WORLD: u32 = 3;
-/// Cells along the side of the square the flock is put on: unshifted,
-/// its middle the corner four superchunks meet at.
+/// Cells along the side of the square the flock is put on: with no
+/// shift, its middle the corner four superchunks meet at.
 const PASTURE: u32 = 240;
 /// Walkers put.
 const FLOCK: usize = 8000;
@@ -44,14 +43,14 @@ const MADE: Attribute<u64> = Attribute::new(43);
 const READ_PAST: i64 = 320;
 
 /// The cell `(x, y)` cells east and south of the pasture's top left,
-/// the pasture `shift` cells east and south of where it is unshifted.
+/// the pasture `shift` cells east and south of the corner.
 fn pasture_cell(shift: (u32, u32), x: i64, y: i64) -> CellIndex {
     let from = |shift: u32, along: i64| (i64::from(SUPERCHUNK_SIDE_CELLS - PASTURE / 2 + shift) + along) as u32;
     cell(from(shift.0, x), from(shift.1, y))
 }
 
 /// Where `at` is from the top left of the pasture `shift` cells east
-/// and south: the same of a cell and of its like in a world shifted.
+/// and south.
 fn from_pasture(shift: (u32, u32), at: CellIndex) -> (i64, i64) {
     let (origin, at) = (pasture_cell(shift, 0, 0).cartesian(), at.cartesian());
     (i64::from(at.x) - i64::from(origin.x), i64::from(at.y) - i64::from(origin.y))
@@ -71,9 +70,7 @@ fn standing<'a>(turn: &Turn<'a>, at: CellIndex) -> Option<entity_manager::Entity
 
 /// The way to one of `choices`, cells `about` a cell, drawn from
 /// `drawn` by the ways' own order -- not by how the cells lie in their
-/// tiles, as `around::pick` draws: here the same draw must come to the
-/// same neighbour wherever the tiles' edges fall, the draws being what
-/// the test takes out of what it compares.
+/// tiles, as `around::pick` draws.
 fn way_drawn(drawn: &mut Rng, about: &About, choices: Cells) -> Option<u32> {
     let ways: Vec<u32> = (0..around::WAYS).filter(|&way| !(choices & about.towards(way)).is_empty()).collect();
     (!ways.is_empty()).then(|| ways[drawn.below(ways.len() as u64) as usize])
@@ -135,7 +132,7 @@ fn flock(turn: &mut Turn, seed: u64, shift: (u32, u32)) -> u64 {
 
 /// A world with the pasture on it, `shift` cells east and south: stone
 /// on the cells the seed draws, walkers on others it draws, each set
-/// in the collision plane -- the same whatever the shift.
+/// in the collision plane.
 fn pasture(seed: u64, shift: (u32, u32)) -> (BitmapArena, Entities) {
     let (mut arena, mut entities) = world(WORLD);
     let mut codec = LayerCodec::new();
@@ -180,37 +177,39 @@ fn came(arena: &BitmapArena, entities: &Entities, shift: (u32, u32)) -> Came {
     (stone, held, walkers)
 }
 
-/// The same flock here and shifted a drawn way east and south --
-/// across other borders of chunks and superchunks -- is the same
-/// before a tick and after each: every cell of stone, every cell the
-/// collision plane holds -- the walkers' -- every walker.
+/// The same flock, put a drawn way east and south of the corner four
+/// superchunks meet at, is the same on one thread and on every thread
+/// the machine has, before a tick and after each: every cell of
+/// stone, every cell the collision plane holds -- the walkers' --
+/// every walker, and as many acts over a border.
 /// And the flock did all the test is of: walkers crossed borders, were
 /// refused cells and writes, were made and removed and written.
 #[test]
-fn a_world_shifted_comes_to_the_same() {
+fn a_flock_over_borders_comes_to_the_same_on_any_number_of_threads() {
     let seed = utilities::seed::counted();
     let mut random = Rng::new(!seed);
-    let shift = (1 + random.below(u64::from(SUPERCHUNK_SIDE_CELLS) - 1) as u32, 1 + random.below(u64::from(SUPERCHUNK_SIDE_CELLS) - 1) as u32);
-    let ((mut arena, mut entities), (mut arena_there, mut entities_there)) = (pasture(seed, (0, 0)), pasture(seed, shift));
-    let (mut simulation, mut simulation_there) = (Simulation::for_superchunks((WORLD * WORLD) as usize), Simulation::for_superchunks((WORLD * WORLD) as usize));
+    // Under half the pasture each way: the corner four superchunks meet at stays on it, wherever on it.
+    let shift = (random.below(u64::from(PASTURE / 2 - 10)) as u32, random.below(u64::from(PASTURE / 2 - 10)) as u32);
+    let ((mut arena, mut entities), (mut arena_there, mut entities_there)) = (pasture(seed, shift), pasture(seed, shift));
+    let (mut simulation, mut simulation_there) = (Simulation::new(1), Simulation::for_superchunks((WORLD * WORLD) as usize));
     simulation.keep_entities_in(COLLISION);
     simulation_there.keep_entities_in(COLLISION);
-    assert_eq!(came(&arena, &entities, (0, 0)), came(&arena_there, &entities_there, shift), "the same pasture put, shifted {shift:?}");
+    assert_eq!(came(&arena, &entities, shift), came(&arena_there, &entities_there, shift), "the same pasture put, shifted {shift:?}");
     let (mut done, mut refused, mut over_a_border) = (InstructionsApplied::default(), 0, (0, 0));
     for _ in 0..TICKS {
-        let report = simulation.tick(&mut arena, &mut entities, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed, (0, 0)));
+        let report = simulation.tick(&mut arena, &mut entities, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed, shift));
         let report_there = simulation_there.tick(&mut arena_there, &mut entities_there, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed, shift));
         over_a_border = (over_a_border.0 + report.acts_over_a_border, over_a_border.1 + report_there.acts_over_a_border);
         done += report.instructions_applied;
         refused += report.writes_applied.refused;
-        let ((stone, held, walkers), (stone_there, held_there, walkers_there)) = (came(&arena, &entities, (0, 0)), came(&arena_there, &entities_there, shift));
+        let ((stone, held, walkers), (stone_there, held_there, walkers_there)) = (came(&arena, &entities, shift), came(&arena_there, &entities_there, shift));
         // The collision plane holds the cells the walkers stand on, and no other.
         assert_eq!(held, walkers.iter().map(|walker| (walker.0, walker.1)).collect(), "after tick {}", entities.now());
         let stone_apart: Vec<_> = stone.symmetric_difference(&stone_there).chain(held.symmetric_difference(&held_there)).take(4).collect();
         let walkers_apart: Vec<_> = walkers.iter().zip(&walkers_there).filter(|(here, there)| here != there).take(4).collect();
-        assert!(stone_apart.is_empty() && walkers_apart.is_empty() && walkers.len() == walkers_there.len(), "after tick {}, shifted {shift:?}, seed {seed:#x}: {} walkers here and {} there; apart, stone {stone_apart:?}, walkers {walkers_apart:?}; done here {done:?}", entities.now(), walkers.len(), walkers_there.len());
+        assert!(stone_apart.is_empty() && walkers_apart.is_empty() && walkers.len() == walkers_there.len(), "after tick {}, shifted {shift:?}, seed {seed:#x}: {} walkers on one thread and {} on all; apart, stone {stone_apart:?}, walkers {walkers_apart:?}; done here {done:?}", entities.now(), walkers.len(), walkers_there.len());
     }
     assert!(done.crossed > 0 && done.stayed > 0 && done.refused > 0 && done.puts > 0 && done.removes > 0 && done.edits > 0 && refused > 0, "{done:?}, {refused} writes refused");
-    // Acts reached over the borders the unshifted pasture lies on; shifted, over others or -- the pasture come clear of them all -- over none, and still to the same.
-    assert!(over_a_border.0 > 0 && over_a_border.0 != over_a_border.1, "acts over a border: {over_a_border:?}");
+    // Both borders of superchunks cross the pasture wherever it was put, and acts reach over them.
+    assert!(over_a_border.0 > 0 && over_a_border.0 == over_a_border.1, "acts over a border: {over_a_border:?}");
 }

@@ -62,8 +62,9 @@ pub(crate) struct Across {
 /// fall").
 #[derive(Clone, Copy)]
 pub(crate) struct Segment {
-    /// The author: its cell's place in reading order
-    /// ([`Turn::seeing_to`]), or 0 for the superchunk's rule itself.
+    /// The author: its cell's place in Morton order over the world,
+    /// and one ([`Turn::seeing_to`]), or 0 for the superchunk's rule
+    /// itself.
     pub(crate) author: u64,
     /// The first of its instructions.
     pub(crate) instructions: u32,
@@ -206,17 +207,16 @@ impl<'a> Turn<'a> {
     /// Says the rule is seeing to what is on the cell `at` from here
     /// on -- an entity woken, a cell sampled: the author of all it
     /// queues until another is named. What the tick queued is applied
-    /// author by author in the reading order of their cells -- rows
-    /// down, then cells across -- over the whole world, whichever
-    /// superchunk each is in (`docs/simulation.md`, "One order,
-    /// wherever the borders fall"). What is queued with no author
+    /// author by author in the Morton order of their cells over the
+    /// whole world -- an entity's name in the tick is its place --
+    /// whichever superchunk each is in (`docs/simulation.md`, "One
+    /// order, wherever the borders fall"). What is queued with no author
     /// named is the superchunk's rule's own, applied before any
     /// author's.
     pub fn seeing_to(&mut self, at: CellIndex) {
         self.compare_end();
         debug_assert_eq!(self.compares_open_count, 0, "an author named with a compare open");
-        let at = at.cartesian();
-        self.author = (u64::from(at.y) << 32 | u64::from(at.x)) + 1;
+        self.author = at.0 + 1;
         self.across = false;
     }
 

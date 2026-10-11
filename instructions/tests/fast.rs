@@ -17,5 +17,5 @@ mod area;
 #[path = "fast/mask.rs"]
 mod mask;
 
-#[path = "fast/shifted.rs"]
-mod shifted;
+#[path = "fast/flock_over_borders.rs"]
+mod flock_over_borders;
