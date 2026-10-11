@@ -493,6 +493,18 @@ B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    goes; whether masks are the unit of plane instructions; whether an
    entity is named by cell); WAITING before shaping the 16-byte
    writes and the 24-byte instructions, which hang on it.
+   THE LENGTHS OFF THE INSTRUCTION, the user: "aight, we need to
+   store that offsite lol ... one list with 2 elements per value,
+   read backwards as i said, we keep the queue length of the gated
+   instructions. but also the length of nested compare blocks as the
+   second value. we want to use the instruction space to store more
+   ways of comparing and writing. not nesting bookeeping". DONE:
+   Conditional::gated, a Gated {steps, compares_within, writes} a
+   compare, 8 bytes; Segment::compares where an author's begin. Read
+   FORWARDS: an entry is kept as the compare is opened, so the list
+   is in the order compares are met (pushed at close and read
+   backwards, two side by side inside one come out in the wrong
+   order). The third number, writes, is only for counting refused.
    THE NESTING, the user: "fair way of doing it, but i would model
    the accounting of nesting as a small stack, we push the offsets of
    compares when encountering them, on finding a skip instruction we

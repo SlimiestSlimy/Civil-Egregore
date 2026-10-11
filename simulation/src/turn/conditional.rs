@@ -18,6 +18,24 @@ const NO_COUNT: u32 = u32::MAX;
 /// As many compares as are open at once, one within another: the
 /// rule's, one a write is queued under, the write's own.
 pub(crate) const COMPARES_WITHIN: usize = 4;
+
+/// A compare open, on the turn's stack of them.
+#[derive(Clone, Copy)]
+pub(crate) struct CompareOpen {
+    /// The cell it is of.
+    at: CellIndex,
+    /// Which step of its superchunk's queue it is.
+    step: u32,
+    /// Which of the queue's [`Gated`] is its.
+    gated: u32,
+    /// Writes of cells the turn had queued when it was opened.
+    writes_before: u32,
+}
+
+impl CompareOpen {
+    /// None: what a stack with nothing open holds.
+    pub(crate) const NONE: Self = Self { at: CellIndex(0), step: 0, gated: 0, writes_before: 0 };
+}
 /// As many numbers as a tick counts when applied
 /// ([`Turn::count_under`]): a count's is under this.
 pub const COUNTED_WHEN_APPLIED: usize = 256;
@@ -152,18 +170,27 @@ pub(crate) struct Step {
     does: Does,
     /// Instructions queued before it.
     before: u32,
-    /// Of a compare, the steps after it that are under it -- up to
-    /// its end, those of the compares within it among them -- noted
-    /// as the compare is closed: what a compare that does not hold
-    /// jumps over at once, not step by step.
-    under: u16,
-    /// Of a compare, how many of those are writes of cells: counted
+}
+
+/// What is under one compare, kept beside the steps and not in them
+/// -- a step's room is for what it compares and writes: one of these
+/// a compare, in the order the compares are queued, so read in the
+/// order they are come to.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct Gated {
+    /// The steps after the compare that are under it, up to its end:
+    /// what it jumps over if it does not hold.
+    steps: u32,
+    /// The compares within it: as many of these are passed over with
+    /// it.
+    compares_within: u16,
+    /// How many of the steps under it are writes of cells: counted
     /// as refused when jumped over.
-    writes_under: u16,
+    writes: u16,
 }
 
 // A step is small whatever it is: no compare carries a block.
-const _: () = assert!(size_of::<Step>() <= 48 && size_of::<Compare>() <= 40);
+const _: () = assert!(size_of::<Step>() <= 48 && size_of::<Compare>() <= 40 && size_of::<Gated>() == 8);
 
 /// What a superchunk's rule queues for one superchunk beside its
 /// entity instructions -- compares, cell writes, counts -- in the
@@ -172,6 +199,9 @@ const _: () = assert!(size_of::<Step>() <= 48 && size_of::<Compare>() <= 40);
 pub(crate) struct Conditional {
     /// The steps.
     steps: Vec<Step>,
+    /// What is under each compare among them, a compare each, in
+    /// the order queued.
+    gated: Vec<Gated>,
 }
 
 /// What a thread applied in a tick's second phase.
@@ -196,6 +226,12 @@ impl Conditional {
     /// Empties it, keeping its room.
     pub(crate) fn clear(&mut self) {
         self.steps.clear();
+        self.gated.clear();
+    }
+
+    /// How many compares are queued.
+    pub(crate) fn compares(&self) -> usize {
+        self.gated.len()
     }
 
     /// How many steps are queued.
@@ -211,7 +247,8 @@ impl Conditional {
     }
 
     /// Applies the steps at `steps` and those of `instructions` at
-    /// `queued` -- one author's ([`super::Segment`]) -- to
+    /// `queued` -- one author's ([`super::Segment`]), whose compares
+    /// are those from `compares` on -- to
     /// `superchunk` and its `entities`, in the order queued, each as
     /// it is come to. A compare that does not hold has what follows
     /// skipped, writes, instructions and counts alike, up to the next
@@ -219,7 +256,7 @@ impl Conditional {
     /// changed, the next compare is held against. `collision` is the
     /// layer entities are kept in, if the world has one ([`Standing`]).
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn apply(&self, steps: std::ops::Range<usize>, queued: std::ops::Range<usize>, superchunk: &mut Superchunk, entities: &mut SuperchunkEntities, instructions: &Instructions, earliest: u64, collision: Option<LayerType>, applied: &mut Applied) {
+    pub(crate) fn apply(&self, steps: std::ops::Range<usize>, queued: std::ops::Range<usize>, mut compares: usize, superchunk: &mut Superchunk, entities: &mut SuperchunkEntities, instructions: &Instructions, earliest: u64, collision: Option<LayerType>, applied: &mut Applied) {
         let (mut next, mut at_step, last_step) = (queued.start, steps.start, steps.end);
         while at_step < last_step {
             let step = &self.steps[at_step];
@@ -228,14 +265,16 @@ impl Conditional {
             next = step.before as usize;
             match step.does {
                 Does::Compare(compare) => {
+                    let gated = self.gated[compares];
+                    compares += 1;
                     if compare.holds(superchunk, entities) {
                         applied.compared.0 += 1;
                         continue;
                     }
                     applied.compared.1 += 1;
                     // Over all that is under it at once: to its end, or the end of what the author queued.
-                    at_step += step.under as usize;
-                    (applied.writes.writes, applied.writes.refused) = (applied.writes.writes + step.writes_under as usize, applied.writes.refused + u64::from(step.writes_under));
+                    (at_step, compares) = (at_step + gated.steps as usize, compares + gated.compares_within as usize);
+                    (applied.writes.writes, applied.writes.refused) = (applied.writes.writes + gated.writes as usize, applied.writes.refused + u64::from(gated.writes));
                     next = self.steps[..last_step].get(at_step).map_or(queued.end, |after| after.before as usize);
                 }
                 Does::CompareEnd => {}
@@ -275,11 +314,11 @@ impl Turn<'_> {
     /// Queues `does` for the superchunk of the cell `lands`, after
     /// whatever its author queued before.
     fn queue_step(&mut self, lands: CellIndex, does: Does) {
-        debug_assert!(self.compares_open[..self.compares_open_count].iter().all(|open| open.0.superchunk() == lands.superchunk()), "a step under a compare of another superchunk");
+        debug_assert!(self.compares_open[..self.compares_open_count].iter().all(|open| open.at.superchunk() == lands.superchunk()), "a step under a compare of another superchunk");
         let slot = self.slot_queued(lands.superchunk());
         let before = self.outbox.instructions[slot].len() as u32;
         self.writes_queued += u32::from(matches!(does, Does::Write { .. }));
-        self.outbox.conditional[slot].steps.push(Step { does, before, under: 0, writes_under: 0 });
+        self.outbox.conditional[slot].steps.push(Step { does, before });
     }
 
     /// Queues `compare`, open from here: what is queued until it is
@@ -288,27 +327,29 @@ impl Turn<'_> {
     /// of compares open.
     pub(crate) fn open_compare(&mut self, compare: Compare) {
         self.queue_step(compare.at(), Does::Compare(compare));
-        let slot = self.slot_of(compare.at().superchunk());
-        let step = self.outbox.conditional[slot].steps.len() as u32 - 1;
+        let queue = &mut self.outbox.conditional[self.slot_of(compare.at().superchunk())];
+        // Its place among what is under each compare is kept now, in the order the compares are come to, and filled as it is closed.
+        let open = CompareOpen { at: compare.at(), step: queue.steps.len() as u32 - 1, gated: queue.gated.len() as u32, writes_before: self.writes_queued };
+        queue.gated.push(Gated::default());
         assert!(self.compares_open_count < COMPARES_WITHIN, "more compares one within another than a turn keeps");
-        self.compares_open[self.compares_open_count] = (compare.at(), step, self.writes_queued);
+        self.compares_open[self.compares_open_count] = open;
         self.compares_open_count += 1;
     }
 
     /// Closes the compare opened last, popped off the stack: all its
     /// queue holds after it is what is under it -- the queue's end
-    /// less where the compare lies -- noted on it once, here, for a
+    /// less where the compare lies, and the compares queued since,
+    /// those within it -- noted beside the queue ([`Gated`]), for a
     /// compare that does not hold to jump over; then its end is
-    /// queued. One within another is closed first, and is among what
-    /// the outer notes.
+    /// queued. One within another is closed first.
     pub(crate) fn close_compare(&mut self) {
         self.compares_open_count -= 1;
-        let (at, step, writes_before) = self.compares_open[self.compares_open_count];
-        let steps = &mut self.outbox.conditional[self.slot_of(at.superchunk())].steps;
-        let (under, writes_under) = (steps.len() - step as usize - 1, self.writes_queued - writes_before);
-        let compare = &mut steps[step as usize];
-        (compare.under, compare.writes_under) = (u16::try_from(under).expect("more under one compare than a compare notes"), writes_under as u16);
-        self.queue_step(at, Does::CompareEnd);
+        let open = self.compares_open[self.compares_open_count];
+        let queue = &mut self.outbox.conditional[self.slot_of(open.at.superchunk())];
+        let compares_within = u16::try_from(queue.gated.len() - open.gated as usize - 1).expect("more compares within one than is noted");
+        let writes = u16::try_from(self.writes_queued - open.writes_before).expect("more writes under one compare than is noted");
+        queue.gated[open.gated as usize] = Gated { steps: queue.steps.len() as u32 - open.step - 1, compares_within, writes };
+        self.queue_step(open.at, Does::CompareEnd);
     }
 
     /// From here on, what the rule queues for the compare's
