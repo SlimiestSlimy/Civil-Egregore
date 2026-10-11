@@ -8,7 +8,7 @@
 use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{Attribute, AttributeBlock, Entities, EntityId, EntityType, Header, NEVER};
+use entity_manager::{Attribute, AttributeBlock, Entities, EntityType, Header, NEVER};
 use simulation::{Simulation, Turn};
 
 /// The layer type the arena holds: every cell hot, none set.
@@ -43,9 +43,15 @@ fn cell(x: u32, y: u32) -> CellIndex {
     CellCartesian { x: 10 * SUPERCHUNK_SIDE_CELLS + x, y: 10 * SUPERCHUNK_SIDE_CELLS + y }.into()
 }
 
-/// A walker with ID `id` on `at`, waking at `wake`.
-fn walker(id: u64, at: CellIndex, wake: u64) -> Header {
-    Header { id: EntityId(id), kind: WALKER, at, wake }
+/// A walker on `at`, waking at `wake`.
+fn walker(at: CellIndex, wake: u64) -> Header {
+    Header { kind: WALKER, at, wake }
+}
+
+/// The number a test knows the walker on `at` by: 1 the one on
+/// `first`, 2 any other.
+fn number(at: CellIndex, first: CellIndex) -> u64 {
+    if at == first { 1 } else { 2 }
 }
 
 /// Every walker woken steps a cell to the right, to wake next tick.
@@ -65,8 +71,8 @@ fn a_step_carries_no_attributes_and_keeps_them() {
     let (mut arena, mut entities) = world(2);
     let attributes = [AttributeBlock::holding(NAME, 7), AttributeBlock::holding(MARK, 9)];
     // In a chunk, over a chunk's border, over a superchunk's.
-    for (id, x) in [(1, 40), (2, 250), (3, 1020)] {
-        entities.queue_put(walker(id, cell(x, 30), 0), &attributes);
+    for x in [40, 250, 1020] {
+        entities.queue_put(walker(cell(x, 30), 0), &attributes);
     }
     entities.apply();
     let mut simulation = Simulation::new(2);
@@ -75,8 +81,8 @@ fn a_step_carries_no_attributes_and_keeps_them() {
         let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), step_right);
         (moves, puts) = (moves + report.instructions_applied.moves, puts + report.instructions_applied.puts);
     }
-    for (id, x) in [(1, 50), (2, 260), (3, 1030)] {
-        let entity = entities.get(EntityId(id), cell(x, 30)).expect("ten steps on");
+    for x in [50, 260, 1030] {
+        let entity = entities.get(cell(x, 30)).expect("ten steps on");
         assert_eq!(entity.attributes, attributes);
     }
     assert_eq!(entities.len(), 3);
@@ -90,8 +96,8 @@ fn a_step_carries_no_attributes_and_keeps_them() {
 #[test]
 fn a_step_onto_a_taken_cell_is_turned_back() {
     let (mut arena, mut entities) = world(1);
-    entities.queue_put(walker(1, cell(40, 30), 0), &[AttributeBlock::holding(NAME, 1)]);
-    entities.queue_put(walker(2, cell(41, 30), NEVER), &[]);
+    entities.queue_put(walker(cell(40, 30), 0), &[AttributeBlock::holding(NAME, 1)]);
+    entities.queue_put(walker(cell(41, 30), NEVER), &[]);
     entities.apply();
     let mut simulation = Simulation::new(1);
     let (mut stayed, mut moves) = (0, 0);
@@ -100,9 +106,9 @@ fn a_step_onto_a_taken_cell_is_turned_back() {
         (stayed, moves) = (stayed + report.instructions_applied.stayed, moves + report.instructions_applied.moves);
     }
     assert_eq!((stayed, moves), (3, 3), "turned back each tick, and woken the next");
-    let stepper = entities.get(EntityId(1), cell(40, 30)).expect("where it stood");
+    let stepper = entities.get(cell(40, 30)).expect("where it stood");
     assert_eq!((stepper.header.wake, stepper.attribute(NAME)), (3, Some(1)));
-    assert!(entities.get(EntityId(2), cell(41, 30)).is_some());
+    assert!(entities.get(cell(41, 30)).is_some());
 }
 
 /// Entities edit another, an attribute each, in one tick, each saying
@@ -113,26 +119,26 @@ fn a_step_onto_a_taken_cell_is_turned_back() {
 fn entities_edit_another_an_attribute_at_a_time() {
     let (mut arena, mut entities) = world(2);
     // The one edited, in another superchunk than one of the two editing it.
-    let target = walker(9, cell(1030, 30), NEVER);
+    let target = walker(cell(1030, 30), NEVER);
     entities.queue_put(target, &[AttributeBlock::holding(NAME, 7)]);
-    entities.queue_put(walker(1, cell(1020, 30), 0), &[]);
-    entities.queue_put(walker(2, cell(1040, 30), 0), &[]);
+    entities.queue_put(walker(cell(1020, 30), 0), &[]);
+    entities.queue_put(walker(cell(1040, 30), 0), &[]);
     entities.apply();
     let mut simulation = Simulation::new(2);
     let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
-            let kind = if entity.header.id == EntityId(1) { MARK } else { SCAR };
-            turn.set_attribute(&target, kind, None, entity.header.id.0);
+            let number = number(entity.header.at, cell(1020, 30));
+            turn.set_attribute(&target, if number == 1 { MARK } else { SCAR }, None, number);
             turn.step(&entity.header, entity.header.at, NEVER);
         }
         0
     });
     assert_eq!((report.instructions_applied.edits, report.instructions_applied.puts, report.instructions_compared), (2, 0, (2, 0)));
-    let edited = entities.get(target.id, target.at).expect("where it stood");
+    let edited = entities.get(target.at).expect("where it stood");
     assert_eq!(edited.attributes, [AttributeBlock::holding(NAME, 7), AttributeBlock::holding(MARK, 1), AttributeBlock::holding(SCAR, 2)]);
     assert_eq!(edited.header, target);
 
-    entities.queue_put(walker(3, cell(1031, 31), 1), &[]);
+    entities.queue_put(walker(cell(1031, 31), 1), &[]);
     entities.apply();
     simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
         for entity in turn.woken() {
@@ -142,7 +148,7 @@ fn entities_edit_another_an_attribute_at_a_time() {
         }
         0
     });
-    let edited = entities.get(target.id, target.at).expect("where it stood");
+    let edited = entities.get(target.at).expect("where it stood");
     assert_eq!(edited.attributes, [AttributeBlock::holding(NAME, 8), AttributeBlock::holding(SCAR, 2)]);
 }
 
@@ -155,20 +161,20 @@ fn of_two_edits_of_one_attribute_one_is_refused_the_same_on_any_threads() {
     let kept = [1, 4].map(|threads| {
         let (mut arena, mut entities) = world(2);
         // The one edited, and the two editing it from the two superchunks beside its border.
-        let target = walker(9, cell(1030, 30), NEVER);
+        let target = walker(cell(1030, 30), NEVER);
         entities.queue_put(target, &[]);
-        entities.queue_put(walker(1, cell(1020, 30), 0), &[]);
-        entities.queue_put(walker(2, cell(1040, 30), 0), &[]);
+        entities.queue_put(walker(cell(1020, 30), 0), &[]);
+        entities.queue_put(walker(cell(1040, 30), 0), &[]);
         entities.apply();
         let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             for entity in turn.woken() {
-                turn.set_attribute(&target, NAME, None, entity.header.id.0);
+                turn.set_attribute(&target, NAME, None, number(entity.header.at, cell(1020, 30)));
                 turn.step(&entity.header, entity.header.at, NEVER);
             }
             0
         });
         assert_eq!((report.instructions_applied.edits, report.instructions_compared), (1, (1, 1)));
-        entities.get(target.id, target.at).expect("where it stood").attribute(NAME).expect("set")
+        entities.get(target.at).expect("where it stood").attribute(NAME).expect("set")
     });
     assert!(kept[0] == kept[1] && [1, 2].contains(&kept[0]), "{kept:?}");
 }
@@ -183,13 +189,13 @@ fn an_entity_changing_itself_and_another_writing_it_both_stand() {
     let kept = [1, 4].map(|threads| {
         let (mut arena, mut entities) = world(2);
         // The one written, awake, in another superchunk than the one writing it.
-        let target = walker(9, cell(1030, 30), 0);
+        let target = walker(cell(1030, 30), 0);
         entities.queue_put(target, &[AttributeBlock::holding(NAME, 7)]);
-        entities.queue_put(walker(1, cell(1020, 30), 0), &[]);
+        entities.queue_put(walker(cell(1020, 30), 0), &[]);
         entities.apply();
         let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             for entity in turn.woken() {
-                if entity.header.id == target.id {
+                if entity.header.at == target.at {
                     // Itself: its name changed, asleep from here on.
                     turn.update(&entity.header, Header { wake: NEVER, ..entity.header }, &[AttributeBlock::holding(NAME, 8)]);
                 } else {
@@ -201,7 +207,7 @@ fn an_entity_changing_itself_and_another_writing_it_both_stand() {
             0
         });
         assert_eq!((report.instructions_applied.edits, report.instructions_compared), (2, (2, 1)), "the mark and one name applied, the other name refused");
-        let written = entities.get(target.id, target.at).expect("where it stood");
+        let written = entities.get(target.at).expect("where it stood");
         assert_eq!((written.attribute(MARK), written.header.wake), (Some(1), NEVER), "the other's mark, and its own sleep");
         written.attribute(NAME).expect("named")
     });
@@ -217,15 +223,15 @@ fn a_crossing_written_behind_takes_what_was_written() {
         let (mut arena, mut entities) = world(2);
         // On the last cell before the border, to step over it.
         let (edge, across) = (cell(SUPERCHUNK_SIDE_CELLS - 1, 30), cell(SUPERCHUNK_SIDE_CELLS, 30));
-        let crosser = walker(9, edge, 0);
+        let crosser = walker(edge, 0);
         entities.queue_put(crosser, &[AttributeBlock::holding(NAME, 7)]);
-        entities.queue_put(walker(1, cell(1000, 30), 0), &[]);
+        entities.queue_put(walker(cell(1000, 30), 0), &[]);
         entities.apply();
         let mut simulation = Simulation::new(threads);
         let rule = |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             let now = turn.now();
             for entity in turn.woken() {
-                if entity.header.id == crosser.id {
+                if entity.header.at == crosser.at {
                     turn.step(&entity.header, across, now + 1);
                 } else {
                     turn.set_attribute(&crosser, MARK, None, 1);
@@ -236,8 +242,8 @@ fn a_crossing_written_behind_takes_what_was_written() {
         };
         let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), rule);
         assert_eq!((report.instructions_applied.crossed, report.instructions_applied.turned_back, entities.len()), (1, 0, 2), "on {threads} threads");
-        assert!(entities.get(crosser.id, edge).is_none(), "gone from where it stood");
-        let crossed = entities.get(crosser.id, across).expect("across");
+        assert!(entities.get(edge).is_none(), "gone from where it stood");
+        let crossed = entities.get(across).expect("across");
         assert_eq!((crossed.attribute(NAME), crossed.attribute(MARK)), (Some(7), Some(1)), "with all that was written to it");
     }
 }

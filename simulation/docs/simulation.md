@@ -233,14 +233,14 @@ tick).
 ## Entities
 
 `../../entity_manager/src/`: what stands on the cells. An entity is a header -- a
-random 64-bit ID, a type, its cell, the tick it next wakes at -- and
+type, its cell, the tick it next wakes at; no ID, the cell names it -- and
 attributes, typed blocks of 64 bytes added and removed at run time. A superchunk
 holds its entities in a bucket a chunk, sorted by cell -- Morton order
--- then ID, attributes beside, and a timer wheel of when each wakes: a
-tick costs the entities waking in it. An entity is found by its cell
-and ID: its cell's place searched for in a list of the places alone,
-two bytes an entity, then its ID among those on the cell. A wake or
-instruction naming one no longer on that cell -- moved on, or dead -- is
+-- attributes beside, and a timer wheel of when each wakes: a
+tick costs the entities waking in it. An entity is found by its cell:
+its cell's place searched for in a list of the places alone,
+two bytes an entity. A wake or
+instruction naming a cell nobody stands on any more -- moved on, or dead -- is
 passed over; but for the length of a tick an instruction names an
 entity by the cell the tick found it on, and finds it wherever it
 moved to meanwhile.
@@ -282,7 +282,7 @@ stands on one cell.
 
 They tick in the same two phases as the cells. In the first, a
 superchunk's entities waking run the rule (`Turn::woken`) in
-Morton order -- each tick's wakes sorted by cell, then ID, once all are
+Morton order -- each tick's wakes sorted by cell, once all are
 filed -- so they read and write forwards through memory,
 and their instructions -- below -- are queued in the
 outbox slot of the superchunk they land in; in the second, each
@@ -312,7 +312,7 @@ carrying no more than it changes (`../entity_manager/`):
 
 | instruction | queued by | what it does | carries |
 |---|---|---|---|
-| put | `put`, a crossing | an entity made; or put whole in the superchunk it crosses to | its attributes |
+| put | `put`, a crossing | an entity made, on a cell nobody stands on; so too in the superchunk it crosses to | its attributes |
 | move | `step`, `update` | moved to a cell, or left where it stands, to wake at a tick; its attributes as they are | nothing |
 | edit | `set_attribute`, `unset_attribute`, `set_attribute_blocks`, `update` | one attribute set or removed, of any entity in reach -- the rule's own or another -- if it is still as seen | the one attribute's blocks, or none |
 | remove | `remove` | removed | nothing |

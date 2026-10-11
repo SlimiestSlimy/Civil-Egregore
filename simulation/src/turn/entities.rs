@@ -3,15 +3,15 @@
 
 use super::Turn;
 use super::conditional::Compare;
-use entity_manager::{attribute_blocks, each_attribute, push_attribute, Attribute, AttributeBlock, EntityId, EntityRef, Header, Layout, SuperchunkEntities, OCCUPIED_SIDE};
+use entity_manager::{attribute_blocks, each_attribute, push_attribute, Attribute, AttributeBlock, EntityRef, Header, Layout, SuperchunkEntities, OCCUPIED_SIDE};
 use bitplane_manager::Reader;
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, ChunkIndex};
 
 impl<'a> Turn<'a> {
     /// The superchunk's entities waking this tick, as the tick found
-    /// them, in Morton order by cell, then by ID -- the order their
-    /// buckets hold them in. Each that is to wake
+    /// them, in Morton order by cell -- the order their buckets hold
+    /// them in. Each that is to wake
     /// again must be put back with a later wake tick.
     pub fn woken(&self) -> impl Iterator<Item = EntityRef<'a>> + 'a {
         let entities: &'a SuperchunkEntities = self.entities;
@@ -26,14 +26,14 @@ impl<'a> Turn<'a> {
         entities.woken_prefetching(self.now, move |cell| layers.iter().for_each(|&layer_type| reader.prefetch(layer_type, cell)))
     }
 
-    /// The entity whose ID is `id`, standing on `at` -- in any hot
-    /// superchunk -- as the tick found it.
-    pub fn entity(&self, id: EntityId, at: CellIndex) -> Option<EntityRef<'a>> {
-        self.entity_reader.get(id, at)
+    /// The entity standing on `at` -- in any hot superchunk -- as the
+    /// tick found it: the cell is its name for the tick.
+    pub fn entity_on(&self, at: CellIndex) -> Option<EntityRef<'a>> {
+        self.entity_reader.get(at)
     }
 
     /// The entities on `chunk` -- in any hot superchunk -- as the tick
-    /// found them, in Morton order by cell, then by ID; `None` if its
+    /// found them, in Morton order by cell; `None` if its
     /// superchunk is not hot.
     pub fn entities_in(&self, chunk: ChunkIndex) -> Option<impl Iterator<Item = EntityRef<'a>> + 'a> {
         self.entity_reader.chunk(chunk)
@@ -47,18 +47,13 @@ impl<'a> Turn<'a> {
         self.entity_reader.occupied(origin, width, height)
     }
 
-    /// A new entity's ID, drawn from the superchunk's random numbers.
-    pub fn new_id(&mut self) -> EntityId {
-        EntityId(self.random.draw())
-    }
-
-    /// Queues putting `header`'s entity -- made, or changed where it
-    /// stands -- with `attributes`, sorted by type, to wake after this
-    /// tick. A new one whose cell is taken by then is not put.
+    /// Queues making `header`'s entity on its cell, with `attributes`,
+    /// sorted by type, to wake after this tick. Its cell taken by
+    /// then, it is not made.
     pub fn put(&mut self, header: Header, attributes: &[AttributeBlock]) {
         debug_assert!(header.wake > self.now, "an entity put to wake at tick {}, not after {}", header.wake, self.now);
         let slot = self.slot_queued(header.at.superchunk());
-        self.outbox.instructions[slot].put(header, header.at, attributes);
+        self.outbox.instructions[slot].put(header, attributes);
     }
 
     /// Queues `entity` stepping to `to` -- its own cell to sleep where
@@ -71,7 +66,7 @@ impl<'a> Turn<'a> {
         if entity.at.superchunk() == to.superchunk() {
             let slot = self.slot_queued(to.superchunk());
             self.outbox.instructions[slot].move_entity(after, entity.at);
-        } else if let Some(whole) = self.entity_reader.get(entity.id, entity.at) {
+        } else if let Some(whole) = self.entity_reader.get(entity.at) {
             self.cross(entity, after, whole.attributes);
         }
     }
@@ -88,11 +83,11 @@ impl<'a> Turn<'a> {
     pub fn set_attribute_blocks(&mut self, entity: &Header, seen: Option<&[AttributeBlock]>, value: Option<&[AttributeBlock]>) {
         let kind = value.or(seen).expect("an attribute seen or set")[0].kind();
         // What was seen of it a compare, then the write under it: a write carries none.
-        self.open_compare(Compare::attribute(entity.id, entity.at, kind, seen));
+        self.open_compare(Compare::attribute(entity.at, kind, seen));
         let slot = self.slot_queued(entity.at.superchunk());
         match value {
-            Some(value) => self.outbox.instructions[slot].set_attribute_blocks(entity.id, entity.at, value),
-            None => self.outbox.instructions[slot].unset_attribute(entity.id, entity.at, kind),
+            Some(value) => self.outbox.instructions[slot].set_attribute_blocks(entity.at, value),
+            None => self.outbox.instructions[slot].unset_attribute(entity.at, kind),
         }
         self.close_compare();
     }
@@ -139,7 +134,7 @@ impl<'a> Turn<'a> {
     /// crosses (`docs/simulation.md`, "Entities").
     pub fn update(&mut self, before: &Header, after: Header, attributes: &[AttributeBlock]) {
         debug_assert!(after.wake > self.now, "an entity put to wake at tick {}, not after {}", after.wake, self.now);
-        let seen = self.entity_reader.get(before.id, before.at).map_or(&[][..], |seen| seen.attributes);
+        let seen = self.entity_reader.get(before.at).map_or(&[][..], |seen| seen.attributes);
         self.set_attributes_changed(before, seen, attributes);
         if before.at.superchunk() == after.at.superchunk() {
             let slot = self.slot_queued(after.at.superchunk());
@@ -166,6 +161,6 @@ impl<'a> Turn<'a> {
     /// Queues removing `header`'s entity.
     pub fn remove(&mut self, header: &Header) {
         let slot = self.slot_queued(header.at.superchunk());
-        self.outbox.instructions[slot].remove(header.id, header.at);
+        self.outbox.instructions[slot].remove(header.at);
     }
 }

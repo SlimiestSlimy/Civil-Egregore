@@ -164,13 +164,15 @@ fn sheep_never_step_through_a_wall() {
         // A sheep strayed past the superchunk: the generator asked.
         if across < side && down < side { heights[down * side + across] } else { worldgen::height_shaped(&shape, seed, cell.x, cell.y) }
     };
-    let mut stood: HashMap<u64, coordinates::CellIndex> = made.entities().iter().map(|sheep| (sheep.header.id.0, sheep.header.at)).collect();
+    // Each sheep told from the others by a tag; a lamb, born after, has none, and is not followed.
+    crate::tests::tag_sheep(&mut made);
+    let mut stood: HashMap<u64, coordinates::CellIndex> = made.entities().iter().map(|sheep| (crate::tests::tag(&sheep).expect("tagged"), sheep.header.at)).collect();
     let (mut moved, mut beside_walls) = (0, 0);
     for _ in 0..1_500 {
         made.tick();
         for sheep in made.entities().iter() {
             let at = sheep.header.at;
-            if let Some(was) = stood.insert(sheep.header.id.0, at).filter(|&was| was != at) {
+            if let Some(was) = crate::tests::tag(&sheep).and_then(|tag| stood.insert(tag, at)).filter(|&was| was != at) {
                 let (from, to) = (was.cartesian(), at.cartesian());
                 // The cells of each way round: the straight step's alone, or the diagonal's two corners.
                 let corners = [CellCartesian { x: to.x, y: from.y }, CellCartesian { x: from.x, y: to.y }];

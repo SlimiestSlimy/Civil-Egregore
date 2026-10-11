@@ -41,12 +41,12 @@ Entities read: **`woken()`**, **`woken_reading(layers)`** (the cells
 about each asked of memory ahead) -- its entities waking this tick, in
 Morton order, borrowed from the world as the tick found it, not from
 the turn, so instructions can be queued while going through them;
-**`entity(id, at)`**, **`entities_in(chunk)`**, **`occupied(origin,
+**`entity_on(at)`** (the entity the tick found on a cell: its name for the tick), **`entities_in(chunk)`**, **`occupied(origin,
 width, height)`** (the cells entities stand on, up to `OCCUPIED_SIDE`
 each way, a row a word: cell `(x, y)` from `origin` at bit `x` of row
 `y`). Entities written:
-**`new_id`**; **`put(header, attributes)`**: an entity made or changed
-where it stands, waking after this tick; **`update(before, after,
+**`put(header, attributes)`**: an entity made, on a cell nobody
+stands on by then, waking after this tick; **`update(before, after,
 attributes)`**: changed, and moved to its cell if that is free --
 staying if not; passed over if no longer where the tick found it -- or,
 to another superchunk, crossing; **`step(entity, to, wake)`**: a move,

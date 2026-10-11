@@ -47,10 +47,9 @@ and nothing else").
 ## `entities.rs`
 
 **`each_woken(turn, layers, state, each)`**: `each` run on every entity
-waking. **`stands(turn, id, at)`**: whether an entity stood on a
-cell; **`stands_beside(turn, id, centre, among)`**: which of the
-neighbours it stood on. **`spawn(turn, kind, at, wake, attributes)`**: a new entity,
-its ID drawn and returned. **`sleep(turn, entity, wake)`**: a move to
+waking. **`on(turn, at)`**: the entity that stood on a cell as the
+tick found it -- the cell its name for the tick, there being no ID.
+**`spawn(turn, kind, at, wake, attributes)`**: a new entity. **`sleep(turn, entity, wake)`**: a move to
 where it stands. **`commit(turn, edit, to, wake)`**: an `EntityEdit`'s
 entity moved, each attribute changed written before, held against
 what was seen of it. **`set_attribute_of(turn, other, attribute, seen,
@@ -161,7 +160,7 @@ The words the instructions are asked in: `CellIndex`, `CellCartesian`,
 `SuperchunkIndex`, `NEIGHBOURS`, `SUPERCHUNK_SIDE_CELLS`, `LayerType`,
 `Wide`, `Bits4`, `Attribute`, `AttributeBlock`, `AttributeType`,
 `Layout`, `EntityType`,
-`EntityId`, `Header`, `EntityRef`, `EntityEdit`, `Turn`, `TickReport`,
+`Header`, `EntityRef`, `EntityEdit`, `Turn`, `TickReport`,
 `Rng`, `Chance`.
 
 **`place_counted(counted, name)`**: the place of a name in a rule's

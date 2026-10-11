@@ -7,7 +7,7 @@
 
 use chunk_storage::SuperchunkImage;
 use coordinates::SuperchunkIndex;
-use entity_manager::{AttributeBlock, Header};
+use entity_manager::{set_attribute, Attribute, AttributeBlock, EntityRef, Header};
 use server::{transient_data, World};
 use std::path::PathBuf;
 
@@ -70,6 +70,27 @@ pub fn plant_grass(world: &mut World, at: coordinates::CellCartesian, width: u8,
 /// Puts an entity on `world`, whole: there before the next tick.
 pub fn put_entity(world: &mut World, header: Header, attributes: &[AttributeBlock]) {
     world.put_entity(header, attributes);
+}
+
+/// A test's own attribute: a number a sheep is told from the others
+/// by from a tick to the next -- an entity has no ID, and its cell
+/// names it for a tick alone.
+pub const TAG: Attribute<u64> = Attribute::new(1 << 20);
+
+/// Gives every sheep of `world` a [`TAG`], each its own: taken off the
+/// world and put back with it. A lamb born after has none.
+pub fn tag_sheep(world: &mut World) {
+    let sheep: Vec<(Header, Vec<AttributeBlock>)> = world.entities().iter().map(|sheep| (sheep.header, sheep.attributes.to_vec())).collect();
+    for (tag, (header, mut attributes)) in sheep.into_iter().enumerate() {
+        set_attribute(&mut attributes, TAG, tag as u64);
+        assert_eq!(world.remove_entity(&header).removes, 1);
+        assert_eq!(world.put_entity(header, &attributes).puts, 1);
+    }
+}
+
+/// The [`TAG`] of `sheep`, if it was given one.
+pub fn tag(sheep: &EntityRef) -> Option<u64> {
+    sheep.attribute(TAG)
 }
 
 /// One tick of `rule` alone over `world`'s hot

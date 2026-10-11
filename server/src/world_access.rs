@@ -65,7 +65,7 @@ impl World {
     /// if the collision plane holds its cell for another. Put, its
     /// cell is set there (`docs/server.md`, "The collision plane").
     pub fn put_entity(&mut self, header: Header, attributes: &[AttributeBlock]) -> InstructionsApplied {
-        if self.arena.holds(COLLISION, header.at) == Ok(true) && self.entities.get(header.id, header.at).is_none() {
+        if self.arena.holds(COLLISION, header.at) == Ok(true) && self.entities.get(header.at).is_none() {
             return InstructionsApplied { refused: 1, ..InstructionsApplied::default() };
         }
         self.entities.queue_put(header, attributes);
@@ -79,7 +79,7 @@ impl World {
     /// Removes `header`'s entity from the world, between two ticks,
     /// its cell cleared in the collision plane.
     pub fn remove_entity(&mut self, header: &Header) -> InstructionsApplied {
-        self.entities.queue_remove(header);
+        self.entities.queue_remove(header.at);
         let applied = self.entities.apply();
         if applied.removes > 0 {
             self.write_cells(COLLISION, [Write::cell(header.at, WriteOp::Unset)]);

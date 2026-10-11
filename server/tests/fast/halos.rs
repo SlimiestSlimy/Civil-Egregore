@@ -8,7 +8,7 @@
 use type_registry::GRASS;
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use bitplane_manager::{Write, WriteOp};
-use entity_manager::{AttributeBlock, EntityId, EntityType, Header, NEVER};
+use entity_manager::{AttributeBlock, EntityType, Header, NEVER};
 use server::host::frame::Viewport;
 use server::{about, HaloChange, World, COOL_TICKS, HOT_ENTITY, WARM_TICKS};
 
@@ -60,7 +60,7 @@ fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
     let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), sheep: 4_000, ..server::Start::default() });
     let try_both = |world: &mut World, cell| {
         let missed = world.write_cells(GRASS, [Write::cell(cell, WriteOp::Flip)]).missed;
-        (missed, world.put_entity(Header { id: EntityId(u64::MAX), kind: EntityType::of(99), at: cell, wake: NEVER }, &[]).lost)
+        (missed, world.put_entity(Header { kind: EntityType::of(99), at: cell, wake: NEVER }, &[]).lost)
     };
     while world.warming().next().is_none() {
         assert!(world.entities().now() < 60_000, "the halos moved");

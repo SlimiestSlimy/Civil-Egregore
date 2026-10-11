@@ -8,7 +8,7 @@
 use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{Attribute, Entities, EntityId, EntityType, Header, remove_attribute, set_attribute};
+use entity_manager::{Attribute, Entities, EntityType, Header, remove_attribute, set_attribute};
 use simulation::Turn;
 
 
@@ -18,6 +18,8 @@ pub const STONE: LayerType = LayerType::of_a_bit(6);
 pub const WALKER: EntityType = EntityType::of(40);
 /// An attribute counting the times an entity woke.
 pub const WOKEN: Attribute<u64> = Attribute::new(41);
+/// An attribute a test tells its entities apart by: a number each.
+pub const TAG: Attribute<u64> = Attribute::new(43);
 /// An attribute present every other time an entity woke.
 pub const ODD: Attribute<u64> = Attribute::new(42);
 
@@ -42,9 +44,9 @@ pub fn cell(x: u32, y: u32) -> CellIndex {
     CellCartesian { x: 10 * SUPERCHUNK_SIDE_CELLS + x, y: 10 * SUPERCHUNK_SIDE_CELLS + y }.into()
 }
 
-/// A walker with ID `id` on `at`, waking at `wake`.
-pub fn walker(id: u64, at: CellIndex, wake: u64) -> Header {
-    Header { id: EntityId(id), kind: WALKER, at, wake }
+/// A walker on `at`, waking at `wake`.
+pub fn walker(at: CellIndex, wake: u64) -> Header {
+    Header { kind: WALKER, at, wake }
 }
 
 /// Each walker woken counts it, flips `ODD`, and wakes next tick, where
@@ -59,7 +61,7 @@ pub fn count_and_flip(turn: &mut Turn, _: &mut Vec<CellIndex>) -> usize {
         if !remove_attribute(&mut attributes, ODD.attribute_type()) {
             set_attribute(&mut attributes, ODD, 1);
         }
-        turn.put(Header { wake: turn.now() + 1, ..entity.header }, &attributes);
+        turn.update(&entity.header, Header { wake: turn.now() + 1, ..entity.header }, &attributes);
         woken += 1;
     }
     woken

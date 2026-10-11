@@ -1,17 +1,12 @@
-//! What an entity is: a header -- its ID, its type, its cell, when it
-//! next wakes -- and its attributes, a run of blocks that may grow or
-//! shrink at run time.
+//! What an entity is: a header -- its type, its cell, when it next
+//! wakes -- and its attributes, a run of blocks that may grow or
+//! shrink at run time. It has no ID: no two stand on one cell, so the
+//! cell it stands on names it (`docs/entity_manager.md`,
+//! "Instructions", An entity's name in a tick).
 
 use crate::attributes::{attribute_blocks, remove_attribute, set_attribute, set_attribute_blocks, Attribute, AttributeBlock, AttributeType, Layout};
 use coordinates::CellIndex;
 pub use type_registry::EntityType;
-
-/// An entity's ID: drawn at random when it is made, from the random
-/// numbers of the superchunk making it, so the same on any number of
-/// threads. It finds the entity among those in its chunk; two entities
-/// near each other sharing one is a chance of about one in 2^64 a pair.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct EntityId(pub u64);
 
 /// The tick an entity that never wakes wakes at.
 pub const NEVER: u64 = u64::MAX;
@@ -19,8 +14,6 @@ pub const NEVER: u64 = u64::MAX;
 /// An entity's fixed part.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Header {
-    /// Its ID.
-    pub id: EntityId,
     /// Its type.
     pub kind: EntityType,
     /// The cell it stands on.

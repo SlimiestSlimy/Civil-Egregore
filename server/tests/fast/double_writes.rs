@@ -8,7 +8,7 @@
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, put_entity, tick_sheep};
 use bitplane_manager::Write;
 use coordinates::{CellCartesian, CellIndex};
-use entity_manager::{AttributeBlock, EntityId, Header, NEVER};
+use entity_manager::{AttributeBlock, Header, NEVER};
 use entity_rules::sheep::{SheepState, BIRTHS, EATEN, SHEEP, SHEEP_STATE, STEP_JITTER, STEP_TICKS};
 use sca_rules::{grass, trees};
 use server::World;
@@ -43,7 +43,7 @@ fn no_two_sheep_eat_one_cell() {
     while taken.len() < 10_000 {
         let (x, y) = (random.below(SIDE as u64) as u32, random.below(SIDE as u64) as u32);
         if taken.insert((x, y)) {
-            let header = Header { id: EntityId(random.draw()), kind: SHEEP, at: cell(&world, 400 + x, 400 + y), wake: random.below(STEP_TICKS) };
+            let header = Header { kind: SHEEP, at: cell(&world, 400 + x, 400 + y), wake: random.below(STEP_TICKS) };
             world.put_entity(header, &hungry_at(0));
         }
     }
@@ -129,13 +129,13 @@ fn carrying(hungry_at: u64) -> [AttributeBlock; 1] {
 fn a_lamb_refused_its_cell_is_born_later() {
     let mut world = plain_world(1, 0, 0, 1);
     let (x, y) = (500, 500);
-    for (id, mother) in [x, x + 2].into_iter().enumerate() {
-        let header = Header { id: EntityId(1 + id as u64), kind: SHEEP, at: cell(&world, mother, y), wake: 1 };
+    for mother in [x, x + 2] {
+        let header = Header { kind: SHEEP, at: cell(&world, mother, y), wake: 1 };
         put_entity(&mut world, header, &carrying(1));
     }
     // Every cell beside either taken, but the one between them.
     let beside: Vec<(u32, u32)> = (x - 1..=x + 3).flat_map(|x| (y - 1..=y + 1).map(move |y| (x, y))).filter(|&at| ![(x, y), (x + 1, y), (x + 2, y)].contains(&at)).collect();
-    let blockers: Vec<Header> = beside.iter().enumerate().map(|(id, &(x, y))| Header { id: EntityId(10 + id as u64), kind: SHEEP, at: cell(&world, x, y), wake: NEVER }).collect();
+    let blockers: Vec<Header> = beside.iter().map(|&(x, y)| Header { kind: SHEEP, at: cell(&world, x, y), wake: NEVER }).collect();
     for &blocker in &blockers {
         put_entity(&mut world, blocker, &hungry_at(0));
     }
@@ -160,7 +160,7 @@ fn a_lamb_refused_its_cell_is_born_later() {
         most_lambs = most_lambs.max(lambs(&world));
     }
     assert_eq!((births, most_lambs, pregnant(&world)), (2, 2, 0));
-    assert!(world.entities().iter().all(|sheep| state(&sheep).bearing == 0));
+    assert!(world.entities().iter().all(|sheep| state(&sheep).bearing_neighbour == 0));
 }
 
 /// Two mothers bearing in one tick, two cells free between them:
@@ -170,15 +170,15 @@ fn a_lamb_refused_its_cell_is_born_later() {
 fn a_lamb_whose_cell_was_taken_is_put_the_tick_after() {
     let mut world = plain_world(1, 0, 0, 1);
     let (x, y) = (500, 500);
-    for (id, mother) in [x, x + 2].into_iter().enumerate() {
-        let header = Header { id: EntityId(1 + id as u64), kind: SHEEP, at: cell(&world, mother, y), wake: 1 };
+    for mother in [x, x + 2] {
+        let header = Header { kind: SHEEP, at: cell(&world, mother, y), wake: 1 };
         // Not hungry for long: neither walks onto the cell the other's lamb is to have.
         put_entity(&mut world, header, &carrying(5000));
     }
     // Every cell beside either taken, but two between them.
     let free = [(x, y), (x + 1, y), (x + 1, y + 1), (x + 2, y)];
-    for (id, (x, y)) in (x - 1..=x + 3).flat_map(|x| (y - 1..=y + 1).map(move |y| (x, y))).filter(|at| !free.contains(at)).enumerate() {
-        let header = Header { id: EntityId(10 + id as u64), kind: SHEEP, at: cell(&world, x, y), wake: NEVER };
+    for (x, y) in (x - 1..=x + 3).flat_map(|x| (y - 1..=y + 1).map(move |y| (x, y))).filter(|at| !free.contains(at)) {
+        let header = Header { kind: SHEEP, at: cell(&world, x, y), wake: NEVER };
         put_entity(&mut world, header, &hungry_at(0));
     }
     // A tick with nobody awake: the lambs are due at the next.
@@ -187,5 +187,5 @@ fn a_lamb_whose_cell_was_taken_is_put_the_tick_after() {
     assert_eq!(made.refused + world.entities().iter().filter(|sheep| state(sheep).grown_at != 0).count(), 2, "each made, or refused its cell");
     let births: u64 = (0..4).map(|_| tick_sheep(&mut world).rules[BIRTHS]).sum();
     assert_eq!(births, 2);
-    assert!(world.entities().iter().all(|sheep| state(&sheep).lamb_due_at == 0 && state(&sheep).bearing == 0));
+    assert!(world.entities().iter().all(|sheep| state(&sheep).lamb_due_at == 0 && state(&sheep).bearing_neighbour == 0));
 }

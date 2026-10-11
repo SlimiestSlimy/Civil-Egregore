@@ -8,7 +8,7 @@
 
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::saved::{decode_state, encode_state};
-use entity_manager::{find_attribute, push_attribute, sorted, Attribute, AttributeBlock, AttributeType, Entities, EntityId, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER};
+use entity_manager::{find_attribute, push_attribute, sorted, Attribute, AttributeBlock, AttributeType, Entities, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER};
 
 /// The entities' type.
 const WALKER: EntityType = EntityType::of(40);
@@ -25,9 +25,9 @@ fn cell(x: u32, y: u32) -> CellIndex {
     CellCartesian { x: 10 * SUPERCHUNK_SIDE_CELLS + x, y: 10 * SUPERCHUNK_SIDE_CELLS + y }.into()
 }
 
-/// A walker with ID `id` on `at`, never waking.
-fn walker(id: u64, at: CellIndex) -> Header {
-    Header { id: EntityId(id), kind: WALKER, at, wake: NEVER }
+/// A walker on `at`, never waking.
+fn walker(at: CellIndex) -> Header {
+    Header { kind: WALKER, at, wake: NEVER }
 }
 
 /// A layout of two blocks: a number in its data's first word and one
@@ -102,10 +102,10 @@ fn every_attribute_is_found_over_those_of_any_length() {
     assert!(!sorted(&[AttributeBlock([WALKER.0, 0, 0, 0, 0, 0, 0, 0])]), "an entity type is no attribute's");
 
     let mut entities = world();
-    let header = walker(1, cell(40, 30));
+    let header = walker(cell(40, 30));
     entities.queue_put(header, &blocks);
     entities.apply();
-    let entity = entities.get(header.id, header.at).expect("put");
+    let entity = entities.get(header.at).expect("put");
     assert_eq!((entity.attribute(NAME), entity.attribute(ENDS)), (Some(7), Some(BothEnds { first: 11, last: 13 })));
     assert_eq!(entity.attribute_blocks(NOTE).map(<[_]>::len), Some(3));
     assert_eq!(entity.attribute_blocks(TAIL).expect("after the note")[0].0[2], 3);
@@ -118,21 +118,21 @@ fn every_attribute_is_found_over_those_of_any_length() {
 #[test]
 fn an_attribute_is_edited_to_any_length_and_saved() {
     let mut entities = world();
-    let target = walker(9, cell(40, 30));
+    let target = walker(cell(40, 30));
     entities.queue_put(target, &attributes());
     entities.apply();
     let edits: [&dyn Fn(&mut Instructions); 4] = [
-        &|queue| queue.set_attribute_blocks(target.id, target.at, &varying(NOTE, &[6; 40])),
-        &|queue| queue.set_attribute_blocks(target.id, target.at, &varying(NOTE, &[8; 2])),
-        &|queue| queue.set_attribute(target.id, target.at, ENDS, BothEnds { first: 17, last: 19 }),
-        &|queue| queue.unset_attribute(target.id, target.at, NAME.attribute_type()),
+        &|queue| queue.set_attribute_blocks(target.at, &varying(NOTE, &[6; 40])),
+        &|queue| queue.set_attribute_blocks(target.at, &varying(NOTE, &[8; 2])),
+        &|queue| queue.set_attribute(target.at, ENDS, BothEnds { first: 17, last: 19 }),
+        &|queue| queue.unset_attribute(target.at, NAME.attribute_type()),
     ];
     for (tick, edit) in edits.into_iter().enumerate() {
         let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
         edit(&mut queue);
         queue.apply(entities.superchunks_mut(), 0, &mut applied);
         assert_eq!(applied.edits, 1, "edit {tick}");
-        let edited = entities.get(target.id, target.at).expect("where it stood");
+        let edited = entities.get(target.at).expect("where it stood");
         assert!(sorted(edited.attributes), "edit {tick}");
         let note = edited.attribute_blocks(NOTE).expect("the note");
         assert_eq!((note.len(), note[0].0[2]), if tick == 0 { (6, 6) } else { (1, 8) }, "edit {tick}");
@@ -147,7 +147,7 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
     let mut read_back = world();
     assert_eq!(decode_state(&words, 4, &mut read_back).map(|state| state.entities), Ok(1));
     read_back.apply();
-    let (was, is) = (entities.get(target.id, target.at).expect("there"), read_back.get(target.id, target.at).expect("read back"));
+    let (was, is) = (entities.get(target.at).expect("there"), read_back.get(target.at).expect("read back"));
     assert_eq!((was.header, was.attributes), (is.header, is.attributes));
 
     // The note's block length said to be more than the entity has blocks: nothing is read.
@@ -169,7 +169,7 @@ fn attributes_edited_in_any_order_are_those_last_set() {
     use std::collections::BTreeMap;
     let mut random = utilities::rng::Rng::new(utilities::seed::counted());
     let mut entities = world();
-    let target = walker(9, cell(random.below(1024) as u32, random.below(1024) as u32));
+    let target = walker(cell(random.below(1024) as u32, random.below(1024) as u32));
     entities.queue_put(target, &[]);
     entities.apply();
     // Twelve types: numbers drawn, no two the same, eight of 1 to 3 blocks and four whose size varies.
@@ -183,7 +183,7 @@ fn attributes_edited_in_any_order_are_those_last_set() {
         let kind = kinds[random.below(kinds.len() as u64) as usize];
         let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
         if random.below(3) == 0 {
-            queue.unset_attribute(target.id, target.at, kind);
+            queue.unset_attribute(target.at, kind);
             held.remove(&kind.0);
         } else {
             let blocks = match kind.blocks() {
@@ -194,12 +194,12 @@ fn attributes_edited_in_any_order_are_those_last_set() {
                 }
                 None => varying(kind, &(0..random.below(40)).map(|_| random.draw()).collect::<Vec<_>>()),
             };
-            queue.set_attribute_blocks(target.id, target.at, &blocks);
+            queue.set_attribute_blocks(target.at, &blocks);
             held.insert(kind.0, blocks);
         }
         queue.apply(entities.superchunks_mut(), 0, &mut applied);
         assert_eq!((applied.edits, applied.passed_over), (1, 0), "edit {edit}");
-        let edited = entities.get(target.id, target.at).expect("where it stood");
+        let edited = entities.get(target.at).expect("where it stood");
         assert!(sorted(edited.attributes), "edit {edit}");
         let expected: Vec<AttributeBlock> = held.values().flatten().copied().collect();
         assert!(edited.attributes == expected.as_slice(), "edit {edit}: {} blocks held, {} expected", edited.attributes.len(), expected.len());
@@ -211,7 +211,7 @@ fn attributes_edited_in_any_order_are_those_last_set() {
     let mut read_back = world();
     assert_eq!((count, decode_state(&words, 4, &mut read_back).map(|state| state.entities)), (1, Ok(1)));
     read_back.apply();
-    let (was, is) = (entities.get(target.id, target.at).expect("there"), read_back.get(target.id, target.at).expect("read back"));
+    let (was, is) = (entities.get(target.at).expect("there"), read_back.get(target.at).expect("read back"));
     assert!((was.header, was.attributes) == (is.header, is.attributes));
 }
 
@@ -226,37 +226,38 @@ fn attributes_edited_in_any_order_are_those_last_set() {
 fn an_entity_is_named_by_the_cell_the_tick_found_it_on() {
     let mut entities = world();
     let (wanted, second, third) = (cell(40, 30), cell(41, 30), cell(42, 30));
-    entities.queue_put(walker(1, wanted), &[]);
-    entities.queue_put(walker(2, second), &[]);
+    entities.queue_put(walker(wanted), &[]);
+    entities.queue_put(walker(second), &[]);
     entities.apply();
     let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
-    queue.move_entity(walker(1, third), wanted);
-    queue.set_attribute(EntityId(1), wanted, NAME, 7);
-    queue.move_entity(walker(2, wanted), second);
-    queue.put(walker(3, wanted), wanted, &[]);
+    queue.move_entity(walker(third), wanted);
+    queue.set_attribute(wanted, NAME, 7);
+    queue.move_entity(walker(wanted), second);
+    queue.put(walker(wanted), &[]);
     queue.apply(entities.superchunks_mut(), 0, &mut applied);
     assert_eq!((applied.moves, applied.edits, applied.stayed, applied.refused, applied.passed_over), (2, 1, 1, 1, 0));
-    assert_eq!(entities.get(EntityId(1), third).and_then(|moved| moved.attribute(NAME)), Some(7), "written where it moved to");
-    assert!(entities.get(EntityId(2), second).is_some() && entities.len() == 2, "the cell left is no other's this tick");
+    assert_eq!(entities.get(third).and_then(|moved| moved.attribute(NAME)), Some(7), "written where it moved to");
+    assert!(entities.get(second).is_some() && entities.len() == 2, "the cell left is no other's this tick");
     // Still the same tick: removed by the name it has in it, and nothing written to it after.
     let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
-    queue.remove(EntityId(1), wanted);
-    queue.set_attribute(EntityId(1), wanted, NAME, 8);
+    queue.remove(wanted);
+    queue.set_attribute(wanted, NAME, 8);
     queue.apply(entities.superchunks_mut(), 0, &mut applied);
     assert_eq!((applied.removes, applied.passed_over, entities.len()), (1, 1, 1));
     // The tick over, the cells are whoever comes to them.
     entities.superchunks_mut().iter_mut().for_each(|superchunk| superchunk.names_anew(&mut ()));
     let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
-    queue.put(walker(3, wanted), wanted, &[]);
-    queue.put(walker(4, third), third, &[]);
+    queue.put(walker(wanted), &[]);
+    queue.put(walker(third), &[]);
     queue.apply(entities.superchunks_mut(), 0, &mut applied);
     assert_eq!((applied.puts, entities.len()), (2, 3));
     entities.superchunks_mut().iter_mut().for_each(|superchunk| superchunk.names_anew(&mut ()));
 
     let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
-    queue.remove(EntityId(9), wanted);
-    queue.unset_attribute(EntityId(1), second, NAME.attribute_type());
-    queue.move_entity(walker(3, wanted), second);
+    let nobodys = cell(50, 50);
+    queue.remove(nobodys);
+    queue.unset_attribute(nobodys, NAME.attribute_type());
+    queue.move_entity(walker(second), nobodys);
     queue.apply(entities.superchunks_mut(), 0, &mut applied);
     assert_eq!((applied.passed_over, applied.removes, applied.edits, applied.moves, entities.len()), (3, 0, 0, 0, 3));
 }

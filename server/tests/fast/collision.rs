@@ -6,7 +6,7 @@
 //!
 //! `cargo test --test fast collision`
 
-use crate::tests::{land_seed, tick_rule, tick_sheep};
+use crate::tests::{land_seed, tag, tag_sheep, tick_rule, tick_sheep};
 use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use server::{Start, World};
 use std::collections::HashMap;
@@ -42,7 +42,9 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     let (same, trees) = what_stands_and_no_other(&world);
     assert!(same && trees > 0, "as generated: {trees} trees");
     assert!(world.entities().iter().all(|sheep| world.arena().holds(TREE, sheep.header.at) == Ok(false)), "a sheep put on a tree");
-    let mut stood: HashMap<u64, CellIndex> = world.entities().iter().map(|sheep| (sheep.header.id.0, sheep.header.at)).collect();
+    // Each sheep told from the others by a tag; a lamb, born after, has none.
+    tag_sheep(&mut world);
+    let mut stood: HashMap<u64, CellIndex> = world.entities().iter().map(|sheep| (tag(&sheep).expect("tagged"), sheep.header.at)).collect();
     let (mut stepped, mut born) = (0, 0);
     for tick in 0..400 {
         tick_sheep(&mut world);
@@ -50,15 +52,19 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
             assert!(what_stands_and_no_other(&world).0, "after tick {tick} of the sheep");
         }
         for sheep in world.entities().iter() {
-            let (id, at) = (sheep.header.id.0, sheep.header.at);
-            let was = stood.insert(id, at);
-            if was != Some(at) {
+            let at = sheep.header.at;
+            let Some(tag) = tag(&sheep) else {
+                assert_eq!(world.arena().holds(TREE, at), Ok(false), "a lamb on a tree's cell");
+                born += 1;
+                continue;
+            };
+            if stood.insert(tag, at) != Some(at) {
                 assert_eq!(world.arena().holds(TREE, at), Ok(false), "a sheep come onto a tree's cell");
-                (stepped, born) = (stepped + u64::from(was.is_some()), born + u64::from(was.is_none()));
+                stepped += 1;
             }
         }
     }
-    assert!(stepped > 0, "{stepped} steps, {born} births");
+    assert!(stepped > 0, "{stepped} steps, {born} lamb-ticks");
     // The trees after the sheep: a sheep whose wake passes with its rule not run never wakes again.
     let mut done = instructions::RuleCounts::default();
     for _ in 0..2000 {

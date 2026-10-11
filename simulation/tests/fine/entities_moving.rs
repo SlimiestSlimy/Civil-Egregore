@@ -6,16 +6,16 @@
 
 use crate::tests::*;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{AttributeBlock, Entities, EntityId, EntityReader, Header, NEVER};
+use entity_manager::{AttributeBlock, Entities, EntityReader, Header, NEVER};
 use simulation::{Simulation, Turn};
 use std::sync::Mutex;
 
-/// A turn reads entities in its neighbours, by ID and by chunk, as the
+/// A turn reads entities in its neighbours, by cell and by chunk, as the
 /// tick found them -- changes queued this tick unseen.
 #[test]
 fn turns_read_entities_across_superchunks() {
     let (mut arena, mut entities) = world(2);
-    let (left, right) = (walker(1, cell(SUPERCHUNK_SIDE_CELLS - 1, 7), 0), walker(2, cell(SUPERCHUNK_SIDE_CELLS, 7), NEVER));
+    let (left, right) = (walker(cell(SUPERCHUNK_SIDE_CELLS - 1, 7), 0), walker(cell(SUPERCHUNK_SIDE_CELLS, 7), NEVER));
     entities.queue_put(left, &[]);
     entities.queue_put(right, &[]);
     entities.apply();
@@ -23,26 +23,26 @@ fn turns_read_entities_across_superchunks() {
     Simulation::new(2).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
         for entity in turn.woken() {
             let neighbour = entity.header.at.offset(1, 0).unwrap();
-            let by_id = turn.entity(EntityId(2), neighbour).map(|other| other.header);
-            let in_chunk: Vec<_> = turn.entities_in(neighbour.chunk()).expect("hot").map(|other| other.header.id).collect();
+            let by_cell = turn.entity_on(neighbour).map(|other| other.header);
+            let in_chunk: Vec<_> = turn.entities_in(neighbour.chunk()).expect("hot").map(|other| other.header.at).collect();
             turn.remove(&entity.header);
-            seen.lock().unwrap().push((by_id, in_chunk, turn.entity(entity.header.id, entity.header.at).is_some()));
+            seen.lock().unwrap().push((by_cell, in_chunk, turn.entity_on(entity.header.at).is_some()));
         }
         0
     });
-    assert_eq!(seen.into_inner().unwrap(), [(Some(right), vec![EntityId(2)], true)]);
+    assert_eq!(seen.into_inner().unwrap(), [(Some(right), vec![right.at], true)]);
     assert_eq!(entities.len(), 1);
     assert!(Entities::new().superchunk(SuperchunkIndex(0)).is_none());
 }
 
-/// A superchunk's entities wake in Morton order, by cell then ID,
+/// A superchunk's entities wake in Morton order by cell,
 /// however their wakes were filed: queued between ticks, or put in a
 /// tick.
 #[test]
 fn entities_wake_in_morton_order() {
     let (mut arena, mut entities) = world(1);
-    for (id, at) in (0..500u64).zip(cells_drawn(500, 1000)) {
-        entities.queue_put(walker(1000 - id, at, 0), &[]);
+    for at in cells_drawn(500, 1000) {
+        entities.queue_put(walker(at, 0), &[]);
     }
     entities.apply();
     let mut simulation = Simulation::new(1);
@@ -50,7 +50,7 @@ fn entities_wake_in_morton_order() {
         let order = Mutex::new(Vec::new());
         simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
             for entity in turn.woken() {
-                order.lock().unwrap().push((entity.header.at, entity.header.id));
+                order.lock().unwrap().push(entity.header.at);
                 let at = entity.header.at.offset(1, 1).unwrap();
                 turn.update(&entity.header, Header { at, wake: turn.now() + 1, ..entity.header }, &[]);
             }
@@ -70,7 +70,7 @@ fn entities_stay_in_morton_order_as_they_step() {
     let (mut arena, mut entities) = world(1);
     for id in 0..600u64 {
         let at = cell(200 + (id % 20) as u32 * 3, 240 + (id / 20) as u32 * 3);
-        entities.queue_put(walker(id + 1, at, 0), &[AttributeBlock::holding(WOKEN, id)]);
+        entities.queue_put(walker(at, 0), &[AttributeBlock::holding(TAG, id)]);
     }
     entities.apply();
     let mut simulation = Simulation::new(1);
@@ -83,16 +83,17 @@ fn entities_stay_in_morton_order_as_they_step() {
             }
             0
         });
-        let kept: Vec<_> = entities.iter().map(|entity| (entity.header.at, entity.header.id)).collect();
+        let kept: Vec<_> = entities.iter().map(|entity| entity.header.at).collect();
         assert_eq!(kept.len(), 600);
         assert!(kept.windows(2).all(|pair| pair[0] < pair[1]), "tick {tick}: kept out of Morton order");
     }
     for entity in entities.iter() {
         let header = entity.header;
-        assert_eq!(entity.attribute(WOKEN), Some(header.id.0 - 1), "its own attributes");
-        assert_eq!(entities.get(header.id, header.at).map(|found| found.header), Some(header));
-        assert!(entities.get(header.id, header.at.offset(1, 0).unwrap()).is_none(), "found only where it stands");
+        assert_eq!(entities.get(header.at).map(|found| (found.header, found.attribute(TAG))), Some((header, entity.attribute(TAG))), "found where it stands");
     }
+    let mut tags: Vec<_> = entities.iter().map(|entity| entity.attribute(TAG).expect("its own attributes")).collect();
+    tags.sort_unstable();
+    assert!(tags.into_iter().eq(0..600), "each its own attributes still, none lost and none twice");
 }
 
 /// A change to an entity no longer where the tick found it is passed
@@ -101,7 +102,7 @@ fn entities_stay_in_morton_order_as_they_step() {
 #[test]
 fn a_change_to_an_entity_that_moved_on_is_passed_over() {
     let (mut arena, mut entities) = world(1);
-    entities.queue_put(walker(1, cell(50, 50), 0), &[]);
+    entities.queue_put(walker(cell(50, 50), 0), &[]);
     entities.apply();
     let mut simulation = Simulation::new(1);
     let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
@@ -114,7 +115,7 @@ fn a_change_to_an_entity_that_moved_on_is_passed_over() {
         0
     });
     assert_eq!((report.instructions_applied.moves, report.instructions_applied.passed_over, entities.len()), (1, 1, 1));
-    assert!(entities.get(EntityId(1), cell(51, 50)).is_some(), "the first move applied");
+    assert!(entities.get(cell(51, 50)).is_some(), "the first move applied");
     let woken = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| turn.woken().count()).rules;
     assert_eq!(woken, 1);
 }
@@ -130,11 +131,11 @@ fn entities_never_overlap() {
     // Crowded about the corner the four superchunks meet at, which is the corner of chunks too.
     let corner = SUPERCHUNK_SIDE_CELLS - 20;
     for id in 0..900u64 {
-        entities.queue_put(walker(id + 1, cell(corner + (id % 30) as u32, corner + (id / 30) as u32), id % 3), &[]);
+        entities.queue_put(walker(cell(corner + (id % 30) as u32, corner + (id / 30) as u32), id % 3), &[AttributeBlock::holding(TAG, id)]);
     }
     // Two on a cell already taken: refused.
-    entities.queue_put(walker(5000, cell(corner, corner), 0), &[]);
-    entities.queue_put(walker(5001, cell(corner + 7, corner + 7), 0), &[]);
+    entities.queue_put(walker(cell(corner, corner), 0), &[]);
+    entities.queue_put(walker(cell(corner + 7, corner + 7), 0), &[]);
     let applied = entities.apply();
     assert_eq!((applied.puts, applied.refused, entities.len()), (900, 2, 900));
     let jostle = |turn: &mut Turn, _: &mut Vec<CellIndex>| {
@@ -145,8 +146,8 @@ fn entities_never_overlap() {
             turn.update(&header, Header { at: header.at.offset(dx, dy).unwrap(), wake, ..header }, entity.attributes);
             if turn.random().below(50) == 0 {
                 let born = header.at.offset(turn.random().below(5) as i32 - 2, turn.random().below(5) as i32 - 2).unwrap();
-                let id = turn.new_id();
-                turn.put(Header { id, at: born, wake, ..header }, &[]);
+                let tag = 1000 + turn.random().draw();
+                turn.put(Header { at: born, wake, ..header }, &[AttributeBlock::holding(TAG, tag)]);
             }
         }
         0
@@ -160,9 +161,9 @@ fn entities_never_overlap() {
         let mut cells: Vec<CellIndex> = entities.iter().map(|entity| entity.header.at).collect();
         cells.sort_unstable();
         assert!(cells.windows(2).all(|pair| pair[0] != pair[1]), "tick {tick}: two entities on a cell");
-        let mut ids: Vec<EntityId> = entities.iter().map(|entity| entity.header.id).collect();
-        ids.sort_unstable();
-        assert!(ids.windows(2).all(|pair| pair[0] != pair[1]), "tick {tick}: an entity on two cells");
+        let mut tags: Vec<u64> = entities.iter().map(|entity| entity.attribute(TAG).expect("tagged")).collect();
+        tags.sort_unstable();
+        assert!(tags.windows(2).all(|pair| pair[0] != pair[1]), "tick {tick}: an entity on two cells");
         if tick % 50 == 0 {
             let reader = EntityReader::new(entities.superchunks());
             let mut random = utilities::rng::Rng::new(utilities::seed::counted().wrapping_add(tick));

@@ -6,7 +6,7 @@
 
 use crate::tests::*;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{AttributeBlock, EntityId, Header, WHEEL_TICKS};
+use entity_manager::{AttributeBlock, Header, WHEEL_TICKS};
 use simulation::{Simulation, Turn};
 use std::sync::Mutex;
 
@@ -16,12 +16,8 @@ use std::sync::Mutex;
 #[test]
 fn attributes_come_and_go_at_run_time() {
     let (mut arena, mut entities) = world(1);
-    // IDs drawn, no two the same, on cells drawn.
-    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
-    let mut id = 0;
     for at in cells_drawn(300, 1024) {
-        id += random.between(1, 10_000);
-        entities.queue_put(walker(id, at, 0), &[]);
+        entities.queue_put(walker(at, 0), &[]);
     }
     assert_eq!(entities.queued(), 300);
     assert_eq!(entities.apply().puts, 300);
@@ -29,7 +25,7 @@ fn attributes_come_and_go_at_run_time() {
     let mut simulation = Simulation::new(1);
     for _ in 1..=101u64 {
         let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), count_and_flip);
-        assert_eq!((report.rules, report.instructions_applied.puts), (300, 300));
+        assert_eq!((report.rules, report.instructions_applied.moves), (300, 300));
     }
     assert_eq!(entities.len(), 300);
     for entity in entities.iter() {
@@ -45,26 +41,27 @@ fn attributes_come_and_go_at_run_time() {
 fn entities_wake_at_their_tick() {
     let (mut arena, mut entities) = world(1);
     let far = 2 * WHEEL_TICKS + 300;
-    entities.queue_put(walker(1, cell(3, 3), 5), &[]);
-    entities.queue_put(walker(2, cell(900, 900), far), &[]);
-    entities.queue_put(walker(3, cell(10, 10), 7), &[]);
+    let (first, second, third) = (cell(3, 3), cell(900, 900), cell(10, 10));
+    entities.queue_put(walker(first, 5), &[]);
+    entities.queue_put(walker(second, far), &[]);
+    entities.queue_put(walker(third, 7), &[]);
     entities.apply();
     let woken = Mutex::new(Vec::new());
     let mut simulation = Simulation::new(1);
     for _ in 0..=far + 10 {
         simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
             for entity in turn.woken() {
-                woken.lock().unwrap().push((entity.header.id.0, turn.now()));
-                if entity.header.id == EntityId(3) {
+                woken.lock().unwrap().push((entity.header.at, turn.now()));
+                if entity.header.at == third {
                     turn.remove(&entity.header);
-                } else if entity.header.id == EntityId(1) && turn.now() == 5 {
-                    turn.put(Header { wake: 40, ..entity.header }, entity.attributes);
+                } else if entity.header.at == first && turn.now() == 5 {
+                    turn.step(&entity.header, first, 40);
                 }
             }
             0
         });
     }
-    assert_eq!(woken.into_inner().unwrap(), [(1, 5), (3, 7), (1, 40), (2, far)]);
+    assert_eq!(woken.into_inner().unwrap(), [(first, 5), (third, 7), (first, 40), (second, far)]);
     assert_eq!(entities.len(), 2, "the third removed");
 }
 
@@ -76,7 +73,7 @@ fn entities_wake_at_their_tick() {
 fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
     let (mut arena, mut entities) = world(2);
     let start = SUPERCHUNK_SIDE_CELLS - 3;
-    entities.queue_put(walker(9, cell(start, 100), 0), &[AttributeBlock::holding(WOKEN, 0)]);
+    entities.queue_put(walker(cell(start, 100), 0), &[AttributeBlock::holding(WOKEN, 0)]);
     entities.apply();
     let mut simulation = Simulation::new(2);
     let step = |turn: &mut Turn, _: &mut Vec<CellIndex>| {
@@ -116,9 +113,8 @@ fn any_number_of_threads_ticks_entities_the_same() {
             match turn.random().below(40) {
                 0 => turn.remove(&header),
                 1 => {
-                    let child = Header { id: turn.new_id(), at, wake, ..header };
-                    turn.put(child, &[]);
-                    turn.put(Header { wake: turn.now() + 3, ..header }, entity.attributes);
+                    turn.put(Header { at, wake, ..header }, &[]);
+                    turn.step(&header, header.at, turn.now() + 3);
                 }
                 _ => turn.update(&header, Header { at, wake, ..header }, entity.attributes),
             }
@@ -129,7 +125,7 @@ fn any_number_of_threads_ticks_entities_the_same() {
     let run = |threads| {
         let (mut arena, mut entities) = world(3);
         for (id, at) in (0..2000u64).zip(cells_drawn(2000, 3072)) {
-            entities.queue_put(walker(id + 1, at, id % 4), &[]);
+            entities.queue_put(walker(at, id % 4), &[]);
         }
         entities.apply();
         let mut simulation = Simulation::new(threads);
@@ -147,13 +143,13 @@ fn any_number_of_threads_ticks_entities_the_same() {
 #[test]
 fn changes_outside_a_tick_are_queued_then_applied() {
     let (_, mut entities) = world(1);
-    let (here, away) = (walker(1, cell(5, 5), 0), walker(2, cell(2 * SUPERCHUNK_SIDE_CELLS, 5), 0));
+    let (here, away) = (walker(cell(5, 5), 0), walker(cell(2 * SUPERCHUNK_SIDE_CELLS, 5), 0));
     entities.queue_put(here, &[]);
     entities.queue_put(away, &[]);
     assert_eq!(entities.len(), 0, "nothing changes until applied");
     let applied = entities.apply();
     assert_eq!((applied.puts, applied.lost, entities.len()), (1, 1, 1));
-    assert_eq!(entities.get(here.id, here.at).map(|entity| entity.header), Some(here));
-    entities.queue_remove(&here);
+    assert_eq!(entities.get(here.at).map(|entity| entity.header), Some(here));
+    entities.queue_remove(here.at);
     assert_eq!((entities.apply().removes, entities.len()), (1, 0));
 }

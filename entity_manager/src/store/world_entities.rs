@@ -2,7 +2,7 @@
 //! queued to be put and removed.
 
 use crate::attributes::AttributeBlock;
-use crate::entity::{EntityId, EntityRef, Header};
+use crate::entity::{EntityRef, Header};
 use crate::instructions::{Instructions, InstructionsApplied};
 use super::SuperchunkEntities;
 use super::entity_reader::EntityReader;
@@ -61,9 +61,9 @@ impl Entities {
         EntityReader::new(&self.superchunks).superchunk(superchunk)
     }
 
-    /// The entity whose ID is `id`, standing on `at`, if kept here.
-    pub fn get(&self, id: EntityId, at: CellIndex) -> Option<EntityRef<'_>> {
-        self.superchunk(at.superchunk())?.get(id, at)
+    /// The entity standing on `at`, if one does.
+    pub fn get(&self, at: CellIndex) -> Option<EntityRef<'_>> {
+        self.superchunk(at.superchunk())?.get(at)
     }
 
     /// Keeps exactly `superchunk_indices`, sorted:
@@ -86,17 +86,17 @@ impl Entities {
         dropped + had.map(|superchunk| superchunk.len()).sum::<usize>()
     }
 
-    /// Queues putting `header`'s entity -- made, or changed where it
-    /// stands -- with `attributes` sorted by type, outside a tick:
-    /// setting up, say. It wakes at its wake tick, the tick about to run
-    /// or later. One to stand elsewhere is removed, and put there.
+    /// Queues making `header`'s entity, with `attributes` sorted by
+    /// type, outside a tick: setting up, say. It wakes at its wake
+    /// tick, the tick about to run or later. Not made, an entity
+    /// standing on its cell.
     pub fn queue_put(&mut self, header: Header, attributes: &[AttributeBlock]) {
-        self.queued.put(header, header.at, attributes);
+        self.queued.put(header, attributes);
     }
 
-    /// Queues removing `header`'s entity, outside a tick.
-    pub fn queue_remove(&mut self, header: &Header) {
-        self.queued.remove(header.id, header.at);
+    /// Queues removing the entity standing on `at`, outside a tick.
+    pub fn queue_remove(&mut self, at: CellIndex) {
+        self.queued.remove(at);
     }
 
     /// How many instructions are queued.

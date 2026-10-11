@@ -32,8 +32,8 @@ attribute block; **`data_words(blocks)`**: the words of data so many
 blocks hold. **`Layout`**: how an attribute's data is laid out --
 `BLOCKS`, **`write(data)`**, **`read(data)`** -- had by `u64`, one
 number in the first word, and by **`SheepState`** `{hungry_at,
-lamb_due_at, grown_at, roaming_until, bearing, roaming_neighbour}`, a
-word each in that order, a tick of 0 none. **`Attribute<L>`**: an attribute, its
+lamb_due_at, grown_at, roaming_until, bearing_neighbour, mother_neighbour, roaming_neighbour}`, a
+word each in that order but the two neighbours of a birth, a word's halves; a tick of 0 none. **`Attribute<L>`**: an attribute, its
 layout in its type: **`new(number)`**, **`attribute_type`**.
 
 ## `registry.rs`

@@ -3,10 +3,9 @@
 //! instruction that carries least, and those put on the world between
 //! two ticks, on no superchunk's turn.
 
-use crate::around;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{Attribute, AttributeBlock, Entities, EntityEdit, EntityId, EntityRef, EntityType, Header, Layout};
+use entity_manager::{Attribute, AttributeBlock, Entities, EntityEdit, EntityRef, EntityType, Header, Layout};
 use simulation::Turn;
 
 /// Runs `each` on every entity of the turn's superchunk waking this
@@ -21,28 +20,20 @@ pub fn each_woken<'a, const N: usize, S>(turn: &mut Turn<'a>, layers: [LayerType
     }
 }
 
-/// Whether the entity whose ID is `id` stood on `at` -- any cell in
-/// reach -- as the tick found it.
+/// The entity that stood on `at` -- any cell in reach -- as the tick
+/// found it: the cell is its name for the tick, whatever is queued
+/// for it found by it.
 #[inline]
-pub fn stands(turn: &Turn, id: EntityId, at: CellIndex) -> bool {
-    turn.entity(id, at).is_some()
+pub fn on<'a>(turn: &Turn<'a>, at: CellIndex) -> Option<EntityRef<'a>> {
+    turn.entity_on(at)
 }
 
 /// Queues making an entity of type `kind` on `at`, with `attributes`
-/// sorted by type, to wake at `wake`: its ID, drawn here. It is not
-/// made if an entity stands on the cell by then.
+/// sorted by type, to wake at `wake`. It is not made if the cell is
+/// taken by then.
 #[inline]
-pub fn spawn(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attributes: &[AttributeBlock]) -> EntityId {
-    let id = turn.new_id();
-    turn.put(Header { id, kind, at, wake }, attributes);
-    id
-}
-
-/// The way from `centre` to the neighbour the entity whose ID is `id`
-/// stood on as the tick found it, if it stood on one.
-#[inline]
-pub fn stands_beside(turn: &Turn, id: EntityId, centre: CellIndex) -> Option<u32> {
-    (0..around::WAYS).filter(|&way| way != around::HERE).find(|&way| around::cell(centre, way).is_some_and(|cell| stands(turn, id, cell)))
+pub fn spawn(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attributes: &[AttributeBlock]) {
+    turn.put(Header { kind, at, wake }, attributes);
 }
 
 /// Queues `entity` sleeping where it stands until `wake`: its

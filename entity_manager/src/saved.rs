@@ -3,11 +3,11 @@
 
 use coordinates::CellIndex;
 use crate::attributes::{sorted, AttributeBlock, BLOCK_WORDS};
-use crate::entity::{EntityId, EntityType, Header};
+use crate::entity::{EntityType, Header};
 use crate::store::{Entities, SuperchunkEntities};
 
-/// The first word: `TSstate` and the format's number, 3.
-const FIRST_WORD: u64 = u64::from_le_bytes(*b"TSstate\x03");
+/// The first word: `TSstate` and the format's number, 4.
+const FIRST_WORD: u64 = u64::from_le_bytes(*b"TSstate\x04");
 
 /// What a state file held, beside the entities queued.
 pub struct SavedState {
@@ -25,7 +25,7 @@ pub fn encode_state(random: Option<u64>, entities: Option<&SuperchunkEntities>) 
     let mut words = vec![FIRST_WORD, random.is_some() as u64, random.unwrap_or(0), count as u64];
     for entity in entities.into_iter().flat_map(SuperchunkEntities::iter) {
         let header = entity.header;
-        words.extend([header.id.0, header.kind.0, header.at.0, header.wake, entity.attributes.len() as u64]);
+        words.extend([header.kind.0, header.at.0, header.wake, entity.attributes.len() as u64]);
         words.extend(entity.attributes.iter().flat_map(|block| block.0));
     }
     (words, count)
@@ -49,7 +49,7 @@ fn read(words: &[u64], mut each: impl FnMut(Header, &[AttributeBlock])) -> Resul
     let (has_random, random, count) = (next()?, next()?, next()?);
     let mut attributes = Vec::new();
     for _ in 0..count {
-        let (id, kind, at, wake, block_count) = (next()?, next()?, next()?, next()?, next()?);
+        let (kind, at, wake, block_count) = (next()?, next()?, next()?, next()?);
         attributes.clear();
         for _ in 0..block_count {
             let mut block = AttributeBlock([0; BLOCK_WORDS]);
@@ -61,7 +61,7 @@ fn read(words: &[u64], mut each: impl FnMut(Header, &[AttributeBlock])) -> Resul
         if !sorted(&attributes) {
             return Err("an entity's attributes are not whole ones sorted by type");
         }
-        each(Header { id: EntityId(id), kind: EntityType(kind), at: CellIndex(at), wake }, &attributes);
+        each(Header { kind: EntityType(kind), at: CellIndex(at), wake }, &attributes);
     }
     Ok(SavedState { random: (has_random == 1).then_some(random), entities: count as usize })
 }

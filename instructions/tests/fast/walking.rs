@@ -10,7 +10,7 @@ use chunk_storage::LayerCodec;
 use coordinates::{CellIndex, SuperchunkIndex};
 use instructions::area::{self, AREA_CENTRE};
 use instructions::{around, entities, walking};
-use entity_manager::{EntityId, NEVER};
+use entity_manager::NEVER;
 use instructions::Turn;
 use simulation::Simulation;
 use std::sync::Mutex;
@@ -33,10 +33,10 @@ fn with_walls_hot(arena: &mut BitmapArena) {
 fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
     let (mut arena, mut entities) = world(1);
     let (from, to) = (cell(40, 30), cell(44, 30));
-    entities.queue_put(walker(1, from, 0), &[]);
+    entities.queue_put(walker(from, 0), &[]);
     // A wall of entities across the straight way, open only below.
     for y in 23..=30 {
-        entities.queue_put(walker(10 + y as u64, cell(42, y), NEVER), &[]);
+        entities.queue_put(walker(cell(42, y), NEVER), &[]);
     }
     entities.apply();
     // The entities are kept in the collision plane, as a world keeps them: each put there holds its cell.
@@ -49,7 +49,7 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
     let mut simulation = Simulation::new(1);
     simulation.keep_entities_in(COLLISION);
     let mut steps = 0;
-    while entities.get(EntityId(1), to).is_none() {
+    while entities.get(to).is_none() {
         simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             let now = turn.now();
             for entity in turn.woken() {
@@ -85,11 +85,11 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
     }
     arena.queue(COLLISION, Write::cell(cell(41, 29), WriteOp::Set));
     arena.apply();
-    entities.queue_put(walker(1, from, 0), &[]);
+    entities.queue_put(walker(from, 0), &[]);
     entities.apply();
     let mut simulation = Simulation::new(1);
     let mut steps = 0;
-    while entities.get(EntityId(1), to).is_none() {
+    while entities.get(to).is_none() {
         simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             let now = turn.now();
             for entity in turn.woken() {
@@ -118,7 +118,7 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
 fn a_cell_is_sought_further_and_further_off() {
     let (mut arena, mut entities) = world(2);
     let from = cell(1000, 1000);
-    entities.queue_put(walker(1, from, 0), &[]);
+    entities.queue_put(walker(from, 0), &[]);
     entities.apply();
     let mut simulation = Simulation::new(1);
     // How far off the one cell set is, across and down, and the scale its tile is first seen at.
@@ -162,11 +162,11 @@ fn walls_of_the_terrain_bar_steps() {
     }
     arena.apply();
     let (from, to) = (cell(41, 30), cell(43, 30));
-    entities.queue_put(walker(1, from, 0), &[]);
+    entities.queue_put(walker(from, 0), &[]);
     entities.apply();
     let mut simulation = Simulation::new(1);
     let mut steps = 0;
-    while entities.get(EntityId(1), to).is_none() {
+    while entities.get(to).is_none() {
         simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
             let now = turn.now();
             for entity in turn.woken() {

@@ -216,8 +216,8 @@ what differs is the simulation's doing. Nothing outside the test is
 made for it.
 
 Chance is another matter, and meant to be: each superchunk draws from
-a random stream of its own -- the sampling of cells, a sheep's lot, a
-new entity's ID -- so what is drawn is another draw where the borders
+a random stream of its own -- the sampling of cells, a sheep's lot
+-- so what is drawn is another draw where the borders
 fall otherwise. What must not see a border is what is not chance.
 The same of a neighbour drawn (`around::pick`): which one a draw comes
 to goes by how the cells about a cell lie in their small tiles, in
@@ -252,8 +252,9 @@ not its concern.
 **What must be made** (`entities::spawn`): a new entity's cell
 may be taken between the rule seeing it free and the put being applied,
 and the put is then refused -- nothing is put elsewhere for it. A rule
-that must not lose it asks the tick after whether it stands there
-(`entities::stands_beside`), and puts it again if not.
+that must not lose it asks the tick after what stands there
+(`entities::on`) -- an entity has no ID, so the rule tells its own by
+what it put it with -- and puts it again if it is not that.
 
 **The cells beside it** (`around`): sets of the cells about a cell,
 read at once (`around::layer`), narrowed with `&`; the way to one

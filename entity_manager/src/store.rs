@@ -12,7 +12,7 @@ pub use world_entities::Entities;
 
 use crate::bucket::{place, Bucket, Put};
 use crate::attributes::{sorted, AttributeBlock, AttributeType};
-use crate::entity::{EntityId, EntityRef, Header, NEVER};
+use crate::entity::{EntityRef, Header, NEVER};
 use crate::wheel::{Wake, Wheel};
 use coordinates::{CellIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 
@@ -25,8 +25,6 @@ const ATTRIBUTES_AHEAD: usize = 4;
 /// still standing where it left until the crossing is settled.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Arrival {
-    /// Its ID.
-    pub id: EntityId,
     /// The cell it left, in another superchunk.
     pub left: CellIndex,
     /// The cell it was put on.
@@ -116,26 +114,26 @@ impl SuperchunkEntities {
         self.len() == 0
     }
 
-    /// The entity whose ID is `id`, standing on `at`.
+    /// The entity standing on `at`, if one does.
     #[inline]
-    pub fn get(&self, id: EntityId, at: CellIndex) -> Option<EntityRef<'_>> {
+    pub fn get(&self, at: CellIndex) -> Option<EntityRef<'_>> {
         debug_assert_eq!(at.superchunk(), self.index);
-        self.chunks[at.chunk().place()].get(id, at)
+        self.chunks[at.chunk().place()].get(at)
     }
 
-    /// Every entity it holds, in Morton order by cell, then by ID.
+    /// Every entity it holds, in Morton order by cell.
     pub fn iter(&self) -> impl Iterator<Item = EntityRef<'_>> {
         self.chunks.iter().flat_map(Bucket::iter)
     }
 
     /// The entities on the chunk at `place` ([`ChunkIndex::place`]), in
-    /// Morton order by cell, then by ID.
+    /// Morton order by cell.
     pub fn chunk(&self, place: usize) -> impl Iterator<Item = EntityRef<'_>> {
         self.chunks[place].iter()
     }
 
     /// The entities waking at `tick`, which is in reach of the wheel: in
-    /// Morton order by cell, then by ID, once every wake for it is filed
+    /// Morton order by cell, once every wake for it is filed
     /// and sorted -- as the tick sees them -- those no longer due passed
     /// over. Those to come are asked of memory ahead ([`ENTITY_AHEAD`]).
     pub fn woken(&self, tick: u64) -> impl Iterator<Item = EntityRef<'_>> {
@@ -163,13 +161,27 @@ impl SuperchunkEntities {
             if let Some(ahead) = due.get(at + ATTRIBUTES_AHEAD) {
                 self.chunks[ahead.at.chunk().place()].prefetch_attributes(ahead.at);
             }
-            self.get(wake.id, wake.at).filter(|entity| entity.header.wake == tick)
+            self.get(wake.at).filter(|entity| entity.header.wake == tick)
         })
     }
 
-    /// Puts `header`'s entity, which stood on `from`, with `attributes`
-    /// sorted by type -- or, with none given, those it has -- and files
-    /// its wake, no earlier than `earliest`: what came of it
+    /// Makes `header`'s entity on its cell, with `attributes` sorted
+    /// by type, and files its wake, no earlier than `earliest`: new,
+    /// or refused, an entity standing there.
+    pub(crate) fn make(&mut self, earliest: u64, header: Header, attributes: &[AttributeBlock]) -> Put {
+        debug_assert_eq!(header.at.superchunk(), self.index, "an entity made in a superchunk it is not in");
+        debug_assert!(sorted(attributes), "attributes whole, sorted by type, each type once");
+        let put = self.chunks[header.at.chunk().place()].make(header, attributes);
+        if put == Put::New && header.wake != NEVER {
+            self.wheel.file(earliest, header.wake, Wake { at: header.at });
+        }
+        put
+    }
+
+    /// Gives the entity standing on `from` `header` -- its cell, when
+    /// it wakes -- and `attributes` sorted by type, or, with none
+    /// given, leaves it those it has; and files its wake, no earlier
+    /// than `earliest`: what came of it
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
     pub(crate) fn put(&mut self, earliest: u64, header: Header, from: CellIndex, attributes: Option<&[AttributeBlock]>) -> Put {
         debug_assert_eq!(header.at.superchunk(), self.index, "an entity put in a superchunk it is not in");
@@ -178,7 +190,7 @@ impl SuperchunkEntities {
         let (origin, target) = (from.chunk().place(), header.at.chunk().place());
         let put = if origin == target {
             self.chunks[target].put(header, place(from), attributes)
-        } else if let Some(stood) = self.chunks[origin].get(header.id, from) {
+        } else if let Some(stood) = self.chunks[origin].get(from) {
             // Those it has go with it to the other bucket.
             self.carried.clear();
             self.carried.extend_from_slice(attributes.unwrap_or(stood.attributes));
@@ -188,7 +200,7 @@ impl SuperchunkEntities {
         };
         let stands = if put == Put::Stayed { from } else { header.at };
         if !matches!(put, Put::Refused | Put::PassedOver) && header.wake != NEVER {
-            self.wheel.file(earliest, header.wake, Wake { id: header.id, at: stands });
+            self.wheel.file(earliest, header.wake, Wake { at: stands });
         }
         put
     }
@@ -202,18 +214,18 @@ impl SuperchunkEntities {
             self.chunks[origin].put(Header { at: from, ..header }, place(from), Some(&self.carried));
             Put::Stayed
         } else {
-            self.chunks[origin].remove(header.id, from);
-            self.chunks[target].put(header, place(header.at), Some(&self.carried));
+            self.chunks[origin].remove(from);
+            self.chunks[target].make(header, &self.carried);
             Put::Moved
         }
     }
 
-    /// Sets the attribute of type `kind` of the entity whose ID is `id`
-    /// standing on `at` to `blocks`, or with none removes it: whether
-    /// the entity is there.
-    pub(crate) fn edit(&mut self, id: EntityId, at: CellIndex, kind: AttributeType, blocks: &[AttributeBlock]) -> bool {
+    /// Sets the attribute of type `kind` of the entity standing on
+    /// `at` to `blocks`, or with none removes it: whether one stands
+    /// there.
+    pub(crate) fn edit(&mut self, at: CellIndex, kind: AttributeType, blocks: &[AttributeBlock]) -> bool {
         debug_assert_eq!(at.superchunk(), self.index);
-        self.chunks[at.chunk().place()].edit(id, place(at), kind, blocks)
+        self.chunks[at.chunk().place()].edit(place(at), kind, blocks)
     }
 
     /// The places, in the chunk at `chunk`, of the entities standing on
@@ -223,11 +235,10 @@ impl SuperchunkEntities {
         self.chunks[chunk].in_word_tile(first)
     }
 
-    /// Removes the entity whose ID is `id` standing on `at`: whether it
-    /// was there.
-    pub(crate) fn remove(&mut self, id: EntityId, at: CellIndex) -> bool {
+    /// Removes the entity standing on `at`: whether one did.
+    pub(crate) fn remove(&mut self, at: CellIndex) -> bool {
         debug_assert_eq!(at.superchunk(), self.index);
-        self.chunks[at.chunk().place()].remove(id, at)
+        self.chunks[at.chunk().place()].remove(at)
     }
 
     /// Whether an entity stands on `at`.
@@ -259,14 +270,14 @@ impl SuperchunkEntities {
     pub fn settle_leavers(&mut self, arrived: &[Arrival], settled: &mut Settled) {
         let here = self.index;
         for &arrival in arrived.iter().filter(|arrival| arrival.left.superchunk() == here) {
-            match self.get(arrival.id, arrival.left) {
+            match self.get(arrival.left) {
                 Some(left) => {
                     if crate::blocks_sum(left.attributes) != arrival.attributes {
                         let first = settled.attributes.len() as u32;
                         settled.attributes.extend_from_slice(left.attributes);
                         settled.changed.push((arrival, first, left.attributes.len() as u32));
                     }
-                    self.remove(arrival.id, arrival.left);
+                    self.remove(arrival.left);
                     self.vacated.push(arrival.left);
                 }
                 None => settled.turned_back.push(arrival),
@@ -281,13 +292,13 @@ impl SuperchunkEntities {
     pub fn settle_arrivals(&mut self, settled: &Settled) -> usize {
         let here = self.index;
         for &(arrival, first, count) in settled.changed.iter().filter(|(arrival, ..)| arrival.at.superchunk() == here) {
-            if let Some(header) = self.get(arrival.id, arrival.at).map(|put| put.header) {
+            if let Some(header) = self.get(arrival.at).map(|put| put.header) {
                 self.chunks[arrival.at.chunk().place()].put(header, place(arrival.at), Some(&settled.attributes[first as usize..(first + count) as usize]));
             }
         }
         let mut taken_back = 0;
         for arrival in settled.turned_back.iter().filter(|arrival| arrival.at.superchunk() == here) {
-            if self.remove(arrival.id, arrival.at) {
+            if self.remove(arrival.at) {
                 self.vacated.push(arrival.at);
                 taken_back += 1;
             }

@@ -4,7 +4,7 @@
 //! bucket").
 
 use crate::attributes::{find_attribute, AttributeBlock, AttributeType};
-use crate::entity::{EntityId, EntityRef, Header};
+use crate::entity::{EntityRef, Header};
 use coordinates::CellIndex;
 use utilities::cache::prefetch;
 
@@ -52,8 +52,8 @@ pub(crate) enum Put {
     Stayed,
     /// It is new and its cell was occupied: it is not put.
     Refused,
-    /// It was to be changed or moved, but is no longer where it was: it
-    /// moved on, or was removed.
+    /// It was to be changed or moved, but no entity stands where it
+    /// was: it moved on, or was removed.
     PassedOver,
 }
 
@@ -93,10 +93,10 @@ impl Bucket {
         (self.attributes.len() - self.garbage, self.garbage)
     }
 
-    /// The entity whose ID is `id` standing on `at`, if it is here.
+    /// The entity standing on `at`, if one does.
     #[inline]
-    pub(crate) fn get(&self, id: EntityId, at: CellIndex) -> Option<EntityRef<'_>> {
-        let index = self.find(place(at), id).ok()?;
+    pub(crate) fn get(&self, at: CellIndex) -> Option<EntityRef<'_>> {
+        let index = self.find(place(at)).ok()?;
         Some(self.entity(&self.stored[index]))
     }
 
@@ -136,12 +136,29 @@ impl Bucket {
         self.index_of(place).1
     }
 
-    /// Puts `header`'s entity, which stood on the cell at `was`, with
-    /// `attributes` -- or, with none given, those it has
+    /// Makes `header`'s entity on its cell, with `attributes`: new, or
+    /// refused, an entity standing there
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
+    pub(crate) fn make(&mut self, header: Header, attributes: &[AttributeBlock]) -> Put {
+        let to = place(header.at);
+        let Err(index) = self.find(to) else {
+            return Put::Refused;
+        };
+        self.places.insert(index, to);
+        self.tile_starts[search_tile(to) + 1..].iter_mut().for_each(|start| *start += 1);
+        self.stored.insert(index, StoredEntity { header, first: self.attributes.len() as u32, count: attributes.len() as u32 });
+        self.attributes.extend_from_slice(attributes);
+        Put::New
+    }
+
+    /// Gives the entity standing on the cell at `was` `header` -- its
+    /// cell, when it wakes -- and `attributes`, or, with none given,
+    /// leaves it those it has: moved to `header`'s cell, or left
+    /// where it stands, that one taken; passed over, none standing on
+    /// `was` (`docs/entity_manager.md`, "A chunk's bucket", Putting).
     pub(crate) fn put(&mut self, header: Header, was: u16, attributes: Option<&[AttributeBlock]>) -> Put {
         let to = place(header.at);
-        let (index, put) = match (self.find(was, header.id), was == to) {
+        let (index, put) = match (self.find(was), was == to) {
             (Ok(index), true) => (index, Put::InPlace),
             (Ok(from), false) => {
                 let (goes, occupied) = self.index_of(to);
@@ -153,17 +170,7 @@ impl Bucket {
                 }
                 (self.shift_entity(from, goes, to), Put::Moved)
             }
-            (Err(_), true) if attributes.is_none() => return Put::PassedOver,
-            (Err((_, true)), true) => return Put::Refused,
-            (Err((index, false)), true) => {
-                let attributes = attributes.unwrap_or_default();
-                self.places.insert(index, to);
-                self.tile_starts[search_tile(to) + 1..].iter_mut().for_each(|start| *start += 1);
-                self.stored.insert(index, StoredEntity { header, first: self.attributes.len() as u32, count: attributes.len() as u32 });
-                self.attributes.extend_from_slice(attributes);
-                return Put::New;
-            }
-            (Err(_), false) => return Put::PassedOver,
+            (Err(_), _) => return Put::PassedOver,
         };
         self.rewrite(index, header, attributes);
         put
@@ -189,13 +196,13 @@ impl Bucket {
         self.sweep();
     }
 
-    /// Sets the attribute of type `kind` of the entity whose ID is `id`,
-    /// standing on the cell at `place`, to `blocks`, or removes it if
-    /// they are none. Returns whether the entity is here. One as long
-    /// as it was is written in place; any other makes the entity's run
-    /// anew at the end of the list.
-    pub(crate) fn edit(&mut self, id: EntityId, place: u16, kind: AttributeType, blocks: &[AttributeBlock]) -> bool {
-        let Ok(index) = self.find(place, id) else {
+    /// Sets the attribute of type `kind` of the entity standing on the
+    /// cell at `place` to `blocks`, or removes it if they are none.
+    /// Returns whether an entity stands there. One as long as it was
+    /// is written in place; any other makes the entity's run anew at
+    /// the end of the list.
+    pub(crate) fn edit(&mut self, place: u16, kind: AttributeType, blocks: &[AttributeBlock]) -> bool {
+        let Ok(index) = self.find(place) else {
             return false;
         };
         let (first, count) = (self.stored[index].first as usize, self.stored[index].count as usize);
@@ -217,10 +224,9 @@ impl Bucket {
         true
     }
 
-    /// Removes the entity whose ID is `id` standing on `at`. Returns
-    /// whether it was here.
-    pub(crate) fn remove(&mut self, id: EntityId, at: CellIndex) -> bool {
-        let Ok(index) = self.find(place(at), id) else {
+    /// Removes the entity standing on `at`. Returns whether one did.
+    pub(crate) fn remove(&mut self, at: CellIndex) -> bool {
+        let Ok(index) = self.find(place(at)) else {
             return false;
         };
         let place = self.places.remove(index);
@@ -240,13 +246,12 @@ impl Bucket {
         (index, self.places.get(index) == Some(&place))
     }
 
-    /// Where the entity whose ID is `id`, on the cell at `place`, is in
-    /// the bucket's order; or, if it is not there, where the cell's
-    /// entity would go and whether another entity stands there.
+    /// Where the entity on the cell at `place` is in the bucket's
+    /// order; or, none standing there, where it would go.
     #[inline]
-    fn find(&self, place: u16, id: EntityId) -> Result<usize, (usize, bool)> {
+    fn find(&self, place: u16) -> Result<usize, usize> {
         let (index, occupied) = self.index_of(place);
-        if occupied && self.stored[index].header.id == id { Ok(index) } else { Err((index, occupied)) }
+        if occupied { Ok(index) } else { Err(index) }
     }
 
     /// Moves the entity at `from` to `goes`, where an entity on the free
