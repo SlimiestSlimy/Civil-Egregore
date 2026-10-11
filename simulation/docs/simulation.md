@@ -656,7 +656,7 @@ rate: `TICKS_A_SIMULATION_SECOND`, 256. A time is kept as the ticks it
 takes at that rate, the nearest whole number and one at least, worked
 out as the code is built: a rule's times cost nothing at run time, and
 a rule written so is the same rule at another tick rate -- a sheep
-hungry again 27 seconds after a meal is so at 256 ticks a second or
+hungry again 45 seconds after a meal is so at 256 ticks a second or
 at 64.
 
 A thing that happens by chance says its **mean simulation time**: how
@@ -673,7 +673,12 @@ samples -- or a count -- the trees that crowd one -- is as it was.
 
 No rule says the tick rate or a number of ticks: a rule's times are
 `SimulationTime`s, and a rule is the same rule whatever a second of
-the simulation is defined as.
+the simulation is defined as. When a thing next happens is the tick
+a time after this one (`SimulationTime::after`); a time drawn -- a
+step's jitter, the part of a life a sleep is -- is part of a time
+(`part_drawn`); how long a sleep is, the time between two ticks
+(`between`). What a rule keeps of when -- an entity's wake, when a
+sheep is next hungry -- is a tick still: a moment, not a length.
 
 What is coarser at a lower rate is only what a tick is: nothing takes
 less than one, and two times closer than a tick are the same. The

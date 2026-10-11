@@ -125,7 +125,7 @@ what they always do and are not listed.
 |---|---|---|---|
 | **tick** | one step of the simulation: every hot superchunk's turn, then every write and instruction applied | phase, turn | step (an entity's move), frame |
 | **tick rate** | ticks in a second of the simulation: `TICKS_A_SIMULATION_SECOND`, 256, written in one place | simulation time, pace | |
-| **simulation time** | how long a thing takes in the world, said in seconds of the simulation and turned to ticks by the tick rate alone (`SimulationTime`); a thing that happens by chance says its **mean simulation time**, and its chance each tick is worked out from it | tick rate, tick | |
+| **simulation time** | how long a thing takes in the world, said in seconds of the simulation and turned to ticks by the tick rate alone (`SimulationTime`); a thing that happens by chance says its **mean simulation time**, and its chance each tick is worked out from it; a rule adds a time to the tick it runs in (`SimulationTime::after`), draws part of one (`part_drawn`) or measures one between two ticks (`between`), and never says a number of ticks | tick rate, tick | |
 | **phase** | half a tick: the **first** computes -- rules read the world as the tick found it and queue writes and instructions; the **second** applies them | tick | |
 | **turn** | one superchunk's part of the first phase: what a rule is given (`Turn`) | rule, superchunk | |
 | **rule table** | the one list of the rules a world ticks, each with its name, the names of its counts, and its function (`server::RULES`) | rule, rule counts | registry |

@@ -10,22 +10,21 @@ use actions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
 use actions::{WholeAttribute, Chance, area, cells, compare, entities, place_counted, this_tick, walking, CellCartesian, CellIndex, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
-/// Every time below is said in simulation time, and is ticks only
-/// once worked out: the same sheep at any tick rate.
+/// Every time below is said in simulation time: the rule adds them to
+/// the tick it runs in and never says how many ticks they are -- the
+/// same sheep at any tick rate.
 ///
-/// Ticks between a walking sheep's steps, at the least: a quarter of
-/// a second...
-pub const STEP_TICKS: u64 = SimulationTime::milliseconds(250).ticks();
-/// ...and up to this many more, a sixteenth of a second, drawn each
+/// The time between a walking sheep's steps, at the least: a quarter
+/// of a second...
+pub const STEP: SimulationTime = SimulationTime::milliseconds(250);
+/// ...and up to this much more, a sixteenth of a second, drawn each
 /// wake, so the flock's wakes spread over the ticks.
-pub const STEP_JITTER: u64 = SimulationTime::milliseconds(62).ticks();
-/// Ticks after a meal a sheep is hungry again at: until then it eats
-/// nothing, though it stands on grass, and sleeps.
-pub const MEAL_TICKS: u64 = MEAL.ticks();
-/// The simulation time from a meal to being hungry again.
-pub const MEAL: SimulationTime = SimulationTime::seconds(27);
-/// Ticks a hungry sheep finds no meal in before it starves.
-pub const STARVE_TICKS: u64 = SimulationTime::seconds(54).ticks();
+pub const STEP_JITTER: SimulationTime = SimulationTime::milliseconds(62);
+/// The time from a meal to being hungry again: until then a sheep
+/// eats nothing, though it stands on grass, and sleeps.
+pub const MEAL: SimulationTime = SimulationTime::seconds(45);
+/// The time a hungry sheep finds no meal in before it starves.
+pub const STARVATION: SimulationTime = SimulationTime::seconds(90);
 /// Cells of grass among the 16 by 16 about a sheep for the pasture
 /// to be lush enough to breed on: a quarter of them
 /// (`docs/entity_rules.md`, "The sheep").
@@ -36,13 +35,13 @@ pub const MEAN_TIME_TO_CONCEIVE: SimulationTime = SimulationTime::seconds(135);
 /// The chance, each meal of a grown sheep on lush pasture, that it
 /// falls pregnant.
 pub const CONCEIVE_CHANCE: Chance = MEAN_TIME_TO_CONCEIVE.chance_each(MEAL);
-/// Ticks of sleep to a sheep's life, on average: before a sleep of so
-/// many ticks it dies of old age at so many in these.
-pub const LIFE_TICKS: u64 = SimulationTime::seconds(675).ticks();
-/// Ticks a sheep that set off roaming walks for, one way, once it is
-/// hungry again, before it looks for grass: 96 steps or so, out of
-/// the patch its flock has grazed.
-pub const ROAM_TICKS: u64 = SimulationTime::seconds(27).ticks();
+/// The sleep there is to a sheep's life, on average: before a sleep
+/// it dies of old age at that sleep's part of this.
+pub const LIFE: SimulationTime = SimulationTime::seconds(675);
+/// The time a sheep that set off roaming walks for, one way, once it
+/// is hungry again, before it looks for grass: 96 steps or so, out
+/// of the patch its flock has grazed.
+pub const ROAM: SimulationTime = SimulationTime::seconds(27);
 /// The simulation time a sheep eating on lush pasture takes to set
 /// off roaming all the same, on average: on thin pasture it sets off
 /// at every meal.
@@ -50,10 +49,10 @@ pub const MEAN_TIME_TO_ROAM: SimulationTime = SimulationTime::seconds(54);
 /// The chance, each meal on lush pasture, that the sheep sets off
 /// roaming when next hungry.
 pub const ROAM_CHANCE: Chance = MEAN_TIME_TO_ROAM.chance_each(MEAL);
-/// Ticks from falling pregnant to giving birth.
-pub const GESTATION_TICKS: u64 = SimulationTime::milliseconds(4_500).ticks();
-/// Ticks a lamb takes to grow.
-pub const LAMB_TICKS: u64 = SimulationTime::seconds(18).ticks();
+/// The time from falling pregnant to giving birth.
+pub const GESTATION: SimulationTime = SimulationTime::milliseconds(4_500);
+/// The time a lamb takes to grow.
+pub const LAMBHOOD: SimulationTime = SimulationTime::seconds(18);
 
 /// What the rule counts, each named at its place in its
 /// [`RuleCounts`]: the one order, the places below worked out from it.
@@ -106,7 +105,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let (hungry_at, roaming) = (was.hungry_at, was.roaming_until != 0);
     // On its way, roaming, it does not stop to eat.
     let fed = now >= hungry_at && !(grass.set & about.centre()).is_empty() && !roaming;
-    if !fed && now >= hungry_at + STARVE_TICKS {
+    if !fed && now >= STARVATION.after(hungry_at) {
         entities::remove(turn, &before);
         done[DEATHS] += 1;
         return;
@@ -118,16 +117,16 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         // against it, and the grass cleared last. Should it be gone by then -- decayed in this very tick -- none of it happens, and
         // what is held against the grass being gone does instead: the sheep sleeps a step, hungry as it was, and wakes to look again.
         compare::from_here(turn, compare::holds(GRASS, at));
-        state.hungry_at = now + MEAL_TICKS;
+        state.hungry_at = MEAL.after(now);
         // Off thin pasture always; off lush, now and then: a flock spreads over the land it could stay on.
         let roams = !lush || this_tick::random(turn).chance(ROAM_CHANCE);
         if let (true, Some(way)) = (roams, around::pick(this_tick::random(turn), &about, steppable)) {
-            (state.roaming_until, state.roaming_neighbour) = (now + MEAL_TICKS + ROAM_TICKS, way);
+            (state.roaming_until, state.roaming_neighbour) = (ROAM.after(MEAL.after(now)), way);
         }
     }
     let hungry = !fed && now >= hungry_at;
     // What it next has to wake for, were it to sleep as long as it can.
-    let mut needs = if fed { now + MEAL_TICKS } else { hungry_at };
+    let mut needs = if fed { MEAL.after(now) } else { hungry_at };
     let grown_at = (was.grown_at != 0).then_some(was.grown_at);
     // The cell it bears its lamb on this tick, if it does: it stays where it is, the cell not to be the one it steps to.
     let mut bearing = None;
@@ -142,8 +141,8 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
             needs = now;
         }
         None if lush && grown_at.is_none() && this_tick::random(turn).chance(CONCEIVE_CHANCE) => {
-            state.lamb_due_at = now + GESTATION_TICKS;
-            needs = needs.min(now + GESTATION_TICKS);
+            state.lamb_due_at = GESTATION.after(now);
+            needs = needs.min(state.lamb_due_at);
         }
         None => {}
     }
@@ -182,10 +181,10 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let wake = if hungry {
         next_step(turn)
     } else {
-        next_step(turn).max(needs + this_tick::random(turn).below(STEP_JITTER))
+        next_step(turn).max(STEP_JITTER.part_drawn(this_tick::random(turn)).after(needs))
     };
-    // Old age comes by the tick, not the wake: a long sleep is as much of a life as many short ones.
-    if this_tick::random(turn).below(LIFE_TICKS) < wake - now {
+    // Old age comes by the time slept, not the wake: a long sleep is as much of a life as many short ones.
+    if LIFE.part_drawn(this_tick::random(turn)) < SimulationTime::between(now, wake) {
         entities::remove(turn, &before);
         count(turn, done, fed.then_some(at), DEATHS);
     } else {
@@ -217,7 +216,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
 /// cell is in: the cell taken first, the mother is pregnant still.
 fn bear(turn: &mut Turn, mother: &Header, state: SheepState, beside: CellIndex) {
     let now = this_tick::now(turn);
-    let (wake, born) = (next_step(turn), SheepState { hungry_at: now + MEAL_TICKS, grown_at: now + LAMB_TICKS, ..SheepState::default() });
+    let (wake, born) = (next_step(turn), SheepState { hungry_at: MEAL.after(now), grown_at: LAMBHOOD.after(now), ..SheepState::default() });
     let delivered = SheepState { lamb_due_at: 0, ..state };
     compare::from_here(turn, compare::attribute(mother, SHEEP_STATE, Some(state)));
     entities::make(turn, SHEEP, beside, wake, &WholeAttribute::holding(SHEEP_STATE, born));
@@ -239,13 +238,13 @@ fn count(turn: &mut Turn, done: &mut RuleCounts, fed: Option<CellIndex>, place: 
 
 /// The tick a sheep taking a step now wakes next.
 fn next_step(turn: &mut Turn) -> u64 {
-    this_tick::now(turn) + STEP_TICKS + this_tick::random(turn).below(STEP_JITTER)
+    let now = this_tick::now(turn);
+    STEP_JITTER.part_drawn(this_tick::random(turn)).after(STEP.after(now))
 }
 
 /// Queues `count` grown sheep, each some way from its next meal, each
 /// on a cell of its own of `superchunk` drawn from `random` -- at most
-/// half its cells' worth of them -- waking over the next [`STEP_TICKS`]
-/// ticks: in the world once whoever runs it places what was put. A
+/// half its cells' worth of them -- waking over the next [`STEP`]: in the world once whoever runs it places what was put. A
 /// cell that is not free -- a tree's -- is drawn again; fewer are put
 /// only where a superchunk has almost no free cell left.
 pub fn flock(entities: &mut EntitiesBetweenTicks, superchunk: SuperchunkIndex, count: usize, random: &mut Rng) {
@@ -262,7 +261,7 @@ pub fn flock(entities: &mut EntitiesBetweenTicks, superchunk: SuperchunkIndex, c
         if !taken.insert((at.x, at.y)) {
             continue;
         }
-        let header = Header { kind: SHEEP, at: at.into(), wake: now + random.below(STEP_TICKS) };
-        put += usize::from(entities.put(header, &WholeAttribute::holding(SHEEP_STATE, SheepState { hungry_at: now + random.below(MEAL_TICKS), ..SheepState::default() })));
+        let header = Header { kind: SHEEP, at: at.into(), wake: STEP.part_drawn(random).after(now) };
+        put += usize::from(entities.put(header, &WholeAttribute::holding(SHEEP_STATE, SheepState { hungry_at: MEAL.part_drawn(random).after(now), ..SheepState::default() })));
     }
 }

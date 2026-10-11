@@ -51,7 +51,7 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     let (mut stepped, mut born) = (0, 0);
     // A stretch at the least; and on, to the first step: within two meals, as no grass grows back with the sheep's rule alone run.
     let (stretch, mut tick) = (400, 0);
-    while tick < stretch || stepped == 0 && tick < 2 * entity_rules::sheep::MEAL_TICKS {
+    while tick < stretch || stepped == 0 && tick < 2 * entity_rules::sheep::MEAL.ticks() {
         tick_sheep(&mut world);
         tick += 1;
         if tick % 50 == 0 && tick <= stretch {

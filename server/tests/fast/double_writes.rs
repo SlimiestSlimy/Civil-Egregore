@@ -9,7 +9,7 @@ use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, p
 use bitplane_manager::Write;
 use coordinates::{CellCartesian, CellIndex};
 use entity_manager::{Header, WholeAttribute, NEVER};
-use entity_rules::sheep::{SheepState, BIRTHS, EATEN, SHEEP, SHEEP_STATE, STEP_JITTER, STEP_TICKS};
+use entity_rules::sheep::{SheepState, BIRTHS, EATEN, SHEEP, SHEEP_STATE, STEP_JITTER, STEP};
 use sca_rules::{grass, trees};
 use server::World;
 use std::collections::HashSet;
@@ -43,13 +43,13 @@ fn no_two_sheep_eat_one_cell() {
     while taken.len() < 10_000 {
         let (x, y) = (random.below(SIDE as u64) as u32, random.below(SIDE as u64) as u32);
         if taken.insert((x, y)) {
-            let header = Header { kind: SHEEP, at: cell(&world, 400 + x, 400 + y), wake: random.below(STEP_TICKS) };
+            let header = Header { kind: SHEEP, at: cell(&world, 400 + x, 400 + y), wake: random.below(STEP.ticks()) };
             world.put_entity(header, &hungry_at(0));
         }
     }
     let before = cells_of_grass(&world);
     let mut eaten = 0;
-    for tick in 0..4 * STEP_TICKS {
+    for tick in 0..4 * STEP.ticks() {
         let report = tick_sheep(&mut world);
         assert_eq!((report.writes_applied.writes as u64, report.writes_applied.changed), (report.rules[EATEN], report.rules[EATEN]), "tick {tick}");
         eaten += report.rules[EATEN];
@@ -151,7 +151,7 @@ fn a_lamb_refused_its_cell_is_born_later() {
         world.remove_entity(blocker);
     }
     let (mut births, mut most_lambs) = (1, 1);
-    for _ in 1..2 + 2 * (STEP_TICKS + STEP_JITTER) {
+    for _ in 1..2 + 2 * (STEP.ticks() + STEP_JITTER.ticks()) {
         births += tick_sheep(&mut world).rules[BIRTHS];
         // Seen as it is born: a lamb may die of old age at its first wake.
         most_lambs = most_lambs.max(lambs(&world));
@@ -183,7 +183,7 @@ fn a_lamb_whose_cell_was_taken_is_put_the_tick_after() {
     let lambs = world.entities().iter().filter(|sheep| state(sheep).grown_at != 0).count();
     // A lamb made is a birth counted, in the tick it is made in.
     assert_eq!((report.instructions_applied.refused + lambs, report.rules[BIRTHS] as usize), (2, lambs), "each made, or refused its cell");
-    let births: u64 = report.rules[BIRTHS] + (0..2 * (STEP_TICKS + STEP_JITTER)).map(|_| tick_sheep(&mut world).rules[BIRTHS]).sum::<u64>();
+    let births: u64 = report.rules[BIRTHS] + (0..2 * (STEP.ticks() + STEP_JITTER.ticks())).map(|_| tick_sheep(&mut world).rules[BIRTHS]).sum::<u64>();
     assert_eq!(births, 2);
     assert!(world.entities().iter().all(|sheep| state(&sheep).lamb_due_at == 0));
 }
