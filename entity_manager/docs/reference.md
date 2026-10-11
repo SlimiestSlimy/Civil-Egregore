@@ -59,9 +59,9 @@ the entity standing on `was`, with no attributes given those it has
 kept: `InPlace`; `Moved` (**`shift_entity`**) to its cell if that is
 another and free, else `Stayed`; `PassedOver`, nobody standing on
 `was`. **`rewrite`**: attributes in place when as many blocks,
-else a new run at the end. **`remove(at)`**, **`index_of(place)`**,
+else a new attribute list at the end. **`remove(at)`**, **`index_of(place)`**,
 **`find(place)`**, **`entity`**, **`edit(place, kind, blocks)`**
-(one attribute set in place if as long as it was, or the run made anew
+(one attribute set in place if as long as it was, or the attribute list made anew
 with it added, removed -- no blocks given -- or of another length),
 **`write_bytes(place, kind, offset, bytes, value)`** (a member of an
 attribute written in place, nothing moved), **`set_wake(place,

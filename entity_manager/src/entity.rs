@@ -1,5 +1,5 @@
 //! What an entity is: a header -- its type, its cell, when it next
-//! wakes -- and its attributes, a run of blocks that may grow or
+//! wakes -- and its attribute list, blocks that may grow or
 //! shrink at run time. It has no ID: no two stand on one cell, so the
 //! cell it stands on names it (`docs/entity_manager.md`,
 //! "Instructions", An entity's name in a tick).

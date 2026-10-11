@@ -55,7 +55,7 @@ said by its first word -- the type's last four bits, the blocks less
 one -- so nothing is looked up to step over an attribute
 (`AttributeBlock::blocks`). The types are one namespace, everything's:
 an ID of another supertype, or whose number is 0, is **not an attribute's**, and a block that
-begins with one is no attribute (`sorted` says so of a run of blocks,
+begins with one is no attribute (`sorted` says so of an attribute list,
 and a saved entity with one is not read).
 
 **Variable size.** Most attributes are of a fixed size, set as the
@@ -74,7 +74,8 @@ walk over an entity's attributes honours an attribute length all the same,
 and a test makes one to say so
 (`../tests/fine.rs`).
 
-**An entity's attributes** are a run of blocks in its bucket's list,
+**An entity's attributes** are its **attribute list**: blocks one
+after another among its bucket's blocks,
 its type's default attribute first if it has one, the others after it
 sorted by type, each type once. Finding one is a walk from the first
 (`find_attribute`): read the type, and either it is the one, or step
@@ -187,11 +188,12 @@ where it was and changed all the same. What came of it is a `Put`
 (one put where it stood because its cell was another's that tick is
 said to have stayed too, `Put::stayed`).
 
-**Attributes.** Each entity's attributes are a run of the bucket's
-list of blocks. They are rewritten in place when they stay as many
+**Attributes.** Each entity's attribute list is a part of the bucket's
+blocks. They are rewritten in place when they stay as many
 blocks. When that changes -- an attribute added or removed, or one of
-a varying size made longer or shorter, which is rare -- the new run
-goes at the end of the list and the old run becomes garbage, swept out
+a varying size made longer or shorter, which is rare -- the new
+attribute list goes at the end of the bucket's blocks and the old one
+becomes garbage, swept out
 once there is as much garbage as blocks in use (`attribute_counts`:
 the two).
 

@@ -1,4 +1,4 @@
-//! An entity's attributes: a run of 16-byte blocks sorted by type,
+//! An entity's attributes: its attribute list, 16-byte blocks sorted by type,
 //! walked from the first, read and written as their layouts' members
 //! (`docs/entity_manager.md`, "Attributes, a block each").
 
@@ -240,7 +240,7 @@ pub fn find_attribute(blocks: &[AttributeBlock], kind: AttributeType) -> Result<
 }
 
 /// A sum of `blocks`, the same for the same blocks in the same order:
-/// what two runs of attributes are told apart by where one of them is
+/// what two attribute lists are told apart by where one of them is
 /// not at hand -- in another superchunk, or queued with a compare. Two
 /// that differ sum the same once in 2^64 or so.
 pub fn blocks_sum(blocks: &[AttributeBlock]) -> u64 {
