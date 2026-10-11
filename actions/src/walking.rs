@@ -58,16 +58,17 @@ pub fn around_unwalled(turn: &Turn, about: &About) -> Cells {
     if east | south == 0 {
         return about.nine();
     }
+    use around::{EAST, HERE, NORTH, NORTH_EAST, NORTH_WEST, SOUTH, SOUTH_EAST, SOUTH_WEST, WEST};
     // Whether the cell `way` from it keeps a wall east of it, or south.
     let (east_of, south_of) = (|way: u32| east & about.way_word(way) != 0, |way: u32| south & about.way_word(way) != 0);
     // A wall is kept by the upper or left cell of the two: the centre's own east and south, its neighbours' west and north.
-    let (to_east, to_west, to_south, to_north) = (east_of(4), east_of(3), south_of(4), south_of(1));
+    let (to_east, to_west, to_south, to_north) = (east_of(HERE), east_of(WEST), south_of(HERE), south_of(NORTH));
     // A diagonal is barred unless both ways round it are open.
-    let to_south_east = to_east | to_south | south_of(5) | east_of(7);
-    let to_south_west = to_west | to_south | south_of(3) | east_of(6);
-    let to_north_east = to_east | to_north | south_of(2) | east_of(1);
-    let to_north_west = to_west | to_north | south_of(0) | east_of(0);
-    let barred = [(to_north_west, 0), (to_north, 1), (to_north_east, 2), (to_west, 3), (to_east, 5), (to_south_west, 6), (to_south, 7), (to_south_east, 8)];
+    let to_south_east = to_east | to_south | south_of(EAST) | east_of(SOUTH);
+    let to_south_west = to_west | to_south | south_of(WEST) | east_of(SOUTH_WEST);
+    let to_north_east = to_east | to_north | south_of(NORTH_EAST) | east_of(NORTH);
+    let to_north_west = to_west | to_north | south_of(NORTH_WEST) | east_of(NORTH_WEST);
+    let barred = [(to_north_west, NORTH_WEST), (to_north, NORTH), (to_north_east, NORTH_EAST), (to_west, WEST), (to_east, EAST), (to_south_west, SOUTH_WEST), (to_south, SOUTH), (to_south_east, SOUTH_EAST)];
     Cells(barred.iter().fold(about.nine_word(), |open, &(barred, way)| if barred { open & !about.way_word(way) } else { open }))
 }
 

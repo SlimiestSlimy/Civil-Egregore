@@ -174,7 +174,7 @@ fn walls_of_the_terrain_bar_steps() {
                 if at == from {
                     // The three cells east of it are behind the cliff.
                     let about = around::about(at);
-                    assert_eq!(walking::around_unwalled(turn, &about), about.nine().without(about.towards(2) | about.towards(5) | about.towards(8)));
+                    assert_eq!(walking::around_unwalled(turn, &about), about.nine().without(about.towards(around::NORTH_EAST) | about.towards(around::EAST) | about.towards(around::SOUTH_EAST)));
                 }
                 let passable = area::layer(turn, STONE, at).hot;
                 let next = walking::step_to(turn, at, to, &passable).expect("a way through the gap");
@@ -218,8 +218,9 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
                 let at = cell(x, y);
                 let (open, walls) = (walking::around_unwalled(turn, &around::about(at)), walking::area_walls(turn, at));
                 let centre = pathfinding::Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
-                for bit in (0..9).filter(|&bit| bit != 4) {
-                    let (dx, dy) = (bit as i8 % 3 - 1, bit as i8 / 3 - 1);
+                for bit in (0..around::WAYS).filter(|&bit| bit != around::HERE) {
+                    let beside = around::cell(at, bit).expect("in the world").cartesian();
+                    let (dx, dy) = ((beside.x as i64 - x as i64) as i8, (beside.y as i64 - y as i64) as i8);
                     assert_eq!(!(open & around::about(at).towards(bit)).is_empty(), !walls.bars_step(centre, dx, dy), "({x}, {y}) by ({dx}, {dy})");
                     *checked.lock().unwrap() += 1;
                 }

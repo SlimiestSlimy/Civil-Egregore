@@ -47,6 +47,13 @@ fn the_nine_about_a_cell_are_its_cells_read_one_by_one() {
                 set_cells += usize::from(set);
             }
             assert_eq!((about.nine().count(), about.ring().count(), about.centre(), nine.set.count()), (9, 8, about.towards(around::HERE), (nine.set & about.nine()).count()));
+            // One drawn is the one of that rank among the ways chosen among, in the ways' order: the same neighbour wherever the cell lies in its tiles.
+            let ways: Vec<u32> = (0..around::WAYS).filter(|&way| !(nine.set & about.towards(way)).is_empty()).collect();
+            let draws = turn.random().draw();
+            for draw in 0..8 * ways.len() as u64 {
+                let (mut picking, mut ranking) = (Rng::for_stream(draws, draw), Rng::for_stream(draws, draw));
+                assert_eq!(around::pick(&mut picking, &about, nine.set), Some(ways[ranking.below(ways.len() as u64) as usize]), "about ({x}, {y})");
+            }
             // One drawn among those set is one of them, and with draws enough each is drawn.
             let mut drawn = around::Cells::default();
             for _ in 0..40 * nine.set.count() {

@@ -83,8 +83,10 @@ places them.
 
 The cells about a cell, a set of them a word of bits in Morton order:
 **`Cells`** (`&`, `|`, **`without`**, **`is_empty`**, **`count`**);
-**`Around`** `{set, hot}`. `WAYS` (9), **`HERE`** (4): the ways from a
-cell to the nine about it, row by row. **`about(at)`**: an **`About`**
+**`Around`** `{set, hot}`. `WAYS` (9): the ways from a
+cell to the nine about it, in Morton order of where they lead --
+`NORTH_WEST`, `NORTH`, `WEST`, **`HERE`** (3), `NORTH_EAST`, `EAST`,
+`SOUTH_WEST`, `SOUTH`, `SOUTH_EAST`. **`about(at)`**: an **`About`**
 (`tiles_about.rs`), of which **`centre()`**, **`ring()`**,
 **`nine()`**, **`towards(way)`** are sets. **`cell(at, way)`**,
 **`way_of(at, cell)`**: a way and its cell. **`pick(random, about,
@@ -106,7 +108,7 @@ in Morton order over their 8x8 cells (`SQUARE_SIDE`, `SQUARE_CELLS`;
 neighbours alone, as bits of the word -- from `NINE_OF`, made as the
 program is compiled; **`way_word(way)`**: the one cell a way off, by
 `ABOUT`, each of the nine's (`NINE`) bit for each place the cell can
-have; **`way_of_bit(bit)`**: back. **`layer(turn, type, about,
+have; **`ways_of(word)`**: a set of them as ways, a bit a way; `WAY_OFFSETS`: where each way leads, across and down, in Morton order; `WAY_AT`: the way to each of the nine, row by row. **`layer(turn, type, about,
 under)`**, **`layers(turn, types, about, under)`**: a layer in the
 tiles, the cells of `under` alone, a `SmallTiles` (`actions.md`,
 "The small tiles about a cell").
