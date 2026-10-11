@@ -302,8 +302,20 @@ NOW, the user, 2026-10-11, in this order:
    reduction and simplification: `simulation` first, then the other
    crates, not tessera. ("after finishing all the queued tasks, were
    doing code size reduction and simplification".)
-THEN: climate ("good, now were going to work on climate!"; nothing
-said of it yet -- ask what it tracks, at what scale, what it affects).
+4. "btw i still see a lot of \"tick\" in sheep.rs, we should be using
+   sim-seconds instead" (said while 2 was measured).
+   And: "everything using ticks that can use simulation time should
+   do it, actions, rules of any kind, etc".
+5. "also, type registry could use some better words haha, i hope the
+   glossary is updated, thats what must be updated first before any
+   docs" -- RULE: the glossary first, then the docs.
+THEN: climate ("good, now were going to work on climate!"). Said
+2026-10-11: "ok, now here is the climate stuff, we have a new
+wideplane, of 4 bits per cell as well, its the cloud layer, this
+simply casts a shadow with differing intensity based on the number,
+where 0 is no cloud and 15 is max cloud shadow, but this bitplane
+works in 8x8 sections of the world, ie each cell in this plane covers
+an 8x8 area of the world". Not said yet: what makes and moves clouds.
 WAITING: mask / word-of-cells instructions ("this will have to wait
 for now haha, too much complex stuff"); Morton pathfinding (branch
 wip/morton-search, pathfinding/src/morton.rs, tested equal to the
@@ -429,8 +441,8 @@ RULES AND TIME
   drifts and the user is using it. Border probe: `AI_SCRATCHPAD
   acts_over_a_border side every stepping ticks threads crossing`.
   The scratch folder is a small tmpfs: one or two binaries at most.
-- The check's last line now: 600,7c13edff92f5d70f,acb69968c95fdcb4,
-  fecb18dba5bea4ec,6b2e44078bde7624,cbbe5c62e1e5fae6,e220a8397b1dcdaf
+- The check's last line now: 600,cefae6934aac104e,708d986ad043fb37,
+  5c7b75f20c6ba45a,abbfe87d131ea892,40d474e53b88bbd1,e220a8397b1dcdaf
 - Borders of chunks and superchunks are invisible to what is not
   chance; chance may hang on them ("rngs per superchunk were the plan
   all along"). A neighbour drawn does not: around::pick goes by the
@@ -450,7 +462,8 @@ RULES AND TIME
   pasture 300000 333 4000 4 0` on the measuring seed -- 16,000 sheep
   rise past 150,000, the grass goes to 0, the last sheep dies about
   tick 240,000 (after the roaming change: peak 161,600 at 203,000,
-  gone by 299,800). The same on the build of that morning (~e2dc19d);
+  gone by 299,800; with the meal 45 s and starving 90 s: peak
+  279,700 at 250,000, 123,000 and falling at 300,000). The same on the build of that morning (~e2dc19d);
   docs/civil_egregore.md said it settled near 10,000 and now says it
   does not. Cause not looked for.
 - Costs not found: +1.3% processor instructions a tick from the

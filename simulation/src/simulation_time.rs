@@ -4,6 +4,7 @@
 //! changed in one place (`docs/simulation.md`, "Simulation time").
 
 use utilities::chance::Chance;
+use utilities::rng::Rng;
 
 /// Ticks in a second of the simulation: the tick rate, written here
 /// and nowhere else.
@@ -14,7 +15,8 @@ const MILLISECONDS_A_SECOND: u64 = 1000;
 
 /// A length of simulation time, kept as the ticks it takes at
 /// [`TICKS_A_SIMULATION_SECOND`]: the nearest whole number of them,
-/// and one at least -- nothing takes less than a tick.
+/// and one at least when it is said in seconds -- nothing takes less
+/// than a tick; one drawn or measured may be none.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SimulationTime {
     /// The ticks it takes.
@@ -36,6 +38,22 @@ impl SimulationTime {
     /// The ticks it takes.
     pub const fn ticks(self) -> u64 {
         self.ticks
+    }
+
+    /// The tick this long after the tick `moment`.
+    pub const fn after(self, moment: u64) -> u64 {
+        moment + self.ticks
+    }
+
+    /// The time from the tick `moment` to the tick `later`.
+    pub const fn between(moment: u64, later: u64) -> Self {
+        Self { ticks: later - moment }
+    }
+
+    /// A time shorter than this, drawn from `random`: any tick of it
+    /// as likely as another.
+    pub fn part_drawn(self, random: &mut Rng) -> Self {
+        Self { ticks: random.below(self.ticks) }
     }
 
     /// The chance, each tick, of a thing that takes this long on

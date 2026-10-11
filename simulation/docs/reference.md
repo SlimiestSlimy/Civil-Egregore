@@ -315,7 +315,10 @@ entity not itself, noted in `Outbox::named_by_others`.
 alone; `MILLISECONDS_A_SECOND`. **`SimulationTime`**: a length of
 simulation time, kept as its ticks: **`seconds(seconds)`**,
 **`milliseconds(milliseconds)`** to the nearest tick and one at least,
-**`ticks`**, **`chance_a_tick`** the chance each tick of a thing that
+**`ticks`**, **`after(moment)`** the tick so long after another,
+**`between(moment, later)`** the time from a tick to a later one,
+**`part_drawn(random)`** a shorter time drawn, any tick of it as
+likely, **`chance_a_tick`** the chance each tick of a thing that
 takes so long on average, **`chance_each(every)`** its chance each
 time something happens that happens once in `every` on average.
 

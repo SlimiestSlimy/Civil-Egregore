@@ -57,23 +57,23 @@ A sheep sleeps until it next needs something, and wakes for that
 alone:
 
 - **Rests while satisfied**: fed, it sleeps where it stands until it is
-  hungry again, `MEAL_TICKS` after its meal -- or until its lamb is
+  hungry again, `MEAL` after its meal -- or until its lamb is
   due, or it is grown, if that is sooner. It does not wake to wander: a
   sheep with nothing to do costs the tick nothing.
 - **Eats**: hungry and on grass, it eats it, the cell back to dirt.
-  Hungry and not, it walks, a step every `STEP_TICKS` ticks and up to
+  Hungry and not, it walks, a step every `STEP` and up to
   `STEP_JITTER` more, drawn each wake so the flock's wakes spread over
-  the ticks; it starves `STARVE_TICKS` after it grew hungry.
+  the ticks; it starves `STARVATION` after it grew hungry.
 - **Breeds**: a grown sheep may fall pregnant on a meal taken on lush
   pasture -- `LUSH_CELLS` of the 16 by 16 cells about it grass, a
   quarter of them -- once in `MEAN_TIME_TO_CONCEIVE` of such eating on
-  average (`CONCEIVE_CHANCE` a meal); `GESTATION_TICKS` on,
-  a lamb is born on a free cell beside it, grown `LAMB_TICKS` after.
+  average (`CONCEIVE_CHANCE` a meal); `GESTATION` on,
+  a lamb is born on a free cell beside it, grown `LAMBHOOD` after.
   Grass left alone covers a third of the dirt and grows fastest
   covering a sixth: so a flock stops growing while the grass still
   grows back faster than it is eaten, and never strips it.
 - **Roams**: a meal taken where it is not lush, the sheep
-  sets off when next hungry, `ROAM_TICKS` of steps one way -- 96 or so
+  sets off when next hungry, `ROAM` of steps one way -- 96 or so
   -- eating nothing on the way, and looks for grass where it comes to.
   Without it lambs stay beside their mothers, a flock grazes its own
   patch bare, and breeds no more though the world is green. A meal on
@@ -81,9 +81,9 @@ alone:
   `MEAN_TIME_TO_ROAM` of such eating on average (`ROAM_CHANCE` a
   meal), so a flock spreads over land it could have stayed on. Fed, it
   sleeps as before; it is the hungry sheep that walks.
-- **Dies**: of hunger, or of old age -- `LIFE_TICKS` of sleep to a life
-  on average: before a sleep of so many ticks it dies at so many in
-  `LIFE_TICKS`, so a long sleep is as much of a life as many short
+- **Dies**: of hunger, or of old age -- `LIFE` of sleep to a life
+  on average: before a sleep it dies at that sleep's part of
+  `LIFE`, so a long sleep is as much of a life as many short
   ones.
 - **Never stands where another does**: it steps only to cells the
   collision plane does not hold, where no sheep stood as the tick
