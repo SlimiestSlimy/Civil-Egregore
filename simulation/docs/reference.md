@@ -52,9 +52,8 @@ each way, a row a word: cell `(x, y)` from `origin` at bit `x` of row
 another; **`write_cell(type, at, value, counted)`**;
 **`count(place)`**, landing where the compare open last does;
 **`make_entity(header)`**; **`move_entity(from, to)`**, within a
-superchunk; **`remove_entity(at)`**; **`cross_entity(left, after,
-default, attributes)`**: the entity made in another superchunk, its
-blocks carried beside the queue after a block of its type and wake;
+superchunk or over a border (`move_instruction`: a move, or a
+crossing, which lands its author in both); **`remove_entity(at)`**;
 **`write_attribute_member(at, kind, member, value)`**;
 **`write_attribute(at, attribute)`**: an attribute whole, its blocks
 carried; **`remove_attribute(at, kind)`**; **`write_wake(at, wake)`**.
@@ -63,7 +62,7 @@ under it and its end at once, the queue found once -- every write
 landing in the compare's superchunk; **`Write`**: a write as a value,
 those that carry no blocks (`instruction_of`: the instruction it is
 queued as and the cell it lands on). What is made of several --
-an entity stepping, crossing, an attribute edited member by member --
+an entity stepping, an attribute edited member by member --
 is `../../actions/`.
 **`slot_of`**: the slot of a superchunk, past the neighbours panicking;
 `queue_landing_in(superchunk)`: the queue something about to be queued
@@ -131,7 +130,7 @@ the rule's first count is counted under; `counted_number(place)`: a
 count's number, under `COUNTED_WHEN_APPLIED` (256) --
 **`CountedWhenApplied`**, a tick's counts made as it applied.
 `Queue` `{instructions, gated, carried}`: what is queued for one
-superchunk, and the blocks its crossings carry -- `clear`, `len`,
+superchunk, and the blocks its attributes given whole carry -- `clear`, `len`,
 `compares`.
 
 `apply.rs`: `Queue::apply(some, compares, superchunk, entities,
@@ -238,10 +237,9 @@ and those that did not; `acts_over_a_border` the authors whose
 instructions were applied to several superchunks at once.
 
 **`threads_for(superchunks)`**: every thread the machine has, no more
-than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived, settled, collision, applying_room}`:
+than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, collision, applying_room}`:
 the threads, and what a tick reuses -- an outbox a superchunk, room for
-samples a thread, each superchunk's random stream, and the entities
-crossed into each in a tick -- so a tick allocates nothing once they
+samples a thread, each superchunk's random stream -- so a tick allocates nothing once they
 have grown. **`Simulation::for_superchunks(superchunks)`**: on
 those; **`Simulation::new(threads)`**: on a number given, to measure
 against another; **`Simulation::on(dispatcher)`**: on threads others
@@ -259,14 +257,8 @@ thread; the second, each thread the superchunks it claims and
 their entities, passes each wheel's tick, then applies what the nine
 outboxes hold for it, segment by segment in the order of their authors
 (`simulation.md`, "One order, wherever the borders fall"); writes to superchunks not in use counted
-missed, entities made there lost (`Queue::count_missed`); the crossings settled
-(**`settle_crossings`**, in `tick/crossings.rs`: each superchunk's arrivals taken, then each
-thread its run of superchunks, each removing its leavers from its
-neighbours' arrivals and noting what those written there meanwhile
-ended with, and those removed there, in its `Settled` -- a
-`LeaversPart` a thread -- each then giving the ones it was put what
-they have and taking back those turned back, how many; and every
-entity named anew, the cells left cleared in the collision plane);
+missed, entities made there lost (`Queue::count_missed`); every
+entity named anew, the cells left cleared in the collision plane;
 the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
 offsets in a fixed order.
 
@@ -283,7 +275,13 @@ order)`: what is queued for a superchunk, sorted by author;
 `landed_in(source, lands)`: the hot superchunks an act lands in, and
 how many; `go_on(here, part, applied)`: applies down a superchunk's
 order until it is done or waits at an act, then the superchunks it may
-be waiting for.
+be waiting for. `tick/applying/following.rs` (`simulation.md`, "An entity over a border"):
+`Phase::named_by_others`, the entities others named, with those
+authors; `Repointed` `{also, arrived}`, what became of a segment
+naming an entity that crossed, kept in `repointed` and asked with
+`repointed_of(source, from, segment)` once `any_repointed`;
+`have_follow(crossed, held)`: as a crossing is applied, the later
+segments naming the entity re-pointed in the orders held.
 
 `tick/applying/who_goes_on.rs`: which thread goes on with which
 superchunk. `LetGoOn` `{list, lying}`: superchunks let go on after an
@@ -297,11 +295,18 @@ it; `give_up_those_kept(part)`; `is_something_to_do(part)`, `sleep`,
 `wake(all)`. `LONGEST_REST`: the longest a thread rests between two
 looks before it sleeps.
 
-In `turn/apply.rs`: `Landing`, where instructions land as they are
-applied (`of_slot(slot)`: a slot's superchunk and entities, if hot) --
-`LandingInOne`, a slot's queue, and `LandingInSeveral`, an act over a
-border; `Queue::jump_over`: over all under a compare that does not
-hold.
+In `turn/landing.rs`: `Landing`, where instructions land as they are
+applied (`SEVERAL`: whether in several superchunks, known as the code is built, so a slot's queue asks nothing of crossings; `of_slot(slot)`: a slot's superchunk and entities, if hot;
+`of_named(instruction)`: where the entity it names stands now;
+`of_crossing(instruction)`: the two superchunks of a crossing;
+`crossed(stood, to)`: one noted) -- `Held`, a superchunk and its
+entities; `LandingInOne`, a slot's queue, and `LandingInSeveral`
+`{source, lands, also, crossed}`, an act over a border. In `turn/apply.rs`:
+`Queue::jump_over`: over all under a compare that does not
+hold; `Queue::names_alone(some, stood)`: whether a segment is of one
+entity alone. `Instruction::names_an_entity`: whether an instruction
+names one. `Turn::note_named(at, instruction)`: an author naming an
+entity not itself, noted in `Outbox::named_by_others`.
 
 ## `simulation_time.rs`
 

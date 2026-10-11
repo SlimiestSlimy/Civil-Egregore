@@ -242,6 +242,76 @@ about its middle -- with its place in the order its origin's, and to
 wait for every superchunk it queues for as any author does: up to
 four, which the counting already allows.
 
+### An entity over a border
+
+An entity's ID for a tick is the Morton index of the cell the tick
+found it on: a handle that stays good for the whole tick, wherever
+the entity stands by then. Everything queued for it says that cell.
+Within a superchunk that is enough -- the superchunk's entities know
+where each one that moved went. Over a border it has to be made
+enough, since what is queued for the entity lies in the order of the
+superchunk it left.
+
+**The move is one instruction, and one move.** A rule queues a move
+(`Turn::move_entity`; `actions::entities::step`) and does not know
+whether the cell is over a border. If it is, the instruction is a
+crossing (`Instruction::cross_entity`: it lands where the entity
+stood, the cell it comes to beside it), and the author lands in both
+superchunks, so all it queued is an act over a border ("An act over a
+border"): applied once, by one thread holding both. As it is applied
+the entity is taken from one superchunk's entities and put in the
+other's with all it has at that moment
+(`SuperchunkEntities::cross_named`), its wake filed there. Its cell
+there taken, it stays, as any step does. Nothing is left behind to be
+settled after the tick: there is one entity, and it stands in one
+place.
+
+**What others queued for it follows it.** Its ID is noted in both
+superchunks -- where it left, as gone over the border; where it came
+to, as the entity now standing there (`crossed_to`,
+`named_from_abroad`) -- so an instruction that names it is applied
+to it where it stands, by whoever holds that superchunk
+(`Landing::of_named`). What is left is to have that superchunk held:
+
+- As a turn queues, it notes each entity an author names that is not
+  the author itself (`Turn::note_named`, into
+  `Outbox::named_by_others`). An author nearly always names itself,
+  so the list is nearly always empty.
+- As a crossing is applied, both superchunks are held and stopped at
+  the same place in the world's order, the crossing is known to have
+  happened, and neither has come to a later author. There
+  (`Phase::have_follow`), every segment of a later author that names
+  the entity -- found in the order of the superchunk it left -- is
+  re-pointed (`Repointed`, asked with `repointed_of`):
+  - of that entity alone (`Queue::names_alone`), it is taken out of
+    that order and put in the order of the superchunk the entity came
+    to: the right queue, and nothing waits;
+  - else it lands in both from then on, with whatever else it lands
+    in if it is an act over a border already: applied when every one
+    has come to it, as any act is.
+- A crossing refused re-points nothing: the entity stands where it
+  stood, and what names it lands there.
+
+An author before the entity in the order was applied before it
+crossed. So every compare and write of the tick finds the entity, in
+the world's one order, and where the border lies changes nothing but
+which threads meet. The superchunk an entity came to need be no
+neighbour of the author's: a segment re-pointed names its
+superchunks outright (`Repointed::also`; held by slot where they
+have one, besides where not: `LandingInSeveral::also`).
+
+Held by `../tests/fine/entity_over_a_border.rs`: an entity stepping
+over a border while eight others write to it in the same tick --
+before it and after it in the order, from its superchunk, from the
+one it comes to, and from one that is no neighbour of that, alone or
+with a write of their own -- stands over the border with every
+attribute given; its cell there taken, it stays with them all; one
+removing it after it crossed removes it. On one thread and on all.
+
+Not built: an authorless instruction (author 0) naming an entity is
+noted nowhere -- all authorless instructions are one place in the
+order, before every author's.
+
 ### Instructions
 
 All a rule's turn queues is instructions, one stream a superchunk it
@@ -281,9 +351,10 @@ each opcode takes what it needs of the room. When an entity next
 wakes is a write like another -- to its superchunk's timer wheel,
 not to an attribute or a plane -- and a move does not set it.
 
-A crossing too carries more than its 24 bytes: the entity whole, its
-blocks in a list beside the queue, since the superchunk it comes to
-holds nothing of it.
+A crossing carries nothing beside its 24 bytes: the cell the entity is
+named by and the cell it comes to. The entity goes as it is when the
+crossing is applied, from one superchunk's entities to the other's
+("An entity over a border").
 
 **The hard rule: every write lies under a compare**, in whichever
 superchunk's queue it is queued -- its own or a neighbour's. No
@@ -406,13 +477,10 @@ saw the other. A tick has none:
   (`../../entity_manager/docs/entity_manager.md`, "Instructions", An
   entity's name in a tick).
 - **An entity crossing to another superchunk** is the same entity
-  moving: it is put there with what its rule knew, stays where it
-  stood for the rest of the tick -- where every write to it lands --
-  and, the tick applied, is removed there and given, where it came
-  to, what it ended the tick with. So it crosses with all that was
-  written to it, as one stepping within a superchunk does. Only one
-  removed where it stood meanwhile is **turned back**: what was put
-  is taken back (`InstructionsApplied::turned_back`).
+  moving, by the same instruction a rule queues for any step: it
+  leaves one superchunk and stands in the other at once, with all it
+  has, and what others queued for it in the tick follows it ("An
+  entity over a border").
 - **A cell an entity is made on** is a compare of its being free,
   queued before the making and all that follows of it -- its
   attributes given and written: another's, none of it happens. **A
@@ -487,11 +555,8 @@ entities was taken out for its cost -- a fifth of the ticks on 12
 threads, a second random write a step -- and is back for what it buys:
 one plane a movement check reads, whatever is in the way. Not
 measured again. Crossing to another
-superchunk, an entity is put there as new and changed here as if
-its cell there were taken; once the second phase is over, each one put
-there is removed here and given there what it ended the tick with,
-each superchunk settling its own leavers on
-the threads (`Simulation::settle_crossings`, `tick/crossings.rs`). So its cell is
+superchunk, an entity is moved as it is anywhere ("An entity over a
+border"). So its cell is
 never left for one it cannot have, and between ticks every entity
 stands on one cell.
 
@@ -743,12 +808,12 @@ comes to does not depend on the thread that takes it.
 |---|---|
 | `src/hot.rs` | which superchunks are to be hot: the world's size, the hot entity |
 | `src/halos.rs` | the halos moved: warming and cooling, each due at a tick, by jobs off the tick -- `halos/warming.rs` superchunks made hot and let cool, `halos/write_back.rs` write-backs and flushes landed |
-| `src/turn/` | a superchunk's turn: `mod` the turn, its cells and its outbox, `entities` the entities read, `conditional` the compares and the queues, `one_instruction` what is queued, a function an instruction, `instruction` the instruction itself, `apply` its applying |
+| `src/turn/` | a superchunk's turn: `mod` the turn, its cells and its outbox, `entities` the entities read, `conditional` the compares and the queues, `one_instruction` what is queued, a function an instruction, `instruction` the instruction itself, `apply` its applying, `landing` the superchunks it lands in |
 | `../entity_manager/` | the entities: buckets, the timer wheel, the instructions queued -- a crate of its own |
 | `src/simulation_time.rs` | simulation time: the tick rate, a time as its ticks, a mean time as a chance a tick |
 | `src/sampling.rs` | the cells a rule is given: a layer sampled by gaps drawn against a chance |
 | `src/tick.rs` | the tick: every hot superchunk's turn on the dispatcher's threads, then the writes and instructions applied, author by author |
-| `src/tick/crossings.rs` | the tick's crossings settled: leavers removed, what was written to them sent after |
+| `src/tick/applying/following.rs` | what others queued for an entity that crosses a border re-pointed to follow it |
 | `src/transient_data.rs` | where runs would leave what they make; nothing yet |
 | `tests/` | sampling, the tick, the entities, their instructions and the dispatcher, judged |
 | `docs/` | this, and the reference, function by function |

@@ -31,5 +31,4 @@ kind, member, value)`**; **`attribute_whole(turn, at, attribute)`**;
 ## `entity.rs`
 
 `compares_and_writes.md`, "Writes". **`make(turn, header)`**;
-**`move_to(turn, from, to)`**; **`remove(turn, at)`**;
-**`cross(turn, left, after, default, attributes)`**.
+**`move_to(turn, from, to)`**; **`remove(turn, at)`**.

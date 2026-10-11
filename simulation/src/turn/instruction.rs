@@ -150,11 +150,12 @@ impl Instruction {
         Self::on(Opcode::RemoveEntity, at)
     }
 
-    /// The entity crossing from `left` made on `at`, with the
-    /// `count` blocks carried from `carried_first` on after its type
-    /// and wake.
-    pub(crate) fn cross_entity(at: CellIndex, left: CellIndex, carried_first: u32, count: u32) -> Self {
-        Self { first: left.0, second: u64::from(carried_first) << 32 | u64::from(count), ..Self::on(Opcode::CrossEntity, at) }
+    /// The entity the tick found on `from` moved to `to`, a cell of
+    /// another superchunk: a crossing. It lands where it stood; the
+    /// cell it comes to, whole, is beside it.
+    pub(crate) fn cross_entity(from: CellIndex, to: CellIndex) -> Self {
+        debug_assert_ne!(from.superchunk(), to.superchunk(), "a crossing within a superchunk: a move");
+        Self { first: to.0, ..Self::on(Opcode::CrossEntity, from) }
     }
 
     /// Whether the attribute `kind` of the entity on `at` sums to `seen`.
@@ -213,7 +214,7 @@ impl Instruction {
     /// (or back) in the list beside its queue: nothing, of one that
     /// carries none.
     pub(crate) fn carried_moved_by(mut self, moved: i64) -> Self {
-        if matches!(self.opcode, Opcode::WriteAttribute | Opcode::CrossEntity) {
+        if self.opcode == Opcode::WriteAttribute {
             self.second = (((self.second >> 32) as i64 + moved) as u64) << 32 | (self.second & u64::from(u32::MAX));
         }
         self
@@ -237,6 +238,15 @@ impl Instruction {
     #[inline]
     pub(crate) fn is_a_write(&self) -> bool {
         !self.is_a_compare() && !matches!(self.opcode, Opcode::CompareEnd | Opcode::Count)
+    }
+
+    /// Whether it names an entity by the cell the tick found it on:
+    /// what is to find it wherever it stands as it is applied, in
+    /// another superchunk if it crossed.
+    #[inline]
+    pub(crate) fn names_an_entity(&self) -> bool {
+        use Opcode::*;
+        matches!(self.opcode, CompareEntity | CompareAttribute | CompareAttributeMember | MoveEntity | CrossEntity | RemoveEntity | WriteWake | WriteAttributeMember | WriteAttribute | RemoveAttribute)
     }
 
     /// Whether it is a compare: what follows it is under it.

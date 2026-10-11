@@ -188,7 +188,7 @@ guarantees:
   the first applied does and the other is refused;
 - which is first is fixed, the same on any number of threads;
 - which is first does not hang on where the borders fall either: it
-  is the order of the writers' cells, read as a page is;
+  is the Morton order of the writers' cells;
 - an entity moving in the tick it is written is written all the same,
   where it now stands, and one crossing to another superchunk crosses
   with what was written.

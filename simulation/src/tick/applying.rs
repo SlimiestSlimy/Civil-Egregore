@@ -5,17 +5,21 @@
 //! superchunk it lands in has come to it
 //! (`docs/simulation.md`, "An act over a border").
 
-use crate::turn::apply::{Applied, LandingInOne, LandingInSeveral};
-use crate::turn::{slot, Outbox, ACROSS, SLOTS};
+use crate::turn::apply::Applied;
+use crate::turn::landing::{LandingInOne, LandingInSeveral};
+use crate::turn::{slot, slot_between, Outbox, ACROSS, SLOTS};
 use bitplane_manager::Superchunk;
 use chunk_storage::LayerType;
-use coordinates::SuperchunkIndex;
+use coordinates::{CellIndex, SuperchunkIndex};
 use entity_manager::SuperchunkEntities;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Condvar, Mutex, MutexGuard};
 use utilities::dispatcher::Dispatcher;
+use following::Repointed;
 use who_goes_on::{LetGoOn, LONGEST_REST};
 
+mod following;
 mod who_goes_on;
 
 /// One author's segment queued for a superchunk: the author, whose
@@ -85,6 +89,16 @@ struct Phase<'a, 'b> {
     now: u64,
     /// The layer entities are kept in, if the world has one.
     collision: Option<LayerType>,
+    /// The entities an author that is not the entity itself named
+    /// this tick, each with those authors: by the cell the tick found
+    /// it on. What is looked at as an entity crosses a border.
+    named_by_others: HashMap<CellIndex, Vec<u64>>,
+    /// Whether any segment was repointed this tick: read before the
+    /// map is.
+    any_repointed: AtomicBool,
+    /// The segments an entity that crossed a border had follow it, by
+    /// outbox, queue and segment.
+    repointed: Mutex<HashMap<(u32, u32, u32), Repointed>>,
 }
 
 /// A superchunk's own place and its eight neighbours', as offsets, in
@@ -148,17 +162,28 @@ impl Phase<'_, '_> {
             let queue = &outbox.queues[from];
             let (begun, next) = (outbox.segments[from][segment], outbox.segments[from].get(segment + 1));
             let some = begun.instructions as usize..next.map_or(queue.len(), |next| next.instructions as usize);
-            if from != ACROSS {
+            let repointed = self.repointed_of(source, from as u32, segment as u32);
+            if from != ACROSS && repointed.is_none() {
                 self.give_up_those_kept(part);
                 queue.apply(some, begun.compares as usize, &mut LandingInOne { superchunk: applying.superchunk, entities: applying.entities }, self.now + 1, self.collision, applied);
                 applying.next += 1;
                 continue;
             }
-            let across = &outbox.across[segment];
-            let (landed, count) = self.landed_in(source as usize, across.lands);
-            if usize::from(across.arrived.fetch_add(1, Ordering::SeqCst)) + 1 < count {
+            // An act: of the queue of acts over a border, or a segment an entity that crossed had follow it.
+            let (landed, mut count) = if from == ACROSS { self.landed_in(source as usize, outbox.across[segment].lands) } else { ([None; SLOTS], 0) };
+            let also: Vec<usize> = repointed.as_ref().map_or(Vec::new(), |repointed| repointed.also.iter().copied().filter(|also| !landed.contains(&Some(*also))).collect());
+            count += also.len();
+            let arrived = match &repointed {
+                Some(repointed) if from != ACROSS => &*repointed.arrived,
+                _ => &outbox.across[segment].arrived,
+            };
+            if usize::from(arrived.fetch_add(1, Ordering::SeqCst)) + 1 < count {
                 // Another it lands in is not here yet: whoever comes last applies it and has this one go on.
-                return landed.map(|other| other.filter(|&other| other != here));
+                let mut waited_for = landed.map(|other| other.filter(|&other| other != here));
+                for (&other, place) in also.iter().filter(|&&other| other != here).zip(waited_for.iter_mut().filter(|place| place.is_none())) {
+                    *place = Some(other);
+                }
+                return waited_for;
             }
             // The last to come: the others wait at it, let go of, and are held here while it is applied.
             let mut others: [Option<MutexGuard<Applying>>; SLOTS] = Default::default();
@@ -167,6 +192,7 @@ impl Phase<'_, '_> {
                     others[slot] = Some(self.applying[other].lock().expect("a superchunk applying"));
                 }
             }
+            let mut others_also: Vec<(usize, MutexGuard<Applying>)> = also.iter().filter(|&&other| other != here).map(|&other| (other, self.applying[other].lock().expect("a superchunk applying"))).collect();
             let mut lands: [Option<(&mut Superchunk, &mut SuperchunkEntities)>; SLOTS] = Default::default();
             let mut own = Some((&mut *applying.superchunk, &mut *applying.entities));
             for ((slot, land), other) in lands.iter_mut().enumerate().zip(&mut others) {
@@ -179,18 +205,41 @@ impl Phase<'_, '_> {
                     None => None,
                 };
             }
-            queue.apply(some, begun.compares as usize, &mut LandingInSeveral { lands }, self.now + 1, self.collision, applied);
-            applied.acts_over_a_border += 1;
+            // Those held besides: by its slot, each that is a neighbour of the outbox's superchunk, as an instruction for it says it.
+            let source_index = self.superchunk_indices[source as usize];
+            let mut held_also = Vec::new();
+            let besides = others_also.iter_mut().map(|(other, guard)| {
+                let guard = &mut **guard;
+                (*other, (&mut *guard.superchunk, &mut *guard.entities))
+            });
+            // This one too, if no slot's: the superchunk an entity the segment names crossed to.
+            for (other, held) in besides.chain(own.take().map(|own| (here, own))) {
+                match slot_between(source_index, self.superchunk_indices[other]) {
+                    Some(slot) if lands[slot].is_none() => lands[slot] = Some(held),
+                    _ => held_also.push(held),
+                }
+            }
+            let mut landing = LandingInSeveral { source: source_index, lands, also: held_also, crossed: Vec::new() };
+            queue.apply(some, begun.compares as usize, &mut landing, self.now + 1, self.collision, applied);
+            let crossed = std::mem::take(&mut landing.crossed);
+            drop(landing);
+            applied.acts_over_a_border += u64::from(count > 1);
+            if !crossed.is_empty() && !self.named_by_others.is_empty() {
+                // Each superchunk held, by where it is among them all: what an entity that crossed has follow it is in their orders.
+                let mut held: Vec<(usize, &mut Applying)> = others.iter_mut().enumerate().filter_map(|(slot, other)| other.as_mut().map(|other| (landed[slot].expect("held, so landed in"), &mut **other))).collect();
+                held.extend(others_also.iter_mut().map(|(other, guard)| (*other, &mut **guard)));
+                held.push((here, &mut *applying));
+                self.have_follow(&crossed, &mut held);
+            }
             let at_another = applying.order.get(applying.next + 1).is_some_and(|next| next.2 == ACROSS as u32);
-            for (slot, other) in others.iter_mut().enumerate() {
-                if let Some(mut other) = other.take() {
-                    other.next += 1;
-                    drop(other);
-                    // Kept for this thread if it is at once at another such act itself, and so back for it; else anyone's.
-                    self.let_lie(landed[slot].expect("held, so landed in"), if at_another { part } else { self.let_go_on.len() - 1 });
-                    if !at_another {
-                        self.wake(false);
-                    }
+            let let_go = others.into_iter().enumerate().filter_map(|(slot, other)| other.map(|other| (landed[slot].expect("held, so landed in"), other))).chain(others_also);
+            for (index, mut other) in let_go {
+                other.next += 1;
+                drop(other);
+                // Kept for this thread if it is at once at another such act itself, and so back for it; else anyone's.
+                self.let_lie(index, if at_another { part } else { self.let_go_on.len() - 1 });
+                if !at_another {
+                    self.wake(false);
                 }
             }
             applying.next += 1;
@@ -242,7 +291,12 @@ pub(crate) fn apply_what_was_queued(dispatcher: &Dispatcher, superchunks: &mut [
         superchunks.iter_mut().zip(entities).zip(&mut room.orders).map(|((superchunk, entities), order)| Mutex::new(Applying { superchunk, entities, order, next: 0, begun: false })).collect();
     let (asleep, woken, sleeping) = (Mutex::new(()), Condvar::new(), AtomicUsize::new(0));
     let (to_begin, any_acts, done) = (AtomicUsize::new(count), outboxes.iter().any(|outbox| !outbox.across.is_empty()), AtomicUsize::new(0));
-    let phase = Phase { applying: &applying, superchunk_indices, outboxes, to_go_on: &room.to_go_on, let_go_on: &room.let_go_on, lying: &room.lying, whose: &room.whose, asleep, woken, sleeping, to_begin, any_acts, done, now, collision };
+    let mut named_by_others: HashMap<CellIndex, Vec<u64>> = HashMap::new();
+    for &(named, author) in outboxes.iter().flat_map(|outbox| &outbox.named_by_others) {
+        named_by_others.entry(named).or_default().push(author);
+    }
+    let (any_repointed, repointed) = (AtomicBool::new(false), Mutex::new(HashMap::new()));
+    let phase = Phase { applying: &applying, superchunk_indices, outboxes, to_go_on: &room.to_go_on, let_go_on: &room.let_go_on, lying: &room.lying, whose: &room.whose, asleep, woken, sleeping, to_begin, any_acts, done, now, collision, named_by_others, any_repointed, repointed };
     let applied_parts: Vec<Mutex<Applied>> = (0..dispatcher.threads()).map(|_| Mutex::new(Applied::default())).collect();
     dispatcher.run(&|part| {
         let mut applied = Applied::default();

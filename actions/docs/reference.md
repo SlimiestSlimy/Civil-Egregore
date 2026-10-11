@@ -53,10 +53,7 @@ tick found it -- the cell its name for the tick, there being no ID.
 and **`made(turn)`**: the same, what is queued between them happening only if the entity is made. **`sleep(turn, entity, wake)`**: a move to
 where it stands. **`step(turn, entity, to, wake)`**: under a compare
 of the entity being there still, a move to a cell, or none to its
-own, and its wake -- to another superchunk a crossing (`cross`: made
-there whole under a compare of the cell being free, with all it has,
-and asleep where it stood under a compare of its being there,
-settled after the tick). **`remove(turn, entity)`**, under a compare
+own, and its wake -- the same over a border. **`remove(turn, entity)`**, under a compare
 of its being there still.
 
 `entities/attribute_edits.rs` (`attribute_edits`), handed on by
@@ -71,8 +68,7 @@ that differs (`members_differing`), the attribute whole, or taken;
 one member, held against that member alone -- two writing two members
 of one attribute both do; **`update(turn, before, after,
 attributes)`**: each attribute that differs written
-(`set_attributes_changed`), then the step, or the crossing with what
-it is to have. **`EntitiesBetweenTicks`**: the world's entities off any
+(`set_attributes_changed`), then the step. **`EntitiesBetweenTicks`**: the world's entities off any
 turn, lent by whoever runs the world (**`of`**; **`where_free(free)`**,
 putting only on cells the world's collision plane does not hold;
 **`cells_put()`**, the cells put on, for the runner to set there). **`now()`**,

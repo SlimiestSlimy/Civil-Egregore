@@ -140,7 +140,7 @@ what they always do and are not listed.
 | **act over a border** | all one author queued in a tick, once any of it is for a second superchunk: applied once, in the order queued, by one thread holding every superchunk it lands in, where it falls in the world's one order (`simulation/docs/simulation.md`, "An act over a border") | author, compare-and-write, outbox | cross-chunk transaction |
 | **author** | of what a rule queues in a tick: the entity woken or the cell sampled it was seeing to (`Turn::seeing_to`). What a tick queued is applied author by author, in the Morton order of their cells over the whole world: the lower first, across every border | compare-and-write, turn | writer, source, owner |
 | **name in a tick** | of an entity: the cell the tick found it on, which names it until the tick is over wherever it moves, and is no other's meanwhile (`named_in_a_tick.rs`) | author, instruction | tick ID, handle |
-| **turned back** | of an entity crossing to another superchunk: taken from where it was put, because it was removed where it left in the same tick. Also of a step onto a taken cell: the stepper stays | crossing, compare-and-write | bounced, rolled back |
+| **turned back** | of a step onto a taken cell, over a border or not: the stepper stays | crossing, compare-and-write | bounced, rolled back |
 | **write** | a change to cells: an operation on a shape, at a cell (`Write`), as the world is written between ticks. In a tick a rule writes a cell at a time, each a compare-and-write, queued in the first phase and applied in the second | outbox, apply, compare-and-write | command |
 | **write-after-write hazard** | two writes of one thing in one tick, the later landing on the first and what the first did lost, neither rule having seen the other. A tick has none: every write says what was seen of what it writes (`../simulation/docs/simulation.md`, "No write lands on another's") | compare-and-write, refused | WAW, lost update, race |
 | **apply** | carry out a write or an instruction, in the second phase | write, instruction | carry out, execute |
@@ -188,7 +188,7 @@ what they always do and are not listed.
 | **move** | the instruction stepping an entity to a cell, or setting its next wake, attributes as they are | step, instruction | |
 | **edit** | a write to an attribute: a member of it written, the attribute given whole or taken (`InstructionsApplied::edits`) | attribute, instruction | |
 | **step** | an entity moving to one of its eight neighbours | move, wall | |
-| **crossing** | an entity moving to another superchunk: put there, and removed here once the tick's instructions are applied, if it was (`Simulation::settle_crossings`, each superchunk its own leavers) | step | |
+| **crossing** | an entity moving to another superchunk: one instruction as any step, the entity taken from one superchunk's entities and put in the other's at once, with all it has; what others queued for it in the tick follows it (`SuperchunkEntities::cross_named`; `simulation.md`, "An entity over a border") | step | |
 | **lost** | an entity put where no superchunk is hot | missed | |
 | **occupied** | a cell an entity stands on | entity | taken |
 | **flock** | sheep made together on a superchunk | sheep | |

@@ -293,8 +293,8 @@ to tick 4,000: the same cells, entities and random numbers). What makes it so:
 - **Entities are put back through the same door as any other**: queued
   and applied, so their wakes are filed as they were. Wakes left over
   from before an entity was changed are not kept: they wake nothing.
-- **Nothing is half done between ticks**: a crossing is settled
-  within its tick, so a save holds each entity once, on one cell.
+- **Nothing is half done between ticks**: an entity crossing a border
+  is moved once, so a save holds each entity once, on one cell.
 - **A superchunk turns hot at a tick fixed when a halo reaches it**,
   not when its job is done, and cold at a tick fixed when the
   halos leave it; the hot file keeps both.

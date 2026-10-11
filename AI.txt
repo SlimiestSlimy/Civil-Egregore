@@ -619,49 +619,33 @@ threads`.
   600,7c13edff92f5d70f,acb69968c95fdcb4,fecb18dba5bea4ec,6b2e44078bde7624,cbbe5c62e1e5fae6,e220a8397b1dcdaf
 
 - Fragile collision test: DONE (e3c5a54).
-- CROSSING AS ONE MOVE, 2026-10-11. I found the settling step is what
-  lets later same-tick writes to a crossed entity land, and asked.
-  The user: "ok, since the origin morton id for the entitiy last for
-  the entire tick, if an entity crosses a superchunk and another rule
-  tries to write to that entity id the writes should go to the tenth
-  queue. so no settlement step is needed in theory, check my logic".
-  My check, told to the user: holds, with one gap -- at queue time
-  nobody knows the entity will cross. Proposed (NOT yet confirmed by
-  the user): turns note (author, entity named that is not itself);
-  crossings note (name, destination); between the phases, an author
-  later in Morton order naming a crosser has its segment promoted to
-  an act over both superchunks, named outright (the destination may
-  be two superchunks from the writer, no outbox slot). Then the move
-  is real at the act (one MoveEntity for any step, actions::step no
-  longer telling a border), names resolve across superchunks in an
-  act, and crossings.rs, Arrival, Settled, settle_leavers/arrivals,
-  kept_sum, cross_entity and its carried blocks go. Tests that hold
-  it: simulation/tests/fine/entities_moving.rs,
-  actions/tests/fast/flock_over_borders.rs (walkers write to others).
-  CONFIRMED by the user: "yeah, we just need a separate structure to
-  track what entities crossed to properly redirect writes, thats
-  pretty much it". Then: "instead of redirecting straight to the 10th
-  queue, lets redirect writes to the right queue first if possible,
-  otherwise we do the same extraction to the 10th queue"; "based on
-  the same conditions, as soon as the simulation detects the same
-  autor writing to 2 queues it write and compares go straight to the
-  10th queue". Told to the user: a crossing queued may be refused as
-  it is applied (its cell taken), the entity then staying; so one who
-  writes to an entity that queued a crossing needs both superchunks
-  -- two queues, so the tenth by that same rule, every time. "The
-  right queue alone" is only safe if the crossing is known to stand,
-  which is known only as it is applied. The user: "that shouldnt
-  happen, the simulation should route the dispatched instructions to
-  the entity id automagically if it already crossed or if it hasnt
-  crossed yet." RESOLVED, the plan now: the redirect is decided AS
-  THE CROSSING IS APPLIED (the act holds S and D, both stopped at the
-  crosser's place in the world order, the crossing known to stand):
-  there, every later author naming the crosser (found by a structure
-  built from what turns note: who names an entity not itself) has its
-  segment re-pointed -- into D's order alone if it lands nowhere else
-  ("the right queue"), else made an act over all it lands in and D
-  (the tenth queue's way). A crossing refused re-points nothing. No
-  settling, one copy of the entity. To do after the sheep.
+- CROSSING AS ONE MOVE: DONE 2026-10-11. The user's design: the
+  entity's ID (Morton index of its tick-start cell) is a stable
+  handle for the tick; "if an entity crosses a superchunk and another
+  rule tries to write to that entity id the writes should go to the
+  tenth queue. so no settlement step is needed"; "we just need a
+  separate structure to track what entities crossed to properly
+  redirect writes"; "lets redirect writes to the right queue first if
+  possible, otherwise ... the 10th queue"; "the simulation should
+  route the dispatched instructions to the entity id automagically if
+  it already crossed or if it hasnt crossed yet." Built so: one
+  CrossEntity instruction (24 bytes, nothing carried) from
+  Turn::move_entity; SuperchunkEntities::cross_named moves it at the
+  act; later authors naming it (Outbox::named_by_others) are
+  re-pointed as the crossing is applied (tick/applying/following.rs).
+  Settling, Arrival, Settled, turned_back, entity::cross are gone.
+  Worlds identical to before (hashes, a 20,000-tick run). Docs:
+  simulation.md "An entity over a border".
+  Left: authorless (author 0) instructions naming an entity are not
+  noted; the whole-tick cost is +1.3% processor instructions on
+  `pasture 1000 333 4000 4 1`, cause not pinned down.
+- 2026-10-11, the user, as the crossing was being built: "when i say
+  entity id is the origin coordinate at the start of the tick,
+  remember that lol" / "in morton" / "yes thats so we have a stable
+  handle to anything whithin a tick". And: "ok, after finishing all
+  the queued tasks, were doing code size reduction and
+  simplification" -- NEXT after the crossing (asked whether before
+  climate; taken as before unless told).
 
 == OPEN THREADS ==
 - THE FLOCK DIES OUT (found 2026-10-11, told to the user, not mine to

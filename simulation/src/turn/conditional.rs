@@ -207,9 +207,22 @@ impl Turn<'_> {
     pub(crate) fn queue(&mut self, lands: CellIndex, instruction: Instruction) -> usize {
         assert!(self.compares_open_count > 0 || !instruction.is_a_write(), "a write under no compare: {:?}", instruction.opcode);
         let (queue, slot) = self.queue_landing_in(lands.superchunk());
+        self.note_named(lands, instruction);
         self.writes_queued += u32::from(instruction.opcode == super::instruction::Opcode::WriteCell);
         self.outbox.queues[queue].instructions.push(instruction.landing_in(slot));
         queue
+    }
+
+    /// Notes, of `instruction` naming the entity the tick found on
+    /// `at`, that its author is not that entity: should the entity
+    /// cross a border this tick, what this author queued for it is
+    /// to follow it ([`super::Outbox::named_by_others`]). An author
+    /// nearly always names itself, and nothing is noted.
+    #[inline]
+    pub(crate) fn note_named(&mut self, at: CellIndex, instruction: Instruction) {
+        if at.0 + 1 != self.author && self.author != 0 && instruction.names_an_entity() {
+            self.outbox.named_by_others.push((at, self.author));
+        }
     }
 
     /// Carries `blocks` beside the queue an instruction landing in

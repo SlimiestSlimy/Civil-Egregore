@@ -7,6 +7,7 @@ pub(crate) mod apply;
 pub(crate) mod conditional;
 mod entities;
 pub(crate) mod instruction;
+pub(crate) mod landing;
 pub(crate) mod one_instruction;
 
 use entity_manager::{EntityReader, SuperchunkEntities};
@@ -43,6 +44,13 @@ pub(crate) struct Outbox {
     /// Of each segment of the queue of acts over a border, where it
     /// lands and who has come to it.
     pub(crate) across: Vec<Across>,
+    /// The entities named this tick by an author that is not the
+    /// entity itself, each with that author: by the cell the tick
+    /// found it on. Few: an author nearly always names itself. What
+    /// is read when an entity crosses a border, to have what others
+    /// queued for it follow it
+    /// (`docs/simulation.md`, "An entity over a border").
+    pub(crate) named_by_others: Vec<(CellIndex, u64)>,
 }
 
 /// What is kept of one author's act over a border, beside its

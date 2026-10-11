@@ -74,36 +74,14 @@ pub fn sleep(turn: &mut Turn, entity: &Header, wake: u64) {
 /// Queues `entity` stepping to `to` -- its own cell to stay where it
 /// stands -- to wake at `wake`: its attributes as they are, none
 /// carried. Its cell taken by then, it stays, and wakes at `wake`
-/// all the same.
+/// all the same. The same whether `to` is in its superchunk or over
+/// a border: the simulation's to see to
+/// (`../../simulation/docs/simulation.md`, "An entity over a border").
 #[inline]
 pub fn step(turn: &mut Turn, entity: &Header, to: CellIndex, wake: u64) {
-    if entity.at.superchunk() != to.superchunk() {
-        // All it has goes with it, its type's default attribute too, each with its type as an entity is given them.
-        if let Some(whole) = on(turn, entity.at) {
-            let default = whole.default_attribute();
-            cross(turn, entity, Header { at: to, wake, ..*entity }, default.as_deref().unwrap_or(&[]), whole.attributes);
-        }
-        return;
-    }
     let both = [Write::MoveEntity { from: entity.at, to }, Write::Wake { at: entity.at, wake }];
     // Sleeping where it stands, it is not moved.
     compare::with_writes(turn, compare::entity(entity), &both[usize::from(to == entity.at)..]);
-}
-
-/// Queues `before`'s entity crossing to `after`'s cell, in another
-/// superchunk, with `default` and `attributes` -- its type's default
-/// attribute, if it has one and it is not among the others, and the
-/// others: made there whole, under a compare of that cell being
-/// free; and here, under a compare of its being there still, put to
-/// sleep where it stands until its wake. The crossing stands only if
-/// it ends the tick here with those attributes -- else another
-/// changed it meanwhile, and it stays, asleep, with every change
-/// made to it (`../../simulation/docs/simulation.md`, "Entities").
-pub(crate) fn cross(turn: &mut Turn, before: &Header, after: Header, default: &[AttributeBlock], attributes: &[AttributeBlock]) {
-    compare::open(turn, compare::cell_free(after.at));
-    entity::cross(turn, before.at, after, default, attributes);
-    compare::close(turn);
-    compare::with_writes(turn, compare::entity(before), &[Write::Wake { at: before.at, wake: after.wake }]);
 }
 
 /// Queues removing `entity`.

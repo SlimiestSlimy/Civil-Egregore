@@ -52,9 +52,9 @@ open as it was queued holds when it is come to:
   the attribute whole (`write::attribute_whole`, its blocks carried
   beside the instruction) or taken (`write::attribute_removed`) --
   and its wake (`write::wake`);
-- an entity whole (`entity`): made (`entity::make`), moved within its
-  superchunk (`entity::move_to`), removed (`entity::remove`), made in
-  another superchunk as it crosses (`entity::cross`).
+- an entity whole (`entity`): made (`entity::make`), moved, within its
+  superchunk or over a border (`entity::move_to`), removed
+  (`entity::remove`).
 
 ## A compare and its writes at once
 

@@ -60,7 +60,7 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `entity_manager` | attributes of any length put, found, edited and saved -- by hand, and types and edits drawn against those last set; an entity named by the cell the tick found it on | | |
 | `pathfinding` | paths and waves; walls | | |
 | `utilities` | chance, commands, dispatcher, fixed_list, hash, process_memory, rng, settings, table, tuning | | |
-| `simulation` | entities moving, entities waking, their instructions | sampling, the tick, writes across borders | |
+| `simulation` | entities moving, entities waking, their instructions, an entity over a border | sampling, the tick, writes across borders | |
 | `compares_and_writes` | what is queued from a compare to its end | | |
 | `actions` | an entity changed, the cells beside it | the nine about a cell off its small tiles, area, mask, walking -- round walls, entities and what the collision plane holds; a flock over borders coming to the same on any number of threads | |
 | `worldgen` | | heights, walls, the mesh, superchunks made in any order | walls over many seeds; no seam between superchunks |

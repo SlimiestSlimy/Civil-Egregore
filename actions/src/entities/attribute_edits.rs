@@ -109,17 +109,10 @@ fn set_attributes_changed(turn: &mut Turn, entity: &Header, seen: &[AttributeBlo
 /// compare-and-write of its own ([`set_attribute_blocks`]), then
 /// moved to its cell unless that is taken by then, and its wake
 /// written. It is never put whole over itself, so what another
-/// entity writes to it in the same tick is not lost. To another
-/// superchunk it crosses.
+/// entity writes to it in the same tick is not lost. The same
+/// whether its cell is in its superchunk or over a border.
 pub fn update(turn: &mut Turn, before: &Header, after: Header, attributes: &[AttributeBlock]) {
     let seen = super::on(turn, before.at).map_or(&[][..], |seen| seen.attributes);
     set_attributes_changed(turn, before, seen, attributes);
-    if before.at.superchunk() == after.at.superchunk() {
-        super::step(turn, before, after.at, after.wake);
-    } else {
-        // Its type's default attribute goes with it as the tick found it, unless it is among those given.
-        let default = super::on(turn, before.at).and_then(|seen| seen.default_attribute());
-        let default = default.as_deref().filter(|default| attribute_blocks(attributes, default[0].kind()).is_none());
-        super::cross(turn, before, after, default.unwrap_or(&[]), attributes);
-    }
+    super::step(turn, before, after.at, after.wake);
 }
