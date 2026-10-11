@@ -592,6 +592,14 @@ threads`.
   machine's file alone. Use the flag; do not delete.
 
 
+- 2026-10-11, the user, while the rule kinds were being written:
+  "yeah, anotate in docs the first byte of the typeid is the kind of
+  the typeid". Done in type_registry.md ("The bytes of an ID"), the
+  reference, the glossary. In the code the first byte's enum is still
+  `Supertype`, and `Kind` is a row's kind (it tells a layer from a
+  wide plane, which share a first byte): told to the user, a rename
+  theirs to ask for.
+
 == OPEN THREADS ==
 - server fast test collision::trees_bar_their_cells_and_no_sheep_steps_onto_one
   failed once in a whole-workspace run at "stepped > 0" and passed

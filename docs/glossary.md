@@ -46,8 +46,8 @@ what they always do and are not listed.
 
 | word | means | relates to | not |
 |---|---|---|---|
-| **type registry** | the one table of every type a world has -- layer, wide plane, entity type, attribute -- a row each: name, kind, number, width; checked as it is built for two rows sharing a number, a name, or a wide plane's range (`type_registry::REGISTRY`) | layer type, entity type, wide plane, type ID | type table |
-| **type ID** | the `u64` a type is known by: its first byte its **supertype** (`Supertype`: attribute, layer, entity type), its last its **size** (a plane's bits a cell, an attribute's blocks), the six between its **number**, what its row is written with | type registry, layer type | |
+| **type registry** | the one table of every type a world has -- layer, wide plane, entity type, attribute -- and each rule, of the cells or of an entity, with its master -- a row each: name, kind, number, width; checked as it is built for two rows sharing a number, a name, or a wide plane's range (`type_registry::REGISTRY`) | layer type, entity type, wide plane, type ID | type table |
+| **type ID** | the `u64` a type is known by: its first byte its **kind** (`Supertype` in the code: attribute, layer, entity type, rule of the cells, rule of an entity), its last its **size** (a plane's bits a cell, an attribute's blocks), the six between its **number**, what its row is written with | type registry, layer type | |
 | **layer type** | what a layer holds -- dirt, grass, a wall -- as a `u64` from the one namespace every type in Civil Egregore is drawn from (`LayerType`) | entity type, attribute type | |
 | **layer** | one layer type over one chunk: a bitmap of which cells hold it | bitmap, bitplane | plane |
 | **bitplane** | one layer type over the whole world: every chunk's layer of that type | layer | |
@@ -130,7 +130,8 @@ what they always do and are not listed.
 | **turn** | one superchunk's part of the first phase: what a rule is given (`Turn`) | rule, superchunk | |
 | **rule table** | the one list of the rules a world ticks, each with its name, the names of its counts, and its function (`server::RULES`) | rule, rule counts | registry |
 | **rule counts** | what a rule did on a turn or over many: a few numbers, each at a place the rule names (`actions::RuleCounts`); a tick's are an array of them, a rule's at its place in the rule table (`server::TickCounts`) | rule table | stats |
-| **rule** | what decides what changes: a rule of the cells, the stochastic cell automaton's (`sca_rules`), or an entity's rule (`entity_rules`) | turn, sampling | |
+| **rule** | what decides what changes: a rule of the cells, the stochastic cell automaton's (`sca_rules`), or an entity's rule (`entity_rules`); each registered in the type registry under its own kind | turn, sampling, master | |
+| **master** (of a rule) | the one plane a rule of the cells is of, or the one type of entity an entity's rule is of, whatever else the rule reads or writes (`Registered::master`) | rule, type registry | |
 | **speed of light** | 1,024 cells a tick: nothing reaches past the superchunks next to its own; an entity is at most 256x256 cells | outbox, reach | |
 | **reach** | how far an entity's rule reads and acts: up to the speed of light | speed of light | |
 | **outbox** | a superchunk's queues of writes and instructions, a slot each for itself and its eight neighbours | write, instruction, slot | |

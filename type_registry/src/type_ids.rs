@@ -17,6 +17,11 @@ pub enum Supertype {
     Layer = 0x01,
     /// A type of entity.
     EntityType = 0x02,
+    /// A rule of the cells, the stochastic cell automaton's: its
+    /// master a plane.
+    ScaRule = 0x03,
+    /// A rule of an entity: its master a type of entity.
+    EntityRule = 0x04,
 }
 
 /// Where an ID keeps its supertype: its first byte, over its number.
@@ -166,6 +171,42 @@ impl EntityType {
     /// The entity type of number `number`.
     pub const fn of(number: u64) -> Self {
         Self(type_id(Supertype::EntityType, number, 0))
+    }
+
+    /// Its number.
+    pub const fn number(self) -> u64 {
+        number_of(self.0)
+    }
+}
+
+/// A rule of the cells (`docs/type_registry.md`, "Rules"): an ID
+/// from the one namespace, of its own supertype. It has no size: its
+/// last byte is 0.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ScaRuleType(pub u64);
+
+impl ScaRuleType {
+    /// The rule of the cells of number `number`.
+    pub const fn of(number: u64) -> Self {
+        Self(type_id(Supertype::ScaRule, number, 0))
+    }
+
+    /// Its number.
+    pub const fn number(self) -> u64 {
+        number_of(self.0)
+    }
+}
+
+/// A rule of an entity (`docs/type_registry.md`, "Rules"): an ID
+/// from the one namespace, of its own supertype. It has no size: its
+/// last byte is 0.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct EntityRuleType(pub u64);
+
+impl EntityRuleType {
+    /// The rule of an entity of number `number`.
+    pub const fn of(number: u64) -> Self {
+        Self(type_id(Supertype::EntityRule, number, 0))
     }
 
     /// Its number.

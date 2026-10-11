@@ -4,8 +4,8 @@ The design is in `type_registry.md`.
 
 ## `type_ids.rs`
 
-`type_registry.md`, "The bytes of an ID". **`Supertype`**: what an ID
-is of, its first byte -- `Attribute`, `Layer`, `EntityType`.
+`type_registry.md`, "The bytes of an ID". **`Supertype`**: the kind of an ID,
+its first byte -- `Attribute`, `Layer`, `EntityType`, `ScaRule`, `EntityRule`.
 `SUPERTYPE_SHIFT`, `SIZE_BITS`, `SIZE_MOST`: where the first byte and
 the last lie; **`NUMBERS`**: how many numbers the six bytes between
 hold. `type_id(supertype, number, size)` makes an ID; `number_of`,
@@ -18,7 +18,7 @@ and **`planes`** the layers of a bit a cell it is kept cold as,
 as a type, `BITS` bits a cell -- **`Bits2`**, **`Bits4`**, **`Bits8`**, **`Bits16`**.
 **`Wide<W>`**: a wide plane, its width in its type: **`new(first)`**,
 **`layer_type`**, **`most`** the most a cell of it holds.
-**`EntityType(u64)`**: an entity's type: **`of(number)`**, **`number`**. **`AttributeType(u64)`**: an
+**`EntityType(u64)`**: an entity's type: **`of(number)`**, **`number`**. **`ScaRuleType(u64)`**, **`EntityRuleType(u64)`**: a rule of the cells, a rule of an entity: **`of(number)`**, **`number`**. **`AttributeType(u64)`**: an
 attribute's, its last four bits (`ATTRIBUTE_SIZE_BITS`) how many
 blocks one takes, less one, its number the 52 bits before
 (`ATTRIBUTE_NUMBERS`): **`of_blocks(number, blocks)`**,
@@ -40,16 +40,17 @@ layout in its type: **`new(number)`**, **`attribute_type`**. **`Member`** `{offs
 
 ## `registry.rs`
 
-**`Kind`**: `Layer`, `WidePlane`, `EntityType`, `Attribute`.
-**`Registered`** `{name, kind, number, width, varies_in_size, default_attribute}`: a row, an attribute's
+**`Kind`**: `Layer`, `WidePlane`, `EntityType`, `Attribute`, `ScaRule`, `EntityRule`.
+**`Registered`** `{name, kind, number, width, varies_in_size, default_attribute, master}`: a row, a rule's `master` the number of the one plane or type of entity it is of (0: no rule), an attribute's
 width the bits of its data, an entity type's `default_attribute` the number of the attribute every entity of it has (0: none; **`with_default(attribute)`** gives a row one); **`numbers`** how many
 numbers it takes from `number` on, **`layer_type`** its layer type if it is of
-the cells. `layer`, `wide`, `entity`, `attribute`: a row made from its constant. **`REGISTRY`**: the table, written by hand. The constants:
+the cells. `layer`, `wide`, `entity`, `attribute`, `sca_rule`, `entity_rule`: a row made from its constant. **`REGISTRY`**: the table, written by hand. The constants:
 `GRASS`, `TREE`, `TREE_STAGE`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`, `WET`, the
-cells'; `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, three blocks; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
+cells'; `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, three blocks; `RULE_OF_GRASS`, `RULE_OF_TREES`, the cells' rules, `RULE_OF_SHEEP`, the entity's; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
 **`first_clash(registry)`**: the first row to take a number or a name of
 one before it -- checked on `REGISTRY` as the crate is built, as is
 **`first_default_amiss(registry)`**: the first row whose default attribute is no attribute of a fixed size of the table, or that has one and is no entity type's.
+**`first_master_amiss(registry)`**: the first row whose master is amiss -- a rule whose master is no row of the kind its rule is of, or a row that is no rule and has one -- checked on `REGISTRY` too (`type_registry.md`, "Rules"). **`rule_of_id(id)`**: a rule's row by its ID; **`RULES_REGISTERED`**: how many rules there are; **`master_of(rule)`**: the row of a rule's master; **`rules_of(master)`**: the rules a plane or a type of entity is the master of.
 **`default_attribute_of(entity_type)`**: the row of its default attribute, if it has one; **`default_of(entity_type)`**: its type and the words of its data, from `DEFAULTS`, worked out as the crate is built.
 **`named(name)`**, **`of_number(number)`**: a row by its name, and by any number it
 takes. **`layer_types()`**: every layer type a world's cells have, a
