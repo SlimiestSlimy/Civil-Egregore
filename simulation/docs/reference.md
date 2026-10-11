@@ -78,9 +78,11 @@ is on; `Compare::holds(superchunk, entities)`, whether it holds now.
 **`Turn::compare_from_here(compare)`**: from here on what the rule
 queues for the compare's superchunk is skipped if the compare does
 not hold when come to; **`Turn::compare_end()`**: no more.
-`queue_step(lands, does)`: a step queued, noted on every compare it is
-under; `open_compare(compare)`, `close_compare()`: a compare queued
-and open, one within another up to `COMPARES_WITHIN` (4), and closed.
+`queue_step(lands, does)`: a step queued; `open_compare(compare)`,
+`close_compare()`: a compare queued and pushed on the turn's stack of
+compares open, one within another up to `COMPARES_WITHIN` (4), and
+popped, what is under it -- the queue's end less where it lies --
+noted on it.
 **`Turn::queue_if(compare, type, at, seen, value, counted)`**: the
 compare, within it a compare of the cell as seen, within that the
 write, with the count added if it is come to; **`Turn::queue_seen(type, at, seen, value,

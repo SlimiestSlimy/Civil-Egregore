@@ -127,9 +127,12 @@ the rule's: skipped with the outer, skipping no more than its own.
 `Turn::queue_if` and `Turn::count_if` are the short way to one write
 or one count under a compare, the write's own within it.
 
-As a compare is queued it notes how much is under it, those within
-it too, so one that does not hold is jumped over at once, not step
-by step.
+A compare that does not hold jumps over all that is under it at
+once, not step by step. How much that is costs nothing as things are
+queued: the turn keeps a small stack of the compares open, where each
+lies in its queue; one closed is popped, and what is under it is the
+queue's end less where it lies -- those within it, closed before it,
+among them -- noted on the compare then.
 
 Everything under a compare lands in the compare's superchunk: a
 superchunk applying reads no other, so a write across a border could
