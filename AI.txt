@@ -172,7 +172,7 @@ REMOTE (cloud, no screen)
 == WHERE THINGS GO ==
 
 - A rule (entity_rules/, sca_rules/) reaches the simulation only
-  through instructions/: what it lacks is added there.
+  through actions/: what it lacks is added there.
 - What is hot and for how long is the simulation's (simulation::halos);
   the server only defines it (server::hot_of -> simulation::Hot:
   About { entity, side, viewport } or Forced), hands over what
@@ -216,15 +216,14 @@ headless, `cargo run --release -- server new <folder> <seed> <sheep>
 - The tree rule is separate from worldgen: a generated cover drifting
   to the rule's own balance is the simulation, not a fault.
 - No cap slider on the viewport's hot superchunks.
-- Rules depend on `instructions` alone, and the instructions are the
-  simulation's public API: they hand on no internals (no arena, no
-  entities' store, no storage). The user rejected a module that
-  re-exported those. Vocabulary types are at instructions' root.
+- Rules depend on `actions` alone (it was `instructions`): it hands
+  on no internals (no arena, no entities' store, no storage). The
+  user rejected a module that re-exported those.
 - World formats are not stabilized: no backwards compatibility kept.
 - A crate holds only what its name implies; mixing across crates is
   forbidden. Every world -- the program's, a test's, a tool's -- is
   made by server::start(Start { .. }), whatever it is to be: no mock
-  world anywhere (one in `instructions` was rejected). A rule's tools
+  world anywhere (one was rejected). A rule's tools
   are therefore the server's (server/src/diagnostics/); its tests are
   its own crate's since 2026-10-10 (review item 5), on a world the
   server makes -- `server` a dev-dependency, the helpers the server's
@@ -264,7 +263,8 @@ Seen in the stills: sheep stand on deep ocean cells (told to the user).
 
 == TYPES AND RULES ==
 
-A new layer, wide plane, entity type or attribute is its constant
+A new layer, wide plane, entity type, attribute or rule (its row
+names its one master) is its constant
 and its row in type_registry/src/registry.rs, written by hand (no
 macro: a runtime registry is to come, for mods); the build fails
 naming it if its IDs or name clash. A
@@ -290,271 +290,126 @@ Linux/Windows comparison is the user's to run. No camera in it.
 == TASKS ==
 
 Read this first after any break; write a new ask here the moment it is
-made, in the user's words. What is done is in the git log; how the
-instruction design got here (a VM, flags, programs as data: all
-dropped by the user, "we're overcomplicating stuff") is in this
-file's history up to 5e081c6, not here.
+made, in the user's words. What is done is in the git log, with the
+user's words in each commit's first line; the long form of every
+decision below is in this file's history up to 5476cd2.
 
-DONE, a line each: docs against code (tests/fine.rs, `docs stale`);
-worldgen 6 times faster; cold pool paged to disk (COLD_POOL_BYTES_KEPT
-2 GiB is my number); mipmaps on the graphics card; SCA rename; tests
-drawn from the run's seed; the 2026-10-10 review; a world shifted is
-the same world (instructions/tests/fast/shifted.rs); the collision
-plane, entities in it; cells about a cell and masks in Morton order;
-type IDs (first byte supertype, last byte size); simulation time
-(TICKS_A_SIMULATION_SECOND 256; the mean times are ugly numbers the
-user may round); EntityId removed (c077937); one stream of 24-byte
-instructions (5e081c6).
+NOW, the user, 2026-10-11, in this order:
+1. "trim AI.txt first" -- this rewrite.
+2. "the sheep need to be less hungry now that they wander more lol".
+3. "tessera is fine as is, what matters more for reduction and
+   simplification is simuulation code and then the rest" -- code size
+   reduction and simplification: `simulation` first, then the other
+   crates, not tessera. ("after finishing all the queued tasks, were
+   doing code size reduction and simplification".)
+THEN: climate ("good, now were going to work on climate!"; nothing
+said of it yet -- ask what it tracks, at what scale, what it affects).
+WAITING: mask / word-of-cells instructions ("this will have to wait
+for now haha, too much complex stuff"); Morton pathfinding (branch
+wip/morton-search, pathfinding/src/morton.rs, tested equal to the
+rows' search; left: wire into walking::seek, measure both, "let the
+best win"; after climate); entities of more than a cell ("later when
+we have multicelled entities im gonna get into details"); rules that
+sample entities as cells are sampled, maybe only the dormant (not
+asked for yet); a runtime type registry, for mods.
 
---- THE INSTRUCTION DESIGN IN FORCE (the user's words) ---
+DONE 2026-10-11, a line each (commit): the crate `compares_and_writes`
+(131eadf); rule kinds in the registry, a master each (654be35);
+neighbour picking by the ways' Morton order (71fb640); the collision
+test on any seed (e3c5a54); sheep roam further and off lush pasture
+(e5b03c4); a crossing is one move, nothing settled (5476cd2).
+Earlier: the actions crate; one stream of 24-byte instructions;
+attributes as bytes; the default attribute; acts over a border;
+simulation time; EntityId removed; the collision plane.
+
+
+== THE DESIGN IN FORCE (the user's words) ==
+
+INSTRUCTIONS
 - "the simulation instruction set is being reduced to a family of
   writes, and a family of compare instructions (and the stop skip
   instruction), higher level behaviour ... is no longer instructions,
-  were going to move that to a crate named actions".
+  were going to move that to a crate named actions". Reads are
+  actions too, "so rules can depend only on the actions crate".
+  "actions can queue instructions as groups, so we can push many
+  things in one function call ideally instead of one by one".
 - "3 types of instructions at a minimum plane-plane / plane-entity /
   entity-entity ... instructions remain completely agnostic to
-  semantic behaviour and instead couple more to the simulation needs
-  for efficient instructions".
-- 24 bytes: "first 2 bytes is opcode, the rest is up to you". "some
-  instructions hold constants, other dont"; "masks are most useful for
-  interacting with bitplanes. not for everything".
-- A compare fails -> all under it is jumped. "no more comparisons on
-  writes bro. emmit more compares instructions instead". The lengths
-  under a compare are kept beside the queue, not in the instruction.
+  semantic behaviour". 24 bytes: "first 2 bytes is opcode, the rest
+  is up to you". "masks are most useful for interacting with
+  bitplanes. not for everything".
 - HARD RULE: "every write must be gated by a compare including on
-  neighboring chunk queues" (asserted in Turn::queue).
-- "the id of an entity ona given tick its its initial origin position"
-  -- "by origin entity origin coordinate tobe specific".
+  neighboring chunk queues" (asserted in Turn::queue). A compare
+  fails -> all under it is jumped; the lengths under a compare are
+  kept beside the queue.
 - "scheduled wakes and stuff like that are write instructions, but to
-  the entitiy scheduling wheels"; wheel compares/reads: "not right now".
-- Births: "births should not be lost, they should be retried".
-- "between ticks queue is actually very important, that will later
-  become part of the player input. for now it can stay as is".
+  the entitiy scheduling wheels". Births "should not be lost, they
+  should be retried". The between-ticks queue "will later become part
+  of the player input. for now it can stay as is".
 
---- NOW: ATTRIBUTES AS BYTES (built 2026-10-11, to commit) ---
-The user: "an atribute is very different from a memeber of it ... we
-want instructions to carry updates of sizes tailored to the atribute
-member. basically the offset into the attribute and the bytes"; "i
-said max limits, youre going overboard"; "atribute block size changes
-to 16. max atribute size is therefore 256 bytes ... larger atributes
-are simply behind references"; "since atributes are entity defined,
-they cant be tied to instructions, instead instructions must index
-structs like arrays"; "the definer defines offset and size";
-"atributes are composed of many members, we want instructions to
-update members, but of course bulk write instructions have their uses
-as well"; the registry "by hand", "we will use a runtime registry in
-the future, imagine mods", "thats also the reason we have a universal
-typeid space".
-BUILT: blocks of 16 bytes, 1 to 16 an attribute (enforced in `sorted`);
-type_registry::Member {offset, bytes} and Layout::MEMBERS; opcodes
-CompareAttributeMember / WriteAttributeMember (the whole u64 ID, a
-byte offset, a byte count, 8 bytes of value at the most),
-WriteAttribute (whole, blocks carried); the registry written by hand;
-save format 5. Same cell hashes as 5e081c6; a sheep's wake 2-4%
-slower, applying 2% faster.
-THE LENGTH (the user): what an attribute's type registers is "name /
-super type 8 bits / variably sized flag / fixed size # if fixed size,
-otherwise 0 or simply not present / typeid ... the last 4 bits are
-zeroed if variably sized flag is true"; "the supertype is what
-defines the data that needs registration"; "when variably sized the 4
-zeroed bits at the end are reused to give the [attribute] length,
-otherwise the block length is simply defined beforehand at
-registration". BUILT: an attribute's ID is supertype (8 bits), number
-(52), blocks less one (4); a varying type registers the four bits 0
-and each attribute of it keeps its length there
-(AttributeType::with_blocks, identity); Registered::varies_in_size.
-Planes and entity types keep their IDs. CONFIRMED by the user: "yes, less one"; number 0 = "type id all
-zeores" is no attribute's; default compare: "both are fine by me".
-OPEN, SAID TO THE USER, NOT DECIDED:
-- Whole-attribute compare (by sum) is still what set_attribute queues;
-  the member compare is there (Turn::set_attribute_member). Which is
-  the default was asked and not answered.
-
---- BUILT: AN ENTITY'S ACT OVER A BORDER (2026-10-11, e2dc19d) ---
-The user: "we make actions and instructions completely oblivious to
-superchunk boundaries"; their design, an entity writing to a second
-queue has "a separate queue just for that entity ... evaluated in
-order as normal but the instruction gets dispatched to the relevant
-superchunk ... a mutex ... shared by up to 4 superchunks"; "try mine
-first, make adversarial tests ... then decide to keep it or try
-something else ... superchunk trasnparency for deterministic actions
-is critical"; "it wasnt just a tent queue, i said per entity" / "but
-its a decent starting point". The whole of it is in the commit.
-KEPT, the user's design, with these of mine (told, not confirmed):
-- an author goes to the separate queue only when a compare of one
-  superchunk gates something landing in another, not for any write to
-  a second queue: ungated writes to a neighbour need no order beyond
-  the one all share;
-- the per-entity queues lie back to back in the outbox's tenth queue,
-  a segment and an arrival count each;
-- order: every superchunk goes down one list sorted by author and
-  waits at such an author until all it lands in have come; the last
-  applies it holding the others (the mutex). No deadlock;
-- threads: what waits together becomes one thread's (who_goes_on.rs).
-  Without it the worst case was 3.4x the same acts off the border on
-  12 threads; with it 1.4x. Found by counting, not guessing: an empty
-  segment left behind by the move made every act look like other work;
-- a destination not hot: the compare fails, the write is missed.
-- births are on it: `bear` in sheep.rs; bearing_neighbour,
-  mother_neighbour, lamb_put_stands and the wake to look are gone;
-  SheepState is 3 blocks.
-OPEN, said in the commit: ordinary applying is slower by what the
-second phase now carries (sparse one thread +4%, 16 and 64 superchunks
-on all threads +7% and +9% of applying, +3 to 4% of the tick). Not
-found where yet; a tick with any act has idle threads rest and sleep
-instead of leaving. settle_crossings still stands: a crossing is an
-act now but the entity's move over the border is still settled after.
-Probe: `AI_SCRATCHPAD acts_over_a_border side every stepping ticks
-threads`.
-
---- THEN ---
-- THE DEFAULT ATTRIBUTE, BUILT (2026-10-11). The user: "on the type
-  registry, for entities add an optional \"default atribute\" that is
-  always present if the entity exists so it avoids the 8 bytes of
-  typeid at the beggining, but it has to be fixed size"; "if no
-  default atribute is present then we simply dont have nothing, we can
-  still add atributes dynamically lol, those do have to pay for the 8
-  bytes of typeid"; "yeah, most stuff will have a default one, so
-  better make a special case for it". ("idk what are you talking about
-  runs": my word for an entity's list of blocks -- do not use it to
-  the user.) Registry: Registered::default_attribute, with_default,
-  first_default_amiss, default_of. Store: the bucket keeps it first
-  without its type, zeroes if not given; outside the bucket it is
-  named by its type like any other (entity_manager.md, "The default
-  attribute"). The sheep's state is five words: three blocks either
-  way, nothing saved for it; measured the same within noise.
-- Of the border queue the user asked "in what order are you applying
-  the extra queue?" and "so you keep the position of the original
-  destionation queue per insutrution in the tenth queue and drain it
-  in order dispatching to each respective superchunk?" -- yes; and
-  "in theory all writes should be gated, i never said anything about
-  naked wriites lmao": there are none, I had worded it badly.
-- NOW (the user, 2026-10-11, after I explained that an author went to
-  the tenth queue only when a compare of one superchunk gated
-  something landing in another): "ok, now do it as i stated from the
-  beggining instead, if the queues ANY type of instruction to multiple
+THE ENTITY ID AND THE WORLD'S ORDER
+- "the id of an entity ona given tick its its initial origin
+  position", "in morton": "so we have a stable handle to anything
+  whithin a tick".
+- INVARIANT: "the entity id (origin coordinate that tick) is
+  literally the global world execution order, the morton order ...
+  lower entitiy id should get its instructions executed first.
+  (thatas what the tent queue is for lmao)". "same on any number of
+  threads is fine, morton order is supreme". A world shifted is not
+  held to be the same world.
+- "we make actions and instructions completely oblivious to
+  superchunk boundaries"; "the goal of all this is to make superchunk
+  boundaries invisible to instructions and therefore actions".
+- The tenth queue: "if the queues ANY type of instruction to multiple
   superchunk queues. all its instructions for that entitiy are moved
-  to the tenth queue". So: the second superchunk queue an author
-  queues anything for sends ALL it queued this tick to the tenth
-  queue, compares or no. My narrower trigger is to go.
-  WRITTEN (Turn::queue_landing_in, AuthorBegan, go_across); the user:
-  "this is a substantial change, so we need to profile this,
-  rememeber, the goal of all this is to make superchunk boundaries
-  invisible to instructions and therefore actions"; "the key to
-  border invisibility is the ultimate global order. entnties get
-  their instructions queued based on their origin morton index at
-  that tick". Settled since: what is queued with no author named is
-  treated as any author's ("yeah i agree, no exception").
-- INVARIANT, the user, 2026-10-11: "the entity id (origin coordinate
-  that tick) is literally the global world execution order, the morton
-  order. write that down as an invariant for interchunk boundary
-  resolution. lower entitiy id should get its instructions executed
-  first. (thatas what the tent queue is for lmao)". Written in
-  simulation.md, "One order, wherever the borders fall". The order
-  was reading order (for the shifted-world test); the user: "yeah,
-  same on any number of threads is fine, morton order is supreme in
-  global world execution order"; "it contradicts a little what i said
-  yesterday, but i was half asleep lmao". DONE: author = Morton index
-  of its cell (Turn::seeing_to); shifted.rs became
-  flock_over_borders.rs (one thread against all). A world shifted is
-  no longer held to be the same world.
-- Entities over several superchunks, the user, 2026-10-11: "lets keep
-  one rule"; "multi superchunk spanning entities have an origin
-  coordinate at one specific chunk, thats the owner, the origin chunk
-  for large entities will be dynamically calculated to be roughly in
-  the center coordinate of the entity". So: one owner, where its
-  origin is; its place in the order is its origin; it waits for every
-  superchunk it queues for, as any author does. Not built.
-- OPEN, told to the user 2026-10-11: Morton order + acts over a
-  border cost threads. All of a lower superchunk's authors come before
-  a higher one's, so one act from the lower into the higher makes the
-  higher wait until the lower reaches that author. Probe
-  (`AI_SCRATCHPAD acts_over_a_border 4 1024 4000 200 0 1`, 12 acts a
-  tick): second phase on 12 threads 740 -> 1130 us; one thread
-  unchanged. Under reading order the worst was 1.4x and sparse acts
-  free. ACCEPTED by the user: "thats fair, we are optimizing for
-  the 99% percent of cases, there will always be worst cases no matter
-  what we do, but we to avoid write hazards or inconsisntent entity
-  states over everything".
-- NOW, the user, 2026-10-11: "but finish any previous tasks first,
-  and finish moving those 3 one in N things that still need porting
-  to the mean simulation time, rules should also be agnostic to what
-  the sim-second is defined as". DONE for the two that are chances:
-  trees MEAN_TIME_TO_DIE/DIE_CHANCE, sheep MEAN_TIME_TO_CONCEIVE/
-  CONCEIVE_CHANCE (SimulationTime::chance_each). CROWDED is a count
-  of trees, not a chance over time: left, told to the user. All tests
-  pass with the tick rate set to 100 (tried, put back to 256).
-  "finish any previous tasks first": still open below -- the actions
-  crate, mask instructions, the parked items.
-- ASKED MY VIEW, the user, 2026-10-11: "on the type registry, rules
-  should also register there under a new \"rule\" kind or maybe 2
-  rule kinds, idk"; "that way we can also add fields on the entities
-  and planes to register the used rules"; "what do you think of
-  this?". Not to build until the user says how.
-- THE ACTIONS CRATE, decided by the user 2026-10-11 (asked):
-  reads: "option 1 and 3 are basically the same, because \"reads\"
-  are basically abstracted function calls into the simulation. id say
-  make them actions, so they are clearly separate from instructions".
-  Depth: two stages, both now -- 1: make the crate, move the modules,
-  rules depend on actions alone, commit; 2: lift step, crossing, make
-  and attribute edits out of the simulation into actions so
-  instructions exposes single instructions only, measure, commit.
-  STAGE 1 DONE: crate `actions` is what `instructions` was; the new
-  `instructions` holds the compares alone so far. Also the user: "oh
-  and the other reason to make reads actions is so rules can depend
-  only on the actions crate lmao"; "instructions crate probably needs
-  a better name lol" (kept for now; names to suggest). STAGE 2 DONE:
-  the simulation's turn queues single instructions
-  (turn/one_instruction.rs) and one batch (compare_with_writes, the
-  user: "actions can queue instructions as groups, so we can push
-  many things in one function call ideally instead of one by one");
-  step, crossing, make, attribute edits, update are in actions.
-- RENAME, the user 2026-10-11: "run is a bad name for the atributes
-  of an entity, a better name is \"atribute_list or array or
-  watever". DONE: "attribute list" in entity_manager's comments and
-  docs and the glossary (no identifier was named run).
-- BEFORE CLIMATE, the user's answers 2026-10-11 (asked): do
-  neighbour picking the same wherever tiles fall; the fragile
-  collision test; a crossing as one move; sheep "Roam further and
-  more often"; the rule's row holds "Name and master only". Mask
-  instructions: "this will have to wait for now haha, too much
-  complex stuff". Morton pathfinding: not picked, after climate.
-  Order I take: the crate's name, rule kinds, neighbour picking,
-  collision test, crossing as one move, sheep roaming.
-- NAME, the user 2026-10-11, of the instructions crate:
-  "compares_and_writes might be good, that basically what we have
-  there now lmao". DONE: the crate is `compares_and_writes`.
-- RULE KINDS, the user 2026-10-11: "kinds are the first byte of the
-  typeid, what weve been calling supertypes so far, in this case we
-  want 2 new supertypes/kinds, for SCA rules and Entity rules". So
-  two new first-byte values, not one with two kinds under it.
-- RULES IN THE REGISTRY, the user 2026-10-11: "every rule has a master
-  entity type or plane, regardless of what planes or entities the rule
-  reads or writes". So a rule's row names its one master. Not built.
-- NEXT, the user, 2026-10-11, after the border work was pushed
-  (b5d7802): "good, now were going to work on climate!". Nothing said
-  of it yet: wait for what the user wants of it.
-- STANDING, the user, 2026-10-11: "hey hey, tests should be seed
-  genereated when possible". Done for the two border tests; holds for
-  every test from here on.
-- The `actions` crate ("we need a sperate crate for actions, cant be
-  mixed with instructiosn", 2026-10-11): what in `instructions` is many instructions
-  (cells::set, spawn, step, walking, seek, around, area, mask) moves
-  there; "rules would depend on actions alone".
-- Mask / word-of-cells plane-plane instructions.
-- PARKED: pathfinding in Morton order (branch wip/morton-search:
-  pathfinding/src/morton.rs, tested equal to the rows' search; left:
-  wire into walking::seek, measure both on `pasture 1000 20 4000 4 1`,
-  "let the best win"). around::pick the same wherever tiles fall ("no
-  exceptions"; plan: ways numbered in Morton order of their offsets).
-  "we want sheep to wander more and sleep less haha". Entities of more
-  than a cell: "the instructions should compose the mask ... later
-  when we have multicelled entities im gonna get into details".
-- LOWEST: optimizations and inlining another day; cold states not
-  paged; page-out on the tick's thread.
-- KNOWN, TOLD: sparse-pasture applying ~10% slower since the stream (a
-  step is a move and a wake, two lookups); a fused opcode would win
-  it back and is not a plain write.
+  to the tenth queue". No exception for what has no author.
+- A crossing: "if an entity crosses a superchunk and another rule
+  tries to write to that entity id the writes should go to the tenth
+  queue. so no settlement step is needed"; "a separate structure to
+  track what entities crossed to properly redirect writes"; "redirect
+  writes to the right queue first if possible"; "the simulation
+  should route the dispatched instructions to the entity id
+  automagically if it already crossed or if it hasnt crossed yet".
+  Built: simulation.md, "An entity over a border". Not noted: an
+  authorless instruction naming an entity (applied before all).
+- Entities over several superchunks: "lets keep one rule"; one owner,
+  "the origin chunk for large entities will be dynamically calculated
+  to be roughly in the center coordinate of the entity". Not built.
+- The cost accepted: in Morton order one act from a lower superchunk
+  into a higher makes the higher wait (12 acts a tick on 16
+  superchunks: second phase 740 -> 1130 us on 12 threads). "we are
+  optimizing for the 99% percent of cases ... but we to avoid write
+  hazards or inconsisntent entity states over everything".
+- Dormant entities: "entities going permanently to sleep is fine if
+  no wake are detected ... we will have rules that sample entities in
+  the SCA rules style potentially filtering for dormant entities".
+  No guard, no count. With the rules as they are none sleeps for good.
+
+ATTRIBUTES AND TYPES
+- Blocks of 16 bytes, 1 to 16 an attribute ("max atribute size is
+  therefore 256 bytes ... larger atributes are simply behind
+  references"); "the definer defines offset and size"; instructions
+  write members, whole-attribute writes "have their uses as well".
+- An attribute's ID: kind 8 bits, number 52, blocks less one 4; a
+  type whose size varies registers the four bits 0. An entity type
+  may register a default attribute, kept without its type ("most
+  stuff will have a default one"). An entity's attributes as kept
+  are its "attribute list" -- never "run".
+- "kinds are the first byte of the typeid, what weve been calling
+  supertypes so far"; rules are two kinds, SCA rules and entity
+  rules; "every rule has a master entity type or plane, regardless of
+  what planes or entities the rule reads or writes". In the code the
+  first byte's enum is still `Supertype` and `Kind` a row's kind:
+  told to the user, a rename theirs to ask for.
+- OPEN, asked, not answered: whether the whole-attribute compare (by
+  sum) or the member compare is set_attribute's default ("both are
+  fine by me").
+
+RULES AND TIME
+- "rules should also be agnostic to what the sim-second is defined
+  as": times in seconds of the simulation, chances as mean times
+  (TICKS_A_SIMULATION_SECOND 256; tests pass at 100).
+- "hey hey, tests should be seed genereated when possible".
 
 
 == WHAT THE USER HAS SAID OF HOW THINGS ARE ==
@@ -563,110 +418,57 @@ threads`.
   cheaper. Masks are aligned tiles, as Tessera's (tessera/src/tile.rs):
   one run of bits. Cell operations are masked bitwise ops.
 - MEASURE before saying a change is done ("where is the profiling?
-  benchmarks?"): `server pasture 1000 333 4000 4 1` four times (ns a
-  rule); the tick reference, `perf stat -e instructions:u` of `pasture
-  300 333 4000 4 1` less the 0-tick run; `server check` hashes;
-  `perf record -e cycles:u` for the hot function. Against the commit
-  before, built from a checkout. Numbers in the commit.
-  The same seed for both builds: copy transient_data/seed.csv aside
-  and restore it before each run (it rolls every 5 uses); alternate
-  the builds, the machine drifts.
-- One stream of instructions, applied in the order they arrive: no
-  kind before another. An entity is named for the tick by the cell the
-  tick found it on.
+  benchmarks?"), against the commit before, numbers in the commit:
+  `perf stat -x, -e instructions:u <binary> server pasture 1000 333
+  4000 4 1` less the same with 0 ticks (also `1000 20 4000 4 1`,
+  `1000 333 4000 16 0`); `server check 0 600 200 4000 0` hashes; a
+  long `pasture` for what the world comes to. The same seed for both
+  builds: copy the scratch folder's seed.measure over
+  transient_data/seed.csv before each run and put seed.now back
+  (the file rolls every 5 uses); alternate the builds, the machine
+  drifts and the user is using it. Border probe: `AI_SCRATCHPAD
+  acts_over_a_border side every stepping ticks threads crossing`.
+  The scratch folder is a small tmpfs: one or two binaries at most.
+- The check's last line now: 600,7c13edff92f5d70f,acb69968c95fdcb4,
+  fecb18dba5bea4ec,6b2e44078bde7624,cbbe5c62e1e5fae6,e220a8397b1dcdaf
 - Borders of chunks and superchunks are invisible to what is not
   chance; chance may hang on them ("rngs per superchunk were the plan
-  all along"). A neighbour drawn (around::pick) hangs on tile
-  alignment the same way -- the user asked what that means: explained,
-  not yet answered whether it is wanted.
+  all along"). A neighbour drawn does not: around::pick goes by the
+  ways' order ("no exceptions").
 - The collision plane holds everything that can collide; walls stay
   the terrain's edge layers.
 - A test's infrastructure lives in its test file: nothing is put in
   the program for a test.
-- The persistent settings, "~/.local/share/Civil Egregore/" (settings
-  and saved worlds), may be deleted whenever needed ("i dont care for
-  anything there"). Its settings.csv had sheep a superchunk 0, which
-  is why the window's world had none; removed 2026-10-11. BUT there
-  is a flag for it, which the user pointed out after: the feature
+- The persistent settings, "~/.local/share/Civil Egregore/", may be
+  deleted ("i dont care for anything there"), but the feature
   `force_default_settings` (utilities/src/settings.rs) leaves the
-  machine's file alone. Use the flag; do not delete.
+  machine's file alone: use the flag, do not delete.
 
-
-- 2026-10-11, the user, while the rule kinds were being written:
-  "yeah, anotate in docs the first byte of the typeid is the kind of
-  the typeid". Done in type_registry.md ("The bytes of an ID"), the
-  reference, the glossary. In the code the first byte's enum is still
-  `Supertype`, and `Kind` is a row's kind (it tells a layer from a
-  wide plane, which share a first byte): told to the user, a rename
-  theirs to ask for.
-
-- 2026-10-11, the user, of entities with no wake ahead (I had said a
-  rule forgetting to put one back leaves it asleep for good, and
-  offered a count to catch it): "no, actually, entities going
-  permanently to sleep is fine if no wake are detected, you see, we
-  will have rules that sample entities in the SCA rules style
-  potentially filtering for dormant entities for sampling. waking
-  them up if needed for the rule." So: dormancy is a state, not a
-  fault; no count, no guard. To come (not asked for yet): rules that
-  sample entities as the cells are sampled, maybe only the dormant.
-- Sheep roaming: DONE (ROAM_TICKS 27 s; MEAN_TIME_TO_ROAM 54 s on lush
-  pasture). check hash now ends 600,7c13edff92f5d70f,acb69968c95fdcb4,fecb18dba5bea4ec,6b2e44078bde7624,cbbe5c62e1e5fae6,e220a8397b1dcdaf
-- Neighbour picking: DONE. Ways are numbered in Morton order of
-  where they lead (HERE is 3; around::NORTH_WEST .. SOUTH_EAST), and
-  around::pick draws by the ways' order, the same wherever the cell
-  lies in its tiles. World hashes changed with it, as meant:
-  `server check 0 600 200 4000 0` on the measuring seed now ends
-  600,7c13edff92f5d70f,acb69968c95fdcb4,fecb18dba5bea4ec,6b2e44078bde7624,cbbe5c62e1e5fae6,e220a8397b1dcdaf
-
-- Fragile collision test: DONE (e3c5a54).
-- CROSSING AS ONE MOVE: DONE 2026-10-11. The user's design: the
-  entity's ID (Morton index of its tick-start cell) is a stable
-  handle for the tick; "if an entity crosses a superchunk and another
-  rule tries to write to that entity id the writes should go to the
-  tenth queue. so no settlement step is needed"; "we just need a
-  separate structure to track what entities crossed to properly
-  redirect writes"; "lets redirect writes to the right queue first if
-  possible, otherwise ... the 10th queue"; "the simulation should
-  route the dispatched instructions to the entity id automagically if
-  it already crossed or if it hasnt crossed yet." Built so: one
-  CrossEntity instruction (24 bytes, nothing carried) from
-  Turn::move_entity; SuperchunkEntities::cross_named moves it at the
-  act; later authors naming it (Outbox::named_by_others) are
-  re-pointed as the crossing is applied (tick/applying/following.rs).
-  Settling, Arrival, Settled, turned_back, entity::cross are gone.
-  Worlds identical to before (hashes, a 20,000-tick run). Docs:
-  simulation.md "An entity over a border".
-  Left: authorless (author 0) instructions naming an entity are not
-  noted; the whole-tick cost is +1.3% processor instructions on
-  `pasture 1000 333 4000 4 1`, cause not pinned down.
-- 2026-10-11, the user, as the crossing was being built: "when i say
-  entity id is the origin coordinate at the start of the tick,
-  remember that lol" / "in morton" / "yes thats so we have a stable
-  handle to anything whithin a tick". And: "ok, after finishing all
-  the queued tasks, were doing code size reduction and
-  simplification" -- NEXT after the crossing (asked whether before
-  climate; taken as before unless told).
 
 == OPEN THREADS ==
-- THE FLOCK DIES OUT (found 2026-10-11, told to the user, not mine to
-  rebalance unasked): `server pasture 300000 333 4000 4 0` on the
-  measuring seed -- sheep 16,000 rise past 150,000, grass goes to 0
-  about tick 222,000, the last sheep dies about 240,000. The same on
-  this morning's build (scratchpad `base`, ~e2dc19d) and before the
-  roaming change; docs/civil_egregore.md said it settled near 10,000.
-  Cause not looked for. Roaming more (ROAM 27 s, off lush pasture one
-  meal in two) moved the peak from tick 159,000 to 203,000, no more.
-- Limits known: another removing an entity as it crosses turns it
-  back; entities of one cell only.
+- THE FLOCK DIES OUT (found 2026-10-11, told to the user): `server
+  pasture 300000 333 4000 4 0` on the measuring seed -- 16,000 sheep
+  rise past 150,000, the grass goes to 0, the last sheep dies about
+  tick 240,000 (after the roaming change: peak 161,600 at 203,000,
+  gone by 299,800). The same on the build of that morning (~e2dc19d);
+  docs/civil_egregore.md said it settled near 10,000 and now says it
+  does not. Cause not looked for.
+- Costs not found: +1.3% processor instructions a tick from the
+  crossing as one move; ~2% from the actions split; ordinary applying
+  4-9% slower since acts over a border (e2dc19d); sparse-pasture
+  applying ~10% slower since the one stream (a step is a move and a
+  wake, two lookups).
+- The renderer was not run for any change of 2026-10-11.
+- e5b03c4's message says the check's hash changed with the roaming;
+  it did not.
+- Limits known: entities of one cell only.
 - A world's stored image of a cooled superchunk is behind its cells
   until the writeback ring is flushed (World::write_back_and_flush_all):
   compare images only after it.
 - A fresh flock loses ~2% at its first wake (old age rolled for the
   whole sleep ahead): the rule as written; told to the user.
 - Worldgen, if more speed is wanted: the vertices a square shares with
-  the last kept; the broad meshes on a coarser lattice. What is left
-  of a superchunk's 1.77 G instructions: the mesh 44%,
-  HeightMap::from_heights 15%, Tessera's encode 10%.
+  the last kept; the broad meshes on a coarser lattice.
 - Answers of server::host::terrain are the terrain AS GENERATED: when
   a made superchunk's ground can change they must come from the world.
 - Every `unsafe` gets a test trying to break its safety comment.
@@ -677,5 +479,6 @@ threads`.
 - Told to the user, shortcuts not decisions: chunk_storage and
   entity_manager hand on the ID types under their own names;
   TickCounts carries per-rule times; float sqrt is allowed by the lint.
-- Later: an area allocator (256 MiB blocks, 256-byte units); Tessera's
-  deep clean; a read of every file for one name a thing.
+- Later: optimizations and inlining; cold states not paged; page-out
+  on the tick's thread; an area allocator (256 MiB blocks, 256-byte
+  units); a read of every file for one name a thing.
