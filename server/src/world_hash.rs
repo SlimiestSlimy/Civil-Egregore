@@ -50,7 +50,7 @@ pub fn world_hash(world: &mut World) -> WorldHash {
     let mut entities = fold(0, world.entities.len() as u64);
     for entity in world.entities.iter() {
         let header = entity.header;
-        entities = [header.id.0, header.kind.0, header.at.0, header.wake, entity.attributes.len() as u64].into_iter().fold(entities, fold);
+        entities = [header.kind.0, header.at.0, header.wake, entity.attributes.len() as u64].into_iter().fold(entities, fold);
         entities = entity.attributes.iter().flat_map(|block| block.0).fold(entities, fold);
     }
     let random_streams = world.simulation.random_states().fold(0, |hash, (superchunk, state)| fold(fold(hash, superchunk.0), state));

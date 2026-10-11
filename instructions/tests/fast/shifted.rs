@@ -16,7 +16,7 @@ use crate::tests::{cell, walker, world, STONE, WALKER};
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{Attribute, AttributeBlock, Entities, EntityId, Header, InstructionsApplied};
+use entity_manager::{Attribute, AttributeBlock, Entities, Header, InstructionsApplied};
 use instructions::around::{self, About, Cells};
 use instructions::{cells, compare, Turn};
 use simulation::Simulation;
@@ -46,10 +46,18 @@ fn pasture_cell(shift: (u32, u32), x: i64, y: i64) -> CellIndex {
     cell(from(shift.0, x), from(shift.1, y))
 }
 
-/// What the test's one generator holds for the entity `id` at the tick
-/// `now`: every chance of the flock's rule is read from it.
-fn drawn_for(seed: u64, now: u64, id: EntityId) -> Rng {
-    Rng::for_stream(seed ^ now.wrapping_mul(0x9e37_79b9_7f4a_7c15), id.0)
+/// Where `at` is from the top left of the pasture `shift` cells east
+/// and south: the same of a cell and of its like in a world shifted.
+fn from_pasture(shift: (u32, u32), at: CellIndex) -> (i64, i64) {
+    let (origin, at) = (pasture_cell(shift, 0, 0).cartesian(), at.cartesian());
+    (i64::from(at.x) - i64::from(origin.x), i64::from(at.y) - i64::from(origin.y))
+}
+
+/// What the test's one generator holds, at the tick `now`, for the
+/// entity that tick found on the cell `from_pasture`: every chance of
+/// the flock's rule is read from it.
+fn drawn_for(seed: u64, now: u64, from_pasture: (i64, i64)) -> Rng {
+    Rng::for_stream(seed ^ now.wrapping_mul(0x9e37_79b9_7f4a_7c15), (from_pasture.0 as u64) << 32 | from_pasture.1 as u64 & 0xffff_ffff)
 }
 
 /// The entity on `at` as the tick found it, if one stood there.
@@ -72,12 +80,12 @@ fn way_drawn(drawn: &mut Rng, about: &About, choices: Cells) -> Option<u32> {
 /// it; counts on a neighbour too; may make another beside it; and
 /// steps to a neighbour, whoever stands there. Every cell and every
 /// attribute written is a compare-and-write.
-fn flock(turn: &mut Turn, seed: u64) -> u64 {
+fn flock(turn: &mut Turn, seed: u64, shift: (u32, u32)) -> u64 {
     let now = turn.now();
     for entity in turn.woken() {
         let (header, at) = (entity.header, entity.header.at);
         turn.seeing_to(at);
-        let mut drawn = drawn_for(seed, now, header.id);
+        let mut drawn = drawn_for(seed, now, from_pasture(shift, at));
         let about = around::about(at);
         let stone = around::layer(turn, STONE, &about);
         let (open, taken) = (stone.hot & about.ring(), around::layer(turn, COLLISION, &about).set & about.ring());
@@ -101,7 +109,7 @@ fn flock(turn: &mut Turn, seed: u64) -> u64 {
             turn.set_attribute(&other.header, COUNTED, seen, seen.unwrap_or(0) + 1000);
         }
         if let Some(beside) = way_drawn(&mut drawn, &about, open.without(taken)).filter(|_| chance < 9).and_then(|bit| around::cell(at, bit)) {
-            turn.put(Header { id: EntityId(drawn.draw()), kind: WALKER, at: beside, wake: now + 1 + drawn.below(3) }, &[]);
+            turn.put(Header { kind: WALKER, at: beside, wake: now + 1 + drawn.below(3) }, &[]);
         }
         let to = way_drawn(&mut drawn, &about, open).and_then(|bit| around::cell(at, bit)).unwrap_or(at);
         turn.step(&header, to, now + 1 + drawn.below(3));
@@ -131,7 +139,7 @@ fn pasture(seed: u64, shift: (u32, u32)) -> (BitmapArena, Entities) {
     while taken.len() < FLOCK {
         let at = (random.below(u64::from(PASTURE)) as i64, random.below(u64::from(PASTURE)) as i64);
         if taken.insert(at) {
-            entities.queue_put(walker(random.draw(), pasture_cell(shift, at.0, at.1), random.below(3)), &[]);
+            entities.queue_put(walker(pasture_cell(shift, at.0, at.1), random.below(3)), &[]);
             arena.queue(COLLISION, Write::cell(pasture_cell(shift, at.0, at.1), WriteOp::Set));
         }
     }
@@ -142,18 +150,17 @@ fn pasture(seed: u64, shift: (u32, u32)) -> (BitmapArena, Entities) {
 
 /// What came of the pasture, said from its own top left: the cells of
 /// stone on it and about it, those the collision plane holds, and
-/// every walker by its ID -- where, when it wakes, its attributes.
-type Came = (BTreeSet<(i64, i64)>, BTreeSet<(i64, i64)>, Vec<(u64, i64, i64, u64, Vec<AttributeBlock>)>);
+/// every walker by its cell -- where, when it wakes, its attributes.
+type Came = (BTreeSet<(i64, i64)>, BTreeSet<(i64, i64)>, Vec<(i64, i64, u64, Vec<AttributeBlock>)>);
 
 /// [`Came`] of a world whose pasture is `shift` cells east and south.
 fn came(arena: &BitmapArena, entities: &Entities, shift: (u32, u32)) -> Came {
     let read = -READ_PAST..i64::from(PASTURE) + READ_PAST;
     let holding = |layer| read.clone().flat_map(|y| read.clone().map(move |x| (x, y))).filter(|&(x, y)| arena.holds(layer, pasture_cell(shift, x, y)) == Ok(true)).collect();
     let (stone, held) = (holding(STONE), holding(COLLISION));
-    let origin = pasture_cell(shift, 0, 0).cartesian();
-    let from = |at: CellIndex| (i64::from(at.cartesian().x) - i64::from(origin.x), i64::from(at.cartesian().y) - i64::from(origin.y));
-    let mut walkers: Vec<_> = entities.iter().map(|walker| (walker.header.id.0, from(walker.header.at).0, from(walker.header.at).1, walker.header.wake, walker.attributes.to_vec())).collect();
-    walkers.sort_unstable_by_key(|walker| walker.0);
+    let from = |at: CellIndex| from_pasture(shift, at);
+    let mut walkers: Vec<_> = entities.iter().map(|walker| (from(walker.header.at).0, from(walker.header.at).1, walker.header.wake, walker.attributes.to_vec())).collect();
+    walkers.sort_unstable_by_key(|walker| (walker.0, walker.1));
     (stone, held, walkers)
 }
 
@@ -175,13 +182,13 @@ fn a_world_shifted_comes_to_the_same() {
     assert_eq!(came(&arena, &entities, (0, 0)), came(&arena_there, &entities_there, shift), "the same pasture put, shifted {shift:?}");
     let (mut done, mut refused) = (InstructionsApplied::default(), 0);
     for _ in 0..TICKS {
-        let report = simulation.tick(&mut arena, &mut entities, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed));
-        simulation_there.tick(&mut arena_there, &mut entities_there, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed));
+        let report = simulation.tick(&mut arena, &mut entities, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed, (0, 0)));
+        simulation_there.tick(&mut arena_there, &mut entities_there, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed, shift));
         done += report.instructions_applied;
         refused += report.writes_applied.refused;
         let ((stone, held, walkers), (stone_there, held_there, walkers_there)) = (came(&arena, &entities, (0, 0)), came(&arena_there, &entities_there, shift));
         // The collision plane holds the cells the walkers stand on, and no other.
-        assert_eq!(held, walkers.iter().map(|walker| (walker.1, walker.2)).collect(), "after tick {}", entities.now());
+        assert_eq!(held, walkers.iter().map(|walker| (walker.0, walker.1)).collect(), "after tick {}", entities.now());
         let stone_apart: Vec<_> = stone.symmetric_difference(&stone_there).chain(held.symmetric_difference(&held_there)).take(4).collect();
         let walkers_apart: Vec<_> = walkers.iter().zip(&walkers_there).filter(|(here, there)| here != there).take(4).collect();
         assert!(stone_apart.is_empty() && walkers_apart.is_empty() && walkers.len() == walkers_there.len(), "after tick {}, shifted {shift:?}, seed {seed:#x}: {} walkers here and {} there; apart, stone {stone_apart:?}, walkers {walkers_apart:?}; done here {done:?}", entities.now(), walkers.len(), walkers_there.len());

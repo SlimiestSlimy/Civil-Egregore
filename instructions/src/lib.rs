@@ -28,7 +28,7 @@ pub mod walking;
 // lot drawn.
 pub use chunk_storage::{Bits4, LayerType, Wide};
 pub use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOURS, SUPERCHUNK_SIDE_CELLS};
-pub use entity_manager::{Attribute, AttributeBlock, AttributeType, EntityEdit, EntityId, EntityRef, EntityType, Header, Layout};
+pub use entity_manager::{Attribute, AttributeBlock, AttributeType, EntityEdit, EntityRef, EntityType, Header, Layout};
 pub use simulation::{TickReport, Turn};
 pub use utilities::chance::Chance;
 pub use utilities::rng::Rng;

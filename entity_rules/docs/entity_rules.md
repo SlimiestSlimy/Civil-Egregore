@@ -128,8 +128,10 @@ it, so a sheep due to bear at a meal bears at its next wake.
 which another lamb or a stepping sheep may take first in the same
 tick. The put refused, nothing in the tick tells
 its mother: so she does not take the put for a birth. She notes the
-lamb (the `bearing` of her `SheepState`, its ID), stays where she is, and wakes the next tick:
-the lamb standing beside her (`entities::stands_beside`), it is born --
+neighbour she put it on (the `bearing_neighbour` of her `SheepState`), stays where she is, and wakes the next tick.
+An entity has no ID, so she knows her lamb by what she put it with: a sheep on that neighbour (`entities::on`) due to be grown
+as one put the tick before is, and whose `mother_neighbour` is the way back to her -- not another's lamb put on the same cell
+first, nor a sheep that stepped there (`lamb_put_stands`). Her lamb standing beside her, it is born --
 counted, and she is pregnant no more; not there, she is pregnant and
 due as before, and puts it again when a cell beside her is free. A birth costs a wake more; none is lost and none counted that
 was not. How it came to be -- what was measured, what was

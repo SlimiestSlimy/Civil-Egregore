@@ -8,15 +8,20 @@ what a rule is given: `../../simulation/docs/simulation.md`,
 
 ## An entity
 
-A header and attributes. The header is a random 64-bit ID, a type, the
-cell it stands on, and the tick it next wakes at. Attributes are typed
+A header and attributes. The header is a type, the cell it stands on,
+and the tick it next wakes at. Attributes are typed
 blocks of 64 bytes, added and removed at run time ("Attributes, a block
 each"). Types are the type registry's (`../../type_registry/`).
 
-An entity is found by its ID and its cell: its cell's chunk's bucket,
-then its ID there -- never a search past its chunk. That keeps it found
-however it moves, and a wake or an instruction naming one that has
-moved on or died passes it over.
+An entity has no ID. No two stand on one cell, so the cell names it:
+its origin cell, the one in its header. It is found by that cell --
+its cell's chunk's bucket, the cell's place there -- never a search
+past its chunk. Within a tick the name is the cell the tick found it
+on, wherever it moves meanwhile ("Instructions", An entity's name in a
+tick); from a tick to the next nothing names it but where it stands,
+and what must know one again keeps what it needs in an attribute -- a
+neighbour's way, say, as a sheep its lamb's. A wake or an instruction
+naming a cell nobody stands on any more is passed over.
 
 ## Attributes, a block each
 
@@ -73,7 +78,7 @@ layout of one block is read from its block and written to it where it
 lies; one of more is gathered into a run of words first.
 
 **What it costs.** A block is four times the 16 bytes an attribute
-took. A sheep has one to four: 64 to 256 bytes beside its 32-byte
+took. A sheep has one to four: 64 to 256 bytes beside its 24-byte
 header. Blocks are copied whole when an entity is put, crosses or is
 saved; an edit of one attribute in place writes its block. The tick
 reference (`../../docs/testing_protocol.md`), a word an attribute ->
@@ -112,11 +117,14 @@ cells entities stand on are read a word tile at a time.
 **Stepping.** An entity stepping to another cell of the same chunk
 shifts the entities between its old and its new cell by one.
 
-**Putting** (`Bucket::put`). An entity is put with the cell it stood on
-and, if they changed, its attributes; with none given it keeps those it
-has, and is not made if it is not there. Its cell the same as it stood
-on: changed where it stands, or added if it is new and the cell is
-free. Another cell: moved there if no entity stands on it, else left
+**Putting.** Two things, never one for the other. An entity is made
+(`Bucket::make`) on a cell nobody stands on, with its attributes, or
+refused. And the entity standing on a cell is given a header
+(`Bucket::put`) -- another cell, another wake -- and, if they changed,
+its attributes; with none given it keeps those it has, and nobody
+standing there it is passed over, never made. Its cell the same as it
+stood on: changed where it stands. Another cell: moved there if no
+entity stands on it, else left
 where it was and changed all the same. What came of it is a `Put`
 (one put where it stood because its cell was another's that tick is
 said to have stayed too, `Put::stayed`).
@@ -137,14 +145,16 @@ waking then, not every entity.
 A slot a tick for the next `WHEEL_TICKS` (1,024) ticks, the tick's
 number modulo that its slot. A wake further off waits in a list beside
 the slots, filed into its slot once its tick is in reach; the list is
-looked over every half of `WHEEL_TICKS`. A wake names its entity by ID
-and cell -- which finds it in its chunk's bucket -- and is only good if
-the entity still wakes at that tick: one that moved away, died or was
-woken for another tick is not found, or not due, and is passed over.
-Nothing is ever taken out of the wheel but the slot just passed.
+looked over every half of `WHEEL_TICKS`. A wake names its entity by
+its cell -- which finds it in its chunk's bucket -- and is only good if
+whoever stands there wakes at that tick: of one that moved away or
+died the cell is empty, or another's, not due then, and is passed
+over. Nothing is ever taken out of the wheel but the slot just passed.
 
-A tick's slot is sorted by cell -- Morton order -- then ID, before the
-tick runs (`Wheel::sort`), so the entities wake in Morton order: their
+A tick's slot is sorted by cell -- Morton order -- each cell once,
+before the tick runs (`Wheel::sort`): a cell filed twice for one tick,
+by an entity that left it and by one that came to stand there after,
+wakes whoever stands on it once. So the entities wake in Morton order: their
 buckets, the cells they read and the writes they queue all go forwards
 through memory, as the cells' sampling does. The entities to wake soon
 are asked of memory ahead, an entity 8 wakes before it is given
@@ -160,7 +170,7 @@ more than it changes (`Instruction`, the four):
 
 | instruction | what it does | what it carries |
 |---|---|---|
-| put | an entity made, or made anew whole: header and attributes | its attributes |
+| put | an entity made on a cell nobody stands on: header and attributes | its attributes |
 | move | an entity moved to another cell, or left where it is, to wake at another tick; its attributes as they are | nothing |
 | edit | one attribute of an entity set, or removed: by the entity itself or by another | the one attribute's blocks, or none |
 | remove | an entity removed | nothing |
@@ -208,8 +218,13 @@ from the name:
 - The tick over, every entity is named by the cell it stands on
   (`names_anew`); applying a queue between ticks ends so too.
 
-The ID is still asked beside the cell, as it was. An entity made in a
-tick has no name in it: nothing saw it.
+The cell is all that is asked: there is no ID beside it. An entity
+made in a tick is named in it by the cell it was made on, which no
+rule saw it on: nothing is queued for it.
+
+A put makes (`make_named`, and `make` of the store and of the bucket):
+never over an entity, which is written an attribute at a time and
+moved, not put whole.
 
 **Entities in the collision plane.** Whoever applies a queue may lend
 the collision plane of the superchunk it lands in (`CollisionCells`:
@@ -261,9 +276,9 @@ no superchunk is read, no entity stands.
 
 A superchunk's state is words a save keeps
 (`../../chunk_storage/docs/chunk_storage.md`, "On disk"): a first word
-saying what it is (`FIRST_WORD`: `TSstate` and the format's number, 3);
+saying what it is (`FIRST_WORD`: `TSstate` and the format's number, 4);
 whether it has random numbers, and their state; how many entities; then
-each entity -- its ID, type, cell, wake tick, how many blocks its
+each entity -- its type, cell, wake tick, how many blocks its
 attributes are, and the blocks, eight words each. An entity whose
 blocks are not whole attributes sorted by type is not read.
 

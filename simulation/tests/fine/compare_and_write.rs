@@ -6,7 +6,7 @@
 use crate::tests::{cell, cells_drawn, walker, world, STONE};
 use bitplane_manager::{BitmapArena, Write, WriteOp};
 use coordinates::CellIndex;
-use entity_manager::{Attribute, AttributeBlock, EntityId};
+use entity_manager::{Attribute, AttributeBlock};
 use simulation::{Compare, Simulation, Turn};
 use utilities::rng::Rng;
 
@@ -63,8 +63,8 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
     let (mut arena, mut entities) = world(1);
     let (decaying, eaten) = (cell(300, 300), cell(301, 400));
     set(&mut arena, &[decaying, eaten]);
-    entities.queue_put(walker(1, decaying, 0), &[]);
-    entities.queue_put(walker(2, eaten, 0), &[]);
+    entities.queue_put(walker(decaying, 0), &[]);
+    entities.queue_put(walker(eaten, 0), &[]);
     entities.apply();
     let mark = |at: CellIndex| at.offset(1, 0).expect("in the world");
     let report = Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
@@ -73,12 +73,12 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
             let (now, header) = (turn.now(), eater.header);
             // Fed if the cell still holds, asleep a tick if it does not: one of the two, the eater written once.
             turn.compare_from_here(Compare::Cell { layer_type: STONE, at: header.at, seen: 1 });
-            turn.put(entity_manager::Header { wake: now + 100, ..header }, &[AttributeBlock::holding(FED, 1)]);
+            turn.update(&header, entity_manager::Header { wake: now + 100, ..header }, &[AttributeBlock::holding(FED, 1)]);
             turn.compare_from_here(Compare::Cell { layer_type: STONE, at: header.at, seen: 0 });
             turn.step(&header, header.at, now + 1);
             turn.compare_end();
             turn.queue_seen(STONE, header.at, 1, 0, Some(EATEN));
-            let fed = Compare::attribute(header.id, header.at, FED.attribute_type(), Some(&[AttributeBlock::holding(FED, 1)]));
+            let fed = Compare::attribute(header.at, FED.attribute_type(), Some(&[AttributeBlock::holding(FED, 1)]));
             turn.queue_if(fed, STONE, mark(header.at), 0, 1, None);
         }
         0
@@ -87,12 +87,12 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
     assert_eq!((arena.holds(STONE, mark(decaying)), arena.holds(STONE, mark(eaten))), (Ok(false), Ok(true)), "a mark by the one fed alone");
     let applied = report.writes_applied;
     assert_eq!((applied.writes, applied.changed, applied.refused), (5, 3, 2), "the meal on the cell decayed and its mark, refused");
-    // Every write's compare is an instruction: the decay's holds; the eater fed holds four of its five (fed, its meal's cell, its
-    // attribute, its mark's cell; not asleep); the other one of four come to (asleep; not fed, its meal's cell, its attribute -- the
+    // Every write's compare is an instruction: the decay's holds; the eater fed holds five of its six (fed, nothing seen of the
+    // attribute it sets, its meal's cell, its attribute, its mark's cell; not asleep); the other one of four come to (asleep; not fed, its meal's cell, its attribute -- the
     // mark's cell, within that, never come to).
-    assert_eq!(report.instructions_compared, (6, 4), "one eater fed, one asleep a tick: each written once");
+    assert_eq!(report.instructions_compared, (7, 4), "one eater fed, one asleep a tick: each written once");
     assert_eq!((report.counted_when_applied[DECAYED as usize], report.counted_when_applied[EATEN as usize]), (1, 1));
-    let (hungry, fed) = (entities.get(EntityId(1), decaying).expect("where it stood"), entities.get(EntityId(2), eaten).expect("where it stood"));
+    let (hungry, fed) = (entities.get(decaying).expect("where it stood"), entities.get(eaten).expect("where it stood"));
     assert_eq!((hungry.attribute(FED), hungry.header.wake), (None, 1), "nothing of its meal happened: asleep a tick");
     assert_eq!((fed.attribute(FED), fed.header.wake), (Some(1), 100), "its meal whole");
 }

@@ -11,7 +11,7 @@ use super::Turn;
 use bitplane_manager::{Superchunk, Write, WriteOp, WritesApplied};
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{attribute_blocks, attribute_seen, AttributeBlock, AttributeType, CollisionCells, EntityId, Instructions, InstructionsApplied, SuperchunkEntities};
+use entity_manager::{attribute_blocks, attribute_seen, AttributeBlock, AttributeType, CollisionCells, Instructions, InstructionsApplied, SuperchunkEntities};
 
 /// A write that counts nothing.
 const NO_COUNT: u32 = u32::MAX;
@@ -60,13 +60,11 @@ pub enum Compare {
         /// What the rule saw there.
         seen: u16,
     },
-    /// The entity `id` stands on `at`, and its attribute of type
-    /// `kind` is as seen -- or it has none, if none was seen
-    /// ([`Compare::attribute`]).
+    /// The entity the tick found on `at` is there still, wherever it
+    /// stands now, and its attribute of type `kind` is as seen -- or
+    /// it has none, if none was seen ([`Compare::attribute`]).
     Attribute {
-        /// The entity.
-        id: EntityId,
-        /// The cell it stood on.
+        /// The cell the tick found it on: its name.
         at: CellIndex,
         /// The attribute's type.
         kind: AttributeType,
@@ -77,10 +75,10 @@ pub enum Compare {
 }
 
 impl Compare {
-    /// The entity `id` stands on `at`, its attribute of type `kind`
-    /// the blocks `seen`, or none.
-    pub fn attribute(id: EntityId, at: CellIndex, kind: AttributeType, seen: Option<&[AttributeBlock]>) -> Self {
-        Self::Attribute { id, at, kind, seen: attribute_seen(seen) }
+    /// The entity the tick found on `at`, its attribute of type
+    /// `kind` the blocks `seen`, or none.
+    pub fn attribute(at: CellIndex, kind: AttributeType, seen: Option<&[AttributeBlock]>) -> Self {
+        Self::Attribute { at, kind, seen: attribute_seen(seen) }
     }
 
     /// The cell what is compared is on.
@@ -96,7 +94,7 @@ impl Compare {
     fn holds(&self, superchunk: &Superchunk, entities: &SuperchunkEntities) -> bool {
         match *self {
             Self::Cell { layer_type, at, seen } => superchunk.value_at(layer_type, at) == Some(u32::from(seen)),
-            Self::Attribute { id, at, kind, seen } => entities.get_named(id, at).is_some_and(|entity| attribute_seen(attribute_blocks(entity.attributes, kind)) == seen),
+            Self::Attribute { at, kind, seen } => entities.get_named(at).is_some_and(|entity| attribute_seen(attribute_blocks(entity.attributes, kind)) == seen),
         }
     }
 }

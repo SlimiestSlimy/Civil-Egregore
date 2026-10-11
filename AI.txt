@@ -496,9 +496,24 @@ B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    useful for interacting with bitplanes. not for everything 3: yeah,
    get rid of entity ids, as i said like 20 times, the id of an
    entity ona given tick its its initial origin position."
-   My reading of "24 bits": an instruction's head is 32 bits, 8 of
-   opcode and 24 of parameters; with a 20-bit place in the landing
-   superchunk and 16 bytes of payload that is the 24 bytes.
+   CORRECTED by the user: "sorry, 24 bytes to play with
+   parameterizing instructions" and "yeah like, 8 byte opcodes, and 2
+   8 byte parameters, but id say we can have 16 bit opcodes. just
+   fine". Then: "what i was citing with the 8 byte opcode and 8 byte
+   parameters was a worst case, not what the instructions should be
+   like. my bad there. as i said, first 2 bytes is opcode, the rest
+   is up to you". SO: an instruction is 24 bytes, the first 2 the
+   opcode, the other 22 laid out as each instruction needs.
+   And: "by origin entity origin coordinate tobe specific" -- the
+   name is the entity's ORIGIN cell as the tick found it (what the
+   header's cell is; it matters once an entity spans cells).
+   And: "oh btw, scheduled wakes and stuff like that are write
+   instructions, but to the entitiy scheduling wheels instead of
+   atributes or planes" -- so a write's target is a plane, an
+   attribute, or the wheel (a wake); a move is not what sets a wake.
+   And: "we probably need some compare and read instructions for
+   the wheels, but honestly not right now, only the schedule wakeup
+   write instruction is necessary for now".
    ORDER NOW: (1) EntityId removed everywhere -- an entity is named
    by the cell the tick found it on; (2) the instruction set as the
    three families, 24 bytes, attribute writes of 16 bytes at the

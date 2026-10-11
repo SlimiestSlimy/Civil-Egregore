@@ -163,15 +163,14 @@ what they always do and are not listed.
 | word | means | relates to | not |
 |---|---|---|---|
 | **entity** | a thing on the cells -- a sheep -- on one cell, never two on one: its header and its attributes | header, attribute, bucket | record, object, agent |
-| **header** | an entity's fixed part: its ID, type, cell and wake tick (`Header`) | entity | |
-| **entity ID** | an entity's 64-bit number, drawn from its superchunk's random stream (`EntityId`) | entity | |
+| **header** | an entity's fixed part: its type, cell and wake tick (`Header`); it has no ID, its cell names it | entity, name in a tick | |
 | **entity type** | what an entity is -- a sheep -- from the one type namespace (`EntityType`) | layer type | kind (only as the field holding it) |
 | **attribute** | a typed value an entity has, one or more attribute blocks laid out as its type's layout says: added and removed as it goes (`Attribute`, `AttributeType`) | entity, attribute block, layout | property, component |
 | **attribute block** | 64 bytes of an attribute, eight words: the first block's first word the attribute's type, the rest its data (`AttributeBlock`) | attribute, block length | slot, cell (a cell is the world's) |
 | **layout** | what an attribute's data holds, field by field in its words, the same for every attribute of its type (`Layout`) | attribute, type registry | schema, format |
 | **block length** | how many blocks an attribute whose size varies takes, in its first block's second word | attribute block | size, count |
 | **entity store** | where entities are kept: a bucket a chunk, a wheel a superchunk (`entity_manager::Entities`) | bucket, wheel | |
-| **entity bucket** | one chunk's entities, sorted by cell then ID, their attributes beside them | entity store | (the arena's bucket is a layer's) |
+| **entity bucket** | one chunk's entities, sorted by cell, their attributes beside them | entity store | (the arena's bucket is a layer's) |
 | **wake** | an entity's turn to act: at its wake tick, filed in its superchunk's wheel | wheel, sleep | |
 | **sleep** | an entity waiting, doing nothing and costing nothing, until it wakes | wake | |
 | **wheel** | a superchunk's timer wheel: a slot a tick for the next 1,024, the wakes due in each (`Wheel`); it **passes** a tick once the tick is run | wake | turn |

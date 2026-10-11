@@ -8,7 +8,7 @@
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{Entities, EntityId, EntityType, Header};
+use entity_manager::{Entities, EntityType, Header};
 
 /// The layer type the arena holds.
 pub const STONE: LayerType = LayerType::of_a_bit(6);
@@ -41,9 +41,9 @@ pub fn cell(x: u32, y: u32) -> CellIndex {
     CellCartesian { x: 10 * SUPERCHUNK_SIDE_CELLS + x, y: 10 * SUPERCHUNK_SIDE_CELLS + y }.into()
 }
 
-/// A walker with ID `id` on `at`, waking at `wake`.
-pub fn walker(id: u64, at: CellIndex, wake: u64) -> Header {
-    Header { id: EntityId(id), kind: WALKER, at, wake }
+/// A walker on `at`, waking at `wake`.
+pub fn walker(at: CellIndex, wake: u64) -> Header {
+    Header { kind: WALKER, at, wake }
 }
 
 /// `count` cells drawn from the run's seed, no two the same, each

@@ -1,7 +1,7 @@
-//! Entities read wherever they stand: over the superchunks, by id and
-//! by the cells they occupy.
+//! Entities read wherever they stand: over the superchunks, by the
+//! cells they occupy.
 
-use crate::entity::{EntityId, EntityRef};
+use crate::entity::EntityRef;
 use super::SuperchunkEntities;
 use bitmap::window::{PLACE_IN_WORD_TILE, in_word_tile};
 use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex};
@@ -30,9 +30,9 @@ impl<'a> EntityReader<'a> {
         Some(&self.superchunks[at])
     }
 
-    /// The entity whose ID is `id`, standing on `at`, if read.
-    pub fn get(&self, id: EntityId, at: CellIndex) -> Option<EntityRef<'a>> {
-        self.superchunk(at.superchunk())?.get(id, at)
+    /// The entity standing on `at`, if one does and it is read.
+    pub fn get(&self, at: CellIndex) -> Option<EntityRef<'a>> {
+        self.superchunk(at.superchunk())?.get(at)
     }
 
     /// The cells entities stand on among the `width` by `height` cells
@@ -71,7 +71,7 @@ impl<'a> EntityReader<'a> {
         rows
     }
 
-    /// The entities on `chunk`, in Morton order by cell, then by ID, if
+    /// The entities on `chunk`, in Morton order by cell, if
     /// its superchunk is read.
     pub fn chunk(&self, chunk: ChunkIndex) -> Option<impl Iterator<Item = EntityRef<'a>> + 'a> {
         Some(self.superchunk(chunk.superchunk())?.chunk(chunk.place()))

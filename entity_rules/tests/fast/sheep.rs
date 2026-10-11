@@ -7,7 +7,7 @@
 
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, put_entity, tick_sheep};
 use coordinates::CellCartesian;
-use entity_manager::{AttributeBlock, EntityId, EntityRef, Header};
+use entity_manager::{AttributeBlock, EntityRef, Header};
 use entity_rules::sheep::{BIRTHS, DEATHS, EATEN, FAR, PATHS, SOUGHT, WOKEN, MEAL_TICKS, ROAM_TICKS, SHEEP, SHEEP_STATE, STARVE_TICKS, SheepState, STEP_JITTER, STEP_TICKS};
 
 /// The one block of a sheep next hungry at `hungry_at`, in the middle of nothing.
@@ -76,7 +76,7 @@ fn hungry_sheep_walk_to_the_nearest_grass() {
     let corner = superchunk.top_left().cartesian();
     let (sheep, grass) = (CellCartesian { x: corner.x + 500, y: corner.y + 500 }, CellCartesian { x: corner.x + 506, y: corner.y + 493 });
     plant_grass(&mut world, grass, 1, 1);
-    let header = Header { id: EntityId(1), kind: SHEEP, at: sheep.into(), wake: 0 };
+    let header = Header { kind: SHEEP, at: sheep.into(), wake: 0 };
     put_entity(&mut world, header, &hungry_at(0));
     let (mut done, mut ate_at) = (instructions::RuleCounts::default(), None);
     for _ in 0..12 * (STEP_TICKS + STEP_JITTER) {
@@ -104,7 +104,7 @@ fn hungry_sheep_walk_to_grass_far_off() {
     let corner = first_superchunk(&world).top_left().cartesian();
     let (sheep, grass) = (CellCartesian { x: corner.x + 900, y: corner.y + 700 }, CellCartesian { x: corner.x + 1050, y: corner.y + 800 });
     plant_grass(&mut world, grass, 1, 1);
-    let header = Header { id: EntityId(1), kind: SHEEP, at: sheep.into(), wake: 0 };
+    let header = Header { kind: SHEEP, at: sheep.into(), wake: 0 };
     put_entity(&mut world, header, &hungry_at(0));
     let (mut done, mut ate_at) = (instructions::RuleCounts::default(), None);
     for _ in 0..STARVE_TICKS {
@@ -129,16 +129,19 @@ fn hungry_sheep_walk_to_grass_far_off() {
 fn sheep_on_thin_pasture_roam_away() {
     let mut world = plain_world(16, 0, 0, 1);
     let starts: Vec<CellCartesian> = world.arena().superchunk_indices().into_iter().map(|superchunk| superchunk.top_left().cartesian()).map(|corner| CellCartesian { x: corner.x + 500, y: corner.y + 500 }).collect();
-    for (id, &start) in starts.iter().enumerate() {
+    for &start in &starts {
         plant_grass(&mut world, start, 1, 1);
-        put_entity(&mut world, Header { id: EntityId(id as u64), kind: SHEEP, at: start.into(), wake: 0 }, &hungry_at(0));
+        put_entity(&mut world, Header { kind: SHEEP, at: start.into(), wake: 0 }, &hungry_at(0));
     }
+    // A sheep is told from the others by its superchunk, which it does not walk out of in so few steps.
+    let superchunks = world.arena().superchunk_indices();
+    let which = |sheep: &EntityRef| superchunks.binary_search(&sheep.header.at.superchunk()).expect("on a hot superchunk");
     // Each sheep: whether it has set off, and where its steps ran out.
     let (mut eaten, mut walks) = (0, vec![(false, None); starts.len()]);
     for _ in 0..MEAL_TICKS + ROAM_TICKS + 4 * (STEP_TICKS + STEP_JITTER) {
         eaten += tick_sheep(&mut world).rules[EATEN];
         for sheep in world.entities().iter() {
-            let (roaming, (set_off, came_to)) = (state(&sheep).roaming_until != 0, &mut walks[sheep.header.id.0 as usize]);
+            let (roaming, (set_off, came_to)) = (state(&sheep).roaming_until != 0, &mut walks[which(&sheep)]);
             if *set_off && !roaming && came_to.is_none() {
                 *came_to = Some(sheep.header.at.cartesian());
             }
@@ -146,7 +149,7 @@ fn sheep_on_thin_pasture_roam_away() {
         }
     }
     assert_eq!(eaten, starts.len() as u64, "each its one cell of grass, eaten: thin pasture");
-    let alive: Vec<usize> = world.entities().iter().map(|sheep| sheep.header.id.0 as usize).collect();
+    let alive: Vec<usize> = world.entities().iter().map(|sheep| which(&sheep)).collect();
     assert!(!alive.is_empty(), "sixteen sheep, every one dead of old age in so few ticks");
     for sheep in alive {
         let (start, came_to) = (starts[sheep], walks[sheep].1.expect("it set off, and its steps ran out"));
@@ -222,8 +225,8 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     }
     arena.apply();
     let was_hungry_at = 0;
-    entities.queue_put(Header { id: EntityId(1), kind: SHEEP, at: decaying, wake: 0 }, &hungry_at(was_hungry_at));
-    entities.queue_put(Header { id: EntityId(2), kind: SHEEP, at: standing, wake: 0 }, &hungry_at(was_hungry_at));
+    entities.queue_put(Header { kind: SHEEP, at: decaying, wake: 0 }, &hungry_at(was_hungry_at));
+    entities.queue_put(Header { kind: SHEEP, at: standing, wake: 0 }, &hungry_at(was_hungry_at));
     entities.apply();
     let mut simulation = simulation::Simulation::new(1);
     let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut instructions::Turn, _: &mut Vec<CellIndex>| {
@@ -240,10 +243,10 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     assert_eq!((report.counted_when_applied[0], report.counted_when_applied[8 + EATEN], report.rules[EATEN]), (1, 1, 0), "a decay and one meal, counted as applied");
     let sheep: Vec<_> = entities.iter().collect();
     // One may die of old age before so long a sleep as a meal's, on any seed: its death is its meal's, both or neither.
-    let fed = sheep.iter().find(|sheep| sheep.header.id == EntityId(2));
+    let fed = sheep.iter().find(|sheep| sheep.header.at == standing);
     assert_eq!(fed.is_none() as u64, report.counted_when_applied[8 + entity_rules::sheep::DEATHS]);
     assert!(fed.is_none_or(|fed| state(fed).hungry_at == MEAL_TICKS && fed.header.wake >= MEAL_TICKS), "fed, and asleep until hungry");
-    let hungry = sheep.iter().find(|sheep| sheep.header.id == EntityId(1)).expect("the sheep whose meal was refused, alive");
+    let hungry = sheep.iter().find(|sheep| sheep.header.at == decaying).expect("the sheep whose meal was refused, alive");
     assert_eq!((state(hungry), hungry.header.at), (SheepState { hungry_at: was_hungry_at, ..SheepState::default() }, decaying), "as it was");
     assert!((STEP_TICKS..STEP_TICKS + STEP_JITTER).contains(&hungry.header.wake), "asleep a step: it wakes at {}", hungry.header.wake);
 }

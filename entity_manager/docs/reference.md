@@ -8,9 +8,9 @@ The simulation ticks them (`../../simulation/`); the design is in
 
 ## The store
 
-**`entity.rs`**: `EntityId` (a `u64`); `EntityType`, the type
-registry's (`../../type_registry/`), handed on; **`Header`** `{id,
-kind, at, wake}`, `NEVER`; **`EntityRef`** `{header, attributes}` --
+**`entity.rs`**: `EntityType`, the type
+registry's (`../../type_registry/`), handed on; **`Header`** `{kind,
+at, wake}`, `NEVER` -- no ID, the cell names it; **`EntityRef`** `{header, attributes}` --
 its attributes' blocks -- with **`attribute(attribute)`**, what one
 holds as its layout, and **`attribute_blocks(kind)`**, one's blocks.
 **`EntityEdit::of(entity, room)`**: an entity being changed --
@@ -49,39 +49,41 @@ their places alone in a list (`places`), which is what is searched,
 among one search tile's at a time (`SEARCH_TILES`, 16 of 64x64 cells,
 **`search_tile`**, `tile_starts`); beside it a **`StoredEntity`** each
 (its header, its attributes' first block and how many); the blocks;
-the garbage count. **`get(id, at)`**, **`iter`**, **`occupied(place)`**,
+the garbage count. **`get(at)`**, **`iter`**, **`occupied(place)`**,
 **`in_word_tile(first)`** (the places on a word tile, a run),
-**`put(header, was, attributes)`** -- with no attributes given, those it
-has kept, and not made if not there -- a **`Put`**: `InPlace`; `Moved`
-(**`shift_entity`**) to its cell if that is another and free, else
-`Stayed`; `New` if it is not there, `was` is its cell and it is free,
-else `Refused`; `PassedOver` if it was to have moved and is not where it
-stood. **`rewrite`**: attributes in place when as many blocks,
-else a new run at the end. **`remove(id, at)`**, **`index_of(place)`**,
-**`find(place, id)`**, **`entity`**, **`edit(id, place, kind, blocks)`**
+**`make(header, attributes)`** -- a **`Put`**: `New`, or `Refused`, an
+entity standing there -- and **`put(header, was, attributes)`**, of
+the entity standing on `was`, with no attributes given those it has
+kept: `InPlace`; `Moved` (**`shift_entity`**) to its cell if that is
+another and free, else `Stayed`; `PassedOver`, nobody standing on
+`was`. **`rewrite`**: attributes in place when as many blocks,
+else a new run at the end. **`remove(at)`**, **`index_of(place)`**,
+**`find(place)`**, **`entity`**, **`edit(place, kind, blocks)`**
 (one attribute set in place if as long as it was, or the run made anew
 with it added, removed -- no blocks given -- or of another length),
 **`prefetch_entity(at)`**, **`prefetch_attributes(at)`**:
 asked of memory ahead; **`sweep`** once garbage reaches the blocks
 in use (and 64).
 
-**`wheel.rs`**: `WHEEL_TICKS` (1024); **`Wake`** `{id, at}`;
+**`wheel.rs`**: `WHEEL_TICKS` (1024); **`Wake`** `{at}`;
 **`Wheel`**: **`due(tick)`**, **`file(earliest, tick, wake)`** -- a slot
 if within `WHEEL_TICKS` of `earliest`, else the list further off --
 **`pass(tick)`**: the slot passed emptied, and every half of
 `WHEEL_TICKS` the wakes now in reach filed; **`sort(tick)`**: a tick's
-wakes by cell, then ID.
+wakes by cell, each cell once.
 
 **`store.rs`** (with `store/world_entities.rs`, `Entities`, and
 `store/entity_reader.rs`, `EntityReader`): **`SuperchunkEntities`**: a bucket a chunk and a wheel;
 **`len()`**, **`is_empty()`** -- how many it holds, whether none --
-**`get(id, at)`**, **`iter`**, **`chunk(place)`**, **`woken(tick)`** and
+**`get(at)`**, **`iter`**, **`chunk(place)`**, **`woken(tick)`** and
 **`woken_prefetching(tick, prefetch)`** -- the wheel's slot, each wake
 found and still due, the entities `ENTITY_AHEAD` on asked of memory --
-**`put(earliest, header, from, attributes)`** -- within a chunk or from
-one to another (**`move_between`**), a `Put` -- **`in_word_tile(chunk,
-first)`**, **`remove(id, at)`**, **`arrived(arrival)`** -- an entity crossed in,
-noted, an **`Arrival`** `{id, left, at, attributes}`, the last the sum
+**`make(earliest, header, attributes)`** -- a new one, its wake filed --
+**`put(earliest, header, from, attributes)`** -- of the one standing on
+`from`, within a chunk or from one to another (**`move_between`**), a
+`Put` -- **`in_word_tile(chunk,
+first)`**, **`remove(at)`**, **`arrived(arrival)`** -- an entity crossed in,
+noted, an **`Arrival`** `{left, at, attributes}`, the last the sum
 of the attributes it was put with -- **`take_arrived(arrived)`**,
 **`settle_leavers(arrived, settled)`** -- those of a neighbour's
 arrivals that left this superchunk removed, what each ended the tick
@@ -91,35 +93,36 @@ attributes}`, **`is_empty`**, **`clear`**) -- **`settle_arrivals(settled)`**
 -- those put here given what they have, those turned back removed --
 **`occupied(at)`**, and in `store/named_in_a_tick.rs`, the mod
 `named_in_a_tick`, an entity found by the cell the tick found it on
-(`left_this_tick`): `now_on`, `named_or_taken`, **`get_named(id,
-stood)`**, `put_named`, `edit_named`, `remove_named`,
+(`left_this_tick`): `now_on`, `named_or_taken`, **`get_named(stood)`**,
+`make_named`, `put_named`, `edit_named`, `remove_named`,
 **`names_anew(collision)`** -- and the collision plane as lent to
 them, **`CollisionCells`** (`held`, `hold`, `free`), what the puts and
 moves ask and keep, the cells `vacated` cleared in it when the tick is
 over --
-**`edit(id, at, kind, blocks)`**, **`pass(tick)`**, **`sort_wakes(tick)`** -- after the second phase for
+**`edit(at, kind, blocks)`**, **`pass(tick)`**, **`sort_wakes(tick)`** -- after the second phase for
 the next tick, after `Entities::apply` for the tick about to run --
 **`counts`**. **`Entities`**: the tick about to run, the superchunks by
 superchunk index, and instructions queued outside a tick: **`now`**,
-**`len`**, **`superchunk(superchunk)`**, **`get(id, at)`**,
+**`len`**, **`superchunk(superchunk)`**, **`get(at)`**,
 **`align(superchunk_indices)`** -- added empty, dropped, how many
 entities dropped -- **`queue_put(header, attributes)`**,
-**`queue_remove(header)`**, **`queued`**, **`apply`** -- as the arena's
+**`queue_remove(at)`**, **`queued`**, **`apply`** -- as the arena's
 `queue` and `apply` --
 **`iter`**, **`advance`**. **`EntityReader`**:
 every superchunk's entities read in a tick, as the bitplanes' `Reader`:
-**`get(id, at)`**, **`chunk(chunk)`**, **`occupied(origin, width,
+**`get(at)`**, **`chunk(chunk)`**, **`occupied(origin, width,
 height)`** -- the cells entities stand on among up to 16x16
 (`OCCUPIED_SIDE`), a row a word, from the up to nine word tiles' runs of
 places (**`in_word_tile`**).
 
 **`instructions.rs`**: **`Instructions`**: the instructions queued for one
 superchunk -- put, move, edit, remove -- the blocks the puts and the
-edits carry in a list beside (an `Instruction`'s cell, `lands`): **`put(header, from, attributes)`**,
+edits carry in a list beside (an `Instruction`'s cell, `lands`): **`put(header, attributes)`** -- an entity made --
 **`cross(header, left, attributes)`** (both by **`push`**),
-**`move_entity(header, from)`**, **`set_attribute(id, at, attribute,
-value)`**, **`set_attribute_blocks(id, at, attribute)`**,
-**`unset_attribute(id, at, kind)`**, **`remove`**, **`apply_some(some, superchunks,
+**`move_entity(header, from)`**, **`set_attribute(at, attribute,
+value)`**, **`set_attribute_blocks(at, attribute)`**,
+**`unset_attribute(at, kind)`**, **`remove(at)`** -- each of the entity
+the tick found on `at` -- **`apply_some(some, superchunks,
 earliest, applied)`** -- those at `some` alone, how the instructions under a compare
 refused are left out -- **`apply(superchunks, earliest,
 applied)`** in order, each on its cell's superchunk (a put elsewhere

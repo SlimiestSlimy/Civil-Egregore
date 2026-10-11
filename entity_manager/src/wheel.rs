@@ -1,18 +1,14 @@
 //! A superchunk's timer wheel: which entities wake at which tick
 //! (`docs/entity_manager.md`, "The timer wheel").
 
-use crate::entity::EntityId;
 use coordinates::CellIndex;
 
 /// Ticks the wheel holds a slot for.
 pub const WHEEL_TICKS: u64 = 1024;
 
-/// An entity to wake: its ID, and the cell it stood on when its wake was
-/// filed.
+/// An entity to wake: the cell it stood on when its wake was filed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Wake {
-    /// Its ID.
-    pub id: EntityId,
     /// Its cell.
     pub at: CellIndex,
 }
@@ -67,10 +63,14 @@ impl Wheel {
         });
     }
 
-    /// Sorts the wakes filed for `tick`, in reach, by cell then ID: the
-    /// order they wake in.
+    /// Sorts the wakes filed for `tick`, in reach, by cell -- the order
+    /// they wake in -- each cell once: a cell filed twice for one tick,
+    /// by one entity and by another that came to stand there after it,
+    /// wakes whoever stands on it once.
     pub(crate) fn sort(&mut self, tick: u64) {
-        self.slots[(tick % WHEEL_TICKS) as usize].sort_unstable_by_key(|wake| (wake.at, wake.id));
+        let slot = &mut self.slots[(tick % WHEEL_TICKS) as usize];
+        slot.sort_unstable_by_key(|wake| wake.at);
+        slot.dedup();
     }
 
     /// Wakes filed, in reach and further off, good or not.

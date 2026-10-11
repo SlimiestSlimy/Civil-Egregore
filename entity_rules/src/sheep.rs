@@ -7,7 +7,7 @@ use instructions::entities::EntitiesBetweenTicks;
 pub use instructions::entity_types::{SheepState, SHEEP, SHEEP_STATE};
 use instructions::simulation_time::SimulationTime;
 use instructions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
-use instructions::{area, cells, compare, entities, place_counted, this_tick, walking, AttributeBlock, CellCartesian, CellIndex, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
+use instructions::{area, cells, compare, entities, place_counted, this_tick, walking, AttributeBlock, CellCartesian, CellIndex, EntityEdit, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
 /// Every time below is said in simulation time, and is ticks only
@@ -119,9 +119,9 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let mut needs = if fed { now + MEAL_TICKS } else { hungry_at };
     let grown_at = (was.grown_at != 0).then_some(was.grown_at);
     // The lamb it put beside it last tick stands there, and is born; or its cell was taken first, and it is pregnant still.
-    if was.bearing != 0 {
-        state.bearing = 0;
-        if entities::stands_beside(turn, EntityId(was.bearing), at).is_some() {
+    if was.bearing_neighbour != 0 {
+        state.bearing_neighbour = 0;
+        if lamb_put_stands(turn, at, was.bearing_neighbour - 1) {
             state.lamb_due_at = 0;
             count(turn, done, fed.then_some(at), BIRTHS);
         }
@@ -137,9 +137,10 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
             Some(beside) => {
                 // Beside it on the cell drawn: that taken first, it is pregnant still, and tries the next tick.
                 let wake = next_step(turn);
-                let born = SheepState { hungry_at: now + MEAL_TICKS, grown_at: now + LAMB_TICKS, ..SheepState::default() };
-                let lamb = entities::spawn(turn, SHEEP, beside, wake, &[AttributeBlock::holding(SHEEP_STATE, born)]);
-                state.bearing = lamb.0;
+                let way = around::way_of(at, beside);
+                let born = SheepState { hungry_at: now + MEAL_TICKS, grown_at: now + LAMB_TICKS, mother_neighbour: around::way_of(beside, at) + 1, ..SheepState::default() };
+                entities::spawn(turn, SHEEP, beside, wake, &[AttributeBlock::holding(SHEEP_STATE, born)]);
+                state.bearing_neighbour = way + 1;
                 bearing = true;
             }
             None => needs = now,
@@ -209,6 +210,17 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     }
 }
 
+/// Whether the lamb the sheep on `at` put last tick, on its
+/// neighbour `way`, stands there: a lamb put that tick, and put by
+/// the sheep on `at` -- not another's, put on the same cell first,
+/// nor a sheep that stepped there.
+fn lamb_put_stands(turn: &Turn, at: CellIndex, way: u32) -> bool {
+    let put_last_tick = this_tick::now(turn) - 1 + LAMB_TICKS;
+    around::cell(at, way)
+        .and_then(|beside| entities::on(turn, beside).filter(|lamb| lamb.header.kind == SHEEP)?.attribute(SHEEP_STATE).map(|lamb| (beside, lamb)))
+        .is_some_and(|(beside, lamb)| lamb.grown_at == put_last_tick && lamb.mother_neighbour == around::way_of(beside, at) + 1)
+}
+
 /// Counts one at `place` for the wake of a sheep: if it is `fed`, on
 /// the cell given, as it is applied, the grass there still -- what it
 /// did then happens with the meal or not at all -- else here.
@@ -244,7 +256,7 @@ pub fn flock(entities: &mut EntitiesBetweenTicks, superchunk: SuperchunkIndex, c
         if !taken.insert((at.x, at.y)) {
             continue;
         }
-        let header = Header { id: EntityId(random.draw()), kind: SHEEP, at: at.into(), wake: now + random.below(STEP_TICKS) };
+        let header = Header { kind: SHEEP, at: at.into(), wake: now + random.below(STEP_TICKS) };
         put += usize::from(entities.put(header, &[AttributeBlock::holding(SHEEP_STATE, SheepState { hungry_at: now + random.below(MEAL_TICKS), ..SheepState::default() })]));
     }
 }

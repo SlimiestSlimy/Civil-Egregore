@@ -1,10 +1,10 @@
-//! Instructions: changes to entities -- put, move, edit, remove --
+//! Instructions: changes to entities -- make, move, edit, remove --
 //! queued in a tick's first phase and applied in its second
 //! (`docs/entity_manager.md`, "Instructions").
 
 use crate::bucket::Put;
 use crate::attributes::{push_attribute, Attribute, AttributeBlock, AttributeType, Layout};
-use crate::entity::{EntityId, Header};
+use crate::entity::Header;
 use crate::store::{CollisionCells, SuperchunkEntities};
 use coordinates::CellIndex;
 use std::ops::AddAssign;
@@ -12,15 +12,12 @@ use std::ops::AddAssign;
 /// One instruction.
 #[derive(Clone, Copy, Debug)]
 enum Instruction {
-    /// Puts an entity -- in place of the one with its ID where it stood,
-    /// or new -- with the attributes' blocks `first..first + count` of
-    /// the queue's list.
+    /// Makes an entity on its cell, with the attributes' blocks
+    /// `first..first + count` of the queue's list: not made, an
+    /// entity standing there.
     Put {
         /// Its fixed part.
         header: Header,
-        /// The cell it stood on, in its cell's superchunk: its own, if
-        /// it has not moved or is new.
-        from: CellIndex,
         /// The cell of another superchunk it left, if it is crossing:
         /// put here, it is removed from there once the tick's
         /// instructions are all applied.
@@ -30,22 +27,20 @@ enum Instruction {
         /// How many blocks they are.
         count: u32,
     },
-    /// Moves an entity to `header`'s cell, to wake at its tick, its
-    /// attributes as they are -- or, the cell being the one it stands
-    /// on, only sets when it next wakes.
+    /// Moves the entity the tick found on `from` to `header`'s cell,
+    /// to wake at its tick, its attributes as they are -- or, the
+    /// cell being the one it stands on, only sets when it next wakes.
     Move {
         /// Its fixed part, as it is to be.
         header: Header,
         /// The cell it stands on, in its cell's superchunk.
         from: CellIndex,
     },
-    /// Sets one attribute of the entity whose ID is `id` standing on
-    /// `at` to the blocks `first..first + count` of the queue's list,
-    /// or with none removes it.
+    /// Sets one attribute of the entity the tick found on `at` to the
+    /// blocks `first..first + count` of the queue's list, or with
+    /// none removes it.
     Edit {
-        /// Its ID.
-        id: EntityId,
-        /// Its cell.
+        /// Its cell, as the tick found it.
         at: CellIndex,
         /// The attribute's type.
         kind: AttributeType,
@@ -54,11 +49,9 @@ enum Instruction {
         /// How many blocks it is: none to remove it.
         count: u32,
     },
-    /// Removes the entity whose ID is `id` standing on `at`.
+    /// Removes the entity the tick found on `at`.
     Remove {
-        /// Its ID.
-        id: EntityId,
-        /// Its cell.
+        /// Its cell, as the tick found it.
         at: CellIndex,
     },
 }
@@ -84,11 +77,10 @@ pub struct Instructions {
 }
 
 impl Instructions {
-    /// Queues putting `header`'s entity, with `attributes`: in place of
-    /// the one with its ID standing on `from`, a cell of its cell's
-    /// superchunk -- its cell itself, if it has not moved or is new.
-    pub fn put(&mut self, header: Header, from: CellIndex, attributes: &[AttributeBlock]) {
-        self.push(header, from, None, attributes);
+    /// Queues making `header`'s entity on its cell, with
+    /// `attributes`: not made, an entity standing there by then.
+    pub fn put(&mut self, header: Header, attributes: &[AttributeBlock]) {
+        self.push(header, None, attributes);
     }
 
     /// Queues putting `header`'s entity, with `attributes`, on its cell,
@@ -96,17 +88,16 @@ impl Instructions {
     /// removed from `left` once the tick's instructions are all applied
     /// ([`SuperchunkEntities::settle_leavers`](crate::SuperchunkEntities::settle_leavers)).
     pub fn cross(&mut self, header: Header, left: CellIndex, attributes: &[AttributeBlock]) {
-        self.push(header, header.at, Some(left), attributes);
+        self.push(header, Some(left), attributes);
     }
 
     /// Queues a put.
-    fn push(&mut self, header: Header, from: CellIndex, left: Option<CellIndex>, attributes: &[AttributeBlock]) {
-        debug_assert_eq!(header.at.superchunk(), from.superchunk(), "an entity put from another superchunk: a crossing");
-        self.instructions.push(Instruction::Put { header, from, left, first: self.attributes.len() as u32, count: attributes.len() as u32 });
+    fn push(&mut self, header: Header, left: Option<CellIndex>, attributes: &[AttributeBlock]) {
+        self.instructions.push(Instruction::Put { header, left, first: self.attributes.len() as u32, count: attributes.len() as u32 });
         self.attributes.extend_from_slice(attributes);
     }
 
-    /// Queues moving `header`'s entity, standing on `from` -- a cell of
+    /// Queues moving the entity the tick found on `from` -- a cell of
     /// its cell's superchunk -- to its cell, to wake at its tick, with
     /// the attributes it has: none are carried. Its cell `from` itself,
     /// it only sleeps until then.
@@ -115,32 +106,32 @@ impl Instructions {
         self.instructions.push(Instruction::Move { header, from });
     }
 
-    /// Queues setting `attribute` of the entity whose ID is `id`
-    /// standing on `at` to `value`.
-    pub fn set_attribute<L: Layout>(&mut self, id: EntityId, at: CellIndex, attribute: Attribute<L>, value: L) {
+    /// Queues setting `attribute` of the entity the tick found on
+    /// `at` to `value`.
+    pub fn set_attribute<L: Layout>(&mut self, at: CellIndex, attribute: Attribute<L>, value: L) {
         let first = self.attributes.len() as u32;
         push_attribute(&mut self.attributes, attribute, value);
-        self.instructions.push(Instruction::Edit { id, at, kind: attribute.attribute_type(), first, count: L::BLOCKS as u32 });
+        self.instructions.push(Instruction::Edit { at, kind: attribute.attribute_type(), first, count: L::BLOCKS as u32 });
     }
 
     /// Queues setting the attribute `attribute` is the blocks of, of
-    /// the entity whose ID is `id` standing on `at`: how one whose
-    /// size varies is set.
-    pub fn set_attribute_blocks(&mut self, id: EntityId, at: CellIndex, attribute: &[AttributeBlock]) {
+    /// the entity the tick found on `at`: how one whose size varies
+    /// is set.
+    pub fn set_attribute_blocks(&mut self, at: CellIndex, attribute: &[AttributeBlock]) {
         debug_assert!(attribute.first().is_some_and(|first| first.blocks() == attribute.len()), "an attribute as long as its type or its block length says");
-        self.instructions.push(Instruction::Edit { id, at, kind: attribute[0].kind(), first: self.attributes.len() as u32, count: attribute.len() as u32 });
+        self.instructions.push(Instruction::Edit { at, kind: attribute[0].kind(), first: self.attributes.len() as u32, count: attribute.len() as u32 });
         self.attributes.extend_from_slice(attribute);
     }
 
     /// Queues removing the attribute of type `kind` of the entity
-    /// whose ID is `id` standing on `at`.
-    pub fn unset_attribute(&mut self, id: EntityId, at: CellIndex, kind: AttributeType) {
-        self.instructions.push(Instruction::Edit { id, at, kind, first: 0, count: 0 });
+    /// the tick found on `at`.
+    pub fn unset_attribute(&mut self, at: CellIndex, kind: AttributeType) {
+        self.instructions.push(Instruction::Edit { at, kind, first: 0, count: 0 });
     }
 
-    /// Queues removing the entity whose ID is `id` standing on `at`.
-    pub fn remove(&mut self, id: EntityId, at: CellIndex) {
-        self.instructions.push(Instruction::Remove { id, at });
+    /// Queues removing the entity the tick found on `at`.
+    pub fn remove(&mut self, at: CellIndex) {
+        self.instructions.push(Instruction::Remove { at });
     }
 
     /// How many instructions are queued.
@@ -189,9 +180,9 @@ impl Instructions {
             };
             let superchunk = &mut superchunks[found];
             match instruction {
-                Instruction::Put { header, from, left, first, count } => {
+                Instruction::Put { header, left, first, count } => {
                     let attributes = &self.attributes[first as usize..(first + count) as usize];
-                    let put = superchunk.put_named(earliest, header, from, Some(attributes), collision);
+                    let put = superchunk.make_named(earliest, header, attributes, collision);
                     match put {
                         Put::New | Put::InPlace | Put::Moved => applied.puts += 1,
                         Put::Stayed => (applied.puts, applied.stayed) = (applied.puts + 1, applied.stayed + 1),
@@ -199,7 +190,7 @@ impl Instructions {
                         Put::PassedOver => applied.passed_over += 1,
                     }
                     if let (Some(left), Put::New) = (left, put) {
-                        superchunk.arrived(crate::Arrival { id: header.id, left, at: header.at, attributes: crate::blocks_sum(attributes) });
+                        superchunk.arrived(crate::Arrival { left, at: header.at, attributes: crate::blocks_sum(attributes) });
                         applied.crossed += 1;
                     }
                 }
@@ -208,11 +199,11 @@ impl Instructions {
                     Put::PassedOver => applied.passed_over += 1,
                     _ => applied.moves += 1,
                 },
-                Instruction::Edit { id, at, kind, first, count } => match superchunk.edit_named(id, at, kind, &self.attributes[first as usize..(first + count) as usize]) {
+                Instruction::Edit { at, kind, first, count } => match superchunk.edit_named(at, kind, &self.attributes[first as usize..(first + count) as usize]) {
                     true => applied.edits += 1,
                     false => applied.passed_over += 1,
                 },
-                Instruction::Remove { id, at } => match superchunk.remove_named(id, at) {
+                Instruction::Remove { at } => match superchunk.remove_named(at) {
                     true => applied.removes += 1,
                     false => applied.passed_over += 1,
                 },
@@ -229,7 +220,7 @@ impl Instructions {
 /// What applying the instructions did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct InstructionsApplied {
-    /// Entities put: made, or made anew whole.
+    /// Entities made.
     pub puts: usize,
     /// Entities moved, or set to wake at another tick, their attributes
     /// as they were.

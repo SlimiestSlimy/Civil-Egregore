@@ -82,7 +82,7 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
     assert_eq!((kind.blocks(), row.number, row.width), (Some(1), kind.number(), data_words(1) as u32 * u64::BITS));
     assert_eq!(of_number(kind.number()), Some(row));
     for _ in 0..100 {
-        let state = SheepState { hungry_at: random.draw(), lamb_due_at: random.draw(), grown_at: random.draw(), roaming_until: random.draw(), bearing: random.draw(), roaming_neighbour: random.draw() as u32 };
+        let state = SheepState { hungry_at: random.draw(), lamb_due_at: random.draw(), grown_at: random.draw(), roaming_until: random.draw(), bearing_neighbour: random.draw() as u32, mother_neighbour: random.draw() as u32, roaming_neighbour: random.draw() as u32 };
         let mut data = [0; data_words(SheepState::BLOCKS)];
         state.write(&mut data);
         assert_eq!((SheepState::read(&data), data[6..].iter().sum::<u64>()), (state, 0));

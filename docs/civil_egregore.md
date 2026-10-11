@@ -409,14 +409,14 @@ An entity is a capability unit, not necessarily alive. The first form
 is built in the entity manager (`entity_manager/src/`), with sheep on
 it (`entity_rules/src/sheep.rs`):
 
-- **A record**: a header -- a random 64-bit ID, a type, the cell it
+- **A record**: a header -- a type, the cell it
   stands on, the tick it next wakes at -- and attributes, typed blocks
   of 64 bytes added and removed at run time (a sheep falls pregnant, a lamb grows
   up). Types, of entities and attributes alike, are `u64`s from the one
   namespace every type in Civil Egregore is drawn from, layers' included.
 - **A bucket a chunk**: a superchunk holds its entities in a bucket for
   each of its 16 chunks -- a chunk may hold many single-cell entities --
-  the headers sorted by cell, in Morton order, then by ID, the
+  the headers sorted by cell, in Morton order, the
   attributes in one list beside them, a run an entity. The cells' places
   in the chunk, 16 bits each, are kept alone in a list beside the
   headers, and that is what is searched: two bytes an entity, a few
@@ -434,19 +434,21 @@ it (`entity_rules/src/sheep.rs`):
 - **Reach and size**: an entity affects nothing farther than 1024 cells
   away, the speed of light, and is at most 256x256 cells, whatever its
   shape or how many cells it covers. Neither is checked yet.
-- **IDs, not slots**: an entity is found by its cell and its ID -- its
-  cell's chunk's bucket, its cell's place searched for, then its ID
-  among those on the cell -- never further than its chunk. A slot would go stale whenever the entity
+- **A cell for a name, no ID and no slot**: an entity is found by its
+  origin cell -- its cell's chunk's bucket, its cell's place searched
+  for -- never further than its chunk. No two stand on one cell, so the
+  cell is name enough: for the length of a tick, the cell the tick
+  found it on, wherever it moves meanwhile, and no other's until the
+  tick is over (`entity_manager/docs/entity_manager.md`, "Instructions",
+  An entity's name in a tick). A slot would go stale whenever the entity
   crossed a chunk border, moved superchunk or was swept, and nothing
-  holds a pointer back to fix it; an ID survives all of it, and a wake
-  or change naming an entity no longer on its cell -- moved on, or dead
-  -- is just not found, and passed over: of two changes to one entity
-  in a tick, the first to move it wins. IDs are drawn from the superchunk's random numbers:
-  a clash inside a chunk is a chance of one in 2^64 a pair. Over the
-  whole world and its history, a clash somewhere becomes likely past
-  billions of entities -- no matter for the tick, but to be revisited
-  when entities remember each other by ID (a birth superchunk and its
-  own count, say).
+  holds a pointer back to fix it. A wake or change naming a cell nobody
+  stands on any more -- moved on, or dead -- is passed over: of two
+  changes to one entity in a tick, the first to move it wins. Entities
+  once had a random 64-bit ID beside the cell; it named nothing the
+  cell did not, cost a word an entity and a draw a birth, and is gone.
+  What must know an entity again a tick later keeps what tells it in an
+  attribute: a mother her lamb's neighbour, the lamb the way back.
 - **A timer wheel a superchunk**: most entities wait most of the time
   -- a person walking steps a cell every 128 ticks or so -- so a tick
   costs the entities waking in it, and nothing for the rest. The wheel
@@ -465,7 +467,7 @@ it (`entity_rules/src/sheep.rs`):
 - **The same API as the bitplanes**: outside a tick, changes to
   entities are queued and applied, as writes to cells are -- queuing is
   the only way to change one; in a tick, a turn reads entities anywhere
-  held, by ID or by chunk, as the tick found them, as it reads cells.
+  held, by cell or by chunk, as the tick found them, as it reads cells.
 - **Lost entities**: put in a superchunk whose bitplanes are not held,
   an entity is lost, and counted. Keeping a superchunk's entities in
   chunk storage when it goes cold is work to come, as are reading other

@@ -34,7 +34,7 @@ pub fn value<W: Width>(plane: Wide<W>, cell: CellIndex, seen: u32) -> Compare {
 pub fn attribute<L: Layout>(entity: &Header, attribute: Attribute<L>, seen: Option<L>) -> Compare {
     let mut blocks = Vec::new();
     seen.into_iter().for_each(|seen| push_attribute(&mut blocks, attribute, seen));
-    Compare::attribute(entity.id, entity.at, attribute.attribute_type(), seen.map(|_| &blocks[..]))
+    Compare::attribute(entity.at, attribute.attribute_type(), seen.map(|_| &blocks[..]))
 }
 
 /// Queues the number of `layer_type` at `cell` becoming `value` if

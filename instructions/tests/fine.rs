@@ -14,7 +14,7 @@ mod entities {
 
     use crate::tests::{cell, walker, world, STONE};
     use coordinates::CellIndex;
-    use entity_manager::{Attribute, AttributeBlock, EntityEdit, EntityId, NEVER};
+    use entity_manager::{Attribute, AttributeBlock, EntityEdit, NEVER};
     use instructions::around;
     use instructions::{entities, Turn};
     use simulation::Simulation;
@@ -32,8 +32,8 @@ mod entities {
     #[test]
     fn an_entity_is_written_only_the_attributes_changed() {
         let (mut arena, mut entities) = world(1);
-        entities.queue_put(walker(1, cell(40, 30), 0), &[AttributeBlock::holding(NAME, 7)]);
-        entities.queue_put(walker(2, cell(40, 40), 0), &[AttributeBlock::holding(NAME, 7)]);
+        entities.queue_put(walker(cell(40, 30), 0), &[AttributeBlock::holding(NAME, 7)]);
+        entities.queue_put(walker(cell(40, 40), 0), &[AttributeBlock::holding(NAME, 7)]);
         entities.apply();
         let mut simulation = Simulation::new(1);
         let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
@@ -44,7 +44,7 @@ mod entities {
                 edit.set(NAME, 7);
                 assert_eq!(edit.unset(MARK), None);
                 assert!(!edit.edited());
-                if entity.header.id == EntityId(2) {
+                if entity.header.at == cell(40, 40) {
                     edit.set(NAME, 8);
                     edit.set(MARK, 1);
                     assert_eq!((edit.get(NAME), edit.get(MARK), edit.unset(MARK)), (Some(8), Some(1), Some(1)));
@@ -55,8 +55,8 @@ mod entities {
             0
         });
         assert_eq!((report.instructions_applied.moves, report.instructions_applied.puts, report.instructions_applied.edits, report.instructions_compared), (2, 0, 1, (1, 0)));
-        assert_eq!(entities.get(EntityId(1), cell(41, 31)).expect("moved").attributes, [AttributeBlock::holding(NAME, 7)]);
-        assert_eq!(entities.get(EntityId(2), cell(41, 41)).expect("moved").attributes, [AttributeBlock::holding(NAME, 8)]);
+        assert_eq!(entities.get(cell(41, 31)).expect("moved").attributes, [AttributeBlock::holding(NAME, 7)]);
+        assert_eq!(entities.get(cell(41, 41)).expect("moved").attributes, [AttributeBlock::holding(NAME, 8)]);
     }
 
     /// The cells about an entity: the layer's among them, the ways to
@@ -65,7 +65,7 @@ mod entities {
     fn the_cells_beside_an_entity_are_asked_as_sets() {
         let (mut arena, mut entities) = world(1);
         let at = cell(40, 30);
-        entities.queue_put(walker(1, at, 0), &[]);
+        entities.queue_put(walker(at, 0), &[]);
         entities.apply();
         let seen = Mutex::new(Vec::new());
         let mut simulation = Simulation::new(1);
