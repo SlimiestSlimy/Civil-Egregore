@@ -72,11 +72,15 @@ alone:
   Grass left alone covers a third of the dirt and grows fastest
   covering a sixth: so a flock stops growing while the grass still
   grows back faster than it is eaten, and never strips it.
-- **Leaves thin pasture**: a meal taken where it is not lush, the sheep
-  sets off when next hungry, `ROAM_TICKS` of steps one way -- 48 or so
+- **Roams**: a meal taken where it is not lush, the sheep
+  sets off when next hungry, `ROAM_TICKS` of steps one way -- 96 or so
   -- eating nothing on the way, and looks for grass where it comes to.
   Without it lambs stay beside their mothers, a flock grazes its own
-  patch bare, and breeds no more though the world is green.
+  patch bare, and breeds no more though the world is green. A meal on
+  lush pasture, it sets off all the same now and then: once in
+  `MEAN_TIME_TO_ROAM` of such eating on average (`ROAM_CHANCE` a
+  meal), so a flock spreads over land it could have stayed on. Fed, it
+  sleeps as before; it is the hungry sheep that walks.
 - **Dies**: of hunger, or of old age -- `LIFE_TICKS` of sleep to a life
   on average: before a sleep of so many ticks it dies at so many in
   `LIFE_TICKS`, so a long sleep is as much of a life as many short
