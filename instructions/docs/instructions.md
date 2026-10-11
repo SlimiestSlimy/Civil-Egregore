@@ -49,7 +49,7 @@ function's name says as well whether it reads or queues
 | `walking` | the steps walls leave open, the step towards a goal, the nearest of a layer in reach |
 
 What more than one of them needs is written once: the corner of the
-square about a cell (`mask::about`), the set bit of a rank
+square about a cell (`cells::corner_about`), the set bit of a rank
 (`set_bit_of_rank`, what drawing one of nine bits and one of a mask's
 cells both come to), and in `walking` where an entity stands in its
 area, a cell of the area as a cell of the world, and the area less the
@@ -62,9 +62,9 @@ the top left, the cell `(x, y)` -- each 0 to 2, the cell itself at
 `(1, 1)` -- at bit `3 * y + x`. A set of neighbours is a mask, narrowed
 with `&`: those with grass, those no entity stands on, those in the
 world hot. A neighbour chosen is a bit's index, turned into a cell only
-when it is stepped to. They are read at once (`around::layer`): a window
-of the bitplane from the cell up and left, its three rows of three
-squeezed together; no cell is looked at alone.
+when it is stepped to. They are read at once (`around::layer`), off
+the small tiles about the cell ("The small tiles about a cell"); no
+cell is looked at alone.
 
 **An area** (`area`): the 16x16 cells about a cell, a row a `u16`, the
 cell itself at `AREA_CENTRE` each way -- what `../../pathfinding/`
@@ -241,7 +241,7 @@ that must not lose it asks the tick after whether it stands there
 (`entities::stands_beside`), and puts it again if not.
 
 **The cells beside it** (`around`): the 3x3 about a cell as nine bits,
-read in one window (`around::layer`); sets of neighbours are
+read at once (`around::layer`); sets of neighbours are
 masks narrowed with `&`, one drawn with `pick` or `prefer`.
 `around::occupied` gives those entities stand on, `free_beside` one that
 none does -- for what must have its cell, as a newborn; a step need not
@@ -263,6 +263,8 @@ it are open. `around_unwalled(turn, at)` is the neighbours of a cell no wall is 
 nine bits to narrow a step's choices by; `area_walls(turn, centre)` the
 walls of the area, which `step_towards` and `step_to` go round by
 themselves. Where the wall layers are not hot, nothing bars.
+`around_steppable(turn, at)` is those of them the collision plane does
+not hold: the plane is asked first, and a cell hemmed in reads no wall.
 
 **What stands in the way**: the collision plane (`COLLISION`), a bit a
 cell -- 1 where something stands that bars stepping there, a tree or
@@ -328,6 +330,47 @@ Not yet: masks of the common shapes made once and shipped with the
 program, masks kept from one read to the next, and the same over the
 cells entities stand on. A large square is read a window at a time,
 which a read of whole chunks will better when a rule asks for one.
+
+Not yet, either: these masks lie row by row from any cell, where the
+bitmaps lie in Morton order by aligned tiles -- so a read turns and
+cuts. What is about one cell no longer does ("The small tiles about a
+cell"); a shape of many cells, put down anywhere, is to be composed by
+an instruction into the aligned tiles it touches, however many, as the
+ring about a cell is into its one to four. Left until entities of more
+than a cell are built.
+
+## The small tiles about a cell
+
+A bitmap's cells lie in Morton order, so a tile whose side is a power
+of two and whose corner is a multiple of it is one run of bits: read
+as it lies, and asked things of with an AND. A mask is such a tile's
+cells in the same order; a shape put down anywhere touches several
+tiles, and is a mask in each. Composing them is the instructions'
+work, never a rule's -- a rule asks what is about a cell, or whether
+it may step, and is not shown the tiles (`tiles_about` is the crate's
+own).
+
+For one cell: it and its eight neighbours lie in one, two or four
+small tiles -- 4x4 cells, 16 bits. `tiles_about::of(at)` takes the four
+small tiles, two by two, they can lie in: its own, the one to the left
+if it is on its tile's left column, else the one to the right, and so
+up and down. The four are one word, in Morton order over their 8x8
+cells, and for each place the cell can have in them the ring about it
+is a word made as the program is compiled (`TilesAbout::ring`, with
+the cell `TilesAbout::nine`). A layer is read under that mask
+(`tiles_about::layer`): only the tiles the mask has a cell in are
+looked up -- one for a cell in the middle of its tile, two on an edge,
+four in a corner -- each a shift of a bitmap word, and the lot ANDed
+with the mask. Whether a sheep can move at all is the ring ANDed with
+the collision plane's tiles, and one compare.
+
+What is drawn among the neighbours, or kept as a way to walk, cannot
+hang on how the tiles fall about the cell -- the same world a few cells
+over must come to the same ("The same wherever the borders fall"). So
+the word is turned into the nine bits of `around`
+(`TilesAbout::as_nine`), row by row whichever tiles they came from,
+only when a neighbour is to be told from another; what asks only
+whether there is any, or none, stays with the word.
 
 ## Moved out of the simulation
 

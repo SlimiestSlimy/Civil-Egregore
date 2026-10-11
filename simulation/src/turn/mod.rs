@@ -8,7 +8,7 @@ mod entities;
 
 use entity_manager::{EntityReader, Instructions, SuperchunkEntities};
 use crate::sampling::sample_layer;
-use bitplane_manager::{NotHot, Reader, Superchunk, Window};
+use bitplane_manager::{NotHot, Reader, SmallTiles, Superchunk, Window};
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::{CellIndex, SuperchunkIndex};
 use utilities::chance::Chance;
@@ -117,6 +117,15 @@ impl<'a> Turn<'a> {
     /// than either alone.
     pub fn windows<const N: usize>(&self, types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
         self.reader.windows(types, origin, width, height)
+    }
+
+    /// The four small tiles, two by two, from the one that begins at
+    /// `first`, of each of `types`, as the tick found them: those
+    /// `wanted` has a cell in, the cells in Morton order -- what is
+    /// about a cell as a word of bits, nothing turned.
+    #[inline]
+    pub fn small_tiles<const N: usize>(&self, types: [LayerType; N], first: CellIndex, wanted: u64) -> [SmallTiles; N] {
+        self.reader.small_tiles(types, first, wanted)
     }
 
     /// Whether `layer_type` holds at `cell`, as the tick found it.

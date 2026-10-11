@@ -4,7 +4,7 @@
 //! entities stand on among them, and the same from further off, a tile
 //! a bit.
 
-use crate::mask::about;
+use crate::cells::corner_about as about;
 use bitplane_manager::COARSEST_TILES_IN_CHUNK;
 use chunk_storage::LayerType;
 use coordinates::{CellCartesian, CellIndex};

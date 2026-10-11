@@ -68,6 +68,14 @@ tiles each) hold any, a bit each, off the counts --
 **`prefetch(type, cell)`**: asks memory for the word `cell` is in ahead
 of its being read; nothing if its bitmap is not hot.
 
+`reader/aligned_tiles.rs` (**`aligned_tiles`**): **`small_tiles(types,
+first, wanted)`** of a `Reader` -- the four small tiles, two by two,
+from the one beginning at `first`, of each type, as a **`SmallTiles`**
+`{set, hot}`: a word in Morton order over their 8x8 cells, a tile 16
+bits of it (`SMALL_TILE`), only the tiles `wanted` has a cell in looked
+up, and its cells alone kept. **`SMALL_TILE_SIDE`** (4),
+**`SMALL_TILE_CELLS`** (16), **`SMALL_TILES_TOGETHER`** (4).
+
 **`Lookup`**: lookups remembering the last superchunk; one a thread. **`superchunk`** an entry by superchunk
 index; **`find`** an allocation by type and superchunk index, as a
 `LayerAt` (entry, index among its allocations); **`holds`** a cell, from

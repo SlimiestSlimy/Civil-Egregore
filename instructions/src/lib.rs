@@ -19,6 +19,8 @@ pub mod compare;
 pub mod entities;
 pub mod mask;
 pub mod this_tick;
+// Composed by the instructions, never by a rule: a rule asks what is about a cell, and is not shown the tiles.
+pub(crate) mod tiles_about;
 pub mod walking;
 
 // The words the instructions are asked in: where a cell and an entity

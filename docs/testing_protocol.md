@@ -61,7 +61,7 @@ takes long. A test that only prints belongs to none: it is a tool.
 | `pathfinding` | paths and waves; walls | | |
 | `utilities` | chance, commands, dispatcher, fixed_list, hash, process_memory, rng, settings, table, tuning | | |
 | `simulation` | entities moving, entities waking, their instructions | sampling, the tick, writes across borders | |
-| `instructions` | an entity changed, the cells beside it | area, mask, walking -- round walls, entities and what the collision plane holds; a world shifted coming to the same | |
+| `instructions` | an entity changed, the cells beside it | the nine about a cell off its small tiles, area, mask, walking -- round walls, entities and what the collision plane holds; a world shifted coming to the same | |
 | `worldgen` | | heights, walls, the mesh, superchunks made in any order | walls over many seeds; no seam between superchunks |
 | `sca_rules` | | grass; trees -- each rule alone on a plain | |
 | `entity_rules` | | the sheep alone on a plain | |

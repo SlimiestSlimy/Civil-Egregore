@@ -29,7 +29,9 @@ samples)`** of its own cells. Cells read, anywhere hot, as the tick
 found them: **`holds(type, cell)`**, **`value(plane, cell)`** (a wide
 plane's number), **`window(type, origin, width, height)`** (up to 8x8
 cells as a `Window`), **`windows(types, ...)`** (of several types at
-once), **`any_in_tile(type, cell, scale)`**, **`tiles_holding(type,
+once), **`small_tiles(types, first, wanted)`** (four aligned small
+tiles, two by two, as a word in Morton order: the cells of a mask),
+**`any_in_tile(type, cell, scale)`**, **`tiles_holding(type,
 cell)`** (tiles holding any cell, off the counts). Cells are written
 by compare-and-writes alone (`conditional.rs`).
 Entities read: **`woken()`**, **`woken_reading(layers)`** (the cells
