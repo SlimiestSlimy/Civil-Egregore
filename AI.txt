@@ -220,444 +220,167 @@ thread and on all, hashed along the way or once (2026-10-09). The
 Linux/Windows comparison is the user's to run. No camera in it.
 
 
-== TASKS (the list; kept current, done ones struck off) ==
+== TASKS ==
 
-ORDER (user, 2026-10-10, verbatim): "do it in this order: fix world
-struct, finish docs, finish tests, make cool pool paging, work on gpu
-LOD". Then, 2026-10-10, to the renderer's terrain generation (review
-item 1) going after the tests and before paging: "yes! GPU LOD and
-SCA renaming are last". SO THE ORDER NOW: tests (task 7, DONE) ->
-review item 1 (the renderer asks the host for terrain: DONE
-2026-10-10, server/src/host/terrain.rs; map mode and the height
-labels not tried by hand in the window -- the user's to look at) ->
-cold pool paging (DONE) -> the decay+eat case and compare-and-write
-(DONE 2026-10-10, see below) -> SCA rename (DONE 2026-10-10) -> GPU
-LOD (DONE 2026-10-10; the user, verbatim: "yes, mipmaps but done on
-the gpu instead of the cpu" -- see task 5). THE ORDER IS DONE: what
-is left is task 6, another day, and what the user says next.
-That is: (1) server::World -- DONE 2026-10-10; (2) docs
-finished; (3) tests finished -- task 7, and each crate testing itself;
-(4) cold pool paging (task 4); (5) GPU LOD (task 5).
-THEN (user, 2026-10-10, verbatim): "then we work on generating
-syntetic cases for the decay+eat. but i believe we can basically solve
-all this problems by making writes into compare-and-writes". That is:
-(6) a test that makes a cell both decay and be eaten in one tick, on
-purpose; and COMPARE-AND-WRITE: a write carries what the rule saw at
-the cell and is applied only if the cell still holds it, what failed
-counted -- to design (cells first; an entity's put already is one: a
-new entity is put only on a free cell). Note for the design: a rule
-still cannot learn in the tick that its write failed, so what hangs
-on the write (the sheep's meal) must hang on it where it is applied.
-User on that, 2026-10-10, verbatim: "exactly, thats the logic behind
-compare and write, if the write fails nothing happens, otherwise the
-write is valid, i believ e the last ingredient we need is write
-grouping markers (write group start and end instructions" so a whole
-group of writes can fail or succeed at the same time". That is: WRITE
-GROUPS -- a group-start and a group-end instruction; the writes
-between them all apply or none does (the meal: the grass cell cleared
-if still grass AND the sheep's hunger edited, as one).
-GROUPS WERE BUILT AND TAKEN OUT AGAIN. The user, 2026-10-10,
-verbatim: "regarding groups, i think we need to backtrack a bit, lets
-only do compare and writes, no groups, of course the compare target
-and the write target can be different things. so an entity can perform
-a write to its internal state based on the compare to the environment
-and the other way around as well. if an entity queued many writes they
-should fail as a chain of failed compares ion theory, and we skip
-complex inter-superchunk grouping semantics". And: "yeah, make sure we
-have no more WAW hazards".
-DONE 2026-10-10: no groups. A compare (simulation::Compare: a cell's
-number, or an entity's attribute) and what hangs on it (a cell written,
-entity instructions, a count) -- instructions::compare. NO
-WRITE-AFTER-WRITE HAZARD IN A TICK: no plain write and no shape
-(Turn::queue is gone; mask::set_under is cell by cell); every cell
-write says what was seen at that cell, whatever else it is held
-against; an attribute of another entity is set only if as seen, and
-not at all if that entity wakes this tick; a sheep is fed or put to
-sleep hungry under opposite compares, written once. simulation.md,
-"Compare-and-write" and "No write lands on another's"; server.md,
-"Two writes on one cell". Tests: simulation/tests/fine/
-compare_and_write.rs and instructions.rs, entity_rules sheep
-a_meal_lost_to_a_decay_leaves_the_sheep_hungry.
-THEN (user, 2026-10-10, verbatim): "cell writes counts, etc. should
-be abstracted to instructuctions as well, no direct access to the
-simulation internals never from rules (excluding the necessary data
-types for the instructions of course)"; "if they need multiple
-mutations in a tick the idea is to have a cascading failure of compare
-and writes as necessary. every instruction must be atomic and leave
-the entity or cell in a consistent state ... (basically were
-simulating atomic CAS instructions lol)"; "entity to entity writes can
-happen in the same tick, as i explained before, we need certain
-guarantees". DONE 2026-10-10: rules call nothing of the turn
-(instructions::this_tick; root test the_rules_ask_instructions_alone);
-an entity is written an attribute at a time, never whole
-(Turn::update is those writes and a move; entities::set_attribute_of
-for another's), so awake or not it may be written by another in the
-tick; a crossing written behind is turned back
-(SuperchunkEntities::settle_leavers, settle_arrivals). instructions.md,
-"Every instruction atomic", "One entity writing another", "Rules ask
-instructions, and nothing else".
-MINE, for the user to say: a compare is in the superchunk its write
-lands in (so an eating sheep bears a wake later); a crossing written
-behind is turned back, not carried over with the write; a removal is
-not counted a hazard; an attribute of several blocks is compared by
-its first block and a sum of the rest.
-Tick reference 62.98 M (58.77 M before compare-and-write): not chased.
+Read this first after any break; write a new ask here the moment it is
+made, in the user's words. What is done is in the git log.
 
-Asked by the user, in the order to do them. Read this first after any
-break; write a new ask here the moment it is made.
+DONE, a line each: docs against code (kept by tests/fine.rs and `docs
+stale`); worldgen 6 times faster; attributes as 64-byte blocks; cold
+pool paged to disk (COLD_POOL_BYTES_KEPT 2 GiB is my number); mipmaps
+on the graphics card; SCA rename; tests drawn from the run's seed; the
+2026-10-10 review; compare-and-write with no groups; every instruction
+atomic; a world shifted is the same world (instructions/tests/fast/
+shifted.rs); the collision plane, entities in it; cells about a cell
+and masks in Morton order.
 
-1. DOCS, ALL OF THEM AGAINST ALL THE CODE: DONE 2026-10-09, every
-   crate. Kept so by tests/fine.rs (every item, private too, named in
-   its crate's docs; every pointer and name holds) and by `docs stale`
-   before each commit (ALWAYS).
-2. WORLDGEN: DONE 2026-10-09 as far as: 6 times faster (OPEN
-   THREADS), and a line's blend and sigmoidness drawn a little towards
-   the slope (level land 59% -> 53%). The user is to say whether it is
-   fast enough and whether the land is right; vertex heights untouched.
-3. ENTITY ATTRIBUTES, NEW SHAPE (asked 2026-10-09). The type ID stays
-   one u64 for everything. An attribute becomes a fixed-size block of
-   64 bytes: the first 64 bits its type, the rest laid out as that
-   type's layout says -- the layout fixed per type (a row of the type
-   registry). Needing more room, an attribute takes 2 (or more) 64-byte
-   blocks; the first block then also holds the block length where one
-   is needed. Most attribute data is fixed size; some will later be
-   small but variable size -- be ready for it. Design it in
-   entity_manager + type_registry, write the design in the docs first.
-   DONE 2026-10-10: blocks built in type_registry (layouts.rs) and
-   entity_manager (attributes.rs); the ID's top byte is the block
-   count, 0 = not an attribute, 0xFF = size varies (user's rule). Not
-   done: a typed layout for a varying size (none registered yet).
-3b. INSTRUCTIONS CRATE CLEANUP: DONE 2026-10-10. 20 source files ->
-   7, a module a subject (cells, entities, around, area, mask, walking,
-   lib); read/ and write/ gone; repeats written once; tests share
-   tests/tests.rs. The user may yet say whether Around/Area/Window as
-   three {set, hot} shapes should be one.
-4. COLD POOL PAGED TO DISK: DONE 2026-10-10 (chunk_storage/src/
-   paging.rs; chunk_storage.md "Paged to disk", server.md "The cold
-   pool paged"; server/tests/fast/paging.rs). A world keeps
-   COLD_POOL_BYTES_KEPT (2 GiB, my number -- the user's to set) of
-   cold images in memory, the rest in transient_data/paging/. Left:
-   page-out writes on the tick's thread (page-in is on the job's);
-   cold STATES (entities, random number) not paged; BMI2 pdep for
-   select not done (optional, and performance is not worked on now).
-   The written seeds in server/tests/complete.rs: already the run's.
-5. LOD ON THE GPU (renderer): DONE 2026-10-10. Each superchunk's
-   picture has mipmaps the graphics card makes (renderer/src/
-   mipmaps.rs; Bevy's mip_generation, compute), blended when the
-   picture is drawn smaller; sharp enlarged, as before. renderer.md,
-   "Mipmaps made on the graphics card". Checked with no one at the
-   screen: `Civil_Egregore renderer window_still [seed] [cells a
-   screen pixel] [name]` opens the window on a world, keeps what the
-   card drew as a PNG and closes it. MINE, for the user to say: the
-   painter's detail steps (frames::detail_at, paint_far) stay -- they
-   bound what the host copies and what is kept, far out; painting
-   fine farther out and leaving more to the card is one constant.
-   NOT seen by eye in a moving window: whether the shimmer is gone.
-6. Another day: optimizations, inlining.
+IN ORDER NOW:
 
-6b. DOUBLE WRITES: CHECKED 2026-10-10 (server.md, "Two writes on one
-   cell"; server/tests/fast/double_writes.rs). Two sheep cannot eat one
-   cell. Found: two lambs born onto one cell in a tick -> one refused,
-   counted as born, mother no longer pregnant.
-6c. THE LOST LAMB: FIXED 2026-10-10 (BEARING; entity_rules.md, "A lamb
-   is born once it is seen").
-6d. WRITES THAT TOLERATE FAILURE: FIRST PART DONE 2026-10-10 -- a new
-   entity may be put on the first free of some cells
-   (put_on_the_first_free, entities::spawn_beside), and instructions
-   passed over are counted. The rest is compare-and-write (ORDER, 6).
-8. LOWEST PRIORITY OF ALL (user, 2026-10-10, verbatim): "rename monte
-   carlo to the more proper terminology, i believe is stochastic
-   something". Then, verbatim: "SCA for stochastic cell automaton".
-   So: Monte Carlo -> stochastic cell automaton, SCA for short;
-   mc_rules -> sca_rules (crate, docs, glossary, every mention).
-   DONE 2026-10-10: the crate is sca_rules, its design
-   sca_rules/docs/sca_rules.md; the glossary has the word, Monte
-   Carlo among those not used.
-7. TESTS GENERATED: DONE 2026-10-10, every crate gone through. A case
-   that can be drawn is drawn from the run's seed, beside the edges
-   written by hand; new tests against the plainest working-out (writes
-   cell by cell, shapes by coordinates, the codec and heights back,
-   paths by a full search over walls, a fixed list against a Vec,
-   attribute edits against those last set); no seed written as a
-   number left. Tessera's already drew from the seed file. Left as
-   they were: the lifecycle tests of hot bitmaps, the ring, halos.
+A. PATHFINDING TO MORTON ORDER (user, 2026-10-11: "next fix
+   pathfinding to morton order"). Today: instructions::area is 16x16
+   rows read by windows, pathfinding::Rows/Walls a u16 a row.
 
-To tell the user at the end: chunk_storage/entity_manager still hand
-on the ID types (shortcut); TickCounts carries per-rule times; float
-sqrt is allowed by the lint; tessera's own 8-bit fixed_point_log2
-untouched; Linux/Windows `server check` comparison is theirs; the
-Google Drive connector needs authorizing in claude.ai settings.
+B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
+   instructions from scratch lmao"; "were basically building a VM
+   machine"). The user, verbatim:
+   - "instructions are function calls with parameters ... imagine
+     rules being composed of functions that either apply totally or
+     fail entirely, kinda like groups as we had before, but we want a
+     way to fail as soon as possible if were going to fail. so i
+     propose this, lets separate compare, compute, and write ... first
+     rules try to queue all comparations and computation upfront, so
+     now reading is part of the apply queue, now, computation is
+     instructions that call functions specified by the rules. both
+     comparations and computations can write to entity atributes ...
+     were going to have a typeID0x00FFFFFF... as the first attribute
+     of every entity. to hold general data for all entities. on that
+     attribute block comparations and computations write bitflags that
+     later write steps compare and write."
+   - when they run: "now everything runs at apply time."
+   - a compute: "limited still to the pulic API simulation, reading
+     state or attributes only ... we need a concrete set of
+     instructions with flexible parameters, like specifying 2
+     bitplanes or an entityref for the function ... we want the
+     available instructions to be efficient and then do the rules with
+     them. then profiling." "the functions callabe by instructions
+     must have a defined set of signatures".
+   - naming a function: the one global type registry.
+   - flags: "defined specifically at compile time, however some
+     dynamicity is allowed by using atributes as a way to store bit
+     flag offsets dynamically"; "private to each entity for
+     inter-entity comms we need to use extra atributes. probably well
+     have a special 'entity_channel' atribute ... things for the
+     future"; "we will only use the first 128 bits after the type for
+     the bitflags, so the bitflag offsets is a nice round 7 bits of
+     offset + the bit to compare to. or we can also have two sets of 8
+     bit instruction parameters comparing 2 bitflags directly".
+   - failure: "only the writes that test that flag fail, so we can
+     have compartmentalized failures and safe entity states".
+   - writes: "now writes specifically test only the bitflags produced
+     by compares and computations. so writes themselves become simpler
+     but we have more instructions"; "entity only and bitplane only
+     instructions should be different"; "all compare, compute and
+     write have no precedence on one another, an entity can queue them
+     in any order ... we probably want all instructions to have both
+     unconditional and flag offset conditional variants".
+   - a flag here letting a write over a border: "we have a test just
+     for that" (shifted.rs).
+   - SIZE: "instructions should be like, 16-32 bytes tops"; "less is
+     better". Today: a conditional step 448 bytes (Compare 192, two a
+     step, the seen block inside), an entity instruction 64, a cell
+     write 16. Assert sizes in the code as it is built.
+   - what a write carries: "watever space is left is fine lmao. what
+     i dont want you to do is store whole 64 byte attribute blocks in
+     instructions, attribute blocks are composed of many smaller
+     components, structs of fixed size basically to 64 bytes".
+   - the entity's name: "entity ID is its origin position at tick
+     start and stays constant through the tick". No entity IDs built
+     on ("we can add entity IDs later"); EntityId is still in the
+     code: ASK before removing it.
+   - no private copy: of Flock.room / EntityEdit, "we should be
+     writing to the entity store instead of writing twice".
+
+C. TYPE ID: "you actually poisoned the first byte of the typeid by
+   encoding length there, we would actually would like the first byte
+   of the typeID to be a kind of 'supertype' be it entity, function,
+   atribute, etc."; "block count would be the last byte for the
+   flagged attribute types on the registry". (Today the top byte is
+   the block count, 0xFF = varies.)
+
+D. QUEUED: "we want sheep to wander more and sleep less haha"; and
+   rules independent of the tick rate: "more constants: ticks per
+   simulation second = 256 and now thing like grass spreading are
+   determined by a random draw to a 'mean sim time to' ... so the
+   rules are portable if we ever decide to change tick rate" -- ask
+   what is unclear when come to.
+
+E. WAITING FOR THE USER'S DETAILS: entities of more than a cell -- a
+   shape composed by an instruction into however many aligned tiles it
+   touches ("the instructions should compose the mask ... later when
+   we have multicelled entities im gonna get into details"; "we want
+   to avoid composing masks manually", "there can be the need of a
+   variable amount of them").
+
+LOWEST: optimizations and inlining another day; cold states not
+paged; page-out on the tick's thread.
+
+
+== WHAT THE USER HAS SAID OF HOW THINGS ARE ==
+
+- Morton order is the default everywhere; cartesian only where it is
+  cheaper. Masks are aligned tiles, as Tessera's (tessera/src/tile.rs):
+  one run of bits. Cell operations are masked bitwise ops.
+- MEASURE before saying a change is done ("where is the profiling?
+  benchmarks?"): `server pasture 1000 333 4000 4 1` four times (ns a
+  rule); the tick reference, `perf stat -e instructions:u` of `pasture
+  300 333 4000 4 1` less the 0-tick run; `server check` hashes;
+  `perf record -e cycles:u` for the hot function. Against the commit
+  before, built from a checkout. Numbers in the commit.
+  Now (cd798e1): a sheep's wake about 200 ns, the reference 71.82 M.
+  It was 62.98 M at 98fbc06: the author sort and the entities'
+  collision bits cost the difference, not yet looked at.
+- One stream of instructions, applied in the order they arrive: no
+  kind before another. An entity is named for the tick by the cell the
+  tick found it on.
+- Borders of chunks and superchunks are invisible to what is not
+  chance; chance may hang on them ("rngs per superchunk were the plan
+  all along"). A neighbour drawn (around::pick) hangs on tile
+  alignment the same way -- the user asked what that means: explained,
+  not yet answered whether it is wanted.
+- The collision plane holds everything that can collide; walls stay
+  the terrain's edge layers.
+- A test's infrastructure lives in its test file: nothing is put in
+  the program for a test.
+- The persistent settings, "~/.local/share/Civil Egregore/" (settings
+  and saved worlds), may be deleted whenever needed ("i dont care for
+  anything there"). Its settings.csv had sheep a superchunk 0, which
+  is why the window's world had none; removed 2026-10-11.
 
 
 == OPEN THREADS ==
 
-- REVIEW 2026-10-10 (remote session, architecture read) -- to fix.
-  Soundness and correctness only: performance is NOT worked on now
-  (content first, then measure where the bottlenecks are), so nothing
-  here is an optimization.
-  1. The renderer ran terrain generation: DONE 2026-10-10. The
-     client asks the host (Host::terrain, a TerrainAsker; answered on
-     the host's "terrain" thread, server/src/host/terrain.rs) for the
-     heights past a frame's superchunks, the map's cells and the
-     heights written on cells; it holds no generator. Answers are the
-     terrain AS GENERATED: when the ground of a made superchunk can
-     change, they must come from the world (server.md says so).
-  2. Dispatcher::run: DONE 2026-10-10 (one_run lock; tests of four
-     threads running at once, and of a queued job calling run).
-  3. server::World: DONE 2026-10-10 (fields the server's own, read by
-     methods, changed whole: put_entity, remove_entity, write_cells;
-     server.md, "What a world holds together"; World::broken_invariant
-     checked after a debug tick and by the fast tier).
-  4. Rule counts by string: DONE 2026-10-10 (a rule's count places
-     worked out from its COUNTED names as it is compiled,
-     instructions::place_counted; the server's rules picked by
-     RulePlace constants, GRASS_RULE ...; no lookup by name left).
-  5. Each crate testing itself: DONE 2026-10-10 for sca_rules (then mc_rules) and
-     entity_rules (their tests moved from the server's, trees' tests
-     written). entity_manager: a fine tier of attributes and the
-     first-free put; the rest still through the simulation's tests.
-  6. Rule for the future: every `unsafe` has a test trying to break its
-     safety comment's claim.
-  7. DONE 2026-10-10.
-
-- Worldgen, 2026-10-09: a superchunk of land (server new <folder> 1 0
-  1 1 1, callgrind) was 9.67 G instructions, nine tenths the mesh; it
-  is 1.77 G -- the meshes worked out on a lattice of every 4th cell
-  (mesh/lands.rs), the patches' noise kept. 36 superchunks: 3.9 s ->
-  0.67 s on all threads. What is left of 1.77 G: the mesh 44%
-  (Mesh::blended, locate, a vertex made again each square entered),
-  HeightMap::from_heights 15%, Tessera's encode 10%,
-  coordinates::cartesian_from_place 8%, the patches 19%. If more is
-  wanted: the vertices a square shares with the last kept; the broad
-  meshes on a coarser lattice than the fine. `server new` makes
-  Generation::DEFAULT, the window the sliders' (default_settings.csv:
-  highest land 65535, most sigmoid 7.5) -- the steepness probe
-  (AI_SCRATCHPAD how_steep_the_land_is) reads the sliders'.
-- The tick reference (pasture 300 333 4000 4 1 less the 0-tick run)
-  is 58.74 M instructions (8,472.69 M less 8,413.95 M) with integer
-  sampling, 2026-10-09; 58.50 M just before it (rules table), 58.37 M
-  at 9303e37. A logarithm by 48 squarings made it 64.29 M: hence the
-  table and series in utilities::fixed_point.
+- Limits known: a compare must be in the superchunk of what it lets be
+  written (a panic otherwise; sheep fed do not step for it); another
+  removing an entity as it crosses turns it back; entities of one cell
+  only.
 - A world's stored image of a cooled superchunk is behind its cells
-  until the writeback ring is flushed (World::write_back_and_flush_all,
-  as a save does): compare images only after it. The complete tier's
-  save/load test failed for that alone, since before 2026-10-09.
-- A fresh flock loses ~2% at its first wake: old age is rolled for the
-  whole sleep ahead (wake - now over LIFE_TICKS) and a fed sheep's
-  first sleep is long. The rule as written; told to the user.
-- Area allocator: 256 MiB blocks, 256-byte units, sorted interval list,
-  owning handles (after the Tessera clean).
-- Tessera deep clean: settle the code, move abstraction boundaries
-  (the design statement on process and processee).
-- Read every file: one name per thing, generalize repeats.
-
-
-== SCRATCH ==
-
-(The AI's working notes go here; cleared when stale.)
-
-BORDERS (user, 2026-10-10): "cross superchunk behaviour should be
-entirely transparent and deterministic, as equal as possible to intra
-chunk processing"; the test: a world shifted comes to the same. DONE
-for what is not chance: instructions/tests/fast/shifted.rs (its own
-rule and one generator, all in the test file: "we dont want to
-contaminate the rest of the code just to run this test"). What made it
-pass: applied by author in reading order (Turn::seeing_to); an entity
-named all tick by the cell the tick found it on ("use the position of
-an entity as its ID for that tick"); one stream, "no instructions have
-precedence over another"; a crossing takes what was written.
-STILL BORDER-DEPENDENT, not done: every draw from a superchunk's own
-stream (SCA sampling, a sheep's lot, new_id); a compare must be in the
-superchunk of what it lets be written (sheep fed do not step for it);
-another removing an entity as it crosses (turned back).
-The user: "we actually want to avoid entity IDs even if randomly
-assigned ... we can add entity IDs later" -- EntityId is still in the
-code; not asked to take it out yet. ASK before doing so.
-The sort by author is paid every tick: tick reference not measured
-since.
-
-COLLISION PLANE (user, 2026-10-10): "the collision bitplane, where a
-0 means free and 1 means occupied, for movement checks. trees for
-example should be a 1"; then "reuse the wall plane"; then, the walls
-being edges not cells, chose the per-cell plane. DONE: layer COLLISION
-(type registry 10); trees set it put and clear it dead (worldgen and
-the trees' rule); walking::around_steppable and the paths read it; the
-sheep use it. Not in it: entities. A flock is still put by lot, so a
-sheep may start on a tree's cell (it steps off).
-
-ENTITIES IN THE COLLISION PLANE (user, 2026-10-10, verbatim):
-"sheeps should also write to the collision plane, in fact everything
-that can collision should write into it. remember i told you we
-needed to generalize instructions with bitmasks of varying sizes?,
-well, this is why". DONE for one-cell entities: the instructions that
-put, move and remove an entity keep its bit (Simulation::
-keep_entities_in, entity_manager::CollisionCells); the cell left is
-cleared when the tick is over; the server keeps it between ticks.
-Plane = trees + entities between ticks, tested, the same shifted.
-NOT DONE, the masks: an entity of more than a cell (the store keeps
-one cell an entity), and a mask held-then-set as one thing, over a
-border too -- which needs a compare in one superchunk to let a write
-in another (not possible today: a panic). ASK the user how they want
-that built before building it.
-Also said: border-dependent RANDOM behaviour is fine ("rngs per
-superchunk were the plan all along"): only deterministic behaviour
-must not see borders. The draws are not a defect.
-
-QUEUED, after the collision plane and instructions (user, verbatim):
-1. "we want sheep to wander more and sleep less haha"
-2. "were going to write something really important for the rules. to
-   make rules tick independent we are going to have more constants:
-   ticks per simulation second = 256 and now thing like grass
-   spreading are determined by a random draw to a 'mean sim time to'
-   ... so the rules are portable if we ever decide to change tick
-   rate". (The message was cut off mid-sentence at "so the ru"; the
-   next one finished it.) Not designed yet: ask what is unclear when
-   it is come to.
-
-MASKS AS ALIGNED MORTON TILES, 2026-10-11 (user, verbatim):
-"the masks, like, the point is to provide a way to quickly check stuff
-with bitwise computation, for example imagine movement, we want to
-evaluate wether any of the 8 possible single cell movements are
-possible, masks are like tiles, aligned, so they play nice with morton
-order at any size. now, for simple single celled things like sheep, we
-simply draw a 3x3 hollow ring of set bits on the mask. which gets
-tested against the same part of the morton region on the collision
-bitmap for example, alignment of masks as tiles helps here, masked OR
-is basically an aligned OR with the mask, and another OR of the
-result, and we get in 2 instructions weter a move is at all possible
-for a sheep from minimum 4x4 (16 bits of mask) and upwards in nice
-power of 2 numers". "on the single celled thing any case is 1-4 masks
-top"; "we need to make rules as cheap as possible, and morton and
-tiles make things really simple for area checks"; "as long as we keep
-tiles aligned to correspondly sized morton regions, thats the reason
-we need 1-4 masks for single celled stuff"; "the instructions should
-compose the mask, for now we have only single celled stuff, but later
-when we have multicelled entities im gonna get into details"; "once
-again, rules dont touch the simulation, we abstract it for the rules,
-and this is a potentially very cheap abstraction".
-Also: "remember we want to avoid composing masks manually lol",
-"because there can be the need of a variable amount of them".
-DONE 2026-10-11, MORTON ALL THE WAY ("morton order everywhere";
-"cartesian coordinates should only be used where they are cheaper than
-morton order ... oitherwise morton order is default"; "simplify most
-cell operations to masked bitwise ops basically, super cheap, super
-fast"):
-- Reader::small_tiles (four aligned 4x4 tiles, two by two, one word in
-  Morton order; one bitmap lookup a layer, tiles stepped to on the
-  place), Reader::aligned_tile (8 to 256: the bitmap's words).
-- instructions::around: the cells about a cell are a word
-  (around::Cells), never rows. about(at) -> About; centre/ring/nine/
-  towards(way); layer; pick and prefer give a WAY (0 to 8, HERE 4), the
-  one name that does not hang on alignment. The nine-bit form, squeeze,
-  occupied and free_beside are gone. A draw's neighbour goes by tile
-  alignment (chance, allowed); the shifted test draws by ways in its
-  own file.
-- walking::around_unwalled/around_steppable take &About, give Cells.
-- instructions::mask::Mask is an aligned tile in Morton order: read by
-  copying words, any_under an AND, written a set bit a cell.
-- MEASURED (pasture 1000 333 4000 4 1, a sheep's wake): 233 ns at
-  d5e8273, 272 at 865bb33 (a lookup a tile, nine bits gathered a cell
-  at a time: SLOWER, committed unmeasured -- do not do that again),
-  about 200 now. Tick reference (pasture 300 333 4000 4 1 less 0):
-  90.85 M at d5e8273, 88.17 M at 865bb33, 71.82 M now. It was 62.98 M
-  at 98fbc06: the border and collision commits cost what is left.
-  perf record -e cycles:u works here (paranoid 2): use it.
-NOT DONE: a shape of many cells composed into however many aligned
-tiles (waits for the user on multi-celled entities); the area (16x16,
-pathfinding) is still rows read by windows.
-SEEN, NOT CHASED: `renderer window_still` shows 0 sheep, on d5e8273
-too -- to ask the user whether the still's world is meant to have any.
-On Flock.room / EntityEdit (a private copy of the entity edited, then
-diffed into writes) the user, verbatim: "hmmm, me dont likey that, we
-should be writing to the entity store instead of writing twice" -- for
-the redesign: no local copy, writes go to the store as applied.
-
-NEXT: INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically
-redesinging instructions from scratch lmao"). ASKED 2026-10-11, NOT
-BUILT (user, verbatim):
-"instructions are function calls with parameters ... compare and write
-already does 2 compares to write, i think thats actually the key to
-the whole thing, ok, so imagine rules being composed of functions that
-either apply totally or fail entirely, kinda like groups as we had
-before, but we want a way to fail as soon as possible if were going to
-fail. so i propose this, lets separate compare, compute, and write, so
-entity rules change the following way: first rules try to queue all
-comparations and computation upfront, so now reading is part of the
-apply queue, now, computation is instructions that call functions
-specified by the rules. both comparations and computations can write
-to entity atributes, special in the sense of their purpose, basically
-were going to have a typeID0x00FFFFFF... as the first attribute of
-every entity. to hold general data for all entities. on that attribute
-block comparations and computations write bitflags that later write
-steps compare and write." ("im half asleep so do as many questions as
-you want".)
-ANSWERED 2026-10-11 (user, verbatim, to my questions by number). TO
-BUILD AFTER THE MASKS ("11: yes masks first"):
-1 when compares and computes run: "yes, now everything runs at apply
-  time."
-2 what a compute may do: "its limited still to the pulic API
-  simulation, reading state or attributes only. the special part
-  honestly is the instruction that passses the arguments, we need a
-  concrete set of instructions with flexible parameters, like
-  specifying 2 bitplanes or an entityref for the function. what i mean
-  is, even this functions are contrained by the limited instruction
-  set, and thats on purpose, we want the available instructions to be
-  efficient and then do the rules with them. then profiling."
-3 naming a function: "yes, same as everything else, we have a single
-  global typeid registry where everything registers. however you
-  actually poisoned the first byte of the typeid by encoding length
-  there, we would actually would like the first byte of the typeID to
-  be a kind of 'supertype' be it entity, function, atribute, etc. were
-  not going to have that many tbh". SO: the type ID's first byte to
-  become the supertype, the length out of it -- a task of its own.
-4 flags scratch or lasting: "no, flags are defined specifically at
-  compile time, however some dynamicity is allowed by using atributes
-  as a way to store bit flag offsets dynamically if needed for
-  example".
-5 another entity at my flags: "no, the flags of the first superblock
-  are private to each entity for inter-entity comms we need to use
-  extra atributes. probably well have a special 'entity_channel'
-  atribute lmao. things for the future."
-6 what a failed compare fails: "the whole idea of the flags is that
-  only the writes that test that flag fail, so we can have
-  compartmentalized failures and safe entity states, still kinda
-  enforced by the programmer, but with a much better model."
-7 today's compares: "not exactly, now writes specifically test only
-  the bitflags produced by compares and computations. so writes
-  themselves become simpler but we have more instructions"
-8 cells with no entity: "yes, entity only and bitplane only
-  instructions should be different."
-9 a flag here letting a write over a border: "we have a test just for
-  that" (instructions/tests/fast/shifted.rs).
-10 the general attribute beyond flags: "not for now. proably yes in
-  the future."
-And: "the functions callabe by instructions must have a defined set
-of signatures as implied before. and all compare, compute and write
-have no precedence on one another, an entity can queue them in any
-order, what matters is unlocking the hability to skip as much writes
-as possible, in fact, we probably want all instructions to have both
-unconditional and flag offset conditional variants".
-SIZE, A HARD REQUIREMENT OF IT (user, 2026-10-11, verbatim, on being
-told a conditional step is 448 bytes -- Compare 192, two a step, the
-seen attribute block inside it; an entity instruction 64; a cell write
-16): "HOLY FUCK, that should not have worked like that from the
-beggining, instructions should be like, 16-32 bytes tops"; "less is
-better". Assert the sizes in the code as it is built.
-And: "from the beggining we shouldve only carried tops 64 bits of
-compare payload" -- a compare carries 64 bits at the most, never a
-block.
-THEN (user, 2026-10-11, verbatim): "basically we will only use the
-first 128 bits after the type for the bitflags, so the bitflag offsets
-is a nice round 7 bits of offset + the bit to compare to. or we can
-also have two sets of 8 bit instruction parameters comparing 2
-bitflags directly, were basically building a VM machine". To my three
-questions: block count -- "block count would be the last byte for the
-flagged attribute types on the registry"; the entity's name -- "we
-already decided that entity ID is its origin position at tick start
-and stays constant through the tick". (Payloads: not answered.)
-ON 865bb33 (user, verbatim): "where is the profiling? benchmarks?" --
-MEASURE what a change costs or saves before saying it is done. And:
-"we need the masks to be morton, otherwise were not reaping any
-performance benefits at all. i think you might want to re-read tessera
-code a bit to remember what a tile is" -- Mask TO BE MORTON, ALIGNED
-TILES, NOW; not left for later.
+  until the writeback ring is flushed (World::write_back_and_flush_all):
+  compare images only after it.
+- A fresh flock loses ~2% at its first wake (old age rolled for the
+  whole sleep ahead): the rule as written; told to the user.
+- Worldgen, if more speed is wanted: the vertices a square shares with
+  the last kept; the broad meshes on a coarser lattice. What is left
+  of a superchunk's 1.77 G instructions: the mesh 44%,
+  HeightMap::from_heights 15%, Tessera's encode 10%.
+- Answers of server::host::terrain are the terrain AS GENERATED: when
+  a made superchunk's ground can change they must come from the world.
+- Every `unsafe` gets a test trying to break its safety comment.
+- The user's to say or do: whether the land is right and worldgen fast
+  enough; whether the mipmaps stop the shimmer in a moving window; the
+  Linux/Windows `server check` comparison; whether Around/Area/Window
+  should be one shape.
+- Told to the user, shortcuts not decisions: chunk_storage and
+  entity_manager hand on the ID types under their own names;
+  TickCounts carries per-rule times; float sqrt is allowed by the lint.
+- Later: an area allocator (256 MiB blocks, 256-byte units); Tessera's
+  deep clean; a read of every file for one name a thing.
