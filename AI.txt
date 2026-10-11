@@ -480,6 +480,19 @@ B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    actions, instructions is basically the dependency of actions. and
    actions represent more higher level behaviour with more
    complicated compare and write instruction patterns for us".
+   THE FAMILIES, the user (2026-10-11): "we do need instructions (now
+   that are separate from actions) to behave more close to how the
+   simulation likes stuff, like the mask work for example,
+   specifically we need 3 types of instructions at a minimum
+   plane-plane / plane-entity / entity-entity and within those 3
+   families we implement the low level instructions actions are made
+   out of, actions couple with attributes and bitplanes, instructions
+   remain completely agnostic to semantic behaviour and instead
+   couple more to the simulation needs for efficient instructions".
+   My reading and three questions put to the user (where a constant
+   goes; whether masks are the unit of plane instructions; whether an
+   entity is named by cell); WAITING before shaping the 16-byte
+   writes and the 24-byte instructions, which hang on it.
    THE NESTING, the user: "fair way of doing it, but i would model
    the accounting of nesting as a small stack, we push the offsets of
    compares when encountering them, on finding a skip instruction we
