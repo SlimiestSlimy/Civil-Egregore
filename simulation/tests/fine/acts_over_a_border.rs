@@ -1,6 +1,6 @@
-//! An act over a border: what an author queues under a compare of a
-//! cell in another superchunk is applied whole or not at all, in the
-//! one order of the world, however the superchunks wait on one
+//! An act over a border: what an author queues for more than one
+//! superchunk is applied in one piece -- what is under a compare
+//! whole or not at all -- in the one order of the world, however the superchunks wait on one
 //! another (`docs/simulation.md`, "An act over a border").
 //!
 //! `cargo test --test fine acts_over_a_border`

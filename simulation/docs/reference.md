@@ -75,9 +75,11 @@ writing two members of one attribute both do;
 `queue_landing_in(superchunk)`: the queue something about to be queued
 goes to, and its slot -- the slot's own queue, or the queue of acts
 over a border (`ACROSS`, the outbox's tenth) once the author's act is
-one, which it becomes here if a compare of another superchunk is open
-(`go_across`: all from the outermost open compare on moved there,
-`Across` `{lands, arrived}` kept beside its segment; `simulation.md`,
+one, which it becomes here at the first thing queued for a second
+superchunk, whatever it is (`AuthorBegan`: the slot the author began
+in and what its queue held before; `go_across`: all the author
+queued moved there, `Across` `{lands, arrived}` kept beside its
+segment; `simulation.md`,
 "An act over a border"); `slot_home`: the slot of the outbox's own
 superchunk. **`seeing_to(at)`**: the rule is seeing to
 what is on a cell -- the `author` of what it queues from here on

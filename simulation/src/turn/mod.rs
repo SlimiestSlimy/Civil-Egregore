@@ -18,9 +18,9 @@ use utilities::rng::Rng;
 
 /// A superchunk's outbox slots: itself and its eight neighbours.
 pub(crate) const SLOTS: usize = 9;
-/// The outbox's queue after its slots': of the authors whose act
-/// reaches over a border, each instruction saying where it lands
-/// (`docs/simulation.md`, "An act over a border").
+/// The outbox's queue after its slots': of the authors that queued
+/// for more than one superchunk, each instruction saying where it
+/// lands (`docs/simulation.md`, "An act over a border").
 pub(crate) const ACROSS: usize = SLOTS;
 
 /// The slot of the superchunk `dx` across and `dy` down from the one
@@ -108,9 +108,27 @@ pub struct Turn<'a> {
     /// applied ([`Turn::count_under`]).
     pub(crate) counted_from: u32,
     /// Whether what the author queues goes to the queue of acts over
-    /// a border: from its first instruction under a compare of
-    /// another superchunk, until another author is named.
+    /// a border: from the first thing it queues for a second
+    /// superchunk, until another author is named.
     pub(crate) across: bool,
+    /// Where the author began queuing, if it has: the one superchunk
+    /// all it queued so far is for.
+    pub(crate) author_began: Option<AuthorBegan>,
+}
+
+/// Where an author began queuing: the slot of the superchunk, and
+/// how much that slot's queue held before it -- all after is the
+/// author's, until it queues for another superchunk.
+#[derive(Clone, Copy)]
+pub(crate) struct AuthorBegan {
+    /// The outbox slot of the superchunk.
+    pub(crate) slot: u8,
+    /// The instructions its queue held.
+    pub(crate) instructions: u32,
+    /// The compares its queue held, by what is noted of each.
+    pub(crate) gated: u32,
+    /// The blocks its queue carried.
+    pub(crate) carried: u32,
 }
 
 impl<'a> Turn<'a> {
@@ -218,18 +236,28 @@ impl<'a> Turn<'a> {
         debug_assert_eq!(self.compares_open_count, 0, "an author named with a compare open");
         self.author = at.0 + 1;
         self.across = false;
+        self.author_began = None;
     }
 
     /// The queue of the outbox the author's next instruction goes
     /// to, landing in `superchunk`, and that superchunk's slot: the
-    /// slot's own queue, or the queue of acts over a border if the
-    /// author's act is one -- as it becomes when this lands under a
-    /// compare of another superchunk ([`Turn::go_across`]). Begins
-    /// the author's segment there, if the last begun is another's.
+    /// slot's own queue while all the author queued is for that one
+    /// superchunk, the queue of acts over a border from the first
+    /// thing it queues for a second ([`Turn::go_across`]), whatever
+    /// the instruction. Begins the author's segment there, if the
+    /// last begun is another's.
+    #[inline]
     pub(crate) fn queue_landing_in(&mut self, superchunk: SuperchunkIndex) -> (usize, usize) {
         let slot = self.slot_of(superchunk);
-        if !self.across && self.compares_open[..self.compares_open_count].iter().any(|open| open.at.superchunk() != superchunk) {
-            self.go_across();
+        if !self.across {
+            match self.author_began {
+                Some(began) if began.slot as usize != slot => self.go_across(began),
+                Some(_) => {}
+                None => {
+                    let queue = &self.outbox.queues[slot];
+                    self.author_began = Some(AuthorBegan { slot: slot as u8, instructions: queue.len() as u32, gated: queue.compares() as u32, carried: queue.carried.len() as u32 });
+                }
+            }
         }
         let queue = if self.across { ACROSS } else { slot };
         if self.outbox.segments[queue].last().is_none_or(|last| last.author != self.author) {
@@ -245,17 +273,15 @@ impl<'a> Turn<'a> {
         (queue, slot)
     }
 
-    /// Makes the author's act one over a border: all it queued from
-    /// the outermost compare open on -- in one superchunk's queue, a
-    /// compare letting nothing else be until now -- is moved to the
-    /// queue of acts over a border, in the order queued, each
-    /// instruction keeping where it lands; and what it queues from
-    /// here goes there too. What it queued before that compare stays
-    /// where it is, and is applied before.
-    fn go_across(&mut self) {
-        let outer = self.compares_open[0];
-        let from = outer.queue as usize;
-        debug_assert!(from != ACROSS);
+    /// Makes what the author queues an act over a border: all it
+    /// queued so far -- for the one superchunk it `began` in -- is
+    /// moved to the queue of acts over a border, in the order queued,
+    /// each instruction keeping where it lands; and what it queues
+    /// from here goes there too. So nothing of one author is split
+    /// between two superchunks' queues.
+    #[cold]
+    fn go_across(&mut self, began: AuthorBegan) {
+        let from = began.slot as usize;
         let (slots, across) = self.outbox.queues.split_at_mut(ACROSS);
         let (was, is) = (&mut slots[from], &mut across[0]);
         let (instructions, gated, carried) = (is.instructions.len() as u32, is.gated.len() as u32, is.carried.len() as u32);
@@ -264,16 +290,18 @@ impl<'a> Turn<'a> {
             self.outbox.across.push(Across { lands: 1 << slot_home(), ..Across::default() });
         }
         self.outbox.across.last_mut().expect("the segment's").lands |= 1 << from;
-        let moved = i64::from(carried) - i64::from(outer.carried_before);
-        is.instructions.extend(was.instructions.drain(outer.instruction as usize..).map(|instruction| instruction.carried_moved_by(moved)));
-        is.gated.extend(was.gated.drain(outer.gated as usize..));
-        is.carried.extend(was.carried.drain(outer.carried_before as usize..));
+        let moved = i64::from(carried) - i64::from(began.carried);
+        is.instructions.extend(was.instructions.drain(began.instructions as usize..).map(|instruction| instruction.carried_moved_by(moved)));
+        is.gated.extend(was.gated.drain(began.gated as usize..));
+        is.carried.extend(was.carried.drain(began.carried as usize..));
         // A segment begun there for nothing but what was moved is no segment: the superchunk would stop at it between two acts.
         if self.outbox.segments[from].last().is_some_and(|last| last.author == self.author && last.instructions as usize == was.instructions.len()) {
             self.outbox.segments[from].pop();
         }
+        // The compares open are the author's, so in the queue it began in: they lie where they were moved to.
         for open in &mut self.compares_open[..self.compares_open_count] {
-            *open = conditional::CompareOpen { instruction: open.instruction - outer.instruction + instructions, gated: open.gated - outer.gated + gated, carried_before: open.carried_before - outer.carried_before + carried, queue: ACROSS as u8, ..*open };
+            debug_assert_eq!(open.queue as usize, from);
+            *open = conditional::CompareOpen { instruction: open.instruction - began.instructions + instructions, gated: open.gated - began.gated + gated, carried_before: open.carried_before - began.carried + carried, queue: ACROSS as u8, ..*open };
         }
         self.across = true;
     }

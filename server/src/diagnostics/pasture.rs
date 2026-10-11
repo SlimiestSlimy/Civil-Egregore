@@ -34,6 +34,9 @@ pub struct PastureRun {
     pub instructions: InstructionsApplied,
     /// Writes applied.
     pub writes: usize,
+    /// Acts over a border applied: authors that queued for more
+    /// than one superchunk in a tick.
+    pub acts_over_a_border: u64,
     /// The first phase's time, added up.
     pub computing: Duration,
     /// The second phase's time, added up.
@@ -79,6 +82,7 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
     let mut world = plain_world(superchunks, thousandths as u64 * worldgen::ONE / 1000, sheep, threads);
     let (start_sheep, start_grass) = (world.entities.len(), count(&world, GRASS));
     let (mut done, mut instructions, mut writes, mut computing, mut applying) = (TickCounts::default(), InstructionsApplied::default(), 0, Duration::ZERO, Duration::ZERO);
+    let mut acts_over_a_border = 0;
     let mut census = vec![Census { tick: 0, sheep: start_sheep, grass: start_grass, ..Census::default() }];
     let mut since = RuleCounts::default();
     let chosen = Chosen::of(&RULES_TICKED);
@@ -92,6 +96,7 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
         }
         instructions += report.instructions_applied;
         writes += report.writes_applied.writes;
+        acts_over_a_border += report.acts_over_a_border;
         computing += report.computing;
         applying += report.applying;
         memory.read();
@@ -105,6 +110,7 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
         done,
         instructions,
         writes,
+        acts_over_a_border,
         computing,
         applying,
         memory,

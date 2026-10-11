@@ -22,8 +22,8 @@ const SEED: &str = "seed";
 const COMMANDS: [Command; 4] = [
     Command {
         name: "acts_over_a_border",
-        does: "times the second phase with lines of entities acting over every border running north to south, and with the same lines moved away from it, on one thread and on all: what an act over a border costs",
-        parameters: &[Parameter::new(acts_over_a_border::SIDE, "4"), Parameter::new(acts_over_a_border::EVERY, "2"), Parameter::new(acts_over_a_border::STEPPING, "4000"), Parameter::new(acts_over_a_border::TICKS, "200"), Parameter::new(acts_over_a_border::THREADS, "0")],
+        does: "times the second phase with lines of entities acting over every border running north to south (flipping a cell beyond it under a compare, or with `crossing` 1 stepping over it and back), and with the same lines moved away from it, on one thread and on all: what an act over a border costs",
+        parameters: &[Parameter::new(acts_over_a_border::SIDE, "4"), Parameter::new(acts_over_a_border::EVERY, "2"), Parameter::new(acts_over_a_border::STEPPING, "4000"), Parameter::new(acts_over_a_border::TICKS, "200"), Parameter::new(acts_over_a_border::THREADS, "0"), Parameter::new(acts_over_a_border::CROSSING, "0")],
         run: acts_over_a_border::run,
     },
     Command {

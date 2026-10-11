@@ -437,8 +437,13 @@ threads`.
   to the tenth queue". So: the second superchunk queue an author
   queues anything for sends ALL it queued this tick to the tenth
   queue, compares or no. My narrower trigger is to go.
-  "ask before applying" / "or writing": NOT WRITTEN YET, waiting for
-  the user's go. Settled since: what is queued with no author named is
+  WRITTEN (Turn::queue_landing_in, AuthorBegan, go_across); the user:
+  "this is a substantial change, so we need to profile this,
+  rememeber, the goal of all this is to make superchunk boundaries
+  invisible to instructions and therefore actions"; "the key to
+  border invisibility is the ultimate global order. entnties get
+  their instructions queued based on their origin morton index at
+  that tick". Settled since: what is queued with no author named is
   treated as any author's ("yeah i agree, no exception").
 - INVARIANT, the user, 2026-10-11: "the entity id (origin coordinate
   that tick) is literally the global world execution order, the morton
@@ -460,10 +465,22 @@ threads`.
   the center coordinate of the entity". So: one owner, where its
   origin is; its place in the order is its origin; it waits for every
   superchunk it queues for, as any author does. Not built.
+- OPEN, told to the user 2026-10-11: Morton order + acts over a
+  border cost threads. All of a lower superchunk's authors come before
+  a higher one's, so one act from the lower into the higher makes the
+  higher wait until the lower reaches that author. Probe
+  (`AI_SCRATCHPAD acts_over_a_border 4 1024 4000 200 0 1`, 12 acts a
+  tick): second phase on 12 threads 740 -> 1130 us; one thread
+  unchanged. Under reading order the worst was 1.4x and sparse acts
+  free. ACCEPTED by the user: "thats fair, we are optimizing for
+  the 99% percent of cases, there will always be worst cases no matter
+  what we do, but we to avoid write hazards or inconsisntent entity
+  states over everything".
 - STANDING, the user, 2026-10-11: "hey hey, tests should be seed
   genereated when possible". Done for the two border tests; holds for
   every test from here on.
-- The `actions` crate: what in `instructions` is many instructions
+- The `actions` crate ("we need a sperate crate for actions, cant be
+  mixed with instructiosn", 2026-10-11): what in `instructions` is many instructions
   (cells::set, spawn, step, walking, seek, around, area, mask) moves
   there; "rules would depend on actions alone".
 - Mask / word-of-cells plane-plane instructions.

@@ -107,37 +107,47 @@ for samples are kept between ticks.
 
 ### An act over a border
 
-A compare gates what is under it wherever that lands. An entity beside
-a border that makes another over it and writes itself only if it was
-made -- a birth -- queues a compare of a cell in one superchunk and,
-under it, writes in two. Were each superchunk to apply its own part,
-the half in the author's superchunk could not know how the compare
-came out in the other. So such an author's instructions are not split
-between the queues of two slots: they are **one queue's, applied once,
-in the order queued, by one thread holding every superchunk they land
-in**. Rules and instructions know nothing of it: a rule opens a
-compare and queues under it, and where the border falls changes
-nothing of what comes of it.
+All one author queues in a tick is applied in one piece, at its place
+in the world's order ("The invariant every border is resolved by").
+While all of it is for one superchunk that is that superchunk's own
+business. **The first thing an author queues for a second superchunk
+-- any instruction, a compare, a write, an entity made or crossing --
+makes all it queues that tick one queue's, applied once, in the order
+queued, by one thread holding every superchunk it lands in.** Nothing
+of one author is ever split between two superchunks' queues, so no
+half of what it did can be applied without the other half's compares
+having been come to: an entity beside a border that makes another
+over it and writes itself only if it was made -- a birth -- is no
+different from one in the middle of a superchunk. Rules and
+instructions know nothing of it: a rule opens a compare and queues
+under it, and where the border falls changes nothing of what comes of
+it.
 
 **Queued.** Each instruction carries the outbox slot of the superchunk
 it lands in, in four bits of its `place` above the cell's
-(`Instruction::landing_in`, `slot`). The first time an author queues
-something for one superchunk under an open compare of a cell in
-another (`queue_landing_in`), its act goes across (`go_across`): all it
-queued from its outermost open compare on is moved, in order, out of
-the slot's queue into the outbox's tenth queue (`ACROSS`), what it
-carried beside the queue moved with it (`carried_moved_by`), and what
-it queues from there on, until the rule sees to the next author, goes
-there too. What it queued before that compare stays in the slot's
-queue and is applied before. A segment begun in the slot's queue for
-nothing but what was moved is taken back: an empty one would be a stop
-between two acts for the superchunk applying. The tenth queue has a
-segment an author like the others, and beside each an `Across`: the
-slots it lands in (`lands`, the author's own superchunk always among
-them, `slot_home`) and how many of those superchunks have come to it
-(`arrived`). Only an author that needs it pays: one whose compares
-gate nothing past their own superchunk queues as before, and its
-writes to a neighbour stay in that neighbour's slot.
+(`Instruction::landing_in`, `slot`). The turn keeps where the author
+began queuing (`AuthorBegan`: the slot, and what that slot's queue
+held before it; forgotten as the next author is named,
+`Turn::seeing_to`). As the author queues for another slot
+(`queue_landing_in`), its instructions go across (`go_across`): all it
+queued is moved, in order, out of the slot's queue into the outbox's
+tenth queue (`ACROSS`), what it carried beside the queue moved with it
+(`carried_moved_by`), the compares it has open with them, and what it
+queues from there on, until the rule sees to the next author, goes
+there too. A segment begun in the slot's queue for nothing but what
+was moved is taken back: an empty one would be a stop between two
+acts for the superchunk applying. The tenth queue has a segment an
+author like the others, and beside each an `Across`: the slots it
+lands in (`lands`, the author's own superchunk always among them,
+`slot_home`) and how many of those superchunks have come to it
+(`arrived`). What is queued with no author named is one author's
+like any other. Only an author that queues over a border pays: one
+whose instructions are all for one superchunk queues as before.
+
+An author named twice in a turn -- a cell sampled by one rule and the
+entity on it woken by another -- is two parts of the one place in the
+order; of them, what stayed in a slot's queue is applied before what
+went across.
 
 **Applied** (`tick/applying.rs`). Every superchunk gathers what is
 queued for it -- the nine slots' segments, and the acts over a border
@@ -195,14 +205,25 @@ things; what makes a superchunk a thread's is the flag it takes
 clears the lists for the next tick). The lists, the flags and each
 superchunk's order are kept from tick to tick (`Room`).
 
-**What it costs.** With lines of entities along every border of
-sixteen superchunks, every other cell, each acting over the border
-every tick -- the worst there is: each superchunk waits on its
-neighbour at every act -- the second phase took 1.4 times what it
-took with the same lines moved away from the border, on all threads;
-before the threads kept what waits together it was 3.4 times. One act
-in eight cells of border, or fewer, cost nothing that could be
-measured. Probed by `AI_SCRATCHPAD acts_over_a_border`; held by
+**What it costs.** An act itself is cheap: on one thread a tick with
+an act at every other cell of every border is about a tenth slower to
+apply than one with none. What it costs is threads. In Morton order
+every author of one superchunk comes before every author of the next,
+so an act by an author of the lower superchunk landing in the higher
+one comes, for the higher, before anything of its own: the higher
+waits, doing nothing, until the lower has applied its way to that
+author -- and a third superchunk an author of the second acts into
+waits for both. One act a tick over a border is enough for that; more
+acts on the same border add little. With one entity stepping over
+each border of sixteen superchunks every tick, a border a superchunk
+running north to south, the second phase on all threads took about
+half as long again as with none; with one at every other cell, about
+twice. (Under reading order, rows of neighbouring superchunks
+interleaved, the wait was short and often: 1.4 times at the worst,
+nothing to measure when acts were few.) Not solved. Probed by
+`AI_SCRATCHPAD acts_over_a_border` (`crossing` 1 for entities
+stepping over the border and back); a pasture run says how many acts
+it applied. Held by
 `tests/fine/acts_over_a_border.rs` (whole or not at all, on any
 border; a crowd contending over four superchunks' corner the same on
 any number of threads) and by the flock of
@@ -212,8 +233,11 @@ puts it on. A tick counts its acts (`TickReport::acts_over_a_border`).
 
 What it does not do: an act that lands in a superchunk past the
 author's neighbours is past the speed of light, as any write is; and
-an entity standing over several superchunks at once is not built --
-its acts would land in up to four, which the counting already allows.
+an entity standing over several superchunks at once is not built. It
+is to be one superchunk's, the one its origin is in -- the origin
+about its middle -- with its place in the order its origin's, and to
+wait for every superchunk it queues for as any author does: up to
+four, which the counting already allows.
 
 ### Instructions
 
@@ -319,9 +343,8 @@ compares within it in the list.
 
 What is under a compare may land in any superchunk in reach, the
 compare's or another: a superchunk applying reads no other, so an
-author with something under a compare of another superchunk has all
-of it applied at once, by one thread holding each ("An act over a
-border").
+author that queued for more than one superchunk has all of it applied
+at once, by one thread holding each ("An act over a border").
 
 Nothing is applied "together" beyond that: what is under a compare
 is skipped or not as the compare is come to, and each write under it
@@ -393,10 +416,6 @@ What a rule queues twice for its own entity is its own, in the order
 it queued them; the rules here do not (a sheep's two ends are under
 opposite compares). Between ticks the world is written by one hand at
 a time (`World::write_cells`, `put_entity`), in order.
-
-One limit: what a write is held against is in the superchunk the
-write lands in (a panic otherwise). The thread applying a superchunk
-reads no other, so nothing is agreed between superchunks.
 
 A count may hang on a write: `queue_if` names one added if the write
 is applied. These come back in the tick's report
