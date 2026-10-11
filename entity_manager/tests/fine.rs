@@ -63,12 +63,13 @@ const NOTE: AttributeType = AttributeType::of_varying_size(42);
 const TAIL: AttributeType = AttributeType::of_varying_size(43);
 
 /// An attribute of type `kind`, whose size varies, holding `data`: its
-/// block length in its second word, its data from the third.
+/// block length in its type's last four bits, its data from the
+/// second word.
 fn varying(kind: AttributeType, data: &[u64]) -> Vec<AttributeBlock> {
-    let blocks = (2 + data.len()).div_ceil(BLOCK_WORDS);
+    let blocks = (1 + data.len()).div_ceil(BLOCK_WORDS);
     let mut words = vec![0; blocks * BLOCK_WORDS];
-    (words[0], words[1]) = (kind.0, blocks as u64);
-    words[2..2 + data.len()].copy_from_slice(data);
+    words[0] = kind.with_blocks(blocks).0;
+    words[1..1 + data.len()].copy_from_slice(data);
     words.as_chunks::<BLOCK_WORDS>().0.iter().map(|&block| AttributeBlock(block)).collect()
 }
 
@@ -77,8 +78,8 @@ fn varying(kind: AttributeType, data: &[u64]) -> Vec<AttributeBlock> {
 fn attributes() -> Vec<AttributeBlock> {
     let mut blocks = vec![AttributeBlock::holding(NAME, 7)];
     push_attribute(&mut blocks, ENDS, BothEnds { first: 11, last: 13 });
-    blocks.extend(varying(NOTE, &[5; 8]));
-    blocks.extend(varying(TAIL, &[3]));
+    blocks.extend(varying(NOTE, &[5; 9]));
+    blocks.extend(varying(TAIL, &[3; 3]));
     blocks
 }
 
@@ -87,7 +88,7 @@ fn attributes() -> Vec<AttributeBlock> {
 /// says.
 #[test]
 fn every_attribute_is_found_over_those_of_any_length() {
-    assert_eq!((NAME.attribute_type().blocks(), ENDS.attribute_type().blocks(), NOTE.blocks()), (Some(1), Some(8), None));
+    assert_eq!((NAME.attribute_type().blocks(), ENDS.attribute_type().blocks(), NOTE.0 & 0xF), (1, 8, 0));
     assert_eq!((ENDS.attribute_type().number(), NOTE.number()), (41, 42));
     let blocks = attributes();
     assert_eq!(blocks.len(), 1 + 8 + 5 + 2);
@@ -123,8 +124,8 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
     entities.queue_put(target, &attributes());
     entities.apply();
     let edits: [&dyn Fn(&mut Instructions); 4] = [
-        &|queue| queue.set_attribute_blocks(target.at, &varying(NOTE, &[6; 20])),
-        &|queue| queue.set_attribute_blocks(target.at, &varying(NOTE, &[8; 2])),
+        &|queue| queue.set_attribute_blocks(target.at, &varying(NOTE, &[6; 21])),
+        &|queue| queue.set_attribute_blocks(target.at, &varying(NOTE, &[8; 3])),
         &|queue| queue.set_attribute(target.at, ENDS, BothEnds { first: 17, last: 19 }),
         &|queue| queue.unset_attribute(target.at, NAME.attribute_type()),
     ];
@@ -153,8 +154,8 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
 
     // The note's block length said to be more than the entity has blocks: nothing is read.
     let mut wrong = words.clone();
-    let length = wrong.iter().position(|&word| word == NOTE.0).expect("the note's type") + 1;
-    wrong[length] = 400;
+    let length = wrong.iter().position(|&word| AttributeType(word).identity() == NOTE.identity()).expect("the note's type");
+    wrong[length] = NOTE.with_blocks(16).0;
     assert!(decode_state(&wrong, 4, &mut world()).is_err());
     assert!(decode_state(&words[..words.len() - 1], 4, &mut world()).is_err(), "cut short");
 }
@@ -178,22 +179,23 @@ fn attributes_edited_in_any_order_are_those_last_set() {
     while numbers.len() < 12 {
         numbers.insert(1 + random.below(1 << 20));
     }
-    let kinds: Vec<AttributeType> = numbers.into_iter().enumerate().map(|(nth, number)| if nth % 3 == 2 { AttributeType::of_varying_size(number) } else { AttributeType::of_blocks(number, 1 + nth % 4 % 3) }).collect();
+    // Each with whether its size varies: the type alone does not say, its registering does.
+    let kinds: Vec<(AttributeType, bool)> = numbers.into_iter().enumerate().map(|(nth, number)| if nth % 3 == 2 { (AttributeType::of_varying_size(number), true) } else { (AttributeType::of_blocks(number, 1 + nth % 4 % 3), false) }).collect();
     let mut held: BTreeMap<u64, Vec<AttributeBlock>> = BTreeMap::new();
     for edit in 0..400 {
-        let kind = kinds[random.below(kinds.len() as u64) as usize];
+        let (kind, varies) = kinds[random.below(kinds.len() as u64) as usize];
         let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
         if random.below(3) == 0 {
             queue.unset_attribute(target.at, kind);
             held.remove(&kind.0);
         } else {
-            let blocks = match kind.blocks() {
+            let blocks = match (!varies).then_some(kind.blocks()) {
                 Some(blocks) => {
                     let mut words: Vec<u64> = (0..blocks * BLOCK_WORDS).map(|_| random.draw()).collect();
                     words[0] = kind.0;
                     words.as_chunks::<BLOCK_WORDS>().0.iter().map(|&block| AttributeBlock(block)).collect()
                 }
-                None => varying(kind, &(0..random.below(28)).map(|_| random.draw()).collect::<Vec<_>>()),
+                None => varying(kind, &(0..1 + random.below(28)).map(|_| random.draw()).collect::<Vec<_>>()),
             };
             queue.set_attribute_blocks(target.at, &blocks);
             held.insert(kind.0, blocks);
@@ -204,7 +206,7 @@ fn attributes_edited_in_any_order_are_those_last_set() {
         assert!(sorted(edited.attributes), "edit {edit}");
         let expected: Vec<AttributeBlock> = held.values().flatten().copied().collect();
         assert!(edited.attributes == expected.as_slice(), "edit {edit}: {} blocks held, {} expected", edited.attributes.len(), expected.len());
-        for &kind in &kinds {
+        for &(kind, _) in &kinds {
             assert_eq!(edited.attribute_blocks(kind), held.get(&kind.0).map(Vec::as_slice), "edit {edit}: {kind:?}");
         }
     }

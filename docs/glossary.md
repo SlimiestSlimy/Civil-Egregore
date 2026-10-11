@@ -169,7 +169,7 @@ what they always do and are not listed.
 | **attribute block** | 16 bytes of an attribute, two words; an attribute is 1 to 16 of them: the first block's first word the attribute's type, the rest its data (`AttributeBlock`) | attribute, block length | slot, cell (a cell is the world's) |
 | **layout** | what an attribute's data holds, field by field in its words, the same for every attribute of its type (`Layout`) | attribute, type registry | schema, format |
 | **member** | one field of an attribute's layout, by where its bytes lie: its first byte, counted from the attribute's, and how many it is, 1 to 8. What an instruction reads or writes of an attribute; what it means is its definer's (`Member`, `Layout::MEMBERS`) | attribute, layout, instruction | field (in prose of a layout it is the same thing), slot |
-| **block length** | how many blocks an attribute whose size varies takes, in its first block's second word | attribute block | size, count |
+| **attribute length** | how many blocks an attribute takes, less one, in the last four bits of its first word, its type: a fixed type's size as registered, or, of a type whose size varies, that one attribute's own | attribute block | block length, size, count |
 | **entity store** | where entities are kept: a bucket a chunk, a wheel a superchunk (`entity_manager::Entities`) | bucket, wheel | |
 | **entity bucket** | one chunk's entities, sorted by cell, their attributes beside them | entity store | (the arena's bucket is a layer's) |
 | **wake** | an entity's turn to act: at its wake tick, filed in its superchunk's wheel | wheel, sleep | |

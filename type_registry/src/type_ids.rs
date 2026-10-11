@@ -174,50 +174,69 @@ impl EntityType {
     }
 }
 
-/// An attribute's type, from the same namespace. Its last byte says
-/// how many blocks an attribute of it takes -- none, and it is no
-/// attribute's (`docs/type_registry.md`, "Layouts").
+/// An attribute's type, from the same namespace, laid out its own
+/// way under the supertype: its number in the 52 bits after it, and
+/// in its last four how many blocks an attribute of it takes, less
+/// one -- 1 to 16. A type of a fixed size says its size there, set
+/// as it is registered. One whose size varies is registered with the
+/// four bits 0, and each attribute of it keeps its own length in
+/// them: so the first word of any attribute says how long it is, and
+/// what tells two types apart is all but those bits
+/// (`docs/type_registry.md`, "Layouts").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct AttributeType(pub u64);
 
-impl AttributeType {
-    /// What its last byte holds if its size varies: its attribute's
-    /// first block then says its block length.
-    const SIZE_VARIES: u64 = SIZE_MOST;
+/// Bits of an attribute's ID that are its blocks, less one.
+const ATTRIBUTE_SIZE_BITS: u32 = 4;
+/// Numbers an attribute can have: those of the 52 bits between.
+pub const ATTRIBUTE_NUMBERS: u64 = 1 << (SUPERTYPE_SHIFT - ATTRIBUTE_SIZE_BITS);
 
+impl AttributeType {
     /// The type of number `number` whose attributes take `blocks`
     /// blocks, 1 to 16.
     pub const fn of_blocks(number: u64, blocks: usize) -> Self {
-        assert!(blocks >= 1 && blocks <= crate::layouts::ATTRIBUTE_BLOCKS_MOST, "an attribute is 1 to 16 blocks");
-        Self(type_id(Supertype::Attribute, number, blocks as u64))
+        assert!(number < ATTRIBUTE_NUMBERS && blocks >= 1 && blocks <= crate::layouts::ATTRIBUTE_BLOCKS_MOST, "an attribute's number is under 2^52, and it is 1 to 16 blocks");
+        Self((Supertype::Attribute as u64) << SUPERTYPE_SHIFT | number << ATTRIBUTE_SIZE_BITS | (blocks as u64 - 1))
     }
 
-    /// The type of number `number` whose attributes vary in size.
+    /// The type of number `number` whose attributes vary in size: its
+    /// last four bits 0, for each attribute of it to say its own.
     pub const fn of_varying_size(number: u64) -> Self {
-        Self(type_id(Supertype::Attribute, number, Self::SIZE_VARIES))
+        Self::of_blocks(number, 1)
     }
 
-    /// Blocks an attribute of it takes, or none if its size varies:
-    /// 0 for an ID that is no attribute's.
+    /// It with `blocks` blocks said in its last four bits: what the
+    /// first word of an attribute of it so long holds, if its size
+    /// varies.
+    pub const fn with_blocks(self, blocks: usize) -> Self {
+        Self::of_blocks(self.number(), blocks)
+    }
+
+    /// Blocks its last four bits say: a fixed type's size, or the
+    /// length of the one attribute whose first word it is.
     #[inline]
-    pub const fn blocks(self) -> Option<usize> {
-        match size_of(self.0) {
-            _ if !is_of(self.0, Supertype::Attribute) => Some(0),
-            Self::SIZE_VARIES => None,
-            blocks => Some(blocks as usize),
-        }
+    pub const fn blocks(self) -> usize {
+        (self.0 & ((1 << ATTRIBUTE_SIZE_BITS) - 1)) as usize + 1
+    }
+
+    /// What tells it from another type: all of it but its blocks.
+    /// Two attributes of one type whose size varies are the same by
+    /// this, however long each is.
+    #[inline]
+    pub const fn identity(self) -> u64 {
+        self.0 >> ATTRIBUTE_SIZE_BITS
     }
 
     /// Whether it is an attribute's type at all: its first byte the
-    /// attributes', its last not 0 -- the one namespace being everything's.
+    /// attributes', its number not 0 -- the one namespace being
+    /// everything's, and 0 nobody's.
     #[inline]
     pub const fn is_an_attributes(self) -> bool {
-        is_of(self.0, Supertype::Attribute) && size_of(self.0) != 0
+        is_of(self.0, Supertype::Attribute) && self.number() != 0
     }
 
-    /// Its number: its ID without its first byte and its last, what
-    /// its row in the registry is written with.
+    /// Its number: what its row in the registry is written with.
     pub const fn number(self) -> u64 {
-        number_of(self.0)
+        (self.0 >> ATTRIBUTE_SIZE_BITS) & (ATTRIBUTE_NUMBERS - 1)
     }
 }

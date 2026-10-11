@@ -29,9 +29,13 @@ pub struct Registered {
     /// last: for a wide plane, its first -- its lowest bit's layer's.
     pub number: u64,
     /// Its width, in bits: what a cell of a layer or a wide plane
-    /// holds, what an attribute's data holds; 0 for an entity type,
-    /// which holds nothing itself.
+    /// holds, what an attribute's data holds if its size is fixed; 0
+    /// for an entity type, which holds nothing itself, and for an
+    /// attribute whose size varies.
     pub width: u32,
+    /// Whether it is an attribute whose size varies: each of it then
+    /// says its own length, in the last four bits of its first word.
+    pub varies_in_size: bool,
 }
 
 impl Registered {
@@ -56,22 +60,22 @@ impl Registered {
 
 /// A row of a layer of a bit a cell.
 const fn layer(name: &'static str, layer_type: LayerType) -> Registered {
-    Registered { name, kind: Kind::Layer, number: layer_type.number(), width: 1 }
+    Registered { name, kind: Kind::Layer, number: layer_type.number(), width: 1, varies_in_size: false }
 }
 
 /// A row of a wide plane.
 const fn wide<W: Width>(name: &'static str, plane: Wide<W>) -> Registered {
-    Registered { name, kind: Kind::WidePlane, number: plane.layer_type().number(), width: W::BITS }
+    Registered { name, kind: Kind::WidePlane, number: plane.layer_type().number(), width: W::BITS, varies_in_size: false }
 }
 
 /// A row of an entity type.
 const fn entity(name: &'static str, entity_type: EntityType) -> Registered {
-    Registered { name, kind: Kind::EntityType, number: entity_type.number(), width: 0 }
+    Registered { name, kind: Kind::EntityType, number: entity_type.number(), width: 0, varies_in_size: false }
 }
 
 /// A row of an attribute.
 const fn attribute<L: Layout>(name: &'static str, attribute: Attribute<L>) -> Registered {
-    Registered { name, kind: Kind::Attribute, number: attribute.attribute_type().number(), width: data_words(L::BLOCKS) as u32 * u64::BITS }
+    Registered { name, kind: Kind::Attribute, number: attribute.attribute_type().number(), width: data_words(L::BLOCKS) as u32 * u64::BITS, varies_in_size: false }
 }
 
 /// Grass: what a superchunk is generated with in patches, where its

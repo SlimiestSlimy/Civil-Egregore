@@ -49,31 +49,36 @@ attribute of one type is laid out alike.
 **More than one block.** A layout that needs more than 8 bytes takes
 two blocks, or more: the blocks after the first are all data, two
 words each, straight after the first block's one -- so the data is
-one run of words, 1, 3, 5 and so on, 31 at the most. How many blocks a type takes is
-said by its ID -- the ID's last byte, as a layer type's last byte says
-how wide it is -- so nothing is looked up to step over an attribute
+one run of words, 1, 3, 5 and so on, 31 at the most. How many blocks an attribute takes is
+said by its first word -- the type's last four bits, the blocks less
+one -- so nothing is looked up to step over an attribute
 (`AttributeBlock::blocks`). The types are one namespace, everything's:
-an ID of another supertype, or whose last byte is 0, is **not an attribute's**, and a block that
+an ID of another supertype, or whose number is 0, is **not an attribute's**, and a block that
 begins with one is no attribute (`sorted` says so of a run of blocks,
 and a saved entity with one is not read).
 
-**Variable size.** Most attributes are of a fixed size. One whose
-size varies -- a short text, a short list -- has a last byte of all
-ones, and then its first block's second word is its **block length**:
-how many blocks it takes in all, one at least. Its data starts at the
-third word. None is registered yet, and no layout is written for one:
+**Variable size.** Most attributes are of a fixed size, set as the
+type is registered and said in its ID's last four bits. One whose
+size varies -- a short text, a short list -- is registered with those
+bits 0, and each attribute of it keeps its own **attribute length**
+there: how many blocks it is, less one, 1 to 16. So two attributes
+of one such type have first words that differ in those bits, and a
+type is told from another by all the rest
+(`AttributeType::identity`): what an entity's attributes are sorted
+and found by. Its data starts at the second word, as any
+attribute's. None is registered yet, and no layout is written for one:
 it is read and written as its blocks (`EntityRef::attribute_blocks`,
 `Instructions::set_attribute_blocks`). The
-walk over an entity's attributes honours a block length all the same,
+walk over an entity's attributes honours an attribute length all the same,
 and a test makes one to say so
 (`../tests/fine.rs`).
 
 **An entity's attributes** are a run of blocks in its bucket's list,
 sorted by type, each type once. Finding one is a walk from the first
 (`find_attribute`): read the type, and either it is the one, or step
-over as many blocks as the type -- or the block length -- says. An
-entity has few attributes, and each step reads the one word. A block
-length that reaches past the entity's blocks is cut to them, so a walk
+over as many blocks as its first word says. An
+entity has few attributes, and each step reads the one word. An
+attribute length that reaches past the entity's blocks is cut to them, so a walk
 never leaves them.
 
 **Read and written as fields.** `attribute(blocks, attribute)` reads
