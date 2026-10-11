@@ -43,7 +43,9 @@ kept a world quietly wrong.
 In one table every row is beside the others, and the table is checked
 as the crate is built (`first_clash`, in a `const`): two rows sharing
 a number or a name, or a wide plane's cold planes reaching into another
-row's, stops the build, naming the row. A type is added as its
+row's, stops the build, naming the row; so does an entity type whose
+default attribute is none of the table's of a fixed size
+(`first_default_amiss`; "Layouts"). A type is added as its
 constant and its row, both written by hand in `registry.rs`, the row
 made from the constant (`layer`, `wide`, `entity`, `attribute`) so
 the two cannot say different numbers. No macro makes them: the
