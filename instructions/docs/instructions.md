@@ -119,15 +119,16 @@ added to the count named, if the write is applied.
 
 What is compared need not be what is written (`compare`). A compare
 is of a cell (`compare::holds`, `lacks`, `value`) or of an entity's
-attribute (`compare::attribute`), and what hangs on it is a cell
-written (`compare::write`, which says what was seen at that cell
-too), a count (`compare::count`), or what an
-entity comes to: everything queued of entities from
-`compare::entities_from_here` to `compare::entities_as_ever`. A
-sheep's meal is all three: what the sheep comes to, and what it
-counts, held against the grass under it being there still; then the
-grass cleared, held against itself. Should the grass be gone, each is
-refused in turn. A tree's death is its stage put to 0 if the tree
+attribute (`compare::attribute`), and it is queued as an instruction
+of its own (`compare::from_here`): if it does not hold when it is
+come to, everything the rule queued after it -- cells written, what
+entities come to, counts -- is skipped, up to the next compare or
+`compare::end`. `compare::write` and `compare::count` are one write
+and one count under a compare. A sheep's meal is one compare, the
+grass under it being there still, and under it what the sheep comes
+to and what it counts; then the grass cleared, held against itself.
+Should the grass be gone, all of it is skipped at once. All that is
+under a compare lands in the compare's superchunk. A tree's death is its stage put to 0 if the tree
 still stands and its stage is as seen, then the tree cleared.
 
 Nothing is applied together: each write has its own compare, read

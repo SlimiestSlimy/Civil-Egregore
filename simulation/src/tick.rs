@@ -34,8 +34,8 @@ pub struct TickReport<R> {
     pub writes_applied: WritesApplied,
     /// What applying the instructions did.
     pub instructions_applied: InstructionsApplied,
-    /// Runs of entity instructions queued under a compare: those
-    /// applied, and those refused (`docs/simulation.md`,
+    /// The compares come to as the tick was applied: those that
+    /// held, and those that did not (`docs/simulation.md`,
     /// "Compare-and-write").
     pub instructions_compared: (u64, u64),
     /// What was counted as it was applied, by the number each rule's
@@ -189,7 +189,7 @@ impl Simulation {
                     let random = Rng::new(kept.1.state());
                     let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random, author: 0, comparing: None, counted_from: 0 };
                     total += rule(&mut turn, &mut samples);
-                    turn.close_instructions_compared();
+                    turn.compare_end();
                     // Where its random numbers have come to: the next tick goes on from there.
                     kept.1 = turn.random;
                 }

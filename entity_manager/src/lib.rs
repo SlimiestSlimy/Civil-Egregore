@@ -19,7 +19,7 @@ mod store;
 mod wheel;
 
 pub use instructions::{Instructions, InstructionsApplied};
-pub use attributes::{attribute, attribute_blocks, blocks_sum, each_attribute, find_attribute, push_attribute, remove_attribute, set_attribute, set_attribute_blocks, sorted, Attribute, AttributeBlock, AttributeType, Layout, BLOCK_WORDS};
+pub use attributes::{attribute, attribute_blocks, attribute_seen, blocks_sum, each_attribute, find_attribute, push_attribute, remove_attribute, set_attribute, set_attribute_blocks, sorted, Attribute, AttributeBlock, AttributeType, Layout, BLOCK_WORDS, NO_ATTRIBUTE};
 pub use entity::{EntityEdit, EntityId, EntityRef, EntityType, Header, NEVER};
 pub use store::{Arrival, CollisionCells, Entities, EntityReader, Settled, SuperchunkEntities, OCCUPIED_SIDE};
 pub use wheel::{Wake, WHEEL_TICKS};

@@ -89,9 +89,9 @@ fn flock(turn: &mut Turn, seed: u64) -> u64 {
         let meals = entity.attribute(COUNTED);
         if !(stone.set & about.centre()).is_empty() {
             // The meal is counted only if the stone is there still: another on its way here may not eat it, but one counting on this one may.
-            compare::entities_from_here(turn, compare::holds(STONE, at));
+            compare::from_here(turn, compare::holds(STONE, at));
             turn.set_attribute(&header, COUNTED, meals, meals.unwrap_or(0) + 1);
-            compare::entities_as_ever(turn);
+            compare::end(turn);
             cells::clear(turn, STONE, at);
         } else if let Some(beside) = way_drawn(&mut drawn, &about, open.without(stone.set)).filter(|_| chance < 40).and_then(|bit| around::cell(at, bit)) {
             cells::set(turn, STONE, beside);
