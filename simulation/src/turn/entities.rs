@@ -3,7 +3,7 @@
 
 use super::Turn;
 use super::instruction::Instruction;
-use entity_manager::{attribute_blocks, attribute_seen, each_attribute, push_attribute, Attribute, AttributeBlock, EntityRef, Header, Layout, SuperchunkEntities, BLOCK_WORDS, OCCUPIED_SIDE};
+use entity_manager::{attribute_blocks, attribute_bytes, attribute_seen, each_attribute, Attribute, AttributeBlock, AttributeType, EntityRef, Header, Layout, Member, SuperchunkEntities, WholeAttribute, words_sum, ATTRIBUTE_WORDS_MOST, BLOCK_WORDS, NO_ATTRIBUTE, OCCUPIED_SIDE};
 use bitplane_manager::Reader;
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, ChunkIndex};
@@ -50,9 +50,8 @@ impl<'a> Turn<'a> {
     /// Queues making `header`'s entity on its cell, with `attributes`,
     /// sorted by type, to wake after this tick: under a compare of
     /// the cell being free, in the queue of the superchunk it lands
-    /// in -- the entity made, each attribute given it and its words
-    /// written, sixteen bytes an instruction. Its cell taken by then,
-    /// none of it happens. What the rule queues until
+    /// in -- the entity made, each attribute given it whole, a write
+    /// in bulk. Its cell taken by then, none of it happens. What the rule queues until
     /// [`Turn::made`] is under that compare too: what is to happen
     /// only if the entity is made.
     pub fn put(&mut self, header: Header, attributes: &[AttributeBlock]) {
@@ -69,9 +68,18 @@ impl<'a> Turn<'a> {
         self.open(at, Instruction::compare_cell_free(at));
         self.queue(at, Instruction::make_entity(at, header.kind.0, header.wake));
         for attribute in each_attribute(attributes) {
-            self.queue(at, Instruction::add_attribute(at, attribute[0].kind(), attribute.len()));
-            self.queue_words_differing(at, None, attribute);
+            self.queue_attribute_whole(at, attribute);
         }
+    }
+
+    /// Queues the entity on `at` given `attribute` whole, its blocks
+    /// carried beside the queue: under whatever compare is open.
+    fn queue_attribute_whole(&mut self, at: CellIndex, attribute: &[AttributeBlock]) {
+        let slot = self.slot_queued(at.superchunk());
+        let carried = &mut self.outbox.queues[slot].carried;
+        let first = carried.len() as u32;
+        carried.extend_from_slice(attribute);
+        self.queue(at, Instruction::write_attribute(at, first, attribute.len() as u32));
     }
 
     /// Closes the compare [`Turn::make`] left open.
@@ -99,26 +107,17 @@ impl<'a> Turn<'a> {
         }
     }
 
-    /// Queues the words that differ between `was` -- or, with none
-    /// given, an attribute of nothing but zeros -- and `is`, the
-    /// blocks of one attribute of the entity on `at`, as long as each
-    /// other: written a word or two an instruction, sixteen bytes at
-    /// the most. Under whatever compare is open.
-    fn queue_words_differing(&mut self, at: CellIndex, was: Option<&[AttributeBlock]>, is: &[AttributeBlock]) {
-        let (kind, words) = (is[0].kind(), is.len() * BLOCK_WORDS - 1);
-        // A word of an attribute's data, counted after its first, its type.
-        let word = |blocks: &[AttributeBlock], offset: usize| blocks[(1 + offset) / BLOCK_WORDS].0[(1 + offset) % BLOCK_WORDS];
-        let differs = |offset: usize| was.map_or(0, |was| word(was, offset)) != word(is, offset);
-        let mut offset = 0;
-        while offset < words {
-            if !differs(offset) {
-                offset += 1;
-                continue;
+    /// Queues each of `members` that differs between `was` and `is`,
+    /// the blocks of one attribute of the entity on `at`, as long as
+    /// each other: a write a member, its bytes and no more. Under
+    /// whatever compare is open.
+    fn queue_members_differing(&mut self, at: CellIndex, members: impl Iterator<Item = Member>, was: &[AttributeBlock], is: &[AttributeBlock]) {
+        let kind = is[0].kind();
+        for member in members {
+            let held = |blocks: &[AttributeBlock]| attribute_bytes(blocks, usize::from(member.offset), usize::from(member.bytes));
+            if let Some(value) = held(is).filter(|&value| held(was) != Some(value)) {
+                self.queue(at, Instruction::write_attribute_member(at, kind, member, value));
             }
-            let together = if offset + 1 < words && differs(offset + 1) { 2 } else { 1 };
-            let written = [word(is, offset), if together == 2 { word(is, offset + 1) } else { 0 }];
-            self.queue(at, Instruction::write_attribute_words(at, kind, offset, &written[..together]));
-            offset += together;
         }
     }
 
@@ -126,66 +125,64 @@ impl<'a> Turn<'a> {
     /// rule's own or another -- becoming `value`: both the blocks of
     /// one attribute, either none -- not there before, or removed. A
     /// compare of the attribute being still as seen, and under it the
-    /// writes: the words that differ, sixteen bytes an instruction;
-    /// or the attribute given, or taken. So of two writing one
-    /// attribute of one entity in a tick the first applied does and
-    /// the other is refused, and two writing two attributes both do:
-    /// an entity is written an attribute at a time, never whole, and
-    /// no write lands on another's.
+    /// writes: the words that differ, each a member for want of its
+    /// layout; or, its size another or it not there, the attribute
+    /// whole; or it taken. So of two writing one attribute of one
+    /// entity in a tick the first applied does and the other is
+    /// refused, and two writing two attributes both do: an entity is
+    /// written an attribute at a time, never whole, and no write
+    /// lands on another's.
     pub fn set_attribute_blocks(&mut self, entity: &Header, seen: Option<&[AttributeBlock]>, value: Option<&[AttributeBlock]>) {
         let (at, kind) = (entity.at, value.or(seen).expect("an attribute seen or set")[0].kind());
         self.open(at, Instruction::compare_attribute(at, kind, attribute_seen(seen)));
         match (seen, value) {
             (_, None) => self.queue(at, Instruction::remove_attribute(at, kind)),
-            (Some(seen), Some(value)) if seen.len() == value.len() => self.queue_words_differing(at, Some(seen), value),
-            (_, Some(value)) => {
-                self.queue(at, Instruction::add_attribute(at, kind, value.len()));
-                self.queue_words_differing(at, None, value);
+            (Some(seen), Some(value)) if seen.len() == value.len() => self.queue_members_differing(at, (0..value.len() * BLOCK_WORDS - 1).map(Member::word), seen, value),
+            (_, Some(value)) => self.queue_attribute_whole(at, value),
+        }
+        self.close_compare();
+    }
+
+    /// Queues `member` of the attribute of type `kind` of `entity`
+    /// becoming `value`, if it is still the `seen` the rule read
+    /// there: a compare of that member alone, and the write under it.
+    /// So two writing two members of one attribute in a tick both do,
+    /// where a compare of the whole attribute would refuse the second.
+    pub fn set_attribute_member(&mut self, entity: &Header, kind: AttributeType, member: Member, seen: u64, value: u64) {
+        let at = entity.at;
+        self.queue_under(at, Instruction::compare_attribute_member(at, kind, member, seen), &[Instruction::write_attribute_member(at, kind, member, value)]);
+    }
+
+    /// [`Turn::set_attribute_blocks`], of an attribute by its layout:
+    /// `attribute` of `entity` set to `value`, if it is still the
+    /// `seen` the rule read of it, or still has none. What is written
+    /// is each member of the layout that differs, its bytes and no
+    /// more; the attribute whole if it had none. Laid out where it
+    /// is queued from: nothing is copied to be changed.
+    pub fn set_attribute<L: Layout>(&mut self, entity: &Header, attribute: Attribute<L>, seen: Option<L>, value: L) {
+        let Some(seen) = seen else {
+            return self.set_attribute_blocks(entity, None, Some(&WholeAttribute::holding(attribute, value)));
+        };
+        // Both as their words, the type first: all a member is read from, and what the attribute sums to.
+        let (at, kind, words) = (entity.at, attribute.attribute_type(), L::BLOCKS * BLOCK_WORDS);
+        let (mut was, mut is) = ([0; ATTRIBUTE_WORDS_MOST], [0; ATTRIBUTE_WORDS_MOST]);
+        (was[0], is[0]) = (kind.0, kind.0);
+        seen.write(&mut was[1..words]);
+        value.write(&mut is[1..words]);
+        self.open(at, Instruction::compare_attribute(at, kind, words_sum(&was[..words]).max(NO_ATTRIBUTE + 1)));
+        for &member in L::MEMBERS {
+            let held = member.of(&is[1..words]);
+            if member.of(&was[1..words]) != held {
+                self.queue(at, Instruction::write_attribute_member(at, kind, member, held));
             }
         }
         self.close_compare();
     }
 
-    /// Queues the one or two words from `offset` -- counted after its
-    /// first, its type -- of the attribute of type `kind` of `entity`
-    /// becoming `value`, if they are still the `seen` the rule read
-    /// there: a compare of those words alone, and the write under it.
-    /// So two writing two fields of one attribute in a tick both do,
-    /// where a compare of the whole attribute would refuse the second.
-    pub fn set_attribute_words(&mut self, entity: &Header, kind: entity_manager::AttributeType, offset: usize, seen: &[u64], value: &[u64]) {
-        assert_eq!(seen.len(), value.len(), "as many words written as seen");
-        let at = entity.at;
-        self.queue_under(at, Instruction::compare_attribute_words(at, kind, offset, seen), &[Instruction::write_attribute_words(at, kind, offset, value)]);
-    }
-
-    /// [`Turn::set_attribute_blocks`], of an attribute by its layout:
-    /// `attribute` of `entity` set to `value`, if it is still the
-    /// `seen` the rule read of it, or still has none. A layout of
-    /// one block is laid out where it is queued from: nothing is
-    /// copied to be changed.
-    pub fn set_attribute<L: Layout>(&mut self, entity: &Header, attribute: Attribute<L>, seen: Option<L>, value: L) {
-        if L::BLOCKS == 1 {
-            let block = |held: L| {
-                let mut block = AttributeBlock([0; BLOCK_WORDS]);
-                block.0[0] = attribute.attribute_type().0;
-                held.write(&mut block.0[1..]);
-                [block]
-            };
-            let (was, is) = (seen.map(block), block(value));
-            return self.set_attribute_blocks(entity, was.as_ref().map(|was| &was[..]), Some(&is));
-        }
-        let (mut was, mut is) = (Vec::new(), Vec::new());
-        seen.into_iter().for_each(|seen| push_attribute(&mut was, attribute, seen));
-        push_attribute(&mut is, attribute, value);
-        self.set_attribute_blocks(entity, seen.map(|_| &was[..]), Some(&is));
-    }
-
     /// Queues removing `attribute` of `entity`, if it is still the
     /// `seen` the rule read of it.
     pub fn unset_attribute<L: Layout>(&mut self, entity: &Header, attribute: Attribute<L>, seen: L) {
-        let mut was = Vec::new();
-        push_attribute(&mut was, attribute, seen);
-        self.set_attribute_blocks(entity, Some(&was), None);
+        self.set_attribute_blocks(entity, Some(&WholeAttribute::holding(attribute, seen)), None);
     }
 
     /// Queues every attribute that differs between `seen` and

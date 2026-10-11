@@ -41,7 +41,8 @@ struct BothEnds {
 }
 
 impl Layout for BothEnds {
-    const BLOCKS: usize = 2;
+    const WORDS: usize = 15;
+    const MEMBERS: &'static [entity_manager::Member] = &[entity_manager::Member::word(0), entity_manager::Member::word(14)];
 
     fn write(self, data: &mut [u64]) {
         (data[0], data[14]) = (self.first, self.last);
@@ -54,7 +55,7 @@ impl Layout for BothEnds {
 
 /// An attribute of one block: its number the lowest, so the first of an entity's.
 const NAME: Attribute<u64> = Attribute::new(39);
-/// One of two blocks.
+/// One of eight blocks.
 const ENDS: Attribute<BothEnds> = Attribute::new(41);
 /// One whose size varies.
 const NOTE: AttributeType = AttributeType::of_varying_size(42);
@@ -71,12 +72,12 @@ fn varying(kind: AttributeType, data: &[u64]) -> Vec<AttributeBlock> {
     words.as_chunks::<BLOCK_WORDS>().0.iter().map(|&block| AttributeBlock(block)).collect()
 }
 
-/// The attributes an entity of the tests starts with: one block, two,
-/// three by its block length, and one after.
+/// The attributes an entity of the tests starts with: one block,
+/// eight, five by its block length, and one of two after.
 fn attributes() -> Vec<AttributeBlock> {
     let mut blocks = vec![AttributeBlock::holding(NAME, 7)];
     push_attribute(&mut blocks, ENDS, BothEnds { first: 11, last: 13 });
-    blocks.extend(varying(NOTE, &[5; 20]));
+    blocks.extend(varying(NOTE, &[5; 8]));
     blocks.extend(varying(TAIL, &[3]));
     blocks
 }
@@ -86,20 +87,20 @@ fn attributes() -> Vec<AttributeBlock> {
 /// says.
 #[test]
 fn every_attribute_is_found_over_those_of_any_length() {
-    assert_eq!((NAME.attribute_type().blocks(), ENDS.attribute_type().blocks(), NOTE.blocks()), (Some(1), Some(2), None));
+    assert_eq!((NAME.attribute_type().blocks(), ENDS.attribute_type().blocks(), NOTE.blocks()), (Some(1), Some(8), None));
     assert_eq!((ENDS.attribute_type().number(), NOTE.number()), (41, 42));
     let blocks = attributes();
-    assert_eq!(blocks.len(), 1 + 2 + 3 + 1);
+    assert_eq!(blocks.len(), 1 + 8 + 5 + 2);
     assert!(sorted(&blocks));
     assert_eq!(find_attribute(&blocks, NAME.attribute_type()), Ok(0..1));
-    assert_eq!(find_attribute(&blocks, ENDS.attribute_type()), Ok(1..3));
-    assert_eq!(find_attribute(&blocks, NOTE), Ok(3..6));
-    assert_eq!(find_attribute(&blocks, TAIL), Ok(6..7));
+    assert_eq!(find_attribute(&blocks, ENDS.attribute_type()), Ok(1..9));
+    assert_eq!(find_attribute(&blocks, NOTE), Ok(9..14));
+    assert_eq!(find_attribute(&blocks, TAIL), Ok(14..16));
     assert_eq!(find_attribute(&blocks, Attribute::<u64>::new(40).attribute_type()), Err(1), "between the first and the second, by number");
-    assert_eq!(find_attribute(&blocks, Attribute::<u64>::new(50).attribute_type()), Err(7), "after them all");
-    assert!(!sorted(&blocks[..5]), "an attribute cut short");
-    assert!(!sorted(&[blocks[6], blocks[0]]), "out of order");
-    assert!(!sorted(&[AttributeBlock([WALKER.0, 0, 0, 0, 0, 0, 0, 0])]), "an entity type is no attribute's");
+    assert_eq!(find_attribute(&blocks, Attribute::<u64>::new(50).attribute_type()), Err(16), "after them all");
+    assert!(!sorted(&blocks[..12]), "an attribute cut short");
+    assert!(!sorted(&[blocks[14], blocks[15], blocks[0]]), "out of order");
+    assert!(!sorted(&[AttributeBlock([WALKER.0, 0])]), "an entity type is no attribute's");
 
     let mut entities = world();
     let header = walker(cell(40, 30));
@@ -107,8 +108,8 @@ fn every_attribute_is_found_over_those_of_any_length() {
     entities.apply();
     let entity = entities.get(header.at).expect("put");
     assert_eq!((entity.attribute(NAME), entity.attribute(ENDS)), (Some(7), Some(BothEnds { first: 11, last: 13 })));
-    assert_eq!(entity.attribute_blocks(NOTE).map(<[_]>::len), Some(3));
-    assert_eq!(entity.attribute_blocks(TAIL).expect("after the note")[0].0[2], 3);
+    assert_eq!(entity.attribute_blocks(NOTE).map(<[_]>::len), Some(5));
+    assert_eq!(entity.attribute_blocks(TAIL).expect("after the note")[1].0[0], 3);
 }
 
 /// An attribute is edited to another length -- longer, shorter, as
@@ -122,7 +123,7 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
     entities.queue_put(target, &attributes());
     entities.apply();
     let edits: [&dyn Fn(&mut Instructions); 4] = [
-        &|queue| queue.set_attribute_blocks(target.at, &varying(NOTE, &[6; 40])),
+        &|queue| queue.set_attribute_blocks(target.at, &varying(NOTE, &[6; 20])),
         &|queue| queue.set_attribute_blocks(target.at, &varying(NOTE, &[8; 2])),
         &|queue| queue.set_attribute(target.at, ENDS, BothEnds { first: 17, last: 19 }),
         &|queue| queue.unset_attribute(target.at, NAME.attribute_type()),
@@ -135,10 +136,10 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
         let edited = entities.get(target.at).expect("where it stood");
         assert!(sorted(edited.attributes), "edit {tick}");
         let note = edited.attribute_blocks(NOTE).expect("the note");
-        assert_eq!((note.len(), note[0].0[2]), if tick == 0 { (6, 6) } else { (1, 8) }, "edit {tick}");
+        assert_eq!((note.len(), note[1].0[0]), if tick == 0 { (11, 6) } else { (2, 8) }, "edit {tick}");
         assert_eq!(edited.attribute(ENDS), Some(if tick < 2 { BothEnds { first: 11, last: 13 } } else { BothEnds { first: 17, last: 19 } }), "edit {tick}");
         assert_eq!(edited.attribute(NAME), (tick < 3).then_some(7), "edit {tick}");
-        assert_eq!(edited.attribute_blocks(TAIL).map(|tail| tail[0].0[2]), Some(3), "edit {tick}");
+        assert_eq!(edited.attribute_blocks(TAIL).map(|tail| tail[1].0[0]), Some(3), "edit {tick}");
     }
 
     let superchunk = target.at.superchunk();
@@ -153,7 +154,7 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
     // The note's block length said to be more than the entity has blocks: nothing is read.
     let mut wrong = words.clone();
     let length = wrong.iter().position(|&word| word == NOTE.0).expect("the note's type") + 1;
-    wrong[length] = 40;
+    wrong[length] = 400;
     assert!(decode_state(&wrong, 4, &mut world()).is_err());
     assert!(decode_state(&words[..words.len() - 1], 4, &mut world()).is_err(), "cut short");
 }
@@ -192,7 +193,7 @@ fn attributes_edited_in_any_order_are_those_last_set() {
                     words[0] = kind.0;
                     words.as_chunks::<BLOCK_WORDS>().0.iter().map(|&block| AttributeBlock(block)).collect()
                 }
-                None => varying(kind, &(0..random.below(40)).map(|_| random.draw()).collect::<Vec<_>>()),
+                None => varying(kind, &(0..random.below(28)).map(|_| random.draw()).collect::<Vec<_>>()),
             };
             queue.set_attribute_blocks(target.at, &blocks);
             held.insert(kind.0, blocks);

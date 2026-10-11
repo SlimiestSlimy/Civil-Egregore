@@ -6,8 +6,8 @@ use crate::attributes::{sorted, AttributeBlock, BLOCK_WORDS};
 use crate::entity::{EntityType, Header};
 use crate::store::{Entities, SuperchunkEntities};
 
-/// The first word: `TSstate` and the format's number, 4.
-const FIRST_WORD: u64 = u64::from_le_bytes(*b"TSstate\x04");
+/// The first word: `TSstate` and the format's number, 5.
+const FIRST_WORD: u64 = u64::from_le_bytes(*b"TSstate\x05");
 
 /// What a state file held, beside the entities queued.
 pub struct SavedState {

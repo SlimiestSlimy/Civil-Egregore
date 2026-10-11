@@ -95,11 +95,11 @@ alone:
   wall, and never onto a cell the collision plane holds -- a tree's
   (`walking::around_steppable`).
 
-All a sheep keeps is one attribute, one block (`SHEEP_STATE`, laid out
+All a sheep keeps is one attribute, four blocks (`SHEEP_STATE`, laid out
 as `SheepState`): when it is next hungry, when its lamb is due, when
 it is grown, the tick it roams until and which of the nine cells about
-it it heads for, each a field. A tick of 0 is none -- not pregnant, no
-lamb, not roaming -- so what comes and goes at run time is a field
+it it heads for, each a member. A tick of 0 is none -- not pregnant, no
+lamb, not roaming -- so what comes and goes at run time is a member
 written, not a block added and taken away. They are ticks, not counts of wakes, because a sheep's
 wakes are as far apart as its needs; and every time the rule adds to a
 tick is said in seconds of the simulation

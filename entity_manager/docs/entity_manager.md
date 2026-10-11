@@ -10,7 +10,7 @@ what a rule is given: `../../simulation/docs/simulation.md`,
 
 A header and attributes. The header is a type, the cell it stands on,
 and the tick it next wakes at. Attributes are typed
-blocks of 64 bytes, added and removed at run time ("Attributes, a block
+blocks of 16 bytes, added and removed at run time ("Attributes, a block
 each"). Types are the type registry's (`../../type_registry/`).
 
 An entity has no ID. No two stand on one cell, so the cell names it:
@@ -25,25 +25,31 @@ naming a cell nobody stands on any more is passed over.
 
 ## Attributes, a block each
 
-An attribute is one or more **blocks** of 64 bytes -- eight words, a
-cache line, and aligned as one (`AttributeBlock`, `BLOCK_WORDS`). The
-first word of an attribute's first
-block is its type, the one u64 ID every type in a world has. The rest
-is its data, 56 bytes in a block of its own: way more than the one
-word it had, so that what belongs together is one attribute -- where a
-sheep roams to and until when, not the two packed into a word.
+An attribute is one to sixteen **blocks** of 16 bytes -- two words,
+aligned as such (`AttributeBlock`, `BLOCK_WORDS`,
+`ATTRIBUTE_BLOCKS_MOST`): 256 bytes at the most, and what is larger
+is to be kept elsewhere, the attribute saying where. The first word
+of an attribute's first block is its type, the one u64 ID every type
+in a world has. The rest is its data, so that what belongs together
+is one attribute -- where a sheep roams to and until when, not the
+two packed into a word. Blocks were 64 bytes, a cache line each,
+until an attribute came to be written a member at a time: a number
+then took 64 bytes to keep, and takes 16.
 
 **Its layout is its type's, and fixed.** A type of attribute has a
-layout: what the data's words hold, field by field. The type registry
+layout: what the data's words hold, member by member, each where
+its bytes lie (`Member`: its first byte, counted from the
+attribute's, and how many it is). An instruction writes a member by
+those two numbers and knows nothing else of the layout. The type registry
 says it, a row an attribute, and the layout is a type in the code, so
 an attribute is read and written as its fields and never as loose
 words (`../../type_registry/docs/type_registry.md`, "Layouts"). Every
 attribute of one type is laid out alike.
 
-**More than one block.** A layout that needs more than 56 bytes takes
-two blocks, or more: the blocks after the first are all data, eight
-words each, straight after the first block's seven -- so the data is
-one run of words, 7, 15, 23 and so on. How many blocks a type takes is
+**More than one block.** A layout that needs more than 8 bytes takes
+two blocks, or more: the blocks after the first are all data, two
+words each, straight after the first block's one -- so the data is
+one run of words, 1, 3, 5 and so on, 31 at the most. How many blocks a type takes is
 said by its ID -- the ID's last byte, as a layer type's last byte says
 how wide it is -- so nothing is looked up to step over an attribute
 (`AttributeBlock::blocks`). The types are one namespace, everything's:
@@ -73,13 +79,16 @@ never leaves them.
 **Read and written as fields.** `attribute(blocks, attribute)` reads
 one as its layout, `set_attribute` and `push_attribute` write one, and
 `AttributeBlock::holding(attribute, value)` makes the one block of a
-layout that takes one -- a layout of more does not build there. A
-layout of one block is read from its block and written to it where it
-lies; one of more is gathered into a run of words first.
+layout that takes one -- a layout of more does not build there, and
+`WholeAttribute::holding` makes any, on the stack. A layout of one
+block is read from its block where it lies; one of more is gathered
+into a run of words first, on the stack too. A member alone is read
+and written where it lies (`attribute_bytes`,
+`write_attribute_bytes`).
 
-**What it costs.** A block is four times the 16 bytes an attribute
-took. A sheep has one to four: 64 to 256 bytes beside its 24-byte
-header. Blocks are copied whole when an entity is put, crosses or is
+**What it costs.** A sheep's one attribute is four blocks, 64 bytes
+beside its 24-byte header, and not aligned to a cache line: it is
+asked of memory ahead a line and the next. Blocks are copied whole when an entity is put, crosses or is
 saved; an edit of one attribute in place writes its block. The tick
 reference (`../../docs/testing_protocol.md`), a word an attribute ->
 a block: 58.72 M instructions -> 59.33 M, the blocks copied where a
@@ -181,8 +190,8 @@ instructions are 24 bytes each, compares and writes in one stream
 that is of an entity is applied by one function of the store, the
 entity named by the cell the tick found it on -- made (`make_named`),
 moved with nothing else of it changed (`move_named`), its wake
-written to the wheel (`wake_named`), a word or two of an attribute
-written in place (`write_attribute_words_named`), an attribute given
+written to the wheel (`wake_named`), a member of an attribute
+written in place (`write_attribute_bytes_named`), an attribute given
 or taken (`edit_named`), removed (`remove_named`); what a compare
 asks is `get_named` and `free_for_a_new_entity`. The queue here
 (`Instructions`) is what is queued between ticks -- a world set up, a
@@ -289,10 +298,10 @@ no superchunk is read, no entity stands.
 
 A superchunk's state is words a save keeps
 (`../../chunk_storage/docs/chunk_storage.md`, "On disk"): a first word
-saying what it is (`FIRST_WORD`: `TSstate` and the format's number, 4);
+saying what it is (`FIRST_WORD`: `TSstate` and the format's number, 5);
 whether it has random numbers, and their state; how many entities; then
 each entity -- its type, cell, wake tick, how many blocks its
-attributes are, and the blocks, eight words each. An entity whose
+attributes are, and the blocks, two words each. An entity whose
 blocks are not whole attributes sorted by type is not read.
 
 ## Layout

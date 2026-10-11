@@ -17,21 +17,23 @@ An entity is not copied to be changed: what is written of it is
 written to the store, a word or two at a time.
 
 **`attributes.rs`** (`entity_manager.md`, "Attributes, a block each"):
-`Attribute`, `AttributeType`, `Layout` and `BLOCK_WORDS`, the type
-registry's, handed on. **`AttributeBlock`**: eight words, aligned as a
-cache line; **`holding(attribute, value)`**, the one block of a layout
-that takes one (**`holding_one`**, the same unchecked);
+`Attribute`, `AttributeType`, `Layout`, `Member` and `BLOCK_WORDS`,
+the type registry's, handed on. **`AttributeBlock`**: two words,
+sixteen bytes, aligned as such; **`holding(attribute, value)`**, the
+one block of a layout that takes one; **`WholeAttribute`**: one
+attribute of any layout laid out where it is made, read as its
+blocks (**`WholeAttribute::holding`**);
 **`kind()`**, the type in its first word; **`blocks()`**, how many
 blocks the attribute it begins takes, by its type or its block length,
 one at least. On an entity's blocks, sorted by type:
 **`blocks_sum(blocks)`** -- a sum of blocks, the same for the same
-blocks; **`attribute_seen(blocks)`** -- what a compare carries of one
+blocks (**`words_sum(words)`**, of the words they are); **`attribute_seen(blocks)`** -- what a compare carries of one
 attribute, 64 bits: that sum, or `NO_ATTRIBUTE` of none; **`each_attribute(blocks)`** -- the attributes one after
 another; **`find_attribute(blocks, kind)`** -- the walk: an attribute's blocks,
-or where they would go; **`find_attribute_numbered(blocks, number)`**,
-the same by its type's number alone, what an instruction names one
-by; **`attribute_words(blocks, offset)`**, an attribute's words from
-one counted after its first -- **`attribute_blocks(blocks, kind)`**,
+or where they would go; **`attribute_bytes(blocks, offset, bytes)`**,
+what a member of an attribute holds, and
+**`write_attribute_bytes(blocks, offset, bytes, value)`**, it written
+in place, never over the type -- **`attribute_blocks(blocks, kind)`**,
 **`attribute(blocks, attribute)`** (read as its layout),
 **`set_attribute_blocks(blocks, attribute)`** and
 **`set_attribute(blocks, attribute, value)`** (in place of the one of
@@ -61,10 +63,10 @@ else a new run at the end. **`remove(at)`**, **`index_of(place)`**,
 **`find(place)`**, **`entity`**, **`edit(place, kind, blocks)`**
 (one attribute set in place if as long as it was, or the run made anew
 with it added, removed -- no blocks given -- or of another length),
-**`write_words(place, number, offset, words)`** (words of an
+**`write_bytes(place, kind, offset, bytes, value)`** (a member of an
 attribute written in place, nothing moved), **`set_wake(place,
 wake)`**, **`prefetch_entity(at)`**, **`prefetch_attributes(at)`**:
-asked of memory ahead; **`sweep`** once garbage reaches the blocks
+asked of memory ahead, an entity's attributes a cache line and the next (`CACHE_LINE_BLOCKS`); **`sweep`** once garbage reaches the blocks
 in use (and 64).
 
 **`wheel.rs`**: `WHEEL_TICKS` (1024); **`Wake`** `{at}`;
@@ -99,7 +101,7 @@ attributes}`, **`is_empty`**, **`clear`**) -- **`settle_arrivals(settled)`**
 **`make_named`**, **`put_named`**, **`move_named(earliest, stood, to,
 collision)`** (moved, all else of it as it is), **`wake_named(earliest,
 stood, wake)`** (its wake set and filed: a write to the wheel),
-**`write_attribute_words_named(stood, number, offset, words)`**,
+**`write_attribute_bytes_named(stood, kind, offset, bytes, value)`**,
 **`edit_named`**, **`remove_named`**,
 **`free_for_a_new_entity(at, collision)`** (what a making is held
 against),

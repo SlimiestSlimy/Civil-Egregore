@@ -8,6 +8,72 @@ docs/glossary.md (one name per thing -- use its names, not the ones in
 its "not" column), docs/design_statements.md.
 
 
+== THE DESIGN STATEMENTS, AS I UNDERSTAND THEM ==
+(docs/design_statements.md is the user's; this is my reading of it,
+which the user cannot do for me: "its not a checklist, i cant
+interpret it for you". 2026-10-11. To be rewritten as I understand
+more; the file itself is read again at the start of design work.)
+
+What it is: a way of LOOKING, before and while deciding -- at the goal
+as much as at the design. Not six checks to tick after the work: one
+lens with six sides, turned on every part, and turned again on what
+it shows (a statement can send me back to redefine the goal).
+
+A system, in its words: things that do (processes), things done to
+(processees), and the links between them.
+
+- Epistemology. What I do not know and act on anyway becomes an
+  assumption nobody said; then one nobody remembers; then a bug nobody
+  can trace. The decay is the point: unknown -> implied -> forgotten
+  -> harm. So an unknown is SAID, where it will be read, the moment it
+  is met -- to the user, in AI.txt, in the commit. Guessing quietly
+  and going on is the first step of the decay, however sensible the
+  guess. (My "Decided on my own" list is this, late; earlier is better.)
+- Change. Whatever moves makes unknowns: a format changed, and every
+  reader of the old one is now wrong without knowing it; a thing made
+  dynamic (attributes at run time, a registry at run time, mods) can
+  no longer be known where the code is written. Each change: who still
+  believes the old thing?
+- Irreversibility. Nothing is done without losing something. A write
+  loses what was there; a sum of an attribute loses which member
+  changed; a queue loses who else wanted the cell; a summary of a
+  session loses why. Ask what this action throws away and whether
+  anyone needs it after.
+- Tradeoffs. Speed, efficiency and correctness buy one another;
+  nothing is free. If something looks free I have not found the price.
+  Name which is being paid for which, then measure.
+- Boundaries. The doer and the done-to are one thing cut in two, and
+  WHERE it is cut is mine to choose: what the instruction knows and
+  what the attribute's definer knows; what a rule does and what the
+  simulation does; which superchunk owns what. A hard problem is often
+  a cut in the wrong place (the pregnant sheep: an entity's act cut
+  along a superchunk border).
+- Links. With the cut made, the cost and the gain are in the join: the
+  lookup from an instruction to the bytes it writes, the queue between
+  superchunks, the walk to an attribute. Make the link cheap and both
+  sides get faster.
+
+HOW THEY GUIDE MY JUDGEMENT (the user: "the most important question
+is: how can the statements guide my judgement?"). They do not decide
+for me; they show what I am not looking at when I decide. I fail by
+weighing too few things more than by weighing badly: left alone I
+look at what I changed, what I made, what I gained, and the parts as
+handed to me. Each statement points at the other side -- what I do
+not know, who still believes what I changed, what I threw away, what
+the gain cost, where else the cut could go, the join and not the
+parts. So they come BEFORE the choice, to widen what is chosen
+among, and again on the result; and on the goal before the design.
+Example: for the pregnant sheep I proposed a general settle pass --
+better inside the cut I was given (a queue a superchunk). The user
+moved the cut (an entity's act is one stream wherever it lands).
+Boundaries, asked first, would have put that on the table.
+
+How I failed it, to remember: I kept it out of commits and never
+opened it. Applied late on 2026-10-11 it found a save format number
+not raised after the blocks changed, a size limit written and not
+enforced, and a question (the size byte) drifting into "decided".
+
+
 == SESSIONS ==
 
 LOCAL (the user's PC, has a screen)
@@ -198,9 +264,10 @@ Seen in the stills: sheep stand on deep ocean cells (told to the user).
 
 == TYPES AND RULES ==
 
-A new layer, wide plane, entity type or attribute is a row in
-type_registry/src/registry.rs (registered!): its constant comes from
-the row, and the build fails naming it if its IDs or name clash. A
+A new layer, wide plane, entity type or attribute is its constant
+and its row in type_registry/src/registry.rs, written by hand (no
+macro: a runtime registry is to come, for mods); the build fails
+naming it if its IDs or name clash. A
 new rule is a row in server/src/rules.rs (RULES). chunk_storage and
 entity_manager still hand on LayerType/Wide/EntityType/AttributeType
 under their own names (told to the user: a shortcut, not a decision).
@@ -223,455 +290,129 @@ Linux/Windows comparison is the user's to run. No camera in it.
 == TASKS ==
 
 Read this first after any break; write a new ask here the moment it is
-made, in the user's words. What is done is in the git log.
+made, in the user's words. What is done is in the git log; how the
+instruction design got here (a VM, flags, programs as data: all
+dropped by the user, "we're overcomplicating stuff") is in this
+file's history up to 5e081c6, not here.
 
-DONE, a line each: docs against code (kept by tests/fine.rs and `docs
-stale`); worldgen 6 times faster; attributes as 64-byte blocks; cold
-pool paged to disk (COLD_POOL_BYTES_KEPT 2 GiB is my number); mipmaps
-on the graphics card; SCA rename; tests drawn from the run's seed; the
-2026-10-10 review; compare-and-write with no groups; every instruction
-atomic; a world shifted is the same world (instructions/tests/fast/
-shifted.rs); the collision plane, entities in it; cells about a cell
-and masks in Morton order.
+DONE, a line each: docs against code (tests/fine.rs, `docs stale`);
+worldgen 6 times faster; cold pool paged to disk (COLD_POOL_BYTES_KEPT
+2 GiB is my number); mipmaps on the graphics card; SCA rename; tests
+drawn from the run's seed; the 2026-10-10 review; a world shifted is
+the same world (instructions/tests/fast/shifted.rs); the collision
+plane, entities in it; cells about a cell and masks in Morton order;
+type IDs (first byte supertype, last byte size); simulation time
+(TICKS_A_SIMULATION_SECOND 256; the mean times are ugly numbers the
+user may round); EntityId removed (c077937); one stream of 24-byte
+instructions (5e081c6).
 
-IN ORDER NOW: B FIRST (user, 2026-10-11: "finish the prior tasks
-first, in order"; "instructions are not finished as specified and they
-were previous work"), then A (parked), A2, C, D.
+--- THE INSTRUCTION DESIGN IN FORCE (the user's words) ---
+- "the simulation instruction set is being reduced to a family of
+  writes, and a family of compare instructions (and the stop skip
+  instruction), higher level behaviour ... is no longer instructions,
+  were going to move that to a crate named actions".
+- "3 types of instructions at a minimum plane-plane / plane-entity /
+  entity-entity ... instructions remain completely agnostic to
+  semantic behaviour and instead couple more to the simulation needs
+  for efficient instructions".
+- 24 bytes: "first 2 bytes is opcode, the rest is up to you". "some
+  instructions hold constants, other dont"; "masks are most useful for
+  interacting with bitplanes. not for everything".
+- A compare fails -> all under it is jumped. "no more comparisons on
+  writes bro. emmit more compares instructions instead". The lengths
+  under a compare are kept beside the queue, not in the instruction.
+- HARD RULE: "every write must be gated by a compare including on
+  neighboring chunk queues" (asserted in Turn::queue).
+- "the id of an entity ona given tick its its initial origin position"
+  -- "by origin entity origin coordinate tobe specific".
+- "scheduled wakes and stuff like that are write instructions, but to
+  the entitiy scheduling wheels"; wheel compares/reads: "not right now".
+- Births: "births should not be lost, they should be retried".
+- "between ticks queue is actually very important, that will later
+  become part of the player input. for now it can stay as is".
 
-A. PATHFINDING TO MORTON ORDER (user, 2026-10-11: "next fix
-   pathfinding to morton order"). FIRST PART DONE: the area is read
-   off the four aligned tiles of 16 it lies in (a lookup a layer),
-   what is in the way from the collision plane and the walls at once,
-   the entity store not read. Sparse pasture (`pasture 1000 20 4000 4
-   1`), a wake: 368 ns -> 297. LEFT, AND PUT TO THE USER: the search
-   itself (pathfinding::Rows, Wave, Walls, a_star) is still rows, the
-   tiles' words turned into rows for it. A wave in Morton order is a
-   step east as three masked shifts a word and a carry into the next
-   word tile, twelve passes a spread with walls and diagonals, over 16
-   words: by my count 3 to 4 times a rows spread. Profile now (sparse):
-   turning to rows ~1.5%, the search ~0.85%, lookups ~0.7%.
-   THE USER (2026-10-11): "regarding pathfinding yes, measure and let
-   the best win". BUILD THE MORTON SEARCH, MEASURE BOTH, KEEP THE BEST.
-   PARKED on the branch wip/morton-search (pushed): pathfinding/src/
-   morton.rs, the search over 32x32 cells of four tiles of 16 in
-   Morton order, tested equal to the rows' on 3,000 drawn areas. Left:
-   wire it into walking::seek (area as Tiles, the centred 16x16 a
-   mask), measure both on `pasture 1000 20 4000 4 1`, keep the best,
-   docs.
+--- NOW: ATTRIBUTES AS BYTES (built 2026-10-11, to commit) ---
+The user: "an atribute is very different from a memeber of it ... we
+want instructions to carry updates of sizes tailored to the atribute
+member. basically the offset into the attribute and the bytes"; "i
+said max limits, youre going overboard"; "atribute block size changes
+to 16. max atribute size is therefore 256 bytes ... larger atributes
+are simply behind references"; "since atributes are entity defined,
+they cant be tied to instructions, instead instructions must index
+structs like arrays"; "the definer defines offset and size";
+"atributes are composed of many members, we want instructions to
+update members, but of course bulk write instructions have their uses
+as well"; the registry "by hand", "we will use a runtime registry in
+the future, imagine mods", "thats also the reason we have a universal
+typeid space".
+BUILT: blocks of 16 bytes, 1 to 16 an attribute (enforced in `sorted`);
+type_registry::Member {offset, bytes} and Layout::MEMBERS; opcodes
+CompareAttributeMember / WriteAttributeMember (the whole u64 ID, a
+byte offset, a byte count, 8 bytes of value at the most),
+WriteAttribute (whole, blocks carried); the registry written by hand;
+save format 5. Same cell hashes as 5e081c6; a sheep's wake 2-4%
+slower, applying 2% faster.
+OPEN, SAID TO THE USER, NOT DECIDED:
+- "fixed sized atributtes dont carry a size byte. only variable sized
+  ones" and "now we use 4 bit size counts": the block count is STILL
+  the ID's last byte (1 to 16, 0xFF varies) and a varying one's block
+  length its first block's second word. Where the four bits live, and
+  where a fixed attribute's size comes from when it is not in the ID
+  (the runtime registry?), is the user's to say. Tests make attribute
+  types of their own, which a registry lookup would have to know.
+- Whole-attribute compare (by sum) is still what set_attribute queues;
+  the member compare is there (Turn::set_attribute_member). Which is
+  the default was asked and not answered.
 
-A2. THE PICK, NO EXCEPTIONS (user, 2026-10-11, on the shifted test
-   drawing a neighbour its own way, row by row: "no exceptions"). So
-   around::pick itself must come to the same neighbour for the same
-   draw wherever the tiles fall, and the test use it: no pick of the
-   test's own. My plan: the ways numbered in Morton order of their
-   offsets, a pick the way of a rank in that order. After A.
+--- NEXT: AN ENTITY'S ACT OVER A BORDER ---
+The user: "settle crossings is the secret sauce we need to make
+actions superchunk agnostic"; multi cell entities soon, "that span
+multiple superchunks. up to 4 if in the corners and never more"; "we
+make actions and instructions completely oblivious to superchunk
+boundaries"; "the real restriction is that every entity can only
+interact with one apply queue at a time. thats what we have to take
+advantage of". Their proposal: "when an entity tries to write to a
+second queue in the same tick, all its instructions are filtered from
+the first queue into a separate queue just for that entity, then we
+continue gathering the instructions for that entity into that queue
+so the global neighbor queues stay parallel ... the instruction queue
+for that entity gets evaluated in order as normal but the instruction
+gets dispatched to the relevant superchunk. there will have to be a
+mutex in the entity instruction queue. shared by up to 4 superchunks.
+there might be a better solution". (Earlier: "execute their
+instructions one queue at a time. in queue destination superchunk
+morton order".)
+MY OPINION, GIVEN, NOT ANSWERED: apply such an entity's instructions
+in the order it queued them (destination order would write the mother
+before the lamb's cell is checked, half the time), and not in a pass
+after (who wins a cell would hang on a border): each superchunk
+applies its authors in the one global order and waits at such an
+author until every superchunk it touches has reached it -- cannot
+deadlock, the order being the same in all. A mutex alone does not
+give that order. Then a birth is "cell free -> make lamb, write
+mother", a crossing "cell free -> make there, remove here": delete
+bearing_neighbour, mother_neighbour, lamb_put_stands, the extra wake,
+settle_crossings. Cost unknown until measured: superchunks no longer
+apply independently. DO NOT BUILD before the user says which.
 
-B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
-   instructions from scratch lmao"; "were basically building a VM
-   machine"). The user, verbatim:
-   - "instructions are function calls with parameters ... imagine
-     rules being composed of functions that either apply totally or
-     fail entirely, kinda like groups as we had before, but we want a
-     way to fail as soon as possible if were going to fail. so i
-     propose this, lets separate compare, compute, and write ... first
-     rules try to queue all comparations and computation upfront, so
-     now reading is part of the apply queue, now, computation is
-     instructions that call functions specified by the rules. both
-     comparations and computations can write to entity atributes ...
-     were going to have a typeID0x00FFFFFF... as the first attribute
-     of every entity. to hold general data for all entities. on that
-     attribute block comparations and computations write bitflags that
-     later write steps compare and write."
-   - when they run: "now everything runs at apply time."
-   - a compute: "limited still to the pulic API simulation, reading
-     state or attributes only ... we need a concrete set of
-     instructions with flexible parameters, like specifying 2
-     bitplanes or an entityref for the function ... we want the
-     available instructions to be efficient and then do the rules with
-     them. then profiling." "the functions callabe by instructions
-     must have a defined set of signatures".
-   - naming a function: the one global type registry.
-   - flags: "defined specifically at compile time, however some
-     dynamicity is allowed by using atributes as a way to store bit
-     flag offsets dynamically"; "private to each entity for
-     inter-entity comms we need to use extra atributes. probably well
-     have a special 'entity_channel' atribute ... things for the
-     future"; "we will only use the first 128 bits after the type for
-     the bitflags, so the bitflag offsets is a nice round 7 bits of
-     offset + the bit to compare to. or we can also have two sets of 8
-     bit instruction parameters comparing 2 bitflags directly".
-   - failure: "only the writes that test that flag fail, so we can
-     have compartmentalized failures and safe entity states".
-   - writes: "now writes specifically test only the bitflags produced
-     by compares and computations. so writes themselves become simpler
-     but we have more instructions"; "entity only and bitplane only
-     instructions should be different"; "all compare, compute and
-     write have no precedence on one another, an entity can queue them
-     in any order ... we probably want all instructions to have both
-     unconditional and flag offset conditional variants".
-   - a flag here letting a write over a border: "we have a test just
-     for that" (shifted.rs).
-   - SIZE: "instructions should be like, 16-32 bytes tops"; "less is
-     better". Today: a conditional step 448 bytes (Compare 192, two a
-     step, the seen block inside), an entity instruction 64, a cell
-     write 16. Assert sizes in the code as it is built.
-   - what a write carries: "watever space is left is fine lmao. what
-     i dont want you to do is store whole 64 byte attribute blocks in
-     instructions, attribute blocks are composed of many smaller
-     components, structs of fixed size basically to 64 bytes".
-   - the entity's name: "entity ID is its origin position at tick
-     start and stays constant through the tick". No entity IDs built
-     on ("we can add entity IDs later"); EntityId is still in the
-     code: ASK before removing it.
-   - no private copy: of Flock.room / EntityEdit, "we should be
-     writing to the entity store instead of writing twice".
-
-   ANSWERED 2026-10-11 (asked, the user chose):
-   - what a compare or compute may read of cells: "Own cell now, rest
-     as tick found" -- current state only at the entity's own cell and
-     its own attributes and flags; other cells (ring, area, paths) as
-     the tick found them, worked out before apply and handed on as
-     flags; what lands elsewhere (a step, a spawn, a cell written) is a
-     compare-and-write at its target, its outcome learnt the tick
-     after. Parallel, borders invisible.
-   - a rule's shape: "Fixed program, flags branch" -- a rule is the
-     same list of instructions for every woken entity of its type and
-     reads nothing itself; compares and computes set flags, writes
-     test them. Rules are data.
-   THE TABLE: the user: "yes, instruction table pleaseeeee. make it a
-   markdown lol". Drafted in delete_after_use/instruction_table.md
-   (16 bytes, every instruction, the sheep as a program, 7 questions
-   at its end); WAITING for the user's mark-up. No code before it.
-
-   ON THE TABLE, the user (2026-10-11): "on the type registry, specify
-   which byte stores the size for the bitplane. ie the last bit, same
-   as more than one block sized atributes."; "the type registry wastes
-   a lot of bytes from having all atributes separate, group them, make
-   structs. for example most sheep stuff can fit inside one atribute
-   block"; asked me to detail the two halves of the flags; "yes, wake
-   and sleep should obviously be instructions" (question 1: fold the
-   wake lines); "lets get to the remaining questions later" (2-7 open).
-
-   NOW, while the user marks the table up (2026-10-11): "while i work
-   on the instructions fix that [the registry: size byte, attributes
-   grouped], and also work on the tickrate simulation-second
-   invariance stuff to have it ready"; "because instructions will
-   depend on that". So: registry first, then D's tick rate part.
-
-   THE USER'S PROPOSAL (2026-10-11), replacing my two halves of the
-   flags: "we need to respect the 2 phase tick"; "we have 3 kinds of
-   instructions now, basically phase one is flag instructions and
-   compute instructions on internal state only. combined with the
-   write producing/queuing instructions then phase 2 proceed. writes
-   can compare and write based on internal state or the current
-   latest simulation state of external stuff."; "flag/compare and
-   flag: writes allowed at phase 1, individual to each entity";
-   "compute/compare and compute: writes allowed at phase 1,
-   individual to each entity"; "to bridge phase one and phase 2 we
-   have a specific kind of instruction: compare and produce
-   write/compare and write". Asked me to analyze it. My two
-   conditions, put to the user, unanswered: phase 1 writes only what
-   no other entity reads (the flags), and a phase-2 write may leave
-   whether it applied in a flag. Also the apply order is rows, not
-   Morton (simulation.md, "One order, wherever the borders fall"):
-   told the user, who thought Morton.
-
-   THE USER'S SECOND PROPOSAL (2026-10-11), over the one above: "lets
-   keep go back a little more to the current model, we also have flag
-   and compute instructions, but those are queued to phase 2 as
-   normal. then the compare and produce instructions, add
-   instructions at the end of the apply queue as it is evaluated,
-   producing compare and writes, in your example, its easy to solve,
-   queue a compare and write that compares and writes the grass
-   status, result into one of the flags, then another write dependant
-   on that flag satisfies the hunger or watever". My answer: yes,
-   with two things -- what reads neighbours is still worked out in
-   phase 1 and queued as its result; "the end of the queue" has to be
-   a next round, exchanged between superchunks and sorted by author,
-   or a border shows. Unanswered.
-
-   THE USER STEPS BACK (2026-10-11): "honestly i think were
-   overcomplicating stuff, lets revert back to the model we have,
-   rule reads world state through approved function calls. then
-   produces the compare and writes accordingly. we have everything we
-   need already tbh. why we were doing this again?" So: NO VM, no
-   programs as data, no compute opcodes, no rounds; the table in
-   delete_after_use is superseded. What is left of B is what started
-   it, put to the user and waiting for a yes: instructions of one
-   small fixed size (no attribute block carried, a compare of 64 bits
-   at most), a write able to hang on an earlier write's outcome
-   without carrying its compare, and no private copy of the entity
-   (Flock.room / EntityEdit). The design below is NOT to be built.
-
-   THE USER'S DECISION (2026-10-11), TO BUILD: "since we schedule
-   writes in order already, lets use that to our advantage, lets
-   emmit compare instructions separately of the write instructions,
-   is basically the group idea but simplified so basically we have a
-   compare instruction, if the compare fails, it skips all queued
-   writes until the next compare instruction or a finish skipping
-   instruction. this gives us room to have better compare
-   instructions, and better write instructions now that they are
-   separate".
-
-   And: "but otherwise everything else stays the same and we do the
-   fixes we already agreed on" -- the fixes: instructions small and
-   of a fixed size, no attribute block carried, a compare of 64 bits
-   at most; no private copy of the entity (Flock.room / EntityEdit),
-   fields written to the store.
-
-   And: "this change is a superset of what we have already, the
-   extra capacity is gating multiple writes behind a single compare";
-   "separating them now gives a lot more space for write payloads and
-   compare payloads, or rather, make instructions smaller, we have to
-   test that as well, but probably 24 bytes per instruction is
-   plenty."; "a good optimization is, as the apply queue fills up, it
-   tracks where the compares and skips are in a separate smaller
-   array of offsets. so on a compare fail it can jump tothe next
-   relevant instruction instead of skipping one by one. is a little
-   extra processing on the queue side. but i think its worth it".
-
-   BUILT 2026-10-11: the compare is a step of its own in the queue
-   (Turn::compare_from_here / compare_end; compare::from_here / end);
-   one that fails jumps over all under it (noted on it as queued);
-   an attribute edit carries its own compare, 64 bits
-   (attribute_seen); a step is 48 bytes at the most (was 448), a
-   compare 40 (was 192). Same census; a dense wake 213 -> 197 ns,
-   applied 120 -> 110.
-   STILL TO DO of the fixes: instructions to about 24 bytes ("probably
-   24 bytes per instruction is plenty", "we have to test that") --
-   the entity instruction is still 64 (a put carries its header), a
-   step 48; and no private copy of the entity (Flock.room,
-   EntityEdit): fields written to the store.
-   OPEN QUESTION to the user: a write under a compare must land in
-   the compare's superchunk (asserted, as before today). So a write
-   to a NEIGHBOURING cell under a compare works inside a superchunk
-   and panics at a border: not transparent. Tighten to "only the
-   compare's own cell" (loses compare-of-another-cell, which
-   simulation/tests/fine/compare_and_write.rs tests on purpose), or
-   leave. The user: "compares dont write nothing"; "compares only
-   compare 2 things [or more] and report the result to the apply
-   job, thats it" -- told them I worded it badly and tightened
-   nothing.
-
-   THE USER, on bf8513f's "writes carry no compare except of what
-   they write" (2026-10-11): "no, bad, no more comparisons on writes
-   bro. emmit more compares instructions instead. writes should be
-   limited to 16 bytes at a time. at most (for attributes that is)".
-   So: a write is a write and nothing else; what it was held against
-   is a compare instruction queued before it; an attribute write
-   carries 16 bytes of the attribute at the most.
-
-   BUILT 2026-10-11: no write carries a compare. A cell write is a
-   layer, a cell, a number; what was seen there is a compare step
-   queued before it (queue_seen queues both); an attribute set is a
-   compare of the attribute and the edit under it. Compares lie one
-   within another (open_compare / close_compare, up to 4), each
-   noting what is under it. Same census; a wake 196-199 ns, applied
-   113-115, a grass sample 158-162 (a step more a write).
-   STILL TO DO: attribute writes of 16 bytes at the most (today an
-   edit carries the attribute's blocks in the queue's list beside);
-   instructions of about 24 bytes; no private copy of the entity.
-
-   THE USER'S DIRECTION (2026-10-11), NEXT: "the simulation
-   instruction set is being reduced to a family of writes, and a
-   family of compare instructions (and the stop skip instruction),
-   higher level behaviour composed of many writes and comparison is
-   no longer instructions, were going to move that to a crate named
-   actions, instructions is basically the dependency of actions. and
-   actions represent more higher level behaviour with more
-   complicated compare and write instruction patterns for us".
-   THE FAMILIES, the user (2026-10-11): "we do need instructions (now
-   that are separate from actions) to behave more close to how the
-   simulation likes stuff, like the mask work for example,
-   specifically we need 3 types of instructions at a minimum
-   plane-plane / plane-entity / entity-entity and within those 3
-   families we implement the low level instructions actions are made
-   out of, actions couple with attributes and bitplanes, instructions
-   remain completely agnostic to semantic behaviour and instead
-   couple more to the simulation needs for efficient instructions".
-   ANSWERED (2026-10-11): "1: some instructions hold constants, other
-   dont, you have 24 bits to parameterize the instructions 2: no,
-   some instructions may not use masks, point cell instructions is
-   one example direct write atributes is another, masks are most
-   useful for interacting with bitplanes. not for everything 3: yeah,
-   get rid of entity ids, as i said like 20 times, the id of an
-   entity ona given tick its its initial origin position."
-   CORRECTED by the user: "sorry, 24 bytes to play with
-   parameterizing instructions" and "yeah like, 8 byte opcodes, and 2
-   8 byte parameters, but id say we can have 16 bit opcodes. just
-   fine". Then: "what i was citing with the 8 byte opcode and 8 byte
-   parameters was a worst case, not what the instructions should be
-   like. my bad there. as i said, first 2 bytes is opcode, the rest
-   is up to you". SO: an instruction is 24 bytes, the first 2 the
-   opcode, the other 22 laid out as each instruction needs.
-   And: "by origin entity origin coordinate tobe specific" -- the
-   name is the entity's ORIGIN cell as the tick found it (what the
-   header's cell is; it matters once an entity spans cells).
-   And: "oh btw, scheduled wakes and stuff like that are write
-   instructions, but to the entitiy scheduling wheels instead of
-   atributes or planes" -- so a write's target is a plane, an
-   attribute, or the wheel (a wake); a move is not what sets a wake.
-   And: "we probably need some compare and read instructions for
-   the wheels, but honestly not right now, only the schedule wakeup
-   write instruction is necessary for now".
-   The user asked: "why do you make lambs remember their
-   offspring?" ANSWERED: the mother remembers where she put the lamb
-   (and the lamb the way back) only because a put can be refused and
-   nothing tells her; a compare "the lamb's cell is free" gating the
-   make AND her not-pregnant write would remove it all, but her write
-   and the lamb's cell can be in two superchunks, and what is under a
-   compare must land in the compare's superchunk. WAITING on the
-   user's call on that limit; if lifted, delete bearing_neighbour,
-   mother_neighbour, lamb_put_stands and the extra wake.
-   DONE (c077937): EntityId removed everywhere.
-   THE USER'S CALL (2026-10-11): "aight fair, so lambs only
-   remembers the position of the offspring to double check birth on
-   the next tick, that can be solved, gate birth itself lmao. also, on
-   the outgoing queues to other superchunks. the same situation
-   applies, every write must be gated by a compare including on
-   neighboring chunk queues, thats a hard rule we should write
-   somewhere. and should solve the issue".
-   HARD RULE: EVERY WRITE IS UNDER A COMPARE, in every queue, a
-   neighbour's too (asserted where instructions are queued).
-   CORRECTED by the user: "on the contrary, births should not be
-   lost, they should be retried, i never said otherwise". So the
-   birth stays as it is (the mother looks the tick after, retries)
-   until gating can cover it. TOLD THE USER what is missing: her
-   not-pregnant write must hang on the make, which is gated in
-   ANOTHER superchunk's queue when the lamb lands over a border, and
-   a queue cannot see how a compare in another came out. PROPOSED,
-   NOT BUILT, WAITING: a compare's outcome visible to the neighbour
-   after the apply -- writes hanging on a compare of another queue
-   applied in a short pass after all superchunks applied; crossings
-   (put there, settle here) become one use of it.
-   The user again: "gating the birth writes on the neighbor
-   superchunk queues solves the double explicit double check,
-   because when the neighboring chunk processes the gated writes for
-   the birth it can either succeed completetly or fail completely.
-   so the pregnant entity only stops being pregnant when the child
-   is born, otherwise is like nothing happened". TOLD: true in one
-   superchunk; over a border the neighbour does not hold the
-   mother's data. PLAN SAID TO THE USER (do after the stream is
-   green, unless they object): the mother queues only the gated
-   birth and remembers nothing; the LAMB on its first wake, the tick
-   after, writes its mother not-pregnant (entity writes entity,
-   gated, works over borders); the mother does not retry before
-   that can have landed. Same-superchunk births could be fully
-   under one compare -- but keep ONE way, borders invisible.
-   The user: "not exacly, you see, the real restriction is that
-   every entity can only interact with one apply queue at a time.
-   thats what we have to take advantage of". MY READING, told: in a
-   tick all an entity queues goes to ONE queue, so one compare gates
-   it all; a birth over a border goes whole to the neighbour's, the
-   mother writes nothing of herself, the lamb tells her on its first
-   wake. ASKED (WAITING): is her own next wake exempt (a write to
-   her own wheel = a second queue), else who wakes her after a
-   refused birth?
-   The user: "lets go back for a moment, how did we solve the issues
-   with entities crossing chunk boundaries last time?" ANSWERED: made
-   there under cell-free, asleep here, then settle_crossings after
-   every superchunk applied removes the original (or turns back).
-   OFFERED (WAITING for "yes"): make that after-pass general -- a
-   write at home that happens only if a make in the neighbour did --
-   for crossings and births both; then delete bearing_neighbour,
-   mother_neighbour, lamb_put_stands.
-   ORDER NOW: (1) EntityId removed everywhere -- an entity is named
-   by the cell the tick found it on; (2) the instruction set as the
-   three families, 24 bytes, attribute writes of 16 bytes at the
-   most, no private copy; (3) the actions crate, rules on it alone.
-   THE LENGTHS OFF THE INSTRUCTION, the user: "aight, we need to
-   store that offsite lol ... one list with 2 elements per value,
-   read backwards as i said, we keep the queue length of the gated
-   instructions. but also the length of nested compare blocks as the
-   second value. we want to use the instruction space to store more
-   ways of comparing and writing. not nesting bookeeping". DONE:
-   Conditional::gated, a Gated {steps, compares_within, writes} a
-   compare, 8 bytes; Segment::compares where an author's begin. Read
-   FORWARDS: an entry is kept as the compare is opened, so the list
-   is in the order compares are met (pushed at close and read
-   backwards, two side by side inside one come out in the wrong
-   order). The third number, writes, is only for counting refused.
-   THE NESTING, the user: "fair way of doing it, but i would model
-   the accounting of nesting as a small stack, we push the offsets of
-   compares when encountering them, on finding a skip instruction we
-   save the current tail of the queue minus the popped offset from
-   the stack, that gives the length of that specific compare gated
-   instruction stream". DONE so: close_compare pops and notes the
-   length on the compare itself (not a list read backwards: two
-   compares side by side pop in another order than they are met).
-   NEXT: the fixes (16-byte attribute writes, ~24-byte instructions,
-   no private copy), then the actions crate.
-   ANSWERED: "no, rules would depend on actions alone. first do the
-   fixes to the instructions. but before anything i want to know how
-   youre doing the nested comparisons" -- explained, see above.
-   My reading of the split: instructions = the compares,
-   the writes, the end of a compare, and the reads a rule is allowed;
-   actions = what is in instructions today that is many of them
-   (cells::set as compare + write, entities::commit, spawn, sleep,
-   walking, seek, around, area, mask); rules depend on actions.
-
-   MY DESIGN FROM THAT (to build in steps, each green and committed):
-   1. Type IDs: first byte the supertype (C below), functions
-      registered; the general attribute, type 0x00FFFFFF..., first of
-      every entity, its first 128 bits after the type the flags.
-   2. An instruction is 16 bytes: opcode, condition (7 bits of flag
-      offset + the bit wanted, or none), small parameters, 8 bytes of
-      operand. Sizes asserted. A put carries no blocks: fields are
-      written after it, a field an instruction.
-   3. A program runs for each woken entity in two parts, one stream
-      still: before apply, on the tick-start world, its reads of other
-      cells and its computes set flags, and what lands elsewhere is
-      queued then if its flags (known by then) let it; at apply, in
-      author order with everything else landing in the superchunk, its
-      own-cell compares and its writes run against the entity in the
-      store -- no private copy.
-      So a send can hang only on flags known before apply; a flag set
-      at apply (the grass still under me) lets only writes to the
-      entity and its own cell. As today: a fed sheep does not step.
-   4. Cell rules (grass, trees) get their own instructions, with a
-      flag register for the sampled cell and no entity.
-   5. Rules rewritten as programs; computes are registered functions
-      of a few fixed signatures (ring open to a step, a way drawn, the
-      step to seek, cells counted in the area).
-
-C. TYPE ID: "you actually poisoned the first byte of the typeid by
-   encoding length there, we would actually would like the first byte
-   of the typeID to be a kind of 'supertype' be it entity, function,
-   atribute, etc."; "block count would be the last byte for the
-   flagged attribute types on the registry". DONE 2026-10-11: first
-   byte the supertype (0x00 attribute, 0x01 layer, 0x02 entity type;
-   function not yet: nothing registers one), last byte the size (a
-   plane's bits a cell, an attribute's blocks, 0xFF = varies), the
-   six between the number. The sheep's five attributes are one block
-   (SHEEP_STATE, SheepState; a tick of 0 = none). Same census as
-   before on one seed; wake and apply no slower.
-
-D. TICK RATE, DONE 2026-10-11 (the user: "work on the tickrate
-   simulation-second invariance stuff to have it ready ... because
-   instructions will depend on that"): simulation/src/simulation_time.rs
-   -- TICKS_A_SIMULATION_SECOND = 256, SimulationTime::seconds /
-   milliseconds -> ticks, chance_a_tick for a mean simulation time;
-   rules get it as instructions::simulation_time. Sheep times, grass
-   and tree mean times, halos' warm/cool, the host's pace all said so.
-   Same hashes as before. The mean times are the old chances exactly
-   (390.625 s, 781.25 s, 39.062 s): ugly numbers, the user may round.
-   The table's "time" operand form is to be a SimulationTime.
-   STILL QUEUED: "we want sheep to wander more and sleep less haha"; and
-   rules independent of the tick rate: "more constants: ticks per
-   simulation second = 256 and now thing like grass spreading are
-   determined by a random draw to a 'mean sim time to' ... so the
-   rules are portable if we ever decide to change tick rate" -- ask
-   what is unclear when come to.
-
-E. WAITING FOR THE USER'S DETAILS: entities of more than a cell -- a
-   shape composed by an instruction into however many aligned tiles it
-   touches ("the instructions should compose the mask ... later when
-   we have multicelled entities im gonna get into details"; "we want
-   to avoid composing masks manually", "there can be the need of a
-   variable amount of them").
-
-LOWEST: optimizations and inlining another day; cold states not
-paged; page-out on the tick's thread.
+--- THEN ---
+- The `actions` crate: what in `instructions` is many instructions
+  (cells::set, spawn, step, walking, seek, around, area, mask) moves
+  there; "rules would depend on actions alone".
+- Mask / word-of-cells plane-plane instructions.
+- PARKED: pathfinding in Morton order (branch wip/morton-search:
+  pathfinding/src/morton.rs, tested equal to the rows' search; left:
+  wire into walking::seek, measure both on `pasture 1000 20 4000 4 1`,
+  "let the best win"). around::pick the same wherever tiles fall ("no
+  exceptions"; plan: ways numbered in Morton order of their offsets).
+  "we want sheep to wander more and sleep less haha". Entities of more
+  than a cell: "the instructions should compose the mask ... later
+  when we have multicelled entities im gonna get into details".
+- LOWEST: optimizations and inlining another day; cold states not
+  paged; page-out on the tick's thread.
+- KNOWN, TOLD: sparse-pasture applying ~10% slower since the stream (a
+  step is a move and a wake, two lookups); a fused opcode would win
+  it back and is not a plain write.
 
 
 == WHAT THE USER HAS SAID OF HOW THINGS ARE ==
@@ -685,9 +426,9 @@ paged; page-out on the tick's thread.
   300 333 4000 4 1` less the 0-tick run; `server check` hashes;
   `perf record -e cycles:u` for the hot function. Against the commit
   before, built from a checkout. Numbers in the commit.
-  Now (cd798e1): a sheep's wake about 200 ns, the reference 71.82 M.
-  It was 62.98 M at 98fbc06: the author sort and the entities'
-  collision bits cost the difference, not yet looked at.
+  The same seed for both builds: copy transient_data/seed.csv aside
+  and restore it before each run (it rolls every 5 uses); alternate
+  the builds, the machine drifts.
 - One stream of instructions, applied in the order they arrive: no
   kind before another. An entity is named for the tick by the cell the
   tick found it on.
@@ -717,9 +458,9 @@ paged; page-out on the tick's thread.
   09193e7). To make hold on any seed.
 
 - Limits known: a compare must be in the superchunk of what it lets be
-  written (a panic otherwise; sheep fed do not step for it); another
-  removing an entity as it crosses turns it back; entities of one cell
-  only.
+  written (a panic otherwise); another removing an entity as it
+  crosses turns it back; entities of one cell only. All three go with
+  "an entity's act over a border" above.
 - A world's stored image of a cooled superchunk is behind its cells
   until the writeback ring is flushed (World::write_back_and_flush_all):
   compare images only after it.

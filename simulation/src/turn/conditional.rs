@@ -11,7 +11,7 @@ use super::instruction::{Instruction, NO_COUNT};
 use super::Turn;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{attribute_seen, AttributeBlock, AttributeType};
+use entity_manager::{attribute_seen, AttributeBlock, AttributeType, Member};
 
 /// As many compares as are open at once, one within another: the
 /// rule's, one a write is queued under, the write's own.
@@ -85,19 +85,16 @@ pub enum Compare {
         seen: u64,
     },
     /// The entity the tick found on `at` has the attribute of type
-    /// `kind`, and its words from `offset` -- counted after its
-    /// first, its type -- are `words`, the first `count` of them.
-    AttributeWords {
+    /// `kind`, and `member` of it holds `seen`.
+    AttributeMember {
         /// The cell the tick found it on: its name.
         at: CellIndex,
         /// The attribute's type.
         kind: AttributeType,
-        /// The first word's offset.
-        offset: u16,
-        /// How many words: one or two.
-        count: u16,
-        /// The words as the rule saw them.
-        words: [u64; 2],
+        /// Which of its members.
+        member: Member,
+        /// What the rule saw it hold.
+        seen: u64,
     },
 }
 
@@ -108,17 +105,10 @@ impl Compare {
         Self::Attribute { at, kind, seen: attribute_seen(seen) }
     }
 
-    /// The entity the tick found on `at`, the words of its attribute
-    /// of type `kind` from `offset` the one or two `words`.
-    pub fn attribute_words(at: CellIndex, kind: AttributeType, offset: usize, words: &[u64]) -> Self {
-        assert!((1..=2).contains(&words.len()), "{} words in one compare: it has room for two", words.len());
-        Self::AttributeWords { at, kind, offset: offset as u16, count: words.len() as u16, words: [words[0], words.get(1).copied().unwrap_or(0)] }
-    }
-
     /// The cell what is compared is on.
     pub(crate) fn at(&self) -> CellIndex {
         match *self {
-            Self::Cell { at, .. } | Self::CellFree { at } | Self::Entity { at, .. } | Self::Attribute { at, .. } | Self::AttributeWords { at, .. } => at,
+            Self::Cell { at, .. } | Self::CellFree { at } | Self::Entity { at, .. } | Self::Attribute { at, .. } | Self::AttributeMember { at, .. } => at,
         }
     }
 
@@ -129,7 +119,7 @@ impl Compare {
             Self::CellFree { at } => Instruction::compare_cell_free(at),
             Self::Entity { at, kind } => Instruction::compare_entity(at, kind.0),
             Self::Attribute { at, kind, seen } => Instruction::compare_attribute(at, kind, seen),
-            Self::AttributeWords { at, kind, offset, count, words } => Instruction::compare_attribute_words(at, kind, offset as usize, &words[..count as usize]),
+            Self::AttributeMember { at, kind, member, seen } => Instruction::compare_attribute_member(at, kind, member, seen),
         }
     }
 }

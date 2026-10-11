@@ -158,6 +158,7 @@ what a rule says its times and its mean times in
 The words the instructions are asked in: `CellIndex`, `CellCartesian`,
 `SuperchunkIndex`, `NEIGHBOURS`, `SUPERCHUNK_SIDE_CELLS`, `LayerType`,
 `Wide`, `Bits4`, `Attribute`, `AttributeBlock`, `AttributeType`,
+`Member`, `WholeAttribute`,
 `Layout`, `EntityType`,
 `Header`, `EntityRef`, `Turn`, `TickReport`,
 `Rng`, `Chance`.

@@ -411,7 +411,7 @@ it (`entity_rules/src/sheep.rs`):
 
 - **A record**: a header -- a type, the cell it
   stands on, the tick it next wakes at -- and attributes, typed blocks
-  of 64 bytes added and removed at run time (a sheep falls pregnant, a lamb grows
+  of 16 bytes added and removed at run time (a sheep falls pregnant, a lamb grows
   up). Types, of entities and attributes alike, are `u64`s from the one
   namespace every type in Civil Egregore is drawn from, layers' included.
 - **A bucket a chunk**: a superchunk holds its entities in a bucket for

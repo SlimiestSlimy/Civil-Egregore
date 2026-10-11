@@ -186,9 +186,9 @@ impl AttributeType {
     const SIZE_VARIES: u64 = SIZE_MOST;
 
     /// The type of number `number` whose attributes take `blocks`
-    /// blocks, 1 to 254.
+    /// blocks, 1 to 16.
     pub const fn of_blocks(number: u64, blocks: usize) -> Self {
-        assert!(blocks >= 1 && (blocks as u64) < Self::SIZE_VARIES, "an attribute is 1 to 254 blocks");
+        assert!(blocks >= 1 && blocks <= crate::layouts::ATTRIBUTE_BLOCKS_MOST, "an attribute is 1 to 16 blocks");
         Self(type_id(Supertype::Attribute, number, blocks as u64))
     }
 

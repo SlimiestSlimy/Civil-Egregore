@@ -95,6 +95,9 @@ All a rule's turn queues is instructions, one stream a superchunk it
 writes to (`turn/instruction.rs`). An instruction is **24 bytes**:
 its first two the **opcode**, the other twenty-two what that opcode
 needs and nothing else -- sixteen bits, thirty-two, and two words.
+An instruction knows no attribute and no layout: whoever defines an
+attribute says where each member of it lies, and an instruction says
+only which bytes.
 There are compares, writes, and the end of a compare, and no more:
 whatever a rule means by a run of them -- a meal, a step, a birth --
 is not an instruction's to know. They are shaped by what the
@@ -105,20 +108,24 @@ high byte, by what they are of:
 |---|---|---|
 | plane and plane | a cell's number on a layer | a cell's number on a layer |
 | plane and entity | a cell free for an entity to be made on; an entity there still | an entity made, moved, removed, crossing in -- each with the collision plane |
-| entity and entity | an attribute by its sum; one word or two of it | one word or two of an attribute; an attribute given or taken; a wake, written to the wheel |
+| entity and entity | an attribute by its sum; a member of it | a member of an attribute; an attribute whole, in bulk, or taken; a wake, written to the wheel |
 
 A cell is named by its place in the superchunk the instruction lands
 in, twenty bits. An entity is named by the cell the tick found it on.
-An attribute is named by its type's number, in sixteen bits, and a
-word of it by its offset after the first, in twelve: so one
-instruction compares or writes **sixteen bytes of an attribute at the
-most**, two words, and an attribute's number is under 65,536 for an
-instruction to name it. Not everything has a mask or a constant:
+An attribute is named by its type's ID, whole -- the one namespace
+is everything's, and a type not written in this code has an ID like
+another -- and a **member** of it by its first byte, counted from
+the attribute's, and how many bytes it is: an attribute is an array
+of bytes to an instruction, 256 at the most, and what the bytes mean
+is its definer's (`type_registry::Member`, `Layout::MEMBERS`). So an
+instruction compares or writes **a member's bytes and no more**,
+eight at the most, and a write in bulk gives an attribute whole, its
+blocks carried beside the queue. Not everything has a mask or a constant:
 each opcode takes what it needs of the room. When an entity next
 wakes is a write like another -- to its superchunk's timer wheel,
 not to an attribute or a plane -- and a move does not set it.
 
-Only a crossing carries more than its 24 bytes: the entity whole, its
+A crossing too carries more than its 24 bytes: the entity whole, its
 blocks in a list beside the queue, since the superchunk it comes to
 holds nothing of it.
 
@@ -159,7 +166,7 @@ it, the attribute still as seen, the entity there still -- is a
 compare queued before it, and the write is under that:
 `Turn::queue_seen` queues the two, a compare of the cell and the
 write; an attribute set queues a compare of the attribute and, under
-it, the words that changed, sixteen bytes an instruction; a step
+it, the members that changed, each its bytes and no more; a step
 queues a compare of the entity being there, its move and its wake. A
 compare carries what was seen in sixteen bytes at the most -- of a
 whole attribute, a sum of its blocks
@@ -282,7 +289,7 @@ tick).
 
 `../../entity_manager/src/`: what stands on the cells. An entity is a header -- a
 type, its cell, the tick it next wakes at; no ID, the cell names it -- and
-attributes, typed blocks of 64 bytes added and removed at run time. A superchunk
+attributes, typed blocks of 16 bytes added and removed at run time. A superchunk
 holds its entities in a bucket a chunk, sorted by cell -- Morton order
 -- attributes beside, and a timer wheel of when each wakes: a
 tick costs the entities waking in it. An entity is found by its cell:

@@ -8,7 +8,7 @@
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, put_entity, tick_sheep};
 use bitplane_manager::Write;
 use coordinates::{CellCartesian, CellIndex};
-use entity_manager::{AttributeBlock, Header, NEVER};
+use entity_manager::{Header, WholeAttribute, NEVER};
 use entity_rules::sheep::{SheepState, BIRTHS, EATEN, SHEEP, SHEEP_STATE, STEP_JITTER, STEP_TICKS};
 use sca_rules::{grass, trees};
 use server::World;
@@ -105,9 +105,9 @@ fn a_tree_put_twice_is_one_tree() {
     assert!(put > 0, "no tree spread");
 }
 
-/// The one block of a sheep next hungry at `hungry_at`, in the middle of nothing.
-fn hungry_at(hungry_at: u64) -> [AttributeBlock; 1] {
-    [AttributeBlock::holding(SHEEP_STATE, SheepState { hungry_at, ..SheepState::default() })]
+/// The state of a sheep next hungry at `hungry_at`, in the middle of nothing.
+fn hungry_at(hungry_at: u64) -> WholeAttribute {
+    WholeAttribute::holding(SHEEP_STATE, SheepState { hungry_at, ..SheepState::default() })
 }
 
 /// What `sheep` keeps: every sheep has its block.
@@ -115,10 +115,10 @@ fn state(sheep: &entity_manager::EntityRef) -> SheepState {
     sheep.attribute(SHEEP_STATE).expect("a sheep's state, always")
 }
 
-/// The one block of a sheep next hungry at `hungry_at` whose lamb is
+/// The state of a sheep next hungry at `hungry_at` whose lamb is
 /// due at tick 1: the first tick a lamb can be due at, 0 being none.
-fn carrying(hungry_at: u64) -> [AttributeBlock; 1] {
-    [AttributeBlock::holding(SHEEP_STATE, SheepState { hungry_at, lamb_due_at: 1, ..SheepState::default() })]
+fn carrying(hungry_at: u64) -> WholeAttribute {
+    WholeAttribute::holding(SHEEP_STATE, SheepState { hungry_at, lamb_due_at: 1, ..SheepState::default() })
 }
 
 /// Two lambs put on one cell in a tick: the second is refused, and

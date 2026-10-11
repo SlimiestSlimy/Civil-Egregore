@@ -60,15 +60,16 @@ it is to have;
 **`unset_attribute(entity, attribute, seen)`**,
 **`set_attribute_blocks(entity, seen, value)`**: a write to an
 attribute of any entity in reach, under a compare of the attribute
-being still as seen: the words that differ, two an instruction
-(`queue_words_differing`), or the attribute given and written, or
-taken -- a layout of one block laid out where it is queued from,
-nothing copied; `cross`: made there whole under a compare of the cell
+being still as seen: each member of its layout that differs, its
+bytes and no more (`queue_members_differing`: of blocks with no
+layout at hand, each word that differs), or the attribute whole, a
+write in bulk (`queue_attribute_whole`), or taken -- a layout laid
+out where it is queued from, nothing copied; `cross`: made there whole under a compare of the cell
 free, its blocks carried beside that queue after a block of its type
 and wake, and asleep where it stood, settled after;
-**`set_attribute_words(entity, kind, offset, seen, value)`**: a word
-or two of an attribute, held against those words alone -- two
-writing two fields of one attribute both do;
+**`set_attribute_member(entity, kind, member, seen, value)`**: one
+member of an attribute, held against that member alone -- two
+writing two members of one attribute both do;
 **`remove(header)`**: under a compare of its being there still.
 **`slot_of`**: the slot of a superchunk, past the neighbours panicking;
 `slot_queued`: the same for something about to be queued, beginning
@@ -84,35 +85,32 @@ outbox, none past the neighbours.
 
 `instruction.rs` (`simulation.md`, "Instructions"). **`Instruction`**:
 24 bytes -- its `opcode`, sixteen bits (`small`), thirty-two (`place`:
-the cell's place in its superchunk in `PLACE_BITS`, 20, a word's
-offset above them) and two words (`first`, `second`). **`Opcode`**,
+the cell's place in its superchunk in `PLACE_BITS`, 20) and two words (`first`, `second`). **`Opcode`**,
 its first two bytes, the high one its family: `CompareEnd`, `Count`;
 `CompareCell`, `WriteCell`; `CompareCellFree`, `CompareEntity`,
 `MakeEntity`, `MoveEntity`, `RemoveEntity`, `CrossEntity`;
-`CompareAttribute`, `CompareAttributeWord`, `CompareAttributeWords`,
-`WriteAttributeWord`, `WriteAttributeWords`, `AddAttribute`,
-`RemoveAttribute`, `WriteWake`. One made by the function of its name
+`CompareAttribute`, `CompareAttributeMember`, `WriteAttributeMember`,
+`WriteAttribute`, `RemoveAttribute`, `WriteWake`. One made by the function of its name
 -- `compare_end`, `count`, `compare_cell`, `write_cell`,
 `compare_cell_free`, `compare_entity`, `make_entity`, `move_entity`,
 `remove_entity`, `cross_entity`, `compare_attribute`,
-`compare_attribute_words` and `write_attribute_words` (of one word or
-two: `of_words`), `add_attribute`, `remove_attribute`, `write_wake` --
-over `on` (an opcode on a cell) and `of_attribute` (of a word of an
-attribute: its number at most `ATTRIBUTE_NUMBER_MOST`, the offset
-`WORD_OFFSET_MOST`). Read back: `at(superchunk)` its cell,
+`compare_attribute_member` and `write_attribute_member` (the
+attribute by its whole ID, the member by its first byte and how many
+bytes it is, in `small`), `write_attribute` (an attribute whole, its
+blocks carried), `remove_attribute`, `write_wake` -- over `on` (an
+opcode on a cell). Read back: `at(superchunk)` its cell,
 `to(superchunk)` the cell its first word is the place of,
-`word_offset()`, `is_a_compare()`, `is_a_write()`. `NO_COUNT`: what a
+`member()`, `is_a_compare()`, `is_a_write()`. `NO_COUNT`: what a
 write counts under when it counts nothing.
 
 `conditional.rs` (`simulation.md`, "Compare-and-write").
 **`Compare`**: what a rule saw -- `Cell {layer_type, at, seen}`,
 `CellFree {at}`, `Entity {at, kind}`, `Attribute {at, kind, seen}`,
-`AttributeWords {at, kind, offset, count, words}` -- sixteen bytes of
+`AttributeMember {at, kind, member, seen}` -- eight bytes of
 what was seen at the most; `Compare::at`, the cell it is on;
 `Compare::instruction`, what it is queued as;
 **`Compare::attribute(at, kind, seen)`**: an attribute as its blocks
-were seen, their sum; **`Compare::attribute_words(at, kind, offset,
-words)`**: a word or two of one.
+were seen, their sum.
 **`Turn::compare_from_here(compare)`**: from here on what the rule
 queues for the compare's superchunk is skipped if the compare does
 not hold when come to; **`Turn::compare_end()`**: no more.
@@ -146,8 +144,7 @@ order queued, each by its opcode, a compare that does not hold
 an entity refused -- the entities' collision plane lent as a
 **`Standing`** `{superchunk, layer}` (its `write`);
 `Queue::count_missed`: writes of cells missed and entities lost, of a
-queue for a superchunk not hot; `empty_attribute(kind, blocks)`: what
-an attribute given holds; `Applied`: what a thread applied in the
+queue for a superchunk not hot; `Applied`: what a thread applied in the
 second phase.
 
 ## `hot.rs`
