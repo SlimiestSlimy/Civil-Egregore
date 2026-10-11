@@ -66,9 +66,12 @@ impl SuperchunkLayer {
         self.counts_less_one[chunk] = count.saturating_sub(1) as u16;
     }
 
-    /// Words a bucket takes: a bitmap's, times the bits a cell.
+    /// Words a bucket takes: a bitmap's, times the bits a cell -- of
+    /// a plane of tiles, a number a tile and so much the fewer
+    /// (`chunk_storage::wide::bucket_words`).
+    #[inline]
     fn bucket_words(&self) -> usize {
-        WORDS * self.layer_type.bits() as usize
+        chunk_storage::wide::bucket_words(self.layer_type)
     }
 
     /// Where the bucket of the chunk at `chunk` starts among the
@@ -129,7 +132,8 @@ impl SuperchunkLayer {
     }
 
     /// The number at `cell`, in Morton order, of the bucket at `chunk`:
-    /// the cell's bits, as many as the layer is wide.
+    /// the cell's bits, as many as the layer is wide -- of a plane of
+    /// tiles, the number of the tile the cell is in.
     pub(crate) fn value(&self, chunk: usize, cell: usize) -> u32 {
         self.value_of(chunk, cell, self.layer_type.bits() as usize)
     }
@@ -139,10 +143,11 @@ impl SuperchunkLayer {
     #[inline]
     pub(crate) fn value_of(&self, chunk: usize, cell: usize, bits: usize) -> u32 {
         debug_assert_eq!(bits, self.layer_type.bits() as usize, "a plane read at its own width");
-        let Some(start) = self.start(chunk, WORDS * bits) else {
+        let shift = self.layer_type.tile_shift();
+        let Some(start) = self.start(chunk, (WORDS * bits) >> shift) else {
             return 0;
         };
-        let at = cell * bits;
+        let at = (cell >> shift) * bits;
         (self.buckets[start + at / BITS_PER_WORD] >> (at % BITS_PER_WORD)) as u32 & ((1 << bits) - 1)
     }
 
@@ -151,14 +156,15 @@ impl SuperchunkLayer {
     /// dirty, and the counts -- of the cells whose number is not 0 --
     /// move if the cell came to 0 or left it. Whether it changed.
     pub(crate) fn put_value(&mut self, chunk: usize, cell: usize, value: u32) -> bool {
-        let (bits, at) = (self.layer_type.bits() as usize, cell * self.layer_type.bits() as usize);
+        let (bits, shift) = (self.layer_type.bits() as usize, self.layer_type.tile_shift());
+        let (at, words) = ((cell >> shift) * bits, (WORDS * bits) >> shift);
         // A chunk with no bucket holds 0 everywhere: it is given one only for another number.
-        let start = match self.start(chunk, WORDS * bits) {
+        let start = match self.start(chunk, words) {
             Some(start) => start,
             None if value as u64 & ((1u64 << bits) - 1) == 0 => return false,
             None => {
                 self.keep(chunk);
-                self.start(chunk, WORDS * bits).expect("kept now")
+                self.start(chunk, words).expect("kept now")
             }
         };
         let (word, mask) = (&mut self.buckets[start + at / BITS_PER_WORD], (1u64 << bits) - 1);

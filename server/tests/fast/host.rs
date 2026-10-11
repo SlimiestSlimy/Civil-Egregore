@@ -101,3 +101,51 @@ fn the_terrain_asked_for_is_what_the_frames_bring() {
     assert!(terrain.map(MapAsk { world: frame.world, first: (0, 0), step: 1, size: (1, 1), borders: false }).is_none(), "the world before, run no more");
     assert!(terrain.heights(HeightsAsk { world: next.world, first: (0, 0), size: (1, 1), skipped: Vec::new() }).is_some());
 }
+
+/// A frame brings the clouds over each superchunk as the world holds
+/// them: every tile's cloud read off the frame by the tile's place,
+/// the tiles and their clouds drawn from the seed; and none where a
+/// superchunk has no cloud.
+#[test]
+fn a_frame_brings_the_clouds_a_tile_at_a_time() {
+    use bitplane_manager::Write;
+    use coordinates::{place_from_cartesian, CellCartesian, SUPERCHUNK_SIDE_CELLS};
+    use server::host::frame::{cloud_over, CLOUD_TILE_SHIFT};
+    use type_registry::CLOUD;
+    let folder = crate::tests::folder("clouds");
+    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
+    let mut world = server::start(Start { seed: crate::tests::land_seed(7), size: Size::Limited { side: 2, forced: true }, sheep: 0, ..Start::default() });
+    // Clouds over one of the four superchunks alone.
+    let clouded = world.arena().superchunk_indices()[random.below(4) as usize];
+    let corner = clouded.top_left().cartesian();
+    let mut clouds = std::collections::BTreeMap::new();
+    for _ in 0..random.between(50, 200) {
+        let cell = (random.below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32, random.below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32);
+        // The tile's place among the superchunk's, in Morton order: its cell's, less the cells of a tile.
+        let tile = place_from_cartesian(cell.0, cell.1) >> CLOUD_TILE_SHIFT;
+        clouds.entry(tile).or_insert((cell, 1 + random.below(u64::from(CLOUD.most())) as u32));
+    }
+    let writes: Vec<Write> = clouds.values().map(|&((x, y), cloud)| Write::value(CLOUD, CellCartesian { x: corner.x + x, y: corner.y + y }.into(), cloud)).collect();
+    assert_eq!(world.write_cells(CLOUD.layer_type(), writes).changed, clouds.len() as u64);
+    server::save(&folder, &mut world).expect("saved");
+
+    let (host, frames) = Host::start();
+    assert!(host.pause(true) && host.open_world(folder.to_string_lossy().into_owned()));
+    let middle = coordinates::WORLD_SIDE_SUPERCHUNKS / 2;
+    let viewport = simulation::halos::Viewport { first: (middle - 2, middle - 2), last: (middle + 2, middle + 2) };
+    // Asked for a bounded number of times: a frame without the four superchunks is the world not opened yet.
+    let frame = (0..200).find_map(|_| {
+        assert!(host.sync(Ask { viewport: Some(viewport), detail: 0, skip: 0, most: u32::MAX, near: None }), "the host is there");
+        Some(frames.recv_timeout(Duration::from_secs(1800)).expect("a frame of the world opened")).filter(|frame| frame.cells.len() == 4)
+    });
+    for cells in &frame.expect("a frame with the world's four superchunks").cells {
+        if cells.top_left != (corner.x, corner.y) {
+            assert!(cells.clouds.is_empty(), "no cloud sent of a superchunk with none");
+            continue;
+        }
+        let tiles = (SUPERCHUNK_SIDE_CELLS as usize * SUPERCHUNK_SIDE_CELLS as usize) >> CLOUD_TILE_SHIFT;
+        for tile in 0..tiles {
+            assert_eq!(cloud_over(&cells.clouds, tile), clouds.get(&tile).map_or(0, |&(_, cloud)| cloud), "the tile {tile}");
+        }
+    }
+}

@@ -16,7 +16,12 @@ type of 2, 4, 8 or 16 bits a cell, **`bits`** how many, its last byte, **`number
 and **`planes`** the layers of a bit a cell it is kept cold as,
 **`holds(plane)`** whether one is its own. **`Width`**: a plane's width
 as a type, `BITS` bits a cell -- **`Bits2`**, **`Bits4`**, **`Bits8`**, **`Bits16`**.
-**`Wide<W>`**: a wide plane, its width in its type: **`new(first)`**,
+**`LayerType::of_tiles(first, bits, tile_scale)`**: a plane of a
+number a tile (`type_registry.md`, "Tile size"), its scale beside its
+width in its last byte (`WIDTH_BITS`, the bits of that byte the width
+takes); **`tile_scale()`**, **`tile_side()`**, **`tile_shift()`** --
+the places a cell's place is shifted by to give its tile's.
+**`Wide<W>`**: a wide plane, its width in its type: **`new(first)`**, **`of_tiles(first, tile_scale)`**,
 **`layer_type`**, **`most`** the most a cell of it holds.
 **`EntityType(u64)`**: an entity's type: **`of(number)`**, **`number`**. **`ScaRuleType(u64)`**, **`EntityRuleType(u64)`**: a rule of the cells, a rule of an entity: **`of(number)`**, **`number`**. **`AttributeType(u64)`**: an
 attribute's, its last four bits (`ATTRIBUTE_SIZE_BITS`) how many
@@ -41,12 +46,12 @@ layout in its type: **`new(number)`**, **`attribute_type`**. **`Member`** `{offs
 ## `registry.rs`
 
 **`Registration`**: what a row registers -- `Layer`, `WidePlane`, `EntityType`, `Attribute`, `ScaRule`, `EntityRule`.
-**`Registered`** `{name, registration, number, width, varies_in_size, default_attribute, master}`: a row, a rule's `master` the number of the one plane or type of entity it is of (0: no rule), an attribute's
+**`Registered`** `{name, registration, number, width, tile_scale, varies_in_size, default_attribute, master}`: a row, a rule's `master` the number of the one plane or type of entity it is of (0: no rule), an attribute's
 width the bits of its data, an entity type's `default_attribute` the number of the attribute every entity of it has (0: none; **`with_default(attribute)`** gives a row one); **`numbers`** how many
 numbers it takes from `number` on, **`layer_type`** its layer type if it is of
 the cells. `layer`, `wide`, `entity`, `attribute`, `sca_rule`, `entity_rule`: a row made from its constant. **`REGISTRY`**: the table, written by hand. The constants:
 `GRASS`, `TREE`, `TREE_STAGE`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`, `WET`, the
-cells'; `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, three blocks; `RULE_OF_GRASS`, `RULE_OF_TREES`, the cells' rules, `RULE_OF_SHEEP`, the entity's; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
+cells'; `CLOUD` and `CLIMATE`, the weather's, a number a tile 8x8 (`WEATHER_TILE_SCALE`); `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, three blocks; `RULE_OF_GRASS`, `RULE_OF_TREES`, the cells' rules, `RULE_OF_SHEEP`, the entity's; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
 **`first_clash(registry)`**: the first row to take a number or a name of
 one before it -- checked on `REGISTRY` as the crate is built, as is
 **`first_default_amiss(registry)`**: the first row whose default attribute is no attribute of a fixed size of the table, or that has one and is no entity type's.

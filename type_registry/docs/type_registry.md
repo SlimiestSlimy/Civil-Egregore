@@ -22,7 +22,7 @@ and a rule's:
 |---|---|
 | the first (the highest) | its **kind** (`Kind`): `0x00` an attribute, `0x01` a layer or a wide plane, `0x02` an entity type, `0x03` a rule of the cells, `0x04` a rule of an entity |
 | the six between | its **number**: what its row in the registry is written with (`NUMBERS`, how many there are) |
-| the last (the lowest) | its **size**: bits a cell of a plane -- 1, 2, 4, 8 or 16; 0 of an entity type and of a rule, which hold nothing |
+| the last (the lowest) | its **size**: of a plane, bits a cell -- 1, 2, 4, 8 or 16 -- in its low five bits and its tile size, as a scale, in the three above ("Tile size"); 0 of an entity type and of a rule, which hold nothing |
 
 An attribute's, under the same first byte: its **number** in the 52
 bits after it (`ATTRIBUTE_NUMBERS`), and in its last four
@@ -102,11 +102,37 @@ Cold, it is as many layers of a bit a cell, the bit `b` of every cell
 the layer of number `first + b` (`LayerType::plane`): storage and the
 codec know bitmaps only. A plane keeps how wide it is in the type
 itself -- its bits a cell, in the ID's last byte ("The bytes of an
-ID") -- so `bits` is read off the ID with no table; the
+ID"), beside its tile size ("Tile size") -- so `bits` is read off the ID with no table; the
 width as a type (`Width::BITS`) is the same number known as the code
 is built. An attribute's width is its data's bits, 448 in a block of
 its own ("Layouts"). An entity type holds nothing itself, nor does a
 rule: 0.
+
+## Tile size
+
+A plane holds a number a cell, or a number a **tile**: an aligned
+square of cells, `2^scale` a side. Every plane of the ground is of
+cells, a tile size of 1x1; the weather's -- the clouds (`CLOUD`, four
+bits) and the climate (`CLIMATE`, sixteen: humidity, temperature and
+wind together, one read for all three) -- are of tiles 8x8
+(`WEATHER_TILE_SCALE`, 3), since weather does not differ from one cell
+to the next and sixty-four times fewer numbers are kept and worked on.
+
+The tile size is in the type, beside the width: the last byte of a
+plane's ID is its bits a cell in its low five bits and its tile's
+scale in the three above (`LayerType::of_tiles`, `tile_scale`,
+`tile_side`; `Wide::of_tiles`), and a plane's row says it too
+(`Registered::tile_scale`). So nothing that keeps, sends or draws a
+plane is told its tile size by hand: the arena sizes its buckets from
+the type, the frame a client is sent says how the clouds are laid out
+from `CLOUD`'s type, and a plane of another tile size registered
+tomorrow is kept as it should be with nothing else changed.
+
+Cells are in Morton order, so a tile is a run of cells and its place
+among its chunk's tiles is any of its cells' places less the bits of a
+tile's cells (`tile_shift`, two a scale): a plane of tiles is read and
+written at a cell, as any plane is, and every cell of a tile reads the
+tile's number.
 
 ## Layouts
 

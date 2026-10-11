@@ -8,7 +8,7 @@ use bitplane_manager::BucketKey;
 use type_registry::GRASS;
 use chunk_storage::{LayerType, SuperchunkImage};
 use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
-use type_registry::{TREE, TREE_STAGE};
+use type_registry::{CLOUD, TREE, TREE_STAGE};
 pub use simulation::halos::Viewport;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -26,6 +26,24 @@ pub const STAGE_BITS: usize = TREE_STAGE.layer_type().bits() as usize;
 
 /// The oldest stage a tree has.
 pub const OLDEST_TREE_STAGE: u32 = type_registry::OLDEST_TREE_STAGE;
+
+/// Bits a tile's cloud takes in [`Cells::clouds`]: the cloud plane's,
+/// as the type registry has it.
+pub const CLOUD_BITS: usize = CLOUD.layer_type().bits() as usize;
+/// How many places a cell's place in its superchunk is shifted by to
+/// give its tile's in the cloud plane: the plane's tile size, as the
+/// type registry has it.
+pub const CLOUD_TILE_SHIFT: u32 = CLOUD.layer_type().tile_shift();
+/// The most cloud a tile holds: the deepest shadow.
+pub const DEEPEST_CLOUD: u32 = CLOUD.most();
+
+/// The cloud over the tile at `tile` of a superchunk -- its tiles in
+/// Morton order, as [`Cells::clouds`] holds them: 0 for none, and
+/// where no cloud was sent.
+pub fn cloud_over(clouds: &[u64], tile: usize) -> u32 {
+    let at = tile * CLOUD_BITS;
+    clouds.get(at / WORD_BITS).map_or(0, |word| (word >> (at % WORD_BITS)) as u32 & DEEPEST_CLOUD)
+}
 
 /// Where in its chunk, `(x, y)`, the cell is that the `bit`-th bit of
 /// a chunk's bitmap stands for: the bits are in Morton order.
@@ -110,6 +128,11 @@ pub struct Cells {
     pub stages: Vec<u64>,
     /// The cells with water on them, however deep, laid out as the grass.
     pub wet: Vec<u64>,
+    /// Its clouds, [`CLOUD_BITS`] a tile: its 16 chunks' buckets one
+    /// after another, as the arena holds the plane -- a number a tile
+    /// of the plane's tile size, read by [`cloud_over`]. Empty where
+    /// no tile of it has any cloud.
+    pub clouds: Vec<u64>,
     /// How deep its water is: never changing, so shared with every
     /// frame it is in, not copied.
     pub water: Arc<Water>,
@@ -189,7 +212,9 @@ pub(crate) fn copy(world: &World, (x, y): (u32, u32), ask: Ask, sent: &mut HashM
     let water = Arc::clone(sent.entry(superchunk).or_insert_with(|| Arc::new(Water::of(image))));
     // A tree's stage is drawn only where a cell is a pixel or more.
     let stages = if ask.near.is_some() || ask.detail == 0 { planes(TREE_STAGE.layer_type()) } else { Vec::new() };
-    Some(Cells { at: (x, y), heights, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages, wet: planes(WET), water, sheep: sheep(world, superchunk) })
+    // No cloud over it: nothing to send, nothing to draw.
+    let clouds = Some(planes(CLOUD.layer_type())).filter(|clouds| clouds.iter().any(|&word| word != 0)).unwrap_or_default();
+    Some(Cells { at: (x, y), heights, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages, wet: planes(WET), clouds, water, sheep: sheep(world, superchunk) })
 }
 
 /// A superchunk's water as a client draws it, off its image: kept for
@@ -229,7 +254,7 @@ impl Water {
 /// after another -- of a wide type, as many times a bitmap's words a
 /// chunk as it has bits a cell.
 fn layer(world: &World, layer_type: LayerType, superchunk: SuperchunkIndex) -> Vec<u64> {
-    let chunk_words = CHUNK_WORDS * layer_type.bits() as usize;
+    let chunk_words = chunk_storage::wide::bucket_words(layer_type);
     let mut words = Vec::with_capacity(CHUNKS_IN_SUPERCHUNK * chunk_words);
     for chunk in superchunk.chunks() {
         match world.arena.bucket(BucketKey { layer_type, chunk }) {
