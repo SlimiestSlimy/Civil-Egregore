@@ -149,8 +149,8 @@ that still holds when the write is come to; otherwise it is
 a cell -- the number a layer holds there, 1 or 0 on a layer of a bit
 a cell; or that an entity may be made on it -- or of an entity: that
 it is there still, wherever it stands now; that an attribute of it is
-as it was seen, or that it has none; that a word or two of an
-attribute are as seen. If it does not hold when
+as it was seen, or that it has none; that a member of an
+attribute is as seen. If it does not hold when
 it is come to, everything its author queued after it is skipped --
 cells written, what entities come to, counts alike -- up to the
 end of the compare (`Turn::compare_end`).
@@ -160,7 +160,7 @@ an entity. A compare a rule gives takes the place of the one it gave
 before.
 
 **A write is a write and nothing else**: a layer, a cell, a number;
-an entity, an attribute, a word or two of it; a wake. It carries no
+an entity, an attribute, a member of it; a wake. It carries no
 compare. What it is held against -- the cell still as the rule saw
 it, the attribute still as seen, the entity there still -- is a
 compare queued before it, and the write is under that:
@@ -168,7 +168,7 @@ compare queued before it, and the write is under that:
 write; an attribute set queues a compare of the attribute and, under
 it, the members that changed, each its bytes and no more; a step
 queues a compare of the entity being there, its move and its wake. A
-compare carries what was seen in sixteen bytes at the most -- of a
+compare carries what was seen in eight bytes at the most -- of a
 whole attribute, a sum of its blocks
 (`entity_manager::attribute_seen`), never a block. What is written is
 in order already, author by author, which is all this takes.
@@ -377,7 +377,7 @@ A walking entity is four instructions a step, 96 bytes -- a compare,
 a move, a wake, the compare's end -- and none of its
 attributes read or written, however many it has -- until it crosses to
 another superchunk, where it goes whole. An entity is
-changed, by itself or by another, a word or two at a time under a
+changed, by itself or by another, a member at a time under a
 compare of the attribute: two wounding one in a tick each
 write their own attribute, where two whole copies would undo each
 other, and of two writing the same attribute one is refused
