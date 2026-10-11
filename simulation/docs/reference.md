@@ -41,22 +41,18 @@ Entities read: **`woken()`**, **`woken_reading(layers)`** (the cells
 about each asked of memory ahead) -- its entities waking this tick, in
 Morton order, borrowed from the world as the tick found it, not from
 the turn, so instructions can be queued while going through them;
-**`entity_on(at)`** (the entity the tick found on a cell: its name for the tick), **`entities_in(chunk)`**, **`occupied(origin,
-width, height)`** (the cells entities stand on, up to `OCCUPIED_SIDE`
-each way, a row a word: cell `(x, y)` from `origin` at bit `x` of row
-`y`).
+**`entity_on(at)`** (the entity the tick found on a cell: its name for the tick), **`entities_in(chunk)`**.
 
-**Queued, an instruction a function** (`turn/one_instruction.rs`;
+**Queued, an instruction a write** (`turn/one_instruction.rs`;
 `simulation.md`, "Instructions"): **`compare_open(compare)`**,
 **`compare_close()`**: a compare queued, open until closed, one within
-another; **`write_cell(type, at, value, counted)`**;
-**`count(place)`**, landing where the compare open last does;
-**`make_entity(header)`**; **`move_entity(from, to)`**, within a
-superchunk or over a border (`move_instruction`: a move, or a
-crossing, which lands its author in both); **`remove_entity(at)`**;
-**`write_attribute_member(at, kind, member, value)`**;
+another; **`write(write)`**: one write, said whole as a **`Write`**
+(below) -- a cell, a count (landing where the compare open last
+does), an entity made, moved (within a superchunk, or over a border:
+a crossing, which lands its author in both), removed, a member of an
+attribute, an attribute removed, a wake;
 **`write_attribute(at, attribute)`**: an attribute whole, its blocks
-carried; **`remove_attribute(at, kind)`**; **`write_wake(at, wake)`**.
+carried, the one write that is no `Write`.
 **`compare_with_writes(compare, writes)`**: a compare, the writes
 under it and its end at once, the queue found once -- every write
 landing in the compare's superchunk; **`Write`**: a write as a value,
@@ -80,9 +76,12 @@ what is on a cell -- the `author` of what it queues from here on
 `SLOTS` (9): an outbox's slots. A turn's fields: its `superchunk`, its
 `entities`, `now`, the thread's `reader` and `entity_reader`, its
 `outbox`, its `random`, the compare its instructions are queued
-under (`comparing`) and the number its counts are `counted_from`.
+under (`comparing`, whether there is one) and the number its counts are `counted_from`.
 `slot_between(from, to)`: the slot of one superchunk in another's
-outbox, none past the neighbours.
+outbox, none past the neighbours. `slots()`: the nine offsets, each
+with its outbox slot. `Turn::new`: a turn with nothing queued.
+`begin_segment(queue, slot)`: the author's segment of a queue begun,
+if the last there is another's.
 
 `instruction.rs` (`simulation.md`, "Instructions"). **`Instruction`**:
 24 bytes -- its `opcode`, sixteen bits (`small`), thirty-two (`place`:
@@ -119,8 +118,8 @@ were seen, their sum.
 queues, for whichever superchunk, is skipped if the compare does
 not hold when come to; **`Turn::compare_end()`**: no more.
 `queue(lands, instruction)`: one queued -- a write under no compare
-panics; `open(at, instruction)`, `open_compare(compare)`,
-`close_compare()`: a compare queued and pushed on the turn's stack of
+panics; `compare_open(compare)`,
+`compare_close()`: a compare queued and pushed on the turn's stack of
 compares open (`CompareOpen`, `NONE` an empty one), one within another up to `COMPARES_WITHIN` (4), and
 popped, what is under it -- the queue's end less where it lies, and
 the compares within it -- noted beside the queue (`Gated` `{instructions,
@@ -130,8 +129,7 @@ the rule's first count is counted under; `counted_number(place)`: a
 count's number, under `COUNTED_WHEN_APPLIED` (256) --
 **`CountedWhenApplied`**, a tick's counts made as it applied.
 `Queue` `{instructions, gated, carried}`: what is queued for one
-superchunk, and the blocks its attributes given whole carry -- `clear`, `len`,
-`compares`.
+superchunk, and the blocks its attributes given whole carry -- `clear`.
 
 `apply.rs`: `Queue::apply(some, compares, superchunk, entities,
 earliest, collision, applied)`: one author's instructions in the
@@ -246,21 +244,20 @@ against another; **`Simulation::on(dispatcher)`**: on threads others
 queue jobs on too; **`keep_entities_in(collision_plane)`**: the layer
 the entities are kept in from then on; **`threads`**. `align_random(superchunks, seed)`:
 each superchunk given the stream it had, or a new one from the seed and
-its index. `PartOfTurns`: what a thread claims of the first phase --
-where its superchunks start, their outboxes, their random streams. **`random_states()`**: each
+its index. `TurnToClaim`: what a thread claims of the first phase --
+a superchunk's outbox and its random stream. **`random_states()`**: each
 superchunk's index and random stream's state; **`restore_random(
 states)`**: taken up, as a save kept them. **`tick(arena, entities,
 seed, rule)`**: the entities aligned to the arena's superchunks (those
 dropped counted lost); the superchunks claimed by the threads one at a
-time (`CLAIMED`); the first phase runs the rule on each, a `Reader` a
+time; the first phase runs the rule on each, a `Reader` a
 thread; the second, each thread the superchunks it claims and
 their entities, passes each wheel's tick, then applies what the nine
 outboxes hold for it, segment by segment in the order of their authors
 (`simulation.md`, "One order, wherever the borders fall"); writes to superchunks not in use counted
 missed, entities made there lost (`Queue::count_missed`); every
 entity named anew, the cells left cleared in the collision plane;
-the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
-offsets in a fixed order.
+the outboxes emptied; the entities' tick advanced.
 
 `tick/applying.rs` (`simulation.md`, "An act over a border"): the
 second phase. **`apply_what_was_queued(dispatcher, superchunks,
@@ -270,10 +267,9 @@ each thread applied. `Room`: what it keeps from tick to tick.
 `order`, the `next` of it, whether it has `begun`. `Phase`: what every
 thread is given. `Segmented`: an author's segment queued for a
 superchunk -- the author, whose outbox, which queue, which segment.
-`slots()`: the nine offsets by outbox slot. `Phase::gather(here,
+`Phase::gather(here,
 order)`: what is queued for a superchunk, sorted by author;
-`landed_in(source, lands)`: the hot superchunks an act lands in, and
-how many; `go_on(here, part, applied)`: applies down a superchunk's
+`landed_in(source, lands)`: the hot superchunks an act lands in; `go_on(here, part, applied)`: applies down a superchunk's
 order until it is done or waits at an act, then the superchunks it may
 be waiting for. `tick/applying/following.rs` (`simulation.md`, "An entity over a border"):
 `Phase::named_by_others`, the entities others named, with those

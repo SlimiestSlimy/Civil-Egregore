@@ -9,7 +9,7 @@ mod applying;
 use entity_manager::{Entities, EntityReader, InstructionsApplied};
 use crate::turn::apply::Standing;
 use crate::turn::conditional::{CountedWhenApplied, COUNTED_WHEN_APPLIED};
-use crate::turn::{slot, Outbox, Turn};
+use crate::turn::{slots, Outbox, Turn};
 use bitplane_manager::{BitmapArena, Reader, WritesApplied};
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, SuperchunkIndex};
@@ -20,12 +20,9 @@ use std::time::{Duration, Instant};
 use utilities::dispatcher::Dispatcher;
 use utilities::rng::Rng;
 
-/// Superchunks a thread claims at a time, of a tick's work.
-const CLAIMED: usize = 1;
-
-/// A piece of the first phase, claimed by a thread: where its superchunks
-/// start among them all, their outboxes, and their random numbers.
-type PartOfTurns<'a> = (usize, &'a mut [Outbox], &'a mut [(SuperchunkIndex, Rng)]);
+/// A superchunk's turn to be claimed by a thread in the first phase:
+/// its outbox and its random numbers.
+type TurnToClaim<'a> = Mutex<(&'a mut Outbox, &'a mut (SuperchunkIndex, Rng))>;
 
 /// What a tick did, and how long each phase took.
 #[derive(Clone, Copy, Debug)]
@@ -159,8 +156,6 @@ impl Simulation {
         let count = arena.superchunks().len();
         self.outboxes.resize_with(count, Outbox::default);
         let parts = self.dispatcher.threads();
-        // The superchunks are not split among the threads beforehand: each thread claims the next piece not yet claimed, so none idles while another has work left.
-        let per_part = CLAIMED;
 
         let start = Instant::now();
         let superchunk_indices = arena.superchunk_indices();
@@ -169,13 +164,8 @@ impl Simulation {
         let now = entities.now();
         let superchunks = arena.superchunks();
         let entity_superchunks = entities.superchunks();
-        let outboxes: Vec<Mutex<PartOfTurns>> = self
-            .outboxes
-            .chunks_mut(per_part)
-            .zip(self.random.chunks_mut(per_part))
-            .enumerate()
-            .map(|(part, (outboxes, random))| Mutex::new((part * per_part, outboxes, random)))
-            .collect();
+        // The superchunks are not split among the threads beforehand: each thread claims the next not yet claimed, so none idles while another has work left.
+        let turns: Vec<TurnToClaim> = self.outboxes.iter_mut().zip(&mut self.random).map(Mutex::new).collect();
         let results: Vec<Mutex<R>> = (0..parts).map(|_| Mutex::new(R::default())).collect();
         let samples = &self.samples;
         let claimed = AtomicUsize::new(0);
@@ -183,21 +173,21 @@ impl Simulation {
             let (reader, entity_reader) = (Reader::new(superchunks), EntityReader::new(entity_superchunks));
             let mut samples = samples[part].lock().expect("a part's samples");
             let mut total = R::default();
-            while let Some(work) = outboxes.get(claimed.fetch_add(1, Ordering::Relaxed)) {
-                let (first, ref mut outboxes, ref mut random) = *work.lock().expect("a piece's outboxes");
-                for (offset, (outbox, kept)) in outboxes.iter_mut().zip(random.iter_mut()).enumerate() {
-                    let superchunk = &superchunks[first + offset];
-                    let random = Rng::new(kept.1.state());
-                    let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random, author: 0, comparing: None, compares_open: [crate::turn::conditional::CompareOpen::NONE; crate::turn::conditional::COMPARES_WITHIN], compares_open_count: 0, writes_queued: 0, counted_from: 0, across: false, author_began: None, landed_last: (crate::turn::NO_SUPERCHUNK, 0, 0) };
-                    total += rule(&mut turn, &mut samples);
-                    turn.compare_end();
-                    // Where its random numbers have come to: the next tick goes on from there.
-                    kept.1 = turn.random;
-                }
+            loop {
+                let at = claimed.fetch_add(1, Ordering::Relaxed);
+                let Some(claim) = turns.get(at) else {
+                    break;
+                };
+                let (ref mut outbox, ref mut kept) = *claim.lock().expect("a superchunk's turn");
+                let mut turn = Turn::new(&superchunks[at], &entity_superchunks[at], now, &reader, &entity_reader, outbox, Rng::new(kept.1.state()));
+                total += rule(&mut turn, &mut samples);
+                turn.compare_end();
+                // Where its random numbers have come to: the next tick goes on from there.
+                kept.1 = turn.random;
             }
             *results[part].lock().expect("a part's result") = total;
         });
-        drop(outboxes);
+        drop(turns);
         let mut rules = R::default();
         for result in results {
             rules += result.into_inner().expect("a part's result");
@@ -220,12 +210,12 @@ impl Simulation {
         }
         // Writes landing where no bitmap is in use are missed.
         for (source, outbox) in self.outboxes.iter_mut().enumerate() {
-            for (dx, dy) in neighbours() {
+            for (slot, (dx, dy)) in slots() {
                 let Some(target) = superchunk_indices[source].offset(dx, dy) else {
                     continue;
                 };
                 if superchunk_indices.binary_search(&target).is_err() {
-                    outbox.queues[slot(dx, dy)].count_missed(&mut applied, &mut instructions_applied);
+                    outbox.queues[slot].count_missed(&mut applied, &mut instructions_applied);
                 }
             }
             outbox.queues.iter_mut().for_each(|queue| queue.clear());
@@ -236,10 +226,4 @@ impl Simulation {
         entities.advance();
         TickReport { writes_applied: applied, instructions_applied, instructions_compared, counted_when_applied, acts_over_a_border, rules, computing: computed - start, applying: computed.elapsed() }
     }
-}
-
-/// A superchunk's own place and its eight neighbours', as offsets, in a
-/// fixed order: the order the second phase applies their writes in.
-fn neighbours() -> impl Iterator<Item = (i32, i32)> {
-    (-1..=1).flat_map(|dy| (-1..=1).map(move |dx| (dx, dy)))
 }

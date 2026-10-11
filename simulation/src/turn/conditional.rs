@@ -171,16 +171,6 @@ impl Queue {
         self.gated.clear();
         self.carried.clear();
     }
-
-    /// How many compares are queued.
-    pub(crate) fn compares(&self) -> usize {
-        self.gated.len()
-    }
-
-    /// How many instructions are queued.
-    pub(crate) fn len(&self) -> usize {
-        self.instructions.len()
-    }
 }
 
 impl Turn<'_> {
@@ -234,19 +224,15 @@ impl Turn<'_> {
         (carried.len() - blocks.len()) as u32
     }
 
-    /// Queues `compare`, open from here ([`Turn::open`]).
-    pub(crate) fn open_compare(&mut self, compare: Compare) {
-        self.open(compare.at(), compare.instruction());
-    }
-
-    /// Queues the compare `instruction`, of the cell `at`, open from
-    /// here: what is queued until it is closed is under it, and under
-    /// every compare open already. Where it lies in its queue is
-    /// pushed on the turn's small stack of compares open.
-    pub(crate) fn open(&mut self, at: CellIndex, instruction: Instruction) {
-        debug_assert!(instruction.is_a_compare());
+    /// Queues `compare`, open from here: what is queued until
+    /// [`Turn::compare_close`] is under it, and under every compare
+    /// open already -- up to [`COMPARES_WITHIN`] one within another.
+    /// Where it lies in its queue is pushed on the turn's small stack
+    /// of compares open.
+    pub fn compare_open(&mut self, compare: Compare) {
+        let at = compare.at();
         // Where the instruction went: its slot's queue, or that of acts over a border.
-        let index = self.queue(at, instruction);
+        let index = self.queue(at, compare.instruction());
         let queue = &mut self.outbox.queues[index];
         // Its place among what is under each compare is kept now, in the order the compares are come to, and filled as it is closed.
         let open = CompareOpen { at, instruction: queue.instructions.len() as u32 - 1, gated: queue.gated.len() as u32, writes_before: self.writes_queued, carried_before: queue.carried.len() as u32, queue: index as u8 };
@@ -256,13 +242,13 @@ impl Turn<'_> {
         self.compares_open_count += 1;
     }
 
-    /// Closes the compare opened last, popped off the stack: all its
+    /// Queues the end of the compare opened last, popped off the stack: all its
     /// queue holds after it is what is under it -- the queue's end
     /// less where the compare lies, and the compares queued since,
     /// those within it -- noted beside the queue ([`Gated`]), for a
     /// compare that does not hold to jump over; then its end is
     /// queued. One within another is closed first.
-    pub(crate) fn close_compare(&mut self) {
+    pub fn compare_close(&mut self) {
         self.compares_open_count -= 1;
         let open = self.compares_open[self.compares_open_count];
         let queue = &mut self.outbox.queues[open.queue as usize];
@@ -282,14 +268,14 @@ impl Turn<'_> {
     /// applied as one (`docs/simulation.md`, "An act over a border").
     pub fn compare_from_here(&mut self, compare: Compare) {
         self.compare_end();
-        self.comparing = Some(compare);
-        self.open_compare(compare);
+        self.comparing = true;
+        self.compare_open(compare);
     }
 
     /// From here on, what the rule queues is under no compare.
     pub fn compare_end(&mut self) {
-        if self.comparing.take().is_some() {
-            self.close_compare();
+        if std::mem::take(&mut self.comparing) {
+            self.compare_close();
         }
     }
 }

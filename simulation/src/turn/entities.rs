@@ -2,7 +2,7 @@
 //! instructions queued for them.
 
 use super::Turn;
-use entity_manager::{EntityRef, SuperchunkEntities, OCCUPIED_SIDE};
+use entity_manager::{EntityRef, SuperchunkEntities};
 use bitplane_manager::Reader;
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, ChunkIndex};
@@ -36,13 +36,5 @@ impl<'a> Turn<'a> {
     /// superchunk is not hot.
     pub fn entities_in(&self, chunk: ChunkIndex) -> Option<impl Iterator<Item = EntityRef<'a>> + 'a> {
         self.entity_reader.chunk(chunk)
-    }
-
-    /// The cells entities stand on among the `width` by `height` cells
-    /// (each up to [`OCCUPIED_SIDE`]) from `origin`, as the tick found
-    /// them: cell `(x, y)` at bit `x` of row `y`
-    /// (`docs/simulation.md`, "Entities").
-    pub fn occupied(&self, origin: CellIndex, width: u32, height: u32) -> [u16; OCCUPIED_SIDE] {
-        self.entity_reader.occupied(origin, width, height)
     }
 }
