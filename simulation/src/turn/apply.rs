@@ -54,18 +54,21 @@ pub(crate) struct Applied {
     pub(crate) compared: (u64, u64),
     /// What was counted as it was applied.
     pub(crate) counted: CountedWhenApplied,
+    /// Acts over a border applied.
+    pub(crate) acts_over_a_border: u64,
 }
 
 impl Default for Applied {
     fn default() -> Self {
-        Self { writes: Default::default(), instructions: Default::default(), compared: (0, 0), counted: [0; COUNTED_WHEN_APPLIED] }
+        Self { writes: Default::default(), instructions: Default::default(), compared: (0, 0), counted: [0; COUNTED_WHEN_APPLIED], acts_over_a_border: 0 }
     }
 }
 
 /// Whether the compare `instruction`, of the cell `at`, holds now, in
 /// `superchunk` and its `entities`: not where the cell is not hot,
 /// nor if the entity no longer stands anywhere.
-fn holds(instruction: &Instruction, at: CellIndex, superchunk: &mut Superchunk, entities: &SuperchunkEntities, collision: Option<LayerType>) -> bool {
+fn holds(instruction: &Instruction, at: CellIndex, superchunk: &mut Superchunk, entities: &mut SuperchunkEntities, collision: Option<LayerType>) -> bool {
+    let entities = &*entities;
     // The attribute of type `kind` of the entity: none within if it has none, none at all if it is gone.
     let attribute = |kind: u64| Some(attribute_blocks(entities.get_named(at)?.attributes, AttributeType(kind)));
     match instruction.opcode {
@@ -81,6 +84,45 @@ fn holds(instruction: &Instruction, at: CellIndex, superchunk: &mut Superchunk, 
     }
 }
 
+/// Where instructions land as they are applied: the superchunk of
+/// an outbox slot and its entities, if it is hot.
+pub(crate) trait Landing {
+    /// The superchunk of the slot `slot` of the outbox the
+    /// instructions were queued in, and its entities.
+    fn of_slot(&mut self, slot: usize) -> Option<(&mut Superchunk, &mut SuperchunkEntities)>;
+}
+
+/// One superchunk, all a queue's instructions landing in it: the
+/// queue of a slot.
+pub(crate) struct LandingInOne<'a> {
+    /// The superchunk.
+    pub(crate) superchunk: &'a mut Superchunk,
+    /// Its entities.
+    pub(crate) entities: &'a mut SuperchunkEntities,
+}
+
+impl Landing for LandingInOne<'_> {
+    #[inline]
+    fn of_slot(&mut self, _: usize) -> Option<(&mut Superchunk, &mut SuperchunkEntities)> {
+        Some((self.superchunk, self.entities))
+    }
+}
+
+/// The superchunks an act over a border lands in, by outbox slot:
+/// none at a slot whose superchunk is not hot, or that the act does
+/// not reach.
+pub(crate) struct LandingInSeveral<'a> {
+    /// The superchunk of each slot, and its entities.
+    pub(crate) lands: [Option<(&'a mut Superchunk, &'a mut SuperchunkEntities)>; super::SLOTS],
+}
+
+impl Landing for LandingInSeveral<'_> {
+    #[inline]
+    fn of_slot(&mut self, slot: usize) -> Option<(&mut Superchunk, &mut SuperchunkEntities)> {
+        self.lands[slot].as_mut().map(|(superchunk, entities)| (&mut **superchunk, &mut **entities))
+    }
+}
+
 impl Queue {
     /// Counts every write of a cell as missed, and every entity to be
     /// made as lost: the superchunk they land in is not hot.
@@ -91,40 +133,62 @@ impl Queue {
         instructions.lost += count(&[Opcode::MakeEntity, Opcode::CrossEntity]);
     }
 
+    /// Jumps over all that is under the compare `instruction`, which
+    /// does not hold -- to its end, or the end of what the author
+    /// queued -- `next` being the instruction after it and `compares`
+    /// its place among the compares: the writes under it refused.
+    #[inline]
+    fn jump_over(&self, instruction: &Instruction, next: &mut usize, compares: &mut usize, applied: &mut Applied) {
+        let gated = self.gated[*compares];
+        applied.compared.1 += 1;
+        (*next, *compares) = (*next + gated.instructions as usize, *compares + 1 + gated.compares_within as usize);
+        (applied.writes.writes, applied.writes.refused) = (applied.writes.writes + gated.writes as usize, applied.writes.refused + u64::from(gated.writes));
+        // The cell not free is the entity not made.
+        applied.instructions.refused += usize::from(instruction.opcode == Opcode::CompareCellFree);
+    }
+
     /// Applies the instructions at `some` -- one author's
     /// ([`super::Segment`]), whose compares are those from `compares`
-    /// on -- to `superchunk` and its `entities`, in the order queued,
-    /// each as it is come to. A compare that does not hold has what
-    /// is under it jumped over, writes of cells, of entities and
-    /// counts alike: so what one applied changed, the next compare is
-    /// held against. Every wake is filed no earlier than `earliest`;
-    /// `collision` is the layer entities are kept in, if the world
-    /// has one ([`Standing`]).
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn apply(&self, some: std::ops::Range<usize>, mut compares: usize, superchunk: &mut Superchunk, entities: &mut SuperchunkEntities, earliest: u64, collision: Option<LayerType>, applied: &mut Applied) {
-        let here = superchunk.index();
+    /// on -- each to the superchunk it lands in, of `lands`, and its
+    /// entities, in the order queued, each as it is come to. A
+    /// compare that does not hold has what is under it jumped over,
+    /// writes of cells, of entities and counts alike, wherever each
+    /// lands: so what one applied changed, the next compare is held
+    /// against. One landing in a superchunk that is not hot does not
+    /// hold, and a write landing in one is missed. Every wake is
+    /// filed no earlier than `earliest`; `collision` is the layer
+    /// entities are kept in, if the world has one ([`Standing`]).
+    pub(crate) fn apply(&self, some: std::ops::Range<usize>, mut compares: usize, lands: &mut impl Landing, earliest: u64, collision: Option<LayerType>, applied: &mut Applied) {
         let (mut next, end) = (some.start, some.end);
         while next < end {
             let instruction = &self.instructions[next];
             next += 1;
+            // One match an instruction where every slot's superchunk is hot, as in a queue of one slot: all but acts over a border.
+            let Some((superchunk, entities)) = lands.of_slot(instruction.slot()) else {
+                // Its superchunk not hot: a compare does not hold, a cell's write is missed, an entity to be made lost, anything else of nobody.
+                match instruction.opcode {
+                    Opcode::CompareEnd => {}
+                    Opcode::Count => applied.counted[instruction.first as usize] += 1,
+                    Opcode::WriteCell => (applied.writes.writes, applied.writes.missed) = (applied.writes.writes + 1, applied.writes.missed + 1),
+                    Opcode::MakeEntity | Opcode::CrossEntity => applied.instructions.lost += 1,
+                    _ if instruction.is_a_compare() => self.jump_over(instruction, &mut next, &mut compares, applied),
+                    _ => applied.instructions.passed_over += 1,
+                }
+                continue;
+            };
+            let here = superchunk.index();
             let at = instruction.at(here);
             let done = &mut applied.instructions;
             match instruction.opcode {
                 Opcode::CompareEnd => {}
                 Opcode::Count => applied.counted[instruction.first as usize] += 1,
                 Opcode::CompareCell | Opcode::CompareCellFree | Opcode::CompareEntity | Opcode::CompareAttribute | Opcode::CompareAttributeMember => {
-                    let gated = self.gated[compares];
-                    compares += 1;
                     if holds(instruction, at, superchunk, entities, collision) {
                         applied.compared.0 += 1;
+                        compares += 1;
                         continue;
                     }
-                    applied.compared.1 += 1;
-                    // Over all that is under it at once: to its end, or the end of what the author queued.
-                    (next, compares) = (next + gated.instructions as usize, compares + gated.compares_within as usize);
-                    (applied.writes.writes, applied.writes.refused) = (applied.writes.writes + gated.writes as usize, applied.writes.refused + u64::from(gated.writes));
-                    // The cell not free is the entity not made.
-                    done.refused += usize::from(instruction.opcode == Opcode::CompareCellFree);
+                    self.jump_over(instruction, &mut next, &mut compares, applied);
                 }
                 Opcode::WriteCell => {
                     let layer_type = LayerType(instruction.first);

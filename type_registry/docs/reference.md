@@ -34,8 +34,8 @@ attribute block, `BLOCK_BYTES` its bytes; `ATTRIBUTE_BLOCKS_MOST` (16) and `ATTR
 blocks hold. **`Layout`**: how an attribute's data is laid out --
 `WORDS`, `BLOCKS`, `MEMBERS`, **`write(data)`**, **`read(data)`** -- had by `u64`, one
 number in the first word, and by **`SheepState`** `{hungry_at,
-lamb_due_at, grown_at, roaming_until, bearing_neighbour, mother_neighbour, roaming_neighbour}`, a
-word each in that order but the two neighbours of a birth, a word's halves; a tick of 0 none. **`Attribute<L>`**: an attribute, its
+lamb_due_at, grown_at, roaming_until, roaming_neighbour}`, a
+word each in that order; a tick of 0 none. **`Attribute<L>`**: an attribute, its
 layout in its type: **`new(number)`**, **`attribute_type`**. **`Member`** `{offset, bytes}`: a field by where its bytes lie; **`Member::word(word)`**, **`Member::within(word, first, bytes)`**, **`Member::of(data)`**.
 
 ## `registry.rs`
@@ -46,7 +46,7 @@ width the bits of its data; **`numbers`** how many
 numbers it takes from `number` on, **`layer_type`** its layer type if it is of
 the cells. `layer`, `wide`, `entity`, `attribute`: a row made from its constant. **`REGISTRY`**: the table, written by hand. The constants:
 `GRASS`, `TREE`, `TREE_STAGE`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`, `WET`, the
-cells'; `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, four blocks; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
+cells'; `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, three blocks; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
 **`first_clash(registry)`**: the first row to take a number or a name of
 one before it -- checked on `REGISTRY` as the crate is built.
 **`named(name)`**, **`of_number(number)`**: a row by its name, and by any number it

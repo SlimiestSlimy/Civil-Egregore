@@ -88,9 +88,8 @@ impl Layout for u64 {
     }
 }
 
-/// All a sheep keeps, in the four blocks of [`SHEEP_STATE`](crate::SHEEP_STATE):
-/// a word a member, in the order written, but the two neighbours of
-/// a birth, a word's halves. A tick of 0 is none: the
+/// All a sheep keeps, in the three blocks of [`SHEEP_STATE`](crate::SHEEP_STATE):
+/// a word a member, in the order written. A tick of 0 is none: the
 /// sheep is not in the middle of that.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SheepState {
@@ -104,29 +103,21 @@ pub struct SheepState {
     /// once, at the meal, with the neighbour: a step on the way
     /// changes nothing.
     pub roaming_until: u64,
-    /// The neighbour it put its lamb on last tick, by its way and one
-    /// more, if it put one: pregnant still, until it has seen the
-    /// lamb stand there.
-    pub bearing_neighbour: u32,
-    /// A lamb's: the neighbour its mother stood on as it was put, by
-    /// its way and one more -- what its mother knows it by, the tick
-    /// after.
-    pub mother_neighbour: u32,
     /// The neighbour it steps to while it roams, by its way: which
     /// of the nine cells about it.
     pub roaming_neighbour: u32,
 }
 
 impl Layout for SheepState {
-    const WORDS: usize = 6;
-    const MEMBERS: &'static [Member] = &[Member::word(0), Member::word(1), Member::word(2), Member::word(3), Member::within(4, 0, 4), Member::within(4, 4, 4), Member::within(5, 0, 4)];
+    const WORDS: usize = 5;
+    const MEMBERS: &'static [Member] = &[Member::word(0), Member::word(1), Member::word(2), Member::word(3), Member::within(4, 0, 4)];
 
     fn write(self, data: &mut [u64]) {
-        data[..6].copy_from_slice(&[self.hungry_at, self.lamb_due_at, self.grown_at, self.roaming_until, u64::from(self.bearing_neighbour) | u64::from(self.mother_neighbour) << 32, self.roaming_neighbour as u64]);
+        data[..5].copy_from_slice(&[self.hungry_at, self.lamb_due_at, self.grown_at, self.roaming_until, self.roaming_neighbour as u64]);
     }
 
     fn read(data: &[u64]) -> Self {
-        Self { hungry_at: data[0], lamb_due_at: data[1], grown_at: data[2], roaming_until: data[3], bearing_neighbour: data[4] as u32, mother_neighbour: (data[4] >> 32) as u32, roaming_neighbour: data[5] as u32 }
+        Self { hungry_at: data[0], lamb_due_at: data[1], grown_at: data[2], roaming_until: data[3], roaming_neighbour: data[4] as u32 }
     }
 }
 

@@ -36,6 +36,24 @@ pub fn spawn(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attrib
     turn.put(Header { kind, at, wake }, attributes);
 }
 
+/// [`spawn`], the compare of the entity's cell left open: what the
+/// rule queues from here to [`made`] happens only if the entity is
+/// made, and the entity is made only if every compare the rule is
+/// queuing under holds -- whichever superchunks the cell and the rest
+/// are in. How a rule has two things happen together or not at all:
+/// a lamb born and its mother no longer pregnant.
+#[inline]
+pub fn make(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attributes: &[AttributeBlock]) {
+    turn.make(Header { kind, at, wake }, attributes);
+}
+
+/// Ends what [`make`] began: what the rule queues from here does not
+/// hang on the entity being made.
+#[inline]
+pub fn made(turn: &mut Turn) {
+    turn.made();
+}
+
 /// Queues `entity` sleeping where it stands until `wake`: its
 /// attributes as they are, none carried.
 #[inline]

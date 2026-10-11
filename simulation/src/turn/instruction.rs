@@ -72,7 +72,8 @@ pub(crate) enum Opcode {
 /// What a write counts under when it counts nothing.
 pub(crate) const NO_COUNT: u64 = u64::MAX;
 /// The bits of an instruction's `place` that are the cell's place in
-/// its superchunk.
+/// its superchunk; the four above say which superchunk it lands in,
+/// of its author's and the eight about that, by outbox slot.
 const PLACE_BITS: u32 = 20;
 
 /// One instruction (the module's docs): its opcode, sixteen bits and
@@ -84,7 +85,8 @@ pub(crate) struct Instruction {
     pub(crate) opcode: Opcode,
     /// A cell's number, or which member of an attribute.
     pub(crate) small: u16,
-    /// The cell's place in the superchunk it lands in.
+    /// The cell's place in the superchunk it lands in, and above it
+    /// the outbox slot of that superchunk.
     place: u32,
     /// The first word.
     pub(crate) first: u64,
@@ -191,7 +193,30 @@ impl Instruction {
     /// The cell it is of, in `superchunk`, which it lands in.
     #[inline]
     pub(crate) fn at(&self, superchunk: SuperchunkIndex) -> CellIndex {
-        CellIndex(superchunk.top_left().0 | u64::from(self.place))
+        CellIndex(superchunk.top_left().0 | u64::from(self.place & ((1 << PLACE_BITS) - 1)))
+    }
+
+    /// It, landing in the superchunk of the outbox slot `slot`.
+    #[inline]
+    pub(crate) fn landing_in(mut self, slot: usize) -> Self {
+        self.place = (self.place & ((1 << PLACE_BITS) - 1)) | (slot as u32) << PLACE_BITS;
+        self
+    }
+
+    /// The outbox slot of the superchunk it lands in.
+    #[inline]
+    pub(crate) fn slot(&self) -> usize {
+        (self.place >> PLACE_BITS) as usize
+    }
+
+    /// It, the blocks it carries beginning `moved` blocks further on
+    /// (or back) in the list beside its queue: nothing, of one that
+    /// carries none.
+    pub(crate) fn carried_moved_by(mut self, moved: i64) -> Self {
+        if matches!(self.opcode, Opcode::WriteAttribute | Opcode::CrossEntity) {
+            self.second = (((self.second >> 32) as i64 + moved) as u64) << 32 | (self.second & u64::from(u32::MAX));
+        }
+        self
     }
 
     /// The cell of `superchunk` its first word is the place of.

@@ -62,7 +62,7 @@ Everything queued has an **author**: the entity woken or the cell
 sampled that the rule was seeing to when it queued it
 (`Turn::seeing_to`, said by `../../instructions/` as it goes over
 them). An outbox notes where each author's part of each of its nine
-queues begins (`Segment`, begun by `slot_queued` at the first thing an
+queues begins (`Segment`, begun by `queue_landing_in` at the first thing an
 author queues for a superchunk). A superchunk applying takes the
 segments its nine neighbours hold for it, sorts them by author -- the
 author's cell in reading order, rows down then cells across, which a
@@ -88,6 +88,116 @@ going on from where the last tick left them -- so a tick is the same
 on any number of threads, and a save can keep them (`random_states`,
 `restore_random`). The outboxes and room
 for samples are kept between ticks.
+
+### An act over a border
+
+A compare gates what is under it wherever that lands. An entity beside
+a border that makes another over it and writes itself only if it was
+made -- a birth -- queues a compare of a cell in one superchunk and,
+under it, writes in two. Were each superchunk to apply its own part,
+the half in the author's superchunk could not know how the compare
+came out in the other. So such an author's instructions are not split
+between the queues of two slots: they are **one queue's, applied once,
+in the order queued, by one thread holding every superchunk they land
+in**. Rules and instructions know nothing of it: a rule opens a
+compare and queues under it, and where the border falls changes
+nothing of what comes of it.
+
+**Queued.** Each instruction carries the outbox slot of the superchunk
+it lands in, in four bits of its `place` above the cell's
+(`Instruction::landing_in`, `slot`). The first time an author queues
+something for one superchunk under an open compare of a cell in
+another (`queue_landing_in`), its act goes across (`go_across`): all it
+queued from its outermost open compare on is moved, in order, out of
+the slot's queue into the outbox's tenth queue (`ACROSS`), what it
+carried beside the queue moved with it (`carried_moved_by`), and what
+it queues from there on, until the rule sees to the next author, goes
+there too. What it queued before that compare stays in the slot's
+queue and is applied before. A segment begun in the slot's queue for
+nothing but what was moved is taken back: an empty one would be a stop
+between two acts for the superchunk applying. The tenth queue has a
+segment an author like the others, and beside each an `Across`: the
+slots it lands in (`lands`, the author's own superchunk always among
+them, `slot_home`) and how many of those superchunks have come to it
+(`arrived`). Only an author that needs it pays: one whose compares
+gate nothing past their own superchunk queues as before, and its
+writes to a neighbour stay in that neighbour's slot.
+
+**Applied** (`tick/applying.rs`). Every superchunk gathers what is
+queued for it -- the nine slots' segments, and the acts over a border
+that land in it -- into one list sorted by author (`Phase::gather`,
+`Segmented`), the same order in every superchunk, and goes down it
+(`go_on`). A segment of a slot's queue it applies to itself
+(`LandingInOne`). At an act over a border it counts itself arrived; if
+another superchunk the act lands in has not come to it yet, it waits
+there, let go of by its thread. The last to arrive holds the others
+(they are let go of, and wait at this very act), applies the act to
+all of them (`LandingInSeveral`, `Landing::of_slot` giving each
+instruction its superchunk), moves each on past it and lets it go on.
+Every superchunk has applied all that comes before the act in the
+world's order, and none anything after it: the act falls where it
+would had the world been applied by one thread from the top left. No
+two superchunks can wait for each other, their lists being in one
+order: of all the acts waited at, the first in that order has every
+superchunk it lands in free to come to it.
+
+A superchunk that is not hot has nobody to arrive for it: it is not
+counted (`landed_in`), a compare landing there does not hold, a write
+there is missed and an entity to be made there lost
+(`Queue::jump_over`, and the arm of `Queue::apply` for a slot with no
+superchunk).
+
+**Which thread goes on with which superchunk**
+(`tick/applying/who_goes_on.rs`). Two superchunks acting over their
+border at every other entity wait on each other all the way down;
+passed between two threads at each act, every act cost a thread
+woken and the superchunk's memory fetched from the other's cache --
+several times the act. So superchunks that wait on one another come to
+be one thread's:
+
+- the thread that applies an act keeps the superchunks it let go on in
+  a list of its own (`LetGoOn`, `let_lie`) if its own superchunk is at
+  another act at once, and takes them up itself when it next waits
+  (`next_for`);
+- a thread whose superchunk waits takes up the one waited for itself
+  if it lies in its own list, in anyone's, or is not begun
+  (`after_waiting`, `take_up`, `begin`); if another thread has it,
+  that thread is given all this one kept, and goes on with the lot;
+- a thread that comes to work that is one superchunk's alone gives up
+  what it kept to the list that is anyone's (`give_up_those_kept`,
+  `anyones`), and wakes a thread for it;
+- a thread with nothing to do looks again after a rest, longer each
+  time up to `LONGEST_REST`, then sleeps until there is something
+  (`is_something_to_do`, `sleep`, `wake`): a thread spinning beside one
+  applying takes from it. In a tick with no act over a border no
+  superchunk waits, and a thread is done when none is left to begin.
+
+Whose a superchunk is (`whose`) is only read to choose where to put
+things; what makes a superchunk a thread's is the flag it takes
+(`lying`), so a list may still name one taken from under it
+(`LetGoOn::pop` gives it, `take` passes it over, `LetGoOn::empty`
+clears the lists for the next tick). The lists, the flags and each
+superchunk's order are kept from tick to tick (`Room`).
+
+**What it costs.** With lines of entities along every border of
+sixteen superchunks, every other cell, each acting over the border
+every tick -- the worst there is: each superchunk waits on its
+neighbour at every act -- the second phase took 1.4 times what it
+took with the same lines moved away from the border, on all threads;
+before the threads kept what waits together it was 3.4 times. One act
+in eight cells of border, or fewer, cost nothing that could be
+measured. Probed by `AI_SCRATCHPAD acts_over_a_border`; held by
+`tests/fine/acts_over_a_border.rs` (whole or not at all, on any
+border; a crowd contending over four superchunks' corner the same on
+any number of threads) and by the shifted world of
+`../../instructions/tests/fast/shifted.rs`, whose flock makes entities
+and lays stone under compares over whatever borders the shift leaves
+it on. A tick counts its acts (`TickReport::acts_over_a_border`).
+
+What it does not do: an act that lands in a superchunk past the
+author's neighbours is past the speed of light, as any write is; and
+an entity standing over several superchunks at once is not built --
+its acts would land in up to four, which the counting already allows.
 
 ### Instructions
 
@@ -191,9 +301,11 @@ list is in the order the compares are come to; one that does not hold
 passes over its instructions in the queue and over the entries of the
 compares within it in the list.
 
-Everything under a compare lands in the compare's superchunk: a
-superchunk applying reads no other, so a write across a border could
-not be held against it, and queuing one is refused as the rule runs.
+What is under a compare may land in any superchunk in reach, the
+compare's or another: a superchunk applying reads no other, so an
+author with something under a compare of another superchunk has all
+of it applied at once, by one thread holding each ("An act over a
+border").
 
 Nothing is applied "together" beyond that: what is under a compare
 is skipped or not as the compare is come to, and each write under it

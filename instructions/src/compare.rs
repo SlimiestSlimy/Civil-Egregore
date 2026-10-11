@@ -56,7 +56,8 @@ pub fn count(turn: &mut Turn, compare: Compare, counted: usize) {
 /// From here on, what the rule queues -- cells written, what
 /// entities come to, counts -- is under `compare`: skipped if it does
 /// not hold when come to, up to the next compare given or [`end`].
-/// All of it lands in the compare's superchunk.
+/// It lands wherever it lands, the compare's superchunk or the
+/// next: a border changes nothing of it.
 #[inline]
 pub fn from_here(turn: &mut Turn, compare: Compare) {
     turn.compare_from_here(compare);

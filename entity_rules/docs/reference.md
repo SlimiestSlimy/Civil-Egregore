@@ -6,8 +6,7 @@ The design is in `entity_rules.md`.
 
 `SHEEP`, and its one attribute `SHEEP_STATE`, laid out as `SheepState`:
 when it is next hungry, when its lamb is due, when it is grown, the
-tick it roams until and which way, the neighbour it put its lamb on
-last tick, and, a lamb's, the neighbour its mother stood on;
+tick it roams until and which way;
 its times, each said in seconds of the simulation
 (`SimulationTime`) and a constant of ticks once worked out, here with
 its ticks at 256 a second: `STEP_TICKS` (0.25 s, 64) and `STEP_JITTER`
@@ -21,11 +20,11 @@ its ticks at 256 a second: `STEP_TICKS` (0.25 s, 64) and `STEP_JITTER`
 what it woke for and sleeps as long as it can. Hungry (past
 its `hungry_at`) and on grass, it eats it, and is hungry again `MEAL_TICKS`
 on; hungry `STARVE_TICKS` with no meal, it dies. Its lamb due, it is
-put on a cell open to a step beside it (`around::pick`,
-`entities::spawn`) -- or waited for, and born the tick after if
-it stands beside it (its `bearing_neighbour`, **`lamb_put_stands`**:
-a lamb put that tick whose `mother_neighbour` is the way back), else put
-again; it falls pregnant on a meal on lush pasture
+born on a cell open to a step beside it (`around::pick`; **`bear`**:
+the lamb made, the mother no longer pregnant and the birth counted
+under one compare of her state and one of the cell being free,
+`entities::make` to `entities::made`) -- that cell taken first, none
+of it happens, and she bears at her next wake; it falls pregnant on a meal on lush pasture
 (`LUSH_CELLS` of the area about it grass, `Area::count`; one in
 `CONCEIVE_ONE_IN`) if grown; a meal on pasture not lush, it roams
 -- when next hungry it walks one way for `ROAM_TICKS`, eating nothing,

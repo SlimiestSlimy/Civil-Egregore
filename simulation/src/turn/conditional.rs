@@ -21,18 +21,22 @@ pub(crate) const COMPARES_WITHIN: usize = 4;
 #[derive(Clone, Copy)]
 pub(crate) struct CompareOpen {
     /// The cell it is of.
-    at: CellIndex,
-    /// Which instruction of its superchunk's queue it is.
-    instruction: u32,
+    pub(crate) at: CellIndex,
+    /// Which instruction of its queue it is.
+    pub(crate) instruction: u32,
     /// Which of the queue's [`Gated`] is its.
-    gated: u32,
+    pub(crate) gated: u32,
     /// Writes of cells the turn had queued when it was opened.
-    writes_before: u32,
+    pub(crate) writes_before: u32,
+    /// Blocks its queue carried when it was opened.
+    pub(crate) carried_before: u32,
+    /// Which of the outbox's queues it lies in.
+    pub(crate) queue: u8,
 }
 
 impl CompareOpen {
     /// None: what a stack with nothing open holds.
-    pub(crate) const NONE: Self = Self { at: CellIndex(0), instruction: 0, gated: 0, writes_before: 0 };
+    pub(crate) const NONE: Self = Self { at: CellIndex(0), instruction: 0, gated: 0, writes_before: 0, carried_before: 0, queue: 0 };
 }
 /// As many numbers as a tick counts when applied
 /// ([`Turn::count_under`]): a count's is under this.
@@ -201,10 +205,18 @@ impl Turn<'_> {
     /// (`docs/simulation.md`, "Compare-and-write", the hard rule).
     pub(crate) fn queue(&mut self, lands: CellIndex, instruction: Instruction) {
         assert!(self.compares_open_count > 0 || !instruction.is_a_write(), "a write under no compare: {:?}", instruction.opcode);
-        debug_assert!(self.compares_open[..self.compares_open_count].iter().all(|open| open.at.superchunk() == lands.superchunk()), "an instruction under a compare of another superchunk");
-        let slot = self.slot_queued(lands.superchunk());
+        let (queue, slot) = self.queue_landing_in(lands.superchunk());
         self.writes_queued += u32::from(instruction.opcode == super::instruction::Opcode::WriteCell);
-        self.outbox.queues[slot].instructions.push(instruction);
+        self.outbox.queues[queue].instructions.push(instruction.landing_in(slot));
+    }
+
+    /// Carries `blocks` beside the queue an instruction landing in
+    /// the superchunk of `lands` goes to: where they begin there.
+    pub(crate) fn carry(&mut self, lands: CellIndex, blocks: &[AttributeBlock]) -> u32 {
+        let (queue, _) = self.queue_landing_in(lands.superchunk());
+        let carried = &mut self.outbox.queues[queue].carried;
+        carried.extend_from_slice(blocks);
+        (carried.len() - blocks.len()) as u32
     }
 
     /// Queues the compare `compare`, of the cell `at`, the `writes`
@@ -215,15 +227,14 @@ impl Turn<'_> {
     #[inline]
     pub(crate) fn queue_under(&mut self, at: CellIndex, compare: Instruction, writes: &[Instruction]) {
         debug_assert!(compare.is_a_compare() && writes.iter().all(Instruction::is_a_write));
-        debug_assert!(self.compares_open[..self.compares_open_count].iter().all(|open| open.at.superchunk() == at.superchunk()), "an instruction under a compare of another superchunk");
-        let slot = self.slot_queued(at.superchunk());
+        let (queue, slot) = self.queue_landing_in(at.superchunk());
         let cell_writes = writes.iter().filter(|write| write.opcode == super::instruction::Opcode::WriteCell).count();
         self.writes_queued += cell_writes as u32;
-        let queue = &mut self.outbox.queues[slot];
+        let queue = &mut self.outbox.queues[queue];
         queue.gated.push(Gated { instructions: writes.len() as u32, compares_within: 0, writes: cell_writes as u16 });
-        queue.instructions.push(compare);
-        queue.instructions.extend_from_slice(writes);
-        queue.instructions.push(Instruction::compare_end());
+        queue.instructions.push(compare.landing_in(slot));
+        queue.instructions.extend(writes.iter().map(|write| write.landing_in(slot)));
+        queue.instructions.push(Instruction::compare_end().landing_in(slot));
     }
 
     /// Queues `compare`, open from here ([`Turn::open`]).
@@ -238,9 +249,11 @@ impl Turn<'_> {
     pub(crate) fn open(&mut self, at: CellIndex, instruction: Instruction) {
         debug_assert!(instruction.is_a_compare());
         self.queue(at, instruction);
-        let queue = &mut self.outbox.queues[self.slot_of(at.superchunk())];
+        // Where the instruction went: its slot's queue, or that of acts over a border.
+        let index = if self.across { super::ACROSS } else { self.slot_of(at.superchunk()) };
+        let queue = &mut self.outbox.queues[index];
         // Its place among what is under each compare is kept now, in the order the compares are come to, and filled as it is closed.
-        let open = CompareOpen { at, instruction: queue.instructions.len() as u32 - 1, gated: queue.gated.len() as u32, writes_before: self.writes_queued };
+        let open = CompareOpen { at, instruction: queue.instructions.len() as u32 - 1, gated: queue.gated.len() as u32, writes_before: self.writes_queued, carried_before: queue.carried.len() as u32, queue: index as u8 };
         queue.gated.push(Gated::default());
         assert!(self.compares_open_count < COMPARES_WITHIN, "more compares one within another than a turn keeps");
         self.compares_open[self.compares_open_count] = open;
@@ -256,7 +269,7 @@ impl Turn<'_> {
     pub(crate) fn close_compare(&mut self) {
         self.compares_open_count -= 1;
         let open = self.compares_open[self.compares_open_count];
-        let queue = &mut self.outbox.queues[self.slot_of(open.at.superchunk())];
+        let queue = &mut self.outbox.queues[open.queue as usize];
         let compares_within = u16::try_from(queue.gated.len() - open.gated as usize - 1).expect("more compares within one than is noted");
         let writes = u16::try_from(self.writes_queued - open.writes_before).expect("more writes under one compare than is noted");
         queue.gated[open.gated as usize] = Gated { instructions: queue.instructions.len() as u32 - open.instruction - 1, compares_within, writes };
@@ -268,9 +281,9 @@ impl Turn<'_> {
     /// applied only if `compare` holds when it is come to: skipped
     /// otherwise, up to the next compare given or
     /// [`Turn::compare_end`]. One given takes the place of the one
-    /// before. Nothing may be queued for another superchunk
-    /// meanwhile: a superchunk applying reads no other, so it could
-    /// not be held against the compare.
+    /// before. What is queued for another superchunk meanwhile makes
+    /// the author's act one over a border
+    /// (`docs/simulation.md`, "An act over a border").
     pub fn compare_from_here(&mut self, compare: Compare) {
         self.compare_end();
         self.comparing = Some(compare);
@@ -290,7 +303,6 @@ impl Turn<'_> {
     /// come to: two compares, one within the other, then the write.
     /// Applied, it adds one to the count `counted`, if one is given.
     pub fn queue_if(&mut self, compare: Compare, layer_type: LayerType, at: CellIndex, seen: u32, value: u32, counted: Option<u32>) {
-        assert_eq!(compare.at().superchunk(), at.superchunk(), "a compare in another superchunk than what it lets be written");
         self.open_compare(compare);
         self.queue_seen(layer_type, at, seen, value, counted);
         self.close_compare();

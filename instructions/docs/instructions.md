@@ -127,8 +127,9 @@ entities come to, counts -- is skipped, up to the next compare or
 and one count under a compare. A sheep's meal is one compare, the
 grass under it being there still, and under it what the sheep comes
 to and what it counts; then the grass cleared, held against itself.
-Should the grass be gone, all of it is skipped at once. All that is
-under a compare lands in the compare's superchunk. A tree's death is its stage put to 0 if the tree
+Should the grass be gone, all of it is skipped at once. What is
+under a compare lands wherever it lands, the compare's superchunk or the next:
+a border changes nothing of it. A tree's death is its stage put to 0 if the tree
 still stands and its stage is as seen, then the tree cleared.
 
 Nothing is applied together: each write has its own compare, read
@@ -137,10 +138,7 @@ that wants several things to happen or not as one holds them all
 against the same thing and queues last the write that changes it --
 or chains them, each held against what the one before wrote.
 
-Two things a rule must see to. What a write is held against is in the
-superchunk the write lands in, so what may land in the next -- a lamb
-put beside its mother -- is not held against the ground under her.
-And an entity woken must be put back whatever is refused: the rule
+One thing a rule must see to. An entity woken must be put back whatever is refused: the rule
 queues what it comes to under the compare, then what stands otherwise
 (`entities::sleep`) under the opposite one -- `holds`, then `lacks` --
 so one of the two is applied and the entity is written once.
@@ -209,8 +207,10 @@ worlds, on the second some cells east and south so that other borders
 cross it, ticks both, and holds every cell and every walker to be the
 same seen from the flock, tick after tick. All the test needs is in
 the test: the shift, a rule of its own -- walkers that die, eat, lay
-stone, write their neighbours, make others and step blind onto each
-other's cells, over and along the borders -- and one generator
+stone and count it under a compare of the cell beside them, write
+their neighbours, make others and count that under the compare of the
+cell being free, and step blind onto each other's cells, over and
+along the borders -- and one generator
 (`utilities::rng::Rng`) every chance in that rule is read from, by the
 tick and the walker, so that chance is the same in both worlds and
 what differs is the simulation's doing. Nothing outside the test is
@@ -255,9 +255,12 @@ to be; what that costs is not its concern.
 **What must be made** (`entities::spawn`): a new entity's cell
 may be taken between the rule seeing it free and the put being applied,
 and the put is then refused -- nothing is put elsewhere for it. A rule
-that must not lose it asks the tick after what stands there
-(`entities::on`) -- an entity has no ID, so the rule tells its own by
-what it put it with -- and puts it again if it is not that.
+that must not lose it makes it with `entities::make` and queues, before
+`entities::made`, what is to happen only if it was made -- its maker
+written so, a count. Refused, none of that happens, and the maker is
+as it was to try again. The cell may be in the next superchunk and the
+maker in this one: the rule does not know, and need not
+(`../../simulation/docs/simulation.md`, "An act over a border").
 
 **The cells beside it** (`around`): sets of the cells about a cell,
 read at once (`around::layer`), narrowed with `&`; the way to one

@@ -4,13 +4,14 @@
 //! applying, each superchunk what was queued for it
 //! (`docs/simulation.md`, "The tick" and "The dispatcher").
 
+mod applying;
 mod crossings;
 
-use entity_manager::{Arrival, Entities, EntityReader, InstructionsApplied, Settled, SuperchunkEntities};
-use crate::turn::apply::{Applied, Standing};
+use entity_manager::{Arrival, Entities, EntityReader, InstructionsApplied, Settled};
+use crate::turn::apply::Standing;
 use crate::turn::conditional::{CountedWhenApplied, COUNTED_WHEN_APPLIED};
 use crate::turn::{slot, Outbox, Turn};
-use bitplane_manager::{BitmapArena, Reader, Superchunk, WritesApplied};
+use bitplane_manager::{BitmapArena, Reader, WritesApplied};
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, SuperchunkIndex};
 use std::ops::AddAssign;
@@ -42,6 +43,10 @@ pub struct TickReport<R> {
     /// What was counted as it was applied, by the number each rule's
     /// counts were given (`Turn::count_under`).
     pub counted_when_applied: CountedWhenApplied,
+    /// The authors whose act reached over a border, each applied
+    /// once to every superchunk it landed in
+    /// (`docs/simulation.md`, "An act over a border").
+    pub acts_over_a_border: u64,
     /// What the rule returned, added up over the superchunks.
     pub rules: R,
     /// The first phase's time: sampling and computing.
@@ -74,6 +79,8 @@ pub struct Simulation {
     /// The layer entities are kept in, if the world has one
     /// ([`Simulation::keep_entities_in`]).
     collision: Option<LayerType>,
+    /// Room the second phase keeps from tick to tick.
+    applying_room: applying::Room,
 }
 
 /// The threads `superchunks` superchunks are ticked on unless told
@@ -101,7 +108,7 @@ impl Simulation {
     /// jobs on too: a thread busy with one sits a tick's phase out.
     pub fn on(dispatcher: Arc<Dispatcher>) -> Self {
         let samples = (0..dispatcher.threads()).map(|_| Mutex::new(Vec::new())).collect();
-        Self { dispatcher, outboxes: Vec::new(), samples, random: Vec::new(), arrived: Vec::new(), settled: Vec::new(), collision: None }
+        Self { dispatcher, outboxes: Vec::new(), samples, random: Vec::new(), arrived: Vec::new(), settled: Vec::new(), collision: None, applying_room: applying::Room::default() }
     }
 
     /// From here on the entities are kept in `collision_plane`, a
@@ -188,7 +195,7 @@ impl Simulation {
                 for (offset, (outbox, kept)) in outboxes.iter_mut().zip(random.iter_mut()).enumerate() {
                     let superchunk = &superchunks[first + offset];
                     let random = Rng::new(kept.1.state());
-                    let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random, author: 0, comparing: None, compares_open: [crate::turn::conditional::CompareOpen::NONE; crate::turn::conditional::COMPARES_WITHIN], compares_open_count: 0, writes_queued: 0, counted_from: 0 };
+                    let mut turn = Turn { superchunk, entities: &entity_superchunks[first + offset], now, reader: &reader, entity_reader: &entity_reader, outbox, random, author: 0, comparing: None, compares_open: [crate::turn::conditional::CompareOpen::NONE; crate::turn::conditional::COMPARES_WITHIN], compares_open_count: 0, writes_queued: 0, counted_from: 0, across: false };
                     total += rule(&mut turn, &mut samples);
                     turn.compare_end();
                     // Where its random numbers have come to: the next tick goes on from there.
@@ -204,51 +211,17 @@ impl Simulation {
         }
         let computed = Instant::now();
 
-        let (superchunk_indices, outboxes, collision) = (&superchunk_indices, &self.outboxes, self.collision);
-        let superchunks: Vec<Mutex<(&mut [Superchunk], &mut [SuperchunkEntities])>> =
-            arena.superchunks_mut().chunks_mut(per_part).zip(entities.superchunks_mut().chunks_mut(per_part)).map(Mutex::new).collect();
-        let applied_parts: Vec<Mutex<Applied>> = (0..parts).map(|_| Mutex::new(Applied::default())).collect();
-        let claimed = AtomicUsize::new(0);
-        self.dispatcher.run(&|part| {
-            let mut applied = Applied::default();
-            // Each author's segment queued for a superchunk: the author, whose outbox, which slot of it, which segment.
-            let mut order: Vec<(u64, u32, u32, u32)> = Vec::new();
-            while let Some(work) = superchunks.get(claimed.fetch_add(1, Ordering::Relaxed)) {
-                let (ref mut superchunks, ref mut entity_superchunks) = *work.lock().expect("a piece's superchunks");
-                for (superchunk, entities) in superchunks.iter_mut().zip(entity_superchunks.iter_mut()) {
-                    let here = superchunk.index();
-                    entities.pass(now);
-                    for (dx, dy) in neighbours() {
-                        let Some(source) = here.offset(dx, dy).and_then(|source| superchunk_indices.binary_search(&source).ok()) else {
-                            continue;
-                        };
-                        let from = slot(-dx, -dy);
-                        order.extend(outboxes[source].segments[from].iter().enumerate().map(|(segment, begun)| (begun.author, source as u32, from as u32, segment as u32)));
-                    }
-                    // Author by author in the reading order of their cells, whichever superchunk each is in: the sort keeps the order one queued in.
-                    order.sort_by_key(|segment| segment.0);
-                    for (_, source, from, segment) in order.drain(..) {
-                        let (outbox, from, segment) = (&outboxes[source as usize], from as usize, segment as usize);
-                        let queue = &outbox.queues[from];
-                        let (begun, next) = (outbox.segments[from][segment], outbox.segments[from].get(segment + 1));
-                        let end = next.map_or(queue.len(), |next| next.instructions as usize);
-                        queue.apply(begun.instructions as usize..end, begun.compares as usize, superchunk, entities, now + 1, collision, &mut applied);
-                    }
-                    entities.sort_wakes(now + 1);
-                }
-            }
-            *applied_parts[part].lock().expect("a part's result") = applied;
-        });
-        drop(superchunks);
+        let (superchunk_indices, collision) = (&superchunk_indices, self.collision);
+        let applied_parts = applying::apply_what_was_queued(&self.dispatcher, arena.superchunks_mut(), entities.superchunks_mut(), &mut self.applying_room, superchunk_indices, &self.outboxes, now, collision);
         instructions_applied.turned_back += self.settle_crossings(entities, superchunk_indices, per_part);
         // The tick over: every entity named by the cell it stands on now, the cells left cleared in the collision plane.
         for (superchunk, entities) in arena.superchunks_mut().iter_mut().zip(entities.superchunks_mut()) {
             entities.names_anew(&mut Standing { superchunk, layer: collision });
         }
-        let (mut applied, mut instructions_compared, mut counted_when_applied) = (WritesApplied::default(), (0, 0), [0; COUNTED_WHEN_APPLIED]);
+        let (mut applied, mut instructions_compared, mut counted_when_applied, mut acts_over_a_border) = (WritesApplied::default(), (0, 0), [0; COUNTED_WHEN_APPLIED], 0);
         for part in applied_parts {
-            let part = part.into_inner().expect("a part's result");
             applied += part.writes;
+            acts_over_a_border += part.acts_over_a_border;
             instructions_applied += part.instructions;
             instructions_compared = (instructions_compared.0 + part.compared.0, instructions_compared.1 + part.compared.1);
             counted_when_applied.iter_mut().zip(part.counted).for_each(|(count, more)| *count += more);
@@ -265,9 +238,10 @@ impl Simulation {
             }
             outbox.queues.iter_mut().for_each(|queue| queue.clear());
             outbox.segments.iter_mut().for_each(Vec::clear);
+            outbox.across.clear();
         }
         entities.advance();
-        TickReport { writes_applied: applied, instructions_applied, instructions_compared, counted_when_applied, rules, computing: computed - start, applying: computed.elapsed() }
+        TickReport { writes_applied: applied, instructions_applied, instructions_compared, counted_when_applied, acts_over_a_border, rules, computing: computed - start, applying: computed.elapsed() }
     }
 }
 

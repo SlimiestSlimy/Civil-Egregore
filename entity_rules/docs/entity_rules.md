@@ -95,7 +95,7 @@ alone:
   wall, and never onto a cell the collision plane holds -- a tree's
   (`walking::around_steppable`).
 
-All a sheep keeps is one attribute, four blocks (`SHEEP_STATE`, laid out
+All a sheep keeps is one attribute, three blocks (`SHEEP_STATE`, laid out
 as `SheepState`): when it is next hungry, when its lamb is due, when
 it is grown, the tick it roams until and which of the nine cells about
 it it heads for, each a member. A tick of 0 is none -- not pregnant, no
@@ -122,21 +122,24 @@ in a `SheepState` of the rule's own, and written if it differs from
 what the tick found: the words that changed, held against what the
 rule saw of the attribute, then the sheep moved or put to sleep. No
 copy of the sheep is kept to be changed, and it is never put whole,
-so what another entity wrote to it in the tick would stand. A lamb may land in the next
-superchunk, where the grass under its mother cannot be held against
-it, so a sheep due to bear at a meal bears at its next wake.
+so what another entity wrote to it in the tick would stand. A meal is
+one thing to happen whole and a birth another: a sheep due to bear at
+a meal bears at its next wake.
 
-**A lamb is born once it is seen.** A lamb is put on a cell seen free,
-which another lamb or a stepping sheep may take first in the same
-tick. The put refused, nothing in the tick tells
-its mother: so she does not take the put for a birth. She notes the
-neighbour she put it on (the `bearing_neighbour` of her `SheepState`), stays where she is, and wakes the next tick.
-An entity has no ID, so she knows her lamb by what she put it with: a sheep on that neighbour (`entities::on`) due to be grown
-as one put the tick before is, and whose `mother_neighbour` is the way back to her -- not another's lamb put on the same cell
-first, nor a sheep that stepped there (`lamb_put_stands`). Her lamb standing beside her, it is born --
-counted, and she is pregnant no more; not there, she is pregnant and
-due as before, and puts it again when a cell beside her is free. A birth costs a wake more; none is lost and none counted that
-was not. How it came to be -- what was measured, what was
+**A lamb is born with its mother's knowing, or not at all** (`bear`).
+A lamb is made on a cell seen free, which another lamb or a stepping
+sheep may take first in the same tick. So the birth is one thing
+queued under two compares: the mother as her wake left her, and,
+within it, the lamb's cell free (`entities::make`). Under them the
+lamb is made, the mother's `lamb_due_at` cleared and the birth
+counted, until `entities::made`. The cell free, all three happen in
+that tick; taken, none does -- she is pregnant and due as before, and
+bears when she next wakes, a step's time on, on a cell drawn anew. No
+birth is lost and none counted that was not. The lamb's cell may be in
+the next superchunk: nothing in the rule says so, and nothing differs
+(`../../simulation/docs/simulation.md`, "An act over a border"). She
+stays where she is the tick she bears: the cell is not to be the one
+she steps to. How it came to be -- what was measured, what was
 thrown away -- is in `../../docs/civil_egregore.md`.
 
 ## Layout

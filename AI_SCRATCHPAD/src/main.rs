@@ -6,6 +6,7 @@
 //!
 //! `cargo run --release -p AI_SCRATCHPAD -- <command> [what it takes]`
 
+mod acts_over_a_border;
 mod asking_the_host;
 mod how_steep_the_land_is;
 mod ticks_under_a_wide_viewport;
@@ -18,7 +19,13 @@ use utilities::commands::{dispatch, Command, Parameter};
 const SEED: &str = "seed";
 
 /// The probes.
-const COMMANDS: [Command; 3] = [
+const COMMANDS: [Command; 4] = [
+    Command {
+        name: "acts_over_a_border",
+        does: "times the second phase with lines of entities acting over every border running north to south, and with the same lines moved away from it, on one thread and on all: what an act over a border costs",
+        parameters: &[Parameter::new(acts_over_a_border::SIDE, "4"), Parameter::new(acts_over_a_border::EVERY, "2"), Parameter::new(acts_over_a_border::STEPPING, "4000"), Parameter::new(acts_over_a_border::TICKS, "200"), Parameter::new(acts_over_a_border::THREADS, "0")],
+        run: acts_over_a_border::run,
+    },
     Command {
         name: "how_steep_the_land_is",
         does: "prints the share of the land's cells at each rise to the next cell, over a square about the world's middle: what a shading of slopes has to tell apart",

@@ -221,7 +221,7 @@ cell:
 | a tree put on a cell, the tree there dying | no: a tree is put where none stood | |
 | a tree growing and dying | no: a tree is sampled once a tick; dying, its stage goes if the tree still stands and the stage is as seen, then the tree | |
 | two entities stepping onto one cell | yes | the first applied takes it, the other stays where it stood and wakes as it was to |
-| two lambs put on one cell, or a lamb put where another sheep steps | yes | the first applied takes the cell; the lamb put after is made on another neighbour its mother may step to, or, every one taken, refused -- and born later: its mother is pregnant until she has seen it stand (`../entity_rules/docs/entity_rules.md`, "The sheep") |
+| two lambs put on one cell, or a lamb put where another sheep steps | yes | the first applied takes the cell; the lamb after is refused, and its birth with it -- its mother is pregnant still, and bears at her next wake on a cell drawn anew (`../entity_rules/docs/entity_rules.md`, "The sheep") |
 | two entities setting one attribute of a third | yes (no rule does yet) | the first applied is kept and the other refused, having seen the attribute as it no longer is: the same one on any number of threads (`../simulation/tests/fine/instructions.rs`) |
 | an entity's attribute set by another, the entity changing itself | yes (no rule does yet) | both stand if they are of two attributes -- an entity is written an attribute at a time, never whole; of one attribute, the first applied and the other refused. Moving in that tick, or crossing to another superchunk, it is written all the same and takes it along (`../simulation/tests/fine/instructions.rs`) |
 | a sheep fed and put to sleep hungry | no: the two are under opposite compares of its grass | one is applied: the sheep is written once |
@@ -230,10 +230,10 @@ No pair leaves a cell or an entity differing by the order threads ran
 in: everything is applied in one order. And no write lands on
 another's: nothing a rule queues can overwrite what another did in the
 same tick (`../simulation/docs/simulation.md`, "No write lands on
-another's"). A lamb's put is not held
-against what its mother comes to -- it may land in the next
-superchunk, and a compare is of the superchunk its write lands in --
-so its birth is still seen the tick after.
+another's"). A lamb made, its mother no longer pregnant and the birth
+counted are under one compare of the lamb's cell, whichever
+superchunk it is in: all of it in one tick, or none
+(`../simulation/docs/simulation.md`, "An act over a border").
 
 ## Saved and loaded
 

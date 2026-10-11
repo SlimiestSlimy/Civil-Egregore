@@ -81,16 +81,16 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
         assert!(!AttributeType(other).is_an_attributes());
     }
     let (kind, row) = (SHEEP_STATE.attribute_type(), named("sheep state").expect("registered"));
-    assert_eq!((kind.blocks(), row.number, row.width, row.varies_in_size), (4, kind.number(), data_words(4) as u32 * u64::BITS, false));
+    assert_eq!((kind.blocks(), row.number, row.width, row.varies_in_size), (3, kind.number(), data_words(3) as u32 * u64::BITS, false));
     assert_eq!(of_number(kind.number()), Some(row));
     for _ in 0..100 {
-        let state = SheepState { hungry_at: random.draw(), lamb_due_at: random.draw(), grown_at: random.draw(), roaming_until: random.draw(), bearing_neighbour: random.draw() as u32, mother_neighbour: random.draw() as u32, roaming_neighbour: random.draw() as u32 };
+        let state = SheepState { hungry_at: random.draw(), lamb_due_at: random.draw(), grown_at: random.draw(), roaming_until: random.draw(), roaming_neighbour: random.draw() as u32 };
         let mut data = [0; data_words(SheepState::BLOCKS)];
         state.write(&mut data);
-        assert_eq!((SheepState::read(&data), data[6..].iter().sum::<u64>()), (state, 0));
+        assert_eq!((SheepState::read(&data), data.len()), (state, SheepState::WORDS));
         // Each member is where the layout says: its bytes, read alone, are the field's.
         let members: Vec<u64> = SheepState::MEMBERS.iter().map(|member| member.of(&data)).collect();
-        assert_eq!(members, [state.hungry_at, state.lamb_due_at, state.grown_at, state.roaming_until, u64::from(state.bearing_neighbour), u64::from(state.mother_neighbour), u64::from(state.roaming_neighbour)]);
+        assert_eq!(members, [state.hungry_at, state.lamb_due_at, state.grown_at, state.roaming_until, u64::from(state.roaming_neighbour)]);
         let (number, mut word) = (random.draw(), [0; data_words(<u64 as Layout>::BLOCKS)]);
         number.write(&mut word);
         assert_eq!((<u64 as Layout>::read(&word), word[1..].iter().sum::<u64>()), (number, 0));

@@ -122,9 +122,8 @@ fn carrying(hungry_at: u64) -> WholeAttribute {
 }
 
 /// Two lambs put on one cell in a tick: the second is refused, and
-/// its mother, who does not see it stand there the tick after, is
-/// pregnant still -- no birth counted that was none -- and bears it
-/// once a cell beside her is free.
+/// its mother with it -- pregnant still, no birth counted that was
+/// none -- and bears it once a cell beside her is free.
 #[test]
 fn a_lamb_refused_its_cell_is_born_later() {
     let mut world = plain_world(1, 0, 0, 1);
@@ -143,29 +142,26 @@ fn a_lamb_refused_its_cell_is_born_later() {
     let pregnant = |world: &World| world.entities().iter().filter(|sheep| state(sheep).lamb_due_at != 0).count();
     // A tick with nobody awake: the lambs are due at the next.
     tick_sheep(&mut world);
-    // Both put a lamb on the one cell, neither with another to put it on: one is made, and no birth is counted before it is seen.
+    // Both bear on the one cell, neither with another to bear on: one lamb is made, its mother's the birth, in that tick; the other
+    // is refused whole, and has no cell to try again on.
     let report = tick_sheep(&mut world);
-    assert_eq!((report.rules[BIRTHS], report.instructions_applied.refused, lambs(&world), pregnant(&world)), (0, 1, 1, 2));
-    // The tick after, one mother sees her lamb; the other does not, and has no cell to try again on.
-    let report = tick_sheep(&mut world);
-    assert_eq!((report.rules[BIRTHS], lambs(&world), pregnant(&world)), (1, 1, 1));
-    // A cell freed beside each: the other's lamb is born, a step's wait and a tick on.
+    assert_eq!((report.rules[BIRTHS], report.instructions_applied.refused, lambs(&world), pregnant(&world)), (1, 1, 1, 1));
+    // A cell freed beside each: the other's lamb is born, a step's wait on.
     for blocker in &blockers {
         world.remove_entity(blocker);
     }
     let (mut births, mut most_lambs) = (1, 1);
-    for _ in 2..2 + 2 * (STEP_TICKS + STEP_JITTER) {
+    for _ in 1..2 + 2 * (STEP_TICKS + STEP_JITTER) {
         births += tick_sheep(&mut world).rules[BIRTHS];
         // Seen as it is born: a lamb may die of old age at its first wake.
         most_lambs = most_lambs.max(lambs(&world));
     }
     assert_eq!((births, most_lambs, pregnant(&world)), (2, 2, 0));
-    assert!(world.entities().iter().all(|sheep| state(&sheep).bearing_neighbour == 0));
 }
 
 /// Two mothers bearing in one tick, two cells free between them:
 /// whichever cell each drew, both lambs are born -- at once, or, the
-/// two having drawn one cell, the second a tick on, on the other.
+/// two having drawn one cell, the second a step's wait on.
 #[test]
 fn a_lamb_whose_cell_was_taken_is_put_the_tick_after() {
     let mut world = plain_world(1, 0, 0, 1);
@@ -183,9 +179,11 @@ fn a_lamb_whose_cell_was_taken_is_put_the_tick_after() {
     }
     // A tick with nobody awake: the lambs are due at the next.
     tick_sheep(&mut world);
-    let made = tick_sheep(&mut world).instructions_applied;
-    assert_eq!(made.refused + world.entities().iter().filter(|sheep| state(sheep).grown_at != 0).count(), 2, "each made, or refused its cell");
-    let births: u64 = (0..4).map(|_| tick_sheep(&mut world).rules[BIRTHS]).sum();
+    let report = tick_sheep(&mut world);
+    let lambs = world.entities().iter().filter(|sheep| state(sheep).grown_at != 0).count();
+    // A lamb made is a birth counted, in the tick it is made in.
+    assert_eq!((report.instructions_applied.refused + lambs, report.rules[BIRTHS] as usize), (2, lambs), "each made, or refused its cell");
+    let births: u64 = report.rules[BIRTHS] + (0..2 * (STEP_TICKS + STEP_JITTER)).map(|_| tick_sheep(&mut world).rules[BIRTHS]).sum::<u64>();
     assert_eq!(births, 2);
-    assert!(world.entities().iter().all(|sheep| state(&sheep).lamb_due_at == 0 && state(&sheep).bearing_neighbour == 0));
+    assert!(world.entities().iter().all(|sheep| state(&sheep).lamb_due_at == 0));
 }

@@ -35,6 +35,10 @@ const FLOCK: usize = 8000;
 const TICKS: u64 = 300;
 /// What a walker counts: its meals, and what its neighbours count on it.
 const COUNTED: Attribute<u64> = Attribute::new(41);
+/// The stones a walker laid: counted only if the stone was.
+const LAID: Attribute<u64> = Attribute::new(42);
+/// The walkers a walker made: counted only if the walker was.
+const MADE: Attribute<u64> = Attribute::new(43);
 /// Cells past the pasture, each way, that what came of it is read on:
 /// further than a walker comes in the ticks run.
 const READ_PAST: i64 = 320;
@@ -77,9 +81,12 @@ fn way_drawn(drawn: &mut Rng, about: &About, choices: Cells) -> Option<u32> {
 
 /// One superchunk's turn of the flock's rule: each walker woken may
 /// die; eats the stone under it, counting the meal, or lays one beside
-/// it; counts on a neighbour too; may make another beside it; and
-/// steps to a neighbour, whoever stands there. Every cell and every
-/// attribute written is a compare-and-write.
+/// it, counting that on itself only if it is laid; counts on a
+/// neighbour too; may make another beside it, counting that only if
+/// it is made; and steps to a neighbour, whoever stands there. Every
+/// cell and every attribute written is a compare-and-write, and what
+/// is counted of a cell beside it is under a compare of that cell --
+/// in another superchunk, where a border lies between.
 fn flock(turn: &mut Turn, seed: u64, shift: (u32, u32)) -> u64 {
     let now = turn.now();
     for entity in turn.woken() {
@@ -102,14 +109,23 @@ fn flock(turn: &mut Turn, seed: u64, shift: (u32, u32)) -> u64 {
             compare::end(turn);
             cells::clear(turn, STONE, at);
         } else if let Some(beside) = way_drawn(&mut drawn, &about, open.without(stone.set)).filter(|_| chance < 40).and_then(|bit| around::cell(at, bit)) {
+            // Laid and counted, or neither: the cell may be another's stone by then, whichever side of a border it is on.
+            let laid = entity.attribute(LAID);
+            compare::from_here(turn, compare::lacks(STONE, beside));
             cells::set(turn, STONE, beside);
+            turn.set_attribute(&header, LAID, laid, laid.unwrap_or(0) + 1);
+            compare::end(turn);
         }
         if let Some(other) = way_drawn(&mut drawn, &about, taken).and_then(|bit| around::cell(at, bit)).and_then(|beside| standing(turn, beside)) {
             let seen = other.attribute(COUNTED);
             turn.set_attribute(&other.header, COUNTED, seen, seen.unwrap_or(0) + 1000);
         }
         if let Some(beside) = way_drawn(&mut drawn, &about, open.without(taken)).filter(|_| chance < 9).and_then(|bit| around::cell(at, bit)) {
-            turn.put(Header { kind: WALKER, at: beside, wake: now + 1 + drawn.below(3) }, &[]);
+            // Made and counted, or neither.
+            let made = entity.attribute(MADE);
+            turn.make(Header { kind: WALKER, at: beside, wake: now + 1 + drawn.below(3) }, &[]);
+            turn.set_attribute(&header, MADE, made, made.unwrap_or(0) + 1);
+            turn.made();
         }
         let to = way_drawn(&mut drawn, &about, open).and_then(|bit| around::cell(at, bit)).unwrap_or(at);
         turn.step(&header, to, now + 1 + drawn.below(3));
@@ -180,10 +196,11 @@ fn a_world_shifted_comes_to_the_same() {
     simulation.keep_entities_in(COLLISION);
     simulation_there.keep_entities_in(COLLISION);
     assert_eq!(came(&arena, &entities, (0, 0)), came(&arena_there, &entities_there, shift), "the same pasture put, shifted {shift:?}");
-    let (mut done, mut refused) = (InstructionsApplied::default(), 0);
+    let (mut done, mut refused, mut over_a_border) = (InstructionsApplied::default(), 0, (0, 0));
     for _ in 0..TICKS {
         let report = simulation.tick(&mut arena, &mut entities, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed, (0, 0)));
-        simulation_there.tick(&mut arena_there, &mut entities_there, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed, shift));
+        let report_there = simulation_there.tick(&mut arena_there, &mut entities_there, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed, shift));
+        over_a_border = (over_a_border.0 + report.acts_over_a_border, over_a_border.1 + report_there.acts_over_a_border);
         done += report.instructions_applied;
         refused += report.writes_applied.refused;
         let ((stone, held, walkers), (stone_there, held_there, walkers_there)) = (came(&arena, &entities, (0, 0)), came(&arena_there, &entities_there, shift));
@@ -194,4 +211,6 @@ fn a_world_shifted_comes_to_the_same() {
         assert!(stone_apart.is_empty() && walkers_apart.is_empty() && walkers.len() == walkers_there.len(), "after tick {}, shifted {shift:?}, seed {seed:#x}: {} walkers here and {} there; apart, stone {stone_apart:?}, walkers {walkers_apart:?}; done here {done:?}", entities.now(), walkers.len(), walkers_there.len());
     }
     assert!(done.crossed > 0 && done.stayed > 0 && done.refused > 0 && done.puts > 0 && done.removes > 0 && done.edits > 0 && refused > 0, "{done:?}, {refused} writes refused");
+    // Acts reached over the borders the unshifted pasture lies on; shifted, over others or -- the pasture come clear of them all -- over none, and still to the same.
+    assert!(over_a_border.0 > 0 && over_a_border.0 != over_a_border.1, "acts over a border: {over_a_border:?}");
 }
