@@ -489,10 +489,20 @@ B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    out of, actions couple with attributes and bitplanes, instructions
    remain completely agnostic to semantic behaviour and instead
    couple more to the simulation needs for efficient instructions".
-   My reading and three questions put to the user (where a constant
-   goes; whether masks are the unit of plane instructions; whether an
-   entity is named by cell); WAITING before shaping the 16-byte
-   writes and the 24-byte instructions, which hang on it.
+   ANSWERED (2026-10-11): "1: some instructions hold constants, other
+   dont, you have 24 bits to parameterize the instructions 2: no,
+   some instructions may not use masks, point cell instructions is
+   one example direct write atributes is another, masks are most
+   useful for interacting with bitplanes. not for everything 3: yeah,
+   get rid of entity ids, as i said like 20 times, the id of an
+   entity ona given tick its its initial origin position."
+   My reading of "24 bits": an instruction's head is 32 bits, 8 of
+   opcode and 24 of parameters; with a 20-bit place in the landing
+   superchunk and 16 bytes of payload that is the 24 bytes.
+   ORDER NOW: (1) EntityId removed everywhere -- an entity is named
+   by the cell the tick found it on; (2) the instruction set as the
+   three families, 24 bytes, attribute writes of 16 bytes at the
+   most, no private copy; (3) the actions crate, rules on it alone.
    THE LENGTHS OFF THE INSTRUCTION, the user: "aight, we need to
    store that offsite lol ... one list with 2 elements per value,
    read backwards as i said, we keep the queue length of the gated
