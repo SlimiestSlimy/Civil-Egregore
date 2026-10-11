@@ -9,13 +9,20 @@ and the types the IDs are of (`LayerType`, `Wide`, `EntityType`,
 
 ## The bytes of an ID
 
-Every ID is laid out alike, whatever it is of:
+Every ID has its supertype first, and the supertype says how the
+rest is laid out and what a type of it registers. A plane's and an
+entity type's:
 
 | byte | holds |
 |---|---|
 | the first (the highest) | its **supertype** (`Supertype`): `0x00` an attribute, `0x01` a layer or a wide plane, `0x02` an entity type |
 | the six between | its **number**: what its row in the registry is written with (`NUMBERS`, how many there are) |
-| the last (the lowest) | its **size**: bits a cell of a plane -- 1, 2, 4, 8 or 16; blocks of an attribute -- 1 to 16, all ones for a size that varies; 0 of an entity type, which holds nothing |
+| the last (the lowest) | its **size**: bits a cell of a plane -- 1, 2, 4, 8 or 16; 0 of an entity type, which holds nothing |
+
+An attribute's, under the same first byte: its **number** in the 52
+bits after it (`ATTRIBUTE_NUMBERS`), and in its last four
+(`ATTRIBUTE_SIZE_BITS`) its **length**, blocks less one -- 1 to 16,
+256 bytes at the most.
 
 So what an ID is of, and how big the thing is, is read off the ID with
 no table, the same way for a plane as for an attribute; and a number
@@ -101,11 +108,17 @@ entity is not in the middle of that. An attribute of its own is for
 what only some entities of a kind carry and is big enough to be worth
 a block.
 
-**The ID's last byte is the blocks** (`AttributeType::of_blocks`,
-`blocks`): 1 to 16, all ones for a size that varies
-(`of_varying_size`). **An ID of another supertype is no attribute's**
-(`is_an_attributes`), nor is one whose last byte is 0 -- the namespace
-is one, everything's, so a layer's or an entity type's ID read as an
-attribute's says so itself. A row is written with the number between
-the two bytes (`number`); a number that reaches into either, or a
-layout of no blocks or of 255 or more, does not build.
+**What an attribute's type registers**: its name, its supertype, whether
+its size varies (`Registered::varies_in_size`), and its size if it
+does not. **The ID's last four bits are the length**
+(`AttributeType::of_blocks`, `blocks`): of a fixed type its size, set
+as it is registered. A type whose size varies is registered with them
+0 (`of_varying_size`), and each attribute of it says its own length
+there (`with_blocks`): so the first word of any attribute says how
+long it is, with no table, and what tells one type from another is
+all but those bits (`identity`). **An ID of another supertype is no
+attribute's** (`is_an_attributes`), nor is one whose number is 0 --
+the namespace is one, everything's, so a layer's or an entity type's
+ID read as an attribute's says so itself. A row is written with the
+number (`number`); a number of 2^52 or more, or a layout of no blocks
+or of more than 16, does not build.

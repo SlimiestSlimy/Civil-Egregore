@@ -24,7 +24,7 @@ one block of a layout that takes one; **`WholeAttribute`**: one
 attribute of any layout laid out where it is made, read as its
 blocks (**`WholeAttribute::holding`**);
 **`kind()`**, the type in its first word; **`blocks()`**, how many
-blocks the attribute it begins takes, by its type or its block length,
+blocks the attribute it begins takes, by its type's last four bits,
 one at least. On an entity's blocks, sorted by type:
 **`blocks_sum(blocks)`** -- a sum of blocks, the same for the same
 blocks (**`words_sum(words)`**, of the words they are); **`attribute_seen(blocks)`** -- what a compare carries of one

@@ -8,7 +8,7 @@ use type_registry::{data_words, first_clash, layer_types, named, of_number, Attr
 
 /// A row of `kind` named `name` at `number`, `width` wide.
 fn row(name: &'static str, kind: Kind, number: u64, width: u32) -> Registered {
-    Registered { name, kind, number, width }
+    Registered { name, kind, number, width, varies_in_size: false }
 }
 
 /// The registry has no clash; every row is found by its name and by
@@ -62,11 +62,13 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
     let mut random = utilities::rng::Rng::new(utilities::seed::counted());
     // The fewest blocks and the most, and every count between with a number drawn: any that fits between the two bytes.
     for blocks in 1..=type_registry::ATTRIBUTE_BLOCKS_MOST {
-        let number = random.below(NUMBERS);
+        let number = 1 + random.below(NUMBERS - 1);
         let kind = AttributeType::of_blocks(number, blocks);
-        assert_eq!((kind.blocks(), kind.number(), kind.0 & 0xFF, kind.0 >> 56, kind.is_an_attributes()), (Some(blocks), number, blocks as u64, 0x00, true));
+        assert_eq!((kind.blocks(), kind.number(), kind.0 & 0xF, kind.0 >> 56, kind.is_an_attributes()), (blocks, number, blocks as u64 - 1, 0x00, true));
         let varying = AttributeType::of_varying_size(number);
-        assert_eq!((varying.blocks(), varying.number(), varying.is_an_attributes()), (None, number, true));
+        // One whose size varies is registered with its four bits 0; an attribute of it so many blocks long says so there, and is of the same type.
+        assert_eq!((varying.0 & 0xF, varying.number(), varying.is_an_attributes()), (0, number, true));
+        assert_eq!((varying.with_blocks(blocks).blocks(), varying.with_blocks(blocks).identity()), (blocks, varying.identity()));
         let (bits, first) = (1u32 << random.below(5), random.below(NUMBERS - 16));
         let plane = LayerType::wide(first, bits);
         assert_eq!((plane.bits(), plane.number(), plane.0 & 0xFF, plane.0 >> 56), (bits, first, u64::from(bits), 0x01));
@@ -76,10 +78,10 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
     }
     // An ID of another supertype is no attribute's: the one namespace is everything's.
     for other in [GRASS.0, SHEEP.0, TREE_STAGE.layer_type().0, 0] {
-        assert_eq!((AttributeType(other).blocks(), AttributeType(other).is_an_attributes()), (Some(0), false));
+        assert!(!AttributeType(other).is_an_attributes());
     }
     let (kind, row) = (SHEEP_STATE.attribute_type(), named("sheep state").expect("registered"));
-    assert_eq!((kind.blocks(), row.number, row.width), (Some(4), kind.number(), data_words(4) as u32 * u64::BITS));
+    assert_eq!((kind.blocks(), row.number, row.width, row.varies_in_size), (4, kind.number(), data_words(4) as u32 * u64::BITS, false));
     assert_eq!(of_number(kind.number()), Some(row));
     for _ in 0..100 {
         let state = SheepState { hungry_at: random.draw(), lamb_due_at: random.draw(), grown_at: random.draw(), roaming_until: random.draw(), bearing_neighbour: random.draw() as u32, mother_neighbour: random.draw() as u32, roaming_neighbour: random.draw() as u32 };

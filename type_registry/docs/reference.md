@@ -19,11 +19,13 @@ as a type, `BITS` bits a cell -- **`Bits2`**, **`Bits4`**, **`Bits8`**, **`Bits1
 **`Wide<W>`**: a wide plane, its width in its type: **`new(first)`**,
 **`layer_type`**, **`most`** the most a cell of it holds.
 **`EntityType(u64)`**: an entity's type: **`of(number)`**, **`number`**. **`AttributeType(u64)`**: an
-attribute's, its last byte how many blocks one takes
-(`SIZE_VARIES`, all ones, for a size that varies; 0 for an ID that is
-no attribute's): **`of_blocks(number, blocks)`**,
-**`of_varying_size(number)`**, **`blocks`**, **`is_an_attributes`**,
-**`number`**, its ID without its first byte and its last.
+attribute's, its last four bits (`ATTRIBUTE_SIZE_BITS`) how many
+blocks one takes, less one, its number the 52 bits before
+(`ATTRIBUTE_NUMBERS`): **`of_blocks(number, blocks)`**,
+**`of_varying_size(number)`** (the four bits 0, each attribute of it
+saying its own: **`with_blocks(blocks)`**), **`blocks`**,
+**`identity`** (all but those bits: what tells types apart),
+**`is_an_attributes`**, **`number`**.
 
 ## `layouts.rs`
 
@@ -39,7 +41,7 @@ layout in its type: **`new(number)`**, **`attribute_type`**. **`Member`** `{offs
 ## `registry.rs`
 
 **`Kind`**: `Layer`, `WidePlane`, `EntityType`, `Attribute`.
-**`Registered`** `{name, kind, number, width}`: a row, an attribute's
+**`Registered`** `{name, kind, number, width, varies_in_size}`: a row, an attribute's
 width the bits of its data; **`numbers`** how many
 numbers it takes from `number` on, **`layer_type`** its layer type if it is of
 the cells. `layer`, `wide`, `entity`, `attribute`: a row made from its constant. **`REGISTRY`**: the table, written by hand. The constants:

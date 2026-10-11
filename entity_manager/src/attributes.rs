@@ -6,8 +6,8 @@ use std::ops::Range;
 pub use type_registry::{Attribute, AttributeType, Layout, Member, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};
 
 /// A block of an attribute: two words, sixteen bytes, aligned as
-/// such. An attribute's first block has its type in its first word;
-/// one whose size varies, its block length in its second.
+/// such. An attribute's first block has its type in its first word,
+/// whose last four bits say how many blocks the attribute is.
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AttributeBlock(pub [u64; BLOCK_WORDS]);
@@ -31,12 +31,11 @@ impl AttributeBlock {
         AttributeType(self.0[0])
     }
 
-    /// Blocks the attribute it is the first block of takes: what its
-    /// type says, or its block length -- one at least, that a walk
-    /// always steps on.
+    /// Blocks the attribute it is the first block of takes: what
+    /// the last four bits of its type say, one at least.
     #[inline]
     pub fn blocks(&self) -> usize {
-        self.kind().blocks().unwrap_or(self.0[1] as usize).max(1)
+        self.kind().blocks()
     }
 }
 
@@ -121,9 +120,10 @@ pub fn write_attribute_bytes(blocks: &mut [AttributeBlock], offset: usize, bytes
 pub fn find_attribute(blocks: &[AttributeBlock], kind: AttributeType) -> Result<Range<usize>, usize> {
     let mut at = 0;
     while let Some(first) = blocks.get(at) {
-        if first.kind() >= kind {
+        // By what tells types apart: an attribute whose size varies says its own length in its type.
+        if first.kind().identity() >= kind.identity() {
             // A block length that reaches past the entity's blocks is cut to them.
-            return if first.kind() == kind { Ok(at..(at + first.blocks()).min(blocks.len())) } else { Err(at) };
+            return if first.kind().identity() == kind.identity() { Ok(at..(at + first.blocks()).min(blocks.len())) } else { Err(at) };
         }
         at += first.blocks();
     }
@@ -222,15 +222,14 @@ pub fn remove_attribute(blocks: &mut Vec<AttributeBlock>, kind: AttributeType) -
 }
 
 /// Whether `blocks` are an entity's attributes: whole ones, each of
-/// a type that is an attribute's and no more blocks than an attribute
-/// may be, sorted by type, each type once.
+/// a type that is an attribute's, sorted by type, each type once.
 pub fn sorted(blocks: &[AttributeBlock]) -> bool {
     let (mut at, mut before) = (0, None);
     while let Some(first) = blocks.get(at) {
-        if !first.kind().is_an_attributes() || first.blocks() > ATTRIBUTE_BLOCKS_MOST || before.is_some_and(|before| before >= first.kind()) {
+        if !first.kind().is_an_attributes() || before.is_some_and(|before| before >= first.kind().identity()) {
             return false;
         }
-        (at, before) = (at + first.blocks(), Some(first.kind()));
+        (at, before) = (at + first.blocks(), Some(first.kind().identity()));
     }
     at == blocks.len()
 }

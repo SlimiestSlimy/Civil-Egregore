@@ -352,14 +352,21 @@ byte offset, a byte count, 8 bytes of value at the most),
 WriteAttribute (whole, blocks carried); the registry written by hand;
 save format 5. Same cell hashes as 5e081c6; a sheep's wake 2-4%
 slower, applying 2% faster.
+THE LENGTH (the user): what an attribute's type registers is "name /
+super type 8 bits / variably sized flag / fixed size # if fixed size,
+otherwise 0 or simply not present / typeid ... the last 4 bits are
+zeroed if variably sized flag is true"; "the supertype is what
+defines the data that needs registration"; "when variably sized the 4
+zeroed bits at the end are reused to give the [attribute] length,
+otherwise the block length is simply defined beforehand at
+registration". BUILT: an attribute's ID is supertype (8 bits), number
+(52), blocks less one (4); a varying type registers the four bits 0
+and each attribute of it keeps its length there
+(AttributeType::with_blocks, identity); Registered::varies_in_size.
+Planes and entity types keep their IDs. MY READING to check with the
+user: "less one" (so 16 blocks fit four bits); number 0 is no
+attribute's.
 OPEN, SAID TO THE USER, NOT DECIDED:
-- "fixed sized atributtes dont carry a size byte. only variable sized
-  ones" and "now we use 4 bit size counts": the block count is STILL
-  the ID's last byte (1 to 16, 0xFF varies) and a varying one's block
-  length its first block's second word. Where the four bits live, and
-  where a fixed attribute's size comes from when it is not in the ID
-  (the runtime registry?), is the user's to say. Tests make attribute
-  types of their own, which a registry lookup would have to know.
 - Whole-attribute compare (by sum) is still what set_attribute queues;
   the member compare is there (Turn::set_attribute_member). Which is
   the default was asked and not answered.
