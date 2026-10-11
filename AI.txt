@@ -234,7 +234,9 @@ atomic; a world shifted is the same world (instructions/tests/fast/
 shifted.rs); the collision plane, entities in it; cells about a cell
 and masks in Morton order.
 
-IN ORDER NOW:
+IN ORDER NOW: B FIRST (user, 2026-10-11: "finish the prior tasks
+first, in order"; "instructions are not finished as specified and they
+were previous work"), then A (parked), A2, C, D.
 
 A. PATHFINDING TO MORTON ORDER (user, 2026-10-11: "next fix
    pathfinding to morton order"). FIRST PART DONE: the area is read
@@ -247,8 +249,22 @@ A. PATHFINDING TO MORTON ORDER (user, 2026-10-11: "next fix
    step east as three masked shifts a word and a carry into the next
    word tile, twelve passes a spread with walls and diagonals, over 16
    words: by my count 3 to 4 times a rows spread. Profile now (sparse):
-   turning to rows ~1.5%, the search ~0.85%, lookups ~0.7%. Not built,
-   not measured: ask, or build it and measure both.
+   turning to rows ~1.5%, the search ~0.85%, lookups ~0.7%.
+   THE USER (2026-10-11): "regarding pathfinding yes, measure and let
+   the best win". BUILD THE MORTON SEARCH, MEASURE BOTH, KEEP THE BEST.
+   PARKED on the branch wip/morton-search (pushed): pathfinding/src/
+   morton.rs, the search over 32x32 cells of four tiles of 16 in
+   Morton order, tested equal to the rows' on 3,000 drawn areas. Left:
+   wire it into walking::seek (area as Tiles, the centred 16x16 a
+   mask), measure both on `pasture 1000 20 4000 4 1`, keep the best,
+   docs.
+
+A2. THE PICK, NO EXCEPTIONS (user, 2026-10-11, on the shifted test
+   drawing a neighbour its own way, row by row: "no exceptions"). So
+   around::pick itself must come to the same neighbour for the same
+   draw wherever the tiles fall, and the test use it: no pick of the
+   test's own. My plan: the ways numbered in Morton order of their
+   offsets, a pick the way of a rank in that order. After A.
 
 B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    instructions from scratch lmao"; "were basically building a VM
@@ -310,12 +326,73 @@ B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    - no private copy: of Flock.room / EntityEdit, "we should be
      writing to the entity store instead of writing twice".
 
+   ANSWERED 2026-10-11 (asked, the user chose):
+   - what a compare or compute may read of cells: "Own cell now, rest
+     as tick found" -- current state only at the entity's own cell and
+     its own attributes and flags; other cells (ring, area, paths) as
+     the tick found them, worked out before apply and handed on as
+     flags; what lands elsewhere (a step, a spawn, a cell written) is a
+     compare-and-write at its target, its outcome learnt the tick
+     after. Parallel, borders invisible.
+   - a rule's shape: "Fixed program, flags branch" -- a rule is the
+     same list of instructions for every woken entity of its type and
+     reads nothing itself; compares and computes set flags, writes
+     test them. Rules are data.
+   THE TABLE: the user: "yes, instruction table pleaseeeee. make it a
+   markdown lol". Drafted in delete_after_use/instruction_table.md
+   (16 bytes, every instruction, the sheep as a program, 7 questions
+   at its end); WAITING for the user's mark-up. No code before it.
+
+   ON THE TABLE, the user (2026-10-11): "on the type registry, specify
+   which byte stores the size for the bitplane. ie the last bit, same
+   as more than one block sized atributes."; "the type registry wastes
+   a lot of bytes from having all atributes separate, group them, make
+   structs. for example most sheep stuff can fit inside one atribute
+   block"; asked me to detail the two halves of the flags; "yes, wake
+   and sleep should obviously be instructions" (question 1: fold the
+   wake lines); "lets get to the remaining questions later" (2-7 open).
+
+   NOW, while the user marks the table up (2026-10-11): "while i work
+   on the instructions fix that [the registry: size byte, attributes
+   grouped], and also work on the tickrate simulation-second
+   invariance stuff to have it ready"; "because instructions will
+   depend on that". So: registry first, then D's tick rate part.
+
+   MY DESIGN FROM THAT (to build in steps, each green and committed):
+   1. Type IDs: first byte the supertype (C below), functions
+      registered; the general attribute, type 0x00FFFFFF..., first of
+      every entity, its first 128 bits after the type the flags.
+   2. An instruction is 16 bytes: opcode, condition (7 bits of flag
+      offset + the bit wanted, or none), small parameters, 8 bytes of
+      operand. Sizes asserted. A put carries no blocks: fields are
+      written after it, a field an instruction.
+   3. A program runs for each woken entity in two parts, one stream
+      still: before apply, on the tick-start world, its reads of other
+      cells and its computes set flags, and what lands elsewhere is
+      queued then if its flags (known by then) let it; at apply, in
+      author order with everything else landing in the superchunk, its
+      own-cell compares and its writes run against the entity in the
+      store -- no private copy.
+      So a send can hang only on flags known before apply; a flag set
+      at apply (the grass still under me) lets only writes to the
+      entity and its own cell. As today: a fed sheep does not step.
+   4. Cell rules (grass, trees) get their own instructions, with a
+      flag register for the sampled cell and no entity.
+   5. Rules rewritten as programs; computes are registered functions
+      of a few fixed signatures (ring open to a step, a way drawn, the
+      step to seek, cells counted in the area).
+
 C. TYPE ID: "you actually poisoned the first byte of the typeid by
    encoding length there, we would actually would like the first byte
    of the typeID to be a kind of 'supertype' be it entity, function,
    atribute, etc."; "block count would be the last byte for the
-   flagged attribute types on the registry". (Today the top byte is
-   the block count, 0xFF = varies.)
+   flagged attribute types on the registry". DONE 2026-10-11: first
+   byte the supertype (0x00 attribute, 0x01 layer, 0x02 entity type;
+   function not yet: nothing registers one), last byte the size (a
+   plane's bits a cell, an attribute's blocks, 0xFF = varies), the
+   six between the number. The sheep's five attributes are one block
+   (SHEEP_STATE, SheepState; a tick of 0 = none). Same census as
+   before on one seed; wake and apply no slower.
 
 D. QUEUED: "we want sheep to wander more and sleep less haha"; and
    rules independent of the tick rate: "more constants: ticks per
@@ -371,6 +448,11 @@ paged; page-out on the tick's thread.
 
 
 == OPEN THREADS ==
+- server fast test collision::trees_bar_their_cells_and_no_sheep_steps_onto_one
+  failed once in a whole-workspace run at "stepped > 0" and passed
+  three reruns: it hangs on the seed (few sheep hungry off grass in
+  400 ticks). Not from the registry change (census the same as
+  09193e7). To make hold on any seed.
 
 - Limits known: a compare must be in the superchunk of what it lets be
   written (a panic otherwise; sheep fed do not step for it); another

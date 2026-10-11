@@ -4,11 +4,11 @@
 //!
 //! `cargo test --test fine`
 
-use type_registry::{data_words, first_clash, layer_types, named, of_id, AttributeType, Kind, Layout, Registered, Roaming, GRASS, HUNGRY_AT, REGISTRY, ROAMING, TREE_STAGE};
+use type_registry::{data_words, first_clash, layer_types, named, of_number, AttributeType, EntityType, Kind, Layout, LayerType, Registered, SheepState, GRASS, NUMBERS, REGISTRY, SHEEP, SHEEP_STATE, TREE_STAGE};
 
-/// A row of `kind` named `name` at `id`, `width` wide.
-fn row(name: &'static str, kind: Kind, id: u64, width: u32) -> Registered {
-    Registered { name, kind, id, width }
+/// A row of `kind` named `name` at `number`, `width` wide.
+fn row(name: &'static str, kind: Kind, number: u64, width: u32) -> Registered {
+    Registered { name, kind, number, width }
 }
 
 /// The registry has no clash; every row is found by its name and by
@@ -21,12 +21,12 @@ fn the_check_finds_every_clash_and_the_registry_has_none() {
     assert_eq!(first_clash(REGISTRY), None);
     for registered in REGISTRY {
         assert_eq!(named(registered.name), Some(registered));
-        for id in registered.id..registered.id + registered.ids() {
-            assert_eq!(of_id(id), Some(registered), "{id}");
+        for number in registered.number..registered.number + registered.numbers() {
+            assert_eq!(of_number(number), Some(registered), "{number}");
         }
     }
-    let taken: u64 = REGISTRY.iter().map(Registered::ids).sum();
-    assert_eq!((0..1_000).filter(|&id| of_id(id).is_some()).count() as u64, taken);
+    let taken: u64 = REGISTRY.iter().map(Registered::numbers).sum();
+    assert_eq!((0..1_000).filter(|&number| of_number(number).is_some()).count() as u64, taken);
 
     let sound = [row("a", Kind::Layer, 2, 1), row("b", Kind::WidePlane, 4, 4), row("c", Kind::Layer, 8, 1), row("d", Kind::EntityType, 3, 0), row("e", Kind::Attribute, 9, 64)];
     assert_eq!(first_clash(&sound), None);
@@ -52,32 +52,40 @@ fn the_layer_types_are_the_layers_and_wide_planes() {
     assert_eq!(TREE_STAGE.layer_type().bits(), named("tree stage").expect("registered").width);
 }
 
-/// An attribute's type says its blocks in its top byte and keeps its
-/// number under it; its row says its data's width; and a layout's
-/// fields come back from the words they were written to.
+/// An ID says what it is of in its first byte and its size in its
+/// last -- an attribute's blocks, a plane's bits a cell, nothing of an
+/// entity type -- and keeps its number between; an attribute's row
+/// says its data's width; and a layout's fields come back from the
+/// words they were written to.
 #[test]
 fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
     let mut random = utilities::rng::Rng::new(utilities::seed::counted());
-    // The fewest blocks and the most, and every count between with a number drawn: any that fits under the top byte.
+    // The fewest blocks and the most, and every count between with a number drawn: any that fits between the two bytes.
     for blocks in 1..=254 {
-        let number = random.below(1 << 56);
+        let number = random.below(NUMBERS);
         let kind = AttributeType::of_blocks(number, blocks);
-        assert_eq!((kind.blocks(), kind.number(), kind.0 >> 56, kind.is_an_attributes()), (Some(blocks), number, blocks as u64, true));
+        assert_eq!((kind.blocks(), kind.number(), kind.0 & 0xFF, kind.0 >> 56, kind.is_an_attributes()), (Some(blocks), number, blocks as u64, 0x00, true));
         let varying = AttributeType::of_varying_size(number);
         assert_eq!((varying.blocks(), varying.number(), varying.is_an_attributes()), (None, number, true));
+        let (bits, first) = (1u32 << random.below(5), random.below(NUMBERS - 16));
+        let plane = LayerType::wide(first, bits);
+        assert_eq!((plane.bits(), plane.number(), plane.0 & 0xFF, plane.0 >> 56), (bits, first, u64::from(bits), 0x01));
+        assert!((0..bits).all(|bit| plane.holds(plane.plane(bit)) && plane.plane(bit) == LayerType::of_a_bit(first + u64::from(bit))) && !plane.holds(plane.plane(bits)));
+        let entity = EntityType::of(number);
+        assert_eq!((entity.number(), entity.0 & 0xFF, entity.0 >> 56), (number, 0, 0x02));
     }
-    // An ID whose top byte is 0 is of something else: the one namespace is everything's.
-    assert_eq!((AttributeType(GRASS.0).blocks(), AttributeType(GRASS.0).is_an_attributes()), (Some(0), false));
-    for (kind, name) in [(HUNGRY_AT.attribute_type(), "hungry at"), (ROAMING.attribute_type(), "roaming")] {
-        let row = named(name).expect("registered");
-        assert_eq!((kind.blocks(), row.id, row.width), (Some(1), kind.number(), data_words(1) as u32 * u64::BITS));
-        assert_eq!(of_id(kind.number()), Some(row));
+    // An ID of another supertype is no attribute's: the one namespace is everything's.
+    for other in [GRASS.0, SHEEP.0, TREE_STAGE.layer_type().0, 0] {
+        assert_eq!((AttributeType(other).blocks(), AttributeType(other).is_an_attributes()), (Some(0), false));
     }
+    let (kind, row) = (SHEEP_STATE.attribute_type(), named("sheep state").expect("registered"));
+    assert_eq!((kind.blocks(), row.number, row.width), (Some(1), kind.number(), data_words(1) as u32 * u64::BITS));
+    assert_eq!(of_number(kind.number()), Some(row));
     for _ in 0..100 {
-        let roaming = Roaming { until: random.draw(), neighbour: random.draw() as u32 };
-        let mut data = [0; data_words(Roaming::BLOCKS)];
-        roaming.write(&mut data);
-        assert_eq!((Roaming::read(&data), data[2..].iter().sum::<u64>()), (roaming, 0));
+        let state = SheepState { hungry_at: random.draw(), lamb_due_at: random.draw(), grown_at: random.draw(), roaming_until: random.draw(), bearing: random.draw(), roaming_neighbour: random.draw() as u32 };
+        let mut data = [0; data_words(SheepState::BLOCKS)];
+        state.write(&mut data);
+        assert_eq!((SheepState::read(&data), data[6..].iter().sum::<u64>()), (state, 0));
         let (number, mut word) = (random.draw(), [0; data_words(<u64 as Layout>::BLOCKS)]);
         number.write(&mut word);
         assert_eq!((<u64 as Layout>::read(&word), word[1..].iter().sum::<u64>()), (number, 0));

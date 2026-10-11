@@ -39,15 +39,15 @@ attribute of one type is laid out alike.
 two blocks, or more: the blocks after the first are all data, eight
 words each, straight after the first block's seven -- so the data is
 one run of words, 7, 15, 23 and so on. How many blocks a type takes is
-said by its ID -- the ID's top byte, as a layer type's top byte says
+said by its ID -- the ID's last byte, as a layer type's last byte says
 how wide it is -- so nothing is looked up to step over an attribute
 (`AttributeBlock::blocks`). The types are one namespace, everything's:
-an ID whose top byte is 0 is **not an attribute's**, and a block that
+an ID of another supertype, or whose last byte is 0, is **not an attribute's**, and a block that
 begins with one is no attribute (`sorted` says so of a run of blocks,
 and a saved entity with one is not read).
 
 **Variable size.** Most attributes are of a fixed size. One whose
-size varies -- a short text, a short list -- has a top byte of all
+size varies -- a short text, a short list -- has a last byte of all
 ones, and then its first block's second word is its **block length**:
 how many blocks it takes in all, one at least. Its data starts at the
 third word. None is registered yet, and no layout is written for one:

@@ -10,7 +10,7 @@ use chunk_storage::{ChunkStorage, LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, WORLD_MIDDLE};
 
 /// The layer type the tests write.
-const STONE: LayerType = LayerType(9);
+const STONE: LayerType = LayerType::of_a_bit(9);
 
 /// An arena with `STONE` hot and empty in every chunk holding one of
 /// `cells`.

@@ -67,9 +67,9 @@ pub fn storage_with(superchunk: SuperchunkIndex, place: usize, layers: &[(LayerT
 }
 
 /// The mock superchunk's dirt: every cell its grass is not on.
-pub const MOCK_DIRT: LayerType = LayerType(1);
+pub const MOCK_DIRT: LayerType = LayerType::of_a_bit(1);
 /// The mock superchunk's grass.
-pub const MOCK_GRASS: LayerType = LayerType(2);
+pub const MOCK_GRASS: LayerType = LayerType::of_a_bit(2);
 
 /// A superchunk of dirt, flat at height 0, with grass on `grass_cells`
 /// cells drawn at random from `seed` -- fewer if a cell is drawn twice.

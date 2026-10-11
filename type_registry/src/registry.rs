@@ -2,7 +2,7 @@
 //! once in [`registered!`] and checked as the crate is built
 //! ([`first_clash`]): `docs/type_registry.md`, "Why one table".
 
-use crate::layouts::{data_words, Attribute, Layout, Roaming};
+use crate::layouts::{data_words, Attribute, Layout, SheepState};
 use crate::type_ids::{Bits4, EntityType, LayerType, Wide, Width};
 
 /// What a registered type is of.
@@ -25,8 +25,9 @@ pub struct Registered {
     pub name: &'static str,
     /// What it is of.
     pub kind: Kind,
-    /// Its ID: for a wide plane, its first -- its lowest bit's layer.
-    pub id: u64,
+    /// Its number, what its ID keeps between its first byte and its
+    /// last: for a wide plane, its first -- its lowest bit's layer's.
+    pub number: u64,
     /// Its width, in bits: what a cell of a layer or a wide plane
     /// holds, what an attribute's data holds; 0 for an entity type,
     /// which holds nothing itself.
@@ -34,9 +35,9 @@ pub struct Registered {
 }
 
 impl Registered {
-    /// How many IDs it takes, from [`Registered::id`] on: a wide
+    /// How many numbers it takes, from [`Registered::number`] on: a wide
     /// plane one a bit, its cold planes'; anything else one.
-    pub const fn ids(&self) -> u64 {
+    pub const fn numbers(&self) -> u64 {
         match self.kind {
             Kind::WidePlane => self.width as u64,
             _ => 1,
@@ -47,7 +48,7 @@ impl Registered {
     /// with its width -- if it is a layer or a wide plane.
     pub const fn layer_type(&self) -> Option<LayerType> {
         match self.kind {
-            Kind::Layer | Kind::WidePlane => Some(LayerType::wide(self.id, self.width)),
+            Kind::Layer | Kind::WidePlane => Some(LayerType::wide(self.number, self.width)),
             _ => None,
         }
     }
@@ -63,17 +64,17 @@ macro_rules! registered {
 
         /// Every type a world has: the layers and wide planes of its
         /// cells, the types of its entities and their attributes. In
-        /// the order written, which is the order of their IDs.
+        /// the order written, which is the order of their numbers.
         pub const REGISTRY: &[Registered] = &[ $( registered!(@row $kind $name $id $($width)?) ),* ];
     };
-    (@constant [$(#[$doc:meta])*] layer $constant:ident $id:literal) => { $(#[$doc])* pub const $constant: LayerType = LayerType($id); };
+    (@constant [$(#[$doc:meta])*] layer $constant:ident $id:literal) => { $(#[$doc])* pub const $constant: LayerType = LayerType::of_a_bit($id); };
     (@constant [$(#[$doc:meta])*] wide $constant:ident $id:literal $width:ident) => { $(#[$doc])* pub const $constant: Wide<$width> = Wide::new($id); };
-    (@constant [$(#[$doc:meta])*] entity $constant:ident $id:literal) => { $(#[$doc])* pub const $constant: EntityType = EntityType($id); };
+    (@constant [$(#[$doc:meta])*] entity $constant:ident $id:literal) => { $(#[$doc])* pub const $constant: EntityType = EntityType::of($id); };
     (@constant [$(#[$doc:meta])*] attribute $constant:ident $id:literal $layout:ident) => { $(#[$doc])* pub const $constant: Attribute<$layout> = Attribute::new($id); };
-    (@row layer $name:literal $id:literal) => { Registered { name: $name, kind: Kind::Layer, id: $id, width: 1 } };
-    (@row wide $name:literal $id:literal $width:ident) => { Registered { name: $name, kind: Kind::WidePlane, id: $id, width: <$width as Width>::BITS } };
-    (@row entity $name:literal $id:literal) => { Registered { name: $name, kind: Kind::EntityType, id: $id, width: 0 } };
-    (@row attribute $name:literal $id:literal $layout:ident) => { Registered { name: $name, kind: Kind::Attribute, id: $id, width: data_words(<$layout as Layout>::BLOCKS) as u32 * u64::BITS } };
+    (@row layer $name:literal $id:literal) => { Registered { name: $name, kind: Kind::Layer, number: $id, width: 1 } };
+    (@row wide $name:literal $id:literal $width:ident) => { Registered { name: $name, kind: Kind::WidePlane, number: $id, width: <$width as Width>::BITS } };
+    (@row entity $name:literal $id:literal) => { Registered { name: $name, kind: Kind::EntityType, number: $id, width: 0 } };
+    (@row attribute $name:literal $id:literal $layout:ident) => { Registered { name: $name, kind: Kind::Attribute, number: $id, width: data_words(<$layout as Layout>::BLOCKS) as u32 * u64::BITS } };
 }
 
 registered! {
@@ -99,19 +100,10 @@ registered! {
     layer COLLISION = 10, "collision";
     /// The sheep's type.
     entity SHEEP = 16, "sheep";
-    /// The tick a sheep is next hungry at.
-    attribute HUNGRY_AT<u64> = 17, "hungry at";
-    /// The tick a pregnant sheep's lamb is due at.
-    attribute PREGNANT<u64> = 18, "pregnant";
-    /// The tick a lamb is grown at.
-    attribute LAMB<u64> = 19, "lamb";
-    /// A sheep leaving thin pasture: the tick it roams until and the
-    /// neighbour it steps to. Set once, at the meal: a step on the way
-    /// changes no attribute.
-    attribute ROAMING<Roaming> = 20, "roaming";
-    /// A sheep whose lamb was put beside it last tick: the lamb's ID.
-    /// Pregnant still, until it has seen the lamb stand beside it.
-    attribute BEARING<u64> = 21, "bearing";
+    /// All a sheep keeps, in one block: when it is next hungry, and
+    /// what it is in the middle of -- carrying a lamb, bearing it,
+    /// growing up, leaving thin pasture.
+    attribute SHEEP_STATE<SheepState> = 17, "sheep state";
     /// The cells under water, however deep: what a rule asks. How deep is
     /// kept a map a chunk with water, in the superchunk's image
     /// (`chunk_storage::SuperchunkImage::depth`).
@@ -133,7 +125,7 @@ const fn same(one: &str, other: &str) -> bool {
 }
 
 /// The first row of `registry` that clashes with one before it, if any
-/// does: its IDs -- one, or a wide plane's one a bit -- overlap the
+/// does: its numbers -- one, or a wide plane's one a bit -- overlap the
 /// other's, or it has the other's name.
 pub const fn first_clash(registry: &[Registered]) -> Option<usize> {
     let mut later = 1;
@@ -141,7 +133,7 @@ pub const fn first_clash(registry: &[Registered]) -> Option<usize> {
         let mut earlier = 0;
         while earlier < later {
             let (one, other) = (&registry[earlier], &registry[later]);
-            if (one.id < other.id + other.ids() && other.id < one.id + one.ids()) || same(one.name, other.name) {
+            if (one.number < other.number + other.numbers() && other.number < one.number + one.numbers()) || same(one.name, other.name) {
                 return Some(later);
             }
             earlier += 1;
@@ -152,7 +144,7 @@ pub const fn first_clash(registry: &[Registered]) -> Option<usize> {
 }
 
 // The build fails here, naming the type, if a row of the registry
-// takes an ID or a name another before it has.
+// takes a number or a name another before it has.
 const _: () = {
     if let Some(row) = first_clash(REGISTRY) {
         panic!("{}", REGISTRY[row].name)
@@ -164,10 +156,10 @@ pub fn named(name: &str) -> Option<&'static Registered> {
     REGISTRY.iter().find(|registered| registered.name == name)
 }
 
-/// The row that `id` is one of the IDs of, if any: a wide plane's for
+/// The row that `number` is one of the numbers of, if any: a wide plane's for
 /// any of its cold planes'.
-pub fn of_id(id: u64) -> Option<&'static Registered> {
-    REGISTRY.iter().find(|registered| (registered.id..registered.id + registered.ids()).contains(&id))
+pub fn of_number(number: u64) -> Option<&'static Registered> {
+    REGISTRY.iter().find(|registered| (registered.number..registered.number + registered.numbers()).contains(&number))
 }
 
 /// Every layer type a world's cells have, as the hot bitmaps know

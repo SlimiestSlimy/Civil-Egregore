@@ -11,9 +11,9 @@ use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CEL
 use entity_manager::{Entities, EntityId, EntityType, Header};
 
 /// The layer type the arena holds.
-pub const STONE: LayerType = LayerType(6);
+pub const STONE: LayerType = LayerType::of_a_bit(6);
 /// The entities' type.
-pub const WALKER: EntityType = EntityType(40);
+pub const WALKER: EntityType = EntityType::of(40);
 
 /// An arena with `STONE` hot over the `side` by `side` superchunks from
 /// `(10, 10)`, the cells `cells` set.

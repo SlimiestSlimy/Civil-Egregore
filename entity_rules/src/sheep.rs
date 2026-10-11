@@ -4,7 +4,7 @@
 
 use instructions::around;
 use instructions::entities::EntitiesBetweenTicks;
-pub use instructions::entity_types::{Roaming, BEARING, HUNGRY_AT, LAMB, PREGNANT, ROAMING, SHEEP};
+pub use instructions::entity_types::{SheepState, SHEEP, SHEEP_STATE};
 use instructions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
 use instructions::{area, cells, compare, entities, place_counted, this_tick, walking, AttributeBlock, CellCartesian, CellIndex, EntityEdit, EntityId, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
@@ -86,10 +86,12 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     let grass = around::layer(turn, GRASS, &about);
     // The neighbours it may step to: on the hot bitplanes, nothing standing there, no wall before them.
     let steppable = grass.hot & walking::around_steppable(turn, &about);
-    let hungry_at = sheep.get(HUNGRY_AT).unwrap_or(now);
-    let roaming = sheep.get(ROAMING);
+    // All it keeps, as the tick found it, and as this wake leaves it: written once, if it changed.
+    let was = sheep.get(SHEEP_STATE).unwrap_or(SheepState { hungry_at: now, ..SheepState::default() });
+    let mut state = was;
+    let (hungry_at, roaming) = (was.hungry_at, was.roaming_until != 0);
     // On its way out of thin pasture it does not stop to eat.
-    let fed = now >= hungry_at && !(grass.set & about.centre()).is_empty() && roaming.is_none();
+    let fed = now >= hungry_at && !(grass.set & about.centre()).is_empty() && !roaming;
     if !fed && now >= hungry_at + STARVE_TICKS {
         entities::remove(turn, sheep.header());
         done[DEATHS] += 1;
@@ -102,25 +104,26 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         // against it, and the grass cleared last. Should it be gone by then -- decayed in this very tick -- none of it happens, and
         // what is held against the grass being gone does instead: the sheep sleeps a step, hungry as it was, and wakes to look again.
         compare::entities_from_here(turn, compare::holds(GRASS, at));
-        sheep.set(HUNGRY_AT, now + MEAL_TICKS);
+        state.hungry_at = now + MEAL_TICKS;
         if let (false, Some(way)) = (lush, around::pick(this_tick::random(turn), &about, steppable)) {
-            sheep.set(ROAMING, Roaming { until: now + MEAL_TICKS + ROAM_TICKS, neighbour: way });
+            (state.roaming_until, state.roaming_neighbour) = (now + MEAL_TICKS + ROAM_TICKS, way);
         }
     }
     let hungry = !fed && now >= hungry_at;
     // What it next has to wake for, were it to sleep as long as it can.
     let mut needs = if fed { now + MEAL_TICKS } else { hungry_at };
-    let grown_at = sheep.get(LAMB);
+    let grown_at = (was.grown_at != 0).then_some(was.grown_at);
     // The lamb it put beside it last tick stands there, and is born; or its cell was taken first, and it is pregnant still.
-    if let Some(lamb) = sheep.unset(BEARING)
-        && entities::stands_beside(turn, EntityId(lamb), at).is_some()
-    {
-        sheep.unset(PREGNANT);
-        count(turn, done, fed.then_some(at), BIRTHS);
+    if was.bearing != 0 {
+        state.bearing = 0;
+        if entities::stands_beside(turn, EntityId(was.bearing), at).is_some() {
+            state.lamb_due_at = 0;
+            count(turn, done, fed.then_some(at), BIRTHS);
+        }
     }
     // Whether it put a lamb this tick: it stays, and wakes the next to see it.
     let mut bearing = false;
-    match sheep.get(PREGNANT) {
+    match (state.lamb_due_at != 0).then_some(state.lamb_due_at) {
         Some(due) if now < due => needs = needs.min(due),
         // Eating, it bears at its next wake: a lamb may land in the next superchunk, where the grass under its mother cannot be held against it.
         Some(_) if fed => needs = now,
@@ -129,31 +132,32 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
             Some(beside) => {
                 // Beside it on the cell drawn: that taken first, it is pregnant still, and tries the next tick.
                 let wake = next_step(turn);
-                let lamb = entities::spawn(turn, SHEEP, beside, wake, &[AttributeBlock::holding(HUNGRY_AT, now + MEAL_TICKS), AttributeBlock::holding(LAMB, now + LAMB_TICKS)]);
-                sheep.set(BEARING, lamb.0);
+                let born = SheepState { hungry_at: now + MEAL_TICKS, grown_at: now + LAMB_TICKS, ..SheepState::default() };
+                let lamb = entities::spawn(turn, SHEEP, beside, wake, &[AttributeBlock::holding(SHEEP_STATE, born)]);
+                state.bearing = lamb.0;
                 bearing = true;
             }
             None => needs = now,
         },
         None if lush && grown_at.is_none() && this_tick::random(turn).below(CONCEIVE_ONE_IN) == 0 => {
-            sheep.set(PREGNANT, now + GESTATION_TICKS);
+            state.lamb_due_at = now + GESTATION_TICKS;
             needs = needs.min(now + GESTATION_TICKS);
         }
         None => {}
     }
     match grown_at {
-        Some(grown_at) if now >= grown_at => _ = sheep.unset(LAMB),
+        Some(grown_at) if now >= grown_at => state.grown_at = 0,
         Some(grown_at) => needs = needs.min(grown_at),
         None => {}
     }
     // Hungry, it walks; satisfied, it stays, and sleeps until it needs something.
     let way = if !hungry || bearing {
         None
-    } else if let Some(roaming) = roaming {
+    } else if roaming {
         // On the way it set off, until its time is up or it comes to the edge of the hot superchunks.
-        let way = about.towards(roaming.neighbour);
-        if now >= roaming.until || (steppable & way).is_empty() {
-            sheep.unset(ROAMING);
+        let way = about.towards(was.roaming_neighbour);
+        if now >= was.roaming_until || (steppable & way).is_empty() {
+            (state.roaming_until, state.roaming_neighbour) = (0, 0);
         }
         around::prefer(this_tick::random(turn), &about, way, steppable)
     } else if !(grass.set & steppable).is_empty() {
@@ -185,6 +189,9 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         entities::remove(turn, sheep.header());
         count(turn, done, fed.then_some(at), DEATHS);
     } else {
+        if state != was {
+            sheep.set(SHEEP_STATE, state);
+        }
         entities::commit(turn, sheep, to, wake);
     }
     if fed {
@@ -233,6 +240,6 @@ pub fn flock(entities: &mut EntitiesBetweenTicks, superchunk: SuperchunkIndex, c
             continue;
         }
         let header = Header { id: EntityId(random.draw()), kind: SHEEP, at: at.into(), wake: now + random.below(STEP_TICKS) };
-        put += usize::from(entities.put(header, &[AttributeBlock::holding(HUNGRY_AT, now + random.below(MEAL_TICKS))]));
+        put += usize::from(entities.put(header, &[AttributeBlock::holding(SHEEP_STATE, SheepState { hungry_at: now + random.below(MEAL_TICKS), ..SheepState::default() })]));
     }
 }

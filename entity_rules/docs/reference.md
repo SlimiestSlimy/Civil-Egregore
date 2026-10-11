@@ -4,9 +4,9 @@ The design is in `entity_rules.md`.
 
 ## `sheep.rs`
 
-`SHEEP`, and its attributes `HUNGRY_AT`, `PREGNANT`, `LAMB`, each a
-tick, `ROAMING`, the tick it roams until and which way
-(`Roaming`), and `BEARING`, the lamb it put last tick;
+`SHEEP`, and its one attribute `SHEEP_STATE`, laid out as `SheepState`:
+when it is next hungry, when its lamb is due, when it is grown, the
+tick it roams until and which way, the lamb it put last tick;
 `STEP_TICKS` (64) and `STEP_JITTER` (16) between a walking sheep's
 steps, `MEAL_TICKS` (6,912), `STARVE_TICKS` (13,824),
 `LUSH_CELLS` (64, of the area's 256), `CONCEIVE_ONE_IN` (5),
@@ -15,14 +15,14 @@ steps, `MEAL_TICKS` (6,912), `STARVE_TICKS` (13,824),
 
 **`rule(turn)`**: hands **`wake`**, the rule for one sheep, to `entities::each_woken`, with a **`Flock`** (the counts, and room for attributes). Every sheep waking on the superchunk's turn sees to
 what it woke for and sleeps as long as it can. Hungry (past
-`HUNGRY_AT`) and on grass, it eats it, and is hungry again `MEAL_TICKS`
+its `hungry_at`) and on grass, it eats it, and is hungry again `MEAL_TICKS`
 on; hungry `STARVE_TICKS` with no meal, it dies. Its lamb due, it is
 put on a cell open to a step beside it (`around::pick`,
 `entities::spawn`) -- or waited for, and born the tick after if
-it stands beside it (`BEARING`, `entities::stands_beside`), else put
+it stands beside it (its `bearing`, `entities::stands_beside`), else put
 again; it falls pregnant on a meal on lush pasture
 (`LUSH_CELLS` of the area about it grass, `Area::count`; one in
-`CONCEIVE_ONE_IN`) if grown; a meal on pasture not lush, it is `ROAMING`
+`CONCEIVE_ONE_IN`) if grown; a meal on pasture not lush, it roams
 -- when next hungry it walks one way for `ROAM_TICKS`, eating nothing,
 before it looks for grass; a lamb past its tick is grown. Satisfied,
 it stays where it stands and wakes at the first of those ticks to come;

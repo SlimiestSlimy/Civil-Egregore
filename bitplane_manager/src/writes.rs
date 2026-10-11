@@ -189,7 +189,7 @@ impl Write {
 /// Counts the cells of the part of `write` in `superchunk` -- which has
 /// no bitmap in use -- as missed.
 pub fn count_missed(superchunk: SuperchunkIndex, write: Write, applied: &mut WritesApplied) {
-    apply_in(None, superchunk, LayerType(0), write, applied);
+    apply_in(None, superchunk, LayerType::of_a_bit(0), write, applied);
 }
 
 /// Applies the part of `write`, to `layer_type`'s bitplane, that lies in

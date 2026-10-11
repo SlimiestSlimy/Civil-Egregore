@@ -17,27 +17,27 @@ use coordinates::{ChunkIndex, SuperchunkIndex};
 #[test]
 fn hot_bitmaps_hold_their_chunks_cells() {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
-    let storage = storage_with(ORIGIN, 0, &[(LayerType(1), drawn())], &mut codec);
+    let storage = storage_with(ORIGIN, 0, &[(LayerType::of_a_bit(1), drawn())], &mut codec);
     let chunk = ChunkIndex(0);
-    let drawn_key = BucketKey { layer_type: LayerType(1), chunk };
-    let absent_key = BucketKey { layer_type: LayerType(2), chunk };
+    let drawn_key = BucketKey { layer_type: LayerType::of_a_bit(1), chunk };
+    let absent_key = BucketKey { layer_type: LayerType::of_a_bit(2), chunk };
 
-    assert!(arena.make_hot(drawn_key, storage.layer(chunk, LayerType(1)), &mut codec));
-    assert!(arena.make_hot(absent_key, storage.layer(chunk, LayerType(2)), &mut codec));
+    assert!(arena.make_hot(drawn_key, storage.layer(chunk, LayerType::of_a_bit(1)), &mut codec));
+    assert!(arena.make_hot(absent_key, storage.layer(chunk, LayerType::of_a_bit(2)), &mut codec));
     assert_eq!(arena.bucket(drawn_key).expect("hot").cells(), &drawn());
     assert!(arena.bucket(absent_key).expect("hot").cells().iter().all(|&word| word == 0));
 
     let inside_the_circle = cell_in(chunk, (180, 180));
-    assert_eq!(arena.holds(LayerType(1), inside_the_circle), Ok(true));
-    write(&mut arena, LayerType(1), WriteOp::Unset, inside_the_circle);
-    assert_eq!(arena.holds(LayerType(1), inside_the_circle), Ok(false));
+    assert_eq!(arena.holds(LayerType::of_a_bit(1), inside_the_circle), Ok(true));
+    write(&mut arena, LayerType::of_a_bit(1), WriteOp::Unset, inside_the_circle);
+    assert_eq!(arena.holds(LayerType::of_a_bit(1), inside_the_circle), Ok(false));
     // Turning it hot again keeps the change.
-    assert!(!arena.make_hot(drawn_key, storage.layer(chunk, LayerType(1)), &mut codec));
-    assert_eq!(arena.holds(LayerType(1), inside_the_circle), Ok(false));
+    assert!(!arena.make_hot(drawn_key, storage.layer(chunk, LayerType::of_a_bit(1)), &mut codec));
+    assert_eq!(arena.holds(LayerType::of_a_bit(1), inside_the_circle), Ok(false));
 
-    let cold = BucketKey { layer_type: LayerType(3), chunk };
-    assert_eq!(arena.holds(LayerType(3), inside_the_circle), Err(NotHot(cold)));
-    assert_eq!(write(&mut arena, LayerType(3), WriteOp::Set, inside_the_circle).missed, 1, "a write to a cold bitmap is missed");
+    let cold = BucketKey { layer_type: LayerType::of_a_bit(3), chunk };
+    assert_eq!(arena.holds(LayerType::of_a_bit(3), inside_the_circle), Err(NotHot(cold)));
+    assert_eq!(write(&mut arena, LayerType::of_a_bit(3), WriteOp::Set, inside_the_circle).missed, 1, "a write to a cold bitmap is missed");
 }
 
 /// The arena's bitmaps come in order by superchunk, then type, then
@@ -47,7 +47,7 @@ fn hot_bitmaps_hold_their_chunks_cells() {
 fn buckets_come_by_superchunk_then_type_then_chunk() {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
     let superchunks = [SuperchunkIndex::from_cartesian(2, 0), ORIGIN, SuperchunkIndex::from_cartesian(1, 0)];
-    for layer_type in [LayerType(9), LayerType(4)] {
+    for layer_type in [LayerType::of_a_bit(9), LayerType::of_a_bit(4)] {
         for superchunk in superchunks {
             for place in [3, 2, 1, 0] {
                 arena.make_hot(BucketKey { layer_type, chunk: ChunkIndex::of(superchunk, place) }, None, &mut codec);
@@ -63,15 +63,15 @@ fn buckets_come_by_superchunk_then_type_then_chunk() {
     let expected: Vec<BucketKey> = superchunks_in_order
         .into_iter()
         .flat_map(|superchunk| {
-            [LayerType(4), LayerType(9)]
+            [LayerType::of_a_bit(4), LayerType::of_a_bit(9)]
                 .into_iter()
                 .flat_map(move |layer_type| places_in_order.map(|place| BucketKey { layer_type, chunk: ChunkIndex::of(superchunk, place) }))
         })
         .collect();
     assert_eq!(arena.keys().collect::<Vec<_>>(), expected);
     assert_eq!(arena.len(), expected.len());
-    assert_eq!(arena.run(LayerType(9)).map(|(chunk, _)| chunk).collect::<Vec<_>>(), chunks_in_order);
-    assert_eq!(arena.run(LayerType(5)).count(), 0);
+    assert_eq!(arena.run(LayerType::of_a_bit(9)).map(|(chunk, _)| chunk).collect::<Vec<_>>(), chunks_in_order);
+    assert_eq!(arena.run(LayerType::of_a_bit(5)).count(), 0);
 }
 
 /// A hot bitmap with no cell set keeps no bucket, and reads clear; the
@@ -81,7 +81,7 @@ fn buckets_come_by_superchunk_then_type_then_chunk() {
 #[test]
 fn a_bucket_is_kept_only_for_a_chunk_with_cells() {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
-    let (plain, stage) = (LayerType(5), Wide::<Bits4>::new(40));
+    let (plain, stage) = (LayerType::of_a_bit(5), Wide::<Bits4>::new(40));
     let chunk = |place: u64| ChunkIndex(place);
     for place in 0..16 {
         arena.make_hot(BucketKey { layer_type: plain, chunk: chunk(place) }, None, &mut codec);

@@ -19,7 +19,7 @@ mod sampling {
     use coordinates::{CellCartesian, CellIndex, ChunkIndex};
 
     /// The layer type the tests sample.
-    const STONE: LayerType = LayerType(4);
+    const STONE: LayerType = LayerType::of_a_bit(4);
 
     /// Writes setting every cell of the `width` by `height` rectangle from
     /// `(x, y)`, in pieces of at most 128 cells a side.
@@ -146,7 +146,7 @@ mod tick {
     use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 
     /// The layer type the tests run on.
-    const STONE: LayerType = LayerType(6);
+    const STONE: LayerType = LayerType::of_a_bit(6);
 
     /// An arena with `STONE` hot over the `side` by `side` superchunks from
     /// `(10, 10)`, the cells `cells` set.
