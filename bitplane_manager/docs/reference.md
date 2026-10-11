@@ -108,11 +108,10 @@ allocations kept; **`done`**, whether it can be let go.
 codec)`** -- a bucket waiting in the ring made hot as it is, else
 decoded or emptied, counted -- and **`make_hot_cells(key, cells)`**,
 the cells given, both through **`make_hot_with`**;
-**`make_hot_layers(chunk, types, storage, codec)`** and
-**`make_hot_superchunk(superchunk, types, storage, codec)`**, every
-chunk of it; **`make_cold_superchunk(superchunk)`** -- its dirty
+**`make_hot_layers(chunk, types, storage, codec)`**;
+**`make_cold_superchunk(superchunk)`** -- its dirty
 buckets taken and returned, its allocations lingering -- **`hold`**,
-**`let_go`**, **`make_hot_again`**, **`lingers(superchunk)`**, **`lingering`** (how many);
+**`make_hot_again`**, **`lingers(superchunk)`**, **`lingering`** (how many);
 **`run(type)`** and **`keys`**, in Morton order; **`superchunks`** /
 **`superchunks_mut`**, for the simulation, and
 **`superchunk_indices`**, theirs; **`take_dirty(superchunk)`** -- the

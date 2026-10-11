@@ -82,11 +82,6 @@ impl BitmapArena {
         types.iter().filter(|&&layer_type| made(self, layer_type)).count()
     }
 
-    /// [`BitmapArena::make_hot_layers`], for every chunk of `superchunk`.
-    pub fn make_hot_superchunk(&mut self, superchunk: SuperchunkIndex, types: &[LayerType], storage: &ChunkStorage, codec: &mut LayerCodec) -> usize {
-        superchunk.chunks().map(|chunk| self.make_hot_layers(chunk, types, storage, codec)).sum()
-    }
-
     /// Makes every bitmap over `superchunk` cold at once: its dirty
     /// buckets returned to be encoded, its allocations set aside,
     /// lingering (`docs/bitplane_manager.md`, "Lingering").
@@ -115,16 +110,6 @@ impl BitmapArena {
         };
         self.lingering[at].wanted = true;
         true
-    }
-
-    /// No longer wants `superchunk` hot again ([`BitmapArena::hold`]
-    /// undone): lingering, it is let go once chunk storage holds its
-    /// changes.
-    pub fn let_go(&mut self, superchunk: SuperchunkIndex) {
-        if let Ok(at) = self.lingering_at(superchunk) {
-            self.lingering[at].wanted = false;
-            self.release_unused();
-        }
     }
 
     /// Makes `superchunk` hot again as it went cold, if it is lingering:

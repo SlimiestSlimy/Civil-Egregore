@@ -38,13 +38,6 @@ pub fn square_side(count: u32) -> u32 {
     if count == 0 { 0 } else { (count - 1).isqrt() + 1 }
 }
 
-/// `count` superchunks in a square from [`WORLD_MIDDLE`], row by row
-/// from its top left: how a world of that many is laid out.
-pub fn square_from_middle(count: u32) -> impl Iterator<Item = SuperchunkIndex> {
-    let (side, (x, y)) = (square_side(count), WORLD_MIDDLE.cartesian());
-    (0..count).map(move |index| SuperchunkIndex::from_cartesian(x + index % side, y + index / side))
-}
-
 /// A cell's eight neighbours, as offsets `(dx, dy)`, row by row from the
 /// top left.
 pub const NEIGHBOURS: [(i32, i32); 8] = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];

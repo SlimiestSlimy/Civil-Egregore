@@ -130,7 +130,7 @@ refused are left out -- **`apply(superchunks, earliest,
 applied)`** in order, each on its cell's superchunk (a put elsewhere
 lost, one of an entity no longer where it stood passed over, a new
 one on a cell taken refused, a mover to one staying),
-**`count_lost`**, **`clear`**, **`len()`** and **`is_empty()`** -- how
+**`clear`**, **`len()`** and **`is_empty()`** -- how
 many are queued, whether none. **`InstructionsApplied`** `{puts, moves,
 edits, wakes, removes, lost, stayed, refused, crossed, passed_over}`,
 added with `+=`.

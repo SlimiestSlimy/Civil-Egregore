@@ -111,7 +111,7 @@ it are missed, and the directory stays the hot superchunks exactly.
 It is let go, its buckets with it, once storage holds its
 changes: none on its way, none waiting in the ring. Wanted hot again
 before then, it is held (`hold`) and made hot as it is, nothing decoded
-(`make_hot_again`); no longer wanted, let go (`let_go`). A superchunk
+(`make_hot_again`). A superchunk
 made hot any other way has its bitmaps' cells decoded from storage, or
 given decoded (`make_hot_cells`) -- off the tick, say.
 

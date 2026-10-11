@@ -14,10 +14,10 @@ The bit fields of an index, private: `CELL_PLACE_BITS` (16),
 `CHUNK_PLACE_BITS` (4), `CELL_PLACE_IN_SUPERCHUNK_BITS` (20, the two
 together), `SUPERCHUNK_INDEX_BITS` (44, what is left of a `u64`).
 
-**`square_side(count)`**, **`square_from_middle(count)`**: the side of
+**`square_side(count)`**: the side of
 the square `count` superchunks make -- the whole root of one less, and
-one, no float -- and those superchunks, row by row
-from `WORLD_MIDDLE`: how a world of that many is laid out.
+one, no float: how a world of that many is laid out, about
+`WORLD_MIDDLE`.
 
 **`SuperchunkIndex(u64)`**: **`from_cartesian(x, y)`** and
 **`cartesian`**; **`top_left`**, its first cell; **`chunks`**, its 16
