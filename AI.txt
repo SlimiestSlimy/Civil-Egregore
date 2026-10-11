@@ -480,7 +480,12 @@ B. INSTRUCTIONS REDESIGNED FROM SCRATCH ("were basically redesinging
    actions, instructions is basically the dependency of actions. and
    actions represent more higher level behaviour with more
    complicated compare and write instruction patterns for us".
-   My reading, put to the user, waiting: instructions = the compares,
+   ANSWERED: "no, rules would depend on actions alone. first do the
+   fixes to the instructions. but before anything i want to know how
+   youre doing the nested comparisons" -- explained; WAIT for the
+   user's word on the nesting before the fixes (16-byte attribute
+   writes, ~24-byte instructions, no private copy), then actions.
+   My reading of the split: instructions = the compares,
    the writes, the end of a compare, and the reads a rule is allowed;
    actions = what is in instructions today that is many of them
    (cells::set as compare + write, entities::commit, spawn, sleep,
