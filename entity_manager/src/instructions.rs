@@ -194,11 +194,6 @@ impl Instructions {
             }
         }
     }
-
-    /// Counts the puts as lost: their superchunk holds no entities.
-    pub fn count_lost(&self, applied: &mut InstructionsApplied) {
-        applied.lost += self.instructions.iter().filter(|instruction| matches!(instruction, Instruction::Put { .. })).count();
-    }
 }
 
 /// What applying the instructions did.
