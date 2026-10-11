@@ -282,7 +282,8 @@ to it where it stands, by whoever holds that superchunk
   happened, and neither has come to a later author. There
   (`Phase::have_follow`), every segment of a later author that names
   the entity -- found in the order of the superchunk it left -- is
-  re-pointed (`Repointed`, asked with `repointed_of`):
+  re-pointed (`Repointed`, asked with `repointed_of`; all of this
+  routing is one type's, `Following`, in `tick/applying/following.rs`):
   - of that entity alone (`Queue::names_alone`), it is taken out of
     that order and put in the order of the superchunk the entity came
     to: the right queue, and nothing waits;

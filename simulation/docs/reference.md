@@ -272,11 +272,14 @@ order)`: what is queued for a superchunk, sorted by author;
 `landed_in(source, lands)`: the hot superchunks an act lands in; `go_on(here, part, applied)`: applies down a superchunk's
 order until it is done or waits at an act, then the superchunks it may
 be waiting for. `tick/applying/following.rs` (`simulation.md`, "An entity over a border"):
-`Phase::named_by_others`, the entities others named, with those
-authors; `Repointed` `{also, arrived}`, what became of a segment
+`Following` (`Phase::following`), all that routes what is queued for
+an entity to where it stands by then, made by
+`Following::of_what_was_queued(outboxes)`: `named_by_others`, the
+entities others named, with those authors (`nobody_named_another`:
+none were); `Repointed` `{also, arrived}`, what became of a segment
 naming an entity that crossed, kept in `repointed` and asked with
 `repointed_of(source, from, segment)` once `any_repointed`;
-`have_follow(crossed, held)`: as a crossing is applied, the later
+`Phase::have_follow(crossed, held)`: as a crossing is applied, the later
 segments naming the entity re-pointed in the orders held.
 
 `tick/applying/who_goes_on.rs`: which thread goes on with which
