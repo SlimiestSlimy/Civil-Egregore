@@ -78,7 +78,9 @@ are one stream, none before another for its kind.
 
 Held by a test that shifts a world (`../../instructions/tests/fast/shifted.rs`;
 `../../instructions/docs/instructions.md`, "The same wherever the
-borders fall"). The sort is paid every tick, and not measured yet.
+borders fall"). The sort is paid every tick, and not measured yet. What is
+drawn is another matter, and meant to be: each superchunk has its own
+random stream, so where chance comes in, a border does too.
 
 Each superchunk has random numbers of its own, kept from tick to tick
 (`Simulation`): first seeded from the seed and its superchunk index, then
@@ -219,8 +221,24 @@ every step -- but can: `Turn::occupied` reads the cells
 entities stand on about a cell from the buckets, a word tile being a
 run of a bucket's places -- a few entities read, and only when asked:
 a step onto a taken cell is turned back as it is applied, asked or
-not. No bitplane of them is kept: it cost
-a fifth of the ticks on 12 threads. Crossing to another
+not.
+
+**Entities in the collision plane.** A world may keep where its
+entities stand in a layer of a bit a cell, beside whatever else bars
+a step (`Simulation::keep_entities_in`; the server names its
+`COLLISION`): the cell an entity comes to stand on -- made, moved,
+crossed -- is set there as the instruction is applied, none comes to a
+cell set there, whoever set it, and the cell one left or was removed
+from is cleared when the tick is over, having been that entity's name
+until then (`Standing`, the plane as the entities' store is lent it:
+`entity_manager::CollisionCells`). So moving is a compare-and-write of
+the plane, done by the instruction that moves: free, the cell is
+taken; held, the mover stays. The bit is written with the instruction
+and not counted among the tick's writes. An earlier bitplane of
+entities was taken out for its cost -- a fifth of the ticks on 12
+threads, a second random write a step -- and is back for what it buys:
+one plane a movement check reads, whatever is in the way. Not
+measured again. Crossing to another
 superchunk, an entity is put there as new and changed here as if
 its cell there were taken; once the second phase is over, each one put
 there is removed here and given there what it ended the tick with,

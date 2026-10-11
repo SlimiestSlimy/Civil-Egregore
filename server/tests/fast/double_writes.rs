@@ -154,7 +154,8 @@ fn a_lamb_whose_cell_was_taken_is_put_the_tick_after() {
     let (x, y) = (500, 500);
     for (id, mother) in [x, x + 2].into_iter().enumerate() {
         let header = Header { id: EntityId(1 + id as u64), kind: SHEEP, at: cell(&world, mother, y), wake: 0 };
-        put_entity(&mut world, header, &[AttributeBlock::holding(HUNGRY_AT, 1), AttributeBlock::holding(PREGNANT, 0)]);
+        // Not hungry for long: neither walks onto the cell the other's lamb is to have.
+        put_entity(&mut world, header, &[AttributeBlock::holding(HUNGRY_AT, 5000), AttributeBlock::holding(PREGNANT, 0)]);
     }
     // Every cell beside either taken, but two between them.
     let free = [(x, y), (x + 1, y), (x + 1, y + 1), (x + 2, y)];

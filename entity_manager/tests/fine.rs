@@ -244,13 +244,13 @@ fn an_entity_is_named_by_the_cell_the_tick_found_it_on() {
     queue.apply(entities.superchunks_mut(), 0, &mut applied);
     assert_eq!((applied.removes, applied.passed_over, entities.len()), (1, 1, 1));
     // The tick over, the cells are whoever comes to them.
-    entities.superchunks_mut().iter_mut().for_each(entity_manager::SuperchunkEntities::names_anew);
+    entities.superchunks_mut().iter_mut().for_each(|superchunk| superchunk.names_anew(&mut ()));
     let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
     queue.put(walker(3, wanted), wanted, &[]);
     queue.put(walker(4, third), third, &[]);
     queue.apply(entities.superchunks_mut(), 0, &mut applied);
     assert_eq!((applied.puts, entities.len()), (2, 3));
-    entities.superchunks_mut().iter_mut().for_each(entity_manager::SuperchunkEntities::names_anew);
+    entities.superchunks_mut().iter_mut().for_each(|superchunk| superchunk.names_anew(&mut ()));
 
     let (mut queue, mut applied) = (Instructions::default(), InstructionsApplied::default());
     queue.remove(EntityId(9), wanted);

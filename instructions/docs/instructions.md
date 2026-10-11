@@ -205,10 +205,13 @@ tick and the walker, so that chance is the same in both worlds and
 what differs is the simulation's doing. Nothing outside the test is
 made for it.
 
-Not so yet, and not in the test: what draws from a superchunk's own
-random stream -- the sampling of cells, a sheep's lot, a new entity's
-ID -- is another draw where the borders fall otherwise; and a compare
-must still be in the superchunk of what it lets be written.
+Chance is another matter, and meant to be: each superchunk draws from
+a random stream of its own -- the sampling of cells, a sheep's lot, a
+new entity's ID -- so what is drawn is another draw where the borders
+fall otherwise. What must not see a border is what is not chance.
+
+Not so yet: a compare must still be in the superchunk of what it lets
+be written.
 
 ## Rules ask instructions, and nothing else
 
@@ -262,8 +265,10 @@ walls of the area, which `step_towards` and `step_to` go round by
 themselves. Where the wall layers are not hot, nothing bars.
 
 **What stands in the way**: the collision plane (`COLLISION`), a bit a
-cell -- 1 where something stands that bars stepping there, a tree for
-one (`../../server/docs/server.md`, "The collision plane"). A walker
+cell -- 1 where something stands that bars stepping there, a tree or
+an entity (`../../server/docs/server.md`, "The collision plane"). An
+entity's own bit is kept by the instructions that put, move and remove
+it; a rule writes none for it. A walker
 asks one thing whatever the thing is: `around_steppable(turn, at)` is
 the neighbours no wall is before and the plane does not hold;
 `step_towards` and `step_to` leave the cells it holds out of what may

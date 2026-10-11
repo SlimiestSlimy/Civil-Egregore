@@ -582,11 +582,11 @@ by the rules: a chunk's bucket has one record a cell.
   there first this tick -- stays where it stood, changed all the same,
   and a new entity is not put. The look is the search that finds where
   the record goes, and costs nothing more.
-- **A rule need not look first.** Few cells have an entity, so a step
-  taken blind is seldom turned back, and looking every step costs more
-  than the steps lost. A rule looks when it matters that the cell be
-  had: a lamb is not born where it cannot stand, and a path goes round
-  the entities in the way.
+- **A rule looks in the collision plane.** Where entities stand is
+  kept there beside what else bars a step, so a walker reads one plane
+  for all that is in its way; what it could not see -- another coming
+  to the same cell in the same tick -- is turned back as it is
+  applied.
 - **Staying is always safe**: a mover's own cell is its own until it
   has moved, so none can have taken it.
 - **No bitplane of the cells entities stand on.** One was kept, a cell

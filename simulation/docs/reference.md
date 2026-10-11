@@ -91,7 +91,8 @@ count's number, under `COUNTED_WHEN_APPLIED` (256) --
 before}`; `Conditional` `{steps}`, what is queued for one superchunk
 -- `clear`, `len`, `count_missed`, and `apply(steps, queued, superchunk,
 entities, instructions, earliest, applied)`: one author's instructions
-and steps in the order queued. `queue_step(compare, lands, does)`: a step queued, its compare
+and steps in the order queued, the entities' collision plane lent as a **`Standing`**
+`{superchunk, layer}` (its `write`). `queue_step(compare, lands, does)`: a step queued, its compare
 in the superchunk it lands in. `Applied`: what a thread applied in the
 second phase.
 
@@ -188,14 +189,15 @@ applying}` -- `instructions_compared` the runs of instructions under a
 compare applied, and those refused.
 
 **`threads_for(superchunks)`**: every thread the machine has, no more
-than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived, settled}`:
+than the superchunks. **`Simulation`** `{dispatcher, outboxes, samples, random, arrived, settled, collision}`:
 the threads, and what a tick reuses -- an outbox a superchunk, room for
 samples a thread, each superchunk's random stream, and the entities
 crossed into each in a tick -- so a tick allocates nothing once they
 have grown. **`Simulation::for_superchunks(superchunks)`**: on
 those; **`Simulation::new(threads)`**: on a number given, to measure
 against another; **`Simulation::on(dispatcher)`**: on threads others
-queue jobs on too; **`threads`**. `align_random(superchunks, seed)`:
+queue jobs on too; **`keep_entities_in(collision_plane)`**: the layer
+the entities are kept in from then on; **`threads`**. `align_random(superchunks, seed)`:
 each superchunk given the stream it had, or a new one from the seed and
 its index. `PartOfTurns`: what a thread claims of the first phase --
 where its superchunks start, their outboxes, their random streams. **`random_states()`**: each
@@ -215,7 +217,8 @@ neighbours' arrivals and noting what those written there meanwhile
 ended with, and those removed there, in its `Settled` -- a
 `LeaversPart` a thread -- each then giving the ones it was put what
 they have and taking back those turned back, how many; and every
-entity named anew); the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
+entity named anew, the cells left cleared in the collision plane);
+the outboxes emptied; the entities' tick advanced. **`neighbours`**: the nine
 offsets in a fixed order.
 
 ## `transient_data.rs`

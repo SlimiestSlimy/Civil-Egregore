@@ -3,7 +3,8 @@
 //! (`docs/server.md`, "What a world holds together").
 
 use crate::{Generation, World, WorldInfo};
-use bitplane_manager::{BitmapArena, Write, WritesApplied};
+use bitplane_manager::{BitmapArena, Write, WriteOp, WritesApplied};
+use type_registry::COLLISION;
 use chunk_storage::{ChunkStorage, LayerType};
 use coordinates::SuperchunkIndex;
 use entity_manager::{AttributeBlock, Entities, Header, InstructionsApplied};
@@ -60,16 +61,30 @@ impl World {
     }
 
     /// Puts `header`'s entity on the world, whole, between two ticks:
-    /// what came of it -- lost, if its superchunk is not hot.
+    /// what came of it -- lost, if its superchunk is not hot; refused,
+    /// if the collision plane holds its cell for another. Put, its
+    /// cell is set there (`docs/server.md`, "The collision plane").
     pub fn put_entity(&mut self, header: Header, attributes: &[AttributeBlock]) -> InstructionsApplied {
+        if self.arena.holds(COLLISION, header.at) == Ok(true) && self.entities.get(header.id, header.at).is_none() {
+            return InstructionsApplied { refused: 1, ..InstructionsApplied::default() };
+        }
         self.entities.queue_put(header, attributes);
-        self.entities.apply()
+        let applied = self.entities.apply();
+        if applied.puts > 0 {
+            self.write_cells(COLLISION, [Write::cell(header.at, WriteOp::Set)]);
+        }
+        applied
     }
 
-    /// Removes `header`'s entity from the world, between two ticks.
+    /// Removes `header`'s entity from the world, between two ticks,
+    /// its cell cleared in the collision plane.
     pub fn remove_entity(&mut self, header: &Header) -> InstructionsApplied {
         self.entities.queue_remove(header);
-        self.entities.apply()
+        let applied = self.entities.apply();
+        if applied.removes > 0 {
+            self.write_cells(COLLISION, [Write::cell(header.at, WriteOp::Unset)]);
+        }
+        applied
     }
 
     /// Applies `writes` to the cells of `layer_type`, between two

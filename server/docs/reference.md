@@ -22,7 +22,8 @@ superchunk generated in the viewport kept (`WorldInfo::camera_flock`) if its
 camera loads superchunks and it is not forced hot.
 **`World::put_flock(superchunk, sheep)`**: a flock queued on a
 superchunk, from its own stream of the seed's inverse -- the same
-flock whenever it is put.
+flock whenever it is put -- each sheep on a cell the collision plane
+does not hold, and set there.
 **`save(folder, world)`**: every dirty bitmap written back and the
 ring flushed (`World::write_back_and_flush_all`), then each superchunk's
 image and state -- live if hot, kept if cold -- the hot file, and the
@@ -99,7 +100,9 @@ together"). Read: **`World::info`**, **`World::generation`**,
 **`World::simulation`**, **`World::cold`**, **`World::halos`**, each
 part lent unchangeable. Changed between two ticks, each applied as it
 is called: **`World::put_entity(header, attributes)`** and
-**`World::remove_entity(header)`**, an `InstructionsApplied` each;
+**`World::remove_entity(header)`**, an `InstructionsApplied` each, the
+collision plane kept with them (a put on a cell held for another
+refused);
 **`World::write_cells(layer_type, writes)`**, a `WritesApplied`.
 **`World::keep_viewport(viewport)`**: the viewport told to the halos.
 **`World::keep_cold_pool_within(bytes_kept)`**: how many bytes of cold

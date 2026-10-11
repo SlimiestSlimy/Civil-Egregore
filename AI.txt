@@ -484,3 +484,32 @@ being edges not cells, chose the per-cell plane. DONE: layer COLLISION
 the trees' rule); walking::around_steppable and the paths read it; the
 sheep use it. Not in it: entities. A flock is still put by lot, so a
 sheep may start on a tree's cell (it steps off).
+
+ENTITIES IN THE COLLISION PLANE (user, 2026-10-10, verbatim):
+"sheeps should also write to the collision plane, in fact everything
+that can collision should write into it. remember i told you we
+needed to generalize instructions with bitmasks of varying sizes?,
+well, this is why". DONE for one-cell entities: the instructions that
+put, move and remove an entity keep its bit (Simulation::
+keep_entities_in, entity_manager::CollisionCells); the cell left is
+cleared when the tick is over; the server keeps it between ticks.
+Plane = trees + entities between ticks, tested, the same shifted.
+NOT DONE, the masks: an entity of more than a cell (the store keeps
+one cell an entity), and a mask held-then-set as one thing, over a
+border too -- which needs a compare in one superchunk to let a write
+in another (not possible today: a panic). ASK the user how they want
+that built before building it.
+Also said: border-dependent RANDOM behaviour is fine ("rngs per
+superchunk were the plan all along"): only deterministic behaviour
+must not see borders. The draws are not a defect.
+
+QUEUED, after the collision plane and instructions (user, verbatim):
+1. "we want sheep to wander more and sleep less haha"
+2. "were going to write something really important for the rules. to
+   make rules tick independent we are going to have more constants:
+   ticks per simulation second = 256 and now thing like grass
+   spreading are determined by a random draw to a 'mean sim time to'
+   ... so the rules are portable if we ever decide to change tick
+   rate". (The message was cut off mid-sentence at "so the ru"; the
+   next one finished it.) Not designed yet: ask what is unclear when
+   it is come to.

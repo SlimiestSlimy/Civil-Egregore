@@ -29,7 +29,7 @@ pub use tick::WorldTick;
 pub use world_hash::{world_hash, WorldHash};
 pub use world_start::{drawn_seed, seed_with_land, Size, Start, FLOCK};
 
-use bitplane_manager::BitmapArena;
+use bitplane_manager::{BitmapArena, Write, WriteOp};
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
 use chunk_storage::{ChunkStorage, HeightMap, SuperchunkImage};
 pub use worldgen::Generation;
@@ -42,6 +42,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 use utilities::dispatcher::Dispatcher;
+use type_registry::COLLISION;
 use utilities::rng::Rng;
 
 /// What a save wrote.
@@ -92,7 +93,8 @@ impl World {
         let entities = Entities::at_tick(info.tick);
         // The world's superchunks not counted, as it grows: one set of threads, the tick's and chunk storage's jobs' alike.
         let dispatcher = Arc::new(threads.map_or_else(Dispatcher::of_the_machine, Dispatcher::new));
-        let simulation = Simulation::on(Arc::clone(&dispatcher));
+        let mut simulation = Simulation::on(Arc::clone(&dispatcher));
+        simulation.keep_entities_in(COLLISION);
         let hot = hot_of(&info);
         let mut storage = ChunkStorage::new(1 << 16);
         storage.page_under(transient_data::paging(), COLD_POOL_BYTES_KEPT);
@@ -124,9 +126,16 @@ fn hot_of(info: &WorldInfo) -> Hot {
 impl World {
     /// Queues a flock of `sheep` on `superchunk`, hot, drawn from a
     /// random stream of its own: the same flock whenever it is put
-    /// there. Put in the world by `Entities::apply`.
+    /// there. Put in the world by `Entities::apply`. Each on a cell
+    /// the collision plane does not hold, and set there at once
+    /// (`docs/server.md`, "The collision plane").
     pub(crate) fn put_flock(&mut self, superchunk: SuperchunkIndex, sheep: usize) {
-        flock(&mut EntitiesBetweenTicks::of(&mut self.entities), superchunk, sheep, &mut Rng::for_stream(!self.info.seed, superchunk.0));
+        let arena = &self.arena;
+        let free = |at| arena.holds(COLLISION, at) != Ok(true);
+        let mut between = EntitiesBetweenTicks::of(&mut self.entities).where_free(&free);
+        flock(&mut between, superchunk, sheep, &mut Rng::for_stream(!self.info.seed, superchunk.0));
+        let stood_on: Vec<Write> = between.cells_put().iter().map(|&at| Write::cell(at, WriteOp::Set)).collect();
+        self.write_cells(COLLISION, stood_on);
     }
 }
 

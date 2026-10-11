@@ -7,6 +7,7 @@ mod named_in_a_tick;
 mod world_entities;
 
 pub use entity_reader::{EntityReader, OCCUPIED_SIDE};
+pub use named_in_a_tick::CollisionCells;
 pub use world_entities::Entities;
 
 use crate::bucket::{place, Bucket, Put};
@@ -85,6 +86,10 @@ pub struct SuperchunkEntities {
     /// moved to, or none, removed. Emptied when the tick is over
     /// ([`SuperchunkEntities::names_anew`]).
     left_this_tick: std::collections::HashMap<CellIndex, Option<CellIndex>>,
+    /// The cells entities left, or were removed from, this tick:
+    /// cleared in the collision plane when the tick is over
+    /// ([`SuperchunkEntities::names_anew`]).
+    vacated: Vec<CellIndex>,
     /// Room for the attributes of an entity moving, with those it has,
     /// from one chunk's bucket to another's.
     carried: Vec<AttributeBlock>,
@@ -93,7 +98,7 @@ pub struct SuperchunkEntities {
 impl SuperchunkEntities {
     /// No entities, in `superchunk`.
     pub fn new(superchunk: SuperchunkIndex) -> Self {
-        Self { index: superchunk, chunks: Default::default(), wheel: Wheel::default(), arrived: Vec::new(), left_this_tick: Default::default(), carried: Vec::new() }
+        Self { index: superchunk, chunks: Default::default(), wheel: Wheel::default(), arrived: Vec::new(), left_this_tick: Default::default(), vacated: Vec::new(), carried: Vec::new() }
     }
 
     /// Which superchunk it is.
@@ -262,6 +267,7 @@ impl SuperchunkEntities {
                         settled.changed.push((arrival, first, left.attributes.len() as u32));
                     }
                     self.remove(arrival.id, arrival.left);
+                    self.vacated.push(arrival.left);
                 }
                 None => settled.turned_back.push(arrival),
             }
@@ -279,7 +285,14 @@ impl SuperchunkEntities {
                 self.chunks[arrival.at.chunk().place()].put(header, place(arrival.at), Some(&settled.attributes[first as usize..(first + count) as usize]));
             }
         }
-        settled.turned_back.iter().filter(|arrival| arrival.at.superchunk() == here && self.remove(arrival.id, arrival.at)).count()
+        let mut taken_back = 0;
+        for arrival in settled.turned_back.iter().filter(|arrival| arrival.at.superchunk() == here) {
+            if self.remove(arrival.id, arrival.at) {
+                self.vacated.push(arrival.at);
+                taken_back += 1;
+            }
+        }
+        taken_back
     }
 
     /// Passes `tick`, just run, on the wheel.

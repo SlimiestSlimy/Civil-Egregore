@@ -92,7 +92,10 @@ attributes}`, **`is_empty`**, **`clear`**) -- **`settle_arrivals(settled)`**
 `named_in_a_tick`, an entity found by the cell the tick found it on
 (`left_this_tick`): `now_on`, `named_or_taken`, **`get_named(id,
 stood)`**, `put_named`, `edit_named`, `remove_named`,
-**`names_anew()`** --
+**`names_anew(collision)`** -- and the collision plane as lent to
+them, **`CollisionCells`** (`held`, `hold`, `free`), what the puts and
+moves ask and keep, the cells `vacated` cleared in it when the tick is
+over --
 **`edit(id, at, kind, blocks)`**, **`pass(tick)`**, **`sort_wakes(tick)`** -- after the second phase for
 the next tick, after `Entities::apply` for the tick about to run --
 **`counts`**. **`Entities`**: the tick about to run, the superchunks by

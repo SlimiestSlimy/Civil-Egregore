@@ -11,6 +11,29 @@ use crate::bucket::Put;
 use crate::entity::{EntityId, EntityRef, Header};
 use coordinates::CellIndex;
 
+/// The collision plane as entities keep it: whoever applies their
+/// instructions lends it, a superchunk's
+/// (`docs/entity_manager.md`, "Instructions", Entities in the
+/// collision plane). `()` is none: nothing held, nothing kept.
+pub trait CollisionCells {
+    /// Whether the plane holds `at`: something stands there.
+    fn held(&self, at: CellIndex) -> bool;
+    /// Sets `at`: an entity came to stand there.
+    fn hold(&mut self, at: CellIndex);
+    /// Clears `at`: the entity that stood there is gone from it.
+    fn free(&mut self, at: CellIndex);
+}
+
+impl CollisionCells for () {
+    fn held(&self, _: CellIndex) -> bool {
+        false
+    }
+
+    fn hold(&mut self, _: CellIndex) {}
+
+    fn free(&mut self, _: CellIndex) {}
+}
+
 impl SuperchunkEntities {
     /// Where the entity the tick found on `stood` stands now: there
     /// still, on the cell it moved to, or -- removed -- nowhere.
@@ -38,11 +61,19 @@ impl SuperchunkEntities {
     /// compare-and-write: one that already left `stood` this tick is
     /// passed over -- of two moving one entity, the first applied
     /// does. And it comes to no cell that is another's this tick: one
-    /// moving stays, one new is refused.
-    pub(crate) fn put_named(&mut self, earliest: u64, header: Header, stood: CellIndex, attributes: Option<&[AttributeBlock]>) -> Put {
+    /// moving stays, one new is refused. Nor to one `collision` holds,
+    /// whatever stands there; the cell it comes to is set in it, and
+    /// the one it left is cleared when the tick is over.
+    pub(crate) fn put_named(&mut self, earliest: u64, header: Header, stood: CellIndex, attributes: Option<&[AttributeBlock]>, collision: &mut impl CollisionCells) -> Put {
         let Some(now_on) = self.now_on(stood).filter(|&now_on| self.get(header.id, now_on).is_some()) else {
             return match attributes {
-                Some(_) if header.at == stood && !self.named_or_taken(stood) => self.put(earliest, header, stood, attributes),
+                Some(_) if header.at == stood && !self.named_or_taken(stood) && !collision.held(stood) => {
+                    let put = self.put(earliest, header, stood, attributes);
+                    if put == Put::New {
+                        collision.hold(stood);
+                    }
+                    put
+                }
                 Some(_) if header.at == stood => Put::Refused,
                 _ => Put::PassedOver,
             };
@@ -50,12 +81,14 @@ impl SuperchunkEntities {
         if now_on != stood {
             return Put::PassedOver;
         }
-        if header.at != stood && self.named_or_taken(header.at) {
+        if header.at != stood && (self.named_or_taken(header.at) || collision.held(header.at)) {
             return self.put(earliest, Header { at: stood, ..header }, stood, attributes).stayed();
         }
         let (to, put) = (header.at, self.put(earliest, header, stood, attributes));
         if put == Put::Moved {
             self.left_this_tick.insert(stood, Some(to));
+            collision.hold(to);
+            self.vacated.push(stood);
         }
         put
     }
@@ -71,16 +104,24 @@ impl SuperchunkEntities {
     /// `stood`: whether it was there. Its cell is its name until the
     /// tick is over, and no other's.
     pub(crate) fn remove_named(&mut self, id: EntityId, stood: CellIndex) -> bool {
-        let removed = self.now_on(stood).is_some_and(|now_on| self.remove(id, now_on));
-        if removed {
-            self.left_this_tick.insert(stood, None);
-        }
-        removed
+        let Some(now_on) = self.now_on(stood).filter(|&now_on| self.remove(id, now_on)) else {
+            return false;
+        };
+        self.left_this_tick.insert(stood, None);
+        self.vacated.push(now_on);
+        true
     }
 
     /// The tick is over: every entity is named by the cell it stands
-    /// on now.
-    pub fn names_anew(&mut self) {
+    /// on now, and each cell an entity left or was removed from in it
+    /// is cleared in `collision` -- held until now, as the cell was
+    /// that entity's name.
+    pub fn names_anew(&mut self, collision: &mut impl CollisionCells) {
         self.left_this_tick.clear();
+        for at in self.vacated.drain(..) {
+            if !self.chunks[at.chunk().place()].occupied(crate::bucket::place(at)) {
+                collision.free(at);
+            }
+        }
     }
 }

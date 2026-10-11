@@ -8,7 +8,7 @@ use super::Turn;
 use bitplane_manager::{Superchunk, Write, WriteOp, WritesApplied};
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use entity_manager::{attribute_blocks, blocks_sum, AttributeBlock, AttributeType, EntityId, Instructions, InstructionsApplied, SuperchunkEntities};
+use entity_manager::{attribute_blocks, blocks_sum, AttributeBlock, AttributeType, CollisionCells, EntityId, Instructions, InstructionsApplied, SuperchunkEntities};
 
 /// A write that counts nothing.
 const NO_COUNT: u32 = u32::MAX;
@@ -80,6 +80,40 @@ impl Compare {
                 now.map(|(first, _)| *first) == seen && blocks_sum(now.map_or(&[][..], |(_, rest)| rest)) == rest
             }),
         }
+    }
+}
+
+/// A superchunk's collision plane as its entities keep it while their
+/// instructions are applied: `layer` of `superchunk`, or none -- a
+/// world with no such plane (`docs/simulation.md`, "Entities").
+pub(crate) struct Standing<'a> {
+    /// The superchunk.
+    pub(crate) superchunk: &'a mut Superchunk,
+    /// The collision plane's layer, if entities are kept in one.
+    pub(crate) layer: Option<LayerType>,
+}
+
+impl Standing<'_> {
+    /// Writes `to` at `at` of the plane, if there is one. Not counted
+    /// among the tick's writes: it is part of the entity's instruction.
+    fn write(&mut self, at: CellIndex, to: WriteOp) {
+        if let Some(layer) = self.layer {
+            self.superchunk.apply(layer, Write::cell(at, to), &mut WritesApplied::default());
+        }
+    }
+}
+
+impl CollisionCells for Standing<'_> {
+    fn held(&self, at: CellIndex) -> bool {
+        self.layer.is_some_and(|layer| self.superchunk.value_at(layer, at) == Some(1))
+    }
+
+    fn hold(&mut self, at: CellIndex) {
+        self.write(at, WriteOp::Set);
+    }
+
+    fn free(&mut self, at: CellIndex) {
+        self.write(at, WriteOp::Unset);
     }
 }
 
@@ -178,12 +212,13 @@ impl Conditional {
     /// `superchunk` and its `entities`, in the order queued: an
     /// instruction under no compare as ever; a step if its compare
     /// holds as it is come to -- so what one applied changed, the
-    /// next is held against.
+    /// next is held against. `collision` is the layer entities are
+    /// kept in, if the world has one ([`Standing`]).
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn apply(&self, steps: std::ops::Range<usize>, queued: std::ops::Range<usize>, superchunk: &mut Superchunk, entities: &mut SuperchunkEntities, instructions: &Instructions, earliest: u64, applied: &mut Applied) {
+    pub(crate) fn apply(&self, steps: std::ops::Range<usize>, queued: std::ops::Range<usize>, superchunk: &mut Superchunk, entities: &mut SuperchunkEntities, instructions: &Instructions, earliest: u64, collision: Option<LayerType>, applied: &mut Applied) {
         let mut next = queued.start;
         for step in &self.steps[steps] {
-            instructions.apply_some(next..step.before as usize, std::slice::from_mut(entities), earliest, &mut applied.instructions);
+            instructions.apply_some(next..step.before as usize, std::slice::from_mut(entities), earliest, &mut applied.instructions, &mut Standing { superchunk, layer: collision });
             next = step.before as usize;
             let holds = step.compare.holds(superchunk, entities) && step.also.is_none_or(|also| also.holds(superchunk, entities));
             match step.does {
@@ -202,7 +237,7 @@ impl Conditional {
                 }
                 Does::Instructions { first, last } => {
                     if holds {
-                        instructions.apply_some(first as usize..last as usize, std::slice::from_mut(entities), earliest, &mut applied.instructions);
+                        instructions.apply_some(first as usize..last as usize, std::slice::from_mut(entities), earliest, &mut applied.instructions, &mut Standing { superchunk, layer: collision });
                         applied.compared.0 += 1;
                     } else {
                         applied.compared.1 += 1;
@@ -212,7 +247,7 @@ impl Conditional {
                 Does::Count(number) => applied.counted[number as usize] += u64::from(holds),
             }
         }
-        instructions.apply_some(next..queued.end, std::slice::from_mut(entities), earliest, &mut applied.instructions);
+        instructions.apply_some(next..queued.end, std::slice::from_mut(entities), earliest, &mut applied.instructions, &mut Standing { superchunk, layer: collision });
     }
 }
 

@@ -73,11 +73,12 @@ tree sampled does one thing, by lot:
 Trees stand on dirt and grass alike and change neither.
 
 **A tree bars its cell.** Where a tree stands is not stepped on: its
-cell is set in the collision plane (`COLLISION`;
-`../../server/docs/server.md`, "The collision plane") as it is put,
-and cleared as it dies -- each a compare-and-write held against the
-tree being there, so of two trees put on one cell in a tick the cell
-is set once, and a cell is cleared only by the tree that held it.
+cell is held in the collision plane (`COLLISION`;
+`../../server/docs/server.md`, "The collision plane"). A tree is put
+only if its cell is still free there as the write is applied, and
+then holds it -- so of two trees put on one cell, or a tree and a
+sheep stepping there in one tick, the first applied has the cell. It
+is cleared as the tree dies, held against the tree being there.
 
 ## Trees: more than a bit a cell
 

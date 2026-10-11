@@ -7,9 +7,10 @@
 mod crossings;
 
 use entity_manager::{Arrival, Entities, EntityReader, Instructions, InstructionsApplied, Settled, SuperchunkEntities};
-use crate::turn::conditional::{Applied, CountedWhenApplied, COUNTED_WHEN_APPLIED};
+use crate::turn::conditional::{Applied, CountedWhenApplied, Standing, COUNTED_WHEN_APPLIED};
 use crate::turn::{slot, Outbox, Turn};
 use bitplane_manager::{BitmapArena, Reader, Superchunk, WritesApplied};
+use chunk_storage::LayerType;
 use coordinates::{CellIndex, SuperchunkIndex};
 use std::ops::AddAssign;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -69,6 +70,9 @@ pub struct Simulation {
     /// What each superchunk settled of those that left it, in the
     /// arena's order: kept for its room.
     settled: Vec<Settled>,
+    /// The layer entities are kept in, if the world has one
+    /// ([`Simulation::keep_entities_in`]).
+    collision: Option<LayerType>,
 }
 
 /// The threads `superchunks` superchunks are ticked on unless told
@@ -96,7 +100,16 @@ impl Simulation {
     /// jobs on too: a thread busy with one sits a tick's phase out.
     pub fn on(dispatcher: Arc<Dispatcher>) -> Self {
         let samples = (0..dispatcher.threads()).map(|_| Mutex::new(Vec::new())).collect();
-        Self { dispatcher, outboxes: Vec::new(), samples, random: Vec::new(), arrived: Vec::new(), settled: Vec::new() }
+        Self { dispatcher, outboxes: Vec::new(), samples, random: Vec::new(), arrived: Vec::new(), settled: Vec::new(), collision: None }
+    }
+
+    /// From here on the entities are kept in `collision_plane`, a
+    /// layer of a bit a cell: the cell an entity comes to stand on is
+    /// set there, none comes to a cell set there -- whatever set it --
+    /// and the cell one left or was removed from is cleared when the
+    /// tick is over (`docs/simulation.md`, "Entities").
+    pub fn keep_entities_in(&mut self, collision_plane: LayerType) {
+        self.collision = Some(collision_plane);
     }
 
     /// Each superchunk's random stream as it stands: its superchunk and
@@ -190,7 +203,7 @@ impl Simulation {
         }
         let computed = Instant::now();
 
-        let (superchunk_indices, outboxes) = (&superchunk_indices, &self.outboxes);
+        let (superchunk_indices, outboxes, collision) = (&superchunk_indices, &self.outboxes, self.collision);
         let superchunks: Vec<Mutex<(&mut [Superchunk], &mut [SuperchunkEntities])>> =
             arena.superchunks_mut().chunks_mut(per_part).zip(entities.superchunks_mut().chunks_mut(per_part)).map(Mutex::new).collect();
         let applied_parts: Vec<Mutex<Applied>> = (0..parts).map(|_| Mutex::new(Applied::default())).collect();
@@ -218,7 +231,7 @@ impl Simulation {
                         let (steps, queued) = (&outbox.conditional[from], &outbox.instructions[from]);
                         let (begun, next) = (outbox.segments[from][segment], outbox.segments[from].get(segment + 1));
                         let ends = next.map_or((steps.len(), queued.len()), |next| (next.steps as usize, next.instructions as usize));
-                        steps.apply(begun.steps as usize..ends.0, begun.instructions as usize..ends.1, superchunk, entities, queued, now + 1, &mut applied);
+                        steps.apply(begun.steps as usize..ends.0, begun.instructions as usize..ends.1, superchunk, entities, queued, now + 1, collision, &mut applied);
                     }
                     entities.sort_wakes(now + 1);
                 }
@@ -227,6 +240,10 @@ impl Simulation {
         });
         drop(superchunks);
         instructions_applied.turned_back += self.settle_crossings(entities, superchunk_indices, per_part);
+        // The tick over: every entity named by the cell it stands on now, the cells left cleared in the collision plane.
+        for (superchunk, entities) in arena.superchunks_mut().iter_mut().zip(entities.superchunks_mut()) {
+            entities.names_anew(&mut Standing { superchunk, layer: collision });
+        }
         let (mut applied, mut instructions_compared, mut counted_when_applied) = (WritesApplied::default(), (0, 0), [0; COUNTED_WHEN_APPLIED]);
         for part in applied_parts {
             let part = part.into_inner().expect("a part's result");

@@ -56,7 +56,9 @@ what was seen of it. **`set_attribute_of(turn, other, attribute, seen,
 value)`**, **`unset_attribute_of(turn, other, attribute, seen)`**: an
 attribute of another entity written, if still as seen. **`remove(turn,
 entity)`**. **`EntitiesBetweenTicks`**: the world's entities off any
-turn, lent by whoever runs the world (**`of`**). **`now()`**,
+turn, lent by whoever runs the world (**`of`**; **`where_free(free)`**,
+putting only on cells the world's collision plane does not hold;
+**`cells_put()`**, the cells put on, for the runner to set there). **`now()`**,
 **`put(header, attributes)`**: queued, in the world once the runner
 places them.
 
