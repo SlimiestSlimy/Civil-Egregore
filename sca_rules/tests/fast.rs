@@ -12,3 +12,6 @@ mod grass;
 
 #[path = "fast/trees.rs"]
 mod trees;
+
+#[path = "fast/weather.rs"]
+mod weather;

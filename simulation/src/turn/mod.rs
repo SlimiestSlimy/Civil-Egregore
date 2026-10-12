@@ -11,7 +11,7 @@ pub(crate) mod landing;
 pub(crate) mod one_instruction;
 
 use entity_manager::{EntityReader, SuperchunkEntities};
-use crate::sampling::sample_layer;
+use crate::sampling::{sample_layer, sample_tiles_of_layer};
 use bitplane_manager::{NotHot, Reader, SmallTiles, Superchunk, Window};
 use chunk_storage::{LayerType, Wide, Width};
 use coordinates::{CellIndex, SuperchunkIndex};
@@ -186,6 +186,18 @@ impl<'a> Turn<'a> {
             return 0;
         };
         sample_layer(self.superchunk.index(), layer, chance, &mut self.random, &mut |cell| samples.push(cell))
+    }
+
+    /// Chooses each tile of `layer_type` -- a plane of tiles -- in this
+    /// superchunk's hot chunks with `chance`, independently, whatever
+    /// it holds, its first cell into `samples` -- emptied first -- in
+    /// Morton order: how many.
+    pub fn sample_tiles(&mut self, layer_type: LayerType, chance: Chance, samples: &mut Vec<CellIndex>) -> usize {
+        samples.clear();
+        let Some(layer) = self.superchunk.layer(layer_type) else {
+            return 0;
+        };
+        sample_tiles_of_layer(self.superchunk.index(), layer, layer_type.tile_shift(), chance, &mut self.random, &mut |cell| samples.push(cell))
     }
 
     /// The window of `width` by `height` cells (each up to 8) whose top

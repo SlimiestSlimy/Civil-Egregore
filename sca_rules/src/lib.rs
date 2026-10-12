@@ -11,3 +11,4 @@
 
 pub mod grass;
 pub mod trees;
+pub mod weather;

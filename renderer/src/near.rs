@@ -5,7 +5,7 @@
 
 use crate::ground::relief::{laid, tint_on_sand, water_light, FOAM, FOAM_MOST, PALE, SAND, SAND_MOST};
 use crate::ground::{shadow_drop, Fine, Ground, MARGIN, SIDE};
-use crate::paint::{depth_at, each_cloud, stage_at, tree_colour, under_cloud, under_water};
+use crate::paint::{depth_at, each_cloud, in_rain, raining, stage_at, streak_of_rain_on, tree_colour, under_cloud, under_water};
 use server::host::frame::{Cells, Near, DEEP, DEEPEST_CLOUD, OLDEST_TREE_STAGE, WORD_BITS};
 use utilities::tuning::{Tuning, RELIEF, SHADOW, STEP_DARK, STEP_LIGHT, TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
 use coordinates::place_from_cartesian;
@@ -124,8 +124,11 @@ pub fn paint_near(cells: &[Cells], grounds: &HashMap<(u32, u32), Ground>, near: 
             let (tile_across, tile_down) = (across.start.max(left + tile_left)..across.end.min(left + tile_left + side), down.start.max(top + tile_top)..down.end.min(top + tile_top + side));
             let rows = (tile_down.start - first.1) * pixels_a_cell..(tile_down.end.max(tile_down.start) - first.1) * pixels_a_cell;
             let columns = (tile_across.start - first.0) * pixels_a_cell..(tile_across.end.max(tile_across.start) - first.0) * pixels_a_cell;
-            for pixel in rows.flat_map(|row| columns.clone().map(move |column| row * width + column)) {
+            for (row, column) in rows.flat_map(|row| columns.clone().map(move |column| (row, column))) {
+                let pixel = row * width + column;
                 let colour = under_cloud([pixels[pixel][0], pixels[pixel][1], pixels[pixel][2]], cloud as usize, DEEPEST_CLOUD as usize);
+                // Rain under a cloud deep enough: a streak on some of its cells, each cell's pixels alike.
+                let colour = if raining(cloud) && streak_of_rain_on(first.0 + column / pixels_a_cell, first.1 + row / pixels_a_cell) { in_rain(colour, 1, 1) } else { colour };
                 pixels[pixel] = [colour[0], colour[1], colour[2], u8::MAX];
             }
         });

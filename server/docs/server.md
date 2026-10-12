@@ -119,7 +119,7 @@ type registry -- whose row says the rule's master
 (`../../type_registry/docs/type_registry.md`, "Rules"; the build
 fails if the two tables do not hold the same rules) -- what
 the rule counts, and its function, in the order a turn runs them --
-grass, trees, sheep. A rule added is a row added there; nothing else
+grass, trees, sheep, weather. A rule added is a row added there; nothing else
 lists them. What a tick did is an array with a rule's counts at its
 place in the table. Nothing is looked up by a name as a world runs: a
 rule's place is a constant made of its name as the server is compiled

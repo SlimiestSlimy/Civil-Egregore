@@ -157,6 +157,8 @@ pub const RULE_OF_GRASS: ScaRuleType = ScaRuleType::of(32);
 pub const RULE_OF_TREES: ScaRuleType = ScaRuleType::of(33);
 /// The sheep's rule: its master the sheep.
 pub const RULE_OF_SHEEP: EntityRuleType = EntityRuleType::of(34);
+/// The weather's rule: its master the climate, whose tiles it samples.
+pub const RULE_OF_WEATHER: ScaRuleType = ScaRuleType::of(35);
 
 /// Every type a world has: the layers and wide planes of its cells,
 /// the types of its entities and their attributes, a row each beside
@@ -174,6 +176,7 @@ pub const REGISTRY: &[Registered] = &[
     sca_rule("grass rule", RULE_OF_GRASS, GRASS),
     sca_rule("trees rule", RULE_OF_TREES, TREE),
     entity_rule("sheep rule", RULE_OF_SHEEP, SHEEP),
+    sca_rule("weather rule", RULE_OF_WEATHER, CLIMATE.layer_type()),
     wide("cloud", CLOUD),
     wide("climate", CLIMATE),
 ];

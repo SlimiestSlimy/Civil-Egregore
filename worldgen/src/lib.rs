@@ -10,6 +10,7 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
+pub mod climate;
 pub mod diagnostics;
 pub mod transient_data;
 
@@ -18,6 +19,7 @@ pub mod generation;
 pub mod mesh;
 pub mod patches;
 
+pub use climate::{ClimateNoises, CLIMATE_SALT};
 pub use generated_superchunk::generate_superchunk;
 pub use generation::{has_land_about, seed_with_land, Generation, Growth, TREES_SALT};
 

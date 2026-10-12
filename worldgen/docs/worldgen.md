@@ -85,6 +85,32 @@ says the same of every cell. Asked so, the grass and the trees of a
 superchunk of land took 0.34 G instructions where they had taken
 0.53 G.
 
+## Climate
+
+A superchunk is made with its climate: for each tile of the climate
+plane, 8 by 8 cells, a humidity, a wind and a temperature
+(`ClimateNoises::at`, asked at the tile's middle cell). All of it is
+smooth noise of the world's seed -- mixed with `CLIMATE_SALT`, so it
+lies apart from the ground -- at world coordinates, so it is the same
+whichever superchunk is made first and there is no seam where two
+meet: a chunk generated later fits what is beside it.
+
+- **Temperature**: the noise of regions many superchunks across
+  three parts, a finer one one part; on land the cooler the higher
+  the ground stands over the ocean; over water half way to neither
+  hot nor cold -- water is mild.
+- **Humidity**: the same of two noises of its own; on land the drier
+  the higher; over water some levels more.
+- **Wind**: one noise says the way, its four ways each a band of the
+  noise so that a region blows one way and turns into the next beside
+  it; another the strength, calm to the strongest.
+
+Nothing of it is drawn cell by cell, so from a tile to the next it
+moves little: no tile is a desert beside a swamp. The tiles' numbers
+are put on the plane's sixteen bit-planes, a tile a cell of each, as a
+wide plane lies cold (`../../chunk_storage/docs/chunk_storage.md`,
+"Wide planes").
+
 ## Layout
 
 | folder | what is in it |
@@ -92,6 +118,7 @@ superchunk of land took 0.34 G instructions where they had taken
 | `src/lib.rs` | the shape, heights, walls, a superchunk's terrain, the noise |
 | `src/mesh.rs` | the land as a mesh: what a height is worked out from; `mesh/lands.rs` the land asked of a cell at a time |
 | `src/patches.rs` | how grass and trees lie when a superchunk is made |
+| `src/climate.rs` | the climate a superchunk is made with, a tile at a time |
 | `src/generation.rs` | how a world is generated as a whole, saved with it; made from the sliders; what grows on a cell; a seed with land |
 | `tests/` | heights settled by seed and cell, walls where they should be |
 | `docs/` | this, and the reference, function by function |

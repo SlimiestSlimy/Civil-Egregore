@@ -12,7 +12,7 @@ to it together.
 
 **`each_sampled(turn, type, chance, samples, each)`**: `each` run
 on every cell sampled -- each set cell of the type chosen with the
-`Chance`, independently -- with its counts. **`hot(turn, type, cell)`**,
+`Chance`, independently -- with its counts. **`each_tile_sampled(turn, plane, chance, samples, each)`**: the same on every tile of a plane of tiles, whatever it holds, named by its first cell. **`held_in_tile(turn, type, cell)`**: how many cells of the tile 8x8 the cell is in the type holds at. **`move_one(turn, plane, from, seen_from, to, seen_to, counted)`**: one taken from the number at a cell and added to another's, both under both compares -- nothing made or lost, whatever border is between them. **`hot(turn, type, cell)`**,
 **`holds`**, **`lacks`**: the cell read. **`value(turn, plane,
 cell)`**: a wide plane's number. **`square(turn, type, cell, side)`**:
 up to 8x8 cells about a cell as a `Window`, with their top left cell;
@@ -167,6 +167,7 @@ held)`**, rows without them.
 `WET`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`: the layers a world's cells have, from
 the type registry (`../../type_registry/`). **`entity_types`**:
 `SHEEP`, and its one attribute `SHEEP_STATE` -- and `SheepState`, its layout.
+**`weather`**: the weather's planes and what the climate's number is made of, from the type registry (`CLIMATE`, `CLOUD`, `Climate`, `Wind`, their limits).
 **`simulation_time`**: `SimulationTime` and `TICKS_A_SIMULATION_SECOND`,
 what a rule says its times and its mean times in
 (`../../simulation/docs/simulation.md`, "Simulation time").

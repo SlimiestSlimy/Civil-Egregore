@@ -343,6 +343,65 @@ two planes at the 8x8 scale: the cloud plane, 4 bits; the climate
 plane, 16 bits = humidity 4 + temperature 8 + wind 4 (a vector in 4
 bits, and which bits are whose: to be asked). Not
 said yet: what makes and moves them.
+THE WEATHER RULE, asked 2026-10-11 (the task in hand): "ok, now here
+is the thing the clouds create \"rain\" when reching a level above 12.
+(0-15)"; "we SCA sample the climate layers, more humidity means a
+higher chance of adding +1 level to the corresponding cloud, the wind
+vector basically moves clouds by sustracting a cloud level from the
+current tile if possible and adding it to the cloud tile the wind
+vector points to, on bodies of water higher temperature means
+increased evaporation into clouds. in land the opposite happens".
+ANSWERED (asked) on the weather: WIND "has the following 16 possible
+states: calm / north 1 / west 1 / south 1 / east 1 / north 2 / west 2
+/ south 2 / east 2 / north 3 / west 3 / south 3 / east 3 where the
+number is the intensity of the wind. also, wind vectors have to
+dynamically change as well based on the surroundings, ill leave that
+modeling to you" (so 0 calm, 1-4 N W S E at 1, 5-8 at 2, 9-12 at 3,
+13-15 unused); RAIN "Only drawn for now"; LAND HEAT "Burns clouds
+off"; CLIMATE SOURCE "worldgen, then dynamically change over time, so
+we need worldgen to be decent so newly generated chunks dont have
+climate catastrophes lmao". THEN, said after: "we want a simplified
+but realistic simulation, water in the cycle must be conserved
+roughly, in fact, we need to distiguish the ocean from lakes, lakes
+can dry off, the ocean never will as you can imagine".
+THEN: "but thats for later" / "right now just implement cloud
+formation and the other stuff" -- so NOW: cloud formation by humidity,
+wind moving clouds, evaporation over water by heat, heat over land
+burning clouds off, rain drawn, worldgen's climate. LATER: water
+conserved roughly, the ocean told from lakes, lakes drying.
+WEATHER, DONE (stage 1): Climate/Wind layout in type_registry,
+worldgen's climate (smooth noise at world coordinates), the rule
+sca_rules::weather (tile sampled every 2 s on average: wind blows a
+level, else deepens/thins towards humidity, +heat over water, -heat
+over land, rain sheds), rain drawn as streaks. MINE, not asked: a
+cloud over its humidity thins; rain sheds; the wind is worldgen's and
+does not change yet. NOT DONE: wind/climate changing with the
+surroundings, water conserved, ocean vs lakes, lakes drying. Cost:
+about 1.17 M instructions a tick on the check world (+21% there, a
+world of few sheep); worldgen +4.6%. Never seen in the renderer yet.
+ASKED 2026-10-11, while the weather was being built (NEXT, right
+after the weather is committed): "instead of manually registering
+things around the codebase, make the codebase use watever is in the
+type registry". To survey: server's RULES table (name, ID written by
+hand beside the registry's row), worldgen's list of planes, the
+frame's layers, actions::layers, whatever lists layer types by hand.
+ASKED 2026-10-11, same while (AFTER the weather, its own commit):
+"and make grass not die anymore, were now going to make grass die
+depending on climate over a very small sampling rate".
+ALSO, of the weather's tests: "also dont run sheeps for this tests".
+ALSO: "we got a game playing right now so performance WILL BE
+IMPACTED" -- measure by instruction counts only, no wall times.
+MY MODEL (for the LATER part; mine to choose, to tell the user): a tile's humidity is the
+water held in its air and ground, its cloud the water condensed over
+it; water moves between the two and is not made or lost on land --
+condensing takes a level of humidity for a level of cloud, heat over
+land and rain give it back. The ocean alone makes water (evaporation,
+by temperature) and takes it (rain over it). STAGES: 1 the layout,
+worldgen's climate, the rule (condense, evaporate, burn off, wind
+moves, rain returns water), rain drawn; 2 wind and temperature
+changing with the surroundings; 3 lakes told from the ocean, a lake
+evaporating loses depth and can dry (the depth maps are fixed today
+and shared with the renderer: to change).
 ANSWERED 2026-10-11 (asked): "Scale in the type" -- a plane's
 registration says its scale (1x1 or 8x8); its hot bucket is 1024 x
 bits a chunk in the same arena; reads, compares, writes take a world

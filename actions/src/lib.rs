@@ -45,6 +45,12 @@ pub mod layers {
     pub use type_registry::{COLLISION, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WALL_EAST, WALL_SOUTH, WET};
 }
 
+/// The weather's planes -- a number a tile 8 by 8 cells -- and what
+/// the climate's number is made of, from the type registry.
+pub mod weather {
+    pub use type_registry::{Climate, Wind, CLIMATE, CLOUD, HOTTEST, MOST_HUMID, RAINS_ABOVE, STRONGEST_WIND, WEATHER_TILE_SCALE};
+}
+
 /// The types of entity a world has and the attributes they carry: what
 /// an entity's rule names its own by, from the type registry.
 pub mod entity_types {

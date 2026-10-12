@@ -18,6 +18,7 @@ the entities' rules, in one table (`server::RULES`).
 |---|---|
 | `src/grass.rs` | grass over dirt |
 | `src/trees.rs` | trees: spreading by how crowded they stand, growing through sixteen stages, dying |
+| `src/weather.rs` | the weather: clouds deepened, thinned and blown over the climate, a tile at a time |
 | `tests/fast/` | each rule alone on a plain the server makes, a file a rule |
 | `docs/` | this, and the reference, function by function |
 
@@ -96,3 +97,51 @@ there is a plane of its own, not stage 0: sampling the trees and
 counting those about one are then each one read of one plane, as for
 grass, where a tree found by any of four planes being set would take
 four.
+
+## Weather
+
+The weather's rule samples the climate plane, whose tiles are 8 by 8
+cells: every tile of a hot chunk is chosen with one chance
+(`MEAN_TIME_TO_SAMPLE`), whatever it holds
+(`cells::each_tile_sampled`), and named by its first cell. It reads
+the tile's climate -- humidity, wind, temperature
+(`../../type_registry/docs/type_registry.md`, "The climate") -- and
+its cloud, 0 to 15, and does one of two things.
+
+**The wind blows.** If the tile has cloud and its wind is not calm,
+then with a chance of its strength over four -- a wind of 3 three
+times in four -- a level of the cloud is taken from the tile and
+added to the tile the wind blows towards, if that one has room
+(`cells::move_one`). Both writes are under both compares, what was
+seen here and what was seen there, so a level is taken only if one is
+added: the wind makes no cloud and loses none, wherever a superchunk's
+border falls between the two.
+
+**Or the cloud deepens or thins a level** (`deepens_and_thins`), with
+parts of 256 added up:
+
+- towards the humidity: a sixteenth for each level the cloud is under
+  the tile's humidity, to deepen; a sixteenth for each level over it,
+  to thin. More humidity, a likelier level more;
+- over water -- a tile most of whose cells are under it -- a quarter
+  of the temperature, to deepen: the hotter, the more of the water
+  goes up;
+- over land a quarter of the temperature, to thin: the hotter, the
+  more is burnt off;
+- a raining cloud, one above 12, sheds: a quarter more, to thin.
+
+So a cloud gathers about its tile's humidity, some levels over it on
+warm water and under it on warm land, and nowhere without end: what
+pulls it back grows with how far it is. Rain is a cloud above 12
+(`rains`): it is drawn, and it thins the cloud; nothing under it is
+changed by it yet. That a cloud over its humidity thins of itself,
+and that rain sheds, were not asked for: without them every tile of
+water came to the deepest cloud and stayed.
+
+Every write says what the rule saw, so a tile's cloud moves a level
+a tick at the most. The rule counts what it sampled, deepened,
+thinned, blew and found raining.
+
+Not yet: the climate does not change -- the wind is the one worldgen
+gave -- and water is not kept count of: cloud is made and unmade, no
+humidity is used up, no lake dries.

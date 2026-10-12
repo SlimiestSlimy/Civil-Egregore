@@ -38,6 +38,11 @@ what they always do and are not listed.
 | **tile size** | the cells a plane holds one number for: 1x1, a number a cell, every plane until the weather's; 8x8, a number a tile 8 cells a side -- the cloud plane, the climate plane. Said in a plane's type and its registration as a scale (`LayerType::tile_scale`, 3 for 8x8), and taken from there by whatever keeps, sends or draws the plane; a cell's tile is its place in Morton order less the bits of a tile's cells (`tile_shift`) | wide plane, tile, scale, type registry | coarse cell, resolution, grid |
 | **cloud** | a tile's number in the cloud plane (`CLOUD`, four bits a tile 8x8): 0 none, 15 the deepest shadow a cloud casts on what is under it | tile size, climate | |
 | **climate** | a tile's number in the climate plane (`CLIMATE`, sixteen bits a tile 8x8): humidity, temperature and wind kept together | tile size, cloud | weather (the two planes together) |
+| **humidity** | the lowest four bits of a tile's climate, 0 to 15 (`Climate::humidity`): the level its cloud gathers towards -- the more humid, the likelier a level more | climate, cloud | |
+| **temperature** | the highest eight bits of a tile's climate, 0 to 255 (`Climate::temperature`): over water the hotter the more goes up into cloud (evaporation), over land the hotter the more cloud is burnt off | climate | heat |
+| **wind** | four bits of a tile's climate (`Wind`): calm, or blowing towards north, west, south or east at a strength of 1 to 3 -- thirteen states, 0 calm, 1 to 4 the four ways at strength 1, 5 to 8 at 2, 9 to 12 at 3. It blows a level of its tile's cloud to the tile it blows towards, the stronger the likelier | climate, cloud | wind vector |
+| **rain** | what a tile under a cloud above 12 (`RAINS_ABOVE`) has: drawn, and the cloud sheds; nothing under it is changed by it yet | cloud | |
+| **weather** | the cloud plane and the climate plane together, and the rule of the cells that samples the climate's tiles (`sca_rules::weather`) | cloud, climate | |
 | **width** | the bits a cell of a plane, in the plane's type: `Bits2`, `Bits4`, `Bits8`, `Bits16` | wide plane | |
 | **value** | the number a cell of a wide plane holds | wide plane | |
 | **patches** | how grass and trees lie when a superchunk is generated: noise under a threshold, not cells scattered (`worldgen::patches`) | generation | pasture |

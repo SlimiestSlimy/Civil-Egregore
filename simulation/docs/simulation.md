@@ -26,6 +26,12 @@ were whatever each machine's maths library rounded to
 how and how precisely). A chance of always passes none over and takes
 every set cell; of never, none, and nothing is drawn.
 
+A plane of tiles that holds a number for every tile -- the climate --
+is sampled by its tiles, not by its set cells
+(`sample_tiles_of_layer`, `Turn::sample_tiles`): every tile of a hot
+chunk is one that may be chosen, whatever it holds, so the gaps are
+counted over the tiles themselves and nothing is searched for.
+
 The counts find each chosen rank
 without a scan: a superchunk's layer passed over whole by its count, a
 chunk by its count, a count tile of 16 words by its count, a word by its
