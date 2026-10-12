@@ -706,3 +706,5 @@ RULES AND TIME
   And: "the borders of the loaded superchunks is what will introduce
   the new wind". (Mine: a tile beside a superchunk not loaded keeps
   its wind as it is, never worn down: the wind comes in from there.)
+- ASK 2026-10-11: "remember to close the renderer when the server stops lmao" (the window a ticker opened closes once no ticker is left).
+- ASK 2026-10-11: "i also need a new keybind to show climate values per tile".

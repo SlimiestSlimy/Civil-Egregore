@@ -267,8 +267,9 @@ headless run measures is seen.
 
 `Civil_Egregore renderer show` opens the window on no world of its
 own: it shows the world of whatever test or diagnostic ticks one
-while `CIVIL_EGREGORE_RENDER` is set, one after another, and stays up
-between them (`diagnostics/window_on.rs`, `show_worlds`;
+while `CIVIL_EGREGORE_RENDER` is set, one after another, stays up
+between them, and closes once the last has stopped and none follows
+(`diagnostics/window_on.rs`, `show_worlds`;
 `../../server/docs/server.md`, "A world shown"). Nobody need start it
 by hand: whatever ticks a world with the variable set starts it. The
 window is the same as the game's -- it is built on a link

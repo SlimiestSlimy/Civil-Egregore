@@ -22,15 +22,21 @@ fn show(mut watched: ResMut<Watched>, mut link: ResMut<Link>, mut screen: ResMut
 }
 
 /// Shows the world, whichever ticker's it is, in place of the main
-/// menu: the window of [`show_worlds`].
-fn show_world(mut screen: ResMut<Screen>) {
+/// menu: the window of [`show_worlds`]. And closes the window once
+/// what ticked has stopped and nothing else ticks
+/// (`server::host::shown::no_ticker_is_left`).
+fn show_world(mut screen: ResMut<Screen>, mut exit: MessageWriter<AppExit>) {
     if *screen != Screen::World {
         *screen = Screen::World;
+    }
+    if server::host::shown::no_ticker_is_left() {
+        exit.write(AppExit::Success);
     }
 }
 
 /// Opens the window on the worlds that come to be shown
-/// (`server::host::shown`), one after another, until it is closed:
+/// (`server::host::shown`), one after another, until it is closed
+/// or the last ticker has stopped:
 /// each a world a test or a diagnostic ticks, drawn as the window
 /// draws any. Says so and opens none if such a window is open
 /// already.
