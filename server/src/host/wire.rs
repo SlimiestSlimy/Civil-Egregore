@@ -205,7 +205,7 @@ pub(crate) fn frame_written(frame: &Frame) -> Vec<u64> {
     for cells in &frame.cells {
         written.pair(cells.at);
         written.pair(cells.top_left);
-        [&cells.grass, &cells.heights, &cells.trees, &cells.stages, &cells.wet, &cells.clouds, &cells.raining].into_iter().for_each(|words| written.words(words));
+        [&cells.grass, &cells.heights, &cells.trees, &cells.stages, &cells.wet, &cells.clouds, &cells.raining, &cells.climates].into_iter().for_each(|words| written.words(words));
         if !cells.heights.is_empty() {
             cells.water.depths.iter().chain([&cells.water.deep]).for_each(|words| written.words(words));
         }
@@ -228,14 +228,14 @@ pub(crate) fn frame_read(words: &[u64], waters: &mut HashMap<(u32, u32), Arc<Wat
     let mut cells = Vec::new();
     for _ in 0..read.number()? {
         let (at, top_left) = (read.pair()?, read.pair()?);
-        let [grass, heights, trees, stages, wet, clouds, raining] = [read.words()?, read.words()?, read.words()?, read.words()?, read.words()?, read.words()?, read.words()?];
+        let [grass, heights, trees, stages, wet, clouds, raining, climates] = [read.words()?, read.words()?, read.words()?, read.words()?, read.words()?, read.words()?, read.words()?, read.words()?];
         if !heights.is_empty() {
             let water = Water { depths: [read.words()?, read.words()?, read.words()?, read.words()?], deep: read.words()? };
             waters.insert(at, Arc::new(water));
         }
         let sheep = read.words()?.into_iter().map(|word| ((word >> 16) as u16, word as u16)).collect();
         let water = Arc::clone(waters.entry(at).or_default());
-        cells.push(Cells { at, grass, top_left, heights, trees, stages, wet, clouds, raining, water, sheep });
+        cells.push(Cells { at, grass, top_left, heights, trees, stages, wet, clouds, raining, climates, water, sheep });
     }
     Some(Frame { world: world?, seed: seed?, levels: Levels::of(&generation), generation, side, tick: tick?, ticks_a_second: f64::from_bits(ticks_a_second?), sheep: sheep? as usize, grass: grass?, trees: trees?, sync_seconds: f64::from_bits(sync_seconds?), sync_share: f64::from_bits(sync_share?), viewport, hot, detail: detail? as u32, near, named, said, more: more? == 1, cells })
 }

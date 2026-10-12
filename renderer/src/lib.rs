@@ -10,6 +10,7 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod diagnostics;
+mod climate_labels;
 mod frames;
 mod ground;
 mod hud;
@@ -40,7 +41,7 @@ fn window() -> App {
 /// not yet run.
 fn window_on(link: link::Link) -> App {
     // Only over a world: a world shown, steered and asked for.
-    let world = (view::fullscreen, link::keys, view::steer, overlays::toggle, overlays::boundaries, overlays::labels, overlays::heights, frames::show, frames::ask, map::far).chain().run_if(resource_equals(Screen::World));
+    let world = (view::fullscreen, link::keys, view::steer, overlays::toggle, overlays::boundaries, overlays::labels, overlays::heights, climate_labels::climates, frames::show, frames::ask, map::far).chain().run_if(resource_equals(Screen::World));
     let mut app = App::new();
     app.add_plugins(
             DefaultPlugins
@@ -55,7 +56,7 @@ fn window_on(link: link::Link) -> App {
         .init_resource::<link::Seen>()
         .init_resource::<view::Sprites>()
         .init_resource::<overlays::Shown>()
-        .add_systems(Startup, (view::spawn, frames::spawn, map::spawn, overlays::spawn, hud::spawn))
+        .add_systems(Startup, (view::spawn, frames::spawn, map::spawn, overlays::spawn, climate_labels::spawn, hud::spawn))
         .add_systems(Update, (link::menus, link::shading, link::generation, world, hud::hud).chain().after(gui::Worked));
     app
 }

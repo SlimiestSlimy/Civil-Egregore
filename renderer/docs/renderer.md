@@ -263,6 +263,20 @@ plain `server pasture` ticks, started as that tool starts it
 every rule of it, the weather too, at the window's pace: what a
 headless run measures is seen.
 
+## The climate, written
+
+The K key writes on every tile of the climate -- 8 by 8 cells -- what it
+holds: its humidity, its heat, and its wind, the way it blows towards
+and how strongly, or that it is calm (`src/climate_labels.rs`). The
+numbers are the plane's own, as the type registry lays them out. A
+frame brings each superchunk's climate with its cells
+(`Cells::climates`); the painter hands them on with its picture and
+the window keeps the last of each (`Seen::climates`), so what is
+written is the climate as the last frame of that superchunk had it,
+changing as the weather changes it. As the heights are, the labels
+are a grid given round to the tiles the camera shows, and are shown
+only once a tile is large enough on the screen to read them.
+
 ## Showing a ticker's world
 
 `Civil_Egregore renderer show` opens the window on no world of its
@@ -299,6 +313,7 @@ pixels made here.
 | `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |
 | `H` | every cell's height written on it, once a cell is 20 screen pixels across |
+| K | every tile's climate written on it -- humidity, heat, and the way its wind blows towards with its strength -- once a tile is 40 screen pixels across |
 | `M` | map mode, or not: the map in place of the cells, at any zoom |
 | `P` | on the map, the mesh's lines drawn over it, or not |
 
@@ -350,6 +365,7 @@ another world is run.
 | `src/mipmaps.rs` | the superchunks' pictures' mipmaps, made by the graphics card |
 | `src/view.rs` | the plane, the camera, where it starts for a world, steering it |
 | `src/overlays.rs` | boundaries, labels and heights over the world |
+| `src/climate_labels.rs` | every tile's climate written on it |
 | `src/hud.rs` | the text over the world |
 | `src/map.rs` | the map: the world from far, as the host answers it is generated |
 | `src/paint.rs` | the painter's thread: cells into pixels |

@@ -47,6 +47,10 @@ pub struct Picture {
     pub superchunks: Vec<Painted>,
     /// The viewport's cells, if they are seen from near.
     pub near: Option<PaintedNear>,
+    /// Each of the frame's superchunks' climates, by where it is in
+    /// the world: kept of the cells, for the climate written on its
+    /// tiles (`climate_labels`).
+    pub climates: Vec<((u32, u32), Vec<u64>)>,
 }
 
 /// Superchunks whose fine ground is kept, at most: 8 MiB each.
@@ -121,8 +125,9 @@ pub fn start(frames: Receiver<Frame>, tunings: Receiver<Tuning>, terrain: Terrai
                     })
                     .collect();
                 let near = frame.near.map(|near| paint_near(&frame.cells, &grounds, near, &tuning));
+                let climates = frame.cells.iter_mut().map(|cells| (cells.at, std::mem::take(&mut cells.climates))).collect();
                 frame.cells = Vec::new();
-                let picture = Picture { frame, paint_seconds: started.elapsed().as_secs_f64(), superchunks, near };
+                let picture = Picture { frame, paint_seconds: started.elapsed().as_secs_f64(), superchunks, near, climates };
                 if painted.send(picture).is_err() {
                     return;
                 }

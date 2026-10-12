@@ -57,6 +57,8 @@ pub struct Shown {
     chunks: bool,
     /// Every cell's height.
     heights: bool,
+    /// Every tile's climate (`climate_labels`).
+    pub(crate) climates: bool,
 }
 
 /// A label in a superchunk's or a chunk's top left corner: one of a
@@ -101,6 +103,7 @@ pub fn toggle(mut shown: ResMut<Shown>, keys: Res<ButtonInput<KeyCode>>, capture
         shown.superchunks ^= keys.just_pressed(KeyCode::KeyB);
         shown.chunks ^= keys.just_pressed(KeyCode::KeyC);
         shown.heights ^= keys.just_pressed(KeyCode::KeyH);
+        shown.climates ^= keys.just_pressed(KeyCode::KeyK);
     }
 }
 
