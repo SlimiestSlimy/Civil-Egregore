@@ -797,3 +797,14 @@ RULES AND TIME
   STEP 1 up, DROP 4 down (4 is mine). "diagnostic" -> "in-bin test"
   where it meant the commands. NEXT: the writeback as a background
   operation until the world is saved.
+- ASK 2026-10-12: "btw on the wind vector stuff, what direction is +-
+  xy?" (answered: +x east, +y south, where it blows towards) /
+  "doesnt that mean diagonal wind can be stronger? or are you using
+  it as a ratio?" (answered: yes stronger, a square not a circle) /
+  "yes, ckip to circle lol" -> hold the wind's vector to a circle of
+  STRONGEST_WIND. After the cold-storage commit.
+- FOUND 2026-10-12 (cold storage): nothing encodes back while a world
+  ticks -- only a superchunk cooling (a job, off the tick) and a
+  save. What I measured as the weather's cost was `server check`'s
+  hashes: world_hash wrote back and flushed every hot superchunk each
+  time. Hash now flushes only what went cold.

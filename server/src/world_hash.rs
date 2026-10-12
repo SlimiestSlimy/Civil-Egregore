@@ -34,12 +34,15 @@ impl WorldHash {
     }
 }
 
-/// The hash of `world`. Its hot superchunks are written back and the
-/// writeback ring flushed first (`World::write_back_and_flush_all`),
-/// as a save does: a cold superchunk's image is behind its cells until
-/// then. That changes nothing a tick reads.
+/// The hash of `world`. What went cold is flushed first
+/// (`World::flush_what_went_cold`): a cold superchunk's image is
+/// behind its cells until its write-back, encoded off the tick, is
+/// in. The hot superchunks are hashed as they are, their cells
+/// themselves, and not written back for it -- encoding them is a
+/// save's work, and was most of what a hash cost. That changes
+/// nothing a tick reads.
 pub fn world_hash(world: &mut World) -> WorldHash {
-    world.write_back_and_flush_all();
+    world.flush_what_went_cold();
     let mut cells = 0;
     for &layer_type in &world.info.layers {
         cells = fold(cells, layer_type.0);
