@@ -445,9 +445,26 @@ is a game, we want to see the testing as well, not just do it"; pace:
 So: the diagnostics' runs AND the cargo tests that tick a world, shown
 in the window when a flag says so; flat out unless paused or paced by
 the keys.
+   AND: "thats why i should think renderer should be an environment
+   flag, it applies to everything" / "and this excersice should make
+   the rendering and server code more modular with respect to each
+   other and diagnostics/tests" / "you can run perfs again, the cpu and
+   gpu is all yours now" (wall times may be taken again).
+   DESIGN (mine): the flag is an environment variable. A run -- a
+   test, a diagnostic -- that ticks a World with it set is SHOWN: the
+   server answers a window's asks between its ticks over a local
+   socket (a wire for Ask and Frame; no Bevy in a test), and the
+   window is the game's own program started as a viewer (`renderer
+   show`), one window staying up from run to run. Flat out unless the
+   keys pause or pace it. The host thread and the shown run share the
+   making of a frame.
+   BUILT: server::host::{shown, wire}; hook in World::tick/tick_only;
+   `renderer show`; test server/tests/shown.rs. Tried live with a
+   pasture: the window started itself. Words (user: "check the
+   glossary, i think youre using run for multiple things" / "whats a
+   ticker?" -> "fair, i hope this model applies seamlessly with normal
+   game operation as well"): TICKER, SHOWN WORLD, in the glossary.
 ALSO, of the weather's tests: "also dont run sheeps for this tests".
-ALSO: "we got a game playing right now so performance WILL BE
-IMPACTED" -- measure by instruction counts only, no wall times.
 MY MODEL (for the LATER part; mine to choose, to tell the user): a tile's humidity is the
 water held in its air and ground, its cloud the water condensed over
 it; water moves between the two and is not made or lost on land --

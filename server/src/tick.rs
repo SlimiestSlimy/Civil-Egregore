@@ -34,6 +34,7 @@ impl World {
         self.page_cold_pool_out();
         // What a world holds together (`docs/server.md`), checked in a debug build.
         debug_assert_eq!(self.broken_invariant(), None, "after tick {}", self.entities.now());
+        crate::host::shown::between_ticks(self);
         WorldTick { rules, halos }
     }
 
@@ -42,9 +43,11 @@ impl World {
     /// a rule tried or measured by itself.
     pub fn tick_only(&mut self, chosen: Chosen, timed: bool) -> TickReport<TickCounts> {
         let (simulation, seed) = (&mut self.simulation, self.info.seed);
-        match timed {
+        let report = match timed {
             true => with_counts_applied(simulation.tick(&mut self.arena, &mut self.entities, seed, |turn, samples| chosen.timed_turn(turn, samples))),
             false => tick_chosen(simulation, &mut self.arena, &mut self.entities, seed, chosen),
-        }
+        };
+        crate::host::shown::between_ticks(self);
+        report
     }
 }

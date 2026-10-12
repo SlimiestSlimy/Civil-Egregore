@@ -3,10 +3,9 @@
 
 use crate::{Start, World};
 use super::{CATCH_UP, CENSUS_EVERY, FRAMES_SHARE, Request, TARGET_PACE, census};
-use super::frame::{self, Ask, Cells, Frame, copy, count, hot_in};
-use super::terrain::{Levels, TerrainRequest};
+use super::frame::{self, Ask, Cells, Frame, copy, count, frame_of, hot_in};
+use super::terrain::TerrainRequest;
 use type_registry::GRASS;
-use type_registry::TREE;
 use std::thread;
 use std::collections::HashMap;
 use std::fs::File;
@@ -236,10 +235,7 @@ impl HostThread {
             }
             (self.last_frame, self.answering) = ((Instant::now(), tick), None);
         }
-        let (ticks_a_second, sync_seconds, sync_share) = self.measured;
-        let (sheep, grass, trees) = (world.entities.len(), count(world, GRASS), count(world, TREE));
-        let (named, said) = (self.named.clone(), self.said.clone());
-        Some(Frame { world: self.worlds, seed: world.info.seed, generation: world.generation, levels: Levels::of(&world.generation), side: world.halos.hot.side(), tick, ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, viewport: ask.viewport, hot, detail: ask.detail, near: ask.near, named, said, more, cells })
+        Some(frame_of(world, self.worlds, ask, hot, cells, self.measured, (self.named.clone(), self.said.clone()), more))
     }
 
     /// The time there is for copying a frame's superchunks before the

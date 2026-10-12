@@ -22,7 +22,7 @@ const NAMED: &str = "name";
 const CELLS_A_PIXEL: &str = "cells a screen pixel";
 
 /// The renderer's tools.
-pub const COMMANDS: [Command; 3] = [Command {
+pub const COMMANDS: [Command; 4] = [Command {
     name: "stills",
     does: "paints one place of a world at every zoom -- the map, the cells from far, a cell a pixel, the cells from near -- with no window, and keeps each as a PNG under the renderer's transient_data/renders/",
     parameters: &[Parameter::new(SEED, "0"), Parameter::new(CELLS_EAST, "0"), Parameter::new(CELLS_SOUTH, "0"), Parameter::new(FARTHEST, "8"), Parameter::new(NAMED, "still")],
@@ -37,6 +37,11 @@ pub const COMMANDS: [Command; 3] = [Command {
     does: "opens the window on a world the diagnostics tick, running, to be watched: the world `server check` ticks from a seed -- 0, the run's own, the seed the tests are on -- or, given superchunks, the plain `server pasture` ticks, with its grass",
     parameters: &[Parameter::new(SEED, "0"), Parameter::new(SHEEP, "4000"), Parameter::new(PASTURE_SUPERCHUNKS, "0"), Parameter::new(GRASS_THOUSANDTHS, "333")],
     run: watch_tool,
+}, Command {
+    name: "show",
+    does: "opens the window that shows worlds as they are ticked: the world of every test and every diagnostic that ticks one while CIVIL_EGREGORE_RENDER is set is drawn in it, one after another, flat out unless the keys pause or pace it; a test or a diagnostic that finds none open starts it",
+    parameters: &[],
+    run: |_| super::window_on::show_worlds(),
 }];
 
 /// Sheep the world watched starts with: on its origin, or on each

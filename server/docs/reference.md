@@ -263,6 +263,29 @@ last tick's time at least, no limit while paused -- and those sent as a
 frame; seen from near, sent only once all are copied, being one
 picture; **`tick`**.
 
+## `host/shown.rs`, `host/wire.rs`
+
+A ticker's world shown in a window (`server.md`, "A world shown").
+`RENDER`: the environment variable's name; `PORT`; `WINDOW_OPENS_WITHIN`.
+**`asked()`**: whether the environment asks. `Shown`: the ticker's
+end -- the window's socket, its requests read on a thread, pause,
+pace, which world was last shown and what of it was sent
+(`begin`, `between_ticks(world)`); `SHOWN`, the one of a process;
+`program()`, the game's program to start as the window; `window()`,
+the window reached or started. **`between_ticks(world)`**: what the
+world's tick ends with -- `ASKED`, the flag read once -- `show` where a window was asked for.
+**`Host::of_shown_worlds()`**: the window's end, a host whose world is
+whatever ticker's comes: `Told` what the window last said, kept for
+the next ticker (`send`); `tickers`, every ticker that connects, one
+after another, its frames sent on.
+
+`wire.rs`: `MOST_WORDS`; `send(to, words)`, `receive(from)`, a message
+of words; `Written` (`number`, `pair`, `words`, `text`, `maybe`) and
+`Read64` (`of`, the same to read); `viewport_written`/`viewport_read`,
+`near_written`/`near_read`; `request_written(request)`,
+`request_read(words)`; `frame_written(frame)`, `frame_read(words,
+waters)`.
+
 ## `host/terrain.rs`
 
 What a client asks of a world's terrain where no frame brings it
@@ -287,6 +310,8 @@ given out among the machine's threads. `heights(seed, generation,
 ask)` and `map(seed, generation, ask)`: the answers worked out.
 
 ## `host/frame.rs`
+
+**`frame_of(world, worlds, ask, hot, cells, measured, named and said, more)`**: a frame of a world, the one making of it -- the host's thread's and a shown world's.
 
 `CHUNK_WORDS`, `WORD_BITS`, `STAGE_BITS`, `OLDEST_TREE_STAGE`,
 `CLOUD_BITS`, `CLOUD_TILE_SHIFT`, `DEEPEST_CLOUD`; **`raining(clouds, climates)`**, the tiles whose cloud is above what their climate holds, a bit a tile (`Cells::raining`), read by **`rains_over(raining, tile)`** -- the cloud

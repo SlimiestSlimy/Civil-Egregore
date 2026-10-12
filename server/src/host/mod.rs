@@ -7,7 +7,9 @@ mod host_thread;
 use host_thread::HostThread;
 
 pub mod frame;
+pub mod shown;
 pub mod terrain;
+mod wire;
 
 use crate::Start;
 use utilities::tuning::Tuning;

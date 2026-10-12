@@ -99,7 +99,7 @@ height's tint, sand or foam beside the coast, its water's light.
 ## `lib.rs`
 
 **`run()`**: the window opened on the main menu, run until it is
-closed; `window()`: it, not yet run -- the menus (`gui::Gui`), the host's and the map's links, every
+closed; `window()`: it, not yet run, on a host of its own; `window_on(link)`: on whatever host the link reaches -- the menus (`gui::Gui`), the host's and the map's links, every
 part made at startup, and each frame the menus' worlds told the host,
 then -- only over a world -- the view steered, the overlays laid, the
 frame shown and the next asked for, the map; then the text.
@@ -125,7 +125,7 @@ makes them is built -- not taken as built before mipmaps were asked on
 
 **`Link`** `{host, pictures, shading, waiting, since, asked, paused,
 pace, generation, first_view}`: the host as the window holds it (`server::host::Host`) --
-**`start()`**: the host and the painter started; **`forget_asked()`**:
+**`start()`**: the host and the painter started; **`of_shown_worlds()`**: the same on a host whose world is whatever ticker's comes, flat out (`of`, what both are made by); **`forget_asked()`**:
 another world to run in place of the one run, no frame of the one
 before waited for. **`Seen`** `{frame, painted, paint_seconds,
 viewport_superchunks, detail, near_pixels, map}`: the last frame, and how it was
@@ -230,7 +230,7 @@ asks it, each 1,024 by 768 as a screen would show it; **`answered`**,
 `WAITED_AT_MOST` (half an hour: a world's superchunks take a while to
 generate) and `BETWEEN_ASKS` (200 ms before the host is asked again
 for superchunks not yet hot). **`tool::COMMANDS`**: `stills`, each kept
-as a PNG (`stills_tool`); `watch` opens the window on a world a diagnostic ticks (`watch_tool`; `SHEEP`, `PASTURE_SUPERCHUNKS`, `GRASS_THOUSANDTHS`): **`window_on::open(start)`** tells the host to make the world and shows it in place of the main menu -- `Watched`, `show` (`renderer.md`, "Watching a test's world"); the tools' parameters' names `SEED` (in hex; 0 the
+as a PNG (`stills_tool`); `watch` opens the window on a world a diagnostic ticks (`watch_tool`; `SHEEP`, `PASTURE_SUPERCHUNKS`, `GRASS_THOUSANDTHS`): `show` opens the window that shows tickers' worlds (**`window_on::show_worlds()`**, `show_world`); **`window_on::open(start)`** tells the host to make the world and shows it in place of the main menu -- `Watched`, `show` (`renderer.md`, "Watching a test's world"); the tools' parameters' names `SEED` (in hex; 0 the
 counted one, moved on to one with land about the middle),
 `CELLS_EAST`, `CELLS_SOUTH`, `FARTHEST`, `NAMED`; and `window_still`
 (`window_still_tool`; `CELLS_A_PIXEL`): **`window_still::keep(seed,

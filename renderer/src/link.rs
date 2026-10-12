@@ -49,9 +49,23 @@ impl Link {
     /// painted on a thread of their own.
     pub fn start() -> Self {
         let (host, frames) = Host::start();
+        Self::of(host, frames, Some(TARGET_PACE))
+    }
+
+    /// A host whose world is whatever ticker's comes to be shown
+    /// (`Host::of_shown_worlds`), flat out unless the keys say
+    /// otherwise: none if a window showing them is open already.
+    pub fn of_shown_worlds() -> Option<Self> {
+        let (host, frames) = Host::of_shown_worlds()?;
+        Some(Self::of(host, frames, None))
+    }
+
+    /// `host`, held to `pace`, asked nothing yet; its `frames` painted
+    /// on a thread of their own.
+    fn of(host: Host, frames: Receiver<server::host::frame::Frame>, pace: Option<u32>) -> Self {
         let (shading, tunings) = channel();
         let pictures = Mutex::new(crate::paint::start(frames, tunings, host.terrain()));
-        Self { host, pictures, shading, waiting: false, since: f32::INFINITY, asked: None, paused: false, pace: Some(TARGET_PACE), generation: None, first_view: true }
+        Self { host, pictures, shading, waiting: false, since: f32::INFINITY, asked: None, paused: false, pace, generation: None, first_view: true }
     }
 
     /// Forgets a frame asked of the world run: another is to run in its
