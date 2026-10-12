@@ -163,11 +163,12 @@ held)`**, rows without them.
 
 ## The root (`lib.rs`)
 
-**`layers`**: `GRASS`, `TREE`, `TREE_STAGE` (and `OLDEST_TREE_STAGE`),
-`WET`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`: the layers a world's cells have, from
-the type registry (`../../type_registry/`). **`entity_types`**:
-`SHEEP`, and its one attribute `SHEEP_STATE` -- and `SheepState`, its layout.
-**`weather`**: the weather's planes and what the climate's number is made of, from the type registry (`CLIMATE`, `CLOUD`, `Climate`, `Wind`, their limits).
+**`types`**: the type registry (`../../type_registry/`), whole: the
+layers and planes of a world's cells (`GRASS`, `TREE_STAGE`, `CLOUD`,
+`CLIMATE`...), its types of entity and their attributes (`SHEEP`,
+`SHEEP_STATE`, `SheepState`), what the climate's number is made of
+(`Climate`, `Wind`). Nothing is listed: a type registered is one a
+rule may name.
 **`simulation_time`**: `SimulationTime` and `TICKS_A_SIMULATION_SECOND`,
 what a rule says its times and its mean times in
 (`../../simulation/docs/simulation.md`, "Simulation time").

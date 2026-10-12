@@ -37,24 +37,14 @@ pub use utilities::rng::Rng;
 
 use std::ops::{AddAssign, Index, IndexMut};
 
-/// The layers a world's cells have, before any rule adds its own: what
-/// a rule reads and writes by name, from the type registry
-/// (`../../type_registry/`). A cell with nothing on it is dirt, which
-/// has no layer.
-pub mod layers {
-    pub use type_registry::{COLLISION, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WALL_EAST, WALL_SOUTH, WET};
-}
-
-/// The weather's planes -- a number a tile 8 by 8 cells -- and what
-/// the climate's number is made of, from the type registry.
-pub mod weather {
-    pub use type_registry::{Climate, Wind, CLIMATE, CLOUD, HOTTEST, MOST_HUMID, RAINS_ABOVE, STRONGEST_WIND, WEATHER_TILE_SCALE};
-}
-
-/// The types of entity a world has and the attributes they carry: what
-/// an entity's rule names its own by, from the type registry.
-pub mod entity_types {
-    pub use type_registry::{SheepState, SHEEP, SHEEP_STATE};
+/// Every type a world has, as the type registry has it
+/// (`../../type_registry/`): the layers and planes of its cells, the
+/// types of its entities and their attributes, what the climate's number
+/// is made of -- what a rule reads and writes by name. Nothing is listed
+/// here: a type registered is a type a rule may name. A cell with
+/// nothing on it is dirt, which has no layer.
+pub mod types {
+    pub use type_registry::*;
 }
 
 /// Simulation time: a rule says how long a thing takes in seconds of

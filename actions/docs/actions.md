@@ -29,8 +29,8 @@ the actions and on nothing else -- its crate names no other in its
 the hot bitmaps, the entities' store or the storage. What they are
 asked in is theirs to give, from the crate's root: where a cell and an
 entity are, what a layer and an attribute are, a turn, a tick's
-report, the lot drawn; the layers a world has before a rule adds its
-own are `layers`; the compares a rule opens and ends itself are handed
+report, the lot drawn; every type a world has is `types`, the type registry whole, nothing
+listed by hand; the compares a rule opens and ends itself are handed
 on from the instructions (`compare`). Off a turn there is one thing
 more: `entities::EntitiesBetweenTicks`, where a rule puts the entities
 a world starts with, lent by whoever runs the world. No world is made

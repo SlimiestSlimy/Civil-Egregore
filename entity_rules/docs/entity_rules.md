@@ -47,7 +47,7 @@ the tests alone, and what they share the server's own tests'
 A new file in `src/`, named in `lib.rs`; its type and its attributes'
 types rows of the type registry
 (`../../type_registry/docs/type_registry.md`), which refuses a number
-taken, handed to it by `actions::entity_types`; its rule a row of
+taken, handed to it by `actions::types`; its rule a row of
 the server's table beside the others; its tests in `../tests/fast/`,
 a file a kind.
 

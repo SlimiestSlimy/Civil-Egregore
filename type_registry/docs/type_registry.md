@@ -71,8 +71,10 @@ entity's rule is of -- whatever else the rule reads or writes. The
 grass's rule reads and writes other planes and its master is the
 grass; the sheep's eats grass and its master is the sheep. A row
 holds the rule's name and its master, and no more: what the rule
-does, and what it counts, are the server's to say, in its own table,
-which names each rule by its ID here
+does, and what it counts, are code above this crate, which the
+registry cannot hold. The server lists no rule of its own for that:
+it ticks the rules registered, as many and in this table's order
+(`rule_at`, `id_of_rule`), and says for each ID only its function
 (`../../server/docs/server.md`, "TickCounts").
 
 So a plane and a type of entity say which rules are theirs with

@@ -4,9 +4,9 @@
 
 use actions::around;
 use actions::entities::EntitiesBetweenTicks;
-pub use actions::entity_types::{SheepState, SHEEP, SHEEP_STATE};
+pub use actions::types::{SheepState, SHEEP, SHEEP_STATE};
 use actions::simulation_time::SimulationTime;
-use actions::layers::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
+use actions::types::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
 use actions::{WholeAttribute, Chance, area, cells, compare, entities, place_counted, this_tick, walking, CellCartesian, CellIndex, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 

@@ -3,9 +3,8 @@
 //! deepened or thinned by its humidity, its heat and what is under it
 //! (`docs/sca_rules.md`, "Weather").
 
-use actions::layers::WET;
 use actions::simulation_time::SimulationTime;
-use actions::weather::{Climate, CLIMATE, CLOUD, MOST_HUMID, RAINS_ABOVE, STRONGEST_WIND, WEATHER_TILE_SCALE};
+use actions::types::{Climate, CLIMATE, CLOUD, MOST_HUMID, RAINS_ABOVE, STRONGEST_WIND, WEATHER_TILE_SCALE, WET};
 use actions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn};
 
 /// The simulation time from one sample of a tile to the next, on
