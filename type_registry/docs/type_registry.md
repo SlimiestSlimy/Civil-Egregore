@@ -219,6 +219,17 @@ have beside are no wind's and read as calm (`of_state`). `blowing(way,
 strength)` makes one, `state` is its bits, `way`, `strength` and
 `towards` what a rule asks of it.
 
+**What a wind carries** is said here too, a step at a time: a
+climate's humidity a level nearer another's
+(`Climate::with_humidity_carried_from`), its temperature up to 4
+nearer (`with_temperature_carried_from`, `DEGREES_A_WIND_CARRIES`),
+and its wind a step nearer another wind (`with_wind_carried_from`,
+`Wind::a_step_towards`) -- as two vectors averaged a little at a
+time: the same way, a strength nearer; another way, a strength
+weaker, to calm; calm, the other's way at the least strength. The
+weather's rule says when (`../../sca_rules/docs/sca_rules.md`,
+"Weather").
+
 **Rain** is a climate's to say, of its temperature and its humidity
 both (`Climate::rains_above`, `Climate::rains(cloud)`): the level of
 cloud above which a tile is raining is 12 in the coldest, driest air

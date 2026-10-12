@@ -64,6 +64,21 @@ impl Wind {
         if self.0 == 0 { None } else { Some((self.0 as usize - 1) % WAYS_OF_WIND.len()) }
     }
 
+    /// This wind a step nearer `other`, as two vectors are averaged a
+    /// little at a time: blowing the same way, a strength nearer its
+    /// strength; blowing another way, a strength weaker, down to
+    /// calm; calm, the way `other` blows at the least strength. So
+    /// winds that differ wear each other down, and one wind over all
+    /// stays as it is.
+    pub const fn a_step_towards(self, other: Self) -> Self {
+        match (self.way(), other.way()) {
+            (Some(way), Some(others)) if way == others => Self::blowing(way, if self.strength() < other.strength() { self.strength() + 1 } else if self.strength() > other.strength() { self.strength() - 1 } else { self.strength() }),
+            (Some(way), _) => Self::blowing(way, self.strength() - 1),
+            (None, Some(others)) => Self::blowing(others, 1),
+            (None, None) => Self::CALM,
+        }
+    }
+
     /// The step to the tile it blows towards, in tiles across and
     /// down: none when calm.
     pub const fn towards(self) -> Option<(i32, i32)> {
@@ -71,6 +86,21 @@ impl Wind {
             Some(way) => Some(WAYS_OF_WIND[way]),
             None => None,
         }
+    }
+}
+
+/// How much of the temperature between two tiles a wind carries
+/// from one to the next at once, at the most.
+pub const DEGREES_A_WIND_CARRIES: u32 = 4;
+
+/// `from` up to `step` nearer `to`, never past it.
+const fn nearer(from: u32, to: u32, step: u32) -> u32 {
+    if from < to {
+        if to - from < step { to } else { from + step }
+    } else if from - to < step {
+        to
+    } else {
+        from - step
     }
 }
 
@@ -91,6 +121,24 @@ impl Climate {
     /// The climate the plane's number `number` says.
     pub const fn of_number(number: u32) -> Self {
         Self { humidity: number & MOST_HUMID, wind: Wind::of_state(number >> 4 & 0xF), temperature: number >> 8 & HOTTEST }
+    }
+
+    /// This climate with its humidity a level nearer that of
+    /// `upwind`: what a wind carries of the air it comes from.
+    pub const fn with_humidity_carried_from(self, upwind: Self) -> Self {
+        Self { humidity: nearer(self.humidity, upwind.humidity, 1), ..self }
+    }
+
+    /// This climate with its temperature up to
+    /// [`DEGREES_A_WIND_CARRIES`] nearer that of `upwind`.
+    pub const fn with_temperature_carried_from(self, upwind: Self) -> Self {
+        Self { temperature: nearer(self.temperature, upwind.temperature, DEGREES_A_WIND_CARRIES), ..self }
+    }
+
+    /// This climate with its wind a step nearer that of `upwind`
+    /// ([`Wind::a_step_towards`]).
+    pub const fn with_wind_carried_from(self, upwind: Self) -> Self {
+        Self { wind: self.wind.a_step_towards(upwind.wind), ..self }
     }
 
     /// The level of cloud above which a tile of this climate is

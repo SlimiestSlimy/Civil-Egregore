@@ -709,3 +709,14 @@ RULES AND TIME
 - ASK 2026-10-11: "remember to close the renderer when the server stops lmao" (the window a ticker opened closes once no ticker is left).
 - ASK 2026-10-11: "i also need a new keybind to show climate values per tile".
 - ASK 2026-10-11: "i better see all the tests" (every test run of mine is to be shown: CIVIL_EGREGORE_RENDER set).
+- ASK 2026-10-11: "ok, for glossary reference, lets name the binary
+  command tests like pasture and stuff "in-bin tests" and normal code
+  tests  are just tests".
+- ASK 2026-10-11: "now, we actually need one more variable lol,
+  pressure lets not make it dependant on height, instead dependant on
+  multiple wind vectors being sampled and pushing to the same cell
+  rougly" / "importantly, a pressure difference of more than 1
+  inmediatly triggers spreadingof the pressure".
+  And: "pressure spreads to the randomly, but of course following
+  pressure laws, high pressure likes to go towards lower pressure more
+  than mid or high pressure".
