@@ -239,7 +239,7 @@ asks it, each 1,024 by 768 as a screen would show it; **`answered`**,
 `WAITED_AT_MOST` (half an hour: a world's superchunks take a while to
 generate) and `BETWEEN_ASKS` (200 ms before the host is asked again
 for superchunks not yet hot). **`tool::COMMANDS`**: `stills`, each kept
-as a PNG (`stills_tool`); `watch` opens the window on a world a diagnostic ticks (`watch_tool`; `SHEEP`, `PASTURE_SUPERCHUNKS`, `GRASS_THOUSANDTHS`): `show` opens the window that shows tickers' worlds (**`window_on::show_worlds()`**, `show_world`); **`window_on::open(start)`** tells the host to make the world and shows it in place of the main menu -- `Watched`, `show` (`renderer.md`, "Watching a test's world"); the tools' parameters' names `SEED` (in hex; 0 the
+as a PNG (`stills_tool`); `watch` opens the window on a world an in-bin test ticks (`watch_tool`; `SHEEP`, `PASTURE_SUPERCHUNKS`, `GRASS_THOUSANDTHS`): `show` opens the window that shows tickers' worlds (**`window_on::show_worlds()`**, `show_world`); **`window_on::open(start)`** tells the host to make the world and shows it in place of the main menu -- `Watched`, `show` (`renderer.md`, "Watching a test's world"); the tools' parameters' names `SEED` (in hex; 0 the
 counted one, moved on to one with land about the middle),
 `CELLS_EAST`, `CELLS_SOUTH`, `FARTHEST`, `NAMED`; and `window_still`
 (`window_still_tool`; `CELLS_A_PIXEL`): **`window_still::keep(seed,

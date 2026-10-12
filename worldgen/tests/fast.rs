@@ -14,7 +14,7 @@ mod terrain {
 
     use crate::tests::{at, walled};
     use coordinates::{CellCartesian, SuperchunkIndex, WORLD_MIDDLE};
-    use worldgen::{height_shaped, wall, Shape, Terrain, STEP, WALLS};
+    use worldgen::{height_shaped, wall, Shape, Terrain, DROP, STEP, WALLS};
 
     /// The seed the run's tests grow their ground from: the crate's,
     /// rolled every few runs (`utilities::seed`), so that nothing passes on
@@ -53,9 +53,11 @@ mod terrain {
         }
     }
 
-    /// A wall is kept exactly where the two cells are more than a step
-    /// apart -- across the superchunk's edges too, by the heights beyond --
-    /// and with narrow edges some of the ground is walled, most of it not.
+    /// A wall is kept exactly where the cell stepped to is more than a
+    /// step up or more than a drop down -- across the superchunk's edges
+    /// too, by the heights beyond -- and with narrow edges some of the
+    /// ground is walled, most of it not; and some drops are stepped
+    /// down and not back up.
     #[test]
     fn walls_are_where_heights_are_more_than_a_step_apart() {
         let CellCartesian { x: left, y: top } = WORLD_MIDDLE.top_left().cartesian();
@@ -65,13 +67,14 @@ mod terrain {
             for x in (0..1024).step_by(5).chain([0, 1023]) {
                 for (way, &(_, (dx, dy))) in WALLS.iter().enumerate() {
                     let (here, there) = (height(left + x, top + y), height((left + x).wrapping_add_signed(dx), (top + y).wrapping_add_signed(dy)));
-                    assert_eq!(walled(&terrain, way, x, y), here.abs_diff(there) > STEP, "({x}, {y}) way {way}: {here} and {there}");
-                    assert_eq!(wall(here, there), here.abs_diff(there) > STEP);
+                    let barred = there > here + STEP || here > there + DROP;
+                    assert_eq!(walled(&terrain, way, x, y), barred, "({x}, {y}) way {way}: {here} and {there}");
+                    assert_eq!(wall(here, there), barred);
                 }
             }
         }
         let counts = terrain.wall_counts();
-        let share = counts.iter().sum::<u64>() as f64 / (2.0 * 1024.0 * 1024.0);
+        let share = counts.iter().sum::<u64>() as f64 / (4.0 * 1024.0 * 1024.0);
         assert!(share > 0.0005 && share < 0.25, "{:.3}% of steps walled: {counts:?}", 100.0 * share);
     }
 
@@ -81,7 +84,7 @@ mod terrain {
     #[test]
     fn broad_edges_have_no_walls() {
         let terrain = Terrain::generate_shaped(&RAMPS, seed(), WORLD_MIDDLE);
-        assert_eq!(terrain.wall_counts(), [0; 2]);
+        assert_eq!(terrain.wall_counts(), [0; 4]);
         let heights: Vec<u16> = (0..1024).map(|x| at(&terrain, x, 500)).collect();
         assert!(heights.windows(2).all(|pair| pair[0].abs_diff(pair[1]) <= 1), "a row: {heights:?}");
     }
@@ -89,10 +92,14 @@ mod terrain {
     /// Flat ground has no walls; a cliff has them along it.
     #[test]
     fn a_cliff_is_walled_along_its_length() {
-        assert_eq!(Terrain::from_heights(|_, _| 9).wall_counts(), [0; 2]);
-        // Ground 3 higher from column 500 on.
+        assert_eq!(Terrain::from_heights(|_, _| 9).wall_counts(), [0; 4]);
+        // Ground 3 higher from column 500 on: stepped down, not up.
         let terrain = Terrain::from_heights(|x, _| if x >= 500 { 3 } else { 0 });
-        assert_eq!(terrain.wall_counts(), [1024, 0], "east walls down it, none south");
+        assert_eq!(terrain.wall_counts(), [1024, 0, 0, 0], "east walls down it, none back west: a drop to hop down");
+        // Higher than a drop: walled both ways, the step west out of column 500 too.
+        let high = Terrain::from_heights(|x, _| if x >= 500 { DROP + 1 } else { 0 });
+        assert_eq!(high.wall_counts(), [1024, 0, 1024, 0]);
+        assert!(walled(&high, 2, 500, 77) && !walled(&high, 2, 499, 77) && !walled(&high, 2, 501, 77));
         assert!(walled(&terrain, 0, 499, 77));
         assert!(!walled(&terrain, 0, 500, 77) && !walled(&terrain, 0, 498, 77));
     }
@@ -160,7 +167,7 @@ mod terrain {
         let at_once: Vec<Terrain> = std::thread::scope(|scope| about.iter().map(|&superchunk| scope.spawn(move || made(superchunk))).collect::<Vec<_>>().into_iter().map(|made| made.join().expect("made")).collect());
         // The heights alone: the walls follow from them.
         let same = |one: &Terrain, other: &Terrain| one.heights == other.heights;
-        assert!(in_order.iter().any(|terrain| terrain.wall_counts() != [0; 2]), "ground with something to it");
+        assert!(in_order.iter().any(|terrain| terrain.wall_counts() != [0; 4]), "ground with something to it");
         for which in 0..about.len() {
             assert!(same(&in_order[which], by_lot[which].as_ref().expect("made")), "superchunk {which}, made by lot");
             assert!(same(&in_order[which], &at_once[which]), "superchunk {which}, made at once");

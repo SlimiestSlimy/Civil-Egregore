@@ -253,8 +253,8 @@ rain. The streaks stand still: nothing falls yet.
 ## Watching a test's world
 
 `Civil_Egregore renderer watch [seed] [sheep] [pasture superchunks]
-[grass, thousandths]` opens the window straight on a world a
-diagnostic ticks, running, in place of the main menu
+[grass, thousandths]` opens the window straight on a world an
+in-bin test ticks, running, in place of the main menu
 (`src/diagnostics/window_on.rs`): the world `server check` ticks from
 a seed -- 0, the run's own, the seed the tests are on
 (`utilities::seed::counted`) -- or, given a number of superchunks, the
@@ -281,7 +281,7 @@ only once a tile is large enough on the screen to read them.
 ## Showing a ticker's world
 
 `Civil_Egregore renderer show` opens the window on no world of its
-own: it shows the world of whatever test or diagnostic ticks one
+own: it shows the world of whatever test or in-bin test ticks one
 while `CIVIL_EGREGORE_RENDER` is set, one after another, stays up
 between them, and closes once the last has stopped and none follows
 (`diagnostics/window_on.rs`, `show_worlds`;

@@ -133,7 +133,7 @@ and so is the place of each thing
 a rule counts, worked out from the one list of their names
 (`sheep::EATEN`, `actions::place_counted`) -- a name that is not
 there does not compile. A tick's counts are read by them
-(`counts.of(SHEEP_RULE)[EATEN]`), and a diagnostic or a test ticks
+(`counts.of(SHEEP_RULE)[EATEN]`), and an in-bin test or a test ticks
 only the rules it picks (`Chosen::of(&[GRASS_RULE])`).
 
 A rule's counts come from two places. What it counts as it runs is
@@ -370,7 +370,7 @@ the host").
 
 ## A world shown
 
-Whatever ticks a world can be watched doing it: a test, a diagnostic
+Whatever ticks a world can be watched doing it: a test, an in-bin test
 -- a **ticker**, anything that is no host. With the environment
 variable `CIVIL_EGREGORE_RENDER` set (to anything but `0`), every
 world a ticker ticks is a **shown world**: drawn in a window as it is

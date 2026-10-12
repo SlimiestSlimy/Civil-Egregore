@@ -11,7 +11,7 @@ use crate::around::{self, About, Cells};
 use crate::tiles_about;
 use crate::cells;
 use simulation::Turn;
-use type_registry::{COLLISION, WALL_EAST, WALL_SOUTH};
+use type_registry::{COLLISION, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
 
 // The area a turn reads is the area paths are found over.
 const _: () = assert!(pathfinding::SIDE == AREA_SIDE);
@@ -29,8 +29,8 @@ fn of_the_area(at: CellIndex, cell: Cell) -> Option<CellIndex> {
 /// cells the collision plane holds -- what stands there, entities
 /// among it -- and the terrain's walls.
 fn in_the_way(turn: &Turn, at: CellIndex) -> (Rows, Walls) {
-    let [held, east, south] = area::layers(turn, [COLLISION, WALL_EAST, WALL_SOUTH], at).map(|area| area.set);
-    (held, Walls::new(east, south))
+    let [held, north, west, south, east] = area::layers(turn, [COLLISION, WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST], at).map(|area| area.set);
+    (held, Walls::one_way(north, west, south, east))
 }
 
 /// `rows` less the cells of `held`.
@@ -49,25 +49,27 @@ pub struct SoughtStep {
 }
 
 /// Which of the cells `about` a cell may be stepped to from it, for
-/// the terrain's walls: those none is before -- its own among them. A
-/// diagonal is barred unless both ways round it are open. Where the
-/// wall layers are not hot, none bars; the walls' tiles are asked a
-/// cell at a time as they lie, and not at all where they hold nothing.
+/// the terrain's walls: those none is before -- its own among them.
+/// A wall is one way's, the cell's it is stepped from: a drop lets a
+/// step down and none back. A diagonal is barred unless both ways
+/// round it are open. Where the wall layers are not hot, none bars;
+/// the walls' tiles are asked a cell at a time as they lie, and not
+/// at all where they hold nothing.
 pub fn around_unwalled(turn: &Turn, about: &About) -> Cells {
-    let [east, south] = tiles_about::layers(turn, [WALL_EAST, WALL_SOUTH], about, about.nine_word()).map(|tiles| tiles.set);
-    if east | south == 0 {
+    let [north, west, south, east] = tiles_about::layers(turn, [WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST], about, about.nine_word()).map(|tiles| tiles.set);
+    if north | west | south | east == 0 {
         return about.nine();
     }
     use around::{EAST, HERE, NORTH, NORTH_EAST, NORTH_WEST, SOUTH, SOUTH_EAST, SOUTH_WEST, WEST};
-    // Whether the cell `way` from it keeps a wall east of it, or south.
-    let (east_of, south_of) = (|way: u32| east & about.way_word(way) != 0, |way: u32| south & about.way_word(way) != 0);
-    // A wall is kept by the upper or left cell of the two: the centre's own east and south, its neighbours' west and north.
-    let (to_east, to_west, to_south, to_north) = (east_of(HERE), east_of(WEST), south_of(HERE), south_of(NORTH));
-    // A diagonal is barred unless both ways round it are open.
+    // Whether no step leaves the cell `way` from it to the north, the west, the south, the east.
+    let (north_of, west_of) = (|way: u32| north & about.way_word(way) != 0, |way: u32| west & about.way_word(way) != 0);
+    let (south_of, east_of) = (|way: u32| south & about.way_word(way) != 0, |way: u32| east & about.way_word(way) != 0);
+    let (to_east, to_west, to_south, to_north) = (east_of(HERE), west_of(HERE), south_of(HERE), north_of(HERE));
+    // A diagonal is barred unless both ways round it are open: each a step out of the centre, and one out of the cell it comes to.
     let to_south_east = to_east | to_south | south_of(EAST) | east_of(SOUTH);
-    let to_south_west = to_west | to_south | south_of(WEST) | east_of(SOUTH_WEST);
-    let to_north_east = to_east | to_north | south_of(NORTH_EAST) | east_of(NORTH);
-    let to_north_west = to_west | to_north | south_of(NORTH_WEST) | east_of(NORTH_WEST);
+    let to_south_west = to_west | to_south | south_of(WEST) | west_of(SOUTH);
+    let to_north_east = to_east | to_north | north_of(EAST) | east_of(NORTH);
+    let to_north_west = to_west | to_north | north_of(WEST) | west_of(NORTH);
     let barred = [(to_north_west, NORTH_WEST), (to_north, NORTH), (to_north_east, NORTH_EAST), (to_west, WEST), (to_east, EAST), (to_south_west, SOUTH_WEST), (to_south, SOUTH), (to_south_east, SOUTH_EAST)];
     Cells(barred.iter().fold(about.nine_word(), |open, &(barred, way)| if barred { open & !about.way_word(way) } else { open }))
 }
@@ -90,8 +92,8 @@ pub fn around_steppable(turn: &Turn, about: &About) -> Cells {
 /// cells around `centre`, laid out as an [`crate::area::Area`] is: what paths
 /// are found round.
 pub fn area_walls(turn: &Turn, centre: CellIndex) -> Walls {
-    let [east, south] = area::layers(turn, [WALL_EAST, WALL_SOUTH], centre).map(|area| area.set);
-    Walls::new(east, south)
+    let [north, west, south, east] = area::layers(turn, [WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST], centre).map(|area| area.set);
+    Walls::one_way(north, west, south, east)
 }
 
 /// The cell to step to from `at` for the nearest of `goals` -- cells

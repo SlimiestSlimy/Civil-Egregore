@@ -782,3 +782,18 @@ RULES AND TIME
   clock 0.25%, the check's hashes 0.2%; counts are adds inlined, not
   seen apart). STILL OWED: the timescales (sheep ~75 min), offspring,
   hopping down; sweep of "diagnostic" in the docs.
+- ASK 2026-10-12: "hmmm we shouldnt be encoding back so aggressively
+  in the first place, chunk cold storage and sync to disk is a
+  background operation until we save the world" / "also display k
+  bind in the renderer with the rest" / "ok, do the still oweds and
+  then tweak the cold storage a little". Order: K in the window's
+  list of keys; timescales + offspring; hop down; "diagnostic" swept
+  in the docs; then the writeback.
+- DONE 2026-10-12 (this commit): K in the window's keys. Sheep LIFE
+  4,500 s (75 min), GESTATION 190 s, LAMBHOOD 450 s, conceive 800 s
+  (about 4 lambs a sheep); grass, trees, weather 20/3 slower (the
+  factor of the life). MEAL, STARVATION, ROAM, steps left as they
+  were: my call, say so. Walls one way's: WALL_NORTH, WALL_WEST added,
+  STEP 1 up, DROP 4 down (4 is mine). "diagnostic" -> "in-bin test"
+  where it meant the commands. NEXT: the writeback as a background
+  operation until the world is saved.

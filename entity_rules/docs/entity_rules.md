@@ -69,6 +69,11 @@ alone:
   quarter of them -- once in `MEAN_TIME_TO_CONCEIVE` of such eating on
   average (`CONCEIVE_CHANCE` a meal); `GESTATION` on,
   a lamb is born on a free cell beside it, grown `LAMBHOOD` after.
+  The times are a sheep's own at a scale: its life of ten years or
+  so is an hour and a quarter, so a year is seven and a half minutes
+  -- a lamb grown in one, carried five months, and four lambs or so
+  to the grown part of a life on lush pasture: every sheep bears, so
+  that is the eight of a ewe.
   Grass left alone covers a third of the dirt and grows fastest
   covering a sixth: so a flock stops growing while the grass still
   grows back faster than it is eaten, and never strips it.
@@ -97,7 +102,9 @@ alone:
   far as it reaches (`walking::seek`) -- one pathfinding step a
   wake, no route kept; with no grass in reach, onto any neighbour.
   Hemmed in, it stays. Never off the hot bitplanes, never through a
-  wall, and never onto a cell the collision plane holds -- a tree's
+  wall -- up a step, down a drop of four: it hops off a height it
+  could not climb back onto, and is not trapped on steep ground --
+  and never onto a cell the collision plane holds -- a tree's
   (`walking::around_steppable`).
 
 All a sheep keeps is one attribute, three blocks (`SHEEP_STATE`, laid out

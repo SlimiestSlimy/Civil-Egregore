@@ -19,7 +19,7 @@ mod walls;
 pub use a_star::a_star;
 pub use walls::Walls;
 
-use walls::spread;
+use walls::{spread, spread_back};
 
 /// Cells along an area's side.
 pub const SIDE: usize = 16;
@@ -132,11 +132,12 @@ impl Wave {
         &self.reached
     }
 
-    /// One step: every passable neighbour of a reached cell, no wall
-    /// between them, reached. Whether any was -- if not, the wave has
+    /// One step: every passable neighbour of a reached cell reached,
+    /// no wall before its step onto that cell -- the way a walker
+    /// goes, towards the goals. Whether any was -- if not, the wave has
     /// gone as far as it can.
     pub fn advance(&mut self, passable: &Rows, walls: &Walls) -> bool {
-        let wider = spread(&self.reached, walls);
+        let wider = spread_back(&self.reached, walls);
         let mut grew = 0;
         for ((reached, &wider), &passable) in self.reached.iter_mut().zip(&wider).zip(passable) {
             let new = wider & passable & !*reached;

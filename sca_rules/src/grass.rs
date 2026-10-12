@@ -10,12 +10,12 @@ use actions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Tu
 /// The simulation time a cell of grass takes, on average, to try to
 /// spread: what its chance each tick is worked out from, so the grass
 /// grows as fast at any tick rate.
-pub const MEAN_TIME_TO_SPREAD: SimulationTime = SimulationTime::milliseconds(390_625);
+pub const MEAN_TIME_TO_SPREAD: SimulationTime = SimulationTime::seconds(2_600);
 /// The simulation time a cell of grass in the harshest climate --
 /// the driest, the hottest -- takes, on average, to turn back to dirt:
 /// how rarely a cell of grass is held against its climate. In any
 /// milder one it takes as much longer as the climate is milder.
-pub const MEAN_TIME_TO_DECAY: SimulationTime = SimulationTime::milliseconds(3_125_000);
+pub const MEAN_TIME_TO_DECAY: SimulationTime = SimulationTime::seconds(20_800);
 /// The chance, each tick, that a cell of grass tries to spread.
 pub const SPREAD_CHANCE: Chance = MEAN_TIME_TO_SPREAD.chance_a_tick();
 /// The chance, each tick, that a cell of grass is held against its

@@ -25,6 +25,13 @@ pub fn walls_drawn(random: &mut utilities::rng::Rng) -> Walls {
     Walls::new(rows(), rows())
 }
 
+/// Walls drawn each way of its own: about one step in eight barred
+/// out of a cell north, west, south, east, whatever the step back is.
+pub fn one_way_walls_drawn(random: &mut utilities::rng::Rng) -> Walls {
+    let mut rows = || std::array::from_fn(|_| (random.draw() & random.draw() >> 16 & random.draw() >> 32) as u16);
+    Walls::one_way(rows(), rows(), rows(), rows())
+}
+
 /// The steps of the shortest path from `from` to `to` over `passable`
 /// and through no wall of `walls`, by a search of every cell, ring
 /// after ring: what A* and the waves are judged by.

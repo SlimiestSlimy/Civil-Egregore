@@ -120,8 +120,10 @@ pub const TREE: LayerType = LayerType::of_a_bit(3);
 /// A tree's stage, 0 to [`OLDEST_TREE_STAGE`]: a plane four bits a cell
 /// wide, kept cold as the four layer types from 4 on, a bit each.
 pub const TREE_STAGE: Wide<Bits4> = Wide::new(4);
-/// A wall between a cell and the cell to its east: the layer of the
-/// cells that keep one.
+/// A wall before a cell's step to the cell to its east: the layer of
+/// the cells no step leaves that way. A wall is one way's: the step
+/// back, the other cell's west, has its own -- a drop is stepped down
+/// and not back up.
 pub const WALL_EAST: LayerType = LayerType::of_a_bit(8);
 /// ...to its south.
 pub const WALL_SOUTH: LayerType = LayerType::of_a_bit(9);
@@ -130,6 +132,11 @@ pub const WALL_SOUTH: LayerType = LayerType::of_a_bit(9);
 /// movement check asks, whatever the thing is. Who puts such a
 /// thing sets its cell, and clears it when the thing goes.
 pub const COLLISION: LayerType = LayerType::of_a_bit(10);
+/// A wall before a cell's step to the cell to its north
+/// ([`WALL_EAST`])...
+pub const WALL_NORTH: LayerType = LayerType::of_a_bit(11);
+/// ...to its west.
+pub const WALL_WEST: LayerType = LayerType::of_a_bit(12);
 /// The sheep's type.
 pub const SHEEP: EntityType = EntityType::of(16);
 /// All a sheep keeps: when it is next hungry, and what it is in the
@@ -175,6 +182,8 @@ pub const REGISTRY: &[Registered] = &[
     layer("wall east", WALL_EAST),
     layer("wall south", WALL_SOUTH),
     layer("collision", COLLISION),
+    layer("wall north", WALL_NORTH),
+    layer("wall west", WALL_WEST),
     entity("sheep", SHEEP).with_default(SHEEP_STATE),
     attribute("sheep state", SHEEP_STATE),
     layer("wet", WET),

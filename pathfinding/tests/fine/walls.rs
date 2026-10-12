@@ -1,5 +1,6 @@
-//! Walls between cells: barring a step both ways, one thick in any
-//! direction, never crossed by waves, by A* or by a walker.
+//! Walls between cells: barring a step both ways or one way alone,
+//! one thick in any direction, never crossed by waves, by A* or by a
+//! walker.
 //!
 //! `cargo test`
 
@@ -141,4 +142,50 @@ fn walls_one_thick_in_any_direction_are_never_crossed() {
             }
         }
     }
+}
+
+/// A wall of one way: a drop along a column is stepped down by waves
+/// and by A* alike and not back up, the diagonals over it as the
+/// straight step; and on walls drawn each way of its own both find
+/// the shortest way a search of every cell finds, there and back --
+/// the two no longer one length.
+#[test]
+fn a_wall_of_one_way_bars_the_step_back_alone() {
+    // High ground west of column 8: no step west out of column 8, all the way down.
+    let mut west = [0; SIDE];
+    west.iter_mut().for_each(|row| *row = 1 << 8);
+    let drop = Walls::one_way([0; SIDE], west, [0; SIDE], [0; SIDE]);
+    let (above, below) = (cell(6, 5), cell(10, 5));
+    let goals_of = |goal: Cell| {
+        let mut goals: Rows = [0; SIDE];
+        goals[goal.y as usize] = 1 << goal.x;
+        goals
+    };
+    assert_eq!(a_star(&ALL, &drop, above, below).map(|path| path.steps), Some(4), "straight down it");
+    assert_eq!(step_towards(&ALL, &drop, &goals_of(below), above, 0).map(|path| path.steps), Some(4));
+    assert_eq!(a_star(&ALL, &drop, below, above), None, "and not back up");
+    assert_eq!(step_towards(&ALL, &drop, &goals_of(above), below, 0), None);
+    for dy in [-1, 0, 1] {
+        assert!(drop.bars_step(cell(8, 5), -1, dy) && !drop.bars_step(cell(7, 5), 1, dy), "by {dy} down");
+    }
+
+    let mut random = Rng::new(utilities::seed::counted());
+    let (mut found, mut unlike) = (0, 0);
+    for _ in 0..200 {
+        let walls = one_way_walls_drawn(&mut random);
+        let (from, to) = (cell(random.below(SIDE as u64) as u8, random.below(SIDE as u64) as u8), cell(random.below(SIDE as u64) as u8, random.below(SIDE as u64) as u8));
+        if from == to {
+            continue;
+        }
+        let (there, back) = (searched(&ALL, &walls, from, to), searched(&ALL, &walls, to, from));
+        assert_eq!(a_star(&ALL, &walls, from, to).map(|path| path.steps), there, "{from:?} to {to:?}");
+        assert_eq!(a_star(&ALL, &walls, to, from).map(|path| path.steps), back, "{to:?} to {from:?}");
+        assert_eq!(step_towards(&ALL, &walls, &goals_of(to), from, random.draw()).map(|path| path.steps), there, "waves, {from:?} to {to:?}");
+        // The first step of either is one no wall bars.
+        if let Some(path) = a_star(&ALL, &walls, from, to) {
+            assert!(!walls.bars_step(from, path.first.x as i8 - from.x as i8, path.first.y as i8 - from.y as i8));
+        }
+        (found, unlike) = (found + there.is_some() as u32, unlike + (there != back) as u32);
+    }
+    assert!(found > 100 && unlike > 0, "{found} ways found, {unlike} not the length of the way back");
 }

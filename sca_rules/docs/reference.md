@@ -4,8 +4,8 @@ The design is in `sca_rules.md`.
 
 ## `grass.rs`
 
-`MEAN_TIME_TO_SPREAD` (390.625 seconds of the simulation) and
-`MEAN_TIME_TO_DECAY` (3,125, in the harshest climate): what
+`MEAN_TIME_TO_SPREAD` (2,600 seconds of the simulation) and
+`MEAN_TIME_TO_DECAY` (20,800, in the harshest climate): what
 `SPREAD_CHANCE` and `DECAY_CHANCE` are worked out from
 (`SimulationTime::chance_a_tick`; once in 100,000 ticks and in 800,000
 at 256 ticks a second); `SAMPLE_CHANCE` (the two together): each a
@@ -25,8 +25,8 @@ Returns its `RuleCounts`, their places named **`SAMPLED`**,
 
 The trees' layers are the terrain's (`actions::types`): `TREE`,
 the cells a tree stands on, and `TREE_STAGE`, its stage, 0 to
-`OLDEST_TREE_STAGE`. `MEAN_TIME_TO_SAMPLE` (39.062 seconds of the simulation) and the `SAMPLE_CHANCE` worked out from it, `SPREAD_SHARE` and `GROW_SHARE` (`Chance::HALF` each), `SEEDS_FROM` (4),
-`CROWDED` (9 trees), `MEAN_TIME_TO_DIE` (312.5 seconds at the oldest stage) and the `DIE_CHANCE` a sample worked out from it, `AROUND` (8).
+`OLDEST_TREE_STAGE`. `MEAN_TIME_TO_SAMPLE` (260 seconds of the simulation) and the `SAMPLE_CHANCE` worked out from it, `SPREAD_SHARE` and `GROW_SHARE` (`Chance::HALF` each), `SEEDS_FROM` (4),
+`CROWDED` (9 trees), `MEAN_TIME_TO_DIE` (2,080 seconds at the oldest stage) and the `DIE_CHANCE` a sample worked out from it, `AROUND` (8).
 
 **`rule(turn, cell, counts)`**: the rule on one tree sampled. Every tree sampled tries to spread or grows
 a stage -- or at the oldest dies one time in four, its cell and its
@@ -41,12 +41,12 @@ names listed in **`COUNTED`**.
 ## `weather.rs`
 
 The weather's planes are the registry's (`actions::types`): `CLIMATE`,
-`CLOUD` and `ELEVATION` (`sca_rules.md`, "Weather"). `MEAN_TIME_TO_SAMPLE` (2 seconds of the simulation) and
+`CLOUD` and `ELEVATION` (`sca_rules.md`, "Weather"). `MEAN_TIME_TO_SAMPLE` (13 seconds of the simulation) and
 the `SAMPLE_CHANCE` worked out from it; `WHOLE` (256), what a sample's
 chances are parts of; `PARTS_A_LEVEL_FROM_HUMIDITY` (16),
 `EVAPORATION_DIVIDES_HEAT` (16), `BURNING_OFF_DIVIDES_HEAT` (4),
 `PARTS_RAIN_SHEDS` (64), `PRESSURE_DIVIDES_ITS_GAP` (2); `TILE_SIDE` (8);
-`MEAN_TIME_TO_CARRY_CLIMATE` (60 seconds), `CARRY_CHANCE`,
+`MEAN_TIME_TO_CARRY_CLIMATE` (400 seconds), `CARRY_CHANCE`,
 `CARRIED_OF_A_CLIMATE` (3). The small functions: `beside(turn, tile,
 step)`, a tile about one and its climate;
 `at_the_border_of_what_is_loaded(turn, tile)`; `passes(turn, from, to,

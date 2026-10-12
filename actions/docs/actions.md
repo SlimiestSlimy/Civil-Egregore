@@ -288,9 +288,10 @@ plane holds walked on or to, the plane and the walls read at once, none if no go
 waves and A* of `../../pathfinding/`, round the entities in the way,
 one step a wake.
 
-**Walls**: the terrain's (`../../worldgen/`), two layers -- east and
-south -- read as any other; a diagonal is barred unless both ways round
-it are open. `around_unwalled(turn, about)` is the cells about a cell no wall is before,
+**Walls**: the terrain's (`../../worldgen/`), four layers -- the
+cells no step leaves north, west, south, east: a wall is one way's, a
+drop stepped down and not back up -- read as any other; a diagonal is
+barred unless both ways round it are open. `around_unwalled(turn, about)` is the cells about a cell no wall is before,
 a set to narrow a step's choices by -- the walls' tiles asked a cell at
 a time as they lie, and not at all where they hold nothing; `area_walls(turn, centre)` the
 walls of the area, which `step_towards` and `step_to` go round by
