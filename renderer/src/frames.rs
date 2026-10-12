@@ -98,6 +98,7 @@ pub fn show(
     for picture in pictures {
         link.waiting &= picture.frame.more;
         if seen.frame.as_ref().is_none_or(|frame| frame.world != picture.frame.world) {
+            seen.climates.clear();
             for (_, (sprite, ..)) in sprites.tiles.drain() {
                 commands.entity(sprite).despawn();
             }
@@ -118,6 +119,7 @@ pub fn show(
                 }
             }
         }
+        seen.climates.extend(picture.climates);
         (seen.frame, seen.painted, seen.paint_seconds) = (Some(picture.frame), seen.painted + picture.superchunks.len(), picture.paint_seconds);
         for painted in picture.superchunks {
             let (at, side) = (painted.at, painted.side);

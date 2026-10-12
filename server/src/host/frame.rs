@@ -8,7 +8,8 @@ use bitplane_manager::BucketKey;
 use type_registry::GRASS;
 use chunk_storage::{LayerType, SuperchunkImage};
 use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
-use type_registry::{Climate, CLIMATE, CLOUD, TREE, TREE_STAGE};
+pub use type_registry::Climate;
+use type_registry::{CLIMATE, CLOUD, TREE, TREE_STAGE};
 pub use simulation::halos::Viewport;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -36,6 +37,21 @@ pub const CLOUD_BITS: usize = CLOUD.layer_type().bits() as usize;
 pub const CLOUD_TILE_SHIFT: u32 = CLOUD.layer_type().tile_shift();
 /// The most cloud a tile holds: the deepest shadow.
 pub const DEEPEST_CLOUD: u32 = CLOUD.most();
+
+/// How many places a cell's place in its chunk is shifted by to give
+/// its climate's tile's, as the type registry has it.
+pub const CLIMATE_TILE_SHIFT: u32 = CLIMATE.layer_type().tile_shift();
+/// Bits a tile's climate takes in [`Cells::climates`]: the climate
+/// plane's.
+pub const CLIMATE_BITS: usize = CLIMATE.layer_type().bits() as usize;
+
+/// The climate of the tile at `tile` of a superchunk -- its tiles in
+/// Morton order, as [`Cells::climates`] holds them: none where no
+/// climate was sent.
+pub fn climate_over(climates: &[u64], tile: usize) -> Option<Climate> {
+    let at = tile * CLIMATE_BITS;
+    climates.get(at / WORD_BITS).map(|word| Climate::of_number((word >> (at % WORD_BITS)) as u32 & CLIMATE.most()))
+}
 
 /// The cloud over the tile at `tile` of a superchunk -- its tiles in
 /// Morton order, as [`Cells::clouds`] holds them: 0 for none, and
@@ -136,6 +152,10 @@ pub struct Cells {
     /// Which of its tiles are raining, a bit a tile in the order of
     /// `clouds`, read by [`rains_over`]. Empty where none is.
     pub raining: Vec<u64>,
+    /// Its climates, [`CLIMATE_BITS`] a tile, laid out as the
+    /// clouds, read by [`climate_over`]: what a client writes on a
+    /// tile when asked to show its climate.
+    pub climates: Vec<u64>,
     /// How deep its water is: never changing, so shared with every
     /// frame it is in, not copied.
     pub water: Arc<Water>,
@@ -229,9 +249,10 @@ pub(crate) fn copy(world: &World, (x, y): (u32, u32), ask: Ask, sent: &mut HashM
     let stages = if ask.near.is_some() || ask.detail == 0 { planes(TREE_STAGE.layer_type()) } else { Vec::new() };
     // No cloud over it: nothing to send, nothing to draw.
     let clouds = Some(planes(CLOUD.layer_type())).filter(|clouds| clouds.iter().any(|&word| word != 0)).unwrap_or_default();
-    // Which of its tiles rain is the climate's to say, of each tile's own: worked out here, so a client needs no climate.
-    let raining = if clouds.is_empty() { Vec::new() } else { raining(&clouds, &planes(CLIMATE.layer_type())) };
-    Some(Cells { at: (x, y), heights, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages, wet: planes(WET), clouds, raining, water, sheep: sheep(world, superchunk) })
+    // Which of its tiles rain is the climate's to say, of each tile's own: worked out here, so a client need not.
+    let climates = planes(CLIMATE.layer_type());
+    let raining = if clouds.is_empty() { Vec::new() } else { raining(&clouds, &climates) };
+    Some(Cells { at: (x, y), heights, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages, wet: planes(WET), clouds, raining, climates, water, sheep: sheep(world, superchunk) })
 }
 
 /// The tiles of a superchunk that are raining, a bit a tile in the
@@ -240,12 +261,9 @@ pub(crate) fn copy(world: &World, (x, y): (u32, u32), ask: Ask, sent: &mut HashM
 /// the same tiles -- lets the air hold (`Climate::rains_above`).
 /// Empty if none is.
 pub fn raining(clouds: &[u64], climates: &[u64]) -> Vec<u64> {
-    let climate_bits = CLIMATE.layer_type().bits() as usize;
     let mut raining = vec![0u64; (clouds.len() * WORD_BITS / CLOUD_BITS).div_ceil(WORD_BITS)];
     for tile in (0..clouds.len() * WORD_BITS / CLOUD_BITS).filter(|&tile| cloud_over(clouds, tile) != 0) {
-        let at = tile * climate_bits;
-        let climate = Climate::of_number(climates.get(at / WORD_BITS).map_or(0, |word| (word >> (at % WORD_BITS)) as u32 & CLIMATE.most()));
-        if climate.rains(cloud_over(clouds, tile)) {
+        if climate_over(climates, tile).unwrap_or(Climate::of_number(0)).rains(cloud_over(clouds, tile)) {
             raining[tile / WORD_BITS] |= 1 << (tile % WORD_BITS);
         }
     }

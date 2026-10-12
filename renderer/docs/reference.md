@@ -5,7 +5,7 @@ The design is in `renderer.md`.
 ## `paint.rs`
 
 **`Painted`** `{at, cold, side, pixels}`: a superchunk's pixels, four bytes each.
-**`Picture`** `{frame, paint_seconds, superchunks, near}`: a frame, painted -- the frame itself, its cells gone into the pixels. **`start(frames, tunings, terrain)`**: the painter's
+**`Picture`** `{frame, paint_seconds, superchunks, near, climates}`: a frame, painted -- the frame itself, its cells gone into the pixels. **`start(frames, tunings, terrain)`**: the painter's
 thread, the ground made again for each world run; where pictures come. **`ground(grounds, terrain, frame, number)`**: the
 ground of every hot superchunk of the frame made if missing, the fine
 parts of those longest unseen dropped (`FINE_KEPT`, 48), and past
@@ -128,7 +128,7 @@ pace, generation, first_view}`: the host as the window holds it (`server::host::
 **`start()`**: the host and the painter started; **`of_shown_worlds()`**: the same on a host whose world is whatever ticker's comes, flat out (`of`, what both are made by); **`forget_asked()`**:
 another world to run in place of the one run, no frame of the one
 before waited for. **`Seen`** `{frame, painted, paint_seconds,
-viewport_superchunks, detail, near_pixels, map}`: the last frame, and how it was
+viewport_superchunks, detail, near_pixels, map, climates}`: the last frame, and how it was
 drawn. **`menus`**: the worlds the menus make (`server::Start::from_tuning`
 of the seed and numbers they give), open and save, the host told; the
 options told the world run's name. **`keys`**: pause and pace, the
@@ -178,13 +178,22 @@ origin's halo. **`steer`**: the view moved and zoomed, unless the
 menus took the keys, the wheel or the pointer. **`fullscreen`**: by
 `F11`.
 
+## `climate_labels.rs`
+
+Every tile's climate written on it (`renderer.md`, "The climate,
+written"). `TILE_SIDE`, `CLIMATE_LABELS` (the grid of labels),
+`CLIMATE_FROM`, `CLIMATE_WIDTH`, `WAYS_NAMED`; **`ClimateLabel`**
+(`slot`), `CameraOnly`; **`spawn`**: the labels, hidden; `written(climate)`: a
+tile's text; **`climates`**: gives each label the tile the camera
+shows that is its own, from `Seen::climates`.
+
 ## `overlays.rs`
 
 `LINES_FROM`, `LINES`, `SUPERCHUNK_LINE`, `CHUNK_LINE`; `HEIGHT_WIDTH`
 (80 screen pixels a height written at its full size, five digits);
 `CameraOnly`, the camera and none of the overlays' parts.
 **`Boundary`**: a line between chunks or superchunks; **`Shown`**: which
-of the overlays are shown; **`toggle`**: by `B`, `C` and `H`.
+of the overlays are shown; **`toggle`**: by `B`, `C`, `H` and the K key.
 **`boundaries`**: as wide on the screen however near.
 **`Label`**: one of `LABELS` (256) texts; **`labels`**: the superchunks
 and chunks the camera shows named in their top left corners, from

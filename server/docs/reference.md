@@ -314,7 +314,7 @@ ask)` and `map(seed, generation, ask)`: the answers worked out.
 **`frame_of(world, worlds, ask, hot, cells, measured, named and said, more)`**: a frame of a world, the one making of it -- the host's thread's and a shown world's.
 
 `CHUNK_WORDS`, `WORD_BITS`, `STAGE_BITS`, `OLDEST_TREE_STAGE`,
-`CLOUD_BITS`, `CLOUD_TILE_SHIFT`, `DEEPEST_CLOUD`; **`raining(clouds, climates)`**, the tiles whose cloud is above what their climate holds, a bit a tile (`Cells::raining`), read by **`rains_over(raining, tile)`** -- the cloud
+`CLOUD_BITS`, `CLOUD_TILE_SHIFT`, `DEEPEST_CLOUD`; `CLIMATE_BITS`, `CLIMATE_TILE_SHIFT` and **`climate_over(climates, tile)`**, a tile's climate off `Cells::climates` -- a superchunk's climate plane's words, sent with its cells for a client to write on the tiles (`Climate`, the registry's, handed on); **`raining(clouds, climates)`**, the tiles whose cloud is above what their climate holds, a bit a tile (`Cells::raining`), read by **`rains_over(raining, tile)`** -- the cloud
 plane's width, tile size and most, off its type in the registry --
 **`cloud_over(clouds, tile)`**, a tile's cloud in `Cells::clouds`
 (the plane's buckets as the arena holds them, empty where a
