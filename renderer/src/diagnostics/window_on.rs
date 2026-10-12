@@ -21,6 +21,27 @@ fn show(mut watched: ResMut<Watched>, mut link: ResMut<Link>, mut screen: ResMut
     }
 }
 
+/// Shows the world, whichever ticker's it is, in place of the main
+/// menu: the window of [`show_worlds`].
+fn show_world(mut screen: ResMut<Screen>) {
+    if *screen != Screen::World {
+        *screen = Screen::World;
+    }
+}
+
+/// Opens the window on the worlds that come to be shown
+/// (`server::host::shown`), one after another, until it is closed:
+/// each a world a test or a diagnostic ticks, drawn as the window
+/// draws any. Says so and opens none if such a window is open
+/// already.
+pub fn show_worlds() -> Result<(), String> {
+    let link = Link::of_shown_worlds().ok_or_else(|| format!("a window showing worlds is open already: port {} is taken", server::host::shown::PORT))?;
+    let mut window = crate::window_on(link);
+    window.add_systems(Update, show_world.after(crate::hud::hud));
+    window.run();
+    Ok(())
+}
+
 /// Opens the window on the world started as `start` says, running,
 /// until it is closed.
 pub fn open(start: Start) {

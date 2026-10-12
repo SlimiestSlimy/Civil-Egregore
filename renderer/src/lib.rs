@@ -30,11 +30,17 @@ pub fn run() {
     window().run();
 }
 
-/// The window, on the main menu, not yet run.
+/// The window, on the main menu, its world run by a host of its own:
+/// not yet run.
 fn window() -> App {
+    window_on(link::Link::start())
+}
+
+/// The window, on the main menu, its world the one `link` reaches:
+/// not yet run.
+fn window_on(link: link::Link) -> App {
     // Only over a world: a world shown, steered and asked for.
     let world = (view::fullscreen, link::keys, view::steer, overlays::toggle, overlays::boundaries, overlays::labels, overlays::heights, frames::show, frames::ask, map::far).chain().run_if(resource_equals(Screen::World));
-    let link = link::Link::start();
     let mut app = App::new();
     app.add_plugins(
             DefaultPlugins

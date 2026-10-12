@@ -195,6 +195,18 @@ pub struct Frame {
     pub cells: Vec<Cells>,
 }
 
+/// A frame of `world`, the `worlds`-th a client is shown: what `ask`
+/// asked, `hot` the viewport's hot superchunks, `cells` those copied
+/// for it; `measured` the ticks a second, the seconds the copy took
+/// and the share of the time that is; the world's name and what was
+/// last said of it; and whether `more` of what was asked is to come.
+/// The one making of a frame: the host's thread's and a shown run's.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn frame_of(world: &World, worlds: u64, ask: Ask, hot: Vec<(u32, u32)>, cells: Vec<Cells>, (ticks_a_second, sync_seconds, sync_share): (f64, f64, f64), (named, said): (Option<String>, Option<String>), more: bool) -> Frame {
+    let (sheep, grass, trees) = (world.entities.len(), count(world, GRASS), count(world, TREE));
+    Frame { world: worlds, seed: world.info.seed, generation: world.generation, levels: super::terrain::Levels::of(&world.generation), side: world.halos.hot.side(), tick: world.entities.now(), ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, viewport: ask.viewport, hot, detail: ask.detail, near: ask.near, named, said, more, cells }
+}
+
 /// Cells of `layer_type` over every hot superchunk of `world`.
 pub(crate) fn count(world: &World, layer_type: LayerType) -> u64 {
     world.arena.superchunk_indices().into_iter().map(|superchunk| world.arena.superchunk_count(layer_type, superchunk) as u64).sum()

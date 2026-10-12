@@ -263,6 +263,19 @@ plain `server pasture` ticks, started as that tool starts it
 every rule of it, the weather too, at the window's pace: what a
 headless run measures is seen.
 
+## Showing a ticker's world
+
+`Civil_Egregore renderer show` opens the window on no world of its
+own: it shows the world of whatever test or diagnostic ticks one
+while `CIVIL_EGREGORE_RENDER` is set, one after another, and stays up
+between them (`diagnostics/window_on.rs`, `show_worlds`;
+`../../server/docs/server.md`, "A world shown"). Nobody need start it
+by hand: whatever ticks a world with the variable set starts it. The
+window is the same as the game's -- it is built on a link
+(`window_on(link)`), and the link's host is either one that runs a
+world (`Link::start`) or the worlds that come (`Link::of_shown_worlds`),
+flat out until the keys pause or pace them.
+
 ## Still to come
 
 The words of every superchunk a frame carries are still copied whole,

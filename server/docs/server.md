@@ -365,6 +365,61 @@ closed at any time leaves what it came to. The ground no frame
 brings a client asks of it too, on another thread ("Terrain asked of
 the host").
 
+## A world shown
+
+Whatever ticks a world can be watched doing it: a test, a diagnostic
+-- a **ticker**, anything that is no host. With the environment
+variable `CIVIL_EGREGORE_RENDER` set (to anything but `0`), every
+world a ticker ticks is a **shown world**: drawn in a window as it is
+ticked. It is the environment's to say because it applies to
+everything alike -- `cargo test`, a tool of any crate -- and no
+command or test has a parameter for it.
+
+```
+CIVIL_EGREGORE_RENDER=1 cargo test --release -p sca_rules
+CIVIL_EGREGORE_RENDER=1 Civil_Egregore server pasture 300000
+```
+
+**Where it is hooked.** One place: `World::tick` and
+`World::tick_only` end with `host::shown::between_ticks(self)`. Where
+no window was asked for that is one read of a flag kept from the first
+tick on. Nothing of the world is written by it, so a world shown comes
+to what it comes to unseen -- held by `tests/shown.rs`, which plays
+the window.
+
+**The window is the game's own program**, started as
+`Civil_Egregore renderer show`: it listens on a port of this machine
+(`shown::PORT`), and a ticker that finds none listening starts it
+(the program beside its own, or beside the folder a test's is built
+in) and waits for it. The window stays up when a ticker ends and
+takes the next, so a whole `cargo test` passes through one window,
+world after world. A test's program needs nothing of the renderer:
+no test links a window.
+
+**Between them is a wire** (`host/wire.rs`): what a window asks
+(`Request`: a frame, pause, pace) and the frames answered, as words of
+64 bits over a local socket. A superchunk's water goes with its
+heights, the once; the window keeps it.
+
+**The same window either way.** A window holds a `Host` and where its
+frames come back, and asks; it does not know what answers. In the
+game that is the host's thread, which owns the world and ticks it
+(`Host::start`). Showing a ticker it is `Host::of_shown_worlds`: the
+asks go down the wire and the ticker's frames come up it. Both make a
+frame with the one function (`frame::frame_of`) from the same copy of
+a superchunk (`frame::copy`). What only an owner of the world can do
+-- make one, open one, save one, reset one -- a ticker is not asked.
+
+**Flat out, with the keys.** A ticker is held to no pace unless the
+window says one: pausing stops it between two ticks until let go, a
+pace makes it wait as a host does. A world shown at another address in
+memory or of another seed than the last is another world to the
+window, which draws it anew.
+
+One ticker at a time is shown; tests ticking worlds on several threads
+at once take the window in turns, tick by tick -- `cargo test --
+--test-threads=1` shows each whole.
+
 ## Terrain asked of the host
 
 A frame brings what is hot. What a client draws past that -- the
