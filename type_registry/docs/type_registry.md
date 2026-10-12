@@ -216,12 +216,18 @@ pushed air in or out). `of_number` and `number` turn the plane's
 number into it and back. One plane, one read, for all four.
 
 A **`Wind`** is a vector in its byte, a nibble each: how strongly it
-blows east (`across`) and south (`down`), each from -7 to 7
-(`STRONGEST_WIND`), under 0 west and north. So it blows any of eight
-ways or between them, at many strengths, and two winds are averaged
-by their numbers. `blowing(across, down)` makes one, held to the
-strongest; `state` is its byte, `vector` its two numbers, `strength`
-the stronger of them.
+blows east (`across`) and south (`down`), under 0 west and north --
+where it blows towards. The vector is no longer than 7
+(`STRONGEST_WIND`) whichever way it points: a circle, not a square,
+so a wind between two of the eight ways blows no stronger than one
+along a way -- each part from -7 to 7 alone let a diagonal carry half
+as far again. So it blows any of eight ways or between them, at many
+strengths, and two winds are averaged by their numbers.
+`blowing(across, down)` makes one, a longer vector shortened to the
+circle the way it points, to the nearest whole numbers
+(`held_to_the_circle`, by `nearest_root`); `state` is its byte,
+`vector` its two numbers, `strength` its length, to the nearest whole
+number.
 
 **The small functions the four are connected by** are here too, each
 doing one thing, the weather's rule putting them together

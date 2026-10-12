@@ -41,7 +41,8 @@ fn stages(world: &World) -> Vec<(CellIndex, u32)> {
     stages
 }
 
-/// Trees of every stage scattered thin: each tick the trees are no
+/// Trees of every stage scattered thin, half of them the oldest --
+/// so some die in so few ticks: each tick the trees are no
 /// more than were put and no fewer than died; a tree only ever grows
 /// one stage or stays; one gone was at the oldest; one new starts at
 /// 0, put by one old enough -- and all of it happens.
@@ -50,7 +51,7 @@ fn trees_grow_a_stage_at_a_time_spread_and_die_of_age() {
     let mut world = plain_world(1, 0, 0, 2);
     let mut random = Rng::new(utilities::seed::counted());
     let planted: Vec<CellIndex> = cells(&world).filter(|_| random.below(16) == 0).collect();
-    plant(&mut world, &planted, || random.below(u64::from(OLDEST_TREE_STAGE) + 1) as u32);
+    plant(&mut world, &planted, || if random.below(2) == 0 { OLDEST_TREE_STAGE } else { random.below(u64::from(OLDEST_TREE_STAGE) + 1) as u32 });
     let mut before = stages(&world);
     let seeding = before.iter().filter(|(_, stage)| *stage >= SEEDS_FROM).count();
     assert!(seeding > 0, "trees old enough to spread");

@@ -4,7 +4,7 @@
 //! (`docs/sca_rules.md`, "Weather").
 
 use actions::simulation_time::SimulationTime;
-use actions::types::{passes_a_rise, pressure_falls_by, Climate, CLIMATE, CLOUD, ELEVATION, HIGHEST_PRESSURE, HUMIDITY_A_LEVEL_OF_CLOUD, PRESSURE_AT_REST, STRONGEST_WIND, TILES_ABOUT, WEATHER_TILE_SCALE, WET};
+use actions::types::{passes_a_rise, pressure_falls_by, Climate, CLIMATE, CLOUD, ELEVATION, HIGHEST_PRESSURE, HUMIDITY_A_LEVEL_OF_CLOUD, PRESSURE_AT_REST, STRONGEST_WIND, TILES_ABOUT, WEATHER_TILE_SCALE, WET, Wind};
 use actions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn};
 
 /// The simulation time from one sample of a tile to the next, on
@@ -54,6 +54,10 @@ pub const PUSHED: usize = place_counted(&COUNTED, "pushed");
 /// Units of pressure that fell from a tile to a lower one beside it.
 pub const EVENED: usize = place_counted(&COUNTED, "evened");
 
+/// How many times likelier, for each unit of a tile's wind along the
+/// step to a tile, its pressure falls to that one than to one the
+/// wind does not blow to at all ([`leans`]).
+pub const A_WIND_LEANS_PRESSURE: u32 = 4;
 /// The simulation time a wind blowing takes to carry something of its
 /// tile's climate to the next, on average, were it to reach it every
 /// sample: slowly, beside the air and the clouds it moves.
@@ -97,17 +101,33 @@ fn give_pressure(turn: &mut Turn, (from, here, left): (CellIndex, Climate, Clima
     cells::change_both(turn, CLIMATE, (from, here.number(), left.number()), (to, there.number(), got.number()), counted);
 }
 
+/// How much likelier pressure falls to the tile the step `towards`
+/// away for the wind `wind` over the tile it leaves: once with no
+/// wind that way, and [`A_WIND_LEANS_PRESSURE`] times more for each
+/// unit of the wind along the step -- so air goes with the wind it
+/// made, past where the pressures would have evened, and comes back:
+/// what gives the weather its spring.
+pub const fn leans(wind: Wind, towards: (i32, i32)) -> u32 {
+    let (across, down) = wind.vector();
+    let along = across * towards.0 + down * towards.1;
+    1 + A_WIND_LEANS_PRESSURE * if along > 0 { along as u32 } else { 0 }
+}
+
 /// Pressure falls: the tile at `sampled`, of climate `here`, gives a
 /// unit of its pressure to one of the tiles about it far enough
 /// under it (`pressure_falls_by`), drawn among them by how far under
-/// each is and how little the land rises to it ([`passes`]) -- the
-/// lowest the likeliest, none higher ever, and up a slope less
-/// often. The air leaving turns the tile's own wind that way
+/// each is, how much its own wind blows that way ([`leans`]) and
+/// how little the land rises to it ([`passes`]) -- the lowest and
+/// the most downwind the likeliest, none higher ever, and up a slope
+/// less often. The air leaving turns the tile's own wind that way
 /// (`Wind::pushed`), unless it is at the border of what is loaded.
 /// Whether a unit went.
 fn pressure_falls(turn: &mut Turn, sampled: CellIndex, here: Climate) -> bool {
     let about = TILES_ABOUT.map(|step| beside(turn, sampled, step));
-    let falls = about.map(|beside| beside.map_or(0, |(_, there)| pressure_falls_by(here.pressure, there.pressure)));
+    let mut falls = about.map(|beside| beside.map_or(0, |(_, there)| pressure_falls_by(here.pressure, there.pressure)));
+    for (way, falls) in falls.iter_mut().enumerate() {
+        *falls *= leans(here.wind, TILES_ABOUT[way]);
+    }
     let whole: u32 = falls.iter().sum();
     if whole == 0 || here.pressure == 0 {
         return false;

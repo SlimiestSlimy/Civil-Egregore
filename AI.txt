@@ -808,3 +808,18 @@ RULES AND TIME
   save. What I measured as the weather's cost was `server check`'s
   hashes: world_hash wrote back and flushed every hot superchunk each
   time. Hash now flushes only what went cold.
+- ASK 2026-10-12: "why do all tests report seed 000001 in the
+  reader?" -> found: plain worlds start from Start::default(), seed
+  1; the tests' plain_world must take the run's counted seed (the
+  standing rule: tests seed generated). / "ok, we need more
+  springiness in the sytem, chage pressure transfer to be even more
+  biased towards wind vector direction".
+- SAID 2026-10-12, of the tests' plain worlds taking
+  utilities::seed::counted(): "its fine as is"; of `server pasture`
+  taking the rotation's seed too: "hell no, the binary cant depend on
+  parts of the codebase" -> the binary keeps its own seed (1).
+- ASK 2026-10-12: "now, make tree and grass spreading more likely
+  with humidity" / "change the environment flag to a cargo feature
+  flag LOL" (CIVIL_EGREGORE_RENDER, as I read it: the flag I set on
+  every run). Order: commit circle + lean + tests' seed first; then
+  humidity in spreading; then the feature flag.
