@@ -114,16 +114,19 @@ run with no window has no camera, and loads nothing by it.
 
 `World::tick` runs every rule of the cells (`../sca_rules/`) and every
 kind of entity (`../entity_rules/`) on each hot superchunk's turn, then
-moves the halos. The rules are one table, `rules::RULES`: a name, the rule's ID in the
-type registry -- whose row says the rule's master
-(`../../type_registry/docs/type_registry.md`, "Rules"; the build
-fails if the two tables do not hold the same rules) -- what
-the rule counts, and its function, in the order a turn runs them --
-grass, trees, sheep, weather. A rule added is a row added there; nothing else
-lists them. What a tick did is an array with a rule's counts at its
-place in the table. Nothing is looked up by a name as a world runs: a
-rule's place is a constant made of its name as the server is compiled
-(`SHEEP_RULE`, `RulePlace::named`), and so is the place of each thing
+moves the halos. The rules are the type registry's
+(`../../type_registry/docs/type_registry.md`, "Rules"):
+`rules::RULES` is made of its rows as the server is compiled, as many
+and in its order -- the order a turn runs them in -- each with its
+row there, which says its name and its master. The server lists no
+rule; it says only what the registry, which is under the code, cannot
+hold: for a rule's ID, what it counts and its function
+(`written_for`). A rule registered with no function written for it
+does not build, and names itself. What a tick did is an array with a
+rule's counts at its place among them. Nothing is looked up by a name
+as a world runs: a rule's place is a constant made of its ID in the
+registry as the server is compiled (`SHEEP_RULE`, `RulePlace::of`),
+and so is the place of each thing
 a rule counts, worked out from the one list of their names
 (`sheep::EATEN`, `actions::place_counted`) -- a name that is not
 there does not compile. A tick's counts are read by them

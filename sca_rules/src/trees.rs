@@ -2,7 +2,7 @@
 //! bits a cell. A tree sampled tries to spread, or grows a stage, or
 //! at the oldest may die (`docs/sca_rules.md`, "Trees").
 
-use actions::layers::{COLLISION, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
+use actions::types::{COLLISION, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
 use actions::simulation_time::SimulationTime;
 use actions::{cells, compare, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn};
 

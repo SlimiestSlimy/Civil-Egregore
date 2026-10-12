@@ -2,7 +2,7 @@
 //! neighbour, or decay back to dirt the more grass is around it -- one
 //! sampling pass for both (`docs/sca_rules.md`, "Grass").
 
-use actions::layers::{GRASS, WET};
+use actions::types::{GRASS, WET};
 use actions::simulation_time::SimulationTime;
 use actions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
 

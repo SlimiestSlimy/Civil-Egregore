@@ -113,11 +113,14 @@ words, or `None`.
 
 ## `rules.rs`
 
-**`RULES`**: every rule a world ticks, a **`Rule`** `{name, registered, counted,
-rule}` each -- grass, trees, sheep -- in the order a turn runs them; the
-one list of them. `registered` is its ID in the type registry:
-**`Rule::registered`** its row there, **`Rule::master`** its master's. **`RulePlace`**: a rule's place in it, made of its
-name as the server is compiled (**`RulePlace::named(name)`**, a name
+**`RULES`**: every rule a world ticks, a **`Rule`** `{registered, counted,
+rule}` each: the type registry's rules, as many and in its order, made
+as the server is compiled (`registered_at(place)`). `registered` is
+its row in the registry, **`Rule::master`** its master's. `RuleFunction`: what a rule is called as.
+`written_for(id)`: what a rule counts and its function, by its ID --
+all the server says of a rule, and the build fails if the registry
+has one it says nothing of. **`RulePlace`**: a rule's place in it, made of its
+ID as the server is compiled (**`RulePlace::of(id)`**, an ID
 not there not compiling), **`RulePlace::rule`** the row there;
 **`GRASS_RULE`**, **`TREES_RULE`**, **`SHEEP_RULE`**, **`WEATHER_RULE`**: each rule's.
 **`TickCounts`** `{counts, times}`: each rule's `RuleCounts` and time at

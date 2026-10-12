@@ -298,6 +298,33 @@ pub const fn rule_of_id(id: u64) -> Option<&'static Registered> {
     None
 }
 
+/// The row of the rule at `place` among the rules registered, in the
+/// table's order: none past the last. What whoever runs the rules
+/// goes through them by, so the order is said here and nowhere else.
+pub const fn rule_at(place: usize) -> Option<&'static Registered> {
+    let (mut passed, mut row) = (0, 0);
+    while row < REGISTRY.len() {
+        if matches!(REGISTRY[row].registration, Registration::ScaRule | Registration::EntityRule) {
+            if passed == place {
+                return Some(&REGISTRY[row]);
+            }
+            passed += 1;
+        }
+        row += 1;
+    }
+    None
+}
+
+/// The ID of the rule `rule` is a row of: its kind's, of its number.
+/// None of a row that is no rule.
+pub const fn id_of_rule(rule: &Registered) -> Option<u64> {
+    match rule.registration {
+        Registration::ScaRule => Some(ScaRuleType::of(rule.number).0),
+        Registration::EntityRule => Some(EntityRuleType::of(rule.number).0),
+        _ => None,
+    }
+}
+
 /// How many rules are registered, of the cells and of entities.
 pub const RULES_REGISTERED: usize = {
     let (mut count, mut row) = (0, 0);

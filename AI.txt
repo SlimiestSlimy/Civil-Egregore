@@ -385,6 +385,12 @@ things around the codebase, make the codebase use watever is in the
 type registry". To survey: server's RULES table (name, ID written by
 hand beside the registry's row), worldgen's list of planes, the
 frame's layers, actions::layers, whatever lists layer types by hand.
+   DONE for it: server's RULES made of the registry's rules at compile
+   time (no list; only ID -> function, `written_for`), RulePlace::of(id);
+   actions::types = the registry whole (was three hand lists). Left as
+   they are, being uses and not registrations: worldgen's planes it
+   generates, the frame's planes it sends. TO TELL the user, theirs to
+   say if they meant more.
 ASKED 2026-10-11, same while (AFTER the weather, its own commit):
 "and make grass not die anymore, were now going to make grass die
 depending on climate over a very small sampling rate".

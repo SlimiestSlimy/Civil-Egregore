@@ -1,5 +1,5 @@
-//! The rules a world ticks, in one table ([`RULES`]): a rule added is
-//! a row added here, and nowhere else. A tick's counts by rule
+//! The rules a world ticks ([`RULES`]): those the type registry has,
+//! in its order, each with the function written for it here. A tick's counts by rule
 //! ([`TickCounts`]), the rules picked ([`Chosen`]) by their place ([`RulePlace`])
 //! (`docs/server.md`, "TickCounts").
 
@@ -8,81 +8,98 @@ use actions::{RuleCounts, TickReport, Turn, COUNTS_OF_A_RULE};
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
+/// A rule, on one superchunk's turn, with room for samples.
+type RuleFunction = fn(&mut Turn, &mut Vec<CellIndex>) -> RuleCounts;
+
 /// One rule of the world.
+#[derive(Clone, Copy)]
 pub struct Rule {
-    /// Its name: what it is picked by.
-    pub name: &'static str,
-    /// Its ID in the type registry: a rule of the cells' or of an
-    /// entity's, whose row says its master.
-    pub registered: u64,
+    /// Its row in the type registry: its name there, and its master.
+    pub registered: &'static type_registry::Registered,
     /// What it counts, each named at its place in its counts.
     pub counted: &'static [&'static str],
     /// The rule, on one superchunk's turn, with room for samples.
-    pub rule: fn(&mut Turn, &mut Vec<CellIndex>) -> RuleCounts,
+    pub rule: RuleFunction,
 }
 
-/// Every rule a world ticks, in the order a turn runs them: the cells'
-/// (`sca_rules`), then the entities' (`entity_rules`), all reading the
-/// world as the tick found it.
-pub const RULES: [Rule; 4] = [
-    Rule { name: "grass", registered: type_registry::RULE_OF_GRASS.0, counted: &sca_rules::grass::COUNTED, rule: sca_rules::grass::rule },
-    Rule { name: "trees", registered: type_registry::RULE_OF_TREES.0, counted: &sca_rules::trees::COUNTED, rule: sca_rules::trees::rule },
-    Rule { name: "sheep", registered: type_registry::RULE_OF_SHEEP.0, counted: &entity_rules::sheep::COUNTED, rule: |turn, _| entity_rules::sheep::rule(turn) },
-    Rule { name: "weather", registered: type_registry::RULE_OF_WEATHER.0, counted: &sca_rules::weather::COUNTED, rule: sca_rules::weather::rule },
-];
+/// What the registry cannot hold of the rule whose ID is `id`, the
+/// code being above it: what it counts and its function. None of an
+/// ID no rule here is written for -- and the build fails
+/// ([`RULES`]) if that is a rule the registry has.
+const fn written_for(id: u64) -> Option<(&'static [&'static str], RuleFunction)> {
+    if id == type_registry::RULE_OF_GRASS.0 {
+        Some((&sca_rules::grass::COUNTED, sca_rules::grass::rule))
+    } else if id == type_registry::RULE_OF_TREES.0 {
+        Some((&sca_rules::trees::COUNTED, sca_rules::trees::rule))
+    } else if id == type_registry::RULE_OF_SHEEP.0 {
+        Some((&entity_rules::sheep::COUNTED, |turn, _| entity_rules::sheep::rule(turn)))
+    } else if id == type_registry::RULE_OF_WEATHER.0 {
+        Some((&sca_rules::weather::COUNTED, sca_rules::weather::rule))
+    } else {
+        None
+    }
+}
+
+/// The rule the registry has at `place` among its rules, with what is
+/// written for it here.
+///
+/// # Panics
+/// If the registry has no rule there, or one nothing is written for
+/// -- as the server is compiled, naming it.
+const fn registered_at(place: usize) -> Rule {
+    let Some(registered) = type_registry::rule_at(place) else { panic!("fewer rules registered than counted") };
+    let Some(id) = type_registry::id_of_rule(registered) else { panic!("a rule's row") };
+    match written_for(id) {
+        Some((counted, rule)) => Rule { registered, counted, rule },
+        None => panic!("{}", registered.name),
+    }
+}
+
+/// Every rule a world ticks: those the type registry has, as many and
+/// in its order -- the order a turn runs them in, the cells'
+/// (`sca_rules`) and the entities' (`entity_rules`) alike, all
+/// reading the world as the tick found it. Nothing is listed here: a
+/// rule registered is ticked, and the build fails, naming it, if no
+/// function is written for it ([`written_for`]).
+pub const RULES: [Rule; type_registry::RULES_REGISTERED] = {
+    let mut rules = [registered_at(0); type_registry::RULES_REGISTERED];
+    let mut place = 1;
+    while place < rules.len() {
+        rules[place] = registered_at(place);
+        place += 1;
+    }
+    rules
+};
 
 impl Rule {
-    /// Its row in the type registry: its name there, and its master.
-    pub fn registered(&self) -> &'static type_registry::Registered {
-        type_registry::rule_of_id(self.registered).expect("checked as the server is built")
-    }
-
     /// Its master's row in the type registry: the one plane or type of
     /// entity it is of, whatever else it reads or writes.
     pub fn master(&self) -> &'static type_registry::Registered {
-        type_registry::master_of(self.registered()).expect("checked as the registry is built")
+        type_registry::master_of(self.registered).expect("checked as the registry is built")
     }
 }
 
-// The build fails here, naming the rule, if a rule of the table is
-// not registered or two are registered as one; and if a rule is
-// registered that the table has not.
-const _: () = {
-    let mut place = 0;
-    while place < RULES.len() {
-        let mut before = 0;
-        while before < place {
-            assert!(RULES[before].registered != RULES[place].registered, "{}", RULES[place].name);
-            before += 1;
-        }
-        assert!(type_registry::rule_of_id(RULES[place].registered).is_some(), "{}", RULES[place].name);
-        place += 1;
-    }
-    assert!(RULES.len() == type_registry::RULES_REGISTERED, "a rule is registered that the server does not tick");
-};
-
 /// A rule's place in [`RULES`]: what a rule is picked by, and its
-/// counts read by. Made of a name as the server is compiled
-/// ([`RulePlace::named`]), so a rule that is not there does not compile.
+/// counts read by. Made of the rule's ID in the type registry as the
+/// server is compiled ([`RulePlace::of`]), so a rule that is not
+/// there does not compile.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RulePlace(usize);
 
 impl RulePlace {
-    /// The place of the rule named `name`.
+    /// The place of the rule whose ID in the type registry is `id`.
     ///
     /// # Panics
-    /// If no rule is named so -- for a constant, as it is compiled.
-    pub const fn named(name: &str) -> Self {
-        let names = {
-            let mut names = [""; RULES.len()];
-            let mut place = 0;
-            while place < RULES.len() {
-                names[place] = RULES[place].name;
-                place += 1;
+    /// If no rule has it -- for a constant, as it is compiled.
+    pub const fn of(id: u64) -> Self {
+        let mut place = 0;
+        while place < RULES.len() {
+            if let Some(registered) = type_registry::id_of_rule(RULES[place].registered) && registered == id {
+                return Self(place);
             }
-            names
-        };
-        Self(actions::place_counted(&names, name))
+            place += 1;
+        }
+        panic!("no rule is registered with that ID")
     }
 
     /// The rule at this place.
@@ -92,13 +109,13 @@ impl RulePlace {
 }
 
 /// The grass's rule.
-pub const GRASS_RULE: RulePlace = RulePlace::named("grass");
+pub const GRASS_RULE: RulePlace = RulePlace::of(type_registry::RULE_OF_GRASS.0);
 /// The trees' rule.
-pub const TREES_RULE: RulePlace = RulePlace::named("trees");
+pub const TREES_RULE: RulePlace = RulePlace::of(type_registry::RULE_OF_TREES.0);
 /// The sheep's rule.
-pub const SHEEP_RULE: RulePlace = RulePlace::named("sheep");
-/// The weather's place.
-pub const WEATHER_RULE: RulePlace = RulePlace::named("weather");
+pub const SHEEP_RULE: RulePlace = RulePlace::of(type_registry::RULE_OF_SHEEP.0);
+/// The weather's rule.
+pub const WEATHER_RULE: RulePlace = RulePlace::of(type_registry::RULE_OF_WEATHER.0);
 
 /// What the rules did, in a tick or added up over many: each rule's
 /// counts at its place in [`RULES`], and how long each took, every

@@ -55,6 +55,7 @@ cells'; `CLOUD` and `CLIMATE`, the weather's, a number a tile 8x8 (`WEATHER_TILE
 **`first_clash(registry)`**: the first row to take a number or a name of
 one before it -- checked on `REGISTRY` as the crate is built, as is
 **`first_default_amiss(registry)`**: the first row whose default attribute is no attribute of a fixed size of the table, or that has one and is no entity type's.
+**`rule_at(place)`**: the row of the rule at a place among the rules registered, in the table's order; **`id_of_rule(rule)`**: a rule's row's ID.
 **`first_master_amiss(registry)`**: the first row whose master is amiss -- a rule whose master is no row of the kind its rule is of, or a row that is no rule and has one -- checked on `REGISTRY` too (`type_registry.md`, "Rules"). **`rule_of_id(id)`**: a rule's row by its ID; **`RULES_REGISTERED`**: how many rules there are; **`master_of(rule)`**: the row of a rule's master; **`rules_of(master)`**: the rules a plane or a type of entity is the master of.
 **`default_attribute_of(entity_type)`**: the row of its default attribute, if it has one; **`default_of(entity_type)`**: its type and the words of its data, from `DEFAULTS`, worked out as the crate is built.
 **`named(name)`**, **`of_number(number)`**: a row by its name, and by any number it
