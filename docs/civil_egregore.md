@@ -290,7 +290,7 @@ Two steps a tick:
    each works through superchunks in Morton order.
 
    Write queues, one a layer type.
-   A write is fixed in size, 16 bytes -- the layer type is its queue's:
+   A write is fixed in size, 20 bytes -- the layer type is its queue's:
    an anchor cell, an operation -- set, unset, flip, or a number put in
    a wide plane's cell -- and a shape --
    the cell, a rectangle from it of up to 255 cells a side, or a disc

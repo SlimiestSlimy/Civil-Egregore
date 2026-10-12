@@ -90,7 +90,7 @@ if the last there is another's.
 
 `instruction.rs` (`simulation.md`, "Instructions"). **`Instruction`**:
 24 bytes -- its `opcode`, sixteen bits (`small`), thirty-two (`place`:
-the cell's place in its superchunk in `PLACE_BITS`, 20) and two words (`first`, `second`). **`Opcode`**,
+the cell's place in its superchunk in `PLACE_BITS`, 20) and two words (`first`, `second`). A compare of a cell keeps the number seen in its second word; a write of one keeps the number to hold in that word's high half and what it counts under in its low (`value_written`, `counted_under`; `NO_COUNT` for nothing) -- a plane's number is up to 32 bits. **`Opcode`**,
 its first two bytes, the high one its family: `CompareEnd`, `Count`;
 `CompareCell`, `WriteCell`; `CompareCellFree`, `CompareEntity`,
 `MakeEntity`, `MoveEntity`, `RemoveEntity`, `CrossEntity`;

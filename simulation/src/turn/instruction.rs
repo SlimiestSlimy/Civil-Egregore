@@ -70,7 +70,7 @@ pub(crate) enum Opcode {
 }
 
 /// What a write counts under when it counts nothing.
-pub(crate) const NO_COUNT: u64 = u64::MAX;
+pub(crate) const NO_COUNT: u32 = u32::MAX;
 /// The bits of an instruction's `place` that are the cell's place in
 /// its superchunk; the four above say which superchunk it lands in,
 /// of its author's and the eight about that, by outbox slot.
@@ -83,7 +83,7 @@ const PLACE_BITS: u32 = 20;
 pub(crate) struct Instruction {
     /// What it does.
     pub(crate) opcode: Opcode,
-    /// A cell's number, or which member of an attribute.
+    /// Which member of an attribute.
     pub(crate) small: u16,
     /// The cell's place in the superchunk it lands in, and above it
     /// the outbox slot of that superchunk.
@@ -114,13 +114,25 @@ impl Instruction {
     }
 
     /// Whether `layer_type` holds `seen` at `at`.
-    pub(crate) fn compare_cell(layer_type: LayerType, at: CellIndex, seen: u16) -> Self {
-        Self { small: seen, first: layer_type.0, ..Self::on(Opcode::CompareCell, at) }
+    pub(crate) fn compare_cell(layer_type: LayerType, at: CellIndex, seen: u32) -> Self {
+        Self { first: layer_type.0, second: u64::from(seen), ..Self::on(Opcode::CompareCell, at) }
     }
 
-    /// `layer_type` made to hold `value` at `at`, counted under `count`.
-    pub(crate) fn write_cell(layer_type: LayerType, at: CellIndex, value: u16, count: u64) -> Self {
-        Self { small: value, first: layer_type.0, second: count, ..Self::on(Opcode::WriteCell, at) }
+    /// `layer_type` made to hold `value` at `at`, counted under
+    /// `count`, or under nothing ([`NO_COUNT`]): the value the second
+    /// word's high half, the count its low.
+    pub(crate) fn write_cell(layer_type: LayerType, at: CellIndex, value: u32, count: u32) -> Self {
+        Self { first: layer_type.0, second: u64::from(value) << 32 | u64::from(count), ..Self::on(Opcode::WriteCell, at) }
+    }
+
+    /// The number a write of a cell makes its cell hold.
+    pub(crate) fn value_written(&self) -> u32 {
+        (self.second >> 32) as u32
+    }
+
+    /// What a write of a cell counts under: [`NO_COUNT`] for nothing.
+    pub(crate) fn counted_under(&self) -> u32 {
+        self.second as u32
     }
 
     /// Whether an entity may be made on `at`.

@@ -1,6 +1,7 @@
-//! What the climate plane's sixteen bits a tile hold ([`Climate`]):
-//! humidity, wind and temperature kept together, and the wind's
-//! thirteen states ([`Wind`]) (`docs/type_registry.md`, "The climate").
+//! What the climate plane's thirty-two bits a tile hold ([`Climate`]):
+//! humidity, wind, temperature and pressure, a byte each, kept
+//! together; the wind a vector ([`Wind`]); and the small functions
+//! the four are connected by (`docs/type_registry.md`, "The climate").
 
 /// The level of cloud above which a tile of the coldest, driest
 /// climate is raining: what [`Climate::rains_above`] is worked out
@@ -11,90 +12,42 @@ pub const RAINS_ABOVE_IN_COLD_DRY_AIR: u32 = 12;
 pub const HEAT_A_LEVEL_MORE_HELD: u32 = 64;
 /// The humidity that has the air rain a level of cloud sooner: air
 /// already wet has less room.
-pub const HUMIDITY_A_LEVEL_SOONER: u32 = 4;
+pub const HUMIDITY_A_LEVEL_SOONER: u32 = 64;
 /// The most [`Climate::rains_above`] is: under the deepest cloud it
 /// rains in any climate.
 pub const RAINS_ABOVE_AT_THE_MOST: u32 = 14;
-/// The most humid a tile is: four bits.
-pub const MOST_HUMID: u32 = 15;
-/// The hottest a tile is: eight bits.
+/// The most humid a tile is: a byte.
+pub const MOST_HUMID: u32 = 255;
+/// The humidity a level of cloud stands for: the clouds are 0 to 15,
+/// the humidity 0 to 255 ([`Climate::humidity_level`]).
+pub const HUMIDITY_A_LEVEL_OF_CLOUD: u32 = 16;
+/// The hottest a tile is: a byte.
 pub const HOTTEST: u32 = 255;
-/// The strongest a wind blows.
-pub const STRONGEST_WIND: u32 = 3;
-/// The ways a wind blows towards, in the order its states name them:
-/// north, west, south, east -- each the step to the next tile, across
-/// and down.
-pub const WAYS_OF_WIND: [(i32, i32); 4] = [(0, -1), (-1, 0), (0, 1), (1, 0)];
-
-/// The wind over a tile: calm, or blowing towards one of
-/// [`WAYS_OF_WIND`] at a strength of 1 to [`STRONGEST_WIND`]. Four
-/// bits: 0 calm, 1 to 4 the four ways at strength 1, 5 to 8 at 2, 9 to
-/// 12 at 3; 13 to 15 are no wind's, and read as calm.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Wind(u8);
-
-impl Wind {
-    /// No wind.
-    pub const CALM: Self = Self(0);
-
-    /// The wind blowing towards `WAYS_OF_WIND[way]` at `strength`: calm
-    /// at none.
-    pub const fn blowing(way: usize, strength: u32) -> Self {
-        assert!(way < WAYS_OF_WIND.len() && strength <= STRONGEST_WIND, "a wind blows one of four ways at a strength up to three");
-        if strength == 0 { Self::CALM } else { Self(((strength - 1) * WAYS_OF_WIND.len() as u32 + way as u32 + 1) as u8) }
-    }
-
-    /// The wind the four bits `state` say.
-    pub const fn of_state(state: u32) -> Self {
-        if state > STRONGEST_WIND * WAYS_OF_WIND.len() as u32 { Self::CALM } else { Self(state as u8) }
-    }
-
-    /// Its four bits.
-    pub const fn state(self) -> u32 {
-        self.0 as u32
-    }
-
-    /// How strong it blows: 0 calm, to [`STRONGEST_WIND`].
-    pub const fn strength(self) -> u32 {
-        (self.0 as u32 + WAYS_OF_WIND.len() as u32 - 1) / WAYS_OF_WIND.len() as u32
-    }
-
-    /// Which of [`WAYS_OF_WIND`] it blows towards: none when calm.
-    pub const fn way(self) -> Option<usize> {
-        if self.0 == 0 { None } else { Some((self.0 as usize - 1) % WAYS_OF_WIND.len()) }
-    }
-
-    /// This wind a step nearer `other`, as two vectors are averaged a
-    /// little at a time: blowing the same way, a strength nearer its
-    /// strength; blowing another way, a strength weaker, down to
-    /// calm; calm, the way `other` blows at the least strength. So
-    /// winds that differ wear each other down, and one wind over all
-    /// stays as it is.
-    pub const fn a_step_towards(self, other: Self) -> Self {
-        match (self.way(), other.way()) {
-            (Some(way), Some(others)) if way == others => Self::blowing(way, if self.strength() < other.strength() { self.strength() + 1 } else if self.strength() > other.strength() { self.strength() - 1 } else { self.strength() }),
-            (Some(way), _) => Self::blowing(way, self.strength() - 1),
-            (None, Some(others)) => Self::blowing(others, 1),
-            (None, None) => Self::CALM,
-        }
-    }
-
-    /// The step to the tile it blows towards, in tiles across and
-    /// down: none when calm.
-    pub const fn towards(self) -> Option<(i32, i32)> {
-        match self.way() {
-            Some(way) => Some(WAYS_OF_WIND[way]),
-            None => None,
-        }
-    }
-}
-
-/// How much of the temperature between two tiles a wind carries
-/// from one to the next at once, at the most.
+/// The highest a tile's pressure is: a byte.
+pub const HIGHEST_PRESSURE: u32 = 255;
+/// The pressure a tile is generated at, and all are at with no wind:
+/// the middle of what its byte holds.
+pub const PRESSURE_AT_REST: u32 = 128;
+/// How far apart the pressures of two tiles side by side may be and
+/// stay: past it the higher gives the lower a unit
+/// ([`pressure_falls_by`]).
+pub const PRESSURE_GAP_AT_REST: u32 = 1;
+/// The strongest a wind blows, across or down: what a nibble holds
+/// either side of none.
+pub const STRONGEST_WIND: i32 = 7;
+/// The eight tiles about a tile, each the step to it across and
+/// down: where a wind blows to and pressure falls to.
+pub const TILES_ABOUT: [(i32, i32); 8] = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
+/// How much of the humidity or the temperature between two tiles a
+/// wind carries from one to the next at once, at the most.
 pub const DEGREES_A_WIND_CARRIES: u32 = 4;
+/// The rise in height, a tile to the next, that halves the chance of
+/// air going up it ([`passes_a_rise`]).
+pub const RISE_THAT_HALVES: u32 = 8;
 
-/// `from` up to `step` nearer `to`, never past it.
-const fn nearer(from: u32, to: u32, step: u32) -> u32 {
+/// `from` up to `step` nearer `to`, never past it: how a number a
+/// wind carries comes to its neighbour's.
+pub const fn nearer(from: u32, to: u32, step: u32) -> u32 {
     if from < to {
         if to - from < step { to } else { from + step }
     } else if from - to < step {
@@ -104,9 +57,101 @@ const fn nearer(from: u32, to: u32, step: u32) -> u32 {
     }
 }
 
+/// The parts of `whole` with which air goes from a tile to one
+/// `rise` higher -- by pressure or by wind, the one resistance: all
+/// of it on the level or downhill, half up a rise of
+/// [`RISE_THAT_HALVES`], a third up twice that; the steeper, the less.
+pub const fn passes_a_rise(rise: u32, whole: u32) -> u32 {
+    whole * RISE_THAT_HALVES / (RISE_THAT_HALVES + rise)
+}
+
+/// How strongly pressure `here` falls to a tile at `there`: by how
+/// far that one is under it, and not at all within
+/// [`PRESSURE_GAP_AT_REST`] -- so of the tiles about one, the lowest
+/// is the likeliest drawn and none higher ever is.
+pub const fn pressure_falls_by(here: u32, there: u32) -> u32 {
+    if here > there + PRESSURE_GAP_AT_REST { here - there } else { 0 }
+}
+
+/// A number from -[`STRONGEST_WIND`] to [`STRONGEST_WIND`], held to it.
+const fn held(strength: i32) -> i32 {
+    if strength > STRONGEST_WIND { STRONGEST_WIND } else if strength < -STRONGEST_WIND { -STRONGEST_WIND } else { strength }
+}
+
+/// The wind over a tile: a vector, how strongly it blows across
+/// (east the more) and down (south the more), each from
+/// -[`STRONGEST_WIND`] to [`STRONGEST_WIND`] -- so it blows any of
+/// eight ways, or between them, at many strengths, and two winds are
+/// averaged by their numbers. A byte: a nibble each.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Wind {
+    /// How strongly it blows east: west if under 0.
+    across: i8,
+    /// How strongly it blows south: north if under 0.
+    down: i8,
+}
+
+impl Wind {
+    /// No wind.
+    pub const CALM: Self = Self { across: 0, down: 0 };
+
+    /// The wind blowing `across` east and `down` south, each held to
+    /// [`STRONGEST_WIND`] either way.
+    pub const fn blowing(across: i32, down: i32) -> Self {
+        Self { across: held(across) as i8, down: held(down) as i8 }
+    }
+
+    /// The wind the byte `state` says: a nibble each, two's
+    /// complement.
+    pub const fn of_state(state: u32) -> Self {
+        Self::blowing(((state & 0xF) as i32) << 28 >> 28, ((state >> 4 & 0xF) as i32) << 28 >> 28)
+    }
+
+    /// Its byte.
+    pub const fn state(self) -> u32 {
+        (self.across as u32 & 0xF) | (self.down as u32 & 0xF) << 4
+    }
+
+    /// How strongly it blows east and south: under 0, west and north.
+    pub const fn vector(self) -> (i32, i32) {
+        (self.across as i32, self.down as i32)
+    }
+
+    /// How strong it blows: the stronger of its two ways, 0 calm.
+    pub const fn strength(self) -> u32 {
+        let (across, down) = (self.across.unsigned_abs() as u32, self.down.unsigned_abs() as u32);
+        if across > down { across } else { down }
+    }
+
+    /// The step to the tile it blows to this time, across and down,
+    /// by two numbers drawn under [`STRONGEST_WIND`] + 1: a step
+    /// each way as likely as the wind is strong that way -- so any of
+    /// the eight tiles about it, the stronger the likelier. None if
+    /// it reaches no tile this time.
+    pub const fn step_drawn(self, drawn_across: u32, drawn_down: u32) -> Option<(i32, i32)> {
+        let across = if drawn_across < self.across.unsigned_abs() as u32 { self.across.signum() as i32 } else { 0 };
+        let down = if drawn_down < self.down.unsigned_abs() as u32 { self.down.signum() as i32 } else { 0 };
+        if across == 0 && down == 0 { None } else { Some((across, down)) }
+    }
+
+    /// This wind with a push of `across` and `down` added to it: what
+    /// air going that way does to the wind over the tile it leaves,
+    /// the more of it the stronger.
+    pub const fn pushed(self, across: i32, down: i32) -> Self {
+        Self::blowing(self.across as i32 + across, self.down as i32 + down)
+    }
+
+    /// This wind a step nearer `other`, each of its two ways by one:
+    /// two winds averaged a little at a time, so winds that differ
+    /// wear each other down and one wind over all stays as it is.
+    pub const fn a_step_towards(self, other: Self) -> Self {
+        Self { across: self.across + (other.across - self.across).signum(), down: self.down + (other.down - self.down).signum() }
+    }
+}
+
 /// A tile's climate: what the climate plane's number is made of, and
-/// read back as. Its lowest four bits the humidity, the next four the
-/// wind, the highest eight the temperature.
+/// read back as. Its lowest byte the humidity, the next the wind,
+/// the next the temperature, the highest the pressure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Climate {
     /// How much water its air holds: 0 to [`MOST_HUMID`].
@@ -115,18 +160,34 @@ pub struct Climate {
     pub wind: Wind,
     /// How hot it is: 0 to [`HOTTEST`].
     pub temperature: u32,
+    /// The pressure of its air: 0 to [`HIGHEST_PRESSURE`],
+    /// [`PRESSURE_AT_REST`] where no wind has pushed air in or out.
+    pub pressure: u32,
 }
 
 impl Climate {
     /// The climate the plane's number `number` says.
     pub const fn of_number(number: u32) -> Self {
-        Self { humidity: number & MOST_HUMID, wind: Wind::of_state(number >> 4 & 0xF), temperature: number >> 8 & HOTTEST }
+        Self { humidity: number & 0xFF, wind: Wind::of_state(number >> 8 & 0xFF), temperature: number >> 16 & 0xFF, pressure: number >> 24 }
     }
 
-    /// This climate with its humidity a level nearer that of
-    /// `upwind`: what a wind carries of the air it comes from.
+    /// The number the plane holds for it.
+    pub const fn number(self) -> u32 {
+        assert!(self.humidity <= MOST_HUMID && self.temperature <= HOTTEST && self.pressure <= HIGHEST_PRESSURE, "a climate within its bytes");
+        self.humidity | self.wind.state() << 8 | self.temperature << 16 | self.pressure << 24
+    }
+
+    /// Its humidity as a level of cloud, 0 to 15: what a cloud over
+    /// it gathers about.
+    pub const fn humidity_level(self) -> u32 {
+        self.humidity / HUMIDITY_A_LEVEL_OF_CLOUD
+    }
+
+    /// This climate with its humidity up to
+    /// [`DEGREES_A_WIND_CARRIES`] nearer that of `upwind`: what a
+    /// wind carries of the air it comes from.
     pub const fn with_humidity_carried_from(self, upwind: Self) -> Self {
-        Self { humidity: nearer(self.humidity, upwind.humidity, 1), ..self }
+        Self { humidity: nearer(self.humidity, upwind.humidity, DEGREES_A_WIND_CARRIES), ..self }
     }
 
     /// This climate with its temperature up to
@@ -154,11 +215,5 @@ impl Climate {
     /// Whether a tile of this climate under `cloud` is raining.
     pub const fn rains(self, cloud: u32) -> bool {
         cloud > self.rains_above()
-    }
-
-    /// The number the plane holds for it.
-    pub const fn number(self) -> u32 {
-        assert!(self.humidity <= MOST_HUMID && self.temperature <= HOTTEST, "a climate within its bits");
-        self.humidity | self.wind.state() << 4 | self.temperature << 8
     }
 }

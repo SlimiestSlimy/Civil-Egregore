@@ -112,62 +112,87 @@ four.
 The weather's rule samples the climate plane, whose tiles are 8 by 8
 cells: every tile of a hot chunk is chosen with one chance
 (`MEAN_TIME_TO_SAMPLE`), whatever it holds
-(`Turn::each_tile_sampled`, the simulation's), and named by its first cell. It reads
-the tile's climate -- humidity, wind, temperature
+(`Turn::each_tile_sampled`, the simulation's), and named by its first
+cell. A tile's climate is four numbers kept together -- humidity,
+wind, temperature, pressure
 (`../../type_registry/docs/type_registry.md`, "The climate") -- and
-its cloud, 0 to 15, and does one of three things.
+its cloud is a fifth, on a plane of its own, 0 to 15.
 
-**The wind blows**, if it is not calm, with a chance of its strength
-over four -- a wind of 3 three times in four. Then, now and then
-(`CARRY_CHANCE`, once in 60 seconds of a strongest wind,
-`MEAN_TIME_TO_CARRY_CLIMATE`), **it carries its tile's climate** to
-the tile it blows towards (`carry`): one of three drawn -- that
-tile's humidity a level nearer this one's, its temperature up to 4
-nearer (`DEGREES_A_WIND_CARRIES`), or its wind a step nearer this
-wind (`Wind::a_step_towards`): blowing the same way, a strength
-nearer; another way, a strength weaker, down to calm; calm, this
-wind's way at the least strength. So humidity and heat drift down
-the wind, and winds that differ wear each other down to nothing,
-averaging out. A tile beside what is not loaded keeps its wind
-(`at_the_border_of_what_is_loaded`): the wind comes in from there,
-and no wind inside wears it down. Each is one compare-and-write of
-the tile's climate as the rule saw it.
+**How the five are connected** is three kinds of thing, each a small
+function of its own, and the rule is those put together:
 
-Else, if the tile has cloud, a level of the cloud is taken from the tile and
-added to the tile the wind blows towards, if that one has room
-(`cells::move_one`). Both writes are under both compares, what was
-seen here and what was seen there, so a level is taken only if one is
-added: the wind makes no cloud and loses none, wherever a superchunk's
-border falls between the two.
+| kind | what | function |
+|---|---|---|
+| the air moves | pressure too far over a tile about it falls there | `pressure_falls` |
+| | the wind reaches a tile about it and takes air, cloud or climate with it | `wind_blows`, `carry` |
+| what a tile makes of itself | its cloud forms or clears, of its humidity, heat, pressure and what is under it; and rains | `cloud_forms`, `deepens_and_thins` |
+| the land | a rise holds back every move of the air, by pressure or by wind | `passes` |
 
-**Or the cloud deepens or thins a level** (`deepens_and_thins`), with
-parts of 256 added up:
+Pressure and wind are the movers; humidity, temperature and cloud are
+what is moved. Pressure feeds wind -- air leaving a tile turns the
+wind over it -- and wind feeds pressure -- air it pushes piles up
+where winds meet.
+
+A tile sampled does this, in order:
+
+**1. Pressure falls** (`pressure_falls`), if any of the eight tiles
+about it is more than 1 under it (`PRESSURE_GAP_AT_REST`): one of
+those is drawn, each as likely as it is far under
+(`pressure_falls_by`) -- the lowest the likeliest, none higher ever --
+and as the land lets the air up to it (`passes`), so that up a slope
+it goes less often, or not at all this time. A unit of pressure goes
+there, and the air leaving turns the tile's own wind that way
+(`Wind::pushed`). This is tried every sample before anything else: a
+gap does not wait for a chance.
+
+**2. Else the wind blows** (`wind_blows`). Its vector draws which of
+the eight tiles about it it reaches, the stronger the likelier
+(`Wind::step_drawn`), and the land must let it (`passes`). There, now
+and then (`CARRY_CHANCE`, `MEAN_TIME_TO_CARRY_CLIMATE`), it carries
+climate (`carry`): that tile's humidity up to 4 nearer this one's,
+its temperature up to 4 nearer, or its wind a step nearer this wind
+(`Wind::a_step_towards`) -- winds that differ wear each other down.
+Otherwise it pushes a unit of its tile's pressure onto that tile --
+so winds meeting or crowding on a tile raise its pressure, which then
+falls outwards -- and with it a level of its cloud, if it has one
+and there is room (`cells::move_one`).
+
+**3. Then the cloud forms or clears a level** (`cloud_forms`,
+`deepens_and_thins`), unless one was just blown off, with parts of
+256 added up:
 
 - towards the humidity: a sixteenth for each level the cloud is under
-  the tile's humidity, to deepen; a sixteenth for each level over it,
-  to thin. More humidity, a likelier level more;
+  the tile's humidity level, to deepen; a sixteenth for each over it,
+  to thin;
 - over water -- a tile most of whose cells are under it -- a
-  sixteenth of the temperature, to deepen: the hotter, the more of
-  the water goes up. It was a quarter, which the wind could not carry
-  off: the seas stood under cloud the wind did not move;
-- over land a quarter of the temperature, to thin: the hotter, the
-  more is burnt off;
-- a raining cloud sheds: a quarter more, to thin. Whether it rains
-  is the climate's to say, of its temperature and its humidity both
-  (`Climate::rains_above`): warm air holds more cloud before it
-  rains, humid air less.
+  sixteenth of the temperature, to deepen; over land a quarter of it,
+  to thin;
+- of the pressure: half of how far it is under rest, to deepen -- air
+  rising -- and half of how far over, to thin -- air sinking
+  (`PRESSURE_DIVIDES_ITS_GAP`);
+- a raining cloud sheds: a quarter more, to thin
+  (`Climate::rains_above`).
 
-So a cloud gathers about its tile's humidity, some levels over it on
-warm water and under it on warm land, and nowhere without end: what
-pulls it back grows with how far it is. So what forms, and when it
-rains, hang on humidity and temperature together. Rain is drawn, and it thins the cloud; nothing under it is
-changed by it yet. That a cloud over its humidity thins of itself,
-and that rain sheds, were not asked for: without them every tile of
-water came to the deepest cloud and stayed.
+**Nothing is made or lost by a move.** A unit of pressure leaves one
+tile and comes to another under both tiles' compares, their climates
+as the rule saw them (`give_pressure`, `cells::change_both`); a level
+of cloud the same. Wherever a superchunk's border falls between the
+two. So the pressure of all the tiles together never changes.
 
-Every write says what the rule saw, so a tile's cloud moves a level
-a tick at the most. The rule counts what it sampled, deepened,
-thinned, blew, found raining, and carried.
+**The border of what is loaded brings the wind in.** A tile with a
+tile about it that is not loaded keeps its wind
+(`at_the_border_of_what_is_loaded`): nothing inside turns it or
+wears it down, so what blows there blows in.
 
-Not yet: nothing makes new climate but the wind carrying what is there, and water is not kept count of: cloud is made and unmade, no
-humidity is used up, no lake dries.
+**The land** is read off the elevation plane (`ELEVATION`), a tile's
+height over the ocean: on the level or downhill all the air passes, up
+a rise of 8 heights half of it, the steeper the less
+(`passes_a_rise`).
+
+The rule counts what it sampled, deepened, thinned, blew and found
+raining, what climate it carried, and the units of pressure a wind
+pushed and those that fell.
+
+Not yet: water is not kept count of -- cloud is made and unmade, no
+humidity is used up, no lake dries -- and nothing but the border
+makes new wind.

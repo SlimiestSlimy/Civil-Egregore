@@ -40,15 +40,25 @@ names listed in **`COUNTED`**.
 
 ## `weather.rs`
 
-The weather's planes are the registry's (`actions::types`): `CLIMATE`
-and `CLOUD`. `MEAN_TIME_TO_SAMPLE` (2 seconds of the simulation) and
+The weather's planes are the registry's (`actions::types`): `CLIMATE`,
+`CLOUD` and `ELEVATION` (`sca_rules.md`, "Weather"). `MEAN_TIME_TO_SAMPLE` (2 seconds of the simulation) and
 the `SAMPLE_CHANCE` worked out from it; `WHOLE` (256), what a sample's
 chances are parts of; `PARTS_A_LEVEL_FROM_HUMIDITY` (16),
 `EVAPORATION_DIVIDES_HEAT` (16), `BURNING_OFF_DIVIDES_HEAT` (4),
-`PARTS_RAIN_SHEDS` (64); `TILE_SIDE` (8). **`deepens_and_thins(climate, cloud, over_water)`**:
-the parts with which a cloud deepens a level, and thins one.
-**`rule(turn, sampled, counts)`**: the rule on one tile of the climate
-sampled, named by its first cell (`sca_rules.md`, "Weather"). It counts in the
-`RuleCounts` it is handed, their places named **`SAMPLED`**, **`DEEPENED`**,
-**`THINNED`**, **`BLOWN`**, **`RAINING`**, **`CARRIED`**, their names listed in
-**`COUNTED`**. `MEAN_TIME_TO_CARRY_CLIMATE` (60 seconds), `CARRY_CHANCE`, `CARRIED_OF_A_CLIMATE` (3); `at_the_border_of_what_is_loaded(turn, tile)`; `carry(turn, climate, towards, there)`: one of a climate's three carried a step onto the tile the wind blows towards.
+`PARTS_RAIN_SHEDS` (64), `PRESSURE_DIVIDES_ITS_GAP` (2); `TILE_SIDE` (8);
+`MEAN_TIME_TO_CARRY_CLIMATE` (60 seconds), `CARRY_CHANCE`,
+`CARRIED_OF_A_CLIMATE` (3). The small functions: `beside(turn, tile,
+step)`, a tile about one and its climate;
+`at_the_border_of_what_is_loaded(turn, tile)`; `passes(turn, from, to,
+whole)`, what the land lets through; `give_pressure(turn, from, to,
+counted)`, a unit moved under both compares; `pressure_falls(turn,
+sampled, here)`; `carry(turn, here, towards, there)`;
+`wind_blows(turn, sampled, here, cloud)`;
+**`deepens_and_thins(climate, cloud, over_water)`**, the parts with
+which a cloud deepens a level, and thins one; `cloud_forms(turn,
+sampled, here, cloud)`. **`rule(turn, sampled, counts)`**: the rule on
+one tile of the climate sampled, named by its first cell. It counts in
+the `RuleCounts` it is handed, their places named **`SAMPLED`**,
+**`DEEPENED`**, **`THINNED`**, **`BLOWN`**, **`RAINING`**,
+**`CARRIED`**, **`PUSHED`**, **`EVENED`**, their names listed in
+**`COUNTED`**.

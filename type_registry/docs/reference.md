@@ -12,10 +12,10 @@ hold. `type_id(kind, number, size)` makes an ID; `number_of`,
 `size_of`, `is_of` read one.
 **`LayerType(u64)`**: what a layer represents; **`of_a_bit(number)`** a
 layer, a bit a cell; **`wide(first, bits)`** a
-type of 2, 4, 8 or 16 bits a cell, **`bits`** how many, its last byte, **`number`** its first, **`plane(bit)`**
+type of 2, 4, 8, 16 or 32 bits a cell, **`bits`** how many, its last byte, **`number`** its first, **`plane(bit)`**
 and **`planes`** the layers of a bit a cell it is kept cold as,
 **`holds(plane)`** whether one is its own. **`Width`**: a plane's width
-as a type, `BITS` bits a cell -- **`Bits2`**, **`Bits4`**, **`Bits8`**, **`Bits16`**.
+as a type, `BITS` bits a cell -- **`Bits2`**, **`Bits4`**, **`Bits8`**, **`Bits16`**, **`Bits32`**.
 **`LayerType::of_tiles(first, bits, tile_scale)`**: a plane of a
 number a tile (`type_registry.md`, "Tile size"), its scale beside its
 width in its last byte (`WIDTH_BITS`, the bits of that byte the width
@@ -70,8 +70,4 @@ folder all the same.
 ## `climate.rs`
 
 What the climate plane's number holds (`type_registry.md`, "The
-climate"). `RAINS_ABOVE_IN_COLD_DRY_AIR`, `HEAT_A_LEVEL_MORE_HELD`, `HUMIDITY_A_LEVEL_SOONER`, `RAINS_ABOVE_AT_THE_MOST`, `MOST_HUMID`, `HOTTEST`, `STRONGEST_WIND`,
-`WAYS_OF_WIND`. **`Wind`**: `CALM`, **`blowing(way, strength)`**,
-**`of_state(state)`**, **`state`**, **`strength`**, **`way`**,
-**`towards`**. **`Climate`**: `humidity`, `wind`, `temperature`;
-**`of_number(number)`**, **`number`**, **`rains_above`**, **`rains(cloud)`**. What a wind carries: **`Wind::a_step_towards(other)`**, **`Climate::with_humidity_carried_from(upwind)`**, **`with_temperature_carried_from`** (`DEGREES_A_WIND_CARRIES`, 4), **`with_wind_carried_from`**; `nearer(from, to, step)`.
+climate"). `RAINS_ABOVE_IN_COLD_DRY_AIR`, `HEAT_A_LEVEL_MORE_HELD`, `HUMIDITY_A_LEVEL_SOONER`, `RAINS_ABOVE_AT_THE_MOST`, `MOST_HUMID`, `HUMIDITY_A_LEVEL_OF_CLOUD`, `HOTTEST`, `HIGHEST_PRESSURE`, `PRESSURE_AT_REST`, `PRESSURE_GAP_AT_REST`, `STRONGEST_WIND`, `TILES_ABOUT`, `DEGREES_A_WIND_CARRIES`, `RISE_THAT_HALVES`. **`nearer(from, to, step)`**, **`passes_a_rise(rise, whole)`**, **`pressure_falls_by(here, there)`**; `held(strength)`. **`Wind`** (`across`, `down`): `CALM`, **`blowing(across, down)`**, **`of_state`**, **`state`**, **`vector`**, **`strength`**, **`step_drawn(drawn_across, drawn_down)`**, **`pushed(across, down)`**, **`a_step_towards(other)`**. **`Climate`** `{humidity, wind, temperature, pressure}`: **`of_number(number)`**, **`number`**, **`humidity_level`**, **`with_humidity_carried_from(upwind)`**, **`with_temperature_carried_from`**, **`with_wind_carried_from`**, **`rains_above`**, **`rains(cloud)`**. In `registry.rs`: **`ELEVATION`**, a tile's height over the ocean.

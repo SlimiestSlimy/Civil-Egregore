@@ -720,3 +720,65 @@ RULES AND TIME
   And: "pressure spreads to the randomly, but of course following
   pressure laws, high pressure likes to go towards lower pressure more
   than mid or high pressure".
+- RULE 2026-10-11: "running headless is forbbiden until further notice": every run of mine that ticks a world has CIVIL_EGREGORE_RENDER=1, measurements too.
+- ASK 2026-10-11: "now, lets do this, make the climate plane 32 bits,
+  we have 4 variables of 8 bits now" (humidity, wind, temperature,
+  pressure: so pressure is the climate's, no plane of its own).
+  And: "so we can have a single plane for climate stuff"; "oh also, i
+  almost forgot, pressure also has less chance to push towards higher
+  elevations, the stepper the less chance". Then the user stopped me:
+  "ok, let me restate the mechanisms here" -- WAIT for the
+  restatement before writing any of the pressure or the 32 bit
+  climate. Nothing of either is in the code (the separate PRESSURE
+  plane I began was undone). Found so far for 32 bits: the plane ID's
+  width field is 5 bits (WIDTH_BITS), an instruction carries a cell's
+  number in 16 (Instruction::small, WriteOp::Put(u16), Compare::Cell
+  seen u16), `Wide::most` and superchunk_layer.rs:151 shift a u32 by
+  the width.
+- ASK 2026-10-11, THE WEATHER RESTATED (the user's words): "ok, so we
+  have 4 variables, pressure, temperature, humidity and wind, now we
+  can have 8 directions for wind instead of 4 with multiple
+  strenghts. and the cloud layer separately, everything at the 8x8
+  tile size as agreed" / "pressure and wind and the movers of
+  humidity, temperature and clouds" / "pressure can feed wind, wind
+  can feed pressure" / "so when pressure gradient is more than a
+  threshold it pushes into a neighbor tile randomly selected but
+  weighed by pressure. that induces wind in the cell bein processed in
+  that direction, averaged with the current wind vector as well
+  depending on how much pressure was deposited" / "wind clashing or
+  concentrating increases presssure." / "both pressure and wind
+  interact with the height map" / "pressure can also mess with cloud
+  formation as you might expect." / "so basically think of all the
+  ways the variables can connect between one another, categorize them
+  and collapse them into simple small composable functions".
+  MY DESIGN (told to the user, theirs to overrule):
+  climate = 32 bits a tile: humidity, wind, temperature, pressure, a
+  byte each; wind a vector, two signed nibbles (x, y, -7..7): 8 ways
+  and strengths come of it, and averaging is arithmetic. Cloud its
+  own plane. The land's height a tile read by the rule (a plane of
+  tiles made by worldgen: ELEVATION, 8 bits).
+  Small functions: (1) resisted_by_rise(rise) -> chance, shared by
+  every move; (2) Wind::step_drawn -> which of 8 neighbours; (3)
+  Wind::with(push) -> vector added/averaged; (4) nearer(from, to,
+  step) for humidity and heat; (5) pressure_falls_to(here, there) ->
+  weight, 0 under the threshold; (6) deepens_and_thins(climate, cloud,
+  over_water) with pressure in it.
+  A sample: pressure flows if a gap is over the threshold (a unit to
+  a neighbour drawn by gap, own wind turned that way), ELSE the wind
+  blows (a unit of pressure, a level of cloud, a step of humidity,
+  heat or wind carried to the tile drawn); THEN the cloud forms.
+  Stages: A = planes of 32 bits + the four bytes + pressure at rest +
+  K label; B = wind a vector, the moves; C = elevation; D = pressure
+  in cloud formation.
+- DONE 2026-10-11 (this commit): climate 32 bits, four bytes; wind a
+  vector; pressure falls / wind blows / cloud forms; elevation plane;
+  K label. OPEN from it: the weather now costs a generated idle world
+  +74% instructions a tick (reads of 8 tiles about each sample, and
+  the climate written most samples: its 32 planes re-encoded by
+  Tessera when written back is my guess -- the cold storage of tile
+  planes, raw or bit-planes, is still the user's to say). Asked and
+  answered roughly: "how much % of instructions is gathering data for
+  diagnostics?" / "for everything" -- under 1% by the profile (the
+  clock 0.25%, the check's hashes 0.2%; counts are adds inlined, not
+  seen apart). STILL OWED: the timescales (sheep ~75 min), offspring,
+  hopping down; sweep of "diagnostic" in the docs.

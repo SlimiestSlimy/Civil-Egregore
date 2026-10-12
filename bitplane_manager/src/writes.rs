@@ -20,7 +20,7 @@ pub enum WriteOp {
     /// Makes the cell's number this: for a layer more than a bit a cell
     /// wide, its low bits as many as the layer has. On a layer of a bit
     /// a cell, set if it is not 0.
-    Put(u16),
+    Put(u32),
 }
 
 /// The cells a write covers, from its anchor cell; the parts past the
@@ -58,7 +58,7 @@ pub struct Write {
     pub shape: Shape,
 }
 
-const _: () = assert!(size_of::<Write>() == 16, "a write is fixed in size, 16 bytes");
+const _: () = assert!(size_of::<Write>() == 20, "a write is fixed in size, 20 bytes: a number of up to 32 bits in it");
 
 impl Write {
     /// `op` on the cell `at`.
@@ -70,7 +70,7 @@ impl Write {
     /// more than a plane of that width holds.
     pub fn value<W: Width>(plane: Wide<W>, at: CellIndex, value: u32) -> Self {
         debug_assert!(value <= plane.most(), "{value} in a plane of {} bits a cell", W::BITS);
-        Self { at, op: WriteOp::Put(value as u16), shape: Shape::Cell }
+        Self { at, op: WriteOp::Put(value), shape: Shape::Cell }
     }
 
     /// The smallest rectangle holding the write's cells: its first and
@@ -207,7 +207,7 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk: Super
         (WriteOp::Unset, 1) => layer.put_cell(chunk, cell, false),
         (WriteOp::Flip, 1) => layer.put_cell(chunk, cell, !layer.get(chunk, cell)),
         (WriteOp::Put(value), 1) => layer.put_cell(chunk, cell, value != 0),
-        (WriteOp::Put(value), _) => layer.put_value(chunk, cell, value as u32),
+        (WriteOp::Put(value), _) => layer.put_value(chunk, cell, value),
         // A wide cell is given a number: set is 1, unset 0, and a flip sets a cell at 0 and clears any other.
         (WriteOp::Set, _) => layer.put_value(chunk, cell, 1),
         (WriteOp::Unset, _) => layer.put_value(chunk, cell, 0),

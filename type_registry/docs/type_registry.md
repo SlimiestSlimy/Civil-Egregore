@@ -22,7 +22,7 @@ and a rule's:
 |---|---|
 | the first (the highest) | its **kind** (`Kind`): `0x00` an attribute, `0x01` a layer or a wide plane, `0x02` an entity type, `0x03` a rule of the cells, `0x04` a rule of an entity |
 | the six between | its **number**: what its row in the registry is written with (`NUMBERS`, how many there are) |
-| the last (the lowest) | its **size**: of a plane, bits a cell -- 1, 2, 4, 8 or 16 -- in its low five bits and its tile size, as a scale, in the three above ("Tile size"); 0 of an entity type and of a rule, which hold nothing |
+| the last (the lowest) | its **size**: of a plane, bits a cell -- 1, 2, 4, 8, 16 or 32 -- in its low six bits and its tile size, as a scale, in the two above ("Tile size"); 0 of an entity type and of a rule, which hold nothing |
 
 An attribute's, under the same first byte: its **number** in the 52
 bits after it (`ATTRIBUTE_NUMBERS`), and in its last four
@@ -115,13 +115,13 @@ rule: 0.
 A plane holds a number a cell, or a number a **tile**: an aligned
 square of cells, `2^scale` a side. Every plane of the ground is of
 cells, a tile size of 1x1; the weather's -- the clouds (`CLOUD`, four
-bits) and the climate (`CLIMATE`, sixteen: humidity, temperature and
+bits) and the climate (`CLIMATE`, thirty-two: humidity, pressure, temperature and
 wind together, one read for all three) -- are of tiles 8x8
 (`WEATHER_TILE_SCALE`, 3), since weather does not differ from one cell
 to the next and sixty-four times fewer numbers are kept and worked on.
 
 The tile size is in the type, beside the width: the last byte of a
-plane's ID is its bits a cell in its low five bits and its tile's
+plane's ID is its bits a cell in its low six bits and its tile's
 scale in the three above (`LayerType::of_tiles`, `tile_scale`,
 `tile_side`; `Wide::of_tiles`), and a plane's row says it too
 (`Registered::tile_scale`). So nothing that keeps, sends or draws a
@@ -204,38 +204,63 @@ or of more than 16, does not build.
 
 ## The climate
 
-The climate plane holds sixteen bits a tile, and what they are is said
-here once (`climate.rs`), for worldgen that makes them, the weather's
-rule that reads them and whatever shows them: **`Climate`**, its
-`humidity` the lowest four bits (0 to `MOST_HUMID`), its `wind` the
-next four, its `temperature` the highest eight (0 to `HOTTEST`) --
-`of_number` and `number` turn the plane's number into it and back.
+The climate plane holds thirty-two bits a tile, and what they are is
+said here once (`climate.rs`), for worldgen that makes them, the
+weather's rule that reads them and whatever shows them:
+**`Climate`**, a byte each -- its `humidity` the lowest (0 to
+`MOST_HUMID`, 255; its sixteenths, `humidity_level`, are the level of
+cloud it stands for, `HUMIDITY_A_LEVEL_OF_CLOUD`), then its `wind`,
+its `temperature` (0 to `HOTTEST`) and, the highest, its `pressure`
+(0 to `HIGHEST_PRESSURE`, `PRESSURE_AT_REST`, 128, where no wind has
+pushed air in or out). `of_number` and `number` turn the plane's
+number into it and back. One plane, one read, for all four.
 
-A **`Wind`** is one of thirteen states in its four bits: 0 calm
-(`Wind::CALM`), 1 to 4 blowing towards north, west, south, east
-(`WAYS_OF_WIND`, each the step to the next tile) at strength 1, 5 to
-8 at 2, 9 to 12 at 3 (`STRONGEST_WIND`). The three numbers its bits
-have beside are no wind's and read as calm (`of_state`). `blowing(way,
-strength)` makes one, `state` is its bits, `way`, `strength` and
-`towards` what a rule asks of it.
+A **`Wind`** is a vector in its byte, a nibble each: how strongly it
+blows east (`across`) and south (`down`), each from -7 to 7
+(`STRONGEST_WIND`), under 0 west and north. So it blows any of eight
+ways or between them, at many strengths, and two winds are averaged
+by their numbers. `blowing(across, down)` makes one, held to the
+strongest; `state` is its byte, `vector` its two numbers, `strength`
+the stronger of them.
 
-**What a wind carries** is said here too, a step at a time: a
-climate's humidity a level nearer another's
-(`Climate::with_humidity_carried_from`), its temperature up to 4
-nearer (`with_temperature_carried_from`, `DEGREES_A_WIND_CARRIES`),
-and its wind a step nearer another wind (`with_wind_carried_from`,
-`Wind::a_step_towards`) -- as two vectors averaged a little at a
-time: the same way, a strength nearer; another way, a strength
-weaker, to calm; calm, the other's way at the least strength. The
-weather's rule says when (`../../sca_rules/docs/sca_rules.md`,
-"Weather").
+**The small functions the four are connected by** are here too, each
+doing one thing, the weather's rule putting them together
+(`../../sca_rules/docs/sca_rules.md`, "Weather"):
+
+- `Wind::step_drawn(drawn_across, drawn_down)`: which of the eight
+  tiles about it (`TILES_ABOUT`) a wind reaches this time, a step
+  each way as likely as it is strong that way -- none if it reaches
+  none;
+- `Wind::pushed(across, down)`: a push added to a wind, what air
+  leaving a tile does to the wind over it;
+- `Wind::a_step_towards(other)`: a wind a step nearer another, each
+  of its numbers by one -- two vectors averaged a little at a time,
+  so winds that differ wear each other down;
+- `nearer(from, to, step)`: a number carried a step towards another,
+  never past it -- `Climate::with_humidity_carried_from`,
+  `with_temperature_carried_from` (`DEGREES_A_WIND_CARRIES`, 4) and
+  `with_wind_carried_from` are a climate with one of its three so
+  carried;
+- `pressure_falls_by(here, there)`: how strongly pressure falls to a
+  tile, by how far that one is under it and not at all within
+  `PRESSURE_GAP_AT_REST` (1);
+- `passes_a_rise(rise, whole)`: the parts of the air that go up a
+  rise -- all of it on the level, half at `RISE_THAT_HALVES` (8
+  heights), the steeper the less: the one resistance of the land, to
+  pressure and to wind alike.
 
 **Rain** is a climate's to say, of its temperature and its humidity
 both (`Climate::rains_above`, `Climate::rains(cloud)`): the level of
 cloud above which a tile is raining is 12 in the coldest, driest air
 (`RAINS_ABOVE_IN_COLD_DRY_AIR`), a level more for every 64 of
 temperature (`HEAT_A_LEVEL_MORE_HELD`) -- warm air holds more water
-before it falls -- and a level fewer for every 4 of humidity
+before it falls -- and a level fewer for every 64 of humidity
 (`HUMIDITY_A_LEVEL_SOONER`), 14 at the most (`RAINS_ABOVE_AT_THE_MOST`):
-9 over the coldest, wettest tile. It was one number, 12, for every
-tile. The rule's and whatever draws rain have it from this one place.
+9 over the coldest, wettest tile. The rule's and whatever draws rain
+have it from this one place.
+
+**The elevation** (`ELEVATION`, eight bits a tile 8 by 8) is beside
+the climate, not in it: how high the tile stands over the ocean, 255
+at the most, made by worldgen and never changed. A rule reads no
+height otherwise.
+

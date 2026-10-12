@@ -18,10 +18,7 @@ const CLIMATE_LABELS: (u32, u32) = (48, 28);
 const CLIMATE_FROM: f32 = 40.0;
 /// Screen pixels a climate is across at its full size: under that
 /// much room it is written smaller, to fit.
-const CLIMATE_WIDTH: f32 = 110.0;
-/// The ways a wind blows towards, named, in the order the type
-/// registry has them (`type_registry::WAYS_OF_WIND`).
-const WAYS_NAMED: [&str; 4] = ["north", "west", "south", "east"];
+const CLIMATE_WIDTH: f32 = 120.0;
 
 /// A tile's climate, written on it: one of a grid of them, each given
 /// to the tile the camera shows whose place is its own, counted round
@@ -43,11 +40,14 @@ pub fn spawn(mut commands: Commands) {
 }
 
 /// What is written on a tile of `climate`: its humidity, its
-/// temperature, and the way its wind blows towards with its strength
-/// -- or that it is calm.
+/// temperature, its pressure, and its wind -- how strongly it blows
+/// east and south, under 0 west and north, or that it is calm.
 fn written(climate: Climate) -> String {
-    let wind = climate.wind.way().map_or("calm".to_string(), |way| format!("{} {}", WAYS_NAMED[way], climate.wind.strength()));
-    format!("humid {}\nheat {}\n{wind}", climate.humidity, climate.temperature)
+    let wind = match climate.wind.vector() {
+        (0, 0) => "calm".to_string(),
+        (across, down) => format!("wind {across:+} {down:+}"),
+    };
+    format!("humid {}\nheat {}\npress {}\n{wind}", climate.humidity, climate.temperature, climate.pressure)
 }
 
 /// Writes every tile's climate on it, as the last frame of its

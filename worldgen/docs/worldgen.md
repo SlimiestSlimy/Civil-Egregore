@@ -88,8 +88,11 @@ superchunk of land took 0.34 G instructions where they had taken
 ## Climate
 
 A superchunk is made with its climate: for each tile of the climate
-plane, 8 by 8 cells, a humidity, a wind and a temperature
-(`ClimateNoises::at`, asked at the tile's middle cell). All of it is
+plane, 8 by 8 cells, a humidity, a wind, a temperature and its
+pressure at rest (`ClimateNoises::at`, asked at the tile's middle
+cell); and, on the elevation plane beside it, how high the tile
+stands over the ocean, 255 at the most -- what the weather holds the
+air's moves against. All of it is
 smooth noise of the world's seed -- mixed with `CLIMATE_SALT`, so it
 lies apart from the ground -- at world coordinates, so it is the same
 whichever superchunk is made first and there is no seam where two
@@ -100,14 +103,15 @@ meet: a chunk generated later fits what is beside it.
   the ground stands over the ocean; over water half way to neither
   hot nor cold -- water is mild.
 - **Humidity**: the same of two noises of its own; on land the drier
-  the higher; over water some levels more.
-- **Wind**: one noise says the way, its four ways each a band of the
-  noise so that a region blows one way and turns into the next beside
-  it; another the strength, calm to the strongest.
+  the higher; over water some more. A byte, 0 to 255.
+- **Wind**: a vector. One noise says the way, one of eight, each a
+  band of the noise so that a region blows one way and turns into the
+  next beside it; another the strength, calm to the strongest.
+- **Pressure**: at rest everywhere. The winds make the rest of it.
 
 Nothing of it is drawn cell by cell, so from a tile to the next it
 moves little: no tile is a desert beside a swamp. The tiles' numbers
-are put on the plane's sixteen bit-planes, a tile a cell of each, as a
+are put on the planes' bit-planes, the climate's thirty-two and the elevation's eight, a tile a cell of each, as a
 wide plane lies cold (`../../chunk_storage/docs/chunk_storage.md`,
 "Wide planes").
 

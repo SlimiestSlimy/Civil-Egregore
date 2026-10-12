@@ -88,8 +88,8 @@ fn flip_what_is_about(turn: &mut Turn, seed: u64) -> u64 {
         }
         let seen = |turn: &Turn, x: u32, y: u32| (CellIndex::from(coordinates::CellCartesian { x, y }), u32::from(turn.holds(STONE, coordinates::CellCartesian { x, y }.into()) == Ok(true)));
         let (east, south, past) = (seen(turn, at.x + 1, at.y), seen(turn, at.x, at.y + 1), seen(turn, at.x + 1, at.y + 2));
-        turn.compare_from_here(Compare::Cell { layer_type: STONE, at: east.0, seen: east.1 as u16 });
-        actions::compare::write(turn, Compare::Cell { layer_type: STONE, at: south.0, seen: south.1 as u16 }, STONE, past.0, past.1, 1 - past.1, None);
+        turn.compare_from_here(Compare::Cell { layer_type: STONE, at: east.0, seen: east.1 });
+        actions::compare::write(turn, Compare::Cell { layer_type: STONE, at: south.0, seen: south.1 }, STONE, past.0, past.1, 1 - past.1, None);
         actions::cells::seen_becoming(turn, STONE, south.0, south.1, 1 - south.1, None);
         actions::cells::seen_becoming(turn, STONE, east.0, east.1, 1 - east.1, None);
         let counted = entity.attribute(WOKEN);

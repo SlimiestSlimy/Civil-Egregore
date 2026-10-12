@@ -28,7 +28,7 @@ pub enum Kind {
 const KIND_SHIFT: u32 = 56;
 /// Bits of a plane's ID's last byte that say its bits a cell; those
 /// above say its tile size ([`LayerType::tile_scale`]).
-const WIDTH_BITS: u32 = 5;
+const WIDTH_BITS: u32 = 6;
 /// Bits of an ID's last byte, its size, under its number.
 const SIZE_BITS: u32 = 8;
 /// The most an ID's last byte holds.
@@ -58,7 +58,7 @@ const fn is_of(id: u64, kind: Kind) -> bool {
 }
 
 /// What a layer represents: a `u64` the registry gives a meaning
-/// ([`crate::REGISTRY`]). It may be wide, 2 to 16 bits a cell: its
+/// ([`crate::REGISTRY`]). It may be wide, 2 to 32 bits a cell: its
 /// last byte says how many (`docs/type_registry.md`, "Width").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LayerType(pub u64);
@@ -69,7 +69,7 @@ impl LayerType {
         Self::wide(number, 1)
     }
 
-    /// The type of `bits` bits a cell -- 1, 2, 4, 8 or 16 -- whose
+    /// The type of `bits` bits a cell -- 1, 2, 4, 8, 16 or 32 -- whose
     /// planes are the layers of the numbers `first` on.
     pub const fn wide(first: u64, bits: u32) -> Self {
         Self::of_tiles(first, bits, 0)
@@ -80,8 +80,8 @@ impl LayerType {
     /// every cell (`docs/type_registry.md`, "Tile size"). A scale of
     /// 0 is a plane of cells, as every plane was.
     pub const fn of_tiles(first: u64, bits: u32, tile_scale: u32) -> Self {
-        assert!(bits.is_power_of_two() && bits <= 16, "a plane is 1, 2, 4, 8 or 16 bits a cell");
-        assert!(tile_scale < 1 << (SIZE_BITS - WIDTH_BITS), "a plane's tile size is said in three bits");
+        assert!(bits.is_power_of_two() && bits <= 32, "a plane is 1, 2, 4, 8, 16 or 32 bits a cell");
+        assert!(tile_scale < 1 << (SIZE_BITS - WIDTH_BITS), "a plane's tile size is said in two bits");
         Self(type_id(Kind::Layer, first, (tile_scale as u64) << WIDTH_BITS | bits as u64))
     }
 
@@ -149,6 +149,9 @@ pub struct Bits8;
 /// Sixteen bits a cell: numbers 0 to 65,535.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Bits16;
+/// Thirty-two bits a cell: numbers 0 to 4,294,967,295.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Bits32;
 
 impl Width for Bits2 {
     const BITS: u32 = 2;
@@ -161,6 +164,9 @@ impl Width for Bits8 {
 }
 impl Width for Bits16 {
     const BITS: u32 = 16;
+}
+impl Width for Bits32 {
+    const BITS: u32 = 32;
 }
 
 /// A wide plane, its width in its type: a cell of it holds a number,
@@ -194,7 +200,7 @@ impl<W: Width> Wide<W> {
 
     /// The most a cell of it holds.
     pub const fn most(self) -> u32 {
-        (1 << W::BITS) - 1
+        u32::MAX >> (u32::BITS - W::BITS)
     }
 }
 

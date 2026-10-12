@@ -4,7 +4,7 @@
 
 use crate::climate::ClimateNoises;
 use crate::{Generation, Terrain, WALLS};
-use type_registry::{CLIMATE, COLLISION, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
+use type_registry::{CLIMATE, COLLISION, ELEVATION, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{ChunkMaps, LayerType, SuperchunkCells};
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
@@ -64,14 +64,17 @@ pub fn generate_superchunk(generation: &Generation, seed: u64, superchunk: Super
     }
     // The climate, a number a tile: each of its bits a plane, the tiles its first cells in Morton order.
     let (mut climate, tile_cells) = (ClimateNoises::new(seed), 1usize << CLIMATE.layer_type().tile_shift());
-    let climate_planes: Vec<LayerType> = CLIMATE.layer_type().planes().collect();
+    // And how high each tile stands over the ocean, laid out the same: what the air's moves are held against.
+    let climate_planes: Vec<LayerType> = CLIMATE.layer_type().planes().chain(ELEVATION.layer_type().planes()).collect();
+    let climate_bits = CLIMATE.layer_type().bits() as usize;
     for chunk in 0..CHUNKS_IN_SUPERCHUNK {
         let mut bits = vec![[0u64; WORDS]; climate_planes.len()];
         for tile in 0..CELLS_IN_CHUNK / tile_cells {
             // The tile's middle cell: half a tile across and down from its first.
             let middle = chunk * CELLS_IN_CHUNK + tile * tile_cells + 3 * tile_cells / 4;
             let (x, y) = cartesian_from_place(middle);
-            let number = climate.at(left + x, top + y, terrain.height(middle).saturating_sub(generation.shape.ocean), depth_at(middle) > 0).number();
+            let above = terrain.height(middle).saturating_sub(generation.shape.ocean);
+            let number = u64::from(climate.at(left + x, top + y, above, depth_at(middle) > 0).number()) | u64::from(u32::from(above).min(ELEVATION.most())) << climate_bits;
             (0..climate_planes.len()).filter(|bit| number >> bit & 1 == 1).for_each(|bit| bits[bit][tile / BITS_PER_WORD] |= 1 << (tile % BITS_PER_WORD));
         }
         layers.extend(bits.iter().zip(&climate_planes).filter(|(bits, _)| bits.iter().any(|&word| word != 0)).map(|(bits, &plane)| (chunk, plane, *bits)));

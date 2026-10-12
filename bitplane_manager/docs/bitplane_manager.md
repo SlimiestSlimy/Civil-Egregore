@@ -117,8 +117,8 @@ given decoded (`make_hot_cells`) -- off the tick, say.
 
 ## Wide planes
 
-A layer type is a bit a cell, or wide: 2, 4, 8 or 16 bits a cell
-(`chunk_storage::Wide<W>`, the width `W` -- `Bits2` to `Bits16` -- in
+A layer type is a bit a cell, or wide: 2, 4, 8, 16 or 32 bits a cell
+(`chunk_storage::Wide<W>`, the width `W` -- `Bits2` to `Bits32` -- in
 the plane's type). A wide plane's bucket holds a cell's whole number
 together, the cell at place `p` at bit `p` times the width: a tree's
 stage is one read and one write, where four bitmaps took four of each,
@@ -150,7 +150,7 @@ the rest clear, which costs the codec nothing.
 
 ## Writes
 
-The only way cells change. A write is 16 bytes: its anchor cell's
+The only way cells change. A write is 20 bytes -- a number of up to 32 bits in it: its anchor cell's
 Morton index, an operation (set, unset, flip, or put a number, for a
 wide plane) and a shape (the cell, a
 rectangle up to 255 a side, a disc up to radius 255); the layer type is

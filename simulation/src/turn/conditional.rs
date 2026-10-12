@@ -60,7 +60,7 @@ pub enum Compare {
         /// The cell.
         at: CellIndex,
         /// What the rule saw there.
-        seen: u16,
+        seen: u32,
     },
     /// The entity of type `kind` the tick found on `at` is there
     /// still, wherever it stands now.
