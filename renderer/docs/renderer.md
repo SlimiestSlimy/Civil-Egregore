@@ -266,8 +266,9 @@ headless run measures is seen.
 ## The climate, written
 
 The K key writes on every tile of the climate -- 8 by 8 cells -- what it
-holds: its humidity, its heat, and its wind, the way it blows towards
-and how strongly, or that it is calm (`src/climate_labels.rs`). The
+holds: its humidity, its heat, its pressure, and its wind -- how
+strongly it blows east and south, under 0 west and north -- or that
+it is calm (`src/climate_labels.rs`). The
 numbers are the plane's own, as the type registry lays them out. A
 frame brings each superchunk's climate with its cells
 (`Cells::climates`); the painter hands them on with its picture and
@@ -313,7 +314,7 @@ pixels made here.
 | `B` | show the superchunks' boundaries, or not; and once a superchunk is 150 screen pixels across, its Morton index (as its save file is named) and `(x, y)` in its top left corner |
 | `C` | the same of the chunks, their labels a line below |
 | `H` | every cell's height written on it, once a cell is 20 screen pixels across |
-| K | every tile's climate written on it -- humidity, heat, and the way its wind blows towards with its strength -- once a tile is 40 screen pixels across |
+| K | every tile's climate written on it -- humidity, heat, pressure, and its wind, how strongly east and south -- once a tile is 40 screen pixels across |
 | `M` | map mode, or not: the map in place of the cells, at any zoom |
 | `P` | on the map, the mesh's lines drawn over it, or not |
 

@@ -71,7 +71,7 @@ impl Default for Applied {
 fn holds(instruction: &Instruction, at: CellIndex, superchunk: &mut Superchunk, entities: &mut SuperchunkEntities, collision: Option<LayerType>) -> bool {
     let entities = &*entities;
     match instruction.opcode {
-        Opcode::CompareCell => superchunk.value_at(LayerType(instruction.first), at) == Some(u32::from(instruction.small)),
+        Opcode::CompareCell => superchunk.value_at(LayerType(instruction.first), at) == Some(instruction.second as u32),
         Opcode::CompareCellFree => entities.free_for_a_new_entity(at, &Standing { superchunk, layer: collision }),
         Opcode::CompareEntity => entities.get_named(at).is_some_and(|entity| entity.header.kind.0 == instruction.first),
         // Gone, it holds against nothing; there, against what is seen of the attribute, none seen of one it has not.
@@ -191,9 +191,9 @@ impl Queue {
                     if superchunk.value_at(layer_type, at).is_none() {
                         applied.writes.missed += 1;
                     } else {
-                        superchunk.apply(layer_type, Write::cell(at, WriteOp::Put(instruction.small)), &mut applied.writes);
-                        if instruction.second != NO_COUNT {
-                            applied.counted[instruction.second as usize] += 1;
+                        superchunk.apply(layer_type, Write::cell(at, WriteOp::Put(instruction.value_written())), &mut applied.writes);
+                        if instruction.counted_under() != NO_COUNT {
+                            applied.counted[instruction.counted_under() as usize] += 1;
                         }
                     }
                 }

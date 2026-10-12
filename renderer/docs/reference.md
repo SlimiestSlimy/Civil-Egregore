@@ -182,7 +182,7 @@ menus took the keys, the wheel or the pointer. **`fullscreen`**: by
 
 Every tile's climate written on it (`renderer.md`, "The climate,
 written"). `TILE_SIDE`, `CLIMATE_LABELS` (the grid of labels),
-`CLIMATE_FROM`, `CLIMATE_WIDTH`, `WAYS_NAMED`; **`ClimateLabel`**
+`CLIMATE_FROM`, `CLIMATE_WIDTH`; **`ClimateLabel`**
 (`slot`), `CameraOnly`; **`spawn`**: the labels, hidden; `written(climate)`: a
 tile's text; **`climates`**: gives each label the tile the camera
 shows that is its own, from `Seen::climates`.

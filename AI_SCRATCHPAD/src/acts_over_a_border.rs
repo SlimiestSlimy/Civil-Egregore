@@ -91,7 +91,7 @@ fn turn_of(turn: &mut Turn, crossing: bool) -> u64 {
                 continue;
             }
             let seen = u32::from(turn.holds(STONE, beside) == Ok(true));
-            turn.compare_from_here(Compare::Cell { layer_type: STONE, at: beside, seen: seen as u16 });
+            turn.compare_from_here(Compare::Cell { layer_type: STONE, at: beside, seen });
             if seen == 1 { cells::clear(turn, STONE, beside) } else { cells::set(turn, STONE, beside) }
             entities::set_attribute_of(turn, &header, COUNTED, Some(counted), counted + 1);
             turn.compare_end();

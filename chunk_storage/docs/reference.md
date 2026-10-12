@@ -16,7 +16,7 @@ chunk's more; **`words_of(words)`**: a map's length from its start.
 
 ## `layer_codec.rs`
 
-`LayerType`, `Width` (`Bits2`, `Bits4`, `Bits8`, `Bits16`) and `Wide<W>` are the type registry's (`../../type_registry/docs/reference.md`), handed on from this crate's root as what a layer is of.
+`LayerType`, `Width` (`Bits2`, `Bits4`, `Bits8`, `Bits16`, `Bits32`) and `Wide<W>` are the type registry's (`../../type_registry/docs/reference.md`), handed on from this crate's root as what a layer is of.
 
 **`LayerCodec`**: Tessera and its buffers, allocated once.
 **`encode(cells)`**: the bitmap's stream, as words, until the next

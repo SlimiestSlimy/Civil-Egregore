@@ -26,10 +26,21 @@ pub fn held_in_tile(turn: &Turn, layer_type: LayerType, cell: CellIndex) -> u32 
 #[inline]
 pub fn move_one<W: Width>(turn: &mut Turn, plane: Wide<W>, from: CellIndex, seen_from: u32, to: CellIndex, seen_to: u32, counted: usize) {
     debug_assert!(seen_from > 0 && seen_to < plane.most(), "one moved from {seen_from} to {seen_to}");
-    compare::open(turn, compare::value(plane, from, seen_from));
-    compare::open(turn, compare::value(plane, to, seen_to));
-    turn.write(Write::Cell { layer_type: plane.layer_type(), at: from, value: seen_from - 1, counted: Some(counted as u32) });
-    turn.write(Write::Cell { layer_type: plane.layer_type(), at: to, value: seen_to + 1, counted: None });
+    change_both(turn, plane, (from, seen_from, seen_from - 1), (to, seen_to, seen_to + 1), counted);
+}
+
+/// Queues the numbers `plane` holds at two cells changed together:
+/// each of `first` and `second` a cell, what the rule saw there and
+/// what it becomes. Both under both compares, so the one changes
+/// only if the other does -- whichever superchunk each is in. One
+/// added to the rule's count `counted` if it is applied.
+#[inline]
+pub fn change_both<W: Width>(turn: &mut Turn, plane: Wide<W>, first: (CellIndex, u32, u32), second: (CellIndex, u32, u32), counted: usize) {
+    debug_assert!(first.2 <= plane.most() && second.2 <= plane.most(), "{} and {} in a plane of {} bits a cell", first.2, second.2, W::BITS);
+    compare::open(turn, compare::value(plane, first.0, first.1));
+    compare::open(turn, compare::value(plane, second.0, second.1));
+    turn.write(Write::Cell { layer_type: plane.layer_type(), at: first.0, value: first.2, counted: Some(counted as u32) });
+    turn.write(Write::Cell { layer_type: plane.layer_type(), at: second.0, value: second.2, counted: None });
     compare::close(turn);
     compare::close(turn);
 }
@@ -79,7 +90,7 @@ pub fn square(turn: &Turn, layer_type: LayerType, cell: CellIndex, side: u32) ->
 #[inline]
 pub fn seen_becoming(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, seen: u32, value: u32, counted: Option<usize>) {
     debug_assert!(seen != value, "a write that changes nothing");
-    compare::with_writes(turn, compare::Compare::Cell { layer_type, at: cell, seen: seen as u16 }, &[Write::Cell { layer_type, at: cell, value, counted: counted.map(|place| place as u32) }]);
+    compare::with_writes(turn, compare::Compare::Cell { layer_type, at: cell, seen }, &[Write::Cell { layer_type, at: cell, value, counted: counted.map(|place| place as u32) }]);
 }
 
 /// Queues `layer_type` holding at `cell`, which the rule saw it did

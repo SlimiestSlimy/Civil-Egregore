@@ -3,7 +3,7 @@
 //! ([`first_clash`]): `docs/type_registry.md`, "Why one table".
 
 use crate::layouts::{Attribute, Layout, SheepState, BLOCK_WORDS};
-use crate::type_ids::{AttributeType, Bits16, Bits4, EntityRuleType, EntityType, LayerType, ScaRuleType, Wide, Width};
+use crate::type_ids::{AttributeType, Bits32, Bits4, Bits8, EntityRuleType, EntityType, LayerType, ScaRuleType, Wide, Width};
 
 /// What a row registers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -147,9 +147,14 @@ pub const WEATHER_TILE_SCALE: u32 = 3;
 /// The clouds: a number a tile 8 by 8 cells, 0 no cloud to 15 the
 /// deepest shadow a cloud casts.
 pub const CLOUD: Wide<Bits4> = Wide::of_tiles(40, WEATHER_TILE_SCALE);
-/// The climate: sixteen bits a tile 8 by 8 cells -- humidity,
-/// temperature and wind kept together, one read for all three.
-pub const CLIMATE: Wide<Bits16> = Wide::of_tiles(44, WEATHER_TILE_SCALE);
+/// The climate: thirty-two bits a tile 8 by 8 cells -- humidity,
+/// wind, temperature and pressure, a byte each, kept together: one
+/// read for all four.
+pub const CLIMATE: Wide<Bits32> = Wide::of_tiles(44, WEATHER_TILE_SCALE);
+/// How high the land of a tile 8 by 8 cells stands over the ocean,
+/// in heights, 255 at the most: what the air's moves are held
+/// against, read by the weather as any plane is.
+pub const ELEVATION: Wide<Bits8> = Wide::of_tiles(80, WEATHER_TILE_SCALE);
 
 /// The grass's rule: its master the grass.
 pub const RULE_OF_GRASS: ScaRuleType = ScaRuleType::of(32);
@@ -179,6 +184,7 @@ pub const REGISTRY: &[Registered] = &[
     sca_rule("weather rule", RULE_OF_WEATHER, CLIMATE.layer_type()),
     wide("cloud", CLOUD),
     wide("climate", CLIMATE),
+    wide("elevation", ELEVATION),
 ];
 
 /// The oldest stage a tree has: sixteen in all.

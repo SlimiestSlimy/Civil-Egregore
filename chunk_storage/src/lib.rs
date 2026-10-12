@@ -29,7 +29,7 @@ pub use paging::{read_back, Stored};
 pub use chunk_maps::{ChunkMaps, MAP_WORDS};
 pub use height_map::{height_in, Height, HeightMap, HEIGHT_WORDS, TALL_WORDS};
 pub use layer_codec::{BucketKey, LayerCodec};
-pub use type_registry::{Bits16, Bits2, Bits4, Bits8, LayerType, Wide, Width};
+pub use type_registry::{Bits16, Bits2, Bits32, Bits4, Bits8, LayerType, Wide, Width};
 pub use superchunk_cells::SuperchunkCells;
 pub use superchunk_image::{InvalidImage, LayerChange, SuperchunkImage};
 pub use writeback_ring::{RingEntry, WritebackRing};

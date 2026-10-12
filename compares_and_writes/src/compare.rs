@@ -25,7 +25,7 @@ pub fn lacks(layer_type: LayerType, cell: CellIndex) -> Compare {
 /// `plane` still holds the number `seen` at `cell`.
 #[inline]
 pub fn value<W: Width>(plane: Wide<W>, cell: CellIndex, seen: u32) -> Compare {
-    Compare::Cell { layer_type: plane.layer_type(), at: cell, seen: seen as u16 }
+    Compare::Cell { layer_type: plane.layer_type(), at: cell, seen }
 }
 
 /// `entity` still stands where it stood, its `attribute` what the

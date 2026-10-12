@@ -43,7 +43,7 @@ fn put_climate(world: &mut World, climate: Climate) {
 #[allow(clippy::disallowed_methods)]
 fn grass_decays_by_how_harsh_its_climate_is() {
     let mut random = Rng::new(utilities::seed::counted());
-    let harsh = Climate { humidity: random.below(8) as u32, wind: Wind::CALM, temperature: random.between(128, u64::from(HOTTEST) + 1) as u32 };
+    let harsh = Climate { humidity: random.below(8) as u32, wind: Wind::CALM, temperature: random.between(128, u64::from(HOTTEST) + 1) as u32, pressure: type_registry::PRESSURE_AT_REST };
     let mild = [Climate { humidity: MOST_HUMID, ..harsh }, Climate { temperature: 0, ..harsh }];
     for climate in [harsh, mild[random.below(2) as usize]] {
         let mut world = plain_world(1, 0, 0, 1);

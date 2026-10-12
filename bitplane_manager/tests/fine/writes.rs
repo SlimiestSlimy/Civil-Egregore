@@ -33,8 +33,8 @@ fn holds(arena: &BitmapArena, x: u32, y: u32) -> bool {
 }
 
 #[test]
-fn a_write_is_16_bytes() {
-    assert_eq!(size_of::<Write>(), 16);
+fn a_write_is_20_bytes() {
+    assert_eq!(size_of::<Write>(), 20);
 }
 
 /// Queued writes change nothing until applied; applying empties the

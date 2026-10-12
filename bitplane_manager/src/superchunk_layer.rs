@@ -148,7 +148,7 @@ impl SuperchunkLayer {
             return 0;
         };
         let at = (cell >> shift) * bits;
-        (self.buckets[start + at / BITS_PER_WORD] >> (at % BITS_PER_WORD)) as u32 & ((1 << bits) - 1)
+        (self.buckets[start + at / BITS_PER_WORD] >> (at % BITS_PER_WORD) & ((1u64 << bits) - 1)) as u32
     }
 
     /// Makes `value` the number at `cell`, in Morton order, of the hot

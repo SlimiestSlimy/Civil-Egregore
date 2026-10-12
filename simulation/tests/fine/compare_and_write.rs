@@ -149,7 +149,7 @@ fn drawn_writes_come_to_the_same_as_applied_in_order() {
         let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
             let superchunk = turn.superchunk();
             attempts(&cells, superchunk, |flipped, compared| {
-                let compare = Compare::Cell { layer_type: STONE, at: compared.0, seen: u16::from(compared.1) };
+                let compare = Compare::Cell { layer_type: STONE, at: compared.0, seen: u32::from(compared.1) };
                 actions::compare::write(turn, compare, STONE, flipped.0, u32::from(flipped.1), u32::from(!flipped.1), Some(usize::from(flipped.0 != compared.0)));
             });
             0

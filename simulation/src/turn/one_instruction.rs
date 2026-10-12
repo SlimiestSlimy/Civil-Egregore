@@ -82,7 +82,7 @@ impl Turn<'_> {
     #[inline]
     fn instruction_of(&self, write: Write) -> (Option<CellIndex>, Instruction) {
         match write {
-            Write::Cell { layer_type, at, value, counted } => (Some(at), Instruction::write_cell(layer_type, at, value as u16, counted.map_or(NO_COUNT, |place| u64::from(self.counted_number(place))))),
+            Write::Cell { layer_type, at, value, counted } => (Some(at), Instruction::write_cell(layer_type, at, value, counted.map_or(NO_COUNT, |place| self.counted_number(place)))),
             Write::Count(place) => (None, Instruction::count(self.counted_number(place))),
             Write::MakeEntity(header) => {
                 debug_assert!(header.wake > self.now, "an entity made to wake at tick {}, not after {}", header.wake, self.now);

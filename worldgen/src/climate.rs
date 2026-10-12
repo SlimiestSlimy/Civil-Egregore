@@ -5,7 +5,7 @@
 //! (`docs/worldgen.md`, "Climate").
 
 use crate::{Height, Noise};
-use type_registry::{Climate, Wind, HOTTEST, MOST_HUMID, STRONGEST_WIND, WAYS_OF_WIND};
+use type_registry::{Climate, Wind, HOTTEST, MOST_HUMID, PRESSURE_AT_REST, STRONGEST_WIND, TILES_ABOUT};
 
 /// Mixed with a world's seed for its climate's noise: it lies apart
 /// from the ground and from what grows.
@@ -18,9 +18,9 @@ const FINER: u32 = 9;
 /// Steps of height above the ocean that cool a tile by one.
 const STEPS_A_DEGREE_COOLER: u32 = 2;
 /// Steps of height above the ocean that dry a tile by one.
-const STEPS_A_LEVEL_DRIER: u32 = 32;
+const STEPS_A_LEVEL_DRIER: u32 = 2;
 /// How much more humid a tile of water is than the noise has it.
-const MORE_HUMID_OVER_WATER: u32 = 3;
+const MORE_HUMID_OVER_WATER: u32 = 48;
 
 /// The noises a world's climate lies by, kept tile after tile.
 pub struct ClimateNoises {
@@ -56,15 +56,15 @@ impl ClimateNoises {
         let blended = |noises: &mut [Noise; 2]| (3 * noises[0].at(x, y) + noises[1].at(x, y)) / 4;
         let above = u32::from(above_ocean);
         let temperature = (blended(&mut self.temperature) >> 8) as u32;
-        let humidity = (blended(&mut self.humidity) >> 12) as u32;
+        let humidity = (blended(&mut self.humidity) >> 8) as u32;
         let (temperature, humidity) = if under_water {
             ((temperature + HOTTEST / 2) / 2, (humidity + MORE_HUMID_OVER_WATER).min(MOST_HUMID))
         } else {
             (temperature.saturating_sub(above / STEPS_A_DEGREE_COOLER), humidity.saturating_sub(above / STEPS_A_LEVEL_DRIER))
         };
-        // A region a way, the ways turning one into the next; the strength of 0, calm, to the strongest.
-        let way = ((self.way.at(x, y) * WAYS_OF_WIND.len() as u64) >> 16) as usize;
-        let strength = ((self.strength.at(x, y) * u64::from(STRONGEST_WIND + 1)) >> 16) as u32;
-        Climate { humidity, wind: Wind::blowing(way, strength), temperature }
+        // A region a way, one of the eight, the ways turning one into the next; the strength of 0, calm, to the strongest. The pressure at rest: the winds make the rest of it.
+        let (across, down) = TILES_ABOUT[((self.way.at(x, y) * TILES_ABOUT.len() as u64) >> 16) as usize];
+        let strength = ((self.strength.at(x, y) * (STRONGEST_WIND as u64 + 1)) >> 16) as i32;
+        Climate { humidity, wind: Wind::blowing(across * strength, down * strength), temperature, pressure: PRESSURE_AT_REST }
     }
 }
