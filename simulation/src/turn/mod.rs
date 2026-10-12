@@ -136,6 +136,9 @@ pub struct Turn<'a> {
     /// `NO_SUPERCHUNK` until the author queues, and after its
     /// instructions go across.
     pub(crate) landed_last: (SuperchunkIndex, u8, u8),
+    /// Room for the cells sampled, its thread's: filled and gone over
+    /// by [`Turn::each_sampled`], kept from a turn to the next.
+    pub(crate) samples: &'a mut Vec<CellIndex>,
 }
 
 /// No superchunk: what [`Turn::landed_last`] holds before an author
@@ -160,10 +163,11 @@ pub(crate) struct AuthorBegan {
 impl<'a> Turn<'a> {
     /// The turn of `superchunk` and its `entities` in the tick `now`,
     /// nothing queued yet: what it queues goes to `outbox`, what it
-    /// draws comes from `random`.
-    pub(crate) fn new(superchunk: &'a Superchunk, entities: &'a SuperchunkEntities, now: u64, reader: &'a Reader<'a>, entity_reader: &'a EntityReader<'a>, outbox: &'a mut Outbox, random: Rng) -> Self {
+    /// draws comes from `random`, what it samples is kept in `samples`.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new(superchunk: &'a Superchunk, entities: &'a SuperchunkEntities, now: u64, reader: &'a Reader<'a>, entity_reader: &'a EntityReader<'a>, outbox: &'a mut Outbox, random: Rng, samples: &'a mut Vec<CellIndex>) -> Self {
         let compares_open = [conditional::CompareOpen::NONE; conditional::COMPARES_WITHIN];
-        Self { superchunk, entities, now, reader, entity_reader, outbox, random, author: 0, comparing: false, compares_open, compares_open_count: 0, writes_queued: 0, counted_from: 0, across: false, author_began: None, landed_last: (NO_SUPERCHUNK, 0, 0) }
+        Self { superchunk, entities, now, reader, entity_reader, outbox, random, author: 0, comparing: false, compares_open, compares_open_count: 0, writes_queued: 0, counted_from: 0, across: false, author_began: None, landed_last: (NO_SUPERCHUNK, 0, 0), samples }
     }
 
     /// The superchunk whose turn it is.
@@ -177,27 +181,49 @@ impl<'a> Turn<'a> {
         &mut self.random
     }
 
-    /// Chooses each hot set cell of `layer_type` in this superchunk with
-    /// `chance`, independently, into `samples` -- emptied first --
-    /// in Morton order: how many.
-    pub fn sample(&mut self, layer_type: LayerType, chance: Chance, samples: &mut Vec<CellIndex>) -> usize {
+    /// Runs `rule` on every hot set cell of `layer_type` in this
+    /// superchunk chosen with `chance`, independently, in Morton
+    /// order -- each named the author of what `rule` queues for it
+    /// ([`Turn::seeing_to`]) -- with `counts`, what the rule counts:
+    /// how many were chosen. A rule of the cells is the function on
+    /// one cell sampled; drawing the cells and going over them is
+    /// done here.
+    #[inline]
+    pub fn each_sampled<C>(&mut self, layer_type: LayerType, chance: Chance, counts: &mut C, rule: impl FnMut(&mut Self, CellIndex, &mut C)) -> usize {
+        let mut samples = std::mem::take(self.samples);
         samples.clear();
-        let Some(layer) = self.superchunk.layer(layer_type) else {
-            return 0;
-        };
-        sample_layer(self.superchunk.index(), layer, chance, &mut self.random, &mut |cell| samples.push(cell))
+        if let Some(layer) = self.superchunk.layer(layer_type) {
+            sample_layer(self.superchunk.index(), layer, chance, &mut self.random, &mut |cell| samples.push(cell));
+        }
+        self.each_of(samples, counts, rule)
     }
 
-    /// Chooses each tile of `layer_type` -- a plane of tiles -- in this
-    /// superchunk's hot chunks with `chance`, independently, whatever
-    /// it holds, its first cell into `samples` -- emptied first -- in
-    /// Morton order: how many.
-    pub fn sample_tiles(&mut self, layer_type: LayerType, chance: Chance, samples: &mut Vec<CellIndex>) -> usize {
+    /// [`Turn::each_sampled`] on every tile of `layer_type` -- a plane
+    /// of tiles -- in this superchunk's hot chunks chosen with
+    /// `chance`, whatever number it holds: `rule` is handed the
+    /// tile's first cell.
+    #[inline]
+    pub fn each_tile_sampled<C>(&mut self, layer_type: LayerType, chance: Chance, counts: &mut C, rule: impl FnMut(&mut Self, CellIndex, &mut C)) -> usize {
+        let mut samples = std::mem::take(self.samples);
         samples.clear();
-        let Some(layer) = self.superchunk.layer(layer_type) else {
-            return 0;
-        };
-        sample_tiles_of_layer(self.superchunk.index(), layer, layer_type.tile_shift(), chance, &mut self.random, &mut |cell| samples.push(cell))
+        if let Some(layer) = self.superchunk.layer(layer_type) {
+            sample_tiles_of_layer(self.superchunk.index(), layer, layer_type.tile_shift(), chance, &mut self.random, &mut |cell| samples.push(cell));
+        }
+        self.each_of(samples, counts, rule)
+    }
+
+    /// Runs `rule` on each of `samples`, in their order, each named
+    /// the author of what is queued for it, and keeps their room for
+    /// the next sampling: how many they were.
+    #[inline]
+    fn each_of<C>(&mut self, samples: Vec<CellIndex>, counts: &mut C, mut rule: impl FnMut(&mut Self, CellIndex, &mut C)) -> usize {
+        for &sampled in &samples {
+            self.seeing_to(sampled);
+            rule(self, sampled, counts);
+        }
+        let sampled = samples.len();
+        *self.samples = samples;
+        sampled
     }
 
     /// The window of `width` by `height` cells (each up to 8) whose top

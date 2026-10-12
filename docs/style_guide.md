@@ -42,9 +42,10 @@ reader has to wonder whether something is missing or was never needed
   optimization: what it was before and after. Everywhere else it says
   what was found and the command that measures it; the latest figures
   are in `transient_data/measurements/`.
-- A rule is written for one cell or one entity; the loop over them is
-  an instruction (`cells::each_sampled`, `entities::each_woken`), inlined,
-  so it costs nothing.
+- A rule is written for one cell or one entity. A rule of the cells is
+  the function on one sample, and no more: drawing the samples and
+  going over them is the simulation's (`Turn::each_sampled`), handed
+  the rule by whoever ticks it, inlined, so it costs nothing.
 - A command's parameters are declared once, name and default
   (`utilities::commands::Parameter`): the usage, the parsing and the
   report's line all come from that. No crate reads `std::env::args`.

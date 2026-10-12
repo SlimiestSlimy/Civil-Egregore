@@ -234,7 +234,7 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     entities.queue_put(Header { kind: SHEEP, at: standing, wake: 0 }, &hungry_at(was_hungry_at));
     entities.apply();
     let mut simulation = simulation::Simulation::new(1);
-    let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut actions::Turn, _: &mut Vec<CellIndex>| {
+    let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut actions::Turn| {
         // The decay first, counted under 0; the sheep's counts from 8 on.
         cells::clear_counted(turn, GRASS, decaying, 0);
         turn.count_under(8);

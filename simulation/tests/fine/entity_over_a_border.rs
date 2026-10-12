@@ -74,7 +74,7 @@ fn tick(threads: usize, row: u32, last: Does, blocked: bool) -> (entity_manager:
         assert!(at.0 > from.0, "a writer meant to come after the crosser in the world's order");
     }
     assert!(writers[0].0 .0 < from.0);
-    let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
         let now = turn.now();
         actions::entities::each_woken(turn, [], &mut (), |turn, entity, _| {
             let header: Header = entity.header;

@@ -29,7 +29,7 @@ fn cells_every_way() -> impl Iterator<Item = (u32, u32)> {
 fn the_nine_about_a_cell_are_its_cells_read_one_by_one() {
     let mut random = Rng::new(utilities::seed::counted());
     let mut arena = crate::tests::arena(3, (0..3_000_000).map(move |_| cell(random.below(3072) as u32, random.below(3072) as u32)));
-    let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
+    let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }
@@ -88,7 +88,7 @@ fn what_may_be_stepped_to_is_the_unwalled_less_the_held() {
     let hemmed: CellIndex = cell(1023, 1024);
     (0..around::WAYS).filter(|&bit| bit != around::HERE).for_each(|bit| arena.queue(COLLISION, Write::cell(around::cell(hemmed, bit).unwrap(), WriteOp::Set)));
     assert_eq!(arena.apply().missed, 0);
-    let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
+    let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }

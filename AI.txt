@@ -688,3 +688,21 @@ RULES AND TIME
 - Later: optimizations and inlining; cold states not paged; page-out
   on the tick's thread; an area allocator (256 MiB blocks, 256-byte
   units); a read of every file for one name a thing.
+
+- ASK 2026-10-11, on sca_rules/src/weather.rs `pub fn rule(turn: &mut
+  Turn, samples: &mut Vec<CellIndex>) -> RuleCounts`: "this is bad,
+  that should be on the simulation side, not here. in this case would
+  be the tile function, which is very wrong name btw". (Mine: a rule
+  is the function on ONE sample; the drawing of samples, their vector
+  and the loop over them are the simulation's; `tile` is renamed.)
+  Interrupted while in hand, NOT started in code: sheep hopping down
+  (plan: four wall planes, "no step out of this cell that way").
+- ASK 2026-10-11: "also, both temperature and humidity should slowly
+  spread as well over neighbroing tiles with the wind vector".
+- ASK 2026-10-11: "and also, wind vectors can spread slowly as well".
+  And of the wind's spreading: "like averaging over time to 0". (Mine:
+  a tile's wind is stepped towards its upwind neighbour's as a vector,
+  so winds that differ wear each other down to calm.)
+  And: "the borders of the loaded superchunks is what will introduce
+  the new wind". (Mine: a tile beside a superchunk not loaded keeps
+  its wind as it is, never worn down: the wind comes in from there.)

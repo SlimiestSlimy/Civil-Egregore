@@ -20,7 +20,7 @@ fn turns_read_entities_across_superchunks() {
     entities.queue_put(right, &[]);
     entities.apply();
     let seen = Mutex::new(Vec::new());
-    Simulation::new(2).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
+    Simulation::new(2).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn| {
         for entity in turn.woken() {
             let neighbour = entity.header.at.offset(1, 0).unwrap();
             let by_cell = turn.entity_on(neighbour).map(|other| other.header);
@@ -48,7 +48,7 @@ fn entities_wake_in_morton_order() {
     let mut simulation = Simulation::new(1);
     for tick in 0..3 {
         let order = Mutex::new(Vec::new());
-        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn| {
             for entity in turn.woken() {
                 order.lock().unwrap().push(entity.header.at);
                 let at = entity.header.at.offset(1, 1).unwrap();
@@ -75,7 +75,7 @@ fn entities_stay_in_morton_order_as_they_step() {
     entities.apply();
     let mut simulation = Simulation::new(1);
     for tick in 0..200 {
-        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn| {
             for entity in turn.woken() {
                 let (dx, dy) = (turn.random().below(5) as i32 - 2, turn.random().below(5) as i32 - 2);
                 let after = Header { at: entity.header.at.offset(dx, dy).unwrap(), wake: turn.now() + 1, ..entity.header };
@@ -105,7 +105,7 @@ fn a_change_to_an_entity_that_moved_on_is_passed_over() {
     entities.queue_put(walker(cell(50, 50), 0), &[]);
     entities.apply();
     let mut simulation = Simulation::new(1);
-    let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
+    let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn| {
         for entity in turn.woken() {
             for step in [1, 2] {
                 let after = Header { at: entity.header.at.offset(step, 0).unwrap(), wake: turn.now() + 1, ..entity.header };
@@ -116,7 +116,7 @@ fn a_change_to_an_entity_that_moved_on_is_passed_over() {
     });
     assert_eq!((report.instructions_applied.moves, report.instructions_applied.passed_over, entities.len()), (1, 1, 1));
     assert!(entities.get(cell(51, 50)).is_some(), "the first move applied");
-    let woken = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| turn.woken().count()).rules;
+    let woken = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn| turn.woken().count()).rules;
     assert_eq!(woken, 1);
 }
 
@@ -138,7 +138,7 @@ fn entities_never_overlap() {
     entities.queue_put(walker(cell(corner + 7, corner + 7), 0), &[]);
     let applied = entities.apply();
     assert_eq!((applied.puts, applied.refused, entities.len()), (900, 2, 900));
-    let jostle = |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    let jostle = |turn: &mut Turn| {
         for entity in turn.woken() {
             let header = entity.header;
             let (dx, dy) = (turn.random().below(3) as i32 - 1, turn.random().below(3) as i32 - 1);

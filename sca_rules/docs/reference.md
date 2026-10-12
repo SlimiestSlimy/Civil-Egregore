@@ -11,8 +11,7 @@ The design is in `sca_rules.md`.
 at 256 ticks a second); `SAMPLE_CHANCE` (the two together): each a
 `Chance`, parts in 2^32, no float.
 
-**`rule(turn, samples)`**: hands **`cell`**, the rule for one cell of grass, to `cells::each_sampled`, which goes over the cells. On one superchunk's turn, every cell of grass
-sampled at the two chances together; each draws whether it spreads (in
+**`rule(turn, cell, counts)`**: the rule on one cell of grass sampled -- whoever ticks it has the simulation sample the grass at the two chances together (`Turn::each_sampled`). Each draws whether it spreads (in
 `SPREAD_CHANCE` of the sum, `Rng::chance_among`) or is held against its
 climate: grass set on a neighbour with none (one of the eight, drawn,
 stepped on the Morton index), or its own cleared with a chance of
@@ -29,7 +28,7 @@ the cells a tree stands on, and `TREE_STAGE`, its stage, 0 to
 `OLDEST_TREE_STAGE`. `MEAN_TIME_TO_SAMPLE` (39.062 seconds of the simulation) and the `SAMPLE_CHANCE` worked out from it, `SPREAD_SHARE` and `GROW_SHARE` (`Chance::HALF` each), `SEEDS_FROM` (4),
 `CROWDED` (9 trees), `MEAN_TIME_TO_DIE` (312.5 seconds at the oldest stage) and the `DIE_CHANCE` a sample worked out from it, `AROUND` (8).
 
-**`rule(turn, samples)`**: hands **`tree`**, the rule for one tree, to `cells::each_sampled`. Every tree sampled tries to spread or grows
+**`rule(turn, cell, counts)`**: the rule on one tree sampled. Every tree sampled tries to spread or grows
 a stage -- or at the oldest dies one time in four, its cell and its
 stage cleared, and its cell in the collision plane (`COLLISION`). **`spread(turn, cell, stage)`**: the other trees in the
 8 by 8 cells about it counted from one window; with `n` of them it goes
@@ -48,8 +47,8 @@ chances are parts of; `PARTS_A_LEVEL_FROM_HUMIDITY` (16),
 `EVAPORATION_DIVIDES_HEAT` (16), `BURNING_OFF_DIVIDES_HEAT` (4),
 `PARTS_RAIN_SHEDS` (64); `TILE_SIDE` (8). **`deepens_and_thins(climate, cloud, over_water)`**:
 the parts with which a cloud deepens a level, and thins one.
-**`rule(turn, samples)`**: hands **`tile`**, the rule for one tile, to
-`cells::each_tile_sampled` (`sca_rules.md`, "Weather"). Returns its
-`RuleCounts`, their places named **`SAMPLED`**, **`DEEPENED`**,
+**`rule(turn, sampled, counts)`**: the rule on one tile of the climate
+sampled, named by its first cell (`sca_rules.md`, "Weather"). It counts in the
+`RuleCounts` it is handed, their places named **`SAMPLED`**, **`DEEPENED`**,
 **`THINNED`**, **`BLOWN`**, **`RAINING`**, their names listed in
 **`COUNTED`**.

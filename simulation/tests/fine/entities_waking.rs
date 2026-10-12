@@ -5,7 +5,7 @@
 //! `cargo test`
 
 use crate::tests::*;
-use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use coordinates::{SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{AttributeBlock, Header, WHEEL_TICKS};
 use simulation::{Simulation, Turn};
 use std::sync::Mutex;
@@ -49,7 +49,7 @@ fn entities_wake_at_their_tick() {
     let woken = Mutex::new(Vec::new());
     let mut simulation = Simulation::new(1);
     for _ in 0..=far + 10 {
-        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn, _| {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn| {
             for entity in turn.woken() {
                 woken.lock().unwrap().push((entity.header.at, turn.now()));
                 if entity.header.at == third {
@@ -76,7 +76,7 @@ fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
     entities.queue_put(walker(cell(start, 100), 0), &[AttributeBlock::holding(WOKEN, 0)]);
     entities.apply();
     let mut simulation = Simulation::new(2);
-    let step = |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    let step = |turn: &mut Turn| {
         for entity in turn.woken() {
             let after = Header { at: entity.header.at.offset(1, 0).unwrap(), wake: turn.now() + 1, ..entity.header };
             actions::entities::update(turn, &entity.header, after, &[AttributeBlock::holding(WOKEN, entity.attribute(WOKEN).unwrap() + 1)]);
@@ -103,7 +103,7 @@ fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
 /// superchunks, across their borders: the same on one thread and four.
 #[test]
 fn any_number_of_threads_ticks_entities_the_same() {
-    let wander = |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    let wander = |turn: &mut Turn| {
         let mut changes = 0;
         for entity in turn.woken() {
             let header = entity.header;

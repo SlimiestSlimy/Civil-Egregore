@@ -10,9 +10,7 @@ to it together.
 
 ## `cells.rs`
 
-**`each_sampled(turn, type, chance, samples, each)`**: `each` run
-on every cell sampled -- each set cell of the type chosen with the
-`Chance`, independently -- with its counts. **`each_tile_sampled(turn, plane, chance, samples, each)`**: the same on every tile of a plane of tiles, whatever it holds, named by its first cell. **`held_in_tile(turn, type, cell)`**: how many cells of the tile 8x8 the cell is in the type holds at. **`move_one(turn, plane, from, seen_from, to, seen_to, counted)`**: one taken from the number at a cell and added to another's, both under both compares -- nothing made or lost, whatever border is between them. **`hot(turn, type, cell)`**,
+**`held_in_tile(turn, type, cell)`**: how many cells of the tile 8x8 the cell is in the type holds at. **`move_one(turn, plane, from, seen_from, to, seen_to, counted)`**: one taken from the number at a cell and added to another's, both under both compares -- nothing made or lost, whatever border is between them. **`hot(turn, type, cell)`**,
 **`holds`**, **`lacks`**: the cell read. **`value(turn, plane,
 cell)`**: a wide plane's number. **`square(turn, type, cell, side)`**:
 up to 8x8 cells about a cell as a `Window`, with their top left cell;

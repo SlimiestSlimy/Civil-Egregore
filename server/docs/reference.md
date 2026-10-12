@@ -116,7 +116,7 @@ words, or `None`.
 **`RULES`**: every rule a world ticks, a **`Rule`** `{registered, counted,
 rule}` each: the type registry's rules, as many and in its order, made
 as the server is compiled (`registered_at(place)`). `registered` is
-its row in the registry, **`Rule::master`** its master's. `RuleFunction`: what a rule is called as.
+its row in the registry, **`Rule::master`** its master's. `RuleFunction`: what a rule is called as, on one superchunk's turn. `on_each_sampled(turn, id, chance, rule)`: a rule of the cells -- the function on one sample -- handed to the simulation to run on each sample of its master, the registry's: a layer's set cells, a wide plane's every tile.
 `written_for(id)`: what a rule counts and its function, by its ID --
 all the server says of a rule, and the build fails if the registry
 has one it says nothing of. **`RulePlace`**: a rule's place in it, made of its

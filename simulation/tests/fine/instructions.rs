@@ -55,7 +55,7 @@ fn number(at: CellIndex, first: CellIndex) -> u64 {
 }
 
 /// Every walker woken steps a cell to the right, to wake next tick.
-fn step_right(turn: &mut Turn, _: &mut Vec<CellIndex>) -> usize {
+fn step_right(turn: &mut Turn) -> usize {
     let now = turn.now();
     for entity in turn.woken() {
         actions::entities::step(turn, &entity.header, entity.header.at.offset(1, 0).expect("in the world"), now + 1);
@@ -125,7 +125,7 @@ fn entities_edit_another_an_attribute_at_a_time() {
     entities.queue_put(walker(cell(1040, 30), 0), &[]);
     entities.apply();
     let mut simulation = Simulation::new(2);
-    let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
         for entity in turn.woken() {
             let number = number(entity.header.at, cell(1020, 30));
             actions::entities::set_attribute_of(turn, &target, if number == 1 { MARK } else { SCAR }, None, number);
@@ -141,7 +141,7 @@ fn entities_edit_another_an_attribute_at_a_time() {
 
     entities.queue_put(walker(cell(1031, 31), 1), &[]);
     entities.apply();
-    simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
         for entity in turn.woken() {
             actions::entities::unset_attribute_of(turn, &target, MARK, 1);
             actions::entities::set_attribute_of(turn, &target, NAME, Some(7), 8);
@@ -167,7 +167,7 @@ fn of_two_edits_of_one_attribute_one_is_refused_the_same_on_any_threads() {
         entities.queue_put(walker(cell(1020, 30), 0), &[]);
         entities.queue_put(walker(cell(1040, 30), 0), &[]);
         entities.apply();
-        let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
             for entity in turn.woken() {
                 actions::entities::set_attribute_of(turn, &target, NAME, None, number(entity.header.at, cell(1020, 30)));
                 actions::entities::step(turn, &entity.header, entity.header.at, NEVER);
@@ -195,7 +195,7 @@ fn an_entity_changing_itself_and_another_writing_it_both_stand() {
         entities.queue_put(target, &[AttributeBlock::holding(NAME, 7)]);
         entities.queue_put(walker(cell(1020, 30), 0), &[]);
         entities.apply();
-        let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
             for entity in turn.woken() {
                 if entity.header.at == target.at {
                     // Itself: its name changed, asleep from here on.
@@ -230,7 +230,7 @@ fn a_crossing_written_behind_takes_what_was_written() {
         entities.queue_put(walker(cell(1000, 30), 0), &[]);
         entities.apply();
         let mut simulation = Simulation::new(threads);
-        let rule = |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        let rule = |turn: &mut Turn| {
             let now = turn.now();
             for entity in turn.woken() {
                 if entity.header.at == crosser.at {
@@ -266,7 +266,7 @@ fn two_fields_of_one_attribute_are_written_by_two_in_a_tick() {
     entities.queue_put(walker(cell(1040, 30), 0), &[]);
     entities.apply();
     let kind = NAME.attribute_type();
-    let report = Simulation::new(2).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    let report = Simulation::new(2).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
         for entity in turn.woken() {
             if number(entity.header.at, cell(1020, 30)) == 1 {
                 // The first member, and the one after it seen wrongly.

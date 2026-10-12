@@ -58,44 +58,38 @@ pub const fn deepens_and_thins(climate: Climate, cloud: u32, over_water: bool) -
     if over_water { (deepens + climate.temperature / EVAPORATION_DIVIDES_HEAT, thins) } else { (deepens, thins + climate.temperature / BURNING_OFF_DIVIDES_HEAT) }
 }
 
-/// The rule, on one superchunk's turn: every tile of the climate
-/// sampled with [`SAMPLE_CHANCE`], in Morton order, each seen to by
-/// [`tile`].
-pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
-    let (sampled, mut counts) = cells::each_tile_sampled(turn, CLIMATE, SAMPLE_CHANCE, samples, tile);
-    counts[SAMPLED] = sampled as u64;
-    counts
-}
-
-/// The rule, on one tile sampled, named by its first cell: its wind
+/// The rule, on one tile of the climate sampled -- each with
+/// [`SAMPLE_CHANCE`], by whoever ticks the rule -- named by its
+/// first cell, `sampled`: its wind
 /// may blow a level of its cloud to the tile it blows towards --
 /// the stronger the likelier, and only where that tile has room --
 /// or else the cloud deepens or thins a level
 /// ([`deepens_and_thins`]).
 #[inline]
-fn tile(turn: &mut Turn, tile: CellIndex, counts: &mut RuleCounts) {
-    let (Some(climate), Some(cloud)) = (cells::value(turn, CLIMATE, tile), cells::value(turn, CLOUD, tile)) else {
+pub fn rule(turn: &mut Turn, sampled: CellIndex, counts: &mut RuleCounts) {
+    counts[SAMPLED] += 1;
+    let (Some(climate), Some(cloud)) = (cells::value(turn, CLIMATE, sampled), cells::value(turn, CLOUD, sampled)) else {
         return;
     };
     let climate = Climate::of_number(climate);
     counts[RAINING] += u64::from(climate.rains(cloud));
     if let Some((across, down)) = climate.wind.towards().filter(|_| cloud > 0)
         && this_tick::random(turn).below(u64::from(STRONGEST_WIND + 1)) < u64::from(climate.wind.strength())
-        && let Some(towards) = tile.offset(across * TILE_SIDE, down * TILE_SIDE)
+        && let Some(towards) = sampled.offset(across * TILE_SIDE, down * TILE_SIDE)
         && let Some(there) = cells::value(turn, CLOUD, towards).filter(|&there| there < CLOUD.most())
     {
-        cells::move_one(turn, CLOUD, tile, cloud, towards, there, BLOWN);
+        cells::move_one(turn, CLOUD, sampled, cloud, towards, there, BLOWN);
         return;
     }
     // A tile is water's if most of its cells are under it.
-    let over_water = cells::held_in_tile(turn, WET, tile) * 2 > (TILE_SIDE * TILE_SIDE) as u32;
+    let over_water = cells::held_in_tile(turn, WET, sampled) * 2 > (TILE_SIDE * TILE_SIDE) as u32;
     let (deepens, thins) = deepens_and_thins(climate, cloud, over_water);
     let drawn = this_tick::random(turn).below(u64::from(WHOLE)) as u32;
     if drawn < deepens {
         if cloud < CLOUD.most() {
-            cells::set_value_counted(turn, CLOUD, tile, cloud, cloud + 1, DEEPENED);
+            cells::set_value_counted(turn, CLOUD, sampled, cloud, cloud + 1, DEEPENED);
         }
     } else if drawn < deepens + thins && cloud > 0 {
-        cells::set_value_counted(turn, CLOUD, tile, cloud, cloud - 1, THINNED);
+        cells::set_value_counted(turn, CLOUD, sampled, cloud, cloud - 1, THINNED);
     }
 }

@@ -189,8 +189,8 @@ fn a_flock_over_borders_comes_to_the_same_on_any_number_of_threads() {
     assert_eq!(came(&arena, &entities, shift), came(&arena_there, &entities_there, shift), "the same pasture put, shifted {shift:?}");
     let (mut done, mut refused, mut over_a_border) = (InstructionsApplied::default(), 0, (0, 0));
     for _ in 0..TICKS {
-        let report = simulation.tick(&mut arena, &mut entities, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed, shift));
-        let report_there = simulation_there.tick(&mut arena_there, &mut entities_there, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flock(turn, seed, shift));
+        let report = simulation.tick(&mut arena, &mut entities, seed, |turn: &mut Turn| flock(turn, seed, shift));
+        let report_there = simulation_there.tick(&mut arena_there, &mut entities_there, seed, |turn: &mut Turn| flock(turn, seed, shift));
         over_a_border = (over_a_border.0 + report.acts_over_a_border, over_a_border.1 + report_there.acts_over_a_border);
         done += report.instructions_applied;
         refused += report.writes_applied.refused;

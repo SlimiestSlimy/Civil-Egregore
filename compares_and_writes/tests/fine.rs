@@ -34,7 +34,7 @@ fn what_is_queued_from_a_compare_to_its_end_hangs_on_it() {
         if [seen, under, after].iter().collect::<std::collections::BTreeSet<_>>().len() < 3 {
             continue;
         }
-        Simulation::new(1).tick(&mut arena, &mut entities, 1, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        Simulation::new(1).tick(&mut arena, &mut entities, 1, |turn: &mut Turn| {
             // The compare says the cell holds stone, or lacks it: it lacks it.
             compare::from_here(turn, if holding { compare::lacks(STONE, seen) } else { compare::holds(STONE, seen) });
             compare::with_writes(turn, compare::lacks(STONE, under), &[Write::Cell { layer_type: STONE, at: under, value: 1, counted: None }]);

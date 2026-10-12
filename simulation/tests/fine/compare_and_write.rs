@@ -32,7 +32,7 @@ fn a_write_is_applied_only_where_the_cell_is_as_it_was_seen() {
     let (mut arena, mut entities) = world(1);
     let (twice, never_set, cleared) = (cell(5, 5), cell(700, 9), cell(1023, 1023));
     set(&mut arena, &[cleared]);
-    let report = Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    let report = Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
         turn.count_under(10);
         actions::cells::seen_becoming(turn, STONE, twice, 0, 1, Some(DECAYED as usize));
         actions::cells::seen_becoming(turn, STONE, twice, 0, 1, Some(DECAYED as usize));
@@ -67,7 +67,7 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
     entities.queue_put(walker(eaten, 0), &[]);
     entities.apply();
     let mark = |at: CellIndex| at.offset(1, 0).expect("in the world");
-    let report = Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    let report = Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
         actions::cells::seen_becoming(turn, STONE, decaying, 1, 0, Some(DECAYED as usize));
         for eater in turn.woken() {
             let (now, header) = (turn.now(), eater.header);
@@ -146,7 +146,7 @@ fn drawn_writes_come_to_the_same_as_applied_in_order() {
     for threads in [1, 4] {
         let (mut arena, mut entities) = world(2);
         set(&mut arena, &cells.iter().filter(|(_, set)| *set).map(|(at, _)| *at).collect::<Vec<_>>());
-        let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
             let superchunk = turn.superchunk();
             attempts(&cells, superchunk, |flipped, compared| {
                 let compare = Compare::Cell { layer_type: STONE, at: compared.0, seen: u16::from(compared.1) };

@@ -22,7 +22,7 @@ pub struct WorldTick {
 /// superchunk's random stream the first tick it is in. The halos are
 /// not moved.
 fn tick_chosen(simulation: &mut Simulation, arena: &mut BitmapArena, entities: &mut Entities, seed: u64, chosen: Chosen) -> TickReport<TickCounts> {
-    with_counts_applied(simulation.tick(arena, entities, seed, |turn, samples| chosen.turn(turn, samples)))
+    with_counts_applied(simulation.tick(arena, entities, seed, |turn| chosen.turn(turn)))
 }
 
 impl World {
@@ -44,7 +44,7 @@ impl World {
     pub fn tick_only(&mut self, chosen: Chosen, timed: bool) -> TickReport<TickCounts> {
         let (simulation, seed) = (&mut self.simulation, self.info.seed);
         let report = match timed {
-            true => with_counts_applied(simulation.tick(&mut self.arena, &mut self.entities, seed, |turn, samples| chosen.timed_turn(turn, samples))),
+            true => with_counts_applied(simulation.tick(&mut self.arena, &mut self.entities, seed, |turn| chosen.timed_turn(turn))),
             false => tick_chosen(simulation, &mut self.arena, &mut self.entities, seed, chosen),
         };
         crate::host::shown::between_ticks(self);

@@ -29,8 +29,8 @@ dy)`**, and for each where every author's part begins (`segments`, a
 **`Segment`** `{author, instructions, compares}` each).
 
 **`Turn`**: a superchunk's turn in the first phase:
-**`superchunk`**, **`random`**, **`now`**, **`sample(type, chance,
-samples)`** of its own cells, **`sample_tiles(type, chance, samples)`** of the tiles of a plane of tiles. Cells read, anywhere hot, as the tick
+**`superchunk`**, **`random`**, **`now`**, **`each_sampled(type, chance,
+counts, rule)`**: `rule` run on each of its own set cells chosen, with what it counts -- how many; **`each_tile_sampled(type, chance, counts, rule)`** on the tiles of a plane of tiles; `each_of(samples, counts, rule)`, the going over, and `samples`, the room kept for them. Cells read, anywhere hot, as the tick
 found them: **`holds(type, cell)`**, **`value(plane, cell)`** (a wide
 plane's number), **`window(type, origin, width, height)`** (up to 8x8
 cells as a `Window`), **`windows(types, ...)`** (of several types at

@@ -113,7 +113,7 @@ pub fn run(given: &Given) -> Result<(), String> {
             let mut simulation = Simulation::new(threads);
             let (mut acts, mut applying, mut computing, mut compared) = (0, std::time::Duration::ZERO, std::time::Duration::ZERO, (0, 0));
             for tick in 0..ticks + 20 {
-                let report = simulation.tick(&mut arena, &mut entities, 1, |turn: &mut Turn, _: &mut Vec<CellIndex>| turn_of(turn, crossing == 1));
+                let report = simulation.tick(&mut arena, &mut entities, 1, |turn: &mut Turn| turn_of(turn, crossing == 1));
                 // The first ticks grow the queues: not counted.
                 if tick >= 20 {
                     (acts, applying, computing) = (acts + report.acts_over_a_border, applying + report.applying, computing + report.computing);

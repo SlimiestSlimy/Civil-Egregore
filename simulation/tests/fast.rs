@@ -172,17 +172,15 @@ mod tick {
     /// Stone creeping: each cell sampled at 5% sets a random neighbour it
     /// sees clear -- within the 3x3 around it -- or clears itself: how
     /// many it sampled.
-    fn creep(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> usize {
-        let sampled = turn.sample(STONE, Chance::one_in(20), samples);
-        for &cell in samples.iter() {
+    fn creep(turn: &mut Turn) -> usize {
+        turn.each_sampled(STONE, Chance::one_in(20), &mut (), |turn, cell, _| {
             let (dx, dy) = (turn.random().below(3) as i32 - 1, turn.random().below(3) as i32 - 1);
             if (dx, dy) == (0, 0) {
                 actions::cells::seen_becoming(turn, STONE, cell, 1, 0, None);
             } else if let Some(neighbour) = cell.offset(dx, dy).filter(|&neighbour| turn.holds(STONE, neighbour) == Ok(false)) {
                 actions::cells::seen_becoming(turn, STONE, neighbour, 0, 1, None);
             }
-        }
-        sampled
+        })
     }
 
     /// Every hot bitmap's cells, in the arena's order.
@@ -221,14 +219,12 @@ mod tick {
         let edge = CellCartesian { x: corner(11, 10).x - 1, y: corner(10, 10).y + utilities::rng::Rng::new(utilities::seed::counted()).below(1024) as u32 };
         let mut arena = arena(2, [edge].into_iter());
         let across: CellIndex = CellCartesian { x: edge.x + 1, y: edge.y }.into();
-        let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
-            turn.sample(STONE, Chance::ALWAYS, samples);
-            for &cell in samples.iter() {
+        let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
+            turn.each_sampled(STONE, Chance::ALWAYS, &mut (), |turn, cell, _| {
                 let right = cell.offset(1, 0).expect("in the world");
                 actions::cells::seen_becoming(turn, STONE, right, 0, 1, None);
                 assert_eq!(turn.holds(STONE, right), Ok(false), "still as the tick found it");
-            }
-            samples.len()
+            })
         });
         assert_eq!((report.rules, report.writes_applied.changed), (1, 1));
         assert_eq!(arena.holds(STONE, across), Ok(true), "set in the neighbour");
@@ -241,16 +237,15 @@ mod tick {
     fn writes_about_a_corner_land_in_the_four_superchunks() {
         let meet = corner(11, 11);
         let mut arena = arena(2, [CellCartesian { x: meet.x - 1, y: meet.y - 1 }].into_iter());
-        let report = Simulation::new(2).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
-            turn.sample(STONE, Chance::ALWAYS, samples);
-            for &cell in samples.iter() {
+        let report = Simulation::new(2).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
+            turn.each_sampled(STONE, Chance::ALWAYS, &mut (), |turn, cell, _| {
                 for (x, y) in (-1..3).flat_map(|y| (-1..3).map(move |x| (x, y))) {
                     let at = cell.offset(x, y).expect("in the world");
                     if turn.holds(STONE, at) == Ok(false) {
                         actions::cells::seen_becoming(turn, STONE, at, 0, 1, None);
                     }
                 }
-            }
+            });
             0
         });
         assert_eq!(report.writes_applied.changed, 15, "the 4x4 from two up and left of the meeting point, one cell set already");
@@ -265,11 +260,10 @@ mod tick {
     fn writes_to_cold_neighbours_are_missed() {
         let edge = CellCartesian { x: corner(11, 10).x - 1, y: corner(10, 10).y + utilities::rng::Rng::new(utilities::seed::counted()).below(1024) as u32 };
         let mut arena = arena(1, [edge].into_iter());
-        let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
-            turn.sample(STONE, Chance::ALWAYS, samples);
-            for &cell in samples.iter() {
+        let report = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
+            turn.each_sampled(STONE, Chance::ALWAYS, &mut (), |turn, cell, _| {
                 actions::cells::seen_becoming(turn, STONE, cell.offset(1, 0).expect("in the world"), 0, 1, None);
-            }
+            });
             0
         });
         assert_eq!((report.writes_applied.changed, report.writes_applied.missed), (0, 1));
@@ -280,11 +274,10 @@ mod tick {
     #[should_panic(expected = "past the speed of light")]
     fn writes_past_the_speed_of_light_panic() {
         let mut arena = arena(1, [corner(10, 10)].into_iter());
-        Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, samples| {
-            turn.sample(STONE, Chance::ALWAYS, samples);
-            for &cell in samples.iter() {
+        Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
+            turn.each_sampled(STONE, Chance::ALWAYS, &mut (), |turn, cell, _| {
                 actions::cells::seen_becoming(turn, STONE, cell.offset(2 * SUPERCHUNK_SIDE_CELLS as i32, 0).expect("in the world"), 0, 1, None);
-            }
+            });
             0
         });
     }

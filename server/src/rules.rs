@@ -4,12 +4,12 @@
 //! (`docs/server.md`, "TickCounts").
 
 use coordinates::CellIndex;
-use actions::{RuleCounts, TickReport, Turn, COUNTS_OF_A_RULE};
+use actions::{Chance, RuleCounts, TickReport, Turn, COUNTS_OF_A_RULE};
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
-/// A rule, on one superchunk's turn, with room for samples.
-type RuleFunction = fn(&mut Turn, &mut Vec<CellIndex>) -> RuleCounts;
+/// A rule, on one superchunk's turn.
+type RuleFunction = fn(&mut Turn) -> RuleCounts;
 
 /// One rule of the world.
 #[derive(Clone, Copy)]
@@ -18,7 +18,7 @@ pub struct Rule {
     pub registered: &'static type_registry::Registered,
     /// What it counts, each named at its place in its counts.
     pub counted: &'static [&'static str],
-    /// The rule, on one superchunk's turn, with room for samples.
+    /// The rule, on one superchunk's turn.
     pub rule: RuleFunction,
 }
 
@@ -28,16 +28,32 @@ pub struct Rule {
 /// ([`RULES`]) if that is a rule the registry has.
 const fn written_for(id: u64) -> Option<(&'static [&'static str], RuleFunction)> {
     if id == type_registry::RULE_OF_GRASS.0 {
-        Some((&sca_rules::grass::COUNTED, sca_rules::grass::rule))
+        Some((&sca_rules::grass::COUNTED, |turn| on_each_sampled(turn, type_registry::RULE_OF_GRASS.0, sca_rules::grass::SAMPLE_CHANCE, sca_rules::grass::rule)))
     } else if id == type_registry::RULE_OF_TREES.0 {
-        Some((&sca_rules::trees::COUNTED, sca_rules::trees::rule))
+        Some((&sca_rules::trees::COUNTED, |turn| on_each_sampled(turn, type_registry::RULE_OF_TREES.0, sca_rules::trees::SAMPLE_CHANCE, sca_rules::trees::rule)))
     } else if id == type_registry::RULE_OF_SHEEP.0 {
-        Some((&entity_rules::sheep::COUNTED, |turn, _| entity_rules::sheep::rule(turn)))
+        Some((&entity_rules::sheep::COUNTED, entity_rules::sheep::rule))
     } else if id == type_registry::RULE_OF_WEATHER.0 {
-        Some((&sca_rules::weather::COUNTED, sca_rules::weather::rule))
+        Some((&sca_rules::weather::COUNTED, |turn| on_each_sampled(turn, type_registry::RULE_OF_WEATHER.0, sca_rules::weather::SAMPLE_CHANCE, sca_rules::weather::rule)))
     } else {
         None
     }
+}
+
+/// One superchunk's turn of the rule of the cells whose ID is `id`:
+/// `rule`, the function on one sample, run by the simulation on each
+/// its master has in the superchunk, chosen with `chance` -- the
+/// master the registry gives the rule, its set cells if it is a
+/// layer, its every tile if it is a wide plane.
+#[inline]
+fn on_each_sampled(turn: &mut Turn, id: u64, chance: Chance, rule: impl FnMut(&mut Turn, CellIndex, &mut RuleCounts)) -> RuleCounts {
+    let master = type_registry::rule_of_id(id).and_then(type_registry::master_of).expect("checked as the registry is built");
+    let (layer_type, mut counts) = (master.layer_type().expect("a rule of the cells' master is a plane"), RuleCounts::default());
+    match master.registration {
+        type_registry::Registration::WidePlane => turn.each_tile_sampled(layer_type, chance, &mut counts, rule),
+        _ => turn.each_sampled(layer_type, chance, &mut counts, rule),
+    };
+    counts
 }
 
 /// The rule the registry has at `place` among its rules, with what is
@@ -187,25 +203,25 @@ impl Chosen {
     /// One superchunk's turn of these rules: what `Simulation::tick`
     /// is given.
     #[inline]
-    pub fn turn(self, turn: &mut Turn, samples: &mut Vec<CellIndex>) -> TickCounts {
+    pub fn turn(self, turn: &mut Turn) -> TickCounts {
         let mut done = TickCounts::default();
         for (place, rule) in RULES.iter().enumerate() {
             if self.run[place] {
                 turn.count_under((place * COUNTS_OF_A_RULE) as u32);
-                done.counts[place] = (rule.rule)(turn, samples);
+                done.counts[place] = (rule.rule)(turn);
             }
         }
         done
     }
 
     /// One superchunk's turn of these rules, each one's time taken.
-    pub fn timed_turn(self, turn: &mut Turn, samples: &mut Vec<CellIndex>) -> TickCounts {
+    pub fn timed_turn(self, turn: &mut Turn) -> TickCounts {
         let mut done = TickCounts::default();
         for (place, rule) in RULES.iter().enumerate() {
             if self.run[place] {
                 let start = Instant::now();
                 turn.count_under((place * COUNTS_OF_A_RULE) as u32);
-                done.counts[place] = (rule.rule)(turn, samples);
+                done.counts[place] = (rule.rule)(turn);
                 done.times[place] = start.elapsed();
             }
         }
