@@ -115,11 +115,25 @@ cells: every tile of a hot chunk is chosen with one chance
 (`Turn::each_tile_sampled`, the simulation's), and named by its first cell. It reads
 the tile's climate -- humidity, wind, temperature
 (`../../type_registry/docs/type_registry.md`, "The climate") -- and
-its cloud, 0 to 15, and does one of two things.
+its cloud, 0 to 15, and does one of three things.
 
-**The wind blows.** If the tile has cloud and its wind is not calm,
-then with a chance of its strength over four -- a wind of 3 three
-times in four -- a level of the cloud is taken from the tile and
+**The wind blows**, if it is not calm, with a chance of its strength
+over four -- a wind of 3 three times in four. Then, now and then
+(`CARRY_CHANCE`, once in 60 seconds of a strongest wind,
+`MEAN_TIME_TO_CARRY_CLIMATE`), **it carries its tile's climate** to
+the tile it blows towards (`carry`): one of three drawn -- that
+tile's humidity a level nearer this one's, its temperature up to 4
+nearer (`DEGREES_A_WIND_CARRIES`), or its wind a step nearer this
+wind (`Wind::a_step_towards`): blowing the same way, a strength
+nearer; another way, a strength weaker, down to calm; calm, this
+wind's way at the least strength. So humidity and heat drift down
+the wind, and winds that differ wear each other down to nothing,
+averaging out. A tile beside what is not loaded keeps its wind
+(`at_the_border_of_what_is_loaded`): the wind comes in from there,
+and no wind inside wears it down. Each is one compare-and-write of
+the tile's climate as the rule saw it.
+
+Else, if the tile has cloud, a level of the cloud is taken from the tile and
 added to the tile the wind blows towards, if that one has room
 (`cells::move_one`). Both writes are under both compares, what was
 seen here and what was seen there, so a level is taken only if one is
@@ -153,8 +167,7 @@ water came to the deepest cloud and stayed.
 
 Every write says what the rule saw, so a tile's cloud moves a level
 a tick at the most. The rule counts what it sampled, deepened,
-thinned, blew and found raining.
+thinned, blew, found raining, and carried.
 
-Not yet: the climate does not change -- the wind is the one worldgen
-gave -- and water is not kept count of: cloud is made and unmade, no
+Not yet: nothing makes new climate but the wind carrying what is there, and water is not kept count of: cloud is made and unmade, no
 humidity is used up, no lake dries.

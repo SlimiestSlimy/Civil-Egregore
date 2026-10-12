@@ -74,4 +74,4 @@ climate"). `RAINS_ABOVE_IN_COLD_DRY_AIR`, `HEAT_A_LEVEL_MORE_HELD`, `HUMIDITY_A_
 `WAYS_OF_WIND`. **`Wind`**: `CALM`, **`blowing(way, strength)`**,
 **`of_state(state)`**, **`state`**, **`strength`**, **`way`**,
 **`towards`**. **`Climate`**: `humidity`, `wind`, `temperature`;
-**`of_number(number)`**, **`number`**, **`rains_above`**, **`rains(cloud)`**.
+**`of_number(number)`**, **`number`**, **`rains_above`**, **`rains(cloud)`**. What a wind carries: **`Wind::a_step_towards(other)`**, **`Climate::with_humidity_carried_from(upwind)`**, **`with_temperature_carried_from`** (`DEGREES_A_WIND_CARRIES`, 4), **`with_wind_carried_from`**; `nearer(from, to, step)`.

@@ -50,5 +50,5 @@ the parts with which a cloud deepens a level, and thins one.
 **`rule(turn, sampled, counts)`**: the rule on one tile of the climate
 sampled, named by its first cell (`sca_rules.md`, "Weather"). It counts in the
 `RuleCounts` it is handed, their places named **`SAMPLED`**, **`DEEPENED`**,
-**`THINNED`**, **`BLOWN`**, **`RAINING`**, their names listed in
-**`COUNTED`**.
+**`THINNED`**, **`BLOWN`**, **`RAINING`**, **`CARRIED`**, their names listed in
+**`COUNTED`**. `MEAN_TIME_TO_CARRY_CLIMATE` (60 seconds), `CARRY_CHANCE`, `CARRIED_OF_A_CLIMATE` (3); `at_the_border_of_what_is_loaded(turn, tile)`; `carry(turn, climate, towards, there)`: one of a climate's three carried a step onto the tile the wind blows towards.

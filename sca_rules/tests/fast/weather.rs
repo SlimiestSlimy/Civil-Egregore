@@ -7,7 +7,7 @@
 use crate::tests::{land_seed, plain_world, tick_rule};
 use bitplane_manager::{Write, WriteOp};
 use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
-use sca_rules::weather::{deepens_and_thins, BLOWN, DEEPENED, RAINING, SAMPLED, THINNED, WHOLE};
+use sca_rules::weather::{deepens_and_thins, BLOWN, CARRIED, DEEPENED, RAINING, SAMPLED, THINNED, WHOLE};
 use server::World;
 use type_registry::{Climate, Wind, CLIMATE, CLOUD, HOTTEST, MOST_HUMID, STRONGEST_WIND, WAYS_OF_WIND, WEATHER_TILE_SCALE, WET};
 use utilities::rng::Rng;
@@ -228,4 +228,68 @@ fn a_wind_blows_clouds_its_way_and_makes_none() {
         }
         assert_eq!(blown > 0, !calm, "{blown} levels blown by a wind of strength {strength}");
     }
+}
+
+/// A wind stepped towards another comes to be it, in no more steps
+/// than wearing down to calm and rising again takes, never stronger
+/// on the way than the stronger of the two; and a wind is a step from
+/// itself nowhere.
+#[test]
+fn a_wind_stepped_towards_another_comes_to_be_it() {
+    let winds: Vec<Wind> = (0..=STRONGEST_WIND * WAYS_OF_WIND.len() as u32).map(Wind::of_state).collect();
+    for &from in &winds {
+        assert_eq!(from.a_step_towards(from), from);
+        for &to in &winds {
+            let (mut wind, mut steps) = (from, 0);
+            while wind != to {
+                wind = wind.a_step_towards(to);
+                steps += 1;
+                assert!(wind.strength() <= from.strength().max(to.strength()) && steps <= 2 * STRONGEST_WIND, "{from:?} towards {to:?}: {wind:?} after {steps} steps");
+            }
+        }
+    }
+}
+
+/// A wind carries its tile's climate to the tile it blows towards, a
+/// step at a time: a plain under one wind, humid and hot on the half
+/// the wind comes from, dry and cold and calm on the other, has the
+/// tiles down the wind come nearer the tiles up it -- no tile ever
+/// past either half's numbers -- while every tile beside what is not
+/// loaded keeps the wind it had.
+#[test]
+fn a_wind_carries_its_climate_down_it_and_the_border_keeps_its_wind() {
+    let mut random = Rng::new(utilities::seed::counted());
+    let mut world = plain_world(4, 0, 0, 2);
+    let side = tiles_a_side(&world);
+    let (way, strength) = (random.below(WAYS_OF_WIND.len() as u64) as usize, 1 + random.below(u64::from(STRONGEST_WIND)) as u32);
+    let (across, down) = WAYS_OF_WIND[way];
+    // How far down the wind a tile is from the middle: under 0, the half the wind comes from.
+    let along = |(x, y): (u32, u32)| i64::from(across) * (i64::from(x) - i64::from(side / 2)) + i64::from(down) * (i64::from(y) - i64::from(side / 2));
+    let upwind = Climate { humidity: 8 + random.below(8) as u32, wind: Wind::blowing(way, strength), temperature: 128 + random.below(128) as u32 };
+    let downwind = Climate { humidity: random.below(8) as u32, wind: Wind::CALM, temperature: random.below(128) as u32 };
+    let tiles: Vec<(u32, u32)> = (0..side * side).map(|tile| (tile % side, tile / side)).collect();
+    let put: Vec<Write> = tiles.iter().map(|&tile| Write::value(CLIMATE, tile_at(&world, tile), if along(tile) < 0 { upwind } else { downwind }.number())).collect();
+    world.write_cells(CLIMATE.layer_type(), put);
+    let began = climates(&world);
+    let at_the_border = |(x, y): (u32, u32)| x == 0 || y == 0 || x == side - 1 || y == side - 1;
+    let mut carried = 0;
+    for _ in 0..random.between(3_000, 4_000) {
+        carried += tick_rule(&mut world, server::WEATHER_RULE).rules[CARRIED];
+    }
+    let now = climates(&world);
+    assert!(carried > 0, "nothing carried by a wind of strength {strength}");
+    let (mut nearer, mut winds_risen) = (0, 0);
+    for (place, &tile) in tiles.iter().enumerate() {
+        let (was, is) = (began[place], now[place]);
+        assert!((downwind.humidity..=upwind.humidity).contains(&is.humidity) && (downwind.temperature..=upwind.temperature).contains(&is.temperature), "{tile:?}: {is:?} past both halves");
+        assert!(is.wind == was.wind || !at_the_border(tile), "{tile:?} at the border: its wind {:?} was {:?}", is.wind, was.wind);
+        assert!(is.wind.way().is_none_or(|is| is == way), "{tile:?}: a wind another way, {:?}", is.wind);
+        if along(tile) < 0 {
+            assert_eq!((is.humidity, is.temperature), (was.humidity, was.temperature), "{tile:?}: up the wind, nothing blows onto it but its like");
+        } else {
+            nearer += u64::from(is.humidity > was.humidity || is.temperature > was.temperature);
+            winds_risen += u64::from(is.wind != was.wind);
+        }
+    }
+    assert!(nearer > 0 && winds_risen > 0, "{nearer} tiles down the wind more humid or hotter, {winds_risen} with a wind risen, of {carried} carried");
 }

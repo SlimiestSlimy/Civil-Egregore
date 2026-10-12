@@ -236,6 +236,8 @@ what they always do and are not listed.
 | **transient data** | a crate's `transient_data/`, out of git: what its runs leave behind (`TransientData`) | report | |
 | **census** | a count of a population: the flock and grass over a run, or Tessera's nodes by kind | | |
 | **reading** | the process's memory read once (`MemoryTrack::read`) | | sample |
+| **test** | a test of the code, run by `cargo test`: it judges, and fails or passes (`docs/testing_protocol.md`) | tier, in-bin test | |
+| **in-bin test** | a command of the binary that ticks a world and reports what it did -- `server pasture`, `server check`, `server throughput`: run by hand or to measure, judging nothing itself. The code such a command is written in is the diagnostics | test, diagnostics, ticker | test (that is `cargo test`'s); benchmark |
 | **tier** | a test's size: fine, fast or complete (`docs/testing_protocol.md`) | | |
 | **settings** | this machine's settings, kept from run to run: `settings.csv` in the folder `Civil Egregore` where the system keeps a user's programs' data (`utilities::settings`) | default settings, slider, group | config, preferences, preset |
 | **default settings** | every setting and what it is unless changed: a settings file built into the program, copied to a machine that has none; all there is under the build feature `force_default_settings` | settings | |
@@ -247,6 +249,6 @@ what they always do and are not listed.
 | **toggle** | a slider that is only on or off, turned by a click: its `kind` in the sliders' file (`Tuned::toggle`) | slider, tuning | checkbox, switch, flag |
 | **world start** | every number a new world starts from -- seed, generation, size, forced hot, sheep, threads, hot entity, camera loading -- whoever gives them (`server::Start`); the server alone knows what they mean | tuning, forced hot, hot entity, world's size | world options, lab |
 | **host** | a world run on a thread of its own for a window, which calls it (`server::host::Host`) and is answered with the cells of its viewport's hot superchunks (`Frame`) | world start | sim, simulation thread |
-| **ticker** | whatever ticks a world that is no host: a test, a diagnostic. It owns its world and ticks it flat out | host, shown world | run (a job is run; a host runs a world) |
+| **ticker** | whatever ticks a world that is no host: a test, an in-bin test. It owns its world and ticks it flat out | host, shown world | run (a job is run; a host runs a world) |
 | **shown world** | a ticker's world drawn in a window while it is ticked: the server answers the window's asks between the ticker's ticks, over a local socket, when the environment variable `CIVIL_EGREGORE_RENDER` is set (`server::host::shown`); the window is the game's own program (`Civil_Egregore renderer show`) | ticker, host, frame | |
 | **worlds' folder** | where worlds are kept unless a path is given: `worlds` in the folder `Civil Egregore`, or what the setting `worlds` names (`utilities::settings::worlds`) | save, settings | |
