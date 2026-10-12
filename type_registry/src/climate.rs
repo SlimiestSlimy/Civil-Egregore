@@ -73,16 +73,40 @@ pub const fn pressure_falls_by(here: u32, there: u32) -> u32 {
     if here > there + PRESSURE_GAP_AT_REST { here - there } else { 0 }
 }
 
-/// A number from -[`STRONGEST_WIND`] to [`STRONGEST_WIND`], held to it.
-const fn held(strength: i32) -> i32 {
-    if strength > STRONGEST_WIND { STRONGEST_WIND } else if strength < -STRONGEST_WIND { -STRONGEST_WIND } else { strength }
+/// The whole number nearest the square root of `number`.
+const fn nearest_root(number: u32) -> u32 {
+    // The greatest whole number whose square is no more, a bit at a time from the highest...
+    let (mut root, mut bit) = (0u64, 1u64 << 15);
+    while bit != 0 {
+        if (root | bit) * (root | bit) <= number as u64 {
+            root |= bit;
+        }
+        bit >>= 1;
+    }
+    // ...and the next, if `number` is past the half way between them.
+    if (2 * root + 1) * (2 * root + 1) < 4 * number as u64 { root as u32 + 1 } else { root as u32 }
+}
+
+/// The vector `across` and `down` held to a circle of
+/// [`STRONGEST_WIND`]: as it is within it, else shortened to it the
+/// way it points, to the nearest whole numbers -- so a wind blows no
+/// stronger between two of the eight ways than along one.
+const fn held_to_the_circle(across: i32, down: i32) -> (i32, i32) {
+    let square = across * across + down * down;
+    if square <= STRONGEST_WIND * STRONGEST_WIND {
+        return (across, down);
+    }
+    // Its length, in 256ths.
+    let length = nearest_root(square as u32 * 256 * 256) as i32;
+    ((across * STRONGEST_WIND * 256 + across.signum() * (length / 2)) / length, (down * STRONGEST_WIND * 256 + down.signum() * (length / 2)) / length)
 }
 
 /// The wind over a tile: a vector, how strongly it blows across
-/// (east the more) and down (south the more), each from
-/// -[`STRONGEST_WIND`] to [`STRONGEST_WIND`] -- so it blows any of
-/// eight ways, or between them, at many strengths, and two winds are
-/// averaged by their numbers. A byte: a nibble each.
+/// (east the more) and down (south the more), no longer than
+/// [`STRONGEST_WIND`] whichever way it points -- a circle, not a
+/// square -- so it blows any of eight ways, or between them, at many
+/// strengths, and two winds are averaged by their numbers. A byte: a
+/// nibble each.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Wind {
     /// How strongly it blows east: west if under 0.
@@ -95,16 +119,18 @@ impl Wind {
     /// No wind.
     pub const CALM: Self = Self { across: 0, down: 0 };
 
-    /// The wind blowing `across` east and `down` south, each held to
-    /// [`STRONGEST_WIND`] either way.
+    /// The wind blowing `across` east and `down` south, held to
+    /// [`STRONGEST_WIND`] whichever way that is
+    /// ([`held_to_the_circle`]).
     pub const fn blowing(across: i32, down: i32) -> Self {
-        Self { across: held(across) as i8, down: held(down) as i8 }
+        let (across, down) = held_to_the_circle(across, down);
+        Self { across: across as i8, down: down as i8 }
     }
 
     /// The wind the byte `state` says: a nibble each, two's
     /// complement.
     pub const fn of_state(state: u32) -> Self {
-        Self::blowing(((state & 0xF) as i32) << 28 >> 28, ((state >> 4 & 0xF) as i32) << 28 >> 28)
+        Self { across: (((state & 0xF) as i32) << 28 >> 28) as i8, down: (((state >> 4 & 0xF) as i32) << 28 >> 28) as i8 }
     }
 
     /// Its byte.
@@ -117,10 +143,11 @@ impl Wind {
         (self.across as i32, self.down as i32)
     }
 
-    /// How strong it blows: the stronger of its two ways, 0 calm.
+    /// How strong it blows: its vector's length, to the nearest whole
+    /// number, 0 calm.
     pub const fn strength(self) -> u32 {
-        let (across, down) = (self.across.unsigned_abs() as u32, self.down.unsigned_abs() as u32);
-        if across > down { across } else { down }
+        let (across, down) = (self.across as i32, self.down as i32);
+        nearest_root((across * across + down * down) as u32)
     }
 
     /// The step to the tile it blows to this time, across and down,
@@ -141,11 +168,12 @@ impl Wind {
         Self::blowing(self.across as i32 + across, self.down as i32 + down)
     }
 
-    /// This wind a step nearer `other`, each of its two ways by one:
-    /// two winds averaged a little at a time, so winds that differ
-    /// wear each other down and one wind over all stays as it is.
+    /// This wind a step nearer `other`, each of its two ways by one,
+    /// held to the circle as any wind: two winds averaged a little at
+    /// a time, so winds that differ wear each other down and one wind
+    /// over all stays as it is.
     pub const fn a_step_towards(self, other: Self) -> Self {
-        Self { across: self.across + (other.across - self.across).signum(), down: self.down + (other.down - self.down).signum() }
+        Self::blowing((self.across + (other.across - self.across).signum()) as i32, (self.down + (other.down - self.down).signum()) as i32)
     }
 }
 

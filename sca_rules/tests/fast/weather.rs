@@ -64,8 +64,8 @@ fn air(world: &World) -> u64 {
     climates(world).iter().map(|climate| u64::from(climate.pressure)).sum()
 }
 
-/// Every wind there is, each of its two ways from the strongest one
-/// way to the strongest the other.
+/// Every wind there is: each of its two ways asked from the strongest
+/// one way to the strongest the other, and held to the circle.
 fn winds() -> Vec<Wind> {
     (-STRONGEST_WIND..=STRONGEST_WIND).flat_map(|down| (-STRONGEST_WIND..=STRONGEST_WIND).map(move |across| Wind::blowing(across, down))).collect()
 }
@@ -78,10 +78,15 @@ fn a_climate_is_its_number_and_back() {
     let winds = winds();
     for &wind in &winds {
         let (across, down) = wind.vector();
-        assert_eq!((Wind::of_state(wind.state()), wind.strength()), (wind, across.unsigned_abs().max(down.unsigned_abs())));
-        assert!(wind.state() <= 0xFF);
+        // Its strength its length, to the nearest whole number -- none longer than the strongest, but by the rounding of a diagonal's parts.
+        let length = f64::from(across * across + down * down).sqrt();
+        assert_eq!((Wind::of_state(wind.state()), wind.strength()), (wind, length.round() as u32), "{wind:?}");
+        assert!(wind.state() <= 0xFF && length < f64::from(STRONGEST_WIND) + 0.5, "{wind:?}");
+        assert_eq!(Wind::blowing(across, down), wind, "held, it is held already");
     }
-    assert_eq!((Wind::CALM.strength(), Wind::CALM.state(), Wind::blowing(99, -99).vector()), (0, 0, (STRONGEST_WIND, -STRONGEST_WIND)));
+    // A diagonal blows no stronger than a straight wind: the square's corner comes in to the circle, its way kept.
+    assert_eq!((Wind::CALM.strength(), Wind::CALM.state(), Wind::blowing(99, -99).vector()), (0, 0, (5, -5)));
+    assert_eq!((Wind::blowing(99, 0).vector(), Wind::blowing(0, -99).vector(), Wind::blowing(7, 7).strength()), ((STRONGEST_WIND, 0), (0, -STRONGEST_WIND), STRONGEST_WIND as u32));
     for _ in 0..random.between(200, 400) {
         let climate = Climate { humidity: random.below(u64::from(MOST_HUMID) + 1) as u32, wind: winds[random.below(winds.len() as u64) as usize], temperature: random.below(u64::from(HOTTEST) + 1) as u32, pressure: random.below(u64::from(HIGHEST_PRESSURE) + 1) as u32 };
         assert_eq!(Climate::of_number(climate.number()), climate);
@@ -92,7 +97,7 @@ fn a_climate_is_its_number_and_back() {
 /// nearer and never past; a rise passes all of the air on the level,
 /// half at the rise that halves, and less the steeper; pressure falls
 /// only past the gap that stays, the more the lower; a wind stepped
-/// towards another comes to be it, never stronger on the way; a wind
+/// towards another comes to be it, never past the strongest on the way; a wind
 /// reaches a tile as often as it is strong, and a calm one never.
 #[test]
 fn the_small_functions_the_air_goes_by() {
@@ -116,14 +121,24 @@ fn the_small_functions_the_air_goes_by() {
         let (misses_across, misses_down) = (draws - across.unsigned_abs(), draws - down.unsigned_abs());
         assert_eq!(reached, draws * draws - misses_across * misses_down, "{from:?}");
         assert!((0..draws * draws).filter_map(|draw| from.step_drawn(draw % draws, draw / draws)).all(|(x, y)| (x == 0 || x == across.signum()) && (y == 0 || y == down.signum())));
-        let to = winds[random.below(winds.len() as u64) as usize];
-        let (mut wind, mut steps) = (from, 0);
-        while wind != to {
-            wind = wind.a_step_towards(to);
-            steps += 1;
-            assert!(wind.strength() <= from.strength().max(to.strength()) && steps <= 2 * STRONGEST_WIND, "{from:?} towards {to:?}: {wind:?} after {steps} steps");
+        // Towards every wind there is: held to the circle at each step, it comes to be the other all the same.
+        for &to in &winds {
+            let (mut wind, mut steps) = (from, 0);
+            while wind != to {
+                wind = wind.a_step_towards(to);
+                steps += 1;
+                assert!(wind.strength() <= STRONGEST_WIND as u32 && steps <= 3 * STRONGEST_WIND, "{from:?} towards {to:?}: {wind:?} after {steps} steps");
+            }
         }
         assert_eq!(from.pushed(0, 0), from);
+        // Pressure leans the way the wind blows: once where it blows no way towards a tile, more the more it blows along the step there.
+        let leans = type_registry::TILES_ABOUT.map(|step| sca_rules::weather::leans(from, step));
+        for (way, &(step_across, step_down)) in type_registry::TILES_ABOUT.iter().enumerate() {
+            let along = across * step_across + down * step_down;
+            assert_eq!(leans[way], 1 + sca_rules::weather::A_WIND_LEANS_PRESSURE * along.max(0) as u32, "{from:?} towards {:?}", type_registry::TILES_ABOUT[way]);
+            assert_eq!(sca_rules::weather::leans(Wind::CALM, type_registry::TILES_ABOUT[way]), 1);
+        }
+        assert!(from == Wind::CALM || leans.iter().max() > leans.iter().min(), "{from:?}: some way likelier than another");
     }
 }
 

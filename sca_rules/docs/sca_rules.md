@@ -139,11 +139,16 @@ A tile sampled does this, in order:
 about it is more than 1 under it (`PRESSURE_GAP_AT_REST`): one of
 those is drawn, each as likely as it is far under
 (`pressure_falls_by`) -- the lowest the likeliest, none higher ever --
-and as the land lets the air up to it (`passes`), so that up a slope
+times how much the tile's own wind blows that way (`leans`: once with
+no wind along the step there, `A_WIND_LEANS_PRESSURE` times more for
+each unit of it), and as the land lets the air up to it (`passes`), so that up a slope
 it goes less often, or not at all this time. A unit of pressure goes
 there, and the air leaving turns the tile's own wind that way
 (`Wind::pushed`). This is tried every sample before anything else: a
-gap does not wait for a chance.
+gap does not wait for a chance. The two feed one another, which is the
+weather's spring: air leaving turns the wind its way, and the wind
+then sends the next air the same way, past where the pressures would
+have evened -- until the gap it made the other side pushes back.
 
 **2. Else the wind blows** (`wind_blows`). Its vector draws which of
 the eight tiles about it it reaches, the stronger the likelier

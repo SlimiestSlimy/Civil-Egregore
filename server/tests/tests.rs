@@ -42,10 +42,13 @@ pub fn land_seed(nth: u64) -> u64 {
 /// A plain forced hot of `superchunks` superchunks -- a square of them
 /// -- made by the server, with grass on about `grass_cells` cells of
 /// each and `sheep` sheep on each, ticked on `threads` threads: a rule
-/// tried alone, the terrain taking no part.
+/// tried alone, the terrain taking no part. Its seed is the seed
+/// rotation's (`utilities::seed::counted`): where the grass and the
+/// sheep lie and what every rule draws change as it is rolled.
 pub fn plain_world(superchunks: u32, grass_cells: u64, sheep: usize, threads: usize) -> World {
     let cells = u64::from(coordinates::SUPERCHUNK_SIDE_CELLS).pow(2);
-    server::diagnostics::plain_world::plain_world(superchunks, grass_cells * worldgen::ONE / cells, sheep, threads)
+    let start = server::diagnostics::plain_world::plain_start(superchunks, grass_cells * worldgen::ONE / cells, sheep, threads);
+    server::start(server::Start { seed: utilities::seed::counted(), ..start })
 }
 
 /// The top left superchunk of `world`'s hot ones.

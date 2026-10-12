@@ -46,12 +46,12 @@ the `SAMPLE_CHANCE` worked out from it; `WHOLE` (256), what a sample's
 chances are parts of; `PARTS_A_LEVEL_FROM_HUMIDITY` (16),
 `EVAPORATION_DIVIDES_HEAT` (16), `BURNING_OFF_DIVIDES_HEAT` (4),
 `PARTS_RAIN_SHEDS` (64), `PRESSURE_DIVIDES_ITS_GAP` (2); `TILE_SIDE` (8);
-`MEAN_TIME_TO_CARRY_CLIMATE` (400 seconds), `CARRY_CHANCE`,
+`A_WIND_LEANS_PRESSURE` (4); `MEAN_TIME_TO_CARRY_CLIMATE` (400 seconds), `CARRY_CHANCE`,
 `CARRIED_OF_A_CLIMATE` (3). The small functions: `beside(turn, tile,
 step)`, a tile about one and its climate;
 `at_the_border_of_what_is_loaded(turn, tile)`; `passes(turn, from, to,
 whole)`, what the land lets through; `give_pressure(turn, from, to,
-counted)`, a unit moved under both compares; `pressure_falls(turn,
+counted)`, a unit moved under both compares; `leans(wind, towards)`, how much likelier pressure falls the way the wind blows; `pressure_falls(turn,
 sampled, here)`; `carry(turn, here, towards, there)`;
 `wind_blows(turn, sampled, here, cloud)`;
 **`deepens_and_thins(climate, cloud, over_water)`**, the parts with
