@@ -277,7 +277,7 @@ world's tick ends with -- `ASKED`, the flag read once -- `show` where a window w
 **`Host::of_shown_worlds()`**: the window's end, a host whose world is
 whatever ticker's comes: `Told` what the window last said, kept for
 the next ticker (`send`); `tickers`, every ticker that connects, one
-after another, its frames sent on.
+after another, its frames sent on (`next_ticker`, the next waited for). **`no_ticker_is_left()`** (`NO_TICKER_LEFT`): the last ticker gone and none come within **`WINDOW_WAITS_FOR_THE_NEXT_TICKER`** -- the window closes on it.
 
 `wire.rs`: `MOST_WORDS`; `send(to, words)`, `receive(from)`, a message
 of words; `Written` (`number`, `pair`, `words`, `text`, `maybe`) and
@@ -292,7 +292,7 @@ What a client asks of a world's terrain where no frame brings it
 (`server.md`, "Terrain asked of the host"), answered on a thread named
 `terrain`. `Height`, the word heights come in. **`Levels`** `{ground,
 ocean, highest}`, the heights a world is drawn between
-(`Levels::of(generation)`); **`Cover`** -- `Ocean`, `Tree`, `Grass`,
+(`Levels::of(generation)`: a world with no relief, a plain, drawn between the default world's, as low land); **`Cover`** -- `Ocean`, `Tree`, `Grass`,
 `Dirt` -- what a cell is generated with.
 **`HeightsAsk`** `{world, first, size, skipped}`: the heights of a
 rectangle of cells, those of the superchunks `skipped` passed by and

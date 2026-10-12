@@ -419,6 +419,13 @@ pace makes it wait as a host does. A world shown at another address in
 memory or of another seed than the last is another world to the
 window, which draws it anew.
 
+**Closed when the ticking stops.** Once a ticker has been shown and
+has gone, the window's end waits a short while for the next
+(`WINDOW_WAITS_FOR_THE_NEXT_TICKER`: a test program ends, another
+starts) and, none coming, says none is left (`no_ticker_is_left`):
+the window closes. Before its first ticker it waits for as long as it
+takes.
+
 One ticker at a time is shown; tests ticking worlds on several threads
 at once take the window in turns, tick by tick -- `cargo test --
 --test-threads=1` shows each whole.

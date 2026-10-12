@@ -13,6 +13,7 @@ use coordinates::SuperchunkIndex;
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
@@ -242,15 +243,56 @@ impl Host {
     }
 }
 
+/// How long a window that has shown a ticker's world waits for the
+/// next ticker once none is connected, before it says none is left
+/// ([`no_ticker_is_left`]): the time one test program takes to end
+/// and the next to start.
+pub const WINDOW_WAITS_FOR_THE_NEXT_TICKER: Duration = Duration::from_secs(2);
+
+/// Whether this process's window has shown a ticker and none has
+/// come since: set by [`tickers`], asked by the window.
+static NO_TICKER_LEFT: AtomicBool = AtomicBool::new(false);
+
+/// Whether the tickers this process's window showed are all gone, and
+/// none came in [`WINDOW_WAITS_FOR_THE_NEXT_TICKER`]: the window
+/// closes then, as whatever ticked has stopped. False before the
+/// first ticker: a window opened by hand waits for one.
+pub fn no_ticker_is_left() -> bool {
+    NO_TICKER_LEFT.load(Ordering::Relaxed)
+}
+
+/// The next ticker to connect to `listener`: waited for as long as
+/// it takes if none has been `shown` yet, else for
+/// [`WINDOW_WAITS_FOR_THE_NEXT_TICKER`] and no longer.
+fn next_ticker(listener: &TcpListener, shown: bool) -> Option<TcpStream> {
+    if !shown {
+        return listener.accept().ok().map(|(ticker, _)| ticker);
+    }
+    listener.set_nonblocking(true).ok()?;
+    let until = Instant::now() + WINDOW_WAITS_FOR_THE_NEXT_TICKER;
+    let mut ticker = None;
+    while ticker.is_none() && Instant::now() < until {
+        ticker = listener.accept().ok().map(|(ticker, _)| ticker);
+        if ticker.is_none() {
+            thread::sleep(Duration::from_millis(20));
+        }
+    }
+    listener.set_nonblocking(false).ok()?;
+    // A stream may come as its listener was: read as any other, waiting.
+    ticker.filter(|ticker| ticker.set_nonblocking(false).is_ok())
+}
+
 /// Every ticker that connects to `listener`, one after another: told
 /// what the window last said, its frames read and sent on to
 /// `answers` -- each world of each ticker a world of its own to the
 /// window, the terrain's thread told of it first -- until the window
-/// is gone.
+/// is gone, or the last ticker is and none comes after it
+/// ([`no_ticker_is_left`]).
 fn tickers(listener: &TcpListener, told: &Mutex<Told>, answers: &Sender<Frame>, terrain: &Sender<TerrainRequest>) {
     // Counts the worlds shown, over every ticker; and which one of the ticker connected the last was.
-    let mut worlds = 0;
-    for ticker in listener.incoming().flatten() {
+    let (mut worlds, mut shown) = (0, false);
+    while let Some(ticker) = next_ticker(listener, shown) {
+        shown = true;
         _ = ticker.set_nodelay(true);
         let Ok(mut from) = ticker.try_clone() else {
             continue;
@@ -277,4 +319,5 @@ fn tickers(listener: &TcpListener, told: &Mutex<Told>, answers: &Sender<Frame>, 
         }
         told.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).ticker = None;
     }
+    NO_TICKER_LEFT.store(true, Ordering::Relaxed);
 }

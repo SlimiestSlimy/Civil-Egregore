@@ -24,9 +24,14 @@ pub struct Levels {
 }
 
 impl Levels {
-    /// Those of a world generated as `generation` says.
+    /// Those of a world generated as `generation` says. A world with
+    /// no relief to speak of -- a plain, a step above its ocean -- is
+    /// drawn between the levels worlds have unless told otherwise:
+    /// its land is low land, not a peak.
     pub(crate) fn of(generation: &Generation) -> Self {
-        Self { ground: generation.shape.ground, ocean: generation.shape.ocean, highest: generation.shape.highest }
+        let shape = &generation.shape;
+        let flat = shape.highest <= shape.ocean + worldgen::STEP;
+        Self { ground: shape.ground, ocean: shape.ocean, highest: if flat { shape.ocean + worldgen::Shape::DEFAULT.highest } else { shape.highest } }
     }
 }
 
