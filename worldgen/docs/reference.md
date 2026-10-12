@@ -4,14 +4,15 @@ The design is in `worldgen.md`.
 
 ## `lib.rs`
 
-`STEP` (1): the most two cells beside one another may differ and be
-stepped between. `WALLS`: the walls' layers, `WALL_EAST` and
-`WALL_SOUTH`, each with the neighbour it is towards. The layers
+`STEP` (1): the most a cell may be higher than the one beside it and
+be stepped up to; `DROP` (4): the most it may be lower and be stepped
+down to. `WALLS`: the walls' layers, `WALL_EAST`, `WALL_SOUTH`,
+`WALL_WEST` and `WALL_NORTH`, each with the neighbour it is towards. The layers
 themselves -- the walls, `GRASS`, `TREE`, `TREE_STAGE`, `WET` -- are
 rows of the type registry (`../../type_registry/docs/type_registry.md`),
 not this crate's. A diagonal has no wall
-of its own: `pathfinding::Walls::new` and
-`actions::walking::around_unwalled` bar it from the two. `ONE` (65,536): a fraction's whole.
+of its own: `pathfinding::Walls::one_way` and
+`actions::walking::around_unwalled` bar it from the four. `ONE` (65,536): a fraction's whole.
 
 **`Shape`** `{ground, ocean, span, sea, highest, clumping, coast, coast_low, narrow, wide,
 soft, hard, warp, finer_depth, finer_share, finer_height, finer_fall, weight, raised}`: the
@@ -26,7 +27,7 @@ otherwise. **`Terrain::generate_shaped(shape, seed, superchunk)`**: a
 superchunk's heights and walls. **`Noise`**: smooth noise asked cell after cell, the four points
 about the last cell kept -- `new(seed, index, shift)`, `at(x, y)`;
 **`noise(seed, index, shift, x, y)`**: the same for one cell alone.
-Private: **`point`**, an octave's number at a point; **`between`**. **`wall(a, b)`**: whether two heights are too far apart.
+Private: **`point`**, an octave's number at a point; **`between`**. **`wall(from, to)`**: whether no step goes from a cell so high to one beside it so high -- more than a step up or a drop down; the step back is asked the other way round.
 
 **`Terrain`** `{heights, walls}`: a superchunk's height map, and for
 each way each chunk's cells that keep a wall.

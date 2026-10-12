@@ -10,7 +10,7 @@ use actions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Tu
 /// The simulation time from one sample of a tile to the next, on
 /// average: what its chance each tick is worked out from, so the
 /// weather goes as fast at any tick rate.
-pub const MEAN_TIME_TO_SAMPLE: SimulationTime = SimulationTime::seconds(2);
+pub const MEAN_TIME_TO_SAMPLE: SimulationTime = SimulationTime::seconds(13);
 /// The chance, each tick, that a tile is sampled.
 pub const SAMPLE_CHANCE: Chance = MEAN_TIME_TO_SAMPLE.chance_a_tick();
 /// What a sample's chances are parts of: one number drawn under it
@@ -57,7 +57,7 @@ pub const EVENED: usize = place_counted(&COUNTED, "evened");
 /// The simulation time a wind blowing takes to carry something of its
 /// tile's climate to the next, on average, were it to reach it every
 /// sample: slowly, beside the air and the clouds it moves.
-pub const MEAN_TIME_TO_CARRY_CLIMATE: SimulationTime = SimulationTime::seconds(60);
+pub const MEAN_TIME_TO_CARRY_CLIMATE: SimulationTime = SimulationTime::seconds(400);
 /// The chance, each sample its wind reaches a tile in, that it
 /// carries climate and not air.
 pub const CARRY_CHANCE: Chance = MEAN_TIME_TO_CARRY_CLIMATE.chance_each(MEAN_TIME_TO_SAMPLE);

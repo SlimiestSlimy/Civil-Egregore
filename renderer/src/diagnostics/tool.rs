@@ -34,12 +34,12 @@ pub const COMMANDS: [Command; 4] = [Command {
     run: window_still_tool,
 }, Command {
     name: "watch",
-    does: "opens the window on a world the diagnostics tick, running, to be watched: the world `server check` ticks from a seed -- 0, the run's own, the seed the tests are on -- or, given superchunks, the plain `server pasture` ticks, with its grass",
+    does: "opens the window on a world an in-bin test ticks, running, to be watched: the world `server check` ticks from a seed -- 0, the run's own, the seed the tests are on -- or, given superchunks, the plain `server pasture` ticks, with its grass",
     parameters: &[Parameter::new(SEED, "0"), Parameter::new(SHEEP, "4000"), Parameter::new(PASTURE_SUPERCHUNKS, "0"), Parameter::new(GRASS_THOUSANDTHS, "333")],
     run: watch_tool,
 }, Command {
     name: "show",
-    does: "opens the window that shows worlds as they are ticked: the world of every test and every diagnostic that ticks one while CIVIL_EGREGORE_RENDER is set is drawn in it, one after another, flat out unless the keys pause or pace it; a test or a diagnostic that finds none open starts it",
+    does: "opens the window that shows worlds as they are ticked: the world of every test and every in-bin test that ticks one while CIVIL_EGREGORE_RENDER is set is drawn in it, one after another, flat out unless the keys pause or pace it; a test or a diagnostic that finds none open starts it",
     parameters: &[],
     run: |_| super::window_on::show_worlds(),
 }];

@@ -49,7 +49,8 @@ what they always do and are not listed.
 | **value** | the number a cell of a wide plane holds | wide plane | |
 | **patches** | how grass and trees lie when a superchunk is generated: noise under a threshold, not cells scattered (`worldgen::patches`) | generation | pasture |
 | **collision plane** | the layer `COLLISION`, a bit a cell: 1 where something stands that bars stepping there -- a tree, an entity -- 0 where the cell is free. What a movement check reads, whatever the thing is; kept by who puts the thing, an entity's by the instructions that put, move and remove it | wall, layer | occupancy plane, obstacle map, blocked plane |
-| **wall** | a bar between two cells across or down more than one apart in height; kept by the upper or left cell, in the layers `WALL_EAST` and `WALL_SOUTH`. A diagonal step has no wall of its own: it is open only when both ways round it are | step, terrain | cliff (the renderer's drawing of walls) |
+| **wall** | a bar before the step from a cell to the one beside it across or down: where that one is more than a step higher (`STEP`, 1) or more than a drop lower. One way's -- the step back has its own -- and kept by the cell stepped from, in the layers `WALL_NORTH`, `WALL_WEST`, `WALL_SOUTH` and `WALL_EAST`. A diagonal step has no wall of its own: it is open only when both ways round it are | step, drop, terrain | cliff (the renderer's drawing of walls) |
+| **drop** | the most a cell may be lower than the one beside it and still be stepped down to (`DROP`, 4 heights): further than a step up, so a drop is hopped down and not climbed back | wall, step, height | fall, ledge |
 | **terrain** | a superchunk's heights and walls | height, wall | |
 
 ## Layers and bitmaps

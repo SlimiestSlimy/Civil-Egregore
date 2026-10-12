@@ -98,7 +98,7 @@ pub fn a_star(passable: &Rows, walls: &Walls, from: Cell, to: Cell) -> Option<Pa
                 continue;
             }
             let neighbour = Cell { x: x as u8, y: y as u8 };
-            if neighbour != from && !holds(passable, neighbour) || walls.bars_step(cell, dx, dy) || further >= steps[neighbour.index()] {
+            if neighbour != from && !holds(passable, neighbour) || walls.bars_step(neighbour, -dx, -dy) || further >= steps[neighbour.index()] {
                 continue;
             }
             steps[neighbour.index()] = further;

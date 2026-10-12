@@ -25,16 +25,19 @@ pub use generation::{has_land_about, seed_with_land, Generation, Growth, TREES_S
 
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{Height, HeightMap, LayerType};
-use type_registry::{WALL_EAST, WALL_SOUTH};
+use type_registry::{WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
 use coordinates::{cartesian_from_place, place_from_cartesian, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
 use utilities::hash::{mix, GOLDEN_RATIO};
 
-/// The most two cells beside one another may differ in height and still
-/// be stepped between.
+/// The most a cell may be higher than the one beside it and still be
+/// stepped up to from it.
 pub const STEP: Height = 1;
+/// The most a cell may be lower than the one beside it and still be
+/// stepped down to from it: a hop down, further than a step up.
+pub const DROP: Height = 4;
 
 /// The walls' layers, and the neighbour each is towards.
-pub const WALLS: [(LayerType, (i32, i32)); 2] = [(WALL_EAST, (1, 0)), (WALL_SOUTH, (0, 1))];
+pub const WALLS: [(LayerType, (i32, i32)); 4] = [(WALL_EAST, (1, 0)), (WALL_SOUTH, (0, 1)), (WALL_WEST, (-1, 0)), (WALL_NORTH, (0, -1))];
 
 /// How the heights are shaped: the land as a mesh ([`mesh`]) --
 /// vertices that carry heights, each ocean, at the lowest ground, or
@@ -184,18 +187,20 @@ pub fn height_shaped(shape: &Shape, seed: u64, x: u32, y: u32) -> Height {
     mesh::Lands::new(shape, seed).height(x, y)
 }
 
-/// Whether two heights are too far apart to step between.
-pub const fn wall(a: Height, b: Height) -> bool {
-    a.abs_diff(b) > STEP
+/// Whether no step goes from a cell as high as `from` to one beside
+/// it as high as `to`: more than a [`STEP`] up, or than a [`DROP`]
+/// down. One way's: the step back is asked the other way round.
+pub const fn wall(from: Height, to: Height) -> bool {
+    if to > from { to - from > STEP } else { from - to > DROP }
 }
 
 /// A superchunk's terrain: its heights, and its walls -- for each of
-/// the two ways ([`WALLS`]), each chunk's cells that keep one.
+/// the four ways ([`WALLS`]), each chunk's cells that keep one.
 pub struct Terrain {
     /// Every cell's height.
     pub heights: HeightMap,
     /// The walls' bitmaps: a way, then a chunk in Morton order.
-    pub walls: [Box<[CellWords; CHUNKS_IN_SUPERCHUNK]>; 2],
+    pub walls: [Box<[CellWords; CHUNKS_IN_SUPERCHUNK]>; 4],
 }
 
 impl Terrain {
@@ -232,7 +237,7 @@ impl Terrain {
             let (x, y) = cartesian_from_place(place);
             at(x as i32, y as i32)
         });
-        let mut walls: [Box<[CellWords; CHUNKS_IN_SUPERCHUNK]>; 2] = std::array::from_fn(|_| Box::new([[0; WORDS]; CHUNKS_IN_SUPERCHUNK]));
+        let mut walls: [Box<[CellWords; CHUNKS_IN_SUPERCHUNK]>; 4] = std::array::from_fn(|_| Box::new([[0; WORDS]; CHUNKS_IN_SUPERCHUNK]));
         for y in 0..side {
             for x in 0..side {
                 let place = place_from_cartesian(x as u32, y as u32);
@@ -260,8 +265,8 @@ impl Terrain {
         self.walls[way][chunk][cell / BITS_PER_WORD] >> (cell % BITS_PER_WORD) & 1 == 1
     }
 
-    /// How many walls it has, each of the two ways.
-    pub fn wall_counts(&self) -> [u64; 2] {
+    /// How many walls it has, each of the four ways.
+    pub fn wall_counts(&self) -> [u64; 4] {
         std::array::from_fn(|way| self.walls[way].iter().flatten().map(|word| word.count_ones() as u64).sum())
     }
 }

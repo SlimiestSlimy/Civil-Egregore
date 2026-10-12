@@ -681,7 +681,11 @@ grass: the same run peaks near 280,000 at tick 250,000, the grass
 gone under them, and is falling as it ends. Since then the sheep eat
 three times as often and conceive four times as rarely (a meal 15 s,
 540 s of eating to conceive), and the grass dies by its climate
-alone: the balance of that is not measured yet.
+alone. Since then again everything but a sheep's steps and its hunger
+goes far slower, nearer what it is in a second of the simulation: a
+sheep lives an hour and a quarter and bears four lambs or so in it,
+and grass, trees and weather go as much slower as its life is longer.
+The balance of that is not measured yet.
 
 ### An instruction for each thing done to an entity
 
@@ -750,10 +754,11 @@ Every cell has a height, from the world's seed and where the cell is
 (`worldgen/`): islands in an ocean, their land a mesh of vertices that
 carry heights and lines that say how they are blended, in whole numbers
 alone -- the same on any machine and in whatever order it is made,
-seamless from superchunk to superchunk. Two cells beside one another
--- across or down -- more than one apart in height have a wall between
-them: no step is taken through it. A diagonal step is open only when
-both ways round it are. The walls are two layers of bits, so rules read
+seamless from superchunk to superchunk. A step to the cell beside one
+-- across or down -- has a wall before it where that cell is more
+than one higher, or more than four lower: a drop is hopped down and
+not climbed back. A diagonal step is open only when
+both ways round it are. The walls are four layers of bits, so rules read
 them as masks and never read a height; the pathfinding goes round
 them, and the sheep step through none. Walls stand in cliffs, where
 the ground is steep. The whole of it:

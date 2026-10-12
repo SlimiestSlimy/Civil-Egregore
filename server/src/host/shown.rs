@@ -1,5 +1,5 @@
 //! A world shown: a ticker -- whatever ticks a world that is no
-//! host: a test, a diagnostic --
+//! host: a test, an in-bin test --
 //! answers a window's asks between its ticks when the environment
 //! says so ([`RENDER`]), over a local socket; and the window's end of
 //! that, a host whose world is whatever ticker's comes

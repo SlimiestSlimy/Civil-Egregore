@@ -13,7 +13,7 @@ use coordinates::{CellIndex, SuperchunkIndex};
 use entity_manager::Entities;
 use actions::{around, walking};
 use simulation::Simulation;
-use type_registry::{COLLISION, WALL_EAST, WALL_SOUTH};
+use type_registry::{COLLISION, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
 use utilities::rng::Rng;
 
 /// Cells of the 3x3 superchunks from `(10, 10)`, across and down from
@@ -74,7 +74,7 @@ fn the_nine_about_a_cell_are_its_cells_read_one_by_one() {
 #[test]
 fn what_may_be_stepped_to_is_the_unwalled_less_the_held() {
     let (mut codec, mut arena, mut random) = (LayerCodec::new(), BitmapArena::new(), Rng::new(utilities::seed::counted()));
-    for layer_type in [WALL_EAST, WALL_SOUTH, COLLISION] {
+    for layer_type in [WALL_NORTH, WALL_WEST, WALL_EAST, WALL_SOUTH, COLLISION] {
         for (x, y) in (10..13).flat_map(|y| (10..13).map(move |x| (x, y))) {
             for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
                 arena.make_hot(BucketKey { layer_type, chunk }, None, &mut codec);

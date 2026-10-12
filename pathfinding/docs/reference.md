@@ -13,7 +13,7 @@ distances across and down.
 
 **`Wave::from(goals)`**: a search with the goals alone reached;
 **`reached`**; **`advance(passable, walls)`**: every passable neighbour of a
-reached cell reached (**`spread`**), whether any was.
+reached cell that may step onto it reached (**`spread_back`**), whether any was.
 
 **`step_towards(passable, walls, goals, from, pick)`**: waves from every goal
 until one comes beside `from`; the neighbour reached -- the `pick`-th
@@ -32,10 +32,16 @@ entries, `push`, `pop`; `STEPS`, the eight neighbours). `None` if there is no wa
 
 ## `walls.rs`
 
-**`Walls::new(east, south)`**: the steps that cannot be taken -- the
-walls east and south of cells, and the diagonals they bar, worked out
-from them (a wall on either way round); **`east`**, **`south`**,
-**`bars_step(cell, dx, dy)`**. `Wave::advance`,
+**`Walls::one_way(north, west, south, east)`**: the steps that cannot
+be taken -- for each of the four ways the cells no step leaves that
+way, and the diagonals they bar, worked out from them (a wall on
+either way round); **`Walls::new(east, south)`**: walls barring both
+ways, east and south of cells; **`bars_step(cell, dx, dy)`**. Private:
+the eight ways' places among its masks, `NORTH`, `WEST`, `SOUTH`,
+`EAST`, `NORTH_WEST`, `NORTH_EAST`, `SOUTH_WEST`, `SOUTH_EAST`, and
+**`way_of(dx, dy)`**; **`spread(rows, walls)`**, the cells a step from
+one of `rows` comes to, and **`spread_back(rows, walls)`**, the cells
+a step from which comes to one. `Wave::advance`,
 `step_towards` and `a_star` each take them after `passable`;
 `Walls::default()` is none.
 

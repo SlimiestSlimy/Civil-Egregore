@@ -50,7 +50,7 @@ layout in its type: **`new(number)`**, **`attribute_type`**. **`Member`** `{offs
 width the bits of its data, an entity type's `default_attribute` the number of the attribute every entity of it has (0: none; **`with_default(attribute)`** gives a row one); **`numbers`** how many
 numbers it takes from `number` on, **`layer_type`** its layer type if it is of
 the cells. `layer`, `wide`, `entity`, `attribute`, `sca_rule`, `entity_rule`: a row made from its constant. **`REGISTRY`**: the table, written by hand. The constants:
-`GRASS`, `TREE`, `TREE_STAGE`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`, `WET`, the
+`GRASS`, `TREE`, `TREE_STAGE`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`, `WALL_NORTH`, `WALL_WEST` (a wall is before a cell's step one way, kept by that cell: four layers), `WET`, the
 cells'; `CLOUD` and `CLIMATE`, the weather's, a number a tile 8x8 (`WEATHER_TILE_SCALE`); `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, three blocks; `RULE_OF_GRASS`, `RULE_OF_TREES`, the cells' rules, `RULE_OF_SHEEP`, the entity's, `RULE_OF_WEATHER`, the weather's, its master the climate; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
 **`first_clash(registry)`**: the first row to take a number or a name of
 one before it -- checked on `REGISTRY` as the crate is built, as is

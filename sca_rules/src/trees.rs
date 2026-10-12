@@ -9,7 +9,7 @@ use actions::{cells, compare, place_counted, this_tick, CellIndex, Chance, RuleC
 /// The simulation time from one sample of a tree to the next, on
 /// average: what its chance each tick is worked out from, so trees
 /// grow as fast at any tick rate.
-pub const MEAN_TIME_TO_SAMPLE: SimulationTime = SimulationTime::milliseconds(39_062);
+pub const MEAN_TIME_TO_SAMPLE: SimulationTime = SimulationTime::seconds(260);
 /// The chance, each tick, that a tree is sampled.
 pub const SAMPLE_CHANCE: Chance = MEAN_TIME_TO_SAMPLE.chance_a_tick();
 /// The share of a tree's samples it tries to spread in; it grows in the rest.
@@ -23,7 +23,7 @@ pub const SEEDS_FROM: u32 = 4;
 pub const CROWDED: u32 = 9;
 /// The simulation time a tree stands at the oldest stage before it
 /// dies, on average.
-pub const MEAN_TIME_TO_DIE: SimulationTime = SimulationTime::milliseconds(312_500);
+pub const MEAN_TIME_TO_DIE: SimulationTime = SimulationTime::seconds(2_080);
 /// The chance, each sample of a tree at the oldest stage, that it
 /// dies: drawn among the samples it does not spread in.
 pub const DIE_CHANCE: Chance = MEAN_TIME_TO_DIE.chance_each(MEAN_TIME_TO_SAMPLE);

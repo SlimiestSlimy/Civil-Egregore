@@ -1,4 +1,4 @@
-//! The world the diagnostics tick: a plain (`Generation::plain`) with a
+//! The world the in-bin tests tick: a plain (`Generation::plain`) with a
 //! side, forced hot, made as every world is ([`crate::start`]) -- so a
 //! rule is measured alone, the terrain taking no part.
 

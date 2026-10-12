@@ -1,4 +1,4 @@
-//! The window opened on a world a diagnostic or a test ticks, running:
+//! The window opened on a world an in-bin test or a test ticks, running:
 //! the same world, to be watched (`docs/renderer.md`, "Watching a
 //! test's world").
 
@@ -37,7 +37,7 @@ fn show_world(mut screen: ResMut<Screen>, mut exit: MessageWriter<AppExit>) {
 /// Opens the window on the worlds that come to be shown
 /// (`server::host::shown`), one after another, until it is closed
 /// or the last ticker has stopped:
-/// each a world a test or a diagnostic ticks, drawn as the window
+/// each a world a test or an in-bin test ticks, drawn as the window
 /// draws any. Says so and opens none if such a window is open
 /// already.
 pub fn show_worlds() -> Result<(), String> {

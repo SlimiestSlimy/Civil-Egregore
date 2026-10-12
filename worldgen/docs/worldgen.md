@@ -19,18 +19,21 @@ same on any machine.
 
 ## Walls
 
-Two cells beside one another, across or down, more than one apart in
-height (`STEP`) cannot be stepped between: there is a wall between
-them. A diagonal step has no wall of its own: it is open only when both
-ways round it -- across then down, and down then across -- are. So a
-diagonal between cells two apart in height, each way round a step of
-one, is open; one with a cliff on either side of it is not. Where the
-ground is steep the walls line up into cliffs.
+A step goes from a cell to the one beside it, across or down, unless
+that one is more than one higher (`STEP`) or more than four lower
+(`DROP`): then there is a wall before it. A wall is one way's: ground
+two, three or four lower is hopped down to and not climbed back from,
+so nothing that walks is trapped on a height by the steepness under
+it -- it was, when a wall stood wherever two cells were more than one
+apart, either way. A diagonal step has no wall of its own: it is open
+only when both ways round it -- across then down, and down then across
+-- are. So a diagonal between cells two apart in height, each way
+round a step of one, is open; one with a cliff on either side of it is
+not. Where the ground is steep the walls line up into cliffs.
 
-A wall is between two cells, not on one, so it is kept by one of the
-two: the upper, or of two on a row the left. Two layers of bits hold
-them -- `WALL_EAST` and `WALL_SOUTH`: the cells with a wall that way --
-ordinary layers,
+A wall is kept by the cell the step leaves. Four layers of bits hold
+them -- `WALL_NORTH`, `WALL_WEST`, `WALL_SOUTH` and `WALL_EAST`: the
+cells no step leaves that way -- ordinary layers,
 stored, made hot and read as any other. So a rule reads the walls about
 a cell as masks, in the same windows it reads grass by, and never a
 height: heights stay cold in the superchunk's image.
@@ -45,7 +48,7 @@ Who reads them: the turn gives the neighbours no wall is before
 
 How much of the ground is walled is the shape's doing: narrow, hard
 blends make cliffs, broad soft ones none. Diagonal walls of their own,
-when there were any, were four layers where two do.
+when there were any, were four layers more.
 
 Not yet: heights do not change. When they do -- digging -- the walls of
 the cells about the change are worked out again.

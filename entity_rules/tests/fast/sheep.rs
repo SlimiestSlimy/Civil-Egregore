@@ -7,8 +7,8 @@
 
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, put_entity, tick_sheep};
 use coordinates::CellCartesian;
-use entity_manager::{EntityRef, Header, WholeAttribute};
-use entity_rules::sheep::{BIRTHS, DEATHS, EATEN, FAR, PATHS, SOUGHT, WOKEN, MEAL, ROAM, SHEEP, SHEEP_STATE, STARVATION, SheepState, STEP_JITTER, STEP};
+use entity_manager::{set_attribute, AttributeBlock, EntityRef, Header, WholeAttribute};
+use entity_rules::sheep::{BIRTHS, DEATHS, EATEN, FAR, PATHS, SOUGHT, WOKEN, GESTATION, MEAL, ROAM, SHEEP, SHEEP_STATE, STARVATION, SheepState, STEP_JITTER, STEP};
 
 /// The state of a sheep next hungry at `hungry_at`, in the middle of nothing.
 fn hungry_at(hungry_at: u64) -> WholeAttribute {
@@ -18,6 +18,25 @@ fn hungry_at(hungry_at: u64) -> WholeAttribute {
 /// What `sheep` keeps: every sheep has its block.
 fn state(sheep: &EntityRef) -> SheepState {
     sheep.attribute(SHEEP_STATE).expect("a sheep's state, always")
+}
+
+/// Makes about one sheep in `one_in` of `world` pregnant, its lamb
+/// due at a tick within `within` of now and the sheep awake for it:
+/// which sheep and when, drawn from the run's seed. A gestation is
+/// longer than the tests that want a birth among much else run for.
+fn with_lambs_due(world: &mut server::World, one_in: u64, within: u64) {
+    let mut drawn = utilities::rng::Rng::new(utilities::seed::counted());
+    let now = world.entities().now();
+    let all: Vec<(Header, SheepState, Vec<AttributeBlock>)> = world.entities().iter().map(|sheep| (sheep.header, state(&sheep), sheep.attributes.to_vec())).collect();
+    for (header, was, mut attributes) in all {
+        let due = now + 1 + drawn.below(within);
+        if drawn.below(one_in) != 0 {
+            continue;
+        }
+        set_attribute(&mut attributes, SHEEP_STATE, SheepState { lamb_due_at: due, ..was });
+        assert_eq!(world.remove_entity(&header).removes, 1);
+        assert_eq!(world.put_entity(Header { wake: header.wake.min(due), ..header }, &attributes).puts, 1);
+    }
 }
 
 /// Every sheep knows when it is next hungry, is a sheep, and is
@@ -48,8 +67,8 @@ fn sheep_without_grass_starve() {
 fn sheep_eat_breed_and_grow_up() {
     let mut world = plain_world(4, 300_000, 400, 2);
     let (mut eaten, mut births, mut lost, mut lambs_seen, mut pregnant_seen) = (0, 0, 0, false, false);
-    // Six meals' time: as many meals whatever a meal lasts.
-    for tick in 0..6 * MEAL.ticks() {
+    // A gestation and six meals' time: the lambs conceived over those meals born, whatever either lasts.
+    for tick in 0..GESTATION.ticks() + 6 * MEAL.ticks() {
         let report = tick_sheep(&mut world);
         (eaten, births, lost) = (eaten + report.rules[EATEN], births + report.rules[BIRTHS], lost + report.instructions_applied.lost);
         if tick % 500 == 0 {
@@ -60,7 +79,7 @@ fn sheep_eat_breed_and_grow_up() {
             }
         }
     }
-    assert!(eaten > 5_000 && births > 100, "{eaten} eaten, {births} born");
+    assert!(eaten > 5_000 && births > 50, "{eaten} eaten, {births} born");
     assert!(lambs_seen && pregnant_seen);
     assert_eq!(lost, 0, "no sheep walks off the hot superchunks");
     assert!(world.entities().iter().any(|sheep| state(&sheep).grown_at == 0), "grown sheep");
@@ -186,6 +205,7 @@ fn any_number_of_threads_ticks_sheep_the_same() {
 fn sheep_never_overlap() {
     let mut world = plain_world(4, 300_000, 60_000, 4);
     assert_eq!(world.entities().len(), 240_000, "each on a cell of its own from the start");
+    with_lambs_due(&mut world, 16, 2_000);
     let (mut moved, mut births) = (0, 0);
     for tick in 0..2_000 {
         let report = tick_sheep(&mut world);
@@ -214,11 +234,11 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     use coordinates::CellIndex;
     use entity_manager::Entities;
     use actions::cells;
-    use type_registry::{GRASS, WALL_EAST, WALL_SOUTH};
+    use type_registry::{GRASS, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
     let superchunk = coordinates::WORLD_MIDDLE;
     let (mut codec, mut arena, mut entities) = (chunk_storage::LayerCodec::new(), BitmapArena::new(), Entities::new());
     for chunk in superchunk.chunks() {
-        for layer_type in [GRASS, WALL_EAST, WALL_SOUTH] {
+        for layer_type in [GRASS, WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST] {
             arena.make_hot(BucketKey { layer_type, chunk }, None, &mut codec);
         }
     }

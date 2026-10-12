@@ -19,7 +19,9 @@ and costs little enough to ask every time.
 
 What a step costs is waves. A search's whole memory is the cells
 reached so far, 16 words, 32 bytes, beside the 32 of the cells that may
-be walked on: one line of cache. A wave moves every reached cell's
+be walked on: one line of cache. A wave goes out from the goals, the
+other way to the walker: where walls are one way's it grows by the
+cells that may step onto it ("Walls"). A wave moves every reached cell's
 front one cell at once: each row or-ed with the rows above and below
 it, spread a column each way, and kept where it may be walked -- a few
 shifts and ors a row, no queue, no cell looked at alone.
@@ -42,7 +44,8 @@ left with nothing in the way: the greater of the distances across and
 down (`steps_apart`), a step to any of the eight neighbours costing
 one. It runs backwards, from the end: each cell reached remembers the
 cell it was reached from, one step nearer the end, so the start is
-reached remembering its first step, and no path is walked back along.
+reached remembering its first step, and no path is walked back along;
+a wall is asked of each step the way the walker would take it.
 Neither end need be passable -- a walker stands on one and wants the
 other. A cell is queued again each time a shorter way to it is found,
 from one neighbour after another at most, which is what the queue is
@@ -69,16 +72,23 @@ slope); and walkers larger than a cell.
 ## Walls
 
 A cell that may not be walked on is a bit of `passable`. A **wall** is
-not a cell: it is between two cells, and bars the step from one to the
-other both ways, whatever the cells are -- the terrain's cliffs
-(`../worldgen/`). Walls stand only east and south of cells, kept by the
-upper or left cell of the two. A diagonal step has no wall of its own:
-it is open only when both ways round it -- across then down, down then
-across -- are. `Walls::new` takes the east and south masks and works out
-once, a mask a diagonal, the diagonal steps they bar
-(`Walls::bars_step`).
+not a cell: it is before the step from one cell to the one beside it,
+whatever the cells are -- the terrain's cliffs (`../worldgen/`). It is
+one way's: the step back has a wall of its own or none, as a drop is
+hopped down and not climbed. So a wall is kept by the cell the step
+leaves, a mask each of the four ways. A diagonal step has no wall of
+its own: it is open only when both ways round it -- across then down,
+down then across -- are. `Walls::one_way` takes the four masks and
+works out once, a mask a diagonal, the diagonal steps they bar
+(`Walls::bars_step`); `Walls::new` takes walls barring both ways, east
+and south of cells, and makes the four of them.
 
 A wave spreads each of the eight ways apart, each masked by its walls
-before it is shifted -- eight shifts a row where there were three. A*
-asks `bars_step` of each step it tries. With no walls (`Walls::default`)
-both are what they were.
+-- eight shifts a row where there were three. Walls of one way give
+spreading a direction: the cells a step from a set comes to (`spread`,
+what is beside a walker) are not the cells a step from which comes to
+it (`spread_back`, what a wave going out from the goals grows by --
+the walker's steps run the other way to the wave's). A* searches from
+its end back to its start, and asks `bars_step` of each step as the
+walker would take it. With no walls (`Walls::default`) both are what
+they were.

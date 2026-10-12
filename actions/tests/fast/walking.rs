@@ -14,12 +14,12 @@ use entity_manager::NEVER;
 use actions::Turn;
 use simulation::Simulation;
 use std::sync::Mutex;
-use type_registry::{COLLISION, WALL_EAST, WALL_SOUTH};
+use type_registry::{COLLISION, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
 
 /// Makes the wall layers hot over the superchunk `(10, 10)` of `arena`.
 fn with_walls_hot(arena: &mut BitmapArena) {
     let mut codec = LayerCodec::new();
-    for layer_type in [WALL_EAST, WALL_SOUTH] {
+    for layer_type in [WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST] {
         for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {
             arena.make_hot(BucketKey { layer_type, chunk }, None, &mut codec);
         }
@@ -191,6 +191,35 @@ fn walls_of_the_terrain_bar_steps() {
     assert_eq!(steps, 7);
 }
 
+/// A drop is stepped down and not back up: with no step west out of
+/// a column, a row drawn from the seed is crossed eastwards straight
+/// over it, and westwards there is no way in the area -- nor is the
+/// cell above among those that may be stepped to from below.
+#[test]
+fn a_drop_is_stepped_down_and_not_back_up() {
+    let (mut arena, mut entities) = world(1);
+    with_walls_hot(&mut arena);
+    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
+    let row = 20 + random.below(20) as u32;
+    // High ground west of column 42: every cell of the column bars its step west, further up and down than an area reaches.
+    for y in row - 16..=row + 16 {
+        arena.queue(WALL_WEST, Write::cell(cell(42, y), WriteOp::Set));
+    }
+    arena.apply();
+    let (above, below) = (cell(41, row), cell(43, row));
+    Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
+        let (about_above, about_foot) = (around::about(above), around::about(cell(42, row)));
+        assert_eq!(walking::around_unwalled(turn, &about_above), about_above.nine(), "every step open from above");
+        let west = about_foot.towards(around::NORTH_WEST) | about_foot.towards(around::WEST) | about_foot.towards(around::SOUTH_WEST);
+        assert_eq!(walking::around_unwalled(turn, &about_foot), about_foot.nine().without(west), "none back up");
+        let passable = area::layer(turn, STONE, above).hot;
+        assert_eq!(walking::step_to(turn, above, below, &passable).map(|next| next.cartesian().x), Some(cell(42, row).cartesian().x), "down it");
+        let passable = area::layer(turn, STONE, below).hot;
+        assert_eq!(walking::step_to(turn, below, above, &passable), None, "no way back in the area");
+        0
+    });
+}
+
 /// The two readings of the walls agree, on walls set at random: the
 /// steps out of a cell the turn leaves open ([`walking::around_unwalled`])
 /// are those pathfinding's walls about it do not bar
@@ -203,7 +232,7 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
     let mut random = utilities::rng::Rng::new(utilities::seed::counted());
     for y in 0..64 {
         for x in 0..64 {
-            for layer_type in [WALL_EAST, WALL_SOUTH] {
+            for layer_type in [WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST] {
                 if random.below(4) == 0 {
                     arena.queue(layer_type, Write::cell(cell(x, y), WriteOp::Set));
                 }

@@ -6,7 +6,7 @@ use actions::around;
 use actions::entities::EntitiesBetweenTicks;
 pub use actions::types::{SheepState, SHEEP, SHEEP_STATE};
 use actions::simulation_time::SimulationTime;
-use actions::types::{COLLISION, GRASS, WALL_EAST, WALL_SOUTH};
+use actions::types::{COLLISION, GRASS, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
 use actions::{WholeAttribute, Chance, area, cells, compare, entities, place_counted, this_tick, walking, CellCartesian, CellIndex, EntityRef, Header, Rng, RuleCounts, SuperchunkIndex, Turn, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashSet;
 
@@ -30,14 +30,18 @@ pub const STARVATION: SimulationTime = SimulationTime::seconds(90);
 /// (`docs/entity_rules.md`, "The sheep").
 pub const LUSH_CELLS: u32 = 64;
 /// The simulation time a grown sheep eating on lush pasture takes to
-/// fall pregnant, on average.
-pub const MEAN_TIME_TO_CONCEIVE: SimulationTime = SimulationTime::seconds(540);
+/// fall pregnant, on average: with its gestation, four lambs or so
+/// in the grown part of a life spent on lush pasture -- every sheep
+/// bears, so that is a ewe's eight.
+pub const MEAN_TIME_TO_CONCEIVE: SimulationTime = SimulationTime::seconds(800);
 /// The chance, each meal of a grown sheep on lush pasture, that it
 /// falls pregnant.
 pub const CONCEIVE_CHANCE: Chance = MEAN_TIME_TO_CONCEIVE.chance_each(MEAL);
 /// The sleep there is to a sheep's life, on average: before a sleep
-/// it dies of old age at that sleep's part of this.
-pub const LIFE: SimulationTime = SimulationTime::seconds(675);
+/// it dies of old age at that sleep's part of this. An hour and a
+/// quarter: a sheep's ten years or so, a year of them seven and a
+/// half minutes -- what the times below are worked out from.
+pub const LIFE: SimulationTime = SimulationTime::seconds(4_500);
 /// The time a sheep that set off roaming walks for, one way, once it
 /// is hungry again, before it looks for grass: 96 steps or so, out
 /// of the patch its flock has grazed.
@@ -49,10 +53,11 @@ pub const MEAN_TIME_TO_ROAM: SimulationTime = SimulationTime::seconds(54);
 /// The chance, each meal on lush pasture, that the sheep sets off
 /// roaming when next hungry.
 pub const ROAM_CHANCE: Chance = MEAN_TIME_TO_ROAM.chance_each(MEAL);
-/// The time from falling pregnant to giving birth.
-pub const GESTATION: SimulationTime = SimulationTime::milliseconds(4_500);
-/// The time a lamb takes to grow.
-pub const LAMBHOOD: SimulationTime = SimulationTime::seconds(18);
+/// The time from falling pregnant to giving birth: five months of
+/// such a year.
+pub const GESTATION: SimulationTime = SimulationTime::seconds(190);
+/// The time a lamb takes to grow: a year.
+pub const LAMBHOOD: SimulationTime = SimulationTime::seconds(450);
 
 /// What the rule counts, each named at its place in its
 /// [`RuleCounts`]: the one order, the places below worked out from it.
@@ -83,7 +88,7 @@ struct Flock {
 /// by [`wake`].
 pub fn rule(turn: &mut Turn) -> RuleCounts {
     let mut flock = Flock::default();
-    entities::each_woken(turn, [GRASS, WALL_EAST, WALL_SOUTH, COLLISION], &mut flock, wake);
+    entities::each_woken(turn, [GRASS, WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST, COLLISION], &mut flock, wake);
     flock.done
 }
 

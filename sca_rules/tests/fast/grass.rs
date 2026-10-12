@@ -76,7 +76,8 @@ fn grass_decays_by_how_harsh_its_climate_is() {
 // What is expected is a float; nothing is drawn against it.
 #[allow(clippy::disallowed_methods)]
 fn grass_changes_by_what_spread_and_decayed() {
-    let mut world = plain_world(1, 400, 0, 1);
+    // Grass enough that some of it spreads in so few ticks.
+    let mut world = plain_world(1, 100_000, 0, 1);
     let start = cells_of_grass(&world);
     let mut grass = start;
     for _ in 0..1000 {
