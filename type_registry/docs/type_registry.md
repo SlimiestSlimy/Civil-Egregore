@@ -250,10 +250,12 @@ doing one thing, the weather's rule putting them together
 - `pressure_falls_by(here, there)`: how strongly pressure falls to a
   tile, by how far that one is under it and not at all within
   `PRESSURE_GAP_AT_REST` (1);
-- `passes_a_rise(rise, whole)`: the parts of the air that go up a
-  rise -- all of it on the level, half at `RISE_THAT_HALVES` (8
-  heights), the steeper the less: the one resistance of the land, to
-  pressure and to wind alike.
+- `passes_a_slope(slope, whole)`: the parts of the air that go over
+  a slope -- all of it down a fall of `FALL_THAT_FREES` (8 heights) or
+  more, a little less on the level, and less the steeper the rise,
+  mildly: half where the land holds it as by `RISE_THAT_HALVES` (64
+  heights). The one resistance of the land, to pressure and to wind
+  alike: a slope leans the air, and seldom stops it.
 
 **Rain** is a climate's to say, of its temperature and its humidity
 both (`Climate::rains_above`, `Climate::rains(cloud)`): the level of

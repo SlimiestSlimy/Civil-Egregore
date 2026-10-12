@@ -1,11 +1,13 @@
 //! Grass over dirt, on a plain the server makes: it spreads onto dirt at
-//! its chance, decays by how harsh its tile's climate is and not at
-//! all in a mild one, and grows wherever a superchunk is hot.
+//! its chance and as the air there is humid, decays by how harsh its
+//! tile's climate is and not at all in a mild one, and grows wherever
+//! a superchunk is hot.
 
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, tick_grass};
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use bitplane_manager::Write;
-use sca_rules::grass::{harshness, DECAYS, DECAY_CHANCE, HARSHEST, SPREADS, SPREAD_CHANCE};
+use sca_rules::grass::{DECAYS, DECAY_CHANCE, SPREADS, SPREAD_CHANCE};
+use sca_rules::growing::{harshness, HARSHEST};
 use server::World;
 use type_registry::{Climate, Wind, CLIMATE, GRASS, HOTTEST, MOST_HUMID, WEATHER_TILE_SCALE};
 use utilities::rng::Rng;
@@ -26,7 +28,7 @@ fn origin(world: &World) -> CellCartesian {
 
 /// Makes `climate` the climate of every tile of `world`'s first
 /// superchunk.
-fn put_climate(world: &mut World, climate: Climate) {
+pub fn put_climate(world: &mut World, climate: Climate) {
     let (origin, tile_side) = (origin(world), 1 << WEATHER_TILE_SCALE);
     let tiles = SUPERCHUNK_SIDE_CELLS / tile_side;
     let everywhere: Vec<Write> = (0..tiles * tiles).map(|tile| Write::value(CLIMATE, CellCartesian { x: origin.x + tile % tiles * tile_side, y: origin.y + tile / tiles * tile_side }.into(), climate.number())).collect();
@@ -115,4 +117,27 @@ fn grass_grows_in_every_superchunk() {
         let (x, y) = superchunk.cartesian();
         assert!(touched(superchunk), "{x}, {y}: unchanged");
     }
+}
+
+/// Grass spreads as often as the air over the cell it would take is
+/// humid: scattered the same under three climates, cold so that none
+/// decays, it never spreads in the driest, spreads in the most humid,
+/// and under a humidity drawn between them spreads less than that --
+/// about its share of it, give or take what chance moves so many by.
+#[test]
+// What is expected is a float; nothing is drawn against it.
+#[allow(clippy::disallowed_methods)]
+fn grass_spreads_as_the_air_is_humid() {
+    let mut random = Rng::new(utilities::seed::counted());
+    let cold = Climate { humidity: 0, wind: Wind::CALM, temperature: 0, pressure: type_registry::PRESSURE_AT_REST };
+    let between = random.between(64, 192) as u32;
+    let spreads = [0, between, MOST_HUMID].map(|humidity| {
+        let mut world = plain_world(1, 300_000, 0, 1);
+        put_climate(&mut world, Climate { humidity, ..cold });
+        (0..600).map(|_| tick_grass(&mut world).rules).map(|done| (done[SPREADS], done[DECAYS])).fold((0, 0), |sum, done| (sum.0 + done.0, sum.1 + done.1))
+    });
+    assert_eq!((spreads[0], spreads[1].1, spreads[2].1), ((0, 0), 0, 0), "none in the driest, and no decay in the cold");
+    let (some, most) = (spreads[1].0 as f64, spreads[2].0 as f64);
+    let expected = most * f64::from(between) / f64::from(MOST_HUMID);
+    assert!(most > 100.0 && (some - expected).abs() <= 5.0 * most.sqrt(), "{some} spreads at humidity {between}, {most} at the most: about {expected:.0} expected");
 }

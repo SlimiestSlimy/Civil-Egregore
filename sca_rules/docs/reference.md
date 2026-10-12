@@ -14,12 +14,21 @@ at 256 ticks a second); `SAMPLE_CHANCE` (the two together): each a
 **`rule(turn, cell, counts)`**: the rule on one cell of grass sampled -- whoever ticks it has the simulation sample the grass at the two chances together (`Turn::each_sampled`). Each draws whether it spreads (in
 `SPREAD_CHANCE` of the sum, `Rng::chance_among`) or is held against its
 climate: grass set on a neighbour with none (one of the eight, drawn,
-stepped on the Morton index), or its own cleared with a chance of
-**`harshness(climate)`** of `HARSHEST` -- how dry its tile is times how
-hot. Dirt is a
+stepped on the Morton index) if the air there is humid enough this
+time, or its own cleared if its climate is too harsh this time
+(`growing.rs`). Dirt is a
 cell with no grass: it has no layer.
 Returns its `RuleCounts`, their places named **`SAMPLED`**,
 **`SPREADS`**, **`DECAYS`**, their names listed in **`COUNTED`**.
+
+## `growing.rs`
+
+What grass and trees share of the climate. **`harshness(climate)`** of
+**`HARSHEST`**: how dry a tile is times how hot.
+**`humid_enough_to_spread(turn, onto)`**: drawn, as likely as the tile
+of `onto` is humid; always where no climate is hot.
+**`too_harsh_to_live(turn, cell)`**: drawn, as likely as the tile of
+`cell` is harsh; never where no climate is hot.
 
 ## `trees.rs`
 
@@ -29,12 +38,16 @@ the cells a tree stands on, and `TREE_STAGE`, its stage, 0 to
 `CROWDED` (9 trees), `MEAN_TIME_TO_DIE` (2,080 seconds at the oldest stage) and the `DIE_CHANCE` a sample worked out from it, `AROUND` (8).
 
 **`rule(turn, cell, counts)`**: the rule on one tree sampled. Every tree sampled tries to spread or grows
-a stage -- or at the oldest dies one time in four, its cell and its
-stage cleared, and its cell in the collision plane (`COLLISION`). **`spread(turn, cell, stage)`**: the other trees in the
+a stage -- or dies (**`die(turn, cell, stage)`**: its cell and its
+stage cleared, and its cell in the collision plane, `COLLISION`): of
+age at the oldest stage one time in four, and at any stage of its
+climate, one time in four times how harsh its tile's is
+(`growing::too_harsh_to_live`). **`spread(turn, cell, stage)`**: the other trees in the
 8 by 8 cells about it counted from one window; with `n` of them it goes
 on `1 - n/9` of the time, never with 9; a cell of the 64 is drawn and a
-tree put there if it has none and the collision plane does not hold
-it, its cell set there too. Returns its `RuleCounts`, their
+tree put there if it has none, the collision plane does not hold
+it and the air there is humid enough this time
+(`growing::humid_enough_to_spread`), its cell set there too. Returns its `RuleCounts`, their
 places named **`SAMPLED`**, **`SPREADS`**, **`GROWN`**, **`DIED`**, their
 names listed in **`COUNTED`**.
 

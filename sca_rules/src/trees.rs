@@ -2,6 +2,7 @@
 //! bits a cell. A tree sampled tries to spread, or grows a stage, or
 //! at the oldest may die (`docs/sca_rules.md`, "Trees").
 
+use crate::growing::{humid_enough_to_spread, too_harsh_to_live};
 use actions::types::{COLLISION, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
 use actions::simulation_time::SimulationTime;
 use actions::{cells, compare, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn};
@@ -44,8 +45,10 @@ pub const GROWN: usize = place_counted(&COUNTED, "grown");
 pub const DIED: usize = place_counted(&COUNTED, "died");
 
 /// The rule, on one tree sampled -- each with [`SAMPLE_CHANCE`], by
-/// whoever ticks the rule: it tries to spread or grows -- or, at
-/// the oldest stage, may die.
+/// whoever ticks the rule: it tries to spread, or it grows -- or
+/// dies: of age at the oldest stage, with [`DIE_CHANCE`], and at any
+/// stage of its climate, with that chance times how harsh its tile's
+/// is ([`too_harsh_to_live`]): the hotter and drier, the sooner.
 #[inline]
 pub fn rule(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
     counts[SAMPLED] += 1;
@@ -55,19 +58,28 @@ pub fn rule(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
     };
     if spreading {
         spread(turn, cell, stage);
+        return;
+    }
+    let of_age = stage == OLDEST_TREE_STAGE && this_tick::random(turn).chance_among(DIE_CHANCE, GROW_SHARE);
+    if of_age || this_tick::random(turn).chance_among(DIE_CHANCE, GROW_SHARE) && too_harsh_to_live(turn, cell) {
+        die(turn, cell, stage);
     } else if stage < OLDEST_TREE_STAGE {
         cells::set_value_counted(turn, TREE_STAGE, cell, stage, stage + 1, GROWN);
-    } else if this_tick::random(turn).chance_among(DIE_CHANCE, GROW_SHARE) {
-        // Its stage goes with it, so the next tree there starts at 0: gone if the tree still stands, which is then cleared.
-        compare::write(turn, compare::holds(TREE, cell), TREE_STAGE.layer_type(), cell, stage, 0, None);
-        // And its cell is free to step on again, if it is the tree that held it.
-        compare::write(turn, compare::holds(TREE, cell), COLLISION, cell, 1, 0, None);
-        cells::clear_counted(turn, TREE, cell, DIED);
     }
 }
 
+/// The tree at `cell`, `stage` old, dies: counted as it is applied.
+fn die(turn: &mut Turn, cell: CellIndex, stage: u32) {
+    // Its stage goes with it, so the next tree there starts at 0: gone if the tree still stands, which is then cleared.
+    compare::write(turn, compare::holds(TREE, cell), TREE_STAGE.layer_type(), cell, stage, 0, None);
+    // And its cell is free to step on again, if it is the tree that held it.
+    compare::write(turn, compare::holds(TREE, cell), COLLISION, cell, 1, 0, None);
+    cells::clear_counted(turn, TREE, cell, DIED);
+}
+
 /// The tree at `cell`, `stage` old, tries to spread: one put where it
-/// may is counted as it is applied.
+/// may -- no water, nothing standing, and the air humid enough this
+/// time ([`humid_enough_to_spread`]) -- is counted as it is applied.
 fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) {
     if stage < SEEDS_FROM {
         return;
@@ -86,8 +98,8 @@ fn spread(turn: &mut Turn, cell: CellIndex, stage: u32) {
     let Some(onto) = corner.offset((drawn % AROUND) as i32, (drawn / AROUND) as i32).filter(|_| free) else {
         return;
     };
-    // No tree under water, nor where something stands already.
-    if cells::holds(turn, WET, onto) || cells::holds(turn, COLLISION, onto) {
+    // No tree under water, nor where something stands already; and only as often as the air there is humid.
+    if cells::holds(turn, WET, onto) || cells::holds(turn, COLLISION, onto) || !humid_enough_to_spread(turn, onto) {
         return;
     }
     // The tree is put only if its cell is still free in the collision plane -- of two trees, or a tree and a sheep stepping there, the

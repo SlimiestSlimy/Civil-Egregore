@@ -19,6 +19,7 @@ the entities' rules, in one table (`server::RULES`).
 | folder | what is in it |
 |---|---|
 | `src/grass.rs` | grass over dirt |
+| `src/growing.rs` | what grass and trees share of the climate: humid enough to spread, too harsh to live |
 | `src/trees.rs` | trees: spreading by how crowded they stand, growing through sixteen stages, dying |
 | `src/weather.rs` | the weather: clouds deepened, thinned and blown over the climate, a tile at a time |
 | `tests/fast/` | each rule alone on a plain the server makes, a file a rule |
@@ -34,12 +35,16 @@ far more rarely, decay back to dirt by the climate of its tile:
   simulation, so as fast at any tick rate
   (`../../simulation/docs/simulation.md`, "Simulation time") --
   onto one of its eight neighbours drawn at random, if that one is dirt
-  -- a cell with no grass: dirt has no layer -- and not under water.
+  -- a cell with no grass: dirt has no layer -- and not under water,
+  and as often as the air over it is humid
+  (`growing::humid_enough_to_spread`): always in the most humid tile,
+  never in the driest, half the time half way. So grass creeps into
+  wet land and stops at the edge of dry.
 - **Decay**: a cell of grass is held against its climate with
   `DECAY_CHANCE` -- once in `MEAN_TIME_TO_DECAY` on average, a very
   small rate -- and then turns back to dirt with a chance of how
-  harsh the climate of its tile is (`harshness`, of `HARSHEST`): how
-  dry it is times how hot. In the driest and hottest it always does;
+  harsh the climate of its tile is (`growing::too_harsh_to_live`:
+  `harshness`, of `HARSHEST`): how dry it is times how hot. In the driest and hottest it always does;
   in the most humid, or the coldest, never.
 
 Grass no longer dies of the grass around it: it once decayed by its
@@ -77,12 +82,19 @@ tree sampled does one thing, by lot:
   likely it spreads, never with `CROWDED` or more. If it does, a cell
   of those 64 is drawn, and a tree of stage 0 is put there if there is
   none and the cell is hot, not under water, and not held in the
-  collision plane by something else standing there.
+  collision plane by something else standing there -- and as often as
+  the air over it is humid (`growing::humid_enough_to_spread`), as
+  grass.
 - **Else it grows** a stage (`GROW_SHARE` of its samples); or, at the
   oldest stage, may die -- once in `MEAN_TIME_TO_DIE` of standing
   there on average, `DIE_CHANCE` a sample -- its stage put to 0 if the tree still stands, then
   the cell cleared, so the next tree there starts at 0 -- and lives on
-  otherwise.
+  otherwise. A tree of any stage may die of its climate too: with the
+  same chance a sample times how harsh its tile's is
+  (`growing::too_harsh_to_live`) -- never in the most humid or the
+  coldest, as often as an old tree dies of age in the driest and
+  hottest. So a forest thins where the land dries out, young trees
+  with the old.
   What a tree does is counted as it is applied: a tree put where
   another was put first in the tick is refused, and not counted.
 
@@ -190,9 +202,12 @@ tile about it that is not loaded keeps its wind
 wears it down, so what blows there blows in.
 
 **The land** is read off the elevation plane (`ELEVATION`), a tile's
-height over the ocean: on the level or downhill all the air passes, up
-a rise of 8 heights half of it, the steeper the less
-(`passes_a_rise`).
+height over the ocean: the land leans the air and seldom stops it.
+Down a fall of 8 heights or more all of it passes, on the level a
+little less, up a rise less again, mildly -- eight parts in nine on the
+level, four in five up a rise of 8, half only up one of 56
+(`passes_a_slope`). A rise held the air back far harder once -- half of
+it at 8 heights -- and the weather stood still against every hill.
 
 The rule counts what it sampled, deepened, thinned, blew and found
 raining, what climate it carried, and the units of pressure a wind

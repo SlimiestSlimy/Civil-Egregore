@@ -4,7 +4,7 @@
 //! (`docs/sca_rules.md`, "Weather").
 
 use actions::simulation_time::SimulationTime;
-use actions::types::{passes_a_rise, pressure_falls_by, Climate, CLIMATE, CLOUD, ELEVATION, HIGHEST_PRESSURE, HUMIDITY_A_LEVEL_OF_CLOUD, PRESSURE_AT_REST, STRONGEST_WIND, TILES_ABOUT, WEATHER_TILE_SCALE, WET, Wind};
+use actions::types::{passes_a_slope, pressure_falls_by, Climate, CLIMATE, CLOUD, ELEVATION, HIGHEST_PRESSURE, HUMIDITY_A_LEVEL_OF_CLOUD, PRESSURE_AT_REST, STRONGEST_WIND, TILES_ABOUT, WEATHER_TILE_SCALE, WET, Wind};
 use actions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn};
 
 /// The simulation time from one sample of a tile to the next, on
@@ -84,12 +84,12 @@ fn at_the_border_of_what_is_loaded(turn: &Turn, tile: CellIndex) -> bool {
 }
 
 /// The parts of `whole` with which air goes from the tile at `from`
-/// to the one at `to`: all of it on the level or downhill, the less
-/// the steeper the rise (`passes_a_rise`) -- the one resistance of
-/// the land, to pressure and to wind alike.
+/// to the one at `to`: the more downhill, the less uphill, mildly
+/// either way (`passes_a_slope`) -- the one resistance of the land,
+/// to pressure and to wind alike.
 fn passes(turn: &Turn, from: CellIndex, to: CellIndex, whole: u32) -> u32 {
-    let high = |tile| cells::value(turn, ELEVATION, tile).unwrap_or(0);
-    passes_a_rise(high(to).saturating_sub(high(from)), whole)
+    let high = |tile| cells::value(turn, ELEVATION, tile).unwrap_or(0) as i32;
+    passes_a_slope(high(to) - high(from), whole)
 }
 
 /// A unit of pressure goes from the tile at `from`, whose climate
