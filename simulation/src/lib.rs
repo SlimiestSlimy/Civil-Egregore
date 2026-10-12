@@ -17,7 +17,7 @@ mod tick;
 mod turn;
 pub mod transient_data;
 
-pub use sampling::{sample, sample_layer};
+pub use sampling::{sample, sample_layer, sample_tiles_of_layer};
 pub use halos::{HaloChange, Halos, Held, COOL_TICKS, WARM_TICKS};
 pub use hot::Hot;
 pub use tick::{threads_for, Simulation, TickReport};

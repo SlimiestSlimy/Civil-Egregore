@@ -25,6 +25,46 @@ pub fn each_sampled<C: Default>(turn: &mut Turn, layer_type: LayerType, chance: 
     (sampled, counts)
 }
 
+/// Runs `each` on every tile of `plane` -- a plane of tiles -- in the
+/// turn's superchunk chosen with `chance`, independently, in Morton
+/// order, handing it the tile's first cell: how many were chosen, and
+/// the counts. Every tile is one that may be chosen, whatever the
+/// plane holds there. `samples` is room for them, emptied first.
+#[inline]
+pub fn each_tile_sampled<W: Width, C: Default>(turn: &mut Turn, plane: Wide<W>, chance: Chance, samples: &mut Vec<CellIndex>, mut each: impl FnMut(&mut Turn, CellIndex, &mut C)) -> (usize, C) {
+    let (sampled, mut counts) = (turn.sample_tiles(plane.layer_type(), chance, samples), C::default());
+    for &tile in samples.iter() {
+        turn.seeing_to(tile);
+        each(turn, tile, &mut counts);
+    }
+    (sampled, counts)
+}
+
+/// How many cells of the tile 8 by 8 cells that `cell` is in
+/// `layer_type` holds at, as the tick found them: none where it is
+/// not hot.
+#[inline]
+pub fn held_in_tile(turn: &Turn, layer_type: LayerType, cell: CellIndex) -> u32 {
+    turn.aligned_tile(layer_type, cell, 8).map_or(0, |words| words.iter().map(|word| word.count_ones()).sum())
+}
+
+/// Queues one taken from the number `plane` holds at `from`, where the
+/// rule saw `seen_from`, and one added to that at `to`, where it saw
+/// `seen_to`: what is at `from` moved a step. Both under both
+/// compares, so one is taken only if one is added -- whichever
+/// superchunk each is in: nothing is made or lost. One added to the
+/// rule's count `counted` if it is applied.
+#[inline]
+pub fn move_one<W: Width>(turn: &mut Turn, plane: Wide<W>, from: CellIndex, seen_from: u32, to: CellIndex, seen_to: u32, counted: usize) {
+    debug_assert!(seen_from > 0 && seen_to < plane.most(), "one moved from {seen_from} to {seen_to}");
+    compare::open(turn, compare::value(plane, from, seen_from));
+    compare::open(turn, compare::value(plane, to, seen_to));
+    turn.write(Write::Cell { layer_type: plane.layer_type(), at: from, value: seen_from - 1, counted: Some(counted as u32) });
+    turn.write(Write::Cell { layer_type: plane.layer_type(), at: to, value: seen_to + 1, counted: None });
+    compare::close(turn);
+    compare::close(turn);
+}
+
 /// Whether `cell` is hot in `layer_type`: in the world, and read.
 #[inline]
 pub fn hot(turn: &Turn, layer_type: LayerType, cell: CellIndex) -> bool {

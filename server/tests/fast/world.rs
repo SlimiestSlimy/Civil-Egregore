@@ -189,7 +189,8 @@ fn sheep_never_step_through_a_wall() {
 
 /// The weather's planes -- the clouds and the climate, a number a tile
 /// 8 by 8 cells -- hold what is written to them: read at any cell of
-/// the tile, through ticks, a save and a load. Tiles, numbers and the
+/// the tile, the climate through ticks, both through a save and a
+/// load of what the weather made of the clouds meanwhile. Tiles, numbers and the
 /// cells they are read at drawn from the seed.
 #[test]
 fn the_weathers_planes_hold_a_number_a_tile_through_ticks_and_a_save() {
@@ -213,22 +214,31 @@ fn the_weathers_planes_hold_a_number_a_tile_through_ticks_and_a_save() {
     let climates: Vec<Write> = tiles.iter().map(|(&tile, &(_, climate))| Write::value(CLIMATE, cell_of(tile, &mut random), climate)).collect();
     assert_eq!(world.write_cells(CLOUD.layer_type(), clouds).changed, tiles.len() as u64, "a cloud written a tile");
     assert_eq!(world.write_cells(CLIMATE.layer_type(), climates).changed, tiles.len() as u64, "a climate written a tile");
-    let held = |world: &server::World, when: &str, random: &mut utilities::rng::Rng| {
+    // The climate is what was written, whenever it is read: no rule writes it. The clouds are until the weather is ticked, which moves them.
+    let held = |world: &server::World, when: &str, clouds_too: bool, random: &mut utilities::rng::Rng| {
         for (&tile, &(cloud, climate)) in &tiles {
-            let read = (world.arena().value(CLOUD, cell_of(tile, random)), world.arena().value(CLIMATE, cell_of(tile, random)));
-            assert_eq!(read, (Ok(cloud), Ok(climate)), "the tile {tile:?}, {when}");
+            assert_eq!(world.arena().value(CLIMATE, cell_of(tile, random)), Ok(climate), "the climate of the tile {tile:?}, {when}");
+            if clouds_too {
+                assert_eq!(world.arena().value(CLOUD, cell_of(tile, random)), Ok(cloud), "the cloud over the tile {tile:?}, {when}");
+            }
         }
-        // A tile nothing was written to holds none.
+        // A tile no cloud was written to has none.
         let bare = (0..).map(|_| (random.below(u64::from(side / tile_side)) as u32, random.below(u64::from(side / tile_side)) as u32)).find(|tile| !tiles.contains_key(tile)).expect("a tile not written");
-        assert_eq!((world.arena().value(CLOUD, cell_of(bare, random)), world.arena().value(CLIMATE, cell_of(bare, random))), (Ok(0), Ok(0)), "a bare tile, {when}");
+        if clouds_too {
+            assert_eq!(world.arena().value(CLOUD, cell_of(bare, random)), Ok(0), "a bare tile, {when}");
+        }
     };
-    held(&world, "as written", &mut random);
+    held(&world, "as written", true, &mut random);
+    // Every cloud as it is over each tile, read at a cell of it drawn anew.
+    let clouds = |world: &server::World, random: &mut utilities::rng::Rng| -> Vec<u32> { (0..side / tile_side).flat_map(|y| (0..side / tile_side).map(move |x| (x, y))).map(|tile| world.arena().value(CLOUD, cell_of(tile, random)).expect("hot")).collect() };
     for _ in 0..random.between(20, 60) {
         world.tick();
     }
-    held(&world, "after ticks", &mut random);
+    held(&world, "after ticks", false, &mut random);
+    let ticked = clouds(&world, &mut random);
     server::save(&folder, &mut world).expect("saved");
     let loaded = server::load(&folder).expect("loaded");
-    held(&loaded, "loaded from a save", &mut random);
+    held(&loaded, "loaded from a save", false, &mut random);
+    assert_eq!(clouds(&loaded, &mut random), ticked, "the clouds loaded as saved");
     assert!(everything(&world) == everything(&loaded), "loaded as saved");
 }

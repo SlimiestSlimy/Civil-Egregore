@@ -16,7 +16,7 @@ superchunk's top left a chunk starts, in cells.
 sheep over that, a pixel each (`SHEEP_REACH`, none); **`opaque`**;
 `BROWN`, `GREEN`, `WHITE`: dirt's, grass's and a sheep's colours. `WATER`, `FILM`, **`depth_at(cells, word, bit)`**, **`under_water(colour,
 depth)`**: a colour seen through water, the less the deeper, none from
-`server::host::frame::DEEP` (16). `CLOUD_SHADOW`, `SEEN_UNDER_DEEPEST_CLOUD`, **`under_cloud(colour, cloud, whole)`**: a colour in a cloud's shadow; **`each_cloud(cells, shadow)`**: every tile with a cloud, its top left cell, its side and its cloud (`renderer.md`, "Clouds"). `TREE_YOUNG`, `TREE_OLD`, **`tree_colour(stage)`**, **`stage_at(cells,
+`server::host::frame::DEEP` (16). `CLOUD_SHADOW`, `SEEN_UNDER_DEEPEST_CLOUD`, **`under_cloud(colour, cloud, whole)`**: a colour in a cloud's shadow; **`each_cloud(cells, shadow)`**: every tile with a cloud, its top left cell, its side and its cloud (`renderer.md`, "Clouds"). `RAIN`, `CELLS_A_STREAK_OF_RAIN`, **`raining(cloud)`**, **`streak_of_rain_on(x, y)`**, **`in_rain(colour, rain, whole)`**: rain drawn under a cloud deep enough ("Rain"). `TREE_YOUNG`, `TREE_OLD`, **`tree_colour(stage)`**, **`stage_at(cells,
 word, bit)`**; **`counted(words, detail)`**: the cells set a tile.
 **`paint_far(cells, detail, ground)`**: a pixel a tile of cells
 `2^detail` a side, its grass counted from its run of bits, its colours

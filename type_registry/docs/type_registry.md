@@ -199,3 +199,23 @@ the namespace is one, everything's, so a layer's or an entity type's
 ID read as an attribute's says so itself. A row is written with the
 number (`number`); a number of 2^52 or more, or a layout of no blocks
 or of more than 16, does not build.
+
+## The climate
+
+The climate plane holds sixteen bits a tile, and what they are is said
+here once (`climate.rs`), for worldgen that makes them, the weather's
+rule that reads them and whatever shows them: **`Climate`**, its
+`humidity` the lowest four bits (0 to `MOST_HUMID`), its `wind` the
+next four, its `temperature` the highest eight (0 to `HOTTEST`) --
+`of_number` and `number` turn the plane's number into it and back.
+
+A **`Wind`** is one of thirteen states in its four bits: 0 calm
+(`Wind::CALM`), 1 to 4 blowing towards north, west, south, east
+(`WAYS_OF_WIND`, each the step to the next tile) at strength 1, 5 to
+8 at 2, 9 to 12 at 3 (`STRONGEST_WIND`). The three numbers its bits
+have beside are no wind's and read as calm (`of_state`). `blowing(way,
+strength)` makes one, `state` is its bits, `way`, `strength` and
+`towards` what a rule asks of it.
+
+`RAINS_ABOVE` (12) is the level of cloud above which a tile is
+raining: the rule's and the renderer's from one place.

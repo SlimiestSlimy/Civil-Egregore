@@ -51,7 +51,7 @@ width the bits of its data, an entity type's `default_attribute` the number of t
 numbers it takes from `number` on, **`layer_type`** its layer type if it is of
 the cells. `layer`, `wide`, `entity`, `attribute`, `sca_rule`, `entity_rule`: a row made from its constant. **`REGISTRY`**: the table, written by hand. The constants:
 `GRASS`, `TREE`, `TREE_STAGE`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`, `WET`, the
-cells'; `CLOUD` and `CLIMATE`, the weather's, a number a tile 8x8 (`WEATHER_TILE_SCALE`); `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, three blocks; `RULE_OF_GRASS`, `RULE_OF_TREES`, the cells' rules, `RULE_OF_SHEEP`, the entity's; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
+cells'; `CLOUD` and `CLIMATE`, the weather's, a number a tile 8x8 (`WEATHER_TILE_SCALE`); `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, three blocks; `RULE_OF_GRASS`, `RULE_OF_TREES`, the cells' rules, `RULE_OF_SHEEP`, the entity's, `RULE_OF_WEATHER`, the weather's, its master the climate; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
 **`first_clash(registry)`**: the first row to take a number or a name of
 one before it -- checked on `REGISTRY` as the crate is built, as is
 **`first_default_amiss(registry)`**: the first row whose default attribute is no attribute of a fixed size of the table, or that has one and is no entity type's.
@@ -65,3 +65,12 @@ wide plane's whole: what the server lists a world's layers from.
 
 Nothing gathered, nothing kept yet; `TRANSIENT_DATA` names the
 folder all the same.
+
+## `climate.rs`
+
+What the climate plane's number holds (`type_registry.md`, "The
+climate"). `RAINS_ABOVE`, `MOST_HUMID`, `HOTTEST`, `STRONGEST_WIND`,
+`WAYS_OF_WIND`. **`Wind`**: `CALM`, **`blowing(way, strength)`**,
+**`of_state(state)`**, **`state`**, **`strength`**, **`way`**,
+**`towards`**. **`Climate`**: `humidity`, `wind`, `temperature`;
+**`of_number(number)`**, **`number`**.

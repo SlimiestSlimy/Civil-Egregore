@@ -5,7 +5,7 @@
 
 use bitmap::BITS_PER_WORD;
 use bitplane_manager::{BitmapArena, LayerView, COUNT_TILE_WORDS};
-use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
+use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 use chunk_storage::LayerType;
 use utilities::chance::Chance;
 use utilities::rng::Rng;
@@ -73,6 +73,31 @@ pub fn sample_layer(superchunk: SuperchunkIndex, layer: LayerView, chance: Chanc
             next += 1 + draw(random);
         }
         next -= count;
+    }
+    chosen
+}
+
+/// Chooses each tile of `layer`'s hot chunks -- of `superchunk`, a
+/// plane of tiles of `tile_shift` (twice its scale) -- with `chance`,
+/// independently, whatever number it holds, and hands the first cell
+/// of every chosen tile to `emit` in Morton order: how many were
+/// chosen. A plane that holds a number for every tile is sampled so:
+/// none of its tiles is unset.
+pub fn sample_tiles_of_layer(superchunk: SuperchunkIndex, layer: LayerView, tile_shift: u32, chance: Chance, random: &mut Rng, emit: &mut impl FnMut(CellIndex)) -> usize {
+    if chance.is_never() {
+        return 0;
+    }
+    let tiles = (CELLS_IN_CHUNK >> tile_shift) as u64;
+    let draw = |random: &mut Rng| if chance.is_always() { 0 } else { chance.passed_over(random.draw()) };
+    // The rank, among the tiles of the hot chunks still ahead, of the next one chosen.
+    let (mut next, mut chosen) = (draw(random), 0);
+    for chunk in (0..CHUNKS_IN_SUPERCHUNK).filter(|&chunk| layer.is_hot(chunk)) {
+        while next < tiles {
+            emit(CellIndex::of(ChunkIndex::of(superchunk, chunk), (next as usize) << tile_shift));
+            chosen += 1;
+            next += 1 + draw(random);
+        }
+        next -= tiles;
     }
     chosen
 }

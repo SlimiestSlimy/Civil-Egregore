@@ -119,7 +119,7 @@ one list of them. `registered` is its ID in the type registry:
 **`Rule::registered`** its row there, **`Rule::master`** its master's. **`RulePlace`**: a rule's place in it, made of its
 name as the server is compiled (**`RulePlace::named(name)`**, a name
 not there not compiling), **`RulePlace::rule`** the row there;
-**`GRASS_RULE`**, **`TREES_RULE`**, **`SHEEP_RULE`**: each rule's.
+**`GRASS_RULE`**, **`TREES_RULE`**, **`SHEEP_RULE`**, **`WEATHER_RULE`**: each rule's.
 **`TickCounts`** `{counts, times}`: each rule's `RuleCounts` and time at
 its place; **`of(rule)`** and **`time_of(rule)`** read them by place.
 **`Chosen`**: some of the rules --
@@ -286,7 +286,7 @@ ask)` and `map(seed, generation, ask)`: the answers worked out.
 ## `host/frame.rs`
 
 `CHUNK_WORDS`, `WORD_BITS`, `STAGE_BITS`, `OLDEST_TREE_STAGE`,
-`CLOUD_BITS`, `CLOUD_TILE_SHIFT`, `DEEPEST_CLOUD` -- the cloud
+`CLOUD_BITS`, `CLOUD_TILE_SHIFT`, `DEEPEST_CLOUD`, `RAINS_ABOVE` (the cloud above which it rains) -- the cloud
 plane's width, tile size and most, off its type in the registry --
 **`cloud_over(clouds, tile)`**, a tile's cloud in `Cells::clouds`
 (the plane's buckets as the arena holds them, empty where a

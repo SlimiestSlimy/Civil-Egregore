@@ -36,3 +36,19 @@ tree put there if it has none and the collision plane does not hold
 it, its cell set there too. Returns its `RuleCounts`, their
 places named **`SAMPLED`**, **`SPREADS`**, **`GROWN`**, **`DIED`**, their
 names listed in **`COUNTED`**.
+
+## `weather.rs`
+
+The weather's planes are the registry's (`actions::weather`): `CLIMATE`
+and `CLOUD`. `MEAN_TIME_TO_SAMPLE` (2 seconds of the simulation) and
+the `SAMPLE_CHANCE` worked out from it; `WHOLE` (256), what a sample's
+chances are parts of; `PARTS_A_LEVEL_FROM_HUMIDITY` (16),
+`EVAPORATION_DIVIDES_HEAT` (4), `BURNING_OFF_DIVIDES_HEAT` (4),
+`PARTS_RAIN_SHEDS` (64); `TILE_SIDE` (8). **`rains(cloud)`**: above
+`RAINS_ABOVE`. **`deepens_and_thins(climate, cloud, over_water)`**:
+the parts with which a cloud deepens a level, and thins one.
+**`rule(turn, samples)`**: hands **`tile`**, the rule for one tile, to
+`cells::each_tile_sampled` (`sca_rules.md`, "Weather"). Returns its
+`RuleCounts`, their places named **`SAMPLED`**, **`DEEPENED`**,
+**`THINNED`**, **`BLOWN`**, **`RAINING`**, their names listed in
+**`COUNTED`**.

@@ -9,12 +9,14 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
+mod climate;
 pub mod diagnostics;
 mod layouts;
 mod registry;
 pub mod transient_data;
 mod type_ids;
 
+pub use climate::{Climate, Wind, HOTTEST, MOST_HUMID, RAINS_ABOVE, STRONGEST_WIND, WAYS_OF_WIND};
 pub use layouts::{data_words, Attribute, Layout, Member, SheepState, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};
 pub use registry::*;
 pub use type_ids::{AttributeType, Bits16, Bits2, Bits4, Bits8, EntityRuleType, EntityType, LayerType, Kind, ScaRuleType, Wide, Width, ATTRIBUTE_NUMBERS, NUMBERS};

@@ -11,6 +11,11 @@ passed over before each drawn by `Chance::passed_over` from one draw,
 none for a chance of always -- found by the counts: the chunks', the
 count tiles', the words'. **`sample(arena, type, chance, random,
 emit)`**: every superchunk's, in Morton order.
+**`sample_tiles_of_layer(superchunk, layer, tile_shift, chance,
+random, emit)`**: of a plane of tiles, each tile of the hot chunks
+chosen whatever it holds -- a plane with a number for every tile has
+no unset one to pass over -- its first cell handed on, in Morton
+order.
 
 ## `turn/`
 
@@ -25,7 +30,7 @@ dy)`**, and for each where every author's part begins (`segments`, a
 
 **`Turn`**: a superchunk's turn in the first phase:
 **`superchunk`**, **`random`**, **`now`**, **`sample(type, chance,
-samples)`** of its own cells. Cells read, anywhere hot, as the tick
+samples)`** of its own cells, **`sample_tiles(type, chance, samples)`** of the tiles of a plane of tiles. Cells read, anywhere hot, as the tick
 found them: **`holds(type, cell)`**, **`value(plane, cell)`** (a wide
 plane's number), **`window(type, origin, width, height)`** (up to 8x8
 cells as a `Window`), **`windows(types, ...)`** (of several types at

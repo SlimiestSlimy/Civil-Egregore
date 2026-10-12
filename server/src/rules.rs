@@ -24,10 +24,11 @@ pub struct Rule {
 /// Every rule a world ticks, in the order a turn runs them: the cells'
 /// (`sca_rules`), then the entities' (`entity_rules`), all reading the
 /// world as the tick found it.
-pub const RULES: [Rule; 3] = [
+pub const RULES: [Rule; 4] = [
     Rule { name: "grass", registered: type_registry::RULE_OF_GRASS.0, counted: &sca_rules::grass::COUNTED, rule: sca_rules::grass::rule },
     Rule { name: "trees", registered: type_registry::RULE_OF_TREES.0, counted: &sca_rules::trees::COUNTED, rule: sca_rules::trees::rule },
     Rule { name: "sheep", registered: type_registry::RULE_OF_SHEEP.0, counted: &entity_rules::sheep::COUNTED, rule: |turn, _| entity_rules::sheep::rule(turn) },
+    Rule { name: "weather", registered: type_registry::RULE_OF_WEATHER.0, counted: &sca_rules::weather::COUNTED, rule: sca_rules::weather::rule },
 ];
 
 impl Rule {
@@ -96,6 +97,8 @@ pub const GRASS_RULE: RulePlace = RulePlace::named("grass");
 pub const TREES_RULE: RulePlace = RulePlace::named("trees");
 /// The sheep's rule.
 pub const SHEEP_RULE: RulePlace = RulePlace::named("sheep");
+/// The weather's place.
+pub const WEATHER_RULE: RulePlace = RulePlace::named("weather");
 
 /// What the rules did, in a tick or added up over many: each rule's
 /// counts at its place in [`RULES`], and how long each took, every

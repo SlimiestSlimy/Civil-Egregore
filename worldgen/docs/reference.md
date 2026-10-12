@@ -88,6 +88,16 @@ stages, as `Generation::growth` says of each cell, each tree's cell set
 in the collision plane. No image: that is
 storage's to make.
 
+## `climate.rs`
+
+`CLIMATE_SALT`: what keeps the climate's noise apart from the
+ground's. `BROAD`, `FINER`: the cells from a point to the next of its
+noises, as powers of two. `STEPS_A_DEGREE_COOLER`,
+`STEPS_A_LEVEL_DRIER`, `MORE_HUMID_OVER_WATER`: what height and water
+do to it. **`ClimateNoises`**: the noises a world's climate lies by;
+**`new(seed)`**, **`at(x, y, above_ocean, under_water)`**: a tile's
+climate (`worldgen.md`, "Climate"). The module is `climate`.
+
 ## `generation.rs`
 
 `TREES_SALT`: what keeps the trees' numbers apart from the grass's.

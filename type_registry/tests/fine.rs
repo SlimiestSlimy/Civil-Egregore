@@ -4,7 +4,7 @@
 //!
 //! `cargo test --test fine`
 
-use type_registry::{data_words, default_attribute_of, first_clash, first_default_amiss, first_master_amiss, layer_types, master_of, named, of_number, rule_of_id, rules_of, AttributeType, EntityRuleType, EntityType, Registration, Layout, LayerType, Registered, ScaRuleType, SheepState, GRASS, NUMBERS, REGISTRY, RULES_REGISTERED, RULE_OF_GRASS, RULE_OF_SHEEP, RULE_OF_TREES, SHEEP, SHEEP_STATE, TREE, TREE_STAGE};
+use type_registry::{data_words, default_attribute_of, first_clash, first_default_amiss, first_master_amiss, layer_types, master_of, named, of_number, rule_of_id, rules_of, AttributeType, EntityRuleType, EntityType, Registration, Layout, LayerType, Registered, ScaRuleType, SheepState, GRASS, NUMBERS, REGISTRY, RULES_REGISTERED, CLIMATE, RULE_OF_GRASS, RULE_OF_SHEEP, RULE_OF_TREES, RULE_OF_WEATHER, SHEEP, SHEEP_STATE, TREE, TREE_STAGE};
 use utilities::rng::Rng;
 
 /// A row registering `registration`, named `name` at `number`, `width` wide.
@@ -102,7 +102,7 @@ fn a_default_attribute_is_an_attribute_of_a_fixed_size_of_the_table() {
 #[test]
 fn a_rule_has_one_master_of_the_kind_its_rule_is_of() {
     assert_eq!(first_master_amiss(REGISTRY), None);
-    let rules = [(RULE_OF_GRASS.0, "grass rule", GRASS.number()), (RULE_OF_TREES.0, "trees rule", TREE.number()), (RULE_OF_SHEEP.0, "sheep rule", SHEEP.number())];
+    let rules = [(RULE_OF_GRASS.0, "grass rule", GRASS.number()), (RULE_OF_TREES.0, "trees rule", TREE.number()), (RULE_OF_SHEEP.0, "sheep rule", SHEEP.number()), (RULE_OF_WEATHER.0, "weather rule", CLIMATE.layer_type().number())];
     assert_eq!(rules.len(), RULES_REGISTERED);
     for (id, name, master) in rules {
         let rule = rule_of_id(id).unwrap_or_else(|| panic!("{name} not found by its ID"));

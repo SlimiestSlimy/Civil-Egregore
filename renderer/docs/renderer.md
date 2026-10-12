@@ -240,6 +240,15 @@ How the clouds are laid out -- four bits, a tile 8 by 8 -- the
 renderer does not say: it is the cloud plane's type in the registry
 (`server::host::frame::CLOUD_BITS`, `CLOUD_TILE_SHIFT`).
 
+### Rain
+
+A tile under a cloud above 12 is raining (`raining`, by the type
+registry's number): after its shadow, one cell in five of it
+(`CELLS_A_STREAK_OF_RAIN`), in slanted lines the same for every tile
+(`streak_of_rain_on`), is drawn half way to a pale blue (`in_rain`,
+`RAIN`). From far, a pixel is as much paler as it has cells under
+rain. The streaks stand still: nothing falls yet.
+
 ## Still to come
 
 The words of every superchunk a frame carries are still copied whole,

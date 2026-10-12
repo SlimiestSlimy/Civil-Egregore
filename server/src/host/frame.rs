@@ -37,6 +37,10 @@ pub const CLOUD_TILE_SHIFT: u32 = CLOUD.layer_type().tile_shift();
 /// The most cloud a tile holds: the deepest shadow.
 pub const DEEPEST_CLOUD: u32 = CLOUD.most();
 
+/// The cloud above which a tile is raining, as the type registry has
+/// it.
+pub const RAINS_ABOVE: u32 = type_registry::RAINS_ABOVE;
+
 /// The cloud over the tile at `tile` of a superchunk -- its tiles in
 /// Morton order, as [`Cells::clouds`] holds them: 0 for none, and
 /// where no cloud was sent.

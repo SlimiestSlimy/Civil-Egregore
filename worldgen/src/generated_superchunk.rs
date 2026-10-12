@@ -2,8 +2,9 @@
 //! grows on it put on the layers a world has ([`layer_types`]). The
 //! image of them is storage's to make (`SuperchunkCells::image`).
 
+use crate::climate::ClimateNoises;
 use crate::{Generation, Terrain, WALLS};
-use type_registry::{COLLISION, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
+use type_registry::{CLIMATE, COLLISION, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{ChunkMaps, LayerType, SuperchunkCells};
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
@@ -12,7 +13,8 @@ use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN
 /// `generation` says: its terrain, the ocean where it is under the
 /// ocean's level, and on the rest grass in patches -- dirt where there is none --
 /// and trees in patches of their own, each of a stage drawn for its
-/// cell -- the same whenever it is made.
+/// cell; and over all of it the climate, a tile at a time
+/// ([`ClimateNoises`]) -- the same whenever it is made.
 pub fn generate_superchunk(generation: &Generation, seed: u64, superchunk: SuperchunkIndex) -> SuperchunkCells {
     let terrain = Terrain::generate_shaped(&generation.shape, seed, superchunk);
     let CellCartesian { x: left, y: top } = superchunk.top_left().cartesian();
@@ -59,6 +61,20 @@ pub fn generate_superchunk(generation: &Generation, seed: u64, superchunk: Super
         for (place, cells) in terrain.walls[way].iter().enumerate().filter(|(_, cells)| cells.iter().any(|&word| word != 0)) {
             layers.push((place, layer_type, *cells));
         }
+    }
+    // The climate, a number a tile: each of its bits a plane, the tiles its first cells in Morton order.
+    let (mut climate, tile_cells) = (ClimateNoises::new(seed), 1usize << CLIMATE.layer_type().tile_shift());
+    let climate_planes: Vec<LayerType> = CLIMATE.layer_type().planes().collect();
+    for chunk in 0..CHUNKS_IN_SUPERCHUNK {
+        let mut bits = vec![[0u64; WORDS]; climate_planes.len()];
+        for tile in 0..CELLS_IN_CHUNK / tile_cells {
+            // The tile's middle cell: half a tile across and down from its first.
+            let middle = chunk * CELLS_IN_CHUNK + tile * tile_cells + 3 * tile_cells / 4;
+            let (x, y) = cartesian_from_place(middle);
+            let number = climate.at(left + x, top + y, terrain.height(middle).saturating_sub(generation.shape.ocean), depth_at(middle) > 0).number();
+            (0..climate_planes.len()).filter(|bit| number >> bit & 1 == 1).for_each(|bit| bits[bit][tile / BITS_PER_WORD] |= 1 << (tile % BITS_PER_WORD));
+        }
+        layers.extend(bits.iter().zip(&climate_planes).filter(|(bits, _)| bits.iter().any(|&word| word != 0)).map(|(bits, &plane)| (chunk, plane, *bits)));
     }
     SuperchunkCells { water_depths: ChunkMaps::from_numbers(depth_at), heights: terrain.heights, layers }
 }
