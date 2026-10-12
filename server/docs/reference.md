@@ -79,6 +79,8 @@ The viewport is told to the halos (`World::keep_viewport`), by the
 host on each frame asked.
 **`World::keep_hot(wanted)`**, **`World::warming`**,
 **`World::cooling`**, **`World::start_warming(superchunk, due)`**,
+**`World::flush_what_went_cold`** (every write-back on its way put in
+the ring and the ring flushed, no hot bitmap encoded),
 **`World::write_back_and_flush_all`**: each the halos' own
 (`../../simulation/docs/reference.md`, "`halos.rs`").
 
@@ -164,7 +166,8 @@ folded (`utilities::hash::fold`) from the part in Morton order: every
 hot bitmap of every layer type with its chunk and count; every entity's
 header and attributes; every random stream; the superchunks hot,
 warming and cooling with when each is due; every cold superchunk's
-state and image. The writeback ring is flushed first, as a save does.
+state and image. What went cold is flushed first
+(`World::flush_what_went_cold`); no hot superchunk is written back for it.
 **`WorldHash::whole(seed)`**: the parts, the tick and the seed in one
 word.
 

@@ -96,6 +96,18 @@ impl World {
         self.with_halos(|halos, held| halos.start_warming(held, superchunk, due));
     }
 
+    /// Puts every write-back still on its way into the ring and
+    /// flushes it: each cold superchunk's image the cells it went cold
+    /// with. No hot superchunk's changed bitmaps are encoded: they stay
+    /// as they are, hot, until it cools or the world is saved
+    /// ([`World::write_back_and_flush_all`]).
+    pub fn flush_what_went_cold(&mut self) {
+        self.with_halos(|halos, held| {
+            halos.land_write_backs(held, true);
+            halos.flush_all(held);
+        });
+    }
+
     /// Writes back every hot superchunk's changed bitmaps, then
     /// flushes every superchunk with changes in the ring: the cold
     /// pool's images the cells as they are.

@@ -154,7 +154,11 @@ the entities, the random streams, the halos and the cold pool, folded
 by nothing a machine could do its own way: no float, no pointer, no
 order but Morton's -- and
 `Civil_Egregore server check <seed> <ticks>` prints them every so many
-ticks:
+ticks. A hash encodes nothing hot: the hot bitmaps are folded as they
+are, and only what went cold is flushed, so its image is its cells.
+Encoding back is a superchunk cooling's, off the tick, and a save's --
+never a tick's own. (A hash wrote every hot superchunk back, once, and
+was most of what a checked run cost.)
 
     cargo run --release -- server check bd044074d908b399 20000 500 > linux.csv
 
