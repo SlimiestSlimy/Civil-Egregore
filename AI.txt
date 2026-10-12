@@ -823,3 +823,11 @@ RULES AND TIME
   flag LOL" (CIVIL_EGREGORE_RENDER, as I read it: the flag I set on
   every run). Order: commit circle + lean + tests' seed first; then
   humidity in spreading; then the feature flag.
+- ASK 2026-10-12: "and death of trees and grass more likely with high
+  heat/ low humidity" -> grass has it (harshness); trees get it: a
+  tree of any stage may die of its climate.
+- ASK 2026-10-12: "yeah, and we need to dial the difficulty of
+  movements across rising height gradients way down, and the contrary
+  should also happen of course, with diminished intensity as well" ->
+  the air (passes_a_rise): up a rise far less held back; down a fall
+  let through more, mildly.

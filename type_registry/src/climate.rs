@@ -41,9 +41,16 @@ pub const TILES_ABOUT: [(i32, i32); 8] = [(-1, -1), (0, -1), (1, -1), (-1, 0), (
 /// How much of the humidity or the temperature between two tiles a
 /// wind carries from one to the next at once, at the most.
 pub const DEGREES_A_WIND_CARRIES: u32 = 4;
-/// The rise in height, a tile to the next, that halves the chance of
-/// air going up it ([`passes_a_rise`]).
-pub const RISE_THAT_HALVES: u32 = 8;
+/// How much the land holds air back by, as a rise in height a tile
+/// to the next: what halves the chance of air going over it
+/// ([`passes_a_slope`]). Far more than the land rises from most
+/// tiles to the next: a slope leans the air, and seldom stops it.
+pub const RISE_THAT_HALVES: u32 = 64;
+/// The fall in height, a tile to the next, down which nothing holds
+/// air back; level land holds it as a rise of this much does past
+/// it, so air goes downhill a little the likelier
+/// ([`passes_a_slope`]).
+pub const FALL_THAT_FREES: u32 = 8;
 
 /// `from` up to `step` nearer `to`, never past it: how a number a
 /// wind carries comes to its neighbour's.
@@ -58,11 +65,15 @@ pub const fn nearer(from: u32, to: u32, step: u32) -> u32 {
 }
 
 /// The parts of `whole` with which air goes from a tile to one
-/// `rise` higher -- by pressure or by wind, the one resistance: all
-/// of it on the level or downhill, half up a rise of
-/// [`RISE_THAT_HALVES`], a third up twice that; the steeper, the less.
-pub const fn passes_a_rise(rise: u32, whole: u32) -> u32 {
-    whole * RISE_THAT_HALVES / (RISE_THAT_HALVES + rise)
+/// `slope` higher -- lower, under 0 -- by pressure or by wind, the
+/// one resistance: all of it down a fall of [`FALL_THAT_FREES`] or
+/// more, a little less on the level, and less the steeper the rise,
+/// mildly -- half where the rise is [`RISE_THAT_HALVES`] past that
+/// fall.
+pub const fn passes_a_slope(slope: i32, whole: u32) -> u32 {
+    let held_as_by = slope + FALL_THAT_FREES as i32;
+    let held_as_by = if held_as_by > 0 { held_as_by as u32 } else { 0 };
+    whole * RISE_THAT_HALVES / (RISE_THAT_HALVES + held_as_by)
 }
 
 /// How strongly pressure `here` falls to a tile at `there`: by how

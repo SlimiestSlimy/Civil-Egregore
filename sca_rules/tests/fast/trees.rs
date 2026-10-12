@@ -1,13 +1,16 @@
 //! Trees, on a plain the server makes: they grow a stage at a time to
 //! the oldest and no further, spread once old enough and not where
-//! they are crowded, die only at the oldest, and leave no stage behind.
+//! they are crowded and as the air is humid, die of age only at the
+//! oldest and of a harsh climate at any stage, and leave no stage
+//! behind.
 
 use crate::tests::{first_superchunk, plain_world, tick_rule};
 use bitplane_manager::{Write, WriteOp};
 use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use sca_rules::trees::{DIED, GROWN, SAMPLED, SEEDS_FROM, SPREADS};
 use server::World;
-use type_registry::{COLLISION, OLDEST_TREE_STAGE, TREE, TREE_STAGE};
+use crate::grass::put_climate;
+use type_registry::{Climate, Wind, COLLISION, HOTTEST, MOST_HUMID, OLDEST_TREE_STAGE, PRESSURE_AT_REST, TREE, TREE_STAGE};
 use utilities::rng::Rng;
 
 /// Every cell of `world`'s first superchunk, in rows.
@@ -41,6 +44,9 @@ fn stages(world: &World) -> Vec<(CellIndex, u32)> {
     stages
 }
 
+/// The mildest climate: the most humid, the coldest.
+const MILDEST: Climate = Climate { humidity: MOST_HUMID, wind: Wind::CALM, temperature: 0, pressure: PRESSURE_AT_REST };
+
 /// Trees of every stage scattered thin, half of them the oldest --
 /// so some die in so few ticks: each tick the trees are no
 /// more than were put and no fewer than died; a tree only ever grows
@@ -50,6 +56,8 @@ fn stages(world: &World) -> Vec<(CellIndex, u32)> {
 fn trees_grow_a_stage_at_a_time_spread_and_die_of_age() {
     let mut world = plain_world(1, 0, 0, 2);
     let mut random = Rng::new(utilities::seed::counted());
+    // The mildest climate: no tree dies of it, and the air always lets one spread.
+    put_climate(&mut world, MILDEST);
     let planted: Vec<CellIndex> = cells(&world).filter(|_| random.below(16) == 0).collect();
     plant(&mut world, &planted, || if random.below(2) == 0 { OLDEST_TREE_STAGE } else { random.below(u64::from(OLDEST_TREE_STAGE) + 1) as u32 });
     let mut before = stages(&world);
@@ -106,4 +114,29 @@ fn crowded_trees_never_spread() {
         (sampled, died) = (sampled + done[SAMPLED], died + done[DIED]);
     }
     assert!(sampled > 1_000 && died > 100, "{sampled} sampled, {died} died");
+}
+
+/// The climate over trees: young ones scattered thin, old enough to
+/// spread and none at the oldest stage, so none dies of age. In the
+/// mildest climate none dies and they spread; in the driest and
+/// hottest they die young and none spreads; and in a hot climate of a
+/// humidity drawn between they die less than in the harshest.
+#[test]
+fn trees_spread_as_the_air_is_humid_and_die_as_the_climate_is_harsh() {
+    let mut random = Rng::new(utilities::seed::counted());
+    let between = random.between(64, 192) as u32;
+    let harshest = Climate { humidity: 0, temperature: HOTTEST, ..MILDEST };
+    let [mild, some, harsh] = [MILDEST, Climate { humidity: between, ..harshest }, harshest].map(|climate| {
+        let mut world = plain_world(1, 0, 0, 2);
+        put_climate(&mut world, climate);
+        let planted: Vec<CellIndex> = cells(&world).filter(|_| random.below(16) == 0).collect();
+        plant(&mut world, &planted, || SEEDS_FROM);
+        // Too few ticks for a tree to grow from there to the oldest stage.
+        let ticks = 700;
+        assert!(u64::from(OLDEST_TREE_STAGE - SEEDS_FROM) * sca_rules::trees::MEAN_TIME_TO_SAMPLE.ticks() > 8 * ticks);
+        (0..ticks).map(|_| tick_rule(&mut world, server::TREES_RULE).rules).fold((0, 0), |sum, done| (sum.0 + done[SPREADS], sum.1 + done[DIED]))
+    });
+    assert!(mild.0 > 20 && mild.1 == 0, "the mildest: {mild:?} spread and died");
+    assert!(harsh.0 == 0 && harsh.1 > 20, "the harshest: {harsh:?} spread and died");
+    assert!(some.0 > 0 && some.0 < mild.0 && some.1 > 0 && some.1 < harsh.1, "humidity {between}, hot: {some:?} spread and died, between {mild:?} and {harsh:?}");
 }

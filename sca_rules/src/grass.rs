@@ -3,7 +3,8 @@
 //! tile's climate, the drier and the hotter the likelier: one sampling
 //! pass for both (`docs/sca_rules.md`, "Grass").
 
-use actions::types::{Climate, CLIMATE, GRASS, HOTTEST, MOST_HUMID, WET};
+use crate::growing::{humid_enough_to_spread, too_harsh_to_live};
+use actions::types::{GRASS, WET};
 use actions::simulation_time::SimulationTime;
 use actions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn, NEIGHBOURS};
 
@@ -37,22 +38,15 @@ pub const SPREADS: usize = place_counted(&COUNTED, "spreads");
 /// each is applied.
 pub const DECAYS: usize = place_counted(&COUNTED, "decays");
 
-/// How harsh `climate` is to grass, of [`HARSHEST`]: how dry it is
-/// times how hot -- none where it is the most humid, or the coldest.
-pub const fn harshness(climate: Climate) -> u32 {
-    (MOST_HUMID - climate.humidity) * climate.temperature
-}
-
-/// The harshest a climate is to grass: the driest, the hottest.
-pub const HARSHEST: u32 = MOST_HUMID * HOTTEST;
-
 /// The rule, on one cell of grass sampled -- each with
 /// [`SAMPLE_CHANCE`], the chances of spreading and of decay
 /// together, by whoever ticks the rule: it draws whether it tries
 /// to spread or is held against its climate. Spreading, it draws a
-/// neighbour and queues the grass there if the neighbour lets it;
+/// neighbour and queues the grass there if the neighbour lets it and
+/// the air over it is humid enough this time
+/// ([`humid_enough_to_spread`]);
 /// held against its climate, it decays with a chance of the
-/// [`harshness`] of its tile's.
+/// harshness of its tile's ([`too_harsh_to_live`]).
 #[inline]
 pub fn rule(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
     counts[SAMPLED] += 1;
@@ -61,12 +55,12 @@ pub fn rule(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
         // Stepped on the Morton index itself: no cartesian coordinates.
         // Dirt is a cell with no grass on it: no layer of its own.
         // And grass does not spread under water; a world with no water has none.
-        if let Some(neighbour) = cell.offset(dx, dy).filter(|&neighbour| cells::lacks(turn, GRASS, neighbour) && !cells::holds(turn, WET, neighbour)) {
+        if let Some(neighbour) = cell.offset(dx, dy).filter(|&neighbour| cells::lacks(turn, GRASS, neighbour) && !cells::holds(turn, WET, neighbour))
+            && humid_enough_to_spread(turn, neighbour)
+        {
             cells::set_counted(turn, GRASS, neighbour, SPREADS);
         }
-    } else if let Some(climate) = cells::value(turn, CLIMATE, cell)
-        && this_tick::random(turn).below(u64::from(HARSHEST)) < u64::from(harshness(Climate::of_number(climate)))
-    {
+    } else if too_harsh_to_live(turn, cell) {
         cells::clear_counted(turn, GRASS, cell, DECAYS);
     }
 }

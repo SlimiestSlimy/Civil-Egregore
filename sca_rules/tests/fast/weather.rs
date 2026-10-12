@@ -9,7 +9,7 @@ use bitplane_manager::Write;
 use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use sca_rules::weather::{deepens_and_thins, BLOWN, CARRIED, DEEPENED, EVENED, PUSHED, SAMPLED, THINNED, WHOLE};
 use server::World;
-use type_registry::{nearer, passes_a_rise, pressure_falls_by, Climate, Wind, CLIMATE, CLOUD, ELEVATION, HIGHEST_PRESSURE, HOTTEST, HUMIDITY_A_LEVEL_OF_CLOUD, MOST_HUMID, PRESSURE_AT_REST, PRESSURE_GAP_AT_REST, RISE_THAT_HALVES, STRONGEST_WIND, WEATHER_TILE_SCALE, WET};
+use type_registry::{nearer, passes_a_slope, FALL_THAT_FREES, pressure_falls_by, Climate, Wind, CLIMATE, CLOUD, ELEVATION, HIGHEST_PRESSURE, HOTTEST, HUMIDITY_A_LEVEL_OF_CLOUD, MOST_HUMID, PRESSURE_AT_REST, PRESSURE_GAP_AT_REST, RISE_THAT_HALVES, STRONGEST_WIND, WEATHER_TILE_SCALE, WET};
 use utilities::rng::Rng;
 
 /// Cells along a tile's side.
@@ -94,8 +94,9 @@ fn a_climate_is_its_number_and_back() {
 }
 
 /// The small functions the air goes by: a number carried comes
-/// nearer and never past; a rise passes all of the air on the level,
-/// half at the rise that halves, and less the steeper; pressure falls
+/// nearer and never past; a slope passes all of the air down a fall
+/// that frees it, a little less on the level, less the steeper it
+/// rises; pressure falls
 /// only past the gap that stays, the more the lower; a wind stepped
 /// towards another comes to be it, never past the strongest on the way; a wind
 /// reaches a tile as often as it is strong, and a calm one never.
@@ -106,14 +107,15 @@ fn the_small_functions_the_air_goes_by() {
         let (from, to, step) = (random.below(256) as u32, random.below(256) as u32, 1 + random.below(8) as u32);
         let is = nearer(from, to, step);
         assert!(is.abs_diff(to) <= from.abs_diff(to) && is.abs_diff(from) <= step && (from != to) == (is != from), "{from} towards {to} by {step}: {is}");
-        let (rise, whole) = (random.below(256) as u32, 1 + random.below(1024) as u32);
-        assert!(passes_a_rise(rise, whole) <= passes_a_rise(rise / 2, whole) && passes_a_rise(0, whole) == whole);
+        let (slope, whole) = (random.below(511) as i32 - 255, 1 + random.below(1024) as u32);
+        assert!(passes_a_slope(slope, whole) <= passes_a_slope(slope - 1 - random.below(64) as i32, whole) && passes_a_slope(-(FALL_THAT_FREES as i32) - random.below(64) as i32, whole) == whole);
         let (here, there) = (random.below(256) as u32, random.below(256) as u32);
         let falls = pressure_falls_by(here, there);
         assert_eq!(falls > 0, here > there + PRESSURE_GAP_AT_REST, "{here} to {there}");
         assert!(falls == 0 || falls < pressure_falls_by(here, there.saturating_sub(1)) || there == 0);
     }
-    assert_eq!(passes_a_rise(RISE_THAT_HALVES, 256), 128);
+    assert_eq!(passes_a_slope((RISE_THAT_HALVES - FALL_THAT_FREES) as i32, 256), 128);
+    assert!(passes_a_slope(0, 256) < 256 && passes_a_slope(0, 256) > passes_a_slope(8, 256) && passes_a_slope(8, 256) > 192, "level land holds a little, a rise a little more");
     let (winds, draws) = (winds(), STRONGEST_WIND as u32 + 1);
     for &from in &winds {
         let (across, down) = from.vector();

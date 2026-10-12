@@ -10,5 +10,6 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod grass;
+pub mod growing;
 pub mod trees;
 pub mod weather;

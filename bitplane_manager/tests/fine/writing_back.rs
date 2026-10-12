@@ -119,7 +119,10 @@ fn a_full_ring_releases_what_it_flushed() {
     let encoded = codec.encode(&drawn()).to_vec();
     for superchunk in [first, second] {
         arena.make_hot(key(superchunk), Some(&encoded), &mut codec);
-        write(&mut arena, LayerType::of_a_bit(3), WriteOp::Set, cell_in(key(superchunk).chunk, a_cell()));
+        // A change whichever cell is drawn: set if the bitmap drawn left it clear, cleared if it set it.
+        let cell = cell_in(key(superchunk).chunk, a_cell());
+        let op = if arena.holds(LayerType::of_a_bit(3), cell) == Ok(true) { WriteOp::Unset } else { WriteOp::Set };
+        write(&mut arena, LayerType::of_a_bit(3), op, cell);
     }
     arena.write_back(first, &mut storage, &mut codec);
     assert!(arena.evict(key(first)));
