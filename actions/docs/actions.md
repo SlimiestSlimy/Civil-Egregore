@@ -93,9 +93,10 @@ over cheaply, a row shifted and its neighbours ORed in.
 
 ## The going over
 
-A rule is written for one cell or one entity: `cells::each_sampled`
-and `entities::each_woken` go over them, inlined into the rule, so the
-loop costs nothing; each says, as it comes to a cell or an entity,
+A rule is written for one cell or one entity. The cells sampled are
+gone over by the simulation (`Turn::each_sampled`), which is handed the
+rule for one of them; `entities::each_woken` goes over the entities
+waking, inlined into the rule, so the loop costs nothing; each says, as it comes to a cell or an entity,
 that the rule is seeing to it ("The same wherever the borders fall"). `each_woken` hands each entity waking, in Morton
 order by cell, with a state of the rule's -- what it counts, and
 whatever it keeps from one entity to the next -- and asks memory, a few
@@ -204,7 +205,7 @@ borders fall"; `../../entity_manager/docs/entity_manager.md`,
 "Instructions", An entity's name in a tick):
 
 - what is queued is applied in the Morton order of its authors' cells
-  over the whole world -- `each_woken` and `cells::each_sampled` say whom
+  over the whole world -- `each_woken` and `Turn::each_sampled` say whom
   the rule is seeing to (`Turn::seeing_to`) -- not in the order
   superchunks are gone over in;
 - an entity is named, all a tick long, by the cell the tick found it

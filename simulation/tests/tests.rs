@@ -51,7 +51,7 @@ pub fn walker(at: CellIndex, wake: u64) -> Header {
 
 /// Each walker woken counts it, flips `ODD`, and wakes next tick, where
 /// it stands: how many woke.
-pub fn count_and_flip(turn: &mut Turn, _: &mut Vec<CellIndex>) -> usize {
+pub fn count_and_flip(turn: &mut Turn) -> usize {
     let mut woken = 0;
     let mut attributes = Vec::new();
     for entity in turn.woken() {

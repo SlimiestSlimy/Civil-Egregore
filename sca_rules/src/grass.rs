@@ -37,15 +37,6 @@ pub const SPREADS: usize = place_counted(&COUNTED, "spreads");
 /// each is applied.
 pub const DECAYS: usize = place_counted(&COUNTED, "decays");
 
-/// The rule, on one superchunk's turn: every cell of grass chosen with
-/// the chances of spreading and of decay together, in Morton order,
-/// each seen to by [`cell`].
-pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
-    let (sampled, mut counts) = cells::each_sampled(turn, GRASS, SAMPLE_CHANCE, samples, cell);
-    counts[SAMPLED] = sampled as u64;
-    counts
-}
-
 /// How harsh `climate` is to grass, of [`HARSHEST`]: how dry it is
 /// times how hot -- none where it is the most humid, or the coldest.
 pub const fn harshness(climate: Climate) -> u32 {
@@ -55,13 +46,16 @@ pub const fn harshness(climate: Climate) -> u32 {
 /// The harshest a climate is to grass: the driest, the hottest.
 pub const HARSHEST: u32 = MOST_HUMID * HOTTEST;
 
-/// The rule, on one cell of grass chosen: it draws whether it tries
+/// The rule, on one cell of grass sampled -- each with
+/// [`SAMPLE_CHANCE`], the chances of spreading and of decay
+/// together, by whoever ticks the rule: it draws whether it tries
 /// to spread or is held against its climate. Spreading, it draws a
 /// neighbour and queues the grass there if the neighbour lets it;
 /// held against its climate, it decays with a chance of the
 /// [`harshness`] of its tile's.
 #[inline]
-fn cell(turn: &mut Turn, cell: CellIndex, _counts: &mut RuleCounts) {
+pub fn rule(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
+    counts[SAMPLED] += 1;
     if this_tick::random(turn).chance_among(SPREAD_CHANCE, SAMPLE_CHANCE) {
         let (dx, dy) = NEIGHBOURS[this_tick::random(turn).below(NEIGHBOURS.len() as u64) as usize];
         // Stepped on the Morton index itself: no cartesian coordinates.

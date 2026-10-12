@@ -32,7 +32,7 @@ fn an_act_over_a_border_happens_whole_or_not_at_all() {
             entities.queue_put(walker(beside, NEVER), &[]);
         }
         entities.apply();
-        let report = Simulation::new(2).tick(&mut arena, &mut entities, random.draw(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        let report = Simulation::new(2).tick(&mut arena, &mut entities, random.draw(), |turn: &mut Turn| {
             for entity in turn.woken() {
                 turn.seeing_to(entity.header.at);
                 crate::tests::make(turn, walker(beside, NEVER), &[AttributeBlock::holding(TAG, 5)]);
@@ -132,7 +132,7 @@ fn a_crowd_acting_over_every_border_comes_to_the_same_on_any_threads() {
         let mut simulation = Simulation::new(threads);
         let (mut over_a_border, mut refused) = (0, 0);
         for _ in 0..TICKS {
-            let report = simulation.tick(&mut arena, &mut entities, seed, |turn: &mut Turn, _: &mut Vec<CellIndex>| flip_what_is_about(turn, seed));
+            let report = simulation.tick(&mut arena, &mut entities, seed, |turn: &mut Turn| flip_what_is_about(turn, seed));
             over_a_border += report.acts_over_a_border;
             refused += report.instructions_compared.1;
         }

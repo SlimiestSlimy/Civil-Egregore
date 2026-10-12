@@ -1,6 +1,5 @@
 //! The cells: what a rule asks of a layer at a cell and the square
-//! about one, the going over the cells sampled -- a rule of the cells
-//! is written for one cell -- and a cell written, each a
+//! about one, and a cell written, each a
 //! compare-and-write queued: it says what the rule saw at the cell,
 //! and is applied only if the cell still holds it.
 
@@ -9,36 +8,6 @@ use chunk_storage::{LayerType, Wide, Width};
 use coordinates::CellIndex;
 use compares_and_writes::{compare, Write};
 use simulation::Turn;
-use utilities::chance::Chance;
-
-/// Runs `each` on every hot set cell of `layer_type` in the turn's
-/// superchunk chosen with `chance`, independently, in Morton
-/// order, with what it counts: how many were chosen, and the counts.
-/// `samples` is room for them, emptied first.
-#[inline]
-pub fn each_sampled<C: Default>(turn: &mut Turn, layer_type: LayerType, chance: Chance, samples: &mut Vec<CellIndex>, mut each: impl FnMut(&mut Turn, CellIndex, &mut C)) -> (usize, C) {
-    let (sampled, mut counts) = (turn.sample(layer_type, chance, samples), C::default());
-    for &cell in samples.iter() {
-        turn.seeing_to(cell);
-        each(turn, cell, &mut counts);
-    }
-    (sampled, counts)
-}
-
-/// Runs `each` on every tile of `plane` -- a plane of tiles -- in the
-/// turn's superchunk chosen with `chance`, independently, in Morton
-/// order, handing it the tile's first cell: how many were chosen, and
-/// the counts. Every tile is one that may be chosen, whatever the
-/// plane holds there. `samples` is room for them, emptied first.
-#[inline]
-pub fn each_tile_sampled<W: Width, C: Default>(turn: &mut Turn, plane: Wide<W>, chance: Chance, samples: &mut Vec<CellIndex>, mut each: impl FnMut(&mut Turn, CellIndex, &mut C)) -> (usize, C) {
-    let (sampled, mut counts) = (turn.sample_tiles(plane.layer_type(), chance, samples), C::default());
-    for &tile in samples.iter() {
-        turn.seeing_to(tile);
-        each(turn, tile, &mut counts);
-    }
-    (sampled, counts)
-}
 
 /// How many cells of the tile 8 by 8 cells that `cell` is in
 /// `layer_type` holds at, as the tick found them: none where it is

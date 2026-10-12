@@ -145,13 +145,13 @@ impl Simulation {
     }
 
     /// One tick of `rule` over every superchunk of `arena` and its
-    /// entities: `rule` run on each, with room for samples, then what
+    /// entities: `rule` run on each, then what
     /// they queued applied. `seed`, the world's, seeds a superchunk's
     /// random numbers the first tick it is in.
     pub fn tick<R, F>(&mut self, arena: &mut BitmapArena, entities: &mut Entities, seed: u64, rule: F) -> TickReport<R>
     where
         R: Default + AddAssign + Send,
-        F: Fn(&mut Turn, &mut Vec<CellIndex>) -> R + Sync,
+        F: Fn(&mut Turn) -> R + Sync,
     {
         let count = arena.superchunks().len();
         self.outboxes.resize_with(count, Outbox::default);
@@ -179,8 +179,8 @@ impl Simulation {
                     break;
                 };
                 let (ref mut outbox, ref mut kept) = *claim.lock().expect("a superchunk's turn");
-                let mut turn = Turn::new(&superchunks[at], &entity_superchunks[at], now, &reader, &entity_reader, outbox, Rng::new(kept.1.state()));
-                total += rule(&mut turn, &mut samples);
+                let mut turn = Turn::new(&superchunks[at], &entity_superchunks[at], now, &reader, &entity_reader, outbox, Rng::new(kept.1.state()), &mut samples);
+                total += rule(&mut turn);
                 turn.compare_end();
                 // Where its random numbers have come to: the next tick goes on from there.
                 kept.1 = turn.random;

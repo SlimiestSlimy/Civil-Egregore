@@ -7,7 +7,7 @@
 use crate::tests::{cell, walker, world, STONE};
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
-use coordinates::{CellIndex, SuperchunkIndex};
+use coordinates::{SuperchunkIndex};
 use actions::area::{self, AREA_CENTRE};
 use actions::{around, entities, walking};
 use entity_manager::NEVER;
@@ -50,7 +50,7 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
     simulation.keep_entities_in(COLLISION);
     let mut steps = 0;
     while entities.get(to).is_none() {
-        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
             let now = turn.now();
             for entity in turn.woken() {
                 let at = entity.header.at;
@@ -90,7 +90,7 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
     let mut simulation = Simulation::new(1);
     let mut steps = 0;
     while entities.get(to).is_none() {
-        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
             let now = turn.now();
             for entity in turn.woken() {
                 let at = entity.header.at;
@@ -129,7 +129,7 @@ fn a_cell_is_sought_further_and_further_off() {
             arena.queue(STONE, Write::cell(goal, WriteOp::Set));
             arena.apply();
         }
-        simulation.tick(&mut arena, &mut entities, seed as u64, |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        simulation.tick(&mut arena, &mut entities, seed as u64, |turn: &mut Turn| {
             for entity in turn.woken() {
                 let found = walking::seek(turn, from, STONE);
                 assert_eq!(found.map(|found| found.scale), scale, "{across} across, {down} down");
@@ -167,7 +167,7 @@ fn walls_of_the_terrain_bar_steps() {
     let mut simulation = Simulation::new(1);
     let mut steps = 0;
     while entities.get(to).is_none() {
-        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+        simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
             let now = turn.now();
             for entity in turn.woken() {
                 let at = entity.header.at;
@@ -212,7 +212,7 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
     }
     arena.apply();
     let checked = Mutex::new(0);
-    Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn, _: &mut Vec<CellIndex>| {
+    Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
         for y in 1..63 {
             for x in 1..63 {
                 let at = cell(x, y);

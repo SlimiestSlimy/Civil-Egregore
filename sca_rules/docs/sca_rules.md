@@ -1,9 +1,11 @@
 # The SCA rules
 
 The rules the cells run by, a file each. A rule is a function of one
-superchunk's turn in a tick's first phase (`simulation/`): it samples
-the cells of a layer at a chance -- a stochastic cell automaton
-(SCA), so no cell is visited that is not drawn -- reads the world as the tick found it, and queues
+cell sampled, in a superchunk's turn of a tick's first phase: the
+simulation samples the cells of the rule's master at the rule's
+chance (`SAMPLE_CHANCE`) -- a stochastic cell automaton
+(SCA), so no cell is visited that is not drawn -- and goes over them
+(`../../simulation/docs/simulation.md`, "Sampling"); the rule reads the world as the tick found it, and queues
 writes, which change nothing until the second phase. A rule knows no
 other rule and no entity; the world's tick (`server/`) runs them
 together with the entities (`entity_rules/`).
@@ -110,7 +112,7 @@ four.
 The weather's rule samples the climate plane, whose tiles are 8 by 8
 cells: every tile of a hot chunk is chosen with one chance
 (`MEAN_TIME_TO_SAMPLE`), whatever it holds
-(`cells::each_tile_sampled`), and named by its first cell. It reads
+(`Turn::each_tile_sampled`, the simulation's), and named by its first cell. It reads
 the tile's climate -- humidity, wind, temperature
 (`../../type_registry/docs/type_registry.md`, "The climate") -- and
 its cloud, 0 to 15, and does one of two things.

@@ -24,7 +24,7 @@ fn areas_read_at_once_are_the_cells_read_one_by_one() {
     let mut arena = arena(3, scattered());
     let start = cell(0, 0).cartesian();
     let centres = [(300, 300), (1024, 1024), (1020, 1029), (5, 5), (2040, 2047), (1024, 3), (777, 1023)];
-    let checked = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
+    let checked = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }

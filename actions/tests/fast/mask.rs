@@ -50,7 +50,7 @@ fn a_mask_holds_its_cells() {
 fn a_tile_read_is_its_cells_read_one_by_one() {
     let mut arena = arena();
     let origins = [(300, 300), (1000, 1000), (2047, 5), (2900, 2900), (0, 1500)];
-    Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
+    Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }
@@ -91,7 +91,7 @@ fn a_mask_written_is_read_back() {
         let (origin, disc) = (cell(700, 900), Mask::disc(side));
         let before = std::sync::Mutex::new((Mask::empty(side), Mask::empty(side)));
         let mut simulation = Simulation::new(2);
-        let writes = simulation.tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
+        let writes = simulation.tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
             if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
                 return 0;
             }
@@ -105,7 +105,7 @@ fn a_mask_written_is_read_back() {
         });
         assert_eq!((writes.writes_applied.missed, writes.writes_applied.refused), (0, 0));
         assert_eq!(writes.writes_applied.changed, writes.rules as u64, "every write queued changes its cell");
-        simulation.tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn, _| {
+        simulation.tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
             if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
                 return 0;
             }

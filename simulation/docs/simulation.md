@@ -28,9 +28,16 @@ every set cell; of never, none, and nothing is drawn.
 
 A plane of tiles that holds a number for every tile -- the climate --
 is sampled by its tiles, not by its set cells
-(`sample_tiles_of_layer`, `Turn::sample_tiles`): every tile of a hot
+(`sample_tiles_of_layer`, `Turn::each_tile_sampled`): every tile of a hot
 chunk is one that may be chosen, whatever it holds, so the gaps are
 counted over the tiles themselves and nothing is searched for.
+
+A rule of the cells is the function on one sample; the turn draws the
+samples and goes over them (`Turn::each_sampled`,
+`Turn::each_tile_sampled`): each chosen cell named the author of what
+the rule queues for it, in Morton order, the rule handed the cell and
+what it counts. The room the samples are kept in is the turn's, its
+thread's from one superchunk to the next: no rule sees it.
 
 The counts find each chosen rank
 without a scan: a superchunk's layer passed over whole by its count, a

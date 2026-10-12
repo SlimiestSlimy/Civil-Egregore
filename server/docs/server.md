@@ -121,7 +121,10 @@ and in its order -- the order a turn runs them in -- each with its
 row there, which says its name and its master. The server lists no
 rule; it says only what the registry, which is under the code, cannot
 hold: for a rule's ID, what it counts and its function
-(`written_for`). A rule registered with no function written for it
+(`written_for`). A rule of the cells is the function on one sample:
+the server hands it to the simulation, which samples the rule's
+master -- the registry's -- and goes over the samples
+(`on_each_sampled`). A rule registered with no function written for it
 does not build, and names itself. What a tick did is an array with a
 rule's counts at its place among them. Nothing is looked up by a name
 as a world runs: a rule's place is a constant made of its ID in the

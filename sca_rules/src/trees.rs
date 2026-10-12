@@ -43,18 +43,12 @@ pub const GROWN: usize = place_counted(&COUNTED, "grown");
 /// Trees dead: counted as each is applied.
 pub const DIED: usize = place_counted(&COUNTED, "died");
 
-/// The rule, on one superchunk's turn: every tree sampled with
-/// [`SAMPLE_CHANCE`], in Morton order, each seen to by [`tree`].
-pub fn rule(turn: &mut Turn, samples: &mut Vec<CellIndex>) -> RuleCounts {
-    let (sampled, mut counts) = cells::each_sampled(turn, TREE, SAMPLE_CHANCE, samples, tree);
-    counts[SAMPLED] = sampled as u64;
-    counts
-}
-
-/// The rule, on one tree sampled: it tries to spread or grows -- or, at
+/// The rule, on one tree sampled -- each with [`SAMPLE_CHANCE`], by
+/// whoever ticks the rule: it tries to spread or grows -- or, at
 /// the oldest stage, may die.
 #[inline]
-fn tree(turn: &mut Turn, cell: CellIndex, _counts: &mut RuleCounts) {
+pub fn rule(turn: &mut Turn, cell: CellIndex, counts: &mut RuleCounts) {
+    counts[SAMPLED] += 1;
     let spreading = this_tick::random(turn).chance(SPREAD_SHARE);
     let Some(stage) = cells::value(turn, TREE_STAGE, cell) else {
         return;
