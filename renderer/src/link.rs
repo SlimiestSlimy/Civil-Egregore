@@ -56,7 +56,7 @@ impl Link {
 
     /// Forgets a frame asked of the world run: another is to run in its
     /// place, and the frame is not waited for.
-    fn forget_asked(&mut self) {
+    pub fn forget_asked(&mut self) {
         (self.waiting, self.asked) = (false, None);
     }
 }

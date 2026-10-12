@@ -345,17 +345,15 @@ the rest of its superchunk.
 
 The first rule built on it is grass (`sca_rules/src/grass.rs`). Each tick a
 cell of grass tries to spread with a chance of 0.001%, onto one of its
-eight neighbours drawn at random, if that one is dirt; and turns back
-to dirt with `k / 8` of 0.0005%, `k` its grass neighbours -- none alone,
-the whole 0.0005% with grass all round. One sampling pass serves both, at
-0.0015%: each sample draws one neighbour, and spreads (two thirds of the
-time) or decays (a third) if that neighbour lets it, so decay comes
-at `k / 8` of its chance from one neighbour read, not eight. Every
-sample reads the world as the tick found it: the writes are applied at
-the tick's end. Spreading at `0.001% x (dirt share)` and decay at
-`0.0005% x (grass share)` balance, roughly, at two thirds of the cells
-grass. (Decay was 0.002%, and the balance a third: grazed, the grass
-then thinned year on year and the flock starved with it. The chances were a hundred times these until the world was
+eight neighbours drawn at random, if that one is dirt; and, far more
+rarely, is held against the climate of its tile and turns back to
+dirt the likelier the drier and the hotter that is -- never in the
+most humid or the coldest. One sampling pass serves both: each sample
+draws which of the two it is. Every sample reads the world as the
+tick found it: the writes are applied at the tick's end. (Grass once
+decayed by the grass around it instead, `k / 8` of a chance with `k`
+grass neighbours, which balanced a plain at two thirds grass whatever
+its climate. The chances were a hundred times these until the world was
 first seen on a screen, where grass at 0.3% a tick boils; every
 measurement below was taken at 0.3%.)
 
@@ -680,7 +678,10 @@ tick 240,000 or so. The balance is to be found again. Sheep made
 less hungry since (a meal 45 s where it was 27, starving in 90 where
 it was 54) eat less each and so rise higher and later on the same
 grass: the same run peaks near 280,000 at tick 250,000, the grass
-gone under them, and is falling as it ends.
+gone under them, and is falling as it ends. Since then the sheep eat
+three times as often and conceive four times as rarely (a meal 15 s,
+540 s of eating to conceive), and the grass dies by its climate
+alone: the balance of that is not measured yet.
 
 ### An instruction for each thing done to an entity
 

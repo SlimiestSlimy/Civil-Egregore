@@ -5,17 +5,19 @@ The design is in `sca_rules.md`.
 ## `grass.rs`
 
 `MEAN_TIME_TO_SPREAD` (390.625 seconds of the simulation) and
-`MEAN_TIME_TO_DECAY` (781.25, with grass all round): what
+`MEAN_TIME_TO_DECAY` (3,125, in the harshest climate): what
 `SPREAD_CHANCE` and `DECAY_CHANCE` are worked out from
-(`SimulationTime::chance_a_tick`; once in 100,000 ticks and in 200,000
+(`SimulationTime::chance_a_tick`; once in 100,000 ticks and in 800,000
 at 256 ticks a second); `SAMPLE_CHANCE` (the two together): each a
 `Chance`, parts in 2^32, no float.
 
 **`rule(turn, samples)`**: hands **`cell`**, the rule for one cell of grass, to `cells::each_sampled`, which goes over the cells. On one superchunk's turn, every cell of grass
-sampled at the two chances together; each draws a neighbour (one of the
-eight, stepped on the Morton index) and whether it spreads (in
-`SPREAD_CHANCE` of the sum, `Rng::chance_among`) or decays: grass set on a
-neighbour with none, or its own cleared beside a grass one. Dirt is a
+sampled at the two chances together; each draws whether it spreads (in
+`SPREAD_CHANCE` of the sum, `Rng::chance_among`) or is held against its
+climate: grass set on a neighbour with none (one of the eight, drawn,
+stepped on the Morton index), or its own cleared with a chance of
+**`harshness(climate)`** of `HARSHEST` -- how dry its tile is times how
+hot. Dirt is a
 cell with no grass: it has no layer.
 Returns its `RuleCounts`, their places named **`SAMPLED`**,
 **`SPREADS`**, **`DECAYS`**, their names listed in **`COUNTED`**.
@@ -43,9 +45,8 @@ The weather's planes are the registry's (`actions::types`): `CLIMATE`
 and `CLOUD`. `MEAN_TIME_TO_SAMPLE` (2 seconds of the simulation) and
 the `SAMPLE_CHANCE` worked out from it; `WHOLE` (256), what a sample's
 chances are parts of; `PARTS_A_LEVEL_FROM_HUMIDITY` (16),
-`EVAPORATION_DIVIDES_HEAT` (4), `BURNING_OFF_DIVIDES_HEAT` (4),
-`PARTS_RAIN_SHEDS` (64); `TILE_SIDE` (8). **`rains(cloud)`**: above
-`RAINS_ABOVE`. **`deepens_and_thins(climate, cloud, over_water)`**:
+`EVAPORATION_DIVIDES_HEAT` (16), `BURNING_OFF_DIVIDES_HEAT` (4),
+`PARTS_RAIN_SHEDS` (64); `TILE_SIDE` (8). **`deepens_and_thins(climate, cloud, over_water)`**:
 the parts with which a cloud deepens a level, and thins one.
 **`rule(turn, samples)`**: hands **`tile`**, the rule for one tile, to
 `cells::each_tile_sampled` (`sca_rules.md`, "Weather"). Returns its

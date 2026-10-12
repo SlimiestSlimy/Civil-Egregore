@@ -1,12 +1,14 @@
 //! Grass over dirt, on a plain the server makes: it spreads onto dirt at
-//! its chance, decays at its chance times its share of grass
-//! neighbours, and grows wherever a superchunk is hot.
+//! its chance, decays by how harsh its tile's climate is and not at
+//! all in a mild one, and grows wherever a superchunk is hot.
 
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, tick_grass};
-use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex};
-use sca_rules::grass::{DECAYS, DECAY_CHANCE, SAMPLED, SPREADS, SPREAD_CHANCE};
+use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use bitplane_manager::Write;
+use sca_rules::grass::{harshness, DECAYS, DECAY_CHANCE, HARSHEST, SPREADS, SPREAD_CHANCE};
 use server::World;
-use type_registry::GRASS;
+use type_registry::{Climate, Wind, CLIMATE, GRASS, HOTTEST, MOST_HUMID, WEATHER_TILE_SCALE};
+use utilities::rng::Rng;
 
 /// Every chunk's grass in `world`, as its bitmap's words, the chunks in
 /// Morton order.
@@ -22,42 +24,49 @@ fn origin(world: &World) -> CellCartesian {
     first_superchunk(world).top_left().cartesian()
 }
 
-/// Grass alone, with no grass around, never decays: a lattice of grass
-/// a cell every other each way -- enough of them for a tick to sample
-/// some -- for a tick.
-#[test]
-fn lone_grass_never_decays() {
-    let mut world = plain_world(1, 0, 0, 1);
-    let origin = origin(&world);
-    for (x, y) in (0..512).flat_map(|y| (0..512).map(move |x| (x, y))) {
-        plant_grass(&mut world, CellCartesian { x: origin.x + 2 * x, y: origin.y + 2 * y }, 1, 1);
-    }
-    assert_eq!(cells_of_grass(&world), 512 * 512);
-    let done = tick_grass(&mut world).rules;
-    assert!(done[SAMPLED] > 0);
-    assert_eq!(done[DECAYS], 0);
+/// Makes `climate` the climate of every tile of `world`'s first
+/// superchunk.
+fn put_climate(world: &mut World, climate: Climate) {
+    let (origin, tile_side) = (origin(world), 1 << WEATHER_TILE_SCALE);
+    let tiles = SUPERCHUNK_SIDE_CELLS / tile_side;
+    let everywhere: Vec<Write> = (0..tiles * tiles).map(|tile| Write::value(CLIMATE, CellCartesian { x: origin.x + tile % tiles * tile_side, y: origin.y + tile / tiles * tile_side }.into(), climate.number())).collect();
+    world.write_cells(CLIMATE.layer_type(), everywhere);
 }
 
-/// Grass with grass all round decays at the whole chance, and has no
-/// dirt to spread onto: a superchunk all grass loses about 0.002% of it
-/// in a tick -- some twenty cells, give or take three times what chance
-/// alone moves that many by; a little less, as cells on its edge see
-/// neighbours past it that are not hot.
+/// A superchunk all grass, with no dirt to spread onto, under one
+/// climate drawn: over some ticks it loses the share of it its chance
+/// and the climate's harshness say, give or take four times what
+/// chance alone moves that many by -- and none at all where the
+/// climate is the most humid, or the coldest, however hot or dry.
 #[test]
 // What is expected is a float; nothing is drawn against it.
 #[allow(clippy::disallowed_methods)]
-fn surrounded_grass_decays_at_its_chance() {
-    let mut world = plain_world(1, 0, 0, 1);
-    let origin = origin(&world);
-    for (x, y) in (0..8).flat_map(|y| (0..8).map(move |x| (x, y))) {
-        plant_grass(&mut world, CellCartesian { x: origin.x + 128 * x, y: origin.y + 128 * y }, 128, 128);
+fn grass_decays_by_how_harsh_its_climate_is() {
+    let mut random = Rng::new(utilities::seed::counted());
+    let harsh = Climate { humidity: random.below(8) as u32, wind: Wind::CALM, temperature: random.between(128, u64::from(HOTTEST) + 1) as u32 };
+    let mild = [Climate { humidity: MOST_HUMID, ..harsh }, Climate { temperature: 0, ..harsh }];
+    for climate in [harsh, mild[random.below(2) as usize]] {
+        let mut world = plain_world(1, 0, 0, 1);
+        let origin = origin(&world);
+        for (x, y) in (0..8).flat_map(|y| (0..8).map(move |x| (x, y))) {
+            plant_grass(&mut world, CellCartesian { x: origin.x + 128 * x, y: origin.y + 128 * y }, 128, 128);
+        }
+        put_climate(&mut world, climate);
+        assert_eq!(cells_of_grass(&world), CELLS);
+        let (ticks, mut decays) = (random.between(40, 80), 0);
+        for _ in 0..ticks {
+            let done = tick_grass(&mut world).rules;
+            assert_eq!(done[SPREADS], 0, "no dirt to spread onto but what decayed, and that is not spread onto in a tick");
+            decays += done[DECAYS];
+            // What decayed is dirt again, to be spread onto: put back, so every tick is of a superchunk all grass.
+            for (x, y) in (0..8).flat_map(|y| (0..8).map(move |x| (x, y))).filter(|_| done[DECAYS] > 0) {
+                plant_grass(&mut world, CellCartesian { x: origin.x + 128 * x, y: origin.y + 128 * y }, 128, 128);
+            }
+        }
+        let expected = ticks as f64 * CELLS as f64 * DECAY_CHANCE.fraction() * f64::from(harshness(climate)) / f64::from(HARSHEST);
+        assert!((decays as f64 - expected).abs() <= 4.0 * expected.sqrt(), "under {climate:?}: {decays} decays in {ticks} ticks, about {expected:.0} expected");
+        assert_eq!(expected == 0.0, harshness(climate) == 0);
     }
-    assert_eq!(cells_of_grass(&world), CELLS);
-    let done = tick_grass(&mut world).rules;
-    let expected = CELLS as f64 * DECAY_CHANCE.fraction();
-    assert_eq!(done[SPREADS], 0);
-    assert!((done[DECAYS] as f64 - expected).abs() < 3.0 * expected.sqrt(), "{} decays, about {expected:.0} expected", done[DECAYS]);
-    assert_eq!(cells_of_grass(&world), CELLS - done[DECAYS]);
 }
 
 /// Over 1,000 ticks the grass changes by

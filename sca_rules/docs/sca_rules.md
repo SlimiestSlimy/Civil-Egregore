@@ -24,8 +24,8 @@ the entities' rules, in one table (`server::RULES`).
 
 ## Grass
 
-Each tick every cell of grass may spread onto a dirt neighbour, or
-decay back to dirt the more grass is around it:
+Each tick every cell of grass may spread onto a dirt neighbour, or,
+far more rarely, decay back to dirt by the climate of its tile:
 
 - **Spreading**: a cell of grass tries to spread with `SPREAD_CHANCE`
   -- once in `MEAN_TIME_TO_SPREAD` on average, a time of the
@@ -33,18 +33,25 @@ decay back to dirt the more grass is around it:
   (`../../simulation/docs/simulation.md`, "Simulation time") --
   onto one of its eight neighbours drawn at random, if that one is dirt
   -- a cell with no grass: dirt has no layer -- and not under water.
-- **Decay**: a cell of grass with `k` of its eight neighbours grass
-  turns back to dirt with `k / 8` of `DECAY_CHANCE` (once in
-  `MEAN_TIME_TO_DECAY` on average): none with no grass
-  around, the whole chance with grass all round.
+- **Decay**: a cell of grass is held against its climate with
+  `DECAY_CHANCE` -- once in `MEAN_TIME_TO_DECAY` on average, a very
+  small rate -- and then turns back to dirt with a chance of how
+  harsh the climate of its tile is (`harshness`, of `HARSHEST`): how
+  dry it is times how hot. In the driest and hottest it always does;
+  in the most humid, or the coldest, never.
+
+Grass no longer dies of the grass around it: it once decayed by its
+share of grass neighbours, which kept a plain at two thirds grass
+whatever its climate. Now what a land is covered with hangs on its
+climate, and where that is mild the grass, left alone, covers it.
 
 One sampling pass serves both, and no sample is wasted: every cell of
 grass is sampled with the two chances together (`SAMPLE_CHANCE`), and
-each sample draws one neighbour and which of the two it tries --
-spreading, in `SPREAD_CHANCE` of the sum, else decay. Decay so happens
-when the neighbour drawn is grass: `k / 8` of the time, as asked, from
-one neighbour read rather than eight. The neighbour is stepped to on
-the Morton index itself, no cartesian coordinates made.
+each sample draws which of the two it is -- spreading, in
+`SPREAD_CHANCE` of the sum, else held against its climate. The
+neighbour is stepped to on the Morton index itself, no cartesian
+coordinates made; the climate is one read, of the tile the cell is
+in.
 
 The writes are queued as the samples come, in Morton order -- grass
 spreading over a border into the neighbour's queue -- and applied in
@@ -123,17 +130,21 @@ parts of 256 added up:
 - towards the humidity: a sixteenth for each level the cloud is under
   the tile's humidity, to deepen; a sixteenth for each level over it,
   to thin. More humidity, a likelier level more;
-- over water -- a tile most of whose cells are under it -- a quarter
-  of the temperature, to deepen: the hotter, the more of the water
-  goes up;
+- over water -- a tile most of whose cells are under it -- a
+  sixteenth of the temperature, to deepen: the hotter, the more of
+  the water goes up. It was a quarter, which the wind could not carry
+  off: the seas stood under cloud the wind did not move;
 - over land a quarter of the temperature, to thin: the hotter, the
   more is burnt off;
-- a raining cloud, one above 12, sheds: a quarter more, to thin.
+- a raining cloud sheds: a quarter more, to thin. Whether it rains
+  is the climate's to say, of its temperature and its humidity both
+  (`Climate::rains_above`): warm air holds more cloud before it
+  rains, humid air less.
 
 So a cloud gathers about its tile's humidity, some levels over it on
 warm water and under it on warm land, and nowhere without end: what
-pulls it back grows with how far it is. Rain is a cloud above 12
-(`rains`): it is drawn, and it thins the cloud; nothing under it is
+pulls it back grows with how far it is. So what forms, and when it
+rains, hang on humidity and temperature together. Rain is drawn, and it thins the cloud; nothing under it is
 changed by it yet. That a cloud over its humidity thins of itself,
 and that rain sheds, were not asked for: without them every tile of
 water came to the deepest cloud and stayed.

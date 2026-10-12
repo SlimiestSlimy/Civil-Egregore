@@ -242,12 +242,26 @@ renderer does not say: it is the cloud plane's type in the registry
 
 ### Rain
 
-A tile under a cloud above 12 is raining (`raining`, by the type
-registry's number): after its shadow, one cell in five of it
+Which tiles are raining the frame says (`Cells::raining`, a bit a
+tile, worked out by the server from each tile's cloud and climate):
+the renderer knows no climate. After a raining tile's shadow, one cell in five of it
 (`CELLS_A_STREAK_OF_RAIN`), in slanted lines the same for every tile
 (`streak_of_rain_on`), is drawn half way to a pale blue (`in_rain`,
 `RAIN`). From far, a pixel is as much paler as it has cells under
 rain. The streaks stand still: nothing falls yet.
+
+## Watching a test's world
+
+`Civil_Egregore renderer watch [seed] [sheep] [pasture superchunks]
+[grass, thousandths]` opens the window straight on a world a
+diagnostic ticks, running, in place of the main menu
+(`src/diagnostics/window_on.rs`): the world `server check` ticks from
+a seed -- 0, the run's own, the seed the tests are on
+(`utilities::seed::counted`) -- or, given a number of superchunks, the
+plain `server pasture` ticks, started as that tool starts it
+(`server::diagnostics::plain_world::pasture_start`). The host ticks
+every rule of it, the weather too, at the window's pace: what a
+headless run measures is seen.
 
 ## Still to come
 

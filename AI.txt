@@ -394,6 +394,57 @@ frame's layers, actions::layers, whatever lists layer types by hand.
 ASKED 2026-10-11, same while (AFTER the weather, its own commit):
 "and make grass not die anymore, were now going to make grass die
 depending on climate over a very small sampling rate".
+   DOING: decay by neighbours gone; a cell of grass sampled rarely
+   (MEAN_TIME_TO_DECAY) dies with dry x hot of its tile's climate.
+   MINE: that it is drought (dry and hot) that kills, and the rate.
+ASKED 2026-10-11 (evening), while the long pasture ran: "wait, do it
+with renderer on"; then "wait" / "we need sheep to eat more and
+reproduce way less" / "and enable the renderer good this time, i want
+to see the tests running, not just a random seed" -- so: the renderer
+must show THE WORLD OF THE RUN (the pasture's seed, sheep and size),
+not its own default world; and the sheep's MEAL shorter, conceiving
+much rarer.
+   DONE for it: `Civil_Egregore renderer watch [seed=0 the testing
+   seed] [sheep] [pasture superchunks] [grass]` opens the window on
+   the check's world or the pasture's. MEAL 45 -> 15 s,
+   MEAN_TIME_TO_CONCEIVE 135 -> 540 s (MINE: the numbers). The long
+   pasture with these is NOT measured yet.
+SAID 2026-10-11, watching the window (`renderer watch`): "sheep
+generated on water lol"; "also water evaporation is too strong,
+compared to wind"; "are you using elevation as well?" (a question: yes
+in worldgen's climate -- higher land cooler and drier -- not in the
+rule: clouds do not meet mountains. To answer.)
+ASKED 2026-10-11, after: "lets change the rain rule, now we take both
+humidity and temperature for deciding cloud formation and rain
+threshold, instead of a fixed value". PLAN (mine): `rains_above(climate)`
+in the registry -- warm air holds more before it rains, humid air
+less; the frame brings which tiles rain (a bit a tile) so the
+renderer does not work it out; evaporation a quarter of what it was.
+SAID after: "just roll seeds until  a valid one for testing is fould
+lol" / "thats why we have the test seed as an api lol" -- the watched
+world's seed goes through seed_with_land(counted()), as the tests'.
+ASKED 2026-10-11 (night), watching: "yeah, were doing sampling too
+aggressively, we need to tone things down a lot to get the simulation
+closer to its real progression per simulation second" / "like, sheep
+should live for a couple of in game hours for on average for example"
+/ "like hour- hour and a half" / "also, sheep become trapped in high
+gradients of elevation, make them able to hop down a larger distance
+than 1 height". NEXT, after the batch in hand is committed: every
+rule's times slowed towards real ones (sheep LIFE about 75 min of the
+simulation; grass, trees, weather with it); sheep step DOWN over more
+than one height (walls are both ways today: to look at).
+   AND: "and watever amount of offspring a sheep normally has over a
+   normal wild lifetime lol" / "on average" -- a ewe bears about 1.3
+   lambs a year over 6 to 8 breeding years: 8 or so in a life; every
+   sheep here bears (no rams), so about 4 a sheep is the same flock.
+ASKED 2026-10-11 (night): "ok, we need to make test running include a
+flag for test rendering decided by flag". ANSWERED (asked which runs):
+"everything that is runnable must have the renderer as an option. this
+is a game, we want to see the testing as well, not just do it"; pace:
+"flat out default, but still controls pls"; "so i can see all tests".
+So: the diagnostics' runs AND the cargo tests that tick a world, shown
+in the window when a flag says so; flat out unless paused or paced by
+the keys.
 ALSO, of the weather's tests: "also dont run sheeps for this tests".
 ALSO: "we got a game playing right now so performance WILL BE
 IMPACTED" -- measure by instruction counts only, no wall times.

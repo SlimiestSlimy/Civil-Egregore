@@ -22,7 +22,7 @@ const NAMED: &str = "name";
 const CELLS_A_PIXEL: &str = "cells a screen pixel";
 
 /// The renderer's tools.
-pub const COMMANDS: [Command; 2] = [Command {
+pub const COMMANDS: [Command; 3] = [Command {
     name: "stills",
     does: "paints one place of a world at every zoom -- the map, the cells from far, a cell a pixel, the cells from near -- with no window, and keeps each as a PNG under the renderer's transient_data/renders/",
     parameters: &[Parameter::new(SEED, "0"), Parameter::new(CELLS_EAST, "0"), Parameter::new(CELLS_SOUTH, "0"), Parameter::new(FARTHEST, "8"), Parameter::new(NAMED, "still")],
@@ -32,7 +32,41 @@ pub const COMMANDS: [Command; 2] = [Command {
     does: "opens the window on a world, the view so many cells a screen pixel over its middle, keeps what the graphics card drew -- the pictures' mipmaps among it -- as a PNG under the renderer's transient_data/renders/, and closes it",
     parameters: &[Parameter::new(SEED, "0"), Parameter::new(CELLS_A_PIXEL, "1.5"), Parameter::new(NAMED, "window")],
     run: window_still_tool,
+}, Command {
+    name: "watch",
+    does: "opens the window on a world the diagnostics tick, running, to be watched: the world `server check` ticks from a seed -- 0, the run's own, the seed the tests are on -- or, given superchunks, the plain `server pasture` ticks, with its grass",
+    parameters: &[Parameter::new(SEED, "0"), Parameter::new(SHEEP, "4000"), Parameter::new(PASTURE_SUPERCHUNKS, "0"), Parameter::new(GRASS_THOUSANDTHS, "333")],
+    run: watch_tool,
 }];
+
+/// Sheep the world watched starts with: on its origin, or on each
+/// superchunk of a pasture.
+const SHEEP: &str = "sheep";
+/// Superchunks of the pasture watched: 0, no pasture but the world of
+/// the seed.
+const PASTURE_SUPERCHUNKS: &str = "pasture superchunks";
+/// The share of a pasture's cells that are grass, in thousandths.
+const GRASS_THOUSANDTHS: &str = "grass, thousandths";
+
+/// Opens the window on the world `server check` ticks from the seed
+/// given, or on the plain `server pasture` ticks, and runs until it is
+/// closed.
+fn watch_tool(given: &Given) -> Result<(), String> {
+    let text = given.text(SEED)?;
+    let seed = utilities::seed::of_hex(text).ok_or_else(|| format!("`{text}` is no seed in hex"))?;
+    let (sheep, superchunks, grass): (usize, u32, u64) = (given.number(SHEEP)?, given.number(PASTURE_SUPERCHUNKS)?, given.number(GRASS_THOUSANDTHS)?);
+    let start = if superchunks > 0 {
+        println!("# the pasture: {superchunks} superchunks, {sheep} sheep on each, grass on {grass} thousandths");
+        server::diagnostics::plain_world::pasture_start(superchunks, grass, sheep)
+    } else {
+        // As the tests have it: the run's seed moved on to one with land about the origin, where the sheep start.
+        let seed = if seed == 0 { server::seed_with_land(utilities::seed::counted(), &server::Generation::DEFAULT) } else { seed };
+        println!("# seed {}, {sheep} sheep", utilities::seed::hex(seed));
+        server::Start { seed, sheep, ..server::Start::default() }
+    };
+    super::window_on::open(start);
+    Ok(())
+}
 
 /// Opens the window, keeps its still and closes it, a line printed for
 /// the file.

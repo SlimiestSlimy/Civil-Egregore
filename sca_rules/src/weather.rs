@@ -4,7 +4,7 @@
 //! (`docs/sca_rules.md`, "Weather").
 
 use actions::simulation_time::SimulationTime;
-use actions::types::{Climate, CLIMATE, CLOUD, MOST_HUMID, RAINS_ABOVE, STRONGEST_WIND, WEATHER_TILE_SCALE, WET};
+use actions::types::{Climate, CLIMATE, CLOUD, MOST_HUMID, STRONGEST_WIND, WEATHER_TILE_SCALE, WET};
 use actions::{cells, place_counted, this_tick, CellIndex, Chance, RuleCounts, Turn};
 
 /// The simulation time from one sample of a tile to the next, on
@@ -22,7 +22,7 @@ pub const WHOLE: u32 = 256;
 pub const PARTS_A_LEVEL_FROM_HUMIDITY: u32 = WHOLE / (MOST_HUMID + 1);
 /// The temperature over this is the parts of [`WHOLE`] the cloud over
 /// water deepens with: the hotter, the more of the water goes up.
-pub const EVAPORATION_DIVIDES_HEAT: u32 = 4;
+pub const EVAPORATION_DIVIDES_HEAT: u32 = 16;
 /// The temperature over this is the parts of [`WHOLE`] the cloud over
 /// land thins with: the hotter, the more of it is burnt off.
 pub const BURNING_OFF_DIVIDES_HEAT: u32 = 4;
@@ -45,19 +45,16 @@ pub const BLOWN: usize = place_counted(&COUNTED, "blown");
 /// Tiles sampled that were raining.
 pub const RAINING: usize = place_counted(&COUNTED, "raining");
 
-/// Whether a tile under `cloud` is raining.
-pub const fn rains(cloud: u32) -> bool {
-    cloud > RAINS_ABOVE
-}
-
 /// The parts of [`WHOLE`] with which the cloud at level `cloud` over
 /// a tile of `climate` deepens a level, and with which it thins one:
 /// towards the tile's humidity from either side; over water the
 /// hotter the more goes up, over land the hotter the more is burnt
-/// off; and a raining cloud sheds.
+/// off; and a cloud raining in this climate
+/// ([`Climate::rains_above`], of its humidity and its temperature)
+/// sheds.
 pub const fn deepens_and_thins(climate: Climate, cloud: u32, over_water: bool) -> (u32, u32) {
     let deepens = climate.humidity.saturating_sub(cloud) * PARTS_A_LEVEL_FROM_HUMIDITY;
-    let thins = cloud.saturating_sub(climate.humidity) * PARTS_A_LEVEL_FROM_HUMIDITY + if rains(cloud) { PARTS_RAIN_SHEDS } else { 0 };
+    let thins = cloud.saturating_sub(climate.humidity) * PARTS_A_LEVEL_FROM_HUMIDITY + if climate.rains(cloud) { PARTS_RAIN_SHEDS } else { 0 };
     if over_water { (deepens + climate.temperature / EVAPORATION_DIVIDES_HEAT, thins) } else { (deepens, thins + climate.temperature / BURNING_OFF_DIVIDES_HEAT) }
 }
 
@@ -81,7 +78,7 @@ fn tile(turn: &mut Turn, tile: CellIndex, counts: &mut RuleCounts) {
         return;
     };
     let climate = Climate::of_number(climate);
-    counts[RAINING] += u64::from(rains(cloud));
+    counts[RAINING] += u64::from(climate.rains(cloud));
     if let Some((across, down)) = climate.wind.towards().filter(|_| cloud > 0)
         && this_tick::random(turn).below(u64::from(STRONGEST_WIND + 1)) < u64::from(climate.wind.strength())
         && let Some(towards) = tile.offset(across * TILE_SIDE, down * TILE_SIDE)

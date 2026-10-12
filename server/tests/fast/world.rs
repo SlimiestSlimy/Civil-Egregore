@@ -71,7 +71,7 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
         stopped = server::load(&folder).expect("loaded");
         assert_eq!((stopped.info().tick, stopped.broken_invariant()), (stop, None));
     }
-    assert!(straight.entities().len() > 4_000, "{} sheep: a flock that bred", straight.entities().len());
+    assert_ne!(straight.entities().len(), 4_000, "a flock that was born into or died of, over the run");
     // The one that ran straight saved too: a superchunk gone cold on the way has its last cells in the writeback ring until a save, or the ring's need of room, puts them in its image.
     server::save(&folder.join("straight"), &mut straight).expect("saved");
     assert!(everything(&straight) == everything(&stopped), "the same at tick {until}");

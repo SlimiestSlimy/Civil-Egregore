@@ -10,10 +10,10 @@ tick it roams until and which way;
 its times, each a `SimulationTime` said in seconds of the simulation,
 none a number of ticks: `STEP` (0.25 s) and `STEP_JITTER`
 (a sixteenth) between a walking sheep's steps, `MEAL`
-(45 s), `STARVATION` (90 s), `ROAM` (27 s),
+(15 s), `STARVATION` (90 s), `ROAM` (27 s),
 `LIFE` (675 s), `GESTATION` (4.5 s),
 `LAMBHOOD` (18 s); `LUSH_CELLS` (64, of the area's 256); and
-`MEAN_TIME_TO_CONCEIVE` (135 s of eating on lush pasture) with the
+`MEAN_TIME_TO_CONCEIVE` (540 s of eating on lush pasture) with the
 `CONCEIVE_CHANCE` a meal worked out from it and `MEAL`; `MEAN_TIME_TO_ROAM`
 (54 s of eating on lush pasture) with its `ROAM_CHANCE` a meal, likewise.
 
