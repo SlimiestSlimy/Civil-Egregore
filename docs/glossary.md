@@ -41,7 +41,7 @@ what they always do and are not listed.
 | **humidity** | the lowest four bits of a tile's climate, 0 to 15 (`Climate::humidity`): the level its cloud gathers towards -- the more humid, the likelier a level more | climate, cloud | |
 | **temperature** | the highest eight bits of a tile's climate, 0 to 255 (`Climate::temperature`): over water the hotter the more goes up into cloud (evaporation), over land the hotter the more cloud is burnt off | climate | heat |
 | **wind** | four bits of a tile's climate (`Wind`): calm, or blowing towards north, west, south or east at a strength of 1 to 3 -- thirteen states, 0 calm, 1 to 4 the four ways at strength 1, 5 to 8 at 2, 9 to 12 at 3. It blows a level of its tile's cloud to the tile it blows towards, the stronger the likelier | climate, cloud | wind vector |
-| **rain** | what a tile under a cloud above 12 (`RAINS_ABOVE`) has: drawn, and the cloud sheds; nothing under it is changed by it yet | cloud | |
+| **rain** | what a tile has whose cloud is above what its climate lets the air hold (`Climate::rains_above`: of its temperature and its humidity both -- the hotter the more, the more humid the less; 9 to 14): drawn, and the cloud sheds; nothing under it is changed by it yet | cloud, climate | |
 | **weather** | the cloud plane and the climate plane together, and the rule of the cells that samples the climate's tiles (`sca_rules::weather`) | cloud, climate | |
 | **width** | the bits a cell of a plane, in the plane's type: `Bits2`, `Bits4`, `Bits8`, `Bits16` | wide plane | |
 | **value** | the number a cell of a wide plane holds | wide plane | |

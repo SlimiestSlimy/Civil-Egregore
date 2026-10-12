@@ -16,7 +16,7 @@ superchunk's top left a chunk starts, in cells.
 sheep over that, a pixel each (`SHEEP_REACH`, none); **`opaque`**;
 `BROWN`, `GREEN`, `WHITE`: dirt's, grass's and a sheep's colours. `WATER`, `FILM`, **`depth_at(cells, word, bit)`**, **`under_water(colour,
 depth)`**: a colour seen through water, the less the deeper, none from
-`server::host::frame::DEEP` (16). `CLOUD_SHADOW`, `SEEN_UNDER_DEEPEST_CLOUD`, **`under_cloud(colour, cloud, whole)`**: a colour in a cloud's shadow; **`each_cloud(cells, shadow)`**: every tile with a cloud, its top left cell, its side and its cloud (`renderer.md`, "Clouds"). `RAIN`, `CELLS_A_STREAK_OF_RAIN`, **`raining(cloud)`**, **`streak_of_rain_on(x, y)`**, **`in_rain(colour, rain, whole)`**: rain drawn under a cloud deep enough ("Rain"). `TREE_YOUNG`, `TREE_OLD`, **`tree_colour(stage)`**, **`stage_at(cells,
+`server::host::frame::DEEP` (16). `CLOUD_SHADOW`, `SEEN_UNDER_DEEPEST_CLOUD`, **`under_cloud(colour, cloud, whole)`**: a colour in a cloud's shadow; **`each_cloud(cells, shadow)`**: every tile with a cloud, its top left cell, its side and its cloud (`renderer.md`, "Clouds"). `RAIN`, `CELLS_A_STREAK_OF_RAIN`, **`streak_of_rain_on(x, y)`**, **`in_rain(colour, rain, whole)`**: rain drawn under a cloud deep enough ("Rain"). `TREE_YOUNG`, `TREE_OLD`, **`tree_colour(stage)`**, **`stage_at(cells,
 word, bit)`**; **`counted(words, detail)`**: the cells set a tile.
 **`paint_far(cells, detail, ground)`**: a pixel a tile of cells
 `2^detail` a side, its grass counted from its run of bits, its colours
@@ -230,7 +230,7 @@ asks it, each 1,024 by 768 as a screen would show it; **`answered`**,
 `WAITED_AT_MOST` (half an hour: a world's superchunks take a while to
 generate) and `BETWEEN_ASKS` (200 ms before the host is asked again
 for superchunks not yet hot). **`tool::COMMANDS`**: `stills`, each kept
-as a PNG (`stills_tool`); its parameters' names `SEED` (in hex; 0 the
+as a PNG (`stills_tool`); `watch` opens the window on a world a diagnostic ticks (`watch_tool`; `SHEEP`, `PASTURE_SUPERCHUNKS`, `GRASS_THOUSANDTHS`): **`window_on::open(start)`** tells the host to make the world and shows it in place of the main menu -- `Watched`, `show` (`renderer.md`, "Watching a test's world"); the tools' parameters' names `SEED` (in hex; 0 the
 counted one, moved on to one with land about the middle),
 `CELLS_EAST`, `CELLS_SOUTH`, `FARTHEST`, `NAMED`; and `window_still`
 (`window_still_tool`; `CELLS_A_PIXEL`): **`window_still::keep(seed,

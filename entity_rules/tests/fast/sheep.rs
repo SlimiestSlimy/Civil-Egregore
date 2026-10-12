@@ -114,6 +114,10 @@ fn hungry_sheep_walk_to_grass_far_off() {
             ate_at = Some(done[WOKEN]);
         }
         done += report.rules;
+        // No further: fed, it is hungry again within the time it would have starved in, and seeks grass there is none of.
+        if ate_at.is_some() {
+            break;
+        }
     }
     assert_eq!(done[EATEN], 1, "the one cell of grass, eaten");
     assert_eq!(ate_at, Some(150), "as many steps as the further of across and down, eaten on the wake after");

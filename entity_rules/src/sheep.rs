@@ -22,7 +22,7 @@ pub const STEP: SimulationTime = SimulationTime::milliseconds(250);
 pub const STEP_JITTER: SimulationTime = SimulationTime::milliseconds(62);
 /// The time from a meal to being hungry again: until then a sheep
 /// eats nothing, though it stands on grass, and sleeps.
-pub const MEAL: SimulationTime = SimulationTime::seconds(45);
+pub const MEAL: SimulationTime = SimulationTime::seconds(15);
 /// The time a hungry sheep finds no meal in before it starves.
 pub const STARVATION: SimulationTime = SimulationTime::seconds(90);
 /// Cells of grass among the 16 by 16 about a sheep for the pasture
@@ -31,7 +31,7 @@ pub const STARVATION: SimulationTime = SimulationTime::seconds(90);
 pub const LUSH_CELLS: u32 = 64;
 /// The simulation time a grown sheep eating on lush pasture takes to
 /// fall pregnant, on average.
-pub const MEAN_TIME_TO_CONCEIVE: SimulationTime = SimulationTime::seconds(135);
+pub const MEAN_TIME_TO_CONCEIVE: SimulationTime = SimulationTime::seconds(540);
 /// The chance, each meal of a grown sheep on lush pasture, that it
 /// falls pregnant.
 pub const CONCEIVE_CHANCE: Chance = MEAN_TIME_TO_CONCEIVE.chance_each(MEAL);

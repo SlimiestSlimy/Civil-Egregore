@@ -70,8 +70,8 @@ folder all the same.
 ## `climate.rs`
 
 What the climate plane's number holds (`type_registry.md`, "The
-climate"). `RAINS_ABOVE`, `MOST_HUMID`, `HOTTEST`, `STRONGEST_WIND`,
+climate"). `RAINS_ABOVE_IN_COLD_DRY_AIR`, `HEAT_A_LEVEL_MORE_HELD`, `HUMIDITY_A_LEVEL_SOONER`, `RAINS_ABOVE_AT_THE_MOST`, `MOST_HUMID`, `HOTTEST`, `STRONGEST_WIND`,
 `WAYS_OF_WIND`. **`Wind`**: `CALM`, **`blowing(way, strength)`**,
 **`of_state(state)`**, **`state`**, **`strength`**, **`way`**,
 **`towards`**. **`Climate`**: `humidity`, `wind`, `temperature`;
-**`of_number(number)`**, **`number`**.
+**`of_number(number)`**, **`number`**, **`rains_above`**, **`rains(cloud)`**.

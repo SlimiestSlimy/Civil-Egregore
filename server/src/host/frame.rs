@@ -8,7 +8,7 @@ use bitplane_manager::BucketKey;
 use type_registry::GRASS;
 use chunk_storage::{LayerType, SuperchunkImage};
 use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
-use type_registry::{CLOUD, TREE, TREE_STAGE};
+use type_registry::{Climate, CLIMATE, CLOUD, TREE, TREE_STAGE};
 pub use simulation::halos::Viewport;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -36,10 +36,6 @@ pub const CLOUD_BITS: usize = CLOUD.layer_type().bits() as usize;
 pub const CLOUD_TILE_SHIFT: u32 = CLOUD.layer_type().tile_shift();
 /// The most cloud a tile holds: the deepest shadow.
 pub const DEEPEST_CLOUD: u32 = CLOUD.most();
-
-/// The cloud above which a tile is raining, as the type registry has
-/// it.
-pub const RAINS_ABOVE: u32 = type_registry::RAINS_ABOVE;
 
 /// The cloud over the tile at `tile` of a superchunk -- its tiles in
 /// Morton order, as [`Cells::clouds`] holds them: 0 for none, and
@@ -137,6 +133,9 @@ pub struct Cells {
     /// of the plane's tile size, read by [`cloud_over`]. Empty where
     /// no tile of it has any cloud.
     pub clouds: Vec<u64>,
+    /// Which of its tiles are raining, a bit a tile in the order of
+    /// `clouds`, read by [`rains_over`]. Empty where none is.
+    pub raining: Vec<u64>,
     /// How deep its water is: never changing, so shared with every
     /// frame it is in, not copied.
     pub water: Arc<Water>,
@@ -218,7 +217,33 @@ pub(crate) fn copy(world: &World, (x, y): (u32, u32), ask: Ask, sent: &mut HashM
     let stages = if ask.near.is_some() || ask.detail == 0 { planes(TREE_STAGE.layer_type()) } else { Vec::new() };
     // No cloud over it: nothing to send, nothing to draw.
     let clouds = Some(planes(CLOUD.layer_type())).filter(|clouds| clouds.iter().any(|&word| word != 0)).unwrap_or_default();
-    Some(Cells { at: (x, y), heights, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages, wet: planes(WET), clouds, water, sheep: sheep(world, superchunk) })
+    // Which of its tiles rain is the climate's to say, of each tile's own: worked out here, so a client needs no climate.
+    let raining = if clouds.is_empty() { Vec::new() } else { raining(&clouds, &planes(CLIMATE.layer_type())) };
+    Some(Cells { at: (x, y), heights, top_left: (left, top), grass: planes(GRASS), trees: planes(TREE), stages, wet: planes(WET), clouds, raining, water, sheep: sheep(world, superchunk) })
+}
+
+/// The tiles of a superchunk that are raining, a bit a tile in the
+/// order of `clouds`, its tiles' clouds: those whose cloud is above
+/// what their climate -- `climates`, the climate plane's words for
+/// the same tiles -- lets the air hold (`Climate::rains_above`).
+/// Empty if none is.
+pub fn raining(clouds: &[u64], climates: &[u64]) -> Vec<u64> {
+    let climate_bits = CLIMATE.layer_type().bits() as usize;
+    let mut raining = vec![0u64; (clouds.len() * WORD_BITS / CLOUD_BITS).div_ceil(WORD_BITS)];
+    for tile in (0..clouds.len() * WORD_BITS / CLOUD_BITS).filter(|&tile| cloud_over(clouds, tile) != 0) {
+        let at = tile * climate_bits;
+        let climate = Climate::of_number(climates.get(at / WORD_BITS).map_or(0, |word| (word >> (at % WORD_BITS)) as u32 & CLIMATE.most()));
+        if climate.rains(cloud_over(clouds, tile)) {
+            raining[tile / WORD_BITS] |= 1 << (tile % WORD_BITS);
+        }
+    }
+    if raining.iter().any(|&word| word != 0) { raining } else { Vec::new() }
+}
+
+/// Whether the tile at `tile` of a superchunk is raining, by
+/// [`Cells::raining`]: not where none was sent.
+pub fn rains_over(raining: &[u64], tile: usize) -> bool {
+    raining.get(tile / WORD_BITS).is_some_and(|word| word >> (tile % WORD_BITS) & 1 == 1)
 }
 
 /// A superchunk's water as a client draws it, off its image: kept for

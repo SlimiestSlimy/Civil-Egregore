@@ -219,5 +219,12 @@ have beside are no wind's and read as calm (`of_state`). `blowing(way,
 strength)` makes one, `state` is its bits, `way`, `strength` and
 `towards` what a rule asks of it.
 
-`RAINS_ABOVE` (12) is the level of cloud above which a tile is
-raining: the rule's and the renderer's from one place.
+**Rain** is a climate's to say, of its temperature and its humidity
+both (`Climate::rains_above`, `Climate::rains(cloud)`): the level of
+cloud above which a tile is raining is 12 in the coldest, driest air
+(`RAINS_ABOVE_IN_COLD_DRY_AIR`), a level more for every 64 of
+temperature (`HEAT_A_LEVEL_MORE_HELD`) -- warm air holds more water
+before it falls -- and a level fewer for every 4 of humidity
+(`HUMIDITY_A_LEVEL_SOONER`), 14 at the most (`RAINS_ABOVE_AT_THE_MOST`):
+9 over the coldest, wettest tile. It was one number, 12, for every
+tile. The rule's and whatever draws rain have it from this one place.

@@ -134,7 +134,7 @@ its place; **`of(rule)`** and **`time_of(rule)`** read them by place.
 The world they tick is one the server starts as any other
 (`start`): **`plain_world::plain_world(superchunks, grass_cover, sheep,
 threads)`**, a plain (`worldgen::Generation::plain`) with a side,
-forced hot, so a rule is measured alone; **`plain_world::superchunks`**
+forced hot, so a rule is measured alone -- **`plain_world::plain_start`** how it is started, **`plain_world::pasture_start(superchunks, grass_thousandths, sheep)`** how the pasture's is, for the same world shown in a window; **`plain_world::superchunks`**
 how many it holds hot.
 
 **`throughput::run(ticks, thousandths, superchunks, threads)`**: grass
@@ -289,7 +289,7 @@ ask)` and `map(seed, generation, ask)`: the answers worked out.
 ## `host/frame.rs`
 
 `CHUNK_WORDS`, `WORD_BITS`, `STAGE_BITS`, `OLDEST_TREE_STAGE`,
-`CLOUD_BITS`, `CLOUD_TILE_SHIFT`, `DEEPEST_CLOUD`, `RAINS_ABOVE` (the cloud above which it rains) -- the cloud
+`CLOUD_BITS`, `CLOUD_TILE_SHIFT`, `DEEPEST_CLOUD`; **`raining(clouds, climates)`**, the tiles whose cloud is above what their climate holds, a bit a tile (`Cells::raining`), read by **`rains_over(raining, tile)`** -- the cloud
 plane's width, tile size and most, off its type in the registry --
 **`cloud_over(clouds, tile)`**, a tile's cloud in `Cells::clouds`
 (the plane's buckets as the arena holds them, empty where a

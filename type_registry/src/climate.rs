@@ -2,8 +2,19 @@
 //! humidity, wind and temperature kept together, and the wind's
 //! thirteen states ([`Wind`]) (`docs/type_registry.md`, "The climate").
 
-/// The level of cloud above which a tile is raining.
-pub const RAINS_ABOVE: u32 = 12;
+/// The level of cloud above which a tile of the coldest, driest
+/// climate is raining: what [`Climate::rains_above`] is worked out
+/// from.
+pub const RAINS_ABOVE_IN_COLD_DRY_AIR: u32 = 12;
+/// The temperature that lets the air hold a level of cloud more
+/// before it rains: warm air holds more water.
+pub const HEAT_A_LEVEL_MORE_HELD: u32 = 64;
+/// The humidity that has the air rain a level of cloud sooner: air
+/// already wet has less room.
+pub const HUMIDITY_A_LEVEL_SOONER: u32 = 4;
+/// The most [`Climate::rains_above`] is: under the deepest cloud it
+/// rains in any climate.
+pub const RAINS_ABOVE_AT_THE_MOST: u32 = 14;
 /// The most humid a tile is: four bits.
 pub const MOST_HUMID: u32 = 15;
 /// The hottest a tile is: eight bits.
@@ -80,6 +91,21 @@ impl Climate {
     /// The climate the plane's number `number` says.
     pub const fn of_number(number: u32) -> Self {
         Self { humidity: number & MOST_HUMID, wind: Wind::of_state(number >> 4 & 0xF), temperature: number >> 8 & HOTTEST }
+    }
+
+    /// The level of cloud above which a tile of this climate is
+    /// raining: from both its temperature and its humidity -- the
+    /// hotter, the more cloud the air holds before it rains; the more
+    /// humid, the less. 9 in the coldest and most humid, to
+    /// [`RAINS_ABOVE_AT_THE_MOST`].
+    pub const fn rains_above(self) -> u32 {
+        let above = RAINS_ABOVE_IN_COLD_DRY_AIR + self.temperature / HEAT_A_LEVEL_MORE_HELD - self.humidity / HUMIDITY_A_LEVEL_SOONER;
+        if above > RAINS_ABOVE_AT_THE_MOST { RAINS_ABOVE_AT_THE_MOST } else { above }
+    }
+
+    /// Whether a tile of this climate under `cloud` is raining.
+    pub const fn rains(self, cloud: u32) -> bool {
+        cloud > self.rains_above()
     }
 
     /// The number the plane holds for it.

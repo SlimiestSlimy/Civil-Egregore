@@ -7,7 +7,7 @@
 use crate::tests::{land_seed, plain_world, tick_rule};
 use bitplane_manager::{Write, WriteOp};
 use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
-use sca_rules::weather::{deepens_and_thins, rains, BLOWN, DEEPENED, RAINING, SAMPLED, THINNED, WHOLE};
+use sca_rules::weather::{deepens_and_thins, BLOWN, DEEPENED, RAINING, SAMPLED, THINNED, WHOLE};
 use server::World;
 use type_registry::{Climate, Wind, CLIMATE, CLOUD, HOTTEST, MOST_HUMID, STRONGEST_WIND, WAYS_OF_WIND, WEATHER_TILE_SCALE, WET};
 use utilities::rng::Rng;
@@ -87,7 +87,13 @@ fn humidity_deepens_a_cloud_and_heat_does_what_is_under_it_says() {
         let (more_humid, hotter) = (Climate { humidity: climate.humidity + 1, ..climate }, Climate { temperature: (climate.temperature + 8).min(HOTTEST), ..climate });
         for water in [false, true] {
             let ((deepens, thins), (humid_deepens, humid_thins), (hot_deepens, hot_thins)) = (deepens_and_thins(climate, cloud, water), deepens_and_thins(more_humid, cloud, water), deepens_and_thins(hotter, cloud, water));
-            assert!(humid_deepens >= deepens && humid_thins <= thins && humid_deepens + thins > deepens + humid_thins, "more humid, {climate:?} under {cloud}");
+            // Where the other climate has the same cloud rain and this one not, or the other way, the shedding is what differs: held apart (below).
+            if more_humid.rains(cloud) == climate.rains(cloud) {
+                assert!(humid_deepens >= deepens && humid_thins <= thins && humid_deepens + thins > deepens + humid_thins, "more humid, {climate:?} under {cloud}");
+            }
+            if hotter.rains(cloud) != climate.rains(cloud) {
+                continue;
+            }
             if water {
                 assert!(hot_deepens >= deepens && hot_thins == thins, "hotter water, {climate:?} under {cloud}");
             } else {
@@ -96,10 +102,15 @@ fn humidity_deepens_a_cloud_and_heat_does_what_is_under_it_says() {
         }
         let (water, land) = (deepens_and_thins(Climate { temperature: HOTTEST, ..climate }, cloud, true), deepens_and_thins(Climate { temperature: HOTTEST, ..climate }, cloud, false));
         assert!(water.0 > land.0 && land.1 > water.1, "the hottest: water makes cloud, land burns it off");
-        assert!(deepens_and_thins(climate, cloud, false).1 >= u32::from(rains(cloud)) * WHOLE / 8, "a raining cloud sheds");
-        if !rains(climate.humidity) {
-            assert_eq!(deepens_and_thins(Climate { temperature: 0, ..climate }, climate.humidity, false), (0, 0), "at its humidity, cold, not raining");
+        assert!(deepens_and_thins(climate, cloud, false).1 >= u32::from(climate.rains(cloud)) * WHOLE / 8, "a raining cloud sheds");
+        let cold = Climate { temperature: 0, ..climate };
+        if !cold.rains(cold.humidity) {
+            assert_eq!(deepens_and_thins(cold, cold.humidity, false), (0, 0), "at its humidity, cold, not raining");
         }
+        // When it rains hangs on both: the hotter, the more cloud the air holds; the more humid, the less -- within what a cloud can be.
+        assert!(hotter.rains_above() >= climate.rains_above() && more_humid.rains_above() <= climate.rains_above(), "{climate:?} rains above {}", climate.rains_above());
+        assert!(climate.rains_above() < CLOUD.most() && Climate { humidity: 0, temperature: HOTTEST, ..climate }.rains_above() > Climate { humidity: MOST_HUMID, temperature: 0, ..climate }.rains_above());
+        assert_eq!(climate.rains(cloud), cloud > climate.rains_above());
     }
 }
 

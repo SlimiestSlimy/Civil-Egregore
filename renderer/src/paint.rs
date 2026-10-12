@@ -5,7 +5,7 @@
 use crate::ground::{lit, Given, Ground, COARSEST};
 use crate::near::{paint_near, PaintedNear};
 use coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
-use server::host::frame::{cell_of_bit, cloud_over, Cells, Frame, CHUNK_WORDS, CLOUD_TILE_SHIFT, DEEP, DEEPEST_CLOUD, OLDEST_TREE_STAGE, RAINS_ABOVE, STAGE_BITS, WORD_BITS};
+use server::host::frame::{cell_of_bit, cloud_over, rains_over, Cells, Frame, CHUNK_WORDS, CLOUD_TILE_SHIFT, DEEP, DEEPEST_CLOUD, OLDEST_TREE_STAGE, STAGE_BITS, WORD_BITS};
 use server::host::terrain::TerrainAsker;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
@@ -198,12 +198,6 @@ const RAIN: [u8; 3] = [150, 176, 226];
 /// drawn on it.
 pub const CELLS_A_STREAK_OF_RAIN: usize = 5;
 
-/// Whether a tile under `cloud` is raining: what the weather's rule
-/// says, by the type registry's number.
-pub fn raining(cloud: u32) -> bool {
-    cloud > RAINS_ABOVE
-}
-
 /// Whether the cell `(x, y)` -- counted from anywhere, the same for
 /// every tile -- has a streak of rain drawn on it under a raining
 /// cloud: one in [`CELLS_A_STREAK_OF_RAIN`], in slanted lines.
@@ -219,13 +213,14 @@ pub fn in_rain(colour: [u8; 3], rain: usize, whole: usize) -> [u8; 3] {
 
 /// Every tile of `cells` with a cloud over it: where its top left
 /// cell is from the superchunk's, `(x, y)`, how many cells it is a
-/// side, and its cloud -- the tiles those of the cloud plane, its tile
+/// side, its cloud, and whether it is raining, as the frame says
+/// (`Cells::raining`) -- the tiles those of the cloud plane, its tile
 /// size the type registry's.
-pub fn each_cloud(cells: &Cells, mut shadow: impl FnMut((usize, usize), usize, u32)) {
+pub fn each_cloud(cells: &Cells, mut shadow: impl FnMut((usize, usize), usize, u32, bool)) {
     let (tiles_a_chunk, side) = (CELLS_IN_CHUNK >> CLOUD_TILE_SHIFT, 1usize << (CLOUD_TILE_SHIFT / 2));
     for tile in (0..cells.clouds.len() * WORD_BITS / server::host::frame::CLOUD_BITS).filter(|&tile| cloud_over(&cells.clouds, tile) != 0) {
         let ((left, top), (x, y)) = (chunk_top_left(tile / tiles_a_chunk), cell_of_bit((tile % tiles_a_chunk) << CLOUD_TILE_SHIFT));
-        shadow((left + x as usize, top + y as usize), side, cloud_over(&cells.clouds, tile));
+        shadow((left + x as usize, top + y as usize), side, cloud_over(&cells.clouds, tile), rains_over(&cells.raining, tile));
     }
 }
 
@@ -287,11 +282,11 @@ fn paint(cells: &Cells, ground: &Ground) -> Painted {
         }
     }
     // The clouds' shadows over all of it, the sheep too.
-    each_cloud(cells, |(left, top), side, cloud| {
+    each_cloud(cells, |(left, top), side, cloud, raining| {
         for pixel in (top..top + side).flat_map(|y| (left..left + side).map(move |x| y * SIDE + x)) {
             let shaded = under_cloud([pixels[pixel][0], pixels[pixel][1], pixels[pixel][2]], cloud as usize, DEEPEST_CLOUD as usize);
             // Rain under a cloud deep enough: a streak on some of its cells.
-            pixels[pixel] = opaque(if raining(cloud) && streak_of_rain_on(pixel % SIDE, pixel / SIDE) { in_rain(shaded, 1, 1) } else { shaded });
+            pixels[pixel] = opaque(if raining && streak_of_rain_on(pixel % SIDE, pixel / SIDE) { in_rain(shaded, 1, 1) } else { shaded });
         }
     });
     Painted { at: cells.at, side: SIDE as u32, pixels: pixels.into_flattened() }
@@ -346,11 +341,11 @@ fn paint_far(cells: &Cells, detail: u32, ground: &Ground) -> Painted {
     let mut clouds = vec![0usize; if cells.clouds.is_empty() { 0 } else { side * side }];
     // And the cells of each pixel that are under a raining cloud.
     let mut rain = clouds.clone();
-    each_cloud(cells, |(left, top), tile_side, cloud| {
+    each_cloud(cells, |(left, top), tile_side, cloud, raining| {
         let (pixels_a_side, cells_each) = ((tile_side >> detail).max(1), tile_side.min(1 << detail));
         for pixel in ((top >> detail)..(top >> detail) + pixels_a_side).flat_map(|y| ((left >> detail)..(left >> detail) + pixels_a_side).map(move |x| y * side + x)) {
             clouds[pixel] += cloud as usize * cells_each * cells_each;
-            if raining(cloud) {
+            if raining {
                 rain[pixel] += cells_each * cells_each;
             }
         }
