@@ -61,7 +61,7 @@ part starting on a word:
    table -- a type and an offset per layer, sorted by type, the offset
    from the chunk's start -- and its encoded layers, in no order.
 
-An image is never changed in place: `rewritten` makes a new one with
+An image is never changed in place: `rewritten_with` makes a new one with
 changes made. `from_words` checks words read back are an image.
 
 In words:
@@ -168,7 +168,7 @@ a millisecond. Instead the pool holds each image behind a reference
 count (`Arc`): a handle any number of holders share, the image freed
 when the last lets go. The thread is handed a handle
 (`ChunkStorage::shared_image`), nothing copied. Since an image is never
-changed in place, only replaced (`rewritten`), what the thread reads is
+changed in place, only replaced (`rewritten_with`), what the thread reads is
 the image as it was when handed over, whatever the pool does next; and
 an image replaced while a thread reads it lives on until that thread is
 done with it. An image paged to disk is handed over as the folder it

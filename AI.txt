@@ -91,8 +91,8 @@ Boundaries, asked first, would have put that on the table.
   crate: `cargo test --release --offline -p <crate>` and
   `cargo clippy --release --offline -p <crate> --all-targets`; the
   root with `-p Civil_Egregore --no-default-features`.
-- LOCAL: every run that ticks a world is shown (CIVIL_EGREGORE_RENDER
-  set): "running headless is forbbiden until further notice".
+- LOCAL: test runs are unshown unless the user asks to see one
+  (then CIVIL_EGREGORE_RENDER set); the renderer is built as usual.
 - No seed written in a test or tool: all take transient_data/seed.csv
   (utilities::seed). Every command goes through the root program
   (`cargo run --release -- help`).
@@ -113,54 +113,15 @@ NOW
   will be compiled as usual for local sessions" / "now what were going
   to do before anything else is working on modularizing and de
   coupling the code a little, pull first, though, we need to finish
-  the stuff mid work upstream". Order: finish the name sweep's
-  handoff below; then modularize and decouple.
+  the stuff mid work upstream". The name sweep is finished (its docs
+  followed, the world hash unchanged); next, modularize and decouple.
+- `server check` with seed 0 reads transient_data/seed.csv: the binary
+  leaning on the repository, against the user's rule (it predates
+  it). Told the user 2026-10-16; theirs to say.
 - Found 2026-10-12, not fixed: the simulation's fine test
   what_others_write_to_an_entity_follows_it_over_a_border hung with
   every thread asleep on a futex, once in 300 runs alone (not the
   seed's doing): a lost wake in the threads.
-- NAME SWEEP (the user, 2026-10-16): every ambiguous single-word name
-  gets a name of two or more words saying what it is in its place.
-  Exempt: single-word glossary terms, x/y/dx/dy, the Rust idioms (new,
-  default, len, get, set, push, pop, insert, remove, clear, contains,
-  iter, main), trait-impl methods, names a framework requires. Renamed
-  through rust-analyzer; markdown docs and comments follow by script;
-  checked by the world hash. What rust-analyzer misses, by hand:
-  macro_rules bodies, a test helper file included by several test
-  targets (one target's uses only), and tests behind a dev-dependency
-  cycle (entity_rules and sca_rules tests use server, which depends on
-  them). tessera/external_benchmarks done too.
-  HANDOFF (2026-10-16, committed mid-way at the user's word): the
-  code renames are in (about 8,050, rust-analyzer, one snapshot) and
-  everything compiles; clippy was clean and the world hash equal to
-  the one before after the code renames. NOT DONE:
-  1. Docs: the root fine test `every_item_is_in_its_crates_docs`
-     fails on 64 renamed items no doc names yet -- tessera 26,
-     entity_manager 9, gui 7, simulation 7, worldgen 5, actions 3,
-     chunk_storage 3, type_registry 2, bitplane_manager 1,
-     pathfinding 1 (run it for the list). server, sca_rules,
-     renderer and utilities are done by hand. For each item: find
-     where HEAD~1's docs named it (`git show HEAD~1:<doc>`) and put
-     the new name there.
-  2. Docs audit: the script passes that made docs follow renamed some
-     words to the wrong item's new name (e.g. gui reference.md
-     `OpenWorld(set_world_name)` and `Save(set_world_name)`, meant
-     `(name)`; renderer's `cell_tint` for relief's `height_tint`;
-     server's `print_throughput::run_throughput` for
-     `throughput::run_throughput`). Struct field lists `{a, b}` in
-     the docs were mostly not followed (HostLink, TunedNumber,
-     MemoryReading, WorldStart fixed; gui's `CapturedInput`
-     `{pointer, wheel, keys}` is not). Every changed word against
-     HEAD~1 should be read: does the new name belong to the item
-     that section means?
-  3. Re-run before calling it done: every headless crate's tests and
-     clippy, the root's, `cargo check -p gui -p renderer`,
-     `server check` against the hash before, `docs stale`. The tests
-     last passed before the forced second pass (87 renames) and
-     clippy's field shorthand fixes.
-  4. Tell the user what was left unrenamed: the CSV-bound fields,
-     Tessera::encode/decode (callgrind reads them), and the unclear
-     names flagged while renaming.
 - THEN, transient data folded into utilities (the user's): each
   crate's lib.rs or main.rs, after its imports, declares statically
   its transient data paths, to the files themselves; utilities::csv

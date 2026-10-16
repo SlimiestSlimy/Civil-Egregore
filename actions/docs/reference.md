@@ -12,12 +12,12 @@ to it together.
 
 **`held_in_tile(turn, type, cell)`**: how many cells of the tile 8x8 the cell is in the type holds at. **`move_one(turn, wide_plane, from_cell, seen_from, to_cell, seen_to, count_place)`**: one taken from the number at a cell and added to another's, both under both compares -- nothing made or lost, whatever border is between them. **`change_both(turn, wide_plane, first_change, second_change, count_place)`**: what it is made of -- the numbers at two cells changed together, each `(cell, seen, becomes)`, the one only if the other. **`hot(turn, type, cell)`**,
 **`layer_holds`**, **`layer_lacks`**: the cell read. **`value(turn, plane,
-cell)`**: a wide plane's number. **`square(turn, type, cell, side)`**:
+cell)`**: a wide plane's number. **`window_about(turn, layer_type, cell, window_side)`**:
 up to 8x8 cells about a cell as a `Window`, with their top left cell;
 **`corner_about(centre_cell, square_side)`**: that cell, of a square of any side.
 **`set(turn, type, cell)`**, **`clear`**: a compare-and-write queued,
-the cell seen clear, or set. **`set_value(turn, plane, cell, seen,
-value)`**: a wide plane's number put where `seen` was read.
+the cell seen clear, or set. **`set_value(turn, plane, cell, value_seen,
+value)`**: a wide plane's number put where `value_seen` was read.
 **`set_counted(turn, type, cell, count_place)`**, **`clear_counted`**,
 **`set_value_counted`**: the same, one added to the rule's count
 `counted` if applied (`actions.md`, "Compare-and-write"). All are
@@ -28,7 +28,7 @@ of the cell as seen, the write and the compare's end, queued at once
 ## `compare.rs`
 
 Handed on from `../../compares_and_writes/` (its `reference.md`):
-`Compare`, `layer_holds`, `layer_lacks`, `value`, `attribute`, `from_here`, `end`
+`Compare`, `layer_holds`, `layer_lacks`, `value`, `attribute`, `from_here`, `end_from_here`
 -- an instruction each. Here, what is made of several: **`write(turn, compare, type,
 cell, seen, value, counted)`**: a cell written if the compare holds
 and the cell is still as seen.
@@ -64,7 +64,7 @@ seen, value)`**: the same of blocks with no layout at hand, each word
 that differs (`members_differing`), the attribute whole, or taken;
 **`set_attribute_member(turn, entity, type_of_attribute, member, member_seen, value)`**:
 one member, held against that member alone -- two writing two members
-of one attribute both do; **`update(turn, before, after,
+of one attribute both do; **`update_entity(turn, header_before, header_after,
 attributes)`**: each attribute that differs written
 (`set_attributes_changed`), then the step. **`EntitiesBetweenTicks`**: the world's entities off any
 turn, lent by whoever runs the world (**`from_entities`**; **`where_free(is_cell_free)`**,
@@ -83,8 +83,8 @@ cell to the nine about it, in Morton order of where they lead --
 `SOUTH_WEST`, `SOUTH`, `SOUTH_EAST`. **`tiles_about_cell(asked_cell)`**: an **`TilesAbout`**
 (`tiles_about.rs`), of which **`centre_cell()`**, **`neighbour_cells()`**,
 **`nine_cells()`**, **`cell_towards(way)`** are sets. **`cell(from_cell, way)`**,
-**`way_of(from_cell, cell)`**: a way and its cell. **`pick(random, about,
-choices)`**, **`prefer(random, about, wanted, open)`**: the way to one
+**`way_of(from_cell, cell)`**: a way and its cell. **`pick_way(random, about,
+choices)`**, **`prefer_way(random, about, wanted, open)`**: the way to one
 drawn; **`set_bit_of_rank(bit_word, set_bit_rank)`**: the set bit with so many
 under it, the crate's. **`read_layer(turn, type, about_tiles)`**: a layer's cells
 about a cell, the small tiles they lie in read as they lie.
@@ -103,8 +103,8 @@ neighbours alone, as bits of the word -- from `NINE_OF`, made as the
 program is compiled; **`way_word(way)`**: the one cell a way off, by
 `NINE_ABOUT_EACH_BIT`, each of the nine's (`NINE_CELLS`) bit for each place the cell can
 have; **`ways_of(word)`**: a set of them as ways, a bit a way; `WAY_OFFSETS`: where each way leads, across and down, in Morton order; `WAY_AT`: the way to each of the nine, row by row. **`read_layer(turn, type, about,
-under)`**, **`read_layers(turn, types, about, under)`**: a layer in the
-tiles, the cells of `under` alone, a `SmallTiles` (`actions.md`,
+under_word)`**, **`read_layers(turn, types, about, under_word)`**: a layer in the
+tiles, the cells of `under_word` alone, a `SmallTiles` (`actions.md`,
 "The small tiles about a cell").
 
 ## `area.rs`
@@ -122,8 +122,8 @@ window a quarter (**`layers_at_the_edge`**). **`of_tiles(turn, type, centre_cell
 
 **`Mask`**, an aligned tile's cells a bit each in Morton order, its
 side one of **`MASK_SIDES`** (4 to 1,024): **`all_clear(side_in_cells)`**,
-**`all_set(side_in_cells)`**, **`filling_disc(side_in_cells)`**; **`side`**, **`words`**, **`get(x,
-y)`**, **`set(x, y, to)`**, **`clear`**, **`count`**, **`is_empty`**;
+**`all_set(side_in_cells)`**, **`filling_disc(side_in_cells)`**; **`side_in_cells`**, **`words`**, **`get(x,
+y)`**, **`set(x, y, is_set)`**, **`clear`**, **`count`**, **`is_empty`**;
 **`and_with`**, **`or_with`**, **`and_not`** with another of its side
 (**`combine_words_with`**); **`cells()`** the set ones (**`set_bits`**, their places),
 **`pick_set_cell(random_stream)`** one drawn. `WORD` (64): bits in a word;
@@ -132,7 +132,7 @@ y)`**, **`set(x, y, to)`**, **`clear`**, **`count`**, **`is_empty`**;
 **`cell(tile_first_cell, x, y)`**: a cell of it. **`read_layer(turn, type, at, set,
 hot)`**: the tile of a layer into two masks, its words copied
 (**`tile_word_runs`**: a tile's words as they lie, a chunk a run);
-**`layer_under(turn, type, cell_in_tile, under_mask, set_mask, hot)`**: the cells `under`
+**`layer_under(turn, type, cell_in_tile, under_mask, set_mask, hot)`**: the cells `under_mask`
 has alone (**`read_where`**). **`any_under(turn, type, cell_in_tile, mask)`**:
 whether the layer holds at any cell of the mask, the words ANDed as
 they lie. **`set_under(turn, type, cell_in_tile, mask)`**, **`clear_under`**: a
@@ -156,8 +156,8 @@ by scale, `FARTHEST_SCALE` first and the finest that reach after -- a
 **`SoughtStep`** `{step_cell, scale}`. Its own: `AREA_CENTRE_CELL`, where an entity stands
 in its area; **`of_the_area(entity_cell, cell)`**, a cell of the area as the
 world's; **`in_the_way(turn, entity_cell)`**, the cells of the area the
-collision plane holds and its walls, read at once; **`less(rows,
-held)`**, rows without them.
+collision plane holds and its walls, read at once; **`rows_less_collisions(cell_rows,
+collision_rows)`**, rows without them.
 
 ## The root (`lib.rs`)
 

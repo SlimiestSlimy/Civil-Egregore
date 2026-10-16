@@ -14,8 +14,8 @@ not this crate's. A diagonal has no wall
 of its own: `pathfinding::Walls::one_way` and
 `actions::walking::around_unwalled` bar it from the four. `FRACTION_ONE` (65,536): a fraction's whole.
 
-**`LandShape`** `{ground, ocean, span, sea, highest, clumping, coast, coast_low, narrow, wide,
-soft, hard, warp, finer_depth, finer_share, finer_height, finer_fall, weight, raised}`: the
+**`LandShape`** `{ocean_floor, ocean, vertex_spacing_power, ocean_share, highest_land, land_clumping, coast_breadth, coast_low, narrowest_blend, widest_blend,
+least_sigmoidness, most_sigmoidness, line_bending, finer_depth, finer_share, finer_height, finer_fall, weight, raised_share}`: the
 lowest ground and the ocean's height; the vertices' grid and the share
 of them that are ocean; the highest land, and the vertices from the
 ocean it is reached over; the lines' blends and sigmoidness, least and
@@ -33,15 +33,15 @@ Private: **`point_number_cartesian`**, an octave's number at a point; **`value_b
 each way each chunk's cells that keep a wall.
 **`Terrain::generate_terrain(seed, superchunk)`**;
 **`Terrain::from_heights(height_at)`**: from any heights, those a cell
-past the edges asked for too; **`height(place)`**, **`walled(way,
+past the edges asked for too; **`height(place)`**, **`keeps_wall(way,
 place)`**: a cell's, by its place in the superchunk; **`wall_counts()`**.
 
 ## `mesh.rs`
 
-`WorldLand` and `land` are in `mesh/lands.rs`.
+`WorldLand` and `land_of_one_cell_cartesian` are in `mesh/lands.rs`.
 
 **`WorldLand`**: the land asked for cell after cell, the vertices about the
-last cell and its triangle kept -- **`new(land_shape, seed)`**, **`land(x,
+last cell and its triangle kept -- **`new(land_shape, seed)`**, **`land_at_cartesian(x,
 y)`** (the lattice's points about the cell blended, a point no share is
 taken from not worked out), **`height(x, y)`**,
 **`heights_of_a_square(square_left, square_top, side_cells)`** (every cell's height, row by
@@ -52,12 +52,12 @@ nearest line). Private to `mesh/lands.rs`: `LATTICE_STEP_POWER` (2) and
 as a power of two and as cells; `WorldLand::at_the_lattice(x, y)`, the
 meshes' land at a point, in 16-bit fractions of a height;
 `between_the_lattice(corner_points, cells_across, cells_down)`, a cell's land from the
-four points about it, made whole once. **`land`**:
+four points about it, made whole once. **`land_of_one_cell_cartesian`**:
 the same for one cell alone. `SIGMOID_ONE`, `FINER_MOST`, `COAST_MOST`.
 Private: **`Vertex`**, **`MeshTriangle`**, **`BlendedCell`**, **`Mesh`**
-(`new`, `lot`, `ocean`, `vertex`, `triangle_of_corners`, `locate_triangle_cartesian`, `blended_cartesian`),
+(`new`, `vertex_lot_cartesian`, `ocean`, `vertex`, `triangle_of_corners`, `locate_triangle_cartesian`, `blended_cartesian`),
 **`raised_to_power`**, **`area`**; `towards_the_slope(line_lot)`: a line's lot drawn
-a little nearer nothing, halfway to its square; `inverse(whole_area)`: what a part of a
+a little nearer nothing, halfway to its square; `inverse_of_area(whole_area)`: what a part of a
 triangle's area is multiplied by to be its share of the whole -- a
 division done once for the triangle, 0 where the triangle is too broad
 for that to be exact enough and the division is done a cell;
@@ -71,8 +71,8 @@ the finest grid's square as a power of two, 16 cells; `SIGMOID_MOST`,
 ## `patches.rs`
 
 How something lies in patches when a superchunk is made. `CELLS_LOOKED_AT`
-(16,384); a fraction's whole is the crate's `FRACTION_ONE` (65,536). **`Patches`** `{cover, patch, detail,
-scatter}`; **`number(seed, x, y)`**: a cell's number -- noise as broad
+(16,384); a fraction's whole is the crate's `FRACTION_ONE` (65,536). **`Patches`** `{cover_share, patch_size_power, detail_share,
+scatter_share}`; **`cell_number_cartesian(seed, x, y)`**: a cell's number -- noise as broad
 as a patch, finer noise, and the cell's own lot;
 **`cover_threshold(seed)`**: the number under which `cover_share` of the cells are.
 For a superchunk's every cell (crate only): `patch_noises(seed)`, the
@@ -102,17 +102,17 @@ climate (`worldgen.md`, "Climate"). The module is `climate`.
 ## `generation.rs`
 
 `TREES_SALT`: what keeps the trees' numbers apart from the grass's.
-**`WorldGeneration`** `{land_shape, grass, trees}`; `WorldGeneration::DEFAULT`;
+**`WorldGeneration`** `{land_shape, grass_patches, trees}`; `WorldGeneration::DEFAULT`;
 **`WorldGeneration::plain(grass_cover)`**: a plain -- flat dry land, no
 ocean, no walls, no trees, grass scattered on `grass_cover` of `FRACTION_ONE` of
 its cells;
-**`generation_numbers()`** and **`of_numbers(generation_numbers)`**: its numbers by name, as
+**`generation_numbers()`** and **`of_numbers(numbers)`**: its numbers by name, as
 a world's file keeps them (`generation_numbers!`). **`from_tuning(slider_tuning)`**: as
 the sliders have it (**`shape_from_tuning`**). **`world_growth(seed)`**: a
 **`WorldGrowth`**, the thresholds found once and the noises kept;
 **`WorldGrowth::grown_at(x, y)`** (it keeps the noise about the cell, so each
 thread has a `WorldGrowth` of its own): a
-**`GrownCell`** `{grass, tree}` -- the tree a lot, its stage drawn from it
+**`GrownCell`** `{has_grass, tree}` -- the tree a lot, its stage drawn from it
 by whoever counts the stages. **`has_land_about(seed, land_shape, near_superchunk)`**:
 land three superchunks each way about `near`; **`seed_with_land(from,
 shape, near)`**: the first seed from `from` that has.

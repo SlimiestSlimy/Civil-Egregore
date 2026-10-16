@@ -98,7 +98,7 @@ that plus its Morton index (`element_index`).
 
 - **`get`**, **`set`**: by tile. **`set_at`**: by level and Morton
   index, for building a level in order without coordinates.
-- **`children`**, **`children_at`**: a tile's four children's
+- **`child_elements`**, **`children_at`**: a tile's four children's
   elements, read as one slice of four.
 
 **Private to the file.** `NEAR_OFFSETS`: where a near copy reads from, by
@@ -133,7 +133,7 @@ never divides, so there is always one.
 ## `set_cells_before_each_word.rs`
 
 **`SetCellsBeforeEachWord`**: the cells set before each of the bitmap's
-1,024 words, and in all: one pass over the bitmap, after which any run
+1,024 words, and in all (**`total_set_cells()`**): one pass over the bitmap, after which any run
 of whole words is counted by a subtraction.
 
 **`count(bitmap)`**: running totals: `set_before[i]` cells set in words
@@ -291,17 +291,17 @@ leaf, bind, plain-or-complex, the size offset in truncated binary
 finest first, and at 1x1 the cell-list bit. A plain tile is the
 complex tile of size offset 0.
 
-**`write_tree_and_plan_last_pass(stream, tree, bitmap, plan,
-start_level)`**: clears `plan`, writes the start level and every node
-from each start-level tile down, and fills `city_plan`: each residual floor tile,
+**`write_tree_and_plan_last_pass(stream, tree, bitmap, floor_plan,
+start_level)`**: clears `floor_plan`, writes the start level and every node
+from each start-level tile down, and fills `floor_plan`: each residual floor tile,
 and each floor tile a copy covers with its source -- a whole copy's own
 tile, or each `NoNode` child of a copy naming children.
 
 **`read_tree_and_plan_last_pass(stream_reader, cells, floor_plan)`**: the mirror:
-clears `city_plan`, reads every node and acts on it at once -- sets the
+clears `floor_plan`, reads every node and acts on it at once -- sets the
 cells a flipping or keeping divide binds inside (each unnamed child
 when the value bound inside is set), reads payloads and cell lists into
-`cells`, and fills `city_plan` the same way the writer did. Builds no tree.
+`cells`, and fills `floor_plan` the same way the writer did. Builds no tree.
 
 The widths the node's bits are counted with: `FLAG_WIDTH` (1), every
 one-bit choice; `START_LEVEL_WIDTH` (3), the bits naming the start
@@ -416,7 +416,7 @@ a time. Builds the log2 table when compiling; never above the true
 log2, under a hundredth of a bit below it (`tests/unit/last_pass.rs`).
 
 **`ContextOdds`**: a context's weights for clear and set, in half
-cells, starting at one each.
+cells, starting at one each; `weight_total()`, the two added up.
 - **`clear_probability()`**: clear's share of `2^32`, as clear's weight
   times a table of `2^32 / total`: no division.
 - **`cell_cost(value)`**: `log2(total) - log2(weight)`, two lookups, in
@@ -430,7 +430,7 @@ floor tile removed by an earlier visit in a later word is skipped.
 
 **`code_residual_floor_tile(context_odds, cells, floor_tile_index, code_cell)`**: codes a residual
 floor tile's 16 cells in Morton order, each at its context's odds, through
-`code` -- which encodes, decodes or prices the cell at a Morton index
+`code_cell` -- which encodes, decodes or prices the cell at a Morton index
 and says whether it is set -- and returns the floor tile's cells as one
 run. Each set cell is put into the window as it is coded, so later
 cells read it.
@@ -582,7 +582,7 @@ loaded stream's length is every bit of every word or byte: the padding
 reads as the zeros it is.
 
 **`BitSink`**: where bits go. **`push_value(value, width)`**, the one
-required method; **`counted()`**, `Some` for a `BitCounter`, lets a
+required method; **`counted_bits()`**, `Some` for a `BitCounter`, lets a
 writer add bits it need not look at (a payload's, a unary run's, a
 binary count tree word's) without producing them.
 - **`push_unary(count)`**: `count` ones then a zero.
@@ -597,6 +597,7 @@ binary count tree word's) without producing them.
 **`gamma_bits`**, **`truncated_binary_bits`**, **`truncated_binary_shape`**:
 the same codes' lengths, when compiling.
 
+**`BitStream::bit_reader()`**: a reader from the start; **`BitReader::read_bit()`**: one bit.
 **`BitReader::value(width)`**: up to a word: off a buffer of bits taken
 from the stream a word at a time; when the buffer runs short, the rest
 off the next word, whose leftover bits become the buffer. Zeros past

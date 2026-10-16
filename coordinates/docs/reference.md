@@ -21,7 +21,7 @@ one, no float: how a world of that many is laid out, about
 
 **`SuperchunkIndex(u64)`**: **`from_cartesian(x, y)`** and
 **`cartesian`**; **`top_left`**, its first cell; **`chunks`**, its 16
-in Morton order; **`offset(dx, dy)`**, stepped on the index, refused
+in Morton order; **`at_cartesian_offset(dx, dy)`**, stepped on the index, refused
 past the world's edge.
 
 **`ChunkIndex(u64)`**: **`from_superchunk_place(superchunk, place)`**, **`superchunk`**,
@@ -30,7 +30,7 @@ past the world's edge.
 **`CellIndex(u64)`**: **`from_chunk_place(chunk, place)`**, **`superchunk`**,
 **`chunk`**, **`place`** (the low 16 bits: its bit in the chunk's
 words), **`place_in_superchunk`** (the low 20), **`cartesian`**, and
-`From<CellCartesian>`. **`offset(dx, dy)`**: the cell so far away, if
+`From<CellCartesian>`. **`at_cartesian_offset(dx, dy)`**: the cell so far away, if
 in the world.
 
 **`CellCartesian`** `{x, y}`: a cell's cartesian coordinates.

@@ -216,7 +216,7 @@ be one thread's:
 
 Whose a superchunk is (`whose`) is only read to choose where to put
 things; what makes a superchunk a thread's is the flag it takes
-(`lying`), so a list may still name one taken from under it
+(`lying_to_take_up`), so a list may still name one taken from under it
 (`LetGoOn::pop` gives it, `take_up_lying` passes it over, `LetGoOn::empty_out`
 clears the lists for the next tick). The lists, the flags and each
 superchunk's order are kept from tick to tick (`ApplyingRoom`).
@@ -609,10 +609,10 @@ go together is the actions' (`actions::entities`), named here:
 
 | the action | the compare | under it |
 |---|---|---|
-| `spawn` (`make_with_compare_open` ... `made`) | the cell free for an entity | the entity made; each attribute given, its words written |
-| `step`, `update` | the entity there still | a move, if to another cell; its wake written |
+| `make_entity` (`begin_making_entity` ... `end_making_entity`) | the cell free for an entity | the entity made; each attribute given, its words written |
+| `step`, `update_entity` | the entity there still | a move, if to another cell; its wake written |
 | a crossing | the cell free, in the superchunk crossed to; the entity there still, where it stood | there, the entity made whole; here, its wake written |
-| `set_attribute_of`, `unset_attribute_of`, `set_attribute_blocks`, `update` | the attribute as seen, or none seen | the words that differ, two an instruction; or the attribute given and written, or taken |
+| `set_attribute_of`, `unset_attribute_of`, `set_attribute_blocks`, `update_entity` | the attribute as seen, or none seen | the words that differ, two an instruction; or the attribute given and written, or taken |
 | `remove` | the entity there still | removed |
 
 A walking entity is four instructions a step, 96 bytes -- a compare,
@@ -786,7 +786,7 @@ superchunks it generated, made new rather than read back
 (`Halos::generated_superchunks`), so the holder can put entities on them.
 
 The halos work on what the world's holder lends them for each call
-(`Held`): the arena, chunk storage, the entities, the tick's random
+(`LentWorld`): the arena, chunk storage, the entities, the tick's random
 streams, the cold states, and what generates a superchunk never made
 -- the one thing of the world's making they need, so they know
 nothing of how worlds are generated.
@@ -811,7 +811,7 @@ run.
 
 The threads, started once and kept, parked between jobs: a job runs on
 all of them at once, the caller's thread doing the first part, and
-`run` returns only once every part has -- which is what lets a job
+`run_in_parts` returns only once every part has -- which is what lets a job
 borrow what the caller holds (the arena, the outboxes) and the one
 `unsafe` rests on. A part's panic is raised to the caller after every
 part is done. The superchunks are not split among the threads

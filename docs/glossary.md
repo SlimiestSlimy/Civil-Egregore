@@ -240,7 +240,7 @@ what they always do and are not listed.
 | **census** | a count of a population: the flock and grass over a run, or Tessera's nodes by kind | | |
 | **reading** | the process's memory read once (`MemoryTrack::take_reading`) | | sample |
 | **test** | a test of the code, run by `cargo test`: it judges, and fails or passes (`docs/testing_protocol.md`) | tier, in-bin test | |
-| **in-bin test** | a command of the binary that ticks a world and reports what it did -- `server pasture`, `server check`, `server print_throughput`: run by hand or to measure, judging nothing itself. The code such a command is written in is the diagnostics | test, diagnostics, ticker | test (that is `cargo test`'s); benchmark |
+| **in-bin test** | a command of the binary that ticks a world and reports what it did -- `server pasture`, `server check`, `server throughput`: run by hand or to measure, judging nothing itself. The code such a command is written in is the diagnostics | test, diagnostics, ticker | test (that is `cargo test`'s); benchmark |
 | **tier** | a test's size: fine, fast or complete (`docs/testing_protocol.md`) | | |
 | **settings** | this machine's settings, kept from run to run: `settings.csv` in the folder `Civil Egregore` where the system keeps a user's programs' data (`utilities::settings`) | default settings, slider, group | config, preferences, preset |
 | **default settings** | every setting and what it is unless changed: a settings file built into the program, copied to a machine that has none; all there is under the build feature `force_default_settings` | settings | |

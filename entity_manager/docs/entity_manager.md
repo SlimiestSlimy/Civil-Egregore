@@ -294,13 +294,13 @@ The cell is all that is asked: there is no ID beside it. An entity
 made in a tick is named in it by the cell it was made on, which no
 rule saw it on: nothing is queued for it.
 
-A put makes (`make_named`, and `make` of the store and of the bucket):
+A put makes (`make_named`, and `make_entity` of the store and of the bucket):
 never over an entity, which is written an attribute at a time and
 moved, not put whole.
 
 **Entities in the collision plane.** Whoever applies a queue may lend
 the collision plane of the superchunk it lands in (`CollisionCells`:
-`held`, `hold`, `free`; `()` is none). Then no entity is put on or
+`holds_cell`, `hold_cell`, `free_cell`; `()` is none). Then no entity is put on or
 moved to a cell it holds -- whatever holds it, an entity or not -- the
 cell one comes to is set in it, and the cells left or removed from
 (`vacated_cells`) are cleared when the tick is over (`names_anew`), the cell one left

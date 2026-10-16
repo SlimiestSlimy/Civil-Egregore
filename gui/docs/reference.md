@@ -11,8 +11,8 @@ sliders set and whatever draws reads (`utilities::tuning::Tuning`).
 **`MenusWorked`**: the set their work of a frame is in. **`ShownScreen`**:
 `MainMenu`, until a world is made or opened from it, then `World`.
 **`MakeWorld`** `{seed, tuning}`, **`OpenWorld(set_world_name)`**, **`Save(set_world_name)`**: the
-messages. **`CapturedInput`** `{pointer, wheel,
-keys}`: what the menus took this frame. **`offer`**: the sliders
+messages. **`CapturedInput`** `{pointer_buttons, wheel,
+keyboard_keys}`: what the menus took this frame. **`offer_sliders`**: the sliders
 offered as the screen has it. **`capture_input`**: `CapturedInput`, last.
 
 ## `rows.rs`
@@ -25,16 +25,16 @@ row's words. **`spawn_menu_parts(bevy_commands, part_marker)`**: them, hidden, e
 as the menu's. **`row_under_pointer(window, row_count)`**: the row the pointer is on.
 **`clicked_row_does(menu_rows, window, mouse_buttons)`**: what the row just clicked does.
 **`show_rows(menu_open, menu_rows, shade_visibility, bars, words)`**: the parts as the rows say.
-**`WorldListing`** `{worlds, first_shown}`: **`from_lister(world_lister)`**, **`rows(back,
-opens)`**, **`scroll(wheel)`**. **`type_into(line, typed, allowed,
-most)`**: keys typed into a line; whether Enter was pressed.
+**`WorldListing`** `{worlds, first_shown}`: **`from_lister(world_lister)`**, **`world_rows(back_does,
+opens_world)`**, **`scroll_by_wheel(wheel)`**. **`type_into(line, typed_keys, letter_allowed,
+most_letters)`**: keys typed into a line; whether Enter was pressed.
 
 ## `main_menu.rs`
 
 **`MainMenuClick`**: `DoesNothing`, `SetsUp`, `MakesWorld`, `ListsWorlds`, `GoesBack`,
 `OpensWorld(place)`, `LeavesGame`. **`MainMenuPage`**: `FirstPage`, `NewWorld`, `Worlds`.
 **`Part`**: marks its parts. **`MainMenu`**: the page, the seed typed,
-the worlds listed -- **`listing(world_lister)`**, **`setting_up()`**: whether
+the worlds listed -- **`with_world_lister(world_lister)`**, **`setting_up()`**: whether
 a new world is being set up; **`seed()`**: the seed typed, if one is;
 **`shown_rows()`**. **`spawn_main_menu`**: its parts. **`update_main_menu`**: a row clicked done,
 unless the pointer is the sliders'; a seed typed; the worlds gone
@@ -47,8 +47,8 @@ the window shows it.
 `GoesOn`, `Saves`, `SavesNamed`, `ListsWorlds`, `GoesBack`, `OpensWorld(place)`,
 `LeavesGame`. **`OptionsPage`**: `FirstPage`, `Worlds`, `NamingWorld`. **`Part`**: marks
 its parts. **`Options`**: whether they are open, the page, the world's
-name, the name typed, the worlds listed -- **`listing(world_lister)`**,
-**`is_open()`**, **`named()`** and **`set_world_name(world_name)`**: the world run's
+name, the name typed, the worlds listed -- **`with_world_lister(world_lister)`**,
+**`is_open()`**, **`current_world_name()`** and **`set_world_name(world_name)`**: the world run's
 name, as the window tells it; **`save_named(save)`**: the name typed
 saved under, unless none or taken; **`shown_rows()`**. **`spawn_options`**: its
 parts. **`update_options`**: opened and closed by Escape over a world, unless a
@@ -62,13 +62,13 @@ worlds gone through by the wheel; the rows shown.
 **`SlidersOffered`**: `NoneOffered`, `EveryGroup`, `RunningGroups`. **`Sliders`**: what
 is offered and shown, how far it is scrolled, whether the left button
 is held over it, the slider dragged, the value typed, where the pointer
-rested -- **`held()`**, **`typing_value()`**, **`pointer_over(window)`**,
+rested -- **`holds_left_button()`**, **`typing_value()`**, **`pointer_over(window)`**,
 **`offer_groups(to_offer)`**: a group no longer offered closed;
 **`show_from_top(to_show)`**, **`listed_groups()`**, **`shown_group()`**, **`rows_under()`**,
 **`shown_foot()`**, **`shown_width()`**, **`row_under(window)`**: the arithmetic
 of where things are. **`group_rows(tuning_group)`**: a group's numbers in the
-sliders' file's order; **`row_middle(row_number)`**. **`Part`** `{shown,
-everything}`: anything of the sliders, what it is shown with, and
+sliders' file's order; **`row_middle(row_number)`**. **`Part`** `{shown_with,
+every_group_only}`: anything of the sliders, what it is shown with, and
 whether only while every group is offered; **`PartTop`**: how far down it
 is. **`toggle`**: the menu by `U`, or all closed. **`scroll_sliders`**: by the
 wheel, and every part shown or hidden.

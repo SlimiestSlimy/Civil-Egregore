@@ -43,12 +43,12 @@ layers as they are. **`with_water(water_depths)`**: the image with `ChunkMaps` i
 **`ChunkMaps`**: a number a cell, a map only for the chunks with one
 not 0, wide (16 bits a cell) if one is over 255, else a byte a cell
 (`MAP_WORDS` words). **`from_numbers(number_at)`**, **`get(place)`**,
-**`words`**; **`number_in(words, place)`**, **`words_of(words)`**.
+**`words`**; **`number_in(words, place)`**, **`words_of(words)`**; private, **`bits_before_chunk(first_word, chunk)`**: the first word's bits for the chunks before one, those with a map and those wide.
 **`SuperchunkCells`** `{heights, water_depths, layers}`
 (`superchunk_cells.rs`): a superchunk's cells as whoever makes them
 gives them; **`image(layer_codec)`**: the image of them, every layer encoded.
 **`layer(chunk, type)`**: an encoded layer's words, from its first to its
-chunk's end. **`layer_types(chunk)`**. **`rewritten(layer_changes)`**: a new
+chunk's end. **`layer_types(chunk)`**. **`rewritten_with(layer_changes)`**: a new
 image with **`LayerChange`**s made in order, a later one to a layer
 replacing an earlier, no words removing the layer; built by **`build_image_words`**
 from each chunk's **`exact_layers`** -- each encoded layer's words to the next
@@ -80,7 +80,7 @@ of one in memory, a panic at one on disk.
 an empty ring too small grown -- whether it went in.
 **`write_back(chunk, type, encoded_layer, flushed_superchunks)`**: the same, the
 superchunk at its tail flushed here until it fits, each added to
-`flushed` -- before the encoded layer went in. **`take_entries(superchunk)`**:
+`flushed_superchunks` -- before the encoded layer went in. **`take_entries(superchunk)`**:
 its ring entries copied out and freed, with its image as it was -- a
 **`Flush`** `{superchunk, image, layer_changes}`, to be done on any thread
 (**`Flush::rewritten_image`**: the image with every change made; a
@@ -99,8 +99,8 @@ The cold pool paged to disk (`chunk_storage.md`, "Paged to disk").
 does not. `bytes_of(image)`. `PagingFolder`: a pool's own folder, its
 lock file beside it (`LOCK_EXTENSION`), named by its process and a count
 (`FOLDERS_MADE`); `PagingFolder::new_under(root_folder)` makes one, those left
-behind removed; dropped, it is removed. `ColdPoolPaging` `{root, folder,
-bytes_kept, bytes_in_memory, hand}`; `Paging::none()`.
+behind removed; dropped, it is removed. `ColdPoolPaging` `{root_folder, folder,
+bytes_kept, bytes_in_memory, clock_hand}`; `Paging::never_paged()`.
 **`ChunkStorage::page_under(root_folder, bytes_kept)`**: pages, under `root_folder`,
 keeping so many bytes; **`keep_in_memory(bytes_kept)`**;
 **`stop_paging_out()`**; **`over_memory_kept()`**;
@@ -142,7 +142,7 @@ the ring's bytes.
 ## `transient_data.rs`
 
 `TRANSIENT_DATA`: the crate's `transient_data/` folder.
-**`measurements()`**, **`publish(report)`**: as in every crate.
+`TRANSIENT_DATA`, its **`measurements_folder()`** and **`publish_report(report)`** (`utilities::transient_data::TransientData`): as in every crate.
 
 ## `jobs.rs`
 

@@ -9,8 +9,8 @@ The simulation ticks them (`../../simulation/`); the design is in
 ## The store
 
 **`entity.rs`**: `EntityType`, the type
-registry's (`../../type_registry/`), handed on; **`Header`** `{kind,
-at, wake}`, `NEVER` -- no ID, the cell names it; **`EntityRef`** `{header, attributes, kept}` (`attributes` all but its type's default; **`default_attribute()`**, **`attribute_seen(kind)`**, **`attribute_member(kind, offset, bytes)`**, **`attribute_list()`**; `entity_manager.md`, "The default attribute") --
+registry's (`../../type_registry/`), handed on; **`Header`** `{entity_type,
+stood_cell, wake}`, `NEVER_WAKES` -- no ID, the cell names it; **`EntityRef`** `{header, attributes, kept_blocks}` (`attributes` all but its type's default; **`default_attribute()`**, **`attribute_seen(kind)`**, **`attribute_member(kind, offset, bytes)`**, **`attribute_list()`**; `entity_manager.md`, "The default attribute") --
 its attributes' blocks -- with **`attribute(attribute)`**, what one
 holds as its layout, and **`attribute_blocks(attribute_type)`**, one's blocks.
 An entity is not copied to be changed: what is written of it is
@@ -19,11 +19,11 @@ written to the store, a member at a time.
 **`attributes.rs`** (`entity_manager.md`, "Attributes, a block each"):
 `Attribute`, `AttributeType`, `Layout`, `Member` and `BLOCK_WORDS`,
 the type registry's, handed on. **`AttributeBlock`**: two words,
-sixteen bytes, aligned as such; **`holding(attribute, value)`**, the
+sixteen bytes, aligned as such; **`holding_value(attribute, value)`**, the
 one block of a layout that takes one; **`WholeAttribute`**: one
 attribute of any layout laid out where it is made, read as its
 blocks (**`WholeAttribute::holding_value`**);
-**`kind()`**, the type in its first word; **`blocks()`**, how many
+**`attribute_type()`**, the type in its first word; **`block_count()`**, how many
 blocks the attribute it begins takes, by its type's last four bits,
 one at least. On an entity's blocks, sorted by type:
 **`blocks_sum(summed_blocks)`** -- a sum of blocks, the same for the same
@@ -53,12 +53,12 @@ among one search tile's at a time (`SEARCH_TILES`, 16 of 64x64 cells,
 (its header, its attributes' first block and how many); the blocks;
 the garbage count. **`get(stood_cell)`**, **`iter`**, **`occupied(place)`**,
 **`in_word_tile(first_place)`** (the places on a word tile, a run),
-**`make(header, attributes)`** (the attributes as a bucket keeps them, `append_kept`) -- a **`Put`**: `NewlyPut`, or `RefusedOccupied`, an
+**`make_entity(header, attributes)`** (the attributes as a bucket keeps them, `append_kept`) -- a **`Put`**: `NewlyPut`, or `RefusedOccupied`, an
 entity standing there -- and **`put(header, former_place, attributes)`**, of
-the entity standing on `was`, with no attributes given those it has
+the entity standing on `former_place`, with no attributes given those it has
 kept: `InPlace`; `MovedToCell` (**`shift_entity`**) to its cell if that is
 another and free, else `TurnedBack`; `PassedOver`, nobody standing on
-`was`. **`rewrite_entity`**: attributes in place when as many blocks,
+`former_place`. **`rewrite_entity`**: attributes in place when as many blocks,
 else a new attribute list at the end. **`remove(stood_cell)`**, **`index_of(place)`**,
 **`find_place(place)`**, **`entity`**, **`edit(place, attribute_type, whole_attribute)`**
 (one attribute set in place if as long as it was, or the attribute list made anew
@@ -69,20 +69,20 @@ wake)`**, **`prefetch_entity(at)`**, **`prefetch_attributes(at)`**:
 asked of memory ahead, an entity's attributes a cache line and the next (`CACHE_LINE_BLOCKS`); **`sweep_garbage`** once garbage reaches the blocks
 in use (and 64).
 
-**`wheel.rs`**: `WHEEL_TICKS` (1024); **`Wake`** `{at}`;
+**`wheel.rs`**: `WHEEL_TICKS` (1024); **`Wake`** `{stood_cell}`;
 **`Wheel`**: **`due_wakes(tick)`**, **`file_wake(earliest_tick, tick, wake)`** -- a slot
-if within `WHEEL_TICKS` of `earliest`, else the list further off --
-**`pass(tick)`**: the slot passed emptied, and every half of
+if within `WHEEL_TICKS` of `earliest_tick`, else the list further off --
+**`pass_tick(tick)`**: the slot passed emptied, and every half of
 `WHEEL_TICKS` the wakes now in reach filed; **`sort_wakes(tick)`**: a tick's
 wakes by cell, each cell once.
 
 **`store.rs`** (with `store/world_entities.rs`, `WorldEntities`, and
 `store/entity_reader.rs`, `EntityReader`): **`SuperchunkEntities`**: a bucket a chunk and a wheel;
-**`len()`**, **`is_empty()`** -- how many it holds, whether none --
+**`superchunk_index()`**, which superchunk it is; **`len()`**, **`is_empty()`** -- how many it holds, whether none --
 **`get(stood_cell)`**, **`iter`**, **`chunk(place)`**, **`woken_entities(tick)`** and
 **`woken_prefetching(tick, prefetch_cell)`** -- the wheel's slot, each wake
 found and still due, the entities `ENTITY_AHEAD` on asked of memory --
-**`make(earliest_tick, header, attributes)`** -- a new one, its wake filed --
+**`make_entity(earliest_tick, header, attributes)`** -- a new one, its wake filed --
 **`put(earliest_tick, header, from_cell, attributes)`** -- of the one standing on
 `named_cell`, within a chunk or from one to another (**`move_between`**), a
 `Put` -- **`in_word_tile(chunk,
@@ -98,18 +98,18 @@ stood, wake)`** (its wake set and filed: a write to the wheel),
 **`free_for_a_new_entity(checked_cell, collision_plane)`** (what a making is held
 against),
 **`names_anew(collision_plane)`** -- and the collision plane as lent to
-them, **`CollisionCells`** (`held`, `hold`, `free`), what the puts and
+them, **`CollisionCells`** (`holds_cell`, `hold_cell`, `free_cell`), what the puts and
 moves ask and keep, the cells `vacated_cells` cleared in it when the tick is
 over --
-**`edit(stood_cell, attribute_type, whole_attribute)`**, **`pass(tick)`**, **`sort_wakes(tick)`** -- after the second phase for
+**`edit(stood_cell, attribute_type, whole_attribute)`**, **`pass_tick(tick)`**, **`sort_wakes(tick)`** -- after the second phase for
 the next tick, after `WorldEntities::apply` for the tick about to run --
 **`counts`**. **`WorldEntities`**: the tick about to run, the superchunks by
-superchunk index, and instructions queued outside a tick: **`now`**,
+superchunk index, and instructions queued outside a tick: **`current_tick`**,
 **`len`**, **`superchunk(superchunk)`**, **`get(stood_cell)`**,
 **`keep_superchunks(superchunk_indices)`** -- added empty, dropped, how many
 entities dropped -- **`queue_put(header, attributes)`**,
-**`queue_remove(stood_cell)`**, **`queued`**, **`apply`** -- as the arena's
-`queue` and `apply` --
+**`queue_remove(stood_cell)`**, **`queued_count`**, **`apply`** -- as the arena's
+`put`, `remove` and `apply` --
 **`iter`**, **`advance_tick`**. **`EntityReader`**:
 every superchunk's entities read in a tick, as the bitplanes' `Reader`:
 **`get(stood_cell)`**, **`chunk(chunk)`**, **`occupied(origin, width,
@@ -121,18 +121,18 @@ places (**`in_word_tile`**).
 superchunk -- put, move, edit, remove -- the blocks the puts and the
 edits carry in a list beside (an `Instruction`'s cell, `landing_cell`): **`put(header, attributes)`** -- an entity made --
 (by **`push`**),
-**`move_entity(header, named_cell)`**, **`set_attribute(at, attribute,
-value)`**, **`set_attribute_blocks(at, attribute)`**,
+**`move_entity(header, named_cell)`**, **`set_attribute(named_cell, attribute,
+value)`**, **`set_attribute_blocks(named_cell, attribute)`**,
 **`unset_attribute(named_cell, attribute_type)`**, **`remove(stood_cell)`** -- each of the entity
-the tick found on `at` -- **`apply_some(some, superchunks,
-earliest, applied)`** -- those at `some` alone, how the instructions under a compare
-refused are left out -- **`apply(superchunks, earliest,
-applied)`** in order, each on its cell's superchunk (a put elsewhere
+the tick found on `named_cell` -- **`apply_some(instruction_range, superchunks,
+earliest_tick, instructions_applied, collision_plane)`** -- those in `instruction_range` alone, how the instructions under a compare
+refused are left out -- **`apply(superchunks, earliest_tick,
+instructions_applied)`** in order, each on its cell's superchunk (a put elsewhere
 lost, one of an entity no longer where it stood passed over, a new
 one on a cell taken refused, a mover to one staying),
 **`clear`**, **`len()`** and **`is_empty()`** -- how
 many are queued, whether none. **`InstructionsApplied`** `{puts, moves,
-edits, wakes, removes, lost, stayed, refused, crossed, passed_over}`,
+edits, wakes, entities_removed, lost, turned_back, puts_refused, border_crossings, passed_over}`,
 added with `+=`.
 
 **`WorldEntities`** (`store/world_entities.rs`), the world's: **`len()`**,
@@ -143,9 +143,9 @@ a tick hands each thread its own.
 **`saved.rs`**: a superchunk's state as words: **`encode_state(random,
 entities)`** -- the words, and how many entities -- and
 **`decode_state(words, current_tick, world_entities)`**, its entities
-queued -- a wake passed made `now` -- a **`SavedState`** `{random,
-entities}`; **`entity_count(words)`**; all three read by
-**`read(words, each_entity)`**. **`WorldEntities::at_tick(current_tick)`**: what a load
+queued -- a wake passed made `current_tick` -- a **`SavedState`** `{random_stream_state,
+entity_count}`; **`entity_count(words)`**; all three read by
+**`read_state(words, each_entity)`**. **`WorldEntities::at_tick(current_tick)`**: what a load
 puts them back into.
 
 ## `diagnostics/entities.rs`

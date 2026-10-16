@@ -223,7 +223,7 @@ standard error says which it is, which use and from where -- so a
 failure names the seed that made it.
 
 `CIVIL_EGREGORE_SEED` in the environment picks a seed for one run and
-leaves the file alone, its count too; `is_fresh` as its value draws one
+leaves the file alone, its count too; `fresh` as its value draws one
 for the run. A use may be left uncounted (`uncounted_seed`; `UseCounting` says
 which): for the fine tests, run far more often than anything measured.
 

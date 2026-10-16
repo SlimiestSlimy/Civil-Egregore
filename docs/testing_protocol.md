@@ -96,7 +96,7 @@ the top of the workspace and out of git (`utilities::seed`):
 - A seed is 64 bits, written everywhere in hexadecimal:
   `0x50921cc8cf51e5ba`, in the file, a world's, and whatever prints one.
 - `CIVIL_EGREGORE_SEED=<seed>` picks a seed for one run and leaves the file
-  alone; `CIVIL_EGREGORE_SEED=is_fresh` draws one for the run.
+  alone; `CIVIL_EGREGORE_SEED=fresh` draws one for the run.
 - The first asking prints the seed, which use it is and where it came
   from, so a failure names the seed that made it.
 
@@ -182,7 +182,7 @@ updated or said in the commit to hold.
 ## What is measured, and how
 
 Speed is not a test: it is measured by a tool and written down with the
-command that gave it (`server`'s `Civil_Egregore server pasture` and `print_throughput`).
+command that gave it (`server`'s `Civil_Egregore server pasture` and `throughput`).
 A number in the docs names its command. While the renderer or another run
 is on the machine, times are skewed: the instructions counted
 (`perf stat -e instructions:u`) are not.

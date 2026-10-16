@@ -150,7 +150,7 @@ never read as another.
 A layout (`Layout`) says how many words of data it holds (`WORDS`;
 `BLOCK_COUNT`, the blocks that takes with its type before it, 16 at the
 most: `ATTRIBUTE_BLOCKS_MOST`, `ATTRIBUTE_WORDS_MOST`, `BLOCK_BYTES`)
-and how its fields lie in those words (`write`, `read`; `data_words`,
+and how its fields lie in those words (`write`, `read_data`; `data_words`,
 how many words so many blocks hold: all but the type): words, not a
 machine's bytes, so the same on any machine.
 
@@ -199,7 +199,7 @@ all but those bits (`type_identity`). **An ID of another kind is no
 attribute's** (`is_an_attributes`), nor is one whose number is 0 --
 the namespace is one, everything's, so a layer's or an entity type's
 ID read as an attribute's says so itself. A row is written with the
-number (`number`); a number of 2^52 or more, or a layout of no blocks
+number (`type_number`); a number of 2^52 or more, or a layout of no blocks
 or of more than 16, does not build.
 
 ## The climate
@@ -212,7 +212,7 @@ weather's rule that reads them and whatever shows them:
 cloud it stands for, `HUMIDITY_A_LEVEL_OF_CLOUD`), then its `wind`,
 its `temperature` (0 to `HOTTEST_TEMPERATURE`) and, the highest, its `pressure`
 (0 to `HIGHEST_PRESSURE`, `PRESSURE_AT_REST`, 128, where no wind has
-pushed air in or out). `of_number` and `number` turn the plane's
+pushed air in or out). `of_number` and `plane_number` turn the plane's
 number into it and back. One plane, one read, for all four.
 
 A **`Wind`** is a vector in its byte, a nibble each: how strongly it
