@@ -4,7 +4,7 @@ The design is in `server.md`.
 
 ## `lib.rs`
 
-**`World`** `{info, generation, arena, storage, entities, simulation,
+**`World`** `{world_info, world_generation, bitmap_arena, chunk_storage, entity_store, world_simulation,
 cold, halos}` -- **`cold`**, each cold superchunk's state as a save
 keeps it; **`halos`**, the simulation's; every one the server's own,
 read from outside by `world_access.rs`'s methods -- and
@@ -27,7 +27,7 @@ does not hold, and set there.
 **`save(folder, world)`**: every dirty bitmap written back and the
 ring flushed (`World::write_back_and_flush_all`), then each superchunk's
 image and state -- live if hot, kept if cold -- the hot file, and the
-world's file last: a **`SaveWritten`** `{superchunks, entities, bytes_written}`.
+world's file last: a **`SaveWritten`** `{superchunks, entities_written, bytes_written}`.
 **`worlds_in(folder)`**: the worlds saved in a folder, by their
 folders' names, sorted.
 **`load_world(folder)`**: every superchunk's image into the cold pool and its
@@ -48,7 +48,7 @@ forced}` -- so many superchunks along a side, a square about the
 origin, and whether every one of them is hot throughout;
 **`WorldSize::of_side(side_superchunks, forced_hot)`**: a side of 0 no limit, refused if
 forced without a side, which only a world with one can be.
-**`WorldStart`** `{seed, generation, size, threads, sheep, hot_entity,
+**`WorldStart`** `{seed, world_generation, world_size, thread_count, sheep_per_flock, hot_entity,
 camera_loads}`;
 `WorldStart::default()`: seed 1, the default generation, no size, every
 thread, `FLOCK` on the origin, hot about `HOT_ENTITY`, its camera
@@ -92,7 +92,7 @@ they are.
 **`World::tick`**: the rules, then the halos moved: a **`WorldTick`**
 `{rules, halos}`; in a debug build, `World::broken_invariant` checked
 after it. **`World::tick_only(chosen_rules, each_rule_timed)`**: the rules
-chosen alone, each one's time taken if `timed`, the halos not moved.
+chosen alone, each one's time taken if `each_rule_timed`, the halos not moved.
 
 ## `world_access.rs`
 
@@ -115,7 +115,7 @@ words, or `None`.
 
 ## `rules.rs`
 
-**`RULES`**: every rule a world ticks, a **`Rule`** `{registered, counted,
+**`RULES`**: every rule a world ticks, a **`Rule`** `{registry_row, count_names,
 rule}` each: the type registry's rules, as many and in its order, made
 as the server is compiled (`registered_at(place)`). `registry_row` is
 its row in the registry, **`Rule::master`** its master's. `RuleFunction`: what a rule is called as, on one superchunk's turn. `on_each_sampled(turn, rule_id, chance, rule)`: a rule of the cells -- the function on one sample -- handed to the simulation to run on each sample of its master, the registry's: a layer's set cells, a wide plane's every tile.
@@ -134,7 +134,7 @@ its place; **`counts_of(rule)`** and **`time_of(rule)`** read them by place.
 ## `diagnostics/`
 
 The world they tick is one the server starts as any other
-(`start`): **`plain_world::plain_world(superchunks, grass_cover, sheep,
+(`start_world`): **`plain_world::plain_world(superchunks, grass_cover, sheep,
 threads)`**, a plain (`worldgen::WorldGeneration::plain`) with a side,
 forced hot, so a rule is measured alone -- **`plain_world::plain_start`** how it is started, **`plain_world::pasture_start(superchunks, grass_thousandths, sheep_per_flock)`** how the pasture's is, for the same world shown in a window; **`plain_world::superchunks`**
 how many it holds hot.
@@ -155,8 +155,8 @@ a **`PastureRun`**.
 ## `transient_data.rs`
 
 `TRANSIENT_DATA`: the crate's `transient_data/` folder.
-**`measurements()`**, **`saves()`**, **`paging_folder()`** -- where running
-worlds page their cold pools -- **`publish(report)`**.
+**`saves()`**, **`paging_folder()`** -- where running
+worlds page their cold pools -- and `TRANSIENT_DATA`'s **`measurements_folder()`** and **`publish_report(report)`**.
 
 ## `world_hash.rs`
 
@@ -177,7 +177,7 @@ word.
 parameters and their defaults. `Civil_Egregore server new <folder> [seed]
 [sheep] [side] [forced] [threads]`: a world generated from the seed --
 the origin, a flock of `sheep` on it, and its halo (**`new`**), of
-`side` superchunks a side unless 0, forced hot throughout if `forced_hot`
+`side` superchunks a side unless 0, forced hot throughout if `forced`
 is not 0, on `threads` threads or every one the machine has if 0 --
 and saved in the folder, which must not hold one and
 whose name is the world's (**`world_name_of`**). `Civil_Egregore server run <folder> [ticks]`: it
@@ -294,15 +294,15 @@ waters)`.
 
 What a client asks of a world's terrain where no frame brings it
 (`server.md`, "Terrain asked of the host"), answered on a thread named
-`terrain`. `Height`, the word heights come in. **`DrawnHeightRange`** `{ground,
-ocean, highest}`, the heights a world is drawn between
+`terrain`. `Height`, the word heights come in. **`DrawnHeightRange`** `{lowest_height,
+ocean, highest_land}`, the heights a world is drawn between
 (`DrawnHeightRange::from_generation(world_generation)`: a world with no relief, a plain, drawn between the default world's, as low land); **`CellCover`** -- `Ocean`, `Tree`, `Grass`,
 `Dirt` -- what a cell is generated with.
-**`HeightsAsk`** `{world, first, size, skipped_corners_cartesian}`: the heights of a
+**`HeightsAsk`** `{world, first_cell_cartesian, size_in_cells, skipped_corners_cartesian}`: the heights of a
 rectangle of cells, those of the superchunks `skipped_corners_cartesian` passed by and
-answered as 0. **`MapAsk`** `{world, first, step, size, mesh_lines_asked}`: a
-map, a pixel the cell in its middle; **`MapAnswer`** `{ask, levels,
-cells}`, a **`MapCell`** `{height, above, cover, on_a_mesh_line}` a
+answered as 0. **`MapAsk`** `{world, first_cell_cartesian, step, size_in_pixels, mesh_lines_asked}`: a
+map, a pixel the cell in its middle; **`MapAnswer`** `{map_ask, drawn_heights,
+cells}`, a **`MapCell`** `{height, height_above, cell_cover, on_a_mesh_line}` a
 pixel, none past the world's edges.
 **`TerrainAsker`**: where a client asks, a handle to clone --
 **`heights(heights_ask)`**, **`map(map_ask)`**, each waiting for its answer on the
@@ -324,10 +324,10 @@ plane's width, tile size and most, off its type in the registry --
 (the plane's buckets as the arena holds them, empty where a
 superchunk has no cloud),
 **`cell_of_bit(bit_index)`** -- how a frame's bits lie, so a client asks no
-one else. `DEEP_WATER_DEPTH` (16). **`Viewport`** `{first_cell_cartesian, last}`: what the
+one else. `DEEP_WATER_DEPTH` (16). `Viewport` (the simulation's, handed on) `{top_left_superchunk_cartesian, bottom_right_superchunk_cartesian}`: what the
 renderer should render, in superchunks -- not Bevy's camera viewport,
-a rectangle of the window -- **`contains(superchunk_cartesian)`**. **`FrameAsk`** `{viewport,
-detail, skip, most, near}`: what a frame is to carry, `viewport` `None`
+a rectangle of the window -- with `contains`. **`FrameAsk`** `{viewport,
+pixel_side_log2, superchunks_skipped, most_superchunks, seen_near}`: what a frame is to carry, `viewport` `None`
 when the client renders none of the world's cells (map mode); `superchunks_skipped`
 and `most_superchunks` count the viewport's hot superchunks. **`hot_in(world,
 viewport)`**: those, row by row.
@@ -336,9 +336,8 @@ viewport)`**: those, row by row.
 stages where a cell is a pixel or more, its water (a `Water`, shared,
 not copied again) -- its heights the first frame it is hot in, its
 sheep's cells. **`height_in_frame(height_words, place)`**: a cell's
-height from those words. **`ViewportFrame`** `{world, seed, generation, levels, side, tick,
-ticks_a_second, sheep, grass, trees, sync_seconds, sync_share,
-viewport, hot, detail, near, named, said, more, cells}`: `world` counts the
+height from those words. **`ViewportFrame`** `{world, seed, world_generation, drawn_heights, side_superchunks, tick,
+ticks_a_second, sheep_count, grass_cells, trees, sync_seconds, sync_share, viewport, hot, pixel_side_log2, seen_near, world_name, last_outcome, more_to_come, cells}`: `world` counts the
 worlds the host has run, so a client knows what it drew is of another;
 `hot`, every hot superchunk of the viewport, so a client knows what it
 drew there of any other has gone cold; `more_to_come`, whether frames of the

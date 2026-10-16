@@ -12,7 +12,7 @@ cell `(x, y)` at bit `x` of row `y`. **`Cell`** `{x, y}`, privately `area_index(
 distances across and down.
 
 **`Wave::from_goals(goal_rows)`**: a search with the goals alone reached;
-**`reached`**; **`spread_one_step(passable, walls)`**: every passable neighbour of a
+**`reached_rows`**; **`spread_one_step(passable, walls)`**: every passable neighbour of a
 reached cell that may step onto it reached (**`spread_back`**), whether any was.
 
 **`step_towards(passable, walls, goal_rows, from_cell, pick_number)`**: waves from every goal

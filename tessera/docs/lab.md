@@ -17,7 +17,7 @@ grown again whenever asked for; nothing is stored.
 
 **`GrownShape`**, **`GROWN_SHAPES`**, **`SPARSE_SHAPES`**: a grown shape -- a density and
 a clustering -- with how many bitmaps a timed run and a test take.
-**`take(count)`**, **`timed()`**, **`tested()`**: that many bitmaps,
+**`take_bitmaps(count)`**, **`timed_bitmaps()`**, **`tested_bitmaps()`**: that many bitmaps,
 from consecutive seeds starting at the run's.
 
 **`grown_bitmaps(seed, cell_density, cluster_weight, count)`**, **`one_grown`**:
@@ -39,7 +39,7 @@ paying, so densities near 1 finish).
 **`city::CityPlan`**, **`CITY_PLANS`**, **`one_laid_out(seed, city_plan)`**: streets
 on a pitch, blocks between them, courtyards cut out of blocks, some
 blocks left as parks; the grid starts at a random offset, so blocks do
-not land on tile corners. **`block`**: one block, filled, its
+not land on tile corners (a block **`block_side()`** cells a side). **`lay_out_block`**: one block, filled, its
 courtyards cut at random places inside it.
 
 **`city::CityBitmaps`** and **`lines::LineDrawings`**: a run of cities, and of
@@ -70,10 +70,10 @@ runs have used it.
   tests, which run too often to count.
 - **`seed_in_use()`**: the seed this run settled on, if any corpus bitmap was
   asked for, and whether it was fresh: what a measurement notes.
-- **`settled`**, **`settle`**: settle the seed once a run
+- `utilities::seed`'s `settled_once` and `settle_seed` settle the seed once a run
   (`OnceLock`), print a one-row table on standard error saying which
   seed, which use and from where, and rewrite the file.
-- **`fresh_seed()`**: from the process's own randomness (the standard
+- and its `fresh_seed()` draws one from the process's own randomness (the standard
   library's hasher keys).
 
 **Private to the files.** `GUESSES_BEFORE_SCANNING`
@@ -91,11 +91,11 @@ differ. **`tree_of(bitmap)`**: the tree a fresh `Tessera` makes.
 
 **`measured::MeasuredBitmaps::measure_bitmaps(tessera, bitmaps)`**: bits, cells set, the
 fewest and most bits, encode time, and the bitmaps that did not round
-trip, over many. **`add`**: sums two, dropping the other's lost ones.
+trip, over many. **`add_measured`**: sums two, dropping the other's lost ones.
 
 **`tree_stats::TreeStats::measure_tree(tree)`**: what a tree holds -- plain
 tiles, complex tiles and their payload values, copies naming children,
-flipping divides, cell lists -- walked from the top.
+flipping divides, cell lists -- walked from the top; **`add_counts(other_stats)`** sums two.
 
 **`census::census(tree)`**: node kinds by level, walked from the top,
 so stale nodes are not counted. **`node_kind_name`**: a node's name as
@@ -135,7 +135,7 @@ stored deflate block holds.
 
 **`whole_search(seed, worst, search_effort, score_bitmap)`**: two stages, each the best
 of several annealed starts (`best_of`). First a 64x64 window in an
-otherwise clear bitmap, from clear and from noise. Then the whole
+otherwise clear bitmap, from clear and from noise (`noisy_area`). Then the whole
 plane, from the window's best filled into the plane, from noise, and
 from the worst bitmap, if any.
 
@@ -161,7 +161,7 @@ one plus the times it has raised the score.
 **`moves.rs`**: the changes, each confined to the area, each a
 **`ChangeKind`** -- a function of the random source, the bitmap and the
 area:
-- **`flip_a_cell`**, **`flip_a_tile`**: one cell, or every cell of a
+- **`flip_a_cell`**, **`flip_a_tile`**: one cell (**`flip_cell(bitmap, x, y)`**), or every cell of a
   random tile inside the area;
 - **`paint_a_rectangle`**: set or clear a rectangle at any offset and
   size, so its edges cut tiles;
@@ -211,7 +211,8 @@ and keeps it as `measurements/<tool>.csv`, replacing the last.
 **`run_adversarial_tool`**: the search against the raw cells: `search_at_once` scoring
 each bitmap by **`score_against_raw`** -- Tessera's bits less the raw cells of the
 area searched, not Tessera's bits alone, which noise maximizes for any
-encoder. Keeps the worst plane if it beats the worst kept, checks the
+encoder; `CHANGES_PARAMETER` its parameter, how many changes each
+search tries on the whole plane from each start. Keeps the worst plane if it beats the worst kept, checks the
 worst bitmap round trips, and publishes what each search found.
 The parameters of `save`, by name: `FROM_PARAMETER` (the worst bitmap saved),
 `NAME_PARAMETER` (what it is saved as), `DESCRIPTION_PARAMETER` (a line describing it).
@@ -226,16 +227,17 @@ under.
 **`COMMANDS`**: every tool -- its name, what it takes and what it
 prints -- run by name through `utilities::commands` (`Civil_Egregore tessera
 <tool>`); with no name, the list. A tool that
-measures is given a `Report` and published with the run's seed.
+measures is given a `Report` and published with the run's seed
+(**`run_measuring_tool(given_parameters, fill_report)`**).
 
 - **`measurement::run_measurement_tool`**: a table a corpus generator, a row a parameter
-  set (`generator_table`, `row`), the saved adversarial bitmaps, then
+  set (`generator_table`, `measured_row`; `percent_of`), the saved adversarial bitmaps, then
   what the trees hold, family by family (`add_structure`): binary
   count tree streams, complex tiles, payload values, plain tiles,
   copies naming children, flipping divides, cell lists.
 - **`census::run_census_tool`**: the census of every bitmap looked at.
 - **`per_shape::run_per_shape_tool`**: bits on every shape, plan and line set alone.
-- **`noisy_area::run`**: bits on noise at several densities against the raw
+- **`noise::run_noise_tool`**: bits on noise at several densities against the raw
   cells.
 - **`sparse::run_sparse_tool`**: on sparse bitmaps, scattered and clustered,
   density by density: the tree's bits and the binary count tree's
@@ -244,7 +246,8 @@ measures is given a `Report` and published with the run's seed.
   (`placements_bits`), the least any encoding averages on scattered
   cells.
 - **`timing::run_timing_tool`**: encode and decode wall time over a large corpus,
-  every bitmap built before any is timed; `PER_GENERATOR` its one
+  every bitmap built before any is timed (`time_family`, a row of it
+  `timing_row`); `PER_GENERATOR` its one
   parameter, the bitmaps grown from each generator.
 - **`instruction_count::run_instruction_count_tool`**: runs this tool's `instruction_corpus`
   (`CORPUS_TOOL`, the tool that runs the corpus alone for callgrind)

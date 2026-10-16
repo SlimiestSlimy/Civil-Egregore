@@ -10,7 +10,7 @@ use entity_manager::{WorldEntities, EntityType};
 pub enum Hot {
     /// Every entity of the kind `entity` keeps its halo hot -- and, if
     /// `viewport`, the viewport's superchunks too -- in a world of
-    /// `side` superchunks a side, or as far as coordinates reach.
+    /// `world_side_superchunks` superchunks a side, or as far as coordinates reach.
     AboutHotEntities {
         /// The hot entity.
         entity: EntityType,
@@ -19,7 +19,7 @@ pub enum Hot {
         /// Whether the viewport's superchunks are hot too.
         viewport: bool,
     },
-    /// Every superchunk of a world `side` superchunks along a side is
+    /// Every superchunk of a world `world_side_superchunks` superchunks along a side is
     /// hot, whatever its entities do: a fixed load. Only a world of a
     /// size can be forced: one of none has no end to be hot to.
     Forced {

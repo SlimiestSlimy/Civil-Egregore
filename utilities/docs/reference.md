@@ -42,7 +42,7 @@ The one seed every seeded run starts from, kept in the workspace's
 `transient_data/seed.csv` (**`seed_file()`**; `SEED_FILE_NAME` its name) with how many
 runs have used it. `SEED_VARIABLE`: `CIVIL_EGREGORE_SEED`, the environment
 variable that picks a seed for one run and leaves the file alone --
-a number in hexadecimal, or `FRESH_SEED_VALUE` (`is_fresh`) for one drawn.
+a number in hexadecimal, or `FRESH_SEED_VALUE` (`fresh`) for one drawn.
 `USES_BEFORE_THE_SEED_ROLLS` (5): the runs a seed serves before the
 next run rolls another.
 

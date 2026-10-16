@@ -272,8 +272,8 @@ mod tests {
         let mut differing_lines = 0;
         for cells_along in 0..SUPERCHUNK_CELLS_A_SIDE as isize {
             for cells_off in 0..KEPT_MARGIN_CELLS as isize {
-                differing_lines += (origin_ground.line(SUPERCHUNK_CELLS_A_SIDE as isize + cells_off, cells_along) != beside_ground.line(cells_off, cells_along)) as usize;
-                differing_lines += (origin_ground.line(cells_along, SUPERCHUNK_CELLS_A_SIDE as isize + cells_off) != below_ground.line(cells_along, cells_off)) as usize;
+                differing_lines += (origin_ground.shadow_line(SUPERCHUNK_CELLS_A_SIDE as isize + cells_off, cells_along) != beside_ground.shadow_line(cells_off, cells_along)) as usize;
+                differing_lines += (origin_ground.shadow_line(cells_along, SUPERCHUNK_CELLS_A_SIDE as isize + cells_off) != below_ground.shadow_line(cells_along, cells_off)) as usize;
             }
         }
         assert_eq!(differing_lines, 0, "shadow lines unlike over an edge");
@@ -281,7 +281,7 @@ mod tests {
         let image = world.chunk_storage().image(coordinates::WORLD_MIDDLE).expect("the origin's image");
         let brought_ground = fine_ground_at((origin_left, origin_top), &[((origin_left, origin_top), image.height_words())].into_iter().collect());
         let cells = || (0..SUPERCHUNK_CELLS_A_SIDE as isize).flat_map(|y| (0..SUPERCHUNK_CELLS_A_SIDE as isize).map(move |x| (x, y)));
-        assert!(cells().all(|(x, y)| brought_ground.height(x, y) == origin_ground.height(x, y) && brought_ground.line(x, y) == origin_ground.line(x, y)), "heights brought unlike those asked for");
+        assert!(cells().all(|(x, y)| brought_ground.height(x, y) == origin_ground.height(x, y) && brought_ground.shadow_line(x, y) == origin_ground.shadow_line(x, y)), "heights brought unlike those asked for");
         // Asked of a world the host does not run: no answer, and a ground flat at the ocean's level.
         assert!(heights(&terrain, first_frame.world + 1, (origin_left, origin_top), &GivenHeights::new()).is_none());
     }

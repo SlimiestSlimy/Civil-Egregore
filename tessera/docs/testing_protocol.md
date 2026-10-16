@@ -63,8 +63,8 @@ Three parts, kept apart:
 | tier | runs on | command |
 |---|---|---|
 | fine | one bitmap per test: drawn by hand, or grown from the seed, not counted as a use; and every adversarial worst bitmap and saved bitmap | `cargo test --test fine` |
-| fast | a small corpus from the seed: every shape, sparse shape, plan and line set at its `tested` count; and every family and the saved adversarial bitmaps turned a quarter, a half and three quarters, each turn's total bits within 5% of the total as drawn | `cargo test --test fast` |
-| complete | every family at its `timed` count, plus a second corpus of 4 bitmaps of each shape and plan from the seed plus a million, plus every checkerboard of odd square side 3 to 31; and every family and the saved adversarial bitmaps turned each way, within 2% | `cargo test --release --test complete -- --ignored` |
+| fast | a small corpus from the seed: every shape, sparse shape, plan and line set at its `tested_count`; and every family and the saved adversarial bitmaps turned a quarter, a half and three quarters, each turn's total bits within 5% of the total as drawn | `cargo test --test fast` |
+| complete | every family at its `timed_count`, plus a second corpus of 4 bitmaps of each shape and plan from the seed plus a million, plus every checkerboard of odd square side 3 to 31; and every family and the saved adversarial bitmaps turned each way, within 2% | `cargo test --release --test complete -- --ignored` |
 
 Plain `cargo test` runs fine and fast, and the unit tests of the
 library's private internals (`tests/unit/`, compiled into the library
@@ -102,7 +102,7 @@ cargo run --release -- tessera <tool> [<argument>]
 | `measurement` | one table a corpus generator (grown, city, lines, checkerboard, and the saved adversarial bitmaps), a row a parameter set with its parameters, bitmaps, cells set, Tessera's mean, fewest and most bits, share of the raw cells and encode time; then what the trees hold, family by family | |
 | `census` | node kinds by level, for each bitmap looked at | |
 | `per_shape` | Tessera's bits on every shape, plan and line set | |
-| `noisy_area` | Tessera's bits on noise at several densities, against the raw cells | |
+| `noise` | Tessera's bits on noise at several densities, against the raw cells | |
 | `sparse` | the tree against the binary count tree on sparse bitmaps, density by density, scattered and clustered, beside the least scattered cells can take | |
 | `timing` | encode and decode times over a large corpus, family by family | bitmaps a generator (100) |
 | `instruction_count` | instructions to encode and to decode a corpus, counted by callgrind | |
@@ -260,7 +260,7 @@ Each is set, beside its reason, at the place given.
 | parameter | value | where |
 |---|---|---|
 | runs a seed serves before it rolls | 5 | `USES_BEFORE_THE_SEED_ROLLS`, `utilities/src/seed.rs` (handed on by `src/corpus/seed.rs`) |
-| each generator's `tested` and `timed` bitmaps | per shape, sparse shape, plan and line set | `GROWN_SHAPES`, `SPARSE_SHAPES` (`src/corpus/mod.rs`), `CITY_PLANS` (`city.rs`), `LINE_SETS` (`lines.rs`) |
+| each generator's `tested_count` and `timed_count` bitmaps | per shape, sparse shape, plan and line set | `GROWN_SHAPES`, `SPARSE_SHAPES` (`src/corpus/mod.rs`), `CITY_PLANS` (`city.rs`), `LINE_SETS` (`lines.rs`) |
 | the most any bitmap may take, every tier | the raw cells and 1% | `CAP_BITS`, `tests/tests.rs` |
 | a turned family's drift, fast tier | 5% | `MOST_TURNED_DRIFT_PERCENT`, `tests/fast.rs` |
 | a turned family's drift, complete tier | 2% | `MOST_TURNED_DRIFT_PERCENT`, `tests/complete.rs` |
@@ -270,7 +270,7 @@ Each is set, beside its reason, at the place given.
 | timing's saved adversarial repeats | 20 | `SAVED_REPEATS`, `src/diagnostics/tool/timing.rs` |
 | timing's percentiles | median, 90th | `MEDIAN_PERCENT`, `TAIL_PERCENT`, same file |
 | the instruction count's corpus | 5 bitmaps a generator, 1 of noise at half density, a checkerboard of 7-cell squares | `BITMAPS_PER_GENERATOR`, `NOISE_BITMAPS`, `NOISE_DENSITY`, `CHECKERBOARD_SQUARE`, `src/diagnostics/tool/instruction_count.rs` |
-| `noisy_area`'s densities | 0.5, 0.35, 0.2, 0.1, 3 bitmaps each | `NOISE_DENSITIES`, `BITMAPS_PER_DENSITY`, `src/diagnostics/tool/noise.rs` |
+| `noise`'s densities | 0.5, 0.35, 0.2, 0.1, 3 bitmaps each | `NOISE_DENSITIES`, `BITMAPS_PER_DENSITY`, `src/diagnostics/tool/noise.rs` |
 | `sparse`'s densities and clusterings | 15 densities, clustering 0, 0.7, 0.95, 20 bitmaps each | `SPARSE_DENSITIES`, `CLUSTER_WEIGHTS`, `BITMAPS_PER_CASE`, `src/diagnostics/tool/sparse.rs` |
 | `render`'s pixels a cell | 2 | `PIXELS_A_CELL`, `src/diagnostics/png.rs` |
 | searches at once | 4 | `SEARCHES_AT_ONCE`, `src/diagnostics/adversarial/mod.rs` |

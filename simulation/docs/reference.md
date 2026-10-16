@@ -4,7 +4,7 @@ The design is in `simulation.md`.
 
 ## `sampling.rs`
 
-**`select_set_bit(word, set_bit_rank)`**: the `rank`-th set bit's position.
+**`select_set_bit(word, set_bit_rank)`**: the `set_bit_rank`-th set bit's position.
 **`sample_layer(superchunk, layer, chance, random_stream, emit_sample)`**: one
 superchunk's layer's chosen cells, in Morton order -- the set cells
 passed over before each drawn by `Chance::passed_over` from one draw,
@@ -25,13 +25,13 @@ instruction; `conditional.rs` the compares and the queue;
 applied. What a rule makes of them is `../../actions/`.
 
 **`Outbox`**: nine queues (`instruction_queues`, a `InstructionQueue` each), by **`slot_toward(dx,
-dy)`**, and for each where every author's part begins (`segments`, a
+dy)`**, and for each where every author's part begins (`author_segments`, a
 **`AuthorSegment`** `{author, instructions, first_compare}` each).
 
 **`Turn`**: a superchunk's turn in the first phase:
-**`superchunk`**, **`random`**, **`now`**, **`each_sampled(type, chance,
+**`superchunk`**, **`random_stream`**, **`current_tick`**, **`each_sampled(type, chance,
 counts, rule)`**: `rule` run on_cell each of its own set cells chosen, with what it counts -- how many; **`each_tile_sampled(type, chance, counts, rule)`** on_cell the tiles of a plane of tiles; `each_of(samples, counts, rule)`, the going over, and `samples`, the room kept for them. Cells read, anywhere hot, as the tick
-found them: **`holds(type, cell)`**, **`value(wide_plane, cell)`** (a wide
+found them: **`layer_holds(layer_type, cell)`**, **`value(wide_plane, cell)`** (a wide
 plane's number), **`window(type, origin, width, height)`** (up to 8x8
 cells as a `Window`), **`windows(layer_types, ...)`** (of several types at
 once), **`small_tiles(layer_types, first_tile_cell, wanted_cells)`** (four aligned small
@@ -72,14 +72,14 @@ over a border (`ACROSS_QUEUE`, the outbox's tenth) once the author's act is
 one, which it becomes here at the first thing queued for a second
 superchunk, whatever it is (`AuthorBegan`: the slot the author began
 in and what its queue held before; `landed_last`, the superchunk, queue and slot of the author's last instruction, so the next for the same superchunk looks nothing up, `NO_SUPERCHUNK` until it queues; `go_across`: all the author
-queued moved there, `AcrossAct` `{lands, arrived_count}` kept beside its
+queued moved there, `AcrossAct` `{lands_in_slots, arrived_count}` kept beside its
 segment; `simulation.md`,
 "An act over a border"); `slot_home`: the slot of the outbox's own
 superchunk. **`seeing_to(author_cell)`**: the rule is seeing to
 what is on a cell -- the `author` of what it queues from here on
 (`simulation.md`, "One order, wherever the borders fall").
 `SLOTS` (9): an outbox's slots. A turn's fields: its `superchunk`, its
-`entities`, `now`, the thread's `bitmap_reader` and `entity_reader`, its
+`superchunk_entities`, `current_tick`, the thread's `bitmap_reader` and `entity_reader`, its
 `outbox`, its `random`, the compare its instructions are queued
 under (`is_comparing`, whether there is one) and the number its counts are `counted_from`.
 `slot_between(from_superchunk, to_superchunk)`: the slot of one superchunk in another's
@@ -104,7 +104,7 @@ attribute by its whole ID, the member by its first byte and how many
 bytes it is, in `member_operand`), `write_attribute` (an attribute whole, its
 blocks carried), `remove_attribute`, `write_wake` -- over `on_cell` (an
 opcode on a cell). Read back: `cell_in(superchunk)` its cell,
-`to(superchunk)` the cell its first word is the place of,
+`destination_cell(superchunk)` the cell its first word is the place of,
 `member()`, `is_a_compare()`, `is_a_write()`; `landing_in(slot)` and
 `outbox_slot()`: the outbox slot of the superchunk it lands in, four bits of
 `place`; `carried_moved_by(carried_shift)`: the same with what it carries
@@ -122,7 +122,7 @@ were seen, their sum.
 **`Turn::compare_from_here(gating_compare)`**: from here on what the rule
 queues, for whichever superchunk, is skipped if the compare does
 not hold when come to; **`Turn::compare_end()`**: no more.
-`queue(landing_cell, instruction)`: one queued -- a write under no compare
+`queue_instruction(landing_cell, instruction)`: one queued -- a write under no compare
 panics; `compare_open(opened_compare)`,
 `compare_close()`: a compare queued and pushed on the turn's stack of
 compares open (`CompareOpen`, `NONE_OPEN` an empty one), one within another up to `COMPARES_WITHIN` (4), and
@@ -133,13 +133,15 @@ compares_within, writes}`, 8 bytes a compare).
 the rule's first count is counted under; `counted_number(place)`: a
 count's number, under `COUNTED_WHEN_APPLIED` (256) --
 **`CountedWhenApplied`**, a tick's counts made as it applied.
-`InstructionQueue` `{instructions, gated, carried}`: what is queued for one
-superchunk, and the blocks its attributes given whole carry -- `clear`.
+`InstructionQueue` `{instructions, gated_by_compares, carried_blocks}`: what is queued for one
+superchunk, and the blocks its attributes given whole carry -- `clear`;
+`Turn::carry_blocks(landing_cell, attribute_blocks)` carries them beside
+the queue an instruction landing there goes to.
 
 `apply.rs`: `InstructionQueue::apply(segment_range, compare_index,
 instruction_landing, earliest_wake, collision_plane, part_applied)`: one author's instructions in the
 order queued, each by its opcode, a compare that does not hold
-(`holds`) jumping over what is under it -- a cell not free counted as
+(`compare_holds`) jumping over what is under it -- a cell not free counted as
 an entity refused -- the entities' collision plane lent as a
 **`SuperchunkCollisionPlane`** `{superchunk, layer}` (its `write`);
 `InstructionQueue::count_missed`: writes of cells missed and entities lost, of a
@@ -148,14 +150,14 @@ second phase.
 
 ## `hot.rs`
 
-**`Hot`**: `AboutHotEntities {entity, side, viewport}` -- every entity of the kind
-keeps its halo hot, in a world of `side` superchunks a side if it has
+**`Hot`**: `AboutHotEntities {entity, world_side_superchunks, viewport}` -- every entity of the kind
+keeps its halo hot, in a world of `world_side_superchunks` superchunks a side if it has
 one, and if `viewport` every superchunk of the viewport too, however
-many -- or `Forced {side}`: every superchunk of a world of that side hot,
+many -- or `Forced {world_side_superchunks}`: every superchunk of a world of that side hot,
 whatever its entities do; only a world with a side can be forced.
 **`about_entity(entity)`**: a world of no size, about `entity`;
 **`viewport()`**: whether the viewport's superchunks are hot too;
-**`side()`**, **`world_span_cartesian()`**, **`is_within_world(superchunk)`**, **`all_superchunks()`**:
+**`world_side_superchunks()`**, **`world_span_cartesian()`**, **`is_within_world(superchunk)`**, **`all_superchunks()`**:
 every superchunk of a world with a side, none of one without;
 **`wanted_hot_superchunks(entity_store)`**: the superchunks to be hot. **`halos_about(halo_middles)`**: the 3x3
 superchunks about each, sorted, each once.
@@ -169,9 +171,9 @@ The halos' own methods lie in two files under it: `halos/warming.rs`
 `page_out_unheld`).
 
 **`Viewport`** `{top_left_superchunk_cartesian, bottom_right_superchunk_cartesian}`: what a renderer renders, in
-superchunks; **`contains(at)`**. **`LentWorld`** `{arena, storage, entities, simulation, cold, layers,
-generate}`: the world's, lent for a call. **`Halos`** `{hot, jobs,
-warming, cooling, writing_back, flushing, told, viewport, generated}`
+superchunks; **`contains(at)`**. **`LentWorld`** `{bitmap_arena, chunk_storage, entity_store, world_simulation, cold, layers,
+generate_superchunk}`: the world's, lent for a call. **`Halos`** `{hot, jobs,
+warming, cooling, writing_back, flushing_superchunks, last_told_viewport, viewport, generated_superchunks}`
 -- `last_told_viewport` the viewport last given, `viewport` its superchunks --, **`new(hot,
 dispatcher)`**, **`restore_cooling(cooling)`**.
 **`Halos::keep_viewport(viewport)`**: the viewport's superchunks --
@@ -182,7 +184,7 @@ the world's hot has its viewport's superchunks hot;
 the last move or `keep_hot` generated -- made new by a job, not read
 back -- sorted. `WARM_TICKS`: the ticks a superchunk is warming;
 `COOL_TICKS`: the ticks one is cooling -- a second of the simulation each.
-**`HaloChange`** `{superchunks_reached, generated, superchunks_restored, superchunks_cooled}`, added with
+**`HaloChange`** `{superchunks_reached, superchunks_generated, superchunks_restored, superchunks_cooled}`, added with
 `+=`. **`Warming`** `{superchunk, due_tick, warmed_from}`, from a
 **`WarmedFrom`**: `Lingering`, or `Job(ticket)`.
 **`Halos::move_to_hot_entities`**: the halos, and the superchunks in
@@ -234,8 +236,8 @@ many, or the disk's refusal.
 ## `tick.rs`
 
 **`TickReport`** `{writes_applied, instructions_applied,
-instructions_compared, counted_when_applied, rules, computing,
-applying, acts_over_a_border}` -- `instructions_compared` the compares come to that held,
+instructions_compared, counted_when_applied, rules, computing_time,
+applying_time, acts_over_a_border}` -- `instructions_compared` the compares come to that held,
 and those that did not; `acts_over_a_border` the authors whose
 instructions were applied to several superchunks at once.
 
@@ -281,14 +283,14 @@ be waiting for. `tick/applying/following.rs` (`simulation.md`, "An entity over a
 an entity to where it stands by then, made by
 `EntityFollowing::of_what_was_queued(outboxes)`: `named_by_others`, the
 entities others named, with those authors (`nobody_named_another`:
-none were); `RepointedSegment` `{also, arrived}`, what became of a segment
+none were); `RepointedSegment` `{also_lands_in, arrived_count}`, what became of a segment
 naming an entity that crossed, kept in `repointed_segments` and asked with
 `repointed_of(source_arena_index, from_slot, segment_number)` once `any_repointed`;
 `Phase::have_follow(crossed_entities, locked_applying)`: as a crossing is applied, the later
 segments naming the entity re-pointed in the orders held.
 
 `tick/applying/who_goes_on.rs`: which thread goes on with which
-superchunk. `LetGoOn` `{superchunk_list, lying}`: superchunks let go on after an
+superchunk. `LetGoOn` `{superchunk_list, lying_count}`: superchunks let go on after an
 act, a thread's or anyone's -- `put`, `pop`, `take_up_lying` (one no thread
 took up first), `empty_out`. On `Phase`: `next_for(part)`, a thread's next
 superchunk -- its own kept, one not begun (`take_unbegun`), anyone's
@@ -303,9 +305,9 @@ In `turn/landing.rs`: `InstructionLanding`, where instructions land as they are
 applied (`LANDS_IN_SEVERAL`: whether in several superchunks, known as the code is built, so a slot's queue asks nothing of crossings; `of_slot(slot)`: a slot's superchunk and entities, if hot;
 `of_named(instruction)`: where the entity it names stands now;
 `of_crossing(instruction)`: the two superchunks of a crossing;
-`crossed(stood_cell, to_cell)`: one noted) -- `Held`, a superchunk and its
+`note_crossed(stood, to)`: one noted) -- `SuperchunkAndEntities`, a superchunk and its
 entities; `LandingInOne`, a slot's queue, and `LandingInSeveral`
-`{source_superchunk, lands, also, crossed}`, an act over a border. In `turn/apply.rs`:
+`{source_superchunk, slot_superchunks, also_superchunks, crossed_entities}`, an act over a border. In `turn/apply.rs`:
 `InstructionQueue::jump_over`: over all under a compare that does not
 hold; `InstructionQueue::names_alone(segment_range, stood_cell)`: whether a segment is of one
 entity alone. `Instruction::names_an_entity`: whether an instruction
@@ -324,7 +326,7 @@ simulation time, kept as its ticks: **`from_seconds(simulation_seconds)`**,
 **`part_drawn(random_stream)`** a shorter time drawn, any tick of it as
 likely, **`chance_a_tick`** the chance each tick of a thing that
 takes so long on average, **`chance_each(mean_time_between)`** its chance each
-time something happens that happens once in `every` on average.
+time something happens that happens once in `mean_time_between` on average.
 
 ## `transient_data.rs`
 

@@ -363,7 +363,7 @@ them back.
 | `measurement.csv` | `cargo run --release -- tessera measurement` | bits a bitmap by generator, checkerboards, saved adversarial bitmaps; what the trees hold |
 | `census.csv` | `... -- census` | node kinds by level, for each bitmap looked at |
 | `per_shape.csv` | `... -- per_shape` | bits a bitmap and a cell set, shape by shape |
-| `noise.csv` | `... -- noisy_area` | bits on noise at several densities |
+| `noise.csv` | `... -- noise` | bits on noise at several densities |
 | `timing.csv` | `... -- timing` | encode and decode times, family by family |
 | `instruction_count.csv` | `... -- instruction_count` | instructions to encode and decode a corpus, by callgrind |
 | `sparse.csv` | `... -- sparse` | the tree against the binary count tree on sparse bitmaps |

@@ -25,7 +25,7 @@ read as, so a read needs no branch on whether there is one.
 **`SuperchunkLayer`**: an allocation, one layer type over one
 superchunk -- its owned block, flags, counts less one, count tiles'
 counts, hot count. **`count`** / **`set_count`** a bucket's set cells;
-**`cells`** a bucket of a bit a cell as a bitmap's words, **`words`** / **`words_mut`** a bucket's words at any width; **`get`** a cell by
+**`cells`** a bucket of a bit a cell as a bitmap's words, **`words`** a bucket's words at any width; **`get`** a cell by
 Morton index; **`value`** and **`put_value`** the number of a wide layer's cell, read and put whole; **`put_cell`** a cell set or clear if not already, the
 bucket dirty and the counts moved by one: whether it changed.
 `bucket_offset(chunk, words)`: where a chunk's bucket starts, if it
@@ -41,8 +41,8 @@ known from its type.
 
 ## `superchunk.rs`
 
-**`Superchunk`** `{index, layers, on_their_way}`: one superchunk,
-owning its allocations, and its write-backs taken not yet in the ring. **`index`**, **`layer(type)`** -- a
+**`Superchunk`** `{superchunk_index, layers, on_their_way}`: one superchunk,
+owning its allocations, and its write-backs taken not yet in the ring. **`superchunk_index`**, **`layer(type)`** -- a
 **`LayerView`** (**`hot_count`**, **`is_hot(chunk)`**,
 **`count(chunk)`**, **`cells(chunk)`**, **`tile_counts(chunk)`** -- the
 set cells of each of its `COUNT_TILES_IN_CHUNK` count tiles of
@@ -165,6 +165,6 @@ buckets kept and their bytes.
 ## `transient_data.rs`
 
 `TRANSIENT_DATA`: the crate's `transient_data/` folder.
-**`measurements()`**, **`publish(report)`**: as in every crate.
+`TRANSIENT_DATA`, its **`measurements_folder()`** and **`publish_report(report)`** (`utilities::transient_data::TransientData`): as in every crate.
 
 Wide planes: **`CellReader::value(wide_plane, cell)`** and **`BitmapArena::value`** read a cell's number; **`Write::value(wide_plane, anchor_cell, value)`** puts one (`WriteOp::Put`); **`Bucket::words()`** is a bucket's words at any width. `take_dirty` and `make_hot_cells` carry a bucket as a bitmap's words times its bits a cell; `written_back` takes a wide layer's planes' keys.

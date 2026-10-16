@@ -12,7 +12,7 @@ hold. `type_id(type_kind, type_number, size_byte)` makes an ID; `number_of`,
 `size_of`, `is_of` read one.
 **`LayerType(u64)`**: what a layer represents; **`of_a_bit(type_number)`** a
 layer, a bit a cell; **`of_width(first_number, width_bits)`** a
-type of 2, 4, 8, 16 or 32 bits a cell, **`width_bits`** how many, its last byte, **`number`** its first, **`bitplane_of(bit_index)`**
+type of 2, 4, 8, 16 or 32 bits a cell, **`width_bits`** how many, its last byte, **`type_number`** its first, **`bitplane_of(bit_index)`**
 and **`each_bitplane`** the layers of a bit a cell it is kept cold as,
 **`holds_bitplane(asked_bitplane)`** whether one is its own. **`Width`**: a plane's width
 as a type, `BITS` bits a cell -- **`Bits2`**, **`Bits4`**, **`Bits8`**, **`Bits16`**, **`Bits32`**.
@@ -23,21 +23,21 @@ takes); **`tile_scale()`**, **`tile_side()`**, **`tile_shift()`** --
 the places a cell's place is shifted by to give its tile's.
 **`WidePlane<W>`**: a wide plane, its width in its type: **`new(first_number)`**, **`of_tiles(first_number, tile_scale)`**,
 **`layer_type`**, **`most_value`** the most a cell of it holds.
-**`EntityType(u64)`**: an entity's type: **`from_number(type_number)`**, **`number`**. **`ScaRuleType(u64)`**, **`EntityRuleType(u64)`**: a rule of the cells, a rule of an entity: **`from_number(type_number)`**, **`number`**. **`AttributeType(u64)`**: an
+**`EntityType(u64)`**: an entity's type: **`from_number(type_number)`**, **`type_number`**. **`ScaRuleType(u64)`**, **`EntityRuleType(u64)`**: a rule of the cells, a rule of an entity: **`from_number(type_number)`**, **`type_number`**. **`AttributeType(u64)`**: an
 attribute's, its last four bits (`ATTRIBUTE_SIZE_BITS`) how many
 blocks one takes, less one, its number the 52 bits before
 (`ATTRIBUTE_NUMBERS`): **`of_blocks(type_number, block_count)`**,
 **`of_varying_size(type_number)`** (the four bits 0, each attribute of it
 saying its own: **`with_blocks(block_count)`**), **`block_count`**,
 **`type_identity`** (all but those bits: what tells types apart),
-**`is_an_attributes`**, **`number`**.
+**`is_an_attributes`**, **`type_number`**.
 
 ## `layouts.rs`
 
 `type_registry.md`, "Layouts". `BLOCK_WORDS` (2): the words of an
 attribute block, `BLOCK_BYTES` its bytes; `ATTRIBUTE_BLOCKS_MOST` (16) and `ATTRIBUTE_WORDS_MOST`: the most an attribute is; **`data_words(block_count)`**: the words of data so many
 blocks hold. **`Layout`**: how an attribute's data is laid out --
-`WORDS`, `BLOCK_COUNT`, `MEMBERS`, **`write(attribute_data)`**, **`read(attribute_data)`** -- had by `u64`, one
+`WORDS`, `BLOCK_COUNT`, `MEMBERS`, **`write(attribute_data)`**, **`read_data(attribute_data)`** -- had by `u64`, one
 number in the first word, and by **`SheepState`** `{hungry_at,
 lamb_due_at, grown_at, roaming_until, roaming_neighbour}`, a
 word each in that order; a tick of 0 none. **`Attribute<L>`**: an attribute, its
@@ -52,6 +52,7 @@ numbers it takes from `type_number` on, **`layer_type`** its layer type if it is
 the cells. `layer`, `wide_plane`, `entity`, `attribute`, `sca_rule`, `entity_rule`: a row made from its constant. **`REGISTRY`**: the table, written by hand. The constants:
 `GRASS`, `TREE`, `TREE_STAGE`, `WALL_EAST`, `WALL_SOUTH`, `COLLISION`, `WALL_NORTH`, `WALL_WEST` (a wall is before a cell's step one way, kept by that cell: four layers), `WET`, the
 cells'; `CLOUD` and `CLIMATE`, the weather's, a number a tile 8x8 (`WEATHER_TILE_SCALE`); `SHEEP`, the entity; `SHEEP_STATE`, its one attribute, three blocks; `RULE_OF_GRASS`, `RULE_OF_TREES`, the cells' rules, `RULE_OF_SHEEP`, the entity's, `RULE_OF_WEATHER`, the weather's, its master the climate; **`OLDEST_TREE_STAGE`**, the most a tree's stage holds.
+Private: `same_text(one_text, other_text)`, `==` where a constant is worked out.
 **`first_clash(registry_rows)`**: the first row to take a number or a name of
 one before it -- checked on `REGISTRY` as the crate is built, as is
 **`first_default_amiss(registry_rows)`**: the first row whose default attribute is no attribute of a fixed size of the table, or that has one and is no entity type's.

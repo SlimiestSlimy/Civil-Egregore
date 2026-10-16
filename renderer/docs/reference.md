@@ -4,7 +4,7 @@ The design is in `renderer.md`.
 
 ## `paint.rs`
 
-**`PaintedSuperchunk`** `{superchunk_cartesian, cold, side_pixels, rgba_bytes}`: a superchunk's pixels, four bytes each.
+**`PaintedSuperchunk`** `{superchunk_cartesian, side_pixels, rgba_bytes}`: a superchunk's pixels, four bytes each.
 **`PaintedFrame`** `{host_frame, paint_seconds, superchunks, painted_near, climates}`: a frame, painted -- the frame itself, its cells gone into the pixels. **`start_painter(frame_receiver, tunings, terrain)`**: the painter's
 thread, the ground made again for each world run; where pictures come. **`make_grounds(kept_grounds, terrain, host_frame, frame_number)`**: the
 ground of every hot superchunk of the frame made if missing, the fine
@@ -54,7 +54,7 @@ ground, the heights about it asked of the host, flat at the ocean's
 level if the host runs another world by then; `of_heights`: it, of
 heights had; **`drop_fine_parts()`**: the
 fine parts dropped. **`heights(terrain, world, top_left, given_heights)`**: the heights about a superchunk,
-those `given` laid over what the host answers of the rest.
+those `given_heights` laid over what the host answers of the rest.
 
 ### `ground/relief.rs`
 
@@ -129,8 +129,8 @@ makes them is built -- not taken as built before mipmaps were asked on
 held_pace, last_generation, first_view}`: the host as the window holds it (`server::host::Host`) --
 **`start_own_host()`**: the host and the painter started; **`of_shown_worlds()`**: the same on a host whose world is whatever ticker's comes, flat out (`around_host`, what both are made by); **`forget_asked()`**:
 another world to run in place of the one run, no frame of the one
-before waited for. **`LastFrameSeen`** `{frame, painted, paint_seconds,
-viewport_superchunks, detail, near_pixels, map, climates}`: the last frame, and how it was
+before waited for. **`LastFrameSeen`** `{last_frame, painted_superchunks, paint_seconds,
+viewport_superchunks, detail_shift, near_pixels, map, climates}`: the last frame, and how it was
 drawn. **`tell_host_of_menus`**: the worlds the menus make (`server::WorldStart::from_tuning`
 of the seed and numbers they give), open and save, the host told; the
 options told the world run's name. **`pause_and_pace_by_keys`**: pause and pace, the
@@ -217,7 +217,7 @@ over the main menu.
 
 `MAP_MARGIN_PIXELS` (64 pixels), `BORDER_LIGHT`; what a height does to a colour
 is `ground/relief.rs`'s.
-**`WantedMap`** `{first_cell_cartesian, step, size_pixels, world, borders}`: a map
+**`WantedMap`** `{first_cell_cartesian, step, size_pixels, world, mesh_lines_drawn}`: a map
 asked for; **`DrawnMap`**: one drawn. **`start_map_thread(terrain)`**: the map's thread.
 **`draw_map(terrain, wanted_map)`**: its pixels, each cell asked of the host
 (`server::host::terrain::MapAsk`) and coloured by its height and its
@@ -232,7 +232,7 @@ mesh's lines.
 
 **`stills::StillPicture`** `{zoom_name, size_pixels, rgba_bytes}`. **`stills::gather_stills(seed,
 cells_east_south, farthest_cells_a_pixel, keep_still)`**: one place of a world at every zoom -- the
-map at 64 and 16 cells a pixel, the cells from `farthest` cells a pixel
+map at 64 and 16 cells a pixel, the cells from `farthest_cells_a_pixel` cells a pixel
 to one, the cells from near at 2, 4 and 8 pixels a cell -- painted by
 the map's and the painter's own code from a host asked as the window
 asks it, each 1,024 by 768 as a screen would show it; **`pictures_answered`**,
