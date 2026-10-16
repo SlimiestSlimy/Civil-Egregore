@@ -191,9 +191,13 @@ OPEN, FOUND BY ME
   renderer.
 - Simplification not yet read for: entity_manager, server, utilities,
   chunk_storage, bitplane_manager, actions, renderer.
-- Morton pathfinding: branch wip/morton-search, tested equal to the
-  rows' search; left: wire into walking::seek, measure both, the best
-  wins.
+- Morton pathfinding: pathfinding/src/morton.rs (on main since
+  2026-10-16, used by nothing), tested equal to the rows' search;
+  left: one-way walls for it, wire into walking::seek, measure both,
+  the best wins.
+- One branch only: `main` ("make sure all branches are collapsed into
+  a single branch" / "rename the only remaining branch to main",
+  2026-10-16). Commit and push there.
 
 LATER
 - Rules that sample entities as cells are sampled (maybe only dormant).
