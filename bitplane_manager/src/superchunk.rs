@@ -46,7 +46,7 @@ impl Bucket<'_> {
 /// through [`Superchunk::apply`].
 pub struct Superchunk {
     /// Which superchunk it is.
-    pub(crate) index: SuperchunkIndex,
+    pub(crate) superchunk_index: SuperchunkIndex,
     /// Its allocations, sorted by layer type, one a type.
     pub(crate) layers: Vec<SuperchunkLayer>,
     /// Its write-backs taken ([`BitmapArena::take_dirty`]) and not yet
@@ -62,8 +62,8 @@ impl Superchunk {
     }
 
     /// Which superchunk it is.
-    pub fn index(&self) -> SuperchunkIndex {
-        self.index
+    pub fn superchunk_index(&self) -> SuperchunkIndex {
+        self.superchunk_index
     }
 
     /// Its layer of `layer_type`, to read, if it has one in use.
@@ -71,21 +71,21 @@ impl Superchunk {
         self.layer_index(layer_type).map(|layer| LayerView(&self.layers[layer]))
     }
 
-    /// The number `layer_type` holds at `at`, a cell of this superchunk,
+    /// The number `layer_type` holds at `asked_cell`, a cell of this superchunk,
     /// as it is now -- 1 or 0 on a layer of a bit a cell: none where
     /// its bitmap is not hot. What a write that says what its rule saw
     /// is held against (`docs/bitplane_manager.md`, "Writes").
-    pub fn value_at(&self, layer_type: LayerType, at: CellIndex) -> Option<u32> {
-        debug_assert_eq!(at.superchunk(), self.index, "a cell of another superchunk");
+    pub fn value_at(&self, layer_type: LayerType, asked_cell: CellIndex) -> Option<u32> {
+        debug_assert_eq!(asked_cell.superchunk(), self.superchunk_index, "a cell of another superchunk");
         let layer = &self.layers[self.layer_index(layer_type)?];
-        let chunk = at.chunk().place();
-        contains(layer.flags.hot, chunk).then(|| layer.value(chunk, at.place()))
+        let chunk = asked_cell.chunk().place();
+        contains(layer.chunk_flags.hot, chunk).then(|| layer.value(chunk, asked_cell.place()))
     }
 
     /// Applies the part of `write`, to `layer_type`'s bitplane, that
     /// lies in this superchunk: cells in bitmaps not hot counted missed.
-    pub fn apply(&mut self, layer_type: LayerType, write: Write, applied: &mut WritesApplied) {
-        apply_in(Some(&mut self.layers), self.index, layer_type, write, applied);
+    pub fn apply(&mut self, layer_type: LayerType, write: Write, writes_applied: &mut WritesApplied) {
+        apply_in(Some(&mut self.layers), self.superchunk_index, layer_type, write, writes_applied);
     }
 }
 
@@ -103,7 +103,7 @@ impl LayerView<'_> {
     /// Whether the bucket of the chunk at `chunk`, in Morton order, is
     /// hot.
     pub fn is_hot(&self, chunk: usize) -> bool {
-        contains(self.0.flags.hot, chunk)
+        contains(self.0.chunk_flags.hot, chunk)
     }
 
     /// How many cells the bucket of the chunk at `chunk` has set.

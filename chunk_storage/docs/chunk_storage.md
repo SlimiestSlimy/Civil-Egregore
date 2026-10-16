@@ -11,7 +11,7 @@ the `coordinates` crate's (`../../coordinates/`).
 
 A layer is a type (`LayerType`, a `u64` naming what it represents) and
 a bitmap, Tessera-encoded in 64-bit words. A Tessera stream ends
-itself, so no length is kept: `LayerCodec::decode` reads from a
+itself, so no length is kept: `LayerCodec::decode_cells` reads from a
 bitmap's first word whatever follows its last.
 
 `LayerCodec` holds what encoding and decoding need, allocated once: a
@@ -27,8 +27,8 @@ kept two ways. Hot, a cell's number is `bits` bits together, the cell
 at place `p` at bit `p * bits` of the bucket's words -- a word holds
 whole cells, `bits` being a power of two. Cold, it is `bits` bitmaps, a
 bit of every cell each, encoded as any layer. `wide.rs` goes between
-the two: `spread` puts a bitmap into a wide bucket as one bit of every
-cell, `plane` takes that bit of every cell out as a bitmap. Both pass
+the two: `spread_into_wide` puts a bitmap into a wide bucket as one bit of every
+cell, `bitmap_of_bit` takes that bit of every cell out as a bitmap. Both pass
 over the cells set alone, so a plane mostly clear costs little.
 
 A plane of tiles (`../../type_registry/docs/type_registry.md`, "Tile
@@ -81,7 +81,7 @@ chunk's offset, the last to the image's end.
 
 ### The height map
 
-A `Height` is 16 bits, but a chunk seldom spans more than 255 (`SPAN`)
+A `Height` is 16 bits, but a chunk seldom spans more than 255 (`SPAN_IN_A_BYTE`)
 from its lowest ground to its highest. So each chunk has a **floor** --
 its lowest height -- and each of its cells a byte over it. A chunk that
 does span more is **tall**, and has a map of its own, a whole height a
@@ -134,11 +134,11 @@ when the world is saved.
 
 A ring buffer of words. An entry is a header of three words
 (`HEADER_WORDS`) -- its chunk's Morton index in the world, its layer
-type, its length and, in the length word's lowest bit (`DEAD`), whether
+type, its length and, in the length word's lowest bit (`DEAD_BIT`), whether
 it is dead -- then the encoded layer's words; an entry of no words says
 the layer is gone. Entries never wrap: one that does not fit before the
 end starts again at the start, a marker left where it would have gone
-(`WRAP`, a first word no chunk's index can be: a chunk's takes 48
+(`WRAP_MARKER`, a first word no chunk's index can be: a chunk's takes 48
 bits). Entries are written at the head and freed from the tail:
 releasing a superchunk marks its entries dead, and the tail moves past
 dead entries. So a superchunk's image is rewritten once for many of its
@@ -150,9 +150,9 @@ The slow work is done off the tick, on the dispatcher's threads
 (`../../utilities/docs/utilities.md`, "The dispatcher"): encoding the
 changed layers of superchunks gone cold, rewriting images with the
 changes flushed from the ring, and generating and decoding the
-superchunks warming -- each thread with a codec of its own (`CODEC`, a
-thread's). A job sent (`Jobs::send`) is a `Ticket`; what it made is
-taken by it (`Jobs::take`, waiting if not yet made, or
+superchunks warming -- each thread with a codec of its own (`THREAD_CODEC`, a
+thread's). A job sent (`Jobs::send_job`) is a `JobTicket`; what it made is
+taken by it (`Jobs::take_waiting`, waiting if not yet made, or
 `Jobs::try_take`). What a job makes depends on nothing but the job, so
 the world is the same however fast the threads are.
 
@@ -191,7 +191,7 @@ stopped, so each waits as long. Which are paged changes nothing the
 world holds: an image on disk is read back the same, word for word.
 
 Read back: a superchunk warming is handed to its job as the pool has
-it (`Stored`) -- the image, or the folder it is in -- and the job
+it (`ImageStored`) -- the image, or the folder it is in -- and the job
 reads it, off the tick as it decodes it, and hands it back to be in
 memory again while it is hot (`ChunkStorage::bring_in`). Anything else
 that wants a paged image -- a flush, the world's hash -- reads it where
@@ -221,21 +221,21 @@ pool's list of superchunks does too.
 
 A world is a folder (`disk.rs`), its text files CSV (`utilities::csv`).
 The names as the code has them: the folder of superchunks `SUPERCHUNKS`;
-the world file's columns `WORLD_COLUMNS` and its rows' names `FORMAT`
+the world file's columns `WORLD_COLUMNS` and its rows' names `FORMAT_ROW`
 (with the number written, 2), `HOT_ENTITY`, `CAMERA_FLOCK`,
-`WITHOUT_CAMERA_FLOCK`, `GENERATION` (what starts a generation number's
+`WITHOUT_CAMERA_FLOCK`, `GENERATION_PREFIX` (what starts a generation number's
 name); the hot file's columns `HOT_COLUMNS` and what a superchunk is in
 it, `HOT`, `COOLING`, `WARMING`. The files:
 `world.csv`, a row a thing, its name and what it is -- `format`, the
 number of the format written; `seed`, in hexadecimal; `tick`;
-`layers`; `side`, if the world has a size, and `forced`, 1, if all of
+`layers`; `side_in_superchunks`, if the world has a size, and `forced_hot`, 1, if all of
 it is hot throughout, which only a world with a side can be; `hot
 entity`, the kind of entity it is hot about otherwise, as a number,
 if its runner gave one; `camera flock`, if its camera loads
 superchunks, the sheep each superchunk generated in the viewport starts with;
 `without camera flock`, the superchunks generated out of its view and
 still owed theirs, spaces between them;
-and a row for each number it is generated by, `generation` before its
+and a row for each number it is generated by, `generation_numbers` before its
 name -- under the row `world,is`, which comes first. The other rows
 are read by name, in any order, a name given twice refused and one
 not known passed over; a row missing is its default -- tick 0, no

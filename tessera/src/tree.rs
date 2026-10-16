@@ -2,7 +2,7 @@
 //!
 //! Function by function: `docs/reference.md`, "`tree.rs`".
 
-use crate::tile::{Pyramid, Tile, FLOOR_LEVEL};
+use crate::tile::{TilePyramid, Tile, FLOOR_LEVEL};
 
 /// What the tree holds at one tile.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -10,22 +10,22 @@ pub enum Node {
     /// No node: the tile lies inside a coarser node's tile, or the value
     /// bound above says it.
     #[default]
-    Absent,
+    NoNode,
     /// The tile's four children, each a node of its own -- or, the
     /// divide naming its children, the value bound above saying those
     /// that are not.
-    Divided,
+    PlainDivide,
     /// A divide naming its children that flips the value bound above:
     /// every child not a node is bound to the other value. A bind with
     /// holes.
     FlippingDivide,
     /// A copy of a same-size tile; naming its children, it copies only
     /// those that are not nodes of their own.
-    Copied {
+    CopiedTile {
         /// Whether it reads from the far offsets.
-        far: bool,
+        is_far_copy: bool,
         /// Which offset it reads from.
-        direction: u8,
+        copy_direction: u8,
         /// Whether some of its children are nodes of their own.
         names_children: bool,
     },
@@ -39,20 +39,20 @@ pub enum Node {
     /// list.
     CellList,
     /// A 4x4 whose cells are left to the last pass.
-    Residual,
+    ResidualFloorTile,
 }
 
 impl Node {
     /// Whether its children's nodes follow it.
     pub fn has_children(self) -> bool {
-        matches!(self, Node::Divided | Node::FlippingDivide | Node::Copied { names_children: true, .. })
+        matches!(self, Node::PlainDivide | Node::FlippingDivide | Node::CopiedTile { names_children: true, .. })
     }
 }
 
 /// The tree: a node a tile, down to the 4x4 floor. Walk it from the top:
 /// nodes under a complex tile are stale (`docs/tessera.md`, "Stale
 /// nodes").
-pub type Tree = Pyramid<Node, FLOOR_LEVEL>;
+pub type Tree = TilePyramid<Node, FLOOR_LEVEL>;
 
 /// The value bound at the top of the bitmap, before any flipping
 /// divide: clear.
@@ -63,8 +63,8 @@ pub const BOUND_AT_THE_TOP: bool = false;
 /// trunk, which the stream never spells out.
 pub fn start_level(tree: &Tree) -> u8 {
     (0..=FLOOR_LEVEL)
-        .find(|&level| {
-            Tile::all_of_level(level).any(|tile| tree.get(tile) != Node::Divided || tree.children(tile).contains(&Node::Absent))
+        .find(|&tile_level| {
+            Tile::all_of_level(tile_level).any(|tile| tree.get(tile) != Node::PlainDivide || tree.child_elements(tile).contains(&Node::NoNode))
         })
         .expect("the 4x4 floor never divides")
 }

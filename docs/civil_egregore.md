@@ -45,7 +45,7 @@ The Morton index is a cell's identity everywhere it is cheaper
 (`CellIndex`): writes are anchored at one, sampling hands them out, and
 reads take them. Its superchunk, chunk and bit are bit fields -- shifts
 and masks, no coordinates -- and a neighbour is a step on the index
-itself, each coordinate's bits added apart (`CellIndex::offset`).
+itself, each coordinate's bits added apart (`CellIndex::at_cartesian_offset`).
 Cartesian coordinates (`CellCartesian`) are kept where they are the
 cheaper: a rectangle's or a disc's geometry, and drawing.
 
@@ -53,7 +53,7 @@ An aligned 8x8 square of cells is one word of a bitmap: a **tile**.
 Cells near one another are read as tiles, not one by one: a window of
 up to 8x8 cells at any cell is cut from the one to four tiles it
 overlaps -- each word turned row by row in three delta swaps, then
-shifted and masked (`bitmap::tile`, `Reader::window`) -- so a rule
+shifted and masked (`bitmap::tile`, `CellReader::window`) -- so a rule
 reads a neighbourhood as a mask and decides on it in boolean steps,
 with no array of cells and no loop over them.
 
@@ -526,7 +526,7 @@ thread, buckets still sorted by ID), by share of each event:
 |---|---|---|
 | sampling (`sample_layer`) | 26% | 2% |
 | finding an entity by ID (`get`, `put`: the binary search) | 13% | 33% |
-| reading a cell (`Lookup::holds`) | 10% | 9% |
+| reading a cell (`Lookup::layer_holds_cell`) | 10% | 9% |
 | setting a cell (`put_cell`) | 7% | 15% |
 
 The binary search by ID was a third of every load that went to memory
@@ -662,7 +662,7 @@ about the sheep -- a quarter of them grass -- read at a meal, once in
 6,912 ticks: grass left alone covers two thirds of the dirt and grows
 fastest covering a third, so the flock stops growing while the grass
 still gains on it. And a sheep that eats where it is not lush leaves:
-hungry again, it walks one way for `ROAM` -- 96 steps or so --
+hungry again, it walks one way for `ROAMING_TIME` -- 96 steps or so --
 eating nothing, before it looks for grass; off lush pasture it sets
 off too, now and then (fields of its `SheepState`:
 the tick it roams until and the way, set once, so a step on the way

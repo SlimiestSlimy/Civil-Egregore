@@ -47,7 +47,7 @@ sample costs the same few counts however rare samples are.
 
 ## The tick
 
-`Simulation::tick(arena, entities, seed, rule)`, every superchunk in two phases:
+`Simulation::tick(bitmap_arena, entity_store, seed, rule)`, every superchunk in two phases:
 
 1. **Computing**: each superchunk runs the rule on itself
    (`Turn`): samples its own cells, reads any cell as the
@@ -77,7 +77,7 @@ Everything queued has an **author**: the entity woken or the cell
 sampled that the rule was seeing to when it queued it
 (`Turn::seeing_to`, said by `../../actions/` as it goes over
 them). An outbox notes where each author's part of each of its nine
-queues begins (`Segment`, begun by `queue_landing_in` at the first thing an
+queues begins (`AuthorSegment`, begun by `queue_landing_in` at the first thing an
 author queues for a superchunk). A superchunk applying takes the
 segments its nine neighbours hold for it, sorts them by author -- the
 Morton index of the author's cell -- and applies each in turn, what
@@ -144,13 +144,13 @@ held before it; forgotten as the next author is named,
 `Turn::seeing_to`). As the author queues for another slot
 (`queue_landing_in`), its instructions go across (`go_across`): all it
 queued is moved, in order, out of the slot's queue into the outbox's
-tenth queue (`ACROSS`), what it carried beside the queue moved with it
+tenth queue (`ACROSS_QUEUE`), what it carried beside the queue moved with it
 (`carried_moved_by`), the compares it has open with them, and what it
 queues from there on, until the rule sees to the next author, goes
 there too. A segment begun in the slot's queue for nothing but what
 was moved is taken back: an empty one would be a stop between two
 acts for the superchunk applying. The tenth queue has a segment an
-author like the others, and beside each an `Across`: the slots it
+author like the others, and beside each an `AcrossAct`: the slots it
 lands in (`lands`, the author's own superchunk always among them,
 `slot_home`) and how many of those superchunks have come to it
 (`arrived`). The turn remembers where the author's last instruction
@@ -167,14 +167,14 @@ went across.
 
 **Applied** (`tick/applying.rs`). Every superchunk gathers what is
 queued for it -- the nine slots' segments, and the acts over a border
-that land in it -- into one list sorted by author (`Phase::gather`,
-`Segmented`), the same order in every superchunk, and goes down it
+that land in it -- into one list sorted by author (`Phase::gather_order`,
+`QueuedSegment`), the same order in every superchunk, and goes down it
 (`go_on`). A segment of a slot's queue it applies to itself
 (`LandingInOne`). At an act over a border it counts itself arrived; if
 another superchunk the act lands in has not come to it yet, it waits
 there, let go of by its thread. The last to arrive holds the others
 (they are let go of, and wait at this very act), applies the act to
-all of them (`LandingInSeveral`, `Landing::of_slot` giving each
+all of them (`LandingInSeveral`, `InstructionLanding::of_slot` giving each
 instruction its superchunk), moves each on past it and lets it go on.
 Every superchunk has applied all that comes before the act in the
 world's order, and none anything after it: the act falls where it
@@ -186,7 +186,7 @@ superchunk it lands in free to come to it.
 A superchunk that is not hot has nobody to arrive for it: it is not
 counted (`landed_in`), a compare landing there does not hold, a write
 there is missed and an entity to be made there lost
-(`Queue::jump_over`, and the arm of `Queue::apply` for a slot with no
+(`InstructionQueue::jump_over`, and the arm of `InstructionQueue::apply` for a slot with no
 superchunk).
 
 **Which thread goes on with which superchunk**
@@ -203,11 +203,11 @@ be one thread's:
   (`next_for`);
 - a thread whose superchunk waits takes up the one waited for itself
   if it lies in its own list, in anyone's, or is not begun
-  (`after_waiting`, `take_up`, `begin`); if another thread has it,
+  (`after_waiting`, `take_up`, `take_unbegun`); if another thread has it,
   that thread is given all this one kept, and goes on with the lot;
 - a thread that comes to work that is one superchunk's alone gives up
   what it kept to the list that is anyone's (`give_up_those_kept`,
-  `anyones`), and wakes a thread for it;
+  `anyones_list`), and wakes a thread for it;
 - a thread with nothing to do looks again after a rest, longer each
   time up to `LONGEST_REST`, then sleeps until there is something
   (`is_something_to_do`, `sleep`, `wake`): a thread spinning beside one
@@ -217,9 +217,9 @@ be one thread's:
 Whose a superchunk is (`whose`) is only read to choose where to put
 things; what makes a superchunk a thread's is the flag it takes
 (`lying`), so a list may still name one taken from under it
-(`LetGoOn::pop` gives it, `take` passes it over, `LetGoOn::empty`
+(`LetGoOn::pop` gives it, `take_up_lying` passes it over, `LetGoOn::empty_out`
 clears the lists for the next tick). The lists, the flags and each
-superchunk's order are kept from tick to tick (`Room`).
+superchunk's order are kept from tick to tick (`ApplyingRoom`).
 
 **What it costs.** An act itself is cheap: on one thread a tick with
 an act at every other cell of every border is about a tenth slower to
@@ -284,7 +284,7 @@ superchunks -- where it left, as gone over the border; where it came
 to, as the entity now standing there (`crossed_to`,
 `named_from_abroad`) -- so an instruction that names it is applied
 to it where it stands, by whoever holds that superchunk
-(`Landing::of_named`). What is left is to have that superchunk held:
+(`InstructionLanding::of_named`). What is left is to have that superchunk held:
 
 - As a turn queues, it notes each entity an author names that is not
   the author itself (`Turn::note_named`, into
@@ -295,9 +295,9 @@ to it where it stands, by whoever holds that superchunk
   happened, and neither has come to a later author. There
   (`Phase::have_follow`), every segment of a later author that names
   the entity -- found in the order of the superchunk it left -- is
-  re-pointed (`Repointed`, asked with `repointed_of`; all of this
-  routing is one type's, `Following`, in `tick/applying/following.rs`):
-  - of that entity alone (`Queue::names_alone`), it is taken out of
+  re-pointed (`RepointedSegment`, asked with `repointed_of`; all of this
+  routing is one type's, `EntityFollowing`, in `tick/applying/following.rs`):
+  - of that entity alone (`InstructionQueue::names_alone`), it is taken out of
     that order and put in the order of the superchunk the entity came
     to: the right queue, and nothing waits;
   - else it lands in both from then on, with whatever else it lands
@@ -311,8 +311,8 @@ crossed. So every compare and write of the tick finds the entity, in
 the world's one order, and where the border lies changes nothing but
 which threads meet. The superchunk an entity came to need be no
 neighbour of the author's: a segment re-pointed names its
-superchunks outright (`Repointed::also`; held by slot where they
-have one, besides where not: `LandingInSeveral::also`).
+superchunks outright (`RepointedSegment::also_lands_in`; held by slot where they
+have one, besides where not: `LandingInSeveral::also_superchunks`).
 
 Held by `../tests/fine/entity_over_a_border.rs`: an entity stepping
 over a border while eight others write to it in the same tick --
@@ -373,7 +373,7 @@ crossing is applied, from one superchunk's entities to the other's
 **The hard rule: every write lies under a compare**, in whichever
 superchunk's queue it is queued -- its own or a neighbour's. No
 instruction that writes is held against nothing, and queuing one
-under no compare panics (`Turn::queue`). What has nothing else to be
+under no compare panics (`Turn::queue_instruction`). What has nothing else to be
 held against is held against the entity it is of being there still.
 
 ### Compare-and-write
@@ -383,7 +383,7 @@ a thing as it was and both queue a change that hangs on it. A
 **compare-and-write** says what its rule saw and is applied only if
 that still holds when the write is come to; otherwise it is
 **refused**: nothing happens, and it is counted
-(`WritesApplied::refused`, `TickReport::instructions_compared`).
+(`WritesApplied::writes_refused`, `TickReport::instructions_compared`).
 
 **A compare is an instruction of its own** (`Compare`,
 `Turn::compare_from_here`), queued in order with the writes. It is of
@@ -473,7 +473,7 @@ saw the other. A tick has none:
   one attribute, the first applied does and the other is refused; two
   writing two attributes both do. This holds whoever writes -- the
   entity itself, awake, or another, in the same tick.
-- **An entity changing itself** (`actions::entities::update`, or a
+- **An entity changing itself** (`actions::entities::update_entity`, or a
   `set_attribute_of` and a `step`) is those writes, one compare for each
   attribute that differs from what the tick found and under it the
   words that changed, then a move, which carries nothing, and its
@@ -561,7 +561,7 @@ a step (`Simulation::keep_entities_in`; the server names its
 crossed -- is set there as the instruction is applied, none comes to a
 cell set there, whoever set it, and the cell one left or was removed
 from is cleared when the tick is over, having been that entity's name
-until then (`Standing`, the plane as the entities' store is lent it:
+until then (`SuperchunkCollisionPlane`, the plane as the entities' store is lent it:
 `entity_manager::CollisionCells`). So moving is a compare-and-write of
 the plane, done by the instruction that moves: free, the cell is
 taken; held, the mover stays. The bit is written with the instruction
@@ -576,7 +576,7 @@ never left for one it cannot have, and between ticks every entity
 stands on one cell.
 
 They tick in the same two phases as the cells. In the first, a
-superchunk's entities waking run the rule (`Turn::woken`) in
+superchunk's entities waking run the rule (`Turn::woken_entities`) in
 Morton order -- each tick's wakes sorted by cell, once all are
 filed -- so they read and write forwards through memory,
 and their instructions -- below -- are queued in the
@@ -609,7 +609,7 @@ go together is the actions' (`actions::entities`), named here:
 
 | the action | the compare | under it |
 |---|---|---|
-| `spawn` (`make` ... `made`) | the cell free for an entity | the entity made; each attribute given, its words written |
+| `spawn` (`make_with_compare_open` ... `made`) | the cell free for an entity | the entity made; each attribute given, its words written |
 | `step`, `update` | the entity there still | a move, if to another cell; its wake written |
 | a crossing | the cell free, in the superchunk crossed to; the entity there still, where it stood | there, the entity made whole; here, its wake written |
 | `set_attribute_of`, `unset_attribute_of`, `set_attribute_blocks`, `update` | the attribute as seen, or none seen | the words that differ, two an instruction; or the attribute given and written, or taken |
@@ -637,8 +637,8 @@ attributes (read then through a copy kept to change them, 15%). Pathfinding, far
 under 2%.
 
 The wakes due in a tick are known before any is seen to
-(`SuperchunkEntities::woken`), so they are asked for ahead
-(`utilities::cache::prefetch`): a turn's first eight entities and four
+(`SuperchunkEntities::woken_entities`), so they are asked for ahead
+(`utilities::cache::prefetch_cache_line`): a turn's first eight entities and four
 attribute runs before the first entity is given, then, as each is
 given, the entity eight on and the attributes of the one four on -- the
 entity, which says where they are, having come by then.
@@ -665,7 +665,7 @@ through a `Reader`) and queues its instructions. The decisions behind it:
 ## Simulation time
 
 Nothing says how long a thing takes in ticks. It says it in seconds of
-the simulation (`SimulationTime::seconds`, `milliseconds`), and that is
+the simulation (`SimulationTime::from_seconds`, `from_milliseconds`), and that is
 turned to ticks in one place, by the one constant that is the tick
 rate: `TICKS_A_SIMULATION_SECOND`, 256. A time is kept as the ticks it
 takes at that rate, the nearest whole number and one at least, worked
@@ -689,10 +689,10 @@ samples -- or a count -- the trees that crowd one -- is as it was.
 No rule says the tick rate or a number of ticks: a rule's times are
 `SimulationTime`s, and a rule is the same rule whatever a second of
 the simulation is defined as. When a thing next happens is the tick
-a time after this one (`SimulationTime::after`); a time drawn -- a
+a time after this one (`SimulationTime::tick_after`); a time drawn -- a
 step's jitter, the part of a life a sleep is -- is part of a time
 (`part_drawn`); how long a sleep is, the time between two ticks
-(`between`). What a rule keeps of when -- an entity's wake, when a
+(`time_between_ticks`). What a rule keeps of when -- an entity's wake, when a
 sheep is next hungry -- is a tick still: a moment, not a length.
 
 What is coarser at a lower rate is only what a tick is: nothing takes
@@ -705,7 +705,7 @@ the tick rate: a second of the simulation in a second.
 
 Only the superchunks about the entities that matter are hot
 (`src/hot.rs`, `src/halos.rs`). A **hot entity** -- one of the kind
-whoever holds the world names (`Hot::About`) -- keeps its superchunk
+whoever holds the world names (`Hot::AboutHotEntities`) -- keeps its superchunk
 and the eight about it hot -- as far as anything reaches in a tick, the speed of light.
 Every other superchunk is cold: its cells in its image in chunk
 storage, its entities and random numbers kept as a save keeps them
@@ -768,7 +768,7 @@ so the flock, its halos and the world may grow as far as it leads them.
 An entity
 kept cold whose wake passes wakes the tick its superchunk turns hot.
 
-**The world's size** (`Hot::side()`): given one, the world is a square
+**The world's size** (`Hot::world_side_superchunks()`): given one, the world is a square
 of so many superchunks along a side, its origin in the middle, and
 nothing outside it is ever hot, whoever wants it -- so nothing is made
 there and nothing goes there, an entity sent past the edge staying
@@ -778,12 +778,12 @@ Only a world with a size can be: one of none has no end to be hot to.
 
 **The viewport** (`Halos::keep_viewport`): whoever holds the world
 may name superchunks wanted hot besides the halos -- of what a
-renderer renders, if the world's hot says so (`Hot::About.viewport`:
+renderer renders, if the world's hot says so (`Hot::AboutHotEntities.viewport`:
 its camera loads superchunks, `../../server/docs/server.md`, "Halos"),
 every one of them, however many -- warmed and
 cooled as a halo's are, generated if never made. A move says which
 superchunks it generated, made new rather than read back
-(`Halos::generated`), so the holder can put entities on them.
+(`Halos::generated_superchunks`), so the holder can put entities on them.
 
 The halos work on what the world's holder lends them for each call
 (`Held`): the arena, chunk storage, the entities, the tick's random
@@ -803,7 +803,7 @@ takes whole superchunks -- (`Simulation::for_superchunks`); a number is
 given only to measure one against another.
 
 The dispatcher is not the simulation's: it is `utilities::dispatcher`,
-and a simulation is given one (`Simulation::on`) that others may queue
+and a simulation is given one (`Simulation::on_dispatcher`) that others may queue
 jobs on -- the world makes one for the tick and chunk storage's jobs
 alike. A thread busy with a queued job sits a phase out, and the phase
 is split among the rest: nothing in a tick counts on every part being

@@ -8,10 +8,10 @@
 //! bitmap.set_rect(10, 10, 40, 30);
 //! bitmap.set_circle(180, 180, 25);
 //!
-//! let (mut tessera, mut stream, mut back) = (Tessera::new(), BitStream::default(), Bitmap::new());
+//! let (mut tessera, mut stream, mut decoded_bitmap) = (Tessera::new(), BitStream::default(), Bitmap::new());
 //! tessera.encode(&bitmap, &mut stream);
-//! tessera.decode(&stream, &mut back);
-//! assert_eq!(back.words(), bitmap.words());
+//! tessera.decode(&stream, &mut decoded_bitmap);
+//! assert_eq!(decoded_bitmap.words(), bitmap.words());
 //! ```
 //!
 //! A [`Tessera`] allocates once and never again. Encoding: set cells
@@ -47,12 +47,12 @@ mod unit_tests;
 pub use bit_stream::{BitStream, MOST_BITS};
 
 use bitmap::Bitmap;
-use bit_stream::{Counter, Sink};
+use bit_stream::{BitCounter, BitSink};
 use greedy_tiler::{complex_tiling, greedy_tiling};
-use last_pass::{FloorPlan, LastPass, Pricing};
+use last_pass::{FloorPlan, LastPass, ResidualPricing};
 use quadtree_writer::{read_tree_and_plan_last_pass, write_tree_and_plan_last_pass, FLAG_WIDTH};
 use tree::Tree;
-use patterns::Patterns;
+use patterns::PatternPyramid;
 use set_cells_before_each_word::SetCellsBeforeEachWord;
 
 /// How much longer than the tree, in percent, the binary count tree may be
@@ -66,14 +66,14 @@ const TREE_STREAM: u64 = 0;
 const BINARY_COUNT_TREE_STREAM: u64 = 1;
 
 /// Encodes `bitmap` with a [`Tessera`] of its own.
-pub fn encode(bitmap: &Bitmap) -> BitStream {
+pub fn encode_bitmap(bitmap: &Bitmap) -> BitStream {
     let mut stream = BitStream::default();
     Tessera::new().encode(bitmap, &mut stream);
     stream
 }
 
 /// Decodes `stream` with a [`Tessera`] of its own.
-pub fn decode(stream: &BitStream) -> Bitmap {
+pub fn decode_stream(stream: &BitStream) -> Bitmap {
     let mut bitmap = Bitmap::new();
     Tessera::new().decode(stream, &mut bitmap);
     bitmap
@@ -86,11 +86,11 @@ pub struct Tessera {
     /// How many cells of the bitmap encoded are set before each word.
     set_cells_before_each_word: SetCellsBeforeEachWord,
     /// The pattern numbers of the bitmap encoded.
-    patterns: Patterns,
+    pattern_pyramid: PatternPyramid,
     /// The tree of the bitmap encoded.
     tree: Tree,
     /// The residual floor tiles' prices.
-    pricing: Pricing,
+    residual_pricing: ResidualPricing,
     /// The floor tiles the tree leaves to the last pass.
     floor_plan: FloorPlan,
     /// Room for the last pass.
@@ -102,9 +102,9 @@ impl Tessera {
     pub fn new() -> Self {
         Self {
             set_cells_before_each_word: SetCellsBeforeEachWord::new(),
-            patterns: Patterns::new(),
+            pattern_pyramid: PatternPyramid::new(),
             tree: Tree::new(),
-            pricing: Pricing::new(),
+            residual_pricing: ResidualPricing::new(),
             floor_plan: FloorPlan::new(),
             last_pass: LastPass::new(),
         }
@@ -114,10 +114,10 @@ impl Tessera {
     /// or its binary count tree unless the tree is shorter by more than
     /// [`BINARY_COUNT_TREE_TOLERANCE_PERCENT`].
     pub fn encode(&mut self, bitmap: &Bitmap, stream: &mut BitStream) {
-        let (tree_bits, start_level, binary_count_tree_bits) = self.weigh(bitmap);
+        let (tree_bits, start_level, binary_count_tree_bits) = self.weigh_both_streams(bitmap);
         stream.clear();
-        const PERCENT: u64 = 100;
-        if binary_count_tree_bits * PERCENT < tree_bits * (PERCENT + BINARY_COUNT_TREE_TOLERANCE_PERCENT) {
+        const PERCENT_WHOLE: u64 = 100;
+        if binary_count_tree_bits * PERCENT_WHOLE < tree_bits * (PERCENT_WHOLE + BINARY_COUNT_TREE_TOLERANCE_PERCENT) {
             stream.push_value(BINARY_COUNT_TREE_STREAM, FLAG_WIDTH);
             binary_count_tree::write(stream, bitmap, &self.set_cells_before_each_word);
             return;
@@ -125,22 +125,22 @@ impl Tessera {
         stream.push_value(TREE_STREAM, FLAG_WIDTH);
         write_tree_and_plan_last_pass(stream, &self.tree, bitmap, &mut self.floor_plan, start_level);
         if cfg!(debug_assertions) {
-            let mut prices = 0;
-            self.floor_plan.residual_floor_tiles(|index| prices += self.pricing.price_of(index));
-            assert_eq!(stream.len() as u64 - FLAG_WIDTH as u64, tree_bits - prices, "the tree written is not the tree counted");
+            let mut residual_prices_total = 0;
+            self.floor_plan.residual_floor_tiles(|floor_tile_index| residual_prices_total += self.residual_pricing.price_of(floor_tile_index));
+            assert_eq!(stream.len() as u64 - FLAG_WIDTH as u64, tree_bits - residual_prices_total, "the tree written is not the tree counted");
         }
-        self.last_pass.encode(&mut self.floor_plan, bitmap, stream);
+        self.last_pass.encode_last_pass(&mut self.floor_plan, bitmap, stream);
     }
 
     /// Tiles `bitmap` and counts both streams: the tree's bits, its
     /// residual floor tiles at their prices, its start level, and the binary
     /// count tree's bits.
-    fn weigh(&mut self, bitmap: &Bitmap) -> (u64, u8, u64) {
+    fn weigh_both_streams(&mut self, bitmap: &Bitmap) -> (u64, u8, u64) {
         self.set_cells_before_each_word.count(bitmap);
-        self.patterns.build(bitmap);
-        greedy_tiling(&self.patterns, &mut self.tree);
-        let (tree_bits, start_level) = complex_tiling(bitmap, &self.set_cells_before_each_word, &mut self.tree, &mut self.pricing);
-        let mut binary_count_tree_bits = Counter::default();
+        self.pattern_pyramid.number_every_tile(bitmap);
+        greedy_tiling(&self.pattern_pyramid, &mut self.tree);
+        let (tree_bits, start_level) = complex_tiling(bitmap, &self.set_cells_before_each_word, &mut self.tree, &mut self.residual_pricing);
+        let mut binary_count_tree_bits = BitCounter::default();
         binary_count_tree::write(&mut binary_count_tree_bits, bitmap, &self.set_cells_before_each_word);
         (tree_bits, start_level, binary_count_tree_bits.0)
     }
@@ -149,7 +149,7 @@ impl Tessera {
     /// tree's bits, its residual floor tiles at their prices, and the binary
     /// count tree's -- what encoding weighs, each without its mode bit.
     pub fn stream_bits(&mut self, bitmap: &Bitmap) -> (u64, u64) {
-        let (tree_bits, _, binary_count_tree_bits) = self.weigh(bitmap);
+        let (tree_bits, _, binary_count_tree_bits) = self.weigh_both_streams(bitmap);
         (tree_bits, binary_count_tree_bits)
     }
 
@@ -163,13 +163,13 @@ impl Tessera {
     /// Decodes `stream` into `bitmap`, whatever it held before.
     pub fn decode(&mut self, stream: &BitStream, bitmap: &mut Bitmap) {
         bitmap.reset();
-        let mut reader = stream.reader();
-        if reader.value(FLAG_WIDTH) == BINARY_COUNT_TREE_STREAM {
-            binary_count_tree::read(&mut reader, bitmap);
+        let mut stream_reader = stream.bit_reader();
+        if stream_reader.value(FLAG_WIDTH) == BINARY_COUNT_TREE_STREAM {
+            binary_count_tree::read_binary_count_tree(&mut stream_reader, bitmap);
             return;
         }
-        read_tree_and_plan_last_pass(&mut reader, bitmap, &mut self.floor_plan);
-        self.last_pass.decode(&mut self.floor_plan, bitmap, &mut reader);
+        read_tree_and_plan_last_pass(&mut stream_reader, bitmap, &mut self.floor_plan);
+        self.last_pass.decode_last_pass(&mut self.floor_plan, bitmap, &mut stream_reader);
     }
 }
 

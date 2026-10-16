@@ -3,7 +3,7 @@
 //! worth at once. What is made of several is not the simulation's
 //! (`docs/simulation.md`, "Instructions").
 
-use super::conditional::{Compare, Gated};
+use super::conditional::{Compare, GatedByCompare};
 use super::instruction::{Instruction, NO_COUNT};
 use super::Turn;
 use chunk_storage::LayerType;
@@ -22,11 +22,11 @@ pub enum Write {
         /// The layer.
         layer_type: LayerType,
         /// The cell.
-        at: CellIndex,
+        target_cell: CellIndex,
         /// The number it is to hold.
         value: u32,
         /// The rule's count one is added to as it is applied, if any.
-        counted: Option<u32>,
+        counted_place: Option<u32>,
     },
     /// One added to the rule's count of this place: it lands where
     /// the compare open last does.
@@ -41,9 +41,9 @@ pub enum Write {
     /// (`docs/simulation.md`, "An act over a border").
     MoveEntity {
         /// The cell the tick found it on.
-        from: CellIndex,
+        from_cell: CellIndex,
         /// The cell it moves to.
-        to: CellIndex,
+        to_cell: CellIndex,
     },
     /// The entity the tick found on the cell removed.
     RemoveEntity(CellIndex),
@@ -51,9 +51,9 @@ pub enum Write {
     /// becomes `value`.
     AttributeMember {
         /// The cell the tick found the entity on.
-        at: CellIndex,
+        named_cell: CellIndex,
         /// The attribute's type.
-        kind: AttributeType,
+        attribute_type: AttributeType,
         /// Which of its members.
         member: Member,
         /// What it is to hold.
@@ -63,14 +63,14 @@ pub enum Write {
     /// found on `at`.
     RemoveAttribute {
         /// The cell the tick found the entity on.
-        at: CellIndex,
+        named_cell: CellIndex,
         /// The attribute's type.
-        kind: AttributeType,
+        attribute_type: AttributeType,
     },
     /// The entity the tick found on `at` wakes next at `wake`.
     Wake {
         /// The cell the tick found the entity on.
-        at: CellIndex,
+        named_cell: CellIndex,
         /// The tick it is to wake at.
         wake: u64,
     },
@@ -82,19 +82,19 @@ impl Turn<'_> {
     #[inline]
     fn instruction_of(&self, write: Write) -> (Option<CellIndex>, Instruction) {
         match write {
-            Write::Cell { layer_type, at, value, counted } => (Some(at), Instruction::write_cell(layer_type, at, value, counted.map_or(NO_COUNT, |place| self.counted_number(place)))),
+            Write::Cell { layer_type, target_cell: at, value, counted_place: counted } => (Some(at), Instruction::write_cell(layer_type, at, value, counted.map_or(NO_COUNT, |place| self.counted_number(place)))),
             Write::Count(place) => (None, Instruction::count_under(self.counted_number(place))),
             Write::MakeEntity(header) => {
-                debug_assert!(header.wake > self.now, "an entity made to wake at tick {}, not after {}", header.wake, self.now);
-                (Some(header.at), Instruction::make_entity(header.at, header.kind.0, header.wake))
+                debug_assert!(header.wake > self.current_tick, "an entity made to wake at tick {}, not after {}", header.wake, self.current_tick);
+                (Some(header.stood_cell), Instruction::make_entity(header.stood_cell, header.entity_type.0, header.wake))
             }
-            Write::MoveEntity { from, to } if from.superchunk() == to.superchunk() => (Some(from), Instruction::move_entity(from, to)),
-            Write::MoveEntity { from, to } => (Some(from), Instruction::cross_entity(from, to)),
-            Write::RemoveEntity(at) => (Some(at), Instruction::remove_entity(at)),
-            Write::AttributeMember { at, kind, member, value } => (Some(at), Instruction::write_attribute_member(at, kind, member, value)),
-            Write::RemoveAttribute { at, kind } => (Some(at), Instruction::remove_attribute(at, kind)),
-            Write::Wake { at, wake } => {
-                debug_assert!(wake > self.now, "an entity to wake at tick {wake}, not after {}", self.now);
+            Write::MoveEntity { from_cell: from, to_cell: to } if from.superchunk() == to.superchunk() => (Some(from), Instruction::move_entity(from, to)),
+            Write::MoveEntity { from_cell: from, to_cell: to } => (Some(from), Instruction::cross_entity(from, to)),
+            Write::RemoveEntity(removed_cell) => (Some(removed_cell), Instruction::remove_entity(removed_cell)),
+            Write::AttributeMember { named_cell: at, attribute_type: kind, member, value } => (Some(at), Instruction::write_attribute_member(at, kind, member, value)),
+            Write::RemoveAttribute { named_cell: at, attribute_type: kind } => (Some(at), Instruction::remove_attribute(at, kind)),
+            Write::Wake { named_cell: at, wake } => {
+                debug_assert!(wake > self.current_tick, "an entity to wake at tick {wake}, not after {}", self.current_tick);
                 (Some(at), Instruction::write_wake(at, wake))
             }
         }
@@ -105,52 +105,52 @@ impl Turn<'_> {
     pub fn write(&mut self, write: Write) {
         // A move over a border lands its author in both superchunks: the one it comes to is named first.
         match write {
-            Write::MoveEntity { from, to } if from.superchunk() != to.superchunk() => _ = self.queue_landing_in(to.superchunk()),
+            Write::MoveEntity { from_cell: from, to_cell: to } if from.superchunk() != to.superchunk() => _ = self.queue_landing_in(to.superchunk()),
             _ => {}
         }
-        let (lands, instruction) = self.instruction_of(write);
-        self.queue(lands.unwrap_or_else(|| self.compares_open[self.compares_open_count - 1].at), instruction);
+        let (landing_cell, instruction) = self.instruction_of(write);
+        self.queue_instruction(landing_cell.unwrap_or_else(|| self.compares_open[self.compares_open_count - 1].compared_cell), instruction);
     }
 
-    /// Queues the entity the tick found on `at` -- or made on it
+    /// Queues the entity the tick found on `named_cell` -- or made on it
     /// under the compare open -- given `attribute` whole, the blocks
     /// of one attribute, carried beside the instruction.
     #[inline]
-    pub fn write_attribute(&mut self, at: CellIndex, attribute: &[AttributeBlock]) {
-        let first = self.carry(at, attribute);
-        self.queue(at, Instruction::write_attribute(at, first, attribute.len() as u32));
+    pub fn write_attribute(&mut self, named_cell: CellIndex, attribute: &[AttributeBlock]) {
+        let carried_first = self.carry_blocks(named_cell, attribute);
+        self.queue_instruction(named_cell, Instruction::write_attribute(named_cell, carried_first, attribute.len() as u32));
     }
 
-    /// Queues `compare`, the `writes` under it and its end, at once:
+    /// Queues `group_compare`, the `writes` under it and its end, at once:
     /// what [`Turn::compare_open`], [`Turn::write`] of each and
     /// [`Turn::compare_close`] come to, the queue found once -- most
     /// of what a rule queues is one compare and a write or two.
     #[inline]
-    pub fn compare_with_writes(&mut self, compare: Compare, writes: &[Write]) {
-        let at = compare.compared_cell();
+    pub fn compare_with_writes(&mut self, group_compare: Compare, writes: &[Write]) {
+        let group_cell = group_compare.compared_cell();
         // A move over a border lands its author in two superchunks: queued an instruction at a time, as what goes to the queue of acts is.
-        if writes.iter().any(|write| matches!(write, Write::MoveEntity { from, to } if from.superchunk() != to.superchunk())) {
-            self.compare_open(compare);
+        if writes.iter().any(|write| matches!(write, Write::MoveEntity { from_cell, to_cell } if from_cell.superchunk() != to_cell.superchunk())) {
+            self.compare_open(group_compare);
             writes.iter().for_each(|&write| self.write(write));
             self.compare_close();
             return;
         }
-        let (queue, slot) = self.queue_landing_in(at.superchunk());
-        self.note_named(at, compare.instruction());
-        let (mut cell_writes, counted_before) = (0, self.outbox.queues[queue].instructions.len());
-        self.outbox.queues[queue].instructions.push(compare.instruction().landing_in(slot));
+        let (queue_index, slot) = self.queue_landing_in(group_cell.superchunk());
+        self.note_named(group_cell, group_compare.instruction());
+        let (mut cell_writes, counted_before) = (0, self.outbox.instruction_queues[queue_index].instructions.len());
+        self.outbox.instruction_queues[queue_index].instructions.push(group_compare.instruction().landing_in(slot));
         for &write in writes {
-            let (lands, instruction) = self.instruction_of(write);
-            debug_assert!(lands.is_none_or(|lands| lands.superchunk() == at.superchunk()), "a write of a compare's group landing in another superchunk");
+            let (write_landing, instruction) = self.instruction_of(write);
+            debug_assert!(write_landing.is_none_or(|checked_landing| checked_landing.superchunk() == group_cell.superchunk()), "a write of a compare's group landing in another superchunk");
             cell_writes += u32::from(matches!(write, Write::Cell { .. }));
-            if let Some(lands) = lands {
-                self.note_named(lands, instruction);
+            if let Some(landed_cell) = write_landing {
+                self.note_named(landed_cell, instruction);
             }
-            self.outbox.queues[queue].instructions.push(instruction.landing_in(slot));
+            self.outbox.instruction_queues[queue_index].instructions.push(instruction.landing_in(slot));
         }
         self.writes_queued += cell_writes;
-        let queue = &mut self.outbox.queues[queue];
-        queue.gated.push(Gated { instructions: (queue.instructions.len() - counted_before - 1) as u32, compares_within: 0, writes: cell_writes as u16 });
-        queue.instructions.push(Instruction::compare_end().landing_in(slot));
+        let group_queue = &mut self.outbox.instruction_queues[queue_index];
+        group_queue.gated_by_compares.push(GatedByCompare { instructions: (group_queue.instructions.len() - counted_before - 1) as u32, compares_within: 0, writes: cell_writes as u16 });
+        group_queue.instructions.push(Instruction::compare_end().landing_in(slot));
     }
 }

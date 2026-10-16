@@ -16,7 +16,7 @@ pub use floor_plan::FloorPlan;
 use context_odds::FRACTION_BITS;
 use context_window::{WINDOW_PLACES, Window};
 
-use crate::arithmetic::{Decoder, Encoder, FINISHING_BITS};
+use crate::arithmetic::{RangeDecoder, RangeEncoder, FINISHING_BITS};
 use crate::bit_stream::{BitReader, BitStream};
 use crate::tile::{cells_in_tile, tiles_in_level, Tile, CELLS, FLOOR_LEVEL};
 use bitmap::Bitmap;
@@ -27,11 +27,11 @@ use utilities::fixed_list::FixedList;
 /// Morton order.
 pub const CONTEXT_CELLS: [(i8, i8); 6] = [(-1, -1), (0, -1), (-1, 0), (-2, -2), (0, -2), (-2, 0)];
 /// Contexts: one for every value the context cells can hold.
-const CONTEXTS: usize = 1 << CONTEXT_CELLS.len();
+const CONTEXT_COUNT: usize = 1 << CONTEXT_CELLS.len();
 
 /// The most bits the pass takes over one a residual cell
 /// (`docs/tessera.md`, "The odds").
-pub const MOST_EXTRA_BITS: usize = CONTEXTS * (CELLS.ilog2() as usize / 2 + 1) + (CELLS >> 10) + (CELLS >> 12) + FINISHING_BITS;
+pub const MOST_EXTRA_BITS: usize = CONTEXT_COUNT * (CELLS.ilog2() as usize / 2 + 1) + (CELLS >> 10) + (CELLS >> 12) + FINISHING_BITS;
 
 /// Floor tiles in the bitmap: the 4x4 floor's tiles. A copy is 4x4 or
 /// coarser, and so is every child a copy naming children copies, so a
@@ -58,98 +58,98 @@ const FLOOR_X_BITS: usize = 0x5555_5555 & (FLOOR_TILES - 1);
 /// two fields stepped in place.
 const FLOOR_Y_BITS: usize = FLOOR_X_BITS << 1;
 
-/// Whether `index` is in `set`.
-fn contains(set: &FloorSet, index: usize) -> bool {
-    set[index / u64::BITS as usize] >> (index % u64::BITS as usize) & 1 == 1
+/// Whether `floor_tile_index` is in `floor_set`.
+fn contains(floor_set: &FloorSet, floor_tile_index: usize) -> bool {
+    floor_set[floor_tile_index / u64::BITS as usize] >> (floor_tile_index % u64::BITS as usize) & 1 == 1
 }
 
-/// Adds `index` to `set`.
-fn insert(set: &mut FloorSet, index: usize) {
-    set[index / u64::BITS as usize] |= 1 << (index % u64::BITS as usize);
+/// Adds `floor_tile_index` to `floor_set`.
+fn insert(floor_set: &mut FloorSet, floor_tile_index: usize) {
+    floor_set[floor_tile_index / u64::BITS as usize] |= 1 << (floor_tile_index % u64::BITS as usize);
 }
 
-/// Takes `index` out of `set`.
-fn remove(set: &mut FloorSet, index: usize) {
-    set[index / u64::BITS as usize] &= !(1 << (index % u64::BITS as usize));
+/// Takes `floor_tile_index` out of `floor_set`.
+fn remove(floor_set: &mut FloorSet, floor_tile_index: usize) {
+    floor_set[floor_tile_index / u64::BITS as usize] &= !(1 << (floor_tile_index % u64::BITS as usize));
 }
 
-/// Every floor tile of `set`, in Morton order, each read off it when its
+/// Every floor tile of `floor_set_word`, in Morton order, each read off it when its
 /// turn comes: one taken out of it before then is passed over.
-fn each_floor_tile(set: impl Fn(usize) -> u64, mut visit: impl FnMut(usize)) {
+fn each_floor_tile(floor_set_word: impl Fn(usize) -> u64, mut visit_floor_tile: impl FnMut(usize)) {
     for word_index in 0..FLOOR_SET_WORDS {
-        let mut floor_tiles = set(word_index);
+        let mut floor_tiles = floor_set_word(word_index);
         while floor_tiles != 0 {
-            visit(word_index * u64::BITS as usize + floor_tiles.trailing_zeros() as usize);
+            visit_floor_tile(word_index * u64::BITS as usize + floor_tiles.trailing_zeros() as usize);
             floor_tiles &= floor_tiles - 1;
         }
     }
 }
 
-/// Codes the residual floor tile at `index` in Morton order, each cell at its
-/// context's odds in `cells`, which `odds` learn; `code` encodes, decodes
+/// Codes the residual floor tile at `floor_tile_index` in Morton order, each cell at its
+/// context's odds in `cells`, which `context_odds` learn; `code_cell` encodes, decodes
 /// or prices a cell and says whether it is set. The floor tile's cells, as
 /// one run.
-fn code_residual_floor_tile(odds: &mut [ContextOdds; CONTEXTS], cells: &Bitmap, index: usize, code: &mut impl FnMut(ContextOdds, usize) -> bool) -> u64 {
-    let mut window = Window::around(cells, index);
+fn code_residual_floor_tile(context_odds: &mut [ContextOdds; CONTEXT_COUNT], cells: &Bitmap, floor_tile_index: usize, code_cell: &mut impl FnMut(ContextOdds, usize) -> bool) -> u64 {
+    let mut window = Window::around(cells, floor_tile_index);
     let mut floor_tile_run = 0;
     for place in 0..FLOOR_TILE_CELLS {
-        let context = &mut odds[window.context(place)];
-        let set = code(*context, index * FLOOR_TILE_CELLS + place);
-        if set {
+        let cell_context_odds = &mut context_odds[window.cell_context(place)];
+        let cell_is_set = code_cell(*cell_context_odds, floor_tile_index * FLOOR_TILE_CELLS + place);
+        if cell_is_set {
             window.0 |= 1 << WINDOW_PLACES[place];
             floor_tile_run |= 1 << place;
         }
-        context.learn(set);
+        cell_context_odds.learn_cell(cell_is_set);
     }
     floor_tile_run
 }
 
 /// What the last pass takes for each residual floor tile, priced as the
 /// greedy tiler reaches it, in Morton order, the pass's.
-pub struct Pricing {
+pub struct ResidualPricing {
     /// Each context's odds, as learned so far.
-    odds: [ContextOdds; CONTEXTS],
+    context_odds: [ContextOdds; CONTEXT_COUNT],
     /// Each floor tile's bits, rounded to the nearest, as the counts the
     /// greedy tiler makes are whole bits.
-    prices: Box<[u16; FLOOR_TILES]>,
+    floor_tile_prices: Box<[u16; FLOOR_TILES]>,
 }
 
-impl Pricing {
+impl ResidualPricing {
     /// No floor tile priced.
     pub fn new() -> Self {
-        Self { odds: [ContextOdds::UNSEEN; CONTEXTS], prices: Box::new([0; FLOOR_TILES]) }
+        Self { context_odds: [ContextOdds::UNSEEN_CONTEXT; CONTEXT_COUNT], floor_tile_prices: Box::new([0; FLOOR_TILES]) }
     }
 
     /// Forgets every floor tile priced: before a bitmap's walk.
     pub fn clear(&mut self) {
-        self.odds = [ContextOdds::UNSEEN; CONTEXTS];
+        self.context_odds = [ContextOdds::UNSEEN_CONTEXT; CONTEXT_COUNT];
     }
 
     /// Prices the residual floor tile `floor tile` of `bitmap`, every residual
     /// floor tile before it in Morton order priced: its bits.
-    pub fn price(&mut self, bitmap: &Bitmap, floor_tile: Tile) -> u64 {
-        let mut bits = 0;
-        code_residual_floor_tile(&mut self.odds, bitmap, floor_tile.index(), &mut |odds, cell_index| {
-            let set = bitmap.morton_run(cell_index, 1) == 1;
-            bits += odds.cost(set);
-            set
+    pub fn price_residual_floor_tile(&mut self, bitmap: &Bitmap, floor_tile: Tile) -> u64 {
+        let mut fixed_point_bits = 0;
+        code_residual_floor_tile(&mut self.context_odds, bitmap, floor_tile.place_in_level(), &mut |cell_context_odds, cell_index| {
+            let cell_is_set = bitmap.morton_run(cell_index, 1) == 1;
+            fixed_point_bits += cell_context_odds.cell_cost(cell_is_set);
+            cell_is_set
         });
-        let price = ((bits + (1 << (FRACTION_BITS - 1))) >> FRACTION_BITS) as u16;
-        self.prices[floor_tile.index()] = price;
-        price as u64
+        let rounded_price = ((fixed_point_bits + (1 << (FRACTION_BITS - 1))) >> FRACTION_BITS) as u16;
+        self.floor_tile_prices[floor_tile.place_in_level()] = rounded_price;
+        rounded_price as u64
     }
 
-    /// The bits the residual floor tile at Morton index `index` was priced
+    /// The bits the residual floor tile at Morton index `floor_tile_index` was priced
     /// at.
-    pub fn price_of(&self, index: usize) -> u64 {
-        self.prices[index] as u64
+    pub fn price_of(&self, floor_tile_index: usize) -> u64 {
+        self.floor_tile_prices[floor_tile_index] as u64
     }
 }
 
 /// Room for the last pass, allocated once.
 pub struct LastPass {
     /// How far the pass is.
-    state: PassState,
+    pass_state: PassState,
     /// Encoding: the cells as decoding has them.
     cells_as_decoded: Bitmap,
 }
@@ -158,98 +158,98 @@ pub struct LastPass {
 struct PassState {
     /// A copy waiting on its source, and that source on its own: a
     /// chain, never longer than there are floor tiles.
-    waiting: FixedList<FloorIndex, FLOOR_TILES>,
+    waiting_chain: FixedList<FloorIndex, FLOOR_TILES>,
     /// Copies whose source was a residual floor tile not yet coded, copied at
     /// the end.
-    pending: FixedList<FloorIndex, FLOOR_TILES>,
+    pending_copies: FixedList<FloorIndex, FLOOR_TILES>,
     /// Each context's odds.
-    odds: [ContextOdds; CONTEXTS],
+    context_odds: [ContextOdds; CONTEXT_COUNT],
 }
 
 impl LastPass {
     /// Room for the pass.
     pub fn new() -> Self {
-        let state = PassState { waiting: FixedList::new(), pending: FixedList::new(), odds: [ContextOdds::UNSEEN; CONTEXTS] };
-        Self { state, cells_as_decoded: Bitmap::new() }
+        let pass_state = PassState { waiting_chain: FixedList::new(), pending_copies: FixedList::new(), context_odds: [ContextOdds::UNSEEN_CONTEXT; CONTEXT_COUNT] };
+        Self { pass_state, cells_as_decoded: Bitmap::new() }
     }
 
-    /// Writes the pass of `plan` for `bitmap` to `stream`, after its
+    /// Writes the pass of `floor_plan` for `bitmap` to `stream`, after its
     /// tree.
-    pub fn encode(&mut self, plan: &mut FloorPlan, bitmap: &Bitmap, stream: &mut BitStream) {
+    pub fn encode_last_pass(&mut self, floor_plan: &mut FloorPlan, bitmap: &Bitmap, stream: &mut BitStream) {
         // The cells as decoding has them after the tree: none of a floor tile
         // the tree leaves unsaid.
         self.cells_as_decoded.copy_from(bitmap);
-        let unsaid = &plan.unsaid;
-        each_floor_tile(|word_index| unsaid[word_index], |index| self.cells_as_decoded.clear_morton_run(index * FLOOR_TILE_CELLS, FLOOR_TILE_CELLS));
+        let unsaid_floor_tiles = &floor_plan.unsaid_floor_tiles;
+        each_floor_tile(|word_index| unsaid_floor_tiles[word_index], |floor_tile_index| self.cells_as_decoded.clear_morton_run(floor_tile_index * FLOOR_TILE_CELLS, FLOOR_TILE_CELLS));
         // A pass coding no cell writes nothing: not even the coder's end.
-        let codes_any_cell = plan.residual != [0; FLOOR_SET_WORDS];
-        let mut encoder = Encoder::default();
-        self.state.run_pass(plan, &mut self.cells_as_decoded, &mut |odds, cell_index| {
-            let set = bitmap.morton_run(cell_index, 1) == 1;
-            encoder.encode(set, odds.clear_probability(), stream);
-            set
+        let codes_any_cell = floor_plan.residual_floor_tiles_left != [0; FLOOR_SET_WORDS];
+        let mut range_encoder = RangeEncoder::default();
+        self.pass_state.run_pass(floor_plan, &mut self.cells_as_decoded, &mut |cell_context_odds, cell_index| {
+            let cell_is_set = bitmap.morton_run(cell_index, 1) == 1;
+            range_encoder.encode_bit(cell_is_set, cell_context_odds.clear_probability(), stream);
+            cell_is_set
         });
         if codes_any_cell {
-            encoder.finish(stream);
+            range_encoder.finish_stream(stream);
         }
     }
 
-    /// Reads the pass of `plan` into `cells`, which hold what the tree
+    /// Reads the pass of `floor_plan` into `cells`, which hold what the tree
     /// said.
-    pub fn decode(&mut self, plan: &mut FloorPlan, cells: &mut Bitmap, reader: &mut BitReader) {
+    pub fn decode_last_pass(&mut self, floor_plan: &mut FloorPlan, cells: &mut Bitmap, stream_reader: &mut BitReader) {
         // A pass coding no cell has nothing after it: the coder's start
         // reads past the stream's end, all 0, and nothing more.
-        let mut decoder = Decoder::new(reader);
-        self.state.run_pass(plan, cells, &mut |odds, _| decoder.decode(odds.clear_probability(), reader));
+        let mut range_decoder = RangeDecoder::new(stream_reader);
+        self.pass_state.run_pass(floor_plan, cells, &mut |cell_context_odds, _| range_decoder.decode_bit(cell_context_odds.clear_probability(), stream_reader));
     }
 }
 
 impl PassState {
     /// The pass itself, on `cells`: every floor tile copied or coded, in
     /// Morton order, then the copies that waited.
-    fn run_pass(&mut self, plan: &mut FloorPlan, cells: &mut Bitmap, code: &mut impl FnMut(ContextOdds, usize) -> bool) {
-        self.odds = [ContextOdds::UNSEEN; CONTEXTS];
-        self.pending.clear();
-        let unsaid = plan.unsaid;
-        each_floor_tile(|word_index| unsaid[word_index], |index| {
+    fn run_pass(&mut self, floor_plan: &mut FloorPlan, cells: &mut Bitmap, code_cell: &mut impl FnMut(ContextOdds, usize) -> bool) {
+        self.context_odds = [ContextOdds::UNSEEN_CONTEXT; CONTEXT_COUNT];
+        self.pending_copies.clear();
+        let unsaid_floor_tiles = floor_plan.unsaid_floor_tiles;
+        each_floor_tile(|word_index| unsaid_floor_tiles[word_index], |floor_tile_index| {
             // A floor tile copied as the source of one before it has no source
             // left when its turn comes, and is passed over.
-            if plan.sources[index] != NO_SOURCE {
-                if !self.copy_floor_tile_chain(plan, index, cells) {
-                    self.pending.push(index as FloorIndex);
+            if floor_plan.copy_sources[floor_tile_index] != NO_SOURCE {
+                if !self.copy_floor_tile_chain(floor_plan, floor_tile_index, cells) {
+                    self.pending_copies.push(floor_tile_index as FloorIndex);
                 }
-            } else if contains(&plan.residual, index) {
-                let run = code_residual_floor_tile(&mut self.odds, cells, index, code);
-                cells.set_in_morton_run(index * FLOOR_TILE_CELLS, FLOOR_TILE_CELLS, run);
-                remove(&mut plan.residual, index);
+            } else if contains(&floor_plan.residual_floor_tiles_left, floor_tile_index) {
+                let floor_tile_run = code_residual_floor_tile(&mut self.context_odds, cells, floor_tile_index, code_cell);
+                cells.set_in_morton_run(floor_tile_index * FLOOR_TILE_CELLS, FLOOR_TILE_CELLS, floor_tile_run);
+                remove(&mut floor_plan.residual_floor_tiles_left, floor_tile_index);
             }
         });
-        for pending_index in 0..self.pending.len() {
-            let copied = self.copy_floor_tile_chain(plan, self.pending[pending_index] as usize, cells);
-            debug_assert!(copied, "every source is final by the end");
+        for pending_index in 0..self.pending_copies.len() {
+            let chain_copied = self.copy_floor_tile_chain(floor_plan, self.pending_copies[pending_index] as usize, cells);
+            debug_assert!(chain_copied, "every source is final by the end");
         }
     }
 
-    /// Copies the floor tile at `index`, and first its source when that is a
+    /// Copies the floor tile at `floor_tile_index`, and first its source when that is a
     /// floor tile a copy covers not copied yet, and so on down the chain --
     /// unless the chain ends at a residual floor tile not coded yet: then
     /// nothing. Whether it copied.
-    fn copy_floor_tile_chain(&mut self, plan: &mut FloorPlan, index: usize, cells: &mut Bitmap) -> bool {
-        self.waiting.clear();
-        self.waiting.push(index as FloorIndex);
-        while let Some(&waiting) = self.waiting.last() {
-            let source = plan.sources[waiting as usize];
-            if source == NO_SOURCE {
-                self.waiting.pop();
-            } else if contains(&plan.residual, source as usize) {
+    fn copy_floor_tile_chain(&mut self, floor_plan: &mut FloorPlan, floor_tile_index: usize, cells: &mut Bitmap) -> bool {
+        self.waiting_chain.clear();
+        self.waiting_chain.push(floor_tile_index as FloorIndex);
+        while let Some(&waiting_floor_tile) = self.waiting_chain.last() {
+            let source_floor_tile = floor_plan.copy_sources[waiting_floor_tile as usize];
+            if source_floor_tile == NO_SOURCE {
+                self.waiting_chain.pop();
+            } else if contains(&floor_plan.residual_floor_tiles_left, source_floor_tile as usize) {
                 return false;
-            } else if plan.sources[source as usize] != NO_SOURCE {
-                self.waiting.push(source);
+            } else if floor_plan.copy_sources[source_floor_tile as usize] != NO_SOURCE {
+                self.waiting_chain.push(source_floor_tile);
             } else {
-                let run = cells.morton_run(source as usize * FLOOR_TILE_CELLS, FLOOR_TILE_CELLS);
-                cells.set_in_morton_run(waiting as usize * FLOOR_TILE_CELLS, FLOOR_TILE_CELLS, run);
-                plan.sources[waiting as usize] = NO_SOURCE;
-                self.waiting.pop();
+                let source_run = cells.morton_run(source_floor_tile as usize * FLOOR_TILE_CELLS, FLOOR_TILE_CELLS);
+                cells.set_in_morton_run(waiting_floor_tile as usize * FLOOR_TILE_CELLS, FLOOR_TILE_CELLS, source_run);
+                floor_plan.copy_sources[waiting_floor_tile as usize] = NO_SOURCE;
+                self.waiting_chain.pop();
             }
         }
         true

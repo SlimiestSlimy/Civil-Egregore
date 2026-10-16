@@ -11,15 +11,15 @@ const WIDE_FROM: u32 = CHUNKS_IN_SUPERCHUNK as u32;
 
 /// The first word's bits for the chunks before `chunk`: those with a
 /// map, and those wide.
-fn before(first: u64, chunk: usize) -> (u64, u64) {
-    let below = (1u64 << chunk) - 1;
-    (first & below, first >> WIDE_FROM & below)
+fn bits_before_chunk(first_word: u64, chunk: usize) -> (u64, u64) {
+    let below_mask = (1u64 << chunk) - 1;
+    (first_word & below_mask, first_word >> WIDE_FROM & below_mask)
 }
 
 /// Words a superchunk's maps take, the first of them being `words`.
 pub fn words_of(words: &[u64]) -> usize {
-    let (kept, wide) = before(words[0], CHUNKS_IN_SUPERCHUNK);
-    1 + (kept.count_ones() + wide.count_ones()) as usize * MAP_WORDS
+    let (chunks_with_map, wide_chunks) = bits_before_chunk(words[0], CHUNKS_IN_SUPERCHUNK);
+    1 + (chunks_with_map.count_ones() + wide_chunks.count_ones()) as usize * MAP_WORDS
 }
 
 /// The number of the cell at `place` in the superchunk
@@ -30,8 +30,8 @@ pub fn number_in(words: &[u64], place: usize) -> u16 {
     if words[0] >> chunk & 1 == 0 {
         return 0;
     }
-    let (kept, wide) = before(words[0], chunk);
-    let map = &words[1 + (kept.count_ones() + wide.count_ones()) as usize * MAP_WORDS..];
+    let (chunks_with_map, wide_chunks) = bits_before_chunk(words[0], chunk);
+    let map = &words[1 + (chunks_with_map.count_ones() + wide_chunks.count_ones()) as usize * MAP_WORDS..];
     if words[0] >> (WIDE_FROM + chunk as u32) & 1 == 1 {
         (map[cell / 4] >> (cell % 4 * 16)) as u16
     } else {
@@ -55,16 +55,16 @@ impl ChunkMaps {
         let mut words = vec![0u64];
         for chunk in 0..CHUNKS_IN_SUPERCHUNK {
             let cells = chunk * CELLS_IN_CHUNK..(chunk + 1) * CELLS_IN_CHUNK;
-            let most = cells.clone().map(&number_at).max().unwrap_or(0);
-            if most == 0 {
+            let most_number = cells.clone().map(&number_at).max().unwrap_or(0);
+            if most_number == 0 {
                 continue;
             }
-            let (wide, map) = (most > u8::MAX as u16, words.len());
-            words[0] |= 1 << chunk | (wide as u64) << (WIDE_FROM + chunk as u32);
-            words.resize(map + MAP_WORDS * (1 + wide as usize), 0);
-            let (in_word, bits) = if wide { (4, 16) } else { (8, 8) };
+            let (is_wide, map) = (most_number > u8::MAX as u16, words.len());
+            words[0] |= 1 << chunk | (is_wide as u64) << (WIDE_FROM + chunk as u32);
+            words.resize(map + MAP_WORDS * (1 + is_wide as usize), 0);
+            let (in_word, bits_a_cell) = if is_wide { (4, 16) } else { (8, 8) };
             for (cell, place) in cells.enumerate() {
-                words[map + cell / in_word] |= (number_at(place) as u64) << (cell % in_word * bits);
+                words[map + cell / in_word] |= (number_at(place) as u64) << (cell % in_word * bits_a_cell);
             }
         }
         Self { words: words.into_boxed_slice() }

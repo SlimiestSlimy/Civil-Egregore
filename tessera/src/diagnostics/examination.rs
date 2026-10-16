@@ -9,7 +9,7 @@ use bitmap::Bitmap;
 
 /// What one bitmap's encoding and decoding came to.
 #[derive(Clone, Debug)]
-pub struct Examination {
+pub struct BitmapExamination {
     /// The bits written.
     pub written_bits: usize,
     /// Whether the stream is the binary count tree rather than the tree.
@@ -19,11 +19,11 @@ pub struct Examination {
 }
 
 /// The first cell, in reading order, where two bitmaps differ.
-pub fn first_difference(a: &Bitmap, b: &Bitmap) -> Option<(u8, u8)> {
-    if a.words() == b.words() {
+pub fn first_difference(first_bitmap: &Bitmap, second_bitmap: &Bitmap) -> Option<(u8, u8)> {
+    if first_bitmap.words() == second_bitmap.words() {
         return None;
     }
-    (0..=u8::MAX).flat_map(|y| (0..=u8::MAX).map(move |x| (x, y))).find(|&(x, y)| a.get(x, y) != b.get(x, y))
+    (0..=u8::MAX).flat_map(|y| (0..=u8::MAX).map(move |x| (x, y))).find(|&(x, y)| first_bitmap.get(x, y) != second_bitmap.get(x, y))
 }
 
 /// The tree Tessera makes of `bitmap`, whichever stream it writes.
@@ -33,12 +33,12 @@ pub fn tree_of(bitmap: &Bitmap) -> Tree {
     tessera.tree().clone()
 }
 
-impl Examination {
+impl BitmapExamination {
     /// Encodes `bitmap` with `tessera` into `stream` and decodes it into
-    /// `back`.
-    pub fn examine_bitmap(tessera: &mut Tessera, stream: &mut BitStream, back: &mut Bitmap, bitmap: &Bitmap) -> Self {
+    /// `decoded_bitmap`.
+    pub fn examine_bitmap(tessera: &mut Tessera, stream: &mut BitStream, decoded_bitmap: &mut Bitmap, bitmap: &Bitmap) -> Self {
         tessera.encode(bitmap, stream);
-        tessera.decode(stream, back);
-        Self { written_bits: stream.len(), binary_count_tree: stream.words()[0] & 1 == 1, first_difference: first_difference(bitmap, back) }
+        tessera.decode(stream, decoded_bitmap);
+        Self { written_bits: stream.len(), binary_count_tree: stream.words()[0] & 1 == 1, first_difference: first_difference(bitmap, decoded_bitmap) }
     }
 }

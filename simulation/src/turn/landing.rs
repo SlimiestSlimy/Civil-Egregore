@@ -10,11 +10,11 @@ use entity_manager::SuperchunkEntities;
 
 /// Where instructions land as they are applied: the superchunk of
 /// an outbox slot and its entities, if it is hot.
-pub(crate) trait Landing {
+pub(crate) trait InstructionLanding {
     /// Whether it lands in several superchunks: only then is an
     /// entity found where it crossed to, or had cross. Known as the
     /// code is built, so a slot's queue asks neither.
-    const SEVERAL: bool;
+    const LANDS_IN_SEVERAL: bool;
 
     /// The superchunk of the slot `slot` of the outbox the
     /// instructions were queued in, and its entities.
@@ -26,25 +26,25 @@ pub(crate) trait Landing {
     /// border this tick and the superchunk it came to is held.
     #[inline]
     fn of_named(&mut self, instruction: &Instruction) -> Option<(&mut Superchunk, &mut SuperchunkEntities, CellIndex)> {
-        let (superchunk, entities) = self.of_slot(instruction.outbox_slot())?;
-        let at = instruction.cell_in(superchunk.index());
-        Some((superchunk, entities, at))
+        let (superchunk, slot_entities) = self.of_slot(instruction.outbox_slot())?;
+        let named_cell = instruction.cell_in(superchunk.superchunk_index());
+        Some((superchunk, slot_entities, named_cell))
     }
 
     /// What the crossing `instruction` is applied to: the cell the
     /// entity is named by, the cell it comes to, the superchunk it
     /// leaves and the one it comes to. None unless both are held.
-    fn of_crossing(&mut self, _: &Instruction) -> Option<(CellIndex, CellIndex, Held<'_>, Held<'_>)> {
+    fn of_crossing(&mut self, _: &Instruction) -> Option<(CellIndex, CellIndex, SuperchunkAndEntities<'_>, SuperchunkAndEntities<'_>)> {
         None
     }
 
     /// Notes that the entity named by `stood` crossed to `to`.
-    fn crossed(&mut self, _stood: CellIndex, _to: CellIndex) {}
+    fn note_crossed(&mut self, _stood: CellIndex, _to: CellIndex) {}
 }
 
 /// A superchunk held as instructions are applied to it, and its
 /// entities.
-pub(crate) type Held<'a> = (&'a mut Superchunk, &'a mut SuperchunkEntities);
+pub(crate) type SuperchunkAndEntities<'a> = (&'a mut Superchunk, &'a mut SuperchunkEntities);
 
 /// One superchunk, all a queue's instructions landing in it: the
 /// queue of a slot.
@@ -52,15 +52,15 @@ pub(crate) struct LandingInOne<'a> {
     /// The superchunk.
     pub(crate) superchunk: &'a mut Superchunk,
     /// Its entities.
-    pub(crate) entities: &'a mut SuperchunkEntities,
+    pub(crate) superchunk_entities: &'a mut SuperchunkEntities,
 }
 
-impl Landing for LandingInOne<'_> {
-    const SEVERAL: bool = false;
+impl InstructionLanding for LandingInOne<'_> {
+    const LANDS_IN_SEVERAL: bool = false;
 
     #[inline]
     fn of_slot(&mut self, _: usize) -> Option<(&mut Superchunk, &mut SuperchunkEntities)> {
-        Some((self.superchunk, self.entities))
+        Some((self.superchunk, self.superchunk_entities))
     }
 }
 
@@ -70,51 +70,51 @@ impl Landing for LandingInOne<'_> {
 pub(crate) struct LandingInSeveral<'a> {
     /// The superchunk whose outbox the instructions were queued in:
     /// what the slots are told from.
-    pub(crate) source: SuperchunkIndex,
+    pub(crate) source_superchunk: SuperchunkIndex,
     /// The superchunk of each slot, and its entities.
-    pub(crate) lands: [Option<Held<'a>>; super::SLOTS],
+    pub(crate) slot_superchunks: [Option<SuperchunkAndEntities<'a>>; super::SLOTS],
     /// The superchunks held besides: those entities the act names
     /// crossed to, which may be no neighbour of `source`.
-    pub(crate) also: Vec<Held<'a>>,
+    pub(crate) also_superchunks: Vec<SuperchunkAndEntities<'a>>,
     /// The entities the act had cross a border, each by the cell
     /// that names it, with the cell it came to.
-    pub(crate) crossed: Vec<(CellIndex, CellIndex)>,
+    pub(crate) crossed_entities: Vec<(CellIndex, CellIndex)>,
 }
 
-impl Landing for LandingInSeveral<'_> {
-    const SEVERAL: bool = true;
+impl InstructionLanding for LandingInSeveral<'_> {
+    const LANDS_IN_SEVERAL: bool = true;
 
     #[inline]
     fn of_slot(&mut self, slot: usize) -> Option<(&mut Superchunk, &mut SuperchunkEntities)> {
-        self.lands[slot].as_mut().map(|(superchunk, entities)| (&mut **superchunk, &mut **entities))
+        self.slot_superchunks[slot].as_mut().map(|(superchunk, slot_entities)| (&mut **superchunk, &mut **slot_entities))
     }
 
     fn of_named(&mut self, instruction: &Instruction) -> Option<(&mut Superchunk, &mut SuperchunkEntities, CellIndex)> {
         let slot = instruction.outbox_slot();
-        let at = instruction.cell_in(self.source.offset(slot as i32 % 3 - 1, slot as i32 / 3 - 1)?);
+        let named_cell = instruction.cell_in(self.source_superchunk.at_cartesian_offset(slot as i32 % 3 - 1, slot as i32 / 3 - 1)?);
         // Where the tick found it, unless it crossed a border since: then whichever superchunk held it came to.
-        let stayed = self.lands[slot].as_ref().is_some_and(|(_, entities)| entities.crossed_to(at).is_none());
-        if !stayed {
-            let came_to = |held: &Held| held.1.named_from_abroad(at);
-            if let Some(found) = self.lands.iter().position(|held| held.as_ref().is_some_and(came_to)) {
-                return self.lands[found].as_mut().map(|(superchunk, entities)| (&mut **superchunk, &mut **entities, at));
+        let stayed_in_slot = self.slot_superchunks[slot].as_ref().is_some_and(|(_, stayed_entities)| stayed_entities.crossed_to(named_cell).is_none());
+        if !stayed_in_slot {
+            let came_to = |candidate_superchunk: &SuperchunkAndEntities| candidate_superchunk.1.named_from_abroad(named_cell);
+            if let Some(found_slot) = self.slot_superchunks.iter().position(|slot_superchunk| slot_superchunk.as_ref().is_some_and(came_to)) {
+                return self.slot_superchunks[found_slot].as_mut().map(|(superchunk, found_entities)| (&mut **superchunk, &mut **found_entities, named_cell));
             }
-            if let Some((superchunk, entities)) = self.also.iter_mut().find(|held| came_to(held)) {
-                return Some((&mut **superchunk, &mut **entities, at));
+            if let Some((superchunk, also_entities)) = self.also_superchunks.iter_mut().find(|also_superchunk| came_to(also_superchunk)) {
+                return Some((&mut **superchunk, &mut **also_entities, named_cell));
             }
         }
-        self.lands[slot].as_mut().map(|(superchunk, entities)| (&mut **superchunk, &mut **entities, at))
+        self.slot_superchunks[slot].as_mut().map(|(superchunk, slot_entities)| (&mut **superchunk, &mut **slot_entities, named_cell))
     }
 
-    fn of_crossing(&mut self, instruction: &Instruction) -> Option<(CellIndex, CellIndex, Held<'_>, Held<'_>)> {
-        let (slot, to) = (instruction.outbox_slot(), CellIndex(instruction.first));
-        let came_to = self.lands.iter().position(|held| held.as_ref().is_some_and(|held| held.0.index() == to.superchunk()))?;
-        let [from, into] = self.lands.get_disjoint_mut([slot, came_to]).ok()?;
-        let (from, into) = (from.as_mut()?, into.as_mut()?);
-        Some((instruction.cell_in(from.0.index()), to, (&mut *from.0, &mut *from.1), (&mut *into.0, &mut *into.1)))
+    fn of_crossing(&mut self, instruction: &Instruction) -> Option<(CellIndex, CellIndex, SuperchunkAndEntities<'_>, SuperchunkAndEntities<'_>)> {
+        let (slot, to_cell) = (instruction.outbox_slot(), CellIndex(instruction.first_operand));
+        let came_to = self.slot_superchunks.iter().position(|slot_superchunk| slot_superchunk.as_ref().is_some_and(|hot_superchunk| hot_superchunk.0.superchunk_index() == to_cell.superchunk()))?;
+        let [from_slot_entry, into_slot_entry] = self.slot_superchunks.get_disjoint_mut([slot, came_to]).ok()?;
+        let (from_superchunk, into_superchunk) = (from_slot_entry.as_mut()?, into_slot_entry.as_mut()?);
+        Some((instruction.cell_in(from_superchunk.0.superchunk_index()), to_cell, (&mut *from_superchunk.0, &mut *from_superchunk.1), (&mut *into_superchunk.0, &mut *into_superchunk.1)))
     }
 
-    fn crossed(&mut self, stood: CellIndex, to: CellIndex) {
-        self.crossed.push((stood, to));
+    fn note_crossed(&mut self, stood_cell: CellIndex, to_cell: CellIndex) {
+        self.crossed_entities.push((stood_cell, to_cell));
     }
 }

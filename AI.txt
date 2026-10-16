@@ -1,7 +1,8 @@
-AI WORKSPACE -- this file is the AI's own: its notes, rules and open
-threads for working on Civil Egregore, written for an AI first and a
-person second. The AI keeps it current and may rewrite it whole; a
-person reads it to see what the AI goes by. Plain text on purpose.
+AI WORKSPACE -- this file is the AI's own: the design statements as it
+reads them, the rules it works by, and what is left to do. Plain text
+on purpose. Everything else it used to hold (the design in force in
+the user's words, what was settled, the tasks done) is in this file's
+history up to ed985b5, and in each commit's first line.
 
 Docs that say the rest: docs/style_guide.md, docs/testing_protocol.md,
 docs/glossary.md (one name per thing -- use its names, not the ones in
@@ -68,796 +69,125 @@ better inside the cut I was given (a queue a superchunk). The user
 moved the cut (an entity's act is one stream wherever it lands).
 Boundaries, asked first, would have put that on the table.
 
-How I failed it, to remember: I kept it out of commits and never
-opened it. Applied late on 2026-10-11 it found a save format number
-not raised after the blocks changed, a size limit written and not
-enforced, and a question (the size byte) drifting into "decided".
-
-
-== SESSIONS ==
-
-LOCAL (the user's PC, has a screen)
-  Bevy is built. The renderer is kept working, and running worlds are
-  tested and measured in it: `cargo run --release`, a world made from
-  the main menu. A run's census is server/transient_data/measurements/
-  census.csv (ticks, the seconds they took, the pace, sheep, grass).
-
-REMOTE (cloud, no screen)
-  gui and renderer: only `cargo check --offline -p gui` / `-p renderer`
-  (debug, no --release) is allowed. Never build, run, clippy or test
-  them remotely; the renderer is run on the local machine.
-  Never `--workspace` (it builds Bevy). Per crate:
-    cargo test   --release --offline -p <crate>
-    cargo clippy --release --offline -p <crate> --all-targets
-  The root crate without Bevy, after checking
-  `cargo tree -p Civil_Egregore --no-default-features --offline | grep -c bevy`
-  prints 0:
-    cargo clippy --release --offline -p Civil_Egregore --no-default-features --all-targets
-
 
 == ALWAYS ==
 
-- EVERY COMMIT MESSAGE ENDS WITH "Decided on my own:" (the user,
-  2026-10-09): one line each, every choice the user did not ask for or
-  specify -- a new name, constant, threshold, limit, data layout, crate
-  or module boundary, fallback, cap, default, or behaviour beyond the
-  request -- what was chosen and why. If there is none: "Decided on my
-  own: nothing." (Above the Co-Authored-By line.)
-- BEFORE EACH COMMIT, `cargo run --release -- docs stale` (the user,
-  2026-10-09; `docs stale <from commit>` for more than the last
-  commit): every doc section the changed code's comments point at that
-  the change left untouched. Each section it lists is read, and either
-  updated or the commit says why it still holds. A list, not a test.
-- THIS FILE AND THE SCRATCHPAD ARE CLEANED UP AS I GO (the user,
-  2026-10-09). AI.txt: a task done is struck to a line or removed, a
-  note that no longer holds is deleted, nothing said twice; it stays
-  short enough to read whole after a break. The scratchpad
-  (AI_SCRATCHPAD the crate, and the session's scratch folder): a probe
-  or script is removed once what it was for is done or has moved to
-  where it belongs.
-- Never run `cargo fmt`; never `cargo clippy --fix` (both reformat).
-- CODE EXPLAINS ITSELF ROUGHLY, DOCS EXPLAIN THE CODE IN DETAIL (the
-  user, 2026-10-09, "really seriously"). Names and short comments give
-  the rough picture; docs/ carry the how and the why, and are current:
-  a change is not done until every doc describing what it touched --
-  the crate's docs/<crate>.md and docs/reference.md, the root docs/,
-  the README, the glossary, this file -- says what the code now does.
-  After a batch of changes, a pass over all docs against the code.
-- Testing, committing and pushing are separate commands: a test's
-  output is read before the commit is made.
-- Clippy warnings are cleaned before a commit.
-- No test or tool has a seed written in it: all take the one in
-  transient_data/seed.csv, rolled every 5 counted runs
-  (utilities::seed; env `CIVIL_EGREGORE_SEED=<hex>` or `=fresh` for one
-  run). A test holds on any seed; a changed test is checked on several
-  fresh ones.
-- Every command goes through the root program:
-  `cargo run --release -- help` lists them.
-- A doc gives a performance figure only where it explains an
-  optimization, before and after.
-- Renames: the language server where it is easier; folder names,
-  package names and prose by hand.
-- No file much past 300 lines: a longer one is split into child
-  modules by concern, public paths unchanged (a test tier's topics
-  into tests/<tier>/<topic>.rs, named by #[path]). After a split of
-  hot code, count instructions before and after: a function moved to
-  another module may stop being inlined (Window::around did).
-- Names are long, human and descriptive, and the glossary's:
-  context_odds, world_files, host_thread -- not odds, info, thread.
-- The renderer never stalls on the simulation: it asks for frames and
-  shows what comes, never waiting on the host, however far the
-  simulation is behind the viewport.
+- EVERY COMMIT MESSAGE ENDS WITH "Decided on my own:" (above the
+  Co-Authored-By line): one line each, every choice the user did not
+  ask for -- a name, constant, threshold, limit, layout, boundary,
+  default, behaviour beyond the request -- and why. None: "Decided on
+  my own: nothing."
+- BEFORE EACH COMMIT, `cargo run --release -- docs stale`: each doc
+  section it lists is read, and updated or the commit says why it
+  still holds.
+- Code explains itself roughly, docs explain it in detail: a change is
+  not done until every doc describing what it touched says what the
+  code now does. The glossary first, then the docs.
+- Testing, committing and pushing are separate commands; clippy
+  warnings are cleaned before a commit. Never `cargo fmt`, never
+  `cargo clippy --fix`.
+- REMOTE (cloud, no screen): never `--workspace` (it builds Bevy); gui
+  and renderer only `cargo check --offline -p gui -p renderer`. Per
+  crate: `cargo test --release --offline -p <crate>` and
+  `cargo clippy --release --offline -p <crate> --all-targets`; the
+  root with `-p Civil_Egregore --no-default-features`.
+- LOCAL: every run that ticks a world is shown (CIVIL_EGREGORE_RENDER
+  set): "running headless is forbbiden until further notice".
+- No seed written in a test or tool: all take transient_data/seed.csv
+  (utilities::seed). Every command goes through the root program
+  (`cargo run --release -- help`).
+- Measure before calling a change done, against the commit before.
+  `Civil_Egregore server check` prints the world's hash: a change that
+  is not meant to change behaviour leaves it as it was.
+- Names are long, human and descriptive, and the glossary's. No file
+  much past 300 lines.
+- This file stays short: a task done is removed, a note that no longer
+  holds is deleted.
 
 
-== FILES ==
+== TO DO ==
 
-- Every text file kept is CSV (utilities::csv): a first row naming the
-  columns; lines starting `#` are notes (a report's notes and `##`
-  table titles, the census's seed), `---` a table divider. Seeds are
-  written in hexadecimal (utilities::seed::hex). Settings and world
-  files are read by name, in any order, missing rows filled by
-  defaults.
-- Binary is fine for world data. A saved world is a folder:
-  world.csv (what it is), hot.csv (its hot, cooling and warming
-  superchunks), and superchunks/ with two files a superchunk, named by
-  its index in hex: <index>.image (its cells' layers, as the cold pool
-  holds them) and <index>.state (its random numbers and its entities,
-  attributes and all) -- terrain and entities kept apart.
-- Not CSV and fine: tessera's saved worst bitmaps (.pbm, an image
-  format), rendered .png, tool configs (.toml, .json).
-- utilities/default_settings.csv and utilities/sliders.csv are written
-  by hand; nothing generates them.
+NOW
+- NAME SWEEP (the user, 2026-10-16): every ambiguous single-word name
+  gets a name of two or more words saying what it is in its place.
+  Exempt: single-word glossary terms, x/y/dx/dy, the Rust idioms (new,
+  default, len, get, set, push, pop, insert, remove, clear, contains,
+  iter, main), trait-impl methods, names a framework requires. Renamed
+  through rust-analyzer; markdown docs and comments follow by script;
+  checked by the world hash. What rust-analyzer misses, by hand:
+  macro_rules bodies, a test helper file included by several test
+  targets (one target's uses only), and tests behind a dev-dependency
+  cycle (entity_rules and sca_rules tests use server, which depends on
+  them). tessera/external_benchmarks done too.
+  HANDOFF (2026-10-16, committed mid-way at the user's word): the
+  code renames are in (about 8,050, rust-analyzer, one snapshot) and
+  everything compiles; clippy was clean and the world hash equal to
+  the one before after the code renames. NOT DONE:
+  1. Docs: the root fine test `every_item_is_in_its_crates_docs`
+     fails on 64 renamed items no doc names yet -- tessera 26,
+     entity_manager 9, gui 7, simulation 7, worldgen 5, actions 3,
+     chunk_storage 3, type_registry 2, bitplane_manager 1,
+     pathfinding 1 (run it for the list). server, sca_rules,
+     renderer and utilities are done by hand. For each item: find
+     where HEAD~1's docs named it (`git show HEAD~1:<doc>`) and put
+     the new name there.
+  2. Docs audit: the script passes that made docs follow renamed some
+     words to the wrong item's new name (e.g. gui reference.md
+     `OpenWorld(set_world_name)` and `Save(set_world_name)`, meant
+     `(name)`; renderer's `cell_tint` for relief's `height_tint`;
+     server's `print_throughput::run_throughput` for
+     `throughput::run_throughput`). Struct field lists `{a, b}` in
+     the docs were mostly not followed (HostLink, TunedNumber,
+     MemoryReading, WorldStart fixed; gui's `CapturedInput`
+     `{pointer, wheel, keys}` is not). Every changed word against
+     HEAD~1 should be read: does the new name belong to the item
+     that section means?
+  3. Re-run before calling it done: every headless crate's tests and
+     clippy, the root's, `cargo check -p gui -p renderer`,
+     `server check` against the hash before, `docs stale`. The tests
+     last passed before the forced second pass (87 renames) and
+     clippy's field shorthand fixes.
+  4. Tell the user what was left unrenamed: the CSV-bound fields,
+     Tessera::encode/decode (callgrind reads them), and the unclear
+     names flagged while renaming.
+- THEN, transient data folded into utilities (the user's): each
+  crate's lib.rs or main.rs, after its imports, declares statically
+  its transient data paths, to the files themselves; utilities::csv
+  takes a flag to make the file and its folders for any path, so disk
+  storage stays with the file interactor, the csv library.
 
+ASKED, NOT DONE
+- "change the environment flag to a cargo feature flag LOL"
+  (CIVIL_EGREGORE_RENDER).
+- Weather, later: water conserved roughly; the ocean told from lakes;
+  lakes can dry, the ocean never.
 
-== WHERE THINGS GO ==
+WAITING ON THE USER
+- Mask / word-of-cells instructions ("this will have to wait").
+- Entities of more than a cell ("later ... im gonna get into details").
+- Whether the whole-attribute compare (by sum) or the member compare is
+  set_attribute's default ("both are fine by me").
+- How tile planes are kept cold: raw, or bit-planes through Tessera
+  (today).
+- The user's to check: the land and worldgen's speed; whether the
+  mipmaps stop the shimmer; the Linux/Windows `server check`
+  comparison; whether Around/Area/Window should be one shape.
 
-- A rule (entity_rules/, sca_rules/) reaches the simulation only
-  through actions/: what it lacks is added there.
-- What is hot and for how long is the simulation's (simulation::halos);
-  the server only defines it (server::hot_of -> simulation::Hot:
-  About { entity, side, viewport } or Forced), hands over what
-  generates a superchunk, and passes each frame's viewport to
-  Halos::keep_viewport. With Hot::About.viewport (the world's camera
-  loads superchunks) EVERY superchunk of the viewport is hot, unioned
-  with the entity halos, independent of them -- no cap (the old 8x8
-  CAMERA_SIDE was an unrequested invention, removed). Off: only the
-  entities make superchunks hot.
-- server owns a world's start (server::Start); the CLI and the gui
-  both feed it.
-- The renderer asks the host (server::host) for frames; the host never
-  sends unasked. An ask is answered a few superchunks at a time between
-  ticks (HostThread::answer_a_little, FRAMES_SHARE of a tick when there
-  is no time to spare), each few a Frame, the last with more = false;
-  the renderer shows every frame queued and asks again after the last.
-  Nothing asked is dropped or capped to spare the ticks. Measured by
-  `AI_SCRATCHPAD ticks_under_a_wide_viewport` (it waits for the world
-  to settle first, or the baseline reads the world's making).
-
-
-== WORDS (beyond the glossary) ==
-
-- viewport: whatever the renderer should render, in superchunks; none
-  in map mode. Everything else in the renderer uses Bevy's own terms.
-  Our viewport is not Bevy's camera `Viewport`.
-- map mode: toggled with M, at any zoom; no cells are asked for.
-
-
-== FULL LOAD ==
-
-The world is hot only about its hot entities. For a fixed load, make a
-world with a side forced hot: in the renderer, the main menu's new
-world, sliders' world group (side, forced hot, sheep a superchunk);
-headless, `cargo run --release -- server new <folder> <seed> <sheep>
-<side> 1`. Only a world with a side can be forced hot.
-
-
-== SETTLED BY THE USER (2026-10-09) ==
-
-- The tree rule is separate from worldgen: a generated cover drifting
-  to the rule's own balance is the simulation, not a fault.
-- No cap slider on the viewport's hot superchunks.
-- Rules depend on `actions` alone (it was `instructions`): it hands
-  on no internals (no arena, no entities' store, no storage). The
-  user rejected a module that re-exported those.
-- World formats are not stabilized: no backwards compatibility kept.
-- A crate holds only what its name implies; mixing across crates is
-  forbidden. Every world -- the program's, a test's, a tool's -- is
-  made by server::start(Start { .. }), whatever it is to be: no mock
-  world anywhere (one was rejected). A rule's tools
-  are therefore the server's (server/src/diagnostics/); its tests are
-  its own crate's since 2026-10-10 (review item 5), on a world the
-  server makes -- `server` a dev-dependency, the helpers the server's
-  tests/tests.rs by #[path] -- on worldgen's Generation::plain: flat,
-  dry, no walls, no trees.
-- The server is the starter and coordinator and generates nothing:
-  worldgen says what is on each cell (generate_superchunk ->
-  chunk_storage::SuperchunkCells), chunk_storage makes the image of
-  them and keeps it cold, the server passes finished images and
-  entity states between the managers and the disk. The renderer
-  asks the server alone: server::host::frame for what is hot (its bit
-  layout included), server::host::terrain_seen for the ground and the
-  map where nothing is hot. It depends on server, gui, coordinates and
-  utilities, and on nothing under the server.
-- NOT KNOWING WHERE SOMETHING GOES: put it in `utilities` or in
-  AI_SCRATCHPAD, TEMPORARILY (unless it really is a utility), and tell
-  the user. What the program needs can only wait in `utilities`.
-- AI.txt and the crate AI_SCRATCHPAD are the AI's to use freely.
-  NOTHING MAY DEPEND ON AI_SCRATCHPAD. Probes go there as commands,
-  not as temporary tests:
-    cargo run --release -p AI_SCRATCHPAD -- <command>
-
-
-== LOOKING AT WHAT IS DRAWN ==
-
-No screenshots: `cargo run --release -- renderer stills <seed hex>
-<cells east> <cells south> <farthest cells a pixel> <name>` paints one
-place of a world at every zoom (map, far, a cell a pixel, near) by the
-window's own painter, to renderer/transient_data/renders/<name>_*.png,
-some 15 s. Seed 0 is the counted one, which rolls: pin a seed to
-compare two shadings. What a height does to a colour is one file,
-renderer/src/ground/relief.rs, shared by far, near and map.
-`AI_SCRATCHPAD how_steep_the_land_is`: half the default land is level,
-a third walls (rise 2+), with rises past 64 -- shading has to span it.
-Seen in the stills: sheep stand on deep ocean cells (told to the user).
-
-
-== TYPES AND RULES ==
-
-A new layer, wide plane, entity type, attribute or rule (its row
-names its one master) is its constant
-and its row in type_registry/src/registry.rs, written by hand (no
-macro: a runtime registry is to come, for mods); the build fails
-naming it if its IDs or name clash. A
-new rule is a row in server/src/rules.rs (RULES). chunk_storage and
-entity_manager still hand on LayerType/Wide/EntityType/AttributeType
-under their own names (told to the user: a shortcut, not a decision).
-
-
-== DETERMINISM ==
-
-`cargo run --release -- server check <seed hex> <ticks> [every]
-[sheep] [threads]` prints server::world_hash part by part (cells,
-entities, random streams, halos, cold) with nothing of the machine in
-the output: two machines' files are compared with cmp. No float
-in what a world follows from: chances are utilities::chance::Chance
-(parts in 2^32), gaps a fixed-point log2 over another; the root
-clippy.toml forbids ln/exp/powf/sin/... and Rng::unit everywhere but
-the crates with an (empty) clippy.toml of their own. Same rows on 1
-thread and on all, hashed along the way or once (2026-10-09). The
-Linux/Windows comparison is the user's to run. No camera in it.
-
-
-== TASKS ==
-
-Read this first after any break; write a new ask here the moment it is
-made, in the user's words. What is done is in the git log, with the
-user's words in each commit's first line; the long form of every
-decision below is in this file's history up to 5476cd2.
-
-NOW, the user, 2026-10-11, in this order:
-1. "trim AI.txt first" -- this rewrite.
-2. "the sheep need to be less hungry now that they wander more lol".
-3. "tessera is fine as is, what matters more for reduction and
-   simplification is simuulation code and then the rest" -- code size
-   reduction and simplification: `simulation` first, then the other
-   crates, not tessera. ("after finishing all the queued tasks, were
-   doing code size reduction and simplification".)
-4. "btw i still see a lot of \"tick\" in sheep.rs, we should be using
-   sim-seconds instead" (said while 2 was measured).
-   And: "everything using ticks that can use simulation time should
-   do it, actions, rules of any kind, etc".
-5. "also, type registry could use some better words haha, i hope the
-   glossary is updated, thats what must be updated first before any
-   docs" -- RULE: the glossary first, then the docs.
-ANSWERED 2026-10-11 (asked): `Supertype` -> `Kind`, the row's enum
-`Kind` -> `Registration`, glossary first; moments (wake, hungry_at,
-now) stay ticks, lengths alone are simulation time; clouds: "Plane
-and shadow only" for the first step (registered at the 8x8 scale,
-stored, saved, drawn; empty until the weather rule is described);
-order: "Words, simplify, clouds".
-SUGGESTED, not asked ("i said probably, thats not an ask, is a
-   suggestion"): "we should probably have a modular absrtaction for
-   redirecting writes and compares to the right entities based on the
-   provided entity id". Taken up lightly 2026-10-11: the second
-   phase's routing state is one type, `Following`
-   (tick/applying/following.rs). Not done: the finding itself
-   (LandingInSeveral::of_named; entity_manager's left_this_tick,
-   crossed_to, named_from_abroad) is still where it was -- to weigh
-   when entity_manager is simplified. It would be one
-   module that says where the entity
-   of a name stands now -- today spread over entity_manager
-   (left_this_tick, crossed_to, named_from_abroad), turn/landing.rs
-   (of_named) and tick/applying/following.rs (the re-pointing).
-THEN: climate ("good, now were going to work on climate!"). Said
-2026-10-11: "ok, now here is the climate stuff, we have a new
-wideplane, of 4 bits per cell as well, its the cloud layer, this
-simply casts a shadow with differing intensity based on the number,
-where 0 is no cloud and 15 is max cloud shadow, but this bitplane
-works in 8x8 sections of the world, ie each cell in this plane covers
-an 8x8 area of the world". "im just giving details for now. for each
-8x8 area we have another 3 wideplanes, humidity and temperature. and
-a wind vector, all 4 bits wide (except temperature which is 8)". So
-"BUT those 3 planes are merged in one 16 bit wide plane for
-optimization reasons lol, basically a single \"climate\" plane". So
-two planes at the 8x8 scale: the cloud plane, 4 bits; the climate
-plane, 16 bits = humidity 4 + temperature 8 + wind 4 (a vector in 4
-bits, and which bits are whose: to be asked). Not
-said yet: what makes and moves them.
-THE WEATHER RULE, asked 2026-10-11 (the task in hand): "ok, now here
-is the thing the clouds create \"rain\" when reching a level above 12.
-(0-15)"; "we SCA sample the climate layers, more humidity means a
-higher chance of adding +1 level to the corresponding cloud, the wind
-vector basically moves clouds by sustracting a cloud level from the
-current tile if possible and adding it to the cloud tile the wind
-vector points to, on bodies of water higher temperature means
-increased evaporation into clouds. in land the opposite happens".
-ANSWERED (asked) on the weather: WIND "has the following 16 possible
-states: calm / north 1 / west 1 / south 1 / east 1 / north 2 / west 2
-/ south 2 / east 2 / north 3 / west 3 / south 3 / east 3 where the
-number is the intensity of the wind. also, wind vectors have to
-dynamically change as well based on the surroundings, ill leave that
-modeling to you" (so 0 calm, 1-4 N W S E at 1, 5-8 at 2, 9-12 at 3,
-13-15 unused); RAIN "Only drawn for now"; LAND HEAT "Burns clouds
-off"; CLIMATE SOURCE "worldgen, then dynamically change over time, so
-we need worldgen to be decent so newly generated chunks dont have
-climate catastrophes lmao". THEN, said after: "we want a simplified
-but realistic simulation, water in the cycle must be conserved
-roughly, in fact, we need to distiguish the ocean from lakes, lakes
-can dry off, the ocean never will as you can imagine".
-THEN: "but thats for later" / "right now just implement cloud
-formation and the other stuff" -- so NOW: cloud formation by humidity,
-wind moving clouds, evaporation over water by heat, heat over land
-burning clouds off, rain drawn, worldgen's climate. LATER: water
-conserved roughly, the ocean told from lakes, lakes drying.
-WEATHER, DONE (stage 1): Climate/Wind layout in type_registry,
-worldgen's climate (smooth noise at world coordinates), the rule
-sca_rules::weather (tile sampled every 2 s on average: wind blows a
-level, else deepens/thins towards humidity, +heat over water, -heat
-over land, rain sheds), rain drawn as streaks. MINE, not asked: a
-cloud over its humidity thins; rain sheds; the wind is worldgen's and
-does not change yet. NOT DONE: wind/climate changing with the
-surroundings, water conserved, ocean vs lakes, lakes drying. Cost:
-about 1.17 M instructions a tick on the check world (+21% there, a
-world of few sheep); worldgen +4.6%. Never seen in the renderer yet.
-ASKED 2026-10-11, while the weather was being built (NEXT, right
-after the weather is committed): "instead of manually registering
-things around the codebase, make the codebase use watever is in the
-type registry". To survey: server's RULES table (name, ID written by
-hand beside the registry's row), worldgen's list of planes, the
-frame's layers, actions::layers, whatever lists layer types by hand.
-   DONE for it: server's RULES made of the registry's rules at compile
-   time (no list; only ID -> function, `written_for`), RulePlace::from_registry_id(id);
-   actions::types = the registry whole (was three hand lists). Left as
-   they are, being uses and not registrations: worldgen's planes it
-   generates, the frame's planes it sends. TO TELL the user, theirs to
-   say if they meant more.
-ASKED 2026-10-11, same while (AFTER the weather, its own commit):
-"and make grass not die anymore, were now going to make grass die
-depending on climate over a very small sampling rate".
-   DOING: decay by neighbours gone; a cell of grass sampled rarely
-   (MEAN_TIME_TO_DECAY) dies with dry x hot of its tile's climate.
-   MINE: that it is drought (dry and hot) that kills, and the rate.
-ASKED 2026-10-11 (evening), while the long pasture ran: "wait, do it
-with renderer on"; then "wait" / "we need sheep to eat more and
-reproduce way less" / "and enable the renderer good this time, i want
-to see the tests running, not just a random seed" -- so: the renderer
-must show THE WORLD OF THE RUN (the pasture's seed, sheep and size),
-not its own default world; and the sheep's MEAL shorter, conceiving
-much rarer.
-   DONE for it: `Civil_Egregore renderer watch [seed=0 the testing
-   seed] [sheep] [pasture superchunks] [grass]` opens the window on
-   the check's world or the pasture's. MEAL 45 -> 15 s,
-   MEAN_TIME_TO_CONCEIVE 135 -> 540 s (MINE: the numbers). The long
-   pasture with these is NOT measured yet.
-SAID 2026-10-11, watching the window (`renderer watch`): "sheep
-generated on water lol"; "also water evaporation is too strong,
-compared to wind"; "are you using elevation as well?" (a question: yes
-in worldgen's climate -- higher land cooler and drier -- not in the
-rule: clouds do not meet mountains. To answer.)
-ASKED 2026-10-11, after: "lets change the rain rule, now we take both
-humidity and temperature for deciding cloud formation and rain
-threshold, instead of a fixed value". PLAN (mine): `rains_above(climate)`
-in the registry -- warm air holds more before it rains, humid air
-less; the frame brings which tiles rain (a bit a tile) so the
-renderer does not work it out; evaporation a quarter of what it was.
-SAID after: "just roll seeds until  a valid one for testing is fould
-lol" / "thats why we have the test seed as an api lol" -- the watched
-world's seed goes through seed_with_land(counted()), as the tests'.
-ASKED 2026-10-11 (night), watching: "yeah, were doing sampling too
-aggressively, we need to tone things down a lot to get the simulation
-closer to its real progression per simulation second" / "like, sheep
-should live for a couple of in game hours for on average for example"
-/ "like hour- hour and a half" / "also, sheep become trapped in high
-gradients of elevation, make them able to hop down a larger distance
-than 1 height". NEXT, after the batch in hand is committed: every
-rule's times slowed towards real ones (sheep LIFE about 75 min of the
-simulation; grass, trees, weather with it); sheep step DOWN over more
-than one height (walls are both ways today: to look at).
-   AND: "and watever amount of offspring a sheep normally has over a
-   normal wild lifetime lol" / "on average" -- a ewe bears about 1.3
-   lambs a year over 6 to 8 breeding years: 8 or so in a life; every
-   sheep here bears (no rams), so about 4 a sheep is the same flock.
-ASKED 2026-10-11 (night): "ok, we need to make test running include a
-flag for test rendering decided by flag". ANSWERED (asked which runs):
-"everything that is runnable must have the renderer as an option. this
-is a game, we want to see the testing as well, not just do it"; pace:
-"flat out default, but still controls pls"; "so i can see all tests".
-So: the diagnostics' runs AND the cargo tests that tick a world, shown
-in the window when a flag says so; flat out unless paused or paced by
-the keys.
-   AND: "thats why i should think renderer should be an environment
-   flag, it applies to everything" / "and this excersice should make
-   the rendering and server code more modular with respect to each
-   other and diagnostics/tests" / "you can run perfs again, the cpu and
-   gpu is all yours now" (wall times may be taken again).
-   DESIGN (mine): the flag is an environment variable. A run -- a
-   test, a diagnostic -- that ticks a World with it set is SHOWN: the
-   server answers a window's asks between its ticks over a local
-   socket (a wire for Ask and Frame; no Bevy in a test), and the
-   window is the game's own program started as a viewer (`renderer
-   show`), one window staying up from run to run. Flat out unless the
-   keys pause or pace it. The host thread and the shown run share the
-   making of a frame.
-   BUILT: server::host::{shown, wire}; hook in World::tick/tick_only;
-   `renderer show`; test server/tests/shown.rs. Tried live with a
-   pasture: the window started itself. Words (user: "check the
-   glossary, i think youre using run for multiple things" / "whats a
-   ticker?" -> "fair, i hope this model applies seamlessly with normal
-   game operation as well"): TICKER, SHOWN WORLD, in the glossary.
-ALSO, of the weather's tests: "also dont run sheeps for this tests".
-MY MODEL (for the LATER part; mine to choose, to tell the user): a tile's humidity is the
-water held in its air and ground, its cloud the water condensed over
-it; water moves between the two and is not made or lost on land --
-condensing takes a level of humidity for a level of cloud, heat over
-land and rain give it back. The ocean alone makes water (evaporation,
-by temperature) and takes it (rain over it). STAGES: 1 the layout,
-worldgen's climate, the rule (condense, evaporate, burn off, wind
-moves, rain returns water), rain drawn; 2 wind and temperature
-changing with the surroundings; 3 lakes told from the ocean, a lake
-evaporating loses depth and can dry (the depth maps are fixed today
-and shared with the renderer: to change).
-ANSWERED 2026-10-11 (asked): "Scale in the type" -- a plane's
-registration says its scale (1x1 or 8x8); its hot bucket is 1024 x
-bits a chunk in the same arena; reads, compares, writes take a world
-cell and address place >> 6 (Morton); cold, raw in the superchunk
-image, not through Tessera. "Both planes" registered and stored now:
-cloud (4 bits) and climate (16 bits, one number, members named when
-the layout is given). And: "also, \"coarse cells\" have a name, tiles
-lmao" -- NEVER "coarse cell": the plane holds a number a TILE (the
-aligned tile 8 cells a side); glossary first. "the climate plane is
-at the 8x8 tile size, all planes up to now used a 1x1 tile size
-logically"; "now the idea of the type registry is make the other
-systems use it to not have t0o hotwire stuff around eh" -- the tile
-size is the registration's and the type's; storage, arena, frame and
-renderer take it from there, nothing wired by hand. The word is a
-plane's TILE SIZE: 1x1 for every plane
-before, 8x8 for cloud and climate. Details only so far: do not
-build beyond "plane and shadow" before the user says so.
-WAITING: mask / word-of-cells instructions ("this will have to wait
-for now haha, too much complex stuff"); Morton pathfinding (branch
-wip/morton-search, pathfinding/src/morton.rs, tested equal to the
-rows' search; left: wire into walking::seek, measure both, "let the
-best win"; after climate); entities of more than a cell ("later when
-we have multicelled entities im gonna get into details"); rules that
-sample entities as cells are sampled, maybe only the dormant (not
-asked for yet); a runtime type registry, for mods.
-
-DONE 2026-10-11, a line each (commit): the crate `compares_and_writes`
-(131eadf); rule kinds in the registry, a master each (654be35);
-neighbour picking by the ways' Morton order (71fb640); the collision
-test on any seed (e3c5a54); sheep roam further and off lush pasture
-(e5b03c4); a crossing is one move, nothing settled (5476cd2).
-Earlier: the actions crate; one stream of 24-byte instructions;
-attributes as bytes; the default attribute; acts over a border;
-simulation time; EntityId removed; the collision plane.
-
-
-== THE DESIGN IN FORCE (the user's words) ==
-
-INSTRUCTIONS
-- "the simulation instruction set is being reduced to a family of
-  writes, and a family of compare instructions (and the stop skip
-  instruction), higher level behaviour ... is no longer instructions,
-  were going to move that to a crate named actions". Reads are
-  actions too, "so rules can depend only on the actions crate".
-  "actions can queue instructions as groups, so we can push many
-  things in one function call ideally instead of one by one".
-- "3 types of instructions at a minimum plane-plane / plane-entity /
-  entity-entity ... instructions remain completely agnostic to
-  semantic behaviour". 24 bytes: "first 2 bytes is opcode, the rest
-  is up to you". "masks are most useful for interacting with
-  bitplanes. not for everything".
-- HARD RULE: "every write must be gated by a compare including on
-  neighboring chunk queues" (asserted in Turn::queue). A compare
-  fails -> all under it is jumped; the lengths under a compare are
-  kept beside the queue.
-- "scheduled wakes and stuff like that are write instructions, but to
-  the entitiy scheduling wheels". Births "should not be lost, they
-  should be retried". The between-ticks queue "will later become part
-  of the player input. for now it can stay as is".
-
-THE ENTITY ID AND THE WORLD'S ORDER
-- "the id of an entity ona given tick its its initial origin
-  position", "in morton": "so we have a stable handle to anything
-  whithin a tick".
-- INVARIANT: "the entity id (origin coordinate that tick) is
-  literally the global world execution order, the morton order ...
-  lower entitiy id should get its instructions executed first.
-  (thatas what the tent queue is for lmao)". "same on any number of
-  threads is fine, morton order is supreme". A world shifted is not
-  held to be the same world.
-- "we make actions and instructions completely oblivious to
-  superchunk boundaries"; "the goal of all this is to make superchunk
-  boundaries invisible to instructions and therefore actions".
-- The tenth queue: "if the queues ANY type of instruction to multiple
-  superchunk queues. all its instructions for that entitiy are moved
-  to the tenth queue". No exception for what has no author.
-- A crossing: "if an entity crosses a superchunk and another rule
-  tries to write to that entity id the writes should go to the tenth
-  queue. so no settlement step is needed"; "a separate structure to
-  track what entities crossed to properly redirect writes"; "redirect
-  writes to the right queue first if possible"; "the simulation
-  should route the dispatched instructions to the entity id
-  automagically if it already crossed or if it hasnt crossed yet".
-  Built: simulation.md, "An entity over a border". Not noted: an
-  authorless instruction naming an entity (applied before all).
-- Entities over several superchunks: "lets keep one rule"; one owner,
-  "the origin chunk for large entities will be dynamically calculated
-  to be roughly in the center coordinate of the entity". Not built.
-- The cost accepted: in Morton order one act from a lower superchunk
-  into a higher makes the higher wait (12 acts a tick on 16
-  superchunks: second phase 740 -> 1130 us on 12 threads). "we are
-  optimizing for the 99% percent of cases ... but we to avoid write
-  hazards or inconsisntent entity states over everything".
-- Dormant entities: "entities going permanently to sleep is fine if
-  no wake are detected ... we will have rules that sample entities in
-  the SCA rules style potentially filtering for dormant entities".
-  No guard, no count. With the rules as they are none sleeps for good.
-
-ATTRIBUTES AND TYPES
-- Blocks of 16 bytes, 1 to 16 an attribute ("max atribute size is
-  therefore 256 bytes ... larger atributes are simply behind
-  references"); "the definer defines offset and size"; instructions
-  write members, whole-attribute writes "have their uses as well".
-- An attribute's ID: kind 8 bits, number 52, blocks less one 4; a
-  type whose size varies registers the four bits 0. An entity type
-  may register a default attribute, kept without its type ("most
-  stuff will have a default one"). An entity's attributes as kept
-  are its "attribute list" -- never "run".
-- "kinds are the first byte of the typeid, what weve been calling
-  supertypes so far"; rules are two kinds, SCA rules and entity
-  rules; "every rule has a master entity type or plane, regardless of
-  what planes or entities the rule reads or writes". In the code the
-  first byte's enum is `Kind`, and what a row registers its
-  `Registration` (renamed 2026-10-11, the user's answer).
-- OPEN, asked, not answered: whether the whole-attribute compare (by
-  sum) or the member compare is set_attribute's default ("both are
-  fine by me").
-
-RULES AND TIME
-- "rules should also be agnostic to what the sim-second is defined
-  as": times in seconds of the simulation, chances as mean times
-  (TICKS_A_SIMULATION_SECOND 256; tests pass at 100).
-- "hey hey, tests should be seed genereated when possible".
-
-
-== WHAT THE USER HAS SAID OF HOW THINGS ARE ==
-
-- Morton order is the default everywhere; cartesian only where it is
-  cheaper. Masks are aligned tiles, as Tessera's (tessera/src/tile.rs):
-  one run of bits. Cell operations are masked bitwise ops.
-- MEASURE before saying a change is done ("where is the profiling?
-  benchmarks?"), against the commit before, numbers in the commit:
-  `perf stat -x, -e instructions:u <binary> server pasture 1000 333
-  4000 4 1` less the same with 0 ticks (also `1000 20 4000 4 1`,
-  `1000 333 4000 16 0`); `server check 0 600 200 4000 0` hashes; a
-  long `pasture` for what the world comes to. The same seed for both
-  builds: copy the scratch folder's seed.measure over
-  transient_data/seed.csv before each run and put seed.now back
-  (the file rolls every 5 uses); alternate the builds, the machine
-  drifts and the user is using it. Border probe: `AI_SCRATCHPAD
-  acts_over_a_border side every stepping ticks threads crossing`.
-  The scratch folder is a small tmpfs: one or two binaries at most.
-- The check's last line now: 600,7d9edf1b90f99e48,14d65fe66d7651c7,
-  5c7b75f20c6ba45a,abbfe87d131ea892,40d474e53b88bbd1,e220a8397b1dcdaf
-- Borders of chunks and superchunks are invisible to what is not
-  chance; chance may hang on them ("rngs per superchunk were the plan
-  all along"). A neighbour drawn does not: around::pick goes by the
-  ways' order ("no exceptions").
-- The collision plane holds everything that can collide; walls stay
-  the terrain's edge layers.
-- A test's infrastructure lives in its test file: nothing is put in
-  the program for a test.
-- The persistent settings, "~/.local/share/Civil Egregore/", may be
-  deleted ("i dont care for anything there"), but the feature
-  `force_default_settings` (utilities/src/settings.rs) leaves the
-  machine's file alone: use the flag, do not delete.
-
-
-== OPEN THREADS ==
-- NAME SWEEP, in progress 2026-10-16 (after f985607, the punch-list
-  renames). The user's rule: ambiguous names go; a name of two words
-  or more says what it is in its place. Single-word glossary terms
-  are fine; exempt: x, y, dx, dy, the Rust idioms (new, default, len,
-  get, set, push, pop, insert, remove, clear, contains, iter, main),
-  trait-impl methods, names a framework requires. Everything else
-  single-word is a candidate: functions, types, consts, fields,
-  variants, locals, parameters (8164 of them by rust-analyzer's
-  semantic tokens; `at` 282, `index` 127, `first` 121, ...).
-  How: rename through rust-analyzer (rustup component add
-  rust-analyzer), never by text -- all renames asked against one
-  snapshot, merged, applied at once; a local's new name refused if it
-  already appears in its function (shadowing would compile and change
-  behaviour); field shorthand renamed both ways merges to
-  `field: local`. Comments' backticked mentions and the markdown docs
-  follow by script (rust-analyzer leaves them). Check after each
-  batch: every headless crate compiles, tests and clippy clean, gui
-  and renderer `cargo check`, and `Civil_Egregore server check`
-  prints the same world hash as before the sweep (it did at
-  f985607). The worksheets and scripts were in the session's /tmp,
-  gone with it: start again from the inventory.
-- NEXT, after the sweep (the user's): transient data folded into
-  utilities -- each crate's lib.rs or main.rs, after its imports,
-  declares statically its transient data paths, to the files
-  themselves; utilities::csv takes a flag to make the file and its
-  folders for any path, so disk storage stays with the file
-  interactor, the csv library. Disk is touched directly today in 17
-  files (chunk_storage paging/disk, server host and tests, utilities
-  settings/seed/report, tessera adversarial/render, renderer tool,
-  the root's tests/fine.rs).
-- CLOUDS, built 2026-10-11 ("plane and shadow only"): CLOUD and
-  CLIMATE registered at tile size 8x8, kept by the arena, saved,
-  the clouds sent in the frame and drawn as shadow. NOT as answered
-  on one point: cold they are their bits' bitmaps through Tessera
-  (tiles in each bitmap's first cells), not raw in the image -- no
-  format added; told to the user, theirs to overrule. Cost: +0.8%
-  processor instructions a tick from the tile shift in every wide
-  read, +1.8% from two more planes a superchunk (lookup). The shadow
-  was NOT seen in the renderer: nothing fills the clouds. To see it:
-  a world with clouds written (World::write_cells) saved, opened by
-  its path. Nothing says yet what makes or moves weather, nor how the
-  climate's 16 bits are laid out.
-- SIMPLIFICATION, so far: simulation 3178 -> 3059 lines, dead
-  functions out of three crates. Not yet read for it: entity_manager,
-  server, utilities, chunk_storage, bitplane_manager, actions,
+OPEN, FOUND BY ME
+- THE FLOCK DIES OUT: a long `server pasture` -- the sheep rise past
+  150,000, the grass goes to 0, the flock dies. Cause not looked for.
+- The cloud shadow and the 2026-10-11 changes were never seen in the
   renderer.
-- THE FLOCK DIES OUT (found 2026-10-11, told to the user): `server
-  pasture 300000 333 4000 4 0` on the measuring seed -- 16,000 sheep
-  rise past 150,000, the grass goes to 0, the last sheep dies about
-  tick 240,000 (after the roaming change: peak 161,600 at 203,000,
-  gone by 299,800; with the meal 45 s and starving 90 s: peak
-  279,700 at 250,000, 123,000 and falling at 300,000). The same on the build of that morning (~e2dc19d);
-  docs/civil_egregore.md said it settled near 10,000 and now says it
-  does not. Cause not looked for.
-- Costs not found: +1.3% processor instructions a tick from the
-  crossing as one move; ~2% from the actions split; ordinary applying
-  4-9% slower since acts over a border (e2dc19d); sparse-pasture
-  applying ~10% slower since the one stream (a step is a move and a
-  wake, two lookups).
-- The renderer was not run for any change of 2026-10-11.
-- e5b03c4's message says the check's hash changed with the roaming;
-  it did not.
-- Limits known: entities of one cell only.
-- A world's stored image of a cooled superchunk is behind its cells
-  until the writeback ring is flushed (World::write_back_and_flush_all):
-  compare images only after it.
-- A fresh flock loses ~2% at its first wake (old age rolled for the
-  whole sleep ahead): the rule as written; told to the user.
-- Worldgen, if more speed is wanted: the vertices a square shares with
-  the last kept; the broad meshes on a coarser lattice.
-- Answers of server::host::terrain are the terrain AS GENERATED: when
-  a made superchunk's ground can change they must come from the world.
-- Every `unsafe` gets a test trying to break its safety comment.
-- The user's to say or do: whether the land is right and worldgen fast
-  enough; whether the mipmaps stop the shimmer in a moving window; the
-  Linux/Windows `server check` comparison; whether Around/Area/Window
-  should be one shape.
-- Told to the user, shortcuts not decisions: chunk_storage and
-  entity_manager hand on the ID types under their own names;
-  TickCounts carries per-rule times; float sqrt is allowed by the lint.
-- Later: optimizations and inlining; cold states not paged; page-out
-  on the tick's thread; an area allocator (256 MiB blocks, 256-byte
-  units); a read of every file for one name a thing.
+- Simplification not yet read for: entity_manager, server, utilities,
+  chunk_storage, bitplane_manager, actions, renderer.
+- Morton pathfinding: branch wip/morton-search, tested equal to the
+  rows' search; left: wire into walking::seek, measure both, the best
+  wins.
 
-- ASK 2026-10-11, on sca_rules/src/weather.rs `pub fn rule(turn: &mut
-  Turn, samples: &mut Vec<CellIndex>) -> RuleCounts`: "this is bad,
-  that should be on the simulation side, not here. in this case would
-  be the tile function, which is very wrong name btw". (Mine: a rule
-  is the function on ONE sample; the drawing of samples, their vector
-  and the loop over them are the simulation's; `tile` is renamed.)
-  Interrupted while in hand, NOT started in code: sheep hopping down
-  (plan: four wall planes, "no step out of this cell that way").
-- ASK 2026-10-11: "also, both temperature and humidity should slowly
-  spread as well over neighbroing tiles with the wind vector".
-- ASK 2026-10-11: "and also, wind vectors can spread slowly as well".
-  And of the wind's spreading: "like averaging over time to 0". (Mine:
-  a tile's wind is stepped towards its upwind neighbour's as a vector,
-  so winds that differ wear each other down to calm.)
-  And: "the borders of the loaded superchunks is what will introduce
-  the new wind". (Mine: a tile beside a superchunk not loaded keeps
-  its wind as it is, never worn down: the wind comes in from there.)
-- ASK 2026-10-11: "remember to close the renderer when the server stops lmao" (the window a ticker opened closes once no ticker is left).
-- ASK 2026-10-11: "i also need a new keybind to show climate values per tile".
-- ASK 2026-10-11: "i better see all the tests" (every test run of mine is to be shown: CIVIL_EGREGORE_RENDER set).
-- ASK 2026-10-11: "ok, for glossary reference, lets name the binary
-  command tests like pasture and stuff "in-bin tests" and normal code
-  tests  are just tests".
-- ASK 2026-10-11: "now, we actually need one more variable lol,
-  pressure lets not make it dependant on height, instead dependant on
-  multiple wind vectors being sampled and pushing to the same cell
-  rougly" / "importantly, a pressure difference of more than 1
-  inmediatly triggers spreadingof the pressure".
-  And: "pressure spreads to the randomly, but of course following
-  pressure laws, high pressure likes to go towards lower pressure more
-  than mid or high pressure".
-- RULE 2026-10-11: "running headless is forbbiden until further notice": every run of mine that ticks a world has CIVIL_EGREGORE_RENDER=1, measurements too.
-- ASK 2026-10-11: "now, lets do this, make the climate plane 32 bits,
-  we have 4 variables of 8 bits now" (humidity, wind, temperature,
-  pressure: so pressure is the climate's, no plane of its own).
-  And: "so we can have a single plane for climate stuff"; "oh also, i
-  almost forgot, pressure also has less chance to push towards higher
-  elevations, the stepper the less chance". Then the user stopped me:
-  "ok, let me restate the mechanisms here" -- WAIT for the
-  restatement before writing any of the pressure or the 32 bit
-  climate. Nothing of either is in the code (the separate PRESSURE
-  plane I began was undone). Found so far for 32 bits: the plane ID's
-  width field is 5 bits (WIDTH_BITS), an instruction carries a cell's
-  number in 16 (Instruction::small, WriteOp::Put(u16), Compare::Cell
-  seen u16), `Wide::most` and superchunk_layer.rs:151 shift a u32 by
-  the width.
-- ASK 2026-10-11, THE WEATHER RESTATED (the user's words): "ok, so we
-  have 4 variables, pressure, temperature, humidity and wind, now we
-  can have 8 directions for wind instead of 4 with multiple
-  strenghts. and the cloud layer separately, everything at the 8x8
-  tile size as agreed" / "pressure and wind and the movers of
-  humidity, temperature and clouds" / "pressure can feed wind, wind
-  can feed pressure" / "so when pressure gradient is more than a
-  threshold it pushes into a neighbor tile randomly selected but
-  weighed by pressure. that induces wind in the cell bein processed in
-  that direction, averaged with the current wind vector as well
-  depending on how much pressure was deposited" / "wind clashing or
-  concentrating increases presssure." / "both pressure and wind
-  interact with the height map" / "pressure can also mess with cloud
-  formation as you might expect." / "so basically think of all the
-  ways the variables can connect between one another, categorize them
-  and collapse them into simple small composable functions".
-  MY DESIGN (told to the user, theirs to overrule):
-  climate = 32 bits a tile: humidity, wind, temperature, pressure, a
-  byte each; wind a vector, two signed nibbles (x, y, -7..7): 8 ways
-  and strengths come of it, and averaging is arithmetic. Cloud its
-  own plane. The land's height a tile read by the rule (a plane of
-  tiles made by worldgen: ELEVATION, 8 bits).
-  Small functions: (1) resisted_by_rise(rise) -> chance, shared by
-  every move; (2) Wind::step_drawn -> which of 8 neighbours; (3)
-  Wind::with(push) -> vector added/averaged; (4) nearer(from, to,
-  step) for humidity and heat; (5) pressure_falls_to(here, there) ->
-  weight, 0 under the threshold; (6) deepens_and_thins(climate, cloud,
-  over_water) with pressure in it.
-  A sample: pressure flows if a gap is over the threshold (a unit to
-  a neighbour drawn by gap, own wind turned that way), ELSE the wind
-  blows (a unit of pressure, a level of cloud, a step of humidity,
-  heat or wind carried to the tile drawn); THEN the cloud forms.
-  Stages: A = planes of 32 bits + the four bytes + pressure at rest +
-  K label; B = wind a vector, the moves; C = elevation; D = pressure
-  in cloud formation.
-- DONE 2026-10-11 (this commit): climate 32 bits, four bytes; wind a
-  vector; pressure falls / wind blows / cloud forms; elevation plane;
-  K label. OPEN from it: the weather now costs a generated idle world
-  +74% instructions a tick (reads of 8 tiles about each sample, and
-  the climate written most samples: its 32 planes re-encoded by
-  Tessera when written back is my guess -- the cold storage of tile
-  planes, raw or bit-planes, is still the user's to say). Asked and
-  answered roughly: "how much % of instructions is gathering data for
-  diagnostics?" / "for everything" -- under 1% by the profile (the
-  clock 0.25%, the check's hashes 0.2%; counts are adds inlined, not
-  seen apart). STILL OWED: the timescales (sheep ~75 min), offspring,
-  hopping down; sweep of "diagnostic" in the docs.
-- ASK 2026-10-12: "hmmm we shouldnt be encoding back so aggressively
-  in the first place, chunk cold storage and sync to disk is a
-  background operation until we save the world" / "also display k
-  bind in the renderer with the rest" / "ok, do the still oweds and
-  then tweak the cold storage a little". Order: K in the window's
-  list of keys; timescales + offspring; hop down; "diagnostic" swept
-  in the docs; then the writeback.
-- DONE 2026-10-12 (this commit): K in the window's keys. Sheep LIFE
-  4,500 s (75 min), GESTATION 190 s, LAMBHOOD 450 s, conceive 800 s
-  (about 4 lambs a sheep); grass, trees, weather 20/3 slower (the
-  factor of the life). MEAL, STARVATION, ROAM, steps left as they
-  were: my call, say so. Walls one way's: WALL_NORTH, WALL_WEST added,
-  STEP 1 up, DROP 4 down (4 is mine). "diagnostic" -> "in-bin test"
-  where it meant the commands. NEXT: the writeback as a background
-  operation until the world is saved.
-- ASK 2026-10-12: "btw on the wind vector stuff, what direction is +-
-  xy?" (answered: +x east, +y south, where it blows towards) /
-  "doesnt that mean diagonal wind can be stronger? or are you using
-  it as a ratio?" (answered: yes stronger, a square not a circle) /
-  "yes, ckip to circle lol" -> hold the wind's vector to a circle of
-  STRONGEST_WIND. After the cold-storage commit.
-- FOUND 2026-10-12 (cold storage): nothing encodes back while a world
-  ticks -- only a superchunk cooling (a job, off the tick) and a
-  save. What I measured as the weather's cost was `server check`'s
-  hashes: world_hash wrote back and flushed every hot superchunk each
-  time. Hash now flushes only what went cold.
-- ASK 2026-10-12: "why do all tests report seed 000001 in the
-  reader?" -> found: plain worlds start from Start::default(), seed
-  1; the tests' plain_world must take the run's counted seed (the
-  standing rule: tests seed generated). / "ok, we need more
-  springiness in the sytem, chage pressure transfer to be even more
-  biased towards wind vector direction".
-- SAID 2026-10-12, of the tests' plain worlds taking
-  utilities::seed::counted(): "its fine as is"; of `server pasture`
-  taking the rotation's seed too: "hell no, the binary cant depend on
-  parts of the codebase" -> the binary keeps its own seed (1).
-- ASK 2026-10-12: "now, make tree and grass spreading more likely
-  with humidity" / "change the environment flag to a cargo feature
-  flag LOL" (CIVIL_EGREGORE_RENDER, as I read it: the flag I set on
-  every run). Order: commit circle + lean + tests' seed first; then
-  humidity in spreading; then the feature flag.
-- ASK 2026-10-12: "and death of trees and grass more likely with high
-  heat/ low humidity" -> grass has it (harshness); trees get it: a
-  tree of any stage may die of its climate.
-- ASK 2026-10-12: "yeah, and we need to dial the difficulty of
-  movements across rising height gradients way down, and the contrary
-  should also happen of course, with diminished intensity as well" ->
-  the air (passes_a_rise): up a rise far less held back; down a fall
-  let through more, mildly.
+LATER
+- Rules that sample entities as cells are sampled (maybe only dormant).
+- A runtime type registry, for mods.
+- Tessera deep clean: settle the code, move abstraction boundaries.
+- An area allocator: 256 MiB blocks, 256-byte units.
+- Optimizations and inlining; cold states paged; page-out on the
+  tick's thread.

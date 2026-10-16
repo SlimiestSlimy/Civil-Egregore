@@ -32,7 +32,7 @@ entity are, what a layer and an attribute are, a turn, a tick's
 report, the lot drawn; every type a world has is `types`, the type registry whole, nothing
 listed by hand; the compares a rule opens and ends itself are handed
 on from the instructions (`compare`). Off a turn there is one thing
-more: `entities::EntitiesBetweenTicks`, where a rule puts the entities
+more: `world_entities::EntitiesBetweenTicks`, where a rule puts the entities
 a world starts with, lent by whoever runs the world. No world is made
 here: that is the server's (`../../server/`), a rule's tests and tools
 with it. What a rule lacks is added here as an action, not gone
@@ -45,12 +45,12 @@ what they do to the world -- a `read` folder, a `write` folder, the
 shapes beside them -- which made three files of a mask and two of
 everything else, and a rule's every call two modules deep; the
 function's name says as well whether it reads or queues
-(`cells::holds`, `cells::set`).
+(`cells::layer_holds`, `cells::set`).
 
 | module | what it answers, and does |
 |---|---|
 | `cells` | does a layer hold at a cell, is the cell hot; a wide plane's number; the square about a cell; each cell sampled -- a cell set, cleared, a wide plane's number put |
-| `entities` | each entity waking -- one made, put to sleep, committed as changed, removed; those a world starts with |
+| `world_entities` | each entity waking -- one made, put to sleep, committed as changed, removed; those a world starts with |
 | `around` | the 3x3 cells about a cell as nine bits: a layer's, those entities stand on, a free one, one drawn |
 | `area` | the 16x16 cells about a cell: a layer's, several at once, those entities stand on, and the tiles further off |
 | `mask` | a square of cells as bits, 4 to 1,024 cells a side: a layer read into it, whole or under a mask, and set or cleared under one |
@@ -69,10 +69,10 @@ cells entities stand on.
 set of them a word of bits (`Cells`) in Morton order -- as they lie in
 the small tiles of their bitmaps ("The small tiles about a cell"),
 nothing turned into rows. What is about a cell is asked once
-(`around::about`), and every set made with it: the cell
-(`About::centre`), its neighbours (`ring`), both (`nine`), the one a
-way off (`towards`). A layer's is read at once (`around::read_layer`); sets
-are narrowed with `&`, joined with `|`, taken from with `without`, and
+(`around::tiles_about_cell`), and every set made with it: the cell
+(`TilesAbout::centre_cell`), its neighbours (`neighbour_cells`), both (`nine_cells`), the one a
+way off (`cell_towards`). A layer's is read at once (`around::read_layer`); sets
+are narrowed with `&`, joined with `|`, taken from with `cells_not_in`, and
 asked `is_empty`: those with grass, those nothing stands on, those in
 the world hot. A neighbour is named by its **way** -- 0 to 8, in
 Morton order of where they lead (`NORTH_WEST`, `NORTH`, `WEST`, the
@@ -95,7 +95,7 @@ over cheaply, a row shifted and its neighbours ORed in.
 
 A rule is written for one cell or one entity. The cells sampled are
 gone over by the simulation (`Turn::each_sampled`), which is handed the
-rule for one of them; `entities::each_woken` goes over the entities
+rule for one of them; `world_entities::each_woken` goes over the entities
 waking, inlined into the rule, so the loop costs nothing; each says, as it comes to a cell or an entity,
 that the rule is seeing to it ("The same wherever the borders fall"). `each_woken` hands each entity waking, in Morton
 order by cell, with a state of the rule's -- what it counts, and
@@ -129,12 +129,12 @@ that counts (`set_counted`, `clear_counted`, `set_value_counted`): one
 added to the count named, if the write is applied.
 
 What is compared need not be what is written (`compare`). A compare
-is of a cell (`compare::holds`, `lacks`, `value`) or of an entity's
+is of a cell (`compare::layer_holds`, `layer_lacks`, `value`) or of an entity's
 attribute (`compare::attribute`), and it is queued as an instruction
 of its own (`compare::from_here`): if it does not hold when it is
 come to, everything the rule queued after it -- cells written, what
 entities come to, counts -- is skipped, up to the next compare or
-`compare::end`. `compare::write` and `compare::count` are one write
+`compare::end_from_here`. `compare::write` and `compare::count` are one write
 and one count under a compare. A sheep's meal is one compare, the
 grass under it being there still, and under it what the sheep comes
 to and what it counts; then the grass cleared, held against itself.
@@ -151,7 +151,7 @@ or chains them, each held against what the one before wrote.
 
 One thing a rule must see to. An entity woken must be put back whatever is refused: the rule
 queues what it comes to under the compare, then what stands otherwise
-(`entities::sleep`) under the opposite one -- `holds`, then `lacks` --
+(`world_entities::sleep`) under the opposite one -- `layer_holds`, then `layer_lacks` --
 so one of the two is applied and the entity is written once.
 
 No write lands on another's: every cell written says what was seen
@@ -175,12 +175,12 @@ refused.
 
 ### One entity writing another
 
-An entity's own change (`entities::set_attribute_of`, then
-`entities::step`) is such instructions: for each attribute it
+An entity's own change (`world_entities::set_attribute_of`, then
+`world_entities::step`) is such instructions: for each attribute it
 changed, the words that differ, held against what it saw of that
 attribute, then a move and its wake. It is never put whole over itself. So another
 entity may write it in the same tick, awake or asleep
-(`entities::set_attribute_of`, `unset_attribute_of`), with these
+(`world_entities::set_attribute_of`, `unset_attribute_of`), with these
 guarantees:
 
 - what is written of an attribute is applied only if the attribute is
@@ -224,7 +224,7 @@ stone and count it under a compare of the cell beside them, write
 their neighbours, make others and count that under the compare of the
 cell being free, and step blind onto each other's cells, over and
 along the borders -- and one generator
-(`utilities::rng::Rng`) every chance in that rule is read from, by the
+(`utilities::rng::RandomSource`) every chance in that rule is read from, by the
 tick and the walker. Nothing outside the test is
 made for it.
 
@@ -232,7 +232,7 @@ Chance is another matter, and meant to be: each superchunk draws from
 a random stream of its own -- the sampling of cells, a sheep's lot
 -- so what is drawn is another draw where the borders
 fall otherwise. What must not see a border is what is not chance.
-A neighbour drawn (`around::pick`) is not chance of that kind: which
+A neighbour drawn (`around::pick_way`) is not chance of that kind: which
 one a draw comes to goes by the ways' own order, so it is the same
 neighbour wherever the tiles and the borders fall about the cell. The
 test's walkers draw theirs with it, from the test's generator.
@@ -241,7 +241,7 @@ test's walkers draw theirs with it, from the test's generator.
 
 A rule depends on this crate alone, and asks its turn nothing itself:
 the turn is handed to an action. The tick and the superchunk's
-lot are actions too (`this_tick::now`, `this_tick::random`), as
+lot are actions too (`this_tick::current_tick`, `this_tick::random_stream`), as
 cells, counts, compares and entities are. What a rule names of the
 crates under this one are the words actions are asked in -- a
 cell, a layer, an entity's header, an attribute, the turn as a thing
@@ -254,17 +254,17 @@ fails there.
 
 **An entity being changed**: a rule reads what it keeps
 (`EntityRef::attribute`), works out what it is to keep in a value of
-its own, and writes that if it differs (`entities::set_attribute_of`)
+its own, and writes that if it differs (`world_entities::set_attribute_of`)
 -- the words that changed, held against what was seen of the
-attribute -- then has it step or stay (`entities::step`). Nothing of
+attribute -- then has it step or stay (`world_entities::step`). Nothing of
 the entity is copied to be changed. A rule states what the entity is
 to be; what that costs is not its concern.
 
-**What must be made** (`entities::spawn`): a new entity's cell
+**What must be made** (`world_entities::make_entity`): a new entity's cell
 may be taken between the rule seeing it free and the put being applied,
 and the put is then refused -- nothing is put elsewhere for it. A rule
-that must not lose it makes it with `entities::make` and queues, before
-`entities::made`, what is to happen only if it was made -- its maker
+that must not lose it makes it with `world_entities::begin_making_entity` and queues, before
+`world_entities::end_making_entity`, what is to happen only if it was made -- its maker
 written so, a count. Refused, none of that happens, and the maker is
 as it was to try again. The cell may be in the next superchunk and the
 maker in this one: the rule does not know, and need not
@@ -272,7 +272,7 @@ maker in this one: the rule does not know, and need not
 
 **The cells beside it** (`around`): sets of the cells about a cell,
 read at once (`around::read_layer`), narrowed with `&`; the way to one
-drawn with `pick` or `prefer`, a way a cell with `around::cell`. A
+drawn with `pick` or `prefer_way`, a way a cell with `around::cell`. A
 draw falls on any of those chosen among as likely as on another; which
 one a given draw comes to goes by how the cells lie in their tiles --
 as the lot itself goes by the superchunk. What must have its cell, as
@@ -282,21 +282,21 @@ holds what stands there.
 **The area about it, and the way**: `area::read_layer` gives 16x16 cells of a
 layer as masks, `Area::count` how many are set. The way over them is `walking`'s, where the
 simulation's cells, the terrain's walls and `../../pathfinding/` meet.
-`step_towards(turn, at, goals, passable)` gives the cell to step to
+`step_towards(turn, entity_cell, goal_rows, passable)` gives the cell to step to
 for the nearest goal by the shortest way -- no cell the collision
-plane holds walked on or to, the plane and the walls read at once, none if no goal can be come to -- `step_to(turn, at, to, passable)` for one cell --
+plane holds walked on or to, the plane and the walls read at once, none if no goal can be come to -- `step_to(turn, entity_cell, target_cell, passable)` for one cell --
 waves and A* of `../../pathfinding/`, round the entities in the way,
 one step a wake.
 
 **Walls**: the terrain's (`../../worldgen/`), four layers -- the
 cells no step leaves north, west, south, east: a wall is one way's, a
 drop stepped down and not back up -- read as any other; a diagonal is
-barred unless both ways round it are open. `around_unwalled(turn, about)` is the cells about a cell no wall is before,
+barred unless both ways round it are open. `around_unwalled(turn, about_tiles)` is the cells about a cell no wall is before,
 a set to narrow a step's choices by -- the walls' tiles asked a cell at
-a time as they lie, and not at all where they hold nothing; `area_walls(turn, centre)` the
+a time as they lie, and not at all where they hold nothing; `area_walls(turn, centre_cell)` the
 walls of the area, which `step_towards` and `step_to` go round by
 themselves. Where the wall layers are not hot, nothing bars.
-`around_steppable(turn, about)` is the neighbours the collision plane
+`around_steppable(turn, about_tiles)` is the neighbours the collision plane
 does not hold and no wall bars: the plane is asked first -- the ring
 ANDed with its tiles -- and a cell hemmed in reads no wall.
 
@@ -312,7 +312,7 @@ be walked on and of what may be gone to, as they do the cells entities
 stand on. The far
 search sees no walls: the step it gives is not taken if one bars it.
 
-**Further off** (`walking::seek(turn, at, type)`): nothing found in the area, the same
+**Further off** (`walking::seek(turn, entity_cell, type)`): nothing found in the area, the same
 search is made over tiles of a scale, 16 by 16 of them
 (`area::of_tiles`), a tile a goal if the type holds at any of its
 cells. The coarsest scale first: tiles 64 cells a side, 1,024 cells
@@ -349,7 +349,7 @@ reach -- in Morton order: the cell `(x, y)` from the tile's top left at
 the bit whose index is the two interleaved, which is how the tile lies
 in its bitmap, one run of bits. A mask of 8 is a word, of 16 four, of
 256 a chunk's bitmap. Sets of cells are masks put together with `&`,
-`|` and `!`, and a shape is a mask like any other: `Mask::disc`, the
+`|` and `!`, and a shape is a mask like any other: `Mask::filling_disc`, the
 one made so far. A mask stands for the tile of its side a cell is in
 (`mask::tile`); a rule keeps its masks as room and reads into them:
 the largest is 128 KiB.
@@ -388,13 +388,13 @@ it may step, and is not shown the tiles (`tiles_about` is the crate's
 own).
 
 For one cell: it and its eight neighbours lie in one, two or four
-small tiles -- 4x4 cells, 16 bits. `tiles_about::about_cell(at)` takes the four
+small tiles -- 4x4 cells, 16 bits. `tiles_about::about_cell(centre_cell)` takes the four
 small tiles, two by two, they can lie in: its own, the one to the left
 if it is on its tile's left column, else the one to the right, and so
 up and down -- a step on the cell's index, no coordinate worked out.
 The four are one word, in Morton order over their 8x8 cells, and for
 each place the cell can have in them the ring about it is a word made
-as the program is compiled (`About::ring_word`, with the cell
+as the program is compiled (`TilesAbout::ring_word`, with the cell
 `nine_word`). A layer is read under that mask (`tiles_about::read_layer`):
 where the four lie in one chunk, its bitmap is looked up once and each
 tile is a shift of one of its words, the lot ANDed with the mask.
@@ -403,12 +403,12 @@ plane's tiles, and one compare.
 
 The word stays a word all the way to the rule (`around::Cells`): no
 set of cells is turned into rows. A neighbour is told from another by
-its way, and a way is a bit of the word by a table (`About::way_word`)
+its way, and a way is a bit of the word by a table (`TilesAbout::way_word`)
 -- asked for the one cell kept, never for a set. The ways are numbered
 in Morton order of where they lead (`WAY_OFFSETS`; `WAY_AT`, the way
 to each of the nine row by row). One drawn is not the set bit of a
 rank in the word's order, which would go by how the tiles fall about
-the cell: the set is turned into ways, a bit a way (`About::ways_of`,
+the cell: the set is turned into ways, a bit a way (`TilesAbout::ways_of`,
 nine shifts by the same table), and the one drawn is the way of that
 rank. So a draw comes to the same neighbour wherever the cell lies
 in its tiles -- no exception at a tile's, a chunk's or a superchunk's
@@ -433,7 +433,7 @@ clear, an entity made with its attributes, a step, a crossing, an
 attribute edited member by member, an entity changed whole. The turn
 built each itself; it now queues single instructions
 (`../../compares_and_writes/`), and these are built here from them. A tick of
-`pasture 1000 333 4000 4 1`, less the same run with no ticks, went
+`pasture_world 1000 333 4000 4 1`, less the same run with no ticks, went
 from 131.8 million of the processor's instructions to 140.1 with each
 queued by a call of its own, and to 134.4 with a compare and its
 writes queued in one call (`compares_and_writes::compare::with_writes`); the

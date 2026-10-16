@@ -3,9 +3,9 @@
 //! foam (`docs/renderer.md`, "Height, from straight above").
 
 /// The rise a cell from which a slope is lit, or darkened, no more.
-const STEEPEST: f32 = 64.0;
+const STEEPEST_RISE: f32 = 64.0;
 /// The rise a cell under which a slope hardly shows.
-const GENTLEST: f32 = 0.05;
+const GENTLEST_RISE: f32 = 0.05;
 /// How much lighter the steepest slope facing the sun is.
 const TOWARDS_SUN: f32 = 0.30;
 /// How much darker the steepest slope facing away from it is.
@@ -14,24 +14,24 @@ const AWAY_FROM_SUN: f32 = 0.38;
 /// otherwise show as level ground does.
 const ACROSS_SUN: f32 = 0.12;
 
-/// The light on ground rising `across` and `down` heights a cell: 1
+/// The light on ground rising `rise_across` and `rise_down` heights a cell: 1
 /// level ground's, more facing the sun, which is to the top left.
-pub fn slope_light(across: f32, down: f32) -> f32 {
-    let rise = across.hypot(down);
-    if rise == 0.0 {
+pub fn slope_light(rise_across: f32, rise_down: f32) -> f32 {
+    let total_rise = rise_across.hypot(rise_down);
+    if total_rise == 0.0 {
         return 1.0;
     }
-    let steep = ((1.0 + rise / GENTLEST).ln() / (1.0 + STEEPEST / GENTLEST).ln()).min(1.0);
-    let facing = (across + down) / (rise * std::f32::consts::SQRT_2);
-    1.0 + steep * (if facing > 0.0 { TOWARDS_SUN } else { AWAY_FROM_SUN } * facing - ACROSS_SUN * (1.0 - facing.abs()))
+    let steepness_factor = ((1.0 + total_rise / GENTLEST_RISE).ln() / (1.0 + STEEPEST_RISE / GENTLEST_RISE).ln()).min(1.0);
+    let sun_facing = (rise_across + rise_down) / (total_rise * std::f32::consts::SQRT_2);
+    1.0 + steepness_factor * (if sun_facing > 0.0 { TOWARDS_SUN } else { AWAY_FROM_SUN } * sun_facing - ACROSS_SUN * (1.0 - sun_facing.abs()))
 }
 
 /// The colour laid over the highest ground.
-pub const PALE: [u8; 3] = [240, 240, 244];
+pub const PALE_COLOUR: [u8; 3] = [240, 240, 244];
 /// The colour laid over the land beside water.
-pub const SAND: [u8; 3] = [226, 208, 150];
+pub const SAND_COLOUR: [u8; 3] = [226, 208, 150];
 /// The colour laid over the water beside land.
-pub const FOAM: [u8; 3] = [214, 238, 244];
+pub const FOAM_COLOUR: [u8; 3] = [214, 238, 244];
 /// How much of the land right beside water is sand.
 pub const SAND_MOST: f32 = 0.85;
 /// How much of the water right beside land is foam.
@@ -39,8 +39,8 @@ pub const FOAM_MOST: f32 = 0.55;
 
 /// The tint at each share of the way from the ocean's level to the
 /// highest land: the share, what a colour is multiplied by, and how
-/// much of it is [`PALE`].
-const TINTS: [(f32, [f32; 3], f32); 6] = [
+/// much of it is [`PALE_COLOUR`].
+const HEIGHT_TINTS: [(f32, [f32; 3], f32); 6] = [
     (0.00, [0.70, 0.80, 0.74], 0.00),
     (0.12, [0.86, 0.93, 0.78], 0.00),
     (0.30, [1.08, 1.06, 0.78], 0.00),
@@ -54,43 +54,43 @@ const TINTS: [(f32, [f32; 3], f32); 6] = [
 /// tint alone, level as both may be.
 const TINT_BANDS: f32 = 40.0;
 
-/// The tint of ground `share` of the way from the ocean's level to the
+/// The tint of ground `height_share` of the way from the ocean's level to the
 /// highest land: what its colour is multiplied by, red, green and
-/// blue, and how much of it is [`PALE`].
-pub fn tint(share: f32) -> ([f32; 3], f32) {
-    let share = (share.clamp(0.0, 1.0) * TINT_BANDS).floor() / TINT_BANDS;
-    let upper = TINTS.iter().position(|&(at, ..)| at >= share).unwrap_or(TINTS.len() - 1).max(1);
-    let ((from, low, low_pale), (to, high, high_pale)) = (TINTS[upper - 1], TINTS[upper]);
-    let along = (share - from) / (to - from);
-    (std::array::from_fn(|channel| low[channel] + (high[channel] - low[channel]) * along), low_pale + (high_pale - low_pale) * along)
+/// blue, and how much of it is [`PALE_COLOUR`].
+pub fn height_tint(height_share: f32) -> ([f32; 3], f32) {
+    let banded_share = (height_share.clamp(0.0, 1.0) * TINT_BANDS).floor() / TINT_BANDS;
+    let upper_tint = HEIGHT_TINTS.iter().position(|&(tint_share, ..)| tint_share >= banded_share).unwrap_or(HEIGHT_TINTS.len() - 1).max(1);
+    let ((lower_share, lower_factor, low_pale), (upper_share, upper_factor, high_pale)) = (HEIGHT_TINTS[upper_tint - 1], HEIGHT_TINTS[upper_tint]);
+    let share_along = (banded_share - lower_share) / (upper_share - lower_share);
+    (std::array::from_fn(|colour_channel| lower_factor[colour_channel] + (upper_factor[colour_channel] - lower_factor[colour_channel]) * share_along), low_pale + (high_pale - low_pale) * share_along)
 }
 
 /// What water's colour is multiplied by over the shallowest water.
-const SHALLOWEST: [f32; 3] = [1.35, 1.52, 1.30];
+const SHALLOWEST_FACTORS: [f32; 3] = [1.35, 1.52, 1.30];
 /// What it is multiplied by over the deepest.
-const DEEPEST: [f32; 3] = [0.34, 0.40, 0.58];
+const DEEPEST_FACTORS: [f32; 3] = [0.34, 0.40, 0.58];
 /// The depth the water's light halves its way down by, about.
-const SHALLOWS: f32 = 12.0;
+const SHALLOWS_DEPTH: f32 = 12.0;
 /// The bands the water's light is in, from the shallowest to the deepest.
 const WATER_BANDS: f32 = 14.0;
 
-/// What water's colour is multiplied by over ground `depth` under it,
-/// where the deepest there is is `deepest`: light over the shallows,
+/// What water's colour is multiplied by over ground `water_depth` under it,
+/// where the deepest there is is `deepest_depth`: light over the shallows,
 /// dark over the deep, in bands -- a doubling of the depth as far down
 /// the bands wherever it is.
-pub fn water_light(depth: f32, deepest: f32) -> [f32; 3] {
-    let down = ((1.0 + depth.max(0.0) / SHALLOWS).ln() / (1.0 + deepest.max(1.0) / SHALLOWS).ln()).min(1.0);
-    let down = (down * WATER_BANDS).round() / WATER_BANDS;
-    std::array::from_fn(|channel| SHALLOWEST[channel] + (DEEPEST[channel] - SHALLOWEST[channel]) * down)
+pub fn water_light(water_depth: f32, deepest_depth: f32) -> [f32; 3] {
+    let depth_share = ((1.0 + water_depth.max(0.0) / SHALLOWS_DEPTH).ln() / (1.0 + deepest_depth.max(1.0) / SHALLOWS_DEPTH).ln()).min(1.0);
+    let banded_depth_share = (depth_share * WATER_BANDS).round() / WATER_BANDS;
+    std::array::from_fn(|colour_channel| SHALLOWEST_FACTORS[colour_channel] + (DEEPEST_FACTORS[colour_channel] - SHALLOWEST_FACTORS[colour_channel]) * banded_depth_share)
 }
 
-/// `tint` on ground `sand` of which is sand: sand is its own colour at
+/// `land_tint` on ground `sand_share` of which is sand: sand is its own colour at
 /// any height.
-pub fn tint_on_sand(tint: [f32; 3], sand: f32) -> [f32; 3] {
-    tint.map(|tint| tint + (1.0 - tint) * sand / SAND_MOST)
+pub fn tint_on_sand(land_tint: [f32; 3], sand_share: f32) -> [f32; 3] {
+    land_tint.map(|tint_channel| tint_channel + (1.0 - tint_channel) * sand_share / SAND_MOST)
 }
 
-/// `from` with `part` of it `to`.
-pub fn laid(from: [u8; 3], to: [u8; 3], part: f32) -> [u8; 3] {
-    std::array::from_fn(|channel| (from[channel] as f32 + (to[channel] as f32 - from[channel] as f32) * part).round() as u8)
+/// `under_colour` with `part` of it `over_colour`.
+pub fn laid_over(under_colour: [u8; 3], over_colour: [u8; 3], part: f32) -> [u8; 3] {
+    std::array::from_fn(|colour_channel| (under_colour[colour_channel] as f32 + (over_colour[colour_channel] as f32 - under_colour[colour_channel] as f32) * part).round() as u8)
 }

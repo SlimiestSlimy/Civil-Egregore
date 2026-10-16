@@ -14,7 +14,7 @@ pub const LARGEST_SQUARE_SIDE: u8 = 31;
 
 /// A checkerboard of `square_side` cell squares, the top left square
 /// clear.
-pub fn checkerboard(square_side: u8) -> Bitmap {
+pub fn one_checkerboard(square_side: u8) -> Bitmap {
     let mut bitmap = Bitmap::new();
     for y in 0..=u8::MAX {
         for x in 0..=u8::MAX {
@@ -27,6 +27,6 @@ pub fn checkerboard(square_side: u8) -> Bitmap {
 }
 
 /// Every odd square side measured, with its checkerboard.
-pub fn checkerboards() -> impl Iterator<Item = (u8, Bitmap)> {
-    (SMALLEST_SQUARE_SIDE..=LARGEST_SQUARE_SIDE).step_by(2).map(|side| (side, checkerboard(side)))
+pub fn every_checkerboard() -> impl Iterator<Item = (u8, Bitmap)> {
+    (SMALLEST_SQUARE_SIDE..=LARGEST_SQUARE_SIDE).step_by(2).map(|square_side| (square_side, one_checkerboard(square_side)))
 }

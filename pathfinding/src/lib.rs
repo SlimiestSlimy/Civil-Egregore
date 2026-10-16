@@ -1,7 +1,7 @@
 //! Civil Egregore's pathfinding: over an **area**, 16x16 cells kept as
 //! masks -- a row a `u16`, cell `(x, y)` at bit `x` of row `y` -- which
 //! is all it knows of the world. Waves from many goals ([`Wave`],
-//! [`step_towards`]), the nearest cell ([`nearest`]), and A* between two
+//! [`step_towards`]), the nearest cell ([`nearest_goal`]), and A* between two
 //! cells ([`a_star`]); nothing here allocates.
 //!
 //! The design: `docs/pathfinding.md`; function by function:
@@ -19,19 +19,19 @@ mod walls;
 pub use a_star::a_star;
 pub use walls::Walls;
 
-use walls::{spread, spread_back};
+use walls::{spread_forwards, spread_back};
 
 /// Cells along an area's side.
-pub const SIDE: usize = 16;
+pub const AREA_SIDE: usize = 16;
 
 /// Cells in an area.
-const CELLS: usize = SIDE * SIDE;
+const CELLS: usize = AREA_SIDE * AREA_SIDE;
 
 /// An area's cells of one kind: a row a word, cell `(x, y)` at bit `x`
 /// of row `y`.
-pub type Rows = [u16; SIDE];
+pub type Rows = [u16; AREA_SIDE];
 
-/// A cell of an area: `(x, y)` from its top left, each under [`SIDE`].
+/// A cell of an area: `(x, y)` from its top left, each under [`AREA_SIDE`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cell {
     /// Its column.
@@ -42,13 +42,13 @@ pub struct Cell {
 
 impl Cell {
     /// Its index in the area, row by row.
-    const fn index(self) -> usize {
-        self.y as usize * SIDE + self.x as usize
+    const fn area_index(self) -> usize {
+        self.y as usize * AREA_SIDE + self.x as usize
     }
 
-    /// The cell at `index`, row by row.
-    const fn from_index(index: usize) -> Self {
-        Self { x: (index % SIDE) as u8, y: (index / SIDE) as u8 }
+    /// The cell at `area_index`, row by row.
+    const fn from_index(area_index: usize) -> Self {
+        Self { x: (area_index % AREA_SIDE) as u8, y: (area_index / AREA_SIDE) as u8 }
     }
 }
 
@@ -56,130 +56,130 @@ impl Cell {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Path {
     /// The first cell on it after the one it starts from.
-    pub first: Cell,
+    pub first_cell: Cell,
     /// Its steps, start to end.
     pub steps: u8,
 }
 
-/// Whether `rows` holds `cell`.
-pub const fn holds(rows: &Rows, cell: Cell) -> bool {
-    rows[cell.y as usize] >> cell.x & 1 == 1
+/// Whether `area_rows` holds `cell`.
+pub const fn rows_hold(area_rows: &Rows, cell: Cell) -> bool {
+    area_rows[cell.y as usize] >> cell.x & 1 == 1
 }
 
-/// The steps from `a` to `b` with nothing in the way: the greater of
+/// The steps from `from_cell` to `to_cell` with nothing in the way: the greater of
 /// their distances across and down, a step reaching any neighbour.
-pub const fn steps_apart(a: Cell, b: Cell) -> u8 {
-    let (across, down) = (a.x.abs_diff(b.x), a.y.abs_diff(b.y));
-    if across > down { across } else { down }
+pub const fn steps_apart(from_cell: Cell, to_cell: Cell) -> u8 {
+    let (cells_across, cells_down) = (from_cell.x.abs_diff(to_cell.x), from_cell.y.abs_diff(to_cell.y));
+    if cells_across > cells_down { cells_across } else { cells_down }
 }
 
-/// The cell of `goals` nearest `from` in steps, nothing in the way
-/// counted, other than `from` itself: of those equally near, the
-/// `pick`-th, round and round -- a random number, so walkers do not all
-/// lean one way. `None` if `goals` holds no other cell.
-pub fn nearest(goals: &Rows, from: Cell, pick: u64) -> Option<Cell> {
-    let (mut least, mut equally_near) = (u8::MAX, 0u64);
-    for_each(goals, from, |cell| {
-        let apart = steps_apart(from, cell);
-        if apart < least {
-            (least, equally_near) = (apart, 0);
+/// The cell of `goal_rows` nearest `from_cell` in steps, nothing in the way
+/// counted, other than `from_cell` itself: of those equally near, the
+/// `pick_number`-th, round and round -- a random number, so walkers do not all
+/// lean one way. `None` if `goal_rows` holds no other cell.
+pub fn nearest_goal(goal_rows: &Rows, from_cell: Cell, pick_number: u64) -> Option<Cell> {
+    let (mut least_apart, mut equally_near) = (u8::MAX, 0u64);
+    for_each(goal_rows, from_cell, |cell| {
+        let cell_distance = steps_apart(from_cell, cell);
+        if cell_distance < least_apart {
+            (least_apart, equally_near) = (cell_distance, 0);
         }
-        equally_near += (apart == least) as u64;
+        equally_near += (cell_distance == least_apart) as u64;
     });
     if equally_near == 0 {
         return None;
     }
-    let (mut left, mut found) = (pick % equally_near, None);
-    for_each(goals, from, |cell| {
-        if steps_apart(from, cell) == least {
-            if left == 0 && found.is_none() {
-                found = Some(cell);
+    let (mut picks_left, mut found_cell) = (pick_number % equally_near, None);
+    for_each(goal_rows, from_cell, |cell| {
+        if steps_apart(from_cell, cell) == least_apart {
+            if picks_left == 0 && found_cell.is_none() {
+                found_cell = Some(cell);
             }
-            left = left.wrapping_sub(1);
+            picks_left = picks_left.wrapping_sub(1);
         }
     });
-    found
+    found_cell
 }
 
-/// `each` on every cell of `rows` but `from`, row by row.
-fn for_each(rows: &Rows, from: Cell, mut each: impl FnMut(Cell)) {
-    for (y, &row) in rows.iter().enumerate() {
-        let mut bits = if y == from.y as usize { row & !(1 << from.x) } else { row };
-        while bits != 0 {
-            each(Cell { x: bits.trailing_zeros() as u8, y: y as u8 });
-            bits &= bits - 1;
+/// `each_cell` on every cell of `area_rows` but `skipped_cell`, row by row.
+fn for_each(area_rows: &Rows, skipped_cell: Cell, mut each_cell: impl FnMut(Cell)) {
+    for (y, &row_bits) in area_rows.iter().enumerate() {
+        let mut remaining_bits = if y == skipped_cell.y as usize { row_bits & !(1 << skipped_cell.x) } else { row_bits };
+        while remaining_bits != 0 {
+            each_cell(Cell { x: remaining_bits.trailing_zeros() as u8, y: y as u8 });
+            remaining_bits &= remaining_bits - 1;
         }
     }
 }
 
 /// A search spreading from every goal at once: the cells within so many
 /// steps of a goal, over the cells that may be walked on, a step further
-/// each [`Wave::advance`].
+/// each [`Wave::spread_one_step`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Wave {
     /// The cells reached so far.
-    reached: Rows,
+    reached_rows: Rows,
 }
 
 impl Wave {
-    /// A wave yet to spread: `goals` alone reached.
-    pub const fn from(goals: &Rows) -> Self {
-        Self { reached: *goals }
+    /// A wave yet to spread: `goal_rows` alone reached.
+    pub const fn from_goals(goal_rows: &Rows) -> Self {
+        Self { reached_rows: *goal_rows }
     }
 
     /// The cells reached so far.
-    pub const fn reached(&self) -> &Rows {
-        &self.reached
+    pub const fn reached_rows(&self) -> &Rows {
+        &self.reached_rows
     }
 
     /// One step: every passable neighbour of a reached cell reached,
     /// no wall before its step onto that cell -- the way a walker
     /// goes, towards the goals. Whether any was -- if not, the wave has
     /// gone as far as it can.
-    pub fn advance(&mut self, passable: &Rows, walls: &Walls) -> bool {
-        let wider = spread_back(&self.reached, walls);
-        let mut grew = 0;
-        for ((reached, &wider), &passable) in self.reached.iter_mut().zip(&wider).zip(passable) {
-            let new = wider & passable & !*reached;
-            *reached |= new;
-            grew |= new;
+    pub fn spread_one_step(&mut self, passable: &Rows, walls: &Walls) -> bool {
+        let spread_rows = spread_back(&self.reached_rows, walls);
+        let mut grown_bits = 0;
+        for ((reached_row, &spread_row), &passable) in self.reached_rows.iter_mut().zip(&spread_rows).zip(passable) {
+            let new_cells = spread_row & passable & !*reached_row;
+            *reached_row |= new_cells;
+            grown_bits |= new_cells;
         }
-        grew != 0
+        grown_bits != 0
     }
 }
 
-/// A walker on `from`'s next step to the nearest cell of `goals` over
+/// A walker on `from_cell`'s next step to the nearest cell of `goal_rows` over
 /// the cells of `passable`, through no wall of `walls`, and how many
 /// steps away that goal is; `None` if none can be walked to
 /// (`docs/pathfinding.md`, "Waves").
-pub fn step_towards(passable: &Rows, walls: &Walls, goals: &Rows, from: Cell, pick: u64) -> Option<Path> {
-    let mut beside: Rows = [0; SIDE];
-    beside[from.y as usize] = 1 << from.x;
-    beside = spread(&beside, walls);
-    beside[from.y as usize] &= !(1 << from.x);
-    let mut wave = Wave::from(goals);
-    wave.reached[from.y as usize] &= !(1 << from.x);
+pub fn step_towards(passable: &Rows, walls: &Walls, goal_rows: &Rows, from_cell: Cell, pick_number: u64) -> Option<Path> {
+    let mut beside_rows: Rows = [0; AREA_SIDE];
+    beside_rows[from_cell.y as usize] = 1 << from_cell.x;
+    beside_rows = spread_forwards(&beside_rows, walls);
+    beside_rows[from_cell.y as usize] &= !(1 << from_cell.x);
+    let mut wave = Wave::from_goals(goal_rows);
+    wave.reached_rows[from_cell.y as usize] &= !(1 << from_cell.x);
     let mut steps = 1;
     loop {
-        let (mut arrived, mut count): (Rows, u32) = ([0; SIDE], 0);
-        for ((arrived, &beside), &reached) in arrived.iter_mut().zip(&beside).zip(&wave.reached) {
-            *arrived = beside & reached;
-            count += arrived.count_ones();
+        let (mut arrived_rows, mut count): (Rows, u32) = ([0; AREA_SIDE], 0);
+        for ((arrived_row, &beside_row), &reached_row) in arrived_rows.iter_mut().zip(&beside_rows).zip(&wave.reached_rows) {
+            *arrived_row = beside_row & reached_row;
+            count += arrived_row.count_ones();
         }
         if count > 0 {
-            let mut left = pick % count as u64;
-            for (y, &row) in arrived.iter().enumerate() {
-                let mut bits = row;
-                while bits != 0 {
-                    if left == 0 {
-                        return Some(Path { first: Cell { x: bits.trailing_zeros() as u8, y: y as u8 }, steps });
+            let mut picks_left = pick_number % count as u64;
+            for (y, &row_bits) in arrived_rows.iter().enumerate() {
+                let mut remaining_bits = row_bits;
+                while remaining_bits != 0 {
+                    if picks_left == 0 {
+                        return Some(Path { first_cell: Cell { x: remaining_bits.trailing_zeros() as u8, y: y as u8 }, steps });
                     }
-                    left -= 1;
-                    bits &= bits - 1;
+                    picks_left -= 1;
+                    remaining_bits &= remaining_bits - 1;
                 }
             }
         }
-        if !wave.advance(passable, walls) {
+        if !wave.spread_one_step(passable, walls) {
             return None;
         }
         steps += 1;

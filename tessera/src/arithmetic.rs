@@ -3,10 +3,10 @@
 //!
 //! Function by function: `docs/reference.md`, "`arithmetic.rs`".
 
-use crate::bit_stream::{BitReader, BitStream, Sink};
+use crate::bit_stream::{BitReader, BitStream, BitSink};
 
 /// The width the interval is kept at or over: a byte under the window's.
-const TOP: u32 = 1 << 24;
+const LEAST_INTERVAL_WIDTH: u32 = 1 << 24;
 /// Bits a byte takes, in the stream.
 const BYTE_BITS: u8 = u8::BITS as u8;
 /// The bits of the window the interval's ends are held in.
@@ -16,14 +16,14 @@ const ALL_ONES: u8 = u8::MAX;
 
 /// Every byte with its bits in the other order: bytes go to the stream
 /// highest bit first, so that the stream can end partway through one.
-const REVERSED: [u8; 1 << u8::BITS] = {
-    let mut reversed = [0; 1 << u8::BITS];
-    let mut byte = 0;
-    while byte < reversed.len() {
-        reversed[byte] = (byte as u8).reverse_bits();
-        byte += 1;
+const REVERSED_BYTES: [u8; 1 << u8::BITS] = {
+    let mut reversed_bytes = [0; 1 << u8::BITS];
+    let mut byte_value = 0;
+    while byte_value < reversed_bytes.len() {
+        reversed_bytes[byte_value] = (byte_value as u8).reverse_bits();
+        byte_value += 1;
     }
-    reversed
+    reversed_bytes
 };
 
 /// The probability that a bit is clear, as a fraction of `2^32`: neither
@@ -33,52 +33,52 @@ const REVERSED: [u8; 1 << u8::BITS] = {
 pub struct ClearProbability(pub u32);
 
 impl ClearProbability {
-    /// Where `range` splits: the width of the clear part.
+    /// Where `interval_width` splits: the width of the clear part.
     #[inline]
-    fn split(self, range: u32) -> u32 {
-        ((range as u64 * self.0 as u64) >> WINDOW_BITS) as u32
+    fn clear_part_width(self, interval_width: u32) -> u32 {
+        ((interval_width as u64 * self.0 as u64) >> WINDOW_BITS) as u32
     }
 }
 
-/// Bits [`Encoder::finish`] takes beyond what the bits coded carry: the
+/// Bits [`RangeEncoder::finish_stream`] takes beyond what the bits coded carry: the
 /// final interval always holds an aligned run of numbers half its
 /// width's power of two wide, named by at most two bits more than its
 /// width's `-log2`.
 pub const FINISHING_BITS: usize = 2;
 
 /// Codes bits into a stream.
-pub struct Encoder {
+pub struct RangeEncoder {
     /// The interval's lower end, in the window, and a carry above it.
-    low: u64,
+    interval_low: u64,
     /// The interval's width.
-    range: u32,
+    interval_width: u32,
     /// The last byte settled, held back for a carry, if any is.
-    held: Option<u8>,
+    held_byte: Option<u8>,
     /// `0xFF` bytes held back after it.
     held_all_ones: u64,
 }
 
-impl Default for Encoder {
+impl Default for RangeEncoder {
     /// The whole interval, nothing coded.
     fn default() -> Self {
-        Self { low: 0, range: u32::MAX, held: None, held_all_ones: 0 }
+        Self { interval_low: 0, interval_width: u32::MAX, held_byte: None, held_all_ones: 0 }
     }
 }
 
-impl Encoder {
-    /// Codes `bit` at `clear`, the probability it is clear.
+impl RangeEncoder {
+    /// Codes `coded_bit` at `clear_probability`, the probability it is clear.
     #[inline]
-    pub fn encode(&mut self, bit: bool, clear: ClearProbability, stream: &mut BitStream) {
-        let split = clear.split(self.range);
-        if bit {
-            self.low += split as u64;
-            self.range -= split;
+    pub fn encode_bit(&mut self, coded_bit: bool, clear_probability: ClearProbability, stream: &mut BitStream) {
+        let clear_width = clear_probability.clear_part_width(self.interval_width);
+        if coded_bit {
+            self.interval_low += clear_width as u64;
+            self.interval_width -= clear_width;
         } else {
-            self.range = split;
+            self.interval_width = clear_width;
         }
-        while self.range < TOP {
+        while self.interval_width < LEAST_INTERVAL_WIDTH {
             self.settle_top_byte(stream);
-            self.range <<= BYTE_BITS;
+            self.interval_width <<= BYTE_BITS;
         }
     }
 
@@ -86,24 +86,24 @@ impl Encoder {
     /// held back if a carry could still change it, else written with
     /// every byte held before it, the carry added to them.
     fn settle_top_byte(&mut self, stream: &mut BitStream) {
-        let top = (self.low >> (WINDOW_BITS - BYTE_BITS as u32)) as u8;
-        let carry = self.low >> WINDOW_BITS;
-        if top != ALL_ONES || carry != 0 {
-            self.write_held(carry as u8, stream);
-            self.held = Some(top);
+        let top_byte = (self.interval_low >> (WINDOW_BITS - BYTE_BITS as u32)) as u8;
+        let carry_out = self.interval_low >> WINDOW_BITS;
+        if top_byte != ALL_ONES || carry_out != 0 {
+            self.write_held(carry_out as u8, stream);
+            self.held_byte = Some(top_byte);
         } else {
             self.held_all_ones += 1;
         }
-        self.low = (self.low << BYTE_BITS) & (u32::MAX as u64);
+        self.interval_low = (self.interval_low << BYTE_BITS) & (u32::MAX as u64);
     }
 
-    /// Writes the bytes held back, `carry` added to them.
-    fn write_held(&mut self, carry: u8, stream: &mut BitStream) {
-        if let Some(held) = self.held {
-            push_byte(held.wrapping_add(carry), stream);
+    /// Writes the bytes held back, `carry_out` added to them.
+    fn write_held(&mut self, carry_out: u8, stream: &mut BitStream) {
+        if let Some(held_byte) = self.held_byte {
+            push_byte(held_byte.wrapping_add(carry_out), stream);
         }
         for _ in 0..self.held_all_ones {
-            push_byte(ALL_ONES.wrapping_add(carry), stream);
+            push_byte(ALL_ONES.wrapping_add(carry_out), stream);
         }
         self.held_all_ones = 0;
     }
@@ -111,71 +111,71 @@ impl Encoder {
     /// Ends the stream: the fewest bits that keep every number they
     /// start inside the final interval, whatever bits follow them -- so
     /// the stream ends itself (`docs/reference.md`, "`arithmetic.rs`").
-    pub fn finish(mut self, stream: &mut BitStream) {
-        let end = self.low + self.range as u64;
-        let (pinned, free_bits) = (0..=WINDOW_BITS)
+    pub fn finish_stream(mut self, stream: &mut BitStream) {
+        let interval_end = self.interval_low + self.interval_width as u64;
+        let (pinned_number, free_bits) = (0..=WINDOW_BITS)
             .rev()
             .map(|free_bits| {
-                let unit = (1u64 << free_bits) - 1;
-                ((self.low + unit) & !unit, free_bits)
+                let free_bits_mask = (1u64 << free_bits) - 1;
+                ((self.interval_low + free_bits_mask) & !free_bits_mask, free_bits)
             })
-            .find(|&(number, free_bits)| number + (1u64 << free_bits) <= end)
+            .find(|&(rounded_number, free_bits)| rounded_number + (1u64 << free_bits) <= interval_end)
             .expect("the interval holds at least one whole unit of its last bit");
-        self.write_held((pinned >> WINDOW_BITS) as u8, stream);
-        let window = pinned as u32;
-        let significant = WINDOW_BITS - free_bits;
-        for bit in 0..significant {
-            stream.push(window >> (WINDOW_BITS - 1 - bit) & 1 == 1);
+        self.write_held((pinned_number >> WINDOW_BITS) as u8, stream);
+        let window = pinned_number as u32;
+        let significant_bits = WINDOW_BITS - free_bits;
+        for bit_position in 0..significant_bits {
+            stream.push(window >> (WINDOW_BITS - 1 - bit_position) & 1 == 1);
         }
     }
 }
 
-/// Writes `byte`, highest bit first.
+/// Writes `byte_value`, highest bit first.
 #[inline]
-fn push_byte(byte: u8, stream: &mut BitStream) {
-    stream.push_value(REVERSED[byte as usize] as u64, BYTE_BITS);
+fn push_byte(byte_value: u8, stream: &mut BitStream) {
+    stream.push_value(REVERSED_BYTES[byte_value as usize] as u64, BYTE_BITS);
 }
 
 /// Reads a byte [`push_byte`] wrote.
 #[inline]
-fn read_byte(reader: &mut BitReader) -> u8 {
-    REVERSED[reader.value(BYTE_BITS) as usize]
+fn read_byte(stream_reader: &mut BitReader) -> u8 {
+    REVERSED_BYTES[stream_reader.value(BYTE_BITS) as usize]
 }
 
-/// Reads back bits an [`Encoder`] coded.
-pub struct Decoder {
+/// Reads back bits an [`RangeEncoder`] coded.
+pub struct RangeDecoder {
     /// The interval's width.
-    range: u32,
+    interval_width: u32,
     /// The number the stream spells, less the interval's lower end, in
     /// the window.
-    offset: u32,
+    offset_in_interval: u32,
 }
 
-impl Decoder {
-    /// Starts reading at `reader`'s next bit.
-    pub fn new(reader: &mut BitReader) -> Self {
-        let mut offset = 0;
+impl RangeDecoder {
+    /// Starts reading at `stream_reader`'s next bit.
+    pub fn new(stream_reader: &mut BitReader) -> Self {
+        let mut offset_in_interval = 0;
         for _ in 0..WINDOW_BITS / BYTE_BITS as u32 {
-            offset = offset << BYTE_BITS | read_byte(reader) as u32;
+            offset_in_interval = offset_in_interval << BYTE_BITS | read_byte(stream_reader) as u32;
         }
-        Self { range: u32::MAX, offset }
+        Self { interval_width: u32::MAX, offset_in_interval }
     }
 
-    /// Reads a bit coded at `clear`.
+    /// Reads a bit coded at `clear_probability`.
     #[inline]
-    pub fn decode(&mut self, clear: ClearProbability, reader: &mut BitReader) -> bool {
-        let split = clear.split(self.range);
-        let bit = self.offset >= split;
-        if bit {
-            self.offset -= split;
-            self.range -= split;
+    pub fn decode_bit(&mut self, clear_probability: ClearProbability, stream_reader: &mut BitReader) -> bool {
+        let clear_width = clear_probability.clear_part_width(self.interval_width);
+        let decoded_bit = self.offset_in_interval >= clear_width;
+        if decoded_bit {
+            self.offset_in_interval -= clear_width;
+            self.interval_width -= clear_width;
         } else {
-            self.range = split;
+            self.interval_width = clear_width;
         }
-        while self.range < TOP {
-            self.range <<= BYTE_BITS;
-            self.offset = self.offset << BYTE_BITS | read_byte(reader) as u32;
+        while self.interval_width < LEAST_INTERVAL_WIDTH {
+            self.interval_width <<= BYTE_BITS;
+            self.offset_in_interval = self.offset_in_interval << BYTE_BITS | read_byte(stream_reader) as u32;
         }
-        bit
+        decoded_bit
     }
 }

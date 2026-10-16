@@ -4,52 +4,52 @@
 //! window nothing of a ticker's process (`docs/server.md`, "A world
 //! shown").
 
-use super::frame::{Ask, Cells, Frame, Near, Viewport, Water};
-use super::terrain::Levels;
-use super::Request;
+use super::frame::{FrameAsk, Cells, ViewportFrame, NearRectangle, Viewport, Water};
+use super::terrain::DrawnHeightRange;
+use super::HostRequest;
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::sync::Arc;
-use worldgen::Generation;
+use worldgen::WorldGeneration;
 
 /// The most words a message is read as: more is no message of ours.
 const MOST_WORDS: u64 = 1 << 28;
 
 /// Sends `words` as one message: how many, then each, low byte first.
-pub(crate) fn send(to: &mut impl Write, words: &[u64]) -> io::Result<()> {
-    let mut bytes = Vec::with_capacity((words.len() + 1) * 8);
-    bytes.extend_from_slice(&(words.len() as u64).to_le_bytes());
-    words.iter().for_each(|word| bytes.extend_from_slice(&word.to_le_bytes()));
-    to.write_all(&bytes)?;
-    to.flush()
+pub(crate) fn send_message(stream_to: &mut impl Write, words: &[u64]) -> io::Result<()> {
+    let mut message_bytes = Vec::with_capacity((words.len() + 1) * 8);
+    message_bytes.extend_from_slice(&(words.len() as u64).to_le_bytes());
+    words.iter().for_each(|word| message_bytes.extend_from_slice(&word.to_le_bytes()));
+    stream_to.write_all(&message_bytes)?;
+    stream_to.flush()
 }
 
-/// Reads one message [`send`] sent: its words.
-pub(crate) fn receive(from: &mut impl Read) -> io::Result<Vec<u64>> {
+/// Reads one message [`send_message`] sent: its words.
+pub(crate) fn receive_message(stream_from: &mut impl Read) -> io::Result<Vec<u64>> {
     let mut word = [0u8; 8];
-    from.read_exact(&mut word)?;
+    stream_from.read_exact(&mut word)?;
     let count = u64::from_le_bytes(word);
     if count > MOST_WORDS {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "a message longer than any sent"));
     }
-    let mut bytes = vec![0u8; count as usize * 8];
-    from.read_exact(&mut bytes)?;
-    Ok(bytes.as_chunks::<8>().0.iter().map(|word| u64::from_le_bytes(*word)).collect())
+    let mut message_bytes = vec![0u8; count as usize * 8];
+    stream_from.read_exact(&mut message_bytes)?;
+    Ok(message_bytes.as_chunks::<8>().0.iter().map(|word| u64::from_le_bytes(*word)).collect())
 }
 
 /// A message being written, word after word.
 #[derive(Default)]
-pub(crate) struct Written(pub(crate) Vec<u64>);
+pub(crate) struct MessageWritten(pub(crate) Vec<u64>);
 
-impl Written {
+impl MessageWritten {
     /// One number.
-    fn number(&mut self, number: u64) {
-        self.0.push(number);
+    fn write_number(&mut self, number_written: u64) {
+        self.0.push(number_written);
     }
 
     /// A pair of them, in one word.
-    fn pair(&mut self, (first, second): (u32, u32)) {
-        self.0.push(u64::from(first) << 32 | u64::from(second));
+    fn write_pair(&mut self, (high_half, low_half): (u32, u32)) {
+        self.0.push(u64::from(high_half) << 32 | u64::from(low_half));
     }
 
     /// Words, how many before them.
@@ -59,183 +59,183 @@ impl Written {
     }
 
     /// A text, its bytes eight a word.
-    fn text(&mut self, text: &str) {
-        self.0.push(text.len() as u64);
-        self.0.extend(text.as_bytes().chunks(8).map(|bytes| bytes.iter().rev().fold(0, |word, &byte| word << 8 | u64::from(byte))));
+    fn write_text(&mut self, text_written: &str) {
+        self.0.push(text_written.len() as u64);
+        self.0.extend(text_written.as_bytes().chunks(8).map(|eight_bytes| eight_bytes.iter().rev().fold(0, |word, &text_byte| word << 8 | u64::from(text_byte))));
     }
 
     /// Something there may be none of: whether there is, then it.
-    fn maybe<T>(&mut self, maybe: Option<T>, mut written: impl FnMut(&mut Self, T)) {
-        self.0.push(u64::from(maybe.is_some()));
-        if let Some(there) = maybe {
-            written(self, there);
+    fn write_maybe<T>(&mut self, maybe_value: Option<T>, mut write_value: impl FnMut(&mut Self, T)) {
+        self.0.push(u64::from(maybe_value.is_some()));
+        if let Some(present_value) = maybe_value {
+            write_value(self, present_value);
         }
     }
 }
 
 /// A message being read, word after word: `None` from any read past
 /// its end, so a message cut short is no message.
-pub(crate) struct Read64<'a> {
+pub(crate) struct MessageRead<'a> {
     /// Its words.
     words: &'a [u64],
     /// The next to read.
-    at: usize,
+    next_word_index: usize,
 }
 
-impl<'a> Read64<'a> {
+impl<'a> MessageRead<'a> {
     /// `words`, from the first.
     pub(crate) fn over_words(words: &'a [u64]) -> Self {
-        Self { words, at: 0 }
+        Self { words, next_word_index: 0 }
     }
 
     /// One number.
-    fn number(&mut self) -> Option<u64> {
-        self.at += 1;
-        self.words.get(self.at - 1).copied()
+    fn read_number(&mut self) -> Option<u64> {
+        self.next_word_index += 1;
+        self.words.get(self.next_word_index - 1).copied()
     }
 
     /// A pair of them.
-    fn pair(&mut self) -> Option<(u32, u32)> {
-        self.number().map(|word| ((word >> 32) as u32, word as u32))
+    fn read_pair(&mut self) -> Option<(u32, u32)> {
+        self.read_number().map(|word| ((word >> 32) as u32, word as u32))
     }
 
     /// Words, how many before them.
     fn words(&mut self) -> Option<Vec<u64>> {
-        let count = self.number()? as usize;
-        let words = self.words.get(self.at..self.at.checked_add(count)?)?;
-        self.at += count;
+        let count = self.read_number()? as usize;
+        let words = self.words.get(self.next_word_index..self.next_word_index.checked_add(count)?)?;
+        self.next_word_index += count;
         Some(words.to_vec())
     }
 
     /// A text.
-    fn text(&mut self) -> Option<String> {
-        let bytes = self.number()? as usize;
-        let words = self.words.get(self.at..self.at.checked_add(bytes.div_ceil(8))?)?;
-        self.at += words.len();
-        String::from_utf8(words.iter().flat_map(|word| word.to_le_bytes()).take(bytes).collect()).ok()
+    fn read_text(&mut self) -> Option<String> {
+        let byte_count = self.read_number()? as usize;
+        let words = self.words.get(self.next_word_index..self.next_word_index.checked_add(byte_count.div_ceil(8))?)?;
+        self.next_word_index += words.len();
+        String::from_utf8(words.iter().flat_map(|word| word.to_le_bytes()).take(byte_count).collect()).ok()
     }
 
     /// Something there may be none of.
-    fn maybe<T>(&mut self, read: impl FnOnce(&mut Self) -> Option<T>) -> Option<Option<T>> {
-        match self.number()? {
+    fn read_maybe<T>(&mut self, read_value: impl FnOnce(&mut Self) -> Option<T>) -> Option<Option<T>> {
+        match self.read_number()? {
             0 => Some(None),
-            _ => read(self).map(Some),
+            _ => read_value(self).map(Some),
         }
     }
 }
 
 /// A viewport's two corners.
-fn viewport_written(written: &mut Written, viewport: Viewport) {
-    written.pair(viewport.first);
-    written.pair(viewport.last);
+fn viewport_written(message_written: &mut MessageWritten, viewport: Viewport) {
+    message_written.write_pair(viewport.top_left_superchunk_cartesian);
+    message_written.write_pair(viewport.bottom_right_superchunk_cartesian);
 }
 
 /// A viewport read.
-fn viewport_read(read: &mut Read64) -> Option<Viewport> {
-    Some(Viewport { first: read.pair()?, last: read.pair()? })
+fn viewport_read(message_read: &mut MessageRead) -> Option<Viewport> {
+    Some(Viewport { top_left_superchunk_cartesian: message_read.read_pair()?, bottom_right_superchunk_cartesian: message_read.read_pair()? })
 }
 
 /// The cells seen from near, written.
-fn near_written(written: &mut Written, near: Near) {
-    written.pair(near.first);
-    written.pair(near.size);
-    written.number(u64::from(near.pixels_a_cell));
+fn near_written(message_written: &mut MessageWritten, seen_near: NearRectangle) {
+    message_written.write_pair(seen_near.first_cell_cartesian);
+    message_written.write_pair(seen_near.size_in_cells);
+    message_written.write_number(u64::from(seen_near.pixels_a_cell));
 }
 
 /// The cells seen from near, read.
-fn near_read(read: &mut Read64) -> Option<Near> {
-    Some(Near { first: read.pair()?, size: read.pair()?, pixels_a_cell: read.number()? as u32 })
+fn near_read(message_read: &mut MessageRead) -> Option<NearRectangle> {
+    Some(NearRectangle { first_cell_cartesian: message_read.read_pair()?, size_in_cells: message_read.read_pair()?, pixels_a_cell: message_read.read_number()? as u32 })
 }
 
 /// What a window asks of a ticker, as a message: none of what only a
 /// host that owns its world can do -- make one, open one, save one.
-pub(crate) fn request_written(request: &Request) -> Option<Vec<u64>> {
-    let mut written = Written::default();
-    match request {
-        Request::Sync(ask) => {
-            written.number(0);
-            written.maybe(ask.viewport, viewport_written);
-            written.pair((ask.detail, ask.skip));
-            written.number(u64::from(ask.most));
-            written.maybe(ask.near, near_written);
+pub(crate) fn request_written(host_request: &HostRequest) -> Option<Vec<u64>> {
+    let mut message_written = MessageWritten::default();
+    match host_request {
+        HostRequest::AskFrame(frame_ask) => {
+            message_written.write_number(0);
+            message_written.write_maybe(frame_ask.viewport, viewport_written);
+            message_written.write_pair((frame_ask.pixel_side_log2, frame_ask.superchunks_skipped));
+            message_written.write_number(u64::from(frame_ask.most_superchunks));
+            message_written.write_maybe(frame_ask.seen_near, near_written);
         }
-        Request::Pause(paused) => written.pair((1, u32::from(*paused))),
-        Request::Pace(pace) => {
-            written.number(2);
-            written.maybe(*pace, |written, pace| written.number(u64::from(pace)));
+        HostRequest::SetPaused(pause_asked) => message_written.write_pair((1, u32::from(*pause_asked))),
+        HostRequest::SetPace(pace_asked) => {
+            message_written.write_number(2);
+            message_written.write_maybe(*pace_asked, |pace_written, ticks_a_second| pace_written.write_number(u64::from(ticks_a_second)));
         }
-        Request::New(_) | Request::Open(_) | Request::Save(_) | Request::Reset(_) => return None,
+        HostRequest::MakeWorld(_) | HostRequest::OpenWorld(_) | HostRequest::Save(_) | HostRequest::Reset(_) => return None,
     }
-    Some(written.0)
+    Some(message_written.0)
 }
 
 /// What [`request_written`] wrote.
-pub(crate) fn request_read(words: &[u64]) -> Option<Request> {
-    let mut read = Read64::over_words(words);
-    Some(match read.number()? {
+pub(crate) fn request_read(words: &[u64]) -> Option<HostRequest> {
+    let mut message_read = MessageRead::over_words(words);
+    Some(match message_read.read_number()? {
         0 => {
-            let viewport = read.maybe(viewport_read)?;
-            let ((detail, skip), most) = (read.pair()?, read.number()? as u32);
-            Request::Sync(Ask { viewport, detail, skip, most, near: read.maybe(near_read)? })
+            let viewport = message_read.read_maybe(viewport_read)?;
+            let ((pixel_side_log2, superchunks_skipped), most_superchunks) = (message_read.read_pair()?, message_read.read_number()? as u32);
+            HostRequest::AskFrame(FrameAsk { viewport, pixel_side_log2, superchunks_skipped, most_superchunks, seen_near: message_read.read_maybe(near_read)? })
         }
-        2 => Request::Pace(read.maybe(|read| read.number().map(|pace| pace as u32))?),
-        pause => Request::Pause(pause & 1 == 1),
+        2 => HostRequest::SetPace(message_read.read_maybe(|pace_read| pace_read.read_number().map(|ticks_a_second| ticks_a_second as u32))?),
+        pause_word => HostRequest::SetPaused(pause_word & 1 == 1),
     })
 }
 
 /// A frame as a message. A superchunk's water goes with its heights,
 /// the once they are sent: the window keeps it from then.
-pub(crate) fn frame_written(frame: &Frame) -> Vec<u64> {
-    let mut written = Written::default();
-    [frame.world, frame.seed, frame.tick, frame.ticks_a_second.to_bits(), frame.sheep as u64, frame.grass, frame.trees, frame.sync_seconds.to_bits(), frame.sync_share.to_bits(), u64::from(frame.detail), u64::from(frame.more)].into_iter().for_each(|number| written.number(number));
-    let numbers = frame.generation.numbers();
-    written.number(numbers.len() as u64);
-    for (name, number) in &numbers {
-        written.text(name);
-        written.number(*number);
+pub(crate) fn frame_written(viewport_frame: &ViewportFrame) -> Vec<u64> {
+    let mut message_written = MessageWritten::default();
+    [viewport_frame.world, viewport_frame.seed, viewport_frame.tick, viewport_frame.ticks_a_second.to_bits(), viewport_frame.sheep_count as u64, viewport_frame.grass_cells, viewport_frame.trees, viewport_frame.sync_seconds.to_bits(), viewport_frame.sync_share.to_bits(), u64::from(viewport_frame.pixel_side_log2), u64::from(viewport_frame.more_to_come)].into_iter().for_each(|frame_number| message_written.write_number(frame_number));
+    let generation_numbers = viewport_frame.world_generation.numbers();
+    message_written.write_number(generation_numbers.len() as u64);
+    for (number_name, number_value) in &generation_numbers {
+        message_written.write_text(number_name);
+        message_written.write_number(*number_value);
     }
-    written.maybe(frame.side, |written, side| written.number(u64::from(side)));
-    written.maybe(frame.viewport, viewport_written);
-    written.maybe(frame.near, near_written);
-    written.maybe(frame.named.as_deref(), Written::text);
-    written.maybe(frame.said.as_deref(), Written::text);
-    written.number(frame.hot.len() as u64);
-    frame.hot.iter().for_each(|&at| written.pair(at));
-    written.number(frame.cells.len() as u64);
-    for cells in &frame.cells {
-        written.pair(cells.at);
-        written.pair(cells.top_left);
-        [&cells.grass, &cells.heights, &cells.trees, &cells.stages, &cells.wet, &cells.clouds, &cells.raining, &cells.climates].into_iter().for_each(|words| written.words(words));
+    message_written.write_maybe(viewport_frame.side_superchunks, |side_written, side_number| side_written.write_number(u64::from(side_number)));
+    message_written.write_maybe(viewport_frame.viewport, viewport_written);
+    message_written.write_maybe(viewport_frame.seen_near, near_written);
+    message_written.write_maybe(viewport_frame.world_name.as_deref(), MessageWritten::write_text);
+    message_written.write_maybe(viewport_frame.last_outcome.as_deref(), MessageWritten::write_text);
+    message_written.write_number(viewport_frame.hot.len() as u64);
+    viewport_frame.hot.iter().for_each(|&superchunk_cartesian| message_written.write_pair(superchunk_cartesian));
+    message_written.write_number(viewport_frame.cells.len() as u64);
+    for cells in &viewport_frame.cells {
+        message_written.write_pair(cells.superchunk_cartesian);
+        message_written.write_pair(cells.top_left);
+        [&cells.grass_bitmaps, &cells.heights, &cells.trees, &cells.stages, &cells.wet_bitmaps, &cells.clouds, &cells.raining_tiles, &cells.climates].into_iter().for_each(|words| message_written.words(words));
         if !cells.heights.is_empty() {
-            cells.water.depths.iter().chain([&cells.water.deep]).for_each(|words| written.words(words));
+            cells.water.depth_low_bits.iter().chain([&cells.water.deep_cells]).for_each(|words| message_written.words(words));
         }
-        written.words(&cells.sheep.iter().map(|&(x, y)| u64::from(x) << 16 | u64::from(y)).collect::<Vec<u64>>());
+        message_written.words(&cells.sheep_cells_cartesian.iter().map(|&(x, y)| u64::from(x) << 16 | u64::from(y)).collect::<Vec<u64>>());
     }
-    written.0
+    message_written.0
 }
 
 /// What [`frame_written`] wrote: `waters` the water of each
 /// superchunk whose heights came, kept for the frames after.
-pub(crate) fn frame_read(words: &[u64], waters: &mut HashMap<(u32, u32), Arc<Water>>) -> Option<Frame> {
-    let mut read = Read64::over_words(words);
-    let [world, seed, tick, ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, detail, more] = std::array::from_fn(|_| read.number());
-    let numbers: Vec<(String, u64)> = (0..read.number()?).map(|_| Some((read.text()?, read.number()?))).collect::<Option<_>>()?;
-    let generation = Generation::of_numbers(&numbers);
-    let side = read.maybe(|read| read.number().map(|side| side as u32))?;
-    let (viewport, near) = (read.maybe(viewport_read)?, read.maybe(near_read)?);
-    let (named, said) = (read.maybe(Read64::text)?, read.maybe(Read64::text)?);
-    let hot: Vec<(u32, u32)> = (0..read.number()?).map(|_| read.pair()).collect::<Option<_>>()?;
+pub(crate) fn frame_read(words: &[u64], waters: &mut HashMap<(u32, u32), Arc<Water>>) -> Option<ViewportFrame> {
+    let mut message_read = MessageRead::over_words(words);
+    let [world, seed, tick, ticks_a_second, sheep_count, grass_cells, trees, sync_seconds, sync_share, pixel_side_log2, more_to_come] = std::array::from_fn(|_| message_read.read_number());
+    let generation_numbers: Vec<(String, u64)> = (0..message_read.read_number()?).map(|_| Some((message_read.read_text()?, message_read.read_number()?))).collect::<Option<_>>()?;
+    let world_generation = WorldGeneration::of_numbers(&generation_numbers);
+    let side_superchunks = message_read.read_maybe(|side_read| side_read.read_number().map(|side_number| side_number as u32))?;
+    let (viewport, seen_near) = (message_read.read_maybe(viewport_read)?, message_read.read_maybe(near_read)?);
+    let (world_name, last_outcome) = (message_read.read_maybe(MessageRead::read_text)?, message_read.read_maybe(MessageRead::read_text)?);
+    let hot: Vec<(u32, u32)> = (0..message_read.read_number()?).map(|_| message_read.read_pair()).collect::<Option<_>>()?;
     let mut cells = Vec::new();
-    for _ in 0..read.number()? {
-        let (at, top_left) = (read.pair()?, read.pair()?);
-        let [grass, heights, trees, stages, wet, clouds, raining, climates] = [read.words()?, read.words()?, read.words()?, read.words()?, read.words()?, read.words()?, read.words()?, read.words()?];
+    for _ in 0..message_read.read_number()? {
+        let (superchunk_cartesian, top_left) = (message_read.read_pair()?, message_read.read_pair()?);
+        let [grass_bitmaps, heights, trees, stages, wet_bitmaps, clouds, raining_tiles, climates] = [message_read.words()?, message_read.words()?, message_read.words()?, message_read.words()?, message_read.words()?, message_read.words()?, message_read.words()?, message_read.words()?];
         if !heights.is_empty() {
-            let water = Water { depths: [read.words()?, read.words()?, read.words()?, read.words()?], deep: read.words()? };
-            waters.insert(at, Arc::new(water));
+            let water = Water { depth_low_bits: [message_read.words()?, message_read.words()?, message_read.words()?, message_read.words()?], deep_cells: message_read.words()? };
+            waters.insert(superchunk_cartesian, Arc::new(water));
         }
-        let sheep = read.words()?.into_iter().map(|word| ((word >> 16) as u16, word as u16)).collect();
-        let water = Arc::clone(waters.entry(at).or_default());
-        cells.push(Cells { at, grass, top_left, heights, trees, stages, wet, clouds, raining, climates, water, sheep });
+        let sheep_cells_cartesian = message_read.words()?.into_iter().map(|word| ((word >> 16) as u16, word as u16)).collect();
+        let water = Arc::clone(waters.entry(superchunk_cartesian).or_default());
+        cells.push(Cells { superchunk_cartesian, grass_bitmaps, top_left, heights, trees, stages, wet_bitmaps, clouds, raining_tiles, climates, water, sheep_cells_cartesian });
     }
-    Some(Frame { world: world?, seed: seed?, levels: Levels::from_generation(&generation), generation, side, tick: tick?, ticks_a_second: f64::from_bits(ticks_a_second?), sheep: sheep? as usize, grass: grass?, trees: trees?, sync_seconds: f64::from_bits(sync_seconds?), sync_share: f64::from_bits(sync_share?), viewport, hot, detail: detail? as u32, near, named, said, more: more? == 1, cells })
+    Some(ViewportFrame { world: world?, seed: seed?, drawn_heights: DrawnHeightRange::from_generation(&world_generation), world_generation, side_superchunks, tick: tick?, ticks_a_second: f64::from_bits(ticks_a_second?), sheep_count: sheep_count? as usize, grass_cells: grass_cells?, trees: trees?, sync_seconds: f64::from_bits(sync_seconds?), sync_share: f64::from_bits(sync_share?), viewport, hot, pixel_side_log2: pixel_side_log2? as u32, seen_near, world_name, last_outcome, more_to_come: more_to_come? == 1, cells })
 }

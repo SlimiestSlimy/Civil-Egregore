@@ -20,8 +20,8 @@ superchunk's 2^20 (`CellIndex::place_in_superchunk`, where its height
 is). Each part is a bit field, so going from a cell to its chunk,
 superchunk or place is a shift or a mask.
 
-A neighbour is a step on the index itself (`CellIndex::offset`,
-`SuperchunkIndex::offset`): one coordinate's bits are added apart --
+A neighbour is a step on the index itself (`CellIndex::at_cartesian_offset`,
+`SuperchunkIndex::at_cartesian_offset`): one coordinate's bits are added apart --
 the other's set to ones so a carry passes over them, or cleared so a
 borrow does -- and a step past the world's edge is refused.
 

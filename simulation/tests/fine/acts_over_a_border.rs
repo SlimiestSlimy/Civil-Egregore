@@ -5,13 +5,13 @@
 //!
 //! `cargo test --test fine acts_over_a_border`
 
-use crate::tests::{cell, walker, world, STONE, TAG, WOKEN};
+use crate::tests::{cell, walker_header, world, STONE_LAYER, ENTITY_NUMBER, WOKEN_COUNT};
 use bitplane_manager::BitmapArena;
 use coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{AttributeBlock, Entities, NEVER};
+use entity_manager::{AttributeBlock, WorldEntities, NEVER_WAKES};
 use simulation::{Compare, Simulation, Turn};
 use std::collections::BTreeSet;
-use utilities::rng::Rng;
+use utilities::rng::RandomSource;
 
 /// An entity beside a border -- any of the four that meet at the
 /// corner of four superchunks, on either side of it, anywhere along
@@ -20,37 +20,37 @@ use utilities::rng::Rng;
 /// both happen; taken, neither -- and it sleeps either way.
 #[test]
 fn an_act_over_a_border_happens_whole_or_not_at_all() {
-    let mut random = Rng::new(utilities::seed::counted());
-    for taken in [false, true, false, true] {
-        let (mut arena, mut entities) = world(2);
+    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    for is_taken in [false, true, false, true] {
+        let (mut bitmap_arena, mut entity_store) = world(2);
         // Along the border, and the two cells either side of it: which the maker stands on, and whether the border runs north to south.
-        let (along, side, north_to_south) = (random.below(u64::from(2 * SUPERCHUNK_SIDE_CELLS)) as u32, random.below(2) as u32, random.below(2) == 0);
-        let across = |side: u32| if north_to_south { cell(SUPERCHUNK_SIDE_CELLS - 1 + side, along) } else { cell(along, SUPERCHUNK_SIDE_CELLS - 1 + side) };
-        let (maker, beside) = (walker(across(side), 0), across(1 - side));
-        entities.queue_put(maker, &[]);
-        if taken {
-            entities.queue_put(walker(beside, NEVER), &[]);
+        let (along_border, maker_side, north_to_south) = (seeded_rng.draw_below(u64::from(2 * SUPERCHUNK_SIDE_CELLS)) as u32, seeded_rng.draw_below(2) as u32, seeded_rng.draw_below(2) == 0);
+        let cell_across = |border_side: u32| if north_to_south { cell(SUPERCHUNK_SIDE_CELLS - 1 + border_side, along_border) } else { cell(along_border, SUPERCHUNK_SIDE_CELLS - 1 + border_side) };
+        let (maker_header, beside_cell) = (walker_header(cell_across(maker_side), 0), cell_across(1 - maker_side));
+        entity_store.queue_put(maker_header, &[]);
+        if is_taken {
+            entity_store.queue_put(walker_header(beside_cell, NEVER_WAKES), &[]);
         }
-        entities.apply();
-        let report = Simulation::new(2).tick(&mut arena, &mut entities, random.draw(), |turn: &mut Turn| {
-            for entity in turn.woken() {
-                turn.seeing_to(entity.header.at);
-                crate::tests::make(turn, walker(beside, NEVER), &[AttributeBlock::holding(TAG, 5)]);
-                actions::entities::set_attribute_of(turn, &entity.header, WOKEN, None, 1);
-                actions::entities::made(turn);
-                actions::entities::step(turn, &entity.header, entity.header.at, NEVER);
+        entity_store.apply();
+        let report = Simulation::new(2).tick(&mut bitmap_arena, &mut entity_store, seeded_rng.next_draw(), |turn: &mut Turn| {
+            for entity in turn.woken_entities() {
+                turn.seeing_to(entity.header.stood_cell);
+                crate::tests::make_with_compare_open(turn, walker_header(beside_cell, NEVER_WAKES), &[AttributeBlock::holding_value(ENTITY_NUMBER, 5)]);
+                actions::entities::set_attribute_of(turn, &entity.header, WOKEN_COUNT, None, 1);
+                actions::entities::end_making_entity(turn);
+                actions::entities::step(turn, &entity.header, entity.header.stood_cell, NEVER_WAKES);
             }
             0
         });
-        assert_eq!(report.acts_over_a_border, 1, "taken: {taken}");
-        let (made, itself) = (entities.get(beside).and_then(|made| made.attribute(TAG)), entities.get(maker.at).expect("where it stood"));
-        assert_eq!((made, itself.attribute(WOKEN), itself.header.wake), if taken { (None, None, NEVER) } else { (Some(5), Some(1), NEVER) }, "taken: {taken}");
+        assert_eq!(report.acts_over_a_border, 1, "taken: {is_taken}");
+        let (made_tag, maker_entity) = (entity_store.get(beside_cell).and_then(|made_entity| made_entity.attribute(ENTITY_NUMBER)), entity_store.get(maker_header.stood_cell).expect("where it stood"));
+        assert_eq!((made_tag, maker_entity.attribute(WOKEN_COUNT), maker_entity.header.wake), if is_taken { (None, None, NEVER_WAKES) } else { (Some(5), Some(1), NEVER_WAKES) }, "taken: {is_taken}");
     }
 }
 
 /// The most cells each way from the corner four superchunks meet at
 /// that the crowd stands on.
-const CROWD: u32 = 12;
+const CROWD_REACH: u32 = 12;
 /// The most cells along each border from the corner that a line of
 /// the crowd stands on.
 const LINE: u32 = 200;
@@ -61,12 +61,12 @@ const TICKS: u64 = 31;
 /// a square about the corner of four superchunks, and of two lines
 /// along the borders from it, a cell each side -- the square and the
 /// lines as large as drawn, never less than half the most.
-fn crowd(seed: u64) -> BTreeSet<(u32, u32)> {
-    let (mut random, corner) = (Rng::new(seed), SUPERCHUNK_SIDE_CELLS);
-    let (crowd, line) = (CROWD / 2 + random.below(u64::from(CROWD / 2) + 1) as u32, LINE / 2 + random.below(u64::from(LINE / 2) + 1) as u32);
-    let square = (corner - crowd..corner + crowd).flat_map(|y| (corner - crowd..corner + crowd).map(move |x| (x, y)));
-    let along = (corner..corner + line).flat_map(|along| [(corner - 1, along), (corner, along), (along, corner - 1), (along, corner)]);
-    square.chain(along).collect::<BTreeSet<_>>().into_iter().filter(|_| random.below(2) == 0).collect()
+fn crowd_cartesian(seed: u64) -> BTreeSet<(u32, u32)> {
+    let (mut crowd_rng, corner_coordinate) = (RandomSource::new(seed), SUPERCHUNK_SIDE_CELLS);
+    let (square_half_side, line) = (CROWD_REACH / 2 + crowd_rng.draw_below(u64::from(CROWD_REACH / 2) + 1) as u32, LINE / 2 + crowd_rng.draw_below(u64::from(LINE / 2) + 1) as u32);
+    let square_cells = (corner_coordinate - square_half_side..corner_coordinate + square_half_side).flat_map(|y| (corner_coordinate - square_half_side..corner_coordinate + square_half_side).map(move |x| (x, y)));
+    let line_cells = (corner_coordinate..corner_coordinate + line).flat_map(|along_line| [(corner_coordinate - 1, along_line), (corner_coordinate, along_line), (along_line, corner_coordinate - 1), (along_line, corner_coordinate)]);
+    square_cells.chain(line_cells).collect::<BTreeSet<_>>().into_iter().filter(|_| crowd_rng.draw_below(2) == 0).collect()
 }
 
 /// One superchunk's turn of the crowd: each, one tick in three drawn
@@ -78,40 +78,40 @@ fn crowd(seed: u64) -> BTreeSet<(u32, u32)> {
 /// has it and the others are refused: in up to four superchunks at
 /// once.
 fn flip_what_is_about(turn: &mut Turn, seed: u64) -> u64 {
-    let now = turn.now();
-    for entity in turn.woken() {
-        let (header, at) = (entity.header, entity.header.at.cartesian());
-        turn.seeing_to(header.at);
-        if Rng::for_stream(seed ^ now, u64::from(at.y) << 32 | u64::from(at.x)).below(3) != 0 {
-            actions::entities::step(turn, &header, header.at, now + 1);
+    let current_tick = turn.current_tick();
+    for entity in turn.woken_entities() {
+        let (header, stood_cartesian) = (entity.header, entity.header.stood_cell.cartesian());
+        turn.seeing_to(header.stood_cell);
+        if RandomSource::for_stream(seed ^ current_tick, u64::from(stood_cartesian.y) << 32 | u64::from(stood_cartesian.x)).draw_below(3) != 0 {
+            actions::entities::step(turn, &header, header.stood_cell, current_tick + 1);
             continue;
         }
-        let seen = |turn: &Turn, x: u32, y: u32| (CellIndex::from(coordinates::CellCartesian { x, y }), u32::from(turn.holds(STONE, coordinates::CellCartesian { x, y }.into()) == Ok(true)));
-        let (east, south, past) = (seen(turn, at.x + 1, at.y), seen(turn, at.x, at.y + 1), seen(turn, at.x + 1, at.y + 2));
-        turn.compare_from_here(Compare::Cell { layer_type: STONE, at: east.0, seen: east.1 });
-        actions::compare::write(turn, Compare::Cell { layer_type: STONE, at: south.0, seen: south.1 }, STONE, past.0, past.1, 1 - past.1, None);
-        actions::cells::seen_becoming(turn, STONE, south.0, south.1, 1 - south.1, None);
-        actions::cells::seen_becoming(turn, STONE, east.0, east.1, 1 - east.1, None);
-        let counted = entity.attribute(WOKEN);
-        actions::entities::set_attribute_of(turn, &header, WOKEN, counted, counted.unwrap_or(0) + 1);
+        let seen_at = |turn: &Turn, x: u32, y: u32| (CellIndex::from(coordinates::CellCartesian { x, y }), u32::from(turn.layer_holds(STONE_LAYER, coordinates::CellCartesian { x, y }.into()) == Ok(true)));
+        let (east_seen, south_seen, past_seen) = (seen_at(turn, stood_cartesian.x + 1, stood_cartesian.y), seen_at(turn, stood_cartesian.x, stood_cartesian.y + 1), seen_at(turn, stood_cartesian.x + 1, stood_cartesian.y + 2));
+        turn.compare_from_here(Compare::Cell { layer_type: STONE_LAYER, target_cell: east_seen.0, seen_value: east_seen.1 });
+        actions::compare::write(turn, Compare::Cell { layer_type: STONE_LAYER, target_cell: south_seen.0, seen_value: south_seen.1 }, STONE_LAYER, past_seen.0, past_seen.1, 1 - past_seen.1, None);
+        actions::cells::seen_becoming(turn, STONE_LAYER, south_seen.0, south_seen.1, 1 - south_seen.1, None);
+        actions::cells::seen_becoming(turn, STONE_LAYER, east_seen.0, east_seen.1, 1 - east_seen.1, None);
+        let counted_wakes = entity.attribute(WOKEN_COUNT);
+        actions::entities::set_attribute_of(turn, &header, WOKEN_COUNT, counted_wakes, counted_wakes.unwrap_or(0) + 1);
         turn.compare_end();
-        actions::entities::step(turn, &header, header.at, now + 1);
+        actions::entities::step(turn, &header, header.stood_cell, current_tick + 1);
     }
     0
 }
 
 /// What came of a crowd: the cells of stone about it, and each of it
 /// by its cell with what it counted.
-type Came = (Vec<(u32, u32)>, Vec<(u64, Option<u64>)>);
+type CrowdOutcome = (Vec<(u32, u32)>, Vec<(u64, Option<u64>)>);
 
 /// What came of the crowd: the cells of stone about it, and what each
 /// of it counted.
-fn came(arena: &BitmapArena, entities: &Entities) -> Came {
-    let about = SUPERCHUNK_SIDE_CELLS - CROWD - 2..SUPERCHUNK_SIDE_CELLS + LINE + 4;
-    let stone = about.clone().flat_map(|y| about.clone().map(move |x| (x, y))).filter(|&(x, y)| arena.holds(STONE, coordinates::CellCartesian { x: cell(0, 0).cartesian().x + x, y: cell(0, 0).cartesian().y + y }.into()) == Ok(true)).collect();
-    let mut counted: Vec<_> = entities.iter().map(|entity| (entity.header.at.0, entity.attribute(WOKEN))).collect();
-    counted.sort_unstable();
-    (stone, counted)
+fn crowd_outcome(bitmap_arena: &BitmapArena, entity_store: &WorldEntities) -> CrowdOutcome {
+    let about_range = SUPERCHUNK_SIDE_CELLS - CROWD_REACH - 2..SUPERCHUNK_SIDE_CELLS + LINE + 4;
+    let stone_cells = about_range.clone().flat_map(|y| about_range.clone().map(move |x| (x, y))).filter(|&(x, y)| bitmap_arena.layer_holds_cell(STONE_LAYER, coordinates::CellCartesian { x: cell(0, 0).cartesian().x + x, y: cell(0, 0).cartesian().y + y }.into()) == Ok(true)).collect();
+    let mut counted_by_cell: Vec<_> = entity_store.iter().map(|entity| (entity.header.stood_cell.0, entity.attribute(WOKEN_COUNT))).collect();
+    counted_by_cell.sort_unstable();
+    (stone_cells, counted_by_cell)
 }
 
 /// The worst there is for superchunks waiting on one another -- a
@@ -121,30 +121,30 @@ fn came(arena: &BitmapArena, entities: &Entities) -> Came {
 /// any number: every cell of stone and every count.
 #[test]
 fn a_crowd_acting_over_every_border_comes_to_the_same_on_any_threads() {
-    let (mut first, seed) = (None, utilities::seed::counted());
-    for threads in [1, 2, 3, 4, 16] {
-        let (mut arena, mut entities) = world(2);
-        let crowd = crowd(seed);
-        for &(x, y) in &crowd {
-            entities.queue_put(walker(cell(x, y), 0), &[]);
+    let (mut first_outcome, seed) = (None, utilities::seed::counted_seed());
+    for thread_count in [1, 2, 3, 4, 16] {
+        let (mut bitmap_arena, mut entity_store) = world(2);
+        let crowd_cells = crowd_cartesian(seed);
+        for &(x, y) in &crowd_cells {
+            entity_store.queue_put(walker_header(cell(x, y), 0), &[]);
         }
-        entities.apply();
-        let mut simulation = Simulation::new(threads);
-        let (mut over_a_border, mut refused) = (0, 0);
+        entity_store.apply();
+        let mut world_simulation = Simulation::new(thread_count);
+        let (mut over_a_border, mut refused_count) = (0, 0);
         for _ in 0..TICKS {
-            let report = simulation.tick(&mut arena, &mut entities, seed, |turn: &mut Turn| flip_what_is_about(turn, seed));
+            let report = world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| flip_what_is_about(turn, seed));
             over_a_border += report.acts_over_a_border;
-            refused += report.instructions_compared.1;
+            refused_count += report.instructions_compared.1;
         }
         // Of those by a border a third act over it every tick: more acts than there are of the crowd, whatever was drawn.
-        assert!(over_a_border > crowd.len() as u64 && refused > 0, "seed {seed:#x}: {over_a_border} acts over a border by a crowd of {}, {refused} compares not holding", crowd.len());
-        let came = (came(&arena, &entities), over_a_border, refused);
+        assert!(over_a_border > crowd_cells.len() as u64 && refused_count > 0, "seed {seed:#x}: {over_a_border} acts over a border by a crowd of {}, {refused_count} compares not holding", crowd_cells.len());
+        let thread_outcome = (crowd_outcome(&bitmap_arena, &entity_store), over_a_border, refused_count);
         // Stone is left, and most of the crowd counted an act of its own: those of the lines too, all of whose acts are over a border.
-        let counting = came.0 .1.iter().filter(|counted| counted.1.is_some()).count();
-        assert!(!came.0 .0.is_empty() && counting > came.0 .1.len() / 2, "seed {seed:#x}: {} cells of stone, {counting} of {} counting; {over_a_border} acts, {refused} refused", came.0 .0.len(), came.0 .1.len());
-        match &first {
-            None => first = Some(came),
-            Some(first) => assert!(*first == came, "seed {seed:#x}, on {threads} threads: {} cells of stone and {} acts, on one {} and {}", came.0 .0.len(), came.1, first.0 .0.len(), first.1),
+        let counting_members = thread_outcome.0 .1.iter().filter(|counted_entry| counted_entry.1.is_some()).count();
+        assert!(!thread_outcome.0 .0.is_empty() && counting_members > thread_outcome.0 .1.len() / 2, "seed {seed:#x}: {} cells of stone, {counting_members} of {} counting; {over_a_border} acts, {refused_count} refused", thread_outcome.0 .0.len(), thread_outcome.0 .1.len());
+        match &first_outcome {
+            None => first_outcome = Some(thread_outcome),
+            Some(earlier_outcome) => assert!(*earlier_outcome == thread_outcome, "seed {seed:#x}, on {thread_count} threads: {} cells of stone and {} acts, on one {} and {}", thread_outcome.0 .0.len(), thread_outcome.1, earlier_outcome.0 .0.len(), earlier_outcome.1),
         }
     }
 }

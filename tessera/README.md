@@ -53,7 +53,7 @@ tessera.encode(&bitmap, &mut stream);
 tessera.decode(&stream, &mut back);
 ```
 
-`tessera::encode(&bitmap)` and `tessera::decode(&stream)` do the same
+`tessera::encode_bitmap(&bitmap)` and `tessera::decode_stream(&stream)` do the same
 for a single bitmap, with a `Tessera` of their own.
 
 ## How it works

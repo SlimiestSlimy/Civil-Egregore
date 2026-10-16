@@ -3,17 +3,17 @@
 //!
 //! `cargo test --test fast`
 
-use crate::tests::{arena, cell, STONE};
+use crate::tests::{stone_arena, cell, STONE_LAYER};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex};
-use entity_manager::Entities;
+use entity_manager::WorldEntities;
 use actions::area::{self, AREA_CENTRE, AREA_SIDE};
 use simulation::Simulation;
 
 /// Cells scattered over the 3x3 superchunks from `(10, 10)`, some on
 /// their borders.
-fn scattered() -> impl Iterator<Item = CellIndex> {
-    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
-    (0..3000).map(move |_| cell(random.below(3072) as u32, random.below(3072) as u32))
+fn scattered_cells() -> impl Iterator<Item = CellIndex> {
+    let mut seeded_random = utilities::rng::RandomSource::new(utilities::seed::counted_seed());
+    (0..3000).map(move |_| cell(seeded_random.draw_below(3072) as u32, seeded_random.draw_below(3072) as u32))
 }
 
 /// The area about a cell read at once is its cells read one by one:
@@ -21,24 +21,24 @@ fn scattered() -> impl Iterator<Item = CellIndex> {
 /// the hot superchunks, where some cells are not hot.
 #[test]
 fn areas_read_at_once_are_the_cells_read_one_by_one() {
-    let mut arena = arena(3, scattered());
-    let start = cell(0, 0).cartesian();
-    let centres = [(300, 300), (1024, 1024), (1020, 1029), (5, 5), (2040, 2047), (1024, 3), (777, 1023)];
-    let checked = Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
+    let mut bitmap_arena = stone_arena(3, scattered_cells());
+    let corner_cartesian = cell(0, 0).cartesian();
+    let centre_offsets = [(300, 300), (1024, 1024), (1020, 1029), (5, 5), (2040, 2047), (1024, 3), (777, 1023)];
+    let tick_report = Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), utilities::seed::counted_seed(), |turn| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }
-        for (x, y) in centres {
-            let centre = CellCartesian { x: start.x + x, y: start.y + y };
-            let area = area::read_layer(turn, STONE, centre.into());
-            for (across, down) in (0..AREA_SIDE as u32).flat_map(|down| (0..AREA_SIDE as u32).map(move |across| (across, down))) {
-                let cell = CellCartesian { x: centre.x + across - AREA_CENTRE as u32, y: centre.y + down - AREA_CENTRE as u32 };
-                let held = turn.holds(STONE, cell.into());
-                let read = |rows: [u16; AREA_SIDE]| rows[down as usize] >> across & 1 == 1;
-                assert_eq!((read(area.hot), read(area.set)), (held.is_ok(), held == Ok(true)), "({across}, {down}) of the area about ({x}, {y})");
+        for (x, y) in centre_offsets {
+            let centre_cartesian = CellCartesian { x: corner_cartesian.x + x, y: corner_cartesian.y + y };
+            let area = area::read_layer(turn, STONE_LAYER, centre_cartesian.into());
+            for (across_in_area, down_in_area) in (0..AREA_SIDE as u32).flat_map(|row_down| (0..AREA_SIDE as u32).map(move |column_across| (column_across, row_down))) {
+                let cell = CellCartesian { x: centre_cartesian.x + across_in_area - AREA_CENTRE as u32, y: centre_cartesian.y + down_in_area - AREA_CENTRE as u32 };
+                let cell_holds = turn.layer_holds(STONE_LAYER, cell.into());
+                let read_bit = |area_rows: [u16; AREA_SIDE]| area_rows[down_in_area as usize] >> across_in_area & 1 == 1;
+                assert_eq!((read_bit(area.hot), read_bit(area.set_rows)), (cell_holds.is_ok(), cell_holds == Ok(true)), "({across_in_area}, {down_in_area}) of the area about ({x}, {y})");
             }
         }
-        centres.len()
+        centre_offsets.len()
     });
-    assert_eq!(checked.rules, centres.len());
+    assert_eq!(tick_report.rules, centre_offsets.len());
 }

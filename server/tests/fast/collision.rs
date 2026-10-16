@@ -6,9 +6,9 @@
 //!
 //! `cargo test --test fast collision`
 
-use crate::tests::{land_seed, tag, tag_sheep, tick_rule, tick_sheep};
+use crate::tests::{land_seed, tag_of, tag_sheep, tick_rule, tick_sheep};
 use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
-use server::{Start, World};
+use server::{WorldStart, World};
 use std::collections::HashMap;
 use type_registry::{COLLISION, TREE};
 
@@ -16,19 +16,19 @@ use type_registry::{COLLISION, TREE};
 /// entities stand on, over every hot superchunk of `world`; and how
 /// many trees those are.
 fn what_stands_and_no_other(world: &World) -> (bool, u64) {
-    let arena = world.arena();
-    let stood_on: std::collections::HashSet<CellIndex> = world.entities().iter().map(|entity| entity.header.at).collect();
-    let (mut same, mut trees) = (true, 0);
-    for superchunk in arena.superchunk_indices() {
-        let corner = superchunk.top_left().cartesian();
+    let bitmap_arena = world.bitmap_arena();
+    let stood_on: std::collections::HashSet<CellIndex> = world.entity_store().iter().map(|entity| entity.header.stood_cell).collect();
+    let (mut collision_matches, mut trees) = (true, 0);
+    for superchunk in bitmap_arena.superchunk_indices() {
+        let top_left_cartesian = superchunk.top_left().cartesian();
         for (x, y) in (0..SUPERCHUNK_SIDE_CELLS).flat_map(|y| (0..SUPERCHUNK_SIDE_CELLS).map(move |x| (x, y))) {
-            let cell: CellIndex = CellCartesian { x: corner.x + x, y: corner.y + y }.into();
-            let tree = arena.holds(TREE, cell);
-            same &= arena.holds(COLLISION, cell) == Ok(tree == Ok(true) || stood_on.contains(&cell));
+            let cell: CellIndex = CellCartesian { x: top_left_cartesian.x + x, y: top_left_cartesian.y + y }.into();
+            let tree = bitmap_arena.layer_holds_cell(TREE, cell);
+            collision_matches &= bitmap_arena.layer_holds_cell(COLLISION, cell) == Ok(tree == Ok(true) || stood_on.contains(&cell));
             trees += u64::from(tree == Ok(true));
         }
     }
-    (same, trees)
+    (collision_matches, trees)
 }
 
 /// A world generated with trees and a flock: the collision plane is
@@ -41,42 +41,42 @@ fn what_stands_and_no_other(world: &World) -> (bool, u64) {
 /// when it is hungry again, a meal later.
 #[test]
 fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
-    let mut world = server::start(Start { seed: land_seed(0), sheep: 4000, ..Start::default() });
-    let (same, trees) = what_stands_and_no_other(&world);
-    assert!(same && trees > 0, "as generated: {trees} trees");
-    assert!(world.entities().iter().all(|sheep| world.arena().holds(TREE, sheep.header.at) == Ok(false)), "a sheep put on a tree");
+    let mut world = server::start_world(WorldStart { seed: land_seed(0), sheep_per_flock: 4000, ..WorldStart::default() });
+    let (collision_matches, trees) = what_stands_and_no_other(&world);
+    assert!(collision_matches && trees > 0, "as generated: {trees} trees");
+    assert!(world.entity_store().iter().all(|put_sheep| world.bitmap_arena().layer_holds_cell(TREE, put_sheep.header.stood_cell) == Ok(false)), "a sheep put on a tree");
     // Each sheep told from the others by a tag; a lamb, born after, has none.
     tag_sheep(&mut world);
-    let mut stood: HashMap<u64, CellIndex> = world.entities().iter().map(|sheep| (tag(&sheep).expect("tagged"), sheep.header.at)).collect();
-    let (mut stepped, mut born) = (0, 0);
+    let mut stood_cell_by_tag: HashMap<u64, CellIndex> = world.entity_store().iter().map(|tagged_sheep| (tag_of(&tagged_sheep).expect("tagged"), tagged_sheep.header.stood_cell)).collect();
+    let (mut steps_seen, mut lamb_ticks) = (0, 0);
     // A stretch at the least; and on, to the first step: within two meals, as no grass grows back with the sheep's rule alone run.
-    let (stretch, mut tick) = (400, 0);
-    while tick < stretch || stepped == 0 && tick < 2 * entity_rules::sheep::MEAL.ticks() {
+    let (stretch_ticks, mut tick) = (400, 0);
+    while tick < stretch_ticks || steps_seen == 0 && tick < 2 * entity_rules::sheep::TIME_BETWEEN_MEALS.ticks() {
         tick_sheep(&mut world);
         tick += 1;
-        if tick % 50 == 0 && tick <= stretch {
+        if tick % 50 == 0 && tick <= stretch_ticks {
             assert!(what_stands_and_no_other(&world).0, "after tick {tick} of the sheep");
         }
-        for sheep in world.entities().iter() {
-            let at = sheep.header.at;
-            let Some(tag) = tag(&sheep) else {
-                assert_eq!(world.arena().holds(TREE, at), Ok(false), "a lamb on a tree's cell");
-                born += 1;
+        for ticked_sheep in world.entity_store().iter() {
+            let stood_cell = ticked_sheep.header.stood_cell;
+            let Some(sheep_tag) = tag_of(&ticked_sheep) else {
+                assert_eq!(world.bitmap_arena().layer_holds_cell(TREE, stood_cell), Ok(false), "a lamb on a tree's cell");
+                lamb_ticks += 1;
                 continue;
             };
-            if stood.insert(tag, at) != Some(at) {
-                assert_eq!(world.arena().holds(TREE, at), Ok(false), "a sheep come onto a tree's cell");
-                stepped += 1;
+            if stood_cell_by_tag.insert(sheep_tag, stood_cell) != Some(stood_cell) {
+                assert_eq!(world.bitmap_arena().layer_holds_cell(TREE, stood_cell), Ok(false), "a sheep come onto a tree's cell");
+                steps_seen += 1;
             }
         }
     }
-    assert!(stepped > 0, "{stepped} steps, {born} lamb-ticks in {tick} ticks");
+    assert!(steps_seen > 0, "{steps_seen} steps, {lamb_ticks} lamb-ticks in {tick} ticks");
     assert!(what_stands_and_no_other(&world).0, "after {tick} ticks of the sheep");
     // The trees after the sheep: a sheep whose wake passes with its rule not run never wakes again.
-    let mut done = actions::RuleCounts::default();
+    let mut trees_counts = actions::RuleCounts::default();
     for _ in 0..2000 {
-        done += tick_rule(&mut world, server::TREES_RULE).rules;
+        trees_counts += tick_rule(&mut world, server::TREES_RULE).rules;
     }
     assert!(what_stands_and_no_other(&world).0, "after the trees spread and died");
-    assert!(done[sca_rules::trees::SPREADS] > 0, "trees put");
+    assert!(trees_counts[sca_rules::trees::SPREADS_COUNT] > 0, "trees put");
 }

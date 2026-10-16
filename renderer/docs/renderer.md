@@ -39,13 +39,13 @@ The two share two queues and no memory.
 The window is the one that asks, never the host that sends: each
 time the window has shown a frame -- 60 times a second at most -- it
 asks the host for the hot superchunks of its **viewport** -- whatever
-it should render, in superchunks; none in map mode -- (`Host::sync`),
+it should render, in superchunks; none in map mode -- (`Host::ask_frame`),
 and the host answers with their cells as a tick left them, and which
 superchunks of the viewport are hot -- a few superchunks between two
 ticks, each few a `Frame` of their own, so a wide viewport takes
 little of any one tick. The frames queue here: each one that has come
 is painted and laid over the images in turn, and the next ask goes
-once the last of an answer has (`Frame::more`). So the window sets how
+once the last of an answer has (`Frame::more_to_come`). So the window sets how
 often the world is drawn; a window that falls behind slows no tick;
 one ask at most is ever being answered;
 and what is not in the viewport, or is cold, is never sent. "Viewport"
@@ -90,7 +90,7 @@ labels and heights are laid over whatever the camera shows.
 A world of 1,024 superchunks -- 32,768 cells a side -- is seen whole,
 which a pixel a cell cannot do: that would be 4 GiB of pixels a frame.
 
-- **From far off, a pixel is a tile of cells**, `2^detail` a side: as
+- **From far off, a pixel is a tile of cells**, `2^detail_shift` a side: as
   many as a screen pixel covers up to 4 cells, and from there coarser
   by a power of two for each further one the view goes out -- 16 cells
   a pixel at 8 a screen pixel, 64 at 16, and a chunk, 256, from 32 on
@@ -138,7 +138,7 @@ Three things it rests on:
   The halvings therefore average the numbers, not the light -- as the
   painter's own mixing of a tile's colours does.
 - What makes the mipmaps is built by the card off the frame, and is
-  not there on the first frames: a picture waits (`Waiting`) until it
+  not there on the first frames: a picture waits (`MipmapsWaiting`) until it
   is, asked again each frame. A small picture is sent when the window
   opens, so it is built while the menu shows.
 - A picture's detail is still the painter's (`frames::detail_at`): it
@@ -207,7 +207,7 @@ made again.
   wall the sun is on and one facing away. The band is longer the
   higher the wall -- 4 eighths of a cell and half an eighth a height
   it rises, 5 at the least -- and no darker: a cliff's runs over the
-  cells before it, as far as 8 (`ground::MARGIN`), over ground that
+  cells before it, as far as 8 (`make_grounds::KEPT_MARGIN_CELLS`), over ground that
   does not itself drop by a wall. Walls are drawn much
   the stronger: they are what cannot be crossed.
 
@@ -242,7 +242,7 @@ renderer does not say: it is the cloud plane's type in the registry
 
 ### Rain
 
-Which tiles are raining the frame says (`Cells::raining`, a bit a
+Which tiles are raining the frame says (`Cells::raining_tiles`, a bit a
 tile, worked out by the server from each tile's cloud and climate):
 the renderer knows no climate. After a raining tile's shadow, one cell in five of it
 (`CELLS_A_STREAK_OF_RAIN`), in slanted lines the same for every tile
@@ -257,7 +257,7 @@ rain. The streaks stand still: nothing falls yet.
 in-bin test ticks, running, in place of the main menu
 (`src/diagnostics/window_on.rs`): the world `server check` ticks from
 a seed -- 0, the run's own, the seed the tests are on
-(`utilities::seed::counted`) -- or, given a number of superchunks, the
+(`utilities::seed::counted_seed`) -- or, given a number of superchunks, the
 plain `server pasture` ticks, started as that tool starts it
 (`server::diagnostics::plain_world::pasture_start`). The host ticks
 every rule of it, the weather too, at the window's pace: what a
@@ -272,7 +272,7 @@ it is calm (`src/climate_labels.rs`). The
 numbers are the plane's own, as the type registry lays them out. A
 frame brings each superchunk's climate with its cells
 (`Cells::climates`); the painter hands them on with its picture and
-the window keeps the last of each (`Seen::climates`), so what is
+the window keeps the last of each (`LastFrameSeen::climates`), so what is
 written is the climate as the last frame of that superchunk had it,
 changing as the weather changes it. As the heights are, the labels
 are a grid given round to the tiles the camera shows, and are shown
@@ -288,8 +288,8 @@ between them, and closes once the last has stopped and none follows
 `../../server/docs/server.md`, "A world shown"). Nobody need start it
 by hand: whatever ticks a world with the variable set starts it. The
 window is the same as the game's -- it is built on a link
-(`window_on(link)`), and the link's host is either one that runs a
-world (`Link::start`) or the worlds that come (`Link::of_shown_worlds`),
+(`window_on(host_link)`), and the link's host is either one that runs a
+world (`HostLink::start_own_host`) or the worlds that come (`HostLink::of_shown_worlds`),
 flat out until the keys pause or pace them.
 
 ## Still to come
@@ -323,10 +323,10 @@ pixels made here.
 The main menu, the sliders at the window's top right and the options
 Escape opens are the `gui` crate's (`gui/docs/gui.md`), added to the
 window's app. The renderer leaves the pointer, the wheel and the keys
-to a menu that took them (`gui::Captured`), and tells the host what
+to a menu that took them (`gui::CapturedInput`), and tells the host what
 the menus say (`src/link.rs`): a world made (`Host::make_world`), the
 numbers it is made from read off the sliders then, and handed to the
-server to make sense of (`server::Start::from_tuning`); one opened from
+server to make sense of (`server::WorldStart::from_tuning`); one opened from
 the worlds' folder (`Host::open_world`), run in place of the one run, hot in
 its halos, its ticks its own, the view put over it; the world run made
 again from its start (`Host::reset`) as a slider of how worlds are
@@ -360,7 +360,7 @@ another world is run.
 
 | file | what is in it |
 |---|---|
-| `src/lib.rs` | `run`: the window, its parts and its systems |
+| `src/lib.rs` | `run_window`: the window, its parts and its systems |
 | `src/link.rs` | the host as the window holds it: the menus' worlds made, opened and saved, paused and paced |
 | `src/frames.rs` | frames asked for and shown: an image a superchunk, the picture from near |
 | `src/mipmaps.rs` | the superchunks' pictures' mipmaps, made by the graphics card |

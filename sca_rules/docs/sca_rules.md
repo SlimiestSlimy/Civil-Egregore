@@ -44,7 +44,7 @@ far more rarely, decay back to dirt by the climate of its tile:
   `DECAY_CHANCE` -- once in `MEAN_TIME_TO_DECAY` on average, a very
   small rate -- and then turns back to dirt with a chance of how
   harsh the climate of its tile is (`growing::too_harsh_to_live`:
-  `harshness`, of `HARSHEST`): how dry it is times how hot. In the driest and hottest it always does;
+  `climate_harshness`, of `HARSHEST_CLIMATE`): how dry it is times how hot. In the driest and hottest it always does;
   in the most humid, or the coldest, never.
 
 Grass no longer dies of the grass around it: it once decayed by its
@@ -79,7 +79,7 @@ tree sampled does one thing, by lot:
 - **It tries to spread**, in `SPREAD_SHARE` of its samples, if it is at
   least `SEEDS_FROM` old. It counts the other trees in the 8 by 8 cells
   about it (`AROUND`), one window read: the more there are the less
-  likely it spreads, never with `CROWDED` or more. If it does, a cell
+  likely it spreads, never with `CROWDED_AT` or more. If it does, a cell
   of those 64 is drawn, and a tree of stage 0 is put there if there is
   none and the cell is hot, not under water, and not held in the
   collision plane by something else standing there -- and as often as
@@ -136,9 +136,9 @@ function of its own, and the rule is those put together:
 | kind | what | function |
 |---|---|---|
 | the air moves | pressure too far over a tile about it falls there | `pressure_falls` |
-| | the wind reaches a tile about it and takes air, cloud or climate with it | `wind_blows`, `carry` |
+| | the wind reaches a tile about it and takes air, cloud or climate with it | `wind_blows`, `carry_climate` |
 | what a tile makes of itself | its cloud forms or clears, of its humidity, heat, pressure and what is under it; and rains | `cloud_forms`, `deepens_and_thins` |
-| the land | a rise holds back every move of the air, by pressure or by wind | `passes` |
+| the land | a rise holds back every move of the air, by pressure or by wind | `air_passes` |
 
 Pressure and wind are the movers; humidity, temperature and cloud are
 what is moved. Pressure feeds wind -- air leaving a tile turns the
@@ -151,12 +151,12 @@ A tile sampled does this, in order:
 about it is more than 1 under it (`PRESSURE_GAP_AT_REST`): one of
 those is drawn, each as likely as it is far under
 (`pressure_falls_by`) -- the lowest the likeliest, none higher ever --
-times how much the tile's own wind blows that way (`leans`: once with
+times how much the tile's own wind blows that way (`wind_leans_pressure`: once with
 no wind along the step there, `A_WIND_LEANS_PRESSURE` times more for
-each unit of it), and as the land lets the air up to it (`passes`), so that up a slope
+each unit of it), and as the land lets the air up to it (`air_passes`), so that up a slope
 it goes less often, or not at all this time. A unit of pressure goes
 there, and the air leaving turns the tile's own wind that way
-(`Wind::pushed`). This is tried every sample before anything else: a
+(`Wind::pushed_by`). This is tried every sample before anything else: a
 gap does not wait for a chance. The two feed one another, which is the
 weather's spring: air leaving turns the wind its way, and the wind
 then sends the next air the same way, past where the pressures would
@@ -164,9 +164,9 @@ have evened -- until the gap it made the other side pushes back.
 
 **2. Else the wind blows** (`wind_blows`). Its vector draws which of
 the eight tiles about it it reaches, the stronger the likelier
-(`Wind::step_drawn`), and the land must let it (`passes`). There, now
+(`Wind::step_drawn`), and the land must let it (`air_passes`). There, now
 and then (`CARRY_CHANCE`, `MEAN_TIME_TO_CARRY_CLIMATE`), it carries
-climate (`carry`): that tile's humidity up to 4 nearer this one's,
+climate (`carry_climate`): that tile's humidity up to 4 nearer this one's,
 its temperature up to 4 nearer, or its wind a step nearer this wind
 (`Wind::a_step_towards`) -- winds that differ wear each other down.
 Otherwise it pushes a unit of its tile's pressure onto that tile --

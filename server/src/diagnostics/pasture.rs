@@ -6,8 +6,8 @@
 use type_registry::GRASS;
 use crate::diagnostics::plain_world::{plain_world, superchunks as superchunks_of};
 use crate::host::frame::count;
-use crate::{Chosen, RulePlace, TickCounts, GRASS_RULE, SHEEP_RULE};
-use entity_rules::sheep::{BIRTHS, DEATHS, WOKEN};
+use crate::{ChosenRules, RulePlace, TickCounts, GRASS_RULE, SHEEP_RULE};
+use entity_rules::sheep::{BIRTHS_COUNT, DEATHS_COUNT, WOKEN_COUNT};
 use entity_manager::diagnostics::entities::EntityStats;
 use entity_manager::InstructionsApplied;
 use actions::RuleCounts;
@@ -22,14 +22,14 @@ pub struct PastureRun {
     /// Superchunks ticked.
     pub superchunks: usize,
     /// Threads ticked on.
-    pub threads: usize,
+    pub thread_count: usize,
     /// Sheep at the start, and at the end.
-    pub sheep: (usize, usize),
+    pub sheep_at_start_and_end: (usize, usize),
     /// Cells of grass at the start, and at the end.
-    pub grass: (u64, u64),
+    pub grass_at_start_and_end: (u64, u64),
     /// What grass and sheep did, added up, and each rule's time over
     /// every thread.
-    pub done: TickCounts,
+    pub rule_counts_added: TickCounts,
     /// What applying the instructions did, added up.
     pub instructions: InstructionsApplied,
     /// Writes applied.
@@ -38,13 +38,13 @@ pub struct PastureRun {
     /// than one superchunk in a tick.
     pub acts_over_a_border: u64,
     /// The first phase's time, added up.
-    pub computing: Duration,
+    pub computing_time: Duration,
     /// The second phase's time, added up.
-    pub applying: Duration,
+    pub applying_time: Duration,
     /// The process's memory, read after every tick.
-    pub memory: MemoryTrack,
+    pub process_memory: MemoryTrack,
     /// What the entities held at the end.
-    pub held: EntityStats,
+    pub entity_stats: EntityStats,
     /// The flock and the grass over the run, every [`CENSUS_EVERY`]
     /// ticks and at the end.
     pub census: Vec<Census>,
@@ -74,47 +74,47 @@ pub struct Census {
 pub const RULES_TICKED: [RulePlace; 2] = [GRASS_RULE, SHEEP_RULE];
 
 /// Ticks grass and sheep `ticks` times over `superchunks` superchunks,
-/// grass drawn on `thousandths` of each one's cells and `sheep` sheep on
-/// each, on `threads` threads.
-pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, threads: usize) -> PastureRun {
-    let mut memory = MemoryTrack::default();
-    memory.read();
-    let mut world = plain_world(superchunks, thousandths as u64 * worldgen::ONE / 1000, sheep, threads);
-    let (start_sheep, start_grass) = (world.entities.len(), count(&world, GRASS));
-    let (mut done, mut instructions, mut writes, mut computing, mut applying) = (TickCounts::default(), InstructionsApplied::default(), 0, Duration::ZERO, Duration::ZERO);
+/// grass drawn on `grass_thousandths` of each one's cells and `sheep_per_flock` sheep on
+/// each, on `thread_count` threads.
+pub fn run_pasture(ticks: usize, grass_thousandths: usize, sheep_per_flock: usize, superchunks: u32, thread_count: usize) -> PastureRun {
+    let mut process_memory = MemoryTrack::default();
+    process_memory.take_reading();
+    let mut world = plain_world(superchunks, grass_thousandths as u64 * worldgen::FRACTION_ONE / 1000, sheep_per_flock, thread_count);
+    let (start_sheep, start_grass) = (world.entity_store.len(), count(&world, GRASS));
+    let (mut rule_counts_added, mut instructions, mut writes, mut computing_time, mut applying_time) = (TickCounts::default(), InstructionsApplied::default(), 0, Duration::ZERO, Duration::ZERO);
     let mut acts_over_a_border = 0;
     let mut census = vec![Census { tick: 0, sheep: start_sheep, grass: start_grass, ..Census::default() }];
-    let mut since = RuleCounts::default();
-    let chosen = Chosen::from_rules(&RULES_TICKED);
+    let mut sheep_counts_since_census = RuleCounts::default();
+    let chosen_rules = ChosenRules::from_rules(&RULES_TICKED);
     for tick in 0..ticks {
-        let report = world.tick_only(chosen, true);
-        done += report.rules;
-        since += report.rules.counts_of(SHEEP_RULE);
+        let report = world.tick_only(chosen_rules, true);
+        rule_counts_added += report.rules;
+        sheep_counts_since_census += report.rules.counts_of(SHEEP_RULE);
         if (tick + 1) % CENSUS_EVERY == 0 || tick + 1 == ticks {
-            census.push(Census { tick: tick + 1, sheep: world.entities.len(), grass: count(&world, GRASS), woken: since[WOKEN] as usize, births: since[BIRTHS] as usize, deaths: since[DEATHS] as usize });
-            since = RuleCounts::default();
+            census.push(Census { tick: tick + 1, sheep: world.entity_store.len(), grass: count(&world, GRASS), woken: sheep_counts_since_census[WOKEN_COUNT] as usize, births: sheep_counts_since_census[BIRTHS_COUNT] as usize, deaths: sheep_counts_since_census[DEATHS_COUNT] as usize });
+            sheep_counts_since_census = RuleCounts::default();
         }
         instructions += report.instructions_applied;
         writes += report.writes_applied.writes;
         acts_over_a_border += report.acts_over_a_border;
-        computing += report.computing;
-        applying += report.applying;
-        memory.read();
+        computing_time += report.computing_time;
+        applying_time += report.applying_time;
+        process_memory.take_reading();
     }
     PastureRun {
         ticks,
         superchunks: superchunks_of(&world),
-        threads,
-        sheep: (start_sheep, world.entities.len()),
-        grass: (start_grass, count(&world, GRASS)),
-        done,
+        thread_count,
+        sheep_at_start_and_end: (start_sheep, world.entity_store.len()),
+        grass_at_start_and_end: (start_grass, count(&world, GRASS)),
+        rule_counts_added,
         instructions,
         writes,
         acts_over_a_border,
-        computing,
-        applying,
-        memory,
-        held: EntityStats::measure_entities(&world.entities),
+        computing_time,
+        applying_time,
+        process_memory,
+        entity_stats: EntityStats::measure_entities(&world.entity_store),
         census,
     }
 }

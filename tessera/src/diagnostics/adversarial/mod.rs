@@ -9,16 +9,16 @@ mod moves;
 mod plane;
 pub mod worst;
 
-pub use anneal::Found;
-use anneal::anneal;
-use utilities::rng::Rng;
+pub use anneal::FoundWorst;
+use anneal::anneal_bitmap;
+use utilities::rng::RandomSource;
 
 use crate::tile::Tile;
 use bitmap::Bitmap;
 
 /// What one bitmap scored.
 #[derive(Clone, Copy, Debug)]
-pub struct Score {
+pub struct BitmapScore {
     /// What the search maximizes: Tessera's bits less what they are held
     /// against.
     pub gap: i64,
@@ -27,24 +27,24 @@ pub struct Score {
 }
 
 /// The searched window: a 64x64, the top left one.
-pub const WINDOW: Tile = Tile { level: 2, x: 0, y: 0 };
+pub const WINDOW: Tile = Tile { tile_level: 2, x: 0, y: 0 };
 
 /// How long a search runs: the changes tried from each start, in each
 /// stage. One long search cools slowly -- the temperature falls over all
 /// its changes -- so it can settle deeper than many short ones, each of
 /// which starts hot again.
 #[derive(Clone, Copy, Debug)]
-pub struct Effort {
+pub struct SearchEffort {
     /// Changes tried on a window, from each start.
     pub window: u64,
     /// Changes tried on the whole plane, from each start.
-    pub plane: u64,
+    pub whole_bitmap: u64,
 }
 
-impl Default for Effort {
+impl Default for SearchEffort {
     /// A quick search: 400 changes a window start, 100 a plane start.
     fn default() -> Self {
-        Self { window: 400, plane: 100 }
+        Self { window: 400, whole_bitmap: 100 }
     }
 }
 
@@ -53,12 +53,12 @@ impl Default for Effort {
 const NOISE_DENSITY_DIVISOR: u64 = 2;
 
 /// `area` filled with noise, the rest clear.
-fn noise(rng: &mut Rng, area: Tile) -> Bitmap {
+fn noisy_area(random_generator: &mut RandomSource, area: Tile) -> Bitmap {
     let mut bitmap = Bitmap::new();
-    let (left, top, right, bottom) = cell_rect(area);
-    for y in top..=bottom {
-        for x in left..=right {
-            if rng.below(NOISE_DENSITY_DIVISOR) == 0 {
+    let (left_x, top_y, right_x, bottom_y) = cell_rect(area);
+    for y in top_y..=bottom_y {
+        for x in left_x..=right_x {
+            if random_generator.draw_below(NOISE_DENSITY_DIVISOR) == 0 {
                 bitmap.set(x, y);
             }
         }
@@ -66,48 +66,48 @@ fn noise(rng: &mut Rng, area: Tile) -> Bitmap {
     bitmap
 }
 
-/// The best of `starts`, each annealed in `area` by `score`, and which
+/// The best of `named_starts`, each annealed in `area` by `score_bitmap`, and which
 /// start it came from.
 fn best_of(
-    starts: Vec<(&'static str, Bitmap)>,
+    named_starts: Vec<(&'static str, Bitmap)>,
     area: Tile,
-    iterations: u64,
-    rng: &mut Rng,
-    score: &mut impl FnMut(&Bitmap, Tile) -> Score,
-) -> (Found, &'static str) {
-    starts
+    changes_tried: u64,
+    random_generator: &mut RandomSource,
+    score_bitmap: &mut impl FnMut(&Bitmap, Tile) -> BitmapScore,
+) -> (FoundWorst, &'static str) {
+    named_starts
         .into_iter()
-        .map(|(from, start)| (anneal(start, area, iterations, rng, &mut |bitmap| score(bitmap, area)), from))
-        .max_by_key(|(found, _)| found.score.gap)
+        .map(|(start_name, start_bitmap)| (anneal_bitmap(start_bitmap, area, changes_tried, random_generator, &mut |bitmap| score_bitmap(bitmap, area)), start_name))
+        .max_by_key(|(annealed_start, _)| annealed_start.bitmap_score.gap)
         .expect("a start")
 }
 
 /// What one search found, and which start each stage's best came from.
-pub struct Outcome {
+pub struct SearchOutcome {
     /// The worst found in the window stage, searching one small tile.
-    pub window: Found,
+    pub window: FoundWorst,
     /// Which start the window stage's worst came from.
     pub window_from: &'static str,
     /// The worst found over the whole bitmap.
-    pub worst: Found,
+    pub worst: FoundWorst,
     /// Which start that came from.
     pub worst_from: &'static str,
 }
 
-/// One whole search, from its own seed, as long as `effort` says, by
-/// `score` -- which is told the area searched -- carrying on from
+/// One whole search, from its own seed, as long as `search_effort` says, by
+/// `score_bitmap` -- which is told the area searched -- carrying on from
 /// `worst`, if any.
-pub fn search(seed: u64, worst: Option<Bitmap>, effort: Effort, score: &mut impl FnMut(&Bitmap, Tile) -> Score) -> Outcome {
-    let mut rng = Rng::new(seed);
-    let window_starts = vec![("clear", Bitmap::new()), ("noise", noise(&mut rng, WINDOW))];
-    let (window, window_from) = best_of(window_starts, WINDOW, effort.window, &mut rng, score);
+pub fn whole_search(seed: u64, worst: Option<Bitmap>, search_effort: SearchEffort, score_bitmap: &mut impl FnMut(&Bitmap, Tile) -> BitmapScore) -> SearchOutcome {
+    let mut random_generator = RandomSource::new(seed);
+    let window_starts = vec![("clear", Bitmap::new()), ("noise", noisy_area(&mut random_generator, WINDOW))];
+    let (window, window_from) = best_of(window_starts, WINDOW, search_effort.window, &mut random_generator, score_bitmap);
 
-    let whole = Tile::WHOLE_BITMAP;
+    let whole_bitmap_tile = Tile::WHOLE_BITMAP;
     let mut plane_starts =
-        vec![("window variants", plane::fill_the_plane(&window.bitmap, WINDOW)), ("noise", noise(&mut rng, whole))];
+        vec![("window variants", plane::fill_the_plane(&window.bitmap, WINDOW)), ("noise", noisy_area(&mut random_generator, whole_bitmap_tile))];
     plane_starts.extend(worst.map(|bitmap| ("worst", bitmap)));
-    let (worst, worst_from) = best_of(plane_starts, whole, effort.plane, &mut rng, score);
-    Outcome { window, window_from, worst, worst_from }
+    let (worst, worst_from) = best_of(plane_starts, whole_bitmap_tile, search_effort.whole_bitmap, &mut random_generator, score_bitmap);
+    SearchOutcome { window, window_from, worst, worst_from }
 }
 
 /// Searches run at once by [`search_at_once`], one a core.
@@ -117,26 +117,26 @@ pub const SEARCHES_AT_ONCE: u64 = 4;
 /// from seed `seed + i`, each carrying on from `worst`, if any, and
 /// scoring with a score of its own that `make_score` makes -- one per
 /// thread, so each may hold its own encoders. What each found, in order.
-pub fn search_at_once<S: FnMut(&Bitmap, Tile) -> Score>(
+pub fn search_at_once<S: FnMut(&Bitmap, Tile) -> BitmapScore>(
     seed: u64,
     worst: Option<Bitmap>,
-    effort: Effort,
+    search_effort: SearchEffort,
     make_score: &(impl Fn() -> S + Sync),
-) -> Vec<Outcome> {
-    std::thread::scope(|scope| {
-        let searches: Vec<_> = (0..SEARCHES_AT_ONCE)
-            .map(|index| {
+) -> Vec<SearchOutcome> {
+    std::thread::scope(|thread_scope| {
+        let search_threads: Vec<_> = (0..SEARCHES_AT_ONCE)
+            .map(|search_index| {
                 let worst = worst.clone();
-                scope.spawn(move || search(seed.wrapping_add(index), worst, effort, &mut make_score()))
+                thread_scope.spawn(move || whole_search(seed.wrapping_add(search_index), worst, search_effort, &mut make_score()))
             })
             .collect();
-        searches.into_iter().map(|search| search.join().expect("a search")).collect()
+        search_threads.into_iter().map(|search_thread| search_thread.join().expect("a search")).collect()
     })
 }
 
 /// `area`'s cells as an inclusive rectangle: left, top, right, bottom.
 pub(crate) fn cell_rect(area: Tile) -> (u8, u8, u8, u8) {
-    let (left, top) = area.top_left_cell();
-    let last = (area.side_in_cells() - 1) as u8;
-    (left, top, left + last, top + last)
+    let (left_x, top_y) = area.top_left_cell();
+    let last_offset = (area.side_in_cells() - 1) as u8;
+    (left_x, top_y, left_x + last_offset, top_y + last_offset)
 }

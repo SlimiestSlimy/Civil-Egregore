@@ -12,18 +12,18 @@ pub(crate) mod one_instruction;
 
 use entity_manager::{EntityReader, SuperchunkEntities};
 use crate::sampling::{sample_layer, sample_tiles_of_layer};
-use bitplane_manager::{NotHot, Reader, SmallTiles, Superchunk, Window};
-use chunk_storage::{LayerType, Wide, Width};
+use bitplane_manager::{NotHot, CellReader, SmallTiles, Superchunk, Window};
+use chunk_storage::{LayerType, WidePlane, Width};
 use coordinates::{CellIndex, SuperchunkIndex};
 use utilities::chance::Chance;
-use utilities::rng::Rng;
+use utilities::rng::RandomSource;
 
 /// A superchunk's outbox slots: itself and its eight neighbours.
 pub(crate) const SLOTS: usize = 9;
 /// The outbox's queue after its slots': of the authors that queued
 /// for more than one superchunk, each instruction saying where it
 /// lands (`docs/simulation.md`, "An act over a border").
-pub(crate) const ACROSS: usize = SLOTS;
+pub(crate) const ACROSS_QUEUE: usize = SLOTS;
 
 /// The slot of the superchunk `dx` across and `dy` down from the one
 /// whose outbox it is.
@@ -42,14 +42,14 @@ pub(crate) fn slots() -> impl Iterator<Item = (usize, (i32, i32))> {
 #[derive(Default)]
 pub(crate) struct Outbox {
     /// The instructions, a queue a superchunk, by [`slot_toward`], and
-    /// after them the one of acts over a border ([`ACROSS`]).
-    pub(crate) queues: [conditional::Queue; SLOTS + 1],
+    /// after them the one of acts over a border ([`ACROSS_QUEUE`]).
+    pub(crate) instruction_queues: [conditional::InstructionQueue; SLOTS + 1],
     /// Where what each author queued begins in those queues, a list a
     /// queue, in the order queued.
-    pub(crate) segments: [Vec<Segment>; SLOTS + 1],
+    pub(crate) author_segments: [Vec<AuthorSegment>; SLOTS + 1],
     /// Of each segment of the queue of acts over a border, where it
     /// lands and who has come to it.
-    pub(crate) across: Vec<Across>,
+    pub(crate) across_acts: Vec<AcrossAct>,
     /// The entities named this tick by an author that is not the
     /// entity itself, each with that author: by the cell the tick
     /// found it on. Few: an author nearly always names itself. What
@@ -60,15 +60,15 @@ pub(crate) struct Outbox {
 }
 
 /// What is kept of one author's act over a border, beside its
-/// segment of the outbox's queue [`ACROSS`].
+/// segment of the outbox's queue [`ACROSS_QUEUE`].
 #[derive(Default)]
-pub(crate) struct Across {
+pub(crate) struct AcrossAct {
     /// The superchunks it lands in, a bit an outbox slot: its
     /// author's always.
-    pub(crate) lands: u16,
+    pub(crate) lands_in_slots: u16,
     /// How many of those superchunks have come to it as they apply:
     /// it is applied by the last.
-    pub(crate) arrived: std::sync::atomic::AtomicU8,
+    pub(crate) arrived_count: std::sync::atomic::AtomicU8,
 }
 
 /// Where what one author queued for a superchunk begins in the
@@ -76,7 +76,7 @@ pub(crate) struct Across {
 /// author's (`docs/simulation.md`, "One order, wherever the borders
 /// fall").
 #[derive(Clone, Copy)]
-pub(crate) struct Segment {
+pub(crate) struct AuthorSegment {
     /// The author: its cell's place in Morton order over the world,
     /// and one ([`Turn::seeing_to`]), or 0 for the superchunk's rule
     /// itself.
@@ -85,7 +85,7 @@ pub(crate) struct Segment {
     pub(crate) instructions: u32,
     /// The first of its compares, among what is noted of each beside
     /// the instructions.
-    pub(crate) compares: u32,
+    pub(crate) first_compare: u32,
 }
 
 /// One superchunk's turn in a tick's first phase: what the rule sees and
@@ -96,23 +96,23 @@ pub struct Turn<'a> {
     /// The superchunk.
     pub(crate) superchunk: &'a Superchunk,
     /// The superchunk's entities.
-    pub(crate) entities: &'a SuperchunkEntities,
+    pub(crate) superchunk_entities: &'a SuperchunkEntities,
     /// The tick running.
-    pub(crate) now: u64,
+    pub(crate) current_tick: u64,
     /// The thread's reader of every superchunk.
-    pub(crate) reader: &'a Reader<'a>,
+    pub(crate) bitmap_reader: &'a CellReader<'a>,
     /// The thread's reader of every superchunk's entities.
     pub(crate) entity_reader: &'a EntityReader<'a>,
     /// The superchunk's outbox.
     pub(crate) outbox: &'a mut Outbox,
     /// The superchunk's random numbers this tick.
-    pub(crate) random: Rng,
+    pub(crate) random_stream: RandomSource,
     /// Whom the rule is seeing to ([`Turn::seeing_to`]): what is
     /// queued is that author's.
     pub(crate) author: u64,
     /// Whether the rule is queuing under a compare given by
     /// [`Turn::compare_from_here`].
-    pub(crate) comparing: bool,
+    pub(crate) is_comparing: bool,
     /// The stack of compares open, the outermost first.
     pub(crate) compares_open: [conditional::CompareOpen; conditional::COMPARES_WITHIN],
     /// How many are open.
@@ -126,7 +126,7 @@ pub struct Turn<'a> {
     /// Whether what the author queues goes to the queue of acts over
     /// a border: from the first thing it queues for a second
     /// superchunk, until another author is named.
-    pub(crate) across: bool,
+    pub(crate) going_across: bool,
     /// Where the author began queuing, if it has: the one superchunk
     /// all it queued so far is for.
     pub(crate) author_began: Option<AuthorBegan>,
@@ -155,30 +155,30 @@ pub(crate) struct AuthorBegan {
     /// The instructions its queue held.
     pub(crate) instructions: u32,
     /// The compares its queue held, by what is noted of each.
-    pub(crate) gated: u32,
+    pub(crate) gated_count: u32,
     /// The blocks its queue carried.
-    pub(crate) carried: u32,
+    pub(crate) carried_count: u32,
 }
 
 impl<'a> Turn<'a> {
-    /// The turn of `superchunk` and its `entities` in the tick `now`,
+    /// The turn of `superchunk` and its `superchunk_entities` in the tick `current_tick`,
     /// nothing queued yet: what it queues goes to `outbox`, what it
-    /// draws comes from `random`, what it samples is kept in `samples`.
+    /// draws comes from `random_stream`, what it samples is kept in `samples`.
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn new(superchunk: &'a Superchunk, entities: &'a SuperchunkEntities, now: u64, reader: &'a Reader<'a>, entity_reader: &'a EntityReader<'a>, outbox: &'a mut Outbox, random: Rng, samples: &'a mut Vec<CellIndex>) -> Self {
-        let compares_open = [conditional::CompareOpen::NONE; conditional::COMPARES_WITHIN];
-        Self { superchunk, entities, now, reader, entity_reader, outbox, random, author: 0, comparing: false, compares_open, compares_open_count: 0, writes_queued: 0, counted_from: 0, across: false, author_began: None, landed_last: (NO_SUPERCHUNK, 0, 0), samples }
+    pub(crate) fn new(superchunk: &'a Superchunk, superchunk_entities: &'a SuperchunkEntities, current_tick: u64, bitmap_reader: &'a CellReader<'a>, entity_reader: &'a EntityReader<'a>, outbox: &'a mut Outbox, random_stream: RandomSource, samples: &'a mut Vec<CellIndex>) -> Self {
+        let compares_open = [conditional::CompareOpen::NONE_OPEN; conditional::COMPARES_WITHIN];
+        Self { superchunk, superchunk_entities, current_tick, bitmap_reader, entity_reader, outbox, random_stream, author: 0, is_comparing: false, compares_open, compares_open_count: 0, writes_queued: 0, counted_from: 0, going_across: false, author_began: None, landed_last: (NO_SUPERCHUNK, 0, 0), samples }
     }
 
     /// The superchunk whose turn it is.
     pub fn superchunk(&self) -> SuperchunkIndex {
-        self.superchunk.index()
+        self.superchunk.superchunk_index()
     }
 
     /// The superchunk's random numbers: its own, going on from the last
     /// tick's.
-    pub fn random(&mut self) -> &mut Rng {
-        &mut self.random
+    pub fn random_stream(&mut self) -> &mut RandomSource {
+        &mut self.random_stream
     }
 
     /// Runs `rule` on every hot set cell of `layer_type` in this
@@ -193,7 +193,7 @@ impl<'a> Turn<'a> {
         let mut samples = std::mem::take(self.samples);
         samples.clear();
         if let Some(layer) = self.superchunk.layer(layer_type) {
-            sample_layer(self.superchunk.index(), layer, chance, &mut self.random, &mut |cell| samples.push(cell));
+            sample_layer(self.superchunk.superchunk_index(), layer, chance, &mut self.random_stream, &mut |cell| samples.push(cell));
         }
         self.each_of(samples, counts, rule)
     }
@@ -207,7 +207,7 @@ impl<'a> Turn<'a> {
         let mut samples = std::mem::take(self.samples);
         samples.clear();
         if let Some(layer) = self.superchunk.layer(layer_type) {
-            sample_tiles_of_layer(self.superchunk.index(), layer, layer_type.tile_shift(), chance, &mut self.random, &mut |cell| samples.push(cell));
+            sample_tiles_of_layer(self.superchunk.superchunk_index(), layer, layer_type.tile_shift(), chance, &mut self.random_stream, &mut |cell| samples.push(cell));
         }
         self.each_of(samples, counts, rule)
     }
@@ -217,84 +217,84 @@ impl<'a> Turn<'a> {
     /// the next sampling: how many they were.
     #[inline]
     fn each_of<C>(&mut self, samples: Vec<CellIndex>, counts: &mut C, mut rule: impl FnMut(&mut Self, CellIndex, &mut C)) -> usize {
-        for &sampled in &samples {
-            self.seeing_to(sampled);
-            rule(self, sampled, counts);
+        for &sampled_cell in &samples {
+            self.seeing_to(sampled_cell);
+            rule(self, sampled_cell, counts);
         }
-        let sampled = samples.len();
+        let sampled_count = samples.len();
         *self.samples = samples;
-        sampled
+        sampled_count
     }
 
     /// The window of `width` by `height` cells (each up to 8) whose top
     /// left cell is `origin`, of `layer_type`, row by row, as the tick
     /// found them: the cells around a cell, say, as masks.
     pub fn window(&self, layer_type: LayerType, origin: CellIndex, width: u32, height: u32) -> Window {
-        self.reader.window(layer_type, origin, width, height)
+        self.bitmap_reader.window(layer_type, origin, width, height)
     }
 
-    /// [`Turn::window`], of each of `types` at once: grass and
+    /// [`Turn::window`], of each of `layer_types` at once: grass and
     /// the cells entities stand on about a cell, say, for little more
     /// than either alone.
-    pub fn windows<const N: usize>(&self, types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
-        self.reader.windows(types, origin, width, height)
+    pub fn windows<const N: usize>(&self, layer_types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
+        self.bitmap_reader.windows(layer_types, origin, width, height)
     }
 
     /// The four small tiles, two by two, from the one that begins at
-    /// `first`, of each of `types`, as the tick found them: those
-    /// `wanted` has a cell in, the cells in Morton order -- what is
+    /// `first_tile_cell`, of each of `layer_types`, as the tick found them: those
+    /// `wanted_cells` has a cell in, the cells in Morton order -- what is
     /// about a cell as a word of bits, nothing turned.
     #[inline]
-    pub fn small_tiles<const N: usize>(&self, types: [LayerType; N], first: CellIndex, wanted: u64) -> [SmallTiles; N] {
-        self.reader.small_tiles(types, first, wanted)
+    pub fn small_tiles<const N: usize>(&self, layer_types: [LayerType; N], first_tile_cell: CellIndex, wanted_cells: u64) -> [SmallTiles; N] {
+        self.bitmap_reader.small_tiles(layer_types, first_tile_cell, wanted_cells)
     }
 
-    /// The words of the aligned tile `side` cells a side (8 to a
+    /// The words of the aligned tile `side_in_cells` cells a side (8 to a
     /// chunk's) that `cell` is in, of `layer_type`, as the tick found
     /// them, in Morton order: none if its bitmap is not hot.
-    pub fn aligned_tile(&self, layer_type: LayerType, cell: CellIndex, side: u32) -> Option<&[u64]> {
-        self.reader.aligned_tile(layer_type, cell, side)
+    pub fn aligned_tile(&self, layer_type: LayerType, cell: CellIndex, side_in_cells: u32) -> Option<&[u64]> {
+        self.bitmap_reader.aligned_tile(layer_type, cell, side_in_cells)
     }
 
-    /// The four aligned tiles `side` cells a side, two by two from the
-    /// one beginning at `first`, of each of `types`, as the tick found
+    /// The four aligned tiles `side_in_cells` cells a side, two by two from the
+    /// one beginning at `first_tile_cell`, of each of `layer_types`, as the tick found
     /// them: each tile's words as they lie, none where not hot.
     #[inline]
-    pub fn aligned_tiles_two_by_two<const N: usize>(&self, types: [LayerType; N], first: CellIndex, side: u32) -> [[Option<&[u64]>; 4]; N] {
-        self.reader.aligned_tiles_two_by_two(types, first, side)
+    pub fn aligned_tiles_two_by_two<const N: usize>(&self, layer_types: [LayerType; N], first_tile_cell: CellIndex, side_in_cells: u32) -> [[Option<&[u64]>; 4]; N] {
+        self.bitmap_reader.aligned_tiles_two_by_two(layer_types, first_tile_cell, side_in_cells)
     }
 
     /// Whether `layer_type` holds at `cell`, as the tick found it.
-    pub fn holds(&self, layer_type: LayerType, cell: CellIndex) -> Result<bool, NotHot> {
-        self.reader.holds(layer_type, cell)
+    pub fn layer_holds(&self, layer_type: LayerType, cell: CellIndex) -> Result<bool, NotHot> {
+        self.bitmap_reader.layer_holds_cell(layer_type, cell)
     }
 
-    /// The number `plane` holds at `cell`, as the tick found it: one
+    /// The number `wide_plane` holds at `cell`, as the tick found it: one
     /// read, whatever its width -- which is its type's.
     #[inline]
-    pub fn value<W: Width>(&self, plane: Wide<W>, cell: CellIndex) -> Result<u32, NotHot> {
-        self.reader.value(plane, cell)
+    pub fn value<W: Width>(&self, wide_plane: WidePlane<W>, cell: CellIndex) -> Result<u32, NotHot> {
+        self.bitmap_reader.value(wide_plane, cell)
     }
 
     /// Whether `layer_type` holds at any cell of the tile of `scale`
     /// that `cell` is in, as the tick found it: `None` if not hot.
     pub fn any_in_tile(&self, layer_type: LayerType, cell: CellIndex, scale: u32) -> Option<bool> {
-        self.reader.any_in_tile(layer_type, cell, scale)
+        self.bitmap_reader.any_in_tile(layer_type, cell, scale)
     }
 
     /// Which tiles of the coarsest scale in `cell`'s chunk `layer_type`
     /// holds at any cell of, a bit each in Morton order, as the tick
     /// found them: `None` if not hot.
     pub fn tiles_holding(&self, layer_type: LayerType, cell: CellIndex) -> Option<u16> {
-        self.reader.tiles_holding(layer_type, cell)
+        self.bitmap_reader.tiles_holding(layer_type, cell)
     }
 
     /// The tick running.
-    pub fn now(&self) -> u64 {
-        self.now
+    pub fn current_tick(&self) -> u64 {
+        self.current_tick
     }
 
-    /// Says the rule is seeing to what is on the cell `at` from here
+    /// Says the rule is seeing to what is on the cell `author_cell` from here
     /// on -- an entity woken, a cell sampled: the author of all it
     /// queues until another is named. What the tick queued is applied
     /// author by author in the Morton order of their cells over the
@@ -303,11 +303,11 @@ impl<'a> Turn<'a> {
     /// order, wherever the borders fall"). What is queued with no author
     /// named is the superchunk's rule's own, applied before any
     /// author's.
-    pub fn seeing_to(&mut self, at: CellIndex) {
+    pub fn seeing_to(&mut self, author_cell: CellIndex) {
         self.compare_end();
         debug_assert_eq!(self.compares_open_count, 0, "an author named with a compare open");
-        self.author = at.0 + 1;
-        self.across = false;
+        self.author = author_cell.0 + 1;
+        self.going_across = false;
         self.author_began = None;
         self.landed_last.0 = NO_SUPERCHUNK;
     }
@@ -326,75 +326,75 @@ impl<'a> Turn<'a> {
             return (self.landed_last.1 as usize, self.landed_last.2 as usize);
         }
         let slot = self.slot_of(superchunk);
-        if !self.across {
+        if !self.going_across {
             match self.author_began {
-                Some(began) if began.slot as usize != slot => self.go_across(began),
+                Some(author_start) if author_start.slot as usize != slot => self.go_across(author_start),
                 Some(_) => {}
                 None => {
-                    let queue = &self.outbox.queues[slot];
-                    self.author_began = Some(AuthorBegan { slot: slot as u8, instructions: queue.instructions.len() as u32, gated: queue.gated.len() as u32, carried: queue.carried.len() as u32 });
+                    let slot_queue = &self.outbox.instruction_queues[slot];
+                    self.author_began = Some(AuthorBegan { slot: slot as u8, instructions: slot_queue.instructions.len() as u32, gated_count: slot_queue.gated_by_compares.len() as u32, carried_count: slot_queue.carried_blocks.len() as u32 });
                 }
             }
         }
-        let queue = if self.across { ACROSS } else { slot };
-        self.begin_segment(queue, slot);
-        self.landed_last = (superchunk, queue as u8, slot as u8);
-        (queue, slot)
+        let queue_index = if self.going_across { ACROSS_QUEUE } else { slot };
+        self.begin_segment(queue_index, slot);
+        self.landed_last = (superchunk, queue_index as u8, slot as u8);
+        (queue_index, slot)
     }
 
-    /// Begins the author's segment of the queue `queue` of the
+    /// Begins the author's segment of the queue `queue_index` of the
     /// outbox, if the last begun there is another's; and, of the
     /// queue of acts over a border, notes that the act lands in the
     /// superchunk of `slot`.
     #[inline]
-    fn begin_segment(&mut self, queue: usize, slot: usize) {
+    fn begin_segment(&mut self, queue_index: usize, slot: usize) {
         let outbox = &mut *self.outbox;
-        if outbox.segments[queue].last().is_none_or(|last| last.author != self.author) {
-            let (instructions, compares) = (outbox.queues[queue].instructions.len() as u32, outbox.queues[queue].gated.len() as u32);
-            outbox.segments[queue].push(Segment { author: self.author, instructions, compares });
-            if queue == ACROSS {
-                outbox.across.push(Across { lands: 1 << slot_home(), ..Across::default() });
+        if outbox.author_segments[queue_index].last().is_none_or(|last_segment| last_segment.author != self.author) {
+            let (instructions, first_compare) = (outbox.instruction_queues[queue_index].instructions.len() as u32, outbox.instruction_queues[queue_index].gated_by_compares.len() as u32);
+            outbox.author_segments[queue_index].push(AuthorSegment { author: self.author, instructions, first_compare });
+            if queue_index == ACROSS_QUEUE {
+                outbox.across_acts.push(AcrossAct { lands_in_slots: 1 << slot_home(), ..AcrossAct::default() });
             }
         }
-        if queue == ACROSS {
-            outbox.across.last_mut().expect("the segment's").lands |= 1 << slot;
+        if queue_index == ACROSS_QUEUE {
+            outbox.across_acts.last_mut().expect("the segment's").lands_in_slots |= 1 << slot;
         }
     }
 
     /// Makes what the author queues an act over a border: all it
-    /// queued so far -- for the one superchunk it `began` in -- is
+    /// queued so far -- for the one superchunk it `author_start` in -- is
     /// moved to the queue of acts over a border, in the order queued,
     /// each instruction keeping where it lands; and what it queues
     /// from here goes there too. So nothing of one author is split
     /// between two superchunks' queues.
     #[cold]
-    fn go_across(&mut self, began: AuthorBegan) {
-        let from = began.slot as usize;
-        self.begin_segment(ACROSS, from);
-        let (slots, across) = self.outbox.queues.split_at_mut(ACROSS);
-        let (was, is) = (&mut slots[from], &mut across[0]);
-        let (instructions, gated, carried) = (is.instructions.len() as u32, is.gated.len() as u32, is.carried.len() as u32);
-        let moved = i64::from(carried) - i64::from(began.carried);
-        is.instructions.extend(was.instructions.drain(began.instructions as usize..).map(|instruction| instruction.carried_moved_by(moved)));
-        is.gated.extend(was.gated.drain(began.gated as usize..));
-        is.carried.extend(was.carried.drain(began.carried as usize..));
+    fn go_across(&mut self, author_start: AuthorBegan) {
+        let from_slot = author_start.slot as usize;
+        self.begin_segment(ACROSS_QUEUE, from_slot);
+        let (slots, across_queues) = self.outbox.instruction_queues.split_at_mut(ACROSS_QUEUE);
+        let (was_queue, across_queue) = (&mut slots[from_slot], &mut across_queues[0]);
+        let (instructions, across_gated, across_carried) = (across_queue.instructions.len() as u32, across_queue.gated_by_compares.len() as u32, across_queue.carried_blocks.len() as u32);
+        let carried_shift = i64::from(across_carried) - i64::from(author_start.carried_count);
+        across_queue.instructions.extend(was_queue.instructions.drain(author_start.instructions as usize..).map(|instruction| instruction.carried_moved_by(carried_shift)));
+        across_queue.gated_by_compares.extend(was_queue.gated_by_compares.drain(author_start.gated_count as usize..));
+        across_queue.carried_blocks.extend(was_queue.carried_blocks.drain(author_start.carried_count as usize..));
         // A segment begun there for nothing but what was moved is no segment: the superchunk would stop at it between two acts.
-        if self.outbox.segments[from].last().is_some_and(|last| last.author == self.author && last.instructions as usize == was.instructions.len()) {
-            self.outbox.segments[from].pop();
+        if self.outbox.author_segments[from_slot].last().is_some_and(|last_segment| last_segment.author == self.author && last_segment.instructions as usize == was_queue.instructions.len()) {
+            self.outbox.author_segments[from_slot].pop();
         }
         // The compares open are the author's, so in the queue it began in: they lie where they were moved to.
-        for open in &mut self.compares_open[..self.compares_open_count] {
-            debug_assert_eq!(open.queue as usize, from);
-            *open = conditional::CompareOpen { instruction: open.instruction - began.instructions + instructions, gated: open.gated - began.gated + gated, carried_before: open.carried_before - began.carried + carried, queue: ACROSS as u8, ..*open };
+        for open_compare in &mut self.compares_open[..self.compares_open_count] {
+            debug_assert_eq!(open_compare.queue_index as usize, from_slot);
+            *open_compare = conditional::CompareOpen { instruction: open_compare.instruction - author_start.instructions + instructions, gated_index: open_compare.gated_index - author_start.gated_count + across_gated, carried_before: open_compare.carried_before - author_start.carried_count + across_carried, queue_index: ACROSS_QUEUE as u8, ..*open_compare };
         }
-        self.across = true;
+        self.going_across = true;
         self.landed_last.0 = NO_SUPERCHUNK;
     }
 
     /// The outbox slot of `superchunk`: this one or a neighbour. Farther
     /// is past the speed of light, and a bug.
     pub(crate) fn slot_of(&self, superchunk: SuperchunkIndex) -> usize {
-        slot_between(self.superchunk.index(), superchunk).unwrap_or_else(|| panic!("a write more than a superchunk away: past the speed of light"))
+        slot_between(self.superchunk.superchunk_index(), superchunk).unwrap_or_else(|| panic!("a write more than a superchunk away: past the speed of light"))
     }
 }
 
@@ -403,13 +403,13 @@ pub(crate) fn slot_home() -> usize {
     slot_toward(0, 0)
 }
 
-/// The outbox slot, in the outbox of the superchunk `from`, of the
-/// superchunk `to`: itself or a neighbour, none farther.
-pub(crate) fn slot_between(from: SuperchunkIndex, to: SuperchunkIndex) -> Option<usize> {
-    if to == from {
+/// The outbox slot, in the outbox of the superchunk `from_superchunk`, of the
+/// superchunk `to_superchunk`: itself or a neighbour, none farther.
+pub(crate) fn slot_between(from_superchunk: SuperchunkIndex, to_superchunk: SuperchunkIndex) -> Option<usize> {
+    if to_superchunk == from_superchunk {
         return Some(slot_toward(0, 0));
     }
-    let ((x, y), (to_x, to_y)) = (from.cartesian(), to.cartesian());
+    let ((x, y), (to_x, to_y)) = (from_superchunk.cartesian(), to_superchunk.cartesian());
     let (dx, dy) = (to_x as i64 - x as i64, to_y as i64 - y as i64);
     (dx.abs() <= 1 && dy.abs() <= 1).then(|| slot_toward(dx as i32, dy as i32))
 }

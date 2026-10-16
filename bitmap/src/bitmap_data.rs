@@ -51,7 +51,7 @@ impl Bitmap {
     }
 
     /// Clears the cell at `(x, y)`. Already clear is not an error.
-    pub fn unset(&mut self, x: u8, y: u8) {
+    pub fn clear_cell(&mut self, x: u8, y: u8) {
         let cell_index = morton_index(x, y);
         self.words[cell_index / BITS_PER_WORD] &= !(1u64 << (cell_index % BITS_PER_WORD));
     }
@@ -72,10 +72,10 @@ impl Bitmap {
     }
 
     /// Sets the cells of a tile smaller than a word -- top left at
-    /// `(x, y)`, `side` cells a side -- whose bits are set in `run`, in
+    /// `(x, y)`, `side_in_cells` cells a side -- whose bits are set in `run_bits`, in
     /// Morton order; its other cells stay as they are.
-    pub fn set_in_small_tile(&mut self, (x, y): (u8, u8), side: usize, run: u64) {
-        self.set_in_morton_run(morton_index(x, y), side * side, run);
+    pub fn set_in_small_tile(&mut self, (x, y): (u8, u8), side_in_cells: usize, run_bits: u64) {
+        self.set_in_morton_run(morton_index(x, y), side_in_cells * side_in_cells, run_bits);
     }
 
     /// `cells` cells, fewer than a word, from the one at Morton index
@@ -87,15 +87,15 @@ impl Bitmap {
 
     /// Sets the cells, of the `cells` from Morton index
     /// `first_cell_index` (fewer than a word, the index a multiple of
-    /// it), whose bits are set in `run`; the others stay as they are.
-    pub fn set_in_morton_run(&mut self, first_cell_index: usize, cells: usize, run: u64) {
-        debug_assert!(run & !low_bits_mask(cells) == 0, "{run:#b} is more than {cells} cells");
-        self.words[first_cell_index / BITS_PER_WORD] |= run << (first_cell_index % BITS_PER_WORD);
+    /// it), whose bits are set in `run_bits`; the others stay as they are.
+    pub fn set_in_morton_run(&mut self, first_cell_index: usize, cells: usize, run_bits: u64) {
+        debug_assert!(run_bits & !low_bits_mask(cells) == 0, "{run_bits:#b} is more than {cells} cells");
+        self.words[first_cell_index / BITS_PER_WORD] |= run_bits << (first_cell_index % BITS_PER_WORD);
     }
 
-    /// Makes every cell what it is in `other`, in place.
-    pub fn copy_from(&mut self, other: &Bitmap) {
-        *self.words = *other.words;
+    /// Makes every cell what it is in `source_bitmap`, in place.
+    pub fn copy_from(&mut self, source_bitmap: &Bitmap) {
+        *self.words = *source_bitmap.words;
     }
 
     /// Clears the `cells` from Morton index `first_cell_index` (fewer
@@ -105,17 +105,17 @@ impl Bitmap {
     }
 
     /// The words of a tile of a word or more -- top left at `(x, y)`,
-    /// `side` cells a side -- to write, in Morton order.
-    pub fn tile_words_mut(&mut self, (x, y): (u8, u8), side: usize) -> &mut [u64] {
-        let (first_cell_index, cells) = (morton_index(x, y), side * side);
-        debug_assert!(cells >= BITS_PER_WORD, "a {side}x{side} tile is less than a word");
+    /// `side_in_cells` cells a side -- to write, in Morton order.
+    pub fn tile_words_mut(&mut self, (x, y): (u8, u8), side_in_cells: usize) -> &mut [u64] {
+        let (first_cell_index, cells) = (morton_index(x, y), side_in_cells * side_in_cells);
+        debug_assert!(cells >= BITS_PER_WORD, "a {side_in_cells}x{side_in_cells} tile is less than a word");
         &mut self.words[first_cell_index / BITS_PER_WORD..(first_cell_index + cells) / BITS_PER_WORD]
     }
 
     /// A tile's cells, a word at a time in Morton order: its words, or,
     /// for a tile of fewer than 64 cells, its one run.
-    pub fn tile_words(&self, (x, y): (u8, u8), side: usize) -> impl Iterator<Item = u64> + '_ {
-        let (first_cell_index, cells) = (morton_index(x, y), side * side);
+    pub fn tile_words(&self, (x, y): (u8, u8), side_in_cells: usize) -> impl Iterator<Item = u64> + '_ {
+        let (first_cell_index, cells) = (morton_index(x, y), side_in_cells * side_in_cells);
         let (whole_words, small_run) = if cells >= BITS_PER_WORD {
             (&self.words[first_cell_index / BITS_PER_WORD..(first_cell_index + cells) / BITS_PER_WORD], None)
         } else {
@@ -126,14 +126,14 @@ impl Bitmap {
 
     /// The set cells of a tile, each as its place in the tile's own
     /// Morton order, in that order.
-    pub fn set_cells_in_tile(&self, top_left: (u8, u8), side: usize) -> impl Iterator<Item = usize> + '_ {
-        self.tile_words(top_left, side).enumerate().flat_map(|(word_index, word)| {
-            let mut remaining = word;
+    pub fn set_cells_in_tile(&self, top_left: (u8, u8), side_in_cells: usize) -> impl Iterator<Item = usize> + '_ {
+        self.tile_words(top_left, side_in_cells).enumerate().flat_map(|(word_index, word)| {
+            let mut remaining_bits = word;
             std::iter::from_fn(move || {
-                (remaining != 0).then(|| {
-                    let bit = remaining.trailing_zeros() as usize;
-                    remaining &= remaining - 1;
-                    word_index * BITS_PER_WORD + bit
+                (remaining_bits != 0).then(|| {
+                    let bit_in_word = remaining_bits.trailing_zeros() as usize;
+                    remaining_bits &= remaining_bits - 1;
+                    word_index * BITS_PER_WORD + bit_in_word
                 })
             })
         })
@@ -147,8 +147,8 @@ impl Bitmap {
     }
 
     /// Sets every cell of a tile.
-    pub fn set_tile(&mut self, (x, y): (u8, u8), side: usize) {
-        self.fill_morton_run(morton_index(x, y), side * side);
+    pub fn set_tile(&mut self, (x, y): (u8, u8), side_in_cells: usize) {
+        self.fill_morton_run(morton_index(x, y), side_in_cells * side_in_cells);
     }
 
     /// Sets every one of the `cells` cells from Morton index

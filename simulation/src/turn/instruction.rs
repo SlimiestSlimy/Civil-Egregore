@@ -84,123 +84,123 @@ pub(crate) struct Instruction {
     /// What it does.
     pub(crate) opcode: Opcode,
     /// Which member of an attribute.
-    pub(crate) small: u16,
+    pub(crate) member_operand: u16,
     /// The cell's place in the superchunk it lands in, and above it
     /// the outbox slot of that superchunk.
     place: u32,
     /// The first word.
-    pub(crate) first: u64,
+    pub(crate) first_operand: u64,
     /// The second.
-    pub(crate) second: u64,
+    pub(crate) second_operand: u64,
 }
 
 // The size the instruction set is built to: no opcode has more.
 const _: () = assert!(size_of::<Instruction>() == 24 && std::mem::offset_of!(Instruction, opcode) == 0 && coordinates::SUPERCHUNK_SIDE_CELLS as u64 * coordinates::SUPERCHUNK_SIDE_CELLS as u64 == 1 << PLACE_BITS);
 
 impl Instruction {
-    /// One of `opcode` on the cell `at`, all else 0.
-    fn on(opcode: Opcode, at: CellIndex) -> Self {
-        Self { opcode, small: 0, place: at.place_in_superchunk() as u32, first: 0, second: 0 }
+    /// One of `opcode` on the cell `instruction_cell`, all else 0.
+    fn on_cell(opcode: Opcode, instruction_cell: CellIndex) -> Self {
+        Self { opcode, member_operand: 0, place: instruction_cell.place_in_superchunk() as u32, first_operand: 0, second_operand: 0 }
     }
 
     /// The end of a compare.
     pub(crate) fn compare_end() -> Self {
-        Self { opcode: Opcode::CompareEnd, small: 0, place: 0, first: 0, second: 0 }
+        Self { opcode: Opcode::CompareEnd, member_operand: 0, place: 0, first_operand: 0, second_operand: 0 }
     }
 
-    /// One counted under `number`.
-    pub(crate) fn count_under(number: u32) -> Self {
-        Self { opcode: Opcode::Count, first: u64::from(number), ..Self::compare_end() }
+    /// One counted under `counted_number`.
+    pub(crate) fn count_under(counted_number: u32) -> Self {
+        Self { opcode: Opcode::Count, first_operand: u64::from(counted_number), ..Self::compare_end() }
     }
 
-    /// Whether `layer_type` holds `seen` at `at`.
-    pub(crate) fn compare_cell(layer_type: LayerType, at: CellIndex, seen: u32) -> Self {
-        Self { first: layer_type.0, second: u64::from(seen), ..Self::on(Opcode::CompareCell, at) }
+    /// Whether `layer_type` holds `seen_value` at `target_cell`.
+    pub(crate) fn compare_cell(layer_type: LayerType, target_cell: CellIndex, seen_value: u32) -> Self {
+        Self { first_operand: layer_type.0, second_operand: u64::from(seen_value), ..Self::on_cell(Opcode::CompareCell, target_cell) }
     }
 
-    /// `layer_type` made to hold `value` at `at`, counted under
+    /// `layer_type` made to hold `value` at `target_cell`, counted under
     /// `count`, or under nothing ([`NO_COUNT`]): the value the second
     /// word's high half, the count its low.
-    pub(crate) fn write_cell(layer_type: LayerType, at: CellIndex, value: u32, count: u32) -> Self {
-        Self { first: layer_type.0, second: u64::from(value) << 32 | u64::from(count), ..Self::on(Opcode::WriteCell, at) }
+    pub(crate) fn write_cell(layer_type: LayerType, target_cell: CellIndex, value: u32, count: u32) -> Self {
+        Self { first_operand: layer_type.0, second_operand: u64::from(value) << 32 | u64::from(count), ..Self::on_cell(Opcode::WriteCell, target_cell) }
     }
 
     /// The number a write of a cell makes its cell hold.
     pub(crate) fn value_written(&self) -> u32 {
-        (self.second >> 32) as u32
+        (self.second_operand >> 32) as u32
     }
 
     /// What a write of a cell counts under: [`NO_COUNT`] for nothing.
     pub(crate) fn counted_under(&self) -> u32 {
-        self.second as u32
+        self.second_operand as u32
     }
 
-    /// Whether an entity may be made on `at`.
-    pub(crate) fn compare_cell_free(at: CellIndex) -> Self {
-        Self::on(Opcode::CompareCellFree, at)
+    /// Whether an entity may be made on `target_cell`.
+    pub(crate) fn compare_cell_free(target_cell: CellIndex) -> Self {
+        Self::on_cell(Opcode::CompareCellFree, target_cell)
     }
 
-    /// Whether the entity of type `kind` the tick found on `at` is
+    /// Whether the entity of type `entity_type` the tick found on `named_cell` is
     /// there still.
-    pub(crate) fn compare_entity(at: CellIndex, kind: u64) -> Self {
-        Self { first: kind, ..Self::on(Opcode::CompareEntity, at) }
+    pub(crate) fn compare_entity(named_cell: CellIndex, entity_type: u64) -> Self {
+        Self { first_operand: entity_type, ..Self::on_cell(Opcode::CompareEntity, named_cell) }
     }
 
-    /// An entity of type `kind` made on `at`, to wake at `wake`.
-    pub(crate) fn make_entity(at: CellIndex, kind: u64, wake: u64) -> Self {
-        Self { first: kind, second: wake, ..Self::on(Opcode::MakeEntity, at) }
+    /// An entity of type `entity_type` made on `target_cell`, to wake at `wake`.
+    pub(crate) fn make_entity(target_cell: CellIndex, entity_type: u64, wake: u64) -> Self {
+        Self { first_operand: entity_type, second_operand: wake, ..Self::on_cell(Opcode::MakeEntity, target_cell) }
     }
 
-    /// The entity on `from` moved to `to`, a cell of its superchunk.
-    pub(crate) fn move_entity(from: CellIndex, to: CellIndex) -> Self {
-        debug_assert_eq!(from.superchunk(), to.superchunk(), "an entity moved to another superchunk: a crossing");
-        Self { first: to.place_in_superchunk() as u64, ..Self::on(Opcode::MoveEntity, from) }
+    /// The entity on `from_cell` moved to `to_cell`, a cell of its superchunk.
+    pub(crate) fn move_entity(from_cell: CellIndex, to_cell: CellIndex) -> Self {
+        debug_assert_eq!(from_cell.superchunk(), to_cell.superchunk(), "an entity moved to another superchunk: a crossing");
+        Self { first_operand: to_cell.place_in_superchunk() as u64, ..Self::on_cell(Opcode::MoveEntity, from_cell) }
     }
 
-    /// The entity on `at` removed.
-    pub(crate) fn remove_entity(at: CellIndex) -> Self {
-        Self::on(Opcode::RemoveEntity, at)
+    /// The entity on `named_cell` removed.
+    pub(crate) fn remove_entity(named_cell: CellIndex) -> Self {
+        Self::on_cell(Opcode::RemoveEntity, named_cell)
     }
 
-    /// The entity the tick found on `from` moved to `to`, a cell of
+    /// The entity the tick found on `from_cell` moved to `to_cell`, a cell of
     /// another superchunk: a crossing. It lands where it stood; the
     /// cell it comes to, whole, is beside it.
-    pub(crate) fn cross_entity(from: CellIndex, to: CellIndex) -> Self {
-        debug_assert_ne!(from.superchunk(), to.superchunk(), "a crossing within a superchunk: a move");
-        Self { first: to.0, ..Self::on(Opcode::CrossEntity, from) }
+    pub(crate) fn cross_entity(from_cell: CellIndex, to_cell: CellIndex) -> Self {
+        debug_assert_ne!(from_cell.superchunk(), to_cell.superchunk(), "a crossing within a superchunk: a move");
+        Self { first_operand: to_cell.0, ..Self::on_cell(Opcode::CrossEntity, from_cell) }
     }
 
-    /// Whether the attribute `kind` of the entity on `at` sums to `seen`.
-    pub(crate) fn compare_attribute(at: CellIndex, kind: AttributeType, seen: u64) -> Self {
-        Self { first: seen, second: kind.0, ..Self::on(Opcode::CompareAttribute, at) }
+    /// Whether the attribute `attribute_type` of the entity on `named_cell` sums to `seen_value`.
+    pub(crate) fn compare_attribute(named_cell: CellIndex, attribute_type: AttributeType, seen_value: u64) -> Self {
+        Self { first_operand: seen_value, second_operand: attribute_type.0, ..Self::on_cell(Opcode::CompareAttribute, named_cell) }
     }
 
-    /// Whether `member` of the attribute `kind` of the entity on `at`
-    /// holds `seen`.
-    pub(crate) fn compare_attribute_member(at: CellIndex, kind: AttributeType, member: Member, seen: u64) -> Self {
-        Self { small: u16::from(member.offset) | u16::from(member.bytes) << 8, first: kind.0, second: seen, ..Self::on(Opcode::CompareAttributeMember, at) }
+    /// Whether `member` of the attribute `attribute_type` of the entity on `named_cell`
+    /// holds `seen_value`.
+    pub(crate) fn compare_attribute_member(named_cell: CellIndex, attribute_type: AttributeType, member: Member, seen_value: u64) -> Self {
+        Self { member_operand: u16::from(member.byte_offset) | u16::from(member.byte_count) << 8, first_operand: attribute_type.0, second_operand: seen_value, ..Self::on_cell(Opcode::CompareAttributeMember, named_cell) }
     }
 
-    /// `value` written to `member` of the attribute `kind` of the
-    /// entity on `at`.
-    pub(crate) fn write_attribute_member(at: CellIndex, kind: AttributeType, member: Member, value: u64) -> Self {
-        Self { opcode: Opcode::WriteAttributeMember, ..Self::compare_attribute_member(at, kind, member, value) }
+    /// `value` written to `member` of the attribute `attribute_type` of the
+    /// entity on `named_cell`.
+    pub(crate) fn write_attribute_member(named_cell: CellIndex, attribute_type: AttributeType, member: Member, value: u64) -> Self {
+        Self { opcode: Opcode::WriteAttributeMember, ..Self::compare_attribute_member(named_cell, attribute_type, member, value) }
     }
 
-    /// The entity on `at` given the attribute that is the `count`
+    /// The entity on `named_cell` given the attribute that is the `count`
     /// blocks carried from `carried_first` on.
-    pub(crate) fn write_attribute(at: CellIndex, carried_first: u32, count: u32) -> Self {
-        Self { second: u64::from(carried_first) << 32 | u64::from(count), ..Self::on(Opcode::WriteAttribute, at) }
+    pub(crate) fn write_attribute(named_cell: CellIndex, carried_first: u32, count: u32) -> Self {
+        Self { second_operand: u64::from(carried_first) << 32 | u64::from(count), ..Self::on_cell(Opcode::WriteAttribute, named_cell) }
     }
 
-    /// The attribute `kind` taken from the entity on `at`.
-    pub(crate) fn remove_attribute(at: CellIndex, kind: AttributeType) -> Self {
-        Self { first: kind.0, ..Self::on(Opcode::RemoveAttribute, at) }
+    /// The attribute `attribute_type` taken from the entity on `named_cell`.
+    pub(crate) fn remove_attribute(named_cell: CellIndex, attribute_type: AttributeType) -> Self {
+        Self { first_operand: attribute_type.0, ..Self::on_cell(Opcode::RemoveAttribute, named_cell) }
     }
 
-    /// The entity on `at` to wake next at `wake`.
-    pub(crate) fn write_wake(at: CellIndex, wake: u64) -> Self {
-        Self { first: wake, ..Self::on(Opcode::WriteWake, at) }
+    /// The entity on `named_cell` to wake next at `wake`.
+    pub(crate) fn write_wake(named_cell: CellIndex, wake: u64) -> Self {
+        Self { first_operand: wake, ..Self::on_cell(Opcode::WriteWake, named_cell) }
     }
 
     /// The cell it is of, in `superchunk`, which it lands in.
@@ -222,27 +222,27 @@ impl Instruction {
         (self.place >> PLACE_BITS) as usize
     }
 
-    /// It, the blocks it carries beginning `moved` blocks further on
+    /// It, the blocks it carries beginning `carried_shift` blocks further on
     /// (or back) in the list beside its queue: nothing, of one that
     /// carries none.
-    pub(crate) fn carried_moved_by(mut self, moved: i64) -> Self {
+    pub(crate) fn carried_moved_by(mut self, carried_shift: i64) -> Self {
         if self.opcode == Opcode::WriteAttribute {
-            self.second = (((self.second >> 32) as i64 + moved) as u64) << 32 | (self.second & u64::from(u32::MAX));
+            self.second_operand = (((self.second_operand >> 32) as i64 + carried_shift) as u64) << 32 | (self.second_operand & u64::from(u32::MAX));
         }
         self
     }
 
     /// The cell of `superchunk` its first word is the place of.
     #[inline]
-    pub(crate) fn to(&self, superchunk: SuperchunkIndex) -> CellIndex {
-        CellIndex(superchunk.top_left().0 | self.first)
+    pub(crate) fn destination_cell(&self, superchunk: SuperchunkIndex) -> CellIndex {
+        CellIndex(superchunk.top_left().0 | self.first_operand)
     }
 
     /// The member of an attribute it is of: its first byte, and how
     /// many bytes it is.
     #[inline]
     pub(crate) fn member(&self) -> (usize, usize) {
-        (usize::from(self.small & 0xFF), usize::from(self.small >> 8))
+        (usize::from(self.member_operand & 0xFF), usize::from(self.member_operand >> 8))
     }
 
     /// Whether it writes the world -- a plane, an entity, the wheel:

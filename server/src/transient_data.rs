@@ -11,11 +11,11 @@ pub const TRANSIENT_DATA: TransientData = TransientData::for_crate(env!("CARGO_M
 
 /// Where worlds are saved, a folder each.
 pub fn saves() -> PathBuf {
-    TRANSIENT_DATA.under("saves")
+    TRANSIENT_DATA.path_under("saves")
 }
 
 /// Where running worlds page their cold pools' images, a folder each,
 /// gone with its world (`chunk_storage`'s docs, "Paged to disk").
-pub fn paging() -> PathBuf {
-    TRANSIENT_DATA.under("paging")
+pub fn paging_folder() -> PathBuf {
+    TRANSIENT_DATA.path_under("paging")
 }

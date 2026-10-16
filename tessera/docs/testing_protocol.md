@@ -102,7 +102,7 @@ cargo run --release -- tessera <tool> [<argument>]
 | `measurement` | one table a corpus generator (grown, city, lines, checkerboard, and the saved adversarial bitmaps), a row a parameter set with its parameters, bitmaps, cells set, Tessera's mean, fewest and most bits, share of the raw cells and encode time; then what the trees hold, family by family | |
 | `census` | node kinds by level, for each bitmap looked at | |
 | `per_shape` | Tessera's bits on every shape, plan and line set | |
-| `noise` | Tessera's bits on noise at several densities, against the raw cells | |
+| `noisy_area` | Tessera's bits on noise at several densities, against the raw cells | |
 | `sparse` | the tree against the binary count tree on sparse bitmaps, density by density, scattered and clustered, beside the least scattered cells can take | |
 | `timing` | encode and decode times over a large corpus, family by family | bitmaps a generator (100) |
 | `instruction_count` | instructions to encode and to decode a corpus, counted by callgrind | |
@@ -260,7 +260,7 @@ Each is set, beside its reason, at the place given.
 | parameter | value | where |
 |---|---|---|
 | runs a seed serves before it rolls | 5 | `USES_BEFORE_THE_SEED_ROLLS`, `utilities/src/seed.rs` (handed on by `src/corpus/seed.rs`) |
-| each generator's `tested` and `timed` bitmaps | per shape, sparse shape, plan and line set | `SHAPES`, `SPARSE` (`src/corpus/mod.rs`), `PLANS` (`city.rs`), `LINE_SETS` (`lines.rs`) |
+| each generator's `tested` and `timed` bitmaps | per shape, sparse shape, plan and line set | `GROWN_SHAPES`, `SPARSE_SHAPES` (`src/corpus/mod.rs`), `CITY_PLANS` (`city.rs`), `LINE_SETS` (`lines.rs`) |
 | the most any bitmap may take, every tier | the raw cells and 1% | `CAP_BITS`, `tests/tests.rs` |
 | a turned family's drift, fast tier | 5% | `MOST_TURNED_DRIFT_PERCENT`, `tests/fast.rs` |
 | a turned family's drift, complete tier | 2% | `MOST_TURNED_DRIFT_PERCENT`, `tests/complete.rs` |
@@ -270,19 +270,19 @@ Each is set, beside its reason, at the place given.
 | timing's saved adversarial repeats | 20 | `SAVED_REPEATS`, `src/diagnostics/tool/timing.rs` |
 | timing's percentiles | median, 90th | `MEDIAN_PERCENT`, `TAIL_PERCENT`, same file |
 | the instruction count's corpus | 5 bitmaps a generator, 1 of noise at half density, a checkerboard of 7-cell squares | `BITMAPS_PER_GENERATOR`, `NOISE_BITMAPS`, `NOISE_DENSITY`, `CHECKERBOARD_SQUARE`, `src/diagnostics/tool/instruction_count.rs` |
-| `noise`'s densities | 0.5, 0.35, 0.2, 0.1, 3 bitmaps each | `DENSITIES`, `EACH`, `src/diagnostics/tool/noise.rs` |
-| `sparse`'s densities and clusterings | 15 densities, clustering 0, 0.7, 0.95, 20 bitmaps each | `DENSITIES`, `CLUSTERS`, `EACH`, `src/diagnostics/tool/sparse.rs` |
+| `noisy_area`'s densities | 0.5, 0.35, 0.2, 0.1, 3 bitmaps each | `NOISE_DENSITIES`, `BITMAPS_PER_DENSITY`, `src/diagnostics/tool/noise.rs` |
+| `sparse`'s densities and clusterings | 15 densities, clustering 0, 0.7, 0.95, 20 bitmaps each | `SPARSE_DENSITIES`, `CLUSTER_WEIGHTS`, `BITMAPS_PER_CASE`, `src/diagnostics/tool/sparse.rs` |
 | `render`'s pixels a cell | 2 | `PIXELS_A_CELL`, `src/diagnostics/png.rs` |
 | searches at once | 4 | `SEARCHES_AT_ONCE`, `src/diagnostics/adversarial/mod.rs` |
 | the searched window | the top left 64x64 | `WINDOW`, same file |
 | a noisy start's density | half | `NOISE_DENSITY_DIVISOR`, same file |
 | the search's starting temperature | 8 bits, cooling linearly to nothing | `START_TEMPERATURE`, `src/diagnostics/adversarial/anneal.rs` |
-| the search's changes | flip a cell, flip a tile, paint a rectangle, copy almost, xor a checkerboard | `CHANGES`, `src/diagnostics/adversarial/moves.rs` |
+| the search's changes | flip a cell, flip a tile, paint a rectangle, copy almost, xor a checkerboard | `CHANGE_KINDS`, `src/diagnostics/adversarial/moves.rs` |
 | a painted rectangle or checkerboard patch | up to a quarter of the area's side; odd checker periods 3 to 15 | `PATCH_SHARE_OF_SIDE`, `SHORTEST_CHECKER_PERIOD`, `LONGEST_CHECKER_PERIOD`, same file |
-| a window's variants on the plane | 16: 4 turns, mirrored or not, inverted or not | `ROTATIONS`, `MIRRORINGS`, `INVERSIONS`, `src/diagnostics/adversarial/plane.rs` |
-| changes a search tries from each start | 400 on the window, then 100 on the plane, or the argument | `Effort::default`, `src/diagnostics/adversarial/mod.rs` |
+| a window's variants on the plane | 16: 4 turns, mirrored or not, inverted or not | `ROTATION_COUNT`, `MIRRORING_COUNT`, `INVERSION_COUNT`, `src/diagnostics/adversarial/plane.rs` |
+| changes a search tries from each start | 400 on the window, then 100 on the plane, or the argument | `SearchEffort::default`, `src/diagnostics/adversarial/mod.rs` |
 | zstd's levels | 3 and 19 | `ZSTD_LEVELS`, `external_benchmarks/src/diagnostics/benchmarks.rs` |
-| timings of each worst bitmap against a codec | 21, the median kept | `TIMINGS`, `external_benchmarks/src/diagnostics/adversarial.rs` |
+| timings of each worst bitmap against a codec | 21, the median kept | `TIMING_REPEATS`, `external_benchmarks/src/diagnostics/adversarial.rs` |
 
 ## Phase one: fix, with the seed held still
 

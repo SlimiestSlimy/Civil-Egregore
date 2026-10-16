@@ -25,25 +25,25 @@ pub struct TreeStats {
 impl TreeStats {
     /// The counts of one tree.
     pub fn measure_tree(tree: &Tree) -> Self {
-        let mut stats = Self::default();
-        stats.count(tree, Tile::WHOLE_BITMAP);
-        stats
+        let mut tree_stats = Self::default();
+        tree_stats.count(tree, Tile::WHOLE_BITMAP);
+        tree_stats
     }
 
-    /// Adds `other`'s counts to these.
-    pub fn add(&mut self, other: &TreeStats) {
-        self.tiles += other.tiles;
-        self.complex_tiles += other.complex_tiles;
-        self.payload_values += other.payload_values;
-        self.copies_naming_children += other.copies_naming_children;
-        self.flipping_divides += other.flipping_divides;
-        self.cell_lists += other.cell_lists;
+    /// Adds `other_stats`'s counts to these.
+    pub fn add_counts(&mut self, other_stats: &TreeStats) {
+        self.tiles += other_stats.tiles;
+        self.complex_tiles += other_stats.complex_tiles;
+        self.payload_values += other_stats.payload_values;
+        self.copies_naming_children += other_stats.copies_naming_children;
+        self.flipping_divides += other_stats.flipping_divides;
+        self.cell_lists += other_stats.cell_lists;
     }
 
     /// Counts `tile`'s node and everything under it.
     fn count(&mut self, tree: &Tree, tile: Tile) {
         match tree.get(tile) {
-            Node::Copied { names_children: true, .. } => {
+            Node::CopiedTile { names_children: true, .. } => {
                 self.copies_naming_children += 1;
                 self.count_children(tree, tile);
             }
@@ -51,21 +51,21 @@ impl TreeStats {
                 self.flipping_divides += 1;
                 self.count_children(tree, tile);
             }
-            Node::Divided => self.count_children(tree, tile),
+            Node::PlainDivide => self.count_children(tree, tile),
             Node::ComplexTile { size_offset: 0 } => self.tiles += 1,
             Node::ComplexTile { size_offset } => {
                 self.complex_tiles += 1;
                 self.payload_values += 1 << (2 * size_offset);
             }
             Node::CellList => self.cell_lists += 1,
-            Node::Copied { names_children: false, .. } | Node::Residual | Node::Absent => {}
+            Node::CopiedTile { names_children: false, .. } | Node::ResidualFloorTile | Node::NoNode => {}
         }
     }
 
     /// Counts every child of `tile` that is a node.
     fn count_children(&mut self, tree: &Tree, tile: Tile) {
-        for child in tile.children() {
-            self.count(tree, child);
+        for child_tile in tile.child_tiles() {
+            self.count(tree, child_tile);
         }
     }
 }

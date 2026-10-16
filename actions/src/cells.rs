@@ -4,7 +4,7 @@
 //! and is applied only if the cell still holds it.
 
 use bitplane_manager::Window;
-use chunk_storage::{LayerType, Wide, Width};
+use chunk_storage::{LayerType, WidePlane, Width};
 use coordinates::CellIndex;
 use compares_and_writes::{compare, Write};
 use simulation::Turn;
@@ -17,30 +17,30 @@ pub fn held_in_tile(turn: &Turn, layer_type: LayerType, cell: CellIndex) -> u32 
     turn.aligned_tile(layer_type, cell, 8).map_or(0, |words| words.iter().map(|word| word.count_ones()).sum())
 }
 
-/// Queues one taken from the number `plane` holds at `from`, where the
-/// rule saw `seen_from`, and one added to that at `to`, where it saw
-/// `seen_to`: what is at `from` moved a step. Both under both
+/// Queues one taken from the number `wide_plane` holds at `from_cell`, where the
+/// rule saw `seen_from`, and one added to that at `to_cell`, where it saw
+/// `seen_to`: what is at `from_cell` moved a step. Both under both
 /// compares, so one is taken only if one is added -- whichever
 /// superchunk each is in: nothing is made or lost. One added to the
-/// rule's count `counted` if it is applied.
+/// rule's count `count_place` if it is applied.
 #[inline]
-pub fn move_one<W: Width>(turn: &mut Turn, plane: Wide<W>, from: CellIndex, seen_from: u32, to: CellIndex, seen_to: u32, counted: usize) {
-    debug_assert!(seen_from > 0 && seen_to < plane.most(), "one moved from {seen_from} to {seen_to}");
-    change_both(turn, plane, (from, seen_from, seen_from - 1), (to, seen_to, seen_to + 1), counted);
+pub fn move_one<W: Width>(turn: &mut Turn, wide_plane: WidePlane<W>, from_cell: CellIndex, seen_from: u32, to_cell: CellIndex, seen_to: u32, count_place: usize) {
+    debug_assert!(seen_from > 0 && seen_to < wide_plane.most_value(), "one moved from {seen_from} to {seen_to}");
+    change_both(turn, wide_plane, (from_cell, seen_from, seen_from - 1), (to_cell, seen_to, seen_to + 1), count_place);
 }
 
-/// Queues the numbers `plane` holds at two cells changed together:
-/// each of `first` and `second` a cell, what the rule saw there and
+/// Queues the numbers `wide_plane` holds at two cells changed together:
+/// each of `first_change` and `second_change` a cell, what the rule saw there and
 /// what it becomes. Both under both compares, so the one changes
 /// only if the other does -- whichever superchunk each is in. One
-/// added to the rule's count `counted` if it is applied.
+/// added to the rule's count `count_place` if it is applied.
 #[inline]
-pub fn change_both<W: Width>(turn: &mut Turn, plane: Wide<W>, first: (CellIndex, u32, u32), second: (CellIndex, u32, u32), counted: usize) {
-    debug_assert!(first.2 <= plane.most() && second.2 <= plane.most(), "{} and {} in a plane of {} bits a cell", first.2, second.2, W::BITS);
-    compare::open_compare(turn, compare::value(plane, first.0, first.1));
-    compare::open_compare(turn, compare::value(plane, second.0, second.1));
-    turn.write(Write::Cell { layer_type: plane.layer_type(), at: first.0, value: first.2, counted: Some(counted as u32) });
-    turn.write(Write::Cell { layer_type: plane.layer_type(), at: second.0, value: second.2, counted: None });
+pub fn change_both<W: Width>(turn: &mut Turn, wide_plane: WidePlane<W>, first_change: (CellIndex, u32, u32), second_change: (CellIndex, u32, u32), count_place: usize) {
+    debug_assert!(first_change.2 <= wide_plane.most_value() && second_change.2 <= wide_plane.most_value(), "{} and {} in a plane of {} bits a cell", first_change.2, second_change.2, W::BITS_A_CELL);
+    compare::open_compare(turn, compare::value(wide_plane, first_change.0, first_change.1));
+    compare::open_compare(turn, compare::value(wide_plane, second_change.0, second_change.1));
+    turn.write(Write::Cell { layer_type: wide_plane.layer_type(), target_cell: first_change.0, value: first_change.2, counted_place: Some(count_place as u32) });
+    turn.write(Write::Cell { layer_type: wide_plane.layer_type(), target_cell: second_change.0, value: second_change.2, counted_place: None });
     compare::close_compare(turn);
     compare::close_compare(turn);
 }
@@ -48,49 +48,49 @@ pub fn change_both<W: Width>(turn: &mut Turn, plane: Wide<W>, first: (CellIndex,
 /// Whether `cell` is hot in `layer_type`: in the world, and read.
 #[inline]
 pub fn hot(turn: &Turn, layer_type: LayerType, cell: CellIndex) -> bool {
-    turn.holds(layer_type, cell).is_ok()
+    turn.layer_holds(layer_type, cell).is_ok()
 }
 
 /// Whether `layer_type` holds at `cell`, as the tick found it: not
 /// where it is not hot.
 #[inline]
-pub fn holds(turn: &Turn, layer_type: LayerType, cell: CellIndex) -> bool {
-    turn.holds(layer_type, cell) == Ok(true)
+pub fn layer_holds(turn: &Turn, layer_type: LayerType, cell: CellIndex) -> bool {
+    turn.layer_holds(layer_type, cell) == Ok(true)
 }
 
 /// Whether `cell` is hot in `layer_type` and it does not hold there, as
 /// the tick found it: a cell to put it on.
 #[inline]
-pub fn lacks(turn: &Turn, layer_type: LayerType, cell: CellIndex) -> bool {
-    turn.holds(layer_type, cell) == Ok(false)
+pub fn layer_lacks(turn: &Turn, layer_type: LayerType, cell: CellIndex) -> bool {
+    turn.layer_holds(layer_type, cell) == Ok(false)
 }
 
-/// The number `plane` holds at `cell`, as the tick found it: none
+/// The number `wide_plane` holds at `cell`, as the tick found it: none
 /// where it is not hot.
 #[inline]
-pub fn value<W: Width>(turn: &Turn, plane: Wide<W>, cell: CellIndex) -> Option<u32> {
-    turn.value(plane, cell).ok()
+pub fn value<W: Width>(turn: &Turn, wide_plane: WidePlane<W>, cell: CellIndex) -> Option<u32> {
+    turn.value(wide_plane, cell).ok()
 }
 
-/// The `side` by `side` cells (up to 8) of `layer_type` about `cell`
-/// -- it `side / 2` across and down -- as the tick found them, and
+/// The `window_side` by `window_side` cells (up to 8) of `layer_type` about `cell`
+/// -- it `window_side / 2` across and down -- as the tick found them, and
 /// their top left cell: cell `(x, y)` of them at bit `8 * y + x`. None
 /// at the world's edge.
 #[inline]
-pub fn square(turn: &Turn, layer_type: LayerType, cell: CellIndex, side: u32) -> Option<(CellIndex, Window)> {
-    let corner = corner_about(cell, side)?;
-    Some((corner, turn.window(layer_type, corner, side, side)))
+pub fn window_about(turn: &Turn, layer_type: LayerType, cell: CellIndex, window_side: u32) -> Option<(CellIndex, Window)> {
+    let window_corner = corner_about(cell, window_side)?;
+    Some((window_corner, turn.window(layer_type, window_corner, window_side, window_side)))
 }
 
 /// Queues the number of `layer_type` at `cell` becoming `value` if it
-/// is still the `seen` the rule read there: three instructions -- a
+/// is still the `value_seen` the rule read there: three instructions -- a
 /// compare of the cell, the write, the compare's end, queued at once -- so none lands
 /// on another's, under whatever compare the rule is queuing under as
-/// well. One added to the rule's count `counted` if it is applied.
+/// well. One added to the rule's count `count_place` if it is applied.
 #[inline]
-pub fn seen_becoming(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, seen: u32, value: u32, counted: Option<usize>) {
-    debug_assert!(seen != value, "a write that changes nothing");
-    compare::with_writes(turn, compare::Compare::Cell { layer_type, at: cell, seen }, &[Write::Cell { layer_type, at: cell, value, counted: counted.map(|place| place as u32) }]);
+pub fn seen_becoming(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, value_seen: u32, value: u32, count_place: Option<usize>) {
+    debug_assert!(value_seen != value, "a write that changes nothing");
+    compare::with_writes(turn, compare::Compare::Cell { layer_type, target_cell: cell, seen_value: value_seen }, &[Write::Cell { layer_type, target_cell: cell, value, counted_place: count_place.map(|place| place as u32) }]);
 }
 
 /// Queues `layer_type` holding at `cell`, which the rule saw it did
@@ -101,10 +101,10 @@ pub fn set(turn: &mut Turn, layer_type: LayerType, cell: CellIndex) {
     seen_becoming(turn, layer_type, cell, 0, 1, None);
 }
 
-/// [`set`], adding one to the rule's count `counted` if it is applied.
+/// [`set`], adding one to the rule's count `count_place` if it is applied.
 #[inline]
-pub fn set_counted(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, counted: usize) {
-    seen_becoming(turn, layer_type, cell, 0, 1, Some(counted));
+pub fn set_counted(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, count_place: usize) {
+    seen_becoming(turn, layer_type, cell, 0, 1, Some(count_place));
 }
 
 /// Queues `layer_type` no longer holding at `cell`, which the rule saw
@@ -114,33 +114,33 @@ pub fn clear(turn: &mut Turn, layer_type: LayerType, cell: CellIndex) {
     seen_becoming(turn, layer_type, cell, 1, 0, None);
 }
 
-/// [`clear`], adding one to the rule's count `counted` if it is
+/// [`clear`], adding one to the rule's count `count_place` if it is
 /// applied.
 #[inline]
-pub fn clear_counted(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, counted: usize) {
-    seen_becoming(turn, layer_type, cell, 1, 0, Some(counted));
+pub fn clear_counted(turn: &mut Turn, layer_type: LayerType, cell: CellIndex, count_place: usize) {
+    seen_becoming(turn, layer_type, cell, 1, 0, Some(count_place));
 }
 
-/// Queues `value` as the number `plane` holds at `cell`, where the
-/// rule saw `seen`: a compare-and-write, applied only if the cell
-/// still holds `seen`.
+/// Queues `value` as the number `wide_plane` holds at `cell`, where the
+/// rule saw `value_seen`: a compare-and-write, applied only if the cell
+/// still holds `value_seen`.
 #[inline]
-pub fn set_value<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, seen: u32, value: u32) {
-    debug_assert!(value <= plane.most(), "{value} in a plane of {} bits a cell", W::BITS);
-    seen_becoming(turn, plane.layer_type(), cell, seen, value, None);
+pub fn set_value<W: Width>(turn: &mut Turn, wide_plane: WidePlane<W>, cell: CellIndex, value_seen: u32, value: u32) {
+    debug_assert!(value <= wide_plane.most_value(), "{value} in a plane of {} bits a cell", W::BITS_A_CELL);
+    seen_becoming(turn, wide_plane.layer_type(), cell, value_seen, value, None);
 }
 
-/// [`set_value`], adding one to the rule's count `counted` if it is
+/// [`set_value`], adding one to the rule's count `count_place` if it is
 /// applied.
 #[inline]
-pub fn set_value_counted<W: Width>(turn: &mut Turn, plane: Wide<W>, cell: CellIndex, seen: u32, value: u32, counted: usize) {
-    debug_assert!(value <= plane.most(), "{value} in a plane of {} bits a cell", W::BITS);
-    seen_becoming(turn, plane.layer_type(), cell, seen, value, Some(counted));
+pub fn set_value_counted<W: Width>(turn: &mut Turn, wide_plane: WidePlane<W>, cell: CellIndex, value_seen: u32, value: u32, count_place: usize) {
+    debug_assert!(value <= wide_plane.most_value(), "{value} in a plane of {} bits a cell", W::BITS_A_CELL);
+    seen_becoming(turn, wide_plane.layer_type(), cell, value_seen, value, Some(count_place));
 }
 
-/// The top left cell of the square `side` cells a side about `centre`
-/// -- it `side / 2` across and down: none past the world's edge.
-pub fn corner_about(centre: CellIndex, side: u32) -> Option<CellIndex> {
-    let reach = side as i32 / 2;
-    centre.offset(-reach, -reach)
+/// The top left cell of the square `square_side` cells a side about `centre_cell`
+/// -- it `square_side / 2` across and down: none past the world's edge.
+pub fn corner_about(centre_cell: CellIndex, square_side: u32) -> Option<CellIndex> {
+    let reach = square_side as i32 / 2;
+    centre_cell.at_cartesian_offset(-reach, -reach)
 }

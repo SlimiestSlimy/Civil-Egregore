@@ -6,9 +6,9 @@ The design is in `chunk_storage.md`.
 
 **`Height`**: 16 bits. **`HeightMap`**: a superchunk's heights -- 16
 chunk floors, a mask of the tall chunks, a byte a cell in Morton order,
-and each tall chunk's 16-bit map after. **`filled`**,
+and each tall chunk's 16-bit map after. **`all_at_height`**,
 **`from_heights(at)`** (settles floors and which chunks are tall),
-**`from_words`**, **`get`**, **`floor(chunk)`**, **`tall(chunk)`**,
+**`from_words`**, **`get`**, **`floor(chunk)`**, **`is_tall(chunk)`**,
 **`set`** (narrow chunks, within the floor's 255), **`words`**.
 **`height_in(words, place)`**: one height from an image's words.
 `HEIGHT_WORDS`: a map's words with no tall chunk; `TALL_WORDS`: a tall
@@ -19,14 +19,14 @@ chunk's more; **`words_of(words)`**: a map's length from its start.
 `LayerType`, `Width` (`Bits2`, `Bits4`, `Bits8`, `Bits16`, `Bits32`) and `Wide<W>` are the type registry's (`../../type_registry/docs/reference.md`), handed on from this crate's root as what a layer is of.
 
 **`LayerCodec`**: Tessera and its buffers, allocated once.
-**`encode(cells)`**: the bitmap's stream, as words, until the next
+**`encode_cells(cells)`**: the bitmap's stream, as words, until the next
 encoding. **`encode_layer(cells)`**: as a layer's words -- encoded, or
-none where no cell is set. **`decode(words, cells)`**: the bitmap whose stream starts at
+none where no cell is set. **`decode_cells(words, cells)`**: the bitmap whose stream starts at
 `words`, at most `MOST_WORDS` of them read.
 
 ## `wide.rs`
 
-**`bucket_words(layer_type)`**: the words a chunk's hot bucket takes -- a bitmap's a bit, over the cells of a tile of the plane's tile size. **`spread(plane, bits, bit, wide)`**: a bitmap put into a wide bucket as one bit of every cell. **`plane(wide, bits, bit)`**: that bit of every cell, as a bitmap. **`cells_set(words, bits)`**: the cells whose number is not 0.
+**`bucket_words(layer_type)`**: the words a chunk's hot bucket takes -- a bitmap's a bit, over the cells of a tile of the plane's tile size. **`spread_into_wide(one_bit_bitmap, bits_a_cell, bit_of_cell, wide_bucket)`**: a bitmap put into a wide bucket as one bit of every cell. **`bitmap_of_bit(wide_bucket, bits_a_cell, bit_of_cell)`**: that bit of every cell, as a bitmap. **`cells_set(words, bits_a_cell)`**: the cells whose number is not 0.
 
 ## `superchunk_image.rs`
 
@@ -35,8 +35,8 @@ checked to be an image (**`check_chunk`** each chunk: a table that fits,
 types sorted one a type, offsets inside the chunk and apart), else
 **`InvalidImage`**. **`words`**, **`height_words`**, **`height`**.
 **`with_heights(heights)`**: the image with those its heights, its
-layers as they are. **`with_water(depths)`**: the image with `ChunkMaps` its water's;
-**`water_words`**, **`depth(place)`**.
+layers as they are. **`with_water(water_depths)`**: the image with `ChunkMaps` its water's;
+**`water_words`**, **`water_depth(place)`**.
 
 ## `chunk_maps.rs`
 
@@ -46,44 +46,44 @@ not 0, wide (16 bits a cell) if one is over 255, else a byte a cell
 **`words`**; **`number_in(words, place)`**, **`words_of(words)`**.
 **`SuperchunkCells`** `{heights, water_depths, layers}`
 (`superchunk_cells.rs`): a superchunk's cells as whoever makes them
-gives them; **`image(codec)`**: the image of them, every layer encoded.
+gives them; **`image(layer_codec)`**: the image of them, every layer encoded.
 **`layer(chunk, type)`**: an encoded layer's words, from its first to its
-chunk's end. **`layer_types(chunk)`**. **`rewritten(changes)`**: a new
+chunk's end. **`layer_types(chunk)`**. **`rewritten(layer_changes)`**: a new
 image with **`LayerChange`**s made in order, a later one to a layer
-replacing an earlier, no words removing the layer; built by **`build`**
+replacing an earlier, no words removing the layer; built by **`build_image_words`**
 from each chunk's **`exact_layers`** -- each encoded layer's words to the next
 offset, offsets sorted. **`layer_table(chunk)`**: a chunk's layer table.
 
 ## `writeback_ring.rs`
 
-**`WritebackRing::new(capacity)`**, **`capacity`**, **`is_empty`**.
-**`push(chunk, type, encoded)`**: an entry, if it fits (**`room_for`**:
+**`WritebackRing::new(capacity_in_words)`**, **`capacity_in_words`**, **`is_empty`**.
+**`push(chunk, type, encoded_layer)`**: an entry, if it fits (**`room_for`**:
 at the head, or at the start past a wrap marker); whether it did.
-**`grow(capacity)`**: an empty ring made bigger. **`tail_superchunk`**:
+**`grow_empty(capacity_in_words)`**: an empty ring made bigger. **`tail_superchunk`**:
 the oldest live entry's superchunk. **`entries_of(superchunk)`**: its
-live entries, oldest first, as **`RingEntry`**s; **`encoded(entry)`**:
-an entry's words. **`release(superchunk)`**: its entries marked dead,
+live entries, oldest first, as **`RingEntry`**s; **`encoded_layer(ring_entry)`**:
+an entry's words. **`release_superchunk(superchunk)`**: its entries marked dead,
 the tail moved past the dead at it. **`all_entries`**, **`entry_start`**:
 walking entries from the tail, over wrap markers.
 
 ## `chunk_storage.rs`
 
-**`ChunkStorage::new(ring_words)`**. `find(superchunk)`: where a
+**`ChunkStorage::new(ring_words)`**. `find_superchunk(superchunk)`: where a
 superchunk is in the cold pool, or where it would go. **`insert(superchunk, image)`**,
-**`holds(superchunk)`**,
+**`holds_image(superchunk)`**,
 **`image(superchunk)`**, **`shared_image(superchunk)`** -- a handle to
 it, to read on another thread, read here if it is paged to disk --
 **`superchunks()`**, **`layer(chunk,
 type)`**: the cold pool, its images shared (`Arc`); `image` and `layer`
 of one in memory, a panic at one on disk.
-**`try_write_back(chunk, type, encoded)`**: into the ring if it fits --
+**`try_write_back(chunk, type, encoded_layer)`**: into the ring if it fits --
 an empty ring too small grown -- whether it went in.
-**`write_back(chunk, type, encoded, flushed)`**: the same, the
+**`write_back(chunk, type, encoded_layer, flushed_superchunks)`**: the same, the
 superchunk at its tail flushed here until it fits, each added to
-`flushed` -- before the encoded layer went in. **`take(superchunk)`**:
+`flushed` -- before the encoded layer went in. **`take_entries(superchunk)`**:
 its ring entries copied out and freed, with its image as it was -- a
-**`Flush`** `{superchunk, image, changes}`, to be done on any thread
-(**`Flush::rewritten`**: the image with every change made; a
+**`Flush`** `{superchunk, image, layer_changes}`, to be done on any thread
+(**`Flush::rewritten_image`**: the image with every change made; a
 superchunk not stored made flat); **`tail_superchunk`**,
 **`take_tail`**, **`holds_changes(superchunk)`**.
 **`flush(superchunk)`**: taken and rewritten here. **`flush_all`**,
@@ -92,25 +92,25 @@ superchunk not stored made flat); **`tail_superchunk`**,
 ## `paging.rs`
 
 The cold pool paged to disk (`chunk_storage.md`, "Paged to disk").
-`Kept`: where the pool keeps an image -- `InMemory(image)`, or
-`OnDisk(folder)`. **`Stored`**: the same, to hand to another thread;
-**`Stored::image(superchunk)`**: the image, read now if on disk.
+`ImageKept`: where the pool keeps an image -- `InMemory(image)`, or
+`OnDisk(folder)`. **`ImageStored`**: the same, to hand to another thread;
+**`ImageStored::image(superchunk)`**: the image, read now if on disk.
 **`read_back(folder, superchunk)`**: a paged image read, a panic if it
 does not. `bytes_of(image)`. `PagingFolder`: a pool's own folder, its
-lock file beside it (`LOCK`), named by its process and a count
-(`FOLDERS_MADE`); `PagingFolder::under(root)` makes one, those left
-behind removed; dropped, it is removed. `Paging` `{root, folder,
+lock file beside it (`LOCK_EXTENSION`), named by its process and a count
+(`FOLDERS_MADE`); `PagingFolder::new_under(root_folder)` makes one, those left
+behind removed; dropped, it is removed. `ColdPoolPaging` `{root, folder,
 bytes_kept, bytes_in_memory, hand}`; `Paging::none()`.
-**`ChunkStorage::page_under(root, bytes_kept)`**: pages, under `root`,
+**`ChunkStorage::page_under(root_folder, bytes_kept)`**: pages, under `root_folder`,
 keeping so many bytes; **`keep_in_memory(bytes_kept)`**;
 **`stop_paging_out()`**; **`over_memory_kept()`**;
 **`bytes_in_memory()`**; **`is_on_disk(superchunk)`**; **`on_disk()`**,
-how many are. **`page_out(held)`**: images written and let go until no
+how many are. **`page_out(is_held)`**: images written and let go until no
 more are in memory than kept, none `held` says is held nor with
 changes in the ring -- how many, or the disk's refusal, the image
 still in memory. **`insert_on_disk(superchunk, folder)`**: an image
 left in a save. **`bring_in(superchunk, image)`**: one read back, in
-memory again. **`stored(superchunk)`**. **`save_image(folder,
+memory again. **`stored_image(superchunk)`**. **`save_image(folder,
 superchunk)`**: written from memory, or copied from where it is paged.
 
 ## `disk.rs`
@@ -120,7 +120,7 @@ superchunk)`**: written from memory, or copied from where it is paged.
 `WORLD_FILE` (`world.csv`) and `HOT_FILE` (`hot.csv`): their names in
 a world's folder.
 
-**`WorldInfo`** `{seed, tick, layers, side, forced, hot_entity, camera_flock, without_camera_flock, generation}` -- `forced` only with a `side`, refused otherwise; `hot_entity` a number, the runner knowing the kinds; `camera_flock` the sheep each superchunk generated in the viewport starts with, if its camera loads superchunks; `without_camera_flock` the superchunks generated out of its view, still owed theirs, sorted; `generation` sorted by name -- no name: a world's is its folder's --; read by its rows' names in any order, the header first, missing ones their defaults but the seed ("On disk" in `chunk_storage.md`); **`DiskError`**: `Io(path,
+**`WorldInfo`** `{seed, tick, layers, side_in_superchunks, forced_hot, hot_entity, camera_flock, without_camera_flock, generation_numbers}` -- `forced_hot` only with a `side_in_superchunks`, refused otherwise; `hot_entity` a number, the runner knowing the kinds; `camera_flock` the sheep each superchunk generated in the viewport starts with, if its camera loads superchunks; `without_camera_flock` the superchunks generated out of its view, still owed theirs, sorted; `generation_numbers` sorted by name -- no name: a world's is its folder's --; read by its rows' names in any order, the header first, missing ones their defaults but the seed ("On disk" in `chunk_storage.md`); **`DiskError`**: `IoFailed(path,
 error)` or `Invalid(path, what)`. **`write_world(folder, info)`**,
 **`read_world(folder)`**; **`write_image(folder, superchunk,
 image)`**, **`read_image`**, **`copy_image(from, folder, superchunk)`**
@@ -130,12 +130,12 @@ words)`**, **`read_state`** -- the words, and the file's path;
 **`read_hot(folder)`**: the hot file;
 **`saved_superchunks(folder)`**: those with an image, in Morton order.
 Private: `superchunk_file`, `make_folder`, `write`, `write_words`,
-`read`, `read_words`, `images_in`, `WorldInfo::to_text`, `from_text`,
+`read_bytes`, `read_words`, `images_in`, `WorldInfo::to_text`, `from_text`,
 `HotSuperchunks::to_text`, `from_text`.
 
 ## `diagnostics/storage.rs`
 
-**`StorageStats::measure_storage(storage)`**: superchunk images stored, how many of
+**`StorageStats::measure_storage(cold_storage)`**: superchunk images stored, how many of
 them on disk, the bytes of those in memory,
 the ring's bytes.
 
@@ -147,17 +147,17 @@ the ring's bytes.
 ## `jobs.rs`
 
 The slow work, done off the tick on the dispatcher's threads.
-**`Job`**: `Encode(dirty)`, `Flush(flush)`, or `Warm {superchunk,
+**`Job`**: `EncodeWriteBack(dirty)`, `Flush(flush)`, or `Warm {superchunk,
 image, generate, types}` -- `image` as the pool has it (`Stored`), read
-by the job if on disk; `generate` (**`Generate`**) the world's
-generator, called if there is no image; **`Job::execute_with_codec(codec)`**: a
-**`Done`** -- `Encoded(encoded)`, each bucket's layer words;
-`Flushed(image)`; `Warmed {generated, read, cells}`, every bitmap's cells,
+by the job if on disk; `generate_image` (**`GenerateImage`**) the world's
+generator, called if there is no image; **`Job::execute_with_codec(layer_codec)`**: a
+**`JobDone`** -- `WriteBackEncoded(encoded)`, each bucket's layer words;
+`ImageFlushed(image)`; `SuperchunkWarmed {generated_image, image_read_back, cells}`, every bitmap's cells,
 chunk by chunk, type by type, and the image if generated, or if read
 back from disk; or
-`Failed(said)`, a panic caught. **`Ticket`**: a job sent.
-**`Jobs::new(dispatcher)`**; **`send(job)`**, a ticket, the job queued
-on the dispatcher with the thread's own codec; **`try_take(ticket)`**;
-**`take(ticket)`**, waiting. **`checked`**: a job's panic carried on
+`JobPanicked(said)`, a panic caught. **`JobTicket`**: a job sent.
+**`Jobs::new(dispatcher)`**; **`send_job(job)`**, a ticket, the job queued
+on the dispatcher with the thread's own codec; **`try_take(job_ticket)`**;
+**`take_waiting(job_ticket)`**, waiting. **`panic_if_failed`**: a job's panic carried on
 where it is taken. **`BucketKey`** `{layer_type, chunk}` (in
 `layer_codec.rs`): a layer of a chunk, hot or encoded.

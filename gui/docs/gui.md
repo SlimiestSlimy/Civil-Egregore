@@ -4,11 +4,11 @@ Civil Egregore's menus, laid over whatever window shows the world: the
 main menu the window opens on, the options Escape opens over a world,
 and the sliders. It knows nothing of the world or of what draws it,
 and depends on Bevy's interface and on `utilities` alone. A window
-adds `Gui` to its app, giving it what names the worlds there are to
-open; it reads which screen is up (`Screen`), what of the pointer, the
-wheel and the keys the menus took (`Captured`), and a message for each
-world to be made (`Make`), opened (`Open`) or saved (`Save`). Its own
-work of a frame is the set `Worked`: what is to see it the same frame
+adds `GuiPlugin` to its app, giving it what names the worlds there are to
+open; it reads which screen is up (`ShownScreen`), what of the pointer, the
+wheel and the keys the menus took (`CapturedInput`), and a message for each
+world to be made (`MakeWorld`), opened (`OpenWorld`) or saved (`Save`). Its own
+work of a frame is the set `MenusWorked`: what is to see it the same frame
 runs after.
 
 A part a module: `main_menu`, `options`, `sliders` (itself a folder,
@@ -25,23 +25,23 @@ hexadecimal -- none typed, one is drawn at random -- and `U` opens the
 sliders, every group of them offered (below): the world's size, whether
 it is forced hot or its camera loads superchunks, its sheep, how it is
 generated. **Make the world**,
-or Enter, says it is to be made (`Make`), with the seed and the
+or Enter, says it is to be made (`MakeWorld`), with the seed and the
 sliders' numbers as they are then; the window has the server make it
-(`server::Start::from_tuning`), and shows it (`Screen::World`). Escape goes
+(`server::WorldStart::from_tuning`), and shows it (`ShownScreen::World`). Escape goes
 back a page.
 
 **Open a world** lists those there are, as the options do (below); a
-click on one says it is to be opened (`Open(name)`), and the window
+click on one says it is to be opened (`OpenWorld(set_world_name)`), and the window
 shows it.
 
 ## Rows
 
 What the main menu and the options are both made of: a dimmed window,
 rows a bar each over its middle, a click on a row doing what it does.
-A menu says what its rows are each frame (`Row`); the parts are made
-once (`rows::spawn`), hidden, and shown as the rows are said
+A menu says what its rows are each frame (`MenuRow`); the parts are made
+once (`rows::spawn_menu_parts`), hidden, and shown as the rows are said
 (`rows::show_rows`). Shared beside: the list of the worlds there are, gone
-through by the wheel (`Listing`), and keys typed into a line
+through by the wheel (`WorldListing`), and keys typed into a line
 (`type_into`).
 
 ## Sliders
@@ -54,7 +54,7 @@ row of a group goes back to the menu. `U` closes whatever is open.
 
 Which groups are offered is the screen's: every one while a new world
 is set up; over a world all but the world's own, read only when a
-world is made (`Group::setup_only`) -- the shading, and how a world is
+world is made (`OneGroup::setup_only`) -- the shading, and how a world is
 generated, the world run made again from its start as one of those
 changes; none over the rest of the main menu, nor under the options.
 
@@ -87,7 +87,7 @@ the window runs on the default settings alone and keeps nothing.
   with a side, the origin's alone of one with none, as sheep
   everywhere would keep the whole of an endless world hot.
 - **Ocean and land**, **mesh lines**, **finer meshes**, **grass**,
-  **trees**: how the world is generated (`worldgen::Generation::from_tuning`).
+  **trees**: how the world is generated (`worldgen::WorldGeneration::from_tuning`).
 
 All of it is laid out by plain arithmetic -- a row each, a track of a
 fixed width against the window's right edge -- so where the pointer is
@@ -101,7 +101,7 @@ rows in both.
 
 What is longer than the window is scrolled by the wheel, the pointer
 over it. The pointer rested on a slider's row for a moment, and what
-the slider does is said beside it (`Tuned::what`).
+the slider does is said beside it (`Tuned::what_it_does`).
 
 ## Options
 
@@ -112,7 +112,7 @@ theirs; the world ticks on behind them. Leaving is no more than
 closing the window does: it is here to be found.
 
 **Save** says the world is to be saved (`Save`) under the name the
-window gave for it (`Options::name`). A world with none yet is named
+window gave for it (`Options::set_world_name`). A world with none yet is named
 first: the name typed, Enter or a click to save. A world's name is its
 folder's, so only what a folder may be named is typed
 (`utilities::settings::world_name`), and a name a world there is
@@ -122,14 +122,14 @@ already has is refused. Saving it is the window's.
 them: the renderer, those saved in the worlds' folder
 (`utilities::settings::worlds()`) -- a row each, ten at a time, the
 wheel going through the rest; its first row goes back. A click on one
-closes the options and says it is to be opened (`Open`): opening it is
+closes the options and says it is to be opened (`OpenWorld`): opening it is
 the window's. The list is asked for each time it is opened.
 
 ## Layout
 
 | file | holds |
 |---|---|
-| `src/lib.rs` | `Gui`, the menus added to an app; `Screen`, `Captured`, the messages; `Worked` |
+| `src/lib.rs` | `GuiPlugin`, the menus added to an app; `ShownScreen`, `CapturedInput`, the messages; `MenusWorked` |
 | `src/rows.rs` | a menu of rows over the window's middle, a click each; the worlds listed; keys typed into a line |
 | `src/main_menu.rs` | what the window opens on: a new world set up, a world opened, leaving |
 | `src/options.rs` | what Escape opens over a world: going on, saving it, opening another, leaving |

@@ -40,7 +40,7 @@ pub fn square_side(count: u32) -> u32 {
 
 /// A cell's eight neighbours, as offsets `(dx, dy)`, row by row from the
 /// top left.
-pub const NEIGHBOURS: [(i32, i32); 8] = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
+pub const NEIGHBOUR_OFFSETS: [(i32, i32); 8] = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
 
 /// The bits of a cell's index giving its place in its chunk.
 const CELL_PLACE_BITS: u32 = CELLS_IN_CHUNK.trailing_zeros();
@@ -62,13 +62,13 @@ impl SuperchunkIndex {
     /// from its top -- cartesian, each under [`WORLD_SIDE_SUPERCHUNKS`].
     pub const fn from_cartesian(x: u32, y: u32) -> Self {
         debug_assert!(x < WORLD_SIDE_SUPERCHUNKS && y < WORLD_SIDE_SUPERCHUNKS, "a superchunk outside the world");
-        Self(interleave(x, y))
+        Self(morton_index_from_cartesian(x, y))
     }
 
     /// Its cartesian coordinates, in superchunks:
     /// [`SuperchunkIndex::from_cartesian`] undone.
     pub fn cartesian(self) -> (u32, u32) {
-        (gather(self.0), gather(self.0 >> 1))
+        (gather_even_bits(self.0), gather_even_bits(self.0 >> 1))
     }
 
     /// Its top left cell.
@@ -82,12 +82,12 @@ impl SuperchunkIndex {
     }
 
     /// The superchunk `dx` across and `dy` down, if it is in the world:
-    /// stepped on the index, as [`CellIndex::offset`] steps a cell.
-    pub fn offset(self, dx: i32, dy: i32) -> Option<Self> {
+    /// stepped on the index, as [`CellIndex::at_cartesian_offset`] steps a cell.
+    pub fn at_cartesian_offset(self, dx: i32, dy: i32) -> Option<Self> {
         let x = step(self.0 & X_BITS, dx, X_BITS)?;
         let y = step(self.0 & Y_BITS, dy, Y_BITS)?;
-        let moved = x | y;
-        (moved >> SUPERCHUNK_INDEX_BITS == 0).then_some(Self(moved))
+        let moved_index = x | y;
+        (moved_index >> SUPERCHUNK_INDEX_BITS == 0).then_some(Self(moved_index))
     }
 }
 
@@ -119,16 +119,16 @@ impl ChunkIndex {
     }
 }
 
-/// A `u64` whose bits alternate, `run` set then `run` clear, from the
+/// A `u64` whose bits alternate, `run_length` set then `run_length` clear, from the
 /// lowest: the mask that keeps each half of a spread step.
-const fn alternating_runs(run: u32) -> u64 {
+const fn alternating_runs(run_length: u32) -> u64 {
     let mut mask = 0u64;
-    let mut bit = 0;
-    while bit < u64::BITS {
-        if (bit / run).is_multiple_of(2) {
-            mask |= 1 << bit;
+    let mut bit_index = 0;
+    while bit_index < u64::BITS {
+        if (bit_index / run_length).is_multiple_of(2) {
+            mask |= 1 << bit_index;
         }
-        bit += 1;
+        bit_index += 1;
     }
     mask
 }
@@ -144,14 +144,14 @@ const SPREAD_STEPS: [(u32, u64); 5] = [
 ];
 
 /// `value`'s bits spread to every other bit: bit `i` to bit `2i`.
-const fn spread(value: u32) -> u64 {
-    let (mut spread, mut step) = (value as u64, 0);
+const fn spread_to_even_bits(value: u32) -> u64 {
+    let (mut spread_value, mut step) = (value as u64, 0);
     while step < SPREAD_STEPS.len() {
-        let (shift, mask) = SPREAD_STEPS[step];
-        spread = (spread | spread << shift) & mask;
+        let (run_shift, mask) = SPREAD_STEPS[step];
+        spread_value = (spread_value | spread_value << run_shift) & mask;
         step += 1;
     }
-    spread
+    spread_value
 }
 
 /// The gather steps, narrowest first: [`SPREAD_STEPS`] undone, each
@@ -165,15 +165,15 @@ const GATHER_STEPS: [(u32, u64); 5] = [
     (16, alternating_runs(32)),
 ];
 
-/// The even bits of `value` gathered into the low half: [`spread`]
+/// The even bits of `value` gathered into the low half: [`spread_to_even_bits`]
 /// undone.
-fn gather(value: u64) -> u32 {
-    GATHER_STEPS.iter().fold(value & alternating_runs(1), |gathered, &(shift, mask)| (gathered | gathered >> shift) & mask) as u32
+fn gather_even_bits(value: u64) -> u32 {
+    GATHER_STEPS.iter().fold(value & alternating_runs(1), |gathered_bits, &(run_shift, mask)| (gathered_bits | gathered_bits >> run_shift) & mask) as u32
 }
 
 /// `x` and `y`'s bits interleaved, `x` in the even bits.
-const fn interleave(x: u32, y: u32) -> u64 {
-    spread(x) | spread(y) << 1
+const fn morton_index_from_cartesian(x: u32, y: u32) -> u64 {
+    spread_to_even_bits(x) | spread_to_even_bits(y) << 1
 }
 
 /// A cell anywhere in the world, as its Morton index: from the lowest
@@ -217,12 +217,12 @@ impl CellIndex {
 
     /// The same cell as cartesian coordinates.
     pub fn cartesian(self) -> CellCartesian {
-        CellCartesian { x: gather(self.0), y: gather(self.0 >> 1) }
+        CellCartesian { x: gather_even_bits(self.0), y: gather_even_bits(self.0 >> 1) }
     }
 
     /// The cell `dx` across and `dy` down from this one, if it is in the
     /// world: stepped on the index itself (`docs/reference.md`, "step").
-    pub fn offset(self, dx: i32, dy: i32) -> Option<Self> {
+    pub fn at_cartesian_offset(self, dx: i32, dy: i32) -> Option<Self> {
         let x = step(self.0 & X_BITS, dx, X_BITS)?;
         let y = step(self.0 & Y_BITS, dy, Y_BITS)?;
         Some(Self(x | y))
@@ -245,13 +245,13 @@ pub struct CellCartesian {
 /// the cell `x` across and `y` down from the superchunk's top left.
 pub fn place_from_cartesian(x: u32, y: u32) -> usize {
     debug_assert!(x < SUPERCHUNK_SIDE_CELLS && y < SUPERCHUNK_SIDE_CELLS, "a cell outside its superchunk");
-    interleave(x, y) as usize
+    morton_index_from_cartesian(x, y) as usize
 }
 
 /// How far across and down from its superchunk's top left the cell at
 /// `place` in it is: [`place_from_cartesian`] undone.
 pub fn cartesian_from_place(place: usize) -> (u32, u32) {
-    (gather(place as u64), gather(place as u64 >> 1))
+    (gather_even_bits(place as u64), gather_even_bits(place as u64 >> 1))
 }
 
 /// The bits of a Morton index holding x: the even ones.
@@ -259,25 +259,25 @@ const X_BITS: u64 = alternating_runs(1);
 /// The bits of a Morton index holding y: the odd ones.
 const Y_BITS: u64 = !X_BITS;
 
-/// `coordinate` -- one coordinate's bits of a Morton index, those in
-/// `lane` -- moved by `by`, unless it passes the top or bottom of the
+/// `coordinate_bits` -- one coordinate's bits of a Morton index, those in
+/// `lane_mask` -- moved by `signed_offset`, unless it passes the top or bottom of the
 /// `u64` (`docs/reference.md`, "step").
-fn step(coordinate: u64, by: i32, lane: u64) -> Option<u64> {
-    let magnitude = by.unsigned_abs();
-    if magnitude == 0 {
-        return Some(coordinate);
+fn step(coordinate_bits: u64, signed_offset: i32, lane_mask: u64) -> Option<u64> {
+    let offset_magnitude = signed_offset.unsigned_abs();
+    if offset_magnitude == 0 {
+        return Some(coordinate_bits);
     }
-    let spread_by = if magnitude.is_power_of_two() { 1 << (2 * magnitude.trailing_zeros()) } else { spread(magnitude) };
+    let spread_by = if offset_magnitude.is_power_of_two() { 1 << (2 * offset_magnitude.trailing_zeros()) } else { spread_to_even_bits(offset_magnitude) };
     // The y lane is the odd bits: its distance one bit higher.
-    let distance = spread_by << (lane & 1 ^ 1);
-    let moved = if by >= 0 { (coordinate | !lane).wrapping_add(distance) & lane } else { (coordinate.wrapping_sub(distance)) & lane };
-    let wrapped = if by >= 0 { moved < coordinate } else { moved > coordinate };
-    (!wrapped).then_some(moved)
+    let lane_distance = spread_by << (lane_mask & 1 ^ 1);
+    let moved_bits = if signed_offset >= 0 { (coordinate_bits | !lane_mask).wrapping_add(lane_distance) & lane_mask } else { (coordinate_bits.wrapping_sub(lane_distance)) & lane_mask };
+    let wrapped_past_end = if signed_offset >= 0 { moved_bits < coordinate_bits } else { moved_bits > coordinate_bits };
+    (!wrapped_past_end).then_some(moved_bits)
 }
 
 impl From<CellCartesian> for CellIndex {
     /// The cell's Morton index.
     fn from(cell: CellCartesian) -> Self {
-        Self(interleave(cell.x, cell.y))
+        Self(morton_index_from_cartesian(cell.x, cell.y))
     }
 }

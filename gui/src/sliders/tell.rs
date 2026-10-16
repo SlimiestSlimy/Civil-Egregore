@@ -1,34 +1,34 @@
 //! What a slider does, said beside it once the pointer has rested on
-//! its row a moment (`Tuned::what`).
+//! its row a moment (`Tuned::what_it_does`).
 
-use super::spawn::Tip;
-use super::{rows, Sliders, MARGIN, ROW};
+use super::spawn::SliderTip;
+use super::{group_rows, Sliders, SLIDERS_MARGIN_PIXELS, ROW_STEP_PIXELS};
 use bevy::prelude::*;
-use utilities::tuning::tuned;
+use utilities::tuning::tuned_number;
 
 /// Seconds the pointer rests on a row before what its slider does is said.
-const REST: f32 = 0.4;
+const REST_SECONDS: f32 = 0.4;
 
 /// Says what a slider does, beside its row, once the pointer has
 /// rested on it a moment -- and no more once it moves.
-pub fn tell(mut sliders: ResMut<Sliders>, time: Res<Time>, window: Single<&Window>, tip: Single<(&mut Text, &mut Node, &mut Visibility), With<Tip>>) {
-    let (mut said, mut node, mut shown) = tip.into_inner();
-    let pointer = window.cursor_position();
-    let rested = match pointer {
-        Some(pointer) if pointer == sliders.rested.0 => sliders.rested.1 + time.delta_secs(),
+pub fn tell_what_slider_does(mut sliders: ResMut<Sliders>, frame_time: Res<Time>, window: Single<&Window>, tip_parts: Single<(&mut Text, &mut Node, &mut Visibility), With<SliderTip>>) {
+    let (mut tip_text, mut node, mut tip_visibility) = tip_parts.into_inner();
+    let pointer_position = window.cursor_position();
+    let rested_seconds = match pointer_position {
+        Some(still_position) if still_position == sliders.pointer_rest.0 => sliders.pointer_rest.1 + frame_time.delta_secs(),
         _ => 0.0,
     };
-    sliders.rested = (pointer.unwrap_or(Vec2::NEG_ONE), rested);
+    sliders.pointer_rest = (pointer_position.unwrap_or(Vec2::NEG_ONE), rested_seconds);
     // The row the pointer is on, of the group shown, and its number: under the first row.
-    let told = sliders.page().zip(sliders.row_under(&window)).and_then(|(page, row)| Some((row, rows(page).nth(row.checked_sub(1)?)?)));
-    match told.filter(|_| rested >= REST && sliders.dragged.is_none()) {
-        Some((row, index)) => {
-            if said.0 != tuned(index).what {
-                said.0 = tuned(index).what.to_string();
+    let told_slider = sliders.shown_group().zip(sliders.row_under(&window)).and_then(|(shown_group, pointed_row)| Some((pointed_row, group_rows(shown_group).nth(pointed_row.checked_sub(1)?)?)));
+    match told_slider.filter(|_| rested_seconds >= REST_SECONDS && sliders.dragged_slider.is_none()) {
+        Some((row_number, slider_index)) => {
+            if tip_text.0 != tuned_number(slider_index).what_it_does {
+                tip_text.0 = tuned_number(slider_index).what_it_does.to_string();
             }
-            node.top = Val::Px(MARGIN + ROW * row as f32 - sliders.scrolled);
-            shown.set_if_neq(Visibility::Visible);
+            node.top = Val::Px(SLIDERS_MARGIN_PIXELS + ROW_STEP_PIXELS * row_number as f32 - sliders.scrolled_pixels);
+            tip_visibility.set_if_neq(Visibility::Visible);
         }
-        None => _ = shown.set_if_neq(Visibility::Hidden),
+        None => _ = tip_visibility.set_if_neq(Visibility::Hidden),
     }
 }

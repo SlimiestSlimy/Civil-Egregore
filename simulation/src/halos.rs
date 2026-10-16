@@ -9,11 +9,11 @@ mod write_back;
 use crate::hot::Hot;
 use crate::Simulation;
 use bitplane_manager::BitmapArena;
-use chunk_storage::jobs::{Generate, Jobs, Ticket};
+use chunk_storage::jobs::{GenerateImage, Jobs, JobTicket};
 use chunk_storage::{ChunkStorage, LayerType};
 use coordinates::SuperchunkIndex;
 use crate::simulation_time::SimulationTime;
-use entity_manager::Entities;
+use entity_manager::WorldEntities;
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::AddAssign;
 use std::sync::Arc;
@@ -21,12 +21,12 @@ use utilities::dispatcher::Dispatcher;
 
 /// Ticks a superchunk a halo reaches is warming before it turns hot
 /// (`docs/simulation.md`, "Halos").
-pub const WARM_TICKS: u64 = SimulationTime::seconds(1).ticks();
+pub const WARM_TICKS: u64 = SimulationTime::from_seconds(1).ticks();
 
 /// Ticks a hot superchunk no halo reaches is cooling before it goes
 /// cold: as long as one warming takes, so a hot entity stepping back over
 /// the edge it just crossed finds the superchunks behind it still hot.
-pub const COOL_TICKS: u64 = SimulationTime::seconds(1).ticks();
+pub const COOL_TICKS: u64 = SimulationTime::from_seconds(1).ticks();
 
 /// What the renderer should render, in superchunks: a rectangle of
 /// them, each `(x, y)` in superchunks from the world's top left, both
@@ -34,15 +34,15 @@ pub const COOL_TICKS: u64 = SimulationTime::seconds(1).ticks();
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Viewport {
     /// The top left superchunk, `(x, y)`.
-    pub first: (u32, u32),
+    pub top_left_superchunk_cartesian: (u32, u32),
     /// The bottom right one.
-    pub last: (u32, u32),
+    pub bottom_right_superchunk_cartesian: (u32, u32),
 }
 
 impl Viewport {
     /// Whether `(x, y)`, in superchunks, is in it.
     pub fn contains(self, (x, y): (u32, u32)) -> bool {
-        (self.first.0..=self.last.0).contains(&x) && (self.first.1..=self.last.1).contains(&y)
+        (self.top_left_superchunk_cartesian.0..=self.bottom_right_superchunk_cartesian.0).contains(&x) && (self.top_left_superchunk_cartesian.1..=self.bottom_right_superchunk_cartesian.1).contains(&y)
     }
 }
 
@@ -50,42 +50,42 @@ impl Viewport {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct HaloChange {
     /// Superchunks a halo reached: warming.
-    pub reached: usize,
+    pub superchunks_reached: usize,
     /// Superchunks made hot for the first time: generated.
-    pub generated: usize,
+    pub superchunks_generated: usize,
     /// Superchunks made hot again, as they were: lingering, or from storage.
-    pub restored: usize,
+    pub superchunks_restored: usize,
     /// Superchunks gone cold.
-    pub cooled: usize,
+    pub superchunks_cooled: usize,
 }
 
 impl AddAssign for HaloChange {
     /// Both added up.
-    fn add_assign(&mut self, other: Self) {
-        self.reached += other.reached;
-        self.generated += other.generated;
-        self.restored += other.restored;
-        self.cooled += other.cooled;
+    fn add_assign(&mut self, added_change: Self) {
+        self.superchunks_reached += added_change.superchunks_reached;
+        self.superchunks_generated += added_change.superchunks_generated;
+        self.superchunks_restored += added_change.superchunks_restored;
+        self.superchunks_cooled += added_change.superchunks_cooled;
     }
 }
 
 /// The world's, lent to the halos for a call.
-pub struct Held<'a> {
+pub struct LentWorld<'a> {
     /// Its hot bitmaps.
-    pub arena: &'a mut BitmapArena,
+    pub bitmap_arena: &'a mut BitmapArena,
     /// Every superchunk ever made, as stored.
-    pub storage: &'a mut ChunkStorage,
+    pub chunk_storage: &'a mut ChunkStorage,
     /// The hot superchunks' entities.
-    pub entities: &'a mut Entities,
+    pub entity_store: &'a mut WorldEntities,
     /// Its simulation: the hot superchunks' random numbers.
-    pub simulation: &'a mut Simulation,
+    pub world_simulation: &'a mut Simulation,
     /// Each cold superchunk's state -- its entities and random numbers
     /// -- as a save keeps it ([`saved::encode_state`]).
     pub cold: &'a mut BTreeMap<SuperchunkIndex, Vec<u64>>,
     /// Its layer types: made hot on every chunk.
     pub layers: &'a [LayerType],
     /// What generates a superchunk never made.
-    pub generate: &'a dyn Fn(SuperchunkIndex) -> Generate,
+    pub generate_superchunk: &'a dyn Fn(SuperchunkIndex) -> GenerateImage,
 }
 
 /// The halos: which superchunks are to be hot, those warming and
@@ -103,17 +103,17 @@ pub struct Halos {
     cooling: Vec<(SuperchunkIndex, u64)>,
     /// The write-backs of superchunks gone cold, each with its job,
     /// being encoded by chunk storage's jobs, in the order taken.
-    writing_back: VecDeque<(SuperchunkIndex, Ticket)>,
+    writing_back: VecDeque<(SuperchunkIndex, JobTicket)>,
     /// The superchunks whose changes were taken from the ring, each with
     /// its job, their images being rewritten by a job.
-    flushing: Vec<(SuperchunkIndex, Ticket)>,
+    flushing_superchunks: Vec<(SuperchunkIndex, JobTicket)>,
     /// The viewport last told, if the viewport's superchunks are hot.
-    told: Option<Viewport>,
+    last_told_viewport: Option<Viewport>,
     /// Its superchunks within the world, sorted: wanted hot besides the
     /// halos.
     viewport: Vec<SuperchunkIndex>,
     /// The superchunks the last move generated, sorted.
-    generated: Vec<SuperchunkIndex>,
+    generated_superchunks: Vec<SuperchunkIndex>,
 }
 
 /// A superchunk warming: a halo reached it, and it turns hot at `due`.
@@ -122,9 +122,9 @@ struct Warming {
     /// The superchunk.
     superchunk: SuperchunkIndex,
     /// The tick it turns hot at.
-    due: u64,
+    due_tick: u64,
     /// Where its cells come from.
-    from: WarmedFrom,
+    warmed_from: WarmedFrom,
 }
 
 /// Where a warming superchunk's cells come from.
@@ -133,14 +133,14 @@ enum WarmedFrom {
     /// Its bitmaps, lingering: made hot as they are.
     Lingering,
     /// A job, decoding its image: its ticket.
-    Job(Ticket),
+    Job(JobTicket),
 }
 
 impl Halos {
     /// No halos yet, as `hot` says which superchunks are to be, their
     /// jobs on `dispatcher`'s threads.
     pub fn new(hot: Hot, dispatcher: Arc<Dispatcher>) -> Self {
-        Self { hot, jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing: Vec::new(), told: None, viewport: Vec::new(), generated: Vec::new() }
+        Self { hot, jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing_superchunks: Vec::new(), last_told_viewport: None, viewport: Vec::new(), generated_superchunks: Vec::new() }
     }
 
     /// Takes `viewport` -- what the renderer renders now, if any --
@@ -149,15 +149,15 @@ impl Halos {
     /// ([`Hot::viewport`]); else nothing.
     pub fn keep_viewport(&mut self, viewport: Option<Viewport>) {
         let viewport = viewport.filter(|_| self.hot.viewport());
-        if viewport == self.told {
+        if viewport == self.last_told_viewport {
             return;
         }
-        self.told = viewport;
+        self.last_told_viewport = viewport;
         self.viewport.clear();
         if let Some(viewport) = viewport {
-            let span = self.hot.span();
-            let (across, down) = (viewport.first.0.max(span.start)..=viewport.last.0.min(span.end - 1), viewport.first.1.max(span.start)..=viewport.last.1.min(span.end - 1));
-            self.viewport.extend(down.flat_map(|y| across.clone().map(move |x| SuperchunkIndex::from_cartesian(x, y))));
+            let world_span_cartesian = self.hot.world_span_cartesian();
+            let (viewport_columns_cartesian, viewport_rows_cartesian) = (viewport.top_left_superchunk_cartesian.0.max(world_span_cartesian.start)..=viewport.bottom_right_superchunk_cartesian.0.min(world_span_cartesian.end - 1), viewport.top_left_superchunk_cartesian.1.max(world_span_cartesian.start)..=viewport.bottom_right_superchunk_cartesian.1.min(world_span_cartesian.end - 1));
+            self.viewport.extend(viewport_rows_cartesian.flat_map(|y| viewport_columns_cartesian.clone().map(move |x| SuperchunkIndex::from_cartesian(x, y))));
             self.viewport.sort_unstable();
         }
     }
@@ -170,8 +170,8 @@ impl Halos {
 
     /// The superchunks the last move -- or [`Halos::keep_hot`] --
     /// generated, sorted: made hot for the first time, nothing on them.
-    pub fn generated(&self) -> &[SuperchunkIndex] {
-        &self.generated
+    pub fn generated_superchunks(&self) -> &[SuperchunkIndex] {
+        &self.generated_superchunks
     }
 
     /// Takes up `cooling` -- sorted, each with the tick it goes cold
@@ -181,36 +181,36 @@ impl Halos {
     }
 
     /// Moves the halos to where the hot entities stand
-    /// ([`Hot::wanted`]), with the viewport's superchunks: the superchunks
+    /// ([`Hot::wanted_hot_superchunks`]), with the viewport's superchunks: the superchunks
     /// reached warming, hot [`WARM_TICKS`] on; the rest cooling, cold
     /// [`COOL_TICKS`] on. Forced hot, it is the whole world all the while.
-    pub fn move_to_hot_entities(&mut self, held: &mut Held<'_>) -> HaloChange {
-        let mut wanted = self.hot.wanted(held.entities);
+    pub fn move_to_hot_entities(&mut self, lent_world: &mut LentWorld<'_>) -> HaloChange {
+        let mut wanted_superchunks = self.hot.wanted_hot_superchunks(lent_world.entity_store);
         if !self.viewport.is_empty() {
-            wanted.extend_from_slice(&self.viewport);
-            wanted.sort_unstable();
-            wanted.dedup();
+            wanted_superchunks.extend_from_slice(&self.viewport);
+            wanted_superchunks.sort_unstable();
+            wanted_superchunks.dedup();
         }
-        self.generated.clear();
-        self.make_hot_within(held, &wanted, WARM_TICKS, COOL_TICKS)
+        self.generated_superchunks.clear();
+        self.make_hot_within(lent_world, &wanted_superchunks, WARM_TICKS, COOL_TICKS)
     }
 
-    /// Makes `wanted` -- sorted -- the hot superchunks now, nothing
+    /// Makes `wanted_superchunks` -- sorted -- the hot superchunks now, nothing
     /// warming or cooling after: what generating and loading start
     /// from (`docs/reference.md`, "Halos::keep_hot").
-    pub fn keep_hot(&mut self, held: &mut Held<'_>, wanted: &[SuperchunkIndex]) -> HaloChange {
-        self.generated.clear();
-        let mut change = self.make_hot_within(held, wanted, 0, 0);
+    pub fn keep_hot(&mut self, lent_world: &mut LentWorld<'_>, wanted_superchunks: &[SuperchunkIndex]) -> HaloChange {
+        self.generated_superchunks.clear();
+        let mut halo_change = self.make_hot_within(lent_world, wanted_superchunks, 0, 0);
         // One that was warming and is not wanted turned hot, as every warming does: cold now.
         if !self.cooling.is_empty() {
-            change += self.make_hot_within(held, wanted, 0, 0);
+            halo_change += self.make_hot_within(lent_world, wanted_superchunks, 0, 0);
         }
-        change
+        halo_change
     }
 
     /// The superchunks warming, each with the tick it turns hot at.
     pub fn warming(&self) -> impl Iterator<Item = (SuperchunkIndex, u64)> + '_ {
-        self.warming.iter().map(|warming| (warming.superchunk, warming.due))
+        self.warming.iter().map(|warming| (warming.superchunk, warming.due_tick))
     }
 
     /// The hot superchunks cooling, each with the tick it goes cold at.

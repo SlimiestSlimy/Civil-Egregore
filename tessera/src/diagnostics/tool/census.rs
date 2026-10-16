@@ -11,19 +11,19 @@ use utilities::diagnostics::table::report::Report;
 use utilities::diagnostics::table::Table;
 
 /// Prints the census of every bitmap looked at.
-pub fn run(report: &mut Report) {
+pub fn run_census_tool(report: &mut Report) {
     let (mut tessera, mut stream) = (Tessera::new(), BitStream::default());
-    for (name, bitmap) in looked_at() {
+    for (bitmap_name, bitmap) in looked_at() {
         tessera.encode(&bitmap, &mut stream);
         let tree = tessera.tree();
-        let headings: Vec<String> = std::iter::once("node".to_string())
-            .chain((0..=FLOOR_LEVEL).map(|level| format!("level {level}\n{0}x{0}", Tile { level, x: 0, y: 0 }.side_in_cells())))
+        let level_headings: Vec<String> = std::iter::once("node".to_string())
+            .chain((0..=FLOOR_LEVEL).map(|tile_level| format!("level {tile_level}\n{0}x{0}", Tile { tile_level, x: 0, y: 0 }.side_in_cells())))
             .collect();
-        let mut table = Table::new(&headings.iter().map(String::as_str).collect::<Vec<_>>());
-        for (kind, by_level) in census(tree) {
-            let row: Vec<String> = std::iter::once(kind.to_string()).chain(by_level.iter().map(|count| count.to_string())).collect();
-            table.row(&row);
+        let mut table = Table::new(&level_headings.iter().map(String::as_str).collect::<Vec<_>>());
+        for (node_kind, by_level) in census(tree) {
+            let row_cells: Vec<String> = std::iter::once(node_kind.to_string()).chain(by_level.iter().map(|count| count.to_string())).collect();
+            table.add_row(&row_cells);
         }
-        report.add(format!("{name}: {} bits written", stream.len()), table);
+        report.add_table(format!("{bitmap_name}: {} bits written", stream.len()), table);
     }
 }

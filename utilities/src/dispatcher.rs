@@ -1,6 +1,6 @@
 //! The thread dispatcher: worker threads started once and kept, a job
 //! run on all at once ([`Dispatcher::run_in_parts`]) and jobs queued for
-//! whichever is free ([`Dispatcher::queue`]): `docs/utilities.md`,
+//! whichever is free ([`Dispatcher::queue_job`]): `docs/utilities.md`,
 //! "The dispatcher".
 
 use std::collections::VecDeque;
@@ -12,7 +12,7 @@ use std::thread::JoinHandle;
 type Job = dyn Fn(usize) + Sync;
 
 /// A job queued: done once, by one worker.
-type Queued = Box<dyn FnOnce() + Send>;
+type QueuedJob = Box<dyn FnOnce() + Send>;
 
 /// A job run, handed to the workers for no longer than
 /// [`Dispatcher::run_in_parts`] waits on them.
@@ -24,28 +24,28 @@ struct JobPointer(*const Job);
 unsafe impl Send for JobPointer {}
 
 /// What the dispatcher and its workers share, behind the lock.
-struct State {
+struct DispatcherState {
     /// The job running, if any.
     job: Option<JobPointer>,
     /// Counts the jobs run: a worker runs its part of each new one once.
-    generation: u64,
+    run_generation: u64,
     /// Workers still running their part of the job.
-    running: usize,
+    parts_running: usize,
     /// Whether a worker's part panicked.
-    panicked: bool,
+    part_panicked: bool,
     /// Whether the workers are to stop.
-    quit: bool,
+    quit_requested: bool,
     /// The jobs queued, the oldest first.
-    queued: VecDeque<Queued>,
+    queued_jobs: VecDeque<QueuedJob>,
     /// How many workers are busy with a queued job: they sit a job run
     /// out.
-    busy: usize,
+    busy_workers: usize,
 }
 
 /// The lock and the two waits on it.
-struct Shared {
+struct DispatcherShared {
     /// The state.
-    state: Mutex<State>,
+    locked_state: Mutex<DispatcherState>,
     /// Signalled when a job is run or queued, or the workers are to stop.
     work_given: Condvar,
     /// Signalled when the last worker finishes its part.
@@ -55,29 +55,29 @@ struct Shared {
 /// Worker threads, kept between jobs.
 pub struct Dispatcher {
     /// What the dispatcher and the workers share.
-    shared: Arc<Shared>,
+    shared_state: Arc<DispatcherShared>,
     /// The workers: one fewer than the threads, the caller's being one.
-    workers: Vec<JoinHandle<()>>,
+    worker_threads: Vec<JoinHandle<()>>,
     /// Held for the whole of a job run: one at a time, whoever calls.
     one_run: Mutex<()>,
 }
 
 impl Dispatcher {
-    /// A dispatcher of `threads` threads: this one, and `threads - 1`
+    /// A dispatcher of `thread_count` threads: this one, and `thread_count - 1`
     /// workers started now and kept. At least one.
-    pub fn new(threads: usize) -> Self {
-        let shared = Arc::new(Shared {
-            state: Mutex::new(State { job: None, generation: 0, running: 0, panicked: false, quit: false, queued: VecDeque::new(), busy: 0 }),
+    pub fn new(thread_count: usize) -> Self {
+        let shared_state = Arc::new(DispatcherShared {
+            locked_state: Mutex::new(DispatcherState { job: None, run_generation: 0, parts_running: 0, part_panicked: false, quit_requested: false, queued_jobs: VecDeque::new(), busy_workers: 0 }),
             work_given: Condvar::new(),
             job_done: Condvar::new(),
         });
-        let workers = (1..threads.max(1))
+        let worker_threads = (1..thread_count.max(1))
             .map(|part| {
-                let shared = Arc::clone(&shared);
-                std::thread::spawn(move || worker_loop(&shared, part))
+                let worker_shared = Arc::clone(&shared_state);
+                std::thread::spawn(move || worker_loop(&worker_shared, part))
             })
             .collect();
-        Self { shared, workers, one_run: Mutex::new(()) }
+        Self { shared_state, worker_threads, one_run: Mutex::new(()) }
     }
 
     /// A dispatcher of every thread the machine has.
@@ -87,8 +87,8 @@ impl Dispatcher {
 
     /// How many threads there are: the most parts a job run is split
     /// into.
-    pub fn threads(&self) -> usize {
-        self.workers.len() + 1
+    pub fn thread_count(&self) -> usize {
+        self.worker_threads.len() + 1
     }
 
     /// Runs `job` once a part, part 0 on this thread and each other on
@@ -97,7 +97,7 @@ impl Dispatcher {
     /// job is run at a time: a second caller waits for the first. A
     /// job run must not itself call this -- it would wait on itself.
     pub fn run_in_parts(&self, job: &(dyn Fn(usize) + Sync)) {
-        if self.workers.is_empty() {
+        if self.worker_threads.is_empty() {
             job(0);
             return;
         }
@@ -108,89 +108,89 @@ impl Dispatcher {
         // job while this call waits for them: it returns after the last
         // has finished with it, so the job outlives every use -- and
         // no other call hands them another meanwhile (`one_run`).
-        let erased: *const Job = unsafe { std::mem::transmute::<*const (dyn Fn(usize) + Sync + '_), *const Job>(job) };
+        let erased_job: *const Job = unsafe { std::mem::transmute::<*const (dyn Fn(usize) + Sync + '_), *const Job>(job) };
         {
-            let mut state = self.shared.state.lock().expect("the dispatcher's lock");
-            state.job = Some(JobPointer(erased));
-            state.generation += 1;
-            state.running = self.workers.len() - state.busy;
-            state.panicked = false;
+            let mut start_guard = self.shared_state.locked_state.lock().expect("the dispatcher's lock");
+            start_guard.job = Some(JobPointer(erased_job));
+            start_guard.run_generation += 1;
+            start_guard.parts_running = self.worker_threads.len() - start_guard.busy_workers;
+            start_guard.part_panicked = false;
         }
-        self.shared.work_given.notify_all();
-        let own = catch_unwind(AssertUnwindSafe(|| job(0)));
-        let mut state = self.shared.state.lock().expect("the dispatcher's lock");
-        while state.running > 0 {
-            state = self.shared.job_done.wait(state).expect("the dispatcher's lock");
+        self.shared_state.work_given.notify_all();
+        let own_part_result = catch_unwind(AssertUnwindSafe(|| job(0)));
+        let mut finish_guard = self.shared_state.locked_state.lock().expect("the dispatcher's lock");
+        while finish_guard.parts_running > 0 {
+            finish_guard = self.shared_state.job_done.wait(finish_guard).expect("the dispatcher's lock");
         }
-        state.job = None;
-        let panicked = state.panicked;
-        drop(state);
-        if let Err(panic) = own {
-            resume_unwind(panic);
+        finish_guard.job = None;
+        let worker_panicked = finish_guard.part_panicked;
+        drop(finish_guard);
+        if let Err(panic_payload) = own_part_result {
+            resume_unwind(panic_payload);
         }
-        assert!(!panicked, "a part of the job panicked on a worker");
+        assert!(!worker_panicked, "a part of the job panicked on a worker");
     }
 
     /// Queues `job`, done once by a worker when one is free -- or here
     /// and now, there being no worker. What it makes it hands over
     /// itself; its panic is its own to catch, and is dropped here.
-    pub fn queue(&self, job: impl FnOnce() + Send + 'static) {
-        if self.workers.is_empty() {
+    pub fn queue_job(&self, job: impl FnOnce() + Send + 'static) {
+        if self.worker_threads.is_empty() {
             let _ = catch_unwind(AssertUnwindSafe(job));
             return;
         }
-        self.shared.state.lock().expect("the dispatcher's lock").queued.push_back(Box::new(job));
-        self.shared.work_given.notify_one();
+        self.shared_state.locked_state.lock().expect("the dispatcher's lock").queued_jobs.push_back(Box::new(job));
+        self.shared_state.work_given.notify_one();
     }
 }
 
 /// What a worker found to do.
-enum Work {
+enum FoundWork {
     /// Its part of a job run.
     Part(JobPointer),
     /// A job queued.
-    Queued(Queued),
+    JobQueued(QueuedJob),
 }
 
 /// A worker's life: waits for work, a job run before one queued, does
 /// it, says so.
-fn worker_loop(shared: &Shared, part: usize) {
-    let mut seen = 0;
+fn worker_loop(dispatcher_shared: &DispatcherShared, part: usize) {
+    let mut seen_generation = 0;
     loop {
-        let work = {
-            let mut state = shared.state.lock().expect("the dispatcher's lock");
+        let found_work = {
+            let mut wait_guard = dispatcher_shared.locked_state.lock().expect("the dispatcher's lock");
             loop {
-                if state.quit {
+                if wait_guard.quit_requested {
                     return;
                 }
-                if state.generation != seen {
-                    seen = state.generation;
-                    break Work::Part(state.job.expect("a job handed out"));
+                if wait_guard.run_generation != seen_generation {
+                    seen_generation = wait_guard.run_generation;
+                    break FoundWork::Part(wait_guard.job.expect("a job handed out"));
                 }
-                if let Some(queued) = state.queued.pop_front() {
-                    state.busy += 1;
-                    break Work::Queued(queued);
+                if let Some(queued_job) = wait_guard.queued_jobs.pop_front() {
+                    wait_guard.busy_workers += 1;
+                    break FoundWork::JobQueued(queued_job);
                 }
-                state = shared.work_given.wait(state).expect("the dispatcher's lock");
+                wait_guard = dispatcher_shared.work_given.wait(wait_guard).expect("the dispatcher's lock");
             }
         };
-        match work {
-            Work::Part(job) => {
+        match found_work {
+            FoundWork::Part(job) => {
                 // Safety: `Dispatcher::run_in_parts` holds the job until this part is done.
-                let result = catch_unwind(AssertUnwindSafe(|| unsafe { (*job.0)(part) }));
-                let mut state = shared.state.lock().expect("the dispatcher's lock");
-                state.panicked |= result.is_err();
-                state.running -= 1;
-                if state.running == 0 {
-                    shared.job_done.notify_one();
+                let part_result = catch_unwind(AssertUnwindSafe(|| unsafe { (*job.0)(part) }));
+                let mut part_guard = dispatcher_shared.locked_state.lock().expect("the dispatcher's lock");
+                part_guard.part_panicked |= part_result.is_err();
+                part_guard.parts_running -= 1;
+                if part_guard.parts_running == 0 {
+                    dispatcher_shared.job_done.notify_one();
                 }
             }
-            Work::Queued(queued) => {
-                let _ = catch_unwind(AssertUnwindSafe(queued));
-                let mut state = shared.state.lock().expect("the dispatcher's lock");
-                state.busy -= 1;
+            FoundWork::JobQueued(job_to_run) => {
+                let _ = catch_unwind(AssertUnwindSafe(job_to_run));
+                let mut queued_guard = dispatcher_shared.locked_state.lock().expect("the dispatcher's lock");
+                queued_guard.busy_workers -= 1;
                 // A job run meanwhile did not count on this worker: its part is not run.
-                seen = state.generation;
+                seen_generation = queued_guard.run_generation;
             }
         }
     }
@@ -200,10 +200,10 @@ impl Drop for Dispatcher {
     /// Stops the workers, each once its job is done, and waits for
     /// them; jobs queued and not begun are dropped.
     fn drop(&mut self) {
-        self.shared.state.lock().expect("the dispatcher's lock").quit = true;
-        self.shared.work_given.notify_all();
-        for worker in self.workers.drain(..) {
-            let _ = worker.join();
+        self.shared_state.locked_state.lock().expect("the dispatcher's lock").quit_requested = true;
+        self.shared_state.work_given.notify_all();
+        for worker_thread in self.worker_threads.drain(..) {
+            let _ = worker_thread.join();
         }
     }
 }

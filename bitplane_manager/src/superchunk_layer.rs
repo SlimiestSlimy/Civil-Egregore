@@ -20,7 +20,7 @@ pub(crate) struct ChunkFlags {
     /// buckets hold their newest cells, hot or not.
     pub(crate) in_ring: ChunkSet,
     /// The chunks whose buckets have a cell set.
-    pub(crate) nonempty: ChunkSet,
+    pub(crate) with_cells_set: ChunkSet,
 }
 
 const _: () = assert!(size_of::<ChunkFlags>() == 4 * size_of::<ChunkSet>(), "the four chunk sets packed together");
@@ -37,9 +37,9 @@ pub(crate) struct SuperchunkLayer {
     /// order: [`SuperchunkLayer::bucket_words`] words each.
     pub(crate) buckets: Vec<u64>,
     /// The chunks that have a bucket.
-    pub(crate) kept: ChunkSet,
+    pub(crate) chunks_with_bucket: ChunkSet,
     /// Which chunks are hot, dirty, waiting in the ring and non-empty.
-    pub(crate) flags: ChunkFlags,
+    pub(crate) chunk_flags: ChunkFlags,
     /// How many cells each bucket has set, less one, by place --
     /// a bucket with any cell set has 1 to 65,536 of them, so a `u16`
     /// holds the count -- meaningful where the bucket is non-empty
@@ -57,12 +57,12 @@ pub(crate) struct SuperchunkLayer {
 impl SuperchunkLayer {
     /// How many cells the bucket at `chunk` has set.
     pub(crate) fn count(&self, chunk: usize) -> u32 {
-        if contains(self.flags.nonempty, chunk) { self.counts_less_one[chunk] as u32 + 1 } else { 0 }
+        if contains(self.chunk_flags.with_cells_set, chunk) { self.counts_less_one[chunk] as u32 + 1 } else { 0 }
     }
 
     /// Makes `count` the bucket at `chunk`'s count of cells set.
     pub(crate) fn set_count(&mut self, chunk: usize, count: u32) {
-        put(&mut self.flags.nonempty, chunk, count > 0);
+        put(&mut self.chunk_flags.with_cells_set, chunk, count > 0);
         self.counts_less_one[chunk] = count.saturating_sub(1) as u16;
     }
 
@@ -79,7 +79,7 @@ impl SuperchunkLayer {
     /// chunks before it.
     #[inline]
     fn bucket_offset(&self, chunk: usize, words: usize) -> Option<usize> {
-        contains(self.kept, chunk).then(|| (self.kept & ((1 << chunk) - 1)).count_ones() as usize * words)
+        contains(self.chunks_with_bucket, chunk).then(|| (self.chunks_with_bucket & ((1 << chunk) - 1)).count_ones() as usize * words)
     }
 
     /// The words of the bucket of the chunk at `chunk`, however wide:
@@ -87,7 +87,7 @@ impl SuperchunkLayer {
     pub(crate) fn words(&self, chunk: usize) -> &[u64] {
         let words = self.bucket_words();
         match self.bucket_offset(chunk, words) {
-            Some(start) => &self.buckets[start..][..words],
+            Some(bucket_start) => &self.buckets[bucket_start..][..words],
             None => &NO_CELLS[..words],
         }
     }
@@ -97,27 +97,27 @@ impl SuperchunkLayer {
     /// chunk had none.
     pub(crate) fn bucket_or_insert(&mut self, chunk: usize) -> &mut [u64] {
         let words = self.bucket_words();
-        if !contains(self.kept, chunk) {
-            put(&mut self.kept, chunk, true);
-            let (start, end) = (self.bucket_offset(chunk, words).expect("kept now"), self.buckets.len());
+        if !contains(self.chunks_with_bucket, chunk) {
+            put(&mut self.chunks_with_bucket, chunk, true);
+            let (new_bucket_start, old_buckets_end) = (self.bucket_offset(chunk, words).expect("kept now"), self.buckets.len());
             self.buckets.reserve_exact(words);
-            self.buckets.resize(end + words, 0);
-            self.buckets.copy_within(start..end, start + words);
-            self.buckets[start..][..words].fill(0);
+            self.buckets.resize(old_buckets_end + words, 0);
+            self.buckets.copy_within(new_bucket_start..old_buckets_end, new_bucket_start + words);
+            self.buckets[new_bucket_start..][..words].fill(0);
             self.tile_counts[chunk] = [0; COUNT_TILES_IN_CHUNK];
             self.set_count(chunk, 0);
         }
-        let start = self.bucket_offset(chunk, words).expect("kept");
-        &mut self.buckets[start..][..words]
+        let bucket_start = self.bucket_offset(chunk, words).expect("kept");
+        &mut self.buckets[bucket_start..][..words]
     }
 
     /// Lets the bucket of the chunk at `chunk` go, if it has one: the
     /// chunk has no cell set then.
     pub(crate) fn let_bucket_go(&mut self, chunk: usize) {
         let words = self.bucket_words();
-        if let Some(start) = self.bucket_offset(chunk, words) {
-            self.buckets.drain(start..start + words);
-            put(&mut self.kept, chunk, false);
+        if let Some(bucket_start) = self.bucket_offset(chunk, words) {
+            self.buckets.drain(bucket_start..bucket_start + words);
+            put(&mut self.chunks_with_bucket, chunk, false);
         }
         self.tile_counts[chunk] = [0; COUNT_TILES_IN_CHUNK];
         self.set_count(chunk, 0);
@@ -126,7 +126,7 @@ impl SuperchunkLayer {
     /// Lets go the bucket of every chunk neither hot nor waiting in the
     /// ring: nothing reads it any more.
     pub(crate) fn let_unused_go(&mut self) {
-        for chunk in members(self.kept & !(self.flags.hot | self.flags.in_ring)) {
+        for chunk in members(self.chunks_with_bucket & !(self.chunk_flags.hot | self.chunk_flags.in_ring)) {
             self.let_bucket_go(chunk);
         }
     }
@@ -135,20 +135,20 @@ impl SuperchunkLayer {
     /// the cell's bits, as many as the layer is wide -- of a plane of
     /// tiles, the number of the tile the cell is in.
     pub(crate) fn value(&self, chunk: usize, cell: usize) -> u32 {
-        self.value_of(chunk, cell, self.layer_type.bits() as usize)
+        self.value_of(chunk, cell, self.layer_type.width_bits() as usize)
     }
 
-    /// [`SuperchunkLayer::value`], the layer's `bits` a cell given:
+    /// [`SuperchunkLayer::value`], the layer's `bits_a_cell` a cell given:
     /// known where the plane's width is in its type.
     #[inline]
-    pub(crate) fn value_of(&self, chunk: usize, cell: usize, bits: usize) -> u32 {
-        debug_assert_eq!(bits, self.layer_type.bits() as usize, "a plane read at its own width");
-        let shift = self.layer_type.tile_shift();
-        let Some(start) = self.bucket_offset(chunk, (WORDS * bits) >> shift) else {
+    pub(crate) fn value_of(&self, chunk: usize, cell: usize, bits_a_cell: usize) -> u32 {
+        debug_assert_eq!(bits_a_cell, self.layer_type.width_bits() as usize, "a plane read at its own width");
+        let tile_shift_bits = self.layer_type.tile_shift();
+        let Some(bucket_start) = self.bucket_offset(chunk, (WORDS * bits_a_cell) >> tile_shift_bits) else {
             return 0;
         };
-        let at = (cell >> shift) * bits;
-        (self.buckets[start + at / BITS_PER_WORD] >> (at % BITS_PER_WORD) & ((1u64 << bits) - 1)) as u32
+        let bit_in_bucket = (cell >> tile_shift_bits) * bits_a_cell;
+        (self.buckets[bucket_start + bit_in_bucket / BITS_PER_WORD] >> (bit_in_bucket % BITS_PER_WORD) & ((1u64 << bits_a_cell) - 1)) as u32
     }
 
     /// Makes `value` the number at `cell`, in Morton order, of the hot
@@ -156,27 +156,27 @@ impl SuperchunkLayer {
     /// dirty, and the counts -- of the cells whose number is not 0 --
     /// move if the cell came to 0 or left it. Whether it changed.
     pub(crate) fn put_value(&mut self, chunk: usize, cell: usize, value: u32) -> bool {
-        let (bits, shift) = (self.layer_type.bits() as usize, self.layer_type.tile_shift());
-        let (at, words) = ((cell >> shift) * bits, (WORDS * bits) >> shift);
+        let (bits_a_cell, tile_shift_bits) = (self.layer_type.width_bits() as usize, self.layer_type.tile_shift());
+        let (bit_in_bucket, words) = ((cell >> tile_shift_bits) * bits_a_cell, (WORDS * bits_a_cell) >> tile_shift_bits);
         // A chunk with no bucket holds 0 everywhere: it is given one only for another number.
-        let start = match self.bucket_offset(chunk, words) {
-            Some(start) => start,
-            None if value as u64 & ((1u64 << bits) - 1) == 0 => return false,
+        let bucket_start = match self.bucket_offset(chunk, words) {
+            Some(existing_start) => existing_start,
+            None if value as u64 & ((1u64 << bits_a_cell) - 1) == 0 => return false,
             None => {
                 self.bucket_or_insert(chunk);
                 self.bucket_offset(chunk, words).expect("kept now")
             }
         };
-        let (word, mask) = (&mut self.buckets[start + at / BITS_PER_WORD], (1u64 << bits) - 1);
-        let (was, value) = (*word >> (at % BITS_PER_WORD) & mask, value as u64 & mask);
-        if was == value {
+        let (word, mask) = (&mut self.buckets[bucket_start + bit_in_bucket / BITS_PER_WORD], (1u64 << bits_a_cell) - 1);
+        let (old_value, value) = (*word >> (bit_in_bucket % BITS_PER_WORD) & mask, value as u64 & mask);
+        if old_value == value {
             return false;
         }
-        *word ^= (was ^ value) << (at % BITS_PER_WORD);
-        put(&mut self.flags.dirty, chunk, true);
-        if (was == 0) != (value == 0) {
+        *word ^= (old_value ^ value) << (bit_in_bucket % BITS_PER_WORD);
+        put(&mut self.chunk_flags.dirty, chunk, true);
+        if (old_value == 0) != (value == 0) {
             let (count, tile_count) = (self.count(chunk), &mut self.tile_counts[chunk][cell / COUNT_TILE_CELLS]);
-            if was == 0 {
+            if old_value == 0 {
                 *tile_count += 1;
                 self.set_count(chunk, count + 1);
                 self.hot_count += 1;
@@ -199,32 +199,32 @@ impl SuperchunkLayer {
     /// `chunk` is set.
     #[inline]
     pub(crate) fn get(&self, chunk: usize, cell: usize) -> bool {
-        self.bucket_offset(chunk, WORDS).is_some_and(|start| self.buckets[start + cell / BITS_PER_WORD] >> (cell % BITS_PER_WORD) & 1 == 1)
+        self.bucket_offset(chunk, WORDS).is_some_and(|bucket_start| self.buckets[bucket_start + cell / BITS_PER_WORD] >> (cell % BITS_PER_WORD) & 1 == 1)
     }
 
     /// Makes the cell at `cell`, in Morton order, of the hot bucket at
     /// `chunk` set or clear, if it is not already: the bucket is then
     /// dirty, and its count and the hot count move by one. Whether it
     /// changed.
-    pub(crate) fn put_cell(&mut self, chunk: usize, cell: usize, set: bool) -> bool {
+    pub(crate) fn put_cell(&mut self, chunk: usize, cell: usize, make_set: bool) -> bool {
         // A chunk with no bucket has no cell set: it is given one only to set one.
-        let start = match self.bucket_offset(chunk, WORDS) {
-            Some(start) => start,
-            None if !set => return false,
+        let bucket_start = match self.bucket_offset(chunk, WORDS) {
+            Some(existing_start) => existing_start,
+            None if !make_set => return false,
             None => {
                 self.bucket_or_insert(chunk);
                 self.bucket_offset(chunk, WORDS).expect("kept now")
             }
         };
         // The one word read and written, found once.
-        let (word, bit) = (&mut self.buckets[start + cell / BITS_PER_WORD], 1 << (cell % BITS_PER_WORD));
-        if (*word & bit != 0) == set {
+        let (word, cell_bit) = (&mut self.buckets[bucket_start + cell / BITS_PER_WORD], 1 << (cell % BITS_PER_WORD));
+        if (*word & cell_bit != 0) == make_set {
             return false;
         }
-        *word ^= bit;
-        put(&mut self.flags.dirty, chunk, true);
+        *word ^= cell_bit;
+        put(&mut self.chunk_flags.dirty, chunk, true);
         let (count, tile_count) = (self.count(chunk), &mut self.tile_counts[chunk][cell / COUNT_TILE_CELLS]);
-        if set {
+        if make_set {
             *tile_count += 1;
             self.set_count(chunk, count + 1);
             self.hot_count += 1;

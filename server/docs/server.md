@@ -8,11 +8,11 @@ and the renderer (`../renderer/`) call it.
 
 ## Made from a seed
 
-`start(options)`: the one way a world starts, from a `Start`
-`{seed, generation, size, threads, sheep, hot_entity, camera_loads}`
+`start_world(options)`: the one way a world starts, from a `WorldStart`
+`{seed, world_generation, world_size, thread_count, sheep_per_flock, hot_entity, camera_loads}`
 (`src/world_start.rs`) -- every number a world starts from, whoever
 gives it: the command line (`server new`), or a window's sliders
-(`Start::from_tuning`), the seed drawn with land about the origin if
+(`WorldStart::from_tuning`), the seed drawn with land about the origin if
 none is given (`drawn_seed`). What the numbers mean is the server's
 alone; a window only hands them over. A world with a size has
 sheep on every superchunk of it, and their halos -- the whole of it --
@@ -23,7 +23,7 @@ endless world hot: the origin and the eight about it hot before it
 ticks. If its camera loads superchunks and it is not forced hot, the
 viewport's superchunks are hot too, and it keeps how many sheep a
 superchunk generated in the viewport starts with ("Halos", below).
-Unless told otherwise (`Start::default`), it has no size and 4,000
+Unless told otherwise (`WorldStart::default`), it has no size and 4,000
 sheep. Every superchunk's contents come from the world's seed
 and its superchunk index (`worldgen::generate_superchunk`), so a superchunk is the
 same whenever and in whatever order it is made: the world has no edge
@@ -31,11 +31,11 @@ but the coordinates', and grows as the sheep wander. A superchunk is
 its terrain (`../worldgen/`) -- heights, and the walls they make, two
 layers -- and on it grass in patches, dirt being a cell with none and
 having no layer, and trees in patches of
-their own, each of a stage drawn for its cell (`worldgen::Generation`,
+their own, each of a stage drawn for its cell (`worldgen::WorldGeneration`,
 `worldgen::patches`).
 
 Each superchunk's random numbers are a stream of their own
-(`Rng::for_stream`): seeded by the seed moved along by the
+(`RandomSource::for_stream`): seeded by the seed moved along by the
 superchunk index, as they first were, two superchunks drew one
 sequence a few draws apart -- two flocks came out with the same sheep.
 
@@ -55,7 +55,7 @@ and `World::broken_invariant` says which is not, if any:
   are hot and cold together.
 
 So the parts are not open to be changed one by one. Outside the
-server a world's parts are read (`World::arena`, `World::entities`
+server a world's parts are read (`World::bitmap_arena`, `World::entity_store`
 and the others, each lent unchangeable) and the world is changed only
 whole: ticked (`World::tick`, `World::tick_only`), its halos moved,
 saved, or, between two ticks, by `World::put_entity`,
@@ -77,10 +77,10 @@ save and the load.
 Only the superchunks about the hot entities are hot, and the halos are
 the simulation's (`../../simulation/docs/simulation.md`, "Halos"): the
 world lends them what it holds (`World::with_halos`) and tells them
-two things. The kind of entity it is hot about (`Start::hot_entity`,
+two things. The kind of entity it is hot about (`WorldStart::hot_entity`,
 `HOT_ENTITY` unless told): people, to come; for now the sheep stand
 in, and a save keeps it. And the world's size, if it has one
-(`Start::size`, `Civil_Egregore server new <folder> [seed] [sheep]
+(`WorldStart::world_size`, `Civil_Egregore server new <folder> [seed] [sheep]
 [side] [forced] [threads]`): so many superchunks along a side, a square about
 the origin, nothing ever made outside it -- and whether every one of
 them is forced hot throughout, which only a world with a side can be;
@@ -88,7 +88,7 @@ a save keeps both. What generates a
 superchunk never made is the server's, handed to the halos' jobs.
 
 A world without a size may have its **camera load superchunks**
-(`Start::camera_loads`, the slider `camera loads`; nothing to a world
+(`WorldStart::camera_loads`, the slider `camera loads`; nothing to a world
 forced hot, all of which is hot anyway). It starts as any other: the
 origin, its flock and its halo. Then each frame a window asks of the
 host tells the world its **viewport**, whatever the window should
@@ -96,7 +96,7 @@ render (`Halos::keep_viewport`; none in map mode): every superchunk
 of it kept hot besides the halos, however many -- which are hot is the
 simulation's to say, as the world's hot defines it (`hot_of`) --
 generated as a halo's are if never made. Each
-superchunk generated in the viewport gets `sheep` of its own
+superchunk generated in the viewport gets `sheep_per_flock` of its own
 (`World::put_flock`, the same flock whenever it is made); one generated
 only for a halo gets none while it is out of view, or the sheep's
 halos would generate more sheep, and those more, without end. It is
@@ -131,10 +131,10 @@ as a world runs: a rule's place is a constant made of its ID in the
 registry as the server is compiled (`SHEEP_RULE`, `RulePlace::from_registry_id`),
 and so is the place of each thing
 a rule counts, worked out from the one list of their names
-(`sheep::EATEN`, `actions::place_counted`) -- a name that is not
+(`sheep::EATEN_COUNT`, `actions::place_counted`) -- a name that is not
 there does not compile. A tick's counts are read by them
 (`counts.counts_of(SHEEP_RULE)[EATEN]`), and an in-bin test or a test ticks
-only the rules it picks (`Chosen::from_rules(&[GRASS_RULE])`).
+only the rules it picks (`ChosenRules::from_rules(&[GRASS_RULE])`).
 
 A rule's counts come from two places. What it counts as it runs is
 what its function returns. What hangs on a write being applied -- a
@@ -355,7 +355,7 @@ client's; a layer's words go as the storage holds them, in Morton
 order (`Cells`), and that layout is the client's format, chosen: one
 process, and no word turned round for a window -- a few between two ticks, in the time the host has to spare
 or a small share of a tick's (`FRAMES_SHARE`), each few sent as a
-frame of their own, the last saying it is (`Frame::more`): so a
+frame of their own, the last saying it is (`ViewportFrame::more_to_come`): so a
 frame's superchunks are not all of the one tick, answering costs each
 tick a little however much is asked, and nothing asked for is left
 out. What is rendered so costs the ticks next to nothing -- and with them which are hot, so a window
@@ -396,7 +396,7 @@ the window.
 
 **The window is the game's own program**, started as
 `Civil_Egregore renderer show`: it listens on a port of this machine
-(`shown::PORT`), and a ticker that finds none listening starts it
+(`shown::SHOWN_WORLDS_PORT`), and a ticker that finds none listening starts it
 (the program beside its own, or beside the folder a test's is built
 in) and waits for it. The window stays up when a ticker ends and
 takes the next, so a whole `cargo test` passes through one window,
@@ -404,17 +404,17 @@ world after world. A test's program needs nothing of the renderer:
 no test links a window.
 
 **Between them is a wire** (`host/wire.rs`): what a window asks
-(`Request`: a frame, pause, pace) and the frames answered, as words of
+(`HostRequest`: a frame, pause, pace) and the frames answered, as words of
 64 bits over a local socket. A superchunk's water goes with its
 heights, the once; the window keeps it.
 
 **The same window either way.** A window holds a `Host` and where its
 frames come back, and asks; it does not know what answers. In the
 game that is the host's thread, which owns the world and ticks it
-(`Host::start`). Showing a ticker it is `Host::of_shown_worlds`: the
+(`Host::start_on_thread`). Showing a ticker it is `Host::of_shown_worlds`: the
 asks go down the wire and the ticker's frames come up it. Both make a
 frame with the one function (`frame::frame_of`) from the same copy of
-a superchunk (`frame::copy`). What only an owner of the world can do
+a superchunk (`frame::copy_superchunk`). What only an owner of the world can do
 -- make one, open one, save one, reset one -- a ticker is not asked.
 
 **Flat out, with the keys.** A ticker is held to no pace unless the
@@ -446,7 +446,7 @@ asks are answered on a thread of the host's own, so no tick waits for
 a map, and each call waits for its answer on the thread that made it
 -- a client asks what takes long from a thread that may wait. The
 host's thread tells the terrain's of each world it runs before it
-sends a frame of it, and an ask names its world (`Frame::world`): one
+sends a frame of it, and an ask names its world (`ViewportFrame::world`): one
 of a world run no more is answered with nothing.
 
 What is answered is the terrain as the world is generated, a cell the
@@ -462,7 +462,7 @@ where that will be done, and no client changes for it.
 | `src/lib.rs` | start, save, load |
 | `src/world_start.rs` | what a new world starts from: its size, its seed drawn with land, the sliders' numbers read |
 | `src/halos.rs` | the hot entity, and the world lent to the simulation's halos |
-| `src/world_hash.rs` | a world's hash, part by part: what `check` prints |
+| `src/world_hash.rs` | a world's hash, part by part: what `print_world_hashes` prints |
 | `src/rules.rs` | the table of the rules, a tick's counts by rule, the rules chosen by name |
 | `src/tick.rs` | the tick of every rule in the table, then the halos moved |
 | `src/world_access.rs` | a world from outside the server: its parts read, changed only whole, and what must hold between them |
