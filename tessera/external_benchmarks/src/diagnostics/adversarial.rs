@@ -58,7 +58,7 @@ const OPPONENTS: [Opponent; 4] = [
 
 /// Tessera's bits and the codec's, on one bitmap.
 fn bits(tessera: &mut Tessera, codec: &mut dyn Codec, bitmap: &Bitmap) -> (u64, u64) {
-    let rows = Rows::of(bitmap);
+    let rows = Rows::from_bitmap(bitmap);
     tessera.encode(bitmap, &rows);
     codec.encode(bitmap, &rows);
     (tessera.encoded_bits() as u64, codec.encoded_bits() as u64)
@@ -120,7 +120,7 @@ fn main() {
         // The worst bitmap, whichever it is now: both encoders must give it
         // back, and both are timed on it.
         let bitmap = worst::read(opponent.worst).expect("kept");
-        let rows = Rows::of(&bitmap);
+        let rows = Rows::from_bitmap(&bitmap);
         for coder in [&mut tessera as &mut dyn Codec, codec.as_mut()] {
             coder.encode(&bitmap, &rows);
             coder.decode();

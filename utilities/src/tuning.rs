@@ -179,7 +179,7 @@ pub fn defaults() -> Tuning {
 }
 
 /// Every number as the machine's settings have it, or its default.
-pub fn kept() -> Tuning {
+pub fn load_from_settings() -> Tuning {
     let kept = Settings::read();
     std::array::from_fn(|index| settled(index, kept.number(NAMES[index]).unwrap_or(f32::NAN)))
 }
@@ -194,7 +194,7 @@ pub fn settled(index: usize, value: f32) -> f32 {
 /// Keeps `tuning` for the next run, in the machine's settings: lines
 /// not these numbers' are left as they are. A failure is let pass:
 /// they are then only not kept.
-pub fn keep(tuning: &Tuning) {
+pub fn save_to_settings(tuning: &Tuning) {
     let mut kept = Settings::read();
     for (name, value) in NAMES.into_iter().zip(tuning) {
         kept.set(name, Some(format!("{value:.3}")));

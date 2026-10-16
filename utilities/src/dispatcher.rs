@@ -1,5 +1,5 @@
 //! The thread dispatcher: worker threads started once and kept, a job
-//! run on all at once ([`Dispatcher::run`]) and jobs queued for
+//! run on all at once ([`Dispatcher::run_in_parts`]) and jobs queued for
 //! whichever is free ([`Dispatcher::queue`]): `docs/utilities.md`,
 //! "The dispatcher".
 
@@ -15,12 +15,12 @@ type Job = dyn Fn(usize) + Sync;
 type Queued = Box<dyn FnOnce() + Send>;
 
 /// A job run, handed to the workers for no longer than
-/// [`Dispatcher::run`] waits on them.
+/// [`Dispatcher::run_in_parts`] waits on them.
 #[derive(Clone, Copy)]
 struct JobPointer(*const Job);
 
 // Safety: the job is `Sync`, so its parts may run on any thread; the
-// pointer is only followed while `Dispatcher::run` waits.
+// pointer is only followed while `Dispatcher::run_in_parts` waits.
 unsafe impl Send for JobPointer {}
 
 /// What the dispatcher and its workers share, behind the lock.
@@ -74,7 +74,7 @@ impl Dispatcher {
         let workers = (1..threads.max(1))
             .map(|part| {
                 let shared = Arc::clone(&shared);
-                std::thread::spawn(move || work(&shared, part))
+                std::thread::spawn(move || worker_loop(&shared, part))
             })
             .collect();
         Self { shared, workers, one_run: Mutex::new(()) }
@@ -96,7 +96,7 @@ impl Dispatcher {
     /// started has finished: a part's panic is raised here, after. One
     /// job is run at a time: a second caller waits for the first. A
     /// job run must not itself call this -- it would wait on itself.
-    pub fn run(&self, job: &(dyn Fn(usize) + Sync)) {
+    pub fn run_in_parts(&self, job: &(dyn Fn(usize) + Sync)) {
         if self.workers.is_empty() {
             job(0);
             return;
@@ -154,7 +154,7 @@ enum Work {
 
 /// A worker's life: waits for work, a job run before one queued, does
 /// it, says so.
-fn work(shared: &Shared, part: usize) {
+fn worker_loop(shared: &Shared, part: usize) {
     let mut seen = 0;
     loop {
         let work = {
@@ -176,7 +176,7 @@ fn work(shared: &Shared, part: usize) {
         };
         match work {
             Work::Part(job) => {
-                // Safety: `Dispatcher::run` holds the job until this part is done.
+                // Safety: `Dispatcher::run_in_parts` holds the job until this part is done.
                 let result = catch_unwind(AssertUnwindSafe(|| unsafe { (*job.0)(part) }));
                 let mut state = shared.state.lock().expect("the dispatcher's lock");
                 state.panicked |= result.is_err();

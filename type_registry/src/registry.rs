@@ -138,7 +138,7 @@ pub const WALL_NORTH: LayerType = LayerType::of_a_bit(11);
 /// ...to its west.
 pub const WALL_WEST: LayerType = LayerType::of_a_bit(12);
 /// The sheep's type.
-pub const SHEEP: EntityType = EntityType::of(16);
+pub const SHEEP: EntityType = EntityType::from_number(16);
 /// All a sheep keeps: when it is next hungry, and what it is in the
 /// middle of -- carrying a lamb, bearing it, growing up, leaving thin
 /// pasture.
@@ -164,13 +164,13 @@ pub const CLIMATE: Wide<Bits32> = Wide::of_tiles(44, WEATHER_TILE_SCALE);
 pub const ELEVATION: Wide<Bits8> = Wide::of_tiles(80, WEATHER_TILE_SCALE);
 
 /// The grass's rule: its master the grass.
-pub const RULE_OF_GRASS: ScaRuleType = ScaRuleType::of(32);
+pub const RULE_OF_GRASS: ScaRuleType = ScaRuleType::from_number(32);
 /// The trees' rule: its master the cells a tree stands on.
-pub const RULE_OF_TREES: ScaRuleType = ScaRuleType::of(33);
+pub const RULE_OF_TREES: ScaRuleType = ScaRuleType::from_number(33);
 /// The sheep's rule: its master the sheep.
-pub const RULE_OF_SHEEP: EntityRuleType = EntityRuleType::of(34);
+pub const RULE_OF_SHEEP: EntityRuleType = EntityRuleType::from_number(34);
 /// The weather's rule: its master the climate, whose tiles it samples.
-pub const RULE_OF_WEATHER: ScaRuleType = ScaRuleType::of(35);
+pub const RULE_OF_WEATHER: ScaRuleType = ScaRuleType::from_number(35);
 
 /// Every type a world has: the layers and wide planes of its cells,
 /// the types of its entities and their attributes, a row each beside
@@ -301,8 +301,8 @@ pub const fn rule_of_id(id: u64) -> Option<&'static Registered> {
     while row < REGISTRY.len() {
         let registered = &REGISTRY[row];
         let same = match registered.registration {
-            Registration::ScaRule => ScaRuleType::of(registered.number).0 == cells.0,
-            Registration::EntityRule => EntityRuleType::of(registered.number).0 == entity.0,
+            Registration::ScaRule => ScaRuleType::from_number(registered.number).0 == cells.0,
+            Registration::EntityRule => EntityRuleType::from_number(registered.number).0 == entity.0,
             _ => false,
         };
         if same {
@@ -334,8 +334,8 @@ pub const fn rule_at(place: usize) -> Option<&'static Registered> {
 /// None of a row that is no rule.
 pub const fn id_of_rule(rule: &Registered) -> Option<u64> {
     match rule.registration {
-        Registration::ScaRule => Some(ScaRuleType::of(rule.number).0),
-        Registration::EntityRule => Some(EntityRuleType::of(rule.number).0),
+        Registration::ScaRule => Some(ScaRuleType::from_number(rule.number).0),
+        Registration::EntityRule => Some(EntityRuleType::from_number(rule.number).0),
         _ => None,
     }
 }

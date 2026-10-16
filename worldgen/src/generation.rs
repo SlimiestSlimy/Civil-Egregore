@@ -110,7 +110,7 @@ impl Generation {
     }
 
     /// What grows in a world of `seed` generated so: the thresholds
-    /// found once, each cell then asked ([`Growth::at`]).
+    /// found once, each cell then asked ([`Growth::grown_at`]).
     pub fn growth(&self, seed: u64) -> Growth {
         let trees_seed = seed ^ TREES_SALT;
         Growth {
@@ -191,8 +191,8 @@ pub struct Grown {
 
 impl Growth {
     /// What the dry cell at `(x, y)` starts with.
-    pub fn at(&mut self, x: u32, y: u32) -> Grown {
-        let weighed = |patches: &Patches, noises: &mut [Noise; 2], seed: u64| patches.weighed(seed, noises[0].at(x, y), noises[1].at(x, y), x, y);
+    pub fn grown_at(&mut self, x: u32, y: u32) -> Grown {
+        let weighed = |patches: &Patches, noises: &mut [Noise; 2], seed: u64| patches.weighed(seed, noises[0].noise_at(x, y), noises[1].noise_at(x, y), x, y);
         let grass = weighed(&self.grass, &mut self.grass_noises, self.seed) < self.grass_under;
         let tree = (weighed(&self.trees, &mut self.trees_noises, self.trees_seed) < self.trees_under).then(|| mix(self.trees_seed ^ ((y as u64) << 32 | x as u64)));
         Grown { grass, tree }

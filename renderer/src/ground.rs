@@ -103,18 +103,18 @@ pub struct Fine {
 impl Fine {
     /// Where the cell `(x, y)` from the top left is kept: [`MARGIN`]
     /// cells past each edge are.
-    const fn kept(x: isize, y: isize) -> usize {
+    const fn offset_of(x: isize, y: isize) -> usize {
         (y + MARGIN as isize) as usize * KEPT + (x + MARGIN as isize) as usize
     }
 
     /// The height of the cell `(x, y)`.
     pub fn height(&self, x: isize, y: isize) -> Height {
-        self.heights[Self::kept(x, y)]
+        self.heights[Self::offset_of(x, y)]
     }
 
     /// How high the shadow line stands over the cell `(x, y)`, in heights.
-    pub fn line(&self, x: isize, y: isize) -> f32 {
-        self.lines[Self::kept(x, y)]
+    pub fn shadow_line(&self, x: isize, y: isize) -> f32 {
+        self.lines[Self::offset_of(x, y)]
     }
 
     /// The light of the cell `(x, y)`: 1 flat ground's, shadows apart.

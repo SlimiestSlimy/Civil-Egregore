@@ -31,7 +31,7 @@ pub fn check(bitmap: &Bitmap, label: &str) {
             RefCell::new((Tessera::new(), BitStream::default(), Bitmap::new(), BitStream::default()));
     }
     TESSERA.with_borrow_mut(|(tessera, stream, back, followed)| {
-        let examined = Examination::of(tessera, stream, back, bitmap);
+        let examined = Examination::examine_bitmap(tessera, stream, back, bitmap);
         assert!(examined.written_bits <= CAP_BITS, "{label}: {} bits, over the cap of {CAP_BITS}", examined.written_bits);
         if let Some((x, y)) = examined.first_difference {
             panic!("{label}: cell ({x}, {y}) comes back {} instead of {}", back.get(x, y), bitmap.get(x, y));

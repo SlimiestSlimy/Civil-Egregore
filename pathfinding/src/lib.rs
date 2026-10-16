@@ -47,7 +47,7 @@ impl Cell {
     }
 
     /// The cell at `index`, row by row.
-    const fn at(index: usize) -> Self {
+    const fn from_index(index: usize) -> Self {
         Self { x: (index % SIDE) as u8, y: (index / SIDE) as u8 }
     }
 }

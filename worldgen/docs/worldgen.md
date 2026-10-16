@@ -62,7 +62,7 @@ the sliders' numbers (`utilities::tuning`) when a new world is set up
 (`Generation::from_tuning`), what is typed held to what a height, the
 mesh and the noise can take. What a dry cell starts with -- grass or
 dirt, and a tree or none -- is said once (`Generation::growth`, then
-`Growth::at`), for the superchunks generated and for the renderer's
+`Growth::grown_at`), for the superchunks generated and for the renderer's
 map alike. A seed is found with land about where a flock is to stand
 (`seed_with_land`, `has_land_about`).
 
@@ -92,7 +92,7 @@ superchunk of land took 0.34 G instructions where they had taken
 
 A superchunk is made with its climate: for each tile of the climate
 plane, 8 by 8 cells, a humidity, a wind, a temperature and its
-pressure at rest (`ClimateNoises::at`, asked at the tile's middle
+pressure at rest (`ClimateNoises::climate_at`, asked at the tile's middle
 cell); and, on the elevation plane beside it, how high the tile
 stands over the ocean, 255 at the most -- what the weather holds the
 air's moves against. All of it is

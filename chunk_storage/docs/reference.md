@@ -135,7 +135,7 @@ Private: `superchunk_file`, `make_folder`, `write`, `write_words`,
 
 ## `diagnostics/storage.rs`
 
-**`StorageStats::of(storage)`**: superchunk images stored, how many of
+**`StorageStats::measure_storage(storage)`**: superchunk images stored, how many of
 them on disk, the bytes of those in memory,
 the ring's bytes.
 
@@ -150,7 +150,7 @@ The slow work, done off the tick on the dispatcher's threads.
 **`Job`**: `Encode(dirty)`, `Flush(flush)`, or `Warm {superchunk,
 image, generate, types}` -- `image` as the pool has it (`Stored`), read
 by the job if on disk; `generate` (**`Generate`**) the world's
-generator, called if there is no image; **`Job::run(codec)`**: a
+generator, called if there is no image; **`Job::execute_with_codec(codec)`**: a
 **`Done`** -- `Encoded(encoded)`, each bucket's layer words;
 `Flushed(image)`; `Warmed {generated, read, cells}`, every bitmap's cells,
 chunk by chunk, type by type, and the image if generated, or if read

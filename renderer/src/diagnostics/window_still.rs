@@ -58,7 +58,7 @@ fn take(mut commands: Commands, mut wanted: ResMut<Wanted>, mut make: MessageWri
 /// Opens the window on the world of `seed`, `cells_a_pixel` cells a
 /// screen pixel over its middle, keeps what the graphics card drew at
 /// `path`, and closes it.
-pub fn keep(seed: u64, cells_a_pixel: f32, path: PathBuf) {
+pub fn save_still(seed: u64, cells_a_pixel: f32, path: PathBuf) {
     let mut window = crate::window();
     window.insert_resource(Wanted { seed, cells_a_pixel, path, shown_for: None }).add_systems(Update, take.after(crate::hud::hud));
     window.run();

@@ -56,7 +56,7 @@ fn the_check_finds_every_clash_and_the_registry_has_none() {
 fn a_default_attribute_is_an_attribute_of_a_fixed_size_of_the_table() {
     assert_eq!(first_default_amiss(REGISTRY), None);
     assert_eq!(default_attribute_of(SHEEP), named("sheep state"));
-    assert_eq!(default_attribute_of(EntityType::of(200_000)), None, "a type not registered");
+    assert_eq!(default_attribute_of(EntityType::from_number(200_000)), None, "a type not registered");
     assert!(REGISTRY.iter().all(|registered| registered.registration == Registration::EntityType || registered.default_attribute == 0));
     let mut random = Rng::new(utilities::seed::counted());
     for _ in 0..200 {
@@ -113,7 +113,7 @@ fn a_rule_has_one_master_of_the_kind_its_rule_is_of() {
     }
     assert_eq!((RULE_OF_GRASS.0 >> 56, RULE_OF_SHEEP.0 >> 56, RULE_OF_GRASS.0 & 0xFF, RULE_OF_SHEEP.0 & 0xFF), (0x03, 0x04, 0, 0));
     // A rule's number read as the other kind's, or as a plane's, is no rule's ID.
-    assert_eq!((rule_of_id(EntityRuleType::of(RULE_OF_GRASS.number()).0), rule_of_id(ScaRuleType::of(RULE_OF_SHEEP.number()).0), rule_of_id(GRASS.0), rule_of_id(SHEEP.0)), (None, None, None, None));
+    assert_eq!((rule_of_id(EntityRuleType::from_number(RULE_OF_GRASS.number()).0), rule_of_id(ScaRuleType::from_number(RULE_OF_SHEEP.number()).0), rule_of_id(GRASS.0), rule_of_id(SHEEP.0)), (None, None, None, None));
     for registered in REGISTRY {
         let rule = matches!(registered.registration, Registration::ScaRule | Registration::EntityRule);
         assert_eq!((registered.master != 0, master_of(registered).is_some()), (rule, rule), "{}", registered.name);
@@ -182,7 +182,7 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
         let plane = LayerType::wide(first, bits);
         assert_eq!((plane.bits(), plane.number(), plane.0 & 0xFF, plane.0 >> 56), (bits, first, u64::from(bits), 0x01));
         assert!((0..bits).all(|bit| plane.holds(plane.plane(bit)) && plane.plane(bit) == LayerType::of_a_bit(first + u64::from(bit))) && !plane.holds(plane.plane(bits)));
-        let entity = EntityType::of(number);
+        let entity = EntityType::from_number(number);
         assert_eq!((entity.number(), entity.0 & 0xFF, entity.0 >> 56), (number, 0, 0x02));
     }
     // An ID of another kind is no attribute's: the one namespace is everything's.
@@ -198,7 +198,7 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
         state.write(&mut data);
         assert_eq!((SheepState::read(&data), data.len()), (state, SheepState::WORDS));
         // Each member is where the layout says: its bytes, read alone, are the field's.
-        let members: Vec<u64> = SheepState::MEMBERS.iter().map(|member| member.of(&data)).collect();
+        let members: Vec<u64> = SheepState::MEMBERS.iter().map(|member| member.value_in(&data)).collect();
         assert_eq!(members, [state.hungry_at, state.lamb_due_at, state.grown_at, state.roaming_until, u64::from(state.roaming_neighbour)]);
         let (number, mut word) = (random.draw(), [0; data_words(<u64 as Layout>::BLOCKS)]);
         number.write(&mut word);

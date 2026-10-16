@@ -156,7 +156,7 @@ pub enum HowMany {
 impl HowMany {
     /// How many to take of a generator whose own counts are `timed` and
     /// `tested`.
-    pub fn of(self, timed: u64, tested: u64) -> u64 {
+    pub fn to_take(self, timed: u64, tested: u64) -> u64 {
         match self {
             HowMany::Timed => timed,
             HowMany::Tested => tested,
@@ -174,9 +174,9 @@ pub const TIMING_PER_GENERATOR: u64 = 100;
 /// (`docs/lab.md`, "`corpus/`").
 pub fn families(how_many: HowMany) -> Vec<(String, Vec<Bitmap>)> {
     vec![
-        ("laid out like a city".to_string(), PLANS.iter().flat_map(|plan| plan.take(how_many.of(plan.timed, plan.tested))).collect()),
-        ("grown like a blob".to_string(), SHAPES.iter().flat_map(|shape| shape.take(how_many.of(shape.timed, shape.tested))).collect()),
-        ("sparse".to_string(), SPARSE.iter().flat_map(|shape| shape.take(how_many.of(shape.timed, shape.tested))).collect()),
-        ("drawn with lines".to_string(), LINE_SETS.iter().flat_map(|set| set.take(how_many.of(set.timed, set.tested))).collect()),
+        ("laid out like a city".to_string(), PLANS.iter().flat_map(|plan| plan.take(how_many.to_take(plan.timed, plan.tested))).collect()),
+        ("grown like a blob".to_string(), SHAPES.iter().flat_map(|shape| shape.take(how_many.to_take(shape.timed, shape.tested))).collect()),
+        ("sparse".to_string(), SPARSE.iter().flat_map(|shape| shape.take(how_many.to_take(shape.timed, shape.tested))).collect()),
+        ("drawn with lines".to_string(), LINE_SETS.iter().flat_map(|set| set.take(how_many.to_take(set.timed, set.tested))).collect()),
     ]
 }

@@ -4,7 +4,10 @@ version = 4
 
 [[package]]
 name = "bitmap"
-version = "0.1.0"
+version = "0.0.0"
+dependencies = [
+ "utilities",
+]
 
 [[package]]
 name = "cc"
@@ -95,7 +98,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "tessera"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "bitmap",
  "utilities",
@@ -103,7 +106,7 @@ dependencies = [
 
 [[package]]
 name = "utilities"
-version = "0.1.0"
+version = "0.0.0"
 
 [[package]]
 name = "zstd"

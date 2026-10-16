@@ -120,7 +120,7 @@ pub struct About {
 /// so up and down. At the world's edge, where there is none to the
 /// left or above, its own is the first.
 #[inline]
-pub(crate) fn of(at: CellIndex) -> About {
+pub(crate) fn about_cell(at: CellIndex) -> About {
     let in_tile = at.0 & TILE;
     let (mut first, (mut x, mut y)) = (at.0 & !TILE, across_and_down(in_tile as u32));
     // A small tile to the left, or above: its side taken from the one coordinate's bits, where they are not all 0.
@@ -182,13 +182,13 @@ impl About {
 /// it: the cells of `under` alone, and only the tiles it has a cell
 /// in looked up -- one to four, for a cell and its neighbours.
 #[inline]
-pub(crate) fn layer(turn: &Turn, layer_type: LayerType, about: &About, under: u64) -> SmallTiles {
-    let [tiles] = layers(turn, [layer_type], about, under);
+pub(crate) fn read_layer(turn: &Turn, layer_type: LayerType, about: &About, under: u64) -> SmallTiles {
+    let [tiles] = read_layers(turn, [layer_type], about, under);
     tiles
 }
 
-/// [`layer`], of each of `types` at once.
+/// [`read_layer`], of each of `types` at once.
 #[inline]
-pub(crate) fn layers<const N: usize>(turn: &Turn, types: [LayerType; N], about: &About, under: u64) -> [SmallTiles; N] {
+pub(crate) fn read_layers<const N: usize>(turn: &Turn, types: [LayerType; N], about: &About, under: u64) -> [SmallTiles; N] {
     turn.small_tiles(types, about.first, under)
 }

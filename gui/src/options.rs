@@ -75,7 +75,7 @@ impl Options {
     }
 
     /// Whether they are open.
-    pub fn open(&self) -> bool {
+    pub fn is_open(&self) -> bool {
         self.open
     }
 
@@ -129,7 +129,7 @@ pub fn spawn(mut commands: Commands) {
 /// takes the keys typing a name, goes through the worlds by the wheel,
 /// and shows the rows as they are.
 #[allow(clippy::too_many_arguments)]
-pub fn work(
+pub fn update_options(
     mut options: ResMut<Options>,
     screen: Res<Screen>,
     sliders: Res<Sliders>,
@@ -160,7 +160,7 @@ pub fn work(
                 None => (options.page, options.typed, options.taken) = (Page::Naming, String::new(), false),
             },
             Some(Does::Names) => options.save_named(save),
-            Some(Does::Lists) => (options.listing, options.page) = (Listing::of(options.lister), Page::Worlds),
+            Some(Does::Lists) => (options.listing, options.page) = (Listing::from_lister(options.lister), Page::Worlds),
             Some(Does::GoesBack) => options.page = Page::First,
             Some(Does::Opens(place)) => {
                 open.write(Open(options.listing.worlds[place].clone()));
@@ -184,5 +184,5 @@ pub fn work(
     if options.open && options.page == Page::Worlds {
         options.listing.scroll(wheel.delta.y);
     }
-    rows::show(options.open, &options.rows(), &mut shade, &mut bars, &mut words);
+    rows::show_rows(options.open, &options.rows(), &mut shade, &mut bars, &mut words);
 }

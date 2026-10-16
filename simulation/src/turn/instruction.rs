@@ -109,7 +109,7 @@ impl Instruction {
     }
 
     /// One counted under `number`.
-    pub(crate) fn count(number: u32) -> Self {
+    pub(crate) fn count_under(number: u32) -> Self {
         Self { opcode: Opcode::Count, first: u64::from(number), ..Self::compare_end() }
     }
 
@@ -205,7 +205,7 @@ impl Instruction {
 
     /// The cell it is of, in `superchunk`, which it lands in.
     #[inline]
-    pub(crate) fn at(&self, superchunk: SuperchunkIndex) -> CellIndex {
+    pub(crate) fn cell_in(&self, superchunk: SuperchunkIndex) -> CellIndex {
         CellIndex(superchunk.top_left().0 | u64::from(self.place & ((1 << PLACE_BITS) - 1)))
     }
 
@@ -218,7 +218,7 @@ impl Instruction {
 
     /// The outbox slot of the superchunk it lands in.
     #[inline]
-    pub(crate) fn slot(&self) -> usize {
+    pub(crate) fn outbox_slot(&self) -> usize {
         (self.place >> PLACE_BITS) as usize
     }
 

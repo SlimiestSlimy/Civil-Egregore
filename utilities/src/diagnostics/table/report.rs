@@ -27,7 +27,7 @@ pub fn path(folder: &Path, name: &str) -> PathBuf {
 }
 
 /// The names of every report kept in `folder`, in name order.
-pub fn kept(folder: &Path) -> Vec<String> {
+pub fn saved_reports(folder: &Path) -> Vec<String> {
     let mut names: Vec<String> = fs::read_dir(folder)
         .map(|entries| {
             entries
@@ -146,7 +146,7 @@ impl Report {
     /// [`Report::publish`] without printing anything -- for a run whose
     /// standard output is something else, a video say: the report kept
     /// in its file in `folder`, and where.
-    pub fn keep(mut self, folder: &Path) -> PathBuf {
+    pub fn write_to_folder(mut self, folder: &Path) -> PathBuf {
         self.note_commit(folder);
         self.write(folder)
     }

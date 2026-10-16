@@ -23,7 +23,7 @@ takes); **`tile_scale()`**, **`tile_side()`**, **`tile_shift()`** --
 the places a cell's place is shifted by to give its tile's.
 **`Wide<W>`**: a wide plane, its width in its type: **`new(first)`**, **`of_tiles(first, tile_scale)`**,
 **`layer_type`**, **`most`** the most a cell of it holds.
-**`EntityType(u64)`**: an entity's type: **`of(number)`**, **`number`**. **`ScaRuleType(u64)`**, **`EntityRuleType(u64)`**: a rule of the cells, a rule of an entity: **`of(number)`**, **`number`**. **`AttributeType(u64)`**: an
+**`EntityType(u64)`**: an entity's type: **`from_number(number)`**, **`number`**. **`ScaRuleType(u64)`**, **`EntityRuleType(u64)`**: a rule of the cells, a rule of an entity: **`from_number(number)`**, **`number`**. **`AttributeType(u64)`**: an
 attribute's, its last four bits (`ATTRIBUTE_SIZE_BITS`) how many
 blocks one takes, less one, its number the 52 bits before
 (`ATTRIBUTE_NUMBERS`): **`of_blocks(number, blocks)`**,
@@ -41,7 +41,7 @@ blocks hold. **`Layout`**: how an attribute's data is laid out --
 number in the first word, and by **`SheepState`** `{hungry_at,
 lamb_due_at, grown_at, roaming_until, roaming_neighbour}`, a
 word each in that order; a tick of 0 none. **`Attribute<L>`**: an attribute, its
-layout in its type: **`new(number)`**, **`attribute_type`**. **`Member`** `{offset, bytes}`: a field by where its bytes lie; **`Member::word(word)`**, **`Member::within(word, first, bytes)`**, **`Member::of(data)`**.
+layout in its type: **`new(number)`**, **`attribute_type`**. **`Member`** `{offset, bytes}`: a field by where its bytes lie; **`Member::word(word)`**, **`Member::within(word, first, bytes)`**, **`Member::value_in(data)`**.
 
 ## `registry.rs`
 

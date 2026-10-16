@@ -28,6 +28,9 @@ counts, hot count. **`count`** / **`set_count`** a bucket's set cells;
 **`cells`** a bucket of a bit a cell as a bitmap's words, **`words`** / **`words_mut`** a bucket's words at any width; **`get`** a cell by
 Morton index; **`value`** and **`put_value`** the number of a wide layer's cell, read and put whole; **`put_cell`** a cell set or clear if not already, the
 bucket dirty and the counts moved by one: whether it changed.
+`bucket_offset(chunk, words)`: where a chunk's bucket starts, if it
+has one; `bucket_or_insert(chunk)`: its bucket, made all clear if it
+had none.
 `bucket_words`: the words a bucket takes, a bitmap's times the bits a
 cell. `let_bucket_go(chunk)`: a chunk's bucket given up, the chunk
 then having no cell set; `let_unused_go`: the same of every chunk
@@ -112,7 +115,7 @@ the cells given, both through **`make_hot_with`**;
 **`make_cold_superchunk(superchunk)`** -- its dirty
 buckets taken and returned, its allocations lingering -- **`hold`**,
 **`make_hot_again`**, **`lingers(superchunk)`**, **`lingering`** (how many);
-**`run(type)`** and **`keys`**, in Morton order; **`superchunks`** /
+**`buckets_of(type)`** and **`keys`**, in Morton order; **`superchunks`** /
 **`superchunks_mut`**, for the simulation, and
 **`superchunk_indices`**, theirs; **`take_dirty(superchunk)`** -- the
 dirty buckets' cells copied out, marked clean, a write-back on its way
@@ -122,7 +125,7 @@ each bucket marked waiting, held until flushed -- and
 put in the ring here, flushes reported as they come;
 **`flushed`**; **`evict(key)`** -- an allocation with nothing hot or
 waiting released. Private: **`allocation`** (found or
-made), **`hot`**, **`at`**/**`at_mut`**, **`entry_mut`** (hot or
+made), **`hot`**, **`layer_at`**/**`layer_at_mut`**, **`entry_mut`** (hot or
 lingering), **`lingering_at`**, **`layers`**, **`layers_of`**,
 **`leave_ring`**, **`release_unused`** -- lingering superchunks done with
 let go too.
@@ -156,7 +159,7 @@ a tick, applied in order over every superchunk they land in.
 
 ## `diagnostics/arena.rs`
 
-**`ArenaStats::of(arena)`**: superchunks, allocations, hot bitmaps, the
+**`ArenaStats::measure_arena(arena)`**: superchunks, allocations, hot bitmaps, the
 buckets kept and their bytes.
 
 ## `transient_data.rs`

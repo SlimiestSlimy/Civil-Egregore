@@ -94,7 +94,7 @@ pub struct Around {
 /// made and read with it.
 #[inline]
 pub fn about(at: CellIndex) -> About {
-    tiles_about::of(at)
+    tiles_about::about_cell(at)
 }
 
 impl About {
@@ -166,7 +166,7 @@ pub fn prefer(random: &mut Rng, about: &About, wanted: Cells, open: Cells) -> Op
 /// the one to four small tiles they lie in read as they lie
 /// ([`crate::tiles_about`]), under the nine.
 #[inline]
-pub fn layer(turn: &Turn, layer_type: LayerType, about: &About) -> Around {
-    let tiles = tiles_about::layer(turn, layer_type, about, about.nine_word());
+pub fn read_layer(turn: &Turn, layer_type: LayerType, about: &About) -> Around {
+    let tiles = tiles_about::read_layer(turn, layer_type, about, about.nine_word());
     Around { set: Cells(tiles.set), hot: Cells(tiles.hot) }
 }

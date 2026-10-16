@@ -24,8 +24,8 @@ time; `ROWS`: the rows there are parts for. **`Look`**: `Said`, `Back`,
 row's words. **`spawn(commands, marker)`**: them, hidden, each marked
 as the menu's. **`under(window, rows)`**: the row the pointer is on.
 **`clicked(rows, window, buttons)`**: what the row just clicked does.
-**`show(open, rows, shade, bars, words)`**: the parts as the rows say.
-**`Listing`** `{worlds, first}`: **`of(lister)`**, **`rows(back,
+**`show_rows(open, rows, shade, bars, words)`**: the parts as the rows say.
+**`Listing`** `{worlds, first}`: **`from_lister(lister)`**, **`rows(back,
 opens)`**, **`scroll(wheel)`**. **`type_into(line, typed, allowed,
 most)`**: keys typed into a line; whether Enter was pressed.
 
@@ -36,7 +36,7 @@ most)`**: keys typed into a line; whether Enter was pressed.
 **`Part`**: marks its parts. **`MainMenu`**: the page, the seed typed,
 the worlds listed -- **`listing(lister)`**, **`setting_up()`**: whether
 a new world is being set up; **`seed()`**: the seed typed, if one is;
-**`rows()`**. **`spawn`**: its parts. **`work`**: a row clicked done,
+**`rows()`**. **`spawn`**: its parts. **`update_main_menu`**: a row clicked done,
 unless the pointer is the sliders'; a seed typed; the worlds gone
 through by the wheel; Escape back a page; the rows shown -- all while
 the window shows it.
@@ -48,10 +48,10 @@ the window shows it.
 `Leaves`. **`Page`**: `First`, `Worlds`, `Naming`. **`Part`**: marks
 its parts. **`Options`**: whether they are open, the page, the world's
 name, the name typed, the worlds listed -- **`listing(lister)`**,
-**`open()`**, **`named()`** and **`name(named)`**: the world run's
+**`is_open()`**, **`named()`** and **`name(named)`**: the world run's
 name, as the window tells it; **`save_named(save)`**: the name typed
 saved under, unless none or taken; **`rows()`**. **`spawn`**: its
-parts. **`work`**: opened and closed by Escape over a world, unless a
+parts. **`update_options`**: opened and closed by Escape over a world, unless a
 slider's value is being typed; a row clicked done; a name typed; the
 worlds gone through by the wheel; the rows shown.
 
@@ -64,7 +64,7 @@ is offered and shown, how far it is scrolled, whether the left button
 is held over it, the slider dragged, the value typed, where the pointer
 rested -- **`held()`**, **`typing()`**, **`over(window)`**,
 **`offer(offered)`**: a group no longer offered closed;
-**`show(what)`**, **`listed()`**, **`page()`**, **`rows_under()`**,
+**`show_from_top(what)`**, **`listed()`**, **`page()`**, **`rows_under()`**,
 **`foot()`**, **`across()`**, **`row_under(window)`**: the arithmetic
 of where things are. **`rows(group)`**: a group's numbers in the
 sliders' file's order; **`middle(row)`**. **`Part`** `{shown,
@@ -88,7 +88,7 @@ digit's key and its key on the number pad. `turned_on(index, value)`:
 whether a toggle is on -- nearer its range's far end than its near
 one. **`slide`**: the menu
 and the groups opened and left, sliders dragged and set back, values
-typed -- into `CurrentTuning` -- the numbers kept; **`show`**: knobs
+typed -- into `CurrentTuning` -- the numbers kept; **`update_slider_visuals`**: knobs
 and values as they are.
 
 ## `sliders/tell.rs`

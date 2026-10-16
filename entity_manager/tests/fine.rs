@@ -11,7 +11,7 @@ use entity_manager::saved::{decode_state, encode_state};
 use entity_manager::{default_kept, may_be_given, WholeAttribute, find_attribute, push_attribute, sorted, Attribute, AttributeBlock, AttributeType, Entities, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER};
 
 /// The entities' type.
-const WALKER: EntityType = EntityType::of(40);
+const WALKER: EntityType = EntityType::from_number(40);
 
 /// Entities holding the superchunk `(10, 10)`, none in it.
 fn world() -> Entities {
@@ -306,10 +306,10 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
         let mut holds = if given { state } else { SheepState::default() };
         let put = entities.get(at).expect("put");
         // Kept: its data's blocks, then the others with their types -- a block each here.
-        assert_eq!(put.kept().len(), default.blocks + usize::from(before) + usize::from(after), "round {round}");
+        assert_eq!(put.attribute_list().len(), default.blocks + usize::from(before) + usize::from(after), "round {round}");
         assert_eq!(put.attributes.len(), usize::from(before) + usize::from(after));
         // Its first word is its data's first, no type before it.
-        assert_eq!(put.kept()[0].0[0], holds.hungry_at, "round {round}");
+        assert_eq!(put.attribute_list()[0].0[0], holds.hungry_at, "round {round}");
         assert_eq!((put.attribute(SHEEP_STATE), put.attribute(BEFORE), put.attribute(NAME)), (Some(holds), before.then_some(5), after.then_some(7)), "round {round}");
         assert_eq!(put.default_attribute().as_deref(), Some(&*WholeAttribute::holding(SHEEP_STATE, holds)));
         assert_eq!(put.attribute_seen(SHEEP_STATE.attribute_type()), entity_manager::attribute_seen(Some(&WholeAttribute::holding(SHEEP_STATE, holds))));
@@ -348,7 +348,7 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
             assert_eq!(applied.passed_over, usize::from(chosen == 2), "round {round}, edit {edit}");
             let edited = entities.iter().next().expect("the one sheep");
             assert_eq!(edited.attribute(SHEEP_STATE), Some(holds), "round {round}, edit {edit}");
-            assert!(sorted(edited.attributes) && edited.kept().len() == default.blocks + edited.attributes.len(), "round {round}, edit {edit}");
+            assert!(sorted(edited.attributes) && edited.attribute_list().len() == default.blocks + edited.attributes.len(), "round {round}, edit {edit}");
             assert_eq!(edited.attribute(BEFORE), before.then_some(5), "round {round}, edit {edit}");
         }
         // Saved and read back: the same sheep, kept the same.
@@ -358,6 +358,6 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
         assert_eq!((count, decode_state(&words, 0, &mut read_back).map(|state| state.entities)), (1, Ok(1)));
         read_back.apply();
         let is = read_back.get(was.header.at).expect("read back");
-        assert_eq!((was.header, was.kept()), (is.header, is.kept()), "round {round}");
+        assert_eq!((was.header, was.attribute_list()), (is.header, is.attribute_list()), "round {round}");
     }
 }

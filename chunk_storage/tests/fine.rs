@@ -256,7 +256,7 @@ mod chunk_storage {
     fn the_ring_frees_from_its_tail_and_wraps() {
         let mut ring = WritebackRing::new(40);
         let (a, b) = (SuperchunkIndex::from_cartesian(1, 0), SuperchunkIndex::from_cartesian(0, 1));
-        let chunk = ChunkIndex::of;
+        let chunk = ChunkIndex::from_superchunk_place;
         assert!(ring.push(chunk(a, 1), LayerType(1), &[11; 5]));
         assert!(ring.push(chunk(b, 2), LayerType(2), &[22; 5]));
         assert!(ring.push(chunk(a, 3), LayerType(3), &[33; 5]));
@@ -289,7 +289,7 @@ mod chunk_storage {
     fn flushing_writes_the_ring_into_the_cold_pool() {
         let (mut codec, mut storage, mut flushed) = (LayerCodec::new(), ChunkStorage::new(1 << 12), Vec::new());
         storage.insert(WORLD_MIDDLE, SuperchunkImage::new(&HeightMap::filled(4)));
-        let chunk = ChunkIndex::of(WORLD_MIDDLE, 6);
+        let chunk = ChunkIndex::from_superchunk_place(WORLD_MIDDLE, 6);
         storage.write_back(chunk, LayerType(1), codec.encode(&one_cell(CELL)), &mut flushed);
         storage.write_back(chunk, LayerType(2), codec.encode(&drawn()), &mut flushed);
         storage.write_back(chunk, LayerType(1), codec.encode(&drawn()), &mut flushed);
@@ -315,10 +315,10 @@ mod chunk_storage {
         let words = codec.encode(&drawn()).to_vec();
         assert!(words.len() > 8, "bigger than the ring");
         let (one, other) = (SuperchunkIndex::from_cartesian(5, 5), SuperchunkIndex::from_cartesian(6, 5));
-        let first = ChunkIndex::of(one, 0);
+        let first = ChunkIndex::from_superchunk_place(one, 0);
         storage.write_back(first, LayerType(1), &words, &mut flushed);
         assert!(flushed.is_empty(), "grown, nothing flushed");
-        let second = ChunkIndex::of(other, 3);
+        let second = ChunkIndex::from_superchunk_place(other, 3);
         storage.write_back(second, LayerType(1), &words, &mut flushed);
         assert_eq!(flushed, [one]);
         assert_eq!(decoded(&mut codec, storage.layer(first, LayerType(1)).expect("flushed")), drawn());

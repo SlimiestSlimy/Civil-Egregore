@@ -6,7 +6,7 @@
 mod tests;
 
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
-use tests::{at, walled};
+use tests::{height_at, walled};
 use worldgen::{wall, Shape, Terrain};
 
 /// A shape of small polygons joined by cliffs: plenty of walls.
@@ -36,8 +36,8 @@ fn superchunks_made_apart_meet_with_no_seam() {
         let here = SuperchunkIndex::from_cartesian(random.below(last) as u32, random.below(last) as u32);
         let [own, east, south] = [(0, 0), (1, 0), (0, 1)].map(|(dx, dy)| Terrain::generate_shaped(&CLIFFS, seed, here.offset(dx, dy).expect("in the world")));
         for along in 0..1024 {
-            assert_eq!(walled(&own, 0, 1023, along), wall(at(&own, 1023, along), at(&east, 0, along)), "east edge, row {along}");
-            assert_eq!(walled(&own, 1, along, 1023), wall(at(&own, along, 1023), at(&south, along, 0)), "south edge, column {along}");
+            assert_eq!(walled(&own, 0, 1023, along), wall(height_at(&own, 1023, along), height_at(&east, 0, along)), "east edge, row {along}");
+            assert_eq!(walled(&own, 1, along, 1023), wall(height_at(&own, along, 1023), height_at(&south, along, 0)), "south edge, column {along}");
         }
     }
 }

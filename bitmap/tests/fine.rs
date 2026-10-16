@@ -203,7 +203,7 @@ mod window {
     use bitmap::window::{left_columns, morton_from_rows, rows_from_morton, top_rows, window, WORD_TILE_SIDE};
 
     /// Whether the cell `(x, y)` of a row-by-row tile is set.
-    fn at(rows: u64, x: u32, y: u32) -> bool {
+    fn bit_at(rows: u64, x: u32, y: u32) -> bool {
         rows >> (y * WORD_TILE_SIDE + x) & 1 == 1
     }
 
@@ -216,7 +216,7 @@ mod window {
             let word = random.draw();
             let rows = rows_from_morton(word);
             for (x, y) in (0..8).flat_map(|y| (0..8).map(move |x| (x, y))) {
-                assert_eq!(at(rows, x, y), word >> morton_index(x as u8, y as u8) & 1 == 1, "({x}, {y})");
+                assert_eq!(bit_at(rows, x, y), word >> morton_index(x as u8, y as u8) & 1 == 1, "({x}, {y})");
             }
             assert_eq!(morton_from_rows(rows), word);
         }
@@ -228,11 +228,11 @@ mod window {
         let mut random = Rng::new(utilities::seed::counted());
         for _ in 0..200 {
             let tiles = [[random.draw(), random.draw()], [random.draw(), random.draw()]];
-            let cell = |x: u32, y: u32| at(tiles[(y / 8) as usize][(x / 8) as usize], x % 8, y % 8);
+            let cell = |x: u32, y: u32| bit_at(tiles[(y / 8) as usize][(x / 8) as usize], x % 8, y % 8);
             for (across, down) in (0..8).flat_map(|down| (0..8).map(move |across| (across, down))) {
                 let cut = window(tiles, across, down);
                 for (x, y) in (0..8).flat_map(|y| (0..8).map(move |x| (x, y))) {
-                    assert_eq!(at(cut, x, y), cell(across + x, down + y), "window at ({across}, {down}), cell ({x}, {y})");
+                    assert_eq!(bit_at(cut, x, y), cell(across + x, down + y), "window at ({across}, {down}), cell ({x}, {y})");
                 }
             }
         }

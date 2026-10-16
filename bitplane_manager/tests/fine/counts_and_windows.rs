@@ -54,7 +54,7 @@ fn counts_follow_every_change() {
     let mut storage = ChunkStorage::new(1 << 12);
     let mut random = Rng::new(counted());
     storage.insert(WORLD_MIDDLE, grass_on_dirt(counted(), 0, &mut codec));
-    let chunk = ChunkIndex::of(WORLD_MIDDLE, random.below(16) as usize);
+    let chunk = ChunkIndex::from_superchunk_place(WORLD_MIDDLE, random.below(16) as usize);
     arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
     let (dirt, grass) = (BucketKey { layer_type: MOCK_DIRT, chunk }, BucketKey { layer_type: MOCK_GRASS, chunk });
     assert_eq!((arena.bucket(dirt).expect("hot").count(), arena.bucket(grass).expect("hot").count()), (1 << 16, 0));
@@ -181,7 +181,7 @@ fn a_wide_plane_holds_numbers<W: Width>(plane: Wide<W>) {
     let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
     let mut storage = ChunkStorage::new(1 << 12);
     let mut random = Rng::new(counted());
-    let (layer_type, chunk) = (plane.layer_type(), ChunkIndex::of(WORLD_MIDDLE, random.below(16) as usize));
+    let (layer_type, chunk) = (plane.layer_type(), ChunkIndex::from_superchunk_place(WORLD_MIDDLE, random.below(16) as usize));
     let key = BucketKey { layer_type, chunk };
     assert_eq!(arena.make_hot_layers(chunk, &[layer_type], &storage, &mut codec), 1);
     // Numbers over the plane's whole range, on cells of their own; one of them put again, one taken back to 0.
@@ -191,7 +191,7 @@ fn a_wide_plane_holds_numbers<W: Width>(plane: Wide<W>) {
     while tiles.len() < 40 {
         tiles.insert(random.below(1 << (16 - shift)) as usize);
     }
-    let in_tile = |tile: usize, random: &mut Rng| CellIndex::of(chunk, tile << shift | random.below(1 << shift) as usize);
+    let in_tile = |tile: usize, random: &mut Rng| CellIndex::from_chunk_place(chunk, tile << shift | random.below(1 << shift) as usize);
     let numbers: Vec<(CellIndex, u32)> = tiles.iter().map(|&tile| (in_tile(tile, &mut random), 1 + random.below(u64::from(plane.most())) as u32)).collect();
     let same_tiles: Vec<CellIndex> = tiles.iter().map(|&tile| in_tile(tile, &mut random)).collect();
     let (emptied, _) = numbers[7];

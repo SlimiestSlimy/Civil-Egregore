@@ -95,7 +95,7 @@ impl SuperchunkEntities {
         into.carried = carried;
         debug_assert_eq!(put, Put::New, "a cell seen free");
         if header.wake != NEVER && header.wake >= earliest {
-            into.wheel.file(earliest, header.wake, Wake { at: to });
+            into.wheel.file_wake(earliest, header.wake, Wake { at: to });
         }
         self.remove(stood);
         self.left_this_tick.insert(stood, Some(to));
@@ -184,7 +184,7 @@ impl SuperchunkEntities {
             return false;
         };
         if wake != NEVER {
-            self.wheel.file(earliest, wake, Wake { at: now_on });
+            self.wheel.file_wake(earliest, wake, Wake { at: now_on });
         }
         true
     }

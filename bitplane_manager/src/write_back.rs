@@ -20,7 +20,7 @@ impl BitmapArena {
         let mut dirty = Vec::new();
         for allocation in &mut self.directory[entry].layers {
             for chunk in members(allocation.flags.dirty) {
-                dirty.push((BucketKey { layer_type: allocation.layer_type, chunk: ChunkIndex::of(superchunk, chunk) }, allocation.words(chunk).into()));
+                dirty.push((BucketKey { layer_type: allocation.layer_type, chunk: ChunkIndex::from_superchunk_place(superchunk, chunk) }, allocation.words(chunk).into()));
             }
             allocation.flags.dirty = 0;
         }
@@ -117,7 +117,7 @@ impl BitmapArena {
         let Some((at, chunk)) = self.hot(key) else {
             return false;
         };
-        let allocation = self.at_mut(at);
+        let allocation = self.layer_at_mut(at);
         assert!(!contains(allocation.flags.dirty, chunk), "{key:?} changed and was not written back");
         put(&mut allocation.flags.hot, chunk, false);
         allocation.hot_count -= allocation.count(chunk);

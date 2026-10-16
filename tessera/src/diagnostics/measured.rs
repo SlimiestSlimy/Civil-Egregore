@@ -30,7 +30,7 @@ pub struct Measured {
 impl Measured {
     /// Encodes and decodes every bitmap of `bitmaps` with `tessera`, and
     /// gathers what they came to.
-    pub fn of(tessera: &mut Tessera, bitmaps: impl IntoIterator<Item = Bitmap>) -> Self {
+    pub fn measure_bitmaps(tessera: &mut Tessera, bitmaps: impl IntoIterator<Item = Bitmap>) -> Self {
         let (mut stream, mut back) = (BitStream::default(), Bitmap::new());
         let mut measured = Measured::default();
         for (case, bitmap) in bitmaps.into_iter().enumerate() {

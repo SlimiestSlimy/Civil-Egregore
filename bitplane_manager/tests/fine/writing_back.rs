@@ -17,7 +17,7 @@ fn changes_write_back_through_the_ring() {
     let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
     let place = a_place();
     let mut storage = storage_with(ORIGIN, place, &[(LayerType::of_a_bit(2), one_cell(a_cell()))], &mut codec);
-    let chunk = ChunkIndex::of(ORIGIN, place);
+    let chunk = ChunkIndex::from_superchunk_place(ORIGIN, place);
     let (new, cleared) = (BucketKey { layer_type: LayerType::of_a_bit(1), chunk }, BucketKey { layer_type: LayerType::of_a_bit(2), chunk });
 
     assert_eq!(arena.make_hot_layers(chunk, &[LayerType::of_a_bit(1), LayerType::of_a_bit(2)], &storage, &mut codec), 2);
@@ -47,7 +47,7 @@ fn changes_write_back_through_the_ring() {
 fn evicted_bitmaps_wait_for_the_ring() {
     let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
     let mut storage = ChunkStorage::new(1 << 12);
-    let key = BucketKey { layer_type: LayerType::of_a_bit(1), chunk: ChunkIndex::of(WORLD_MIDDLE, a_place()) };
+    let key = BucketKey { layer_type: LayerType::of_a_bit(1), chunk: ChunkIndex::from_superchunk_place(WORLD_MIDDLE, a_place()) };
     let cell = cell_in(key.chunk, a_cell());
     arena.make_hot(key, storage.layer(key.chunk, key.layer_type), &mut codec);
     write(&mut arena, LayerType::of_a_bit(1), WriteOp::Set, cell);
@@ -75,7 +75,7 @@ fn evicted_bitmaps_wait_for_the_ring() {
 fn a_superchunk_lingering_waits_for_its_changes() {
     let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
     let mut storage = ChunkStorage::new(1 << 12);
-    let key = BucketKey { layer_type: LayerType::of_a_bit(1), chunk: ChunkIndex::of(WORLD_MIDDLE, a_place()) };
+    let key = BucketKey { layer_type: LayerType::of_a_bit(1), chunk: ChunkIndex::from_superchunk_place(WORLD_MIDDLE, a_place()) };
     let cell = cell_in(key.chunk, a_cell());
     arena.make_hot(key, None, &mut codec);
     write(&mut arena, LayerType::of_a_bit(1), WriteOp::Set, cell);
@@ -113,7 +113,7 @@ fn a_full_ring_releases_what_it_flushed() {
     let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
     let mut storage = ChunkStorage::new(8);
     let (first, second) = (SuperchunkIndex::from_cartesian(7, 7), SuperchunkIndex::from_cartesian(8, 7));
-    let key = |superchunk| BucketKey { layer_type: LayerType::of_a_bit(3), chunk: ChunkIndex::of(superchunk, 0) };
+    let key = |superchunk| BucketKey { layer_type: LayerType::of_a_bit(3), chunk: ChunkIndex::from_superchunk_place(superchunk, 0) };
     // An entry bigger than the ring grows it to the power of two over the
     // entry -- under two entries -- so the second entry flushes the first.
     let encoded = codec.encode(&drawn()).to_vec();
@@ -151,7 +151,7 @@ fn only_the_types_asked_for_turn_hot() {
     let place = a_place();
     let layers: Vec<(LayerType, CellWords)> = [1, 2, 3].map(|layer_type| (LayerType::of_a_bit(layer_type), drawn())).to_vec();
     let storage = storage_with(WORLD_MIDDLE, place, &layers, &mut codec);
-    let chunk = ChunkIndex::of(WORLD_MIDDLE, place);
+    let chunk = ChunkIndex::from_superchunk_place(WORLD_MIDDLE, place);
     assert_eq!(arena.make_hot_layers(chunk, &[LayerType::of_a_bit(3), LayerType::of_a_bit(1), LayerType::of_a_bit(8)], &storage, &mut codec), 3);
     assert_eq!(arena.make_hot_layers(chunk, &[LayerType::of_a_bit(1)], &storage, &mut codec), 0, "already hot");
     let hot: Vec<LayerType> = arena.keys().map(|key| key.layer_type).collect();

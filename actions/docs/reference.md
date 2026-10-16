@@ -67,7 +67,7 @@ one member, held against that member alone -- two writing two members
 of one attribute both do; **`update(turn, before, after,
 attributes)`**: each attribute that differs written
 (`set_attributes_changed`), then the step. **`EntitiesBetweenTicks`**: the world's entities off any
-turn, lent by whoever runs the world (**`of`**; **`where_free(free)`**,
+turn, lent by whoever runs the world (**`from_entities`**; **`where_free(free)`**,
 putting only on cells the world's collision plane does not hold;
 **`cells_put()`**, the cells put on, for the runner to set there). **`now()`**,
 **`put(header, attributes)`**: queued, in the world once the runner
@@ -86,7 +86,7 @@ cell to the nine about it, in Morton order of where they lead --
 **`way_of(at, cell)`**: a way and its cell. **`pick(random, about,
 choices)`**, **`prefer(random, about, wanted, open)`**: the way to one
 drawn; **`set_bit_of_rank(bits, rank)`**: the set bit with so many
-under it, the crate's. **`layer(turn, type, about)`**: a layer's cells
+under it, the crate's. **`read_layer(turn, type, about)`**: a layer's cells
 about a cell, the small tiles they lie in read as they lie.
 
 ## `tiles_about.rs`
@@ -97,13 +97,13 @@ in Morton order over their 8x8 cells (`SQUARE_SIDE`, `SQUARE_CELLS`;
 **`bit_at(x, y)`** a cell's bit, **`across_and_down(bit)`** back;
 `TILE`, `X_BITS`, `Y_BITS`: the parts of a cell's index).
 **`About`**: the first tile's first cell, and the cell's bit;
-**`of(at)`** takes them. **`centre_word()`**, **`nine_word()`**,
+**`about_cell(at)`** takes them. **`centre_word()`**, **`nine_word()`**,
 **`ring_word()`**: the cell, it and its neighbours in the world, the
 neighbours alone, as bits of the word -- from `NINE_OF`, made as the
 program is compiled; **`way_word(way)`**: the one cell a way off, by
 `ABOUT`, each of the nine's (`NINE`) bit for each place the cell can
-have; **`ways_of(word)`**: a set of them as ways, a bit a way; `WAY_OFFSETS`: where each way leads, across and down, in Morton order; `WAY_AT`: the way to each of the nine, row by row. **`layer(turn, type, about,
-under)`**, **`layers(turn, types, about, under)`**: a layer in the
+have; **`ways_of(word)`**: a set of them as ways, a bit a way; `WAY_OFFSETS`: where each way leads, across and down, in Morton order; `WAY_AT`: the way to each of the nine, row by row. **`read_layer(turn, type, about,
+under)`**, **`read_layers(turn, types, about, under)`**: a layer in the
 tiles, the cells of `under` alone, a `SmallTiles` (`actions.md`,
 "The small tiles about a cell").
 
@@ -111,8 +111,8 @@ tiles, the cells of `under` alone, a `SmallTiles` (`actions.md`,
 
 **`Area`** `{set, hot}`, a row a `u16`, `AREA_SIDE` (16) a side, its
 centre at `AREA_CENTRE`; **`Area::count`**; `FARTHEST_SCALE` (6), the
-coarsest tiles asked of. **`layer(turn, type, centre)`**,
-**`layers(turn, types, centre)`**: the area of one layer, or of several
+coarsest tiles asked of. **`read_layer(turn, type, centre)`**,
+**`read_layers(turn, types, centre)`**: the area of one layer, or of several
 at once, off the four aligned tiles of 16 it lies in (`TILE_CELLS`: the
 cells of one), their words turned into rows; at the world's edge, a
 window a quarter (**`layers_at_the_edge`**). **`of_tiles(turn, type, centre, scale)`**: the tiles of
@@ -129,7 +129,7 @@ y)`**, **`set(x, y, to)`**, **`clear`**, **`count`**, **`is_empty`**;
 **`pick(random)`** one drawn. `WORD` (64): bits in a word;
 `SMALL_TILE`: the bits of the one mask less than a word.
 **`tile(at, side)`**: the first cell of the aligned tile a cell is in;
-**`cell(first, x, y)`**: a cell of it. **`layer(turn, type, at, set,
+**`cell(first, x, y)`**: a cell of it. **`read_layer(turn, type, at, set,
 hot)`**: the tile of a layer into two masks, its words copied
 (**`runs`**: a tile's words as they lie, a chunk a run);
 **`layer_under(turn, type, at, under, set, hot)`**: the cells `under`

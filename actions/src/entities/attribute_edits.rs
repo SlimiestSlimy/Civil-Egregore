@@ -34,13 +34,13 @@ fn members_differing(turn: &mut Turn, at: CellIndex, members: impl Iterator<Item
 /// time, never whole, and no write lands on another's.
 pub fn set_attribute_blocks(turn: &mut Turn, entity: &Header, seen: Option<&[AttributeBlock]>, value: Option<&[AttributeBlock]>) {
     let (at, kind) = (entity.at, value.or(seen).expect("an attribute seen or set")[0].kind());
-    compare::open(turn, compare::attribute_blocks(at, kind, seen));
+    compare::open_compare(turn, compare::attribute_blocks(at, kind, seen));
     match (seen, value) {
         (_, None) => write::attribute_removed(turn, at, kind),
         (Some(seen), Some(value)) if seen.len() == value.len() => members_differing(turn, at, (0..value.len() * BLOCK_WORDS - 1).map(Member::word), seen, value),
         (_, Some(value)) => write::attribute_whole(turn, at, value),
     }
-    compare::close(turn);
+    compare::close_compare(turn);
 }
 
 /// Queues `member` of the attribute of type `kind` of `entity`
@@ -70,14 +70,14 @@ pub fn set_attribute_of<L: Layout>(turn: &mut Turn, other: &Header, attribute: A
     (was[0], is[0]) = (kind.0, kind.0);
     seen.write(&mut was[1..words]);
     value.write(&mut is[1..words]);
-    compare::open(turn, compare::Compare::Attribute { at, kind, seen: words_sum(&was[..words]).max(NO_ATTRIBUTE + 1) });
+    compare::open_compare(turn, compare::Compare::Attribute { at, kind, seen: words_sum(&was[..words]).max(NO_ATTRIBUTE + 1) });
     for &member in L::MEMBERS {
-        let held = member.of(&is[1..words]);
-        if member.of(&was[1..words]) != held {
+        let held = member.value_in(&is[1..words]);
+        if member.value_in(&was[1..words]) != held {
             write::attribute_member(turn, at, kind, member, held);
         }
     }
-    compare::close(turn);
+    compare::close_compare(turn);
 }
 
 /// Queues removing `attribute` of `other`, another entity in reach,

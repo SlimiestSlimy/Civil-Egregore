@@ -38,7 +38,7 @@ fn word_of(blocks: &[AttributeBlock], word: usize) -> u64 {
 /// `attributes`, sorted by type, as a bucket keeps them: its default
 /// attribute first, without its type -- zeroes if it is not among
 /// those given -- then the others as they are.
-pub fn keep(kind: EntityType, attributes: &[AttributeBlock], kept: &mut Vec<AttributeBlock>) {
+pub fn append_kept(kind: EntityType, attributes: &[AttributeBlock], kept: &mut Vec<AttributeBlock>) {
     let Some(default) = default_kept(kind) else {
         return kept.extend_from_slice(attributes);
     };
@@ -86,7 +86,7 @@ pub fn may_be_given(kind: EntityType, attributes: &[AttributeBlock]) -> bool {
         return sorted(attributes);
     };
     let mut kept = Vec::new();
-    keep(kind, attributes, &mut kept);
+    append_kept(kind, attributes, &mut kept);
     let defaults: Vec<usize> = each_attribute(attributes).filter(|attribute| attribute[0].kind().identity() == default.kind.identity()).map(<[_]>::len).collect();
     sorted(&kept[default.blocks..]) && defaults.len() <= 1 && defaults.iter().all(|&blocks| blocks == default.kind.blocks())
 }

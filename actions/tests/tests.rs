@@ -13,7 +13,7 @@ use entity_manager::{Entities, EntityType, Header};
 /// The layer type the arena holds.
 pub const STONE: LayerType = LayerType::of_a_bit(6);
 /// The entities' type.
-pub const WALKER: EntityType = EntityType::of(40);
+pub const WALKER: EntityType = EntityType::from_number(40);
 
 /// An arena with `STONE` hot over the `side` by `side` superchunks from
 /// `(10, 10)`, the cells `cells` set.

@@ -45,7 +45,7 @@ pub fn write(arena: &mut BitmapArena, layer_type: LayerType, op: WriteOp, cell: 
 
 /// The cell `(x, y)` across and down from `chunk`'s top left.
 pub fn cell_in(chunk: ChunkIndex, (x, y): (u8, u8)) -> CellIndex {
-    CellIndex::of(chunk, morton_index(x, y))
+    CellIndex::from_chunk_place(chunk, morton_index(x, y))
 }
 
 /// A bitmap's cells with only `(x, y)` set.

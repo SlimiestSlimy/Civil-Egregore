@@ -68,11 +68,11 @@ fn no_two_sheep_eat_one_cell() {
 #[test]
 fn grass_spread_decayed_and_eaten_changes_once_a_cell() {
     let mut world = plain_world(1, 1 << 19, 20_000, 2);
-    let chosen = || server::Chosen::of(&[server::GRASS_RULE, server::SHEEP_RULE]);
+    let chosen = || server::Chosen::from_rules(&[server::GRASS_RULE, server::SHEEP_RULE]);
     for tick in 0..600 {
         let before = cells_of_grass(&world);
         let report = world.tick_only(chosen(), false);
-        let (grass, sheep) = (report.rules.of(server::GRASS_RULE), report.rules.of(server::SHEEP_RULE));
+        let (grass, sheep) = (report.rules.counts_of(server::GRASS_RULE), report.rules.counts_of(server::SHEEP_RULE));
         let (set, cleared) = set_and_cleared(report.writes_applied.changed, cells_of_grass(&world) as i64 - before as i64);
         assert_eq!(set, grass[grass::SPREADS], "tick {tick}: cells set, spreads counted");
         let (decays, eaten) = (grass[grass::DECAYS], sheep[EATEN]);
@@ -97,7 +97,7 @@ fn a_tree_put_twice_is_one_tree() {
     let mut put = 0;
     for tick in 0..2_000 {
         let before = trees_there(&world);
-        let done = world.tick_only(server::Chosen::of(&[server::TREES_RULE]), false).rules.of(server::TREES_RULE);
+        let done = world.tick_only(server::Chosen::from_rules(&[server::TREES_RULE]), false).rules.counts_of(server::TREES_RULE);
         let set = trees_there(&world) + done[trees::DIED] - before;
         assert_eq!(set, done[trees::SPREADS], "tick {tick}: trees more, trees put");
         put += set;

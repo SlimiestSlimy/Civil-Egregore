@@ -84,14 +84,14 @@ pub struct Captured {
 fn offer(mut sliders: ResMut<sliders::Sliders>, screen: Res<Screen>, menu: Res<main_menu::MainMenu>, options: Res<options::Options>) {
     sliders.offer(match *screen {
         Screen::MainMenu if menu.setting_up() => sliders::Offered::Everything,
-        Screen::World if !options.open() => sliders::Offered::Running,
+        Screen::World if !options.is_open() => sliders::Offered::Running,
         _ => sliders::Offered::Hidden,
     });
 }
 
 /// What the menus took, worked out last of their work.
 fn capture(mut captured: ResMut<Captured>, screen: Res<Screen>, options: Res<options::Options>, sliders: Res<sliders::Sliders>, window: Single<&Window>) {
-    let menu = *screen == Screen::MainMenu || options.open();
+    let menu = *screen == Screen::MainMenu || options.is_open();
     *captured = Captured { pointer: menu || sliders.held(), wheel: menu || sliders.over(&window), keys: menu || sliders.typing() };
 }
 
@@ -99,7 +99,7 @@ impl Plugin for Gui {
     /// Its parts and its work -- and the numbers tuned, as the machine
     /// last kept them.
     fn build(&self, app: &mut App) {
-        app.insert_resource(CurrentTuning(utilities::tuning::kept()))
+        app.insert_resource(CurrentTuning(utilities::tuning::load_from_settings()))
             .init_resource::<Screen>()
             .init_resource::<Captured>()
             .init_resource::<sliders::Sliders>()
@@ -109,6 +109,6 @@ impl Plugin for Gui {
             .add_message::<Open>()
             .add_message::<Save>()
             .add_systems(Startup, (sliders::spawn, options::spawn, main_menu::spawn))
-            .add_systems(Update, (main_menu::work, options::work, offer, sliders::toggle, sliders::scroll, sliders::slide, sliders::tell, capture).chain().in_set(Worked));
+            .add_systems(Update, (main_menu::update_main_menu, options::update_options, offer, sliders::toggle, sliders::scroll, sliders::slide, sliders::tell, capture).chain().in_set(Worked));
     }
 }

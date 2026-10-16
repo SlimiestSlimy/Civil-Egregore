@@ -206,7 +206,7 @@ impl Cell<'_> {
         let texture = if self.water.is_some() { 0.0 } else { tuning[TEXTURE] };
         // The shadow lines that reach the cell: down the diagonal, and from above and from the left.
         let (drop, over) = (shadow_drop(), self.fine.surface(x, y) as f32 + 0.01);
-        let (diagonal, above, beside) = (self.fine.line(x - 1, y - 1) - over, self.fine.line(x, y - 1) - over, self.fine.line(x - 1, y) - over);
+        let (diagonal, above, beside) = (self.fine.shadow_line(x - 1, y - 1) - over, self.fine.shadow_line(x, y - 1) - over, self.fine.shadow_line(x - 1, y) - over);
         let may_be_shadowed = diagonal.max(above).max(beside) > 0.0;
         let light = 1.0 + tuning[RELIEF] * (self.fine.light(self.at.0, self.at.1) - 1.0);
         // A cast shadow: darker, and bluer.

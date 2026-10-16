@@ -169,7 +169,7 @@ impl Simulation {
         let results: Vec<Mutex<R>> = (0..parts).map(|_| Mutex::new(R::default())).collect();
         let samples = &self.samples;
         let claimed = AtomicUsize::new(0);
-        self.dispatcher.run(&|part| {
+        self.dispatcher.run_in_parts(&|part| {
             let (reader, entity_reader) = (Reader::new(superchunks), EntityReader::new(entity_superchunks));
             let mut samples = samples[part].lock().expect("a part's samples");
             let mut total = R::default();

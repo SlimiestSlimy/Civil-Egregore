@@ -160,7 +160,7 @@ A crate's `transient_data/` is beside its `Cargo.toml` and out of git:
 what its runs leave behind, one folder a kind. Nothing there is an
 input the code needs; a fresh checkout has none of it, and the first
 run that needs a part makes it. Every crate names its own with
-`TransientData::of` in its `src/transient_data.rs`; its measurements go
+`TransientData::for_crate` in its `src/transient_data.rs`; its measurements go
 to `measurements/`, one CSV a tool (`TransientData::publish`).
 
 ## The dispatcher
@@ -168,17 +168,17 @@ to `measurements/`, one CSV a tool (`TransientData::publish`).
 Worker threads are started once and kept, parked while there is nothing
 to do. They take two kinds of work.
 
-- A job **run** (`Dispatcher::run`) is done on every thread at once, a
+- A job **run** (`Dispatcher::run_in_parts`) is done on every thread at once, a
   part each, the caller's thread doing the first: a tick's phase. It
-  borrows what the caller holds, for no longer than `run` takes: `run`
+  borrows what the caller holds, for no longer than `run_in_parts` takes: `run_in_parts`
   does not return -- not even when a part panics -- until every worker
   has finished its part. That is what lets a borrowed job be handed to
   threads that outlive it, and the crate's one `unsafe` beside the
   prefetch rests on it (`JobPointer`: the job's address, handed to the
   workers for that long and no longer). One job is run at a time: a
-  lock is held for the whole of `run`, so a second thread calling it
+  lock is held for the whole of `run_in_parts`, so a second thread calling it
   waits -- the state holds one job, and two at once would hand a worker
-  a job already let go of. A job run must not call `run` itself.
+  a job already let go of. A job run must not call `run_in_parts` itself.
 - A job **queued** (`Dispatcher::queue`) is done by one worker,
   whenever one is free, the caller not waiting: chunk storage's slow
   work, off the tick.
@@ -198,7 +198,7 @@ workers are still running their part; whether one panicked; whether
 the workers are to stop; the jobs queued, oldest first; and how many
 workers are busy with a queued job, which sit a run out. `Job` is a
 job run, a function of the part's number; `Queued` a job queued, done
-once. A worker's loop (`work`) waits until there is something, takes a
+once. A worker's loop (`worker_loop`) waits until there is something, takes a
 `Work` -- its part of a job run before a job queued -- does it, and
 says so; told to stop, it returns.
 

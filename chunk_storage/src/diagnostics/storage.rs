@@ -18,7 +18,7 @@ pub struct StorageStats {
 
 impl StorageStats {
     /// What `storage` holds now.
-    pub fn of(storage: &ChunkStorage) -> Self {
+    pub fn measure_storage(storage: &ChunkStorage) -> Self {
         Self { superchunks: storage.cold_pool.len(), on_disk: storage.on_disk(), image_bytes: storage.bytes_in_memory(), ring_bytes: (storage.ring.capacity() * size_of::<u64>()) as u64 }
     }
 }

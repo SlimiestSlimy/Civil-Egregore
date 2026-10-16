@@ -185,17 +185,17 @@ fn runs<'t>(turn: &'t Turn, layer_type: LayerType, first: CellIndex, side: u32) 
 /// found it, into `set` -- the cells it holds at -- and `hot` -- those
 /// in hot bitmaps: in the world, and read. Both of one side, the
 /// tile's: its words copied as they lie.
-pub fn layer(turn: &Turn, layer_type: LayerType, at: CellIndex, set: &mut Mask, hot: &mut Mask) {
+pub fn read_layer(turn: &Turn, layer_type: LayerType, at: CellIndex, set: &mut Mask, hot: &mut Mask) {
     read_where(turn, layer_type, at, None, set, hot);
 }
 
-/// [`layer`], of the cells set in `under` alone: the rest are left
+/// [`read_layer`], of the cells set in `under` alone: the rest are left
 /// clear in `set` and `hot`.
 pub fn layer_under(turn: &Turn, layer_type: LayerType, at: CellIndex, under: &Mask, set: &mut Mask, hot: &mut Mask) {
     read_where(turn, layer_type, at, Some(under), set, hot);
 }
 
-/// [`layer`], under `under` if there is one.
+/// [`read_layer`], under `under` if there is one.
 fn read_where(turn: &Turn, layer_type: LayerType, at: CellIndex, under: Option<&Mask>, set: &mut Mask, hot: &mut Mask) {
     let side = set.side;
     assert!(hot.side == side && under.is_none_or(|under| under.side == side), "masks of two sides");

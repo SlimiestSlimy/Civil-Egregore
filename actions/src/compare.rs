@@ -5,7 +5,7 @@
 
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use compares_and_writes::compare::{close, open};
+use compares_and_writes::compare::{close_compare, open_compare};
 pub use compares_and_writes::compare::{attribute, end, from_here, holds, lacks, value, Compare};
 use simulation::Turn;
 
@@ -15,9 +15,9 @@ use simulation::Turn;
 /// then, if one is given. The compare is of the cell's superchunk.
 #[inline]
 pub fn write(turn: &mut Turn, compare: Compare, layer_type: LayerType, cell: CellIndex, seen: u32, value: u32, counted: Option<usize>) {
-    open(turn, compare);
+    open_compare(turn, compare);
     crate::cells::seen_becoming(turn, layer_type, cell, seen, value, counted);
-    close(turn);
+    close_compare(turn);
 }
 
 /// Adds one to the rule's count `counted` if `compare` holds when it

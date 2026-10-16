@@ -110,7 +110,7 @@ impl Compare {
     }
 
     /// The cell what is compared is on.
-    pub(crate) fn at(&self) -> CellIndex {
+    pub(crate) fn compared_cell(&self) -> CellIndex {
         match *self {
             Self::Cell { at, .. } | Self::CellFree { at } | Self::Entity { at, .. } | Self::Attribute { at, .. } | Self::AttributeMember { at, .. } => at,
         }
@@ -230,7 +230,7 @@ impl Turn<'_> {
     /// Where it lies in its queue is pushed on the turn's small stack
     /// of compares open.
     pub fn compare_open(&mut self, compare: Compare) {
-        let at = compare.at();
+        let at = compare.compared_cell();
         // Where the instruction went: its slot's queue, or that of acts over a border.
         let index = self.queue(at, compare.instruction());
         let queue = &mut self.outbox.queues[index];

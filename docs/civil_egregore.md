@@ -173,8 +173,10 @@ its words written sequentially as laid out in memory ("Saves", below).
 
 ### The tick budget
 
-The simulation is to run at 1 kHz -- a tick every millisecond -- with
-1,000 to 10,000 updates a tick. Against that budget, what the world
+The simulation is to run at 256 ticks a second
+(`simulation::simulation_time::TICKS_A_SIMULATION_SECOND`, the host's
+`TARGET_PACE`) -- a tick every 3.9 milliseconds -- with 1,000 to
+10,000 updates a tick. Against that budget, what the world
 structures cost decides where each operation may run:
 
 - **Nothing on the tick path decodes or encodes.** Decoding a layer and
@@ -774,7 +776,7 @@ step is found by waves: every goal's front moved a cell at once, each
 row a few shifts and ors, the whole search's memory one line of cache;
 the walker steps into the first wave to come beside it. A* is there
 too, for one place to go. An entity's turn reads the area
-(`actions::area::layer`), and the rule makes the masks: for a sheep,
+(`actions::area::read_layer`), and the rule makes the masks: for a sheep,
 grass the goals, the bitplanes held what may be walked on -- but for
 the cells other entities stand on, which are in its way.
 

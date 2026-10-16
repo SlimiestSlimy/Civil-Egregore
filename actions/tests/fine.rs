@@ -64,7 +64,7 @@ mod entities {
             for entity in turn.woken() {
                 let at = entity.header.at;
                 let about = around::about(at);
-                let stone = around::layer(turn, STONE, &about);
+                let stone = around::read_layer(turn, STONE, &about);
                 // Up and left of it, and to its right: the two chosen among.
                 let two = about.towards(around::NORTH_WEST) | about.towards(around::EAST);
                 let drawn = (0..64).filter_map(|_| around::pick(turn.random(), &about, two)).fold(0u16, |drawn, way| drawn | 1 << way);

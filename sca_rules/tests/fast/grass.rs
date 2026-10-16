@@ -15,7 +15,7 @@ use utilities::rng::Rng;
 /// Every chunk's grass in `world`, as its bitmap's words, the chunks in
 /// Morton order.
 fn grass_words(world: &World) -> Vec<(ChunkIndex, Vec<u64>)> {
-    world.arena().run(GRASS).map(|(chunk, bucket)| (chunk, bucket.cells().to_vec())).collect()
+    world.arena().buckets_of(GRASS).map(|(chunk, bucket)| (chunk, bucket.cells().to_vec())).collect()
 }
 
 /// Cells in a superchunk.
@@ -108,7 +108,7 @@ fn grass_grows_in_every_superchunk() {
         assert_eq!(chunk, same);
         for (word, (&was, &is)) in was.iter().zip(is).enumerate() {
             let flipped = was ^ is;
-            changed.extend((0..64).filter(|bit| flipped >> bit & 1 == 1).map(|bit| CellIndex::of(*chunk, word * 64 + bit).cartesian()));
+            changed.extend((0..64).filter(|bit| flipped >> bit & 1 == 1).map(|bit| CellIndex::from_chunk_place(*chunk, word * 64 + bit).cartesian()));
         }
     }
     assert!(changed.len() > 1000, "grass changed on {} cells", changed.len());

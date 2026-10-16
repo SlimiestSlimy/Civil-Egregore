@@ -50,7 +50,7 @@ pub fn spawn(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attrib
 /// a lamb born and its mother no longer pregnant.
 #[inline]
 pub fn make(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attributes: &[AttributeBlock]) {
-    compare::open(turn, compare::cell_free(at));
+    compare::open_compare(turn, compare::cell_free(at));
     entity::make(turn, Header { kind, at, wake });
     for attribute in each_attribute(attributes) {
         write::attribute_whole(turn, at, attribute);
@@ -61,7 +61,7 @@ pub fn make(turn: &mut Turn, kind: EntityType, at: CellIndex, wake: u64, attribu
 /// hang on the entity being made.
 #[inline]
 pub fn made(turn: &mut Turn) {
-    compare::close(turn);
+    compare::close_compare(turn);
 }
 
 /// Queues `entity` sleeping where it stands until `wake`: its
@@ -107,7 +107,7 @@ pub struct EntitiesBetweenTicks<'a> {
 impl<'a> EntitiesBetweenTicks<'a> {
     /// Those of a world whose entities are `entities`: made by whoever
     /// runs the world, never by a rule.
-    pub fn of(entities: &'a mut Entities) -> Self {
+    pub fn from_entities(entities: &'a mut Entities) -> Self {
         Self { entities, free: None, cells_put: Vec::new() }
     }
 

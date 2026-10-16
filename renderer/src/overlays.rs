@@ -174,7 +174,7 @@ pub fn heights(shown: Res<Shown>, sprites: Res<Sprites>, seen: Res<Seen>, link: 
         if text.0 != height {
             text.0 = height;
         }
-        *transform = Transform::from_xyz(sprites.plane(x, 0) + 0.5, -(sprites.plane(y, 1) + 0.5), 4.0).with_scale(Vec3::splat(size));
+        *transform = Transform::from_xyz(sprites.translation_of_cell(x, 0) + 0.5, -(sprites.translation_of_cell(y, 1) + 0.5), 4.0).with_scale(Vec3::splat(size));
         *visibility = Visibility::Visible;
     }
 }
@@ -199,13 +199,13 @@ pub fn labels(shown: Res<Shown>, sprites: Res<Sprites>, camera: Single<(&Transfo
             let (within_x, within_y) = (x % SUPERCHUNK_SIDE as u32, y % SUPERCHUNK_SIDE as u32);
             let superchunk = SuperchunkIndex::from_cartesian(x / SUPERCHUNK_SIDE as u32, y / SUPERCHUNK_SIDE as u32);
             let (superchunk_x, superchunk_y) = superchunk.cartesian();
-            let corner = Vec2::new(sprites.plane(x * CHUNK_SIDE as u32, 0), -sprites.plane(y * CHUNK_SIDE as u32, 1));
+            let corner = Vec2::new(sprites.translation_of_cell(x * CHUNK_SIDE as u32, 0), -sprites.translation_of_cell(y * CHUNK_SIDE as u32, 1));
             if let Some(size) = superchunk_size.filter(|_| (within_x, within_y) == (0, 0)) {
                 wanted.push((corner, 0.0, size, format!("superchunk {:011x} ({superchunk_x}, {superchunk_y})", superchunk.0)));
             }
             if let Some(size) = chunk_size {
                 let place = place_from_cartesian(within_x * CHUNK_SIDE as u32, within_y * CHUNK_SIDE as u32) / CELLS_IN_CHUNK;
-                wanted.push((corner, superchunk_size.unwrap_or(0.0), size, format!("chunk {:012x} ({x}, {y})", ChunkIndex::of(superchunk, place).0)));
+                wanted.push((corner, superchunk_size.unwrap_or(0.0), size, format!("chunk {:012x} ({x}, {y})", ChunkIndex::from_superchunk_place(superchunk, place).0)));
             }
         }
     }

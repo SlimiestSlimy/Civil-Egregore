@@ -26,7 +26,7 @@ from consecutive seeds starting at the run's.
 
 **`HowMany`**, **`families(how_many)`**: every family -- cities, grown,
 sparse, lines -- named, each generator taking its timed count, its
-tested count, or the same number each.
+tested count, or the same number each (**`to_take(timed, tested)`**).
 
 **`generate::one(seed, density, cluster)`**: grows a bitmap cell by
 cell until `density` of it is set. Each new cell lands, with
@@ -83,17 +83,17 @@ and down either diagonal.
 
 ## `diagnostics/`: data gathered, never judged
 
-**`examination::Examination::of(tessera, stream, back, bitmap)`**:
+**`examination::Examination::examine_bitmap(tessera, stream, back, bitmap)`**:
 encodes and decodes one bitmap: the bits written, whether the stream is
 the binary count tree, and the first cell decoded wrong.
 **`first_difference(a, b)`**: compares words first, cells only if they
 differ. **`tree_of(bitmap)`**: the tree a fresh `Tessera` makes.
 
-**`measured::Measured::of(tessera, bitmaps)`**: bits, cells set, the
+**`measured::Measured::measure_bitmaps(tessera, bitmaps)`**: bits, cells set, the
 fewest and most bits, encode time, and the bitmaps that did not round
 trip, over many. **`add`**: sums two, dropping the other's lost ones.
 
-**`tree_stats::TreeStats::of(tree)`**: what a tree holds -- plain
+**`tree_stats::TreeStats::measure_tree(tree)`**: what a tree holds -- plain
 tiles, complex tiles and their payload values, copies naming children,
 flipping divides, cell lists -- walked from the top.
 
@@ -117,7 +117,7 @@ and the PBM image `TESSERA_DIAGNOSE` names, if any: what `census` and
 **`png::png(bitmap)`**: a greyscale PNG, two pixels a cell, written
 with no library: the image data in stored (uncompressed) deflate blocks
 inside a zlib stream (`stored_zlib`, `adler32`), each PNG chunk with
-its CRC (`chunk`, `crc32`).
+its CRC (`append_png_chunk`, `crc32`).
 
 **Private to the files.** `count_children(tree, tile)`
 (`tree_stats.rs`): counts every child of a tile that is a node. In
@@ -268,7 +268,7 @@ longer than it needs to be.
 
 A crate of its own, so the codecs never enter Tessera's build.
 
-**`Rows::of(bitmap)`**, **`Rows::get`**: a bitmap as the raster codecs
+**`Rows::from_bitmap(bitmap)`**, **`Rows::get`**: a bitmap as the raster codecs
 take it: rows of packed bits, top row first, the leftmost cell the
 highest bit. Converted before anything is timed.
 

@@ -24,10 +24,10 @@ one, no float: how a world of that many is laid out, about
 in Morton order; **`offset(dx, dy)`**, stepped on the index, refused
 past the world's edge.
 
-**`ChunkIndex(u64)`**: **`of(superchunk, place)`**, **`superchunk`**,
+**`ChunkIndex(u64)`**: **`from_superchunk_place(superchunk, place)`**, **`superchunk`**,
 **`place`** (0 to 15), **`top_left`**.
 
-**`CellIndex(u64)`**: **`of(chunk, place)`**, **`superchunk`**,
+**`CellIndex(u64)`**: **`from_chunk_place(chunk, place)`**, **`superchunk`**,
 **`chunk`**, **`place`** (the low 16 bits: its bit in the chunk's
 words), **`place_in_superchunk`** (the low 20), **`cartesian`**, and
 `From<CellCartesian>`. **`offset(dx, dy)`**: the cell so far away, if

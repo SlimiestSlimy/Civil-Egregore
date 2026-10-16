@@ -102,7 +102,7 @@ impl Queue {
         self.instructions[some].iter().all(|instruction| match instruction.opcode {
             Opcode::CompareEnd | Opcode::Count => true,
             Opcode::MoveEntity | Opcode::CrossEntity => false,
-            _ => instruction.names_an_entity() && instruction.at(stood.superchunk()) == stood,
+            _ => instruction.names_an_entity() && instruction.cell_in(stood.superchunk()) == stood,
         })
     }
 
@@ -156,8 +156,8 @@ impl Queue {
             let landed = if L::SEVERAL && instruction.names_an_entity() {
                 lands.of_named(instruction)
             } else {
-                lands.of_slot(instruction.slot()).map(|(superchunk, entities)| {
-                    let at = instruction.at(superchunk.index());
+                lands.of_slot(instruction.outbox_slot()).map(|(superchunk, entities)| {
+                    let at = instruction.cell_in(superchunk.index());
                     (superchunk, entities, at)
                 })
             };

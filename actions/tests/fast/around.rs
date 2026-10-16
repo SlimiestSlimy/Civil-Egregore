@@ -37,7 +37,7 @@ fn the_nine_about_a_cell_are_its_cells_read_one_by_one() {
         for (x, y) in cells_every_way() {
             let at = cell(x, y);
             let about = around::about(at);
-            let nine = around::layer(turn, STONE, &about);
+            let nine = around::read_layer(turn, STONE, &about);
             for way in 0..around::WAYS {
                 let held = around::cell(at, way).map(|cell| turn.holds(STONE, cell));
                 let (hot, set) = (matches!(held, Some(Ok(_))), held == Some(Ok(true)));
@@ -97,7 +97,7 @@ fn what_may_be_stepped_to_is_the_unwalled_less_the_held() {
         for (x, y) in cells_every_way() {
             let at = cell(x, y);
             let about = around::about(at);
-            let (steppable, held) = (walking::around_steppable(turn, &about), around::layer(turn, COLLISION, &about));
+            let (steppable, held) = (walking::around_steppable(turn, &about), around::read_layer(turn, COLLISION, &about));
             assert_eq!(steppable, (walking::around_unwalled(turn, &about) & about.ring()).without(held.set), "about ({x}, {y})");
             open += steppable.count() as usize;
         }

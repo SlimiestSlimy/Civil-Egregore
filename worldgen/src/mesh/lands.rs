@@ -124,7 +124,7 @@ impl Lands {
     /// How high the land at the cell `(x, y)` stands of what it may, of
     /// [`ONE`], and about
     /// how many cells it is from the nearest line of the broad mesh.
-    pub fn line(&mut self, x: u32, y: u32) -> (u64, u64) {
+    pub fn inland_and_line_distance(&mut self, x: u32, y: u32) -> (u64, u64) {
         let at = self.moved(x, y);
         let broad = self.broad.blended(&self.shape, self.seed, at);
         (broad.inland, broad.line)

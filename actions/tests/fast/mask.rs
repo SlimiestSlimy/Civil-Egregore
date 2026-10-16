@@ -60,7 +60,7 @@ fn a_tile_read_is_its_cells_read_one_by_one() {
             for (x, y) in origins {
                 let (at, first) = (cell(x, y), mask::tile(cell(x, y), side));
                 assert_eq!((first.cartesian().x % side, first.cartesian().y % side, mask::tile(first, side)), (0, 0, first), "a tile is aligned");
-                mask::layer(turn, STONE, at, &mut set, &mut hot);
+                mask::read_layer(turn, STONE, at, &mut set, &mut hot);
                 mask::layer_under(turn, STONE, at, &disc, &mut set_under, &mut hot_under);
                 for (across, down) in (0..side).flat_map(|down| (0..side).map(move |across| (across, down))) {
                     let held = turn.holds(STONE, mask::cell(first, across, down));
@@ -97,7 +97,7 @@ fn a_mask_written_is_read_back() {
             }
             let mut before = before.lock().unwrap();
             let (set, hot) = &mut *before;
-            mask::layer(turn, STONE, origin, set, hot);
+            mask::read_layer(turn, STONE, origin, set, hot);
             // The disc cleared where set, and a square in its middle set where clear: each cell written once, from what was seen.
             let mut middle = Mask::empty(side);
             (side / 4..side / 2).flat_map(|y| (side / 4..side / 2).map(move |x| (x, y))).for_each(|(x, y)| middle.set(x, y, true));
@@ -110,7 +110,7 @@ fn a_mask_written_is_read_back() {
                 return 0;
             }
             let (mut set, mut hot) = (Mask::empty(side), Mask::empty(side));
-            mask::layer(turn, STONE, origin, &mut set, &mut hot);
+            mask::read_layer(turn, STONE, origin, &mut set, &mut hot);
             let before = &before.lock().unwrap().0;
             for (x, y) in (0..side).flat_map(|y| (0..side).map(move |x| (x, y))) {
                 let middle = (side / 4..side / 2).contains(&x) && (side / 4..side / 2).contains(&y);

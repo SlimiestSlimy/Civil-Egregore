@@ -88,7 +88,7 @@ pub fn clicked<Does: Copy>(rows: &[Row<Does>], window: &Window, buttons: &Button
 
 /// A menu's parts, as `rows` say, if it `open`s: each bar shown or not
 /// and coloured as its row looks, and its words.
-pub fn show<Does, Of: QueryFilter>(open: bool, rows: &[Row<Does>], shade: &mut Visibility, bars: &mut Query<(&Bar, &mut Node, &mut BackgroundColor), Of>, words: &mut Query<(&Says, &mut Text), Of>) {
+pub fn show_rows<Does, Of: QueryFilter>(open: bool, rows: &[Row<Does>], shade: &mut Visibility, bars: &mut Query<(&Bar, &mut Node, &mut BackgroundColor), Of>, words: &mut Query<(&Says, &mut Text), Of>) {
     let shown = if open { Visibility::Visible } else { Visibility::Hidden };
     if *shade != shown {
         *shade = shown;
@@ -131,7 +131,7 @@ pub struct Listing {
 
 impl Listing {
     /// The worlds `lister` names, from the first.
-    pub fn of(lister: fn() -> Vec<String>) -> Self {
+    pub fn from_lister(lister: fn() -> Vec<String>) -> Self {
         Self { worlds: lister(), first: 0 }
     }
 

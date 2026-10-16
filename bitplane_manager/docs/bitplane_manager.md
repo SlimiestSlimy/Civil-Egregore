@@ -11,10 +11,10 @@ Allocations, one a layer type over a superchunk: an array of buckets
 -- a 256x256 bitmap each -- one for each of its chunks that has a cell
 set, 16 at the most, in their Morton order. A chunk with no cell set
 has no bucket and reads clear; the first cell set in it makes one, put
-in its place among the others (`SuperchunkLayer::keep`), so buckets
+in its place among the others (`SuperchunkLayer::bucket_or_insert`), so buckets
 after it move -- a superchunk owns its own, and changes them alone. A
 bucket is found by how many chunks before it have one: a count of bits
-(`start`), no search. One is let go when its chunk is neither hot nor
+(`bucket_offset`), no search. One is let go when its chunk is neither hot nor
 waiting in the ring. Each
 allocation keeps four 16-bit chunk sets packed in 8 bytes (hot, dirty,
 waiting in the ring, non-empty), each bucket's count of set cells (a

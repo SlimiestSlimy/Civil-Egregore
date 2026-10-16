@@ -60,7 +60,7 @@ fn adler32(bytes: &[u8]) -> u32 {
 
 /// Appends one PNG chunk to `bytes`: its length, `kind`, `data`, and the
 /// CRC of the last two.
-fn chunk(bytes: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]) {
+fn append_png_chunk(bytes: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]) {
     bytes.extend((data.len() as u32).to_be_bytes());
     let mut body = kind.to_vec();
     body.extend(data);
@@ -97,8 +97,8 @@ pub fn png(bitmap: &Bitmap) -> Vec<u8> {
     let mut header = (side as u32).to_be_bytes().to_vec();
     header.extend((side as u32).to_be_bytes());
     header.extend([BIT_DEPTH, GREYSCALE, DEFLATE, ADAPTIVE_FILTERING, NO_INTERLACE]);
-    chunk(&mut bytes, b"IHDR", &header);
-    chunk(&mut bytes, b"IDAT", &stored_zlib(&rows));
-    chunk(&mut bytes, b"IEND", &[]);
+    append_png_chunk(&mut bytes, b"IHDR", &header);
+    append_png_chunk(&mut bytes, b"IDAT", &stored_zlib(&rows));
+    append_png_chunk(&mut bytes, b"IEND", &[]);
     bytes
 }

@@ -7,7 +7,7 @@
 
 use crate::turn::apply::Applied;
 use crate::turn::landing::{LandingInOne, LandingInSeveral};
-use crate::turn::{slot, slot_between, slots, Outbox, ACROSS, SLOTS};
+use crate::turn::{slot_toward, slot_between, slots, Outbox, ACROSS, SLOTS};
 use bitplane_manager::Superchunk;
 use chunk_storage::LayerType;
 use coordinates::SuperchunkIndex;
@@ -106,7 +106,7 @@ impl Phase<'_, '_> {
             let Some(source) = self.superchunk_indices[here].offset(dx, dy).and_then(|source| self.superchunk_indices.binary_search(&source).ok()) else {
                 continue;
             };
-            let (outbox, from) = (&self.outboxes[source], slot(-dx, -dy));
+            let (outbox, from) = (&self.outboxes[source], slot_toward(-dx, -dy));
             order.extend(outbox.segments[from].iter().enumerate().map(|(segment, begun)| (begun.author, source as u32, from as u32, segment as u32)));
             let across = outbox.segments[ACROSS].iter().zip(&outbox.across).enumerate().filter(|(_, (_, across))| across.lands & 1 << from != 0);
             order.extend(across.map(|(segment, (begun, _))| (begun.author, source as u32, ACROSS as u32, segment as u32)));
@@ -258,7 +258,7 @@ pub(crate) fn apply_what_was_queued(dispatcher: &Dispatcher, superchunks: &mut [
     let (to_begin, any_acts, done) = (AtomicUsize::new(count), outboxes.iter().any(|outbox| !outbox.across.is_empty()), AtomicUsize::new(0));
     let phase = Phase { applying: &applying, superchunk_indices, outboxes, to_go_on: &room.to_go_on, let_go_on: &room.let_go_on, lying: &room.lying, whose: &room.whose, asleep, woken, sleeping, to_begin, any_acts, done, now, collision, following: Following::of_what_was_queued(outboxes) };
     let applied_parts: Vec<Mutex<Applied>> = (0..dispatcher.threads()).map(|_| Mutex::new(Applied::default())).collect();
-    dispatcher.run(&|part| {
+    dispatcher.run_in_parts(&|part| {
         let mut applied = Applied::default();
         let mut rests = 1;
         loop {

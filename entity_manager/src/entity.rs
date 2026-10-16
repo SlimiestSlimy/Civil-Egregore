@@ -113,7 +113,7 @@ impl<'a> EntityRef<'a> {
     /// summed of one; not what an entity is given
     /// ([`EntityRef::default_attribute`]).
     #[inline]
-    pub fn kept(&self) -> &'a [AttributeBlock] {
+    pub fn attribute_list(&self) -> &'a [AttributeBlock] {
         self.kept
     }
 }

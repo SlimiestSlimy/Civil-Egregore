@@ -36,7 +36,7 @@ impl Wheel {
     /// Files `wake` for `tick`, no earlier than `earliest`: the tick about
     /// to run between ticks, the next one during a tick's second phase,
     /// after [`Wheel::pass`].
-    pub(crate) fn file(&mut self, earliest: u64, tick: u64, wake: Wake) {
+    pub(crate) fn file_wake(&mut self, earliest: u64, tick: u64, wake: Wake) {
         assert!(tick >= earliest, "a wake at tick {tick}, before {earliest}");
         if tick - earliest < WHEEL_TICKS {
             self.slots[(tick % WHEEL_TICKS) as usize].push(wake);

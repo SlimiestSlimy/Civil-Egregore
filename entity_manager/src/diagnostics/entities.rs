@@ -20,7 +20,7 @@ pub struct EntityStats {
 
 impl EntityStats {
     /// What `entities` hold now.
-    pub fn of(entities: &Entities) -> Self {
+    pub fn measure_entities(entities: &Entities) -> Self {
         let mut stats = Self { superchunks: entities.superchunks().len(), ..Self::default() };
         for superchunk in entities.superchunks() {
             let (attributes, garbage, wakes) = superchunk.counts();

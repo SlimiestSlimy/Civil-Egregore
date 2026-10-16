@@ -25,7 +25,7 @@ How deep water is over a `WET` cell is the image's
 **`height_shaped(shape, seed, x, y)`**: the same in a world shaped
 otherwise. **`Terrain::generate_shaped(shape, seed, superchunk)`**: a
 superchunk's heights and walls. **`Noise`**: smooth noise asked cell after cell, the four points
-about the last cell kept -- `new(seed, index, shift)`, `at(x, y)`;
+about the last cell kept -- `new(seed, index, shift)`, `noise_at(x, y)`;
 **`noise(seed, index, shift, x, y)`**: the same for one cell alone.
 Private: **`point`**, an octave's number at a point; **`between`**. **`wall(from, to)`**: whether no step goes from a cell so high to one beside it so high -- more than a step up or a drop down; the step back is asked the other way round.
 
@@ -45,7 +45,7 @@ last cell and its triangle kept -- **`new(shape, seed)`**, **`land(x,
 y)`** (the lattice's points about the cell blended, a point no share is
 taken from not worked out), **`height(x, y)`**,
 **`heights_of_a_square(left, top, side)`** (every cell's height, row by
-row, each point of the lattice worked out once), **`line(x, y)`** (how
+row, each point of the lattice worked out once), **`inland_and_line_distance(x, y)`** (how
 far inland the cell is, and about how far from the broad mesh's
 nearest line). Private to `mesh/lands.rs`: `LATTICE` (2) and
 `LATTICE_STEP` (4), the cells from a point of the lattice to the next,
@@ -96,7 +96,7 @@ ground's. `BROAD`, `FINER`: the cells from a point to the next of its
 noises, as powers of two. `STEPS_A_DEGREE_COOLER`,
 `STEPS_A_LEVEL_DRIER`, `MORE_HUMID_OVER_WATER`: what height and water
 do to it. **`ClimateNoises`**: the noises a world's climate lies by;
-**`new(seed)`**, **`at(x, y, above_ocean, under_water)`**: a tile's
+**`new(seed)`**, **`climate_at(x, y, above_ocean, under_water)`**: a tile's
 climate (`worldgen.md`, "Climate"). The module is `climate`.
 
 ## `generation.rs`
@@ -110,7 +110,7 @@ its cells;
 a world's file keeps them (`numbers!`). **`from_tuning(tuned)`**: as
 the sliders have it (**`shape_from_tuning`**). **`growth(seed)`**: a
 **`Growth`**, the thresholds found once and the noises kept;
-**`Growth::at(x, y)`** (it keeps the noise about the cell, so each
+**`Growth::grown_at(x, y)`** (it keeps the noise about the cell, so each
 thread has a `Growth` of its own): a
 **`Grown`** `{grass, tree}` -- the tree a lot, its stage drawn from it
 by whoever counts the stages. **`has_land_about(seed, shape, near)`**:

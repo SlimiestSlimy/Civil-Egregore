@@ -43,9 +43,11 @@ multiplied by, and what is laid over it first, pale, sand or foam and
 how much. **`lit(colour, shade)`**: a colour through a shade.
 
 **`Fine`**: heights, shadow lines and light, a cell each, the ocean's
-level and the highest land -- **`height(x, y)`**, **`line(x, y)`**,
+level and the highest land -- **`height(x, y)`**, **`shadow_line(x, y)`**,
 **`light(x, y)`**, **`under_ocean(x, y)`**, **`surface(x, y)`**: what
 a shadow falls on, **`deepest()`**, **`tint(x, y)`**. **`share`**.
+`offset_of(x, y)`: where a cell is kept, `MARGIN` cells past each
+edge.
 **`Ground`** `{levels, fine, used}`: a level of shades a detail;
 **`ask(terrain, world, levels, top_left, given)`**: a superchunk's
 ground, the heights about it asked of the host, flat at the ocean's
@@ -74,7 +76,7 @@ how far its nearest cell is from the coast -- **`halved()`**,
 **`drawn(detail)`**: contours (`CONTOUR`, `FIFTH_CONTOUR`,
 `CONTOUR_EVERY`, `CONTOURS_APART`; `FIFTH`, 5, contours from one drawn
 darker to the next), sand and foam.
-**`Shade::of(factor, over, part)`**.
+**`Shade::from_factor(factor, over, part)`**.
 
 ### `ground/light_and_shadow.rs`
 
@@ -116,7 +118,7 @@ none due but, the first time, a small picture (`WarmUp`,
 `WARM_UP_SIDE` 4) that has the card build what makes mipmaps. On the
 card's side: `Waiting` `{pictures, asked_on}`, the pictures not yet
 done; `take`: the frame's due taken, every one waiting asked for;
-`make`: the mipmaps made before the cameras draw
+`make_mipmaps`: the mipmaps made before the cameras draw
 (`BEFORE_THE_CAMERAS`), a picture done once the card has it and what
 makes them is built -- not taken as built before mipmaps were asked on
 `ASKED_BEFORE` (2) frames -- and given up after `GIVEN_UP_AFTER` (600).
@@ -125,7 +127,7 @@ makes them is built -- not taken as built before mipmaps were asked on
 
 **`Link`** `{host, pictures, shading, waiting, since, asked, paused,
 pace, generation, first_view}`: the host as the window holds it (`server::host::Host`) --
-**`start()`**: the host and the painter started; **`of_shown_worlds()`**: the same on a host whose world is whatever ticker's comes, flat out (`of`, what both are made by); **`forget_asked()`**:
+**`start()`**: the host and the painter started; **`of_shown_worlds()`**: the same on a host whose world is whatever ticker's comes, flat out (`around_host`, what both are made by); **`forget_asked()`**:
 another world to run in place of the one run, no frame of the one
 before waited for. **`Seen`** `{frame, painted, paint_seconds,
 viewport_superchunks, detail, near_pixels, map, climates}`: the last frame, and how it was
@@ -148,7 +150,7 @@ change how worlds are generated, the view left where it is.
 with no mipmaps -- the picture from near, the map, a still.
 **`Laid`**: what of a picture over the images is changed.
 **`NearView`**: the picture from near; **`spawn`**: it, hidden.
-**`show`**: every frame that came shown, in the order they came, the
+**`show_frames`**: every frame that came shown, in the order they came, the
 host asked again once one says no more follow -- another world's dropping what
 was drawn of the last, the view put over it; what was drawn of a
 superchunk of the viewport gone cold dropped; each superchunk's image,
@@ -169,7 +171,7 @@ dropped.
 **`Sprites`** `{tiles}`: a sprite and its image a superchunk that has
 been in the viewport, by where it is in the world; **`origin(axis)`**: the
 plane's origin, the origin superchunk's top left;
-**`plane(cell, axis)`** and **`cell(plane, axis)`** between the world's
+**`translation_of_cell(cell, axis)`** and **`cell_at_translation(plane, axis)`** between the world's
 cells and the plane, **`viewport_cells(transform, scale, window)`**:
 the cells the camera shows.
 **`spawn`**: the camera. **`first_view(side, window, transform,
@@ -239,10 +241,10 @@ asks it, each 1,024 by 768 as a screen would show it; **`answered`**,
 `WAITED_AT_MOST` (half an hour: a world's superchunks take a while to
 generate) and `BETWEEN_ASKS` (200 ms before the host is asked again
 for superchunks not yet hot). **`tool::COMMANDS`**: `stills`, each kept
-as a PNG (`stills_tool`); `watch` opens the window on a world an in-bin test ticks (`watch_tool`; `SHEEP`, `PASTURE_SUPERCHUNKS`, `GRASS_THOUSANDTHS`): `show` opens the window that shows tickers' worlds (**`window_on::show_worlds()`**, `show_world`); **`window_on::open(start)`** tells the host to make the world and shows it in place of the main menu -- `Watched`, `show` (`renderer.md`, "Watching a test's world"); the tools' parameters' names `SEED` (in hex; 0 the
+as a PNG (`stills_tool`); `watch` opens the window on a world an in-bin test ticks (`watch_tool`; `SHEEP`, `PASTURE_SUPERCHUNKS`, `GRASS_THOUSANDTHS`): `show` opens the window that shows tickers' worlds (**`window_on::show_worlds()`**, `show_world`); **`window_on::open_window(start)`** tells the host to make the world and shows it in place of the main menu -- `Watched`, `make_watched_world` (`renderer.md`, "Watching a test's world"); the tools' parameters' names `SEED` (in hex; 0 the
 counted one, moved on to one with land about the middle),
 `CELLS_EAST`, `CELLS_SOUTH`, `FARTHEST`, `NAMED`; and `window_still`
-(`window_still_tool`; `CELLS_A_PIXEL`): **`window_still::keep(seed,
+(`window_still_tool`; `CELLS_A_PIXEL`): **`window_still::save_still(seed,
 cells_a_pixel, path)`** opens the window on the world of a seed, holds
 the view at so many cells a screen pixel, keeps what the graphics card
 drew and closes it -- `Wanted` `{seed, cells_a_pixel, path,

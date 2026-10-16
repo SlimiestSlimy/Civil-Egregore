@@ -126,7 +126,7 @@ impl Tessera {
         write_tree_and_plan_last_pass(stream, &self.tree, bitmap, &mut self.floor_plan, start_level);
         if cfg!(debug_assertions) {
             let mut prices = 0;
-            self.floor_plan.residual_floor_tiles(|index| prices += self.pricing.of(index));
+            self.floor_plan.residual_floor_tiles(|index| prices += self.pricing.price_of(index));
             assert_eq!(stream.len() as u64 - FLAG_WIDTH as u64, tree_bits - prices, "the tree written is not the tree counted");
         }
         self.last_pass.encode(&mut self.floor_plan, bitmap, stream);

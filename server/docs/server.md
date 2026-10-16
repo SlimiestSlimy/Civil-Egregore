@@ -128,13 +128,13 @@ master -- the registry's -- and goes over the samples
 does not build, and names itself. What a tick did is an array with a
 rule's counts at its place among them. Nothing is looked up by a name
 as a world runs: a rule's place is a constant made of its ID in the
-registry as the server is compiled (`SHEEP_RULE`, `RulePlace::of`),
+registry as the server is compiled (`SHEEP_RULE`, `RulePlace::from_registry_id`),
 and so is the place of each thing
 a rule counts, worked out from the one list of their names
 (`sheep::EATEN`, `actions::place_counted`) -- a name that is not
 there does not compile. A tick's counts are read by them
-(`counts.of(SHEEP_RULE)[EATEN]`), and an in-bin test or a test ticks
-only the rules it picks (`Chosen::of(&[GRASS_RULE])`).
+(`counts.counts_of(SHEEP_RULE)[EATEN]`), and an in-bin test or a test ticks
+only the rules it picks (`Chosen::from_rules(&[GRASS_RULE])`).
 
 A rule's counts come from two places. What it counts as it runs is
 what its function returns. What hangs on a write being applied -- a

@@ -22,7 +22,7 @@ mod world_hash;
 mod world_start;
 
 pub use halos::HOT_ENTITY;
-pub use simulation::hot::about;
+pub use simulation::hot::halos_about;
 pub use simulation::{HaloChange, COOL_TICKS, WARM_TICKS};
 pub use rules::{Chosen, Rule, RulePlace, TickCounts, GRASS_RULE, RULES, SHEEP_RULE, TREES_RULE, WEATHER_RULE};
 pub use tick::WorldTick;
@@ -132,7 +132,7 @@ impl World {
     pub(crate) fn put_flock(&mut self, superchunk: SuperchunkIndex, sheep: usize) {
         let arena = &self.arena;
         let free = |at| arena.holds(COLLISION, at) != Ok(true);
-        let mut between = EntitiesBetweenTicks::of(&mut self.entities).where_free(&free);
+        let mut between = EntitiesBetweenTicks::from_entities(&mut self.entities).where_free(&free);
         flock(&mut between, superchunk, sheep, &mut Rng::for_stream(!self.info.seed, superchunk.0));
         let stood_on: Vec<Write> = between.cells_put().iter().map(|&at| Write::cell(at, WriteOp::Set)).collect();
         self.write_cells(COLLISION, stood_on);
@@ -188,7 +188,7 @@ pub fn flocked(mut world: World, superchunks: &[SuperchunkIndex], sheep: usize) 
         world.put_flock(superchunk, sheep);
     }
     world.entities.apply();
-    let halo = about(flocked.iter().copied());
+    let halo = halos_about(flocked.iter().copied());
     world.keep_hot(&halo);
     world
 }
