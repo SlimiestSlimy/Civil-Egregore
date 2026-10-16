@@ -108,6 +108,17 @@ Boundaries, asked first, would have put that on the table.
 == TO DO ==
 
 NOW
+- ASK 2026-10-16 (Remote Control, on the user's PC): "since this is a
+  remote session but still running locally on my computer rendering
+  will be compiled as usual for local sessions" / "now what were going
+  to do before anything else is working on modularizing and de
+  coupling the code a little, pull first, though, we need to finish
+  the stuff mid work upstream". Order: finish the name sweep's
+  handoff below; then modularize and decouple.
+- Found 2026-10-12, not fixed: the simulation's fine test
+  what_others_write_to_an_entity_follows_it_over_a_border hung with
+  every thread asleep on a futex, once in 300 runs alone (not the
+  seed's doing): a lost wake in the threads.
 - NAME SWEEP (the user, 2026-10-16): every ambiguous single-word name
   gets a name of two or more words saying what it is in its place.
   Exempt: single-word glossary terms, x/y/dx/dy, the Rust idioms (new,

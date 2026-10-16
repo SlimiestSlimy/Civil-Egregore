@@ -52,6 +52,33 @@ from one neighbour after another at most, which is what the queue is
 sized by (`QUEUE_ROOM`: the area's cells, `CELLS`, times the eight steps). It allocates nothing either, but looks at cells one by
 one: for the nearest of many goals, waves are the cheaper.
 
+## In Morton order
+
+`morton.rs` is the same search as the waves, over cells kept as the
+bitmaps keep them: `Tiles`, the 32x32 cells of four aligned tiles of
+16 two by two, 16 words (`TILES_WORDS`), each an 8x8 word tile, a
+cell's bit the index of its two coordinates interleaved
+(`bit_at`). Read off the bitplanes as they lie, nothing is turned
+into rows first.
+
+A step east is not a shift of a row. A cell's x is every other bit of
+its index, so a step up it carries through those bits: the cells of a
+word tile fall in four kinds by how far the carry goes
+(`STEP_UP_KINDS`, `STEP_DOWN_KINDS`), each moved by one shift
+(`KIND_SHIFTS`, twice as far for y), and the fourth kind -- on the
+tile's far edge -- leaves for the word tile beside
+(`WORD_TILE_BESIDE`). So `step_up` and `step_down` move a whole set a
+cell each way in three masked shifts a word and a carry, and a wave
+spreads by eight of them (`MortonWalls::spread_through`).
+
+Its walls (`MortonWalls`) bar a step both ways, east and south of
+cells, as the walls did before they were one way's: made from the
+four one-way layers it would need the four ways of `Walls::one_way`.
+It was written, and tested against the waves over rows on areas
+drawn (the same goal as near, by a first step as short), and parked
+on a branch of its own; it came into the main line when the branches
+were made one, and nothing calls it.
+
 ## Still to come
 
 Areas larger than 16x16 -- waves over the words of several, or a
@@ -65,6 +92,7 @@ slope); and walkers larger than a cell.
 | `src/lib.rs` | areas, waves, a walker's step, the nearest cell |
 | `src/walls.rs` | the walls between cells, and cells spread a step through them |
 | `src/a_star.rs` | A*: the shortest path between two cells |
+| `src/morton.rs` | waves in Morton order, over tiles as they lie in their bitmaps: written and tested, used by nothing yet |
 | `src/diagnostics/`, `src/transient_data.rs` | the folders every crate has; nothing gathered or kept yet |
 | `tests/` | each judged against a search of every cell |
 | `docs/` | this, and the reference, function by function |

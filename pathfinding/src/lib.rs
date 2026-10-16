@@ -13,6 +13,7 @@
 
 mod a_star;
 pub mod diagnostics;
+pub mod morton;
 pub mod transient_data;
 mod walls;
 
