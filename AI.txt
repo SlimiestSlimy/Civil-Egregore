@@ -635,6 +635,36 @@ RULES AND TIME
 
 
 == OPEN THREADS ==
+- NAME SWEEP, in progress 2026-10-16 (after f985607, the punch-list
+  renames). The user's rule: ambiguous names go; a name of two words
+  or more says what it is in its place. Single-word glossary terms
+  are fine; exempt: x, y, dx, dy, the Rust idioms (new, default, len,
+  get, set, push, pop, insert, remove, clear, contains, iter, main),
+  trait-impl methods, names a framework requires. Everything else
+  single-word is a candidate: functions, types, consts, fields,
+  variants, locals, parameters (8164 of them by rust-analyzer's
+  semantic tokens; `at` 282, `index` 127, `first` 121, ...).
+  How: rename through rust-analyzer (rustup component add
+  rust-analyzer), never by text -- all renames asked against one
+  snapshot, merged, applied at once; a local's new name refused if it
+  already appears in its function (shadowing would compile and change
+  behaviour); field shorthand renamed both ways merges to
+  `field: local`. Comments' backticked mentions and the markdown docs
+  follow by script (rust-analyzer leaves them). Check after each
+  batch: every headless crate compiles, tests and clippy clean, gui
+  and renderer `cargo check`, and `Civil_Egregore server check`
+  prints the same world hash as before the sweep (it did at
+  f985607). The worksheets and scripts were in the session's /tmp,
+  gone with it: start again from the inventory.
+- NEXT, after the sweep (the user's): transient data folded into
+  utilities -- each crate's lib.rs or main.rs, after its imports,
+  declares statically its transient data paths, to the files
+  themselves; utilities::csv takes a flag to make the file and its
+  folders for any path, so disk storage stays with the file
+  interactor, the csv library. Disk is touched directly today in 17
+  files (chunk_storage paging/disk, server host and tests, utilities
+  settings/seed/report, tessera adversarial/render, renderer tool,
+  the root's tests/fine.rs).
 - CLOUDS, built 2026-10-11 ("plane and shadow only"): CLOUD and
   CLIMATE registered at tile size 8x8, kept by the arena, saved,
   the clouds sent in the frame and drawn as shadow. NOT as answered
