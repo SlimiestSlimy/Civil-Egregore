@@ -6,7 +6,7 @@
 use crate::attributes::{default_kept, find_attribute, write_attribute_bytes, write_bytes, write_default, AttributeBlock, AttributeType};
 use crate::entity::{EntityRef, Header};
 use coordinates::CellIndex;
-use utilities::cache::prefetch;
+use utilities::cache::prefetch_cache_line;
 
 /// Attribute blocks in a cache line.
 const CACHE_LINE_BLOCKS: usize = 64 / crate::attributes::BLOCK_BYTES;
@@ -37,7 +37,7 @@ struct StoredEntity {
     /// The entity's fixed part.
     header: Header,
     /// Where its blocks start in the list.
-    first: u32,
+    first_block: u32,
     /// How many blocks they are.
     count: u16,
     /// How many of them, the first, are its type's default
@@ -49,15 +49,15 @@ struct StoredEntity {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Put {
     /// It is new, and now stands on its cell.
-    New,
+    NewlyPut,
     /// It was changed where it stands.
     InPlace,
     /// It moved to its cell.
-    Moved,
+    MovedToCell,
     /// Its cell was occupied: it was changed, and stays where it was.
-    Stayed,
+    TurnedBack,
     /// It is new and its cell was occupied: it is not put.
-    Refused,
+    RefusedOccupied,
     /// It was to be changed or moved, but no entity stands where it
     /// was: it moved on, or was removed.
     PassedOver,
@@ -66,8 +66,8 @@ pub enum Put {
 impl Put {
     /// What it is of an entity that was to move and was put where it
     /// stood instead, its cell not to be come to: it stayed.
-    pub(crate) fn stayed(self) -> Self {
-        if self == Self::InPlace { Self::Stayed } else { self }
+    pub(crate) fn as_turned_back(self) -> Self {
+        if self == Self::InPlace { Self::TurnedBack } else { self }
     }
 }
 
@@ -81,69 +81,69 @@ pub(crate) struct Bucket {
     /// search tile's, a few, not all the chunk's.
     tile_starts: [u32; SEARCH_TILES + 1],
     /// The entities, in the same order as `places`.
-    stored: Vec<StoredEntity>,
+    stored_entities: Vec<StoredEntity>,
     /// Every entity's attribute list, one after another, and garbage.
     attributes: Vec<AttributeBlock>,
     /// How many blocks of `attributes` belong to no entity.
-    garbage: usize,
+    garbage_blocks: usize,
 }
 
 impl Bucket {
     /// How many entities it holds.
     pub(crate) fn len(&self) -> usize {
-        self.stored.len()
+        self.stored_entities.len()
     }
 
     /// The attributes' blocks in use, and the garbage.
     pub(crate) fn attribute_counts(&self) -> (usize, usize) {
-        (self.attributes.len() - self.garbage, self.garbage)
+        (self.attributes.len() - self.garbage_blocks, self.garbage_blocks)
     }
 
-    /// The entity standing on `at`, if one does.
+    /// The entity standing on `stood_cell`, if one does.
     #[inline]
-    pub(crate) fn get(&self, at: CellIndex) -> Option<EntityRef<'_>> {
-        let index = self.find(place(at)).ok()?;
-        Some(self.entity(&self.stored[index]))
+    pub(crate) fn get(&self, stood_cell: CellIndex) -> Option<EntityRef<'_>> {
+        let entity_index = self.find_place(place(stood_cell)).ok()?;
+        Some(self.entity(&self.stored_entities[entity_index]))
     }
 
-    /// Asks memory ahead for the entity standing on `at`.
-    pub(crate) fn prefetch_entity(&self, at: CellIndex) {
-        if let Some(stored) = self.stored.get(self.index_of(place(at)).0) {
-            prefetch(stored);
+    /// Asks memory ahead for the entity standing on `stood_cell`.
+    pub(crate) fn prefetch_entity(&self, stood_cell: CellIndex) {
+        if let Some(stored_entity) = self.stored_entities.get(self.index_of(place(stood_cell)).0) {
+            prefetch_cache_line(stored_entity);
         }
     }
 
     /// Asks memory ahead for the attributes of the entity standing on
-    /// `at`: its first block, and the one a cache line on, blocks of
+    /// `stood_cell`: its first block, and the one a cache line on, blocks of
     /// sixteen bytes lying over two lines as often as not. This reads
     /// the entity, so ask for it first.
-    pub(crate) fn prefetch_attributes(&self, at: CellIndex) {
-        let Some(stored) = self.stored.get(self.index_of(place(at)).0) else {
+    pub(crate) fn prefetch_attributes(&self, stood_cell: CellIndex) {
+        let Some(stored_entity) = self.stored_entities.get(self.index_of(place(stood_cell)).0) else {
             return;
         };
-        let (first, last) = (stored.first as usize, (stored.first as usize + stored.count as usize).saturating_sub(1));
-        if let Some(first) = self.attributes.get(first) {
-            prefetch(first);
+        let (first_block, last_block) = (stored_entity.first_block as usize, (stored_entity.first_block as usize + stored_entity.count as usize).saturating_sub(1));
+        if let Some(nearer_block) = self.attributes.get(first_block) {
+            prefetch_cache_line(nearer_block);
         }
-        if let Some(farther) = self.attributes.get(last.min(first + CACHE_LINE_BLOCKS - 1)).filter(|_| last > first) {
-            prefetch(farther);
+        if let Some(farther_block) = self.attributes.get(last_block.min(first_block + CACHE_LINE_BLOCKS - 1)).filter(|_| last_block > first_block) {
+            prefetch_cache_line(farther_block);
         }
     }
 
     /// Every entity here, by cell in Morton order.
     pub(crate) fn iter(&self) -> impl Iterator<Item = EntityRef<'_>> {
-        self.stored.iter().map(|stored| self.entity(stored))
+        self.stored_entities.iter().map(|stored_entity| self.entity(stored_entity))
     }
 
     /// The places of the entities standing on the aligned 8x8 tile whose
-    /// first cell is at `first`. An aligned tile is a run of cells in
+    /// first cell is at `first_place`. An aligned tile is a run of cells in
     /// Morton order, so these are a run of `places`.
-    pub(crate) fn in_word_tile(&self, first: u16) -> &[u16] {
-        let from = self.index_of(first).0;
+    pub(crate) fn in_word_tile(&self, first_place: u16) -> &[u16] {
+        let start_index = self.index_of(first_place).0;
         // A word tile lies within one search tile.
-        let end = self.tile_starts[search_tile(first) + 1] as usize;
-        let candidates = &self.places[from..end];
-        &candidates[..candidates.partition_point(|&other| other - first < WORD_TILE_CELLS)]
+        let end_index = self.tile_starts[search_tile(first_place) + 1] as usize;
+        let candidate_places = &self.places[start_index..end_index];
+        &candidate_places[..candidate_places.partition_point(|&other_place| other_place - first_place < WORD_TILE_CELLS)]
     }
 
     /// Whether an entity stands on the cell at `place`.
@@ -155,138 +155,138 @@ impl Bucket {
     /// bucket keeps them ([`crate::attributes::append_kept`]): new, or
     /// refused, an entity standing there
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
-    pub(crate) fn make(&mut self, header: Header, attributes: &[AttributeBlock]) -> Put {
-        let to = place(header.at);
-        let Err(index) = self.find(to) else {
-            return Put::Refused;
+    pub(crate) fn make_entity(&mut self, header: Header, attributes: &[AttributeBlock]) -> Put {
+        let target_place = place(header.stood_cell);
+        let Err(entity_index) = self.find_place(target_place) else {
+            return Put::RefusedOccupied;
         };
-        self.places.insert(index, to);
-        self.tile_starts[search_tile(to) + 1..].iter_mut().for_each(|start| *start += 1);
-        let default_blocks = default_kept(header.kind).map_or(0, |default| default.blocks as u16);
+        self.places.insert(entity_index, target_place);
+        self.tile_starts[search_tile(target_place) + 1..].iter_mut().for_each(|tile_start| *tile_start += 1);
+        let default_blocks = default_kept(header.entity_type).map_or(0, |kept_default| kept_default.block_count as u16);
         debug_assert!(attributes.len() >= default_blocks as usize && attributes.len() <= u16::MAX as usize, "an entity's blocks as a bucket keeps them");
-        self.stored.insert(index, StoredEntity { header, first: self.attributes.len() as u32, count: attributes.len() as u16, default_blocks });
+        self.stored_entities.insert(entity_index, StoredEntity { header, first_block: self.attributes.len() as u32, count: attributes.len() as u16, default_blocks });
         self.attributes.extend_from_slice(attributes);
-        Put::New
+        Put::NewlyPut
     }
 
-    /// Gives the entity standing on the cell at `was` `header` -- its
+    /// Gives the entity standing on the cell at `former_place` `header` -- its
     /// cell, when it wakes -- and `attributes`, or, with none given,
     /// leaves it those it has: moved to `header`'s cell, or left
     /// where it stands, that one taken; passed over, none standing on
-    /// `was` (`docs/entity_manager.md`, "A chunk's bucket", Putting).
-    pub(crate) fn put(&mut self, header: Header, was: u16, attributes: Option<&[AttributeBlock]>) -> Put {
-        let to = place(header.at);
-        let (index, put) = match (self.find(was), was == to) {
-            (Ok(index), true) => (index, Put::InPlace),
-            (Ok(from), false) => {
-                let (goes, occupied) = self.index_of(to);
+    /// `former_place` (`docs/entity_manager.md`, "A chunk's bucket", Putting).
+    pub(crate) fn put(&mut self, header: Header, former_place: u16, attributes: Option<&[AttributeBlock]>) -> Put {
+        let target_place = place(header.stood_cell);
+        let (entity_index, put) = match (self.find_place(former_place), former_place == target_place) {
+            (Ok(found_index), true) => (found_index, Put::InPlace),
+            (Ok(from_index), false) => {
+                let (goes_index, occupied) = self.index_of(target_place);
                 if occupied {
                     // Its cell is occupied: it stays on the cell it was on.
-                    let stays = Header { at: CellIndex(header.at.0 - to as u64 + was as u64), ..header };
-                    self.rewrite(from, stays, attributes);
-                    return Put::Stayed;
+                    let turned_back_header = Header { stood_cell: CellIndex(header.stood_cell.0 - target_place as u64 + former_place as u64), ..header };
+                    self.rewrite_entity(from_index, turned_back_header, attributes);
+                    return Put::TurnedBack;
                 }
-                (self.shift_entity(from, goes, to), Put::Moved)
+                (self.shift_entity(from_index, goes_index, target_place), Put::MovedToCell)
             }
             (Err(_), _) => return Put::PassedOver,
         };
-        self.rewrite(index, header, attributes);
+        self.rewrite_entity(entity_index, header, attributes);
         put
     }
 
-    /// Gives the entity at `index` `header`, and `attributes` if given:
+    /// Gives the entity at `entity_index` `header`, and `attributes` if given:
     /// written over its attribute list when they are as many blocks,
     /// else as a new attribute list at the end of the bucket's blocks.
-    fn rewrite(&mut self, index: usize, header: Header, attributes: Option<&[AttributeBlock]>) {
-        let stored = &mut self.stored[index];
-        stored.header = header;
+    fn rewrite_entity(&mut self, entity_index: usize, header: Header, attributes: Option<&[AttributeBlock]>) {
+        let stored_entity = &mut self.stored_entities[entity_index];
+        stored_entity.header = header;
         let Some(attributes) = attributes else {
             return;
         };
-        if stored.count as usize == attributes.len() {
-            let first = stored.first as usize;
-            self.attributes[first..first + attributes.len()].copy_from_slice(attributes);
+        if stored_entity.count as usize == attributes.len() {
+            let first_block = stored_entity.first_block as usize;
+            self.attributes[first_block..first_block + attributes.len()].copy_from_slice(attributes);
             return;
         }
-        self.garbage += stored.count as usize;
-        (stored.first, stored.count) = (self.attributes.len() as u32, attributes.len() as u16);
+        self.garbage_blocks += stored_entity.count as usize;
+        (stored_entity.first_block, stored_entity.count) = (self.attributes.len() as u32, attributes.len() as u16);
         self.attributes.extend_from_slice(attributes);
-        self.sweep();
+        self.sweep_garbage();
     }
 
-    /// Sets the attribute of type `kind` of the entity standing on the
-    /// cell at `place` to `blocks`, or removes it if they are none.
+    /// Sets the attribute of type `attribute_type` of the entity standing on the
+    /// cell at `place` to `whole_attribute`, or removes it if they are none.
     /// Returns whether an entity stands there. One as long as it was
     /// is written in place; any other makes the entity's attribute
     /// list anew at the end of the bucket's blocks.
-    pub(crate) fn edit(&mut self, place: u16, kind: AttributeType, blocks: &[AttributeBlock]) -> bool {
-        let Ok(index) = self.find(place) else {
+    pub(crate) fn edit(&mut self, place: u16, attribute_type: AttributeType, whole_attribute: &[AttributeBlock]) -> bool {
+        let Ok(entity_index) = self.find_place(place) else {
             return false;
         };
-        let (first, count) = (self.stored[index].first as usize, self.stored[index].count as usize);
+        let (first_block, count) = (self.stored_entities[entity_index].first_block as usize, self.stored_entities[entity_index].count as usize);
         // The type's default attribute is written where it is kept, its type left off, and never removed.
-        let others = first + self.stored[index].default_blocks as usize;
-        if let Some(default) = default_kept(self.stored[index].header.kind).filter(|default| others > first && default.kind.identity() == kind.identity()) {
-            return write_default(&mut self.attributes[first..others], default, blocks);
+        let first_other_block = first_block + self.stored_entities[entity_index].default_blocks as usize;
+        if let Some(kept_default) = default_kept(self.stored_entities[entity_index].header.entity_type).filter(|candidate_default| first_other_block > first_block && candidate_default.attribute_type.type_identity() == attribute_type.type_identity()) {
+            return write_default(&mut self.attributes[first_block..first_other_block], kept_default, whole_attribute);
         }
-        let (was, start) = match find_attribute(&self.attributes[others..first + count], kind) {
-            Ok(found) => (others + found.start..others + found.end, self.attributes.len()),
-            Err(at) => (others + at..others + at, self.attributes.len()),
+        let (former_range, new_start) = match find_attribute(&self.attributes[first_other_block..first_block + count], attribute_type) {
+            Ok(found_range) => (first_other_block + found_range.start..first_other_block + found_range.end, self.attributes.len()),
+            Err(insert_index) => (first_other_block + insert_index..first_other_block + insert_index, self.attributes.len()),
         };
-        if was.len() == blocks.len() {
-            self.attributes[was].copy_from_slice(blocks);
+        if former_range.len() == whole_attribute.len() {
+            self.attributes[former_range].copy_from_slice(whole_attribute);
             return true;
         }
-        self.attributes.extend_from_within(first..was.start);
-        self.attributes.extend_from_slice(blocks);
-        self.attributes.extend_from_within(was.end..first + count);
-        let stored = &mut self.stored[index];
-        (stored.first, stored.count) = (start as u32, (self.attributes.len() - start) as u16);
-        self.garbage += count;
-        self.sweep();
+        self.attributes.extend_from_within(first_block..former_range.start);
+        self.attributes.extend_from_slice(whole_attribute);
+        self.attributes.extend_from_within(former_range.end..first_block + count);
+        let stored_entity = &mut self.stored_entities[entity_index];
+        (stored_entity.first_block, stored_entity.count) = (new_start as u32, (self.attributes.len() - new_start) as u16);
+        self.garbage_blocks += count;
+        self.sweep_garbage();
         true
     }
 
-    /// Writes the low `bytes` bytes of `value` over the member from
-    /// the byte `offset` of the attribute of type `kind`, of the
+    /// Writes the low `byte_count` bytes of `value` over the member from
+    /// the byte `byte_offset` of the attribute of type `attribute_type`, of the
     /// entity standing on the cell at `place`: in place, nothing
     /// moved. Whether it was written -- not if nobody stands there,
     /// it has no such attribute, or the member is not within it.
-    pub(crate) fn write_bytes(&mut self, place: u16, kind: AttributeType, offset: usize, bytes: usize, value: u64) -> bool {
-        let Ok(index) = self.find(place) else {
+    pub(crate) fn write_bytes(&mut self, place: u16, attribute_type: AttributeType, byte_offset: usize, byte_count: usize, value: u64) -> bool {
+        let Ok(entity_index) = self.find_place(place) else {
             return false;
         };
-        let (first, count) = (self.stored[index].first as usize, self.stored[index].count as usize);
-        let others = first + self.stored[index].default_blocks as usize;
+        let (first_block, count) = (self.stored_entities[entity_index].first_block as usize, self.stored_entities[entity_index].count as usize);
+        let first_other_block = first_block + self.stored_entities[entity_index].default_blocks as usize;
         // A member of the type's default attribute is where it would be were its type kept before it.
-        if others > first && default_kept(self.stored[index].header.kind).is_some_and(|default| default.kind.identity() == kind.identity()) {
-            return offset >= 8 && write_bytes(&mut self.attributes[first..others], offset - 8, bytes, value);
+        if first_other_block > first_block && default_kept(self.stored_entities[entity_index].header.entity_type).is_some_and(|kept_default| kept_default.attribute_type.type_identity() == attribute_type.type_identity()) {
+            return byte_offset >= 8 && write_bytes(&mut self.attributes[first_block..first_other_block], byte_offset - 8, byte_count, value);
         }
-        let Ok(found) = find_attribute(&self.attributes[others..first + count], kind) else {
+        let Ok(found_range) = find_attribute(&self.attributes[first_other_block..first_block + count], attribute_type) else {
             return false;
         };
-        write_attribute_bytes(&mut self.attributes[others + found.start..others + found.end], offset, bytes, value)
+        write_attribute_bytes(&mut self.attributes[first_other_block + found_range.start..first_other_block + found_range.end], byte_offset, byte_count, value)
     }
 
     /// Sets the tick the entity standing on the cell at `place` next
     /// wakes at: whether one stands there.
     pub(crate) fn set_wake(&mut self, place: u16, wake: u64) -> bool {
-        let Ok(index) = self.find(place) else {
+        let Ok(entity_index) = self.find_place(place) else {
             return false;
         };
-        self.stored[index].header.wake = wake;
+        self.stored_entities[entity_index].header.wake = wake;
         true
     }
 
-    /// Removes the entity standing on `at`. Returns whether one did.
-    pub(crate) fn remove(&mut self, at: CellIndex) -> bool {
-        let Ok(index) = self.find(place(at)) else {
+    /// Removes the entity standing on `stood_cell`. Returns whether one did.
+    pub(crate) fn remove(&mut self, stood_cell: CellIndex) -> bool {
+        let Ok(entity_index) = self.find_place(place(stood_cell)) else {
             return false;
         };
-        let place = self.places.remove(index);
-        self.tile_starts[search_tile(place) + 1..].iter_mut().for_each(|start| *start -= 1);
-        self.garbage += self.stored.remove(index).count as usize;
-        self.sweep();
+        let place = self.places.remove(entity_index);
+        self.tile_starts[search_tile(place) + 1..].iter_mut().for_each(|tile_start| *tile_start -= 1);
+        self.garbage_blocks += self.stored_entities.remove(entity_index).count as usize;
+        self.sweep_garbage();
         true
     }
 
@@ -295,64 +295,64 @@ impl Bucket {
     #[inline]
     fn index_of(&self, place: u16) -> (usize, bool) {
         let tile = search_tile(place);
-        let (first, end) = (self.tile_starts[tile] as usize, self.tile_starts[tile + 1] as usize);
-        let index = first + self.places[first..end].partition_point(|&other| other < place);
-        (index, self.places.get(index) == Some(&place))
+        let (tile_first_index, tile_end_index) = (self.tile_starts[tile] as usize, self.tile_starts[tile + 1] as usize);
+        let entity_index = tile_first_index + self.places[tile_first_index..tile_end_index].partition_point(|&other_place| other_place < place);
+        (entity_index, self.places.get(entity_index) == Some(&place))
     }
 
     /// Where the entity on the cell at `place` is in the bucket's
     /// order; or, none standing there, where it would go.
     #[inline]
-    fn find(&self, place: u16) -> Result<usize, usize> {
-        let (index, occupied) = self.index_of(place);
-        if occupied { Ok(index) } else { Err(index) }
+    fn find_place(&self, place: u16) -> Result<usize, usize> {
+        let (entity_index, occupied) = self.index_of(place);
+        if occupied { Ok(entity_index) } else { Err(entity_index) }
     }
 
-    /// Moves the entity at `from` to `goes`, where an entity on the free
-    /// cell at `to` belongs, shifting the entities between by one.
+    /// Moves the entity at `from_index` to `goes_index`, where an entity on the free
+    /// cell at `target_place` belongs, shifting the entities between by one.
     /// Returns where it now is.
-    fn shift_entity(&mut self, from: usize, goes: usize, to: u16) -> usize {
-        let was = self.places[from];
-        let index = if goes > from {
-            self.places[from..goes].rotate_left(1);
-            self.stored[from..goes].rotate_left(1);
-            goes - 1
+    fn shift_entity(&mut self, from_index: usize, goes_index: usize, target_place: u16) -> usize {
+        let former_place = self.places[from_index];
+        let entity_index = if goes_index > from_index {
+            self.places[from_index..goes_index].rotate_left(1);
+            self.stored_entities[from_index..goes_index].rotate_left(1);
+            goes_index - 1
         } else {
-            self.places[goes..=from].rotate_right(1);
-            self.stored[goes..=from].rotate_right(1);
-            goes
+            self.places[goes_index..=from_index].rotate_right(1);
+            self.stored_entities[goes_index..=from_index].rotate_right(1);
+            goes_index
         };
-        self.places[index] = to;
+        self.places[entity_index] = target_place;
         // The search tiles between the two cells now start one earlier, or one later.
-        if search_tile(was) < search_tile(to) {
-            self.tile_starts[search_tile(was) + 1..=search_tile(to)].iter_mut().for_each(|start| *start -= 1);
+        if search_tile(former_place) < search_tile(target_place) {
+            self.tile_starts[search_tile(former_place) + 1..=search_tile(target_place)].iter_mut().for_each(|tile_start| *tile_start -= 1);
         } else {
-            self.tile_starts[search_tile(to) + 1..=search_tile(was)].iter_mut().for_each(|start| *start += 1);
+            self.tile_starts[search_tile(target_place) + 1..=search_tile(former_place)].iter_mut().for_each(|tile_start| *tile_start += 1);
         }
-        index
+        entity_index
     }
 
-    /// The entity `stored` is, with its attributes.
+    /// The entity `stored_entity` is, with its attributes.
     #[inline]
-    fn entity(&self, stored: &StoredEntity) -> EntityRef<'_> {
-        let first = stored.first as usize;
-        let kept = &self.attributes[first..first + stored.count as usize];
-        EntityRef { header: stored.header, attributes: &kept[stored.default_blocks as usize..], kept }
+    fn entity(&self, stored_entity: &StoredEntity) -> EntityRef<'_> {
+        let first_block = stored_entity.first_block as usize;
+        let kept_blocks = &self.attributes[first_block..first_block + stored_entity.count as usize];
+        EntityRef { header: stored_entity.header, attributes: &kept_blocks[stored_entity.default_blocks as usize..], kept_blocks }
     }
 
     /// Sweeps the garbage out of the list of blocks, once there is as
     /// much garbage as blocks in use (and enough to be worth it).
-    fn sweep(&mut self) {
-        if self.garbage < 64 || self.garbage < self.attributes.len() - self.garbage {
+    fn sweep_garbage(&mut self) {
+        if self.garbage_blocks < 64 || self.garbage_blocks < self.attributes.len() - self.garbage_blocks {
             return;
         }
-        let mut swept = Vec::with_capacity(self.attributes.len() - self.garbage);
-        for stored in &mut self.stored {
-            let first = stored.first as usize;
-            stored.first = swept.len() as u32;
-            swept.extend_from_slice(&self.attributes[first..first + stored.count as usize]);
+        let mut swept_blocks = Vec::with_capacity(self.attributes.len() - self.garbage_blocks);
+        for stored_entity in &mut self.stored_entities {
+            let first_block = stored_entity.first_block as usize;
+            stored_entity.first_block = swept_blocks.len() as u32;
+            swept_blocks.extend_from_slice(&self.attributes[first_block..first_block + stored_entity.count as usize]);
         }
-        self.attributes = swept;
-        self.garbage = 0;
+        self.attributes = swept_blocks;
+        self.garbage_blocks = 0;
     }
 }

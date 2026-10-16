@@ -53,9 +53,9 @@ words each, straight after the first block's one -- so the data is
 one run of words, 1, 3, 5 and so on, 31 at the most. How many blocks an attribute takes is
 said by its first word -- the type's last four bits, the blocks less
 one -- so nothing is looked up to step over an attribute
-(`AttributeBlock::blocks`). The types are one namespace, everything's:
+(`AttributeBlock::block_count`). The types are one namespace, everything's:
 an ID of another kind, or whose number is 0, is **not an attribute's**, and a block that
-begins with one is no attribute (`sorted` says so of an attribute list,
+begins with one is no attribute (`is_attribute_list` says so of an attribute list,
 and a saved entity with one is not read).
 
 **Variable size.** Most attributes are of a fixed size, set as the
@@ -65,7 +65,7 @@ bits 0, and each attribute of it keeps its own **attribute length**
 there: how many blocks it is, less one, 1 to 16. So two attributes
 of one such type have first words that differ in those bits, and a
 type is told from another by all the rest
-(`AttributeType::identity`): what an entity's attributes are sorted
+(`AttributeType::type_identity`): what an entity's attributes are sorted
 and found by. Its data starts at the second word, as any
 attribute's. None is registered yet, and no layout is written for one:
 it is read and written as its blocks (`EntityRef::attribute_blocks`,
@@ -84,11 +84,11 @@ entity has few attributes, and each step reads the one word. An
 attribute length that reaches past the entity's blocks is cut to them, so a walk
 never leaves them.
 
-**Read and written as fields.** `attribute(blocks, attribute)` reads
+**Read and written as fields.** `attribute(attribute_list, attribute)` reads
 one as its layout, `set_attribute` and `push_attribute` write one, and
-`AttributeBlock::holding(attribute, value)` makes the one block of a
+`AttributeBlock::holding_value(attribute, value)` makes the one block of a
 layout that takes one -- a layout of more does not build there, and
-`WholeAttribute::holding` makes any, on the stack. A layout of one
+`WholeAttribute::holding_value` makes any, on the stack. A layout of one
 block is read from its block where it lies; one of more is gathered
 into a run of words first, on the stack too. A member alone is read
 and written where it lies (`attribute_bytes`,
@@ -177,7 +177,7 @@ cells entities stand on are read a word tile at a time.
 shifts the entities between its old and its new cell by one.
 
 **Putting.** Two things, never one for the other. An entity is made
-(`Bucket::make`) on a cell nobody stands on, with its attributes, or
+(`Bucket::make_entity`) on a cell nobody stands on, with its attributes, or
 refused. And the entity standing on a cell is given a header
 (`Bucket::put`) -- another cell, another wake -- and, if they changed,
 its attributes; with none given it keeps those it has, and nobody
@@ -186,7 +186,7 @@ stood on: changed where it stands. Another cell: moved there if no
 entity stands on it, else left
 where it was and changed all the same. What came of it is a `Put`
 (one put where it stood because its cell was another's that tick is
-said to have stayed too, `Put::stayed`).
+said to have stayed too, `Put::as_turned_back`).
 
 **Attributes.** Each entity's attribute list is a part of the bucket's
 blocks. They are rewritten in place when they stay as many
@@ -212,7 +212,7 @@ died the cell is empty, or another's, not due then, and is passed
 over. Nothing is ever taken out of the wheel but the slot just passed.
 
 A tick's slot is sorted by cell -- Morton order -- each cell once,
-before the tick runs (`Wheel::sort`): a cell filed twice for one tick,
+before the tick runs (`Wheel::sort_wakes`): a cell filed twice for one tick,
 by an entity that left it and by one that came to stand there after,
 wakes whoever stands on it once. So the entities wake in Morton order: their
 buckets, the cells they read and the writes they queue all go forwards
@@ -256,7 +256,7 @@ reads another superchunk's entities while that one changes them. A put
 is queued by the one private `push`.
 
 Applied (`Instructions::apply`; `apply_some` for a part of the queue;
-`Instruction::lands` the cell that says which superchunk), each goes to the superchunk its cell
+`Instruction::landing_cell` the cell that says which superchunk), each goes to the superchunk its cell
 is in, in the order queued, every wake filed no earlier than the tick
 given. A put in a superchunk not there is lost; one of an entity no
 longer where it stood is passed over; a new entity on a cell another
@@ -303,7 +303,7 @@ the collision plane of the superchunk it lands in (`CollisionCells`:
 `held`, `hold`, `free`; `()` is none). Then no entity is put on or
 moved to a cell it holds -- whatever holds it, an entity or not -- the
 cell one comes to is set in it, and the cells left or removed from
-(`vacated`) are cleared when the tick is over (`names_anew`), the cell one left
+(`vacated_cells`) are cleared when the tick is over (`names_anew`), the cell one left
 over a border among them. The buckets' own check
 stays: a cell holds one entity whether or not a plane is kept.
 
@@ -327,11 +327,11 @@ entity over a border"). At no time is an entity on two cells.
 
 A superchunk's entities are its buckets and its wheel
 (`SuperchunkEntities`); the world's are every superchunk's, in the
-bitmap arena's order, with the tick the world is at (`Entities`). In a
+bitmap arena's order, with the tick the world is at (`WorldEntities`). In a
 tick they are read across superchunks by an `EntityReader`, as cells
 are by the bitplanes' reader. The API follows the bitplanes': outside a
-tick, instructions are queued (`Entities::queue_put`, `queue_remove`)
-and applied (`Entities::apply`), as writes to cells are; in a tick, a
+tick, instructions are queued (`WorldEntities::queue_put`, `queue_remove`)
+and applied (`WorldEntities::apply`), as writes to cells are; in a tick, a
 superchunk's turn queues them. Queuing is the only way to change an
 entity. While a queue is applied an entity is found by the cell it
 stood on when the applying began, wherever it moved since

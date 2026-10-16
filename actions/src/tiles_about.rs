@@ -15,7 +15,7 @@ const SQUARE_SIDE: u32 = 2 * SMALL_TILE_SIDE;
 /// Cells in that square: the bits of its word.
 const SQUARE_CELLS: usize = (SQUARE_SIDE * SQUARE_SIDE) as usize;
 /// The cells about a cell, its own among them: three by three.
-const NINE: usize = 9;
+const NINE_CELLS: usize = 9;
 
 /// The bits of a cell's index that place it in its small tile.
 const TILE: u64 = SMALL_TILE_CELLS as u64 - 1;
@@ -31,33 +31,33 @@ const fn bit_at(x: u32, y: u32) -> u32 {
 }
 
 /// What [`bit_at`] interleaves, from the bit: across, and down.
-const fn across_and_down(bit: u32) -> (u32, u32) {
-    (bit & 1 | bit >> 1 & 2 | bit >> 2 & 4, bit >> 1 & 1 | bit >> 2 & 2 | bit >> 3 & 4)
+const fn across_and_down(square_bit: u32) -> (u32, u32) {
+    (square_bit & 1 | square_bit >> 1 & 2 | square_bit >> 2 & 4, square_bit >> 1 & 1 | square_bit >> 2 & 2 | square_bit >> 3 & 4)
 }
 
 /// Where each way leads, across and down from the cell one to the
 /// left of and above the cell it is from: the nine in Morton order of
 /// those two, as [`crate::around`] numbers the ways -- so the cell
 /// itself is the fourth.
-pub(crate) const WAY_OFFSETS: [(u32, u32); NINE] = {
-    let (mut offsets, mut way, mut place) = ([(0, 0); NINE], 0, 0);
+pub(crate) const WAY_OFFSETS: [(u32, u32); NINE_CELLS] = {
+    let (mut way_offsets, mut way, mut place) = ([(0, 0); NINE_CELLS], 0, 0);
     // The places of a square of four by four in Morton order: those within three by three are the nine.
-    while way < NINE {
-        let (across, down) = across_and_down(place);
-        if across < 3 && down < 3 {
-            offsets[way] = (across, down);
+    while way < NINE_CELLS {
+        let (place_across, place_down) = across_and_down(place);
+        if place_across < 3 && place_down < 3 {
+            way_offsets[way] = (place_across, place_down);
             way += 1;
         }
         place += 1;
     }
-    offsets
+    way_offsets
 };
 
 /// The way to each of the nine, row by row from the top left: what
 /// [`WAY_OFFSETS`] says, the other way about.
-pub(crate) const WAY_AT: [u8; NINE] = {
-    let (mut ways, mut way) = ([0; NINE], 0);
-    while way < NINE {
+pub(crate) const WAY_AT: [u8; NINE_CELLS] = {
+    let (mut ways, mut way) = ([0; NINE_CELLS], 0);
+    while way < NINE_CELLS {
         ways[(WAY_OFFSETS[way].1 * 3 + WAY_OFFSETS[way].0) as usize] = way as u8;
         way += 1;
     }
@@ -67,85 +67,85 @@ pub(crate) const WAY_AT: [u8; NINE] = {
 /// For a cell at each bit of the word, the nine cells about it: the
 /// bit of each, by its way as [`crate::around`] numbers them, and
 /// which of the nine are in the square at all.
-const ABOUT: [([u8; NINE], u16); SQUARE_CELLS] = {
-    let mut about = [([0u8; NINE], 0u16); SQUARE_CELLS];
-    let mut bit = 0;
-    while bit < SQUARE_CELLS {
-        let (x, y) = across_and_down(bit as u32);
-        let mut neighbour = 0;
-        while neighbour < NINE {
+const NINE_ABOUT_EACH_BIT: [([u8; NINE_CELLS], u16); SQUARE_CELLS] = {
+    let mut nine_about = [([0u8; NINE_CELLS], 0u16); SQUARE_CELLS];
+    let mut square_bit = 0;
+    while square_bit < SQUARE_CELLS {
+        let (x, y) = across_and_down(square_bit as u32);
+        let mut neighbour_way = 0;
+        while neighbour_way < NINE_CELLS {
             // One to the left and above the cell is the first of the nine.
-            let (across, down) = (x + WAY_OFFSETS[neighbour].0, y + WAY_OFFSETS[neighbour].1);
-            if across >= 1 && down >= 1 && across <= SQUARE_SIDE && down <= SQUARE_SIDE {
-                about[bit].0[neighbour] = bit_at(across - 1, down - 1) as u8;
-                about[bit].1 |= 1 << neighbour;
+            let (neighbour_across, neighbour_down) = (x + WAY_OFFSETS[neighbour_way].0, y + WAY_OFFSETS[neighbour_way].1);
+            if neighbour_across >= 1 && neighbour_down >= 1 && neighbour_across <= SQUARE_SIDE && neighbour_down <= SQUARE_SIDE {
+                nine_about[square_bit].0[neighbour_way] = bit_at(neighbour_across - 1, neighbour_down - 1) as u8;
+                nine_about[square_bit].1 |= 1 << neighbour_way;
             }
-            neighbour += 1;
+            neighbour_way += 1;
         }
-        bit += 1;
+        square_bit += 1;
     }
-    about
+    nine_about
 };
 
 /// For a cell at each bit of the word, the nine about it that are in
 /// the square, as bits of the word.
 const NINE_OF: [u64; SQUARE_CELLS] = {
-    let mut nine = [0u64; SQUARE_CELLS];
-    let mut bit = 0;
-    while bit < SQUARE_CELLS {
-        let mut neighbour = 0;
-        while neighbour < NINE {
-            if ABOUT[bit].1 >> neighbour & 1 == 1 {
-                nine[bit] |= 1 << ABOUT[bit].0[neighbour];
+    let mut nine_of_bits = [0u64; SQUARE_CELLS];
+    let mut square_bit = 0;
+    while square_bit < SQUARE_CELLS {
+        let mut neighbour_way = 0;
+        while neighbour_way < NINE_CELLS {
+            if NINE_ABOUT_EACH_BIT[square_bit].1 >> neighbour_way & 1 == 1 {
+                nine_of_bits[square_bit] |= 1 << NINE_ABOUT_EACH_BIT[square_bit].0[neighbour_way];
             }
-            neighbour += 1;
+            neighbour_way += 1;
         }
-        bit += 1;
+        square_bit += 1;
     }
-    nine
+    nine_of_bits
 };
 
 /// The four small tiles about a cell, and where it is in them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct About {
+pub struct TilesAbout {
     /// The first cell of the first of the four: the top left one.
-    first: CellIndex,
+    first_cell: CellIndex,
     /// The cell's bit in their word.
-    bit: u32,
+    centre_bit: u32,
 }
 
-/// The four small tiles about `at`: its own, and those beside, above
+/// The four small tiles about `centre_cell`: its own, and those beside, above
 /// or below it that its neighbours reach into -- the one to the left
 /// if it is on its tile's left column, else the one to the right, and
 /// so up and down. At the world's edge, where there is none to the
 /// left or above, its own is the first.
 #[inline]
-pub(crate) fn about_cell(at: CellIndex) -> About {
-    let in_tile = at.0 & TILE;
-    let (mut first, (mut x, mut y)) = (at.0 & !TILE, across_and_down(in_tile as u32));
+pub(crate) fn about_cell(centre_cell: CellIndex) -> TilesAbout {
+    let in_tile = centre_cell.0 & TILE;
+    let (mut first_cell_index, (mut x, mut y)) = (centre_cell.0 & !TILE, across_and_down(in_tile as u32));
     // A small tile to the left, or above: its side taken from the one coordinate's bits, where they are not all 0.
-    if x == 0 && first & X_BITS != 0 {
-        (first, x) = ((first & X_BITS).wrapping_sub(TILE + 1) & X_BITS | first & Y_BITS, SMALL_TILE_SIDE);
+    if x == 0 && first_cell_index & X_BITS != 0 {
+        (first_cell_index, x) = ((first_cell_index & X_BITS).wrapping_sub(TILE + 1) & X_BITS | first_cell_index & Y_BITS, SMALL_TILE_SIDE);
     }
-    if y == 0 && first & Y_BITS != 0 {
-        (first, y) = ((first & Y_BITS).wrapping_sub(2 * (TILE + 1)) & Y_BITS | first & X_BITS, SMALL_TILE_SIDE);
+    if y == 0 && first_cell_index & Y_BITS != 0 {
+        (first_cell_index, y) = ((first_cell_index & Y_BITS).wrapping_sub(2 * (TILE + 1)) & Y_BITS | first_cell_index & X_BITS, SMALL_TILE_SIDE);
     }
-    let first = CellIndex(first);
-    About { first, bit: bit_at(x, y) }
+    let first_cell = CellIndex(first_cell_index);
+    TilesAbout { first_cell, centre_bit: bit_at(x, y) }
 }
 
-impl About {
+impl TilesAbout {
     /// The cell itself, as a bit of the word.
     #[inline]
     pub(crate) fn centre_word(&self) -> u64 {
-        1 << self.bit
+        1 << self.centre_bit
     }
 
     /// The cell and its neighbours in the world, as bits of the word:
     /// in one to four of the small tiles.
     #[inline]
     pub(crate) fn nine_word(&self) -> u64 {
-        NINE_OF[self.bit as usize]
+        NINE_OF[self.centre_bit as usize]
     }
 
     /// Its neighbours in the world, as bits of the word: the hollow
@@ -160,8 +160,8 @@ impl About {
     /// as a bit of the word: none if it is not in the world.
     #[inline]
     pub(crate) fn way_word(&self, way: u32) -> u64 {
-        let (bits, in_square) = &ABOUT[self.bit as usize];
-        ((in_square >> way & 1) as u64) << bits[way as usize]
+        let (way_bits, in_square) = &NINE_ABOUT_EACH_BIT[self.centre_bit as usize];
+        ((in_square >> way & 1) as u64) << way_bits[way as usize]
     }
 
     /// The cells of `word`, bits of the word, as ways from the cell: a
@@ -169,26 +169,26 @@ impl About {
     /// the cell lies in its tiles.
     #[inline]
     pub(crate) fn ways_of(&self, word: u64) -> u32 {
-        let (bits, in_square) = &ABOUT[self.bit as usize];
+        let (way_bits, in_square) = &NINE_ABOUT_EACH_BIT[self.centre_bit as usize];
         let mut ways = 0;
-        for (way, &bit) in bits.iter().enumerate() {
-            ways |= ((word >> bit & 1) as u32) << way;
+        for (way, &word_bit) in way_bits.iter().enumerate() {
+            ways |= ((word >> word_bit & 1) as u32) << way;
         }
         ways & *in_square as u32
     }
 }
 
-/// `layer_type` in the small tiles `about` a cell, as the tick found
-/// it: the cells of `under` alone, and only the tiles it has a cell
+/// `layer_type` in the small tiles `nine_about` a cell, as the tick found
+/// it: the cells of `under_word` alone, and only the tiles it has a cell
 /// in looked up -- one to four, for a cell and its neighbours.
 #[inline]
-pub(crate) fn read_layer(turn: &Turn, layer_type: LayerType, about: &About, under: u64) -> SmallTiles {
-    let [tiles] = read_layers(turn, [layer_type], about, under);
+pub(crate) fn read_layer(turn: &Turn, layer_type: LayerType, about_tiles: &TilesAbout, under_word: u64) -> SmallTiles {
+    let [tiles] = read_layers(turn, [layer_type], about_tiles, under_word);
     tiles
 }
 
-/// [`read_layer`], of each of `types` at once.
+/// [`read_layer`], of each of `layer_types` at once.
 #[inline]
-pub(crate) fn read_layers<const N: usize>(turn: &Turn, types: [LayerType; N], about: &About, under: u64) -> [SmallTiles; N] {
-    turn.small_tiles(types, about.first, under)
+pub(crate) fn read_layers<const N: usize>(turn: &Turn, layer_types: [LayerType; N], about_tiles: &TilesAbout, under_word: u64) -> [SmallTiles; N] {
+    turn.small_tiles(layer_types, about_tiles.first_cell, under_word)
 }

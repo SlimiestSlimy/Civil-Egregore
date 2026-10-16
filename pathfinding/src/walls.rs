@@ -2,7 +2,7 @@
 //! its own -- a drop is stepped down and not back up -- and a set of
 //! cells spread a step through them, forwards and backwards.
 
-use super::{Cell, Rows, SIDE, holds};
+use super::{Cell, Rows, AREA_SIDE, rows_hold};
 
 /// The step north, among a [`Walls`]' ways...
 const NORTH: usize = 0;
@@ -42,99 +42,99 @@ const fn way_of(dx: i8, dy: i8) -> usize {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Walls {
     /// For each of the eight ways, the cells no step leaves that way.
-    barred: [Rows; 8],
+    barred_rows: [Rows; 8],
 }
 
 impl Walls {
-    /// Walls barring both ways: `east` and `south` the cells with one
+    /// Walls barring both ways: `east_walls` and `south_walls` the cells with one
     /// between them and the cell to their east, to their south.
-    pub const fn new(east: Rows, south: Rows) -> Self {
-        let (mut north, mut west) = ([0; SIDE], [0; SIDE]);
+    pub const fn new(east_walls: Rows, south_walls: Rows) -> Self {
+        let (mut north_walls, mut west_walls) = ([0; AREA_SIDE], [0; AREA_SIDE]);
         let mut y = 0;
-        while y < SIDE {
-            west[y] = east[y] << 1;
+        while y < AREA_SIDE {
+            west_walls[y] = east_walls[y] << 1;
             if y > 0 {
-                north[y] = south[y - 1];
+                north_walls[y] = south_walls[y - 1];
             }
             y += 1;
         }
-        Self::one_way(north, west, south, east)
+        Self::one_way(north_walls, west_walls, south_walls, east_walls)
     }
 
-    /// The walls each way of its own: `north`, `west`, `south` and
-    /// `east` the cells no step leaves that way, and the diagonal steps
+    /// The walls each way of its own: `north_walls`, `west_walls`, `south_walls` and
+    /// `east_walls` the cells no step leaves that way, and the diagonal steps
     /// they bar -- a cell's step down and east is barred unless both
     /// ways round it are open: east and then south, south and then
     /// east; the other three likewise. Past the area's edge nothing
     /// bars: no step leaves the area.
-    pub const fn one_way(north: Rows, west: Rows, south: Rows, east: Rows) -> Self {
-        let mut barred = [[0; SIDE]; 8];
-        (barred[NORTH], barred[WEST], barred[SOUTH], barred[EAST]) = (north, west, south, east);
+    pub const fn one_way(north_walls: Rows, west_walls: Rows, south_walls: Rows, east_walls: Rows) -> Self {
+        let mut barred_rows = [[0; AREA_SIDE]; 8];
+        (barred_rows[NORTH], barred_rows[WEST], barred_rows[SOUTH], barred_rows[EAST]) = (north_walls, west_walls, south_walls, east_walls);
         let mut y = 0;
-        while y < SIDE {
-            let (east_above, west_above) = if y > 0 { (east[y - 1], west[y - 1]) } else { (0, 0) };
-            let (east_below, west_below) = if y + 1 < SIDE { (east[y + 1], west[y + 1]) } else { (0, 0) };
+        while y < AREA_SIDE {
+            let (east_above, west_above) = if y > 0 { (east_walls[y - 1], west_walls[y - 1]) } else { (0, 0) };
+            let (east_below, west_below) = if y + 1 < AREA_SIDE { (east_walls[y + 1], west_walls[y + 1]) } else { (0, 0) };
             // The cell a column east is a bit up the row: its walls come a bit down to be over this cell's.
-            barred[NORTH_WEST][y] = west[y] | north[y] | north[y] << 1 | west_above;
-            barred[NORTH_EAST][y] = east[y] | north[y] | north[y] >> 1 | east_above;
-            barred[SOUTH_WEST][y] = west[y] | south[y] | south[y] << 1 | west_below;
-            barred[SOUTH_EAST][y] = east[y] | south[y] | south[y] >> 1 | east_below;
+            barred_rows[NORTH_WEST][y] = west_walls[y] | north_walls[y] | north_walls[y] << 1 | west_above;
+            barred_rows[NORTH_EAST][y] = east_walls[y] | north_walls[y] | north_walls[y] >> 1 | east_above;
+            barred_rows[SOUTH_WEST][y] = west_walls[y] | south_walls[y] | south_walls[y] << 1 | west_below;
+            barred_rows[SOUTH_EAST][y] = east_walls[y] | south_walls[y] | south_walls[y] >> 1 | east_below;
             y += 1;
         }
-        Self { barred }
+        Self { barred_rows }
     }
 
     /// Whether a wall bars the step from `cell` to its neighbour `dx`
     /// across and `dy` down, a cell of the area too.
     pub const fn bars_step(&self, cell: Cell, dx: i8, dy: i8) -> bool {
-        holds(&self.barred[way_of(dx, dy)], cell)
+        rows_hold(&self.barred_rows[way_of(dx, dy)], cell)
     }
 }
 
-/// `rows` and every cell a step from one of them comes to through
+/// `from_rows` and every cell a step from one of them comes to through
 /// `walls`: each row with the rows above and below it, a column each
 /// way.
-pub(crate) fn spread(rows: &Rows, walls: &Walls) -> Rows {
-    let barred = &walls.barred;
-    let mut wider = [0; SIDE];
+pub(crate) fn spread_forwards(from_rows: &Rows, walls: &Walls) -> Rows {
+    let barred_rows = &walls.barred_rows;
+    let mut spread_rows = [0; AREA_SIDE];
     let mut y = 0;
-    while y < SIDE {
-        let here = rows[y];
-        let mut row = here | (here & !barred[EAST][y]) << 1 | (here & !barred[WEST][y]) >> 1;
+    while y < AREA_SIDE {
+        let here_row = from_rows[y];
+        let mut spread_row = here_row | (here_row & !barred_rows[EAST][y]) << 1 | (here_row & !barred_rows[WEST][y]) >> 1;
         if y > 0 {
-            let above = rows[y - 1];
-            row |= above & !barred[SOUTH][y - 1] | (above & !barred[SOUTH_EAST][y - 1]) << 1 | (above & !barred[SOUTH_WEST][y - 1]) >> 1;
+            let above_row = from_rows[y - 1];
+            spread_row |= above_row & !barred_rows[SOUTH][y - 1] | (above_row & !barred_rows[SOUTH_EAST][y - 1]) << 1 | (above_row & !barred_rows[SOUTH_WEST][y - 1]) >> 1;
         }
-        if y + 1 < SIDE {
-            let below = rows[y + 1];
-            row |= below & !barred[NORTH][y + 1] | (below & !barred[NORTH_EAST][y + 1]) << 1 | (below & !barred[NORTH_WEST][y + 1]) >> 1;
+        if y + 1 < AREA_SIDE {
+            let below_row = from_rows[y + 1];
+            spread_row |= below_row & !barred_rows[NORTH][y + 1] | (below_row & !barred_rows[NORTH_EAST][y + 1]) << 1 | (below_row & !barred_rows[NORTH_WEST][y + 1]) >> 1;
         }
-        wider[y] = row;
+        spread_rows[y] = spread_row;
         y += 1;
     }
-    wider
+    spread_rows
 }
 
-/// `rows` and every cell a step from which comes to one of them
-/// through `walls`: [`spread`] the other way, what a search going out
+/// `to_rows` and every cell a step from which comes to one of them
+/// through `walls`: [`spread_forwards`] the other way, what a search going out
 /// from its goals grows by.
-pub(crate) fn spread_back(rows: &Rows, walls: &Walls) -> Rows {
-    let barred = &walls.barred;
-    let mut wider = [0; SIDE];
+pub(crate) fn spread_back(to_rows: &Rows, walls: &Walls) -> Rows {
+    let barred_rows = &walls.barred_rows;
+    let mut spread_rows = [0; AREA_SIDE];
     let mut y = 0;
-    while y < SIDE {
-        let here = rows[y];
-        let mut row = here | here >> 1 & !barred[EAST][y] | here << 1 & !barred[WEST][y];
+    while y < AREA_SIDE {
+        let here_row = to_rows[y];
+        let mut spread_row = here_row | here_row >> 1 & !barred_rows[EAST][y] | here_row << 1 & !barred_rows[WEST][y];
         if y > 0 {
-            let above = rows[y - 1];
-            row |= above & !barred[NORTH][y] | above >> 1 & !barred[NORTH_EAST][y] | above << 1 & !barred[NORTH_WEST][y];
+            let above_row = to_rows[y - 1];
+            spread_row |= above_row & !barred_rows[NORTH][y] | above_row >> 1 & !barred_rows[NORTH_EAST][y] | above_row << 1 & !barred_rows[NORTH_WEST][y];
         }
-        if y + 1 < SIDE {
-            let below = rows[y + 1];
-            row |= below & !barred[SOUTH][y] | below >> 1 & !barred[SOUTH_EAST][y] | below << 1 & !barred[SOUTH_WEST][y];
+        if y + 1 < AREA_SIDE {
+            let below_row = to_rows[y + 1];
+            spread_row |= below_row & !barred_rows[SOUTH][y] | below_row >> 1 & !barred_rows[SOUTH_EAST][y] | below_row << 1 & !barred_rows[SOUTH_WEST][y];
         }
-        wider[y] = row;
+        spread_rows[y] = spread_row;
         y += 1;
     }
-    wider
+    spread_rows
 }

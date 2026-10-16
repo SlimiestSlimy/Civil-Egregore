@@ -5,7 +5,7 @@
 
 use coordinates::{ChunkIndex, SuperchunkIndex};
 use crate::height_map::HeightMap;
-use crate::paging::{bytes_of, Kept, Paging};
+use crate::paging::{bytes_of, ImageKept, ColdPoolPaging};
 use type_registry::LayerType;
 use crate::superchunk_image::{LayerChange, SuperchunkImage};
 use crate::writeback_ring::WritebackRing;
@@ -17,22 +17,22 @@ pub struct ChunkStorage {
     /// memory shared, so one is read off the tick -- decoded on
     /// another thread -- with nothing copied; or paged to disk. An
     /// image is never changed, only replaced.
-    pub(crate) cold_pool: Vec<(SuperchunkIndex, Kept)>,
+    pub(crate) cold_pool: Vec<(SuperchunkIndex, ImageKept)>,
     /// Changed layers, encoded, on their way to the cold pool.
-    pub(crate) ring: WritebackRing,
+    pub(crate) writeback_ring: WritebackRing,
     /// How the pool is paged to disk, and the bytes it has in memory.
-    pub(crate) paging: Paging,
+    pub(crate) cold_pool_paging: ColdPoolPaging,
 }
 
 impl ChunkStorage {
     /// No superchunk stored, and a ring of `ring_words` words.
     pub fn new(ring_words: usize) -> Self {
-        Self { cold_pool: Vec::new(), ring: WritebackRing::new(ring_words), paging: Paging::none() }
+        Self { cold_pool: Vec::new(), writeback_ring: WritebackRing::new(ring_words), cold_pool_paging: ColdPoolPaging::never_paged() }
     }
 
     /// Where `superchunk` is in the cold pool, or where it would go.
-    pub(crate) fn find(&self, superchunk: SuperchunkIndex) -> Result<usize, usize> {
-        self.cold_pool.binary_search_by_key(&superchunk, |&(kept, _)| kept)
+    pub(crate) fn find_superchunk(&self, superchunk: SuperchunkIndex) -> Result<usize, usize> {
+        self.cold_pool.binary_search_by_key(&superchunk, |&(stored_superchunk, _)| stored_superchunk)
     }
 
     /// Puts `image` in the cold pool as `superchunk` (read from disk, or
@@ -40,15 +40,15 @@ impl ChunkStorage {
     /// entries still in the ring are applied to the new image when it
     /// is flushed.
     pub fn insert(&mut self, superchunk: SuperchunkIndex, image: SuperchunkImage) {
-        self.paging.bytes_in_memory += bytes_of(&image);
-        let kept = Kept::InMemory(Arc::new(image));
-        match self.find(superchunk) {
-            Ok(at) => {
-                if let Kept::InMemory(before) = std::mem::replace(&mut self.cold_pool[at].1, kept) {
-                    self.paging.bytes_in_memory -= bytes_of(&before);
+        self.cold_pool_paging.bytes_in_memory += bytes_of(&image);
+        let image_kept = ImageKept::InMemory(Arc::new(image));
+        match self.find_superchunk(superchunk) {
+            Ok(pool_index) => {
+                if let ImageKept::InMemory(replaced_image) = std::mem::replace(&mut self.cold_pool[pool_index].1, image_kept) {
+                    self.cold_pool_paging.bytes_in_memory -= bytes_of(&replaced_image);
                 }
             }
-            Err(at) => self.cold_pool.insert(at, (superchunk, kept)),
+            Err(insert_index) => self.cold_pool.insert(insert_index, (superchunk, image_kept)),
         }
     }
 
@@ -59,8 +59,8 @@ impl ChunkStorage {
 
     /// Whether the cold pool holds an image of `superchunk`, in memory
     /// or on disk.
-    pub fn holds(&self, superchunk: SuperchunkIndex) -> bool {
-        self.find(superchunk).is_ok()
+    pub fn holds_image(&self, superchunk: SuperchunkIndex) -> bool {
+        self.find_superchunk(superchunk).is_ok()
     }
 
     /// The image of `superchunk`, if the cold pool holds it -- in
@@ -68,9 +68,9 @@ impl ChunkStorage {
     /// paged. One paged to disk is not lent from here: a panic, the
     /// caller's mistake ([`ChunkStorage::shared_image`] reads it).
     pub fn image(&self, superchunk: SuperchunkIndex) -> Option<&SuperchunkImage> {
-        self.find(superchunk).ok().map(|at| match &self.cold_pool[at].1 {
-            Kept::InMemory(image) => &**image,
-            Kept::OnDisk(_) => panic!("the image of superchunk {:x} is paged to disk: shared_image reads it", superchunk.0),
+        self.find_superchunk(superchunk).ok().map(|pool_index| match &self.cold_pool[pool_index].1 {
+            ImageKept::InMemory(image) => &**image,
+            ImageKept::OnDisk(_) => panic!("the image of superchunk {:x} is paged to disk: shared_image reads it", superchunk.0),
         })
     }
 
@@ -78,7 +78,7 @@ impl ChunkStorage {
     /// read on another thread, as it is now. One paged to disk is read
     /// here, and stays on disk.
     pub fn shared_image(&self, superchunk: SuperchunkIndex) -> Option<Arc<SuperchunkImage>> {
-        self.stored(superchunk).map(|stored| stored.image(superchunk))
+        self.stored_image(superchunk).map(|image_stored| image_stored.image(superchunk))
     }
 
     /// The encoded layer of `layer_type` in `chunk`, if the cold pool has
@@ -89,30 +89,30 @@ impl ChunkStorage {
         self.image(chunk.superchunk())?.layer(chunk.place(), layer_type)
     }
 
-    /// Writes `encoded` back into the ring as the layer of `layer_type`
+    /// Writes `encoded_layer` back into the ring as the layer of `layer_type`
     /// in `chunk` (no words: no layer), if it fits -- an empty ring too
     /// small grown until it does: whether it went in. If not, the
     /// superchunk at the ring's tail is to be flushed first
     /// ([`ChunkStorage::take_tail`]).
-    pub fn try_write_back(&mut self, chunk: ChunkIndex, layer_type: LayerType, encoded: &[u64]) -> bool {
-        while !self.ring.push(chunk, layer_type, encoded) {
-            if !self.ring.is_empty() {
+    pub fn try_write_back(&mut self, chunk: ChunkIndex, layer_type: LayerType, encoded_layer: &[u64]) -> bool {
+        while !self.writeback_ring.push(chunk, layer_type, encoded_layer) {
+            if !self.writeback_ring.is_empty() {
                 return false;
             }
-            self.ring.grow(self.ring.capacity().max(1) * 2);
+            self.writeback_ring.grow_empty(self.writeback_ring.capacity_in_words().max(1) * 2);
         }
         true
     }
 
     /// [`ChunkStorage::try_write_back`], flushing the superchunk at the
     /// ring's tail here until it fits, and adding each one flushed to
-    /// `flushed`. Every superchunk was flushed before `encoded` went in,
+    /// `flushed_superchunks`. Every superchunk was flushed before `encoded_layer` went in,
     /// so its entries left in the ring are this one and later ones.
-    pub fn write_back(&mut self, chunk: ChunkIndex, layer_type: LayerType, encoded: &[u64], flushed: &mut Vec<SuperchunkIndex>) {
-        while !self.try_write_back(chunk, layer_type, encoded) {
+    pub fn write_back(&mut self, chunk: ChunkIndex, layer_type: LayerType, encoded_layer: &[u64], flushed_superchunks: &mut Vec<SuperchunkIndex>) {
+        while !self.try_write_back(chunk, layer_type, encoded_layer) {
             let flush = self.take_tail().expect("a full ring has a tail");
-            self.insert(flush.superchunk, flush.rewritten());
-            flushed.push(flush.superchunk);
+            self.insert(flush.superchunk, flush.rewritten_image());
+            flushed_superchunks.push(flush.superchunk);
         }
     }
 
@@ -121,58 +121,58 @@ impl ChunkStorage {
     /// any: they are freed from the ring now. Until the image rewritten
     /// with them is put in the cold pool, their newest cells are only in
     /// the bitmap arena, which holds them that long.
-    pub fn take(&mut self, superchunk: SuperchunkIndex) -> Option<Flush> {
-        let entries = self.ring.entries_of(superchunk);
-        if entries.is_empty() {
+    pub fn take_entries(&mut self, superchunk: SuperchunkIndex) -> Option<Flush> {
+        let ring_entries = self.writeback_ring.entries_of(superchunk);
+        if ring_entries.is_empty() {
             return None;
         }
-        let changes = entries.iter().map(|entry| (entry.place, entry.layer_type, self.ring.encoded(entry).to_vec())).collect();
-        self.ring.release(superchunk);
-        Some(Flush { superchunk, image: self.shared_image(superchunk), changes })
+        let layer_changes = ring_entries.iter().map(|ring_entry| (ring_entry.place, ring_entry.layer_type, self.writeback_ring.encoded_layer(ring_entry).to_vec())).collect();
+        self.writeback_ring.release_superchunk(superchunk);
+        Some(Flush { superchunk, image: self.shared_image(superchunk), layer_changes })
     }
 
     /// The superchunk at the ring's tail -- the one to flush to make room
     /// -- if the ring holds any change.
     pub fn tail_superchunk(&self) -> Option<SuperchunkIndex> {
-        self.ring.tail_superchunk()
+        self.writeback_ring.tail_superchunk()
     }
 
-    /// [`ChunkStorage::take`] of the superchunk at the ring's tail.
+    /// [`ChunkStorage::take_entries`] of the superchunk at the ring's tail.
     pub fn take_tail(&mut self) -> Option<Flush> {
-        self.take(self.ring.tail_superchunk()?)
+        self.take_entries(self.writeback_ring.tail_superchunk()?)
     }
 
     /// Whether the ring holds any change of `superchunk`.
     pub fn holds_changes(&self, superchunk: SuperchunkIndex) -> bool {
-        !self.ring.entries_of(superchunk).is_empty()
+        !self.writeback_ring.entries_of(superchunk).is_empty()
     }
 
     /// Rewrites the image of `superchunk` with all its entries in the
     /// ring, here, and frees them. Returns whether it had any.
     pub fn flush(&mut self, superchunk: SuperchunkIndex) -> bool {
-        let Some(flush) = self.take(superchunk) else {
+        let Some(flush) = self.take_entries(superchunk) else {
             return false;
         };
-        self.insert(superchunk, flush.rewritten());
+        self.insert(superchunk, flush.rewritten_image());
         true
     }
 
     /// Flushes every superchunk with entries in the ring, each added to
-    /// `flushed`: the ring is empty after.
-    pub fn flush_all(&mut self, flushed: &mut Vec<SuperchunkIndex>) {
-        while let Some(superchunk) = self.ring.tail_superchunk() {
+    /// `flushed_superchunks`: the ring is empty after.
+    pub fn flush_all(&mut self, flushed_superchunks: &mut Vec<SuperchunkIndex>) {
+        while let Some(superchunk) = self.writeback_ring.tail_superchunk() {
             self.flush(superchunk);
-            flushed.push(superchunk);
+            flushed_superchunks.push(superchunk);
         }
     }
 
     /// Whether the ring holds no change.
     pub fn nothing_to_flush(&self) -> bool {
-        self.ring.tail_superchunk().is_none()
+        self.writeback_ring.tail_superchunk().is_none()
     }
 }
 
-/// A superchunk's entries taken out of the ring ([`ChunkStorage::take`]),
+/// A superchunk's entries taken out of the ring ([`ChunkStorage::take_entries`]),
 /// with its image as it was: all a flush needs, so it can be done on any
 /// thread.
 pub struct Flush {
@@ -181,17 +181,17 @@ pub struct Flush {
     /// Its image when the entries were taken, if it had one.
     pub image: Option<Arc<SuperchunkImage>>,
     /// Its entries, oldest first: each layer's chunk place, type and words.
-    pub changes: Vec<(usize, LayerType, Vec<u64>)>,
+    pub layer_changes: Vec<(usize, LayerType, Vec<u64>)>,
 }
 
 impl Flush {
     /// The image with every change made: a superchunk with no image made,
     /// flat at height 0.
-    pub fn rewritten(&self) -> SuperchunkImage {
-        let changes: Vec<LayerChange> = self.changes.iter().map(|(place, layer_type, encoded)| LayerChange { place: *place, layer_type: *layer_type, encoded }).collect();
+    pub fn rewritten_image(&self) -> SuperchunkImage {
+        let image_changes: Vec<LayerChange> = self.layer_changes.iter().map(|(place, layer_type, encoded_words)| LayerChange { place: *place, layer_type: *layer_type, encoded_layer: encoded_words }).collect();
         match &self.image {
-            Some(image) => image.rewritten(&changes),
-            None => SuperchunkImage::new(&HeightMap::default()).rewritten(&changes),
+            Some(image) => image.rewritten_with(&image_changes),
+            None => SuperchunkImage::new(&HeightMap::default()).rewritten_with(&image_changes),
         }
     }
 }

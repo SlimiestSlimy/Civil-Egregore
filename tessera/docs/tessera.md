@@ -154,7 +154,7 @@ children: its node's own bits, as the quadtree writer writes them --
 counting is writing to a counter -- and each child node's fewest; a
 residual floor tile at its price. A divide or a residual floor tile may instead
 be one **complex tile**: a value for every tile of its **resolution**,
-`size offset` levels finer, each homogeneous -- it says every cell
+`size offset_in_interval` levels finer, each homogeneous -- it says every cell
 under it, so it never contains another complex tile. Candidates, each
 taken only if strictly fewer bits, the first of the fewest kept:
 
@@ -363,7 +363,7 @@ them back.
 | `measurement.csv` | `cargo run --release -- tessera measurement` | bits a bitmap by generator, checkerboards, saved adversarial bitmaps; what the trees hold |
 | `census.csv` | `... -- census` | node kinds by level, for each bitmap looked at |
 | `per_shape.csv` | `... -- per_shape` | bits a bitmap and a cell set, shape by shape |
-| `noise.csv` | `... -- noise` | bits on noise at several densities |
+| `noise.csv` | `... -- noisy_area` | bits on noise at several densities |
 | `timing.csv` | `... -- timing` | encode and decode times, family by family |
 | `instruction_count.csv` | `... -- instruction_count` | instructions to encode and decode a corpus, by callgrind |
 | `sparse.csv` | `... -- sparse` | the tree against the binary count tree on sparse bitmaps |

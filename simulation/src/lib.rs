@@ -18,7 +18,7 @@ mod turn;
 pub mod transient_data;
 
 pub use sampling::{sample, sample_layer, sample_tiles_of_layer};
-pub use halos::{HaloChange, Halos, Held, COOL_TICKS, WARM_TICKS};
+pub use halos::{HaloChange, Halos, LentWorld, COOL_TICKS, WARM_TICKS};
 pub use hot::Hot;
 pub use tick::{threads_for, Simulation, TickReport};
 pub use turn::conditional::{Compare, CountedWhenApplied, COUNTED_WHEN_APPLIED};

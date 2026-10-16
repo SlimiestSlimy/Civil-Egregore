@@ -3,24 +3,24 @@
 //! -- the cell made to decay and be eaten in one tick, on purpose, and
 //! all of it the same on any number of threads.
 
-use crate::tests::{cell, cells_drawn, walker, world, STONE};
+use crate::tests::{cell, cells_drawn, walker_header, world, STONE_LAYER};
 use bitplane_manager::{BitmapArena, Write, WriteOp};
 use coordinates::CellIndex;
 use entity_manager::{Attribute, AttributeBlock};
 use simulation::{Compare, Simulation, Turn};
-use utilities::rng::Rng;
+use utilities::rng::RandomSource;
 
 /// An attribute an entity has once it has eaten.
-const FED: Attribute<u64> = Attribute::new(43);
+const FED_ATTRIBUTE: Attribute<u64> = Attribute::new(43);
 /// The place cells decayed are counted at.
-const DECAYED: u32 = 3;
+const DECAYED_COUNT_PLACE: u32 = 3;
 /// The place meals are counted at.
-const EATEN: u32 = 4;
+const EATEN_COUNT_PLACE: u32 = 4;
 
 /// Sets `cells` of the stone, between two ticks.
-fn set(arena: &mut BitmapArena, cells: &[CellIndex]) {
-    cells.iter().for_each(|&at| arena.queue(STONE, Write::cell(at, WriteOp::Set)));
-    assert_eq!(arena.apply().changed, cells.len() as u64);
+fn set(bitmap_arena: &mut BitmapArena, cells: &[CellIndex]) {
+    cells.iter().for_each(|&set_cell| bitmap_arena.queue_write(STONE_LAYER, Write::cell(set_cell, WriteOp::SetCell)));
+    assert_eq!(bitmap_arena.apply().cells_changed, cells.len() as u64);
 }
 
 /// Two writes on one cell that both saw it clear: the first applied
@@ -29,21 +29,21 @@ fn set(arena: &mut BitmapArena, cells: &[CellIndex]) {
 /// if applied, under the number its rule's counts were given.
 #[test]
 fn a_write_is_applied_only_where_the_cell_is_as_it_was_seen() {
-    let (mut arena, mut entities) = world(1);
-    let (twice, never_set, cleared) = (cell(5, 5), cell(700, 9), cell(1023, 1023));
-    set(&mut arena, &[cleared]);
-    let report = Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
+    let (mut bitmap_arena, mut entity_store) = world(1);
+    let (written_twice_cell, never_set, cleared_cell) = (cell(5, 5), cell(700, 9), cell(1023, 1023));
+    set(&mut bitmap_arena, &[cleared_cell]);
+    let report = Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, utilities::seed::counted_seed(), |turn: &mut Turn| {
         turn.count_under(10);
-        actions::cells::seen_becoming(turn, STONE, twice, 0, 1, Some(DECAYED as usize));
-        actions::cells::seen_becoming(turn, STONE, twice, 0, 1, Some(DECAYED as usize));
-        actions::cells::seen_becoming(turn, STONE, never_set, 1, 0, Some(EATEN as usize));
-        actions::cells::seen_becoming(turn, STONE, cleared, 1, 0, None);
+        actions::cells::seen_becoming(turn, STONE_LAYER, written_twice_cell, 0, 1, Some(DECAYED_COUNT_PLACE as usize));
+        actions::cells::seen_becoming(turn, STONE_LAYER, written_twice_cell, 0, 1, Some(DECAYED_COUNT_PLACE as usize));
+        actions::cells::seen_becoming(turn, STONE_LAYER, never_set, 1, 0, Some(EATEN_COUNT_PLACE as usize));
+        actions::cells::seen_becoming(turn, STONE_LAYER, cleared_cell, 1, 0, None);
         0
     });
-    let applied = report.writes_applied;
-    assert_eq!((applied.writes, applied.changed, applied.refused, applied.missed), (4, 2, 2, 0));
-    assert_eq!((arena.holds(STONE, twice), arena.holds(STONE, never_set), arena.holds(STONE, cleared)), (Ok(true), Ok(false), Ok(false)));
-    assert_eq!((report.counted_when_applied[10 + DECAYED as usize], report.counted_when_applied[10 + EATEN as usize]), (1, 0));
+    let report_writes = report.writes_applied;
+    assert_eq!((report_writes.writes, report_writes.cells_changed, report_writes.writes_refused, report_writes.missed), (4, 2, 2, 0));
+    assert_eq!((bitmap_arena.layer_holds_cell(STONE_LAYER, written_twice_cell), bitmap_arena.layer_holds_cell(STONE_LAYER, never_set), bitmap_arena.layer_holds_cell(STONE_LAYER, cleared_cell)), (Ok(true), Ok(false), Ok(false)));
+    assert_eq!((report.counted_when_applied[10 + DECAYED_COUNT_PLACE as usize], report.counted_when_applied[10 + EATEN_COUNT_PLACE as usize]), (1, 0));
     assert_eq!(report.counted_when_applied.iter().sum::<u64>(), 1);
 }
 
@@ -60,41 +60,41 @@ fn a_write_is_applied_only_where_the_cell_is_as_it_was_seen() {
 /// -- and the other's are all applied.
 #[test]
 fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
-    let (mut arena, mut entities) = world(1);
-    let (decaying, eaten) = (cell(300, 300), cell(301, 400));
-    set(&mut arena, &[decaying, eaten]);
-    entities.queue_put(walker(decaying, 0), &[]);
-    entities.queue_put(walker(eaten, 0), &[]);
-    entities.apply();
-    let mark = |at: CellIndex| at.offset(1, 0).expect("in the world");
-    let report = Simulation::new(1).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
-        actions::cells::seen_becoming(turn, STONE, decaying, 1, 0, Some(DECAYED as usize));
-        for eater in turn.woken() {
-            let (now, header) = (turn.now(), eater.header);
+    let (mut bitmap_arena, mut entity_store) = world(1);
+    let (decaying_cell, eaten_cell) = (cell(300, 300), cell(301, 400));
+    set(&mut bitmap_arena, &[decaying_cell, eaten_cell]);
+    entity_store.queue_put(walker_header(decaying_cell, 0), &[]);
+    entity_store.queue_put(walker_header(eaten_cell, 0), &[]);
+    entity_store.apply();
+    let mark_cell_of = |eater_cell: CellIndex| eater_cell.at_cartesian_offset(1, 0).expect("in the world");
+    let report = Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, utilities::seed::counted_seed(), |turn: &mut Turn| {
+        actions::cells::seen_becoming(turn, STONE_LAYER, decaying_cell, 1, 0, Some(DECAYED_COUNT_PLACE as usize));
+        for eater_entity in turn.woken_entities() {
+            let (current_tick, header) = (turn.current_tick(), eater_entity.header);
             // Fed if the cell still holds, asleep a tick if it does not: one of the two, the eater written once.
-            turn.compare_from_here(Compare::Cell { layer_type: STONE, at: header.at, seen: 1 });
-            actions::entities::update(turn, &header, entity_manager::Header { wake: now + 100, ..header }, &[AttributeBlock::holding(FED, 1)]);
-            turn.compare_from_here(Compare::Cell { layer_type: STONE, at: header.at, seen: 0 });
-            actions::entities::step(turn, &header, header.at, now + 1);
+            turn.compare_from_here(Compare::Cell { layer_type: STONE_LAYER, target_cell: header.stood_cell, seen_value: 1 });
+            actions::entities::update_entity(turn, &header, entity_manager::Header { wake: current_tick + 100, ..header }, &[AttributeBlock::holding_value(FED_ATTRIBUTE, 1)]);
+            turn.compare_from_here(Compare::Cell { layer_type: STONE_LAYER, target_cell: header.stood_cell, seen_value: 0 });
+            actions::entities::step(turn, &header, header.stood_cell, current_tick + 1);
             turn.compare_end();
-            actions::cells::seen_becoming(turn, STONE, header.at, 1, 0, Some(EATEN as usize));
-            let fed = Compare::attribute(header.at, FED.attribute_type(), Some(&[AttributeBlock::holding(FED, 1)]));
-            actions::compare::write(turn, fed, STONE, mark(header.at), 0, 1, None);
+            actions::cells::seen_becoming(turn, STONE_LAYER, header.stood_cell, 1, 0, Some(EATEN_COUNT_PLACE as usize));
+            let fed_compare = Compare::attribute(header.stood_cell, FED_ATTRIBUTE.attribute_type(), Some(&[AttributeBlock::holding_value(FED_ATTRIBUTE, 1)]));
+            actions::compare::write(turn, fed_compare, STONE_LAYER, mark_cell_of(header.stood_cell), 0, 1, None);
         }
         0
     });
-    assert_eq!((arena.holds(STONE, decaying), arena.holds(STONE, eaten)), (Ok(false), Ok(false)));
-    assert_eq!((arena.holds(STONE, mark(decaying)), arena.holds(STONE, mark(eaten))), (Ok(false), Ok(true)), "a mark by the one fed alone");
-    let applied = report.writes_applied;
-    assert_eq!((applied.writes, applied.changed, applied.refused), (5, 3, 2), "the meal on the cell decayed and its mark, refused");
+    assert_eq!((bitmap_arena.layer_holds_cell(STONE_LAYER, decaying_cell), bitmap_arena.layer_holds_cell(STONE_LAYER, eaten_cell)), (Ok(false), Ok(false)));
+    assert_eq!((bitmap_arena.layer_holds_cell(STONE_LAYER, mark_cell_of(decaying_cell)), bitmap_arena.layer_holds_cell(STONE_LAYER, mark_cell_of(eaten_cell))), (Ok(false), Ok(true)), "a mark by the one fed alone");
+    let report_writes = report.writes_applied;
+    assert_eq!((report_writes.writes, report_writes.cells_changed, report_writes.writes_refused), (5, 3, 2), "the meal on the cell decayed and its mark, refused");
     // Every write's compare is an instruction: the decay's holds; the eater fed holds six of its seven (fed, nothing seen of the
     // attribute it sets, itself there to be put to sleep, its meal's cell, its attribute, its mark's cell; not asleep); the other one of four come to (asleep; not fed, its meal's cell, its attribute -- the
     // mark's cell, within that, never come to).
     assert_eq!(report.instructions_compared, (9, 4), "one eater fed, one asleep a tick: each written once");
-    assert_eq!((report.counted_when_applied[DECAYED as usize], report.counted_when_applied[EATEN as usize]), (1, 1));
-    let (hungry, fed) = (entities.get(decaying).expect("where it stood"), entities.get(eaten).expect("where it stood"));
-    assert_eq!((hungry.attribute(FED), hungry.header.wake), (None, 1), "nothing of its meal happened: asleep a tick");
-    assert_eq!((fed.attribute(FED), fed.header.wake), (Some(1), 100), "its meal whole");
+    assert_eq!((report.counted_when_applied[DECAYED_COUNT_PLACE as usize], report.counted_when_applied[EATEN_COUNT_PLACE as usize]), (1, 1));
+    let (hungry_entity, fed_entity) = (entity_store.get(decaying_cell).expect("where it stood"), entity_store.get(eaten_cell).expect("where it stood"));
+    assert_eq!((hungry_entity.attribute(FED_ATTRIBUTE), hungry_entity.header.wake), (None, 1), "nothing of its meal happened: asleep a tick");
+    assert_eq!((fed_entity.attribute(FED_ATTRIBUTE), fed_entity.header.wake), (Some(1), 100), "its meal whole");
 }
 
 /// What a superchunk's turn queues in
@@ -102,16 +102,16 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
 /// cells of `cells` in it, each as it was `seen`: for each, in order,
 /// one to three times, a write that flips it -- held against itself,
 /// or against the next cell of its superchunk being as seen. Given to
-/// `queue` as the cell flipped and the cell compared.
-fn attempts(cells: &[(CellIndex, bool)], superchunk: coordinates::SuperchunkIndex, mut queue: impl FnMut((CellIndex, bool), (CellIndex, bool))) {
-    let here: Vec<(CellIndex, bool)> = cells.iter().copied().filter(|(at, _)| at.superchunk() == superchunk).collect();
-    for (nth, &one) in here.iter().enumerate() {
+/// `queue_attempt` as the cell flipped and the cell compared.
+fn queue_attempts(cells: &[(CellIndex, bool)], superchunk: coordinates::SuperchunkIndex, mut queue_attempt: impl FnMut((CellIndex, bool), (CellIndex, bool))) {
+    let cells_here: Vec<(CellIndex, bool)> = cells.iter().copied().filter(|(drawn_cell, _)| drawn_cell.superchunk() == superchunk).collect();
+    for (cell_number, &this_cell) in cells_here.iter().enumerate() {
         // Drawn from the cell, not the turn: the same whoever asks.
-        let mut random = Rng::new(one.0 .0 ^ utilities::seed::counted());
-        for _ in 0..random.between(1, 3) {
-            match random.below(2) == 0 || here.len() < 2 {
-                true => queue(one, one),
-                false => queue(one, here[(nth + 1) % here.len()]),
+        let mut cell_rng = RandomSource::new(this_cell.0 .0 ^ utilities::seed::counted_seed());
+        for _ in 0..cell_rng.draw_between(1, 3) {
+            match cell_rng.draw_below(2) == 0 || cells_here.len() < 2 {
+                true => queue_attempt(this_cell, this_cell),
+                false => queue_attempt(this_cell, cells_here[(cell_number + 1) % cells_here.len()]),
             }
         }
     }
@@ -126,37 +126,37 @@ fn attempts(cells: &[(CellIndex, bool)], superchunk: coordinates::SuperchunkInde
 /// four.
 #[test]
 fn drawn_writes_come_to_the_same_as_applied_in_order() {
-    let mut random = Rng::new(utilities::seed::counted());
-    let cells: Vec<(CellIndex, bool)> = cells_drawn(400, 2048).into_iter().map(|at| (at, random.below(2) == 0)).collect();
+    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let cells: Vec<(CellIndex, bool)> = cells_drawn(400, 2048).into_iter().map(|drawn_cell| (drawn_cell, seeded_rng.draw_below(2) == 0)).collect();
     // What applying them in order comes to: the cells, the writes held against their own cell applied, against another, and refused.
-    let (mut held, mut own, mut other, mut refused): (std::collections::HashMap<CellIndex, bool>, _, _, _) = (cells.iter().copied().collect(), 0u64, 0u64, 0u64);
-    let mut superchunks: Vec<coordinates::SuperchunkIndex> = cells.iter().map(|(at, _)| at.superchunk()).collect();
+    let (mut expected_cells, mut own_applied, mut other_applied, mut refused_count): (std::collections::HashMap<CellIndex, bool>, _, _, _) = (cells.iter().copied().collect(), 0u64, 0u64, 0u64);
+    let mut superchunks: Vec<coordinates::SuperchunkIndex> = cells.iter().map(|(superchunk_cell, _)| superchunk_cell.superchunk()).collect();
     superchunks.sort_unstable();
     superchunks.dedup();
     for &superchunk in &superchunks {
-        attempts(&cells, superchunk, |flipped, compared| match (held[&compared.0] == compared.1 && held[&flipped.0] == flipped.1, flipped.0 == compared.0) {
-            (false, _) => refused += 1,
-            (true, same) => {
-                (own, other) = (own + u64::from(same), other + u64::from(!same));
-                held.insert(flipped.0, !flipped.1);
+        queue_attempts(&cells, superchunk, |flipped_entry, compared_entry| match (expected_cells[&compared_entry.0] == compared_entry.1 && expected_cells[&flipped_entry.0] == flipped_entry.1, flipped_entry.0 == compared_entry.0) {
+            (false, _) => refused_count += 1,
+            (true, same_cell) => {
+                (own_applied, other_applied) = (own_applied + u64::from(same_cell), other_applied + u64::from(!same_cell));
+                expected_cells.insert(flipped_entry.0, !flipped_entry.1);
             }
         });
     }
-    assert!(own > 0 && other > 0 && refused > 0, "every case drawn");
-    for threads in [1, 4] {
-        let (mut arena, mut entities) = world(2);
-        set(&mut arena, &cells.iter().filter(|(_, set)| *set).map(|(at, _)| *at).collect::<Vec<_>>());
-        let report = Simulation::new(threads).tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut Turn| {
+    assert!(own_applied > 0 && other_applied > 0 && refused_count > 0, "every case drawn");
+    for thread_count in [1, 4] {
+        let (mut bitmap_arena, mut entity_store) = world(2);
+        set(&mut bitmap_arena, &cells.iter().filter(|(_, is_set)| *is_set).map(|(set_cell, _)| *set_cell).collect::<Vec<_>>());
+        let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, utilities::seed::counted_seed(), |turn: &mut Turn| {
             let superchunk = turn.superchunk();
-            attempts(&cells, superchunk, |flipped, compared| {
-                let compare = Compare::Cell { layer_type: STONE, at: compared.0, seen: u32::from(compared.1) };
-                actions::compare::write(turn, compare, STONE, flipped.0, u32::from(flipped.1), u32::from(!flipped.1), Some(usize::from(flipped.0 != compared.0)));
+            queue_attempts(&cells, superchunk, |turn_flipped, turn_compared| {
+                let held_against = Compare::Cell { layer_type: STONE_LAYER, target_cell: turn_compared.0, seen_value: u32::from(turn_compared.1) };
+                actions::compare::write(turn, held_against, STONE_LAYER, turn_flipped.0, u32::from(turn_flipped.1), u32::from(!turn_flipped.1), Some(usize::from(turn_flipped.0 != turn_compared.0)));
             });
             0
         });
-        for (at, _) in &cells {
-            assert_eq!(arena.holds(STONE, *at), Ok(held[at]), "on {threads} threads");
+        for (checked_cell, _) in &cells {
+            assert_eq!(bitmap_arena.layer_holds_cell(STONE_LAYER, *checked_cell), Ok(expected_cells[checked_cell]), "on {thread_count} threads");
         }
-        assert_eq!((report.counted_when_applied[0], report.counted_when_applied[1], report.writes_applied.refused), (own, other, refused), "on {threads} threads");
+        assert_eq!((report.counted_when_applied[0], report.counted_when_applied[1], report.writes_applied.writes_refused), (own_applied, other_applied, refused_count), "on {thread_count} threads");
     }
 }

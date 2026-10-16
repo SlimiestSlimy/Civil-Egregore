@@ -13,30 +13,30 @@ use utilities::transient_data::TransientData;
 pub const TRANSIENT_DATA: TransientData = TransientData::for_crate(env!("CARGO_MANIFEST_DIR"));
 
 /// Where the measurements are kept.
-pub fn measurements() -> PathBuf {
-    TRANSIENT_DATA.measurements()
+pub fn measurements_folder() -> PathBuf {
+    TRANSIENT_DATA.measurements_folder()
 }
 
 /// Where the adversarial searches' worst bitmaps are kept.
 pub fn worst() -> PathBuf {
-    TRANSIENT_DATA.under("worst")
+    TRANSIENT_DATA.path_under("worst")
 }
 
 /// Where the renders go.
-pub fn renders() -> PathBuf {
-    TRANSIENT_DATA.under("renders")
+pub fn renders_folder() -> PathBuf {
+    TRANSIENT_DATA.path_under("renders")
 }
 
 /// Where the callgrind output goes.
-pub fn callgrind() -> PathBuf {
-    TRANSIENT_DATA.under("callgrind")
+pub fn callgrind_folder() -> PathBuf {
+    TRANSIENT_DATA.path_under("callgrind")
 }
 
 /// Notes the seed `report`'s corpus was grown from, if any was, then
-/// publishes it in [`measurements`]: printed, and kept in its file.
-pub fn publish(mut report: Report) {
-    if let Some((seed, fresh)) = seed_in_use() {
-        report.note(format!("seed {}{}", utilities::seed::hex(seed), if fresh { ", fresh for this run" } else { "" }));
+/// publishes it in [`measurements_folder`]: printed, and kept in its file.
+pub fn publish_report(mut report: Report) {
+    if let Some((seed, seed_is_fresh)) = seed_in_use() {
+        report.add_note(format!("seed {}{}", utilities::seed::seed_as_hex(seed), if seed_is_fresh { ", fresh for this run" } else { "" }));
     }
-    TRANSIENT_DATA.publish(report);
+    TRANSIENT_DATA.publish_report(report);
 }

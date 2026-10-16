@@ -10,8 +10,8 @@ use crate::last_pass::context_odds::{fixed_point_log2, FRACTION_BITS};
 fn fixed_point_log2_is_close() {
     let hundredth_of_a_bit = (1 << FRACTION_BITS) as f64 / 100.0;
     for value in (1..1u64 << 18).step_by(7).chain((1..1u64 << 60).step_by(1 << 44)) {
-        let exact = (value as f64).log2() * (1 << FRACTION_BITS) as f64;
-        let fixed = fixed_point_log2(value) as f64;
-        assert!(fixed <= exact && exact - fixed < hundredth_of_a_bit, "log2({value}): {fixed} against {exact}");
+        let exact_log2 = (value as f64).log2() * (1 << FRACTION_BITS) as f64;
+        let fixed_log2 = fixed_point_log2(value) as f64;
+        assert!(fixed_log2 <= exact_log2 && exact_log2 - fixed_log2 < hundredth_of_a_bit, "log2({value}): {fixed_log2} against {exact_log2}");
     }
 }

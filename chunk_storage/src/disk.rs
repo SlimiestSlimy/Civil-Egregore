@@ -23,16 +23,16 @@ const SUPERCHUNKS: &str = "superchunks";
 #[derive(Debug)]
 pub enum DiskError {
     /// The system refused: the file, and what it said.
-    Io(PathBuf, io::Error),
+    IoFailed(PathBuf, io::Error),
     /// A file is not what a save writes: the file, and what is wrong.
-    Invalid(PathBuf, String),
+    InvalidFile(PathBuf, String),
 }
 
 impl fmt::Display for DiskError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Io(path, error) => write!(formatter, "{}: {error}", path.display()),
-            Self::Invalid(path, what) => write!(formatter, "{}: {what}", path.display()),
+            Self::IoFailed(path, io_error) => write!(formatter, "{}: {io_error}", path.display()),
+            Self::InvalidFile(path, what_is_wrong) => write!(formatter, "{}: {what_is_wrong}", path.display()),
         }
     }
 }
@@ -40,23 +40,23 @@ impl fmt::Display for DiskError {
 impl std::error::Error for DiskError {}
 
 /// A superchunk's file in `folder`: its index in hexadecimal,
-/// and `extension`.
-fn superchunk_file(folder: &Path, superchunk: SuperchunkIndex, extension: &str) -> PathBuf {
-    folder.join(SUPERCHUNKS).join(format!("{:011x}.{extension}", superchunk.0))
+/// and `file_extension`.
+fn superchunk_file(folder: &Path, superchunk: SuperchunkIndex, file_extension: &str) -> PathBuf {
+    folder.join(SUPERCHUNKS).join(format!("{:011x}.{file_extension}", superchunk.0))
 }
 
 /// Writes what the world is as `folder`'s world file, the folder
 /// made if not there: how many bytes.
-pub fn write_world(folder: &Path, info: &WorldInfo) -> Result<u64, DiskError> {
+pub fn write_world(folder: &Path, world_info: &WorldInfo) -> Result<u64, DiskError> {
     make_folder(&folder.join(SUPERCHUNKS))?;
-    write(&folder.join(WORLD_FILE), info.to_text().as_bytes())
+    write(&folder.join(WORLD_FILE), world_info.to_text().as_bytes())
 }
 
 /// What the world in `folder` is: its world file read.
 pub fn read_world(folder: &Path) -> Result<WorldInfo, DiskError> {
     let path = folder.join(WORLD_FILE);
-    let text = String::from_utf8(read(&path)?).map_err(|_| DiskError::Invalid(path.clone(), "not text".to_string()))?;
-    WorldInfo::from_text(&text).map_err(|what| DiskError::Invalid(path, what))
+    let world_text = String::from_utf8(read_bytes(&path)?).map_err(|_| DiskError::InvalidFile(path.clone(), "not text".to_string()))?;
+    WorldInfo::from_text(&world_text).map_err(|what_is_wrong| DiskError::InvalidFile(path, what_is_wrong))
 }
 
 /// Writes `hot` as `folder`'s hot file, the folder made if not
@@ -69,8 +69,8 @@ pub fn write_hot(folder: &Path, hot: &HotSuperchunks) -> Result<u64, DiskError> 
 /// Which superchunks were hot in `folder`'s world: its hot file read.
 pub fn read_hot(folder: &Path) -> Result<HotSuperchunks, DiskError> {
     let path = folder.join(HOT_FILE);
-    let text = String::from_utf8(read(&path)?).map_err(|_| DiskError::Invalid(path.clone(), "not text".to_string()))?;
-    HotSuperchunks::from_text(&text).map_err(|what| DiskError::Invalid(path, what))
+    let hot_text = String::from_utf8(read_bytes(&path)?).map_err(|_| DiskError::InvalidFile(path.clone(), "not text".to_string()))?;
+    HotSuperchunks::from_text(&hot_text).map_err(|what_is_wrong| DiskError::InvalidFile(path, what_is_wrong))
 }
 
 /// Writes `image` as `superchunk`'s in `folder`: how many bytes.
@@ -79,27 +79,27 @@ pub fn write_image(folder: &Path, superchunk: SuperchunkIndex, image: &Superchun
     write_words(&superchunk_file(folder, superchunk, "image"), image.words())
 }
 
-/// Copies the image of `superchunk` from its file of the folder `from`
+/// Copies the image of `superchunk` from its file of the folder `from_folder`
 /// to its file of `folder`: how many bytes. The same file -- `folder`
-/// is `from` -- is left as it is.
-pub fn copy_image(from: &Path, folder: &Path, superchunk: SuperchunkIndex) -> Result<u64, DiskError> {
-    let (kept, path) = (superchunk_file(from, superchunk, "image"), superchunk_file(folder, superchunk, "image"));
-    let io = |path: &Path| { let path = path.to_path_buf(); move |error| DiskError::Io(path, error) };
-    let same = matches!((from.canonicalize(), folder.canonicalize()), (Ok(from), Ok(folder)) if from == folder);
-    if same {
-        return Ok(fs::metadata(&kept).map_err(io(&kept))?.len());
+/// is `from_folder` -- is left as it is.
+pub fn copy_image(from_folder: &Path, folder: &Path, superchunk: SuperchunkIndex) -> Result<u64, DiskError> {
+    let (source_path, path) = (superchunk_file(from_folder, superchunk, "image"), superchunk_file(folder, superchunk, "image"));
+    let io_failed_at = |path: &Path| { let path = path.to_path_buf(); move |io_error| DiskError::IoFailed(path, io_error) };
+    let same_folder = matches!((from_folder.canonicalize(), folder.canonicalize()), (Ok(canonical_from), Ok(folder)) if canonical_from == folder);
+    if same_folder {
+        return Ok(fs::metadata(&source_path).map_err(io_failed_at(&source_path))?.len());
     }
     make_folder(&folder.join(SUPERCHUNKS))?;
-    let beside = path.with_extension("writing");
-    let bytes = fs::copy(&kept, &beside).map_err(io(&kept))?;
-    fs::rename(&beside, &path).map_err(io(&path))?;
-    Ok(bytes)
+    let writing_path = path.with_extension("writing");
+    let bytes_copied = fs::copy(&source_path, &writing_path).map_err(io_failed_at(&source_path))?;
+    fs::rename(&writing_path, &path).map_err(io_failed_at(&path))?;
+    Ok(bytes_copied)
 }
 
 /// The image of `superchunk` in `folder`, checked.
 pub fn read_image(folder: &Path, superchunk: SuperchunkIndex) -> Result<SuperchunkImage, DiskError> {
     let path = superchunk_file(folder, superchunk, "image");
-    SuperchunkImage::from_words(read_words(&path)?.into_boxed_slice()).map_err(|invalid| DiskError::Invalid(path, invalid.0.to_string()))
+    SuperchunkImage::from_words(read_words(&path)?.into_boxed_slice()).map_err(|invalid_image| DiskError::InvalidFile(path, invalid_image.0.to_string()))
 }
 
 /// Writes `words` as `superchunk`'s state in `folder`: how many
@@ -125,46 +125,46 @@ pub fn saved_superchunks(folder: &Path) -> Result<Vec<SuperchunkIndex>, DiskErro
 
 /// Makes `folder`, and those above it, if not there.
 fn make_folder(folder: &Path) -> Result<(), DiskError> {
-    fs::create_dir_all(folder).map_err(|error| DiskError::Io(folder.to_path_buf(), error))
+    fs::create_dir_all(folder).map_err(|io_error| DiskError::IoFailed(folder.to_path_buf(), io_error))
 }
 
-/// Writes `bytes` as `path`: how many.
-fn write(path: &Path, bytes: &[u8]) -> Result<u64, DiskError> {
-    let beside = path.with_extension("writing");
-    fs::write(&beside, bytes).and_then(|()| fs::rename(&beside, path)).map_err(|error| DiskError::Io(path.to_path_buf(), error))?;
-    Ok(bytes.len() as u64)
+/// Writes `file_bytes` as `path`: how many.
+fn write(path: &Path, file_bytes: &[u8]) -> Result<u64, DiskError> {
+    let writing_path = path.with_extension("writing");
+    fs::write(&writing_path, file_bytes).and_then(|()| fs::rename(&writing_path, path)).map_err(|io_error| DiskError::IoFailed(path.to_path_buf(), io_error))?;
+    Ok(file_bytes.len() as u64)
 }
 
 /// Writes `words` as `path`: how many bytes.
 fn write_words(path: &Path, words: &[u64]) -> Result<u64, DiskError> {
-    let bytes: Vec<u8> = words.iter().flat_map(|word| word.to_le_bytes()).collect();
-    write(path, &bytes)
+    let word_bytes: Vec<u8> = words.iter().flat_map(|word| word.to_le_bytes()).collect();
+    write(path, &word_bytes)
 }
 
 /// The bytes of `path`.
-fn read(path: &Path) -> Result<Vec<u8>, DiskError> {
-    fs::read(path).map_err(|error| DiskError::Io(path.to_path_buf(), error))
+fn read_bytes(path: &Path) -> Result<Vec<u8>, DiskError> {
+    fs::read(path).map_err(|io_error| DiskError::IoFailed(path.to_path_buf(), io_error))
 }
 
 /// The words of `path`.
 fn read_words(path: &Path) -> Result<Vec<u64>, DiskError> {
-    let bytes = read(path)?;
-    if bytes.len() % 8 != 0 {
-        return Err(DiskError::Invalid(path.to_path_buf(), "not a whole number of words".to_string()));
+    let file_bytes = read_bytes(path)?;
+    if file_bytes.len() % 8 != 0 {
+        return Err(DiskError::InvalidFile(path.to_path_buf(), "not a whole number of words".to_string()));
     }
-    Ok(bytes.as_chunks::<8>().0.iter().map(|&word| u64::from_le_bytes(word)).collect())
+    Ok(file_bytes.as_chunks::<8>().0.iter().map(|&word| u64::from_le_bytes(word)).collect())
 }
 
 /// Every superchunk with an image in `folder`.
 fn images_in(folder: &Path) -> Result<Vec<SuperchunkIndex>, DiskError> {
-    let io = |error| DiskError::Io(folder.to_path_buf(), error);
+    let io_failed = |io_error| DiskError::IoFailed(folder.to_path_buf(), io_error);
     let mut superchunks = Vec::new();
-    for entry in fs::read_dir(folder).map_err(io)? {
-        let path = entry.map_err(io)?.path();
-        if path.extension().is_some_and(|extension| extension == "image") {
-            let name = path.file_stem().and_then(|name| name.to_str()).unwrap_or_default();
-            let index = u64::from_str_radix(name, 16).map_err(|_| DiskError::Invalid(path.clone(), "not named by a superchunk index".to_string()))?;
-            superchunks.push(SuperchunkIndex(index));
+    for folder_entry in fs::read_dir(folder).map_err(io_failed)? {
+        let path = folder_entry.map_err(io_failed)?.path();
+        if path.extension().is_some_and(|file_extension| file_extension == "image") {
+            let stem_text = path.file_stem().and_then(|os_stem| os_stem.to_str()).unwrap_or_default();
+            let superchunk_number = u64::from_str_radix(stem_text, 16).map_err(|_| DiskError::InvalidFile(path.clone(), "not named by a superchunk index".to_string()))?;
+            superchunks.push(SuperchunkIndex(superchunk_number));
         }
     }
     Ok(superchunks)

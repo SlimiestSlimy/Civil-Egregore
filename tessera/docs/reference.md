@@ -21,18 +21,18 @@ plan and the last pass. The only allocation a `Tessera` ever makes
 (12 with a stream and a bitmap; `tests/allocations.rs`).
 
 **`Tessera::encode(bitmap, stream)`**: overwrites `stream`. Weighs both
-streams (`weigh`); writes the binary count tree if it is within
+streams (`weigh_both_streams`); writes the binary count tree if it is within
 `BINARY_COUNT_TREE_TOLERANCE_PERCENT` of the tree, else the tree and
 the last pass. In debug builds, after the tree is written and before
 the last pass, asserts the bits written (less the mode bit) are the
 bits counted less the residual floor tiles' prices: the writer and the
 counting agree, node for node.
 
-**`Tessera::weigh(bitmap) -> (tree bits, start level, binary count tree
+**`Tessera::weigh_both_streams(bitmap) -> (tree bits, start level, binary count tree
 bits)`**: steps 1-4 and the binary count tree counted -- everything
 encoding decides before writing. Leaves the tree in `self.tree`.
 
-**`Tessera::stream_bits(bitmap)`**: `weigh`, for diagnostics: what
+**`Tessera::stream_bits(bitmap)`**: `weigh_both_streams`, for diagnostics: what
 each stream would take, without its mode bit.
 
 **`Tessera::tree()`**: the tree of the last bitmap encoded, made
@@ -43,7 +43,7 @@ nodes under a complex tile are stale.
 mode bit, then the binary count tree, or the tree and the last pass.
 
 **Private to the file.** `TREE_STREAM` and `BINARY_COUNT_TREE_STREAM`: the
-stream's first bit, saying which of the two follows. `PERCENT`: a
+stream's first bit, saying which of the two follows. `PERCENT_WHOLE`: a
 hundred, what a share is counted in.
 
 ## `tile.rs`: tiles, copy offsets, pyramids
@@ -51,33 +51,33 @@ hundred, what a share is counted in.
 The levels and counts everything else is sized by: `CELL_LEVEL` (8), a
 single cell's level, the finest there is; `FLOOR_LEVEL` (6), the 4x4
 floor, the finest tile the tree holds a node at and the finest a copy
-reads; `CHILDREN` (4), a tile's; `CELLS`, the bitmap's 65,536;
-`DIRECTIONS`, the directions a copy names, as many as there are near
+reads; `CHILDREN_PER_TILE` (4), a tile's; `CELLS`, the bitmap's 65,536;
+`COPY_DIRECTIONS`, the directions a copy names, as many as there are near
 offsets; `WHOLE_BITMAP`, the tile at level 0. **`Tile::side_in_cells()`**:
-a tile's side, `2^(8 - level)` cells.
+a tile's side, `2^(8 - tile_level)` cells.
 
-**`copy_offset(far, direction)`**: the offset, in tiles of the copy's
+**`copy_offset(is_far_copy, copy_direction)`**: the offset, in tiles of the copy's
 own size, of the tile a copy reads from. Every offset precedes the tile
 in reading order (above, or left in the same row), so decoding has
 every source before what copies it.
 
-**`tiles_across(level)`**, **`tiles_in_level(level)`**: a level's plane
-is `2^level` tiles across and `4^level` in all -- also the tiles
+**`tiles_across(tile_level)`**, **`tiles_in_level(tile_level)`**: a level's plane
+is `2^tile_level` tiles across and `4^tile_level` in all -- also the tiles
 filling one tile that many levels finer.
 
-**`tiles_down_to(level)`**: `1 + 4 + ... + 4^level`, the tiles of every
-level from the whole bitmap down to `level`: a pyramid's size.
+**`tiles_down_to(tile_level)`**: `1 + 4 + ... + 4^tile_level`, the tiles of every
+level from the whole bitmap down to `tile_level`: a pyramid's size.
 
-**`cells_in_tile(level)`**: `4^(8 - level)`.
+**`cells_in_tile(tile_level)`**: `4^(8 - tile_level)`.
 
-**`Tile::index()`**: its Morton index among its level's tiles. With
-`level` it locates the tile's element in a pyramid, and times
+**`Tile::place_in_level()`**: its Morton index among its level's tiles. With
+`tile_level` it locates the tile's element in a pyramid, and times
 `cells_in_tile` its first cell in the bitmap (`first_cell`).
 
 **`Tile::top_left_cell()`**: its corner in cell coordinates, `u8`s:
 every tile is on the 256x256 bitmap.
 
-**`Tile::children()`**: its four children, in reading order, which for
+**`Tile::child_tiles()`**: its four children, in reading order, which for
 one 2x2 group is Morton order -- four consecutive elements in any
 pyramid. A plain array.
 
@@ -87,11 +87,11 @@ on the bitmap.
 **`Tile::top_left_value(bitmap)`**: the tile's value when it is
 homogeneous; used for plain tiles and payload values, which are.
 
-**`Tile::all_of_level(level)`**, **`Tile::tiles_under(size_offset)`**:
+**`Tile::all_of_level(tile_level)`**, **`Tile::tiles_under(size_offset)`**:
 the tiles of a level, or under a tile some levels finer, in Morton
 order: one run of indices, each turned back into coordinates.
 
-**`Pyramid<T, FINEST>`**: one `T` per tile, levels 0 to `FINEST`,
+**`TilePyramid<T, FINEST_LEVEL>`**: one `T` per tile, levels 0 to `FINEST_LEVEL`,
 each level's elements in Morton order, levels one after another:
 level `l` starts at `(4^l - 1) / 3` (`level_start`), a tile's element
 that plus its Morton index (`element_index`).
@@ -111,7 +111,7 @@ checkerboards.
 ## `tree.rs`: the tree
 
 **`Node`**: what the tree holds at a tile (`docs/tessera.md`, "The
-quadtree grammar"). `Absent` is the default, so a fresh tree holds no
+quadtree grammar"). `NoNode` is the default, so a fresh tree holds no
 nodes.
 
 **`Tree`**: the tree itself, a pyramid of nodes, a node a tile, from the
@@ -122,7 +122,7 @@ has flipped it -- clear.
 
 **`Node::has_children()`**: whether its children's nodes follow it in
 the stream: a divide, a flipping divide, or a copy naming children.
-Their children that are not `Absent` are nodes; the others are said by
+Their children that are not `NoNode` are nodes; the others are said by
 them.
 
 **`start_level(tree)`**: the first level, from the top, where some tile
@@ -139,7 +139,7 @@ of whole words is counted by a subtraction.
 **`count(bitmap)`**: running totals: `set_before[i]` cells set in words
 `0..i`, `set_before[1024]` in all. Overwrites everything.
 
-**`in_words(first, count)`**: cells set in a run of whole words, one
+**`in_words(first_word, count)`**: cells set in a run of whole words, one
 subtraction. **`in_tile(tile)`**: the same for a tile of 8x8 or
 coarser, whose cells are a run of whole words; the binary count tree
 and the cell list pre-check use these.
@@ -149,39 +149,39 @@ holds.
 
 ## `patterns.rs`: the pattern pyramid
 
-**`homogeneous_value_of(number)`**: `Some(false)` for 0, `Some(true)`
+**`homogeneous_value_of(pattern_number)`**: `Some(false)` for 0, `Some(true)`
 for 1, `None` for any other number: whether a tile is homogeneous is
 whether its number is one of the two reserved for it.
 
-**`Patterns::build(bitmap)`**: numbers every tile, finest level first:
+**`PatternPyramid::number_every_tile(bitmap)`**: numbers every tile, finest level first:
 clears the hash tables, then each level in Morton order.
 
-**`pattern_key(bitmap, level, index)`**: the pattern to number: a
+**`pattern_key(bitmap, tile_level, tile_place)`**: the pattern to number: a
 4x4's 16 cells, one 16-bit run of the bitmap; or a coarser tile's four
 children's numbers packed into one `u64` -- equal children's numbers
 are equal cells, so equal keys are equal patterns.
 
-**`number_for(bitmap, level, index)`**: the reserved number for all
+**`number_for(bitmap, tile_level, tile_place)`**: the reserved number for all
 clear or all set; else the number the key already has, or the next
 one. The hash table is probed linearly from the key's slot
 (`utilities::hash::slot`); a slot holds a number only, and the key is read back off the
 tile that number first appeared at (`first_tile`) to compare. Finding
 a key already numbered marks the number as repeated.
 
-**`number(tile)`**, **`children_numbers(tile)`**: by tile.
+**`pattern_number(tile)`**, **`children_numbers(tile)`**: by tile.
 
-**`repeats(level, number)`**: whether a second tile of `level` holds
+**`pattern_repeats(tile_level, pattern_number)`**: whether a second tile of `tile_level` holds
 that pattern; always for the homogeneous two. A tile whose pattern does
 not repeat is never searched for a copy source.
 
-**`copy_source(tile, number)`**: the first copy offset, near before
-far, then by direction, whose tile has `number`: `(far, direction)`.
+**`copy_source(tile, tile_number)`**: the first copy offset, near before
+far, then by direction, whose tile has `pattern_number`: `(is_far_copy, copy_direction)`.
 
 `ALL_CLEAR` (0) and `ALL_SET` (1): the two patterns every level has,
 a tile with every cell clear and one with every cell set -- the numbers
 a plain tile's pattern is compared with.
 
-**Private to the file.** `LEVELS`: the levels numbered, the whole bitmap
+**Private to the file.** `LEVEL_COUNT`: the levels numbered, the whole bitmap
 down to the 4x4 floor. `FLOOR_CELLS`: a 4x4's cells -- its pattern, one
 run of the bitmap. `FIRST_PATTERN`: the first number a pattern that is
 not homogeneous gets; `EMPTY_SLOT`: an empty slot, as no such pattern
@@ -192,29 +192,29 @@ tile's pattern when its four children are all clear, or all set.
 one's end -- a power of two a level, at least twice its tiles, so a
 probe ends soon. `NUMBER_STARTS`: where each level's numbers start
 among every level's -- one for each of its tiles and the two
-homogeneous ones; `NUMBERS`: all of them together.
+homogeneous ones; `NUMBER_COUNT`: all of them together.
 
 ## `greedy_tiler.rs`: the greedy tiling and the complex tiling
 
-**`greedy_tiling(patterns, tree)`**: the top-down walk from the whole
-bitmap, writing every reached tile's node as placed, and `Absent` for
+**`greedy_tiling(pattern_pyramid, tree)`**: the top-down walk from the whole
+bitmap, writing every reached tile's node as placed, and `NoNode` for
 every child not visited.
 
-**`place_subtree(patterns, tree, visit)`**: one tile of that walk:
+**`place_subtree(pattern_pyramid, tree, tile_visit)`**: one tile of that walk:
 `place` decides its node and the children it names (every child for a
 divide); a child of a divide that is a plain tile bound to the value
-bound above is written `Absent` -- left to the binding above -- and
+bound above is written `NoNode` -- left to the binding above -- and
 its subtree not visited. Each named child is visited with the value
 bound inside: flipped under a flipping divide, the same otherwise.
 
-**`place(patterns, visit, children_numbers)`**: the rule
+**`place(pattern_pyramid, tile_visit, children_numbers)`**: the rule
 (`docs/tessera.md`, "The greedy tiling"): a plain tile if homogeneous,
 a whole copy if a copy source exists, then -- coarser than 4x4, when
 `children_numbers` are given -- a copy naming children, then a flipping
 divide. `None` means divide. Returns the node and the named children,
 bit `i` for child `i`.
 
-**`copy_naming_children(patterns, visit, numbers)`**: for every copy
+**`copy_naming_children(pattern_pyramid, tile_visit, child_pattern_numbers)`**: for every copy
 offset whose source tile exists, the children that hold the same cells
 as the source's same child -- compared by number, the source's four
 children read at once. Only children whose pattern repeats can match.
@@ -225,11 +225,11 @@ not homogeneous. Skips every offset when even all four children
 matching would not be worth it. Keeps the offset copying the most, the
 first on a tie.
 
-**`flipping_divide(numbers, bound_above)`**: names every child that is
+**`flipping_divide(child_pattern_numbers, bound_above)`**: names every child that is
 not homogeneous with the value not bound above; worth it if at least
 `MIN_FLIPPED_CHILDREN` are.
 
-**`complex_tiling(bitmap, set_cells_before_each_word, tree, pricing)`**:
+**`complex_tiling(bitmap, set_cells_before_each_word, tree, residual_pricing)`**:
 the bottom-up walk over the placed tree. Returns the tree's bits --
 its residual floor tiles at their prices -- and its start level. The divides
 above the start level are counted on the way up but never written, so
@@ -242,7 +242,7 @@ fewest, or, for a residual floor tile, its price. Also returns its **bound
 size**: the one level every cell under it is bound at by plain tiles,
 if any -- its own for a plain tile, 2x2 for a residual floor tile whose four
 2x2s are all homogeneous (`all_2x2s_homogeneous`), the shared size of
-a divide's four children (an `Absent` child counts as bound at its own
+a divide's four children (an `NoNode` child counts as bound at its own
 level), else none. A divide or a residual floor tile is then made its
 cheapest complex tile, if cheaper.
 
@@ -256,52 +256,52 @@ set count could take (`cell_list_least_bits`) beats the best.
 **`all_2x2s_homogeneous(bitmap, tile)`**: a 4x4's 16 cells, one run,
 whose four quarters are its 2x2s: each all clear or all set.
 
-**Private to the file.** `Visit`: a tile the walk visits, and what it
+**Private to the file.** `TileVisit`: a tile the walk visits, and what it
 knows of it on the way down. `CountedSubtree`: what the complex tiling
 knows of a tile once it is through everything under it.
 `ALL_CHILDREN`: a child mask naming every child. `PLAIN_TILE`: a bind
-of the whole tile, a complex tile of its own size. `QUARTER`: a 2x2's
+of the whole tile, a complex tile of its own size. `QUARTER_ALL_SET`: a 2x2's
 cells, all set.
 
 ## `quadtree_writer.rs`: the tree's bits
 
-**`may_name_children(level)`**: whether a copy at `level` has a
+**`may_name_children(tile_level)`**: whether a copy at `tile_level` has a
 names-children bit: coarser than 4x4, as a 4x4's children are finer
 than the tree. Every divide is coarser than 4x4, so it always has one.
 
-**`most_size_offset(level)`**: the largest size offset a complex tile at
-`level` can be named with: down to 1x1 where the truncated binary code
+**`most_size_offset(tile_level)`**: the largest size offset a complex tile at
+`tile_level` can be named with: down to 1x1 where the truncated binary code
 over the offsets 1 to 2x2 would leave a value spare, else down to 2x2.
-**`raw_resolution_fits(level)`**: whether that reaches 1x1.
+**`raw_resolution_fits(tile_level)`**: whether that reaches 1x1.
 
 **`node_bits(tree, bitmap, tile, node)`**: `write_node` into a
-`Counter`: how the complex tiling counts every node, so counting can
+`BitCounter`: how the complex tiling counts every node, so counting can
 never disagree with writing.
 
-**`write_node(sink, tree, bitmap, tile, node)`**: one node's own bits,
+**`write_node(bit_sink, tree, bitmap, tile, node)`**: one node's own bits,
 child mask and payload, not its children's nodes. A divide names its
-children exactly when one of them is `Absent` in `tree`, read there;
+children exactly when one of them is `NoNode` in `tree`, read there;
 a flipping divide always does.
 
 **`write_child_mask`**, **`read_child_mask`**: a bit a child, in
 reading order: 1 when the child is a node of its own.
 
-**`write_complex_tile_header(sink, level, size_offset, cell_list)`**:
+**`write_complex_tile_header(bit_sink, tile_level, size_offset, cell_list)`**:
 leaf, bind, plain-or-complex, the size offset in truncated binary
 finest first, and at 1x1 the cell-list bit. A plain tile is the
 complex tile of size offset 0.
 
 **`write_tree_and_plan_last_pass(stream, tree, bitmap, plan,
 start_level)`**: clears `plan`, writes the start level and every node
-from each start-level tile down, and fills `plan`: each residual floor tile,
+from each start-level tile down, and fills `city_plan`: each residual floor tile,
 and each floor tile a copy covers with its source -- a whole copy's own
-tile, or each `Absent` child of a copy naming children.
+tile, or each `NoNode` child of a copy naming children.
 
-**`read_tree_and_plan_last_pass(reader, cells, plan)`**: the mirror:
-clears `plan`, reads every node and acts on it at once -- sets the
+**`read_tree_and_plan_last_pass(stream_reader, cells, floor_plan)`**: the mirror:
+clears `city_plan`, reads every node and acts on it at once -- sets the
 cells a flipping or keeping divide binds inside (each unnamed child
 when the value bound inside is set), reads payloads and cell lists into
-`cells`, and fills `plan` the same way the writer did. Builds no tree.
+`cells`, and fills `city_plan` the same way the writer did. Builds no tree.
 
 The widths the node's bits are counted with: `FLAG_WIDTH` (1), every
 one-bit choice; `START_LEVEL_WIDTH` (3), the bits naming the start
@@ -309,9 +309,9 @@ level, whole bitmap to floor; `MOST_NODE_BITS`, the most one node takes
 with its payload aside -- a copy naming its children: leaf, copy, far,
 the direction, names-children, and a bit a child.
 
-**Private to the file.** The grammar's bits, by name. `LEAF` or
-`DIVIDE`: a node's first bit -- a leaf, a copy or a bind; or a divide,
-at the 4x4 floor a residual floor tile. `COPY` or `BIND`: after a
+**Private to the file.** The grammar's bits, by name. `LEAF_FLAG` or
+`DIVIDE_FLAG`: a node's first bit -- a leaf, a copy or a bind; or a divide,
+at the 4x4 floor a residual floor tile. `COPY_FLAG` or `BIND_FLAG`: after a
 leaf's first bit. `NAMES_CHILDREN`: whether a copy or a divide names
 its children, its child mask following -- every divide is 8x8 or
 coarser and so says it; a copy says it down to 8x8 only, a 4x4's
@@ -323,46 +323,46 @@ size offset starts with for a plain tile, nothing more; else the size
 offset follows in truncated binary over those its level allows, finest
 first. `CELL_LIST`: a complex tile of 1x1 resolution says its cells as
 a cell list, else raw. `DIRECTION_WIDTH`: the bits naming a copy's
-direction. `push_flag(sink, value)` and `read_flag(reader)`: one flag
+direction. `push_flag(bit_sink, value)` and `read_flag(stream_reader)`: one flag
 written, read. `write_subtree_and_plan_last_pass` and
 `read_subtree_and_plan_last_pass`: a tile's node and everything under
 it, written and read, the reader told the value bound above.
 
 ## `payload_writer.rs`: payloads and cell lists
 
-**`write_payload(sink, bitmap, tile, size_offset)`**: a value bit for
+**`write_payload(bit_sink, bitmap, tile, size_offset)`**: a value bit for
 each tile `size_offset` levels finer, in Morton order; at 1x1, the
 tile's words as they are (a 4x4 or 2x2 is one short run). Counting
-(`Sink::counted`) adds the tile count without reading the bitmap.
+(`BitSink::counted_bits`) adds the tile count without reading the bitmap.
 
-**`read_payload(reader, cells, tile, size_offset)`**: sets each tile
+**`read_payload(stream_reader, cells, tile, size_offset)`**: sets each tile
 whose bit is set; at 1x1, ORs the words in.
 
-**`rice_parameter(cells, set)`**: the low bits of each gap: the floor
+**`rice_parameter(cells, set_cells)`**: the low bits of each gap: the floor
 of log2 of the mean gap, `(cells - set) / set`. Never written: the
 reader knows the tile and reads the count first.
 
-**`cell_list_least_bits(level, set)`**: the count's gamma code and each
+**`cell_list_least_bits(tile_level, set_cells)`**: the count's gamma code and each
 gap's unary end and low bits -- every gap's high part taken as zero:
 no cell list of that count can take fewer.
 
-**`write_cell_list(sink, bitmap, tile)`**: the set count (popcount of
+**`write_cell_list(bit_sink, bitmap, tile)`**: the set count (popcount of
 the tile's words) in gamma of count + 1, then each set cell's gap since
 the last in the tile's own Morton order: the high part in unary, the
 low part in the Rice parameter's bits.
 
-**`read_cell_list(reader, tile, cells)`**: the mirror, setting each
+**`read_cell_list(stream_reader, tile, cells)`**: the mirror, setting each
 cell read.
 
 ## `binary_count_tree.rs`
 
 The stream for sparse bitmaps (`docs/tessera.md`, "The stream").
 
-**`first_half_counts(cells, set)`**: the counts a run's first half can
+**`first_half_counts(cells, set_cells)`**: the counts a run's first half can
 hold: from `set - half` (at least 0) to `min(set, half)` -- the
 fewest, and how many there are, the range of the truncated binary code.
 
-**`run_bits(run, cells, set)`**: what a run takes inside it, by
+**`run_bits(cell_run, cells, set_cells)`**: what a run takes inside it, by
 recursion: its own count, then each half's. Only when compiling, to
 build the tables.
 
@@ -376,19 +376,19 @@ for reading: every 8-cell run as it would be read off the next
 `MOST_BYTE_RUN_BITS` bits, by set count -- its cells and the bits it
 took -- made when compiling by reading the same way off a number.
 
-**`Words::write(stream, first, count, set)`**: a run of whole words:
+**`Words::write(stream, first_word, count, set_cells)`**: a run of whole words:
 nothing if all or none of it is set, else its first half's count from
 the set counts (one subtraction) and each half in turn; a single word
 goes to `write_word`.
 
-**`write_word(stream, run, cells, set)`**: a run of a word or less, its
+**`write_word(stream, cell_run, cells, set_cells)`**: a run of a word or less, its
 halves' counts from popcounts; counting, a 16-cell run is one lookup in
 `SHORT_RUN_BITS`.
 
 **`write(stream, bitmap, set_cells_before_each_word)`**: the set count in gamma of
 count + 1, then the whole bitmap as one run.
 
-**`read(reader, cells)`**, **`read_words`**, **`read_word`**: the
+**`read_binary_count_tree(stream_reader, cells)`**, **`read_words`**, **`read_word`**: the
 mirror. Shortcuts that read the same bits: a run all set is filled
 without reading; a run of one set cell reads its place at once
 (`read_lone_cell_place`: a bit a halving, the place from the top bit
@@ -400,7 +400,7 @@ read back by one lookup in `BYTE_RUNS`; `ByteRun`: such a run as read
 back -- its cells, and how many bits saying them took.
 `SHORT_RUN_CELLS`: runs this short -- two bytes of cells, a quarter of
 a word -- are counted by a lookup in `SHORT_RUN_BITS`.
-`first_half_set(first, count)`: the cells set in the first half of the
+`first_half_set(first_word, count)`: the cells set in the first half of the
 run of `count` words from `first`.
 
 ## `last_pass.rs`
@@ -419,60 +419,60 @@ log2, under a hundredth of a bit below it (`tests/unit/last_pass.rs`).
 cells, starting at one each.
 - **`clear_probability()`**: clear's share of `2^32`, as clear's weight
   times a table of `2^32 / total`: no division.
-- **`cost(value)`**: `log2(total) - log2(weight)`, two lookups, in
+- **`cell_cost(value)`**: `log2(total) - log2(weight)`, two lookups, in
   fixed point.
-- **`learn(value)`**: adds a cell; when one weight reaches the halving
+- **`learn_cell(value)`**: adds a cell; when one weight reaches the halving
   weight, both are halved, counts rounded up.
 
-**`each_floor_tile(set, visit)`**: visits the floor tiles in a floor tile set in
+**`each_floor_tile(floor_set_word, visit_floor_tile)`**: visits the floor tiles in a floor tile set in
 Morton order, reading each word of the set when its turn comes, so a
 floor tile removed by an earlier visit in a later word is skipped.
 
-**`code_residual_floor_tile(odds, cells, index, code)`**: codes a residual
+**`code_residual_floor_tile(context_odds, cells, floor_tile_index, code_cell)`**: codes a residual
 floor tile's 16 cells in Morton order, each at its context's odds, through
 `code` -- which encodes, decodes or prices the cell at a Morton index
 and says whether it is set -- and returns the floor tile's cells as one
 run. Each set cell is put into the window as it is coded, so later
 cells read it.
 
-**`Pricing::price(bitmap, floor tile)`**: `code_residual_floor_tile` reading
+**`ResidualPricing::price_residual_floor_tile(bitmap, floor tile)`**: `code_residual_floor_tile` reading
 cells off the bitmap and summing their costs, rounded to the nearest
 bit; the odds carry over to the next floor tile priced, as in the pass.
 Kept per floor tile (`price_of`) for the debug check in `Tessera::encode`.
 
 **`FloorPlan`**: the last pass's input. **`add_residual_floor_tile`**,
-**`add_copied_floor_tiles(copy, part, far, direction)`**: `part` is the copy
+**`add_copied_floor_tiles(copy_tile, part, is_far_copy, copy_direction)`**: `part` is the copy
 or a child of it; its source is the same-size tile the offset away,
 counted in the copy's own sides (twice as many of `part`'s when `part`
 is a child), and each of `part`'s floor tiles gets the floor tile at the same
 place of the source as its source.
 
-**`LastPass::encode(plan, bitmap, stream)`**: makes the cells as
+**`LastPass::encode_last_pass(floor_plan, bitmap, stream)`**: makes the cells as
 decoding will have them after the tree -- the bitmap with every floor tile
 in the plan cleared -- and runs the pass on them; ends the range coder
 only if some cell was coded, so a pass coding nothing writes nothing.
 
-**`LastPass::decode(plan, cells, reader)`**: runs the pass on the cells
+**`LastPass::decode_last_pass(floor_plan, cells, stream_reader)`**: runs the pass on the cells
 the tree said. The range decoder starts reading even when there is
 nothing to decode; past the stream's end it reads zeros.
 
-**`run_pass(plan, cells, code)`**: every floor tile of the plan in Morton
+**`run_pass(floor_plan, cells, code_cell)`**: every floor tile of the plan in Morton
 order: a covered floor tile copied (`copy_floor_tile_chain`), or set aside if its
 chain ends at a residual floor tile not coded yet; a residual floor tile coded
 and set. Then the set-aside copies, whose sources are all final.
 
-**`copy_floor_tile_chain(plan, index, cells)`**: copies a floor tile, following
+**`copy_floor_tile_chain(floor_plan, floor_tile_index, cells)`**: copies a floor tile, following
 its source's source first while that is itself a copy not yet made --
 an explicit stack, as a chain can run long. Gives up, copying nothing,
 if the chain reaches a residual floor tile not coded yet.
 
-**`Window::around(cells, index)`**: an 8x8 square of cells, row-major
+**`Window::around(cells, floor_tile_index)`**: an 8x8 square of cells, row-major
 in a `u64`: the floor tiles above left, above and left of the floor tile, and
 the floor tile itself, each read as one 16-bit run and turned into window
 rows by `FLOOR_TILE_ROWS`. A floor tile off the bitmap reads as clear: its index
 field would underflow.
 
-**`Window::context(place)`**: the context of the floor tile's cell at
+**`Window::cell_context(place)`**: the context of the floor tile's cell at
 `place` in its Morton order: three 3-cell rows of the window above and
 left of the cell, packed into 9 bits, looked up in
 `NEIGHBOURHOOD_CONTEXTS`, which picks out the six context cells.
@@ -483,17 +483,17 @@ away -- every one before the cell in Morton order, so the decoder has
 them. `FLOOR_TILES`: the 4x4 floor's tiles in the bitmap; a copy is 4x4
 or coarser, so a copy's own cells are always whole floor tiles, and the
 pass keeps what is residual a floor tile at a time
-(**`FloorPlan::residual_floor_tiles(visit)`**, `last_pass/floor_plan.rs`:
+(**`FloorPlan::residual_floor_tiles(visit_floor_tile)`**, `last_pass/floor_plan.rs`:
 each residual floor tile's Morton index, in order). `MOST_EXTRA_BITS`:
 the most the pass takes over one bit a residual cell
 (`docs/tessera.md`, "The odds").
 
-**Private to the file.** `CONTEXTS`: one for every value the context
+**Private to the file.** `CONTEXT_COUNT`: one for every value the context
 cells can hold. `FLOOR_TILE_CELLS` and `FLOOR_TILE_SIDE`: a floor
 tile's cells -- one run of the bitmap, in Morton order -- and its side.
 `FloorIndex`: a floor tile, by its Morton index among the floor tiles;
 `FloorSet`: one bit a floor tile, `FLOOR_SET_WORDS` words of them,
-`insert(set, index)` and `remove(set, index)`. `NO_SOURCE`: the source
+`insert(floor_set, floor_tile_index)` and `remove(floor_set, floor_tile_index)`. `NO_SOURCE`: the source
 of a floor tile no copy covers, or one already copied. `FLOOR_X_BITS`
 and `FLOOR_Y_BITS`: a floor index's `x` bits, the even ones, and its
 `y` bits, the odd ones -- a neighbour's index is one of the two fields
@@ -502,14 +502,14 @@ and the contexts' odds.
 
 In `last_pass/context_odds.rs`: `UNSEEN_WEIGHT`, a context's weight for
 clear and for set before any cell -- a half, in units of half a cell --
-and `UNSEEN`, the odds made of it; `CELL_WEIGHT`, what each cell coded
+and `UNSEEN_CONTEXT`, the odds made of it; `CELL_WEIGHT`, what each cell coded
 in a context adds to its value's. `HALVING_COUNT`: the cells either
 value counts at most -- reaching it (`HALVING_WEIGHT`, as a weight)
 both are halved; residual cells are much the same all over a bitmap,
 so forgetting costs bits, and this is where it stops costing any the
 corpus shows. `MOST_WEIGHT_TOTAL`: the most the two weights add up to
 when a cell is coded at them. `FRACTION_BITS`: the bits of a
-fixed-point `log2` below the point, a 256th of a bit; `POINT`: where
+fixed-point `log2` below the point, a 256th of a bit; `MANTISSA_POINT_BITS`: where
 the point is in the mantissa `fixed_point_log2` squares, 2.30. `RECIPROCALS_AND_LOG2S`: `2^32` over every total the weights can
 add up to, and `log2` of every weight and total -- a probability is a
 lookup and a multiply, a price two lookups.
@@ -524,10 +524,10 @@ bit in the window.
 
 ## `arithmetic.rs`: the range coder
 
-**`ClearProbability::split(range)`**: where an interval of width
+**`ClearProbability::clear_part_width(interval_width)`**: where an interval of width
 `range` splits: `range * probability >> 32`.
 
-**`Encoder::encode(bit, clear, stream)`**: keeps the clear part or the
+**`RangeEncoder::encode_bit(coded_bit, clear_probability, stream)`**: keeps the clear part or the
 set part of the interval; while the width is under `2^24`, settles the
 top byte and widens the window by a byte.
 
@@ -535,10 +535,10 @@ top byte and widens the window by a byte.
 holds the new top byte -- unless it is `0xFF` with no carry, which a
 later carry could still turn to `0x00`: then it is counted as held too.
 
-**`write_held(carry, stream)`**: the held byte and every held `0xFF`,
+**`write_held(carry_out, stream)`**: the held byte and every held `0xFF`,
 each with the carry added.
 
-**`finish(stream)`**: the widest aligned run of numbers inside the
+**`finish_stream(stream)`**: the widest aligned run of numbers inside the
 final interval -- its free low bits are the run's width -- and the
 bits that name the run: the held bytes, carried, then the window's
 bits above the free ones. Whatever follows the stream fills the free
@@ -548,20 +548,20 @@ can lie one after another, byte-aligned, with no length kept.
 **`push_byte`**, **`read_byte`**: a byte highest bit first, so the
 stream can end inside one.
 
-**`Decoder::new(reader)`**: reads the first four bytes into the offset.
+**`RangeDecoder::new(stream_reader)`**: reads the first four bytes into the offset.
 
-**`Decoder::decode(clear, reader)`**: the same split; the bit is
+**`RangeDecoder::decode_bit(clear_probability, stream_reader)`**: the same split; the bit is
 whether the offset lies in the set part; widens as the encoder did.
 
-`FINISHING_BITS` (2): what `Encoder::finish` takes beyond what the
+`FINISHING_BITS` (2): what `RangeEncoder::finish_stream` takes beyond what the
 coded bits carry -- the final interval always holds an aligned run of
 numbers named by at most two bits more than its width's `-log2`.
 
 **Private to the file.** `WINDOW_BITS`: the bits of the window the
-interval's ends are held in; `TOP`: the width the interval is kept at
+interval's ends are held in; `LEAST_INTERVAL_WIDTH`: the width the interval is kept at
 or over, a byte under the window's. `BYTE_BITS`: the bits a byte takes
 in the stream. `ALL_ONES`: a byte a carry turns to `0x00`, carrying
-on. `REVERSED`: every byte with its bits in the other order -- bytes go
+on. `REVERSED_BYTES`: every byte with its bits in the other order -- bytes go
 to the stream highest bit first, so that the stream can end partway
 through one.
 
@@ -581,18 +581,18 @@ to the byte, for disk; `to_bytes` allocates the bytes it returns. A
 loaded stream's length is every bit of every word or byte: the padding
 reads as the zeros it is.
 
-**`Sink`**: where bits go. **`push_value(value, width)`**, the one
-required method; **`counted()`**, `Some` for a `Counter`, lets a
+**`BitSink`**: where bits go. **`push_value(value, width)`**, the one
+required method; **`counted()`**, `Some` for a `BitCounter`, lets a
 writer add bits it need not look at (a payload's, a unary run's, a
 binary count tree word's) without producing them.
 - **`push_unary(count)`**: `count` ones then a zero.
 - **`push_gamma(value)`**: Elias gamma: the length less one in unary,
   then the value's bits under its top one.
-- **`push_truncated_binary(value, range)`**: values below
+- **`push_truncated_binary(value, value_range)`**: values below
   `2^(w+1) - range` take `w` bits, the rest `w + 1`, `w` the floor of
   log2 of `range`; nothing for a range of one.
 
-**`Counter`**: a `Sink` that adds widths.
+**`BitCounter`**: a `BitSink` that adds widths.
 
 **`gamma_bits`**, **`truncated_binary_bits`**, **`truncated_binary_shape`**:
 the same codes' lengths, when compiling.
@@ -600,12 +600,12 @@ the same codes' lengths, when compiling.
 **`BitReader::value(width)`**: up to a word: off a buffer of bits taken
 from the stream a word at a time; when the buffer runs short, the rest
 off the next word, whose leftover bits become the buffer. Zeros past
-the end. **`peek`**, **`skip`**: the same, for the binary count tree's
-table reads. **`unary`**, **`gamma`**, **`truncated_binary`**: the
+the end. **`peek_bits`**, **`skip_bits`**: the same, for the binary count tree's
+table reads. **`read_unary`**, **`read_gamma`**, **`truncated_binary`**: the
 mirrors of the pushes.
 
 **Private to the file.** `WORD_BITS`, `BYTE_BITS`, `WORD_BYTES`: the bits
 of a word and of a byte, the bytes of a word. `MOST_WORDS`: the words
-the most bits a stream takes fill. `push(bit)`: one bit written.
+the most bits a stream takes fill. `push(bit_value)`: one bit written.
 `low_bits(width)`: a word with its low `width` bits set, `width` at
 most a word.

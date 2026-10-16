@@ -4,7 +4,7 @@
 use coordinates::CellIndex;
 use crate::attributes::{may_be_given, AttributeBlock, BLOCK_WORDS};
 use crate::entity::{EntityType, Header};
-use crate::store::{Entities, SuperchunkEntities};
+use crate::store::{WorldEntities, SuperchunkEntities};
 
 /// The first word: `TSstate` and the format's number, 5.
 const FIRST_WORD: u64 = u64::from_le_bytes(*b"TSstate\x05");
@@ -12,65 +12,65 @@ const FIRST_WORD: u64 = u64::from_le_bytes(*b"TSstate\x05");
 /// What a state file held, beside the entities queued.
 pub struct SavedState {
     /// Its random numbers' state, if it had ticked.
-    pub random: Option<u64>,
+    pub random_stream_state: Option<u64>,
     /// How many entities it holds.
-    pub entities: usize,
+    pub entity_count: usize,
 }
 
-/// The state file of a superchunk with `random` its random numbers'
-/// state and `entities` its entities, either of which it may lack: its
+/// The state file of a superchunk with `random_stream_state` its random numbers'
+/// state and `superchunk_entities` its entities, either of which it may lack: its
 /// words, and how many entities.
-pub fn encode_state(random: Option<u64>, entities: Option<&SuperchunkEntities>) -> (Vec<u64>, usize) {
-    let count = entities.map_or(0, SuperchunkEntities::len);
-    let mut words = vec![FIRST_WORD, random.is_some() as u64, random.unwrap_or(0), count as u64];
-    for entity in entities.into_iter().flat_map(SuperchunkEntities::iter) {
+pub fn encode_state(random_stream_state: Option<u64>, superchunk_entities: Option<&SuperchunkEntities>) -> (Vec<u64>, usize) {
+    let count = superchunk_entities.map_or(0, SuperchunkEntities::len);
+    let mut words = vec![FIRST_WORD, random_stream_state.is_some() as u64, random_stream_state.unwrap_or(0), count as u64];
+    for entity in superchunk_entities.into_iter().flat_map(SuperchunkEntities::iter) {
         let header = entity.header;
         // Its type's default attribute first, its type before it as any other's: a file says what each of its blocks is.
-        let default = entity.default_attribute();
-        let default = default.as_deref().unwrap_or(&[]);
-        words.extend([header.kind.0, header.at.0, header.wake, (default.len() + entity.attributes.len()) as u64]);
-        words.extend(default.iter().chain(entity.attributes).flat_map(|block| block.0));
+        let whole_default = entity.default_attribute();
+        let default_blocks = whole_default.as_deref().unwrap_or(&[]);
+        words.extend([header.entity_type.0, header.stood_cell.0, header.wake, (default_blocks.len() + entity.attributes.len()) as u64]);
+        words.extend(default_blocks.iter().chain(entity.attributes).flat_map(|saved_block| saved_block.0));
     }
     (words, count)
 }
 
-/// Reads the state file `words` of a world at tick `now`: its entities
-/// queued to be put in `entities`, each whose wake has passed -- kept
-/// while its superchunk was cold -- waking at `now`.
-pub fn decode_state(words: &[u64], now: u64, entities: &mut Entities) -> Result<SavedState, &'static str> {
-    read(words, |header, attributes| entities.queue_put(Header { wake: header.wake.max(now), ..header }, attributes))
+/// Reads the state file `words` of a world at tick `current_tick`: its entities
+/// queued to be put in `world_entities`, each whose wake has passed -- kept
+/// while its superchunk was cold -- waking at `current_tick`.
+pub fn decode_state(words: &[u64], current_tick: u64, world_entities: &mut WorldEntities) -> Result<SavedState, &'static str> {
+    read_state(words, |header, attributes| world_entities.queue_put(Header { wake: header.wake.max(current_tick), ..header }, attributes))
 }
 
-/// Reads the state file `words`, each entity handed to `each` with its
+/// Reads the state file `words`, each entity handed to `each_entity` with its
 /// attributes: what it held beside them, or what is wrong with it.
-fn read(words: &[u64], mut each: impl FnMut(Header, &[AttributeBlock])) -> Result<SavedState, &'static str> {
+fn read_state(words: &[u64], mut each_entity: impl FnMut(Header, &[AttributeBlock])) -> Result<SavedState, &'static str> {
     let mut words = words.iter().copied();
-    let mut next = || words.next().ok_or("cut short");
-    if next()? != FIRST_WORD {
+    let mut next_word = || words.next().ok_or("cut short");
+    if next_word()? != FIRST_WORD {
         return Err("not a state file of this format");
     }
-    let (has_random, random, count) = (next()?, next()?, next()?);
+    let (has_random, random_stream_state, count) = (next_word()?, next_word()?, next_word()?);
     let mut attributes = Vec::new();
     for _ in 0..count {
-        let (kind, at, wake, block_count) = (next()?, next()?, next()?, next()?);
+        let (type_word, cell_word, wake, block_count) = (next_word()?, next_word()?, next_word()?, next_word()?);
         attributes.clear();
         for _ in 0..block_count {
-            let mut block = AttributeBlock([0; BLOCK_WORDS]);
-            for word in &mut block.0 {
-                *word = next()?;
+            let mut read_block = AttributeBlock([0; BLOCK_WORDS]);
+            for word in &mut read_block.0 {
+                *word = next_word()?;
             }
-            attributes.push(block);
+            attributes.push(read_block);
         }
-        if !may_be_given(EntityType(kind), &attributes) {
+        if !may_be_given(EntityType(type_word), &attributes) {
             return Err("an entity's attributes are not whole ones sorted by type");
         }
-        each(Header { kind: EntityType(kind), at: CellIndex(at), wake }, &attributes);
+        each_entity(Header { entity_type: EntityType(type_word), stood_cell: CellIndex(cell_word), wake }, &attributes);
     }
-    Ok(SavedState { random: (has_random == 1).then_some(random), entities: count as usize })
+    Ok(SavedState { random_stream_state: (has_random == 1).then_some(random_stream_state), entity_count: count as usize })
 }
 
 /// How many entities the state file `words` holds, every one read: or
 /// what is wrong with it.
 pub fn entity_count(words: &[u64]) -> Result<usize, &'static str> {
-    read(words, |_, _| {}).map(|state| state.entities)
+    read_state(words, |_, _| {}).map(|saved_state| saved_state.entity_count)
 }

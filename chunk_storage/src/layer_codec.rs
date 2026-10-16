@@ -27,7 +27,7 @@ impl LayerCodec {
 
     /// `cells`, encoded: its words, the stream's bits rounded up to the
     /// next word, until the next encoding.
-    pub fn encode(&mut self, cells: &CellWords) -> &[u64] {
+    pub fn encode_cells(&mut self, cells: &CellWords) -> &[u64] {
         self.bitmap.words_mut().copy_from_slice(cells);
         self.tessera.encode(&self.bitmap, &mut self.stream);
         self.stream.words()
@@ -39,14 +39,14 @@ impl LayerCodec {
         if cells.iter().all(|&word| word == 0) {
             &[]
         } else {
-            self.encode(cells)
+            self.encode_cells(cells)
         }
     }
 
     /// Decodes the bitmap whose encoding starts at `words` into `cells`,
     /// whatever they held before. What follows the encoding in `words`
     /// -- other bitmaps, say -- is read past, not decoded.
-    pub fn decode(&mut self, words: &[u64], cells: &mut CellWords) {
+    pub fn decode_cells(&mut self, words: &[u64], cells: &mut CellWords) {
         self.stream.load_words(&words[..words.len().min(MOST_WORDS)]);
         self.tessera.decode(&self.stream, &mut self.bitmap);
         cells.copy_from_slice(self.bitmap.words());

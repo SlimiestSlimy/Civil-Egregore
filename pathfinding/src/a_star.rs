@@ -1,6 +1,6 @@
 //! A*: the shortest path from one cell of the area to another.
 
-use super::{CELLS, Cell, Path, Rows, SIDE, holds, steps_apart};
+use super::{CELLS, Cell, Path, Rows, AREA_SIDE, rows_hold, steps_apart};
 use super::walls::Walls;
 
 /// The eight neighbours, as steps `(dx, dy)`.
@@ -8,30 +8,30 @@ const STEPS: [(i8, i8); 8] = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 
 
 /// Room in a search's queue: a cell is queued again each time a shorter
 /// way to it is found, from one neighbour after another at most.
-const QUEUE: usize = CELLS * STEPS.len();
+const QUEUE_ROOM: usize = CELLS * STEPS.len();
 
 /// A search's queue: the cells to look at next, the one on the shortest
 /// path guessed first -- a binary heap in an array.
-struct Queue {
+struct SearchQueue {
     /// The entries: a path's guessed length, then its steps so far
     /// counted down -- of two guessed equal, the further along first --
     /// then the cell, packed so the least is the next.
-    entries: [u32; QUEUE],
+    heap_entries: [u32; QUEUE_ROOM],
     /// How many there are.
     len: usize,
 }
 
-impl Queue {
-    /// Queues the cell at `index`, `steps` steps along a path guessed
-    /// `guessed` steps long.
-    fn push(&mut self, guessed: u8, steps: u8, index: usize) {
-        debug_assert!(self.len < QUEUE, "a cell queued more often than it has neighbours");
-        let mut at = self.len;
-        self.entries[at] = (guessed as u32) << 16 | ((u8::MAX - steps) as u32) << 8 | index as u32;
+impl SearchQueue {
+    /// Queues the cell at `area_index`, `steps` steps along a path guessed
+    /// `guessed_length` steps long.
+    fn push(&mut self, guessed_length: u8, steps: u8, area_index: usize) {
+        debug_assert!(self.len < QUEUE_ROOM, "a cell queued more often than it has neighbours");
+        let mut heap_index = self.len;
+        self.heap_entries[heap_index] = (guessed_length as u32) << 16 | ((u8::MAX - steps) as u32) << 8 | area_index as u32;
         self.len += 1;
-        while at > 0 && self.entries[at] < self.entries[(at - 1) / 2] {
-            self.entries.swap(at, (at - 1) / 2);
-            at = (at - 1) / 2;
+        while heap_index > 0 && self.heap_entries[heap_index] < self.heap_entries[(heap_index - 1) / 2] {
+            self.heap_entries.swap(heap_index, (heap_index - 1) / 2);
+            heap_index = (heap_index - 1) / 2;
         }
     }
 
@@ -41,69 +41,69 @@ impl Queue {
         if self.len == 0 {
             return None;
         }
-        let next = self.entries[0];
+        let next_entry = self.heap_entries[0];
         self.len -= 1;
-        self.entries[0] = self.entries[self.len];
-        let mut at = 0;
+        self.heap_entries[0] = self.heap_entries[self.len];
+        let mut heap_index = 0;
         loop {
-            let (left, right) = (2 * at + 1, 2 * at + 2);
-            let mut least = at;
-            if left < self.len && self.entries[left] < self.entries[least] {
-                least = left;
+            let (left_child, right_child) = (2 * heap_index + 1, 2 * heap_index + 2);
+            let mut least_index = heap_index;
+            if left_child < self.len && self.heap_entries[left_child] < self.heap_entries[least_index] {
+                least_index = left_child;
             }
-            if right < self.len && self.entries[right] < self.entries[least] {
-                least = right;
+            if right_child < self.len && self.heap_entries[right_child] < self.heap_entries[least_index] {
+                least_index = right_child;
             }
-            if least == at {
+            if least_index == heap_index {
                 break;
             }
-            self.entries.swap(at, least);
-            at = least;
+            self.heap_entries.swap(heap_index, least_index);
+            heap_index = least_index;
         }
-        Some(((next & 0xff) as usize, u8::MAX - (next >> 8 & 0xff) as u8))
+        Some(((next_entry & 0xff) as usize, u8::MAX - (next_entry >> 8 & 0xff) as u8))
     }
 }
 
-/// The shortest path from `from` to `to` over the cells of `passable`,
+/// The shortest path from `from_cell` to `to_cell` over the cells of `passable`,
 /// through no wall of `walls`: its first step and its length. `None`
 /// if there is no way, or if they are one cell (`docs/pathfinding.md`,
 /// "A*").
-pub fn a_star(passable: &Rows, walls: &Walls, from: Cell, to: Cell) -> Option<Path> {
-    if from == to {
+pub fn a_star(passable: &Rows, walls: &Walls, from_cell: Cell, to_cell: Cell) -> Option<Path> {
+    if from_cell == to_cell {
         return None;
     }
-    // Steps from `to` to each cell, the shortest found so far.
+    // Steps from `to_cell` to each cell, the shortest found so far.
     let mut steps = [u8::MAX; CELLS];
-    // The cell each was reached from: one step nearer `to`.
-    let mut towards = [0u8; CELLS];
+    // The cell each was reached from: one step nearer `to_cell`.
+    let mut reached_from = [0u8; CELLS];
     // The cells whose shortest path is settled.
-    let mut settled: Rows = [0; SIDE];
-    let mut queue = Queue { entries: [0; QUEUE], len: 0 };
-    steps[to.index()] = 0;
-    queue.push(steps_apart(to, from), 0, to.index());
-    while let Some((index, queued_at)) = queue.pop() {
-        let cell = Cell::from_index(index);
+    let mut settled_cells: Rows = [0; AREA_SIDE];
+    let mut search_queue = SearchQueue { heap_entries: [0; QUEUE_ROOM], len: 0 };
+    steps[to_cell.area_index()] = 0;
+    search_queue.push(steps_apart(to_cell, from_cell), 0, to_cell.area_index());
+    while let Some((popped_index, queued_at)) = search_queue.pop() {
+        let cell = Cell::from_index(popped_index);
         // Queued again since by a shorter way, and looked at then.
-        if holds(&settled, cell) || queued_at > steps[index] {
+        if rows_hold(&settled_cells, cell) || queued_at > steps[popped_index] {
             continue;
         }
-        if cell == from {
-            return Some(Path { first: Cell::from_index(towards[index] as usize), steps: steps[index] });
+        if cell == from_cell {
+            return Some(Path { first_cell: Cell::from_index(reached_from[popped_index] as usize), steps: steps[popped_index] });
         }
-        settled[cell.y as usize] |= 1 << cell.x;
-        let further = steps[index] + 1;
+        settled_cells[cell.y as usize] |= 1 << cell.x;
+        let further_steps = steps[popped_index] + 1;
         for (dx, dy) in STEPS {
             let (x, y) = (cell.x as i8 + dx, cell.y as i8 + dy);
-            if x < 0 || y < 0 || x >= SIDE as i8 || y >= SIDE as i8 {
+            if x < 0 || y < 0 || x >= AREA_SIDE as i8 || y >= AREA_SIDE as i8 {
                 continue;
             }
-            let neighbour = Cell { x: x as u8, y: y as u8 };
-            if neighbour != from && !holds(passable, neighbour) || walls.bars_step(neighbour, -dx, -dy) || further >= steps[neighbour.index()] {
+            let neighbour_cell = Cell { x: x as u8, y: y as u8 };
+            if neighbour_cell != from_cell && !rows_hold(passable, neighbour_cell) || walls.bars_step(neighbour_cell, -dx, -dy) || further_steps >= steps[neighbour_cell.area_index()] {
                 continue;
             }
-            steps[neighbour.index()] = further;
-            towards[neighbour.index()] = index as u8;
-            queue.push(further + steps_apart(neighbour, from), further, neighbour.index());
+            steps[neighbour_cell.area_index()] = further_steps;
+            reached_from[neighbour_cell.area_index()] = popped_index as u8;
+            search_queue.push(further_steps + steps_apart(neighbour_cell, from_cell), further_steps, neighbour_cell.area_index());
         }
     }
     None

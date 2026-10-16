@@ -24,25 +24,25 @@ impl SetCellsBeforeEachWord {
 
     /// `bitmap`'s counts, whatever these held before.
     pub fn count(&mut self, bitmap: &Bitmap) {
-        for (index, word) in bitmap.words().iter().enumerate() {
-            self.set_before[index + 1] = self.set_before[index] + word.count_ones();
+        for (word_index, word) in bitmap.words().iter().enumerate() {
+            self.set_before[word_index + 1] = self.set_before[word_index] + word.count_ones();
         }
     }
 
     /// Cells set in all.
-    pub fn total(&self) -> u64 {
+    pub fn total_set_cells(&self) -> u64 {
         self.set_before[WORDS] as u64
     }
 
-    /// Cells set in the run of `count` words from `first`.
-    pub fn in_words(&self, first: usize, count: usize) -> u64 {
-        (self.set_before[first + count] - self.set_before[first]) as u64
+    /// Cells set in the run of `count` words from `first_word`.
+    pub fn in_words(&self, first_word: usize, count: usize) -> u64 {
+        (self.set_before[first_word + count] - self.set_before[first_word]) as u64
     }
 
     /// Cells set in `tile`, a word or more of cells: one run of whole
     /// words.
     pub fn in_tile(&self, tile: Tile) -> u64 {
-        let cells = cells_in_tile(tile.level);
+        let cells = cells_in_tile(tile.tile_level);
         debug_assert!(cells >= WORD_CELLS, "{tile:?} is less than a word of cells");
         self.in_words(tile.first_cell() / WORD_CELLS, cells / WORD_CELLS)
     }

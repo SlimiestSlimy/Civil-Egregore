@@ -5,19 +5,19 @@ use crate::tree::{Node, Tree};
 use std::collections::BTreeMap;
 
 /// The node at `tile`'s kind, as `docs/tessera.md` names it.
-pub fn kind(tree: &Tree, tile: Tile, node: Node) -> &'static str {
+pub fn node_kind_name(tree: &Tree, tile: Tile, node: Node) -> &'static str {
     match node {
-        Node::ComplexTile { size_offset } if tile.level + size_offset == CELL_LEVEL => "raw",
+        Node::ComplexTile { size_offset } if tile.tile_level + size_offset == CELL_LEVEL => "raw",
         Node::ComplexTile { size_offset: 0 } => "tile",
         Node::ComplexTile { .. } => "complex tile",
         Node::FlippingDivide => "flipping divide",
-        Node::Divided if tree.children(tile).contains(&Node::Absent) => "divide naming children",
-        Node::Divided => "divide",
-        Node::Copied { names_children: false, .. } => "copy",
-        Node::Copied { names_children: true, .. } => "copy naming children",
-        Node::Residual => "residual",
+        Node::PlainDivide if tree.child_elements(tile).contains(&Node::NoNode) => "divide naming children",
+        Node::PlainDivide => "divide",
+        Node::CopiedTile { names_children: false, .. } => "copy",
+        Node::CopiedTile { names_children: true, .. } => "copy naming children",
+        Node::ResidualFloorTile => "residual",
         Node::CellList => "cell list",
-        Node::Absent => "absent",
+        Node::NoNode => "absent",
     }
 }
 
@@ -36,11 +36,11 @@ pub fn census(tree: &Tree) -> Census {
 /// Counts `tile`'s node and every node under it.
 fn count(tree: &Tree, tile: Tile, counts: &mut Census) {
     let node = tree.get(tile);
-    counts.entry(kind(tree, tile, node)).or_default()[tile.level as usize] += 1;
+    counts.entry(node_kind_name(tree, tile, node)).or_default()[tile.tile_level as usize] += 1;
     if node.has_children() {
-        for child in tile.children() {
-            if tree.get(child) != Node::Absent {
-                count(tree, child, counts);
+        for child_tile in tile.child_tiles() {
+            if tree.get(child_tile) != Node::NoNode {
+                count(tree, child_tile, counts);
             }
         }
     }

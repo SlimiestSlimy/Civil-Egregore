@@ -9,29 +9,29 @@ use bitmap::Bitmap;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use tessera::diagnostics::adversarial::worst;
-use tessera::corpus::checkerboards::checkerboard;
-use tessera::corpus::{families, HowMany};
+use tessera::corpus::checkerboards::one_checkerboard;
+use tessera::corpus::{corpus_families, HowMany};
 use tessera::{BitStream, Tessera};
 
 /// The system allocator, counting the allocations of a thread that asks.
-struct Counting;
+struct CountingAllocator;
 
 thread_local! {
     /// Whether this thread's allocations are counted, and how many so far.
-    static COUNTED: Cell<(bool, usize)> = const { Cell::new((false, 0)) };
+    static COUNTED_ALLOCATIONS: Cell<(bool, usize)> = const { Cell::new((false, 0)) };
 }
 
 /// Counts an allocation, if this thread is counting.
 fn count() {
-    COUNTED.with(|counted| {
-        let (counting, allocations) = counted.get();
-        if counting {
-            counted.set((true, allocations + 1));
+    COUNTED_ALLOCATIONS.with(|counted_allocations| {
+        let (is_counting, allocations) = counted_allocations.get();
+        if is_counting {
+            counted_allocations.set((true, allocations + 1));
         }
     });
 }
 
-unsafe impl GlobalAlloc for Counting {
+unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         count();
         unsafe { System.alloc(layout) }
@@ -42,32 +42,32 @@ unsafe impl GlobalAlloc for Counting {
         unsafe { System.alloc_zeroed(layout) }
     }
 
-    unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+    unsafe fn realloc(&self, allocation_pointer: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
         count();
-        unsafe { System.realloc(pointer, layout, new_size) }
+        unsafe { System.realloc(allocation_pointer, layout, new_size) }
     }
 
-    unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
-        unsafe { System.dealloc(pointer, layout) }
+    unsafe fn dealloc(&self, allocation_pointer: *mut u8, layout: Layout) {
+        unsafe { System.dealloc(allocation_pointer, layout) }
     }
 }
 
 #[global_allocator]
-static ALLOCATOR: Counting = Counting;
+static GLOBAL_ALLOCATOR: CountingAllocator = CountingAllocator;
 
 /// Every family's tested bitmaps, a checkerboard and the saved
 /// adversarial bitmaps, encoded and decoded with no allocation at all.
 #[test]
 fn encoding_and_decoding_never_allocate() {
-    let mut corpus: Vec<Bitmap> = families(HowMany::Tested).into_iter().flat_map(|(_, bitmaps)| bitmaps).collect();
-    corpus.push(checkerboard(7));
-    corpus.extend(worst::saved().into_iter().map(|(_, bitmap)| bitmap));
-    let (mut tessera, mut stream, mut back) = (Tessera::new(), BitStream::default(), Bitmap::new());
-    COUNTED.with(|counted| counted.set((true, 0)));
+    let mut corpus: Vec<Bitmap> = corpus_families(HowMany::TestedCount).into_iter().flat_map(|(_, bitmaps)| bitmaps).collect();
+    corpus.push(one_checkerboard(7));
+    corpus.extend(worst::every_saved().into_iter().map(|(_, bitmap)| bitmap));
+    let (mut tessera, mut stream, mut decoded_bitmap) = (Tessera::new(), BitStream::default(), Bitmap::new());
+    COUNTED_ALLOCATIONS.with(|counted_allocations| counted_allocations.set((true, 0)));
     for bitmap in &corpus {
         tessera.encode(bitmap, &mut stream);
-        tessera.decode(&stream, &mut back);
+        tessera.decode(&stream, &mut decoded_bitmap);
     }
-    let (_, allocations) = COUNTED.with(|counted| counted.replace((false, 0)));
+    let (_, allocations) = COUNTED_ALLOCATIONS.with(|counted_allocations| counted_allocations.replace((false, 0)));
     assert_eq!(allocations, 0, "{allocations} allocations encoding and decoding {} bitmaps", corpus.len());
 }

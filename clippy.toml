@@ -64,6 +64,6 @@ disallowed-methods = [
     { path = "f32::hypot", reason = "not the same on every machine: whole numbers instead (utilities::chance, utilities::fixed_point)" },
     { path = "f32::ln_1p", reason = "not the same on every machine: whole numbers instead (utilities::chance, utilities::fixed_point)" },
     { path = "f32::exp_m1", reason = "not the same on every machine: whole numbers instead (utilities::chance, utilities::fixed_point)" },
-    { path = "utilities::rng::Rng::unit", reason = "a float drawn: draw against a utilities::chance::Chance instead" },
-    { path = "utilities::chance::Chance::fraction", reason = "a float, for a report or a test alone: allow it there by name" },
+    { path = "utilities::rng::RandomSource::draw_unit_float", reason = "a float drawn: draw against a utilities::chance::Chance instead" },
+    { path = "utilities::chance::Chance::as_fraction", reason = "a float, for a report or a test alone: allow it there by name" },
 ]

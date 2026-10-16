@@ -8,43 +8,43 @@
 use crate::tests::{cells_of_grass, first_superchunk, plain_world, plant_grass, put_entity, tick_sheep};
 use coordinates::CellCartesian;
 use entity_manager::{set_attribute, AttributeBlock, EntityRef, Header, WholeAttribute};
-use entity_rules::sheep::{BIRTHS, DEATHS, EATEN, FAR, PATHS, SOUGHT, WOKEN, GESTATION, MEAL, ROAM, SHEEP, SHEEP_STATE, STARVATION, SheepState, STEP_JITTER, STEP};
+use entity_rules::sheep::{BIRTHS_COUNT, DEATHS_COUNT, EATEN_COUNT, FAR_COUNT, PATHS, SOUGHT_COUNT, WOKEN_COUNT, GESTATION_TIME, TIME_BETWEEN_MEALS, ROAMING_TIME, SHEEP, SHEEP_STATE, TIME_TO_STARVE, SheepState, STEP_JITTER, STEP};
 
 /// The state of a sheep next hungry at `hungry_at`, in the middle of nothing.
 fn hungry_at(hungry_at: u64) -> WholeAttribute {
-    WholeAttribute::holding(SHEEP_STATE, SheepState { hungry_at, ..SheepState::default() })
+    WholeAttribute::holding_value(SHEEP_STATE, SheepState { hungry_at, ..SheepState::default() })
 }
 
-/// What `sheep` keeps: every sheep has its block.
-fn state(sheep: &EntityRef) -> SheepState {
-    sheep.attribute(SHEEP_STATE).expect("a sheep's state, always")
+/// What `sheep_entity` keeps: every sheep has its block.
+fn sheep_state(sheep_entity: &EntityRef) -> SheepState {
+    sheep_entity.attribute(SHEEP_STATE).expect("a sheep's state, always")
 }
 
 /// Makes about one sheep in `one_in` of `world` pregnant, its lamb
-/// due at a tick within `within` of now and the sheep awake for it:
+/// due at a tick within `due_within` of now and the sheep awake for it:
 /// which sheep and when, drawn from the run's seed. A gestation is
 /// longer than the tests that want a birth among much else run for.
-fn with_lambs_due(world: &mut server::World, one_in: u64, within: u64) {
-    let mut drawn = utilities::rng::Rng::new(utilities::seed::counted());
-    let now = world.entities().now();
-    let all: Vec<(Header, SheepState, Vec<AttributeBlock>)> = world.entities().iter().map(|sheep| (sheep.header, state(&sheep), sheep.attributes.to_vec())).collect();
-    for (header, was, mut attributes) in all {
-        let due = now + 1 + drawn.below(within);
-        if drawn.below(one_in) != 0 {
+fn with_lambs_due(world: &mut server::World, one_in: u64, due_within: u64) {
+    let mut seeded_random = utilities::rng::RandomSource::new(utilities::seed::counted_seed());
+    let tick_now = world.entity_store().current_tick();
+    let every_sheep: Vec<(Header, SheepState, Vec<AttributeBlock>)> = world.entity_store().iter().map(|sheep_entity| (sheep_entity.header, sheep_state(&sheep_entity), sheep_entity.attributes.to_vec())).collect();
+    for (header, state_was, mut attributes) in every_sheep {
+        let due_tick = tick_now + 1 + seeded_random.draw_below(due_within);
+        if seeded_random.draw_below(one_in) != 0 {
             continue;
         }
-        set_attribute(&mut attributes, SHEEP_STATE, SheepState { lamb_due_at: due, ..was });
-        assert_eq!(world.remove_entity(&header).removes, 1);
-        assert_eq!(world.put_entity(Header { wake: header.wake.min(due), ..header }, &attributes).puts, 1);
+        set_attribute(&mut attributes, SHEEP_STATE, SheepState { lamb_due_at: due_tick, ..state_was });
+        assert_eq!(world.remove_entity(&header).entities_removed, 1);
+        assert_eq!(world.put_entity(Header { wake: header.wake.min(due_tick), ..header }, &attributes).puts, 1);
     }
 }
 
 /// Every sheep knows when it is next hungry, is a sheep, and is
 /// never both a lamb and pregnant.
-fn well_formed(sheep: EntityRef) {
-    assert_eq!(sheep.header.kind, SHEEP);
-    let state = state(&sheep);
-    assert!(state.grown_at == 0 || state.lamb_due_at == 0, "a lamb, pregnant");
+fn well_formed(sheep_entity: EntityRef) {
+    assert_eq!(sheep_entity.header.entity_type, SHEEP);
+    let checked_state = sheep_state(&sheep_entity);
+    assert!(checked_state.grown_at == 0 || checked_state.lamb_due_at == 0, "a lamb, pregnant");
 }
 
 /// With no grass at all, every sheep starves, within the wakes it
@@ -52,12 +52,12 @@ fn well_formed(sheep: EntityRef) {
 #[test]
 fn sheep_without_grass_starve() {
     let mut world = plain_world(1, 0, 500, 1);
-    let (mut eaten, mut deaths) = (0, 0);
-    for _ in 0..MEAL.ticks() + STARVATION.ticks() + 2 * (STEP.ticks() + STEP_JITTER.ticks()) {
-        let done = tick_sheep(&mut world).rules;
-        (eaten, deaths) = (eaten + done[EATEN], deaths + done[DEATHS]);
+    let (mut eaten_total, mut deaths_total) = (0, 0);
+    for _ in 0..TIME_BETWEEN_MEALS.ticks() + TIME_TO_STARVE.ticks() + 2 * (STEP.ticks() + STEP_JITTER.ticks()) {
+        let tick_counts = tick_sheep(&mut world).rules;
+        (eaten_total, deaths_total) = (eaten_total + tick_counts[EATEN_COUNT], deaths_total + tick_counts[DEATHS_COUNT]);
     }
-    assert_eq!((eaten, deaths, world.entities().len()), (0, 500, 0));
+    assert_eq!((eaten_total, deaths_total, world.entity_store().len()), (0, 500, 0));
 }
 
 /// On grass, sheep eat -- each cell eaten turned to dirt -- breed, and
@@ -66,23 +66,23 @@ fn sheep_without_grass_starve() {
 #[test]
 fn sheep_eat_breed_and_grow_up() {
     let mut world = plain_world(4, 300_000, 400, 2);
-    let (mut eaten, mut births, mut lost, mut lambs_seen, mut pregnant_seen) = (0, 0, 0, false, false);
+    let (mut eaten_total, mut births_total, mut lost, mut lambs_seen, mut pregnant_seen) = (0, 0, 0, false, false);
     // A gestation and six meals' time: the lambs conceived over those meals born, whatever either lasts.
-    for tick in 0..GESTATION.ticks() + 6 * MEAL.ticks() {
+    for tick in 0..GESTATION_TIME.ticks() + 6 * TIME_BETWEEN_MEALS.ticks() {
         let report = tick_sheep(&mut world);
-        (eaten, births, lost) = (eaten + report.rules[EATEN], births + report.rules[BIRTHS], lost + report.instructions_applied.lost);
+        (eaten_total, births_total, lost) = (eaten_total + report.rules[EATEN_COUNT], births_total + report.rules[BIRTHS_COUNT], lost + report.instructions_applied.lost);
         if tick % 500 == 0 {
-            for sheep in world.entities().iter() {
-                well_formed(sheep);
-                lambs_seen |= state(&sheep).grown_at != 0;
-                pregnant_seen |= state(&sheep).lamb_due_at != 0;
+            for sheep_entity in world.entity_store().iter() {
+                well_formed(sheep_entity);
+                lambs_seen |= sheep_state(&sheep_entity).grown_at != 0;
+                pregnant_seen |= sheep_state(&sheep_entity).lamb_due_at != 0;
             }
         }
     }
-    assert!(eaten > 5_000 && births > 50, "{eaten} eaten, {births} born");
+    assert!(eaten_total > 5_000 && births_total > 50, "{eaten_total} eaten, {births_total} born");
     assert!(lambs_seen && pregnant_seen);
     assert_eq!(lost, 0, "no sheep walks off the hot superchunks");
-    assert!(world.entities().iter().any(|sheep| state(&sheep).grown_at == 0), "grown sheep");
+    assert!(world.entity_store().iter().any(|grown_entity| sheep_state(&grown_entity).grown_at == 0), "grown sheep");
 }
 
 /// A hungry sheep with no grass beside it walks the shortest way to the
@@ -93,23 +93,23 @@ fn sheep_eat_breed_and_grow_up() {
 fn hungry_sheep_walk_to_the_nearest_grass() {
     let mut world = plain_world(1, 0, 0, 1);
     let superchunk = first_superchunk(&world);
-    let corner = superchunk.top_left().cartesian();
-    let (sheep, grass) = (CellCartesian { x: corner.x + 500, y: corner.y + 500 }, CellCartesian { x: corner.x + 506, y: corner.y + 493 });
-    plant_grass(&mut world, grass, 1, 1);
-    let header = Header { kind: SHEEP, at: sheep.into(), wake: 0 };
+    let corner_cartesian = superchunk.top_left().cartesian();
+    let (sheep_cartesian, grass_cartesian) = (CellCartesian { x: corner_cartesian.x + 500, y: corner_cartesian.y + 500 }, CellCartesian { x: corner_cartesian.x + 506, y: corner_cartesian.y + 493 });
+    plant_grass(&mut world, grass_cartesian, 1, 1);
+    let header = Header { entity_type: SHEEP, stood_cell: sheep_cartesian.into(), wake: 0 };
     put_entity(&mut world, header, &hungry_at(0));
-    let (mut done, mut ate_at) = (actions::RuleCounts::default(), None);
+    let (mut counts_so_far, mut ate_at) = (actions::RuleCounts::default(), None);
     for _ in 0..12 * (STEP.ticks() + STEP_JITTER.ticks()) {
         // The grass rule left out: the one cell of grass must stay until eaten.
         let report = tick_sheep(&mut world);
-        if report.rules[EATEN] > 0 && ate_at.is_none() {
-            ate_at = Some(done[WOKEN]);
+        if report.rules[EATEN_COUNT] > 0 && ate_at.is_none() {
+            ate_at = Some(counts_so_far[WOKEN_COUNT]);
         }
-        done += report.rules;
+        counts_so_far += report.rules;
     }
-    assert_eq!(done[EATEN], 1, "the one cell of grass, eaten");
+    assert_eq!(counts_so_far[EATEN_COUNT], 1, "the one cell of grass, eaten");
     assert_eq!(ate_at, Some(7), "seven steps to it, eaten on the wake after");
-    assert_eq!((done[SOUGHT], done[PATHS]), (6, 6), "a path found each step until the grass was beside it");
+    assert_eq!((counts_so_far[SOUGHT_COUNT], counts_so_far[PATHS]), (6, 6), "a path found each step until the grass was beside it");
     assert_eq!(cells_of_grass(&world), 0);
 }
 
@@ -121,27 +121,27 @@ fn hungry_sheep_walk_to_the_nearest_grass() {
 fn hungry_sheep_walk_to_grass_far_off() {
     let mut world = plain_world(4, 0, 0, 2);
     // The square's top left superchunk: the first, row by row.
-    let corner = first_superchunk(&world).top_left().cartesian();
-    let (sheep, grass) = (CellCartesian { x: corner.x + 900, y: corner.y + 700 }, CellCartesian { x: corner.x + 1050, y: corner.y + 800 });
-    plant_grass(&mut world, grass, 1, 1);
-    let header = Header { kind: SHEEP, at: sheep.into(), wake: 0 };
+    let corner_cartesian = first_superchunk(&world).top_left().cartesian();
+    let (sheep_cartesian, grass_cartesian) = (CellCartesian { x: corner_cartesian.x + 900, y: corner_cartesian.y + 700 }, CellCartesian { x: corner_cartesian.x + 1050, y: corner_cartesian.y + 800 });
+    plant_grass(&mut world, grass_cartesian, 1, 1);
+    let header = Header { entity_type: SHEEP, stood_cell: sheep_cartesian.into(), wake: 0 };
     put_entity(&mut world, header, &hungry_at(0));
-    let (mut done, mut ate_at) = (actions::RuleCounts::default(), None);
-    for _ in 0..STARVATION.ticks() {
+    let (mut counts_so_far, mut ate_at) = (actions::RuleCounts::default(), None);
+    for _ in 0..TIME_TO_STARVE.ticks() {
         let report = tick_sheep(&mut world);
-        if report.rules[EATEN] > 0 && ate_at.is_none() {
-            ate_at = Some(done[WOKEN]);
+        if report.rules[EATEN_COUNT] > 0 && ate_at.is_none() {
+            ate_at = Some(counts_so_far[WOKEN_COUNT]);
         }
-        done += report.rules;
+        counts_so_far += report.rules;
         // No further: fed, it is hungry again within the time it would have starved in, and seeks grass there is none of.
         if ate_at.is_some() {
             break;
         }
     }
-    assert_eq!(done[EATEN], 1, "the one cell of grass, eaten");
+    assert_eq!(counts_so_far[EATEN_COUNT], 1, "the one cell of grass, eaten");
     assert_eq!(ate_at, Some(150), "as many steps as the further of across and down, eaten on the wake after");
-    assert_eq!(done[SOUGHT], done[PATHS], "a way found every step");
-    assert!(done[FAR] > 135 && done[FAR] < 150, "{} of them from far off", done[FAR]);
+    assert_eq!(counts_so_far[SOUGHT_COUNT], counts_so_far[PATHS], "a way found every step");
+    assert!(counts_so_far[FAR_COUNT] > 135 && counts_so_far[FAR_COUNT] < 150, "{} of them from far off", counts_so_far[FAR_COUNT]);
 }
 
 /// A sheep that eats on thin pasture leaves it: hungry again, it walks
@@ -152,34 +152,34 @@ fn hungry_sheep_walk_to_grass_far_off() {
 #[test]
 fn sheep_on_thin_pasture_roam_away() {
     let mut world = plain_world(16, 0, 0, 1);
-    let starts: Vec<CellCartesian> = world.arena().superchunk_indices().into_iter().map(|superchunk| superchunk.top_left().cartesian()).map(|corner| CellCartesian { x: corner.x + 500, y: corner.y + 500 }).collect();
-    for &start in &starts {
-        plant_grass(&mut world, start, 1, 1);
-        put_entity(&mut world, Header { kind: SHEEP, at: start.into(), wake: 0 }, &hungry_at(0));
+    let start_cells: Vec<CellCartesian> = world.bitmap_arena().superchunk_indices().into_iter().map(|superchunk| superchunk.top_left().cartesian()).map(|corner_cartesian| CellCartesian { x: corner_cartesian.x + 500, y: corner_cartesian.y + 500 }).collect();
+    for &start_cell in &start_cells {
+        plant_grass(&mut world, start_cell, 1, 1);
+        put_entity(&mut world, Header { entity_type: SHEEP, stood_cell: start_cell.into(), wake: 0 }, &hungry_at(0));
     }
     // A sheep is told from the others by its superchunk, which it does not walk out of in so few steps.
-    let superchunks = world.arena().superchunk_indices();
-    let which = |sheep: &EntityRef| superchunks.binary_search(&sheep.header.at.superchunk()).expect("on a hot superchunk");
+    let superchunks = world.bitmap_arena().superchunk_indices();
+    let index_of_sheep = |sheep_asked: &EntityRef| superchunks.binary_search(&sheep_asked.header.stood_cell.superchunk()).expect("on a hot superchunk");
     // Each sheep: whether it has set off, and where its steps ran out.
-    let (mut eaten, mut walks) = (0, vec![(false, None); starts.len()]);
-    for _ in 0..MEAL.ticks() + ROAM.ticks() + 4 * (STEP.ticks() + STEP_JITTER.ticks()) {
-        eaten += tick_sheep(&mut world).rules[EATEN];
-        for sheep in world.entities().iter() {
-            let (roaming, (set_off, came_to)) = (state(&sheep).roaming_until != 0, &mut walks[which(&sheep)]);
-            if *set_off && !roaming && came_to.is_none() {
-                *came_to = Some(sheep.header.at.cartesian());
+    let (mut eaten_total, mut sheep_walks) = (0, vec![(false, None); start_cells.len()]);
+    for _ in 0..TIME_BETWEEN_MEALS.ticks() + ROAMING_TIME.ticks() + 4 * (STEP.ticks() + STEP_JITTER.ticks()) {
+        eaten_total += tick_sheep(&mut world).rules[EATEN_COUNT];
+        for sheep_entity in world.entity_store().iter() {
+            let (is_roaming, (set_off, came_to)) = (sheep_state(&sheep_entity).roaming_until != 0, &mut sheep_walks[index_of_sheep(&sheep_entity)]);
+            if *set_off && !is_roaming && came_to.is_none() {
+                *came_to = Some(sheep_entity.header.stood_cell.cartesian());
             }
-            *set_off |= roaming;
+            *set_off |= is_roaming;
         }
     }
-    assert_eq!(eaten, starts.len() as u64, "each its one cell of grass, eaten: thin pasture");
-    let alive: Vec<usize> = world.entities().iter().map(|sheep| which(&sheep)).collect();
-    assert!(!alive.is_empty(), "sixteen sheep, every one dead of old age in so few ticks");
-    for sheep in alive {
-        let (start, came_to) = (starts[sheep], walks[sheep].1.expect("it set off, and its steps ran out"));
-        let apart = (came_to.x.abs_diff(start.x)).max(came_to.y.abs_diff(start.y));
-        let steps = ROAM.ticks() / (STEP.ticks() + STEP_JITTER.ticks())..=ROAM.ticks() / STEP.ticks() + 1;
-        assert!(steps.contains(&(apart as u64)), "{apart} cells off: one way, every step");
+    assert_eq!(eaten_total, start_cells.len() as u64, "each its one cell of grass, eaten: thin pasture");
+    let alive_sheep: Vec<usize> = world.entity_store().iter().map(|alive_entity| index_of_sheep(&alive_entity)).collect();
+    assert!(!alive_sheep.is_empty(), "sixteen sheep, every one dead of old age in so few ticks");
+    for sheep_index in alive_sheep {
+        let (walk_start, came_to) = (start_cells[sheep_index], sheep_walks[sheep_index].1.expect("it set off, and its steps ran out"));
+        let cells_apart = (came_to.x.abs_diff(walk_start.x)).max(came_to.y.abs_diff(walk_start.y));
+        let steps = ROAMING_TIME.ticks() / (STEP.ticks() + STEP_JITTER.ticks())..=ROAMING_TIME.ticks() / STEP.ticks() + 1;
+        assert!(steps.contains(&(cells_apart as u64)), "{cells_apart} cells off: one way, every step");
     }
 }
 
@@ -187,15 +187,15 @@ fn sheep_on_thin_pasture_roam_away() {
 /// the same on one thread and on four.
 #[test]
 fn any_number_of_threads_ticks_sheep_the_same() {
-    let run = |threads| {
-        let mut world = plain_world(4, 200_000, 300, threads);
+    let run_with_threads = |thread_count| {
+        let mut world = plain_world(4, 200_000, 300, thread_count);
         let reports: Vec<_> = (0..1500).map(|_| tick_sheep(&mut world)).map(|report| (report.rules, report.instructions_applied)).collect();
-        let sheep: Vec<_> = world.entities().iter().map(|sheep| (sheep.header, sheep.attributes.to_vec())).collect();
-        (reports, sheep, cells_of_grass(&world))
+        let sheep_list: Vec<_> = world.entity_store().iter().map(|sheep_entity| (sheep_entity.header, sheep_entity.attributes.to_vec())).collect();
+        (reports, sheep_list, cells_of_grass(&world))
     };
-    let (one, four) = (run(1), run(4));
-    assert!(!one.1.is_empty());
-    assert_eq!(one, four);
+    let (on_one_thread, on_four_threads) = (run_with_threads(1), run_with_threads(4));
+    assert!(!on_one_thread.1.is_empty());
+    assert_eq!(on_one_thread, on_four_threads);
 }
 
 /// Sheep never overlap: a crowded flock, eating, breeding and walking
@@ -204,21 +204,21 @@ fn any_number_of_threads_ticks_sheep_the_same() {
 #[test]
 fn sheep_never_overlap() {
     let mut world = plain_world(4, 300_000, 60_000, 4);
-    assert_eq!(world.entities().len(), 240_000, "each on a cell of its own from the start");
+    assert_eq!(world.entity_store().len(), 240_000, "each on a cell of its own from the start");
     with_lambs_due(&mut world, 16, 2_000);
-    let (mut moved, mut births) = (0, 0);
+    let (mut moves_total, mut births_total) = (0, 0);
     for tick in 0..2_000 {
         let report = tick_sheep(&mut world);
-        (moved, births) = (moved + report.instructions_applied.moves, births + report.rules[BIRTHS]);
+        (moves_total, births_total) = (moves_total + report.instructions_applied.moves, births_total + report.rules[BIRTHS_COUNT]);
         if tick % 100 == 99 {
-            let mut cells: Vec<_> = world.entities().iter().map(|sheep| sheep.header.at).collect();
+            let mut cells: Vec<_> = world.entity_store().iter().map(|sheep_entity| sheep_entity.header.stood_cell).collect();
             cells.sort_unstable();
-            assert!(cells.windows(2).all(|pair| pair[0] != pair[1]), "tick {tick}: two sheep on a cell");
+            assert!(cells.windows(2).all(|adjacent_pair| adjacent_pair[0] != adjacent_pair[1]), "tick {tick}: two sheep on a cell");
         }
     }
     // They see where the others stand, in the collision plane, and seldom step for one cell in one tick: stepping is what is asked for.
-    assert!(moved > 10_000, "{moved} moves");
-    assert!(births > 0);
+    assert!(moves_total > 10_000, "{moves_total} moves");
+    assert!(births_total > 0);
 }
 
 /// A sheep's meal lost to a decay, made to happen: a hungry sheep on a
@@ -232,46 +232,46 @@ fn sheep_never_overlap() {
 fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
     use coordinates::CellIndex;
-    use entity_manager::Entities;
+    use entity_manager::WorldEntities;
     use actions::cells;
     use type_registry::{GRASS, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
     let superchunk = coordinates::WORLD_MIDDLE;
-    let (mut codec, mut arena, mut entities) = (chunk_storage::LayerCodec::new(), BitmapArena::new(), Entities::new());
+    let (mut layer_codec, mut bitmap_arena, mut entity_store) = (chunk_storage::LayerCodec::new(), BitmapArena::new(), WorldEntities::new());
     for chunk in superchunk.chunks() {
         for layer_type in [GRASS, WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST] {
-            arena.make_hot(BucketKey { layer_type, chunk }, None, &mut codec);
+            bitmap_arena.make_hot(BucketKey { layer_type, chunk }, None, &mut layer_codec);
         }
     }
-    entities.align(&arena.superchunk_indices());
-    let corner = superchunk.top_left().cartesian();
-    let (decaying, standing): (CellIndex, CellIndex) = (CellCartesian { x: corner.x + 400, y: corner.y + 400 }.into(), CellCartesian { x: corner.x + 600, y: corner.y + 400 }.into());
-    for at in [decaying, standing] {
-        arena.queue(GRASS, Write::cell(at, WriteOp::Set));
+    entity_store.keep_superchunks(&bitmap_arena.superchunk_indices());
+    let corner_cartesian = superchunk.top_left().cartesian();
+    let (decaying_cell, standing_cell): (CellIndex, CellIndex) = (CellCartesian { x: corner_cartesian.x + 400, y: corner_cartesian.y + 400 }.into(), CellCartesian { x: corner_cartesian.x + 600, y: corner_cartesian.y + 400 }.into());
+    for grass_cell in [decaying_cell, standing_cell] {
+        bitmap_arena.queue_write(GRASS, Write::cell(grass_cell, WriteOp::SetCell));
     }
-    arena.apply();
+    bitmap_arena.apply();
     let was_hungry_at = 0;
-    entities.queue_put(Header { kind: SHEEP, at: decaying, wake: 0 }, &hungry_at(was_hungry_at));
-    entities.queue_put(Header { kind: SHEEP, at: standing, wake: 0 }, &hungry_at(was_hungry_at));
-    entities.apply();
-    let mut simulation = simulation::Simulation::new(1);
-    let report = simulation.tick(&mut arena, &mut entities, utilities::seed::counted(), |turn: &mut actions::Turn| {
+    entity_store.queue_put(Header { entity_type: SHEEP, stood_cell: decaying_cell, wake: 0 }, &hungry_at(was_hungry_at));
+    entity_store.queue_put(Header { entity_type: SHEEP, stood_cell: standing_cell, wake: 0 }, &hungry_at(was_hungry_at));
+    entity_store.apply();
+    let mut test_simulation = simulation::Simulation::new(1);
+    let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, utilities::seed::counted_seed(), |turn: &mut actions::Turn| {
         // The decay first, counted under 0; the sheep's counts from 8 on.
-        cells::clear_counted(turn, GRASS, decaying, 0);
+        cells::clear_counted(turn, GRASS, decaying_cell, 0);
         turn.count_under(8);
         entity_rules::sheep::rule(turn)
     });
-    assert_eq!((arena.holds(GRASS, decaying), arena.holds(GRASS, standing)), (Ok(false), Ok(false)));
-    assert_eq!((report.writes_applied.changed, report.writes_applied.refused), (2, 1), "one meal applied, one refused");
+    assert_eq!((bitmap_arena.layer_holds_cell(GRASS, decaying_cell), bitmap_arena.layer_holds_cell(GRASS, standing_cell)), (Ok(false), Ok(false)));
+    assert_eq!((report.writes_applied.cells_changed, report.writes_applied.writes_refused), (2, 1), "one meal applied, one refused");
     // What each comes to is a write an attribute changed and a move, all of the one applied and of the other refused; and of the two sleeps, the other way about.
-    let (applied, refused) = report.instructions_compared;
-    assert!(applied >= 2 && refused >= 2, "{applied} applied, {refused} refused");
-    assert_eq!((report.counted_when_applied[0], report.counted_when_applied[8 + EATEN], report.rules[EATEN]), (1, 1, 0), "a decay and one meal, counted as applied");
-    let sheep: Vec<_> = entities.iter().collect();
+    let (compares_applied, compares_refused) = report.instructions_compared;
+    assert!(compares_applied >= 2 && compares_refused >= 2, "{compares_applied} applied, {compares_refused} refused");
+    assert_eq!((report.counted_when_applied[0], report.counted_when_applied[8 + EATEN_COUNT], report.rules[EATEN_COUNT]), (1, 1, 0), "a decay and one meal, counted as applied");
+    let sheep_list: Vec<_> = entity_store.iter().collect();
     // One may die of old age before so long a sleep as a meal's, on any seed: its death is its meal's, both or neither.
-    let fed = sheep.iter().find(|sheep| sheep.header.at == standing);
-    assert_eq!(fed.is_none() as u64, report.counted_when_applied[8 + entity_rules::sheep::DEATHS]);
-    assert!(fed.is_none_or(|fed| state(fed).hungry_at == MEAL.ticks() && fed.header.wake >= MEAL.ticks()), "fed, and asleep until hungry");
-    let hungry = sheep.iter().find(|sheep| sheep.header.at == decaying).expect("the sheep whose meal was refused, alive");
-    assert_eq!((state(hungry), hungry.header.at), (SheepState { hungry_at: was_hungry_at, ..SheepState::default() }, decaying), "as it was");
-    assert!((STEP.ticks()..STEP.ticks() + STEP_JITTER.ticks()).contains(&hungry.header.wake), "asleep a step: it wakes at {}", hungry.header.wake);
+    let fed_sheep = sheep_list.iter().find(|sheep_checked| sheep_checked.header.stood_cell == standing_cell);
+    assert_eq!(fed_sheep.is_none() as u64, report.counted_when_applied[8 + entity_rules::sheep::DEATHS_COUNT]);
+    assert!(fed_sheep.is_none_or(|fed_entity| sheep_state(fed_entity).hungry_at == TIME_BETWEEN_MEALS.ticks() && fed_entity.header.wake >= TIME_BETWEEN_MEALS.ticks()), "fed, and asleep until hungry");
+    let hungry_sheep = sheep_list.iter().find(|sheep_found| sheep_found.header.stood_cell == decaying_cell).expect("the sheep whose meal was refused, alive");
+    assert_eq!((sheep_state(hungry_sheep), hungry_sheep.header.stood_cell), (SheepState { hungry_at: was_hungry_at, ..SheepState::default() }, decaying_cell), "as it was");
+    assert!((STEP.ticks()..STEP.ticks() + STEP_JITTER.ticks()).contains(&hungry_sheep.header.wake), "asleep a step: it wakes at {}", hungry_sheep.header.wake);
 }

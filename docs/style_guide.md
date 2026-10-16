@@ -47,18 +47,18 @@ reader has to wonder whether something is missing or was never needed
   going over them is the simulation's (`Turn::each_sampled`), handed
   the rule by whoever ticks it, inlined, so it costs nothing.
 - A command's parameters are declared once, name and default
-  (`utilities::commands::Parameter`): the usage, the parsing and the
+  (`utilities::commands::CommandParameter`): the usage, the parsing and the
   report's line all come from that. No crate reads `std::env::args`.
 - Every text file kept -- a seed, settings, a world's file, a report --
   is CSV, read and written by `utilities::csv`, a first row naming its
   columns: one format, one reader (#2). A seed is 64 bits in
-  hexadecimal wherever it is written (`utilities::seed::hex`).
+  hexadecimal wherever it is written (`utilities::seed::seed_as_hex`).
 - **`utilities/` is the shared top folder.** Code that two crates need
   goes there, once (#2). It is never copied into both.
 - A crate holds what its name says and nothing else: what belongs to
   another's name goes there, however small. A world -- the program's, a
   test's, a tool's -- is made in one place, the server's `start`,
-  whatever it is to be given as its `Start`: no crate makes a world of
+  whatever it is to be given as its `WorldStart`: no crate makes a world of
   its own. The server starts and coordinates, and generates nothing:
   what is on a cell is `worldgen`'s to say, a superchunk's image
   `chunk_storage`'s to make and keep, the server's to pass between
@@ -67,7 +67,7 @@ reader has to wonder whether something is missing or was never needed
   terrain asked of the host for the ground past it
   (`host::terrain`), and names no crate under it but `coordinates` and
   `utilities`. A client works out nothing of the world itself: it
-  holds no generator, and no type of `worldgen`'s but `Generation` as
+  holds no generator, and no type of `worldgen`'s but `WorldGeneration` as
   the sliders' value it hands the host.
 - The rules' crates hold their rules alone: no diagnostics, no
   `transient_data`. A rule is tried on a world, and every world is the
@@ -140,7 +140,7 @@ Some things are named by rule:
 - Nothing a world follows from is a float worked on by the machine's
   maths library: no `ln`, `exp`, `powf`, `sin` or their like. A chance
   is `utilities::chance::Chance`, a logarithm
-  `utilities::fixed_point::log2`. The workspace's `clippy.toml` forbids
+  `utilities::fixed_point::log2_by_table`. The workspace's `clippy.toml` forbids
   the rest in every crate that has no `clippy.toml` of its own; only a
   crate no world follows from has one.
 
@@ -176,7 +176,7 @@ Some things are named by rule:
     offset;
   - `entities_never_overlap`: hundreds of entities jostling for 400
     ticks, every tick checked;
-  - Tessera's sample families (`Plan`, `LineSet`).
+  - Tessera's sample families (`CityPlan`, `LineSet`).
 - A test by hand is for the one case a generator cannot reach, or a
   behaviour best shown by a single picture.
 - **Three tiers**, each one test program:

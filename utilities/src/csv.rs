@@ -6,108 +6,108 @@
 pub const DIVIDER: &str = "---";
 /// What a line that is not a row starts with: a report's note or
 /// title.
-pub const COMMENT: char = '#';
+pub const COMMENT_MARK: char = '#';
 /// Between fields.
-const SEPARATOR: char = ',';
+const FIELD_SEPARATOR: char = ',';
 /// Around a quoted field.
-const QUOTE: char = '"';
+const QUOTE_MARK: char = '"';
 
 /// A line of CSV text, as read.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Line {
     /// A row: its fields.
-    Row(Vec<String>),
+    TableRow(Vec<String>),
     /// A divider.
     Divider,
-    /// A line starting with [`COMMENT`], without it.
-    Comment(String),
+    /// A line starting with [`COMMENT_MARK`], without it.
+    CommentLine(String),
     /// An empty line.
-    Blank,
+    BlankLine,
 }
 
-/// `field` as CSV: bare, or quoted when it has to be.
-fn field(field: &str) -> String {
-    let quoted = field == DIVIDER
-        || field.starts_with(COMMENT)
-        || field.contains([SEPARATOR, QUOTE, '\n']);
-    if quoted {
-        format!("{QUOTE}{}{QUOTE}", field.replace(QUOTE, &format!("{QUOTE}{QUOTE}")))
+/// `field_text` as CSV: bare, or quoted when it has to be.
+fn field_as_csv(field_text: &str) -> String {
+    let needs_quotes = field_text == DIVIDER
+        || field_text.starts_with(COMMENT_MARK)
+        || field_text.contains([FIELD_SEPARATOR, QUOTE_MARK, '\n']);
+    if needs_quotes {
+        format!("{QUOTE_MARK}{}{QUOTE_MARK}", field_text.replace(QUOTE_MARK, &format!("{QUOTE_MARK}{QUOTE_MARK}")))
     } else {
-        field.to_string()
+        field_text.to_string()
     }
 }
 
-/// `fields` as one CSV row, ended by a newline.
-pub fn row<S: AsRef<str>>(fields: &[S]) -> String {
+/// `row_fields` as one CSV row, ended by a newline.
+pub fn row_text<S: AsRef<str>>(row_fields: &[S]) -> String {
     // A row of one empty field would be a blank line: quoted, it is a row.
-    if matches!(fields, [only] if only.as_ref().is_empty()) {
-        return format!("{QUOTE}{QUOTE}\n");
+    if matches!(row_fields, [only_field] if only_field.as_ref().is_empty()) {
+        return format!("{QUOTE_MARK}{QUOTE_MARK}\n");
     }
-    let fields: Vec<String> = fields.iter().map(|text| field(text.as_ref())).collect();
-    format!("{}\n", fields.join(&SEPARATOR.to_string()))
+    let quoted_fields: Vec<String> = row_fields.iter().map(|raw_field| field_as_csv(raw_field.as_ref())).collect();
+    format!("{}\n", quoted_fields.join(&FIELD_SEPARATOR.to_string()))
 }
 
-/// Every line of `text`: rows, dividers, comments and blanks. A quoted
+/// Every line of `csv_text`: rows, dividers, comments and blanks. A quoted
 /// field may run over several lines.
-pub fn lines(text: &str) -> Vec<Line> {
+pub fn lines(csv_text: &str) -> Vec<Line> {
     let mut lines = Vec::new();
-    let mut chars = text.chars().peekable();
-    while let Some(&first) = chars.peek() {
-        if first == '\n' {
-            chars.next();
-            lines.push(Line::Blank);
+    let mut text_chars = csv_text.chars().peekable();
+    while let Some(&first_char) = text_chars.peek() {
+        if first_char == '\n' {
+            text_chars.next();
+            lines.push(Line::BlankLine);
             continue;
         }
-        if first == COMMENT {
-            chars.next();
-            let comment: String = chars.by_ref().take_while(|&c| c != '\n').collect();
-            lines.push(Line::Comment(comment));
+        if first_char == COMMENT_MARK {
+            text_chars.next();
+            let comment_text: String = text_chars.by_ref().take_while(|&comment_char| comment_char != '\n').collect();
+            lines.push(Line::CommentLine(comment_text));
             continue;
         }
-        let mut fields = vec![String::new()];
-        let mut quoted = false;
-        while let Some(c) = chars.next() {
-            let current = fields.last_mut().expect("a field");
-            match c {
-                QUOTE if quoted && chars.peek() == Some(&QUOTE) => {
-                    chars.next();
-                    current.push(QUOTE);
+        let mut row_fields = vec![String::new()];
+        let mut in_quotes = false;
+        while let Some(next_char) = text_chars.next() {
+            let current_field = row_fields.last_mut().expect("a field");
+            match next_char {
+                QUOTE_MARK if in_quotes && text_chars.peek() == Some(&QUOTE_MARK) => {
+                    text_chars.next();
+                    current_field.push(QUOTE_MARK);
                 }
-                QUOTE => quoted = !quoted,
-                SEPARATOR if !quoted => fields.push(String::new()),
-                '\n' if !quoted => break,
-                c => current.push(c),
+                QUOTE_MARK => in_quotes = !in_quotes,
+                FIELD_SEPARATOR if !in_quotes => row_fields.push(String::new()),
+                '\n' if !in_quotes => break,
+                plain_char => current_field.push(plain_char),
             }
         }
         // A divider is the one bare line that reads as a lone `---`: a field
         // `---` is always quoted.
-        let bare_divider = fields.len() == 1 && fields[0] == DIVIDER;
-        lines.push(if bare_divider { Line::Divider } else { Line::Row(fields) });
+        let bare_divider = row_fields.len() == 1 && row_fields[0] == DIVIDER;
+        lines.push(if bare_divider { Line::Divider } else { Line::TableRow(row_fields) });
     }
     lines
 }
 
 
-/// The rows of `text` alone, each its fields: what a file kept as a
+/// The rows of `csv_text` alone, each its fields: what a file kept as a
 /// plain table is, its notes, blanks and dividers passed over. The
 /// first is the one naming the columns.
-pub fn rows(text: &str) -> Vec<Vec<String>> {
-    lines(text).into_iter().filter_map(|line| if let Line::Row(fields) = line { Some(fields) } else { None }).collect()
+pub fn rows_with_header(csv_text: &str) -> Vec<Vec<String>> {
+    lines(csv_text).into_iter().filter_map(|line| if let Line::TableRow(row_fields) = line { Some(row_fields) } else { None }).collect()
 }
 
-/// The rows of `text` after the one naming its columns.
-pub fn rows_named(text: &str) -> Vec<Vec<String>> {
-    rows(text).into_iter().skip(1).collect()
+/// The rows of `csv_text` after the one naming its columns.
+pub fn rows_named(csv_text: &str) -> Vec<Vec<String>> {
+    rows_with_header(csv_text).into_iter().skip(1).collect()
 }
 
-/// The rows of `text` after the one naming its columns, each its
-/// fields of `columns`, in their order, whatever order the text has
+/// The rows of `csv_text` after the one naming its columns, each its
+/// fields of `wanted_columns`, in their order, whatever order the text has
 /// them in: a column the text lacks, or a field a row lacks, empty.
-pub fn rows_by_column(text: &str, columns: &[&str]) -> Vec<Vec<String>> {
-    let mut rows = rows(text).into_iter();
-    let Some(named) = rows.next() else {
+pub fn rows_by_column(csv_text: &str, wanted_columns: &[&str]) -> Vec<Vec<String>> {
+    let mut remaining_rows = rows_with_header(csv_text).into_iter();
+    let Some(header_row) = remaining_rows.next() else {
         return Vec::new();
     };
-    let at: Vec<Option<usize>> = columns.iter().map(|column| named.iter().position(|name| name.trim() == *column)).collect();
-    rows.map(|row| at.iter().map(|at| at.and_then(|at| row.get(at)).cloned().unwrap_or_default()).collect()).collect()
+    let column_positions: Vec<Option<usize>> = wanted_columns.iter().map(|wanted_column| header_row.iter().position(|header_name| header_name.trim() == *wanted_column)).collect();
+    remaining_rows.map(|data_row| column_positions.iter().map(|column_position| column_position.and_then(|field_position| data_row.get(field_position)).cloned().unwrap_or_default()).collect()).collect()
 }

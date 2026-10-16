@@ -8,9 +8,9 @@
 mod tests;
 
 use tessera::diagnostics::adversarial::worst;
-use tessera::corpus::checkerboards::checkerboards;
-use tessera::corpus::{families, grown, one_laid_out, corpus_seed, HowMany, PLANS, SHAPES};
-use tests::{check, check_turned_bits};
+use tessera::corpus::checkerboards::every_checkerboard;
+use tessera::corpus::{corpus_families, grown_bitmaps, one_laid_out, corpus_seed, HowMany, CITY_PLANS, GROWN_SHAPES};
+use tests::{check_bitmap, check_turned_bits};
 
 /// How far from the measured seeds the second corpus starts.
 const SECOND_SEED_OFFSET: u64 = 1_000_000;
@@ -19,47 +19,47 @@ const SECOND_SEED_OFFSET: u64 = 1_000_000;
 const SECOND_CORPUS_EACH: u64 = 4;
 
 /// Every bitmap of every family, at its `timed` count, passes every check in
-/// `tests::check`: covered, capped, costed as written, and decoded back,
+/// `tests::check_bitmap`: covered, capped, costed as written, and decoded back,
 /// whatever follows its stream.
 #[test]
 #[ignore]
 fn every_family_round_trips() {
-    for (family, maps) in families(HowMany::Timed) {
-        for (case, bitmap) in maps.iter().enumerate() {
-            check(bitmap, &format!("{family}, case {case}"));
+    for (family_name, maps) in corpus_families(HowMany::TimedCount) {
+        for (case_index, bitmap) in maps.iter().enumerate() {
+            check_bitmap(bitmap, &format!("{family_name}, case {case_index}"));
         }
     }
 }
 
 /// A few bitmaps of every shape and plan from seeds the measurements
-/// never use, and each passes every check in `tests::check`: covered,
+/// never use, and each passes every check in `tests::check_bitmap`: covered,
 /// capped, costed as written, and decoded back,
 /// whatever follows its stream.
 #[test]
 #[ignore]
 fn a_second_seed_base_round_trips() {
-    for shape in &SHAPES {
+    for grown_shape in &GROWN_SHAPES {
         let seed = corpus_seed().wrapping_add(SECOND_SEED_OFFSET);
-        for (case, bitmap) in grown(seed, shape.density, shape.cluster, SECOND_CORPUS_EACH).enumerate() {
-            check(&bitmap, &format!("{}, second seed base, case {case}", shape.name));
+        for (case_index, bitmap) in grown_bitmaps(seed, grown_shape.cell_density, grown_shape.cluster_weight, SECOND_CORPUS_EACH).enumerate() {
+            check_bitmap(&bitmap, &format!("{}, second seed base, case {case_index}", grown_shape.display_name));
         }
     }
-    for plan in &PLANS {
+    for city_plan in &CITY_PLANS {
         let seed = corpus_seed().wrapping_add(SECOND_SEED_OFFSET);
-        for case in 0..SECOND_CORPUS_EACH {
-            check(&one_laid_out(seed + case, plan), &format!("{}, second seed base, case {case}", plan.name));
+        for case_index in 0..SECOND_CORPUS_EACH {
+            check_bitmap(&one_laid_out(seed + case_index, city_plan), &format!("{}, second seed base, case {case_index}", city_plan.display_name));
         }
     }
 }
 
 /// Every checkerboard of odd-sided squares passes every check in
-/// `tests::check`: covered, capped, costed as written, and decoded back,
+/// `tests::check_bitmap`: covered, capped, costed as written, and decoded back,
 /// whatever follows its stream.
 #[test]
 #[ignore]
 fn every_checkerboard_round_trips() {
-    for (square_side, bitmap) in checkerboards() {
-        check(&bitmap, &format!("checkerboard of {square_side}x{square_side} squares"));
+    for (square_side, bitmap) in every_checkerboard() {
+        check_bitmap(&bitmap, &format!("checkerboard of {square_side}x{square_side} squares"));
     }
 }
 
@@ -76,7 +76,7 @@ const MOST_TURNED_DRIFT_PERCENT: f64 = 2.0;
 #[test]
 #[ignore]
 fn turned_bitmaps_take_about_as_many_bits() {
-    let mut sets = families(HowMany::Timed);
-    sets.push(("the saved adversarial bitmaps".to_string(), worst::saved().into_iter().map(|(_, bitmap)| bitmap).collect()));
-    check_turned_bits(sets, MOST_TURNED_DRIFT_PERCENT);
+    let mut family_sets = corpus_families(HowMany::TimedCount);
+    family_sets.push(("the saved adversarial bitmaps".to_string(), worst::every_saved().into_iter().map(|(_, bitmap)| bitmap).collect()));
+    check_turned_bits(family_sets, MOST_TURNED_DRIFT_PERCENT);
 }

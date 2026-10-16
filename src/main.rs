@@ -1,9 +1,9 @@
 //! Civil Egregore, from the command line: the one program, built with the
 //! renderer or without it (the `renderer` feature, on by default). It
 //! holds nothing but which crates have commands; the rest is
-//! `utilities::commands`.
+//! `utilities::crate_commands`.
 //!
-//! No arguments, built with the renderer: the window, on its main menu ([`renderer::run`]).
+//! No arguments, built with the renderer: the window, on its main menu ([`renderer::run_window`]).
 //! `cargo run --release -- help`: every command of every crate, what
 //! each takes and what that is if not given.
 //! `cargo run --release -- server run <folder> [ticks]`
@@ -15,15 +15,15 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 use std::process::ExitCode;
-use utilities::commands::{program, Crate};
+use utilities::commands::{run_program, CommandCrate};
 
 /// The crates with commands.
-const CRATES: &[Crate] = &[
-    Crate { name: "server", does: "a world made, run and looked at, and the server's diagnostics tools", commands: &server::commands::COMMANDS },
-    Crate { name: "tessera", does: "Tessera's diagnostics tools", commands: &tessera::diagnostics::tool::COMMANDS },
-    Crate { name: "docs", does: "the docs read against a change", commands: &utilities::stale_docs::COMMANDS },
+const CRATES_WITH_COMMANDS: &[CommandCrate] = &[
+    CommandCrate { crate_name: "server", what_it_does: "a world made, run and looked at, and the server's diagnostics tools", crate_commands: &server::commands::COMMANDS },
+    CommandCrate { crate_name: "tessera", what_it_does: "Tessera's diagnostics tools", crate_commands: &tessera::diagnostics::tool::COMMANDS },
+    CommandCrate { crate_name: "docs", what_it_does: "the docs read against a change", crate_commands: &utilities::stale_docs::COMMANDS },
     #[cfg(feature = "renderer")]
-    Crate { name: "renderer", does: "the renderer's diagnostics tools: what the window draws, with no window", commands: &renderer::diagnostics::tool::COMMANDS },
+    CommandCrate { crate_name: "renderer", what_it_does: "the renderer's diagnostics tools: what the window draws, with no window", crate_commands: &renderer::diagnostics::tool::COMMANDS },
 ];
 
 #[cfg(all(windows, feature = "renderer"))]
@@ -46,20 +46,20 @@ fn leave_the_console() {
 /// run once it closes. Otherwise, hands the command line to the crate
 /// its first word names, or says why not.
 fn main() -> ExitCode {
-    let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
+    let owned_arguments: Vec<String> = std::env::args().skip(1).collect();
+    let command_line_arguments: Vec<&str> = owned_arguments.iter().map(String::as_str).collect();
 
     #[cfg(feature = "renderer")]
-    if arguments.is_empty() {
+    if command_line_arguments.is_empty() {
         leave_the_console();
-        renderer::run();
+        renderer::run_window();
         return ExitCode::SUCCESS;
     }
 
-    match program("Civil_Egregore", CRATES, &arguments) {
+    match run_program("Civil_Egregore", CRATES_WITH_COMMANDS, &command_line_arguments) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(why) => {
-            eprintln!("{why}");
+        Err(failure_reason) => {
+            eprintln!("{failure_reason}");
             ExitCode::FAILURE
         }
     }

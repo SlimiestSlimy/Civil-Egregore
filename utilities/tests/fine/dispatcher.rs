@@ -16,27 +16,27 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 #[test]
 fn every_part_runs_once_a_job() {
     let dispatcher = Dispatcher::new(4);
-    assert_eq!(dispatcher.threads(), 4);
-    let runs: Vec<AtomicUsize> = (0..4).map(|_| AtomicUsize::new(0)).collect();
-    let numbers: Vec<usize> = (0..1000).collect();
-    let sums: Vec<AtomicUsize> = (0..4).map(|_| AtomicUsize::new(0)).collect();
+    assert_eq!(dispatcher.thread_count(), 4);
+    let runs_per_part: Vec<AtomicUsize> = (0..4).map(|_| AtomicUsize::new(0)).collect();
+    let summed_numbers: Vec<usize> = (0..1000).collect();
+    let part_sums: Vec<AtomicUsize> = (0..4).map(|_| AtomicUsize::new(0)).collect();
     for _ in 0..100 {
         dispatcher.run_in_parts(&|part| {
-            runs[part].fetch_add(1, Ordering::Relaxed);
-            let sum: usize = numbers.iter().skip(part).step_by(4).sum();
-            sums[part].store(sum, Ordering::Relaxed);
+            runs_per_part[part].fetch_add(1, Ordering::Relaxed);
+            let part_sum: usize = summed_numbers.iter().skip(part).step_by(4).sum();
+            part_sums[part].store(part_sum, Ordering::Relaxed);
         });
     }
-    assert!(runs.iter().all(|runs| runs.load(Ordering::Relaxed) == 100));
-    assert_eq!(sums.iter().map(|sum| sum.load(Ordering::Relaxed)).sum::<usize>(), numbers.iter().sum());
+    assert!(runs_per_part.iter().all(|part_runs| part_runs.load(Ordering::Relaxed) == 100));
+    assert_eq!(part_sums.iter().map(|stored_sum| stored_sum.load(Ordering::Relaxed)).sum::<usize>(), summed_numbers.iter().sum());
 }
 
 /// One thread is the caller's alone.
 #[test]
 fn one_thread_runs_on_the_caller() {
     let dispatcher = Dispatcher::new(1);
-    let caller = std::thread::current().id();
-    dispatcher.run_in_parts(&|part| assert_eq!((part, std::thread::current().id()), (0, caller)));
+    let caller_thread = std::thread::current().id();
+    dispatcher.run_in_parts(&|part| assert_eq!((part, std::thread::current().id()), (0, caller_thread)));
 }
 
 /// A part's panic on a worker reaches the caller, and the dispatcher
@@ -44,15 +44,15 @@ fn one_thread_runs_on_the_caller() {
 #[test]
 fn a_workers_panic_reaches_the_caller() {
     let dispatcher = Dispatcher::new(3);
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    let run_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         dispatcher.run_in_parts(&|part| assert_ne!(part, 2, "part 2 fails"));
     }));
-    assert!(result.is_err());
-    let ran = AtomicUsize::new(0);
+    assert!(run_result.is_err());
+    let parts_ran = AtomicUsize::new(0);
     dispatcher.run_in_parts(&|_| {
-        ran.fetch_add(1, Ordering::Relaxed);
+        parts_ran.fetch_add(1, Ordering::Relaxed);
     });
-    assert_eq!(ran.load(Ordering::Relaxed), 3);
+    assert_eq!(parts_ran.load(Ordering::Relaxed), 3);
 }
 
 /// Jobs queued are each done once, off the caller's thread while there
@@ -60,18 +60,18 @@ fn a_workers_panic_reaches_the_caller() {
 /// nothing with it.
 #[test]
 fn jobs_queued_are_done_once_each() {
-    for threads in [1, 3] {
-        let dispatcher = Dispatcher::new(threads);
-        let (made, done) = channel();
-        dispatcher.queue(|| panic!("a job of its own failing"));
+    for thread_count in [1, 3] {
+        let dispatcher = Dispatcher::new(thread_count);
+        let (job_sender, job_receiver) = channel();
+        dispatcher.queue_job(|| panic!("a job of its own failing"));
         for job in 0..50u32 {
-            let made = made.clone();
-            dispatcher.queue(move || made.send((job, std::thread::current().id())).expect("the test waiting"));
+            let cloned_sender = job_sender.clone();
+            dispatcher.queue_job(move || cloned_sender.send((job, std::thread::current().id())).expect("the test waiting"));
         }
-        let mut jobs: Vec<(u32, std::thread::ThreadId)> = (0..50).map(|_| done.recv().expect("a job done")).collect();
+        let mut jobs: Vec<(u32, std::thread::ThreadId)> = (0..50).map(|_| job_receiver.recv().expect("a job done")).collect();
         jobs.sort_unstable_by_key(|job| job.0);
-        assert!(jobs.iter().map(|job| job.0).eq(0..50), "{threads} threads");
-        assert!(jobs.iter().all(|job| (job.1 == std::thread::current().id()) == (threads == 1)), "{threads} threads");
+        assert!(jobs.iter().map(|job| job.0).eq(0..50), "{thread_count} threads");
+        assert!(jobs.iter().all(|job| (job.1 == std::thread::current().id()) == (thread_count == 1)), "{thread_count} threads");
     }
 }
 
@@ -80,32 +80,32 @@ fn jobs_queued_are_done_once_each() {
 #[test]
 fn a_worker_busy_with_a_queued_job_sits_a_run_out() {
     let dispatcher = Dispatcher::new(3);
-    let (begun_by, begun) = channel();
-    let (release, released) = channel::<()>();
-    let released = std::sync::Mutex::new(released);
-    let released = std::sync::Arc::new(released);
+    let (begun_by, begun_receiver) = channel();
+    let (release_sender, release_receiver) = channel::<()>();
+    let locked_release = std::sync::Mutex::new(release_receiver);
+    let shared_release = std::sync::Arc::new(locked_release);
     for _ in 0..2 {
-        let (begun_by, released) = (begun_by.clone(), std::sync::Arc::clone(&released));
-        dispatcher.queue(move || {
+        let (begun_by, job_release) = (begun_by.clone(), std::sync::Arc::clone(&shared_release));
+        dispatcher.queue_job(move || {
             begun_by.send(()).expect("the test waiting");
-            let _ = released.lock().expect("the release").recv();
+            let _ = job_release.lock().expect("the release").recv();
         });
     }
     // One job holds the release, the other waits on its lock: both workers busy.
-    begun.recv().expect("one begun");
-    begun.recv().expect("the other begun");
-    let ran = AtomicUsize::new(0);
+    begun_receiver.recv().expect("one begun");
+    begun_receiver.recv().expect("the other begun");
+    let busy_parts_ran = AtomicUsize::new(0);
     dispatcher.run_in_parts(&|part| {
         assert_eq!(part, 0, "only the caller is free");
-        ran.fetch_add(1, Ordering::Relaxed);
+        busy_parts_ran.fetch_add(1, Ordering::Relaxed);
     });
-    assert_eq!(ran.load(Ordering::Relaxed), 1);
-    drop(release);
+    assert_eq!(busy_parts_ran.load(Ordering::Relaxed), 1);
+    drop(release_sender);
     // Free again, every part is run: a worker still finishing may sit one more out.
-    let ran = AtomicUsize::new(0);
-    while ran.swap(0, Ordering::Relaxed) != 3 {
+    let free_parts_ran = AtomicUsize::new(0);
+    while free_parts_ran.swap(0, Ordering::Relaxed) != 3 {
         dispatcher.run_in_parts(&|_| {
-            ran.fetch_add(1, Ordering::Relaxed);
+            free_parts_ran.fetch_add(1, Ordering::Relaxed);
         });
     }
 }
@@ -116,18 +116,18 @@ fn a_worker_busy_with_a_queued_job_sits_a_run_out() {
 #[test]
 fn jobs_run_from_several_threads_are_each_whole() {
     let dispatcher = Dispatcher::new(4);
-    std::thread::scope(|scope| {
-        for caller in 0..4usize {
+    std::thread::scope(|thread_scope| {
+        for caller_number in 0..4usize {
             let dispatcher = &dispatcher;
-            scope.spawn(move || {
-                for run in 0..500 {
+            thread_scope.spawn(move || {
+                for run_number in 0..500 {
                     // What this run alone holds: a part that ran after it returned, or another run's, would be seen.
                     let parts: Vec<AtomicUsize> = (0..4).map(|_| AtomicUsize::new(0)).collect();
                     dispatcher.run_in_parts(&|part| {
                         parts[part].fetch_add(1, Ordering::Relaxed);
                     });
-                    let ran: Vec<usize> = parts.iter().map(|part| part.load(Ordering::Relaxed)).collect();
-                    assert!(ran[0] == 1 && ran.iter().all(|&ran| ran <= 1), "caller {caller}, run {run}: {ran:?}");
+                    let part_runs: Vec<usize> = parts.iter().map(|part| part.load(Ordering::Relaxed)).collect();
+                    assert!(part_runs[0] == 1 && part_runs.iter().all(|&part_ran| part_ran <= 1), "caller {caller_number}, run {run_number}: {part_runs:?}");
                 }
             });
         }
@@ -139,16 +139,16 @@ fn jobs_run_from_several_threads_are_each_whole() {
 #[test]
 fn a_queued_job_runs_a_job() {
     let dispatcher = std::sync::Arc::new(Dispatcher::new(4));
-    let (done, said) = channel();
-    let within = std::sync::Arc::clone(&dispatcher);
-    dispatcher.queue(move || {
+    let (result_sender, result_receiver) = channel();
+    let inner_dispatcher = std::sync::Arc::clone(&dispatcher);
+    dispatcher.queue_job(move || {
         let parts = AtomicUsize::new(0);
-        within.run_in_parts(&|_| {
+        inner_dispatcher.run_in_parts(&|_| {
             parts.fetch_add(1, Ordering::Relaxed);
         });
         // Leaves the worker without the dispatcher: the test's is the last let go of.
-        done.send((parts.load(Ordering::Relaxed), within)).expect("the test waits");
+        result_sender.send((parts.load(Ordering::Relaxed), inner_dispatcher)).expect("the test waits");
     });
-    let (parts, _within) = said.recv_timeout(std::time::Duration::from_secs(30)).expect("the queued job's run to end");
+    let (parts, _within) = result_receiver.recv_timeout(std::time::Duration::from_secs(30)).expect("the queued job's run to end");
     assert!((1..=4).contains(&parts), "{parts} parts");
 }

@@ -3,7 +3,7 @@
 
 use super::Turn;
 use entity_manager::{EntityRef, SuperchunkEntities};
-use bitplane_manager::Reader;
+use bitplane_manager::CellReader;
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, ChunkIndex};
 
@@ -12,23 +12,23 @@ impl<'a> Turn<'a> {
     /// them, in Morton order by cell -- the order their buckets hold
     /// them in. Each that is to wake
     /// again must be put back with a later wake tick.
-    pub fn woken(&self) -> impl Iterator<Item = EntityRef<'a>> + 'a {
-        let entities: &'a SuperchunkEntities = self.entities;
-        entities.woken(self.now)
+    pub fn woken_entities(&self) -> impl Iterator<Item = EntityRef<'a>> + 'a {
+        let superchunk_entities: &'a SuperchunkEntities = self.superchunk_entities;
+        superchunk_entities.woken_entities(self.current_tick)
     }
 
-    /// [`Turn::woken`], for a rule that reads the cells of
+    /// [`Turn::woken_entities`], for a rule that reads the cells of
     /// `layers` about each entity woken: they are asked of memory a few
     /// wakes ahead.
     pub fn woken_reading<const N: usize>(&self, layers: [LayerType; N]) -> impl Iterator<Item = EntityRef<'a>> + 'a {
-        let (entities, reader): (&'a SuperchunkEntities, &'a Reader<'a>) = (self.entities, self.reader);
-        entities.woken_prefetching(self.now, move |cell| layers.iter().for_each(|&layer_type| reader.prefetch(layer_type, cell)))
+        let (superchunk_entities, bitmap_reader): (&'a SuperchunkEntities, &'a CellReader<'a>) = (self.superchunk_entities, self.bitmap_reader);
+        superchunk_entities.woken_prefetching(self.current_tick, move |cell| layers.iter().for_each(|&layer_type| bitmap_reader.prefetch_cell(layer_type, cell)))
     }
 
-    /// The entity standing on `at` -- in any hot superchunk -- as the
+    /// The entity standing on `named_cell` -- in any hot superchunk -- as the
     /// tick found it: the cell is its name for the tick.
-    pub fn entity_on(&self, at: CellIndex) -> Option<EntityRef<'a>> {
-        self.entity_reader.get(at)
+    pub fn entity_on(&self, named_cell: CellIndex) -> Option<EntityRef<'a>> {
+        self.entity_reader.get(named_cell)
     }
 
     /// The entities on `chunk` -- in any hot superchunk -- as the tick

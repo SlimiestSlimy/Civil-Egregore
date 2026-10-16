@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 /// Up to `N` items, in the order pushed.
 pub struct FixedList<T, const N: usize> {
     /// Room for all `N`; only the first `len` are in the list.
-    items: Box<[T; N]>,
+    item_storage: Box<[T; N]>,
     /// How many are in the list.
     len: usize,
 }
@@ -16,7 +16,7 @@ pub struct FixedList<T, const N: usize> {
 impl<T: Copy + Default, const N: usize> FixedList<T, N> {
     /// An empty list, all its room allocated.
     pub fn new() -> Self {
-        Self { items: Box::new([T::default(); N]), len: 0 }
+        Self { item_storage: Box::new([T::default(); N]), len: 0 }
     }
 
     /// Empties the list, keeping its room.
@@ -24,17 +24,17 @@ impl<T: Copy + Default, const N: usize> FixedList<T, N> {
         self.len = 0;
     }
 
-    /// Adds `item` at the end.
-    pub fn push(&mut self, item: T) {
+    /// Adds `pushed_item` at the end.
+    pub fn push(&mut self, pushed_item: T) {
         assert!(self.len < N, "a fixed list of {N} overflowed: its bound is wrong");
-        self.items[self.len] = item;
+        self.item_storage[self.len] = pushed_item;
         self.len += 1;
     }
 
     /// Takes the last item off, if any.
     pub fn pop(&mut self) -> Option<T> {
         self.len = self.len.checked_sub(1)?;
-        Some(self.items[self.len])
+        Some(self.item_storage[self.len])
     }
 }
 
@@ -50,14 +50,14 @@ impl<T, const N: usize> Deref for FixedList<T, N> {
 
     /// The items in the list.
     fn deref(&self) -> &[T] {
-        &self.items[..self.len]
+        &self.item_storage[..self.len]
     }
 }
 
 impl<T, const N: usize> DerefMut for FixedList<T, N> {
     /// The items in the list, to change or reorder.
     fn deref_mut(&mut self) -> &mut [T] {
-        &mut self.items[..self.len]
+        &mut self.item_storage[..self.len]
     }
 }
 

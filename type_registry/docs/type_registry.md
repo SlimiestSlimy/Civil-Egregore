@@ -5,14 +5,14 @@ cells, a wide plane, a type of entity, an attribute an entity carries,
 a rule of the cells, a rule of an entity.
 This crate is where they are all written down, once: one table,
 `REGISTRY`, a row a type -- its name, its registration, its number and its width --
-and the types the IDs are of (`LayerType`, `Wide`, `EntityType`,
+and the types the IDs are of (`LayerType`, `WidePlane`, `EntityType`,
 `AttributeType`, `ScaRuleType`, `EntityRuleType`). Function by function: `reference.md`.
 
 ## The bytes of an ID
 
 **The first byte of a type ID is the kind of the type ID.** Every ID
 has its kind first, and the kind says how the rest is laid out and
-what a type of it registers (`Kind`). What a row registers is its
+what a type of it registers (`TypeKind`). What a row registers is its
 **registration** (`Registration`), which also tells a layer from a
 wide plane -- two registrations under one kind, as both are planes of
 the cells. A plane's, an entity type's
@@ -20,8 +20,8 @@ and a rule's:
 
 | byte | holds |
 |---|---|
-| the first (the highest) | its **kind** (`Kind`): `0x00` an attribute, `0x01` a layer or a wide plane, `0x02` an entity type, `0x03` a rule of the cells, `0x04` a rule of an entity |
-| the six between | its **number**: what its row in the registry is written with (`NUMBERS`, how many there are) |
+| the first (the highest) | its **kind** (`TypeKind`): `0x00` an attribute, `0x01` a layer or a wide plane, `0x02` an entity type, `0x03` a rule of the cells, `0x04` a rule of an entity |
+| the six between | its **number**: what its row in the registry is written with (`TYPE_ID_NUMBERS`, how many there are) |
 | the last (the lowest) | its **size**: of a plane, bits a cell -- 1, 2, 4, 8, 16 or 32 -- in its low six bits and its tile size, as a scale, in the two above ("Tile size"); 0 of an entity type and of a rule, which hold nothing |
 
 An attribute's, under the same first byte: its **number** in the 52
@@ -65,7 +65,7 @@ rule of the cells, the stochastic cell automaton's (`ScaRuleType`,
 `Registration::ScaRule`), or a rule of an entity (`EntityRuleType`,
 `Registration::EntityRule`).
 
-**Every rule has one master** (`Registered::master`, its number): the
+**Every rule has one master** (`RegistryRow::master`, its number): the
 one plane a rule of the cells is of, the one type of entity an
 entity's rule is of -- whatever else the rule reads or writes. The
 grass's rule reads and writes other planes and its master is the
@@ -101,11 +101,11 @@ under their own names, as what a layer and an entity are made of.
 A layer is a bit a cell: width 1. A wide plane is 2, 4, 8 or 16, and
 takes as many numbers. Hot, one bucket holds each cell's whole number.
 Cold, it is as many layers of a bit a cell, the bit `b` of every cell
-the layer of number `first + b` (`LayerType::plane`): storage and the
+the layer of number `first + b` (`LayerType::bitplane_of`): storage and the
 codec know bitmaps only. A plane keeps how wide it is in the type
 itself -- its bits a cell, in the ID's last byte ("The bytes of an
-ID"), beside its tile size ("Tile size") -- so `bits` is read off the ID with no table; the
-width as a type (`Width::BITS`) is the same number known as the code
+ID"), beside its tile size ("Tile size") -- so `width_bits` is read off the ID with no table; the
+width as a type (`Width::BITS_A_CELL`) is the same number known as the code
 is built. An attribute's width is its data's bits, 448 in a block of
 its own ("Layouts"). An entity type holds nothing itself, nor does a
 rule: 0.
@@ -123,8 +123,8 @@ to the next and sixty-four times fewer numbers are kept and worked on.
 The tile size is in the type, beside the width: the last byte of a
 plane's ID is its bits a cell in its low six bits and its tile's
 scale in the three above (`LayerType::of_tiles`, `tile_scale`,
-`tile_side`; `Wide::of_tiles`), and a plane's row says it too
-(`Registered::tile_scale`). So nothing that keeps, sends or draws a
+`tile_side`; `WidePlane::of_tiles`), and a plane's row says it too
+(`RegistryRow::tile_scale`). So nothing that keeps, sends or draws a
 plane is told its tile size by hand: the arena sizes its buckets from
 the type, the frame a client is sent says how the clouds are laid out
 from `CLOUD`'s type, and a plane of another tile size registered
@@ -148,7 +148,7 @@ its width, so an attribute is read as its fields and one layout is
 never read as another.
 
 A layout (`Layout`) says how many words of data it holds (`WORDS`;
-`BLOCKS`, the blocks that takes with its type before it, 16 at the
+`BLOCK_COUNT`, the blocks that takes with its type before it, 16 at the
 most: `ATTRIBUTE_BLOCKS_MOST`, `ATTRIBUTE_WORDS_MOST`, `BLOCK_BYTES`)
 and how its fields lie in those words (`write`, `read`; `data_words`,
 how many words so many blocks hold: all but the type): words, not a
@@ -157,7 +157,7 @@ machine's bytes, so the same on any machine.
 **Its members** (`MEMBERS`, each a `Member`): every field by where
 its bytes lie -- its first byte, counted from the attribute's first,
 and how many it is, 1 to 8, within one word (`Member::word`, a whole
-word of the data; `Member::within`, some bytes of one; `Member::value_in`,
+word of the data; `Member::within_word`, some bytes of one; `Member::value_in`,
 what it holds in the data). This is what an instruction is given to
 write a field: the layout is its definer's, and the simulation is
 told bytes (`../../simulation/docs/simulation.md`, "Instructions").
@@ -172,7 +172,7 @@ what only some entities of a kind carry and is big enough to be worth
 a block.
 
 **An entity type may register a default attribute**
-(`Registered::default_attribute`, given a row by `with_default`): the
+(`RegistryRow::default_attribute`, given a row by `with_default`): the
 one attribute every entity of the type has for as long as it is. It
 has to be of a fixed size -- only an attribute with a layout can be
 given, and the build fails, naming the type, if a row's default is no
@@ -183,19 +183,19 @@ need not say what it is, so the eight bytes of its type at its
 beginning can go. The sheep's is its state (`default_attribute_of`).
 The entities' store keeps it so (`default_of`: its type and the words
 of its data, from a few rows worked out as the crate is built,
-`DEFAULTS`; `../../entity_manager/docs/entity_manager.md`, "The
+`DEFAULT_ATTRIBUTES`; `../../entity_manager/docs/entity_manager.md`, "The
 default attribute"). An attribute's row says the bits of its data
 exactly, its layout's words, for that.
 
 **What an attribute's type registers**: its name, its registration, whether
-its size varies (`Registered::varies_in_size`), and its size if it
+its size varies (`RegistryRow::varies_in_size`), and its size if it
 does not. **The ID's last four bits are the length**
-(`AttributeType::of_blocks`, `blocks`): of a fixed type its size, set
+(`AttributeType::of_blocks`, `block_count`): of a fixed type its size, set
 as it is registered. A type whose size varies is registered with them
 0 (`of_varying_size`), and each attribute of it says its own length
 there (`with_blocks`): so the first word of any attribute says how
 long it is, with no table, and what tells one type from another is
-all but those bits (`identity`). **An ID of another kind is no
+all but those bits (`type_identity`). **An ID of another kind is no
 attribute's** (`is_an_attributes`), nor is one whose number is 0 --
 the namespace is one, everything's, so a layer's or an entity type's
 ID read as an attribute's says so itself. A row is written with the
@@ -210,23 +210,23 @@ weather's rule that reads them and whatever shows them:
 **`Climate`**, a byte each -- its `humidity` the lowest (0 to
 `MOST_HUMID`, 255; its sixteenths, `humidity_level`, are the level of
 cloud it stands for, `HUMIDITY_A_LEVEL_OF_CLOUD`), then its `wind`,
-its `temperature` (0 to `HOTTEST`) and, the highest, its `pressure`
+its `temperature` (0 to `HOTTEST_TEMPERATURE`) and, the highest, its `pressure`
 (0 to `HIGHEST_PRESSURE`, `PRESSURE_AT_REST`, 128, where no wind has
 pushed air in or out). `of_number` and `number` turn the plane's
 number into it and back. One plane, one read, for all four.
 
 A **`Wind`** is a vector in its byte, a nibble each: how strongly it
-blows east (`across`) and south (`down`), under 0 west and north --
+blows east (`blows_east`) and south (`blows_south`), under 0 west and north --
 where it blows towards. The vector is no longer than 7
 (`STRONGEST_WIND`) whichever way it points: a circle, not a square,
 so a wind between two of the eight ways blows no stronger than one
 along a way -- each part from -7 to 7 alone let a diagonal carry half
 as far again. So it blows any of eight ways or between them, at many
 strengths, and two winds are averaged by their numbers.
-`blowing(across, down)` makes one, a longer vector shortened to the
+`from_vector(blows_east, blows_south)` makes one, a longer vector shortened to the
 circle the way it points, to the nearest whole numbers
-(`held_to_the_circle`, by `nearest_root`); `state` is its byte,
-`vector` its two numbers, `strength` its length, to the nearest whole
+(`held_to_the_circle`, by `nearest_root`); `state_byte` is its byte,
+`east_south_vector` its two numbers, `wind_strength` its length, to the nearest whole
 number.
 
 **The small functions the four are connected by** are here too, each
@@ -237,20 +237,20 @@ doing one thing, the weather's rule putting them together
   tiles about it (`TILES_ABOUT`) a wind reaches this time, a step
   each way as likely as it is strong that way -- none if it reaches
   none;
-- `Wind::pushed(across, down)`: a push added to a wind, what air
+- `Wind::pushed_by(push_east, push_south)`: a push added to a wind, what air
   leaving a tile does to the wind over it;
-- `Wind::a_step_towards(other)`: a wind a step nearer another, each
+- `Wind::a_step_towards(other_wind)`: a wind a step nearer another, each
   of its numbers by one -- two vectors averaged a little at a time,
   so winds that differ wear each other down;
-- `nearer(from, to, step)`: a number carried a step towards another,
+- `nearer_by_step(from_value, to_value, step)`: a number carried a step towards another,
   never past it -- `Climate::with_humidity_carried_from`,
   `with_temperature_carried_from` (`DEGREES_A_WIND_CARRIES`, 4) and
   `with_wind_carried_from` are a climate with one of its three so
   carried;
-- `pressure_falls_by(here, there)`: how strongly pressure falls to a
+- `pressure_falls_by(pressure_here, pressure_there)`: how strongly pressure falls to a
   tile, by how far that one is under it and not at all within
   `PRESSURE_GAP_AT_REST` (1);
-- `passes_a_slope(slope, whole)`: the parts of the air that go over
+- `passes_a_slope(height_rise, whole_parts)`: the parts of the air that go over
   a slope -- all of it down a fall of `FALL_THAT_FREES` (8 heights) or
   more, a little less on the level, and less the steeper the rise,
   mildly: half where the land holds it as by `RISE_THAT_HALVES` (64

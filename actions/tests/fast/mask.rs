@@ -5,40 +5,40 @@
 //!
 //! `cargo test --test fast`
 
-use crate::tests::{cell, STONE};
+use crate::tests::{cell, STONE_LAYER};
 use bitplane_manager::BitmapArena;
 use coordinates::SuperchunkIndex;
-use entity_manager::Entities;
-use actions::mask::{self, Mask, SIDES};
+use entity_manager::WorldEntities;
+use actions::mask::{self, Mask, MASK_SIDES};
 use simulation::Simulation;
-use utilities::rng::Rng;
+use utilities::rng::RandomSource;
 
 /// An arena with `STONE` hot over the 3x3 superchunks from `(10, 10)`,
 /// cells scattered over them set, some on their borders.
-fn arena() -> BitmapArena {
-    let mut random = utilities::rng::Rng::new(utilities::seed::counted());
-    crate::tests::arena(3, (0..200_000).map(move |_| cell(random.below(3072) as u32, random.below(3072) as u32)))
+fn scattered_stone_arena() -> BitmapArena {
+    let mut seeded_random = utilities::rng::RandomSource::new(utilities::seed::counted_seed());
+    crate::tests::stone_arena(3, (0..200_000).map(move |_| cell(seeded_random.draw_below(3072) as u32, seeded_random.draw_below(3072) as u32)))
 }
 
 /// A mask's own cells: full, a disc, and those drawn and listed are
 /// the ones set.
 #[test]
 fn a_mask_holds_its_cells() {
-    let mut random = Rng::new(utilities::seed::counted());
-    for side in SIDES {
-        let (full, disc) = (Mask::full(side), Mask::disc(side));
-        assert_eq!((full.count(), Mask::empty(side).count()), (side * side, 0));
+    let mut seeded_random = RandomSource::new(utilities::seed::counted_seed());
+    for mask_side in MASK_SIDES {
+        let (full_mask, disc_mask) = (Mask::all_set(mask_side), Mask::filling_disc(mask_side));
+        assert_eq!((full_mask.count(), Mask::all_clear(mask_side).count()), (mask_side * mask_side, 0));
         // A disc is its square's, less the corners, and the same turned over.
-        assert!(disc.count() < full.count() && disc.count() > full.count() / 2, "a disc of {side}");
-        assert!(disc.cells().all(|(x, y)| disc.get(side - 1 - x, y) && disc.get(y, x)));
-        assert_eq!(disc.cells().count() as u32, disc.count());
-        let (x, y) = disc.pick(&mut random).expect("a cell");
-        assert!(disc.get(x, y));
-        let mut ring = full.clone();
-        ring.and_not(&disc);
-        assert_eq!(ring.count(), full.count() - disc.count());
-        ring.and(&disc);
-        assert!(ring.is_empty() && ring.pick(&mut random).is_none());
+        assert!(disc_mask.count() < full_mask.count() && disc_mask.count() > full_mask.count() / 2, "a disc of {mask_side}");
+        assert!(disc_mask.cells().all(|(x, y)| disc_mask.get(mask_side - 1 - x, y) && disc_mask.get(y, x)));
+        assert_eq!(disc_mask.cells().count() as u32, disc_mask.count());
+        let (x, y) = disc_mask.pick_set_cell(&mut seeded_random).expect("a cell");
+        assert!(disc_mask.get(x, y));
+        let mut ring_mask = full_mask.clone();
+        ring_mask.and_not(&disc_mask);
+        assert_eq!(ring_mask.count(), full_mask.count() - disc_mask.count());
+        ring_mask.and_with(&disc_mask);
+        assert!(ring_mask.is_empty() && ring_mask.pick_set_cell(&mut seeded_random).is_none());
     }
 }
 
@@ -48,33 +48,33 @@ fn a_mask_holds_its_cells() {
 /// and a layer holds under a mask if it holds at any cell of it.
 #[test]
 fn a_tile_read_is_its_cells_read_one_by_one() {
-    let mut arena = arena();
+    let mut bitmap_arena = scattered_stone_arena();
     let origins = [(300, 300), (1000, 1000), (2047, 5), (2900, 2900), (0, 1500)];
-    Simulation::new(1).tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
+    Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), utilities::seed::counted_seed(), |turn| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }
-        for side in [4, 8, 16, 64, 256, 512] {
-            let (mut set, mut hot, disc) = (Mask::empty(side), Mask::empty(side), Mask::disc(side));
-            let (mut set_under, mut hot_under) = (Mask::empty(side), Mask::empty(side));
+        for mask_side in [4, 8, 16, 64, 256, 512] {
+            let (mut set_mask, mut hot, disc_mask) = (Mask::all_clear(mask_side), Mask::all_clear(mask_side), Mask::filling_disc(mask_side));
+            let (mut set_under, mut hot_under) = (Mask::all_clear(mask_side), Mask::all_clear(mask_side));
             for (x, y) in origins {
-                let (at, first) = (cell(x, y), mask::tile(cell(x, y), side));
-                assert_eq!((first.cartesian().x % side, first.cartesian().y % side, mask::tile(first, side)), (0, 0, first), "a tile is aligned");
-                mask::read_layer(turn, STONE, at, &mut set, &mut hot);
-                mask::layer_under(turn, STONE, at, &disc, &mut set_under, &mut hot_under);
-                for (across, down) in (0..side).flat_map(|down| (0..side).map(move |across| (across, down))) {
-                    let held = turn.holds(STONE, mask::cell(first, across, down));
-                    assert_eq!((hot.get(across, down), set.get(across, down)), (held.is_ok(), held == Ok(true)), "({across}, {down}) of {side} from ({x}, {y})");
+                let (origin_cell, tile_first_cell) = (cell(x, y), mask::tile(cell(x, y), mask_side));
+                assert_eq!((tile_first_cell.cartesian().x % mask_side, tile_first_cell.cartesian().y % mask_side, mask::tile(tile_first_cell, mask_side)), (0, 0, tile_first_cell), "a tile is aligned");
+                mask::read_layer(turn, STONE_LAYER, origin_cell, &mut set_mask, &mut hot);
+                mask::layer_under(turn, STONE_LAYER, origin_cell, &disc_mask, &mut set_under, &mut hot_under);
+                for (across_in_tile, down_in_tile) in (0..mask_side).flat_map(|row_down| (0..mask_side).map(move |column_across| (column_across, row_down))) {
+                    let cell_holds = turn.layer_holds(STONE_LAYER, mask::cell(tile_first_cell, across_in_tile, down_in_tile));
+                    assert_eq!((hot.get(across_in_tile, down_in_tile), set_mask.get(across_in_tile, down_in_tile)), (cell_holds.is_ok(), cell_holds == Ok(true)), "({across_in_tile}, {down_in_tile}) of {mask_side} from ({x}, {y})");
                 }
-                set.and(&disc);
-                hot.and(&disc);
-                assert_eq!((&set_under, &hot_under), (&set, &hot), "{side} from ({x}, {y}), under a disc");
-                assert_eq!(mask::any_under(turn, STONE, at, &disc), !set.is_empty(), "{side} from ({x}, {y}): any under a disc");
+                set_mask.and_with(&disc_mask);
+                hot.and_with(&disc_mask);
+                assert_eq!((&set_under, &hot_under), (&set_mask, &hot), "{mask_side} from ({x}, {y}), under a disc");
+                assert_eq!(mask::any_under(turn, STONE_LAYER, origin_cell, &disc_mask), !set_mask.is_empty(), "{mask_side} from ({x}, {y}): any under a disc");
                 // Under one cell of it: whether that cell is held.
-                if let Some((across, down)) = disc.pick(turn.random()) {
-                    let mut one = Mask::empty(side);
-                    one.set(across, down, true);
-                    assert_eq!(mask::any_under(turn, STONE, at, &one), set.get(across, down), "{side} from ({x}, {y}): under ({across}, {down})");
+                if let Some((picked_across, picked_down)) = disc_mask.pick_set_cell(turn.random_stream()) {
+                    let mut one_cell_mask = Mask::all_clear(mask_side);
+                    one_cell_mask.set(picked_across, picked_down, true);
+                    assert_eq!(mask::any_under(turn, STONE_LAYER, origin_cell, &one_cell_mask), set_mask.get(picked_across, picked_down), "{mask_side} from ({x}, {y}): under ({picked_across}, {picked_down})");
                 }
             }
         }
@@ -86,36 +86,36 @@ fn a_tile_read_is_its_cells_read_one_by_one() {
 /// otherwise, the rest left as they were, no cell written twice.
 #[test]
 fn a_mask_written_is_read_back() {
-    for side in [4, 64, 1024] {
-        let mut arena = arena();
-        let (origin, disc) = (cell(700, 900), Mask::disc(side));
-        let before = std::sync::Mutex::new((Mask::empty(side), Mask::empty(side)));
-        let mut simulation = Simulation::new(2);
-        let writes = simulation.tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
+    for mask_side in [4, 64, 1024] {
+        let mut bitmap_arena = scattered_stone_arena();
+        let (origin, disc_mask) = (cell(700, 900), Mask::filling_disc(mask_side));
+        let masks_before = std::sync::Mutex::new((Mask::all_clear(mask_side), Mask::all_clear(mask_side)));
+        let mut test_simulation = Simulation::new(2);
+        let writes = test_simulation.tick(&mut bitmap_arena, &mut WorldEntities::new(), utilities::seed::counted_seed(), |turn| {
             if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
                 return 0;
             }
-            let mut before = before.lock().unwrap();
-            let (set, hot) = &mut *before;
-            mask::read_layer(turn, STONE, origin, set, hot);
+            let mut masks_before_guard = masks_before.lock().unwrap();
+            let (set_mask_before, hot) = &mut *masks_before_guard;
+            mask::read_layer(turn, STONE_LAYER, origin, set_mask_before, hot);
             // The disc cleared where set, and a square in its middle set where clear: each cell written once, from what was seen.
-            let mut middle = Mask::empty(side);
-            (side / 4..side / 2).flat_map(|y| (side / 4..side / 2).map(move |x| (x, y))).for_each(|(x, y)| middle.set(x, y, true));
-            mask::clear_under(turn, STONE, origin, &disc) + mask::set_under(turn, STONE, origin, &middle)
+            let mut middle_mask = Mask::all_clear(mask_side);
+            (mask_side / 4..mask_side / 2).flat_map(|y| (mask_side / 4..mask_side / 2).map(move |x| (x, y))).for_each(|(x, y)| middle_mask.set(x, y, true));
+            mask::clear_under(turn, STONE_LAYER, origin, &disc_mask) + mask::set_under(turn, STONE_LAYER, origin, &middle_mask)
         });
-        assert_eq!((writes.writes_applied.missed, writes.writes_applied.refused), (0, 0));
-        assert_eq!(writes.writes_applied.changed, writes.rules as u64, "every write queued changes its cell");
-        simulation.tick(&mut arena, &mut Entities::new(), utilities::seed::counted(), |turn| {
+        assert_eq!((writes.writes_applied.missed, writes.writes_applied.writes_refused), (0, 0));
+        assert_eq!(writes.writes_applied.cells_changed, writes.rules as u64, "every write queued changes its cell");
+        test_simulation.tick(&mut bitmap_arena, &mut WorldEntities::new(), utilities::seed::counted_seed(), |turn| {
             if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
                 return 0;
             }
-            let (mut set, mut hot) = (Mask::empty(side), Mask::empty(side));
-            mask::read_layer(turn, STONE, origin, &mut set, &mut hot);
-            let before = &before.lock().unwrap().0;
-            for (x, y) in (0..side).flat_map(|y| (0..side).map(move |x| (x, y))) {
-                let middle = (side / 4..side / 2).contains(&x) && (side / 4..side / 2).contains(&y);
-                let expected = if middle { !before.get(x, y) } else { !disc.get(x, y) && before.get(x, y) };
-                assert_eq!(set.get(x, y), expected, "({x}, {y}) of {side}");
+            let (mut set_mask_after, mut hot) = (Mask::all_clear(mask_side), Mask::all_clear(mask_side));
+            mask::read_layer(turn, STONE_LAYER, origin, &mut set_mask_after, &mut hot);
+            let set_before = &masks_before.lock().unwrap().0;
+            for (x, y) in (0..mask_side).flat_map(|y| (0..mask_side).map(move |x| (x, y))) {
+                let in_middle = (mask_side / 4..mask_side / 2).contains(&x) && (mask_side / 4..mask_side / 2).contains(&y);
+                let expected_set = if in_middle { !set_before.get(x, y) } else { !disc_mask.get(x, y) && set_before.get(x, y) };
+                assert_eq!(set_mask_after.get(x, y), expected_set, "({x}, {y}) of {mask_side}");
             }
             0
         });

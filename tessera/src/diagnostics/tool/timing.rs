@@ -6,8 +6,8 @@ use crate::diagnostics::adversarial::worst;
 use crate::diagnostics::examination::first_difference;
 use crate::BitStream;
 use crate::Tessera;
-use crate::corpus::{families, HowMany};
-use utilities::commands::Given;
+use crate::corpus::{corpus_families, HowMany};
+use utilities::commands::GivenCommand;
 use utilities::diagnostics::table::report::Report;
 use utilities::diagnostics::table::Table;
 use bitmap::Bitmap;
@@ -28,76 +28,76 @@ pub const PER_GENERATOR: &str = "bitmaps a generator";
 
 /// Builds the corpus, times encoding every bitmap of it once, then
 /// decoding, and reports both a family at a time.
-pub fn run(report: &mut Report, given: &Given) -> Result<(), String> {
-    let per_generator: u64 = given.number(PER_GENERATOR)?;
-    let families = families(HowMany::Each(per_generator));
+pub fn run_timing_tool(report: &mut Report, given_parameters: &GivenCommand) -> Result<(), String> {
+    let per_generator: u64 = given_parameters.argument_number(PER_GENERATOR)?;
+    let timed_families = corpus_families(HowMany::SameCountEach(per_generator));
 
-    let (mut tessera, mut stream, mut back) = (Tessera::new(), BitStream::default(), Bitmap::new());
+    let (mut tessera, mut stream, mut decoded_bitmap) = (Tessera::new(), BitStream::default(), Bitmap::new());
     // One encode first, so the first timed one pays for nothing extra.
-    tessera.encode(&families[0].1[0], &mut stream);
+    tessera.encode(&timed_families[0].1[0], &mut stream);
 
-    let tail = format!("p{TAIL_PERCENT} us");
-    let mut table = Table::new(&["family", "bitmaps", "mean us", "median us", &tail, "max us", "decode us"]);
+    let tail_heading = format!("p{TAIL_PERCENT} us");
+    let mut table = Table::new(&["family", "bitmaps", "mean us", "median us", &tail_heading, "max us", "decode us"]);
     let (mut every_encode, mut every_decode) = (Vec::new(), Vec::new());
-    for (name, bitmaps) in &families {
-        let (mut encodes, decodes) = time(&mut tessera, &mut stream, &mut back, name, bitmaps);
-        table.row(&row(name, &mut encodes, &decodes));
-        every_encode.extend(encodes);
-        every_decode.extend(decodes);
+    for (family_name, bitmaps) in &timed_families {
+        let (mut encode_times, decode_times) = time_family(&mut tessera, &mut stream, &mut decoded_bitmap, family_name, bitmaps);
+        table.add_row(&timing_row(family_name, &mut encode_times, &decode_times));
+        every_encode.extend(encode_times);
+        every_decode.extend(decode_times);
     }
     table.divider();
-    table.row(&row("all", &mut every_encode, &every_decode));
+    table.add_row(&timing_row("all", &mut every_encode, &every_decode));
 
     // The saved adversarial bitmaps, apart from the corpus: few, and
     // each among the worst found against one encoder, so each is encoded
     // several times.
-    let saved = worst::saved();
-    let repeated: Vec<Bitmap> = (0..SAVED_REPEATS).flat_map(|_| saved.iter().map(|(_, bitmap)| bitmap.clone())).collect();
-    let name = "adversarial, saved";
-    let (mut encodes, decodes) = time(&mut tessera, &mut stream, &mut back, name, &repeated);
+    let saved_bitmaps = worst::every_saved();
+    let repeated_bitmaps: Vec<Bitmap> = (0..SAVED_REPEATS).flat_map(|_| saved_bitmaps.iter().map(|(_, bitmap)| bitmap.clone())).collect();
+    let saved_family_name = "adversarial, saved";
+    let (mut encode_times, decode_times) = time_family(&mut tessera, &mut stream, &mut decoded_bitmap, saved_family_name, &repeated_bitmaps);
     table.divider();
-    table.row(&row(name, &mut encodes, &decodes));
-    report.note(format!("{per_generator} bitmaps a generator, the saved adversarial bitmaps {SAVED_REPEATS} times each"));
-    report.add("encode and decode times", table);
+    table.add_row(&timing_row(saved_family_name, &mut encode_times, &decode_times));
+    report.add_note(format!("{per_generator} bitmaps a generator, the saved adversarial bitmaps {SAVED_REPEATS} times each"));
+    report.add_table("encode and decode times", table);
     Ok(())
 }
 
-/// Encodes every bitmap of `bitmaps`, the family `name`, once, timing
+/// Encodes every bitmap of `bitmaps`, the family `family_name`, once, timing
 /// each, then decodes each stream, timing each and checking it round
 /// trips: the encode times and the decode times.
-fn time(tessera: &mut Tessera, stream: &mut BitStream, back: &mut Bitmap, name: &str, bitmaps: &[Bitmap]) -> (Vec<Duration>, Vec<Duration>) {
-    let mut encodes = Vec::with_capacity(bitmaps.len());
+fn time_family(tessera: &mut Tessera, stream: &mut BitStream, decoded_bitmap: &mut Bitmap, family_name: &str, bitmaps: &[Bitmap]) -> (Vec<Duration>, Vec<Duration>) {
+    let mut encode_times = Vec::with_capacity(bitmaps.len());
     let mut streams = Vec::with_capacity(bitmaps.len());
     for bitmap in bitmaps {
-        let start = Instant::now();
+        let encode_start = Instant::now();
         tessera.encode(bitmap, stream);
-        encodes.push(start.elapsed());
+        encode_times.push(encode_start.elapsed());
         streams.push(stream.clone());
     }
-    let mut decodes = Vec::with_capacity(streams.len());
-    for (encoded, bitmap) in streams.iter().zip(bitmaps) {
-        let start = Instant::now();
-        tessera.decode(encoded, back);
-        decodes.push(start.elapsed());
-        assert_eq!(first_difference(back, bitmap), None, "{name} did not round trip");
+    let mut decode_times = Vec::with_capacity(streams.len());
+    for (encoded_stream, bitmap) in streams.iter().zip(bitmaps) {
+        let decode_start = Instant::now();
+        tessera.decode(encoded_stream, decoded_bitmap);
+        decode_times.push(decode_start.elapsed());
+        assert_eq!(first_difference(decoded_bitmap, bitmap), None, "{family_name} did not round trip");
     }
-    (encodes, decodes)
+    (encode_times, decode_times)
 }
 
 /// One row: how many, the encode times' mean, median, tail and worst,
 /// and the decode times' mean, in microseconds.
-fn row(name: &str, encodes: &mut [Duration], decodes: &[Duration]) -> Vec<String> {
-    encodes.sort_unstable();
-    let micros = |duration: Duration| duration.as_secs_f64() * 1e6;
-    let mean = |times: &[Duration]| times.iter().map(|&time| micros(time)).sum::<f64>() / times.len() as f64;
-    let at_percent = |percent: usize| micros(encodes[(encodes.len() - 1) * percent / 100]);
+fn timing_row(family_name: &str, encode_times: &mut [Duration], decode_times: &[Duration]) -> Vec<String> {
+    encode_times.sort_unstable();
+    let to_micros = |time_taken: Duration| time_taken.as_secs_f64() * 1e6;
+    let mean_micros = |family_times: &[Duration]| family_times.iter().map(|&one_time| to_micros(one_time)).sum::<f64>() / family_times.len() as f64;
+    let at_percent = |time_percentile: usize| to_micros(encode_times[(encode_times.len() - 1) * time_percentile / 100]);
     vec![
-        name.to_string(),
-        encodes.len().to_string(),
-        format!("{:.1}", mean(encodes)),
+        family_name.to_string(),
+        encode_times.len().to_string(),
+        format!("{:.1}", mean_micros(encode_times)),
         format!("{:.1}", at_percent(MEDIAN_PERCENT)),
         format!("{:.1}", at_percent(TAIL_PERCENT)),
-        format!("{:.1}", micros(encodes[encodes.len() - 1])),
-        format!("{:.1}", mean(decodes)),
+        format!("{:.1}", to_micros(encode_times[encode_times.len() - 1])),
+        format!("{:.1}", mean_micros(decode_times)),
     ]
 }

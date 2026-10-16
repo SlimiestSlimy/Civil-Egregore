@@ -2,9 +2,9 @@
 //! world saved opened, or leaving -- a row each
 //! (`docs/gui.md`, "The main menu").
 
-use crate::rows::{self, Bar, Listing, Look, Row, Says, Shade};
+use crate::rows::{self, Bar, WorldListing, RowLook, MenuRow, RowText, MenuShade};
 use crate::sliders::Sliders;
-use crate::{CurrentTuning, Make, Open, Screen};
+use crate::{CurrentTuning, MakeWorld, OpenWorld, ShownScreen};
 use bevy::app::AppExit;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::AccumulatedMouseScroll;
@@ -12,30 +12,30 @@ use bevy::prelude::*;
 
 /// What a click on a row of the main menu does.
 #[derive(Clone, Copy)]
-enum Does {
+enum MainMenuClick {
     /// Nothing: a row that only says something.
-    Nothing,
+    DoesNothing,
     /// Sets up a new world.
     SetsUp,
     /// Makes the world set up.
-    Makes,
+    MakesWorld,
     /// Lists the worlds there are to open.
-    Lists,
+    ListsWorlds,
     /// Goes back to the first page.
     GoesBack,
     /// Opens a world, by its place among those listed.
-    Opens(usize),
+    OpensWorld(usize),
     /// Leaves Civil Egregore.
-    Leaves,
+    LeavesGame,
 }
 
 /// What of the main menu is shown.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Page {
+enum MainMenuPage {
     /// Its first page.
-    First,
+    FirstPage,
     /// A new world being set up.
-    New,
+    NewWorld,
     /// The worlds there are to open.
     Worlds,
 }
@@ -48,24 +48,24 @@ pub struct Part;
 #[derive(Resource)]
 pub struct MainMenu {
     /// What of it is shown.
-    page: Page,
+    shown_page: MainMenuPage,
     /// The new world's seed, typed: hexadecimal digits, or none.
     seed: String,
     /// Names the worlds there are.
-    lister: fn() -> Vec<String>,
+    world_lister: fn() -> Vec<String>,
     /// The worlds, as last listed.
-    listing: Listing,
+    world_listing: WorldListing,
 }
 
 impl MainMenu {
-    /// The main menu, on its first page, its worlds named by `lister`.
-    pub fn listing(lister: fn() -> Vec<String>) -> Self {
-        Self { page: Page::First, seed: String::new(), lister, listing: Listing::default() }
+    /// The main menu, on its first page, its worlds named by `world_lister`.
+    pub fn with_world_lister(world_lister: fn() -> Vec<String>) -> Self {
+        Self { shown_page: MainMenuPage::FirstPage, seed: String::new(), world_lister, world_listing: WorldListing::default() }
     }
 
     /// Whether a new world is being set up: every slider is offered.
     pub fn setting_up(&self) -> bool {
-        self.page == Page::New
+        self.shown_page == MainMenuPage::NewWorld
     }
 
     /// The seed typed, if one is.
@@ -74,24 +74,24 @@ impl MainMenu {
     }
 
     /// The rows shown, from the top.
-    fn rows(&self) -> Vec<Row<Does>> {
-        match self.page {
-            Page::First => vec![Row::new("Civil Egregore", Look::Said, Does::Nothing), Row::new("new world", Look::Clicked, Does::SetsUp), Row::new("open a world", Look::Clicked, Does::Lists), Row::new("exit", Look::Clicked, Does::Leaves)],
-            Page::New => vec![
-                Row::new("< back  |  a new world", Look::Back, Does::GoesBack),
-                Row::new(format!("seed 0x{}_", self.seed), Look::Said, Does::Nothing),
-                Row::new(if self.seed.is_empty() { "none typed: one drawn at random" } else { "in hexadecimal" }, Look::Said, Does::Nothing),
-                Row::new("U: its size, its camera, its sheep, its land", Look::Said, Does::Nothing),
-                Row::new("make the world (Enter)", Look::Clicked, Does::Makes),
+    fn shown_rows(&self) -> Vec<MenuRow<MainMenuClick>> {
+        match self.shown_page {
+            MainMenuPage::FirstPage => vec![MenuRow::new("Civil Egregore", RowLook::OnlySays, MainMenuClick::DoesNothing), MenuRow::new("new world", RowLook::ActsOnClick, MainMenuClick::SetsUp), MenuRow::new("open a world", RowLook::ActsOnClick, MainMenuClick::ListsWorlds), MenuRow::new("exit", RowLook::ActsOnClick, MainMenuClick::LeavesGame)],
+            MainMenuPage::NewWorld => vec![
+                MenuRow::new("< back  |  a new world", RowLook::GoesBack, MainMenuClick::GoesBack),
+                MenuRow::new(format!("seed 0x{}_", self.seed), RowLook::OnlySays, MainMenuClick::DoesNothing),
+                MenuRow::new(if self.seed.is_empty() { "none typed: one drawn at random" } else { "in hexadecimal" }, RowLook::OnlySays, MainMenuClick::DoesNothing),
+                MenuRow::new("U: its size, its camera, its sheep, its land", RowLook::OnlySays, MainMenuClick::DoesNothing),
+                MenuRow::new("make the world (Enter)", RowLook::ActsOnClick, MainMenuClick::MakesWorld),
             ],
-            Page::Worlds => self.listing.rows(Does::GoesBack, Does::Opens),
+            MainMenuPage::Worlds => self.world_listing.world_rows(MainMenuClick::GoesBack, MainMenuClick::OpensWorld),
         }
     }
 }
 
 /// The main menu's parts, hidden until shown.
-pub fn spawn(mut commands: Commands) {
-    rows::spawn(&mut commands, Part);
+pub fn spawn_main_menu(mut bevy_commands: Commands) {
+    rows::spawn_menu_parts(&mut bevy_commands, Part);
 }
 
 /// Does what a row clicked does -- unless the pointer is the sliders'
@@ -100,55 +100,55 @@ pub fn spawn(mut commands: Commands) {
 /// all while the window shows it.
 #[allow(clippy::too_many_arguments)]
 pub fn update_main_menu(
-    mut menu: ResMut<MainMenu>,
-    mut screen: ResMut<Screen>,
+    mut main_menu_state: ResMut<MainMenu>,
+    mut shown_screen: ResMut<ShownScreen>,
     sliders: Res<Sliders>,
     tuning: Res<CurrentTuning>,
-    keys: Res<ButtonInput<KeyCode>>,
-    buttons: Res<ButtonInput<MouseButton>>,
+    pressed_keys: Res<ButtonInput<KeyCode>>,
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
     wheel: Res<AccumulatedMouseScroll>,
     window: Single<&Window>,
-    mut shade: Single<&mut Visibility, (With<Shade>, With<Part>)>,
+    mut shade_visibility: Single<&mut Visibility, (With<MenuShade>, With<Part>)>,
     mut bars: Query<(&Bar, &mut Node, &mut BackgroundColor), With<Part>>,
-    mut words: Query<(&Says, &mut Text), With<Part>>,
-    mut writers: (MessageWriter<AppExit>, MessageWriter<Make>, MessageWriter<Open>),
-    mut typed: MessageReader<KeyboardInput>,
+    mut words: Query<(&RowText, &mut Text), With<Part>>,
+    mut message_writers: (MessageWriter<AppExit>, MessageWriter<MakeWorld>, MessageWriter<OpenWorld>),
+    mut typed_keys: MessageReader<KeyboardInput>,
 ) {
-    let (leave, make, open) = &mut writers;
-    let shown = *screen == Screen::MainMenu;
-    let mut makes = false;
-    if shown && !sliders.typing() && keys.just_pressed(KeyCode::Escape) {
-        menu.page = Page::First;
+    let (exit_writer, make_world_writer, open_world_writer) = &mut message_writers;
+    let menu_shown = *shown_screen == ShownScreen::MainMenu;
+    let mut makes_world = false;
+    if menu_shown && !sliders.typing_value() && pressed_keys.just_pressed(KeyCode::Escape) {
+        main_menu_state.shown_page = MainMenuPage::FirstPage;
     }
-    if shown && !sliders.held() && !sliders.over(&window) {
-        match rows::clicked(&menu.rows(), &window, &buttons) {
-            Some(Does::SetsUp) => menu.page = Page::New,
-            Some(Does::Makes) => makes = true,
-            Some(Does::Lists) => (menu.listing, menu.page) = (Listing::from_lister(menu.lister), Page::Worlds),
-            Some(Does::GoesBack) => menu.page = Page::First,
-            Some(Does::Opens(place)) => {
-                open.write(Open(menu.listing.worlds[place].clone()));
-                *screen = Screen::World;
+    if menu_shown && !sliders.holds_left_button() && !sliders.pointer_over(&window) {
+        match rows::clicked_row_does(&main_menu_state.shown_rows(), &window, &mouse_buttons) {
+            Some(MainMenuClick::SetsUp) => main_menu_state.shown_page = MainMenuPage::NewWorld,
+            Some(MainMenuClick::MakesWorld) => makes_world = true,
+            Some(MainMenuClick::ListsWorlds) => (main_menu_state.world_listing, main_menu_state.shown_page) = (WorldListing::from_lister(main_menu_state.world_lister), MainMenuPage::Worlds),
+            Some(MainMenuClick::GoesBack) => main_menu_state.shown_page = MainMenuPage::FirstPage,
+            Some(MainMenuClick::OpensWorld(place)) => {
+                open_world_writer.write(OpenWorld(main_menu_state.world_listing.worlds[place].clone()));
+                *shown_screen = ShownScreen::World;
             }
-            Some(Does::Leaves) => _ = leave.write(AppExit::Success),
-            Some(Does::Nothing) | None => {}
+            Some(MainMenuClick::LeavesGame) => _ = exit_writer.write(AppExit::Success),
+            Some(MainMenuClick::DoesNothing) | None => {}
         }
     }
-    if shown && menu.page == Page::New && !sliders.typing() {
-        let mut seed = std::mem::take(&mut menu.seed);
-        makes |= rows::type_into(&mut seed, &mut typed, |digit| digit.is_ascii_hexdigit(), 16);
-        menu.seed = seed;
+    if menu_shown && main_menu_state.shown_page == MainMenuPage::NewWorld && !sliders.typing_value() {
+        let mut seed = std::mem::take(&mut main_menu_state.seed);
+        makes_world |= rows::type_into(&mut seed, &mut typed_keys, |typed_character| typed_character.is_ascii_hexdigit(), 16);
+        main_menu_state.seed = seed;
     } else {
         // Keys not typed into a seed are no one's: none is kept for later.
-        typed.clear();
+        typed_keys.clear();
     }
-    if makes {
-        make.write(Make { seed: menu.seed(), tuning: tuning.0 });
-        *screen = Screen::World;
+    if makes_world {
+        make_world_writer.write(MakeWorld { seed: main_menu_state.seed(), tuning: tuning.0 });
+        *shown_screen = ShownScreen::World;
     }
-    if shown && menu.page == Page::Worlds && !sliders.over(&window) {
-        menu.listing.scroll(wheel.delta.y);
+    if menu_shown && main_menu_state.shown_page == MainMenuPage::Worlds && !sliders.pointer_over(&window) {
+        main_menu_state.world_listing.scroll_by_wheel(wheel.delta.y);
     }
-    let shown = *screen == Screen::MainMenu;
-    rows::show_rows(shown, &menu.rows(), &mut shade, &mut bars, &mut words);
+    let menu_still_shown = *shown_screen == ShownScreen::MainMenu;
+    rows::show_rows(menu_still_shown, &main_menu_state.shown_rows(), &mut shade_visibility, &mut bars, &mut words);
 }

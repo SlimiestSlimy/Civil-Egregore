@@ -28,7 +28,7 @@ pub struct LayerChange<'a> {
     /// The layer's type.
     pub layer_type: LayerType,
     /// The layer, encoded; empty for no layer.
-    pub encoded: &'a [u64],
+    pub encoded_layer: &'a [u64],
 }
 
 /// A superchunk's words: its chunk table, its heights, its water's
@@ -42,14 +42,14 @@ pub struct SuperchunkImage {
 impl SuperchunkImage {
     /// A superchunk with `heights` and no layers.
     pub fn new(heights: &HeightMap) -> Self {
-        Self { words: build(heights.words(), ChunkMaps::default().words(), &Default::default()) }
+        Self { words: build_image_words(heights.words(), ChunkMaps::default().words(), &Default::default()) }
     }
 
-    /// This image with `depths` its water's, its heights and layers
+    /// This image with `water_depths` its water's, its heights and layers
     /// as they are.
-    pub fn with_water(&self, depths: &ChunkMaps) -> Self {
+    pub fn with_water(&self, water_depths: &ChunkMaps) -> Self {
         let chunks: [Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK] = std::array::from_fn(|place| exact_layers(self.chunk(place)));
-        Self { words: build(self.height_words(), depths.words(), &chunks) }
+        Self { words: build_image_words(self.height_words(), water_depths.words(), &chunks) }
     }
 
     /// `words` as an image, if they are one: every offset inside its
@@ -68,17 +68,17 @@ impl SuperchunkImage {
             return Err(InvalidImage("shorter than its water's depths"));
         }
         previous_end += chunk_maps::words_of(&words[previous_end..]);
-        for index in 0..CHUNKS_IN_SUPERCHUNK {
-            let start = words[index] as usize;
-            if start != previous_end {
+        for chunk_place in 0..CHUNKS_IN_SUPERCHUNK {
+            let chunk_start = words[chunk_place] as usize;
+            if chunk_start != previous_end {
                 return Err(InvalidImage("a chunk does not start where the one before ends"));
             }
-            let end = if index + 1 < CHUNKS_IN_SUPERCHUNK { words[index + 1] as usize } else { words.len() };
-            if end <= start || end > words.len() {
+            let chunk_end = if chunk_place + 1 < CHUNKS_IN_SUPERCHUNK { words[chunk_place + 1] as usize } else { words.len() };
+            if chunk_end <= chunk_start || chunk_end > words.len() {
                 return Err(InvalidImage("a chunk outside the image"));
             }
-            check_chunk(&words[start..end])?;
-            previous_end = end;
+            check_chunk(&words[chunk_start..chunk_end])?;
+            previous_end = chunk_end;
         }
         Ok(Self { words })
     }
@@ -86,7 +86,7 @@ impl SuperchunkImage {
     /// This image with `heights` its heights, its layers as they are.
     pub fn with_heights(&self, heights: &HeightMap) -> Self {
         let chunks: [Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK] = std::array::from_fn(|place| exact_layers(self.chunk(place)));
-        Self { words: build(heights.words(), self.water_words(), &chunks) }
+        Self { words: build_image_words(heights.words(), self.water_words(), &chunks) }
     }
 
     /// Every word, as on disk.
@@ -107,7 +107,7 @@ impl SuperchunkImage {
 
     /// How deep the water is over the cell at `place` in the
     /// superchunk: 0 where there is none.
-    pub fn depth(&self, place: usize) -> Height {
+    pub fn water_depth(&self, place: usize) -> Height {
         number_in(self.water_words(), place)
     }
 
@@ -119,8 +119,8 @@ impl SuperchunkImage {
 
     /// The words of the chunk at `place`, its layer count first.
     fn chunk(&self, place: usize) -> &[u64] {
-        let end = if place + 1 < CHUNKS_IN_SUPERCHUNK { self.words[place + 1] as usize } else { self.words.len() };
-        &self.words[self.words[place] as usize..end]
+        let chunk_end = if place + 1 < CHUNKS_IN_SUPERCHUNK { self.words[place + 1] as usize } else { self.words.len() };
+        &self.words[self.words[place] as usize..chunk_end]
     }
 
     /// The encoded layer of `layer_type` in the chunk at `place`, if it
@@ -129,33 +129,33 @@ impl SuperchunkImage {
     pub fn layer(&self, place: usize, layer_type: LayerType) -> Option<&[u64]> {
         let words = self.chunk(place);
         let table = layer_table(words);
-        let entry = table.binary_search_by_key(&layer_type.0, |entry| entry[0]).ok()?;
-        Some(&words[table[entry][1] as usize..])
+        let entry_index = table.binary_search_by_key(&layer_type.0, |table_entry| table_entry[0]).ok()?;
+        Some(&words[table[entry_index][1] as usize..])
     }
 
     /// The types of the layers of the chunk at `place`, sorted.
     pub fn layer_types(&self, place: usize) -> impl Iterator<Item = LayerType> + '_ {
-        layer_table(self.chunk(place)).iter().map(|entry| LayerType(entry[0]))
+        layer_table(self.chunk(place)).iter().map(|table_entry| LayerType(table_entry[0]))
     }
 
-    /// The image with `changes` made, in order: a later change to a
+    /// The image with `layer_changes` made, in order: a later change to a
     /// layer replaces an earlier one. Every encoded layer is copied; this
     /// image is not changed.
-    pub fn rewritten(&self, changes: &[LayerChange]) -> Self {
+    pub fn rewritten_with(&self, layer_changes: &[LayerChange]) -> Self {
         let mut chunks: [Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK] = Default::default();
         for (place, layers) in chunks.iter_mut().enumerate() {
             *layers = exact_layers(self.chunk(place));
         }
-        for change in changes {
-            let layers = &mut chunks[change.place];
-            match (layers.binary_search_by_key(&change.layer_type, |&(layer_type, _)| layer_type), change.encoded.is_empty()) {
-                (Ok(at), false) => layers[at].1 = change.encoded,
-                (Ok(at), true) => drop(layers.remove(at)),
-                (Err(at), false) => layers.insert(at, (change.layer_type, change.encoded)),
+        for layer_change in layer_changes {
+            let layers = &mut chunks[layer_change.place];
+            match (layers.binary_search_by_key(&layer_change.layer_type, |&(layer_type, _)| layer_type), layer_change.encoded_layer.is_empty()) {
+                (Ok(found_index), false) => layers[found_index].1 = layer_change.encoded_layer,
+                (Ok(removed_index), true) => drop(layers.remove(removed_index)),
+                (Err(insert_index), false) => layers.insert(insert_index, (layer_change.layer_type, layer_change.encoded_layer)),
                 (Err(_), true) => {}
             }
         }
-        Self { words: build(self.height_words(), self.water_words(), &chunks) }
+        Self { words: build_image_words(self.height_words(), self.water_words(), &chunks) }
     }
 }
 
@@ -174,14 +174,14 @@ fn check_chunk(chunk: &[u64]) -> Result<(), InvalidImage> {
     let header = layers.checked_mul(ENTRY_WORDS).and_then(|words| words.checked_add(1)).filter(|&words| words <= chunk.len());
     let header = header.ok_or(InvalidImage("a layer table longer than its chunk"))?;
     let table = layer_table(chunk);
-    if !table.windows(2).all(|pair| pair[0][0] < pair[1][0]) {
+    if !table.windows(2).all(|type_pair| type_pair[0][0] < type_pair[1][0]) {
         return Err(InvalidImage("a layer table not sorted by type, each type once"));
     }
-    let mut offsets: Vec<u64> = table.iter().map(|entry| entry[1]).collect();
-    offsets.sort_unstable();
-    if offsets.first().is_some_and(|&first| (first as usize) < header)
-        || offsets.last().is_some_and(|&last| last as usize >= chunk.len())
-        || !offsets.windows(2).all(|pair| pair[0] < pair[1])
+    let mut layer_offsets: Vec<u64> = table.iter().map(|table_entry| table_entry[1]).collect();
+    layer_offsets.sort_unstable();
+    if layer_offsets.first().is_some_and(|&first_offset| (first_offset as usize) < header)
+        || layer_offsets.last().is_some_and(|&last_offset| last_offset as usize >= chunk.len())
+        || !layer_offsets.windows(2).all(|offset_pair| offset_pair[0] < offset_pair[1])
     {
         return Err(InvalidImage("an encoded layer outside its chunk, or two at one offset"));
     }
@@ -192,40 +192,40 @@ fn check_chunk(chunk: &[u64]) -> Result<(), InvalidImage> {
 /// next one's start, or the chunk's end.
 fn exact_layers(chunk: &[u64]) -> Vec<(LayerType, &[u64])> {
     let table = layer_table(chunk);
-    let mut starts: Vec<usize> = table.iter().map(|entry| entry[1] as usize).collect();
-    starts.sort_unstable();
+    let mut layer_starts: Vec<usize> = table.iter().map(|table_entry| table_entry[1] as usize).collect();
+    layer_starts.sort_unstable();
     table
         .iter()
-        .map(|&[layer_type, offset]| {
-            let start = offset as usize;
-            let next = starts.partition_point(|&other| other <= start);
-            let end = starts.get(next).copied().unwrap_or(chunk.len());
-            (LayerType(layer_type), &chunk[start..end])
+        .map(|&[layer_type, layer_offset]| {
+            let layer_start = layer_offset as usize;
+            let next_index = layer_starts.partition_point(|&other_start| other_start <= layer_start);
+            let layer_end = layer_starts.get(next_index).copied().unwrap_or(chunk.len());
+            (LayerType(layer_type), &chunk[layer_start..layer_end])
         })
         .collect()
 }
 
 /// An image's words: `heights`, the `water`'s depths if any, then each
 /// chunk's encoded layers, sorted by type.
-fn build(heights: &[u64], water: &[u64], chunks: &[Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK]) -> Box<[u64]> {
+fn build_image_words(heights: &[u64], water: &[u64], chunks: &[Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK]) -> Box<[u64]> {
     let chunk_words = |layers: &Vec<(LayerType, &[u64])>| 1 + layers.len() * ENTRY_WORDS + layers.iter().map(|(_, words)| words.len()).sum::<usize>();
-    let mut start = HEIGHTS_START + heights.len() + water.len();
-    let mut words = Vec::with_capacity(start + chunks.iter().map(chunk_words).sum::<usize>());
+    let mut chunk_start = HEIGHTS_START + heights.len() + water.len();
+    let mut words = Vec::with_capacity(chunk_start + chunks.iter().map(chunk_words).sum::<usize>());
     for layers in chunks {
-        words.push(start as u64);
-        start += chunk_words(layers);
+        words.push(chunk_start as u64);
+        chunk_start += chunk_words(layers);
     }
     words.extend_from_slice(heights);
     words.extend_from_slice(water);
     for layers in chunks {
         words.push(layers.len() as u64);
-        let mut offset = 1 + layers.len() * ENTRY_WORDS;
-        for &(layer_type, encoded) in layers {
-            words.extend([layer_type.0, offset as u64]);
-            offset += encoded.len();
+        let mut layer_offset = 1 + layers.len() * ENTRY_WORDS;
+        for &(layer_type, encoded_layer) in layers {
+            words.extend([layer_type.0, layer_offset as u64]);
+            layer_offset += encoded_layer.len();
         }
-        for (_, encoded) in layers {
-            words.extend_from_slice(encoded);
+        for (_, layer_words) in layers {
+            words.extend_from_slice(layer_words);
         }
     }
     words.into_boxed_slice()

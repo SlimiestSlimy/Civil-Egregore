@@ -10,11 +10,11 @@
 mod tests;
 
 use bitmap::Bitmap;
-use tests::check;
+use tests::check_bitmap;
 use tessera::diagnostics::examination::tree_of;
 use tessera::diagnostics::tree_stats::TreeStats;
-use tessera::encode;
-use tessera::corpus::{one_grown, one_laid_out, seed_uncounted, PLANS};
+use tessera::encode_bitmap;
+use tessera::corpus::{one_grown, one_laid_out, seed_uncounted, CITY_PLANS};
 use tessera::tile::{Tile, CELL_LEVEL, FLOOR_LEVEL};
 use tessera::tree::Node;
 
@@ -24,10 +24,10 @@ fn seed() -> u64 {
     seed_uncounted()
 }
 
-/// The tile at `level` holding the cell `cell`.
-fn ancestor(cell: Tile, level: u8) -> Tile {
-    let shift = CELL_LEVEL - level;
-    Tile { level, x: ((cell.x as u16) >> shift) as u8, y: ((cell.y as u16) >> shift) as u8 }
+/// The tile at `tile_level` holding the cell `cell`.
+fn ancestor_tile(cell: Tile, tile_level: u8) -> Tile {
+    let level_shift = CELL_LEVEL - tile_level;
+    Tile { tile_level, x: ((cell.x as u16) >> level_shift) as u8, y: ((cell.y as u16) >> level_shift) as u8 }
 }
 
 /// An empty bitmap's tree is one tile at the top, but its stream is its
@@ -36,9 +36,9 @@ fn ancestor(cell: Tile, level: u8) -> Tile {
 fn all_clear_is_an_empty_binary_count_tree_in_two_bits() {
     let bitmap = Bitmap::new();
     // The stream's mode bit + the set cell count, zero, in 1 bit.
-    assert_eq!(encode(&bitmap).len(), 2);
+    assert_eq!(encode_bitmap(&bitmap).len(), 2);
     assert_eq!(tree_of(&bitmap).get(Tile::WHOLE_BITMAP), Node::ComplexTile { size_offset: 0 });
-    check(&bitmap, "all clear");
+    check_bitmap(&bitmap, "all clear");
 }
 
 /// One set cell, wherever it is, is a binary count tree of 20 bits, and passes
@@ -50,8 +50,8 @@ fn one_cell_is_a_binary_count_tree_in_twenty_bits() {
         bitmap.set(x, y);
         // The stream's mode bit + the count, 1, as 2 in Elias gamma (3
         // bits) + one bit a halving, 16 of them, for which half holds it.
-        assert_eq!(encode(&bitmap).len(), 20, "the cell at ({x}, {y})");
-        check(&bitmap, &format!("one cell at ({x}, {y})"));
+        assert_eq!(encode_bitmap(&bitmap).len(), 20, "the cell at ({x}, {y})");
+        check_bitmap(&bitmap, &format!("one cell at ({x}, {y})"));
     }
 }
 
@@ -66,8 +66,8 @@ fn two_cells_apart_are_a_binary_count_tree_in_thirty_six_bits() {
     // + how many of the 2 are in the first half, 1 of 0..=2 in truncated
     // binary (2 bits) + 15 halvings under each of the two halves, a bit
     // each.
-    assert_eq!(encode(&bitmap).len(), 36);
-    check(&bitmap, "two cells apart");
+    assert_eq!(encode_bitmap(&bitmap).len(), 36);
+    check_bitmap(&bitmap, "two cells apart");
 }
 
 /// A full bitmap is one tile at the top, in 8 bits, and passes every
@@ -78,8 +78,8 @@ fn all_set_is_one_tile_in_eight_bits() {
     bitmap.set_rect(0, 0, 255, 255);
     // The stream's mode bit + 3 start level bits (0) + leaf + bind + the
     // plain-tile bit + 1 value bit
-    assert_eq!(encode(&bitmap).len(), 8);
-    check(&bitmap, "all set");
+    assert_eq!(encode_bitmap(&bitmap).len(), 8);
+    check_bitmap(&bitmap, "all set");
 }
 
 /// Every adversarial worst bitmap -- the worst bitmap found so far against
@@ -91,10 +91,10 @@ fn all_set_is_one_tile_in_eight_bits() {
 #[test]
 fn adversarial_bitmaps_pass_every_check() {
     use tessera::diagnostics::adversarial::worst;
-    let (kept, saved) = (worst::all(), worst::saved());
-    assert!(!saved.is_empty(), "no saved adversarial bitmaps in external_benchmarks/adversarial/saved");
-    for (name, bitmap) in kept.into_iter().chain(saved) {
-        check(&bitmap, &name);
+    let (worst_bitmaps, saved_bitmaps) = (worst::every_worst(), worst::every_saved());
+    assert!(!saved_bitmaps.is_empty(), "no saved adversarial bitmaps in external_benchmarks/adversarial/saved");
+    for (bitmap_name, bitmap) in worst_bitmaps.into_iter().chain(saved_bitmaps) {
+        check_bitmap(&bitmap, &bitmap_name);
     }
 }
 
@@ -105,10 +105,10 @@ fn a_repeated_quarter_is_a_near_copy() {
     let mut bitmap = Bitmap::new();
     bitmap.set_circle(64, 64, 40);
     bitmap.set_circle(192, 64, 40);
-    let right_quarter = Tile { level: 1, x: 1, y: 0 };
+    let right_quarter = Tile { tile_level: 1, x: 1, y: 0 };
     // Near direction 3 is the neighbour to the left.
-    assert_eq!(tree_of(&bitmap).get(right_quarter), Node::Copied { far: false, direction: 3, names_children: false });
-    check(&bitmap, "a repeated quarter");
+    assert_eq!(tree_of(&bitmap).get(right_quarter), Node::CopiedTile { is_far_copy: false, copy_direction: 3, names_children: false });
+    check_bitmap(&bitmap, "a repeated quarter");
 }
 
 /// Overlapping rectangles and circles, set and cleared, pass every
@@ -120,21 +120,21 @@ fn rectangles_and_circles_round_trip() {
     bitmap.set_rect(100, 3, 200, 90);
     bitmap.set_circle(180, 180, 25);
     bitmap.unset_circle(150, 50, 20);
-    check(&bitmap, "rectangles and circles");
+    check_bitmap(&bitmap, "rectangles and circles");
 }
 
 /// A regular city forms complex tiles, and passes every check.
 #[test]
 fn one_city_round_trips_with_complex_tiles() {
-    let bitmap = one_laid_out(seed(), &PLANS[0]);
+    let bitmap = one_laid_out(seed(), &CITY_PLANS[0]);
     assert!(TreeStats::measure_tree(&tree_of(&bitmap)).complex_tiles > 0, "a city this regular forms complex tiles");
-    check(&bitmap, "one city");
+    check_bitmap(&bitmap, "one city");
 }
 
 /// A middling, ragged bitmap passes every check.
 #[test]
 fn one_ragged_bitmap_round_trips() {
-    check(&one_grown(seed(), 0.20, 0.70), "one middling ragged bitmap");
+    check_bitmap(&one_grown(seed(), 0.20, 0.70), "one middling ragged bitmap");
 }
 
 /// A complex tile says every cell under it: where one square of a regular area holds
@@ -149,23 +149,23 @@ fn a_lone_cell_leaves_the_areas_around_it_complex_tiles() {
     // than 1x1 can say: its 32x32 is no complex tile, and the lone cell's
     // 8x8 says its cells as a cell list.
     /// The side of one square, in cells.
-    const SQUARE: i64 = 16;
+    const SQUARE_SIDE: i64 = 16;
     let mut bitmap = Bitmap::new();
     for (square_x, square_y) in [(0, 0), (3, 0), (0, 3), (3, 3)] {
-        let (x, y) = (square_x * SQUARE, square_y * SQUARE);
-        bitmap.set_rect(x, y, x + SQUARE - 1, y + SQUARE - 1);
+        let (x, y) = (square_x * SQUARE_SIDE, square_y * SQUARE_SIDE);
+        bitmap.set_rect(x, y, x + SQUARE_SIDE - 1, y + SQUARE_SIDE - 1);
     }
-    let lone_cell = Tile { level: 8, x: 21, y: 5 };
+    let lone_cell = Tile { tile_level: 8, x: 21, y: 5 };
     bitmap.set(lone_cell.x, lone_cell.y);
 
-    let written = tree_of(&bitmap);
-    let lone_cells_32x32 = ancestor(lone_cell, 3);
-    for quarter in ancestor(lone_cell, 2).children().into_iter().filter(|&quarter| quarter != lone_cells_32x32) {
-        assert_eq!(written.get(quarter), Node::ComplexTile { size_offset: 1 }, "{quarter:?}");
+    let written_tree = tree_of(&bitmap);
+    let lone_cells_32x32 = ancestor_tile(lone_cell, 3);
+    for quarter_tile in ancestor_tile(lone_cell, 2).child_tiles().into_iter().filter(|&candidate_quarter| candidate_quarter != lone_cells_32x32) {
+        assert_eq!(written_tree.get(quarter_tile), Node::ComplexTile { size_offset: 1 }, "{quarter_tile:?}");
     }
-    for level in 3..FLOOR_LEVEL - 1 {
-        assert_eq!(written.get(ancestor(lone_cell, level)), Node::Divided);
+    for tile_level in 3..FLOOR_LEVEL - 1 {
+        assert_eq!(written_tree.get(ancestor_tile(lone_cell, tile_level)), Node::PlainDivide);
     }
-    assert_eq!(written.get(ancestor(lone_cell, FLOOR_LEVEL - 1)), Node::CellList);
-    check(&bitmap, "a lone cell among complex tiles");
+    assert_eq!(written_tree.get(ancestor_tile(lone_cell, FLOOR_LEVEL - 1)), Node::CellList);
+    check_bitmap(&bitmap, "a lone cell among complex tiles");
 }

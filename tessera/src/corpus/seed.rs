@@ -18,13 +18,13 @@ pub const USES_BEFORE_THE_SEED_ROLLS: u64 = utilities::seed::USES_BEFORE_THE_SEE
 /// file alone: a check on bitmaps never seen, which moves nothing a
 /// measurement holds still -- what the fast tier runs on while the code
 /// changes.
-pub const FRESH: &str = utilities::seed::FRESH;
+pub const FRESH_SEED_VALUE: &str = utilities::seed::FRESH_SEED_VALUE;
 
 /// The seed every corpus bitmap starts from, counted as a use:
 /// `CIVIL_EGREGORE_SEED` if set, else the file's, rolled once used up
 /// (`docs/lab.md`, "`corpus/`").
 pub fn seed_counted() -> u64 {
-    utilities::seed::counted()
+    utilities::seed::counted_seed()
 }
 
 /// The seed every corpus bitmap starts from, as [`seed_counted`] gives it, but
@@ -33,7 +33,7 @@ pub fn seed_counted() -> u64 {
 /// still used; the next counted run rolls it. No file yet: one is
 /// rolled, and kept at no uses.
 pub fn seed_uncounted() -> u64 {
-    utilities::seed::uncounted()
+    utilities::seed::uncounted_seed()
 }
 
 /// The seed this run's corpus came from, and whether it was fresh, if

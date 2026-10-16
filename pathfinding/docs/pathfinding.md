@@ -49,7 +49,7 @@ a wall is asked of each step the way the walker would take it.
 Neither end need be passable -- a walker stands on one and wants the
 other. A cell is queued again each time a shorter way to it is found,
 from one neighbour after another at most, which is what the queue is
-sized by (`QUEUE`: the area's cells, `CELLS`, times the eight steps). It allocates nothing either, but looks at cells one by
+sized by (`QUEUE_ROOM`: the area's cells, `CELLS`, times the eight steps). It allocates nothing either, but looks at cells one by
 one: for the nearest of many goals, waves are the cheaper.
 
 ## Still to come
@@ -85,7 +85,7 @@ and south of cells, and makes the four of them.
 
 A wave spreads each of the eight ways apart, each masked by its walls
 -- eight shifts a row where there were three. Walls of one way give
-spreading a direction: the cells a step from a set comes to (`spread`,
+spreading a direction: the cells a step from a set comes to (`spread_forwards`,
 what is beside a walker) are not the cells a step from which comes to
 it (`spread_back`, what a wave going out from the goals grows by --
 the walker's steps run the other way to the wave's). A* searches from

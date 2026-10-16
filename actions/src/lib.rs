@@ -28,12 +28,12 @@ pub mod walking;
 // The words the actions are asked in: where a cell and an entity
 // are, what a layer and an attribute are, a turn, a tick's report, the
 // lot drawn.
-pub use chunk_storage::{Bits4, LayerType, Wide};
-pub use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOURS, SUPERCHUNK_SIDE_CELLS};
+pub use chunk_storage::{Bits4, LayerType, WidePlane};
+pub use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOUR_OFFSETS, SUPERCHUNK_SIDE_CELLS};
 pub use entity_manager::{Attribute, AttributeBlock, AttributeType, EntityRef, EntityType, Header, Layout, Member, WholeAttribute};
 pub use simulation::{TickReport, Turn};
 pub use utilities::chance::Chance;
-pub use utilities::rng::Rng;
+pub use utilities::rng::RandomSource;
 
 use std::ops::{AddAssign, Index, IndexMut};
 
@@ -57,23 +57,23 @@ pub mod simulation_time {
 /// The most counts a rule keeps.
 pub const COUNTS_OF_A_RULE: usize = 8;
 
-/// The place of the count named `name` among `counted`, the names of
+/// The place of the count named `count_name` among `count_names`, the names of
 /// what a rule counts in the order it keeps them: the one order, from
 /// which each place is worked out as the rule is compiled.
 ///
 /// # Panics
 /// If nothing is named so -- for a constant, as it is compiled.
-pub const fn place_counted(counted: &[&str], name: &str) -> usize {
+pub const fn place_counted(count_names: &[&str], count_name: &str) -> usize {
     let mut place = 0;
-    while place < counted.len() {
-        let (one, other) = (counted[place].as_bytes(), name.as_bytes());
-        let mut same = one.len() == other.len();
-        let mut byte = 0;
-        while same && byte < one.len() {
-            same = one[byte] == other[byte];
-            byte += 1;
+    while place < count_names.len() {
+        let (listed_bytes, name_bytes) = (count_names[place].as_bytes(), count_name.as_bytes());
+        let mut bytes_same = listed_bytes.len() == name_bytes.len();
+        let mut byte_index = 0;
+        while bytes_same && byte_index < listed_bytes.len() {
+            bytes_same = listed_bytes[byte_index] == name_bytes[byte_index];
+            byte_index += 1;
         }
-        if same {
+        if bytes_same {
             return place;
         }
         place += 1;
@@ -107,9 +107,9 @@ impl IndexMut<usize> for RuleCounts {
 impl AddAssign for RuleCounts {
     /// Each count added to its like.
     #[inline]
-    fn add_assign(&mut self, other: Self) {
-        for (count, more) in self.0.iter_mut().zip(other.0) {
-            *count += more;
+    fn add_assign(&mut self, counts_added: Self) {
+        for (count, count_added) in self.0.iter_mut().zip(counts_added.0) {
+            *count += count_added;
         }
     }
 }

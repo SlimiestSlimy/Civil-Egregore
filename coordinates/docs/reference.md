@@ -8,7 +8,7 @@ The design is in `coordinates.md`.
 `CHUNKS_IN_SUPERCHUNK` (16), `SUPERCHUNK_SIDE_CELLS` (1024),
 `CELLS_IN_CHUNK` (65,536), `WORLD_SIDE_SUPERCHUNKS` (2^22: a cell's
 coordinates fit a `u32`), `WORLD_MIDDLE` (the superchunk the world
-starts at), `NEIGHBOURS` (a cell's eight, as offsets).
+starts at), `NEIGHBOUR_OFFSETS` (a cell's eight, as offsets).
 
 The bit fields of an index, private: `CELL_PLACE_BITS` (16),
 `CHUNK_PLACE_BITS` (4), `CELL_PLACE_IN_SUPERCHUNK_BITS` (20, the two
@@ -39,7 +39,7 @@ in the world.
 cell's place in its superchunk from how far across and down from the
 superchunk's top left it is, and back.
 
-**`spread`**, **`gather`**, **`interleave`**: a `u32`'s bits to every
+**`spread_to_even_bits`**, **`gather_even_bits`**, **`morton_index_from_cartesian`**: a `u32`'s bits to every
 other bit and back, in five shift-and-mask steps each
 (`SPREAD_STEPS`, `GATHER_STEPS`, from `alternating_runs`).
 

@@ -8,6 +8,6 @@ use utilities::transient_data::TransientData;
 pub const TRANSIENT_DATA: TransientData = TransientData::for_crate(env!("CARGO_MANIFEST_DIR"));
 
 /// Where stills are kept.
-pub fn renders() -> PathBuf {
-    TRANSIENT_DATA.under("renders")
+pub fn renders_folder() -> PathBuf {
+    TRANSIENT_DATA.path_under("renders")
 }

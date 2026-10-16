@@ -40,13 +40,13 @@ hot or waiting in the ring leaves the directory, its buckets with it. Each super
 superchunks are changed apart.
 
 **Windows**: up to 8x8 cells at any cell read at once
-(`Reader::window`), as a `Window` -- two masks, row by row: the cells set,
+(`CellReader::window`), as a `Window` -- two masks, row by row: the cells set,
 and the cells in hot bitmaps. A window overlaps one to four word
 tiles, 8x8 cells a bitmap word each (`bitmap::window`); only those it
 reaches are read. Its bucket is looked up once, the word tiles beside
 and below stepped to on the word tile's index in the chunk, and only
 one across the chunk's edge looked up again. Read of several layer
-types at once (`Reader::windows`), where the window lies among the word
+types at once (`CellReader::windows`), where the window lies among the word
 tiles is worked out once for all of them. So the 3x3 cells around a
 cell are one lookup, a word or two, and a few shifts and masks.
 
@@ -55,7 +55,7 @@ is a multiple of its side is, in Morton order, one run of bits of its
 chunk's bitmap -- nothing to turn into rows, nothing to cut. The
 smallest read so is the small tile, 4x4 cells and 16 bits
 (`SMALL_TILE_SIDE`, `SMALL_TILE_CELLS`); four of them, two by two from
-any aligned small tile, are read as one word (`Reader::small_tiles`, a
+any aligned small tile, are read as one word (`CellReader::small_tiles`, a
 `SmallTiles` -- the cells set, and the cells hot), each tile 16 bits of
 it as it lies in its bitmap, the word itself in Morton order over the
 8x8 cells they make. Whoever asks says which cells are wanted, as a
@@ -66,9 +66,9 @@ in it. So a cell and its eight neighbours, which lie in one to four
 small tiles, are a lookup, four shifts of a bitmap word and an AND --
 and whether a layer holds at any of them a compare with 0. A larger
 aligned tile, 8 cells a side to a chunk's 256, is handed over as the
-words it is (`Reader::aligned_tile`): a mask of its side is ANDed with
+words it is (`CellReader::aligned_tile`): a mask of its side is ANDed with
 them where they lie. Four of them two by two
-(`Reader::aligned_tiles_two_by_two`) are what a square of their side
+(`CellReader::aligned_tiles_two_by_two`) are what a square of their side
 put down anywhere lies in: the area about a cell is read so, its
 bitmap looked up once. A window gives the same cells row by row, and pays
 for the turning; what does not need rows asks for the tiles.
@@ -76,9 +76,9 @@ for the turning; what does not need rows asks for the tiles.
 **The far search**: whether a layer holds at any cell of a tile of a
 given scale -- `2^scale` cells a side, up to `COARSEST_SCALE` (6) --
 read off the count tiles' counts where they are 0, and off the words
-only where they are not (`Reader::any_in_tile`); and which of a chunk's
+only where they are not (`CellReader::any_in_tile`); and which of a chunk's
 16 tiles of the coarsest scale hold any, off the counts alone
-(`Reader::tiles_holding`).
+(`CellReader::tiles_holding`).
 
 ## Making hot, writing back, evicting
 
@@ -98,7 +98,7 @@ cells copied out, the buckets marked clean, one write-back more on its
 way), and, encoded wherever, put into the ring by its caller and marked
 waiting (`written_back`), in the order taken. `write_back` does both at
 once. A bucket waiting is held until storage says its superchunk's
-image holds every change of it (`flushed`), however long the flush
+image holds every change of it (`flushed_from_ring`), however long the flush
 takes, wherever it is done.
 
 ## Lingering
@@ -110,7 +110,7 @@ no longer hot, so the simulation neither reads nor ticks it, writes to
 it are missed, and the directory stays the hot superchunks exactly.
 It is let go, its buckets with it, once storage holds its
 changes: none on its way, none waiting in the ring. Wanted hot again
-before then, it is held (`hold`) and made hot as it is, nothing decoded
+before then, it is held (`hold_lingering`) and made hot as it is, nothing decoded
 (`make_hot_again`). A superchunk
 made hot any other way has its bitmaps' cells decoded from storage, or
 given decoded (`make_hot_cells`) -- off the tick, say.
@@ -126,7 +126,7 @@ in four places in memory. Its buckets are as many times a bitmap's
 words as it has bits. Its counts are of the cells whose number is not 0.
 
 The width is in the type so that it is known where the plane is read:
-`value(plane, cell)` shifts and masks by constants, a number of one
+`value(wide_plane, cell)` shifts and masks by constants, a number of one
 width cannot be read as another, and a wide plane cannot be asked
 whether a cell is "set".
 
@@ -169,7 +169,7 @@ world is written between ticks, by one hand, in order. In a tick
 every cell is written only if it is still as a rule saw it, which is the
 simulation's (`../../simulation/docs/simulation.md`, "Compare-and-write"): it reads the cell as it is now (`Superchunk::value_at`),
 applies a plain write if that is what was seen, and counts the write
-refused otherwise (`WritesApplied::refused`).
+refused otherwise (`WritesApplied::writes_refused`).
 
 ## What the simulation reads and changes
 
@@ -179,7 +179,7 @@ reads and changes the arena only through narrow handles:
 `superchunks_mut` (to change, each apart); a superchunk's
 `LayerView` -- its hot buckets, counts and cells, what sampling finds
 cells by -- and `apply`, a write's part in that superchunk; and a
-`Reader` -- cell and window reads remembering the last lookups, one a
+`CellReader` -- cell and window reads remembering the last lookups, one a
 thread.
 
 ## Layout

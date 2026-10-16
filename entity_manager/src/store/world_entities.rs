@@ -11,29 +11,29 @@ use coordinates::{CellIndex, SuperchunkIndex};
 /// Every superchunk's entities, in the bitmap arena's order -- by Morton
 /// index -- and the tick the world is at: the next to run.
 #[derive(Default)]
-pub struct Entities {
+pub struct WorldEntities {
     /// The tick about to run.
-    now: u64,
+    current_tick: u64,
     /// The superchunks, by Morton index.
     superchunks: Vec<SuperchunkEntities>,
-    /// Instructions queued outside a tick, applied by [`Entities::apply`].
-    queued: Instructions,
+    /// Instructions queued outside a tick, applied by [`WorldEntities::apply`].
+    queued_instructions: Instructions,
 }
 
-impl Entities {
+impl WorldEntities {
     /// None, at tick 0.
     pub fn new() -> Self {
         Self::default()
     }
 
     /// The tick about to run.
-    pub fn now(&self) -> u64 {
-        self.now
+    pub fn current_tick(&self) -> u64 {
+        self.current_tick
     }
 
-    /// None, at tick `now`: what a save's entities are put back into.
-    pub fn at_tick(now: u64) -> Self {
-        Self { now, ..Self::default() }
+    /// None, at tick `current_tick`: what a save's entities are put back into.
+    pub fn at_tick(current_tick: u64) -> Self {
+        Self { current_tick, ..Self::default() }
     }
 
     /// How many entities there are.
@@ -61,29 +61,29 @@ impl Entities {
         EntityReader::new(&self.superchunks).superchunk(superchunk)
     }
 
-    /// The entity standing on `at`, if one does.
-    pub fn get(&self, at: CellIndex) -> Option<EntityRef<'_>> {
-        self.superchunk(at.superchunk())?.get(at)
+    /// The entity standing on `stood_cell`, if one does.
+    pub fn get(&self, stood_cell: CellIndex) -> Option<EntityRef<'_>> {
+        self.superchunk(stood_cell.superchunk())?.get(stood_cell)
     }
 
     /// Keeps exactly `superchunk_indices`, sorted:
     /// those it lacked added empty, those not among them dropped with
     /// their entities -- how many entities were dropped. Keeping them in
     /// chunk storage when their bitmaps go cold is work to come.
-    pub fn align(&mut self, superchunk_indices: &[SuperchunkIndex]) -> usize {
-        if self.superchunks.len() == superchunk_indices.len() && self.superchunks.iter().zip(superchunk_indices).all(|(kept, &index)| kept.index == index) {
+    pub fn keep_superchunks(&mut self, superchunk_indices: &[SuperchunkIndex]) -> usize {
+        if self.superchunks.len() == superchunk_indices.len() && self.superchunks.iter().zip(superchunk_indices).all(|(kept_superchunk, &wanted_index)| kept_superchunk.superchunk_index == wanted_index) {
             return 0;
         }
-        let mut had = std::mem::take(&mut self.superchunks).into_iter().peekable();
-        let mut dropped = 0;
-        for &index in superchunk_indices {
-            while let Some(superchunk) = had.next_if(|superchunk| superchunk.index < index) {
-                dropped += superchunk.len();
+        let mut had_superchunks = std::mem::take(&mut self.superchunks).into_iter().peekable();
+        let mut dropped_entities = 0;
+        for &wanted_index in superchunk_indices {
+            while let Some(superchunk) = had_superchunks.next_if(|superchunk| superchunk.superchunk_index < wanted_index) {
+                dropped_entities += superchunk.len();
             }
-            let superchunk = had.next_if(|superchunk| superchunk.index == index).unwrap_or_else(|| SuperchunkEntities::new(index));
+            let superchunk = had_superchunks.next_if(|superchunk| superchunk.superchunk_index == wanted_index).unwrap_or_else(|| SuperchunkEntities::new(wanted_index));
             self.superchunks.push(superchunk);
         }
-        dropped + had.map(|superchunk| superchunk.len()).sum::<usize>()
+        dropped_entities + had_superchunks.map(|superchunk| superchunk.len()).sum::<usize>()
     }
 
     /// Queues making `header`'s entity, with `attributes` sorted by
@@ -91,30 +91,30 @@ impl Entities {
     /// tick, the tick about to run or later. Not made, an entity
     /// standing on its cell.
     pub fn queue_put(&mut self, header: Header, attributes: &[AttributeBlock]) {
-        self.queued.put(header, attributes);
+        self.queued_instructions.put(header, attributes);
     }
 
-    /// Queues removing the entity standing on `at`, outside a tick.
-    pub fn queue_remove(&mut self, at: CellIndex) {
-        self.queued.remove(at);
+    /// Queues removing the entity standing on `stood_cell`, outside a tick.
+    pub fn queue_remove(&mut self, stood_cell: CellIndex) {
+        self.queued_instructions.remove(stood_cell);
     }
 
     /// How many instructions are queued.
-    pub fn queued(&self) -> usize {
-        self.queued.len()
+    pub fn queued_count(&self) -> usize {
+        self.queued_instructions.len()
     }
 
     /// Applies the instructions queued, in order, and empties the queue:
     /// an entity put in a superchunk not kept here is lost, one put on a
     /// cell another stands on refused.
     pub fn apply(&mut self) -> InstructionsApplied {
-        let mut applied = InstructionsApplied::default();
-        self.queued.apply(&mut self.superchunks, self.now, &mut applied);
-        self.queued.clear();
-        let now = self.now;
-        self.superchunks.iter_mut().for_each(|superchunk| superchunk.sort_wakes(now));
+        let mut instructions_applied = InstructionsApplied::default();
+        self.queued_instructions.apply(&mut self.superchunks, self.current_tick, &mut instructions_applied);
+        self.queued_instructions.clear();
+        let current_tick = self.current_tick;
+        self.superchunks.iter_mut().for_each(|superchunk| superchunk.sort_wakes(current_tick));
         self.superchunks.iter_mut().for_each(|superchunk| superchunk.names_anew(&mut ()));
-        applied
+        instructions_applied
     }
 
     /// Every entity, superchunk by superchunk.
@@ -123,7 +123,7 @@ impl Entities {
     }
 
     /// The tick just run is over: the next is about to run.
-    pub fn advance(&mut self) {
-        self.now += 1;
+    pub fn advance_tick(&mut self) {
+        self.current_tick += 1;
     }
 }

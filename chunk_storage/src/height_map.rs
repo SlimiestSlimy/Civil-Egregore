@@ -22,7 +22,7 @@ pub const HEIGHT_WORDS: usize = BYTES_START + CELLS_IN_CHUNK * CHUNKS_IN_SUPERCH
 /// Words a tall chunk's map takes.
 pub const TALL_WORDS: usize = CELLS_IN_CHUNK / HEIGHTS_IN_WORD;
 /// The most a chunk spans, lowest to highest, with a byte a cell.
-const SPAN: Height = u8::MAX as Height;
+const SPAN_IN_A_BYTE: Height = u8::MAX as Height;
 
 /// Words a superchunk's heights take, the first of them being `words`:
 /// [`HEIGHT_WORDS`], and [`TALL_WORDS`] more a tall chunk.
@@ -42,14 +42,14 @@ fn floor_in(words: &[u64], chunk: usize) -> Height {
 /// its chunk's own map says if the chunk is tall.
 pub fn height_in(words: &[u64], place: usize) -> Height {
     let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
-    let tall = words[TALL_WORD];
-    if tall >> chunk & 1 == 1 {
+    let tall_chunks = words[TALL_WORD];
+    if tall_chunks >> chunk & 1 == 1 {
         // Its map: after those of the tall chunks before it.
-        let map = HEIGHT_WORDS + (tall & ((1 << chunk) - 1)).count_ones() as usize * TALL_WORDS;
+        let map = HEIGHT_WORDS + (tall_chunks & ((1 << chunk) - 1)).count_ones() as usize * TALL_WORDS;
         return (words[map + cell / HEIGHTS_IN_WORD] >> ((cell % HEIGHTS_IN_WORD) as u32 * Height::BITS)) as Height;
     }
-    let byte = (words[BYTES_START + place / BYTES_IN_WORD] >> ((place % BYTES_IN_WORD) as u32 * u8::BITS)) as u8;
-    floor_in(words, chunk) + byte as Height
+    let height_byte = (words[BYTES_START + place / BYTES_IN_WORD] >> ((place % BYTES_IN_WORD) as u32 * u8::BITS)) as u8;
+    floor_in(words, chunk) + height_byte as Height
 }
 
 /// A superchunk's heights, one a cell, in Morton order.
@@ -62,7 +62,7 @@ pub struct HeightMap {
 
 impl HeightMap {
     /// Every cell at `height`.
-    pub fn filled(height: Height) -> Self {
+    pub fn all_at_height(height: Height) -> Self {
         Self::from_heights(|_| height)
     }
 
@@ -73,9 +73,9 @@ impl HeightMap {
         let mut words = vec![0u64; HEIGHT_WORDS];
         for chunk in 0..CHUNKS_IN_SUPERCHUNK {
             let cells = chunk * CELLS_IN_CHUNK..(chunk + 1) * CELLS_IN_CHUNK;
-            let (floor, top) = cells.clone().map(&height_at).fold((Height::MAX, 0), |(floor, top), height| (floor.min(height), top.max(height)));
+            let (floor, highest_height) = cells.clone().map(&height_at).fold((Height::MAX, 0), |(floor, highest_so_far), height| (floor.min(height), highest_so_far.max(height)));
             words[chunk / HEIGHTS_IN_WORD] |= (floor as u64) << ((chunk % HEIGHTS_IN_WORD) as u32 * Height::BITS);
-            if top - floor <= SPAN {
+            if highest_height - floor <= SPAN_IN_A_BYTE {
                 for place in cells {
                     words[BYTES_START + place / BYTES_IN_WORD] |= ((height_at(place) - floor) as u64) << ((place % BYTES_IN_WORD) as u32 * u8::BITS);
                 }
@@ -109,7 +109,7 @@ impl HeightMap {
 
     /// Whether the chunk at `chunk` in the superchunk is tall: spans
     /// more than a byte, and has a map of whole heights.
-    pub fn tall(&self, chunk: usize) -> bool {
+    pub fn is_tall(&self, chunk: usize) -> bool {
         self.words[TALL_WORD] >> chunk & 1 == 1
     }
 
@@ -119,9 +119,9 @@ impl HeightMap {
     pub fn set(&mut self, place: usize, height: Height) {
         let chunk = place / CELLS_IN_CHUNK;
         let floor = self.floor(chunk);
-        assert!(!self.tall(chunk) && (floor..=floor + SPAN).contains(&height), "a height its chunk cannot hold as it is");
-        let (word, shift) = (BYTES_START + place / BYTES_IN_WORD, (place % BYTES_IN_WORD) as u32 * u8::BITS);
-        self.words[word] = self.words[word] & !((u8::MAX as u64) << shift) | ((height - floor) as u64) << shift;
+        assert!(!self.is_tall(chunk) && (floor..=floor + SPAN_IN_A_BYTE).contains(&height), "a height its chunk cannot hold as it is");
+        let (word, byte_shift) = (BYTES_START + place / BYTES_IN_WORD, (place % BYTES_IN_WORD) as u32 * u8::BITS);
+        self.words[word] = self.words[word] & !((u8::MAX as u64) << byte_shift) | ((height - floor) as u64) << byte_shift;
     }
 
     /// Every word, as an image holds them.

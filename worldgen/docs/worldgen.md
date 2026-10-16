@@ -55,14 +55,14 @@ the cells about the change are worked out again.
 
 ## Generation
 
-How a world is generated as a whole is a `Generation`: the heights'
+How a world is generated as a whole is a `WorldGeneration`: the heights'
 shape, and how the grass and the trees lie on them -- saved with a
 world, a number a row, so one loaded goes on as it was made; made from
 the sliders' numbers (`utilities::tuning`) when a new world is set up
-(`Generation::from_tuning`), what is typed held to what a height, the
+(`WorldGeneration::from_tuning`), what is typed held to what a height, the
 mesh and the noise can take. What a dry cell starts with -- grass or
-dirt, and a tree or none -- is said once (`Generation::growth`, then
-`Growth::grown_at`), for the superchunks generated and for the renderer's
+dirt, and a tree or none -- is said once (`WorldGeneration::world_growth`, then
+`WorldGrowth::grown_at`), for the superchunks generated and for the renderer's
 map alike. A seed is found with land about where a flock is to stand
 (`seed_with_land`, `has_land_about`).
 
@@ -70,19 +70,19 @@ map alike. A seed is found with land about where a flock is to stand
 
 Grass and trees are not scattered cell by cell: they lie in patches
 (`Patches`). Every cell has a number, from the world's seed and where
-it is: smooth noise as broad as a patch (`patch`), finer noise on it
-(`detail`), and a lot drawn for the cell alone (`scatter`). The cells
+it is: smooth noise as broad as a patch (`patch_size_power`), finer noise on it
+(`detail_share`), and a lot drawn for the cell alone (`scatter_share`). The cells
 whose number is under a threshold have the thing; the threshold is
-found, from `SAMPLED` cells looked at, so that the share asked for
-(`cover`) do. Whole numbers only, as the heights, so the same on any
+found, from `CELLS_LOOKED_AT` cells looked at, so that the share asked for
+(`cover_share`) do. Whole numbers only, as the heights, so the same on any
 machine. The trees' numbers are kept apart from the grass's by a salt
 (`TREES_SALT`).
 
 A superchunk asks every dry cell, so what a cell is asked costs. The
-noise keeps the four points about the last cell (`Noise`): the next
+noise keeps the four points about the last cell (`SmoothNoise`): the next
 cell is nearly always among the same, and the four are hashed once a
 square, not once a cell. And a cell's number is never divided out:
-its three parts weighed (`Patches::weighed`) are set against the
+its three parts weighed (`Patches::weighed_cartesian`) are set against the
 threshold times what they weigh in all (`Patches::weights`), which
 says the same of every cell. Asked so, the grass and the trees of a
 superchunk of land took 0.34 G instructions where they had taken
@@ -138,18 +138,18 @@ how the heights are blended.
 A **vertex** is one to each square of a grid `2^span` cells a side,
 placed by lot in the square's middle half; the four of neighbouring
 squares make a quad, cut by lot along one diagonal or the other into
-two triangles. A vertex is ocean (`Shape::sea` of them) -- at the
+two triangles. A vertex is ocean (`LandShape::ocean_share` of them) -- at the
 lowest ground -- or land, at a height of its own.
 
 Whether a vertex is ocean is its own lot mixed with smooth noise some
-vertices broad (`Shape::clumping`): land and ocean clump, with no
+vertices broad (`LandShape::land_clumping`): land and ocean clump, with no
 blocks to show through. The more it counts, the less exactly the
 ocean's share is kept.
 
 Land is low by the ocean and higher inland. A land vertex's height is
-drawn between just over the ocean and the highest (`Shape::highest`):
-past `Shape::coast` vertices from any ocean one, any height as likely
-as another; nearer, the higher the less likely (`Shape::coast_low`, the
+drawn between just over the ocean and the highest (`LandShape::highest_land`):
+past `LandShape::coast_breadth` vertices from any ocean one, any height as likely
+as another; nearer, the higher the less likely (`LandShape::coast_low`, the
 power the lot is raised to, the most beside the ocean) -- so most
 coasts are low, each by a little of its own, and a few are cliffs.
 
@@ -182,7 +182,7 @@ differences compound inland.
 
 The broad mesh has a **weight** of one. The weight that reaches a
 vertex of a finer mesh is shared out by lot: each takes a share of its
-own -- a byte, from one less `Shape::weight` to one -- moves the land by
+own -- a byte, from one less `LandShape::weight` to one -- moves the land by
 its height times that share, and hands the share on to its own
 subdivisions, where it is shared out again. So under some vertices the
 land is broken up in detail and under others it keeps its parent's
@@ -191,7 +191,7 @@ shape: a plain stays mostly a plain, a ridge a ridge.
 Every cell's height follows from the seed and the cell alone, in whole
 numbers: the same whatever order cells or superchunks are made in. A
 cell on a line is in two triangles; it is always given to the first of
-them in a fixed order. `Lands` keeps the vertices about the last cell
+them in a fixed order. `WorldLand` keeps the vertices about the last cell
 and its triangle, with what a part of the triangle's area is
 multiplied by to be its share -- a division for a triangle, not three
 for a cell. Land costs more than ocean, which no finer mesh touches.
@@ -199,7 +199,7 @@ for a cell. Land costs more than ocean, which no finer mesh touches.
 ### On a lattice
 
 The meshes are worked out at the points of a lattice alone -- every
-fourth cell across and down (`LATTICE`, in `src/mesh/lands.rs`), a
+fourth cell across and down (`LATTICE_STEP_POWER`, in `src/mesh/lands.rs`), a
 sixteenth of the cells -- and a cell between has the four points'
 about it, each by how near it is (`between_the_lattice`). A point's
 land is kept in 16-bit fractions of a height and the cell's made whole
@@ -207,8 +207,8 @@ once, for the reason below. The lattice lies on the world's cells, not
 a superchunk's, so a cell's height still follows from the seed and
 where the cell is alone, and superchunks meet with no seam; a cell on
 a point is that point's land and no other is worked out for it
-(`Lands::land`), and a whole square of cells works each point out once
-(`Lands::heights_of_a_square`, what a superchunk's terrain is made
+(`WorldLand::land_at_cartesian`), and a whole square of cells works each point out once
+(`WorldLand::heights_of_a_square`, what a superchunk's terrain is made
 from).
 
 No line of a mesh is shorter than 16 cells, four steps of the lattice,
@@ -224,7 +224,7 @@ triangle into its own smaller ones; noise for the ground's detail.
 
 **Water** is a depth a cell: how far it stands over the ground, 0
 none, as deep as the ocean is. It is kept in the superchunk's image beside the heights
-(`SuperchunkImage::depth`), sparse by chunk: a map only for the chunks
+(`SuperchunkImage::water_depth`), sparse by chunk: a map only for the chunks
 with water, a byte a cell, or 16 bits a cell where it is deeper than
 255 (`chunk_storage::ChunkMaps`). The rules ask only whether a cell is under
 any, of one bitplane (`WET`). Nothing grows or spreads under water. Water does not

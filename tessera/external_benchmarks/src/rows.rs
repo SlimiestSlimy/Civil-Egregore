@@ -8,25 +8,25 @@ use bitmap::Bitmap;
 /// Bytes a row.
 pub const ROW_BYTES: usize = WIDTH / 8;
 /// Bytes the whole bitmap takes.
-pub const BYTES: usize = ROW_BYTES * HEIGHT;
+pub const BITMAP_BYTES: usize = ROW_BYTES * HEIGHT;
 
 /// A bitmap in rows of packed bits.
 #[derive(Clone, PartialEq, Eq)]
-pub struct Rows(pub Vec<u8>);
+pub struct BitmapRows(pub Vec<u8>);
 
-impl Rows {
+impl BitmapRows {
     /// `bitmap`'s cells, a row at a time -- read one cell at a time, so
     /// done before anything is timed.
     pub fn from_bitmap(bitmap: &Bitmap) -> Self {
-        let mut bytes = vec![0; BYTES];
+        let mut packed_bytes = vec![0; BITMAP_BYTES];
         for y in 0..HEIGHT {
             for x in 0..WIDTH {
                 if bitmap.get(x as u8, y as u8) {
-                    bytes[y * ROW_BYTES + x / 8] |= 0x80 >> (x % 8);
+                    packed_bytes[y * ROW_BYTES + x / 8] |= 0x80 >> (x % 8);
                 }
             }
         }
-        Rows(bytes)
+        BitmapRows(packed_bytes)
     }
 
     /// Whether the cell at `(x, y)` is set.

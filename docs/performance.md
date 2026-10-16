@@ -135,18 +135,18 @@ after: they are not one series, the tick having changed between them.
 
 Whether the compiler inlines a small function into its caller in
 another crate is its own call, and moves with changes nowhere near it.
-Drawing a random number through `utilities::hash::mix`, not the same
+Drawing a random number through `utilities::hash::mix_word`, not the same
 four lines written out, made the entity bucket's lookups
-(`Bucket::find`, `get`) stop being inlined into the sheep's rule: the
+(`Bucket::find_place`, `get`) stop being inlined into the sheep's rule: the
 tick's instructions (`pasture 300 333 4000 4 1`, the ticks alone) went
 from 67.88 million to 69.61, the world's every result unchanged. The
 lookups on the hot path are marked `#[inline]` now -- `Bucket::get`,
 `index_of`, `find`, `entity`, `SuperchunkEntities::get`,
-`Rng::draw` -- and the tick takes 67.78 million. A change that moves
+`RandomSource::next_draw` -- and the tick takes 67.78 million. A change that moves
 the count with no change of work is looked for there first.
 
 The same held for an array mapped by a closure. `Lookup::windows`
-read its layers with `types.map(...)`; once the actions crate (then named instructions)
+read its layers with `layer_types.map(...)`; once the actions crate (then named instructions)
 grew, the map was left as calls draining the array, a layer at a time,
 and the tick went from 53.72 million instructions to 54.98 with no
 change of work. Built by index (`std::array::from_fn`) and marked
@@ -156,7 +156,7 @@ change of work. Built by index (`std::array::from_fn`) and marked
 
 A rule's sampling drew its gaps with the machine's `ln`, which is not
 the same to the last bit on every machine. It is whole-number
-arithmetic now: a fixed-point `log2` of the draw over one of the
+arithmetic now: a fixed-point `log2_by_table` of the draw over one of the
 chance, worked out once where the chance is written
 (`utilities/docs/utilities.md`, "The gap"). The logarithm was first
 made by squaring, a bit of the answer a squaring, 48 of them a gap;

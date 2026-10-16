@@ -22,7 +22,7 @@ pub const MOST_HUMID: u32 = 255;
 /// the humidity 0 to 255 ([`Climate::humidity_level`]).
 pub const HUMIDITY_A_LEVEL_OF_CLOUD: u32 = 16;
 /// The hottest a tile is: a byte.
-pub const HOTTEST: u32 = 255;
+pub const HOTTEST_TEMPERATURE: u32 = 255;
 /// The highest a tile's pressure is: a byte.
 pub const HIGHEST_PRESSURE: u32 = 255;
 /// The pressure a tile is generated at, and all are at with no wind:
@@ -52,64 +52,64 @@ pub const RISE_THAT_HALVES: u32 = 64;
 /// ([`passes_a_slope`]).
 pub const FALL_THAT_FREES: u32 = 8;
 
-/// `from` up to `step` nearer `to`, never past it: how a number a
+/// `from_value` up to `step` nearer `to_value`, never past it: how a number a
 /// wind carries comes to its neighbour's.
-pub const fn nearer(from: u32, to: u32, step: u32) -> u32 {
-    if from < to {
-        if to - from < step { to } else { from + step }
-    } else if from - to < step {
-        to
+pub const fn nearer_by_step(from_value: u32, to_value: u32, step: u32) -> u32 {
+    if from_value < to_value {
+        if to_value - from_value < step { to_value } else { from_value + step }
+    } else if from_value - to_value < step {
+        to_value
     } else {
-        from - step
+        from_value - step
     }
 }
 
-/// The parts of `whole` with which air goes from a tile to one
-/// `slope` higher -- lower, under 0 -- by pressure or by wind, the
+/// The parts of `whole_parts` with which air goes from a tile to one
+/// `height_rise` higher -- lower, under 0 -- by pressure or by wind, the
 /// one resistance: all of it down a fall of [`FALL_THAT_FREES`] or
 /// more, a little less on the level, and less the steeper the rise,
 /// mildly -- half where the rise is [`RISE_THAT_HALVES`] past that
 /// fall.
-pub const fn passes_a_slope(slope: i32, whole: u32) -> u32 {
-    let held_as_by = slope + FALL_THAT_FREES as i32;
+pub const fn passes_a_slope(height_rise: i32, whole_parts: u32) -> u32 {
+    let held_as_by = height_rise + FALL_THAT_FREES as i32;
     let held_as_by = if held_as_by > 0 { held_as_by as u32 } else { 0 };
-    whole * RISE_THAT_HALVES / (RISE_THAT_HALVES + held_as_by)
+    whole_parts * RISE_THAT_HALVES / (RISE_THAT_HALVES + held_as_by)
 }
 
-/// How strongly pressure `here` falls to a tile at `there`: by how
+/// How strongly pressure `pressure_here` falls to a tile at `pressure_there`: by how
 /// far that one is under it, and not at all within
 /// [`PRESSURE_GAP_AT_REST`] -- so of the tiles about one, the lowest
 /// is the likeliest drawn and none higher ever is.
-pub const fn pressure_falls_by(here: u32, there: u32) -> u32 {
-    if here > there + PRESSURE_GAP_AT_REST { here - there } else { 0 }
+pub const fn pressure_falls_by(pressure_here: u32, pressure_there: u32) -> u32 {
+    if pressure_here > pressure_there + PRESSURE_GAP_AT_REST { pressure_here - pressure_there } else { 0 }
 }
 
-/// The whole number nearest the square root of `number`.
-const fn nearest_root(number: u32) -> u32 {
+/// The whole number nearest the square root of `squared_number`.
+const fn nearest_root(squared_number: u32) -> u32 {
     // The greatest whole number whose square is no more, a bit at a time from the highest...
-    let (mut root, mut bit) = (0u64, 1u64 << 15);
-    while bit != 0 {
-        if (root | bit) * (root | bit) <= number as u64 {
-            root |= bit;
+    let (mut root_so_far, mut trial_bit) = (0u64, 1u64 << 15);
+    while trial_bit != 0 {
+        if (root_so_far | trial_bit) * (root_so_far | trial_bit) <= squared_number as u64 {
+            root_so_far |= trial_bit;
         }
-        bit >>= 1;
+        trial_bit >>= 1;
     }
-    // ...and the next, if `number` is past the half way between them.
-    if (2 * root + 1) * (2 * root + 1) < 4 * number as u64 { root as u32 + 1 } else { root as u32 }
+    // ...and the next, if `squared_number` is past the half way between them.
+    if (2 * root_so_far + 1) * (2 * root_so_far + 1) < 4 * squared_number as u64 { root_so_far as u32 + 1 } else { root_so_far as u32 }
 }
 
-/// The vector `across` and `down` held to a circle of
+/// The vector `blows_east` and `blows_south` held to a circle of
 /// [`STRONGEST_WIND`]: as it is within it, else shortened to it the
 /// way it points, to the nearest whole numbers -- so a wind blows no
 /// stronger between two of the eight ways than along one.
-const fn held_to_the_circle(across: i32, down: i32) -> (i32, i32) {
-    let square = across * across + down * down;
-    if square <= STRONGEST_WIND * STRONGEST_WIND {
-        return (across, down);
+const fn held_to_the_circle(blows_east: i32, blows_south: i32) -> (i32, i32) {
+    let length_squared = blows_east * blows_east + blows_south * blows_south;
+    if length_squared <= STRONGEST_WIND * STRONGEST_WIND {
+        return (blows_east, blows_south);
     }
     // Its length, in 256ths.
-    let length = nearest_root(square as u32 * 256 * 256) as i32;
-    ((across * STRONGEST_WIND * 256 + across.signum() * (length / 2)) / length, (down * STRONGEST_WIND * 256 + down.signum() * (length / 2)) / length)
+    let length_in_256ths = nearest_root(length_squared as u32 * 256 * 256) as i32;
+    ((blows_east * STRONGEST_WIND * 256 + blows_east.signum() * (length_in_256ths / 2)) / length_in_256ths, (blows_south * STRONGEST_WIND * 256 + blows_south.signum() * (length_in_256ths / 2)) / length_in_256ths)
 }
 
 /// The wind over a tile: a vector, how strongly it blows across
@@ -121,44 +121,44 @@ const fn held_to_the_circle(across: i32, down: i32) -> (i32, i32) {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Wind {
     /// How strongly it blows east: west if under 0.
-    across: i8,
+    blows_east: i8,
     /// How strongly it blows south: north if under 0.
-    down: i8,
+    blows_south: i8,
 }
 
 impl Wind {
     /// No wind.
-    pub const CALM: Self = Self { across: 0, down: 0 };
+    pub const CALM_AIR: Self = Self { blows_east: 0, blows_south: 0 };
 
-    /// The wind blowing `across` east and `down` south, held to
+    /// The wind blowing `blows_east` east and `blows_south` south, held to
     /// [`STRONGEST_WIND`] whichever way that is
     /// ([`held_to_the_circle`]).
-    pub const fn blowing(across: i32, down: i32) -> Self {
-        let (across, down) = held_to_the_circle(across, down);
-        Self { across: across as i8, down: down as i8 }
+    pub const fn from_vector(blows_east: i32, blows_south: i32) -> Self {
+        let (blows_east, blows_south) = held_to_the_circle(blows_east, blows_south);
+        Self { blows_east: blows_east as i8, blows_south: blows_south as i8 }
     }
 
-    /// The wind the byte `state` says: a nibble each, two's
+    /// The wind the byte `state_byte` says: a nibble each, two's
     /// complement.
-    pub const fn of_state(state: u32) -> Self {
-        Self { across: (((state & 0xF) as i32) << 28 >> 28) as i8, down: (((state >> 4 & 0xF) as i32) << 28 >> 28) as i8 }
+    pub const fn of_state(state_byte: u32) -> Self {
+        Self { blows_east: (((state_byte & 0xF) as i32) << 28 >> 28) as i8, blows_south: (((state_byte >> 4 & 0xF) as i32) << 28 >> 28) as i8 }
     }
 
     /// Its byte.
-    pub const fn state(self) -> u32 {
-        (self.across as u32 & 0xF) | (self.down as u32 & 0xF) << 4
+    pub const fn state_byte(self) -> u32 {
+        (self.blows_east as u32 & 0xF) | (self.blows_south as u32 & 0xF) << 4
     }
 
     /// How strongly it blows east and south: under 0, west and north.
-    pub const fn vector(self) -> (i32, i32) {
-        (self.across as i32, self.down as i32)
+    pub const fn east_south_vector(self) -> (i32, i32) {
+        (self.blows_east as i32, self.blows_south as i32)
     }
 
     /// How strong it blows: its vector's length, to the nearest whole
     /// number, 0 calm.
-    pub const fn strength(self) -> u32 {
-        let (across, down) = (self.across as i32, self.down as i32);
-        nearest_root((across * across + down * down) as u32)
+    pub const fn wind_strength(self) -> u32 {
+        let (blows_east, blows_south) = (self.blows_east as i32, self.blows_south as i32);
+        nearest_root((blows_east * blows_east + blows_south * blows_south) as u32)
     }
 
     /// The step to the tile it blows to this time, across and down,
@@ -167,24 +167,24 @@ impl Wind {
     /// the eight tiles about it, the stronger the likelier. None if
     /// it reaches no tile this time.
     pub const fn step_drawn(self, drawn_across: u32, drawn_down: u32) -> Option<(i32, i32)> {
-        let across = if drawn_across < self.across.unsigned_abs() as u32 { self.across.signum() as i32 } else { 0 };
-        let down = if drawn_down < self.down.unsigned_abs() as u32 { self.down.signum() as i32 } else { 0 };
-        if across == 0 && down == 0 { None } else { Some((across, down)) }
+        let step_east = if drawn_across < self.blows_east.unsigned_abs() as u32 { self.blows_east.signum() as i32 } else { 0 };
+        let step_south = if drawn_down < self.blows_south.unsigned_abs() as u32 { self.blows_south.signum() as i32 } else { 0 };
+        if step_east == 0 && step_south == 0 { None } else { Some((step_east, step_south)) }
     }
 
-    /// This wind with a push of `across` and `down` added to it: what
+    /// This wind with a push of `push_east` and `push_south` added to it: what
     /// air going that way does to the wind over the tile it leaves,
     /// the more of it the stronger.
-    pub const fn pushed(self, across: i32, down: i32) -> Self {
-        Self::blowing(self.across as i32 + across, self.down as i32 + down)
+    pub const fn pushed_by(self, push_east: i32, push_south: i32) -> Self {
+        Self::from_vector(self.blows_east as i32 + push_east, self.blows_south as i32 + push_south)
     }
 
-    /// This wind a step nearer `other`, each of its two ways by one,
+    /// This wind a step nearer `other_wind`, each of its two ways by one,
     /// held to the circle as any wind: two winds averaged a little at
     /// a time, so winds that differ wear each other down and one wind
     /// over all stays as it is.
-    pub const fn a_step_towards(self, other: Self) -> Self {
-        Self::blowing((self.across + (other.across - self.across).signum()) as i32, (self.down + (other.down - self.down).signum()) as i32)
+    pub const fn a_step_towards(self, other_wind: Self) -> Self {
+        Self::from_vector((self.blows_east + (other_wind.blows_east - self.blows_east).signum()) as i32, (self.blows_south + (other_wind.blows_south - self.blows_south).signum()) as i32)
     }
 }
 
@@ -197,7 +197,7 @@ pub struct Climate {
     pub humidity: u32,
     /// The wind over it.
     pub wind: Wind,
-    /// How hot it is: 0 to [`HOTTEST`].
+    /// How hot it is: 0 to [`HOTTEST_TEMPERATURE`].
     pub temperature: u32,
     /// The pressure of its air: 0 to [`HIGHEST_PRESSURE`],
     /// [`PRESSURE_AT_REST`] where no wind has pushed air in or out.
@@ -205,15 +205,15 @@ pub struct Climate {
 }
 
 impl Climate {
-    /// The climate the plane's number `number` says.
-    pub const fn of_number(number: u32) -> Self {
-        Self { humidity: number & 0xFF, wind: Wind::of_state(number >> 8 & 0xFF), temperature: number >> 16 & 0xFF, pressure: number >> 24 }
+    /// The climate the plane's number `plane_number` says.
+    pub const fn of_number(plane_number: u32) -> Self {
+        Self { humidity: plane_number & 0xFF, wind: Wind::of_state(plane_number >> 8 & 0xFF), temperature: plane_number >> 16 & 0xFF, pressure: plane_number >> 24 }
     }
 
     /// The number the plane holds for it.
-    pub const fn number(self) -> u32 {
-        assert!(self.humidity <= MOST_HUMID && self.temperature <= HOTTEST && self.pressure <= HIGHEST_PRESSURE, "a climate within its bytes");
-        self.humidity | self.wind.state() << 8 | self.temperature << 16 | self.pressure << 24
+    pub const fn plane_number(self) -> u32 {
+        assert!(self.humidity <= MOST_HUMID && self.temperature <= HOTTEST_TEMPERATURE && self.pressure <= HIGHEST_PRESSURE, "a climate within its bytes");
+        self.humidity | self.wind.state_byte() << 8 | self.temperature << 16 | self.pressure << 24
     }
 
     /// Its humidity as a level of cloud, 0 to 15: what a cloud over
@@ -223,22 +223,22 @@ impl Climate {
     }
 
     /// This climate with its humidity up to
-    /// [`DEGREES_A_WIND_CARRIES`] nearer that of `upwind`: what a
+    /// [`DEGREES_A_WIND_CARRIES`] nearer that of `upwind_climate`: what a
     /// wind carries of the air it comes from.
-    pub const fn with_humidity_carried_from(self, upwind: Self) -> Self {
-        Self { humidity: nearer(self.humidity, upwind.humidity, DEGREES_A_WIND_CARRIES), ..self }
+    pub const fn with_humidity_carried_from(self, upwind_climate: Self) -> Self {
+        Self { humidity: nearer_by_step(self.humidity, upwind_climate.humidity, DEGREES_A_WIND_CARRIES), ..self }
     }
 
     /// This climate with its temperature up to
-    /// [`DEGREES_A_WIND_CARRIES`] nearer that of `upwind`.
-    pub const fn with_temperature_carried_from(self, upwind: Self) -> Self {
-        Self { temperature: nearer(self.temperature, upwind.temperature, DEGREES_A_WIND_CARRIES), ..self }
+    /// [`DEGREES_A_WIND_CARRIES`] nearer that of `upwind_climate`.
+    pub const fn with_temperature_carried_from(self, upwind_climate: Self) -> Self {
+        Self { temperature: nearer_by_step(self.temperature, upwind_climate.temperature, DEGREES_A_WIND_CARRIES), ..self }
     }
 
-    /// This climate with its wind a step nearer that of `upwind`
+    /// This climate with its wind a step nearer that of `upwind_climate`
     /// ([`Wind::a_step_towards`]).
-    pub const fn with_wind_carried_from(self, upwind: Self) -> Self {
-        Self { wind: self.wind.a_step_towards(upwind.wind), ..self }
+    pub const fn with_wind_carried_from(self, upwind_climate: Self) -> Self {
+        Self { wind: self.wind.a_step_towards(upwind_climate.wind), ..self }
     }
 
     /// The level of cloud above which a tile of this climate is
@@ -247,8 +247,8 @@ impl Climate {
     /// humid, the less. 9 in the coldest and most humid, to
     /// [`RAINS_ABOVE_AT_THE_MOST`].
     pub const fn rains_above(self) -> u32 {
-        let above = RAINS_ABOVE_IN_COLD_DRY_AIR + self.temperature / HEAT_A_LEVEL_MORE_HELD - self.humidity / HUMIDITY_A_LEVEL_SOONER;
-        if above > RAINS_ABOVE_AT_THE_MOST { RAINS_ABOVE_AT_THE_MOST } else { above }
+        let rain_level = RAINS_ABOVE_IN_COLD_DRY_AIR + self.temperature / HEAT_A_LEVEL_MORE_HELD - self.humidity / HUMIDITY_A_LEVEL_SOONER;
+        if rain_level > RAINS_ABOVE_AT_THE_MOST { RAINS_ABOVE_AT_THE_MOST } else { rain_level }
     }
 
     /// Whether a tile of this climate under `cloud` is raining.

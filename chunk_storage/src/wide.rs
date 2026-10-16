@@ -9,47 +9,47 @@ use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 /// bitmap's, times its bits, over the cells of one of its tiles -- a
 /// number a tile, however many cells a tile is.
 pub const fn bucket_words(layer_type: LayerType) -> usize {
-    (WORDS * layer_type.bits() as usize) >> layer_type.tile_shift()
+    (WORDS * layer_type.width_bits() as usize) >> layer_type.tile_shift()
 }
 
-/// Puts `plane`, the bit `bit` of every cell, into `wide`, of `bits`
-/// bits a cell: where `plane` has a cell set, that bit of the cell.
-/// Of a plane of tiles, `wide` is as much shorter and the tiles are
-/// `plane`'s first cells, in Morton order: no more of it is read.
-pub fn spread(plane: &CellWords, bits: u32, bit: u32, wide: &mut [u64]) {
-    debug_assert!(wide.len() <= WORDS * bits as usize && wide.len().is_multiple_of(bits as usize), "a wide bucket");
-    for (index, &word) in plane[..wide.len() / bits as usize].iter().enumerate() {
-        let mut left = word;
-        while left != 0 {
-            let at = (index * BITS_PER_WORD + left.trailing_zeros() as usize) * bits as usize + bit as usize;
-            wide[at / BITS_PER_WORD] |= 1 << (at % BITS_PER_WORD);
-            left &= left - 1;
+/// Puts `one_bit_bitmap`, the bit `bit_of_cell` of every cell, into `wide_bucket`, of `bits_a_cell`
+/// bits a cell: where `one_bit_bitmap` has a cell set, that bit of the cell.
+/// Of a plane of tiles, `wide_bucket` is as much shorter and the tiles are
+/// `one_bit_bitmap`'s first cells, in Morton order: no more of it is read.
+pub fn spread_into_wide(one_bit_bitmap: &CellWords, bits_a_cell: u32, bit_of_cell: u32, wide_bucket: &mut [u64]) {
+    debug_assert!(wide_bucket.len() <= WORDS * bits_a_cell as usize && wide_bucket.len().is_multiple_of(bits_a_cell as usize), "a wide bucket");
+    for (word_index, &word) in one_bit_bitmap[..wide_bucket.len() / bits_a_cell as usize].iter().enumerate() {
+        let mut bits_left = word;
+        while bits_left != 0 {
+            let bit_in_wide = (word_index * BITS_PER_WORD + bits_left.trailing_zeros() as usize) * bits_a_cell as usize + bit_of_cell as usize;
+            wide_bucket[bit_in_wide / BITS_PER_WORD] |= 1 << (bit_in_wide % BITS_PER_WORD);
+            bits_left &= bits_left - 1;
         }
     }
 }
 
-/// The bit `bit` of every cell of `wide`, of `bits` bits a cell, as a
-/// bitmap: [`spread`] undone. Of a plane of tiles, the tiles are the
+/// The bit `bit_of_cell` of every cell of `wide_bucket`, of `bits_a_cell` bits a cell, as a
+/// bitmap: [`spread_into_wide`] undone. Of a plane of tiles, the tiles are the
 /// bitmap's first cells and the rest of it is clear.
-pub fn plane(wide: &[u64], bits: u32, bit: u32) -> Box<CellWords> {
-    debug_assert!(wide.len() <= WORDS * bits as usize, "a wide bucket");
-    let mut plane = Box::new([0; WORDS]);
+pub fn bitmap_of_bit(wide_bucket: &[u64], bits_a_cell: u32, bit_of_cell: u32) -> Box<CellWords> {
+    debug_assert!(wide_bucket.len() <= WORDS * bits_a_cell as usize, "a wide bucket");
+    let mut one_bit_bitmap = Box::new([0; WORDS]);
     // The lowest bit of every cell of a word.
-    let lowest = u64::MAX / ((1u64 << bits) - 1).max(1);
-    for (index, &word) in wide.iter().enumerate() {
-        let mut left = word >> bit & lowest;
-        while left != 0 {
-            let cell = (index * BITS_PER_WORD + left.trailing_zeros() as usize) / bits as usize;
-            plane[cell / BITS_PER_WORD] |= 1 << (cell % BITS_PER_WORD);
-            left &= left - 1;
+    let lowest_bits = u64::MAX / ((1u64 << bits_a_cell) - 1).max(1);
+    for (word_index, &word) in wide_bucket.iter().enumerate() {
+        let mut bits_left = word >> bit_of_cell & lowest_bits;
+        while bits_left != 0 {
+            let cell = (word_index * BITS_PER_WORD + bits_left.trailing_zeros() as usize) / bits_a_cell as usize;
+            one_bit_bitmap[cell / BITS_PER_WORD] |= 1 << (cell % BITS_PER_WORD);
+            bits_left &= bits_left - 1;
         }
     }
-    plane
+    one_bit_bitmap
 }
 
-/// How many cells of `words`, of `bits` bits a cell, hold a number that
+/// How many cells of `words`, of `bits_a_cell` bits a cell, hold a number that
 /// is not 0.
-pub fn cells_set(words: &[u64], bits: u32) -> u32 {
-    let lowest = u64::MAX / ((1u64 << bits) - 1).max(1);
-    words.iter().map(|&word| ((0..bits).fold(0, |any, bit| any | word >> bit) & lowest).count_ones()).sum()
+pub fn cells_set(words: &[u64], bits_a_cell: u32) -> u32 {
+    let lowest_bits = u64::MAX / ((1u64 << bits_a_cell) - 1).max(1);
+    words.iter().map(|&word| ((0..bits_a_cell).fold(0, |any_bit_so_far, bit_of_cell| any_bit_so_far | word >> bit_of_cell) & lowest_bits).count_ones()).sum()
 }

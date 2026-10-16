@@ -21,9 +21,9 @@ mod writes;
 
 pub use arena::BitmapArena;
 pub use reader::aligned_tiles::{SmallTiles, SMALL_TILES_TOGETHER, SMALL_TILE_CELLS, SMALL_TILE_SIDE};
-pub use reader::{Reader, Window};
+pub use reader::{CellReader, Window};
 pub use superchunk::{Bucket, LayerView, Superchunk};
-pub use writes::{count_missed, WritesApplied, Shape, Write, WriteOp, WriteQueues};
+pub use writes::{count_missed, WritesApplied, WriteShape, Write, WriteOp, WriteQueues};
 
 use bitmap::{BITS_PER_WORD, WORDS};
 use coordinates::CHUNKS_IN_SUPERCHUNK;
@@ -39,31 +39,31 @@ type ChunkSet = u16;
 
 const _: () = assert!(ChunkSet::BITS as usize == CHUNKS_IN_SUPERCHUNK, "a chunk set holds a bit for every chunk");
 
-/// Whether `set` holds the chunk at `index`.
-fn contains(set: ChunkSet, index: usize) -> bool {
-    set >> index & 1 == 1
+/// Whether `chunk_set` holds the chunk at `chunk_place`.
+fn contains(chunk_set: ChunkSet, chunk_place: usize) -> bool {
+    chunk_set >> chunk_place & 1 == 1
 }
 
-/// Puts the chunk at `index` in `set`, or takes it out.
-fn put(set: &mut ChunkSet, index: usize, member: bool) {
+/// Puts the chunk at `chunk_place` in `chunk_set`, or takes it out.
+fn put(chunk_set: &mut ChunkSet, chunk_place: usize, member: bool) {
     if member {
-        *set |= 1 << index;
+        *chunk_set |= 1 << chunk_place;
     } else {
-        *set &= !(1 << index);
+        *chunk_set &= !(1 << chunk_place);
     }
 }
 
-/// The chunks in `set`, in Morton order.
-fn members(set: ChunkSet) -> impl Iterator<Item = usize> {
-    (0..CHUNKS_IN_SUPERCHUNK).filter(move |&index| contains(set, index))
+/// The chunks in `chunk_set`, in Morton order.
+fn members(chunk_set: ChunkSet) -> impl Iterator<Item = usize> {
+    (0..CHUNKS_IN_SUPERCHUNK).filter(move |&chunk_place| contains(chunk_set, chunk_place))
 }
 
 /// The most bits a cell a layer has.
-const WIDEST: usize = 16;
+const MOST_BITS_A_CELL: usize = 16;
 
 /// A bucket with no cell set, however wide: what a chunk with no bucket
 /// is read as.
-static NO_CELLS: [u64; WORDS * WIDEST] = [0; WORDS * WIDEST];
+static NO_CELLS: [u64; WORDS * MOST_BITS_A_CELL] = [0; WORDS * MOST_BITS_A_CELL];
 
 /// Words in a count tile: the 32x32 cells whose set cells are counted,
 /// so sampling and the far search pass over an empty one whole. Two

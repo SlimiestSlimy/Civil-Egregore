@@ -4,12 +4,12 @@
 //! ways from the cell to each (`docs/actions.md`, "The shapes").
 
 use crate::tiles_about::{self, WAY_AT, WAY_OFFSETS};
-pub use crate::tiles_about::About;
+pub use crate::tiles_about::TilesAbout;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use simulation::Turn;
 use std::ops::{BitAnd, BitOr};
-use utilities::rng::Rng;
+use utilities::rng::RandomSource;
 
 /// The ways from a cell: to each of the nine about it, numbered in
 /// Morton order of where they lead -- up and left, up, left, the cell
@@ -54,10 +54,10 @@ impl Cells {
         self.0.count_ones()
     }
 
-    /// Its cells that `other` has not.
+    /// Its cells that `other_cells` has not.
     #[inline]
-    pub fn without(self, other: Cells) -> Cells {
-        Cells(self.0 & !other.0)
+    pub fn cells_not_in(self, other_cells: Cells) -> Cells {
+        Cells(self.0 & !other_cells.0)
     }
 }
 
@@ -66,8 +66,8 @@ impl BitAnd for Cells {
 
     /// The cells both have.
     #[inline]
-    fn bitand(self, other: Cells) -> Cells {
-        Cells(self.0 & other.0)
+    fn bitand(self, other_cells: Cells) -> Cells {
+        Cells(self.0 & other_cells.0)
     }
 }
 
@@ -76,8 +76,8 @@ impl BitOr for Cells {
 
     /// The cells either has.
     #[inline]
-    fn bitor(self, other: Cells) -> Cells {
-        Cells(self.0 | other.0)
+    fn bitor(self, other_cells: Cells) -> Cells {
+        Cells(self.0 | other_cells.0)
     }
 }
 
@@ -85,88 +85,88 @@ impl BitOr for Cells {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Around {
     /// The cells the type holds at.
-    pub set: Cells,
+    pub set_cells: Cells,
     /// The cells in hot bitmaps: in the world, and read.
     pub hot: Cells,
 }
 
-/// What is about `at`: asked once, and every set of cells about it
+/// What is about `asked_cell`: asked once, and every set of cells about it
 /// made and read with it.
 #[inline]
-pub fn about(at: CellIndex) -> About {
-    tiles_about::about_cell(at)
+pub fn tiles_about_cell(asked_cell: CellIndex) -> TilesAbout {
+    tiles_about::about_cell(asked_cell)
 }
 
-impl About {
+impl TilesAbout {
     /// The cell itself.
     #[inline]
-    pub fn centre(&self) -> Cells {
+    pub fn centre_cell(&self) -> Cells {
         Cells(self.centre_word())
     }
 
     /// Its eight neighbours, those in the world.
     #[inline]
-    pub fn ring(&self) -> Cells {
+    pub fn neighbour_cells(&self) -> Cells {
         Cells(self.ring_word())
     }
 
     /// The cell and its neighbours.
     #[inline]
-    pub fn nine(&self) -> Cells {
+    pub fn nine_cells(&self) -> Cells {
         Cells(self.nine_word())
     }
 
     /// The one cell `way` from it: none, off the world.
     #[inline]
-    pub fn towards(&self, way: u32) -> Cells {
+    pub fn cell_towards(&self, way: u32) -> Cells {
         Cells(self.way_word(way))
     }
 }
 
-/// The cell `way` from `at`: none off the world.
-pub fn cell(at: CellIndex, way: u32) -> Option<CellIndex> {
-    let (across, down) = WAY_OFFSETS[way as usize];
-    at.offset(across as i32 - 1, down as i32 - 1)
+/// The cell `way` from `from_cell`: none off the world.
+pub fn cell(from_cell: CellIndex, way: u32) -> Option<CellIndex> {
+    let (across_offset, down_offset) = WAY_OFFSETS[way as usize];
+    from_cell.at_cartesian_offset(across_offset as i32 - 1, down_offset as i32 - 1)
 }
 
-/// The way from `at` to `cell`, one of the nine about it.
-pub fn way_of(at: CellIndex, cell: CellIndex) -> u32 {
-    let (at, cell) = (at.cartesian(), cell.cartesian());
-    u32::from(WAY_AT[((cell.y + 1 - at.y) * 3 + cell.x + 1 - at.x) as usize])
+/// The way from `from_cell` to `cell`, one of the nine about it.
+pub fn way_of(from_cell: CellIndex, cell: CellIndex) -> u32 {
+    let (from_cell_cartesian, cell) = (from_cell.cartesian(), cell.cartesian());
+    u32::from(WAY_AT[((cell.y + 1 - from_cell_cartesian.y) * 3 + cell.x + 1 - from_cell_cartesian.x) as usize])
 }
 
-/// The way to one of `choices`, cells `about` a cell, drawn from
-/// `random`: none if there is none to choose, and then nothing is
+/// The way to one of `choice_cells`, cells `about_tiles` a cell, drawn from
+/// `random_stream`: none if there is none to choose, and then nothing is
 /// drawn. Any is as likely as another, and which a draw comes to goes
 /// by the ways' own order -- Morton order -- so it is the same
 /// neighbour wherever the cell lies in its tiles.
-pub fn pick(random: &mut Rng, about: &About, choices: Cells) -> Option<u32> {
-    if choices.is_empty() {
+pub fn pick_way(random_stream: &mut RandomSource, about_tiles: &TilesAbout, choice_cells: Cells) -> Option<u32> {
+    if choice_cells.is_empty() {
         return None;
     }
-    let ways = about.ways_of(choices.0);
-    Some(set_bit_of_rank(u64::from(ways), random.below(u64::from(ways.count_ones())) as u32))
+    let ways = about_tiles.ways_of(choice_cells.0);
+    Some(set_bit_of_rank(u64::from(ways), random_stream.draw_below(u64::from(ways.count_ones())) as u32))
 }
 
-/// The set bit of `bits` with `rank` set bits under it.
+/// The set bit of `bit_word` with `set_bit_rank` set bits under it.
 #[inline]
-pub(crate) fn set_bit_of_rank(bits: u64, rank: u32) -> u32 {
-    let mut left = bits;
-    (0..rank).for_each(|_| left &= left - 1);
-    left.trailing_zeros()
+pub(crate) fn set_bit_of_rank(bit_word: u64, set_bit_rank: u32) -> u32 {
+    let mut bits_left = bit_word;
+    (0..set_bit_rank).for_each(|_| bits_left &= bits_left - 1);
+    bits_left.trailing_zeros()
 }
 
-/// One of `wanted` among `open`, if any is, else any of `open`: where
+/// One of `wanted_cells` among `open_cells`, if any is, else any of `open_cells`: where
 /// to step when some neighbours are better than others.
-pub fn prefer(random: &mut Rng, about: &About, wanted: Cells, open: Cells) -> Option<u32> {
-    pick(random, about, if (wanted & open).is_empty() { open } else { wanted & open })
+pub fn prefer_way(random_stream: &mut RandomSource, about_tiles: &TilesAbout, wanted_cells: Cells, open_cells: Cells) -> Option<u32> {
+    pick_way(random_stream, about_tiles, if (wanted_cells & open_cells).is_empty() { open_cells } else { wanted_cells & open_cells })
 }
 
-/// The cells `about` a cell, of `layer_type`, as the tick found them:
+/// The cells `about_tiles` a cell, of `layer_type`, as the tick found them:
 /// the one to four small tiles they lie in read as they lie
 /// ([`crate::tiles_about`]), under the nine.
 #[inline]
-pub fn read_layer(turn: &Turn, layer_type: LayerType, about: &About) -> Around {
-    let tiles = tiles_about::read_layer(turn, layer_type, about, about.nine_word());
-    Around { set: Cells(tiles.set), hot: Cells(tiles.hot) }
+pub fn read_layer(turn: &Turn, layer_type: LayerType, about_tiles: &TilesAbout) -> Around {
+    let tiles = tiles_about::read_layer(turn, layer_type, about_tiles, about_tiles.nine_word());
+    Around { set_cells: Cells(tiles.cells_set), hot: Cells(tiles.hot) }
 }

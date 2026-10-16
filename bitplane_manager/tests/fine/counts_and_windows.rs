@@ -5,10 +5,10 @@
 
 use crate::tests::*;
 use bitmap::CellWords;
-use bitplane_manager::{BitmapArena, BucketKey, NotHot, Reader, Shape, Window, Write, WriteOp, COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS};
-use chunk_storage::{Bits16, Bits2, Bits4, Bits8, Wide, Width, ChunkStorage, LayerCodec};
-use utilities::rng::Rng;
-use utilities::seed::counted;
+use bitplane_manager::{BitmapArena, BucketKey, NotHot, CellReader, WriteShape, Window, Write, WriteOp, COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS};
+use chunk_storage::{Bits16, Bits2, Bits4, Bits8, WidePlane, Width, ChunkStorage, LayerCodec};
+use utilities::rng::RandomSource;
+use utilities::seed::counted_seed;
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 
 /// The mock superchunk, made hot: every cell is dirt or grass, never
@@ -16,32 +16,32 @@ use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCH
 /// included, and each superchunk bitplane the cells of its hot bitmaps.
 #[test]
 fn every_bitmap_counts_its_cells() {
-    let mut codec = LayerCodec::new();
-    let mut arena = BitmapArena::new();
-    let mut storage = ChunkStorage::new(1 << 12);
-    storage.insert(WORLD_MIDDLE, grass_on_dirt(counted(), 8, &mut codec));
+    let mut layer_codec = LayerCodec::new();
+    let mut bitmap_arena = BitmapArena::new();
+    let mut cold_storage = ChunkStorage::new(1 << 12);
+    cold_storage.insert(WORLD_MIDDLE, grass_on_dirt(counted_seed(), 8, &mut layer_codec));
     for chunk in WORLD_MIDDLE.chunks() {
-        arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
+        bitmap_arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &cold_storage, &mut layer_codec);
     }
-    let (mut full_chunks, mut grass) = (0, 0);
+    let (mut full_chunks, mut grass_count) = (0, 0);
     for chunk in WORLD_MIDDLE.chunks() {
         let (dirt_bucket, grass_bucket) = (
-            arena.bucket(BucketKey { layer_type: MOCK_DIRT, chunk }).expect("hot"),
-            arena.bucket(BucketKey { layer_type: MOCK_GRASS, chunk }).expect("hot"),
+            bitmap_arena.bucket(BucketKey { layer_type: MOCK_DIRT, chunk }).expect("hot"),
+            bitmap_arena.bucket(BucketKey { layer_type: MOCK_GRASS, chunk }).expect("hot"),
         );
-        let ones = |cells: &CellWords| cells.iter().map(|word| word.count_ones()).sum::<u32>();
-        assert_eq!(dirt_bucket.count(), ones(dirt_bucket.cells()));
-        assert_eq!(grass_bucket.count(), ones(grass_bucket.cells()));
+        let cells_set_in = |cells: &CellWords| cells.iter().map(|word| word.count_ones()).sum::<u32>();
+        assert_eq!(dirt_bucket.count(), cells_set_in(dirt_bucket.cells()));
+        assert_eq!(grass_bucket.count(), cells_set_in(grass_bucket.cells()));
         assert_eq!(dirt_bucket.count() + grass_bucket.count(), 1 << 16, "{chunk:?}");
-        assert!(dirt_bucket.cells().iter().zip(grass_bucket.cells()).all(|(dirt, grass)| dirt & grass == 0), "never both");
+        assert!(dirt_bucket.cells().iter().zip(grass_bucket.cells()).all(|(dirt, grass_word)| dirt & grass_word == 0), "never both");
         full_chunks += (dirt_bucket.count() == 1 << 16) as u32;
-        grass += grass_bucket.count();
+        grass_count += grass_bucket.count();
     }
     assert!(full_chunks > 0, "a chunk with no grass: 65,536 cells of dirt");
-    assert!((6..=8).contains(&grass), "about 8 cells of grass, {grass}");
-    assert_eq!(arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), grass);
-    assert_eq!(arena.superchunk_count(MOCK_DIRT, WORLD_MIDDLE), (1 << 20) - grass);
-    assert_eq!(arena.superchunk_count(MOCK_GRASS, ORIGIN), 0, "nothing hot there");
+    assert!((6..=8).contains(&grass_count), "about 8 cells of grass, {grass_count}");
+    assert_eq!(bitmap_arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), grass_count);
+    assert_eq!(bitmap_arena.superchunk_count(MOCK_DIRT, WORLD_MIDDLE), (1 << 20) - grass_count);
+    assert_eq!(bitmap_arena.superchunk_count(MOCK_GRASS, ORIGIN), 0, "nothing hot there");
 }
 
 /// Counts move by one a cell changed, not at all for a cell already so;
@@ -49,33 +49,33 @@ fn every_bitmap_counts_its_cells() {
 /// with it.
 #[test]
 fn counts_follow_every_change() {
-    let mut codec = LayerCodec::new();
-    let mut arena = BitmapArena::new();
-    let mut storage = ChunkStorage::new(1 << 12);
-    let mut random = Rng::new(counted());
-    storage.insert(WORLD_MIDDLE, grass_on_dirt(counted(), 0, &mut codec));
-    let chunk = ChunkIndex::from_superchunk_place(WORLD_MIDDLE, random.below(16) as usize);
-    arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
-    let (dirt, grass) = (BucketKey { layer_type: MOCK_DIRT, chunk }, BucketKey { layer_type: MOCK_GRASS, chunk });
-    assert_eq!((arena.bucket(dirt).expect("hot").count(), arena.bucket(grass).expect("hot").count()), (1 << 16, 0));
+    let mut layer_codec = LayerCodec::new();
+    let mut bitmap_arena = BitmapArena::new();
+    let mut cold_storage = ChunkStorage::new(1 << 12);
+    let mut seeded_random = RandomSource::new(counted_seed());
+    cold_storage.insert(WORLD_MIDDLE, grass_on_dirt(counted_seed(), 0, &mut layer_codec));
+    let chunk = ChunkIndex::from_superchunk_place(WORLD_MIDDLE, seeded_random.draw_below(16) as usize);
+    bitmap_arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &cold_storage, &mut layer_codec);
+    let (dirt, grass_key) = (BucketKey { layer_type: MOCK_DIRT, chunk }, BucketKey { layer_type: MOCK_GRASS, chunk });
+    assert_eq!((bitmap_arena.bucket(dirt).expect("hot").count(), bitmap_arena.bucket(grass_key).expect("hot").count()), (1 << 16, 0));
 
-    let cell = cell_in(chunk, (random.below(256) as u8, random.below(256) as u8));
+    let cell = cell_in(chunk, (seeded_random.draw_below(256) as u8, seeded_random.draw_below(256) as u8));
     for _ in 0..2 {
-        write(&mut arena, MOCK_GRASS, WriteOp::Set, cell);
-        write(&mut arena, MOCK_DIRT, WriteOp::Unset, cell);
+        write(&mut bitmap_arena, MOCK_GRASS, WriteOp::SetCell, cell);
+        write(&mut bitmap_arena, MOCK_DIRT, WriteOp::ClearCell, cell);
     }
-    assert_eq!((arena.bucket(dirt).expect("hot").count(), arena.bucket(grass).expect("hot").count()), ((1 << 16) - 1, 1));
-    assert_eq!(arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), 1);
-    write(&mut arena, MOCK_GRASS, WriteOp::Unset, cell);
-    write(&mut arena, MOCK_DIRT, WriteOp::Set, cell);
-    assert_eq!((arena.bucket(dirt).expect("hot").count(), arena.bucket(grass).expect("hot").count()), (1 << 16, 0));
+    assert_eq!((bitmap_arena.bucket(dirt).expect("hot").count(), bitmap_arena.bucket(grass_key).expect("hot").count()), ((1 << 16) - 1, 1));
+    assert_eq!(bitmap_arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), 1);
+    write(&mut bitmap_arena, MOCK_GRASS, WriteOp::ClearCell, cell);
+    write(&mut bitmap_arena, MOCK_DIRT, WriteOp::SetCell, cell);
+    assert_eq!((bitmap_arena.bucket(dirt).expect("hot").count(), bitmap_arena.bucket(grass_key).expect("hot").count()), (1 << 16, 0));
 
-    write(&mut arena, MOCK_GRASS, WriteOp::Set, cell);
-    arena.write_back(WORLD_MIDDLE, &mut storage, &mut codec);
-    assert!(arena.evict(grass));
-    assert_eq!(arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), 0, "evicted, waiting in the ring");
-    arena.make_hot(grass, None, &mut codec);
-    assert_eq!(arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), 1, "back as it was");
+    write(&mut bitmap_arena, MOCK_GRASS, WriteOp::SetCell, cell);
+    bitmap_arena.write_back(WORLD_MIDDLE, &mut cold_storage, &mut layer_codec);
+    assert!(bitmap_arena.evict(grass_key));
+    assert_eq!(bitmap_arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), 0, "evicted, waiting in the ring");
+    bitmap_arena.make_hot(grass_key, None, &mut layer_codec);
+    assert_eq!(bitmap_arena.superchunk_count(MOCK_GRASS, WORLD_MIDDLE), 1, "back as it was");
 }
 
 /// A window of cells read at once is its cells read one by one: at any
@@ -84,48 +84,48 @@ fn counts_follow_every_change() {
 /// with superchunks and types read by turns.
 #[test]
 fn windows_read_at_once_are_the_cells_read_one_by_one() {
-    let (mut codec, mut arena) = (LayerCodec::new(), BitmapArena::new());
-    let mut random = Rng::new(counted());
+    let (mut layer_codec, mut bitmap_arena) = (LayerCodec::new(), BitmapArena::new());
+    let mut seeded_random = RandomSource::new(counted_seed());
     for y in 0..5 {
         for x in 0..5 {
             for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
                 // Some chunks of grass left cold, and dirt over half the superchunks.
-                if random.below(7) != 0 {
-                    arena.make_hot(BucketKey { layer_type: MOCK_GRASS, chunk }, None, &mut codec);
+                if seeded_random.draw_below(7) != 0 {
+                    bitmap_arena.make_hot(BucketKey { layer_type: MOCK_GRASS, chunk }, None, &mut layer_codec);
                 }
                 if (x + y).is_multiple_of(2) {
-                    arena.make_hot(BucketKey { layer_type: MOCK_DIRT, chunk }, None, &mut codec);
+                    bitmap_arena.make_hot(BucketKey { layer_type: MOCK_DIRT, chunk }, None, &mut layer_codec);
                 }
             }
         }
     }
-    let side = 5 * SUPERCHUNK_SIDE_CELLS;
+    let side_in_cells = 5 * SUPERCHUNK_SIDE_CELLS;
     for _ in 0..40_000 {
         // Half scattered, half crowded about one place: windows with one cell set, and with many.
-        let spread = if random.below(2) == 0 { side } else { 64 };
-        let cell = CellCartesian { x: random.below(u64::from(spread)) as u32, y: random.below(u64::from(spread)) as u32 };
-        arena.queue(if random.below(3) == 0 { MOCK_DIRT } else { MOCK_GRASS }, Write::cell(cell.into(), WriteOp::Set));
+        let spread_in_cells = if seeded_random.draw_below(2) == 0 { side_in_cells } else { 64 };
+        let cell = CellCartesian { x: seeded_random.draw_below(u64::from(spread_in_cells)) as u32, y: seeded_random.draw_below(u64::from(spread_in_cells)) as u32 };
+        bitmap_arena.queue_write(if seeded_random.draw_below(3) == 0 { MOCK_DIRT } else { MOCK_GRASS }, Write::cell(cell.into(), WriteOp::SetCell));
     }
-    arena.apply();
-    let reader = Reader::new(arena.superchunks());
-    let edge = SUPERCHUNK_SIDE_CELLS;
-    let mut origins = vec![(0, 0), (1, 1), (7, 7), (255, 255), (252, 3), (edge - 1, edge - 1), (edge - 4, edge - 5), (2 * edge, 3 * edge - 1), (side - 8, side - 8)];
-    origins.extend((0..3000).map(|at| {
-        let reach = u64::from(if at % 3 == 0 { 64 } else { side - 8 });
-        (random.below(reach) as u32, random.below(reach) as u32)
+    bitmap_arena.apply();
+    let cell_reader = CellReader::new(bitmap_arena.superchunks());
+    let superchunk_edge = SUPERCHUNK_SIDE_CELLS;
+    let mut origins = vec![(0, 0), (1, 1), (7, 7), (255, 255), (252, 3), (superchunk_edge - 1, superchunk_edge - 1), (superchunk_edge - 4, superchunk_edge - 5), (2 * superchunk_edge, 3 * superchunk_edge - 1), (side_in_cells - 8, side_in_cells - 8)];
+    origins.extend((0..3000).map(|drawn_index| {
+        let reach = u64::from(if drawn_index % 3 == 0 { 64 } else { side_in_cells - 8 });
+        (seeded_random.draw_below(reach) as u32, seeded_random.draw_below(reach) as u32)
     }));
     for (x, y) in origins {
-        let (width, height) = (random.between(1, 8) as u32, random.between(1, 8) as u32);
+        let (width, height) = (seeded_random.draw_between(1, 8) as u32, seeded_random.draw_between(1, 8) as u32);
         let origin = CellIndex::from(CellCartesian { x, y });
         for layer_type in [MOCK_GRASS, MOCK_DIRT] {
-            let mut expected = Window::default();
+            let mut expected_window = Window::default();
             for (dx, dy) in (0..height).flat_map(|dy| (0..width).map(move |dx| (dx, dy))) {
-                if let Ok(set) = reader.holds(layer_type, CellIndex::from(CellCartesian { x: x + dx, y: y + dy })) {
-                    expected.hot |= 1 << (dy * 8 + dx);
-                    expected.set |= (set as u64) << (dy * 8 + dx);
+                if let Ok(cell_is_set) = cell_reader.layer_holds_cell(layer_type, CellIndex::from(CellCartesian { x: x + dx, y: y + dy })) {
+                    expected_window.hot |= 1 << (dy * 8 + dx);
+                    expected_window.cells_set |= (cell_is_set as u64) << (dy * 8 + dx);
                 }
             }
-            assert_eq!(reader.window(layer_type, origin, width, height), expected, "{width}x{height} at ({x}, {y}), {layer_type:?}");
+            assert_eq!(cell_reader.window(layer_type, origin, width, height), expected_window, "{width}x{height} at ({x}, {y}), {layer_type:?}");
         }
     }
 }
@@ -135,88 +135,88 @@ fn windows_read_at_once_are_the_cells_read_one_by_one() {
 /// flipped: what sampling passes over a bitmap by.
 #[test]
 fn every_count_tile_counts_its_cells() {
-    let mut codec = LayerCodec::new();
-    let mut arena = BitmapArena::new();
-    let mut storage = ChunkStorage::new(1 << 12);
-    let mut random = Rng::new(counted());
-    storage.insert(WORLD_MIDDLE, grass_on_dirt(counted(), 300_000, &mut codec));
+    let mut layer_codec = LayerCodec::new();
+    let mut bitmap_arena = BitmapArena::new();
+    let mut cold_storage = ChunkStorage::new(1 << 12);
+    let mut seeded_random = RandomSource::new(counted_seed());
+    cold_storage.insert(WORLD_MIDDLE, grass_on_dirt(counted_seed(), 300_000, &mut layer_codec));
     for chunk in WORLD_MIDDLE.chunks() {
-        arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &storage, &mut codec);
+        bitmap_arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &cold_storage, &mut layer_codec);
     }
-    let counted = |arena: &BitmapArena| {
-        let superchunk = arena.superchunks().iter().find(|superchunk| superchunk.index() == WORLD_MIDDLE).expect("in use");
+    let check_counts = |counted_arena: &BitmapArena| {
+        let superchunk = counted_arena.superchunks().iter().find(|superchunk| superchunk.superchunk_index() == WORLD_MIDDLE).expect("in use");
         for layer_type in [MOCK_DIRT, MOCK_GRASS] {
             let layer = superchunk.layer(layer_type).expect("hot");
             for chunk in 0..16 {
                 let (cells, tile_counts) = (layer.cells(chunk), layer.tile_counts(chunk));
                 for tile in 0..COUNT_TILES_IN_CHUNK {
-                    let ones: u32 = cells[tile * COUNT_TILE_WORDS..][..COUNT_TILE_WORDS].iter().map(|word| word.count_ones()).sum();
-                    assert_eq!(tile_counts[tile] as u32, ones, "{layer_type:?}, chunk {chunk}, count tile {tile}");
+                    let cells_set_counted: u32 = cells[tile * COUNT_TILE_WORDS..][..COUNT_TILE_WORDS].iter().map(|word| word.count_ones()).sum();
+                    assert_eq!(tile_counts[tile] as u32, cells_set_counted, "{layer_type:?}, chunk {chunk}, count tile {tile}");
                 }
                 assert_eq!(tile_counts.iter().map(|&count| count as u32).sum::<u32>(), layer.count(chunk));
             }
         }
     };
-    counted(&arena);
-    let corner = WORLD_MIDDLE.top_left().cartesian();
+    check_counts(&bitmap_arena);
+    let superchunk_corner = WORLD_MIDDLE.top_left().cartesian();
     for _ in 0..3000 {
-        let cell = CellCartesian { x: corner.x + random.below(1000) as u32, y: corner.y + random.below(1000) as u32 };
-        let op = [WriteOp::Set, WriteOp::Unset, WriteOp::Flip][random.below(3) as usize];
-        let shape = match random.below(50) {
-            0 => Shape::Rect { width: random.between(1, 40) as u8, height: random.between(1, 40) as u8 },
-            1 => Shape::Disc { radius: random.below(16) as u8 },
-            _ => Shape::Cell,
+        let cell = CellCartesian { x: superchunk_corner.x + seeded_random.draw_below(1000) as u32, y: superchunk_corner.y + seeded_random.draw_below(1000) as u32 };
+        let write_op = [WriteOp::SetCell, WriteOp::ClearCell, WriteOp::FlipCell][seeded_random.draw_below(3) as usize];
+        let write_shape = match seeded_random.draw_below(50) {
+            0 => WriteShape::RectangleOfCells { width: seeded_random.draw_between(1, 40) as u8, height: seeded_random.draw_between(1, 40) as u8 },
+            1 => WriteShape::DiscOfCells { radius_in_cells: seeded_random.draw_below(16) as u8 },
+            _ => WriteShape::Cell,
         };
-        arena.queue(if random.below(2) == 0 { MOCK_GRASS } else { MOCK_DIRT }, Write { at: cell.into(), op, shape });
+        bitmap_arena.queue_write(if seeded_random.draw_below(2) == 0 { MOCK_GRASS } else { MOCK_DIRT }, Write { anchor_cell: cell.into(), write_op, write_shape });
     }
-    assert!(arena.apply().changed > 1000);
-    counted(&arena);
+    assert!(bitmap_arena.apply().cells_changed > 1000);
+    check_counts(&bitmap_arena);
 }
 
 /// A wide plane of `W`'s bits a cell holds a number a cell: written,
 /// read back whole, counted where it is not 0; written back, it is
 /// cold as its bits' bitmaps, a layer type each, and made hot again
 /// from them it holds what it held.
-fn a_wide_plane_holds_numbers<W: Width>(plane: Wide<W>) {
-    let (mut codec, mut arena, mut flushed) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
-    let mut storage = ChunkStorage::new(1 << 12);
-    let mut random = Rng::new(counted());
-    let (layer_type, chunk) = (plane.layer_type(), ChunkIndex::from_superchunk_place(WORLD_MIDDLE, random.below(16) as usize));
-    let key = BucketKey { layer_type, chunk };
-    assert_eq!(arena.make_hot_layers(chunk, &[layer_type], &storage, &mut codec), 1);
+fn a_wide_plane_holds_numbers<W: Width>(wide_plane: WidePlane<W>) {
+    let (mut layer_codec, mut bitmap_arena, mut flushed_superchunks) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
+    let mut cold_storage = ChunkStorage::new(1 << 12);
+    let mut seeded_random = RandomSource::new(counted_seed());
+    let (layer_type, chunk) = (wide_plane.layer_type(), ChunkIndex::from_superchunk_place(WORLD_MIDDLE, seeded_random.draw_below(16) as usize));
+    let bucket_key = BucketKey { layer_type, chunk };
+    assert_eq!(bitmap_arena.make_hot_layers(chunk, &[layer_type], &cold_storage, &mut layer_codec), 1);
     // Numbers over the plane's whole range, on cells of their own; one of them put again, one taken back to 0.
     // Of a plane of tiles, on tiles of their own: a cell drawn in each, and another of the same tile to read it by.
-    let shift = layer_type.tile_shift();
+    let tile_shift_bits = layer_type.tile_shift();
     let mut tiles = std::collections::BTreeSet::new();
     while tiles.len() < 40 {
-        tiles.insert(random.below(1 << (16 - shift)) as usize);
+        tiles.insert(seeded_random.draw_below(1 << (16 - tile_shift_bits)) as usize);
     }
-    let in_tile = |tile: usize, random: &mut Rng| CellIndex::from_chunk_place(chunk, tile << shift | random.below(1 << shift) as usize);
-    let numbers: Vec<(CellIndex, u32)> = tiles.iter().map(|&tile| (in_tile(tile, &mut random), 1 + random.below(u64::from(plane.most())) as u32)).collect();
-    let same_tiles: Vec<CellIndex> = tiles.iter().map(|&tile| in_tile(tile, &mut random)).collect();
-    let (emptied, _) = numbers[7];
-    for &(cell, number) in &numbers {
-        arena.queue(layer_type, Write::value(plane, cell, number));
+    let in_tile = |tile: usize, random_for_tile: &mut RandomSource| CellIndex::from_chunk_place(chunk, tile << tile_shift_bits | random_for_tile.draw_below(1 << tile_shift_bits) as usize);
+    let cell_numbers: Vec<(CellIndex, u32)> = tiles.iter().map(|&tile| (in_tile(tile, &mut seeded_random), 1 + seeded_random.draw_below(u64::from(wide_plane.most_value())) as u32)).collect();
+    let same_tiles: Vec<CellIndex> = tiles.iter().map(|&tile| in_tile(tile, &mut seeded_random)).collect();
+    let (emptied_cell, _) = cell_numbers[7];
+    for &(cell, cell_number) in &cell_numbers {
+        bitmap_arena.queue_write(layer_type, Write::value(wide_plane, cell, cell_number));
     }
-    arena.queue(layer_type, Write::value(plane, numbers[0].0, plane.most()));
-    arena.queue(layer_type, Write::value(plane, emptied, 0));
-    arena.apply();
-    let held = |arena: &BitmapArena| numbers.iter().map(|&(cell, _)| arena.value(plane, cell)).collect::<Vec<_>>();
-    let expected: Vec<_> = numbers.iter().enumerate().map(|(nth, &(_, number))| Ok(if nth == 0 { plane.most() } else if nth == 7 { 0 } else { number })).collect();
-    assert_eq!(held(&arena), expected, "{} bits a cell", W::BITS);
-    assert_eq!(same_tiles.iter().map(|&cell| arena.value(plane, cell)).collect::<Vec<_>>(), expected, "every cell of a tile reads the tile's number");
-    assert_eq!(arena.bucket(key).expect("hot").count(), 39, "the cells not at 0");
-    assert_eq!(arena.bucket(key).expect("hot").words().len(), (1024 * W::BITS as usize) >> shift, "a bitmap's words a bit, over a tile's cells");
+    bitmap_arena.queue_write(layer_type, Write::value(wide_plane, cell_numbers[0].0, wide_plane.most_value()));
+    bitmap_arena.queue_write(layer_type, Write::value(wide_plane, emptied_cell, 0));
+    bitmap_arena.apply();
+    let numbers_held = |arena_read: &BitmapArena| cell_numbers.iter().map(|&(cell, _)| arena_read.value(wide_plane, cell)).collect::<Vec<_>>();
+    let expected_numbers: Vec<_> = cell_numbers.iter().enumerate().map(|(number_index, &(_, written_number))| Ok(if number_index == 0 { wide_plane.most_value() } else if number_index == 7 { 0 } else { written_number })).collect();
+    assert_eq!(numbers_held(&bitmap_arena), expected_numbers, "{} bits a cell", W::BITS_A_CELL);
+    assert_eq!(same_tiles.iter().map(|&cell| bitmap_arena.value(wide_plane, cell)).collect::<Vec<_>>(), expected_numbers, "every cell of a tile reads the tile's number");
+    assert_eq!(bitmap_arena.bucket(bucket_key).expect("hot").count(), 39, "the cells not at 0");
+    assert_eq!(bitmap_arena.bucket(bucket_key).expect("hot").words().len(), (1024 * W::BITS_A_CELL as usize) >> tile_shift_bits, "a bitmap's words a bit, over a tile's cells");
 
-    assert_eq!(arena.write_back(WORLD_MIDDLE, &mut storage, &mut codec), 1);
-    storage.flush_all(&mut flushed);
-    arena.flushed(&flushed);
-    assert!(layer_type.planes().any(|bit| storage.layer(chunk, bit).is_some()) && storage.layer(chunk, layer_type).is_none(), "cold as its bits' bitmaps");
-    assert!(arena.evict(key));
-    assert_eq!(arena.value(plane, emptied), Err(NotHot(key)));
-    assert_eq!(arena.make_hot_layers(chunk, &[layer_type], &storage, &mut codec), 1);
-    assert_eq!(held(&arena), expected, "{} bits a cell, from the cold pool", W::BITS);
-    assert_eq!(arena.bucket(key).expect("hot").count(), 39);
+    assert_eq!(bitmap_arena.write_back(WORLD_MIDDLE, &mut cold_storage, &mut layer_codec), 1);
+    cold_storage.flush_all(&mut flushed_superchunks);
+    bitmap_arena.flushed_from_ring(&flushed_superchunks);
+    assert!(layer_type.each_bitplane().any(|bit_layer_type| cold_storage.layer(chunk, bit_layer_type).is_some()) && cold_storage.layer(chunk, layer_type).is_none(), "cold as its bits' bitmaps");
+    assert!(bitmap_arena.evict(bucket_key));
+    assert_eq!(bitmap_arena.value(wide_plane, emptied_cell), Err(NotHot(bucket_key)));
+    assert_eq!(bitmap_arena.make_hot_layers(chunk, &[layer_type], &cold_storage, &mut layer_codec), 1);
+    assert_eq!(numbers_held(&bitmap_arena), expected_numbers, "{} bits a cell, from the cold pool", W::BITS_A_CELL);
+    assert_eq!(bitmap_arena.bucket(bucket_key).expect("hot").count(), 39);
 }
 
 /// A plane of tiles 8 by 8 cells holds a number a tile, read at any
@@ -224,15 +224,15 @@ fn a_wide_plane_holds_numbers<W: Width>(plane: Wide<W>) {
 /// hot and cold, as any wide plane.
 #[test]
 fn planes_of_tiles_hold_a_number_a_tile() {
-    a_wide_plane_holds_numbers(Wide::<Bits4>::of_tiles(40, 3));
-    a_wide_plane_holds_numbers(Wide::<Bits16>::of_tiles(40, 3));
+    a_wide_plane_holds_numbers(WidePlane::<Bits4>::of_tiles(40, 3));
+    a_wide_plane_holds_numbers(WidePlane::<Bits16>::of_tiles(40, 3));
 }
 
 /// Planes of 2, 4, 8 and 16 bits a cell each hold their numbers, hot and cold.
 #[test]
 fn wide_planes_hold_numbers_at_every_width() {
-    a_wide_plane_holds_numbers(Wide::<Bits2>::new(40));
-    a_wide_plane_holds_numbers(Wide::<Bits4>::new(40));
-    a_wide_plane_holds_numbers(Wide::<Bits8>::new(40));
-    a_wide_plane_holds_numbers(Wide::<Bits16>::new(40));
+    a_wide_plane_holds_numbers(WidePlane::<Bits2>::new(40));
+    a_wide_plane_holds_numbers(WidePlane::<Bits4>::new(40));
+    a_wide_plane_holds_numbers(WidePlane::<Bits8>::new(40));
+    a_wide_plane_holds_numbers(WidePlane::<Bits16>::new(40));
 }

@@ -21,10 +21,10 @@ pub struct SuperchunkCells {
 }
 
 impl SuperchunkCells {
-    /// The image of these cells, every layer encoded by `codec`.
-    pub fn image(&self, codec: &mut LayerCodec) -> SuperchunkImage {
-        let encoded: Vec<(usize, LayerType, Vec<u64>)> = self.layers.iter().map(|(place, layer_type, cells)| (*place, *layer_type, codec.encode(cells).to_vec())).collect();
-        let changes: Vec<LayerChange> = encoded.iter().map(|(place, layer_type, words)| LayerChange { place: *place, layer_type: *layer_type, encoded: words }).collect();
-        SuperchunkImage::new(&self.heights).with_water(&self.water_depths).rewritten(&changes)
+    /// The image of these cells, every layer encoded by `layer_codec`.
+    pub fn image(&self, layer_codec: &mut LayerCodec) -> SuperchunkImage {
+        let encoded_layers: Vec<(usize, LayerType, Vec<u64>)> = self.layers.iter().map(|(place, layer_type, cells)| (*place, *layer_type, layer_codec.encode_cells(cells).to_vec())).collect();
+        let layer_changes: Vec<LayerChange> = encoded_layers.iter().map(|(place, layer_type, words)| LayerChange { place: *place, layer_type: *layer_type, encoded_layer: words }).collect();
+        SuperchunkImage::new(&self.heights).with_water(&self.water_depths).rewritten_with(&layer_changes)
     }
 }

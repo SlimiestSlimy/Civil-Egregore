@@ -25,18 +25,18 @@ applies; an action is a function that reads or that queues several.
 ## Compares
 
 A compare says what a rule saw -- a cell holding or lacking a layer,
-the number a plane holds, an entity's attribute (`compare::holds`,
-`lacks`, `value`, `attribute`; `Compare`) -- and is queued as an
+the number a plane holds, an entity's attribute (`compare::layer_holds`,
+`layer_lacks`, `value`, `attribute`; `Compare`) -- and is queued as an
 instruction of its own (`compare::from_here`). Come to in the second
 phase, if what it says no longer holds, everything the same author
 queued after it is skipped, up to the end of the compare
-(`compare::end`) or the next compare given. Every write lies under
+(`compare::end_from_here`) or the next compare given. Every write lies under
 one: none is held against nothing.
 
 A compare within another is opened and closed in turn
 (`compare::open_compare`, `compare::close_compare`): skipped with the outer, skipping
-no more than its own. The compares there are: of a cell (`holds`,
-`lacks`, `value`), of a cell being free for an entity (`cell_free`),
+no more than its own. The compares there are: of a cell (`layer_holds`,
+`layer_lacks`, `value`), of a cell being free for an entity (`cell_free`),
 of an entity being there still (`entity`), of an attribute whole
 (`attribute`, `attribute_blocks`) or of one member of it
 (`attribute_member`).
@@ -52,7 +52,7 @@ open as it was queued holds when it is come to:
   the attribute whole (`write::attribute_whole`, its blocks carried
   beside the instruction) or taken (`write::attribute_removed`) --
   and its wake (`write::wake`);
-- an entity whole (`entity`): made (`entity::make`), moved, within its
+- an entity whole (`entity`): made (`entity::queue_entity_made`), moved, within its
   superchunk or over a border (`entity::move_to`), removed
   (`entity::remove`).
 

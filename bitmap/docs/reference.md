@@ -11,7 +11,7 @@ The design is in `bitmap.md`.
 **`CellWords`**: `[u64; WORDS]`, a bitmap's words.
 
 **`Bitmap`**: **`new`**, **`words`** / **`words_mut`**, **`get`** /
-**`set`** / **`unset`** a cell by `(x, y)`, **`reset`**,
+**`set`** / **`clear_cell`** a cell by `(x, y)`, **`reset`**,
 **`count_set`**, **`is_empty`**, **`copy_from`**.
 
 Morton runs, a run of cells from an index: **`morton_run(first,
@@ -35,22 +35,22 @@ inclusive, either way round, clamped to the bitmap (**`clamped_column`**,
 ## `morton.rs`
 
 **`morton_index(x, y)`**: the cell's Morton index, from a table spreading a
-byte's bits (`SPREAD`). **`morton_coordinates(index)`**: undone
-(`compact`).
+byte's bits (`SPREAD_BYTE_TABLE`). **`morton_coordinates(cell_morton_index)`**: undone
+(`gather_even_bits`).
 
 ## `window.rs`
 
 `WORD_TILE_SIDE` (8): a word tile's side, and a window's.
-**`in_word_tile(index)`**: a cell's column and row in its word tile,
+**`in_word_tile(cell_morton_index)`**: a cell's column and row in its word tile,
 from its Morton index (`PLACE_IN_WORD_TILE`).
 
 **`rows_from_morton(word)`**: a word tile, one Morton-ordered word, row
 by row -- cell `(x, y)` at bit `y * 8 + x` -- by three delta
 swaps (`MORTON_TO_ROWS`, **`swap_index_bits`**, **`swap_mask`**);
-**`morton_from_rows(rows)`**: undone. **`left_columns(columns)`**,
-**`top_rows(rows)`**: the masks keeping a tile's first columns and rows.
-**`window(word_tiles, across, down)`**: the 8x8 window `(across, down)`
-into the 16x16 square of four word tiles, row by row (**`beside`**: two
+**`morton_from_rows(row_ordered_bits)`**: undone. **`left_columns(column_count)`**,
+**`top_rows(row_count)`**: the masks keeping a tile's first columns and rows.
+**`window(word_tiles, columns_across, rows_down)`**: the 8x8 window `(across, down)`
+into the 16x16 square of four word tiles, row by row (**`window_across_pair`**: two
 word tiles side by side, cut across).
 
 ## `diagnostics/`, `transient_data.rs`

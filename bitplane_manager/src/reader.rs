@@ -7,21 +7,21 @@ use super::{COARSEST_SCALE, COUNTS_IN_COARSEST, COUNT_TILE_CELLS, NotHot, contai
 use super::superchunk::Superchunk;
 use bitmap::{BITS_PER_WORD, CellWords};
 use bitmap::window::{PLACE_IN_WORD_TILE, WORD_TILE_SIDE, in_word_tile, left_columns, rows_from_morton, top_rows, window};
-use chunk_storage::{BucketKey, LayerType, Wide, Width};
+use chunk_storage::{BucketKey, LayerType, WidePlane, Width};
 use coordinates::{CellIndex, SuperchunkIndex};
 use std::cell::Cell;
-use utilities::cache::prefetch;
+use utilities::cache::prefetch_cache_line;
 
 /// Reads cells from superchunks, remembering its last lookup -- one a
 /// thread -- so runs of reads in one superchunk search nothing.
-pub struct Reader<'a> {
+pub struct CellReader<'a> {
     /// The superchunks read, sorted by superchunk index.
     superchunks: &'a [Superchunk],
     /// The lookups, remembering the last.
     lookup: Lookup,
 }
 
-impl<'a> Reader<'a> {
+impl<'a> CellReader<'a> {
     /// A reader of `superchunks`: an arena's ([`BitmapArena::superchunks`]).
     pub fn new(superchunks: &'a [Superchunk]) -> Self {
         Self { superchunks, lookup: Lookup::default() }
@@ -29,14 +29,14 @@ impl<'a> Reader<'a> {
 
     /// Whether `layer_type` holds at `cell`: its superchunk, chunk and
     /// bit taken from its index.
-    pub fn holds(&self, layer_type: LayerType, cell: CellIndex) -> Result<bool, NotHot> {
-        self.lookup.holds(self.superchunks, layer_type, cell)
+    pub fn layer_holds_cell(&self, layer_type: LayerType, cell: CellIndex) -> Result<bool, NotHot> {
+        self.lookup.layer_holds_cell(self.superchunks, layer_type, cell)
     }
 
-    /// The number `plane` holds at `cell`: one read, however many bits.
+    /// The number `wide_plane` holds at `cell`: one read, however many bits.
     #[inline]
-    pub fn value<W: Width>(&self, plane: Wide<W>, cell: CellIndex) -> Result<u32, NotHot> {
-        self.lookup.value(self.superchunks, plane, cell)
+    pub fn value<W: Width>(&self, wide_plane: WidePlane<W>, cell: CellIndex) -> Result<u32, NotHot> {
+        self.lookup.value(self.superchunks, wide_plane, cell)
     }
 
     /// The window of `width` by `height` cells (each up to 8) whose top
@@ -48,19 +48,19 @@ impl<'a> Reader<'a> {
         tile
     }
 
-    /// [`Reader::window`], of each of `types` at once: one window of
+    /// [`CellReader::window`], of each of `layer_types` at once: one window of
     /// cells read in several layers costs little more than in one, where
     /// it lies being worked out once.
     #[inline]
-    pub fn windows<const N: usize>(&self, types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
-        self.lookup.windows(self.superchunks, types, origin, width, height)
+    pub fn windows<const N: usize>(&self, layer_types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
+        self.lookup.windows(self.superchunks, layer_types, origin, width, height)
     }
 
     /// Asks memory for the word `cell` is in, of `layer_type`, ahead of
     /// its being read: nothing if its bitmap is not hot.
-    pub fn prefetch(&self, layer_type: LayerType, cell: CellIndex) {
+    pub fn prefetch_cell(&self, layer_type: LayerType, cell: CellIndex) {
         if let Some(cells) = self.lookup.bucket(self.superchunks, layer_type, cell) {
-            prefetch(&cells[cell.place() / BITS_PER_WORD]);
+            prefetch_cache_line(&cells[cell.place() / BITS_PER_WORD]);
         }
     }
 
@@ -93,7 +93,7 @@ impl<'a> Reader<'a> {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Window {
     /// The cells the type holds at: hot ones only.
-    pub set: u64,
+    pub cells_set: u64,
     /// The cells in hot bitmaps: in the world, read, and in the window.
     pub hot: u64,
 }
@@ -108,7 +108,7 @@ const WORD_TILE_Y: usize = 0x2aa;
 /// The word tile at `tile` of `bucket`, row by row; nothing if not hot.
 fn word_tile(bucket: Option<&CellWords>, tile: usize) -> Window {
     match bucket {
-        Some(cells) => Window { set: rows_from_morton(cells[tile]), hot: u64::MAX },
+        Some(cells) => Window { cells_set: rows_from_morton(cells[tile]), hot: u64::MAX },
         None => Window::default(),
     }
 }
@@ -129,68 +129,68 @@ pub(crate) struct Lookup {
 
 impl Lookup {
     /// Forgets the superchunk remembered: the directory's shape changed.
-    pub(crate) fn forget(&self) {
+    pub(crate) fn forget_last(&self) {
         self.superchunk.set(None);
     }
 
     /// Where `superchunk` is in `directory`, or where it would go.
     pub(crate) fn superchunk(&self, directory: &[Superchunk], superchunk: SuperchunkIndex) -> Result<usize, usize> {
-        if let Some((last, entry)) = self.superchunk.get()
-            && last == superchunk
+        if let Some((last_superchunk, last_entry_index)) = self.superchunk.get()
+            && last_superchunk == superchunk
         {
-            return Ok(entry);
+            return Ok(last_entry_index);
         }
-        let found = directory.binary_search_by_key(&superchunk, |entry| entry.index);
-        if let Ok(entry) = found {
-            self.superchunk.set(Some((superchunk, entry)));
+        let search_result = directory.binary_search_by_key(&superchunk, |directory_entry| directory_entry.superchunk_index);
+        if let Ok(found_entry_index) = search_result {
+            self.superchunk.set(Some((superchunk, found_entry_index)));
         }
-        found
+        search_result
     }
 
     /// Where the allocation for `layer_type` over `superchunk` is in
     /// `directory`, if in use.
-    pub(crate) fn find(&self, directory: &[Superchunk], layer_type: LayerType, superchunk: SuperchunkIndex) -> Option<LayerAt> {
-        let entry = self.superchunk(directory, superchunk).ok()?;
-        directory[entry].layer_index(layer_type).map(|layer| (entry, layer))
+    pub(crate) fn find_allocation(&self, directory: &[Superchunk], layer_type: LayerType, superchunk: SuperchunkIndex) -> Option<LayerAt> {
+        let entry_index = self.superchunk(directory, superchunk).ok()?;
+        directory[entry_index].layer_index(layer_type).map(|layer| (entry_index, layer))
     }
 
     /// The window of `width` by `height` cells (each up to 8) whose top
-    /// left cell is `origin`, of each of `types` in `directory`, row by
+    /// left cell is `origin`, of each of `layer_types` in `directory`, row by
     /// row (`docs/bitplane_manager.md`, "The arena", Windows).
     #[inline]
-    fn windows<const N: usize>(&self, directory: &[Superchunk], types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
+    fn windows<const N: usize>(&self, directory: &[Superchunk], layer_types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
         // The window's top left in its word tile.
-        let (across, down) = in_word_tile(origin.0);
-        let first = CellIndex(origin.0 & !PLACE_IN_WORD_TILE);
-        let tile = first.place() / BITS_PER_WORD;
+        let (across_in_word_tile, down_in_word_tile) = in_word_tile(origin.0);
+        let tile_first_cell = CellIndex(origin.0 & !PLACE_IN_WORD_TILE);
+        let tile = tile_first_cell.place() / BITS_PER_WORD;
         let (x, y) = (tile & WORD_TILE_X, tile & WORD_TILE_Y);
         // The word tiles beside and below, in the chunk: a carry through the other coordinate's bits.
-        let (beside, below) = (((x | WORD_TILE_Y) + 1) & WORD_TILE_X, ((y | WORD_TILE_X) + 2) & WORD_TILE_Y);
-        let (wide, tall) = (across + width > WORD_TILE_SIDE, down + height > WORD_TILE_SIDE);
-        let side = WORD_TILE_SIDE as i32;
-        let kept = left_columns(width) & top_rows(height);
+        let (tile_beside, tile_below) = (((x | WORD_TILE_Y) + 1) & WORD_TILE_X, ((y | WORD_TILE_X) + 2) & WORD_TILE_Y);
+        let (past_tile_across, past_tile_down) = (across_in_word_tile + width > WORD_TILE_SIDE, down_in_word_tile + height > WORD_TILE_SIDE);
+        let word_tile_side = WORD_TILE_SIDE as i32;
+        let window_mask = left_columns(width) & top_rows(height);
         // Built by index: an array mapped by a closure is drained through calls the optimizer leaves standing.
-        std::array::from_fn(|index| {
-            let layer_type = types[index];
-            let bucket = self.bucket(directory, layer_type, first);
+        std::array::from_fn(|type_index| {
+            let layer_type = layer_types[type_index];
+            let bucket = self.bucket(directory, layer_type, tile_first_cell);
             let top_left = word_tile(bucket, tile);
             let (mut top_right, mut bottom_left, mut bottom_right) = (Window::default(), Window::default(), Window::default());
-            if wide {
-                top_right = if x != WORD_TILE_X { word_tile(bucket, beside | y) } else { self.word_tile_at(directory, layer_type, first.offset(side, 0)) };
+            if past_tile_across {
+                top_right = if x != WORD_TILE_X { word_tile(bucket, tile_beside | y) } else { self.word_tile_at(directory, layer_type, tile_first_cell.at_cartesian_offset(word_tile_side, 0)) };
             }
-            if tall {
-                bottom_left = if y != WORD_TILE_Y { word_tile(bucket, x | below) } else { self.word_tile_at(directory, layer_type, first.offset(0, side)) };
+            if past_tile_down {
+                bottom_left = if y != WORD_TILE_Y { word_tile(bucket, x | tile_below) } else { self.word_tile_at(directory, layer_type, tile_first_cell.at_cartesian_offset(0, word_tile_side)) };
             }
-            if wide && tall {
+            if past_tile_across && past_tile_down {
                 bottom_right = if x != WORD_TILE_X && y != WORD_TILE_Y {
-                    word_tile(bucket, beside | below)
+                    word_tile(bucket, tile_beside | tile_below)
                 } else {
-                    self.word_tile_at(directory, layer_type, first.offset(side, side))
+                    self.word_tile_at(directory, layer_type, tile_first_cell.at_cartesian_offset(word_tile_side, word_tile_side))
                 };
             }
             Window {
-                set: window([[top_left.set, top_right.set], [bottom_left.set, bottom_right.set]], across, down) & kept,
-                hot: window([[top_left.hot, top_right.hot], [bottom_left.hot, bottom_right.hot]], across, down) & kept,
+                cells_set: window([[top_left.cells_set, top_right.cells_set], [bottom_left.cells_set, bottom_right.cells_set]], across_in_word_tile, down_in_word_tile) & window_mask,
+                hot: window([[top_left.hot, top_right.hot], [bottom_left.hot, bottom_right.hot]], across_in_word_tile, down_in_word_tile) & window_mask,
             }
         })
     }
@@ -198,9 +198,9 @@ impl Lookup {
     /// The hot bucket of `cell`'s chunk in `layer_type`, in `directory`.
     fn bucket<'d>(&self, directory: &'d [Superchunk], layer_type: LayerType, cell: CellIndex) -> Option<&'d CellWords> {
         let chunk = cell.chunk().place();
-        let (entry, layer) = self.find(directory, layer_type, cell.superchunk())?;
-        let layer = &directory[entry].layers[layer];
-        contains(layer.flags.hot, chunk).then(|| layer.cells(chunk))
+        let (entry_index, layer) = self.find_allocation(directory, layer_type, cell.superchunk())?;
+        let layer = &directory[entry_index].layers[layer];
+        contains(layer.chunk_flags.hot, chunk).then(|| layer.cells(chunk))
     }
 
     /// Whether `layer_type` holds, in `directory`, at any cell of the
@@ -208,24 +208,24 @@ impl Lookup {
     fn any_in_tile(&self, directory: &[Superchunk], layer_type: LayerType, cell: CellIndex, scale: u32) -> Option<bool> {
         debug_assert!(scale <= COARSEST_SCALE, "a tile coarser than the coarsest scale");
         let chunk = cell.chunk().place();
-        let (entry, layer) = self.find(directory, layer_type, cell.superchunk())?;
-        let layer = &directory[entry].layers[layer];
-        if !contains(layer.flags.hot, chunk) {
+        let (entry_index, layer) = self.find_allocation(directory, layer_type, cell.superchunk())?;
+        let layer = &directory[entry_index].layers[layer];
+        if !contains(layer.chunk_flags.hot, chunk) {
             return None;
         }
         // The tile's cells are a run of this many bits, in Morton order.
-        let run = 1usize << (2 * scale);
-        let first = cell.place() & !(run - 1);
+        let cells_in_tile = 1usize << (2 * scale);
+        let tile_first_place = cell.place() & !(cells_in_tile - 1);
         // The count tiles the run lies in: one, or those it is made of.
-        let counted = &layer.tile_counts[chunk][first / COUNT_TILE_CELLS..][..run.div_ceil(COUNT_TILE_CELLS)];
-        if counted.iter().all(|&count| count == 0) {
+        let covering_tile_counts = &layer.tile_counts[chunk][tile_first_place / COUNT_TILE_CELLS..][..cells_in_tile.div_ceil(COUNT_TILE_CELLS)];
+        if covering_tile_counts.iter().all(|&count| count == 0) {
             return Some(false);
         }
         let cells = layer.cells(chunk);
-        Some(if run < BITS_PER_WORD {
-            cells[first / BITS_PER_WORD] >> (first % BITS_PER_WORD) & ((1 << run) - 1) != 0
+        Some(if cells_in_tile < BITS_PER_WORD {
+            cells[tile_first_place / BITS_PER_WORD] >> (tile_first_place % BITS_PER_WORD) & ((1 << cells_in_tile) - 1) != 0
         } else {
-            run >= COUNT_TILE_CELLS || cells[first / BITS_PER_WORD..(first + run) / BITS_PER_WORD].iter().any(|&word| word != 0)
+            cells_in_tile >= COUNT_TILE_CELLS || cells[tile_first_place / BITS_PER_WORD..(tile_first_place + cells_in_tile) / BITS_PER_WORD].iter().any(|&word| word != 0)
         })
     }
 
@@ -234,40 +234,40 @@ impl Lookup {
     /// bitmap is not hot.
     fn tiles_holding(&self, directory: &[Superchunk], layer_type: LayerType, cell: CellIndex) -> Option<u16> {
         let chunk = cell.chunk().place();
-        let (entry, layer) = self.find(directory, layer_type, cell.superchunk())?;
-        let layer = &directory[entry].layers[layer];
-        if !contains(layer.flags.hot, chunk) {
+        let (entry_index, layer) = self.find_allocation(directory, layer_type, cell.superchunk())?;
+        let layer = &directory[entry_index].layers[layer];
+        if !contains(layer.chunk_flags.hot, chunk) {
             return None;
         }
-        if !contains(layer.flags.nonempty, chunk) {
+        if !contains(layer.chunk_flags.with_cells_set, chunk) {
             return Some(0);
         }
-        Some(layer.tile_counts[chunk].as_chunks::<COUNTS_IN_COARSEST>().0.iter().enumerate().fold(0, |holding, (tile, counts)| holding | (counts.iter().any(|&count| count != 0) as u16) << tile))
+        Some(layer.tile_counts[chunk].as_chunks::<COUNTS_IN_COARSEST>().0.iter().enumerate().fold(0, |holding_tiles, (tile, counts)| holding_tiles | (counts.iter().any(|&count| count != 0) as u16) << tile))
     }
 
-    /// The word tile whose first cell is `first`, if in the world, of
+    /// The word tile whose first cell is `tile_first_cell_in_world`, if in the world, of
     /// `layer_type` in `directory`: looked up.
-    fn word_tile_at(&self, directory: &[Superchunk], layer_type: LayerType, first: Option<CellIndex>) -> Window {
-        first.map_or(Window::default(), |first| word_tile(self.bucket(directory, layer_type, first), first.place() / BITS_PER_WORD))
+    fn word_tile_at(&self, directory: &[Superchunk], layer_type: LayerType, tile_first_cell_in_world: Option<CellIndex>) -> Window {
+        tile_first_cell_in_world.map_or(Window::default(), |tile_first_cell| word_tile(self.bucket(directory, layer_type, tile_first_cell), tile_first_cell.place() / BITS_PER_WORD))
     }
 
-    /// The number `plane` holds at `cell` in `directory`.
+    /// The number `wide_plane` holds at `cell` in `directory`.
     #[inline]
-    pub(crate) fn value<W: Width>(&self, directory: &[Superchunk], plane: Wide<W>, cell: CellIndex) -> Result<u32, NotHot> {
-        let (layer_type, chunk) = (plane.layer_type(), cell.chunk().place());
-        match self.find(directory, layer_type, cell.superchunk()) {
-            Some((entry, layer)) if contains(directory[entry].layers[layer].flags.hot, chunk) => Ok(directory[entry].layers[layer].value_of(chunk, cell.place(), W::BITS as usize)),
+    pub(crate) fn value<W: Width>(&self, directory: &[Superchunk], wide_plane: WidePlane<W>, cell: CellIndex) -> Result<u32, NotHot> {
+        let (layer_type, chunk) = (wide_plane.layer_type(), cell.chunk().place());
+        match self.find_allocation(directory, layer_type, cell.superchunk()) {
+            Some((entry_index, layer)) if contains(directory[entry_index].layers[layer].chunk_flags.hot, chunk) => Ok(directory[entry_index].layers[layer].value_of(chunk, cell.place(), W::BITS_A_CELL as usize)),
             _ => Err(NotHot(BucketKey { layer_type, chunk: cell.chunk() })),
         }
     }
 
     /// Whether `layer_type` holds at `cell` in `directory`: its
     /// superchunk, chunk and bit taken from its index.
-    pub(crate) fn holds(&self, directory: &[Superchunk], layer_type: LayerType, cell: CellIndex) -> Result<bool, NotHot> {
+    pub(crate) fn layer_holds_cell(&self, directory: &[Superchunk], layer_type: LayerType, cell: CellIndex) -> Result<bool, NotHot> {
         let chunk = cell.chunk().place();
-        match self.find(directory, layer_type, cell.superchunk()) {
-            Some((entry, layer)) if contains(directory[entry].layers[layer].flags.hot, chunk) => {
-                Ok(directory[entry].layers[layer].get(chunk, cell.place()))
+        match self.find_allocation(directory, layer_type, cell.superchunk()) {
+            Some((entry_index, layer)) if contains(directory[entry_index].layers[layer].chunk_flags.hot, chunk) => {
+                Ok(directory[entry_index].layers[layer].get(chunk, cell.place()))
             }
             _ => Err(NotHot(BucketKey { layer_type, chunk: cell.chunk() })),
         }

@@ -1,9 +1,9 @@
 //! The host's own thread: the world run, requests read between its
 //! ticks, frames answered.
 
-use crate::{Start, World};
-use super::{CATCH_UP, CENSUS_EVERY, FRAMES_SHARE, Request, TARGET_PACE, census};
-use super::frame::{self, Ask, Cells, Frame, copy, count, frame_of, hot_in};
+use crate::{WorldStart, World};
+use super::{CATCH_UP, CENSUS_EVERY, FRAMES_SHARE, HostRequest, TARGET_PACE, census};
+use super::frame::{self, FrameAsk, Cells, ViewportFrame, copy_superchunk, count, frame_of, hot_in};
 use super::terrain::TerrainRequest;
 use type_registry::GRASS;
 use std::thread;
@@ -13,29 +13,29 @@ use std::io::{BufWriter, Write};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use worldgen::Generation;
+use worldgen::WorldGeneration;
 
 /// The world run, and what goes with running it.
-struct Running {
+struct RunningWorld {
     /// The world.
     world: World,
     /// What it started from, as far as is known: what it is made again
     /// from when reset.
-    start: Start,
+    world_start: WorldStart,
     /// The superchunks whose heights a frame has carried, each with its
     /// water as drawn.
-    sent: HashMap<coordinates::SuperchunkIndex, Arc<frame::Water>>,
+    heights_sent: HashMap<coordinates::SuperchunkIndex, Arc<frame::Water>>,
     /// When it began to run.
-    started: Instant,
+    began_running: Instant,
     /// Its census, if one could be kept.
     census: Option<BufWriter<File>>,
 }
 
-impl Running {
-    /// `world`, started from `start`, starting to run.
-    fn from_start(start: Start, world: World) -> Self {
-        let census = census(world.info.seed);
-        Self { world, start, sent: HashMap::new(), started: Instant::now(), census }
+impl RunningWorld {
+    /// `world`, started from `world_start`, starting to run.
+    fn from_start(world_start: WorldStart, world: World) -> Self {
+        let census = census(world.world_info.seed);
+        Self { world, world_start, heights_sent: HashMap::new(), began_running: Instant::now(), census }
     }
 }
 
@@ -43,9 +43,9 @@ impl Running {
 /// a few superchunks between two ticks, each few sent as a frame as
 /// soon as they are copied, the last saying it is ([`Frame::more`]).
 /// Seen from near they are one picture, so sent the once, together.
-struct Answering {
+struct AskBeingAnswered {
     /// What was asked.
-    ask: Ask,
+    frame_ask: FrameAsk,
     /// The viewport's hot superchunks when it was asked.
     hot: Vec<(u32, u32)>,
     /// Those of them asked for and yet to copy, the next one last.
@@ -53,36 +53,36 @@ struct Answering {
     /// Those copied and not yet sent.
     cells: Vec<Cells>,
     /// What copying has taken of the host's thread so far.
-    spent: Duration,
+    copying_spent: Duration,
 }
 
 /// The host's state between ticks, on its own thread.
 pub(crate) struct HostThread {
     /// The world run, if one is.
-    running: Option<Running>,
+    running_world: Option<RunningWorld>,
     /// Counts the worlds run.
     worlds: u64,
     /// Whether ticking is paused.
-    paused: bool,
+    ticking_paused: bool,
     /// Ticks a second it is held to, or flat out.
-    pace: Option<u32>,
+    pace_held_to: Option<u32>,
     /// The name of the world run, if it is one of the worlds' folder.
-    named: Option<String>,
+    world_name: Option<String>,
     /// What opening or saving a world last came to.
-    said: Option<String>,
+    last_outcome: Option<String>,
     /// The generation the world run is to be made again with, before
     /// the next tick, if it is to be.
-    reset: Option<Generation>,
+    reset: Option<WorldGeneration>,
     /// When the next tick is due.
     next_tick: Instant,
     /// When the last frame was answered, and the tick then.
     last_frame: (Instant, u64),
     /// The ask being answered, if one is.
-    answering: Option<Answering>,
+    being_answered: Option<AskBeingAnswered>,
     /// What the last ask answered whole came to: the ticks a second
     /// since the one before, the seconds answering took the host's
     /// thread, and the share of its time that is.
-    measured: (f64, f64, f64),
+    last_answer_measured: (f64, f64, f64),
     /// What the last tick took.
     tick_took: Duration,
     /// The terrain's thread, told of each world run.
@@ -91,76 +91,76 @@ pub(crate) struct HostThread {
 
 impl HostThread {
     /// No world, at the game's pace; `terrain` told of each world run.
-    pub(crate) fn telling(terrain: Sender<TerrainRequest>) -> Self {
-        Self { terrain, running: None, worlds: 0, paused: false, pace: Some(TARGET_PACE), named: None, said: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), answering: None, measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
+    pub(crate) fn telling_terrain(terrain: Sender<TerrainRequest>) -> Self {
+        Self { terrain, running_world: None, worlds: 0, ticking_paused: false, pace_held_to: Some(TARGET_PACE), world_name: None, last_outcome: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), being_answered: None, last_answer_measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
     }
 }
 
 impl HostThread {
     /// Requests read between ticks, a tick, and a wait for the next
     /// one's time -- until the client is gone.
-    pub(crate) fn run(mut self, asked: &Receiver<Request>, answers: &Sender<Frame>) {
+    pub(crate) fn serve_requests(mut self, request_receiver: &Receiver<HostRequest>, frame_sender: &Sender<ViewportFrame>) {
         loop {
             // Paused, or with no world, there is nothing to do until the client asks -- once what it asked is answered.
-            let mut request = if (self.paused || self.running.is_none()) && self.answering.is_none() { asked.recv().ok() } else { None };
+            let mut waited_request = if (self.ticking_paused || self.running_world.is_none()) && self.being_answered.is_none() { request_receiver.recv().ok() } else { None };
             loop {
-                match request.take().map_or_else(|| asked.try_recv(), Ok) {
-                    Ok(Request::Sync(ask)) => {
+                match waited_request.take().map_or_else(|| request_receiver.try_recv(), Ok) {
+                    Ok(HostRequest::AskFrame(frame_ask)) => {
                         // A frame asked after a reset is of the world remade.
                         self.reset_now();
-                        self.begin_frame(ask);
+                        self.begin_frame(frame_ask);
                     }
-                    Ok(Request::Pause(pause)) => (self.paused, self.next_tick) = (pause, Instant::now()),
-                    Ok(Request::Pace(pace)) => (self.pace, self.next_tick) = (pace, Instant::now()),
-                    Ok(Request::New(start)) => {
-                        self.said = Some(format!("a world made from seed {}", utilities::seed::hex(start.seed)));
-                        (self.named, self.reset) = (None, None);
-                        self.run_world(start);
+                    Ok(HostRequest::SetPaused(pause_asked)) => (self.ticking_paused, self.next_tick) = (pause_asked, Instant::now()),
+                    Ok(HostRequest::SetPace(pace_asked)) => (self.pace_held_to, self.next_tick) = (pace_asked, Instant::now()),
+                    Ok(HostRequest::MakeWorld(world_start)) => {
+                        self.last_outcome = Some(format!("a world made from seed {}", utilities::seed::seed_as_hex(world_start.seed)));
+                        (self.world_name, self.reset) = (None, None);
+                        self.run_world(world_start);
                     }
-                    Ok(Request::Open(name)) => match crate::load(&utilities::settings::world(&name)) {
-                        Ok(opened) => {
-                            (self.said, self.named, self.reset) = (Some(format!("{name} opened")), Some(name), None);
-                            self.run_in_place(Running::from_start(Start::of_world(&opened.info, opened.generation), opened));
+                    Ok(HostRequest::OpenWorld(world_to_open)) => match crate::load_world(&utilities::settings::world(&world_to_open)) {
+                        Ok(opened_world) => {
+                            (self.last_outcome, self.world_name, self.reset) = (Some(format!("{world_to_open} opened")), Some(world_to_open), None);
+                            self.run_in_place(RunningWorld::from_start(WorldStart::of_world(&opened_world.world_info, opened_world.world_generation), opened_world));
                         }
-                        Err(why) => self.said = Some(format!("{name} not opened: {why}")),
+                        Err(load_error) => self.last_outcome = Some(format!("{world_to_open} not opened: {load_error}")),
                     },
-                    Ok(Request::Save(name)) => {
+                    Ok(HostRequest::Save(name_to_save)) => {
                         self.reset_now();
-                        self.save(name);
+                        self.save(name_to_save);
                     }
-                    Ok(Request::Reset(generation)) => self.reset = Some(*generation),
+                    Ok(HostRequest::Reset(reset_generation)) => self.reset = Some(*reset_generation),
                     Err(TryRecvError::Empty) => break,
                     Err(TryRecvError::Disconnected) => return,
                 }
             }
             self.reset_now();
-            if let Some(frame) = self.answer_a_little()
-                && answers.send(frame).is_err()
+            if let Some(answered_frame) = self.answer_a_little()
+                && frame_sender.send(answered_frame).is_err()
             {
                 return;
             }
-            if !self.paused {
+            if !self.ticking_paused {
                 self.tick();
             }
         }
     }
 
-    /// Makes a world as `start` says, and runs it in place of any run:
+    /// Makes a world as `world_start` says, and runs it in place of any run:
     /// that one dropped first, not to hold both.
-    fn run_world(&mut self, start: Start) {
-        self.running = None;
-        self.run_in_place(Running::from_start(start, crate::start(start)));
+    fn run_world(&mut self, world_start: WorldStart) {
+        self.running_world = None;
+        self.run_in_place(RunningWorld::from_start(world_start, crate::start_world(world_start)));
     }
 
-    /// Runs `running` in place of any run, from its world's own tick.
-    fn run_in_place(&mut self, running: Running) {
-        self.last_frame = (Instant::now(), running.world.entities.now());
+    /// Runs `running_world` in place of any run, from its world's own tick.
+    fn run_in_place(&mut self, running_world: RunningWorld) {
+        self.last_frame = (Instant::now(), running_world.world.entity_store.current_tick());
         // A frame half answered was of the world before.
-        self.answering = None;
+        self.being_answered = None;
         self.worlds += 1;
         // Told before any frame of this world is sent: an ask of it finds it known. The thread gone, there is no one to ask either.
-        _ = self.terrain.send(TerrainRequest::World(self.worlds, running.world.info.seed, Box::new(running.world.generation)));
-        self.running = Some(running);
+        _ = self.terrain.send(TerrainRequest::World(self.worlds, running_world.world.world_info.seed, Box::new(running_world.world.world_generation)));
+        self.running_world = Some(running_world);
         self.next_tick = Instant::now();
     }
 
@@ -168,74 +168,74 @@ impl HostThread {
     /// asked, if it was asked to be: a world of its own from then, of
     /// no name.
     fn reset_now(&mut self) {
-        let (Some(generation), Some(running)) = (self.reset.take(), &self.running) else {
+        let (Some(reset_generation), Some(running_world)) = (self.reset.take(), &self.running_world) else {
             return;
         };
-        let start = Start { generation, ..running.start };
-        (self.said, self.named) = (Some(format!("the world remade from seed {}, as the sliders have it", utilities::seed::hex(start.seed))), None);
-        self.run_world(start);
+        let world_start = WorldStart { world_generation: reset_generation, ..running_world.world_start };
+        (self.last_outcome, self.world_name) = (Some(format!("the world remade from seed {}, as the sliders have it", utilities::seed::seed_as_hex(world_start.seed))), None);
+        self.run_world(world_start);
     }
 
-    /// Saves the world run under `name`, if one runs.
-    fn save(&mut self, name: String) {
-        let Some(running) = &mut self.running else {
+    /// Saves the world run under `world_name`, if one runs.
+    fn save(&mut self, world_name: String) {
+        let Some(running_world) = &mut self.running_world else {
             return;
         };
-        let world = &mut running.world;
-        self.said = Some(match crate::save(&utilities::settings::world(&name), world) {
-            Ok(saved) => {
-                let said = format!("{name} saved at tick {}: {} superchunks, {} entities", world.entities.now(), saved.superchunks, saved.entities);
-                self.named = Some(name);
-                said
+        let world = &mut running_world.world;
+        self.last_outcome = Some(match crate::save(&utilities::settings::world(&world_name), world) {
+            Ok(save_written) => {
+                let saved_text = format!("{world_name} saved at tick {}: {} superchunks, {} entities", world.entity_store.current_tick(), save_written.superchunks, save_written.entities_written);
+                self.world_name = Some(world_name);
+                saved_text
             }
-            Err(why) => format!("{name} not saved: {why}"),
+            Err(save_error) => format!("{world_name} not saved: {save_error}"),
         });
         self.next_tick = Instant::now();
     }
 
-    /// Begins answering `ask`, if a world runs, in place of any frame
+    /// Begins answering `frame_ask`, if a world runs, in place of any frame
     /// half answered -- its viewport kept hot from now, if the world's
     /// camera loads superchunks.
-    fn begin_frame(&mut self, ask: Ask) {
-        let Some(running) = &mut self.running else {
+    fn begin_frame(&mut self, frame_ask: FrameAsk) {
+        let Some(running_world) = &mut self.running_world else {
             return;
         };
-        running.world.halos.keep_viewport(ask.viewport);
-        let hot = hot_in(&running.world, ask.viewport);
-        let mut to_copy: Vec<(u32, u32)> = hot.iter().copied().skip(ask.skip as usize).take(ask.most as usize).collect();
+        running_world.world.halos.keep_viewport(frame_ask.viewport);
+        let hot = hot_in(&running_world.world, frame_ask.viewport);
+        let mut to_copy: Vec<(u32, u32)> = hot.iter().copied().skip(frame_ask.superchunks_skipped as usize).take(frame_ask.most_superchunks as usize).collect();
         to_copy.reverse();
-        self.answering = Some(Answering { ask, hot, to_copy, cells: Vec::new(), spent: Duration::ZERO });
+        self.being_answered = Some(AskBeingAnswered { frame_ask, hot, to_copy, cells: Vec::new(), copying_spent: Duration::ZERO });
     }
 
     /// Copies a little more of what is asked -- a superchunk at
     /// least, and as many as the time to spare takes -- and gives them
     /// as a frame (`docs/server.md`, "The host").
-    fn answer_a_little(&mut self) -> Option<Frame> {
-        let until = self.time_for_frames().map(|time| Instant::now() + time);
-        let (running, answering) = (self.running.as_mut()?, self.answering.as_mut()?);
-        let began = Instant::now();
-        while let Some(at) = answering.to_copy.pop() {
-            answering.cells.extend(copy(&running.world, at, answering.ask, &mut running.sent));
-            if until.is_some_and(|until| Instant::now() >= until) {
+    fn answer_a_little(&mut self) -> Option<ViewportFrame> {
+        let copy_until = self.time_for_frames().map(|time_for_copying| Instant::now() + time_for_copying);
+        let (running_world, being_answered) = (self.running_world.as_mut()?, self.being_answered.as_mut()?);
+        let copying_began = Instant::now();
+        while let Some(superchunk_cartesian) = being_answered.to_copy.pop() {
+            being_answered.cells.extend(copy_superchunk(&running_world.world, superchunk_cartesian, being_answered.frame_ask, &mut running_world.heights_sent));
+            if copy_until.is_some_and(|until_instant| Instant::now() >= until_instant) {
                 break;
             }
         }
-        answering.spent += began.elapsed();
-        let more = !answering.to_copy.is_empty();
-        if more && answering.ask.near.is_some() {
+        being_answered.copying_spent += copying_began.elapsed();
+        let more_to_copy = !being_answered.to_copy.is_empty();
+        if more_to_copy && being_answered.frame_ask.seen_near.is_some() {
             return None;
         }
-        let (ask, hot, cells) = (answering.ask, answering.hot.clone(), std::mem::take(&mut answering.cells));
-        let world = &running.world;
-        let tick = world.entities.now();
-        if !more {
-            let (spent, elapsed) = (answering.spent.as_secs_f64(), self.last_frame.0.elapsed().as_secs_f64());
-            if elapsed > 0.0 {
-                self.measured = ((tick - self.last_frame.1) as f64 / elapsed, spent, spent / elapsed);
+        let (frame_ask, hot, cells) = (being_answered.frame_ask, being_answered.hot.clone(), std::mem::take(&mut being_answered.cells));
+        let world = &running_world.world;
+        let tick = world.entity_store.current_tick();
+        if !more_to_copy {
+            let (copying_seconds, seconds_since_frame) = (being_answered.copying_spent.as_secs_f64(), self.last_frame.0.elapsed().as_secs_f64());
+            if seconds_since_frame > 0.0 {
+                self.last_answer_measured = ((tick - self.last_frame.1) as f64 / seconds_since_frame, copying_seconds, copying_seconds / seconds_since_frame);
             }
-            (self.last_frame, self.answering) = ((Instant::now(), tick), None);
+            (self.last_frame, self.being_answered) = ((Instant::now(), tick), None);
         }
-        Some(frame_of(world, self.worlds, ask, hot, cells, self.measured, (self.named.clone(), self.said.clone()), more))
+        Some(frame_of(world, self.worlds, frame_ask, hot, cells, self.last_answer_measured, (self.world_name.clone(), self.last_outcome.clone()), more_to_copy))
     }
 
     /// The time there is for copying a frame's superchunks before the
@@ -243,38 +243,38 @@ impl HostThread {
     /// frame at once -- else what is left until the tick is due, and
     /// [`FRAMES_SHARE`] of what the last tick took at least.
     fn time_for_frames(&self) -> Option<Duration> {
-        if self.paused {
+        if self.ticking_paused {
             return None;
         }
-        let spare = if self.pace.is_some() { self.next_tick.saturating_duration_since(Instant::now()) } else { Duration::ZERO };
-        Some(spare.max(self.tick_took.mul_f64(FRAMES_SHARE)))
+        let time_to_spare = if self.pace_held_to.is_some() { self.next_tick.saturating_duration_since(Instant::now()) } else { Duration::ZERO };
+        Some(time_to_spare.max(self.tick_took.mul_f64(FRAMES_SHARE)))
     }
 
     /// A tick of the world run, its census written when due, and a wait
     /// for the next one's time at the pace asked.
     fn tick(&mut self) {
-        let Some(running) = &mut self.running else {
+        let Some(running_world) = &mut self.running_world else {
             return;
         };
-        let tick = running.world.entities.now();
+        let tick = running_world.world.entity_store.current_tick();
         if tick.is_multiple_of(CENSUS_EVERY)
-            && let Some(file) = &mut running.census
+            && let Some(census_file) = &mut running_world.census
         {
             // A line lost is a line lost: the run goes on. The pace it is held to, 0 flat out: only flat out do the seconds say what a tick costs.
-            let (seconds, sheep, grass) = (running.started.elapsed().as_secs_f64(), running.world.entities.len(), count(&running.world, GRASS));
-            _ = writeln!(file, "{tick},{seconds:.3},{},{sheep},{grass}", self.pace.unwrap_or(0)).and_then(|()| file.flush());
+            let (seconds, sheep, grass) = (running_world.began_running.elapsed().as_secs_f64(), running_world.world.entity_store.len(), count(&running_world.world, GRASS));
+            _ = writeln!(census_file, "{tick},{seconds:.3},{},{sheep},{grass}", self.pace_held_to.unwrap_or(0)).and_then(|()| census_file.flush());
         }
-        let began = Instant::now();
-        running.world.tick();
-        self.tick_took = began.elapsed();
-        if let Some(pace) = self.pace {
-            self.next_tick += Duration::from_secs_f64(1.0 / pace as f64);
-            let now = Instant::now();
-            if self.next_tick > now {
-                thread::sleep(self.next_tick - now);
-            } else if now - self.next_tick > CATCH_UP {
+        let tick_began = Instant::now();
+        running_world.world.tick();
+        self.tick_took = tick_began.elapsed();
+        if let Some(ticks_a_second) = self.pace_held_to {
+            self.next_tick += Duration::from_secs_f64(1.0 / ticks_a_second as f64);
+            let time_now = Instant::now();
+            if self.next_tick > time_now {
+                thread::sleep(self.next_tick - time_now);
+            } else if time_now - self.next_tick > CATCH_UP {
                 // Far behind: no catching up in a long burst.
-                self.next_tick = now;
+                self.next_tick = time_now;
             }
         }
     }

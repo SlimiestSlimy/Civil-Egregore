@@ -15,6 +15,6 @@ pub fn height_at(terrain: &Terrain, x: u32, y: u32) -> u16 {
 }
 
 /// Whether `terrain` keeps a wall the `way`-th way at the cell `(x, y)`.
-pub fn walled(terrain: &Terrain, way: usize, x: u32, y: u32) -> bool {
-    terrain.walled(way, place_from_cartesian(x, y))
+pub fn keeps_wall_cartesian(terrain: &Terrain, way: usize, x: u32, y: u32) -> bool {
+    terrain.keeps_wall(way, place_from_cartesian(x, y))
 }
