@@ -30,6 +30,25 @@ nothing in the way counted, the `pick`-th of those equally near
 backwards from `to` (**`SearchQueue`**: a binary heap in an array of `QUEUE_ROOM`
 entries, `push`, `pop`; `STEPS`, the eight neighbours). `None` if there is no way.
 
+## `morton.rs`
+
+The search in Morton order (`pathfinding.md`, "In Morton order").
+`TILES_WORDS` (16), `TILES_SIDE` (32), **`Tiles`**.
+**`bit_at(x, y)`**: a cell's word and bit. **`step_up(cells, lane)`**,
+**`step_down(cells, lane)`**: a set stepped a cell east or south, west
+or north (`lane` 0 for x, 1 for y), those past the edge gone.
+**`MortonWalls::new(east, south)`**, walls of both ways, with
+**`spread_through(cells)`**: the cells and every neighbour no wall is
+before. **`step_towards(passable, walls, goals, (x, y), pick)`**: the
+first step to the nearest goal and how far it is, of steps as short
+the `pick`-th in `NEIGHBOUR_STEPS`' order. Private:
+`bits_whose_index_masks_to(mask, value)`, `coordinate_bits(lane)`,
+`STEP_UP_KINDS`, `STEP_DOWN_KINDS`, `KIND_SHIFTS`,
+`word_tile_at(x, y)`, `spread_coordinate_bits(of)`,
+`WORD_TILE_BESIDE`, `cells_less(cells, other)`,
+`cells_of_either(cells, other)`; `MortonWalls`' fields
+`no_step_across`, `no_south`, `no_north`, `any_wall`.
+
 ## `walls.rs`
 
 **`Walls::one_way(north_walls, west_walls, south_walls, east_walls)`**: the steps that cannot

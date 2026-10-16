@@ -10,3 +10,6 @@ mod paths_and_waves;
 
 #[path = "fine/walls.rs"]
 mod walls;
+
+#[path = "fine/morton.rs"]
+mod morton;
