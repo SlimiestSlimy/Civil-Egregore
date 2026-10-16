@@ -17,7 +17,7 @@ pub struct Rows(pub Vec<u8>);
 impl Rows {
     /// `bitmap`'s cells, a row at a time -- read one cell at a time, so
     /// done before anything is timed.
-    pub fn of(bitmap: &Bitmap) -> Self {
+    pub fn from_bitmap(bitmap: &Bitmap) -> Self {
         let mut bytes = vec![0; BYTES];
         for y in 0..HEIGHT {
             for x in 0..WIDTH {

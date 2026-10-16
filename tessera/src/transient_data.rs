@@ -10,7 +10,7 @@ use utilities::diagnostics::table::report::Report;
 use utilities::transient_data::TransientData;
 
 /// The crate's transient data ([`utilities::transient_data`]).
-pub const TRANSIENT_DATA: TransientData = TransientData::of(env!("CARGO_MANIFEST_DIR"));
+pub const TRANSIENT_DATA: TransientData = TransientData::for_crate(env!("CARGO_MANIFEST_DIR"));
 
 /// Where the measurements are kept.
 pub fn measurements() -> PathBuf {

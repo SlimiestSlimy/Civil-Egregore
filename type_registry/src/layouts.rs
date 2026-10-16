@@ -48,7 +48,7 @@ impl Member {
     }
 
     /// What it holds in `data`, an attribute's data words.
-    pub const fn of(self, data: &[u64]) -> u64 {
+    pub const fn value_in(self, data: &[u64]) -> u64 {
         let (word, shift) = (self.offset as usize / 8 - 1, self.offset as u32 % 8 * 8);
         (data[word] >> shift) & (u64::MAX >> (64 - self.bytes as u32 * 8))
     }

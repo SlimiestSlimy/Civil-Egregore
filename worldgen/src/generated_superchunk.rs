@@ -39,7 +39,7 @@ pub fn generate_superchunk(generation: &Generation, seed: u64, superchunk: Super
             set(wet);
             continue;
         }
-        let grown = growth.at(x, y);
+        let grown = growth.grown_at(x, y);
         if grown.grass {
             set(0);
         }
@@ -74,7 +74,7 @@ pub fn generate_superchunk(generation: &Generation, seed: u64, superchunk: Super
             let middle = chunk * CELLS_IN_CHUNK + tile * tile_cells + 3 * tile_cells / 4;
             let (x, y) = cartesian_from_place(middle);
             let above = terrain.height(middle).saturating_sub(generation.shape.ocean);
-            let number = u64::from(climate.at(left + x, top + y, above, depth_at(middle) > 0).number()) | u64::from(u32::from(above).min(ELEVATION.most())) << climate_bits;
+            let number = u64::from(climate.climate_at(left + x, top + y, above, depth_at(middle) > 0).number()) | u64::from(u32::from(above).min(ELEVATION.most())) << climate_bits;
             (0..climate_planes.len()).filter(|bit| number >> bit & 1 == 1).for_each(|bit| bits[bit][tile / BITS_PER_WORD] |= 1 << (tile % BITS_PER_WORD));
         }
         layers.extend(bits.iter().zip(&climate_planes).filter(|(bits, _)| bits.iter().any(|&word| word != 0)).map(|(bits, &plane)| (chunk, plane, *bits)));

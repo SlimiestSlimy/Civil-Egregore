@@ -27,21 +27,21 @@ pub(crate) const ACROSS: usize = SLOTS;
 
 /// The slot of the superchunk `dx` across and `dy` down from the one
 /// whose outbox it is.
-pub(crate) fn slot(dx: i32, dy: i32) -> usize {
+pub(crate) fn slot_toward(dx: i32, dy: i32) -> usize {
     ((dy + 1) * 3 + dx + 1) as usize
 }
 
 /// A superchunk's own place and its eight neighbours', each its
 /// outbox slot and its offset, in the order of the slots.
 pub(crate) fn slots() -> impl Iterator<Item = (usize, (i32, i32))> {
-    (-1..=1).flat_map(|dy| (-1..=1).map(move |dx| (slot(dx, dy), (dx, dy))))
+    (-1..=1).flat_map(|dy| (-1..=1).map(move |dx| (slot_toward(dx, dy), (dx, dy))))
 }
 
 /// The instructions a superchunk's rule queues in a tick, by the
 /// superchunk they land in: itself, or one of its eight neighbours.
 #[derive(Default)]
 pub(crate) struct Outbox {
-    /// The instructions, a queue a superchunk, by [`slot`], and
+    /// The instructions, a queue a superchunk, by [`slot_toward`], and
     /// after them the one of acts over a border ([`ACROSS`]).
     pub(crate) queues: [conditional::Queue; SLOTS + 1],
     /// Where what each author queued begins in those queues, a list a
@@ -400,16 +400,16 @@ impl<'a> Turn<'a> {
 
 /// The outbox slot of the superchunk whose outbox it is.
 pub(crate) fn slot_home() -> usize {
-    slot(0, 0)
+    slot_toward(0, 0)
 }
 
 /// The outbox slot, in the outbox of the superchunk `from`, of the
 /// superchunk `to`: itself or a neighbour, none farther.
 pub(crate) fn slot_between(from: SuperchunkIndex, to: SuperchunkIndex) -> Option<usize> {
     if to == from {
-        return Some(slot(0, 0));
+        return Some(slot_toward(0, 0));
     }
     let ((x, y), (to_x, to_y)) = (from.cartesian(), to.cartesian());
     let (dx, dy) = (to_x as i64 - x as i64, to_y as i64 - y as i64);
-    (dx.abs() <= 1 && dy.abs() <= 1).then(|| slot(dx as i32, dy as i32))
+    (dx.abs() <= 1 && dy.abs() <= 1).then(|| slot_toward(dx as i32, dy as i32))
 }

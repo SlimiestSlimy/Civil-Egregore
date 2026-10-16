@@ -36,7 +36,7 @@ pub fn tree_of(bitmap: &Bitmap) -> Tree {
 impl Examination {
     /// Encodes `bitmap` with `tessera` into `stream` and decodes it into
     /// `back`.
-    pub fn of(tessera: &mut Tessera, stream: &mut BitStream, back: &mut Bitmap, bitmap: &Bitmap) -> Self {
+    pub fn examine_bitmap(tessera: &mut Tessera, stream: &mut BitStream, back: &mut Bitmap, bitmap: &Bitmap) -> Self {
         tessera.encode(bitmap, stream);
         tessera.decode(stream, back);
         Self { written_bits: stream.len(), binary_count_tree: stream.words()[0] & 1 == 1, first_difference: first_difference(bitmap, back) }

@@ -51,9 +51,9 @@ impl ClimateNoises {
     /// `under_water`: the regions' noise three parts and the finer
     /// one, the higher the ground the cooler and the drier, water
     /// milder -- half way to neither hot nor cold -- and more humid.
-    pub fn at(&mut self, x: u32, y: u32, above_ocean: Height, under_water: bool) -> Climate {
+    pub fn climate_at(&mut self, x: u32, y: u32, above_ocean: Height, under_water: bool) -> Climate {
         // Sixteen bits, the regions' three parts and the finer one.
-        let blended = |noises: &mut [Noise; 2]| (3 * noises[0].at(x, y) + noises[1].at(x, y)) / 4;
+        let blended = |noises: &mut [Noise; 2]| (3 * noises[0].noise_at(x, y) + noises[1].noise_at(x, y)) / 4;
         let above = u32::from(above_ocean);
         let temperature = (blended(&mut self.temperature) >> 8) as u32;
         let humidity = (blended(&mut self.humidity) >> 8) as u32;
@@ -63,8 +63,8 @@ impl ClimateNoises {
             (temperature.saturating_sub(above / STEPS_A_DEGREE_COOLER), humidity.saturating_sub(above / STEPS_A_LEVEL_DRIER))
         };
         // A region a way, one of the eight, the ways turning one into the next; the strength of 0, calm, to the strongest. The pressure at rest: the winds make the rest of it.
-        let (across, down) = TILES_ABOUT[((self.way.at(x, y) * TILES_ABOUT.len() as u64) >> 16) as usize];
-        let strength = ((self.strength.at(x, y) * (STRONGEST_WIND as u64 + 1)) >> 16) as i32;
+        let (across, down) = TILES_ABOUT[((self.way.noise_at(x, y) * TILES_ABOUT.len() as u64) >> 16) as usize];
+        let strength = ((self.strength.noise_at(x, y) * (STRONGEST_WIND as u64 + 1)) >> 16) as i32;
         Climate { humidity, wind: Wind::blowing(across * strength, down * strength), temperature, pressure: PRESSURE_AT_REST }
     }
 }

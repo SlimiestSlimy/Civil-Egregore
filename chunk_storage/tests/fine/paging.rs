@@ -58,7 +58,7 @@ fn images_past_what_is_kept_go_to_disk_and_read_back_the_same() {
     // One held by its caller, one by its changes in the ring: drawn.
     let (held, in_ring) = (images[random.below(6) as usize].0, images[6 + random.below(6) as usize].0);
     let (mut codec, mut flushed) = (LayerCodec::new(), Vec::new());
-    storage.write_back(ChunkIndex::of(in_ring, random.below(16) as usize), LayerType(1), codec.encode(&[u64::MAX; bitmap::WORDS]), &mut flushed);
+    storage.write_back(ChunkIndex::from_superchunk_place(in_ring, random.below(16) as usize), LayerType(1), codec.encode(&[u64::MAX; bitmap::WORDS]), &mut flushed);
     assert!(flushed.is_empty());
     assert_eq!(storage.page_out(|superchunk| superchunk == held).expect("paged out"), 9);
     assert!(!storage.over_memory_kept() && storage.on_disk() == 9 && storage.bytes_in_memory() == 3 * one);

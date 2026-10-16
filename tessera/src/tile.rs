@@ -154,14 +154,14 @@ impl<T: Copy + Default, const FINEST: u8> Pyramid<T, FINEST> {
 
     /// The element of `level`'s tile at Morton index `index`.
     #[inline]
-    fn slot(level: u8, index: usize) -> usize {
+    fn element_index(level: u8, index: usize) -> usize {
         Self::level_start(level) + index
     }
 
     /// `tile`'s element.
     #[inline]
     pub fn get(&self, tile: Tile) -> T {
-        self.elements[Self::slot(tile.level, tile.index())]
+        self.elements[Self::element_index(tile.level, tile.index())]
     }
 
     /// Makes `value` `tile`'s element.
@@ -174,7 +174,7 @@ impl<T: Copy + Default, const FINEST: u8> Pyramid<T, FINEST> {
     /// `index`.
     #[inline]
     pub fn set_at(&mut self, level: u8, index: usize, value: T) {
-        self.elements[Self::slot(level, index)] = value;
+        self.elements[Self::element_index(level, index)] = value;
     }
 
     /// `tile`'s four children's elements, in reading order.
@@ -187,7 +187,7 @@ impl<T: Copy + Default, const FINEST: u8> Pyramid<T, FINEST> {
     /// `index`, in reading order.
     #[inline]
     pub fn children_at(&self, level: u8, index: usize) -> [T; 4] {
-        let first = Self::slot(level + 1, 4 * index);
+        let first = Self::element_index(level + 1, 4 * index);
         self.elements[first..first + 4].try_into().expect("four children")
     }
 }

@@ -39,9 +39,9 @@ fn what_is_queued_from_a_compare_to_its_end_hangs_on_it() {
             compare::from_here(turn, if holding { compare::lacks(STONE, seen) } else { compare::holds(STONE, seen) });
             compare::with_writes(turn, compare::lacks(STONE, under), &[Write::Cell { layer_type: STONE, at: under, value: 1, counted: None }]);
             compare::end(turn);
-            compare::open(turn, compare::lacks(STONE, after));
+            compare::open_compare(turn, compare::lacks(STONE, after));
             write::cell(turn, STONE, after, 1, None);
-            compare::close(turn);
+            compare::close_compare(turn);
             0
         });
         assert_eq!((arena.holds(STONE, under), arena.holds(STONE, after)), (Ok(holding), Ok(true)), "holding: {holding}");

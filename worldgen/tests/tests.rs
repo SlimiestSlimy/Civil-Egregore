@@ -10,7 +10,7 @@ use worldgen::Terrain;
 
 /// The height of the cell `(x, y)` of a superchunk's `terrain`, from
 /// its top left.
-pub fn at(terrain: &Terrain, x: u32, y: u32) -> u16 {
+pub fn height_at(terrain: &Terrain, x: u32, y: u32) -> u16 {
     terrain.height(place_from_cartesian(x, y))
 }
 

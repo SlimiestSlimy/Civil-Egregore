@@ -84,7 +84,7 @@ pub(crate) struct Read64<'a> {
 
 impl<'a> Read64<'a> {
     /// `words`, from the first.
-    pub(crate) fn of(words: &'a [u64]) -> Self {
+    pub(crate) fn over_words(words: &'a [u64]) -> Self {
         Self { words, at: 0 }
     }
 
@@ -171,7 +171,7 @@ pub(crate) fn request_written(request: &Request) -> Option<Vec<u64>> {
 
 /// What [`request_written`] wrote.
 pub(crate) fn request_read(words: &[u64]) -> Option<Request> {
-    let mut read = Read64::of(words);
+    let mut read = Read64::over_words(words);
     Some(match read.number()? {
         0 => {
             let viewport = read.maybe(viewport_read)?;
@@ -217,7 +217,7 @@ pub(crate) fn frame_written(frame: &Frame) -> Vec<u64> {
 /// What [`frame_written`] wrote: `waters` the water of each
 /// superchunk whose heights came, kept for the frames after.
 pub(crate) fn frame_read(words: &[u64], waters: &mut HashMap<(u32, u32), Arc<Water>>) -> Option<Frame> {
-    let mut read = Read64::of(words);
+    let mut read = Read64::over_words(words);
     let [world, seed, tick, ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, detail, more] = std::array::from_fn(|_| read.number());
     let numbers: Vec<(String, u64)> = (0..read.number()?).map(|_| Some((read.text()?, read.number()?))).collect::<Option<_>>()?;
     let generation = Generation::of_numbers(&numbers);
@@ -237,5 +237,5 @@ pub(crate) fn frame_read(words: &[u64], waters: &mut HashMap<(u32, u32), Arc<Wat
         let water = Arc::clone(waters.entry(at).or_default());
         cells.push(Cells { at, grass, top_left, heights, trees, stages, wet, clouds, raining, climates, water, sheep });
     }
-    Some(Frame { world: world?, seed: seed?, levels: Levels::of(&generation), generation, side, tick: tick?, ticks_a_second: f64::from_bits(ticks_a_second?), sheep: sheep? as usize, grass: grass?, trees: trees?, sync_seconds: f64::from_bits(sync_seconds?), sync_share: f64::from_bits(sync_share?), viewport, hot, detail: detail? as u32, near, named, said, more: more? == 1, cells })
+    Some(Frame { world: world?, seed: seed?, levels: Levels::from_generation(&generation), generation, side, tick: tick?, ticks_a_second: f64::from_bits(ticks_a_second?), sheep: sheep? as usize, grass: grass?, trees: trees?, sync_seconds: f64::from_bits(sync_seconds?), sync_share: f64::from_bits(sync_share?), viewport, hot, detail: detail? as u32, near, named, said, more: more? == 1, cells })
 }

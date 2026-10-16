@@ -154,7 +154,7 @@ impl Noise {
     }
 
     /// The noise at the cell `(x, y)`.
-    pub fn at(&mut self, x: u32, y: u32) -> u64 {
+    pub fn noise_at(&mut self, x: u32, y: u32) -> u64 {
         let (left, top) = (x >> self.shift, y >> self.shift);
         if self.square != Some((left, top)) {
             let point = |east: u32, south: u32| point(self.seed, self.index, left.wrapping_add(east), top.wrapping_add(south));
@@ -172,7 +172,7 @@ impl Noise {
 
 /// [`Noise`] at the cell `(x, y)`, for one cell alone.
 pub fn noise(seed: u64, index: u32, shift: u32, x: u32, y: u32) -> u64 {
-    Noise::new(seed, index, shift).at(x, y)
+    Noise::new(seed, index, shift).noise_at(x, y)
 }
 
 /// The height of the cell at `(x, y)` of the world whose seed is `seed`:

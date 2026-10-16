@@ -13,7 +13,7 @@ made there; **`entity(entity)`**: it is there still;
 **`attribute(entity, attribute, seen)`**: of an entity's attribute by
 its layout, or of its having none; **`attribute_blocks(at, kind,
 seen)`**: the same of blocks; **`attribute_member(at, kind, member,
-seen)`**: of one member. **`open(turn, compare)`**, **`close(turn)`**:
+seen)`**: of one member. **`open_compare(turn, compare)`**, **`close_compare(turn)`**:
 queued, open until closed, one within another.
 **`from_here(turn, compare)`**: queued, taking the place of the one
 given before; **`end(turn)`**: its end.

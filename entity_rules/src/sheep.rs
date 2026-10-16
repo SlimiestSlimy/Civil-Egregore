@@ -100,7 +100,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
     done[WOKEN] += 1;
     let (at, before) = (sheep.header.at, sheep.header);
     let about = around::about(at);
-    let grass = around::layer(turn, GRASS, &about);
+    let grass = around::read_layer(turn, GRASS, &about);
     // The neighbours it may step to: on the hot bitplanes, nothing standing there, no wall before them.
     let steppable = grass.hot & walking::around_steppable(turn, &about);
     // All it keeps, as the tick found it, and as this wake leaves it: written once, if it changed.
@@ -116,7 +116,7 @@ fn wake(turn: &mut Turn, sheep: EntityRef, flock: &mut Flock) {
         return;
     }
     // The pasture about it, looked at as it eats: thin, it will leave when next hungry; lush, it may.
-    let lush = fed && area::layer(turn, GRASS, at).count() >= LUSH_CELLS;
+    let lush = fed && area::read_layer(turn, GRASS, at).count() >= LUSH_CELLS;
     if fed {
         // All the sheep comes to this wake hangs on the grass being there still when it is applied: each thing queued from here is held
         // against it, and the grass cleared last. Should it be gone by then -- decayed in this very tick -- none of it happens, and

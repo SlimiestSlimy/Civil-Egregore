@@ -30,7 +30,7 @@ impl BitmapArena {
     /// cell set, and no bucket.
     fn make_hot_with(&mut self, key: BucketKey, fill: Option<impl FnOnce(&mut [u64])>) -> bool {
         let (at, chunk) = (self.allocation(key.layer_type, key.chunk.superchunk()), key.chunk.place());
-        let allocation = self.at_mut(at);
+        let allocation = self.layer_at_mut(at);
         if contains(allocation.flags.hot, chunk) {
             return false;
         }
@@ -38,7 +38,7 @@ impl BitmapArena {
             match fill {
                 Some(fill) => {
                     let bits = key.layer_type.bits();
-                    let bucket = allocation.keep(chunk);
+                    let bucket = allocation.bucket_or_insert(chunk);
                     fill(bucket);
                     // A count tile's cells: as many times its words as the layer has bits a cell -- over its tile's cells, of a plane of tiles.
                     let tile_words = (COUNT_TILE_WORDS * bits as usize) >> key.layer_type.tile_shift();

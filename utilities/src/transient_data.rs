@@ -18,7 +18,7 @@ pub struct TransientData {
 impl TransientData {
     /// The transient data of the crate in `crate_folder`:
     /// `env!("CARGO_MANIFEST_DIR")`, from the crate itself.
-    pub const fn of(crate_folder: &'static str) -> Self {
+    pub const fn for_crate(crate_folder: &'static str) -> Self {
         Self { crate_folder }
     }
 
@@ -40,4 +40,4 @@ impl TransientData {
 }
 
 /// The utilities' own transient data: what their tests keep.
-pub const TRANSIENT_DATA: TransientData = TransientData::of(env!("CARGO_MANIFEST_DIR"));
+pub const TRANSIENT_DATA: TransientData = TransientData::for_crate(env!("CARGO_MANIFEST_DIR"));

@@ -37,12 +37,12 @@ pub fn move_one<W: Width>(turn: &mut Turn, plane: Wide<W>, from: CellIndex, seen
 #[inline]
 pub fn change_both<W: Width>(turn: &mut Turn, plane: Wide<W>, first: (CellIndex, u32, u32), second: (CellIndex, u32, u32), counted: usize) {
     debug_assert!(first.2 <= plane.most() && second.2 <= plane.most(), "{} and {} in a plane of {} bits a cell", first.2, second.2, W::BITS);
-    compare::open(turn, compare::value(plane, first.0, first.1));
-    compare::open(turn, compare::value(plane, second.0, second.1));
+    compare::open_compare(turn, compare::value(plane, first.0, first.1));
+    compare::open_compare(turn, compare::value(plane, second.0, second.1));
     turn.write(Write::Cell { layer_type: plane.layer_type(), at: first.0, value: first.2, counted: Some(counted as u32) });
     turn.write(Write::Cell { layer_type: plane.layer_type(), at: second.0, value: second.2, counted: None });
-    compare::close(turn);
-    compare::close(turn);
+    compare::close_compare(turn);
+    compare::close_compare(turn);
 }
 
 /// Whether `cell` is hot in `layer_type`: in the world, and read.

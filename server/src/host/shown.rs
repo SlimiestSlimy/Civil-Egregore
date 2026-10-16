@@ -68,7 +68,7 @@ fn program() -> Option<std::path::PathBuf> {
 }
 
 /// The window listening, if there is one or one can be started.
-fn window() -> Option<TcpStream> {
+fn connect_window() -> Option<TcpStream> {
     let connect = || TcpStream::connect((Ipv4Addr::LOCALHOST, PORT)).ok();
     if let Some(window) = connect() {
         return Some(window);
@@ -96,7 +96,7 @@ fn window() -> Option<TcpStream> {
 impl Shown {
     /// The ticker's end of a window reached, if one is.
     fn begin() -> Option<Self> {
-        let window = window()?;
+        let window = connect_window()?;
         _ = window.set_nodelay(true);
         let (told, requests) = channel();
         let mut from = window.try_clone().ok()?;
@@ -168,13 +168,13 @@ impl Shown {
 pub(crate) fn between_ticks(world: &World) {
     static ASKED: OnceLock<bool> = OnceLock::new();
     if *ASKED.get_or_init(asked) {
-        show(world);
+        serve_window(world);
     }
 }
 
 /// [`between_ticks`], a window having been asked for.
 #[cold]
-fn show(world: &World) {
+fn serve_window(world: &World) {
     let mut shown = SHOWN.get_or_init(|| Mutex::new(Shown::begin())).lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     if shown.as_mut().is_some_and(|shown| !shown.between_ticks(world)) {
         // The window closed: the ticker goes on unseen.

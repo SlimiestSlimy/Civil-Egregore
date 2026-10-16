@@ -14,7 +14,7 @@ use simulation::{Simulation, Turn};
 /// The layer type the arena holds: every cell hot, none set.
 const STONE: LayerType = LayerType::of_a_bit(6);
 /// The entities' type.
-const WALKER: EntityType = EntityType::of(40);
+const WALKER: EntityType = EntityType::from_number(40);
 /// An attribute.
 const NAME: Attribute<u64> = Attribute::new(41);
 /// Another.

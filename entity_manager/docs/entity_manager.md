@@ -125,7 +125,7 @@ by its type like any other, wherever an entity is given attributes,
 read, compared or written:
 
 - given: among an entity's attributes, with its type before it
-  (`keep` turns what is given into what is kept, `write_default` the
+  (`append_kept` turns what is given into what is kept, `write_default` the
   one attribute, `word_of` reading it); not given, it is zeroes. It
   may come anywhere among those given, which are otherwise sorted by
   type (`may_be_given`);
@@ -141,7 +141,7 @@ read, compared or written:
 - written: whole, its data over what is kept; a member, where it
   lies. Removing it is passed over: it is never taken.
 
-`EntityRef::attributes` are the others; `EntityRef::kept`, all the
+`EntityRef::attributes` are the others; `EntityRef::attribute_list`, all the
 blocks as kept -- what two entities are told apart by, and what
 goes with one that crosses a border.
 

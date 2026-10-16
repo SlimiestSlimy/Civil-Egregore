@@ -157,7 +157,7 @@ machine's bytes, so the same on any machine.
 **Its members** (`MEMBERS`, each a `Member`): every field by where
 its bytes lie -- its first byte, counted from the attribute's first,
 and how many it is, 1 to 8, within one word (`Member::word`, a whole
-word of the data; `Member::within`, some bytes of one; `Member::of`,
+word of the data; `Member::within`, some bytes of one; `Member::value_in`,
 what it holds in the data). This is what an instruction is given to
 write a field: the layout is its definer's, and the simulation is
 told bytes (`../../simulation/docs/simulation.md`, "Instructions").

@@ -103,9 +103,9 @@ mod coordinates {
                 assert_eq!(cell.place_in_superchunk(), chunk.place() << 16 | cell.place());
                 assert_eq!(cell.place_in_superchunk(), place_from_cartesian(x % SUPERCHUNK_SIDE_CELLS, y % SUPERCHUNK_SIDE_CELLS));
                 assert_eq!(cartesian_from_place(cell.place_in_superchunk()), (x % SUPERCHUNK_SIDE_CELLS, y % SUPERCHUNK_SIDE_CELLS));
-                assert_eq!(CellIndex::of(ChunkIndex::of(superchunk, chunk.place()), cell.place()), cell);
-                assert_eq!(chunk.top_left(), CellIndex::of(chunk, 0));
-                assert_eq!(superchunk.top_left(), CellIndex::of(ChunkIndex::of(superchunk, 0), 0));
+                assert_eq!(CellIndex::from_chunk_place(ChunkIndex::from_superchunk_place(superchunk, chunk.place()), cell.place()), cell);
+                assert_eq!(chunk.top_left(), CellIndex::from_chunk_place(chunk, 0));
+                assert_eq!(superchunk.top_left(), CellIndex::from_chunk_place(ChunkIndex::from_superchunk_place(superchunk, 0), 0));
             }
         }
         // The cell just up and left of the middle superchunk is the last of

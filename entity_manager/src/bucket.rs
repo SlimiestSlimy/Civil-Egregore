@@ -152,7 +152,7 @@ impl Bucket {
     }
 
     /// Makes `header`'s entity on its cell, with `attributes` as a
-    /// bucket keeps them ([`crate::attributes::keep`]): new, or
+    /// bucket keeps them ([`crate::attributes::append_kept`]): new, or
     /// refused, an entity standing there
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
     pub(crate) fn make(&mut self, header: Header, attributes: &[AttributeBlock]) -> Put {

@@ -26,8 +26,8 @@ pub(crate) trait Landing {
     /// border this tick and the superchunk it came to is held.
     #[inline]
     fn of_named(&mut self, instruction: &Instruction) -> Option<(&mut Superchunk, &mut SuperchunkEntities, CellIndex)> {
-        let (superchunk, entities) = self.of_slot(instruction.slot())?;
-        let at = instruction.at(superchunk.index());
+        let (superchunk, entities) = self.of_slot(instruction.outbox_slot())?;
+        let at = instruction.cell_in(superchunk.index());
         Some((superchunk, entities, at))
     }
 
@@ -90,8 +90,8 @@ impl Landing for LandingInSeveral<'_> {
     }
 
     fn of_named(&mut self, instruction: &Instruction) -> Option<(&mut Superchunk, &mut SuperchunkEntities, CellIndex)> {
-        let slot = instruction.slot();
-        let at = instruction.at(self.source.offset(slot as i32 % 3 - 1, slot as i32 / 3 - 1)?);
+        let slot = instruction.outbox_slot();
+        let at = instruction.cell_in(self.source.offset(slot as i32 % 3 - 1, slot as i32 / 3 - 1)?);
         // Where the tick found it, unless it crossed a border since: then whichever superchunk held it came to.
         let stayed = self.lands[slot].as_ref().is_some_and(|(_, entities)| entities.crossed_to(at).is_none());
         if !stayed {
@@ -107,11 +107,11 @@ impl Landing for LandingInSeveral<'_> {
     }
 
     fn of_crossing(&mut self, instruction: &Instruction) -> Option<(CellIndex, CellIndex, Held<'_>, Held<'_>)> {
-        let (slot, to) = (instruction.slot(), CellIndex(instruction.first));
+        let (slot, to) = (instruction.outbox_slot(), CellIndex(instruction.first));
         let came_to = self.lands.iter().position(|held| held.as_ref().is_some_and(|held| held.0.index() == to.superchunk()))?;
         let [from, into] = self.lands.get_disjoint_mut([slot, came_to]).ok()?;
         let (from, into) = (from.as_mut()?, into.as_mut()?);
-        Some((instruction.at(from.0.index()), to, (&mut *from.0, &mut *from.1), (&mut *into.0, &mut *into.1)))
+        Some((instruction.cell_in(from.0.index()), to, (&mut *from.0, &mut *from.1), (&mut *into.0, &mut *into.1)))
     }
 
     fn crossed(&mut self, stood: CellIndex, to: CellIndex) {

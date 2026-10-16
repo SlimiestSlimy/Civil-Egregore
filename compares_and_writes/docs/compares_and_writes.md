@@ -34,7 +34,7 @@ queued after it is skipped, up to the end of the compare
 one: none is held against nothing.
 
 A compare within another is opened and closed in turn
-(`compare::open`, `compare::close`): skipped with the outer, skipping
+(`compare::open_compare`, `compare::close_compare`): skipped with the outer, skipping
 no more than its own. The compares there are: of a cell (`holds`,
 `lacks`, `value`), of a cell being free for an entity (`cell_free`),
 of an entity being there still (`entity`), of an attribute whole

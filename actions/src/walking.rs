@@ -29,7 +29,7 @@ fn of_the_area(at: CellIndex, cell: Cell) -> Option<CellIndex> {
 /// cells the collision plane holds -- what stands there, entities
 /// among it -- and the terrain's walls.
 fn in_the_way(turn: &Turn, at: CellIndex) -> (Rows, Walls) {
-    let [held, north, west, south, east] = area::layers(turn, [COLLISION, WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST], at).map(|area| area.set);
+    let [held, north, west, south, east] = area::read_layers(turn, [COLLISION, WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST], at).map(|area| area.set);
     (held, Walls::one_way(north, west, south, east))
 }
 
@@ -56,7 +56,7 @@ pub struct SoughtStep {
 /// the walls' tiles are asked a cell at a time as they lie, and not
 /// at all where they hold nothing.
 pub fn around_unwalled(turn: &Turn, about: &About) -> Cells {
-    let [north, west, south, east] = tiles_about::layers(turn, [WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST], about, about.nine_word()).map(|tiles| tiles.set);
+    let [north, west, south, east] = tiles_about::read_layers(turn, [WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST], about, about.nine_word()).map(|tiles| tiles.set);
     if north | west | south | east == 0 {
         return about.nine();
     }
@@ -81,7 +81,7 @@ pub fn around_unwalled(turn: &Turn, about: &About) -> Cells {
 /// the cell ANDed with its tiles: hemmed in, there is no step, and no
 /// wall is read.
 pub fn around_steppable(turn: &Turn, about: &About) -> Cells {
-    let free = about.ring_word() & !tiles_about::layer(turn, COLLISION, about, about.ring_word()).set;
+    let free = about.ring_word() & !tiles_about::read_layer(turn, COLLISION, about, about.ring_word()).set;
     if free == 0 {
         return Cells::default();
     }
@@ -92,7 +92,7 @@ pub fn around_steppable(turn: &Turn, about: &About) -> Cells {
 /// cells around `centre`, laid out as an [`crate::area::Area`] is: what paths
 /// are found round.
 pub fn area_walls(turn: &Turn, centre: CellIndex) -> Walls {
-    let [north, west, south, east] = area::layers(turn, [WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST], centre).map(|area| area.set);
+    let [north, west, south, east] = area::read_layers(turn, [WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST], centre).map(|area| area.set);
     Walls::one_way(north, west, south, east)
 }
 
@@ -110,7 +110,7 @@ pub fn step_towards(turn: &mut Turn, at: CellIndex, goals: &Rows, passable: &Row
 /// at: in the area around it, else over tiles by scale, as far as
 /// an entity reaches. None if there is none in reach.
 pub fn seek(turn: &mut Turn, at: CellIndex, layer_type: LayerType) -> Option<SoughtStep> {
-    let near = area::layer(turn, layer_type, at);
+    let near = area::read_layer(turn, layer_type, at);
     if let Some(to) = step_towards(turn, at, &near.set, &near.hot) {
         return Some(SoughtStep { to, scale: 0 });
     }

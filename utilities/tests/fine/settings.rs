@@ -16,7 +16,7 @@ fn the_file_is_in_civil_egregores_folder() {
 /// stand, a row each under the one naming the columns; a setting never set has none.
 #[test]
 fn settings_are_kept_a_line_each() {
-    let path = utilities::transient_data::TransientData::of(env!("CARGO_MANIFEST_DIR")).under("tests/settings").join(FILE);
+    let path = utilities::transient_data::TransientData::for_crate(env!("CARGO_MANIFEST_DIR")).under("tests/settings").join(FILE);
     let mut settings = Settings::default();
     settings.set("wall length", Some("0.75".to_string()));
     settings.set("another's", Some("kept as it is".to_string()));
@@ -37,7 +37,7 @@ fn settings_are_kept_a_line_each() {
 /// default settings, which give the rest.
 #[test]
 fn the_default_settings_never_replace_a_machines() {
-    let folder = utilities::transient_data::TransientData::of(env!("CARGO_MANIFEST_DIR")).under("tests/settings");
+    let folder = utilities::transient_data::TransientData::for_crate(env!("CARGO_MANIFEST_DIR")).under("tests/settings");
     let (none, some) = (folder.join("started"), folder.join("kept"));
     _ = std::fs::remove_file(&none);
     let defaults = Settings::defaults();
@@ -60,10 +60,11 @@ fn the_default_settings_never_replace_a_machines() {
 /// it lacks empty.
 #[test]
 fn settings_are_found_by_name_in_any_order() {
-    let path = utilities::transient_data::TransientData::of(env!("CARGO_MANIFEST_DIR")).under("tests/settings").join("turned round");
+    let path = utilities::transient_data::TransientData::for_crate(env!("CARGO_MANIFEST_DIR")).under("tests/settings").join("turned round");
     let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/default_settings.csv")).expect("the default settings");
     let mut lines: Vec<&str> = text.lines().collect();
     lines[1..].reverse();
+    std::fs::create_dir_all(path.parent().expect("a folder")).expect("its folder made");
     std::fs::write(&path, lines.join("\n")).expect("written");
     let (read, defaults) = (Settings::read_from(&path), Settings::defaults());
     for name in utilities::tuning::NAMES.into_iter().chain([WORLDS]) {

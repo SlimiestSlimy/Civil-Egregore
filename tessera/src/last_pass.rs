@@ -141,7 +141,7 @@ impl Pricing {
 
     /// The bits the residual floor tile at Morton index `index` was priced
     /// at.
-    pub fn of(&self, index: usize) -> u64 {
+    pub fn price_of(&self, index: usize) -> u64 {
         self.prices[index] as u64
     }
 }

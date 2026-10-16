@@ -24,7 +24,7 @@ instruction; `conditional.rs` the compares and the queue;
 `entities.rs` what is queued for entities; `apply.rs` the queue
 applied. What a rule makes of them is `../../actions/`.
 
-**`Outbox`**: nine queues (`queues`, a `Queue` each), by **`slot(dx,
+**`Outbox`**: nine queues (`queues`, a `Queue` each), by **`slot_toward(dx,
 dy)`**, and for each where every author's part begins (`segments`, a
 **`Segment`** `{author, instructions, compares}` each).
 
@@ -96,17 +96,17 @@ its first two bytes, the high one its family: `CompareEnd`, `Count`;
 `MakeEntity`, `MoveEntity`, `RemoveEntity`, `CrossEntity`;
 `CompareAttribute`, `CompareAttributeMember`, `WriteAttributeMember`,
 `WriteAttribute`, `RemoveAttribute`, `WriteWake`. One made by the function of its name
--- `compare_end`, `count`, `compare_cell`, `write_cell`,
+-- `compare_end`, `count_under`, `compare_cell`, `write_cell`,
 `compare_cell_free`, `compare_entity`, `make_entity`, `move_entity`,
 `remove_entity`, `cross_entity`, `compare_attribute`,
 `compare_attribute_member` and `write_attribute_member` (the
 attribute by its whole ID, the member by its first byte and how many
 bytes it is, in `small`), `write_attribute` (an attribute whole, its
 blocks carried), `remove_attribute`, `write_wake` -- over `on` (an
-opcode on a cell). Read back: `at(superchunk)` its cell,
+opcode on a cell). Read back: `cell_in(superchunk)` its cell,
 `to(superchunk)` the cell its first word is the place of,
 `member()`, `is_a_compare()`, `is_a_write()`; `landing_in(slot)` and
-`slot()`: the outbox slot of the superchunk it lands in, four bits of
+`outbox_slot()`: the outbox slot of the superchunk it lands in, four bits of
 `place`; `carried_moved_by(moved)`: the same with what it carries
 beside the queue that much further on. `NO_COUNT`: what a
 write counts under when it counts nothing.
@@ -115,7 +115,7 @@ write counts under when it counts nothing.
 **`Compare`**: what a rule saw -- `Cell {layer_type, at, seen}`,
 `CellFree {at}`, `Entity {at, kind}`, `Attribute {at, kind, seen}`,
 `AttributeMember {at, kind, member, seen}` -- eight bytes of
-what was seen at the most; `Compare::at`, the cell it is on;
+what was seen at the most; `Compare::compared_cell`, the cell it is on;
 `Compare::instruction`, what it is queued as;
 **`Compare::attribute(at, kind, seen)`**: an attribute as its blocks
 were seen, their sum.
@@ -153,11 +153,11 @@ keeps its halo hot, in a world of `side` superchunks a side if it has
 one, and if `viewport` every superchunk of the viewport too, however
 many -- or `Forced {side}`: every superchunk of a world of that side hot,
 whatever its entities do; only a world with a side can be forced.
-**`about(entity)`**: a world of no size, about `entity`;
+**`about_entity(entity)`**: a world of no size, about `entity`;
 **`viewport()`**: whether the viewport's superchunks are hot too;
 **`side()`**, **`span()`**, **`within(superchunk)`**, **`all()`**:
 every superchunk of a world with a side, none of one without;
-**`wanted(entities)`**: the superchunks to be hot. **`about(of)`**: the 3x3
+**`wanted(entities)`**: the superchunks to be hot. **`halos_about(of)`**: the 3x3
 superchunks about each, sorted, each once.
 
 ## `halos.rs`

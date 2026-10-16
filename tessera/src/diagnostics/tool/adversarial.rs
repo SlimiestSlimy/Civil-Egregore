@@ -94,7 +94,7 @@ pub fn run(given: &Given) -> Result<(), String> {
         worst::write(WORST, &worst.bitmap, &format!("{WORST}: gap {} bits", worst.score.gap));
     }
     let bitmap = worst::read(WORST).expect("kept");
-    let examined = Examination::of(&mut Tessera::new(), &mut BitStream::default(), &mut Bitmap::new(), &bitmap);
+    let examined = Examination::examine_bitmap(&mut Tessera::new(), &mut BitStream::default(), &mut Bitmap::new(), &bitmap);
     assert_eq!(examined.first_difference, None, "{WORST} does not round trip");
 
     let kept_gap_now = if beaten { worst.score.gap } else { kept_gap.expect("a worst bitmap not beaten is there") };

@@ -105,12 +105,12 @@ impl Sliders {
         if let Shown::Group(group) = self.shown
             && !self.listed().any(|listed| listed == group)
         {
-            self.show(Shown::Closed);
+            self.show_from_top(Shown::Closed);
         }
     }
 
     /// Shows `what`, from its top.
-    fn show(&mut self, what: Shown) {
+    fn show_from_top(&mut self, what: Shown) {
         (self.shown, self.scrolled) = (what, 0.0);
     }
 
@@ -189,7 +189,7 @@ pub struct Row(f32);
 pub fn toggle(keys: Res<ButtonInput<KeyCode>>, mut sliders: ResMut<Sliders>) {
     if keys.just_pressed(KeyCode::KeyU) && !sliders.typing() && sliders.offered != Offered::Hidden {
         let what = if sliders.shown == Shown::Closed { Shown::Menu } else { Shown::Closed };
-        sliders.show(what);
+        sliders.show_from_top(what);
     }
 }
 

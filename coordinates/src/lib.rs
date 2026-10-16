@@ -78,7 +78,7 @@ impl SuperchunkIndex {
 
     /// Its chunks, in Morton order.
     pub fn chunks(self) -> impl Iterator<Item = ChunkIndex> {
-        (0..CHUNKS_IN_SUPERCHUNK).map(move |place| ChunkIndex::of(self, place))
+        (0..CHUNKS_IN_SUPERCHUNK).map(move |place| ChunkIndex::from_superchunk_place(self, place))
     }
 
     /// The superchunk `dx` across and `dy` down, if it is in the world:
@@ -98,7 +98,7 @@ pub struct ChunkIndex(pub u64);
 
 impl ChunkIndex {
     /// The chunk at `place` (0 to 15, in Morton order) in `superchunk`.
-    pub fn of(superchunk: SuperchunkIndex, place: usize) -> Self {
+    pub fn from_superchunk_place(superchunk: SuperchunkIndex, place: usize) -> Self {
         debug_assert!(place < CHUNKS_IN_SUPERCHUNK, "chunk place {place} is outside a superchunk");
         Self(superchunk.0 << CHUNK_PLACE_BITS | place as u64)
     }
@@ -184,7 +184,7 @@ pub struct CellIndex(pub u64);
 
 impl CellIndex {
     /// The cell at `place` (in Morton order) in `chunk`.
-    pub fn of(chunk: ChunkIndex, place: usize) -> Self {
+    pub fn from_chunk_place(chunk: ChunkIndex, place: usize) -> Self {
         debug_assert!(place < CELLS_IN_CHUNK, "cell place {place} is outside a chunk");
         Self(chunk.0 << CELL_PLACE_BITS | place as u64)
     }

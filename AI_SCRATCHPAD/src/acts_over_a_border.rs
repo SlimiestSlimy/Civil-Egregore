@@ -32,7 +32,7 @@ pub const CROSSING: &str = "crossing";
 /// The layer flipped.
 const STONE: LayerType = LayerType::of_a_bit(6);
 /// The entities' type.
-const WALKER: EntityType = EntityType::of(40);
+const WALKER: EntityType = EntityType::from_number(40);
 /// What one of a line counts.
 const COUNTED: Attribute<u64> = Attribute::new(41);
 /// Cells from the border the lines stand when moved away from it.

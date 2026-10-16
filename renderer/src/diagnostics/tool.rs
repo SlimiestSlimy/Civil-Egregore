@@ -69,7 +69,7 @@ fn watch_tool(given: &Given) -> Result<(), String> {
         println!("# seed {}, {sheep} sheep", utilities::seed::hex(seed));
         server::Start { seed, sheep, ..server::Start::default() }
     };
-    super::window_on::open(start);
+    super::window_on::open_window(start);
     Ok(())
 }
 
@@ -83,7 +83,7 @@ fn window_still_tool(given: &Given) -> Result<(), String> {
     let (folder, named) = (renders(), given.text(NAMED)?);
     std::fs::create_dir_all(&folder).map_err(|why| format!("{}: {why}", folder.display()))?;
     let path = folder.join(format!("{named}_{cells_a_pixel}.png"));
-    super::window_still::keep(seed, cells_a_pixel, path.clone());
+    super::window_still::save_still(seed, cells_a_pixel, path.clone());
     println!("still,file\nwindow,{}\n# seed {}", path.display(), utilities::seed::hex(seed));
     Ok(())
 }

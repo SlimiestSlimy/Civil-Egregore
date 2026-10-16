@@ -66,21 +66,21 @@ pub fn attribute_blocks(at: CellIndex, kind: AttributeType, seen: Option<&[Attri
     Compare::attribute(at, kind, seen)
 }
 
-/// Queues `compare`, open from here: what is queued until [`close`]
+/// Queues `compare`, open from here: what is queued until [`close_compare`]
 /// is under it, and under every compare open already.
 #[inline]
-pub fn open(turn: &mut Turn, compare: Compare) {
+pub fn open_compare(turn: &mut Turn, compare: Compare) {
     turn.compare_open(compare);
 }
 
-/// Queues the end of the compare opened last by [`open`].
+/// Queues the end of the compare opened last by [`open_compare`].
 #[inline]
-pub fn close(turn: &mut Turn) {
+pub fn close_compare(turn: &mut Turn) {
     turn.compare_close();
 }
 
 /// Queues `compare`, the `writes` under it and its end in one call:
-/// what [`open`], a write each and [`close`] come to, for a compare
+/// what [`open_compare`], a write each and [`close_compare`] come to, for a compare
 /// whose writes all land in its own superchunk -- most of what is
 /// queued.
 #[inline]

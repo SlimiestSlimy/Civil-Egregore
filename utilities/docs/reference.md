@@ -14,9 +14,9 @@ columns sized to their widest field (**`column_widths`**,
 **`Report::new(name, command)`**, **`note`**, **`add(title, table)`**,
 **`print`**, **`to_text`** / **`from_text`**, **`read(folder, name)`**,
 **`publish(folder)`** -- printed, noted with the commit (**`commit`**),
-and kept as `<name>.csv`; **`keep(folder)`**, the same unprinted, for a
+and kept as `<name>.csv`; **`write_to_folder(folder)`**, the same unprinted, for a
 run whose standard output is something else (**`note_commit`**,
-**`write`**). **`path(folder, name)`**, **`kept(folder)`**:
+**`write`**). **`path(folder, name)`**, **`saved_reports(folder)`**:
 the reports kept.
 
 ## `diagnostics/table/csv.rs`
@@ -64,7 +64,7 @@ hexadecimal digits; **`of_hex(text)`**: back, with or without the `0x`.
 place. **`Command { name, does, parameters, run }`**. **`dispatch(called,
 commands, arguments)`**: runs the command the first argument names on
 the rest, or gives the usage as why not; **`usage(called, commands)`**:
-the commands as a table. **`Given`**, what a command is run with:
+the commands as a table, a row each (**`usage_line(called, command)`**). **`Given`**, what a command is run with:
 `name()`, `arguments()`, `given(name)` (if given), `text(name)` and
 `number(name)` (as given, or the default), `route()` (the words between
 the program and the command), `usage()`, `resolved()` (the line it ran
@@ -151,7 +151,7 @@ says. **`MemoryTrack`**: **`read`** (one reading), **`average`**, **`peak`**.
 ## `transient_data.rs`
 
 `TRANSIENT_DATA`: the crate's `transient_data/` folder.
-**`TransientData::of(crate_folder)`**: a crate's `transient_data/`, from
+**`TransientData::for_crate(crate_folder)`**: a crate's `transient_data/`, from
 its `env!("CARGO_MANIFEST_DIR")`; **`under(relative)`**,
 **`measurements()`**, **`publish(report)`** -- printed, and kept as
 `measurements/<name>.csv`. `FOLDER`: the folder's name.
@@ -165,10 +165,10 @@ the crate's one `unsafe` line, on a reference's address.
 
 **`Dispatcher::new(threads)`**: `threads - 1` workers started and kept;
 **`of_the_machine()`**: every thread the machine has. **`threads`**.
-**`run(job)`**: part 0 here, the others on the workers not busy with a
+**`run_in_parts(job)`**: part 0 here, the others on the workers not busy with a
 queued job; returns once every part started is done, a part's panic
 raised after; one at a time (`one_run`). **`queue(job)`**: done once by a worker when one is free,
-or at once where there is no worker. **`work`**: a worker's loop -- wait
+or at once where there is no worker. **`worker_loop`**: a worker's loop -- wait
 for work, a job run before one queued, do it, say so. Dropping it stops
 and joins the workers.
 
@@ -179,7 +179,7 @@ The settings of this machine: `FILE` (`settings.csv`) in `FOLDER`
 **`folder()`**, **`file()`**. `default_settings.csv`, at the crate's root: every setting
 there is and what it is unless changed, built into the program.
 **`Settings`**: a name and a value a row, under `setting,value`, found
-by name in any order -- **`defaults()`**,
+by name in any order (**`parse_text(text)`**) -- **`defaults()`**,
 **`read()`** (the machine's file, given a copy of the default settings
 if it has none, and the default ones for what it lacks; the default
 ones alone under the feature `force_default_settings`),
@@ -207,6 +207,6 @@ is made. **`Tuning`**: the
 numbers together, a value held by whoever sets them -- nothing of them
 is held here. **`unless_set(index)`**: what a number is unless set,
 from the default settings; **`defaults()`**: every one so.
-**`kept()`**: what the machine's settings have. **`settled(index,
+**`load_from_settings()`**: what the machine's settings have. **`settled(index,
 value)`**: a value set, or the default if it is no number.
-**`keep(tuning)`**: the numbers written to the machine's settings.
+**`save_to_settings(tuning)`**: the numbers written to the machine's settings.

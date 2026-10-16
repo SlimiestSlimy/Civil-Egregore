@@ -54,7 +54,7 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
             let now = turn.now();
             for entity in turn.woken() {
                 let at = entity.header.at;
-                let passable = area::layer(turn, STONE, at).hot;
+                let passable = area::read_layer(turn, STONE, at).hot;
                 assert_eq!(walking::step_to(turn, at, at.offset(9, 0).unwrap(), &passable), None, "out of the area");
                 let next = walking::step_to(turn, at, to, &passable).expect("a way round");
                 actions::entities::step(turn, &entity.header, next, now + 1);
@@ -99,7 +99,7 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
                     let about = around::about(at);
                     assert_eq!(walking::around_steppable(turn, &about), about.ring().without(about.towards(around::way_of(at, cell(41, 29)))));
                 }
-                let next = walking::step_to(turn, at, to, &area::layer(turn, STONE, at).hot).expect("a way round");
+                let next = walking::step_to(turn, at, to, &area::read_layer(turn, STONE, at).hot).expect("a way round");
                 assert_eq!(turn.holds(COLLISION, next), Ok(false), "a step onto what the collision plane holds");
                 actions::entities::step(turn, &entity.header, next, now + 1);
             }
@@ -176,7 +176,7 @@ fn walls_of_the_terrain_bar_steps() {
                     let about = around::about(at);
                     assert_eq!(walking::around_unwalled(turn, &about), about.nine().without(about.towards(around::NORTH_EAST) | about.towards(around::EAST) | about.towards(around::SOUTH_EAST)));
                 }
-                let passable = area::layer(turn, STONE, at).hot;
+                let passable = area::read_layer(turn, STONE, at).hot;
                 let next = walking::step_to(turn, at, to, &passable).expect("a way through the gap");
                 let about = around::about(at);
                 assert!(!(walking::around_unwalled(turn, &about) & about.towards(around::way_of(at, next))).is_empty(), "a step through a wall");
@@ -212,9 +212,9 @@ fn a_drop_is_stepped_down_and_not_back_up() {
         assert_eq!(walking::around_unwalled(turn, &about_above), about_above.nine(), "every step open from above");
         let west = about_foot.towards(around::NORTH_WEST) | about_foot.towards(around::WEST) | about_foot.towards(around::SOUTH_WEST);
         assert_eq!(walking::around_unwalled(turn, &about_foot), about_foot.nine().without(west), "none back up");
-        let passable = area::layer(turn, STONE, above).hot;
+        let passable = area::read_layer(turn, STONE, above).hot;
         assert_eq!(walking::step_to(turn, above, below, &passable).map(|next| next.cartesian().x), Some(cell(42, row).cartesian().x), "down it");
-        let passable = area::layer(turn, STONE, below).hot;
+        let passable = area::read_layer(turn, STONE, below).hot;
         assert_eq!(walking::step_to(turn, below, above, &passable), None, "no way back in the area");
         0
     });

@@ -1,4 +1,4 @@
-//! Frames asked of the host ([`ask`]) and shown ([`show`]): a
+//! Frames asked of the host ([`ask`]) and shown ([`show_frames`]): a
 //! superchunk's image a sprite each, and from near one picture of the
 //! viewport's cells (`docs/renderer.md`, "The window asks").
 
@@ -75,7 +75,7 @@ pub fn spawn(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
 /// near; what went cold or is of another world dropped
 /// (`docs/reference.md`, "frames.rs").
 #[allow(clippy::too_many_arguments)]
-pub fn show(
+pub fn show_frames(
     mut commands: Commands,
     mut link: ResMut<Link>,
     mut sprites: ResMut<Sprites>,
@@ -136,7 +136,7 @@ pub fn show(
             let image = images.add(picture_with_mipmaps(side, painted.pixels));
             due.0.push(image.id());
             let sprite = Sprite { image: image.clone(), custom_size: Some(Vec2::splat(SPRITE_SIDE)), ..default() };
-            let middle = [0, 1].map(|axis| sprites.plane([at.0, at.1][axis] * SUPERCHUNK_SIDE_CELLS, axis) + SPRITE_SIDE / 2.0);
+            let middle = [0, 1].map(|axis| sprites.translation_of_cell([at.0, at.1][axis] * SUPERCHUNK_SIDE_CELLS, axis) + SPRITE_SIDE / 2.0);
             let sprite = commands.spawn((sprite, Transform::from_xyz(middle[0], -middle[1], 0.0))).id();
             sprites.tiles.insert(at, (sprite, image, side));
         }
@@ -146,7 +146,7 @@ pub fn show(
                 *image = picture_of((size.0 * pixels, size.1 * pixels), painted.pixels);
             }
             // Over the cells it is of, a cell a unit whatever its pixels.
-            let middle = (sprites.plane(first.0, 0) + size.0 as f32 / 2.0, -(sprites.plane(first.1, 1) + size.1 as f32 / 2.0));
+            let middle = (sprites.translation_of_cell(first.0, 0) + size.0 as f32 / 2.0, -(sprites.translation_of_cell(first.1, 1) + size.1 as f32 / 2.0));
             *near_transform = Transform::from_xyz(middle.0, middle.1, 1.0).with_scale(Vec3::new(1.0 / pixels as f32, 1.0 / pixels as f32, 1.0));
             if seen.near_pixels > 0 {
                 *near_visibility = Visibility::Visible;

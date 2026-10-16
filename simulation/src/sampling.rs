@@ -46,7 +46,7 @@ pub fn sample_layer(superchunk: SuperchunkIndex, layer: LayerView, chance: Chanc
             next -= count;
             continue;
         }
-        let (cells, tile_counts, chunk_index) = (layer.cells(chunk), layer.tile_counts(chunk), ChunkIndex::of(superchunk, chunk));
+        let (cells, tile_counts, chunk_index) = (layer.cells(chunk), layer.tile_counts(chunk), ChunkIndex::from_superchunk_place(superchunk, chunk));
         // Set cells in the words before `word`, and in those before its count tile.
         let (mut word, mut before, mut before_tile) = (0, 0u64, 0u64);
         while next < count {
@@ -68,7 +68,7 @@ pub fn sample_layer(superchunk: SuperchunkIndex, layer: LayerView, chance: Chanc
                 word += 1;
             }
             let bit = select(cells[word], (next - before) as u32);
-            emit(CellIndex::of(chunk_index, word * BITS_PER_WORD + bit as usize));
+            emit(CellIndex::from_chunk_place(chunk_index, word * BITS_PER_WORD + bit as usize));
             chosen += 1;
             next += 1 + draw(random);
         }
@@ -93,7 +93,7 @@ pub fn sample_tiles_of_layer(superchunk: SuperchunkIndex, layer: LayerView, tile
     let (mut next, mut chosen) = (draw(random), 0);
     for chunk in (0..CHUNKS_IN_SUPERCHUNK).filter(|&chunk| layer.is_hot(chunk)) {
         while next < tiles {
-            emit(CellIndex::of(ChunkIndex::of(superchunk, chunk), (next as usize) << tile_shift));
+            emit(CellIndex::from_chunk_place(ChunkIndex::from_superchunk_place(superchunk, chunk), (next as usize) << tile_shift));
             chosen += 1;
             next += 1 + draw(random);
         }

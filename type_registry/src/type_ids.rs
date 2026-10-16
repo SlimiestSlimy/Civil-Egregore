@@ -212,7 +212,7 @@ pub struct EntityType(pub u64);
 
 impl EntityType {
     /// The entity type of number `number`.
-    pub const fn of(number: u64) -> Self {
+    pub const fn from_number(number: u64) -> Self {
         Self(type_id(Kind::EntityType, number, 0))
     }
 
@@ -230,7 +230,7 @@ pub struct ScaRuleType(pub u64);
 
 impl ScaRuleType {
     /// The rule of the cells of number `number`.
-    pub const fn of(number: u64) -> Self {
+    pub const fn from_number(number: u64) -> Self {
         Self(type_id(Kind::ScaRule, number, 0))
     }
 
@@ -248,7 +248,7 @@ pub struct EntityRuleType(pub u64);
 
 impl EntityRuleType {
     /// The rule of an entity of number `number`.
-    pub const fn of(number: u64) -> Self {
+    pub const fn from_number(number: u64) -> Self {
         Self(type_id(Kind::EntityRule, number, 0))
     }
 

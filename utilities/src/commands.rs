@@ -85,7 +85,7 @@ impl Given<'_> {
     /// How the command is called: the words it is reached by, its name
     /// and its parameters.
     pub fn usage(&self) -> String {
-        line(self.called, self.command)
+        usage_line(self.called, self.command)
     }
 
     /// The command as it ran: the words it was reached by, its name,
@@ -106,7 +106,7 @@ fn parameters(command: &Command) -> String {
 }
 
 /// How `command` is called, reached by `called`.
-fn line(called: &str, command: &Command) -> String {
+fn usage_line(called: &str, command: &Command) -> String {
     format!("{called} {} {}", command.name, parameters(command)).trim_end().to_string()
 }
 

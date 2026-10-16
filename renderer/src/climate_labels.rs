@@ -79,7 +79,7 @@ pub fn climates(shown: Res<Shown>, sprites: Res<Sprites>, seen: Res<Seen>, camer
             text.0 = climate;
         }
         let middle = TILE_SIDE as f32 / 2.0;
-        *transform = Transform::from_xyz(sprites.plane(left, 0) + middle, -(sprites.plane(top, 1) + middle), 4.0).with_scale(Vec3::splat(size));
+        *transform = Transform::from_xyz(sprites.translation_of_cell(left, 0) + middle, -(sprites.translation_of_cell(top, 1) + middle), 4.0).with_scale(Vec3::splat(size));
         *visibility = Visibility::Visible;
     }
 }

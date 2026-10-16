@@ -122,13 +122,13 @@ its row in the registry, **`Rule::master`** its master's. `RuleFunction`: what a
 `written_for(id)`: what a rule counts and its function, by its ID --
 all the server says of a rule, and the build fails if the registry
 has one it says nothing of. **`RulePlace`**: a rule's place in it, made of its
-ID as the server is compiled (**`RulePlace::of(id)`**, an ID
+ID as the server is compiled (**`RulePlace::from_registry_id(id)`**, an ID
 not there not compiling), **`RulePlace::rule`** the row there;
 **`GRASS_RULE`**, **`TREES_RULE`**, **`SHEEP_RULE`**, **`WEATHER_RULE`**: each rule's.
 **`TickCounts`** `{counts, times}`: each rule's `RuleCounts` and time at
-its place; **`of(rule)`** and **`time_of(rule)`** read them by place.
+its place; **`counts_of(rule)`** and **`time_of(rule)`** read them by place.
 **`Chosen`**: some of the rules --
-**`ALL`**, or **`of(rules)`** -- and a superchunk's turn of them,
+**`ALL`**, or **`from_rules(rules)`** -- and a superchunk's turn of them,
 **`turn`**, or **`timed_turn`** with each one's time.
 
 ## `diagnostics/`
@@ -248,7 +248,8 @@ after is of the world remade. `Request`, private:
 a call as sent. **`census_path()`**: where a run's census is kept
 (`transient_data/measurements/census.csv`); **`census(seed)`**: its
 file, started afresh for each world. **`Running`**: the world run, the
-superchunks whose heights were sent, when it began, its census.
+superchunks whose heights were sent, when it began, its census;
+**`from_start(start, world)`**, a world just made, its census begun.
 **`Answering`**: an ask being answered -- what was asked, the
 viewport's hot superchunks then, those yet to copy, those copied and
 not yet sent, what copying has taken.
@@ -274,9 +275,9 @@ A ticker's world shown in a window (`server.md`, "A world shown").
 end -- the window's socket, its requests read on a thread, pause,
 pace, which world was last shown and what of it was sent
 (`begin`, `between_ticks(world)`); `SHOWN`, the one of a process;
-`program()`, the game's program to start as the window; `window()`,
+`program()`, the game's program to start as the window; `connect_window()`,
 the window reached or started. **`between_ticks(world)`**: what the
-world's tick ends with -- `ASKED`, the flag read once -- `show` where a window was asked for.
+world's tick ends with -- `ASKED`, the flag read once -- `serve_window(world)` where a window was asked for.
 **`Host::of_shown_worlds()`**: the window's end, a host whose world is
 whatever ticker's comes: `Told` what the window last said, kept for
 the next ticker (`send`); `tickers`, every ticker that connects, one
@@ -284,7 +285,7 @@ after another, its frames sent on (`next_ticker`, the next waited for). **`no_ti
 
 `wire.rs`: `MOST_WORDS`; `send(to, words)`, `receive(from)`, a message
 of words; `Written` (`number`, `pair`, `words`, `text`, `maybe`) and
-`Read64` (`of`, the same to read); `viewport_written`/`viewport_read`,
+`Read64` (`over_words`, the same to read); `viewport_written`/`viewport_read`,
 `near_written`/`near_read`; `request_written(request)`,
 `request_read(words)`; `frame_written(frame)`, `frame_read(words,
 waters)`.
@@ -295,7 +296,7 @@ What a client asks of a world's terrain where no frame brings it
 (`server.md`, "Terrain asked of the host"), answered on a thread named
 `terrain`. `Height`, the word heights come in. **`Levels`** `{ground,
 ocean, highest}`, the heights a world is drawn between
-(`Levels::of(generation)`: a world with no relief, a plain, drawn between the default world's, as low land); **`Cover`** -- `Ocean`, `Tree`, `Grass`,
+(`Levels::from_generation(generation)`: a world with no relief, a plain, drawn between the default world's, as low land); **`Cover`** -- `Ocean`, `Tree`, `Grass`,
 `Dirt` -- what a cell is generated with.
 **`HeightsAsk`** `{world, first, size, skipped}`: the heights of a
 rectangle of cells, those of the superchunks `skipped` passed by and
@@ -345,4 +346,5 @@ same ask are still to come. **`count(world,
 layer_type)`**; **`copy(world, superchunk, ask, sent)`**: one
 superchunk's `Cells`, none if it has gone cold since asked
 (**`layer`**, **`sheep`**); **`Water`** `{depths, deep}`: a
-superchunk's water off its image, read once and kept.
+superchunk's water off its image, read once and kept
+(**`from_image(image)`**).

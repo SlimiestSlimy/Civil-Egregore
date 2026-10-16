@@ -138,7 +138,7 @@ it.
 
 **Queued.** Each instruction carries the outbox slot of the superchunk
 it lands in, in four bits of its `place` above the cell's
-(`Instruction::landing_in`, `slot`). The turn keeps where the author
+(`Instruction::landing_in`, `outbox_slot`). The turn keeps where the author
 began queuing (`AuthorBegan`: the slot, and what that slot's queue
 held before it; forgotten as the next author is named,
 `Turn::seeing_to`). As the author queues for another slot

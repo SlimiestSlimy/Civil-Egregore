@@ -99,7 +99,7 @@ fn take(due: Extract<Res<MipmapsDue>>, mut waiting: ResMut<Waiting>, mut jobs: R
 
 /// Makes the mipmaps asked for, before the cameras draw; a picture
 /// waits on until the card has it and what makes mipmaps is built.
-fn make(jobs: Res<MipGenerationJobs>, cache: Res<PipelineCache>, pipelines: Res<MipGenerationPipelines>, images: Res<RenderAssets<GpuImage>>, mut waiting: ResMut<Waiting>, mut context: RenderContext) {
+fn make_mipmaps(jobs: Res<MipGenerationJobs>, cache: Res<PipelineCache>, pipelines: Res<MipGenerationPipelines>, images: Res<RenderAssets<GpuImage>>, mut waiting: ResMut<Waiting>, mut context: RenderContext) {
     generate_mips_for_phase(BEFORE_THE_CAMERAS, &jobs, &cache, &pipelines, &images, &mut context);
     let built = waiting.asked_on >= ASKED_BEFORE && cache.waiting_pipelines().next().is_none();
     waiting.pictures.retain(|&picture, frames| {
@@ -118,6 +118,6 @@ impl Plugin for Mipmaps {
         let Some(card) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
-        card.init_resource::<Waiting>().add_systems(ExtractSchedule, take).add_systems(RenderGraph, make.before(camera_driver));
+        card.init_resource::<Waiting>().add_systems(ExtractSchedule, take).add_systems(RenderGraph, make_mipmaps.before(camera_driver));
     }
 }

@@ -30,7 +30,7 @@ fn areas_read_at_once_are_the_cells_read_one_by_one() {
         }
         for (x, y) in centres {
             let centre = CellCartesian { x: start.x + x, y: start.y + y };
-            let area = area::layer(turn, STONE, centre.into());
+            let area = area::read_layer(turn, STONE, centre.into());
             for (across, down) in (0..AREA_SIDE as u32).flat_map(|down| (0..AREA_SIDE as u32).map(move |across| (across, down))) {
                 let cell = CellCartesian { x: centre.x + across - AREA_CENTRE as u32, y: centre.y + down - AREA_CENTRE as u32 };
                 let held = turn.holds(STONE, cell.into());

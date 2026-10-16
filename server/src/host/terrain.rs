@@ -28,7 +28,7 @@ impl Levels {
     /// no relief to speak of -- a plain, a step above its ocean -- is
     /// drawn between the levels worlds have unless told otherwise:
     /// its land is low land, not a peak.
-    pub(crate) fn of(generation: &Generation) -> Self {
+    pub(crate) fn from_generation(generation: &Generation) -> Self {
         let shape = &generation.shape;
         let flat = shape.highest <= shape.ocean + worldgen::STEP;
         Self { ground: shape.ground, ocean: shape.ocean, highest: if flat { shape.ocean + worldgen::Shape::DEFAULT.highest } else { shape.highest } }
@@ -205,7 +205,7 @@ fn heights(seed: u64, generation: &Generation, ask: &HeightsAsk) -> Vec<Height> 
 /// The map `ask` asks for, of the world of `seed` generated as
 /// `generation` says.
 fn map(seed: u64, generation: &Generation, ask: MapAsk) -> MapAnswer {
-    let (width, levels) = (ask.size.0 as usize, Levels::of(generation));
+    let (width, levels) = (ask.size.0 as usize, Levels::from_generation(generation));
     // The cell in the middle of a pixel, or none past the world's edges.
     let cell = |x: i64, y: i64| {
         let cell = |first: i64, pixel: i64| u32::try_from(first + pixel * i64::from(ask.step) + i64::from(ask.step) / 2).ok();
@@ -227,14 +227,14 @@ fn map(seed: u64, generation: &Generation, ask: MapAsk) -> MapAnswer {
                 let cover = if height < levels.ocean {
                     Cover::Ocean
                 } else {
-                    let grown = growth.at(cell_x, cell_y);
+                    let grown = growth.grown_at(cell_x, cell_y);
                     match (grown.tree, grown.grass) {
                         (Some(_), _) => Cover::Tree,
                         (None, true) => Cover::Grass,
                         (None, false) => Cover::Dirt,
                     }
                 };
-                let on_a_mesh_line = ask.borders && lands.line(cell_x, cell_y).1 < u64::from(ask.step);
+                let on_a_mesh_line = ask.borders && lands.inland_and_line_distance(cell_x, cell_y).1 < u64::from(ask.step);
                 *pixel = Some(MapCell { height, above, cover, on_a_mesh_line });
             }
         }

@@ -20,7 +20,7 @@ pub struct ArenaStats {
 
 impl ArenaStats {
     /// What `arena` holds now.
-    pub fn of(arena: &BitmapArena) -> Self {
+    pub fn measure_arena(arena: &BitmapArena) -> Self {
         let buckets = arena.layers().map(|layer| layer.kept.count_ones() as usize).sum();
         let bucket_bytes = arena.layers().map(|layer| size_of_val(&*layer.buckets) as u64).sum();
         Self { superchunks: arena.directory.len(), allocations: arena.allocations(), hot_bitmaps: arena.len(), buckets, bucket_bytes }

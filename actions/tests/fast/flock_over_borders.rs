@@ -83,8 +83,8 @@ fn flock(turn: &mut Turn, seed: u64, shift: (u32, u32)) -> u64 {
         turn.seeing_to(at);
         let mut drawn = drawn_for(seed, now, from_pasture(shift, at));
         let about = around::about(at);
-        let stone = around::layer(turn, STONE, &about);
-        let (open, taken) = (stone.hot & about.ring(), around::layer(turn, COLLISION, &about).set & about.ring());
+        let stone = around::read_layer(turn, STONE, &about);
+        let (open, taken) = (stone.hot & about.ring(), around::read_layer(turn, COLLISION, &about).set & about.ring());
         let chance = drawn.below(100);
         if chance < 4 {
             actions::entities::remove(turn, &header);

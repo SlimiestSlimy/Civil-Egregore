@@ -24,7 +24,7 @@ pub struct TreeStats {
 
 impl TreeStats {
     /// The counts of one tree.
-    pub fn of(tree: &Tree) -> Self {
+    pub fn measure_tree(tree: &Tree) -> Self {
         let mut stats = Self::default();
         stats.count(tree, Tile::WHOLE_BITMAP);
         stats

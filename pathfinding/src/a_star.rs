@@ -82,13 +82,13 @@ pub fn a_star(passable: &Rows, walls: &Walls, from: Cell, to: Cell) -> Option<Pa
     steps[to.index()] = 0;
     queue.push(steps_apart(to, from), 0, to.index());
     while let Some((index, queued_at)) = queue.pop() {
-        let cell = Cell::at(index);
+        let cell = Cell::from_index(index);
         // Queued again since by a shorter way, and looked at then.
         if holds(&settled, cell) || queued_at > steps[index] {
             continue;
         }
         if cell == from {
-            return Some(Path { first: Cell::at(towards[index] as usize), steps: steps[index] });
+            return Some(Path { first: Cell::from_index(towards[index] as usize), steps: steps[index] });
         }
         settled[cell.y as usize] |= 1 << cell.x;
         let further = steps[index] + 1;

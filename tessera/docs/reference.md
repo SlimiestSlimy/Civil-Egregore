@@ -93,7 +93,8 @@ order: one run of indices, each turned back into coordinates.
 
 **`Pyramid<T, FINEST>`**: one `T` per tile, levels 0 to `FINEST`,
 each level's elements in Morton order, levels one after another:
-level `l` starts at `(4^l - 1) / 3` (`level_start`).
+level `l` starts at `(4^l - 1) / 3` (`level_start`), a tile's element
+that plus its Morton index (`element_index`).
 
 - **`get`**, **`set`**: by tile. **`set_at`**: by level and Morton
   index, for building a level in order without coordinates.
@@ -437,7 +438,7 @@ cells read it.
 **`Pricing::price(bitmap, floor tile)`**: `code_residual_floor_tile` reading
 cells off the bitmap and summing their costs, rounded to the nearest
 bit; the odds carry over to the next floor tile priced, as in the pass.
-Kept per floor tile (`of`) for the debug check in `Tessera::encode`.
+Kept per floor tile (`price_of`) for the debug check in `Tessera::encode`.
 
 **`FloorPlan`**: the last pass's input. **`add_residual_floor_tile`**,
 **`add_copied_floor_tiles(copy, part, far, direction)`**: `part` is the copy

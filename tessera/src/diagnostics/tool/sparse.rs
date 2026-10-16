@@ -55,7 +55,7 @@ pub fn run(report: &mut Report) {
         for density in DENSITIES {
             let (mut set, mut tree, mut split, mut written, mut splits, mut bound) = (0, 0, 0, 0, 0, 0.0);
             for bitmap in grown(corpus_seed(), density, cluster, EACH) {
-                let examined = Examination::of(&mut tessera, &mut stream, &mut back, &bitmap);
+                let examined = Examination::examine_bitmap(&mut tessera, &mut stream, &mut back, &bitmap);
                 assert_eq!(examined.first_difference, None, "cluster {cluster}, density {density}: a bitmap did not round trip");
                 let set_cells = bitmap.count_set() as u64;
                 set += set_cells;

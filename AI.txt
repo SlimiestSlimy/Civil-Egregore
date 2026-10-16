@@ -386,7 +386,7 @@ type registry". To survey: server's RULES table (name, ID written by
 hand beside the registry's row), worldgen's list of planes, the
 frame's layers, actions::layers, whatever lists layer types by hand.
    DONE for it: server's RULES made of the registry's rules at compile
-   time (no list; only ID -> function, `written_for`), RulePlace::of(id);
+   time (no list; only ID -> function, `written_for`), RulePlace::from_registry_id(id);
    actions::types = the registry whole (was three hand lists). Left as
    they are, being uses and not registrations: worldgen's planes it
    generates, the frame's planes it sends. TO TELL the user, theirs to

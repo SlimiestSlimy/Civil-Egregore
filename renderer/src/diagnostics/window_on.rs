@@ -13,7 +13,7 @@ struct Watched(Option<Start>);
 
 /// Tells the host to make the world, once, and shows it in place of
 /// the main menu.
-fn show(mut watched: ResMut<Watched>, mut link: ResMut<Link>, mut screen: ResMut<Screen>) {
+fn make_watched_world(mut watched: ResMut<Watched>, mut link: ResMut<Link>, mut screen: ResMut<Screen>) {
     if let Some(start) = watched.0.take() {
         _ = link.host.make_world(start);
         link.forget_asked();
@@ -50,8 +50,8 @@ pub fn show_worlds() -> Result<(), String> {
 
 /// Opens the window on the world started as `start` says, running,
 /// until it is closed.
-pub fn open(start: Start) {
+pub fn open_window(start: Start) {
     let mut window = crate::window();
-    window.insert_resource(Watched(Some(start))).add_systems(Update, show.after(crate::hud::hud));
+    window.insert_resource(Watched(Some(start))).add_systems(Update, make_watched_world.after(crate::hud::hud));
     window.run();
 }

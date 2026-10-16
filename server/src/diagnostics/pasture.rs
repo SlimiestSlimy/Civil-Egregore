@@ -85,11 +85,11 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
     let mut acts_over_a_border = 0;
     let mut census = vec![Census { tick: 0, sheep: start_sheep, grass: start_grass, ..Census::default() }];
     let mut since = RuleCounts::default();
-    let chosen = Chosen::of(&RULES_TICKED);
+    let chosen = Chosen::from_rules(&RULES_TICKED);
     for tick in 0..ticks {
         let report = world.tick_only(chosen, true);
         done += report.rules;
-        since += report.rules.of(SHEEP_RULE);
+        since += report.rules.counts_of(SHEEP_RULE);
         if (tick + 1) % CENSUS_EVERY == 0 || tick + 1 == ticks {
             census.push(Census { tick: tick + 1, sheep: world.entities.len(), grass: count(&world, GRASS), woken: since[WOKEN] as usize, births: since[BIRTHS] as usize, deaths: since[DEATHS] as usize });
             since = RuleCounts::default();
@@ -114,7 +114,7 @@ pub fn run(ticks: usize, thousandths: usize, sheep: usize, superchunks: u32, thr
         computing,
         applying,
         memory,
-        held: EntityStats::of(&world.entities),
+        held: EntityStats::measure_entities(&world.entities),
         census,
     }
 }

@@ -74,7 +74,7 @@ impl Level {
                 let (x, y) = (index % self.side, index / self.side);
                 let coast = ((coast_wide + 1.0 - self.to_coast[index]) / coast_wide).clamp(0.0, 1.0);
                 if !land(index) {
-                    return Shade::of(self.factors[index], FOAM, FOAM_MOST * coast);
+                    return Shade::from_factor(self.factors[index], FOAM, FOAM_MOST * coast);
                 }
                 // The pixel to its right and the one under it, where they are land: no contour over water.
                 let others = [(x + 1 < self.side).then_some(index + 1), (y + 1 < self.side).then_some(index + self.side)];
@@ -93,7 +93,7 @@ impl Level {
                 // Sand is its own colour at any height: untinted by as much as the pixel is sand.
                 let (tinted, plain) = (self.factors[index], self.lights[index]);
                 let factor: [f32; 3] = std::array::from_fn(|channel| (tinted[channel] + (plain[channel] - tinted[channel]) * sand / SAND_MOST) * darker);
-                Shade::of(factor, over, part)
+                Shade::from_factor(factor, over, part)
             })
             .collect()
     }
@@ -101,7 +101,7 @@ impl Level {
 
 impl Shade {
     /// The shade multiplying a colour by `factor`, `part` of it `over` first.
-    fn of(factor: [f32; 3], over: [u8; 3], part: f32) -> Self {
+    fn from_factor(factor: [f32; 3], over: [u8; 3], part: f32) -> Self {
         let kind = [PALE, SAND, FOAM].iter().position(|&colour| colour == over).unwrap_or(0) as u8;
         let factor = factor.map(|factor| (factor * FACTOR_ONE as f32).round().min(255.0) as u8);
         Self([factor[0], factor[1], factor[2], kind << Self::PART_BITS | (part.clamp(0.0, 1.0) * Self::WHOLE as f32).round() as u8])

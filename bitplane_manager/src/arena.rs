@@ -79,12 +79,12 @@ impl BitmapArena {
     }
 
     /// The allocation at `at`.
-    fn at(&self, (entry, layer): LayerAt) -> &SuperchunkLayer {
+    fn layer_at(&self, (entry, layer): LayerAt) -> &SuperchunkLayer {
         &self.directory[entry].layers[layer]
     }
 
     /// The allocation at `at`, to change.
-    pub(crate) fn at_mut(&mut self, (entry, layer): LayerAt) -> &mut SuperchunkLayer {
+    pub(crate) fn layer_at_mut(&mut self, (entry, layer): LayerAt) -> &mut SuperchunkLayer {
         &mut self.directory[entry].layers[layer]
     }
 
@@ -92,7 +92,7 @@ impl BitmapArena {
     /// bucket's index there.
     pub(crate) fn hot(&self, key: BucketKey) -> Option<(LayerAt, usize)> {
         let at = self.lookup.find(&self.directory, key.layer_type, key.chunk.superchunk())?;
-        contains(self.at(at).flags.hot, key.chunk.place()).then_some((at, key.chunk.place()))
+        contains(self.layer_at(at).flags.hot, key.chunk.place()).then_some((at, key.chunk.place()))
     }
 
     /// Whether `key`'s bitmap is hot.
@@ -123,13 +123,13 @@ impl BitmapArena {
     /// How many cells of `layer_type` are set over `superchunk`, in its
     /// hot bitmaps: what weighs the superchunk when sampling.
     pub fn superchunk_count(&self, layer_type: LayerType, superchunk: SuperchunkIndex) -> u32 {
-        self.lookup.find(&self.directory, layer_type, superchunk).map_or(0, |at| self.at(at).hot_count)
+        self.lookup.find(&self.directory, layer_type, superchunk).map_or(0, |at| self.layer_at(at).hot_count)
     }
 
     /// `key`'s bitmap, to read, if it is hot.
     pub fn bucket(&self, key: BucketKey) -> Option<Bucket<'_>> {
         self.hot(key).map(|(at, chunk)| {
-            let allocation = self.at(at);
+            let allocation = self.layer_at(at);
             Bucket { words: allocation.words(chunk), count: allocation.count(chunk) }
         })
     }
@@ -171,10 +171,10 @@ impl BitmapArena {
 
     /// Every hot bitmap of `layer_type`: superchunk by superchunk in their
     /// Morton order, and in each the chunks in theirs.
-    pub fn run(&self, layer_type: LayerType) -> impl Iterator<Item = (ChunkIndex, Bucket<'_>)> {
+    pub fn buckets_of(&self, layer_type: LayerType) -> impl Iterator<Item = (ChunkIndex, Bucket<'_>)> {
         self.layers_of(layer_type).flat_map(move |(superchunk, allocation)| {
             members(allocation.flags.hot)
-                .map(move |chunk| (ChunkIndex::of(superchunk, chunk), Bucket { words: allocation.words(chunk), count: allocation.count(chunk) }))
+                .map(move |chunk| (ChunkIndex::from_superchunk_place(superchunk, chunk), Bucket { words: allocation.words(chunk), count: allocation.count(chunk) }))
         })
     }
 
@@ -183,7 +183,7 @@ impl BitmapArena {
     pub fn keys(&self) -> impl Iterator<Item = BucketKey> + '_ {
         self.directory.iter().flat_map(move |entry| {
             entry.layers.iter().flat_map(move |allocation| {
-                members(allocation.flags.hot).map(move |chunk| BucketKey { layer_type: allocation.layer_type, chunk: ChunkIndex::of(entry.index, chunk) })
+                members(allocation.flags.hot).map(move |chunk| BucketKey { layer_type: allocation.layer_type, chunk: ChunkIndex::from_superchunk_place(entry.index, chunk) })
             })
         })
     }

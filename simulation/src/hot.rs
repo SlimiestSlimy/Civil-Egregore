@@ -31,7 +31,7 @@ pub enum Hot {
 impl Hot {
     /// A world of no size, hot about every entity of the kind `entity`
     /// alone.
-    pub const fn about(entity: EntityType) -> Self {
+    pub const fn about_entity(entity: EntityType) -> Self {
         Self::About { entity, side: None, viewport: false }
     }
 
@@ -80,7 +80,7 @@ impl Hot {
     /// none outside the world either way.
     pub fn wanted(&self, entities: &Entities) -> Vec<SuperchunkIndex> {
         let mut wanted = match *self {
-            Self::About { entity, .. } => about(entities.superchunks().iter().filter(|superchunk| superchunk.iter().any(|kept| kept.header.kind == entity)).map(|superchunk| superchunk.index())),
+            Self::About { entity, .. } => halos_about(entities.superchunks().iter().filter(|superchunk| superchunk.iter().any(|kept| kept.header.kind == entity)).map(|superchunk| superchunk.index())),
             Self::Forced { .. } => self.all(),
         };
         wanted.retain(|&superchunk| self.within(superchunk));
@@ -90,7 +90,7 @@ impl Hot {
 
 /// The halos about the superchunks `of` -- each one's own and its
 /// eight neighbours' -- as superchunk indices, sorted, each once.
-pub fn about(of: impl Iterator<Item = SuperchunkIndex>) -> Vec<SuperchunkIndex> {
+pub fn halos_about(of: impl Iterator<Item = SuperchunkIndex>) -> Vec<SuperchunkIndex> {
     let mut halos: Vec<SuperchunkIndex> = of.flat_map(|middle| (-1..=1).flat_map(move |dy| (-1..=1).filter_map(move |dx| middle.offset(dx, dy)))).collect();
     halos.sort_unstable();
     halos.dedup();

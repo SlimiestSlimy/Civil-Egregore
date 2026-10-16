@@ -12,7 +12,7 @@ pub use world_entities::Entities;
 
 use crate::bucket::{place, Bucket};
 pub use crate::bucket::Put;
-use crate::attributes::{keep, may_be_given, AttributeBlock, AttributeType};
+use crate::attributes::{append_kept, may_be_given, AttributeBlock, AttributeType};
 use crate::entity::{EntityRef, Header, NEVER};
 use crate::wheel::{Wake, Wheel};
 use coordinates::{CellIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
@@ -128,10 +128,10 @@ impl SuperchunkEntities {
         debug_assert_eq!(header.at.superchunk(), self.index, "an entity made in a superchunk it is not in");
         debug_assert!(may_be_given(header.kind, attributes), "attributes whole, sorted by type, each type once");
         self.carried.clear();
-        keep(header.kind, attributes, &mut self.carried);
+        append_kept(header.kind, attributes, &mut self.carried);
         let put = self.chunks[header.at.chunk().place()].make(header, &self.carried);
         if put == Put::New && header.wake != NEVER {
-            self.wheel.file(earliest, header.wake, Wake { at: header.at });
+            self.wheel.file_wake(earliest, header.wake, Wake { at: header.at });
         }
         put
     }
@@ -157,7 +157,7 @@ impl SuperchunkEntities {
         let stands = if put == Put::Stayed { from } else { header.at };
         // A wake already passed is not filed again: whatever sets its next one files that.
         if !matches!(put, Put::Refused | Put::PassedOver) && header.wake != NEVER && header.wake >= earliest {
-            self.wheel.file(earliest, header.wake, Wake { at: stands });
+            self.wheel.file_wake(earliest, header.wake, Wake { at: stands });
         }
         put
     }

@@ -21,7 +21,7 @@ fn every_part_runs_once_a_job() {
     let numbers: Vec<usize> = (0..1000).collect();
     let sums: Vec<AtomicUsize> = (0..4).map(|_| AtomicUsize::new(0)).collect();
     for _ in 0..100 {
-        dispatcher.run(&|part| {
+        dispatcher.run_in_parts(&|part| {
             runs[part].fetch_add(1, Ordering::Relaxed);
             let sum: usize = numbers.iter().skip(part).step_by(4).sum();
             sums[part].store(sum, Ordering::Relaxed);
@@ -36,7 +36,7 @@ fn every_part_runs_once_a_job() {
 fn one_thread_runs_on_the_caller() {
     let dispatcher = Dispatcher::new(1);
     let caller = std::thread::current().id();
-    dispatcher.run(&|part| assert_eq!((part, std::thread::current().id()), (0, caller)));
+    dispatcher.run_in_parts(&|part| assert_eq!((part, std::thread::current().id()), (0, caller)));
 }
 
 /// A part's panic on a worker reaches the caller, and the dispatcher
@@ -45,11 +45,11 @@ fn one_thread_runs_on_the_caller() {
 fn a_workers_panic_reaches_the_caller() {
     let dispatcher = Dispatcher::new(3);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        dispatcher.run(&|part| assert_ne!(part, 2, "part 2 fails"));
+        dispatcher.run_in_parts(&|part| assert_ne!(part, 2, "part 2 fails"));
     }));
     assert!(result.is_err());
     let ran = AtomicUsize::new(0);
-    dispatcher.run(&|_| {
+    dispatcher.run_in_parts(&|_| {
         ran.fetch_add(1, Ordering::Relaxed);
     });
     assert_eq!(ran.load(Ordering::Relaxed), 3);
@@ -95,7 +95,7 @@ fn a_worker_busy_with_a_queued_job_sits_a_run_out() {
     begun.recv().expect("one begun");
     begun.recv().expect("the other begun");
     let ran = AtomicUsize::new(0);
-    dispatcher.run(&|part| {
+    dispatcher.run_in_parts(&|part| {
         assert_eq!(part, 0, "only the caller is free");
         ran.fetch_add(1, Ordering::Relaxed);
     });
@@ -104,7 +104,7 @@ fn a_worker_busy_with_a_queued_job_sits_a_run_out() {
     // Free again, every part is run: a worker still finishing may sit one more out.
     let ran = AtomicUsize::new(0);
     while ran.swap(0, Ordering::Relaxed) != 3 {
-        dispatcher.run(&|_| {
+        dispatcher.run_in_parts(&|_| {
             ran.fetch_add(1, Ordering::Relaxed);
         });
     }
@@ -123,7 +123,7 @@ fn jobs_run_from_several_threads_are_each_whole() {
                 for run in 0..500 {
                     // What this run alone holds: a part that ran after it returned, or another run's, would be seen.
                     let parts: Vec<AtomicUsize> = (0..4).map(|_| AtomicUsize::new(0)).collect();
-                    dispatcher.run(&|part| {
+                    dispatcher.run_in_parts(&|part| {
                         parts[part].fetch_add(1, Ordering::Relaxed);
                     });
                     let ran: Vec<usize> = parts.iter().map(|part| part.load(Ordering::Relaxed)).collect();
@@ -143,7 +143,7 @@ fn a_queued_job_runs_a_job() {
     let within = std::sync::Arc::clone(&dispatcher);
     dispatcher.queue(move || {
         let parts = AtomicUsize::new(0);
-        within.run(&|_| {
+        within.run_in_parts(&|_| {
             parts.fetch_add(1, Ordering::Relaxed);
         });
         // Leaves the worker without the dispatcher: the test's is the last let go of.

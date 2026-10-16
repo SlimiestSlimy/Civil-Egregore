@@ -12,7 +12,7 @@ mod terrain {
     //!
     //! `cargo test`
 
-    use crate::tests::{at, walled};
+    use crate::tests::{height_at, walled};
     use coordinates::{CellCartesian, SuperchunkIndex, WORLD_MIDDLE};
     use worldgen::{height_shaped, wall, Shape, Terrain, DROP, STEP, WALLS};
 
@@ -49,7 +49,7 @@ mod terrain {
         // Its corners, a chunk's border, and cells drawn.
         let drawn: Vec<(u32, u32)> = (0..2_000).map(|_| (random.below(1024) as u32, random.below(1024) as u32)).collect();
         for (x, y) in [(0, 0), (1023, 1023), (1023, 0), (255, 256)].into_iter().chain(drawn) {
-            assert_eq!(at(&first, x, y), height_shaped(&CLIFFS, seed(), left + x, top + y));
+            assert_eq!(height_at(&first, x, y), height_shaped(&CLIFFS, seed(), left + x, top + y));
         }
     }
 
@@ -85,7 +85,7 @@ mod terrain {
     fn broad_edges_have_no_walls() {
         let terrain = Terrain::generate_shaped(&RAMPS, seed(), WORLD_MIDDLE);
         assert_eq!(terrain.wall_counts(), [0; 4]);
-        let heights: Vec<u16> = (0..1024).map(|x| at(&terrain, x, 500)).collect();
+        let heights: Vec<u16> = (0..1024).map(|x| height_at(&terrain, x, 500)).collect();
         assert!(heights.windows(2).all(|pair| pair[0].abs_diff(pair[1]) <= 1), "a row: {heights:?}");
     }
 

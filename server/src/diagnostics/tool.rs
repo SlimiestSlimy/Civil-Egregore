@@ -85,7 +85,7 @@ pub(crate) fn pasture(given: &Given) -> Result<(), String> {
     let threads = threads(given, superchunks)?;
     let run = pasture_run::run(ticks, thousandths, flock, superchunks, threads);
     let mut report = Report::new(given.name(), &given.resolved());
-    let (grass, sheep) = (run.done.of(crate::GRASS_RULE), run.done.of(crate::SHEEP_RULE));
+    let (grass, sheep) = (run.done.counts_of(crate::GRASS_RULE), run.done.counts_of(crate::SHEEP_RULE));
     let woken = sheep[entity_rules::sheep::WOKEN] as usize;
     report.note(format!(
         "{ticks} ticks over {superchunks} superchunk(s) on {threads} thread(s); sheep {} -> {}; grass {} -> {}; {} entities lost past the superchunks used; {} acts over a border",

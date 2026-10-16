@@ -47,8 +47,8 @@ struct Family {
 
 impl Family {
     /// A family of these bitmaps.
-    fn of(name: String, bitmaps: impl Iterator<Item = Bitmap>) -> Self {
-        Self { name, bitmaps: bitmaps.map(|bitmap| { let rows = Rows::of(&bitmap); (bitmap, rows) }).collect() }
+    fn from_named_bitmaps(name: String, bitmaps: impl Iterator<Item = Bitmap>) -> Self {
+        Self { name, bitmaps: bitmaps.map(|bitmap| { let rows = Rows::from_bitmap(&bitmap); (bitmap, rows) }).collect() }
     }
 }
 
@@ -82,7 +82,7 @@ impl Totals {
 fn main() {
     let per_generator = std::env::args().nth(1).map_or(TIMING_PER_GENERATOR, |count| count.parse().expect("a count"));
     let families: Vec<Family> =
-        families(HowMany::Each(per_generator)).into_iter().map(|(name, bitmaps)| Family::of(name, bitmaps.into_iter())).collect();
+        families(HowMany::Each(per_generator)).into_iter().map(|(name, bitmaps)| Family::from_named_bitmaps(name, bitmaps.into_iter())).collect();
     let mut codecs: Vec<Box<dyn Codec>> = vec![Box::new(Tessera::new()), Box::new(G4::new()), Box::new(Jbig::new())];
     codecs.extend(ZSTD_LEVELS.map(|level| Box::new(Zstd::new(level)) as Box<dyn Codec>));
 

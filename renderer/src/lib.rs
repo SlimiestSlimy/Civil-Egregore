@@ -41,7 +41,7 @@ fn window() -> App {
 /// not yet run.
 fn window_on(link: link::Link) -> App {
     // Only over a world: a world shown, steered and asked for.
-    let world = (view::fullscreen, link::keys, view::steer, overlays::toggle, overlays::boundaries, overlays::labels, overlays::heights, climate_labels::climates, frames::show, frames::ask, map::far).chain().run_if(resource_equals(Screen::World));
+    let world = (view::fullscreen, link::keys, view::steer, overlays::toggle, overlays::boundaries, overlays::labels, overlays::heights, climate_labels::climates, frames::show_frames, frames::ask, map::far).chain().run_if(resource_equals(Screen::World));
     let mut app = App::new();
     app.add_plugins(
             DefaultPlugins

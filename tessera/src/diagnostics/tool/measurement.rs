@@ -61,7 +61,7 @@ fn generator_table(
     ]);
     let mut total = Measured::default();
     for (name, parameters, bitmaps) in sets {
-        let measured = Measured::of(tessera, bitmaps);
+        let measured = Measured::measure_bitmaps(tessera, bitmaps);
         assert!(measured.lost.is_empty(), "{name}: Tessera lost cells of cases {:?}", measured.lost);
         table.row(&row(&measured, &name, &parameters));
         total.add(&measured);
@@ -128,7 +128,7 @@ fn add_structure(tessera: &mut Tessera, report: &mut Report) {
         for bitmap in &maps {
             tessera.encode(bitmap, &mut stream);
             binary_count_trees += (stream.words()[0] & 1 == 1) as usize;
-            stats.add(&TreeStats::of(tessera.tree()));
+            stats.add(&TreeStats::measure_tree(tessera.tree()));
         }
 
         let bitmaps = maps.len();

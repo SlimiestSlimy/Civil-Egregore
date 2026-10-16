@@ -33,7 +33,7 @@ struct Running {
 
 impl Running {
     /// `world`, started from `start`, starting to run.
-    fn of(start: Start, world: World) -> Self {
+    fn from_start(start: Start, world: World) -> Self {
         let census = census(world.info.seed);
         Self { world, start, sent: HashMap::new(), started: Instant::now(), census }
     }
@@ -120,7 +120,7 @@ impl HostThread {
                     Ok(Request::Open(name)) => match crate::load(&utilities::settings::world(&name)) {
                         Ok(opened) => {
                             (self.said, self.named, self.reset) = (Some(format!("{name} opened")), Some(name), None);
-                            self.run_in_place(Running::of(Start::of_world(&opened.info, opened.generation), opened));
+                            self.run_in_place(Running::from_start(Start::of_world(&opened.info, opened.generation), opened));
                         }
                         Err(why) => self.said = Some(format!("{name} not opened: {why}")),
                     },
@@ -149,7 +149,7 @@ impl HostThread {
     /// that one dropped first, not to hold both.
     fn run_world(&mut self, start: Start) {
         self.running = None;
-        self.run_in_place(Running::of(start, crate::start(start)));
+        self.run_in_place(Running::from_start(start, crate::start(start)));
     }
 
     /// Runs `running` in place of any run, from its world's own tick.

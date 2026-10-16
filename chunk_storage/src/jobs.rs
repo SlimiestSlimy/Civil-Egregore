@@ -65,7 +65,7 @@ pub enum Done {
 
 impl Job {
     /// Does the job, with `codec`.
-    fn run(self, codec: &mut LayerCodec) -> Done {
+    fn execute_with_codec(self, codec: &mut LayerCodec) -> Done {
         match self {
             Self::Encode(dirty) => {
                 let mut encoded = Vec::with_capacity(dirty.len());
@@ -144,7 +144,7 @@ impl Jobs {
         self.next += 1;
         let made_by = self.made_by.clone();
         self.dispatcher.queue(move || {
-            let done = catch_unwind(AssertUnwindSafe(|| CODEC.with(|codec| job.run(&mut codec.borrow_mut())))).unwrap_or_else(|panic| {
+            let done = catch_unwind(AssertUnwindSafe(|| CODEC.with(|codec| job.execute_with_codec(&mut codec.borrow_mut())))).unwrap_or_else(|panic| {
                 let said = panic.downcast_ref::<&str>().map(|said| said.to_string()).or_else(|| panic.downcast_ref::<String>().cloned());
                 Done::Failed(said.unwrap_or_default())
             });

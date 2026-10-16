@@ -71,7 +71,7 @@ the small tiles of their bitmaps ("The small tiles about a cell"),
 nothing turned into rows. What is about a cell is asked once
 (`around::about`), and every set made with it: the cell
 (`About::centre`), its neighbours (`ring`), both (`nine`), the one a
-way off (`towards`). A layer's is read at once (`around::layer`); sets
+way off (`towards`). A layer's is read at once (`around::read_layer`); sets
 are narrowed with `&`, joined with `|`, taken from with `without`, and
 asked `is_empty`: those with grass, those nothing stands on, those in
 the world hot. A neighbour is named by its **way** -- 0 to 8, in
@@ -271,7 +271,7 @@ maker in this one: the rule does not know, and need not
 (`../../simulation/docs/simulation.md`, "An act over a border").
 
 **The cells beside it** (`around`): sets of the cells about a cell,
-read at once (`around::layer`), narrowed with `&`; the way to one
+read at once (`around::read_layer`), narrowed with `&`; the way to one
 drawn with `pick` or `prefer`, a way a cell with `around::cell`. A
 draw falls on any of those chosen among as likely as on another; which
 one a given draw comes to goes by how the cells lie in their tiles --
@@ -279,7 +279,7 @@ as the lot itself goes by the superchunk. What must have its cell, as
 a newborn, is put on one of those open to a step: the collision plane
 holds what stands there.
 
-**The area about it, and the way**: `area::layer` gives 16x16 cells of a
+**The area about it, and the way**: `area::read_layer` gives 16x16 cells of a
 layer as masks, `Area::count` how many are set. The way over them is `walking`'s, where the
 simulation's cells, the terrain's walls and `../../pathfinding/` meet.
 `step_towards(turn, at, goals, passable)` gives the cell to step to
@@ -354,7 +354,7 @@ one made so far. A mask stands for the tile of its side a cell is in
 (`mask::tile`); a rule keeps its masks as room and reads into them:
 the largest is 128 KiB.
 
-- **Read**: `mask::layer` fills two masks from a layer, the cells it
+- **Read**: `mask::read_layer` fills two masks from a layer, the cells it
   holds at and the cells hot -- the tile's words copied as they lie, a
   chunk a run for the tiles of several. `mask::layer_under` keeps the
   cells another mask has.
@@ -388,14 +388,14 @@ it may step, and is not shown the tiles (`tiles_about` is the crate's
 own).
 
 For one cell: it and its eight neighbours lie in one, two or four
-small tiles -- 4x4 cells, 16 bits. `tiles_about::of(at)` takes the four
+small tiles -- 4x4 cells, 16 bits. `tiles_about::about_cell(at)` takes the four
 small tiles, two by two, they can lie in: its own, the one to the left
 if it is on its tile's left column, else the one to the right, and so
 up and down -- a step on the cell's index, no coordinate worked out.
 The four are one word, in Morton order over their 8x8 cells, and for
 each place the cell can have in them the ring about it is a word made
 as the program is compiled (`About::ring_word`, with the cell
-`nine_word`). A layer is read under that mask (`tiles_about::layer`):
+`nine_word`). A layer is read under that mask (`tiles_about::read_layer`):
 where the four lie in one chunk, its bitmap is looked up once and each
 tile is a shift of one of its words, the lot ANDed with the mask.
 Whether a sheep can move at all is the ring ANDed with the collision

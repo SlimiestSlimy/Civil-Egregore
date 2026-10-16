@@ -10,7 +10,7 @@ use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use bitplane_manager::{Write, WriteOp};
 use entity_manager::{AttributeBlock, EntityType, Header, NEVER};
 use server::host::frame::Viewport;
-use server::{about, HaloChange, World, COOL_TICKS, HOT_ENTITY, WARM_TICKS};
+use server::{halos_about, HaloChange, World, COOL_TICKS, HOT_ENTITY, WARM_TICKS};
 
 /// The superchunks holding a hot entity.
 fn hot_entities(world: &World) -> Vec<SuperchunkIndex> {
@@ -25,7 +25,7 @@ fn hot_entities(world: &World) -> Vec<SuperchunkIndex> {
 #[test]
 fn the_hot_superchunks_are_the_halos() {
     let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), sheep: 4_000, ..server::Start::default() });
-    assert_eq!(world.arena().superchunk_indices(), about([WORLD_MIDDLE].into_iter()), "the origin's halo");
+    assert_eq!(world.arena().superchunk_indices(), halos_about([WORLD_MIDDLE].into_iter()), "the origin's halo");
     let mut moved = HaloChange::default();
     // 6,000 ticks at least, and on until a superchunk has been generated: on some seeds the flock is long in nearing an edge.
     while world.entities().now() < 6_000 || moved.generated == 0 {
@@ -37,7 +37,7 @@ fn the_hot_superchunks_are_the_halos() {
         assert!(cooling.iter().all(|(superchunk, _)| hot.binary_search(superchunk).is_ok()), "cooling, hot still");
         let staying = hot.iter().filter(|superchunk| cooling.binary_search_by_key(superchunk, |(cooling, _)| cooling).is_err());
         // A warming is never given up: one its halo has left is warming still, and no halo's.
-        let wanted = about(hot_entities(&world).into_iter());
+        let wanted = halos_about(hot_entities(&world).into_iter());
         let mut halos: Vec<SuperchunkIndex> = staying.copied().chain(warming.iter().map(|&(superchunk, _)| superchunk).filter(|superchunk| wanted.binary_search(superchunk).is_ok())).collect();
         halos.sort_unstable();
         assert!(warming.iter().all(|(superchunk, _)| hot.binary_search(superchunk).is_err()), "warming, not hot yet");
@@ -60,7 +60,7 @@ fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
     let mut world = server::start(server::Start { seed: crate::tests::land_seed(1), sheep: 4_000, ..server::Start::default() });
     let try_both = |world: &mut World, cell| {
         let missed = world.write_cells(GRASS, [Write::cell(cell, WriteOp::Flip)]).missed;
-        (missed, world.put_entity(Header { kind: EntityType::of(99), at: cell, wake: NEVER }, &[]).lost)
+        (missed, world.put_entity(Header { kind: EntityType::from_number(99), at: cell, wake: NEVER }, &[]).lost)
     };
     while world.warming().next().is_none() {
         assert!(world.entities().now() < 60_000, "the halos moved");
@@ -132,7 +132,7 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
     let halo = world.arena().superchunk_indices();
     type Held = (Vec<u64>, Vec<(Header, Vec<AttributeBlock>)>, Vec<(SuperchunkIndex, u64)>);
     let held = |world: &World| -> Held {
-        let cells = world.info().layers.clone().into_iter().flat_map(|layer| world.arena().run(layer)).flat_map(|(_, bucket)| bucket.words().to_vec()).collect();
+        let cells = world.info().layers.clone().into_iter().flat_map(|layer| world.arena().buckets_of(layer)).flat_map(|(_, bucket)| bucket.words().to_vec()).collect();
         (cells, world.entities().iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect(), world.simulation().random_states().collect())
     };
     let before = held(&world);
@@ -190,7 +190,7 @@ fn a_world_of_a_size_is_hot_within_it_only() {
     let hot = world.arena().superchunk_indices();
     assert!(hot.len() == (side * side) as usize && hot.iter().all(|&superchunk| world.halos().hot.within(superchunk)), "sheep everywhere in it: all of it hot, nothing outside it");
     assert!(hot.iter().all(|&superchunk| world.entities().superchunk(superchunk).is_some_and(|kept| !kept.is_empty())), "sheep on every superchunk");
-    world.keep_hot(&about(hot.into_iter()));
+    world.keep_hot(&halos_about(hot.into_iter()));
     assert_eq!(world.arena().superchunk_indices().len(), (side * side) as usize, "nothing made hot outside it, whoever wants it");
     for _ in 0..2 * WARM_TICKS {
         world.tick();
@@ -235,7 +235,7 @@ fn the_camera_loads_the_superchunks_of_the_viewport() {
     world.keep_viewport(Some(Viewport { first: (x + 10, y), last: (x + 11, y) }));
     let viewport = [SuperchunkIndex::from_cartesian(x + 10, y), SuperchunkIndex::from_cartesian(x + 11, y)];
     let sheep_on = |world: &World, superchunk: SuperchunkIndex| world.entities().superchunk(superchunk).map_or(0, |kept| kept.iter().filter(|entity| entity.header.kind == HOT_ENTITY).count());
-    let about_view = about(viewport.into_iter());
+    let about_view = halos_about(viewport.into_iter());
     let (mut seen, mut beside) = (0, 0);
     while seen < 2 || beside == 0 {
         assert!(world.entities().now() < 4 * WARM_TICKS, "the halos about the flocks of the viewport generated");

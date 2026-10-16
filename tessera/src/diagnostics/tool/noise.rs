@@ -20,7 +20,7 @@ pub fn run(report: &mut Report) {
     let mut tessera = Tessera::new();
     let mut table = Table::new(&["density", "Tessera\nbits a bitmap", "Tessera\nover raw cells"]);
     for density in DENSITIES {
-        let measured = Measured::of(&mut tessera, grown(corpus_seed(), density, 0.0, EACH));
+        let measured = Measured::measure_bitmaps(&mut tessera, grown(corpus_seed(), density, 0.0, EACH));
         assert!(measured.lost.is_empty(), "noise at {density}: Tessera lost cells of cases {:?}", measured.lost);
         let tessera_bits = measured.bits / measured.bitmaps;
         table.row(&[

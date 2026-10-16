@@ -83,7 +83,7 @@ impl Turn<'_> {
     fn instruction_of(&self, write: Write) -> (Option<CellIndex>, Instruction) {
         match write {
             Write::Cell { layer_type, at, value, counted } => (Some(at), Instruction::write_cell(layer_type, at, value, counted.map_or(NO_COUNT, |place| self.counted_number(place)))),
-            Write::Count(place) => (None, Instruction::count(self.counted_number(place))),
+            Write::Count(place) => (None, Instruction::count_under(self.counted_number(place))),
             Write::MakeEntity(header) => {
                 debug_assert!(header.wake > self.now, "an entity made to wake at tick {}, not after {}", header.wake, self.now);
                 (Some(header.at), Instruction::make_entity(header.at, header.kind.0, header.wake))
@@ -127,7 +127,7 @@ impl Turn<'_> {
     /// of what a rule queues is one compare and a write or two.
     #[inline]
     pub fn compare_with_writes(&mut self, compare: Compare, writes: &[Write]) {
-        let at = compare.at();
+        let at = compare.compared_cell();
         // A move over a border lands its author in two superchunks: queued an instruction at a time, as what goes to the queue of acts is.
         if writes.iter().any(|write| matches!(write, Write::MoveEntity { from, to } if from.superchunk() != to.superchunk())) {
             self.compare_open(compare);

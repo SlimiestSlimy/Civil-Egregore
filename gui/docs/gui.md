@@ -40,7 +40,7 @@ What the main menu and the options are both made of: a dimmed window,
 rows a bar each over its middle, a click on a row doing what it does.
 A menu says what its rows are each frame (`Row`); the parts are made
 once (`rows::spawn`), hidden, and shown as the rows are said
-(`rows::show`). Shared beside: the list of the worlds there are, gone
+(`rows::show_rows`). Shared beside: the list of the worlds there are, gone
 through by the wheel (`Listing`), and keys typed into a line
 (`type_into`).
 

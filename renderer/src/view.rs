@@ -48,13 +48,13 @@ pub fn origin(axis: usize) -> u32 {
 impl Sprites {
     /// Where on the plane the cell `cell` cells from the world's edge
     /// is, across (`axis` 0) or down (1).
-    pub fn plane(&self, cell: u32, axis: usize) -> f32 {
+    pub fn translation_of_cell(&self, cell: u32, axis: usize) -> f32 {
         cell.wrapping_sub(origin(axis)) as i32 as f32
     }
 
     /// The cell at `plane` on the plane, across or down: the world's
     /// first or last if it is past an edge.
-    pub fn cell(&self, plane: f32, axis: usize) -> u32 {
+    pub fn cell_at_translation(&self, plane: f32, axis: usize) -> u32 {
         (origin(axis) as i64 + plane.floor() as i64).clamp(0, u32::MAX as i64) as u32
     }
 
@@ -63,7 +63,7 @@ impl Sprites {
     pub fn viewport_cells(&self, transform: &Transform, scale: f32, window: &Window) -> [(u32, u32); 2] {
         let half = Vec2::new(window.width(), window.height()) * scale / 2.0;
         let middle = [transform.translation.x, -transform.translation.y];
-        [0, 1].map(|axis| (self.cell(middle[axis] - half[axis], axis), self.cell(middle[axis] + half[axis], axis)))
+        [0, 1].map(|axis| (self.cell_at_translation(middle[axis] - half[axis], axis), self.cell_at_translation(middle[axis] + half[axis], axis)))
     }
 }
 

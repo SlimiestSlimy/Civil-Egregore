@@ -15,7 +15,7 @@ pub fn run(report: &mut Report) {
     let mut tessera = Tessera::new();
     let mut table = Table::new(&["corpus", "bitmaps", "cells set\na bitmap", "Tessera\nbits a bitmap", "Tessera bits\na cell set", "of the\nraw cells"]);
     let mut measure = |name: &str, bitmaps: Vec<Bitmap>| {
-        let measured = Measured::of(&mut tessera, bitmaps);
+        let measured = Measured::measure_bitmaps(&mut tessera, bitmaps);
         assert!(measured.lost.is_empty(), "{name}: Tessera lost cells of cases {:?}", measured.lost);
         let bitmaps = measured.bitmaps;
         table.row(&[

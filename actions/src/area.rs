@@ -18,7 +18,7 @@ pub const AREA_CENTRE: usize = AREA_SIDE / 2;
 /// index that place it in one.
 const TILE_CELLS: u64 = (AREA_SIDE * AREA_SIDE) as u64;
 
-/// The cells of one layer type around a cell ([`layer`]),
+/// The cells of one layer type around a cell ([`read_layer`]),
 /// a row a word: cell `(x, y)` from the area's top left at bit `x` of
 /// row `y`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -43,16 +43,16 @@ pub const FARTHEST_SCALE: u32 = bitplane_manager::COARSEST_SCALE;
 /// The [`AREA_SIDE`] by [`AREA_SIDE`] cells around `centre` -- it at
 /// `(AREA_CENTRE, AREA_CENTRE)` of them -- of `layer_type`, as the
 /// tick found them: four windows, a row a word.
-pub fn layer(turn: &Turn, layer_type: LayerType, centre: CellIndex) -> Area {
-    let [area] = layers(turn, [layer_type], centre);
+pub fn read_layer(turn: &Turn, layer_type: LayerType, centre: CellIndex) -> Area {
+    let [area] = read_layers(turn, [layer_type], centre);
     area
 }
 
-/// [`layer`], of each of `types` at once: the four aligned tiles of
+/// [`read_layer`], of each of `types` at once: the four aligned tiles of
 /// [`AREA_SIDE`] the area lies in, two by two, taken as they lie --
 /// a lookup a layer -- and the words of them the area reaches turned
 /// into rows, for the paths found over them.
-pub fn layers<const N: usize>(turn: &Turn, types: [LayerType; N], centre: CellIndex) -> [Area; N] {
+pub fn read_layers<const N: usize>(turn: &Turn, types: [LayerType; N], centre: CellIndex) -> [Area; N] {
     let Some(corner) = about(centre, AREA_SIDE as u32) else {
         return layers_at_the_edge(turn, types, centre);
     };
@@ -90,7 +90,7 @@ pub fn layers<const N: usize>(turn: &Turn, types: [LayerType; N], centre: CellIn
     })
 }
 
-/// [`layers`], of a centre so near the world's edge that the area's
+/// [`read_layers`], of a centre so near the world's edge that the area's
 /// corner is off it: a window a quarter, those off the world left
 /// clear and not hot.
 #[cold]
@@ -115,7 +115,7 @@ fn layers_at_the_edge<const N: usize>(turn: &Turn, types: [LayerType; N], centre
     areas
 }
 
-/// [`layer`] from further off: the tiles of `scale` around `centre`,
+/// [`read_layer`] from further off: the tiles of `scale` around `centre`,
 /// one set if `layer_type` holds at any of its cells. Up to
 /// [`FARTHEST_SCALE`].
 pub fn of_tiles(turn: &Turn, layer_type: LayerType, centre: CellIndex, scale: u32) -> Area {

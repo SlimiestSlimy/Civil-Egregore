@@ -224,7 +224,7 @@ pub struct Frame {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn frame_of(world: &World, worlds: u64, ask: Ask, hot: Vec<(u32, u32)>, cells: Vec<Cells>, (ticks_a_second, sync_seconds, sync_share): (f64, f64, f64), (named, said): (Option<String>, Option<String>), more: bool) -> Frame {
     let (sheep, grass, trees) = (world.entities.len(), count(world, GRASS), count(world, TREE));
-    Frame { world: worlds, seed: world.info.seed, generation: world.generation, levels: super::terrain::Levels::of(&world.generation), side: world.halos.hot.side(), tick: world.entities.now(), ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, viewport: ask.viewport, hot, detail: ask.detail, near: ask.near, named, said, more, cells }
+    Frame { world: worlds, seed: world.info.seed, generation: world.generation, levels: super::terrain::Levels::from_generation(&world.generation), side: world.halos.hot.side(), tick: world.entities.now(), ticks_a_second, sheep, grass, trees, sync_seconds, sync_share, viewport: ask.viewport, hot, detail: ask.detail, near: ask.near, named, said, more, cells }
 }
 
 /// Cells of `layer_type` over every hot superchunk of `world`.
@@ -244,7 +244,7 @@ pub(crate) fn copy(world: &World, (x, y): (u32, u32), ask: Ask, sent: &mut HashM
     // Heights never change: sent the once, in the first frame the superchunk is hot in. Nor does the water's depth.
     let image = world.storage.image(superchunk).filter(|_| !sent.contains_key(&superchunk));
     let heights = image.map_or(Vec::new(), |image| image.height_words().to_vec());
-    let water = Arc::clone(sent.entry(superchunk).or_insert_with(|| Arc::new(Water::of(image))));
+    let water = Arc::clone(sent.entry(superchunk).or_insert_with(|| Arc::new(Water::from_image(image))));
     // A tree's stage is drawn only where a cell is a pixel or more.
     let stages = if ask.near.is_some() || ask.detail == 0 { planes(TREE_STAGE.layer_type()) } else { Vec::new() };
     // No cloud over it: nothing to send, nothing to draw.
@@ -289,7 +289,7 @@ pub struct Water {
 
 impl Water {
     /// The water of `image`: none of none, and of one with no water.
-    fn of(image: Option<&SuperchunkImage>) -> Self {
+    fn from_image(image: Option<&SuperchunkImage>) -> Self {
         let words = CHUNKS_IN_SUPERCHUNK * CHUNK_WORDS;
         let mut water = Self { depths: std::array::from_fn(|_| vec![0; words]), deep: vec![0; words] };
         let Some(image) = image else {

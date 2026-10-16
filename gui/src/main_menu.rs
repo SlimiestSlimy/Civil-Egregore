@@ -99,7 +99,7 @@ pub fn spawn(mut commands: Commands) {
 /// wheel, goes back a page by Escape, and shows the rows as they are:
 /// all while the window shows it.
 #[allow(clippy::too_many_arguments)]
-pub fn work(
+pub fn update_main_menu(
     mut menu: ResMut<MainMenu>,
     mut screen: ResMut<Screen>,
     sliders: Res<Sliders>,
@@ -124,7 +124,7 @@ pub fn work(
         match rows::clicked(&menu.rows(), &window, &buttons) {
             Some(Does::SetsUp) => menu.page = Page::New,
             Some(Does::Makes) => makes = true,
-            Some(Does::Lists) => (menu.listing, menu.page) = (Listing::of(menu.lister), Page::Worlds),
+            Some(Does::Lists) => (menu.listing, menu.page) = (Listing::from_lister(menu.lister), Page::Worlds),
             Some(Does::GoesBack) => menu.page = Page::First,
             Some(Does::Opens(place)) => {
                 open.write(Open(menu.listing.worlds[place].clone()));
@@ -150,5 +150,5 @@ pub fn work(
         menu.listing.scroll(wheel.delta.y);
     }
     let shown = *screen == Screen::MainMenu;
-    rows::show(shown, &menu.rows(), &mut shade, &mut bars, &mut words);
+    rows::show_rows(shown, &menu.rows(), &mut shade, &mut bars, &mut words);
 }

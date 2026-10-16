@@ -97,7 +97,7 @@ impl Rule {
 
 /// A rule's place in [`RULES`]: what a rule is picked by, and its
 /// counts read by. Made of the rule's ID in the type registry as the
-/// server is compiled ([`RulePlace::of`]), so a rule that is not
+/// server is compiled ([`RulePlace::from_registry_id`]), so a rule that is not
 /// there does not compile.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RulePlace(usize);
@@ -107,7 +107,7 @@ impl RulePlace {
     ///
     /// # Panics
     /// If no rule has it -- for a constant, as it is compiled.
-    pub const fn of(id: u64) -> Self {
+    pub const fn from_registry_id(id: u64) -> Self {
         let mut place = 0;
         while place < RULES.len() {
             if let Some(registered) = type_registry::id_of_rule(RULES[place].registered) && registered == id {
@@ -125,13 +125,13 @@ impl RulePlace {
 }
 
 /// The grass's rule.
-pub const GRASS_RULE: RulePlace = RulePlace::of(type_registry::RULE_OF_GRASS.0);
+pub const GRASS_RULE: RulePlace = RulePlace::from_registry_id(type_registry::RULE_OF_GRASS.0);
 /// The trees' rule.
-pub const TREES_RULE: RulePlace = RulePlace::of(type_registry::RULE_OF_TREES.0);
+pub const TREES_RULE: RulePlace = RulePlace::from_registry_id(type_registry::RULE_OF_TREES.0);
 /// The sheep's rule.
-pub const SHEEP_RULE: RulePlace = RulePlace::of(type_registry::RULE_OF_SHEEP.0);
+pub const SHEEP_RULE: RulePlace = RulePlace::from_registry_id(type_registry::RULE_OF_SHEEP.0);
 /// The weather's rule.
-pub const WEATHER_RULE: RulePlace = RulePlace::of(type_registry::RULE_OF_WEATHER.0);
+pub const WEATHER_RULE: RulePlace = RulePlace::from_registry_id(type_registry::RULE_OF_WEATHER.0);
 
 /// What the rules did, in a tick or added up over many: each rule's
 /// counts at its place in [`RULES`], and how long each took, every
@@ -147,7 +147,7 @@ pub struct TickCounts {
 
 impl TickCounts {
     /// The counts of `rule`, each at the place the rule names it by.
-    pub fn of(&self, rule: RulePlace) -> RuleCounts {
+    pub fn counts_of(&self, rule: RulePlace) -> RuleCounts {
         self.counts[rule.0]
     }
 
@@ -192,7 +192,7 @@ impl Chosen {
     pub const ALL: Self = Self { run: [true; RULES.len()] };
 
     /// The rules `rules`, run in the table's order whatever theirs.
-    pub fn of(rules: &[RulePlace]) -> Self {
+    pub fn from_rules(rules: &[RulePlace]) -> Self {
         let mut run = [false; RULES.len()];
         for rule in rules {
             run[rule.0] = true;

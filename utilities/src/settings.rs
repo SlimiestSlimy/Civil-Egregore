@@ -94,7 +94,7 @@ pub struct Settings {
 impl Settings {
     /// The default settings: every setting there is.
     pub fn defaults() -> Self {
-        Self::of(DEFAULTS)
+        Self::parse_text(DEFAULTS)
     }
 
     /// The settings of this machine: its file's ([`file`]), given a
@@ -121,12 +121,12 @@ impl Settings {
 
     /// The settings in the file at `path`: none, if it cannot be read.
     pub fn read_from(path: &Path) -> Self {
-        Self::of(&read_to_string(path).unwrap_or_default())
+        Self::parse_text(&read_to_string(path).unwrap_or_default())
     }
 
     /// The settings `text` has, a row each after the one naming the
     /// columns: a row that is not a name and a value is passed over.
-    fn of(text: &str) -> Self {
+    fn parse_text(text: &str) -> Self {
         let named = |row: Vec<String>| <[String; 2]>::try_from(row).ok().map(|[name, value]| (name.trim().to_string(), value.trim().to_string()));
         Self { lines: crate::csv::rows_named(text).into_iter().filter_map(named).collect() }
     }

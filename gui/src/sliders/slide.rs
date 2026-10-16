@@ -6,7 +6,7 @@ use super::spawn::{Moved, Valued};
 use super::{rows, Offered, Shown, Sliders, BOX, GAP, KNOB, MARGIN, TRACK};
 use crate::CurrentTuning;
 use bevy::prelude::*;
-use utilities::tuning::{keep, settled, tuned, unless_set};
+use utilities::tuning::{save_to_settings, settled, tuned, unless_set};
 
 /// The digit or the point a key types, if it types one.
 fn typed(key: KeyCode) -> Option<char> {
@@ -47,16 +47,16 @@ pub fn slide(mut sliders: ResMut<Sliders>, mut tuning: ResMut<CurrentTuning>, bu
         sliders.held = buttons.pressed(MouseButton::Left) && (sliders.held || (pressed && sliders.over(&window)));
         let groups: Vec<_> = sliders.listed().collect();
         match (sliders.shown, sliders.row_under(&window).filter(|_| pressed)) {
-            (Shown::Closed, Some(_)) => sliders.show(Shown::Menu),
-            (Shown::Menu, Some(0)) => sliders.show(Shown::Closed),
-            (Shown::Menu, Some(row)) => sliders.show(Shown::Group(groups[row - 1])),
+            (Shown::Closed, Some(_)) => sliders.show_from_top(Shown::Menu),
+            (Shown::Menu, Some(0)) => sliders.show_from_top(Shown::Closed),
+            (Shown::Menu, Some(row)) => sliders.show_from_top(Shown::Group(groups[row - 1])),
             _ => {}
         }
         return;
     };
     // A group's first row goes back to the menu.
     if pressed && sliders.row_under(&window) == Some(0) && !sliders.typing() {
-        sliders.show(Shown::Menu);
+        sliders.show_from_top(Shown::Menu);
         (sliders.held, sliders.dragged) = (true, None);
         return;
     }
@@ -77,7 +77,7 @@ pub fn slide(mut sliders: ResMut<Sliders>, mut tuning: ResMut<CurrentTuning>, bu
         }
         if settles && let Ok(value) = digits.parse() {
             tuning.0[*index] = settled(*index, value);
-            keep(&tuning.0);
+            save_to_settings(&tuning.0);
         }
         if settles || keys.just_pressed(KeyCode::Escape) {
             sliders.typed = None;
@@ -89,7 +89,7 @@ pub fn slide(mut sliders: ResMut<Sliders>, mut tuning: ResMut<CurrentTuning>, bu
         if let Some(index) = on_track.or(on_box).filter(|&index| tuned(index).toggle) {
             let (off, on) = tuned(index).range;
             tuning.0[index] = if turned_on(index, tuning.0[index]) { off } else { on };
-            keep(&tuning.0);
+            save_to_settings(&tuning.0);
         }
         sliders.dragged = on_track.filter(|&index| !tuned(index).toggle);
         sliders.typed = on_box.filter(|&index| !tuned(index).toggle).map(|index| (index, String::new()));
@@ -107,17 +107,17 @@ pub fn slide(mut sliders: ResMut<Sliders>, mut tuning: ResMut<CurrentTuning>, bu
     }
     if let Some(index) = on_track.filter(|_| buttons.just_pressed(MouseButton::Right)) {
         tuning.0[index] = unless_set(index);
-        keep(&tuning.0);
+        save_to_settings(&tuning.0);
     }
     if buttons.just_released(MouseButton::Left) && sliders.dragged.take().is_some() {
-        keep(&tuning.0);
+        save_to_settings(&tuning.0);
     }
-    show(&sliders, &tuning.0, moved, values);
+    update_slider_visuals(&sliders, &tuning.0, moved, values);
 }
 
 /// Each slider's knob and filled track where its number is, and its
 /// value in its box -- or what is being typed into it.
-fn show(sliders: &Sliders, numbers: &utilities::tuning::Tuning, mut moved: Query<(&Moved, &mut Node)>, mut values: Query<(&Valued, &mut Text)>) {
+fn update_slider_visuals(sliders: &Sliders, numbers: &utilities::tuning::Tuning, mut moved: Query<(&Moved, &mut Node)>, mut values: Query<(&Valued, &mut Text)>) {
     for (part, mut node) in &mut moved {
         let (least, most) = tuned(part.index).range;
         // A value typed past the slider's range leaves the knob at its end.
