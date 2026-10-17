@@ -7,7 +7,7 @@ authors = ["SlimiestSlimy", "Opus 5.5 high"]
 repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 
 [dependencies]
-renderer = { path = "client/renderer", optional = true }
+client = { path = "client", optional = true }
 protocol = { path = "protocol" }
 server = { path = "server" }
 utilities = { path = "utilities" }
@@ -30,13 +30,12 @@ worldgen = { path = "server/basegame/worldgen" }
 [features]
 # `--features force_default_settings`: run on the built-in defaults
 # (`utilities/force_default_settings.csv`), ignoring the machine's `settings.csv`.
-force_default_settings = ["utilities/force_default_settings", "renderer?/force_default_settings"]
-default = ["renderer"]
+force_default_settings = ["utilities/force_default_settings", "client?/force_default_settings"]
+default = ["client"]
 
 # Every crate of Civil Egregore, built together: one lock file and one `target/`
 # for them all, here, whichever crate's folder cargo is run from.
-# `cargo test` here tests every one but the renderer and its menus,
-# which bring Bevy: `cargo run --release` opens the window. Tessera's external
+# `cargo test` here tests every one but the client, which brings Bevy: `cargo run --release` opens the window. Tessera's external
 # benchmarks stay a workspace of their own, so the codecs they compare
 # against never enter this build.
 [workspace]
@@ -50,14 +49,13 @@ members = [
     "utilities/coordinates",
     "server/entity_manager",
     "server/basegame/entity_rules",
-    "client/gui",
     "server/pathfinding",
     "server/basegame/sca_rules",
     "server/simulation",
     "server/basegame/worldgen",
     "protocol/type_registry",
     "utilities",
-    "client/renderer",
+    "client",
     "server",
     "AI_SCRATCHPAD",
 ]
@@ -81,7 +79,7 @@ default-members = [
     "server",
 ]
 # Tessera is a project of its own, with its own workspace and tests.
-exclude = ["diagnostics", "tessera"]
+exclude = ["tessera"]
 
 # Lines kept for the profilers -- perf, callgrind -- which say nothing
 # useful without them; they cost no speed.

@@ -19,7 +19,6 @@ mod layer_codec;
 mod paging;
 mod superchunk_cells;
 mod superchunk_image;
-pub mod transient_data;
 pub mod wide;
 mod writeback_ring;
 

@@ -11,7 +11,6 @@
 mod bitmap_data;
 mod bitmap_drawing;
 pub mod morton;
-pub mod transient_data;
 pub mod window;
 
 pub use bitmap_data::{Bitmap, CellWords};

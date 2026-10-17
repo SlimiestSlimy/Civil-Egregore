@@ -103,8 +103,8 @@ what they always do and are not listed.
 | **cold pool** | chunk storage's superchunk images, one per superchunk stored. Never "pool" alone | image | |
 | **image** | one superchunk as stored, one run of words, in memory as on disk: its height map and every chunk's encoded layers (`SuperchunkImage`) | chunk storage, save | |
 | **height map** | a superchunk's heights: a floor a chunk, a byte a cell over it, and a tall chunk's 16 bits a cell (`HeightMap`) | height, floor, tall chunk | |
-| **mipmaps** | a picture halved again and again down to one pixel, kept with it, so that drawn smaller it is blended from the two nearest its size and does not shimmer. A superchunk's picture has them, made by the graphics card (`client/renderer/src/mipmaps.rs`) | picture, detail | mips, LOD, pyramid |
-| **map** | the renderer's picture of the world as generated: each pixel the cell in its middle, nothing of the simulation read (`client/renderer/src/map.rs`) | map mode, detail | overview, minimap |
+| **mipmaps** | a picture halved again and again down to one pixel, kept with it, so that drawn smaller it is blended from the two nearest its size and does not shimmer. A superchunk's picture has them, made by the graphics card (`client/src/renderer/mipmaps.rs`) | picture, detail | mips, LOD, pyramid |
+| **map** | the renderer's picture of the world as generated: each pixel the cell in its middle, nothing of the simulation read (`client/src/renderer/map.rs`) | map mode, detail | overview, minimap |
 | **map mode** | the renderer drawing the map in place of the cells, at any zoom, toggled by `M`: its viewport none, so nothing is copied for it and its camera loads nothing | map, viewport | |
 | **mesh** | the land's shape: vertices joined by lines into triangles (`worldgen::mesh`) | vertex, line | polygons, Voronoi |
 | **vertex** | a point of the mesh, one to each square of a grid: ocean, or land at a height of its own | mesh, line | site, node |
@@ -232,15 +232,14 @@ what they always do and are not listed.
 
 | word | means | relates to | not |
 |---|---|---|---|
-| **diagnostics** | code that gathers data and judges nothing (`src/diagnostics/`) | report, test | |
+| **diagnostics** | code that gathers data, writes it down for comparisons and judges nothing; the only code that makes transient data (being redone) | report, test | |
 | **report** | a measurement's tables and notes, printed and kept as CSV (`Report`) | table | |
 | **table** | rows under headings (`Table`); a **row** is one line of it, in CSV too | report | record |
 | **divider** | a line across a table between its rows, for a total or a group (`Table::divider`) | table | rule (the simulation's) |
 | **transient data** | a crate's `transient_data/`, out of git: what its runs leave behind (`TransientData`) | report | |
 | **census** | a count of a population: the flock and grass over a run, or Tessera's nodes by kind | | |
 | **reading** | the process's memory read once (`MemoryTrack::take_reading`) | | sample |
-| **test** | a test of the code, run by `cargo test`: it judges, and fails or passes (`docs/testing_protocol.md`) | tier, in-bin test | |
-| **in-bin test** | a command of the binary that ticks a world and reports what it did -- `server pasture`, `server check`, `server throughput`: run by hand or to measure, judging nothing itself. The code such a command is written in is the diagnostics | test, diagnostics, ticker | test (that is `cargo test`'s); benchmark |
+| **test** | a test of the code, run by `cargo test`: it judges, and fails or passes (`docs/testing_protocol.md`) | tier | |
 | **tier** | a test's size: fine, fast or complete (`docs/testing_protocol.md`) | | |
 | **settings** | this machine's settings, kept from run to run: `settings.csv` in the folder `Civil Egregore` where the system keeps a user's programs' data (`utilities::settings`) | default settings, slider, group | config, preferences, preset |
 | **default settings** | every setting and what it is unless changed: a settings file built into the program, copied to a machine that has none; all there is under the build feature `force_default_settings` | settings | |
@@ -252,6 +251,6 @@ what they always do and are not listed.
 | **toggle** | a slider that is only on or off, turned by a click: its `kind` in the sliders' file (`TunedNumber::toggle`) | slider, tuning | checkbox, switch, flag |
 | **world start** | every number a new world starts from -- seed, generation, size, forced hot, sheep, threads, hot entity, camera loading -- whoever gives them (`server::WorldStart`); the server alone knows what they mean | tuning, forced hot, hot entity, world's size | world options, lab |
 | **host** | a world run on a thread of its own for a window, which calls it (`server::host::Host`) and is answered with the cells of its viewport's hot superchunks (`ViewportFrame`) | world start | sim, simulation thread |
-| **ticker** | whatever ticks a world that is no host: a test, an in-bin test. It owns its world and ticks it flat out | host, shown world | run (a job is run; a host runs a world) |
+| **ticker** | whatever ticks a world that is no host: a test, a command of the program. It owns its world and ticks it flat out | host, shown world | run (a job is run; a host runs a world) |
 | **shown world** | a ticker's world drawn in a window while it is ticked: the server answers the window's asks between the ticker's ticks, over a local socket, when the environment variable `CIVIL_EGREGORE_RENDER` is set (`server::host::shown`); the window is the game's own program (`Civil_Egregore renderer show`) | ticker, host, frame | |
 | **worlds' folder** | where worlds are kept unless a path is given: `worlds` in the folder `Civil Egregore`, or what the setting `worlds` names (`utilities::settings::worlds`) | save, settings | |

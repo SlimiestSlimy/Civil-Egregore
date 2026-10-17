@@ -1,9 +1,9 @@
 //! Civil Egregore, from the command line: the one program, built with the
-//! renderer or without it (the `renderer` feature, on by default). It
+//! client or without it (the `client` feature, on by default). It
 //! hands its command line to the server's flags ([`server::params`]) and
 //! the server ([`server::start`]).
 //!
-//! No arguments, built with the renderer: the window, on its main menu ([`renderer::run_window`]).
+//! No arguments, built with the client: the window, on its main menu ([`client::run_window`]).
 //! `cargo run --release -- --help`: every flag, and what it takes.
 //! `cargo run --release -- --seed 0x5 --new [folder --sheep 10 --side 4 --forced_hot []]`
 //! `cargo run --release -- --run [folder --ticks 2000]`
@@ -16,7 +16,7 @@ use protocol::flags::FlagError;
 use protocol::server_parameters::ServerParameters;
 use std::process::ExitCode;
 
-#[cfg(all(windows, feature = "renderer"))]
+#[cfg(all(windows, feature = "client"))]
 unsafe extern "system" {
     /// Windows' own: lets go of the console the program was given.
     safe fn FreeConsole() -> i32;
@@ -26,22 +26,22 @@ unsafe extern "system" {
 /// program is a console program, so that its commands print where they
 /// are typed, and Windows opens a console beside one started by a
 /// click, which the window has no use for. Elsewhere, nothing.
-#[cfg(feature = "renderer")]
+#[cfg(feature = "client")]
 fn leave_the_console() {
     #[cfg(windows)]
     FreeConsole();
 }
 
-/// No arguments, built with the renderer: the window, and nothing else
+/// No arguments, built with the client: the window, and nothing else
 /// run once it closes. Otherwise, the command line read by the server's
 /// flags, and run by the server.
 fn main() -> ExitCode {
     let shell_words: Vec<String> = std::env::args().skip(1).collect();
 
-    #[cfg(feature = "renderer")]
+    #[cfg(feature = "client")]
     if shell_words.is_empty() {
         leave_the_console();
-        renderer::run_window();
+        client::run_window();
         return ExitCode::SUCCESS;
     }
 

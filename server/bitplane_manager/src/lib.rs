@@ -14,7 +14,6 @@ mod making_hot;
 mod superchunk_layer;
 mod reader;
 mod superchunk;
-pub mod transient_data;
 mod write_back;
 mod writes;
 

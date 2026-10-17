@@ -52,10 +52,3 @@ swaps (`MORTON_TO_ROWS`, **`swap_index_bits`**, **`swap_mask`**);
 **`window(word_tiles, columns_across, rows_down)`**: the 8x8 window `(across, down)`
 into the 16x16 square of four word tiles, row by row (**`window_across_pair`**: two
 word tiles side by side, cut across).
-
-## `diagnostics/`, `transient_data.rs`
-
-The folders every crate has (`../../docs/style_guide.md`, "One shape for
-every crate"). `diagnostics/mod.rs` gathers nothing yet.
-`transient_data::TRANSIENT_DATA` names the crate's `transient_data/`
-folder, where its runs would leave what they make.
