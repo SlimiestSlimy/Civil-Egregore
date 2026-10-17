@@ -338,19 +338,20 @@ fn the_code_points_at_docs_that_are_there() {
     assert!(wrong_places.is_empty(), "{} comments pointing at docs that are not there:\n{}", wrong_places.len(), wrong_places.join("\n"));
 }
 
-/// The crates rules are written in: what they depend on is
-/// `actions` alone, and they ask their turn nothing themselves.
-const RULES_CRATES: [&str; 2] = ["sca_rules", "entity_rules"];
+/// The crates rules are written in, the base game's: what they depend
+/// on is the simulation's API and the base game, and they ask their
+/// turn nothing themselves.
+const RULES_CRATES: [&str; 2] = ["basegame/sca_rules", "basegame/entity_rules"];
 
-/// A rule asks actions, and nothing else: no rule's source calls
-/// anything of its turn's own -- the turn is handed on to an
-/// action, never asked -- nor names a crate under the
-/// actions (`actions/docs/actions.md`, "Rules ask
-/// actions, and nothing else").
+/// A rule asks the simulation's API, and nothing else: no rule's
+/// source calls anything of its turn's own -- the turn is handed on to
+/// the API, never asked -- nor names a crate under it, nor anything
+/// of the simulation but its API (`simulation/docs/simulation_api.md`,
+/// "Rules ask actions, and nothing else").
 #[test]
-fn the_rules_ask_actions_alone() {
+fn the_rules_ask_the_simulation_api_alone() {
     let root_folder = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let crates_under_actions = ["compares_and_writes::", "simulation::", "bitplane_manager::", "entity_manager::", "chunk_storage::", "coordinates::", "type_registry::", "utilities::", "pathfinding::", "worldgen::", "server::"];
+    let crates_under_the_api = ["bitplane_manager::", "entity_manager::", "chunk_storage::", "coordinates::", "type_registry::", "utilities::", "pathfinding::", "worldgen::", "server::"];
     let mut wrong_places = Vec::new();
     for rules in RULES_CRATES {
         let mut source_files = Vec::new();
@@ -362,14 +363,18 @@ fn the_rules_ask_actions_alone() {
             for (line_index, line) in source_text.lines().enumerate() {
                 // What is said in a comment is not asked.
                 let code_part = line.split_once("//").map_or(line, |(before_comment, _)| before_comment);
-                if code_part.contains("turn.") {
-                    wrong_places.push(format!("{shown_path}:{}: asks its turn itself: `{}`", line_index + 1, code_part.trim()));
+                if code_part.contains("tick_state.") {
+                    wrong_places.push(format!("{shown_path}:{}: asks its tick state itself: `{}`", line_index + 1, code_part.trim()));
                 }
-                if let Some(named_crate) = crates_under_actions.iter().find(|crate_prefix| code_part.contains(**crate_prefix) && !code_part.contains(&format!("actions::{crate_prefix}"))) {
-                    wrong_places.push(format!("{shown_path}:{}: names `{}`, under the actions", line_index + 1, named_crate.trim_end_matches(':')));
+                if let Some(named_crate) = crates_under_the_api.iter().find(|crate_prefix| code_part.contains(**crate_prefix) && !code_part.contains(&format!("simulation_api::{crate_prefix}"))) {
+                    wrong_places.push(format!("{shown_path}:{}: names `{}`, under the simulation's API", line_index + 1, named_crate.trim_end_matches(':')));
+                }
+                // The simulation is named by its API alone.
+                if code_part.replace("simulation::simulation_api::", "").contains("simulation::") {
+                    wrong_places.push(format!("{shown_path}:{}: names the simulation past its API: `{}`", line_index + 1, code_part.trim()));
                 }
             }
         }
     }
-    assert!(wrong_places.is_empty(), "{} places where a rule reaches past the actions:\n{}", wrong_places.len(), wrong_places.join("\n"));
+    assert!(wrong_places.is_empty(), "{} places where a rule reaches past the simulation's API:\n{}", wrong_places.len(), wrong_places.join("\n"));
 }

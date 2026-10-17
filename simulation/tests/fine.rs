@@ -7,5 +7,14 @@
 #[path = "../../utilities/test_seed.rs"]
 mod test_seed;
 
+#[path = "shared/arenas.rs"]
+mod arenas;
+
 #[path = "fine/simulation_time.rs"]
 mod simulation_time;
+
+#[path = "fine/entities.rs"]
+mod entities;
+
+#[path = "fine/skip_tags.rs"]
+mod skip_tags;

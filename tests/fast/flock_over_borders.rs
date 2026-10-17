@@ -16,12 +16,13 @@ use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, AttributeBlock, WorldEntities, InstructionsApplied};
-use actions::around;
-use actions::{cells, compare, Turn};
+use simulation::simulation_api::cell_and_its_neighbours;
+use simulation::simulation_api::{cell_reads_and_writes, compare_and_write, SuperchunkTickState};
 use simulation::Simulation;
 use std::collections::BTreeSet;
-use type_registry::COLLISION;
+use base_types::COLLISION;
 use utilities::rng::RandomSource;
+use libraries::collision::COLLISION as COLLISION_LIBRARY;
 
 /// Superchunks along the side of the world.
 const WORLD: u32 = 3;
@@ -64,8 +65,8 @@ fn drawn_for(seed: u64, tick_now: u64, from_pasture: (i64, i64)) -> RandomSource
 }
 
 /// The entity on `asked_cell` as the tick found it, if one stood there.
-fn entity_standing_on<'a>(turn: &Turn<'a>, asked_cell: CellIndex) -> Option<entity_manager::EntityRef<'a>> {
-    turn.entities_in(asked_cell.chunk())?.find(|entity| entity.header.stood_cell == asked_cell)
+fn entity_standing_on<'a>(tick_state: &SuperchunkTickState<'a>, asked_cell: CellIndex) -> Option<entity_manager::EntityRef<'a>> {
+    tick_state.entities_in(asked_cell.chunk())?.find(|entity| entity.header.stood_cell == asked_cell)
 }
 
 /// One superchunk's turn of the flock's rule: each walker woken may
@@ -76,48 +77,44 @@ fn entity_standing_on<'a>(turn: &Turn<'a>, asked_cell: CellIndex) -> Option<enti
 /// cell and every attribute written is a compare-and-write, and what
 /// is counted of a cell beside it is under a compare of that cell --
 /// in another superchunk, where a border lies between.
-fn flock(turn: &mut Turn, seed: u64, pasture_shift: (u32, u32)) -> u64 {
-    let tick_now = turn.current_tick();
-    for entity in turn.woken_entities() {
+fn flock(tick_state: &mut SuperchunkTickState, seed: u64, pasture_shift: (u32, u32)) -> u64 {
+    let tick_now = tick_state.current_tick();
+    for entity in tick_state.woken_entities() {
         let (header, walker_cell) = (entity.header, entity.header.stood_cell);
-        turn.seeing_to(walker_cell);
+        tick_state.seeing_to(walker_cell);
         let mut walker_random = drawn_for(seed, tick_now, from_pasture(pasture_shift, walker_cell));
-        let about_tiles = around::tiles_about_cell(walker_cell);
-        let stone_about = around::read_layer(turn, STONE_LAYER, &about_tiles);
-        let (open_cells, collision_cells) = (stone_about.hot & about_tiles.neighbour_cells(), around::read_layer(turn, COLLISION, &about_tiles).set_cells & about_tiles.neighbour_cells());
+        let about_tiles = cell_and_its_neighbours::tiles_about_cell(walker_cell);
+        let stone_about = cell_and_its_neighbours::read_layer(tick_state, STONE_LAYER, &about_tiles);
+        let (open_cells, collision_cells) = (stone_about.hot & about_tiles.neighbour_cells(), cell_and_its_neighbours::read_layer(tick_state, COLLISION, &about_tiles).set_cells & about_tiles.neighbour_cells());
         let chance = walker_random.draw_below(100);
         if chance < 4 {
-            actions::entities::remove(turn, &header);
+            COLLISION_LIBRARY.remove(tick_state, &header);
             continue;
         }
         let meals_seen = entity.attribute(COUNTED_ATTRIBUTE);
         if !(stone_about.set_cells & about_tiles.centre_cell()).is_empty() {
             // The meal is counted only if the stone is there still: another on its way here may not eat it, but one counting on this one may.
-            compare::from_here(turn, compare::layer_holds(STONE_LAYER, walker_cell));
-            actions::entities::set_attribute_of(turn, &header, COUNTED_ATTRIBUTE, meals_seen, meals_seen.unwrap_or(0) + 1);
-            compare::end_from_here(turn);
-            cells::clear(turn, STONE_LAYER, walker_cell);
-        } else if let Some(laid_cell) = around::pick_way(&mut walker_random, &about_tiles, open_cells.cells_not_in(stone_about.set_cells)).filter(|_| chance < 40).and_then(|laid_way| around::cell(walker_cell, laid_way)) {
+            simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut compare_and_write::open_compare(tick_state, compare_and_write::layer_holds(STONE_LAYER, walker_cell)), &header, COUNTED_ATTRIBUTE, meals_seen, meals_seen.unwrap_or(0) + 1);
+            cell_reads_and_writes::clear(tick_state, STONE_LAYER, walker_cell);
+        } else if let Some(laid_cell) = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, open_cells.cells_not_in(stone_about.set_cells)).filter(|_| chance < 40).and_then(|laid_way| cell_and_its_neighbours::cell(walker_cell, laid_way)) {
             // Laid and counted, or neither: the cell may be another's stone by then, whichever side of a border it is on.
             let laid_seen = entity.attribute(LAID_ATTRIBUTE);
-            compare::from_here(turn, compare::layer_lacks(STONE_LAYER, laid_cell));
-            cells::set(turn, STONE_LAYER, laid_cell);
-            actions::entities::set_attribute_of(turn, &header, LAID_ATTRIBUTE, laid_seen, laid_seen.unwrap_or(0) + 1);
-            compare::end_from_here(turn);
+            let mut cell_bare_still = compare_and_write::open_compare(tick_state, compare_and_write::layer_lacks(STONE_LAYER, laid_cell));
+            cell_reads_and_writes::set(&mut cell_bare_still, STONE_LAYER, laid_cell);
+            simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut cell_bare_still, &header, LAID_ATTRIBUTE, laid_seen, laid_seen.unwrap_or(0) + 1);
         }
-        if let Some(neighbour_entity) = around::pick_way(&mut walker_random, &about_tiles, collision_cells).and_then(|neighbour_way| around::cell(walker_cell, neighbour_way)).and_then(|neighbour_cell| entity_standing_on(turn, neighbour_cell)) {
+        if let Some(neighbour_entity) = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, collision_cells).and_then(|neighbour_way| cell_and_its_neighbours::cell(walker_cell, neighbour_way)).and_then(|neighbour_cell| entity_standing_on(tick_state, neighbour_cell)) {
             let count_seen = neighbour_entity.attribute(COUNTED_ATTRIBUTE);
-            actions::entities::set_attribute_of(turn, &neighbour_entity.header, COUNTED_ATTRIBUTE, count_seen, count_seen.unwrap_or(0) + 1000);
+            simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &neighbour_entity.header, COUNTED_ATTRIBUTE, count_seen, count_seen.unwrap_or(0) + 1000);
         }
-        if let Some(made_cell) = around::pick_way(&mut walker_random, &about_tiles, open_cells.cells_not_in(collision_cells)).filter(|_| chance < 9).and_then(|made_way| around::cell(walker_cell, made_way)) {
+        if let Some(made_cell) = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, open_cells.cells_not_in(collision_cells)).filter(|_| chance < 9).and_then(|made_way| cell_and_its_neighbours::cell(walker_cell, made_way)) {
             // Made and counted, or neither.
             let made_seen = entity.attribute(MADE_ATTRIBUTE);
-            actions::entities::begin_making_entity(turn, WALKER_TYPE, made_cell, tick_now + 1 + walker_random.draw_below(3), &[]);
-            actions::entities::set_attribute_of(turn, &header, MADE_ATTRIBUTE, made_seen, made_seen.unwrap_or(0) + 1);
-            actions::entities::end_making_entity(turn);
+            let mut entity_made = COLLISION_LIBRARY.begin_making_entity(tick_state, WALKER_TYPE, made_cell, tick_now + 1 + walker_random.draw_below(3), &[]);
+            simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut entity_made, &header, MADE_ATTRIBUTE, made_seen, made_seen.unwrap_or(0) + 1);
         }
-        let step_cell = around::pick_way(&mut walker_random, &about_tiles, open_cells).and_then(|step_way| around::cell(walker_cell, step_way)).unwrap_or(walker_cell);
-        actions::entities::step(turn, &header, step_cell, tick_now + 1 + walker_random.draw_below(3));
+        let step_cell = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, open_cells).and_then(|step_way| cell_and_its_neighbours::cell(walker_cell, step_way)).unwrap_or(walker_cell);
+        COLLISION_LIBRARY.step(tick_state, &header, step_cell, tick_now + 1 + walker_random.draw_below(3));
     }
     0
 }
@@ -144,7 +141,7 @@ fn pasture_world(seed: u64, pasture_shift: (u32, u32)) -> (BitmapArena, WorldEnt
     while drawn_places.len() < FLOCK {
         let drawn_place = (seeded_random.draw_below(u64::from(PASTURE_SIDE)) as i64, seeded_random.draw_below(u64::from(PASTURE_SIDE)) as i64);
         if drawn_places.insert(drawn_place) {
-            entity_store.queue_put(walker_header(pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), seeded_random.draw_below(3)), &[]);
+            entity_store.queue_add(walker_header(pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), seeded_random.draw_below(3)), &[]);
             bitmap_arena.queue_write(COLLISION, Write::cell(pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), WriteOp::SetCell));
         }
     }
@@ -184,16 +181,15 @@ fn a_flock_over_borders_comes_to_the_same_on_any_number_of_threads() {
     let pasture_shift = (seeded_random.draw_below(u64::from(PASTURE_SIDE / 2 - 10)) as u32, seeded_random.draw_below(u64::from(PASTURE_SIDE / 2 - 10)) as u32);
     let ((mut bitmap_arena, mut entity_store), (mut arena_there, mut entities_there)) = (pasture_world(seed, pasture_shift), pasture_world(seed, pasture_shift));
     let (mut test_simulation, mut simulation_there) = (Simulation::new(1), Simulation::for_superchunks((WORLD * WORLD) as usize));
-    test_simulation.keep_entities_in(COLLISION);
-    simulation_there.keep_entities_in(COLLISION);
     assert_eq!(pasture_outcome(&bitmap_arena, &entity_store, pasture_shift), pasture_outcome(&arena_there, &entities_there, pasture_shift), "the same pasture put, shifted {pasture_shift:?}");
-    let (mut instructions_done, mut writes_refused, mut over_a_border) = (InstructionsApplied::default(), 0, (0, 0));
+    let (mut instructions_done, mut writes_refused, mut compares_refused, mut over_a_border) = (InstructionsApplied::default(), 0, 0, (0, 0));
     for _ in 0..TICKS {
-        let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| flock(turn, seed, pasture_shift));
-        let report_there = simulation_there.tick(&mut arena_there, &mut entities_there, seed, |turn: &mut Turn| flock(turn, seed, pasture_shift));
+        let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| flock(tick_state, seed, pasture_shift));
+        let report_there = simulation_there.tick(&mut arena_there, &mut entities_there, seed, |tick_state: &mut SuperchunkTickState| flock(tick_state, seed, pasture_shift));
         over_a_border = (over_a_border.0 + report.acts_over_a_border, over_a_border.1 + report_there.acts_over_a_border);
         instructions_done += report.instructions_applied;
         writes_refused += report.writes_applied.writes_refused;
+        compares_refused += report.instructions_compared.1;
         let ((stone_cells, collision_cells, walker_rows), (stone_there, held_there, walkers_there)) = (pasture_outcome(&bitmap_arena, &entity_store, pasture_shift), pasture_outcome(&arena_there, &entities_there, pasture_shift));
         // The collision plane holds the cells the walkers stand on, and no other.
         assert_eq!(collision_cells, walker_rows.iter().map(|walker_row| (walker_row.0, walker_row.1)).collect(), "after tick {}", entity_store.current_tick());
@@ -201,7 +197,8 @@ fn a_flock_over_borders_comes_to_the_same_on_any_number_of_threads() {
         let walkers_apart: Vec<_> = walker_rows.iter().zip(&walkers_there).filter(|(row_here, row_there)| row_here != row_there).take(4).collect();
         assert!(stone_apart.is_empty() && walkers_apart.is_empty() && walker_rows.len() == walkers_there.len(), "after tick {}, shifted {pasture_shift:?}, seed {seed:#x}: {} walkers on one thread and {} on all; apart, stone {stone_apart:?}, walkers {walkers_apart:?}; done here {instructions_done:?}", entity_store.current_tick(), walker_rows.len(), walkers_there.len());
     }
-    assert!(instructions_done.border_crossings > 0 && instructions_done.turned_back > 0 && instructions_done.puts_refused > 0 && instructions_done.puts > 0 && instructions_done.entities_removed > 0 && instructions_done.edits > 0 && writes_refused > 0, "{instructions_done:?}, {writes_refused} writes refused");
+    // A cell held is refused by the compare of the plane, so no step is turned back by the entities themselves.
+    assert!(instructions_done.border_crossings > 0 && compares_refused > 0 && instructions_done.adds_refused > 0 && instructions_done.added > 0 && instructions_done.entities_removed > 0 && instructions_done.edits > 0 && writes_refused > 0, "{instructions_done:?}, {writes_refused} writes and {compares_refused} compares refused");
     // Both borders of superchunks cross the pasture wherever it was put, and acts reach over them.
     assert!(over_a_border.0 > 0 && over_a_border.0 == over_a_border.1, "acts over a border: {over_a_border:?}");
 }

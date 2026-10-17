@@ -11,14 +11,16 @@
 mod test_seed;
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::saved::{decode_state, encode_state};
-use entity_manager::{default_kept, may_be_given, WholeAttribute, find_attribute, push_attribute, is_attribute_list, Attribute, AttributeBlock, AttributeType, WorldEntities, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER_WAKES};
+use base_types::{SHEEP, SHEEP_STATE};
+use protocol::default_types::new_type_registry_with_default_types;
+use entity_manager::{may_be_given, DefaultAttributes, WholeAttribute, find_attribute, push_attribute, is_attribute_list, Attribute, AttributeBlock, AttributeType, WorldEntities, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER_WAKES};
 
 /// The entities' type.
 const WALKER_TYPE: EntityType = EntityType::from_number(40);
 
 /// Entities holding the superchunk `(10, 10)`, none in it.
 fn world() -> WorldEntities {
-    let mut world_entities = WorldEntities::new();
+    let mut world_entities = WorldEntities::for_types(&new_type_registry_with_default_types().freeze(), 0);
     assert_eq!(world_entities.keep_superchunks(&[SuperchunkIndex::from_cartesian(10, 10)]), 0);
     world_entities
 }
@@ -108,7 +110,7 @@ fn every_attribute_is_found_over_those_of_any_length() {
 
     let mut world_entities = world();
     let header = walker_header(cell(40, 30));
-    world_entities.queue_put(header, &attribute_list);
+    world_entities.queue_add(header, &attribute_list);
     world_entities.apply();
     let entity = world_entities.get(header.stood_cell).expect("put");
     assert_eq!((entity.attribute(ONE_BLOCK_ATTRIBUTE), entity.attribute(BOTH_ENDS_ATTRIBUTE)), (Some(7), Some(BothEnds { first_word: 11, last_word: 13 })));
@@ -124,7 +126,7 @@ fn every_attribute_is_found_over_those_of_any_length() {
 fn an_attribute_is_edited_to_any_length_and_saved() {
     let mut world_entities = world();
     let target_header = walker_header(cell(40, 30));
-    world_entities.queue_put(target_header, &attributes());
+    world_entities.queue_add(target_header, &attributes());
     world_entities.apply();
     let edits: [&dyn Fn(&mut Instructions); 4] = [
         &|instruction_queue| instruction_queue.set_attribute_blocks(target_header.stood_cell, &varying_attribute(VARYING_NOTE, &[6; 21])),
@@ -176,7 +178,7 @@ fn attributes_edited_in_any_order_are_those_last_set() {
     let mut seeded_rng = utilities::rng::RandomSource::new(seed);
     let mut world_entities = world();
     let target_header = walker_header(cell(seeded_rng.draw_below(1024) as u32, seeded_rng.draw_below(1024) as u32));
-    world_entities.queue_put(target_header, &[]);
+    world_entities.queue_add(target_header, &[]);
     world_entities.apply();
     // Twelve types: numbers drawn, no two the same, eight of 1 to 3 blocks and four whose size varies.
     let mut type_numbers = std::collections::BTreeSet::new();
@@ -233,16 +235,16 @@ fn attributes_edited_in_any_order_are_those_last_set() {
 fn an_entity_is_named_by_the_cell_the_tick_found_it_on() {
     let mut world_entities = world();
     let (first_cell, second_cell, third_cell) = (cell(40, 30), cell(41, 30), cell(42, 30));
-    world_entities.queue_put(walker_header(first_cell), &[]);
-    world_entities.queue_put(walker_header(second_cell), &[]);
+    world_entities.queue_add(walker_header(first_cell), &[]);
+    world_entities.queue_add(walker_header(second_cell), &[]);
     world_entities.apply();
     let (mut instruction_queue, mut instructions_applied) = (Instructions::default(), InstructionsApplied::default());
     instruction_queue.move_entity(walker_header(third_cell), first_cell);
     instruction_queue.set_attribute(first_cell, ONE_BLOCK_ATTRIBUTE, 7);
     instruction_queue.move_entity(walker_header(first_cell), second_cell);
-    instruction_queue.put(walker_header(first_cell), &[]);
+    instruction_queue.add(walker_header(first_cell), &[]);
     instruction_queue.apply(world_entities.superchunks_mut(), 0, &mut instructions_applied);
-    assert_eq!((instructions_applied.moves, instructions_applied.edits, instructions_applied.turned_back, instructions_applied.puts_refused, instructions_applied.passed_over), (2, 1, 1, 1, 0));
+    assert_eq!((instructions_applied.moves, instructions_applied.edits, instructions_applied.turned_back, instructions_applied.adds_refused, instructions_applied.passed_over), (2, 1, 1, 1, 0));
     assert_eq!(world_entities.get(third_cell).and_then(|moved_entity| moved_entity.attribute(ONE_BLOCK_ATTRIBUTE)), Some(7), "written where it moved to");
     assert!(world_entities.get(second_cell).is_some() && world_entities.len() == 2, "the cell left is no other's this tick");
     // Still the same tick: removed by the name it has in it, and nothing written to it after.
@@ -252,13 +254,13 @@ fn an_entity_is_named_by_the_cell_the_tick_found_it_on() {
     instruction_queue.apply(world_entities.superchunks_mut(), 0, &mut instructions_applied);
     assert_eq!((instructions_applied.entities_removed, instructions_applied.passed_over, world_entities.len()), (1, 1, 1));
     // The tick over, the cells are whoever comes to them.
-    world_entities.superchunks_mut().iter_mut().for_each(|superchunk| superchunk.names_anew(&mut ()));
+    world_entities.superchunks_mut().iter_mut().for_each(|superchunk| superchunk.names_anew());
     let (mut instruction_queue, mut instructions_applied) = (Instructions::default(), InstructionsApplied::default());
-    instruction_queue.put(walker_header(first_cell), &[]);
-    instruction_queue.put(walker_header(third_cell), &[]);
+    instruction_queue.add(walker_header(first_cell), &[]);
+    instruction_queue.add(walker_header(third_cell), &[]);
     instruction_queue.apply(world_entities.superchunks_mut(), 0, &mut instructions_applied);
-    assert_eq!((instructions_applied.puts, world_entities.len()), (2, 3));
-    world_entities.superchunks_mut().iter_mut().for_each(|superchunk| superchunk.names_anew(&mut ()));
+    assert_eq!((instructions_applied.added, world_entities.len()), (2, 3));
+    world_entities.superchunks_mut().iter_mut().for_each(|superchunk| superchunk.names_anew());
 
     let (mut instruction_queue, mut instructions_applied) = (Instructions::default(), InstructionsApplied::default());
     let nobodys_cell = cell(50, 50);
@@ -280,13 +282,14 @@ fn an_entity_is_named_by_the_cell_the_tick_found_it_on() {
 #[test]
 fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
-    use type_registry::{SheepState, SHEEP, SHEEP_STATE};
+    use base_types::SheepState;
     use utilities::rng::RandomSource;
     /// An attribute sorting before the sheep's state, and one after.
     const SORTS_BEFORE_STATE: Attribute<u64> = Attribute::new(11);
-    let kept_default = default_kept(SHEEP).expect("registered with one");
+    let default_attributes = DefaultAttributes::of_types(&new_type_registry_with_default_types().freeze());
+    let kept_default = default_attributes.of(SHEEP).expect("registered with one");
     assert_eq!((kept_default.attribute_type, kept_default.words, kept_default.block_count), (SHEEP_STATE.attribute_type(), SheepState::WORDS, SheepState::WORDS.div_ceil(BLOCK_WORDS)));
-    assert_eq!(default_kept(WALKER_TYPE), None);
+    assert_eq!(default_attributes.of(WALKER_TYPE), None);
     let mut seeded_rng = RandomSource::new(seed);
     let draw_state = |seeded_rng: &mut RandomSource| SheepState { hungry_at: seeded_rng.next_draw(), lamb_due_at: seeded_rng.next_draw(), grown_at: seeded_rng.next_draw(), roaming_until: seeded_rng.next_draw(), roaming_neighbour: seeded_rng.next_draw() as u32 };
     for round_number in 0..200 {
@@ -305,19 +308,19 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
         if has_after {
             push_attribute(&mut attributes, ONE_BLOCK_ATTRIBUTE, 7);
         }
-        assert!(may_be_given(SHEEP, &attributes));
-        world_entities.queue_put(sheep_header, &attributes);
+        assert!(may_be_given(default_attributes.of(SHEEP), &attributes));
+        world_entities.queue_add(sheep_header, &attributes);
         world_entities.apply();
         let mut held_state = if state_given { drawn_state } else { SheepState::default() };
-        let put = world_entities.get(sheep_cell).expect("put");
+        let added_entity = world_entities.get(sheep_cell).expect("put");
         // Kept: its data's blocks, then the others with their types -- a block each here.
-        assert_eq!(put.attribute_list().len(), kept_default.block_count + usize::from(has_before) + usize::from(has_after), "round {round_number}");
-        assert_eq!(put.attributes.len(), usize::from(has_before) + usize::from(has_after));
+        assert_eq!(added_entity.attribute_list().len(), kept_default.block_count + usize::from(has_before) + usize::from(has_after), "round {round_number}");
+        assert_eq!(added_entity.attributes.len(), usize::from(has_before) + usize::from(has_after));
         // Its first word is its data's first, no type before it.
-        assert_eq!(put.attribute_list()[0].0[0], held_state.hungry_at, "round {round_number}");
-        assert_eq!((put.attribute(SHEEP_STATE), put.attribute(SORTS_BEFORE_STATE), put.attribute(ONE_BLOCK_ATTRIBUTE)), (Some(held_state), has_before.then_some(5), has_after.then_some(7)), "round {round_number}");
-        assert_eq!(put.default_attribute().as_deref(), Some(&*WholeAttribute::holding_value(SHEEP_STATE, held_state)));
-        assert_eq!(put.attribute_seen(SHEEP_STATE.attribute_type()), entity_manager::attribute_seen(Some(&WholeAttribute::holding_value(SHEEP_STATE, held_state))));
+        assert_eq!(added_entity.attribute_list()[0].0[0], held_state.hungry_at, "round {round_number}");
+        assert_eq!((added_entity.attribute(SHEEP_STATE), added_entity.attribute(SORTS_BEFORE_STATE), added_entity.attribute(ONE_BLOCK_ATTRIBUTE)), (Some(held_state), has_before.then_some(5), has_after.then_some(7)), "round {round_number}");
+        assert_eq!(added_entity.default_attribute().as_deref(), Some(&*WholeAttribute::holding_value(SHEEP_STATE, held_state)));
+        assert_eq!(added_entity.attribute_seen(SHEEP_STATE.attribute_type()), entity_manager::attribute_seen(Some(&WholeAttribute::holding_value(SHEEP_STATE, held_state))));
         // Edits drawn: the state whole, a member of it, its removal -- refused -- and the others', which leave it be.
         for edit in 0..8 {
             let (mut instruction_queue, mut instructions_applied) = (Instructions::default(), InstructionsApplied::default());
@@ -348,7 +351,7 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
             }
             instruction_queue.apply(world_entities.superchunks_mut(), 0, &mut instructions_applied);
             // The tick over: it is named by where it stands now.
-            world_entities.superchunks_mut().iter_mut().for_each(|superchunk| superchunk.names_anew(&mut ()));
+            world_entities.superchunks_mut().iter_mut().for_each(|superchunk| superchunk.names_anew());
             // Its removal alone is passed over: a default attribute is never taken.
             assert_eq!(instructions_applied.passed_over, usize::from(chosen_edit == 2), "round {round_number}, edit {edit}");
             let edited_entity = world_entities.iter().next().expect("the one sheep");

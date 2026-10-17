@@ -9,7 +9,7 @@
 use crate::arenas::{cell, walker_header, world};
 use coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, WorldEntities, Header, NEVER_WAKES};
-use simulation::{Simulation, Turn};
+use simulation::{Simulation, SuperchunkTickState};
 use utilities::rng::RandomSource;
 
 /// What the crosser has from the start.
@@ -62,35 +62,35 @@ fn tick(seed: u64, thread_count: usize, crosser_row: u32, last_writer_does: Writ
     let (mut bitmap_arena, mut entity_store) = world(3);
     let (from_cell, to_cell, writer_cells) = crossing_scene(crosser_row, last_writer_does);
     let crosser_header = walker_header(from_cell, 0);
-    entity_store.queue_put(crosser_header, &[entity_manager::AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
+    entity_store.queue_add(crosser_header, &[entity_manager::AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
     for &(writer_cell, _) in &writer_cells {
-        entity_store.queue_put(walker_header(writer_cell, 0), &[]);
+        entity_store.queue_add(walker_header(writer_cell, 0), &[]);
     }
     if is_blocked {
-        entity_store.queue_put(walker_header(to_cell, NEVER_WAKES), &[]);
+        entity_store.queue_add(walker_header(to_cell, NEVER_WAKES), &[]);
     }
     entity_store.apply();
     for &(later_writer_cell, _) in &writer_cells[1..] {
         assert!(later_writer_cell.0 > from_cell.0, "a writer meant to come after the crosser in the world's order");
     }
     assert!(writer_cells[0].0 .0 < from_cell.0);
-    let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
-        let current_tick = turn.current_tick();
-        actions::entities::each_woken(turn, [], &mut (), |turn, entity, _| {
+    let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+        let current_tick = tick_state.current_tick();
+        simulation::simulation_api::entity_reads_and_writes::each_woken(tick_state, [], &mut (), |tick_state, entity, _| {
             let header: Header = entity.header;
             if header.stood_cell == from_cell {
-                actions::entities::step(turn, &header, to_cell, current_tick + 1);
+                simulation::simulation_api::entity_reads_and_writes::step(tick_state, &header, to_cell, current_tick + 1);
                 return;
             }
             let Some(writer_index) = writer_cells.iter().position(|&(candidate_cell, _)| candidate_cell == header.stood_cell) else {
                 return;
             };
             match writer_cells[writer_index].1 {
-                WriterDoes::RemovesCrosser => actions::entities::remove(turn, &crosser_header),
+                WriterDoes::RemovesCrosser => simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &crosser_header),
                 writer_does => {
-                    actions::entities::set_attribute_of(turn, &crosser_header, Attribute::<u64>::new(FIRST_GIVEN_ATTRIBUTE + writer_index as u64), None, writer_index as u64 + 1);
+                    simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &crosser_header, Attribute::<u64>::new(FIRST_GIVEN_ATTRIBUTE + writer_index as u64), None, writer_index as u64 + 1);
                     if writer_does == WriterDoes::GivesAndKeeps {
-                        actions::entities::set_attribute_of(turn, &header, OWN_ATTRIBUTE, None, 1);
+                        simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &header, OWN_ATTRIBUTE, None, 1);
                     }
                 }
             }

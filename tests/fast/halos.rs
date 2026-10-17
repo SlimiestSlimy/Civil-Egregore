@@ -5,7 +5,7 @@
 //!
 //! `cargo test`
 
-use type_registry::GRASS;
+use base_types::GRASS;
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use bitplane_manager::{Write, WriteOp};
 use entity_manager::{AttributeBlock, EntityType, Header, NEVER_WAKES};
@@ -62,7 +62,7 @@ fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
     let mut world = server::start_world(server::WorldStart { seed, sheep_per_flock: 4_000, ..server::WorldStart::default() });
     let try_both = |world: &mut World, cell| {
         let missed = world.write_cells(GRASS, [Write::cell(cell, WriteOp::FlipCell)]).missed;
-        (missed, world.put_entity(Header { entity_type: EntityType::from_number(99), stood_cell: cell, wake: NEVER_WAKES }, &[]).lost)
+        (missed, world.add_entity(Header { entity_type: EntityType::from_number(99), stood_cell: cell, wake: NEVER_WAKES }, &[]).lost)
     };
     while world.warming().next().is_none() {
         assert!(world.entity_store().current_tick() < 60_000, "the halos moved");
@@ -89,7 +89,7 @@ fn a_superchunk_cooling_stays_hot_until_due() {
     let halo = world.bitmap_arena().superchunk_indices();
     let lone_sheep = world.entity_store().iter().map(|entity| (entity.header, entity.attributes.to_vec())).next().expect("the sheep");
     let take_away = |world: &mut World| {
-        world.remove_entity(&lone_sheep.0);
+        crate::worlds::remove_entity(world, &lone_sheep.0);
         world.tick().halos
     };
     let cooling = |world: &World| world.cooling().map(|(superchunk, _)| superchunk).collect::<Vec<_>>();
@@ -101,7 +101,8 @@ fn a_superchunk_cooling_stays_hot_until_due() {
         world.tick();
     }
     // Back asleep over the tick that follows: awake, it might step over an edge and move its halo.
-    world.put_entity(Header { wake: lone_sheep.0.wake.max(world.entity_store().current_tick() + 2), ..lone_sheep.0 }, &lone_sheep.1);
+    let wake = lone_sheep.0.wake.max(world.entity_store().current_tick() + 2);
+    crate::worlds::add_entity(&mut world, Header { wake, ..lone_sheep.0 }, &lone_sheep.1);
     let back_change = world.tick().halos;
     assert!(back_change == HaloChange::default() && world.cooling().next().is_none() && world.bitmap_arena().superchunk_indices() == halo, "the sheep back: the halo hot as it was, nothing made");
 

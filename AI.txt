@@ -108,6 +108,71 @@ Boundaries, asked first, would have put that on the table.
 == TO DO ==
 
 NOW
+- ASK 2026-10-16: the type registry made dynamic ("lets actually get
+  the type registry working dynamically instead"). Settled with the
+  user:
+  "its just types, and associated information, a name, and depending
+  on type other stuff" -- RegisteredType, an enum; no "rows".
+  "the name is th3 clash detector, no two types have the same name".
+  Base types in protocol/default_types.rs ("protocol is the glue
+  between binary initialization, server and client"), optional but
+  on by default, off by a command flag ("a flag on commands should
+  sort that out for now").
+  "the type registry stuff can only chamge in the main menu" -- frozen
+  per world: TypeRegistry::freeze() -> FrozenTypes.
+  "server decides order, for now just registration order is fine".
+  "tests import default types".
+  Flags are not types ("mods will only inject other stuff, not cli
+  args").
+  "no flag for now lol, just make sure its easy to add later" -- a world
+  without the defaults would start from TypeRegistry::default().
+  "world needs to save the types as i said remember" / "typeregistry
+  loads upon loading a world, or loads defaults if no previous world is
+  gicen" / "those questions by the server machinery should be answered
+  entirely by the type registry lol, that's why we register name
+  string, it couples to the rule in-code, the ttpeid is dragged into
+  types.csv for consistency" / "registered type names must be unique"
+  -- "that's our invariant". Done: a rule's code registered with it
+  (RegisteredType<RuleCode>, actions::RuleCode); a world's types.csv,
+  name and ID in registration order; a load picks each saved name from
+  the code's types, ID checked, refused naming the type.
+  Left: host make/open/reset per-world types; the client given them
+  through protocol.
+  Measured, set aside ("no matter performance right now,.we're paying
+  technical debt on the code"): 10000 ticks of a 22-superchunk world,
+  ad52552 3737/3843/3690 ticks a second, now 3461/3547/3239 -- about 9%
+  slower, the world the same. Cause not looked for (suspects: the
+  default attribute looked up in a slice, not a constant match;
+  TickCounts 16 rules wide).
+  Next pass, attributes: registered types with a master rule; a
+  default attribute part of the entity's registration; "attributes
+  should be just defined as structs", reached as "a mutable reference
+  to the struct", and "the mutable struct reference is resolved at
+  compare time" -- the compares carry what they saw in the instruction.
+- ASK 2026-10-16: "a seventh folder is needed, basegame, contains all
+  entity,planes and rules stuff,.separate from.server machinery or
+  protocol machinery (except the load default types registry of
+  course)" / "actions is server code and should not import anything
+  from basegame" / "a rule is, nothing else (except the default types
+  registry crearion) can depend on basegame" / "within basegame
+  dependencies can be freer" / collision and walls "are types
+  registered as well" / "some standalone rules like collisions or
+  pathfinding are among the first tonupload since so many things
+  depend on them" / "so much de coupling to do lol".
+  Done: basegame/{base_types, sca_rules, entity_rules}; climate and
+  SheepState out of type_registry; actions names no game type (walking
+  takes PlanesInTheWay); server/rules.rs names no rule.
+  KNOWN VIOLATIONS, each its own pass (they import base_types):
+  - server: COLLISION for keep_entities_in (lib.rs, world_access.rs);
+    the sheep flock at start (entity_rules::sheep::flock, HOT_ENTITY in
+    halos.rs, params.rs); host/frame.rs and commands.rs count and show
+    grass, trees, sheep, cloud, climate, wet.
+  - worldgen: generates grass, trees, collision, wet, climate,
+    elevation, walls.
+  - renderer: through server::host::frame (climate, tree stages).
+  - pathfinding stays at the root while actions' walking uses it;
+    collision as a standalone rule registered first is a redesign.
+  - AI_SCRATCHPAD depends on base_types (allowed: nothing depends on it).
 - ASK 2026-10-16 (Remote Control, on the user's PC): "since this is a
   remote session but still running locally on my computer rendering
   will be compiled as usual for local sessions" / "now what were going
@@ -306,10 +371,27 @@ OPEN, FOUND BY ME
 - One branch only: `main` ("make sure all branches are collapsed into
   a single branch" / "rename the only remaining branch to main",
   2026-10-16). Commit and push there.
+- Fold (2026-10-17): actions and compares_and_writes are gone, now
+  simulation/src/simulation_api (public, content-agnostic, what basegame
+  uses) and simulation/src/raw_compares_and_writes (private). The
+  turn's raw queue methods are pub(crate).
+- Skip tags (the user's design, 2026-10-17): SetSkipTag before a
+  chain of compares (operand 0 = a new set; k+1 = point the innermost
+  set's compares at the existing tag k sets out, which must enclose
+  it); SkipTag closes a new set. A failing compare reads forward to
+  its target's tag, pairing sets with tags. Typestate: writes are
+  methods of SkipTagSet only; dropping it places the tag;
+  set.skip_tag() hands out a handle tied to the set's lifetime,
+  set.skip_to(handle) re-points. from_here/end_from_here are gone.
+  Byte-identical to ad52552 after 10000 ticks; ~4% slower than
+  ad52552 (collision as compares and plane writes, a set instruction
+  a set). Option left unasked: fold the set into its first compare's
+  spare bits.
+- Simulation second as a server knob (the user, 2026-10-17): later.
 
 LATER
 - Rules that sample entities as cells are sampled (maybe only dormant).
-- A runtime type registry, for mods.
+- Mods registering their own types (the registry is dynamic now).
 - Tessera deep clean: settle the code, move abstraction boundaries.
 - An area allocator: 256 MiB blocks, 256-byte units.
 - Optimizations and inlining; cold states paged; page-out on the

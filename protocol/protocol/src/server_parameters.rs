@@ -46,7 +46,7 @@ pub enum ParameterValue {
 
 impl CleanServerParameters {
     /// Puts `parameter_value` under `parameter_name`, over any before.
-    pub fn put(&mut self, parameter_name: &'static str, parameter_value: ParameterValue) {
+    pub fn insert(&mut self, parameter_name: &'static str, parameter_value: ParameterValue) {
         self.parameter_values.insert(parameter_name, parameter_value);
     }
 

@@ -3,7 +3,7 @@
 //! one entity, enforced here (`docs/entity_manager.md`, "A chunk's
 //! bucket").
 
-use crate::attributes::{default_kept, find_attribute, write_attribute_bytes, write_bytes, write_default, AttributeBlock, AttributeType};
+use crate::attributes::{find_attribute, DefaultAttributes, write_attribute_bytes, write_bytes, write_default, AttributeBlock, AttributeType};
 use crate::entity::{EntityRef, Header};
 use coordinates::CellIndex;
 use utilities::cache::prefetch_cache_line;
@@ -47,23 +47,23 @@ struct StoredEntity {
 
 /// What putting an entity in a bucket did.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Put {
+pub enum EntityWritten {
     /// It is new, and now stands on its cell.
-    NewlyPut,
+    Added,
     /// It was changed where it stands.
     InPlace,
     /// It moved to its cell.
     MovedToCell,
     /// Its cell was occupied: it was changed, and stays where it was.
     TurnedBack,
-    /// It is new and its cell was occupied: it is not put.
+    /// It is new and its cell was occupied: it is not added.
     RefusedOccupied,
     /// It was to be changed or moved, but no entity stands where it
     /// was: it moved on, or was removed.
     PassedOver,
 }
 
-impl Put {
+impl EntityWritten {
     /// What it is of an entity that was to move and was put where it
     /// stood instead, its cell not to be come to: it stayed.
     pub(crate) fn as_turned_back(self) -> Self {
@@ -96,9 +96,9 @@ impl Bucket {
 
     /// The entity standing on `stood_cell`, if one does.
     #[inline]
-    pub(crate) fn get(&self, stood_cell: CellIndex) -> Option<EntityRef<'_>> {
+    pub(crate) fn get<'a>(&'a self, stood_cell: CellIndex, default_attributes: &'a DefaultAttributes) -> Option<EntityRef<'a>> {
         let entity_index = self.find_place(place(stood_cell)).ok()?;
-        Some(self.entity(&self.stored_entities[entity_index]))
+        Some(self.entity(&self.stored_entities[entity_index], default_attributes))
     }
 
     /// Asks memory ahead for the entity standing on `stood_cell`.
@@ -126,8 +126,8 @@ impl Bucket {
     }
 
     /// Every entity here, by cell in Morton order.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = EntityRef<'_>> {
-        self.stored_entities.iter().map(|stored_entity| self.entity(stored_entity))
+    pub(crate) fn iter<'a>(&'a self, default_attributes: &'a DefaultAttributes) -> impl Iterator<Item = EntityRef<'a>> {
+        self.stored_entities.iter().map(move |stored_entity| self.entity(stored_entity, default_attributes))
     }
 
     /// The places of the entities standing on the aligned 8x8 tile whose
@@ -150,18 +150,18 @@ impl Bucket {
     /// bucket keeps them ([`crate::attributes::append_kept`]): new, or
     /// refused, an entity standing there
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
-    pub(crate) fn make_entity(&mut self, header: Header, attributes: &[AttributeBlock]) -> Put {
+    pub(crate) fn make_entity(&mut self, header: Header, attributes: &[AttributeBlock], default_attributes: &DefaultAttributes) -> EntityWritten {
         let target_place = place(header.stood_cell);
         let Err(entity_index) = self.find_place(target_place) else {
-            return Put::RefusedOccupied;
+            return EntityWritten::RefusedOccupied;
         };
         self.places.insert(entity_index, target_place);
         self.tile_starts[search_tile(target_place) + 1..].iter_mut().for_each(|tile_start| *tile_start += 1);
-        let default_blocks = default_kept(header.entity_type).map_or(0, |kept_default| kept_default.block_count as u16);
+        let default_blocks = default_attributes.of(header.entity_type).map_or(0, |kept_default| kept_default.block_count as u16);
         debug_assert!(attributes.len() >= default_blocks as usize && attributes.len() <= u16::MAX as usize, "an entity's blocks as a bucket keeps them");
         self.stored_entities.insert(entity_index, StoredEntity { header, first_block: self.attributes.len() as u32, count: attributes.len() as u16, default_blocks });
         self.attributes.extend_from_slice(attributes);
-        Put::NewlyPut
+        EntityWritten::Added
     }
 
     /// Gives the entity standing on the cell at `former_place` `header` -- its
@@ -169,24 +169,24 @@ impl Bucket {
     /// leaves it those it has: moved to `header`'s cell, or left
     /// where it stands, that one taken; passed over, none standing on
     /// `former_place` (`docs/entity_manager.md`, "A chunk's bucket", Putting).
-    pub(crate) fn put(&mut self, header: Header, former_place: u16, attributes: Option<&[AttributeBlock]>) -> Put {
+    pub(crate) fn write_entity(&mut self, header: Header, former_place: u16, attributes: Option<&[AttributeBlock]>) -> EntityWritten {
         let target_place = place(header.stood_cell);
-        let (entity_index, put) = match (self.find_place(former_place), former_place == target_place) {
-            (Ok(found_index), true) => (found_index, Put::InPlace),
+        let (entity_index, written) = match (self.find_place(former_place), former_place == target_place) {
+            (Ok(found_index), true) => (found_index, EntityWritten::InPlace),
             (Ok(from_index), false) => {
                 let (goes_index, occupied) = self.index_of(target_place);
                 if occupied {
                     // Its cell is occupied: it stays on the cell it was on.
                     let turned_back_header = Header { stood_cell: CellIndex(header.stood_cell.0 - target_place as u64 + former_place as u64), ..header };
                     self.rewrite_entity(from_index, turned_back_header, attributes);
-                    return Put::TurnedBack;
+                    return EntityWritten::TurnedBack;
                 }
-                (self.shift_entity(from_index, goes_index, target_place), Put::MovedToCell)
+                (self.shift_entity(from_index, goes_index, target_place), EntityWritten::MovedToCell)
             }
-            (Err(_), _) => return Put::PassedOver,
+            (Err(_), _) => return EntityWritten::PassedOver,
         };
         self.rewrite_entity(entity_index, header, attributes);
-        put
+        written
     }
 
     /// Gives the entity at `entity_index` `header`, and `attributes` if given:
@@ -214,14 +214,14 @@ impl Bucket {
     /// Returns whether an entity stands there. One as long as it was
     /// is written in place; any other makes the entity's attribute
     /// list anew at the end of the bucket's blocks.
-    pub(crate) fn edit(&mut self, place: u16, attribute_type: AttributeType, whole_attribute: &[AttributeBlock]) -> bool {
+    pub(crate) fn edit(&mut self, place: u16, attribute_type: AttributeType, whole_attribute: &[AttributeBlock], default_attributes: &DefaultAttributes) -> bool {
         let Ok(entity_index) = self.find_place(place) else {
             return false;
         };
         let (first_block, count) = (self.stored_entities[entity_index].first_block as usize, self.stored_entities[entity_index].count as usize);
         // The type's default attribute is written where it is kept, its type left off, and never removed.
         let first_other_block = first_block + self.stored_entities[entity_index].default_blocks as usize;
-        if let Some(kept_default) = default_kept(self.stored_entities[entity_index].header.entity_type).filter(|candidate_default| first_other_block > first_block && candidate_default.attribute_type.type_identity() == attribute_type.type_identity()) {
+        if let Some(kept_default) = default_attributes.of(self.stored_entities[entity_index].header.entity_type).filter(|candidate_default| first_other_block > first_block && candidate_default.attribute_type.type_identity() == attribute_type.type_identity()) {
             return write_default(&mut self.attributes[first_block..first_other_block], kept_default, whole_attribute);
         }
         let (former_range, new_start) = match find_attribute(&self.attributes[first_other_block..first_block + count], attribute_type) {
@@ -247,14 +247,14 @@ impl Bucket {
     /// entity standing on the cell at `place`: in place, nothing
     /// moved. Whether it was written -- not if nobody stands there,
     /// it has no such attribute, or the member is not within it.
-    pub(crate) fn write_bytes(&mut self, place: u16, attribute_type: AttributeType, byte_offset: usize, byte_count: usize, value: u64) -> bool {
+    pub(crate) fn write_bytes(&mut self, place: u16, attribute_type: AttributeType, byte_offset: usize, byte_count: usize, value: u64, default_attributes: &DefaultAttributes) -> bool {
         let Ok(entity_index) = self.find_place(place) else {
             return false;
         };
         let (first_block, count) = (self.stored_entities[entity_index].first_block as usize, self.stored_entities[entity_index].count as usize);
         let first_other_block = first_block + self.stored_entities[entity_index].default_blocks as usize;
         // A member of the type's default attribute is where it would be were its type kept before it.
-        if first_other_block > first_block && default_kept(self.stored_entities[entity_index].header.entity_type).is_some_and(|kept_default| kept_default.attribute_type.type_identity() == attribute_type.type_identity()) {
+        if first_other_block > first_block && default_attributes.of(self.stored_entities[entity_index].header.entity_type).is_some_and(|kept_default| kept_default.attribute_type.type_identity() == attribute_type.type_identity()) {
             return byte_offset >= 8 && write_bytes(&mut self.attributes[first_block..first_other_block], byte_offset - 8, byte_count, value);
         }
         let Ok(found_range) = find_attribute(&self.attributes[first_other_block..first_block + count], attribute_type) else {
@@ -329,10 +329,10 @@ impl Bucket {
 
     /// The entity `stored_entity` is, with its attributes.
     #[inline]
-    fn entity(&self, stored_entity: &StoredEntity) -> EntityRef<'_> {
+    fn entity<'a>(&'a self, stored_entity: &StoredEntity, default_attributes: &'a DefaultAttributes) -> EntityRef<'a> {
         let first_block = stored_entity.first_block as usize;
         let kept_blocks = &self.attributes[first_block..first_block + stored_entity.count as usize];
-        EntityRef { header: stored_entity.header, attributes: &kept_blocks[stored_entity.default_blocks as usize..], kept_blocks }
+        EntityRef { header: stored_entity.header, attributes: &kept_blocks[stored_entity.default_blocks as usize..], kept_blocks, default_attributes }
     }
 
     /// Sweeps the garbage out of the list of blocks, once there is as

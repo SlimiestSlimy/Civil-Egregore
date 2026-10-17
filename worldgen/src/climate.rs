@@ -5,7 +5,7 @@
 //! (`docs/worldgen.md`, "Climate").
 
 use crate::{Height, SmoothNoise};
-use type_registry::{Climate, Wind, HOTTEST_TEMPERATURE, MOST_HUMID, PRESSURE_AT_REST, STRONGEST_WIND, TILES_ABOUT};
+use base_types::{Climate, Wind, HOTTEST_TEMPERATURE, MOST_HUMID, PRESSURE_AT_REST, STRONGEST_WIND, TILES_ABOUT};
 
 /// Mixed with a world's seed for its climate's noise: it lies apart
 /// from the ground and from what grows.

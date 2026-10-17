@@ -8,13 +8,16 @@ use crate::arenas::{cell, walker_header, world, STONE_LAYER};
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
 use coordinates::{SuperchunkIndex};
-use actions::area::{self, AREA_CENTRE};
-use actions::{around, entities, walking};
+use simulation::simulation_api::square_around_a_cell::{self, AREA_CENTRE};
+use simulation::simulation_api::{cell_and_its_neighbours, entity_reads_and_writes, steps_and_paths};
 use entity_manager::NEVER_WAKES;
-use actions::Turn;
+use simulation::simulation_api::SuperchunkTickState;
 use simulation::Simulation;
 use std::sync::Mutex;
-use type_registry::{COLLISION, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
+use base_types::{COLLISION, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
+
+/// What is in a walker's way here: the base game's collision plane and walls.
+const IN_THE_WAY: steps_and_paths::PlanesInTheWay = steps_and_paths::PlanesInTheWay { collision: COLLISION, wall_north: WALL_NORTH, wall_west: WALL_WEST, wall_south: WALL_SOUTH, wall_east: WALL_EAST };
 
 /// Makes the wall layers hot over the superchunk `(10, 10)` of `bitmap_arena`.
 fn with_walls_hot(bitmap_arena: &mut BitmapArena) {
@@ -34,10 +37,10 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let (mut bitmap_arena, mut entity_store) = world(1);
     let (start_cell, goal_cell) = (cell(40, 30), cell(44, 30));
-    entity_store.queue_put(walker_header(start_cell, 0), &[]);
+    entity_store.queue_add(walker_header(start_cell, 0), &[]);
     // A wall of entities across the straight way, open only below.
     for y in 23..=30 {
-        entity_store.queue_put(walker_header(cell(42, y), NEVER_WAKES), &[]);
+        entity_store.queue_add(walker_header(cell(42, y), NEVER_WAKES), &[]);
     }
     entity_store.apply();
     // The entities are kept in the collision plane, as a world keeps them: each put there holds its cell.
@@ -48,17 +51,16 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
     entity_store.iter().for_each(|entity| bitmap_arena.queue_write(COLLISION, Write::cell(entity.header.stood_cell, WriteOp::SetCell)));
     bitmap_arena.apply();
     let mut test_simulation = Simulation::new(1);
-    test_simulation.keep_entities_in(COLLISION);
     let mut steps = 0;
     while entity_store.get(goal_cell).is_none() {
-        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
-            let tick_now = turn.current_tick();
-            for entity in turn.woken_entities() {
+        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+            let tick_now = tick_state.current_tick();
+            for entity in tick_state.woken_entities() {
                 let walker_cell = entity.header.stood_cell;
-                let passable = area::read_layer(turn, STONE_LAYER, walker_cell).hot;
-                assert_eq!(walking::step_to(turn, walker_cell, walker_cell.at_cartesian_offset(9, 0).unwrap(), &passable), None, "out of the area");
-                let next_cell = walking::step_to(turn, walker_cell, goal_cell, &passable).expect("a way round");
-                actions::entities::step(turn, &entity.header, next_cell, tick_now + 1);
+                let passable = square_around_a_cell::read_layer(tick_state, STONE_LAYER, walker_cell).hot;
+                assert_eq!(steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, walker_cell.at_cartesian_offset(9, 0).unwrap(), &passable), None, "out of the area");
+                let next_cell = steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, goal_cell, &passable).expect("a way round");
+                libraries::collision::COLLISION.step(tick_state, &entity.header, next_cell, tick_now + 1);
             }
             0
         });
@@ -87,23 +89,23 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
     }
     bitmap_arena.queue_write(COLLISION, Write::cell(cell(41, 29), WriteOp::SetCell));
     bitmap_arena.apply();
-    entity_store.queue_put(walker_header(start_cell, 0), &[]);
+    entity_store.queue_add(walker_header(start_cell, 0), &[]);
     entity_store.apply();
     let mut test_simulation = Simulation::new(1);
     let mut steps = 0;
     while entity_store.get(goal_cell).is_none() {
-        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
-            let tick_now = turn.current_tick();
-            for entity in turn.woken_entities() {
+        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+            let tick_now = tick_state.current_tick();
+            for entity in tick_state.woken_entities() {
                 let walker_cell = entity.header.stood_cell;
                 if walker_cell == start_cell {
                     // The neighbour up and to the east is held, the others are free.
-                    let about_tiles = around::tiles_about_cell(walker_cell);
-                    assert_eq!(walking::around_steppable(turn, &about_tiles), about_tiles.neighbour_cells().cells_not_in(about_tiles.cell_towards(around::way_of(walker_cell, cell(41, 29)))));
+                    let about_tiles = cell_and_its_neighbours::tiles_about_cell(walker_cell);
+                    assert_eq!(steps_and_paths::around_steppable(tick_state, IN_THE_WAY, &about_tiles), about_tiles.neighbour_cells().cells_not_in(about_tiles.cell_towards(cell_and_its_neighbours::way_of(walker_cell, cell(41, 29)))));
                 }
-                let next_cell = walking::step_to(turn, walker_cell, goal_cell, &area::read_layer(turn, STONE_LAYER, walker_cell).hot).expect("a way round");
-                assert_eq!(turn.layer_holds(COLLISION, next_cell), Ok(false), "a step onto what the collision plane holds");
-                actions::entities::step(turn, &entity.header, next_cell, tick_now + 1);
+                let next_cell = steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, goal_cell, &square_around_a_cell::read_layer(tick_state, STONE_LAYER, walker_cell).hot).expect("a way round");
+                assert_eq!(tick_state.layer_holds(COLLISION, next_cell), Ok(false), "a step onto what the collision plane holds");
+                libraries::collision::COLLISION.step(tick_state, &entity.header, next_cell, tick_now + 1);
             }
             0
         });
@@ -120,7 +122,7 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
 fn a_cell_is_sought_further_and_further_off() {
     let (mut bitmap_arena, mut entity_store) = world(2);
     let start_cell = cell(1000, 1000);
-    entity_store.queue_put(walker_header(start_cell, 0), &[]);
+    entity_store.queue_add(walker_header(start_cell, 0), &[]);
     entity_store.apply();
     let mut test_simulation = Simulation::new(1);
     // How far off the one cell set is, across and down, and the scale its tile is first seen at.
@@ -131,16 +133,16 @@ fn a_cell_is_sought_further_and_further_off() {
             bitmap_arena.queue_write(STONE_LAYER, Write::cell(goal_cell, WriteOp::SetCell));
             bitmap_arena.apply();
         }
-        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed as u64, |turn: &mut Turn| {
-            for entity in turn.woken_entities() {
-                let found_step = walking::seek(turn, start_cell, STONE_LAYER);
+        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed as u64, |tick_state: &mut SuperchunkTickState| {
+            for entity in tick_state.woken_entities() {
+                let found_step = steps_and_paths::seek(tick_state, IN_THE_WAY, start_cell, STONE_LAYER);
                 assert_eq!(found_step.map(|mapped_step| mapped_step.scale), scale, "{goal_across} across, {goal_down} down");
                 if let Some(some_step) = found_step {
                     let (step_cartesian, start_cartesian, goal_cartesian) = (some_step.step_cell.cartesian(), start_cell.cartesian(), goal_cell.cartesian());
                     assert_eq!(step_cartesian.x.abs_diff(goal_cartesian.x).max(step_cartesian.y.abs_diff(goal_cartesian.y)) + 1, start_cartesian.x.abs_diff(goal_cartesian.x).max(start_cartesian.y.abs_diff(goal_cartesian.y)), "a step nearer");
                 }
-                let wake = turn.current_tick() + 1;
-                entities::sleep(turn, &entity.header, wake);
+                let wake = tick_state.current_tick() + 1;
+                entity_reads_and_writes::sleep(tick_state, &entity.header, wake);
             }
             0
         });
@@ -165,25 +167,25 @@ fn walls_of_the_terrain_bar_steps() {
     }
     bitmap_arena.apply();
     let (start_cell, goal_cell) = (cell(41, 30), cell(43, 30));
-    entity_store.queue_put(walker_header(start_cell, 0), &[]);
+    entity_store.queue_add(walker_header(start_cell, 0), &[]);
     entity_store.apply();
     let mut test_simulation = Simulation::new(1);
     let mut steps = 0;
     while entity_store.get(goal_cell).is_none() {
-        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
-            let tick_now = turn.current_tick();
-            for entity in turn.woken_entities() {
+        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+            let tick_now = tick_state.current_tick();
+            for entity in tick_state.woken_entities() {
                 let walker_cell = entity.header.stood_cell;
                 if walker_cell == start_cell {
                     // The three cells east of it are behind the cliff.
-                    let about_start_tiles = around::tiles_about_cell(walker_cell);
-                    assert_eq!(walking::around_unwalled(turn, &about_start_tiles), about_start_tiles.nine_cells().cells_not_in(about_start_tiles.cell_towards(around::NORTH_EAST) | about_start_tiles.cell_towards(around::EAST) | about_start_tiles.cell_towards(around::SOUTH_EAST)));
+                    let about_start_tiles = cell_and_its_neighbours::tiles_about_cell(walker_cell);
+                    assert_eq!(steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &about_start_tiles), about_start_tiles.nine_cells().cells_not_in(about_start_tiles.cell_towards(cell_and_its_neighbours::NORTH_EAST) | about_start_tiles.cell_towards(cell_and_its_neighbours::EAST) | about_start_tiles.cell_towards(cell_and_its_neighbours::SOUTH_EAST)));
                 }
-                let passable = area::read_layer(turn, STONE_LAYER, walker_cell).hot;
-                let next_cell = walking::step_to(turn, walker_cell, goal_cell, &passable).expect("a way through the gap");
-                let about_tiles = around::tiles_about_cell(walker_cell);
-                assert!(!(walking::around_unwalled(turn, &about_tiles) & about_tiles.cell_towards(around::way_of(walker_cell, next_cell))).is_empty(), "a step through a wall");
-                actions::entities::step(turn, &entity.header, next_cell, tick_now + 1);
+                let passable = square_around_a_cell::read_layer(tick_state, STONE_LAYER, walker_cell).hot;
+                let next_cell = steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, goal_cell, &passable).expect("a way through the gap");
+                let about_tiles = cell_and_its_neighbours::tiles_about_cell(walker_cell);
+                assert!(!(steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &about_tiles) & about_tiles.cell_towards(cell_and_its_neighbours::way_of(walker_cell, next_cell))).is_empty(), "a step through a wall");
+                simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, next_cell, tick_now + 1);
             }
             0
         });
@@ -211,15 +213,15 @@ fn a_drop_is_stepped_down_and_not_back_up() {
     }
     bitmap_arena.apply();
     let (above_cell, below_cell) = (cell(41, cliff_row), cell(43, cliff_row));
-    Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
-        let (about_above, about_foot) = (around::tiles_about_cell(above_cell), around::tiles_about_cell(cell(42, cliff_row)));
-        assert_eq!(walking::around_unwalled(turn, &about_above), about_above.nine_cells(), "every step open from above");
-        let west_ways = about_foot.cell_towards(around::NORTH_WEST) | about_foot.cell_towards(around::WEST) | about_foot.cell_towards(around::SOUTH_WEST);
-        assert_eq!(walking::around_unwalled(turn, &about_foot), about_foot.nine_cells().cells_not_in(west_ways), "none back up");
-        let passable = area::read_layer(turn, STONE_LAYER, above_cell).hot;
-        assert_eq!(walking::step_to(turn, above_cell, below_cell, &passable).map(|next_cell| next_cell.cartesian().x), Some(cell(42, cliff_row).cartesian().x), "down it");
-        let passable = area::read_layer(turn, STONE_LAYER, below_cell).hot;
-        assert_eq!(walking::step_to(turn, below_cell, above_cell, &passable), None, "no way back in the area");
+    Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+        let (about_above, about_foot) = (cell_and_its_neighbours::tiles_about_cell(above_cell), cell_and_its_neighbours::tiles_about_cell(cell(42, cliff_row)));
+        assert_eq!(steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &about_above), about_above.nine_cells(), "every step open from above");
+        let west_ways = about_foot.cell_towards(cell_and_its_neighbours::NORTH_WEST) | about_foot.cell_towards(cell_and_its_neighbours::WEST) | about_foot.cell_towards(cell_and_its_neighbours::SOUTH_WEST);
+        assert_eq!(steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &about_foot), about_foot.nine_cells().cells_not_in(west_ways), "none back up");
+        let passable = square_around_a_cell::read_layer(tick_state, STONE_LAYER, above_cell).hot;
+        assert_eq!(steps_and_paths::step_to(tick_state, IN_THE_WAY, above_cell, below_cell, &passable).map(|next_cell| next_cell.cartesian().x), Some(cell(42, cliff_row).cartesian().x), "down it");
+        let passable = square_around_a_cell::read_layer(tick_state, STONE_LAYER, below_cell).hot;
+        assert_eq!(steps_and_paths::step_to(tick_state, IN_THE_WAY, below_cell, above_cell, &passable), None, "no way back in the area");
         0
     });
 }
@@ -246,16 +248,16 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
     }
     bitmap_arena.apply();
     let checked_count = Mutex::new(0);
-    Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
+    Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
         for y in 1..63 {
             for x in 1..63 {
                 let asked_cell = cell(x, y);
-                let (unwalled_cells, walls) = (walking::around_unwalled(turn, &around::tiles_about_cell(asked_cell)), walking::area_walls(turn, asked_cell));
+                let (unwalled_cells, walls) = (steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &cell_and_its_neighbours::tiles_about_cell(asked_cell)), steps_and_paths::area_walls(tick_state, IN_THE_WAY, asked_cell));
                 let area_centre = pathfinding::Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
-                for way_checked in (0..around::WAYS).filter(|&way_filtered| way_filtered != around::HERE) {
-                    let beside_cartesian = around::cell(asked_cell, way_checked).expect("in the world").cartesian();
+                for way_checked in (0..cell_and_its_neighbours::WAYS).filter(|&way_filtered| way_filtered != cell_and_its_neighbours::HERE) {
+                    let beside_cartesian = cell_and_its_neighbours::cell(asked_cell, way_checked).expect("in the world").cartesian();
                     let (dx, dy) = ((beside_cartesian.x as i64 - x as i64) as i8, (beside_cartesian.y as i64 - y as i64) as i8);
-                    assert_eq!(!(unwalled_cells & around::tiles_about_cell(asked_cell).cell_towards(way_checked)).is_empty(), !walls.bars_step(area_centre, dx, dy), "({x}, {y}) by ({dx}, {dy})");
+                    assert_eq!(!(unwalled_cells & cell_and_its_neighbours::tiles_about_cell(asked_cell).cell_towards(way_checked)).is_empty(), !walls.bars_step(area_centre, dx, dy), "({x}, {y}) by ({dx}, {dy})");
                     *checked_count.lock().unwrap() += 1;
                 }
             }

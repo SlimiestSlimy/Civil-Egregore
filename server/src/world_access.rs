@@ -3,8 +3,7 @@
 //! (`docs/server.md`, "What a world holds together").
 
 use crate::{WorldGeneration, World, WorldInfo};
-use bitplane_manager::{BitmapArena, Write, WriteOp, WritesApplied};
-use type_registry::COLLISION;
+use bitplane_manager::{BitmapArena, Write, WritesApplied};
 use chunk_storage::{ChunkStorage, LayerType};
 use coordinates::SuperchunkIndex;
 use entity_manager::{AttributeBlock, WorldEntities, Header, InstructionsApplied};
@@ -61,30 +60,18 @@ impl World {
     }
 
     /// Puts `header`'s entity on the world, whole, between two ticks:
-    /// what came of it -- lost, if its superchunk is not hot; refused,
-    /// if the collision plane holds its cell for another. Put, its
-    /// cell is set there (`docs/server.md`, "The collision plane").
-    pub fn put_entity(&mut self, header: Header, attributes: &[AttributeBlock]) -> InstructionsApplied {
-        if self.bitmap_arena.layer_holds_cell(COLLISION, header.stood_cell) == Ok(true) && self.entity_store.get(header.stood_cell).is_none() {
-            return InstructionsApplied { puts_refused: 1, ..InstructionsApplied::default() };
-        }
-        self.entity_store.queue_put(header, attributes);
-        let put_applied = self.entity_store.apply();
-        if put_applied.puts > 0 {
-            self.write_cells(COLLISION, [Write::cell(header.stood_cell, WriteOp::SetCell)]);
-        }
-        put_applied
+    /// what came of it -- lost, if its superchunk is not hot. Its cells
+    /// on any plane are whoever puts it's to write.
+    pub fn add_entity(&mut self, header: Header, attributes: &[AttributeBlock]) -> InstructionsApplied {
+        self.entity_store.queue_add(header, attributes);
+        self.entity_store.apply()
     }
 
-    /// Removes `header`'s entity from the world, between two ticks,
-    /// its cell cleared in the collision plane.
+    /// Removes `header`'s entity from the world, between two ticks. Its
+    /// cells on any plane are whoever removes it's to clear.
     pub fn remove_entity(&mut self, header: &Header) -> InstructionsApplied {
         self.entity_store.queue_remove(header.stood_cell);
-        let remove_applied = self.entity_store.apply();
-        if remove_applied.entities_removed > 0 {
-            self.write_cells(COLLISION, [Write::cell(header.stood_cell, WriteOp::ClearCell)]);
-        }
-        remove_applied
+        self.entity_store.apply()
     }
 
     /// Applies `writes` to the cells of `layer_type`, between two

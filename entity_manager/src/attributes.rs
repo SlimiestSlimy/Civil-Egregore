@@ -4,7 +4,7 @@
 
 use std::ops::Range;
 pub use type_registry::{Attribute, AttributeType, Layout, Member, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};
-use type_registry::EntityType;
+use type_registry::{EntityType, FrozenTypes};
 
 /// An entity type's default attribute as a bucket keeps it: first of
 /// the entity's blocks, its data alone -- every entity of the type
@@ -20,12 +20,24 @@ pub struct DefaultKept {
     pub block_count: usize,
 }
 
-/// The default attribute of entities of type `entity_type`, if the type is
-/// registered with one.
-#[inline]
-pub fn default_kept(entity_type: EntityType) -> Option<DefaultKept> {
-    let (attribute_type, words) = type_registry::default_of(entity_type)?;
-    Some(DefaultKept { attribute_type, words, block_count: words.div_ceil(BLOCK_WORDS) })
+/// The world's types of entity with a default attribute, each with it
+/// as kept: copied once from the types the world runs with, which never
+/// change while it runs.
+#[derive(Clone, Debug, Default)]
+pub struct DefaultAttributes(Box<[(EntityType, DefaultKept)]>);
+
+impl DefaultAttributes {
+    /// The default attributes of `frozen_types`.
+    pub fn of_types<RuleCode>(frozen_types: &FrozenTypes<RuleCode>) -> Self {
+        Self(frozen_types.default_attributes().into_iter().map(|(entity_type, attribute_type, words)| (entity_type, DefaultKept { attribute_type, words, block_count: words.div_ceil(BLOCK_WORDS) })).collect())
+    }
+
+    /// The default attribute of entities of type `entity_type`, if the
+    /// type has one.
+    #[inline]
+    pub fn of(&self, entity_type: EntityType) -> Option<DefaultKept> {
+        self.0.iter().find(|(kept_type, _)| *kept_type == entity_type).map(|(_, kept_default)| *kept_default)
+    }
 }
 
 /// The word at `word` of `source_blocks`, one after another.
@@ -34,12 +46,13 @@ fn word_of(source_blocks: &[AttributeBlock], word: usize) -> u64 {
     source_blocks[word / BLOCK_WORDS].0[word % BLOCK_WORDS]
 }
 
-/// Appends to `kept_blocks` the blocks of an entity of type `entity_type` given
-/// `attributes`, sorted by type, as a bucket keeps them: its default
-/// attribute first, without its type -- zeroes if it is not among
-/// those given -- then the others as they are.
-pub fn append_kept(entity_type: EntityType, attributes: &[AttributeBlock], kept_blocks: &mut Vec<AttributeBlock>) {
-    let Some(kept_default) = default_kept(entity_type) else {
+/// Appends to `kept_blocks` the blocks of an entity whose type's default
+/// attribute is `kept_default`, if any, given `attributes`, sorted by
+/// type, as a bucket keeps them: its default attribute first, without
+/// its type -- zeroes if it is not among those given -- then the others
+/// as they are.
+pub fn append_kept(kept_default: Option<DefaultKept>, attributes: &[AttributeBlock], kept_blocks: &mut Vec<AttributeBlock>) {
+    let Some(kept_default) = kept_default else {
         return kept_blocks.extend_from_slice(attributes);
     };
     let first_default_block = kept_blocks.len();
@@ -77,16 +90,16 @@ pub(crate) fn default_seen(kept_default: DefaultKept, default_blocks: &[Attribut
     words.fold(0xcbf2_9ce4_8422_2325, |running_sum: u64, word| (running_sum ^ word).wrapping_mul(0x0000_0100_0000_01b3).rotate_left(29)).max(NO_ATTRIBUTE + 1)
 }
 
-/// Whether `attributes` are ones an entity of type `entity_type` may be
-/// given: whole ones, each of a type that is an attribute's, each
-/// type once, sorted by type but for the type's default attribute,
-/// which may come anywhere among them.
-pub fn may_be_given(entity_type: EntityType, attributes: &[AttributeBlock]) -> bool {
-    let Some(kept_default) = default_kept(entity_type) else {
+/// Whether `attributes` are ones an entity whose type's default attribute
+/// is `kept_default`, if any, may be given: whole ones, each of a type
+/// that is an attribute's, each type once, sorted by type but for the
+/// type's default attribute, which may come anywhere among them.
+pub fn may_be_given(kept_default: Option<DefaultKept>, attributes: &[AttributeBlock]) -> bool {
+    let Some(kept_default) = kept_default else {
         return is_attribute_list(attributes);
     };
     let mut kept_blocks = Vec::new();
-    append_kept(entity_type, attributes, &mut kept_blocks);
+    append_kept(Some(kept_default), attributes, &mut kept_blocks);
     let default_lengths: Vec<usize> = each_attribute(attributes).filter(|attribute| attribute[0].attribute_type().type_identity() == kept_default.attribute_type.type_identity()).map(<[_]>::len).collect();
     is_attribute_list(&kept_blocks[kept_default.block_count..]) && default_lengths.len() <= 1 && default_lengths.iter().all(|&default_length| default_length == kept_default.attribute_type.block_count())
 }

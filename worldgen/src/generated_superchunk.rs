@@ -4,7 +4,7 @@
 
 use crate::climate::ClimateNoises;
 use crate::{WorldGeneration, Terrain, WALLS};
-use type_registry::{CLIMATE, COLLISION, ELEVATION, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
+use base_types::{CLIMATE, COLLISION, ELEVATION, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{ChunkMaps, LayerType, SuperchunkCells};
 use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};

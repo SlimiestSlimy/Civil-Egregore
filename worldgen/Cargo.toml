@@ -5,6 +5,7 @@ description = "Civil Egregore's world generation: every cell's height from the w
 
 [dependencies]
 type_registry = { path = "../type_registry" }
+base_types = { path = "../basegame/base_types" }
 bitmap = { path = "../bitmap" }
 chunk_storage = { path = "../chunk_storage" }
 coordinates = { path = "../coordinates" }

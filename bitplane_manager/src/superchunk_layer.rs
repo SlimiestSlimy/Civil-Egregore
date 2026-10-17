@@ -2,7 +2,7 @@
 //! buckets in one allocation -- which chunks have one, their cells read
 //! and changed, their set cells counted.
 
-use super::{COUNT_TILES_IN_CHUNK, COUNT_TILE_CELLS, ChunkSet, NO_CELLS, contains, members, put};
+use super::{COUNT_TILES_IN_CHUNK, COUNT_TILE_CELLS, ChunkSet, NO_CELLS, contains, members, set_membership};
 use bitmap::{BITS_PER_WORD, CellWords, WORDS};
 use chunk_storage::LayerType;
 use coordinates::CHUNKS_IN_SUPERCHUNK;
@@ -62,7 +62,7 @@ impl SuperchunkLayer {
 
     /// Makes `count` the bucket at `chunk`'s count of cells set.
     pub(crate) fn set_count(&mut self, chunk: usize, count: u32) {
-        put(&mut self.chunk_flags.with_cells_set, chunk, count > 0);
+        set_membership(&mut self.chunk_flags.with_cells_set, chunk, count > 0);
         self.counts_less_one[chunk] = count.saturating_sub(1) as u16;
     }
 
@@ -98,7 +98,7 @@ impl SuperchunkLayer {
     pub(crate) fn bucket_or_insert(&mut self, chunk: usize) -> &mut [u64] {
         let words = self.bucket_words();
         if !contains(self.chunks_with_bucket, chunk) {
-            put(&mut self.chunks_with_bucket, chunk, true);
+            set_membership(&mut self.chunks_with_bucket, chunk, true);
             let (new_bucket_start, old_buckets_end) = (self.bucket_offset(chunk, words).expect("kept now"), self.buckets.len());
             self.buckets.reserve_exact(words);
             self.buckets.resize(old_buckets_end + words, 0);
@@ -117,7 +117,7 @@ impl SuperchunkLayer {
         let words = self.bucket_words();
         if let Some(bucket_start) = self.bucket_offset(chunk, words) {
             self.buckets.drain(bucket_start..bucket_start + words);
-            put(&mut self.chunks_with_bucket, chunk, false);
+            set_membership(&mut self.chunks_with_bucket, chunk, false);
         }
         self.tile_counts[chunk] = [0; COUNT_TILES_IN_CHUNK];
         self.set_count(chunk, 0);
@@ -155,7 +155,7 @@ impl SuperchunkLayer {
     /// bucket at `chunk`, if it is not already: the bucket is then
     /// dirty, and the counts -- of the cells whose number is not 0 --
     /// move if the cell came to 0 or left it. Whether it changed.
-    pub(crate) fn put_value(&mut self, chunk: usize, cell: usize, value: u32) -> bool {
+    pub(crate) fn write_value(&mut self, chunk: usize, cell: usize, value: u32) -> bool {
         let (bits_a_cell, tile_shift_bits) = (self.layer_type.width_bits() as usize, self.layer_type.tile_shift());
         let (bit_in_bucket, words) = ((cell >> tile_shift_bits) * bits_a_cell, (WORDS * bits_a_cell) >> tile_shift_bits);
         // A chunk with no bucket holds 0 everywhere: it is given one only for another number.
@@ -173,7 +173,7 @@ impl SuperchunkLayer {
             return false;
         }
         *word ^= (old_value ^ value) << (bit_in_bucket % BITS_PER_WORD);
-        put(&mut self.chunk_flags.dirty, chunk, true);
+        set_membership(&mut self.chunk_flags.dirty, chunk, true);
         if (old_value == 0) != (value == 0) {
             let (count, tile_count) = (self.count(chunk), &mut self.tile_counts[chunk][cell / COUNT_TILE_CELLS]);
             if old_value == 0 {
@@ -206,7 +206,7 @@ impl SuperchunkLayer {
     /// `chunk` set or clear, if it is not already: the bucket is then
     /// dirty, and its count and the hot count move by one. Whether it
     /// changed.
-    pub(crate) fn put_cell(&mut self, chunk: usize, cell: usize, make_set: bool) -> bool {
+    pub(crate) fn write_cell(&mut self, chunk: usize, cell: usize, make_set: bool) -> bool {
         // A chunk with no bucket has no cell set: it is given one only to set one.
         let bucket_start = match self.bucket_offset(chunk, WORDS) {
             Some(existing_start) => existing_start,
@@ -222,7 +222,7 @@ impl SuperchunkLayer {
             return false;
         }
         *word ^= cell_bit;
-        put(&mut self.chunk_flags.dirty, chunk, true);
+        set_membership(&mut self.chunk_flags.dirty, chunk, true);
         let (count, tile_count) = (self.count(chunk), &mut self.tile_counts[chunk][cell / COUNT_TILE_CELLS]);
         if make_set {
             *tile_count += 1;

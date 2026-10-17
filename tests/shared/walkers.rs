@@ -1,5 +1,5 @@
 //! Walkers that count their wakes, as the root's tiers share them, on
-//! the stone arenas of `actions/tests/shared/arenas.rs`.
+//! the stone arenas of `simulation/tests/shared/arenas.rs`.
 
 // A tier uses what it needs of it.
 #![allow(dead_code)]
@@ -7,7 +7,7 @@
 use crate::arenas::cell;
 use coordinates::CellIndex;
 use entity_manager::{Attribute, Header, remove_attribute, set_attribute};
-use simulation::Turn;
+use simulation::SuperchunkTickState;
 
 /// An attribute counting the times an entity woke.
 pub const WOKEN_COUNT: Attribute<u64> = Attribute::new(41);
@@ -18,17 +18,17 @@ pub const ODD_WAKE: Attribute<u64> = Attribute::new(42);
 
 /// Each walker woken counts it, flips `ODD_WAKE`, and wakes next tick, where
 /// it stands: how many woke.
-pub fn count_and_flip(turn: &mut Turn) -> usize {
+pub fn count_and_flip(tick_state: &mut SuperchunkTickState) -> usize {
     let mut woken_count = 0;
     let mut attributes = Vec::new();
-    for entity in turn.woken_entities() {
+    for entity in tick_state.woken_entities() {
         attributes.clear();
         attributes.extend_from_slice(entity.attributes);
         set_attribute(&mut attributes, WOKEN_COUNT, entity.attribute(WOKEN_COUNT).unwrap_or(0) + 1);
         if !remove_attribute(&mut attributes, ODD_WAKE.attribute_type()) {
             set_attribute(&mut attributes, ODD_WAKE, 1);
         }
-        actions::entities::update_entity(turn, &entity.header, Header { wake: turn.current_tick() + 1, ..entity.header }, &attributes);
+        simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, Header { wake: tick_state.current_tick() + 1, ..entity.header }, &attributes);
         woken_count += 1;
     }
     woken_count

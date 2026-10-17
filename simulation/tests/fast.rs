@@ -6,6 +6,18 @@
 #[allow(dead_code)] // a shared file: each test program uses a part of it
 #[path = "../../utilities/test_seed.rs"]
 mod test_seed;
+#[path = "shared/arenas.rs"]
+mod arenas;
+
+#[path = "fast/around.rs"]
+mod around;
+
+#[path = "fast/area.rs"]
+mod area;
+
+#[path = "fast/mask.rs"]
+mod mask;
+
 mod sampling {
     //! SCA sampling: every set cell chosen with the probability
     //! asked, only set cells, each once, in Morton order, weighted across

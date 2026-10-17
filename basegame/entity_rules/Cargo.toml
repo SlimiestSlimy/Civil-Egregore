@@ -1,0 +1,9 @@
+[package]
+name = "entity_rules"
+edition = "2024"
+description = "Civil Egregore's rules of its entities, a kind a file: so far the sheep"
+
+[dependencies]
+simulation = { path = "../../simulation" }
+base_types = { path = "../base_types" }
+libraries = { path = "../libraries" }

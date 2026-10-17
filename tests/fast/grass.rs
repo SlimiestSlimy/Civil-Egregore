@@ -9,7 +9,8 @@ use bitplane_manager::Write;
 use sca_rules::grass::{DECAYS_COUNT, DECAY_CHANCE, SPREADS_COUNT, SPREAD_CHANCE};
 use sca_rules::growing::{climate_harshness, HARSHEST_CLIMATE};
 use server::World;
-use type_registry::{Climate, Wind, CLIMATE, GRASS, HOTTEST_TEMPERATURE, MOST_HUMID, WEATHER_TILE_SCALE};
+use base_types::{Climate, Wind, HOTTEST_TEMPERATURE, MOST_HUMID};
+use base_types::{CLIMATE, GRASS, WEATHER_TILE_SCALE};
 use utilities::rng::RandomSource;
 
 /// Every chunk's grass in `world`, as its bitmap's words, the chunks in
@@ -28,7 +29,7 @@ fn origin(world: &World) -> CellCartesian {
 
 /// Makes `climate` the climate of every tile of `world`'s first
 /// superchunk.
-pub fn put_climate(world: &mut World, climate: Climate) {
+pub fn write_climate(world: &mut World, climate: Climate) {
     let (origin, tile_side) = (origin(world), 1 << WEATHER_TILE_SCALE);
     let tiles = SUPERCHUNK_SIDE_CELLS / tile_side;
     let climate_writes: Vec<Write> = (0..tiles * tiles).map(|tile| Write::value(CLIMATE, CellCartesian { x: origin.x + tile % tiles * tile_side, y: origin.y + tile / tiles * tile_side }.into(), climate.plane_number())).collect();
@@ -46,7 +47,7 @@ pub fn put_climate(world: &mut World, climate: Climate) {
 fn grass_decays_by_how_harsh_its_climate_is() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut seeded_random = RandomSource::new(seed);
-    let harsh_climate = Climate { humidity: seeded_random.draw_below(8) as u32, wind: Wind::CALM_AIR, temperature: seeded_random.draw_between(128, u64::from(HOTTEST_TEMPERATURE) + 1) as u32, pressure: type_registry::PRESSURE_AT_REST };
+    let harsh_climate = Climate { humidity: seeded_random.draw_below(8) as u32, wind: Wind::CALM_AIR, temperature: seeded_random.draw_between(128, u64::from(HOTTEST_TEMPERATURE) + 1) as u32, pressure: base_types::PRESSURE_AT_REST };
     let mild_climates = [Climate { humidity: MOST_HUMID, ..harsh_climate }, Climate { temperature: 0, ..harsh_climate }];
     for climate in [harsh_climate, mild_climates[seeded_random.draw_below(2) as usize]] {
         let mut world = server::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 1) });
@@ -54,7 +55,7 @@ fn grass_decays_by_how_harsh_its_climate_is() {
         for (x, y) in (0..8).flat_map(|y| (0..8).map(move |x| (x, y))) {
             plant_grass(&mut world, CellCartesian { x: origin.x + 128 * x, y: origin.y + 128 * y }, 128, 128);
         }
-        put_climate(&mut world, climate);
+        write_climate(&mut world, climate);
         assert_eq!(cells_of_grass(&world), CELLS);
         let (ticks, mut decays_counted) = (seeded_random.draw_between(40, 80), 0);
         for _ in 0..ticks {
@@ -133,11 +134,11 @@ fn grass_grows_in_every_superchunk() {
 fn grass_spreads_as_the_air_is_humid() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut seeded_random = RandomSource::new(seed);
-    let cold = Climate { humidity: 0, wind: Wind::CALM_AIR, temperature: 0, pressure: type_registry::PRESSURE_AT_REST };
+    let cold = Climate { humidity: 0, wind: Wind::CALM_AIR, temperature: 0, pressure: base_types::PRESSURE_AT_REST };
     let humidity_between = seeded_random.draw_between(64, 192) as u32;
     let spreads_and_decays = [0, humidity_between, MOST_HUMID].map(|humidity| {
         let mut world = server::start_world(server::WorldStart { seed, ..plain_start(1, 18_750, 0, 1) });
-        put_climate(&mut world, Climate { humidity, ..cold });
+        write_climate(&mut world, Climate { humidity, ..cold });
         (0..600).map(|_| tick_grass(&mut world).rules).map(|tick_counts| (tick_counts[SPREADS_COUNT], tick_counts[DECAYS_COUNT])).fold((0, 0), |count_sums, counted_pair| (count_sums.0 + counted_pair.0, count_sums.1 + counted_pair.1))
     });
     assert_eq!((spreads_and_decays[0], spreads_and_decays[1].1, spreads_and_decays[2].1), ((0, 0), 0, 0), "none in the driest, and no decay in the cold");

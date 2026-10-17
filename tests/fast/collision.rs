@@ -10,7 +10,7 @@ use crate::worlds::{tag_of, tag_sheep, tick_rule, tick_sheep};
 use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use server::{WorldStart, World};
 use std::collections::HashMap;
-use type_registry::{COLLISION, TREE};
+use base_types::{COLLISION, TREE};
 
 /// Whether the collision plane holds exactly the cells trees and
 /// entities stand on, over every hot superchunk of `world`; and how
@@ -74,9 +74,9 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     assert!(steps_seen > 0, "{steps_seen} steps, {lamb_ticks} lamb-ticks in {tick} ticks");
     assert!(what_stands_and_no_other(&world).0, "after {tick} ticks of the sheep");
     // The trees after the sheep: a sheep whose wake passes with its rule not run never wakes again.
-    let mut trees_counts = actions::RuleCounts::default();
+    let mut trees_counts = simulation::simulation_api::RuleCounts::default();
     for _ in 0..2000 {
-        trees_counts += tick_rule(&mut world, server::TREES_RULE).rules;
+        trees_counts += tick_rule(&mut world, base_types::RULE_OF_TREES.0).rules;
     }
     assert!(what_stands_and_no_other(&world).0, "after the trees spread and died");
     assert!(trees_counts[sca_rules::trees::SPREADS_COUNT] > 0, "trees put");

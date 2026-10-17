@@ -1,7 +1,7 @@
 //! Bitmaps made hot and cold: a bucket, a chunk's layers, a superchunk
 //! whole -- and a superchunk gone cold kept lingering.
 
-use super::{COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS, contains, put};
+use super::{COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS, contains, set_membership};
 use super::arena::{BitmapArena, Lingering};
 use bitmap::WORDS;
 use chunk_storage::{BucketKey, ChunkStorage, LayerCodec, LayerType};
@@ -50,7 +50,7 @@ impl BitmapArena {
                 None => allocation.let_bucket_go(chunk),
             }
         }
-        put(&mut allocation.chunk_flags.hot, chunk, true);
+        set_membership(&mut allocation.chunk_flags.hot, chunk, true);
         allocation.hot_count += allocation.count(chunk);
         true
     }
