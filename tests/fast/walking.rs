@@ -11,7 +11,7 @@ use coordinates::{SuperchunkIndex};
 use simulation::simulation_api::square_around_a_cell::{self, AREA_CENTRE};
 use simulation::simulation_api::{cell_and_its_neighbours, entity_reads_and_writes, steps_and_paths};
 use entity_manager::NEVER_WAKES;
-use simulation::simulation_api::SuperchunkTickState;
+use simulation::simulation_api::SimulationTickState;
 use simulation::Simulation;
 use std::sync::Mutex;
 use base_types::{COLLISION, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
@@ -53,7 +53,7 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
     let mut test_simulation = Simulation::new(1);
     let mut steps = 0;
     while entity_store.get(goal_cell).is_none() {
-        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
             let tick_now = tick_state.current_tick();
             for entity in tick_state.woken_entities() {
                 let walker_cell = entity.header.stood_cell;
@@ -94,7 +94,7 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
     let mut test_simulation = Simulation::new(1);
     let mut steps = 0;
     while entity_store.get(goal_cell).is_none() {
-        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
             let tick_now = tick_state.current_tick();
             for entity in tick_state.woken_entities() {
                 let walker_cell = entity.header.stood_cell;
@@ -133,7 +133,7 @@ fn a_cell_is_sought_further_and_further_off() {
             bitmap_arena.queue_write(STONE_LAYER, Write::cell(goal_cell, WriteOp::SetCell));
             bitmap_arena.apply();
         }
-        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed as u64, |tick_state: &mut SuperchunkTickState| {
+        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed as u64, |tick_state: &mut SimulationTickState| {
             for entity in tick_state.woken_entities() {
                 let found_step = steps_and_paths::seek(tick_state, IN_THE_WAY, start_cell, STONE_LAYER);
                 assert_eq!(found_step.map(|mapped_step| mapped_step.scale), scale, "{goal_across} across, {goal_down} down");
@@ -172,7 +172,7 @@ fn walls_of_the_terrain_bar_steps() {
     let mut test_simulation = Simulation::new(1);
     let mut steps = 0;
     while entity_store.get(goal_cell).is_none() {
-        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
             let tick_now = tick_state.current_tick();
             for entity in tick_state.woken_entities() {
                 let walker_cell = entity.header.stood_cell;
@@ -213,7 +213,7 @@ fn a_drop_is_stepped_down_and_not_back_up() {
     }
     bitmap_arena.apply();
     let (above_cell, below_cell) = (cell(41, cliff_row), cell(43, cliff_row));
-    Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+    Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         let (about_above, about_foot) = (cell_and_its_neighbours::tiles_about_cell(above_cell), cell_and_its_neighbours::tiles_about_cell(cell(42, cliff_row)));
         assert_eq!(steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &about_above), about_above.nine_cells(), "every step open from above");
         let west_ways = about_foot.cell_towards(cell_and_its_neighbours::NORTH_WEST) | about_foot.cell_towards(cell_and_its_neighbours::WEST) | about_foot.cell_towards(cell_and_its_neighbours::SOUTH_WEST);
@@ -248,7 +248,7 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
     }
     bitmap_arena.apply();
     let checked_count = Mutex::new(0);
-    Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+    Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         for y in 1..63 {
             for x in 1..63 {
                 let asked_cell = cell(x, y);

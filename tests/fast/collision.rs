@@ -42,7 +42,7 @@ fn what_stands_and_no_other(world: &World) -> (bool, u64) {
 #[test]
 fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
-    let mut world = server::start_world(WorldStart { seed, sheep_per_flock: 4000, ..WorldStart::default() });
+    let mut world = crate::worlds::one_flock_world(WorldStart { seed, ..WorldStart::default() }, 4_000);
     let (collision_matches, trees) = what_stands_and_no_other(&world);
     assert!(collision_matches && trees > 0, "as generated: {trees} trees");
     assert!(world.entity_store().iter().all(|put_sheep| world.bitmap_arena().layer_holds_cell(TREE, put_sheep.header.stood_cell) == Ok(false)), "a sheep put on a tree");

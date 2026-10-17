@@ -15,7 +15,7 @@ mod sheep_state;
 pub use climate::{nearer_by_step, passes_a_slope, pressure_falls_by, Climate, Wind, DEGREES_A_WIND_CARRIES, FALL_THAT_FREES, HEAT_A_LEVEL_MORE_HELD, HIGHEST_PRESSURE, HOTTEST_TEMPERATURE, HUMIDITY_A_LEVEL_OF_CLOUD, HUMIDITY_A_LEVEL_SOONER, MOST_HUMID, PRESSURE_AT_REST, PRESSURE_GAP_AT_REST, RAINS_ABOVE_AT_THE_MOST, RAINS_ABOVE_IN_COLD_DRY_AIR, RISE_THAT_HALVES, STRONGEST_WIND, TILES_ABOUT};
 pub use sheep_state::SheepState;
 
-use type_registry::{Attribute, Bits32, Bits4, Bits8, EntityRuleType, EntityType, LayerType, ScaRuleType, WidePlane};
+use type_registry::{Attribute, Bits32, Bits4, Bits8, EntityRuleType, EntityType, LayerType, ScaRuleType, WidePlane, WorldgenType};
 
 /// Grass: what a superchunk is generated with in patches, where its
 /// ground is dry, and the cells' rules grow and the sheep eat. A cell
@@ -78,6 +78,9 @@ pub const RULE_OF_TREES: ScaRuleType = ScaRuleType::from_number(33);
 pub const RULE_OF_SHEEP: EntityRuleType = EntityRuleType::from_number(34);
 /// The weather's rule: its master the climate, whose tiles it samples.
 pub const RULE_OF_WEATHER: ScaRuleType = ScaRuleType::from_number(35);
+/// The world generation: terrain, what grows on it, and a flock on each
+/// superchunk.
+pub const WORLD_GENERATION: WorldgenType = WorldgenType::from_number(36);
 
 /// The grass's rule's name: what it is found by.
 pub const GRASS_RULE: &str = "grass rule";

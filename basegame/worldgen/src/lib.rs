@@ -17,10 +17,11 @@ pub mod generated_superchunk;
 pub mod generation;
 pub mod mesh;
 pub mod patches;
+pub mod world_generation;
 
 pub use climate::{ClimateNoises, CLIMATE_SALT};
 pub use generated_superchunk::generate_superchunk;
-pub use generation::{has_land_about, seed_with_land, WorldGeneration, WorldGrowth, TREES_SALT};
+pub use generation::{has_land_about, seed_with_land, WorldGeneration, WorldGrowth, FLOCK, TREES_SALT};
 
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{Height, HeightMap, LayerType};

@@ -8,7 +8,7 @@ use crate::walkers::{cells_drawn};
 use bitplane_manager::{BitmapArena, Write, WriteOp};
 use coordinates::CellIndex;
 use entity_manager::{Attribute, AttributeBlock};
-use simulation::{Compare, Simulation, SuperchunkTickState};
+use simulation::{Compare, Simulation, SimulationTickState};
 use utilities::rng::RandomSource;
 
 /// An attribute an entity has once it has eaten.
@@ -34,7 +34,7 @@ fn a_write_is_applied_only_where_the_cell_is_as_it_was_seen() {
     let (mut bitmap_arena, mut entity_store) = world(1);
     let (written_twice_cell, never_set, cleared_cell) = (cell(5, 5), cell(700, 9), cell(1023, 1023));
     set(&mut bitmap_arena, &[cleared_cell]);
-    let report = Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+    let report = Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         tick_state.count_under(10);
         simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, written_twice_cell, 0, 1, Some(DECAYED_COUNT_PLACE as usize));
         simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, written_twice_cell, 0, 1, Some(DECAYED_COUNT_PLACE as usize));
@@ -70,7 +70,7 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
     entity_store.queue_add(walker_header(eaten_cell, 0), &[]);
     entity_store.apply();
     let mark_cell_of = |eater_cell: CellIndex| eater_cell.at_cartesian_offset(1, 0).expect("in the world");
-    let report = Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+    let report = Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, decaying_cell, 1, 0, Some(DECAYED_COUNT_PLACE as usize));
         for eater_entity in tick_state.woken_entities() {
             let (current_tick, header) = (tick_state.current_tick(), eater_entity.header);
@@ -147,7 +147,7 @@ fn drawn_writes_come_to_the_same_as_applied_in_order() {
     for thread_count in [1, 4] {
         let (mut bitmap_arena, mut entity_store) = world(2);
         set(&mut bitmap_arena, &cells.iter().filter(|(_, is_set)| *is_set).map(|(set_cell, _)| *set_cell).collect::<Vec<_>>());
-        let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+        let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
             let superchunk = tick_state.superchunk();
             queue_attempts(seed, &cells, superchunk, |turn_flipped, turn_compared| {
                 let held_against = Compare::Cell { layer_type: STONE_LAYER, target_cell: turn_compared.0, seen_value: u32::from(turn_compared.1) };

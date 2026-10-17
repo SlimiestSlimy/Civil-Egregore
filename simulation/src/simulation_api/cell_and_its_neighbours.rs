@@ -7,7 +7,7 @@ use crate::simulation_api::four_tiles_under_the_neighbours::{self, WAY_AT, WAY_O
 pub use crate::simulation_api::four_tiles_under_the_neighbours::TilesAbout;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use crate::SuperchunkTickState;
+use crate::SimulationTickState;
 use std::ops::{BitAnd, BitOr};
 use utilities::rng::RandomSource;
 
@@ -166,7 +166,7 @@ pub fn prefer_way(random_stream: &mut RandomSource, about_tiles: &TilesAbout, wa
 /// the one to four small tiles they lie in read as they lie
 /// ([`crate::simulation_api::tiles_about`]), under the nine.
 #[inline]
-pub fn read_layer(tick_state: &SuperchunkTickState, layer_type: LayerType, about_tiles: &TilesAbout) -> Around {
+pub fn read_layer(tick_state: &SimulationTickState, layer_type: LayerType, about_tiles: &TilesAbout) -> Around {
     let tiles = four_tiles_under_the_neighbours::read_layer(tick_state, layer_type, about_tiles, about_tiles.nine_word());
     Around { set_cells: Cells(tiles.cells_set), hot: Cells(tiles.hot) }
 }

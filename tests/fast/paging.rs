@@ -48,7 +48,7 @@ fn the_same(paged: &mut World, kept_world: &mut World) -> bool {
 #[test]
 fn a_world_paged_to_disk_is_the_world_kept_in_memory() {
     let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
-    let world_start = WorldStart { seed, sheep_per_flock: 0, camera_loads: true, ..WorldStart::default() };
+    let world_start = WorldStart { seed, world_generation: crate::worlds::flocked(0), camera_loads: true, ..WorldStart::default() };
     let (mut paged, mut kept_world) = (server::start_world(world_start), server::start_world(world_start));
     paged.keep_cold_pool_within(0);
     let (middle_coordinate, mut order_random) = (WORLD_SIDE_SUPERCHUNKS / 2, RandomSource::new(crate::test_seed::TestSeedHandle::open().seed()));

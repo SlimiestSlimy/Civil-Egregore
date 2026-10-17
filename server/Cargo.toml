@@ -7,9 +7,7 @@ description = "Civil Egregore's server: the world as a whole, made from a seed, 
 type_registry = { path = "../type_registry" }
 entity_manager = { path = "../entity_manager" }
 bitmap = { path = "../bitmap" }
-sca_rules = { path = "../basegame/sca_rules" }
-worldgen = { path = "../worldgen" }
-entity_rules = { path = "../basegame/entity_rules" }
+worldgen = { path = "../basegame/worldgen" }
 simulation = { path = "../simulation" }
 coordinates = { path = "../coordinates" }
 utilities = { path = "../utilities" }

@@ -9,7 +9,7 @@
 use crate::arenas::{cell, walker_header, world};
 use coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, WorldEntities, Header, NEVER_WAKES};
-use simulation::{Simulation, SuperchunkTickState};
+use simulation::{Simulation, SimulationTickState};
 use utilities::rng::RandomSource;
 
 /// What the crosser has from the start.
@@ -74,7 +74,7 @@ fn tick(seed: u64, thread_count: usize, crosser_row: u32, last_writer_does: Writ
         assert!(later_writer_cell.0 > from_cell.0, "a writer meant to come after the crosser in the world's order");
     }
     assert!(writer_cells[0].0 .0 < from_cell.0);
-    let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+    let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         let current_tick = tick_state.current_tick();
         simulation::simulation_api::entity_reads_and_writes::each_woken(tick_state, [], &mut (), |tick_state, entity, _| {
             let header: Header = entity.header;

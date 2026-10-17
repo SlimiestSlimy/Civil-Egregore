@@ -5,7 +5,7 @@
 
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use entity_manager::WorldEntities;
-use simulation::{Simulation, SuperchunkTickState};
+use simulation::{Simulation, SimulationTickState};
 use utilities::chance::Chance;
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
@@ -37,7 +37,7 @@ fn top_left_cartesian(x: u32, y: u32) -> CellCartesian {
 /// Stone creeping: each cell sampled at 5% sets a random neighbour it
 /// sees clear -- within the 3x3 around it -- or clears itself: how
 /// many it sampled.
-fn stone_creep(tick_state: &mut SuperchunkTickState) -> usize {
+fn stone_creep(tick_state: &mut SimulationTickState) -> usize {
     tick_state.each_sampled(STONE_LAYER, Chance::one_in(20), &mut (), |tick_state, cell, _| {
         let (dx, dy) = (tick_state.random_stream().draw_below(3) as i32 - 1, tick_state.random_stream().draw_below(3) as i32 - 1);
         if (dx, dy) == (0, 0) {

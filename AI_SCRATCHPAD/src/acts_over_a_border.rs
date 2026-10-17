@@ -11,7 +11,7 @@ use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, WorldEntities, EntityType, Header};
 use simulation::simulation_api::{cell_reads_and_writes, compare_and_write, entity_reads_and_writes};
-use simulation::{Compare, Simulation, SuperchunkTickState};
+use simulation::{Compare, Simulation, SimulationTickState};
 use crate::ProbeParameters;
 
 /// Superchunks along the world's side.
@@ -77,7 +77,7 @@ fn world(world_side_superchunks: u32, every_so_many_cells: u32, stepping_a_super
 /// east if it stands west of its border, west if east -- and counts
 /// that on itself, under the compare of the cell; all wake next tick
 /// where they stand. If `crossing`, it steps to that cell instead.
-fn turn_of(tick_state: &mut SuperchunkTickState, crossing: bool) -> u64 {
+fn turn_of(tick_state: &mut SimulationTickState, crossing: bool) -> u64 {
     let tick_now = tick_state.current_tick();
     for entity in tick_state.woken_entities() {
         let header = entity.header;
@@ -112,7 +112,7 @@ pub fn run_probe(given_parameters: &ProbeParameters) -> Result<(), String> {
             let mut timed_simulation = Simulation::new(thread_count);
             let (mut acts_over_border, mut applying_time, mut computing_time, mut compares_counted) = (0, std::time::Duration::ZERO, std::time::Duration::ZERO, (0, 0));
             for tick in 0..ticks + 20 {
-                let report = timed_simulation.tick(&mut bitmap_arena, &mut entity_store, 1, |tick_state: &mut SuperchunkTickState| turn_of(tick_state, crossing == 1));
+                let report = timed_simulation.tick(&mut bitmap_arena, &mut entity_store, 1, |tick_state: &mut SimulationTickState| turn_of(tick_state, crossing == 1));
                 // The first ticks grow the queues: not counted.
                 if tick >= 20 {
                     (acts_over_border, applying_time, computing_time) = (acts_over_border + report.acts_over_a_border, applying_time + report.applying_time, computing_time + report.computing_time);

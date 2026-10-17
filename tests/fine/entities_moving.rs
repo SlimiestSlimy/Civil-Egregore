@@ -8,7 +8,7 @@ use crate::arenas::*;
 use crate::walkers::*;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{AttributeBlock, WorldEntities, EntityReader, Header, NEVER_WAKES};
-use simulation::{Simulation, SuperchunkTickState};
+use simulation::{Simulation, SimulationTickState};
 use std::sync::Mutex;
 
 /// A turn reads entities in its neighbours, by cell and by chunk, as the
@@ -144,7 +144,7 @@ fn entities_never_overlap() {
     entity_store.queue_add(walker_header(cell(crowd_corner + 7, crowd_corner + 7), 0), &[]);
     let applied_counts = entity_store.apply();
     assert_eq!((applied_counts.added, applied_counts.adds_refused, entity_store.len()), (900, 2, 900));
-    let jostle_rule = |tick_state: &mut SuperchunkTickState| {
+    let jostle_rule = |tick_state: &mut SimulationTickState| {
         for entity in tick_state.woken_entities() {
             let header = entity.header;
             let (dx, dy) = (tick_state.random_stream().draw_below(3) as i32 - 1, tick_state.random_stream().draw_below(3) as i32 - 1);

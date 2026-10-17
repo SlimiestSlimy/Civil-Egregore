@@ -70,22 +70,22 @@ impl AddAssign for HaloChange {
 }
 
 /// The world's, lent to the halos for a call.
-pub struct LentWorld<'a> {
+pub(crate) struct LentWorld<'a> {
     /// Its hot bitmaps.
-    pub bitmap_arena: &'a mut BitmapArena,
+    pub(crate) bitmap_arena: &'a mut BitmapArena,
     /// Every superchunk ever made, as stored.
-    pub chunk_storage: &'a mut ChunkStorage,
+    pub(crate) chunk_storage: &'a mut ChunkStorage,
     /// The hot superchunks' entities.
-    pub entity_store: &'a mut WorldEntities,
+    pub(crate) entity_store: &'a mut WorldEntities,
     /// Its simulation: the hot superchunks' random numbers.
-    pub world_simulation: &'a mut Simulation,
+    pub(crate) world_simulation: &'a mut Simulation,
     /// Each cold superchunk's state -- its entities and random numbers
     /// -- as a save keeps it ([`saved::encode_state`]).
-    pub cold: &'a mut BTreeMap<SuperchunkIndex, Vec<u64>>,
+    pub(crate) cold: &'a mut BTreeMap<SuperchunkIndex, Vec<u64>>,
     /// Its layer types: made hot on every chunk.
-    pub layers: &'a [LayerType],
+    pub(crate) layers: &'a [LayerType],
     /// What generates a superchunk never made.
-    pub generate_superchunk: &'a dyn Fn(SuperchunkIndex) -> GenerateImage,
+    pub(crate) generate_superchunk: &'a dyn Fn(SuperchunkIndex) -> GenerateImage,
 }
 
 /// The halos: which superchunks are to be hot, those warming and
@@ -139,7 +139,7 @@ enum WarmedFrom {
 impl Halos {
     /// No halos yet, as `hot` says which superchunks are to be, their
     /// jobs on `dispatcher`'s threads.
-    pub fn new(hot: Hot, dispatcher: Arc<Dispatcher>) -> Self {
+    pub(crate) fn new(hot: Hot, dispatcher: Arc<Dispatcher>) -> Self {
         Self { hot, jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing_superchunks: Vec::new(), last_told_viewport: None, viewport: Vec::new(), generated_superchunks: Vec::new() }
     }
 
@@ -147,7 +147,7 @@ impl Halos {
     /// in place of the last: its superchunks within the world wanted
     /// hot from the next move on, if the world's hot says so
     /// ([`Hot::viewport`]); else nothing.
-    pub fn keep_viewport(&mut self, viewport: Option<Viewport>) {
+    pub(crate) fn keep_viewport(&mut self, viewport: Option<Viewport>) {
         let viewport = viewport.filter(|_| self.hot.viewport());
         if viewport == self.last_told_viewport {
             return;
@@ -176,7 +176,7 @@ impl Halos {
 
     /// Takes up `cooling` -- sorted, each with the tick it goes cold
     /// at -- as the hot superchunks cooling: as a save kept them.
-    pub fn restore_cooling(&mut self, cooling: Vec<(SuperchunkIndex, u64)>) {
+    pub(crate) fn restore_cooling(&mut self, cooling: Vec<(SuperchunkIndex, u64)>) {
         self.cooling = cooling;
     }
 
@@ -184,7 +184,7 @@ impl Halos {
     /// ([`Hot::wanted_hot_superchunks`]), with the viewport's superchunks: the superchunks
     /// reached warming, hot [`WARM_TICKS`] on; the rest cooling, cold
     /// [`COOL_TICKS`] on. Forced hot, it is the whole world all the while.
-    pub fn move_to_hot_entities(&mut self, lent_world: &mut LentWorld<'_>) -> HaloChange {
+    pub(crate) fn move_to_hot_entities(&mut self, lent_world: &mut LentWorld<'_>) -> HaloChange {
         let mut wanted_superchunks = self.hot.wanted_hot_superchunks(lent_world.entity_store);
         if !self.viewport.is_empty() {
             wanted_superchunks.extend_from_slice(&self.viewport);
@@ -198,7 +198,7 @@ impl Halos {
     /// Makes `wanted_superchunks` -- sorted -- the hot superchunks now, nothing
     /// warming or cooling after: what generating and loading start
     /// from (`docs/reference.md`, "Halos::keep_hot").
-    pub fn keep_hot(&mut self, lent_world: &mut LentWorld<'_>, wanted_superchunks: &[SuperchunkIndex]) -> HaloChange {
+    pub(crate) fn keep_hot(&mut self, lent_world: &mut LentWorld<'_>, wanted_superchunks: &[SuperchunkIndex]) -> HaloChange {
         self.generated_superchunks.clear();
         let mut halo_change = self.make_hot_within(lent_world, wanted_superchunks, 0, 0);
         // One that was warming and is not wanted turned hot, as every warming does: cold now.

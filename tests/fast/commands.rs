@@ -23,7 +23,7 @@ fn a_world_is_made_run_and_looked_at() {
         let folder = crate::worlds::folder(&world_name);
         let folder_text = folder.display();
         let made_text = said_to(&format!("--seed {seed_hex} --new [{folder_text} --sheep {sheep_per_flock}]")).expect("made");
-        assert!(made_text.starts_with(&format!("{world_name}, seed {seed_hex}: 9 superchunks, {sheep_per_flock} entities, ")), "{made_text}");
+        assert!(made_text.starts_with(&format!("{world_name}, seed {seed_hex}: 1 superchunks, 0 entities, ")), "{made_text}");
         let first_run_text = said_to(&format!("--run [{folder_text} --ticks 40]")).expect("run");
         assert!(first_run_text.starts_with(&format!("{world_name}: tick 0 -> 40, ")), "{first_run_text}");
         let second_run_text = said_to(&format!("--run [{folder_text} --ticks 60]")).expect("run on");

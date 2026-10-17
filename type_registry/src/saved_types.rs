@@ -11,7 +11,7 @@ use utilities::csv;
 /// The columns of the types' text.
 const TYPES_COLUMNS: [&str; 2] = ["type", "id"];
 
-impl<RuleCode> FrozenTypes<RuleCode> {
+impl FrozenTypes {
     /// As a save holds them: a row a type, its name and its ID in
     /// hexadecimal, in the order registered.
     pub fn to_text(&self) -> String {
@@ -20,12 +20,12 @@ impl<RuleCode> FrozenTypes<RuleCode> {
     }
 }
 
-impl<RuleCode: Clone> TypeRegistry<RuleCode> {
+impl TypeRegistry {
     /// The types `types_text` names ([`FrozenTypes::to_text`]), in its
     /// order, each the one of `available` of its name, registered and
     /// checked as any type is; or what is wrong, naming the type: none
     /// of its name, or one of another ID.
-    pub fn of_saved_text(available: &FrozenTypes<RuleCode>, types_text: &str) -> Result<Self, String> {
+    pub fn of_saved_text(available: &FrozenTypes, types_text: &str) -> Result<Self, String> {
         let mut csv_rows = csv::rows_with_header(types_text).into_iter();
         if csv_rows.next().is_none_or(|first_row| first_row != TYPES_COLUMNS) {
             return Err(format!("does not start with `{}`", TYPES_COLUMNS.join(",")));

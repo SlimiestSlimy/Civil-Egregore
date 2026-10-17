@@ -387,9 +387,58 @@ OPEN, FOUND BY ME
   ad52552 (collision as compares and plane writes, a set instruction
   a set). Option left unasked: fold the set into its first compare's
   spare bits.
-- Simulation second as a server knob (the user, 2026-10-17): later.
+- Worldgen pass (2026-10-17, option b, "worldgen decides where sheeps
+  go"): the registry has hooks (Hook::GeneratesTheWorld,
+  Hook::RunsEveryTick, .with_hooks); a type's code is its library. The
+  "world generation" type's library is a WorldgenCode {generate_cells,
+  populate}; populate runs in-tick, on an unpopulated superchunk's turn
+  before its rules (WorldInfo.unpopulated). No between-ticks entity
+  work: "anythong in between ticks is internal simulation api". Every
+  generated superchunk gets a flock: "a feature for testing, not a bug".
 
-LATER
+- SimulationHandle (2026-10-17; the user named it, "simulatedworld
+  should be simulationhandle"): simulation/src/simulation_handle/ owns
+  the world's state -- arena, entities, chunk storage, cold states,
+  halos, threads, rules, worldgen code, the unpopulated list -- and does
+  everything to it: ticking, populating, moving halos, paging, and every
+  change between ticks (add/remove entity, write cells, load's
+  put_saved_superchunk, save's ready_for_save). "server is a
+  coordinator, not a doer": server::World is world_info + generation +
+  frozen types + the handle, passing calls through. Halos' LentWorld is
+  crate-private. server/src/rules.rs moved to simulation/src/rules.rs.
+- Hook::KeepsTheWorldHot ("good use of hook there"): the sheep's
+  registration; simulation::hot_entity_of finds it. HOT_ENTITY,
+  WorldStart::hot_entity and the world file's "hot entity" row gone.
+- SuperchunkTickState renamed SimulationTickState (the user: "we need
+  to rename superchunk tickstate to simulationtickstate"): what a rule
+  gets, one superchunk's turn; RuleContext the registry side (master +
+  its dependencies' libraries), gathered once a world.
+
+LATER (every "for later" of the user's, and mine, as said)
+- A "hot" attribute on entities in place of the one hooked type ("some
+  entities will have the "hot", atribute later").
+- Simulation second as a server knob ("a prime candidate for a knob
+  that csn be exposed to server", 2026-10-17).
+- Worldgen's numbers (the GUI sliders) handed to it by a registered type
+  it depends on, not by the server: "only stuff registered in the type
+  registry should be spawning stuff, if those registered stuff depend
+  on third party handles like gui sliders thats the types problem".
+  Server couplings left: WorldGeneration in WorldStart/World/save/load/
+  host Reset, from_tuning, seed_with_land/drawn_seed, host/terrain.rs.
+- Sheep stop being the hot entity ("sheep won't be the hot entity for
+  long"); flocks on every superchunk stay until then.
+- Open question: libraries for any dependent type (not only rules).
+- Crate docs, when resumed: simulation's still describe compare ends;
+  server's still describe camera flocks and sheep_per_flock.
+- Rendering test runs again: not as diagnostics ("rendering tests
+  should not be part of diagnostics"); the user has "a better idea for
+  later". The shelved code: diagnostics/server/{shown,wire}.rs,
+  diagnostics/server/tests/shown.rs, diagnostics/renderer/window_on.rs.
+- The shelved diagnostics ("its the only thing that doesn't need
+  diagnostics in fact, well get to that later" -- of Tessera, isolated
+  and working). Its tool's measuring_tool! macro left as it is.
+- Declined for now ("nah, there are other things to do"): fold
+  SetSkipTag into its first compare's spare bits (~4% back).
 - Rules that sample entities as cells are sampled (maybe only dormant).
 - Mods registering their own types (the registry is dynamic now).
 - Tessera deep clean: settle the code, move abstraction boundaries.

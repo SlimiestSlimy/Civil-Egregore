@@ -8,7 +8,7 @@
 //! (`docs/simulation.md`, "Compare-and-write").
 
 use super::instruction::Instruction;
-use super::SuperchunkTickState;
+use super::SimulationTickState;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use entity_manager::{attribute_seen, AttributeBlock, AttributeType, Member};
@@ -16,11 +16,11 @@ use entity_manager::{attribute_seen, AttributeBlock, AttributeType, Member};
 /// As many skip-tag sets as are open at once, one within another.
 pub(crate) const SKIP_TAG_SETS_WITHIN: usize = 8;
 /// As many numbers as a tick counts when applied
-/// ([`SuperchunkTickState::count_under`]): a count's is under this.
+/// ([`SimulationTickState::count_under`]): a count's is under this.
 pub const COUNTED_WHEN_APPLIED: usize = 256;
 
 /// What a tick counted as it applied: a number each
-/// ([`SuperchunkTickState::count_under`]).
+/// ([`SimulationTickState::count_under`]).
 pub type CountedWhenApplied = [u64; COUNTED_WHEN_APPLIED];
 
 /// What a rule saw, held against what is there as the compare is
@@ -128,7 +128,7 @@ impl InstructionQueue {
     }
 }
 
-impl SuperchunkTickState<'_> {
+impl SimulationTickState<'_> {
     /// Has what the rule counts when applied counted from `first_counted_number` on:
     /// whoever runs several rules on a turn gives each numbers of its
     /// own.
@@ -179,7 +179,7 @@ impl SuperchunkTickState<'_> {
     }
 
     /// Queues a skip-tag set and `first_compare` after it: what is queued
-    /// until [`SuperchunkTickState::skip_tag_placed`] is under it, and under every set
+    /// until [`SimulationTickState::skip_tag_placed`] is under it, and under every set
     /// open already -- up to [`SKIP_TAG_SETS_WITHIN`] one within another.
     /// The set lands where its first compare does, and so does its
     /// tag: the cell is pushed on the turn's small stack of sets open.

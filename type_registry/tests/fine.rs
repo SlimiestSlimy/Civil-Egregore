@@ -23,12 +23,12 @@ fn free_number(seeded_rng: &mut RandomSource) -> u64 {
 
 /// The name of `registered`, if any: what tells a type from any other,
 /// no two having one.
-fn told_by<RuleCode>(registered: Option<&RegisteredType<RuleCode>>) -> Option<&str> {
+fn told_by(registered: Option<&RegisteredType>) -> Option<&str> {
     registered.map(RegisteredType::name)
 }
 
 /// Every type of `frozen_types` by its name, in their order.
-fn each_told_by<RuleCode>(frozen_types: &type_registry::FrozenTypes<RuleCode>) -> Vec<&str> {
+fn each_told_by(frozen_types: &type_registry::FrozenTypes) -> Vec<&str> {
     frozen_types.types().iter().map(RegisteredType::name).collect()
 }
 
@@ -67,11 +67,10 @@ fn what_a_type_names_is_registered_before_it() {
         let type_number = free_number(&mut seeded_rng);
         let (fixed_attribute, varying_attribute) = (Attribute::<u64>::new(type_number), AttributeType::of_varying_size(type_number + 1));
         let entity_defaulting = |default_attribute| RegisteredType::Entity { name: "defaulting".to_string(), entity_type: EntityType::from_number(type_number), default_attribute: Some(default_attribute) };
-        // The default types and an attribute whose size varies: each tried on them alone. A rule's code, any rule's.
+        // The default types and an attribute whose size varies: each tried on them alone.
         let mut before = new_type_registry_with_default_types();
-        let code = *before.clone().freeze().named(GRASS_RULE).and_then(RegisteredType::rule_code).expect("the grass's rule");
-        let rule_of_cells = |master| RegisteredType::ScaRule { name: "a rule".to_string(), rule: ScaRuleType::from_number(type_number), master, code };
-        let rule_of_entity = |master| RegisteredType::EntityRule { name: "a rule".to_string(), rule: EntityRuleType::from_number(type_number), master, code };
+        let rule_of_cells = |master| RegisteredType::ScaRule { name: "a rule".to_string(), rule: ScaRuleType::from_number(type_number), master };
+        let rule_of_entity = |master| RegisteredType::EntityRule { name: "a rule".to_string(), rule: EntityRuleType::from_number(type_number), master };
         before.register(RegisteredType::Attribute { name: "varying".to_string(), attribute_type: varying_attribute, data_words: None }).expect("a name no type has");
         let (default_amiss, master_amiss) = (Err(RegistryRefusal::DefaultAmiss), Err(RegistryRefusal::MasterAmiss));
         for (registered_type, outcome) in [

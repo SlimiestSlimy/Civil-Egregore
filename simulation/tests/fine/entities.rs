@@ -8,7 +8,7 @@ use crate::arenas::{cell, walker_header, world, STONE_LAYER};
 use coordinates::CellIndex;
 use entity_manager::{Attribute, AttributeBlock, NEVER_WAKES};
 use simulation::simulation_api::cell_and_its_neighbours;
-use simulation::simulation_api::{entity_reads_and_writes, SuperchunkTickState};
+use simulation::simulation_api::{entity_reads_and_writes, SimulationTickState};
 use simulation::Simulation;
 use std::sync::Mutex;
 
@@ -27,7 +27,7 @@ fn an_entity_is_written_only_the_attributes_changed() {
     entity_store.queue_add(walker_header(cell(40, 40), 0), &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
     entity_store.apply();
     let mut test_simulation = Simulation::new(1);
-    let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+    let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         for entity in tick_state.woken_entities() {
             // The first is left as it was; the second walker's name is changed.
             if entity.header.stood_cell == cell(40, 40) {
@@ -54,7 +54,7 @@ fn the_cells_beside_an_entity_are_asked_as_sets() {
     entity_store.apply();
     let seen_by_rule = Mutex::new(Vec::new());
     let mut test_simulation = Simulation::new(1);
-    test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+    test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         for entity in tick_state.woken_entities() {
             let woken_cell = entity.header.stood_cell;
             let about_tiles = cell_and_its_neighbours::tiles_about_cell(woken_cell);

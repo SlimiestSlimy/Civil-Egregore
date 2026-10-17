@@ -7,7 +7,7 @@
 use crate::arenas::cell;
 use coordinates::CellIndex;
 use entity_manager::{Attribute, Header, remove_attribute, set_attribute};
-use simulation::SuperchunkTickState;
+use simulation::SimulationTickState;
 
 /// An attribute counting the times an entity woke.
 pub const WOKEN_COUNT: Attribute<u64> = Attribute::new(41);
@@ -18,7 +18,7 @@ pub const ODD_WAKE: Attribute<u64> = Attribute::new(42);
 
 /// Each walker woken counts it, flips `ODD_WAKE`, and wakes next tick, where
 /// it stands: how many woke.
-pub fn count_and_flip(tick_state: &mut SuperchunkTickState) -> usize {
+pub fn count_and_flip(tick_state: &mut SimulationTickState) -> usize {
     let mut woken_count = 0;
     let mut attributes = Vec::new();
     for entity in tick_state.woken_entities() {

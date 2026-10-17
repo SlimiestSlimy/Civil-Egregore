@@ -115,7 +115,7 @@ pub(crate) fn hot_in(world: &World, viewport: Option<Viewport>) -> Vec<(u32, u32
     let Some(viewport) = viewport else {
         return Vec::new();
     };
-    let mut hot: Vec<(u32, u32)> = world.entity_store.superchunks().iter().map(|superchunk_entities| superchunk_entities.superchunk_index().cartesian()).filter(|&superchunk_cartesian| viewport.contains(superchunk_cartesian)).collect();
+    let mut hot: Vec<(u32, u32)> = world.entity_store().superchunks().iter().map(|superchunk_entities| superchunk_entities.superchunk_index().cartesian()).filter(|&superchunk_cartesian| viewport.contains(superchunk_cartesian)).collect();
     hot.sort_unstable_by_key(|&(x, y)| (y, x));
     hot
 }
@@ -223,13 +223,13 @@ pub struct ViewportFrame {
 /// The one making of a frame: the host's thread's and a shown run's.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn frame_of(world: &World, worlds: u64, frame_ask: FrameAsk, hot: Vec<(u32, u32)>, cells: Vec<Cells>, (ticks_a_second, sync_seconds, sync_share): (f64, f64, f64), (world_name, last_outcome): (Option<String>, Option<String>), more_to_come: bool) -> ViewportFrame {
-    let (sheep_count, grass_cells, trees) = (world.entity_store.len(), count(world, GRASS), count(world, TREE));
-    ViewportFrame { world: worlds, seed: world.world_info.seed, world_generation: world.world_generation, drawn_heights: super::terrain::DrawnHeightRange::from_generation(&world.world_generation), side_superchunks: world.halos.hot.world_side_superchunks(), tick: world.entity_store.current_tick(), ticks_a_second, sheep_count, grass_cells, trees, sync_seconds, sync_share, viewport: frame_ask.viewport, hot, pixel_side_log2: frame_ask.pixel_side_log2, seen_near: frame_ask.seen_near, world_name, last_outcome, more_to_come, cells }
+    let (sheep_count, grass_cells, trees) = (world.entity_store().len(), count(world, GRASS), count(world, TREE));
+    ViewportFrame { world: worlds, seed: world.world_info.seed, world_generation: world.world_generation, drawn_heights: super::terrain::DrawnHeightRange::from_generation(&world.world_generation), side_superchunks: world.halos().hot.world_side_superchunks(), tick: world.entity_store().current_tick(), ticks_a_second, sheep_count, grass_cells, trees, sync_seconds, sync_share, viewport: frame_ask.viewport, hot, pixel_side_log2: frame_ask.pixel_side_log2, seen_near: frame_ask.seen_near, world_name, last_outcome, more_to_come, cells }
 }
 
 /// Cells of `layer_type` over every hot superchunk of `world`.
 pub(crate) fn count(world: &World, layer_type: LayerType) -> u64 {
-    world.bitmap_arena.superchunk_indices().into_iter().map(|superchunk| world.bitmap_arena.superchunk_count(layer_type, superchunk) as u64).sum()
+    world.bitmap_arena().superchunk_indices().into_iter().map(|superchunk| world.bitmap_arena().superchunk_count(layer_type, superchunk) as u64).sum()
 }
 
 /// The superchunk at `(x, y)` of `world` copied as `frame_ask` asks, if it
@@ -238,11 +238,11 @@ pub(crate) fn count(world: &World, layer_type: LayerType) -> u64 {
 /// its image then and shared from then on, `heights_sent` keeping which.
 pub(crate) fn copy_superchunk(world: &World, (x, y): (u32, u32), frame_ask: FrameAsk, heights_sent: &mut HashMap<SuperchunkIndex, Arc<Water>>) -> Option<Cells> {
     let superchunk = SuperchunkIndex::from_cartesian(x, y);
-    world.entity_store.superchunk(superchunk)?;
+    world.entity_store().superchunk(superchunk)?;
     let CellCartesian { x: left_cell_x, y: top_cell_y } = superchunk.top_left().cartesian();
     let plane_words = |layer_type: LayerType| layer(world, layer_type, superchunk);
     // Heights never change: sent the once, in the first frame the superchunk is hot in. Nor does the water's depth.
-    let image = world.chunk_storage.image(superchunk).filter(|_| !heights_sent.contains_key(&superchunk));
+    let image = world.chunk_storage().image(superchunk).filter(|_| !heights_sent.contains_key(&superchunk));
     let heights = image.map_or(Vec::new(), |image| image.height_words().to_vec());
     let water = Arc::clone(heights_sent.entry(superchunk).or_insert_with(|| Arc::new(Water::from_image(image))));
     // A tree's stage is drawn only where a cell is a pixel or more.
@@ -316,7 +316,7 @@ fn layer(world: &World, layer_type: LayerType, superchunk: SuperchunkIndex) -> V
     let chunk_words = chunk_storage::wide::bucket_words(layer_type);
     let mut words = Vec::with_capacity(CHUNKS_IN_SUPERCHUNK * chunk_words);
     for chunk in superchunk.chunks() {
-        match world.bitmap_arena.bucket(BucketKey { layer_type, chunk }) {
+        match world.bitmap_arena().bucket(BucketKey { layer_type, chunk }) {
             Some(bucket) => words.extend_from_slice(bucket.words()),
             None => words.resize(words.len() + chunk_words, 0),
         }
@@ -326,7 +326,7 @@ fn layer(world: &World, layer_type: LayerType, superchunk: SuperchunkIndex) -> V
 
 /// The cells `superchunk`'s sheep stand on, from its top left.
 fn sheep_cells_of(world: &World, superchunk: SuperchunkIndex) -> Vec<(u16, u16)> {
-    let Some(superchunk_entities) = world.entity_store.superchunk(superchunk) else {
+    let Some(superchunk_entities) = world.entity_store().superchunk(superchunk) else {
         return Vec::new();
     };
     let CellCartesian { x: left_cell_x, y: top_cell_y } = superchunk.top_left().cartesian();

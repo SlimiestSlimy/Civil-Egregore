@@ -71,66 +71,162 @@ impl SliderGroup {
     }
 }
 
-/// Names the numbers and their places among them: a constant each,
-/// and [`NAMES`]. The places are for the code alone, which reads a
-/// number by its constant: no file is read by them, nor in their
-/// order.
-macro_rules! places {
-    ($($place:ident $name:literal,)*) => {
-        /// The numbers' names, as shown and as saved, each at its place.
-        pub const NAMES: [&str; [$($name),*].len()] = [$($name),*];
-        places!(0; $($place $name,)*);
-    };
-    ($at:expr; $place:ident $name:literal, $($rest:tt)*) => {
-        #[doc = concat!("The place of `", $name, "` among the numbers.")]
-        pub const $place: usize = $at;
-        places!($at + 1; $($rest)*);
-    };
-    ($at:expr;) => {};
+/// The numbers' names, as shown and as saved, each at its place. The
+/// places are for the code alone, which reads a number by its constant
+/// ([`place_of`]): no file is read by them, nor in their order.
+pub const NAMES: [&str; 40] = [
+    "step light",
+    "step dark",
+    "wall shade",
+    "wall lit",
+    "wall fade",
+    "shadow",
+    "relief",
+    "texture",
+    "ocean floor level",
+    "ocean level",
+    "highest land",
+    "ocean share",
+    "coast breadth",
+    "coast lowness",
+    "clumping",
+    "vertex spacing (2^)",
+    "narrowest blend",
+    "widest blend",
+    "least sigmoid",
+    "most sigmoid",
+    "line bending",
+    "finer mesh depth",
+    "finer mesh share",
+    "finer mesh height",
+    "finer mesh falloff",
+    "weight spread",
+    "raised share",
+    "grass cover",
+    "grass patch size (2^)",
+    "grass patch detail",
+    "grass scatter",
+    "tree cover",
+    "tree patch size (2^)",
+    "tree patch detail",
+    "tree scatter",
+    "wall length",
+    "world side",
+    "forced hot",
+    "camera loads",
+    "sheep a superchunk",
+];
+
+/// The place among [`NAMES`] of the number named `name`: a name not
+/// among them fails the build.
+const fn place_of(name: &str) -> usize {
+    let mut place = 0;
+    while place < NAMES.len() {
+        if same_text(NAMES[place], name) {
+            return place;
+        }
+        place += 1;
+    }
+    panic!("a number not among the names")
 }
 
-places! {
-    STEP_LIGHT "step light",
-    STEP_DARK "step dark",
-    WALL_SHADE "wall shade",
-    WALL_LIT "wall lit",
-    WALL_FADE "wall fade",
-    CAST_SHADOW "shadow",
-    RELIEF_STRENGTH "relief",
-    GROUND_TEXTURE "texture",
-    OCEAN_FLOOR "ocean floor level",
-    OCEAN_LEVEL "ocean level",
-    HIGHEST_LAND "highest land",
-    OCEAN_SHARE "ocean share",
-    COAST_BREADTH "coast breadth",
-    COAST_LOWNESS "coast lowness",
-    LAND_CLUMPING "clumping",
-    VERTEX_SPACING "vertex spacing (2^)",
-    NARROWEST_BLEND "narrowest blend",
-    WIDEST_BLEND "widest blend",
-    LEAST_SIGMOID "least sigmoid",
-    MOST_SIGMOID "most sigmoid",
-    LINE_BENDING "line bending",
-    FINER_DEPTH "finer mesh depth",
-    FINER_SHARE "finer mesh share",
-    FINER_HEIGHT "finer mesh height",
-    FINER_FALL "finer mesh falloff",
-    WEIGHT_SPREAD "weight spread",
-    RAISED_SHARE "raised share",
-    GRASS_COVER "grass cover",
-    GRASS_PATCH "grass patch size (2^)",
-    GRASS_DETAIL "grass patch detail",
-    GRASS_SCATTER "grass scatter",
-    TREE_COVER "tree cover",
-    TREE_PATCH "tree patch size (2^)",
-    TREE_DETAIL "tree patch detail",
-    TREE_SCATTER "tree scatter",
-    WALL_LENGTH "wall length",
-    WORLD_SIDE "world side",
-    FORCED_HOT "forced hot",
-    CAMERA_LOADS "camera loads",
-    SHEEP_PER_SUPERCHUNK "sheep a superchunk",
+/// Whether `text` and `other_text` are the same, byte for byte: what
+/// [`place_of`] compares by while the build runs.
+const fn same_text(text: &str, other_text: &str) -> bool {
+    let (bytes, other_bytes) = (text.as_bytes(), other_text.as_bytes());
+    if bytes.len() != other_bytes.len() {
+        return false;
+    }
+    let mut at = 0;
+    while at < bytes.len() {
+        if bytes[at] != other_bytes[at] {
+            return false;
+        }
+        at += 1;
+    }
+    true
 }
+
+/// The place of `step light` among the numbers.
+pub const STEP_LIGHT: usize = place_of("step light");
+/// The place of `step dark` among the numbers.
+pub const STEP_DARK: usize = place_of("step dark");
+/// The place of `wall shade` among the numbers.
+pub const WALL_SHADE: usize = place_of("wall shade");
+/// The place of `wall lit` among the numbers.
+pub const WALL_LIT: usize = place_of("wall lit");
+/// The place of `wall fade` among the numbers.
+pub const WALL_FADE: usize = place_of("wall fade");
+/// The place of `shadow` among the numbers.
+pub const CAST_SHADOW: usize = place_of("shadow");
+/// The place of `relief` among the numbers.
+pub const RELIEF_STRENGTH: usize = place_of("relief");
+/// The place of `texture` among the numbers.
+pub const GROUND_TEXTURE: usize = place_of("texture");
+/// The place of `ocean floor level` among the numbers.
+pub const OCEAN_FLOOR: usize = place_of("ocean floor level");
+/// The place of `ocean level` among the numbers.
+pub const OCEAN_LEVEL: usize = place_of("ocean level");
+/// The place of `highest land` among the numbers.
+pub const HIGHEST_LAND: usize = place_of("highest land");
+/// The place of `ocean share` among the numbers.
+pub const OCEAN_SHARE: usize = place_of("ocean share");
+/// The place of `coast breadth` among the numbers.
+pub const COAST_BREADTH: usize = place_of("coast breadth");
+/// The place of `coast lowness` among the numbers.
+pub const COAST_LOWNESS: usize = place_of("coast lowness");
+/// The place of `clumping` among the numbers.
+pub const LAND_CLUMPING: usize = place_of("clumping");
+/// The place of `vertex spacing (2^)` among the numbers.
+pub const VERTEX_SPACING: usize = place_of("vertex spacing (2^)");
+/// The place of `narrowest blend` among the numbers.
+pub const NARROWEST_BLEND: usize = place_of("narrowest blend");
+/// The place of `widest blend` among the numbers.
+pub const WIDEST_BLEND: usize = place_of("widest blend");
+/// The place of `least sigmoid` among the numbers.
+pub const LEAST_SIGMOID: usize = place_of("least sigmoid");
+/// The place of `most sigmoid` among the numbers.
+pub const MOST_SIGMOID: usize = place_of("most sigmoid");
+/// The place of `line bending` among the numbers.
+pub const LINE_BENDING: usize = place_of("line bending");
+/// The place of `finer mesh depth` among the numbers.
+pub const FINER_DEPTH: usize = place_of("finer mesh depth");
+/// The place of `finer mesh share` among the numbers.
+pub const FINER_SHARE: usize = place_of("finer mesh share");
+/// The place of `finer mesh height` among the numbers.
+pub const FINER_HEIGHT: usize = place_of("finer mesh height");
+/// The place of `finer mesh falloff` among the numbers.
+pub const FINER_FALL: usize = place_of("finer mesh falloff");
+/// The place of `weight spread` among the numbers.
+pub const WEIGHT_SPREAD: usize = place_of("weight spread");
+/// The place of `raised share` among the numbers.
+pub const RAISED_SHARE: usize = place_of("raised share");
+/// The place of `grass cover` among the numbers.
+pub const GRASS_COVER: usize = place_of("grass cover");
+/// The place of `grass patch size (2^)` among the numbers.
+pub const GRASS_PATCH: usize = place_of("grass patch size (2^)");
+/// The place of `grass patch detail` among the numbers.
+pub const GRASS_DETAIL: usize = place_of("grass patch detail");
+/// The place of `grass scatter` among the numbers.
+pub const GRASS_SCATTER: usize = place_of("grass scatter");
+/// The place of `tree cover` among the numbers.
+pub const TREE_COVER: usize = place_of("tree cover");
+/// The place of `tree patch size (2^)` among the numbers.
+pub const TREE_PATCH: usize = place_of("tree patch size (2^)");
+/// The place of `tree patch detail` among the numbers.
+pub const TREE_DETAIL: usize = place_of("tree patch detail");
+/// The place of `tree scatter` among the numbers.
+pub const TREE_SCATTER: usize = place_of("tree scatter");
+/// The place of `wall length` among the numbers.
+pub const WALL_LENGTH: usize = place_of("wall length");
+/// The place of `world side` among the numbers.
+pub const WORLD_SIDE: usize = place_of("world side");
+/// The place of `forced hot` among the numbers.
+pub const FORCED_HOT: usize = place_of("forced hot");
+/// The place of `camera loads` among the numbers.
+pub const CAMERA_LOADS: usize = place_of("camera loads");
+/// The place of `sheep a superchunk` among the numbers.
+pub const SHEEP_PER_SUPERCHUNK: usize = place_of("sheep a superchunk");
 
 /// The sliders, as written by hand, in CSV: a row each -- its number's name,
 /// the least and the most its knob reaches, its group, whether it is a

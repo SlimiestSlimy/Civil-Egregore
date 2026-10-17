@@ -3,15 +3,13 @@
 //! walks to grass, a step a wake (`docs/entity_rules.md`, "The sheep").
 
 use simulation::simulation_api::cell_and_its_neighbours;
-use simulation::simulation_api::entity_reads_and_writes::EntitiesBetweenTicks;
 pub use base_types::{SheepState, SHEEP, SHEEP_STATE};
 use simulation::simulation_api::simulation_time::SimulationTime;
 use base_types::{COLLISION, GRASS, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
 use simulation::simulation_api::steps_and_paths::PlanesInTheWay;
 use simulation::simulation_api::RuleCode;
 use libraries::collision::Collision;
-use simulation::simulation_api::{WholeAttribute, Chance, square_around_a_cell, cell_reads_and_writes, compare_and_write, entity_reads_and_writes, place_counted, tick_and_random_stream, steps_and_paths, CellCartesian, CellIndex, EntityRef, Header, RandomSource, RuleCounts, SuperchunkIndex, SuperchunkTickState, SUPERCHUNK_SIDE_CELLS};
-use std::collections::HashSet;
+use simulation::simulation_api::{WholeAttribute, Chance, square_around_a_cell, cell_reads_and_writes, compare_and_write, entity_reads_and_writes, place_counted, tick_and_random_stream, steps_and_paths, CellIndex, EntityRef, Header, RuleCounts, SimulationTickState};
 
 /// Every time below is said in simulation time: the rule adds them to
 /// the tick it runs in and never says how many ticks they are -- the
@@ -97,7 +95,7 @@ struct Flock<'library> {
 
 /// The rule, on one superchunk's turn: every sheep waking, each seen to
 /// by [`wake`], coming, going and stepping through `collision`.
-pub fn rule(tick_state: &mut SuperchunkTickState, collision: &Collision) -> RuleCounts {
+pub fn rule(tick_state: &mut SimulationTickState, collision: &Collision) -> RuleCounts {
     let mut flock = Flock { rule_counts: RuleCounts::default(), collision };
     entity_reads_and_writes::each_woken(tick_state, [GRASS, WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST, COLLISION], &mut flock, wake);
     flock.rule_counts
@@ -106,7 +104,7 @@ pub fn rule(tick_state: &mut SuperchunkTickState, collision: &Collision) -> Rule
 /// The rule, on one sheep waking: it sees to what it woke for -- a
 /// meal, a lamb, growing up -- and sleeps again, as long as it can.
 #[inline]
-fn wake(tick_state: &mut SuperchunkTickState, woken_sheep: EntityRef, flock: &mut Flock) {
+fn wake(tick_state: &mut SimulationTickState, woken_sheep: EntityRef, flock: &mut Flock) {
     let (collision, rule_counts, tick_now) = (flock.collision, &mut flock.rule_counts, tick_and_random_stream::current_tick(tick_state));
     rule_counts[WOKEN_COUNT] += 1;
     let (sheep_cell, header_before) = (woken_sheep.header.stood_cell, woken_sheep.header);
@@ -234,7 +232,7 @@ struct WakeEnd {
 /// Queues `wake_end` for the sheep `sheep_header`: dead of old age, or its state
 /// written if it changed, its step taken and its lamb born. A death
 /// is counted on `meal_cell`, if it ate ([`count`]).
-fn queue_wake_end(tick_state: &mut SuperchunkTickState, collision: &Collision, rule_counts: &mut RuleCounts, sheep_header: &Header, wake_end: WakeEnd, meal_cell: Option<CellIndex>) {
+fn queue_wake_end(tick_state: &mut SimulationTickState, collision: &Collision, rule_counts: &mut RuleCounts, sheep_header: &Header, wake_end: WakeEnd, meal_cell: Option<CellIndex>) {
     if wake_end.dies_of_age {
         collision.remove(tick_state, sheep_header);
         return count(tick_state, rule_counts, meal_cell, DEATHS_COUNT);
@@ -256,7 +254,7 @@ fn queue_wake_end(tick_state: &mut SuperchunkTickState, collision: &Collision, r
 /// left it and, within it, one of the lamb's cell being free. So no
 /// lamb is born twice and none is lost, whichever superchunk its
 /// cell is in: the cell taken first, the mother is pregnant still.
-fn bear_lamb(tick_state: &mut SuperchunkTickState, collision: &Collision, mother_sheep: &Header, mother_state: SheepState, lamb_cell: CellIndex) {
+fn bear_lamb(tick_state: &mut SimulationTickState, collision: &Collision, mother_sheep: &Header, mother_state: SheepState, lamb_cell: CellIndex) {
     let tick_now = tick_and_random_stream::current_tick(tick_state);
     let (wake, lamb_state) = (next_step(tick_state), SheepState { hungry_at: TIME_BETWEEN_MEALS.tick_after(tick_now), grown_at: LAMBHOOD_TIME.tick_after(tick_now), ..SheepState::default() });
     let mother_delivered = SheepState { lamb_due_at: 0, ..mother_state };
@@ -269,7 +267,7 @@ fn bear_lamb(tick_state: &mut SuperchunkTickState, collision: &Collision, mother
 /// Counts one at `place` for the wake of a sheep: if it is `meal_cell`, on
 /// the cell given, as it is applied, the grass there still -- what it
 /// did then happens with the meal or not at all -- else here.
-fn count(tick_state: &mut SuperchunkTickState, rule_counts: &mut RuleCounts, meal_cell: Option<CellIndex>, place: usize) {
+fn count(tick_state: &mut SimulationTickState, rule_counts: &mut RuleCounts, meal_cell: Option<CellIndex>, place: usize) {
     match meal_cell {
         Some(grass_cell) => compare_and_write::count(tick_state, compare_and_write::layer_holds(GRASS, grass_cell), place),
         None => rule_counts[place] += 1,
@@ -277,31 +275,7 @@ fn count(tick_state: &mut SuperchunkTickState, rule_counts: &mut RuleCounts, mea
 }
 
 /// The tick a sheep taking a step now wakes next.
-fn next_step(tick_state: &mut SuperchunkTickState) -> u64 {
+fn next_step(tick_state: &mut SimulationTickState) -> u64 {
     let tick_now = tick_and_random_stream::current_tick(tick_state);
     STEP_JITTER.part_drawn(tick_and_random_stream::random_stream(tick_state)).tick_after(STEP.tick_after(tick_now))
-}
-
-/// Queues `count` grown sheep, each some way from its next meal, each
-/// on a cell of its own of `superchunk` drawn from `random_stream` -- at most
-/// half its cells' worth of them -- waking over the next [`STEP`]: in the world once whoever runs it places what was put. A
-/// cell that is not free -- a tree's -- is drawn again; fewer are put
-/// only where a superchunk has almost no free cell left.
-pub fn flock(entities_between_ticks: &mut EntitiesBetweenTicks, superchunk: SuperchunkIndex, count: usize, random_stream: &mut RandomSource) {
-    let CellCartesian { x: superchunk_left_x, y: superchunk_top_y } = superchunk.top_left().cartesian();
-    let side_in_cells = SUPERCHUNK_SIDE_CELLS as u64;
-    assert!(count as u64 <= side_in_cells * side_in_cells / 2, "{count} sheep on a superchunk: too many to draw a cell each");
-    let tick_now = entities_between_ticks.current_tick();
-    let mut cells_drawn = HashSet::with_capacity(count);
-    let (mut put, mut draws_left) = (0, 16 * count as u64 + side_in_cells * side_in_cells);
-    while put < count && draws_left > 0 {
-        draws_left -= 1;
-        let drawn_cartesian = CellCartesian { x: superchunk_left_x + random_stream.draw_below(side_in_cells) as u32, y: superchunk_top_y + random_stream.draw_below(side_in_cells) as u32 };
-        // A cell drawn twice is drawn again: a cell holds one sheep.
-        if !cells_drawn.insert((drawn_cartesian.x, drawn_cartesian.y)) {
-            continue;
-        }
-        let header = Header { entity_type: SHEEP, stood_cell: drawn_cartesian.into(), wake: STEP.part_drawn(random_stream).tick_after(tick_now) };
-        put += usize::from(entities_between_ticks.add(header, &WholeAttribute::holding_value(SHEEP_STATE, SheepState { hungry_at: TIME_BETWEEN_MEALS.part_drawn(random_stream).tick_after(tick_now), ..SheepState::default() })));
-    }
 }

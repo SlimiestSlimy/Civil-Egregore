@@ -3,16 +3,11 @@
 //! window's sliders ([`WorldStart::from_tuning`]) -- as the server alone
 //! knows what they mean.
 
-use crate::halos::HOT_ENTITY;
 use chunk_storage::disk::WorldInfo;
 use coordinates::WORLD_MIDDLE;
-use entity_manager::EntityType;
 use std::hash::{BuildHasher, RandomState};
-use utilities::tuning::{Tuning, CAMERA_LOADS, FORCED_HOT, SHEEP_PER_SUPERCHUNK, WORLD_SIDE};
+use utilities::tuning::{Tuning, CAMERA_LOADS, FORCED_HOT, WORLD_SIDE};
 use worldgen::{has_land_about, WorldGeneration};
-
-/// Sheep the world's origin superchunk starts with, unless told.
-pub const FLOCK: usize = 4_000;
 
 /// Seeds tried after one drawn at random for one with land about the
 /// origin, where the sheep start, before the one drawn is taken.
@@ -53,29 +48,23 @@ impl WorldSize {
 pub struct WorldStart {
     /// The seed its superchunks are generated from.
     pub seed: u64,
-    /// How its superchunks are generated.
+    /// How its superchunks are generated, and what lives on them.
     pub world_generation: WorldGeneration,
     /// How far it reaches, and whether it is forced hot.
     pub world_size: WorldSize,
     /// Threads it ticks on, every one the machine has if none is given.
     pub thread_count: Option<usize>,
-    /// Sheep each superchunk it puts them on starts with.
-    pub sheep_per_flock: usize,
-    /// The kind of entity it is hot about, unless forced hot.
-    pub hot_entity: EntityType,
-    /// Whether its camera loads superchunks: the viewport's hot, and
-    /// each generated in the viewport given `sheep`. Nothing to a world
-    /// forced hot, all of which is, nor to one run with no window.
+    /// Whether its camera loads superchunks: the viewport's hot. Nothing
+    /// to a world forced hot, all of which is, nor to one run with no
+    /// window.
     pub camera_loads: bool,
 }
 
 impl Default for WorldStart {
-    /// Seed 1, generated as [`Generation::DEFAULT`] says, no size to
-    /// it, every thread the machine has, a flock of [`FLOCK`] on its
-    /// origin, hot about [`HOT_ENTITY`], its camera loading nothing:
-    /// what `new` makes unless told otherwise.
+    /// Seed 1, generated as [`WorldGeneration::DEFAULT`] says, no size
+    /// to it, every thread the machine has, its camera loading nothing: what `new` makes unless told otherwise.
     fn default() -> Self {
-        Self { seed: 1, world_generation: WorldGeneration::DEFAULT, world_size: WorldSize::NoEnd, thread_count: None, sheep_per_flock: FLOCK, hot_entity: HOT_ENTITY, camera_loads: false }
+        Self { seed: 1, world_generation: WorldGeneration::DEFAULT, world_size: WorldSize::NoEnd, thread_count: None, camera_loads: false }
     }
 }
 
@@ -89,17 +78,15 @@ impl WorldStart {
         let forced_hot = side_superchunks > 0 && tuning[FORCED_HOT] >= 0.5;
         let world_size = WorldSize::of_side(side_superchunks, forced_hot).expect("forced hot only with a side");
         let seed = seed.unwrap_or_else(|| drawn_seed(&world_generation));
-        Self { seed, world_generation, world_size, sheep_per_flock: tuning[SHEEP_PER_SUPERCHUNK].max(0.0) as usize, camera_loads: !forced_hot && tuning[CAMERA_LOADS] >= 0.5, ..Self::default() }
+        Self { seed, world_generation, world_size, camera_loads: !forced_hot && tuning[CAMERA_LOADS] >= 0.5, ..Self::default() }
     }
 
     /// What the world `world_info` is of started from, as far as it says: its
-    /// seed, generation, size, hot entity and camera -- and the sheep
-    /// its camera puts on a superchunk, or if it puts none [`FLOCK`], as
-    /// a world's file keeps no other; on every thread the machine has.
+    /// seed, generation, size and camera; on every thread the
+    /// machine has.
     pub fn of_world(world_info: &WorldInfo, world_generation: WorldGeneration) -> Self {
         let world_size = WorldSize::of_side(world_info.side_in_superchunks.unwrap_or(0), world_info.forced_hot).unwrap_or(WorldSize::NoEnd);
-        let sheep_per_flock = world_info.camera_flock.map_or(FLOCK, |camera_sheep| camera_sheep as usize);
-        Self { seed: world_info.seed, world_generation, world_size, sheep_per_flock, hot_entity: world_info.hot_entity.map_or(HOT_ENTITY, EntityType), camera_loads: world_info.camera_flock.is_some(), ..Self::default() }
+        Self { seed: world_info.seed, world_generation, world_size, camera_loads: world_info.camera_loads, ..Self::default() }
     }
 }
 

@@ -8,7 +8,7 @@ use bitmap::window::{rows_from_morton, WORD_TILE_SIDE};
 use bitplane_manager::COARSEST_TILES_IN_CHUNK;
 use chunk_storage::LayerType;
 use coordinates::{cartesian_from_place, CellCartesian, CellIndex};
-use crate::SuperchunkTickState;
+use crate::SimulationTickState;
 
 /// Cells along the side of an [`Area`].
 pub const AREA_SIDE: usize = 16;
@@ -43,7 +43,7 @@ pub const FARTHEST_SCALE: u32 = bitplane_manager::COARSEST_SCALE;
 /// The [`AREA_SIDE`] by [`AREA_SIDE`] cells around `centre_cell` -- it at
 /// `(AREA_CENTRE, AREA_CENTRE)` of them -- of `layer_type`, as the
 /// tick found them: four windows, a row a word.
-pub fn read_layer(tick_state: &SuperchunkTickState, layer_type: LayerType, centre_cell: CellIndex) -> Area {
+pub fn read_layer(tick_state: &SimulationTickState, layer_type: LayerType, centre_cell: CellIndex) -> Area {
     let [area] = read_layers(tick_state, [layer_type], centre_cell);
     area
 }
@@ -52,7 +52,7 @@ pub fn read_layer(tick_state: &SuperchunkTickState, layer_type: LayerType, centr
 /// [`AREA_SIDE`] the area lies in, two by two, taken as they lie --
 /// a lookup a layer -- and the words of them the area reaches turned
 /// into rows, for the paths found over them.
-pub fn read_layers<const N: usize>(tick_state: &SuperchunkTickState, layer_types: [LayerType; N], centre_cell: CellIndex) -> [Area; N] {
+pub fn read_layers<const N: usize>(tick_state: &SimulationTickState, layer_types: [LayerType; N], centre_cell: CellIndex) -> [Area; N] {
     let Some(area_corner) = corner_about(centre_cell, AREA_SIDE as u32) else {
         return layers_at_the_edge(tick_state, layer_types, centre_cell);
     };
@@ -94,7 +94,7 @@ pub fn read_layers<const N: usize>(tick_state: &SuperchunkTickState, layer_types
 /// corner is off it: a window a quarter, those off the world left
 /// clear and not hot.
 #[cold]
-fn layers_at_the_edge<const N: usize>(tick_state: &SuperchunkTickState, layer_types: [LayerType; N], centre_cell: CellIndex) -> [Area; N] {
+fn layers_at_the_edge<const N: usize>(tick_state: &SimulationTickState, layer_types: [LayerType; N], centre_cell: CellIndex) -> [Area; N] {
     let mut areas = [Area::default(); N];
     let half_side = AREA_SIDE as u32 / 2;
     let centre_cartesian = centre_cell.cartesian();
@@ -118,7 +118,7 @@ fn layers_at_the_edge<const N: usize>(tick_state: &SuperchunkTickState, layer_ty
 /// [`read_layer`] from further off: the tiles of `scale` around `centre_cell`,
 /// one set if `layer_type` holds at any of its cells. Up to
 /// [`FARTHEST_SCALE`].
-pub fn of_tiles(tick_state: &SuperchunkTickState, layer_type: LayerType, centre_cell: CellIndex, scale: u32) -> Area {
+pub fn of_tiles(tick_state: &SimulationTickState, layer_type: LayerType, centre_cell: CellIndex, scale: u32) -> Area {
     let mut area = Area::default();
     let centre_cartesian = centre_cell.cartesian();
     // The area's top left tile, in tiles from the world's: before the world, where the centre is near its edge.

@@ -37,9 +37,29 @@ pub fn world_contents(world: &World) -> WorldContents {
 /// terrain taking no part: a plain forced hot of at least
 /// `superchunks` superchunks -- a square of them -- with grass on
 /// `grass_cover` of [`worldgen::FRACTION_ONE`] of its cells and
-/// `sheep_per_flock` sheep on each superchunk, on `thread_count` threads.
+/// `sheep_per_flock` sheep on each superchunk -- made the first tick --, on
+/// `thread_count` threads.
 pub fn plain_start(superchunks: u32, grass_cover: u64, sheep_per_flock: usize, thread_count: usize) -> WorldStart {
-    WorldStart { world_generation: worldgen::WorldGeneration::plain(grass_cover), world_size: WorldSize::SquareOfSide { side_superchunks: coordinates::square_side(superchunks), forced_hot: true }, thread_count: Some(thread_count), sheep_per_flock, ..WorldStart::default() }
+    let world_generation = worldgen::WorldGeneration { sheep_per_superchunk: sheep_per_flock as u64, ..worldgen::WorldGeneration::plain(grass_cover) };
+    WorldStart { world_generation, world_size: WorldSize::SquareOfSide { side_superchunks: coordinates::square_side(superchunks), forced_hot: true }, thread_count: Some(thread_count), ..WorldStart::default() }
+}
+
+/// The default generation, with `sheep` sheep on each superchunk: made the
+/// first tick it is hot.
+pub fn flocked(sheep: usize) -> worldgen::WorldGeneration {
+    worldgen::WorldGeneration { sheep_per_superchunk: sheep as u64, ..worldgen::WorldGeneration::DEFAULT }
+}
+
+/// A world started as `world_start` says, with no end and one flock of
+/// `sheep` at its origin, the flock's halo hot: what a halo test follows.
+/// Its generation gives no sheep -- a flock on every superchunk
+/// generated would grow a world with no end for good -- so the one
+/// flock is put between ticks ([`put_flock`]).
+pub fn one_flock_world(world_start: WorldStart, sheep: usize) -> World {
+    let mut world = server::start_world(WorldStart { world_size: WorldSize::NoEnd, world_generation: flocked(0), ..world_start });
+    put_flock(&mut world, coordinates::WORLD_MIDDLE, sheep);
+    world.keep_hot(&server::halos_about([coordinates::WORLD_MIDDLE].into_iter()));
+    world
 }
 
 /// The top left superchunk of `world`'s hot ones.
@@ -88,6 +108,28 @@ pub fn add_entity(world: &mut World, header: Header, attributes: &[AttributeBloc
         world.write_cells(base_types::COLLISION, [bitplane_manager::Write::cell(header.stood_cell, bitplane_manager::WriteOp::SetCell)]);
     }
     applied
+}
+
+/// Puts `count` sheep on cells of `superchunk` drawn from the seed,
+/// each free of the collision plane, between ticks: one flock on a
+/// world whose generation gives none ([`flocked`] 0) -- a halo test's
+/// one flock wandering a world with no end, which a flock on every
+/// superchunk generated would grow for good.
+pub fn put_flock(world: &mut World, superchunk: SuperchunkIndex, count: usize) {
+    use coordinates::{CellCartesian, SUPERCHUNK_SIDE_CELLS};
+    use entity_rules::sheep::{STEP, TIME_BETWEEN_MEALS};
+    let mut random_stream = utilities::rng::RandomSource::for_stream(!world.world_info().seed, superchunk.0);
+    let (corner, side_in_cells, tick_now) = (superchunk.top_left().cartesian(), SUPERCHUNK_SIDE_CELLS as u64, world.entity_store().current_tick());
+    let mut put = 0;
+    while put < count {
+        let drawn_cell = CellCartesian { x: corner.x + random_stream.draw_below(side_in_cells) as u32, y: corner.y + random_stream.draw_below(side_in_cells) as u32 }.into();
+        if world.bitmap_arena().layer_holds_cell(base_types::COLLISION, drawn_cell) == Ok(true) {
+            continue;
+        }
+        let header = Header { entity_type: base_types::SHEEP, stood_cell: drawn_cell, wake: STEP.part_drawn(&mut random_stream).tick_after(tick_now) };
+        let sheep_state = base_types::SheepState { hungry_at: TIME_BETWEEN_MEALS.part_drawn(&mut random_stream).tick_after(tick_now), ..base_types::SheepState::default() };
+        put += add_entity(world, header, &entity_manager::WholeAttribute::holding_value(base_types::SHEEP_STATE, sheep_state)).added;
+    }
 }
 
 /// Takes `header`'s entity off `world`, the cell it held in the collision

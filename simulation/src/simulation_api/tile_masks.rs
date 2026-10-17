@@ -8,7 +8,7 @@ use crate::simulation_api::cell_and_its_neighbours::set_bit_of_rank;
 use bitplane_manager::{SMALL_TILE_CELLS, SMALL_TILE_SIDE};
 use chunk_storage::LayerType;
 use coordinates::{cartesian_from_place, place_from_cartesian, CellIndex, CHUNK_SIDE};
-use crate::SuperchunkTickState;
+use crate::SimulationTickState;
 use std::ops::Range;
 use utilities::rng::RandomSource;
 
@@ -174,7 +174,7 @@ pub fn cell(tile_first_cell: CellIndex, x: u32, y: u32) -> CellIndex {
 /// words as it lies in a bitmap -- the whole of it in one chunk, or a
 /// chunk a run -- with where the run goes in a mask's words. None of a
 /// run's words, where its bitmap is not hot.
-fn tile_word_runs<'t>(tick_state: &'t SuperchunkTickState, layer_type: LayerType, tile_first_cell: CellIndex, tile_side: u32) -> impl Iterator<Item = (Range<usize>, Option<&'t [u64]>)> {
+fn tile_word_runs<'t>(tick_state: &'t SimulationTickState, layer_type: LayerType, tile_first_cell: CellIndex, tile_side: u32) -> impl Iterator<Item = (Range<usize>, Option<&'t [u64]>)> {
     let part = tile_side.min(CHUNK_SIDE as u32);
     let (words, chunks) = ((part * part / WORD) as usize, (tile_side / part) * (tile_side / part));
     // A chunk's cells are 16 bits of a cell's index: the chunks of a tile follow one another above them.
@@ -185,18 +185,18 @@ fn tile_word_runs<'t>(tick_state: &'t SuperchunkTickState, layer_type: LayerType
 /// found it, into `set_mask` -- the cells it holds at -- and `hot` -- those
 /// in hot bitmaps: in the world, and read. Both of one side, the
 /// tile's: its words copied as they lie.
-pub fn read_layer(tick_state: &SuperchunkTickState, layer_type: LayerType, cell_in_tile: CellIndex, set_mask: &mut Mask, hot: &mut Mask) {
+pub fn read_layer(tick_state: &SimulationTickState, layer_type: LayerType, cell_in_tile: CellIndex, set_mask: &mut Mask, hot: &mut Mask) {
     read_where(tick_state, layer_type, cell_in_tile, None, set_mask, hot);
 }
 
 /// [`read_layer`], of the cells set in `under_mask` alone: the rest are left
 /// clear in `set_mask` and `hot`.
-pub fn layer_under(tick_state: &SuperchunkTickState, layer_type: LayerType, cell_in_tile: CellIndex, under_mask: &Mask, set_mask: &mut Mask, hot: &mut Mask) {
+pub fn layer_under(tick_state: &SimulationTickState, layer_type: LayerType, cell_in_tile: CellIndex, under_mask: &Mask, set_mask: &mut Mask, hot: &mut Mask) {
     read_where(tick_state, layer_type, cell_in_tile, Some(under_mask), set_mask, hot);
 }
 
 /// [`read_layer`], under `under_mask` if there is one.
-fn read_where(tick_state: &SuperchunkTickState, layer_type: LayerType, cell_in_tile: CellIndex, under_mask: Option<&Mask>, set_mask: &mut Mask, hot: &mut Mask) {
+fn read_where(tick_state: &SimulationTickState, layer_type: LayerType, cell_in_tile: CellIndex, under_mask: Option<&Mask>, set_mask: &mut Mask, hot: &mut Mask) {
     let tile_side = set_mask.side_in_cells;
     assert!(hot.side_in_cells == tile_side && under_mask.is_none_or(|under_checked| under_checked.side_in_cells == tile_side), "masks of two sides");
     let tile_first_cell = tile(cell_in_tile, tile_side);
@@ -227,7 +227,7 @@ fn read_where(tick_state: &SuperchunkTickState, layer_type: LayerType, cell_in_t
 /// in `mask`, the aligned tile `cell_in_tile` is in: the tile's words ANDed with
 /// the mask's as they lie, and asked whether anything is left. Nothing
 /// is copied.
-pub fn any_under(tick_state: &SuperchunkTickState, layer_type: LayerType, cell_in_tile: CellIndex, mask: &Mask) -> bool {
+pub fn any_under(tick_state: &SimulationTickState, layer_type: LayerType, cell_in_tile: CellIndex, mask: &Mask) -> bool {
     let tile_first_cell = tile(cell_in_tile, mask.side_in_cells);
     if mask.side_in_cells == SMALL_TILE_SIDE {
         let [tiles] = tick_state.small_tiles([layer_type], tile_first_cell, mask.words[0]);
@@ -239,14 +239,14 @@ pub fn any_under(tick_state: &SuperchunkTickState, layer_type: LayerType, cell_i
 /// Queues `layer_type` holding at every cell set in `mask`, the
 /// aligned tile `cell_in_tile` is in, that the rule sees clear: how many writes,
 /// a compare-and-write each.
-pub fn set_under(tick_state: &mut SuperchunkTickState, layer_type: LayerType, cell_in_tile: CellIndex, mask: &Mask) -> usize {
+pub fn set_under(tick_state: &mut SimulationTickState, layer_type: LayerType, cell_in_tile: CellIndex, mask: &Mask) -> usize {
     write_under(tick_state, layer_type, cell_in_tile, mask, true)
 }
 
 /// Queues `layer_type` no longer holding at any cell set in `mask`,
 /// the aligned tile `cell_in_tile` is in, that the rule sees set: how many
 /// writes, a compare-and-write each.
-pub fn clear_under(tick_state: &mut SuperchunkTickState, layer_type: LayerType, cell_in_tile: CellIndex, mask: &Mask) -> usize {
+pub fn clear_under(tick_state: &mut SimulationTickState, layer_type: LayerType, cell_in_tile: CellIndex, mask: &Mask) -> usize {
     write_under(tick_state, layer_type, cell_in_tile, mask, false)
 }
 
@@ -254,7 +254,7 @@ pub fn clear_under(tick_state: &mut SuperchunkTickState, layer_type: LayerType, 
 /// as `becomes_holding` says becoming so, each a compare-and-write of what the
 /// rule saw there -- no cell written over another's write. How many.
 /// A set bit is its cell: its index added to the tile's first cell's.
-fn write_under(tick_state: &mut SuperchunkTickState, layer_type: LayerType, cell_in_tile: CellIndex, mask: &Mask, becomes_holding: bool) -> usize {
+fn write_under(tick_state: &mut SimulationTickState, layer_type: LayerType, cell_in_tile: CellIndex, mask: &Mask, becomes_holding: bool) -> usize {
     let tile_first_cell = tile(cell_in_tile, mask.side_in_cells);
     let mut writes_queued = 0;
     for cell_place in mask.set_bits() {

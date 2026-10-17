@@ -4,7 +4,7 @@
 //! `cargo test --test fast`
 
 #[allow(dead_code)] // a shared file: each test program uses a part of it
-#[path = "../../utilities/test_seed.rs"]
+#[path = "../../../utilities/test_seed.rs"]
 mod test_seed;
 #[path = "shared/terrain_cells.rs"]
 mod terrain_cells;

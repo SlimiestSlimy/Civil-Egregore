@@ -1,13 +1,13 @@
-//! A type a world has: a name, and what goes with it by its kind -- a
-//! rule's code among it, of whatever type its registry is of.
+//! A type a world has: a name, and what goes with it by its kind. What
+//! runs it, if anything does, is its library, hooked in by its
+//! registration (`crate::Hook`).
 
 use crate::layouts::{Attribute, Layout};
-use crate::type_ids::{AttributeType, EntityRuleType, EntityType, LayerType, ScaRuleType, WidePlane, Width};
+use crate::type_ids::{AttributeType, EntityRuleType, EntityType, LayerType, ScaRuleType, WidePlane, Width, WorldgenType};
 
-/// A type a world has: its name, and what goes with it by its kind --
-/// a rule's `RuleCode`, what runs it, the registry knowing nothing of it.
+/// A type a world has: its name, and what goes with it by its kind.
 #[derive(Clone, Debug)]
-pub enum RegisteredType<RuleCode> {
+pub enum RegisteredType {
     /// A layer: a bit a cell.
     Layer {
         /// Its name.
@@ -52,8 +52,6 @@ pub enum RegisteredType<RuleCode> {
         rule: ScaRuleType,
         /// Its master.
         master: LayerType,
-        /// What runs it.
-        code: RuleCode,
     },
     /// A rule of an entity, and the one type of entity it is of.
     EntityRule {
@@ -63,12 +61,18 @@ pub enum RegisteredType<RuleCode> {
         rule: EntityRuleType,
         /// Its master.
         master: EntityType,
-        /// What runs it.
-        code: RuleCode,
+    },
+    /// A way of generating a world: its superchunks' cells, and what
+    /// lives on them.
+    Worldgen {
+        /// Its name.
+        name: String,
+        /// Its ID.
+        worldgen: WorldgenType,
     },
 }
 
-impl<RuleCode> RegisteredType<RuleCode> {
+impl RegisteredType {
     /// A layer named `name`.
     pub fn layer(name: &str, layer_type: LayerType) -> Self {
         Self::Layer { name: name.to_string(), layer_type }
@@ -92,7 +96,7 @@ impl<RuleCode> RegisteredType<RuleCode> {
     /// Its name.
     pub fn name(&self) -> &str {
         match self {
-            Self::Layer { name, .. } | Self::WidePlane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } => name,
+            Self::Layer { name, .. } | Self::WidePlane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } | Self::Worldgen { name, .. } => name,
         }
     }
 
@@ -112,14 +116,7 @@ impl<RuleCode> RegisteredType<RuleCode> {
             Self::Attribute { attribute_type, .. } => attribute_type.0,
             Self::ScaRule { rule, .. } => rule.0,
             Self::EntityRule { rule, .. } => rule.0,
-        }
-    }
-
-    /// What runs it, if it is a rule.
-    pub fn rule_code(&self) -> Option<&RuleCode> {
-        match self {
-            Self::ScaRule { code, .. } | Self::EntityRule { code, .. } => Some(code),
-            _ => None,
+            Self::Worldgen { worldgen, .. } => worldgen.0,
         }
     }
 
@@ -138,6 +135,7 @@ impl<RuleCode> RegisteredType<RuleCode> {
             Self::Attribute { attribute_type, .. } => (attribute_type.type_number(), 1),
             Self::ScaRule { rule, .. } => (rule.type_number(), 1),
             Self::EntityRule { rule, .. } => (rule.type_number(), 1),
+            Self::Worldgen { worldgen, .. } => (worldgen.type_number(), 1),
         };
         first_number..first_number + numbers_taken
     }

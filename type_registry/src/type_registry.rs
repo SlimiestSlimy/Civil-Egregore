@@ -5,7 +5,7 @@
 
 use crate::frozen_types::FrozenTypes;
 use crate::registered_type::RegisteredType;
-use crate::registration::{Library, Registration};
+use crate::registration::{Hook, Library, Registration};
 
 /// Why a type was refused.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -25,28 +25,30 @@ pub enum RegistryRefusal {
 /// registered -- the base game's, then a mod's -- and frozen before it
 /// runs.
 #[derive(Clone)]
-pub struct TypeRegistry<RuleCode> {
+pub struct TypeRegistry {
     /// Every type registered, in the order registered.
-    types: Vec<RegisteredType<RuleCode>>,
+    types: Vec<RegisteredType>,
     /// The places among them of the types each depends on.
     depends_on: Vec<Box<[usize]>>,
     /// The library each exposes, if any.
     libraries: Vec<Option<Library>>,
+    /// What each is hooked into.
+    hooks: Vec<Box<[Hook]>>,
 }
 
-impl<RuleCode> Default for TypeRegistry<RuleCode> {
+impl Default for TypeRegistry {
     /// No type registered.
     fn default() -> Self {
-        Self { types: Vec::new(), depends_on: Vec::new(), libraries: Vec::new() }
+        Self { types: Vec::new(), depends_on: Vec::new(), libraries: Vec::new(), hooks: Vec::new() }
     }
 }
 
-impl<RuleCode> TypeRegistry<RuleCode> {
+impl TypeRegistry {
     /// Registers `registration`'s type, checked against every type before
     /// it: its name is no other's, its default attribute, its master and
     /// each type it depends on are registered.
-    pub fn register(&mut self, registration: impl Into<Registration<RuleCode>>) -> Result<(), RegistryRefusal> {
-        let Registration { registered_type, depends_on, library } = registration.into();
+    pub fn register(&mut self, registration: impl Into<Registration>) -> Result<(), RegistryRefusal> {
+        let Registration { registered_type, depends_on, library, hooks } = registration.into();
         if self.types.iter().any(|registered| registered.name() == registered_type.name()) {
             return Err(RegistryRefusal::NameTaken);
         }
@@ -61,12 +63,13 @@ impl<RuleCode> TypeRegistry<RuleCode> {
         self.types.push(registered_type);
         self.depends_on.push(depended_on);
         self.libraries.push(library);
+        self.hooks.push(hooks.into_boxed_slice());
         Ok(())
     }
 
     /// The types registered, frozen: what a world runs with, no type
     /// entering from then on.
-    pub fn freeze(self) -> FrozenTypes<RuleCode> {
-        FrozenTypes::of_registered(self.types, self.depends_on, self.libraries)
+    pub fn freeze(self) -> FrozenTypes {
+        FrozenTypes::of_registered(self.types, self.depends_on, self.libraries, self.hooks)
     }
 }

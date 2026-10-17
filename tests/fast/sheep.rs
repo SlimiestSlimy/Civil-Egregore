@@ -211,7 +211,8 @@ fn any_number_of_threads_ticks_sheep_the_same() {
 fn sheep_never_overlap() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut world = server::start_world(server::WorldStart { seed, ..plain_start(4, 18_750, 60_000, 4) });
-    assert_eq!(world.entity_store().len(), 240_000, "each on a cell of its own from the start");
+    world.tick();
+    assert_eq!(world.entity_store().len(), 240_000, "each on a cell of its own from the first tick");
     with_lambs_due(&mut world, seed, 16, 2_000);
     let (mut moves_total, mut births_total) = (0, 0);
     for tick in 0..2_000 {
@@ -262,7 +263,7 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     entity_store.queue_add(Header { entity_type: SHEEP, stood_cell: standing_cell, wake: 0 }, &hungry_at(was_hungry_at));
     entity_store.apply();
     let mut test_simulation = simulation::Simulation::new(1);
-    let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut simulation::simulation_api::SuperchunkTickState| {
+    let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut simulation::simulation_api::SimulationTickState| {
         // The decay first, counted under 0; the sheep's counts from 8 on.
         cell_reads_and_writes::clear_counted(tick_state, GRASS, decaying_cell, 0);
         tick_state.count_under(8);

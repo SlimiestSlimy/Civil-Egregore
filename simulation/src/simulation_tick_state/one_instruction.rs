@@ -5,14 +5,14 @@
 
 use super::conditional::Compare;
 use super::instruction::{Instruction, NO_COUNT};
-use super::SuperchunkTickState;
+use super::SimulationTickState;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use entity_manager::{AttributeBlock, AttributeType, Header, Member};
 
-/// A write, said whole: one instruction, queued by [`SuperchunkTickState::write`]
-/// or with its compare by [`SuperchunkTickState::compare_with_writes`] -- every
-/// write that carries no blocks ([`SuperchunkTickState::write_attribute`] is the one
+/// A write, said whole: one instruction, queued by [`SimulationTickState::write`]
+/// or with its compare by [`SimulationTickState::compare_with_writes`] -- every
+/// write that carries no blocks ([`SimulationTickState::write_attribute`] is the one
 /// that does).
 #[derive(Clone, Copy, Debug)]
 pub enum Write {
@@ -76,7 +76,7 @@ pub enum Write {
     },
 }
 
-impl SuperchunkTickState<'_> {
+impl SimulationTickState<'_> {
     /// The instruction `write` is queued as, and the cell it lands
     /// on: none for a count, which lands where its compare does.
     #[inline]
@@ -122,8 +122,8 @@ impl SuperchunkTickState<'_> {
     }
 
     /// Queues a skip-tag set, `group_compare`, the `writes` under it and the
-    /// tag, at once: what [`SuperchunkTickState::skip_tag_set`], [`SuperchunkTickState::write`] of
-    /// each and [`SuperchunkTickState::skip_tag_placed`] come to, the queue found once
+    /// tag, at once: what [`SimulationTickState::skip_tag_set`], [`SimulationTickState::write`] of
+    /// each and [`SimulationTickState::skip_tag_placed`] come to, the queue found once
     /// -- most of what a rule queues is one compare and a write or two.
     #[inline]
     pub(crate) fn compare_with_writes(&mut self, group_compare: Compare, writes: &[Write]) {

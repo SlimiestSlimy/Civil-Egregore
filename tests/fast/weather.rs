@@ -49,7 +49,7 @@ fn over_water(world: &World, (x, y): (u32, u32)) -> bool {
 
 /// A world of land and sea, forced hot, with no sheep.
 fn land_and_sea(seed: u64) -> World {
-    server::start_world(server::WorldStart { seed: server::seed_with_land(seed, &server::WorldGeneration::DEFAULT), world_size: server::WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, sheep_per_flock: 0, ..server::WorldStart::default() })
+    server::start_world(server::WorldStart { seed: server::seed_with_land(seed, &server::WorldGeneration::DEFAULT), world_size: server::WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, world_generation: crate::worlds::flocked(0), ..server::WorldStart::default() })
 }
 
 /// Every tile of `world` put under `climate`.

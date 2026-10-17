@@ -11,7 +11,7 @@ use crate::simulation_api::square_around_a_cell::{self, AREA_CENTRE, AREA_SIDE, 
 use crate::simulation_api::cell_and_its_neighbours::{self, TilesAbout, Cells};
 use crate::simulation_api::four_tiles_under_the_neighbours;
 use crate::simulation_api::cell_reads_and_writes;
-use crate::SuperchunkTickState;
+use crate::SimulationTickState;
 
 // The area a turn reads is the area paths are found over.
 const _: () = assert!(pathfinding::AREA_SIDE == AREA_SIDE);
@@ -53,7 +53,7 @@ fn of_the_area(entity_cell: CellIndex, cell: Cell) -> Option<CellIndex> {
 /// What is in the way in the area about `entity_cell`, read at once: the
 /// cells the collision plane of `in_the_way` holds -- what stands
 /// there, entities among it -- and the terrain's walls.
-fn read_in_the_way(tick_state: &SuperchunkTickState, in_the_way: PlanesInTheWay, entity_cell: CellIndex) -> (Rows, Walls) {
+fn read_in_the_way(tick_state: &SimulationTickState, in_the_way: PlanesInTheWay, entity_cell: CellIndex) -> (Rows, Walls) {
     let [collision_rows, north_walls, west_walls, south_walls, east_walls] = square_around_a_cell::read_layers(tick_state, [in_the_way.collision, in_the_way.wall_north, in_the_way.wall_west, in_the_way.wall_south, in_the_way.wall_east], entity_cell).map(|area| area.set_rows);
     (collision_rows, Walls::one_way(north_walls, west_walls, south_walls, east_walls))
 }
@@ -80,7 +80,7 @@ pub struct SoughtStep {
 /// round it are open. Where the wall layers are not hot, none bars;
 /// the walls' tiles are asked a cell at a time as they lie, and not
 /// at all where they hold nothing.
-pub fn around_unwalled(tick_state: &SuperchunkTickState, in_the_way: PlanesInTheWay, about_tiles: &TilesAbout) -> Cells {
+pub fn around_unwalled(tick_state: &SimulationTickState, in_the_way: PlanesInTheWay, about_tiles: &TilesAbout) -> Cells {
     let [north_walls, west_walls, south_walls, east_walls] = four_tiles_under_the_neighbours::read_layers(tick_state, in_the_way.walls(), about_tiles, about_tiles.nine_word()).map(|tiles| tiles.cells_set);
     if north_walls | west_walls | south_walls | east_walls == 0 {
         return about_tiles.nine_cells();
@@ -105,7 +105,7 @@ pub fn around_unwalled(tick_state: &SuperchunkTickState, in_the_way: PlanesInThe
 /// ([`around_unwalled`]). The plane is asked first, the ring about
 /// the cell ANDed with its tiles: hemmed in, there is no step, and no
 /// wall is read.
-pub fn around_steppable(tick_state: &SuperchunkTickState, in_the_way: PlanesInTheWay, about_tiles: &TilesAbout) -> Cells {
+pub fn around_steppable(tick_state: &SimulationTickState, in_the_way: PlanesInTheWay, about_tiles: &TilesAbout) -> Cells {
     let free_ring = about_tiles.ring_word() & !four_tiles_under_the_neighbours::read_layer(tick_state, in_the_way.collision, about_tiles, about_tiles.ring_word()).cells_set;
     if free_ring == 0 {
         return Cells::default();
@@ -116,7 +116,7 @@ pub fn around_steppable(tick_state: &SuperchunkTickState, in_the_way: PlanesInTh
 /// The terrain's walls among the [`AREA_SIDE`] by [`AREA_SIDE`]
 /// cells around `centre_cell`, laid out as an [`crate::simulation_api::area::Area`] is: what paths
 /// are found round.
-pub fn area_walls(tick_state: &SuperchunkTickState, in_the_way: PlanesInTheWay, centre_cell: CellIndex) -> Walls {
+pub fn area_walls(tick_state: &SimulationTickState, in_the_way: PlanesInTheWay, centre_cell: CellIndex) -> Walls {
     let [north_walls, west_walls, south_walls, east_walls] = square_around_a_cell::read_layers(tick_state, in_the_way.walls(), centre_cell).map(|area| area.set_rows);
     Walls::one_way(north_walls, west_walls, south_walls, east_walls)
 }
@@ -125,7 +125,7 @@ pub fn area_walls(tick_state: &SuperchunkTickState, in_the_way: PlanesInTheWay, 
 /// of the area around `entity_cell` -- over the cells `passable`, round walls
 /// and what the collision plane holds; none if no goal can be come to. One step: no route
 /// is kept.
-pub fn step_towards(tick_state: &mut SuperchunkTickState, in_the_way: PlanesInTheWay, entity_cell: CellIndex, goal_rows: &Rows, passable: &Rows) -> Option<CellIndex> {
+pub fn step_towards(tick_state: &mut SimulationTickState, in_the_way: PlanesInTheWay, entity_cell: CellIndex, goal_rows: &Rows, passable: &Rows) -> Option<CellIndex> {
     let (collision_rows, walls) = read_in_the_way(tick_state, in_the_way, entity_cell);
     let first_step = pathfinding::step_towards(&rows_less_collisions(passable, &collision_rows), &walls, &rows_less_collisions(goal_rows, &collision_rows), AREA_CENTRE_CELL, tick_state.random_stream().next_draw())?.first_cell;
     of_the_area(entity_cell, first_step)
@@ -134,7 +134,7 @@ pub fn step_towards(tick_state: &mut SuperchunkTickState, in_the_way: PlanesInTh
 /// The step from `entity_cell` towards the nearest cell `layer_type` holds
 /// at: in the area around it, else over tiles by scale, as far as
 /// an entity reaches. None if there is none in reach.
-pub fn seek(tick_state: &mut SuperchunkTickState, in_the_way: PlanesInTheWay, entity_cell: CellIndex, layer_type: LayerType) -> Option<SoughtStep> {
+pub fn seek(tick_state: &mut SimulationTickState, in_the_way: PlanesInTheWay, entity_cell: CellIndex, layer_type: LayerType) -> Option<SoughtStep> {
     let near_area = square_around_a_cell::read_layer(tick_state, layer_type, entity_cell);
     if let Some(near_step_cell) = step_towards(tick_state, in_the_way, entity_cell, &near_area.set_rows, &near_area.hot) {
         return Some(SoughtStep { step_cell: near_step_cell, scale: 0 });
@@ -174,7 +174,7 @@ pub fn seek(tick_state: &mut SuperchunkTickState, in_the_way: PlanesInTheWay, en
 /// `target_cell` -- a cell of the area around `entity_cell` -- over the cells
 /// `passable`, no cell the collision plane holds walked on. None if `target_cell` is out of
 /// the area, or cannot be come to.
-pub fn step_to(tick_state: &mut SuperchunkTickState, in_the_way: PlanesInTheWay, entity_cell: CellIndex, target_cell: CellIndex, passable: &Rows) -> Option<CellIndex> {
+pub fn step_to(tick_state: &mut SimulationTickState, in_the_way: PlanesInTheWay, entity_cell: CellIndex, target_cell: CellIndex, passable: &Rows) -> Option<CellIndex> {
     let (entity_cartesian, target_cartesian) = (entity_cell.cartesian(), target_cell.cartesian());
     let across_in_area = target_cartesian.x as i64 - entity_cartesian.x as i64 + AREA_CENTRE as i64;
     let down_in_area = target_cartesian.y as i64 - entity_cartesian.y as i64 + AREA_CENTRE as i64;

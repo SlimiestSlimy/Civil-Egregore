@@ -78,7 +78,7 @@ pub(crate) struct AcrossAct {
 #[derive(Clone, Copy)]
 pub(crate) struct AuthorSegment {
     /// The author: its cell's place in Morton order over the world,
-    /// and one ([`SuperchunkTickState::seeing_to`]), or 0 for the superchunk's rule
+    /// and one ([`SimulationTickState::seeing_to`]), or 0 for the superchunk's rule
     /// itself.
     pub(crate) author: u64,
     /// The first of its instructions.
@@ -89,7 +89,7 @@ pub(crate) struct AuthorSegment {
 /// does. It samples the superchunk's own cells, wakes its entities due,
 /// reads any cell in reach, and queues writes and instructions, which
 /// change nothing until the second phase.
-pub struct SuperchunkTickState<'a> {
+pub struct SimulationTickState<'a> {
     /// The superchunk.
     pub(crate) superchunk: &'a Superchunk,
     /// The superchunk's entities.
@@ -104,7 +104,7 @@ pub struct SuperchunkTickState<'a> {
     pub(crate) outbox: &'a mut Outbox,
     /// The superchunk's random numbers this tick.
     pub(crate) random_stream: RandomSource,
-    /// Whom the rule is seeing to ([`SuperchunkTickState::seeing_to`]): what is
+    /// Whom the rule is seeing to ([`SimulationTickState::seeing_to`]): what is
     /// queued is that author's.
     pub(crate) author: u64,
     /// The stack of skip-tag sets open, the outermost first: the cell
@@ -113,7 +113,7 @@ pub struct SuperchunkTickState<'a> {
     /// How many are open.
     pub(crate) skip_tag_sets_open: usize,
     /// The number the rule's first count is counted under when
-    /// applied ([`SuperchunkTickState::count_under`]).
+    /// applied ([`SimulationTickState::count_under`]).
     pub(crate) counted_from: u32,
     /// Whether what the author queues goes to the queue of acts over
     /// a border: from the first thing it queues for a second
@@ -129,11 +129,11 @@ pub struct SuperchunkTickState<'a> {
     /// instructions go across.
     pub(crate) landed_last: (SuperchunkIndex, u8, u8),
     /// Room for the cells sampled, its thread's: filled and gone over
-    /// by [`SuperchunkTickState::each_sampled`], kept from a turn to the next.
+    /// by [`SimulationTickState::each_sampled`], kept from a turn to the next.
     pub(crate) samples: &'a mut Vec<CellIndex>,
 }
 
-/// No superchunk: what [`SuperchunkTickState::landed_last`] holds before an author
+/// No superchunk: what [`SimulationTickState::landed_last`] holds before an author
 /// queues anything.
 pub(crate) const NO_SUPERCHUNK: SuperchunkIndex = SuperchunkIndex(u64::MAX);
 
@@ -150,7 +150,7 @@ pub(crate) struct AuthorBegan {
     pub(crate) carried_count: u32,
 }
 
-impl<'a> SuperchunkTickState<'a> {
+impl<'a> SimulationTickState<'a> {
     /// The turn of `superchunk` and its `superchunk_entities` in the tick `current_tick`,
     /// nothing queued yet: what it queues goes to `outbox`, what it
     /// draws comes from `random_stream`, what it samples is kept in `samples`.
@@ -174,7 +174,7 @@ impl<'a> SuperchunkTickState<'a> {
     /// Runs `rule` on every hot set cell of `layer_type` in this
     /// superchunk chosen with `chance`, independently, in Morton
     /// order -- each named the author of what `rule` queues for it
-    /// ([`SuperchunkTickState::seeing_to`]) -- with `counts`, what the rule counts:
+    /// ([`SimulationTickState::seeing_to`]) -- with `counts`, what the rule counts:
     /// how many were chosen. A rule of the cells is the function on
     /// one cell sampled; drawing the cells and going over them is
     /// done here.
@@ -188,7 +188,7 @@ impl<'a> SuperchunkTickState<'a> {
         self.each_of(samples, counts, rule)
     }
 
-    /// [`SuperchunkTickState::each_sampled`] on every tile of `layer_type` -- a plane
+    /// [`SimulationTickState::each_sampled`] on every tile of `layer_type` -- a plane
     /// of tiles -- in this superchunk's hot chunks chosen with
     /// `chance`, whatever number it holds: `rule` is handed the
     /// tile's first cell.
@@ -223,7 +223,7 @@ impl<'a> SuperchunkTickState<'a> {
         self.bitmap_reader.window(layer_type, origin, width, height)
     }
 
-    /// [`SuperchunkTickState::window`], of each of `layer_types` at once: grass and
+    /// [`SimulationTickState::window`], of each of `layer_types` at once: grass and
     /// the cells entities stand on about a cell, say, for little more
     /// than either alone.
     pub fn windows<const N: usize>(&self, layer_types: [LayerType; N], origin: CellIndex, width: u32, height: u32) -> [Window; N] {
@@ -305,7 +305,7 @@ impl<'a> SuperchunkTickState<'a> {
     /// to, landing in `superchunk`, and that superchunk's slot: the
     /// slot's own queue while all the author queued is for that one
     /// superchunk, the queue of acts over a border from the first
-    /// thing it queues for a second ([`SuperchunkTickState::go_across`]), whatever
+    /// thing it queues for a second ([`SimulationTickState::go_across`]), whatever
     /// the instruction. Begins the author's segment there, if the
     /// last begun is another's.
     #[inline]

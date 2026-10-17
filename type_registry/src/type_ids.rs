@@ -22,6 +22,9 @@ pub enum TypeKind {
     ScaRule = 0x03,
     /// A rule of an entity: its master a type of entity.
     EntityRule = 0x04,
+    /// A world generation: a world's superchunks' cells, and what
+    /// lives on them.
+    Worldgen = 0x05,
 }
 
 /// Where an ID keeps its kind: its first byte, over its number.
@@ -232,6 +235,23 @@ impl ScaRuleType {
     /// The rule of the cells of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
         Self(type_id(TypeKind::ScaRule, type_number, 0))
+    }
+
+    /// Its number.
+    pub const fn type_number(self) -> u64 {
+        number_of(self.0)
+    }
+}
+
+/// A world generation: an ID from the one namespace, of its own kind.
+/// It has no size: its last byte is 0.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct WorldgenType(pub u64);
+
+impl WorldgenType {
+    /// The world generation of number `type_number`.
+    pub const fn from_number(type_number: u64) -> Self {
+        Self(type_id(TypeKind::Worldgen, type_number, 0))
     }
 
     /// Its number.

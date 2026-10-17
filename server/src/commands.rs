@@ -35,11 +35,11 @@ pub fn new(seed: u64, command_parameters: &CleanServerParameters) -> Result<Stri
     if folder.join(disk::WORLD_FILE).exists() {
         return Err(format!("{} is a world already", folder.display()));
     }
-    let sheep_per_flock = count_of(command_parameters, SHEEP, crate::FLOCK as u64)? as usize;
+    let world_generation = crate::WorldGeneration { sheep_per_superchunk: count_of(command_parameters, SHEEP, worldgen::FLOCK)?, ..crate::WorldGeneration::DEFAULT };
     let forced_hot = command_parameters.nested(FORCED_HOT).is_some();
     let world_size = crate::WorldSize::of_side(count_of(command_parameters, SIDE, 0)? as u32, forced_hot)?;
     let thread_count = Some(count_of(command_parameters, THREADS, 0)? as usize).filter(|&asked_threads| asked_threads > 0);
-    let mut made_world = crate::start_world(crate::WorldStart { seed, world_size, thread_count, sheep_per_flock, ..crate::WorldStart::default() });
+    let mut made_world = crate::start_world(crate::WorldStart { seed, world_size, thread_count, world_generation, ..crate::WorldStart::default() });
     let save_written = crate::save(folder, &mut made_world).map_err(|save_error| save_error.to_string())?;
     Ok(format!("{}, seed {}: {} superchunks, {} entities, {} bytes in {}", world_name_of(folder), utilities::seed::seed_as_hex(seed), save_written.superchunks, save_written.entities_written, save_written.bytes_written, folder.display()))
 }
@@ -56,8 +56,8 @@ pub fn run_saved_world(command_parameters: &CleanServerParameters) -> Result<Str
         halos += loaded_world.tick().halos;
     }
     let ticking_seconds = ticking_began.elapsed().as_secs_f64();
-    let hot = loaded_world.bitmap_arena.superchunks().len();
-    let grass_cells: u64 = loaded_world.bitmap_arena.superchunks().iter().map(|superchunk| loaded_world.bitmap_arena.superchunk_count(GRASS, superchunk.superchunk_index()) as u64).sum();
+    let hot = loaded_world.bitmap_arena().superchunks().len();
+    let grass_cells: u64 = loaded_world.bitmap_arena().superchunks().iter().map(|superchunk| loaded_world.bitmap_arena().superchunk_count(GRASS, superchunk.superchunk_index()) as u64).sum();
     let save_written = crate::save(folder, &mut loaded_world).map_err(|save_error| save_error.to_string())?;
     let (warming, cooling) = (loaded_world.warming().count(), loaded_world.cooling().count());
     let HaloChange { superchunks_reached: reached, superchunks_generated: generated, superchunks_restored: restored, superchunks_cooled: cooled } = halos;
@@ -65,7 +65,7 @@ pub fn run_saved_world(command_parameters: &CleanServerParameters) -> Result<Str
         "{}: tick {} -> {}, {:.0} ticks a second; {} entities; {hot} of {} superchunks hot, {cooling} of them cooling, {warming} warming, {grass_cells} cells of grass on them; superchunks {reached} reached, {generated} generated, {restored} restored, {cooled} cooled; {} bytes saved",
         world_name_of(folder),
         loaded_world.world_info.tick,
-        loaded_world.entity_store.current_tick(),
+        loaded_world.entity_store().current_tick(),
         ticks as f64 / ticking_seconds,
         save_written.entities_written,
         save_written.superchunks,

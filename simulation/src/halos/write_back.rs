@@ -12,7 +12,7 @@ impl Halos {
     /// for, if `wait_for_jobs`, else up to the first not yet encoded -- the
     /// superchunk at the ring's tail sent to be flushed whenever it needs
     /// the room; then puts the images flushed so far in the cold pool.
-    pub fn land_write_backs(&mut self, lent_world: &mut LentWorld<'_>, wait_for_jobs: bool) {
+    pub(crate) fn land_write_backs(&mut self, lent_world: &mut LentWorld<'_>, wait_for_jobs: bool) {
         while let Some(&(superchunk, encode_ticket)) = self.writing_back.front() {
             let maybe_encode_done = if wait_for_jobs { Some(self.jobs.take_waiting(encode_ticket)) } else { self.jobs.try_take(encode_ticket) };
             let Some(JobDone::WriteBackEncoded(encoded_layers)) = maybe_encode_done else {
@@ -73,7 +73,7 @@ impl Halos {
     /// Flushes every superchunk with changes in the ring, rewritten on
     /// every thread: the ring empty, and the cold pool's
     /// images the cells written back.
-    pub fn flush_all(&mut self, lent_world: &mut LentWorld<'_>) {
+    pub(crate) fn flush_all(&mut self, lent_world: &mut LentWorld<'_>) {
         while lent_world.chunk_storage.tail_superchunk().is_some() {
             self.flush_tail(lent_world);
         }
@@ -83,7 +83,7 @@ impl Halos {
     /// Writes back every hot superchunk's changed bitmaps, encoded on
     /// every thread, and puts them, and every write-back
     /// still on its way, into the writeback ring.
-    pub fn write_back_all(&mut self, lent_world: &mut LentWorld<'_>) {
+    pub(crate) fn write_back_all(&mut self, lent_world: &mut LentWorld<'_>) {
         for superchunk in lent_world.bitmap_arena.superchunk_indices() {
             let dirty = lent_world.bitmap_arena.take_dirty(superchunk);
             if !dirty.is_empty() {
@@ -99,7 +99,7 @@ impl Halos {
     /// goes, so a hot superchunk's image is always in memory. If that
     /// is not enough, the ring is flushed first -- a cold superchunk
     /// whose changes wait there is held by them -- and the rest paged.
-    pub fn page_cold_pool_out(&mut self, lent_world: &mut LentWorld<'_>) -> Result<usize, DiskError> {
+    pub(crate) fn page_cold_pool_out(&mut self, lent_world: &mut LentWorld<'_>) -> Result<usize, DiskError> {
         if !lent_world.chunk_storage.over_memory_kept() {
             return Ok(0);
         }

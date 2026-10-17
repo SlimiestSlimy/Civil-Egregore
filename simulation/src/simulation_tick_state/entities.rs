@@ -1,13 +1,13 @@
 //! The entities in a turn: those woken, any in reach read, and the
 //! instructions queued for them.
 
-use super::SuperchunkTickState;
+use super::SimulationTickState;
 use entity_manager::{EntityRef, SuperchunkEntities};
 use bitplane_manager::CellReader;
 use chunk_storage::LayerType;
 use coordinates::{CellIndex, ChunkIndex};
 
-impl<'a> SuperchunkTickState<'a> {
+impl<'a> SimulationTickState<'a> {
     /// The superchunk's entities waking this tick, as the tick found
     /// them, in Morton order by cell -- the order their buckets hold
     /// them in. Each that is to wake
@@ -17,7 +17,7 @@ impl<'a> SuperchunkTickState<'a> {
         superchunk_entities.woken_entities(self.current_tick)
     }
 
-    /// [`SuperchunkTickState::woken_entities`], for a rule that reads the cells of
+    /// [`SimulationTickState::woken_entities`], for a rule that reads the cells of
     /// `layers` about each entity woken: they are asked of memory a few
     /// wakes ahead.
     pub fn woken_reading<const N: usize>(&self, layers: [LayerType; N]) -> impl Iterator<Item = EntityRef<'a>> + 'a {

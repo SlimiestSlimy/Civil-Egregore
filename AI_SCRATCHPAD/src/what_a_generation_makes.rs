@@ -15,7 +15,7 @@ pub const WORLD_SIDE_SUPERCHUNKS: &str = "side";
 /// Runs the probe on a plain ([`Generation::plain`]): a line a layer.
 pub fn run_probe(given_parameters: &ProbeParameters) -> Result<(), String> {
     let (grass_thousandths, world_side_superchunks): (u64, u32) = (given_parameters.argument_number(GRASS_THOUSANDTHS)?, given_parameters.argument_number(WORLD_SIDE_SUPERCHUNKS)?);
-    let world = server::start_world(WorldStart { world_generation: WorldGeneration::plain(grass_thousandths * FRACTION_ONE / 1000), world_size: WorldSize::SquareOfSide { side_superchunks: world_side_superchunks, forced_hot: true }, sheep_per_flock: 0, ..WorldStart::default() });
+    let world = server::start_world(WorldStart { world_generation: WorldGeneration::plain(grass_thousandths * FRACTION_ONE / 1000), world_size: WorldSize::SquareOfSide { side_superchunks: world_side_superchunks, forced_hot: true }, ..WorldStart::default() });
     println!("layer,cells");
     for (layer_name, layer_type) in [("grass", GRASS), ("wet", WET), ("wall east", WALL_EAST), ("wall south", WALL_SOUTH)] {
         let cells: u64 = world.bitmap_arena().superchunk_indices().into_iter().map(|superchunk| world.bitmap_arena().superchunk_count(layer_type, superchunk) as u64).sum();

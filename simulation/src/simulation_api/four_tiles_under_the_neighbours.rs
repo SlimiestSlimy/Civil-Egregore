@@ -8,7 +8,7 @@
 use bitplane_manager::{SmallTiles, SMALL_TILE_CELLS, SMALL_TILE_SIDE};
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
-use crate::SuperchunkTickState;
+use crate::SimulationTickState;
 
 /// Cells along the side of the square the four small tiles make.
 const SQUARE_SIDE: u32 = 2 * SMALL_TILE_SIDE;
@@ -182,13 +182,13 @@ impl TilesAbout {
 /// it: the cells of `under_word` alone, and only the tiles it has a cell
 /// in looked up -- one to four, for a cell and its neighbours.
 #[inline]
-pub(crate) fn read_layer(tick_state: &SuperchunkTickState, layer_type: LayerType, about_tiles: &TilesAbout, under_word: u64) -> SmallTiles {
+pub(crate) fn read_layer(tick_state: &SimulationTickState, layer_type: LayerType, about_tiles: &TilesAbout, under_word: u64) -> SmallTiles {
     let [tiles] = read_layers(tick_state, [layer_type], about_tiles, under_word);
     tiles
 }
 
 /// [`read_layer`], of each of `layer_types` at once.
 #[inline]
-pub(crate) fn read_layers<const N: usize>(tick_state: &SuperchunkTickState, layer_types: [LayerType; N], about_tiles: &TilesAbout, under_word: u64) -> [SmallTiles; N] {
+pub(crate) fn read_layers<const N: usize>(tick_state: &SimulationTickState, layer_types: [LayerType; N], about_tiles: &TilesAbout, under_word: u64) -> [SmallTiles; N] {
     tick_state.small_tiles(layer_types, about_tiles.first_cell, under_word)
 }
