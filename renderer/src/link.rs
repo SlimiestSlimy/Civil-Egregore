@@ -52,14 +52,6 @@ impl HostLink {
         Self::around_host(host, frame_receiver, Some(TARGET_PACE))
     }
 
-    /// A host whose world is whatever ticker's comes to be shown
-    /// (`Host::of_shown_worlds`), flat out unless the keys say
-    /// otherwise: none if a window showing them is open already.
-    pub fn of_shown_worlds() -> Option<Self> {
-        let (host, frame_receiver) = Host::of_shown_worlds()?;
-        Some(Self::around_host(host, frame_receiver, None))
-    }
-
     /// `host`, held to `held_pace`, asked nothing yet; its `frame_receiver` painted
     /// on a thread of their own.
     fn around_host(host: Host, frame_receiver: Receiver<server::host::frame::ViewportFrame>, held_pace: Option<u32>) -> Self {

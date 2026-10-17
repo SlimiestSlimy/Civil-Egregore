@@ -3,10 +3,14 @@
 //!
 //! `cargo test --release --test complete -- --ignored`
 
-mod tests;
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
+#[path = "shared/terrain_cells.rs"]
+mod terrain_cells;
 
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
-use tests::{height_at, keeps_wall_cartesian};
+use terrain_cells::{height_at, keeps_wall_cartesian};
 use worldgen::{wall, LandShape, Terrain};
 
 /// A shape of small polygons joined by cliffs: plenty of walls.
@@ -16,8 +20,9 @@ const CLIFFS_SHAPE: LandShape = LandShape { vertex_spacing_power: 8, ocean_share
 #[test]
 #[ignore]
 fn walls_are_a_small_share_of_the_ground_whatever_the_seed() {
+    let first_seed = crate::test_seed::TestSeedHandle::open().seed();
     for seed_offset in 1..=16 {
-        let seed = utilities::seed::counted_seed() + seed_offset;
+        let seed = first_seed + seed_offset;
         let counts = Terrain::generate_shaped(&CLIFFS_SHAPE, seed, WORLD_MIDDLE.at_cartesian_offset(seed_offset as i32, 0).expect("in the world")).wall_counts();
         let walled_share = counts.iter().sum::<u64>() as f64 / (4.0 * 1024.0 * 1024.0);
         assert!(walled_share < 0.25, "seed {seed}: {:.2}% of steps walled, {counts:?}", 100.0 * walled_share);
@@ -29,8 +34,9 @@ fn walls_are_a_small_share_of_the_ground_whatever_the_seed() {
 #[test]
 #[ignore]
 fn superchunks_made_apart_meet_with_no_seam() {
-    let mut seeded_rng = utilities::rng::RandomSource::new(utilities::seed::counted_seed());
-    for seed in [0, 1].map(|seed_offset| utilities::seed::counted_seed() + seed_offset) {
+    let first_seed = crate::test_seed::TestSeedHandle::open().seed();
+    let mut seeded_rng = utilities::rng::RandomSource::new(first_seed);
+    for seed in [0, 1].map(|seed_offset| first_seed + seed_offset) {
         // Anywhere with a superchunk east and south of it.
         let last_drawable = u64::from(coordinates::WORLD_SIDE_SUPERCHUNKS) - 1;
         let here_superchunk = SuperchunkIndex::from_cartesian(seeded_rng.draw_below(last_drawable) as u32, seeded_rng.draw_below(last_drawable) as u32);

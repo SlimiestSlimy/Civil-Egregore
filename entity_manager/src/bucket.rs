@@ -94,11 +94,6 @@ impl Bucket {
         self.stored_entities.len()
     }
 
-    /// The attributes' blocks in use, and the garbage.
-    pub(crate) fn attribute_counts(&self) -> (usize, usize) {
-        (self.attributes.len() - self.garbage_blocks, self.garbage_blocks)
-    }
-
     /// The entity standing on `stood_cell`, if one does.
     #[inline]
     pub(crate) fn get(&self, stood_cell: CellIndex) -> Option<EntityRef<'_>> {

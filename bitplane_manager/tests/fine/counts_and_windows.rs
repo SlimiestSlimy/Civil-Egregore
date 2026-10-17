@@ -3,12 +3,11 @@
 //!
 //! `cargo test`
 
-use crate::tests::*;
+use crate::chunks::*;
 use bitmap::CellWords;
 use bitplane_manager::{BitmapArena, BucketKey, NotHot, CellReader, WriteShape, Window, Write, WriteOp, COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS};
 use chunk_storage::{Bits16, Bits2, Bits4, Bits8, WidePlane, Width, ChunkStorage, LayerCodec};
 use utilities::rng::RandomSource;
-use utilities::seed::counted_seed;
 use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 
 /// The mock superchunk, made hot: every cell is dirt or grass, never
@@ -16,10 +15,11 @@ use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCH
 /// included, and each superchunk bitplane the cells of its hot bitmaps.
 #[test]
 fn every_bitmap_counts_its_cells() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let mut layer_codec = LayerCodec::new();
     let mut bitmap_arena = BitmapArena::new();
     let mut cold_storage = ChunkStorage::new(1 << 12);
-    cold_storage.insert(WORLD_MIDDLE, grass_on_dirt(counted_seed(), 8, &mut layer_codec));
+    cold_storage.insert(WORLD_MIDDLE, grass_on_dirt(seed, 8, &mut layer_codec));
     for chunk in WORLD_MIDDLE.chunks() {
         bitmap_arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &cold_storage, &mut layer_codec);
     }
@@ -49,11 +49,12 @@ fn every_bitmap_counts_its_cells() {
 /// with it.
 #[test]
 fn counts_follow_every_change() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let mut layer_codec = LayerCodec::new();
     let mut bitmap_arena = BitmapArena::new();
     let mut cold_storage = ChunkStorage::new(1 << 12);
-    let mut seeded_random = RandomSource::new(counted_seed());
-    cold_storage.insert(WORLD_MIDDLE, grass_on_dirt(counted_seed(), 0, &mut layer_codec));
+    let mut seeded_random = RandomSource::new(crate::test_seed::TestSeedHandle::open().fine_seed());
+    cold_storage.insert(WORLD_MIDDLE, grass_on_dirt(seed, 0, &mut layer_codec));
     let chunk = ChunkIndex::from_superchunk_place(WORLD_MIDDLE, seeded_random.draw_below(16) as usize);
     bitmap_arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &cold_storage, &mut layer_codec);
     let (dirt, grass_key) = (BucketKey { layer_type: MOCK_DIRT, chunk }, BucketKey { layer_type: MOCK_GRASS, chunk });
@@ -84,8 +85,9 @@ fn counts_follow_every_change() {
 /// with superchunks and types read by turns.
 #[test]
 fn windows_read_at_once_are_the_cells_read_one_by_one() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let (mut layer_codec, mut bitmap_arena) = (LayerCodec::new(), BitmapArena::new());
-    let mut seeded_random = RandomSource::new(counted_seed());
+    let mut seeded_random = RandomSource::new(seed);
     for y in 0..5 {
         for x in 0..5 {
             for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
@@ -135,11 +137,12 @@ fn windows_read_at_once_are_the_cells_read_one_by_one() {
 /// flipped: what sampling passes over a bitmap by.
 #[test]
 fn every_count_tile_counts_its_cells() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let mut layer_codec = LayerCodec::new();
     let mut bitmap_arena = BitmapArena::new();
     let mut cold_storage = ChunkStorage::new(1 << 12);
-    let mut seeded_random = RandomSource::new(counted_seed());
-    cold_storage.insert(WORLD_MIDDLE, grass_on_dirt(counted_seed(), 300_000, &mut layer_codec));
+    let mut seeded_random = RandomSource::new(crate::test_seed::TestSeedHandle::open().fine_seed());
+    cold_storage.insert(WORLD_MIDDLE, grass_on_dirt(seed, 300_000, &mut layer_codec));
     for chunk in WORLD_MIDDLE.chunks() {
         bitmap_arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &cold_storage, &mut layer_codec);
     }
@@ -180,7 +183,7 @@ fn every_count_tile_counts_its_cells() {
 fn a_wide_plane_holds_numbers<W: Width>(wide_plane: WidePlane<W>) {
     let (mut layer_codec, mut bitmap_arena, mut flushed_superchunks) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
     let mut cold_storage = ChunkStorage::new(1 << 12);
-    let mut seeded_random = RandomSource::new(counted_seed());
+    let mut seeded_random = RandomSource::new(crate::test_seed::TestSeedHandle::open().fine_seed());
     let (layer_type, chunk) = (wide_plane.layer_type(), ChunkIndex::from_superchunk_place(WORLD_MIDDLE, seeded_random.draw_below(16) as usize));
     let bucket_key = BucketKey { layer_type, chunk };
     assert_eq!(bitmap_arena.make_hot_layers(chunk, &[layer_type], &cold_storage, &mut layer_codec), 1);

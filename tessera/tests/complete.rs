@@ -7,9 +7,9 @@
 
 mod tests;
 
-use tessera::diagnostics::adversarial::worst;
+use tests::saved::every_saved;
 use tessera::corpus::checkerboards::every_checkerboard;
-use tessera::corpus::{corpus_families, grown_bitmaps, one_laid_out, corpus_seed, HowMany, CITY_PLANS, GROWN_SHAPES};
+use tessera::corpus::{corpus_families, grown_bitmaps, one_laid_out, HowMany, CITY_PLANS, GROWN_SHAPES};
 use tests::{check_bitmap, check_turned_bits};
 
 /// How far from the measured seeds the second corpus starts.
@@ -24,7 +24,8 @@ const SECOND_CORPUS_EACH: u64 = 4;
 #[test]
 #[ignore]
 fn every_family_round_trips() {
-    for (family_name, maps) in corpus_families(HowMany::TimedCount) {
+    let seed = tests::fresh_test_seed();
+    for (family_name, maps) in corpus_families(seed, HowMany::TimedCount) {
         for (case_index, bitmap) in maps.iter().enumerate() {
             check_bitmap(bitmap, &format!("{family_name}, case {case_index}"));
         }
@@ -38,14 +39,15 @@ fn every_family_round_trips() {
 #[test]
 #[ignore]
 fn a_second_seed_base_round_trips() {
+    let seed = tests::fresh_test_seed();
     for grown_shape in &GROWN_SHAPES {
-        let seed = corpus_seed().wrapping_add(SECOND_SEED_OFFSET);
+        let seed = seed.wrapping_add(SECOND_SEED_OFFSET);
         for (case_index, bitmap) in grown_bitmaps(seed, grown_shape.cell_density, grown_shape.cluster_weight, SECOND_CORPUS_EACH).enumerate() {
             check_bitmap(&bitmap, &format!("{}, second seed base, case {case_index}", grown_shape.display_name));
         }
     }
     for city_plan in &CITY_PLANS {
-        let seed = corpus_seed().wrapping_add(SECOND_SEED_OFFSET);
+        let seed = seed.wrapping_add(SECOND_SEED_OFFSET);
         for case_index in 0..SECOND_CORPUS_EACH {
             check_bitmap(&one_laid_out(seed + case_index, city_plan), &format!("{}, second seed base, case {case_index}", city_plan.display_name));
         }
@@ -76,7 +78,8 @@ const MOST_TURNED_DRIFT_PERCENT: f64 = 2.0;
 #[test]
 #[ignore]
 fn turned_bitmaps_take_about_as_many_bits() {
-    let mut family_sets = corpus_families(HowMany::TimedCount);
-    family_sets.push(("the saved adversarial bitmaps".to_string(), worst::every_saved().into_iter().map(|(_, bitmap)| bitmap).collect()));
+    let seed = tests::fresh_test_seed();
+    let mut family_sets = corpus_families(seed, HowMany::TimedCount);
+    family_sets.push(("the saved adversarial bitmaps".to_string(), every_saved().into_iter().map(|(_, bitmap)| bitmap).collect()));
     check_turned_bits(family_sets, MOST_TURNED_DRIFT_PERCENT);
 }

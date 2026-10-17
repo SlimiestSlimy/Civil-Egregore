@@ -4,6 +4,9 @@
 //!
 //! `cargo test --test fine`
 
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
 use type_registry::{data_words, default_attribute_of, first_clash, first_default_amiss, first_master_amiss, layer_types, master_of, row_named, of_number, rule_of_id, rules_of, AttributeType, EntityRuleType, EntityType, Registration, Layout, LayerType, RegistryRow, ScaRuleType, SheepState, GRASS, TYPE_ID_NUMBERS, REGISTRY, RULES_REGISTERED, CLIMATE, RULE_OF_GRASS, RULE_OF_SHEEP, RULE_OF_TREES, RULE_OF_WEATHER, SHEEP, SHEEP_STATE, TREE, TREE_STAGE};
 use utilities::rng::RandomSource;
 
@@ -54,11 +57,12 @@ fn the_check_finds_every_clash_and_the_registry_has_none() {
 /// caught at its row.
 #[test]
 fn a_default_attribute_is_an_attribute_of_a_fixed_size_of_the_table() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     assert_eq!(first_default_amiss(REGISTRY), None);
     assert_eq!(default_attribute_of(SHEEP), row_named("sheep state"));
     assert_eq!(default_attribute_of(EntityType::from_number(200_000)), None, "a type not registered");
     assert!(REGISTRY.iter().all(|registered_row| registered_row.registration == Registration::EntityType || registered_row.default_attribute == 0));
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let mut seeded_rng = RandomSource::new(seed);
     for _ in 0..200 {
         let row_count = 4 + seeded_rng.draw_below(12) as usize;
         // Numbers apart, each row an entity type or an attribute, the first two one of each: there is always one of either to name.
@@ -101,6 +105,7 @@ fn a_default_attribute_is_an_attribute_of_a_fixed_size_of_the_table() {
 /// no rule and has one, are each caught at their row.
 #[test]
 fn a_rule_has_one_master_of_the_kind_its_rule_is_of() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     assert_eq!(first_master_amiss(REGISTRY), None);
     let rules = [(RULE_OF_GRASS.0, "grass rule", GRASS.type_number()), (RULE_OF_TREES.0, "trees rule", TREE.type_number()), (RULE_OF_SHEEP.0, "sheep rule", SHEEP.type_number()), (RULE_OF_WEATHER.0, "weather rule", CLIMATE.layer_type().type_number())];
     assert_eq!(rules.len(), RULES_REGISTERED);
@@ -119,7 +124,7 @@ fn a_rule_has_one_master_of_the_kind_its_rule_is_of() {
         assert_eq!((registered_row.master != 0, master_of(registered_row).is_some()), (rule, rule), "{}", registered_row.name);
         assert_eq!(rules_of(registered_row).count(), rules.iter().filter(|rule| rule.2 == registered_row.type_number).count(), "{}", registered_row.name);
     }
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let mut seeded_rng = RandomSource::new(seed);
     for _ in 0..200 {
         let row_count = 5 + seeded_rng.draw_below(12) as usize;
         // Numbers apart; the first four a layer, a wide plane, an entity type and an attribute: there is always one of each to name.
@@ -168,7 +173,8 @@ fn the_layer_types_are_the_layers_and_wide_planes() {
 /// words they were written to.
 #[test]
 fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
-    let mut seeded_rng = utilities::rng::RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut seeded_rng = utilities::rng::RandomSource::new(seed);
     // The fewest blocks and the most, and every count between with a number drawn: any that fits between the two bytes.
     for block_count in 1..=type_registry::ATTRIBUTE_BLOCKS_MOST {
         let type_number = 1 + seeded_rng.draw_below(TYPE_ID_NUMBERS - 1);

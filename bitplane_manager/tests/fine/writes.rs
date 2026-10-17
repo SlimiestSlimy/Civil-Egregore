@@ -5,7 +5,7 @@
 //! `cargo test`
 
 use bitplane_manager::{WritesApplied, BitmapArena, BucketKey, WriteShape, Write, WriteOp};
-use crate::tests::{grass_on_dirt, MOCK_DIRT, MOCK_GRASS};
+use crate::chunks::{grass_on_dirt, MOCK_DIRT, MOCK_GRASS};
 use chunk_storage::{ChunkStorage, LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, WORLD_MIDDLE};
 
@@ -120,8 +120,9 @@ fn cold_bitmaps_are_missed() {
 /// changed and what was missed as that does.
 #[test]
 fn writes_drawn_are_the_cells_written_one_by_one() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     use std::collections::HashSet;
-    let mut seeded_random = utilities::rng::RandomSource::new(utilities::seed::counted_seed());
+    let mut seeded_random = utilities::rng::RandomSource::new(seed);
     let superchunk_edge = WORLD_MIDDLE.top_left().cartesian().x;
     // The chunks about the corner, each way; those up and left of it left cold.
     let hot: Vec<CellCartesian> = (-2..2).flat_map(|chunks_down| (-2..2).map(move |chunks_across| (chunks_across, chunks_down))).filter(|&(offset_across, offset_down)| offset_across >= 0 || offset_down >= 0).map(|(chunk_offset_across, chunk_offset_down)| CellCartesian { x: superchunk_edge.wrapping_add_signed(chunk_offset_across * 256), y: superchunk_edge.wrapping_add_signed(chunk_offset_down * 256) }).collect();
@@ -177,10 +178,11 @@ fn writes_drawn_are_the_cells_written_one_by_one() {
 /// stays dirt or grass, and the counts keep up.
 #[test]
 fn grass_spreads_over_dirt() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let mut layer_codec = LayerCodec::new();
     let mut bitmap_arena = BitmapArena::new();
     let mut cold_storage = ChunkStorage::new(1 << 12);
-    cold_storage.insert(WORLD_MIDDLE, grass_on_dirt(utilities::seed::counted_seed(), 8, &mut layer_codec));
+    cold_storage.insert(WORLD_MIDDLE, grass_on_dirt(seed, 8, &mut layer_codec));
     for chunk in WORLD_MIDDLE.chunks() {
         bitmap_arena.make_hot_layers(chunk, &[MOCK_DIRT, MOCK_GRASS], &cold_storage, &mut layer_codec);
     }

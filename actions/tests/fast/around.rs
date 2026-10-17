@@ -6,7 +6,7 @@
 //!
 //! `cargo test --test fast`
 
-use crate::tests::{cell, STONE_LAYER};
+use crate::arenas::{cell, STONE_LAYER};
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
 use coordinates::{CellIndex, SuperchunkIndex};
@@ -27,9 +27,10 @@ fn cells_every_way() -> impl Iterator<Item = (u32, u32)> {
 /// The nine cells about a cell are its cells read one by one.
 #[test]
 fn the_nine_about_a_cell_are_its_cells_read_one_by_one() {
-    let mut seeded_random = RandomSource::new(utilities::seed::counted_seed());
-    let mut bitmap_arena = crate::tests::stone_arena(3, (0..3_000_000).map(move |_| cell(seeded_random.draw_below(3072) as u32, seeded_random.draw_below(3072) as u32)));
-    let report = Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), utilities::seed::counted_seed(), |turn| {
+    let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let mut seeded_random = RandomSource::new(seed);
+    let mut bitmap_arena = crate::arenas::stone_arena(3, (0..3_000_000).map(move |_| cell(seeded_random.draw_below(3072) as u32, seeded_random.draw_below(3072) as u32)));
+    let report = Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |turn| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }
@@ -73,7 +74,8 @@ fn the_nine_about_a_cell_are_its_cells_read_one_by_one() {
 /// the whole ring.
 #[test]
 fn what_may_be_stepped_to_is_the_unwalled_less_the_held() {
-    let (mut layer_codec, mut bitmap_arena, mut seeded_random) = (LayerCodec::new(), BitmapArena::new(), RandomSource::new(utilities::seed::counted_seed()));
+    let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let (mut layer_codec, mut bitmap_arena, mut seeded_random) = (LayerCodec::new(), BitmapArena::new(), RandomSource::new(seed));
     for layer_type in [WALL_NORTH, WALL_WEST, WALL_EAST, WALL_SOUTH, COLLISION] {
         for (x, y) in (10..13).flat_map(|y| (10..13).map(move |x| (x, y))) {
             for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
@@ -88,7 +90,7 @@ fn what_may_be_stepped_to_is_the_unwalled_less_the_held() {
     let hemmed_cell: CellIndex = cell(1023, 1024);
     (0..around::WAYS).filter(|&way_checked| way_checked != around::HERE).for_each(|way_held| bitmap_arena.queue_write(COLLISION, Write::cell(around::cell(hemmed_cell, way_held).unwrap(), WriteOp::SetCell)));
     assert_eq!(bitmap_arena.apply().missed, 0);
-    let report = Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), utilities::seed::counted_seed(), |turn| {
+    let report = Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |turn| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }

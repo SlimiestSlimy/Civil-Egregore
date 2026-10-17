@@ -7,23 +7,23 @@ use server::host::frame::FrameAsk;
 use server::host::terrain::HeightsAsk;
 use server::host::Host;
 use server::WorldStart;
-use utilities::commands::GivenCommand;
+use crate::ProbeParameters;
 use utilities::tuning::default_tuning;
 
 /// Cells along the side of the square looked at.
-pub const SQUARE_SIDE_CELLS: &str = "cells along the side";
+pub const SQUARE_SIDE_CELLS: &str = "square_side_cells";
 /// Every how many cells one is looked at.
-pub const EVERY_SO_MANY_CELLS: &str = "every so many cells";
+pub const EVERY_SO_MANY_CELLS: &str = "every";
 
 /// The rises counted apart: up to each of these, and past the last.
 const RISE_BOUNDS: [u32; 12] = [0, 1, 2, 3, 4, 6, 8, 12, 16, 32, 64, 256];
 
 /// Runs the probe: the land's and the ocean's share, the heights
 /// between, and a line a rise.
-pub fn run_probe(given_parameters: &GivenCommand) -> Result<(), String> {
+pub fn run_probe(given_parameters: &ProbeParameters) -> Result<(), String> {
     let (square_side_cells, every_so_many_cells): (u32, u32) = (given_parameters.argument_number(SQUARE_SIDE_CELLS)?, given_parameters.argument_number(EVERY_SO_MANY_CELLS)?);
     let world_start = WorldStart::from_tuning(None, &default_tuning());
-    let seed = crate::asking_the_host::seed(given_parameters)?.unwrap_or_else(|| server::seed_with_land(utilities::seed::counted_seed(), &world_start.world_generation));
+    let seed = crate::asking_the_host::seed(given_parameters)?.unwrap_or_else(|| server::seed_with_land(utilities::seed::given_or_fresh_seed(None), &world_start.world_generation));
     // The heights are asked of a host running the world, paused: two rows of cells at a time, the row looked at and the one under it.
     let (host, frame_receiver) = Host::start_on_thread();
     host.set_paused(true);

@@ -11,7 +11,8 @@ use utilities::rng::RandomSource;
 /// to the nearest tick, and nothing takes less than one tick.
 #[test]
 fn a_time_is_its_ticks_at_the_tick_rate() {
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut seeded_rng = RandomSource::new(seed);
     for _ in 0..1000 {
         let drawn_seconds = seeded_rng.draw_below(1 << 20);
         assert_eq!(SimulationTime::from_seconds(drawn_seconds).ticks(), (drawn_seconds * TICKS_A_SIMULATION_SECOND).max(1));
@@ -31,7 +32,8 @@ fn a_time_is_its_ticks_at_the_tick_rate() {
 /// takes no longer than what it is drawn at.
 #[test]
 fn a_chance_each_time_another_happens_keeps_its_own_mean_time() {
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut seeded_rng = RandomSource::new(seed);
     let drawn_at_time = SimulationTime::from_milliseconds(50 + seeded_rng.draw_below(500));
     let mean_time = SimulationTime::from_milliseconds(drawn_at_time.ticks() * 1000 / TICKS_A_SIMULATION_SECOND * (2 + seeded_rng.draw_below(20)));
     let (at_each, a_tick) = (mean_time.chance_each(drawn_at_time), drawn_at_time.chance_a_tick());
@@ -50,7 +52,8 @@ fn a_chance_each_time_another_happens_keeps_its_own_mean_time() {
 /// twenty thousand of them.
 #[test]
 fn a_mean_time_is_the_mean_of_what_its_chance_draws() {
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut seeded_rng = RandomSource::new(seed);
     let mean_time = SimulationTime::from_milliseconds(100 + seeded_rng.draw_below(2000));
     let (chance, mut happened_count, mut ticks) = (mean_time.chance_a_tick(), 0u64, 0u64);
     while happened_count < 20_000 {

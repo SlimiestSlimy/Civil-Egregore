@@ -5,10 +5,12 @@
 //!
 //! `cargo test --test allocations`
 
+mod tests;
+
 use bitmap::Bitmap;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
-use tessera::diagnostics::adversarial::worst;
+use tests::saved::every_saved;
 use tessera::corpus::checkerboards::one_checkerboard;
 use tessera::corpus::{corpus_families, HowMany};
 use tessera::{BitStream, Tessera};
@@ -59,9 +61,10 @@ static GLOBAL_ALLOCATOR: CountingAllocator = CountingAllocator;
 /// adversarial bitmaps, encoded and decoded with no allocation at all.
 #[test]
 fn encoding_and_decoding_never_allocate() {
-    let mut corpus: Vec<Bitmap> = corpus_families(HowMany::TestedCount).into_iter().flat_map(|(_, bitmaps)| bitmaps).collect();
+    let seed = tests::fresh_test_seed();
+    let mut corpus: Vec<Bitmap> = corpus_families(seed, HowMany::TestedCount).into_iter().flat_map(|(_, bitmaps)| bitmaps).collect();
     corpus.push(one_checkerboard(7));
-    corpus.extend(worst::every_saved().into_iter().map(|(_, bitmap)| bitmap));
+    corpus.extend(every_saved().into_iter().map(|(_, bitmap)| bitmap));
     let (mut tessera, mut stream, mut decoded_bitmap) = (Tessera::new(), BitStream::default(), Bitmap::new());
     COUNTED_ALLOCATIONS.with(|counted_allocations| counted_allocations.set((true, 0)));
     for bitmap in &corpus {

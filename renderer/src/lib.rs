@@ -9,7 +9,6 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-pub mod diagnostics;
 mod climate_labels;
 mod frames;
 mod ground;
@@ -22,6 +21,13 @@ mod overlays;
 mod paint;
 pub mod transient_data;
 mod view;
+
+// The tests' seed, from the workspace's file: test infrastructure, built
+// into the tests alone.
+#[cfg(test)]
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
 
 use bevy::prelude::*;
 use gui::{GuiPlugin, ShownScreen};

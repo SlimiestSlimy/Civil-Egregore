@@ -9,20 +9,11 @@ pub mod checkerboards;
 mod city;
 mod generate;
 mod lines;
-pub mod seed;
 
 pub use city::{one_laid_out, CityBitmaps, CityPlan, CITY_PLANS};
 pub use lines::{one_drawn, LineDrawings, LineSet, LINE_SETS};
-pub use seed::seed_uncounted;
 
 use bitmap::Bitmap;
-
-/// Where every corpus bitmap's seeds start: the run's seed, counted
-/// as a use of it ([`seed::seed_counted`]). Nothing a measurement runs
-/// on is a constant in the code.
-pub fn corpus_seed() -> u64 {
-    seed::seed_counted()
-}
 
 /// One shape worth measuring on: what it looks like, the two numbers
 /// that make it, and how many of it a timed run should take.
@@ -45,19 +36,19 @@ pub struct GrownShape {
 }
 
 impl GrownShape {
-    /// `count` bitmaps of this shape, built one at a time.
-    pub fn take_bitmaps(&self, count: u64) -> GrownBitmaps {
-        grown_bitmaps(corpus_seed(), self.cell_density, self.cluster_weight, count)
+    /// `count` bitmaps of this shape grown from `seed`, built one at a time.
+    pub fn take_bitmaps(&self, seed: u64, count: u64) -> GrownBitmaps {
+        grown_bitmaps(seed, self.cell_density, self.cluster_weight, count)
     }
 
     /// As many as a timed run of this shape should take.
-    pub fn timed_bitmaps(&self) -> GrownBitmaps {
-        self.take_bitmaps(self.timed_count)
+    pub fn timed_bitmaps(&self, seed: u64) -> GrownBitmaps {
+        self.take_bitmaps(seed, self.timed_count)
     }
 
     /// As many as a unit test of this shape should take.
-    pub fn tested_bitmaps(&self) -> GrownBitmaps {
-        self.take_bitmaps(self.tested_count)
+    pub fn tested_bitmaps(&self, seed: u64) -> GrownBitmaps {
+        self.take_bitmaps(seed, self.tested_count)
     }
 }
 
@@ -169,14 +160,14 @@ impl HowMany {
 /// enough, over every generator, for a steady mean and a tail.
 pub const TIMING_PER_GENERATOR: u64 = 100;
 
-/// Every family of corpus bitmaps, named, with `how_many` of each
+/// Every family of corpus bitmaps grown from `seed`, named, with `how_many` of each
 /// generator's: a result on one family is a quarter of a result
 /// (`docs/lab.md`, "`corpus/`").
-pub fn corpus_families(how_many: HowMany) -> Vec<(String, Vec<Bitmap>)> {
+pub fn corpus_families(seed: u64, how_many: HowMany) -> Vec<(String, Vec<Bitmap>)> {
     vec![
-        ("laid out like a city".to_string(), CITY_PLANS.iter().flat_map(|city_plan| city_plan.take_bitmaps(how_many.to_take(city_plan.timed_count, city_plan.tested_count))).collect()),
-        ("grown like a blob".to_string(), GROWN_SHAPES.iter().flat_map(|grown_shape| grown_shape.take_bitmaps(how_many.to_take(grown_shape.timed_count, grown_shape.tested_count))).collect()),
-        ("sparse".to_string(), SPARSE_SHAPES.iter().flat_map(|grown_shape| grown_shape.take_bitmaps(how_many.to_take(grown_shape.timed_count, grown_shape.tested_count))).collect()),
-        ("drawn with lines".to_string(), LINE_SETS.iter().flat_map(|line_set| line_set.take_bitmaps(how_many.to_take(line_set.timed_count, line_set.tested_count))).collect()),
+        ("laid out like a city".to_string(), CITY_PLANS.iter().flat_map(|city_plan| city_plan.take_bitmaps(seed, how_many.to_take(city_plan.timed_count, city_plan.tested_count))).collect()),
+        ("grown like a blob".to_string(), GROWN_SHAPES.iter().flat_map(|grown_shape| grown_shape.take_bitmaps(seed, how_many.to_take(grown_shape.timed_count, grown_shape.tested_count))).collect()),
+        ("sparse".to_string(), SPARSE_SHAPES.iter().flat_map(|grown_shape| grown_shape.take_bitmaps(seed, how_many.to_take(grown_shape.timed_count, grown_shape.tested_count))).collect()),
+        ("drawn with lines".to_string(), LINE_SETS.iter().flat_map(|line_set| line_set.take_bitmaps(seed, how_many.to_take(line_set.timed_count, line_set.tested_count))).collect()),
     ]
 }

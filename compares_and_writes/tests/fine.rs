@@ -4,6 +4,9 @@
 //!
 //! `cargo test --test fine`
 
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
 use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
@@ -21,7 +24,8 @@ const STONE_LAYER: LayerType = LayerType::of_a_bit(6);
 /// the seed.
 #[test]
 fn what_is_queued_from_a_compare_to_its_end_hangs_on_it() {
-    let mut random_numbers = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut random_numbers = RandomSource::new(seed);
     for compare_holds in [true, false] {
         let (mut layer_codec, mut bitmap_arena) = (LayerCodec::new(), BitmapArena::new());
         for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {

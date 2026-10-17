@@ -3,23 +3,17 @@
 //!
 //! `cargo test --test fine`
 
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
 #[path = "fine/fixed_list.rs"]
 mod fixed_list;
 
 #[path = "fine/hash.rs"]
 mod hash;
 
-#[path = "fine/process_memory.rs"]
-mod process_memory;
-
 #[path = "fine/rng.rs"]
 mod rng;
-
-#[path = "fine/table.rs"]
-mod table;
-
-#[path = "fine/commands.rs"]
-mod commands;
 
 #[path = "fine/dispatcher.rs"]
 mod dispatcher;

@@ -9,7 +9,8 @@ use utilities::rng::RandomSource;
 /// and a word mixed is what the random source draws from its state.
 #[test]
 fn keys_spread_over_every_slot_and_words_mix_as_draws_do() {
-    let mut random_numbers = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut random_numbers = RandomSource::new(seed);
     // Tables of every size there is a power of two for, the keys starting anywhere.
     for slots in (1..=12).map(|power_of_two| 1usize << power_of_two) {
         let mut slots_hit = vec![false; slots];

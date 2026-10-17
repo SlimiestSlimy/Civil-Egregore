@@ -10,9 +10,7 @@
 
 pub mod cache;
 pub mod chance;
-pub mod commands;
 pub mod csv;
-pub mod diagnostics;
 pub mod dispatcher;
 pub mod fixed_list;
 pub mod fixed_point;
@@ -20,6 +18,5 @@ pub mod hash;
 pub mod rng;
 pub mod seed;
 pub mod settings;
-pub mod stale_docs;
 pub mod transient_data;
 pub mod tuning;

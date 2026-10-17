@@ -3,7 +3,11 @@
 //!
 //! `cargo test --test fine`
 
-mod tests;
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
+#[path = "shared/areas.rs"]
+mod areas;
 
 #[path = "fine/paths_and_waves.rs"]
 mod paths_and_waves;

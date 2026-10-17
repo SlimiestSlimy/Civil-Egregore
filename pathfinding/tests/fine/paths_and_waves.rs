@@ -3,7 +3,7 @@
 //!
 //! `cargo test`
 
-use crate::tests::*;
+use crate::areas::*;
 use utilities::rng::RandomSource;
 use pathfinding::{a_star, rows_hold, nearest_goal, step_towards, steps_apart, Cell, Path, Rows, Wave, AREA_SIDE};
 
@@ -16,7 +16,8 @@ fn cell_drawn(seeded_rng: &mut RandomSource) -> Cell {
 /// and its first step is a neighbour one step nearer.
 #[test]
 fn paths_over_open_ground_are_straight() {
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut seeded_rng = RandomSource::new(seed);
     let mut cell_pairs = vec![(cell(8, 8), cell(15, 8)), (cell(8, 8), cell(0, 0)), (cell(0, 15), cell(15, 0)), (cell(8, 8), cell(9, 9))];
     cell_pairs.extend((0..300).map(|_| (cell_drawn(&mut seeded_rng), cell_drawn(&mut seeded_rng))).filter(|(from_cell, to_cell)| from_cell != to_cell));
     for (from_cell, to_cell) in cell_pairs {
@@ -53,7 +54,8 @@ fn paths_go_round_what_is_in_the_way() {
 /// three with walls drawn between their cells too.
 #[test]
 fn paths_are_the_shortest_and_can_be_walked() {
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut seeded_rng = RandomSource::new(seed);
     let (mut paths_found, mut no_paths) = (0, 0);
     for case_index in 0..3000 {
         // About a third of the cells in the way.
@@ -107,7 +109,8 @@ fn the_nearest_is_picked_among_the_equally_near() {
 /// through every goal that near, each once, and round again.
 #[test]
 fn the_nearest_of_goals_drawn_is_as_near_as_any() {
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut seeded_rng = RandomSource::new(seed);
     for _ in 0..1000 {
         let mut goal_rows: Rows = [0; AREA_SIDE];
         for _ in 0..seeded_rng.draw_below(12) {
@@ -134,7 +137,8 @@ fn the_nearest_of_goals_drawn_is_as_near_as_any() {
 /// goal, and stops at what is in the way.
 #[test]
 fn waves_spread_a_cell_a_step() {
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut seeded_rng = RandomSource::new(seed);
     let mut goal_rows: Rows = [0; AREA_SIDE];
     // From the middle, from a corner, and from cells drawn.
     for goal_cell in [cell(8, 8), cell(0, 15)].into_iter().chain((0..40).map(|_| cell_drawn(&mut seeded_rng))) {
@@ -160,7 +164,8 @@ fn waves_spread_a_cell_a_step() {
 /// every cell finds the nearest -- and walking those steps arrives.
 #[test]
 fn steps_by_waves_lead_to_the_nearest_goal() {
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut seeded_rng = RandomSource::new(seed);
     let (mut paths_found, mut no_paths) = (0, 0);
     for case_index in 0..3000 {
         let passable: Rows = std::array::from_fn(|_| (seeded_rng.next_draw() | seeded_rng.next_draw() >> 16 & seeded_rng.next_draw()) as u16);

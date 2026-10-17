@@ -3,16 +3,16 @@
 //!
 //! `cargo test --test fast`
 
-use crate::tests::{stone_arena, cell, STONE_LAYER};
+use crate::arenas::{stone_arena, cell, STONE_LAYER};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex};
 use entity_manager::WorldEntities;
 use actions::area::{self, AREA_CENTRE, AREA_SIDE};
 use simulation::Simulation;
 
 /// Cells scattered over the 3x3 superchunks from `(10, 10)`, some on
-/// their borders.
-fn scattered_cells() -> impl Iterator<Item = CellIndex> {
-    let mut seeded_random = utilities::rng::RandomSource::new(utilities::seed::counted_seed());
+/// their borders, drawn from `seed`.
+fn scattered_cells(seed: u64) -> impl Iterator<Item = CellIndex> {
+    let mut seeded_random = utilities::rng::RandomSource::new(seed);
     (0..3000).map(move |_| cell(seeded_random.draw_below(3072) as u32, seeded_random.draw_below(3072) as u32))
 }
 
@@ -21,10 +21,11 @@ fn scattered_cells() -> impl Iterator<Item = CellIndex> {
 /// the hot superchunks, where some cells are not hot.
 #[test]
 fn areas_read_at_once_are_the_cells_read_one_by_one() {
-    let mut bitmap_arena = stone_arena(3, scattered_cells());
+    let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let mut bitmap_arena = stone_arena(3, scattered_cells(seed));
     let corner_cartesian = cell(0, 0).cartesian();
     let centre_offsets = [(300, 300), (1024, 1024), (1020, 1029), (5, 5), (2040, 2047), (1024, 3), (777, 1023)];
-    let tick_report = Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), utilities::seed::counted_seed(), |turn| {
+    let tick_report = Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |turn| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }

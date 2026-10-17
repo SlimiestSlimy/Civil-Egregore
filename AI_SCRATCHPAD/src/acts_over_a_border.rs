@@ -12,7 +12,7 @@ use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CEL
 use entity_manager::{Attribute, WorldEntities, EntityType, Header};
 use actions::{cells, entities};
 use simulation::{Compare, Simulation, Turn};
-use utilities::commands::GivenCommand;
+use crate::ProbeParameters;
 
 /// Superchunks along the world's side.
 pub const WORLD_SIDE_SUPERCHUNKS: &str = "side";
@@ -103,7 +103,7 @@ fn turn_of(turn: &mut Turn, crossing: bool) -> u64 {
 
 /// Runs the probe: a line of CSV for the lines over the border and
 /// one for them away from it, on one thread and on every thread.
-pub fn run_probe(given_parameters: &GivenCommand) -> Result<(), String> {
+pub fn run_probe(given_parameters: &ProbeParameters) -> Result<(), String> {
     let (world_side_superchunks, every_so_many_cells, stepping_a_superchunk, ticks): (u32, u32, u32, u64) = (given_parameters.argument_number(WORLD_SIDE_SUPERCHUNKS)?, given_parameters.argument_number(EVERY_SO_MANY_CELLS)?, given_parameters.argument_number(STEPPING_A_SUPERCHUNK)?, given_parameters.argument_number(TICKS)?);
     println!("lines,threads,acts over a border a tick,applying us a tick,computing us a tick,compares held a tick,compares not a tick");
     let (threads_asked, crossing): (usize, u32) = (given_parameters.argument_number(THREADS_OF_SECOND_RUN)?, given_parameters.argument_number(CROSSING)?);

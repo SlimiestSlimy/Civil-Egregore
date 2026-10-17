@@ -3,6 +3,9 @@
 //!
 //! `cargo test --test fine`
 
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
 mod chunk_storage {
     //! Chunks as stored: a superchunk's
     //! heights, the layer codec, superchunk images, the writeback ring and
@@ -58,7 +61,8 @@ mod chunk_storage {
     /// words follow, in any order through one codec.
     #[test]
     fn layers_drawn_decode_to_what_was_encoded() {
-        let mut seeded_random = RandomSource::new(utilities::seed::counted_seed());
+        let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+        let mut seeded_random = RandomSource::new(seed);
         let mut layer_codec = LayerCodec::new();
         for case_number in 0..200 {
             let mut bitmap = Bitmap::new();
@@ -94,8 +98,9 @@ mod chunk_storage {
     /// is tall exactly if its ground spans more than a byte.
     #[test]
     fn heights_drawn_come_back_and_a_chunk_is_tall_by_its_span() {
+        let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
         const CELLS: usize = 1 << 16;
-        let mut seeded_random = RandomSource::new(utilities::seed::counted_seed());
+        let mut seeded_random = RandomSource::new(seed);
         for _ in 0..4 {
             // Spans about a byte, where a chunk turns tall, and far past it.
             let chunks: [(u16, u16); 16] = std::array::from_fn(|_| {

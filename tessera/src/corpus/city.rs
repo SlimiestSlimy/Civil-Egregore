@@ -33,19 +33,19 @@ impl CityPlan {
         self.street_pitch - self.street_width
     }
 
-    /// `count` bitmaps of this plan, built one at a time.
-    pub fn take_bitmaps(&'static self, count: u64) -> CityBitmaps {
-        CityBitmaps { seed: super::corpus_seed(), bitmaps_left: count, city_plan: self }
+    /// `count` bitmaps of this plan grown from `seed`, built one at a time.
+    pub fn take_bitmaps(&'static self, seed: u64, count: u64) -> CityBitmaps {
+        CityBitmaps { seed, bitmaps_left: count, city_plan: self }
     }
 
     /// As many as a timed run of this plan should take.
-    pub fn timed_bitmaps(&'static self) -> CityBitmaps {
-        self.take_bitmaps(self.timed_count)
+    pub fn timed_bitmaps(&'static self, seed: u64) -> CityBitmaps {
+        self.take_bitmaps(seed, self.timed_count)
     }
 
     /// As many as a unit test of this plan should take.
-    pub fn tested_bitmaps(&'static self) -> CityBitmaps {
-        self.take_bitmaps(self.tested_count)
+    pub fn tested_bitmaps(&'static self, seed: u64) -> CityBitmaps {
+        self.take_bitmaps(seed, self.tested_count)
     }
 }
 

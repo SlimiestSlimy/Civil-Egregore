@@ -11,7 +11,6 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 mod chunk_storage;
-pub mod diagnostics;
 pub mod disk;
 mod chunk_maps;
 mod height_map;

@@ -11,7 +11,6 @@
 
 mod attributes;
 mod bucket;
-pub mod diagnostics;
 mod instructions;
 mod entity;
 pub mod saved;

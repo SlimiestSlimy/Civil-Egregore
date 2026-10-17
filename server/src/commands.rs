@@ -1,59 +1,19 @@
-//! The server's commands ([`COMMANDS`]), run by `Civil_Egregore server
-//! <command>`: a world made in a folder, run and looked at, and the
-//! diagnostics tools (`docs/reference.md`, "commands.rs").
+//! The server's commands, as [`crate::start`] runs them from the clean
+//! parameters ([`crate::params`]): a world made in a folder, run and
+//! looked at (`docs/reference.md`, "commands.rs").
 
-use crate::diagnostics::tool::{print_world_hashes, print_pasture, print_throughput, TICKS_BETWEEN_HASHES, FLOCK, GRASS_THOUSANDTHS as GRASS_SHARE, SEED, ORIGIN_SHEEP, SUPERCHUNKS, THREAD_COUNT, TICKS};
+use crate::params::{FOLDER, FORCED_HOT, SHEEP, SIDE, THREADS, TICKS};
 use crate::HaloChange;
 use chunk_storage::disk;
+use protocol::server_parameters::CleanServerParameters;
 use type_registry::GRASS;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
-use utilities::commands::{NamedCommand, GivenCommand, CommandParameter};
 
-/// A world's folder: a name in the worlds' folder, or a path.
-const FOLDER: &str = "folder";
-
-/// Whether a world is made forced hot throughout, not about its
-/// flock's halo: 0, halo; anything else, forced.
-const FORCED_HOT_PARAMETER: &str = "forced";
-
-/// The server's commands: a world made, run and looked at, and its
-/// diagnostics tools.
-pub const COMMANDS: [NamedCommand; 6] = [
-    NamedCommand {
-        command_name: "new",
-        what_it_does: "makes a world from a seed and saves it in the folder: so many superchunks along a side, or 0 for as far as it goes; so many sheep on every superchunk of a world with a side, on its origin of one without; forced hot throughout if told -- only with a side -- else about the sheep's halos; on so many threads, or every one the machine has if 0",
-        command_parameters: &[CommandParameter::new(FOLDER, ""), CommandParameter::new("seed", "1"), CommandParameter::new("sheep", ""), CommandParameter::new("side", "0"), CommandParameter::new(FORCED_HOT_PARAMETER, "0"), CommandParameter::new(THREAD_COUNT, "0")],
-        run_function: |given_arguments| print_command_on_folder(given_arguments, new),
-    },
-    NamedCommand { command_name: "run", what_it_does: "loads the world in the folder, ticks it, and saves it", command_parameters: &[CommandParameter::new(FOLDER, ""), CommandParameter::new("ticks", "10000")], run_function: |given_arguments| print_command_on_folder(given_arguments, run_saved_world) },
-    NamedCommand { command_name: "info", what_it_does: "says what the world in the folder is", command_parameters: &[CommandParameter::new(FOLDER, "")], run_function: |given_arguments| print_command_on_folder(given_arguments, |folder, _| describe_saved_world(folder)) },
-    NamedCommand {
-        command_name: "throughput",
-        what_it_does: "ticks grass flat out: each phase's time, the writes a second, the memory held",
-        command_parameters: &[CommandParameter::new(TICKS, "500"), CommandParameter::new(GRASS_SHARE, "333"), CommandParameter::new(SUPERCHUNKS, "16"), CommandParameter::new(THREAD_COUNT, "0")],
-        run_function: print_throughput,
-    },
-    NamedCommand {
-        command_name: "pasture",
-        what_it_does: "ticks grass and sheep flat out: the flock, what the sheep did, each rule's time, the memory held",
-        command_parameters: &[CommandParameter::new(TICKS, "2000"), CommandParameter::new(GRASS_SHARE, "333"), CommandParameter::new(FLOCK, "4000"), CommandParameter::new(SUPERCHUNKS, "16"), CommandParameter::new(THREAD_COUNT, "0")],
-        run_function: print_pasture,
-    },
-    NamedCommand {
-        command_name: "check",
-        what_it_does: "ticks a world from a seed and prints its hash every so many ticks, part by part: the same rows on every machine and any number of threads, if the simulation is deterministic",
-        command_parameters: &[CommandParameter::new(SEED, "0"), CommandParameter::new(TICKS, "2000"), CommandParameter::new(TICKS_BETWEEN_HASHES, "100"), CommandParameter::new(ORIGIN_SHEEP, "4000"), CommandParameter::new(THREAD_COUNT, "0")],
-        run_function: print_world_hashes,
-    },
-];
-
-/// Runs `folder_command` on the folder given and what follows it, and prints
-/// the line it gives.
-fn print_command_on_folder(given_arguments: &GivenCommand, folder_command: impl FnOnce(&Path, &[&str]) -> Result<String, String>) -> Result<(), String> {
-    let folder = given_arguments.argument_text(FOLDER)?;
-    println!("{}", folder_command(&utilities::settings::world(folder), &given_arguments.argument_words()[1..])?);
-    Ok(())
+/// The world's folder the command was given: a name in the worlds'
+/// folder, or a path.
+fn folder_of(command_parameters: &CleanServerParameters) -> PathBuf {
+    utilities::settings::world(command_parameters.text(FOLDER).expect("every command on a folder is given one"))
 }
 
 /// The name of the world in `folder`: the folder's.
@@ -61,31 +21,34 @@ fn world_name_of(folder: &Path) -> String {
     folder.file_name().map_or_else(|| folder.display().to_string(), |folder_file_name| folder_file_name.to_string_lossy().into_owned())
 }
 
-/// `given_argument` as a number, or `default_number` if not given.
-fn number_argument(given_argument: Option<&&str>, default_number: u64) -> Result<u64, String> {
-    given_argument.map_or(Ok(default_number), |argument_text| argument_text.parse().map_err(|_| format!("`{argument_text}` is not a number")))
+/// The count `parameter_name`, or `default_count` if not given.
+fn count_of(command_parameters: &CleanServerParameters, parameter_name: &str, default_count: u64) -> Result<u64, String> {
+    command_parameters.integer(parameter_name).map_or(Ok(default_count), |given_count| u64::try_from(given_count).map_err(|_| format!("--{parameter_name} {given_count}: a count is never below 0")))
 }
 
-/// Makes a world from a seed and saves it in `folder`, as the rest of
-/// the line says: its sheep, side, whether forced hot, and threads
-/// (`docs/reference.md`, "commands.rs").
-pub fn new(folder: &Path, rest_of_line: &[&str]) -> Result<String, String> {
+/// Makes a world from `seed` and saves it in the folder, as the
+/// command's parameters say: its sheep, side, whether forced hot, and
+/// threads (`docs/reference.md`, "commands.rs").
+pub fn new(seed: u64, command_parameters: &CleanServerParameters) -> Result<String, String> {
+    let folder = folder_of(command_parameters);
+    let folder = folder.as_path();
     if folder.join(disk::WORLD_FILE).exists() {
         return Err(format!("{} is a world already", folder.display()));
     }
-    let seed = rest_of_line.first().map_or(Ok(1), |seed| utilities::seed::of_hex(seed).ok_or_else(|| format!("`{seed}` is not a seed: 64 bits, in hexadecimal")))?;
-    let sheep_per_flock = number_argument(rest_of_line.get(1), crate::FLOCK as u64)? as usize;
-    let forced_hot = number_argument(rest_of_line.get(3), 0)? != 0;
-    let world_size = crate::WorldSize::of_side(number_argument(rest_of_line.get(2), 0)? as u32, forced_hot)?;
-    let thread_count = Some(number_argument(rest_of_line.get(4), 0)? as usize).filter(|&asked_threads| asked_threads > 0);
+    let sheep_per_flock = count_of(command_parameters, SHEEP, crate::FLOCK as u64)? as usize;
+    let forced_hot = command_parameters.nested(FORCED_HOT).is_some();
+    let world_size = crate::WorldSize::of_side(count_of(command_parameters, SIDE, 0)? as u32, forced_hot)?;
+    let thread_count = Some(count_of(command_parameters, THREADS, 0)? as usize).filter(|&asked_threads| asked_threads > 0);
     let mut made_world = crate::start_world(crate::WorldStart { seed, world_size, thread_count, sheep_per_flock, ..crate::WorldStart::default() });
     let save_written = crate::save(folder, &mut made_world).map_err(|save_error| save_error.to_string())?;
     Ok(format!("{}, seed {}: {} superchunks, {} entities, {} bytes in {}", world_name_of(folder), utilities::seed::seed_as_hex(seed), save_written.superchunks, save_written.entities_written, save_written.bytes_written, folder.display()))
 }
 
-/// Loads the world in `folder`, ticks it, and saves it.
-pub fn run_saved_world(folder: &Path, rest_of_line: &[&str]) -> Result<String, String> {
-    let ticks = number_argument(rest_of_line.first(), 10_000)?;
+/// Loads the world in the folder, ticks it, and saves it.
+pub fn run_saved_world(command_parameters: &CleanServerParameters) -> Result<String, String> {
+    let folder = folder_of(command_parameters);
+    let folder = folder.as_path();
+    let ticks = count_of(command_parameters, TICKS, 10_000)?;
     let mut loaded_world = crate::load_world(folder).map_err(|load_error| load_error.to_string())?;
     let ticking_began = Instant::now();
     let mut halos = HaloChange::default();
@@ -110,8 +73,10 @@ pub fn run_saved_world(folder: &Path, rest_of_line: &[&str]) -> Result<String, S
     ))
 }
 
-/// Says what the world in `folder` is.
-pub fn describe_saved_world(folder: &Path) -> Result<String, String> {
+/// Says what the world in the folder is.
+pub fn describe_saved_world(command_parameters: &CleanServerParameters) -> Result<String, String> {
+    let folder = folder_of(command_parameters);
+    let folder = folder.as_path();
     let world_info = disk::read_world(folder).map_err(|read_error| read_error.to_string())?;
     let superchunks = disk::saved_superchunks(folder).map_err(|list_error| list_error.to_string())?;
     let size_text = world_info.side_in_superchunks.map_or("of no size".to_string(), |side_superchunks| format!("{side_superchunks} superchunks a side"));

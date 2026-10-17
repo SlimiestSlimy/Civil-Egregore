@@ -3,7 +3,7 @@
 //!
 //! `cargo test`
 
-use crate::tests::*;
+use crate::chunks::*;
 use bitmap::{CellWords, WORDS};
 use bitplane_manager::{BitmapArena, BucketKey, NotHot, WriteOp};
 use chunk_storage::{ChunkStorage, LayerCodec, LayerType};

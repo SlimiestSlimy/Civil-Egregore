@@ -26,7 +26,8 @@ fn holds_up_to_its_capacity() {
 /// a `Vec` put through the same holds, at every step.
 #[test]
 fn a_list_is_a_vec_of_at_most_its_capacity() {
-    let mut random_numbers = utilities::rng::RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut random_numbers = utilities::rng::RandomSource::new(seed);
     let (mut tested_list, mut model_vec): (FixedList<u64, 12>, Vec<u64>) = (FixedList::new(), Vec::new());
     for step in 0..5_000 {
         match random_numbers.draw_below(8) {

@@ -213,10 +213,4 @@ impl SuperchunkEntities {
     pub fn sort_wakes(&mut self, tick: u64) {
         self.wheel.sort_wakes(tick);
     }
-
-    /// Attributes' blocks in use, those left as garbage, and wakes filed.
-    pub(crate) fn counts(&self) -> (usize, usize, usize) {
-        let (used_blocks, garbage_blocks) = self.chunks.iter().map(Bucket::attribute_counts).fold((0, 0), |(used_sum, garbage_sum), (bucket_used, bucket_garbage)| (used_sum + bucket_used, garbage_sum + bucket_garbage));
-        (used_blocks, garbage_blocks, self.wheel.len())
-    }
 }

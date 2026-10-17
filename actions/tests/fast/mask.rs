@@ -5,7 +5,7 @@
 //!
 //! `cargo test --test fast`
 
-use crate::tests::{cell, STONE_LAYER};
+use crate::arenas::{cell, STONE_LAYER};
 use bitplane_manager::BitmapArena;
 use coordinates::SuperchunkIndex;
 use entity_manager::WorldEntities;
@@ -14,17 +14,19 @@ use simulation::Simulation;
 use utilities::rng::RandomSource;
 
 /// An arena with `STONE` hot over the 3x3 superchunks from `(10, 10)`,
-/// cells scattered over them set, some on their borders.
-fn scattered_stone_arena() -> BitmapArena {
-    let mut seeded_random = utilities::rng::RandomSource::new(utilities::seed::counted_seed());
-    crate::tests::stone_arena(3, (0..200_000).map(move |_| cell(seeded_random.draw_below(3072) as u32, seeded_random.draw_below(3072) as u32)))
+/// cells scattered over them set, some on their borders, drawn from
+/// `seed`.
+fn scattered_stone_arena(seed: u64) -> BitmapArena {
+    let mut seeded_random = utilities::rng::RandomSource::new(seed);
+    crate::arenas::stone_arena(3, (0..200_000).map(move |_| cell(seeded_random.draw_below(3072) as u32, seeded_random.draw_below(3072) as u32)))
 }
 
 /// A mask's own cells: full, a disc, and those drawn and listed are
 /// the ones set.
 #[test]
 fn a_mask_holds_its_cells() {
-    let mut seeded_random = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let mut seeded_random = RandomSource::new(seed);
     for mask_side in MASK_SIDES {
         let (full_mask, disc_mask) = (Mask::all_set(mask_side), Mask::filling_disc(mask_side));
         assert_eq!((full_mask.count(), Mask::all_clear(mask_side).count()), (mask_side * mask_side, 0));
@@ -48,9 +50,10 @@ fn a_mask_holds_its_cells() {
 /// and a layer holds under a mask if it holds at any cell of it.
 #[test]
 fn a_tile_read_is_its_cells_read_one_by_one() {
-    let mut bitmap_arena = scattered_stone_arena();
+    let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let mut bitmap_arena = scattered_stone_arena(seed);
     let origins = [(300, 300), (1000, 1000), (2047, 5), (2900, 2900), (0, 1500)];
-    Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), utilities::seed::counted_seed(), |turn| {
+    Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |turn| {
         if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }
@@ -86,12 +89,13 @@ fn a_tile_read_is_its_cells_read_one_by_one() {
 /// otherwise, the rest left as they were, no cell written twice.
 #[test]
 fn a_mask_written_is_read_back() {
+    let seed = crate::test_seed::TestSeedHandle::open().seed();
     for mask_side in [4, 64, 1024] {
-        let mut bitmap_arena = scattered_stone_arena();
+        let mut bitmap_arena = scattered_stone_arena(seed);
         let (origin, disc_mask) = (cell(700, 900), Mask::filling_disc(mask_side));
         let masks_before = std::sync::Mutex::new((Mask::all_clear(mask_side), Mask::all_clear(mask_side)));
         let mut test_simulation = Simulation::new(2);
-        let writes = test_simulation.tick(&mut bitmap_arena, &mut WorldEntities::new(), utilities::seed::counted_seed(), |turn| {
+        let writes = test_simulation.tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |turn| {
             if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
                 return 0;
             }
@@ -105,7 +109,7 @@ fn a_mask_written_is_read_back() {
         });
         assert_eq!((writes.writes_applied.missed, writes.writes_applied.writes_refused), (0, 0));
         assert_eq!(writes.writes_applied.cells_changed, writes.rules as u64, "every write queued changes its cell");
-        test_simulation.tick(&mut bitmap_arena, &mut WorldEntities::new(), utilities::seed::counted_seed(), |turn| {
+        test_simulation.tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |turn| {
             if turn.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
                 return 0;
             }

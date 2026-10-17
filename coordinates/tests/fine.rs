@@ -3,6 +3,9 @@
 //!
 //! `cargo test --test fine`
 
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
 mod coordinates {
     //! Coordinates: superchunk, chunk and cell indices nested, converted to
     //! and from cartesian coordinates, and stepping as cartesian
@@ -20,7 +23,7 @@ mod coordinates {
 
     /// The run's random numbers: what a test draws its cases from.
     fn seeded_random_numbers() -> RandomSource {
-        RandomSource::new(utilities::seed::counted_seed())
+        RandomSource::new(crate::test_seed::TestSeedHandle::open().fine_seed())
     }
 
     /// `count` numbers below `exclusive_bound`, drawn.

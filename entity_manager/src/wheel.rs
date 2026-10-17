@@ -72,9 +72,4 @@ impl Wheel {
         slot.sort_unstable_by_key(|wake| wake.stood_cell);
         slot.dedup();
     }
-
-    /// Wakes filed, in reach and further off, good or not.
-    pub(crate) fn len(&self) -> usize {
-        self.slots.iter().map(Vec::len).sum::<usize>() + self.later_wakes.len()
-    }
 }
