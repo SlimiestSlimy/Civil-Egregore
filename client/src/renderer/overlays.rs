@@ -3,7 +3,7 @@
 //! corners ([`label_corners`]), and every cell's height on it ([`heights`]).
 
 use crate::renderer::link::{HostLink, LastFrameSeen};
-use protocol::pipe::terrain::{Height, HeightsAsk};
+use protocol::pipe::terrain::{AsksTerrain, Height, HeightsAsk};
 use crate::renderer::view::{SuperchunkSprites, SPRITE_SIDE};
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
@@ -159,7 +159,7 @@ pub fn heights(overlays_shown: Res<OverlaysShown>, superchunk_sprites: Res<Super
     if let Some(world) = world
         && heights_asked.as_ref().is_none_or(|(asked_of, _)| *asked_of != (world, first_cell_cartesian))
     {
-        *heights_asked = host_link.host.terrain().heights(HeightsAsk { world, first_cell_cartesian, size_in_cells: HEIGHT_LABELS, skipped_corners_cartesian: Vec::new() }).map(|heights| ((world, first_cell_cartesian), heights));
+        *heights_asked = host_link.server().heights(HeightsAsk { world, first_cell_cartesian, size_in_cells: HEIGHT_LABELS, skipped_corners_cartesian: Vec::new() }).map(|heights| ((world, first_cell_cartesian), heights));
     }
     let shown_heights = world.and(heights_asked.as_ref()).filter(|(kept_of, _)| kept_of.1 == first_cell_cartesian).map(|(_, heights)| heights);
     for (height_label, mut label_text, mut label_transform, mut label_visibility) in &mut height_labels {

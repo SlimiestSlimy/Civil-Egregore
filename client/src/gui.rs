@@ -14,12 +14,14 @@ use bevy::prelude::*;
 use utilities::tuning::Tuning;
 
 /// The menus, added to a window's app: their parts made at startup,
-/// and worked every frame ([`MenusWorked`]).
-pub struct GuiPlugin {
-    /// Names the worlds there are to open, asked each time a menu
-    /// lists them.
-    pub worlds: fn() -> Vec<String>,
-}
+/// and worked every frame ([`MenusWorked`]). The window gives them a
+/// [`WorldLister`].
+pub struct GuiPlugin;
+
+/// Names the worlds there are to open: asked each time a menu lists
+/// them, and a name typed for a world is checked against them.
+#[derive(Resource)]
+pub struct WorldLister(pub Box<dyn Fn() -> Vec<String> + Send + Sync>);
 
 /// The menus' work of a frame: what is to see what they did the same
 /// frame runs after it.
@@ -99,8 +101,8 @@ impl Plugin for GuiPlugin {
             .init_resource::<ShownScreen>()
             .init_resource::<CapturedInput>()
             .init_resource::<sliders::Sliders>()
-            .insert_resource(options::Options::with_world_lister(self.worlds))
-            .insert_resource(main_menu::MainMenu::with_world_lister(self.worlds))
+            .insert_resource(options::Options::closed())
+            .insert_resource(main_menu::MainMenu::on_first_page())
             .add_message::<MakeWorld>()
             .add_message::<OpenWorld>()
             .add_message::<Save>()

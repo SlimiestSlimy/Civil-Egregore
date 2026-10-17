@@ -161,11 +161,18 @@ Boundaries, asked first, would have put that on the table.
 == TO DO ==
 
 NOW
-- The process split, step 1 of 4 (agreed 2026-10-17): the frame and
-  terrain types into protocol::pipe; then the hand-written encoding
-  ("no thrid party dependencies"), the server's --pipe flag, the client
-  spawning its own executable. Many instances at once, each pair its
-  own pipes.
+- The process split: DONE 2026-10-17 (protocol::pipe, utilities::wire,
+  the server's --pipe, the client's server_end). Measured: ticks equal
+  idle, ~5% fewer under frames; ~23% fewer frames a second (each frame
+  copied four times on its way). Left: fewer copies if it matters;
+  tests over the pipe, only the long-lived ones shown.
+- Protocol at the bottom ("why protocol depends on simulation? it
+  should be the other way around"): protocol on utilities and
+  type_registry alone; default_types to the server; Viewport, Height
+  and the height words' layout, the tick rate into protocol, their
+  crates depending on it; the frame carrying generation numbers, not
+  WorldGeneration, and the planes' widths, not base types'. Next after
+  step 4.
 - A lock on a world ("we need a lock file on worlds lmao. so no two
   instances can open the same world"): world.lock in its folder, held
   with File::try_lock while it is open or saved to; refused if held.
@@ -218,6 +225,12 @@ OPEN, FOUND BY ME
   borrows; the client's Mutex<Receiver>s (Bevy wants Sync); channels
   between threads (host <-> client go with the pipe); the dispatcher's
   Mutex + Condvar, the one real primitive the tick stands on.
+  The user: "the arcs as borrows atracts me if they are read only
+  stuff". Plan: (1) FrozenTypes, DefaultAttributes, Arc<Dispatcher>
+  owned once and borrowed; Arc<Path> of paged images kept once per
+  storage, jobs their own PathBuf -- one pass, measured. (2) The
+  writeback ring's Arc<SuperchunkImage>: the image moved to its flush
+  job and back -- its own step.
 - THE FLOCK DIES OUT: a long run -- the sheep rise past 150,000, the
   grass goes to 0, the flock dies. Cause not looked for.
 - The type registry made the tick ~9% slower (2026-10-16, "no matter
@@ -237,7 +250,11 @@ LATER (every "for later" of the user's, and mine, as said)
   entities will have the "hot", atribute later"); sheep stop being the
   hot entity ("sheep won't be the hot entity for long").
 - Simulation second as a server knob ("a prime candidate for a knob
-  that csn be exposed to server").
+  that csn be exposed to server"); "remember simulation-second stuff,
+  thats very important lol" (2026-10-17). One source today:
+  simulation_time::TICKS_A_SIMULATION_SECOND, protocol's TARGET_PACE
+  derived from it for both ends. As a knob, the client learns it from
+  the server (a frame carries it), never a constant of its own.
 - Worldgen's numbers (the GUI sliders) handed to it by a registered type
   it depends on, not by the server: "only stuff registered in the type
   registry should be spawning stuff, if those registered stuff depend

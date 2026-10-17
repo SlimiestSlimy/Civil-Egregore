@@ -13,6 +13,7 @@
 pub mod commands;
 pub mod host;
 pub mod params;
+mod pipe_end;
 mod save_and_load;
 mod world_access;
 mod world_hash;
@@ -95,6 +96,9 @@ pub fn start(clean_parameters: &protocol::server_parameters::CleanServerParamete
     }
     if let Some(info_parameters) = clean_parameters.nested(params::INFO) {
         return commands::describe_saved_world(info_parameters);
+    }
+    if clean_parameters.nested(params::PIPE).is_some() {
+        return pipe_end::serve_the_pipe();
     }
     Err("no command given: --help says them".to_string())
 }

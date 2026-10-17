@@ -1,11 +1,82 @@
-//! What the probes share: a host asked for frames until one answers
+//! What the probes share: a host -- of this process, or a server over
+//! the pipe as a window has one -- asked for frames until one answers
 //! the question.
 
 use protocol::pipe::frame::{FrameAsk, ViewportFrame, Viewport};
+use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use server::host::Host;
-use std::sync::mpsc::Receiver;
+use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration;
+use utilities::tuning::Tuning;
+use utilities::wire::{receive, send};
 use crate::ProbeParameters;
+
+/// What a probe asks: a host on a thread of this process, or a server
+/// over the pipe -- the program at a path run with `--pipe`.
+pub enum ProbedServer {
+    /// A host on a thread of this process.
+    InProcess(Host),
+    /// A server over the pipe: its process, and its stdin.
+    OverPipe(Child, ChildStdin),
+}
+
+impl ProbedServer {
+    /// A host of this process if `program` is empty, else the program at
+    /// `program` run with `--pipe`; and where its frames come.
+    pub fn start(program: &str) -> (Self, Receiver<ViewportFrame>) {
+        if program.is_empty() {
+            let (host, frame_receiver) = Host::start_on_thread();
+            return (Self::InProcess(host), frame_receiver);
+        }
+        let mut server_process = Command::new(program).arg("--pipe").stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().expect("the server started");
+        let (to_server, mut from_server) = (server_process.stdin.take().expect("its stdin"), std::io::BufReader::new(server_process.stdout.take().expect("its stdout")));
+        let (frame_sender, frame_receiver) = channel();
+        std::thread::spawn(move || {
+            while let Ok(Some(ServerMessage::Frame(frame))) = receive::<ServerMessage>(&mut from_server) {
+                if frame_sender.send(*frame).is_err() {
+                    return;
+                }
+            }
+        });
+        (Self::OverPipe(server_process, to_server), frame_receiver)
+    }
+
+    /// Tells it `message`: whether it was there to be told.
+    fn tell(&mut self, message: ClientMessage) -> bool {
+        match (self, message) {
+            (Self::InProcess(host), ClientMessage::AskFrame(frame_ask)) => host.ask_frame(frame_ask),
+            (Self::InProcess(host), ClientMessage::SetPace(pace)) => host.set_pace(pace),
+            (Self::InProcess(host), ClientMessage::MakeWorld(seed, tuning)) => host.make_world(server::WorldStart::from_tuning(seed, &tuning)),
+            (Self::InProcess(_), _) => false,
+            (Self::OverPipe(_, to_server), mut message) => send(&mut message, to_server).is_ok(),
+        }
+    }
+
+    /// Asks for a frame.
+    pub fn ask_frame(&mut self, frame_ask: FrameAsk) -> bool {
+        self.tell(ClientMessage::AskFrame(frame_ask))
+    }
+
+    /// Holds it to so many ticks a second, or flat out.
+    pub fn set_pace(&mut self, pace: Option<u32>) -> bool {
+        self.tell(ClientMessage::SetPace(pace))
+    }
+
+    /// Makes a world from `seed`, or one drawn, as `tuning` says.
+    pub fn make_world(&mut self, seed: Option<u64>, tuning: Tuning) -> bool {
+        self.tell(ClientMessage::MakeWorld(seed, tuning))
+    }
+}
+
+impl Drop for ProbedServer {
+    fn drop(&mut self) {
+        if let Self::OverPipe(server_process, _) = self {
+            _ = server_process.kill();
+            _ = server_process.wait();
+        }
+    }
+}
 
 /// How long a probe waits between two frames asked.
 const BETWEEN_FRAMES: Duration = Duration::from_millis(20);
@@ -40,7 +111,7 @@ pub fn whole_answer(frame_receiver: &Receiver<ViewportFrame>) -> Result<Viewport
 
 /// The first whole answer of `host` that `is_wanted` takes, every hot
 /// superchunk of `viewport` asked for each time: why not, if none comes.
-pub fn frame_that(host: &Host, frame_receiver: &Receiver<ViewportFrame>, viewport: Option<Viewport>, is_wanted: impl Fn(&ViewportFrame) -> bool) -> Result<ViewportFrame, String> {
+pub fn frame_that(host: &mut ProbedServer, frame_receiver: &Receiver<ViewportFrame>, viewport: Option<Viewport>, is_wanted: impl Fn(&ViewportFrame) -> bool) -> Result<ViewportFrame, String> {
     for _ in 0..FRAMES_ASKED_AT_MOST {
         if !host.ask_frame(FrameAsk { viewport, pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: u32::MAX, seen_near: None }) {
             return Err("the host is gone".to_string());

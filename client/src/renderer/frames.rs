@@ -228,6 +228,6 @@ pub fn ask_next_frame(
         }
         is_kept
     });
-    host_link.awaiting_frame = host_link.host.ask_frame(next_ask);
+    host_link.awaiting_frame = host_link.server().ask_frame(next_ask);
     (host_link.last_ask, host_link.seconds_since_asked) = (Some(next_ask), 0.0);
 }

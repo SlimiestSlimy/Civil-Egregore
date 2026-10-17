@@ -20,6 +20,7 @@ mod grass;
 mod halos;
 mod host;
 mod paging;
+mod pipe;
 mod sheep;
 mod tick;
 mod trees;

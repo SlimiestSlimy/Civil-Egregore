@@ -58,7 +58,10 @@ fn main() -> ExitCode {
     };
     match server::start(&clean_parameters) {
         Ok(said) => {
-            println!("{said}");
+            // Served over the pipe, nothing is left to say: stdout was the wire.
+            if !said.is_empty() {
+                println!("{said}");
+            }
             ExitCode::SUCCESS
         }
         Err(failure_reason) => {

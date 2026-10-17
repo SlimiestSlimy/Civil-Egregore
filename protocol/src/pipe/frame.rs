@@ -7,7 +7,7 @@ pub use base_types::Climate;
 use base_types::{CLIMATE, CLOUD, TREE_STAGE};
 pub use simulation::halos::Viewport;
 use utilities::wire::{Wired, WiredStruct};
-use worldgen::WorldGeneration;
+pub use worldgen::WorldGeneration;
 
 /// Words a chunk's bitmap takes.
 pub const CHUNK_WORDS: usize = bitmap::WORDS;

@@ -4,7 +4,7 @@
 //! (`docs/server.md`, "Terrain asked of the host").
 
 use coordinates::SUPERCHUNK_SIDE_CELLS;
-use protocol::pipe::terrain::{CellCover, DrawnHeightRange, Height, HeightsAsk, MapAnswer, MapAsk, MapCell};
+use protocol::pipe::terrain::{AsksTerrain, CellCover, DrawnHeightRange, Height, HeightsAsk, MapAnswer, MapAsk, MapCell};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use worldgen::mesh::WorldLand;
@@ -30,18 +30,14 @@ pub struct TerrainAsker {
     pub(crate) request_sender: Sender<TerrainRequest>,
 }
 
-impl TerrainAsker {
-    /// The heights asked for, row by row: none if the host is gone or
-    /// runs another world than the one asked of.
-    pub fn heights(&self, heights_ask: HeightsAsk) -> Option<Vec<Height>> {
+impl AsksTerrain for TerrainAsker {
+    fn heights(&self, heights_ask: HeightsAsk) -> Option<Vec<Height>> {
         let (answer_sender, answer_receiver) = channel();
         self.request_sender.send(TerrainRequest::Heights(heights_ask, answer_sender)).ok()?;
         answer_receiver.recv().ok().flatten()
     }
 
-    /// The map asked for: none if the host is gone or runs another
-    /// world than the one asked of.
-    pub fn map(&self, map_ask: MapAsk) -> Option<MapAnswer> {
+    fn map(&self, map_ask: MapAsk) -> Option<MapAnswer> {
         let (answer_sender, answer_receiver) = channel();
         self.request_sender.send(TerrainRequest::Map(map_ask, answer_sender)).ok()?;
         answer_receiver.recv().ok().flatten()

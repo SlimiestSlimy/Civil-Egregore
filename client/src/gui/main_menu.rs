@@ -4,7 +4,7 @@
 
 use crate::gui::rows::{self, Bar, WorldListing, RowLook, MenuRow, RowText, MenuShade};
 use crate::gui::sliders::Sliders;
-use crate::gui::{CurrentTuning, MakeWorld, OpenWorld, ShownScreen};
+use crate::gui::{CurrentTuning, MakeWorld, OpenWorld, ShownScreen, WorldLister};
 use bevy::app::AppExit;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::AccumulatedMouseScroll;
@@ -51,16 +51,14 @@ pub struct MainMenu {
     shown_page: MainMenuPage,
     /// The new world's seed, typed: hexadecimal digits, or none.
     seed: String,
-    /// Names the worlds there are.
-    world_lister: fn() -> Vec<String>,
     /// The worlds, as last listed.
     world_listing: WorldListing,
 }
 
 impl MainMenu {
-    /// The main menu, on its first page, its worlds named by `world_lister`.
-    pub fn with_world_lister(world_lister: fn() -> Vec<String>) -> Self {
-        Self { shown_page: MainMenuPage::FirstPage, seed: String::new(), world_lister, world_listing: WorldListing::default() }
+    /// The main menu, on its first page.
+    pub fn on_first_page() -> Self {
+        Self { shown_page: MainMenuPage::FirstPage, seed: String::new(), world_listing: WorldListing::default() }
     }
 
     /// Whether a new world is being set up: every slider is offered.
@@ -113,6 +111,7 @@ pub fn update_main_menu(
     mut words: Query<(&RowText, &mut Text), With<Part>>,
     mut message_writers: (MessageWriter<AppExit>, MessageWriter<MakeWorld>, MessageWriter<OpenWorld>),
     mut typed_keys: MessageReader<KeyboardInput>,
+    world_lister: Res<WorldLister>,
 ) {
     let (exit_writer, make_world_writer, open_world_writer) = &mut message_writers;
     let menu_shown = *shown_screen == ShownScreen::MainMenu;
@@ -124,7 +123,7 @@ pub fn update_main_menu(
         match rows::clicked_row_does(&main_menu_state.shown_rows(), &window, &mouse_buttons) {
             Some(MainMenuClick::SetsUp) => main_menu_state.shown_page = MainMenuPage::NewWorld,
             Some(MainMenuClick::MakesWorld) => makes_world = true,
-            Some(MainMenuClick::ListsWorlds) => (main_menu_state.world_listing, main_menu_state.shown_page) = (WorldListing::from_lister(main_menu_state.world_lister), MainMenuPage::Worlds),
+            Some(MainMenuClick::ListsWorlds) => (main_menu_state.world_listing, main_menu_state.shown_page) = (WorldListing::from_lister(&world_lister), MainMenuPage::Worlds),
             Some(MainMenuClick::GoesBack) => main_menu_state.shown_page = MainMenuPage::FirstPage,
             Some(MainMenuClick::OpensWorld(place)) => {
                 open_world_writer.write(OpenWorld(main_menu_state.world_listing.worlds[place].clone()));

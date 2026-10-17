@@ -1,4 +1,4 @@
-//! The window's side of the host (`server::host`): where it is asked,
+//! The window's side of the server ([`crate::server_end`]): where it is asked,
 //! where its frames come back painted ([`crate::renderer::paint`]), and what the
 //! window tells it -- a world made, opened or saved as the menus say,
 //! paused, paced -- and the painter the shading the sliders set.
@@ -8,19 +8,19 @@ use bevy::prelude::*;
 use crate::gui::options::Options;
 use crate::gui::{CapturedInput, CurrentTuning, MakeWorld, OpenWorld, Save, ShownScreen};
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
-use server::host::{Host, TARGET_PACE};
-use server::WorldStart;
+use crate::server_end::{ServerEnd, ServerLink};
+use protocol::pipe::frame::WorldGeneration;
+use protocol::pipe::messages::TARGET_PACE;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 use utilities::tuning::Tuning;
-use server::WorldGeneration;
 
-/// The host, as the window holds it: where to ask, where the answers
+/// The server, as the window holds it: where to ask, where the answers
 /// come, and what it was last told.
 #[derive(Resource)]
 pub struct HostLink {
-    /// The host, asked by calls.
-    pub host: Host,
+    /// The server's process, and where it is asked.
+    pub server_end: ServerEnd,
     /// Where frames come back, painted.
     pub painted_pictures: Mutex<Receiver<PaintedFrame>>,
     /// Where the sliders' numbers go to the painter, for its shading.
@@ -45,19 +45,18 @@ pub struct HostLink {
 }
 
 impl HostLink {
-    /// The host, at the game's pace, asked nothing yet; its frames
-    /// painted on a thread of their own.
-    pub fn start_own_host() -> Self {
-        let (host, frame_receiver) = Host::start_on_thread();
-        Self::around_host(host, frame_receiver, Some(TARGET_PACE))
+    /// A server of the window's own, at the game's pace, asked nothing
+    /// yet; its frames painted on a thread of their own.
+    pub fn start_own_server() -> Self {
+        let (server_end, frame_receiver) = ServerEnd::start();
+        let (shading_sender, tunings) = channel();
+        let painted_pictures = Mutex::new(crate::renderer::paint::start_painter(frame_receiver, tunings, server_end.link.clone()));
+        Self { server_end, painted_pictures, shading_sender, awaiting_frame: false, seconds_since_asked: f32::INFINITY, last_ask: None, world_paused: false, held_pace: Some(TARGET_PACE), last_generation: None, first_view: true }
     }
 
-    /// `host`, held to `held_pace`, asked nothing yet; its `frame_receiver` painted
-    /// on a thread of their own.
-    fn around_host(host: Host, frame_receiver: Receiver<protocol::pipe::frame::ViewportFrame>, held_pace: Option<u32>) -> Self {
-        let (shading_sender, tunings) = channel();
-        let painted_pictures = Mutex::new(crate::renderer::paint::start_painter(frame_receiver, tunings, host.terrain()));
-        Self { host, painted_pictures, shading_sender, awaiting_frame: false, seconds_since_asked: f32::INFINITY, last_ask: None, world_paused: false, held_pace, last_generation: None, first_view: true }
+    /// Where the server is told and asked.
+    pub fn server(&self) -> &ServerLink {
+        &self.server_end.link
     }
 
     /// Forgets a frame asked of the world run: another is to run in its
@@ -94,17 +93,17 @@ pub struct LastFrameSeen {
 /// options the name of the world run.
 pub fn tell_host_of_menus(mut host_link: ResMut<HostLink>, mut make_world_reader: MessageReader<MakeWorld>, mut open_world_reader: MessageReader<OpenWorld>, mut save: MessageReader<Save>, mut options: ResMut<Options>, last_seen: Res<LastFrameSeen>) {
     for made_world in make_world_reader.read() {
-        _ = host_link.host.make_world(WorldStart::from_tuning(made_world.seed, &made_world.tuning));
+        _ = host_link.server().make_world(made_world.seed, made_world.tuning);
         host_link.forget_asked();
         host_link.first_view = true;
     }
     for opened_world in open_world_reader.read() {
-        _ = host_link.host.open_world(opened_world.0.clone());
+        _ = host_link.server().open_world(opened_world.0.clone());
         host_link.forget_asked();
         host_link.first_view = true;
     }
     for saved_world in save.read() {
-        _ = host_link.host.save_world(saved_world.0.clone());
+        _ = host_link.server().save_world(saved_world.0.clone());
     }
     if let Some(last_frame) = &last_seen.last_frame
         && options.bypass_change_detection().current_world_name() != last_frame.world_name.as_deref()
@@ -120,7 +119,7 @@ pub fn pause_and_pace_by_keys(mut host_link: ResMut<HostLink>, pressed_keys: Res
     }
     if pressed_keys.just_pressed(KeyCode::Space) {
         host_link.world_paused = !host_link.world_paused;
-        _ = host_link.host.set_paused(host_link.world_paused);
+        _ = host_link.server().set_paused(host_link.world_paused);
     }
     let new_pace = if pressed_keys.just_pressed(KeyCode::KeyT) {
         if host_link.held_pace.is_some() { None } else { Some(TARGET_PACE) }
@@ -132,7 +131,7 @@ pub fn pause_and_pace_by_keys(mut host_link: ResMut<HostLink>, pressed_keys: Res
         return;
     };
     host_link.held_pace = new_pace;
-    _ = host_link.host.set_pace(new_pace);
+    _ = host_link.server().set_pace(new_pace);
 }
 
 /// Sends the painter the sliders' numbers whenever they change: its
@@ -154,7 +153,7 @@ pub fn remake_on_generation_change(mut host_link: ResMut<HostLink>, tuning: Res<
     }
     let new_generation = WorldGeneration::from_tuning(&tuning.0);
     if host_link.last_generation.replace(new_generation).is_some_and(|previous_generation| previous_generation != new_generation) && *shown_screen == ShownScreen::World && last_seen.last_frame.is_some() {
-        _ = host_link.host.reset(&tuning.0);
+        _ = host_link.server().reset(tuning.0);
         host_link.forget_asked();
     }
 }
