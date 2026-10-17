@@ -1,7 +1,7 @@
 //! A superchunk's timer wheel: which entities wake at which tick
 //! (`docs/entity_manager.md`, "The timer wheel").
 
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 
 /// Ticks the wheel holds a slot for.
 pub const WHEEL_TICKS: u64 = 1024;

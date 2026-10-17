@@ -5,10 +5,8 @@ description = "Civil Egregore's entities as kept: a bucket a chunk, attributes a
 
 [dependencies]
 type_registry = { path = "../../protocol/type_registry" }
-bitmap = { path = "../../utilities/bitmap" }
-coordinates = { path = "../../utilities/coordinates" }
 utilities = { path = "../../utilities" }
 
 [dev-dependencies]
-protocol = { path = "../../protocol" }
+server = { path = ".." }
 base_types = { path = "../basegame/base_types" }

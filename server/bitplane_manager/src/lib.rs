@@ -28,8 +28,8 @@ pub use reader::{CellReader, Window};
 pub use superchunk::{Bucket, LayerView, Superchunk};
 pub use writes::{count_missed, WritesApplied, WriteShape, Write, WriteOp, WriteQueues};
 
-use bitmap::{BITS_PER_WORD, WORDS};
-use coordinates::CHUNKS_IN_SUPERCHUNK;
+use utilities::bitmap::{BITS_PER_WORD, WORDS};
+use utilities::coordinates::CHUNKS_IN_SUPERCHUNK;
 
 pub use chunk_storage::BucketKey;
 

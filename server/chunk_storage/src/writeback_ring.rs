@@ -1,7 +1,7 @@
 //! The writeback ring: changed layers, encoded, on their way to the
 //! cold pool (`docs/chunk_storage.md`, "The ring's words").
 
-use coordinates::{ChunkIndex, SuperchunkIndex};
+use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 use type_registry::LayerType;
 use std::ops::Range;
 

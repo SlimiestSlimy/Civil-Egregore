@@ -1,14 +1,12 @@
 //! Simulation time: how long a thing takes in a world is said in
 //! seconds of the simulation, and turned to ticks here alone -- so
 //! nothing that says a time says the tick rate, and the rate is
-//! changed in one place (`docs/simulation.md`, "Simulation time").
+//! changed in one place: the protocol's, which the client paces by
+//! (`docs/simulation.md`, "Simulation time").
 
+use protocol::pipe::messages::TICKS_A_SIMULATION_SECOND;
 use utilities::chance::Chance;
 use utilities::rng::RandomSource;
-
-/// Ticks in a second of the simulation: the tick rate, written here
-/// and nowhere else.
-pub const TICKS_A_SIMULATION_SECOND: u64 = 256;
 
 /// Milliseconds in a second.
 const MILLISECONDS_A_SECOND: u64 = 1000;

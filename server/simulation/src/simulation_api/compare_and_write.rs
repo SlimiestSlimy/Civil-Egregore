@@ -11,7 +11,7 @@ pub use crate::raw_compares_and_writes::compare::{attribute, attribute_blocks, a
 pub use crate::{Compare, Write};
 use crate::SimulationTickState;
 use chunk_storage::LayerType;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use entity_manager::{each_attribute, AttributeBlock, AttributeType, Header, Member};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};

@@ -7,7 +7,7 @@ mod attribute_edits;
 pub use attribute_edits::{set_attribute_blocks, set_attribute_member, set_attribute_of, unset_attribute_of, update_entity};
 
 use chunk_storage::LayerType;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use entity_manager::{AttributeBlock, EntityRef, EntityType, Header};
 use crate::simulation_api::compare_and_write::{self, SkipTagSet};
 use crate::Write;

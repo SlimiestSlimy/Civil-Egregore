@@ -5,7 +5,7 @@
 //! Function by function: `docs/reference.md`, "`set_cells_before_each_word.rs`".
 
 use crate::tile::{cells_in_tile, Tile};
-use bitmap::{Bitmap, WORDS};
+use utilities::bitmap::{Bitmap, WORDS};
 
 /// Cells a word of the bitmap holds.
 const WORD_CELLS: usize = u64::BITS as usize;

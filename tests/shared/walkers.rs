@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use crate::arenas::cell;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use entity_manager::{Attribute, Header, remove_attribute, set_attribute};
 use simulation::SimulationTickState;
 

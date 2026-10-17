@@ -5,7 +5,7 @@
 //! "Instructions", An entity's name in a tick).
 
 use crate::attributes::{attribute_blocks, attribute_bytes, attribute_seen, default_seen, Attribute, AttributeBlock, AttributeType, DefaultAttributes, DefaultKept, Layout, WholeAttribute, ATTRIBUTE_WORDS_MOST, BLOCK_WORDS};
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 pub use type_registry::EntityType;
 
 /// The tick an entity that never wakes wakes at.

@@ -5,7 +5,7 @@
 
 use crate::attributes::{find_attribute, DefaultAttributes, write_attribute_bytes, write_bytes, write_default, AttributeBlock, AttributeType};
 use crate::entity::{EntityRef, Header};
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use utilities::cache::prefetch_cache_line;
 
 /// Attribute blocks in a cache line.

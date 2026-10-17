@@ -7,7 +7,7 @@ use protocol::pipe::terrain::{AsksTerrain, Height, HeightsAsk};
 use crate::renderer::view::{SuperchunkSprites, SPRITE_SIDE};
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
-use coordinates::{place_from_cartesian, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE};
+use utilities::coordinates::{place_from_cartesian, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNK_SIDE, SUPERCHUNK_SIDE};
 use crate::gui::CapturedInput;
 
 /// Screen pixels two boundaries are apart before they are drawn.

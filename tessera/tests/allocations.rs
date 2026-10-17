@@ -7,7 +7,7 @@
 
 mod tests;
 
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use tests::saved::every_saved;

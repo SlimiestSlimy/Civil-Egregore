@@ -5,7 +5,7 @@
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::prelude::*;
 use bevy::window::{MonitorSelection, WindowMode};
-use coordinates::{SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
+use utilities::coordinates::{SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 use crate::gui::CapturedInput;
 use std::collections::HashMap;
 

@@ -5,7 +5,7 @@ use crate::patterns::{homogeneous_value_of, PatternPyramid};
 use crate::corpus::checkerboards::one_checkerboard;
 use crate::corpus::one_grown;
 use crate::tile::{copy_offset, Tile, COPY_DIRECTIONS, FLOOR_LEVEL};
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 
 /// `tile`'s cells, in reading order.
 fn cells(bitmap: &Bitmap, tile: Tile) -> Vec<bool> {

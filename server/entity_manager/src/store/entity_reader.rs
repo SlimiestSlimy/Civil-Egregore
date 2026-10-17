@@ -3,8 +3,8 @@
 
 use crate::entity::EntityRef;
 use super::SuperchunkEntities;
-use bitmap::window::{PLACE_IN_WORD_TILE, in_word_tile};
-use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex};
+use utilities::bitmap::window::{PLACE_IN_WORD_TILE, in_word_tile};
+use utilities::coordinates::{CellIndex, ChunkIndex, SuperchunkIndex};
 
 /// Cells along the side of the most [`EntityReader::occupied`] reads at
 /// once: a row's bits.

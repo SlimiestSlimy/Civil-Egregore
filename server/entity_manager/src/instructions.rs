@@ -6,7 +6,7 @@ use crate::bucket::EntityWritten;
 use crate::attributes::{push_attribute, Attribute, AttributeBlock, AttributeType, Layout};
 use crate::entity::Header;
 use crate::store::SuperchunkEntities;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use std::ops::AddAssign;
 
 /// One instruction.

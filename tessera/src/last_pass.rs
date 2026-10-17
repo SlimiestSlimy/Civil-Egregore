@@ -19,7 +19,7 @@ use context_window::{WINDOW_PLACES, Window};
 use crate::arithmetic::{RangeDecoder, RangeEncoder, FINISHING_BITS};
 use crate::bit_stream::{BitReader, BitStream};
 use crate::tile::{cells_in_tile, tiles_in_level, Tile, CELLS, FLOOR_LEVEL};
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 use utilities::fixed_list::FixedList;
 
 /// Where a cell's context reads, relative to it, `(dx, dy)`: top left,

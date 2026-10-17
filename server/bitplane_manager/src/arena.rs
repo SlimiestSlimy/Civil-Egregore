@@ -7,7 +7,7 @@ use super::reader::{LayerAt, Lookup};
 use super::superchunk::{Bucket, Superchunk};
 use super::writes::WriteQueues;
 use chunk_storage::{BucketKey, LayerType, WidePlane, Width};
-use coordinates::{CHUNKS_IN_SUPERCHUNK, CellIndex, ChunkIndex, SuperchunkIndex};
+use utilities::coordinates::{CHUNKS_IN_SUPERCHUNK, CellIndex, ChunkIndex, SuperchunkIndex};
 
 /// A superchunk gone cold as a whole ([`BitmapArena::make_cold_superchunk`]):
 /// its allocations kept as they were -- hot buckets and all, counted --

@@ -5,7 +5,7 @@
 //! No plane is walking's own: it is told them.
 
 use chunk_storage::LayerType;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use pathfinding::{a_star, Cell, Rows, Walls};
 use crate::simulation_api::square_around_a_cell::{self, AREA_CENTRE, AREA_SIDE, FARTHEST_SCALE};
 use crate::simulation_api::cell_and_its_neighbours::{self, TilesAbout, Cells};

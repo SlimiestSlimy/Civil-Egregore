@@ -2,7 +2,7 @@
 //! or over a border -- removed: each one instruction
 //! (`docs/compares_and_writes.md`, "Writes").
 
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use entity_manager::Header;
 use crate::{SimulationTickState, Write};
 

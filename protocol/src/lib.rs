@@ -1,14 +1,12 @@
 //! What the client and the server say to each other -- the one thing
-//! both depend on, neither on the other. Today the parameters a command
-//! line gives the server, and the base game's types; the messages and
-//! the wire come next
-//! (`docs/reference.md`).
+//! both depend on, neither on the other: the parameters a command line
+//! gives the server, and the messages and their wire ([`pipe`]). It
+//! depends on nothing of the game's (`docs/reference.md`).
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-pub mod default_types;
 pub mod flags;
 pub mod pipe;
 pub mod server_parameters;

@@ -5,7 +5,7 @@
 
 use crate::{generate_superchunk, WorldGeneration};
 use chunk_storage::SuperchunkCells;
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use base_types::{SheepState, COLLISION, SHEEP, SHEEP_STATE};
 use entity_rules::sheep::{STEP, TIME_BETWEEN_MEALS};
 use libraries::collision::{Collision, COLLISION as COLLISION_LIBRARY};

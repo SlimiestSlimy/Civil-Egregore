@@ -2,11 +2,7 @@
 //! asked of them or done to them. Every layer of a chunk is one.
 //!
 //! The design: `docs/bitmap.md`; function by function:
-//! `docs/reference.md`.
-
-// Every item is documented, private ones included; `cargo clippy`
-// checks the private ones.
-#![warn(missing_docs, clippy::missing_docs_in_private_items)]
+//! `docs/bitmap_reference.md`.
 
 mod bitmap_data;
 mod bitmap_drawing;

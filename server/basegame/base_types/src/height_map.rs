@@ -1,11 +1,10 @@
-//! A superchunk's heights: a floor a chunk and a byte a cell over it,
-//! or a whole [`Height`] a cell where a chunk is tall
-//! (`docs/chunk_storage.md`, "The height map").
+//! A superchunk's heights, as the base game lays them out: a floor a
+//! chunk and a byte a cell over it, or a whole [`Height`] a cell where a
+//! chunk is tall (`docs/chunk_storage.md`, "The height map"). Chunk
+//! storage keeps the words as they are given, reading nothing of them.
 
-use coordinates::{CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
-
-/// A cell's height.
-pub type Height = u16;
+pub use protocol::pipe::terrain::Height;
+use utilities::coordinates::{CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 
 /// Floors a word holds, and a tall chunk's heights.
 const HEIGHTS_IN_WORD: usize = (u64::BITS / Height::BITS) as usize;
@@ -26,7 +25,7 @@ const SPAN_IN_A_BYTE: Height = u8::MAX as Height;
 
 /// Words a superchunk's heights take, the first of them being `words`:
 /// [`HEIGHT_WORDS`], and [`TALL_WORDS`] more a tall chunk.
-pub fn words_of(words: &[u64]) -> usize {
+fn words_of(words: &[u64]) -> usize {
     HEIGHT_WORDS + (words[TALL_WORD] & ((1 << CHUNKS_IN_SUPERCHUNK) - 1)).count_ones() as usize * TALL_WORDS
 }
 
@@ -37,10 +36,14 @@ fn floor_in(words: &[u64], chunk: usize) -> Height {
 }
 
 /// The height of the cell at `place` in the superchunk
-/// ([`coordinates::CellIndex::place_in_superchunk`]), from the
+/// ([`utilities::coordinates::CellIndex::place_in_superchunk`]), from the
 /// superchunk's height words: its chunk's floor and its byte, or what
-/// its chunk's own map says if the chunk is tall.
+/// its chunk's own map says if the chunk is tall. No words, and it is
+/// 0: a superchunk storage made an image of with no heights given.
 pub fn height_in(words: &[u64], place: usize) -> Height {
+    if words.is_empty() {
+        return 0;
+    }
     let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);
     let tall_chunks = words[TALL_WORD];
     if tall_chunks >> chunk & 1 == 1 {

@@ -2,7 +2,7 @@
 //! cell not 0, a byte a cell or 16 bits -- a superchunk's water
 //! (`docs/chunk_storage.md`, "The superchunk image").
 
-use coordinates::{CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
+use utilities::coordinates::{CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 
 /// Words a chunk's map takes, a byte a cell; a wide one twice as many.
 pub const MAP_WORDS: usize = CELLS_IN_CHUNK / 8;
@@ -23,7 +23,7 @@ pub fn words_of(words: &[u64]) -> usize {
 }
 
 /// The number of the cell at `place` in the superchunk
-/// ([`coordinates::CellIndex::place_in_superchunk`]), from the
+/// ([`utilities::coordinates::CellIndex::place_in_superchunk`]), from the
 /// superchunk's maps' words: 0 where its chunk has no map.
 pub fn number_in(words: &[u64], place: usize) -> u16 {
     let (chunk, cell) = (place / CELLS_IN_CHUNK, place % CELLS_IN_CHUNK);

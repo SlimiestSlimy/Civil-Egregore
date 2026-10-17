@@ -5,7 +5,7 @@
 
 use bitplane_manager::Window;
 use chunk_storage::{LayerType, WidePlane, Width};
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use crate::simulation_api::compare_and_write;
 use crate::{Compare, Write};
 use crate::SimulationTickState;

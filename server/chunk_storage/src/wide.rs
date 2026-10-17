@@ -3,7 +3,7 @@
 //! (`docs/chunk_storage.md`, "Wide planes").
 
 use crate::LayerType;
-use bitmap::{CellWords, BITS_PER_WORD, WORDS};
+use utilities::bitmap::{CellWords, BITS_PER_WORD, WORDS};
 
 /// Words the hot bucket of a chunk takes, of `layer_type`: a
 /// bitmap's, times its bits, over the cells of one of its tiles -- a

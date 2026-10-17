@@ -17,13 +17,13 @@ mod terrain {
     //! `cargo test`
 
     use crate::terrain_cells::{height_at, keeps_wall_cartesian};
-    use coordinates::{CellCartesian, SuperchunkIndex, WORLD_MIDDLE};
+    use utilities::coordinates::{CellCartesian, SuperchunkIndex, WORLD_MIDDLE};
     use worldgen::{height_shaped, wall, LandShape, Terrain, DROP, STEP, WALLS};
 
     /// A superchunk anywhere in the world but its last row and column,
     /// drawn from the run's seed.
     fn superchunk_drawn(seeded_rng: &mut utilities::rng::RandomSource) -> SuperchunkIndex {
-        let last_drawable = u64::from(coordinates::WORLD_SIDE_SUPERCHUNKS) - 1;
+        let last_drawable = u64::from(utilities::coordinates::WORLD_SIDE_SUPERCHUNKS) - 1;
         SuperchunkIndex::from_cartesian(seeded_rng.draw_below(last_drawable) as u32, seeded_rng.draw_below(last_drawable) as u32)
     }
 

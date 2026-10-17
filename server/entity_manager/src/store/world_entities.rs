@@ -6,7 +6,7 @@ use crate::entity::{EntityRef, Header};
 use crate::instructions::{Instructions, InstructionsApplied};
 use super::SuperchunkEntities;
 use super::entity_reader::EntityReader;
-use coordinates::{CellIndex, SuperchunkIndex};
+use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use std::sync::Arc;
 use type_registry::FrozenTypes;
 

@@ -6,7 +6,7 @@ mod world_files;
 pub use world_files::{HotSuperchunks, WorldInfo};
 
 use crate::superchunk_image::SuperchunkImage;
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use std::fmt;
 use std::fs;
 use std::io;

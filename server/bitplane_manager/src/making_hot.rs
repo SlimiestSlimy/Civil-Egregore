@@ -3,9 +3,9 @@
 
 use super::{COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS, contains, set_membership};
 use super::arena::{BitmapArena, Lingering};
-use bitmap::WORDS;
+use utilities::bitmap::WORDS;
 use chunk_storage::{BucketKey, ChunkStorage, LayerCodec, LayerType};
-use coordinates::{ChunkIndex, SuperchunkIndex};
+use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 
 impl BitmapArena {
     /// Makes `bucket_key`'s bitmap hot, decoding `layer` -- its encoded bitmap,

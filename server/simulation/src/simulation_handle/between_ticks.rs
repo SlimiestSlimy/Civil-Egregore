@@ -5,8 +5,8 @@
 
 use super::SimulationHandle;
 use bitplane_manager::{Write, WritesApplied};
-use chunk_storage::{HeightMap, LayerType, SuperchunkImage};
-use coordinates::SuperchunkIndex;
+use chunk_storage::{LayerType, SuperchunkImage};
+use utilities::coordinates::SuperchunkIndex;
 use entity_manager::{AttributeBlock, Header, InstructionsApplied};
 use std::path::Path;
 use std::sync::Arc;
@@ -66,7 +66,7 @@ impl SimulationHandle {
         self.write_back_and_flush_all();
         for superchunk in self.bitmap_arena.superchunk_indices() {
             if !self.chunk_storage.holds_image(superchunk) {
-                self.chunk_storage.insert(superchunk, SuperchunkImage::new(&HeightMap::default()));
+                self.chunk_storage.insert(superchunk, SuperchunkImage::new(&[]));
             }
         }
     }

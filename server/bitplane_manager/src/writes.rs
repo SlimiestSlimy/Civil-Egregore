@@ -4,9 +4,9 @@
 
 use crate::superchunk_layer::SuperchunkLayer;
 use crate::{contains, BitmapArena};
-use bitmap::morton::morton_index;
+use utilities::bitmap::morton::morton_index;
 use chunk_storage::{LayerType, WidePlane, Width};
-use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
 
 /// What a write does to each cell it covers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

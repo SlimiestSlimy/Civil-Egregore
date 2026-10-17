@@ -8,7 +8,6 @@ version = "0.0.0"
 dependencies = [
  "bitplane_manager",
  "chunk_storage",
- "coordinates",
  "entity_manager",
  "protocol",
  "server",
@@ -24,7 +23,6 @@ dependencies = [
  "bitplane_manager",
  "chunk_storage",
  "client",
- "coordinates",
  "entity_manager",
  "entity_rules",
  "libraries",
@@ -379,7 +377,9 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 name = "base_types"
 version = "0.0.0"
 dependencies = [
+ "protocol",
  "type_registry",
+ "utilities",
 ]
 
 [[package]]
@@ -1799,19 +1799,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitmap"
-version = "0.0.0"
-dependencies = [
- "utilities",
-]
-
-[[package]]
 name = "bitplane_manager"
 version = "0.0.0"
 dependencies = [
- "bitmap",
  "chunk_storage",
- "coordinates",
  "utilities",
 ]
 
@@ -1957,8 +1948,7 @@ checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
 name = "chunk_storage"
 version = "0.0.0"
 dependencies = [
- "bitmap",
- "coordinates",
+ "base_types",
  "tessera",
  "type_registry",
  "utilities",
@@ -1968,8 +1958,8 @@ dependencies = [
 name = "client"
 version = "0.0.0"
 dependencies = [
+ "base_types",
  "bevy",
- "coordinates",
  "protocol",
  "server",
  "utilities",
@@ -2079,14 +2069,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "633458d4ef8c78b72454de2d54fd6ab2e60f9e02be22f3c6104cdc8a4e0fceb9"
 dependencies = [
  "unicode-segmentation",
-]
-
-[[package]]
-name = "coordinates"
-version = "0.0.0"
-dependencies = [
- "bitmap",
- "utilities",
 ]
 
 [[package]]
@@ -2351,9 +2333,7 @@ name = "entity_manager"
 version = "0.0.0"
 dependencies = [
  "base_types",
- "bitmap",
- "coordinates",
- "protocol",
+ "server",
  "type_registry",
  "utilities",
 ]
@@ -4058,16 +4038,8 @@ checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 name = "protocol"
 version = "0.0.0"
 dependencies = [
- "base_types",
- "bitmap",
- "chunk_storage",
- "entity_rules",
- "libraries",
- "sca_rules",
- "simulation",
  "type_registry",
  "utilities",
- "worldgen",
 ]
 
 [[package]]
@@ -4401,12 +4373,13 @@ name = "server"
 version = "0.0.0"
 dependencies = [
  "base_types",
- "bitmap",
  "bitplane_manager",
  "chunk_storage",
- "coordinates",
  "entity_manager",
+ "entity_rules",
+ "libraries",
  "protocol",
+ "sca_rules",
  "simulation",
  "type_registry",
  "utilities",
@@ -4454,12 +4427,11 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 name = "simulation"
 version = "0.0.0"
 dependencies = [
- "bitmap",
  "bitplane_manager",
  "chunk_storage",
- "coordinates",
  "entity_manager",
  "pathfinding",
+ "protocol",
  "type_registry",
  "utilities",
 ]
@@ -4682,7 +4654,6 @@ dependencies = [
 name = "tessera"
 version = "1.0.0"
 dependencies = [
- "bitmap",
  "utilities",
 ]
 
@@ -4922,7 +4893,7 @@ name = "type_registry"
 version = "0.0.0"
 dependencies = [
  "base_types",
- "protocol",
+ "server",
  "utilities",
 ]
 
@@ -5798,9 +5769,7 @@ name = "worldgen"
 version = "0.0.0"
 dependencies = [
  "base_types",
- "bitmap",
  "chunk_storage",
- "coordinates",
  "entity_rules",
  "libraries",
  "simulation",

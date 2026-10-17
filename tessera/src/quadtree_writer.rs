@@ -10,7 +10,7 @@ use crate::last_pass::FloorPlan;
 use crate::payload_writer::{read_cell_list, read_payload, write_cell_list, write_payload};
 use crate::tile::{Tile, CELL_LEVEL, CHILDREN_PER_TILE, COPY_DIRECTIONS, FLOOR_LEVEL};
 use crate::tree::{Node, Tree, BOUND_AT_THE_TOP};
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 
 /// Bits in every one-bit choice below.
 pub const FLAG_WIDTH: u8 = 1;

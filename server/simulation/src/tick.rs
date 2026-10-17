@@ -10,7 +10,7 @@ use entity_manager::{WorldEntities, EntityReader, InstructionsApplied};
 use crate::simulation_tick_state::conditional::{CountedWhenApplied, COUNTED_WHEN_APPLIED};
 use crate::simulation_tick_state::{slots, Outbox, SimulationTickState};
 use bitplane_manager::{BitmapArena, CellReader, WritesApplied};
-use coordinates::{CellIndex, SuperchunkIndex};
+use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use std::ops::AddAssign;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};

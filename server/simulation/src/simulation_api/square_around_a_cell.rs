@@ -4,10 +4,10 @@
 //! from further off, a tile a bit.
 
 use crate::simulation_api::cell_reads_and_writes::corner_about;
-use bitmap::window::{rows_from_morton, WORD_TILE_SIDE};
+use utilities::bitmap::window::{rows_from_morton, WORD_TILE_SIDE};
 use bitplane_manager::COARSEST_TILES_IN_CHUNK;
 use chunk_storage::LayerType;
-use coordinates::{cartesian_from_place, CellCartesian, CellIndex};
+use utilities::coordinates::{cartesian_from_place, CellCartesian, CellIndex};
 use crate::SimulationTickState;
 
 /// Cells along the side of an [`Area`].

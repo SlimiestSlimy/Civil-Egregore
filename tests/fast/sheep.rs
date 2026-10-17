@@ -6,7 +6,7 @@
 //! threads.
 
 use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, add_entity, tick_sheep};
-use coordinates::CellCartesian;
+use utilities::coordinates::CellCartesian;
 use entity_manager::{set_attribute, AttributeBlock, EntityRef, Header, WholeAttribute};
 use entity_rules::sheep::{BIRTHS_COUNT, DEATHS_COUNT, EATEN_COUNT, FAR_COUNT, PATHS, SOUGHT_COUNT, WOKEN_COUNT, GESTATION_TIME, TIME_BETWEEN_MEALS, ROAMING_TIME, SHEEP, SHEEP_STATE, TIME_TO_STARVE, SheepState, STEP_JITTER, STEP};
 
@@ -240,11 +240,11 @@ fn sheep_never_overlap() {
 fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
-    use coordinates::CellIndex;
+    use utilities::coordinates::CellIndex;
     use entity_manager::WorldEntities;
     use simulation::simulation_api::cell_reads_and_writes;
     use base_types::{GRASS, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
-    let superchunk = coordinates::WORLD_MIDDLE;
+    let superchunk = utilities::coordinates::WORLD_MIDDLE;
     let (mut layer_codec, mut bitmap_arena, mut entity_store) = (chunk_storage::LayerCodec::new(), BitmapArena::new(), WorldEntities::new());
     for chunk in superchunk.chunks() {
         for layer_type in [GRASS, WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST] {

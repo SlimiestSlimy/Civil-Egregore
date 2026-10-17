@@ -3,9 +3,9 @@
 //! (`src/lib.rs`).
 
 use crate::{BitmapArena, BucketKey, Write, WriteOp};
-use bitmap::WORDS;
+use utilities::bitmap::WORDS;
 use chunk_storage::{Bits4, LayerCodec, LayerType, WidePlane};
-use coordinates::{ChunkIndex, SuperchunkIndex};
+use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 
 /// A hot bitmap with no cell set keeps no bucket, and reads clear; the
 /// first cell set in it makes one, in its place among the others,

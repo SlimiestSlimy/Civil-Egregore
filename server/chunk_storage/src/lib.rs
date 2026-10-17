@@ -13,7 +13,6 @@
 mod chunk_storage;
 pub mod disk;
 mod chunk_maps;
-mod height_map;
 pub mod jobs;
 mod layer_codec;
 mod paging;
@@ -25,7 +24,6 @@ mod writeback_ring;
 pub use chunk_storage::{ChunkStorage, Flush};
 pub use paging::{read_back, ImageStored};
 pub use chunk_maps::{ChunkMaps, MAP_WORDS};
-pub use height_map::{height_in, Height, HeightMap, HEIGHT_WORDS, TALL_WORDS};
 pub use layer_codec::{BucketKey, LayerCodec};
 pub use type_registry::{Bits16, Bits2, Bits32, Bits4, Bits8, LayerType, WidePlane, Width};
 pub use superchunk_cells::SuperchunkCells;

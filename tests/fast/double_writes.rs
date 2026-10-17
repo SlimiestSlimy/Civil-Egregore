@@ -7,7 +7,7 @@
 
 use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, add_entity, tick_sheep};
 use bitplane_manager::Write;
-use coordinates::{CellCartesian, CellIndex};
+use utilities::coordinates::{CellCartesian, CellIndex};
 use entity_manager::{Header, WholeAttribute, NEVER_WAKES};
 use entity_rules::sheep::{SheepState, BIRTHS_COUNT, EATEN_COUNT, SHEEP, SHEEP_STATE, STEP_JITTER, STEP};
 use sca_rules::{grass, trees};

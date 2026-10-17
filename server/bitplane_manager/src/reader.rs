@@ -5,10 +5,10 @@ pub(crate) mod aligned_tiles;
 
 use super::{COARSEST_SCALE, COUNTS_IN_COARSEST, COUNT_TILE_CELLS, NotHot, contains};
 use super::superchunk::Superchunk;
-use bitmap::{BITS_PER_WORD, CellWords};
-use bitmap::window::{PLACE_IN_WORD_TILE, WORD_TILE_SIDE, in_word_tile, left_columns, rows_from_morton, top_rows, window};
+use utilities::bitmap::{BITS_PER_WORD, CellWords};
+use utilities::bitmap::window::{PLACE_IN_WORD_TILE, WORD_TILE_SIDE, in_word_tile, left_columns, rows_from_morton, top_rows, window};
 use chunk_storage::{BucketKey, LayerType, WidePlane, Width};
-use coordinates::{CellIndex, SuperchunkIndex};
+use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use std::cell::Cell;
 use utilities::cache::prefetch_cache_line;
 
@@ -89,7 +89,7 @@ impl<'a> CellReader<'a> {
 }
 
 /// Up to 8x8 cells of one layer type, row by row: cell `(x, y)` from
-/// the window's top left at bit `y * 8 + x` ([`bitmap::window`]).
+/// the window's top left at bit `y * 8 + x` ([`utilities::bitmap::window`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Window {
     /// The cells the type holds at: hot ones only.

@@ -4,7 +4,8 @@
 //!
 //! `cargo test --test fine simulation_time`
 
-use simulation::simulation_time::{SimulationTime, TICKS_A_SIMULATION_SECOND};
+use protocol::pipe::messages::TICKS_A_SIMULATION_SECOND;
+use simulation::simulation_time::SimulationTime;
 use utilities::rng::RandomSource;
 
 /// Seconds are the tick rate's ticks each, milliseconds their share

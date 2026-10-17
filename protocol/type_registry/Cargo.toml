@@ -8,5 +8,5 @@ description = "Civil Egregore's type registry: every layer, wide plane, entity t
 utilities = { path = "../../utilities" }
 
 [dev-dependencies]
-protocol = { path = ".." }
+server = { path = "../../server" }
 base_types = { path = "../../server/basegame/base_types" }

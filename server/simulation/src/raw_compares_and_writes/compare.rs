@@ -5,7 +5,7 @@
 //! writes (`docs/compares_and_writes.md`, "Compares").
 
 use chunk_storage::{LayerType, WidePlane, Width};
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use entity_manager::{push_attribute, Attribute, AttributeBlock, AttributeType, Header, Layout, Member};
 pub use crate::Compare;
 use crate::{SimulationTickState, Write};

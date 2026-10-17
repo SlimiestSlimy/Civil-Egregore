@@ -9,7 +9,7 @@ mod test_seed;
 #[path = "shared/terrain_cells.rs"]
 mod terrain_cells;
 
-use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
+use utilities::coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use terrain_cells::{height_at, keeps_wall_cartesian};
 use worldgen::{wall, LandShape, Terrain};
 
@@ -38,7 +38,7 @@ fn superchunks_made_apart_meet_with_no_seam() {
     let mut seeded_rng = utilities::rng::RandomSource::new(first_seed);
     for seed in [0, 1].map(|seed_offset| first_seed + seed_offset) {
         // Anywhere with a superchunk east and south of it.
-        let last_drawable = u64::from(coordinates::WORLD_SIDE_SUPERCHUNKS) - 1;
+        let last_drawable = u64::from(utilities::coordinates::WORLD_SIDE_SUPERCHUNKS) - 1;
         let here_superchunk = SuperchunkIndex::from_cartesian(seeded_rng.draw_below(last_drawable) as u32, seeded_rng.draw_below(last_drawable) as u32);
         let [own_terrain, east_terrain, south_terrain] = [(0, 0), (1, 0), (0, 1)].map(|(dx, dy)| Terrain::generate_shaped(&CLIFFS_SHAPE, seed, here_superchunk.at_cartesian_offset(dx, dy).expect("in the world")));
         for along_edge in 0..1024 {

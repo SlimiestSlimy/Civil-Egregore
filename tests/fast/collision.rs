@@ -7,7 +7,7 @@
 //! `cargo test --test fast collision`
 
 use crate::worlds::{tag_of, tag_sheep, tick_rule, tick_sheep};
-use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use server::{WorldStart, World};
 use std::collections::HashMap;
 use base_types::{COLLISION, TREE};

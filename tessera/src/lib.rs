@@ -1,7 +1,7 @@
 //! Tessera: a lossless encoding of a 256x256 bitmap.
 //!
 //! ```
-//! use bitmap::Bitmap;
+//! use utilities::bitmap::Bitmap;
 //! use tessera::{BitStream, Tessera};
 //!
 //! let mut bitmap = Bitmap::new();
@@ -44,7 +44,7 @@ mod unit_tests;
 
 pub use bit_stream::{BitStream, MOST_BITS};
 
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 use bit_stream::{BitCounter, BitSink};
 use greedy_tiler::{complex_tiling, greedy_tiling};
 use last_pass::{FloorPlan, LastPass, ResidualPricing};

@@ -8,8 +8,10 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
+pub mod bitmap;
 pub mod cache;
 pub mod chance;
+pub mod coordinates;
 pub mod csv;
 pub mod dispatcher;
 pub mod fixed_list;

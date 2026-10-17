@@ -1,7 +1,7 @@
 //! Drawing on a bitmap: rectangles and circles, by their shape, clamped
 //! to the bitmap (`docs/reference.md`, "bitmap_drawing.rs").
 
-use crate::{Bitmap, HEIGHT, WIDTH};
+use crate::bitmap::{Bitmap, HEIGHT, WIDTH};
 
 /// `x` pulled onto the bitmap, a column.
 fn clamped_column(x: i64) -> u8 {

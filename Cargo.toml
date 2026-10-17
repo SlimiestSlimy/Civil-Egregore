@@ -18,7 +18,6 @@ base_types = { path = "server/basegame/base_types" }
 libraries = { path = "server/basegame/libraries" }
 bitplane_manager = { path = "server/bitplane_manager" }
 chunk_storage = { path = "server/chunk_storage" }
-coordinates = { path = "utilities/coordinates" }
 entity_manager = { path = "server/entity_manager" }
 entity_rules = { path = "server/basegame/entity_rules" }
 pathfinding = { path = "server/pathfinding" }
@@ -43,10 +42,8 @@ members = [
     "protocol",
     "server/basegame/base_types",
     "server/basegame/libraries",
-    "utilities/bitmap",
     "server/bitplane_manager",
     "server/chunk_storage",
-    "utilities/coordinates",
     "server/entity_manager",
     "server/basegame/entity_rules",
     "server/pathfinding",
@@ -65,10 +62,8 @@ default-members = [
     "protocol",
     "server/basegame/base_types",
     "server/basegame/libraries",
-    "utilities/bitmap",
     "server/bitplane_manager",
     "server/chunk_storage",
-    "utilities/coordinates",
     "server/basegame/entity_rules",
     "server/pathfinding",
     "server/basegame/sca_rules",

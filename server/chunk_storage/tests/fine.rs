@@ -13,10 +13,23 @@ mod chunk_storage {
     //!
     //! `cargo test`
 
-    use bitmap::{Bitmap, CellWords, WORDS};
-    use chunk_storage::{ChunkMaps, ChunkStorage, HeightMap, InvalidImage, LayerChange, LayerCodec, LayerType, SuperchunkImage, WritebackRing};
-    use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
+    use utilities::bitmap::{Bitmap, CellWords, WORDS};
+    use chunk_storage::{ChunkMaps, ChunkStorage, InvalidImage, LayerChange, LayerCodec, LayerType, SuperchunkImage, WritebackRing};
+    use base_types::height_map::{height_in, Height, HeightMap};
+    use utilities::coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
     use utilities::rng::RandomSource;
+
+    /// A cell's height in an image, read as the base game lays heights out.
+    trait HeightInImage {
+        /// The height of the cell at `place` in the superchunk.
+        fn height(&self, place: usize) -> Height;
+    }
+
+    impl HeightInImage for SuperchunkImage {
+        fn height(&self, place: usize) -> Height {
+            height_in(self.height_words(), place)
+        }
+    }
 
     /// A cell of a chunk, cartesian: across and down from its top left.
     const CELL: (u8, u8) = (3, 200);
@@ -118,7 +131,7 @@ mod chunk_storage {
                 }
             };
             let heights = HeightMap::from_heights(height_of);
-            let image = SuperchunkImage::new(&heights);
+            let image = SuperchunkImage::new(heights.words());
             for (chunk, &(floor, expected_span)) in chunks.iter().enumerate() {
                 assert_eq!((heights.is_tall(chunk), heights.floor(chunk)), (expected_span > 255, floor), "chunk {chunk}: a span of {expected_span} from {floor}");
             }
@@ -148,7 +161,7 @@ mod chunk_storage {
         for &cell in &cells {
             heights.set(cell.place_in_superchunk(), height_of(cell));
         }
-        let image = SuperchunkImage::new(&heights);
+        let image = SuperchunkImage::new(heights.words());
         for &cell in &cells {
             assert_eq!(heights.get(cell.place_in_superchunk()), height_of(cell), "{:?}", cell.cartesian());
             assert_eq!(image.height(cell.place_in_superchunk()), height_of(cell), "{:?}", cell.cartesian());
@@ -172,9 +185,9 @@ mod chunk_storage {
         let heights = HeightMap::from_heights(height_of);
         assert_eq!((0..16).filter(|&chunk| heights.is_tall(chunk)).collect::<Vec<_>>(), [3, 9]);
         assert_eq!((heights.floor(0), heights.floor(3), heights.floor(15)), (700, 40_000, 700 + 15 * 300));
-        assert_eq!(heights.words().len(), chunk_storage::HEIGHT_WORDS + 2 * chunk_storage::TALL_WORDS);
+        assert_eq!(heights.words().len(), base_types::height_map::HEIGHT_WORDS + 2 * base_types::height_map::TALL_WORDS);
         let layer = [7u64, 8, 9];
-        let image = SuperchunkImage::new(&heights).rewritten_with(&[LayerChange { place: 5, layer_type: LayerType(2), encoded_layer: &layer }]);
+        let image = SuperchunkImage::new(heights.words()).rewritten_with(&[LayerChange { place: 5, layer_type: LayerType(2), encoded_layer: &layer }]);
         let image_read = SuperchunkImage::from_words(image.words().into()).expect("an image");
         for place in (0..16 * CELLS).step_by(997) {
             assert_eq!(heights.get(place), height_of(place), "cell {place}");
@@ -183,8 +196,8 @@ mod chunk_storage {
         assert_eq!(&image_read.layer(5, LayerType(2)).expect("the layer")[..3], &layer);
         assert_eq!(HeightMap::from_words(image_read.height_words()), heights);
         // Other heights put on it, none tall: the image shorter, its layer as it was.
-        let flat_image = image_read.with_heights(&HeightMap::all_at_height(512));
-        assert_eq!((flat_image.height(12_345), flat_image.words().len() + 2 * chunk_storage::TALL_WORDS), (512, image_read.words().len()));
+        let flat_image = image_read.with_heights(HeightMap::all_at_height(512).words());
+        assert_eq!((flat_image.height(12_345), flat_image.words().len() + 2 * base_types::height_map::TALL_WORDS), (512, image_read.words().len()));
         assert_eq!(&flat_image.layer(5, LayerType(2)).expect("the layer")[..3], &layer);
         // Water on it: none in most chunks, shallow in one, deeper than a byte tells in another -- a map for each of the two, read back, and the rest as it was.
         let depth_of = |place: usize| match place / CELLS {
@@ -200,7 +213,7 @@ mod chunk_storage {
         }
         assert_eq!(&wet_image.layer(5, LayerType(2)).expect("the layer")[..3], &layer);
         // Changed, it keeps its water; with none anywhere, none is kept.
-        assert_eq!(wet_image.rewritten_with(&[]).with_heights(&heights), wet_image);
+        assert_eq!(wet_image.rewritten_with(&[]).with_heights(heights.words()), wet_image);
         assert_eq!(wet_image.with_water(&ChunkMaps::default()), image_read);
     }
 
@@ -213,7 +226,7 @@ mod chunk_storage {
         let (drawn_words, one_cell_words) = (layer_codec.encode_cells(&rectangle_and_circle()).to_vec(), layer_codec.encode_cells(&one_cell(CELL)).to_vec());
         let place = 13;
         let layer_change = |layer_type, words| LayerChange { place, layer_type: LayerType(layer_type), encoded_layer: words };
-        let image = SuperchunkImage::new(&HeightMap::all_at_height(9)).rewritten_with(&[
+        let image = SuperchunkImage::new(HeightMap::all_at_height(9).words()).rewritten_with(&[
             layer_change(42, &one_cell_words),
             layer_change(7, &drawn_words),
             layer_change(u64::MAX, &one_cell_words),
@@ -229,7 +242,7 @@ mod chunk_storage {
         assert!(image.layer(place, LayerType(0)).is_none());
         assert!((0..16).filter(|&other_place| other_place != place).all(|checked_place| image.layer_types(checked_place).count() == 0));
         assert!((0..1 << 20).step_by(4099).all(|cell| image.height(cell) == 9));
-        assert_eq!(image.words()[0] as usize, 16 + chunk_storage::HEIGHT_WORDS + 1, "the first chunk after the chunk table, the heights and the word of no water");
+        assert_eq!(image.words()[0] as usize, 16 + base_types::height_map::HEIGHT_WORDS + 1, "the first chunk after the chunk table, the heights and the word of no water");
 
         let read_back = SuperchunkImage::from_words(image.words().into()).expect("an image");
         assert_eq!(read_back, image);
@@ -242,7 +255,7 @@ mod chunk_storage {
     fn broken_images_are_refused() {
         let mut layer_codec = LayerCodec::new();
         let one_cell_words = layer_codec.encode_cells(&one_cell(CELL)).to_vec();
-        let image = SuperchunkImage::new(&HeightMap::default()).rewritten_with(&[LayerChange { place: 15, layer_type: LayerType(1), encoded_layer: &one_cell_words }]);
+        let image = SuperchunkImage::new(HeightMap::default().words()).rewritten_with(&[LayerChange { place: 15, layer_type: LayerType(1), encoded_layer: &one_cell_words }]);
         let words = image.words();
         assert!(SuperchunkImage::from_words(words[..100].into()).is_err());
         let mut bad_chunk_offset = words.to_vec();
@@ -293,7 +306,7 @@ mod chunk_storage {
     #[test]
     fn flushing_writes_the_ring_into_the_cold_pool() {
         let (mut layer_codec, mut cold_storage, mut flushed_superchunks) = (LayerCodec::new(), ChunkStorage::new(1 << 12), Vec::new());
-        cold_storage.insert(WORLD_MIDDLE, SuperchunkImage::new(&HeightMap::all_at_height(4)));
+        cold_storage.insert(WORLD_MIDDLE, SuperchunkImage::new(HeightMap::all_at_height(4).words()));
         let chunk = ChunkIndex::from_superchunk_place(WORLD_MIDDLE, 6);
         cold_storage.write_back(chunk, LayerType(1), layer_codec.encode_cells(&one_cell(CELL)), &mut flushed_superchunks);
         cold_storage.write_back(chunk, LayerType(2), layer_codec.encode_cells(&rectangle_and_circle()), &mut flushed_superchunks);

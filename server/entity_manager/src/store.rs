@@ -14,7 +14,7 @@ pub use crate::bucket::EntityWritten;
 use crate::attributes::{append_kept, may_be_given, AttributeBlock, AttributeType, DefaultAttributes};
 use crate::entity::{EntityRef, Header, NEVER_WAKES};
 use crate::wheel::{Wake, Wheel};
-use coordinates::{CellIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
+use utilities::coordinates::{CellIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use std::sync::Arc;
 
 /// How many wakes ahead an entity is asked of memory.

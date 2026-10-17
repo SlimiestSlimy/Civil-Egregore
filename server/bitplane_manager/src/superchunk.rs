@@ -4,9 +4,9 @@
 use super::{COUNT_TILES_IN_CHUNK, contains};
 use super::superchunk_layer::{SuperchunkLayer};
 use super::writes::{Write, WritesApplied, apply_in};
-use bitmap::{BITS_PER_WORD, CellWords};
+use utilities::bitmap::{BITS_PER_WORD, CellWords};
 use chunk_storage::LayerType;
-use coordinates::{CellIndex, SuperchunkIndex};
+use utilities::coordinates::{CellIndex, SuperchunkIndex};
 
 /// One hot bitmap, to read.
 pub struct Bucket<'a> {

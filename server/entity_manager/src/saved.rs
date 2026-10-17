@@ -1,7 +1,7 @@
 //! A superchunk's state, as words a save keeps
 //! (`docs/entity_manager.md`, "Saved").
 
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use crate::attributes::{may_be_given, AttributeBlock, DefaultAttributes, BLOCK_WORDS};
 use crate::entity::{EntityType, Header};
 use crate::store::{WorldEntities, SuperchunkEntities};

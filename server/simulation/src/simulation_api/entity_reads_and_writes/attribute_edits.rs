@@ -3,7 +3,7 @@
 //! differ, the attribute whole, or it taken -- so no write lands on
 //! another's (`docs/actions.md`, "One entity writing another").
 
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use entity_manager::{attribute_blocks, attribute_bytes, each_attribute, words_sum, Attribute, AttributeBlock, AttributeType, Header, Layout, Member, WholeAttribute, ATTRIBUTE_WORDS_MOST, BLOCK_WORDS, NO_ATTRIBUTE};
 use crate::simulation_api::compare_and_write::{self, SkipTagSet};
 use crate::{Compare, Write};

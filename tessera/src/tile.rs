@@ -4,8 +4,8 @@
 //!
 //! Function by function: `docs/reference.md`, "`tile.rs`".
 
-use bitmap::morton::{morton_coordinates, morton_index};
-use bitmap::{Bitmap, WIDTH};
+use utilities::bitmap::morton::{morton_coordinates, morton_index};
+use utilities::bitmap::{Bitmap, WIDTH};
 
 /// The level of a single cell, the finest there is.
 pub const CELL_LEVEL: u8 = 8;

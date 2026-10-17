@@ -3,9 +3,9 @@
 //! and changed, their set cells counted.
 
 use super::{COUNT_TILES_IN_CHUNK, COUNT_TILE_CELLS, ChunkSet, NO_CELLS, contains, members, set_membership};
-use bitmap::{BITS_PER_WORD, CellWords, WORDS};
+use utilities::bitmap::{BITS_PER_WORD, CellWords, WORDS};
 use chunk_storage::LayerType;
-use coordinates::CHUNKS_IN_SUPERCHUNK;
+use utilities::coordinates::CHUNKS_IN_SUPERCHUNK;
 
 /// A superchunk layer's four chunk sets, a bit a chunk each, packed
 /// together in 8 bytes.

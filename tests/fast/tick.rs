@@ -8,7 +8,7 @@ use entity_manager::WorldEntities;
 use simulation::{Simulation, SimulationTickState};
 use utilities::chance::Chance;
 use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 
 /// The layer type the tests run on.
 const STONE_LAYER: LayerType = LayerType::of_a_bit(6);

@@ -7,7 +7,7 @@ use super::conditional::Compare;
 use super::instruction::{Instruction, NO_COUNT};
 use super::SimulationTickState;
 use chunk_storage::LayerType;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use entity_manager::{AttributeBlock, AttributeType, Header, Member};
 
 /// A write, said whole: one instruction, queued by [`SimulationTickState::write`]

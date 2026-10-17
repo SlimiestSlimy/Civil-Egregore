@@ -4,7 +4,7 @@
 //! knows what they mean.
 
 use chunk_storage::disk::WorldInfo;
-use coordinates::WORLD_MIDDLE;
+use utilities::coordinates::WORLD_MIDDLE;
 use std::hash::{BuildHasher, RandomState};
 use utilities::tuning::{Tuning, CAMERA_LOADS, FORCED_HOT, WORLD_SIDE};
 use worldgen::{has_land_about, WorldGeneration};

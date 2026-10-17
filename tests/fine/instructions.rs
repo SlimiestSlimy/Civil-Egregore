@@ -6,7 +6,7 @@
 //! `cargo test`
 
 use crate::arenas::{cell, walker_header, world};
-use coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, AttributeBlock, Header, Member, NEVER_WAKES};
 use simulation::{Simulation, SimulationTickState};
 

@@ -14,7 +14,7 @@
 use crate::arenas::{cell, walker_header, world, STONE_LAYER, WALKER_TYPE};
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
-use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, AttributeBlock, WorldEntities, InstructionsApplied};
 use simulation::simulation_api::cell_and_its_neighbours;
 use simulation::simulation_api::{cell_reads_and_writes, compare_and_write, SimulationTickState};

@@ -351,7 +351,7 @@ const RULES_CRATES: [&str; 2] = ["server/basegame/sca_rules", "server/basegame/e
 #[test]
 fn the_rules_ask_the_simulation_api_alone() {
     let root_folder = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let crates_under_the_api = ["bitplane_manager::", "entity_manager::", "chunk_storage::", "coordinates::", "type_registry::", "utilities::", "pathfinding::", "worldgen::", "server::"];
+    let crates_under_the_api = ["bitplane_manager::", "entity_manager::", "chunk_storage::", "utilities::coordinates::", "type_registry::", "utilities::", "pathfinding::", "worldgen::", "server::"];
     let mut wrong_places = Vec::new();
     for rules in RULES_CRATES {
         let mut source_files = Vec::new();

@@ -9,7 +9,7 @@
 
 mod tests;
 
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 use tests::check_bitmap;
 use tests::examination::tree_of;
 use tests::saved::every_saved;

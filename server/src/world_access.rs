@@ -6,9 +6,10 @@
 use crate::{World, WorldGeneration, WorldInfo};
 use bitplane_manager::{BitmapArena, Write, WritesApplied};
 use chunk_storage::{ChunkStorage, LayerType};
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use entity_manager::{AttributeBlock, Header, InstructionsApplied, WorldEntities};
-use simulation::halos::{Halos, Viewport};
+use protocol::pipe::frame::Viewport;
+use simulation::halos::Halos;
 use simulation::{ChosenRules, HaloChange, RulePlace, Simulation, SimulationHandle, TickCounts, TickReport, WorldTick};
 use std::collections::BTreeMap;
 

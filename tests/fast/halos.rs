@@ -6,7 +6,7 @@
 //! `cargo test`
 
 use base_types::GRASS;
-use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
+use utilities::coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use bitplane_manager::{Write, WriteOp};
 use entity_manager::{AttributeBlock, EntityType, Header, NEVER_WAKES};
 use protocol::pipe::frame::Viewport;

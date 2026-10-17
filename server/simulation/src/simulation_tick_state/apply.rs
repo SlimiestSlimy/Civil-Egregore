@@ -8,7 +8,7 @@ use super::instruction::{Instruction, Opcode, NO_COUNT};
 use super::landing::InstructionLanding;
 use bitplane_manager::{Superchunk, Write, WriteOp, WritesApplied};
 use chunk_storage::LayerType;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use entity_manager::{AttributeType, EntityType, Header, InstructionsApplied, EntityWritten, SuperchunkEntities};
 
 /// What a thread applied in a tick's second phase.

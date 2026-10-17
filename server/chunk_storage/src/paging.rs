@@ -5,7 +5,7 @@
 
 use crate::disk::{self, DiskError};
 use crate::{ChunkStorage, SuperchunkImage};
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};

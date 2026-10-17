@@ -1,16 +1,8 @@
 [package]
 name = "protocol"
 edition = "2024"
-description = "What the client and the server say to each other: the parameters a command line gives the server, the base game's types, and later the messages and the wire"
+description = "What the client and the server say to each other: the parameters a command line gives the server, the messages and the wire"
 
 [dependencies]
 type_registry = { path = "type_registry" }
 utilities = { path = "../utilities" }
-simulation = { path = "../server/simulation" }
-base_types = { path = "../server/basegame/base_types" }
-sca_rules = { path = "../server/basegame/sca_rules" }
-entity_rules = { path = "../server/basegame/entity_rules" }
-libraries = { path = "../server/basegame/libraries" }
-worldgen = { path = "../server/basegame/worldgen" }
-bitmap = { path = "../utilities/bitmap" }
-chunk_storage = { path = "../server/chunk_storage" }

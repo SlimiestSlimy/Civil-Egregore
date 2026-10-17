@@ -6,7 +6,7 @@
 
 use crate::worlds::{first_superchunk, plain_start, tick_rule};
 use bitplane_manager::{Write, WriteOp};
-use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use sca_rules::trees::{DIED_COUNT, GROWN_COUNT, SAMPLED_COUNT, SEEDS_FROM, SPREADS_COUNT};
 use server::World;
 use crate::grass::write_climate;
