@@ -40,7 +40,7 @@ impl World {
             let viewport = self.halos.viewport();
             let paid_superchunks: Vec<SuperchunkIndex> = self.world_info.without_camera_flock.iter().map(|&owed_index| SuperchunkIndex(owed_index)).filter(|superchunk| viewport.binary_search(superchunk).is_ok() && self.entity_store.superchunk(*superchunk).is_some()).collect();
             for &superchunk in &paid_superchunks {
-                self.put_flock(superchunk, camera_flock_sheep as usize);
+                self.add_flock(superchunk, camera_flock_sheep as usize);
             }
             if !paid_superchunks.is_empty() {
                 self.world_info.without_camera_flock.retain(|&still_owed_index| paid_superchunks.binary_search(&SuperchunkIndex(still_owed_index)).is_err());

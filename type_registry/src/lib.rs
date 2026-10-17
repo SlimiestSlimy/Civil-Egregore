@@ -1,6 +1,8 @@
 //! Civil Egregore's type registry: the one `u64` namespace every type
-//! in a world is drawn from, and the one table that gives each its
-//! name, registration, ID and width ([`REGISTRY`]); a clash does not build.
+//! in a world is drawn from, the IDs' types, and the registry a world
+//! is given its types in ([`TypeRegistry`]), each by a name no other
+//! has. Which types: none of its own -- the base game's are
+//! `protocol::default_types`.
 //!
 //! The design: `docs/type_registry.md`; item by item:
 //! `docs/reference.md`.
@@ -9,13 +11,18 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-mod climate;
+mod frozen_types;
 mod layouts;
-mod registry;
+mod registered_type;
+mod registration;
+mod saved_types;
+mod type_registry;
 pub mod transient_data;
 mod type_ids;
 
-pub use climate::{nearer_by_step, passes_a_slope, pressure_falls_by, Climate, Wind, DEGREES_A_WIND_CARRIES, FALL_THAT_FREES, HEAT_A_LEVEL_MORE_HELD, HIGHEST_PRESSURE, HOTTEST_TEMPERATURE, HUMIDITY_A_LEVEL_OF_CLOUD, HUMIDITY_A_LEVEL_SOONER, MOST_HUMID, PRESSURE_AT_REST, PRESSURE_GAP_AT_REST, RAINS_ABOVE_AT_THE_MOST, RAINS_ABOVE_IN_COLD_DRY_AIR, RISE_THAT_HALVES, STRONGEST_WIND, TILES_ABOUT};
-pub use layouts::{data_words, Attribute, Layout, Member, SheepState, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};
-pub use registry::*;
+pub use layouts::{data_words, Attribute, Layout, Member, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};
+pub use frozen_types::FrozenTypes;
+pub use registered_type::RegisteredType;
+pub use registration::{Library, Registration};
+pub use type_registry::{RegistryRefusal, TypeRegistry};
 pub use type_ids::{AttributeType, Bits16, Bits2, Bits32, Bits4, Bits8, EntityRuleType, EntityType, LayerType, TypeKind, ScaRuleType, WidePlane, Width, ATTRIBUTE_NUMBERS, TYPE_ID_NUMBERS};

@@ -4,7 +4,7 @@
 //! cell it stands on names it (`docs/entity_manager.md`,
 //! "Instructions", An entity's name in a tick).
 
-use crate::attributes::{attribute_blocks, attribute_bytes, attribute_seen, default_kept, default_seen, Attribute, AttributeBlock, AttributeType, DefaultKept, Layout, WholeAttribute, ATTRIBUTE_WORDS_MOST, BLOCK_WORDS};
+use crate::attributes::{attribute_blocks, attribute_bytes, attribute_seen, default_seen, Attribute, AttributeBlock, AttributeType, DefaultAttributes, DefaultKept, Layout, WholeAttribute, ATTRIBUTE_WORDS_MOST, BLOCK_WORDS};
 use coordinates::CellIndex;
 pub use type_registry::EntityType;
 
@@ -35,6 +35,9 @@ pub struct EntityRef<'a> {
     /// All its blocks as its bucket keeps them: its default
     /// attribute's, if its type has one, then `attributes`.
     pub(crate) kept_blocks: &'a [AttributeBlock],
+    /// The world's default attributes: what its type's is, asked only
+    /// if it has one.
+    pub(crate) default_attributes: &'a DefaultAttributes,
 }
 
 impl<'a> EntityRef<'a> {
@@ -46,7 +49,7 @@ impl<'a> EntityRef<'a> {
         if default_block_count == 0 {
             return None;
         }
-        Some((default_kept(self.header.entity_type)?, &self.kept_blocks[..default_block_count]))
+        Some((self.default_attributes.of(self.header.entity_type)?, &self.kept_blocks[..default_block_count]))
     }
 
     /// Its type's default attribute as kept, if `attribute_type` is it.

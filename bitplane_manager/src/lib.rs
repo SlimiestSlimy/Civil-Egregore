@@ -49,7 +49,7 @@ fn contains(chunk_set: ChunkSet, chunk_place: usize) -> bool {
 }
 
 /// Puts the chunk at `chunk_place` in `chunk_set`, or takes it out.
-fn put(chunk_set: &mut ChunkSet, chunk_place: usize, member: bool) {
+fn set_membership(chunk_set: &mut ChunkSet, chunk_place: usize, member: bool) {
     if member {
         *chunk_set |= 1 << chunk_place;
     } else {

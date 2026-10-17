@@ -7,11 +7,9 @@
 mod applying;
 
 use entity_manager::{WorldEntities, EntityReader, InstructionsApplied};
-use crate::turn::apply::SuperchunkCollisionPlane;
-use crate::turn::conditional::{CountedWhenApplied, COUNTED_WHEN_APPLIED};
-use crate::turn::{slots, Outbox, Turn};
+use crate::superchunk_tick_state::conditional::{CountedWhenApplied, COUNTED_WHEN_APPLIED};
+use crate::superchunk_tick_state::{slots, Outbox, SuperchunkTickState};
 use bitplane_manager::{BitmapArena, CellReader, WritesApplied};
-use chunk_storage::LayerType;
 use coordinates::{CellIndex, SuperchunkIndex};
 use std::ops::AddAssign;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -37,7 +35,7 @@ pub struct TickReport<R> {
     /// "Compare-and-write").
     pub instructions_compared: (u64, u64),
     /// What was counted as it was applied, by the number each rule's
-    /// counts were given (`Turn::count_under`).
+    /// counts were given (`SuperchunkTickState::count_under`).
     pub counted_when_applied: CountedWhenApplied,
     /// The authors whose act reached over a border, each applied
     /// once to every superchunk it landed in
@@ -66,9 +64,6 @@ pub struct Simulation {
     /// Each superchunk's random stream, with its superchunk, in the
     /// arena's order: kept from tick to tick, and by a save.
     random_streams: Vec<(SuperchunkIndex, RandomSource)>,
-    /// The layer entities are kept in, if the world has one
-    /// ([`Simulation::keep_entities_in`]).
-    collision_plane: Option<LayerType>,
     /// Room the second phase keeps from tick to tick.
     applying_room: applying::ApplyingRoom,
 }
@@ -98,16 +93,7 @@ impl Simulation {
     /// jobs on too: a thread busy with one sits a tick's phase out.
     pub fn on_dispatcher(dispatcher: Arc<Dispatcher>) -> Self {
         let samples = (0..dispatcher.thread_count()).map(|_| Mutex::new(Vec::new())).collect();
-        Self { dispatcher, outboxes: Vec::new(), samples, random_streams: Vec::new(), collision_plane: None, applying_room: applying::ApplyingRoom::default() }
-    }
-
-    /// From here on the entities are kept in `collision_plane`, a
-    /// layer of a bit a cell: the cell an entity comes to stand on is
-    /// set there, none comes to a cell set there -- whatever set it --
-    /// and the cell one left or was removed from is cleared when the
-    /// tick is over (`docs/simulation.md`, "Entities").
-    pub fn keep_entities_in(&mut self, collision_plane: LayerType) {
-        self.collision_plane = Some(collision_plane);
+        Self { dispatcher, outboxes: Vec::new(), samples, random_streams: Vec::new(), applying_room: applying::ApplyingRoom::default() }
     }
 
     /// Each superchunk's random stream as it stands: its superchunk and
@@ -151,7 +137,7 @@ impl Simulation {
     pub fn tick<R, F>(&mut self, bitmap_arena: &mut BitmapArena, entity_store: &mut WorldEntities, seed: u64, rule: F) -> TickReport<R>
     where
         R: Default + AddAssign + Send,
-        F: Fn(&mut Turn) -> R + Sync,
+        F: Fn(&mut SuperchunkTickState) -> R + Sync,
     {
         let count = bitmap_arena.superchunks().len();
         self.outboxes.resize_with(count, Outbox::default);
@@ -179,11 +165,11 @@ impl Simulation {
                     break;
                 };
                 let (ref mut outbox, ref mut kept_random_stream) = *claimed_turn.lock().expect("a superchunk's turn");
-                let mut turn = Turn::new(&superchunks[turn_index], &entity_superchunks[turn_index], current_tick, &bitmap_reader, &entity_reader, outbox, RandomSource::new(kept_random_stream.1.whole_state()), &mut samples);
-                part_total += rule(&mut turn);
-                turn.compare_end();
+                let mut tick_state = SuperchunkTickState::new(&superchunks[turn_index], &entity_superchunks[turn_index], current_tick, &bitmap_reader, &entity_reader, outbox, RandomSource::new(kept_random_stream.1.whole_state()), &mut samples);
+                part_total += rule(&mut tick_state);
+                debug_assert_eq!(tick_state.skip_tag_sets_open, 0, "a turn ended with a skip-tag set open");
                 // Where its random numbers have come to: the next tick goes on from there.
-                kept_random_stream.1 = turn.random_stream;
+                kept_random_stream.1 = tick_state.random_stream;
             }
             *part_results[part].lock().expect("a part's result") = part_total;
         });
@@ -194,11 +180,10 @@ impl Simulation {
         }
         let computed_instant = Instant::now();
 
-        let (superchunk_indices, collision_plane) = (&superchunk_indices, self.collision_plane);
-        let applied_parts = applying::apply_what_was_queued(&self.dispatcher, bitmap_arena.superchunks_mut(), entity_store.superchunks_mut(), &mut self.applying_room, superchunk_indices, &self.outboxes, current_tick, collision_plane);
-        // The tick over: every entity named by the cell it stands on now, the cells left cleared in the collision plane.
-        for (superchunk, superchunk_entities) in bitmap_arena.superchunks_mut().iter_mut().zip(entity_store.superchunks_mut()) {
-            superchunk_entities.names_anew(&mut SuperchunkCollisionPlane { superchunk, layer: collision_plane });
+        let applied_parts = applying::apply_what_was_queued(&self.dispatcher, bitmap_arena.superchunks_mut(), entity_store.superchunks_mut(), &mut self.applying_room, &superchunk_indices, &self.outboxes, current_tick);
+        // The tick over: every entity named by the cell it stands on now.
+        for superchunk_entities in entity_store.superchunks_mut() {
+            superchunk_entities.names_anew();
         }
         let (mut applied_writes, mut instructions_compared, mut counted_when_applied, mut acts_over_a_border) = (WritesApplied::default(), (0, 0), [0; COUNTED_WHEN_APPLIED], 0);
         for part in applied_parts {

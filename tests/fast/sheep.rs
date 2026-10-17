@@ -5,7 +5,7 @@
 //! walk off the hot bitplanes, and tick the same on any number of
 //! threads.
 
-use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, put_entity, tick_sheep};
+use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, add_entity, tick_sheep};
 use coordinates::CellCartesian;
 use entity_manager::{set_attribute, AttributeBlock, EntityRef, Header, WholeAttribute};
 use entity_rules::sheep::{BIRTHS_COUNT, DEATHS_COUNT, EATEN_COUNT, FAR_COUNT, PATHS, SOUGHT_COUNT, WOKEN_COUNT, GESTATION_TIME, TIME_BETWEEN_MEALS, ROAMING_TIME, SHEEP, SHEEP_STATE, TIME_TO_STARVE, SheepState, STEP_JITTER, STEP};
@@ -35,7 +35,7 @@ fn with_lambs_due(world: &mut server::World, seed: u64, one_in: u64, due_within:
         }
         set_attribute(&mut attributes, SHEEP_STATE, SheepState { lamb_due_at: due_tick, ..state_was });
         assert_eq!(world.remove_entity(&header).entities_removed, 1);
-        assert_eq!(world.put_entity(Header { wake: header.wake.min(due_tick), ..header }, &attributes).puts, 1);
+        assert_eq!(world.add_entity(Header { wake: header.wake.min(due_tick), ..header }, &attributes).added, 1);
     }
 }
 
@@ -100,8 +100,8 @@ fn hungry_sheep_walk_to_the_nearest_grass() {
     let (sheep_cartesian, grass_cartesian) = (CellCartesian { x: corner_cartesian.x + 500, y: corner_cartesian.y + 500 }, CellCartesian { x: corner_cartesian.x + 506, y: corner_cartesian.y + 493 });
     plant_grass(&mut world, grass_cartesian, 1, 1);
     let header = Header { entity_type: SHEEP, stood_cell: sheep_cartesian.into(), wake: 0 };
-    put_entity(&mut world, header, &hungry_at(0));
-    let (mut counts_so_far, mut ate_at) = (actions::RuleCounts::default(), None);
+    add_entity(&mut world, header, &hungry_at(0));
+    let (mut counts_so_far, mut ate_at) = (simulation::simulation_api::RuleCounts::default(), None);
     for _ in 0..12 * (STEP.ticks() + STEP_JITTER.ticks()) {
         // The grass rule left out: the one cell of grass must stay until eaten.
         let report = tick_sheep(&mut world);
@@ -129,8 +129,8 @@ fn hungry_sheep_walk_to_grass_far_off() {
     let (sheep_cartesian, grass_cartesian) = (CellCartesian { x: corner_cartesian.x + 900, y: corner_cartesian.y + 700 }, CellCartesian { x: corner_cartesian.x + 1050, y: corner_cartesian.y + 800 });
     plant_grass(&mut world, grass_cartesian, 1, 1);
     let header = Header { entity_type: SHEEP, stood_cell: sheep_cartesian.into(), wake: 0 };
-    put_entity(&mut world, header, &hungry_at(0));
-    let (mut counts_so_far, mut ate_at) = (actions::RuleCounts::default(), None);
+    add_entity(&mut world, header, &hungry_at(0));
+    let (mut counts_so_far, mut ate_at) = (simulation::simulation_api::RuleCounts::default(), None);
     for _ in 0..TIME_TO_STARVE.ticks() {
         let report = tick_sheep(&mut world);
         if report.rules[EATEN_COUNT] > 0 && ate_at.is_none() {
@@ -160,7 +160,7 @@ fn sheep_on_thin_pasture_roam_away() {
     let start_cells: Vec<CellCartesian> = world.bitmap_arena().superchunk_indices().into_iter().map(|superchunk| superchunk.top_left().cartesian()).map(|corner_cartesian| CellCartesian { x: corner_cartesian.x + 500, y: corner_cartesian.y + 500 }).collect();
     for &start_cell in &start_cells {
         plant_grass(&mut world, start_cell, 1, 1);
-        put_entity(&mut world, Header { entity_type: SHEEP, stood_cell: start_cell.into(), wake: 0 }, &hungry_at(0));
+        add_entity(&mut world, Header { entity_type: SHEEP, stood_cell: start_cell.into(), wake: 0 }, &hungry_at(0));
     }
     // A sheep is told from the others by its superchunk, which it does not walk out of in so few steps.
     let superchunks = world.bitmap_arena().superchunk_indices();
@@ -241,8 +241,8 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
     use coordinates::CellIndex;
     use entity_manager::WorldEntities;
-    use actions::cells;
-    use type_registry::{GRASS, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
+    use simulation::simulation_api::cell_reads_and_writes;
+    use base_types::{GRASS, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
     let superchunk = coordinates::WORLD_MIDDLE;
     let (mut layer_codec, mut bitmap_arena, mut entity_store) = (chunk_storage::LayerCodec::new(), BitmapArena::new(), WorldEntities::new());
     for chunk in superchunk.chunks() {
@@ -258,15 +258,15 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     }
     bitmap_arena.apply();
     let was_hungry_at = 0;
-    entity_store.queue_put(Header { entity_type: SHEEP, stood_cell: decaying_cell, wake: 0 }, &hungry_at(was_hungry_at));
-    entity_store.queue_put(Header { entity_type: SHEEP, stood_cell: standing_cell, wake: 0 }, &hungry_at(was_hungry_at));
+    entity_store.queue_add(Header { entity_type: SHEEP, stood_cell: decaying_cell, wake: 0 }, &hungry_at(was_hungry_at));
+    entity_store.queue_add(Header { entity_type: SHEEP, stood_cell: standing_cell, wake: 0 }, &hungry_at(was_hungry_at));
     entity_store.apply();
     let mut test_simulation = simulation::Simulation::new(1);
-    let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut actions::Turn| {
+    let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut simulation::simulation_api::SuperchunkTickState| {
         // The decay first, counted under 0; the sheep's counts from 8 on.
-        cells::clear_counted(turn, GRASS, decaying_cell, 0);
-        turn.count_under(8);
-        entity_rules::sheep::rule(turn)
+        cell_reads_and_writes::clear_counted(tick_state, GRASS, decaying_cell, 0);
+        tick_state.count_under(8);
+        entity_rules::sheep::rule(tick_state, &libraries::collision::COLLISION)
     });
     assert_eq!((bitmap_arena.layer_holds_cell(GRASS, decaying_cell), bitmap_arena.layer_holds_cell(GRASS, standing_cell)), (Ok(false), Ok(false)));
     assert_eq!((report.writes_applied.cells_changed, report.writes_applied.writes_refused), (2, 1), "one meal applied, one refused");

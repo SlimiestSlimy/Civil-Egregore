@@ -13,8 +13,8 @@ utilities = { path = "../utilities" }
 worldgen = { path = "../worldgen" }
 bitmap = { path = "../bitmap" }
 chunk_storage = { path = "../chunk_storage" }
-actions = { path = "../actions" }
 simulation = { path = "../simulation" }
 bitplane_manager = { path = "../bitplane_manager" }
 entity_manager = { path = "../entity_manager" }
 protocol = { path = "../protocol/protocol" }
+base_types = { path = "../basegame/base_types" }

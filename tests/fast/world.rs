@@ -1,7 +1,8 @@
 //! A world saved and loaded: it goes on exactly as it would have -- to
 //! the cell, the entity and the random number, however often it is
 //! stopped, hot superchunks and cold -- its files are where and what
-//! they are said to be, and files that are not a save are refused.
+//! they are said to be, and files that are not a save, or a save of
+//! other types, are refused.
 //!
 //! `cargo test`
 
@@ -28,11 +29,11 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
     assert_eq!(second_world.world_info().layers, first_world.world_info().layers);
     assert!(world_contents(&first_world) == world_contents(&second_world), "loaded as saved");
 
-    let mut grass_eaten = 0;
+    let (mut grass_eaten, sheep_rule) = (0, first_world.rule_place(base_types::RULE_OF_SHEEP.0));
     for _ in 0..3_000 {
         let report = first_world.tick().rules;
         second_world.tick();
-        grass_eaten += report.rules.counts_of(server::SHEEP_RULE)[EATEN_COUNT];
+        grass_eaten += report.rules.counts_of(sheep_rule)[EATEN_COUNT];
     }
     assert!(grass_eaten > 300, "{grass_eaten} eaten: a world doing something");
     assert!(world_contents(&first_world) == world_contents(&second_world), "the same 3,000 ticks on");
@@ -90,8 +91,8 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     server::save(&folder, &mut saved_world).expect("saved");
     let world_file_text = std::fs::read_to_string(folder.join("world.csv")).expect("the world's file");
     let generation: String = saved_world.world_generation().numbers().iter().map(|(name, value)| format!("generation {name},{value}\n")).collect();
-    // Every layer the registry has, a wide plane as the layers it is kept cold as.
-    let layers: Vec<String> = type_registry::layer_types().into_iter().flat_map(|layer_type| layer_type.each_bitplane()).map(|plane_type| plane_type.0.to_string()).collect();
+    // Every layer the world's types have, a wide plane as the layers it is kept cold as.
+    let layers: Vec<String> = saved_world.frozen_types().layer_types().into_iter().flat_map(|layer_type| layer_type.each_bitplane()).map(|plane_type| plane_type.0.to_string()).collect();
     assert_eq!(world_file_text, format!("world,is\nformat,2\nseed,{}\ntick,0\nlayers,{}\nhot entity,{}\n{generation}", utilities::seed::seed_as_hex(seed), layers.join(" "), server::HOT_ENTITY.0), "no name: the folder's");
     let hot: String = saved_world.bitmap_arena().superchunk_indices().iter().map(|superchunk| format!("{:011x},hot,\n", superchunk.0)).collect();
     assert_eq!(std::fs::read_to_string(folder.join("hot.csv")).expect("the hot file"), format!("superchunk,is,until\n{hot}"), "the nine hot, none cooling or warming");
@@ -147,6 +148,54 @@ fn files_that_are_not_a_save_are_refused() {
     assert!(matches!(server::load_world(&folder), Err(DiskError::InvalidFile(..))));
 }
 
+/// A save holds the world's types by name and ID, in the order
+/// registered, and a world loaded has those: its own, each the type the
+/// code registers under its name. A name none has, an ID not the code's,
+/// a name said twice, or a default attribute saved after its type, is
+/// refused, naming the type.
+#[test]
+fn a_world_is_loaded_with_the_types_it_was_made_with() {
+    let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
+    let folder = folder("types");
+    let mut world = server::start_world(server::WorldStart { seed, sheep_per_flock: 10, ..server::WorldStart::default() });
+    server::save(&folder, &mut world).expect("saved");
+    let types_path = folder.join(server::TYPES_FILE);
+    let types_text = std::fs::read_to_string(&types_path).expect("the types file");
+    let lines: Vec<String> = types_text.lines().map(str::to_string).collect();
+    let world_lines = world.frozen_types().types().iter().map(|registered| format!("{},{:016x}", registered.name(), registered.type_id()));
+    assert_eq!(lines, std::iter::once("type,id".to_string()).chain(world_lines).collect::<Vec<_>>());
+    let line_of = |type_name: &str| lines.iter().position(|line| line.split(',').next() == Some(type_name)).expect("saved");
+    let with_lines = |change: &dyn Fn(&mut Vec<String>)| {
+        let mut changed_lines = lines.clone();
+        change(&mut changed_lines);
+        changed_lines.join("\n") + "\n"
+    };
+    // Its own types: one left out of the save, the world loaded has it not.
+    std::fs::write(&types_path, with_lines(&|changed_lines| _ = changed_lines.remove(line_of("elevation")))).expect("written");
+    let loaded_world = server::load_world(&folder).expect("loaded without it");
+    assert!(loaded_world.frozen_types().named("elevation").is_none() && loaded_world.frozen_types().types().len() == lines.len() - 2);
+    // A type drawn, renamed, of another ID or said twice; and a default attribute after its type.
+    let mut seeded_rng = utilities::rng::RandomSource::new(seed);
+    let drawn = 1 + seeded_rng.draw_below(lines.len() as u64 - 1) as usize;
+    let (drawn_name, drawn_id) = lines[drawn].split_once(',').expect("a name and an ID");
+    let other_id = format!("{:016x}", u64::from_str_radix(drawn_id, 16).expect("hexadecimal") ^ 1 << 8);
+    for (changed_text, named) in [
+        (with_lines(&|changed_lines| changed_lines[drawn] = format!("unheard of,{drawn_id}")), "unheard of"),
+        (with_lines(&|changed_lines| changed_lines[drawn] = format!("{drawn_name},{other_id}")), drawn_name),
+        (with_lines(&|changed_lines| changed_lines.insert(drawn, lines[drawn].clone())), drawn_name),
+        (with_lines(&|changed_lines| {
+            let state_line = changed_lines.remove(line_of("sheep state"));
+            changed_lines.insert(line_of("sheep"), state_line);
+        }), "sheep"),
+    ] {
+        std::fs::write(&types_path, &changed_text).expect("written");
+        let Err(DiskError::InvalidFile(path, what_is_wrong)) = server::load_world(&folder) else { panic!("loaded with `{named}` amiss:\n{changed_text}") };
+        assert!(path == types_path && what_is_wrong.contains(named), "{what_is_wrong}");
+    }
+    std::fs::write(&types_path, &types_text).expect("written");
+    assert!(server::load_world(&folder).is_ok());
+}
+
 /// In a world generated, the ground has walls, and no sheep ever steps
 /// through one: across or down only between cells at most a step apart
 /// in height, diagonally only where both ways round are such steps.
@@ -199,7 +248,7 @@ fn sheep_never_step_through_a_wall() {
 fn the_weathers_planes_hold_a_number_a_tile_through_ticks_and_a_save() {
     let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
     use bitplane_manager::Write;
-    use type_registry::{CLIMATE, CLOUD, WEATHER_TILE_SCALE};
+    use base_types::{CLIMATE, CLOUD, WEATHER_TILE_SCALE};
     let folder = folder("weather");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
     let mut world = server::start_world(server::WorldStart { seed, world_size: server::WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, sheep_per_flock: 50, ..server::WorldStart::default() });

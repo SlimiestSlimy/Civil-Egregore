@@ -42,7 +42,7 @@ pub fn server_flags() -> Vec<Flag> {
 
 /// `--seed 0x…`.
 fn parse_seed_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters) -> Result<(), FlagError> {
-    clean_parameters.put(SEED, ParameterValue::Hex(flag_parser.hex_parameter()?));
+    clean_parameters.insert(SEED, ParameterValue::Hex(flag_parser.hex_parameter()?));
     Ok(())
 }
 
@@ -69,7 +69,7 @@ fn parse_ticks_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanSe
 /// `--forced_hot []`: given at all, the world is forced hot.
 fn parse_forced_hot_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters) -> Result<(), FlagError> {
     flag_parser.bracketed(|_| Ok(()))?;
-    clean_parameters.put(FORCED_HOT, ParameterValue::Nested(CleanServerParameters::default()));
+    clean_parameters.insert(FORCED_HOT, ParameterValue::Nested(CleanServerParameters::default()));
     Ok(())
 }
 
@@ -90,7 +90,7 @@ fn parse_info_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanSer
 
 /// A flag of one whole number, put under `parameter_name`.
 fn parse_integer_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters, parameter_name: &'static str) -> Result<(), FlagError> {
-    clean_parameters.put(parameter_name, ParameterValue::Integer(flag_parser.integer_parameter()?));
+    clean_parameters.insert(parameter_name, ParameterValue::Integer(flag_parser.integer_parameter()?));
     Ok(())
 }
 
@@ -99,10 +99,10 @@ fn parse_integer_flag(flag_parser: &mut FlagParser, clean_parameters: &mut Clean
 fn parse_command_on_folder(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters, command_name: &'static str) -> Result<(), FlagError> {
     let command_parameters = flag_parser.bracketed(|flag_parser| {
         let mut command_parameters = CleanServerParameters::default();
-        command_parameters.put(FOLDER, ParameterValue::Text(flag_parser.text_parameter()?));
+        command_parameters.insert(FOLDER, ParameterValue::Text(flag_parser.text_parameter()?));
         flag_parser.parse_flags_within(&mut command_parameters)?;
         Ok(command_parameters)
     })?;
-    clean_parameters.put(command_name, ParameterValue::Nested(command_parameters));
+    clean_parameters.insert(command_name, ParameterValue::Nested(command_parameters));
     Ok(())
 }

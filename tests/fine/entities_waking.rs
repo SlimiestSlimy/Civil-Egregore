@@ -8,7 +8,7 @@ use crate::arenas::*;
 use crate::walkers::*;
 use coordinates::{SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{AttributeBlock, Header, WHEEL_TICKS};
-use simulation::{Simulation, Turn};
+use simulation::{Simulation, SuperchunkTickState};
 use std::sync::Mutex;
 
 /// Attributes added and removed every tick, by hundreds of entities in
@@ -19,10 +19,10 @@ fn attributes_come_and_go_at_run_time() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let (mut bitmap_arena, mut entity_store) = world(1);
     for walker_cell in cells_drawn(seed, 300, 1024) {
-        entity_store.queue_put(walker_header(walker_cell, 0), &[]);
+        entity_store.queue_add(walker_header(walker_cell, 0), &[]);
     }
     assert_eq!(entity_store.queued_count(), 300);
-    assert_eq!(entity_store.apply().puts, 300);
+    assert_eq!(entity_store.apply().added, 300);
     assert_eq!((entity_store.len(), entity_store.queued_count()), (300, 0));
     let mut world_simulation = Simulation::new(1);
     for _ in 1..=101u64 {
@@ -45,20 +45,20 @@ fn entities_wake_at_their_tick() {
     let (mut bitmap_arena, mut entity_store) = world(1);
     let far_wake = 2 * WHEEL_TICKS + 300;
     let (first_cell, far_cell, removed_cell) = (cell(3, 3), cell(900, 900), cell(10, 10));
-    entity_store.queue_put(walker_header(first_cell, 5), &[]);
-    entity_store.queue_put(walker_header(far_cell, far_wake), &[]);
-    entity_store.queue_put(walker_header(removed_cell, 7), &[]);
+    entity_store.queue_add(walker_header(first_cell, 5), &[]);
+    entity_store.queue_add(walker_header(far_cell, far_wake), &[]);
+    entity_store.queue_add(walker_header(removed_cell, 7), &[]);
     entity_store.apply();
     let woken_log = Mutex::new(Vec::new());
     let mut world_simulation = Simulation::new(1);
     for _ in 0..=far_wake + 10 {
-        world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn| {
-            for entity in turn.woken_entities() {
-                woken_log.lock().unwrap().push((entity.header.stood_cell, turn.current_tick()));
+        world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state| {
+            for entity in tick_state.woken_entities() {
+                woken_log.lock().unwrap().push((entity.header.stood_cell, tick_state.current_tick()));
                 if entity.header.stood_cell == removed_cell {
-                    actions::entities::remove(turn, &entity.header);
-                } else if entity.header.stood_cell == first_cell && turn.current_tick() == 5 {
-                    actions::entities::step(turn, &entity.header, first_cell, 40);
+                    simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &entity.header);
+                } else if entity.header.stood_cell == first_cell && tick_state.current_tick() == 5 {
+                    simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, first_cell, 40);
                 }
             }
             0
@@ -77,13 +77,13 @@ fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let (mut bitmap_arena, mut entity_store) = world(2);
     let start_column = SUPERCHUNK_SIDE_CELLS - 3;
-    entity_store.queue_put(walker_header(cell(start_column, 100), 0), &[AttributeBlock::holding_value(WOKEN_COUNT, 0)]);
+    entity_store.queue_add(walker_header(cell(start_column, 100), 0), &[AttributeBlock::holding_value(WOKEN_COUNT, 0)]);
     entity_store.apply();
     let mut world_simulation = Simulation::new(2);
-    let step = |turn: &mut Turn| {
-        for entity in turn.woken_entities() {
-            let stepped_header = Header { stood_cell: entity.header.stood_cell.at_cartesian_offset(1, 0).unwrap(), wake: turn.current_tick() + 1, ..entity.header };
-            actions::entities::update_entity(turn, &entity.header, stepped_header, &[AttributeBlock::holding_value(WOKEN_COUNT, entity.attribute(WOKEN_COUNT).unwrap() + 1)]);
+    let step = |tick_state: &mut SuperchunkTickState| {
+        for entity in tick_state.woken_entities() {
+            let stepped_header = Header { stood_cell: entity.header.stood_cell.at_cartesian_offset(1, 0).unwrap(), wake: tick_state.current_tick() + 1, ..entity.header };
+            simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, stepped_header, &[AttributeBlock::holding_value(WOKEN_COUNT, entity.attribute(WOKEN_COUNT).unwrap() + 1)]);
         }
         0
     };
@@ -108,20 +108,20 @@ fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
 #[test]
 fn any_number_of_threads_ticks_entities_the_same() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
-    let wander_rule = |turn: &mut Turn| {
+    let wander_rule = |tick_state: &mut SuperchunkTickState| {
         let mut change_count = 0;
-        for entity in turn.woken_entities() {
+        for entity in tick_state.woken_entities() {
             let header = entity.header;
-            let (dx, dy) = (turn.random_stream().draw_below(3) as i32 - 1, turn.random_stream().draw_below(3) as i32 - 1);
+            let (dx, dy) = (tick_state.random_stream().draw_below(3) as i32 - 1, tick_state.random_stream().draw_below(3) as i32 - 1);
             let wander_cell = header.stood_cell.at_cartesian_offset(dx * 7, dy * 7).unwrap();
-            let wake = turn.current_tick() + 1 + turn.random_stream().draw_below(5);
-            match turn.random_stream().draw_below(40) {
-                0 => actions::entities::remove(turn, &header),
+            let wake = tick_state.current_tick() + 1 + tick_state.random_stream().draw_below(5);
+            match tick_state.random_stream().draw_below(40) {
+                0 => simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &header),
                 1 => {
-                    actions::entities::make_entity(turn, header.entity_type, wander_cell, wake, &[]);
-                    actions::entities::step(turn, &header, header.stood_cell, turn.current_tick() + 3);
+                    simulation::simulation_api::entity_reads_and_writes::make_entity(tick_state, header.entity_type, wander_cell, wake, &[]);
+                    simulation::simulation_api::entity_reads_and_writes::step(tick_state, &header, header.stood_cell, tick_state.current_tick() + 3);
                 }
-                _ => actions::entities::update_entity(turn, &header, Header { stood_cell: wander_cell, wake, ..header }, entity.attributes),
+                _ => simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &header, Header { stood_cell: wander_cell, wake, ..header }, entity.attributes),
             }
             change_count += 1;
         }
@@ -130,7 +130,7 @@ fn any_number_of_threads_ticks_entities_the_same() {
     let tick_on_threads = |thread_count| {
         let (mut bitmap_arena, mut entity_store) = world(3);
         for (walker_number, walker_cell) in (0..2000u64).zip(cells_drawn(seed, 2000, 3072)) {
-            entity_store.queue_put(walker_header(walker_cell, walker_number % 4), &[]);
+            entity_store.queue_add(walker_header(walker_cell, walker_number % 4), &[]);
         }
         entity_store.apply();
         let mut world_simulation = Simulation::new(thread_count);
@@ -149,11 +149,11 @@ fn any_number_of_threads_ticks_entities_the_same() {
 fn changes_outside_a_tick_are_queued_then_applied() {
     let (_, mut entity_store) = world(1);
     let (here_header, away_header) = (walker_header(cell(5, 5), 0), walker_header(cell(2 * SUPERCHUNK_SIDE_CELLS, 5), 0));
-    entity_store.queue_put(here_header, &[]);
-    entity_store.queue_put(away_header, &[]);
+    entity_store.queue_add(here_header, &[]);
+    entity_store.queue_add(away_header, &[]);
     assert_eq!(entity_store.len(), 0, "nothing changes until applied");
     let applied_counts = entity_store.apply();
-    assert_eq!((applied_counts.puts, applied_counts.lost, entity_store.len()), (1, 1, 1));
+    assert_eq!((applied_counts.added, applied_counts.lost, entity_store.len()), (1, 1, 1));
     assert_eq!(entity_store.get(here_header.stood_cell).map(|entity| entity.header), Some(here_header));
     entity_store.queue_remove(here_header.stood_cell);
     assert_eq!((entity_store.apply().entities_removed, entity_store.len()), (1, 0));

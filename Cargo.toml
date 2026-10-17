@@ -14,14 +14,15 @@ utilities = { path = "utilities" }
 
 # What the root's tests (`tests/fine`, `tests/fast`, `tests/complete`) reach into.
 [dev-dependencies]
-actions = { path = "actions" }
+base_types = { path = "basegame/base_types" }
+libraries = { path = "basegame/libraries" }
 bitplane_manager = { path = "bitplane_manager" }
 chunk_storage = { path = "chunk_storage" }
 coordinates = { path = "coordinates" }
 entity_manager = { path = "entity_manager" }
-entity_rules = { path = "entity_rules" }
+entity_rules = { path = "basegame/entity_rules" }
 pathfinding = { path = "pathfinding" }
-sca_rules = { path = "sca_rules" }
+sca_rules = { path = "basegame/sca_rules" }
 simulation = { path = "simulation" }
 type_registry = { path = "type_registry" }
 worldgen = { path = "worldgen" }
@@ -41,17 +42,17 @@ default = ["renderer"]
 [workspace]
 members = [
     "protocol/protocol",
+    "basegame/base_types",
+    "basegame/libraries",
     "bitmap",
     "bitplane_manager",
     "chunk_storage",
     "coordinates",
     "entity_manager",
-    "entity_rules",
+    "basegame/entity_rules",
     "gui",
-    "actions",
-    "compares_and_writes",
     "pathfinding",
-    "sca_rules",
+    "basegame/sca_rules",
     "simulation",
     "worldgen",
     "type_registry",
@@ -64,13 +65,15 @@ members = [
 default-members = [
     ".",
     "protocol/protocol",
+    "basegame/base_types",
+    "basegame/libraries",
     "bitmap",
     "bitplane_manager",
     "chunk_storage",
     "coordinates",
-    "entity_rules",
+    "basegame/entity_rules",
     "pathfinding",
-    "sca_rules",
+    "basegame/sca_rules",
     "simulation",
     "worldgen",
     "type_registry",

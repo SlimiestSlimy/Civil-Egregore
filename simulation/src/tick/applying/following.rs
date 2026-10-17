@@ -4,7 +4,7 @@
 //! (`docs/simulation.md`, "An entity over a border").
 
 use super::{ApplyingSuperchunk, Phase};
-use crate::turn::{Outbox, ACROSS_QUEUE};
+use crate::superchunk_tick_state::{Outbox, ACROSS_QUEUE};
 use coordinates::{CellIndex, SuperchunkIndex};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};

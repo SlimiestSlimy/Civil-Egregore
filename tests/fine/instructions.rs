@@ -8,7 +8,7 @@
 use crate::arenas::{cell, walker_header, world};
 use coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, AttributeBlock, Header, Member, NEVER_WAKES};
-use simulation::{Simulation, Turn};
+use simulation::{Simulation, SuperchunkTickState};
 
 /// An attribute.
 const NAME_ATTRIBUTE: Attribute<u64> = Attribute::new(41);
@@ -24,10 +24,10 @@ fn known_number(walker_cell: CellIndex, first_cell: CellIndex) -> u64 {
 }
 
 /// Every walker woken steps a cell to the right, to wake next tick.
-fn step_right(turn: &mut Turn) -> usize {
-    let current_tick = turn.current_tick();
-    for entity in turn.woken_entities() {
-        actions::entities::step(turn, &entity.header, entity.header.stood_cell.at_cartesian_offset(1, 0).expect("in the world"), current_tick + 1);
+fn step_right(tick_state: &mut SuperchunkTickState) -> usize {
+    let current_tick = tick_state.current_tick();
+    for entity in tick_state.woken_entities() {
+        simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell.at_cartesian_offset(1, 0).expect("in the world"), current_tick + 1);
     }
     0
 }
@@ -42,14 +42,14 @@ fn a_step_carries_no_attributes_and_keeps_them() {
     let attributes = [AttributeBlock::holding_value(NAME_ATTRIBUTE, 7), AttributeBlock::holding_value(MARK_ATTRIBUTE, 9)];
     // In a chunk, over a chunk's border, over a superchunk's.
     for x in [40, 250, 1020] {
-        entity_store.queue_put(walker_header(cell(x, 30), 0), &attributes);
+        entity_store.queue_add(walker_header(cell(x, 30), 0), &attributes);
     }
     entity_store.apply();
     let mut world_simulation = Simulation::new(2);
-    let (mut moves, mut puts) = (0, 0);
+    let (mut moves, mut added) = (0, 0);
     for _ in 0..10 {
         let report = world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, step_right);
-        (moves, puts) = (moves + report.instructions_applied.moves, puts + report.instructions_applied.puts);
+        (moves, added) = (moves + report.instructions_applied.moves, added + report.instructions_applied.added);
     }
     for x in [50, 260, 1030] {
         let entity = entity_store.get(cell(x, 30)).expect("ten steps on");
@@ -57,7 +57,7 @@ fn a_step_carries_no_attributes_and_keeps_them() {
     }
     assert_eq!(entity_store.len(), 3);
     // Every step a move, the one over the superchunk's border as any other: nothing is put.
-    assert_eq!((moves, puts), (30, 0));
+    assert_eq!((moves, added), (30, 0));
 }
 
 /// A step onto a cell an entity stands on is turned back as it is
@@ -67,8 +67,8 @@ fn a_step_carries_no_attributes_and_keeps_them() {
 fn a_step_onto_a_taken_cell_is_turned_back() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let (mut bitmap_arena, mut entity_store) = world(1);
-    entity_store.queue_put(walker_header(cell(40, 30), 0), &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 1)]);
-    entity_store.queue_put(walker_header(cell(41, 30), NEVER_WAKES), &[]);
+    entity_store.queue_add(walker_header(cell(40, 30), 0), &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 1)]);
+    entity_store.queue_add(walker_header(cell(41, 30), NEVER_WAKES), &[]);
     entity_store.apply();
     let mut world_simulation = Simulation::new(1);
     let (mut stayed_count, mut moves) = (0, 0);
@@ -92,32 +92,32 @@ fn entities_edit_another_an_attribute_at_a_time() {
     let (mut bitmap_arena, mut entity_store) = world(2);
     // The one edited, in another superchunk than one of the two editing it.
     let edited_header = walker_header(cell(1030, 30), NEVER_WAKES);
-    entity_store.queue_put(edited_header, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
-    entity_store.queue_put(walker_header(cell(1020, 30), 0), &[]);
-    entity_store.queue_put(walker_header(cell(1040, 30), 0), &[]);
+    entity_store.queue_add(edited_header, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
+    entity_store.queue_add(walker_header(cell(1020, 30), 0), &[]);
+    entity_store.queue_add(walker_header(cell(1040, 30), 0), &[]);
     entity_store.apply();
     let mut world_simulation = Simulation::new(2);
-    let report = world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
-        for entity in turn.woken_entities() {
+    let report = world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+        for entity in tick_state.woken_entities() {
             let editor_number = known_number(entity.header.stood_cell, cell(1020, 30));
-            actions::entities::set_attribute_of(turn, &edited_header, if editor_number == 1 { MARK_ATTRIBUTE } else { SCAR_ATTRIBUTE }, None, editor_number);
-            actions::entities::step(turn, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+            simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &edited_header, if editor_number == 1 { MARK_ATTRIBUTE } else { SCAR_ATTRIBUTE }, None, editor_number);
+            simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
         }
         0
     });
     // Each edit an attribute given whole, one write, under a compare of none being seen; each editor's sleep under a compare of its being there.
-    assert_eq!((report.instructions_applied.edits, report.instructions_applied.puts, report.instructions_compared), (2, 0, (4, 0)));
+    assert_eq!((report.instructions_applied.edits, report.instructions_applied.added, report.instructions_compared), (2, 0, (4, 0)));
     let edited_entity = entity_store.get(edited_header.stood_cell).expect("where it stood");
     assert_eq!(edited_entity.attributes, [AttributeBlock::holding_value(NAME_ATTRIBUTE, 7), AttributeBlock::holding_value(MARK_ATTRIBUTE, 1), AttributeBlock::holding_value(SCAR_ATTRIBUTE, 2)]);
     assert_eq!(edited_entity.header, edited_header);
 
-    entity_store.queue_put(walker_header(cell(1031, 31), 1), &[]);
+    entity_store.queue_add(walker_header(cell(1031, 31), 1), &[]);
     entity_store.apply();
-    world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
-        for entity in turn.woken_entities() {
-            actions::entities::unset_attribute_of(turn, &edited_header, MARK_ATTRIBUTE, 1);
-            actions::entities::set_attribute_of(turn, &edited_header, NAME_ATTRIBUTE, Some(7), 8);
-            actions::entities::step(turn, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+    world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+        for entity in tick_state.woken_entities() {
+            simulation::simulation_api::entity_reads_and_writes::unset_attribute_of(tick_state, &edited_header, MARK_ATTRIBUTE, 1);
+            simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &edited_header, NAME_ATTRIBUTE, Some(7), 8);
+            simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
         }
         0
     });
@@ -136,14 +136,14 @@ fn of_two_edits_of_one_attribute_one_is_refused_the_same_on_any_threads() {
         let (mut bitmap_arena, mut entity_store) = world(2);
         // The one edited, and the two editing it from the two superchunks beside its border.
         let edited_header = walker_header(cell(1030, 30), NEVER_WAKES);
-        entity_store.queue_put(edited_header, &[]);
-        entity_store.queue_put(walker_header(cell(1020, 30), 0), &[]);
-        entity_store.queue_put(walker_header(cell(1040, 30), 0), &[]);
+        entity_store.queue_add(edited_header, &[]);
+        entity_store.queue_add(walker_header(cell(1020, 30), 0), &[]);
+        entity_store.queue_add(walker_header(cell(1040, 30), 0), &[]);
         entity_store.apply();
-        let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
-            for entity in turn.woken_entities() {
-                actions::entities::set_attribute_of(turn, &edited_header, NAME_ATTRIBUTE, None, known_number(entity.header.stood_cell, cell(1020, 30)));
-                actions::entities::step(turn, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+        let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+            for entity in tick_state.woken_entities() {
+                simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &edited_header, NAME_ATTRIBUTE, None, known_number(entity.header.stood_cell, cell(1020, 30)));
+                simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
             }
             0
         });
@@ -166,18 +166,18 @@ fn an_entity_changing_itself_and_another_writing_it_both_stand() {
         let (mut bitmap_arena, mut entity_store) = world(2);
         // The one written, awake, in another superchunk than the one writing it.
         let written_header = walker_header(cell(1030, 30), 0);
-        entity_store.queue_put(written_header, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
-        entity_store.queue_put(walker_header(cell(1020, 30), 0), &[]);
+        entity_store.queue_add(written_header, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
+        entity_store.queue_add(walker_header(cell(1020, 30), 0), &[]);
         entity_store.apply();
-        let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
-            for entity in turn.woken_entities() {
+        let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+            for entity in tick_state.woken_entities() {
                 if entity.header.stood_cell == written_header.stood_cell {
                     // Itself: its name changed, asleep from here on.
-                    actions::entities::update_entity(turn, &entity.header, Header { wake: NEVER_WAKES, ..entity.header }, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 8)]);
+                    simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, Header { wake: NEVER_WAKES, ..entity.header }, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 8)]);
                 } else {
-                    actions::entities::set_attribute_of(turn, &written_header, MARK_ATTRIBUTE, None, 1);
-                    actions::entities::set_attribute_of(turn, &written_header, NAME_ATTRIBUTE, Some(7), 99);
-                    actions::entities::step(turn, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+                    simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &written_header, MARK_ATTRIBUTE, None, 1);
+                    simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &written_header, NAME_ATTRIBUTE, Some(7), 99);
+                    simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
                 }
             }
             0
@@ -201,18 +201,18 @@ fn a_crossing_written_behind_takes_what_was_written() {
         // On the last cell before the border, to step over it.
         let (before_border_cell, across_cell) = (cell(SUPERCHUNK_SIDE_CELLS - 1, 30), cell(SUPERCHUNK_SIDE_CELLS, 30));
         let crosser_header = walker_header(before_border_cell, 0);
-        entity_store.queue_put(crosser_header, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
-        entity_store.queue_put(walker_header(cell(1000, 30), 0), &[]);
+        entity_store.queue_add(crosser_header, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
+        entity_store.queue_add(walker_header(cell(1000, 30), 0), &[]);
         entity_store.apply();
         let mut world_simulation = Simulation::new(thread_count);
-        let rule = |turn: &mut Turn| {
-            let current_tick = turn.current_tick();
-            for entity in turn.woken_entities() {
+        let rule = |tick_state: &mut SuperchunkTickState| {
+            let current_tick = tick_state.current_tick();
+            for entity in tick_state.woken_entities() {
                 if entity.header.stood_cell == crosser_header.stood_cell {
-                    actions::entities::step(turn, &entity.header, across_cell, current_tick + 1);
+                    simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, across_cell, current_tick + 1);
                 } else {
-                    actions::entities::set_attribute_of(turn, &crosser_header, MARK_ATTRIBUTE, None, 1);
-                    actions::entities::step(turn, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+                    simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &crosser_header, MARK_ATTRIBUTE, None, 1);
+                    simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
                 }
             }
             0
@@ -237,22 +237,22 @@ fn two_fields_of_one_attribute_are_written_by_two_in_a_tick() {
     let edited_header = walker_header(cell(1030, 30), NEVER_WAKES);
     // An attribute of one word of data, three members of it: four bytes holding 1, two holding 2, two holding 3.
     let (low_member, middle_member, high_member) = (Member::within_word(0, 0, 4), Member::within_word(0, 4, 2), Member::within_word(0, 6, 2));
-    entity_store.queue_put(edited_header, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 1 | 2 << 32 | 3 << 48)]);
-    entity_store.queue_put(walker_header(cell(1020, 30), 0), &[]);
-    entity_store.queue_put(walker_header(cell(1040, 30), 0), &[]);
+    entity_store.queue_add(edited_header, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 1 | 2 << 32 | 3 << 48)]);
+    entity_store.queue_add(walker_header(cell(1020, 30), 0), &[]);
+    entity_store.queue_add(walker_header(cell(1040, 30), 0), &[]);
     entity_store.apply();
     let name_attribute_type = NAME_ATTRIBUTE.attribute_type();
-    let report = Simulation::new(2).tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
-        for entity in turn.woken_entities() {
+    let report = Simulation::new(2).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| {
+        for entity in tick_state.woken_entities() {
             if known_number(entity.header.stood_cell, cell(1020, 30)) == 1 {
                 // The first member, and the one after it seen wrongly.
-                actions::entities::set_attribute_member(turn, &edited_header, name_attribute_type, low_member, 1, 10);
-                actions::entities::set_attribute_member(turn, &edited_header, name_attribute_type, middle_member, 9, 70);
+                simulation::simulation_api::entity_reads_and_writes::set_attribute_member(tick_state, &edited_header, name_attribute_type, low_member, 1, 10);
+                simulation::simulation_api::entity_reads_and_writes::set_attribute_member(tick_state, &edited_header, name_attribute_type, middle_member, 9, 70);
             } else {
                 // The last: the two bytes beside the one refused.
-                actions::entities::set_attribute_member(turn, &edited_header, name_attribute_type, high_member, 3, 30);
+                simulation::simulation_api::entity_reads_and_writes::set_attribute_member(tick_state, &edited_header, name_attribute_type, high_member, 3, 30);
             }
-            actions::entities::step(turn, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+            simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
         }
         0
     });

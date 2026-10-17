@@ -58,7 +58,7 @@ impl ProbeParameters<'_> {
 macro_rules! parameter_flag {
     ($parameter_name:expr) => {{
         fn parse_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters) -> Result<(), FlagError> {
-            clean_parameters.put($parameter_name, ParameterValue::Text(flag_parser.text_parameter()?));
+            clean_parameters.insert($parameter_name, ParameterValue::Text(flag_parser.text_parameter()?));
             Ok(())
         }
         Flag { flag_name: $parameter_name, flag_help: "a probe's parameter", flag_kind: FlagKind::General, parse_flag }
@@ -75,7 +75,7 @@ macro_rules! probe_flag {
                 flag_parser.parse_flags_within(&mut probe_parameters)?;
                 Ok(probe_parameters)
             })?;
-            clean_parameters.put(PROBES[$probe_index].probe_name, ParameterValue::Nested(probe_parameters));
+            clean_parameters.insert(PROBES[$probe_index].probe_name, ParameterValue::Nested(probe_parameters));
             Ok(())
         }
         Flag { flag_name: PROBES[$probe_index].probe_name, flag_help: PROBES[$probe_index].what_it_does, flag_kind: FlagKind::Terminal, parse_flag }

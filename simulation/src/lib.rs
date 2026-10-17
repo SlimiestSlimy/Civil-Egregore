@@ -10,17 +10,19 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod halos;
+pub mod simulation_api;
+mod raw_compares_and_writes;
 pub mod hot;
 mod sampling;
 pub mod simulation_time;
 mod tick;
-mod turn;
+mod superchunk_tick_state;
 pub mod transient_data;
 
 pub use sampling::{sample, sample_layer, sample_tiles_of_layer};
 pub use halos::{HaloChange, Halos, LentWorld, COOL_TICKS, WARM_TICKS};
 pub use hot::Hot;
 pub use tick::{threads_for, Simulation, TickReport};
-pub use turn::conditional::{Compare, CountedWhenApplied, COUNTED_WHEN_APPLIED};
-pub use turn::one_instruction::Write;
-pub use turn::Turn;
+pub use superchunk_tick_state::conditional::{Compare, CountedWhenApplied, COUNTED_WHEN_APPLIED};
+pub use superchunk_tick_state::one_instruction::Write;
+pub use superchunk_tick_state::SuperchunkTickState;

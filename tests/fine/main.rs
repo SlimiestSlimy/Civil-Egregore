@@ -9,7 +9,7 @@
 #[path = "../../utilities/test_seed.rs"]
 mod test_seed;
 // Hot arenas of stone and walkers on them: actions' tests' own, shared.
-#[path = "../../actions/tests/shared/arenas.rs"]
+#[path = "../../simulation/tests/shared/arenas.rs"]
 mod arenas;
 #[path = "../shared/walkers.rs"]
 mod walkers;

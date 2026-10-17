@@ -1,6 +1,6 @@
 //! Worlds run for long: stopped and saved often, they come to the same.
 
-use type_registry::GRASS;
+use base_types::GRASS;
 use crate::worlds::{world_contents, folder};
 
 /// A world run 30,000 ticks straight, and the same world saved and

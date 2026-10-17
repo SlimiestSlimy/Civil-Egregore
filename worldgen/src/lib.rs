@@ -24,7 +24,7 @@ pub use generation::{has_land_about, seed_with_land, WorldGeneration, WorldGrowt
 
 use bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{Height, HeightMap, LayerType};
-use type_registry::{WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
+use base_types::{WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
 use coordinates::{cartesian_from_place, place_from_cartesian, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
 use utilities::hash::{mix_word, GOLDEN_RATIO};
 

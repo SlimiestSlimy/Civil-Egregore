@@ -4,7 +4,7 @@
 use server::{WorldSize, WorldStart};
 use crate::ProbeParameters;
 use worldgen::{WorldGeneration, FRACTION_ONE};
-use type_registry::{GRASS, WALL_EAST, WALL_SOUTH, WET};
+use base_types::{GRASS, WALL_EAST, WALL_SOUTH, WET};
 
 /// The share of the plain's cells with grass, in thousandths.
 pub const GRASS_THOUSANDTHS: &str = "grass_thousandths";

@@ -2,7 +2,7 @@
 //! (`docs/entity_manager.md`, "Saved").
 
 use coordinates::CellIndex;
-use crate::attributes::{may_be_given, AttributeBlock, BLOCK_WORDS};
+use crate::attributes::{may_be_given, AttributeBlock, DefaultAttributes, BLOCK_WORDS};
 use crate::entity::{EntityType, Header};
 use crate::store::{WorldEntities, SuperchunkEntities};
 
@@ -38,12 +38,13 @@ pub fn encode_state(random_stream_state: Option<u64>, superchunk_entities: Optio
 /// queued to be put in `world_entities`, each whose wake has passed -- kept
 /// while its superchunk was cold -- waking at `current_tick`.
 pub fn decode_state(words: &[u64], current_tick: u64, world_entities: &mut WorldEntities) -> Result<SavedState, &'static str> {
-    read_state(words, |header, attributes| world_entities.queue_put(Header { wake: header.wake.max(current_tick), ..header }, attributes))
+    let default_attributes = world_entities.default_attributes().clone();
+    read_state(words, &default_attributes, |header, attributes| world_entities.queue_add(Header { wake: header.wake.max(current_tick), ..header }, attributes))
 }
 
 /// Reads the state file `words`, each entity handed to `each_entity` with its
 /// attributes: what it held beside them, or what is wrong with it.
-fn read_state(words: &[u64], mut each_entity: impl FnMut(Header, &[AttributeBlock])) -> Result<SavedState, &'static str> {
+fn read_state(words: &[u64], default_attributes: &DefaultAttributes, mut each_entity: impl FnMut(Header, &[AttributeBlock])) -> Result<SavedState, &'static str> {
     let mut words = words.iter().copied();
     let mut next_word = || words.next().ok_or("cut short");
     if next_word()? != FIRST_WORD {
@@ -61,7 +62,7 @@ fn read_state(words: &[u64], mut each_entity: impl FnMut(Header, &[AttributeBloc
             }
             attributes.push(read_block);
         }
-        if !may_be_given(EntityType(type_word), &attributes) {
+        if !may_be_given(default_attributes.of(EntityType(type_word)), &attributes) {
             return Err("an entity's attributes are not whole ones sorted by type");
         }
         each_entity(Header { entity_type: EntityType(type_word), stood_cell: CellIndex(cell_word), wake }, &attributes);
@@ -69,8 +70,9 @@ fn read_state(words: &[u64], mut each_entity: impl FnMut(Header, &[AttributeBloc
     Ok(SavedState { random_stream_state: (has_random == 1).then_some(random_stream_state), entity_count: count as usize })
 }
 
-/// How many entities the state file `words` holds, every one read: or
-/// what is wrong with it.
-pub fn entity_count(words: &[u64]) -> Result<usize, &'static str> {
-    read_state(words, |_, _| {}).map(|saved_state| saved_state.entity_count)
+/// How many entities the state file `words` holds, every one read as of a
+/// world whose default attributes are `default_attributes`: or what is
+/// wrong with it.
+pub fn entity_count(words: &[u64], default_attributes: &DefaultAttributes) -> Result<usize, &'static str> {
+    read_state(words, default_attributes, |_, _| {}).map(|saved_state| saved_state.entity_count)
 }

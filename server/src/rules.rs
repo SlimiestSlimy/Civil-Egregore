@@ -1,148 +1,83 @@
-//! The rules a world ticks ([`RULES`]): those the type registry has,
-//! in its order, each with the function written for it here. A tick's counts by rule
-//! ([`TickCounts`]), the rules picked ([`ChosenRules`]) by their place ([`RulePlace`])
-//! (`docs/server.md`, "TickCounts").
+//! The rules a world ticks ([`rules_of`]): those its types have, in
+//! the order registered, each run by the code registered with it. A
+//! tick's counts by rule ([`TickCounts`]), the rules picked
+//! ([`ChosenRules`]) by their place ([`RulePlace`]) (`docs/server.md`,
+//! "TickCounts").
 
-use coordinates::CellIndex;
-use actions::{Chance, RuleCounts, TickReport, Turn, COUNTS_OF_A_RULE};
+use simulation::simulation_api::{RuleCode, RuleContext, RuleCounts, RuleMaster, TickReport, SuperchunkTickState, COUNTS_OF_A_RULE};
+use std::sync::Arc;
+use type_registry::{FrozenTypes, RegisteredType};
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
-/// A rule, on one superchunk's turn.
-type RuleFunction = fn(&mut Turn) -> RuleCounts;
+/// The most rules a world may have: what its counts and its choice of
+/// rules keep room for, each in an array that copies and never
+/// allocates -- a turn's counts are added up every superchunk.
+pub const MOST_RULES: usize = 16;
 
-/// One rule of the world.
-#[derive(Clone, Copy)]
+/// One rule of a world.
+#[derive(Clone, Debug)]
 pub struct Rule {
-    /// Its row in the type registry: its name there, and its master.
-    pub registry_row: &'static type_registry::RegistryRow,
+    /// Its type's ID, whole: what the server knows it by.
+    pub rule_id: u64,
+    /// What it runs with: the one plane or type of entity it is of,
+    /// whatever else it reads or writes, and the libraries of what that
+    /// depends on.
+    pub context: RuleContext,
     /// What it counts, each named at its place in its counts.
     pub count_names: &'static [&'static str],
     /// The rule, on one superchunk's turn.
-    pub rule: RuleFunction,
+    pub rule: fn(&mut SuperchunkTickState, &RuleContext) -> RuleCounts,
 }
 
-/// What the registry cannot hold of the rule whose ID is `rule_id`, the
-/// code being above it: what it counts and its function. None of an
-/// ID no rule here is written for -- and the build fails
-/// ([`RULES`]) if that is a rule the registry has.
-const fn written_for(rule_id: u64) -> Option<(&'static [&'static str], RuleFunction)> {
-    if rule_id == type_registry::RULE_OF_GRASS.0 {
-        Some((&sca_rules::grass::COUNT_NAMES, |turn| on_each_sampled(turn, type_registry::RULE_OF_GRASS.0, sca_rules::grass::SAMPLE_CHANCE, sca_rules::grass::rule)))
-    } else if rule_id == type_registry::RULE_OF_TREES.0 {
-        Some((&sca_rules::trees::COUNT_NAMES, |turn| on_each_sampled(turn, type_registry::RULE_OF_TREES.0, sca_rules::trees::SAMPLE_CHANCE, sca_rules::trees::rule)))
-    } else if rule_id == type_registry::RULE_OF_SHEEP.0 {
-        Some((&entity_rules::sheep::COUNT_NAMES, entity_rules::sheep::rule))
-    } else if rule_id == type_registry::RULE_OF_WEATHER.0 {
-        Some((&sca_rules::weather::COUNT_NAMES, |turn| on_each_sampled(turn, type_registry::RULE_OF_WEATHER.0, sca_rules::weather::SAMPLE_CHANCE, sca_rules::weather::rule)))
-    } else {
-        None
+/// The rules a world of `frozen_types` ticks, each run by its code:
+/// every rule the types have, in the order registered, the order a turn
+/// runs them in -- the server's choice, the registry promising none. Or
+/// why the world cannot run: more than [`MOST_RULES`].
+pub fn rules_of(frozen_types: &FrozenTypes<RuleCode>) -> Result<Arc<[Rule]>, String> {
+    let rules: Vec<Rule> = frozen_types
+        .rules()
+        .map(|registered_rule| {
+            let master_type = frozen_types.master_of(registered_rule).expect("a rule's master is checked as it is registered");
+            let master = match master_type {
+                RegisteredType::Layer { layer_type, .. } => RuleMaster::Layer(*layer_type),
+                RegisteredType::WidePlane { layer_type, .. } => RuleMaster::WidePlane(*layer_type),
+                RegisteredType::Entity { entity_type, .. } => RuleMaster::Entity(*entity_type),
+                _ => unreachable!("a rule's master is a plane or a type of entity"),
+            };
+            // Gathered once: each library the rule may ask for, by the ID of the type exposing it.
+            let libraries = frozen_types.dependencies_of(master_type).filter_map(|dependency| Some((dependency.type_id(), *frozen_types.library_of(dependency)?))).collect();
+            let code = registered_rule.rule_code().expect("the types' rules are rules");
+            Rule { rule_id: registered_rule.type_id(), context: RuleContext { master, libraries }, count_names: code.count_names, rule: code.run }
+        })
+        .collect();
+    if rules.len() > MOST_RULES {
+        return Err(format!("{} rules: more than the {MOST_RULES} a world may have", rules.len()));
     }
+    Ok(rules.into())
 }
 
-/// One superchunk's turn of the rule of the cells whose ID is `rule_id`:
-/// `rule`, the function on one sample, run by the simulation on each
-/// its master has in the superchunk, chosen with `chance` -- the
-/// master the registry gives the rule, its set cells if it is a
-/// layer, its every tile if it is a wide plane.
-#[inline]
-fn on_each_sampled(turn: &mut Turn, rule_id: u64, chance: Chance, rule: impl FnMut(&mut Turn, CellIndex, &mut RuleCounts)) -> RuleCounts {
-    let master = type_registry::rule_of_id(rule_id).and_then(type_registry::master_of).expect("checked as the registry is built");
-    let (layer_type, mut counts) = (master.layer_type().expect("a rule of the cells' master is a plane"), RuleCounts::default());
-    match master.registration {
-        type_registry::Registration::WidePlane => turn.each_tile_sampled(layer_type, chance, &mut counts, rule),
-        _ => turn.each_sampled(layer_type, chance, &mut counts, rule),
-    };
-    counts
-}
-
-/// The rule the registry has at `place` among its rules, with what is
-/// written for it here.
-///
-/// # Panics
-/// If the registry has no rule there, or one nothing is written for
-/// -- as the server is compiled, naming it.
-const fn registered_at(place: usize) -> Rule {
-    let Some(registry_row) = type_registry::rule_at(place) else { panic!("fewer rules registered than counted") };
-    let Some(rule_id) = type_registry::id_of_rule(registry_row) else { panic!("a rule's row") };
-    match written_for(rule_id) {
-        Some((count_names, rule)) => Rule { registry_row, count_names, rule },
-        None => panic!("{}", registry_row.name),
-    }
-}
-
-/// Every rule a world ticks: those the type registry has, as many and
-/// in its order -- the order a turn runs them in, the cells'
-/// (`sca_rules`) and the entities' (`entity_rules`) alike, all
-/// reading the world as the tick found it. Nothing is listed here: a
-/// rule registered is ticked, and the build fails, naming it, if no
-/// function is written for it ([`written_for`]).
-pub const RULES: [Rule; type_registry::RULES_REGISTERED] = {
-    let mut rules = [registered_at(0); type_registry::RULES_REGISTERED];
-    let mut place = 1;
-    while place < rules.len() {
-        rules[place] = registered_at(place);
-        place += 1;
-    }
-    rules
-};
-
-impl Rule {
-    /// Its master's row in the type registry: the one plane or type of
-    /// entity it is of, whatever else it reads or writes.
-    pub fn master(&self) -> &'static type_registry::RegistryRow {
-        type_registry::master_of(self.registry_row).expect("checked as the registry is built")
-    }
-}
-
-/// A rule's place in [`RULES`]: what a rule is picked by, and its
-/// counts read by. Made of the rule's ID in the type registry as the
-/// server is compiled ([`RulePlace::from_registry_id`]), so a rule that is not
-/// there does not compile.
+/// A rule's place among a world's rules: what a rule is picked by, and
+/// its counts read by ([`place_of`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RulePlace(usize);
 
-impl RulePlace {
-    /// The place of the rule whose ID in the type registry is `rule_id`.
-    ///
-    /// # Panics
-    /// If no rule has it -- for a constant, as it is compiled.
-    pub const fn from_registry_id(rule_id: u64) -> Self {
-        let mut place = 0;
-        while place < RULES.len() {
-            if let Some(registered_id) = type_registry::id_of_rule(RULES[place].registry_row) && registered_id == rule_id {
-                return Self(place);
-            }
-            place += 1;
-        }
-        panic!("no rule is registered with that ID")
-    }
-
-    /// The rule at this place.
-    pub const fn rule(self) -> &'static Rule {
-        &RULES[self.0]
-    }
+/// The place among `rules` of the rule whose type's ID is `rule_id`,
+/// if one is.
+pub fn place_of(rules: &[Rule], rule_id: u64) -> Option<RulePlace> {
+    rules.iter().position(|rule| rule.rule_id == rule_id).map(RulePlace)
 }
 
-/// The grass's rule.
-pub const GRASS_RULE: RulePlace = RulePlace::from_registry_id(type_registry::RULE_OF_GRASS.0);
-/// The trees' rule.
-pub const TREES_RULE: RulePlace = RulePlace::from_registry_id(type_registry::RULE_OF_TREES.0);
-/// The sheep's rule.
-pub const SHEEP_RULE: RulePlace = RulePlace::from_registry_id(type_registry::RULE_OF_SHEEP.0);
-/// The weather's rule.
-pub const WEATHER_RULE: RulePlace = RulePlace::from_registry_id(type_registry::RULE_OF_WEATHER.0);
-
 /// What the rules did, in a tick or added up over many: each rule's
-/// counts at its place in [`RULES`], and how long each took, every
+/// counts at its place among the world's rules, and how long each took, every
 /// thread's time added up -- none, unless the turns were timed
 /// ([`ChosenRules::timed_turn`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TickCounts {
     /// Each rule's counts.
-    pub counts: [RuleCounts; RULES.len()],
+    pub counts: [RuleCounts; MOST_RULES],
     /// Each rule's time.
-    pub rule_times: [Duration; RULES.len()],
+    pub rule_times: [Duration; MOST_RULES],
 }
 
 impl TickCounts {
@@ -173,7 +108,7 @@ pub(crate) fn with_counts_applied(mut report: TickReport<TickCounts>) -> TickRep
 impl AddAssign for TickCounts {
     /// Every rule's counts and time added to its like.
     fn add_assign(&mut self, added_counts: Self) {
-        for place in 0..RULES.len() {
+        for place in 0..MOST_RULES {
             self.counts[place] += added_counts.counts[place];
             self.rule_times[place] += added_counts.rule_times[place];
         }
@@ -183,45 +118,45 @@ impl AddAssign for TickCounts {
 /// Some of the rules: what a tick of only those runs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ChosenRules {
-    /// Whether the rule at each place in [`RULES`] is run.
-    runs_rule: [bool; RULES.len()],
+    /// Whether the rule at each place among the world's rules is run.
+    runs_rule: [bool; MOST_RULES],
 }
 
 impl ChosenRules {
     /// Every rule: what a world's tick runs.
-    pub const EVERY_RULE: Self = Self { runs_rule: [true; RULES.len()] };
+    pub const EVERY_RULE: Self = Self { runs_rule: [true; MOST_RULES] };
 
     /// The rules `rules`, run in the table's order whatever theirs.
     pub fn from_rules(rules: &[RulePlace]) -> Self {
-        let mut runs_rule = [false; RULES.len()];
+        let mut runs_rule = [false; MOST_RULES];
         for rule in rules {
             runs_rule[rule.0] = true;
         }
         Self { runs_rule }
     }
 
-    /// One superchunk's turn of these rules: what `Simulation::tick`
+    /// One superchunk's turn of these of `rules`: what `Simulation::tick`
     /// is given.
     #[inline]
-    pub fn turn(self, turn: &mut Turn) -> TickCounts {
+    pub fn tick_state(self, rules: &[Rule], tick_state: &mut SuperchunkTickState) -> TickCounts {
         let mut turn_counts = TickCounts::default();
-        for (place, rule) in RULES.iter().enumerate() {
+        for (place, rule) in rules.iter().enumerate() {
             if self.runs_rule[place] {
-                turn.count_under((place * COUNTS_OF_A_RULE) as u32);
-                turn_counts.counts[place] = (rule.rule)(turn);
+                tick_state.count_under((place * COUNTS_OF_A_RULE) as u32);
+                turn_counts.counts[place] = (rule.rule)(tick_state, &rule.context);
             }
         }
         turn_counts
     }
 
-    /// One superchunk's turn of these rules, each one's time taken.
-    pub fn timed_turn(self, turn: &mut Turn) -> TickCounts {
+    /// One superchunk's turn of these of `rules`, each one's time taken.
+    pub fn timed_turn(self, rules: &[Rule], tick_state: &mut SuperchunkTickState) -> TickCounts {
         let mut turn_counts = TickCounts::default();
-        for (place, rule) in RULES.iter().enumerate() {
+        for (place, rule) in rules.iter().enumerate() {
             if self.runs_rule[place] {
                 let rule_began = Instant::now();
-                turn.count_under((place * COUNTS_OF_A_RULE) as u32);
-                turn_counts.counts[place] = (rule.rule)(turn);
+                tick_state.count_under((place * COUNTS_OF_A_RULE) as u32);
+                turn_counts.counts[place] = (rule.rule)(tick_state, &rule.context);
                 turn_counts.rule_times[place] = rule_began.elapsed();
             }
         }

@@ -1,7 +1,7 @@
 //! Dirty buckets written back into chunk storage's ring, the ring
 //! flushed, and buckets evicted.
 
-use super::{contains, members, put};
+use super::{contains, members, set_membership};
 use super::arena::BitmapArena;
 use super::superchunk::Superchunk;
 use chunk_storage::{BucketKey, ChunkStorage, LayerCodec};
@@ -39,7 +39,7 @@ impl BitmapArena {
         for bucket_key in bucket_keys {
             // A wide layer is written back as its planes: any of their types names it.
             let layer = directory_entry.layers.iter().position(|layer| layer.layer_type == bucket_key.layer_type || layer.layer_type.holds_bitplane(bucket_key.layer_type)).expect("a layer written back is in use");
-            put(&mut directory_entry.layers[layer].chunk_flags.in_ring, bucket_key.chunk.place(), true);
+            set_membership(&mut directory_entry.layers[layer].chunk_flags.in_ring, bucket_key.chunk.place(), true);
         }
         directory_entry.on_their_way -= 1;
         self.release_unused();
@@ -119,7 +119,7 @@ impl BitmapArena {
         };
         let allocation = self.layer_at_mut(allocation_at);
         assert!(!contains(allocation.chunk_flags.dirty, chunk), "{bucket_key:?} changed and was not written back");
-        put(&mut allocation.chunk_flags.hot, chunk, false);
+        set_membership(&mut allocation.chunk_flags.hot, chunk, false);
         allocation.hot_count -= allocation.count(chunk);
         allocation.let_unused_go();
         if allocation.chunk_flags.hot | allocation.chunk_flags.in_ring == 0 {

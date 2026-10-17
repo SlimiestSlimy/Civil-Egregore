@@ -5,11 +5,10 @@
 //! superchunk it lands in has come to it
 //! (`docs/simulation.md`, "An act over a border").
 
-use crate::turn::apply::PartApplied;
-use crate::turn::landing::{LandingInOne, LandingInSeveral};
-use crate::turn::{slot_toward, slot_between, slots, Outbox, ACROSS_QUEUE, SLOTS};
+use crate::superchunk_tick_state::apply::PartApplied;
+use crate::superchunk_tick_state::landing::{LandingInOne, LandingInSeveral};
+use crate::superchunk_tick_state::{slot_toward, slot_between, slots, Outbox, ACROSS_QUEUE, SLOTS};
 use bitplane_manager::Superchunk;
-use chunk_storage::LayerType;
 use coordinates::SuperchunkIndex;
 use entity_manager::SuperchunkEntities;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -86,8 +85,6 @@ struct Phase<'a, 'b> {
     superchunks_done: AtomicUsize,
     /// The tick running.
     current_tick: u64,
-    /// The layer entities are kept in, if the world has one.
-    collision_plane: Option<LayerType>,
     /// What has the instructions naming an entity follow it over a
     /// border.
     entity_following: EntityFollowing,
@@ -150,7 +147,7 @@ impl Phase<'_, '_> {
             let repointed_segment = self.entity_following.repointed_of(source_arena_index, from_slot as u32, segment_number as u32);
             if from_slot != ACROSS_QUEUE && repointed_segment.is_none() {
                 self.give_up_those_kept(part);
-                segment_queue.apply(segment_instructions, segment_start.first_compare as usize, &mut LandingInOne { superchunk: here_applying.superchunk, superchunk_entities: here_applying.superchunk_entities }, self.current_tick + 1, self.collision_plane, part_applied);
+                segment_queue.apply(segment_instructions, &mut LandingInOne { superchunk: here_applying.superchunk, superchunk_entities: here_applying.superchunk_entities }, self.current_tick + 1, part_applied);
                 here_applying.next_segment += 1;
                 continue;
             }
@@ -187,7 +184,7 @@ impl Phase<'_, '_> {
                     None => landing_in_several.also_superchunks.push(landing_superchunk),
                 }
             }
-            segment_queue.apply(segment_instructions, segment_start.first_compare as usize, &mut landing_in_several, self.current_tick + 1, self.collision_plane, part_applied);
+            segment_queue.apply(segment_instructions, &mut landing_in_several, self.current_tick + 1, part_applied);
             let crossed_entities = std::mem::take(&mut landing_in_several.crossed_entities);
             drop(landing_in_several);
             part_applied.acts_over_a_border += u64::from(places.len() > 1);
@@ -239,7 +236,7 @@ pub(crate) struct ApplyingRoom {
 /// `dispatcher`'s threads: what each thread applied. `applying_room` is kept
 /// from tick to tick.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn apply_what_was_queued(dispatcher: &Dispatcher, superchunks: &mut [Superchunk], entities_by_superchunk: &mut [SuperchunkEntities], applying_room: &mut ApplyingRoom, superchunk_indices: &[SuperchunkIndex], outboxes: &[Outbox], current_tick: u64, collision_plane: Option<LayerType>) -> Vec<PartApplied> {
+pub(crate) fn apply_what_was_queued(dispatcher: &Dispatcher, superchunks: &mut [Superchunk], entities_by_superchunk: &mut [SuperchunkEntities], applying_room: &mut ApplyingRoom, superchunk_indices: &[SuperchunkIndex], outboxes: &[Outbox], current_tick: u64) -> Vec<PartApplied> {
     let (count, anyones_list_index) = (superchunks.len(), dispatcher.thread_count());
     applying_room.segment_orders.resize_with(count, Vec::new);
     applying_room.lying_to_take_up.clear();
@@ -256,7 +253,7 @@ pub(crate) fn apply_what_was_queued(dispatcher: &Dispatcher, superchunks: &mut [
         superchunks.iter_mut().zip(entities_by_superchunk).zip(&mut applying_room.segment_orders).map(|((superchunk, superchunk_entities), segment_order)| Mutex::new(ApplyingSuperchunk { superchunk, superchunk_entities, segment_order, next_segment: 0, has_begun: false })).collect();
     let (asleep_lock, wake_signal, sleeping_threads) = (Mutex::new(()), Condvar::new(), AtomicUsize::new(0));
     let (to_begin, any_acts, superchunks_done) = (AtomicUsize::new(count), outboxes.iter().any(|outbox| !outbox.across_acts.is_empty()), AtomicUsize::new(0));
-    let phase = Phase { applying_superchunks: &applying_superchunks, superchunk_indices, outboxes, to_go_on: &applying_room.to_go_on, let_go_on: &applying_room.let_go_on, lying_to_take_up: &applying_room.lying_to_take_up, claimed_by: &applying_room.claimed_by, asleep_lock, wake_signal, sleeping_threads, to_begin, any_acts, superchunks_done, current_tick, collision_plane, entity_following: EntityFollowing::of_what_was_queued(outboxes) };
+    let phase = Phase { applying_superchunks: &applying_superchunks, superchunk_indices, outboxes, to_go_on: &applying_room.to_go_on, let_go_on: &applying_room.let_go_on, lying_to_take_up: &applying_room.lying_to_take_up, claimed_by: &applying_room.claimed_by, asleep_lock, wake_signal, sleeping_threads, to_begin, any_acts, superchunks_done, current_tick, entity_following: EntityFollowing::of_what_was_queued(outboxes) };
     let applied_parts: Vec<Mutex<PartApplied>> = (0..dispatcher.thread_count()).map(|_| Mutex::new(PartApplied::default())).collect();
     dispatcher.run_in_parts(&|part| {
         let mut part_applied = PartApplied::default();

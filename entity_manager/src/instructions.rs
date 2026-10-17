@@ -2,10 +2,10 @@
 //! queued in a tick's first phase and applied in its second
 //! (`docs/entity_manager.md`, "Instructions").
 
-use crate::bucket::Put;
+use crate::bucket::EntityWritten;
 use crate::attributes::{push_attribute, Attribute, AttributeBlock, AttributeType, Layout};
 use crate::entity::Header;
-use crate::store::{CollisionCells, SuperchunkEntities};
+use crate::store::SuperchunkEntities;
 use coordinates::CellIndex;
 use std::ops::AddAssign;
 
@@ -15,7 +15,7 @@ enum Instruction {
     /// Makes an entity on its cell, with the attributes' blocks
     /// `first..first_block + count` of the queue's list: not made, an
     /// entity standing there.
-    Put {
+    Add {
         /// Its fixed part.
         header: Header,
         /// Its attributes' first block.
@@ -56,7 +56,7 @@ impl Instruction {
     /// The cell it lands on: its superchunk applies it.
     fn landing_cell(&self) -> CellIndex {
         match *self {
-            Self::Put { header, .. } | Self::Move { header, .. } => header.stood_cell,
+            Self::Add { header, .. } | Self::Move { header, .. } => header.stood_cell,
             Self::Edit { named_cell: at, .. } | Self::RemoveEntity { named_cell: at, .. } => at,
         }
     }
@@ -75,13 +75,13 @@ pub struct Instructions {
 impl Instructions {
     /// Queues making `header`'s entity on its cell, with
     /// `attributes`: not made, an entity standing there by then.
-    pub fn put(&mut self, header: Header, attributes: &[AttributeBlock]) {
+    pub fn add(&mut self, header: Header, attributes: &[AttributeBlock]) {
         self.push(header, attributes);
     }
 
-    /// Queues a put.
+    /// Queues an entity added.
     fn push(&mut self, header: Header, attributes: &[AttributeBlock]) {
-        self.instructions.push(Instruction::Put { header, first_block: self.attributes.len() as u32, count: attributes.len() as u32 });
+        self.instructions.push(Instruction::Add { header, first_block: self.attributes.len() as u32, count: attributes.len() as u32 });
         self.attributes.extend_from_slice(attributes);
     }
 
@@ -143,7 +143,7 @@ impl Instructions {
     /// every wake filed no earlier than `earliest_tick`; into `instructions_applied`
     /// (`docs/entity_manager.md`, "Instructions").
     pub fn apply(&self, superchunks: &mut [SuperchunkEntities], earliest_tick: u64, instructions_applied: &mut InstructionsApplied) {
-        self.apply_some(0..self.instructions.len(), superchunks, earliest_tick, instructions_applied, &mut ());
+        self.apply_some(0..self.instructions.len(), superchunks, earliest_tick, instructions_applied);
     }
 
     /// [`Instructions::apply`], of those at `instruction_range` alone, counted from
@@ -151,11 +151,8 @@ impl Instructions {
     /// (`docs/entity_manager.md`, "Instructions"). Each as it is come
     /// to, whatever it does -- none before another for its kind: the
     /// entity it names is found wherever those before it moved it
-    /// (`SuperchunkEntities::get_named`). `collision_plane` is the collision
-    /// plane of the superchunk they land in, if they are all one's
-    /// and it keeps one: no entity comes to a cell it holds, and
-    /// where entities stand is kept in it.
-    pub fn apply_some(&self, instruction_range: std::ops::Range<usize>, superchunks: &mut [SuperchunkEntities], earliest_tick: u64, instructions_applied: &mut InstructionsApplied, collision_plane: &mut impl CollisionCells) {
+    /// (`SuperchunkEntities::get_named`).
+    pub fn apply_some(&self, instruction_range: std::ops::Range<usize>, superchunks: &mut [SuperchunkEntities], earliest_tick: u64, instructions_applied: &mut InstructionsApplied) {
         for &instruction in &self.instructions[instruction_range] {
             let superchunk = instruction.landing_cell().superchunk();
             let maybe_found = match superchunks {
@@ -163,24 +160,24 @@ impl Instructions {
                 _ => superchunks.binary_search_by_key(&superchunk, SuperchunkEntities::superchunk_index).ok(),
             };
             let Some(found_index) = maybe_found else {
-                instructions_applied.lost += matches!(instruction, Instruction::Put { .. }) as usize;
+                instructions_applied.lost += matches!(instruction, Instruction::Add { .. }) as usize;
                 continue;
             };
             let superchunk = &mut superchunks[found_index];
             match instruction {
-                Instruction::Put { header, first_block: first, count } => {
+                Instruction::Add { header, first_block: first, count } => {
                     let attributes = &self.attributes[first as usize..(first + count) as usize];
-                    let put = superchunk.make_named(earliest_tick, header, attributes, collision_plane);
-                    match put {
-                        Put::NewlyPut | Put::InPlace | Put::MovedToCell => instructions_applied.puts += 1,
-                        Put::TurnedBack => (instructions_applied.puts, instructions_applied.turned_back) = (instructions_applied.puts + 1, instructions_applied.turned_back + 1),
-                        Put::RefusedOccupied => instructions_applied.puts_refused += 1,
-                        Put::PassedOver => instructions_applied.passed_over += 1,
+                    let made = superchunk.make_named(earliest_tick, header, attributes);
+                    match made {
+                        EntityWritten::Added | EntityWritten::InPlace | EntityWritten::MovedToCell => instructions_applied.added += 1,
+                        EntityWritten::TurnedBack => (instructions_applied.added, instructions_applied.turned_back) = (instructions_applied.added + 1, instructions_applied.turned_back + 1),
+                        EntityWritten::RefusedOccupied => instructions_applied.adds_refused += 1,
+                        EntityWritten::PassedOver => instructions_applied.passed_over += 1,
                     }
                 }
-                Instruction::Move { header, named_cell: from } => match superchunk.put_named(earliest_tick, header, from, collision_plane) {
-                    Put::TurnedBack => (instructions_applied.moves, instructions_applied.turned_back) = (instructions_applied.moves + 1, instructions_applied.turned_back + 1),
-                    Put::PassedOver => instructions_applied.passed_over += 1,
+                Instruction::Move { header, named_cell: from } => match superchunk.write_named(earliest_tick, header, from) {
+                    EntityWritten::TurnedBack => (instructions_applied.moves, instructions_applied.turned_back) = (instructions_applied.moves + 1, instructions_applied.turned_back + 1),
+                    EntityWritten::PassedOver => instructions_applied.passed_over += 1,
                     _ => instructions_applied.moves += 1,
                 },
                 Instruction::Edit { named_cell: at, attribute_type: kind, first_block: first, count } => match superchunk.edit_named(at, kind, &self.attributes[first as usize..(first + count) as usize]) {
@@ -200,7 +197,7 @@ impl Instructions {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct InstructionsApplied {
     /// Entities made.
-    pub puts: usize,
+    pub added: usize,
     /// Entities moved, or set to wake at another tick, their attributes
     /// as they were.
     pub moves: usize,
@@ -216,8 +213,8 @@ pub struct InstructionsApplied {
     /// Of the entities put or moved, those whose cell was taken: left
     /// where they stood.
     pub turned_back: usize,
-    /// New entities whose cell was taken: not put.
-    pub puts_refused: usize,
+    /// New entities whose cell was taken: not added.
+    pub adds_refused: usize,
     /// Of the entities moved, those that crossed into another superchunk.
     pub border_crossings: usize,
     /// Instructions for an entity no longer where it stood -- moved on,
@@ -228,14 +225,14 @@ pub struct InstructionsApplied {
 impl AddAssign for InstructionsApplied {
     /// Both added up.
     fn add_assign(&mut self, other_applied: Self) {
-        self.puts += other_applied.puts;
+        self.added += other_applied.added;
         self.moves += other_applied.moves;
         self.edits += other_applied.edits;
         self.wakes += other_applied.wakes;
         self.entities_removed += other_applied.entities_removed;
         self.lost += other_applied.lost;
         self.turned_back += other_applied.turned_back;
-        self.puts_refused += other_applied.puts_refused;
+        self.adds_refused += other_applied.adds_refused;
         self.border_crossings += other_applied.border_crossings;
         self.passed_over += other_applied.passed_over;
     }

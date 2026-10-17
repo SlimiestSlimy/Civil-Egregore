@@ -6,7 +6,7 @@ use crate::params::{FOLDER, FORCED_HOT, SHEEP, SIDE, THREADS, TICKS};
 use crate::HaloChange;
 use chunk_storage::disk;
 use protocol::server_parameters::CleanServerParameters;
-use type_registry::GRASS;
+use base_types::GRASS;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 

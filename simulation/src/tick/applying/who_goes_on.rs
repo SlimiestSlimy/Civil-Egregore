@@ -34,7 +34,7 @@ impl LetGoOn {
     }
 
     /// Puts `superchunk` among them.
-    fn put(&self, superchunk: usize) {
+    fn push(&self, superchunk: usize) {
         self.superchunk_list.lock().expect("the superchunks let go on").push(superchunk);
         self.lying_count.fetch_add(1, Ordering::SeqCst);
     }
@@ -87,7 +87,7 @@ impl Phase<'_, '_> {
     pub(super) fn let_lie(&self, superchunk: usize, list_index: usize) {
         self.claimed_by[superchunk].store(list_index, Ordering::SeqCst);
         self.lying_to_take_up[superchunk].store(true, Ordering::SeqCst);
-        self.let_go_on[list_index].put(superchunk);
+        self.let_go_on[list_index].push(superchunk);
     }
 
     /// What the thread `part` goes on with when a superchunk of its
@@ -113,7 +113,7 @@ impl Phase<'_, '_> {
             // One taken up from under the list is no longer there to give.
             if self.lying_to_take_up[kept_superchunk].load(Ordering::SeqCst) {
                 self.claimed_by[kept_superchunk].store(another_list, Ordering::SeqCst);
-                self.let_go_on[another_list].put(kept_superchunk);
+                self.let_go_on[another_list].push(kept_superchunk);
                 gave_any = true;
             }
         }
@@ -166,7 +166,7 @@ impl Phase<'_, '_> {
         while let Some(kept_superchunk) = self.let_go_on[part].pop() {
             if self.lying_to_take_up[kept_superchunk].load(Ordering::SeqCst) {
                 self.claimed_by[kept_superchunk].store(self.let_go_on.len() - 1, Ordering::SeqCst);
-                self.anyones_list().put(kept_superchunk);
+                self.anyones_list().push(kept_superchunk);
                 self.wake(false);
             }
         }

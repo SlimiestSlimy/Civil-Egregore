@@ -33,12 +33,10 @@ sliders its generation is tuned by.
 | [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |
 | [`chunk_storage/`](chunk_storage/) | chunks as stored, what loading and saving work on: height maps, the layer codec, superchunk images, the cold pool and the writeback ring |
 | [`worldgen/`](worldgen/) | world generation: every cell's height from the world's seed, the walls between cells more than a step apart in height, and how grass and trees lie in patches |
-| [`compares_and_writes/`](compares_and_writes/) | what a turn queues for a tick's second phase, one function an instruction: a compare, a write, the end of a compare |
-| [`actions/`](actions/) | what a rule is made of, and all it reaches the simulation through: every read of a turn and every change made of several instructions -- cells asked and set, the cells about a cell, entities made and committed, walking |
 | [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
 | [`renderer/`](renderer/) | Civil Egregore on the screen: a Bevy window, opening on the main menu, asking the server's host, on a thread of its own, for the cells of its viewport |
 | [`gui/`](gui/) | Civil Egregore's menus, over whatever window shows it, a part a module: the main menu -- a new world set up, one saved opened, leaving -- the options Escape opens over a world, and the sliders of the numbers `utilities::tuning` names |
-| [`simulation/`](simulation/) | the simulation: SCA sampling, the two-phase tick and its outboxes, a superchunk's turn -- a bucket a chunk, a timer wheel a superchunk; and what is hot: the halos about the hot entities, warming and cooling by the tick, within the world's size if it has one |
+| [`simulation/`](simulation/) | the simulation: SCA sampling, the two-phase tick and its outboxes, a superchunk's turn -- a bucket a chunk, a timer wheel a superchunk; and what is hot: the halos about the hot entities, warming and cooling by the tick, within the world's size if it has one. Its raw compares and writes are its own; its API, `simulation_api`, is what the base game is written in: every read of a turn, and every write, under a skip-tag set of compares -- cells asked and set, the cells about a cell, entities made and committed, walking |
 | [`bitplane_manager/`](bitplane_manager/) | the hot bitplanes: layers decoded into the bitmap arena, where cells are read and written -- writes batched -- and written back; planes of one bit a cell, or 2, 4, 8 or 16 |
 | [`tessera/`](tessera/) | Tessera, the lossless encoding of a 256x256 bitmap: a project of its own, with its own [README](tessera/README.md), tests, tools and docs |
 | [`AI_SCRATCHPAD/`](AI_SCRATCHPAD/) | the AI's own probes of a running world, used while working on the code: no part of the program, and nothing depends on it |
@@ -94,11 +92,9 @@ type on it; Tessera depends on `bitmap/` and `utilities/` beside it;
 `coordinates/` on `bitmap/`; `chunk_storage/` on those and Tessera;
 `bitplane_manager/` on `chunk_storage/` and `coordinates/`;
 `entity_manager/` on `coordinates/` and `bitmap/`; `simulation/` on
-`bitplane_manager/` and `entity_manager/`; `compares_and_writes/` on
-`simulation/`; `actions/` on `compares_and_writes/`,
-`simulation/` and `pathfinding/`, the last two knowing nothing of one
-another and meeting there; the rules, `sca_rules/` and `entity_rules/`,
-on `actions/` alone, through which they reach the
+`bitplane_manager/`, `entity_manager/` and `pathfinding/`, which
+knows nothing of it and meets it in its API; the base game, `basegame/`,
+on the simulation's API alone, through which it reaches the
 simulation; `worldgen/` on `chunk_storage/` and
 `coordinates/`; `server/` on the rules, the entities and `worldgen/`;
 the program, `src/`, on `server/` and Tessera; `gui/` on `utilities/`

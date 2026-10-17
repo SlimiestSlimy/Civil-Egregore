@@ -5,16 +5,16 @@
 
 use crate::World;
 use bitplane_manager::BucketKey;
-use type_registry::GRASS;
+use base_types::GRASS;
 use chunk_storage::{LayerType, SuperchunkImage};
 use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
-pub use type_registry::Climate;
-use type_registry::{CLIMATE, CLOUD, TREE, TREE_STAGE};
+pub use base_types::Climate;
+use base_types::{CLIMATE, CLOUD, TREE, TREE_STAGE};
 pub use simulation::halos::Viewport;
 use std::collections::HashMap;
 use std::sync::Arc;
 use worldgen::WorldGeneration;
-use type_registry::WET;
+use base_types::WET;
 
 /// Words a chunk's bitmap takes.
 pub const CHUNK_WORDS: usize = bitmap::WORDS;
@@ -26,7 +26,7 @@ pub const WORD_BITS: usize = bitmap::BITS_PER_WORD;
 pub const STAGE_BITS: usize = TREE_STAGE.layer_type().width_bits() as usize;
 
 /// The oldest stage a tree has.
-pub const OLDEST_TREE_STAGE: u32 = type_registry::OLDEST_TREE_STAGE;
+pub const OLDEST_TREE_STAGE: u32 = base_types::OLDEST_TREE_STAGE;
 
 /// Bits a tile's cloud takes in [`Cells::clouds`]: the cloud plane's,
 /// as the type registry has it.

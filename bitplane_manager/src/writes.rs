@@ -20,7 +20,7 @@ pub enum WriteOp {
     /// Makes the cell's number this: for a layer more than a bit a cell
     /// wide, its low bits as many as the layer has. On a layer of a bit
     /// a cell, set if it is not 0.
-    Put(u32),
+    WriteValue(u32),
 }
 
 /// The cells a write covers, from its anchor cell; the parts past the
@@ -70,7 +70,7 @@ impl Write {
     /// more than a plane of that width holds.
     pub fn value<W: Width>(wide_plane: WidePlane<W>, anchor_cell: CellIndex, value: u32) -> Self {
         debug_assert!(value <= wide_plane.most_value(), "{value} in a plane of {} bits a cell", W::BITS_A_CELL);
-        Self { anchor_cell, write_op: WriteOp::Put(value), write_shape: WriteShape::Cell }
+        Self { anchor_cell, write_op: WriteOp::WriteValue(value), write_shape: WriteShape::Cell }
     }
 
     /// The smallest rectangle holding the write's cells: its first and
@@ -202,16 +202,16 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk: Super
         Some(&mut layers[layer_index])
     });
     // What the write does to one cell of a hot bucket: whether it changed.
-    let put = |layer: &mut SuperchunkLayer, chunk, cell| match (write.write_op, layer.layer_type.width_bits()) {
-        (WriteOp::SetCell, 1) => layer.put_cell(chunk, cell, true),
-        (WriteOp::ClearCell, 1) => layer.put_cell(chunk, cell, false),
-        (WriteOp::FlipCell, 1) => layer.put_cell(chunk, cell, !layer.get(chunk, cell)),
-        (WriteOp::Put(value), 1) => layer.put_cell(chunk, cell, value != 0),
-        (WriteOp::Put(value), _) => layer.put_value(chunk, cell, value),
+    let write_one_cell = |layer: &mut SuperchunkLayer, chunk, cell| match (write.write_op, layer.layer_type.width_bits()) {
+        (WriteOp::SetCell, 1) => layer.write_cell(chunk, cell, true),
+        (WriteOp::ClearCell, 1) => layer.write_cell(chunk, cell, false),
+        (WriteOp::FlipCell, 1) => layer.write_cell(chunk, cell, !layer.get(chunk, cell)),
+        (WriteOp::WriteValue(value), 1) => layer.write_cell(chunk, cell, value != 0),
+        (WriteOp::WriteValue(value), _) => layer.write_value(chunk, cell, value),
         // A wide cell is given a number: set is 1, unset 0, and a flip sets a cell at 0 and clears any other.
-        (WriteOp::SetCell, _) => layer.put_value(chunk, cell, 1),
-        (WriteOp::ClearCell, _) => layer.put_value(chunk, cell, 0),
-        (WriteOp::FlipCell, _) => layer.put_value(chunk, cell, (layer.value(chunk, cell) == 0) as u32),
+        (WriteOp::SetCell, _) => layer.write_value(chunk, cell, 1),
+        (WriteOp::ClearCell, _) => layer.write_value(chunk, cell, 0),
+        (WriteOp::FlipCell, _) => layer.write_value(chunk, cell, (layer.value(chunk, cell) == 0) as u32),
     };
     let anchor_cell = { write.anchor_cell };
     if write.write_shape == WriteShape::Cell {
@@ -221,7 +221,7 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk: Super
         let chunk = anchor_cell.chunk().place();
         match layer {
             Some(layer) if contains(layer.chunk_flags.hot, chunk) => {
-                writes_applied.cells_changed += put(layer, chunk, anchor_cell.place()) as u64;
+                writes_applied.cells_changed += write_one_cell(layer, chunk, anchor_cell.place()) as u64;
             }
             _ => writes_applied.missed += 1,
         }
@@ -250,7 +250,7 @@ pub(crate) fn apply_in(layers: Option<&mut [SuperchunkLayer]>, superchunk: Super
                 Some(layer) if contains(layer.chunk_flags.hot, chunk) => {
                     for (x, y) in covered_cartesian {
                         let cell = morton_index(x as u8, y as u8);
-                        writes_applied.cells_changed += put(layer, chunk, cell) as u64;
+                        writes_applied.cells_changed += write_one_cell(layer, chunk, cell) as u64;
                     }
                 }
                 _ => writes_applied.missed += covered_cartesian.count() as u64,

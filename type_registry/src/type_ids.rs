@@ -42,7 +42,7 @@ const fn type_id(type_kind: TypeKind, type_number: u64, size_byte: u64) -> u64 {
     (type_kind as u64) << KIND_SHIFT | type_number << SIZE_BITS | size_byte
 }
 
-/// The number of `type_id_value`: what its row in the registry is written with.
+/// The number of `type_id_value`, between its kind and its size.
 const fn number_of(type_id_value: u64) -> u64 {
     (type_id_value >> SIZE_BITS) & (TYPE_ID_NUMBERS - 1)
 }
@@ -58,7 +58,7 @@ const fn is_of(type_id_value: u64, type_kind: TypeKind) -> bool {
 }
 
 /// What a layer represents: a `u64` the registry gives a meaning
-/// ([`crate::REGISTRY`]). It may be wide, 2 to 32 bits a cell: its
+/// ([`crate::TypeRegistry`]). It may be wide, 2 to 32 bits a cell: its
 /// last byte says how many (`docs/type_registry.md`, "Width").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LayerType(pub u64);
@@ -319,7 +319,7 @@ impl AttributeType {
         is_of(self.0, TypeKind::Attribute) && self.type_number() != 0
     }
 
-    /// Its number: what its row in the registry is written with.
+    /// Its number, between its kind and its size.
     pub const fn type_number(self) -> u64 {
         (self.0 >> ATTRIBUTE_SIZE_BITS) & (ATTRIBUTE_NUMBERS - 1)
     }

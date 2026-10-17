@@ -114,7 +114,7 @@ fn a_frame_brings_the_clouds_a_tile_at_a_time() {
     use bitplane_manager::Write;
     use coordinates::{place_from_cartesian, CellCartesian, SUPERCHUNK_SIDE_CELLS};
     use server::host::frame::{cloud_over, CLOUD_TILE_SHIFT};
-    use type_registry::CLOUD;
+    use base_types::CLOUD;
     let folder = crate::worlds::folder("clouds");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
     let mut world = server::start_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, sheep_per_flock: 0, ..WorldStart::default() });

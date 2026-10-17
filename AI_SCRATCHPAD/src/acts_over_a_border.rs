@@ -10,8 +10,8 @@ use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, WorldEntities, EntityType, Header};
-use actions::{cells, entities};
-use simulation::{Compare, Simulation, Turn};
+use simulation::simulation_api::{cell_reads_and_writes, compare_and_write, entity_reads_and_writes};
+use simulation::{Compare, Simulation, SuperchunkTickState};
 use crate::ProbeParameters;
 
 /// Superchunks along the world's side.
@@ -60,13 +60,13 @@ fn world(world_side_superchunks: u32, every_so_many_cells: u32, stepping_a_super
         for (line_index, y) in (0..world_side_superchunks * SUPERCHUNK_SIDE_CELLS).step_by(every_so_many_cells as usize).enumerate() {
             // West of the border and east of it by turns, so that each superchunk waits on the other all the way down.
             let x = border_index * SUPERCHUNK_SIDE_CELLS - cells_away - if line_index % 2 == 0 { 1 } else { 3 };
-            entity_store.queue_put(Header { entity_type: WALKER_TYPE, stood_cell: cell(x + if line_index % 2 == 0 { 0 } else { 3 }, y), wake: 0 }, &[entity_manager::AttributeBlock::holding_value(COUNTED_ATTRIBUTE, 0)]);
+            entity_store.queue_add(Header { entity_type: WALKER_TYPE, stood_cell: cell(x + if line_index % 2 == 0 { 0 } else { 3 }, y), wake: 0 }, &[entity_manager::AttributeBlock::holding_value(COUNTED_ATTRIBUTE, 0)]);
         }
     }
     for (x, y) in (0..world_side_superchunks).flat_map(|y| (0..world_side_superchunks).map(move |x| (x, y))) {
         for stepper_index in 0..stepping_a_superchunk {
             let stepper_cell = cell(x * SUPERCHUNK_SIDE_CELLS + 300 + stepper_index % 400, y * SUPERCHUNK_SIDE_CELLS + 4 + 2 * (stepper_index / 400));
-            entity_store.queue_put(Header { entity_type: WALKER_TYPE, stood_cell: stepper_cell, wake: 0 }, &[]);
+            entity_store.queue_add(Header { entity_type: WALKER_TYPE, stood_cell: stepper_cell, wake: 0 }, &[]);
         }
     }
     entity_store.apply();
@@ -77,26 +77,25 @@ fn world(world_side_superchunks: u32, every_so_many_cells: u32, stepping_a_super
 /// east if it stands west of its border, west if east -- and counts
 /// that on itself, under the compare of the cell; all wake next tick
 /// where they stand. If `crossing`, it steps to that cell instead.
-fn turn_of(turn: &mut Turn, crossing: bool) -> u64 {
-    let tick_now = turn.current_tick();
-    for entity in turn.woken_entities() {
+fn turn_of(tick_state: &mut SuperchunkTickState, crossing: bool) -> u64 {
+    let tick_now = tick_state.current_tick();
+    for entity in tick_state.woken_entities() {
         let header = entity.header;
-        turn.seeing_to(header.stood_cell);
+        tick_state.seeing_to(header.stood_cell);
         if let Some(count_so_far) = entity.attribute(COUNTED_ATTRIBUTE) {
             let walker_cartesian = header.stood_cell.cartesian();
             // Those put west of their border have an odd x less the border's, those east an even one: the world's cells begin even.
             let cell_beside: CellIndex = CellCartesian { x: if walker_cartesian.x % 2 == 1 { walker_cartesian.x + 1 } else { walker_cartesian.x - 1 }, y: walker_cartesian.y }.into();
             if crossing {
-                entities::step(turn, &header, cell_beside, tick_now + 1);
+                entity_reads_and_writes::step(tick_state, &header, cell_beside, tick_now + 1);
                 continue;
             }
-            let stone_seen = u32::from(turn.layer_holds(STONE_LAYER, cell_beside) == Ok(true));
-            turn.compare_from_here(Compare::Cell { layer_type: STONE_LAYER, target_cell: cell_beside, seen_value: stone_seen });
-            if stone_seen == 1 { cells::clear(turn, STONE_LAYER, cell_beside) } else { cells::set(turn, STONE_LAYER, cell_beside) }
-            entities::set_attribute_of(turn, &header, COUNTED_ATTRIBUTE, Some(count_so_far), count_so_far + 1);
-            turn.compare_end();
+            let stone_seen = u32::from(tick_state.layer_holds(STONE_LAYER, cell_beside) == Ok(true));
+            let mut stone_as_seen = compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: STONE_LAYER, target_cell: cell_beside, seen_value: stone_seen });
+            if stone_seen == 1 { cell_reads_and_writes::clear(&mut stone_as_seen, STONE_LAYER, cell_beside) } else { cell_reads_and_writes::set(&mut stone_as_seen, STONE_LAYER, cell_beside) }
+            entity_reads_and_writes::set_attribute_of(&mut stone_as_seen, &header, COUNTED_ATTRIBUTE, Some(count_so_far), count_so_far + 1);
         }
-        entities::step(turn, &header, header.stood_cell, tick_now + 1);
+        entity_reads_and_writes::step(tick_state, &header, header.stood_cell, tick_now + 1);
     }
     0
 }
@@ -113,7 +112,7 @@ pub fn run_probe(given_parameters: &ProbeParameters) -> Result<(), String> {
             let mut timed_simulation = Simulation::new(thread_count);
             let (mut acts_over_border, mut applying_time, mut computing_time, mut compares_counted) = (0, std::time::Duration::ZERO, std::time::Duration::ZERO, (0, 0));
             for tick in 0..ticks + 20 {
-                let report = timed_simulation.tick(&mut bitmap_arena, &mut entity_store, 1, |turn: &mut Turn| turn_of(turn, crossing == 1));
+                let report = timed_simulation.tick(&mut bitmap_arena, &mut entity_store, 1, |tick_state: &mut SuperchunkTickState| turn_of(tick_state, crossing == 1));
                 // The first ticks grow the queues: not counted.
                 if tick >= 20 {
                     (acts_over_border, applying_time, computing_time) = (acts_over_border + report.acts_over_a_border, applying_time + report.applying_time, computing_time + report.computing_time);

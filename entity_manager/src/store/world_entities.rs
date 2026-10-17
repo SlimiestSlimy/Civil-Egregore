@@ -1,12 +1,14 @@
 //! Every superchunk's entities together: the world's, with what is
 //! queued to be put and removed.
 
-use crate::attributes::AttributeBlock;
+use crate::attributes::{AttributeBlock, DefaultAttributes};
 use crate::entity::{EntityRef, Header};
 use crate::instructions::{Instructions, InstructionsApplied};
 use super::SuperchunkEntities;
 use super::entity_reader::EntityReader;
 use coordinates::{CellIndex, SuperchunkIndex};
+use std::sync::Arc;
+use type_registry::FrozenTypes;
 
 /// Every superchunk's entities, in the bitmap arena's order -- by Morton
 /// index -- and the tick the world is at: the next to run.
@@ -18,22 +20,32 @@ pub struct WorldEntities {
     superchunks: Vec<SuperchunkEntities>,
     /// Instructions queued outside a tick, applied by [`WorldEntities::apply`].
     queued_instructions: Instructions,
+    /// The default attributes of the types the world runs with: each
+    /// superchunk's too.
+    default_attributes: Arc<DefaultAttributes>,
 }
 
 impl WorldEntities {
-    /// None, at tick 0.
+    /// None, at tick 0, no type of entity with a default attribute.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// None, at tick `current_tick`, of a world running with
+    /// `frozen_types`: what a world's entities start as, and a save's are
+    /// put back into.
+    pub fn for_types<RuleCode>(frozen_types: &FrozenTypes<RuleCode>, current_tick: u64) -> Self {
+        Self { current_tick, default_attributes: Arc::new(DefaultAttributes::of_types(frozen_types)), ..Self::default() }
+    }
+
+    /// The default attributes of the types the world runs with.
+    pub fn default_attributes(&self) -> &DefaultAttributes {
+        &self.default_attributes
     }
 
     /// The tick about to run.
     pub fn current_tick(&self) -> u64 {
         self.current_tick
-    }
-
-    /// None, at tick `current_tick`: what a save's entities are put back into.
-    pub fn at_tick(current_tick: u64) -> Self {
-        Self { current_tick, ..Self::default() }
     }
 
     /// How many entities there are.
@@ -80,7 +92,7 @@ impl WorldEntities {
             while let Some(superchunk) = had_superchunks.next_if(|superchunk| superchunk.superchunk_index < wanted_index) {
                 dropped_entities += superchunk.len();
             }
-            let superchunk = had_superchunks.next_if(|superchunk| superchunk.superchunk_index == wanted_index).unwrap_or_else(|| SuperchunkEntities::new(wanted_index));
+            let superchunk = had_superchunks.next_if(|superchunk| superchunk.superchunk_index == wanted_index).unwrap_or_else(|| SuperchunkEntities::new(wanted_index, Arc::clone(&self.default_attributes)));
             self.superchunks.push(superchunk);
         }
         dropped_entities + had_superchunks.map(|superchunk| superchunk.len()).sum::<usize>()
@@ -90,8 +102,8 @@ impl WorldEntities {
     /// type, outside a tick: setting up, say. It wakes at its wake
     /// tick, the tick about to run or later. Not made, an entity
     /// standing on its cell.
-    pub fn queue_put(&mut self, header: Header, attributes: &[AttributeBlock]) {
-        self.queued_instructions.put(header, attributes);
+    pub fn queue_add(&mut self, header: Header, attributes: &[AttributeBlock]) {
+        self.queued_instructions.add(header, attributes);
     }
 
     /// Queues removing the entity standing on `stood_cell`, outside a tick.
@@ -113,7 +125,7 @@ impl WorldEntities {
         self.queued_instructions.clear();
         let current_tick = self.current_tick;
         self.superchunks.iter_mut().for_each(|superchunk| superchunk.sort_wakes(current_tick));
-        self.superchunks.iter_mut().for_each(|superchunk| superchunk.names_anew(&mut ()));
+        self.superchunks.iter_mut().for_each(|superchunk| superchunk.names_anew());
         instructions_applied
     }
 
