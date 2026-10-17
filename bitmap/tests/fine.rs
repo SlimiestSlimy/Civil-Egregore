@@ -3,6 +3,9 @@
 //!
 //! `cargo test --test fine`
 
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
 mod bitmap {
     //! The bitmap: its cells, squares, rectangles and circles.
     //!
@@ -123,7 +126,8 @@ mod bitmap {
     /// than its radius from its centre.
     #[test]
     fn shapes_drawn_are_their_cells_worked_out_one_by_one() {
-        let mut random_numbers = utilities::rng::RandomSource::new(utilities::seed::counted_seed());
+        let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+        let mut random_numbers = utilities::rng::RandomSource::new(seed);
         for _ in 0..20 {
             let (mut bitmap, mut expected_cells) = (Bitmap::new(), vec![false; WIDTH * HEIGHT]);
             for _ in 0..random_numbers.draw_between(1, 12) {
@@ -211,7 +215,8 @@ mod window {
     /// and back.
     #[test]
     fn morton_words_turn_into_rows_and_back() {
-        let mut random_numbers = RandomSource::new(utilities::seed::counted_seed());
+        let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+        let mut random_numbers = RandomSource::new(seed);
         for _ in 0..1000 {
             let word = random_numbers.next_draw();
             let row_ordered_bits = rows_from_morton(word);
@@ -225,7 +230,8 @@ mod window {
     /// A window at any offset into four tiles is the 8x8 cells there.
     #[test]
     fn windows_cut_the_cells_from_four_tiles() {
-        let mut random_numbers = RandomSource::new(utilities::seed::counted_seed());
+        let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+        let mut random_numbers = RandomSource::new(seed);
         for _ in 0..200 {
             let tiles = [[random_numbers.next_draw(), random_numbers.next_draw()], [random_numbers.next_draw(), random_numbers.next_draw()]];
             let cell = |x: u32, y: u32| bit_at(tiles[(y / 8) as usize][(x / 8) as usize], x % 8, y % 8);

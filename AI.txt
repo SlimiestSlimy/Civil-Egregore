@@ -77,9 +77,9 @@ Boundaries, asked first, would have put that on the table.
   ask for -- a name, constant, threshold, limit, layout, boundary,
   default, behaviour beyond the request -- and why. None: "Decided on
   my own: nothing."
-- BEFORE EACH COMMIT, `cargo run --release -- docs stale`: each doc
-  section it lists is read, and updated or the commit says why it
-  still holds.
+- `docs stale` is DELETED (the user, 2026-10-16: "delete"), with the
+  old commands; the three docs tests in tests/fine/docs.rs are ignored
+  while the docs are paused.
 - Code explains itself roughly, docs explain it in detail: a change is
   not done until every doc describing what it touched says what the
   code now does. The glossary first, then the docs.
@@ -115,18 +115,165 @@ NOW
   coupling the code a little, pull first, though, we need to finish
   the stuff mid work upstream". The name sweep is finished (its docs
   followed, the world hash unchanged); next, modularize and decouple.
-- `server check` with seed 0 reads transient_data/seed.csv: the binary
-  leaning on the repository, against the user's rule (it predates
-  it). Told the user 2026-10-16; theirs to say.
+- ASK 2026-10-16: "yeah, the rule of no user-side binary dependency on
+  on the repo still holds" -- no command of the binary reads the seed
+  file (its path is the workspace's, baked in): server check, renderer
+  stills/watch, tessera's tools. Given no seed, a command draws a fresh
+  one and prints it (the user's choice, "Fresh, printed"). Tests keep
+  the rotation.
 - Found 2026-10-12, not fixed: the simulation's fine test
   what_others_write_to_an_entity_follows_it_over_a_border hung with
   every thread asleep on a futex, once in 300 runs alone (not the
   seed's doing): a lost wake in the threads.
+- ASK 2026-10-16, FIRST (co-op: I show what I want to tackle and what
+  I think, the user does the same, edits only once agreed): "we need to
+  fully decouple test infrastructure from the binary" / "diagnostics
+  may be part of production code, but diagnostics should only activate
+  if used. otherwise they should be dormant" / "lets merge renderer and
+  gui as modules of a separate "client" crate" / "client normally
+  doesn't receive any cli parameters (client should be as dynamic as
+  possible for graphics tunning and gui work atm) however if cli args
+  are passed then the client simply setups the correct rendering mode
+  (most likely jump straight to world rendering) and passes the
+  arguments to server" / "we want both binary and server to end up as
+  different binaries now, enforcing this separation at compile time".
+  The user's answers to my proposal: "ideally no diagnostics code
+  should be on production code ... we move all diagnostics code into a
+  separate crate, server then instantiates a diagnosticsManager or
+  something, and gives it a handle to the simulation internals. and
+  only upon server request to the DiagnosticsManager it starts doing
+  reads to stuff, otherwise its just unused ... co-op will be
+  important a t a fine grain per file level" / the project in five
+  folders: diagnostics, server, client, protocol, utilities / "for now
+  dont worry about commands, we'll restructure that later" / client
+  and server over pipes, "also make tests use the pipes if possible" /
+  "what we want when compiling from root is bundling the server and
+  client binaries into a single binary basically".
+  Agreed plan (2026-10-16): utilities/ = utilities, coordinates,
+  bitmap; protocol/ = protocol (messages, wire, generation settings)
+  and type_registry ("thats going to be our source of truth both for
+  server and client, thats where the rules, textures and stuff will
+  attach to dynamically once we make the type registry dynamic");
+  server/ = the rest of the world's crates and tessera; client/ =
+  client (gui, renderer as modules); diagnostics/ = the diagnostics
+  crate, AI_SCRATCHPAD meanwhile. Terrain answered by the server over
+  the pipe. Root binary bundles both: the client relaunches its own
+  executable as the server. Order: 1 seed rotation to test files
+  (+ paging/census commit), 2 protocol crate, 3 client crate, 4 the
+  five folders, 5 the process split (measured), 6 diagnostics crate,
+  file by file.
+  Step 1 settled: the rotation in utilities/seed_rotation.rs, beside
+  src, included by path by tests alone; "we should eliminate all
+  environment flags, that's not the style im going for" --
+  CIVIL_EGREGORE_SEED now, CIVIL_EGREGORE_RENDER with step 5,
+  TESSERA_DIAGNOSE with step 6 (the OS's own HOME, XDG_DATA_HOME,
+  LOCALAPPDATA, APPDATA stay); "i dont mind incomplete work upstream,
+  only you write upstream".
+  Agreed before it: the seed file's rotation is test-only, moved to
+  test files; diagnostics take a seed and never fetch one. In the tree,
+  uncommitted: given_or_fresh_seed, server check and renderer tools
+  off the file, paging and the census moved to Civil Egregore's
+  folder on the machine.
+- ASK 2026-10-16, interrupting step 1 at the commands' seed parameter:
+  "were going to change how commands work, were just going to add a
+  very simple dynamic parsing state machine / first were going to add
+  flag parsing, which will become the default entrypoint / simple
+  structure: --AZ az _ - 09 / ... this state machine at creation time
+  is fed a dynamic list of flags, and a function to handle each flag,
+  (so any flag can have arbitrary parameters, as we do now) once we
+  enter a flags parameters we invoke the same state machine as
+  recursive step (we keep a stack somewhere) and the flag parses with
+  what was already fed to the original state machine. / so we feed it
+  parsing once, it works with that even when recursing, runtime rule
+  establishment, but no parsing self creation / ... we dont need it to
+  be performant, we want it to stupid simple single threaded".
+  Step 1 so far: utilities/test_seed.rs (TestSeedHandle, agreed),
+  utilities/src/seed.rs (agreed, given_seed_of/FRESH_SEED_WORD added
+  just before the stop); the 46 test files and 20 roots scripted
+  earlier still point at the old seed_rotation (to redo, file by file).
+- TESTS SPLIT (the user, 2026-10-16): "were going to have to make
+  another /tests root folder ... tests inside a crate test that crates
+  invariants of the code. nothing else, then the root test folder has
+  all the fine/fast/complete test layers for higher level behaviours".
+  Diagnostics leave the Rust tree for a root diagnostics/ folder, to be
+  rebuilt from scratch ("move all disgnostics folders into the root
+  diagnostics, dont even include them in the rust tree").
+  Root folders: diagnostics, server, client, protocol, utilities,
+  transient_data, tests; AI_SCRATCHPAD stays a top-level folder too.
+  Refactors through rust-analyzer ("the lsp is lovely", "just make the
+  skeleton first"): my driver, AI_SCRATCHPAD/scripts/rust_analyzer_driver.py (rename,
+  move, refs; the VS Code extension's server binary).
+- TRANSIENT DATA (the user, 2026-10-16): "only diagnostics should
+  generate transient data"; tests too, since "test depend on
+  diagnostics, diagnostic writes stuff down".
+- DIAGNOSTICS' ROLES (the user, 2026-10-16): "diagnostics have 2
+  roles, make testing easier, and writing stuff down for comparisons,
+  thats it".
+- TO THE BONES (the user, 2026-10-16): "yeah delete dead code, we want
+  to go to the bones basically" -- what the diagnostics' removal leaves
+  unused is deleted, not kept behind allow(dead_code).
+- DOCS PAUSED (the user, 2026-10-16): "were going to forego docs,
+  except top level ones, were going to update them later, the code is
+  going to chsmge a lot so updating docs is a waste of time for now".
+  Crate docs' prose is not updated; the docs tests stay on and pass
+  ("doc tests do get updated lol, just the prose not"): names go in
+  the references, pointers stay true. docs/ at the root is kept whole.
 - THEN, transient data folded into utilities (the user's): each
   crate's lib.rs or main.rs, after its imports, declares statically
   its transient data paths, to the files themselves; utilities::csv
   takes a flag to make the file and its folders for any path, so disk
   storage stays with the file interactor, the csv library.
+- SERVER CENTRALIZED (the user, 2026-10-16): "lets make the server
+  take cleanparameters first" / "we need to remove old commands pretty
+  much now lol" / "everything should be server centralized". Done:
+  utilities::commands and stale_docs deleted; server/src/params.rs
+  holds every flag (--seed --sheep --side --forced_hot --threads
+  --ticks; commands --new --run --info [folder ...]); server::start
+  runs the clean parameters; main.rs: no words, the window, else the
+  flags and server::start. AI_SCRATCHPAD's probes use the protocol's
+  flags with their own list.
+- Rule tests (grass, trees, weather, sheep) moved into root
+  tests/fast; sca_rules and entity_rules have no tests or
+  dev-dependencies left. actions' flock_over_borders and walking moved
+  too; actions' shared arenas now actions/tests/shared/arenas.rs, also
+  included by the root's fast tier; actions' [[test]] entry gone;
+  actions' own tests on TestSeedHandle (T3 done there). simulation
+  (the user: "yeah b"): every test driving it through actions moved to
+  the root (fast/tick.rs; fine/ the six), sharing tests/shared/walkers.rs;
+  simulation keeps sampling and simulation_time, no dev-dependency, no
+  [[test]] entry.
+- TESSERA ISOLATED (the user, 2026-10-16): "keep in mind tessrra is its
+  own isolated project from civil egregore" / "tessera having its own
+  [[test]] is the only valid exception" / "lets isolate tessera
+  entirely then, we run its tests completely separate from civil
+  egregore". Done: tessera is its own Cargo workspace (its own
+  [workspace], Cargo.lock, target/), excluded from the root's;
+  chunk_storage still uses it as a path dependency. Its tests draw a
+  fresh seed each (tests::fresh_test_seed), keep its [[test]] entry,
+  and hold their own examination, tree_stats and saved-bitmap reading
+  (tessera/tests/tests/); the saved bitmaps are in tessera/tests/saved.
+  `cargo test --manifest-path tessera/Cargo.toml`. T2 is done.
+- T3 (seeds onto TestSeedHandle) done in utilities, bitmap,
+  coordinates, compares_and_writes, entity_manager, type_registry,
+  chunk_storage, pathfinding, worldgen, bitplane_manager and the
+  renderer's unit test (a #[cfg(test)] test_seed module in its lib.rs).
+  Shared test files moved to <crate>/tests/shared/, so no [[test]]
+  entry is left outside tessera. LEFT: bitplane_manager's
+  a_bucket_is_kept_only_for_a_chunk_with_cells reads ArenaStats, now
+  shelved, over pub(crate) internals -- the user: "i guess a? im not
+  sure": now a unit test, bitplane_manager/tests/unit/buckets.rs,
+  included #[cfg(test)] by its lib.rs, counting the buckets directly.
+- FREEZE_SEED (the user, 2026-10-16: "that's one environment variable
+  we do need, freeze seed lmao"): the one environment variable kept,
+  test infrastructure only (utilities/test_seed.rs). FREEZE_SEED=0x...
+  gives every test that seed, the file untouched; FREEZE_SEED= (empty)
+  takes the file's seed and never rolls it.
+- FLAKY: tests/fast/weather.rs a_wind_carries_its_climate_down_it fails
+  on about 1 seed in 11 (0x3b8d69781e6b06e6): 4-5k ticks are 16-20
+  simulated seconds, too few for MEAN_TIME_TO_CARRY_CLIMATE (400 s) to
+  carry humidity or heat over the border column. Older than the move.
+  The user: "climate will be reworked later so for now that can be
+  ignored" -- the test is #[ignore]d until the climate rework.
 
 ASKED, NOT DONE
 - "change the environment flag to a cargo feature flag LOL"

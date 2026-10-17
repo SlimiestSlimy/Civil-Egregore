@@ -10,7 +10,6 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 mod climate;
-pub mod diagnostics;
 mod layouts;
 mod registry;
 pub mod transient_data;

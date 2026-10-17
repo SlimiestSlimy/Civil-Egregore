@@ -4,7 +4,7 @@
 //!
 //! `cargo test`
 
-use crate::tests::*;
+use crate::areas::*;
 use utilities::rng::RandomSource;
 use pathfinding::{a_star, rows_hold, step_towards, Cell, Rows, Walls, Wave, AREA_SIDE};
 
@@ -88,6 +88,7 @@ fn reached_from(start_cell: Cell, walls: &Walls) -> Rows {
 /// round, so it is barred.
 #[test]
 fn walls_one_thick_in_any_direction_are_never_crossed() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     // Each case: the heights, and which side of the wall a cell is on (`None` on the ridge itself).
     type Height = fn(usize, usize) -> u8;
     type SideOfWall = fn(usize, usize) -> Option<bool>;
@@ -114,7 +115,7 @@ fn walls_one_thick_in_any_direction_are_never_crossed() {
             }
         }
         // A* and a walker find no way across, from either side.
-        let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+        let mut seeded_rng = RandomSource::new(seed);
         for _ in 0..200 {
             let draw_cell = |seeded_rng: &mut RandomSource| cell((seeded_rng.next_draw() % AREA_SIDE as u64) as u8, (seeded_rng.next_draw() % AREA_SIDE as u64) as u8);
             let (from_cell, to_cell) = (draw_cell(&mut seeded_rng), draw_cell(&mut seeded_rng));
@@ -151,6 +152,7 @@ fn walls_one_thick_in_any_direction_are_never_crossed() {
 /// the two no longer one length.
 #[test]
 fn a_wall_of_one_way_bars_the_step_back_alone() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     // High ground west of column 8: no step west out of column 8, all the way down.
     let mut west_walls = [0; AREA_SIDE];
     west_walls.iter_mut().for_each(|west_row| *west_row = 1 << 8);
@@ -169,7 +171,7 @@ fn a_wall_of_one_way_bars_the_step_back_alone() {
         assert!(drop.bars_step(cell(8, 5), -1, dy) && !drop.bars_step(cell(7, 5), 1, dy), "by {dy} down");
     }
 
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let mut seeded_rng = RandomSource::new(seed);
     let (mut paths_found, mut unlike_lengths) = (0, 0);
     for _ in 0..200 {
         let walls = one_way_walls_drawn(&mut seeded_rng);

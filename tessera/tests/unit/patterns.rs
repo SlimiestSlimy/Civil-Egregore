@@ -3,7 +3,7 @@
 
 use crate::patterns::{homogeneous_value_of, PatternPyramid};
 use crate::corpus::checkerboards::one_checkerboard;
-use crate::corpus::{one_grown, seed_uncounted};
+use crate::corpus::one_grown;
 use crate::tile::{copy_offset, Tile, COPY_DIRECTIONS, FLOOR_LEVEL};
 use bitmap::Bitmap;
 
@@ -15,7 +15,7 @@ fn cells(bitmap: &Bitmap, tile: Tile) -> Vec<bool> {
 
 /// A ragged bitmap and an odd checkerboard: the cases every test here runs on.
 fn bitmaps() -> [Bitmap; 2] {
-    [one_grown(seed_uncounted(), 0.20, 0.70), one_checkerboard(3)]
+    [one_grown(utilities::seed::given_or_fresh_seed(None), 0.20, 0.70), one_checkerboard(3)]
 }
 
 /// With the top-left quarter filled, that quarter is homogeneous and set,

@@ -11,13 +11,12 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod commands;
-pub mod diagnostics;
 pub mod halos;
 pub mod host;
+pub mod params;
 pub mod rules;
 mod tick;
 mod world_access;
-pub mod transient_data;
 mod world_hash;
 mod world_start;
 
@@ -61,6 +60,13 @@ pub struct SaveWritten {
 /// they are paged to disk (`docs/server.md`, "The cold pool paged").
 pub const COLD_POOL_BYTES_KEPT: u64 = 2 << 30;
 
+/// Where running worlds page their cold pools' images, a folder each,
+/// gone with its world (`chunk_storage`'s docs, "Paged to disk"): in
+/// Civil Egregore's folder on the machine, never the workspace's.
+pub fn paging_folder() -> std::path::PathBuf {
+    utilities::settings::folder().join("paging")
+}
+
 /// A world: its superchunks hot about the entities that keep a halo,
 /// the rest cold.
 pub struct World {
@@ -97,7 +103,7 @@ impl World {
         world_simulation.keep_entities_in(COLLISION);
         let hot = hot_of(&world_info);
         let mut chunk_storage = ChunkStorage::new(1 << 16);
-        chunk_storage.page_under(transient_data::paging_folder(), COLD_POOL_BYTES_KEPT);
+        chunk_storage.page_under(paging_folder(), COLD_POOL_BYTES_KEPT);
         Self {
             world_info,
             world_generation,
@@ -137,6 +143,21 @@ impl World {
         let stood_on: Vec<Write> = entities_between.cells_put().iter().map(|&put_cell| Write::cell(put_cell, WriteOp::SetCell)).collect();
         self.write_cells(COLLISION, stood_on);
     }
+}
+
+/// Runs what `clean_parameters` ask for: the server's one way in from
+/// a command line, whichever command is nested in them.
+pub fn start(clean_parameters: &protocol::server_parameters::CleanServerParameters) -> Result<String, String> {
+    if let Some(new_parameters) = clean_parameters.nested(params::NEW) {
+        return commands::new(utilities::seed::given_or_fresh_seed(clean_parameters.hex(params::SEED)), new_parameters);
+    }
+    if let Some(run_parameters) = clean_parameters.nested(params::RUN) {
+        return commands::run_saved_world(run_parameters);
+    }
+    if let Some(info_parameters) = clean_parameters.nested(params::INFO) {
+        return commands::describe_saved_world(info_parameters);
+    }
+    Err("no command given: --help says them".to_string())
 }
 
 /// A world as `options` say: generated, its sheep put on and their

@@ -44,7 +44,8 @@ fn count_entries(folder: &std::path::Path) -> usize {
 /// gone with it.
 #[test]
 fn images_past_what_is_kept_go_to_disk_and_read_back_the_same() {
-    let mut seeded_random = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut seeded_random = RandomSource::new(seed);
     let (paging_root, save, other_save) = (folder("paging_root"), folder("paging_save"), folder("paging_other"));
     let images = images_drawn(&mut seeded_random, 12);
     let image_bytes = std::mem::size_of_val(images[0].1.words()) as u64;
@@ -112,7 +113,8 @@ fn images_past_what_is_kept_go_to_disk_and_read_back_the_same() {
 /// there is left, and reads back.
 #[test]
 fn a_paging_folder_left_behind_is_removed_and_one_in_use_is_left() {
-    let mut seeded_random = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut seeded_random = RandomSource::new(seed);
     let paging_root = folder("paging_left_behind");
     let images = images_drawn(&mut seeded_random, 2);
     let paged = |image: &(SuperchunkIndex, SuperchunkImage)| {

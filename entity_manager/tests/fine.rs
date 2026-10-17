@@ -6,6 +6,9 @@
 //!
 //! `cargo test --test fine`
 
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::saved::{decode_state, encode_state};
 use entity_manager::{default_kept, may_be_given, WholeAttribute, find_attribute, push_attribute, is_attribute_list, Attribute, AttributeBlock, AttributeType, WorldEntities, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER_WAKES};
@@ -168,8 +171,9 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
 /// the same.
 #[test]
 fn attributes_edited_in_any_order_are_those_last_set() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     use std::collections::BTreeMap;
-    let mut seeded_rng = utilities::rng::RandomSource::new(utilities::seed::counted_seed());
+    let mut seeded_rng = utilities::rng::RandomSource::new(seed);
     let mut world_entities = world();
     let target_header = walker_header(cell(seeded_rng.draw_below(1024) as u32, seeded_rng.draw_below(1024) as u32));
     world_entities.queue_put(target_header, &[]);
@@ -275,6 +279,7 @@ fn an_entity_is_named_by_the_cell_the_tick_found_it_on() {
 /// attributes about them and the edits are drawn from the seed.
 #[test]
 fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     use type_registry::{SheepState, SHEEP, SHEEP_STATE};
     use utilities::rng::RandomSource;
     /// An attribute sorting before the sheep's state, and one after.
@@ -282,7 +287,7 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
     let kept_default = default_kept(SHEEP).expect("registered with one");
     assert_eq!((kept_default.attribute_type, kept_default.words, kept_default.block_count), (SHEEP_STATE.attribute_type(), SheepState::WORDS, SheepState::WORDS.div_ceil(BLOCK_WORDS)));
     assert_eq!(default_kept(WALKER_TYPE), None);
-    let mut seeded_rng = RandomSource::new(utilities::seed::counted_seed());
+    let mut seeded_rng = RandomSource::new(seed);
     let draw_state = |seeded_rng: &mut RandomSource| SheepState { hungry_at: seeded_rng.next_draw(), lamb_due_at: seeded_rng.next_draw(), grown_at: seeded_rng.next_draw(), roaming_until: seeded_rng.next_draw(), roaming_neighbour: seeded_rng.next_draw() as u32 };
     for round_number in 0..200 {
         let mut world_entities = world();

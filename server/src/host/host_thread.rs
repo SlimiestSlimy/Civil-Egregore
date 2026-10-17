@@ -2,14 +2,11 @@
 //! ticks, frames answered.
 
 use crate::{WorldStart, World};
-use super::{CATCH_UP, CENSUS_EVERY, FRAMES_SHARE, HostRequest, TARGET_PACE, census};
-use super::frame::{self, FrameAsk, Cells, ViewportFrame, copy_superchunk, count, frame_of, hot_in};
+use super::{CATCH_UP, FRAMES_SHARE, HostRequest, TARGET_PACE};
+use super::frame::{self, FrameAsk, Cells, ViewportFrame, copy_superchunk, frame_of, hot_in};
 use super::terrain::TerrainRequest;
-use type_registry::GRASS;
 use std::thread;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufWriter, Write};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -25,17 +22,12 @@ struct RunningWorld {
     /// The superchunks whose heights a frame has carried, each with its
     /// water as drawn.
     heights_sent: HashMap<coordinates::SuperchunkIndex, Arc<frame::Water>>,
-    /// When it began to run.
-    began_running: Instant,
-    /// Its census, if one could be kept.
-    census: Option<BufWriter<File>>,
 }
 
 impl RunningWorld {
     /// `world`, started from `world_start`, starting to run.
     fn from_start(world_start: WorldStart, world: World) -> Self {
-        let census = census(world.world_info.seed);
-        Self { world, world_start, heights_sent: HashMap::new(), began_running: Instant::now(), census }
+        Self { world, world_start, heights_sent: HashMap::new() }
     }
 }
 
@@ -250,20 +242,12 @@ impl HostThread {
         Some(time_to_spare.max(self.tick_took.mul_f64(FRAMES_SHARE)))
     }
 
-    /// A tick of the world run, its census written when due, and a wait
+    /// A tick of the world run, and a wait
     /// for the next one's time at the pace asked.
     fn tick(&mut self) {
         let Some(running_world) = &mut self.running_world else {
             return;
         };
-        let tick = running_world.world.entity_store.current_tick();
-        if tick.is_multiple_of(CENSUS_EVERY)
-            && let Some(census_file) = &mut running_world.census
-        {
-            // A line lost is a line lost: the run goes on. The pace it is held to, 0 flat out: only flat out do the seconds say what a tick costs.
-            let (seconds, sheep, grass) = (running_world.began_running.elapsed().as_secs_f64(), running_world.world.entity_store.len(), count(&running_world.world, GRASS));
-            _ = writeln!(census_file, "{tick},{seconds:.3},{},{sheep},{grass}", self.pace_held_to.unwrap_or(0)).and_then(|()| census_file.flush());
-        }
         let tick_began = Instant::now();
         running_world.world.tick();
         self.tick_took = tick_began.elapsed();

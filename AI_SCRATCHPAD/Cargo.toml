@@ -17,3 +17,4 @@ actions = { path = "../actions" }
 simulation = { path = "../simulation" }
 bitplane_manager = { path = "../bitplane_manager" }
 entity_manager = { path = "../entity_manager" }
+protocol = { path = "../protocol/protocol" }

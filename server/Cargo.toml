@@ -14,10 +14,6 @@ simulation = { path = "../simulation" }
 actions = { path = "../actions" }
 coordinates = { path = "../coordinates" }
 utilities = { path = "../utilities" }
+protocol = { path = "../protocol/protocol" }
 bitplane_manager = { path = "../bitplane_manager" }
 chunk_storage = { path = "../chunk_storage" }
-
-# What the tiers' tests share (`tests/tests.rs`): no test program of its own.
-[[test]]
-name = "tests"
-test = false

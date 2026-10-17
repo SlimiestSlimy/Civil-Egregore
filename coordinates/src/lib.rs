@@ -10,7 +10,6 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-pub mod diagnostics;
 pub mod transient_data;
 
 /// Cells along a chunk's side: a chunk's layers are bitmaps, and a

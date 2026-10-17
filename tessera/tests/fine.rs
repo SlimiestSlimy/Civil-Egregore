@@ -11,18 +11,13 @@ mod tests;
 
 use bitmap::Bitmap;
 use tests::check_bitmap;
-use tessera::diagnostics::examination::tree_of;
-use tessera::diagnostics::tree_stats::TreeStats;
+use tests::examination::tree_of;
+use tests::saved::every_saved;
+use tests::tree_stats::TreeStats;
 use tessera::encode_bitmap;
-use tessera::corpus::{one_grown, one_laid_out, seed_uncounted, CITY_PLANS};
+use tessera::corpus::{one_grown, one_laid_out, CITY_PLANS};
 use tessera::tile::{Tile, CELL_LEVEL, FLOOR_LEVEL};
 use tessera::tree::Node;
-
-/// The seed for the grown and laid-out cases here: every other run's,
-/// not counted as a use.
-fn seed() -> u64 {
-    seed_uncounted()
-}
 
 /// The tile at `tile_level` holding the cell `cell`.
 fn ancestor_tile(cell: Tile, tile_level: u8) -> Tile {
@@ -82,18 +77,13 @@ fn all_set_is_one_tile_in_eight_bits() {
     check_bitmap(&bitmap, "all set");
 }
 
-/// Every adversarial worst bitmap -- the worst bitmap found so far against
-/// the raw cells and against each other codec -- and every saved
-/// adversarial bitmap passes every check: each is a hard case, kept for
-/// working on Tessera against. The worst bitmaps are what the searches leave
-/// behind, out of git: a fresh checkout has none, and checks the saved
-/// ones alone.
+/// Every saved adversarial bitmap passes every check: each is a hard
+/// case, kept for working on Tessera against.
 #[test]
 fn adversarial_bitmaps_pass_every_check() {
-    use tessera::diagnostics::adversarial::worst;
-    let (worst_bitmaps, saved_bitmaps) = (worst::every_worst(), worst::every_saved());
-    assert!(!saved_bitmaps.is_empty(), "no saved adversarial bitmaps in external_benchmarks/adversarial/saved");
-    for (bitmap_name, bitmap) in worst_bitmaps.into_iter().chain(saved_bitmaps) {
+    let saved_bitmaps = every_saved();
+    assert!(!saved_bitmaps.is_empty(), "no saved adversarial bitmaps in tests/saved");
+    for (bitmap_name, bitmap) in saved_bitmaps {
         check_bitmap(&bitmap, &bitmap_name);
     }
 }
@@ -126,7 +116,7 @@ fn rectangles_and_circles_round_trip() {
 /// A regular city forms complex tiles, and passes every check.
 #[test]
 fn one_city_round_trips_with_complex_tiles() {
-    let bitmap = one_laid_out(seed(), &CITY_PLANS[0]);
+    let bitmap = one_laid_out(tests::fresh_test_seed(), &CITY_PLANS[0]);
     assert!(TreeStats::measure_tree(&tree_of(&bitmap)).complex_tiles > 0, "a city this regular forms complex tiles");
     check_bitmap(&bitmap, "one city");
 }
@@ -134,7 +124,7 @@ fn one_city_round_trips_with_complex_tiles() {
 /// A middling, ragged bitmap passes every check.
 #[test]
 fn one_ragged_bitmap_round_trips() {
-    check_bitmap(&one_grown(seed(), 0.20, 0.70), "one middling ragged bitmap");
+    check_bitmap(&one_grown(tests::fresh_test_seed(), 0.20, 0.70), "one middling ragged bitmap");
 }
 
 /// A complex tile says every cell under it: where one square of a regular area holds

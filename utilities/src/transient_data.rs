@@ -2,7 +2,6 @@
 //! and kept out of git -- what its runs leave behind
 //! (`docs/utilities.md`, "Transient data").
 
-use crate::diagnostics::table::report::Report;
 use std::path::{Path, PathBuf};
 
 /// The folder's name, in every crate.
@@ -25,17 +24,6 @@ impl TransientData {
     /// `relative_path`, under the crate's `transient_data/`.
     pub fn path_under(self, relative_path: &str) -> PathBuf {
         Path::new(self.crate_folder).join(FOLDER).join(relative_path)
-    }
-
-    /// Where the crate's measurements are kept.
-    pub fn measurements_folder(self) -> PathBuf {
-        self.path_under("measurements")
-    }
-
-    /// Publishes `report` in [`TransientData::measurements_folder`]: printed,
-    /// and kept in its file.
-    pub fn publish_report(self, report: Report) {
-        report.print_and_keep(&self.measurements_folder());
     }
 }
 

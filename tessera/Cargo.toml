@@ -4,6 +4,10 @@ version = "1.0.0"
 edition = "2024"
 description = "A lossless encoding of a 256x256 bitmap"
 
+# A project of its own, apart from Civil Egregore's workspace: its tests
+# run here alone, `cargo test` in this folder.
+[workspace]
+
 [dependencies]
 bitmap = { path = "../bitmap" }
 utilities = { path = "../utilities" }
@@ -12,3 +16,6 @@ utilities = { path = "../utilities" }
 [[test]]
 name = "tests"
 test = false
+
+[profile.release]
+debug = "line-tables-only"

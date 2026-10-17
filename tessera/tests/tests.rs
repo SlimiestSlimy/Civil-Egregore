@@ -1,16 +1,28 @@
 //! What the tiers' tests share: no test program of its own
 //! (`Cargo.toml`), a module of each tier that uses it. What every tier
-//! checks of a bitmap -- judgements on what `tessera::diagnostics`
-//! gathers -- and that turned bitmaps take about as many bits.
+//! checks of a bitmap, and that turned bitmaps take about as many bits;
+//! a bitmap's examination, its tree's counts, and the saved bitmaps.
 
 // A tier uses what it needs of it.
 #![allow(dead_code)]
 
 use bitmap::Bitmap;
 use std::cell::RefCell;
-use tessera::diagnostics::RAW_CELLS;
-use tessera::diagnostics::examination::BitmapExamination;
+use examination::BitmapExamination;
 use tessera::{BitStream, Tessera};
+
+pub mod examination;
+pub mod saved;
+pub mod tree_stats;
+
+/// The raw cells: what a bitmap costs written out, one bit a cell.
+pub const RAW_CELLS: usize = bitmap::WIDTH * bitmap::HEIGHT;
+
+/// A seed drawn fresh for a test, said on standard error: a failing
+/// test's output says it.
+pub fn fresh_test_seed() -> u64 {
+    utilities::seed::given_or_fresh_seed(None)
+}
 
 /// The most Tessera may ever spend on a bitmap: the raw cells and 1%.
 pub const CAP_BITS: usize = RAW_CELLS + RAW_CELLS / 100;

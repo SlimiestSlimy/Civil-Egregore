@@ -8,9 +8,23 @@ repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 
 [dependencies]
 renderer = { path = "renderer", optional = true }
+protocol = { path = "protocol/protocol" }
 server = { path = "server" }
-tessera = { path = "tessera" }
 utilities = { path = "utilities" }
+
+# What the root's tests (`tests/fine`, `tests/fast`, `tests/complete`) reach into.
+[dev-dependencies]
+actions = { path = "actions" }
+bitplane_manager = { path = "bitplane_manager" }
+chunk_storage = { path = "chunk_storage" }
+coordinates = { path = "coordinates" }
+entity_manager = { path = "entity_manager" }
+entity_rules = { path = "entity_rules" }
+pathfinding = { path = "pathfinding" }
+sca_rules = { path = "sca_rules" }
+simulation = { path = "simulation" }
+type_registry = { path = "type_registry" }
+worldgen = { path = "worldgen" }
 
 [features]
 # `--features force_default_settings`: run on the built-in defaults
@@ -26,6 +40,7 @@ default = ["renderer"]
 # against never enter this build.
 [workspace]
 members = [
+    "protocol/protocol",
     "bitmap",
     "bitplane_manager",
     "chunk_storage",
@@ -39,7 +54,6 @@ members = [
     "sca_rules",
     "simulation",
     "worldgen",
-    "tessera",
     "type_registry",
     "utilities",
     "renderer",
@@ -49,6 +63,7 @@ members = [
 
 default-members = [
     ".",
+    "protocol/protocol",
     "bitmap",
     "bitplane_manager",
     "chunk_storage",
@@ -58,12 +73,12 @@ default-members = [
     "sca_rules",
     "simulation",
     "worldgen",
-    "tessera",
     "type_registry",
     "utilities",
     "server",
 ]
-exclude = ["tessera/external_benchmarks"]
+# Tessera is a project of its own, with its own workspace and tests.
+exclude = ["diagnostics", "tessera"]
 
 # Lines kept for the profilers -- perf, callgrind -- which say nothing
 # useful without them; they cost no speed.

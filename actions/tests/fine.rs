@@ -3,7 +3,11 @@
 //!
 //! `cargo test --test fine`
 
-mod tests;
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
+#[path = "shared/arenas.rs"]
+mod arenas;
 
 mod entities {
     //! What an entity comes to, and the cells beside it: one changed is
@@ -12,7 +16,7 @@ mod entities {
     //!
     //! `cargo test --test fine`
 
-    use crate::tests::{cell, walker_header, world, STONE_LAYER};
+    use crate::arenas::{cell, walker_header, world, STONE_LAYER};
     use coordinates::CellIndex;
     use entity_manager::{Attribute, AttributeBlock, NEVER_WAKES};
     use actions::around;
@@ -29,12 +33,13 @@ mod entities {
     /// moved the same -- never put whole.
     #[test]
     fn an_entity_is_written_only_the_attributes_changed() {
+        let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
         let (mut bitmap_arena, mut entity_store) = world(1);
         entity_store.queue_put(walker_header(cell(40, 30), 0), &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
         entity_store.queue_put(walker_header(cell(40, 40), 0), &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
         entity_store.apply();
         let mut test_simulation = Simulation::new(1);
-        let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, utilities::seed::counted_seed(), |turn: &mut Turn| {
+        let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
             for entity in turn.woken_entities() {
                 // The first is left as it was; the second walker's name is changed.
                 if entity.header.stood_cell == cell(40, 40) {
@@ -54,13 +59,14 @@ mod entities {
     /// each, and one drawn among those chosen.
     #[test]
     fn the_cells_beside_an_entity_are_asked_as_sets() {
+        let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
         let (mut bitmap_arena, mut entity_store) = world(1);
         let walker_cell = cell(40, 30);
         entity_store.queue_put(walker_header(walker_cell, 0), &[]);
         entity_store.apply();
         let seen_by_rule = Mutex::new(Vec::new());
         let mut test_simulation = Simulation::new(1);
-        test_simulation.tick(&mut bitmap_arena, &mut entity_store, utilities::seed::counted_seed(), |turn: &mut Turn| {
+        test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn: &mut Turn| {
             for entity in turn.woken_entities() {
                 let woken_cell = entity.header.stood_cell;
                 let about_tiles = around::tiles_about_cell(woken_cell);

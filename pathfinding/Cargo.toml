@@ -5,8 +5,3 @@ description = "Civil Egregore's pathfinding: A* over an area of 16x16 cells kept
 
 [dependencies]
 utilities = { path = "../utilities" }
-
-# What the tiers' tests share (`tests/tests.rs`): no test program of its own.
-[[test]]
-name = "tests"
-test = false

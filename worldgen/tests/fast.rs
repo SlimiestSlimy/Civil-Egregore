@@ -3,7 +3,11 @@
 //!
 //! `cargo test --test fast`
 
-mod tests;
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
+#[path = "shared/terrain_cells.rs"]
+mod terrain_cells;
 
 mod terrain {
     //! Terrain: heights settled by the seed and the cell alone, seamless
@@ -12,16 +16,9 @@ mod terrain {
     //!
     //! `cargo test`
 
-    use crate::tests::{height_at, keeps_wall_cartesian};
+    use crate::terrain_cells::{height_at, keeps_wall_cartesian};
     use coordinates::{CellCartesian, SuperchunkIndex, WORLD_MIDDLE};
     use worldgen::{height_shaped, wall, LandShape, Terrain, DROP, STEP, WALLS};
-
-    /// The seed the run's tests grow their ground from: the crate's,
-    /// rolled every few runs (`utilities::seed`), so that nothing passes on
-    /// one seed alone.
-    fn seed() -> u64 {
-        utilities::seed::counted_seed()
-    }
 
     /// A superchunk anywhere in the world but its last row and column,
     /// drawn from the run's seed.
@@ -40,16 +37,17 @@ mod terrain {
     /// superchunk's heights are the world's, whichever superchunk is made.
     #[test]
     fn heights_are_settled_by_the_seed_and_the_cell() {
-        let mut seeded_rng = utilities::rng::RandomSource::new(seed());
+        let seed = crate::test_seed::TestSeedHandle::open().seed();
+        let mut seeded_rng = utilities::rng::RandomSource::new(seed);
         let superchunk = superchunk_drawn(&mut seeded_rng);
         let CellCartesian { x: superchunk_left, y: superchunk_top } = superchunk.top_left().cartesian();
-        let [first_terrain, again_terrain, other_terrain] = [seed(), seed(), seed() + 1].map(|seed| Terrain::generate_shaped(&CLIFFS_SHAPE, seed, superchunk));
+        let [first_terrain, again_terrain, other_terrain] = [seed, seed, seed + 1].map(|seed| Terrain::generate_shaped(&CLIFFS_SHAPE, seed, superchunk));
         assert!(first_terrain.heights == again_terrain.heights);
         assert!(first_terrain.heights != other_terrain.heights);
         // Its corners, a chunk's border, and cells drawn.
         let drawn_cells: Vec<(u32, u32)> = (0..2_000).map(|_| (seeded_rng.draw_below(1024) as u32, seeded_rng.draw_below(1024) as u32)).collect();
         for (x, y) in [(0, 0), (1023, 1023), (1023, 0), (255, 256)].into_iter().chain(drawn_cells) {
-            assert_eq!(height_at(&first_terrain, x, y), height_shaped(&CLIFFS_SHAPE, seed(), superchunk_left + x, superchunk_top + y));
+            assert_eq!(height_at(&first_terrain, x, y), height_shaped(&CLIFFS_SHAPE, seed, superchunk_left + x, superchunk_top + y));
         }
     }
 
@@ -60,9 +58,10 @@ mod terrain {
     /// down and not back up.
     #[test]
     fn walls_are_where_heights_are_more_than_a_step_apart() {
+        let seed = crate::test_seed::TestSeedHandle::open().seed();
         let CellCartesian { x: superchunk_left, y: superchunk_top } = WORLD_MIDDLE.top_left().cartesian();
-        let terrain = Terrain::generate_shaped(&CLIFFS_SHAPE, seed(), WORLD_MIDDLE);
-        let height = |x, y| height_shaped(&CLIFFS_SHAPE, seed(), x, y);
+        let terrain = Terrain::generate_shaped(&CLIFFS_SHAPE, seed, WORLD_MIDDLE);
+        let height = |x, y| height_shaped(&CLIFFS_SHAPE, seed, x, y);
         for y in (0..1024).step_by(7).chain([1023]) {
             for x in (0..1024).step_by(5).chain([0, 1023]) {
                 for (way, &(_, (dx, dy))) in WALLS.iter().enumerate() {
@@ -83,7 +82,8 @@ mod terrain {
     /// step apart.
     #[test]
     fn broad_edges_have_no_walls() {
-        let terrain = Terrain::generate_shaped(&RAMPS_SHAPE, seed(), WORLD_MIDDLE);
+        let seed = crate::test_seed::TestSeedHandle::open().seed();
+        let terrain = Terrain::generate_shaped(&RAMPS_SHAPE, seed, WORLD_MIDDLE);
         assert_eq!(terrain.wall_counts(), [0; 4]);
         let heights: Vec<u16> = (0..1024).map(|x| height_at(&terrain, x, 500)).collect();
         assert!(heights.windows(2).all(|neighbour_pair| neighbour_pair[0].abs_diff(neighbour_pair[1]) <= 1), "a row: {heights:?}");
@@ -109,8 +109,9 @@ mod terrain {
     /// a line crossed or not -- a slope, never a break.
     #[test]
     fn the_mesh_is_ocean_or_land_joined_by_slopes() {
+        let seed = crate::test_seed::TestSeedHandle::open().seed();
         let ramps_shape = LandShape { vertex_spacing_power: 10, ..RAMPS_SHAPE };
-        let row_lands: Vec<u64> = (0..40_000).map(|x| worldgen::mesh::land_of_one_cell_cartesian(&ramps_shape, seed(), 2_000_000_000 + x, 2_000_000_000)).collect();
+        let row_lands: Vec<u64> = (0..40_000).map(|x| worldgen::mesh::land_of_one_cell_cartesian(&ramps_shape, seed, 2_000_000_000 + x, 2_000_000_000)).collect();
         assert!(row_lands.iter().all(|&land_height| (ramps_shape.ocean_floor..=ramps_shape.highest_land.max(ramps_shape.ocean + 1)).contains(&(land_height as u16))));
         assert!(row_lands.contains(&(ramps_shape.ocean_floor as u64)) && row_lands.iter().any(|&land_height| land_height > ramps_shape.ocean as u64), "ocean and land both");
         assert!(row_lands.windows(2).all(|neighbour_pair| neighbour_pair[0].abs_diff(neighbour_pair[1]) <= 10), "no break");
@@ -121,24 +122,25 @@ mod terrain {
     /// columns -- cliffs, finer meshes and all.
     #[test]
     fn heights_are_the_same_in_whatever_order_they_are_asked_for() {
+        let seed = crate::test_seed::TestSeedHandle::open().seed();
         use worldgen::mesh::WorldLand;
-        let mut seeded_rng = utilities::rng::RandomSource::new(seed());
+        let mut seeded_rng = utilities::rng::RandomSource::new(seed);
         // A lattice of cells from a corner drawn, a few cells apart: over many of the mesh's lines.
         let (side_cells, cells_apart) = (300u32, seeded_rng.draw_between(1, 12) as u32);
         let (lattice_left, lattice_top) = (seeded_rng.draw_below((1 << 32) - u64::from(side_cells * cells_apart)) as u32, seeded_rng.draw_below((1 << 32) - u64::from(side_cells * cells_apart)) as u32);
         let cells = || (0..side_cells * side_cells).map(|cell| (lattice_left + cell % side_cells * cells_apart, lattice_top + cell / side_cells * cells_apart));
-        let mut world_land = WorldLand::new(&CLIFFS_SHAPE, seed());
+        let mut world_land = WorldLand::new(&CLIFFS_SHAPE, seed);
         let forwards_heights: Vec<u16> = cells().map(|(x, y)| world_land.height(x, y)).collect();
-        let mut world_land = WorldLand::new(&CLIFFS_SHAPE, seed());
+        let mut world_land = WorldLand::new(&CLIFFS_SHAPE, seed);
         let mut backwards_heights: Vec<u16> = cells().collect::<Vec<_>>().into_iter().rev().map(|(x, y)| world_land.height(x, y)).collect();
         backwards_heights.reverse();
-        let mut world_land = WorldLand::new(&CLIFFS_SHAPE, seed());
+        let mut world_land = WorldLand::new(&CLIFFS_SHAPE, seed);
         let mut column_heights = vec![0; forwards_heights.len()];
         for cell in 0..side_cells * side_cells {
             let (cell_across, cell_down) = (cell / side_cells, cell % side_cells);
             column_heights[(cell_down * side_cells + cell_across) as usize] = world_land.height(lattice_left + cell_across * cells_apart, lattice_top + cell_down * cells_apart);
         }
-        let alone_heights: Vec<u16> = cells().map(|(x, y)| height_shaped(&CLIFFS_SHAPE, seed(), x, y)).collect();
+        let alone_heights: Vec<u16> = cells().map(|(x, y)| height_shaped(&CLIFFS_SHAPE, seed, x, y)).collect();
         assert!(forwards_heights == backwards_heights && forwards_heights == column_heights && forwards_heights == alone_heights);
     }
 
@@ -147,8 +149,8 @@ mod terrain {
     /// meshes, cliffs and all.
     #[test]
     fn superchunks_made_in_any_order_are_the_same() {
+        let seed = crate::test_seed::TestSeedHandle::open().seed();
         let test_shape = LandShape { vertex_spacing_power: 11, ocean_share: 0, narrowest_blend: 1 << 12, ..LandShape::DEFAULT };
-        let seed = seed();
         let superchunks_about: Vec<SuperchunkIndex> = (0..9).map(|about_index| WORLD_MIDDLE.at_cartesian_offset(about_index % 3 - 1, about_index / 3 - 1).expect("in the world")).collect();
         let make_terrain = |superchunk: SuperchunkIndex| Terrain::generate_shaped(&test_shape, seed, superchunk);
         let in_order: Vec<Terrain> = superchunks_about.iter().map(|&superchunk| make_terrain(superchunk)).collect();

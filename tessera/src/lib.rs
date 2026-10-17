@@ -36,9 +36,7 @@ pub mod tile;
 pub mod tree;
 
 // What measures and tests it.
-pub mod diagnostics;
 pub mod corpus;
-pub mod transient_data;
 
 #[cfg(test)]
 #[path = "../tests/unit/mod.rs"]

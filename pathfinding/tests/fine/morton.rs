@@ -28,7 +28,8 @@ fn rows_drawn(random: &mut RandomSource, one_in: u64) -> Rows {
 /// stepped, those past the tiles' edge gone.
 #[test]
 fn a_set_stepped_is_its_cells_stepped() {
-    let mut random = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut random = RandomSource::new(seed);
     for _ in 0..200 {
         let cells: Vec<(u32, u32)> = (0..40).map(|_| (random.draw_below(TILES_SIDE as u64) as u32, random.draw_below(TILES_SIDE as u64) as u32)).collect();
         let set = |cells: &mut dyn Iterator<Item = (i64, i64)>| {
@@ -52,7 +53,8 @@ fn a_set_stepped_is_its_cells_stepped() {
 /// step from which the goal is a step nearer.
 #[test]
 fn the_search_in_morton_order_is_the_search_over_rows() {
-    let mut random = RandomSource::new(utilities::seed::counted_seed());
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let mut random = RandomSource::new(seed);
     let (mut found, mut none) = (0, 0);
     for case in 0..3000 {
         let (passable, goals) = (rows_drawn(&mut random, 1 + case % 3).map(|row| !row), rows_drawn(&mut random, 20 + 30 * (case % 5)));

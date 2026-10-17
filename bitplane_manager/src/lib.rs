@@ -10,7 +10,6 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 mod arena;
-pub mod diagnostics;
 mod making_hot;
 mod superchunk_layer;
 mod reader;
@@ -18,6 +17,11 @@ mod superchunk;
 pub mod transient_data;
 mod write_back;
 mod writes;
+
+// Tests of what only the crate sees, kept with the other tests.
+#[cfg(test)]
+#[path = "../tests/unit/buckets.rs"]
+mod buckets_unit_tests;
 
 pub use arena::BitmapArena;
 pub use reader::aligned_tiles::{SmallTiles, SMALL_TILES_TOGETHER, SMALL_TILE_CELLS, SMALL_TILE_SIDE};

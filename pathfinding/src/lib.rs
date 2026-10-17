@@ -12,7 +12,6 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 mod a_star;
-pub mod diagnostics;
 pub mod morton;
 pub mod transient_data;
 mod walls;

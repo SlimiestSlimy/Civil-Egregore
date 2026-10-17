@@ -10,7 +10,6 @@
 
 mod bitmap_data;
 mod bitmap_drawing;
-pub mod diagnostics;
 pub mod morton;
 pub mod transient_data;
 pub mod window;

@@ -25,19 +25,19 @@ pub struct LineSet {
 }
 
 impl LineSet {
-    /// `count` bitmaps of this set, built one at a time.
-    pub fn take_bitmaps(&'static self, count: u64) -> LineDrawings {
-        LineDrawings { seed: super::corpus_seed(), bitmaps_left: count, line_set: self }
+    /// `count` bitmaps of this set grown from `seed`, built one at a time.
+    pub fn take_bitmaps(&'static self, seed: u64, count: u64) -> LineDrawings {
+        LineDrawings { seed, bitmaps_left: count, line_set: self }
     }
 
     /// As many as a timed run of this set should take.
-    pub fn timed_bitmaps(&'static self) -> LineDrawings {
-        self.take_bitmaps(self.timed_count)
+    pub fn timed_bitmaps(&'static self, seed: u64) -> LineDrawings {
+        self.take_bitmaps(seed, self.timed_count)
     }
 
     /// As many as a unit test of this set should take.
-    pub fn tested_bitmaps(&'static self) -> LineDrawings {
-        self.take_bitmaps(self.tested_count)
+    pub fn tested_bitmaps(&'static self, seed: u64) -> LineDrawings {
+        self.take_bitmaps(seed, self.tested_count)
     }
 }
 

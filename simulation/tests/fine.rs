@@ -1,27 +1,11 @@
-//! The fine tier: each test pins one behaviour, at the edges written by hand and at cases drawn from the run's seed -- instant.
+//! The fine tier: each test pins one behaviour of the simulation alone, at the edges written by hand and at cases drawn from the run's seed -- instant.
 //! The tiers: `docs/testing_protocol.md`, at the repository's root.
 //!
 //! `cargo test --test fine`
 
-mod tests;
-
-#[path = "fine/entities_waking.rs"]
-mod entities_waking;
-
-#[path = "fine/entities_moving.rs"]
-mod entities_moving;
-
-#[path = "fine/instructions.rs"]
-mod instructions;
-
-#[path = "fine/compare_and_write.rs"]
-mod compare_and_write;
+#[allow(dead_code)] // a shared file: each test program uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
 
 #[path = "fine/simulation_time.rs"]
 mod simulation_time;
-
-#[path = "fine/acts_over_a_border.rs"]
-mod acts_over_a_border;
-
-#[path = "fine/entity_over_a_border.rs"]
-mod entity_over_a_border;

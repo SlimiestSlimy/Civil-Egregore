@@ -12,6 +12,7 @@ dependencies = [
  "chunk_storage",
  "coordinates",
  "entity_manager",
+ "protocol",
  "server",
  "simulation",
  "type_registry",
@@ -23,10 +24,21 @@ dependencies = [
 name = "Civil_Egregore"
 version = "0.6.0"
 dependencies = [
+ "actions",
+ "bitplane_manager",
+ "chunk_storage",
+ "coordinates",
+ "entity_manager",
+ "entity_rules",
+ "pathfinding",
+ "protocol",
  "renderer",
+ "sca_rules",
  "server",
- "tessera",
+ "simulation",
+ "type_registry",
  "utilities",
+ "worldgen",
 ]
 
 [[package]]
@@ -2362,15 +2374,6 @@ name = "entity_rules"
 version = "0.0.0"
 dependencies = [
  "actions",
- "bitplane_manager",
- "chunk_storage",
- "coordinates",
- "entity_manager",
- "server",
- "simulation",
- "type_registry",
- "utilities",
- "worldgen",
 ]
 
 [[package]]
@@ -4061,6 +4064,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
+name = "protocol"
+version = "0.0.0"
+dependencies = [
+ "utilities",
+]
+
+[[package]]
 name = "pxfm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4327,15 +4337,6 @@ name = "sca_rules"
 version = "0.0.0"
 dependencies = [
  "actions",
- "bitplane_manager",
- "chunk_storage",
- "coordinates",
- "entity_manager",
- "server",
- "simulation",
- "type_registry",
- "utilities",
- "worldgen",
 ]
 
 [[package]]
@@ -4416,6 +4417,7 @@ dependencies = [
  "coordinates",
  "entity_manager",
  "entity_rules",
+ "protocol",
  "sca_rules",
  "simulation",
  "type_registry",
@@ -4464,7 +4466,6 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 name = "simulation"
 version = "0.0.0"
 dependencies = [
- "actions",
  "bitmap",
  "bitplane_manager",
  "chunk_storage",

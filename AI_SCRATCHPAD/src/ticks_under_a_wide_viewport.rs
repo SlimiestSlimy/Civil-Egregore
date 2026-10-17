@@ -10,20 +10,20 @@ use server::host::Host;
 use server::WorldStart;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
-use utilities::commands::GivenCommand;
+use crate::ProbeParameters;
 use utilities::tuning::{default_tuning, CAMERA_LOADS, SHEEP_PER_SUPERCHUNK, WORLD_SIDE};
 
 /// Sheep each superchunk generated in the viewport is given.
-pub const SHEEP_A_SUPERCHUNK: &str = "sheep a superchunk";
+pub const SHEEP_A_SUPERCHUNK: &str = "sheep";
 
 /// Superchunks along the side of the viewport asked for.
-pub const VIEWPORT_SIDE: &str = "viewport side";
+pub const VIEWPORT_SIDE: &str = "viewport_side";
 
 /// Seconds each part is measured over.
 pub const SECONDS_MEASURED: &str = "seconds";
 
 /// Superchunks a frame carries at most.
-pub const SUPERCHUNKS_A_FRAME: &str = "superchunks a frame";
+pub const SUPERCHUNKS_A_FRAME: &str = "superchunks_a_frame";
 
 /// Ticks a second the world is held to: 0, flat out.
 pub const PACE_TICKS_A_SECOND: &str = "pace";
@@ -45,7 +45,7 @@ fn ask_one_frame(host: &Host, frame_receiver: &Receiver<ViewportFrame>, viewport
 
 /// Runs the probe: a line for the ticks with no frame asked, a line for
 /// those with frames asked.
-pub fn run_probe(given_parameters: &GivenCommand) -> Result<(), String> {
+pub fn run_probe(given_parameters: &ProbeParameters) -> Result<(), String> {
     let (sheep_a_superchunk, viewport_side, seconds_measured, most_superchunks, pace_ticks_a_second): (f32, u32, f64, u32, u32) = (given_parameters.argument_number(SHEEP_A_SUPERCHUNK)?, given_parameters.argument_number(VIEWPORT_SIDE)?, given_parameters.argument_number(SECONDS_MEASURED)?, given_parameters.argument_number(SUPERCHUNKS_A_FRAME)?, given_parameters.argument_number(PACE_TICKS_A_SECOND)?);
     let mut tuning = default_tuning();
     (tuning[WORLD_SIDE], tuning[CAMERA_LOADS], tuning[SHEEP_PER_SUPERCHUNK]) = (0.0, 1.0, sheep_a_superchunk);

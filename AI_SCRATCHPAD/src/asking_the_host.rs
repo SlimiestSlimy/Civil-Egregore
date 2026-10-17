@@ -5,7 +5,7 @@ use server::host::frame::{FrameAsk, ViewportFrame, Viewport};
 use server::host::Host;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
-use utilities::commands::GivenCommand;
+use crate::ProbeParameters;
 
 /// How long a probe waits between two frames asked.
 const BETWEEN_FRAMES: Duration = Duration::from_millis(20);
@@ -17,9 +17,9 @@ const FRAMES_ASKED_AT_MOST: u32 = 30_000;
 const ANSWER_WAITED_AT_MOST: Duration = Duration::from_secs(1800);
 
 /// The seed `given_parameters` names, in hex: none if it is 0, a seed then drawn.
-pub fn seed(given_parameters: &GivenCommand) -> Result<Option<u64>, String> {
+pub fn seed(given_parameters: &ProbeParameters) -> Result<Option<u64>, String> {
     let seed_text = given_parameters.argument_text(crate::SEED)?;
-    let seed = utilities::seed::of_hex(seed_text).ok_or_else(|| format!("`{seed_text}` is no seed in hex"))?;
+    let seed = utilities::seed::of_hex(&seed_text).ok_or_else(|| format!("`{seed_text}` is no seed in hex"))?;
     Ok((seed != 0).then_some(seed))
 }
 

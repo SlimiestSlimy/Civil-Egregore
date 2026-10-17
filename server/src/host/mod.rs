@@ -7,17 +7,12 @@ mod host_thread;
 use host_thread::HostThread;
 
 pub mod frame;
-pub mod shown;
 pub mod terrain;
-mod wire;
 
 use crate::WorldStart;
 use utilities::tuning::Tuning;
 use worldgen::WorldGeneration;
 use frame::{FrameAsk, ViewportFrame};
-use std::fs::{create_dir_all, File};
-use std::io::{BufWriter, Write};
-use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::Duration;
@@ -25,9 +20,6 @@ use std::time::Duration;
 /// Ticks a second a world is held to unless told otherwise: the
 /// game's target, a second of the simulation in a second.
 pub const TARGET_PACE: u32 = simulation::simulation_time::TICKS_A_SIMULATION_SECOND as u32;
-
-/// Ticks from one line of the census to the next.
-pub const CENSUS_EVERY: u64 = 1000;
 
 /// The share of a tick's time the host gives to copying a frame's
 /// superchunks before the next tick, when it has no time to spare: a
@@ -62,25 +54,6 @@ enum HostRequest {
     /// Make the world run again from its start, generated as this says:
     /// of many read between two ticks, the last alone.
     Reset(Box<WorldGeneration>),
-}
-
-/// Where the census of a run is kept: the flock and the grass every
-/// [`CENSUS_EVERY`] ticks, written as the run goes, so a run closed at
-/// any time leaves what it came to.
-pub fn census_path() -> PathBuf {
-    crate::transient_data::TRANSIENT_DATA.measurements_folder().join("census.csv")
-}
-
-/// Starts the census afresh for a world of `seed`: its file, with what
-/// was run and the columns' names. `None`, and no census kept, if it
-/// cannot be made.
-fn census(seed: u64) -> Option<BufWriter<File>> {
-    let path = census_path();
-    create_dir_all(path.parent()?).ok()?;
-    let mut census_file = BufWriter::new(File::create(path).ok()?);
-    writeln!(census_file, "# seed {}", utilities::seed::seed_as_hex(seed)).ok()?;
-    writeln!(census_file, "tick,seconds,pace,sheep,grass").ok()?;
-    Some(census_file)
 }
 
 /// The host, as a client holds it: each call sent to the host's thread,

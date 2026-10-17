@@ -260,7 +260,7 @@ mod tests {
     #[test]
     fn shadows_are_the_same_from_both_sides_of_an_edge() {
         use server::host::frame::FrameAsk;
-        let world_start = server::WorldStart { seed: server::seed_with_land(utilities::seed::counted_seed(), &server::WorldGeneration::DEFAULT), sheep_per_flock: 1, ..server::WorldStart::default() };
+        let world_start = server::WorldStart { seed: server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT), sheep_per_flock: 1, ..server::WorldStart::default() };
         let (host, frame_receiver) = server::host::Host::start_on_thread();
         assert!(host.set_paused(true) && host.make_world(world_start) && host.ask_frame(FrameAsk { viewport: None, pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: 0, seen_near: None }));
         let first_frame = frame_receiver.recv_timeout(std::time::Duration::from_secs(1800)).expect("a frame of the world made");

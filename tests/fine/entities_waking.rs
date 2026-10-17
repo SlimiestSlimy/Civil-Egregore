@@ -1,0 +1,160 @@
+//! Entities ticked: woken at their tick and no other, in Morton order;
+//! attributes added and removed at run time; changes queued outside a
+//! tick; and the same on any number of threads.
+//!
+//! `cargo test`
+
+use crate::arenas::*;
+use crate::walkers::*;
+use coordinates::{SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use entity_manager::{AttributeBlock, Header, WHEEL_TICKS};
+use simulation::{Simulation, Turn};
+use std::sync::Mutex;
+
+/// Attributes added and removed every tick, by hundreds of entities in
+/// one chunk -- so the old runs pile up as garbage and are swept -- come
+/// out right.
+#[test]
+fn attributes_come_and_go_at_run_time() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let (mut bitmap_arena, mut entity_store) = world(1);
+    for walker_cell in cells_drawn(seed, 300, 1024) {
+        entity_store.queue_put(walker_header(walker_cell, 0), &[]);
+    }
+    assert_eq!(entity_store.queued_count(), 300);
+    assert_eq!(entity_store.apply().puts, 300);
+    assert_eq!((entity_store.len(), entity_store.queued_count()), (300, 0));
+    let mut world_simulation = Simulation::new(1);
+    for _ in 1..=101u64 {
+        let report = world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, count_and_flip);
+        assert_eq!((report.rules, report.instructions_applied.wakes), (300, 300));
+    }
+    assert_eq!(entity_store.len(), 300);
+    for entity in entity_store.iter() {
+        assert_eq!(entity.attribute(WOKEN_COUNT), Some(101));
+        assert_eq!(entity.attribute(ODD_WAKE), Some(1), "flipped 101 times");
+        assert_eq!(entity.attributes.len(), 2);
+    }
+}
+
+/// An entity wakes at its tick and no other: one in reach of the wheel,
+/// one past it, and none once removed.
+#[test]
+fn entities_wake_at_their_tick() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let (mut bitmap_arena, mut entity_store) = world(1);
+    let far_wake = 2 * WHEEL_TICKS + 300;
+    let (first_cell, far_cell, removed_cell) = (cell(3, 3), cell(900, 900), cell(10, 10));
+    entity_store.queue_put(walker_header(first_cell, 5), &[]);
+    entity_store.queue_put(walker_header(far_cell, far_wake), &[]);
+    entity_store.queue_put(walker_header(removed_cell, 7), &[]);
+    entity_store.apply();
+    let woken_log = Mutex::new(Vec::new());
+    let mut world_simulation = Simulation::new(1);
+    for _ in 0..=far_wake + 10 {
+        world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |turn| {
+            for entity in turn.woken_entities() {
+                woken_log.lock().unwrap().push((entity.header.stood_cell, turn.current_tick()));
+                if entity.header.stood_cell == removed_cell {
+                    actions::entities::remove(turn, &entity.header);
+                } else if entity.header.stood_cell == first_cell && turn.current_tick() == 5 {
+                    actions::entities::step(turn, &entity.header, first_cell, 40);
+                }
+            }
+            0
+        });
+    }
+    assert_eq!(woken_log.into_inner().unwrap(), [(first_cell, 5), (removed_cell, 7), (first_cell, 40), (far_cell, far_wake)]);
+    assert_eq!(entity_store.len(), 2, "the third removed");
+}
+
+/// Walkers stepping right a cell a tick cross into the next superchunk,
+/// as whole copies, attributes and all -- the one left behind gone by
+/// the tick's end -- and at the edge of the hot superchunks stay, lost
+/// to nowhere.
+#[test]
+fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let (mut bitmap_arena, mut entity_store) = world(2);
+    let start_column = SUPERCHUNK_SIDE_CELLS - 3;
+    entity_store.queue_put(walker_header(cell(start_column, 100), 0), &[AttributeBlock::holding_value(WOKEN_COUNT, 0)]);
+    entity_store.apply();
+    let mut world_simulation = Simulation::new(2);
+    let step = |turn: &mut Turn| {
+        for entity in turn.woken_entities() {
+            let stepped_header = Header { stood_cell: entity.header.stood_cell.at_cartesian_offset(1, 0).unwrap(), wake: turn.current_tick() + 1, ..entity.header };
+            actions::entities::update_entity(turn, &entity.header, stepped_header, &[AttributeBlock::holding_value(WOKEN_COUNT, entity.attribute(WOKEN_COUNT).unwrap() + 1)]);
+        }
+        0
+    };
+    let mut most_entities = 0;
+    for _ in 0..10 {
+        world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, step);
+        most_entities = most_entities.max(entity_store.len());
+    }
+    assert_eq!(most_entities, 1, "never here and there at a tick's end");
+    let right_superchunk = SuperchunkIndex::from_cartesian(11, 10);
+    let entity = entity_store.superchunk(right_superchunk).and_then(|superchunk| superchunk.iter().next()).expect("in the right neighbour");
+    assert_eq!((entity.header.stood_cell, entity.attribute(WOKEN_COUNT)), (cell(start_column + 10, 100), Some(10)));
+    for _ in 10..1100 {
+        world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, step);
+    }
+    let all_cells: Vec<_> = entity_store.iter().map(|entity| entity.header.stood_cell).collect();
+    assert_eq!(all_cells, [cell(2 * SUPERCHUNK_SIDE_CELLS - 1, 100)], "at the edge of the hot superchunks, not lost past it");
+}
+
+/// Walkers wandering at random, giving birth and dying over 3x3
+/// superchunks, across their borders: the same on one thread and four.
+#[test]
+fn any_number_of_threads_ticks_entities_the_same() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let wander_rule = |turn: &mut Turn| {
+        let mut change_count = 0;
+        for entity in turn.woken_entities() {
+            let header = entity.header;
+            let (dx, dy) = (turn.random_stream().draw_below(3) as i32 - 1, turn.random_stream().draw_below(3) as i32 - 1);
+            let wander_cell = header.stood_cell.at_cartesian_offset(dx * 7, dy * 7).unwrap();
+            let wake = turn.current_tick() + 1 + turn.random_stream().draw_below(5);
+            match turn.random_stream().draw_below(40) {
+                0 => actions::entities::remove(turn, &header),
+                1 => {
+                    actions::entities::make_entity(turn, header.entity_type, wander_cell, wake, &[]);
+                    actions::entities::step(turn, &header, header.stood_cell, turn.current_tick() + 3);
+                }
+                _ => actions::entities::update_entity(turn, &header, Header { stood_cell: wander_cell, wake, ..header }, entity.attributes),
+            }
+            change_count += 1;
+        }
+        change_count
+    };
+    let tick_on_threads = |thread_count| {
+        let (mut bitmap_arena, mut entity_store) = world(3);
+        for (walker_number, walker_cell) in (0..2000u64).zip(cells_drawn(seed, 2000, 3072)) {
+            entity_store.queue_put(walker_header(walker_cell, walker_number % 4), &[]);
+        }
+        entity_store.apply();
+        let mut world_simulation = Simulation::new(thread_count);
+        let total_changes: usize = (0..300).map(|_| world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, wander_rule).rules).sum();
+        let all_entities: Vec<(Header, Vec<_>)> = entity_store.iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
+        (total_changes, all_entities)
+    };
+    let (one_thread_result, four_thread_result) = (tick_on_threads(1), tick_on_threads(4));
+    assert!(one_thread_result.0 > 10_000 && !one_thread_result.1.is_empty());
+    assert_eq!(one_thread_result, four_thread_result);
+}
+
+/// Changes queued outside a tick land where their cells are, and one
+/// past the hot superchunks is lost; a removal takes its entity out.
+#[test]
+fn changes_outside_a_tick_are_queued_then_applied() {
+    let (_, mut entity_store) = world(1);
+    let (here_header, away_header) = (walker_header(cell(5, 5), 0), walker_header(cell(2 * SUPERCHUNK_SIDE_CELLS, 5), 0));
+    entity_store.queue_put(here_header, &[]);
+    entity_store.queue_put(away_header, &[]);
+    assert_eq!(entity_store.len(), 0, "nothing changes until applied");
+    let applied_counts = entity_store.apply();
+    assert_eq!((applied_counts.puts, applied_counts.lost, entity_store.len()), (1, 1, 1));
+    assert_eq!(entity_store.get(here_header.stood_cell).map(|entity| entity.header), Some(here_header));
+    entity_store.queue_remove(here_header.stood_cell);
+    assert_eq!((entity_store.apply().entities_removed, entity_store.len()), (1, 0));
+}

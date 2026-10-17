@@ -3,8 +3,8 @@
 /// another, as it would were a stream the seed moved along.
 #[test]
 fn streams_of_a_seed_share_no_draws() {
+    let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let mut seen_draws = std::collections::HashSet::new();
-    let seed = utilities::seed::counted_seed();
     // Streams one after another from a first one drawn: as superchunks beside each other are.
     let first_stream = utilities::rng::RandomSource::new(seed).next_draw();
     for stream in (0..64u64).map(|stream_offset| first_stream.wrapping_add(stream_offset)) {

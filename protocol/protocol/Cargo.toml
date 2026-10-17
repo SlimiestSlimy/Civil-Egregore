@@ -1,0 +1,7 @@
+[package]
+name = "protocol"
+edition = "2024"
+description = "What the client and the server say to each other: the parameters a command line gives the server, and later the messages and the wire"
+
+[dependencies]
+utilities = { path = "../../utilities" }
