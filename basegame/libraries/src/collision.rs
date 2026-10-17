@@ -4,7 +4,7 @@
 //! entity's, made of the generic actions alone.
 
 use simulation::simulation_api::compare_and_write::{self, SkipTagSet};
-use simulation::simulation_api::{entity_reads_and_writes, AttributeBlock, CellIndex, EntityType, Header, LayerType, SuperchunkTickState};
+use simulation::simulation_api::{entity_reads_and_writes, AttributeBlock, CellIndex, EntityType, Header, LayerType, SimulationTickState};
 
 /// The collision plane's library, as its registration exposes it.
 pub static COLLISION: Collision = Collision { plane: base_types::COLLISION };
@@ -25,7 +25,7 @@ impl Collision {
     /// it is made -- and it is made only if no entity stands on the
     /// cell or is named by it this tick, and the plane holds it not.
     #[inline]
-    pub fn begin_making_entity<'scope, 'world>(&self, tick_state: &'scope mut SuperchunkTickState<'world>, entity_type: EntityType, entity_cell: CellIndex, wake: u64, attributes: &[AttributeBlock]) -> SkipTagSet<'scope, 'world> {
+    pub fn begin_making_entity<'scope, 'world>(&self, tick_state: &'scope mut SimulationTickState<'world>, entity_type: EntityType, entity_cell: CellIndex, wake: u64, attributes: &[AttributeBlock]) -> SkipTagSet<'scope, 'world> {
         let mut cell_free_still = compare_and_write::open_compare(tick_state, compare_and_write::cell_free(entity_cell)).and_compare(compare_and_write::layer_lacks(self.plane, entity_cell));
         cell_free_still.make_entity(Header { entity_type, stood_cell: entity_cell, wake }, attributes);
         cell_free_still.write_cell(self.plane, entity_cell, 1);
@@ -38,7 +38,7 @@ impl Collision {
     /// holds, the cell it left let go. Its cell taken, it stays, and
     /// wakes at `wake` all the same.
     #[inline]
-    pub fn step(&self, tick_state: &mut SuperchunkTickState, entity: &Header, to_cell: CellIndex, wake: u64) {
+    pub fn step(&self, tick_state: &mut SimulationTickState, entity: &Header, to_cell: CellIndex, wake: u64) {
         if to_cell == entity.stood_cell {
             return entity_reads_and_writes::sleep(tick_state, entity, wake);
         }
@@ -54,7 +54,7 @@ impl Collision {
 
     /// Queues removing `entity`, the cell it held let go.
     #[inline]
-    pub fn remove(&self, tick_state: &mut SuperchunkTickState, entity: &Header) {
+    pub fn remove(&self, tick_state: &mut SimulationTickState, entity: &Header) {
         let mut entity_as_seen = compare_and_write::open_compare(tick_state, compare_and_write::entity(entity));
         entity_as_seen.remove_entity(entity.stood_cell);
         entity_as_seen.write_cell(self.plane, entity.stood_cell, 0);

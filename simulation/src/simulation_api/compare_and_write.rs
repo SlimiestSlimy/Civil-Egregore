@@ -9,7 +9,7 @@
 use crate::raw_compares_and_writes::{entity as entity_writes, write as raw_writes};
 pub use crate::raw_compares_and_writes::compare::{attribute, attribute_blocks, attribute_member, cell_free, entity, layer_holds, layer_lacks, value, with_writes};
 pub use crate::{Compare, Write};
-use crate::SuperchunkTickState;
+use crate::SimulationTickState;
 use chunk_storage::LayerType;
 use coordinates::CellIndex;
 use entity_manager::{each_attribute, AttributeBlock, AttributeType, Header, Member};
@@ -24,7 +24,7 @@ use std::ops::{Deref, DerefMut};
 #[must_use = "dropped at once, the tag is placed before anything is written under the set"]
 pub struct SkipTagSet<'scope, 'world> {
     /// The turn the set is open on.
-    tick_state: &'scope mut SuperchunkTickState<'world>,
+    tick_state: &'scope mut SimulationTickState<'world>,
     /// Its depth: how many sets it is within.
     depth: usize,
 }
@@ -45,7 +45,7 @@ pub struct SkipTag<'scope> {
 /// are open already: what is queued until the returned set is dropped
 /// is under it.
 #[inline]
-pub fn open_compare<'scope, 'world>(tick_state: &'scope mut SuperchunkTickState<'world>, first_compare: Compare) -> SkipTagSet<'scope, 'world> {
+pub fn open_compare<'scope, 'world>(tick_state: &'scope mut SimulationTickState<'world>, first_compare: Compare) -> SkipTagSet<'scope, 'world> {
     tick_state.skip_tag_set(first_compare);
     let depth = tick_state.skip_tag_sets_open() - 1;
     SkipTagSet { tick_state, depth }
@@ -153,11 +153,11 @@ impl<'scope> SkipTagSet<'scope, '_> {
 }
 
 impl<'world> Deref for SkipTagSet<'_, 'world> {
-    type Target = SuperchunkTickState<'world>;
+    type Target = SimulationTickState<'world>;
 
     /// The turn, to read.
     #[inline]
-    fn deref(&self) -> &SuperchunkTickState<'world> {
+    fn deref(&self) -> &SimulationTickState<'world> {
         self.tick_state
     }
 }
@@ -166,7 +166,7 @@ impl<'world> DerefMut for SkipTagSet<'_, 'world> {
     /// The turn, to hand to an action: what it queues is under the set
     /// too.
     #[inline]
-    fn deref_mut(&mut self) -> &mut SuperchunkTickState<'world> {
+    fn deref_mut(&mut self) -> &mut SimulationTickState<'world> {
         self.tick_state
     }
 }
@@ -184,13 +184,13 @@ impl Drop for SkipTagSet<'_, '_> {
 /// when the write is come to: one added to the rule's count `count_place`
 /// then, if one is given. The compare is of the cell's superchunk.
 #[inline]
-pub fn write(tick_state: &mut SuperchunkTickState, under_compare: Compare, layer_type: LayerType, cell: CellIndex, value_seen: u32, value: u32, count_place: Option<usize>) {
+pub fn write(tick_state: &mut SimulationTickState, under_compare: Compare, layer_type: LayerType, cell: CellIndex, value_seen: u32, value: u32, count_place: Option<usize>) {
     crate::simulation_api::cell_reads_and_writes::seen_becoming(&mut open_compare(tick_state, under_compare), layer_type, cell, value_seen, value, count_place);
 }
 
 /// Adds one to the rule's count `count_place` if `under_compare` holds when it
 /// is come to.
 #[inline]
-pub fn count(tick_state: &mut SuperchunkTickState, under_compare: Compare, count_place: usize) {
+pub fn count(tick_state: &mut SimulationTickState, under_compare: Compare, count_place: usize) {
     with_writes(tick_state, under_compare, &[Write::Count(count_place as u32)]);
 }

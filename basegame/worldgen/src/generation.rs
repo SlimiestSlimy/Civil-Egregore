@@ -13,8 +13,11 @@ use utilities::tuning::{self, Tuning};
 /// What keeps the trees' numbers apart from the grass's.
 pub const TREES_SALT: u64 = 0x7472_6565_735F_6C6F;
 
-/// How superchunks are generated: the heights' shape, and how the
-/// grass and the trees lie on them.
+/// Sheep a superchunk is given unless told otherwise.
+pub const FLOCK: u64 = 4_000;
+
+/// How superchunks are generated: the heights' shape, how the grass and
+/// the trees lie on them, and the sheep each is given.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WorldGeneration {
     /// The heights' shape.
@@ -23,61 +26,103 @@ pub struct WorldGeneration {
     pub grass_patches: Patches,
     /// How the trees lie.
     pub trees: Patches,
+    /// Sheep each superchunk is given the first time it is hot.
+    pub sheep_per_superchunk: u64,
 }
 
-/// Gives [`WorldGeneration`] its numbers by name: read out, and put back.
-macro_rules! generation_numbers {
-    ($($name:literal => $($field:ident).+,)*) => {
-        impl WorldGeneration {
-            /// Its numbers, each with its name: as a world's file keeps them.
-            pub fn numbers(&self) -> Vec<(String, u64)> {
-                vec![$(($name.to_string(), u64::from(self.$($field).+))),*]
-            }
+/// A number of a generation, kept in a field of whichever width: read
+/// out as a world's file keeps it, and put back.
+trait GenerationNumber {
+    /// The number, widened.
+    fn read(&self) -> u64;
+    /// Puts `value` in, cut to the field's width.
+    fn write(&mut self, value: u64);
+}
 
-            /// As `generation_numbers` say, each by its name: one not among them
-            /// as in [`WorldGeneration::DEFAULT`], one not known passed over.
-            pub fn of_numbers(numbers: &[(String, u64)]) -> Self {
-                let mut generation = Self::DEFAULT;
-                for (name, value) in numbers {
-                    match name.as_str() {
-                        $($name => generation.$($field).+ = *value as _,)*
-                        _ => {}
-                    }
-                }
-                generation
+impl GenerationNumber for u16 {
+    fn read(&self) -> u64 {
+        u64::from(*self)
+    }
+
+    fn write(&mut self, value: u64) {
+        *self = value as u16;
+    }
+}
+
+impl GenerationNumber for u32 {
+    fn read(&self) -> u64 {
+        u64::from(*self)
+    }
+
+    fn write(&mut self, value: u64) {
+        *self = value as u32;
+    }
+}
+
+impl GenerationNumber for u64 {
+    fn read(&self) -> u64 {
+        *self
+    }
+
+    fn write(&mut self, value: u64) {
+        *self = value;
+    }
+}
+
+/// Where a generation keeps one of its numbers.
+type NumberField = fn(&mut WorldGeneration) -> &mut dyn GenerationNumber;
+
+/// Each of a generation's numbers, by its name: in the order a world's
+/// file keeps them.
+const NUMBER_FIELDS: [(&str, NumberField); 28] = [
+    ("ocean floor", |generation| &mut generation.land_shape.ocean_floor),
+    ("ocean level", |generation| &mut generation.land_shape.ocean),
+    ("vertex spacing", |generation| &mut generation.land_shape.vertex_spacing_power),
+    ("ocean share", |generation| &mut generation.land_shape.ocean_share),
+    ("highest land", |generation| &mut generation.land_shape.highest_land),
+    ("clumping", |generation| &mut generation.land_shape.land_clumping),
+    ("coast breadth", |generation| &mut generation.land_shape.coast_breadth),
+    ("coast lowness", |generation| &mut generation.land_shape.coast_low),
+    ("narrowest blend", |generation| &mut generation.land_shape.narrowest_blend),
+    ("widest blend", |generation| &mut generation.land_shape.widest_blend),
+    ("least sigmoid", |generation| &mut generation.land_shape.least_sigmoidness),
+    ("most sigmoid", |generation| &mut generation.land_shape.most_sigmoidness),
+    ("line bending", |generation| &mut generation.land_shape.line_bending),
+    ("finer mesh depth", |generation| &mut generation.land_shape.finer_depth),
+    ("finer mesh share", |generation| &mut generation.land_shape.finer_share),
+    ("finer mesh height", |generation| &mut generation.land_shape.finer_height),
+    ("finer mesh falloff", |generation| &mut generation.land_shape.finer_fall),
+    ("weight spread", |generation| &mut generation.land_shape.weight),
+    ("raised share", |generation| &mut generation.land_shape.raised_share),
+    ("grass cover", |generation| &mut generation.grass_patches.cover_share),
+    ("grass patch size", |generation| &mut generation.grass_patches.patch_size_power),
+    ("grass patch detail", |generation| &mut generation.grass_patches.detail_share),
+    ("grass scatter", |generation| &mut generation.grass_patches.scatter_share),
+    ("tree cover", |generation| &mut generation.trees.cover_share),
+    ("tree patch size", |generation| &mut generation.trees.patch_size_power),
+    ("tree patch detail", |generation| &mut generation.trees.detail_share),
+    ("tree scatter", |generation| &mut generation.trees.scatter_share),
+    ("sheep per superchunk", |generation| &mut generation.sheep_per_superchunk),
+];
+
+impl WorldGeneration {
+    /// Its numbers, each with its name: as a world's file keeps them.
+    pub fn numbers(&self) -> Vec<(String, u64)> {
+        let mut generation = *self;
+        NUMBER_FIELDS.iter().map(|(name, field)| (name.to_string(), field(&mut generation).read())).collect()
+    }
+
+    /// As `generation_numbers` say, each by its name: one not among them
+    /// as in [`WorldGeneration::DEFAULT`], one not known passed over.
+    pub fn of_numbers(numbers: &[(String, u64)]) -> Self {
+        let mut generation = Self::DEFAULT;
+        for (name, value) in numbers {
+            if let Some((_, field)) = NUMBER_FIELDS.iter().find(|(field_name, _)| field_name == name) {
+                field(&mut generation).write(*value);
             }
         }
-    };
-}
-
-generation_numbers! {
-    "ocean floor" => land_shape.ocean_floor,
-    "ocean level" => land_shape.ocean,
-    "vertex spacing" => land_shape.vertex_spacing_power,
-    "ocean share" => land_shape.ocean_share,
-    "highest land" => land_shape.highest_land,
-    "clumping" => land_shape.land_clumping,
-    "coast breadth" => land_shape.coast_breadth,
-    "coast lowness" => land_shape.coast_low,
-    "narrowest blend" => land_shape.narrowest_blend,
-    "widest blend" => land_shape.widest_blend,
-    "least sigmoid" => land_shape.least_sigmoidness,
-    "most sigmoid" => land_shape.most_sigmoidness,
-    "line bending" => land_shape.line_bending,
-    "finer mesh depth" => land_shape.finer_depth,
-    "finer mesh share" => land_shape.finer_share,
-    "finer mesh height" => land_shape.finer_height,
-    "finer mesh falloff" => land_shape.finer_fall,
-    "weight spread" => land_shape.weight,
-    "raised share" => land_shape.raised_share,
-    "grass cover" => grass_patches.cover_share,
-    "grass patch size" => grass_patches.patch_size_power,
-    "grass patch detail" => grass_patches.detail_share,
-    "grass scatter" => grass_patches.scatter_share,
-    "tree cover" => trees.cover_share,
-    "tree patch size" => trees.patch_size_power,
-    "tree patch detail" => trees.detail_share,
-    "tree scatter" => trees.scatter_share,
+        generation
+    }
 }
 
 impl WorldGeneration {
@@ -87,7 +132,7 @@ impl WorldGeneration {
     /// alone, the terrain taking no part.
     pub const fn plain(grass_cover: u64) -> Self {
         let plain_shape = LandShape { ocean_floor: 0, ocean: 0, highest_land: 1, ocean_share: 0, coast_breadth: 0, finer_depth: 0, ..LandShape::DEFAULT };
-        Self { land_shape: plain_shape, grass_patches: Patches { cover_share: grass_cover, patch_size_power: 1, detail_share: 0, scatter_share: 16 * FRACTION_ONE }, trees: Patches { cover_share: 0, patch_size_power: 1, detail_share: 0, scatter_share: 0 } }
+        Self { land_shape: plain_shape, grass_patches: Patches { cover_share: grass_cover, patch_size_power: 1, detail_share: 0, scatter_share: 16 * FRACTION_ONE }, trees: Patches { cover_share: 0, patch_size_power: 1, detail_share: 0, scatter_share: 0 }, sheep_per_superchunk: 0 }
     }
 
     /// How worlds are generated unless told otherwise, as tuned by eye.
@@ -95,6 +140,7 @@ impl WorldGeneration {
         land_shape: LandShape::DEFAULT,
         grass_patches: Patches { cover_share: FRACTION_ONE * 951 / 1000, patch_size_power: 8, detail_share: FRACTION_ONE * 598 / 1000, scatter_share: FRACTION_ONE * 51 / 1000 },
         trees: Patches { cover_share: FRACTION_ONE * 60 / 1000, patch_size_power: 7, detail_share: FRACTION_ONE * 800 / 1000, scatter_share: FRACTION_ONE * 300 / 1000 },
+        sheep_per_superchunk: FLOCK,
     };
 
     /// As the sliders' numbers have it: what is typed held to what a
@@ -106,6 +152,7 @@ impl WorldGeneration {
             land_shape: shape_from_tuning(slider_tuning),
             grass_patches: patches([tuning::GRASS_COVER, tuning::GRASS_PATCH, tuning::GRASS_DETAIL, tuning::GRASS_SCATTER]),
             trees: patches([tuning::TREE_COVER, tuning::TREE_PATCH, tuning::TREE_DETAIL, tuning::TREE_SCATTER]),
+            sheep_per_superchunk: slider_tuning[tuning::SHEEP_PER_SUPERCHUNK].max(0.0) as u64,
         }
     }
 

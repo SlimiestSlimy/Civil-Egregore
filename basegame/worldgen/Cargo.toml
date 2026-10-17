@@ -1,0 +1,15 @@
+[package]
+name = "worldgen"
+edition = "2024"
+description = "Civil Egregore's world generation: every cell's height from the world's seed, the walls between cells too far apart in height to step between, and how what grows lies in patches"
+
+[dependencies]
+type_registry = { path = "../../type_registry" }
+base_types = { path = "../base_types" }
+bitmap = { path = "../../bitmap" }
+chunk_storage = { path = "../../chunk_storage" }
+coordinates = { path = "../../coordinates" }
+utilities = { path = "../../utilities" }
+simulation = { path = "../../simulation" }
+entity_rules = { path = "../entity_rules" }
+libraries = { path = "../libraries" }

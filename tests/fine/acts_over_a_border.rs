@@ -10,7 +10,7 @@ use crate::walkers::{ENTITY_NUMBER, WOKEN_COUNT};
 use bitplane_manager::BitmapArena;
 use coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{AttributeBlock, WorldEntities, NEVER_WAKES};
-use simulation::{Compare, Simulation, SuperchunkTickState};
+use simulation::{Compare, Simulation, SimulationTickState};
 use std::collections::BTreeSet;
 use utilities::rng::RandomSource;
 
@@ -34,7 +34,7 @@ fn an_act_over_a_border_happens_whole_or_not_at_all() {
             entity_store.queue_add(walker_header(beside_cell, NEVER_WAKES), &[]);
         }
         entity_store.apply();
-        let report = Simulation::new(2).tick(&mut bitmap_arena, &mut entity_store, seeded_rng.next_draw(), |tick_state: &mut SuperchunkTickState| {
+        let report = Simulation::new(2).tick(&mut bitmap_arena, &mut entity_store, seeded_rng.next_draw(), |tick_state: &mut SimulationTickState| {
             for entity in tick_state.woken_entities() {
                 tick_state.seeing_to(entity.header.stood_cell);
                 let mut entity_made = simulation::simulation_api::entity_reads_and_writes::begin_making_entity(tick_state, crate::arenas::WALKER_TYPE, beside_cell, NEVER_WAKES, &[AttributeBlock::holding_value(ENTITY_NUMBER, 5)]);
@@ -79,7 +79,7 @@ fn crowd_cartesian(seed: u64) -> BTreeSet<(u32, u32)> {
 /// flip, so of those acting in a tick the first in the world's order
 /// has it and the others are refused: in up to four superchunks at
 /// once.
-fn flip_what_is_about(tick_state: &mut SuperchunkTickState, seed: u64) -> u64 {
+fn flip_what_is_about(tick_state: &mut SimulationTickState, seed: u64) -> u64 {
     let current_tick = tick_state.current_tick();
     for entity in tick_state.woken_entities() {
         let (header, stood_cartesian) = (entity.header, entity.header.stood_cell.cartesian());
@@ -88,7 +88,7 @@ fn flip_what_is_about(tick_state: &mut SuperchunkTickState, seed: u64) -> u64 {
             simulation::simulation_api::entity_reads_and_writes::step(tick_state, &header, header.stood_cell, current_tick + 1);
             continue;
         }
-        let seen_at = |tick_state: &SuperchunkTickState, x: u32, y: u32| (CellIndex::from(coordinates::CellCartesian { x, y }), u32::from(tick_state.layer_holds(STONE_LAYER, coordinates::CellCartesian { x, y }.into()) == Ok(true)));
+        let seen_at = |tick_state: &SimulationTickState, x: u32, y: u32| (CellIndex::from(coordinates::CellCartesian { x, y }), u32::from(tick_state.layer_holds(STONE_LAYER, coordinates::CellCartesian { x, y }.into()) == Ok(true)));
         let (east_seen, south_seen, past_seen) = (seen_at(tick_state, stood_cartesian.x + 1, stood_cartesian.y), seen_at(tick_state, stood_cartesian.x, stood_cartesian.y + 1), seen_at(tick_state, stood_cartesian.x + 1, stood_cartesian.y + 2));
         let mut east_as_seen = simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: STONE_LAYER, target_cell: east_seen.0, seen_value: east_seen.1 });
         simulation::simulation_api::compare_and_write::write(&mut east_as_seen, Compare::Cell { layer_type: STONE_LAYER, target_cell: south_seen.0, seen_value: south_seen.1 }, STONE_LAYER, past_seen.0, past_seen.1, 1 - past_seen.1, None);
@@ -135,7 +135,7 @@ fn a_crowd_acting_over_every_border_comes_to_the_same_on_any_threads() {
         let mut world_simulation = Simulation::new(thread_count);
         let (mut over_a_border, mut refused_count) = (0, 0);
         for _ in 0..TICKS {
-            let report = world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| flip_what_is_about(tick_state, seed));
+            let report = world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| flip_what_is_about(tick_state, seed));
             over_a_border += report.acts_over_a_border;
             refused_count += report.instructions_compared.1;
         }

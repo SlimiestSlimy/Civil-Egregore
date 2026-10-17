@@ -25,7 +25,7 @@ pathfinding = { path = "pathfinding" }
 sca_rules = { path = "basegame/sca_rules" }
 simulation = { path = "simulation" }
 type_registry = { path = "type_registry" }
-worldgen = { path = "worldgen" }
+worldgen = { path = "basegame/worldgen" }
 
 [features]
 # `--features force_default_settings`: run on the built-in defaults
@@ -54,7 +54,7 @@ members = [
     "pathfinding",
     "basegame/sca_rules",
     "simulation",
-    "worldgen",
+    "basegame/worldgen",
     "type_registry",
     "utilities",
     "renderer",
@@ -75,7 +75,7 @@ default-members = [
     "pathfinding",
     "basegame/sca_rules",
     "simulation",
-    "worldgen",
+    "basegame/worldgen",
     "type_registry",
     "utilities",
     "server",

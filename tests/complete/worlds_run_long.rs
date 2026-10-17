@@ -10,12 +10,12 @@ use crate::worlds::{world_contents, folder};
 fn a_world_stopped_often_comes_to_the_same() {
     const LAST_TICK: u64 = 30_000;
     let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
-    let mut straight_world = server::start_world(server::WorldStart { seed, sheep_per_flock: 4_000, ..server::WorldStart::default() });
+    let mut straight_world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
     while straight_world.entity_store().current_tick() < LAST_TICK {
         straight_world.tick();
     }
     let folder = folder("complete");
-    let mut stopped_world = server::start_world(server::WorldStart { seed, sheep_per_flock: 4_000, ..server::WorldStart::default() });
+    let mut stopped_world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
     for stop_tick in (5_000..=LAST_TICK).step_by(5_000) {
         while stopped_world.entity_store().current_tick() < stop_tick {
             stopped_world.tick();
@@ -34,7 +34,7 @@ fn a_world_stopped_often_comes_to_the_same() {
 #[ignore]
 fn a_flock_on_generated_ground_lasts() {
     let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
-    let mut made_world = server::start_world(server::WorldStart { seed, sheep_per_flock: 4_000, ..server::WorldStart::default() });
+    let mut made_world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
     for _ in 0..300_000 {
         made_world.tick();
     }

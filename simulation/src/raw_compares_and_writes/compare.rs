@@ -8,7 +8,7 @@ use chunk_storage::{LayerType, WidePlane, Width};
 use coordinates::CellIndex;
 use entity_manager::{push_attribute, Attribute, AttributeBlock, AttributeType, Header, Layout, Member};
 pub use crate::Compare;
-use crate::{SuperchunkTickState, Write};
+use crate::{SimulationTickState, Write};
 
 /// `layer_type` still holds at `cell`, as the rule saw.
 #[inline]
@@ -71,6 +71,6 @@ pub fn attribute_blocks(entity_cell: CellIndex, attribute_type: AttributeType, s
 /// whose writes all land in its own superchunk -- most of what is
 /// queued.
 #[inline]
-pub fn with_writes(tick_state: &mut SuperchunkTickState, compare_to_hold: Compare, writes: &[Write]) {
+pub fn with_writes(tick_state: &mut SimulationTickState, compare_to_hold: Compare, writes: &[Write]) {
     tick_state.compare_with_writes(compare_to_hold, writes);
 }

@@ -54,32 +54,50 @@ impl ProbeParameters<'_> {
     }
 }
 
-/// A general flag putting its one parameter, as text, under its own name.
-macro_rules! parameter_flag {
-    ($parameter_name:expr) => {{
-        fn parse_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters) -> Result<(), FlagError> {
-            clean_parameters.insert($parameter_name, ParameterValue::Text(flag_parser.text_parameter()?));
-            Ok(())
-        }
-        Flag { flag_name: $parameter_name, flag_help: "a probe's parameter", flag_kind: FlagKind::General, parse_flag }
-    }};
+/// Every parameter any probe reads, a general flag each.
+const PARAMETERS: [&str; 14] = [
+    SEED,
+    acts_over_a_border::WORLD_SIDE_SUPERCHUNKS,
+    acts_over_a_border::EVERY_SO_MANY_CELLS,
+    acts_over_a_border::STEPPING_A_SUPERCHUNK,
+    acts_over_a_border::TICKS,
+    acts_over_a_border::THREADS_OF_SECOND_RUN,
+    acts_over_a_border::CROSSING,
+    how_steep_the_land_is::SQUARE_SIDE_CELLS,
+    ticks_under_a_wide_viewport::VIEWPORT_SIDE,
+    ticks_under_a_wide_viewport::SECONDS_MEASURED,
+    ticks_under_a_wide_viewport::SUPERCHUNKS_A_FRAME,
+    ticks_under_a_wide_viewport::SHEEP_A_SUPERCHUNK,
+    ticks_under_a_wide_viewport::PACE_TICKS_A_SECOND,
+    what_a_generation_makes::GRASS_THOUSANDTHS,
+];
+
+/// Puts the parameter `PARAMETERS[PARAMETER]`, as text, under its own name.
+fn parse_parameter_flag<const PARAMETER: usize>(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters) -> Result<(), FlagError> {
+    clean_parameters.insert(PARAMETERS[PARAMETER], ParameterValue::Text(flag_parser.text_parameter()?));
+    Ok(())
 }
 
-/// A probe's terminal flag: its parameters in brackets, nested under
-/// the probe's name.
-macro_rules! probe_flag {
-    ($probe_index:expr) => {{
-        fn parse_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters) -> Result<(), FlagError> {
-            let probe_parameters = flag_parser.bracketed(|flag_parser| {
-                let mut probe_parameters = CleanServerParameters::default();
-                flag_parser.parse_flags_within(&mut probe_parameters)?;
-                Ok(probe_parameters)
-            })?;
-            clean_parameters.insert(PROBES[$probe_index].probe_name, ParameterValue::Nested(probe_parameters));
-            Ok(())
-        }
-        Flag { flag_name: PROBES[$probe_index].probe_name, flag_help: PROBES[$probe_index].what_it_does, flag_kind: FlagKind::Terminal, parse_flag }
-    }};
+/// The general flag of the parameter `PARAMETERS[PARAMETER]`.
+const fn parameter_flag<const PARAMETER: usize>() -> Flag {
+    Flag { flag_name: PARAMETERS[PARAMETER], flag_help: "a probe's parameter", flag_kind: FlagKind::General, parse_flag: parse_parameter_flag::<PARAMETER> }
+}
+
+/// Puts the parameters of the probe `PROBES[PROBE]`, in brackets, nested
+/// under its name.
+fn parse_probe_flag<const PROBE: usize>(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters) -> Result<(), FlagError> {
+    let probe_parameters = flag_parser.bracketed(|flag_parser| {
+        let mut probe_parameters = CleanServerParameters::default();
+        flag_parser.parse_flags_within(&mut probe_parameters)?;
+        Ok(probe_parameters)
+    })?;
+    clean_parameters.insert(PROBES[PROBE].probe_name, ParameterValue::Nested(probe_parameters));
+    Ok(())
+}
+
+/// The terminal flag of the probe `PROBES[PROBE]`.
+const fn probe_flag<const PROBE: usize>() -> Flag {
+    Flag { flag_name: PROBES[PROBE].probe_name, flag_help: PROBES[PROBE].what_it_does, flag_kind: FlagKind::Terminal, parse_flag: parse_probe_flag::<PROBE> }
 }
 
 /// The probes.
@@ -113,24 +131,24 @@ const PROBES: [Probe; 4] = [
 /// Every flag: the probes, and every parameter any of them reads.
 fn probe_flags() -> Vec<Flag> {
     vec![
-        probe_flag!(0),
-        probe_flag!(1),
-        probe_flag!(2),
-        probe_flag!(3),
-        parameter_flag!(SEED),
-        parameter_flag!(acts_over_a_border::WORLD_SIDE_SUPERCHUNKS),
-        parameter_flag!(acts_over_a_border::EVERY_SO_MANY_CELLS),
-        parameter_flag!(acts_over_a_border::STEPPING_A_SUPERCHUNK),
-        parameter_flag!(acts_over_a_border::TICKS),
-        parameter_flag!(acts_over_a_border::THREADS_OF_SECOND_RUN),
-        parameter_flag!(acts_over_a_border::CROSSING),
-        parameter_flag!(how_steep_the_land_is::SQUARE_SIDE_CELLS),
-        parameter_flag!(ticks_under_a_wide_viewport::VIEWPORT_SIDE),
-        parameter_flag!(ticks_under_a_wide_viewport::SECONDS_MEASURED),
-        parameter_flag!(ticks_under_a_wide_viewport::SUPERCHUNKS_A_FRAME),
-        parameter_flag!(ticks_under_a_wide_viewport::SHEEP_A_SUPERCHUNK),
-        parameter_flag!(ticks_under_a_wide_viewport::PACE_TICKS_A_SECOND),
-        parameter_flag!(what_a_generation_makes::GRASS_THOUSANDTHS),
+        probe_flag::<0>(),
+        probe_flag::<1>(),
+        probe_flag::<2>(),
+        probe_flag::<3>(),
+        parameter_flag::<0>(),
+        parameter_flag::<1>(),
+        parameter_flag::<2>(),
+        parameter_flag::<3>(),
+        parameter_flag::<4>(),
+        parameter_flag::<5>(),
+        parameter_flag::<6>(),
+        parameter_flag::<7>(),
+        parameter_flag::<8>(),
+        parameter_flag::<9>(),
+        parameter_flag::<10>(),
+        parameter_flag::<11>(),
+        parameter_flag::<12>(),
+        parameter_flag::<13>(),
     ]
 }
 

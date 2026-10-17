@@ -146,7 +146,7 @@ impl HostThread {
 
     /// Runs `running_world` in place of any run, from its world's own tick.
     fn run_in_place(&mut self, running_world: RunningWorld) {
-        self.last_frame = (Instant::now(), running_world.world.entity_store.current_tick());
+        self.last_frame = (Instant::now(), running_world.world.entity_store().current_tick());
         // A frame half answered was of the world before.
         self.being_answered = None;
         self.worlds += 1;
@@ -176,7 +176,7 @@ impl HostThread {
         let world = &mut running_world.world;
         self.last_outcome = Some(match crate::save(&utilities::settings::world(&world_name), world) {
             Ok(save_written) => {
-                let saved_text = format!("{world_name} saved at tick {}: {} superchunks, {} entities", world.entity_store.current_tick(), save_written.superchunks, save_written.entities_written);
+                let saved_text = format!("{world_name} saved at tick {}: {} superchunks, {} entities", world.entity_store().current_tick(), save_written.superchunks, save_written.entities_written);
                 self.world_name = Some(world_name);
                 saved_text
             }
@@ -192,7 +192,7 @@ impl HostThread {
         let Some(running_world) = &mut self.running_world else {
             return;
         };
-        running_world.world.halos.keep_viewport(frame_ask.viewport);
+        running_world.world.keep_viewport(frame_ask.viewport);
         let hot = hot_in(&running_world.world, frame_ask.viewport);
         let mut to_copy: Vec<(u32, u32)> = hot.iter().copied().skip(frame_ask.superchunks_skipped as usize).take(frame_ask.most_superchunks as usize).collect();
         to_copy.reverse();
@@ -219,7 +219,7 @@ impl HostThread {
         }
         let (frame_ask, hot, cells) = (being_answered.frame_ask, being_answered.hot.clone(), std::mem::take(&mut being_answered.cells));
         let world = &running_world.world;
-        let tick = world.entity_store.current_tick();
+        let tick = world.entity_store().current_tick();
         if !more_to_copy {
             let (copying_seconds, seconds_since_frame) = (being_answered.copying_spent.as_secs_f64(), self.last_frame.0.elapsed().as_secs_f64());
             if seconds_since_frame > 0.0 {

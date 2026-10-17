@@ -28,7 +28,7 @@ pub struct DefaultAttributes(Box<[(EntityType, DefaultKept)]>);
 
 impl DefaultAttributes {
     /// The default attributes of `frozen_types`.
-    pub fn of_types<RuleCode>(frozen_types: &FrozenTypes<RuleCode>) -> Self {
+    pub fn of_types(frozen_types: &FrozenTypes) -> Self {
         Self(frozen_types.default_attributes().into_iter().map(|(entity_type, attribute_type, words)| (entity_type, DefaultKept { attribute_type, words, block_count: words.div_ceil(BLOCK_WORDS) })).collect())
     }
 

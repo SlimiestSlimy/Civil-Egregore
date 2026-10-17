@@ -13,8 +13,8 @@ use server::{world_hash, WorldStart};
 #[test]
 fn the_same_world_hashes_the_same_however_it_is_ticked() {
     let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
-    let mut one_thread_world = server::start_world(WorldStart { seed, sheep_per_flock: 2_000, thread_count: Some(1), ..WorldStart::default() });
-    let mut several_threads_world = server::start_world(WorldStart { seed, sheep_per_flock: 2_000, thread_count: Some(3), ..WorldStart::default() });
+    let mut one_thread_world = crate::worlds::one_flock_world(WorldStart { seed, thread_count: Some(1), ..WorldStart::default() }, 2_000);
+    let mut several_threads_world = crate::worlds::one_flock_world(WorldStart { seed, thread_count: Some(3), ..WorldStart::default() }, 2_000);
     let mut hashes_seen = vec![world_hash(&mut one_thread_world).whole_hash(seed)];
     for stop_number in 1..=6 {
         for _ in 0..100 {

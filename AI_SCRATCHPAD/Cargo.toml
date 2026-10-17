@@ -10,7 +10,7 @@ type_registry = { path = "../type_registry" }
 coordinates = { path = "../coordinates" }
 server = { path = "../server" }
 utilities = { path = "../utilities" }
-worldgen = { path = "../worldgen" }
+worldgen = { path = "../basegame/worldgen" }
 bitmap = { path = "../bitmap" }
 chunk_storage = { path = "../chunk_storage" }
 simulation = { path = "../simulation" }

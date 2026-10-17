@@ -17,7 +17,7 @@ use chunk_storage::LayerCodec;
 use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, AttributeBlock, WorldEntities, InstructionsApplied};
 use simulation::simulation_api::cell_and_its_neighbours;
-use simulation::simulation_api::{cell_reads_and_writes, compare_and_write, SuperchunkTickState};
+use simulation::simulation_api::{cell_reads_and_writes, compare_and_write, SimulationTickState};
 use simulation::Simulation;
 use std::collections::BTreeSet;
 use base_types::COLLISION;
@@ -65,7 +65,7 @@ fn drawn_for(seed: u64, tick_now: u64, from_pasture: (i64, i64)) -> RandomSource
 }
 
 /// The entity on `asked_cell` as the tick found it, if one stood there.
-fn entity_standing_on<'a>(tick_state: &SuperchunkTickState<'a>, asked_cell: CellIndex) -> Option<entity_manager::EntityRef<'a>> {
+fn entity_standing_on<'a>(tick_state: &SimulationTickState<'a>, asked_cell: CellIndex) -> Option<entity_manager::EntityRef<'a>> {
     tick_state.entities_in(asked_cell.chunk())?.find(|entity| entity.header.stood_cell == asked_cell)
 }
 
@@ -77,7 +77,7 @@ fn entity_standing_on<'a>(tick_state: &SuperchunkTickState<'a>, asked_cell: Cell
 /// cell and every attribute written is a compare-and-write, and what
 /// is counted of a cell beside it is under a compare of that cell --
 /// in another superchunk, where a border lies between.
-fn flock(tick_state: &mut SuperchunkTickState, seed: u64, pasture_shift: (u32, u32)) -> u64 {
+fn flock(tick_state: &mut SimulationTickState, seed: u64, pasture_shift: (u32, u32)) -> u64 {
     let tick_now = tick_state.current_tick();
     for entity in tick_state.woken_entities() {
         let (header, walker_cell) = (entity.header, entity.header.stood_cell);
@@ -184,8 +184,8 @@ fn a_flock_over_borders_comes_to_the_same_on_any_number_of_threads() {
     assert_eq!(pasture_outcome(&bitmap_arena, &entity_store, pasture_shift), pasture_outcome(&arena_there, &entities_there, pasture_shift), "the same pasture put, shifted {pasture_shift:?}");
     let (mut instructions_done, mut writes_refused, mut compares_refused, mut over_a_border) = (InstructionsApplied::default(), 0, 0, (0, 0));
     for _ in 0..TICKS {
-        let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SuperchunkTickState| flock(tick_state, seed, pasture_shift));
-        let report_there = simulation_there.tick(&mut arena_there, &mut entities_there, seed, |tick_state: &mut SuperchunkTickState| flock(tick_state, seed, pasture_shift));
+        let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| flock(tick_state, seed, pasture_shift));
+        let report_there = simulation_there.tick(&mut arena_there, &mut entities_there, seed, |tick_state: &mut SimulationTickState| flock(tick_state, seed, pasture_shift));
         over_a_border = (over_a_border.0 + report.acts_over_a_border, over_a_border.1 + report_there.acts_over_a_border);
         instructions_done += report.instructions_applied;
         writes_refused += report.writes_applied.writes_refused;

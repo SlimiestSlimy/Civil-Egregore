@@ -6,7 +6,7 @@
 
 use crate::simulation_api::RuleCounts;
 use coordinates::CellIndex;
-use crate::SuperchunkTickState;
+use crate::SimulationTickState;
 use type_registry::{EntityType, LayerType, Library};
 use utilities::chance::Chance;
 
@@ -59,7 +59,7 @@ pub struct RuleCode {
     /// What it counts.
     pub count_names: &'static [&'static str],
     /// The rule, on one superchunk's turn.
-    pub run: fn(&mut SuperchunkTickState, &RuleContext) -> RuleCounts,
+    pub run: fn(&mut SimulationTickState, &RuleContext) -> RuleCounts,
 }
 
 /// One superchunk's turn of a rule of the cells: `rule`, the function on
@@ -70,7 +70,7 @@ pub struct RuleCode {
 /// # Panics
 /// If its master is a type of entity.
 #[inline]
-pub fn on_each_sampled(tick_state: &mut SuperchunkTickState, master: RuleMaster, chance: Chance, rule: impl FnMut(&mut SuperchunkTickState, CellIndex, &mut RuleCounts)) -> RuleCounts {
+pub fn on_each_sampled(tick_state: &mut SimulationTickState, master: RuleMaster, chance: Chance, rule: impl FnMut(&mut SimulationTickState, CellIndex, &mut RuleCounts)) -> RuleCounts {
     let mut counts = RuleCounts::default();
     match master {
         RuleMaster::Layer(layer_type) => tick_state.each_sampled(layer_type, chance, &mut counts, rule),

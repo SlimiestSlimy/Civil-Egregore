@@ -9,7 +9,7 @@ use chunk_storage::{LayerCodec, LayerType};
 use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::WorldEntities;
 use simulation::simulation_api::compare_and_write;
-use simulation::simulation_api::SuperchunkTickState;
+use simulation::simulation_api::SimulationTickState;
 use simulation::Simulation;
 use utilities::rng::RandomSource;
 
@@ -47,7 +47,7 @@ fn a_compare_skips_to_the_tag_of_its_own_set() {
         }
         // Every cell lacks stone: a compare that it holds there does not hold.
         let seen_as = |holds: bool, seen_cell: CellIndex| if holds { compare_and_write::layer_lacks(STONE_LAYER, seen_cell) } else { compare_and_write::layer_holds(STONE_LAYER, seen_cell) };
-        Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, 1, |tick_state: &mut SuperchunkTickState| {
+        Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, 1, |tick_state: &mut SimulationTickState| {
             {
                 let mut outer_set = compare_and_write::open_compare(tick_state, seen_as(outer_holds, outer_seen));
                 {
@@ -82,7 +82,7 @@ fn a_chained_compare_skips_to_the_tag_it_was_handed() {
         handed_set.chain_compare(compare_and_write::layer_holds(STONE_LAYER, chained_seen));
         handed_set.write_cell(STONE_LAYER, after_chained, 1);
     }
-    Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, 1, |tick_state: &mut SuperchunkTickState| {
+    Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, 1, |tick_state: &mut SimulationTickState| {
         let mut caller_set = compare_and_write::open_compare(tick_state, compare_and_write::layer_lacks(STONE_LAYER, first_seen));
         caller_set.write_cell(STONE_LAYER, before_chained, 1);
         callee(&mut caller_set, chained_seen, after_chained);

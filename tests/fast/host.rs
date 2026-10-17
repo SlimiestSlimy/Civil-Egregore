@@ -30,10 +30,10 @@ fn a_reset_makes_the_world_again_as_retuned() {
     let (host, frame_receiver) = Host::start_on_thread();
     // Paused, what a frame says is what the start made.
     assert!(host.set_paused(true));
-    let world_start = WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: false }, sheep_per_flock: 3, ..WorldStart::default() };
+    let world_start = WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: false }, world_generation: crate::worlds::flocked(3), ..WorldStart::default() };
     assert!(host.make_world(world_start));
     let made_frame = frame_that(&host, &frame_receiver, |_| true);
-    assert_eq!((made_frame.seed, made_frame.world_generation, made_frame.sheep_count, made_frame.tick), (world_start.seed, WorldGeneration::DEFAULT, 4 * 3, 0));
+    assert_eq!((made_frame.seed, made_frame.world_generation, made_frame.sheep_count, made_frame.tick), (world_start.seed, crate::worlds::flocked(3), 0, 0), "the sheep made the first tick");
     let mut tuning = default_tuning();
     tuning[OCEAN_FLOOR] += 64.0;
     let retuned_generation = WorldGeneration::from_tuning(&tuning);
@@ -41,7 +41,7 @@ fn a_reset_makes_the_world_again_as_retuned() {
     assert!(host.reset(&tuning));
     let reset = frame_that(&host, &frame_receiver, |answered_frame| answered_frame.world_generation == retuned_generation);
     assert!(reset.world > made_frame.world, "another world");
-    assert_eq!((reset.seed, reset.sheep_count, reset.tick, reset.world_name), (world_start.seed, 4 * 3, 0, None));
+    assert_eq!((reset.seed, reset.sheep_count, reset.tick, reset.world_name), (world_start.seed, 0, 0, None));
 }
 
 /// The terrain a client asks of the host is the world's: every height
@@ -59,7 +59,7 @@ fn the_terrain_asked_for_is_what_the_frames_bring() {
     let (host, frame_receiver) = Host::start_on_thread();
     let terrain = host.terrain();
     assert!(host.set_paused(true));
-    assert!(host.make_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, sheep_per_flock: 0, ..WorldStart::default() }));
+    assert!(host.make_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, world_generation: crate::worlds::flocked(0), ..WorldStart::default() }));
     let middle_coordinate = WORLD_SIDE_SUPERCHUNKS / 2;
     let viewport = Viewport { top_left_superchunk_cartesian: (middle_coordinate - 2, middle_coordinate - 2), bottom_right_superchunk_cartesian: (middle_coordinate + 2, middle_coordinate + 2) };
     let full_frame = loop {
@@ -98,7 +98,7 @@ fn the_terrain_asked_for_is_what_the_frames_bring() {
     }
     let corner_map = terrain.map(MapAsk { world: full_frame.world, first_cell_cartesian: (-1, -1), step: 1, size_in_pixels: (2, 2), mesh_lines_asked: false }).expect("the world run");
     assert_eq!(corner_map.cells.iter().map(Option::is_some).collect::<Vec<_>>(), [false, false, false, true], "only the world's first cell is in it");
-    assert!(host.make_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, sheep_per_flock: 0, ..WorldStart::default() }));
+    assert!(host.make_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, world_generation: crate::worlds::flocked(0), ..WorldStart::default() }));
     let next_frame = frame_that(&host, &frame_receiver, |candidate_frame| candidate_frame.world > full_frame.world);
     assert!(terrain.map(MapAsk { world: full_frame.world, first_cell_cartesian: (0, 0), step: 1, size_in_pixels: (1, 1), mesh_lines_asked: false }).is_none(), "the world before, run no more");
     assert!(terrain.heights(HeightsAsk { world: next_frame.world, first_cell_cartesian: (0, 0), size_in_cells: (1, 1), skipped_corners_cartesian: Vec::new() }).is_some());
@@ -117,7 +117,7 @@ fn a_frame_brings_the_clouds_a_tile_at_a_time() {
     use base_types::CLOUD;
     let folder = crate::worlds::folder("clouds");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
-    let mut world = server::start_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, sheep_per_flock: 0, ..WorldStart::default() });
+    let mut world = server::start_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, world_generation: crate::worlds::flocked(0), ..WorldStart::default() });
     // Clouds over one of the four superchunks alone.
     let clouded_superchunk = world.bitmap_arena().superchunk_indices()[test_random.draw_below(4) as usize];
     let clouded_corner_cartesian = clouded_superchunk.top_left().cartesian();

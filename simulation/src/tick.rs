@@ -7,8 +7,8 @@
 mod applying;
 
 use entity_manager::{WorldEntities, EntityReader, InstructionsApplied};
-use crate::superchunk_tick_state::conditional::{CountedWhenApplied, COUNTED_WHEN_APPLIED};
-use crate::superchunk_tick_state::{slots, Outbox, SuperchunkTickState};
+use crate::simulation_tick_state::conditional::{CountedWhenApplied, COUNTED_WHEN_APPLIED};
+use crate::simulation_tick_state::{slots, Outbox, SimulationTickState};
 use bitplane_manager::{BitmapArena, CellReader, WritesApplied};
 use coordinates::{CellIndex, SuperchunkIndex};
 use std::ops::AddAssign;
@@ -35,7 +35,7 @@ pub struct TickReport<R> {
     /// "Compare-and-write").
     pub instructions_compared: (u64, u64),
     /// What was counted as it was applied, by the number each rule's
-    /// counts were given (`SuperchunkTickState::count_under`).
+    /// counts were given (`SimulationTickState::count_under`).
     pub counted_when_applied: CountedWhenApplied,
     /// The authors whose act reached over a border, each applied
     /// once to every superchunk it landed in
@@ -137,7 +137,7 @@ impl Simulation {
     pub fn tick<R, F>(&mut self, bitmap_arena: &mut BitmapArena, entity_store: &mut WorldEntities, seed: u64, rule: F) -> TickReport<R>
     where
         R: Default + AddAssign + Send,
-        F: Fn(&mut SuperchunkTickState) -> R + Sync,
+        F: Fn(&mut SimulationTickState) -> R + Sync,
     {
         let count = bitmap_arena.superchunks().len();
         self.outboxes.resize_with(count, Outbox::default);
@@ -165,7 +165,7 @@ impl Simulation {
                     break;
                 };
                 let (ref mut outbox, ref mut kept_random_stream) = *claimed_turn.lock().expect("a superchunk's turn");
-                let mut tick_state = SuperchunkTickState::new(&superchunks[turn_index], &entity_superchunks[turn_index], current_tick, &bitmap_reader, &entity_reader, outbox, RandomSource::new(kept_random_stream.1.whole_state()), &mut samples);
+                let mut tick_state = SimulationTickState::new(&superchunks[turn_index], &entity_superchunks[turn_index], current_tick, &bitmap_reader, &entity_reader, outbox, RandomSource::new(kept_random_stream.1.whole_state()), &mut samples);
                 part_total += rule(&mut tick_state);
                 debug_assert_eq!(tick_state.skip_tag_sets_open, 0, "a turn ended with a skip-tag set open");
                 // Where its random numbers have come to: the next tick goes on from there.

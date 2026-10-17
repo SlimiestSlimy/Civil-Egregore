@@ -5,7 +5,7 @@
 
 use simulation::simulation_api::simulation_time::SimulationTime;
 use base_types::{passes_a_slope, pressure_falls_by, Climate, CLIMATE, CLOUD, ELEVATION, HIGHEST_PRESSURE, HUMIDITY_A_LEVEL_OF_CLOUD, PRESSURE_AT_REST, STRONGEST_WIND, TILES_ABOUT, WEATHER_TILE_SCALE, WET, Wind};
-use simulation::simulation_api::{on_each_sampled, RuleCode, cell_reads_and_writes, place_counted, tick_and_random_stream, CellIndex, Chance, RuleCounts, SuperchunkTickState};
+use simulation::simulation_api::{on_each_sampled, RuleCode, cell_reads_and_writes, place_counted, tick_and_random_stream, CellIndex, Chance, RuleCounts, SimulationTickState};
 
 /// The simulation time from one sample of a tile to the next, on
 /// average: what its chance each tick is worked out from, so the
@@ -74,7 +74,7 @@ const CARRIED_OF_A_CLIMATE: u64 = 3;
 
 /// The tile a step of `(tiles_across, tiles_down)` tiles from `tile`, and its
 /// climate: none past the world's edge or where it is not loaded.
-fn tile_beside(tick_state: &SuperchunkTickState, tile: CellIndex, (tiles_across, tiles_down): (i32, i32)) -> Option<(CellIndex, Climate)> {
+fn tile_beside(tick_state: &SimulationTickState, tile: CellIndex, (tiles_across, tiles_down): (i32, i32)) -> Option<(CellIndex, Climate)> {
     let beside_tile = tile.at_cartesian_offset(tiles_across * TILE_SIDE, tiles_down * TILE_SIDE)?;
     cell_reads_and_writes::value(tick_state, CLIMATE, beside_tile).map(|climate| (beside_tile, Climate::of_number(climate)))
 }
@@ -82,7 +82,7 @@ fn tile_beside(tick_state: &SuperchunkTickState, tile: CellIndex, (tiles_across,
 /// Whether the tile at `tile` has a tile about it that is not
 /// loaded, or is past the world's edge: its wind is what comes in
 /// from there, and nothing inside turns it.
-fn at_the_border_of_what_is_loaded(tick_state: &SuperchunkTickState, tile: CellIndex) -> bool {
+fn at_the_border_of_what_is_loaded(tick_state: &SimulationTickState, tile: CellIndex) -> bool {
     TILES_ABOUT.iter().any(|&step| tile_beside(tick_state, tile, step).is_none())
 }
 
@@ -90,7 +90,7 @@ fn at_the_border_of_what_is_loaded(tick_state: &SuperchunkTickState, tile: CellI
 /// to the one at `to_tile`: the more downhill, the less uphill, mildly
 /// either way (`passes_a_slope`) -- the one resistance of the land,
 /// to pressure and to wind alike.
-fn air_passes(tick_state: &SuperchunkTickState, from_tile: CellIndex, to_tile: CellIndex, whole_parts: u32) -> u32 {
+fn air_passes(tick_state: &SimulationTickState, from_tile: CellIndex, to_tile: CellIndex, whole_parts: u32) -> u32 {
     let elevation_of = |tile| cell_reads_and_writes::value(tick_state, ELEVATION, tile).unwrap_or(0) as i32;
     passes_a_slope(elevation_of(to_tile) - elevation_of(from_tile), whole_parts)
 }
@@ -99,7 +99,7 @@ fn air_passes(tick_state: &SuperchunkTickState, from_tile: CellIndex, to_tile: C
 /// `climate_here` becomes `climate_left` but for that unit, to the one at `to_tile`, of
 /// climate `climate_there`: both climates under both compares, so no air is
 /// made or lost wherever a border falls between them.
-fn give_pressure(tick_state: &mut SuperchunkTickState, (from_tile, climate_here, climate_left): (CellIndex, Climate, Climate), (to_tile, climate_there): (CellIndex, Climate), count_place: usize) {
+fn give_pressure(tick_state: &mut SimulationTickState, (from_tile, climate_here, climate_left): (CellIndex, Climate, Climate), (to_tile, climate_there): (CellIndex, Climate), count_place: usize) {
     let (from_climate_after, to_climate_after) = (Climate { pressure: climate_here.pressure - 1, ..climate_left }, Climate { pressure: climate_there.pressure + 1, ..climate_there });
     cell_reads_and_writes::change_both(tick_state, CLIMATE, (from_tile, climate_here.plane_number(), from_climate_after.plane_number()), (to_tile, climate_there.plane_number(), to_climate_after.plane_number()), count_place);
 }
@@ -125,7 +125,7 @@ pub const fn wind_leans_pressure(wind: Wind, step_tiles: (i32, i32)) -> u32 {
 /// less often. The air leaving turns the tile's own wind that way
 /// (`Wind::pushed_by`), unless it is at the border of what is loaded.
 /// Whether a unit went.
-fn pressure_falls(tick_state: &mut SuperchunkTickState, sampled_tile: CellIndex, climate_here: Climate) -> bool {
+fn pressure_falls(tick_state: &mut SimulationTickState, sampled_tile: CellIndex, climate_here: Climate) -> bool {
     let tiles_beside = TILES_ABOUT.map(|step| tile_beside(tick_state, sampled_tile, step));
     let mut fall_weights = tiles_beside.map(|tile_and_climate| tile_and_climate.map_or(0, |(_, climate_beside)| pressure_falls_by(climate_here.pressure, climate_beside.pressure)));
     for (way, fall_weight) in fall_weights.iter_mut().enumerate() {
@@ -157,7 +157,7 @@ fn pressure_falls(tick_state: &mut SuperchunkTickState, sampled_tile: CellIndex,
 /// tile it comes from (`Climate::with_humidity_carried_from` and the
 /// two beside it). A tile at the border of what is loaded keeps its
 /// wind. Nothing is queued where the two are alike already.
-fn carry_climate(tick_state: &mut SuperchunkTickState, climate_here: Climate, towards_tile: CellIndex, climate_there: Climate) {
+fn carry_climate(tick_state: &mut SimulationTickState, climate_here: Climate, towards_tile: CellIndex, climate_there: Climate) {
     let climate_carried = match tick_and_random_stream::random_stream(tick_state).draw_below(CARRIED_OF_A_CLIMATE) {
         0 => climate_there.with_humidity_carried_from(climate_here),
         1 => climate_there.with_temperature_carried_from(climate_here),
@@ -177,7 +177,7 @@ fn carry_climate(tick_state: &mut SuperchunkTickState, climate_here: Climate, to
 /// onto that tile -- so winds that meet on a tile raise it -- and
 /// with it a level of its cloud, if it has one and there is room.
 /// Whether a level of cloud went.
-fn wind_blows(tick_state: &mut SuperchunkTickState, sampled_tile: CellIndex, climate_here: Climate, cloud: u32) -> bool {
+fn wind_blows(tick_state: &mut SimulationTickState, sampled_tile: CellIndex, climate_here: Climate, cloud: u32) -> bool {
     let wind_draw_bound = STRONGEST_WIND as u64 + 1;
     let (drawn_across, drawn_down) = (tick_and_random_stream::random_stream(tick_state).draw_below(wind_draw_bound) as u32, tick_and_random_stream::random_stream(tick_state).draw_below(wind_draw_bound) as u32);
     let Some((towards_tile, climate_there)) = climate_here.wind.step_drawn(drawn_across, drawn_down).and_then(|step| tile_beside(tick_state, sampled_tile, step)) else {
@@ -220,7 +220,7 @@ pub const fn deepens_and_thins(climate: Climate, cloud: u32, over_water: bool) -
 /// The cloud forms: that at level `cloud` over the tile at `sampled_tile`,
 /// of climate `climate_here`, deepens or thins a level, or stays
 /// ([`deepens_and_thins`]).
-fn cloud_forms(tick_state: &mut SuperchunkTickState, sampled_tile: CellIndex, climate_here: Climate, cloud: u32) {
+fn cloud_forms(tick_state: &mut SimulationTickState, sampled_tile: CellIndex, climate_here: Climate, cloud: u32) {
     // A tile is water's if most of its cells are under it.
     let over_water = cell_reads_and_writes::held_in_tile(tick_state, WET, sampled_tile) * 2 > (TILE_SIDE * TILE_SIDE) as u32;
     let (deepen_parts, thin_parts) = deepens_and_thins(climate_here, cloud, over_water);
@@ -242,7 +242,7 @@ fn cloud_forms(tick_state: &mut SuperchunkTickState, sampled_tile: CellIndex, cl
 /// its cloud forms or clears ([`cloud_forms`]), unless a level of it
 /// has just been blown off.
 #[inline]
-pub fn rule(tick_state: &mut SuperchunkTickState, sampled_tile: CellIndex, counts: &mut RuleCounts) {
+pub fn rule(tick_state: &mut SimulationTickState, sampled_tile: CellIndex, counts: &mut RuleCounts) {
     counts[SAMPLED_COUNT] += 1;
     let (Some(climate), Some(cloud)) = (cell_reads_and_writes::value(tick_state, CLIMATE, sampled_tile), cell_reads_and_writes::value(tick_state, CLOUD, sampled_tile)) else {
         return;

@@ -120,7 +120,7 @@ superchunk)`**: written from memory, or copied from where it is paged.
 `WORLD_FILE` (`world.csv`) and `HOT_FILE` (`hot.csv`): their names in
 a world's folder.
 
-**`WorldInfo`** `{seed, tick, layers, side_in_superchunks, forced_hot, hot_entity, camera_flock, without_camera_flock, generation_numbers}` -- `forced_hot` only with a `side_in_superchunks`, refused otherwise; `hot_entity` a number, the runner knowing the kinds; `camera_flock` the sheep each superchunk generated in the viewport starts with, if its camera loads superchunks; `without_camera_flock` the superchunks generated out of its view, still owed theirs, sorted; `generation_numbers` sorted by name -- no name: a world's is its folder's --; read by its rows' names in any order, the header first, missing ones their defaults but the seed ("On disk" in `chunk_storage.md`); **`DiskError`**: `IoFailed(path,
+**`WorldInfo`** `{seed, tick, layers, side_in_superchunks, forced_hot, camera_loads, unpopulated, generation_numbers}` -- `forced_hot` only with a `side_in_superchunks`, refused otherwise; `camera_loads` whether its camera loads superchunks; `unpopulated` the superchunks generated and not hot since, each populated the first tick it is, sorted; `generation_numbers` sorted by name -- no name: a world's is its folder's --; read by its rows' names in any order, the header first, missing ones their defaults but the seed ("On disk" in `chunk_storage.md`); **`DiskError`**: `IoFailed(path,
 error)` or `Invalid(path, what)`. **`write_world(folder, info)`**,
 **`read_world(folder)`**; **`write_image(folder, superchunk,
 image)`**, **`read_image`**, **`copy_image(from, folder, superchunk)`**

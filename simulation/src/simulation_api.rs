@@ -13,6 +13,7 @@ pub mod compare_and_write;
 pub mod entity_reads_and_writes;
 pub mod tile_masks;
 mod rule_interface;
+mod worldgen_interface;
 pub mod tick_and_random_stream;
 // Composed by the actions, never by a rule: a rule asks what is about a cell, and is not shown the tiles.
 pub(crate) mod four_tiles_under_the_neighbours;
@@ -25,7 +26,8 @@ pub use chunk_storage::{Bits4, LayerType, WidePlane};
 pub use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOUR_OFFSETS, SUPERCHUNK_SIDE_CELLS};
 pub use entity_manager::{Attribute, AttributeBlock, AttributeType, EntityRef, EntityType, Header, Layout, Member, WholeAttribute};
 pub use rule_interface::{on_each_sampled, RuleCode, RuleContext, RuleMaster};
-pub use crate::{TickReport, SuperchunkTickState};
+pub use worldgen_interface::{GenerationNumbers, WorldgenCode};
+pub use crate::{TickReport, SimulationTickState};
 pub use utilities::chance::Chance;
 pub use utilities::rng::RandomSource;
 

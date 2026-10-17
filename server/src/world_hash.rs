@@ -46,24 +46,24 @@ pub fn world_hash(world: &mut World) -> WorldHash {
     let mut cells = 0;
     for &layer_type in &world.world_info.layers {
         cells = fold_word(cells, layer_type.0);
-        for (chunk, bucket) in world.bitmap_arena.buckets_of(layer_type) {
+        for (chunk, bucket) in world.bitmap_arena().buckets_of(layer_type) {
             cells = fold_all(fold_word(fold_word(cells, chunk.0), u64::from(bucket.count())), bucket.words());
         }
     }
-    let mut entities_hash = fold_word(0, world.entity_store.len() as u64);
-    for entity in world.entity_store.iter() {
+    let mut entities_hash = fold_word(0, world.entity_store().len() as u64);
+    for entity in world.entity_store().iter() {
         let header = entity.header;
         entities_hash = [header.entity_type.0, header.stood_cell.0, header.wake, entity.attribute_list().len() as u64].into_iter().fold(entities_hash, fold_word);
         entities_hash = entity.attribute_list().iter().flat_map(|attribute_block| attribute_block.0).fold(entities_hash, fold_word);
     }
-    let random_streams = world.world_simulation.random_states().fold(0, |streams_hash, (superchunk, random_state)| fold_word(fold_word(streams_hash, superchunk.0), random_state));
+    let random_streams = world.world_simulation().random_states().fold(0, |streams_hash, (superchunk, random_state)| fold_word(fold_word(streams_hash, superchunk.0), random_state));
     let fold_due_tick = |halos_hash: u64, (superchunk, tick): (coordinates::SuperchunkIndex, u64)| fold_word(fold_word(halos_hash, superchunk.0), tick);
-    let hot = world.bitmap_arena.superchunk_indices().iter().fold(0, |hot_hash, superchunk| fold_word(hot_hash, superchunk.0));
+    let hot = world.bitmap_arena().superchunk_indices().iter().fold(0, |hot_hash, superchunk| fold_word(hot_hash, superchunk.0));
     let halos = world.cooling().fold(fold_word(world.warming().fold(fold_word(hot, 0), fold_due_tick), 0), fold_due_tick);
-    let mut cold = fold_word(0, world.cold.len() as u64);
-    for (&superchunk, cold_state) in &world.cold {
+    let mut cold = fold_word(0, world.cold().len() as u64);
+    for (&superchunk, cold_state) in world.cold() {
         cold = fold_all(fold_word(cold, superchunk.0), cold_state);
-        cold = fold_all(cold, world.chunk_storage.shared_image(superchunk).as_ref().map_or(&[][..], |image| image.words()));
+        cold = fold_all(cold, world.chunk_storage().shared_image(superchunk).as_ref().map_or(&[][..], |image| image.words()));
     }
-    WorldHash { tick: world.entity_store.current_tick(), cells, entities: entities_hash, random_streams, halos, cold }
+    WorldHash { tick: world.entity_store().current_tick(), cells, entities: entities_hash, random_streams, halos, cold }
 }

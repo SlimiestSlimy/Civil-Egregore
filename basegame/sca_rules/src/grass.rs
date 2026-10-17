@@ -6,7 +6,7 @@
 use crate::growing::{humid_enough_to_spread, too_harsh_to_live};
 use base_types::{GRASS, WET};
 use simulation::simulation_api::simulation_time::SimulationTime;
-use simulation::simulation_api::{on_each_sampled, RuleCode, cell_reads_and_writes, place_counted, tick_and_random_stream, CellIndex, Chance, RuleCounts, SuperchunkTickState, NEIGHBOUR_OFFSETS};
+use simulation::simulation_api::{on_each_sampled, RuleCode, cell_reads_and_writes, place_counted, tick_and_random_stream, CellIndex, Chance, RuleCounts, SimulationTickState, NEIGHBOUR_OFFSETS};
 
 /// The simulation time a cell of grass takes, on average, to try to
 /// spread: what its chance each tick is worked out from, so the grass
@@ -51,7 +51,7 @@ pub const DECAYS_COUNT: usize = place_counted(&COUNT_NAMES, "decays");
 /// held against its climate, it decays with a chance of the
 /// harshness of its tile's ([`too_harsh_to_live`]).
 #[inline]
-pub fn rule(tick_state: &mut SuperchunkTickState, cell: CellIndex, counts: &mut RuleCounts) {
+pub fn rule(tick_state: &mut SimulationTickState, cell: CellIndex, counts: &mut RuleCounts) {
     counts[SAMPLED_COUNT] += 1;
     if tick_and_random_stream::random_stream(tick_state).chance_among(SPREAD_CHANCE, SAMPLE_CHANCE) {
         let (dx, dy) = NEIGHBOUR_OFFSETS[tick_and_random_stream::random_stream(tick_state).draw_below(NEIGHBOUR_OFFSETS.len() as u64) as usize];

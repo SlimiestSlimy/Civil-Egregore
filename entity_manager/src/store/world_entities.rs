@@ -34,7 +34,7 @@ impl WorldEntities {
     /// None, at tick `current_tick`, of a world running with
     /// `frozen_types`: what a world's entities start as, and a save's are
     /// put back into.
-    pub fn for_types<RuleCode>(frozen_types: &FrozenTypes<RuleCode>, current_tick: u64) -> Self {
+    pub fn for_types(frozen_types: &FrozenTypes, current_tick: u64) -> Self {
         Self { current_tick, default_attributes: Arc::new(DefaultAttributes::of_types(frozen_types)), ..Self::default() }
     }
 

@@ -4066,6 +4066,7 @@ dependencies = [
  "simulation",
  "type_registry",
  "utilities",
+ "worldgen",
 ]
 
 [[package]]
@@ -4415,9 +4416,7 @@ dependencies = [
  "chunk_storage",
  "coordinates",
  "entity_manager",
- "entity_rules",
  "protocol",
- "sca_rules",
  "simulation",
  "type_registry",
  "utilities",
@@ -5812,6 +5811,9 @@ dependencies = [
  "bitmap",
  "chunk_storage",
  "coordinates",
+ "entity_rules",
+ "libraries",
+ "simulation",
  "type_registry",
  "utilities",
 ]

@@ -81,7 +81,7 @@ impl Halos {
 
     /// Starts warming `superchunk`, to turn hot at tick `due_tick`: kept as
     /// it is if it is lingering, else sent as a job.
-    pub fn start_warming(&mut self, lent_world: &mut LentWorld<'_>, superchunk: SuperchunkIndex, due_tick: u64) {
+    pub(crate) fn start_warming(&mut self, lent_world: &mut LentWorld<'_>, superchunk: SuperchunkIndex, due_tick: u64) {
         let warmed_from = if lent_world.bitmap_arena.hold_lingering(superchunk) {
             WarmedFrom::Lingering
         } else {

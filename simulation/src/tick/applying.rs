@@ -5,9 +5,9 @@
 //! superchunk it lands in has come to it
 //! (`docs/simulation.md`, "An act over a border").
 
-use crate::superchunk_tick_state::apply::PartApplied;
-use crate::superchunk_tick_state::landing::{LandingInOne, LandingInSeveral};
-use crate::superchunk_tick_state::{slot_toward, slot_between, slots, Outbox, ACROSS_QUEUE, SLOTS};
+use crate::simulation_tick_state::apply::PartApplied;
+use crate::simulation_tick_state::landing::{LandingInOne, LandingInSeveral};
+use crate::simulation_tick_state::{slot_toward, slot_between, slots, Outbox, ACROSS_QUEUE, SLOTS};
 use bitplane_manager::Superchunk;
 use coordinates::SuperchunkIndex;
 use entity_manager::SuperchunkEntities;

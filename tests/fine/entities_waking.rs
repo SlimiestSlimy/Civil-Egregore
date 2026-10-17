@@ -8,7 +8,7 @@ use crate::arenas::*;
 use crate::walkers::*;
 use coordinates::{SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{AttributeBlock, Header, WHEEL_TICKS};
-use simulation::{Simulation, SuperchunkTickState};
+use simulation::{Simulation, SimulationTickState};
 use std::sync::Mutex;
 
 /// Attributes added and removed every tick, by hundreds of entities in
@@ -80,7 +80,7 @@ fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
     entity_store.queue_add(walker_header(cell(start_column, 100), 0), &[AttributeBlock::holding_value(WOKEN_COUNT, 0)]);
     entity_store.apply();
     let mut world_simulation = Simulation::new(2);
-    let step = |tick_state: &mut SuperchunkTickState| {
+    let step = |tick_state: &mut SimulationTickState| {
         for entity in tick_state.woken_entities() {
             let stepped_header = Header { stood_cell: entity.header.stood_cell.at_cartesian_offset(1, 0).unwrap(), wake: tick_state.current_tick() + 1, ..entity.header };
             simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, stepped_header, &[AttributeBlock::holding_value(WOKEN_COUNT, entity.attribute(WOKEN_COUNT).unwrap() + 1)]);
@@ -108,7 +108,7 @@ fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
 #[test]
 fn any_number_of_threads_ticks_entities_the_same() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
-    let wander_rule = |tick_state: &mut SuperchunkTickState| {
+    let wander_rule = |tick_state: &mut SimulationTickState| {
         let mut change_count = 0;
         for entity in tick_state.woken_entities() {
             let header = entity.header;

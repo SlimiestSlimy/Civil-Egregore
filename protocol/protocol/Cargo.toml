@@ -11,3 +11,4 @@ base_types = { path = "../../basegame/base_types" }
 sca_rules = { path = "../../basegame/sca_rules" }
 entity_rules = { path = "../../basegame/entity_rules" }
 libraries = { path = "../../basegame/libraries" }
+worldgen = { path = "../../basegame/worldgen" }
