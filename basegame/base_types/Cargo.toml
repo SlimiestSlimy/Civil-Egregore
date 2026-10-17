@@ -1,7 +1,0 @@
-[package]
-name = "base_types"
-edition = "2024"
-description = "Civil Egregore's base game's types: the layers, planes, entities, attributes and rules every world has by default, each at its fixed number"
-
-[dependencies]
-type_registry = { path = "../../type_registry" }

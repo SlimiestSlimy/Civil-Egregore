@@ -27,21 +27,21 @@ sliders its generation is tuned by.
 | [`docs/civil_egregore.md`](docs/civil_egregore.md) | what Civil Egregore is, and every decision about it so far: chunks, superchunks, layers, the simulation's plan |
 | [`src/`](src/) | the `Civil_Egregore` crate: the program, which is only the list of crates with commands -- `cargo run --release -- help` |
 | [`server/`](server/) | the world as a whole: made from a seed, ticked -- rules and entities together -- saved and loaded as a folder whose name is the world's; which entity keeps the world hot; its commands and its diagnostics tools |
-| [`sca_rules/`](sca_rules/) | the rules of the cells, a stochastic cell automaton (SCA), a file each: grass over dirt, and trees |
-| [`entity_manager/`](entity_manager/) | the entities as kept, beside the bitplane manager's cells: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied |
-| [`entity_rules/`](entity_rules/) | the entities, a file each: so far the sheep, eating the grass |
-| [`coordinates/`](coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |
-| [`chunk_storage/`](chunk_storage/) | chunks as stored, what loading and saving work on: height maps, the layer codec, superchunk images, the cold pool and the writeback ring |
-| [`worldgen/`](worldgen/) | world generation: every cell's height from the world's seed, the walls between cells more than a step apart in height, and how grass and trees lie in patches |
-| [`pathfinding/`](pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
-| [`renderer/`](renderer/) | Civil Egregore on the screen: a Bevy window, opening on the main menu, asking the server's host, on a thread of its own, for the cells of its viewport |
-| [`gui/`](gui/) | Civil Egregore's menus, over whatever window shows it, a part a module: the main menu -- a new world set up, one saved opened, leaving -- the options Escape opens over a world, and the sliders of the numbers `utilities::tuning` names |
-| [`simulation/`](simulation/) | the simulation: SCA sampling, the two-phase tick and its outboxes, a superchunk's turn -- a bucket a chunk, a timer wheel a superchunk; and what is hot: the halos about the hot entities, warming and cooling by the tick, within the world's size if it has one. Its raw compares and writes are its own; its API, `simulation_api`, is what the base game is written in: every read of a turn, and every write, under a skip-tag set of compares -- cells asked and set, the cells about a cell, entities made and committed, walking |
-| [`bitplane_manager/`](bitplane_manager/) | the hot bitplanes: layers decoded into the bitmap arena, where cells are read and written -- writes batched -- and written back; planes of one bit a cell, or 2, 4, 8 or 16 |
+| [`server/basegame/sca_rules/`](server/basegame/sca_rules/) | the rules of the cells, a stochastic cell automaton (SCA), a file each: grass over dirt, and trees |
+| [`server/entity_manager/`](server/entity_manager/) | the entities as kept, beside the bitplane manager's cells: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied |
+| [`server/basegame/entity_rules/`](server/basegame/entity_rules/) | the entities, a file each: so far the sheep, eating the grass |
+| [`utilities/coordinates/`](utilities/coordinates/) | where things are: cells, chunks and superchunks, by Morton index, and cartesian where named |
+| [`server/chunk_storage/`](server/chunk_storage/) | chunks as stored, what loading and saving work on: height maps, the layer codec, superchunk images, the cold pool and the writeback ring |
+| [`server/basegame/worldgen/`](server/basegame/worldgen/) | world generation: every cell's height from the world's seed, the walls between cells more than a step apart in height, and how grass and trees lie in patches |
+| [`server/pathfinding/`](server/pathfinding/) | how an entity finds its way: waves and A* over an area of 16x16 cells kept as masks |
+| [`client/renderer/`](client/renderer/) | Civil Egregore on the screen: a Bevy window, opening on the main menu, asking the server's host, on a thread of its own, for the cells of its viewport |
+| [`client/gui/`](client/gui/) | Civil Egregore's menus, over whatever window shows it, a part a module: the main menu -- a new world set up, one saved opened, leaving -- the options Escape opens over a world, and the sliders of the numbers `utilities::tuning` names |
+| [`server/simulation/`](server/simulation/) | the simulation: SCA sampling, the two-phase tick and its outboxes, a superchunk's turn -- a bucket a chunk, a timer wheel a superchunk; and what is hot: the halos about the hot entities, warming and cooling by the tick, within the world's size if it has one. Its raw compares and writes are its own; its API, `simulation_api`, is what the base game is written in: every read of a turn, and every write, under a skip-tag set of compares -- cells asked and set, the cells about a cell, entities made and committed, walking |
+| [`server/bitplane_manager/`](server/bitplane_manager/) | the hot bitplanes: layers decoded into the bitmap arena, where cells are read and written -- writes batched -- and written back; planes of one bit a cell, or 2, 4, 8 or 16 |
 | [`tessera/`](tessera/) | Tessera, the lossless encoding of a 256x256 bitmap: a project of its own, with its own [README](tessera/README.md), tests, tools and docs |
 | [`AI_SCRATCHPAD/`](AI_SCRATCHPAD/) | the AI's own probes of a running world, used while working on the code: no part of the program, and nothing depends on it |
-| [`type_registry/`](type_registry/) | the one table of every type a world has -- layer, wide plane, entity type, attribute, rule -- each with its name, kind, ID and width, and the build failing on any two that clash |
-| [`bitmap/`](bitmap/) | the 256x256 bitmap every layer is, laid out in Morton order |
+| [`protocol/type_registry/`](protocol/type_registry/) | the one table of every type a world has -- layer, wide plane, entity type, attribute, rule -- each with its name, kind, ID and width, and the build failing on any two that clash |
+| [`utilities/bitmap/`](utilities/bitmap/) | the 256x256 bitmap every layer is, laid out in Morton order |
 | [`utilities/`](utilities/) | general-purpose utilities: the thread dispatcher, commands and their parameters, the one seed tests and tools run on, the table printer and measurement reports, a seeded random source, a fixed-capacity list, the process's memory; and the settings: Civil Egregore's one folder on a machine, the file of what is changed there, the defaults written by hand in `utilities/default_settings.csv`, and a world's folder from its name |
 
 Every crate but the root has the same folders -- `docs/`, `src/`,
@@ -59,7 +59,7 @@ Builds are for the x86-64 processors since about 2013 to 2015
 many machines. They are one cargo workspace: one lock file and one `target/`, here at
 the root, whichever folder cargo is run from, on the toolchain
 `rust-toolchain.toml` names. `cargo test` at the root tests every crate
-but the renderer and its menus (`gui/`), which bring Bevy. Run from a
+but the renderer and its menus (`client/gui/`), which bring Bevy. Run from a
 crate's folder, cargo keeps to that crate. Only the root is a program
 -- `cargo run --release` with no more said opens the window, and
 `--no-default-features` builds it without the renderer: every other
@@ -87,15 +87,16 @@ What is changed on a machine is kept in Civil Egregore's one folder there
 (`~/.local/share/Civil Egregore` on Linux): its settings, and the worlds
 saved, a folder each.
 
-`type_registry/` depends on `utilities/` alone, and whatever names a
-type on it; Tessera depends on `bitmap/` and `utilities/` beside it;
-`coordinates/` on `bitmap/`; `chunk_storage/` on those and Tessera;
-`bitplane_manager/` on `chunk_storage/` and `coordinates/`;
-`entity_manager/` on `coordinates/` and `bitmap/`; `simulation/` on
-`bitplane_manager/`, `entity_manager/` and `pathfinding/`, which
-knows nothing of it and meets it in its API; the base game, `basegame/`,
+`protocol/type_registry/` depends on `utilities/` alone, and whatever names a
+type on it; Tessera depends on `utilities/bitmap/` and `utilities/` beside it;
+`utilities/coordinates/` on `utilities/bitmap/`; `server/chunk_storage/` on those and Tessera;
+`server/bitplane_manager/` on `server/chunk_storage/` and `utilities/coordinates/`;
+`server/entity_manager/` on `utilities/coordinates/` and `utilities/bitmap/`; `server/simulation/` on
+`server/bitplane_manager/`, `server/entity_manager/` and `server/pathfinding/`, which
+knows nothing of it and meets it in its API; the base game, `server/basegame/`,
 on the simulation's API alone, through which it reaches the
-simulation; `worldgen/` on `chunk_storage/` and
-`coordinates/`; `server/` on the rules, the entities and `worldgen/`;
-the program, `src/`, on `server/` and Tessera; `gui/` on `utilities/`
-alone; the renderer on `server/` and `gui/`.
+simulation; `server/basegame/worldgen/` on `server/chunk_storage/` and
+`utilities/coordinates/`; `server/` on `server/simulation/`, `protocol/` --
+whose default types bring the base game -- and `server/basegame/worldgen/`;
+the program, `src/`, on `server/` and Tessera; `client/gui/` on `utilities/`
+alone; the renderer on `server/` and `client/gui/`.

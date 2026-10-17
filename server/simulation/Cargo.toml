@@ -1,0 +1,14 @@
+[package]
+name = "simulation"
+edition = "2024"
+description = "Civil Egregore's simulation: the sampling of a stochastic cell automaton (SCA), the two-phase tick and its thread dispatcher, its raw compares and writes, and the API the base game is written in"
+
+[dependencies]
+entity_manager = { path = "../entity_manager" }
+bitmap = { path = "../../utilities/bitmap" }
+bitplane_manager = { path = "../bitplane_manager" }
+chunk_storage = { path = "../chunk_storage" }
+coordinates = { path = "../../utilities/coordinates" }
+utilities = { path = "../../utilities" }
+type_registry = { path = "../../protocol/type_registry" }
+pathfinding = { path = "../pathfinding" }

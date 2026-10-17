@@ -6,8 +6,6 @@ version = 4
 name = "AI_SCRATCHPAD"
 version = "0.0.0"
 dependencies = [
- "base_types",
- "bitmap",
  "bitplane_manager",
  "chunk_storage",
  "coordinates",
@@ -15,9 +13,7 @@ dependencies = [
  "protocol",
  "server",
  "simulation",
- "type_registry",
  "utilities",
- "worldgen",
 ]
 
 [[package]]

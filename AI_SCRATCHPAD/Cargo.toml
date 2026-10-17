@@ -6,15 +6,11 @@ description = "The AI's own scratchpad: probes of Civil Egregore, questions aske
 # NOTHING DEPENDS ON THIS CRATE: it is no part of the program, and may be
 # deleted whole without anything else changing.
 [dependencies]
-type_registry = { path = "../type_registry" }
-coordinates = { path = "../coordinates" }
+coordinates = { path = "../utilities/coordinates" }
 server = { path = "../server" }
 utilities = { path = "../utilities" }
-worldgen = { path = "../basegame/worldgen" }
-bitmap = { path = "../bitmap" }
-chunk_storage = { path = "../chunk_storage" }
-simulation = { path = "../simulation" }
-bitplane_manager = { path = "../bitplane_manager" }
-entity_manager = { path = "../entity_manager" }
-protocol = { path = "../protocol/protocol" }
-base_types = { path = "../basegame/base_types" }
+chunk_storage = { path = "../server/chunk_storage" }
+simulation = { path = "../server/simulation" }
+bitplane_manager = { path = "../server/bitplane_manager" }
+entity_manager = { path = "../server/entity_manager" }
+protocol = { path = "../protocol" }

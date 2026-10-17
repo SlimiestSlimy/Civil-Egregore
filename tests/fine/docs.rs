@@ -341,7 +341,7 @@ fn the_code_points_at_docs_that_are_there() {
 /// The crates rules are written in, the base game's: what they depend
 /// on is the simulation's API and the base game, and they ask their
 /// turn nothing themselves.
-const RULES_CRATES: [&str; 2] = ["basegame/sca_rules", "basegame/entity_rules"];
+const RULES_CRATES: [&str; 2] = ["server/basegame/sca_rules", "server/basegame/entity_rules"];
 
 /// A rule asks the simulation's API, and nothing else: no rule's
 /// source calls anything of its turn's own -- the turn is handed on to
