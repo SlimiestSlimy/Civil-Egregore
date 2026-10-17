@@ -5,6 +5,9 @@ applying the WorkspaceEdits it returns.
   rust_analyzer_driver.py rename <file> <line> <column> <new_name> [...more renames as groups of 4]
   rust_analyzer_driver.py move <old_path> <new_path> [...more pairs]
   rust_analyzer_driver.py refs <file> <line> <column>
+  rust_analyzer_driver.py diagnostics [file ...]
+The diagnostics are rust-analyzer's own, of each file given -- every
+tracked .rs file if none is -- errors and warnings, as file:line: text.
 
 Lines and columns are 1-based, as an editor shows them; the column is the
 character within the line. Paths are relative to the workspace root.
@@ -26,7 +29,7 @@ def path_of(uri):
 class Server:
     def __init__(self):
         self.process = subprocess.Popen([SERVER], cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        self.next_id, self.replies, self.progress_ended = 0, {}, set()
+        self.next_id, self.replies, self.progress_ended, self.diagnostics = 0, {}, set(), {}
         self.reply_ready = threading.Condition()
         threading.Thread(target=self.read_loop, daemon=True).start()
 
@@ -56,6 +59,10 @@ class Server:
             elif "id" in message:
                 with self.reply_ready:
                     self.replies[message["id"]] = message
+                    self.reply_ready.notify_all()
+            elif message.get("method") == "textDocument/publishDiagnostics":
+                with self.reply_ready:
+                    self.diagnostics[message["params"]["uri"]] = message["params"]["diagnostics"]
                     self.reply_ready.notify_all()
             elif message.get("method") == "$/progress":
                 value = message["params"]["value"]
@@ -192,6 +199,20 @@ def main():
             found = server.request("textDocument/references", {"textDocument": {"uri": uri_of(path)}, "position": {"line": int(line) - 1, "character": int(column) - 1}, "context": {"includeDeclaration": True}})
             for location in found or []:
                 print(f"{os.path.relpath(path_of(location['uri']), ROOT)}:{location['range']['start']['line'] + 1}")
+        elif command == "diagnostics":
+            paths = arguments or [tracked for tracked in subprocess.run(["git", "ls-files", "*.rs"], cwd=ROOT, capture_output=True, text=True).stdout.split() if not tracked.startswith(("diagnostics/", "server/tessera/", "tessera/"))]
+            for path in paths:
+                server.open(path)
+            uris = [uri_of(path) for path in paths]
+            with server.reply_ready:
+                server.reply_ready.wait_for(lambda: all(uri in server.diagnostics for uri in uris), 300)
+            time.sleep(5)
+            for path, uri in zip(paths, uris):
+                for diagnostic in server.diagnostics.get(uri, []):
+                    if diagnostic.get("severity", 1) <= 2:
+                        print(f"{path}:{diagnostic['range']['start']['line'] + 1}: {diagnostic.get('code', '')} {diagnostic['message'].splitlines()[0]}")
+            missing = [path for path, uri in zip(paths, uris) if uri not in server.diagnostics]
+            print(f"{len(paths)} files looked at, {len(missing)} never answered")
         else:
             sys.exit(__doc__)
     finally:

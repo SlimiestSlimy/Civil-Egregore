@@ -8,9 +8,7 @@
 
 mod acts_over_a_border;
 mod asking_the_host;
-mod how_steep_the_land_is;
 mod ticks_under_a_wide_viewport;
-mod what_a_generation_makes;
 
 use protocol::flags::{Flag, FlagError, FlagKind, FlagParser};
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, ServerParameters};
@@ -55,7 +53,7 @@ impl ProbeParameters<'_> {
 }
 
 /// Every parameter any probe reads, a general flag each.
-const PARAMETERS: [&str; 14] = [
+const PARAMETERS: [&str; 12] = [
     SEED,
     acts_over_a_border::WORLD_SIDE_SUPERCHUNKS,
     acts_over_a_border::EVERY_SO_MANY_CELLS,
@@ -63,13 +61,11 @@ const PARAMETERS: [&str; 14] = [
     acts_over_a_border::TICKS,
     acts_over_a_border::THREADS_OF_SECOND_RUN,
     acts_over_a_border::CROSSING,
-    how_steep_the_land_is::SQUARE_SIDE_CELLS,
     ticks_under_a_wide_viewport::VIEWPORT_SIDE,
     ticks_under_a_wide_viewport::SECONDS_MEASURED,
     ticks_under_a_wide_viewport::SUPERCHUNKS_A_FRAME,
     ticks_under_a_wide_viewport::SHEEP_A_SUPERCHUNK,
     ticks_under_a_wide_viewport::PACE_TICKS_A_SECOND,
-    what_a_generation_makes::GRASS_THOUSANDTHS,
 ];
 
 /// Puts the parameter `PARAMETERS[PARAMETER]`, as text, under its own name.
@@ -101,7 +97,7 @@ const fn probe_flag<const PROBE: usize>() -> Flag {
 }
 
 /// The probes.
-const PROBES: [Probe; 4] = [
+const PROBES: [Probe; 2] = [
     Probe {
         probe_name: "acts_over_a_border",
         what_it_does: "times the second phase with lines of entities acting over every border running north to south (flipping a cell beyond it under a compare, or with `crossing` 1 stepping over it and back), and with the same lines moved away from it, on one thread and on all: what an act over a border costs",
@@ -109,22 +105,10 @@ const PROBES: [Probe; 4] = [
         run_probe: acts_over_a_border::run_probe,
     },
     Probe {
-        probe_name: "how_steep_the_land_is",
-        what_it_does: "prints the share of the land's cells at each rise to the next cell, over a square about the world's middle: what a shading of slopes has to tell apart",
-        parameter_defaults: &[(how_steep_the_land_is::SQUARE_SIDE_CELLS, "16384"), (how_steep_the_land_is::EVERY_SO_MANY_CELLS, "16"), (SEED, "0")],
-        run_probe: how_steep_the_land_is::run_probe,
-    },
-    Probe {
         probe_name: "ticks_under_a_wide_viewport",
         what_it_does: "makes a world with no side whose camera loads, keeps a square viewport hot, and prints its ticks a second with no frame asked and with frames asked as a window asks: what answering a client costs the simulation",
         parameter_defaults: &[(ticks_under_a_wide_viewport::VIEWPORT_SIDE, "12"), (ticks_under_a_wide_viewport::SECONDS_MEASURED, "10"), (ticks_under_a_wide_viewport::SUPERCHUNKS_A_FRAME, "32"), (ticks_under_a_wide_viewport::SHEEP_A_SUPERCHUNK, "250"), (ticks_under_a_wide_viewport::PACE_TICKS_A_SECOND, "0"), (SEED, "0")],
         run_probe: ticks_under_a_wide_viewport::run_probe,
-    },
-    Probe {
-        probe_name: "what_a_generation_makes",
-        what_it_does: "makes a small world forced hot on a plain with grass on so many thousandths of its cells, and prints the cells of each layer: whether a plain is dry, flat and as grassy as asked",
-        parameter_defaults: &[(what_a_generation_makes::GRASS_THOUSANDTHS, "333"), (what_a_generation_makes::WORLD_SIDE_SUPERCHUNKS, "2")],
-        run_probe: what_a_generation_makes::run_probe,
     },
 ];
 
@@ -133,8 +117,6 @@ fn probe_flags() -> Vec<Flag> {
     vec![
         probe_flag::<0>(),
         probe_flag::<1>(),
-        probe_flag::<2>(),
-        probe_flag::<3>(),
         parameter_flag::<0>(),
         parameter_flag::<1>(),
         parameter_flag::<2>(),
@@ -147,8 +129,6 @@ fn probe_flags() -> Vec<Flag> {
         parameter_flag::<9>(),
         parameter_flag::<10>(),
         parameter_flag::<11>(),
-        parameter_flag::<12>(),
-        parameter_flag::<13>(),
     ]
 }
 

@@ -1,8 +1,8 @@
 AI WORKSPACE -- this file is the AI's own: the design statements as it
-reads them, the rules it works by, and what is left to do. Plain text
-on purpose. Everything else it used to hold (the design in force in
-the user's words, what was settled, the tasks done) is in this file's
-history up to ed985b5, and in each commit's first line.
+reads them, the rules it works by, what is settled, and what is left to
+do. Plain text on purpose. Read it at the start of every session and
+before every task. What is done leaves it; its history is in git (the
+long version up to d019445).
 
 Docs that say the rest: docs/style_guide.md, docs/testing_protocol.md,
 docs/glossary.md (one name per thing -- use its names, not the ones in
@@ -72,375 +72,175 @@ Boundaries, asked first, would have put that on the table.
 
 == ALWAYS ==
 
-- EVERY COMMIT MESSAGE ENDS WITH "Decided on my own:" (above the
-  Co-Authored-By line): one line each, every choice the user did not
-  ask for -- a name, constant, threshold, limit, layout, boundary,
-  default, behaviour beyond the request -- and why. None: "Decided on
-  my own: nothing."
-- `docs stale` is DELETED (the user, 2026-10-16: "delete"), with the
-  old commands; the three docs tests in tests/fine/docs.rs are ignored
-  while the docs are paused.
-- Code explains itself roughly, docs explain it in detail: a change is
-  not done until every doc describing what it touched says what the
-  code now does. The glossary first, then the docs.
-- Testing, committing and pushing are separate commands; clippy
-  warnings are cleaned before a commit. Never `cargo fmt`, never
-  `cargo clippy --fix`.
-- REMOTE (cloud, no screen): never `--workspace` (it builds Bevy); gui
-  and renderer only `cargo check --offline -p gui -p renderer`. Per
-  crate: `cargo test --release --offline -p <crate>` and
-  `cargo clippy --release --offline -p <crate> --all-targets`; the
-  root with `-p Civil_Egregore --no-default-features`.
-- LOCAL: test runs are unshown unless the user asks to see one
-  (then CIVIL_EGREGORE_RENDER set); the renderer is built as usual.
-- No seed written in a test or tool: all take transient_data/seed.csv
-  (utilities::seed). Every command goes through the root program
-  (`cargo run --release -- help`).
-- Measure before calling a change done, against the commit before.
-  `Civil_Egregore server check` prints the world's hash: a change that
-  is not meant to change behaviour leaves it as it was.
-- Names are long, human and descriptive, and the glossary's. No file
-  much past 300 lines.
+- EVERY COMMIT MESSAGE: the user's words, then "Decided on my own:"
+  (above the Co-Authored-By line): one line each, every choice the user
+  did not ask for -- a name, constant, threshold, limit, layout,
+  boundary, default, behaviour beyond the request -- and why. None:
+  "Decided on my own: nothing." Commit and push only when asked, to
+  `main`, the one branch.
+- Testing, committing and pushing are separate commands; the test
+  output is read before a commit. Clippy clean before a commit. Never
+  `cargo fmt`, never `cargo clippy --fix`. One test run at a time.
+- The fast tier (tests/fast) runs in under 60 seconds whole.
+- Measure before calling a change done, against the commit before:
+  `--seed 0x5eed1234 --new [folder --side 8 --sheep 40 --forced_hot []]`
+  then `--run [folder --ticks 10000]`, alternating rounds, medians.
+- REMOTE (cloud, no screen): never `--workspace` (it builds Bevy); per
+  crate `cargo test --release --offline -p <crate>`; the root with
+  `-p Civil_Egregore --no-default-features`. LOCAL: the renderer is
+  built and run as usual; test runs are unshown (showing them is LATER).
+- Tests take their seed from utilities/test_seed.rs (TestSeedHandle:
+  transient_data/test_seed.csv, rolled every few counted uses);
+  FREEZE_SEED=0x... pins one, FREEZE_SEED= keeps the file's -- the one
+  environment variable ("that's one environment variable we do need,
+  freeze seed lmao"). The binary never reads repo files: given no seed,
+  a command draws a fresh one and prints it.
+- Names long, human, the glossary's. No file much past 300 lines.
+  No macro of our own where a function or a table will do.
+- Refactors through rust-analyzer: AI_SCRATCHPAD/scripts/
+  rust_analyzer_driver.py (rename, move, refs, diagnostics -- one
+  rename per call).
+- Every "for later" goes into LATER at once, quoted.
 - This file stays short: a task done is removed, a note that no longer
   holds is deleted.
+
+
+== SETTLED (in force) ==
+
+- THE ROOT: five folders -- utilities/ (the utilities crate, with
+  coordinates/, bitmap/ and the shared test_seed.rs), protocol/ (the
+  protocol crate, with type_registry/), server/ (the server crate, with
+  simulation, bitplane_manager, chunk_storage, entity_manager,
+  pathfinding, basegame), client/ (gui, renderer), diagnostics/
+  (shelved) -- plus src/ (the program), docs/, tests/, transient_data/,
+  AI_SCRATCHPAD/, and tessera/, its own project ("keep in mind tessrra
+  is its own isolated project"): Cargo lets no workspace live under a
+  member's folder. A group named as a crate is that crate ("we cant
+  have utilities/utilities").
+- TESTS: a crate's own tests check its invariants alone; root tests/
+  holds the fine/fast/complete tiers of higher behaviour. Test
+  infrastructure lives in tests, no production hook for a test.
+- BASEGAME (server/basegame: base_types, libraries, sca_rules,
+  entity_rules, worldgen): "a rule is, nothing else (except the default
+  types registry creation) can depend on basegame". Rules reach the
+  simulation through simulation_api alone (tests/fine/docs.rs checks).
+- THE TYPE REGISTRY: dynamic, frozen per world, names unique ("that's
+  our invariant"), saved as a world's types.csv; base types in
+  protocol/src/default_types.rs. A type's code is its library. Hooks
+  ("just another parameter on the registry types"): GeneratesTheWorld,
+  RunsEveryTick, KeepsTheWorldHot ("good use of hook there") -- the
+  simulation finds its rules, generation and hot type by them.
+- THE SIMULATION HANDLE ("simulatedworld should be simulationhandle"):
+  server/simulation/src/simulation_handle/ owns the world's state and
+  does everything to it -- ticking, populating, halos, paging, every
+  change between ticks. "server is a coordinator, not a doer";
+  "anythong in between ticks is internal simulation api". A rule gets
+  a SimulationTickState (one superchunk's turn) and its RuleContext
+  (its master and its dependencies' libraries).
+- WORLDGEN populates in-tick: an unpopulated superchunk's turn, before
+  its rules, under compares; every generated superchunk gets a flock
+  ("a feature for testing, not a bug"). Halo tests use one flock on a
+  world with no end (tests/shared one_flock_world).
+- SKIP TAGS (the user's design): SetSkipTag before a chain of compares
+  (operand 0 a new set; k+1 the existing tag k sets out, which must
+  enclose it); SkipTag closes a new set; writes are methods of
+  SkipTagSet only ("we can't have naked writes").
+- DOCS PAUSED ("were going to forego docs, except top level ones"):
+  crate docs' prose is not updated; README and root docs/ are kept
+  whole; the docs pointer tests are ignored meanwhile.
+- DIAGNOSTICS: "diagnostics have 2 roles, make testing easier, and
+  writing stuff down for comparisons"; "only diagnostics should
+  generate transient data". Shelved in diagnostics/, to be rebuilt.
+- TO THE BONES: "delete dead code, we want to go to the bones".
 
 
 == TO DO ==
 
 NOW
-- ASK 2026-10-16: the type registry made dynamic ("lets actually get
-  the type registry working dynamically instead"). Settled with the
-  user:
-  "its just types, and associated information, a name, and depending
-  on type other stuff" -- RegisteredType, an enum; no "rows".
-  "the name is th3 clash detector, no two types have the same name".
-  Base types in protocol/default_types.rs ("protocol is the glue
-  between binary initialization, server and client"), optional but
-  on by default, off by a command flag ("a flag on commands should
-  sort that out for now").
-  "the type registry stuff can only chamge in the main menu" -- frozen
-  per world: TypeRegistry::freeze() -> FrozenTypes.
-  "server decides order, for now just registration order is fine".
-  "tests import default types".
-  Flags are not types ("mods will only inject other stuff, not cli
-  args").
-  "no flag for now lol, just make sure its easy to add later" -- a world
-  without the defaults would start from TypeRegistry::default().
-  "world needs to save the types as i said remember" / "typeregistry
-  loads upon loading a world, or loads defaults if no previous world is
-  gicen" / "those questions by the server machinery should be answered
-  entirely by the type registry lol, that's why we register name
-  string, it couples to the rule in-code, the ttpeid is dragged into
-  types.csv for consistency" / "registered type names must be unique"
-  -- "that's our invariant". Done: a rule's code registered with it
-  (RegisteredType<RuleCode>, actions::RuleCode); a world's types.csv,
-  name and ID in registration order; a load picks each saved name from
-  the code's types, ID checked, refused naming the type.
-  Left: host make/open/reset per-world types; the client given them
-  through protocol.
-  Measured, set aside ("no matter performance right now,.we're paying
-  technical debt on the code"): 10000 ticks of a 22-superchunk world,
-  ad52552 3737/3843/3690 ticks a second, now 3461/3547/3239 -- about 9%
-  slower, the world the same. Cause not looked for (suspects: the
-  default attribute looked up in a slice, not a constant match;
-  TickCounts 16 rules wide).
-  Next pass, attributes: registered types with a master rule; a
-  default attribute part of the entity's registration; "attributes
-  should be just defined as structs", reached as "a mutable reference
-  to the struct", and "the mutable struct reference is resolved at
-  compare time" -- the compares carry what they saw in the instruction.
-- ASK 2026-10-16: "a seventh folder is needed, basegame, contains all
-  entity,planes and rules stuff,.separate from.server machinery or
-  protocol machinery (except the load default types registry of
-  course)" / "actions is server code and should not import anything
-  from basegame" / "a rule is, nothing else (except the default types
-  registry crearion) can depend on basegame" / "within basegame
-  dependencies can be freer" / collision and walls "are types
-  registered as well" / "some standalone rules like collisions or
-  pathfinding are among the first tonupload since so many things
-  depend on them" / "so much de coupling to do lol".
-  Done: basegame/{base_types, sca_rules, entity_rules}; climate and
-  SheepState out of type_registry; actions names no game type (walking
-  takes PlanesInTheWay); server/rules.rs names no rule.
-  KNOWN VIOLATIONS, each its own pass (they import base_types):
-  - server: COLLISION for keep_entities_in (lib.rs, world_access.rs);
-    the sheep flock at start (entity_rules::sheep::flock, HOT_ENTITY in
-    halos.rs, params.rs); host/frame.rs and commands.rs count and show
-    grass, trees, sheep, cloud, climate, wet.
-  - worldgen: generates grass, trees, collision, wet, climate,
-    elevation, walls.
-  - renderer: through server::host::frame (climate, tree stages).
-  - pathfinding stays at the root while actions' walking uses it;
-    collision as a standalone rule registered first is a redesign.
-  - AI_SCRATCHPAD depends on base_types (allowed: nothing depends on it).
-- ASK 2026-10-16 (Remote Control, on the user's PC): "since this is a
-  remote session but still running locally on my computer rendering
-  will be compiled as usual for local sessions" / "now what were going
-  to do before anything else is working on modularizing and de
-  coupling the code a little, pull first, though, we need to finish
-  the stuff mid work upstream". The name sweep is finished (its docs
-  followed, the world hash unchanged); next, modularize and decouple.
-- ASK 2026-10-16: "yeah, the rule of no user-side binary dependency on
-  on the repo still holds" -- no command of the binary reads the seed
-  file (its path is the workspace's, baked in): server check, renderer
-  stills/watch, tessera's tools. Given no seed, a command draws a fresh
-  one and prints it (the user's choice, "Fresh, printed"). Tests keep
-  the rotation.
-- Found 2026-10-12, not fixed: the simulation's fine test
-  what_others_write_to_an_entity_follows_it_over_a_border hung with
-  every thread asleep on a futex, once in 300 runs alone (not the
-  seed's doing): a lost wake in the threads.
-- ASK 2026-10-16, FIRST (co-op: I show what I want to tackle and what
-  I think, the user does the same, edits only once agreed): "we need to
-  fully decouple test infrastructure from the binary" / "diagnostics
-  may be part of production code, but diagnostics should only activate
-  if used. otherwise they should be dormant" / "lets merge renderer and
-  gui as modules of a separate "client" crate" / "client normally
-  doesn't receive any cli parameters (client should be as dynamic as
-  possible for graphics tunning and gui work atm) however if cli args
-  are passed then the client simply setups the correct rendering mode
-  (most likely jump straight to world rendering) and passes the
-  arguments to server" / "we want both binary and server to end up as
-  different binaries now, enforcing this separation at compile time".
-  The user's answers to my proposal: "ideally no diagnostics code
-  should be on production code ... we move all diagnostics code into a
-  separate crate, server then instantiates a diagnosticsManager or
-  something, and gives it a handle to the simulation internals. and
-  only upon server request to the DiagnosticsManager it starts doing
-  reads to stuff, otherwise its just unused ... co-op will be
-  important a t a fine grain per file level" / the project in five
-  folders: diagnostics, server, client, protocol, utilities / "for now
-  dont worry about commands, we'll restructure that later" / client
-  and server over pipes, "also make tests use the pipes if possible" /
-  "what we want when compiling from root is bundling the server and
-  client binaries into a single binary basically".
-  Agreed plan (2026-10-16): utilities/ = utilities, coordinates,
-  bitmap; protocol/ = protocol (messages, wire, generation settings)
-  and type_registry ("thats going to be our source of truth both for
-  server and client, thats where the rules, textures and stuff will
-  attach to dynamically once we make the type registry dynamic");
-  server/ = the rest of the world's crates and tessera; client/ =
-  client (gui, renderer as modules); diagnostics/ = the diagnostics
-  crate, AI_SCRATCHPAD meanwhile. Terrain answered by the server over
-  the pipe. Root binary bundles both: the client relaunches its own
-  executable as the server. Order: 1 seed rotation to test files
-  (+ paging/census commit), 2 protocol crate, 3 client crate, 4 the
-  five folders, 5 the process split (measured), 6 diagnostics crate,
-  file by file.
-  Step 1 settled: the rotation in utilities/seed_rotation.rs, beside
-  src, included by path by tests alone; "we should eliminate all
-  environment flags, that's not the style im going for" --
-  CIVIL_EGREGORE_SEED now, CIVIL_EGREGORE_RENDER with step 5,
-  TESSERA_DIAGNOSE with step 6 (the OS's own HOME, XDG_DATA_HOME,
-  LOCALAPPDATA, APPDATA stay); "i dont mind incomplete work upstream,
-  only you write upstream".
-  Agreed before it: the seed file's rotation is test-only, moved to
-  test files; diagnostics take a seed and never fetch one. In the tree,
-  uncommitted: given_or_fresh_seed, server check and renderer tools
-  off the file, paging and the census moved to Civil Egregore's
-  folder on the machine.
-- ASK 2026-10-16, interrupting step 1 at the commands' seed parameter:
-  "were going to change how commands work, were just going to add a
-  very simple dynamic parsing state machine / first were going to add
-  flag parsing, which will become the default entrypoint / simple
-  structure: --AZ az _ - 09 / ... this state machine at creation time
-  is fed a dynamic list of flags, and a function to handle each flag,
-  (so any flag can have arbitrary parameters, as we do now) once we
-  enter a flags parameters we invoke the same state machine as
-  recursive step (we keep a stack somewhere) and the flag parses with
-  what was already fed to the original state machine. / so we feed it
-  parsing once, it works with that even when recursing, runtime rule
-  establishment, but no parsing self creation / ... we dont need it to
-  be performant, we want it to stupid simple single threaded".
-  Step 1 so far: utilities/test_seed.rs (TestSeedHandle, agreed),
-  utilities/src/seed.rs (agreed, given_seed_of/FRESH_SEED_WORD added
-  just before the stop); the 46 test files and 20 roots scripted
-  earlier still point at the old seed_rotation (to redo, file by file).
-- TESTS SPLIT (the user, 2026-10-16): "were going to have to make
-  another /tests root folder ... tests inside a crate test that crates
-  invariants of the code. nothing else, then the root test folder has
-  all the fine/fast/complete test layers for higher level behaviours".
-  Diagnostics leave the Rust tree for a root diagnostics/ folder, to be
-  rebuilt from scratch ("move all disgnostics folders into the root
-  diagnostics, dont even include them in the rust tree").
-  Root folders: diagnostics, server, client, protocol, utilities,
-  transient_data, tests; AI_SCRATCHPAD stays a top-level folder too.
-  Refactors through rust-analyzer ("the lsp is lovely", "just make the
-  skeleton first"): my driver, AI_SCRATCHPAD/scripts/rust_analyzer_driver.py (rename,
-  move, refs; the VS Code extension's server binary).
-- TRANSIENT DATA (the user, 2026-10-16): "only diagnostics should
-  generate transient data"; tests too, since "test depend on
-  diagnostics, diagnostic writes stuff down".
-- DIAGNOSTICS' ROLES (the user, 2026-10-16): "diagnostics have 2
-  roles, make testing easier, and writing stuff down for comparisons,
-  thats it".
-- TO THE BONES (the user, 2026-10-16): "yeah delete dead code, we want
-  to go to the bones basically" -- what the diagnostics' removal leaves
-  unused is deleted, not kept behind allow(dead_code).
-- DOCS PAUSED (the user, 2026-10-16): "were going to forego docs,
-  except top level ones, were going to update them later, the code is
-  going to chsmge a lot so updating docs is a waste of time for now".
-  Crate docs' prose is not updated; the docs tests stay on and pass
-  ("doc tests do get updated lol, just the prose not"): names go in
-  the references, pointers stay true. docs/ at the root is kept whole.
-- THEN, transient data folded into utilities (the user's): each
-  crate's lib.rs or main.rs, after its imports, declares statically
-  its transient data paths, to the files themselves; utilities::csv
-  takes a flag to make the file and its folders for any path, so disk
-  storage stays with the file interactor, the csv library.
-- SERVER CENTRALIZED (the user, 2026-10-16): "lets make the server
-  take cleanparameters first" / "we need to remove old commands pretty
-  much now lol" / "everything should be server centralized". Done:
-  utilities::commands and stale_docs deleted; server/src/params.rs
-  holds every flag (--seed --sheep --side --forced_hot --threads
-  --ticks; commands --new --run --info [folder ...]); server::start
-  runs the clean parameters; main.rs: no words, the window, else the
-  flags and server::start. AI_SCRATCHPAD's probes use the protocol's
-  flags with their own list.
-- Rule tests (grass, trees, weather, sheep) moved into root
-  tests/fast; sca_rules and entity_rules have no tests or
-  dev-dependencies left. actions' flock_over_borders and walking moved
-  too; actions' shared arenas now actions/tests/shared/arenas.rs, also
-  included by the root's fast tier; actions' [[test]] entry gone;
-  actions' own tests on TestSeedHandle (T3 done there). simulation
-  (the user: "yeah b"): every test driving it through actions moved to
-  the root (fast/tick.rs; fine/ the six), sharing tests/shared/walkers.rs;
-  simulation keeps sampling and simulation_time, no dev-dependency, no
-  [[test]] entry.
-- TESSERA ISOLATED (the user, 2026-10-16): "keep in mind tessrra is its
-  own isolated project from civil egregore" / "tessera having its own
-  [[test]] is the only valid exception" / "lets isolate tessera
-  entirely then, we run its tests completely separate from civil
-  egregore". Done: tessera is its own Cargo workspace (its own
-  [workspace], Cargo.lock, target/), excluded from the root's;
-  chunk_storage still uses it as a path dependency. Its tests draw a
-  fresh seed each (tests::fresh_test_seed), keep its [[test]] entry,
-  and hold their own examination, tree_stats and saved-bitmap reading
-  (tessera/tests/tests/); the saved bitmaps are in tessera/tests/saved.
-  `cargo test --manifest-path tessera/Cargo.toml`. T2 is done.
-- T3 (seeds onto TestSeedHandle) done in utilities, bitmap,
-  coordinates, compares_and_writes, entity_manager, type_registry,
-  chunk_storage, pathfinding, worldgen, bitplane_manager and the
-  renderer's unit test (a #[cfg(test)] test_seed module in its lib.rs).
-  Shared test files moved to <crate>/tests/shared/, so no [[test]]
-  entry is left outside tessera. LEFT: bitplane_manager's
-  a_bucket_is_kept_only_for_a_chunk_with_cells reads ArenaStats, now
-  shelved, over pub(crate) internals -- the user: "i guess a? im not
-  sure": now a unit test, bitplane_manager/tests/unit/buckets.rs,
-  included #[cfg(test)] by its lib.rs, counting the buckets directly.
-- FREEZE_SEED (the user, 2026-10-16: "that's one environment variable
-  we do need, freeze seed lmao"): the one environment variable kept,
-  test infrastructure only (utilities/test_seed.rs). FREEZE_SEED=0x...
-  gives every test that seed, the file untouched; FREEZE_SEED= (empty)
-  takes the file's seed and never rolls it.
-- FLAKY: tests/fast/weather.rs a_wind_carries_its_climate_down_it fails
-  on about 1 seed in 11 (0x3b8d69781e6b06e6): 4-5k ticks are 16-20
-  simulated seconds, too few for MEAN_TIME_TO_CARRY_CLIMATE (400 s) to
-  carry humidity or heat over the border column. Older than the move.
-  The user: "climate will be reworked later so for now that can be
-  ignored" -- the test is #[ignore]d until the climate rework.
+- THE APPLYING DEADLOCK (the user: "so it was tent queue stuff"): an
+  act over a border was applied without a superchunk an entity's
+  crossing had just added to it. The arrival read its places, then
+  counted itself; a crossing in between added a place, the stale
+  arrival counted last and applied to the old places, and the added
+  superchunk waited forever. FIXED 2026-10-17 (applying.rs go_on: the
+  places are looked up after the count). 600 runs clean, trap removed,
+  206 tests pass, clippy clean, speed equal to d019445 within noise.
+  Waiting on "commit". Uncommitted besides: the root-folders
+  move, the README's paths, the driver's diagnostics command, the
+  scratchpad's two old probes removed.
 
-ASKED, NOT DONE
-- "change the environment flag to a cargo feature flag LOL"
-  (CIVIL_EGREGORE_RENDER).
-- Weather, later: water conserved roughly; the ocean told from lakes;
-  lakes can dry, the ocean never.
+PLAN AGREED 2026-10-16, LEFT (co-op, file by file):
+- The client crate: gui and renderer as modules of one "client" crate;
+  "client normally doesn't receive any cli parameters ... if cli args
+  are passed then the client simply setups the correct rendering mode
+  ... and passes the arguments to server".
+- The process split: client and server binaries over pipes, "also make
+  tests use the pipes if possible"; "what we want when compiling from
+  root is bundling the server and client binaries into a single binary
+  basically" (the client relaunches its own executable as the server);
+  terrain answered over the pipe. Measured.
+- The diagnostics crate: "server then instantiates a diagnosticsManager
+  or something, and gives it a handle to the simulation internals. and
+  only upon server request ... it starts doing reads to stuff".
+
+COUPLINGS LEFT (each its own pass)
+- server names base types: host/frame.rs and commands.rs count and show
+  grass, trees, sheep, cloud, climate, wet; WorldGeneration (worldgen's
+  numbers) in WorldStart, World, save, load, the host's reset,
+  from_tuning, seed_with_land/drawn_seed, host/terrain.rs.
+- the renderer through server::host::frame (climate, tree stages).
 
 WAITING ON THE USER
 - Mask / word-of-cells instructions ("this will have to wait").
 - Entities of more than a cell ("later ... im gonna get into details").
 - Whether the whole-attribute compare (by sum) or the member compare is
   set_attribute's default ("both are fine by me").
-- How tile planes are kept cold: raw, or bit-planes through Tessera
-  (today).
+- How tile planes are kept cold: raw, or bit-planes through Tessera.
 - The user's to check: the land and worldgen's speed; whether the
-  mipmaps stop the shimmer; the Linux/Windows `server check`
-  comparison; whether Around/Area/Window should be one shape.
+  mipmaps stop the shimmer; whether Around/Area/Window should be one
+  shape.
 
 OPEN, FOUND BY ME
-- THE FLOCK DIES OUT: a long `server pasture` -- the sheep rise past
-  150,000, the grass goes to 0, the flock dies. Cause not looked for.
-- The cloud shadow and the 2026-10-11 changes were never seen in the
-  renderer.
+- THE FLOCK DIES OUT: a long run -- the sheep rise past 150,000, the
+  grass goes to 0, the flock dies. Cause not looked for.
+- The type registry made the tick ~9% slower (2026-10-16, "no matter
+  performance right now"): suspects, the default attribute looked up in
+  a slice; TickCounts 16 rules wide.
 - Simplification not yet read for: entity_manager, server, utilities,
-  chunk_storage, bitplane_manager, actions, renderer.
-- Morton pathfinding: pathfinding/src/morton.rs (on main since
-  2026-10-16, used by nothing), tested equal to the rows' search;
-  left: one-way walls for it, wire into walking::seek, measure both,
-  the best wins.
-- One branch only: `main` ("make sure all branches are collapsed into
-  a single branch" / "rename the only remaining branch to main",
-  2026-10-16). Commit and push there.
-- Fold (2026-10-17): actions and compares_and_writes are gone, now
-  simulation/src/simulation_api (public, content-agnostic, what basegame
-  uses) and simulation/src/raw_compares_and_writes (private). The
-  turn's raw queue methods are pub(crate).
-- Skip tags (the user's design, 2026-10-17): SetSkipTag before a
-  chain of compares (operand 0 = a new set; k+1 = point the innermost
-  set's compares at the existing tag k sets out, which must enclose
-  it); SkipTag closes a new set. A failing compare reads forward to
-  its target's tag, pairing sets with tags. Typestate: writes are
-  methods of SkipTagSet only; dropping it places the tag;
-  set.skip_tag() hands out a handle tied to the set's lifetime,
-  set.skip_to(handle) re-points. from_here/end_from_here are gone.
-  Byte-identical to ad52552 after 10000 ticks; ~4% slower than
-  ad52552 (collision as compares and plane writes, a set instruction
-  a set). Option left unasked: fold the set into its first compare's
-  spare bits.
-- Worldgen pass (2026-10-17, option b, "worldgen decides where sheeps
-  go"): the registry has hooks (Hook::GeneratesTheWorld,
-  Hook::RunsEveryTick, .with_hooks); a type's code is its library. The
-  "world generation" type's library is a WorldgenCode {generate_cells,
-  populate}; populate runs in-tick, on an unpopulated superchunk's turn
-  before its rules (WorldInfo.unpopulated). No between-ticks entity
-  work: "anythong in between ticks is internal simulation api". Every
-  generated superchunk gets a flock: "a feature for testing, not a bug".
-
-- SimulationHandle (2026-10-17; the user named it, "simulatedworld
-  should be simulationhandle"): simulation/src/simulation_handle/ owns
-  the world's state -- arena, entities, chunk storage, cold states,
-  halos, threads, rules, worldgen code, the unpopulated list -- and does
-  everything to it: ticking, populating, moving halos, paging, and every
-  change between ticks (add/remove entity, write cells, load's
-  put_saved_superchunk, save's ready_for_save). "server is a
-  coordinator, not a doer": server::World is world_info + generation +
-  frozen types + the handle, passing calls through. Halos' LentWorld is
-  crate-private. server/src/rules.rs moved to simulation/src/rules.rs.
-- Hook::KeepsTheWorldHot ("good use of hook there"): the sheep's
-  registration; simulation::hot_entity_of finds it. HOT_ENTITY,
-  WorldStart::hot_entity and the world file's "hot entity" row gone.
-- SuperchunkTickState renamed SimulationTickState (the user: "we need
-  to rename superchunk tickstate to simulationtickstate"): what a rule
-  gets, one superchunk's turn; RuleContext the registry side (master +
-  its dependencies' libraries), gathered once a world.
+  chunk_storage, bitplane_manager, renderer.
+- Morton pathfinding: server/pathfinding/src/morton.rs, used by nothing,
+  tested equal to the rows' search; left: one-way walls for it, wire
+  into walking, measure both, the best wins.
+- Climate-dependent tests fail on some seeds (weather's
+  a_wind_carries_its_climate_down_it ignored): "climate will be
+  reworked later so for now that can be ignored".
 
 LATER (every "for later" of the user's, and mine, as said)
 - A "hot" attribute on entities in place of the one hooked type ("some
-  entities will have the "hot", atribute later").
+  entities will have the "hot", atribute later"); sheep stop being the
+  hot entity ("sheep won't be the hot entity for long").
 - Simulation second as a server knob ("a prime candidate for a knob
-  that csn be exposed to server", 2026-10-17).
+  that csn be exposed to server").
 - Worldgen's numbers (the GUI sliders) handed to it by a registered type
   it depends on, not by the server: "only stuff registered in the type
   registry should be spawning stuff, if those registered stuff depend
   on third party handles like gui sliders thats the types problem".
-  Server couplings left: WorldGeneration in WorldStart/World/save/load/
-  host Reset, from_tuning, seed_with_land/drawn_seed, host/terrain.rs.
-- Sheep stop being the hot entity ("sheep won't be the hot entity for
-  long"); flocks on every superchunk stay until then.
 - Open question: libraries for any dependent type (not only rules).
 - Crate docs, when resumed: simulation's still describe compare ends;
   server's still describe camera flocks and sheep_per_flock.
 - Rendering test runs again: not as diagnostics ("rendering tests
   should not be part of diagnostics"); the user has "a better idea for
-  later". The shelved code: diagnostics/server/{shown,wire}.rs,
+  later". Shelved: diagnostics/server/{shown,wire}.rs,
   diagnostics/server/tests/shown.rs, diagnostics/renderer/window_on.rs.
 - The shelved diagnostics ("its the only thing that doesn't need
   diagnostics in fact, well get to that later" -- of Tessera, isolated
   and working). Its tool's measuring_tool! macro left as it is.
 - Declined for now ("nah, there are other things to do"): fold
   SetSkipTag into its first compare's spare bits (~4% back).
+- Weather: water conserved roughly; the ocean told from lakes; lakes
+  can dry, the ocean never.
 - Rules that sample entities as cells are sampled (maybe only dormant).
-- Mods registering their own types (the registry is dynamic now).
+- Mods registering their own types.
 - Tessera deep clean: settle the code, move abstraction boundaries.
 - An area allocator: 256 MiB blocks, 256-byte units.
 - Optimizations and inlining; cold states paged; page-out on the

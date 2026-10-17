@@ -85,7 +85,7 @@ are held in, is not optimized further for that until the game needs it.
 
 ### Chunk storage: the cold pool and the writeback ring
 
-Chunk storage (`chunk_storage/`) is two parts in memory:
+Chunk storage (`server/chunk_storage/`) is two parts in memory:
 
 1. **The cold pool**: superchunk images, each one run of words, laid
    out as on disk (below). When the bitplane manager asks for a
@@ -142,7 +142,7 @@ its words written sequentially as laid out in memory ("Saves", below).
 1. A superchunk image is read from disk into the cold pool as it is,
    its layers still encoded.
 2. Cells are read and changed in the **bitmap arena**
-   (`bitplane_manager/`): its buckets hold the hot bitmaps, raw, one
+   (`server/bitplane_manager/`): its buckets hold the hot bitmaps, raw, one
    layer of one chunk each, decoded from the cold pool only when needed. The
    arena is the only place with a cell API.
 3. The arena is made of allocations, each one layer type over one
@@ -198,8 +198,8 @@ types asked for are decoded, and the chunk's other layers stay encoded.
 ### Built so far
 
 The in-memory structures and their API, in two projects: chunks as
-stored (`chunk_storage/`) and the hot bitplanes
-(`bitplane_manager/`): the coordinates and
+stored (`server/chunk_storage/`) and the hot bitplanes
+(`server/bitplane_manager/`): the coordinates and
 Morton indices between the world, a superchunk, a chunk and a cell; the
 height map; the layer codec; the superchunk image; the cold pool and
 the writeback ring; the bitmap arena. Nothing is read from or written
@@ -220,8 +220,8 @@ superchunks on disk.
 ### Memory
 
 - A custom allocator is to serve two projects only: chunk storage
-  (`chunk_storage/`, the cold area) and the bitplane manager
-  (`bitplane_manager/`, the hot bitmap area). There is none now: its
+  (`server/chunk_storage/`, the cold area) and the bitplane manager
+  (`server/bitplane_manager/`, the hot bitmap area). There is none now: its
   first form, a block pool of equal-size blocks, was removed once the
   arena's buckets became a variable array a superchunk and nothing
   used it. Chunk storage's images and ring, and the arena's buckets,
@@ -275,7 +275,7 @@ Two steps a tick:
    of their coordinates, and are applied in that order.
 
    Built: the tick runs superchunk by superchunk, in two phases, on as
-   many threads as asked (`Simulation::tick`, in `simulation/`). In the first, each
+   many threads as asked (`Simulation::tick`, in `server/simulation/`). In the first, each
    superchunk runs the rules on itself -- samples its own cells, reads
    any cell, queues writes -- and nothing changes, so every read sees
    the world as the tick found it and the threads share the arena
@@ -406,7 +406,7 @@ The height map is ignored for now.
 ### Entities (built, first form)
 
 An entity is a capability unit, not necessarily alive. The first form
-is built in the entity manager (`entity_manager/src/`), with sheep on
+is built in the entity manager (`server/entity_manager/src/`), with sheep on
 it (`entity_rules/src/sheep.rs`):
 
 - **A record**: a header -- a type, the cell it
@@ -439,7 +439,7 @@ it (`entity_rules/src/sheep.rs`):
   for -- never further than its chunk. No two stand on one cell, so the
   cell is name enough: for the length of a tick, the cell the tick
   found it on, wherever it moves meanwhile, and no other's until the
-  tick is over (`entity_manager/docs/entity_manager.md`, "Instructions",
+  tick is over (`server/entity_manager/docs/entity_manager.md`, "Instructions",
   An entity's name in a tick). A slot would go stale whenever the entity
   crossed a chunk border, moved superchunk or was swept, and nothing
   holds a pointer back to fix it. A wake or change naming a cell nobody
@@ -450,7 +450,7 @@ it (`entity_rules/src/sheep.rs`):
   What had to know an entity again a tick later kept what told it in an
   attribute -- a mother her lamb's neighbour, the lamb the way back --
   until a compare could gate what lands over a border, and a birth
-  became one thing in one tick (`simulation/docs/simulation.md`, "An
+  became one thing in one tick (`server/simulation/docs/simulation.md`, "An
   act over a border"): the two members, the wake to look and the
   looking are gone.
 - **A timer wheel a superchunk**: most entities wait most of the time
@@ -700,7 +700,7 @@ queues for an entity -- made, moved, written, removed -- the neighbourhood and
 the path asked as instructions on the turn. An entity acts on another by a write, an attribute
 at a time. (Since then the simulation's instructions are 24 bytes
 each, compares and writes and nothing else, every write under a
-compare: `simulation/docs/simulation.md`, "Instructions".) The sheep, written on them again, is a third shorter and
+compare: `server/simulation/docs/simulation.md`, "Instructions".) The sheep, written on them again, is a third shorter and
 does what it did.
 
 ### Grass looked for as far as a sheep reaches
@@ -725,7 +725,7 @@ simulation's threads are 90 to 95% of it, painting and the window the
 rest; the ticks a second follow the flock -- 5,500 at 300,000 sheep,
 2,400 at 715,000, 10,900 under 140,000. What a wake costs is waiting
 for memory, not computing: so woken entities are now asked for ahead
-(`simulation/docs/simulation.md`, "Woken entities are asked of memory
+(`server/simulation/docs/simulation.md`, "Woken entities are asked of memory
 ahead"), a quarter off a wake.
 
 ### Saves (built)
@@ -768,7 +768,7 @@ the ground is steep. The whole of it:
 
 ### Pathfinding (built, first form)
 
-`pathfinding/`: over an area of 16x16 cells about a walker, held as
+`server/pathfinding/`: over an area of 16x16 cells about a walker, held as
 masks, a row a `u16`. A walker takes one pathfinding step each time it
 ticks and keeps no route: a route goes stale and has to be held; a
 step asked afresh is right about the world as the tick found it. A
@@ -840,7 +840,7 @@ superchunks across of the origin's middle, so its spreading cannot
 grow the world without end. All of it is the simulation's -- what is
 wanted hot, the warming and the cooling, counted in ticks -- and the
 server lends it the world and what generates a superchunk never made:
-`simulation/docs/simulation.md`, "Halos".
+`server/simulation/docs/simulation.md`, "Halos".
 
 ## Simulation (the plan)
 

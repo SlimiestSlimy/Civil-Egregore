@@ -1,7 +1,0 @@
-[package]
-name = "pathfinding"
-edition = "2024"
-description = "Civil Egregore's pathfinding: A* over an area of 16x16 cells kept as masks, a row a word"
-
-[dependencies]
-utilities = { path = "../utilities" }

@@ -96,7 +96,7 @@ Profiled in the renderer (`perf record -p`, flat out, at the flock's
 peak): most of a tick is the woken sheep -- its record, its attributes,
 the cells about it, putting it back -- then sampling grass; pathfinding
 is very little. Woken entities are asked of memory ahead: a wake 271 ns where it was
-359 (`simulation/docs/simulation.md`, "Woken entities are asked of memory
+359 (`server/simulation/docs/simulation.md`, "Woken entities are asked of memory
 ahead").
 
 ## The cells about a woken sheep, asked for ahead
@@ -207,7 +207,7 @@ cleared whether or not a cell was ever set in it: every hot layer of
 every hot superchunk was memory written. Now it holds an array of
 buckets, one for each chunk with a cell set, a chunk's found by the
 count of the chunks before it that have one
-(`bitplane_manager/docs/bitplane_manager.md`, "The arena"). Layers
+(`server/bitplane_manager/docs/bitplane_manager.md`, "The arena"). Layers
 mostly empty -- the cells under water on land, the walls, the trees --
 cost what they hold.
 

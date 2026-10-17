@@ -1,0 +1,14 @@
+[package]
+name = "entity_manager"
+edition = "2024"
+description = "Civil Egregore's entities as kept: a bucket a chunk, attributes added and removed at run time, a timer wheel a superchunk, instructions queued and applied -- beside the bitplane manager's cells"
+
+[dependencies]
+type_registry = { path = "../../protocol/type_registry" }
+bitmap = { path = "../../utilities/bitmap" }
+coordinates = { path = "../../utilities/coordinates" }
+utilities = { path = "../../utilities" }
+
+[dev-dependencies]
+protocol = { path = "../../protocol" }
+base_types = { path = "../basegame/base_types" }

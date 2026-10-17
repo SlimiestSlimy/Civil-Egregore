@@ -4,7 +4,7 @@
 //! `cargo test --test fine`
 
 #[allow(dead_code)] // a shared file: each test program uses a part of it
-#[path = "../../utilities/test_seed.rs"]
+#[path = "../test_seed.rs"]
 mod test_seed;
 #[path = "fine/fixed_list.rs"]
 mod fixed_list;

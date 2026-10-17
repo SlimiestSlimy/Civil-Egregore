@@ -1,0 +1,10 @@
+[package]
+name = "bitplane_manager"
+edition = "2024"
+description = "Civil Egregore's hot bitplanes: decoded layers, where cells are read and changed"
+
+[dependencies]
+coordinates = { path = "../../utilities/coordinates" }
+utilities = { path = "../../utilities" }
+bitmap = { path = "../../utilities/bitmap" }
+chunk_storage = { path = "../chunk_storage" }

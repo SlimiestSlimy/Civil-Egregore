@@ -7,25 +7,25 @@ authors = ["SlimiestSlimy", "Opus 5.5 high"]
 repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 
 [dependencies]
-renderer = { path = "renderer", optional = true }
-protocol = { path = "protocol/protocol" }
+renderer = { path = "client/renderer", optional = true }
+protocol = { path = "protocol" }
 server = { path = "server" }
 utilities = { path = "utilities" }
 
 # What the root's tests (`tests/fine`, `tests/fast`, `tests/complete`) reach into.
 [dev-dependencies]
-base_types = { path = "basegame/base_types" }
-libraries = { path = "basegame/libraries" }
-bitplane_manager = { path = "bitplane_manager" }
-chunk_storage = { path = "chunk_storage" }
-coordinates = { path = "coordinates" }
-entity_manager = { path = "entity_manager" }
-entity_rules = { path = "basegame/entity_rules" }
-pathfinding = { path = "pathfinding" }
-sca_rules = { path = "basegame/sca_rules" }
-simulation = { path = "simulation" }
-type_registry = { path = "type_registry" }
-worldgen = { path = "basegame/worldgen" }
+base_types = { path = "server/basegame/base_types" }
+libraries = { path = "server/basegame/libraries" }
+bitplane_manager = { path = "server/bitplane_manager" }
+chunk_storage = { path = "server/chunk_storage" }
+coordinates = { path = "utilities/coordinates" }
+entity_manager = { path = "server/entity_manager" }
+entity_rules = { path = "server/basegame/entity_rules" }
+pathfinding = { path = "server/pathfinding" }
+sca_rules = { path = "server/basegame/sca_rules" }
+simulation = { path = "server/simulation" }
+type_registry = { path = "protocol/type_registry" }
+worldgen = { path = "server/basegame/worldgen" }
 
 [features]
 # `--features force_default_settings`: run on the built-in defaults
@@ -41,42 +41,42 @@ default = ["renderer"]
 # against never enter this build.
 [workspace]
 members = [
-    "protocol/protocol",
-    "basegame/base_types",
-    "basegame/libraries",
-    "bitmap",
-    "bitplane_manager",
-    "chunk_storage",
-    "coordinates",
-    "entity_manager",
-    "basegame/entity_rules",
-    "gui",
-    "pathfinding",
-    "basegame/sca_rules",
-    "simulation",
-    "basegame/worldgen",
-    "type_registry",
+    "protocol",
+    "server/basegame/base_types",
+    "server/basegame/libraries",
+    "utilities/bitmap",
+    "server/bitplane_manager",
+    "server/chunk_storage",
+    "utilities/coordinates",
+    "server/entity_manager",
+    "server/basegame/entity_rules",
+    "client/gui",
+    "server/pathfinding",
+    "server/basegame/sca_rules",
+    "server/simulation",
+    "server/basegame/worldgen",
+    "protocol/type_registry",
     "utilities",
-    "renderer",
+    "client/renderer",
     "server",
     "AI_SCRATCHPAD",
 ]
 
 default-members = [
     ".",
-    "protocol/protocol",
-    "basegame/base_types",
-    "basegame/libraries",
-    "bitmap",
-    "bitplane_manager",
-    "chunk_storage",
-    "coordinates",
-    "basegame/entity_rules",
-    "pathfinding",
-    "basegame/sca_rules",
-    "simulation",
-    "basegame/worldgen",
-    "type_registry",
+    "protocol",
+    "server/basegame/base_types",
+    "server/basegame/libraries",
+    "utilities/bitmap",
+    "server/bitplane_manager",
+    "server/chunk_storage",
+    "utilities/coordinates",
+    "server/basegame/entity_rules",
+    "server/pathfinding",
+    "server/basegame/sca_rules",
+    "server/simulation",
+    "server/basegame/worldgen",
+    "protocol/type_registry",
     "utilities",
     "server",
 ]

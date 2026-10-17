@@ -3,7 +3,7 @@
 //! rolled every few uses (`docs/utilities.md`, "The seed"). Test
 //! infrastructure: beside `src/`, compiled into no library, each test
 //! program taking it by path --
-//! `#[path = "../../utilities/test_seed.rs"] mod test_seed;`.
+//! `#[path = "../../test_seed.rs"] mod test_seed;` from `utilities/coordinates/tests/`.
 //! Freeze a seed with [`FREEZE_SEED`]; delete the file to roll one.
 
 use std::fs::OpenOptions;

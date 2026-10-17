@@ -4,14 +4,14 @@ edition = "2024"
 description = "Civil Egregore's server: the world as a whole, made from a seed, ticked -- its cells' rules and its entities together -- saved and loaded"
 
 [dependencies]
-type_registry = { path = "../type_registry" }
-entity_manager = { path = "../entity_manager" }
-bitmap = { path = "../bitmap" }
-worldgen = { path = "../basegame/worldgen" }
-simulation = { path = "../simulation" }
-coordinates = { path = "../coordinates" }
+type_registry = { path = "../protocol/type_registry" }
+entity_manager = { path = "entity_manager" }
+bitmap = { path = "../utilities/bitmap" }
+worldgen = { path = "basegame/worldgen" }
+simulation = { path = "simulation" }
+coordinates = { path = "../utilities/coordinates" }
 utilities = { path = "../utilities" }
-protocol = { path = "../protocol/protocol" }
-base_types = { path = "../basegame/base_types" }
-bitplane_manager = { path = "../bitplane_manager" }
-chunk_storage = { path = "../chunk_storage" }
+protocol = { path = "../protocol" }
+base_types = { path = "basegame/base_types" }
+bitplane_manager = { path = "bitplane_manager" }
+chunk_storage = { path = "chunk_storage" }
