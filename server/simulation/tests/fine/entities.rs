@@ -5,7 +5,7 @@
 //! `cargo test --test fine`
 
 use crate::arenas::{cell, walker_header, world, STONE_LAYER};
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use entity_manager::{Attribute, AttributeBlock, NEVER_WAKES};
 use simulation::simulation_api::cell_and_its_neighbours;
 use simulation::simulation_api::{entity_reads_and_writes, SimulationTickState};

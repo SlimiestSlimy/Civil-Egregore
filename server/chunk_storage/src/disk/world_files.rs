@@ -2,13 +2,13 @@
 //! superchunks were hot, cooling and warming.
 
 use type_registry::LayerType;
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use utilities::csv;
 
 /// The world file's columns.
 const WORLD_COLUMNS: [&str; 2] = ["world", "is"];
 /// The world file's format, and the number of the one written.
-const FORMAT_ROW: (&str, &str) = ("format", "2");
+const FORMAT_ROW: (&str, &str) = ("format", "3");
 
 /// The name of the row saying a world's camera loads superchunks.
 const CAMERA_LOADS: &str = "camera loads";

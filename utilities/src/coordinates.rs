@@ -4,16 +4,12 @@
 //! ([`CellCartesian`]).
 //!
 //! The design: `docs/coordinates.md`; function by function:
-//! `docs/reference.md`.
-
-// Every item is documented, private ones included; `cargo clippy`
-// checks the private ones.
-#![warn(missing_docs, clippy::missing_docs_in_private_items)]
+//! `docs/coordinates_reference.md`.
 
 
 /// Cells along a chunk's side: a chunk's layers are bitmaps, and a
 /// bitmap is this wide.
-pub const CHUNK_SIDE: usize = bitmap::WIDTH;
+pub const CHUNK_SIDE: usize = crate::bitmap::WIDTH;
 /// Chunks along a superchunk's side.
 pub const SUPERCHUNK_SIDE: usize = 4;
 /// Chunks in a superchunk.

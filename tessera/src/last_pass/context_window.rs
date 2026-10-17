@@ -2,8 +2,8 @@
 //! it by tables.
 
 use super::{CONTEXT_CELLS, FLOOR_TILE_CELLS, FLOOR_TILE_SIDE, FLOOR_X_BITS, FLOOR_Y_BITS};
-use bitmap::Bitmap;
-use bitmap::morton::morton_coordinates;
+use utilities::bitmap::Bitmap;
+use utilities::bitmap::morton::morton_coordinates;
 
 /// A floor tile and the three floor tiles before it -- above left, above, left --
 /// as an 8x8 square of cells, a bit each, row after row: bit `8y + x`,

@@ -2,14 +2,18 @@
 //! by, at its fixed number -- the layers and planes of the cells, the
 //! types of entities and their attributes, the rules -- and what the
 //! numbers some hold are made of (the climate's, a sheep's state).
-//! Registered by `protocol::default_types`; nothing but the base
-//! game's rules, and that, depends on it.
+//! Registered by `server::default_types`; nothing but the base
+//! game's rules, and that, depends on it -- and, until the client's
+//! hooks, the frames' readers: the planes' widths and the heights
+//! ([`plane_words`], [`height_map`]).
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 mod climate;
+pub mod height_map;
+pub mod plane_words;
 mod sheep_state;
 
 pub use climate::{nearer_by_step, passes_a_slope, pressure_falls_by, Climate, Wind, DEGREES_A_WIND_CARRIES, FALL_THAT_FREES, HEAT_A_LEVEL_MORE_HELD, HIGHEST_PRESSURE, HOTTEST_TEMPERATURE, HUMIDITY_A_LEVEL_OF_CLOUD, HUMIDITY_A_LEVEL_SOONER, MOST_HUMID, PRESSURE_AT_REST, PRESSURE_GAP_AT_REST, RAINS_ABOVE_AT_THE_MOST, RAINS_ABOVE_IN_COLD_DRY_AIR, RISE_THAT_HALVES, STRONGEST_WIND, TILES_ABOUT};

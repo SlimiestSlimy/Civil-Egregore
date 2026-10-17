@@ -5,7 +5,7 @@ use super::{contains, members, set_membership};
 use super::arena::BitmapArena;
 use super::superchunk::Superchunk;
 use chunk_storage::{BucketKey, ChunkStorage, LayerCodec};
-use coordinates::{ChunkIndex, SuperchunkIndex};
+use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 
 impl BitmapArena {
     /// Takes every dirty bucket over hot `superchunk`: its cells copied

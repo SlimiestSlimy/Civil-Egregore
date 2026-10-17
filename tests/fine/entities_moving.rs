@@ -6,7 +6,7 @@
 
 use crate::arenas::*;
 use crate::walkers::*;
-use coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{AttributeBlock, WorldEntities, EntityReader, Header, NEVER_WAKES};
 use simulation::{Simulation, SimulationTickState};
 use std::sync::Mutex;

@@ -6,7 +6,7 @@
 //! Function by function: `docs/reference.md`, "`patterns.rs`".
 
 use crate::tile::{cells_in_tile, copy_offset, tiles_in_level, TilePyramid, Tile, FLOOR_LEVEL};
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 
 /// Every cell of the tile clear.
 pub const ALL_CLEAR: u16 = 0;

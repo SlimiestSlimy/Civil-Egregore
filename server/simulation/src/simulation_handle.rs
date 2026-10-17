@@ -21,7 +21,7 @@ use crate::Simulation;
 use bitplane_manager::BitmapArena;
 use chunk_storage::disk::WorldInfo;
 use chunk_storage::{ChunkStorage, LayerType};
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use entity_manager::WorldEntities;
 use std::collections::BTreeMap;
 use std::path::PathBuf;

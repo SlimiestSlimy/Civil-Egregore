@@ -2,16 +2,15 @@
 //! alike: one run of 64-bit words (`docs/chunk_storage.md`, "The
 //! superchunk image").
 
-use coordinates::CHUNKS_IN_SUPERCHUNK;
+use utilities::coordinates::CHUNKS_IN_SUPERCHUNK;
 use crate::chunk_maps::{self, number_in, ChunkMaps};
-use crate::height_map::{height_in, words_of, Height, HeightMap, HEIGHT_WORDS};
 use type_registry::LayerType;
 
-/// Where the height map starts: after the chunk table.
-const HEIGHTS_START: usize = CHUNKS_IN_SUPERCHUNK;
-/// Where the first chunk starts at the least: after a height map with
-/// no chunk tall, and the water's one word with no water.
-const CHUNKS_START: usize = HEIGHTS_START + HEIGHT_WORDS + 1;
+/// Where the water's depths start: after the chunk table.
+const WATER_START: usize = CHUNKS_IN_SUPERCHUNK;
+/// Where the first chunk starts at the least: after the water's one
+/// word with no water, and no heights.
+const CHUNKS_START: usize = WATER_START + 1;
 /// Words a layer table entry takes: its type and its offset.
 const ENTRY_WORDS: usize = 2;
 
@@ -31,8 +30,9 @@ pub struct LayerChange<'a> {
     pub encoded_layer: &'a [u64],
 }
 
-/// A superchunk's words: its chunk table, its heights, its water's
-/// depths, its chunks.
+/// A superchunk's words: its chunk table, its water's depths, its
+/// heights -- words the base game lays out, kept as they are given --
+/// and its chunks.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SuperchunkImage {
     /// Every word, as on disk.
@@ -40,34 +40,34 @@ pub struct SuperchunkImage {
 }
 
 impl SuperchunkImage {
-    /// A superchunk with `heights` and no layers.
-    pub fn new(heights: &HeightMap) -> Self {
-        Self { words: build_image_words(heights.words(), ChunkMaps::default().words(), &Default::default()) }
+    /// A superchunk with `height_words` its heights and no layers.
+    pub fn new(height_words: &[u64]) -> Self {
+        Self { words: build_image_words(ChunkMaps::default().words(), height_words, &Default::default()) }
     }
 
     /// This image with `water_depths` its water's, its heights and layers
     /// as they are.
     pub fn with_water(&self, water_depths: &ChunkMaps) -> Self {
         let chunks: [Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK] = std::array::from_fn(|place| exact_layers(self.chunk(place)));
-        Self { words: build_image_words(self.height_words(), water_depths.words(), &chunks) }
+        Self { words: build_image_words(water_depths.words(), self.height_words(), &chunks) }
     }
 
     /// `words` as an image, if they are one: every offset inside its
     /// chunk, and each chunk's layer types sorted, each once.
     pub fn from_words(words: Box<[u64]>) -> Result<Self, InvalidImage> {
         if words.len() < CHUNKS_START {
-            return Err(InvalidImage("shorter than its chunk table and height map"));
+            return Err(InvalidImage("shorter than its chunk table and its water's first word"));
         }
-        // The height map ends past its tall chunks' maps.
-        let mut previous_end = HEIGHTS_START + words_of(&words[HEIGHTS_START..]);
-        if previous_end > words.len() {
-            return Err(InvalidImage("shorter than its height map"));
-        }
-        // Then the water's depths, as long as their first word says: the first chunk starts where they end.
-        if words.len() <= previous_end || words.len() < previous_end + chunk_maps::words_of(&words[previous_end..]) {
+        // The water's depths, as long as their first word says.
+        let water_end = WATER_START + chunk_maps::words_of(&words[WATER_START..]);
+        if water_end > words.len() {
             return Err(InvalidImage("shorter than its water's depths"));
         }
-        previous_end += chunk_maps::words_of(&words[previous_end..]);
+        // Then the heights: the first chunk starts where they end.
+        let mut previous_end = words[0] as usize;
+        if previous_end < water_end || previous_end > words.len() {
+            return Err(InvalidImage("its heights outside the image"));
+        }
         for chunk_place in 0..CHUNKS_IN_SUPERCHUNK {
             let chunk_start = words[chunk_place] as usize;
             if chunk_start != previous_end {
@@ -83,10 +83,10 @@ impl SuperchunkImage {
         Ok(Self { words })
     }
 
-    /// This image with `heights` its heights, its layers as they are.
-    pub fn with_heights(&self, heights: &HeightMap) -> Self {
+    /// This image with `height_words` its heights, its layers as they are.
+    pub fn with_heights(&self, height_words: &[u64]) -> Self {
         let chunks: [Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK] = std::array::from_fn(|place| exact_layers(self.chunk(place)));
-        Self { words: build_image_words(heights.words(), self.water_words(), &chunks) }
+        Self { words: build_image_words(self.water_words(), height_words, &chunks) }
     }
 
     /// Every word, as on disk.
@@ -94,27 +94,22 @@ impl SuperchunkImage {
         &self.words
     }
 
-    /// The superchunk's height map's words ([`HeightMap`]).
-    pub fn height_words(&self) -> &[u64] {
-        &self.words[HEIGHTS_START..][..words_of(&self.words[HEIGHTS_START..])]
+    /// The words of the water's depths ([`ChunkMaps`]): after the
+    /// chunk table, as long as their first word says.
+    pub fn water_words(&self) -> &[u64] {
+        &self.words[WATER_START..][..chunk_maps::words_of(&self.words[WATER_START..])]
     }
 
-    /// The words of the water's depths ([`ChunkMaps`]): from the
-    /// height map's end to the first chunk.
-    pub fn water_words(&self) -> &[u64] {
-        &self.words[HEIGHTS_START + words_of(&self.words[HEIGHTS_START..])..self.words[0] as usize]
+    /// The superchunk's heights' words, as they were given: from the
+    /// water's end to the first chunk. What they say is the base game's.
+    pub fn height_words(&self) -> &[u64] {
+        &self.words[WATER_START + self.water_words().len()..self.words[0] as usize]
     }
 
     /// How deep the water is over the cell at `place` in the
     /// superchunk: 0 where there is none.
-    pub fn water_depth(&self, place: usize) -> Height {
+    pub fn water_depth(&self, place: usize) -> u16 {
         number_in(self.water_words(), place)
-    }
-
-    /// The height of the cell at `place` in the superchunk
-    /// ([`coordinates::CellIndex::place_in_superchunk`]).
-    pub fn height(&self, place: usize) -> Height {
-        height_in(self.height_words(), place)
     }
 
     /// The words of the chunk at `place`, its layer count first.
@@ -155,7 +150,7 @@ impl SuperchunkImage {
                 (Err(_), true) => {}
             }
         }
-        Self { words: build_image_words(self.height_words(), self.water_words(), &chunks) }
+        Self { words: build_image_words(self.water_words(), self.height_words(), &chunks) }
     }
 }
 
@@ -205,18 +200,18 @@ fn exact_layers(chunk: &[u64]) -> Vec<(LayerType, &[u64])> {
         .collect()
 }
 
-/// An image's words: `heights`, the `water`'s depths if any, then each
+/// An image's words: the `water`'s depths, `heights`, then each
 /// chunk's encoded layers, sorted by type.
-fn build_image_words(heights: &[u64], water: &[u64], chunks: &[Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK]) -> Box<[u64]> {
+fn build_image_words(water: &[u64], heights: &[u64], chunks: &[Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK]) -> Box<[u64]> {
     let chunk_words = |layers: &Vec<(LayerType, &[u64])>| 1 + layers.len() * ENTRY_WORDS + layers.iter().map(|(_, words)| words.len()).sum::<usize>();
-    let mut chunk_start = HEIGHTS_START + heights.len() + water.len();
+    let mut chunk_start = WATER_START + water.len() + heights.len();
     let mut words = Vec::with_capacity(chunk_start + chunks.iter().map(chunk_words).sum::<usize>());
     for layers in chunks {
         words.push(chunk_start as u64);
         chunk_start += chunk_words(layers);
     }
-    words.extend_from_slice(heights);
     words.extend_from_slice(water);
+    words.extend_from_slice(heights);
     for layers in chunks {
         words.push(layers.len() as u64);
         let mut layer_offset = 1 + layers.len() * ENTRY_WORDS;

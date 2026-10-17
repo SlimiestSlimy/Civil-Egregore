@@ -29,3 +29,9 @@ mod chance;
 
 #[path = "fine/wire.rs"]
 mod wire;
+
+#[path = "fine/bitmap.rs"]
+mod bitmap;
+
+#[path = "fine/coordinates.rs"]
+mod coordinates;

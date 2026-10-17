@@ -5,7 +5,7 @@ use super::SimulationTickState;
 use entity_manager::{EntityRef, SuperchunkEntities};
 use bitplane_manager::CellReader;
 use chunk_storage::LayerType;
-use coordinates::{CellIndex, ChunkIndex};
+use utilities::coordinates::{CellIndex, ChunkIndex};
 
 impl<'a> SimulationTickState<'a> {
     /// The superchunk's entities waking this tick, as the tick found

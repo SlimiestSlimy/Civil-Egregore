@@ -3,8 +3,7 @@
 //! writeback ring", "Shared images"). Its images paged to disk:
 //! `paging.rs`.
 
-use coordinates::{ChunkIndex, SuperchunkIndex};
-use crate::height_map::HeightMap;
+use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 use crate::paging::{bytes_of, ImageKept, ColdPoolPaging};
 use type_registry::LayerType;
 use crate::superchunk_image::{LayerChange, SuperchunkImage};
@@ -186,12 +185,12 @@ pub struct Flush {
 
 impl Flush {
     /// The image with every change made: a superchunk with no image made,
-    /// flat at height 0.
+    /// with no heights.
     pub fn rewritten_image(&self) -> SuperchunkImage {
         let image_changes: Vec<LayerChange> = self.layer_changes.iter().map(|(place, layer_type, encoded_words)| LayerChange { place: *place, layer_type: *layer_type, encoded_layer: encoded_words }).collect();
         match &self.image {
             Some(image) => image.rewritten_with(&image_changes),
-            None => SuperchunkImage::new(&HeightMap::default()).rewritten_with(&image_changes),
+            None => SuperchunkImage::new(&[]).rewritten_with(&image_changes),
         }
     }
 }

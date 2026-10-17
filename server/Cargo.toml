@@ -6,12 +6,13 @@ description = "Civil Egregore's server: the world as a whole, made from a seed, 
 [dependencies]
 type_registry = { path = "../protocol/type_registry" }
 entity_manager = { path = "entity_manager" }
-bitmap = { path = "../utilities/bitmap" }
 worldgen = { path = "basegame/worldgen" }
 simulation = { path = "simulation" }
-coordinates = { path = "../utilities/coordinates" }
 utilities = { path = "../utilities" }
 protocol = { path = "../protocol" }
 base_types = { path = "basegame/base_types" }
+libraries = { path = "basegame/libraries" }
+sca_rules = { path = "basegame/sca_rules" }
+entity_rules = { path = "basegame/entity_rules" }
 bitplane_manager = { path = "bitplane_manager" }
 chunk_storage = { path = "chunk_storage" }

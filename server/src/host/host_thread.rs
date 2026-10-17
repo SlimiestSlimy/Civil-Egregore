@@ -20,7 +20,7 @@ struct RunningWorld {
     /// from when reset.
     world_start: WorldStart,
     /// The superchunks whose heights and water a frame has carried.
-    heights_sent: HashSet<coordinates::SuperchunkIndex>,
+    heights_sent: HashSet<utilities::coordinates::SuperchunkIndex>,
 }
 
 impl RunningWorld {

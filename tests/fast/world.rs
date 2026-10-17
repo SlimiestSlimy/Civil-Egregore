@@ -8,7 +8,7 @@
 
 use crate::worlds::{world_contents, folder};
 use chunk_storage::disk::{self, DiskError};
-use coordinates::CellCartesian;
+use utilities::coordinates::CellCartesian;
 use entity_rules::sheep::EATEN_COUNT;
 
 /// Grass and sheep ticked, saved, and ticked on; the save loaded and
@@ -93,7 +93,7 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let generation: String = saved_world.world_generation().numbers().iter().map(|(name, value)| format!("generation {name},{value}\n")).collect();
     // Every layer the world's types have, a wide plane as the layers it is kept cold as.
     let layers: Vec<String> = saved_world.frozen_types().layer_types().into_iter().flat_map(|layer_type| layer_type.each_bitplane()).map(|plane_type| plane_type.0.to_string()).collect();
-    assert_eq!(world_file_text, format!("world,is\nformat,2\nseed,{}\ntick,0\nlayers,{}\nunpopulated,{}\n{generation}", utilities::seed::seed_as_hex(seed), layers.join(" "), coordinates::WORLD_MIDDLE.0), "no name: the folder's; the origin unpopulated until the first tick");
+    assert_eq!(world_file_text, format!("world,is\nformat,3\nseed,{}\ntick,0\nlayers,{}\nunpopulated,{}\n{generation}", utilities::seed::seed_as_hex(seed), layers.join(" "), utilities::coordinates::WORLD_MIDDLE.0), "no name: the folder's; the origin unpopulated until the first tick");
     let hot: String = saved_world.bitmap_arena().superchunk_indices().iter().map(|superchunk| format!("{:011x},hot,\n", superchunk.0)).collect();
     assert_eq!(std::fs::read_to_string(folder.join("hot.csv")).expect("the hot file"), format!("superchunk,is,until\n{hot}"), "the nine hot, none cooling or warming");
     let mut file_names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|dir_entry| dir_entry.unwrap().file_name().into_string().unwrap()).collect();
@@ -204,13 +204,13 @@ fn sheep_never_step_through_a_wall() {
     use std::collections::HashMap;
     // Small polygons joined by cliffs, and a seed whose origin superchunk has walls enough.
     let land_shape = worldgen::LandShape { vertex_spacing_power: 8, highest_land: 552, narrowest_blend: 2, widest_blend: 2, ocean_share: 0, finer_depth: 3, ..worldgen::LandShape::DEFAULT };
-    let seed = (crate::test_seed::TestSeedHandle::open().seed()..).find(|&seed| worldgen::Terrain::generate_shaped(&land_shape, seed, coordinates::WORLD_MIDDLE).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
+    let seed = (crate::test_seed::TestSeedHandle::open().seed()..).find(|&seed| worldgen::Terrain::generate_shaped(&land_shape, seed, utilities::coordinates::WORLD_MIDDLE).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
     let mut made_world = server::start_world(server::WorldStart { seed, world_size: server::WorldSize::SquareOfSide { side_superchunks: 1, forced_hot: false }, world_generation: worldgen::WorldGeneration { land_shape, sheep_per_superchunk: 4_000, ..worldgen::WorldGeneration::DEFAULT }, ..server::WorldStart::default() });
     // The superchunk's heights and a cell more all round, worked out once: asked for at every sheep, every tick.
-    let (corner_cartesian, side_cells) = (coordinates::WORLD_MIDDLE.top_left().cartesian(), coordinates::SUPERCHUNK_SIDE_CELLS as usize + 2);
+    let (corner_cartesian, side_cells) = (utilities::coordinates::WORLD_MIDDLE.top_left().cartesian(), utilities::coordinates::SUPERCHUNK_SIDE_CELLS as usize + 2);
     let mut mesh_lands = worldgen::mesh::WorldLand::new(&land_shape, seed);
     let heights: Vec<_> = (0..side_cells * side_cells).map(|cell_number| mesh_lands.height(corner_cartesian.x.wrapping_add((cell_number % side_cells) as u32).wrapping_sub(1), corner_cartesian.y.wrapping_add((cell_number / side_cells) as u32).wrapping_sub(1))).collect();
-    let height_at = |asked_cell: coordinates::CellIndex| {
+    let height_at = |asked_cell: utilities::coordinates::CellIndex| {
         let cell = asked_cell.cartesian();
         let (cells_across, cells_down) = (cell.x.wrapping_sub(corner_cartesian.x).wrapping_add(1) as usize, cell.y.wrapping_sub(corner_cartesian.y).wrapping_add(1) as usize);
         // A sheep strayed past the superchunk: the generator asked.
@@ -220,7 +220,7 @@ fn sheep_never_step_through_a_wall() {
     // The flock made the first tick, by the world's generation.
     made_world.tick();
     crate::worlds::tag_sheep(&mut made_world);
-    let mut stood_cell_by_tag: HashMap<u64, coordinates::CellIndex> = made_world.entity_store().iter().map(|tagged_sheep| (crate::worlds::tag_of(&tagged_sheep).expect("tagged"), tagged_sheep.header.stood_cell)).collect();
+    let mut stood_cell_by_tag: HashMap<u64, utilities::coordinates::CellIndex> = made_world.entity_store().iter().map(|tagged_sheep| (crate::worlds::tag_of(&tagged_sheep).expect("tagged"), tagged_sheep.header.stood_cell)).collect();
     let (mut steps_moved, mut beside_walls) = (0, 0);
     for _ in 0..1_500 {
         made_world.tick();
@@ -254,10 +254,10 @@ fn the_weathers_planes_hold_a_number_a_tile_through_ticks_and_a_save() {
     let folder = folder("weather");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
     let mut world = server::start_world(server::WorldStart { seed, world_size: server::WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, world_generation: crate::worlds::flocked(50), ..server::WorldStart::default() });
-    let (corner_cartesian, side_cells) = (world.bitmap_arena().superchunk_indices()[0].top_left().cartesian(), 2 * coordinates::SUPERCHUNK_SIDE_CELLS);
+    let (corner_cartesian, side_cells) = (world.bitmap_arena().superchunk_indices()[0].top_left().cartesian(), 2 * utilities::coordinates::SUPERCHUNK_SIDE_CELLS);
     // A cell of the tile `(x, y)` -- in tiles from the world's corner -- drawn anew each time.
     let tile_side = 1 << WEATHER_TILE_SCALE;
-    let cell_of = |(x, y): (u32, u32), cell_random: &mut utilities::rng::RandomSource| -> coordinates::CellIndex {
+    let cell_of = |(x, y): (u32, u32), cell_random: &mut utilities::rng::RandomSource| -> utilities::coordinates::CellIndex {
         CellCartesian { x: corner_cartesian.x + x * tile_side + cell_random.draw_below(u64::from(tile_side)) as u32, y: corner_cartesian.y + y * tile_side + cell_random.draw_below(u64::from(tile_side)) as u32 }.into()
     };
     let mut tiles = std::collections::BTreeMap::new();

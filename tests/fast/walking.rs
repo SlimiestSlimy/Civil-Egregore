@@ -7,7 +7,7 @@
 use crate::arenas::{cell, walker_header, world, STONE_LAYER};
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::LayerCodec;
-use coordinates::{SuperchunkIndex};
+use utilities::coordinates::{SuperchunkIndex};
 use simulation::simulation_api::square_around_a_cell::{self, AREA_CENTRE};
 use simulation::simulation_api::{cell_and_its_neighbours, entity_reads_and_writes, steps_and_paths};
 use entity_manager::NEVER_WAKES;

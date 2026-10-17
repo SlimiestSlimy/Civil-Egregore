@@ -4,7 +4,7 @@
 //! `cargo test --test fast`
 
 use crate::arenas::{stone_arena, cell, STONE_LAYER};
-use coordinates::{CellCartesian, CellIndex, SuperchunkIndex};
+use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex};
 use entity_manager::WorldEntities;
 use simulation::simulation_api::square_around_a_cell::{self, AREA_CENTRE, AREA_SIDE};
 use simulation::Simulation;

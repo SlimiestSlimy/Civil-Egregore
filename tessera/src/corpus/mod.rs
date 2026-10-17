@@ -13,7 +13,7 @@ mod lines;
 pub use city::{one_laid_out, CityBitmaps, CityPlan, CITY_PLANS};
 pub use lines::{one_drawn, LineDrawings, LineSet, LINE_SETS};
 
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 
 /// One shape worth measuring on: what it looks like, the two numbers
 /// that make it, and how many of it a timed run should take.

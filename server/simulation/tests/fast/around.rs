@@ -9,7 +9,7 @@
 use crate::arenas::{cell, STONE_LAYER};
 use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CellIndex, SuperchunkIndex};
+use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use entity_manager::WorldEntities;
 use simulation::simulation_api::{cell_and_its_neighbours, steps_and_paths};
 use simulation::Simulation;

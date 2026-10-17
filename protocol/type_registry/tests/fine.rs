@@ -9,7 +9,7 @@
 #[path = "../../../utilities/test_seed.rs"]
 mod test_seed;
 use base_types::{CLIMATE, GRASS, GRASS_RULE, SHEEP, SHEEP_RULE, SHEEP_STATE, TREES_RULE, TREE_STAGE, WEATHER_RULE, SheepState};
-use protocol::default_types::new_type_registry_with_default_types;
+use server::default_types::new_type_registry_with_default_types;
 use type_registry::{data_words, Attribute, AttributeType, EntityRuleType, EntityType, LayerType, Layout, RegisteredType, RegistryRefusal, ScaRuleType, ATTRIBUTE_NUMBERS, TYPE_ID_NUMBERS};
 use utilities::rng::RandomSource;
 

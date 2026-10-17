@@ -7,7 +7,7 @@
 
 use bitplane_manager::{SmallTiles, SMALL_TILE_CELLS, SMALL_TILE_SIDE};
 use chunk_storage::LayerType;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use crate::SimulationTickState;
 
 /// Cells along the side of the square the four small tiles make.

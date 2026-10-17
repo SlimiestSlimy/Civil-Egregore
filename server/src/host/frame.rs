@@ -6,9 +6,10 @@ use crate::World;
 use bitplane_manager::BucketKey;
 use base_types::{CLIMATE, CLOUD, GRASS, TREE, TREE_STAGE, WET};
 use chunk_storage::{LayerType, SuperchunkImage};
-use coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
-use protocol::pipe::frame::{raining_tiles_of, Cells, FrameAsk, Viewport, ViewportFrame, Water, CHUNK_WORDS, DEEP_WATER_DEPTH};
-use protocol::pipe::terrain::DrawnHeightRange;
+use utilities::coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
+use base_types::plane_words::raining_tiles_of;
+use protocol::pipe::frame::{Cells, FrameAsk, Viewport, ViewportFrame, Water, CHUNK_WORDS, DEEP_WATER_DEPTH};
+use super::terrain::drawn_heights_of;
 use std::collections::HashSet;
 
 /// The hot superchunks of `world` in `viewport`, each `(x, y)` in the
@@ -32,7 +33,7 @@ pub(crate) fn hot_in(world: &World, viewport: Option<Viewport>) -> Vec<(u32, u32
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn frame_of(world: &World, worlds: u64, frame_ask: FrameAsk, hot: Vec<(u32, u32)>, cells: Vec<Cells>, (ticks_a_second, sync_seconds, sync_share): (f64, f64, f64), (world_name, last_outcome): (Option<String>, Option<String>), more_to_come: bool) -> ViewportFrame {
     let (sheep_count, grass_cells, trees) = (world.entity_store().len(), count(world, GRASS), count(world, TREE));
-    ViewportFrame { world: worlds, seed: world.world_info.seed, world_generation: world.world_generation, drawn_heights: DrawnHeightRange::from_generation(&world.world_generation), side_superchunks: world.halos().hot.world_side_superchunks(), tick: world.entity_store().current_tick(), ticks_a_second, sheep_count, grass_cells, trees, sync_seconds, sync_share, viewport: frame_ask.viewport, hot, pixel_side_log2: frame_ask.pixel_side_log2, seen_near: frame_ask.seen_near, world_name, last_outcome, more_to_come, cells }
+    ViewportFrame { world: worlds, seed: world.world_info.seed, generation_numbers: world.world_generation.numbers(), drawn_heights: drawn_heights_of(&world.world_generation), side_superchunks: world.halos().hot.world_side_superchunks(), tick: world.entity_store().current_tick(), ticks_a_second, sheep_count, grass_cells, trees, sync_seconds, sync_share, viewport: frame_ask.viewport, hot, pixel_side_log2: frame_ask.pixel_side_log2, seen_near: frame_ask.seen_near, world_name, last_outcome, more_to_come, cells }
 }
 
 /// Cells of `layer_type` over every hot superchunk of `world`.

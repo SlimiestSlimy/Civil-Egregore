@@ -4,7 +4,7 @@
 //! set says. Like every corpus bitmap, settled by a seed.
 
 use utilities::rng::RandomSource;
-use bitmap::{Bitmap, WIDTH};
+use utilities::bitmap::{Bitmap, WIDTH};
 
 /// A kind of drawing: how many lines a bitmap is given, how wide they
 /// get, and how many to measure over and to test.

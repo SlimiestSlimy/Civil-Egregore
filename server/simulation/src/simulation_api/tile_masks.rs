@@ -7,7 +7,7 @@
 use crate::simulation_api::cell_and_its_neighbours::set_bit_of_rank;
 use bitplane_manager::{SMALL_TILE_CELLS, SMALL_TILE_SIDE};
 use chunk_storage::LayerType;
-use coordinates::{cartesian_from_place, place_from_cartesian, CellIndex, CHUNK_SIDE};
+use utilities::coordinates::{cartesian_from_place, place_from_cartesian, CellIndex, CHUNK_SIDE};
 use crate::SimulationTickState;
 use std::ops::Range;
 use utilities::rng::RandomSource;

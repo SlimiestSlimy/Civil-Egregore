@@ -2,7 +2,7 @@
 //! its square side alone -- odd sides never line up with the quadtree's
 //! tiles (`docs/lab.md`, "`corpus/`").
 
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 
 /// The smallest square side measured: the smallest odd side above one
 /// cell, which would be the plain alternating board.

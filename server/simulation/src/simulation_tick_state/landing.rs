@@ -5,7 +5,7 @@
 
 use super::instruction::Instruction;
 use bitplane_manager::Superchunk;
-use coordinates::{CellIndex, SuperchunkIndex};
+use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use entity_manager::SuperchunkEntities;
 
 /// Where instructions land as they are applied: the superchunk of

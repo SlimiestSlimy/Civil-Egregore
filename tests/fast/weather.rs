@@ -6,7 +6,7 @@
 
 use crate::worlds::{plain_start, tick_rule};
 use bitplane_manager::Write;
-use coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use sca_rules::weather::{deepens_and_thins, BLOWN_COUNT, CARRIED_COUNT, DEEPENED_COUNT, EVENED_COUNT, PUSHED_COUNT, SAMPLED_COUNT, THINNED_COUNT, WHOLE_PARTS};
 use server::World;
 use base_types::{nearer_by_step, passes_a_slope, FALL_THAT_FREES, pressure_falls_by, Climate, Wind, HIGHEST_PRESSURE, HOTTEST_TEMPERATURE, HUMIDITY_A_LEVEL_OF_CLOUD, MOST_HUMID, PRESSURE_AT_REST, PRESSURE_GAP_AT_REST, RISE_THAT_HALVES, STRONGEST_WIND};

@@ -14,7 +14,7 @@ use entity_manager::{EntityReader, SuperchunkEntities};
 use crate::sampling::{sample_layer, sample_tiles_of_layer};
 use bitplane_manager::{NotHot, CellReader, SmallTiles, Superchunk, Window};
 use chunk_storage::{LayerType, WidePlane, Width};
-use coordinates::{CellIndex, SuperchunkIndex};
+use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use utilities::chance::Chance;
 use utilities::rng::RandomSource;
 

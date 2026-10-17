@@ -5,7 +5,7 @@
 // A tier uses what it needs of it.
 #![allow(dead_code)]
 
-use coordinates::place_from_cartesian;
+use utilities::coordinates::place_from_cartesian;
 use worldgen::Terrain;
 
 /// The height of the cell `(x, y)` of a superchunk's `terrain`, from

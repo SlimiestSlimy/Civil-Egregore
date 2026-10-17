@@ -3,7 +3,7 @@
 
 use crate::{FRACTION_ONE, LandShape, noise_at_cell_cartesian};
 use super::{FINER_MOST, FINEST_SPACING_POWER, Mesh, WARP_INDEX};
-use chunk_storage::Height;
+use base_types::height_map::Height;
 
 /// The cells from one point of the lattice to the next, as a power of
 /// two: the meshes are worked out at its points alone, a sixteenth of

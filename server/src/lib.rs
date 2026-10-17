@@ -11,6 +11,7 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod commands;
+pub mod default_types;
 pub mod host;
 pub mod params;
 mod pipe_end;
@@ -27,10 +28,10 @@ pub use world_start::{drawn_seed, seed_with_land, WorldSize, WorldStart};
 
 use chunk_storage::disk::WorldInfo;
 pub use worldgen::WorldGeneration;
-use coordinates::WORLD_MIDDLE;
+use utilities::coordinates::WORLD_MIDDLE;
 use simulation::{ColdPoolPaging, SimulationHandle};
 use std::sync::Arc;
-use protocol::default_types::new_type_registry_with_default_types;
+use default_types::new_type_registry_with_default_types;
 use type_registry::FrozenTypes;
 
 /// Bytes of cold superchunks' images a world keeps in memory, unless

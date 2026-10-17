@@ -8,7 +8,7 @@
 
 use bitplane_manager::{BitmapArena, BucketKey};
 use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, WorldEntities, EntityType, Header};
 use simulation::simulation_api::{cell_reads_and_writes, compare_and_write, entity_reads_and_writes};
 use simulation::{Compare, Simulation, SimulationTickState};

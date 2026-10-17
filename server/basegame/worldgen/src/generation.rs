@@ -6,7 +6,7 @@
 use crate::mesh::{WorldLand, SIGMOID_ONE};
 use crate::patches::Patches;
 use crate::{SmoothNoise, LandShape, FRACTION_ONE};
-use coordinates::{SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use utilities::hash::mix_word;
 use utilities::tuning::{self, Tuning};
 use utilities::wire::{WireReader, Wired};

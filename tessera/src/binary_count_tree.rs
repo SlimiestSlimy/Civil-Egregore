@@ -7,8 +7,8 @@
 
 use crate::bit_stream::{truncated_binary_bits, truncated_binary_shape, BitReader, BitSink};
 use crate::set_cells_before_each_word::SetCellsBeforeEachWord;
-use bitmap::WORDS;
-use bitmap::Bitmap;
+use utilities::bitmap::WORDS;
+use utilities::bitmap::Bitmap;
 
 /// The counts a run of `cells` cells, `set_cells` of them set, could have in
 /// its first half: the fewest, and how many there are.

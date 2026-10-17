@@ -5,3 +5,5 @@ description = "Civil Egregore's base game's types: the layers, planes, entities,
 
 [dependencies]
 type_registry = { path = "../../../protocol/type_registry" }
+protocol = { path = "../../../protocol" }
+utilities = { path = "../../../utilities" }

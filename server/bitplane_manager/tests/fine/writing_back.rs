@@ -4,10 +4,10 @@
 //! `cargo test`
 
 use crate::chunks::*;
-use bitmap::{CellWords, WORDS};
+use utilities::bitmap::{CellWords, WORDS};
 use bitplane_manager::{BitmapArena, BucketKey, NotHot, WriteOp};
 use chunk_storage::{ChunkStorage, LayerCodec, LayerType};
-use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
+use utilities::coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
 
 /// Writing back encodes only what changed into the ring, and the cold pool
 /// holds it once flushed; a layer left with no cell set leaves its

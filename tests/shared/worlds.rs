@@ -6,7 +6,7 @@
 #![allow(dead_code)]
 
 use chunk_storage::SuperchunkImage;
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use entity_manager::{set_attribute, Attribute, AttributeBlock, EntityRef, Header};
 use server::{World, WorldSize, WorldStart};
 use std::path::PathBuf;
@@ -41,7 +41,7 @@ pub fn world_contents(world: &World) -> WorldContents {
 /// `thread_count` threads.
 pub fn plain_start(superchunks: u32, grass_cover: u64, sheep_per_flock: usize, thread_count: usize) -> WorldStart {
     let world_generation = worldgen::WorldGeneration { sheep_per_superchunk: sheep_per_flock as u64, ..worldgen::WorldGeneration::plain(grass_cover) };
-    WorldStart { world_generation, world_size: WorldSize::SquareOfSide { side_superchunks: coordinates::square_side(superchunks), forced_hot: true }, thread_count: Some(thread_count), ..WorldStart::default() }
+    WorldStart { world_generation, world_size: WorldSize::SquareOfSide { side_superchunks: utilities::coordinates::square_side(superchunks), forced_hot: true }, thread_count: Some(thread_count), ..WorldStart::default() }
 }
 
 /// The default generation, with `sheep` sheep on each superchunk: made the
@@ -57,8 +57,8 @@ pub fn flocked(sheep: usize) -> worldgen::WorldGeneration {
 /// flock is put between ticks ([`put_flock`]).
 pub fn one_flock_world(world_start: WorldStart, sheep: usize) -> World {
     let mut world = server::start_world(WorldStart { world_size: WorldSize::NoEnd, world_generation: flocked(0), ..world_start });
-    put_flock(&mut world, coordinates::WORLD_MIDDLE, sheep);
-    world.keep_hot(&server::halos_about([coordinates::WORLD_MIDDLE].into_iter()));
+    put_flock(&mut world, utilities::coordinates::WORLD_MIDDLE, sheep);
+    world.keep_hot(&server::halos_about([utilities::coordinates::WORLD_MIDDLE].into_iter()));
     world
 }
 
@@ -70,13 +70,13 @@ pub fn first_superchunk(world: &World) -> SuperchunkIndex {
 /// The cells of `layer_type` on every hot chunk of `world`, as words: what
 /// two of, a tick apart, tell what the tick did to the layer
 /// ([`cells_set_and_cleared`]).
-pub fn layer_words(world: &World, layer_type: type_registry::LayerType) -> Vec<(coordinates::ChunkIndex, Vec<u64>)> {
+pub fn layer_words(world: &World, layer_type: type_registry::LayerType) -> Vec<(utilities::coordinates::ChunkIndex, Vec<u64>)> {
     world.bitmap_arena().buckets_of(layer_type).map(|(chunk, bucket)| (chunk, bucket.cells().to_vec())).collect()
 }
 
 /// The cells set and the cells cleared from `words_before` to `words_after`,
 /// two [`layer_words`] of the same hot chunks.
-pub fn cells_set_and_cleared(words_before: &[(coordinates::ChunkIndex, Vec<u64>)], words_after: &[(coordinates::ChunkIndex, Vec<u64>)]) -> (u64, u64) {
+pub fn cells_set_and_cleared(words_before: &[(utilities::coordinates::ChunkIndex, Vec<u64>)], words_after: &[(utilities::coordinates::ChunkIndex, Vec<u64>)]) -> (u64, u64) {
     assert_eq!(words_before.len(), words_after.len(), "the same chunks hot");
     let word_pairs = words_before.iter().zip(words_after).flat_map(|((chunk, before), (same_chunk, after))| {
         assert_eq!(chunk, same_chunk);
@@ -92,7 +92,7 @@ pub fn cells_of_grass(world: &World) -> u64 {
 
 /// Turns to grass the rectangle of cells `width` by `height` whose top
 /// left is `top_left_cartesian`, all of it on `world`'s hot superchunks.
-pub fn plant_grass(world: &mut World, top_left_cartesian: coordinates::CellCartesian, width: u8, height: u8) {
+pub fn plant_grass(world: &mut World, top_left_cartesian: utilities::coordinates::CellCartesian, width: u8, height: u8) {
     use bitplane_manager::{WriteShape, Write, WriteOp};
     let write_shape = if (width, height) == (1, 1) { WriteShape::Cell } else { WriteShape::RectangleOfCells { width, height } };
     let planted_writes = world.write_cells(base_types::GRASS, [Write { anchor_cell: top_left_cartesian.into(), write_op: WriteOp::SetCell, write_shape }]);
@@ -116,7 +116,7 @@ pub fn add_entity(world: &mut World, header: Header, attributes: &[AttributeBloc
 /// one flock wandering a world with no end, which a flock on every
 /// superchunk generated would grow for good.
 pub fn put_flock(world: &mut World, superchunk: SuperchunkIndex, count: usize) {
-    use coordinates::{CellCartesian, SUPERCHUNK_SIDE_CELLS};
+    use utilities::coordinates::{CellCartesian, SUPERCHUNK_SIDE_CELLS};
     use entity_rules::sheep::{STEP, TIME_BETWEEN_MEALS};
     let mut random_stream = utilities::rng::RandomSource::for_stream(!world.world_info().seed, superchunk.0);
     let (corner, side_in_cells, tick_now) = (superchunk.top_left().cartesian(), SUPERCHUNK_SIDE_CELLS as u64, world.entity_store().current_tick());

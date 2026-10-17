@@ -4,7 +4,7 @@
 
 use crate::layer_codec::BucketKey;
 use crate::{read_back, wide, Flush, LayerCodec, LayerType, ImageStored, SuperchunkImage};
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -91,7 +91,7 @@ impl Job {
                 for chunk in superchunk.chunks() {
                     for &layer_type in &types {
                         // A wide layer's planes decoded and put together: none of them there, no cell set.
-                        let (layer_bits_a_cell, mut one_bit_bitmap, mut bucket) = (layer_type.width_bits(), [0; bitmap::WORDS], None);
+                        let (layer_bits_a_cell, mut one_bit_bitmap, mut bucket) = (layer_type.width_bits(), [0; utilities::bitmap::WORDS], None);
                         for bit_decoded in 0..layer_bits_a_cell {
                             if let Some(layer) = image.layer(chunk.place(), layer_type.bitplane_of(bit_decoded)) {
                                 layer_codec.decode_cells(layer, &mut one_bit_bitmap);

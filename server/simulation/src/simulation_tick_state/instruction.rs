@@ -6,7 +6,7 @@
 //! (`docs/simulation.md`, "Instructions").
 
 use chunk_storage::LayerType;
-use coordinates::{CellIndex, SuperchunkIndex};
+use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use entity_manager::{AttributeType, Member};
 
 /// What an instruction does: its first two bytes. The high byte is
@@ -104,7 +104,7 @@ pub(crate) struct Instruction {
 }
 
 // The size the instruction set is built to: no opcode has more.
-const _: () = assert!(size_of::<Instruction>() == 24 && std::mem::offset_of!(Instruction, opcode) == 0 && coordinates::SUPERCHUNK_SIDE_CELLS as u64 * coordinates::SUPERCHUNK_SIDE_CELLS as u64 == 1 << PLACE_BITS);
+const _: () = assert!(size_of::<Instruction>() == 24 && std::mem::offset_of!(Instruction, opcode) == 0 && utilities::coordinates::SUPERCHUNK_SIDE_CELLS as u64 * utilities::coordinates::SUPERCHUNK_SIDE_CELLS as u64 == 1 << PLACE_BITS);
 
 impl Instruction {
     /// One of `opcode` on the cell `instruction_cell`, all else 0.

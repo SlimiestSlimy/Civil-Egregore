@@ -5,9 +5,9 @@
 use crate::climate::ClimateNoises;
 use crate::{WorldGeneration, Terrain, WALLS};
 use base_types::{CLIMATE, COLLISION, ELEVATION, GRASS, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
-use bitmap::{CellWords, BITS_PER_WORD, WORDS};
+use utilities::bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use chunk_storage::{ChunkMaps, LayerType, SuperchunkCells};
-use coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
+use utilities::coordinates::{cartesian_from_place, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 
 /// The cells of `superchunk` in a world made from `seed` as
 /// `world_generation` says: its terrain, the ocean where it is under the
@@ -79,5 +79,5 @@ pub fn generate_superchunk(world_generation: &WorldGeneration, seed: u64, superc
         }
         layers.extend(climate_bitmaps.iter().zip(&climate_planes).filter(|(plane_bitmap, _)| plane_bitmap.iter().any(|&word| word != 0)).map(|(plane_bitmap, &plane_type)| (chunk, plane_type, *plane_bitmap)));
     }
-    SuperchunkCells { water_depths: ChunkMaps::from_numbers(depth_at), heights: terrain.heights, layers }
+    SuperchunkCells { water_depths: ChunkMaps::from_numbers(depth_at), height_words: terrain.heights.words().into(), layers }
 }

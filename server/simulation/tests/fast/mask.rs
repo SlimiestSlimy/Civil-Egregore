@@ -7,7 +7,7 @@
 
 use crate::arenas::{cell, STONE_LAYER};
 use bitplane_manager::BitmapArena;
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use entity_manager::WorldEntities;
 use simulation::simulation_api::tile_masks::{self, Mask, MASK_SIDES};
 use simulation::Simulation;

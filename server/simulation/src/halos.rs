@@ -11,12 +11,12 @@ use crate::Simulation;
 use bitplane_manager::BitmapArena;
 use chunk_storage::jobs::{GenerateImage, Jobs, JobTicket};
 use chunk_storage::{ChunkStorage, LayerType};
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use crate::simulation_time::SimulationTime;
 use entity_manager::WorldEntities;
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::AddAssign;
-use utilities::wire::{Wired, WiredStruct};
+use protocol::pipe::frame::Viewport;
 use std::sync::Arc;
 use utilities::dispatcher::Dispatcher;
 
@@ -28,28 +28,6 @@ pub const WARM_TICKS: u64 = SimulationTime::from_seconds(1).ticks();
 /// cold: as long as one warming takes, so a hot entity stepping back over
 /// the edge it just crossed finds the superchunks behind it still hot.
 pub const COOL_TICKS: u64 = SimulationTime::from_seconds(1).ticks();
-
-/// What the renderer should render, in superchunks: a rectangle of
-/// them, each `(x, y)` in superchunks from the world's top left, both
-/// corners in it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Viewport {
-    /// The top left superchunk, `(x, y)`.
-    pub top_left_superchunk_cartesian: (u32, u32),
-    /// The bottom right one.
-    pub bottom_right_superchunk_cartesian: (u32, u32),
-}
-
-impl WiredStruct for Viewport {
-    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|viewport| &mut viewport.top_left_superchunk_cartesian, |viewport| &mut viewport.bottom_right_superchunk_cartesian];
-}
-
-impl Viewport {
-    /// Whether `(x, y)`, in superchunks, is in it.
-    pub fn contains(self, (x, y): (u32, u32)) -> bool {
-        (self.top_left_superchunk_cartesian.0..=self.bottom_right_superchunk_cartesian.0).contains(&x) && (self.top_left_superchunk_cartesian.1..=self.bottom_right_superchunk_cartesian.1).contains(&y)
-    }
-}
 
 /// What moving the halos did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

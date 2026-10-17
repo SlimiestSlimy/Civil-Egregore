@@ -5,7 +5,7 @@
 
 use super::{ApplyingSuperchunk, Phase};
 use crate::simulation_tick_state::{Outbox, ACROSS_QUEUE};
-use coordinates::{CellIndex, SuperchunkIndex};
+use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};

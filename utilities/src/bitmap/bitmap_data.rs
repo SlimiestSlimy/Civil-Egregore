@@ -2,8 +2,8 @@
 //! Morton index `i` bit `i % 64` of word `i / 64`, so a tile is a run
 //! of bits (`docs/bitmap.md`, "Morton order").
 
-use crate::morton::morton_index;
-use crate::{BITS_PER_WORD, WORDS};
+use crate::bitmap::morton::morton_index;
+use crate::bitmap::{BITS_PER_WORD, WORDS};
 
 /// Every cell of a bitmap, 64 a word, in Morton order.
 pub type CellWords = [u64; WORDS];

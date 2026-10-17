@@ -6,7 +6,7 @@
 
 use crate::bit_stream::{gamma_bits, BitReader, BitSink};
 use crate::tile::{cells_in_tile, tiles_in_level, Tile, CELL_LEVEL};
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 
 /// A complex tile's payload: the value of each of `tile`'s tiles
 /// `size_offset` levels finer, in Morton order -- at 1x1, its cells as

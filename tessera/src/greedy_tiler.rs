@@ -13,7 +13,7 @@ use crate::last_pass::ResidualPricing;
 use crate::patterns::{homogeneous_value_of, PatternPyramid};
 use crate::set_cells_before_each_word::SetCellsBeforeEachWord;
 use crate::tile::{cells_in_tile, copy_offset, tiles_in_level, Tile, CELL_LEVEL, COPY_DIRECTIONS, FLOOR_LEVEL};
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 
 /// A copy naming its children costs about 10 bits before them. A
 /// homogeneous child it copies is cheap anyway; any other needs a copy

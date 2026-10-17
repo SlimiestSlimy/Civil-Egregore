@@ -8,7 +8,7 @@
 use crate::arenas::{cell, walker_header, world, STONE_LAYER};
 use crate::walkers::{ENTITY_NUMBER, WOKEN_COUNT};
 use bitplane_manager::BitmapArena;
-use coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{AttributeBlock, WorldEntities, NEVER_WAKES};
 use simulation::{Compare, Simulation, SimulationTickState};
 use std::collections::BTreeSet;
@@ -88,7 +88,7 @@ fn flip_what_is_about(tick_state: &mut SimulationTickState, seed: u64) -> u64 {
             simulation::simulation_api::entity_reads_and_writes::step(tick_state, &header, header.stood_cell, current_tick + 1);
             continue;
         }
-        let seen_at = |tick_state: &SimulationTickState, x: u32, y: u32| (CellIndex::from(coordinates::CellCartesian { x, y }), u32::from(tick_state.layer_holds(STONE_LAYER, coordinates::CellCartesian { x, y }.into()) == Ok(true)));
+        let seen_at = |tick_state: &SimulationTickState, x: u32, y: u32| (CellIndex::from(utilities::coordinates::CellCartesian { x, y }), u32::from(tick_state.layer_holds(STONE_LAYER, utilities::coordinates::CellCartesian { x, y }.into()) == Ok(true)));
         let (east_seen, south_seen, past_seen) = (seen_at(tick_state, stood_cartesian.x + 1, stood_cartesian.y), seen_at(tick_state, stood_cartesian.x, stood_cartesian.y + 1), seen_at(tick_state, stood_cartesian.x + 1, stood_cartesian.y + 2));
         let mut east_as_seen = simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: STONE_LAYER, target_cell: east_seen.0, seen_value: east_seen.1 });
         simulation::simulation_api::compare_and_write::write(&mut east_as_seen, Compare::Cell { layer_type: STONE_LAYER, target_cell: south_seen.0, seen_value: south_seen.1 }, STONE_LAYER, past_seen.0, past_seen.1, 1 - past_seen.1, None);
@@ -110,7 +110,7 @@ type CrowdOutcome = (Vec<(u32, u32)>, Vec<(u64, Option<u64>)>);
 /// of it counted.
 fn crowd_outcome(bitmap_arena: &BitmapArena, entity_store: &WorldEntities) -> CrowdOutcome {
     let about_range = SUPERCHUNK_SIDE_CELLS - CROWD_REACH - 2..SUPERCHUNK_SIDE_CELLS + LINE + 4;
-    let stone_cells = about_range.clone().flat_map(|y| about_range.clone().map(move |x| (x, y))).filter(|&(x, y)| bitmap_arena.layer_holds_cell(STONE_LAYER, coordinates::CellCartesian { x: cell(0, 0).cartesian().x + x, y: cell(0, 0).cartesian().y + y }.into()) == Ok(true)).collect();
+    let stone_cells = about_range.clone().flat_map(|y| about_range.clone().map(move |x| (x, y))).filter(|&(x, y)| bitmap_arena.layer_holds_cell(STONE_LAYER, utilities::coordinates::CellCartesian { x: cell(0, 0).cartesian().x + x, y: cell(0, 0).cartesian().y + y }.into()) == Ok(true)).collect();
     let mut counted_by_cell: Vec<_> = entity_store.iter().map(|entity| (entity.header.stood_cell.0, entity.attribute(WOKEN_COUNT))).collect();
     counted_by_cell.sort_unstable();
     (stone_cells, counted_by_cell)

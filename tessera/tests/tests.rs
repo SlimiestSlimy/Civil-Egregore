@@ -6,7 +6,7 @@
 // A tier uses what it needs of it.
 #![allow(dead_code)]
 
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 use std::cell::RefCell;
 use examination::BitmapExamination;
 use tessera::{BitStream, Tessera};
@@ -16,7 +16,7 @@ pub mod saved;
 pub mod tree_stats;
 
 /// The raw cells: what a bitmap costs written out, one bit a cell.
-pub const RAW_CELLS: usize = bitmap::WIDTH * bitmap::HEIGHT;
+pub const RAW_CELLS: usize = utilities::bitmap::WIDTH * utilities::bitmap::HEIGHT;
 
 /// A seed drawn fresh for a test, said on standard error: a failing
 /// test's output says it.

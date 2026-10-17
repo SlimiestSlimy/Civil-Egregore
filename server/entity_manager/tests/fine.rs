@@ -9,10 +9,10 @@
 #[allow(dead_code)] // a shared file: each test program uses a part of it
 #[path = "../../../utilities/test_seed.rs"]
 mod test_seed;
-use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::saved::{decode_state, encode_state};
 use base_types::{SHEEP, SHEEP_STATE};
-use protocol::default_types::new_type_registry_with_default_types;
+use server::default_types::new_type_registry_with_default_types;
 use entity_manager::{may_be_given, DefaultAttributes, WholeAttribute, find_attribute, push_attribute, is_attribute_list, Attribute, AttributeBlock, AttributeType, WorldEntities, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER_WAKES};
 
 /// The entities' type.

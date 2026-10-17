@@ -30,7 +30,7 @@ mod sampling {
     use utilities::chance::Chance;
     use utilities::rng::RandomSource;
     use chunk_storage::{LayerCodec, LayerType};
-    use coordinates::{CellCartesian, CellIndex, ChunkIndex};
+    use utilities::coordinates::{CellCartesian, CellIndex, ChunkIndex};
 
     /// The layer type the tests sample.
     const STONE_LAYER: LayerType = LayerType::of_a_bit(4);

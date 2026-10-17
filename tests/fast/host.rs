@@ -33,13 +33,13 @@ fn a_reset_makes_the_world_again_as_retuned() {
     let world_start = WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: false }, world_generation: crate::worlds::flocked(3), ..WorldStart::default() };
     assert!(host.make_world(world_start));
     let made_frame = frame_that(&host, &frame_receiver, |_| true);
-    assert_eq!((made_frame.seed, made_frame.world_generation, made_frame.sheep_count, made_frame.tick), (world_start.seed, crate::worlds::flocked(3), 0, 0), "the sheep made the first tick");
+    assert_eq!((made_frame.seed, made_frame.generation_numbers.clone(), made_frame.sheep_count, made_frame.tick), (world_start.seed, crate::worlds::flocked(3).numbers(), 0, 0), "the sheep made the first tick");
     let mut tuning = default_tuning();
     tuning[OCEAN_FLOOR] += 64.0;
     let retuned_generation = WorldGeneration::from_tuning(&tuning);
     assert_ne!(retuned_generation, WorldGeneration::DEFAULT);
     assert!(host.reset(&tuning));
-    let reset = frame_that(&host, &frame_receiver, |answered_frame| answered_frame.world_generation == retuned_generation);
+    let reset = frame_that(&host, &frame_receiver, |answered_frame| answered_frame.generation_numbers == retuned_generation.numbers());
     assert!(reset.world > made_frame.world, "another world");
     assert_eq!((reset.seed, reset.sheep_count, reset.tick, reset.world_name), (world_start.seed, 0, 0, None));
 }
@@ -52,10 +52,10 @@ fn a_reset_makes_the_world_again_as_retuned() {
 #[test]
 fn the_terrain_asked_for_is_what_the_frames_bring() {
     let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
-    use coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS, WORLD_SIDE_SUPERCHUNKS};
-    use protocol::pipe::frame::height_in_frame;
+    use utilities::coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS, WORLD_SIDE_SUPERCHUNKS};
+    use base_types::height_map::height_in;
     use protocol::pipe::terrain::{AsksTerrain, HeightsAsk, MapAsk};
-    use simulation::halos::Viewport;
+    use protocol::pipe::frame::Viewport;
     let (host, frame_receiver) = Host::start_on_thread();
     let terrain = host.terrain();
     assert!(host.set_paused(true));
@@ -76,7 +76,7 @@ fn the_terrain_asked_for_is_what_the_frames_bring() {
         let whole_ask = HeightsAsk { world: full_frame.world, first_cell_cartesian: cells.top_left, size_in_cells: (side_cells, side_cells), skipped_corners_cartesian: Vec::new() };
         let answered_heights = terrain.heights(whole_ask.clone()).expect("the world run");
         for (x, y) in (0..side_cells).flat_map(|y| (0..side_cells).map(move |x| (x, y))) {
-            assert_eq!(answered_heights[(y * side_cells + x) as usize], height_in_frame(&cells.heights, place_from_cartesian(x, y)), "cell ({x}, {y}) of the superchunk at {:?}", cells.top_left);
+            assert_eq!(answered_heights[(y * side_cells + x) as usize], height_in(&cells.heights, place_from_cartesian(x, y)), "cell ({x}, {y}) of the superchunk at {:?}", cells.top_left);
         }
         // A rectangle drawn anywhere over the superchunk and past it: the cells of the whole, and none of a superchunk passed by.
         let (first_offset, rect_size) = ((test_random.draw_below(u64::from(side_cells)) as u32, test_random.draw_below(u64::from(side_cells)) as u32), (test_random.draw_between(1, 300) as u32, test_random.draw_between(1, 300) as u32));
@@ -112,8 +112,8 @@ fn the_terrain_asked_for_is_what_the_frames_bring() {
 fn a_frame_brings_the_clouds_a_tile_at_a_time() {
     let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
     use bitplane_manager::Write;
-    use coordinates::{place_from_cartesian, CellCartesian, SUPERCHUNK_SIDE_CELLS};
-    use protocol::pipe::frame::{cloud_over, CLOUD_TILE_SHIFT};
+    use utilities::coordinates::{place_from_cartesian, CellCartesian, SUPERCHUNK_SIDE_CELLS};
+    use base_types::plane_words::{cloud_over, CLOUD_TILE_SHIFT};
     use base_types::CLOUD;
     let folder = crate::worlds::folder("clouds");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
@@ -134,8 +134,8 @@ fn a_frame_brings_the_clouds_a_tile_at_a_time() {
 
     let (host, frame_receiver) = Host::start_on_thread();
     assert!(host.set_paused(true) && host.open_world(folder.to_string_lossy().into_owned()));
-    let middle_coordinate = coordinates::WORLD_SIDE_SUPERCHUNKS / 2;
-    let viewport = simulation::halos::Viewport { top_left_superchunk_cartesian: (middle_coordinate - 2, middle_coordinate - 2), bottom_right_superchunk_cartesian: (middle_coordinate + 2, middle_coordinate + 2) };
+    let middle_coordinate = utilities::coordinates::WORLD_SIDE_SUPERCHUNKS / 2;
+    let viewport = protocol::pipe::frame::Viewport { top_left_superchunk_cartesian: (middle_coordinate - 2, middle_coordinate - 2), bottom_right_superchunk_cartesian: (middle_coordinate + 2, middle_coordinate + 2) };
     // Asked for a bounded number of times: a frame without the four superchunks is the world not opened yet.
     let four_superchunk_frame = (0..200).find_map(|_| {
         assert!(host.ask_frame(FrameAsk { viewport: Some(viewport), pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: u32::MAX, seen_near: None }), "the host is there");

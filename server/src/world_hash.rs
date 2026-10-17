@@ -57,7 +57,7 @@ pub fn world_hash(world: &mut World) -> WorldHash {
         entities_hash = entity.attribute_list().iter().flat_map(|attribute_block| attribute_block.0).fold(entities_hash, fold_word);
     }
     let random_streams = world.world_simulation().random_states().fold(0, |streams_hash, (superchunk, random_state)| fold_word(fold_word(streams_hash, superchunk.0), random_state));
-    let fold_due_tick = |halos_hash: u64, (superchunk, tick): (coordinates::SuperchunkIndex, u64)| fold_word(fold_word(halos_hash, superchunk.0), tick);
+    let fold_due_tick = |halos_hash: u64, (superchunk, tick): (utilities::coordinates::SuperchunkIndex, u64)| fold_word(fold_word(halos_hash, superchunk.0), tick);
     let hot = world.bitmap_arena().superchunk_indices().iter().fold(0, |hot_hash, superchunk| fold_word(hot_hash, superchunk.0));
     let halos = world.cooling().fold(fold_word(world.warming().fold(fold_word(hot, 0), fold_due_tick), 0), fold_due_tick);
     let mut cold = fold_word(0, world.cold().len() as u64);

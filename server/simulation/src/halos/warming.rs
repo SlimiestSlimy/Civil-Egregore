@@ -3,7 +3,7 @@
 
 use super::{HaloChange, Halos, LentWorld, WarmedFrom, Warming};
 use chunk_storage::jobs::{JobDone, Job};
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use entity_manager::saved;
 
 impl Halos {

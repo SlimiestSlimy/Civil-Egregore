@@ -3,7 +3,7 @@
 //! (`docs/lab.md`, "`corpus/`").
 
 use utilities::rng::RandomSource;
-use bitmap::{Bitmap, WIDTH};
+use utilities::bitmap::{Bitmap, WIDTH};
 
 /// Cells in the bitmap.
 const CELLS: usize = WIDTH * WIDTH;

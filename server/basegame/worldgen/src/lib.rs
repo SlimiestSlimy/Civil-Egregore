@@ -22,10 +22,11 @@ pub use climate::{ClimateNoises, CLIMATE_SALT};
 pub use generated_superchunk::generate_superchunk;
 pub use generation::{has_land_about, seed_with_land, WorldGeneration, WorldGrowth, FLOCK, TREES_SALT};
 
-use bitmap::{CellWords, BITS_PER_WORD, WORDS};
-use chunk_storage::{Height, HeightMap, LayerType};
+use utilities::bitmap::{CellWords, BITS_PER_WORD, WORDS};
+use chunk_storage::LayerType;
+use base_types::height_map::{Height, HeightMap};
 use base_types::{WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
-use coordinates::{cartesian_from_place, place_from_cartesian, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{cartesian_from_place, place_from_cartesian, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
 use utilities::hash::{mix_word, GOLDEN_RATIO};
 
 /// The most a cell may be higher than the one beside it and still be

@@ -4,9 +4,11 @@
 
 use crate::renderer::ground::{lit_colour, GivenHeights, SuperchunkGround, COARSEST_DETAIL};
 use crate::renderer::near::{paint_near, PaintedNear};
-use coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
 use protocol::pipe::terrain::AsksTerrain;
-use protocol::pipe::frame::{cell_of_bit, cloud_over, rains_over, Cells, ViewportFrame, Water, CHUNK_WORDS, CLOUD_TILE_SHIFT, DEEP_WATER_DEPTH, DEEPEST_CLOUD, OLDEST_TREE_STAGE, STAGE_BITS, WORD_BITS};
+use base_types::plane_words::{cloud_over, CLOUD_BITS, CLOUD_TILE_SHIFT, DEEPEST_CLOUD, STAGE_BITS};
+use base_types::OLDEST_TREE_STAGE;
+use protocol::pipe::frame::{cell_of_bit, rains_over, Cells, ViewportFrame, Water, CHUNK_WORDS, DEEP_WATER_DEPTH, WORD_BITS};
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
@@ -238,7 +240,7 @@ pub fn in_rain(seen_colour: [u8; 3], rain: usize, whole_rain: usize) -> [u8; 3] 
 /// size the type registry's.
 pub fn each_cloud(cells: &Cells, mut on_cloud_tile: impl FnMut((usize, usize), usize, u32, bool)) {
     let (tiles_a_chunk, tile_side_cells) = (CELLS_IN_CHUNK >> CLOUD_TILE_SHIFT, 1usize << (CLOUD_TILE_SHIFT / 2));
-    for tile in (0..cells.clouds.len() * WORD_BITS / protocol::pipe::frame::CLOUD_BITS).filter(|&tile| cloud_over(&cells.clouds, tile) != 0) {
+    for tile in (0..cells.clouds.len() * WORD_BITS / CLOUD_BITS).filter(|&tile| cloud_over(&cells.clouds, tile) != 0) {
         let ((chunk_left_column, chunk_top_row), (x, y)) = (chunk_top_left(tile / tiles_a_chunk), cell_of_bit((tile % tiles_a_chunk) << CLOUD_TILE_SHIFT));
         on_cloud_tile((chunk_left_column + x as usize, chunk_top_row + y as usize), tile_side_cells, cloud_over(&cells.clouds, tile), rains_over(&cells.raining_tiles, tile));
     }

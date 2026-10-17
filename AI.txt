@@ -107,8 +107,8 @@ Boundaries, asked first, would have put that on the table.
 
 == SETTLED (in force) ==
 
-- THE ROOT: five folders -- utilities/ (the utilities crate, with
-  coordinates/, bitmap/ and the shared test_seed.rs), protocol/ (the
+- THE ROOT: five folders -- utilities/ (the utilities crate, its
+  bitmap and coordinates modules, and the shared test_seed.rs), protocol/ (the
   protocol crate, with type_registry/), server/ (the server crate, with
   simulation, bitplane_manager, chunk_storage, entity_manager,
   pathfinding, basegame), client/ (the client crate: gui and renderer
@@ -127,7 +127,8 @@ Boundaries, asked first, would have put that on the table.
   simulation through simulation_api alone (tests/fine/docs.rs checks).
 - THE TYPE REGISTRY: dynamic, frozen per world, names unique ("that's
   our invariant"), saved as a world's types.csv; base types in
-  protocol/src/default_types.rs. A type's code is its library. Hooks
+  server/src/default_types.rs (until the root program builds them).
+  A type's code is its library. Hooks
   ("just another parameter on the registry types"): GeneratesTheWorld,
   RunsEveryTick, KeepsTheWorldHot ("good use of hook there") -- the
   simulation finds its rules, generation and hot type by them.
@@ -161,18 +162,58 @@ Boundaries, asked first, would have put that on the table.
 == TO DO ==
 
 NOW
+- MODULES, NOT CRATES (the user, 2026-10-17: "every folder inside top
+  level folders should be a module, not a crate"; "were doing code
+  decopuling en masse basi[cally]"): utilities/bitmap and coordinates
+  into utilities (DONE 2026-10-17); protocol/type_registry into protocol ("protocol cant
+  depend on type registry, is a module inside it"); server's simulation,
+  chunk_storage, entity_manager, pathfinding, bitplane_manager into
+  server. tessera stays its own project.
+- THE CLIENT GETS THE WORLD'S TYPES: "type can include optional
+  utilities, client should get a copy of the frozen type registry on
+  server start. and therefore can use the libraries that the registered
+  types can include". A type's library is joined to it by name
+  (TypeRegistry::of_saved_text), so the server sends the frozen types'
+  text and the client rebuilds them against the default registry it
+  links. Ties to CLIENT HOOKS ("this ties to something we need to do"):
+  hooks on registered types for the client, as the server's; the
+  climate labels read a climate through its type's library. Sliders and
+  the server's reset get client hooks later ("dont focus too much on
+  that rn").
+- BASEGAME A CRATE OF ITS OWN, at the root: "basegame crate is
+  completely separate, and only depends on the simulation public api,
+  nothing else" -- and the client's hooks ("for rendering mainly, but
+  also for sliders and stuff") and protocol's type registry. As I read
+  it: basegame -> server's simulation_api, client's hook API,
+  protocol::type_registry; neither server nor client depends on it; the
+  root program builds the default registry from it and hands it to both.
+  base_types, libraries, sca_rules, entity_rules, worldgen its modules.
+  The user: "we have 3 public apis for game content": the type registry
+  (initializes and freezes the set of types before the server starts),
+  the simulation/server API, and the client API (custom rendering, GUI).
+  "utilities CAN'T be used by basegame crate": what basegame takes from
+  utilities today (coordinates, hash::mix_word, the bitmap, tuning in
+  worldgen) comes through those APIs -- re-exported or owned by them,
+  to be settled.
 - The process split: DONE 2026-10-17 (protocol::pipe, utilities::wire,
   the server's --pipe, the client's server_end). Measured: ticks equal
   idle, ~5% fewer under frames; ~23% fewer frames a second (each frame
   copied four times on its way). Left: fewer copies if it matters;
   tests over the pipe, only the long-lived ones shown.
 - Protocol at the bottom ("why protocol depends on simulation? it
-  should be the other way around"): protocol on utilities and
-  type_registry alone; default_types to the server; Viewport, Height
-  and the height words' layout, the tick rate into protocol, their
-  crates depending on it; the frame carrying generation numbers, not
-  WorldGeneration, and the planes' widths, not base types'. Next after
-  step 4.
+  should be the other way around"): DONE 2026-10-17 but the fold --
+  protocol on utilities and type_registry alone; Viewport and the tick
+  rate in protocol; default_types in the server; the frame carries
+  generation_numbers; the planes' readers in base_types::plane_words.
+  Left: type_registry a module of protocol, not a crate ("protocol cant
+  depend on type registry, is a module inside it"); its tests (on the
+  default types) then go to root tests/fine.
+- HEIGHTS A PLANE ("the height map is just another plane / as
+  everything else"): today base_types::height_map, the image keeping
+  its words opaque after the water's (chunk_storage reads nothing of
+  them; world format 3). To be: a plane of the base game's like any
+  other, kept as the others are, no section of its own in the image.
+  Mine to ask: the water's depths the same way.
 - A lock on a world ("we need a lock file on worlds lmao. so no two
   instances can open the same world"): world.lock in its folder, held
   with File::try_lock while it is open or saved to; refused if held.
@@ -199,6 +240,13 @@ COUPLINGS LEFT (each its own pass)
   numbers) in WorldStart, World, save, load, the host's reset,
   from_tuning, seed_with_land/drawn_seed, host/terrain.rs.
 - the renderer through server::host::frame (climate, tree stages).
+- the client names base_types: plane_words (clouds, climate, stages),
+  Climate, OLDEST_TREE_STAGE, height_map -- until the client's hooks.
+- base_types uses utilities (the height map's cell counts): against
+  "utilities CAN'T be used by basegame crate"; goes with HEIGHTS A PLANE.
+- the client resets on any slider but the shading's changing, not on
+  WorldGeneration changing (a move rounding to the same generation
+  resets too) -- until the client's hooks for sliders and reset.
 
 WAITING ON THE USER
 - Mask / word-of-cells instructions ("this will have to wait").
@@ -211,6 +259,10 @@ WAITING ON THE USER
   shape.
 
 OPEN, FOUND BY ME
+- grass_grows_in_every_superchunk (tests/fast/grass.rs) fails on ~4 of
+  60 seeds -- 830 to 1000 cells changed, under its 1000 -- at 0a7d68c
+  too, the same counts (e.g. FREEZE_SEED=0x23f3794b183969c5): the bar
+  or the ticks are the user's to settle.
 - ATOMICS (the user, 2026-10-17: "im concerned about how much atomics
   we have in the code now"): ~46 of the program's ~53 atomic lines are
   the applying phase's scheduler (tick/applying.rs, who_goes_on.rs,

@@ -7,7 +7,7 @@
 //! `cargo test --test fine entity_over_a_border`
 
 use crate::arenas::{cell, walker_header, world};
-use coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
 use entity_manager::{Attribute, WorldEntities, Header, NEVER_WAKES};
 use simulation::{Simulation, SimulationTickState};
 use utilities::rng::RandomSource;

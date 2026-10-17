@@ -1,9 +1,0 @@
-[package]
-name = "coordinates"
-edition = "2024"
-description = "Civil Egregore's coordinates: cells, chunks and superchunks, by Morton index, and cartesian where named"
-
-[dependencies]
-
-bitmap = { path = "../bitmap" }
-utilities = { path = ".." }

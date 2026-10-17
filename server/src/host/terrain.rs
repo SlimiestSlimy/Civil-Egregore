@@ -3,7 +3,7 @@
 //! ticks never waiting, from how the world run is generated
 //! (`docs/server.md`, "Terrain asked of the host").
 
-use coordinates::SUPERCHUNK_SIDE_CELLS;
+use utilities::coordinates::SUPERCHUNK_SIDE_CELLS;
 use protocol::pipe::terrain::{AsksTerrain, CellCover, DrawnHeightRange, Height, HeightsAsk, MapAnswer, MapAsk, MapCell};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
@@ -104,10 +104,20 @@ fn heights(seed: u64, world_generation: &WorldGeneration, heights_ask: &HeightsA
     heights
 }
 
+/// The heights a world generated as `world_generation` says is drawn
+/// between. A world with no relief to speak of -- a plain, a step above
+/// its ocean -- is drawn between the levels worlds have unless told
+/// otherwise: its land is low land, not a peak.
+pub(crate) fn drawn_heights_of(world_generation: &WorldGeneration) -> DrawnHeightRange {
+    let land_shape = &world_generation.land_shape;
+    let nearly_flat = land_shape.highest_land <= land_shape.ocean + worldgen::STEP;
+    DrawnHeightRange { lowest_height: land_shape.ocean_floor, ocean: land_shape.ocean, highest_land: if nearly_flat { land_shape.ocean + worldgen::LandShape::DEFAULT.highest_land } else { land_shape.highest_land } }
+}
+
 /// The map `map_ask` asks for, of the world of `seed` generated as
 /// `world_generation` says.
 fn map(seed: u64, world_generation: &WorldGeneration, map_ask: MapAsk) -> MapAnswer {
-    let (width, drawn_heights) = (map_ask.size_in_pixels.0 as usize, DrawnHeightRange::from_generation(world_generation));
+    let (width, drawn_heights) = (map_ask.size_in_pixels.0 as usize, drawn_heights_of(world_generation));
     // The cell in the middle of a pixel, or none past the world's edges.
     let cell = |x: i64, y: i64| {
         let cell = |first_coordinate: i64, pixel_offset: i64| u32::try_from(first_coordinate + pixel_offset * i64::from(map_ask.step) + i64::from(map_ask.step) / 2).ok();

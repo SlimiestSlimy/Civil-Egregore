@@ -4,9 +4,9 @@
 //! (`docs/bitplane_manager.md`, "The arena", Aligned tiles).
 
 use super::CellReader;
-use bitmap::{BITS_PER_WORD, WIDTH};
+use utilities::bitmap::{BITS_PER_WORD, WIDTH};
 use chunk_storage::LayerType;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 
 /// Cells along a small tile's side: the smallest aligned tile read.
 pub const SMALL_TILE_SIDE: u32 = 4;

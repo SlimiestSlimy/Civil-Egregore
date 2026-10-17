@@ -6,11 +6,11 @@
 // A tier uses what it needs of it.
 #![allow(dead_code)]
 
-use bitmap::{Bitmap, CellWords, BITS_PER_WORD, WORDS};
+use utilities::bitmap::{Bitmap, CellWords, BITS_PER_WORD, WORDS};
 use bitplane_manager::{WritesApplied, BitmapArena, Write, WriteOp};
-use chunk_storage::{ChunkStorage, HeightMap, LayerChange, LayerCodec, LayerType, SuperchunkImage};
-use bitmap::morton::morton_index;
-use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
+use chunk_storage::{ChunkStorage, LayerChange, LayerCodec, LayerType, SuperchunkImage};
+use utilities::bitmap::morton::morton_index;
+use utilities::coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 
 
 /// A cell of a chunk, cartesian: across and down from its top left --
@@ -63,7 +63,7 @@ pub fn storage_with(superchunk: SuperchunkIndex, place: usize, layers: &[(LayerT
     let layer_changes: Vec<LayerChange> =
         encoded_layers.iter().map(|(layer_type, words)| LayerChange { place, layer_type: *layer_type, encoded_layer: words }).collect();
     let mut cold_storage = ChunkStorage::new(1 << 12);
-    cold_storage.insert(superchunk, SuperchunkImage::new(&HeightMap::default()).rewritten_with(&layer_changes));
+    cold_storage.insert(superchunk, SuperchunkImage::new(&[]).rewritten_with(&layer_changes));
     cold_storage
 }
 
@@ -96,5 +96,5 @@ pub fn grass_on_dirt(seed: u64, grass_cells: usize, layer_codec: &mut LayerCodec
         }
     }
     let layer_changes: Vec<LayerChange> = encoded_layers.iter().map(|(chunk, layer_type, words)| LayerChange { place: *chunk, layer_type: *layer_type, encoded_layer: words }).collect();
-    SuperchunkImage::new(&HeightMap::default()).rewritten_with(&layer_changes)
+    SuperchunkImage::new(&[]).rewritten_with(&layer_changes)
 }

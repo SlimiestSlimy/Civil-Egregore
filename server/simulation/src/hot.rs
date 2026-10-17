@@ -2,7 +2,7 @@
 //! whose halos are, and whether the viewport's are too
 //! (`docs/simulation.md`, "Halos").
 
-use coordinates::{SuperchunkIndex, WORLD_MIDDLE, WORLD_SIDE_SUPERCHUNKS};
+use utilities::coordinates::{SuperchunkIndex, WORLD_MIDDLE, WORLD_SIDE_SUPERCHUNKS};
 use entity_manager::{WorldEntities, EntityType};
 
 /// Which superchunks are to be hot.

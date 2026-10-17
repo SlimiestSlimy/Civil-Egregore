@@ -10,7 +10,7 @@
 use super::instruction::Instruction;
 use super::SimulationTickState;
 use chunk_storage::LayerType;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use entity_manager::{attribute_seen, AttributeBlock, AttributeType, Member};
 
 /// As many skip-tag sets as are open at once, one within another.

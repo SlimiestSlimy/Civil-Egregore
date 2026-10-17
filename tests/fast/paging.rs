@@ -2,9 +2,9 @@
 //! superchunks' images in memory is the world keeping them all.
 
 use crate::worlds::{world_contents, folder};
-use coordinates::{SuperchunkIndex, WORLD_SIDE_SUPERCHUNKS};
+use utilities::coordinates::{SuperchunkIndex, WORLD_SIDE_SUPERCHUNKS};
 use server::{WorldStart, World, COOL_TICKS, WARM_TICKS};
-use simulation::halos::Viewport;
+use protocol::pipe::frame::Viewport;
 use utilities::rng::RandomSource;
 
 /// Ticks `paged` and `kept_world` with the viewport on the superchunk `camera_superchunk_cartesian`

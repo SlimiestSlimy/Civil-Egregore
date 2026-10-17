@@ -1,7 +1,7 @@
 //! What a layer is, and how its bitmap is encoded and decoded
 //! (`docs/chunk_storage.md`, "Layers and their codec").
 
-use bitmap::{Bitmap, CellWords};
+use utilities::bitmap::{Bitmap, CellWords};
 use tessera::{BitStream, Tessera, MOST_BITS};
 use type_registry::LayerType;
 
@@ -67,5 +67,5 @@ pub struct BucketKey {
     /// The layer's type.
     pub layer_type: LayerType,
     /// The chunk it is a layer of.
-    pub chunk: coordinates::ChunkIndex,
+    pub chunk: utilities::coordinates::ChunkIndex,
 }

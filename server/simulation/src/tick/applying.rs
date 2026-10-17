@@ -9,7 +9,7 @@ use crate::simulation_tick_state::apply::PartApplied;
 use crate::simulation_tick_state::landing::{LandingInOne, LandingInSeveral};
 use crate::simulation_tick_state::{slot_toward, slot_between, slots, Outbox, ACROSS_QUEUE, SLOTS};
 use bitplane_manager::Superchunk;
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use entity_manager::SuperchunkEntities;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Condvar, Mutex, MutexGuard};

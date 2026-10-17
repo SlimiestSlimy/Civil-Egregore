@@ -4,7 +4,7 @@
 //! a superchunk is hot.
 
 use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, tick_grass};
-use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use bitplane_manager::Write;
 use sca_rules::grass::{DECAYS_COUNT, DECAY_CHANCE, SPREADS_COUNT, SPREAD_CHANCE};
 use sca_rules::growing::{climate_harshness, HARSHEST_CLIMATE};

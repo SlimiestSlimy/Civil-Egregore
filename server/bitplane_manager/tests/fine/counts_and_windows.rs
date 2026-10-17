@@ -4,11 +4,11 @@
 //! `cargo test`
 
 use crate::chunks::*;
-use bitmap::CellWords;
+use utilities::bitmap::CellWords;
 use bitplane_manager::{BitmapArena, BucketKey, NotHot, CellReader, WriteShape, Window, Write, WriteOp, COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS};
 use chunk_storage::{Bits16, Bits2, Bits4, Bits8, WidePlane, Width, ChunkStorage, LayerCodec};
 use utilities::rng::RandomSource;
-use coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
+use utilities::coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 
 /// The mock superchunk, made hot: every cell is dirt or grass, never
 /// both; each bitmap counts its set cells, a full chunk's 65,536

@@ -3,7 +3,7 @@
 //! aligned to the quadtree (`docs/lab.md`, "`corpus/`").
 
 use utilities::rng::RandomSource;
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 
 /// How a city is laid out: how far apart the streets run, how wide
 /// they are, how many courtyards a block is given and how big, and how
@@ -126,9 +126,9 @@ pub fn one_laid_out(seed: u64, city_plan: &CityPlan) -> Bitmap {
     let (offset_x, offset_y) = (random_generator.draw_below(city_plan.street_pitch as u64) as i64, random_generator.draw_below(city_plan.street_pitch as u64) as i64);
 
     let mut y = offset_y - city_plan.street_pitch;
-    while y < bitmap::HEIGHT as i64 {
+    while y < utilities::bitmap::HEIGHT as i64 {
         let mut x = offset_x - city_plan.street_pitch;
-        while x < bitmap::WIDTH as i64 {
+        while x < utilities::bitmap::WIDTH as i64 {
             lay_out_block(&mut bitmap, x, y, city_plan, &mut random_generator);
             x += city_plan.street_pitch;
         }

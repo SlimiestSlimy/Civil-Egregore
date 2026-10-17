@@ -1,7 +1,7 @@
 //! The saved adversarial bitmaps: fixed hard cases, kept as plain PBM
 //! images in `tests/saved/`, that every tier checks.
 
-use bitmap::{Bitmap, HEIGHT, WIDTH};
+use utilities::bitmap::{Bitmap, HEIGHT, WIDTH};
 use std::fs;
 use std::path::{Path, PathBuf};
 

@@ -11,7 +11,7 @@ use crate::bucket::{place, EntityWritten};
 use crate::entity::NEVER_WAKES;
 use crate::wheel::Wake;
 use crate::entity::{EntityRef, Header};
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 
 impl SuperchunkEntities {
     /// Where the entity the tick found on `named_cell` stands now: there
@@ -31,7 +31,7 @@ impl SuperchunkEntities {
     /// to, if it left this one over a border this tick: what is
     /// queued for it lands there
     /// (`docs/entity_manager.md`, "Instructions", Crossing a border).
-    pub fn crossed_to(&self, named_cell: CellIndex) -> Option<coordinates::SuperchunkIndex> {
+    pub fn crossed_to(&self, named_cell: CellIndex) -> Option<utilities::coordinates::SuperchunkIndex> {
         let now_on = (*self.left_this_tick.get(&named_cell)?)?;
         Some(now_on.superchunk()).filter(|&superchunk| superchunk != self.superchunk_index)
     }

@@ -5,7 +5,7 @@
 //! master ([`on_each_sampled`]).
 
 use crate::simulation_api::RuleCounts;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use crate::SimulationTickState;
 use type_registry::{EntityType, LayerType, Library};
 use utilities::chance::Chance;

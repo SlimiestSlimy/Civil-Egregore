@@ -2,8 +2,8 @@
 //! ([`new_type_registry_with_default_types`]): every rule's code its
 //! library, hooked to run every tick, and the world generation's,
 //! hooked to generate the world. What every world made new has for
-//! now, a world without them left for later. The one place outside the
-//! base game that depends on it.
+//! now, a world without them left for later. Here until the root
+//! program builds the registry and hands it to the server.
 
 use base_types::{CLIMATE, CLOUD, COLLISION, ELEVATION, GRASS, GRASS_RULE, RULE_OF_GRASS, RULE_OF_SHEEP, RULE_OF_TREES, RULE_OF_WEATHER, SHEEP, SHEEP_RULE, SHEEP_STATE, TREE, TREES_RULE, TREE_STAGE, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST, WEATHER_RULE, WET, WORLD_GENERATION};
 use type_registry::{Hook, RegisteredType, Registration, TypeRegistry};

@@ -2,10 +2,10 @@
 //! the heights about a superchunk, the whole of the ground for a map --
 //! and what it is answered with.
 
-pub use chunk_storage::Height;
-
 use utilities::wire::{WireReader, Wired, WiredStruct};
-use worldgen::WorldGeneration;
+
+/// A cell's height.
+pub type Height = u16;
 
 /// The heights a world is drawn between.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -16,18 +16,6 @@ pub struct DrawnHeightRange {
     pub ocean: Height,
     /// The highest land.
     pub highest_land: Height,
-}
-
-impl DrawnHeightRange {
-    /// Those of a world generated as `world_generation` says. A world with
-    /// no relief to speak of -- a plain, a step above its ocean -- is
-    /// drawn between the levels worlds have unless told otherwise:
-    /// its land is low land, not a peak.
-    pub fn from_generation(world_generation: &WorldGeneration) -> Self {
-        let land_shape = &world_generation.land_shape;
-        let nearly_flat = land_shape.highest_land <= land_shape.ocean + worldgen::STEP;
-        Self { lowest_height: land_shape.ocean_floor, ocean: land_shape.ocean, highest_land: if nearly_flat { land_shape.ocean + worldgen::LandShape::DEFAULT.highest_land } else { land_shape.highest_land } }
-    }
 }
 
 /// Whoever is asked of a world's terrain: each ask waits for its

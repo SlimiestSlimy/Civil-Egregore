@@ -7,7 +7,7 @@
 use bitplane_manager::{WritesApplied, BitmapArena, BucketKey, WriteShape, Write, WriteOp};
 use crate::chunks::{grass_on_dirt, MOCK_DIRT, MOCK_GRASS};
 use chunk_storage::{ChunkStorage, LayerCodec, LayerType};
-use coordinates::{CellCartesian, CellIndex, WORLD_MIDDLE};
+use utilities::coordinates::{CellCartesian, CellIndex, WORLD_MIDDLE};
 
 /// The layer type the tests write.
 const STONE_LAYER: LayerType = LayerType::of_a_bit(9);

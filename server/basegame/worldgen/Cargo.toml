@@ -6,9 +6,7 @@ description = "Civil Egregore's world generation: every cell's height from the w
 [dependencies]
 type_registry = { path = "../../../protocol/type_registry" }
 base_types = { path = "../base_types" }
-bitmap = { path = "../../../utilities/bitmap" }
 chunk_storage = { path = "../../chunk_storage" }
-coordinates = { path = "../../../utilities/coordinates" }
 utilities = { path = "../../../utilities" }
 simulation = { path = "../../simulation" }
 entity_rules = { path = "../entity_rules" }

@@ -10,7 +10,7 @@ use crate::renderer::view::{first_view, SuperchunkSprites, SPRITE_SIDE};
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use coordinates::SUPERCHUNK_SIDE_CELLS;
+use utilities::coordinates::SUPERCHUNK_SIDE_CELLS;
 use protocol::pipe::frame::{FrameAsk, NearRectangle, Viewport};
 
 /// Seconds from one frame asked for to the next, at least: no oftener

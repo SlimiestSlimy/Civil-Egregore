@@ -7,7 +7,7 @@ use super::SimulationHandle;
 use crate::halos::HaloChange;
 use crate::rules::{with_counts_applied, ChosenRules, TickCounts};
 use crate::TickReport;
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 
 /// What a world's tick did: the rules, then the halos moved.
 #[derive(Clone, Copy, Debug)]

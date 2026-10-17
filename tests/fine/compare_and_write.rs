@@ -6,7 +6,7 @@
 use crate::arenas::{cell, walker_header, world, STONE_LAYER};
 use crate::walkers::{cells_drawn};
 use bitplane_manager::{BitmapArena, Write, WriteOp};
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use entity_manager::{Attribute, AttributeBlock};
 use simulation::{Compare, Simulation, SimulationTickState};
 use utilities::rng::RandomSource;
@@ -103,7 +103,7 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
 /// one to three times, a write that flips it -- held against itself,
 /// or against the next cell of its superchunk being as seen. Given to
 /// `queue_attempt` as the cell flipped and the cell compared.
-fn queue_attempts(seed: u64, cells: &[(CellIndex, bool)], superchunk: coordinates::SuperchunkIndex, mut queue_attempt: impl FnMut((CellIndex, bool), (CellIndex, bool))) {
+fn queue_attempts(seed: u64, cells: &[(CellIndex, bool)], superchunk: utilities::coordinates::SuperchunkIndex, mut queue_attempt: impl FnMut((CellIndex, bool), (CellIndex, bool))) {
     let cells_here: Vec<(CellIndex, bool)> = cells.iter().copied().filter(|(drawn_cell, _)| drawn_cell.superchunk() == superchunk).collect();
     for (cell_number, &this_cell) in cells_here.iter().enumerate() {
         // Drawn from the cell, not the turn: the same whoever asks.
@@ -131,7 +131,7 @@ fn drawn_writes_come_to_the_same_as_applied_in_order() {
     let cells: Vec<(CellIndex, bool)> = cells_drawn(seed, 400, 2048).into_iter().map(|drawn_cell| (drawn_cell, seeded_rng.draw_below(2) == 0)).collect();
     // What applying them in order comes to: the cells, the writes held against their own cell applied, against another, and refused.
     let (mut expected_cells, mut own_applied, mut other_applied, mut refused_count): (std::collections::HashMap<CellIndex, bool>, _, _, _) = (cells.iter().copied().collect(), 0u64, 0u64, 0u64);
-    let mut superchunks: Vec<coordinates::SuperchunkIndex> = cells.iter().map(|(superchunk_cell, _)| superchunk_cell.superchunk()).collect();
+    let mut superchunks: Vec<utilities::coordinates::SuperchunkIndex> = cells.iter().map(|(superchunk_cell, _)| superchunk_cell.superchunk()).collect();
     superchunks.sort_unstable();
     superchunks.dedup();
     for &superchunk in &superchunks {

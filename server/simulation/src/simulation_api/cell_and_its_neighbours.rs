@@ -6,7 +6,7 @@
 use crate::simulation_api::four_tiles_under_the_neighbours::{self, WAY_AT, WAY_OFFSETS};
 pub use crate::simulation_api::four_tiles_under_the_neighbours::TilesAbout;
 use chunk_storage::LayerType;
-use coordinates::CellIndex;
+use utilities::coordinates::CellIndex;
 use crate::SimulationTickState;
 use std::ops::{BitAnd, BitOr};
 use utilities::rng::RandomSource;

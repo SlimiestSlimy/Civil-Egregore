@@ -5,10 +5,11 @@
 //! the world's hot defines it.
 
 use super::SimulationHandle;
-use crate::halos::{HaloChange, Halos, LentWorld, Viewport};
+use crate::halos::{HaloChange, Halos, LentWorld};
+use protocol::pipe::frame::Viewport;
 use chunk_storage::jobs::GenerateImage;
 use chunk_storage::LayerCodec;
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use std::sync::Arc;
 
 impl SimulationHandle {

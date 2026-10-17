@@ -2,7 +2,7 @@
 //! asks of its turn that is neither a cell nor an entity
 //! (`docs/actions.md`, "Rules ask actions, and nothing else").
 
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use crate::SimulationTickState;
 use utilities::rng::RandomSource;
 

@@ -3,9 +3,9 @@
 //! to the next drawn in whole numbers, the counts finding it
 //! (`docs/simulation.md`, "Sampling").
 
-use bitmap::BITS_PER_WORD;
+use utilities::bitmap::BITS_PER_WORD;
 use bitplane_manager::{BitmapArena, LayerView, COUNT_TILE_WORDS};
-use coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
+use utilities::coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 use chunk_storage::LayerType;
 use utilities::chance::Chance;
 use utilities::rng::RandomSource;

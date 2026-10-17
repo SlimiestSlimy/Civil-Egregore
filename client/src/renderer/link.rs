@@ -9,11 +9,10 @@ use crate::gui::options::Options;
 use crate::gui::{CapturedInput, CurrentTuning, MakeWorld, OpenWorld, Save, ShownScreen};
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use crate::server_end::{ServerEnd, ServerLink};
-use protocol::pipe::frame::WorldGeneration;
 use protocol::pipe::messages::TARGET_PACE;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
-use utilities::tuning::Tuning;
+use utilities::tuning::{tuned_number, SliderGroup, Tuning};
 
 /// The server, as the window holds it: where to ask, where the answers
 /// come, and what it was last told.
@@ -36,9 +35,9 @@ pub struct HostLink {
     pub world_paused: bool,
     /// Ticks a second it is held to, or flat out.
     pub held_pace: Option<u32>,
-    /// How the sliders last had worlds generated: none until they are
-    /// first seen.
-    pub last_generation: Option<WorldGeneration>,
+    /// The sliders of how worlds are generated, as they last were: none
+    /// until they are first seen.
+    pub last_generation: Option<Vec<f32>>,
     /// Whether the view is to be put over the next world shown: one
     /// made or opened, not one remade.
     pub first_view: bool,
@@ -142,6 +141,12 @@ pub fn send_shading(host_link: Res<HostLink>, tuning: Res<CurrentTuning>) {
     }
 }
 
+/// The numbers of every slider but the shading's: how worlds are
+/// generated, and the world's own, shown only while one is set up.
+fn generation_sliders(tuning: &Tuning) -> Vec<f32> {
+    tuning.iter().enumerate().filter(|&(number_index, _)| tuned_number(number_index).slider_group != SliderGroup::NearViewShading).map(|(_, &number)| number).collect()
+}
+
 /// Has the host make the world run again whenever the sliders change
 /// how worlds are generated: from its start, the view left where it
 /// is. Compared with what the sliders last said, not with the world's
@@ -151,8 +156,8 @@ pub fn remake_on_generation_change(mut host_link: ResMut<HostLink>, tuning: Res<
     if !tuning.is_changed() {
         return;
     }
-    let new_generation = WorldGeneration::from_tuning(&tuning.0);
-    if host_link.last_generation.replace(new_generation).is_some_and(|previous_generation| previous_generation != new_generation) && *shown_screen == ShownScreen::World && last_seen.last_frame.is_some() {
+    let new_generation = generation_sliders(&tuning.0);
+    if host_link.last_generation.replace(new_generation.clone()).is_some_and(|previous_generation| previous_generation != new_generation) && *shown_screen == ShownScreen::World && last_seen.last_frame.is_some() {
         _ = host_link.server().reset(tuning.0);
         host_link.forget_asked();
     }

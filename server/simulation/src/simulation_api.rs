@@ -23,7 +23,7 @@ pub mod steps_and_paths;
 // are, what a layer and an attribute are, a turn, a tick's report, the
 // lot drawn.
 pub use chunk_storage::{Bits4, LayerType, WidePlane};
-pub use coordinates::{CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOUR_OFFSETS, SUPERCHUNK_SIDE_CELLS};
+pub use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOUR_OFFSETS, SUPERCHUNK_SIDE_CELLS};
 pub use entity_manager::{Attribute, AttributeBlock, AttributeType, EntityRef, EntityType, Header, Layout, Member, WholeAttribute};
 pub use rule_interface::{on_each_sampled, RuleCode, RuleContext, RuleMaster};
 pub use worldgen_interface::{GenerationNumbers, WorldgenCode};

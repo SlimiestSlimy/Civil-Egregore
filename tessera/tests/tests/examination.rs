@@ -5,7 +5,7 @@
 
 use tessera::tree::Tree;
 use tessera::{BitStream, Tessera};
-use bitmap::Bitmap;
+use utilities::bitmap::Bitmap;
 
 /// What one bitmap's encoding and decoding came to.
 #[derive(Clone, Debug)]

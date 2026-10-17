@@ -5,7 +5,7 @@
 
 use crate::{default_frozen_types, World, COLD_POOL_BYTES_KEPT};
 use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
-use coordinates::SuperchunkIndex;
+use utilities::coordinates::SuperchunkIndex;
 use entity_manager::saved;
 use simulation::SavedImage;
 use std::path::Path;

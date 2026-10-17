@@ -10,9 +10,9 @@ use levels::GroundAtDetail;
 use light_and_shadow::{banded_light, coast_distances, shadow_lines, box_smoothed};
 use relief::{slope_light, height_tint, water_light, FOAM_COLOUR, PALE_COLOUR, SAND_COLOUR};
 
-use coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashMap;
-use protocol::pipe::frame::height_in_frame;
+use base_types::height_map::height_in;
 use protocol::pipe::terrain::{AsksTerrain, Height, HeightsAsk, DrawnHeightRange};
 
 /// Cells along a superchunk's side.
@@ -223,7 +223,7 @@ impl SuperchunkGround {
 }
 
 /// Heights already worked out: a superchunk's height words
-/// ([`height_in_frame`]) by its top left cell.
+/// ([`height_in`]) by its top left cell.
 pub type GivenHeights<'a> = HashMap<(u32, u32), &'a [u64]>;
 
 /// The heights about the superchunk whose top left cell is `top_left`
@@ -242,7 +242,7 @@ fn heights(terrain: &dyn AsksTerrain, world: u64, top_left: (u32, u32), given_he
             let (in_x, in_y) = (x % SUPERCHUNK_CELLS_A_SIDE as u32, y % SUPERCHUNK_CELLS_A_SIDE as u32);
             let superchunk_run = (SUPERCHUNK_CELLS_A_SIDE - in_x as usize).min(WORKED_SIDE_CELLS - cells_across);
             if let Some(words) = given_heights.get(&(x - in_x, y - in_y)) {
-                heights[cells_across..cells_across + superchunk_run].iter_mut().zip(0u32..).for_each(|(height, cells_along)| *height = height_in_frame(words, place_from_cartesian(in_x + cells_along, in_y)));
+                heights[cells_across..cells_across + superchunk_run].iter_mut().zip(0u32..).for_each(|(height, cells_along)| *height = height_in(words, place_from_cartesian(in_x + cells_along, in_y)));
             }
             cells_across += superchunk_run;
         }
@@ -265,7 +265,7 @@ mod tests {
         assert!(host.set_paused(true) && host.make_world(world_start) && host.ask_frame(FrameAsk { viewport: None, pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: 0, seen_near: None }));
         let first_frame = frame_receiver.recv_timeout(std::time::Duration::from_secs(1800)).expect("a frame of the world made");
         let terrain = host.terrain();
-        let origin_top_left = coordinates::WORLD_MIDDLE.top_left().cartesian();
+        let origin_top_left = utilities::coordinates::WORLD_MIDDLE.top_left().cartesian();
         let (origin_left, origin_top, side_cells) = (origin_top_left.x, origin_top_left.y, SUPERCHUNK_CELLS_A_SIDE as u32);
         let fine_ground_at = |top_left: (u32, u32), given_heights: &GivenHeights| SuperchunkGround::ask_of_host(&terrain, first_frame.world, first_frame.drawn_heights, top_left, given_heights).fine_ground.expect("made fine");
         let (origin_ground, beside_ground, below_ground) = (fine_ground_at((origin_left, origin_top), &GivenHeights::new()), fine_ground_at((origin_left + side_cells, origin_top), &GivenHeights::new()), fine_ground_at((origin_left, origin_top + side_cells), &GivenHeights::new()));
@@ -278,7 +278,7 @@ mod tests {
         }
         assert_eq!(differing_lines, 0, "shadow lines unlike over an edge");
         let world = server::start_world(world_start);
-        let image = world.chunk_storage().image(coordinates::WORLD_MIDDLE).expect("the origin's image");
+        let image = world.chunk_storage().image(utilities::coordinates::WORLD_MIDDLE).expect("the origin's image");
         let brought_ground = fine_ground_at((origin_left, origin_top), &[((origin_left, origin_top), image.height_words())].into_iter().collect());
         let cells = || (0..SUPERCHUNK_CELLS_A_SIDE as isize).flat_map(|y| (0..SUPERCHUNK_CELLS_A_SIDE as isize).map(move |x| (x, y)));
         assert!(cells().all(|(x, y)| brought_ground.height(x, y) == origin_ground.height(x, y) && brought_ground.shadow_line(x, y) == origin_ground.shadow_line(x, y)), "heights brought unlike those asked for");

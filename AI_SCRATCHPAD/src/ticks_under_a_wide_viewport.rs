@@ -4,7 +4,7 @@
 //! -- one at a time, sixty a second at most, going round the viewport.
 
 use crate::asking_the_host::{frame_that, seed, whole_answer, ProbedServer};
-use coordinates::WORLD_MIDDLE;
+use utilities::coordinates::WORLD_MIDDLE;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame, Viewport};
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};

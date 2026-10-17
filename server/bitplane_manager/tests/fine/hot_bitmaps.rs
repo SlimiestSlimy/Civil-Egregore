@@ -8,7 +8,7 @@
 use crate::chunks::*;
 use bitplane_manager::{BitmapArena, BucketKey, NotHot, WriteOp};
 use chunk_storage::{LayerCodec, LayerType};
-use coordinates::{ChunkIndex, SuperchunkIndex};
+use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 
 /// A bitmap turns hot decoded from its chunk's layer, or empty if the
 /// chunk has none; cells of it are read and changed through the arena,

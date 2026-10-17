@@ -6,8 +6,9 @@ use crate::renderer::link::LastFrameSeen;
 use crate::renderer::overlays::OverlaysShown;
 use crate::renderer::view::{SuperchunkSprites, SPRITE_SIDE};
 use bevy::prelude::*;
-use coordinates::place_from_cartesian;
-use protocol::pipe::frame::{climate_over, Climate, CLIMATE_TILE_SHIFT};
+use utilities::coordinates::place_from_cartesian;
+use base_types::plane_words::{climate_over, CLIMATE_TILE_SHIFT};
+use base_types::Climate;
 
 /// Cells along a side of a tile of the climate.
 const TILE_SIDE: u32 = 1 << (CLIMATE_TILE_SHIFT / 2);
