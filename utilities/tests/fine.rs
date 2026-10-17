@@ -26,3 +26,6 @@ mod tuning;
 
 #[path = "fine/chance.rs"]
 mod chance;
+
+#[path = "fine/wire.rs"]
+mod wire;

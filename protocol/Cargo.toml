@@ -12,3 +12,5 @@ sca_rules = { path = "../server/basegame/sca_rules" }
 entity_rules = { path = "../server/basegame/entity_rules" }
 libraries = { path = "../server/basegame/libraries" }
 worldgen = { path = "../server/basegame/worldgen" }
+bitmap = { path = "../utilities/bitmap" }
+chunk_storage = { path = "../server/chunk_storage" }

@@ -12,8 +12,9 @@ use relief::{slope_light, height_tint, water_light, FOAM_COLOUR, PALE_COLOUR, SA
 
 use coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashMap;
-use server::host::frame::height_in_frame;
-use server::host::terrain::{Height, HeightsAsk, DrawnHeightRange, TerrainAsker};
+use protocol::pipe::frame::height_in_frame;
+use protocol::pipe::terrain::{Height, HeightsAsk, DrawnHeightRange};
+use server::host::terrain::TerrainAsker;
 
 /// Cells along a superchunk's side.
 pub const SUPERCHUNK_CELLS_A_SIDE: usize = SUPERCHUNK_SIDE_CELLS as usize;
@@ -259,7 +260,7 @@ mod tests {
     /// heights a frame brings are the ones the host answers when asked.
     #[test]
     fn shadows_are_the_same_from_both_sides_of_an_edge() {
-        use server::host::frame::FrameAsk;
+        use protocol::pipe::frame::FrameAsk;
         let world_start = server::WorldStart { seed: server::seed_with_land(crate::renderer::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT), world_generation: server::WorldGeneration { sheep_per_superchunk: 1, ..server::WorldGeneration::DEFAULT }, ..server::WorldStart::default() };
         let (host, frame_receiver) = server::host::Host::start_on_thread();
         assert!(host.set_paused(true) && host.make_world(world_start) && host.ask_frame(FrameAsk { viewport: None, pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: 0, seen_near: None }));

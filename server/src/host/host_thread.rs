@@ -3,12 +3,12 @@
 
 use crate::{WorldStart, World};
 use super::{CATCH_UP, FRAMES_SHARE, HostRequest, TARGET_PACE};
-use super::frame::{self, FrameAsk, Cells, ViewportFrame, copy_superchunk, frame_of, hot_in};
+use super::frame::{copy_superchunk, frame_of, hot_in};
+use protocol::pipe::frame::{Cells, FrameAsk, ViewportFrame};
 use super::terrain::TerrainRequest;
 use std::thread;
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 use worldgen::WorldGeneration;
 
@@ -19,15 +19,14 @@ struct RunningWorld {
     /// What it started from, as far as is known: what it is made again
     /// from when reset.
     world_start: WorldStart,
-    /// The superchunks whose heights a frame has carried, each with its
-    /// water as drawn.
-    heights_sent: HashMap<coordinates::SuperchunkIndex, Arc<frame::Water>>,
+    /// The superchunks whose heights and water a frame has carried.
+    heights_sent: HashSet<coordinates::SuperchunkIndex>,
 }
 
 impl RunningWorld {
     /// `world`, started from `world_start`, starting to run.
     fn from_start(world_start: WorldStart, world: World) -> Self {
-        Self { world, world_start, heights_sent: HashMap::new() }
+        Self { world, world_start, heights_sent: HashSet::new() }
     }
 }
 

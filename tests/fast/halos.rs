@@ -9,7 +9,7 @@ use base_types::GRASS;
 use coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use bitplane_manager::{Write, WriteOp};
 use entity_manager::{AttributeBlock, EntityType, Header, NEVER_WAKES};
-use server::host::frame::Viewport;
+use protocol::pipe::frame::Viewport;
 use server::{halos_about, HaloChange, World, COOL_TICKS, WARM_TICKS};
 
 /// The superchunks holding a hot entity.

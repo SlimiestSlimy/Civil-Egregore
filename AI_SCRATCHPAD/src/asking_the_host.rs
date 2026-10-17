@@ -1,7 +1,7 @@
 //! What the probes share: a host asked for frames until one answers
 //! the question.
 
-use server::host::frame::{FrameAsk, ViewportFrame, Viewport};
+use protocol::pipe::frame::{FrameAsk, ViewportFrame, Viewport};
 use server::host::Host;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;

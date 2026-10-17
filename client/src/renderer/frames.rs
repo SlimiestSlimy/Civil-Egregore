@@ -11,7 +11,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use coordinates::SUPERCHUNK_SIDE_CELLS;
-use server::host::frame::{FrameAsk, NearRectangle, Viewport};
+use protocol::pipe::frame::{FrameAsk, NearRectangle, Viewport};
 
 /// Seconds from one frame asked for to the next, at least: no oftener
 /// than a screen shows them.

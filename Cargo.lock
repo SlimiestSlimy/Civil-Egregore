@@ -1970,6 +1970,7 @@ version = "0.0.0"
 dependencies = [
  "bevy",
  "coordinates",
+ "protocol",
  "server",
  "utilities",
 ]
@@ -4058,6 +4059,8 @@ name = "protocol"
 version = "0.0.0"
 dependencies = [
  "base_types",
+ "bitmap",
+ "chunk_storage",
  "entity_rules",
  "libraries",
  "sca_rules",

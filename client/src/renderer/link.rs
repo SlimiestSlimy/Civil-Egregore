@@ -7,7 +7,7 @@ use crate::renderer::paint::PaintedFrame;
 use bevy::prelude::*;
 use crate::gui::options::Options;
 use crate::gui::{CapturedInput, CurrentTuning, MakeWorld, OpenWorld, Save, ShownScreen};
-use server::host::frame::{FrameAsk, ViewportFrame};
+use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use server::host::{Host, TARGET_PACE};
 use server::WorldStart;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -54,7 +54,7 @@ impl HostLink {
 
     /// `host`, held to `held_pace`, asked nothing yet; its `frame_receiver` painted
     /// on a thread of their own.
-    fn around_host(host: Host, frame_receiver: Receiver<server::host::frame::ViewportFrame>, held_pace: Option<u32>) -> Self {
+    fn around_host(host: Host, frame_receiver: Receiver<protocol::pipe::frame::ViewportFrame>, held_pace: Option<u32>) -> Self {
         let (shading_sender, tunings) = channel();
         let painted_pictures = Mutex::new(crate::renderer::paint::start_painter(frame_receiver, tunings, host.terrain()));
         Self { host, painted_pictures, shading_sender, awaiting_frame: false, seconds_since_asked: f32::INFINITY, last_ask: None, world_paused: false, held_pace, last_generation: None, first_view: true }

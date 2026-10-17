@@ -160,6 +160,16 @@ Boundaries, asked first, would have put that on the table.
 
 == TO DO ==
 
+NOW
+- The process split, step 1 of 4 (agreed 2026-10-17): the frame and
+  terrain types into protocol::pipe; then the hand-written encoding
+  ("no thrid party dependencies"), the server's --pipe flag, the client
+  spawning its own executable. Many instances at once, each pair its
+  own pipes.
+- A lock on a world ("we need a lock file on worlds lmao. so no two
+  instances can open the same world"): world.lock in its folder, held
+  with File::try_lock while it is open or saved to; refused if held.
+
 PLAN AGREED 2026-10-16, LEFT (co-op, file by file):
 - The client crate: DONE 2026-10-17 (client/, gui and renderer its
   modules). Left of it, with the process split: "client normally
@@ -194,6 +204,20 @@ WAITING ON THE USER
   shape.
 
 OPEN, FOUND BY ME
+- ATOMICS (the user, 2026-10-17: "im concerned about how much atomics
+  we have in the code now"): ~46 of the program's ~53 atomic lines are
+  the applying phase's scheduler (tick/applying.rs, who_goes_on.rs,
+  following.rs) -- where the deadlock was. NOT a Mutex in their
+  place: "we want to eliminate specific syncronization primitives as
+  much as possible, like the 2 tick philosophy" -- the applying phase
+  redesigned so its order needs no handshakes, as the two phases need
+  none within. Arcs too ("sync::Arc is an atomic aint it?"): the
+  frame's Arc<Water> went with the pipe's step 2. Elsewhere: Arcs of
+  read-only data (FrozenTypes, DefaultAttributes cloned into every
+  superchunk's entities, SuperchunkImage, paths) -- most could be
+  borrows; the client's Mutex<Receiver>s (Bevy wants Sync); channels
+  between threads (host <-> client go with the pipe); the dispatcher's
+  Mutex + Condvar, the one real primitive the tick stands on.
 - THE FLOCK DIES OUT: a long run -- the sheep rise past 150,000, the
   grass goes to 0, the flock dies. Cause not looked for.
 - The type registry made the tick ~9% slower (2026-10-16, "no matter

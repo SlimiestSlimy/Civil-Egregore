@@ -10,4 +10,5 @@
 
 pub mod default_types;
 pub mod flags;
+pub mod pipe;
 pub mod server_parameters;

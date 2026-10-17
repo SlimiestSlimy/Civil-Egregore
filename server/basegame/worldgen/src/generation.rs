@@ -9,6 +9,7 @@ use crate::{SmoothNoise, LandShape, FRACTION_ONE};
 use coordinates::{SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use utilities::hash::mix_word;
 use utilities::tuning::{self, Tuning};
+use utilities::wire::{WireReader, Wired};
 
 /// What keeps the trees' numbers apart from the grass's.
 pub const TREES_SALT: u64 = 0x7472_6565_735F_6C6F;
@@ -104,6 +105,20 @@ const NUMBER_FIELDS: [(&str, NumberField); 28] = [
     ("tree scatter", |generation| &mut generation.trees.scatter_share),
     ("sheep per superchunk", |generation| &mut generation.sheep_per_superchunk),
 ];
+
+/// On the wire, its numbers in the order of [`NUMBER_FIELDS`], a word each.
+impl Wired for WorldGeneration {
+    fn put(&mut self, words: &mut Vec<u64>) {
+        words.extend(NUMBER_FIELDS.iter().map(|(_, field)| field(self).read()));
+    }
+
+    fn take(&mut self, wire: &mut WireReader) -> Option<()> {
+        NUMBER_FIELDS.iter().try_for_each(|(_, field)| {
+            field(self).write(wire.next_word()?);
+            Some(())
+        })
+    }
+}
 
 impl WorldGeneration {
     /// Its numbers, each with its name: as a world's file keeps them.

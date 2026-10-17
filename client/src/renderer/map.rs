@@ -12,7 +12,8 @@ use crate::gui::CapturedInput;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 use std::thread;
-use server::host::terrain::{CellCover, MapAsk, TerrainAsker};
+use protocol::pipe::terrain::{CellCover, MapAsk};
+use server::host::terrain::TerrainAsker;
 
 /// Pixels of the map past each of the view's edges: what a moving view
 /// shows before the next map comes.
