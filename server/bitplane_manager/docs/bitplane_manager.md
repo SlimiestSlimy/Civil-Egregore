@@ -32,8 +32,8 @@ Morton order. A lookup remembers the last superchunk found (`Lookup`,
 one a thread), so the runs of lookups in one superchunk that
 Morton-ordered work makes -- a rule reading grass and dirt by turns --
 search only that superchunk's few types. (A hashed cache of 16
-superchunks and types was measured and removed: `../../docs/style_guide.md`,
-"One representation for one thing".) The arena grows an allocation at a
+superchunks and types was measured and removed: one representation for
+one thing.) The arena grows an allocation at a
 time, as a layer type turns hot over a superchunk it had none of, and
 an allocation a bucket at a time; an allocation none of whose chunks is
 hot or waiting in the ring leaves the directory, its buckets with it. Each superchunk owns its buckets, so

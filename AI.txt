@@ -4,7 +4,7 @@ do. Plain text on purpose. Read it at the start of every session and
 before every task. What is done leaves it; its history is in git (the
 long version up to d019445).
 
-Docs that say the rest: docs/style_guide.md, docs/testing_protocol.md,
+Docs that say the rest: docs/testing_protocol.md,
 docs/glossary.md (one name per thing -- use its names, not the ones in
 its "not" column), docs/design_statements.md.
 
@@ -111,8 +111,9 @@ Boundaries, asked first, would have put that on the table.
   coordinates/, bitmap/ and the shared test_seed.rs), protocol/ (the
   protocol crate, with type_registry/), server/ (the server crate, with
   simulation, bitplane_manager, chunk_storage, entity_manager,
-  pathfinding, basegame), client/ (gui, renderer), diagnostics/
-  (shelved) -- plus src/ (the program), docs/, tests/, transient_data/,
+  pathfinding, basegame), client/ (the client crate: gui and renderer
+  its modules), diagnostics/ (to come) -- plus src/ (the program),
+  docs/, tests/, transient_data/,
   AI_SCRATCHPAD/, and tessera/, its own project ("keep in mind tessrra
   is its own isolated project"): Cargo lets no workspace live under a
   member's folder. A group named as a crate is that crate ("we cant
@@ -145,41 +146,33 @@ Boundaries, asked first, would have put that on the table.
   (operand 0 a new set; k+1 the existing tag k sets out, which must
   enclose it); SkipTag closes a new set; writes are methods of
   SkipTagSet only ("we can't have naked writes").
-- DOCS PAUSED ("were going to forego docs, except top level ones"):
-  crate docs' prose is not updated; README and root docs/ are kept
-  whole; the docs pointer tests are ignored meanwhile.
+- DOCS PAUSED, ALL OF THEM (2026-10-17: "were not keeping docs up to
+  date since the code is so hot, oncve we settle more we focus on"
+  them): no upkeep, root docs included; a rough update only when asked
+  (the testing protocol, 2026-10-17). The docs pointer tests stay
+  ignored. The style guide was deleted.
 - DIAGNOSTICS: "diagnostics have 2 roles, make testing easier, and
   writing stuff down for comparisons"; "only diagnostics should
-  generate transient data". Shelved in diagnostics/, to be rebuilt.
+  generate transient data". The old ones deleted 2026-10-17 by the
+  user ("were doing it from scratch fr lol").
 - TO THE BONES: "delete dead code, we want to go to the bones".
 
 
 == TO DO ==
 
-NOW
-- THE APPLYING DEADLOCK (the user: "so it was tent queue stuff"): an
-  act over a border was applied without a superchunk an entity's
-  crossing had just added to it. The arrival read its places, then
-  counted itself; a crossing in between added a place, the stale
-  arrival counted last and applied to the old places, and the added
-  superchunk waited forever. FIXED 2026-10-17 (applying.rs go_on: the
-  places are looked up after the count). 600 runs clean, trap removed,
-  206 tests pass, clippy clean, speed equal to d019445 within noise.
-  Waiting on "commit". Uncommitted besides: the root-folders
-  move, the README's paths, the driver's diagnostics command, the
-  scratchpad's two old probes removed.
-
 PLAN AGREED 2026-10-16, LEFT (co-op, file by file):
-- The client crate: gui and renderer as modules of one "client" crate;
-  "client normally doesn't receive any cli parameters ... if cli args
-  are passed then the client simply setups the correct rendering mode
-  ... and passes the arguments to server".
+- The client crate: DONE 2026-10-17 (client/, gui and renderer its
+  modules). Left of it, with the process split: "client normally
+  doesn't receive any cli parameters ... if cli args are passed then
+  the client simply setups the correct rendering mode ... and passes
+  the arguments to server".
 - The process split: client and server binaries over pipes, "also make
   tests use the pipes if possible"; "what we want when compiling from
   root is bundling the server and client binaries into a single binary
   basically" (the client relaunches its own executable as the server);
-  terrain answered over the pipe. Measured.
-- The diagnostics crate: "server then instantiates a diagnosticsManager
+  terrain answered over the pipe. Measured. Tests shown over the pipe:
+  "not all tests have to be visible, only the longest lived ones".
+- The diagnostics crate, from scratch: "server then instantiates a diagnosticsManager
   or something, and gives it a handle to the simulation internals. and
   only upon server request ... it starts doing reads to stuff".
 
@@ -230,11 +223,9 @@ LATER (every "for later" of the user's, and mine, as said)
   server's still describe camera flocks and sheep_per_flock.
 - Rendering test runs again: not as diagnostics ("rendering tests
   should not be part of diagnostics"); the user has "a better idea for
-  later". Shelved: diagnostics/server/{shown,wire}.rs,
-  diagnostics/server/tests/shown.rs, diagnostics/renderer/window_on.rs.
-- The shelved diagnostics ("its the only thing that doesn't need
-  diagnostics in fact, well get to that later" -- of Tessera, isolated
-  and working). Its tool's measuring_tool! macro left as it is.
+  later". The old code went with diagnostics/.
+- Tessera's diagnostics ("its the only thing that doesn't need
+  diagnostics in fact, well get to that later").
 - Declined for now ("nah, there are other things to do"): fold
   SetSkipTag into its first compare's spare bits (~4% back).
 - Weather: water conserved roughly; the ocean told from lakes; lakes

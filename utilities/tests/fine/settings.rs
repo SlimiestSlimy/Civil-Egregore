@@ -4,7 +4,13 @@
 //!
 //! `cargo test`
 
+use std::path::PathBuf;
 use utilities::settings::{settings_file, folder, world_in, world_name, Settings, SETTINGS_FILE_NAME, FOLDER, WORLDS};
+
+/// The tests' own folder, in the crate's `transient_data/`, kept out of git.
+fn tests_folder() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("transient_data").join("tests").join("settings")
+}
 
 /// The file is the one file in Civil Egregore's one folder.
 #[test]
@@ -16,7 +22,7 @@ fn the_file_is_in_civil_egregores_folder() {
 /// stand, a row each under the one naming the columns; a setting never set has none.
 #[test]
 fn settings_are_kept_a_line_each() {
-    let path = utilities::transient_data::TransientData::for_crate(env!("CARGO_MANIFEST_DIR")).path_under("tests/settings").join(SETTINGS_FILE_NAME);
+    let path = tests_folder().join(SETTINGS_FILE_NAME);
     let mut settings = Settings::default();
     settings.set("wall length", Some("0.75".to_string()));
     settings.set("another's", Some("kept as it is".to_string()));
@@ -37,7 +43,7 @@ fn settings_are_kept_a_line_each() {
 /// default settings, which give the rest.
 #[test]
 fn the_default_settings_never_replace_a_machines() {
-    let folder = utilities::transient_data::TransientData::for_crate(env!("CARGO_MANIFEST_DIR")).path_under("tests/settings");
+    let folder = tests_folder();
     let (missing_file, existing_file) = (folder.join("started"), folder.join("kept"));
     _ = std::fs::remove_file(&missing_file);
     let default_values = Settings::default_settings();
@@ -60,7 +66,7 @@ fn the_default_settings_never_replace_a_machines() {
 /// it lacks empty.
 #[test]
 fn settings_are_found_by_name_in_any_order() {
-    let path = utilities::transient_data::TransientData::for_crate(env!("CARGO_MANIFEST_DIR")).path_under("tests/settings").join("turned round");
+    let path = tests_folder().join("turned round");
     let default_text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/default_settings.csv")).expect("the default settings");
     let mut lines: Vec<&str> = default_text.lines().collect();
     lines[1..].reverse();

@@ -2,16 +2,16 @@
 //! written to a folder of its own and read back the same, and folders
 //! left behind removed.
 
-use chunk_storage::transient_data::TRANSIENT_DATA;
 use chunk_storage::{disk, ChunkStorage, HeightMap, LayerCodec, LayerType, ImageStored, SuperchunkImage};
 use coordinates::{ChunkIndex, SuperchunkIndex};
 use std::path::PathBuf;
 use std::sync::Arc;
 use utilities::rng::RandomSource;
 
-/// A folder of its own for the test `test_name`, emptied.
+/// A folder of its own for the test `test_name`, in the crate's
+/// `transient_data/`, emptied.
 fn folder(test_name: &str) -> PathBuf {
-    let folder = TRANSIENT_DATA.path_under("tests").join(test_name);
+    let folder = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("transient_data").join("tests").join(test_name);
     let _ = std::fs::remove_dir_all(&folder);
     folder
 }

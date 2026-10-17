@@ -17,7 +17,6 @@ mod registered_type;
 mod registration;
 mod saved_types;
 mod type_registry;
-pub mod transient_data;
 mod type_ids;
 
 pub use layouts::{data_words, Attribute, Layout, Member, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};

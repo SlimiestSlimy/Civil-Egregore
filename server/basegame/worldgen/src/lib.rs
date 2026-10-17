@@ -11,7 +11,6 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 pub mod climate;
-pub mod transient_data;
 
 pub mod generated_superchunk;
 pub mod generation;

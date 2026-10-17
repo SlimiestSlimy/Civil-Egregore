@@ -116,10 +116,3 @@ thread has a `WorldGrowth` of its own): a
 by whoever counts the stages. **`has_land_about(seed, land_shape, near_superchunk)`**:
 land three superchunks each way about `near`; **`seed_with_land(from,
 shape, near)`**: the first seed from `from` that has.
-
-## `diagnostics/`, `transient_data.rs`
-
-The folders every crate has (`../../docs/style_guide.md`, "One shape for
-every crate"). `diagnostics/mod.rs` gathers nothing yet.
-`transient_data::TRANSIENT_DATA` names the crate's `transient_data/`
-folder, where its runs would leave what they make.

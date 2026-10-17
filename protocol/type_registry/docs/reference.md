@@ -63,11 +63,6 @@ one before it -- checked on `REGISTRY` as the crate is built, as is
 takes. **`layer_types()`**: every layer type a world's cells have, a
 wide plane's whole: what the server lists a world's layers from.
 
-## `diagnostics/`, `transient_data.rs`
-
-Nothing gathered, nothing kept yet; `TRANSIENT_DATA` names the
-folder all the same.
-
 ## `climate.rs`
 
 What the climate plane's number holds (`type_registry.md`, "The

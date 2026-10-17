@@ -20,7 +20,6 @@ pub mod simulation_handle;
 pub mod simulation_time;
 mod tick;
 mod simulation_tick_state;
-pub mod transient_data;
 
 pub use sampling::{sample, sample_layer, sample_tiles_of_layer};
 pub use halos::{HaloChange, Halos, COOL_TICKS, WARM_TICKS};

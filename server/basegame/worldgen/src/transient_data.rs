@@ -1,7 +1,0 @@
-//! `transient_data/`, under the crate's folder and kept out of git: what
-//! its runs leave behind ([`utilities::transient_data`]).
-
-use utilities::transient_data::TransientData;
-
-/// The crate's transient data.
-pub const TRANSIENT_DATA: TransientData = TransientData::for_crate(env!("CARGO_MANIFEST_DIR"));

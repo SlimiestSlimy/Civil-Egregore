@@ -13,7 +13,6 @@
 
 mod a_star;
 pub mod morton;
-pub mod transient_data;
 mod walls;
 
 pub use a_star::a_star;

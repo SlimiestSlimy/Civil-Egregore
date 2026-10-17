@@ -1,192 +1,124 @@
 # How Civil Egregore is tested
 
-One protocol for every crate, part of the
-[style guide](style_guide.md): few tests, each a generator of many
-cases. Tessera's own (`tessera/docs/testing_protocol.md`) adds what an
-encoding needs: its seed file, its adversarial searches.
+Few tests, each a generator of many cases. Tessera is a project of its
+own, tested in its own workspace (`tessera/docs/testing_protocol.md`).
 
-## Three parts, kept apart
+## Tests judge, diagnostics gather
 
-- **Diagnostics** (`<crate>/src/diagnostics/`) gather data -- what an
-  arena holds, what a tick took, a flock's census -- and never judge or
-  print it.
-- **Tests** (`<crate>/tests/`) judge: pass or fail.
-- **Tools** (`<crate>/src/diagnostics/tool`) print what the
-  diagnostics gather, as tables, and keep it in
-  `<crate>/transient_data/measurements/`, out of git. A tool is a
-  function, not a program: the crate lists its tools as commands
-  (`utilities::commands`), each with the parameters it takes and what
-  each is if not given, and `Civil_Egregore <crate> <tool> [parameters]` runs
-  one -- `cargo run --release -- server pasture 300 333 4000 4 1`.
-  `cargo run --release -- help` lists every crate's commands and their
-  parameters; a report says the line it ran on, defaults filled in.
+- **Tests** judge: pass or fail.
+- **Diagnostics** gather data -- what an arena holds, what a tick
+  took, a flock's census -- and write it down for comparisons; they
+  never judge. They are the only code that makes transient data, and
+  are being redone from scratch.
 
-## Three tiers of test
+## Where tests are
 
-Each tier is one file in a crate's `tests/`, so one test program:
-`fine.rs`, `fast.rs`, `complete.rs`, a topic a module in it
-(`mod sheep` in `tests/fast.rs`) -- a file of its own in the tier's
-folder once the tier's file would pass some 300 lines
-(`tests/fast/halos.rs`, named by `#[path]` in `tests/fast.rs`). A crate has the tiers it has tests
-for, and no others. What two tiers share -- a check, a world compared
-whole, a seed found -- is in `tests/tests.rs`, a module of each tier
-that uses it and no test program of its own (`[[test]] name = "tests"`,
-`test = false`, in the crate's `Cargo.toml`); a crate whose tiers share
-nothing has none.
+- **A crate's own tests** (`<crate>/tests/`) check its invariants
+  alone: a bitmap's cells, a layer encoded and back, a path found, the
+  simulation's skip tags.
+- **The root's tiers** (`tests/fine/`, `tests/fast/`, `tests/complete/`
+  at the root) test what crosses crates: worlds the server makes,
+  ticked with the base game's rules -- the sheep, grass, trees,
+  halos, saves, the host. A rule is tried on a world, and every world
+  is the server's to make (`server::start_world`), so the base game's
+  tests are here.
+- **What tests share** is in the tests too: `tests/shared/` at the
+  root (`worlds.rs` -- a world in a scratch folder of its own,
+  `one_flock_world`, `put_flock`; `walkers.rs`), and a crate's
+  `tests/shared/`. Nothing in the program is there for a test: no
+  hook, mode or parameter. A test that needs a rule of its own writes
+  it in the test, through the simulation's API.
+
+A tier is one test program, a topic a file in its folder
+(`tests/fast/halos.rs`). A crate has the tiers it has tests for.
+
+## Three tiers
 
 | tier | what runs | how long | command |
 |---|---|---|---|
-| fine | each test pinning one behaviour: the edges written by hand -- a bitmap drawn, a cliff placed, two entities on two cells -- and, wherever the cases can be made, cases drawn from the run's seed and judged against the plainest way of working the answer out (cells written one by one, a layer decoded) | instant | `cargo test --test fine` |
-| fast | small worlds grown from a seed and run a few thousand ticks: what the rules and the tick come to, judged within bounds or against a second run | seconds | `cargo test --test fast` |
-| complete | more superchunks, more seeds, far more ticks; `#[ignore]`d, and run in release | minutes at most | `cargo test --release --test complete -- --ignored` |
+| fine | each test pinning one behaviour: the edges written by hand, and cases drawn from the seed judged against the plainest way of working the answer out | instant | `cargo test --release --test fine` |
+| fast | small worlds grown from a seed and run some ticks: what the rules and the tick come to, judged within bounds or against a second run | the whole tier under 60 seconds | `cargo test --release --test fast` |
+| complete | more superchunks, more seeds, far more ticks; `#[ignore]`d | minutes at most | `cargo test --release --test complete -- --ignored` |
 
-Plain `cargo test`, at the root, runs fine and fast of every crate but
-the renderer and its menus (`gui`), and the workspace's own fine tier,
-which tests the docs (below). `cargo test --release -- --ignored` runs every complete
-tier, Tessera's with them.
+`cargo test --release` at the root runs every crate's fine and fast
+tiers but the client's, which brings Bevy and has no tests;
+`--workspace` adds the client to the build. A test belongs to the
+lowest tier it can: by hand if one case shows it, a seeded run only if
+it takes one, the complete tier only if it takes long. A fast test that
+grows past the tier's minute shrinks its world or moves to complete.
 
-A test belongs to the lowest tier it can be: by hand if one case shows
-it, a seeded run only if it takes one, the complete tier only if it
-takes long. A test that only prints belongs to none: it is a tool.
-
-| crate | fine | fast | complete |
+| where | fine | fast | complete |
 |---|---|---|---|
-| the workspace (`tests/fine.rs`) | the docs against the code | | |
-| `bitmap` | cells, rectangles, discs, squares, Morton order, windows | | |
-| `bitplane_manager` | counts and windows; hot bitmaps; writes; writing back through the ring | | |
-| `chunk_storage` | layers encoded and back, heights, images, the writeback ring | | |
-| `coordinates` | the indices nested, in Morton order, stepping as cartesian coordinates do | | |
-| `type_registry` | the clash check, the layer types, an attribute type's blocks and a layout's fields | | |
-| `entity_manager` | attributes of any length put, found, edited and saved -- by hand, and types and edits drawn against those last set; an entity named by the cell the tick found it on | | |
-| `pathfinding` | paths and waves; walls | | |
-| `utilities` | chance, commands, dispatcher, fixed_list, hash, process_memory, rng, settings, table, tuning | | |
-| `simulation` | entities moving, entities waking, their instructions, an entity over a border | sampling, the tick, writes across borders | |
-| `compares_and_writes` | what is queued from a compare to its end | | |
-| `actions` | an entity changed, the cells beside it | the nine about a cell off its small tiles, area, mask, walking -- round walls, entities and what the collision plane holds; a flock over borders coming to the same on any number of threads | |
-| `worldgen` | | heights, walls, the mesh, superchunks made in any order | walls over many seeds; no seam between superchunks |
-| `sca_rules` | | grass; trees -- each rule alone on a plain | |
-| `entity_rules` | | the sheep alone on a plain | |
-| `server` | | two writes on one cell; the collision plane; halos; the host; the world hash; world: saves, loads, walls; commands | a world stopped often coming to the same; a flock on generated ground lasting |
-| `tessera` | fine | fast | complete |
+| root `tests/` | acts over a border, compare and write, the docs, entities moving and waking, an entity over a border, instructions | collision, commands, double writes, a flock over borders, grass, halos, the host, paging, sheep, the tick, trees, walking, weather, the world hash, worlds saved and loaded | worlds run long |
+| `utilities` | chance, dispatcher, fixed_list, hash, rng, settings, tuning | | |
+| `utilities/bitmap` | cells, shapes, Morton order, windows | | |
+| `utilities/coordinates` | the indices nested, in Morton order, stepping as cartesian coordinates do | | |
+| `protocol/type_registry` | a type registered once by its name, frozen types found again | | |
+| `server/simulation` | entities, simulation time, skip tags | area, around, mask | |
+| `server/bitplane_manager` | counts and windows, hot bitmaps, writes, writing back | | |
+| `server/chunk_storage` | the cold pool paged | | |
+| `server/entity_manager` | attributes of any length put, found, edited and saved | | |
+| `server/pathfinding` | paths and waves, walls, the Morton search | | |
+| `server/basegame/worldgen` | | heights, walls, superchunks made in any order | walls over many seeds; no seam between superchunks |
 
-`gui` and `renderer` have
-no test program. The rest of the entities' store is judged through the
-simulation's tests. A rule is tried on a world, and every world is the
-server's to make: the rules' crates test themselves on one, the server
-a dependency of their tests alone, and what such tests share is the
-server's (`server/tests/tests.rs`, a module of theirs by `#[path]`).
-The simulation's tests say what a turn queues as a rule says it, by
-the actions, a dependency of its tests alone; the instructions' own
-tests queue an instruction at a time.
-The sliders' numbers are judged by
-`utilities`' `tuning`. The renderer is judged by eye: in the window,
-and in its stills (`Civil_Egregore renderer stills`).
+The client is judged by eye, in the window.
 
 ## One seed, rolled every few runs
 
-No test or tool has a seed of its own written in it. Every seeded run,
-in whatever crate, starts from the one seed in `transient_data/seed.csv`, at
-the top of the workspace and out of git (`utilities::seed`):
+No test has a seed of its own written in it. Every seeded test takes
+the one seed in `transient_data/test_seed.csv` at the workspace's top,
+out of git (`utilities/test_seed.rs`, which each test program takes by
+`#[path]`):
 
-- A run that counts (`counted()`) is one use; after 5 the next run rolls
-  a fresh seed by itself, so nothing passes for long on one seed alone.
-- A test that needs several seeds takes consecutive ones from it; one
-  that needs a kind of world -- land about the origin, say -- takes the
-  first seed from it that gives one.
-- A seed is 64 bits, written everywhere in hexadecimal:
-  `0x50921cc8cf51e5ba`, in the file, a world's, and whatever prints one.
-- `CIVIL_EGREGORE_SEED=<seed>` picks a seed for one run and leaves the file
-  alone; `CIVIL_EGREGORE_SEED=fresh` draws one for the run.
-- The first asking prints the seed, which use it is and where it came
-  from, so a failure names the seed that made it.
+- `TestSeedHandle::open().seed()` is one use; after 5 the next rolls a
+  fresh seed, so nothing passes for long on one seed alone. The fine
+  tier's `fine_seed()` counts no use.
+- `FREEZE_SEED=0x...` runs every test on that seed and leaves the file
+  alone, to run a failure again; `FREEZE_SEED=` (empty) keeps the
+  file's seed from rolling. Deleting the file rolls one.
+- A seed is 64 bits, written everywhere in hexadecimal.
 
-A case that can be drawn is drawn: a test's cells, sizes, shapes and
-orders come from the seed (`RandomSource::new(utilities::seed::counted_seed())`),
-not from numbers written in it, so each roll of the seed tries others;
-what is written by hand is what a draw would seldom land on -- the
-world's corners, a chunk's border, a span of exactly a byte.
-
-A test must hold on any seed: what it asserts is a bound or an equality
-between two runs, never a number one seed happened to give.
+A case that can be drawn is drawn: a test's positions, counts, sizes and
+timings come from the seed, so each roll tries others; what is written
+by hand is what a draw would seldom land on -- a world's corner, a
+superchunk's border. A test must hold on any seed: it asserts a bound,
+or an equality between two runs, never a number one seed happened to
+give. Climate is known broken until its rework: a climate-dependent
+test failing on some seed is expected, and the ones that fail too often
+are ignored, naming the rework.
 
 ## The docs are tested too
 
-The code says little about itself and sends its reader to the docs
-([style guide](style_guide.md), "Comments"), so the docs have to be
-right and the way to them has to hold. The workspace's own fine tier,
-`tests/fine.rs` at the root (`cargo test --test fine`), reads every
-markdown file and every source and judges three things -- and a
-fourth of the sources alone: that a rule asks actions and nothing
-else (`the_rules_ask_actions_alone`: no rule's source calls
-anything of its turn, or names a crate under the actions;
-`../actions/docs/actions.md`, "Rules ask actions, and
-nothing else").
+The root's fine tier (`tests/fine/docs.rs`) reads every markdown file
+and every source:
 
-**What the docs name is there** (`the_docs_name_what_is_there`). In
-every markdown file, outside its fenced blocks:
+- `the_rules_ask_the_simulation_api_alone`: no source of the base
+  game's rules names anything of the simulation but its API.
+- While crate docs are paused, ignored: `the_docs_name_what_is_there`
+  (every link, path in backticks and name in backticks of the docs is
+  in the workspace), `every_item_is_in_its_crates_docs`, and
+  `the_code_points_at_docs_that_are_there` (every doc a comment names
+  is there, with the section it quotes).
 
-- A link's target is a file that exists, taken from the file the link
-  is in. Links out to the web are not followed.
-- A path in backticks exists. A span is a path if it has a `/` in it or
-  ends as a file does (`.rs`, `.md`, `.csv`, `.toml`, `.txt`, `.png`,
-  `.pbm`, `.json`), and has nothing that makes it a pattern or a
-  command: a space, `<`, `*`, `{`, `$`, `=`, `:`. It is looked for from
-  the doc's own folder, the workspace's root, and the doc's crate, its
-  sources and its tests. A crate's docs may name only that crate's
-  files this way; the workspace's own docs set out every crate's shape,
-  so what they name may be any crate's. A bare file name has to be a
-  file of the doc's crate, or a name the code writes out in a string --
-  `world.csv`, which only a run makes -- or a tool's name with what a
-  run's file ends in: a tool's report is named after it. Nothing under
-  `transient_data/` or `target/` is looked for: it is not in git.
-- A name in backticks is a name the code has. A span is taken as code
-  if it has `::`, `_`, a call's bracket or a capital in it and is a
-  path of names (`server::world_hash`, `Chance::one_in(n)`,
-  `COUNT_TILE_WORDS`); each name of the path has to be a word somewhere
-  in the workspace's sources, manifests or settings, or a file's name.
-  The standard library's names said in passing are listed in the test
-  (`NAMES_NOT_OURS`).
-- A section sent to is there. After a path to a markdown file, each
-  title in quotes up to the sentence's end has to begin one of that
-  file's headings, or one of its paragraphs that starts in bold (a
-  reference's entry: `**`name`**`, found by the name alone).
-
-This catches a file moved, an item renamed or removed, a section
-retitled. It does not catch a doc that names a thing rightly and says
-something false of it: that takes reading. Something that is gone on
-purpose and still spoken of -- a module removed, a spelling never
-used -- is written without backticks.
-
-**Every item is in its crate's docs**
-(`every_item_is_in_its_crates_docs`). Each crate with a `docs/`
-folder names, somewhere in its markdown, every function, type,
-constant and module of its sources, private ones too: a reference
-goes function by function and leaves none out, and a comment kept
-short can send its reader there. Not counted: what a trait makes a
-type have (the items of an `impl ... for` block), and the tests at a
-source's end (from its `#[cfg(test)]`). A new item fails the test
-until it is written up.
-
-**The code's pointers hold**
-(`the_code_points_at_docs_that_are_there`). Every markdown path a
-comment writes in backticks is a doc that exists -- taken from the
-source's crate or the workspace's root, however many `../` it starts
-with -- and has each section the comment quotes after it.
-
-Whether a section still says what the code does no test can tell.
-Before a commit, `cargo run --release -- docs stale` lists the
-sections the changed code points at that the change left untouched
-(`../utilities/docs/utilities.md`, "Stale docs"): each is read, and
-updated or said in the commit to hold.
+They catch a file moved or an item renamed. They do not catch a doc
+that names a thing rightly and says something false of it: that takes
+reading.
 
 ## What is measured, and how
 
-Speed is not a test: it is measured by a tool and written down with the
-command that gave it (`server`'s `Civil_Egregore server pasture` and `throughput`).
-A number in the docs names its command. While the renderer or another run
-is on the machine, times are skewed: the instructions counted
+Speed is not a test. A change to a hot path is measured against the
+commit before it: both built (`--no-default-features`, no client), the
+same world made by each, and alternating rounds of
+
+```
+Civil_Egregore --seed 0x5eed1234 --new [bench --side 8 --sheep 40 --forced_hot []]
+Civil_Egregore --run [bench --ticks 10000]
+```
+
+their medians compared. While the window or another run is on the
+machine, times are skewed: the instructions counted
 (`perf stat -e instructions:u`) are not.
 
-A change is kept if the tests pass, `cargo clippy --all-targets` is
-silent, and it measures no worse -- or its cost is written down beside
-what it buys.
+A change is kept if the tests pass, `cargo clippy --release --workspace
+--all-targets` is silent, and it measures no worse -- or its cost is
+written down beside what it buys.

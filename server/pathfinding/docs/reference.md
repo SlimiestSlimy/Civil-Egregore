@@ -63,10 +63,3 @@ one of `rows` comes to, and **`spread_back(to_rows, walls)`**, the cells
 a step from which comes to one. `Wave::spread_one_step`,
 `step_towards` and `a_star` each take them after `passable`;
 `Walls::default()` is none.
-
-## `diagnostics/`, `transient_data.rs`
-
-The folders every crate has (`../../docs/style_guide.md`, "One shape for
-every crate"). `diagnostics/mod.rs` gathers nothing yet.
-`transient_data::TRANSIENT_DATA` names the crate's `transient_data/`
-folder, where its runs would leave what they make.
