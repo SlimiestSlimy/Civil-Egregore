@@ -10,5 +10,6 @@
 
 mod gui;
 mod renderer;
+mod server_end;
 
 pub use renderer::run_window;

@@ -54,7 +54,7 @@ fn the_terrain_asked_for_is_what_the_frames_bring() {
     let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
     use coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS, WORLD_SIDE_SUPERCHUNKS};
     use protocol::pipe::frame::height_in_frame;
-    use protocol::pipe::terrain::{HeightsAsk, MapAsk};
+    use protocol::pipe::terrain::{AsksTerrain, HeightsAsk, MapAsk};
     use simulation::halos::Viewport;
     let (host, frame_receiver) = Host::start_on_thread();
     let terrain = host.terrain();

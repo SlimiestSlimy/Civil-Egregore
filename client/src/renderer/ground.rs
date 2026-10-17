@@ -13,8 +13,7 @@ use relief::{slope_light, height_tint, water_light, FOAM_COLOUR, PALE_COLOUR, SA
 use coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashMap;
 use protocol::pipe::frame::height_in_frame;
-use protocol::pipe::terrain::{Height, HeightsAsk, DrawnHeightRange};
-use server::host::terrain::TerrainAsker;
+use protocol::pipe::terrain::{AsksTerrain, Height, HeightsAsk, DrawnHeightRange};
 
 /// Cells along a superchunk's side.
 pub const SUPERCHUNK_CELLS_A_SIDE: usize = SUPERCHUNK_SIDE_CELLS as usize;
@@ -176,7 +175,7 @@ impl SuperchunkGround {
     /// the host -- which, running another world by now, is not
     /// waited for: the ground is flat at the ocean's level, for the
     /// one frame of a world gone.
-    pub fn ask_of_host(terrain: &TerrainAsker, world: u64, height_levels: DrawnHeightRange, top_left: (u32, u32), given_heights: &GivenHeights) -> Self {
+    pub fn ask_of_host(terrain: &dyn AsksTerrain, world: u64, height_levels: DrawnHeightRange, top_left: (u32, u32), given_heights: &GivenHeights) -> Self {
         Self::of_heights(&heights(terrain, world, top_left, given_heights).unwrap_or_else(|| vec![height_levels.ocean; WORKED_SIDE_CELLS * WORKED_SIDE_CELLS]), height_levels)
     }
 
@@ -232,7 +231,7 @@ pub type GivenHeights<'a> = HashMap<(u32, u32), &'a [u64]>;
 /// superchunk `given_heights` are read; the others are asked of the host,
 /// which is told to pass the given ones by -- none if it runs another
 /// world by now.
-fn heights(terrain: &TerrainAsker, world: u64, top_left: (u32, u32), given_heights: &GivenHeights) -> Option<Vec<Height>> {
+fn heights(terrain: &dyn AsksTerrain, world: u64, top_left: (u32, u32), given_heights: &GivenHeights) -> Option<Vec<Height>> {
     let (worked_left_column, worked_top_row) = (top_left.0.wrapping_sub(CELLS_KEPT_BEFORE as u32), top_left.1.wrapping_sub(CELLS_KEPT_BEFORE as u32));
     let mut heights = terrain.heights(HeightsAsk { world, first_cell_cartesian: (worked_left_column, worked_top_row), size_in_cells: (WORKED_SIDE_CELLS as u32, WORKED_SIDE_CELLS as u32), skipped_corners_cartesian: given_heights.keys().copied().collect() })?;
     for (row_number, heights) in heights.chunks_mut(WORKED_SIDE_CELLS).enumerate() {

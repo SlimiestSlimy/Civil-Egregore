@@ -5,7 +5,6 @@ description = "Civil Egregore's client: a Bevy window asking the server's host, 
 
 [dependencies]
 utilities = { path = "../utilities" }
-server = { path = "../server" }
 protocol = { path = "../protocol" }
 coordinates = { path = "../utilities/coordinates" }
 # Bevy for the window, the drawing, the menus and the keys only: no 3D, no audio.
@@ -14,3 +13,7 @@ bevy = { version = "0.19", default-features = false, features = ["2d", "ui"] }
 [features]
 # The machine's settings file is neither read nor written: the settings are the default ones.
 force_default_settings = ["utilities/force_default_settings"]
+
+# The ground's test asks a host of the test's own process for its terrain.
+[dev-dependencies]
+server = { path = "../server" }

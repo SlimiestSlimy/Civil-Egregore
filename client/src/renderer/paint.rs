@@ -5,8 +5,8 @@
 use crate::renderer::ground::{lit_colour, GivenHeights, SuperchunkGround, COARSEST_DETAIL};
 use crate::renderer::near::{paint_near, PaintedNear};
 use coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
+use protocol::pipe::terrain::AsksTerrain;
 use protocol::pipe::frame::{cell_of_bit, cloud_over, rains_over, Cells, ViewportFrame, Water, CHUNK_WORDS, CLOUD_TILE_SHIFT, DEEP_WATER_DEPTH, DEEPEST_CLOUD, OLDEST_TREE_STAGE, STAGE_BITS, WORD_BITS};
-use server::host::terrain::TerrainAsker;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
@@ -64,7 +64,7 @@ const UNSEEN_FRAMES: u64 = 256;
 /// Makes the ground of every superchunk of `host_frame` -- each hot -- that has none
 /// yet, or none fine enough -- each on a thread of its own -- and
 /// drops the fine parts of those longest unseen beyond [`FINE_KEPT`].
-fn make_grounds(kept_grounds: &mut HashMap<(u32, u32), SuperchunkGround>, terrain: &TerrainAsker, host_frame: &ViewportFrame, frame_number: u64) {
+fn make_grounds(kept_grounds: &mut HashMap<(u32, u32), SuperchunkGround>, terrain: &dyn AsksTerrain, host_frame: &ViewportFrame, frame_number: u64) {
     let fine_wanted = host_frame.seen_near.is_some() || host_frame.pixel_side_log2 < 2;
     let hot = || host_frame.cells.iter().map(|cells| cells.top_left);
     let missing_grounds: Vec<(u32, u32)> = hot().filter(|top_left| kept_grounds.get(top_left).is_none_or(|kept_ground| fine_wanted && kept_ground.fine_ground.is_none())).collect();
@@ -97,7 +97,7 @@ fn make_grounds(kept_grounds: &mut HashMap<(u32, u32), SuperchunkGround>, terrai
 /// default settings do until one comes -- the heights about a
 /// superchunk asked of `terrain`. It stops once either end is
 /// dropped.
-pub fn start_painter(frame_receiver: Receiver<ViewportFrame>, tunings: Receiver<Tuning>, terrain: TerrainAsker) -> Receiver<PaintedFrame> {
+pub fn start_painter(frame_receiver: Receiver<ViewportFrame>, tunings: Receiver<Tuning>, terrain: impl AsksTerrain + 'static) -> Receiver<PaintedFrame> {
     let (picture_sender, picture_receiver) = channel();
     thread::Builder::new()
         .name("painter".to_string())

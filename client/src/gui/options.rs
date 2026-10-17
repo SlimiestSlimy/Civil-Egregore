@@ -4,7 +4,7 @@
 
 use crate::gui::rows::{self, Bar, WorldListing, RowLook, MenuRow, RowText, MenuShade};
 use crate::gui::sliders::Sliders;
-use crate::gui::{OpenWorld, Save, ShownScreen};
+use crate::gui::{OpenWorld, Save, ShownScreen, WorldLister};
 use bevy::app::AppExit;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::AccumulatedMouseScroll;
@@ -62,16 +62,14 @@ pub struct Options {
     typed_name: String,
     /// Whether the name typed was refused: a world there is has it.
     name_taken: bool,
-    /// Names the worlds there are.
-    world_lister: fn() -> Vec<String>,
     /// The worlds, as last listed.
     world_listing: WorldListing,
 }
 
 impl Options {
-    /// The options, closed, their worlds named by `world_lister`.
-    pub fn with_world_lister(world_lister: fn() -> Vec<String>) -> Self {
-        Self { options_open: false, shown_page: OptionsPage::FirstPage, world_name: None, typed_name: String::new(), name_taken: false, world_lister, world_listing: WorldListing::default() }
+    /// The options, closed.
+    pub fn closed() -> Self {
+        Self { options_open: false, shown_page: OptionsPage::FirstPage, world_name: None, typed_name: String::new(), name_taken: false, world_listing: WorldListing::default() }
     }
 
     /// Whether they are open.
@@ -91,12 +89,12 @@ impl Options {
     }
 
     /// Says the world is to be saved under the name typed, and closes
-    /// the options -- unless none is typed, or a world there is has it.
-    fn save_named(&mut self, save: &mut MessageWriter<Save>) {
+    /// the options -- unless none is typed, or a world `world_lister` names has it.
+    fn save_named(&mut self, save: &mut MessageWriter<Save>, world_lister: &WorldLister) {
         let Some(valid_name) = utilities::settings::world_name(&self.typed_name) else {
             return;
         };
-        self.name_taken = (self.world_lister)().contains(&valid_name);
+        self.name_taken = (world_lister.0)().contains(&valid_name);
         if !self.name_taken {
             save.write(Save(valid_name));
             self.options_open = false;
@@ -142,6 +140,7 @@ pub fn update_options(
     mut words: Query<(&RowText, &mut Text), With<Part>>,
     mut message_writers: (MessageWriter<AppExit>, MessageWriter<OpenWorld>, MessageWriter<Save>),
     mut typed_keys: MessageReader<KeyboardInput>,
+    world_lister: Res<WorldLister>,
 ) {
     let (exit_writer, open_world_writer, save) = &mut message_writers;
     if *shown_screen != ShownScreen::World {
@@ -159,8 +158,8 @@ pub fn update_options(
                 }
                 None => (options.shown_page, options.typed_name, options.name_taken) = (OptionsPage::NamingWorld, String::new(), false),
             },
-            Some(OptionsClick::SavesNamed) => options.save_named(save),
-            Some(OptionsClick::ListsWorlds) => (options.world_listing, options.shown_page) = (WorldListing::from_lister(options.world_lister), OptionsPage::Worlds),
+            Some(OptionsClick::SavesNamed) => options.save_named(save, &world_lister),
+            Some(OptionsClick::ListsWorlds) => (options.world_listing, options.shown_page) = (WorldListing::from_lister(&world_lister), OptionsPage::Worlds),
             Some(OptionsClick::GoesBack) => options.shown_page = OptionsPage::FirstPage,
             Some(OptionsClick::OpensWorld(place)) => {
                 open_world_writer.write(OpenWorld(options.world_listing.worlds[place].clone()));
@@ -175,7 +174,7 @@ pub fn update_options(
         let enter_pressed = rows::type_into(&mut name_line, &mut typed_keys, |typed_letter| typed_letter.is_alphanumeric() || "-_. ".contains(typed_letter), MOST_NAME_LETTERS);
         options.typed_name = name_line;
         if enter_pressed {
-            options.save_named(save);
+            options.save_named(save, &world_lister);
         }
     } else {
         // Keys not typed into a name are no one's: none is kept for later.

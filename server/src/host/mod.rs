@@ -17,9 +17,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 
-/// Ticks a second a world is held to unless told otherwise: the
-/// game's target, a second of the simulation in a second.
-pub const TARGET_PACE: u32 = simulation::simulation_time::TICKS_A_SIMULATION_SECOND as u32;
+pub use protocol::pipe::messages::TARGET_PACE;
 
 /// The share of a tick's time the host gives to copying a frame's
 /// superchunks before the next tick, when it has no time to spare: a

@@ -12,8 +12,7 @@ use crate::gui::CapturedInput;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 use std::thread;
-use protocol::pipe::terrain::{CellCover, MapAsk};
-use server::host::terrain::TerrainAsker;
+use protocol::pipe::terrain::{AsksTerrain, CellCover, MapAsk};
 
 /// Pixels of the map past each of the view's edges: what a moving view
 /// shows before the next map comes.
@@ -49,7 +48,7 @@ pub struct DrawnMap {
 /// comes back, its cells asked of the host through `terrain`. Of
 /// several asked for while one is drawn, only the last is drawn next;
 /// one of a world the host runs no more is not drawn.
-pub fn start_map_thread(terrain: TerrainAsker) -> (Sender<WantedMap>, Receiver<DrawnMap>) {
+pub fn start_map_thread(terrain: impl AsksTerrain + 'static) -> (Sender<WantedMap>, Receiver<DrawnMap>) {
     let (wanted_sender, wanted_receiver) = channel::<WantedMap>();
     let (drawn_sender, maps) = channel();
     thread::Builder::new()
@@ -70,7 +69,7 @@ pub fn start_map_thread(terrain: TerrainAsker) -> (Sender<WantedMap>, Receiver<D
 
 /// The pixels of `wanted_map`, its cells asked of the host through
 /// `terrain`: none if it runs another world by now.
-pub fn draw_map(terrain: &TerrainAsker, wanted_map: &WantedMap) -> Option<Vec<u8>> {
+pub fn draw_map(terrain: &dyn AsksTerrain, wanted_map: &WantedMap) -> Option<Vec<u8>> {
     let terrain_answer = terrain.map(MapAsk { world: wanted_map.world, first_cell_cartesian: wanted_map.first_cell_cartesian, step: wanted_map.step, size_in_pixels: wanted_map.size_pixels, mesh_lines_asked: wanted_map.mesh_lines_drawn })?;
     let (width, height_levels) = (wanted_map.size_pixels.0 as usize, terrain_answer.drawn_heights);
     let mut rgba_bytes = vec![0u8; terrain_answer.cells.len() * 4];
@@ -129,7 +128,7 @@ pub struct MapLink {
 impl MapLink {
     /// The map's thread, started, asked nothing yet, not shown: its
     /// cells asked of the host through `terrain`.
-    pub fn start_map_link(terrain: TerrainAsker) -> Self {
+    pub fn start_map_link(terrain: impl AsksTerrain + 'static) -> Self {
         let (wanted_sender, maps) = start_map_thread(terrain);
         Self { wanted_sender, maps: Mutex::new(maps), last_asked: None, mesh_lines_drawn: false, map_mode: false }
     }

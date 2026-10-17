@@ -24,6 +24,9 @@ pub const NEW: &str = "new";
 pub const RUN: &str = "run";
 /// The command saying what a saved world is.
 pub const INFO: &str = "info";
+/// The command serving the client that started the process, over
+/// stdin and stdout: what a window starts its server with.
+pub const PIPE: &str = "pipe";
 
 /// Every flag the server's command line may hold.
 pub fn server_flags() -> Vec<Flag> {
@@ -37,6 +40,7 @@ pub fn server_flags() -> Vec<Flag> {
         Flag { flag_name: NEW, flag_help: "[folder ...]: makes a world and saves it in the folder", flag_kind: FlagKind::Terminal, parse_flag: parse_new_flag },
         Flag { flag_name: RUN, flag_help: "[folder ...]: loads the world in the folder, ticks it, and saves it", flag_kind: FlagKind::Terminal, parse_flag: parse_run_flag },
         Flag { flag_name: INFO, flag_help: "[folder]: says what the world in the folder is", flag_kind: FlagKind::Terminal, parse_flag: parse_info_flag },
+        Flag { flag_name: PIPE, flag_help: "serves the client that started it, over stdin and stdout: what a window starts its server with", flag_kind: FlagKind::Terminal, parse_flag: parse_pipe_flag },
     ]
 }
 
@@ -86,6 +90,12 @@ fn parse_run_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServ
 /// `--info [folder]`.
 fn parse_info_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters) -> Result<(), FlagError> {
     parse_command_on_folder(flag_parser, clean_parameters, INFO)
+}
+
+/// `--pipe`.
+fn parse_pipe_flag(_: &mut FlagParser, clean_parameters: &mut CleanServerParameters) -> Result<(), FlagError> {
+    clean_parameters.insert(PIPE, ParameterValue::Nested(CleanServerParameters::default()));
+    Ok(())
 }
 
 /// A flag of one whole number, put under `parameter_name`.

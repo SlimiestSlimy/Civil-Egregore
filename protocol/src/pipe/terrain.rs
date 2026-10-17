@@ -30,6 +30,19 @@ impl DrawnHeightRange {
     }
 }
 
+/// Whoever is asked of a world's terrain: each ask waits for its
+/// answer, on the asker's thread -- a thread other than the window's
+/// own asks what takes long. Asked of any thread.
+pub trait AsksTerrain: Send + Sync {
+    /// The heights asked for, row by row: none if the server is gone or
+    /// runs another world than the one asked of.
+    fn heights(&self, heights_ask: HeightsAsk) -> Option<Vec<Height>>;
+
+    /// The map asked for: none if the server is gone or runs another
+    /// world than the one asked of.
+    fn map(&self, map_ask: MapAsk) -> Option<MapAnswer>;
+}
+
 /// What a cell is generated with.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CellCover {

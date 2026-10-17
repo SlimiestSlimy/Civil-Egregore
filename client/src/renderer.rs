@@ -1,5 +1,5 @@
 //! Civil Egregore on the screen: a Bevy window showing a world run by
-//! the host (`server::host`) on a thread of its own. The window asks,
+//! a server of its own, in a process of its own (`server_end`). The window asks,
 //! the host copies, a third thread paints; a fourth draws the map.
 //!
 //! The design, and the keys: `docs/renderer.md`; function by function:
@@ -25,7 +25,7 @@ mod view;
 mod test_seed;
 
 use bevy::prelude::*;
-use crate::gui::{self, GuiPlugin, ShownScreen};
+use crate::gui::{self, GuiPlugin, ShownScreen, WorldLister};
 
 /// Opens the window on the main menu, and runs until it is closed.
 pub fn run_window() {
@@ -35,7 +35,7 @@ pub fn run_window() {
 /// The window, on the main menu, its world run by a host of its own:
 /// not yet run.
 fn window() -> App {
-    window_on(link::HostLink::start_own_host())
+    window_on(link::HostLink::start_own_server())
 }
 
 /// The window, on the main menu, its world the one `host_link` reaches:
@@ -50,8 +50,12 @@ fn window_on(host_link: link::HostLink) -> App {
                 .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin { primary_window: Some(Window { title: "Civil Egregore".to_string(), ..default() }), ..default() }),
         )
-        .add_plugins((GuiPlugin { worlds: || server::worlds_in(&utilities::settings::worlds()) }, mipmaps::Mipmaps))
-        .insert_resource(map::MapLink::start_map_link(host_link.host.terrain()))
+        .add_plugins((GuiPlugin, mipmaps::Mipmaps))
+        .insert_resource(WorldLister(Box::new({
+            let lister_link = host_link.server().clone();
+            move || lister_link.list_worlds()
+        })))
+        .insert_resource(map::MapLink::start_map_link(host_link.server().clone()))
         .insert_resource(host_link)
         .insert_resource(ClearColor(Color::BLACK))
         .init_resource::<link::LastFrameSeen>()

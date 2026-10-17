@@ -131,8 +131,8 @@ pub struct WorldListing {
 
 impl WorldListing {
     /// The worlds `world_lister` names, from the first.
-    pub fn from_lister(world_lister: fn() -> Vec<String>) -> Self {
-        Self { worlds: world_lister(), first_shown: 0 }
+    pub fn from_lister(world_lister: &crate::gui::WorldLister) -> Self {
+        Self { worlds: (world_lister.0)(), first_shown: 0 }
     }
 
     /// The rows listing them -- under a first that goes back, `does`

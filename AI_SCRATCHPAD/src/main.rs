@@ -53,7 +53,7 @@ impl ProbeParameters<'_> {
 }
 
 /// Every parameter any probe reads, a general flag each.
-const PARAMETERS: [&str; 12] = [
+const PARAMETERS: [&str; 13] = [
     SEED,
     acts_over_a_border::WORLD_SIDE_SUPERCHUNKS,
     acts_over_a_border::EVERY_SO_MANY_CELLS,
@@ -66,6 +66,7 @@ const PARAMETERS: [&str; 12] = [
     ticks_under_a_wide_viewport::SUPERCHUNKS_A_FRAME,
     ticks_under_a_wide_viewport::SHEEP_A_SUPERCHUNK,
     ticks_under_a_wide_viewport::PACE_TICKS_A_SECOND,
+    ticks_under_a_wide_viewport::OVER_PIPE,
 ];
 
 /// Puts the parameter `PARAMETERS[PARAMETER]`, as text, under its own name.
@@ -107,7 +108,7 @@ const PROBES: [Probe; 2] = [
     Probe {
         probe_name: "ticks_under_a_wide_viewport",
         what_it_does: "makes a world with no side whose camera loads, keeps a square viewport hot, and prints its ticks a second with no frame asked and with frames asked as a window asks: what answering a client costs the simulation",
-        parameter_defaults: &[(ticks_under_a_wide_viewport::VIEWPORT_SIDE, "12"), (ticks_under_a_wide_viewport::SECONDS_MEASURED, "10"), (ticks_under_a_wide_viewport::SUPERCHUNKS_A_FRAME, "32"), (ticks_under_a_wide_viewport::SHEEP_A_SUPERCHUNK, "250"), (ticks_under_a_wide_viewport::PACE_TICKS_A_SECOND, "0"), (SEED, "0")],
+        parameter_defaults: &[(ticks_under_a_wide_viewport::VIEWPORT_SIDE, "12"), (ticks_under_a_wide_viewport::SECONDS_MEASURED, "10"), (ticks_under_a_wide_viewport::SUPERCHUNKS_A_FRAME, "32"), (ticks_under_a_wide_viewport::SHEEP_A_SUPERCHUNK, "250"), (ticks_under_a_wide_viewport::PACE_TICKS_A_SECOND, "0"), (ticks_under_a_wide_viewport::OVER_PIPE, ""), (SEED, "0")],
         run_probe: ticks_under_a_wide_viewport::run_probe,
     },
 ];
@@ -129,6 +130,7 @@ fn probe_flags() -> Vec<Flag> {
         parameter_flag::<9>(),
         parameter_flag::<10>(),
         parameter_flag::<11>(),
+        parameter_flag::<12>(),
     ]
 }
 
