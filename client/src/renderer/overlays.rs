@@ -3,7 +3,7 @@
 //! corners ([`label_corners`]), and every cell's height on it ([`heights`]).
 
 use crate::renderer::link::{HostLink, LastFrameSeen};
-use server::host::terrain::{Height, HeightsAsk};
+use protocol::pipe::terrain::{Height, HeightsAsk};
 use crate::renderer::view::{SuperchunkSprites, SPRITE_SIDE};
 use bevy::prelude::*;
 use bevy::sprite::Anchor;

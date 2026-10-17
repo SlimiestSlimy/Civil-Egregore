@@ -1,108 +1,14 @@
-//! What a client asks of a world's terrain where no frame brings it:
-//! the heights about a superchunk, and the whole of the ground for a
-//! map -- asked of the host and answered on a thread of its own, the
+//! The terrain a client asks of the host where no frame brings it
+//! (`protocol::pipe::terrain`), answered on a thread of its own, the
 //! ticks never waiting, from how the world run is generated
 //! (`docs/server.md`, "Terrain asked of the host").
 
-pub use chunk_storage::Height;
-
 use coordinates::SUPERCHUNK_SIDE_CELLS;
+use protocol::pipe::terrain::{CellCover, DrawnHeightRange, Height, HeightsAsk, MapAnswer, MapAsk, MapCell};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use worldgen::mesh::WorldLand;
 use worldgen::WorldGeneration;
-
-/// The heights a world is drawn between.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct DrawnHeightRange {
-    /// The lowest ground: the ocean's floor.
-    pub lowest_height: Height,
-    /// The ocean's level.
-    pub ocean: Height,
-    /// The highest land.
-    pub highest_land: Height,
-}
-
-impl DrawnHeightRange {
-    /// Those of a world generated as `world_generation` says. A world with
-    /// no relief to speak of -- a plain, a step above its ocean -- is
-    /// drawn between the levels worlds have unless told otherwise:
-    /// its land is low land, not a peak.
-    pub(crate) fn from_generation(world_generation: &WorldGeneration) -> Self {
-        let land_shape = &world_generation.land_shape;
-        let nearly_flat = land_shape.highest_land <= land_shape.ocean + worldgen::STEP;
-        Self { lowest_height: land_shape.ocean_floor, ocean: land_shape.ocean, highest_land: if nearly_flat { land_shape.ocean + worldgen::LandShape::DEFAULT.highest_land } else { land_shape.highest_land } }
-    }
-}
-
-/// What a cell is generated with.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CellCover {
-    /// The ocean over it: nothing grows.
-    Ocean,
-    /// A tree.
-    Tree,
-    /// Grass, and no tree.
-    Grass,
-    /// Neither: dirt.
-    Dirt,
-}
-
-/// The heights of a rectangle of cells, asked for.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HeightsAsk {
-    /// The world they are of ([`super::frame::Frame::world`]).
-    pub world: u64,
-    /// The top left cell, `(x, y)` in the world: the rectangle goes
-    /// round the world's edges.
-    pub first_cell_cartesian: (u32, u32),
-    /// Cells across and down.
-    pub size_in_cells: (u32, u32),
-    /// The top left cells of the superchunks not to work out: those a
-    /// frame brought the client. Their cells are answered as 0.
-    pub skipped_corners_cartesian: Vec<(u32, u32)>,
-}
-
-/// A map asked for: a pixel the cell in its middle.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct MapAsk {
-    /// The world it is of ([`super::frame::Frame::world`]).
-    pub world: u64,
-    /// The cell at its top left pixel's top left, `(x, y)` in the
-    /// world: past the world's edges it may be.
-    pub first_cell_cartesian: (i64, i64),
-    /// Cells along a pixel's side.
-    pub step: u32,
-    /// Pixels across and down.
-    pub size_in_pixels: (u32, u32),
-    /// Whether the mesh's lines are asked for.
-    pub mesh_lines_asked: bool,
-}
-
-/// A pixel of a map: the cell in its middle.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct MapCell {
-    /// Its height.
-    pub height: Height,
-    /// The height of the pixel above it: its own, where that is past
-    /// the world's edge.
-    pub height_above: Height,
-    /// What it is generated with.
-    pub cell_cover: CellCover,
-    /// Whether it is no farther from a line of the mesh the land is
-    /// made of than a pixel is across: false unless asked for.
-    pub on_a_mesh_line: bool,
-}
-
-/// A map answered.
-pub struct MapAnswer {
-    /// What was asked.
-    pub map_ask: MapAsk,
-    /// The heights the world is drawn between.
-    pub drawn_heights: DrawnHeightRange,
-    /// Its pixels' cells, row by row: none past the world's edges.
-    pub cells: Vec<Option<MapCell>>,
-}
 
 /// What the terrain's thread is sent.
 pub(crate) enum TerrainRequest {

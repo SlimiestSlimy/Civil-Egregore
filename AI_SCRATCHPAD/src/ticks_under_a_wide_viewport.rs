@@ -5,7 +5,7 @@
 
 use crate::asking_the_host::{frame_that, seed, whole_answer};
 use coordinates::WORLD_MIDDLE;
-use server::host::frame::{FrameAsk, ViewportFrame, Viewport};
+use protocol::pipe::frame::{FrameAsk, ViewportFrame, Viewport};
 use server::host::Host;
 use server::WorldStart;
 use std::sync::mpsc::Receiver;

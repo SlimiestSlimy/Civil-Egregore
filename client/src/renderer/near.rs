@@ -6,7 +6,7 @@
 use crate::renderer::ground::relief::{laid_over, tint_on_sand, water_light, FOAM_COLOUR, FOAM_MOST, PALE_COLOUR, SAND_COLOUR, SAND_MOST};
 use crate::renderer::ground::{shadow_drop, FineGround, SuperchunkGround, KEPT_MARGIN_CELLS, SUPERCHUNK_CELLS_A_SIDE};
 use crate::renderer::paint::{depth_at, each_cloud, in_rain, stage_at, streak_of_rain_on, tree_colour, under_cloud, under_water};
-use server::host::frame::{Cells, NearRectangle, DEEP_WATER_DEPTH, DEEPEST_CLOUD, OLDEST_TREE_STAGE, WORD_BITS};
+use protocol::pipe::frame::{Cells, NearRectangle, DEEP_WATER_DEPTH, DEEPEST_CLOUD, OLDEST_TREE_STAGE, WORD_BITS};
 use utilities::tuning::{Tuning, RELIEF_STRENGTH, CAST_SHADOW, STEP_DARK, STEP_LIGHT, GROUND_TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
 use coordinates::place_from_cartesian;
 use std::collections::HashMap;

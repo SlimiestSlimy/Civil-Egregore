@@ -19,3 +19,4 @@ pub mod rng;
 pub mod seed;
 pub mod settings;
 pub mod tuning;
+pub mod wire;

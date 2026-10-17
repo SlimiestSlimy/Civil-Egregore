@@ -6,13 +6,13 @@
 mod host_thread;
 use host_thread::HostThread;
 
-pub mod frame;
+mod frame;
 pub mod terrain;
 
 use crate::WorldStart;
 use utilities::tuning::Tuning;
 use worldgen::WorldGeneration;
-use frame::{FrameAsk, ViewportFrame};
+use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::Duration;

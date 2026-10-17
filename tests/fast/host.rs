@@ -1,6 +1,6 @@
 //! The host: a world run on a thread of its own, asked for frames.
 
-use server::host::frame::{FrameAsk, ViewportFrame};
+use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use server::host::Host;
 use server::{WorldSize, WorldStart};
 use std::sync::mpsc::Receiver;
@@ -53,8 +53,8 @@ fn a_reset_makes_the_world_again_as_retuned() {
 fn the_terrain_asked_for_is_what_the_frames_bring() {
     let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
     use coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS, WORLD_SIDE_SUPERCHUNKS};
-    use server::host::frame::height_in_frame;
-    use server::host::terrain::{HeightsAsk, MapAsk};
+    use protocol::pipe::frame::height_in_frame;
+    use protocol::pipe::terrain::{HeightsAsk, MapAsk};
     use simulation::halos::Viewport;
     let (host, frame_receiver) = Host::start_on_thread();
     let terrain = host.terrain();
@@ -113,7 +113,7 @@ fn a_frame_brings_the_clouds_a_tile_at_a_time() {
     let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
     use bitplane_manager::Write;
     use coordinates::{place_from_cartesian, CellCartesian, SUPERCHUNK_SIDE_CELLS};
-    use server::host::frame::{cloud_over, CLOUD_TILE_SHIFT};
+    use protocol::pipe::frame::{cloud_over, CLOUD_TILE_SHIFT};
     use base_types::CLOUD;
     let folder = crate::worlds::folder("clouds");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
