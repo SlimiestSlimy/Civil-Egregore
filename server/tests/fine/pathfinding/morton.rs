@@ -4,8 +4,8 @@
 //!
 //! `cargo test`
 
-use server::pathfinding::morton::{self, bit_at, MortonWalls, Tiles, TILES_SIDE, TILES_WORDS};
-use server::pathfinding::{rows_hold, step_towards, Cell, Rows, Walls, AREA_SIDE};
+use crate::pathfinding::morton::{self, bit_at, MortonWalls, Tiles, TILES_SIDE, TILES_WORDS};
+use crate::pathfinding::{rows_hold, step_towards, Cell, Rows, Walls, AREA_SIDE};
 use utilities::rng::RandomSource;
 
 /// `rows`, an area's, as tiles: the area's top left cell `across` and

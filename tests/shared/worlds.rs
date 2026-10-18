@@ -2,12 +2,16 @@
 //! `main.rs`, so no test program of its own -- a module of each tier
 //! that uses it (`#[path = "../shared/worlds.rs"]`).
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 // A tier uses what it needs of it.
 #![allow(dead_code)]
 
-use server::chunk_storage::SuperchunkImage;
+use server::internals_for_root_tests::SuperchunkImage;
 use utilities::coordinates::SuperchunkIndex;
-use server::entity_manager::{set_attribute, Attribute, AttributeBlock, EntityRef, Header};
+use server::internals_for_root_tests::{set_attribute, Attribute, AttributeBlock, EntityRef, Header};
 use basegame::worldgen::WorldGeneration;
 use basegame::base_types::BaseTypes;
 use protocol::type_registry::{FrozenTypes, TypeRegistry};
@@ -158,7 +162,7 @@ pub fn cells_of_grass(world: &World) -> u64 {
 /// Turns to grass the rectangle of cells `width` by `height` whose top
 /// left is `top_left_cartesian`, all of it on `world`'s hot superchunks.
 pub fn plant_grass(world: &mut World, top_left_cartesian: utilities::coordinates::CellCartesian, width: u8, height: u8) {
-    use server::bitplane_manager::{WriteShape, Write, WriteOp};
+    use server::internals_for_root_tests::{WriteShape, Write, WriteOp};
     let write_shape = if (width, height) == (1, 1) { WriteShape::Cell } else { WriteShape::RectangleOfCells { width, height } };
     let planted_writes = world.write_cells(base().grass, [Write { anchor_cell: top_left_cartesian.into(), write_op: WriteOp::SetCell, write_shape }]);
     assert_eq!(planted_writes.missed, 0, "grass planted off the hot superchunks");
@@ -167,10 +171,10 @@ pub fn plant_grass(world: &mut World, top_left_cartesian: utilities::coordinates
 /// Puts an entity on `world`, whole, its cell held in the collision
 /// plane -- as an entity that collides holds it: there before the next
 /// tick.
-pub fn add_entity(world: &mut World, header: Header, attributes: &[AttributeBlock]) -> server::entity_manager::InstructionsApplied {
+pub fn add_entity(world: &mut World, header: Header, attributes: &[AttributeBlock]) -> server::internals_for_root_tests::InstructionsApplied {
     let applied = world.add_entity(header, attributes);
     if applied.added > 0 {
-        world.write_cells(base().collision, [server::bitplane_manager::Write::cell(header.stood_cell, server::bitplane_manager::WriteOp::SetCell)]);
+        world.write_cells(base().collision, [server::internals_for_root_tests::Write::cell(header.stood_cell, server::internals_for_root_tests::WriteOp::SetCell)]);
     }
     applied
 }
@@ -193,16 +197,16 @@ pub fn put_flock(world: &mut World, superchunk: SuperchunkIndex, count: usize) {
         }
         let header = Header { entity_type: base().sheep, stood_cell: drawn_cell, wake: STEP.part_drawn(&mut random_stream).tick_after(tick_now) };
         let sheep_state = basegame::base_types::SheepState { hungry_at: TIME_BETWEEN_MEALS.part_drawn(&mut random_stream).tick_after(tick_now), ..basegame::base_types::SheepState::default() };
-        put += add_entity(world, header, &server::entity_manager::WholeAttribute::holding_value(base().sheep_state, sheep_state)).added;
+        put += add_entity(world, header, &server::internals_for_root_tests::WholeAttribute::holding_value(base().sheep_state, sheep_state)).added;
     }
 }
 
 /// Takes `header`'s entity off `world`, the cell it held in the collision
 /// plane let go.
-pub fn remove_entity(world: &mut World, header: &Header) -> server::entity_manager::InstructionsApplied {
+pub fn remove_entity(world: &mut World, header: &Header) -> server::internals_for_root_tests::InstructionsApplied {
     let remove_applied = world.remove_entity(header);
     if remove_applied.entities_removed > 0 {
-        world.write_cells(base().collision, [server::bitplane_manager::Write::cell(header.stood_cell, server::bitplane_manager::WriteOp::ClearCell)]);
+        world.write_cells(base().collision, [server::internals_for_root_tests::Write::cell(header.stood_cell, server::internals_for_root_tests::WriteOp::ClearCell)]);
     }
     remove_applied
 }
@@ -231,19 +235,19 @@ pub fn tag_of(tagged_sheep: &EntityRef) -> Option<u64> {
 /// One tick of the rule whose type's ID is `rule_id` alone over `world`'s hot
 /// superchunks, its halos left where they are: the tick's report, the
 /// rule's counts alone in it.
-pub fn tick_rule(world: &mut World, rule_id: u64) -> server::simulation::TickReport<server::simulation::simulation_api::RuleCounts> {
+pub fn tick_rule(world: &mut World, rule_id: u64) -> server::internals_for_root_tests::TickReport<server::simulation::simulation_api::RuleCounts> {
     let rule = world.rule_place(rule_id);
     let report = world.tick_only(server::ChosenRules::from_rules(&[rule]), false);
-    server::simulation::TickReport { writes_applied: report.writes_applied, instructions_applied: report.instructions_applied, instructions_compared: report.instructions_compared, counted_when_applied: report.counted_when_applied, rules: report.rules.counts_of(rule), computing_time: report.computing_time, applying_time: report.applying_time, acts_over_a_border: report.acts_over_a_border }
+    server::internals_for_root_tests::TickReport { writes_applied: report.writes_applied, instructions_applied: report.instructions_applied, instructions_compared: report.instructions_compared, counted_when_applied: report.counted_when_applied, rules: report.rules.counts_of(rule), computing_time: report.computing_time, applying_time: report.applying_time, acts_over_a_border: report.acts_over_a_border }
 }
 
 /// One tick of the sheep's rule alone over `world`'s hot superchunks,
 /// its halos left where they are.
-pub fn tick_sheep(world: &mut World) -> server::simulation::TickReport<server::simulation::simulation_api::RuleCounts> {
+pub fn tick_sheep(world: &mut World) -> server::internals_for_root_tests::TickReport<server::simulation::simulation_api::RuleCounts> {
     tick_rule(world, type_id_named(basegame::base_types::SHEEP_RULE))
 }
 
 /// One tick of the grass's rule alone over `world`'s hot superchunks.
-pub fn tick_grass(world: &mut World) -> server::simulation::TickReport<server::simulation::simulation_api::RuleCounts> {
+pub fn tick_grass(world: &mut World) -> server::internals_for_root_tests::TickReport<server::simulation::simulation_api::RuleCounts> {
     tick_rule(world, type_id_named(basegame::base_types::GRASS_RULE))
 }

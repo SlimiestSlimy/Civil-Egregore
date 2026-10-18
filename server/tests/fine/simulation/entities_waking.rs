@@ -7,8 +7,8 @@
 use crate::arenas::*;
 use crate::walkers::*;
 use utilities::coordinates::{SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use server::entity_manager::{AttributeBlock, Header, WHEEL_TICKS};
-use server::simulation::{Simulation, SimulationTickState};
+use crate::entity_manager::{AttributeBlock, Header, WHEEL_TICKS};
+use crate::simulation::{Simulation, SimulationTickState};
 use std::sync::Mutex;
 
 /// Attributes added and removed every tick, by hundreds of entities in
@@ -56,9 +56,9 @@ fn entities_wake_at_their_tick() {
             for entity in tick_state.woken_entities() {
                 woken_log.lock().unwrap().push((entity.header.stood_cell, tick_state.current_tick()));
                 if entity.header.stood_cell == removed_cell {
-                    server::simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &entity.header);
+                    crate::simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &entity.header);
                 } else if entity.header.stood_cell == first_cell && tick_state.current_tick() == 5 {
-                    server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, first_cell, 40);
+                    crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, first_cell, 40);
                 }
             }
             0
@@ -83,7 +83,7 @@ fn entities_cross_borders_and_stay_at_the_edge_of_the_hot_world() {
     let step = |tick_state: &mut SimulationTickState| {
         for entity in tick_state.woken_entities() {
             let stepped_header = Header { stood_cell: entity.header.stood_cell.at_cartesian_offset(1, 0).unwrap(), wake: tick_state.current_tick() + 1, ..entity.header };
-            server::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, stepped_header, &[AttributeBlock::holding_value(WOKEN_COUNT, entity.attribute(WOKEN_COUNT).unwrap() + 1)]);
+            crate::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, stepped_header, &[AttributeBlock::holding_value(WOKEN_COUNT, entity.attribute(WOKEN_COUNT).unwrap() + 1)]);
         }
         0
     };
@@ -116,12 +116,12 @@ fn any_number_of_threads_ticks_entities_the_same() {
             let wander_cell = header.stood_cell.at_cartesian_offset(dx * 7, dy * 7).unwrap();
             let wake = tick_state.current_tick() + 1 + tick_state.random_stream().draw_below(5);
             match tick_state.random_stream().draw_below(40) {
-                0 => server::simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &header),
+                0 => crate::simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &header),
                 1 => {
-                    server::simulation::simulation_api::entity_reads_and_writes::make_entity(tick_state, header.entity_type, wander_cell, wake, &[]);
-                    server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &header, header.stood_cell, tick_state.current_tick() + 3);
+                    crate::simulation::simulation_api::entity_reads_and_writes::make_entity(tick_state, header.entity_type, wander_cell, wake, &[]);
+                    crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &header, header.stood_cell, tick_state.current_tick() + 3);
                 }
-                _ => server::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &header, Header { stood_cell: wander_cell, wake, ..header }, entity.attributes),
+                _ => crate::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &header, Header { stood_cell: wander_cell, wake, ..header }, entity.attributes),
             }
             change_count += 1;
         }

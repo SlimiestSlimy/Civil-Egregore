@@ -5,11 +5,15 @@
 //! on one cell the one refused is born later
 //! (`docs/server.md`, "Two writes on one cell").
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use crate::worlds::base;
 use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, add_entity, tick_sheep};
-use server::bitplane_manager::Write;
+use server::internals_for_root_tests::Write;
 use utilities::coordinates::{CellCartesian, CellIndex};
-use server::entity_manager::{Header, WholeAttribute, NEVER_WAKES};
+use server::internals_for_root_tests::{Header, WholeAttribute, NEVER_WAKES};
 use basegame::entity_rules::sheep::{SheepState, BIRTHS_COUNT, EATEN_COUNT, STEP_JITTER, STEP};
 use basegame::sca_rules::{grass, trees};
 use server::World;
@@ -85,7 +89,7 @@ fn a_tree_written_twice_is_one_tree() {
     let superchunk = first_superchunk(&world);
     // A tree every fourth cell each way, each old enough to spread and not crowded.
     let trees: Vec<CellIndex> = (0..256).flat_map(|y| (0..256).map(move |x| (4 * x, 4 * y))).map(|(x, y)| cell(&world, x, y)).collect();
-    let planted = world.write_cells(base().tree, trees.iter().map(|&tree_cell| Write::cell(tree_cell, server::bitplane_manager::WriteOp::SetCell)));
+    let planted = world.write_cells(base().tree, trees.iter().map(|&tree_cell| Write::cell(tree_cell, server::internals_for_root_tests::WriteOp::SetCell)));
     let aged_writes = world.write_cells(base().tree_stage.layer_type(), trees.iter().map(|&aged_cell| Write::value(base().tree_stage, aged_cell, trees::SEEDS_FROM)));
     assert_eq!((planted.missed, aged_writes.missed), (0, 0));
     let trees_there = |world: &World| world.bitmap_arena().superchunk_count(base().tree, superchunk) as u64;
@@ -107,7 +111,7 @@ fn hungry_at(hungry_at: u64) -> WholeAttribute {
 }
 
 /// What `sheep_ref` keeps: every sheep has its block.
-fn sheep_state_of(sheep_ref: &server::entity_manager::EntityRef) -> SheepState {
+fn sheep_state_of(sheep_ref: &server::internals_for_root_tests::EntityRef) -> SheepState {
     sheep_ref.attribute(base().sheep_state).expect("a sheep's state, always")
 }
 

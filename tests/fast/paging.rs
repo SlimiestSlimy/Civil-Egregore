@@ -1,6 +1,10 @@
 //! The cold pool paged to disk: a world keeping none of its cold
 //! superchunks' images in memory is the world keeping them all.
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use crate::worlds::{world_contents, folder};
 use utilities::coordinates::{SuperchunkIndex, WORLD_SIDE_SUPERCHUNKS};
 use server::{WorldStart, World, COOL_TICKS, WARM_TICKS};

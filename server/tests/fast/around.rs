@@ -4,15 +4,15 @@
 //! less what the collision plane holds; and one drawn is one of those
 //! chosen among, each as likely.
 //!
-//! `cargo test --test fast`
+//! `cargo test -p server --lib fast_tests`
 
 use crate::arenas::{cell, STONE_LAYER};
-use server::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
-use server::chunk_storage::{LayerCodec, LayerType};
+use crate::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
+use crate::chunk_storage::{LayerCodec, LayerType};
 use utilities::coordinates::{CellIndex, SuperchunkIndex};
-use server::entity_manager::WorldEntities;
-use server::simulation::simulation_api::{cell_and_its_neighbours, steps_and_paths};
-use server::simulation::Simulation;
+use crate::entity_manager::WorldEntities;
+use crate::simulation::simulation_api::{cell_and_its_neighbours, steps_and_paths};
+use crate::simulation::Simulation;
 use utilities::rng::RandomSource;
 
 /// What is in a walker's way here: the base game's collision plane and walls.

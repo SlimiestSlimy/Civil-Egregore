@@ -5,8 +5,8 @@
 
 use crate::chunks::*;
 use utilities::bitmap::{CellWords, WORDS};
-use server::bitplane_manager::{BitmapArena, BucketKey, NotHot, WriteOp};
-use server::chunk_storage::{ChunkStorage, LayerCodec, LayerType};
+use crate::bitplane_manager::{BitmapArena, BucketKey, NotHot, WriteOp};
+use crate::chunk_storage::{ChunkStorage, LayerCodec, LayerType};
 use utilities::coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, WORLD_MIDDLE};
 
 /// Writing back encodes only what changed into the ring, and the cold pool

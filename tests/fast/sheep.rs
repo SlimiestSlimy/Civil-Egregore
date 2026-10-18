@@ -5,10 +5,14 @@
 //! walk off the hot bitplanes, and tick the same on any number of
 //! threads.
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use crate::worlds::base;
 use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, add_entity, tick_sheep};
 use utilities::coordinates::CellCartesian;
-use server::entity_manager::{set_attribute, AttributeBlock, EntityRef, Header, WholeAttribute};
+use server::internals_for_root_tests::{set_attribute, AttributeBlock, EntityRef, Header, WholeAttribute};
 use basegame::entity_rules::sheep::{BIRTHS_COUNT, DEATHS_COUNT, EATEN_COUNT, FAR_COUNT, PATHS, SOUGHT_COUNT, WOKEN_COUNT, GESTATION_TIME, TIME_BETWEEN_MEALS, ROAMING_TIME, TIME_TO_STARVE, SheepState, STEP_JITTER, STEP};
 
 /// The state of a sheep next hungry at `hungry_at`, in the middle of nothing.
@@ -240,12 +244,12 @@ fn sheep_never_overlap() {
 #[test]
 fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    use server::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
+    use server::internals_for_root_tests::{BitmapArena, BucketKey, Write, WriteOp};
     use utilities::coordinates::CellIndex;
-    use server::entity_manager::WorldEntities;
+    use server::internals_for_root_tests::WorldEntities;
     use server::simulation::simulation_api::cell_reads_and_writes;
         let superchunk = utilities::coordinates::WORLD_MIDDLE;
-    let (mut layer_codec, mut bitmap_arena, mut entity_store) = (server::chunk_storage::LayerCodec::new(), BitmapArena::new(), WorldEntities::new());
+    let (mut layer_codec, mut bitmap_arena, mut entity_store) = (server::internals_for_root_tests::LayerCodec::new(), BitmapArena::new(), WorldEntities::new());
     for chunk in superchunk.chunks() {
         for layer_type in [base().grass, base().wall_north, base().wall_west, base().wall_south, base().wall_east] {
             bitmap_arena.make_hot(BucketKey { layer_type, chunk }, None, &mut layer_codec);
@@ -262,7 +266,7 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     entity_store.queue_add(Header { entity_type: base().sheep, stood_cell: decaying_cell, wake: 0 }, &hungry_at(was_hungry_at));
     entity_store.queue_add(Header { entity_type: base().sheep, stood_cell: standing_cell, wake: 0 }, &hungry_at(was_hungry_at));
     entity_store.apply();
-    let mut test_simulation = server::simulation::Simulation::new(1);
+    let mut test_simulation = server::internals_for_root_tests::Simulation::new(1);
     let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut server::simulation::simulation_api::SimulationTickState| {
         // The decay first, counted under 0; the sheep's counts from 8 on.
         cell_reads_and_writes::clear_counted(tick_state, base().grass, decaying_cell, 0);

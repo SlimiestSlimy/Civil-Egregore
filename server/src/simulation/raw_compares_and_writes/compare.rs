@@ -4,10 +4,11 @@
 //! compare or the end of the compare: one compare, any number of
 //! writes (`docs/compares_and_writes.md`, "Compares").
 
-use crate::chunk_storage::{LayerType, WidePlane, Width};
+use crate::chunk_storage::{LayerType};
+use crate::bitplane_manager::{WidePlane, Width};
 use utilities::coordinates::CellIndex;
 use crate::entity_manager::{push_attribute, Attribute, AttributeBlock, AttributeType, Header, Layout, Member};
-pub use crate::simulation::Compare;
+pub(crate) use crate::simulation::Compare;
 use crate::simulation::{SimulationTickState, Write};
 
 /// `layer_type` still holds at `cell`, as the rule saw.

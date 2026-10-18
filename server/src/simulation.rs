@@ -7,23 +7,24 @@
 //! `docs/simulation_reference.md`.
 
 
-pub mod halos;
+pub(crate) mod halos;
 pub mod simulation_api;
 mod raw_compares_and_writes;
-pub mod hot;
-pub mod rules;
+pub(crate) mod hot;
+pub(crate) mod rules;
 mod sampling;
-pub mod simulation_handle;
-pub mod simulation_time;
-mod tick;
+pub(crate) mod simulation_handle;
+pub(crate) mod tick;
 mod simulation_tick_state;
 
-pub use sampling::{sample, sample_layer, sample_tiles_of_layer};
-pub use halos::{HaloChange, Halos, COOL_TICKS, WARM_TICKS};
-pub use hot::Hot;
-pub use rules::{hot_entity_of, place_of, rules_of, worldgen_of, ChosenRules, Rule, RulePlace, TickCounts, MOST_RULES};
-pub use simulation_handle::{ColdPoolPaging, SavedImage, SimulationHandle, WorldTick};
-pub use tick::{threads_for, Simulation, TickReport};
-pub use simulation_tick_state::conditional::{Compare, CountedWhenApplied, COUNTED_WHEN_APPLIED};
-pub use simulation_tick_state::one_instruction::Write;
-pub use simulation_tick_state::SimulationTickState;
+pub(crate) use halos::HaloChange;
+pub(crate) use rules::{worldgen_of, ChosenRules, RulePlace, TickCounts};
+pub(crate) use simulation_handle::{ColdPoolPaging, SavedImage, SimulationHandle, WorldTick};
+pub(crate) use tick::{Simulation, TickReport};
+pub(crate) use simulation_tick_state::conditional::Compare;
+pub(crate) use simulation_tick_state::one_instruction::Write;
+pub(crate) use simulation_tick_state::SimulationTickState;
+pub(crate) use simulation_api::simulation_time;
+// Names only the crate's tests use.
+#[cfg(test)]
+pub(crate) use {sampling::sample, tick::threads_for};

@@ -2,7 +2,7 @@
 //! superchunk images, the writeback ring and the cold pool it feeds.
 
 use utilities::bitmap::{Bitmap, CellWords, BITS_PER_WORD, WORDS};
-use server::chunk_storage::{Bits16, Bits4, ChunkStorage, GeneratedArea, InvalidImage, LayerChange, LayerCodec, LayerType, SuperchunkImage, WidePlane, WritebackRing};
+use crate::chunk_storage::{Bits16, Bits4, ChunkStorage, GeneratedArea, InvalidImage, LayerChange, LayerCodec, LayerType, SuperchunkImage, WidePlane, WritebackRing};
 use utilities::coordinates::{place_from_cartesian, CellCartesian, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 use utilities::rng::RandomSource;
 

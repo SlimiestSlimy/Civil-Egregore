@@ -4,16 +4,20 @@
 //!
 //! `cargo test --test fast`
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use crate::worlds::base;
 use crate::arenas::{cell, walker_header, world, STONE_LAYER};
-use server::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
-use server::chunk_storage::LayerCodec;
+use server::internals_for_root_tests::{BitmapArena, BucketKey, Write, WriteOp};
+use server::internals_for_root_tests::LayerCodec;
 use utilities::coordinates::{SuperchunkIndex};
 use server::simulation::simulation_api::square_around_a_cell::{self, AREA_CENTRE};
 use server::simulation::simulation_api::{cell_and_its_neighbours, entity_reads_and_writes, steps_and_paths};
-use server::entity_manager::NEVER_WAKES;
+use server::internals_for_root_tests::NEVER_WAKES;
 use server::simulation::simulation_api::SimulationTickState;
-use server::simulation::Simulation;
+use server::internals_for_root_tests::Simulation;
 use basegame::libraries::collision::Collision;
 use std::sync::Mutex;
 
@@ -256,7 +260,7 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
             for x in 1..63 {
                 let asked_cell = cell(x, y);
                 let (unwalled_cells, walls) = (steps_and_paths::around_unwalled(tick_state, in_the_way(), &cell_and_its_neighbours::tiles_about_cell(asked_cell)), steps_and_paths::area_walls(tick_state, in_the_way(), asked_cell));
-                let area_centre = server::pathfinding::Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
+                let area_centre = server::internals_for_root_tests::Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
                 for way_checked in (0..cell_and_its_neighbours::WAYS).filter(|&way_filtered| way_filtered != cell_and_its_neighbours::HERE) {
                     let beside_cartesian = cell_and_its_neighbours::cell(asked_cell, way_checked).expect("in the world").cartesian();
                     let (dx, dy) = ((beside_cartesian.x as i64 - x as i64) as i8, (beside_cartesian.y as i64 - y as i64) as i8);

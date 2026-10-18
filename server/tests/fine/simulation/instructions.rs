@@ -7,8 +7,8 @@
 
 use crate::arenas::{cell, walker_header, world};
 use utilities::coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
-use server::entity_manager::{Attribute, AttributeBlock, Header, Member, NEVER_WAKES};
-use server::simulation::{Simulation, SimulationTickState};
+use crate::entity_manager::{Attribute, AttributeBlock, Header, Member, NEVER_WAKES};
+use crate::simulation::{Simulation, SimulationTickState};
 
 /// An attribute.
 const NAME_ATTRIBUTE: Attribute<u64> = Attribute::new(41);
@@ -27,7 +27,7 @@ fn known_number(walker_cell: CellIndex, first_cell: CellIndex) -> u64 {
 fn step_right(tick_state: &mut SimulationTickState) -> usize {
     let current_tick = tick_state.current_tick();
     for entity in tick_state.woken_entities() {
-        server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell.at_cartesian_offset(1, 0).expect("in the world"), current_tick + 1);
+        crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell.at_cartesian_offset(1, 0).expect("in the world"), current_tick + 1);
     }
     0
 }
@@ -100,8 +100,8 @@ fn entities_edit_another_an_attribute_at_a_time() {
     let report = world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         for entity in tick_state.woken_entities() {
             let editor_number = known_number(entity.header.stood_cell, cell(1020, 30));
-            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &edited_header, if editor_number == 1 { MARK_ATTRIBUTE } else { SCAR_ATTRIBUTE }, None, editor_number);
-            server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+            crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &edited_header, if editor_number == 1 { MARK_ATTRIBUTE } else { SCAR_ATTRIBUTE }, None, editor_number);
+            crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
         }
         0
     });
@@ -115,9 +115,9 @@ fn entities_edit_another_an_attribute_at_a_time() {
     entity_store.apply();
     world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         for entity in tick_state.woken_entities() {
-            server::simulation::simulation_api::entity_reads_and_writes::unset_attribute_of(tick_state, &edited_header, MARK_ATTRIBUTE, 1);
-            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &edited_header, NAME_ATTRIBUTE, Some(7), 8);
-            server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+            crate::simulation::simulation_api::entity_reads_and_writes::unset_attribute_of(tick_state, &edited_header, MARK_ATTRIBUTE, 1);
+            crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &edited_header, NAME_ATTRIBUTE, Some(7), 8);
+            crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
         }
         0
     });
@@ -142,8 +142,8 @@ fn of_two_edits_of_one_attribute_one_is_refused_the_same_on_any_threads() {
         entity_store.apply();
         let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
             for entity in tick_state.woken_entities() {
-                server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &edited_header, NAME_ATTRIBUTE, None, known_number(entity.header.stood_cell, cell(1020, 30)));
-                server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+                crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &edited_header, NAME_ATTRIBUTE, None, known_number(entity.header.stood_cell, cell(1020, 30)));
+                crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
             }
             0
         });
@@ -173,11 +173,11 @@ fn an_entity_changing_itself_and_another_writing_it_both_stand() {
             for entity in tick_state.woken_entities() {
                 if entity.header.stood_cell == written_header.stood_cell {
                     // Itself: its name changed, asleep from here on.
-                    server::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, Header { wake: NEVER_WAKES, ..entity.header }, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 8)]);
+                    crate::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, Header { wake: NEVER_WAKES, ..entity.header }, &[AttributeBlock::holding_value(NAME_ATTRIBUTE, 8)]);
                 } else {
-                    server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &written_header, MARK_ATTRIBUTE, None, 1);
-                    server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &written_header, NAME_ATTRIBUTE, Some(7), 99);
-                    server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+                    crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &written_header, MARK_ATTRIBUTE, None, 1);
+                    crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &written_header, NAME_ATTRIBUTE, Some(7), 99);
+                    crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
                 }
             }
             0
@@ -209,10 +209,10 @@ fn a_crossing_written_behind_takes_what_was_written() {
             let current_tick = tick_state.current_tick();
             for entity in tick_state.woken_entities() {
                 if entity.header.stood_cell == crosser_header.stood_cell {
-                    server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, across_cell, current_tick + 1);
+                    crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, across_cell, current_tick + 1);
                 } else {
-                    server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &crosser_header, MARK_ATTRIBUTE, None, 1);
-                    server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+                    crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &crosser_header, MARK_ATTRIBUTE, None, 1);
+                    crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
                 }
             }
             0
@@ -246,13 +246,13 @@ fn two_fields_of_one_attribute_are_written_by_two_in_a_tick() {
         for entity in tick_state.woken_entities() {
             if known_number(entity.header.stood_cell, cell(1020, 30)) == 1 {
                 // The first member, and the one after it seen wrongly.
-                server::simulation::simulation_api::entity_reads_and_writes::set_attribute_member(tick_state, &edited_header, name_attribute_type, low_member, 1, 10);
-                server::simulation::simulation_api::entity_reads_and_writes::set_attribute_member(tick_state, &edited_header, name_attribute_type, middle_member, 9, 70);
+                crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_member(tick_state, &edited_header, name_attribute_type, low_member, 1, 10);
+                crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_member(tick_state, &edited_header, name_attribute_type, middle_member, 9, 70);
             } else {
                 // The last: the two bytes beside the one refused.
-                server::simulation::simulation_api::entity_reads_and_writes::set_attribute_member(tick_state, &edited_header, name_attribute_type, high_member, 3, 30);
+                crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_member(tick_state, &edited_header, name_attribute_type, high_member, 3, 30);
             }
-            server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+            crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
         }
         0
     });

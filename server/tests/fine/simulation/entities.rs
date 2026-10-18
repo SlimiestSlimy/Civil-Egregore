@@ -2,14 +2,14 @@
 //! written only the attributes changed, and the nine cells about it,
 //! the free ones among them, are asked as masks.
 //!
-//! `cargo test --test fine`
+//! `cargo test -p server --lib fine_tests`
 
 use crate::arenas::{cell, walker_header, world, STONE_LAYER};
 use utilities::coordinates::CellIndex;
-use server::entity_manager::{Attribute, AttributeBlock, NEVER_WAKES};
-use server::simulation::simulation_api::cell_and_its_neighbours;
-use server::simulation::simulation_api::{entity_reads_and_writes, SimulationTickState};
-use server::simulation::Simulation;
+use crate::entity_manager::{Attribute, AttributeBlock, NEVER_WAKES};
+use crate::simulation::simulation_api::cell_and_its_neighbours;
+use crate::simulation::simulation_api::{entity_reads_and_writes, SimulationTickState};
+use crate::simulation::Simulation;
 use std::sync::Mutex;
 
 /// An attribute.

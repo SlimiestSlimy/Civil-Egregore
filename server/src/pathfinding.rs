@@ -9,6 +9,8 @@
 
 
 mod a_star;
+// The search in Morton order: no rule walks by it yet, only its tests.
+#[cfg_attr(not(test), allow(dead_code))]
 pub mod morton;
 mod walls;
 
@@ -73,6 +75,7 @@ pub const fn steps_apart(from_cell: Cell, to_cell: Cell) -> u8 {
 /// counted, other than `from_cell` itself: of those equally near, the
 /// `pick_number`-th, round and round -- a random number, so walkers do not all
 /// lean one way. `None` if `goal_rows` holds no other cell.
+#[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
 pub fn nearest_goal(goal_rows: &Rows, from_cell: Cell, pick_number: u64) -> Option<Cell> {
     let (mut least_apart, mut equally_near) = (u8::MAX, 0u64);
     for_each(goal_rows, from_cell, |cell| {
@@ -98,6 +101,7 @@ pub fn nearest_goal(goal_rows: &Rows, from_cell: Cell, pick_number: u64) -> Opti
 }
 
 /// `each_cell` on every cell of `area_rows` but `skipped_cell`, row by row.
+#[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
 fn for_each(area_rows: &Rows, skipped_cell: Cell, mut each_cell: impl FnMut(Cell)) {
     for (y, &row_bits) in area_rows.iter().enumerate() {
         let mut remaining_bits = if y == skipped_cell.y as usize { row_bits & !(1 << skipped_cell.x) } else { row_bits };
@@ -124,6 +128,7 @@ impl Wave {
     }
 
     /// The cells reached so far.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub const fn reached_rows(&self) -> &Rows {
         &self.reached_rows
     }

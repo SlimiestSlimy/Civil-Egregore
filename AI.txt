@@ -194,9 +194,11 @@ NOW
   the remaining decoupling ... client rewrite ... thats the last step,
   because the idea is for types to include a rendering rule so client
   can render stuff as needed"): from local-2026-10-17 -- the flags fix
-  (DONE, 7356950), the registry exporting registry things alone, the
-  server private with one start and its folder tests inside it,
-  worldgen parameters' name. Then COUPLINGS LEFT; then render rules on
+  (DONE, 7356950), the registry exporting registry things alone (DONE,
+  b7e6e08), the server private with its tests inside it (DONE, the
+  commit after b7e6e08: server/tests declared in lib.rs, autotests
+  off; seven root tests moved in; internals_for_root_tests and World's
+  handles TEMPORARY), one start, worldgen parameters' name. Then COUPLINGS LEFT; then render rules on
   types and the client rewrite.
 - NO GAME CONTENT OUTSIDE THE TYPE REGISTRY (the user, 2026-10-17,
   verbatim): "NO GAME CONTENT ON SERVER CLIENT OR PROTOCOL, TYPE
@@ -421,6 +423,12 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- World's own public reads (a cell on a plane, the hot superchunks,
+  each entity); then server::internals_for_root_tests, World's
+  TEMPORARY handles and tests/shared/arenas.rs go, and every root test
+  labelled TEMPORARY is rewritten against them (the user: "Keep them
+  until World has reads"; "make sure all is labeled as temporary in the
+  code lol").
 - A "hot" attribute on entities in place of the one hooked type ("some
   entities will have the "hot", atribute later"); sheep stop being the
   hot entity ("sheep won't be the hot entity for long").

@@ -7,8 +7,8 @@
 use crate::arenas::*;
 use crate::walkers::*;
 use utilities::coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use server::entity_manager::{AttributeBlock, WorldEntities, EntityReader, Header, NEVER_WAKES};
-use server::simulation::{Simulation, SimulationTickState};
+use crate::entity_manager::{AttributeBlock, WorldEntities, EntityReader, Header, NEVER_WAKES};
+use crate::simulation::{Simulation, SimulationTickState};
 use std::sync::Mutex;
 
 /// A turn reads entities in its neighbours, by cell and by chunk, as the
@@ -27,7 +27,7 @@ fn turns_read_entities_across_superchunks() {
             let east_neighbour = entity.header.stood_cell.at_cartesian_offset(1, 0).unwrap();
             let by_cell = tick_state.entity_on(east_neighbour).map(|found_entity| found_entity.header);
             let in_chunk: Vec<_> = tick_state.entities_in(east_neighbour.chunk()).expect("hot").map(|chunk_entity| chunk_entity.header.stood_cell).collect();
-            server::simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &entity.header);
+            crate::simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &entity.header);
             seen_log.lock().unwrap().push((by_cell, in_chunk, tick_state.entity_on(entity.header.stood_cell).is_some()));
         }
         0
@@ -55,7 +55,7 @@ fn entities_wake_in_morton_order() {
             for entity in tick_state.woken_entities() {
                 woken_order.lock().unwrap().push(entity.header.stood_cell);
                 let stepped_cell = entity.header.stood_cell.at_cartesian_offset(1, 1).unwrap();
-                server::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, Header { stood_cell: stepped_cell, wake: tick_state.current_tick() + 1, ..entity.header }, &[]);
+                crate::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, Header { stood_cell: stepped_cell, wake: tick_state.current_tick() + 1, ..entity.header }, &[]);
             }
             0
         });
@@ -83,7 +83,7 @@ fn entities_stay_in_morton_order_as_they_step() {
             for entity in tick_state.woken_entities() {
                 let (dx, dy) = (tick_state.random_stream().draw_below(5) as i32 - 2, tick_state.random_stream().draw_below(5) as i32 - 2);
                 let stepped_header = Header { stood_cell: entity.header.stood_cell.at_cartesian_offset(dx, dy).unwrap(), wake: tick_state.current_tick() + 1, ..entity.header };
-                server::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, stepped_header, entity.attributes);
+                crate::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, stepped_header, entity.attributes);
             }
             0
         });
@@ -114,7 +114,7 @@ fn a_change_to_an_entity_that_moved_on_is_passed_over() {
         for entity in tick_state.woken_entities() {
             for step in [1, 2] {
                 let stepped_header = Header { stood_cell: entity.header.stood_cell.at_cartesian_offset(step, 0).unwrap(), wake: tick_state.current_tick() + 1, ..entity.header };
-                server::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, stepped_header, &[]);
+                crate::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, stepped_header, &[]);
             }
         }
         0
@@ -149,11 +149,11 @@ fn entities_never_overlap() {
             let header = entity.header;
             let (dx, dy) = (tick_state.random_stream().draw_below(3) as i32 - 1, tick_state.random_stream().draw_below(3) as i32 - 1);
             let wake = tick_state.current_tick() + 1 + tick_state.random_stream().draw_below(3);
-            server::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &header, Header { stood_cell: header.stood_cell.at_cartesian_offset(dx, dy).unwrap(), wake, ..header }, entity.attributes);
+            crate::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &header, Header { stood_cell: header.stood_cell.at_cartesian_offset(dx, dy).unwrap(), wake, ..header }, entity.attributes);
             if tick_state.random_stream().draw_below(50) == 0 {
                 let born_cell = header.stood_cell.at_cartesian_offset(tick_state.random_stream().draw_below(5) as i32 - 2, tick_state.random_stream().draw_below(5) as i32 - 2).unwrap();
                 let born_number = 1000 + tick_state.random_stream().next_draw();
-                server::simulation::simulation_api::entity_reads_and_writes::make_entity(tick_state, header.entity_type, born_cell, wake, &[AttributeBlock::holding_value(ENTITY_NUMBER, born_number)]);
+                crate::simulation::simulation_api::entity_reads_and_writes::make_entity(tick_state, header.entity_type, born_cell, wake, &[AttributeBlock::holding_value(ENTITY_NUMBER, born_number)]);
             }
         }
         0

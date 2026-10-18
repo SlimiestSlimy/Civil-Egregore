@@ -28,7 +28,8 @@ pub use utilities::coordinates::{CellArea, CellCartesian, CellIndex, SuperchunkI
 pub use crate::entity_manager::{data_words, Attribute, AttributeBlock, AttributeType, EntityRef, EntityType, Header, Layout, Member, WholeAttribute};
 pub use rule_interface::{on_each_sampled, RuleCode, RuleContext, RuleMaster, RuleRun};
 pub use worldgen_interface::{GenerationNumbers, WorldgenCode};
-pub use crate::simulation::{TickReport, SimulationTickState};
+pub use crate::simulation::simulation_tick_state::SimulationTickState;
+pub use crate::simulation::tick::TickReport;
 pub use utilities::chance::Chance;
 pub use utilities::rng::RandomSource;
 
@@ -43,7 +44,8 @@ use std::ops::{AddAssign, Index, IndexMut};
 // Simulation time: a rule says how long a thing takes in seconds of
 // the simulation, never in ticks, so it is the same rule at any tick
 // rate (`docs/simulation.md`, "Simulation time").
-pub use crate::simulation::simulation_time;
+#[path = "simulation_time.rs"]
+pub mod simulation_time;
 
 /// The most counts a rule keeps.
 pub const COUNTS_OF_A_RULE: usize = 8;

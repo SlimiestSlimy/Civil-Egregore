@@ -5,16 +5,20 @@
 //!
 //! `cargo test`
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use crate::worlds::base;
 use utilities::coordinates::{SuperchunkIndex, WORLD_MIDDLE};
-use server::bitplane_manager::{Write, WriteOp};
-use server::entity_manager::{AttributeBlock, EntityType, Header, NEVER_WAKES};
+use server::internals_for_root_tests::{Write, WriteOp};
+use server::internals_for_root_tests::{AttributeBlock, EntityType, Header, NEVER_WAKES};
 use protocol::pipe::frame::Viewport;
 use server::{halos_about, HaloChange, World, COOL_TICKS, WARM_TICKS};
 
 /// The superchunks holding a hot entity.
 fn hot_entities(world: &World) -> Vec<SuperchunkIndex> {
-    let hot_entity = server::simulation::hot_entity_of(world.frozen_types()).expect("a type keeps the world hot");
+    let hot_entity = server::internals_for_root_tests::hot_entity_of(world.frozen_types()).expect("a type keeps the world hot");
     world.entity_store().superchunks().iter().filter(|superchunk| superchunk.iter().any(|entity| entity.header.entity_type == hot_entity)).map(|superchunk| superchunk.superchunk_index()).collect()
 }
 

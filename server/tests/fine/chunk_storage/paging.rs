@@ -2,7 +2,7 @@
 //! written to a folder of its own and read back the same, and folders
 //! left behind removed.
 
-use server::chunk_storage::{disk, ChunkStorage, ImageStored, LayerChange, LayerCodec, LayerType, SuperchunkImage};
+use crate::chunk_storage::{disk, ChunkStorage, ImageStored, LayerChange, LayerCodec, LayerType, SuperchunkImage};
 use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 use std::path::PathBuf;
 use std::sync::Arc;

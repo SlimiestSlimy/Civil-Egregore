@@ -7,8 +7,8 @@
 #![allow(dead_code)]
 
 use utilities::bitmap::{Bitmap, CellWords, BITS_PER_WORD, WORDS};
-use server::bitplane_manager::{WritesApplied, BitmapArena, Write, WriteOp};
-use server::chunk_storage::{ChunkStorage, LayerChange, LayerCodec, LayerType, SuperchunkImage};
+use crate::bitplane_manager::{WritesApplied, BitmapArena, Write, WriteOp};
+use crate::chunk_storage::{ChunkStorage, LayerChange, LayerCodec, LayerType, SuperchunkImage};
 use utilities::bitmap::morton::morton_index;
 use utilities::coordinates::{CellIndex, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK};
 

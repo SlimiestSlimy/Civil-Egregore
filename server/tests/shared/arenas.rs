@@ -1,15 +1,14 @@
-//! Hot arenas of stone and walkers on them, as actions' tests and the
-//! root's tests share them: in a folder of its own, so no test program
-//! of its own, a module of each that uses it.
+//! Hot arenas of stone and walkers on them, as the server's tests share them
+//! (the root's keep a TEMPORARY copy, `tests/shared/arenas.rs`).
 //! The tiers: `docs/testing_protocol.md`, at the repository's root.
 
 // A tier uses what it needs of it.
 #![allow(dead_code)]
 
-use server::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
-use server::chunk_storage::{LayerCodec, LayerType};
+use crate::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
+use crate::chunk_storage::{LayerCodec, LayerType};
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use server::entity_manager::{WorldEntities, EntityType, Header};
+use crate::entity_manager::{WorldEntities, EntityType, Header};
 
 /// The layer type the arena holds.
 pub const STONE_LAYER: LayerType = LayerType::of_a_bit(6);

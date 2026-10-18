@@ -8,7 +8,8 @@
 
 use crate::simulation::raw_compares_and_writes::{entity as entity_writes, write as raw_writes};
 pub use crate::simulation::raw_compares_and_writes::compare::{attribute, attribute_blocks, attribute_member, cell_free, entity, layer_holds, layer_lacks, value, with_writes};
-pub use crate::simulation::{Compare, Write};
+pub use crate::simulation::simulation_tick_state::conditional::Compare;
+pub use crate::simulation::simulation_tick_state::one_instruction::Write;
 use crate::simulation::SimulationTickState;
 use crate::chunk_storage::LayerType;
 use utilities::coordinates::CellIndex;
