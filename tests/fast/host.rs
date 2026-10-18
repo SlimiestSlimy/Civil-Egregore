@@ -119,50 +119,51 @@ fn the_terrain_asked_for_is_what_the_frames_bring() {
     assert!(terrain.heights(HeightsAsk { world: remade_frame.world, first_cell_cartesian: (0, 0), size_in_cells: (1, 1), skipped_corners_cartesian: Vec::new() }).is_some());
 }
 
-/// A frame brings the clouds over each superchunk as the world holds
-/// them: every tile's cloud read off the frame by the tile's place,
-/// the tiles and their clouds drawn from the seed; and none where a
-/// superchunk has no cloud.
+/// A frame brings a plane of tiles as the world holds it: every
+/// tile's number read off the frame by the tile's place, the tiles and
+/// their numbers drawn from the seed; and nothing of a superchunk
+/// none was written to.
 #[test]
-fn a_frame_brings_the_clouds_a_tile_at_a_time() {
+fn a_frame_brings_a_plane_of_tiles_a_tile_at_a_time() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     use server::bitplane_manager::Write;
     use utilities::coordinates::{place_from_cartesian, CellCartesian, SUPERCHUNK_SIDE_CELLS};
-    use basegame::base_types::plane_words::{cloud_over, CLOUD_TILE_SHIFT};
-        let folder = crate::worlds::folder("clouds");
+    let folder = crate::worlds::folder("tiles_in_frames");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
-    let mut world = crate::worlds::start_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, generation_numbers: crate::worlds::flocked(0), ..WorldStart::default() });
-    // Clouds over one of the four superchunks alone.
-    let clouded_superchunk = world.bitmap_arena().superchunk_indices()[test_random.draw_below(4) as usize];
-    let clouded_corner_cartesian = clouded_superchunk.top_left().cartesian();
-    let mut clouds = std::collections::BTreeMap::new();
+    let (frozen_types, test_tiles) = crate::worlds::with_test_tiles();
+    let tile_shift = test_tiles.layer_type().tile_shift();
+    let mut world = server::start_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, generation_numbers: crate::worlds::flocked(0), ..WorldStart::default() }, &frozen_types);
+    // Numbers on one of the four superchunks alone.
+    let written_superchunk = world.bitmap_arena().superchunk_indices()[test_random.draw_below(4) as usize];
+    let written_corner_cartesian = written_superchunk.top_left().cartesian();
+    let mut numbers = std::collections::BTreeMap::new();
     for _ in 0..test_random.draw_between(50, 200) {
         let cell = (test_random.draw_below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32, test_random.draw_below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32);
         // The tile's place among the superchunk's, in Morton order: its cell's, less the cells of a tile.
-        let tile = place_from_cartesian(cell.0, cell.1) >> CLOUD_TILE_SHIFT;
-        clouds.entry(tile).or_insert((cell, 1 + test_random.draw_below(u64::from(base().cloud.most_value())) as u32));
+        let tile = place_from_cartesian(cell.0, cell.1) >> tile_shift;
+        numbers.entry(tile).or_insert((cell, 1 + test_random.draw_below(u64::from(test_tiles.most_value())) as u32));
     }
-    let writes: Vec<Write> = clouds.values().map(|&((x, y), cloud)| Write::value(base().cloud, CellCartesian { x: clouded_corner_cartesian.x + x, y: clouded_corner_cartesian.y + y }.into(), cloud)).collect();
-    assert_eq!(world.write_cells(base().cloud.layer_type(), writes).cells_changed, clouds.len() as u64);
+    let writes: Vec<Write> = numbers.values().map(|&((x, y), number)| Write::value(test_tiles, CellCartesian { x: written_corner_cartesian.x + x, y: written_corner_cartesian.y + y }.into(), number)).collect();
+    assert_eq!(world.write_cells(test_tiles.layer_type(), writes).cells_changed, numbers.len() as u64);
     server::save(&folder, &mut world).expect("saved");
 
-    let (host, frame_receiver) = Host::start_on_thread(basegame::default_types::register_types);
+    let (host, frame_receiver) = Host::start_on_thread(crate::worlds::types_with_test_tiles);
     assert!(host.set_paused(true) && host.open_world(folder.to_string_lossy().into_owned()));
     let middle_coordinate = utilities::coordinates::WORLD_SIDE_SUPERCHUNKS / 2;
     let viewport = protocol::pipe::frame::Viewport { top_left_superchunk_cartesian: (middle_coordinate - 2, middle_coordinate - 2), bottom_right_superchunk_cartesian: (middle_coordinate + 2, middle_coordinate + 2) };
     // Asked for a bounded number of times: a frame without the four superchunks is the world not opened yet.
     let four_superchunk_frame = (0..200).find_map(|_| {
-        assert!(host.ask_frame(FrameAsk { viewport: Some(viewport), pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: u32::MAX, seen_near: None, planes: vec![base().cloud.layer_type()], counted: Vec::new() }), "the host is there");
+        assert!(host.ask_frame(FrameAsk { viewport: Some(viewport), pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: u32::MAX, seen_near: None, planes: vec![test_tiles.layer_type()], counted: Vec::new() }), "the host is there");
         Some(next_frame(&frame_receiver)).filter(|answered_frame| answered_frame.cells.len() == 4)
     });
     for cells in &four_superchunk_frame.expect("a frame with the world's four superchunks").cells {
-        if cells.top_left != (clouded_corner_cartesian.x, clouded_corner_cartesian.y) {
-            assert!(cells.plane(base().cloud.layer_type()).is_empty(), "no cloud sent of a superchunk with none");
+        if cells.top_left != (written_corner_cartesian.x, written_corner_cartesian.y) {
+            assert!(cells.plane(test_tiles.layer_type()).is_empty(), "nothing sent of a superchunk with none");
             continue;
         }
-        let tiles = (SUPERCHUNK_SIDE_CELLS as usize * SUPERCHUNK_SIDE_CELLS as usize) >> CLOUD_TILE_SHIFT;
+        let tiles = (SUPERCHUNK_SIDE_CELLS as usize * SUPERCHUNK_SIDE_CELLS as usize) >> tile_shift;
         for tile in 0..tiles {
-            assert_eq!(cloud_over(cells.plane(base().cloud.layer_type()), tile), clouds.get(&tile).map_or(0, |&(_, cloud)| cloud), "the tile {tile}");
+            assert_eq!(protocol::pipe::frame::value_at(cells.plane(test_tiles.layer_type()), test_tiles.layer_type().width_bits(), tile), numbers.get(&tile).map_or(0, |&(_, number)| number), "the tile {tile}");
         }
     }
 }

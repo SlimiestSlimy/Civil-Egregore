@@ -5,7 +5,6 @@
 //! The design, and the keys: `docs/renderer.md`; function by function:
 //! `docs/reference.md`.
 
-mod climate_labels;
 mod frames;
 mod ground;
 mod hud;
@@ -43,7 +42,7 @@ fn window() -> App {
 /// not yet run.
 fn window_on(host_link: link::HostLink) -> App {
     // Only over a world: a world shown, steered and asked for.
-    let world = (view::toggle_fullscreen, link::pause_and_pace_by_keys, view::steer_view, overlays::toggle, overlays::lay_boundaries, overlays::label_corners, overlays::heights, climate_labels::climates, frames::show_frames, frames::ask_next_frame, map::show_map).chain().run_if(resource_equals(ShownScreen::World));
+    let world = (view::toggle_fullscreen, link::pause_and_pace_by_keys, view::steer_view, overlays::toggle, overlays::lay_boundaries, overlays::label_corners, overlays::heights, frames::show_frames, frames::ask_next_frame, map::show_map).chain().run_if(resource_equals(ShownScreen::World));
     let mut window_app = App::new();
     window_app.add_plugins(
             DefaultPlugins
@@ -62,7 +61,7 @@ fn window_on(host_link: link::HostLink) -> App {
         .init_resource::<link::LastFrameSeen>()
         .init_resource::<view::SuperchunkSprites>()
         .init_resource::<overlays::OverlaysShown>()
-        .add_systems(Startup, (view::spawn_camera, frames::spawn_near_view, map::spawn_map_view, overlays::spawn_overlays, climate_labels::spawn_climate_labels, hud::spawn_hud))
+        .add_systems(Startup, (view::spawn_camera, frames::spawn_near_view, map::spawn_map_view, overlays::spawn_overlays, hud::spawn_hud))
         .add_systems(Update, (link::tell_host_of_menus, link::send_shading, link::remake_on_generation_change, world, hud::write_hud).chain().after(gui::MenusWorked));
     window_app
 }

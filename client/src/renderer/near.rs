@@ -5,8 +5,7 @@
 
 use crate::renderer::ground::relief::{laid_over, tint_on_sand, water_light, FOAM_COLOUR, FOAM_MOST, PALE_COLOUR, SAND_COLOUR, SAND_MOST};
 use crate::renderer::ground::{shadow_drop, FineGround, SuperchunkGround, KEPT_MARGIN_CELLS, SUPERCHUNK_CELLS_A_SIDE};
-use crate::renderer::paint::{depth_at, each_cloud, in_rain, stage_at, streak_of_rain_on, tree_colour, under_cloud, under_water};
-use basegame::base_types::plane_words::DEEPEST_CLOUD;
+use crate::renderer::paint::{depth_at, stage_at, tree_colour, under_water};
 use basegame::base_types::{BaseTypes, OLDEST_TREE_STAGE};
 use protocol::pipe::frame::{bit_set, Cells, NearRectangle, WORD_BITS};
 use basegame::base_types::DEEP_WATER_DEPTH;
@@ -123,19 +122,6 @@ pub fn paint_near(base_types: &BaseTypes, cells: &[Cells], kept_grounds: &HashMa
                 paint_sheep(&mut rgba_pixels, width, ((x - first_cell_cartesian.0) * pixels_a_cell, (y - first_cell_cartesian.1) * pixels_a_cell), pixels_a_cell);
             }
         }
-        // The clouds' shadows over all of it: each tile's, over those of its cells that are in the picture.
-        each_cloud(base_types, cells, |(tile_left, tile_top), tile_side, cloud, is_raining| {
-            let (tile_across, tile_down) = (picture_columns.start.max(superchunk_left_column + tile_left)..picture_columns.end.min(superchunk_left_column + tile_left + tile_side), picture_rows.start.max(superchunk_top_row + tile_top)..picture_rows.end.min(superchunk_top_row + tile_top + tile_side));
-            let pixel_rows = (tile_down.start - first_cell_cartesian.1) * pixels_a_cell..(tile_down.end.max(tile_down.start) - first_cell_cartesian.1) * pixels_a_cell;
-            let pixel_columns = (tile_across.start - first_cell_cartesian.0) * pixels_a_cell..(tile_across.end.max(tile_across.start) - first_cell_cartesian.0) * pixels_a_cell;
-            for (pixel_row, pixel_column) in pixel_rows.flat_map(|flat_row| pixel_columns.clone().map(move |flat_column| (flat_row, flat_column))) {
-                let pixel_number = pixel_row * width + pixel_column;
-                let clouded_colour = under_cloud([rgba_pixels[pixel_number][0], rgba_pixels[pixel_number][1], rgba_pixels[pixel_number][2]], cloud as usize, DEEPEST_CLOUD as usize);
-                // Rain under a cloud deep enough: a streak on some of its cells, each cell's pixels alike.
-                let rained_colour = if is_raining && streak_of_rain_on(first_cell_cartesian.0 + pixel_column / pixels_a_cell, first_cell_cartesian.1 + pixel_row / pixels_a_cell) { in_rain(clouded_colour, 1, 1) } else { clouded_colour };
-                rgba_pixels[pixel_number] = [rained_colour[0], rained_colour[1], rained_colour[2], u8::MAX];
-            }
-        });
     }
     PaintedNear { near_asked, rgba_bytes: rgba_pixels.into_flattened() }
 }

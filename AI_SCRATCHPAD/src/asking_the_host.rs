@@ -20,7 +20,7 @@ use crate::ProbeParameters;
 /// a cell a pixel: what a probe asks, so a frame costs what a window's does.
 pub fn drawn_planes() -> Vec<LayerType> {
     let base_types = base_types().1;
-    vec![base_types.grass, base_types.tree, base_types.wet, base_types.cloud.layer_type(), base_types.climate.layer_type()]
+    vec![base_types.grass, base_types.tree, base_types.wet]
 }
 
 /// The layers a window counts over the world.

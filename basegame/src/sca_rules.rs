@@ -7,6 +7,4 @@
 
 
 pub mod grass;
-pub mod growing;
 pub mod trees;
-pub mod weather;

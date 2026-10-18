@@ -6,7 +6,6 @@
 //!
 //! `cargo test`
 
-use crate::worlds::base;
 use crate::worlds::{world_contents, folder};
 use server::chunk_storage::disk::{self, DiskError};
 use utilities::coordinates::CellCartesian;
@@ -172,12 +171,12 @@ fn a_world_is_loaded_with_the_types_it_was_made_with() {
         change(&mut changed_lines);
         changed_lines.join("\n") + "\n"
     };
-    // A type left out of the save: registered all the same, given an ID past every saved one.
-    std::fs::write(&types_path, with_lines(&|changed_lines| _ = changed_lines.remove(line_of("elevation")))).expect("written");
+    // A type the save does not name -- as in a world saved before the game added it: registered all the same, given an ID past every saved one.
+    std::fs::write(&types_path, with_lines(&|changed_lines| _ = changed_lines.remove(line_of("water depth")))).expect("written");
     let loaded_world = server::load_world(&folder, basegame::default_types::register_types).expect("loaded without it");
-    let elevation = loaded_world.frozen_types().types().iter().find(|registered| registered.name() == "elevation").expect("registered");
-    let saved_numbers_end = world.frozen_types().types().iter().filter(|registered| registered.name() != "elevation").map(|registered| registered.numbers().end).max().expect("types");
-    assert!(elevation.numbers().start >= saved_numbers_end && loaded_world.frozen_types().types().len() == lines.len() - 1);
+    let water_depth = loaded_world.frozen_types().types().iter().find(|registered| registered.name() == "water depth").expect("registered");
+    let saved_numbers_end = world.frozen_types().types().iter().filter(|registered| registered.name() != "water depth").map(|registered| registered.numbers().end).max().expect("types");
+    assert!(water_depth.numbers().start >= saved_numbers_end && loaded_world.frozen_types().types().len() == lines.len() - 1);
     // A type drawn, renamed, of an ID sharing a number with another, or said twice. The order types are saved in is nothing to them.
     let mut seeded_rng = utilities::rng::RandomSource::new(seed);
     let drawn = 1 + seeded_rng.draw_below(lines.len() as u64 - 1) as usize;
@@ -242,57 +241,45 @@ fn sheep_never_step_through_a_wall() {
     assert!(steps_moved > 50 && beside_walls > 10_000, "{steps_moved} steps, {beside_walls} sheep-ticks beside a wall");
 }
 
-/// The weather's planes -- the clouds and the climate, a number a tile
-/// 8 by 8 cells -- hold what is written to them: read at any cell of
-/// the tile, both through a save and a
-/// load of what the weather made of them meanwhile. Tiles, numbers and the
-/// cells they are read at drawn from the seed.
+/// A plane of tiles -- a number a tile 8 by 8 cells -- holds what is
+/// written to it, read at any cell of the tile, through ticks, a save
+/// and a load; a tile nothing was written to holds 0. Tiles, numbers
+/// and the cells they are read at drawn from the seed.
 #[test]
-fn the_weathers_planes_hold_a_number_a_tile_through_ticks_and_a_save() {
+fn a_plane_of_tiles_holds_a_number_a_tile_through_ticks_and_a_save() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     use server::bitplane_manager::Write;
-    use basegame::base_types::WEATHER_TILE_SCALE;
-    let folder = folder("weather");
+    let folder = folder("tiles");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, world_size: server::WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, generation_numbers: crate::worlds::flocked(50), ..server::WorldStart::default() });
+    let (frozen_types, test_tiles) = crate::worlds::with_test_tiles();
+    let mut world = server::start_world(server::WorldStart { seed, world_size: server::WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, generation_numbers: crate::worlds::flocked(50), ..server::WorldStart::default() }, &frozen_types);
     let (corner_cartesian, side_cells) = (world.bitmap_arena().superchunk_indices()[0].top_left().cartesian(), 2 * utilities::coordinates::SUPERCHUNK_SIDE_CELLS);
     // A cell of the tile `(x, y)` -- in tiles from the world's corner -- drawn anew each time.
-    let tile_side = 1 << WEATHER_TILE_SCALE;
+    let tile_side = test_tiles.layer_type().tile_side();
     let cell_of = |(x, y): (u32, u32), cell_random: &mut utilities::rng::RandomSource| -> utilities::coordinates::CellIndex {
         CellCartesian { x: corner_cartesian.x + x * tile_side + cell_random.draw_below(u64::from(tile_side)) as u32, y: corner_cartesian.y + y * tile_side + cell_random.draw_below(u64::from(tile_side)) as u32 }.into()
     };
     let mut tiles = std::collections::BTreeMap::new();
     for _ in 0..test_random.draw_between(200, 400) {
         let tile = (test_random.draw_below(u64::from(side_cells / tile_side)) as u32, test_random.draw_below(u64::from(side_cells / tile_side)) as u32);
-        tiles.insert(tile, (1 + test_random.draw_below(u64::from(base().cloud.most_value())) as u32, 1 + test_random.draw_below(u64::from(base().climate.most_value())) as u32));
+        tiles.insert(tile, 1 + test_random.draw_below(u64::from(test_tiles.most_value())) as u32);
     }
-    let clouds: Vec<Write> = tiles.iter().map(|(&tile, &(cloud, _))| Write::value(base().cloud, cell_of(tile, &mut test_random), cloud)).collect();
-    let climates: Vec<Write> = tiles.iter().map(|(&tile, &(_, climate))| Write::value(base().climate, cell_of(tile, &mut test_random), climate)).collect();
-    assert_eq!(world.write_cells(base().cloud.layer_type(), clouds).cells_changed, tiles.len() as u64, "a cloud written a tile");
-    assert_eq!(world.write_cells(base().climate.layer_type(), climates).cells_changed, tiles.len() as u64, "a climate written a tile");
-    // Both are what was written until the weather is ticked, which moves the clouds and the air.
-    let check_held = |world: &server::World, when_text: &str, clouds_too: bool, held_random: &mut utilities::rng::RandomSource| {
-        for (&tile, &(cloud, climate)) in tiles.iter().filter(|_| clouds_too) {
-            assert_eq!(world.bitmap_arena().value(base().climate, cell_of(tile, held_random)), Ok(climate), "the climate of the tile {tile:?}, {when_text}");
-            assert_eq!(world.bitmap_arena().value(base().cloud, cell_of(tile, held_random)), Ok(cloud), "the cloud over the tile {tile:?}, {when_text}");
+    let writes: Vec<Write> = tiles.iter().map(|(&tile, &number)| Write::value(test_tiles, cell_of(tile, &mut test_random), number)).collect();
+    assert_eq!(world.write_cells(test_tiles.layer_type(), writes).cells_changed, tiles.len() as u64, "a number written a tile");
+    let check_held = |world: &server::World, when_text: &str, held_random: &mut utilities::rng::RandomSource| {
+        for (&tile, &number) in &tiles {
+            assert_eq!(world.bitmap_arena().value(test_tiles, cell_of(tile, held_random)), Ok(number), "the tile {tile:?}, {when_text}");
         }
-        // A tile no cloud was written to has none.
         let bare_tile = (0..).map(|_| (held_random.draw_below(u64::from(side_cells / tile_side)) as u32, held_random.draw_below(u64::from(side_cells / tile_side)) as u32)).find(|tile| !tiles.contains_key(tile)).expect("a tile not written");
-        if clouds_too {
-            assert_eq!(world.bitmap_arena().value(base().cloud, cell_of(bare_tile, held_random)), Ok(0), "a bare tile, {when_text}");
-        }
+        assert_eq!(world.bitmap_arena().value(test_tiles, cell_of(bare_tile, held_random)), Ok(0), "a bare tile, {when_text}");
     };
-    check_held(&world, "as written", true, &mut test_random);
-    // Every cloud and every climate as it is over each tile, read at a cell of it drawn anew.
-    let clouds = |world: &server::World, clouds_random: &mut utilities::rng::RandomSource| -> Vec<(u32, u32)> { (0..side_cells / tile_side).flat_map(|y| (0..side_cells / tile_side).map(move |x| (x, y))).map(|tile| (world.bitmap_arena().value(base().cloud, cell_of(tile, clouds_random)).expect("hot"), world.bitmap_arena().value(base().climate, cell_of(tile, clouds_random)).expect("hot"))).collect() };
+    check_held(&world, "as written", &mut test_random);
     for _ in 0..test_random.draw_between(20, 60) {
         world.tick();
     }
-    check_held(&world, "after ticks", false, &mut test_random);
-    let ticked_weather = clouds(&world, &mut test_random);
+    check_held(&world, "after ticks", &mut test_random);
     server::save(&folder, &mut world).expect("saved");
-    let loaded_world = server::load_world(&folder, basegame::default_types::register_types).expect("loaded");
-    check_held(&loaded_world, "loaded from a save", false, &mut test_random);
-    assert_eq!(clouds(&loaded_world, &mut test_random), ticked_weather, "the clouds and the climate loaded as saved");
+    let loaded_world = server::load_world(&folder, crate::worlds::types_with_test_tiles).expect("loaded");
+    check_held(&loaded_world, "loaded from a save", &mut test_random);
     assert!(world_contents(&world) == world_contents(&loaded_world), "loaded as saved");
 }

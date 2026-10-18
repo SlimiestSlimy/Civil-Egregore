@@ -180,6 +180,24 @@ Boundaries, asked first, would have put that on the table.
 == TO DO ==
 
 NOW
+- CLIMATE REMOVED (the user, 2026-10-18: "remove anything related to
+  climate system, thats going to be redone from scratch ... make grass
+  propagate by itself like old times in the mean time"): DONE. Gone:
+  the climate, cloud and elevation planes, the weather rule, worldgen's
+  climate noises, growing.rs, the client's clouds, rain and climate
+  labels (K), the weather tests. Grass as before 867a64e: spreads onto
+  dry dirt, decays where a drawn neighbour is grass. Trees die of age
+  alone, spread wherever free and dry. Tile planes keep their tests on
+  a tests-only plane (tests/shared/worlds.rs TEST_TILES).
+- MERGE ORDER (the user, 2026-10-18: "take the local branch and merge
+  the old changes that are better than upstream. then go ahead with
+  the remaining decoupling ... client rewrite ... thats the last step,
+  because the idea is for types to include a rendering rule so client
+  can render stuff as needed"): from local-2026-10-17 -- the flags fix
+  (DONE, 7356950), the registry exporting registry things alone, the
+  server private with one start and its folder tests inside it,
+  worldgen parameters' name. Then COUPLINGS LEFT; then render rules on
+  types and the client rewrite.
 - NO GAME CONTENT OUTSIDE THE TYPE REGISTRY (the user, 2026-10-17,
   verbatim): "NO GAME CONTENT ON SERVER CLIENT OR PROTOCOL, TYPE
   REGISTRY IS FOR THAT / SERVER IS FOR SIMULATION RUNNING, CLIENT IS
@@ -401,12 +419,6 @@ OPEN, FOUND BY ME
 - Morton pathfinding: server/src/pathfinding/morton.rs, used by nothing,
   tested equal to the rows' search; left: one-way walls for it, wire
   into walking, measure both, the best wins.
-- Climate-dependent tests fail on some seeds (weather's
-  a_wind_carries_its_climate_down_it ignored): "climate will be
-  reworked later so for now that can be ignored".
-  grass_grows_in_every_superchunk (failing ~4 of 60 seeds) deleted
-  2026-10-17: "grass grow will fail, delete that test. climate is
-  broken".
 
 LATER (every "for later" of the user's, and mine, as said)
 - A "hot" attribute on entities in place of the one hooked type ("some

@@ -1,7 +1,7 @@
 //! A type is registered once by its name, after what it names, and the
 //! types frozen find each again -- tried on the base game's types.
 
-use basegame::base_types::{BaseTypes, GRASS_RULE, SHEEP_RULE, TREES_RULE, WEATHER_RULE, SheepState};
+use basegame::base_types::{BaseTypes, GRASS_RULE, SHEEP_RULE, TREES_RULE, SheepState};
 use protocol::type_registry::{data_words, AttributeType, EntityType, FrozenTypes, LayerType, Layout, RegisteredType, Registration, RegistryRefusal, TypeRegistry, TYPE_ID_NUMBERS};
 use utilities::rng::RandomSource;
 
@@ -78,7 +78,7 @@ fn what_a_type_names_is_registered_before_it() {
         (Registration::entity("defaulting", Some("fixed")), default_amiss.clone()),
         (Registration::entity("defaulting", Some("grass")), default_amiss),
         (Registration::sca_rule("a rule", "grass"), Ok(())),
-        (Registration::sca_rule("a rule", "climate"), Ok(())),
+        (Registration::sca_rule("a rule", "tree stage"), Ok(())),
         (Registration::sca_rule("a rule", "unheard of"), master_amiss.clone()),
         (Registration::sca_rule("a rule", "sheep"), master_amiss.clone()),
         (Registration::entity_rule("a rule", "sheep"), Ok(())),
@@ -142,11 +142,11 @@ fn the_frozen_types_find_each_type_again() {
     }
     let layer_types = frozen_types.layer_types();
     assert_eq!(layer_types.len(), frozen_types.types().iter().filter(|registered_type| matches!(registered_type, RegisteredType::Layer { .. } | RegisteredType::WidePlane { .. })).count());
-    assert!(layer_types.contains(&base_types.grass) && layer_types.contains(&base_types.tree_stage.layer_type()) && layer_types.contains(&base_types.climate.layer_type()));
+    assert!(layer_types.contains(&base_types.grass) && layer_types.contains(&base_types.tree_stage.layer_type()));
     assert_eq!(told_by(frozen_types.entity(base_types.sheep)), Some("sheep"));
     assert_eq!(frozen_types.default_attributes(), [(base_types.sheep, base_types.sheep_state.attribute_type(), SheepState::WORDS)]);
-    assert_eq!(frozen_types.rules().map(RegisteredType::name).collect::<Vec<_>>(), [GRASS_RULE, TREES_RULE, SHEEP_RULE, WEATHER_RULE]);
-    for (rule_name, master_name) in [(GRASS_RULE, "grass"), (TREES_RULE, "tree"), (SHEEP_RULE, "sheep"), (WEATHER_RULE, "climate")] {
+    assert_eq!(frozen_types.rules().map(RegisteredType::name).collect::<Vec<_>>(), [GRASS_RULE, TREES_RULE, SHEEP_RULE]);
+    for (rule_name, master_name) in [(GRASS_RULE, "grass"), (TREES_RULE, "tree"), (SHEEP_RULE, "sheep")] {
         let rule = named(&frozen_types, rule_name).expect("registered");
         let master = frozen_types.master_of(rule).expect("its master registered");
         assert_eq!(master.name(), master_name);

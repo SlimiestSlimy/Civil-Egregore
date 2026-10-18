@@ -117,7 +117,8 @@ mod sampling {
     }
 
     /// Samples fall on chunks in proportion to their set cells: a chunk
-    /// full and one a sixteenth full get them sixteen to one.
+    /// full and one a sixteenth full get them sixteen to one -- each
+    /// within five standard deviations of its share.
     #[test]
     fn chunks_are_weighted_by_their_counts() {
         let seed = crate::test_seed::TestSeedHandle::open().seed();
@@ -126,8 +127,10 @@ mod sampling {
         let bitmap_arena = arena_with(&[full_chunk, sparse_chunk], &writes);
         let cells = sampled_cells(&bitmap_arena, Chance::one_in(20), seed);
         let in_sparse = cells.iter().filter(|&&cell| CellIndex::from(cell).chunk() == sparse_chunk).count() as f64;
-        let full_to_sparse_ratio = (cells.len() as f64 - in_sparse) / in_sparse;
-        assert!((14.0..18.5).contains(&full_to_sparse_ratio), "{full_to_sparse_ratio:.2} to one");
+        let in_full = cells.len() as f64 - in_sparse;
+        // Each chunk's samples: its set cells at one in 20, binomial.
+        let within_five_deviations = |sampled: f64, set_cells: f64| (sampled - set_cells / 20.0).abs() < 5.0 * (set_cells / 20.0 * 0.95).sqrt();
+        assert!(within_five_deviations(in_full, 65_536.0) && within_five_deviations(in_sparse, 4_096.0), "{in_full} in the full chunk, {in_sparse} in the sparse: {:.2} to one", in_full / in_sparse);
     }
 
     /// Only hot bitmaps are sampled: an evicted chunk's cells are not.

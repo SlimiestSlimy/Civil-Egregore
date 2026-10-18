@@ -25,6 +25,5 @@ mod sheep;
 mod tick;
 mod trees;
 mod walking;
-mod weather;
 mod world;
 mod world_hash;

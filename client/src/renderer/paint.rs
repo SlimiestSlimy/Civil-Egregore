@@ -7,9 +7,9 @@ use crate::renderer::near::{paint_near, PaintedNear};
 use utilities::coordinates::{cartesian_from_place, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
 use protocol::pipe::terrain::AsksTerrain;
 use crate::server_end::Shown;
-use basegame::base_types::plane_words::{cloud_over, raining_tiles_of, CLOUD_BITS, CLOUD_TILE_SHIFT, DEEPEST_CLOUD, STAGE_BITS};
+use basegame::base_types::plane_words::STAGE_BITS;
 use basegame::base_types::{BaseTypes, DEEP_WATER_DEPTH, OLDEST_TREE_STAGE};
-use protocol::pipe::frame::{bit_set, cell_of_bit, value_at, Cells, ViewportFrame, CHUNK_WORDS, WORD_BITS};
+use protocol::pipe::frame::{cell_of_bit, value_at, Cells, ViewportFrame, CHUNK_WORDS, WORD_BITS};
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
@@ -53,10 +53,6 @@ pub struct PaintedFrame {
     pub superchunks: Vec<PaintedSuperchunk>,
     /// The viewport's cells, if they are seen from near.
     pub painted_near: Option<PaintedNear>,
-    /// Each of the frame's superchunks' climates, by where it is in
-    /// the world: kept of the cells, for the climate written on its
-    /// tiles (`climate_labels`).
-    pub climates: Vec<((u32, u32), Vec<u64>)>,
 }
 
 /// Superchunks whose fine ground is kept, at most: 8 MiB each.
@@ -143,9 +139,8 @@ pub fn start_painter(shown: Receiver<Shown>, tunings: Receiver<Tuning>, terrain:
                     })
                     .collect();
                 let painted_near = host_frame.seen_near.map(|near_asked| paint_near(&base_types, &host_frame.cells, &kept_grounds, near_asked, &tuning));
-                let climates = host_frame.cells.iter_mut().map(|cells| (cells.superchunk_cartesian, cells.take_plane(base_types.climate.layer_type()))).collect();
                 host_frame.cells = Vec::new();
-                let painted_picture = PaintedFrame { host_frame, base_types, paint_seconds: paint_started.elapsed().as_secs_f64(), superchunks, painted_near, climates };
+                let painted_picture = PaintedFrame { host_frame, base_types, paint_seconds: paint_started.elapsed().as_secs_f64(), superchunks, painted_near };
                 if picture_sender.send(painted_picture).is_err() {
                     return;
                 }
@@ -208,56 +203,6 @@ pub fn stage_at(base_types: &BaseTypes, cells: &Cells, word: usize, bit_in_word:
     cells.plane(base_types.tree_stage.layer_type()).get(stage_bit / WORD_BITS).map_or(0, |&word| (word >> (stage_bit % WORD_BITS)) as u32 & ((1 << STAGE_BITS) - 1))
 }
 
-/// What a cloud's shadow darkens towards: dark, and a little blue.
-const CLOUD_SHADOW: [u8; 3] = [18, 22, 40];
-/// How much of what is under it the deepest cloud's shadow leaves: a
-/// half -- the ground is still read under it.
-const SEEN_UNDER_DEEPEST_CLOUD: usize = 2;
-
-/// `seen_colour` in the shadow of `cloud` of `whole_cloud`: none at 0, the
-/// deepest at `whole_cloud` -- [`DEEPEST_CLOUD`], or as many times it as
-/// the clouds added up.
-pub fn under_cloud(seen_colour: [u8; 3], cloud: usize, whole_cloud: usize) -> [u8; 3] {
-    mixed_colour(seen_colour, CLOUD_SHADOW, cloud, SEEN_UNDER_DEEPEST_CLOUD * whole_cloud)
-}
-
-/// What rain is drawn in: a pale blue.
-const RAIN: [u8; 3] = [150, 176, 226];
-/// Of this many cells under a raining cloud, one has a streak of rain
-/// drawn on it.
-pub const CELLS_A_STREAK_OF_RAIN: usize = 5;
-
-/// Whether the cell `(x, y)` -- counted from anywhere, the same for
-/// every tile -- has a streak of rain drawn on it under a raining
-/// cloud: one in [`CELLS_A_STREAK_OF_RAIN`], in slanted lines.
-pub fn streak_of_rain_on(x: usize, y: usize) -> bool {
-    (2 * x + y).is_multiple_of(CELLS_A_STREAK_OF_RAIN)
-}
-
-/// `seen_colour` with `rain` of `whole_rain` of it rain: a streak, whole, half
-/// seen through.
-pub fn in_rain(seen_colour: [u8; 3], rain: usize, whole_rain: usize) -> [u8; 3] {
-    mixed_colour(seen_colour, RAIN, rain, 2 * whole_rain)
-}
-
-/// Every tile of `cells` with a cloud over it: where its top left
-/// cell is from the superchunk's, `(x, y)`, how many cells it is a
-/// side, its cloud, and whether it is raining, as its climate there
-/// says -- the tiles those of the cloud plane, its tile size the type
-/// registry's.
-pub fn each_cloud(base_types: &BaseTypes, cells: &Cells, mut on_cloud_tile: impl FnMut((usize, usize), usize, u32, bool)) {
-    let (tiles_a_chunk, tile_side_cells) = (CELLS_IN_CHUNK >> CLOUD_TILE_SHIFT, 1usize << (CLOUD_TILE_SHIFT / 2));
-    let clouds = cells.plane(base_types.cloud.layer_type());
-    if clouds.is_empty() {
-        return;
-    }
-    let raining_tiles = raining_tiles_of(clouds, cells.plane(base_types.climate.layer_type()));
-    for tile in (0..clouds.len() * WORD_BITS / CLOUD_BITS).filter(|&tile| cloud_over(clouds, tile) != 0) {
-        let ((chunk_left_column, chunk_top_row), (x, y)) = (chunk_top_left(tile / tiles_a_chunk), cell_of_bit((tile % tiles_a_chunk) << CLOUD_TILE_SHIFT));
-        on_cloud_tile((chunk_left_column + x as usize, chunk_top_row + y as usize), tile_side_cells, cloud_over(clouds, tile), bit_set(&raining_tiles, tile));
-    }
-}
-
 /// `rgb_colour`, opaque.
 const fn opaque_rgba(rgb_colour: [u8; 3]) -> [u8; 4] {
     [rgb_colour[0], rgb_colour[1], rgb_colour[2], u8::MAX]
@@ -315,14 +260,6 @@ fn paint_superchunk(base_types: &BaseTypes, cells: &Cells, superchunk_ground: &S
             }
         }
     }
-    // The clouds' shadows over all of it, the sheep too.
-    each_cloud(base_types, cells, |(cloud_left, cloud_top), cloud_side, cloud, is_raining| {
-        for cloud_pixel in (cloud_top..cloud_top + cloud_side).flat_map(|y| (cloud_left..cloud_left + cloud_side).map(move |x| y * SUPERCHUNK_SIDE_PIXELS + x)) {
-            let cloud_shaded = under_cloud([rgba_pixels[cloud_pixel][0], rgba_pixels[cloud_pixel][1], rgba_pixels[cloud_pixel][2]], cloud as usize, DEEPEST_CLOUD as usize);
-            // Rain under a cloud deep enough: a streak on some of its cells.
-            rgba_pixels[cloud_pixel] = opaque_rgba(if is_raining && streak_of_rain_on(cloud_pixel % SUPERCHUNK_SIDE_PIXELS, cloud_pixel / SUPERCHUNK_SIDE_PIXELS) { in_rain(cloud_shaded, 1, 1) } else { cloud_shaded });
-        }
-    });
     PaintedSuperchunk { superchunk_cartesian: cells.superchunk_cartesian, side_pixels: SUPERCHUNK_SIDE_PIXELS as u32, rgba_bytes: rgba_pixels.into_flattened() }
 }
 
@@ -371,19 +308,6 @@ fn paint_far(base_types: &BaseTypes, cells: &Cells, detail_shift: u32, superchun
         let sheep_pixel = (y as usize >> detail_shift) * side_pixels + (x as usize >> detail_shift);
         sheep_counts[sheep_pixel] = sheep_counts[sheep_pixel].saturating_add(1);
     }
-    // The cloud over each pixel's cells, added up: a tile's cloud once for every cell of it under the pixel.
-    let mut clouds = vec![0usize; if cells.plane(base_types.cloud.layer_type()).is_empty() { 0 } else { side_pixels * side_pixels }];
-    // And the cells of each pixel that are under a raining cloud.
-    let mut rain = clouds.clone();
-    each_cloud(base_types, cells, |(cloud_left, cloud_top), tile_side, cloud, is_raining| {
-        let (pixels_a_side, cells_each) = ((tile_side >> detail_shift).max(1), tile_side.min(1 << detail_shift));
-        for cloud_pixel in ((cloud_top >> detail_shift)..(cloud_top >> detail_shift) + pixels_a_side).flat_map(|y| ((cloud_left >> detail_shift)..(cloud_left >> detail_shift) + pixels_a_side).map(move |x| y * side_pixels + x)) {
-            clouds[cloud_pixel] += cloud as usize * cells_each * cells_each;
-            if is_raining {
-                rain[cloud_pixel] += cells_each * cells_each;
-            }
-        }
-    });
     let sheep_cells = (2 * SHEEP_REACH + 1) * (2 * SHEEP_REACH + 1);
     let mut rgba_bytes = Vec::with_capacity(side_pixels * side_pixels * 4);
     for (pixel_number, &light_shade) in superchunk_ground.shades_by_detail[(detail_shift as usize).min(COARSEST_DETAIL)].iter().enumerate() {
@@ -392,8 +316,7 @@ fn paint_far(base_types: &BaseTypes, cells: &Cells, detail_shift: u32, superchun
         // The water over the ground, by the share of the tile under it, shallow water a quarter seen through; and all of it in the ground's light.
         let wet_lit_colour = lit_colour(mixed_colour(dry_colour, WATER, (3 * wet_counts[pixel_number] as usize + deep_counts[pixel_number] as usize) / 4, tile_cells), light_shade);
         let sheep_mixed_colour = mixed_colour(wet_lit_colour, SHEEP_WHITE, sheep_on_pixel as usize * sheep_cells, tile_cells);
-        // Under the clouds' shadow, and the rain's streaks as thin as they are among the cells.
-        rgba_bytes.extend_from_slice(&opaque_rgba(clouds.get(pixel_number).map_or(sheep_mixed_colour, |&cloud| in_rain(under_cloud(sheep_mixed_colour, cloud, DEEPEST_CLOUD as usize * tile_cells), rain[pixel_number], CELLS_A_STREAK_OF_RAIN * tile_cells))));
+        rgba_bytes.extend_from_slice(&opaque_rgba(sheep_mixed_colour));
     }
     PaintedSuperchunk { superchunk_cartesian: cells.superchunk_cartesian, side_pixels: side_pixels as u32, rgba_bytes }
 }
