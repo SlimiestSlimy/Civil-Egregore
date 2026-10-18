@@ -12,6 +12,7 @@ use server::host::Host;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration;
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_LOADS, SEED, SIDE, WORLDGEN};
 use utilities::tuning::Tuning;
 use utilities::wire::{receive, send};
 use crate::ProbeParameters;
@@ -26,6 +27,22 @@ pub fn drawn_planes() -> Vec<LayerType> {
 /// The layers a window counts over the world.
 pub fn counted() -> [LayerType; 2] {
     [base_types().1.grass, base_types().1.tree]
+}
+
+/// A new world's parameters as `tuning` has it, of `seed` if given:
+/// side, camera and the generation's numbers -- what the server makes of
+/// a window's sliders, never forced hot here.
+fn parameters_of_tuning(seed: Option<u64>, tuning: &Tuning) -> CleanServerParameters {
+    let numbers = (basegame::worldgen::world_generation::code(base_types().1).numbers_of_tuning)(tuning);
+    let worldgen = numbers.into_iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name, ParameterValue::Hex(value)));
+    let mut parameters = CleanServerParameters::default().with(WORLDGEN, ParameterValue::Nested(worldgen)).with(SIDE, ParameterValue::Integer(tuning[utilities::tuning::WORLD_SIDE].round().max(0.0) as i64));
+    if tuning[utilities::tuning::CAMERA_LOADS] >= 0.5 {
+        parameters.insert(CAMERA_LOADS, ParameterValue::Nested(CleanServerParameters::default()));
+    }
+    match seed {
+        Some(given_seed) => parameters.with(SEED, ParameterValue::Hex(given_seed)),
+        None => parameters,
+    }
 }
 
 /// The base game's types of a new world, frozen once, and their IDs: a
@@ -86,7 +103,7 @@ impl ProbedServer {
         match (self, message) {
             (Self::InProcess(host), ClientMessage::AskFrame(frame_ask)) => host.ask_frame(frame_ask),
             (Self::InProcess(host), ClientMessage::SetPace(pace)) => host.set_pace(pace),
-            (Self::InProcess(host), ClientMessage::MakeWorld(seed, tuning)) => host.make_world(server::WorldStart::from_tuning(seed, &tuning, &basegame::worldgen::world_generation::code(base_types().1)), base_types().0.clone()),
+            (Self::InProcess(host), ClientMessage::MakeWorld(seed, tuning)) => host.make_world(parameters_of_tuning(seed, &tuning), base_types().0.clone()),
             (Self::InProcess(_), _) => false,
             (Self::OverPipe(_, to_server), mut message) => send(&mut message, to_server).is_ok(),
         }

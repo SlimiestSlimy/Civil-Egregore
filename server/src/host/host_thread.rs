@@ -1,7 +1,7 @@
 //! The host's own thread: the world run, requests read between its
 //! ticks, frames answered.
 
-use crate::{WorldStart, World};
+use crate::World;
 use super::{CATCH_UP, FRAMES_SHARE, HostRequest, HostSent, TARGET_PACE};
 use super::frame::{copy_superchunk, frame_of, hot_in};
 use protocol::pipe::frame::{Cells, FrameAsk, ViewportFrame};
@@ -10,24 +10,16 @@ use std::thread;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::time::{Duration, Instant};
 use std::sync::Arc;
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, WORLD};
 use protocol::type_registry::FrozenTypes;
 use protocol::world_types::GameTypes;
 use utilities::tuning::Tuning;
 
 /// The world run, and what goes with running it.
 struct RunningWorld {
-    /// The world.
+    /// The world: what it is made again from when reset, its seed,
+    /// size and camera as it started.
     world: World,
-    /// What it started from, as far as is known: what it is made again
-    /// from when reset.
-    world_start: WorldStart,
-}
-
-impl RunningWorld {
-    /// `world`, started from `world_start`, starting to run.
-    fn from_start(world_start: WorldStart, world: World) -> Self {
-        Self { world, world_start }
-    }
 }
 
 /// An ask being answered: what was asked, and what is yet to copy --
@@ -108,17 +100,19 @@ impl HostThread {
                     }
                     Ok(HostRequest::SetPaused(pause_asked)) => (self.ticking_paused, self.next_tick) = (pause_asked, Instant::now()),
                     Ok(HostRequest::SetPace(pace_asked)) => (self.pace_held_to, self.next_tick) = (pace_asked, Instant::now()),
-                    Ok(HostRequest::MakeWorld(world_start, frozen_types)) => {
-                        self.last_outcome = Some(format!("a world made from seed {}", utilities::seed::seed_as_hex(world_start.seed)));
+                    Ok(HostRequest::MakeWorld(parameters, frozen_types)) => {
                         (self.world_name, self.reset) = (None, None);
-                        self.run_world(world_start, &frozen_types);
+                        self.last_outcome = Some(match self.run_world(&parameters, &frozen_types) {
+                            Ok(seed) => format!("a world made from seed {}", utilities::seed::seed_as_hex(seed)),
+                            Err(why_not) => format!("no world made: {why_not}"),
+                        });
                     }
-                    Ok(HostRequest::OpenWorld(world_to_open)) => match crate::load_world(&utilities::settings::world(&world_to_open), self.game_types) {
+                    Ok(HostRequest::OpenWorld(world_to_open)) => match self.open_world(&world_to_open) {
                         Ok(opened_world) => {
                             (self.last_outcome, self.world_name, self.reset) = (Some(format!("{world_to_open} opened")), Some(world_to_open), None);
-                            self.run_in_place(RunningWorld::from_start(WorldStart::of_world(&opened_world.world_info), opened_world));
+                            self.run_in_place(RunningWorld { world: opened_world });
                         }
-                        Err(load_error) => self.last_outcome = Some(format!("{world_to_open} not opened: {load_error}")),
+                        Err(why_not) => self.last_outcome = Some(format!("{world_to_open} not opened: {why_not}")),
                     },
                     Ok(HostRequest::Save(name_to_save)) => {
                         self.reset_now();
@@ -149,12 +143,23 @@ impl HostThread {
         }
     }
 
-    /// Makes a world as `world_start` says, of `frozen_types`, and runs it in
-    /// place of any run: that one dropped first, not to hold both.
-    fn run_world(&mut self, world_start: WorldStart, frozen_types: &Arc<FrozenTypes>) {
+    /// Makes a world as `parameters` say, of `frozen_types`, and runs it
+    /// in place of any run: that one dropped first, not to hold both. Its
+    /// seed; or why not, nothing run.
+    fn run_world(&mut self, parameters: &CleanServerParameters, frozen_types: &Arc<FrozenTypes>) -> Result<u64, String> {
         self.running_world = None;
-        let world = crate::start_world(world_start.clone(), frozen_types);
-        self.run_in_place(RunningWorld::from_start(world_start, world));
+        let world = crate::start_world(parameters, frozen_types).map_err(|why_not| why_not.to_string())?;
+        let seed = world.world_info.seed;
+        self.run_in_place(RunningWorld { world });
+        Ok(seed)
+    }
+
+    /// The world named `world_to_open` in the worlds' folder, started of its
+    /// own types -- frozen first, as its types file says -- the world run
+    /// left running if it cannot be.
+    fn open_world(&self, world_to_open: &str) -> Result<World, String> {
+        let frozen_types = Arc::new(crate::read_types(&utilities::settings::world(world_to_open), self.game_types).map_err(|read_error| read_error.to_string())?);
+        crate::start_world(&CleanServerParameters::default().with(WORLD, ParameterValue::Text(world_to_open.to_string())), &frozen_types).map_err(|why_not| why_not.to_string())
     }
 
     /// Runs `running_world` in place of any run, from its world's own tick.
@@ -178,9 +183,13 @@ impl HostThread {
             return;
         };
         // Remade of its own types: its IDs stay.
-        let (world_start, frozen_types) = (WorldStart { generation_numbers: (running_world.world.worldgen.numbers_of_tuning)(&reset_tuning), ..running_world.world_start.clone() }, Arc::clone(&running_world.world.frozen_types));
-        (self.last_outcome, self.world_name) = (Some(format!("the world remade from seed {}, as the sliders have it", utilities::seed::seed_as_hex(world_start.seed))), None);
-        self.run_world(world_start, &frozen_types);
+        let world = &running_world.world;
+        let (parameters, frozen_types) = (crate::world_start::parameters_of_world(&world.world_info, &(world.worldgen.numbers_of_tuning)(&reset_tuning)), Arc::clone(&world.frozen_types));
+        self.world_name = None;
+        self.last_outcome = Some(match self.run_world(&parameters, &frozen_types) {
+            Ok(seed) => format!("the world remade from seed {}, as the sliders have it", utilities::seed::seed_as_hex(seed)),
+            Err(why_not) => format!("the world not remade: {why_not}"),
+        });
     }
 
     /// Saves the world run under `world_name`, if one runs.

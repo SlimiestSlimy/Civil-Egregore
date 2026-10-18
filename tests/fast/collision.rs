@@ -10,10 +10,11 @@
 // and the world's handles to them -- until the world has reads of its
 // own and this is rewritten against them (AI.txt, LATER).
 
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, SEED};
 use crate::worlds::base;
 use crate::worlds::{tag_of, tag_sheep, tick_rule, tick_sheep};
 use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
-use server::{WorldStart, World};
+use server::World;
 use std::collections::HashMap;
 
 /// Whether the collision plane holds exactly the cells trees and
@@ -46,7 +47,7 @@ fn what_stands_and_no_other(world: &World) -> (bool, u64) {
 #[test]
 fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let mut world = crate::worlds::one_flock_world(WorldStart { seed, ..WorldStart::default() }, 4_000);
+    let mut world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
     let (collision_matches, trees) = what_stands_and_no_other(&world);
     assert!(collision_matches && trees > 0, "as generated: {trees} trees");
     assert!(world.entity_store().iter().all(|put_sheep| world.bitmap_arena().layer_holds_cell(base().tree, put_sheep.header.stood_cell) == Ok(false)), "a sheep put on a tree");

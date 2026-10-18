@@ -9,9 +9,9 @@ use host_thread::HostThread;
 mod frame;
 pub mod terrain;
 
-use crate::WorldStart;
 use utilities::tuning::Tuning;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
+use protocol::server_parameters::CleanServerParameters;
 use protocol::type_registry::FrozenTypes;
 use protocol::world_types::GameTypes;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -55,9 +55,10 @@ enum HostRequest {
     SetPaused(bool),
     /// Tick so many times a second, or flat out.
     SetPace(Option<u32>),
-    /// Make a world as this says, of these types -- frozen for it, before
-    /// anything of it -- and run it in place of any run.
-    MakeWorld(WorldStart, Arc<FrozenTypes>),
+    /// Make a world as these parameters say, of this frozen type
+    /// registry -- frozen for it, before anything of it -- and run it in
+    /// place of any run.
+    MakeWorld(CleanServerParameters, Arc<FrozenTypes>),
     /// Run the world of this name in the worlds' folder in place of any
     /// run: hot in its halos, as it was saved. Refused, the world run
     /// goes on (the next frame's [`Frame::said`]).
@@ -115,10 +116,11 @@ impl Host {
         self.request_sender.send(HostRequest::SetPace(pace_held_to)).is_ok()
     }
 
-    /// Makes a world as `world_start` says, of `frozen_types` -- the new
-    /// world's, frozen first -- and runs it in place of any run.
-    pub fn make_world(&self, world_start: WorldStart, frozen_types: Arc<FrozenTypes>) -> bool {
-        self.request_sender.send(HostRequest::MakeWorld(world_start, frozen_types)).is_ok()
+    /// Makes a world as `parameters` say, of `frozen_type_registry` -- the
+    /// new world's, frozen first -- and runs it in place of any run
+    /// ([`crate::start_world`]).
+    pub fn make_world(&self, parameters: CleanServerParameters, frozen_type_registry: Arc<FrozenTypes>) -> bool {
+        self.request_sender.send(HostRequest::MakeWorld(parameters, frozen_type_registry)).is_ok()
     }
 
     /// Runs the world named `world_name` in the worlds' folder in place of

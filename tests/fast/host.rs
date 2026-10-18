@@ -4,10 +4,10 @@
 // and the world's handles to them -- until the world has reads of its
 // own and this is rewritten against them (AI.txt, LATER).
 
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SEED, SIDE, WORLDGEN};
 use crate::worlds::base;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use server::host::{Host, HostSent};
-use server::{WorldSize, WorldStart};
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use utilities::tuning::{default_tuning, OCEAN_FLOOR};
@@ -47,10 +47,10 @@ fn a_reset_makes_the_world_again_as_retuned() {
     let (host, frame_receiver) = Host::start_on_thread(basegame::default_types::register_types);
     // Paused, what a frame says is what the start made.
     assert!(host.set_paused(true));
-    let world_start = WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: false }, generation_numbers: crate::worlds::flocked(3), ..WorldStart::default() };
+    let world_start = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(3)));
     assert!(host.make_world(world_start.clone(), crate::worlds::types()));
     let made_frame = frame_that(&host, &frame_receiver, |_| true);
-    assert_eq!((made_frame.seed, made_frame.generation_numbers.clone(), made_frame.entity_count, made_frame.tick), (world_start.seed, crate::worlds::flocked(3), 0, 0), "the sheep made the first tick");
+    assert_eq!((made_frame.seed, made_frame.generation_numbers.clone(), made_frame.entity_count, made_frame.tick), (seed, crate::worlds::flocked(3), 0, 0), "the sheep made the first tick");
     let mut tuning = default_tuning();
     tuning[OCEAN_FLOOR] += 64.0;
     let retuned_generation = WorldGeneration::from_tuning(&tuning);
@@ -58,7 +58,7 @@ fn a_reset_makes_the_world_again_as_retuned() {
     assert!(host.reset(&tuning));
     let reset = frame_that(&host, &frame_receiver, |answered_frame| answered_frame.generation_numbers == retuned_generation.numbers());
     assert!(reset.world > made_frame.world, "another world");
-    assert_eq!((reset.seed, reset.entity_count, reset.tick, reset.world_name), (world_start.seed, 0, 0, None));
+    assert_eq!((reset.seed, reset.entity_count, reset.tick, reset.world_name), (seed, 0, 0, None));
 }
 
 /// The terrain a client asks of the host is the world's: every height
@@ -75,7 +75,7 @@ fn the_terrain_asked_for_is_what_the_frames_bring() {
     let (host, frame_receiver) = Host::start_on_thread(basegame::default_types::register_types);
     let terrain = host.terrain();
     assert!(host.set_paused(true));
-    assert!(host.make_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, generation_numbers: crate::worlds::flocked(0), ..WorldStart::default() }, crate::worlds::types()));
+    assert!(host.make_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(0))), crate::worlds::types()));
     let middle_coordinate = WORLD_SIDE_SUPERCHUNKS / 2;
     let viewport = Viewport { top_left_superchunk_cartesian: (middle_coordinate - 2, middle_coordinate - 2), bottom_right_superchunk_cartesian: (middle_coordinate + 2, middle_coordinate + 2) };
     let full_frame = loop {
@@ -117,7 +117,7 @@ fn the_terrain_asked_for_is_what_the_frames_bring() {
     }
     let corner_map = terrain.map(MapAsk { world: full_frame.world, first_cell_cartesian: (-1, -1), step: 1, size_in_pixels: (2, 2), mesh_lines_asked: false }).expect("the world run");
     assert_eq!(corner_map.cells.iter().map(Option::is_some).collect::<Vec<_>>(), [false, false, false, true], "only the world's first cell is in it");
-    assert!(host.make_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, generation_numbers: crate::worlds::flocked(0), ..WorldStart::default() }, crate::worlds::types()));
+    assert!(host.make_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(0))), crate::worlds::types()));
     let remade_frame = frame_that(&host, &frame_receiver, |candidate_frame| candidate_frame.world > full_frame.world);
     assert!(terrain.map(MapAsk { world: full_frame.world, first_cell_cartesian: (0, 0), step: 1, size_in_pixels: (1, 1), mesh_lines_asked: false }).is_none(), "the world before, run no more");
     assert!(terrain.heights(HeightsAsk { world: remade_frame.world, first_cell_cartesian: (0, 0), size_in_cells: (1, 1), skipped_corners_cartesian: Vec::new() }).is_some());
@@ -136,7 +136,7 @@ fn a_frame_brings_a_plane_of_tiles_a_tile_at_a_time() {
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
     let (frozen_types, test_tiles) = crate::worlds::with_test_tiles();
     let tile_shift = test_tiles.layer_type().tile_shift();
-    let mut world = server::start_world(WorldStart { seed, world_size: WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, generation_numbers: crate::worlds::flocked(0), ..WorldStart::default() }, &frozen_types);
+    let mut world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(0))), &frozen_types).expect("the world started");
     // Numbers on one of the four superchunks alone.
     let written_superchunk = world.bitmap_arena().superchunk_indices()[test_random.draw_below(4) as usize];
     let written_corner_cartesian = written_superchunk.top_left().cartesian();

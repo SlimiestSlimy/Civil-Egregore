@@ -7,6 +7,7 @@
 // and the world's handles to them -- until the world has reads of its
 // own and this is rewritten against them (AI.txt, LATER).
 
+use protocol::server_parameters::{ParameterValue, SEED};
 use crate::worlds::base;
 use crate::worlds::{first_superchunk, plain_start, tick_rule};
 use server::internals_for_root_tests::{Write, WriteOp};
@@ -55,7 +56,7 @@ fn stages(world: &World) -> Vec<(CellIndex, u32)> {
 #[test]
 fn trees_grow_a_stage_at_a_time_spread_and_die_of_age() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 2) });
+    let mut world = server::start_world(&plain_start(1, 0, 0, 2).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     let mut seeded_random = RandomSource::new(seed);
     let planted_cells: Vec<CellIndex> = cells(&world).filter(|_| seeded_random.draw_below(16) == 0).collect();
     plant_trees(&mut world, &planted_cells, || if seeded_random.draw_below(2) == 0 { OLDEST_TREE_STAGE } else { seeded_random.draw_below(u64::from(OLDEST_TREE_STAGE) + 1) as u32 });
@@ -104,7 +105,7 @@ fn trees_grow_a_stage_at_a_time_spread_and_die_of_age() {
 #[test]
 fn crowded_trees_never_spread() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 2) });
+    let mut world = server::start_world(&plain_start(1, 0, 0, 2).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     let every_cell: Vec<CellIndex> = cells(&world).collect();
     plant_trees(&mut world, &every_cell, || OLDEST_TREE_STAGE);
     let (mut sampled_total, mut died_total) = (0, 0);
@@ -123,7 +124,7 @@ fn crowded_trees_never_spread() {
 fn young_trees_spread_and_none_dies() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut seeded_random = RandomSource::new(seed);
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 2) });
+    let mut world = server::start_world(&plain_start(1, 0, 0, 2).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     let planted_cells: Vec<CellIndex> = cells(&world).filter(|_| seeded_random.draw_below(16) == 0).collect();
     plant_trees(&mut world, &planted_cells, || SEEDS_FROM);
     // Too few ticks for a tree to grow from there to the oldest stage.

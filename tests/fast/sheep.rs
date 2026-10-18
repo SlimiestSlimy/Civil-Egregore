@@ -9,6 +9,7 @@
 // and the world's handles to them -- until the world has reads of its
 // own and this is rewritten against them (AI.txt, LATER).
 
+use protocol::server_parameters::{ParameterValue, SEED};
 use crate::worlds::base;
 use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, add_entity, tick_sheep};
 use utilities::coordinates::CellCartesian;
@@ -57,7 +58,7 @@ fn well_formed(sheep_entity: EntityRef) {
 #[test]
 fn sheep_without_grass_starve() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(1, 0, 500, 1) });
+    let mut world = server::start_world(&plain_start(1, 0, 500, 1).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     let (mut eaten_total, mut deaths_total) = (0, 0);
     for _ in 0..TIME_BETWEEN_MEALS.ticks() + TIME_TO_STARVE.ticks() + 2 * (STEP.ticks() + STEP_JITTER.ticks()) {
         let tick_counts = tick_sheep(&mut world).rules;
@@ -72,7 +73,7 @@ fn sheep_without_grass_starve() {
 #[test]
 fn sheep_eat_breed_and_grow_up() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(4, 18_750, 400, 2) });
+    let mut world = server::start_world(&plain_start(4, 18_750, 400, 2).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     let (mut eaten_total, mut births_total, mut lost, mut lambs_seen, mut pregnant_seen) = (0, 0, 0, false, false);
     // A gestation and six meals' time: the lambs conceived over those meals born, whatever either lasts.
     for tick in 0..GESTATION_TIME.ticks() + 6 * TIME_BETWEEN_MEALS.ticks() {
@@ -99,7 +100,7 @@ fn sheep_eat_breed_and_grow_up() {
 #[test]
 fn hungry_sheep_walk_to_the_nearest_grass() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 1) });
+    let mut world = server::start_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     let superchunk = first_superchunk(&world);
     let corner_cartesian = superchunk.top_left().cartesian();
     let (sheep_cartesian, grass_cartesian) = (CellCartesian { x: corner_cartesian.x + 500, y: corner_cartesian.y + 500 }, CellCartesian { x: corner_cartesian.x + 506, y: corner_cartesian.y + 493 });
@@ -128,7 +129,7 @@ fn hungry_sheep_walk_to_the_nearest_grass() {
 #[test]
 fn hungry_sheep_walk_to_grass_far_off() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(4, 0, 0, 2) });
+    let mut world = server::start_world(&plain_start(4, 0, 0, 2).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     // The square's top left superchunk: the first, row by row.
     let corner_cartesian = first_superchunk(&world).top_left().cartesian();
     let (sheep_cartesian, grass_cartesian) = (CellCartesian { x: corner_cartesian.x + 900, y: corner_cartesian.y + 700 }, CellCartesian { x: corner_cartesian.x + 1050, y: corner_cartesian.y + 800 });
@@ -161,7 +162,7 @@ fn hungry_sheep_walk_to_grass_far_off() {
 #[test]
 fn sheep_on_thin_pasture_roam_away() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(16, 0, 0, 1) });
+    let mut world = server::start_world(&plain_start(16, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     let start_cells: Vec<CellCartesian> = world.bitmap_arena().superchunk_indices().into_iter().map(|superchunk| superchunk.top_left().cartesian()).map(|corner_cartesian| CellCartesian { x: corner_cartesian.x + 500, y: corner_cartesian.y + 500 }).collect();
     for &start_cell in &start_cells {
         plant_grass(&mut world, start_cell, 1, 1);
@@ -199,7 +200,7 @@ fn sheep_on_thin_pasture_roam_away() {
 fn any_number_of_threads_ticks_sheep_the_same() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let run_with_threads = |thread_count| {
-        let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(4, 12_500, 300, thread_count) });
+        let mut world = server::start_world(&plain_start(4, 12_500, 300, thread_count).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
         let reports: Vec<_> = (0..1500).map(|_| tick_sheep(&mut world)).map(|report| (report.rules, report.instructions_applied)).collect();
         let sheep_list: Vec<_> = world.entity_store().iter().map(|sheep_entity| (sheep_entity.header, sheep_entity.attributes.to_vec())).collect();
         (reports, sheep_list, cells_of_grass(&world))
@@ -215,7 +216,7 @@ fn any_number_of_threads_ticks_sheep_the_same() {
 #[test]
 fn sheep_never_overlap() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(4, 18_750, 60_000, 4) });
+    let mut world = server::start_world(&plain_start(4, 18_750, 60_000, 4).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     world.tick();
     assert_eq!(world.entity_store().len(), 240_000, "each on a cell of its own from the first tick");
     with_lambs_due(&mut world, seed, 16, 2_000);

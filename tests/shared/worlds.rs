@@ -16,8 +16,9 @@ use basegame::worldgen::WorldGeneration;
 use basegame::base_types::BaseTypes;
 use protocol::type_registry::{FrozenTypes, TypeRegistry};
 use server::simulation::simulation_api::{Bits4, WidePlane};
-use server::{World, WorldSize, WorldStart};
-use std::path::PathBuf;
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SIDE, THREADS, WORLD, WORLDGEN};
+use server::World;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 /// The base game's types of a new world, registered and frozen once for
@@ -69,9 +70,31 @@ pub fn type_id_named(type_name: &str) -> u64 {
     types().types().iter().find(|registered_type| registered_type.name() == type_name).unwrap_or_else(|| panic!("no type named {type_name}")).type_id()
 }
 
-/// A world started as `world_start` says, of the base game's types.
-pub fn start_world(world_start: WorldStart) -> World {
-    server::start_world(world_start, &types())
+/// Worldgen parameters, each by its name, as [`WORLDGEN`] holds them.
+pub fn worldgen(generation_numbers: Vec<(String, u64)>) -> ParameterValue {
+    ParameterValue::Nested(generation_numbers.into_iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name, ParameterValue::Hex(value))))
+}
+
+/// A parameter given with nothing of its own -- forced hot, the camera
+/// loading -- as a flag `[]` gives one.
+pub fn given() -> ParameterValue {
+    ParameterValue::Nested(CleanServerParameters::default())
+}
+
+/// The parameters of the world saved in `folder` ([`WORLD`]).
+pub fn world_at(folder: &Path) -> CleanServerParameters {
+    CleanServerParameters::default().with(WORLD, ParameterValue::Text(folder.display().to_string()))
+}
+
+/// The world saved in `folder`, started again -- its types `game_types`
+/// frozen first as its types file says -- or what of the save is not
+/// read.
+pub fn opened(folder: &Path, game_types: protocol::world_types::GameTypes) -> Result<World, server::DiskError> {
+    let frozen_types = Arc::new(server::read_types(folder, game_types)?);
+    server::start_world(&world_at(folder), &frozen_types).map_err(|why_not| match why_not {
+        server::WorldNotStarted::Unreadable(disk_error) => disk_error,
+        server::WorldNotStarted::Refused(why_refused) => panic!("refused: {why_refused}"),
+    })
 }
 
 /// The first seed from `first_seed_tried` on whose world, generated as
@@ -108,9 +131,9 @@ pub fn world_contents(world: &World) -> WorldContents {
 /// `grass_cover` of [`basegame::worldgen::FRACTION_ONE`] of its cells and
 /// `sheep_per_flock` sheep on each superchunk -- made the first tick --, on
 /// `thread_count` threads.
-pub fn plain_start(superchunks: u32, grass_cover: u64, sheep_per_flock: usize, thread_count: usize) -> WorldStart {
+pub fn plain_start(superchunks: u32, grass_cover: u64, sheep_per_flock: usize, thread_count: usize) -> CleanServerParameters {
     let generation_numbers = WorldGeneration { sheep_per_superchunk: sheep_per_flock as u64, ..WorldGeneration::plain(grass_cover) }.numbers();
-    WorldStart { generation_numbers, world_size: WorldSize::SquareOfSide { side_superchunks: utilities::coordinates::square_side(superchunks), forced_hot: true }, thread_count: Some(thread_count), ..WorldStart::default() }
+    CleanServerParameters::default().with(WORLDGEN, worldgen(generation_numbers)).with(SIDE, ParameterValue::Integer(i64::from(utilities::coordinates::square_side(superchunks)))).with(FORCED_HOT, given()).with(THREADS, ParameterValue::Integer(thread_count as i64))
 }
 
 /// The numbers of the default generation, with `sheep` sheep on each
@@ -119,13 +142,13 @@ pub fn flocked(sheep: usize) -> Vec<(String, u64)> {
     WorldGeneration { sheep_per_superchunk: sheep as u64, ..WorldGeneration::DEFAULT }.numbers()
 }
 
-/// A world started as `world_start` says, with no end and one flock of
+/// A world started as `parameters` say -- given no side, with no end -- and one flock of
 /// `sheep` at its origin, the flock's halo hot: what a halo test follows.
 /// Its generation gives no sheep -- a flock on every superchunk
 /// generated would grow a world with no end for good -- so the one
 /// flock is put between ticks ([`put_flock`]).
-pub fn one_flock_world(world_start: WorldStart, sheep: usize) -> World {
-    let mut world = start_world(WorldStart { world_size: WorldSize::NoEnd, generation_numbers: flocked(0), ..world_start });
+pub fn one_flock_world(parameters: CleanServerParameters, sheep: usize) -> World {
+    let mut world = server::start_world(&parameters.with(WORLDGEN, worldgen(flocked(0))), &types()).expect("the world started");
     put_flock(&mut world, utilities::coordinates::WORLD_MIDDLE, sheep);
     world.keep_hot(&server::halos_about([utilities::coordinates::WORLD_MIDDLE].into_iter()));
     world

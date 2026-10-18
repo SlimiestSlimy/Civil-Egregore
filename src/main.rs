@@ -8,8 +8,7 @@
 //!
 //! No arguments, built with the client: the window, on its main menu ([`client::run_window`]).
 //! `cargo run --release -- --help`: every flag, and what it takes.
-//! `cargo run --release -- --seed 0x5 --new [folder --side 4 --forced_hot []]`
-//! `cargo run --release -- --run [folder --ticks 2000]`
+//! `cargo run --release -- --pipe`: a server for the window that started it.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
