@@ -11,6 +11,7 @@ use server::entity_manager::{set_attribute, Attribute, AttributeBlock, EntityRef
 use basegame::worldgen::WorldGeneration;
 use basegame::base_types::BaseTypes;
 use protocol::type_registry::{FrozenTypes, TypeRegistry};
+use server::simulation::simulation_api::{Bits4, WidePlane};
 use server::{World, WorldSize, WorldStart};
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
@@ -47,14 +48,14 @@ pub const TEST_TILES: &str = "test tiles";
 /// as initialization hands one the server.
 pub fn types_with_test_tiles(type_registry: &mut TypeRegistry) -> Result<(), String> {
     basegame::default_types::register_types(type_registry)?;
-    type_registry.register(protocol::type_registry::Registration::wide_plane_of_tiles::<protocol::type_registry::Bits4>(TEST_TILES, 3)).map(drop).map_err(|refusal| format!("{TEST_TILES}: {refusal:?}"))
+    type_registry.register(WidePlane::<Bits4>::registration_of_tiles(TEST_TILES, 3)).map(drop).map_err(|refusal| format!("{TEST_TILES}: {refusal:?}"))
 }
 
 /// The types of [`types_with_test_tiles`], frozen for a new world, and
 /// the plane of tiles among them.
-pub fn with_test_tiles() -> (Arc<FrozenTypes>, protocol::type_registry::WidePlane<protocol::type_registry::Bits4>) {
+pub fn with_test_tiles() -> (Arc<FrozenTypes>, WidePlane<Bits4>) {
     let frozen_types = protocol::world_types::of_a_new_world(types_with_test_tiles).expect("the tests' types");
-    let test_tiles = frozen_types.types().iter().find(|registered| registered.name() == TEST_TILES).and_then(protocol::type_registry::RegisteredType::wide_plane).expect("four bits a tile");
+    let test_tiles = frozen_types.types().iter().find(|registered| registered.name() == TEST_TILES).and_then(WidePlane::registered).expect("four bits a tile");
     (Arc::new(frozen_types), test_tiles)
 }
 

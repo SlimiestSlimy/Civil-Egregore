@@ -19,7 +19,8 @@ mod writeback_ring;
 
 pub use paging::{read_back, ImageStored};
 pub use layer_codec::{BucketKey, LayerCodec};
-pub use protocol::type_registry::{Bits16, Bits2, Bits32, Bits4, Bits8, LayerType, WidePlane, Width};
+pub use protocol::type_registry::LayerType;
+pub use crate::bitplane_manager::{Bits16, Bits2, Bits32, Bits4, Bits8, WidePlane, Width};
 pub use generated_area::GeneratedArea;
 pub use superchunk_image::{InvalidImage, LayerChange, SuperchunkImage};
 pub use writeback_ring::{RingEntry, WritebackRing};

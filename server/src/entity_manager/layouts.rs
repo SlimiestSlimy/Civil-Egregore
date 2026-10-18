@@ -2,7 +2,7 @@
 //! and the attribute's constant typed by it ([`Attribute`])
 //! (`docs/type_registry.md`, "Layouts").
 
-use super::type_ids::AttributeType;
+use protocol::type_registry::{AttributeType, RegisteredType, Registration};
 
 /// Words in an attribute block: sixteen bytes.
 pub const BLOCK_WORDS: usize = 2;
@@ -11,7 +11,7 @@ pub const BLOCK_BYTES: usize = BLOCK_WORDS * 8;
 /// The most blocks an attribute takes: 256 bytes, its type among
 /// them. What is larger is kept elsewhere, and the attribute says
 /// where.
-pub const ATTRIBUTE_BLOCKS_MOST: usize = 16;
+pub const ATTRIBUTE_BLOCKS_MOST: usize = AttributeType::MOST_BLOCKS;
 /// The most words an attribute takes, its type the first.
 pub const ATTRIBUTE_WORDS_MOST: usize = ATTRIBUTE_BLOCKS_MOST * BLOCK_WORDS;
 
@@ -113,5 +113,18 @@ impl<L: Layout> Attribute<L> {
     /// is found among an entity's attributes by.
     pub const fn attribute_type(self) -> AttributeType {
         self.attribute_type
+    }
+
+    /// Its registration, named `name`: of a fixed size, its layout's.
+    pub fn registration(name: &str) -> Registration {
+        Registration::attribute(name, L::BLOCK_COUNT, L::WORDS)
+    }
+
+    /// The attribute `registered` is, if it is one laid out as `L`.
+    pub fn registered(registered: &RegisteredType) -> Option<Self> {
+        match registered {
+            RegisteredType::Attribute { attribute_type, .. } => Self::of_attribute_type(*attribute_type),
+            _ => None,
+        }
     }
 }

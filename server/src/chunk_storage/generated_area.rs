@@ -6,7 +6,8 @@
 
 use crate::chunk_storage::layer_codec::LayerCodec;
 use crate::chunk_storage::superchunk_image::{LayerChange, SuperchunkImage};
-use protocol::type_registry::{LayerType, WidePlane, Width};
+use crate::bitplane_manager::{WidePlane, Width};
+use protocol::type_registry::LayerType;
 use utilities::bitmap::{CellWords, BITS_PER_WORD, WORDS};
 use utilities::coordinates::{place_from_cartesian, CellArea, CellCartesian, SuperchunkIndex, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
 

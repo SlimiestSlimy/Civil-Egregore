@@ -7,16 +7,14 @@
 //! `docs/type_registry_reference.md`.
 
 mod frozen_types;
-mod layouts;
 mod registered_type;
 mod registration;
 mod saved_types;
 mod registry;
 mod type_ids;
 
-pub use layouts::{data_words, Attribute, Layout, Member, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};
 pub use frozen_types::FrozenTypes;
 pub use registered_type::RegisteredType;
 pub use registration::{Declared, Hook, Library, Registration};
 pub use registry::{RegistryRefusal, TypeRegistry};
-pub use type_ids::{AttributeType, Bits16, Bits2, Bits32, Bits4, Bits8, EntityRuleType, EntityType, LayerType, TypeKind, ScaRuleType, WidePlane, Width, WorldgenType, ATTRIBUTE_NUMBERS, TYPE_ID_NUMBERS};
+pub use type_ids::{AttributeType, EntityRuleType, EntityType, LayerType, TypeKind, ScaRuleType, WorldgenType, ATTRIBUTE_NUMBERS, TYPE_ID_NUMBERS};

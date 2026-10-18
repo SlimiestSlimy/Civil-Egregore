@@ -1,5 +1,5 @@
-//! What an ID is of: a layer ([`LayerType`]), a wide plane ([`WidePlane`],
-//! of a [`Width`]), an entity type ([`EntityType`]), an attribute
+//! What an ID is of: a layer ([`LayerType`]), a wide plane (wide plane,
+//! of a width), an entity type ([`EntityType`]), an attribute
 //! ([`AttributeType`]) -- each a `u64` from the one namespace, in a type
 //! of its own so that one is never passed for another.
 //!
@@ -144,86 +144,6 @@ impl LayerType {
     }
 }
 
-/// How wide a plane is, as a type: what a [`WidePlane`] plane is of, so that
-/// its width is known where it is read and written, and a number of
-/// one width is never read as another.
-pub trait Width: Copy {
-    /// Bits a cell.
-    const BITS_A_CELL: u32;
-}
-
-/// Two bits a cell: numbers 0 to 3.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Bits2;
-/// Four bits a cell: numbers 0 to 15.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Bits4;
-/// Eight bits a cell: numbers 0 to 255.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Bits8;
-/// Sixteen bits a cell: numbers 0 to 65,535.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Bits16;
-/// Thirty-two bits a cell: numbers 0 to 4,294,967,295.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Bits32;
-
-impl Width for Bits2 {
-    const BITS_A_CELL: u32 = 2;
-}
-impl Width for Bits4 {
-    const BITS_A_CELL: u32 = 4;
-}
-impl Width for Bits8 {
-    const BITS_A_CELL: u32 = 8;
-}
-impl Width for Bits16 {
-    const BITS_A_CELL: u32 = 16;
-}
-impl Width for Bits32 {
-    const BITS_A_CELL: u32 = 32;
-}
-
-/// A wide plane, its width in its type: a cell of it holds a number,
-/// read and written whole. A layer of a bit a cell is a [`LayerType`]
-/// alone, set or clear.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct WidePlane<W: Width> {
-    /// Its layer type, which says its width too ([`LayerType::of_width`]).
-    layer_type: LayerType,
-    /// Its width.
-    width: std::marker::PhantomData<W>,
-}
-
-impl<W: Width> WidePlane<W> {
-    /// The plane whose bits are kept cold as the types `first_number` on.
-    pub const fn new(first_number: u64) -> Self {
-        Self::of_tiles(first_number, 0)
-    }
-
-    /// The plane of a number a tile, the tiles `2^tile_scale` cells a
-    /// side ([`LayerType::of_tiles`]), whose bits are kept cold as
-    /// the types `first_number` on.
-    pub const fn of_tiles(first_number: u64, tile_scale: u32) -> Self {
-        Self { layer_type: LayerType::of_tiles(first_number, W::BITS_A_CELL, tile_scale), width: std::marker::PhantomData }
-    }
-
-    /// The plane `layer_type` is, if it is of its width.
-    pub const fn of_layer_type(layer_type: LayerType) -> Option<Self> {
-        if layer_type.width_bits() == W::BITS_A_CELL { Some(Self { layer_type, width: std::marker::PhantomData }) } else { None }
-    }
-
-    /// Its layer type: what it is made hot, and found in the arena, by.
-    pub const fn layer_type(self) -> LayerType {
-        self.layer_type
-    }
-
-    /// The most a cell of it holds.
-    pub const fn most_value(self) -> u32 {
-        u32::MAX >> (u32::BITS - W::BITS_A_CELL)
-    }
-}
-
 /// An entity's type: a type ID like a layer's, from the one `u64`
 /// namespace every type in Civil Egregore is drawn from. It has no
 /// size: its last byte is 0.
@@ -313,10 +233,14 @@ const ATTRIBUTE_SIZE_BITS: u32 = 4;
 pub const ATTRIBUTE_NUMBERS: u64 = 1 << (KIND_SHIFT - ATTRIBUTE_SIZE_BITS);
 
 impl AttributeType {
+    /// The most blocks an attribute's ID says it takes: what its last
+    /// four bits hold.
+    pub const MOST_BLOCKS: usize = 1 << ATTRIBUTE_SIZE_BITS;
+
     /// The type of number `type_number` whose attributes take `block_count`
     /// blocks, 1 to 16.
     pub const fn of_blocks(type_number: u64, block_count: usize) -> Self {
-        assert!(type_number < ATTRIBUTE_NUMBERS && block_count >= 1 && block_count <= super::layouts::ATTRIBUTE_BLOCKS_MOST, "an attribute's number is under 2^52, and it is 1 to 16 blocks");
+        assert!(type_number < ATTRIBUTE_NUMBERS && block_count >= 1 && block_count <= Self::MOST_BLOCKS, "an attribute's number is under 2^52, and it is 1 to 16 blocks");
         Self((TypeKind::Attribute as u64) << KIND_SHIFT | type_number << ATTRIBUTE_SIZE_BITS | (block_count as u64 - 1))
     }
 

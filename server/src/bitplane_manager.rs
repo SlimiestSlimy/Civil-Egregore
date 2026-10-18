@@ -11,6 +11,7 @@ mod making_hot;
 mod superchunk_layer;
 mod reader;
 mod superchunk;
+mod wide_plane;
 mod write_back;
 mod writes;
 
@@ -23,6 +24,7 @@ pub use arena::BitmapArena;
 pub use reader::aligned_tiles::{SmallTiles, SMALL_TILES_TOGETHER, SMALL_TILE_CELLS, SMALL_TILE_SIDE};
 pub use reader::{CellReader, Window};
 pub use superchunk::{Bucket, LayerView, Superchunk};
+pub use wide_plane::{Bits16, Bits2, Bits32, Bits4, Bits8, WidePlane, Width};
 pub use writes::{count_missed, WritesApplied, WriteShape, Write, WriteOp, WriteQueues};
 
 use utilities::bitmap::{BITS_PER_WORD, WORDS};

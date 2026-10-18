@@ -3,7 +3,8 @@
 //! (`docs/entity_manager.md`, "Attributes, a block each").
 
 use std::ops::Range;
-pub use protocol::type_registry::{Attribute, AttributeType, Layout, Member, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};
+pub use crate::entity_manager::layouts::{data_words, Attribute, Layout, Member, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};
+pub use protocol::type_registry::AttributeType;
 use protocol::type_registry::{EntityType, FrozenTypes};
 
 /// An entity type's default attribute as a bucket keeps it: first of

@@ -12,7 +12,6 @@ use relief::{slope_light, height_tint, water_light, FOAM_COLOUR, PALE_COLOUR, SA
 
 use utilities::coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashMap;
-use protocol::type_registry::{Bits16, Width};
 use protocol::pipe::frame::value_at;
 use protocol::pipe::terrain::{AsksTerrain, Height, HeightsAsk, DrawnHeightRange};
 
@@ -243,7 +242,7 @@ fn heights(terrain: &dyn AsksTerrain, world: u64, top_left: (u32, u32), given_he
             let (in_x, in_y) = (x % SUPERCHUNK_CELLS_A_SIDE as u32, y % SUPERCHUNK_CELLS_A_SIDE as u32);
             let superchunk_run = (SUPERCHUNK_CELLS_A_SIDE - in_x as usize).min(WORKED_SIDE_CELLS - cells_across);
             if let Some(words) = given_heights.get(&(x - in_x, y - in_y)) {
-                heights[cells_across..cells_across + superchunk_run].iter_mut().zip(0u32..).for_each(|(height, cells_along)| *height = value_at(words, Bits16::BITS_A_CELL, place_from_cartesian(in_x + cells_along, in_y)) as Height);
+                heights[cells_across..cells_across + superchunk_run].iter_mut().zip(0u32..).for_each(|(height, cells_along)| *height = value_at(words, Height::BITS, place_from_cartesian(in_x + cells_along, in_y)) as Height);
             }
             cells_across += superchunk_run;
         }

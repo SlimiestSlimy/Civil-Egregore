@@ -14,7 +14,8 @@ pub use sheep_state::SheepState;
 
 pub use server::simulation::simulation_api::terrain::Height;
 
-use protocol::type_registry::{Attribute, Bits16, Bits4, EntityType, LayerType, WidePlane, Width};
+use protocol::type_registry::{EntityType, LayerType};
+use server::simulation::simulation_api::{Attribute, Bits16, Bits4, WidePlane, Width};
 
 /// The base game's types as a world registered them, each of the ID it
 /// was given there: what everything of the base game that works on

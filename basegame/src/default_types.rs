@@ -9,7 +9,8 @@
 
 use crate::base_types::{BaseTypes, SheepState, GRASS_RULE, SHEEP_RULE, TREES_RULE};
 use crate::libraries::collision::Collision;
-use protocol::type_registry::{Bits16, Bits4, Hook, RegisteredType, Registration, RegistryRefusal, TypeRegistry};
+use protocol::type_registry::{Hook, RegisteredType, Registration, RegistryRefusal, TypeRegistry};
+use server::simulation::simulation_api::{Attribute, Bits16, Bits4, WidePlane};
 use std::sync::Arc;
 
 /// The base game's types registered in `type_registry`, in their order:
@@ -21,7 +22,7 @@ pub fn register(type_registry: &mut TypeRegistry) -> Result<BaseTypes, String> {
     let layer = |registered_type: RegisteredType| registered_type.layer_type().expect("a layer");
     let grass = layer(registered(type_registry, Registration::layer("grass"))?);
     let tree = layer(registered(type_registry, Registration::layer("tree"))?);
-    let tree_stage = registered(type_registry, Registration::wide_plane::<Bits4>("tree stage"))?.wide_plane().expect("four bits a cell");
+    let tree_stage = WidePlane::registered(&registered(type_registry, WidePlane::<Bits4>::registration("tree stage"))?).expect("four bits a cell");
     let wall_east = layer(registered(type_registry, Registration::layer("wall east"))?);
     let wall_south = layer(registered(type_registry, Registration::layer("wall south"))?);
     // The collision plane's library works on the plane itself: made of its ID.
@@ -29,11 +30,11 @@ pub fn register(type_registry: &mut TypeRegistry) -> Result<BaseTypes, String> {
     let collision = layer(collision);
     let wall_north = layer(registered(type_registry, Registration::layer("wall north"))?);
     let wall_west = layer(registered(type_registry, Registration::layer("wall west"))?);
-    let sheep_state = registered(type_registry, Registration::attribute::<SheepState>("sheep state"))?.attribute().expect("laid out as a sheep's state");
+    let sheep_state = Attribute::registered(&registered(type_registry, Attribute::<SheepState>::registration("sheep state"))?).expect("laid out as a sheep's state");
     let sheep = registered(type_registry, Registration::entity("sheep", Some("sheep state")).depending_on(&["collision"]).with_hooks(&[Hook::KeepsTheWorldHot]))?.entity_type().expect("a type of entity");
     let wet = layer(registered(type_registry, Registration::layer("wet"))?);
-    let height = registered(type_registry, Registration::wide_plane::<Bits16>("height"))?.wide_plane().expect("sixteen bits a cell");
-    let water_depth = registered(type_registry, Registration::wide_plane::<Bits16>("water depth"))?.wide_plane().expect("sixteen bits a cell");
+    let height = WidePlane::registered(&registered(type_registry, WidePlane::<Bits16>::registration("height"))?).expect("sixteen bits a cell");
+    let water_depth = WidePlane::registered(&registered(type_registry, WidePlane::<Bits16>::registration("water depth"))?).expect("sixteen bits a cell");
     let base_types = BaseTypes { grass, tree, tree_stage, wall_east, wall_south, collision, wall_north, wall_west, sheep_state, sheep, wet, height, water_depth };
     // Each rule's code, and the world generation's, made with the types it works on.
     let rule_hooks = [Hook::RunsEveryTick];
