@@ -30,3 +30,18 @@ fn a_world_is_made_run_and_looked_at() {
     assert!(said_to(&format!("--new [{folder_text}]")).is_err(), "a world there already");
     fs::remove_dir_all(&folder).expect("removed");
 }
+
+/// A seed is read in hexadecimal however it is written -- with `0x` or
+/// without, all digits, or a word another number would take, `5eed` --
+/// and a count is a count: each word read as its flag wants it.
+#[test]
+fn every_word_is_read_as_its_flag_wants_it() {
+    use server::params::{SEED, SIDE};
+    let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let seed_read = |command_line: &str| ServerParameters { shell_words: command_line.split_whitespace().map(str::to_string).collect() }.cleaned(server::params::server_flags()).map(|clean_parameters| (clean_parameters.hex(SEED), clean_parameters.integer(SIDE)));
+    for (seed_written, seed_meant) in [(format!("{seed:#x}"), seed), (format!("{seed:x}"), seed), ("5eed".to_string(), 0x5eed), ("1234".to_string(), 0x1234)] {
+        assert_eq!(seed_read(&format!("--seed {seed_written} --side 12")).ok(), Some((Some(seed_meant), Some(12))), "--seed {seed_written}");
+    }
+    assert!(seed_read("--seed seed").is_err(), "no hexadecimal");
+    assert!(seed_read("--side 5eed").is_err(), "no whole number");
+}
