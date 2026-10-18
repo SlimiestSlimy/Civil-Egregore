@@ -146,7 +146,7 @@ impl Host {
 
     /// Makes the world run again from its start, its generation as
     /// `tuning` has it now, as its generation reads the sliders
-    /// (`WorldgenCode::numbers_of_tuning`), the rest as it
+    /// (`WorldgenCode::worldgen_parameters_of_tuning`), the rest as it
     /// started: its seed, size, sheep, hot entity and camera. A slider
     /// dragged calls it each frame; of calls with no frame asked between, only the last
     /// is done.

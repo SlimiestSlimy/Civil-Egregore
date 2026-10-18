@@ -175,7 +175,7 @@ impl HostThread {
         self.worlds += 1;
         // Told before any frame of this world is sent: an ask of it finds it known. The thread gone, there is no one to ask either.
         let world = &running_world.world;
-        _ = self.terrain.send(TerrainRequest::World(WorldTold { world: self.worlds, seed: world.world_info.seed, generation_numbers: world.world_info.generation_numbers.clone(), worldgen: world.worldgen.clone() }));
+        _ = self.terrain.send(TerrainRequest::World(WorldTold { world: self.worlds, seed: world.world_info.seed, worldgen_parameters: world.world_info.worldgen_parameters.clone(), worldgen: world.worldgen.clone() }));
         self.running_world = Some(running_world);
         self.next_tick = Instant::now();
     }
@@ -189,7 +189,7 @@ impl HostThread {
         };
         // Remade of its own types: its IDs stay.
         let world = &running_world.world;
-        let (parameters, frozen_type_registry) = (crate::world_start::parameters_of_world(&world.world_info, &(world.worldgen.numbers_of_tuning)(&reset_tuning)), Arc::clone(&world.frozen_type_registry));
+        let (parameters, frozen_type_registry) = (crate::world_start::parameters_of_world(&world.world_info, &(world.worldgen.worldgen_parameters_of_tuning)(&reset_tuning)), Arc::clone(&world.frozen_type_registry));
         self.world_name = None;
         self.last_outcome = Some(match self.run_world(&parameters, &frozen_type_registry) {
             Ok(seed) => format!("the world remade from seed {}, as the sliders have it", utilities::seed::seed_as_hex(seed)),
@@ -256,7 +256,7 @@ impl HostThread {
             }
             (self.last_frame, self.being_answered) = ((Instant::now(), tick), None);
         }
-        Some(frame_of(world, self.worlds, &frame_ask, hot, cells, self.last_answer_measured, (self.world_name.clone(), self.last_outcome.clone()), more_to_copy))
+        Some(frame_of(world, self.worlds, &frame_ask, hot, cells, self.last_answer_measured, self.pace_held_to, (self.world_name.clone(), self.last_outcome.clone()), more_to_copy))
     }
 
     /// The time there is for copying a frame's superchunks before the

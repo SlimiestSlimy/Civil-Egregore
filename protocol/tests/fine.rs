@@ -55,6 +55,8 @@ fn drawn_frame(random: &mut RandomSource) -> ViewportFrame {
         seed: random.next_draw(),
         tick: random.next_draw(),
         ticks_a_second: f64::from_bits(random.next_draw()),
+        target_pace: random.next_draw() as u32,
+        held_pace: random.percent_chance(50).then(|| random.next_draw() as u32),
         entity_count: random.draw_below(1 << 40) as usize,
         counts: drawn_layer_types(random, 3).into_iter().map(|layer_type| (layer_type, random.next_draw())).collect(),
         side_superchunks: random.percent_chance(50).then(|| random.next_draw() as u32),

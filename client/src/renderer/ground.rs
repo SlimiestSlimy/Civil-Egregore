@@ -270,8 +270,8 @@ mod tests {
         // A new world's types frozen first, as the server freezes them.
         let frozen_type_registry = Arc::new(protocol::world_types::of_a_new_world(register_types).expect("the base game's types"));
         let worldgen = server::internals_for_root_tests::worldgen_of(&frozen_type_registry).expect("a world generation");
-        let generation_numbers = WorldGeneration { sheep_per_superchunk: 1, ..WorldGeneration::DEFAULT }.numbers();
-        let world_start = CleanServerParameters::default().with(SEED, ParameterValue::Hex(server::seed_fit_to_start(crate::renderer::test_seed::TestSeedHandle::open().seed(), &generation_numbers, &worldgen))).with(WORLDGEN, ParameterValue::Nested(generation_numbers.into_iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name, ParameterValue::Hex(value)))));
+        let worldgen_parameters = WorldGeneration { sheep_per_superchunk: 1, ..WorldGeneration::DEFAULT }.worldgen_parameters();
+        let world_start = CleanServerParameters::default().with(SEED, ParameterValue::Hex(server::seed_fit_to_start(crate::renderer::test_seed::TestSeedHandle::open().seed(), &worldgen_parameters, &worldgen))).with(WORLDGEN, ParameterValue::Nested(worldgen_parameters.into_iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name, ParameterValue::Hex(value)))));
         let (host, frame_receiver) = server::host::Host::start_on_thread(register_types);
         assert!(host.set_paused(true) && host.make_world(world_start.clone(), frozen_type_registry) && host.ask_frame(FrameAsk::default()));
         // The world's types, sent once before its first frame; then its frames.

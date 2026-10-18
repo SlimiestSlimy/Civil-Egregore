@@ -27,7 +27,7 @@ pub use crate::chunk_storage::{GeneratedArea, LayerType};
 pub use utilities::coordinates::{CellArea, CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOUR_OFFSETS, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE_CELL};
 pub use crate::entity_manager::{data_words, Attribute, AttributeBlock, AttributeType, EntityRef, EntityType, Header, Layout, Member, WholeAttribute};
 pub use rule_interface::{on_each_sampled, RuleCode, RuleContext, RuleMaster, RuleRun};
-pub use worldgen_interface::{GenerationNumbers, WorldgenCode};
+pub use worldgen_interface::{WorldgenParameters, WorldgenCode};
 pub use crate::simulation::simulation_tick_state::SimulationTickState;
 pub use crate::simulation::tick::TickReport;
 pub use utilities::chance::Chance;
@@ -36,8 +36,16 @@ pub use utilities::rng::RandomSource;
 // What a world generation's hooks are still asked in until the
 // client's hooks: the terrain a client asks for, and the numbers off a
 // window's sliders.
-pub use protocol::pipe::terrain;
-pub use utilities::tuning;
+/// The terrain a client asks for, as a world generation answers it:
+/// the names its hooks are asked and answered in, and no more.
+pub mod terrain {
+    pub use protocol::pipe::terrain::{CellCover, DrawnHeightRange, Height, HeightsAsk, MapAnswer, MapAsk, MapCell};
+}
+/// A window's sliders, as a world generation reads them: the names it
+/// reads, and no more.
+pub mod tuning {
+    pub use utilities::tuning::{Tuning, COAST_BREADTH, COAST_LOWNESS, FINER_DEPTH, FINER_FALL, FINER_HEIGHT, FINER_SHARE, GRASS_COVER, GRASS_DETAIL, GRASS_PATCH, GRASS_SCATTER, HIGHEST_LAND, LAND_CLUMPING, LEAST_SIGMOID, LINE_BENDING, MOST_SIGMOID, NARROWEST_BLEND, OCEAN_FLOOR, OCEAN_LEVEL, OCEAN_SHARE, RAISED_SHARE, SHEEP_PER_SUPERCHUNK, TREE_COVER, TREE_DETAIL, TREE_PATCH, TREE_SCATTER, VERTEX_SPACING, WEIGHT_SPREAD, WIDEST_BLEND};
+}
 
 use std::ops::{AddAssign, Index, IndexMut};
 

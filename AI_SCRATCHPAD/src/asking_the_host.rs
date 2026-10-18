@@ -30,10 +30,10 @@ pub fn counted() -> [LayerType; 2] {
 }
 
 /// A new world's parameters as `tuning` has it, of `seed` if given:
-/// side, camera and the generation's numbers -- what the server makes of
+/// side, camera and the generation's parameters -- what the server makes of
 /// a window's sliders, never forced hot here.
 fn parameters_of_tuning(seed: Option<u64>, tuning: &Tuning) -> CleanServerParameters {
-    let numbers = (basegame::worldgen::world_generation::code(base_types().1).numbers_of_tuning)(tuning);
+    let numbers = (basegame::worldgen::world_generation::code(base_types().1).worldgen_parameters_of_tuning)(tuning);
     let worldgen = numbers.into_iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name, ParameterValue::Hex(value)));
     let mut parameters = CleanServerParameters::default().with(WORLDGEN, ParameterValue::Nested(worldgen)).with(SIDE, ParameterValue::Integer(tuning[utilities::tuning::WORLD_SIDE].round().max(0.0) as i64));
     if tuning[utilities::tuning::CAMERA_LOADS] >= 0.5 {

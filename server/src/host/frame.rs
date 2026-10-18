@@ -28,9 +28,9 @@ pub(crate) fn hot_in(world: &World, viewport: Option<Viewport>) -> Vec<(u32, u32
 /// last said of it; and whether `more_to_come` of what was asked is to come.
 /// The one making of a frame: the host's thread's and a shown run's.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn frame_of(world: &World, worlds: u64, frame_ask: &FrameAsk, hot: Vec<(u32, u32)>, cells: Vec<Cells>, (ticks_a_second, sync_seconds, sync_share): (f64, f64, f64), (world_name, last_outcome): (Option<String>, Option<String>), more_to_come: bool) -> ViewportFrame {
+pub(crate) fn frame_of(world: &World, worlds: u64, frame_ask: &FrameAsk, hot: Vec<(u32, u32)>, cells: Vec<Cells>, (ticks_a_second, sync_seconds, sync_share): (f64, f64, f64), held_pace: Option<u32>, (world_name, last_outcome): (Option<String>, Option<String>), more_to_come: bool) -> ViewportFrame {
     let counts = frame_ask.counted.iter().map(|&layer_type| (layer_type, count(world, layer_type))).collect();
-    ViewportFrame { world: worlds, seed: world.world_info.seed, generation_numbers: world.world_info.generation_numbers.clone(), drawn_heights: (world.worldgen.drawn_heights)(&world.world_info.generation_numbers), side_superchunks: world.halos().hot.world_side_superchunks(), tick: world.entity_store().current_tick(), ticks_a_second, entity_count: world.entity_store().len(), counts, sync_seconds, sync_share, viewport: frame_ask.viewport, hot, pixel_side_log2: frame_ask.pixel_side_log2, seen_near: frame_ask.seen_near, world_name, last_outcome, more_to_come, cells }
+    ViewportFrame { world: worlds, seed: world.world_info.seed, worldgen_parameters: world.world_info.worldgen_parameters.clone(), drawn_heights: (world.worldgen.drawn_heights)(&world.world_info.worldgen_parameters), side_superchunks: world.halos().hot.world_side_superchunks(), tick: world.entity_store().current_tick(), ticks_a_second, target_pace: super::TARGET_PACE, held_pace, entity_count: world.entity_store().len(), counts, sync_seconds, sync_share, viewport: frame_ask.viewport, hot, pixel_side_log2: frame_ask.pixel_side_log2, seen_near: frame_ask.seen_near, world_name, last_outcome, more_to_come, cells }
 }
 
 /// Cells of `layer_type` over every hot superchunk of `world`.

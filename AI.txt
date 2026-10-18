@@ -207,7 +207,18 @@ NOW
   frozen type registry" -- server::start_world(&CleanServerParameters,
   &Arc<FrozenTypes>), the world's folder the `world` parameter, the
   registry frozen by whoever starts it and checked against a save's
-  types file), worldgen parameters' name.
+  types file), worldgen parameters' name (DONE, the commit after
+  b50b63d: world file format 5, its rows `worldgen <name>`).
+- WHAT IS LEFT, IN ORDER (the user, 2026-10-18, on my list of what is
+  left: "1 go ahead, 2 not quite, we need client side gui rules or
+  something like that first / 3 same, fold into 5 with 2 / 4 can be
+  done right away / 5 yeah..."): the sliders out of utilities, protocol
+  and the server (2) and game content out of protocol -- CellCover,
+  DrawnHeightRange, drawn heights, mesh lines, the terrain thread (3)
+  -- both wait for client-side GUI rules and fold into the render rules
+  and the client rewrite (5). Done of 4: the client's TARGET_PACE copy
+  gone (the frame carries target_pace and held_pace), simulation_api's
+  terrain and tuning narrowed to the names basegame reads.
 - CLIENT-SERVER COMMS (the user, 2026-10-18, verbatim): "the current
   client-server comms mode is bad, we want headless servers to allow
   clients to connect later. what --pipe does (and should have a better

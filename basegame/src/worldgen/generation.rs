@@ -69,12 +69,12 @@ impl GenerationNumber for u64 {
     }
 }
 
-/// Where a generation keeps one of its numbers.
+/// Where a generation keeps one of its worldgen parameters.
 type NumberField = fn(&mut WorldGeneration) -> &mut dyn GenerationNumber;
 
-/// Each of a generation's numbers, by its name: in the order a world's
+/// Each of a generation's parameters, by its name: in the order a world's
 /// file keeps them.
-const NUMBER_FIELDS: [(&str, NumberField); 28] = [
+const PARAMETER_FIELDS: [(&str, NumberField); 28] = [
     ("ocean floor", |generation| &mut generation.land_shape.ocean_floor),
     ("ocean level", |generation| &mut generation.land_shape.ocean),
     ("vertex spacing", |generation| &mut generation.land_shape.vertex_spacing_power),
@@ -106,18 +106,19 @@ const NUMBER_FIELDS: [(&str, NumberField); 28] = [
 ];
 
 impl WorldGeneration {
-    /// Its numbers, each with its name: as a world's file keeps them.
-    pub fn numbers(&self) -> Vec<(String, u64)> {
+    /// Its worldgen parameters, each with its name: as a world's file
+    /// keeps them.
+    pub fn worldgen_parameters(&self) -> Vec<(String, u64)> {
         let mut generation = *self;
-        NUMBER_FIELDS.iter().map(|(name, field)| (name.to_string(), field(&mut generation).read())).collect()
+        PARAMETER_FIELDS.iter().map(|(name, field)| (name.to_string(), field(&mut generation).read())).collect()
     }
 
-    /// As `generation_numbers` say, each by its name: one not among them
+    /// As `worldgen_parameters` say, each by its name: one not among them
     /// as in [`WorldGeneration::DEFAULT`], one not known passed over.
-    pub fn of_numbers(numbers: &[(String, u64)]) -> Self {
+    pub fn of_worldgen_parameters(worldgen_parameters: &[(String, u64)]) -> Self {
         let mut generation = Self::DEFAULT;
-        for (name, value) in numbers {
-            if let Some((_, field)) = NUMBER_FIELDS.iter().find(|(field_name, _)| field_name == name) {
+        for (name, value) in worldgen_parameters {
+            if let Some((_, field)) = PARAMETER_FIELDS.iter().find(|(field_name, _)| field_name == name) {
                 field(&mut generation).write(*value);
             }
         }

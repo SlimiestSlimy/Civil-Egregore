@@ -26,10 +26,10 @@ pub(crate) fn new_world_info(frozen_type_registry: &FrozenTypeRegistry, worldgen
     if forced_hot && side_superchunks == 0 {
         return Err("only a world with a side can be forced hot".to_string());
     }
-    let generation_numbers = worldgen_parameters_of(parameters)?;
-    let seed = parameters.hex(SEED).unwrap_or_else(|| drawn_seed(&generation_numbers, worldgen));
+    let worldgen_parameters = worldgen_parameters_of(parameters)?;
+    let seed = parameters.hex(SEED).unwrap_or_else(|| drawn_seed(&worldgen_parameters, worldgen));
     let camera_loads = parameters.nested(CAMERA_LOADS).is_some() && !forced_hot;
-    Ok(WorldInfo { seed, tick: 0, layers: frozen_type_registry.layer_types(), side_in_superchunks: Some(side_superchunks).filter(|&side| side > 0), forced_hot, camera_loads, unpopulated: Vec::new(), generation_numbers })
+    Ok(WorldInfo { seed, tick: 0, layers: frozen_type_registry.layer_types(), side_in_superchunks: Some(side_superchunks).filter(|&side| side > 0), forced_hot, camera_loads, unpopulated: Vec::new(), worldgen_parameters })
 }
 
 /// The worldgen parameters given under [`WORLDGEN`], each by its name --
@@ -56,9 +56,9 @@ pub(crate) fn thread_count_of(parameters: &CleanServerParameters) -> Result<Opti
 
 /// The parameters a new world the same as `world_info`'s at its start is
 /// made by: its seed, size and camera, its worldgen parameters
-/// `generation_numbers` -- what a world remade from its start is.
-pub(crate) fn parameters_of_world(world_info: &WorldInfo, generation_numbers: &[(String, u64)]) -> CleanServerParameters {
-    new_world_parameters(world_info.side_in_superchunks.unwrap_or(0), world_info.forced_hot, world_info.camera_loads, generation_numbers).with(SEED, ParameterValue::Hex(world_info.seed))
+/// `worldgen_parameters` -- what a world remade from its start is.
+pub(crate) fn parameters_of_world(world_info: &WorldInfo, worldgen_parameters: &[(String, u64)]) -> CleanServerParameters {
+    new_world_parameters(world_info.side_in_superchunks.unwrap_or(0), world_info.forced_hot, world_info.camera_loads, worldgen_parameters).with(SEED, ParameterValue::Hex(world_info.seed))
 }
 
 /// The parameters of a new world as a window's sliders have it
@@ -68,7 +68,7 @@ pub(crate) fn parameters_of_world(world_info: &WorldInfo, generation_numbers: &[
 pub(crate) fn parameters_of_tuning(seed: Option<u64>, tuning: &Tuning, worldgen: &WorldgenCode) -> CleanServerParameters {
     let side_superchunks = tuning[WORLD_SIDE].round().max(0.0) as u32;
     let forced_hot = side_superchunks > 0 && tuning[FORCED_HOT_SLIDER] >= 0.5;
-    let parameters = new_world_parameters(side_superchunks, forced_hot, !forced_hot && tuning[CAMERA_LOADS_SLIDER] >= 0.5, &(worldgen.numbers_of_tuning)(tuning));
+    let parameters = new_world_parameters(side_superchunks, forced_hot, !forced_hot && tuning[CAMERA_LOADS_SLIDER] >= 0.5, &(worldgen.worldgen_parameters_of_tuning)(tuning));
     match seed {
         Some(given_seed) => parameters.with(SEED, ParameterValue::Hex(given_seed)),
         None => parameters,
@@ -77,9 +77,9 @@ pub(crate) fn parameters_of_tuning(seed: Option<u64>, tuning: &Tuning, worldgen:
 
 /// The parameters of a new world `side_superchunks` a side -- 0, no
 /// end -- forced hot and its camera loading as said, its worldgen
-/// parameters `generation_numbers`, no seed given.
-fn new_world_parameters(side_superchunks: u32, forced_hot: bool, camera_loads: bool, generation_numbers: &[(String, u64)]) -> CleanServerParameters {
-    let worldgen = generation_numbers.iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name.as_str(), ParameterValue::Hex(*value)));
+/// parameters `worldgen_parameters`, no seed given.
+fn new_world_parameters(side_superchunks: u32, forced_hot: bool, camera_loads: bool, worldgen_parameters: &[(String, u64)]) -> CleanServerParameters {
+    let worldgen = worldgen_parameters.iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name.as_str(), ParameterValue::Hex(*value)));
     let mut parameters = CleanServerParameters::default().with(WORLDGEN, ParameterValue::Nested(worldgen));
     if side_superchunks > 0 {
         parameters.insert(SIDE, ParameterValue::Integer(i64::from(side_superchunks)));
@@ -93,15 +93,15 @@ fn new_world_parameters(side_superchunks: u32, forced_hot: bool, camera_loads: b
 }
 
 /// The first seed from `first_seed_tried` on whose world, generated as
-/// `generation_numbers` say, `worldgen` finds fit to start.
-pub fn seed_fit_to_start(first_seed_tried: u64, generation_numbers: &[(String, u64)], worldgen: &WorldgenCode) -> u64 {
-    (first_seed_tried..).find(|&seed| (worldgen.fit_to_start)(generation_numbers, seed)).expect("a seed fit to start")
+/// `worldgen_parameters` say, `worldgen` finds fit to start.
+pub fn seed_fit_to_start(first_seed_tried: u64, worldgen_parameters: &[(String, u64)], worldgen: &WorldgenCode) -> u64 {
+    (first_seed_tried..).find(|&seed| (worldgen.fit_to_start)(worldgen_parameters, seed)).expect("a seed fit to start")
 }
 
 /// A seed drawn at random: the first from it `worldgen` finds fit to
-/// start, generated as `generation_numbers` say, if one is within
+/// start, generated as `worldgen_parameters` say, if one is within
 /// [`START_TRIES`] -- else the one drawn.
-pub fn drawn_seed(generation_numbers: &[(String, u64)], worldgen: &WorldgenCode) -> u64 {
+pub fn drawn_seed(worldgen_parameters: &[(String, u64)], worldgen: &WorldgenCode) -> u64 {
     let random_seed = RandomState::new().hash_one(std::time::SystemTime::now());
-    (random_seed..random_seed.saturating_add(START_TRIES)).find(|&seed| (worldgen.fit_to_start)(generation_numbers, seed)).unwrap_or(random_seed)
+    (random_seed..random_seed.saturating_add(START_TRIES)).find(|&seed| (worldgen.fit_to_start)(worldgen_parameters, seed)).unwrap_or(random_seed)
 }
