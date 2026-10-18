@@ -19,7 +19,7 @@ use server::{halos_about, HaloChange, World, COOL_TICKS, WARM_TICKS};
 
 /// The superchunks holding a hot entity.
 fn hot_entities(world: &World) -> Vec<SuperchunkIndex> {
-    let hot_entity = server::internals_for_root_tests::hot_entity_of(world.frozen_types()).expect("a type keeps the world hot");
+    let hot_entity = server::internals_for_root_tests::hot_entity_of(world.frozen_type_registry()).expect("a type keeps the world hot");
     world.entity_store().superchunks().iter().filter(|superchunk| superchunk.iter().any(|entity| entity.header.entity_type == hot_entity)).map(|superchunk| superchunk.superchunk_index()).collect()
 }
 

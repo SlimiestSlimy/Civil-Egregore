@@ -5,7 +5,7 @@
 use std::ops::Range;
 pub use crate::entity_manager::layouts::{data_words, Attribute, Layout, Member, ATTRIBUTE_BLOCKS_MOST, ATTRIBUTE_WORDS_MOST, BLOCK_BYTES, BLOCK_WORDS};
 pub use protocol::type_registry::AttributeType;
-use protocol::type_registry::{EntityType, FrozenTypes};
+use protocol::type_registry::{EntityType, FrozenTypeRegistry};
 
 /// An entity type's default attribute as a bucket keeps it: first of
 /// the entity's blocks, its data alone -- every entity of the type
@@ -28,9 +28,9 @@ pub struct DefaultKept {
 pub struct DefaultAttributes(Box<[(EntityType, DefaultKept)]>);
 
 impl DefaultAttributes {
-    /// The default attributes of `frozen_types`.
-    pub fn of_types(frozen_types: &FrozenTypes) -> Self {
-        Self(frozen_types.default_attributes().into_iter().map(|(entity_type, attribute_type, words)| (entity_type, DefaultKept { attribute_type, words, block_count: words.div_ceil(BLOCK_WORDS) })).collect())
+    /// The default attributes of `frozen_type_registry`.
+    pub fn of_types(frozen_type_registry: &FrozenTypeRegistry) -> Self {
+        Self(frozen_type_registry.default_attributes().into_iter().map(|(entity_type, attribute_type, words)| (entity_type, DefaultKept { attribute_type, words, block_count: words.div_ceil(BLOCK_WORDS) })).collect())
     }
 
     /// The default attribute of entities of type `entity_type`, if the

@@ -1,10 +1,10 @@
 //! The types a world was made with, as its save holds them
-//! ([`FrozenTypes::to_text`]): each one's name and ID, in the order
+//! ([`FrozenTypeRegistry::to_text`]): each one's name and ID, in the order
 //! registered. Read again ([`TypeRegistry::for_saved_world`]), each
 //! name is given its ID back as its type is registered -- the name
 //! joins it to its code.
 
-use super::frozen_types::FrozenTypes;
+use super::frozen_type_registry::FrozenTypeRegistry;
 use super::registry::TypeRegistry;
 use super::type_ids::numbers_taken;
 use utilities::csv;
@@ -12,7 +12,7 @@ use utilities::csv;
 /// The columns of the types' text.
 const TYPES_COLUMNS: [&str; 2] = ["type", "id"];
 
-impl FrozenTypes {
+impl FrozenTypeRegistry {
     /// As a save holds them: a row a type, its name and its ID in
     /// hexadecimal, in the order registered.
     pub fn to_text(&self) -> String {
@@ -37,7 +37,7 @@ impl FrozenTypes {
 
 impl TypeRegistry {
     /// The registry of the world whose types `types_text` names
-    /// ([`FrozenTypes::to_text`]): each name given its ID as its type is
+    /// ([`FrozenTypeRegistry::to_text`]): each name given its ID as its type is
     /// registered ([`TypeRegistry::of_saved_ids`]); or what is wrong
     /// with the text -- a name said twice, or two of its IDs sharing a
     /// number, are.

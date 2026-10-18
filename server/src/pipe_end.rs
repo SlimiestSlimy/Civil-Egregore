@@ -6,7 +6,7 @@ use crate::host::{Host, HostSent};
 use crate::worlds_in;
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use protocol::pipe::terrain::AsksTerrain;
-use protocol::world_types::{self, GameTypes};
+use protocol::world_types::{self, RegisterTypes};
 use std::io;
 use std::sync::Arc;
 use std::sync::mpsc::channel;
@@ -17,18 +17,18 @@ use utilities::wire::{receive, send};
 /// closes stdin: its asks done by a host of this process's own, the
 /// frames sent as the host makes them, every other ask answered in the
 /// order asked on a thread of its own -- a map takes long, and the
-/// frames go on meanwhile. Each world's types `game_types`, registered
+/// frames go on meanwhile. Each world's types `register_types`, registered
 /// and frozen before anything of it: a new world's here, as it is
 /// asked for, its generation then asked how to start it; an opened
 /// world's by the host, as its save gave them.
-pub fn serve_the_pipe(game_types: GameTypes) -> Result<String, String> {
-    let (host, host_sent) = Host::start_on_thread(game_types);
+pub fn serve_the_pipe(register_types: RegisterTypes) -> Result<String, String> {
+    let (host, host_sent) = Host::start_on_thread(register_types);
     thread::Builder::new()
         .name("frames out".to_string())
         .spawn(move || {
             for sent in host_sent {
                 let message = match sent {
-                    HostSent::WorldRuns(world, frozen_types) => ServerMessage::WorldTypes(world, frozen_types.to_text()),
+                    HostSent::WorldRuns(world, frozen_type_registry) => ServerMessage::WorldTypes(world, frozen_type_registry.to_text()),
                     HostSent::Frame(frame) => ServerMessage::Frame(frame),
                 };
                 if send_out(message).is_err() {
@@ -63,9 +63,9 @@ pub fn serve_the_pipe(game_types: GameTypes) -> Result<String, String> {
             ClientMessage::SetPaused(paused) => _ = host.set_paused(paused),
             ClientMessage::SetPace(pace) => _ = host.set_pace(pace),
             ClientMessage::MakeWorld(seed, tuning) => {
-                let frozen_types = Arc::new(world_types::of_a_new_world(game_types)?);
-                let worldgen = crate::simulation::worldgen_of(&frozen_types)?;
-                _ = host.make_world(crate::world_start::parameters_of_tuning(seed, &tuning, &worldgen), frozen_types);
+                let frozen_type_registry = Arc::new(world_types::of_a_new_world(register_types)?);
+                let worldgen = crate::simulation::worldgen_of(&frozen_type_registry)?;
+                _ = host.make_world(crate::world_start::parameters_of_tuning(seed, &tuning, &worldgen), frozen_type_registry);
             }
             ClientMessage::OpenWorld(world_name) => _ = host.open_world(world_name),
             ClientMessage::Save(world_name) => _ = host.save_world(world_name),

@@ -11,8 +11,8 @@ use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::time::{Duration, Instant};
 use std::sync::Arc;
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, WORLD};
-use protocol::type_registry::FrozenTypes;
-use protocol::world_types::GameTypes;
+use protocol::type_registry::FrozenTypeRegistry;
+use protocol::world_types::RegisterTypes;
 use utilities::tuning::Tuning;
 
 /// The world run, and what goes with running it.
@@ -71,14 +71,14 @@ pub(crate) struct HostThread {
     /// The terrain's thread, told of each world run.
     terrain: Sender<TerrainRequest>,
     /// What registers the types of a world opened.
-    game_types: GameTypes,
+    register_types: RegisterTypes,
 }
 
 impl HostThread {
     /// No world, at the game's pace; `terrain` told of each world run;
-    /// worlds opened of `game_types`.
-    pub(crate) fn telling_terrain(terrain: Sender<TerrainRequest>, game_types: GameTypes) -> Self {
-        Self { terrain, game_types, running_world: None, worlds: 0, ticking_paused: false, pace_held_to: Some(TARGET_PACE), world_name: None, last_outcome: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), being_answered: None, last_answer_measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
+    /// worlds opened of `register_types`.
+    pub(crate) fn telling_terrain(terrain: Sender<TerrainRequest>, register_types: RegisterTypes) -> Self {
+        Self { terrain, register_types, running_world: None, worlds: 0, ticking_paused: false, pace_held_to: Some(TARGET_PACE), world_name: None, last_outcome: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), being_answered: None, last_answer_measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
     }
 }
 
@@ -100,9 +100,9 @@ impl HostThread {
                     }
                     Ok(HostRequest::SetPaused(pause_asked)) => (self.ticking_paused, self.next_tick) = (pause_asked, Instant::now()),
                     Ok(HostRequest::SetPace(pace_asked)) => (self.pace_held_to, self.next_tick) = (pace_asked, Instant::now()),
-                    Ok(HostRequest::MakeWorld(parameters, frozen_types)) => {
+                    Ok(HostRequest::MakeWorld(parameters, frozen_type_registry)) => {
                         (self.world_name, self.reset) = (None, None);
-                        self.last_outcome = Some(match self.run_world(&parameters, &frozen_types) {
+                        self.last_outcome = Some(match self.run_world(&parameters, &frozen_type_registry) {
                             Ok(seed) => format!("a world made from seed {}", utilities::seed::seed_as_hex(seed)),
                             Err(why_not) => format!("no world made: {why_not}"),
                         });
@@ -128,7 +128,7 @@ impl HostThread {
                 && worlds_told != self.worlds
             {
                 worlds_told = self.worlds;
-                if sender.send(HostSent::WorldRuns(self.worlds, Arc::clone(&running_world.world.frozen_types))).is_err() {
+                if sender.send(HostSent::WorldRuns(self.worlds, Arc::clone(&running_world.world.frozen_type_registry))).is_err() {
                     return;
                 }
             }
@@ -143,12 +143,12 @@ impl HostThread {
         }
     }
 
-    /// Makes a world as `parameters` say, of `frozen_types`, and runs it
+    /// Makes a world as `parameters` say, of `frozen_type_registry`, and runs it
     /// in place of any run: that one dropped first, not to hold both. Its
     /// seed; or why not, nothing run.
-    fn run_world(&mut self, parameters: &CleanServerParameters, frozen_types: &Arc<FrozenTypes>) -> Result<u64, String> {
+    fn run_world(&mut self, parameters: &CleanServerParameters, frozen_type_registry: &Arc<FrozenTypeRegistry>) -> Result<u64, String> {
         self.running_world = None;
-        let world = crate::start_world(parameters, frozen_types).map_err(|why_not| why_not.to_string())?;
+        let world = crate::start_world(parameters, frozen_type_registry).map_err(|why_not| why_not.to_string())?;
         let seed = world.world_info.seed;
         self.run_in_place(RunningWorld { world });
         Ok(seed)
@@ -158,8 +158,8 @@ impl HostThread {
     /// own types -- frozen first, as its types file says -- the world run
     /// left running if it cannot be.
     fn open_world(&self, world_to_open: &str) -> Result<World, String> {
-        let frozen_types = Arc::new(crate::read_types(&utilities::settings::world(world_to_open), self.game_types).map_err(|read_error| read_error.to_string())?);
-        crate::start_world(&CleanServerParameters::default().with(WORLD, ParameterValue::Text(world_to_open.to_string())), &frozen_types).map_err(|why_not| why_not.to_string())
+        let frozen_type_registry = Arc::new(crate::read_types(&utilities::settings::world(world_to_open), self.register_types).map_err(|read_error| read_error.to_string())?);
+        crate::start_world(&CleanServerParameters::default().with(WORLD, ParameterValue::Text(world_to_open.to_string())), &frozen_type_registry).map_err(|why_not| why_not.to_string())
     }
 
     /// Runs `running_world` in place of any run, from its world's own tick.
@@ -184,9 +184,9 @@ impl HostThread {
         };
         // Remade of its own types: its IDs stay.
         let world = &running_world.world;
-        let (parameters, frozen_types) = (crate::world_start::parameters_of_world(&world.world_info, &(world.worldgen.numbers_of_tuning)(&reset_tuning)), Arc::clone(&world.frozen_types));
+        let (parameters, frozen_type_registry) = (crate::world_start::parameters_of_world(&world.world_info, &(world.worldgen.numbers_of_tuning)(&reset_tuning)), Arc::clone(&world.frozen_type_registry));
         self.world_name = None;
-        self.last_outcome = Some(match self.run_world(&parameters, &frozen_types) {
+        self.last_outcome = Some(match self.run_world(&parameters, &frozen_type_registry) {
             Ok(seed) => format!("the world remade from seed {}, as the sliders have it", utilities::seed::seed_as_hex(seed)),
             Err(why_not) => format!("the world not remade: {why_not}"),
         });

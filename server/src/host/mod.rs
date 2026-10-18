@@ -12,8 +12,8 @@ pub mod terrain;
 use utilities::tuning::Tuning;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use protocol::server_parameters::CleanServerParameters;
-use protocol::type_registry::FrozenTypes;
-use protocol::world_types::GameTypes;
+use protocol::type_registry::FrozenTypeRegistry;
+use protocol::world_types::RegisterTypes;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread;
@@ -39,7 +39,7 @@ pub enum HostSent {
     /// A world runs, the `n`-th the host has run, of these types: sent
     /// once, as it starts to run, before any frame of it -- what the
     /// client draws its frames by.
-    WorldRuns(u64, Arc<FrozenTypes>),
+    WorldRuns(u64, Arc<FrozenTypeRegistry>),
     /// A frame asked for: boxed, the types' message small beside it.
     Frame(Box<ViewportFrame>),
 }
@@ -58,7 +58,7 @@ enum HostRequest {
     /// Make a world as these parameters say, of this frozen type
     /// registry -- frozen for it, before anything of it -- and run it in
     /// place of any run.
-    MakeWorld(CleanServerParameters, Arc<FrozenTypes>),
+    MakeWorld(CleanServerParameters, Arc<FrozenTypeRegistry>),
     /// Run the world of this name in the worlds' folder in place of any
     /// run: hot in its halos, as it was saved. Refused, the world run
     /// goes on (the next frame's [`Frame::said`]).
@@ -83,14 +83,14 @@ pub struct Host {
 
 impl Host {
     /// Starts the host on a thread of its own, no world run yet, worlds
-    /// opened of `game_types`: the host, and where what it sends comes
+    /// opened of `register_types`: the host, and where what it sends comes
     /// back ([`HostSent`]). It stops once the host is dropped.
-    pub fn start_on_thread(game_types: GameTypes) -> (Self, Receiver<HostSent>) {
+    pub fn start_on_thread(register_types: RegisterTypes) -> (Self, Receiver<HostSent>) {
         let (request_sender, request_receiver) = channel();
         let (sender, host_sent) = channel();
         let terrain = terrain::start_terrain_thread();
         let terrain_for_host = terrain.clone();
-        thread::Builder::new().name("host".to_string()).spawn(move || HostThread::telling_terrain(terrain_for_host, game_types).serve_requests(&request_receiver, &sender)).expect("a thread for the host");
+        thread::Builder::new().name("host".to_string()).spawn(move || HostThread::telling_terrain(terrain_for_host, register_types).serve_requests(&request_receiver, &sender)).expect("a thread for the host");
         (Self { request_sender, terrain: terrain::TerrainAsker { request_sender: terrain } }, host_sent)
     }
 
@@ -119,7 +119,7 @@ impl Host {
     /// Makes a world as `parameters` say, of `frozen_type_registry` -- the
     /// new world's, frozen first -- and runs it in place of any run
     /// ([`crate::start_world`]).
-    pub fn make_world(&self, parameters: CleanServerParameters, frozen_type_registry: Arc<FrozenTypes>) -> bool {
+    pub fn make_world(&self, parameters: CleanServerParameters, frozen_type_registry: Arc<FrozenTypeRegistry>) -> bool {
         self.request_sender.send(HostRequest::MakeWorld(parameters, frozen_type_registry)).is_ok()
     }
 

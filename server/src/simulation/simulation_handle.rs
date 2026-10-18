@@ -26,7 +26,7 @@ use crate::entity_manager::WorldEntities;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use protocol::type_registry::FrozenTypes;
+use protocol::type_registry::FrozenTypeRegistry;
 use utilities::dispatcher::Dispatcher;
 
 /// Where a world pages its cold superchunks' images, and how many bytes
@@ -75,15 +75,15 @@ pub struct SimulationHandle {
 
 impl SimulationHandle {
     /// The world `world_info` says, with nothing in it yet, nothing hot,
-    /// at its tick: what starting and loading build on. Of `frozen_types`,
+    /// at its tick: what starting and loading build on. Of `frozen_type_registry`,
     /// whose hooks give its rules, what generates it and what it is hot
     /// about -- or why it cannot run. On `thread_count` threads, every one
     /// the machine has if none is given; its cold pool paged as
     /// `cold_pool_paging` says.
-    pub fn new(world_info: &WorldInfo, frozen_types: &FrozenTypes, thread_count: Option<usize>, cold_pool_paging: ColdPoolPaging) -> Result<Self, String> {
+    pub fn new(world_info: &WorldInfo, frozen_type_registry: &FrozenTypeRegistry, thread_count: Option<usize>, cold_pool_paging: ColdPoolPaging) -> Result<Self, String> {
         let hot = match (world_info.side_in_superchunks, world_info.forced_hot) {
             (Some(side_superchunks), true) => Hot::Forced { world_side_superchunks: side_superchunks },
-            (side_if_sized, _) => Hot::AboutHotEntities { entity: hot_entity_of(frozen_types)?, world_side_superchunks: side_if_sized, viewport: world_info.camera_loads },
+            (side_if_sized, _) => Hot::AboutHotEntities { entity: hot_entity_of(frozen_type_registry)?, world_side_superchunks: side_if_sized, viewport: world_info.camera_loads },
         };
         // The world's superchunks not counted, as it grows: one set of threads, the tick's and chunk storage's jobs' alike.
         let dispatcher = Arc::new(thread_count.map_or_else(Dispatcher::of_the_machine, Dispatcher::new));
@@ -91,15 +91,15 @@ impl SimulationHandle {
         chunk_storage.page_under(cold_pool_paging.folder, cold_pool_paging.bytes_kept);
         Ok(Self {
             seed: world_info.seed,
-            layers: frozen_types.layer_types(),
+            layers: frozen_type_registry.layer_types(),
             bitmap_arena: BitmapArena::new(),
             chunk_storage,
-            entity_store: WorldEntities::for_types(frozen_types, world_info.tick),
+            entity_store: WorldEntities::for_types(frozen_type_registry, world_info.tick),
             world_simulation: Simulation::on_dispatcher(Arc::clone(&dispatcher)),
             cold: BTreeMap::new(),
             halos: Halos::new(hot, dispatcher),
-            rules: rules_of(frozen_types)?,
-            worldgen: worldgen_of(frozen_types)?,
+            rules: rules_of(frozen_type_registry)?,
+            worldgen: worldgen_of(frozen_type_registry)?,
             generation_numbers: Arc::from(world_info.generation_numbers.clone()),
             unpopulated: world_info.unpopulated.clone(),
         })

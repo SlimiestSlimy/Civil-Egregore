@@ -1,4 +1,4 @@
-//! The types a world runs with ([`FrozenTypes`]): frozen as it
+//! The types a world runs with ([`FrozenTypeRegistry`]): frozen as it
 //! starts, constant as long as it runs -- what is worked out of them
 //! once stays true. Changed only between worlds.
 
@@ -10,7 +10,7 @@ use super::type_ids::{AttributeType, EntityType, LayerType};
 /// tick in it. Read only: no type enters after
 /// [`super::TypeRegistry::freeze`].
 #[derive(Clone)]
-pub struct FrozenTypes {
+pub struct FrozenTypeRegistry {
     /// Every type, in the order registered.
     types: Box<[RegisteredType]>,
     /// The places among them of the types each depends on.
@@ -21,7 +21,7 @@ pub struct FrozenTypes {
     hooks: Box<[Box<[Hook]>]>,
 }
 
-impl FrozenTypes {
+impl FrozenTypeRegistry {
     /// `types`, registered and checked, frozen.
     pub(crate) fn of_registered(types: Vec<RegisteredType>, depends_on: Vec<Box<[usize]>>, libraries: Vec<Option<Library>>, hooks: Vec<Box<[Hook]>>) -> Self {
         Self { types: types.into_boxed_slice(), depends_on: depends_on.into_boxed_slice(), libraries: libraries.into_boxed_slice(), hooks: hooks.into_boxed_slice() }
@@ -124,7 +124,7 @@ impl FrozenTypes {
     }
 }
 
-impl std::fmt::Debug for FrozenTypes {
+impl std::fmt::Debug for FrozenTypeRegistry {
     /// Every type, in the order registered: what a library is, only the
     /// types depending on it know.
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

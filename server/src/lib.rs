@@ -66,9 +66,9 @@ use utilities::coordinates::WORLD_MIDDLE;
 use crate::simulation::simulation_api::WorldgenCode;
 use crate::simulation::{ColdPoolPaging, SimulationHandle};
 use std::sync::Arc;
-use protocol::type_registry::FrozenTypes;
+use protocol::type_registry::FrozenTypeRegistry;
 use protocol::server_parameters::{CleanServerParameters, COLD_POOL_BYTES, WORLD};
-use protocol::world_types::GameTypes;
+use protocol::world_types::RegisterTypes;
 
 /// Bytes of cold superchunks' images a world keeps in memory, unless
 /// told another number ([`World::keep_cold_pool_within`]): past it
@@ -96,40 +96,40 @@ pub struct World {
     pub(crate) worldgen: WorldgenCode,
     /// The types it runs with: frozen as it starts, the same as long as
     /// it runs.
-    pub(crate) frozen_types: Arc<FrozenTypes>,
+    pub(crate) frozen_type_registry: Arc<FrozenTypeRegistry>,
     /// The world itself, as the simulation holds it.
     pub(crate) simulation_handle: SimulationHandle,
 }
 
 impl World {
     /// A world with nothing in it, at `world_info`'s tick: what starting
-    /// and loading build on. Of `frozen_types`, whose hooks give the
+    /// and loading build on. Of `frozen_type_registry`, whose hooks give the
     /// simulation its rules, what generates it and what it is hot about --
     /// or why it cannot run. On `thread_count` threads, every one the
     /// machine has if none is given.
-    fn empty_world(world_info: WorldInfo, thread_count: Option<usize>, frozen_types: Arc<FrozenTypes>) -> Result<Self, String> {
-        let worldgen = crate::simulation::worldgen_of(&frozen_types)?;
+    fn empty_world(world_info: WorldInfo, thread_count: Option<usize>, frozen_type_registry: Arc<FrozenTypeRegistry>) -> Result<Self, String> {
+        let worldgen = crate::simulation::worldgen_of(&frozen_type_registry)?;
         // Its numbers as its generation reads them: every one it knows, none it does not.
         let world_info = WorldInfo { generation_numbers: (worldgen.numbers_read)(&world_info.generation_numbers), ..world_info };
-        let simulation_handle = SimulationHandle::new(&world_info, &frozen_types, thread_count, ColdPoolPaging { folder: paging_folder(), bytes_kept: COLD_POOL_BYTES_KEPT })?;
+        let simulation_handle = SimulationHandle::new(&world_info, &frozen_type_registry, thread_count, ColdPoolPaging { folder: paging_folder(), bytes_kept: COLD_POOL_BYTES_KEPT })?;
         // Those unpopulated are the simulation's to keep from here on.
-        Ok(Self { world_info: WorldInfo { unpopulated: Vec::new(), ..world_info }, worldgen, frozen_types, simulation_handle })
+        Ok(Self { world_info: WorldInfo { unpopulated: Vec::new(), ..world_info }, worldgen, frozen_type_registry, simulation_handle })
     }
 
     /// The types it runs with.
-    pub fn frozen_types(&self) -> &FrozenTypes {
-        &self.frozen_types
+    pub fn frozen_type_registry(&self) -> &FrozenTypeRegistry {
+        &self.frozen_type_registry
     }
 }
 
 /// Runs what `clean_parameters` ask for: the server's one way in from
-/// a command line -- with `game_types`, what registers the game's types:
+/// a command line -- with `register_types`, what registers the game's types:
 /// each world's are registered and frozen before it is made or opened
 /// (`protocol::world_types`). Serving a window over the pipe
 /// ([`params::PIPE`]) is all there is to run yet.
-pub fn start(clean_parameters: &CleanServerParameters, game_types: GameTypes) -> Result<String, String> {
+pub fn start(clean_parameters: &CleanServerParameters, register_types: RegisterTypes) -> Result<String, String> {
     if clean_parameters.nested(params::PIPE).is_some() {
-        return pipe_end::serve_the_pipe(game_types);
+        return pipe_end::serve_the_pipe(register_types);
     }
     Err("nothing to run: --pipe serves a window; --help says the flags".to_string())
 }
@@ -165,7 +165,7 @@ impl std::fmt::Display for WorldNotStarted {
 /// else its middle -- each populated by its generation the first tick,
 /// as every superchunk generated is (`docs/server.md`, "Made from a
 /// seed"). Or why not.
-pub fn start_world(parameters: &CleanServerParameters, frozen_type_registry: &Arc<FrozenTypes>) -> Result<World, WorldNotStarted> {
+pub fn start_world(parameters: &CleanServerParameters, frozen_type_registry: &Arc<FrozenTypeRegistry>) -> Result<World, WorldNotStarted> {
     let thread_count = world_start::thread_count_of(parameters).map_err(WorldNotStarted::Refused)?;
     if let Some(world_to_open) = parameters.text(WORLD) {
         let bytes_kept = parameters.integer(COLD_POOL_BYTES).map_or(Ok(COLD_POOL_BYTES_KEPT), u64::try_from).map_err(|_| WorldNotStarted::Refused(format!("--{COLD_POOL_BYTES}: a count of bytes")))?;

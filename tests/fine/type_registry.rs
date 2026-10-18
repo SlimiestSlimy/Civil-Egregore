@@ -2,7 +2,7 @@
 //! types frozen find each again -- tried on the base game's types.
 
 use basegame::base_types::{BaseTypes, GRASS_RULE, SHEEP_RULE, TREES_RULE, SheepState};
-use protocol::type_registry::{AttributeType, EntityType, FrozenTypes, LayerType, RegisteredType, Registration, RegistryRefusal, TypeRegistry, TYPE_ID_NUMBERS};
+use protocol::type_registry::{AttributeType, EntityType, FrozenTypeRegistry, LayerType, RegisteredType, Registration, RegistryRefusal, TypeRegistry, TYPE_ID_NUMBERS};
 use server::simulation::simulation_api::{data_words, Attribute, Layout};
 use utilities::rng::RandomSource;
 
@@ -15,15 +15,15 @@ fn with_base_types() -> (TypeRegistry, BaseTypes) {
 }
 
 /// The base game's types of a new world, frozen, and their IDs.
-fn frozen_base_types() -> (FrozenTypes, BaseTypes) {
+fn frozen_base_types() -> (FrozenTypeRegistry, BaseTypes) {
     let (type_registry, base_types) = with_base_types();
     (type_registry.freeze().expect("frozen"), base_types)
 }
 
-/// The type of `frozen_types` named `type_name`, if any: a test's own
+/// The type of `frozen_type_registry` named `type_name`, if any: a test's own
 /// look-up, frozen types being known by their IDs alone.
-fn named<'frozen>(frozen_types: &'frozen FrozenTypes, type_name: &str) -> Option<&'frozen RegisteredType> {
-    frozen_types.types().iter().find(|registered_type| registered_type.name() == type_name)
+fn named<'frozen>(frozen_type_registry: &'frozen FrozenTypeRegistry, type_name: &str) -> Option<&'frozen RegisteredType> {
+    frozen_type_registry.types().iter().find(|registered_type| registered_type.name() == type_name)
 }
 
 /// The name of `registered`, if any: what tells a type from any other,
@@ -32,9 +32,9 @@ fn told_by(registered: Option<&RegisteredType>) -> Option<&str> {
     registered.map(RegisteredType::name)
 }
 
-/// Every type of `frozen_types` by its name and ID, in their order.
-fn each_told_by(frozen_types: &FrozenTypes) -> Vec<(String, u64)> {
-    frozen_types.types().iter().map(|registered_type| (registered_type.name().to_string(), registered_type.type_id())).collect()
+/// Every type of `frozen_type_registry` by its name and ID, in their order.
+fn each_told_by(frozen_type_registry: &FrozenTypeRegistry) -> Vec<(String, u64)> {
+    frozen_type_registry.types().iter().map(|registered_type| (registered_type.name().to_string(), registered_type.type_id())).collect()
 }
 
 /// `registered`, its ID let go: whether a registration went through.
@@ -108,11 +108,11 @@ fn what_a_type_names_is_registered_before_it() {
 /// registers keeps the types from freezing.
 #[test]
 fn a_saved_world_keeps_its_ids() {
-    let (frozen_types, base_types) = frozen_base_types();
-    let numbers: Vec<_> = frozen_types.types().iter().flat_map(RegisteredType::numbers).collect();
+    let (frozen_type_registry, base_types) = frozen_base_types();
+    let numbers: Vec<_> = frozen_type_registry.types().iter().flat_map(RegisteredType::numbers).collect();
     assert!(numbers.windows(2).all(|pair| pair[0] < pair[1]) && numbers[0] >= 1, "handed out in order, none overlapping, none 0");
     assert_eq!(frozen_base_types().1, base_types, "the same IDs every time");
-    let saved_text = frozen_types.to_text();
+    let saved_text = frozen_type_registry.to_text();
     // Read back, in another order: each name its saved ID.
     let mut reordered = TypeRegistry::for_saved_world(&saved_text).expect("a world's types");
     let collision = reordered.register(Registration::layer("collision")).expect("saved");
@@ -126,7 +126,7 @@ fn a_saved_world_keeps_its_ids() {
     // Registered whole, the same types come back.
     let mut whole = TypeRegistry::for_saved_world(&saved_text).expect("a world's types");
     assert_eq!(basegame::default_types::register(&mut whole).expect("registered"), base_types);
-    assert_eq!(each_told_by(&whole.freeze().expect("frozen")), each_told_by(&frozen_types));
+    assert_eq!(each_told_by(&whole.freeze().expect("frozen")), each_told_by(&frozen_type_registry));
     assert!(TypeRegistry::for_saved_world("not,a world's types\n").is_err());
 }
 
@@ -136,22 +136,22 @@ fn a_saved_world_keeps_its_ids() {
 /// order registered, each among the rules of the master it names.
 #[test]
 fn the_frozen_types_find_each_type_again() {
-    let (frozen_types, base_types) = frozen_base_types();
-    for registered_type in frozen_types.types() {
-        assert!(registered_type.numbers().all(|type_number| told_by(frozen_types.of_number(type_number)) == told_by(Some(registered_type))), "{}", registered_type.name());
-        assert_eq!(frozen_types.master_of(registered_type).is_some(), registered_type.is_a_rule(), "{}", registered_type.name());
+    let (frozen_type_registry, base_types) = frozen_base_types();
+    for registered_type in frozen_type_registry.types() {
+        assert!(registered_type.numbers().all(|type_number| told_by(frozen_type_registry.of_number(type_number)) == told_by(Some(registered_type))), "{}", registered_type.name());
+        assert_eq!(frozen_type_registry.master_of(registered_type).is_some(), registered_type.is_a_rule(), "{}", registered_type.name());
     }
-    let layer_types = frozen_types.layer_types();
-    assert_eq!(layer_types.len(), frozen_types.types().iter().filter(|registered_type| matches!(registered_type, RegisteredType::Layer { .. } | RegisteredType::WidePlane { .. })).count());
+    let layer_types = frozen_type_registry.layer_types();
+    assert_eq!(layer_types.len(), frozen_type_registry.types().iter().filter(|registered_type| matches!(registered_type, RegisteredType::Layer { .. } | RegisteredType::WidePlane { .. })).count());
     assert!(layer_types.contains(&base_types.grass) && layer_types.contains(&base_types.tree_stage.layer_type()));
-    assert_eq!(told_by(frozen_types.entity(base_types.sheep)), Some("sheep"));
-    assert_eq!(frozen_types.default_attributes(), [(base_types.sheep, base_types.sheep_state.attribute_type(), SheepState::WORDS)]);
-    assert_eq!(frozen_types.rules().map(RegisteredType::name).collect::<Vec<_>>(), [GRASS_RULE, TREES_RULE, SHEEP_RULE]);
+    assert_eq!(told_by(frozen_type_registry.entity(base_types.sheep)), Some("sheep"));
+    assert_eq!(frozen_type_registry.default_attributes(), [(base_types.sheep, base_types.sheep_state.attribute_type(), SheepState::WORDS)]);
+    assert_eq!(frozen_type_registry.rules().map(RegisteredType::name).collect::<Vec<_>>(), [GRASS_RULE, TREES_RULE, SHEEP_RULE]);
     for (rule_name, master_name) in [(GRASS_RULE, "grass"), (TREES_RULE, "tree"), (SHEEP_RULE, "sheep")] {
-        let rule = named(&frozen_types, rule_name).expect("registered");
-        let master = frozen_types.master_of(rule).expect("its master registered");
+        let rule = named(&frozen_type_registry, rule_name).expect("registered");
+        let master = frozen_type_registry.master_of(rule).expect("its master registered");
         assert_eq!(master.name(), master_name);
-        assert_eq!(frozen_types.rules_of(master).map(|master_rule| told_by(Some(master_rule))).collect::<Vec<_>>(), [told_by(Some(rule))], "{rule_name}");
+        assert_eq!(frozen_type_registry.rules_of(master).map(|master_rule| told_by(Some(master_rule))).collect::<Vec<_>>(), [told_by(Some(rule))], "{rule_name}");
     }
 }
 
@@ -184,10 +184,10 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
     for other_id in [frozen_base_types().1.grass.0, frozen_base_types().1.sheep.0, frozen_base_types().1.tree_stage.layer_type().0, 0] {
         assert!(!AttributeType(other_id).is_an_attributes());
     }
-    let (frozen_types, base_types) = frozen_base_types();
+    let (frozen_type_registry, base_types) = frozen_base_types();
     let state_type = base_types.sheep_state.attribute_type();
-    assert_eq!((state_type.block_count(), frozen_types.data_words_of(state_type)), (3, Some(data_words(3))));
-    assert_eq!(told_by(frozen_types.of_number(state_type.type_number())), Some("sheep state"));
+    assert_eq!((state_type.block_count(), frozen_type_registry.data_words_of(state_type)), (3, Some(data_words(3))));
+    assert_eq!(told_by(frozen_type_registry.of_number(state_type.type_number())), Some("sheep state"));
     for _ in 0..100 {
         let sheep_state = SheepState { hungry_at: seeded_rng.next_draw(), lamb_due_at: seeded_rng.next_draw(), grown_at: seeded_rng.next_draw(), roaming_until: seeded_rng.next_draw(), roaming_neighbour: seeded_rng.next_draw() as u32 };
         let mut state_data = [0; data_words(SheepState::BLOCK_COUNT)];
