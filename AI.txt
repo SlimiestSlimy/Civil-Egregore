@@ -304,8 +304,13 @@ NOW
   "otherwise the last 4 bits are 0"; told the code keeps a whole size
   byte -- a plane's bits a cell and tile size: "ohh i see, ok, no more
   rederved byte then, make tile size and plane width parameters at
-  registration time, only the first byte remains for kind"). NEXT,
-  after the worldgen calls.
+  registration time, only the first byte remains for kind"). NEXT.
+  Chosen by the user (asked, 2026-10-18): the handle carries the shape
+  -- LayerType becomes { id, width_bits, tile_scale }, filled in by the
+  registry at registration; call sites keep layer_type.width_bits().
+  Price: 8 -> 16 bytes (bucket keys, wire, world file's layers):
+  benchmark against the commit before. Not begun: ~37 raw LayerType(..)
+  and ~94 of_width/of_tiles/of_a_bit sites to move.
 - WHAT IS LEFT, IN ORDER (the user, 2026-10-18, on my list of what is
   left: "1 go ahead, 2 not quite, we need client side gui rules or
   something like that first / 3 same, fold into 5 with 2 / 4 can be
