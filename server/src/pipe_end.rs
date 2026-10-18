@@ -3,7 +3,7 @@
 //! stdout (`protocol::pipe::messages`), until the client closes it.
 
 use crate::host::{Host, HostSent};
-use crate::{worlds_in, WorldStart};
+use crate::worlds_in;
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use protocol::pipe::terrain::AsksTerrain;
 use protocol::world_types::{self, GameTypes};
@@ -65,7 +65,7 @@ pub fn serve_the_pipe(game_types: GameTypes) -> Result<String, String> {
             ClientMessage::MakeWorld(seed, tuning) => {
                 let frozen_types = Arc::new(world_types::of_a_new_world(game_types)?);
                 let worldgen = crate::simulation::worldgen_of(&frozen_types)?;
-                _ = host.make_world(WorldStart::from_tuning(seed, &tuning, &worldgen), frozen_types);
+                _ = host.make_world(crate::world_start::parameters_of_tuning(seed, &tuning, &worldgen), frozen_types);
             }
             ClientMessage::OpenWorld(world_name) => _ = host.open_world(world_name),
             ClientMessage::Save(world_name) => _ = host.save_world(world_name),

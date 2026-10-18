@@ -9,6 +9,7 @@
 // and the world's handles to them -- until the world has reads of its
 // own and this is rewritten against them (AI.txt, LATER).
 
+use protocol::server_parameters::{ParameterValue, SEED};
 use crate::worlds::base;
 use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, add_entity, tick_sheep};
 use server::internals_for_root_tests::Write;
@@ -32,7 +33,7 @@ fn cell(world: &World, x: u32, y: u32) -> CellIndex {
 #[test]
 fn no_two_sheep_eat_one_cell() {
     const CROWD_SIDE: u32 = 200;
-    let mut world = crate::worlds::start_world(server::WorldStart { seed: crate::test_seed::TestSeedHandle::open().seed(), ..plain_start(1, 0, 0, 2) });
+    let mut world = server::start_world(&plain_start(1, 0, 0, 2).with(SEED, ParameterValue::Hex(crate::test_seed::TestSeedHandle::open().seed())), &crate::worlds::types()).expect("the world started");
     let mut test_random = RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
     let crowd_corner_cartesian = cell(&world, 400, 400).cartesian();
     plant_grass(&mut world, crowd_corner_cartesian, CROWD_SIDE as u8, CROWD_SIDE as u8);
@@ -65,7 +66,7 @@ fn no_two_sheep_eat_one_cell() {
 /// (`a_meal_lost_to_a_decay_leaves_the_sheep_hungry`).
 #[test]
 fn grass_spread_decayed_and_eaten_changes_once_a_cell() {
-    let mut world = crate::worlds::start_world(server::WorldStart { seed: crate::test_seed::TestSeedHandle::open().seed(), ..plain_start(1, basegame::worldgen::FRACTION_ONE / 2, 20_000, 2) });
+    let mut world = server::start_world(&plain_start(1, basegame::worldgen::FRACTION_ONE / 2, 20_000, 2).with(SEED, ParameterValue::Hex(crate::test_seed::TestSeedHandle::open().seed())), &crate::worlds::types()).expect("the world started");
     let (grass_rule, sheep_rule) = (world.rule_place(crate::worlds::type_id_named(basegame::base_types::GRASS_RULE)), world.rule_place(crate::worlds::type_id_named(basegame::base_types::SHEEP_RULE)));
     let chosen_rules = || server::ChosenRules::from_rules(&[grass_rule, sheep_rule]);
     for tick in 0..600 {
@@ -85,7 +86,7 @@ fn grass_spread_decayed_and_eaten_changes_once_a_cell() {
 /// tree, and one put counted.
 #[test]
 fn a_tree_written_twice_is_one_tree() {
-    let mut world = crate::worlds::start_world(server::WorldStart { seed: crate::test_seed::TestSeedHandle::open().seed(), ..plain_start(1, 0, 0, 2) });
+    let mut world = server::start_world(&plain_start(1, 0, 0, 2).with(SEED, ParameterValue::Hex(crate::test_seed::TestSeedHandle::open().seed())), &crate::worlds::types()).expect("the world started");
     let superchunk = first_superchunk(&world);
     // A tree every fourth cell each way, each old enough to spread and not crowded.
     let trees: Vec<CellIndex> = (0..256).flat_map(|y| (0..256).map(move |x| (4 * x, 4 * y))).map(|(x, y)| cell(&world, x, y)).collect();
@@ -126,7 +127,7 @@ fn carrying_lamb(hungry_at: u64) -> WholeAttribute {
 /// none -- and bears it once a cell beside her is free.
 #[test]
 fn a_lamb_refused_its_cell_is_born_later() {
-    let mut world = crate::worlds::start_world(server::WorldStart { seed: crate::test_seed::TestSeedHandle::open().seed(), ..plain_start(1, 0, 0, 1) });
+    let mut world = server::start_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(crate::test_seed::TestSeedHandle::open().seed())), &crate::worlds::types()).expect("the world started");
     let (x, y) = (500, 500);
     for mother_x in [x, x + 2] {
         let header = Header { entity_type: base().sheep, stood_cell: cell(&world, mother_x, y), wake: 1 };
@@ -164,7 +165,7 @@ fn a_lamb_refused_its_cell_is_born_later() {
 /// two having drawn one cell, the second a step's wait on.
 #[test]
 fn a_lamb_whose_cell_was_taken_is_born_the_tick_after() {
-    let mut world = crate::worlds::start_world(server::WorldStart { seed: crate::test_seed::TestSeedHandle::open().seed(), ..plain_start(1, 0, 0, 1) });
+    let mut world = server::start_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(crate::test_seed::TestSeedHandle::open().seed())), &crate::worlds::types()).expect("the world started");
     let (x, y) = (500, 500);
     for mother_x in [x, x + 2] {
         let header = Header { entity_type: base().sheep, stood_cell: cell(&world, mother_x, y), wake: 1 };

@@ -2,6 +2,7 @@
 //! onto dirt at its chance, and turns back to dirt only where grass
 //! crowds it.
 
+use protocol::server_parameters::{ParameterValue, SEED};
 use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, tick_grass};
 use utilities::coordinates::CellCartesian;
 use basegame::sca_rules::grass::{DECAYS_COUNT, DECAY_CHANCE, SPREADS_COUNT, SPREAD_CHANCE};
@@ -26,7 +27,7 @@ fn origin(world: &World) -> CellCartesian {
 fn grass_crowded_by_grass_decays_at_its_chance() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut seeded_random = RandomSource::new(seed);
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 1) });
+    let mut world = server::start_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     let origin = origin(&world);
     let plant_all = |world: &mut World| {
         for (x, y) in (0..8).flat_map(|y| (0..8).map(move |x| (x, y))) {
@@ -57,7 +58,7 @@ fn grass_crowded_by_grass_decays_at_its_chance() {
 #[allow(clippy::disallowed_methods)]
 fn lone_grass_never_decays_and_spreads_at_its_chance() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 1) });
+    let mut world = server::start_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     let origin = origin(&world);
     // A cell every fourth across and down: far enough apart that one spread never makes two neighbours.
     for (x, y) in (0..256).flat_map(|y| (0..256).map(move |x| (x, y))) {
@@ -88,7 +89,7 @@ fn lone_grass_never_decays_and_spreads_at_its_chance() {
 fn grass_changes_by_what_spread_and_decayed() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     // Grass enough that some of it spreads in so few ticks.
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(1, 6_250, 0, 1) });
+    let mut world = server::start_world(&plain_start(1, 6_250, 0, 1).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
     let grass_at_start = cells_of_grass(&world);
     let mut grass_before = grass_at_start;
     for _ in 0..1000 {

@@ -83,8 +83,10 @@ Boundaries, asked first, would have put that on the table.
   `cargo fmt`, never `cargo clippy --fix`. One test run at a time.
 - The fast tier (tests/fast) runs in under 60 seconds whole.
 - Measure before calling a change done, against the commit before:
-  `--seed 0x5eed1234 --new [folder --side 8 --forced_hot []]`
-  then `--run [folder --ticks 10000]`, alternating rounds, medians.
+  was `--seed 0x5eed1234 --new [folder --side 8 --forced_hot []]`
+  then `--run [folder --ticks 10000]`, alternating rounds, medians --
+  those commands are gone (SERVER FLAGS); a way to measure again is
+  LATER.
   (`--sheep` purged 2026-10-17, game content: the world has the
   generation's default sheep now, so numbers before then are not
   comparable. docs/testing_protocol.md still says `--sheep 40`: docs
@@ -198,7 +200,21 @@ NOW
   b7e6e08), the server private with its tests inside it (DONE, the
   commit after b7e6e08: server/tests declared in lib.rs, autotests
   off; seven root tests moved in; internals_for_root_tests and World's
-  handles TEMPORARY), one start, worldgen parameters' name. Then COUPLINGS LEFT; then render rules on
+  handles TEMPORARY), one start (DONE, the commit after: the user,
+  2026-10-18, "only one way of starting the server must exist, for
+  tests or for gameplay"; "instead of worldstart as a parsmeter, there
+  is an ecisting clean parsmeters"; "instead of gametypes, the name is
+  frozen type registry" -- server::start_world(&CleanServerParameters,
+  &Arc<FrozenTypes>), the world's folder the `world` parameter, the
+  registry frozen by whoever starts it and checked against a save's
+  types file), worldgen parameters' name.
+- SERVER FLAGS (the user, 2026-10-18: "remove those commands, were
+  going to add more later, we just want to keep the bare minimum
+  amount, i believe is seed, size and pipe flags"; "one more flag to
+  keep its --world to idicate world path"): --seed, --side, --world,
+  --pipe. --new/--run/--info/--threads/--ticks/--forced_hot gone; only
+  --pipe runs anything yet (OPEN: what --seed/--side/--world do without
+  it). Then COUPLINGS LEFT; then render rules on
   types and the client rewrite.
 - NO GAME CONTENT OUTSIDE THE TYPE REGISTRY (the user, 2026-10-17,
   verbatim): "NO GAME CONTENT ON SERVER CLIENT OR PROTOCOL, TYPE
@@ -423,6 +439,8 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- A way to measure the server again, the commands it was measured with
+  gone ("were going to add more later").
 - World's own public reads (a cell on a plane, the hot superchunks,
   each entity); then server::internals_for_root_tests, World's
   TEMPORARY handles and tests/shared/arenas.rs go, and every root test

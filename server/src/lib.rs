@@ -1,6 +1,7 @@
 //! Civil Egregore's server: the world as a whole, held by the one
-//! crate that puts the rest together -- made from a seed ([`start_world`]),
-//! ticked, saved ([`save`]) and loaded ([`load_world`]) as it was. A
+//! crate that puts the rest together -- started, made from a seed or
+//! opened from a folder as it was saved, the one way ([`start_world`]),
+//! ticked, and saved ([`save`]). A
 //! renderer, or the program, is a client of it.
 //!
 //! The design: `docs/server.md`; function by function:
@@ -13,7 +14,6 @@
 // The server's own parts, private: the simulation shows its API alone.
 mod bitplane_manager;
 mod chunk_storage;
-mod commands;
 mod entity_manager;
 pub mod host;
 pub mod internals_for_root_tests;
@@ -56,9 +56,10 @@ pub use crate::simulation::hot::halos_about;
 pub use crate::simulation::halos::{HaloChange, COOL_TICKS, WARM_TICKS};
 pub use crate::simulation::rules::{ChosenRules, RulePlace, TickCounts};
 pub use crate::simulation::simulation_handle::WorldTick;
-pub use save_and_load::{load_keeping, load_world, read_types, save, worlds_in, write_types, SaveWritten};
+pub use crate::chunk_storage::disk::DiskError;
+pub use save_and_load::{read_types, save, worlds_in, write_types, SaveWritten};
 pub use world_hash::{world_hash, WorldHash};
-pub use world_start::{drawn_seed, seed_fit_to_start, WorldSize, WorldStart};
+pub use world_start::{drawn_seed, seed_fit_to_start};
 
 use crate::chunk_storage::disk::WorldInfo;
 use utilities::coordinates::WORLD_MIDDLE;
@@ -66,6 +67,7 @@ use crate::simulation::simulation_api::WorldgenCode;
 use crate::simulation::{ColdPoolPaging, SimulationHandle};
 use std::sync::Arc;
 use protocol::type_registry::FrozenTypes;
+use protocol::server_parameters::{CleanServerParameters, COLD_POOL_BYTES, WORLD};
 use protocol::world_types::GameTypes;
 
 /// Bytes of cold superchunks' images a world keeps in memory, unless
@@ -121,41 +123,60 @@ impl World {
 }
 
 /// Runs what `clean_parameters` ask for: the server's one way in from
-/// a command line, whichever command is nested in them -- with
-/// `game_types`, what registers the game's types: each world's are
-/// registered and frozen before it is made or loaded
-/// (`protocol::world_types`).
-pub fn start(clean_parameters: &protocol::server_parameters::CleanServerParameters, game_types: GameTypes) -> Result<String, String> {
-    if let Some(new_parameters) = clean_parameters.nested(params::NEW) {
-        return commands::new(utilities::seed::given_or_fresh_seed(clean_parameters.hex(params::SEED)), new_parameters, game_types);
-    }
-    if let Some(run_parameters) = clean_parameters.nested(params::RUN) {
-        return commands::run_saved_world(run_parameters, game_types);
-    }
-    if let Some(info_parameters) = clean_parameters.nested(params::INFO) {
-        return commands::describe_saved_world(info_parameters);
-    }
+/// a command line -- with `game_types`, what registers the game's types:
+/// each world's are registered and frozen before it is made or opened
+/// (`protocol::world_types`). Serving a window over the pipe
+/// ([`params::PIPE`]) is all there is to run yet.
+pub fn start(clean_parameters: &CleanServerParameters, game_types: GameTypes) -> Result<String, String> {
     if clean_parameters.nested(params::PIPE).is_some() {
         return pipe_end::serve_the_pipe(game_types);
     }
-    Err("no command given: --help says them".to_string())
+    Err("nothing to run: --pipe serves a window; --help says the flags".to_string())
 }
 
-/// A world as `options` say, nothing in it yet: the superchunks it starts
-/// with hot -- every one of a world with a size forced hot, else its
-/// middle -- each populated by its generation the first tick, as every
-/// superchunk generated is (`docs/server.md`, "Made from a seed"). Of
-/// `frozen_types`: a world loaded is of its own.
-pub fn start_world(options: WorldStart, frozen_types: &Arc<FrozenTypes>) -> World {
-    let (side_in_superchunks, forced_hot) = match options.world_size {
-        WorldSize::NoEnd => (None, false),
-        WorldSize::SquareOfSide { side_superchunks, forced_hot } => (Some(side_superchunks), forced_hot),
-    };
-    let world_info = WorldInfo { seed: options.seed, tick: 0, layers: frozen_types.layer_types(), side_in_superchunks, forced_hot, camera_loads: options.camera_loads && !forced_hot, unpopulated: Vec::new(), generation_numbers: options.generation_numbers };
-    let mut world = World::empty_world(world_info, options.thread_count, Arc::clone(frozen_types)).expect("the types handed the server run");
+/// Why a world was not started.
+#[derive(Debug)]
+pub enum WorldNotStarted {
+    /// The world asked to be opened is not a save, or not one this
+    /// server reads: which file, and why.
+    Unreadable(DiskError),
+    /// The parameters asked what cannot be -- a number out of range,
+    /// forced hot with no side -- or the types cannot run a world.
+    Refused(String),
+}
+
+impl std::fmt::Display for WorldNotStarted {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Unreadable(disk_error) => write!(formatter, "{disk_error}"),
+            Self::Refused(why_not) => write!(formatter, "{why_not}"),
+        }
+    }
+}
+
+/// The one way a world is started, for play and for tests alike: as
+/// `parameters` say, of `frozen_type_registry` -- registered and frozen
+/// before anything of it, by whoever starts it (`protocol::world_types`)
+/// -- on the threads they say. Opened from the folder they name
+/// ([`WORLD`]) as it was saved, the registry frozen as its types file
+/// gives the IDs (checked against it); or else made new, nothing in it
+/// yet, the superchunks
+/// it starts with hot -- every one of a world with a size forced hot,
+/// else its middle -- each populated by its generation the first tick,
+/// as every superchunk generated is (`docs/server.md`, "Made from a
+/// seed"). Or why not.
+pub fn start_world(parameters: &CleanServerParameters, frozen_type_registry: &Arc<FrozenTypes>) -> Result<World, WorldNotStarted> {
+    let thread_count = world_start::thread_count_of(parameters).map_err(WorldNotStarted::Refused)?;
+    if let Some(world_to_open) = parameters.text(WORLD) {
+        let bytes_kept = parameters.integer(COLD_POOL_BYTES).map_or(Ok(COLD_POOL_BYTES_KEPT), u64::try_from).map_err(|_| WorldNotStarted::Refused(format!("--{COLD_POOL_BYTES}: a count of bytes")))?;
+        return save_and_load::open_world(&utilities::settings::world(world_to_open), bytes_kept, thread_count, frozen_type_registry).map_err(WorldNotStarted::Unreadable);
+    }
+    let worldgen = crate::simulation::worldgen_of(frozen_type_registry).map_err(WorldNotStarted::Refused)?;
+    let world_info = world_start::new_world_info(frozen_type_registry, &worldgen, parameters).map_err(WorldNotStarted::Refused)?;
+    let mut world = World::empty_world(world_info, thread_count, Arc::clone(frozen_type_registry)).map_err(WorldNotStarted::Refused)?;
     let every_superchunk = world.simulation_handle.halos().hot.all_superchunks();
     let start_superchunks = if every_superchunk.is_empty() { vec![WORLD_MIDDLE] } else { every_superchunk };
     world.simulation_handle.keep_hot(&start_superchunks);
     world.simulation_handle.mark_unpopulated(&start_superchunks);
-    world
+    Ok(world)
 }

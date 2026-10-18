@@ -4,6 +4,7 @@
 // and the world's handles to them -- until the world has reads of its
 // own and this is rewritten against them (AI.txt, LATER).
 
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, SEED};
 use crate::worlds::base;
 use crate::worlds::{world_contents, folder};
 
@@ -14,18 +15,18 @@ use crate::worlds::{world_contents, folder};
 fn a_world_stopped_often_comes_to_the_same() {
     const LAST_TICK: u64 = 30_000;
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let mut straight_world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
+    let mut straight_world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
     while straight_world.entity_store().current_tick() < LAST_TICK {
         straight_world.tick();
     }
     let folder = folder("complete");
-    let mut stopped_world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
+    let mut stopped_world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
     for stop_tick in (5_000..=LAST_TICK).step_by(5_000) {
         while stopped_world.entity_store().current_tick() < stop_tick {
             stopped_world.tick();
         }
         server::save(&folder, &mut stopped_world).expect("saved");
-        stopped_world = server::load_world(&folder, basegame::default_types::register_types).expect("loaded");
+        stopped_world = crate::worlds::opened(&folder, basegame::default_types::register_types).expect("loaded");
     }
     // A cooled superchunk's last changes wait in the writeback ring: flushed, as a save's are, before the images are set side by side.
     straight_world.write_back_and_flush_all();
@@ -38,7 +39,7 @@ fn a_world_stopped_often_comes_to_the_same() {
 #[ignore]
 fn a_flock_on_generated_ground_lasts() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let mut made_world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
+    let mut made_world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
     for _ in 0..300_000 {
         made_world.tick();
     }

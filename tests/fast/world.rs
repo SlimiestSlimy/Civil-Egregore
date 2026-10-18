@@ -10,6 +10,7 @@
 // and the world's handles to them -- until the world has reads of its
 // own and this is rewritten against them (AI.txt, LATER).
 
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_LOADS, FORCED_HOT, SEED, SIDE, WORLDGEN};
 use crate::worlds::{world_contents, folder};
 use server::internals_for_root_tests::disk::{self, DiskError};
 use utilities::coordinates::CellCartesian;
@@ -21,14 +22,14 @@ use basegame::entity_rules::sheep::EATEN_COUNT;
 fn a_world_loaded_goes_on_as_the_one_saved() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     let folder = folder("goes_on");
-    let mut first_world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 3_000);
+    let mut first_world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 3_000);
     for _ in 0..1_500 {
         first_world.tick();
     }
     let save_written = server::save(&folder, &mut first_world).expect("saved");
     assert_eq!((save_written.superchunks, save_written.entities_written), (first_world.chunk_storage().superchunks().count(), first_world.entity_store().len()));
 
-    let mut second_world = server::load_world(&folder, basegame::default_types::register_types).expect("loaded");
+    let mut second_world = crate::worlds::opened(&folder, basegame::default_types::register_types).expect("loaded");
     assert_eq!((second_world.world_info().seed, second_world.world_info().tick, second_world.generation_numbers()), (seed, 1_500, first_world.generation_numbers()));
     assert_eq!(second_world.world_info().layers, first_world.world_info().layers);
     assert!(world_contents(&first_world) == world_contents(&second_world), "loaded as saved");
@@ -52,7 +53,7 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
 fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     // At least 4,000 ticks, and on until a superchunk has been warming: on some seeds the flock is long in nearing an edge.
-    let mut straight_world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
+    let mut straight_world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
     let mut warming = None;
     while straight_world.entity_store().current_tick() < 4_000 || warming.is_none() {
         assert!(straight_world.entity_store().current_tick() < 60_000, "a superchunk warming on the way");
@@ -65,7 +66,7 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     let (warming, last_tick) = (warming.expect("seen above"), straight_world.entity_store().current_tick());
 
     let folder = folder("mid_run");
-    let mut stopped_world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
+    let mut stopped_world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
     let mut stop_ticks = vec![1, 700, 701, 1_900, 3_333, warming, last_tick];
     stop_ticks.sort_unstable();
     stop_ticks.dedup();
@@ -75,7 +76,7 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
         }
         server::save(&folder, &mut stopped_world).expect("saved");
         // What ran is dropped whole: the next stretch runs on what the files hold alone.
-        stopped_world = server::load_world(&folder, basegame::default_types::register_types).expect("loaded");
+        stopped_world = crate::worlds::opened(&folder, basegame::default_types::register_types).expect("loaded");
         assert_eq!((stopped_world.world_info().tick, stopped_world.broken_invariant()), (stop_tick, None));
     }
     assert_ne!(straight_world.entity_store().len(), 4_000, "a flock that was born into or died of, over the run");
@@ -91,7 +92,7 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
 fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let folder = folder("files");
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let mut saved_world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 10);
+    let mut saved_world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 10);
     server::save(&folder, &mut saved_world).expect("saved");
     let world_file_text = std::fs::read_to_string(folder.join("world.csv")).expect("the world's file");
     let generation: String = saved_world.generation_numbers().iter().map(|(name, value)| format!("generation {name},{value}\n")).collect();
@@ -116,7 +117,7 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
 fn a_world_file_is_read_in_any_order() {
     let folder = folder("any_order");
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let mut world = crate::worlds::one_flock_world(server::WorldStart { seed, camera_loads: true, ..server::WorldStart::default() }, 10);
+    let mut world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(CAMERA_LOADS, crate::worlds::given()), 10);
     server::save(&folder, &mut world).expect("saved");
     let saved_info = disk::read_world(&folder).expect("read");
     let path = folder.join("world.csv");
@@ -140,16 +141,16 @@ fn a_world_file_is_read_in_any_order() {
 fn files_that_are_not_a_save_are_refused() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     let folder = folder("refused");
-    assert!(matches!(server::load_world(&folder, basegame::default_types::register_types), Err(DiskError::IoFailed(..))), "no such folder");
-    server::save(&folder, &mut crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 10)).expect("saved");
+    assert!(matches!(crate::worlds::opened(&folder, basegame::default_types::register_types), Err(DiskError::IoFailed(..))), "no such folder");
+    server::save(&folder, &mut crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 10)).expect("saved");
     let state_path = std::fs::read_dir(folder.join("superchunks")).unwrap().map(|dir_entry| dir_entry.unwrap().path()).find(|path| path.extension().unwrap() == "state").unwrap();
     let whole_state = std::fs::read(&state_path).unwrap();
     std::fs::write(&state_path, &whole_state[..whole_state.len() - 8]).unwrap();
-    assert!(matches!(server::load_world(&folder, basegame::default_types::register_types), Err(DiskError::InvalidFile(path, invalid_reason)) if path == state_path && invalid_reason == "cut short"));
+    assert!(matches!(crate::worlds::opened(&folder, basegame::default_types::register_types), Err(DiskError::InvalidFile(path, invalid_reason)) if path == state_path && invalid_reason == "cut short"));
     std::fs::write(&state_path, &whole_state).unwrap();
-    assert!(server::load_world(&folder, basegame::default_types::register_types).is_ok());
+    assert!(crate::worlds::opened(&folder, basegame::default_types::register_types).is_ok());
     std::fs::write(folder.join("world.csv"), "something else\n").unwrap();
-    assert!(matches!(server::load_world(&folder, basegame::default_types::register_types), Err(DiskError::InvalidFile(..))));
+    assert!(matches!(crate::worlds::opened(&folder, basegame::default_types::register_types), Err(DiskError::InvalidFile(..))));
 }
 
 /// A save holds the world's types by name and ID, in the order
@@ -162,7 +163,7 @@ fn files_that_are_not_a_save_are_refused() {
 fn a_world_is_loaded_with_the_types_it_was_made_with() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     let folder = folder("types");
-    let mut world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 10);
+    let mut world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 10);
     server::save(&folder, &mut world).expect("saved");
     let types_path = folder.join(protocol::world_types::TYPES_FILE);
     let types_text = std::fs::read_to_string(&types_path).expect("the types file");
@@ -177,7 +178,7 @@ fn a_world_is_loaded_with_the_types_it_was_made_with() {
     };
     // A type the save does not name -- as in a world saved before the game added it: registered all the same, given an ID past every saved one.
     std::fs::write(&types_path, with_lines(&|changed_lines| _ = changed_lines.remove(line_of("water depth")))).expect("written");
-    let loaded_world = server::load_world(&folder, basegame::default_types::register_types).expect("loaded without it");
+    let loaded_world = crate::worlds::opened(&folder, basegame::default_types::register_types).expect("loaded without it");
     let water_depth = loaded_world.frozen_types().types().iter().find(|registered| registered.name() == "water depth").expect("registered");
     let saved_numbers_end = world.frozen_types().types().iter().filter(|registered| registered.name() != "water depth").map(|registered| registered.numbers().end).max().expect("types");
     assert!(water_depth.numbers().start >= saved_numbers_end && loaded_world.frozen_types().types().len() == lines.len() - 1);
@@ -193,11 +194,11 @@ fn a_world_is_loaded_with_the_types_it_was_made_with() {
         (with_lines(&|changed_lines| changed_lines.insert(drawn, lines[drawn].clone())), drawn_name),
     ] {
         std::fs::write(&types_path, &changed_text).expect("written");
-        let Err(DiskError::InvalidFile(path, what_is_wrong)) = server::load_world(&folder, basegame::default_types::register_types) else { panic!("loaded with `{named}` amiss:\n{changed_text}") };
+        let Err(DiskError::InvalidFile(path, what_is_wrong)) = crate::worlds::opened(&folder, basegame::default_types::register_types) else { panic!("loaded with `{named}` amiss:\n{changed_text}") };
         assert!(path == types_path && what_is_wrong.contains(named), "{what_is_wrong}");
     }
     std::fs::write(&types_path, &types_text).expect("written");
-    assert!(server::load_world(&folder, basegame::default_types::register_types).is_ok());
+    assert!(crate::worlds::opened(&folder, basegame::default_types::register_types).is_ok());
 }
 
 /// In a world generated, the ground has walls, and no sheep ever steps
@@ -209,7 +210,7 @@ fn sheep_never_step_through_a_wall() {
     // Small polygons joined by cliffs, and a seed whose origin superchunk has walls enough.
     let land_shape = basegame::worldgen::LandShape { vertex_spacing_power: 8, highest_land: 552, narrowest_blend: 2, widest_blend: 2, ocean_share: 0, finer_depth: 3, ..basegame::worldgen::LandShape::DEFAULT };
     let seed = (crate::test_seed::TestSeedHandle::open().seed()..).find(|&seed| basegame::worldgen::Terrain::generate_shaped(&land_shape, seed, utilities::coordinates::CellArea { top_left: utilities::coordinates::WORLD_MIDDLE_CELL, side_cells: utilities::coordinates::SUPERCHUNK_SIDE_CELLS }).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
-    let mut made_world = crate::worlds::start_world(server::WorldStart { seed, world_size: server::WorldSize::SquareOfSide { side_superchunks: 1, forced_hot: false }, generation_numbers: basegame::worldgen::WorldGeneration { land_shape, sheep_per_superchunk: 4_000, ..basegame::worldgen::WorldGeneration::DEFAULT }.numbers(), ..server::WorldStart::default() });
+    let mut made_world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(1)).with(WORLDGEN, crate::worlds::worldgen(basegame::worldgen::WorldGeneration { land_shape, sheep_per_superchunk: 4_000, ..basegame::worldgen::WorldGeneration::DEFAULT }.numbers())), &crate::worlds::types()).expect("the world started");
     // The superchunk's heights and a cell more all round, worked out once: asked for at every sheep, every tick.
     let (corner_cartesian, side_cells) = (utilities::coordinates::WORLD_MIDDLE.top_left().cartesian(), utilities::coordinates::SUPERCHUNK_SIDE_CELLS as usize + 2);
     let mut mesh_lands = basegame::worldgen::mesh::WorldLand::new(&land_shape, seed);
@@ -256,7 +257,7 @@ fn a_plane_of_tiles_holds_a_number_a_tile_through_ticks_and_a_save() {
     let folder = folder("tiles");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
     let (frozen_types, test_tiles) = crate::worlds::with_test_tiles();
-    let mut world = server::start_world(server::WorldStart { seed, world_size: server::WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, generation_numbers: crate::worlds::flocked(50), ..server::WorldStart::default() }, &frozen_types);
+    let mut world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(50))), &frozen_types).expect("the world started");
     let (corner_cartesian, side_cells) = (world.bitmap_arena().superchunk_indices()[0].top_left().cartesian(), 2 * utilities::coordinates::SUPERCHUNK_SIDE_CELLS);
     // A cell of the tile `(x, y)` -- in tiles from the world's corner -- drawn anew each time.
     let tile_side = test_tiles.layer_type().tile_side();
@@ -283,7 +284,7 @@ fn a_plane_of_tiles_holds_a_number_a_tile_through_ticks_and_a_save() {
     }
     check_held(&world, "after ticks", &mut test_random);
     server::save(&folder, &mut world).expect("saved");
-    let loaded_world = server::load_world(&folder, crate::worlds::types_with_test_tiles).expect("loaded");
+    let loaded_world = crate::worlds::opened(&folder, crate::worlds::types_with_test_tiles).expect("loaded");
     check_held(&loaded_world, "loaded from a save", &mut test_random);
     assert!(world_contents(&world) == world_contents(&loaded_world), "loaded as saved");
 }

@@ -9,6 +9,7 @@
 // and the world's handles to them -- until the world has reads of its
 // own and this is rewritten against them (AI.txt, LATER).
 
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_LOADS, FORCED_HOT, SEED, SIDE, WORLDGEN};
 use crate::worlds::base;
 use utilities::coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use server::internals_for_root_tests::{Write, WriteOp};
@@ -30,7 +31,7 @@ fn hot_entities(world: &World) -> Vec<SuperchunkIndex> {
 #[test]
 fn the_hot_superchunks_are_the_halos() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let mut world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
+    let mut world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
     assert_eq!(world.bitmap_arena().superchunk_indices(), halos_about([WORLD_MIDDLE].into_iter()), "the origin's halo");
     let mut halos_moved = HaloChange::default();
     // 6,000 ticks at least, and on until a superchunk has been generated: on some seeds the flock is long in nearing an edge.
@@ -64,7 +65,7 @@ fn the_hot_superchunks_are_the_halos() {
 #[test]
 fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let mut world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
+    let mut world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
     let try_both = |world: &mut World, cell| {
         let missed = world.write_cells(base().grass, [Write::cell(cell, WriteOp::FlipCell)]).missed;
         (missed, world.add_entity(Header { entity_type: EntityType::from_number(99), stood_cell: cell, wake: NEVER_WAKES }, &[]).lost)
@@ -90,7 +91,7 @@ fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
 #[test]
 fn a_superchunk_cooling_stays_hot_until_due() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let mut world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 1);
+    let mut world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 1);
     let halo = world.bitmap_arena().superchunk_indices();
     let lone_sheep = world.entity_store().iter().map(|entity| (entity.header, entity.attributes.to_vec())).next().expect("the sheep");
     let take_away = |world: &mut World| {
@@ -115,7 +116,7 @@ fn a_superchunk_cooling_stays_hot_until_due() {
     let second_due_tick = world.entity_store().current_tick() + COOL_TICKS;
     let folder = crate::worlds::folder("cooling");
     server::save(&folder, &mut world).expect("saved");
-    world = server::load_world(&folder, basegame::default_types::register_types).expect("loaded");
+    world = crate::worlds::opened(&folder, basegame::default_types::register_types).expect("loaded");
     assert!(cooling(&world) == halo && world.cooling().all(|(_, goes_cold_tick)| goes_cold_tick == second_due_tick), "cooling as it was");
     let mut cooled_count = 0;
     while world.entity_store().current_tick() < second_due_tick {
@@ -132,7 +133,7 @@ fn a_superchunk_cooling_stays_hot_until_due() {
 #[test]
 fn a_superchunk_gone_cold_comes_back_as_it_was() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let mut world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 2_000);
+    let mut world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 2_000);
     // 500 ticks, and on to one with nothing warming or cooling: made cold and hot again by hand, one warming would not turn hot when it was due.
     while world.entity_store().current_tick() < 500 || world.warming().next().is_some() || world.cooling().next().is_some() {
         assert!(world.entity_store().current_tick() < 60_000, "the halos at rest");
@@ -146,7 +147,7 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
         (cells, world.entity_store().iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect(), world.world_simulation().random_states().collect())
     };
     let held_before = world_held(&world);
-    let mut twin_world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 2_000);
+    let mut twin_world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 2_000);
     for _ in 0..ticks_run {
         twin_world.tick();
     }
@@ -198,8 +199,8 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
 fn a_world_of_a_size_is_hot_within_it_only() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     let side_superchunks = 4;
-    let world_size = server::WorldSize::SquareOfSide { side_superchunks, forced_hot: false };
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, world_size, generation_numbers: crate::worlds::flocked(500), ..server::WorldStart::default() });
+    let sized = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(i64::from(side_superchunks)));
+    let mut world = server::start_world(&sized.clone().with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(500))), &crate::worlds::types()).expect("the world started");
     while world.bitmap_arena().superchunk_indices().len() < (side_superchunks * side_superchunks) as usize || !world.unpopulated().is_empty() {
         assert!(world.entity_store().current_tick() < 8 * WARM_TICKS, "the square hot and populated, flock by flock");
         world.tick();
@@ -215,14 +216,13 @@ fn a_world_of_a_size_is_hot_within_it_only() {
     }
     let folder = crate::worlds::folder("sized");
     server::save(&folder, &mut world).expect("saved");
-    assert_eq!(server::load_world(&folder, basegame::default_types::register_types).expect("loaded").halos().hot, world.halos().hot, "its size, kept");
+    assert_eq!(crate::worlds::opened(&folder, basegame::default_types::register_types).expect("loaded").halos().hot, world.halos().hot, "its size, kept");
 
-    let forced_size = server::WorldSize::SquareOfSide { side_superchunks, forced_hot: true };
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, world_size: forced_size, generation_numbers: crate::worlds::flocked(0), ..server::WorldStart::default() });
+    let mut world = server::start_world(&sized.with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(0))), &crate::worlds::types()).expect("the world started");
     assert_eq!(world.bitmap_arena().superchunk_indices().len(), (side_superchunks * side_superchunks) as usize, "forced hot: all of it, no sheep needed");
     _ = std::fs::remove_dir_all(&folder);
     server::save(&folder, &mut world).expect("saved");
-    let mut loaded_world = server::load_world(&folder, basegame::default_types::register_types).expect("loaded");
+    let mut loaded_world = crate::worlds::opened(&folder, basegame::default_types::register_types).expect("loaded");
     assert_eq!(loaded_world.halos().hot, world.halos().hot, "forced, kept");
     for _ in 0..=WARM_TICKS {
         loaded_world.tick();
@@ -241,7 +241,7 @@ fn a_world_of_a_size_is_hot_within_it_only() {
 #[test]
 fn the_camera_loads_the_superchunks_of_the_viewport() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let mut world = crate::worlds::start_world(server::WorldStart { seed, generation_numbers: crate::worlds::flocked(0), camera_loads: true, ..server::WorldStart::default() });
+    let mut world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(0))).with(CAMERA_LOADS, crate::worlds::given()), &crate::worlds::types()).expect("the world started");
     assert!(world.world_info().camera_loads);
     let (x, y) = WORLD_MIDDLE.cartesian();
     world.keep_viewport(Some(Viewport { top_left_superchunk_cartesian: (x - 50, y - 50), bottom_right_superchunk_cartesian: (x + 50, y + 50) }));
@@ -258,13 +258,13 @@ fn the_camera_loads_the_superchunks_of_the_viewport() {
     assert!(viewport.iter().all(|superchunk| world.unpopulated().contains(&superchunk.0)), "generated, and unpopulated until its first tick hot");
     let folder = crate::worlds::folder("camera");
     server::save(&folder, &mut world).expect("saved");
-    let loaded_world = server::load_world(&folder, basegame::default_types::register_types).expect("loaded");
+    let loaded_world = crate::worlds::opened(&folder, basegame::default_types::register_types).expect("loaded");
     assert!(loaded_world.world_info().camera_loads, "that its camera loads, kept");
     assert_eq!(loaded_world.unpopulated(), world.unpopulated(), "those unpopulated, kept");
     world.tick();
     assert!(viewport.iter().all(|superchunk| !world.unpopulated().contains(&superchunk.0)), "populated on its first tick hot");
 
-    let mut unseen_world = crate::worlds::start_world(server::WorldStart { seed, generation_numbers: crate::worlds::flocked(0), ..server::WorldStart::default() });
+    let mut unseen_world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(0))), &crate::worlds::types()).expect("the world started");
     unseen_world.keep_viewport(Some(Viewport { top_left_superchunk_cartesian: (x + 10, y), bottom_right_superchunk_cartesian: (x + 11, y) }));
     assert!(unseen_world.halos().viewport().is_empty() && !unseen_world.world_info().camera_loads, "its camera loads nothing");
 }

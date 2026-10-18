@@ -1,9 +1,35 @@
 //! The parameters a command line gives the server: the shell's words as
 //! they came, and the same read by the flags into a tree
-//! (`docs/reference.md`, "server_parameters.rs").
+//! (`docs/reference.md`, "server_parameters.rs") -- the tree being too
+//! what a world is started by, whoever starts it.
 
 use crate::flags::{Flag, FlagError, FlagParser};
 use std::collections::BTreeMap;
+
+// The parameters a world is started by, whoever starts it: a command
+// line, or a window through the host.
+
+/// The world's seed: none given, one drawn that its generation finds
+/// fit to start.
+pub const SEED: &str = "seed";
+/// Superchunks along a world's side: none, as far as it goes.
+pub const SIDE: &str = "side";
+/// A world hot throughout, not about its hot entities' halos.
+pub const FORCED_HOT: &str = "forced_hot";
+/// Threads a world ticks on: none, every one the machine has.
+pub const THREADS: &str = "threads";
+/// A world's folder: a name in the worlds' folder, or a path. Given,
+/// the world saved there is opened, and every parameter of a new one is
+/// nothing to it.
+pub const WORLD: &str = "world";
+/// Bytes of its cold superchunks' images an opened world keeps in
+/// memory: none given, the server's own.
+pub const COLD_POOL_BYTES: &str = "cold_pool_bytes";
+/// A new world's camera loads superchunks: the viewport's hot as well.
+pub const CAMERA_LOADS: &str = "camera_loads";
+/// A new world's worldgen parameters, each by its name: its
+/// generation's own, handed it untouched.
+pub const WORLDGEN: &str = "worldgen";
 
 /// The command line as the shell gave it: words, nothing read yet.
 pub struct ServerParameters {
@@ -23,14 +49,15 @@ impl ServerParameters {
 /// The command line read: every parameter by name, a flag's bracketed
 /// parameters nested under it. By name and not by field, so what the
 /// type registry adds once it is dynamic can bring parameters of its own.
-#[derive(Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct CleanServerParameters {
     /// Every parameter, by its name.
-    parameter_values: BTreeMap<&'static str, ParameterValue>,
+    parameter_values: BTreeMap<String, ParameterValue>,
 }
 
 /// A parameter's value: typed as its token was, or a flag's own
 /// parameters, nested.
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParameterValue {
     /// A number in hexadecimal: a seed.
     Hex(u64),
@@ -46,8 +73,20 @@ pub enum ParameterValue {
 
 impl CleanServerParameters {
     /// Puts `parameter_value` under `parameter_name`, over any before.
-    pub fn insert(&mut self, parameter_name: &'static str, parameter_value: ParameterValue) {
-        self.parameter_values.insert(parameter_name, parameter_value);
+    pub fn insert(&mut self, parameter_name: impl Into<String>, parameter_value: ParameterValue) {
+        self.parameter_values.insert(parameter_name.into(), parameter_value);
+    }
+
+    /// With `parameter_value` under `parameter_name`, over any before.
+    pub fn with(mut self, parameter_name: impl Into<String>, parameter_value: ParameterValue) -> Self {
+        self.insert(parameter_name, parameter_value);
+        self
+    }
+
+    /// Every parameter, by its name: what one whose names are not known
+    /// beforehand -- a type's own -- is read by.
+    pub fn each(&self) -> impl Iterator<Item = (&str, &ParameterValue)> {
+        self.parameter_values.iter().map(|(parameter_name, parameter_value)| (parameter_name.as_str(), parameter_value))
     }
 
     /// The parameter `parameter_name`, if given in hexadecimal.

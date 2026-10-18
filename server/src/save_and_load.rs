@@ -1,9 +1,9 @@
-//! A world saved in a folder and loaded from it ([`save`],
-//! [`load_world`]): every superchunk, hot and cold, and the types it
+//! A world saved in a folder and opened from it ([`save`],
+//! [`crate::start_world`] given the folder): every superchunk, hot and cold, and the types it
 //! was made with: loaded with it, the world's own, each the type of its
 //! name the code registers.
 
-use crate::{World, COLD_POOL_BYTES_KEPT};
+use crate::World;
 use crate::chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
 use utilities::coordinates::SuperchunkIndex;
 use crate::entity_manager::saved;
@@ -88,28 +88,27 @@ pub fn worlds_in(folder: &Path) -> Vec<String> {
     worlds
 }
 
-/// Loads the world saved in `folder`: every superchunk's image into the
-/// cold pool and its state kept as a cold one's; then the superchunks
-/// hot when it was saved made hot, before it ticks, those cooling
-/// cooling again and those warming warming again, each to turn when it
-/// was to -- as it was when saved, to the cell and the random number.
-/// Its types are `game_types`, frozen first as its types file says
-/// ([`read_types`]).
-pub fn load_world(folder: &Path, game_types: GameTypes) -> Result<World, DiskError> {
-    load_keeping(folder, COLD_POOL_BYTES_KEPT, game_types)
-}
-
-/// [`load_world`], the world keeping `bytes_kept` bytes of its cold
-/// superchunks' images in memory: every image is read and checked,
-/// and those past that many bytes are left in `folder`, read again
-/// when wanted -- so the save is not to be removed while the world
-/// runs.
-pub fn load_keeping(folder: &Path, bytes_kept: u64, game_types: GameTypes) -> Result<World, DiskError> {
+/// Opens the world saved in `folder` ([`crate::start_world`] given its
+/// folder): every superchunk's image into the cold pool and its state
+/// kept as a cold one's; then the superchunks hot when it was saved
+/// made hot, before it ticks, those cooling cooling again and those
+/// warming warming again, each to turn when it was to -- as it was when
+/// saved, to the cell and the random number. Its types are
+/// `frozen_types`, frozen first as its types file says ([`read_types`])
+/// -- refused if they say otherwise; on `thread_count` threads, every one the machine has if none is
+/// given. It keeps `bytes_kept` bytes of its cold superchunks' images
+/// in memory: every image is read and checked, and those past that
+/// many bytes are left in `folder`, read again when wanted -- so the
+/// save is not to be removed while the world runs.
+pub(crate) fn open_world(folder: &Path, bytes_kept: u64, thread_count: Option<usize>, frozen_types: &Arc<FrozenTypes>) -> Result<World, DiskError> {
     // Its types first: those it was made with, each of the ID it was saved with.
-    let frozen_types = Arc::new(read_types(folder, game_types)?);
+    let types_path = folder.join(TYPES_FILE);
+    let types_text = std::fs::read_to_string(&types_path).map_err(|io_error| DiskError::IoFailed(types_path.clone(), io_error))?;
+    frozen_types.agree_with_saved(&types_text).map_err(|what_is_wrong| DiskError::InvalidFile(types_path, what_is_wrong))?;
+    let frozen_types = Arc::clone(frozen_types);
     let world_info = WorldInfo { layers: frozen_types.layer_types(), ..disk::read_world(folder)? };
     let hot = disk::read_hot(folder)?;
-    let mut world = World::empty_world(world_info, None, frozen_types).map_err(|why_not| DiskError::InvalidFile(folder.join(TYPES_FILE), why_not))?;
+    let mut world = World::empty_world(world_info, thread_count, frozen_types).map_err(|why_not| DiskError::InvalidFile(folder.join(TYPES_FILE), why_not))?;
     let simulation_handle = &mut world.simulation_handle;
     simulation_handle.keep_cold_pool_within(bytes_kept);
     let (mut entities_kept, saved_in) = (0, Arc::<Path>::from(folder));
