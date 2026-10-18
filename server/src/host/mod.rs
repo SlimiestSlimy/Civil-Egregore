@@ -65,6 +65,9 @@ enum HostRequest {
     /// Run this world, started already, in place of any run, of no name:
     /// what a headless server runs from its start.
     RunWorld(Box<crate::World>),
+    /// A client's call of the function whose ID is this, with these words
+    /// for arguments: answered, or refused, on the sender.
+    Call(u64, Vec<u64>, Sender<Result<Vec<u64>, String>>),
     /// Save the world run under this name in the worlds' folder, its
     /// name from then ([`Frame::named`]).
     Save(String),
@@ -75,7 +78,9 @@ enum HostRequest {
 
 /// The host, as a client holds it: each call sent to the host's thread,
 /// done there between two ticks, in the order called. Each says whether
-/// the host was still there to be told.
+/// the host was still there to be told. Cloned, each clone tells the
+/// one host.
+#[derive(Clone)]
 pub struct Host {
     /// Where the calls go.
     request_sender: Sender<HostRequest>,
@@ -130,6 +135,16 @@ impl Host {
     /// run goes on (the next frame's [`Frame::said`]).
     pub fn open_world(&self, world_name: String) -> bool {
         self.request_sender.send(HostRequest::OpenWorld(world_name)).is_ok()
+    }
+
+    /// The answer to a client's call of the function whose ID is `call`,
+    /// with `arguments`, answered by the world running between two ticks;
+    /// or why it is refused: no world runs, no function a client may call
+    /// is of the ID, or it would not take them. Waits for it.
+    pub fn call(&self, call: u64, arguments: Vec<u64>) -> Result<Vec<u64>, String> {
+        let (answer_sender, answer) = channel();
+        self.request_sender.send(HostRequest::Call(call, arguments, answer_sender)).map_err(|_| "the host is gone".to_string())?;
+        answer.recv().map_err(|_| "the host is gone".to_string())?
     }
 
     /// Runs `world`, started already ([`crate::start_world`]), in place of

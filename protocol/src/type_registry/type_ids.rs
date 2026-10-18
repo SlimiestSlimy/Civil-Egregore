@@ -31,6 +31,9 @@ pub enum TypeKind {
     /// A window of the client's, its grid's contents declared: nested
     /// in another, or on its own.
     Gui = 0x07,
+    /// A function a client may call across the connection: its library
+    /// the function, its master the type it belongs to.
+    ClientCall = 0x08,
 }
 
 /// Where an ID keeps its kind: its first byte, over its number.
@@ -229,6 +232,24 @@ impl GuiType {
     /// The window of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
         Self(type_id(TypeKind::Gui, type_number, 0))
+    }
+
+    /// Its number.
+    pub const fn type_number(self) -> u64 {
+        number_of(self.0)
+    }
+}
+
+/// A function a client may call across the connection: an ID from the
+/// one namespace, of its own kind -- what a call names on the wire. It
+/// has no size: its last byte is 0.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ClientCallType(pub u64);
+
+impl ClientCallType {
+    /// The call of number `type_number`.
+    pub const fn from_number(type_number: u64) -> Self {
+        Self(type_id(TypeKind::ClientCall, type_number, 0))
     }
 
     /// Its number.

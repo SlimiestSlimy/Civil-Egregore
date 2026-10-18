@@ -12,6 +12,7 @@ pub mod cell_reads_and_writes;
 pub mod compare_and_write;
 pub mod entity_reads_and_writes;
 pub mod tile_masks;
+mod client_call_interface;
 mod rule_interface;
 mod worldgen_interface;
 pub mod tick_and_random_stream;
@@ -28,6 +29,7 @@ pub use utilities::coordinates::{CellArea, CellCartesian, CellIndex, SuperchunkI
 pub use crate::entity_manager::{data_words, Attribute, AttributeBlock, AttributeType, EntityRef, EntityType, Header, Layout, Member, WholeAttribute};
 pub use rule_interface::{on_each_sampled, RuleCode, RuleContext, RuleMaster, RuleRun};
 pub use worldgen_interface::{WorldgenParameters, WorldgenCode};
+pub use client_call_interface::{CallCode, CallContext};
 pub use crate::simulation::simulation_tick_state::SimulationTickState;
 pub use crate::simulation::tick::TickReport;
 pub use utilities::chance::Chance;

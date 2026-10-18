@@ -83,6 +83,12 @@ pub enum Declared {
         /// Its parent's name.
         parent: Option<String>,
     },
+    /// A function a client may call across the connection, and the type
+    /// it belongs to, by its name: its library is the function.
+    ClientCall {
+        /// Its master's name.
+        master: String,
+    },
 }
 
 /// A type to register: its name, what it is, the names of the types it
@@ -160,6 +166,13 @@ impl Registration {
     /// A window named `name`, nested in the window named `parent` if any.
     pub fn gui(name: &str, parent: Option<&str>) -> Self {
         Self::of(name, Declared::Gui { parent: parent.map(str::to_string) })
+    }
+
+    /// A function named `name` a client may call across the connection,
+    /// belonging to the type named `master`: the one way a client reaches
+    /// a library of the server's, opted into function by function.
+    pub fn client_call(name: &str, master: &str) -> Self {
+        Self::of(name, Declared::ClientCall { master: master.to_string() })
     }
 
     /// It depending on the types named `type_names` too.
