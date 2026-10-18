@@ -99,7 +99,7 @@ pub fn serve_clients(clean_parameters: &CleanServerParameters, register_types: R
         })
         .map_err(|spawn_error| spawn_error.to_string())?;
     let (ask_sender, asks) = channel();
-    let (terrain, answers_outgoing) = (host.terrain(), Arc::clone(&outgoing));
+    let (terrain, answers_outgoing, calls_host) = (host.terrain(), Arc::clone(&outgoing), host.clone());
     thread::Builder::new()
         .name("answers out".to_string())
         .spawn(move || {
@@ -108,6 +108,10 @@ pub fn serve_clients(clean_parameters: &CleanServerParameters, register_types: R
                     ClientMessage::AskHeights(heights_ask) => ServerMessage::Heights(terrain.heights(heights_ask)),
                     ClientMessage::AskMap(map_ask) => ServerMessage::Map(terrain.map(map_ask)),
                     ClientMessage::ListWorlds => ServerMessage::Worlds(worlds_in(&utilities::settings::worlds())),
+                    ClientMessage::Call(call, arguments) => match calls_host.call(call, arguments) {
+                        Ok(answer) => ServerMessage::Answered(answer),
+                        Err(why_refused) => ServerMessage::CallRefused(why_refused),
+                    },
                     _ => continue,
                 };
                 answers_outgoing.lock().expect("the client's connection").send_to_client(answer);
@@ -168,7 +172,7 @@ fn serve_one_client(client: TcpStream, host: &Host, ask_sender: &std::sync::mpsc
             ClientMessage::Save(world_name) => _ = host.save_world(world_name),
             ClientMessage::Reset(tuning) => _ = host.reset(&tuning),
             // Answered, in the order asked: a client matches each answer to its ask by that order.
-            ask @ (ClientMessage::AskHeights(_) | ClientMessage::AskMap(_) | ClientMessage::ListWorlds) => _ = ask_sender.send(ask),
+            ask @ (ClientMessage::AskHeights(_) | ClientMessage::AskMap(_) | ClientMessage::ListWorlds | ClientMessage::Call(..)) => _ = ask_sender.send(ask),
         }
     }
 }

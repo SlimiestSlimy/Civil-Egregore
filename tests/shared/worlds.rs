@@ -56,6 +56,19 @@ pub fn types_with_test_tiles(type_registry: &mut TypeRegistry) -> Result<(), Str
     type_registry.register(WidePlane::<Bits4>::registration_of_tiles(TEST_TILES, 3)).map(drop).map_err(|refusal| format!("{TEST_TILES}: {refusal:?}"))
 }
 
+/// The tests' own function a client may call, belonging to the world
+/// generation: it answers the world's seed and tick, then the words it
+/// was called with.
+pub const TEST_CALL: &str = "test call";
+
+/// The base game's types and [`TEST_CALL`]: a game of the tests' own,
+/// as initialization hands one the server.
+pub fn types_with_test_call(type_registry: &mut TypeRegistry) -> Result<(), String> {
+    basegame::default_types::register_types(type_registry)?;
+    let echo = server::simulation::simulation_api::CallCode::new(|call_context, arguments| Ok([call_context.seed(), call_context.tick()].into_iter().chain(arguments.iter().copied()).collect()));
+    type_registry.register(protocol::type_registry::Registration::client_call(TEST_CALL, "world generation").with_library(Arc::new(echo))).map(drop).map_err(|refusal| format!("{TEST_CALL}: {refusal:?}"))
+}
+
 /// The types of [`types_with_test_tiles`], frozen for a new world, and
 /// the plane of tiles among them.
 pub fn with_test_tiles() -> (Arc<FrozenTypeRegistry>, WidePlane<Bits4>) {

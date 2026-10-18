@@ -119,6 +119,11 @@ impl HostThread {
                         }
                         Err(why_not) => self.last_outcome = Some(format!("{world_to_open} not opened: {why_not}")),
                     },
+                    Ok(HostRequest::Call(call, arguments, answer_sender)) => {
+                        let answer = self.running_world.as_ref().map_or_else(|| Err("no world runs".to_string()), |running_world| running_world.world.answer_call(call, &arguments));
+                        // The caller gone has no use for its answer.
+                        _ = answer_sender.send(answer);
+                    }
                     Ok(HostRequest::Save(name_to_save)) => {
                         self.reset_now();
                         self.save(name_to_save);

@@ -2,7 +2,7 @@
 //! runs it, if anything does, is its library, hooked in by its
 //! registration (`super::Hook`).
 
-use super::type_ids::{numbers_taken, AttributeType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
+use super::type_ids::{numbers_taken, AttributeType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
 
 /// What a rule of the renderer draws: a plane, or a type of entity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -97,13 +97,23 @@ pub enum RegisteredType {
         /// Its parent.
         parent: Option<GuiType>,
     },
+    /// A function a client may call across the connection, and the type
+    /// it belongs to.
+    ClientCall {
+        /// Its name.
+        name: String,
+        /// Its ID: what a call names on the wire.
+        call: ClientCallType,
+        /// Its master's ID, whole.
+        master: u64,
+    },
 }
 
 impl RegisteredType {
     /// Its name.
     pub fn name(&self) -> &str {
         match self {
-            Self::Layer { name, .. } | Self::WidePlane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } | Self::Worldgen { name, .. } | Self::RenderRule { name, .. } | Self::Gui { name, .. } => name,
+            Self::Layer { name, .. } | Self::WidePlane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } | Self::Worldgen { name, .. } | Self::RenderRule { name, .. } | Self::Gui { name, .. } | Self::ClientCall { name, .. } => name,
         }
     }
 
@@ -142,6 +152,7 @@ impl RegisteredType {
             Self::Worldgen { worldgen, .. } => worldgen.0,
             Self::RenderRule { rule, .. } => rule.0,
             Self::Gui { gui, .. } => gui.0,
+            Self::ClientCall { call, .. } => call.0,
         }
     }
 

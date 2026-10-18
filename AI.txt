@@ -245,14 +245,37 @@ NOW
     tcp connection, that's basically a security feature lol"; "my
     suggestion is more in the order of, adding an optional parameter to
     type libraries to include function layouts for client calls" (not
-    Layout reused, not a kind of its own). Asked, unanswered: what a
-    call's layout says -- typed fields (whole number, fraction, yes/no)
-    for its arguments and its answer (mine), or counts of words.
+    Layout reused, not a kind of its own). Then: "both client and
+    server have access to the same types and therefore their libraries
+    (thanks frozen type registry) so we actually just need to label
+    client callable functions with a typeid, and just pass the raw
+    arguments and results back and forth". Weighed (asked: "lets
+    actually weigh each one"): (A) a ClientCall kind, one type a
+    callable function, its master the type it belongs to, its library
+    the function; (B) the user's "make library its own kind in the
+    registry, and inside each library registration we register each
+    function separately. plus a "client callable" flag" ("per
+    function"). The user: "fair, simpler first" -- A now, built to grow
+    into B (ClientCall becomes Function { client_callable } under a
+    Library kind) if listing a library's API or per-function
+    dependencies are ever wanted; local calls never by ID (typing, hot
+    paths).
   * DONE (the commit after 3474fbc): TypeKind::RenderRule (0x06) and
     Gui (0x07), Registration::render_rule(name, master) -- a plane or a
     type of entity, RegisteredType::RenderRule { master: Drawn } -- and
     Registration::gui(name, parent), a parent a window registered
     before it (RegistryRefusal::ParentAmiss), Hook::ShownByDefault.
+  * DONE (the commit after bde5f03): client calls, A. TypeKind::
+    ClientCall (0x08), Registration::client_call(name, master) -- the
+    master any type registered before it -- its library a
+    simulation_api::CallCode: words in, words out or why not, against a
+    CallContext (seed, tick, worldgen parameters) between two ticks.
+    ClientMessage::Call(ID, words) answered Answered(words) or
+    CallRefused(why); the host's thread answers it (HostRequest::Call),
+    "no world runs" without one. The user: "client callable functions
+    are still callable within the server eh" -- yes: Host::call is the
+    same call in process, no socket; and the code is the library's own
+    function, basegame's to call directly as any of its functions.
 - WHAT IS LEFT, IN ORDER (the user, 2026-10-18, on my list of what is
   left: "1 go ahead, 2 not quite, we need client side gui rules or
   something like that first / 3 same, fold into 5 with 2 / 4 can be

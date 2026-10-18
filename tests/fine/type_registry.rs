@@ -70,8 +70,8 @@ fn a_name_is_registered_once_whatever_its_kind() {
 /// What a type names is registered before it: a default attribute, an
 /// attribute; a rule's master, a plane for a rule of the cells -- a
 /// layer or a wide plane -- and a type of entity for an entity's; a
-/// rule of the renderer's, either; a window's parent, a window; and
-/// each type it depends on. One named amiss -- nothing registered, or
+/// rule of the renderer's, either; a window's parent, a window; a
+/// client call's, any type; and each type it depends on. One named amiss -- nothing registered, or
 /// registered only after, of another kind -- is refused.
 #[test]
 fn what_a_type_names_is_registered_before_it() {
@@ -97,6 +97,9 @@ fn what_a_type_names_is_registered_before_it() {
         (Registration::gui("a window", None), Ok(())),
         (Registration::gui("a window", Some("unheard of")), Err(RegistryRefusal::ParentAmiss)),
         (Registration::gui("a window", Some("grass")), Err(RegistryRefusal::ParentAmiss)),
+        (Registration::client_call("a call", "world generation"), Ok(())),
+        (Registration::client_call("a call", "grass"), Ok(())),
+        (Registration::client_call("a call", "unheard of"), Err(RegistryRefusal::MasterAmiss)),
         (Registration::layer("depending").depending_on(&["collision"]), Ok(())),
         (Registration::layer("depending").depending_on(&["unheard of"]), Err(RegistryRefusal::DependencyAmiss)),
     ] {
@@ -217,7 +220,8 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
 /// A rule of the renderer is of its own kind, and says what it draws:
 /// the plane or the type of entity its master is. A window nested in
 /// another holds its parent's ID -- a child names its parent, once the
-/// parent is registered -- and a window on its own, none.
+/// parent is registered -- and a window on its own, none. A function a
+/// client may call is of its own kind, holding its master's ID.
 #[test]
 fn a_rule_of_the_renderer_draws_its_master_and_a_window_holds_its_parent() {
     let (mut type_registry, base_types) = with_base_types();
@@ -231,6 +235,10 @@ fn a_rule_of_the_renderer_draws_its_master_and_a_window_holds_its_parent() {
     let (RegisteredType::Gui { gui: menu_id, parent: None, .. }, RegisteredType::Gui { parent: Some(entry_parent), .. }) = (&menu, &entry) else { panic!("windows: {menu:?}, {entry:?}") };
     assert_eq!(entry_parent, menu_id, "the child holds its parent's ID");
     assert_eq!(menu.type_id() >> 56, TypeKind::Gui as u64);
-    assert!(!grass_drawn.is_a_rule() && !menu.is_a_rule(), "nothing the simulation ticks");
+    let call = type_registry.register(Registration::client_call("a call", "world generation")).expect("of a type registered before it");
+    let world_generation = type_registry.clone().freeze().expect("frozen").types().iter().find(|registered| registered.name() == "world generation").expect("registered").type_id();
+    assert!(matches!(call, RegisteredType::ClientCall { master, .. } if master == world_generation), "the call holds its master's ID");
+    assert_eq!(call.type_id() >> 56, TypeKind::ClientCall as u64);
+    assert!(!grass_drawn.is_a_rule() && !menu.is_a_rule() && !call.is_a_rule(), "nothing the simulation ticks");
     assert_eq!(type_registry.freeze().expect("frozen").rules().count(), 3, "the base game's three rules tick, and no rule of the renderer");
 }

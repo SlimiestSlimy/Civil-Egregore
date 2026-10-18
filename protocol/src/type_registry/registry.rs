@@ -9,7 +9,7 @@ use super::frozen_type_registry::FrozenTypeRegistry;
 use super::registered_type::RegisteredType;
 use super::registration::{Declared, Hook, Library, Registration};
 use super::registered_type::Drawn;
-use super::type_ids::{numbers_taken, AttributeType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
+use super::type_ids::{numbers_taken, AttributeType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
 
 /// Why a type was refused.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -161,6 +161,10 @@ impl TypeRegistry {
                     },
                 };
                 RegisteredType::Gui { name, gui: GuiType::from_number(number), parent }
+            }
+            Declared::ClientCall { master } => {
+                let master = registered_named(master).map(RegisteredType::type_id).ok_or(RegistryRefusal::MasterAmiss)?;
+                RegisteredType::ClientCall { name, call: ClientCallType::from_number(number), master }
             }
         })
     }

@@ -34,6 +34,12 @@ pub enum ClientMessage {
     /// The names of the worlds in the worlds' folder: answered with them.
     #[default]
     ListWorlds,
+    /// A call of the function whose type's ID this is
+    /// (`crate::type_registry::ClientCallType`), with these words for
+    /// arguments: answered with its answer, or why it is refused. What
+    /// the words mean, the function's own code says, the same on both
+    /// ends -- both have the world's types.
+    Call(u64, Vec<u64>),
 }
 
 /// What the server tells a client.
@@ -54,6 +60,11 @@ pub enum ServerMessage {
     Map(Option<MapAnswer>),
     /// The names of the worlds in the worlds' folder.
     Worlds(Vec<String>),
+    /// A call's answer: its words.
+    Answered(Vec<u64>),
+    /// Why a call was refused: no world runs, no function the client may
+    /// call is of its ID, or the function would not take its arguments.
+    CallRefused(String),
 }
 
 impl Default for ServerMessage {
@@ -104,6 +115,11 @@ impl Wired for ClientMessage {
                 map_ask.put(words);
             }
             Self::ListWorlds => words.push(9),
+            Self::Call(call, arguments) => {
+                words.push(10);
+                call.put(words);
+                arguments.put(words);
+            }
         }
     }
 
@@ -119,6 +135,7 @@ impl Wired for ClientMessage {
             7 => Self::AskHeights(taken(Default::default(), wire)?),
             8 => Self::AskMap(taken(Default::default(), wire)?),
             9 => Self::ListWorlds,
+            10 => Self::Call(taken(0, wire)?, taken(Vec::new(), wire)?),
             _ => return None,
         };
         Some(())
@@ -149,6 +166,14 @@ impl Wired for ServerMessage {
                 world.put(words);
                 types_text.put(words);
             }
+            Self::Answered(answer) => {
+                words.push(5);
+                answer.put(words);
+            }
+            Self::CallRefused(why_refused) => {
+                words.push(6);
+                why_refused.put(words);
+            }
         }
     }
 
@@ -159,6 +184,8 @@ impl Wired for ServerMessage {
             2 => Self::Map(taken(Default::default(), wire)?),
             3 => Self::Worlds(taken(Default::default(), wire)?),
             4 => Self::WorldTypes(taken(0, wire)?, taken(String::new(), wire)?),
+            5 => Self::Answered(taken(Vec::new(), wire)?),
+            6 => Self::CallRefused(taken(String::new(), wire)?),
             _ => return None,
         };
         Some(())
