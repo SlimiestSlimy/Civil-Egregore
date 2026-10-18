@@ -6,14 +6,14 @@
 //! The design: `docs/type_registry.md`; item by item:
 //! `docs/type_registry_reference.md`.
 
-mod frozen_types;
+mod frozen_type_registry;
 mod registered_type;
 mod registration;
 mod saved_types;
 mod registry;
 mod type_ids;
 
-pub use frozen_types::FrozenTypes;
+pub use frozen_type_registry::FrozenTypeRegistry;
 pub use registered_type::RegisteredType;
 pub use registration::{Declared, Hook, Library, Registration};
 pub use registry::{RegistryRefusal, TypeRegistry};

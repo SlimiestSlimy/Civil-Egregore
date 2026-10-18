@@ -40,7 +40,7 @@ pub enum ClientMessage {
 #[derive(Clone)]
 pub enum ServerMessage {
     /// A world runs, the `n`-th the server has run: its types as its
-    /// save holds them (`crate::type_registry::FrozenTypes::to_text`),
+    /// save holds them (`crate::type_registry::FrozenTypeRegistry::to_text`),
     /// sent once, before any frame of it -- what the client freezes its
     /// own registry of the game's types with, each of the world's ID
     /// (`crate::world_types::of_a_saved_world`).

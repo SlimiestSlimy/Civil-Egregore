@@ -14,7 +14,7 @@ use utilities::coordinates::SuperchunkIndex;
 use server::internals_for_root_tests::{set_attribute, Attribute, AttributeBlock, EntityRef, Header};
 use basegame::worldgen::WorldGeneration;
 use basegame::base_types::BaseTypes;
-use protocol::type_registry::{FrozenTypes, TypeRegistry};
+use protocol::type_registry::{FrozenTypeRegistry, TypeRegistry};
 use server::simulation::simulation_api::{Bits4, WidePlane};
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SIDE, THREADS, WORLD, WORLDGEN};
 use server::World;
@@ -25,8 +25,8 @@ use std::sync::{Arc, OnceLock};
 /// every test of a tier -- what initialization hands the server -- and
 /// the IDs registering them gave each: a new world's IDs are handed out
 /// in registration order, so every new world's are these.
-fn registered_types() -> &'static (Arc<FrozenTypes>, BaseTypes) {
-    static REGISTERED: OnceLock<(Arc<FrozenTypes>, BaseTypes)> = OnceLock::new();
+fn registered_types() -> &'static (Arc<FrozenTypeRegistry>, BaseTypes) {
+    static REGISTERED: OnceLock<(Arc<FrozenTypeRegistry>, BaseTypes)> = OnceLock::new();
     REGISTERED.get_or_init(|| {
         let mut type_registry = TypeRegistry::for_new_world();
         let base_types = basegame::default_types::register(&mut type_registry).expect("the base game's types registered");
@@ -35,7 +35,7 @@ fn registered_types() -> &'static (Arc<FrozenTypes>, BaseTypes) {
 }
 
 /// The base game's types, frozen: what initialization hands the server.
-pub fn types() -> Arc<FrozenTypes> {
+pub fn types() -> Arc<FrozenTypeRegistry> {
     registered_types().0.clone()
 }
 
@@ -58,10 +58,10 @@ pub fn types_with_test_tiles(type_registry: &mut TypeRegistry) -> Result<(), Str
 
 /// The types of [`types_with_test_tiles`], frozen for a new world, and
 /// the plane of tiles among them.
-pub fn with_test_tiles() -> (Arc<FrozenTypes>, WidePlane<Bits4>) {
-    let frozen_types = protocol::world_types::of_a_new_world(types_with_test_tiles).expect("the tests' types");
-    let test_tiles = frozen_types.types().iter().find(|registered| registered.name() == TEST_TILES).and_then(WidePlane::registered).expect("four bits a tile");
-    (Arc::new(frozen_types), test_tiles)
+pub fn with_test_tiles() -> (Arc<FrozenTypeRegistry>, WidePlane<Bits4>) {
+    let frozen_type_registry = protocol::world_types::of_a_new_world(types_with_test_tiles).expect("the tests' types");
+    let test_tiles = frozen_type_registry.types().iter().find(|registered| registered.name() == TEST_TILES).and_then(WidePlane::registered).expect("four bits a tile");
+    (Arc::new(frozen_type_registry), test_tiles)
 }
 
 /// The ID of the base game's type named `type_name`, in a new world:
@@ -86,12 +86,12 @@ pub fn world_at(folder: &Path) -> CleanServerParameters {
     CleanServerParameters::default().with(WORLD, ParameterValue::Text(folder.display().to_string()))
 }
 
-/// The world saved in `folder`, started again -- its types `game_types`
+/// The world saved in `folder`, started again -- its types `register_types`
 /// frozen first as its types file says -- or what of the save is not
 /// read.
-pub fn opened(folder: &Path, game_types: protocol::world_types::GameTypes) -> Result<World, server::DiskError> {
-    let frozen_types = Arc::new(server::read_types(folder, game_types)?);
-    server::start_world(&world_at(folder), &frozen_types).map_err(|why_not| match why_not {
+pub fn opened(folder: &Path, register_types: protocol::world_types::RegisterTypes) -> Result<World, server::DiskError> {
+    let frozen_type_registry = Arc::new(server::read_types(folder, register_types)?);
+    server::start_world(&world_at(folder), &frozen_type_registry).map_err(|why_not| match why_not {
         server::WorldNotStarted::Unreadable(disk_error) => disk_error,
         server::WorldNotStarted::Refused(why_refused) => panic!("refused: {why_refused}"),
     })

@@ -208,6 +208,25 @@ NOW
   &Arc<FrozenTypes>), the world's folder the `world` parameter, the
   registry frozen by whoever starts it and checked against a save's
   types file), worldgen parameters' name.
+- CLIENT-SERVER COMMS (the user, 2026-10-18, verbatim): "the current
+  client-server comms mode is bad, we want headless servers to allow
+  clients to connect later. what --pipe does (and should have a better
+  name) is basically telling the server "this server is being started
+  from a client" so the client basically autoconnects to the server.
+  thats basically it. and we probably need to move away from stdin/out
+  to something better". Also: "headless is a compilation flag and a not
+  a cli flag or environment flag --pipe is basically "gui mode"". So:
+  a server always runs a world as --seed/--side/--world say and takes
+  clients that connect; the renamed --pipe only says a client started
+  it, to connect at once. The user's answers (2026-10-18): "one at a
+  time for now, multi client support for later date"; "since we will
+  limit ourselves to one client, only that client can do those stuff"
+  (make, open, save, reset, pause); "if the server was started headless
+  it keeps running, otherwise it closes with the client that started
+  it"; "simplest for now, multiplayer is not a priority by a long shot"
+  (loopback). Mine, agreed in the asking: TCP over std::net, the wire
+  framing and messages as they are; a client joining late gets the
+  running world's frozen type registry first.
 - SERVER FLAGS (the user, 2026-10-18: "remove those commands, were
   going to add more later, we just want to keep the bare minimum
   amount, i believe is seed, size and pipe flags"; "one more flag to
@@ -439,6 +458,9 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- Several clients at once ("multi client support for later date"):
+  each its own viewport and frames; who may change the world then.
+- Multiplayer beyond loopback ("not a priority by a long shot").
 - A way to measure the server again, the commands it was measured with
   gone ("were going to add more later").
 - World's own public reads (a cell on a plane, the hot superchunks,

@@ -8,7 +8,7 @@ use super::SuperchunkEntities;
 use super::entity_reader::EntityReader;
 use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use std::sync::Arc;
-use protocol::type_registry::FrozenTypes;
+use protocol::type_registry::FrozenTypeRegistry;
 
 /// Every superchunk's entities, in the bitmap arena's order -- by Morton
 /// index -- and the tick the world is at: the next to run.
@@ -32,10 +32,10 @@ impl WorldEntities {
     }
 
     /// None, at tick `current_tick`, of a world running with
-    /// `frozen_types`: what a world's entities start as, and a save's are
+    /// `frozen_type_registry`: what a world's entities start as, and a save's are
     /// put back into.
-    pub fn for_types(frozen_types: &FrozenTypes, current_tick: u64) -> Self {
-        Self { current_tick, default_attributes: Arc::new(DefaultAttributes::of_types(frozen_types)), ..Self::default() }
+    pub fn for_types(frozen_type_registry: &FrozenTypeRegistry, current_tick: u64) -> Self {
+        Self { current_tick, default_attributes: Arc::new(DefaultAttributes::of_types(frozen_type_registry)), ..Self::default() }
     }
 
     /// The default attributes of the types the world runs with.

@@ -97,7 +97,7 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let world_file_text = std::fs::read_to_string(folder.join("world.csv")).expect("the world's file");
     let generation: String = saved_world.generation_numbers().iter().map(|(name, value)| format!("generation {name},{value}\n")).collect();
     // Every layer the world's types have, a wide plane as the layers it is kept cold as.
-    let layers: Vec<String> = saved_world.frozen_types().layer_types().into_iter().flat_map(|layer_type| layer_type.each_bitplane()).map(|plane_type| plane_type.0.to_string()).collect();
+    let layers: Vec<String> = saved_world.frozen_type_registry().layer_types().into_iter().flat_map(|layer_type| layer_type.each_bitplane()).map(|plane_type| plane_type.0.to_string()).collect();
     assert_eq!(world_file_text, format!("world,is\nformat,4\nseed,{}\ntick,0\nlayers,{}\nunpopulated,{}\n{generation}", utilities::seed::seed_as_hex(seed), layers.join(" "), utilities::coordinates::WORLD_MIDDLE.0), "no name: the folder's; the origin unpopulated until the first tick");
     let hot: String = saved_world.bitmap_arena().superchunk_indices().iter().map(|superchunk| format!("{:011x},hot,\n", superchunk.0)).collect();
     assert_eq!(std::fs::read_to_string(folder.join("hot.csv")).expect("the hot file"), format!("superchunk,is,until\n{hot}"), "the nine hot, none cooling or warming");
@@ -168,7 +168,7 @@ fn a_world_is_loaded_with_the_types_it_was_made_with() {
     let types_path = folder.join(protocol::world_types::TYPES_FILE);
     let types_text = std::fs::read_to_string(&types_path).expect("the types file");
     let lines: Vec<String> = types_text.lines().map(str::to_string).collect();
-    let world_lines = world.frozen_types().types().iter().map(|registered| format!("{},{:016x}", registered.name(), registered.type_id()));
+    let world_lines = world.frozen_type_registry().types().iter().map(|registered| format!("{},{:016x}", registered.name(), registered.type_id()));
     assert_eq!(lines, std::iter::once("type,id".to_string()).chain(world_lines).collect::<Vec<_>>());
     let line_of = |type_name: &str| lines.iter().position(|line| line.split(',').next() == Some(type_name)).expect("saved");
     let with_lines = |change: &dyn Fn(&mut Vec<String>)| {
@@ -179,9 +179,9 @@ fn a_world_is_loaded_with_the_types_it_was_made_with() {
     // A type the save does not name -- as in a world saved before the game added it: registered all the same, given an ID past every saved one.
     std::fs::write(&types_path, with_lines(&|changed_lines| _ = changed_lines.remove(line_of("water depth")))).expect("written");
     let loaded_world = crate::worlds::opened(&folder, basegame::default_types::register_types).expect("loaded without it");
-    let water_depth = loaded_world.frozen_types().types().iter().find(|registered| registered.name() == "water depth").expect("registered");
-    let saved_numbers_end = world.frozen_types().types().iter().filter(|registered| registered.name() != "water depth").map(|registered| registered.numbers().end).max().expect("types");
-    assert!(water_depth.numbers().start >= saved_numbers_end && loaded_world.frozen_types().types().len() == lines.len() - 1);
+    let water_depth = loaded_world.frozen_type_registry().types().iter().find(|registered| registered.name() == "water depth").expect("registered");
+    let saved_numbers_end = world.frozen_type_registry().types().iter().filter(|registered| registered.name() != "water depth").map(|registered| registered.numbers().end).max().expect("types");
+    assert!(water_depth.numbers().start >= saved_numbers_end && loaded_world.frozen_type_registry().types().len() == lines.len() - 1);
     // A type drawn, renamed, of an ID sharing a number with another, or said twice. The order types are saved in is nothing to them.
     let mut seeded_rng = utilities::rng::RandomSource::new(seed);
     let drawn = 1 + seeded_rng.draw_below(lines.len() as u64 - 1) as usize;
@@ -256,8 +256,8 @@ fn a_plane_of_tiles_holds_a_number_a_tile_through_ticks_and_a_save() {
     use server::internals_for_root_tests::Write;
     let folder = folder("tiles");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
-    let (frozen_types, test_tiles) = crate::worlds::with_test_tiles();
-    let mut world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(50))), &frozen_types).expect("the world started");
+    let (frozen_type_registry, test_tiles) = crate::worlds::with_test_tiles();
+    let mut world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(50))), &frozen_type_registry).expect("the world started");
     let (corner_cartesian, side_cells) = (world.bitmap_arena().superchunk_indices()[0].top_left().cartesian(), 2 * utilities::coordinates::SUPERCHUNK_SIDE_CELLS);
     // A cell of the tile `(x, y)` -- in tiles from the world's corner -- drawn anew each time.
     let tile_side = test_tiles.layer_type().tile_side();

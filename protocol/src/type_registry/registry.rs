@@ -5,7 +5,7 @@
 //! handed out as they are asked for, a saved world's are those its
 //! save gave each name ([`TypeRegistry::for_saved_world`]).
 
-use super::frozen_types::FrozenTypes;
+use super::frozen_type_registry::FrozenTypeRegistry;
 use super::registered_type::RegisteredType;
 use super::registration::{Declared, Hook, Library, Registration};
 use super::type_ids::{numbers_taken, AttributeType, EntityRuleType, EntityType, LayerType, ScaRuleType, WorldgenType};
@@ -102,11 +102,11 @@ impl TypeRegistry {
     /// The types registered, frozen: what a world runs with, no type
     /// entering from then on; or what is
     /// wrong: a type the world's save holds that none registered is.
-    pub fn freeze(self) -> Result<FrozenTypes, String> {
+    pub fn freeze(self) -> Result<FrozenTypeRegistry, String> {
         if let Some((saved_name, _)) = self.saved_ids.iter().find(|(saved_name, _)| self.place_named(saved_name).is_none()) {
             return Err(format!("the type `{saved_name}` was saved, none of its name is registered"));
         }
-        Ok(FrozenTypes::of_registered(self.types, self.depends_on, self.libraries, self.hooks))
+        Ok(FrozenTypeRegistry::of_registered(self.types, self.depends_on, self.libraries, self.hooks))
     }
 
     /// The place of the type named `type_name` among those registered, if one is.

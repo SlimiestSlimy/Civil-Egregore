@@ -9,7 +9,7 @@
 use crate::simulation::simulation_api::{RuleCode, RuleContext, RuleCounts, RuleMaster, RuleRun, TickReport, SimulationTickState, WorldgenCode, COUNTS_OF_A_RULE};
 use std::sync::Arc;
 use crate::entity_manager::EntityType;
-use protocol::type_registry::{FrozenTypes, Hook, RegisteredType};
+use protocol::type_registry::{FrozenTypeRegistry, Hook, RegisteredType};
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
@@ -41,17 +41,17 @@ impl std::fmt::Debug for Rule {
     }
 }
 
-/// The rules a world of `frozen_types` ticks, each run by its library: every
+/// The rules a world of `frozen_type_registry` ticks, each run by its library: every
 /// type hooked to run every tick ([`Hook::RunsEveryTick`]), in the order
 /// registered, the order a turn runs them in -- the server's choice, the
 /// registry promising none. Or why the world cannot run: one hooked that
 /// is no rule, or whose library is no rule's code, or more than
 /// [`MOST_RULES`].
-pub fn rules_of(frozen_types: &FrozenTypes) -> Result<Arc<[Rule]>, String> {
-    let rules: Vec<Rule> = frozen_types
+pub fn rules_of(frozen_type_registry: &FrozenTypeRegistry) -> Result<Arc<[Rule]>, String> {
+    let rules: Vec<Rule> = frozen_type_registry
         .hooked(Hook::RunsEveryTick)
         .map(|(registered_rule, library)| {
-            let master_type = frozen_types.master_of(registered_rule).ok_or_else(|| format!("{} runs every tick, and is no rule", registered_rule.name()))?;
+            let master_type = frozen_type_registry.master_of(registered_rule).ok_or_else(|| format!("{} runs every tick, and is no rule", registered_rule.name()))?;
             let master = match master_type {
                 RegisteredType::Layer { layer_type, .. } => RuleMaster::Layer(*layer_type),
                 RegisteredType::WidePlane { layer_type, .. } => RuleMaster::WidePlane(*layer_type),
@@ -59,7 +59,7 @@ pub fn rules_of(frozen_types: &FrozenTypes) -> Result<Arc<[Rule]>, String> {
                 _ => unreachable!("a rule's master is a plane or a type of entity"),
             };
             // Gathered once: each library the rule may ask for, by the ID of the type exposing it.
-            let libraries = frozen_types.dependencies_of(master_type).filter_map(|dependency| Some((dependency.type_id(), frozen_types.library_of(dependency)?.clone()))).collect();
+            let libraries = frozen_type_registry.dependencies_of(master_type).filter_map(|dependency| Some((dependency.type_id(), frozen_type_registry.library_of(dependency)?.clone()))).collect();
             // Cast once: the rule's code, its library.
             let code = library.and_then(|rule_library| rule_library.downcast_ref::<RuleCode>()).ok_or_else(|| format!("{} runs every tick, and its library is no rule's code", registered_rule.name()))?;
             Ok(Rule { rule_id: registered_rule.type_id(), context: RuleContext { master, libraries }, count_names: code.count_names, rule: code.run.clone() })
@@ -71,12 +71,12 @@ pub fn rules_of(frozen_types: &FrozenTypes) -> Result<Arc<[Rule]>, String> {
     Ok(rules.into())
 }
 
-/// What generates a world of `frozen_types`: the library of its one type hooked
+/// What generates a world of `frozen_type_registry`: the library of its one type hooked
 /// into generating the world ([`Hook::GeneratesTheWorld`]), cast once. Or
 /// why it cannot run: none hooked, more than one, or a library that is
 /// no world generation's code.
-pub fn worldgen_of(frozen_types: &FrozenTypes) -> Result<WorldgenCode, String> {
-    let mut generating = frozen_types.hooked(Hook::GeneratesTheWorld);
+pub fn worldgen_of(frozen_type_registry: &FrozenTypeRegistry) -> Result<WorldgenCode, String> {
+    let mut generating = frozen_type_registry.hooked(Hook::GeneratesTheWorld);
     let (generating_type, library) = generating.next().ok_or("no type generates the world")?;
     if let Some((another_type, _)) = generating.next() {
         return Err(format!("{} and {} both generate the world", generating_type.name(), another_type.name()));
@@ -84,12 +84,12 @@ pub fn worldgen_of(frozen_types: &FrozenTypes) -> Result<WorldgenCode, String> {
     library.and_then(|worldgen_library| worldgen_library.downcast_ref::<WorldgenCode>()).cloned().ok_or_else(|| format!("{} generates the world, and its library is no world generation's code", generating_type.name()))
 }
 
-/// The type of entity a world of `frozen_types` is kept hot about: its one
+/// The type of entity a world of `frozen_type_registry` is kept hot about: its one
 /// type hooked to keep the world hot ([`Hook::KeepsTheWorldHot`]). Or why
 /// it cannot run: none hooked, more than one, or one that is no type of
 /// entity.
-pub fn hot_entity_of(frozen_types: &FrozenTypes) -> Result<EntityType, String> {
-    let mut keeping_hot = frozen_types.hooked(Hook::KeepsTheWorldHot);
+pub fn hot_entity_of(frozen_type_registry: &FrozenTypeRegistry) -> Result<EntityType, String> {
+    let mut keeping_hot = frozen_type_registry.hooked(Hook::KeepsTheWorldHot);
     let (hot_type, _) = keeping_hot.next().ok_or("no type keeps the world hot")?;
     if let Some((another_type, _)) = keeping_hot.next() {
         return Err(format!("{} and {} both keep the world hot", hot_type.name(), another_type.name()));

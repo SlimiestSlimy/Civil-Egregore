@@ -134,9 +134,9 @@ fn a_frame_brings_a_plane_of_tiles_a_tile_at_a_time() {
     use utilities::coordinates::{place_from_cartesian, CellCartesian, SUPERCHUNK_SIDE_CELLS};
     let folder = crate::worlds::folder("tiles_in_frames");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
-    let (frozen_types, test_tiles) = crate::worlds::with_test_tiles();
+    let (frozen_type_registry, test_tiles) = crate::worlds::with_test_tiles();
     let tile_shift = test_tiles.layer_type().tile_shift();
-    let mut world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(0))), &frozen_types).expect("the world started");
+    let mut world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(0))), &frozen_type_registry).expect("the world started");
     // Numbers on one of the four superchunks alone.
     let written_superchunk = world.bitmap_arena().superchunk_indices()[test_random.draw_below(4) as usize];
     let written_corner_cartesian = written_superchunk.top_left().cartesian();

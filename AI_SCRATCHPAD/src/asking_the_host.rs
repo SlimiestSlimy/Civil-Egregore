@@ -3,7 +3,7 @@
 //! the question.
 
 use basegame::base_types::BaseTypes;
-use protocol::type_registry::{FrozenTypes, TypeRegistry};
+use protocol::type_registry::{FrozenTypeRegistry, TypeRegistry};
 use std::sync::{Arc, OnceLock};
 use protocol::pipe::frame::{FrameAsk, ViewportFrame, Viewport};
 use protocol::type_registry::LayerType;
@@ -48,8 +48,8 @@ fn parameters_of_tuning(seed: Option<u64>, tuning: &Tuning) -> CleanServerParame
 /// The base game's types of a new world, frozen once, and their IDs: a
 /// new world's are handed out in registration order, so every new
 /// world's are these.
-fn base_types() -> &'static (Arc<FrozenTypes>, BaseTypes) {
-    static REGISTERED: OnceLock<(Arc<FrozenTypes>, BaseTypes)> = OnceLock::new();
+fn base_types() -> &'static (Arc<FrozenTypeRegistry>, BaseTypes) {
+    static REGISTERED: OnceLock<(Arc<FrozenTypeRegistry>, BaseTypes)> = OnceLock::new();
     REGISTERED.get_or_init(|| {
         let mut type_registry = TypeRegistry::for_new_world();
         let base_types = basegame::default_types::register(&mut type_registry).expect("the base game's types registered");

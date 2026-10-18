@@ -9,7 +9,7 @@ use basegame::base_types::BaseTypes;
 use protocol::type_registry::TypeRegistry;
 
 /// The base game's types of the world whose types `world_types` names
-/// (`protocol::type_registry::FrozenTypes::to_text`), each of the ID
+/// (`protocol::type_registry::FrozenTypeRegistry::to_text`), each of the ID
 /// the world gave it: none if the text is not a world's types, or
 /// they are not the base game's.
 pub fn base_types_of(world_types: &str) -> Option<BaseTypes> {

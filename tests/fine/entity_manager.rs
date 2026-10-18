@@ -12,12 +12,12 @@
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use server::internals_for_root_tests::{decode_state, encode_state};
 use basegame::base_types::BaseTypes;
-use protocol::type_registry::{FrozenTypes, TypeRegistry};
+use protocol::type_registry::{FrozenTypeRegistry, TypeRegistry};
 use server::internals_for_root_tests::{may_be_given, DefaultAttributes, WholeAttribute, find_attribute, push_attribute, is_attribute_list, Attribute, AttributeBlock, AttributeType, WorldEntities, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER_WAKES};
 
 /// The base game's types of a new world, frozen, and the IDs they were
 /// given: the types the store is tried with.
-fn frozen_base_types() -> (FrozenTypes, BaseTypes) {
+fn frozen_base_types() -> (FrozenTypeRegistry, BaseTypes) {
     let mut type_registry = TypeRegistry::for_new_world();
     let base_types = basegame::default_types::register(&mut type_registry).expect("the base game's types registered");
     (type_registry.freeze().expect("frozen"), base_types)
