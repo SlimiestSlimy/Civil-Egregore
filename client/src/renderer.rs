@@ -56,6 +56,7 @@ fn window_on(host_link: link::HostLink) -> App {
             move || lister_link.list_worlds()
         })))
         .insert_resource(map::MapLink::start_map_link(host_link.server().clone()))
+        .insert_resource(crate::client_api::ServerCalls::through(host_link.server().clone()))
         .insert_resource(host_link)
         .insert_resource(ClearColor(Color::BLACK))
         .init_resource::<link::LastFrameSeen>()

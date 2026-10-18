@@ -140,7 +140,6 @@ impl ServerLink {
     /// Calls the function whose ID is `call` -- a type registered as a
     /// client call -- with `arguments`, and waits for its answer, or why
     /// it is refused: none if the server is gone.
-    #[expect(dead_code, reason = "the client's API calls through it, next")]
     pub fn call(&self, call: u64, arguments: Vec<u64>) -> Option<Result<Vec<u64>, String>> {
         match self.ask(ClientMessage::Call(call, arguments))? {
             ServerMessage::Answered(answer) => Some(Ok(answer)),
