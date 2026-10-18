@@ -9,4 +9,5 @@ mod test_seed;
 #[path = "../shared/worlds.rs"]
 mod worlds;
 
+mod server_closing;
 mod worlds_run_long;

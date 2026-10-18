@@ -14,13 +14,13 @@
 // The server's own parts, private: the simulation shows its API alone.
 mod bitplane_manager;
 mod chunk_storage;
+mod client_connection;
 mod entity_manager;
 pub mod host;
 pub mod internals_for_root_tests;
 pub mod params;
 mod pathfinding;
 pub mod simulation;
-mod pipe_end;
 mod save_and_load;
 mod world_access;
 mod world_hash;
@@ -123,15 +123,13 @@ impl World {
 }
 
 /// Runs what `clean_parameters` ask for: the server's one way in from
-/// a command line -- with `register_types`, what registers the game's types:
-/// each world's are registered and frozen before it is made or opened
-/// (`protocol::world_types`). Serving a window over the pipe
-/// ([`params::PIPE`]) is all there is to run yet.
+/// a command line -- with `register_types`, what registers the game's
+/// types: each world's are registered and frozen before it is made or
+/// opened (`protocol::world_types`). A world run on a host, its clients
+/// connecting one at a time ([`client_connection`]) -- closing once none
+/// is, if told to ([`params::CLOSE_IF_NO_CLIENTS`]).
 pub fn start(clean_parameters: &CleanServerParameters, register_types: RegisterTypes) -> Result<String, String> {
-    if clean_parameters.nested(params::PIPE).is_some() {
-        return pipe_end::serve_the_pipe(register_types);
-    }
-    Err("nothing to run: --pipe serves a window; --help says the flags".to_string())
+    client_connection::serve_clients(clean_parameters, register_types)
 }
 
 /// Why a world was not started.

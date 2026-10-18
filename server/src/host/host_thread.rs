@@ -107,6 +107,11 @@ impl HostThread {
                             Err(why_not) => format!("no world made: {why_not}"),
                         });
                     }
+                    Ok(HostRequest::RunWorld(world)) => {
+                        (self.last_outcome, self.world_name, self.reset) = (Some(format!("a world run from seed {}", utilities::seed::seed_as_hex(world.world_info.seed))), None, None);
+                        self.running_world = None;
+                        self.run_in_place(RunningWorld { world: *world });
+                    }
                     Ok(HostRequest::OpenWorld(world_to_open)) => match self.open_world(&world_to_open) {
                         Ok(opened_world) => {
                             (self.last_outcome, self.world_name, self.reset) = (Some(format!("{world_to_open} opened")), Some(world_to_open), None);

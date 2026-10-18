@@ -8,7 +8,7 @@
 //!
 //! No arguments, built with the client: the window, on its main menu ([`client::run_window`]).
 //! `cargo run --release -- --help`: every flag, and what it takes.
-//! `cargo run --release -- --pipe`: a server for the window that started it.
+//! `cargo run --release -- --seed 0x5 --side 4`: a server running headless, listening for a client.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -35,8 +35,8 @@ fn leave_the_console() {
 }
 
 /// No arguments, built with the client: the window, and nothing else
-/// run once it closes. Otherwise, the command line read by the server's
-/// flags, and run by the server.
+/// run once it closes; built headless, the flags' help. Otherwise, the
+/// command line read by the server's flags, and run by the server.
 fn main() -> ExitCode {
     let shell_words: Vec<String> = std::env::args().skip(1).collect();
 
@@ -47,6 +47,8 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
+    // No arguments, built headless: nothing to run, the flags said instead.
+    let shell_words = if shell_words.is_empty() { vec!["--help".to_string()] } else { shell_words };
     let clean_parameters = match (ServerParameters { shell_words }).cleaned(server::params::server_flags()) {
         Ok(clean_parameters) => clean_parameters,
         Err(FlagError::HelpShown(help_text)) => {
