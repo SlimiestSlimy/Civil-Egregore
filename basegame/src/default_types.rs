@@ -1,7 +1,8 @@
 //! The base game's types registered in a world's registry, in their
 //! order, each with its library and hooks ([`register`]): every rule's
-//! code its library, hooked to run every tick, and the world
-//! generation's, hooked to generate the world -- each made with the IDs
+//! code its library, hooked to run every tick, the world
+//! generation's, hooked to generate the world, and the functions of it
+//! a client may call -- each made with the IDs
 //! the world gave the types it works on, as they were registered. What
 //! the program's initialization hands the server and the client
 //! ([`register_types`]): neither names a type of the base game, and
@@ -42,6 +43,10 @@ pub fn register(type_registry: &mut TypeRegistry) -> Result<BaseTypes, String> {
     registered(type_registry, Registration::sca_rule(TREES_RULE, "tree").with_library(Arc::new(crate::sca_rules::trees::code(base_types))).with_hooks(&rule_hooks))?;
     registered(type_registry, Registration::entity_rule(SHEEP_RULE, "sheep").with_library(Arc::new(crate::entity_rules::sheep::code(base_types))).with_hooks(&rule_hooks))?;
     registered(type_registry, Registration::worldgen("world generation").depending_on(&["sheep", "collision"]).with_library(Arc::new(crate::worldgen::world_generation::code(base_types))).with_hooks(&[Hook::GeneratesTheWorld]))?;
+    // What a client may call of the world generation.
+    for call_registration in crate::worldgen::calls::call_registrations("world generation") {
+        registered(type_registry, call_registration)?;
+    }
     Ok(base_types)
 }
 

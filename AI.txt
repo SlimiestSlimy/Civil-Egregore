@@ -285,6 +285,27 @@ NOW
     (render rules); then basegame depends on client_api. Untested on
     its own: a client crate test cannot start the program's server
     (current_exe is the test); the wire it goes over is tested.
+  * DONE (the commit after 5eee20a): worldgen parameters through
+    calls. The user, on a setter changing what the next reset uses, not
+    the world running: "yes, what you said, we probably will add a
+    "reset world" button later for that lol". CallContext gives the
+    worldgen parameters for the reset (World keeps them, its own until
+    one is set), set_worldgen_parameter_for_reset, and reset_world() --
+    the simulation API's reset: same types, same seed, the parameters
+    set, everything else made again. The host's reset is of worldgen
+    parameters now (the sliders' turned into them as asked). basegame/
+    src/worldgen/calls.rs: "worldgen parameter" (place -> value),
+    "set worldgen parameter" (place, value), "reset world", their
+    master the world generation; a place is the parameter's in
+    WorldGeneration::worldgen_parameters' order.
+- TYPE IDS, KIND BYTE ONLY (the user, 2026-10-18: "the first byte and
+  last 4 bits of a type id serve special purposes, the first byte is
+  the kind, the last 4 bits are for a size if the kind needs it";
+  "otherwise the last 4 bits are 0"; told the code keeps a whole size
+  byte -- a plane's bits a cell and tile size: "ohh i see, ok, no more
+  rederved byte then, make tile size and plane width parameters at
+  registration time, only the first byte remains for kind"). NEXT,
+  after the worldgen calls.
 - WHAT IS LEFT, IN ORDER (the user, 2026-10-18, on my list of what is
   left: "1 go ahead, 2 not quite, we need client side gui rules or
   something like that first / 3 same, fold into 5 with 2 / 4 can be
@@ -562,6 +583,9 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- A reset world button, calling basegame's "reset world" call: "we
+  probably will add a "reset world" button later for that lol"
+  (2026-10-18).
 - Saving on shutdown (Ctrl-C, SIGTERM) for a server run headless: "lets
   not do save on shutdown for now, thats scope creep we dont need right
   now, later is better" (2026-10-18). Until then a headless world is

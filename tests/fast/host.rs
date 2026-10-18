@@ -192,3 +192,29 @@ fn a_call_is_answered_by_the_world_running_and_only_a_client_call_is() {
     assert!(refused(base().grass.0).contains("no function a client may call"), "a plane's ID");
     assert!(host.call(test_call, Vec::new()).is_ok(), "the host goes on after a call refused");
 }
+
+/// The world generation's calls: a worldgen parameter read and set for
+/// the world's reset by its place, the world running generated as it
+/// was until a call resets it -- made again then, another world of the
+/// same seed, with the parameter set; a place past the parameters, or
+/// words too few, refused.
+#[test]
+fn a_worldgen_parameter_set_by_a_call_holds_once_a_call_resets_the_world() {
+    use basegame::worldgen::calls::{RESET_WORLD_CALL, SET_WORLDGEN_PARAMETER_CALL, WORLDGEN_PARAMETER_CALL};
+    let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let (host, frame_receiver) = Host::start_on_thread(basegame::default_types::register_types);
+    assert!(host.set_paused(true) && host.make_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(3))), crate::worlds::types()));
+    let (read, set, reset) = (crate::worlds::type_id_named(WORLDGEN_PARAMETER_CALL), crate::worlds::type_id_named(SET_WORLDGEN_PARAMETER_CALL), crate::worlds::type_id_named(RESET_WORLD_CALL));
+    let sheep_place = WorldGeneration::DEFAULT.worldgen_parameters().iter().position(|(name, _)| name == "sheep per superchunk").expect("a parameter") as u64;
+    let sheep_of = |worldgen_parameters: &[(String, u64)]| worldgen_parameters.iter().find(|(name, _)| name == "sheep per superchunk").expect("a parameter").1;
+    assert_eq!(host.call(read, vec![sheep_place]), Ok(vec![3]), "the world's own, before any is set");
+    assert_eq!(host.call(set, vec![sheep_place, 5]), Ok(Vec::new()));
+    assert_eq!(host.call(read, vec![sheep_place]), Ok(vec![5]), "set for the reset");
+    let made_frame = frame_that(&host, &frame_receiver, |_| true);
+    assert_eq!(sheep_of(&made_frame.worldgen_parameters), 3, "the world running generated as it was");
+    assert!(host.call(read, vec![1 << 40]).expect_err("refused").contains("no worldgen parameter at"));
+    assert!(host.call(set, vec![sheep_place]).is_err(), "a value is wanted");
+    assert_eq!(host.call(reset, Vec::new()), Ok(Vec::new()));
+    let reset_frame = frame_that(&host, &frame_receiver, |answered_frame| answered_frame.world > made_frame.world);
+    assert_eq!((reset_frame.seed, sheep_of(&reset_frame.worldgen_parameters)), (seed, 5), "the same seed, the parameter set");
+}

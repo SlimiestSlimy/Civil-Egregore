@@ -99,6 +99,9 @@ pub struct World {
     pub(crate) frozen_type_registry: Arc<FrozenTypeRegistry>,
     /// The world itself, as the simulation holds it.
     pub(crate) simulation_handle: SimulationHandle,
+    /// The worldgen parameters it is reset with: its own, until a call
+    /// sets one (`simulation_api::CallContext`).
+    pub(crate) worldgen_parameters_for_reset: Vec<(String, u64)>,
 }
 
 impl World {
@@ -113,7 +116,8 @@ impl World {
         let world_info = WorldInfo { worldgen_parameters: (worldgen.parameters_read)(&world_info.worldgen_parameters), ..world_info };
         let simulation_handle = SimulationHandle::new(&world_info, &frozen_type_registry, thread_count, ColdPoolPaging { folder: paging_folder(), bytes_kept: COLD_POOL_BYTES_KEPT })?;
         // Those unpopulated are the simulation's to keep from here on.
-        Ok(Self { world_info: WorldInfo { unpopulated: Vec::new(), ..world_info }, worldgen, frozen_type_registry, simulation_handle })
+        let worldgen_parameters_for_reset = world_info.worldgen_parameters.clone();
+        Ok(Self { world_info: WorldInfo { unpopulated: Vec::new(), ..world_info }, worldgen, frozen_type_registry, simulation_handle, worldgen_parameters_for_reset })
     }
 
     /// The types it runs with.

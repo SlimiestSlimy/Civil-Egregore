@@ -83,7 +83,8 @@ fn a_world_made_by_a_client_is_answered_with_its_frames() {
 /// goes on running it as clients come and go: each client, joining
 /// late, is told the running world's types first, then answered with
 /// its frames -- of the seed the flags gave; a call of what no client
-/// may call is refused, and the asks after it answered in order.
+/// may call is refused, and the asks after it answered in order; a call
+/// a client may make, answered.
 #[test]
 fn a_server_tells_each_client_joining_its_world_the_world_s_types_first() {
     let _one_server = ONE_SERVER.lock().unwrap_or_else(PoisonError::into_inner);
@@ -109,6 +110,15 @@ fn a_server_tells_each_client_joining_its_world_the_world_s_types_first() {
         });
         assert!(matches!(answers.next(), Some(ServerMessage::CallRefused(why_refused)) if why_refused.contains("no function a client may call")), "client {client}: a plane is no call");
         assert!(matches!(answers.next(), Some(ServerMessage::Worlds(_))), "client {client}: the next ask answered after it");
+        // A call a client may make -- the world generation's first parameter -- answered with its value.
+        send(&mut ClientMessage::Call(crate::worlds::type_id_named(basegame::worldgen::calls::WORLDGEN_PARAMETER_CALL), vec![0]), &mut to_server).expect("sent");
+        let answered = loop {
+            match receive(&mut from_server).expect("read") {
+                Some(ServerMessage::Frame(_) | ServerMessage::WorldTypes(..)) => continue,
+                answer => break answer,
+            }
+        };
+        assert!(matches!(answered, Some(ServerMessage::Answered(words)) if words.len() == 1), "client {client}: a worldgen parameter's value");
         drop((to_server, from_server));
         // A moment for the server to see its client gone: it must still be running after.
         std::thread::sleep(std::time::Duration::from_millis(100));

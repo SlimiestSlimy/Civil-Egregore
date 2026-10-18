@@ -13,7 +13,6 @@ use std::sync::Arc;
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, WORLD};
 use protocol::type_registry::FrozenTypeRegistry;
 use protocol::world_types::RegisterTypes;
-use utilities::tuning::Tuning;
 
 /// The world run, and what goes with running it.
 struct RunningWorld {
@@ -53,9 +52,9 @@ pub(crate) struct HostThread {
     world_name: Option<String>,
     /// What opening or saving a world last came to.
     last_outcome: Option<String>,
-    /// The sliders the world run is to be made again as, before the
-    /// next tick, if it is to be.
-    reset: Option<Tuning>,
+    /// The worldgen parameters the world run is to be made again with,
+    /// before the next tick, if it is to be.
+    reset: Option<Vec<(String, u64)>>,
     /// When the next tick is due.
     next_tick: Instant,
     /// When the last frame was answered, and the tick then.
@@ -120,15 +119,18 @@ impl HostThread {
                         Err(why_not) => self.last_outcome = Some(format!("{world_to_open} not opened: {why_not}")),
                     },
                     Ok(HostRequest::Call(call, arguments, answer_sender)) => {
-                        let answer = self.running_world.as_ref().map_or_else(|| Err("no world runs".to_string()), |running_world| running_world.world.answer_call(call, &arguments));
+                        let call_answered = self.running_world.as_mut().map_or_else(|| crate::world_access::CallAnswered { answer: Err("no world runs".to_string()), reset_with: None }, |running_world| running_world.world.answer_call(call, &arguments));
+                        if call_answered.reset_with.is_some() {
+                            self.reset = call_answered.reset_with;
+                        }
                         // The caller gone has no use for its answer.
-                        _ = answer_sender.send(answer);
+                        _ = answer_sender.send(call_answered.answer);
                     }
                     Ok(HostRequest::Save(name_to_save)) => {
                         self.reset_now();
                         self.save(name_to_save);
                     }
-                    Ok(HostRequest::Reset(reset_tuning)) => self.reset = Some(*reset_tuning),
+                    Ok(HostRequest::Reset(reset_tuning)) => self.reset = self.running_world.as_ref().map(|running_world| (running_world.world.worldgen.worldgen_parameters_of_tuning)(&reset_tuning)),
                     Err(TryRecvError::Empty) => break,
                     Err(TryRecvError::Disconnected) => return,
                 }
@@ -186,18 +188,18 @@ impl HostThread {
     }
 
     /// Makes the world run again from its start, generated as the
-    /// sliders last asked say, if it was asked to be: a world of its own
-    /// from then, of no name.
+    /// worldgen parameters last asked say -- the sliders', or a call's --
+    /// if it was asked to be: a world of its own from then, of no name.
     fn reset_now(&mut self) {
-        let (Some(reset_tuning), Some(running_world)) = (self.reset.take(), &self.running_world) else {
+        let (Some(reset_worldgen_parameters), Some(running_world)) = (self.reset.take(), &self.running_world) else {
             return;
         };
         // Remade of its own types: its IDs stay.
         let world = &running_world.world;
-        let (parameters, frozen_type_registry) = (crate::world_start::parameters_of_world(&world.world_info, &(world.worldgen.worldgen_parameters_of_tuning)(&reset_tuning)), Arc::clone(&world.frozen_type_registry));
+        let (parameters, frozen_type_registry) = (crate::world_start::parameters_of_world(&world.world_info, &reset_worldgen_parameters), Arc::clone(&world.frozen_type_registry));
         self.world_name = None;
         self.last_outcome = Some(match self.run_world(&parameters, &frozen_type_registry) {
-            Ok(seed) => format!("the world remade from seed {}, as the sliders have it", utilities::seed::seed_as_hex(seed)),
+            Ok(seed) => format!("the world remade from seed {}", utilities::seed::seed_as_hex(seed)),
             Err(why_not) => format!("the world not remade: {why_not}"),
         });
     }
