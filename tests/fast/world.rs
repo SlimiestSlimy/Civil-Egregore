@@ -30,7 +30,7 @@ fn a_world_loaded_goes_on_as_the_one_saved() {
     assert_eq!((save_written.superchunks, save_written.entities_written), (first_world.chunk_storage().superchunks().count(), first_world.entity_store().len()));
 
     let mut second_world = crate::worlds::opened(&folder, basegame::default_types::register_types).expect("loaded");
-    assert_eq!((second_world.world_info().seed, second_world.world_info().tick, second_world.generation_numbers()), (seed, 1_500, first_world.generation_numbers()));
+    assert_eq!((second_world.world_info().seed, second_world.world_info().tick, second_world.worldgen_parameters()), (seed, 1_500, first_world.worldgen_parameters()));
     assert_eq!(second_world.world_info().layers, first_world.world_info().layers);
     assert!(world_contents(&first_world) == world_contents(&second_world), "loaded as saved");
 
@@ -95,10 +95,10 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let mut saved_world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 10);
     server::save(&folder, &mut saved_world).expect("saved");
     let world_file_text = std::fs::read_to_string(folder.join("world.csv")).expect("the world's file");
-    let generation: String = saved_world.generation_numbers().iter().map(|(name, value)| format!("generation {name},{value}\n")).collect();
+    let worldgen: String = saved_world.worldgen_parameters().iter().map(|(name, value)| format!("worldgen {name},{value}\n")).collect();
     // Every layer the world's types have, a wide plane as the layers it is kept cold as.
     let layers: Vec<String> = saved_world.frozen_type_registry().layer_types().into_iter().flat_map(|layer_type| layer_type.each_bitplane()).map(|plane_type| plane_type.0.to_string()).collect();
-    assert_eq!(world_file_text, format!("world,is\nformat,4\nseed,{}\ntick,0\nlayers,{}\nunpopulated,{}\n{generation}", utilities::seed::seed_as_hex(seed), layers.join(" "), utilities::coordinates::WORLD_MIDDLE.0), "no name: the folder's; the origin unpopulated until the first tick");
+    assert_eq!(world_file_text, format!("world,is\nformat,5\nseed,{}\ntick,0\nlayers,{}\nunpopulated,{}\n{worldgen}", utilities::seed::seed_as_hex(seed), layers.join(" "), utilities::coordinates::WORLD_MIDDLE.0), "no name: the folder's; the origin unpopulated until the first tick");
     let hot: String = saved_world.bitmap_arena().superchunk_indices().iter().map(|superchunk| format!("{:011x},hot,\n", superchunk.0)).collect();
     assert_eq!(std::fs::read_to_string(folder.join("hot.csv")).expect("the hot file"), format!("superchunk,is,until\n{hot}"), "the nine hot, none cooling or warming");
     let mut file_names: Vec<String> = std::fs::read_dir(folder.join("superchunks")).expect("the superchunks").map(|dir_entry| dir_entry.unwrap().file_name().into_string().unwrap()).collect();
@@ -128,8 +128,8 @@ fn a_world_file_is_read_in_any_order() {
     assert_eq!(disk::read_world(&folder).expect("read turned round"), saved_info);
     std::fs::write(&path, format!("world,is\nseed,{}\n", utilities::seed::seed_as_hex(seed))).expect("written");
     let bare_info = disk::read_world(&folder).expect("read with the seed alone");
-    assert_eq!(bare_info, disk::WorldInfo { seed, tick: 0, layers: Vec::new(), side_in_superchunks: None, forced_hot: false, camera_loads: false, unpopulated: Vec::new(), generation_numbers: Vec::new() });
-    assert_eq!(basegame::worldgen::WorldGeneration::of_numbers(&bare_info.generation_numbers).numbers(), basegame::worldgen::WorldGeneration::DEFAULT.numbers(), "generated as by default");
+    assert_eq!(bare_info, disk::WorldInfo { seed, tick: 0, layers: Vec::new(), side_in_superchunks: None, forced_hot: false, camera_loads: false, unpopulated: Vec::new(), worldgen_parameters: Vec::new() });
+    assert_eq!(basegame::worldgen::WorldGeneration::of_worldgen_parameters(&bare_info.worldgen_parameters).worldgen_parameters(), basegame::worldgen::WorldGeneration::DEFAULT.worldgen_parameters(), "generated as by default");
     for refused_text in ["world,is\ntick,3\n", "world,is\nseed,0x7\nseed,0x8\n", "world,is\nformat,1\nseed,0x7\n", "seed,0x7\nworld,is\n"] {
         std::fs::write(&path, refused_text).expect("written");
         assert!(matches!(disk::read_world(&folder), Err(DiskError::InvalidFile(..))), "{refused_text}");
@@ -210,7 +210,7 @@ fn sheep_never_step_through_a_wall() {
     // Small polygons joined by cliffs, and a seed whose origin superchunk has walls enough.
     let land_shape = basegame::worldgen::LandShape { vertex_spacing_power: 8, highest_land: 552, narrowest_blend: 2, widest_blend: 2, ocean_share: 0, finer_depth: 3, ..basegame::worldgen::LandShape::DEFAULT };
     let seed = (crate::test_seed::TestSeedHandle::open().seed()..).find(|&seed| basegame::worldgen::Terrain::generate_shaped(&land_shape, seed, utilities::coordinates::CellArea { top_left: utilities::coordinates::WORLD_MIDDLE_CELL, side_cells: utilities::coordinates::SUPERCHUNK_SIDE_CELLS }).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
-    let mut made_world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(1)).with(WORLDGEN, crate::worlds::worldgen(basegame::worldgen::WorldGeneration { land_shape, sheep_per_superchunk: 4_000, ..basegame::worldgen::WorldGeneration::DEFAULT }.numbers())), &crate::worlds::types()).expect("the world started");
+    let mut made_world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(1)).with(WORLDGEN, crate::worlds::worldgen(basegame::worldgen::WorldGeneration { land_shape, sheep_per_superchunk: 4_000, ..basegame::worldgen::WorldGeneration::DEFAULT }.worldgen_parameters())), &crate::worlds::types()).expect("the world started");
     // The superchunk's heights and a cell more all round, worked out once: asked for at every sheep, every tick.
     let (corner_cartesian, side_cells) = (utilities::coordinates::WORLD_MIDDLE.top_left().cartesian(), utilities::coordinates::SUPERCHUNK_SIDE_CELLS as usize + 2);
     let mut mesh_lands = basegame::worldgen::mesh::WorldLand::new(&land_shape, seed);

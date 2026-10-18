@@ -71,8 +71,8 @@ pub fn type_id_named(type_name: &str) -> u64 {
 }
 
 /// Worldgen parameters, each by its name, as [`WORLDGEN`] holds them.
-pub fn worldgen(generation_numbers: Vec<(String, u64)>) -> ParameterValue {
-    ParameterValue::Nested(generation_numbers.into_iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name, ParameterValue::Hex(value))))
+pub fn worldgen(worldgen_parameters: Vec<(String, u64)>) -> ParameterValue {
+    ParameterValue::Nested(worldgen_parameters.into_iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name, ParameterValue::Hex(value))))
 }
 
 /// A parameter given with nothing of its own -- forced hot, the camera
@@ -101,7 +101,7 @@ pub fn opened(folder: &Path, register_types: protocol::world_types::RegisterType
 /// The first seed from `first_seed_tried` on whose world, generated as
 /// `world_generation` says, the base game finds land about the middle.
 pub fn seed_with_land(first_seed_tried: u64, world_generation: &WorldGeneration) -> u64 {
-    server::seed_fit_to_start(first_seed_tried, &world_generation.numbers(), &basegame::worldgen::world_generation::code(base()))
+    server::seed_fit_to_start(first_seed_tried, &world_generation.worldgen_parameters(), &basegame::worldgen::world_generation::code(base()))
 }
 
 /// A folder of its own for the test `test_name`, emptied: in the
@@ -133,14 +133,14 @@ pub fn world_contents(world: &World) -> WorldContents {
 /// `sheep_per_flock` sheep on each superchunk -- made the first tick --, on
 /// `thread_count` threads.
 pub fn plain_start(superchunks: u32, grass_cover: u64, sheep_per_flock: usize, thread_count: usize) -> CleanServerParameters {
-    let generation_numbers = WorldGeneration { sheep_per_superchunk: sheep_per_flock as u64, ..WorldGeneration::plain(grass_cover) }.numbers();
-    CleanServerParameters::default().with(WORLDGEN, worldgen(generation_numbers)).with(SIDE, ParameterValue::Integer(i64::from(utilities::coordinates::square_side(superchunks)))).with(FORCED_HOT, given()).with(THREADS, ParameterValue::Integer(thread_count as i64))
+    let worldgen_parameters = WorldGeneration { sheep_per_superchunk: sheep_per_flock as u64, ..WorldGeneration::plain(grass_cover) }.worldgen_parameters();
+    CleanServerParameters::default().with(WORLDGEN, worldgen(worldgen_parameters)).with(SIDE, ParameterValue::Integer(i64::from(utilities::coordinates::square_side(superchunks)))).with(FORCED_HOT, given()).with(THREADS, ParameterValue::Integer(thread_count as i64))
 }
 
 /// The numbers of the default generation, with `sheep` sheep on each
 /// superchunk: made the first tick it is hot.
 pub fn flocked(sheep: usize) -> Vec<(String, u64)> {
-    WorldGeneration { sheep_per_superchunk: sheep as u64, ..WorldGeneration::DEFAULT }.numbers()
+    WorldGeneration { sheep_per_superchunk: sheep as u64, ..WorldGeneration::DEFAULT }.worldgen_parameters()
 }
 
 /// A world started as `parameters` say -- given no side, with no end -- and one flock of

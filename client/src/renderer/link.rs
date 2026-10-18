@@ -33,8 +33,6 @@ pub struct HostLink {
     pub last_ask: Option<FrameAsk>,
     /// Whether the world is paused.
     pub world_paused: bool,
-    /// Ticks a second it is held to, or flat out.
-    pub held_pace: Option<u32>,
     /// The sliders of how worlds are generated, as they last were: none
     /// until they are first seen.
     pub last_generation: Option<Vec<f32>>,
@@ -50,7 +48,7 @@ impl HostLink {
         let (server_end, frame_receiver) = ServerEnd::start();
         let (shading_sender, tunings) = channel();
         let painted_pictures = Mutex::new(crate::renderer::paint::start_painter(frame_receiver, tunings, server_end.link.clone()));
-        Self { server_end, painted_pictures, shading_sender, awaiting_frame: false, seconds_since_asked: f32::INFINITY, last_ask: None, world_paused: false, held_pace: Some(TARGET_PACE), last_generation: None, first_view: true }
+        Self { server_end, painted_pictures, shading_sender, awaiting_frame: false, seconds_since_asked: f32::INFINITY, last_ask: None, world_paused: false, last_generation: None, first_view: true }
     }
 
     /// Where the server is told and asked.
@@ -111,8 +109,9 @@ pub fn tell_host_of_menus(mut host_link: ResMut<HostLink>, mut make_world_reader
     }
 }
 
-/// Pauses and paces the world by the keys.
-pub fn pause_and_pace_by_keys(mut host_link: ResMut<HostLink>, pressed_keys: Res<ButtonInput<KeyCode>>, captured_input: Res<CapturedInput>) {
+/// Pauses and paces the world by the keys: paced about the server's own
+/// pace, as its last frame says it -- none, before a frame.
+pub fn pause_and_pace_by_keys(mut host_link: ResMut<HostLink>, last_seen: Res<LastFrameSeen>, pressed_keys: Res<ButtonInput<KeyCode>>, captured_input: Res<CapturedInput>) {
     if captured_input.keyboard_keys {
         return;
     }
@@ -120,16 +119,18 @@ pub fn pause_and_pace_by_keys(mut host_link: ResMut<HostLink>, pressed_keys: Res
         host_link.world_paused = !host_link.world_paused;
         _ = host_link.server().set_paused(host_link.world_paused);
     }
+    let Some((target_pace, held_pace)) = last_seen.last_frame.as_ref().map(|last_frame| (last_frame.target_pace, last_frame.held_pace)) else {
+        return;
+    };
     let new_pace = if pressed_keys.just_pressed(KeyCode::KeyT) {
-        if host_link.held_pace.is_some() { None } else { Some(TARGET_PACE) }
+        if held_pace.is_some() { None } else { Some(target_pace) }
     } else if pressed_keys.just_pressed(KeyCode::BracketLeft) {
-        Some((host_link.held_pace.unwrap_or(TARGET_PACE) / 2).max(1))
+        Some((held_pace.unwrap_or(target_pace) / 2).max(1))
     } else if pressed_keys.just_pressed(KeyCode::BracketRight) {
-        Some(host_link.held_pace.unwrap_or(TARGET_PACE).saturating_mul(2))
+        Some(held_pace.unwrap_or(target_pace).saturating_mul(2))
     } else {
         return;
     };
-    host_link.held_pace = new_pace;
     _ = host_link.server().set_pace(new_pace);
 }
 
@@ -146,10 +147,6 @@ pub fn send_shading(host_link: Res<HostLink>, tuning: Res<CurrentTuning>) {
 fn generation_sliders(tuning: &Tuning) -> Vec<f32> {
     tuning.iter().enumerate().filter(|&(number_index, _)| tuned_number(number_index).slider_group != SliderGroup::NearViewShading).map(|(_, &number)| number).collect()
 }
-
-/// Ticks a second the window holds a world to unless the keys say
-/// otherwise: the server's own pace, until the game's hooks set it.
-const TARGET_PACE: u32 = 256;
 
 /// Has the host make the world run again whenever the sliders change
 /// how worlds are generated: from its start, the view left where it

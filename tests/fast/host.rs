@@ -50,13 +50,13 @@ fn a_reset_makes_the_world_again_as_retuned() {
     let world_start = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(3)));
     assert!(host.make_world(world_start.clone(), crate::worlds::types()));
     let made_frame = frame_that(&host, &frame_receiver, |_| true);
-    assert_eq!((made_frame.seed, made_frame.generation_numbers.clone(), made_frame.entity_count, made_frame.tick), (seed, crate::worlds::flocked(3), 0, 0), "the sheep made the first tick");
+    assert_eq!((made_frame.seed, made_frame.worldgen_parameters.clone(), made_frame.entity_count, made_frame.tick), (seed, crate::worlds::flocked(3), 0, 0), "the sheep made the first tick");
     let mut tuning = default_tuning();
     tuning[OCEAN_FLOOR] += 64.0;
     let retuned_generation = WorldGeneration::from_tuning(&tuning);
     assert_ne!(retuned_generation, WorldGeneration::DEFAULT);
     assert!(host.reset(&tuning));
-    let reset = frame_that(&host, &frame_receiver, |answered_frame| answered_frame.generation_numbers == retuned_generation.numbers());
+    let reset = frame_that(&host, &frame_receiver, |answered_frame| answered_frame.worldgen_parameters == retuned_generation.worldgen_parameters());
     assert!(reset.world > made_frame.world, "another world");
     assert_eq!((reset.seed, reset.entity_count, reset.tick, reset.world_name), (seed, 0, 0, None));
 }

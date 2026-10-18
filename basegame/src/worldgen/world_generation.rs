@@ -1,8 +1,8 @@
 //! The world generation's library ([`code`]), as the type
 //! hooked into generating the world exposes it: each superchunk's
 //! cells, and a flock on each queued on its turn the first tick it is
-//! hot ([`flock`]) -- both as the world's numbers say ([`WorldGeneration`]);
-//! the numbers off a window's sliders; a seed with land about the
+//! hot ([`flock`]) -- both as the world's worldgen parameters say ([`WorldGeneration`]);
+//! the worldgen parameters off a window's sliders; a seed with land about the
 //! middle, where the sheep start; the terrain asked of the server.
 
 use crate::worldgen::terrain_asked::{drawn_heights_of, heights, map};
@@ -12,7 +12,7 @@ use crate::entity_rules::sheep::{STEP, TIME_BETWEEN_MEALS};
 use crate::libraries::collision::Collision;
 use std::sync::Arc;
 use server::simulation::simulation_api::terrain::{DrawnHeightRange, Height, HeightsAsk, MapAnswer, MapAsk};
-use server::simulation::simulation_api::{cell_reads_and_writes, tick_and_random_stream, CellCartesian, CellIndex, GeneratedArea, GenerationNumbers, RandomSource, SimulationTickState, WholeAttribute, WorldgenCode, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE_CELL};
+use server::simulation::simulation_api::{cell_reads_and_writes, tick_and_random_stream, CellCartesian, CellIndex, GeneratedArea, WorldgenParameters, RandomSource, SimulationTickState, WholeAttribute, WorldgenCode, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE_CELL};
 use std::collections::HashSet;
 use server::simulation::simulation_api::tuning::Tuning;
 
@@ -22,10 +22,10 @@ use server::simulation::simulation_api::tuning::Tuning;
 pub fn code(base_types: BaseTypes) -> WorldgenCode {
     let collision = Collision { plane: base_types.collision };
     WorldgenCode {
-        generate_cells: Arc::new(move |generation_numbers, seed, generated_area| generate_cells(&base_types, generation_numbers, seed, generated_area)),
-        populate: Arc::new(move |tick_state, generation_numbers, seed| populate(&base_types, &collision, tick_state, generation_numbers, seed)),
-        numbers_read,
-        numbers_of_tuning,
+        generate_cells: Arc::new(move |worldgen_parameters, seed, generated_area| generate_cells(&base_types, worldgen_parameters, seed, generated_area)),
+        populate: Arc::new(move |tick_state, worldgen_parameters, seed| populate(&base_types, &collision, tick_state, worldgen_parameters, seed)),
+        parameters_read,
+        worldgen_parameters_of_tuning,
         fit_to_start,
         drawn_heights,
         heights: heights_asked,
@@ -34,48 +34,48 @@ pub fn code(base_types: BaseTypes) -> WorldgenCode {
 }
 
 /// Writes the cells of `generated_area`'s area of the world of `seed`, on
-/// the planes of `base_types`, as `generation_numbers` say ([`generate_area`]).
-fn generate_cells(base_types: &BaseTypes, generation_numbers: &GenerationNumbers, seed: u64, generated_area: &mut GeneratedArea) {
-    generate_area(base_types, &WorldGeneration::of_numbers(generation_numbers), seed, generated_area);
+/// the planes of `base_types`, as `worldgen_parameters` say ([`generate_area`]).
+fn generate_cells(base_types: &BaseTypes, worldgen_parameters: &WorldgenParameters, seed: u64, generated_area: &mut GeneratedArea) {
+    generate_area(base_types, &WorldGeneration::of_worldgen_parameters(worldgen_parameters), seed, generated_area);
 }
 
-/// The numbers as [`WorldGeneration`] reads them.
-fn numbers_read(generation_numbers: &GenerationNumbers) -> Vec<(String, u64)> {
-    WorldGeneration::of_numbers(generation_numbers).numbers()
+/// The worldgen parameters as [`WorldGeneration`] reads them.
+fn parameters_read(worldgen_parameters: &WorldgenParameters) -> Vec<(String, u64)> {
+    WorldGeneration::of_worldgen_parameters(worldgen_parameters).worldgen_parameters()
 }
 
-/// The numbers a window's sliders say ([`WorldGeneration::from_tuning`]).
-fn numbers_of_tuning(tuning: &Tuning) -> Vec<(String, u64)> {
-    WorldGeneration::from_tuning(tuning).numbers()
+/// The worldgen parameters a window's sliders say ([`WorldGeneration::from_tuning`]).
+fn worldgen_parameters_of_tuning(tuning: &Tuning) -> Vec<(String, u64)> {
+    WorldGeneration::from_tuning(tuning).worldgen_parameters()
 }
 
 /// Whether the world of `seed` has land about the middle, where the
 /// sheep start ([`has_land_about`]).
-fn fit_to_start(generation_numbers: &GenerationNumbers, seed: u64) -> bool {
-    has_land_about(seed, &WorldGeneration::of_numbers(generation_numbers).land_shape, WORLD_MIDDLE_CELL)
+fn fit_to_start(worldgen_parameters: &WorldgenParameters, seed: u64) -> bool {
+    has_land_about(seed, &WorldGeneration::of_worldgen_parameters(worldgen_parameters).land_shape, WORLD_MIDDLE_CELL)
 }
 
 /// The heights the world is drawn between ([`drawn_heights_of`]).
-fn drawn_heights(generation_numbers: &GenerationNumbers) -> DrawnHeightRange {
-    drawn_heights_of(&WorldGeneration::of_numbers(generation_numbers))
+fn drawn_heights(worldgen_parameters: &WorldgenParameters) -> DrawnHeightRange {
+    drawn_heights_of(&WorldGeneration::of_worldgen_parameters(worldgen_parameters))
 }
 
 /// The heights `heights_ask` asks for, of the world of `seed` ([`heights`]).
-fn heights_asked(generation_numbers: &GenerationNumbers, seed: u64, heights_ask: &HeightsAsk) -> Vec<Height> {
-    heights(seed, &WorldGeneration::of_numbers(generation_numbers), heights_ask)
+fn heights_asked(worldgen_parameters: &WorldgenParameters, seed: u64, heights_ask: &HeightsAsk) -> Vec<Height> {
+    heights(seed, &WorldGeneration::of_worldgen_parameters(worldgen_parameters), heights_ask)
 }
 
 /// The map `map_ask` asks for, of the world of `seed` ([`map`]).
-fn map_asked(generation_numbers: &GenerationNumbers, seed: u64, map_ask: MapAsk) -> MapAnswer {
-    map(seed, &WorldGeneration::of_numbers(generation_numbers), map_ask)
+fn map_asked(worldgen_parameters: &WorldgenParameters, seed: u64, map_ask: MapAsk) -> MapAnswer {
+    map(seed, &WorldGeneration::of_worldgen_parameters(worldgen_parameters), map_ask)
 }
 
-/// A flock of as many sheep as `generation_numbers` say, queued on `tick_state`, its
+/// A flock of as many sheep as `worldgen_parameters` say, queued on `tick_state`, its
 /// superchunk's turn, drawn from a random stream of its own for the world of
 /// `seed`: the same flock whenever it is made there -- of the sheep of
 /// `base_types`, each made through `collision`.
-fn populate(base_types: &BaseTypes, collision: &Collision, tick_state: &mut SimulationTickState, generation_numbers: &GenerationNumbers, seed: u64) {
-    let sheep_count = WorldGeneration::of_numbers(generation_numbers).sheep_per_superchunk as usize;
+fn populate(base_types: &BaseTypes, collision: &Collision, tick_state: &mut SimulationTickState, worldgen_parameters: &WorldgenParameters, seed: u64) {
+    let sheep_count = WorldGeneration::of_worldgen_parameters(worldgen_parameters).sheep_per_superchunk as usize;
     if sheep_count > 0 {
         let mut superchunk_stream = RandomSource::for_stream(!seed, tick_state.superchunk().0);
         flock(base_types, tick_state, collision, sheep_count, &mut superchunk_stream);

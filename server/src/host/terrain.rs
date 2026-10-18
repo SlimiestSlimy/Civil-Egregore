@@ -24,8 +24,8 @@ pub(crate) struct WorldTold {
     pub world: u64,
     /// Its seed.
     pub seed: u64,
-    /// Its generation's numbers.
-    pub generation_numbers: Vec<(String, u64)>,
+    /// Its generation's parameters.
+    pub worldgen_parameters: Vec<(String, u64)>,
     /// What generates it.
     pub worldgen: WorldgenCode,
 }
@@ -70,8 +70,8 @@ fn answer_terrain_requests(request_receiver: &Receiver<TerrainRequest>) {
         // An asker gone before its answer is nothing to tell anyone.
         match terrain_request {
             TerrainRequest::World(told) => world_told = Some(told),
-            TerrainRequest::Heights(heights_ask, heights_answer) => _ = heights_answer.send(running(heights_ask.world).map(|told| (told.worldgen.heights)(&told.generation_numbers, told.seed, &heights_ask))),
-            TerrainRequest::Map(map_ask, map_answer) => _ = map_answer.send(running(map_ask.world).map(|told| (told.worldgen.map)(&told.generation_numbers, told.seed, map_ask))),
+            TerrainRequest::Heights(heights_ask, heights_answer) => _ = heights_answer.send(running(heights_ask.world).map(|told| (told.worldgen.heights)(&told.worldgen_parameters, told.seed, &heights_ask))),
+            TerrainRequest::Map(map_ask, map_answer) => _ = map_answer.send(running(map_ask.world).map(|told| (told.worldgen.map)(&told.worldgen_parameters, told.seed, map_ask))),
         }
     }
 }

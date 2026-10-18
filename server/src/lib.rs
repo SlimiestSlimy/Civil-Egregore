@@ -82,7 +82,7 @@ pub fn paging_folder() -> std::path::PathBuf {
     utilities::settings::folder().join("paging")
 }
 
-/// A world: what its file says it is -- its generation's numbers among
+/// A world: what its file says it is -- its generation's parameters among
 /// it -- what generates it, the types it runs with, and the world
 /// itself as the simulation holds it -- which does all there is to do
 /// to it; the server only coordinates.
@@ -110,7 +110,7 @@ impl World {
     fn empty_world(world_info: WorldInfo, thread_count: Option<usize>, frozen_type_registry: Arc<FrozenTypeRegistry>) -> Result<Self, String> {
         let worldgen = crate::simulation::worldgen_of(&frozen_type_registry)?;
         // Its numbers as its generation reads them: every one it knows, none it does not.
-        let world_info = WorldInfo { generation_numbers: (worldgen.numbers_read)(&world_info.generation_numbers), ..world_info };
+        let world_info = WorldInfo { worldgen_parameters: (worldgen.parameters_read)(&world_info.worldgen_parameters), ..world_info };
         let simulation_handle = SimulationHandle::new(&world_info, &frozen_type_registry, thread_count, ColdPoolPaging { folder: paging_folder(), bytes_kept: COLD_POOL_BYTES_KEPT })?;
         // Those unpopulated are the simulation's to keep from here on.
         Ok(Self { world_info: WorldInfo { unpopulated: Vec::new(), ..world_info }, worldgen, frozen_type_registry, simulation_handle })

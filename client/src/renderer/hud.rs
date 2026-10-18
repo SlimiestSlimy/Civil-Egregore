@@ -49,7 +49,7 @@ pub fn write_hud(hud_parts: Single<(&mut Text, &mut Visibility), With<HudText>>,
         shown_text.0 = format!("no world runs yet\n{KEYS_TEXT}");
         return;
     };
-    let pace_said = match (host_link.world_paused, host_link.held_pace) {
+    let pace_said = match (host_link.world_paused, last_frame.held_pace) {
         (true, _) => "paused".to_string(),
         (false, Some(held_pace)) => format!("held to {held_pace} ticks a second"),
         (false, None) => "flat out".to_string(),
