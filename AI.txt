@@ -276,6 +276,15 @@ NOW
     are still callable within the server eh" -- yes: Host::call is the
     same call in process, no socket; and the code is the library's own
     function, basegame's to call directly as any of its functions.
+  * DONE (the commit after e9bf11a): client::client_api, the client's
+    public API ("right now lol"), calls alone for now: ServerCalls, a
+    Bevy resource, call(ClientCallType, words). NOT YET USABLE BY
+    BASEGAME: the client still depends on basegame (the renderer's
+    BaseTypes, DEEP_WATER_DEPTH, OLDEST_TREE_STAGE, STAGE_BITS), and
+    Cargo refuses the cycle. The rewrite takes the client off basegame
+    (render rules); then basegame depends on client_api. Untested on
+    its own: a client crate test cannot start the program's server
+    (current_exe is the test); the wire it goes over is tested.
 - WHAT IS LEFT, IN ORDER (the user, 2026-10-18, on my list of what is
   left: "1 go ahead, 2 not quite, we need client side gui rules or
   something like that first / 3 same, fold into 5 with 2 / 4 can be
