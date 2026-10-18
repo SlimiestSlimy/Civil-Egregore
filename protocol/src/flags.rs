@@ -1,7 +1,8 @@
 //! Command lines as flags: `--flag_name`, then its parameter, or its
 //! parameters in square brackets -- `--seed 0x1a2b --check [2000 100]`.
-//! The words are read into tokens once; one parser handles them with the
-//! flags it was given, each flag's handler reading its parameters from
+//! The words are read into tokens once -- flags, brackets, and every
+//! other word as it came, read as a number only by the flag that wants
+//! one; one parser handles them with the flags it was given, each flag's handler reading its parameters from
 //! the same parser -- and, within brackets, flags again, the parse
 //! running on in the handler. The first terminal flag met is the
 //! command: its parameters end the line, and any flag within them is
@@ -21,14 +22,9 @@ pub enum CommandLineToken {
     ClosingBracket,
     /// `--flag_name`.
     Flag(String),
-    /// `0x` and hexadecimal digits: a seed.
-    Hex(u64),
-    /// A whole number.
-    Integer(i64),
-    /// A number with a fraction.
-    Float(f64),
-    /// Anything else.
-    Text(String),
+    /// Any other word, as it came: what it is -- a seed, a count, a
+    /// name -- is the flag's that reads it to say.
+    Word(String),
 }
 
 impl fmt::Display for CommandLineToken {
@@ -37,10 +33,7 @@ impl fmt::Display for CommandLineToken {
             CommandLineToken::OpeningBracket => write!(formatter, "`[`"),
             CommandLineToken::ClosingBracket => write!(formatter, "`]`"),
             CommandLineToken::Flag(flag_name) => write!(formatter, "`--{flag_name}`"),
-            CommandLineToken::Hex(hex_number) => write!(formatter, "`{hex_number:#x}`"),
-            CommandLineToken::Integer(integer) => write!(formatter, "`{integer}`"),
-            CommandLineToken::Float(float) => write!(formatter, "`{float}`"),
-            CommandLineToken::Text(text) => write!(formatter, "`{text}`"),
+            CommandLineToken::Word(word) => write!(formatter, "`{word}`"),
         }
     }
 }
@@ -62,23 +55,12 @@ pub fn command_line_tokens(words: &[String]) -> Vec<CommandLineToken> {
     tokens
 }
 
-/// The token a word with no brackets is: a flag, hex, a whole number, a
-/// number with a fraction -- one with a digit in it, so `inf` and `nan`
-/// stay text -- or text.
+/// The token a word with no brackets is: a flag, or a word as it came.
 fn token_of_word(word: &str) -> CommandLineToken {
     let is_flag_name = |flag_name: &str| !flag_name.is_empty() && flag_name.chars().all(|name_char| name_char.is_ascii_alphanumeric() || name_char == '_' || name_char == '-');
-    if let Some(flag_name) = word.strip_prefix("--").filter(|flag_name| is_flag_name(flag_name)) {
-        return CommandLineToken::Flag(flag_name.to_string());
-    }
-    if let Some(hex_number) = word.strip_prefix("0x").and_then(|hex_digits| u64::from_str_radix(hex_digits, 16).ok()) {
-        return CommandLineToken::Hex(hex_number);
-    }
-    if let Ok(integer) = word.parse::<i64>() {
-        return CommandLineToken::Integer(integer);
-    }
-    match word.parse::<f64>() {
-        Ok(float) if word.contains(|word_char: char| word_char.is_ascii_digit()) => CommandLineToken::Float(float),
-        _ => CommandLineToken::Text(word.to_string()),
+    match word.strip_prefix("--").filter(|flag_name| is_flag_name(flag_name)) {
+        Some(flag_name) => CommandLineToken::Flag(flag_name.to_string()),
+        None => CommandLineToken::Word(word.to_string()),
     }
 }
 
@@ -180,52 +162,42 @@ impl FlagParser {
         Ok(read)
     }
 
-    /// A handler's parameter in hexadecimal.
+    /// A handler's parameter in hexadecimal, with or without `0x`: a
+    /// seed, 64 bits.
     pub fn hex_parameter(&mut self) -> Result<u64, FlagError> {
-        match self.next_parameter("a number in hexadecimal")? {
-            CommandLineToken::Hex(hex_number) => Ok(hex_number),
-            other_token => Err(self.wrong_line(&format!("{other_token} is not a number in hexadecimal"))),
-        }
+        let word = self.next_parameter("a number in hexadecimal")?;
+        utilities::seed::of_hex(&word).ok_or_else(|| self.wrong_line(&format!("`{word}` is not a number in hexadecimal")))
     }
 
     /// A handler's parameter as a whole number.
     pub fn integer_parameter(&mut self) -> Result<i64, FlagError> {
-        match self.next_parameter("a whole number")? {
-            CommandLineToken::Integer(integer) => Ok(integer),
-            other_token => Err(self.wrong_line(&format!("{other_token} is not a whole number"))),
-        }
+        let word = self.next_parameter("a whole number")?;
+        word.parse().map_err(|_| self.wrong_line(&format!("`{word}` is not a whole number")))
     }
 
-    /// A handler's parameter as a number, a whole one too.
+    /// A handler's parameter as a number, a whole one too -- one with a
+    /// digit in it, so `inf` and `nan` are none.
     pub fn float_parameter(&mut self) -> Result<f64, FlagError> {
-        match self.next_parameter("a number")? {
-            CommandLineToken::Float(float) => Ok(float),
-            CommandLineToken::Integer(integer) => Ok(integer as f64),
-            other_token => Err(self.wrong_line(&format!("{other_token} is not a number"))),
-        }
+        let word = self.next_parameter("a number")?;
+        word.parse().ok().filter(|_| word.contains(|word_char: char| word_char.is_ascii_digit())).ok_or_else(|| self.wrong_line(&format!("`{word}` is not a number")))
     }
 
     /// A handler's parameter as text: any word that is no flag or bracket.
     pub fn text_parameter(&mut self) -> Result<String, FlagError> {
-        match self.next_parameter("a word")? {
-            CommandLineToken::Text(text) => Ok(text),
-            CommandLineToken::Hex(hex_number) => Ok(format!("{hex_number:#x}")),
-            CommandLineToken::Integer(integer) => Ok(integer.to_string()),
-            CommandLineToken::Float(float) => Ok(float.to_string()),
-            other_token => Err(self.wrong_line(&format!("{other_token} is not a word"))),
-        }
+        self.next_parameter("a word")
     }
 
-    /// The next token, read, if it is a parameter: no flag or bracket.
-    fn next_parameter(&mut self, wanted: &str) -> Result<CommandLineToken, FlagError> {
+    /// The next token, read, if it is a parameter -- no flag or bracket:
+    /// its word.
+    fn next_parameter(&mut self, wanted: &str) -> Result<String, FlagError> {
         match self.tokens.get(self.next_token).cloned() {
-            Some(CommandLineToken::Flag(_) | CommandLineToken::OpeningBracket | CommandLineToken::ClosingBracket) | None => {
-                let found = self.tokens.get(self.next_token).map_or("the line's end".to_string(), ToString::to_string);
-                Err(self.wrong_line(&format!("{wanted} wanted, not {found}")))
-            }
-            Some(parameter_token) => {
+            Some(CommandLineToken::Word(word)) => {
                 self.next_token += 1;
-                Ok(parameter_token)
+                Ok(word)
+            }
+            other_token => {
+                let found = other_token.map_or("the line's end".to_string(), |other_token| other_token.to_string());
+                Err(self.wrong_line(&format!("{wanted} wanted, not {found}")))
             }
         }
     }
