@@ -3,20 +3,18 @@
 //! planes of the cells, the type of entity and its attribute -- each
 //! of the ID its world gave it as it was registered
 //! (`crate::default_types`), never a fixed one; and what the numbers
-//! some hold are made of (the climate's, a sheep's state), and how
+//! some hold are made of (a sheep's state), and how
 //! wide they are ([`plane_words`]).
 
 
-mod climate;
 pub mod plane_words;
 mod sheep_state;
 
-pub use climate::{nearer_by_step, passes_a_slope, pressure_falls_by, Climate, Wind, DEGREES_A_WIND_CARRIES, FALL_THAT_FREES, HEAT_A_LEVEL_MORE_HELD, HIGHEST_PRESSURE, HOTTEST_TEMPERATURE, HUMIDITY_A_LEVEL_OF_CLOUD, HUMIDITY_A_LEVEL_SOONER, MOST_HUMID, PRESSURE_AT_REST, PRESSURE_GAP_AT_REST, RAINS_ABOVE_AT_THE_MOST, RAINS_ABOVE_IN_COLD_DRY_AIR, RISE_THAT_HALVES, STRONGEST_WIND, TILES_ABOUT};
 pub use sheep_state::SheepState;
 
 pub use server::simulation::simulation_api::terrain::Height;
 
-use protocol::type_registry::{Attribute, Bits16, Bits32, Bits4, Bits8, EntityType, LayerType, WidePlane, Width};
+use protocol::type_registry::{Attribute, Bits16, Bits4, EntityType, LayerType, WidePlane, Width};
 
 /// The base game's types as a world registered them, each of the ID it
 /// was given there: what everything of the base game that works on
@@ -58,17 +56,6 @@ pub struct BaseTypes {
     /// The cells under water, however deep: what a rule asks. How deep
     /// is [`BaseTypes::water_depth`].
     pub wet: LayerType,
-    /// The clouds: a number a tile 8 by 8 cells, 0 no cloud to 15 the
-    /// deepest shadow a cloud casts.
-    pub cloud: WidePlane<Bits4>,
-    /// The climate: thirty-two bits a tile 8 by 8 cells -- humidity,
-    /// wind, temperature and pressure, a byte each, kept together: one
-    /// read for all four.
-    pub climate: WidePlane<Bits32>,
-    /// How high the land of a tile 8 by 8 cells stands over the ocean,
-    /// in heights, 255 at the most: what the air's moves are held
-    /// against, read by the weather as any plane is.
-    pub elevation: WidePlane<Bits8>,
     /// Every cell's height: sixteen bits a cell.
     pub height: WidePlane<Bits16>,
     /// How deep the water over a cell is: 0 on dry land, sixteen bits a
@@ -87,9 +74,6 @@ impl BaseTypes {
 /// south, west, north.
 pub const WALL_WAYS: [(i32, i32); 4] = [(1, 0), (0, 1), (-1, 0), (0, -1)];
 
-/// The tile size of the weather's planes, as a scale: tiles 8 by 8
-/// cells.
-pub const WEATHER_TILE_SCALE: u32 = 3;
 /// The depth from which water hides what is under it: a power of two.
 pub const DEEP_WATER_DEPTH: u32 = 16;
 /// The oldest stage a tree has: sixteen in all, what four bits hold.
@@ -101,5 +85,3 @@ pub const GRASS_RULE: &str = "grass rule";
 pub const TREES_RULE: &str = "trees rule";
 /// The sheep's rule's name.
 pub const SHEEP_RULE: &str = "sheep rule";
-/// The weather's rule's name.
-pub const WEATHER_RULE: &str = "weather rule";

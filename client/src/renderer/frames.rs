@@ -99,7 +99,6 @@ pub fn show_frames(
     for painted_picture in new_pictures {
         host_link.awaiting_frame &= painted_picture.host_frame.more_to_come;
         if last_seen.last_frame.as_ref().is_none_or(|last_frame| last_frame.world != painted_picture.host_frame.world) {
-            last_seen.climates.clear();
             for (_, (sprite_entity, ..)) in superchunk_sprites.tiles.drain() {
                 bevy_commands.entity(sprite_entity).despawn();
             }
@@ -120,7 +119,6 @@ pub fn show_frames(
                 }
             }
         }
-        last_seen.climates.extend(painted_picture.climates);
         (last_seen.last_frame, last_seen.base_types, last_seen.painted_superchunks, last_seen.paint_seconds) = (Some(painted_picture.host_frame), Some(painted_picture.base_types), last_seen.painted_superchunks + painted_picture.superchunks.len(), painted_picture.paint_seconds);
         for painted_superchunk in painted_picture.superchunks {
             let (superchunk_cartesian, side_pixels) = (painted_superchunk.superchunk_cartesian, painted_superchunk.side_pixels);
@@ -221,7 +219,7 @@ pub fn ask_next_frame(
     // world's types are known: its first frame brings them.
     let (planes, counted) = match &last_seen.base_types {
         Some(base_types) => {
-            let mut planes = vec![base_types.grass, base_types.tree, base_types.wet, base_types.cloud.layer_type(), base_types.climate.layer_type(), base_types.height.layer_type(), base_types.water_depth.layer_type()];
+            let mut planes = vec![base_types.grass, base_types.tree, base_types.wet, base_types.height.layer_type(), base_types.water_depth.layer_type()];
             if near_wanted.is_some() || detail_shift == 0 {
                 planes.push(base_types.tree_stage.layer_type());
             }

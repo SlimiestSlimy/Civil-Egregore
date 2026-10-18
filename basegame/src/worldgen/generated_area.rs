@@ -3,7 +3,6 @@
 //! simulation's API (`GeneratedArea`): what they are kept in is not
 //! the generation's to know.
 
-use crate::worldgen::climate::ClimateNoises;
 use crate::worldgen::{WorldGeneration, Terrain};
 use crate::base_types::{BaseTypes, OLDEST_TREE_STAGE};
 use server::simulation::simulation_api::{CellCartesian, GeneratedArea};
@@ -13,8 +12,7 @@ use server::simulation::simulation_api::{CellCartesian, GeneratedArea};
 /// and walls -- the ocean where it is under the ocean's level, as deep
 /// as it is lower, and on the rest grass in patches -- dirt where there
 /// is none -- and trees in patches of their own, each of a stage drawn
-/// for its cell; and over all of it the climate, a tile at a time
-/// ([`ClimateNoises`]) -- the same whenever it is made.
+/// for its cell -- the same whenever it is made.
 pub fn generate_area(base_types: &BaseTypes, world_generation: &WorldGeneration, seed: u64, generated_area: &mut GeneratedArea) {
     let area = generated_area.area();
     let terrain = Terrain::generate_shaped(&world_generation.land_shape, seed, area);
@@ -47,14 +45,5 @@ pub fn generate_area(base_types: &BaseTypes, world_generation: &WorldGeneration,
             // Its stage: a lot of the cell's own.
             generated_area.set_value(base_types.tree_stage, cell, (tree_lot % (OLDEST_TREE_STAGE as u64 + 1)) as u32);
         }
-    }
-    // The climate, a number a tile, worked out at the tile's middle cell; and how high the tile stands over the ocean there: what the air's moves are held against.
-    let (mut climate, tile_side) = (ClimateNoises::new(seed), base_types.climate.layer_type().tile_side());
-    for (tile_y, tile_x) in (0..area.side_cells / tile_side).flat_map(|tile_y| (0..area.side_cells / tile_side).map(move |tile_x| (tile_y, tile_x))) {
-        let (x, y) = (tile_x * tile_side + tile_side / 2, tile_y * tile_side + tile_side / 2);
-        let middle_cell = CellCartesian { x: area.top_left.x + x, y: area.top_left.y + y };
-        let height_above_ocean = terrain.height(x, y).saturating_sub(ocean);
-        generated_area.set_value(base_types.climate, middle_cell, climate.climate_at(middle_cell.x, middle_cell.y, height_above_ocean, terrain.height(x, y) < ocean).plane_number());
-        generated_area.set_value(base_types.elevation, middle_cell, u32::from(height_above_ocean).min(base_types.elevation.most_value()));
     }
 }

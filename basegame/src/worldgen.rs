@@ -7,7 +7,6 @@
 //! `docs/reference.md`.
 
 
-pub mod climate;
 
 pub mod generated_area;
 pub mod generation;
@@ -17,7 +16,6 @@ pub mod patches;
 pub mod terrain_asked;
 pub mod world_generation;
 
-pub use climate::{ClimateNoises, CLIMATE_SALT};
 pub use generated_area::generate_area;
 pub use generation::{has_land_about, seed_with_land, WorldGeneration, WorldGrowth, FLOCK, TREES_SALT};
 

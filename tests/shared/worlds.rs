@@ -38,6 +38,26 @@ pub fn base() -> BaseTypes {
     registered_types().1
 }
 
+/// The tests' own plane of tiles: four bits a tile 8 by 8 cells,
+/// registered after the base game's types -- what tiles are tried on
+/// through ticks, saves and frames, the base game having none.
+pub const TEST_TILES: &str = "test tiles";
+
+/// The base game's types and [`TEST_TILES`]: a game of the tests' own,
+/// as initialization hands one the server.
+pub fn types_with_test_tiles(type_registry: &mut TypeRegistry) -> Result<(), String> {
+    basegame::default_types::register_types(type_registry)?;
+    type_registry.register(protocol::type_registry::Registration::wide_plane_of_tiles::<protocol::type_registry::Bits4>(TEST_TILES, 3)).map(drop).map_err(|refusal| format!("{TEST_TILES}: {refusal:?}"))
+}
+
+/// The types of [`types_with_test_tiles`], frozen for a new world, and
+/// the plane of tiles among them.
+pub fn with_test_tiles() -> (Arc<FrozenTypes>, protocol::type_registry::WidePlane<protocol::type_registry::Bits4>) {
+    let frozen_types = protocol::world_types::of_a_new_world(types_with_test_tiles).expect("the tests' types");
+    let test_tiles = frozen_types.types().iter().find(|registered| registered.name() == TEST_TILES).and_then(protocol::type_registry::RegisteredType::wide_plane).expect("four bits a tile");
+    (Arc::new(frozen_types), test_tiles)
+}
+
 /// The ID of the base game's type named `type_name`, in a new world:
 /// a rule ticked alone is asked for by it.
 pub fn type_id_named(type_name: &str) -> u64 {

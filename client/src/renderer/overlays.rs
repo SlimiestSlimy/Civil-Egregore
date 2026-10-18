@@ -57,8 +57,6 @@ pub struct OverlaysShown {
     chunks: bool,
     /// Every cell's height.
     heights: bool,
-    /// Every tile's climate (`climate_labels`).
-    pub(crate) climates: bool,
 }
 
 /// A label in a superchunk's or a chunk's top left corner: one of a
@@ -103,7 +101,6 @@ pub fn toggle(mut overlays_shown: ResMut<OverlaysShown>, pressed_keys: Res<Butto
         overlays_shown.superchunks ^= pressed_keys.just_pressed(KeyCode::KeyB);
         overlays_shown.chunks ^= pressed_keys.just_pressed(KeyCode::KeyC);
         overlays_shown.heights ^= pressed_keys.just_pressed(KeyCode::KeyH);
-        overlays_shown.climates ^= pressed_keys.just_pressed(KeyCode::KeyK);
     }
 }
 

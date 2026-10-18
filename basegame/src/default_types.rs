@@ -7,9 +7,9 @@
 //! ([`register_types`]): neither names a type of the base game, and
 //! the registry is made for each world.
 
-use crate::base_types::{BaseTypes, SheepState, GRASS_RULE, SHEEP_RULE, TREES_RULE, WEATHER_RULE, WEATHER_TILE_SCALE};
+use crate::base_types::{BaseTypes, SheepState, GRASS_RULE, SHEEP_RULE, TREES_RULE};
 use crate::libraries::collision::Collision;
-use protocol::type_registry::{Bits16, Bits32, Bits4, Bits8, Hook, RegisteredType, Registration, RegistryRefusal, TypeRegistry};
+use protocol::type_registry::{Bits16, Bits4, Hook, RegisteredType, Registration, RegistryRefusal, TypeRegistry};
 use std::sync::Arc;
 
 /// The base game's types registered in `type_registry`, in their order:
@@ -32,18 +32,14 @@ pub fn register(type_registry: &mut TypeRegistry) -> Result<BaseTypes, String> {
     let sheep_state = registered(type_registry, Registration::attribute::<SheepState>("sheep state"))?.attribute().expect("laid out as a sheep's state");
     let sheep = registered(type_registry, Registration::entity("sheep", Some("sheep state")).depending_on(&["collision"]).with_hooks(&[Hook::KeepsTheWorldHot]))?.entity_type().expect("a type of entity");
     let wet = layer(registered(type_registry, Registration::layer("wet"))?);
-    let cloud = registered(type_registry, Registration::wide_plane_of_tiles::<Bits4>("cloud", WEATHER_TILE_SCALE))?.wide_plane().expect("four bits a tile");
-    let climate = registered(type_registry, Registration::wide_plane_of_tiles::<Bits32>("climate", WEATHER_TILE_SCALE))?.wide_plane().expect("thirty-two bits a tile");
-    let elevation = registered(type_registry, Registration::wide_plane_of_tiles::<Bits8>("elevation", WEATHER_TILE_SCALE))?.wide_plane().expect("eight bits a tile");
     let height = registered(type_registry, Registration::wide_plane::<Bits16>("height"))?.wide_plane().expect("sixteen bits a cell");
     let water_depth = registered(type_registry, Registration::wide_plane::<Bits16>("water depth"))?.wide_plane().expect("sixteen bits a cell");
-    let base_types = BaseTypes { grass, tree, tree_stage, wall_east, wall_south, collision, wall_north, wall_west, sheep_state, sheep, wet, cloud, climate, elevation, height, water_depth };
+    let base_types = BaseTypes { grass, tree, tree_stage, wall_east, wall_south, collision, wall_north, wall_west, sheep_state, sheep, wet, height, water_depth };
     // Each rule's code, and the world generation's, made with the types it works on.
     let rule_hooks = [Hook::RunsEveryTick];
     registered(type_registry, Registration::sca_rule(GRASS_RULE, "grass").with_library(Arc::new(crate::sca_rules::grass::code(base_types))).with_hooks(&rule_hooks))?;
     registered(type_registry, Registration::sca_rule(TREES_RULE, "tree").with_library(Arc::new(crate::sca_rules::trees::code(base_types))).with_hooks(&rule_hooks))?;
     registered(type_registry, Registration::entity_rule(SHEEP_RULE, "sheep").with_library(Arc::new(crate::entity_rules::sheep::code(base_types))).with_hooks(&rule_hooks))?;
-    registered(type_registry, Registration::sca_rule(WEATHER_RULE, "climate").with_library(Arc::new(crate::sca_rules::weather::code(base_types))).with_hooks(&rule_hooks))?;
     registered(type_registry, Registration::worldgen("world generation").depending_on(&["sheep", "collision"]).with_library(Arc::new(crate::worldgen::world_generation::code(base_types))).with_hooks(&[Hook::GeneratesTheWorld]))?;
     Ok(base_types)
 }

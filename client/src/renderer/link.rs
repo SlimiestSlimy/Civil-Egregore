@@ -86,9 +86,6 @@ pub struct LastFrameSeen {
     pub near_pixels: u32,
     /// Cells along a pixel's side of the map; 0 if it is not shown.
     pub map: u32,
-    /// The climates of the superchunks the frames brought, as each
-    /// last was, by where it is in the world.
-    pub climates: std::collections::HashMap<(u32, u32), Vec<u64>>,
 }
 
 /// Tells the host of each world the menus make, open or save; and the

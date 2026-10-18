@@ -38,7 +38,7 @@ pub fn spawn_hud(mut bevy_commands: Commands) {
 }
 
 /// The keys, as the text says them.
-const KEYS_TEXT: &str = "move: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F11: fullscreen   B: superchunks   C: chunks   H: heights   K: climate   M: map   P: lines (on the map)   U: sliders   Escape: options";
+const KEYS_TEXT: &str = "move: arrows, WASD, drag   zoom: wheel, Q E   space: pause\nT: flat out   [ ]: pace   F11: fullscreen   B: superchunks   C: chunks   H: heights   M: map   P: lines (on the map)   U: sliders   Escape: options";
 
 /// Writes what the last frame said over the world -- nothing over the
 /// main menu.
