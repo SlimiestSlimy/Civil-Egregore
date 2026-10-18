@@ -18,9 +18,9 @@ pub const SIDE: &str = "side";
 pub const FORCED_HOT: &str = "forced_hot";
 /// Threads a world ticks on: none, every one the machine has.
 pub const THREADS: &str = "threads";
-/// A world's folder: a name in the worlds' folder, or a path. Given,
-/// the world saved there is opened, and every parameter of a new one is
-/// nothing to it.
+/// A world's folder: a name in the worlds' folder, or a path. The world
+/// saved there is opened -- every parameter of a new one nothing to it
+/// -- or, none saved there, a new one is made and saved there.
 pub const WORLD: &str = "world";
 /// Bytes of its cold superchunks' images an opened world keeps in
 /// memory: none given, the server's own.
