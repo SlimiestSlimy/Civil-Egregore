@@ -1,7 +1,7 @@
 //! The base game's planes as a frame brings them (`protocol::pipe::frame`):
 //! how wide a cell of each is.
 
-use protocol::type_registry::{Bits4, Width};
+use server::simulation::simulation_api::{Bits4, Width};
 
 /// Bits a cell's stage takes in a frame's stages.
 pub const STAGE_BITS: usize = Bits4::BITS_A_CELL as usize;

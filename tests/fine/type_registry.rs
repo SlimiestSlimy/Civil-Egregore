@@ -2,7 +2,8 @@
 //! types frozen find each again -- tried on the base game's types.
 
 use basegame::base_types::{BaseTypes, GRASS_RULE, SHEEP_RULE, TREES_RULE, SheepState};
-use protocol::type_registry::{data_words, AttributeType, EntityType, FrozenTypes, LayerType, Layout, RegisteredType, Registration, RegistryRefusal, TypeRegistry, TYPE_ID_NUMBERS};
+use protocol::type_registry::{AttributeType, EntityType, FrozenTypes, LayerType, RegisteredType, Registration, RegistryRefusal, TypeRegistry, TYPE_ID_NUMBERS};
+use server::simulation::simulation_api::{data_words, Attribute, Layout};
 use utilities::rng::RandomSource;
 
 /// A new world's registry with the base game's types registered, and
@@ -52,7 +53,7 @@ fn a_name_is_registered_once_whatever_its_kind() {
         let of_a_drawn_kind = |name: &str, seeded_rng: &mut RandomSource| match seeded_rng.draw_below(3) {
             0 => Registration::layer(name),
             1 => Registration::entity(name, None),
-            _ => Registration::attribute::<u64>(name),
+            _ => Attribute::<u64>::registration(name),
         };
         let taken_name = default_frozen.types()[seeded_rng.draw_below(default_frozen.types().len() as u64) as usize].name();
         let (mut type_registry, _) = with_base_types();
@@ -94,7 +95,7 @@ fn what_a_type_names_is_registered_before_it() {
     let mut type_registry = before;
     let (entity, rule) = (Registration::entity("defaulting", Some("fixed")), Registration::entity_rule("a rule", "defaulting"));
     assert_eq!((outcome(type_registry.register(entity.clone())), outcome(type_registry.register(rule.clone()))), (Err(RegistryRefusal::DefaultAmiss), Err(RegistryRefusal::MasterAmiss)));
-    type_registry.register(Registration::attribute::<u64>("fixed")).expect("a name no type has");
+    type_registry.register(Attribute::<u64>::registration("fixed")).expect("a name no type has");
     type_registry.register(entity).expect("its default registered before it");
     type_registry.register(rule).expect("its master registered before it");
 }
@@ -164,7 +165,7 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let mut seeded_rng = utilities::rng::RandomSource::new(seed);
     // The fewest blocks and the most, and every count between with a number drawn: any that fits between the two bytes.
-    for block_count in 1..=protocol::type_registry::ATTRIBUTE_BLOCKS_MOST {
+    for block_count in 1..=AttributeType::MOST_BLOCKS {
         let type_number = 1 + seeded_rng.draw_below(TYPE_ID_NUMBERS - 1);
         let drawn_type = AttributeType::of_blocks(type_number, block_count);
         assert_eq!((drawn_type.block_count(), drawn_type.type_number(), drawn_type.0 & 0xF, drawn_type.0 >> 56, drawn_type.is_an_attributes()), (block_count, type_number, block_count as u64 - 1, 0x00, true));

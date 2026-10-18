@@ -5,8 +5,6 @@
 //! server does with it, and its library, beyond keeping it. Names are
 //! for registering: once frozen, a type is found by its ID.
 
-use super::layouts::Layout;
-use super::type_ids::Width;
 use std::any::Any;
 use std::sync::Arc;
 
@@ -101,14 +99,15 @@ impl Registration {
         Self::of(name, Declared::Layer)
     }
 
-    /// A wide plane named `name`, of `W` a cell.
-    pub fn wide_plane<W: Width>(name: &str) -> Self {
-        Self::wide_plane_of_tiles::<W>(name, 0)
+    /// A wide plane named `name`, `width_bits` a cell.
+    pub fn wide_plane(name: &str, width_bits: u32) -> Self {
+        Self::wide_plane_of_tiles(name, width_bits, 0)
     }
 
-    /// A wide plane named `name`, of `W` a tile `2^tile_scale` cells a side.
-    pub fn wide_plane_of_tiles<W: Width>(name: &str, tile_scale: u32) -> Self {
-        Self::of(name, Declared::WidePlane { width_bits: W::BITS_A_CELL, tile_scale })
+    /// A wide plane named `name`, `width_bits` a tile `2^tile_scale`
+    /// cells a side.
+    pub fn wide_plane_of_tiles(name: &str, width_bits: u32, tile_scale: u32) -> Self {
+        Self::of(name, Declared::WidePlane { width_bits, tile_scale })
     }
 
     /// A type of entity named `name`, with the attribute named
@@ -117,9 +116,10 @@ impl Registration {
         Self::of(name, Declared::Entity { default_attribute: default_attribute.map(str::to_string) })
     }
 
-    /// An attribute named `name`, laid out as `L`.
-    pub fn attribute<L: Layout>(name: &str) -> Self {
-        Self::of(name, Declared::Attribute { block_count: L::BLOCK_COUNT, data_words: L::WORDS })
+    /// An attribute named `name` of a fixed size: `block_count` blocks,
+    /// its data `data_words` words.
+    pub fn attribute(name: &str, block_count: usize, data_words: usize) -> Self {
+        Self::of(name, Declared::Attribute { block_count, data_words })
     }
 
     /// A rule of the cells named `name`, of the plane named `master`.

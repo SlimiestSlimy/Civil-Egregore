@@ -2,8 +2,7 @@
 //! runs it, if anything does, is its library, hooked in by its
 //! registration (`super::Hook`).
 
-use super::layouts::{Attribute, Layout};
-use super::type_ids::{numbers_taken, AttributeType, EntityRuleType, EntityType, LayerType, ScaRuleType, WidePlane, Width, WorldgenType};
+use super::type_ids::{numbers_taken, AttributeType, EntityRuleType, EntityType, LayerType, ScaRuleType, WorldgenType};
 
 /// A type a world has: its name, and what goes with it by its kind.
 #[derive(Clone, Debug)]
@@ -88,14 +87,6 @@ impl RegisteredType {
         }
     }
 
-    /// Its plane, if it is a wide plane of `W`.
-    pub fn wide_plane<W: Width>(&self) -> Option<WidePlane<W>> {
-        match self {
-            Self::WidePlane { layer_type, .. } => WidePlane::of_layer_type(*layer_type),
-            _ => None,
-        }
-    }
-
     /// Its type of entity, if it is one.
     pub fn entity_type(&self) -> Option<EntityType> {
         match self {
@@ -104,10 +95,10 @@ impl RegisteredType {
         }
     }
 
-    /// Its attribute, if it is one laid out as `L`.
-    pub fn attribute<L: Layout>(&self) -> Option<Attribute<L>> {
+    /// Its attribute's type, if it is an attribute.
+    pub fn attribute_type(&self) -> Option<AttributeType> {
         match self {
-            Self::Attribute { attribute_type, .. } => Attribute::of_attribute_type(*attribute_type),
+            Self::Attribute { attribute_type, .. } => Some(*attribute_type),
             _ => None,
         }
     }
