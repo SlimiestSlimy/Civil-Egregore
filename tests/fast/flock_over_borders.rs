@@ -11,6 +11,7 @@
 //!
 //! `cargo test --test fast flock_over_borders`
 
+use crate::worlds::base;
 use crate::arenas::{cell, walker_header, world, STONE_LAYER, WALKER_TYPE};
 use server::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use server::chunk_storage::LayerCodec;
@@ -20,9 +21,13 @@ use server::simulation::simulation_api::cell_and_its_neighbours;
 use server::simulation::simulation_api::{cell_reads_and_writes, compare_and_write, SimulationTickState};
 use server::simulation::Simulation;
 use std::collections::BTreeSet;
-use basegame::base_types::COLLISION;
 use utilities::rng::RandomSource;
-use basegame::libraries::collision::COLLISION as COLLISION_LIBRARY;
+use basegame::libraries::collision::Collision;
+
+/// The base game's collision plane's library, of a new world's ID.
+fn collision_library() -> Collision {
+    Collision { plane: base().collision }
+}
 
 /// Superchunks along the side of the world.
 const WORLD: u32 = 3;
@@ -85,10 +90,10 @@ fn flock(tick_state: &mut SimulationTickState, seed: u64, pasture_shift: (u32, u
         let mut walker_random = drawn_for(seed, tick_now, from_pasture(pasture_shift, walker_cell));
         let about_tiles = cell_and_its_neighbours::tiles_about_cell(walker_cell);
         let stone_about = cell_and_its_neighbours::read_layer(tick_state, STONE_LAYER, &about_tiles);
-        let (open_cells, collision_cells) = (stone_about.hot & about_tiles.neighbour_cells(), cell_and_its_neighbours::read_layer(tick_state, COLLISION, &about_tiles).set_cells & about_tiles.neighbour_cells());
+        let (open_cells, collision_cells) = (stone_about.hot & about_tiles.neighbour_cells(), cell_and_its_neighbours::read_layer(tick_state, base().collision, &about_tiles).set_cells & about_tiles.neighbour_cells());
         let chance = walker_random.draw_below(100);
         if chance < 4 {
-            COLLISION_LIBRARY.remove(tick_state, &header);
+            collision_library().remove(tick_state, &header);
             continue;
         }
         let meals_seen = entity.attribute(COUNTED_ATTRIBUTE);
@@ -110,11 +115,11 @@ fn flock(tick_state: &mut SimulationTickState, seed: u64, pasture_shift: (u32, u
         if let Some(made_cell) = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, open_cells.cells_not_in(collision_cells)).filter(|_| chance < 9).and_then(|made_way| cell_and_its_neighbours::cell(walker_cell, made_way)) {
             // Made and counted, or neither.
             let made_seen = entity.attribute(MADE_ATTRIBUTE);
-            let mut entity_made = COLLISION_LIBRARY.begin_making_entity(tick_state, WALKER_TYPE, made_cell, tick_now + 1 + walker_random.draw_below(3), &[]);
+            let mut entity_made = collision_library().begin_making_entity(tick_state, WALKER_TYPE, made_cell, tick_now + 1 + walker_random.draw_below(3), &[]);
             server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut entity_made, &header, MADE_ATTRIBUTE, made_seen, made_seen.unwrap_or(0) + 1);
         }
         let step_cell = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, open_cells).and_then(|step_way| cell_and_its_neighbours::cell(walker_cell, step_way)).unwrap_or(walker_cell);
-        COLLISION_LIBRARY.step(tick_state, &header, step_cell, tick_now + 1 + walker_random.draw_below(3));
+        collision_library().step(tick_state, &header, step_cell, tick_now + 1 + walker_random.draw_below(3));
     }
     0
 }
@@ -127,7 +132,7 @@ fn pasture_world(seed: u64, pasture_shift: (u32, u32)) -> (BitmapArena, WorldEnt
     let mut layer_codec = LayerCodec::new();
     for (x, y) in (10..10 + WORLD).flat_map(|y| (10..10 + WORLD).map(move |x| (x, y))) {
         for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
-            bitmap_arena.make_hot(BucketKey { layer_type: COLLISION, chunk }, None, &mut layer_codec);
+            bitmap_arena.make_hot(BucketKey { layer_type: base().collision, chunk }, None, &mut layer_codec);
         }
     }
     let mut seeded_random = RandomSource::new(seed);
@@ -142,7 +147,7 @@ fn pasture_world(seed: u64, pasture_shift: (u32, u32)) -> (BitmapArena, WorldEnt
         let drawn_place = (seeded_random.draw_below(u64::from(PASTURE_SIDE)) as i64, seeded_random.draw_below(u64::from(PASTURE_SIDE)) as i64);
         if drawn_places.insert(drawn_place) {
             entity_store.queue_add(walker_header(pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), seeded_random.draw_below(3)), &[]);
-            bitmap_arena.queue_write(COLLISION, Write::cell(pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), WriteOp::SetCell));
+            bitmap_arena.queue_write(base().collision, Write::cell(pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), WriteOp::SetCell));
         }
     }
     entity_store.apply();
@@ -159,7 +164,7 @@ type PastureOutcome = (BTreeSet<(i64, i64)>, BTreeSet<(i64, i64)>, Vec<(i64, i64
 fn pasture_outcome(bitmap_arena: &BitmapArena, entity_store: &WorldEntities, pasture_shift: (u32, u32)) -> PastureOutcome {
     let read_range = -READ_PAST..i64::from(PASTURE_SIDE) + READ_PAST;
     let cells_holding = |layer| read_range.clone().flat_map(|y| read_range.clone().map(move |x| (x, y))).filter(|&(x, y)| bitmap_arena.layer_holds_cell(layer, pasture_cell(pasture_shift, x, y)) == Ok(true)).collect();
-    let (stone_cells, collision_cells) = (cells_holding(STONE_LAYER), cells_holding(COLLISION));
+    let (stone_cells, collision_cells) = (cells_holding(STONE_LAYER), cells_holding(base().collision));
     let place_in_pasture = |walker_cell: CellIndex| from_pasture(pasture_shift, walker_cell);
     let mut walker_rows: Vec<_> = entity_store.iter().map(|walker_entity| (place_in_pasture(walker_entity.header.stood_cell).0, place_in_pasture(walker_entity.header.stood_cell).1, walker_entity.header.wake, walker_entity.attributes.to_vec())).collect();
     walker_rows.sort_unstable_by_key(|walker_row| (walker_row.0, walker_row.1));

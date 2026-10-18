@@ -5,19 +5,20 @@
 //! walk off the hot bitplanes, and tick the same on any number of
 //! threads.
 
+use crate::worlds::base;
 use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, add_entity, tick_sheep};
 use utilities::coordinates::CellCartesian;
 use server::entity_manager::{set_attribute, AttributeBlock, EntityRef, Header, WholeAttribute};
-use basegame::entity_rules::sheep::{BIRTHS_COUNT, DEATHS_COUNT, EATEN_COUNT, FAR_COUNT, PATHS, SOUGHT_COUNT, WOKEN_COUNT, GESTATION_TIME, TIME_BETWEEN_MEALS, ROAMING_TIME, SHEEP, SHEEP_STATE, TIME_TO_STARVE, SheepState, STEP_JITTER, STEP};
+use basegame::entity_rules::sheep::{BIRTHS_COUNT, DEATHS_COUNT, EATEN_COUNT, FAR_COUNT, PATHS, SOUGHT_COUNT, WOKEN_COUNT, GESTATION_TIME, TIME_BETWEEN_MEALS, ROAMING_TIME, TIME_TO_STARVE, SheepState, STEP_JITTER, STEP};
 
 /// The state of a sheep next hungry at `hungry_at`, in the middle of nothing.
 fn hungry_at(hungry_at: u64) -> WholeAttribute {
-    WholeAttribute::holding_value(SHEEP_STATE, SheepState { hungry_at, ..SheepState::default() })
+    WholeAttribute::holding_value(base().sheep_state, SheepState { hungry_at, ..SheepState::default() })
 }
 
 /// What `sheep_entity` keeps: every sheep has its block.
 fn sheep_state(sheep_entity: &EntityRef) -> SheepState {
-    sheep_entity.attribute(SHEEP_STATE).expect("a sheep's state, always")
+    sheep_entity.attribute(base().sheep_state).expect("a sheep's state, always")
 }
 
 /// Makes about one sheep in `one_in` of `world` pregnant, its lamb
@@ -33,7 +34,7 @@ fn with_lambs_due(world: &mut server::World, seed: u64, one_in: u64, due_within:
         if seeded_random.draw_below(one_in) != 0 {
             continue;
         }
-        set_attribute(&mut attributes, SHEEP_STATE, SheepState { lamb_due_at: due_tick, ..state_was });
+        set_attribute(&mut attributes, base().sheep_state, SheepState { lamb_due_at: due_tick, ..state_was });
         assert_eq!(world.remove_entity(&header).entities_removed, 1);
         assert_eq!(world.add_entity(Header { wake: header.wake.min(due_tick), ..header }, &attributes).added, 1);
     }
@@ -42,7 +43,7 @@ fn with_lambs_due(world: &mut server::World, seed: u64, one_in: u64, due_within:
 /// Every sheep knows when it is next hungry, is a sheep, and is
 /// never both a lamb and pregnant.
 fn well_formed(sheep_entity: EntityRef) {
-    assert_eq!(sheep_entity.header.entity_type, SHEEP);
+    assert_eq!(sheep_entity.header.entity_type, base().sheep);
     let checked_state = sheep_state(&sheep_entity);
     assert!(checked_state.grown_at == 0 || checked_state.lamb_due_at == 0, "a lamb, pregnant");
 }
@@ -99,7 +100,7 @@ fn hungry_sheep_walk_to_the_nearest_grass() {
     let corner_cartesian = superchunk.top_left().cartesian();
     let (sheep_cartesian, grass_cartesian) = (CellCartesian { x: corner_cartesian.x + 500, y: corner_cartesian.y + 500 }, CellCartesian { x: corner_cartesian.x + 506, y: corner_cartesian.y + 493 });
     plant_grass(&mut world, grass_cartesian, 1, 1);
-    let header = Header { entity_type: SHEEP, stood_cell: sheep_cartesian.into(), wake: 0 };
+    let header = Header { entity_type: base().sheep, stood_cell: sheep_cartesian.into(), wake: 0 };
     add_entity(&mut world, header, &hungry_at(0));
     let (mut counts_so_far, mut ate_at) = (server::simulation::simulation_api::RuleCounts::default(), None);
     for _ in 0..12 * (STEP.ticks() + STEP_JITTER.ticks()) {
@@ -128,7 +129,7 @@ fn hungry_sheep_walk_to_grass_far_off() {
     let corner_cartesian = first_superchunk(&world).top_left().cartesian();
     let (sheep_cartesian, grass_cartesian) = (CellCartesian { x: corner_cartesian.x + 900, y: corner_cartesian.y + 700 }, CellCartesian { x: corner_cartesian.x + 1050, y: corner_cartesian.y + 800 });
     plant_grass(&mut world, grass_cartesian, 1, 1);
-    let header = Header { entity_type: SHEEP, stood_cell: sheep_cartesian.into(), wake: 0 };
+    let header = Header { entity_type: base().sheep, stood_cell: sheep_cartesian.into(), wake: 0 };
     add_entity(&mut world, header, &hungry_at(0));
     let (mut counts_so_far, mut ate_at) = (server::simulation::simulation_api::RuleCounts::default(), None);
     for _ in 0..TIME_TO_STARVE.ticks() {
@@ -160,7 +161,7 @@ fn sheep_on_thin_pasture_roam_away() {
     let start_cells: Vec<CellCartesian> = world.bitmap_arena().superchunk_indices().into_iter().map(|superchunk| superchunk.top_left().cartesian()).map(|corner_cartesian| CellCartesian { x: corner_cartesian.x + 500, y: corner_cartesian.y + 500 }).collect();
     for &start_cell in &start_cells {
         plant_grass(&mut world, start_cell, 1, 1);
-        add_entity(&mut world, Header { entity_type: SHEEP, stood_cell: start_cell.into(), wake: 0 }, &hungry_at(0));
+        add_entity(&mut world, Header { entity_type: base().sheep, stood_cell: start_cell.into(), wake: 0 }, &hungry_at(0));
     }
     // A sheep is told from the others by its superchunk, which it does not walk out of in so few steps.
     let superchunks = world.bitmap_arena().superchunk_indices();
@@ -243,11 +244,10 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     use utilities::coordinates::CellIndex;
     use server::entity_manager::WorldEntities;
     use server::simulation::simulation_api::cell_reads_and_writes;
-    use basegame::base_types::{GRASS, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
-    let superchunk = utilities::coordinates::WORLD_MIDDLE;
+        let superchunk = utilities::coordinates::WORLD_MIDDLE;
     let (mut layer_codec, mut bitmap_arena, mut entity_store) = (server::chunk_storage::LayerCodec::new(), BitmapArena::new(), WorldEntities::new());
     for chunk in superchunk.chunks() {
-        for layer_type in [GRASS, WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST] {
+        for layer_type in [base().grass, base().wall_north, base().wall_west, base().wall_south, base().wall_east] {
             bitmap_arena.make_hot(BucketKey { layer_type, chunk }, None, &mut layer_codec);
         }
     }
@@ -255,21 +255,21 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     let corner_cartesian = superchunk.top_left().cartesian();
     let (decaying_cell, standing_cell): (CellIndex, CellIndex) = (CellCartesian { x: corner_cartesian.x + 400, y: corner_cartesian.y + 400 }.into(), CellCartesian { x: corner_cartesian.x + 600, y: corner_cartesian.y + 400 }.into());
     for grass_cell in [decaying_cell, standing_cell] {
-        bitmap_arena.queue_write(GRASS, Write::cell(grass_cell, WriteOp::SetCell));
+        bitmap_arena.queue_write(base().grass, Write::cell(grass_cell, WriteOp::SetCell));
     }
     bitmap_arena.apply();
     let was_hungry_at = 0;
-    entity_store.queue_add(Header { entity_type: SHEEP, stood_cell: decaying_cell, wake: 0 }, &hungry_at(was_hungry_at));
-    entity_store.queue_add(Header { entity_type: SHEEP, stood_cell: standing_cell, wake: 0 }, &hungry_at(was_hungry_at));
+    entity_store.queue_add(Header { entity_type: base().sheep, stood_cell: decaying_cell, wake: 0 }, &hungry_at(was_hungry_at));
+    entity_store.queue_add(Header { entity_type: base().sheep, stood_cell: standing_cell, wake: 0 }, &hungry_at(was_hungry_at));
     entity_store.apply();
     let mut test_simulation = server::simulation::Simulation::new(1);
     let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut server::simulation::simulation_api::SimulationTickState| {
         // The decay first, counted under 0; the sheep's counts from 8 on.
-        cell_reads_and_writes::clear_counted(tick_state, GRASS, decaying_cell, 0);
+        cell_reads_and_writes::clear_counted(tick_state, base().grass, decaying_cell, 0);
         tick_state.count_under(8);
-        basegame::entity_rules::sheep::rule(tick_state, &basegame::libraries::collision::COLLISION)
+        basegame::entity_rules::sheep::rule(&base(), tick_state, &basegame::libraries::collision::Collision { plane: base().collision })
     });
-    assert_eq!((bitmap_arena.layer_holds_cell(GRASS, decaying_cell), bitmap_arena.layer_holds_cell(GRASS, standing_cell)), (Ok(false), Ok(false)));
+    assert_eq!((bitmap_arena.layer_holds_cell(base().grass, decaying_cell), bitmap_arena.layer_holds_cell(base().grass, standing_cell)), (Ok(false), Ok(false)));
     assert_eq!((report.writes_applied.cells_changed, report.writes_applied.writes_refused), (2, 1), "one meal applied, one refused");
     // What each comes to is a write an attribute changed and a move, all of the one applied and of the other refused; and of the two sleeps, the other way about.
     let (compares_applied, compares_refused) = report.instructions_compared;

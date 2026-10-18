@@ -276,7 +276,7 @@ mod tests {
         let server::host::HostSent::WorldRuns(_, world_types) = received() else { panic!("a frame before the world's types") };
         let height = crate::renderer::world_types::base_types_of(&world_types.to_text()).expect("the world's types").height.layer_type();
         let next_frame = || match received() {
-            server::host::HostSent::Frame(frame) => frame,
+            server::host::HostSent::Frame(frame) => *frame,
             server::host::HostSent::WorldRuns(..) => panic!("the world's types sent twice"),
         };
         let first_frame = next_frame();

@@ -40,8 +40,8 @@ pub enum HostSent {
     /// once, as it starts to run, before any frame of it -- what the
     /// client draws its frames by.
     WorldRuns(u64, Arc<FrozenTypes>),
-    /// A frame asked for.
-    Frame(ViewportFrame),
+    /// A frame asked for: boxed, the types' message small beside it.
+    Frame(Box<ViewportFrame>),
 }
 
 /// What a client asks of the host, sent to its thread by a [`Host`]'s

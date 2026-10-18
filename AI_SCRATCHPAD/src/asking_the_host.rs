@@ -2,8 +2,9 @@
 //! the pipe as a window has one -- asked for frames until one answers
 //! the question.
 
-use basegame::base_types::{CLIMATE, CLOUD, GRASS, TREE, WET};
-use basegame::worldgen::world_generation::WORLD_GENERATION;
+use basegame::base_types::BaseTypes;
+use protocol::type_registry::{FrozenTypes, TypeRegistry};
+use std::sync::{Arc, OnceLock};
 use protocol::pipe::frame::{FrameAsk, ViewportFrame, Viewport};
 use protocol::type_registry::LayerType;
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
@@ -18,11 +19,26 @@ use crate::ProbeParameters;
 /// The planes a window asks for of each superchunk drawn coarser than
 /// a cell a pixel: what a probe asks, so a frame costs what a window's does.
 pub fn drawn_planes() -> Vec<LayerType> {
-    vec![GRASS, TREE, WET, CLOUD.layer_type(), CLIMATE.layer_type()]
+    let base_types = base_types().1;
+    vec![base_types.grass, base_types.tree, base_types.wet, base_types.cloud.layer_type(), base_types.climate.layer_type()]
 }
 
 /// The layers a window counts over the world.
-pub const COUNTED: [LayerType; 2] = [GRASS, TREE];
+pub fn counted() -> [LayerType; 2] {
+    [base_types().1.grass, base_types().1.tree]
+}
+
+/// The base game's types of a new world, frozen once, and their IDs: a
+/// new world's are handed out in registration order, so every new
+/// world's are these.
+fn base_types() -> &'static (Arc<FrozenTypes>, BaseTypes) {
+    static REGISTERED: OnceLock<(Arc<FrozenTypes>, BaseTypes)> = OnceLock::new();
+    REGISTERED.get_or_init(|| {
+        let mut type_registry = TypeRegistry::for_new_world();
+        let base_types = basegame::default_types::register(&mut type_registry).expect("the base game's types registered");
+        (Arc::new(type_registry.freeze().expect("frozen")), base_types)
+    })
+}
 
 /// What a probe asks: a host on a thread of this process, or a server
 /// over the pipe -- the program at a path run with `--pipe`.
@@ -38,7 +54,18 @@ impl ProbedServer {
     /// `program` run with `--pipe`; and where its frames come.
     pub fn start(program: &str) -> (Self, Receiver<ViewportFrame>) {
         if program.is_empty() {
-            let (host, frame_receiver) = Host::start_on_thread(basegame::default_types::default_frozen_types());
+            let (host, host_sent) = Host::start_on_thread(basegame::default_types::register_types);
+            // The frames alone, the types sent once a world passed by.
+            let (frame_sender, frame_receiver) = channel();
+            std::thread::spawn(move || {
+                while let Ok(sent) = host_sent.recv() {
+                    if let server::host::HostSent::Frame(frame) = sent
+                        && frame_sender.send(*frame).is_err()
+                    {
+                        return;
+                    }
+                }
+            });
             return (Self::InProcess(host), frame_receiver);
         }
         let mut server_process = Command::new(program).arg("--pipe").stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().expect("the server started");
@@ -59,7 +86,7 @@ impl ProbedServer {
         match (self, message) {
             (Self::InProcess(host), ClientMessage::AskFrame(frame_ask)) => host.ask_frame(frame_ask),
             (Self::InProcess(host), ClientMessage::SetPace(pace)) => host.set_pace(pace),
-            (Self::InProcess(host), ClientMessage::MakeWorld(seed, tuning)) => host.make_world(server::WorldStart::from_tuning(seed, &tuning, &WORLD_GENERATION)),
+            (Self::InProcess(host), ClientMessage::MakeWorld(seed, tuning)) => host.make_world(server::WorldStart::from_tuning(seed, &tuning, &basegame::worldgen::world_generation::code(base_types().1)), base_types().0.clone()),
             (Self::InProcess(_), _) => false,
             (Self::OverPipe(_, to_server), mut message) => send(&mut message, to_server).is_ok(),
         }
@@ -125,7 +152,7 @@ pub fn whole_answer(frame_receiver: &Receiver<ViewportFrame>) -> Result<Viewport
 /// superchunk of `viewport` asked for each time: why not, if none comes.
 pub fn frame_that(host: &mut ProbedServer, frame_receiver: &Receiver<ViewportFrame>, viewport: Option<Viewport>, is_wanted: impl Fn(&ViewportFrame) -> bool) -> Result<ViewportFrame, String> {
     for _ in 0..FRAMES_ASKED_AT_MOST {
-        if !host.ask_frame(FrameAsk { viewport, pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: u32::MAX, seen_near: None, planes: drawn_planes(), counted: COUNTED.to_vec() }) {
+        if !host.ask_frame(FrameAsk { viewport, pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: u32::MAX, seen_near: None, planes: drawn_planes(), counted: counted().to_vec() }) {
             return Err("the host is gone".to_string());
         }
         let answered_frame = whole_answer(frame_receiver)?;

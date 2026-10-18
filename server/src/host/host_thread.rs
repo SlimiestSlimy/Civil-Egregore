@@ -139,7 +139,7 @@ impl HostThread {
                 }
             }
             if let Some(answered_frame) = self.answer_a_little()
-                && sender.send(HostSent::Frame(answered_frame)).is_err()
+                && sender.send(HostSent::Frame(Box::new(answered_frame))).is_err()
             {
                 return;
             }

@@ -31,8 +31,8 @@ pub enum Shown {
     /// A world runs, the `n`-th the server has run: its types, as its save
     /// holds them.
     WorldTypes(u64, String),
-    /// A frame asked for.
-    Frame(ViewportFrame),
+    /// A frame asked for: boxed, the types' message small beside it.
+    Frame(Box<ViewportFrame>),
 }
 
 /// Where the server is told and asked: cloned for each thread that asks.
@@ -74,7 +74,7 @@ impl ServerEnd {
                             }
                         }
                         ServerMessage::Frame(frame) => {
-                            if frame_sender.send(Shown::Frame(*frame)).is_err() {
+                            if frame_sender.send(Shown::Frame(frame)).is_err() {
                                 return;
                             }
                         }
