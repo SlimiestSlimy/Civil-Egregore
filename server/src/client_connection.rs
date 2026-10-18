@@ -71,8 +71,8 @@ pub fn serve_clients(clean_parameters: &CleanServerParameters, register_types: R
     let (host, host_sent) = Host::start_on_thread(register_types);
     if clean_parameters.each().any(|(parameter_name, _)| [SEED, SIDE, WORLD].contains(&parameter_name)) {
         let frozen_type_registry = match clean_parameters.text(WORLD) {
-            Some(world_to_open) => crate::read_types(&utilities::settings::world(world_to_open), register_types).map_err(|read_error| read_error.to_string())?,
-            None => world_types::of_a_new_world(register_types)?,
+            Some(world_named) if crate::holds_a_world(&utilities::settings::world(world_named)) => crate::read_types(&utilities::settings::world(world_named), register_types).map_err(|read_error| read_error.to_string())?,
+            _ => world_types::of_a_new_world(register_types)?,
         };
         let world = crate::start_world(clean_parameters, &Arc::new(frozen_type_registry)).map_err(|why_not| why_not.to_string())?;
         println!("seed {}, at tick {}: running", utilities::seed::seed_as_hex(world.world_info.seed), world.world_info.tick);

@@ -247,7 +247,10 @@ NOW
   --pipe (now --close_if_no_clients, see CLIENT-SERVER COMMS).
   --new/--run/--info/--threads/--ticks/--forced_hot gone. A server runs
   the world --seed/--side/--world say from its start, if any is given;
-  else none until a client makes or opens one. Then COUPLINGS LEFT; then render rules on
+  else none until a client makes or opens one.
+  --world (the user: "make world flag create the world if one doesn't
+  exists"): the world saved in the folder opened, or a new one made and
+  saved there as it starts (server::holds_a_world decides; DONE). Then COUPLINGS LEFT; then render rules on
   types and the client rewrite.
 - NO GAME CONTENT OUTSIDE THE TYPE REGISTRY (the user, 2026-10-17,
   verbatim): "NO GAME CONTENT ON SERVER CLIENT OR PROTOCOL, TYPE
@@ -472,6 +475,10 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- Saving on shutdown (Ctrl-C, SIGTERM) for a server run headless: "lets
+  not do save on shutdown for now, thats scope creep we dont need right
+  now, later is better" (2026-10-18). Until then a headless world is
+  saved only as it is made (--world) or when its client asks.
 - Several clients at once ("multi client support for later date"):
   each its own viewport and frames; who may change the world then.
 - Multiplayer beyond loopback ("not a priority by a long shot").

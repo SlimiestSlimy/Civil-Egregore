@@ -17,7 +17,7 @@ pub fn server_flags() -> Vec<Flag> {
     vec![
         Flag { flag_name: SEED, flag_help: "the world's seed, in hexadecimal; none, one drawn", flag_kind: FlagKind::General, parse_flag: parse_seed_flag },
         Flag { flag_name: SIDE, flag_help: "so many superchunks along a side; none, as far as it goes", flag_kind: FlagKind::General, parse_flag: parse_side_flag },
-        Flag { flag_name: WORLD, flag_help: "the world's folder: a name in the worlds' folder, or a path", flag_kind: FlagKind::General, parse_flag: parse_world_flag },
+        Flag { flag_name: WORLD, flag_help: "the world's folder, a name in the worlds' folder or a path: the world saved there opened, or a new one made and saved there", flag_kind: FlagKind::General, parse_flag: parse_world_flag },
         Flag { flag_name: CLOSE_IF_NO_CLIENTS, flag_help: "closes once no client has been connected for 30 seconds: what a window starts its server with; none, stays open", flag_kind: FlagKind::General, parse_flag: parse_close_if_no_clients_flag },
     ]
 }

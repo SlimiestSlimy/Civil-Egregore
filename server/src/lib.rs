@@ -141,6 +141,8 @@ pub enum WorldNotStarted {
     /// The parameters asked what cannot be -- a number out of range,
     /// forced hot with no side -- or the types cannot run a world.
     Refused(String),
+    /// The world made new could not be saved in the folder it was given.
+    Unsaved(DiskError),
 }
 
 impl std::fmt::Display for WorldNotStarted {
@@ -148,26 +150,28 @@ impl std::fmt::Display for WorldNotStarted {
         match self {
             Self::Unreadable(disk_error) => write!(formatter, "{disk_error}"),
             Self::Refused(why_not) => write!(formatter, "{why_not}"),
+            Self::Unsaved(disk_error) => write!(formatter, "made, and not saved: {disk_error}"),
         }
     }
 }
 
 /// The one way a world is started, for play and for tests alike: as
 /// `parameters` say, of `frozen_type_registry` -- registered and frozen
-/// before anything of it, by whoever starts it (`protocol::world_types`)
-/// -- on the threads they say. Opened from the folder they name
-/// ([`WORLD`]) as it was saved, the registry frozen as its types file
-/// gives the IDs (checked against it); or else made new, nothing in it
-/// yet, the superchunks
-/// it starts with hot -- every one of a world with a size forced hot,
-/// else its middle -- each populated by its generation the first tick,
-/// as every superchunk generated is (`docs/server.md`, "Made from a
-/// seed"). Or why not.
+/// before anything of it, by whoever starts it (`protocol::world_types`;
+/// which, a save's or a new world's: [`holds_a_world`]) -- on the
+/// threads they say. Given a folder ([`WORLD`]) a world is saved in, that
+/// world opened as it was saved, the registry checked against its types
+/// file. Else made new, nothing in it yet, the superchunks it starts
+/// with hot -- every one of a world with a size forced hot, else its
+/// middle -- each populated by its generation the first tick, as every
+/// superchunk generated is (`docs/server.md`, "Made from a seed"); and,
+/// given a folder, saved there as it starts. Or why not.
 pub fn start_world(parameters: &CleanServerParameters, frozen_type_registry: &Arc<FrozenTypeRegistry>) -> Result<World, WorldNotStarted> {
     let thread_count = world_start::thread_count_of(parameters).map_err(WorldNotStarted::Refused)?;
-    if let Some(world_to_open) = parameters.text(WORLD) {
+    let folder = parameters.text(WORLD).map(utilities::settings::world);
+    if let Some(world_folder) = folder.as_deref().filter(|world_folder| holds_a_world(world_folder)) {
         let bytes_kept = parameters.integer(COLD_POOL_BYTES).map_or(Ok(COLD_POOL_BYTES_KEPT), u64::try_from).map_err(|_| WorldNotStarted::Refused(format!("--{COLD_POOL_BYTES}: a count of bytes")))?;
-        return save_and_load::open_world(&utilities::settings::world(world_to_open), bytes_kept, thread_count, frozen_type_registry).map_err(WorldNotStarted::Unreadable);
+        return save_and_load::open_world(world_folder, bytes_kept, thread_count, frozen_type_registry).map_err(WorldNotStarted::Unreadable);
     }
     let worldgen = crate::simulation::worldgen_of(frozen_type_registry).map_err(WorldNotStarted::Refused)?;
     let world_info = world_start::new_world_info(frozen_type_registry, &worldgen, parameters).map_err(WorldNotStarted::Refused)?;
@@ -176,5 +180,15 @@ pub fn start_world(parameters: &CleanServerParameters, frozen_type_registry: &Ar
     let start_superchunks = if every_superchunk.is_empty() { vec![WORLD_MIDDLE] } else { every_superchunk };
     world.simulation_handle.keep_hot(&start_superchunks);
     world.simulation_handle.mark_unpopulated(&start_superchunks);
+    if let Some(world_folder) = &folder {
+        save(world_folder, &mut world).map_err(WorldNotStarted::Unsaved)?;
+    }
     Ok(world)
+}
+
+/// Whether a world is saved in `folder` -- what a world started of it
+/// opens, its type registry frozen as its save has it -- or none is, and
+/// a world started of it is made new there.
+pub fn holds_a_world(folder: &std::path::Path) -> bool {
+    folder.join(chunk_storage::disk::WORLD_FILE).exists()
 }

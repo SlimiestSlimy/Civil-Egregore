@@ -288,3 +288,20 @@ fn a_plane_of_tiles_holds_a_number_a_tile_through_ticks_and_a_save() {
     check_held(&loaded_world, "loaded from a save", &mut test_random);
     assert!(world_contents(&world) == world_contents(&loaded_world), "loaded as saved");
 }
+
+/// A world started of a folder no world is saved in is made new, as the
+/// rest of its parameters say, and saved there as it starts: started of
+/// the folder again, it is opened -- the same seed, at the same tick --
+/// and its parameters of a new world are nothing to it.
+#[test]
+fn a_world_folder_holding_no_world_is_given_the_new_one() {
+    let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let folder = folder("made_in_its_folder");
+    assert!(!server::holds_a_world(&folder));
+    let made_world = server::start_world(&crate::worlds::world_at(&folder).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("made and saved");
+    assert!(server::holds_a_world(&folder), "saved as it started");
+    let opened_world = server::start_world(&crate::worlds::world_at(&folder).with(SEED, ParameterValue::Hex(seed ^ 1)), &std::sync::Arc::new(server::read_types(&folder, basegame::default_types::register_types).expect("its types"))).expect("opened");
+    assert_eq!((opened_world.world_info().seed, opened_world.world_info().tick), (made_world.world_info().seed, made_world.world_info().tick), "the world saved, not another seed's");
+    assert_eq!(made_world.world_info().seed, seed);
+    _ = std::fs::remove_dir_all(&folder);
+}

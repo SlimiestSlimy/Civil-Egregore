@@ -94,6 +94,7 @@ pub fn opened(folder: &Path, register_types: protocol::world_types::RegisterType
     server::start_world(&world_at(folder), &frozen_type_registry).map_err(|why_not| match why_not {
         server::WorldNotStarted::Unreadable(disk_error) => disk_error,
         server::WorldNotStarted::Refused(why_refused) => panic!("refused: {why_refused}"),
+        server::WorldNotStarted::Unsaved(disk_error) => panic!("an opened world saved: {disk_error}"),
     })
 }
 
