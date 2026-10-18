@@ -6,12 +6,9 @@ version = 4
 name = "AI_SCRATCHPAD"
 version = "0.0.0"
 dependencies = [
- "bitplane_manager",
- "chunk_storage",
- "entity_manager",
+ "basegame",
  "protocol",
  "server",
- "simulation",
  "utilities",
 ]
 
@@ -19,21 +16,11 @@ dependencies = [
 name = "Civil_Egregore"
 version = "0.6.0"
 dependencies = [
- "base_types",
- "bitplane_manager",
- "chunk_storage",
+ "basegame",
  "client",
- "entity_manager",
- "entity_rules",
- "libraries",
- "pathfinding",
  "protocol",
- "sca_rules",
  "server",
- "simulation",
- "type_registry",
  "utilities",
- "worldgen",
 ]
 
 [[package]]
@@ -374,11 +361,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
-name = "base_types"
+name = "basegame"
 version = "0.0.0"
 dependencies = [
  "protocol",
- "type_registry",
+ "server",
  "utilities",
 ]
 
@@ -1799,14 +1786,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitplane_manager"
-version = "0.0.0"
-dependencies = [
- "chunk_storage",
- "utilities",
-]
-
-[[package]]
 name = "blake3"
 version = "1.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1945,20 +1924,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
 
 [[package]]
-name = "chunk_storage"
-version = "0.0.0"
-dependencies = [
- "base_types",
- "tessera",
- "type_registry",
- "utilities",
-]
-
-[[package]]
 name = "client"
 version = "0.0.0"
 dependencies = [
- "base_types",
+ "basegame",
  "bevy",
  "protocol",
  "server",
@@ -2326,25 +2295,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "entity_manager"
-version = "0.0.0"
-dependencies = [
- "base_types",
- "server",
- "type_registry",
- "utilities",
-]
-
-[[package]]
-name = "entity_rules"
-version = "0.0.0"
-dependencies = [
- "base_types",
- "libraries",
- "simulation",
 ]
 
 [[package]]
@@ -3166,14 +3116,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
-name = "libraries"
-version = "0.0.0"
-dependencies = [
- "base_types",
- "simulation",
-]
-
-[[package]]
 name = "libredox"
 version = "0.1.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3868,13 +3810,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pathfinding"
-version = "0.0.0"
-dependencies = [
- "utilities",
-]
-
-[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4038,7 +3973,6 @@ checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 name = "protocol"
 version = "0.0.0"
 dependencies = [
- "type_registry",
  "utilities",
 ]
 
@@ -4294,14 +4228,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sca_rules"
-version = "0.0.0"
-dependencies = [
- "base_types",
- "simulation",
-]
-
-[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4372,18 +4298,9 @@ dependencies = [
 name = "server"
 version = "0.0.0"
 dependencies = [
- "base_types",
- "bitplane_manager",
- "chunk_storage",
- "entity_manager",
- "entity_rules",
- "libraries",
  "protocol",
- "sca_rules",
- "simulation",
- "type_registry",
+ "tessera",
  "utilities",
- "worldgen",
 ]
 
 [[package]]
@@ -4422,19 +4339,6 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
-
-[[package]]
-name = "simulation"
-version = "0.0.0"
-dependencies = [
- "bitplane_manager",
- "chunk_storage",
- "entity_manager",
- "pathfinding",
- "protocol",
- "type_registry",
- "utilities",
-]
 
 [[package]]
 name = "skrifa"
@@ -4887,15 +4791,6 @@ name = "ttf-parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2df906b07856748fa3f6e0ad0cbaa047052d4a7dd609e231c4f72cee8c36f31"
-
-[[package]]
-name = "type_registry"
-version = "0.0.0"
-dependencies = [
- "base_types",
- "server",
- "utilities",
-]
 
 [[package]]
 name = "typeid"
@@ -5762,19 +5657,6 @@ dependencies = [
  "wayland-client",
  "wayland-protocols",
  "wayland-protocols-wlr",
-]
-
-[[package]]
-name = "worldgen"
-version = "0.0.0"
-dependencies = [
- "base_types",
- "chunk_storage",
- "entity_rules",
- "libraries",
- "simulation",
- "type_registry",
- "utilities",
 ]
 
 [[package]]

@@ -5,16 +5,16 @@
 //! `cargo test --test fast`
 
 use crate::arenas::{cell, walker_header, world, STONE_LAYER};
-use bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
-use chunk_storage::LayerCodec;
+use server::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
+use server::chunk_storage::LayerCodec;
 use utilities::coordinates::{SuperchunkIndex};
-use simulation::simulation_api::square_around_a_cell::{self, AREA_CENTRE};
-use simulation::simulation_api::{cell_and_its_neighbours, entity_reads_and_writes, steps_and_paths};
-use entity_manager::NEVER_WAKES;
-use simulation::simulation_api::SimulationTickState;
-use simulation::Simulation;
+use server::simulation::simulation_api::square_around_a_cell::{self, AREA_CENTRE};
+use server::simulation::simulation_api::{cell_and_its_neighbours, entity_reads_and_writes, steps_and_paths};
+use server::entity_manager::NEVER_WAKES;
+use server::simulation::simulation_api::SimulationTickState;
+use server::simulation::Simulation;
 use std::sync::Mutex;
-use base_types::{COLLISION, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
+use basegame::base_types::{COLLISION, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
 
 /// What is in a walker's way here: the base game's collision plane and walls.
 const IN_THE_WAY: steps_and_paths::PlanesInTheWay = steps_and_paths::PlanesInTheWay { collision: COLLISION, wall_north: WALL_NORTH, wall_west: WALL_WEST, wall_south: WALL_SOUTH, wall_east: WALL_EAST };
@@ -60,7 +60,7 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
                 let passable = square_around_a_cell::read_layer(tick_state, STONE_LAYER, walker_cell).hot;
                 assert_eq!(steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, walker_cell.at_cartesian_offset(9, 0).unwrap(), &passable), None, "out of the area");
                 let next_cell = steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, goal_cell, &passable).expect("a way round");
-                libraries::collision::COLLISION.step(tick_state, &entity.header, next_cell, tick_now + 1);
+                basegame::libraries::collision::COLLISION.step(tick_state, &entity.header, next_cell, tick_now + 1);
             }
             0
         });
@@ -105,7 +105,7 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
                 }
                 let next_cell = steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, goal_cell, &square_around_a_cell::read_layer(tick_state, STONE_LAYER, walker_cell).hot).expect("a way round");
                 assert_eq!(tick_state.layer_holds(COLLISION, next_cell), Ok(false), "a step onto what the collision plane holds");
-                libraries::collision::COLLISION.step(tick_state, &entity.header, next_cell, tick_now + 1);
+                basegame::libraries::collision::COLLISION.step(tick_state, &entity.header, next_cell, tick_now + 1);
             }
             0
         });
@@ -185,7 +185,7 @@ fn walls_of_the_terrain_bar_steps() {
                 let next_cell = steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, goal_cell, &passable).expect("a way through the gap");
                 let about_tiles = cell_and_its_neighbours::tiles_about_cell(walker_cell);
                 assert!(!(steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &about_tiles) & about_tiles.cell_towards(cell_and_its_neighbours::way_of(walker_cell, next_cell))).is_empty(), "a step through a wall");
-                simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, next_cell, tick_now + 1);
+                server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, next_cell, tick_now + 1);
             }
             0
         });
@@ -253,7 +253,7 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
             for x in 1..63 {
                 let asked_cell = cell(x, y);
                 let (unwalled_cells, walls) = (steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &cell_and_its_neighbours::tiles_about_cell(asked_cell)), steps_and_paths::area_walls(tick_state, IN_THE_WAY, asked_cell));
-                let area_centre = pathfinding::Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
+                let area_centre = server::pathfinding::Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
                 for way_checked in (0..cell_and_its_neighbours::WAYS).filter(|&way_filtered| way_filtered != cell_and_its_neighbours::HERE) {
                     let beside_cartesian = cell_and_its_neighbours::cell(asked_cell, way_checked).expect("in the world").cartesian();
                     let (dx, dy) = ((beside_cartesian.x as i64 - x as i64) as i8, (beside_cartesian.y as i64 - y as i64) as i8);

@@ -6,8 +6,6 @@ use protocol::server_parameters::{CleanServerParameters, ParameterValue};
 
 /// The world's seed: none given, a fresh one.
 pub const SEED: &str = "seed";
-/// Sheep on every superchunk of a world with a side, on the origin of one without.
-pub const SHEEP: &str = "sheep";
 /// Superchunks along a world's side: none, as far as it goes.
 pub const SIDE: &str = "side";
 /// A world hot throughout, not about its sheep's halos.
@@ -32,7 +30,6 @@ pub const PIPE: &str = "pipe";
 pub fn server_flags() -> Vec<Flag> {
     vec![
         Flag { flag_name: SEED, flag_help: "the world's seed, in hexadecimal; none, a fresh one", flag_kind: FlagKind::General, parse_flag: parse_seed_flag },
-        Flag { flag_name: SHEEP, flag_help: "so many sheep on every superchunk, given the first tick it is hot", flag_kind: FlagKind::General, parse_flag: parse_sheep_flag },
         Flag { flag_name: SIDE, flag_help: "so many superchunks along a side; none, as far as it goes", flag_kind: FlagKind::General, parse_flag: parse_side_flag },
         Flag { flag_name: FORCED_HOT, flag_help: "[]: hot throughout, not about the sheep's halos; only with a side", flag_kind: FlagKind::General, parse_flag: parse_forced_hot_flag },
         Flag { flag_name: THREADS, flag_help: "on so many threads; none, every one the machine has", flag_kind: FlagKind::General, parse_flag: parse_threads_flag },
@@ -48,11 +45,6 @@ pub fn server_flags() -> Vec<Flag> {
 fn parse_seed_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters) -> Result<(), FlagError> {
     clean_parameters.insert(SEED, ParameterValue::Hex(flag_parser.hex_parameter()?));
     Ok(())
-}
-
-/// `--sheep 400`.
-fn parse_sheep_flag(flag_parser: &mut FlagParser, clean_parameters: &mut CleanServerParameters) -> Result<(), FlagError> {
-    parse_integer_flag(flag_parser, clean_parameters, SHEEP)
 }
 
 /// `--side 4`.

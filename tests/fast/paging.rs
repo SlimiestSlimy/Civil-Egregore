@@ -47,9 +47,9 @@ fn the_same(paged: &mut World, kept_world: &mut World) -> bool {
 /// as it; and it goes on as that world.
 #[test]
 fn a_world_paged_to_disk_is_the_world_kept_in_memory() {
-    let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
-    let world_start = WorldStart { seed, world_generation: crate::worlds::flocked(0), camera_loads: true, ..WorldStart::default() };
-    let (mut paged, mut kept_world) = (server::start_world(world_start), server::start_world(world_start));
+    let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
+    let world_start = WorldStart { seed, generation_numbers: crate::worlds::flocked(0), camera_loads: true, ..WorldStart::default() };
+    let (mut paged, mut kept_world) = (crate::worlds::start_world(world_start.clone()), crate::worlds::start_world(world_start));
     paged.keep_cold_pool_within(0);
     let (middle_coordinate, mut order_random) = (WORLD_SIDE_SUPERCHUNKS / 2, RandomSource::new(crate::test_seed::TestSeedHandle::open().seed()));
     // The three places in an order drawn.
@@ -66,14 +66,14 @@ fn a_world_paged_to_disk_is_the_world_kept_in_memory() {
 
     let (saved_in, copied_to) = (folder("paging_saved"), folder("paging_copied"));
     server::save(&saved_in, &mut paged).expect("saved");
-    let mut loaded_world = server::load_keeping(&saved_in, 0).expect("loaded");
+    let mut loaded_world = server::load_keeping(&saved_in, 0, &crate::worlds::types()).expect("loaded");
     assert!(loaded_world.chunk_storage().on_disk() > 0, "images left in the save");
     kept_world.keep_viewport(None);
     assert!(the_same(&mut loaded_world, &mut kept_world), "loaded as the world that kept its images");
     server::save(&saved_in, &mut loaded_world).expect("saved where it was loaded from");
     server::save(&copied_to, &mut loaded_world).expect("saved elsewhere");
     for save in [&saved_in, &copied_to] {
-        assert!(the_same(&mut server::load_world(save).expect("loaded"), &mut kept_world), "the save in {}", save.display());
+        assert!(the_same(&mut server::load_world(save, &crate::worlds::types()).expect("loaded"), &mut kept_world), "the save in {}", save.display());
     }
     drop(paged);
     for &camera_cartesian_again in &places {

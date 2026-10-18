@@ -1,6 +1,7 @@
 //! The server over the pipe, as a window starts it: the program run
 //! with `--pipe`, asked over its stdin and answered on its stdout.
 
+use basegame::base_types::GRASS;
 use protocol::pipe::frame::{FrameAsk, Viewport};
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use std::process::{Command, Stdio};
@@ -9,7 +10,8 @@ use utilities::wire::{receive, send};
 
 /// A world made over the pipe is ticked and seen: the worlds listed,
 /// then frames of the world made, until one shows its superchunks
-/// hot; and the server ends, well, once its stdin is closed.
+/// hot, each with the plane asked for and the layer counted; and the
+/// server ends, well, once its stdin is closed.
 #[test]
 fn a_world_made_over_the_pipe_is_answered_with_its_frames() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
@@ -21,7 +23,7 @@ fn a_world_made_over_the_pipe_is_answered_with_its_frames() {
     (tuning[WORLD_SIDE], tuning[FORCED_HOT], tuning[SHEEP_PER_SUPERCHUNK]) = (2.0, 1.0, 3.0);
     send(&mut ClientMessage::MakeWorld(Some(seed), tuning), &mut to_server).expect("sent");
     let whole_world = Viewport { top_left_superchunk_cartesian: (0, 0), bottom_right_superchunk_cartesian: (u32::MAX, u32::MAX) };
-    let mut frame_ask = ClientMessage::AskFrame(FrameAsk { viewport: Some(whole_world), pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: 4, seen_near: None });
+    let mut frame_ask = ClientMessage::AskFrame(FrameAsk { viewport: Some(whole_world), pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: 4, seen_near: None, planes: vec![GRASS], counted: vec![GRASS] });
     let mut frames_seen = 0;
     loop {
         send(&mut frame_ask, &mut to_server).expect("sent");
@@ -30,6 +32,8 @@ fn a_world_made_over_the_pipe_is_answered_with_its_frames() {
         };
         frames_seen += 1;
         if frame.seed == seed && frame.hot.len() == 4 {
+            assert!(frame.counts.len() == 1 && frame.counts[0].0 == GRASS, "the layer counted, and no other");
+            assert!(frame.cells.iter().all(|cells| cells.planes.iter().all(|(layer_type, _)| *layer_type == GRASS)), "the plane asked for, and no other");
             break;
         }
         assert!(frames_seen < 2_000, "the world made, 2 superchunks a side forced hot, is never seen whole");

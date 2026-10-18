@@ -7,7 +7,7 @@ description = "Civil Egregore's client: a Bevy window asking the server's host, 
 utilities = { path = "../utilities" }
 protocol = { path = "../protocol" }
 # The base game's planes and heights, read off the frames, until the client's hooks.
-base_types = { path = "../server/basegame/base_types" }
+basegame = { path = "../basegame" }
 # Bevy for the window, the drawing, the menus and the keys only: no 3D, no audio.
 bevy = { version = "0.19", default-features = false, features = ["2d", "ui"] }
 

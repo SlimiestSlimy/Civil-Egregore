@@ -4,11 +4,11 @@
 
 use crate::renderer::ground::{lit_colour, GivenHeights, SuperchunkGround, COARSEST_DETAIL};
 use crate::renderer::near::{paint_near, PaintedNear};
-use utilities::coordinates::{cartesian_from_place, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS};
+use utilities::coordinates::{cartesian_from_place, CELLS_IN_CHUNK, CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
 use protocol::pipe::terrain::AsksTerrain;
-use base_types::plane_words::{cloud_over, CLOUD_BITS, CLOUD_TILE_SHIFT, DEEPEST_CLOUD, STAGE_BITS};
-use base_types::OLDEST_TREE_STAGE;
-use protocol::pipe::frame::{cell_of_bit, rains_over, Cells, ViewportFrame, Water, CHUNK_WORDS, DEEP_WATER_DEPTH, WORD_BITS};
+use basegame::base_types::plane_words::{cloud_over, raining_tiles_of, CLOUD_BITS, CLOUD_TILE_SHIFT, DEEPEST_CLOUD, STAGE_BITS};
+use basegame::base_types::{CLIMATE, CLOUD, DEEP_WATER_DEPTH, GRASS, HEIGHT, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WATER_DEPTH, WET};
+use protocol::pipe::frame::{bit_set, cell_of_bit, value_at, Cells, ViewportFrame, CHUNK_WORDS, WORD_BITS};
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
@@ -71,8 +71,8 @@ fn make_grounds(kept_grounds: &mut HashMap<(u32, u32), SuperchunkGround>, terrai
     let hot = || host_frame.cells.iter().map(|cells| cells.top_left);
     let missing_grounds: Vec<(u32, u32)> = hot().filter(|top_left| kept_grounds.get(top_left).is_none_or(|kept_ground| fine_wanted && kept_ground.fine_ground.is_none())).collect();
     let (world, height_levels) = (host_frame.world, host_frame.drawn_heights);
-    // The heights the frame brings: those of the superchunks just turned hot.
-    let given_heights: GivenHeights = host_frame.cells.iter().filter(|cells| !cells.heights.is_empty()).map(|cells| (cells.top_left, &cells.heights[..])).collect();
+    // The heights the frame brings.
+    let given_heights: GivenHeights = host_frame.cells.iter().map(|cells| (cells.top_left, cells.plane(HEIGHT.layer_type()))).filter(|(_, height_words)| !height_words.is_empty()).collect();
     let given_heights_ref = &given_heights;
     let made_grounds: Vec<SuperchunkGround> = thread::scope(|thread_scope| {
         let making_threads: Vec<_> = missing_grounds.iter().map(|&top_left| thread_scope.spawn(move || SuperchunkGround::ask_of_host(terrain, world, height_levels, top_left, given_heights_ref))).collect();
@@ -105,8 +105,6 @@ pub fn start_painter(frame_receiver: Receiver<ViewportFrame>, tunings: Receiver<
         .name("painter".to_string())
         .spawn(move || {
             let (mut kept_grounds, mut world, mut tuning) = (HashMap::new(), 0, utilities::tuning::default_tuning());
-            // Each superchunk's water, sent the once: moved into its cells to paint them, and back.
-            let mut kept_waters: HashMap<(u32, u32), Water> = HashMap::new();
             for (frame_number, mut host_frame) in frame_receiver.into_iter().enumerate() {
                 let paint_started = Instant::now();
                 if let Some(latest_tuning) = tunings.try_iter().last() {
@@ -115,14 +113,7 @@ pub fn start_painter(frame_receiver: Receiver<ViewportFrame>, tunings: Receiver<
                 if host_frame.world != world {
                     // Another world: its ground is its own.
                     kept_grounds.clear();
-                    kept_waters.clear();
                     world = host_frame.world;
-                }
-                for cells in &mut host_frame.cells {
-                    if let Some(sent_water) = cells.water.take() {
-                        kept_waters.insert(cells.top_left, sent_water);
-                    }
-                    cells.water = kept_waters.remove(&cells.top_left);
                 }
                 make_grounds(&mut kept_grounds, &terrain, &host_frame, frame_number as u64);
                 let superchunks = host_frame
@@ -136,10 +127,7 @@ pub fn start_painter(frame_receiver: Receiver<ViewportFrame>, tunings: Receiver<
                     })
                     .collect();
                 let painted_near = host_frame.seen_near.map(|near_asked| paint_near(&host_frame.cells, &kept_grounds, near_asked, &tuning));
-                let climates = host_frame.cells.iter_mut().map(|cells| (cells.superchunk_cartesian, std::mem::take(&mut cells.climates))).collect();
-                for cells in &mut host_frame.cells {
-                    kept_waters.extend(cells.water.take().map(|painted_water| (cells.top_left, painted_water)));
-                }
+                let climates = host_frame.cells.iter_mut().map(|cells| (cells.superchunk_cartesian, cells.take_plane(CLIMATE.layer_type()))).collect();
                 host_frame.cells = Vec::new();
                 let painted_picture = PaintedFrame { host_frame, paint_seconds: paint_started.elapsed().as_secs_f64(), superchunks, painted_near, climates };
                 if picture_sender.send(painted_picture).is_err() {
@@ -169,13 +157,16 @@ const WATER_FILM_HIDES: usize = 44;
 /// How deep the water at bit `bit_in_word` of word `word` of `cells`' bitmaps
 /// is, to [`DEEP`] at most.
 pub fn depth_at(cells: &Cells, word: usize, bit_in_word: u32) -> u32 {
-    let Some(water) = &cells.water else {
-        return 0;
-    };
-    if water.deep_cells[word] >> bit_in_word & 1 == 1 {
-        return DEEP_WATER_DEPTH;
+    value_at(cells.plane(WATER_DEPTH.layer_type()), WATER_DEPTH.layer_type().width_bits(), word * WORD_BITS + bit_in_word as usize).min(DEEP_WATER_DEPTH)
+}
+
+/// A bit a cell of `cells`: whether the water on it is [`DEEP_WATER_DEPTH`]
+/// deep or more -- none if no water came.
+fn deep_cells_of(cells: &Cells) -> Vec<u64> {
+    if cells.plane(WATER_DEPTH.layer_type()).is_empty() {
+        return Vec::new();
     }
-    (0..water.depth_low_bits.len()).map(|depth_bit| ((water.depth_low_bits[depth_bit][word] >> bit_in_word & 1) as u32) << depth_bit).sum()
+    (0..CHUNK_WORDS * CHUNKS_IN_SUPERCHUNK).map(|word| (0..WORD_BITS as u32).filter(|&bit_in_word| depth_at(cells, word, bit_in_word) == DEEP_WATER_DEPTH).fold(0, |deep_word, bit_in_word| deep_word | 1 << bit_in_word)).collect()
 }
 
 /// `seen_colour` under water `water_depth` deep: the less of it seen the deeper,
@@ -198,7 +189,7 @@ pub fn tree_colour(stage: u32) -> [u8; 3] {
 pub fn stage_at(cells: &Cells, word: usize, bit_in_word: u32) -> u32 {
     // The cell's place among the superchunk's, and its stage's four bits there.
     let stage_bit = (word * WORD_BITS + bit_in_word as usize) * STAGE_BITS;
-    (cells.stages[stage_bit / WORD_BITS] >> (stage_bit % WORD_BITS)) as u32 & ((1 << STAGE_BITS) - 1)
+    cells.plane(TREE_STAGE.layer_type()).get(stage_bit / WORD_BITS).map_or(0, |&word| (word >> (stage_bit % WORD_BITS)) as u32 & ((1 << STAGE_BITS) - 1))
 }
 
 /// What a cloud's shadow darkens towards: dark, and a little blue.
@@ -235,14 +226,19 @@ pub fn in_rain(seen_colour: [u8; 3], rain: usize, whole_rain: usize) -> [u8; 3] 
 
 /// Every tile of `cells` with a cloud over it: where its top left
 /// cell is from the superchunk's, `(x, y)`, how many cells it is a
-/// side, its cloud, and whether it is raining, as the frame says
-/// (`Cells::raining_tiles`) -- the tiles those of the cloud plane, its tile
-/// size the type registry's.
+/// side, its cloud, and whether it is raining, as its climate there
+/// says -- the tiles those of the cloud plane, its tile size the type
+/// registry's.
 pub fn each_cloud(cells: &Cells, mut on_cloud_tile: impl FnMut((usize, usize), usize, u32, bool)) {
     let (tiles_a_chunk, tile_side_cells) = (CELLS_IN_CHUNK >> CLOUD_TILE_SHIFT, 1usize << (CLOUD_TILE_SHIFT / 2));
-    for tile in (0..cells.clouds.len() * WORD_BITS / CLOUD_BITS).filter(|&tile| cloud_over(&cells.clouds, tile) != 0) {
+    let clouds = cells.plane(CLOUD.layer_type());
+    if clouds.is_empty() {
+        return;
+    }
+    let raining_tiles = raining_tiles_of(clouds, cells.plane(CLIMATE.layer_type()));
+    for tile in (0..clouds.len() * WORD_BITS / CLOUD_BITS).filter(|&tile| cloud_over(clouds, tile) != 0) {
         let ((chunk_left_column, chunk_top_row), (x, y)) = (chunk_top_left(tile / tiles_a_chunk), cell_of_bit((tile % tiles_a_chunk) << CLOUD_TILE_SHIFT));
-        on_cloud_tile((chunk_left_column + x as usize, chunk_top_row + y as usize), tile_side_cells, cloud_over(&cells.clouds, tile), rains_over(&cells.raining_tiles, tile));
+        on_cloud_tile((chunk_left_column + x as usize, chunk_top_row + y as usize), tile_side_cells, cloud_over(clouds, tile), bit_set(&raining_tiles, tile));
     }
 }
 
@@ -256,7 +252,7 @@ const fn opaque_rgba(rgb_colour: [u8; 3]) -> [u8; 4] {
 fn paint_superchunk(cells: &Cells, superchunk_ground: &SuperchunkGround) -> PaintedSuperchunk {
     let mut rgba_pixels = vec![opaque_rgba(DIRT_BROWN); SUPERCHUNK_SIDE_PIXELS * SUPERCHUNK_SIDE_PIXELS];
     let grass_pixel = opaque_rgba(GRASS_GREEN);
-    for (place, chunk) in cells.grass_bitmaps.as_chunks::<CHUNK_WORDS>().0.iter().enumerate() {
+    for (place, chunk) in cells.plane(GRASS).as_chunks::<CHUNK_WORDS>().0.iter().enumerate() {
         let (chunk_left_column, chunk_top_row) = chunk_top_left(place);
         for (word_index, &word) in chunk.iter().enumerate() {
             let mut grass_bits = word;
@@ -268,7 +264,7 @@ fn paint_superchunk(cells: &Cells, superchunk_ground: &SuperchunkGround) -> Pain
         }
     }
     // Its trees over the grass, each in its stage's colour.
-    for (tree_word_index, &word) in cells.trees.iter().enumerate() {
+    for (tree_word_index, &word) in cells.plane(TREE).iter().enumerate() {
         let (tree_chunk_left, tree_chunk_top) = chunk_top_left(tree_word_index / CHUNK_WORDS);
         let mut tree_bits = word;
         while tree_bits != 0 {
@@ -279,7 +275,7 @@ fn paint_superchunk(cells: &Cells, superchunk_ground: &SuperchunkGround) -> Pain
         }
     }
     // Its water over the ground: the deeper, the less of the ground seen.
-    for (wet_word_index, &word) in cells.wet_bitmaps.iter().enumerate() {
+    for (wet_word_index, &word) in cells.plane(WET).iter().enumerate() {
         let (wet_chunk_left, wet_chunk_top) = chunk_top_left(wet_word_index / CHUNK_WORDS);
         let mut wet_bits = word;
         while wet_bits != 0 {
@@ -295,7 +291,7 @@ fn paint_superchunk(cells: &Cells, superchunk_ground: &SuperchunkGround) -> Pain
         *lit_pixel = opaque_rgba(lit_colour([lit_pixel[0], lit_pixel[1], lit_pixel[2]], light_shade));
     }
     let sheep_pixel = opaque_rgba(SHEEP_WHITE);
-    for &(x, y) in &cells.sheep_cells_cartesian {
+    for &(x, y) in &cells.entity_cells_cartesian {
         let (x, y) = (x as usize, y as usize);
         for y in y.saturating_sub(SHEEP_REACH)..=(y + SHEEP_REACH).min(SUPERCHUNK_SIDE_PIXELS - 1) {
             for x in x.saturating_sub(SHEEP_REACH)..=(x + SHEEP_REACH).min(SUPERCHUNK_SIDE_PIXELS - 1) {
@@ -352,15 +348,15 @@ fn counted_in_tiles(words: &[u64], detail_shift: u32) -> Vec<u32> {
 /// ground in the `superchunk_ground`'s light.
 fn paint_far(cells: &Cells, detail_shift: u32, superchunk_ground: &SuperchunkGround) -> PaintedSuperchunk {
     let (side_pixels, tile_cells) = (SUPERCHUNK_SIDE_PIXELS >> detail_shift, 1usize << (2 * detail_shift));
-    let (grass_counts, trees) = (counted_in_tiles(&cells.grass_bitmaps, detail_shift), counted_in_tiles(&cells.trees, detail_shift));
-    let (wet_counts, deep_counts) = (counted_in_tiles(&cells.wet_bitmaps, detail_shift), counted_in_tiles(cells.water.as_ref().map_or(&[][..], |water| &water.deep_cells), detail_shift));
+    let (grass_counts, trees) = (counted_in_tiles(cells.plane(GRASS), detail_shift), counted_in_tiles(cells.plane(TREE), detail_shift));
+    let (wet_counts, deep_counts) = (counted_in_tiles(cells.plane(WET), detail_shift), counted_in_tiles(&deep_cells_of(cells), detail_shift));
     let mut sheep_counts = vec![0u16; side_pixels * side_pixels];
-    for &(x, y) in &cells.sheep_cells_cartesian {
+    for &(x, y) in &cells.entity_cells_cartesian {
         let sheep_pixel = (y as usize >> detail_shift) * side_pixels + (x as usize >> detail_shift);
         sheep_counts[sheep_pixel] = sheep_counts[sheep_pixel].saturating_add(1);
     }
     // The cloud over each pixel's cells, added up: a tile's cloud once for every cell of it under the pixel.
-    let mut clouds = vec![0usize; if cells.clouds.is_empty() { 0 } else { side_pixels * side_pixels }];
+    let mut clouds = vec![0usize; if cells.plane(CLOUD.layer_type()).is_empty() { 0 } else { side_pixels * side_pixels }];
     // And the cells of each pixel that are under a raining cloud.
     let mut rain = clouds.clone();
     each_cloud(cells, |(cloud_left, cloud_top), tile_side, cloud, is_raining| {

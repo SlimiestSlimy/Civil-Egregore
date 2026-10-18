@@ -8,15 +8,21 @@
 #[path = "../../utilities/test_seed.rs"]
 mod test_seed;
 
-use protocol::pipe::frame::{Cells, FrameAsk, NearRectangle, Viewport, ViewportFrame, Water};
+use protocol::pipe::frame::{Cells, FrameAsk, NearRectangle, Viewport, ViewportFrame};
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use protocol::pipe::terrain::{CellCover, HeightsAsk, MapAnswer, MapAsk, MapCell};
+use protocol::type_registry::LayerType;
 use utilities::rng::RandomSource;
 use utilities::wire::{receive, send, Wired};
 
 /// `count` words drawn from `random`.
 fn drawn_words(random: &mut RandomSource, count: u64) -> Vec<u64> {
     (0..count).map(|_| random.next_draw()).collect()
+}
+
+/// Up to `most` layer types drawn from `random`.
+fn drawn_layer_types(random: &mut RandomSource, most: u64) -> Vec<LayerType> {
+    (0..random.draw_below(most + 1)).map(|_| LayerType(random.next_draw())).collect()
 }
 
 /// A pair drawn from `random`.
@@ -28,7 +34,7 @@ fn drawn_pair(random: &mut RandomSource) -> (u32, u32) {
 fn drawn_ask(random: &mut RandomSource) -> FrameAsk {
     let viewport = random.percent_chance(50).then(|| Viewport { top_left_superchunk_cartesian: drawn_pair(random), bottom_right_superchunk_cartesian: drawn_pair(random) });
     let seen_near = random.percent_chance(50).then(|| NearRectangle { first_cell_cartesian: drawn_pair(random), size_in_cells: drawn_pair(random), pixels_a_cell: random.draw_below(9) as u32 });
-    FrameAsk { viewport, pixel_side_log2: random.draw_below(8) as u32, superchunks_skipped: random.next_draw() as u32, most_superchunks: random.next_draw() as u32, seen_near }
+    FrameAsk { viewport, pixel_side_log2: random.draw_below(8) as u32, superchunks_skipped: random.next_draw() as u32, most_superchunks: random.next_draw() as u32, seen_near, planes: drawn_layer_types(random, 8), counted: drawn_layer_types(random, 3) }
 }
 
 /// A superchunk's cells drawn from `random`, some planes empty.
@@ -37,8 +43,8 @@ fn drawn_cells(random: &mut RandomSource) -> Cells {
         let count = random.draw_below(3) * random.draw_below(64);
         drawn_words(random, count)
     };
-    let water = random.percent_chance(50).then(|| Water { depth_low_bits: std::array::from_fn(|_| drawn_words(random, 16)), deep_cells: drawn_words(random, 16) });
-    Cells { superchunk_cartesian: drawn_pair(random), grass_bitmaps: plane(random), top_left: drawn_pair(random), heights: plane(random), trees: plane(random), stages: plane(random), wet_bitmaps: plane(random), clouds: plane(random), raining_tiles: plane(random), climates: plane(random), water, sheep_cells_cartesian: (0..random.draw_below(30)).map(|_| (random.next_draw() as u16, random.next_draw() as u16)).collect() }
+    let planes = drawn_layer_types(random, 8).into_iter().map(|layer_type| (layer_type, plane(random))).collect();
+    Cells { superchunk_cartesian: drawn_pair(random), planes, top_left: drawn_pair(random), entity_cells_cartesian: (0..random.draw_below(30)).map(|_| (random.next_draw() as u16, random.next_draw() as u16)).collect() }
 }
 
 /// A frame drawn from `random`.
@@ -49,7 +55,8 @@ fn drawn_frame(random: &mut RandomSource) -> ViewportFrame {
         seed: random.next_draw(),
         tick: random.next_draw(),
         ticks_a_second: f64::from_bits(random.next_draw()),
-        sheep_count: random.draw_below(1 << 40) as usize,
+        entity_count: random.draw_below(1 << 40) as usize,
+        counts: drawn_layer_types(random, 3).into_iter().map(|layer_type| (layer_type, random.next_draw())).collect(),
         side_superchunks: random.percent_chance(50).then(|| random.next_draw() as u32),
         hot: (0..random.draw_below(20)).map(|_| drawn_pair(random)).collect(),
         viewport: ask.viewport,

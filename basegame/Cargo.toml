@@ -1,0 +1,13 @@
+[package]
+name = "basegame"
+edition = "2024"
+description = "Civil Egregore's base game: its types, the libraries they expose, the rules of its cells and entities, and its world generation"
+
+[dependencies]
+protocol = { path = "../protocol" }
+server = { path = "../server" }
+
+# The tests' seed (`utilities/test_seed.rs`) reads and writes through
+# utilities; the crate itself reaches it only through the server's API.
+[dev-dependencies]
+utilities = { path = "../utilities" }

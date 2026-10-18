@@ -25,6 +25,8 @@ pub const WORLD_SIDE_SUPERCHUNKS: u32 = 1 << (u32::BITS - SUPERCHUNK_SIDE_CELLS.
 /// The superchunk roughly in the middle of the world, where it starts:
 /// as far from every edge as a superchunk can be.
 pub const WORLD_MIDDLE: SuperchunkIndex = SuperchunkIndex::from_cartesian(WORLD_SIDE_SUPERCHUNKS / 2, WORLD_SIDE_SUPERCHUNKS / 2);
+/// The cell in the world's middle: [`WORLD_MIDDLE`]'s top left.
+pub const WORLD_MIDDLE_CELL: CellCartesian = CellCartesian { x: WORLD_SIDE_SUPERCHUNKS / 2 * SUPERCHUNK_SIDE_CELLS, y: WORLD_SIDE_SUPERCHUNKS / 2 * SUPERCHUNK_SIDE_CELLS };
 
 /// Superchunks along the side of the square `count` of them make.
 pub fn square_side(count: u32) -> u32 {
@@ -233,6 +235,28 @@ pub struct CellCartesian {
     pub x: u32,
     /// Cells from the world's top edge.
     pub y: u32,
+}
+
+/// A square of the world's cells: its top left cell and how many cells
+/// along its side. Whatever it is kept as is not said.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CellArea {
+    /// Its top left cell.
+    pub top_left: CellCartesian,
+    /// Cells along its side.
+    pub side_cells: u32,
+}
+
+impl CellArea {
+    /// Whether `cell` is in it.
+    pub fn contains(self, cell: CellCartesian) -> bool {
+        cell.x.wrapping_sub(self.top_left.x) < self.side_cells && cell.y.wrapping_sub(self.top_left.y) < self.side_cells
+    }
+
+    /// Its cells, row by row.
+    pub fn cells(self) -> impl Iterator<Item = CellCartesian> {
+        (0..self.side_cells).flat_map(move |down| (0..self.side_cells).map(move |across| CellCartesian { x: self.top_left.x + across, y: self.top_left.y + down }))
+    }
 }
 
 /// The place in its superchunk ([`CellIndex::place_in_superchunk`]) of

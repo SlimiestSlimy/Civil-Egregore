@@ -5,12 +5,13 @@ use crate::{WorldStart, World};
 use super::{CATCH_UP, FRAMES_SHARE, HostRequest, TARGET_PACE};
 use super::frame::{copy_superchunk, frame_of, hot_in};
 use protocol::pipe::frame::{Cells, FrameAsk, ViewportFrame};
-use super::terrain::TerrainRequest;
+use super::terrain::{TerrainRequest, WorldTold};
 use std::thread;
-use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::time::{Duration, Instant};
-use worldgen::WorldGeneration;
+use std::sync::Arc;
+use protocol::type_registry::FrozenTypes;
+use utilities::tuning::Tuning;
 
 /// The world run, and what goes with running it.
 struct RunningWorld {
@@ -19,14 +20,12 @@ struct RunningWorld {
     /// What it started from, as far as is known: what it is made again
     /// from when reset.
     world_start: WorldStart,
-    /// The superchunks whose heights and water a frame has carried.
-    heights_sent: HashSet<utilities::coordinates::SuperchunkIndex>,
 }
 
 impl RunningWorld {
     /// `world`, started from `world_start`, starting to run.
     fn from_start(world_start: WorldStart, world: World) -> Self {
-        Self { world, world_start, heights_sent: HashSet::new() }
+        Self { world, world_start }
     }
 }
 
@@ -61,9 +60,9 @@ pub(crate) struct HostThread {
     world_name: Option<String>,
     /// What opening or saving a world last came to.
     last_outcome: Option<String>,
-    /// The generation the world run is to be made again with, before
-    /// the next tick, if it is to be.
-    reset: Option<WorldGeneration>,
+    /// The sliders the world run is to be made again as, before the
+    /// next tick, if it is to be.
+    reset: Option<Tuning>,
     /// When the next tick is due.
     next_tick: Instant,
     /// When the last frame was answered, and the tick then.
@@ -78,12 +77,15 @@ pub(crate) struct HostThread {
     tick_took: Duration,
     /// The terrain's thread, told of each world run.
     terrain: Sender<TerrainRequest>,
+    /// The types worlds are made of, and opened among.
+    frozen_types: Arc<FrozenTypes>,
 }
 
 impl HostThread {
-    /// No world, at the game's pace; `terrain` told of each world run.
-    pub(crate) fn telling_terrain(terrain: Sender<TerrainRequest>) -> Self {
-        Self { terrain, running_world: None, worlds: 0, ticking_paused: false, pace_held_to: Some(TARGET_PACE), world_name: None, last_outcome: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), being_answered: None, last_answer_measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
+    /// No world, at the game's pace; `terrain` told of each world run;
+    /// worlds made of `frozen_types` and opened among them.
+    pub(crate) fn telling_terrain(terrain: Sender<TerrainRequest>, frozen_types: Arc<FrozenTypes>) -> Self {
+        Self { terrain, frozen_types, running_world: None, worlds: 0, ticking_paused: false, pace_held_to: Some(TARGET_PACE), world_name: None, last_outcome: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), being_answered: None, last_answer_measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
     }
 }
 
@@ -108,10 +110,10 @@ impl HostThread {
                         (self.world_name, self.reset) = (None, None);
                         self.run_world(world_start);
                     }
-                    Ok(HostRequest::OpenWorld(world_to_open)) => match crate::load_world(&utilities::settings::world(&world_to_open)) {
+                    Ok(HostRequest::OpenWorld(world_to_open)) => match crate::load_world(&utilities::settings::world(&world_to_open), &self.frozen_types) {
                         Ok(opened_world) => {
                             (self.last_outcome, self.world_name, self.reset) = (Some(format!("{world_to_open} opened")), Some(world_to_open), None);
-                            self.run_in_place(RunningWorld::from_start(WorldStart::of_world(&opened_world.world_info, opened_world.world_generation), opened_world));
+                            self.run_in_place(RunningWorld::from_start(WorldStart::of_world(&opened_world.world_info), opened_world));
                         }
                         Err(load_error) => self.last_outcome = Some(format!("{world_to_open} not opened: {load_error}")),
                     },
@@ -119,7 +121,7 @@ impl HostThread {
                         self.reset_now();
                         self.save(name_to_save);
                     }
-                    Ok(HostRequest::Reset(reset_generation)) => self.reset = Some(*reset_generation),
+                    Ok(HostRequest::Reset(reset_tuning)) => self.reset = Some(*reset_tuning),
                     Err(TryRecvError::Empty) => break,
                     Err(TryRecvError::Disconnected) => return,
                 }
@@ -140,7 +142,8 @@ impl HostThread {
     /// that one dropped first, not to hold both.
     fn run_world(&mut self, world_start: WorldStart) {
         self.running_world = None;
-        self.run_in_place(RunningWorld::from_start(world_start, crate::start_world(world_start)));
+        let world = crate::start_world(world_start.clone(), &self.frozen_types);
+        self.run_in_place(RunningWorld::from_start(world_start, world));
     }
 
     /// Runs `running_world` in place of any run, from its world's own tick.
@@ -150,19 +153,20 @@ impl HostThread {
         self.being_answered = None;
         self.worlds += 1;
         // Told before any frame of this world is sent: an ask of it finds it known. The thread gone, there is no one to ask either.
-        _ = self.terrain.send(TerrainRequest::World(self.worlds, running_world.world.world_info.seed, Box::new(running_world.world.world_generation)));
+        let world = &running_world.world;
+        _ = self.terrain.send(TerrainRequest::World(WorldTold { world: self.worlds, seed: world.world_info.seed, generation_numbers: world.world_info.generation_numbers.clone(), worldgen: world.worldgen }));
         self.running_world = Some(running_world);
         self.next_tick = Instant::now();
     }
 
-    /// Makes the world run again from its start, generated as last
-    /// asked, if it was asked to be: a world of its own from then, of
-    /// no name.
+    /// Makes the world run again from its start, generated as the
+    /// sliders last asked say, if it was asked to be: a world of its own
+    /// from then, of no name.
     fn reset_now(&mut self) {
-        let (Some(reset_generation), Some(running_world)) = (self.reset.take(), &self.running_world) else {
+        let (Some(reset_tuning), Some(running_world)) = (self.reset.take(), &self.running_world) else {
             return;
         };
-        let world_start = WorldStart { world_generation: reset_generation, ..running_world.world_start };
+        let world_start = WorldStart { generation_numbers: (running_world.world.worldgen.numbers_of_tuning)(&reset_tuning), ..running_world.world_start.clone() };
         (self.last_outcome, self.world_name) = (Some(format!("the world remade from seed {}, as the sliders have it", utilities::seed::seed_as_hex(world_start.seed))), None);
         self.run_world(world_start);
     }
@@ -206,7 +210,7 @@ impl HostThread {
         let (running_world, being_answered) = (self.running_world.as_mut()?, self.being_answered.as_mut()?);
         let copying_began = Instant::now();
         while let Some(superchunk_cartesian) = being_answered.to_copy.pop() {
-            being_answered.cells.extend(copy_superchunk(&running_world.world, superchunk_cartesian, being_answered.frame_ask, &mut running_world.heights_sent));
+            being_answered.cells.extend(copy_superchunk(&running_world.world, superchunk_cartesian, &being_answered.frame_ask));
             if copy_until.is_some_and(|until_instant| Instant::now() >= until_instant) {
                 break;
             }
@@ -216,7 +220,7 @@ impl HostThread {
         if more_to_copy && being_answered.frame_ask.seen_near.is_some() {
             return None;
         }
-        let (frame_ask, hot, cells) = (being_answered.frame_ask, being_answered.hot.clone(), std::mem::take(&mut being_answered.cells));
+        let (frame_ask, hot, cells) = (being_answered.frame_ask.clone(), being_answered.hot.clone(), std::mem::take(&mut being_answered.cells));
         let world = &running_world.world;
         let tick = world.entity_store().current_tick();
         if !more_to_copy {
@@ -226,7 +230,7 @@ impl HostThread {
             }
             (self.last_frame, self.being_answered) = ((Instant::now(), tick), None);
         }
-        Some(frame_of(world, self.worlds, frame_ask, hot, cells, self.last_answer_measured, (self.world_name.clone(), self.last_outcome.clone()), more_to_copy))
+        Some(frame_of(world, self.worlds, &frame_ask, hot, cells, self.last_answer_measured, (self.world_name.clone(), self.last_outcome.clone()), more_to_copy))
     }
 
     /// The time there is for copying a frame's superchunks before the

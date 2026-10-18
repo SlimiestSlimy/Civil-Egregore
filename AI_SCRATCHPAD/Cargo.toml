@@ -8,8 +8,5 @@ description = "The AI's own scratchpad: probes of Civil Egregore, questions aske
 [dependencies]
 server = { path = "../server" }
 utilities = { path = "../utilities" }
-chunk_storage = { path = "../server/chunk_storage" }
-simulation = { path = "../server/simulation" }
-bitplane_manager = { path = "../server/bitplane_manager" }
-entity_manager = { path = "../server/entity_manager" }
 protocol = { path = "../protocol" }
+basegame = { path = "../basegame" }

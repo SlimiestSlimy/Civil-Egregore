@@ -12,7 +12,7 @@ use server::{world_hash, WorldStart};
 /// of one world hash the same.
 #[test]
 fn the_same_world_hashes_the_same_however_it_is_ticked() {
-    let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
+    let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     let mut one_thread_world = crate::worlds::one_flock_world(WorldStart { seed, thread_count: Some(1), ..WorldStart::default() }, 2_000);
     let mut several_threads_world = crate::worlds::one_flock_world(WorldStart { seed, thread_count: Some(3), ..WorldStart::default() }, 2_000);
     let mut hashes_seen = vec![world_hash(&mut one_thread_world).whole_hash(seed)];

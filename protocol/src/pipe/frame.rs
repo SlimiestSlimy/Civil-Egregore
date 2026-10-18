@@ -1,9 +1,10 @@
 //! What a client asks of the world's viewport ([`FrameAsk`]) and what it is
 //! answered with ([`ViewportFrame`]): the hot superchunks asked for, each
-//! copied as a tick left it and nothing more -- and how a client reads
-//! the planes a frame brings.
+//! copied as a tick left it and nothing more -- the planes asked for, by
+//! their layer types, whatever they are: the server names none.
 
-use utilities::wire::{Wired, WiredStruct};
+use crate::type_registry::LayerType;
+use utilities::wire::{WireReader, Wired, WiredStruct};
 
 /// Words a chunk's bitmap takes.
 pub const CHUNK_WORDS: usize = utilities::bitmap::WORDS;
@@ -39,14 +40,12 @@ impl Viewport {
     }
 }
 
-/// The depth from which water hides what is under it: a power of two.
-pub const DEEP_WATER_DEPTH: u32 = 16;
-
 /// What a client wants of the world, one frame: some of the hot
 /// superchunks of its viewport -- as many as a frame may carry, the
-/// client going round them frame after frame -- and how finely it will
-/// draw them.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// client going round them frame after frame -- how finely it will
+/// draw them, which of their planes, and which layers counted over the
+/// whole world.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct FrameAsk {
     /// What the client renders, none if it renders none of the world's
     /// cells (its map, say, drawn from generation alone).
@@ -61,6 +60,22 @@ pub struct FrameAsk {
     /// The viewport's cells, if they are seen from near: drawn as one
     /// picture, a cell many pixels. Passed on in the frame.
     pub seen_near: Option<NearRectangle>,
+    /// The planes of each superchunk sent ([`Cells::planes`]), in this order.
+    pub planes: Vec<LayerType>,
+    /// The layers whose cells are counted over every hot superchunk
+    /// ([`ViewportFrame::counts`]), in this order.
+    pub counted: Vec<LayerType>,
+}
+
+/// A layer type on the wire: its number.
+impl Wired for LayerType {
+    fn put(&mut self, words: &mut Vec<u64>) {
+        self.0.put(words);
+    }
+
+    fn take(&mut self, wire: &mut WireReader) -> Option<()> {
+        self.0.take(wire)
+    }
 }
 
 /// Cells seen from near: a rectangle of them, each many pixels.
@@ -79,46 +94,46 @@ pub struct NearRectangle {
 pub struct Cells {
     /// Where it is in the world, `(x, y)` in superchunks.
     pub superchunk_cartesian: (u32, u32),
-    /// Its grass: its 16 chunks' bitmaps one after another, in the
-    /// chunks' Morton order, [`CHUNK_WORDS`] words each, in Morton order
-    /// -- as the arena holds them. A chunk not hot is all clear.
-    pub grass_bitmaps: Vec<u64>,
+    /// The planes asked for ([`FrameAsk::planes`]), each its layer type
+    /// and its 16 chunks' buckets one after another, in the chunks'
+    /// Morton order, as the arena holds the plane: a bitmap's
+    /// [`CHUNK_WORDS`] words a chunk, in Morton order, so many times
+    /// over as the plane has bits a cell. A chunk not hot is all clear;
+    /// a plane all clear is sent empty ([`Cells::plane`]).
+    pub planes: Vec<(LayerType, Vec<u64>)>,
     /// Its top left cell in the world, `(x, y)`: what its ground is
     /// worked out from.
     pub top_left: (u32, u32),
-    /// Its heights, as its image holds them -- laid out as the base
-    /// game's types say (`base_types::height_map`) --
-    /// in the first frame it is hot in and empty in every other: the
-    /// client is spared working them out again.
-    pub heights: Vec<u64>,
-    /// Its trees, laid out as the grass.
-    pub trees: Vec<u64>,
-    /// Its trees' stages, the stage plane's width a cell: its 16
-    /// chunks' buckets one after another, a cell's stage at the width
-    /// times its place in its chunk -- as the arena holds the plane.
-    /// Empty where no stage is drawn: asked for coarser than a cell a
-    /// pixel, and not from near.
-    pub stages: Vec<u64>,
-    /// The cells with water on them, however deep, laid out as the grass.
-    pub wet_bitmaps: Vec<u64>,
-    /// Its clouds, the cloud plane's width a tile: its 16 chunks' buckets
-    /// one after another, as the arena holds the plane -- a number a tile
-    /// of the plane's tile size, read as the base game's types say
-    /// (`base_types::cloud_over`). Empty where no tile of it has any cloud.
-    pub clouds: Vec<u64>,
-    /// Which of its tiles are raining, a bit a tile in the order of
-    /// `clouds`, read by [`rains_over`]. Empty where none is.
-    pub raining_tiles: Vec<u64>,
-    /// Its climates, the climate plane's width a tile, laid out as the
-    /// clouds, read as the base game's types say
-    /// (`base_types::climate_over`): what a client writes on a tile when
-    /// asked to show its climate.
-    pub climates: Vec<u64>,
-    /// How deep its water is, in the frame its heights come in and in
-    /// no other: it never changes, and the client keeps it.
-    pub water: Option<Water>,
-    /// The cells its sheep stand on, `(x, y)` from its top left.
-    pub sheep_cells_cartesian: Vec<(u16, u16)>,
+    /// The cells its entities stand on, `(x, y)` from its top left.
+    pub entity_cells_cartesian: Vec<(u16, u16)>,
+}
+
+impl Cells {
+    /// The words of its plane of `layer_type`: empty if it was not
+    /// asked for, or is all clear.
+    pub fn plane(&self, layer_type: LayerType) -> &[u64] {
+        self.planes.iter().find(|(sent_type, _)| *sent_type == layer_type).map_or(&[], |(_, words)| words)
+    }
+
+    /// Its plane of `layer_type` taken out of it, empty as
+    /// [`Cells::plane`] would be.
+    pub fn take_plane(&mut self, layer_type: LayerType) -> Vec<u64> {
+        self.planes.iter_mut().find(|(sent_type, _)| *sent_type == layer_type).map_or_else(Vec::new, |(_, words)| std::mem::take(words))
+    }
+}
+
+/// Whether the `bit_index`-th bit of a bitmap's `words` is set: not
+/// where none was sent.
+pub fn bit_set(words: &[u64], bit_index: usize) -> bool {
+    words.get(bit_index / WORD_BITS).is_some_and(|word| word >> (bit_index % WORD_BITS) & 1 == 1)
+}
+
+/// The number at the `place`-th cell of a wide plane's `words`, of
+/// `width_bits` bits a cell, each cell's bits one after another: none
+/// where none was sent.
+pub fn value_at(words: &[u64], width_bits: u32, place: usize) -> u32 {
+    let first_bit = place * width_bits as usize;
+    words.get(first_bit / WORD_BITS).map_or(0, |word| (word >> (first_bit % WORD_BITS)) as u32 & (u32::MAX >> (u32::BITS - width_bits)))
 }
 
 /// The world's viewport, as a tick left it.
@@ -142,12 +157,11 @@ pub struct ViewportFrame {
     /// Ticks a second, over the time between the last two asks
     /// answered whole.
     pub ticks_a_second: f64,
-    /// Sheep in the whole world.
-    pub sheep_count: usize,
-    /// Cells of grass in the whole world.
-    pub grass_cells: u64,
-    /// Trees in the whole world.
-    pub trees: u64,
+    /// Entities in the whole world.
+    pub entity_count: usize,
+    /// The cells of each layer counted ([`FrameAsk::counted`]) over
+    /// every hot superchunk, in the order asked.
+    pub counts: Vec<(LayerType, u64)>,
     /// What answering the last ask answered whole took of the host's
     /// thread -- the copy, all a client costs it -- in seconds.
     pub sync_seconds: f64,
@@ -175,46 +189,25 @@ pub struct ViewportFrame {
     pub cells: Vec<Cells>,
 }
 
-/// Whether the tile at `tile` of a superchunk is raining, by
-/// [`Cells::raining_tiles`]: not where none was sent.
-pub fn rains_over(raining_tiles: &[u64], tile: usize) -> bool {
-    raining_tiles.get(tile / WORD_BITS).is_some_and(|word| word >> (tile % WORD_BITS) & 1 == 1)
-}
-
-/// A superchunk's water as a client draws it, off its image: kept for
-/// every superchunk whose heights were sent.
-#[derive(Clone, Default)]
-pub struct Water {
-    /// The low four bits of its depth, a bitplane a bit, laid out as
-    /// the grass.
-    pub depth_low_bits: [Vec<u64>; 4],
-    /// The cells [`DEEP_WATER_DEPTH`] deep or more.
-    pub deep_cells: Vec<u64>,
-}
-
 impl Default for ViewportFrame {
     /// Of no world: what a frame taken off the wire is filled in.
     fn default() -> Self {
-        Self { world: 0, seed: 0, generation_numbers: Vec::new(), drawn_heights: Default::default(), side_superchunks: None, tick: 0, ticks_a_second: 0.0, sheep_count: 0, grass_cells: 0, trees: 0, sync_seconds: 0.0, sync_share: 0.0, viewport: None, hot: Vec::new(), pixel_side_log2: 0, seen_near: None, world_name: None, last_outcome: None, more_to_come: false, cells: Vec::new() }
+        Self { world: 0, seed: 0, generation_numbers: Vec::new(), drawn_heights: Default::default(), side_superchunks: None, tick: 0, ticks_a_second: 0.0, entity_count: 0, counts: Vec::new(), sync_seconds: 0.0, sync_share: 0.0, viewport: None, hot: Vec::new(), pixel_side_log2: 0, seen_near: None, world_name: None, last_outcome: None, more_to_come: false, cells: Vec::new() }
     }
 }
 
 impl WiredStruct for FrameAsk {
-    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|ask| &mut ask.viewport, |ask| &mut ask.pixel_side_log2, |ask| &mut ask.superchunks_skipped, |ask| &mut ask.most_superchunks, |ask| &mut ask.seen_near];
+    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|ask| &mut ask.viewport, |ask| &mut ask.pixel_side_log2, |ask| &mut ask.superchunks_skipped, |ask| &mut ask.most_superchunks, |ask| &mut ask.seen_near, |ask| &mut ask.planes, |ask| &mut ask.counted];
 }
 
 impl WiredStruct for NearRectangle {
     const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|near| &mut near.first_cell_cartesian, |near| &mut near.size_in_cells, |near| &mut near.pixels_a_cell];
 }
 
-impl WiredStruct for Water {
-    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|water| &mut water.depth_low_bits, |water| &mut water.deep_cells];
-}
-
 impl WiredStruct for Cells {
-    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|cells| &mut cells.superchunk_cartesian, |cells| &mut cells.grass_bitmaps, |cells| &mut cells.top_left, |cells| &mut cells.heights, |cells| &mut cells.trees, |cells| &mut cells.stages, |cells| &mut cells.wet_bitmaps, |cells| &mut cells.clouds, |cells| &mut cells.raining_tiles, |cells| &mut cells.climates, |cells| &mut cells.water, |cells| &mut cells.sheep_cells_cartesian];
+    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|cells| &mut cells.superchunk_cartesian, |cells| &mut cells.planes, |cells| &mut cells.top_left, |cells| &mut cells.entity_cells_cartesian];
 }
 
 impl WiredStruct for ViewportFrame {
-    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|frame| &mut frame.world, |frame| &mut frame.seed, |frame| &mut frame.generation_numbers, |frame| &mut frame.drawn_heights, |frame| &mut frame.side_superchunks, |frame| &mut frame.tick, |frame| &mut frame.ticks_a_second, |frame| &mut frame.sheep_count, |frame| &mut frame.grass_cells, |frame| &mut frame.trees, |frame| &mut frame.sync_seconds, |frame| &mut frame.sync_share, |frame| &mut frame.viewport, |frame| &mut frame.hot, |frame| &mut frame.pixel_side_log2, |frame| &mut frame.seen_near, |frame| &mut frame.world_name, |frame| &mut frame.last_outcome, |frame| &mut frame.more_to_come, |frame| &mut frame.cells];
+    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|frame| &mut frame.world, |frame| &mut frame.seed, |frame| &mut frame.generation_numbers, |frame| &mut frame.drawn_heights, |frame| &mut frame.side_superchunks, |frame| &mut frame.tick, |frame| &mut frame.ticks_a_second, |frame| &mut frame.entity_count, |frame| &mut frame.counts, |frame| &mut frame.sync_seconds, |frame| &mut frame.sync_share, |frame| &mut frame.viewport, |frame| &mut frame.hot, |frame| &mut frame.pixel_side_log2, |frame| &mut frame.seen_near, |frame| &mut frame.world_name, |frame| &mut frame.last_outcome, |frame| &mut frame.more_to_come, |frame| &mut frame.cells];
 }

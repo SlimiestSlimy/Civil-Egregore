@@ -7,15 +7,6 @@ use super::terrain::{Height, HeightsAsk, MapAnswer, MapAsk};
 use utilities::tuning::Tuning;
 use utilities::wire::{WireReader, Wired};
 
-/// Ticks in a second of the simulation: the tick rate, written here and
-/// nowhere else -- the simulation turns its times to ticks by it
-/// (`simulation::simulation_time`).
-pub const TICKS_A_SIMULATION_SECOND: u64 = 256;
-
-/// Ticks a second a world is held to unless told otherwise: the
-/// game's target, a second of the simulation in a second.
-pub const TARGET_PACE: u32 = TICKS_A_SIMULATION_SECOND as u32;
-
 /// What a client asks of the server.
 #[derive(Clone, Debug, Default)]
 pub enum ClientMessage {

@@ -83,8 +83,12 @@ Boundaries, asked first, would have put that on the table.
   `cargo fmt`, never `cargo clippy --fix`. One test run at a time.
 - The fast tier (tests/fast) runs in under 60 seconds whole.
 - Measure before calling a change done, against the commit before:
-  `--seed 0x5eed1234 --new [folder --side 8 --sheep 40 --forced_hot []]`
+  `--seed 0x5eed1234 --new [folder --side 8 --forced_hot []]`
   then `--run [folder --ticks 10000]`, alternating rounds, medians.
+  (`--sheep` purged 2026-10-17, game content: the world has the
+  generation's default sheep now, so numbers before then are not
+  comparable. docs/testing_protocol.md still says `--sheep 40`: docs
+  paused.)
 - REMOTE (cloud, no screen): never `--workspace` (it builds Bevy); per
   crate `cargo test --release --offline -p <crate>`; the root with
   `-p Civil_Egregore --no-default-features`. LOCAL: the renderer is
@@ -107,33 +111,42 @@ Boundaries, asked first, would have put that on the table.
 
 == SETTLED (in force) ==
 
-- THE ROOT: five folders -- utilities/ (the utilities crate, its
-  bitmap and coordinates modules, and the shared test_seed.rs), protocol/ (the
-  protocol crate, with type_registry/), server/ (the server crate, with
-  simulation, bitplane_manager, chunk_storage, entity_manager,
-  pathfinding, basegame), client/ (the client crate: gui and renderer
-  its modules), diagnostics/ (to come) -- plus src/ (the program),
-  docs/, tests/, transient_data/,
-  AI_SCRATCHPAD/, and tessera/, its own project ("keep in mind tessrra
+- THE ROOT: six crates -- server, client, protocol, basegame,
+  tessera, utilities ("utilities remains as a 6th crate") -- every
+  folder inside one a module, not a crate: utilities/ (bitmap,
+  coordinates, ..., and the shared test_seed.rs), protocol/
+  (type_registry, pipe), server/ (simulation, bitplane_manager,
+  chunk_storage, entity_manager, pathfinding, host; their docs in
+  server/docs/), client/ (gui, renderer), basegame/ (base_types,
+  libraries, sca_rules, entity_rules, worldgen, default_types) -- plus
+  src/ and tests/ (the program and its tests: "root /src/ and /tests/
+  stay"), docs/, transient_data/, AI_SCRATCHPAD/ (stays at the root),
+  diagnostics/ (to come). tessera is its own project ("keep in mind tessrra
   is its own isolated project"): Cargo lets no workspace live under a
   member's folder. A group named as a crate is that crate ("we cant
   have utilities/utilities").
 - TESTS: a crate's own tests check its invariants alone; root tests/
   holds the fine/fast/complete tiers of higher behaviour. Test
   infrastructure lives in tests, no production hook for a test.
-- BASEGAME (server/basegame: base_types, libraries, sca_rules,
-  entity_rules, worldgen): "a rule is, nothing else (except the default
-  types registry creation) can depend on basegame". Rules reach the
-  simulation through simulation_api alone (tests/fine/docs.rs checks).
+- BASEGAME (basegame/: base_types, libraries, sca_rules,
+  entity_rules, worldgen, default_types): "a rule is, nothing else
+  (except the default types registry creation) can depend on
+  basegame". "basegame cant depend on server internals, only the
+  public apis"; "utilities CAN'T be used by basegame crate": basegame
+  names server::simulation::simulation_api, protocol::type_registry
+  and std alone (tests/fine/basegame_api.rs checks; utilities only a
+  dev-dependency, for the tests' seed). Rules reach the simulation
+  through simulation_api alone (tests/fine/docs.rs checks).
 - THE TYPE REGISTRY: dynamic, frozen per world, names unique ("that's
   our invariant"), saved as a world's types.csv; base types in
-  server/src/default_types.rs (until the root program builds them).
+  basegame/src/default_types.rs, frozen by initialization (src/main.rs)
+  and handed to the server.
   A type's code is its library. Hooks
   ("just another parameter on the registry types"): GeneratesTheWorld,
   RunsEveryTick, KeepsTheWorldHot ("good use of hook there") -- the
   simulation finds its rules, generation and hot type by them.
 - THE SIMULATION HANDLE ("simulatedworld should be simulationhandle"):
-  server/simulation/src/simulation_handle/ owns the world's state and
+  server/src/simulation/simulation_handle/ owns the world's state and
   does everything to it -- ticking, populating, halos, paging, every
   change between ticks. "server is a coordinator, not a doer";
   "anythong in between ticks is internal simulation api". A rule gets
@@ -162,13 +175,53 @@ Boundaries, asked first, would have put that on the table.
 == TO DO ==
 
 NOW
+- NO GAME CONTENT OUTSIDE THE TYPE REGISTRY (the user, 2026-10-17,
+  verbatim): "NO GAME CONTENT ON SERVER CLIENT OR PROTOCOL, TYPE
+  REGISTRY IS FOR THAT / SERVER IS FOR SIMULATION RUNNING, CLIENT IS
+  FOR RENDERING, PROTOCOL IS THE GLUE BETWEEN SERVER, CLIENT AND
+  INITIALIZATION". Every coupling under COUPLINGS LEFT breaks it.
+  Order (mine; the user: "watever is best tbh, im leaving rendering and
+  gui for last"): (a) quick fixes -- the tick rate back in simulation,
+  the grass test deleted (DONE 2026-10-17); (b) type_registry a module
+  of protocol (DONE); (c) basegame one crate at the root (DONE), the
+  server off basegame (DONE: the types handed to server::start,
+  start_world, load_world and the host by initialization -- src/main.rs
+  and the tests' worlds::types(); generation numbers opaque, asked of
+  the worldgen type's WorldgenCode; the frame generic -- FrameAsk names
+  the planes and the counted layers by LayerType, the client asks for
+  the base game's; `--sheep` purged), the server's sub-crates its
+  modules (DONE 2026-10-17: tests needing basegame in root tests/,
+  basegame through the simulation API alone); (d) heights and water
+  depths as planes, base_types off utilities (DONE 2026-10-18); (e)
+  NEXT: REGISTRY FIRST (below), then the client rewrite rendering from
+  the frozen types.
+- REGISTRY FIRST (the user, 2026-10-18: "very important"): "the type
+  registry is not initialized until a new world is created or an
+  existing world selected for loading. either HEADLESS or with client
+  present, the server startup is the same, we FIRST make the frozen
+  registry before initializing server or passing the frozen registry to
+  the client for rendering code"; "typeids are assigned on demand on a
+  new world, or read from the world typed.csv file on load"; "protocol
+  is also the first steps of world loading before server inits
+  basically"; "then server loads the rest based on the frozen type
+  registry, and rendering renders based on the frozen registry as
+  well". Today: src/main.rs builds default_frozen_types() at program
+  start; basegame's IDs are consts (HEIGHT = 88 ...); of_saved_text
+  only checks saved IDs equal the consts. To be: protocol's world
+  initialization (new: register, IDs on demand, freeze; load: read
+  types.csv, the saved IDs by name, freeze), the server handed only a
+  frozen registry; basegame finds its IDs by name in the frozen
+  registry at world start, through the simulation API; the client
+  given the same frozen registry, drawing from it ("we need to rewrite
+  the client asap so it can take rendering stuff from the frozen
+  registry").
 - MODULES, NOT CRATES (the user, 2026-10-17: "every folder inside top
   level folders should be a module, not a crate"; "were doing code
   decopuling en masse basi[cally]"): utilities/bitmap and coordinates
   into utilities (DONE 2026-10-17); protocol/type_registry into protocol ("protocol cant
   depend on type registry, is a module inside it"); server's simulation,
   chunk_storage, entity_manager, pathfinding, bitplane_manager into
-  server. tessera stays its own project.
+  server (DONE 2026-10-17). tessera stays its own project.
 - THE CLIENT GETS THE WORLD'S TYPES: "type can include optional
   utilities, client should get a copy of the frozen type registry on
   server start. and therefore can use the libraries that the registered
@@ -191,10 +244,9 @@ NOW
   The user: "we have 3 public apis for game content": the type registry
   (initializes and freezes the set of types before the server starts),
   the simulation/server API, and the client API (custom rendering, GUI).
-  "utilities CAN'T be used by basegame crate": what basegame takes from
-  utilities today (coordinates, hash::mix_word, the bitmap, tuning in
-  worldgen) comes through those APIs -- re-exported or owned by them,
-  to be settled.
+  "utilities CAN'T be used by basegame crate": what basegame took from
+  utilities (coordinates, hash, rng, the bitmap, tuning) comes through
+  simulation_api, re-exported whole for now (see COUPLINGS LEFT).
 - The process split: DONE 2026-10-17 (protocol::pipe, utilities::wire,
   the server's --pipe, the client's server_end). Measured: ticks equal
   idle, ~5% fewer under frames; ~23% fewer frames a second (each frame
@@ -202,18 +254,20 @@ NOW
   tests over the pipe, only the long-lived ones shown.
 - Protocol at the bottom ("why protocol depends on simulation? it
   should be the other way around"): DONE 2026-10-17 but the fold --
-  protocol on utilities and type_registry alone; Viewport and the tick
-  rate in protocol; default_types in the server; the frame carries
+  protocol on utilities and type_registry alone; Viewport in protocol;
+  the tick rate back in simulation ("tick rate is not protocol, is
+  simulation."); the frame carries
   generation_numbers; the planes' readers in base_types::plane_words.
-  Left: type_registry a module of protocol, not a crate ("protocol cant
-  depend on type registry, is a module inside it"); its tests (on the
-  default types) then go to root tests/fine.
-- HEIGHTS A PLANE ("the height map is just another plane / as
-  everything else"): today base_types::height_map, the image keeping
-  its words opaque after the water's (chunk_storage reads nothing of
-  them; world format 3). To be: a plane of the base game's like any
-  other, kept as the others are, no section of its own in the image.
-  Mine to ask: the water's depths the same way.
+- HEIGHTS A PLANE: DONE 2026-10-18. HEIGHT and WATER_DEPTH are
+  16-bit wide planes of base_types, hot like every plane, kept cold and
+  on disk as their bitplanes; the image has no section of its own
+  (world format 4); the frame copies them as any plane asked for, every
+  frame ("bot height and water can change, sending it once is
+  meaningless"). The world's generation writes an area through the
+  API's GeneratedArea (set, set_value) over a CellArea; worldgen keeps
+  its own copy of the hash helpers (worldgen/lots.rs: "worldgen can
+  have a copy of its helper functions from utilities").
+  protocol::pipe::frame::value_at reads a wide plane's number.
 - A lock on a world ("we need a lock file on worlds lmao. so no two
   instances can open the same world"): world.lock in its folder, held
   with File::try_lock while it is open or saved to; refused if held.
@@ -235,15 +289,25 @@ PLAN AGREED 2026-10-16, LEFT (co-op, file by file):
   only upon server request ... it starts doing reads to stuff".
 
 COUPLINGS LEFT (each its own pass)
-- server names base types: host/frame.rs and commands.rs count and show
-  grass, trees, sheep, cloud, climate, wet; WorldGeneration (worldgen's
-  numbers) in WorldStart, World, save, load, the host's reset,
-  from_tuning, seed_with_land/drawn_seed, host/terrain.rs.
-- the renderer through server::host::frame (climate, tree stages).
-- the client names base_types: plane_words (clouds, climate, stages),
-  Climate, OLDEST_TREE_STAGE, height_map -- until the client's hooks.
-- base_types uses utilities (the height map's cell counts): against
-  "utilities CAN'T be used by basegame crate"; goes with HEIGHTS A PLANE.
+- the client's TARGET_PACE (renderer/link.rs, 256) a copy of the
+  simulation's tick rate, until "client gui will later dictate specific
+  tick rate by hooks/libraries".
+- the client names base_types: the planes and counts it asks for
+  (renderer/frames.rs, hud.rs COUNTED), plane_words (clouds, climate,
+  stages, raining_tiles_of -- whether a tile rains is worked out by
+  the client now), Climate, OLDEST_TREE_STAGE, HEIGHT, WATER_DEPTH, DEEP_WATER_DEPTH -- until the
+  client's hooks.
+- protocol names the base game: pipe::terrain's CellCover
+  (Ocean/Tree/Grass/Dirt): with step 5 (sliders/Tuning, terrain asks)
+  and the client rewrite.
+- simulation_api still re-exports two whole modules, until step 5:
+  protocol::pipe::terrain and utilities::tuning (game content sitting
+  in utilities). The rest are names: CellArea, CellCartesian,
+  GeneratedArea, WidePlane, RandomSource, Chance ...
+- the HUD counts "entities" (all of them), no longer "sheep": the frame
+  counts entities generically.
+- the server's docs moved to server/docs/ with their relative links
+  unfixed (docs paused; the pointer tests ignored).
 - the client resets on any slider but the shading's changing, not on
   WorldGeneration changing (a move rounding to the same generation
   resets too) -- until the client's hooks for sliders and reset.
@@ -259,10 +323,6 @@ WAITING ON THE USER
   shape.
 
 OPEN, FOUND BY ME
-- grass_grows_in_every_superchunk (tests/fast/grass.rs) fails on ~4 of
-  60 seeds -- 830 to 1000 cells changed, under its 1000 -- at 0a7d68c
-  too, the same counts (e.g. FREEZE_SEED=0x23f3794b183969c5): the bar
-  or the ticks are the user's to settle.
 - ATOMICS (the user, 2026-10-17: "im concerned about how much atomics
   we have in the code now"): ~46 of the program's ~53 atomic lines are
   the applying phase's scheduler (tick/applying.rs, who_goes_on.rs,
@@ -290,12 +350,15 @@ OPEN, FOUND BY ME
   a slice; TickCounts 16 rules wide.
 - Simplification not yet read for: entity_manager, server, utilities,
   chunk_storage, bitplane_manager, renderer.
-- Morton pathfinding: server/pathfinding/src/morton.rs, used by nothing,
+- Morton pathfinding: server/src/pathfinding/morton.rs, used by nothing,
   tested equal to the rows' search; left: one-way walls for it, wire
   into walking, measure both, the best wins.
 - Climate-dependent tests fail on some seeds (weather's
   a_wind_carries_its_climate_down_it ignored): "climate will be
   reworked later so for now that can be ignored".
+  grass_grows_in_every_superchunk (failing ~4 of 60 seeds) deleted
+  2026-10-17: "grass grow will fail, delete that test. climate is
+  broken".
 
 LATER (every "for later" of the user's, and mine, as said)
 - A "hot" attribute on entities in place of the one hooked type ("some
@@ -304,8 +367,8 @@ LATER (every "for later" of the user's, and mine, as said)
 - Simulation second as a server knob ("a prime candidate for a knob
   that csn be exposed to server"); "remember simulation-second stuff,
   thats very important lol" (2026-10-17). One source today:
-  simulation_time::TICKS_A_SIMULATION_SECOND, protocol's TARGET_PACE
-  derived from it for both ends. As a knob, the client learns it from
+  simulation_time::TICKS_A_SIMULATION_SECOND, the host's TARGET_PACE
+  derived from it; the client's a copy until the GUI's hooks set it. As a knob, the client learns it from
   the server (a frame carries it), never a constant of its own.
 - Worldgen's numbers (the GUI sliders) handed to it by a registered type
   it depends on, not by the server: "only stuff registered in the type

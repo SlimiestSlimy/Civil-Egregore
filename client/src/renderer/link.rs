@@ -9,7 +9,6 @@ use crate::gui::options::Options;
 use crate::gui::{CapturedInput, CurrentTuning, MakeWorld, OpenWorld, Save, ShownScreen};
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use crate::server_end::{ServerEnd, ServerLink};
-use protocol::pipe::messages::TARGET_PACE;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 use utilities::tuning::{tuned_number, SliderGroup, Tuning};
@@ -146,6 +145,10 @@ pub fn send_shading(host_link: Res<HostLink>, tuning: Res<CurrentTuning>) {
 fn generation_sliders(tuning: &Tuning) -> Vec<f32> {
     tuning.iter().enumerate().filter(|&(number_index, _)| tuned_number(number_index).slider_group != SliderGroup::NearViewShading).map(|(_, &number)| number).collect()
 }
+
+/// Ticks a second the window holds a world to unless the keys say
+/// otherwise: the server's own pace, until the game's hooks set it.
+const TARGET_PACE: u32 = 256;
 
 /// Has the host make the world run again whenever the sliders change
 /// how worlds are generated: from its start, the view left where it
