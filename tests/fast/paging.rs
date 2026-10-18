@@ -66,14 +66,14 @@ fn a_world_paged_to_disk_is_the_world_kept_in_memory() {
 
     let (saved_in, copied_to) = (folder("paging_saved"), folder("paging_copied"));
     server::save(&saved_in, &mut paged).expect("saved");
-    let mut loaded_world = server::load_keeping(&saved_in, 0, &crate::worlds::types()).expect("loaded");
+    let mut loaded_world = server::load_keeping(&saved_in, 0, basegame::default_types::register_types).expect("loaded");
     assert!(loaded_world.chunk_storage().on_disk() > 0, "images left in the save");
     kept_world.keep_viewport(None);
     assert!(the_same(&mut loaded_world, &mut kept_world), "loaded as the world that kept its images");
     server::save(&saved_in, &mut loaded_world).expect("saved where it was loaded from");
     server::save(&copied_to, &mut loaded_world).expect("saved elsewhere");
     for save in [&saved_in, &copied_to] {
-        assert!(the_same(&mut server::load_world(save, &crate::worlds::types()).expect("loaded"), &mut kept_world), "the save in {}", save.display());
+        assert!(the_same(&mut server::load_world(save, basegame::default_types::register_types).expect("loaded"), &mut kept_world), "the save in {}", save.display());
     }
     drop(paged);
     for &camera_cartesian_again in &places {

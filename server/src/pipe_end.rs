@@ -29,7 +29,7 @@ pub fn serve_the_pipe(game_types: GameTypes) -> Result<String, String> {
             for sent in host_sent {
                 let message = match sent {
                     HostSent::WorldRuns(world, frozen_types) => ServerMessage::WorldTypes(world, frozen_types.to_text()),
-                    HostSent::Frame(frame) => ServerMessage::Frame(Box::new(frame)),
+                    HostSent::Frame(frame) => ServerMessage::Frame(frame),
                 };
                 if send_out(message).is_err() {
                     return;

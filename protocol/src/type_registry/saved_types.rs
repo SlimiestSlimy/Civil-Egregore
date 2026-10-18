@@ -6,6 +6,7 @@
 
 use super::frozen_types::FrozenTypes;
 use super::registry::TypeRegistry;
+use super::type_ids::numbers_taken;
 use utilities::csv;
 
 /// The columns of the types' text.
@@ -24,7 +25,8 @@ impl TypeRegistry {
     /// The registry of the world whose types `types_text` names
     /// ([`FrozenTypes::to_text`]): each name given its ID as its type is
     /// registered ([`TypeRegistry::of_saved_ids`]); or what is wrong
-    /// with the text.
+    /// with the text -- a name said twice, or two of its IDs sharing a
+    /// number, are.
     pub fn for_saved_world(types_text: &str) -> Result<Self, String> {
         let mut csv_rows = csv::rows_with_header(types_text).into_iter();
         if csv_rows.next().is_none_or(|first_row| first_row != TYPES_COLUMNS) {
@@ -39,6 +41,12 @@ impl TypeRegistry {
                 Ok((type_name.trim().to_string(), u64::from_str_radix(type_id.trim(), 16).map_err(|_| wrong_row())?))
             })
             .collect::<Result<Vec<_>, String>>()?;
+        for (place, (type_name, type_id)) in saved_ids.iter().enumerate() {
+            let shares_with = |(other_name, other_id): &&(String, u64)| *other_name == *type_name || { let (numbers, other_numbers) = (numbers_taken(*type_id), numbers_taken(*other_id)); numbers.start < other_numbers.end && other_numbers.start < numbers.end };
+            if let Some((other_name, _)) = saved_ids[place + 1..].iter().find(shares_with) {
+                return Err(format!("`{type_name}` and `{other_name}` share a name or a number"));
+            }
+        }
         Ok(Self::of_saved_ids(saved_ids))
     }
 }

@@ -4,13 +4,14 @@
 //! water than over land, and a wind blows them its way, none made or
 //! lost by it.
 
+use crate::worlds::base;
 use crate::worlds::{plain_start, tick_rule};
 use server::bitplane_manager::Write;
 use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use basegame::sca_rules::weather::{deepens_and_thins, BLOWN_COUNT, CARRIED_COUNT, DEEPENED_COUNT, EVENED_COUNT, PUSHED_COUNT, SAMPLED_COUNT, THINNED_COUNT, WHOLE_PARTS};
 use server::World;
 use basegame::base_types::{nearer_by_step, passes_a_slope, FALL_THAT_FREES, pressure_falls_by, Climate, Wind, HIGHEST_PRESSURE, HOTTEST_TEMPERATURE, HUMIDITY_A_LEVEL_OF_CLOUD, MOST_HUMID, PRESSURE_AT_REST, PRESSURE_GAP_AT_REST, RISE_THAT_HALVES, STRONGEST_WIND};
-use basegame::base_types::{CLIMATE, CLOUD, ELEVATION, WEATHER_TILE_SCALE, WET};
+use basegame::base_types::WEATHER_TILE_SCALE;
 use utilities::rng::RandomSource;
 
 /// Cells along a tile's side.
@@ -31,19 +32,19 @@ fn tile_at(world: &World, (x, y): (u32, u32)) -> CellIndex {
 /// The cloud over every tile of `world`, in rows.
 fn clouds(world: &World) -> Vec<u32> {
     let side_tiles = tiles_a_side(world);
-    (0..side_tiles * side_tiles).map(|tile| world.bitmap_arena().value(CLOUD, tile_at(world, (tile % side_tiles, tile / side_tiles))).expect("hot")).collect()
+    (0..side_tiles * side_tiles).map(|tile| world.bitmap_arena().value(base().cloud, tile_at(world, (tile % side_tiles, tile / side_tiles))).expect("hot")).collect()
 }
 
 /// The climate of every tile of `world`, in rows.
 fn climates(world: &World) -> Vec<Climate> {
     let side_tiles = tiles_a_side(world);
-    (0..side_tiles * side_tiles).map(|tile| Climate::of_number(world.bitmap_arena().value(CLIMATE, tile_at(world, (tile % side_tiles, tile / side_tiles))).expect("hot"))).collect()
+    (0..side_tiles * side_tiles).map(|tile| Climate::of_number(world.bitmap_arena().value(base().climate, tile_at(world, (tile % side_tiles, tile / side_tiles))).expect("hot"))).collect()
 }
 
 /// Whether most cells of the tile `(x, y)` of `world` are under water.
 fn over_water(world: &World, (x, y): (u32, u32)) -> bool {
     let tile_first_cell = tile_at(world, (x, y));
-    let wet_cells = (0..TILE_SIDE * TILE_SIDE).filter(|cell| world.bitmap_arena().layer_holds_cell(WET, tile_first_cell.at_cartesian_offset((cell % TILE_SIDE) as i32, (cell / TILE_SIDE) as i32).expect("in the world")) == Ok(true)).count();
+    let wet_cells = (0..TILE_SIDE * TILE_SIDE).filter(|cell| world.bitmap_arena().layer_holds_cell(base().wet, tile_first_cell.at_cartesian_offset((cell % TILE_SIDE) as i32, (cell / TILE_SIDE) as i32).expect("in the world")) == Ok(true)).count();
     wet_cells as u32 * 2 > TILE_SIDE * TILE_SIDE
 }
 
@@ -55,8 +56,8 @@ fn land_and_sea(seed: u64) -> World {
 /// Every tile of `world` put under `climate`.
 fn write_everywhere(world: &mut World, climate: Climate) {
     let side_tiles = tiles_a_side(world);
-    let climate_writes: Vec<Write> = (0..side_tiles * side_tiles).map(|tile| Write::value(CLIMATE, tile_at(world, (tile % side_tiles, tile / side_tiles)), climate.plane_number())).collect();
-    world.write_cells(CLIMATE.layer_type(), climate_writes);
+    let climate_writes: Vec<Write> = (0..side_tiles * side_tiles).map(|tile| Write::value(base().climate, tile_at(world, (tile % side_tiles, tile / side_tiles)), climate.plane_number())).collect();
+    world.write_cells(base().climate.layer_type(), climate_writes);
 }
 
 /// The pressure of every tile of `world`, added up: what the air's
@@ -156,7 +157,7 @@ fn humidity_pressure_and_what_is_under_it_say_how_a_cloud_goes() {
     let mut seeded_random = RandomSource::new(seed);
     for _ in 0..seeded_random.draw_between(300, 600) {
         let climate = Climate { humidity: seeded_random.draw_below(u64::from(MOST_HUMID) + 1) as u32, wind: Wind::CALM_AIR, temperature: seeded_random.draw_below(u64::from(HOTTEST_TEMPERATURE) + 1) as u32, pressure: seeded_random.draw_between(32, 224) as u32 };
-        let cloud = seeded_random.draw_below(u64::from(CLOUD.most_value()) + 1) as u32;
+        let cloud = seeded_random.draw_below(u64::from(base().cloud.most_value()) + 1) as u32;
         let ((deepen_parts, thin_parts), (on_land, burnt_thin_parts)) = (deepens_and_thins(climate, cloud, true), deepens_and_thins(climate, cloud, false));
         assert!(deepen_parts >= on_land && burnt_thin_parts >= thin_parts, "{climate:?} under {cloud}");
         let lower_pressure = Climate { pressure: climate.pressure - 32, ..climate };
@@ -184,7 +185,7 @@ fn a_generated_climate_has_no_catastrophes() {
         let (least_value, most_value) = (climates.iter().map(quantity_of).min().expect("tiles"), climates.iter().map(quantity_of).max().expect("tiles"));
         assert!(least_value < most_value, "one {quantity_name} everywhere: {least_value}");
     }
-    let elevation_of_tile = |tile: (u32, u32)| world.bitmap_arena().value(ELEVATION, tile_at(&world, tile)).expect("hot");
+    let elevation_of_tile = |tile: (u32, u32)| world.bitmap_arena().value(base().elevation, tile_at(&world, tile)).expect("hot");
     let tiles: Vec<(u32, u32)> = (0..side_tiles * side_tiles).map(|tile| (tile % side_tiles, tile / side_tiles)).collect();
     assert!(tiles.iter().any(|&tile| elevation_of_tile(tile) > 0) && tiles.iter().filter(|&&tile| over_water(&world, tile)).all(|&tile| elevation_of_tile(tile) == 0), "land stands over the ocean, water does not");
 }
@@ -200,7 +201,7 @@ fn a_cloud_gathers_to_its_tiles_humidity_and_no_further() {
     write_everywhere(&mut world, Climate { humidity: humidity_cloud_level * HUMIDITY_A_LEVEL_OF_CLOUD, wind: Wind::CALM_AIR, temperature: 0, pressure: PRESSURE_AT_REST });
     let (mut clouds_before, mut deepened_total) = (clouds(&world), 0);
     for tick in 0..seeded_random.draw_between(1_500, 2_500) {
-        let tick_counts = tick_rule(&mut world, basegame::base_types::RULE_OF_WEATHER.0).rules;
+        let tick_counts = tick_rule(&mut world, crate::worlds::type_id_named(basegame::base_types::WEATHER_RULE)).rules;
         let clouds_after = clouds(&world);
         let cloud_change: i64 = clouds_after.iter().zip(&clouds_before).map(|(&cloud_after, &cloud_before)| i64::from(cloud_after) - i64::from(cloud_before)).sum();
         assert_eq!((cloud_change, tick_counts[THINNED_COUNT], tick_counts[BLOWN_COUNT] + tick_counts[PUSHED_COUNT] + tick_counts[EVENED_COUNT] + tick_counts[CARRIED_COUNT]), (tick_counts[DEEPENED_COUNT] as i64, 0, 0), "tick {tick}");
@@ -224,11 +225,11 @@ fn a_wind_moves_air_and_clouds_and_makes_none() {
         let side_tiles = tiles_a_side(&world);
         let wind = if is_calm { Wind::CALM_AIR } else { Wind::from_vector(1 + seeded_random.draw_below(STRONGEST_WIND as u64) as i32, seeded_random.draw_between(0, 2 * STRONGEST_WIND as u64 + 1) as i32 - STRONGEST_WIND) };
         write_everywhere(&mut world, Climate { humidity: 0, wind, temperature: 0, pressure: PRESSURE_AT_REST });
-        let cloud_writes: Vec<Write> = (0..side_tiles * side_tiles).map(|tile| (tile, seeded_random.draw_below(4), 1 + seeded_random.draw_below(u64::from(CLOUD.most_value())) as u32)).filter(|&(_, drawn_lot, _)| drawn_lot == 0).map(|(tile, _, cloud)| Write::value(CLOUD, tile_at(&world, (tile % side_tiles, tile / side_tiles)), cloud)).collect();
-        world.write_cells(CLOUD.layer_type(), cloud_writes);
+        let cloud_writes: Vec<Write> = (0..side_tiles * side_tiles).map(|tile| (tile, seeded_random.draw_below(4), 1 + seeded_random.draw_below(u64::from(base().cloud.most_value())) as u32)).filter(|&(_, drawn_lot, _)| drawn_lot == 0).map(|(tile, _, cloud)| Write::value(base().cloud, tile_at(&world, (tile % side_tiles, tile / side_tiles)), cloud)).collect();
+        world.write_cells(base().cloud.layer_type(), cloud_writes);
         let (pressure_began, mut clouds_before, mut moved_totals) = (total_pressure(&world), clouds(&world), [0u64; 3]);
         for tick in 0..seeded_random.draw_between(1_000, 1_500) {
-            let tick_counts = tick_rule(&mut world, basegame::base_types::RULE_OF_WEATHER.0).rules;
+            let tick_counts = tick_rule(&mut world, crate::worlds::type_id_named(basegame::base_types::WEATHER_RULE)).rules;
             let clouds_after = clouds(&world);
             let cloud_change: i64 = clouds_after.iter().zip(&clouds_before).map(|(&cloud_after, &cloud_before)| i64::from(cloud_after) - i64::from(cloud_before)).sum();
             // Where the wind has pushed the air out the pressure is under rest, and cloud forms of that alone.
@@ -255,10 +256,10 @@ fn pressure_falls_to_the_lower_tiles_about_it_and_turns_the_wind() {
     let climate_at_rest = Climate { humidity: 0, wind: Wind::CALM_AIR, temperature: 0, pressure: PRESSURE_AT_REST };
     write_everywhere(&mut world, climate_at_rest);
     let (high_tile, pressure_over) = ((side_tiles / 4 + seeded_random.draw_below(u64::from(side_tiles / 2)) as u32, side_tiles / 4 + seeded_random.draw_below(u64::from(side_tiles / 2)) as u32), PRESSURE_AT_REST + 40 + seeded_random.draw_below(60) as u32);
-    world.write_cells(CLIMATE.layer_type(), vec![Write::value(CLIMATE, tile_at(&world, high_tile), Climate { pressure: pressure_over, ..climate_at_rest }.plane_number())]);
+    world.write_cells(base().climate.layer_type(), vec![Write::value(base().climate, tile_at(&world, high_tile), Climate { pressure: pressure_over, ..climate_at_rest }.plane_number())]);
     let (pressure_began, mut evened_total) = (total_pressure(&world), 0);
     for tick in 0..seeded_random.draw_between(6_000, 8_000) {
-        evened_total += tick_rule(&mut world, basegame::base_types::RULE_OF_WEATHER.0).rules[EVENED_COUNT];
+        evened_total += tick_rule(&mut world, crate::worlds::type_id_named(basegame::base_types::WEATHER_RULE)).rules[EVENED_COUNT];
         assert_eq!(total_pressure(&world), pressure_began, "tick {tick}: the air is all there");
     }
     let climates_now = climates(&world);
@@ -285,11 +286,11 @@ fn a_wind_carries_its_climate_down_it() {
     let upwind_climate = Climate { humidity: 128 + seeded_random.draw_below(128) as u32, wind: Wind::from_vector(1 + seeded_random.draw_below(STRONGEST_WIND as u64) as i32, 0), temperature: 128 + seeded_random.draw_below(128) as u32, pressure: PRESSURE_AT_REST };
     let downwind_climate = Climate { humidity: seeded_random.draw_below(128) as u32, wind: Wind::CALM_AIR, temperature: seeded_random.draw_below(128) as u32, pressure: PRESSURE_AT_REST };
     let tiles: Vec<(u32, u32)> = (0..side_tiles * side_tiles).map(|tile| (tile % side_tiles, tile / side_tiles)).collect();
-    let climate_writes: Vec<Write> = tiles.iter().map(|&tile| Write::value(CLIMATE, tile_at(&world, tile), if tile.0 < side_tiles / 2 { upwind_climate } else { downwind_climate }.plane_number())).collect();
-    world.write_cells(CLIMATE.layer_type(), climate_writes);
+    let climate_writes: Vec<Write> = tiles.iter().map(|&tile| Write::value(base().climate, tile_at(&world, tile), if tile.0 < side_tiles / 2 { upwind_climate } else { downwind_climate }.plane_number())).collect();
+    world.write_cells(base().climate.layer_type(), climate_writes);
     let (climates_began, mut carried_total) = (climates(&world), 0);
     for _ in 0..seeded_random.draw_between(4_000, 5_000) {
-        carried_total += tick_rule(&mut world, basegame::base_types::RULE_OF_WEATHER.0).rules[CARRIED_COUNT];
+        carried_total += tick_rule(&mut world, crate::worlds::type_id_named(basegame::base_types::WEATHER_RULE)).rules[CARRIED_COUNT];
     }
     let climates_now = climates(&world);
     let mut tiles_come_nearer = 0;

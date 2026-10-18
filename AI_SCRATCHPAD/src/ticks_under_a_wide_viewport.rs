@@ -3,7 +3,7 @@
 //! frame is asked for and while frames are asked for as a window asks
 //! -- one at a time, sixty a second at most, going round the viewport.
 
-use crate::asking_the_host::{drawn_planes, frame_that, seed, whole_answer, ProbedServer, COUNTED};
+use crate::asking_the_host::{counted, drawn_planes, frame_that, seed, whole_answer, ProbedServer};
 use utilities::coordinates::WORLD_MIDDLE;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame, Viewport};
 use std::sync::mpsc::Receiver;
@@ -39,7 +39,7 @@ const SETTLING_TIME: Duration = Duration::from_secs(5);
 
 /// One frame of `viewport`, `skipped_superchunks` of its hot superchunks passed over.
 fn ask_one_frame(host: &mut ProbedServer, frame_receiver: &Receiver<ViewportFrame>, viewport: Viewport, skipped_superchunks: u32, most_superchunks: u32) -> Result<ViewportFrame, String> {
-    if !host.ask_frame(FrameAsk { viewport: Some(viewport), pixel_side_log2: 8, superchunks_skipped: skipped_superchunks, most_superchunks, seen_near: None, planes: drawn_planes(), counted: COUNTED.to_vec() }) {
+    if !host.ask_frame(FrameAsk { viewport: Some(viewport), pixel_side_log2: 8, superchunks_skipped: skipped_superchunks, most_superchunks, seen_near: None, planes: drawn_planes(), counted: counted().to_vec() }) {
         return Err("the host is gone".to_string());
     }
     whole_answer(frame_receiver)

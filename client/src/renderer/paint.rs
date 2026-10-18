@@ -120,7 +120,7 @@ pub fn start_painter(shown: Receiver<Shown>, tunings: Receiver<Tuning>, terrain:
                         world_types = crate::renderer::world_types::base_types_of(&types_text).map(|base_types| (world, base_types));
                         continue;
                     }
-                    Shown::Frame(host_frame) => host_frame,
+                    Shown::Frame(host_frame) => *host_frame,
                 };
                 frame_number += 1;
                 // A frame of no world whose types came is not painted.

@@ -8,18 +8,40 @@
 use server::chunk_storage::SuperchunkImage;
 use utilities::coordinates::SuperchunkIndex;
 use server::entity_manager::{set_attribute, Attribute, AttributeBlock, EntityRef, Header};
-use basegame::worldgen::world_generation::WORLD_GENERATION;
 use basegame::worldgen::WorldGeneration;
-use protocol::type_registry::FrozenTypes;
+use basegame::base_types::BaseTypes;
+use protocol::type_registry::{FrozenTypes, TypeRegistry};
 use server::{World, WorldSize, WorldStart};
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
-/// The base game's types, frozen once for every test of a tier: what
-/// initialization hands the server.
+/// The base game's types of a new world, registered and frozen once for
+/// every test of a tier -- what initialization hands the server -- and
+/// the IDs registering them gave each: a new world's IDs are handed out
+/// in registration order, so every new world's are these.
+fn registered_types() -> &'static (Arc<FrozenTypes>, BaseTypes) {
+    static REGISTERED: OnceLock<(Arc<FrozenTypes>, BaseTypes)> = OnceLock::new();
+    REGISTERED.get_or_init(|| {
+        let mut type_registry = TypeRegistry::for_new_world();
+        let base_types = basegame::default_types::register(&mut type_registry).expect("the base game's types registered");
+        (Arc::new(type_registry.freeze().expect("the base game's types frozen")), base_types)
+    })
+}
+
+/// The base game's types, frozen: what initialization hands the server.
 pub fn types() -> Arc<FrozenTypes> {
-    static TYPES: OnceLock<Arc<FrozenTypes>> = OnceLock::new();
-    TYPES.get_or_init(basegame::default_types::default_frozen_types).clone()
+    registered_types().0.clone()
+}
+
+/// The IDs of the base game's types in a new world.
+pub fn base() -> BaseTypes {
+    registered_types().1
+}
+
+/// The ID of the base game's type named `type_name`, in a new world:
+/// a rule ticked alone is asked for by it.
+pub fn type_id_named(type_name: &str) -> u64 {
+    types().types().iter().find(|registered_type| registered_type.name() == type_name).unwrap_or_else(|| panic!("no type named {type_name}")).type_id()
 }
 
 /// A world started as `world_start` says, of the base game's types.
@@ -30,7 +52,7 @@ pub fn start_world(world_start: WorldStart) -> World {
 /// The first seed from `first_seed_tried` on whose world, generated as
 /// `world_generation` says, the base game finds land about the middle.
 pub fn seed_with_land(first_seed_tried: u64, world_generation: &WorldGeneration) -> u64 {
-    server::seed_fit_to_start(first_seed_tried, &world_generation.numbers(), &WORLD_GENERATION)
+    server::seed_fit_to_start(first_seed_tried, &world_generation.numbers(), &basegame::worldgen::world_generation::code(base()))
 }
 
 /// A folder of its own for the test `test_name`, emptied: in the
@@ -109,7 +131,7 @@ pub fn cells_set_and_cleared(words_before: &[(utilities::coordinates::ChunkIndex
 
 /// Cells of grass over `world`'s hot superchunks.
 pub fn cells_of_grass(world: &World) -> u64 {
-    world.bitmap_arena().superchunk_indices().into_iter().map(|superchunk| world.bitmap_arena().superchunk_count(basegame::base_types::GRASS, superchunk) as u64).sum()
+    world.bitmap_arena().superchunk_indices().into_iter().map(|superchunk| world.bitmap_arena().superchunk_count(base().grass, superchunk) as u64).sum()
 }
 
 /// Turns to grass the rectangle of cells `width` by `height` whose top
@@ -117,7 +139,7 @@ pub fn cells_of_grass(world: &World) -> u64 {
 pub fn plant_grass(world: &mut World, top_left_cartesian: utilities::coordinates::CellCartesian, width: u8, height: u8) {
     use server::bitplane_manager::{WriteShape, Write, WriteOp};
     let write_shape = if (width, height) == (1, 1) { WriteShape::Cell } else { WriteShape::RectangleOfCells { width, height } };
-    let planted_writes = world.write_cells(basegame::base_types::GRASS, [Write { anchor_cell: top_left_cartesian.into(), write_op: WriteOp::SetCell, write_shape }]);
+    let planted_writes = world.write_cells(base().grass, [Write { anchor_cell: top_left_cartesian.into(), write_op: WriteOp::SetCell, write_shape }]);
     assert_eq!(planted_writes.missed, 0, "grass planted off the hot superchunks");
 }
 
@@ -127,7 +149,7 @@ pub fn plant_grass(world: &mut World, top_left_cartesian: utilities::coordinates
 pub fn add_entity(world: &mut World, header: Header, attributes: &[AttributeBlock]) -> server::entity_manager::InstructionsApplied {
     let applied = world.add_entity(header, attributes);
     if applied.added > 0 {
-        world.write_cells(basegame::base_types::COLLISION, [server::bitplane_manager::Write::cell(header.stood_cell, server::bitplane_manager::WriteOp::SetCell)]);
+        world.write_cells(base().collision, [server::bitplane_manager::Write::cell(header.stood_cell, server::bitplane_manager::WriteOp::SetCell)]);
     }
     applied
 }
@@ -145,12 +167,12 @@ pub fn put_flock(world: &mut World, superchunk: SuperchunkIndex, count: usize) {
     let mut put = 0;
     while put < count {
         let drawn_cell = CellCartesian { x: corner.x + random_stream.draw_below(side_in_cells) as u32, y: corner.y + random_stream.draw_below(side_in_cells) as u32 }.into();
-        if world.bitmap_arena().layer_holds_cell(basegame::base_types::COLLISION, drawn_cell) == Ok(true) {
+        if world.bitmap_arena().layer_holds_cell(base().collision, drawn_cell) == Ok(true) {
             continue;
         }
-        let header = Header { entity_type: basegame::base_types::SHEEP, stood_cell: drawn_cell, wake: STEP.part_drawn(&mut random_stream).tick_after(tick_now) };
+        let header = Header { entity_type: base().sheep, stood_cell: drawn_cell, wake: STEP.part_drawn(&mut random_stream).tick_after(tick_now) };
         let sheep_state = basegame::base_types::SheepState { hungry_at: TIME_BETWEEN_MEALS.part_drawn(&mut random_stream).tick_after(tick_now), ..basegame::base_types::SheepState::default() };
-        put += add_entity(world, header, &server::entity_manager::WholeAttribute::holding_value(basegame::base_types::SHEEP_STATE, sheep_state)).added;
+        put += add_entity(world, header, &server::entity_manager::WholeAttribute::holding_value(base().sheep_state, sheep_state)).added;
     }
 }
 
@@ -159,7 +181,7 @@ pub fn put_flock(world: &mut World, superchunk: SuperchunkIndex, count: usize) {
 pub fn remove_entity(world: &mut World, header: &Header) -> server::entity_manager::InstructionsApplied {
     let remove_applied = world.remove_entity(header);
     if remove_applied.entities_removed > 0 {
-        world.write_cells(basegame::base_types::COLLISION, [server::bitplane_manager::Write::cell(header.stood_cell, server::bitplane_manager::WriteOp::ClearCell)]);
+        world.write_cells(base().collision, [server::bitplane_manager::Write::cell(header.stood_cell, server::bitplane_manager::WriteOp::ClearCell)]);
     }
     remove_applied
 }
@@ -197,10 +219,10 @@ pub fn tick_rule(world: &mut World, rule_id: u64) -> server::simulation::TickRep
 /// One tick of the sheep's rule alone over `world`'s hot superchunks,
 /// its halos left where they are.
 pub fn tick_sheep(world: &mut World) -> server::simulation::TickReport<server::simulation::simulation_api::RuleCounts> {
-    tick_rule(world, basegame::base_types::RULE_OF_SHEEP.0)
+    tick_rule(world, type_id_named(basegame::base_types::SHEEP_RULE))
 }
 
 /// One tick of the grass's rule alone over `world`'s hot superchunks.
 pub fn tick_grass(world: &mut World) -> server::simulation::TickReport<server::simulation::simulation_api::RuleCounts> {
-    tick_rule(world, basegame::base_types::RULE_OF_GRASS.0)
+    tick_rule(world, type_id_named(basegame::base_types::GRASS_RULE))
 }

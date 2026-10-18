@@ -1,17 +1,28 @@
 //! A type is registered once by its name, after what it names, and the
 //! types frozen find each again -- tried on the base game's types.
 
-use basegame::base_types::{CLIMATE, GRASS, GRASS_RULE, SHEEP, SHEEP_RULE, SHEEP_STATE, TREES_RULE, TREE_STAGE, WEATHER_RULE, SheepState};
-use basegame::default_types::new_type_registry_with_default_types;
-use protocol::type_registry::{data_words, Attribute, AttributeType, EntityRuleType, EntityType, LayerType, Layout, RegisteredType, RegistryRefusal, ScaRuleType, ATTRIBUTE_NUMBERS, TYPE_ID_NUMBERS};
+use basegame::base_types::{BaseTypes, GRASS_RULE, SHEEP_RULE, TREES_RULE, WEATHER_RULE, SheepState};
+use protocol::type_registry::{data_words, AttributeType, EntityType, FrozenTypes, LayerType, Layout, RegisteredType, Registration, RegistryRefusal, TypeRegistry, TYPE_ID_NUMBERS};
 use utilities::rng::RandomSource;
 
-/// The first number no default type takes.
-const FIRST_FREE_NUMBER: u64 = 100;
+/// A new world's registry with the base game's types registered, and
+/// the IDs they were given.
+fn with_base_types() -> (TypeRegistry, BaseTypes) {
+    let mut type_registry = TypeRegistry::for_new_world();
+    let base_types = basegame::default_types::register(&mut type_registry).expect("the base game's types registered");
+    (type_registry, base_types)
+}
 
-/// A number no default type takes, drawn: one any kind of type may have.
-fn free_number(seeded_rng: &mut RandomSource) -> u64 {
-    FIRST_FREE_NUMBER + seeded_rng.draw_below(TYPE_ID_NUMBERS.min(ATTRIBUTE_NUMBERS) - FIRST_FREE_NUMBER - 1)
+/// The base game's types of a new world, frozen, and their IDs.
+fn frozen_base_types() -> (FrozenTypes, BaseTypes) {
+    let (type_registry, base_types) = with_base_types();
+    (type_registry.freeze().expect("frozen"), base_types)
+}
+
+/// The type of `frozen_types` named `type_name`, if any: a test's own
+/// look-up, frozen types being known by their IDs alone.
+fn named<'frozen>(frozen_types: &'frozen FrozenTypes, type_name: &str) -> Option<&'frozen RegisteredType> {
+    frozen_types.types().iter().find(|registered_type| registered_type.name() == type_name)
 }
 
 /// The name of `registered`, if any: what tells a type from any other,
@@ -20,75 +31,102 @@ fn told_by(registered: Option<&RegisteredType>) -> Option<&str> {
     registered.map(RegisteredType::name)
 }
 
-/// Every type of `frozen_types` by its name, in their order.
-fn each_told_by(frozen_types: &protocol::type_registry::FrozenTypes) -> Vec<&str> {
-    frozen_types.types().iter().map(RegisteredType::name).collect()
+/// Every type of `frozen_types` by its name and ID, in their order.
+fn each_told_by(frozen_types: &FrozenTypes) -> Vec<(String, u64)> {
+    frozen_types.types().iter().map(|registered_type| (registered_type.name().to_string(), registered_type.type_id())).collect()
+}
+
+/// `registered`, its ID let go: whether a registration went through.
+fn outcome(registered: Result<RegisteredType, RegistryRefusal>) -> Result<(), RegistryRefusal> {
+    registered.map(drop)
 }
 
 /// A name is registered once: a type named as one registered before it
 /// is refused, whatever the kind of either, and leaves the types as
-/// they were; a name none has is registered.
+/// they were; a name none has is registered, given the next ID.
 #[test]
 fn a_name_is_registered_once_whatever_its_kind() {
     let mut seeded_rng = RandomSource::new(crate::test_seed::TestSeedHandle::open().fine_seed());
-    let default_frozen = new_type_registry_with_default_types().freeze();
+    let (default_frozen, _) = frozen_base_types();
     for _ in 0..200 {
-        let type_number = free_number(&mut seeded_rng);
         let of_a_drawn_kind = |name: &str, seeded_rng: &mut RandomSource| match seeded_rng.draw_below(3) {
-            0 => RegisteredType::layer(name, LayerType::of_a_bit(type_number)),
-            1 => RegisteredType::entity::<u64>(name, EntityType::from_number(type_number), None),
-            _ => RegisteredType::attribute(name, Attribute::<u64>::new(type_number)),
+            0 => Registration::layer(name),
+            1 => Registration::entity(name, None),
+            _ => Registration::attribute::<u64>(name),
         };
         let taken_name = default_frozen.types()[seeded_rng.draw_below(default_frozen.types().len() as u64) as usize].name();
-        let mut type_registry = new_type_registry_with_default_types();
-        assert_eq!(type_registry.register(of_a_drawn_kind(taken_name, &mut seeded_rng)), Err(RegistryRefusal::NameTaken), "{taken_name}");
-        assert_eq!(each_told_by(&type_registry.clone().freeze()), each_told_by(&default_frozen), "a type refused is not kept");
-        type_registry.register(of_a_drawn_kind("unheard of", &mut seeded_rng)).expect("a name no type has");
-        assert_eq!(type_registry.freeze().types().len(), default_frozen.types().len() + 1);
+        let (mut type_registry, _) = with_base_types();
+        assert_eq!(outcome(type_registry.register(of_a_drawn_kind(taken_name, &mut seeded_rng))), Err(RegistryRefusal::NameTaken), "{taken_name}");
+        assert_eq!(each_told_by(&type_registry.clone().freeze().expect("frozen")), each_told_by(&default_frozen), "a type refused is not kept");
+        let unheard_of = type_registry.register(of_a_drawn_kind("unheard of", &mut seeded_rng)).expect("a name no type has");
+        assert!(default_frozen.types().iter().all(|registered_type| !registered_type.numbers().any(|number| unheard_of.numbers().contains(&number))), "an ID no type has");
+        assert_eq!(type_registry.freeze().expect("frozen").types().len(), default_frozen.types().len() + 1);
     }
 }
 
 /// What a type names is registered before it: a default attribute, an
-/// attribute of a fixed size; a rule's master, a plane for a rule of the
-/// cells -- a layer or a wide plane -- and a type of entity for an
-/// entity's. One named amiss -- nothing registered, or registered only
-/// after, of another kind, an attribute whose size varies -- is refused.
+/// attribute; a rule's master, a plane for a rule of the cells -- a
+/// layer or a wide plane -- and a type of entity for an entity's; and
+/// each type it depends on. One named amiss -- nothing registered, or
+/// registered only after, of another kind -- is refused.
 #[test]
 fn what_a_type_names_is_registered_before_it() {
-    let mut seeded_rng = RandomSource::new(crate::test_seed::TestSeedHandle::open().fine_seed());
-    for _ in 0..100 {
-        let type_number = free_number(&mut seeded_rng);
-        let (fixed_attribute, varying_attribute) = (Attribute::<u64>::new(type_number), AttributeType::of_varying_size(type_number + 1));
-        let entity_defaulting = |default_attribute| RegisteredType::Entity { name: "defaulting".to_string(), entity_type: EntityType::from_number(type_number), default_attribute: Some(default_attribute) };
-        // The default types and an attribute whose size varies: each tried on them alone.
-        let mut before = new_type_registry_with_default_types();
-        let rule_of_cells = |master| RegisteredType::ScaRule { name: "a rule".to_string(), rule: ScaRuleType::from_number(type_number), master };
-        let rule_of_entity = |master| RegisteredType::EntityRule { name: "a rule".to_string(), rule: EntityRuleType::from_number(type_number), master };
-        before.register(RegisteredType::Attribute { name: "varying".to_string(), attribute_type: varying_attribute, data_words: None }).expect("a name no type has");
-        let (default_amiss, master_amiss) = (Err(RegistryRefusal::DefaultAmiss), Err(RegistryRefusal::MasterAmiss));
-        for (registered_type, outcome) in [
-            (entity_defaulting(SHEEP_STATE.attribute_type()), Ok(())),
-            (entity_defaulting(fixed_attribute.attribute_type()), default_amiss.clone()),
-            (entity_defaulting(varying_attribute), default_amiss.clone()),
-            (entity_defaulting(AttributeType(GRASS.0)), default_amiss),
-            (rule_of_cells(GRASS), Ok(())),
-            (rule_of_cells(CLIMATE.layer_type()), Ok(())),
-            (rule_of_cells(LayerType::of_a_bit(type_number)), master_amiss.clone()),
-            (rule_of_cells(LayerType::of_a_bit(SHEEP.type_number())), master_amiss.clone()),
-            (rule_of_entity(SHEEP), Ok(())),
-            (rule_of_entity(EntityType::from_number(type_number)), master_amiss.clone()),
-            (rule_of_entity(EntityType::from_number(GRASS.type_number())), master_amiss),
-        ] {
-            assert_eq!(before.clone().register(registered_type.clone()), outcome, "{}", registered_type.name());
-        }
-        // Named before it is registered: refused, then registered once it is.
-        let mut type_registry = before;
-        let (entity, rule) = (entity_defaulting(fixed_attribute.attribute_type()), rule_of_entity(EntityType::from_number(type_number)));
-        assert_eq!((type_registry.register(entity.clone()), type_registry.register(rule.clone())), (Err(RegistryRefusal::DefaultAmiss), Err(RegistryRefusal::MasterAmiss)));
-        type_registry.register(RegisteredType::attribute("fixed", fixed_attribute)).expect("a name no type has");
-        type_registry.register(entity).expect("its default registered before it");
-        type_registry.register(rule).expect("its master registered before it");
+    let (before, _) = with_base_types();
+    let (default_amiss, master_amiss) = (Err(RegistryRefusal::DefaultAmiss), Err(RegistryRefusal::MasterAmiss));
+    for (registration, wanted) in [
+        (Registration::entity("defaulting", Some("sheep state")), Ok(())),
+        (Registration::entity("defaulting", Some("fixed")), default_amiss.clone()),
+        (Registration::entity("defaulting", Some("grass")), default_amiss),
+        (Registration::sca_rule("a rule", "grass"), Ok(())),
+        (Registration::sca_rule("a rule", "climate"), Ok(())),
+        (Registration::sca_rule("a rule", "unheard of"), master_amiss.clone()),
+        (Registration::sca_rule("a rule", "sheep"), master_amiss.clone()),
+        (Registration::entity_rule("a rule", "sheep"), Ok(())),
+        (Registration::entity_rule("a rule", "unheard of"), master_amiss.clone()),
+        (Registration::entity_rule("a rule", "grass"), master_amiss),
+        (Registration::layer("depending").depending_on(&["collision"]), Ok(())),
+        (Registration::layer("depending").depending_on(&["unheard of"]), Err(RegistryRefusal::DependencyAmiss)),
+    ] {
+        let type_name = registration.name.clone();
+        assert_eq!(outcome(before.clone().register(registration)), wanted, "{type_name}");
     }
+    // Named before it is registered: refused, then registered once it is.
+    let mut type_registry = before;
+    let (entity, rule) = (Registration::entity("defaulting", Some("fixed")), Registration::entity_rule("a rule", "defaulting"));
+    assert_eq!((outcome(type_registry.register(entity.clone())), outcome(type_registry.register(rule.clone()))), (Err(RegistryRefusal::DefaultAmiss), Err(RegistryRefusal::MasterAmiss)));
+    type_registry.register(Registration::attribute::<u64>("fixed")).expect("a name no type has");
+    type_registry.register(entity).expect("its default registered before it");
+    type_registry.register(rule).expect("its master registered before it");
+}
+
+/// A new world's IDs are handed out as its types are registered, none
+/// overlapping, the same every time; a saved world's types are each
+/// given the ID the save gave its name, whatever order they come in, a
+/// type the save does not name one past them all; a saved name given
+/// to a type of another kind is refused, and a saved name nobody
+/// registers keeps the types from freezing.
+#[test]
+fn a_saved_world_keeps_its_ids() {
+    let (frozen_types, base_types) = frozen_base_types();
+    let numbers: Vec<_> = frozen_types.types().iter().flat_map(RegisteredType::numbers).collect();
+    assert!(numbers.windows(2).all(|pair| pair[0] < pair[1]) && numbers[0] >= 1, "handed out in order, none overlapping, none 0");
+    assert_eq!(frozen_base_types().1, base_types, "the same IDs every time");
+    let saved_text = frozen_types.to_text();
+    // Read back, in another order: each name its saved ID.
+    let mut reordered = TypeRegistry::for_saved_world(&saved_text).expect("a world's types");
+    let collision = reordered.register(Registration::layer("collision")).expect("saved");
+    let grass = reordered.register(Registration::layer("grass")).expect("saved");
+    let newcomer = reordered.register(Registration::layer("newcomer")).expect("a name the save does not hold");
+    assert_eq!((collision.layer_type(), grass.layer_type()), (Some(base_types.collision), Some(base_types.grass)));
+    assert!(newcomer.numbers().start > *numbers.last().expect("types"), "past every saved ID");
+    assert!(reordered.freeze().is_err(), "saved types nobody registered");
+    let mut as_another = TypeRegistry::for_saved_world(&saved_text).expect("a world's types");
+    assert_eq!(outcome(as_another.register(Registration::entity("grass", None))), Err(RegistryRefusal::SavedAsAnother));
+    // Registered whole, the same types come back.
+    let mut whole = TypeRegistry::for_saved_world(&saved_text).expect("a world's types");
+    assert_eq!(basegame::default_types::register(&mut whole).expect("registered"), base_types);
+    assert_eq!(each_told_by(&whole.freeze().expect("frozen")), each_told_by(&frozen_types));
+    assert!(TypeRegistry::for_saved_world("not,a world's types\n").is_err());
 }
 
 /// The types frozen find each again, by its name and by each of its
@@ -97,21 +135,19 @@ fn what_a_type_names_is_registered_before_it() {
 /// order registered, each among the rules of the master it names.
 #[test]
 fn the_frozen_types_find_each_type_again() {
-    let frozen_types = new_type_registry_with_default_types().freeze();
+    let (frozen_types, base_types) = frozen_base_types();
     for registered_type in frozen_types.types() {
-        assert_eq!(told_by(frozen_types.named(registered_type.name())), told_by(Some(registered_type)));
         assert!(registered_type.numbers().all(|type_number| told_by(frozen_types.of_number(type_number)) == told_by(Some(registered_type))), "{}", registered_type.name());
         assert_eq!(frozen_types.master_of(registered_type).is_some(), registered_type.is_a_rule(), "{}", registered_type.name());
     }
-    assert!(frozen_types.named("unheard of").is_none());
     let layer_types = frozen_types.layer_types();
     assert_eq!(layer_types.len(), frozen_types.types().iter().filter(|registered_type| matches!(registered_type, RegisteredType::Layer { .. } | RegisteredType::WidePlane { .. })).count());
-    assert!(layer_types.contains(&GRASS) && layer_types.contains(&TREE_STAGE.layer_type()) && layer_types.contains(&CLIMATE.layer_type()));
-    assert_eq!(told_by(frozen_types.entity(SHEEP)), told_by(frozen_types.named("sheep")));
-    assert_eq!(frozen_types.default_attributes(), [(SHEEP, SHEEP_STATE.attribute_type(), SheepState::WORDS)]);
+    assert!(layer_types.contains(&base_types.grass) && layer_types.contains(&base_types.tree_stage.layer_type()) && layer_types.contains(&base_types.climate.layer_type()));
+    assert_eq!(told_by(frozen_types.entity(base_types.sheep)), Some("sheep"));
+    assert_eq!(frozen_types.default_attributes(), [(base_types.sheep, base_types.sheep_state.attribute_type(), SheepState::WORDS)]);
     assert_eq!(frozen_types.rules().map(RegisteredType::name).collect::<Vec<_>>(), [GRASS_RULE, TREES_RULE, SHEEP_RULE, WEATHER_RULE]);
     for (rule_name, master_name) in [(GRASS_RULE, "grass"), (TREES_RULE, "tree"), (SHEEP_RULE, "sheep"), (WEATHER_RULE, "climate")] {
-        let rule = frozen_types.named(rule_name).expect("registered");
+        let rule = named(&frozen_types, rule_name).expect("registered");
         let master = frozen_types.master_of(rule).expect("its master registered");
         assert_eq!(master.name(), master_name);
         assert_eq!(frozen_types.rules_of(master).map(|master_rule| told_by(Some(master_rule))).collect::<Vec<_>>(), [told_by(Some(rule))], "{rule_name}");
@@ -144,12 +180,13 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
         assert_eq!((entity.type_number(), entity.0 & 0xFF, entity.0 >> 56), (type_number, 0, 0x02));
     }
     // An ID of another kind is no attribute's: the one namespace is everything's.
-    for other_id in [GRASS.0, SHEEP.0, TREE_STAGE.layer_type().0, 0] {
+    for other_id in [frozen_base_types().1.grass.0, frozen_base_types().1.sheep.0, frozen_base_types().1.tree_stage.layer_type().0, 0] {
         assert!(!AttributeType(other_id).is_an_attributes());
     }
-    let (state_type, frozen_types) = (SHEEP_STATE.attribute_type(), new_type_registry_with_default_types().freeze());
+    let (frozen_types, base_types) = frozen_base_types();
+    let state_type = base_types.sheep_state.attribute_type();
     assert_eq!((state_type.block_count(), frozen_types.data_words_of(state_type)), (3, Some(data_words(3))));
-    assert_eq!(told_by(frozen_types.of_number(state_type.type_number())), told_by(frozen_types.named("sheep state")));
+    assert_eq!(told_by(frozen_types.of_number(state_type.type_number())), Some("sheep state"));
     for _ in 0..100 {
         let sheep_state = SheepState { hungry_at: seeded_rng.next_draw(), lamb_due_at: seeded_rng.next_draw(), grown_at: seeded_rng.next_draw(), roaming_until: seeded_rng.next_draw(), roaming_neighbour: seeded_rng.next_draw() as u32 };
         let mut state_data = [0; data_words(SheepState::BLOCK_COUNT)];

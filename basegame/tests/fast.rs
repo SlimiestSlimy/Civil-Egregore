@@ -18,7 +18,8 @@ mod terrain {
 
     use crate::terrain_cells::{area_beside, area_drawn, middle_area};
     use server::simulation::simulation_api::{CellArea, CellCartesian, RandomSource};
-    use basegame::worldgen::{height_shaped, wall, LandShape, Terrain, DROP, STEP, WALLS};
+    use basegame::base_types::WALL_WAYS;
+    use basegame::worldgen::{height_shaped, wall, LandShape, Terrain, DROP, STEP};
 
     /// A shape of land and ocean little apart in height, joined by lines
     /// that slope their whole length, and nothing finer: no walls.
@@ -57,7 +58,7 @@ mod terrain {
         let height = |x, y| height_shaped(&CLIFFS_SHAPE, seed, x, y);
         for y in (0..1024).step_by(7).chain([1023]) {
             for x in (0..1024).step_by(5).chain([0, 1023]) {
-                for (way, &(_, (dx, dy))) in WALLS.iter().enumerate() {
+                for (way, &(dx, dy)) in WALL_WAYS.iter().enumerate() {
                     let (height_here, height_there) = (height(area_left + x, area_top + y), height((area_left + x).wrapping_add_signed(dx), (area_top + y).wrapping_add_signed(dy)));
                     let step_barred = height_there > height_here + STEP || height_here > height_there + DROP;
                     assert_eq!(terrain.keeps_wall(way, x, y), step_barred, "({x}, {y}) way {way}: {height_here} and {height_there}");

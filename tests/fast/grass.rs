@@ -2,6 +2,7 @@
 //! its chance and as the air there is humid, and decays by how harsh
 //! its tile's climate is and not at all in a mild one.
 
+use crate::worlds::base;
 use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, tick_grass};
 use utilities::coordinates::{CellCartesian, SUPERCHUNK_SIDE_CELLS};
 use server::bitplane_manager::Write;
@@ -9,7 +10,7 @@ use basegame::sca_rules::grass::{DECAYS_COUNT, DECAY_CHANCE, SPREADS_COUNT, SPRE
 use basegame::sca_rules::growing::{climate_harshness, HARSHEST_CLIMATE};
 use server::World;
 use basegame::base_types::{Climate, Wind, HOTTEST_TEMPERATURE, MOST_HUMID};
-use basegame::base_types::{CLIMATE, WEATHER_TILE_SCALE};
+use basegame::base_types::WEATHER_TILE_SCALE;
 use utilities::rng::RandomSource;
 
 /// Cells in a superchunk.
@@ -25,8 +26,8 @@ fn origin(world: &World) -> CellCartesian {
 pub fn write_climate(world: &mut World, climate: Climate) {
     let (origin, tile_side) = (origin(world), 1 << WEATHER_TILE_SCALE);
     let tiles = SUPERCHUNK_SIDE_CELLS / tile_side;
-    let climate_writes: Vec<Write> = (0..tiles * tiles).map(|tile| Write::value(CLIMATE, CellCartesian { x: origin.x + tile % tiles * tile_side, y: origin.y + tile / tiles * tile_side }.into(), climate.plane_number())).collect();
-    world.write_cells(CLIMATE.layer_type(), climate_writes);
+    let climate_writes: Vec<Write> = (0..tiles * tiles).map(|tile| Write::value(base().climate, CellCartesian { x: origin.x + tile % tiles * tile_side, y: origin.y + tile / tiles * tile_side }.into(), climate.plane_number())).collect();
+    world.write_cells(base().climate.layer_type(), climate_writes);
 }
 
 /// A superchunk all grass, with no dirt to spread onto, under one

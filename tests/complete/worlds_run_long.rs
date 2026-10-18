@@ -1,6 +1,6 @@
 //! Worlds run for long: stopped and saved often, they come to the same.
 
-use basegame::base_types::GRASS;
+use crate::worlds::base;
 use crate::worlds::{world_contents, folder};
 
 /// A world run 30,000 ticks straight, and the same world saved and
@@ -21,7 +21,7 @@ fn a_world_stopped_often_comes_to_the_same() {
             stopped_world.tick();
         }
         server::save(&folder, &mut stopped_world).expect("saved");
-        stopped_world = server::load_world(&folder, &crate::worlds::types()).expect("loaded");
+        stopped_world = server::load_world(&folder, basegame::default_types::register_types).expect("loaded");
     }
     // A cooled superchunk's last changes wait in the writeback ring: flushed, as a save's are, before the images are set side by side.
     straight_world.write_back_and_flush_all();
@@ -38,7 +38,7 @@ fn a_flock_on_generated_ground_lasts() {
     for _ in 0..300_000 {
         made_world.tick();
     }
-    let grass_cells: u64 = made_world.bitmap_arena().superchunks().iter().map(|superchunk| made_world.bitmap_arena().superchunk_count(GRASS, superchunk.superchunk_index()) as u64).sum();
+    let grass_cells: u64 = made_world.bitmap_arena().superchunks().iter().map(|superchunk| made_world.bitmap_arena().superchunk_count(base().grass, superchunk.superchunk_index()) as u64).sum();
     let sheep_count = made_world.entity_store().len();
     assert!((500..200_000).contains(&sheep_count), "{sheep_count} sheep");
     assert!(grass_cells > 4 * 1024 * 1024 / 20, "{grass_cells} cells of grass");

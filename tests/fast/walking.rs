@@ -4,6 +4,7 @@
 //!
 //! `cargo test --test fast`
 
+use crate::worlds::base;
 use crate::arenas::{cell, walker_header, world, STONE_LAYER};
 use server::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use server::chunk_storage::LayerCodec;
@@ -13,16 +14,18 @@ use server::simulation::simulation_api::{cell_and_its_neighbours, entity_reads_a
 use server::entity_manager::NEVER_WAKES;
 use server::simulation::simulation_api::SimulationTickState;
 use server::simulation::Simulation;
+use basegame::libraries::collision::Collision;
 use std::sync::Mutex;
-use basegame::base_types::{COLLISION, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
 
 /// What is in a walker's way here: the base game's collision plane and walls.
-const IN_THE_WAY: steps_and_paths::PlanesInTheWay = steps_and_paths::PlanesInTheWay { collision: COLLISION, wall_north: WALL_NORTH, wall_west: WALL_WEST, wall_south: WALL_SOUTH, wall_east: WALL_EAST };
+fn in_the_way() -> steps_and_paths::PlanesInTheWay {
+    steps_and_paths::PlanesInTheWay { collision: base().collision, wall_north: base().wall_north, wall_west: base().wall_west, wall_south: base().wall_south, wall_east: base().wall_east }
+}
 
 /// Makes the wall layers hot over the superchunk `(10, 10)` of `bitmap_arena`.
 fn with_walls_hot(bitmap_arena: &mut BitmapArena) {
     let mut layer_codec = LayerCodec::new();
-    for layer_type in [WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST] {
+    for layer_type in [base().wall_north, base().wall_west, base().wall_south, base().wall_east] {
         for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {
             bitmap_arena.make_hot(BucketKey { layer_type, chunk }, None, &mut layer_codec);
         }
@@ -46,9 +49,9 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
     // The entities are kept in the collision plane, as a world keeps them: each put there holds its cell.
     let mut layer_codec = LayerCodec::new();
     for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {
-        bitmap_arena.make_hot(BucketKey { layer_type: COLLISION, chunk }, None, &mut layer_codec);
+        bitmap_arena.make_hot(BucketKey { layer_type: base().collision, chunk }, None, &mut layer_codec);
     }
-    entity_store.iter().for_each(|entity| bitmap_arena.queue_write(COLLISION, Write::cell(entity.header.stood_cell, WriteOp::SetCell)));
+    entity_store.iter().for_each(|entity| bitmap_arena.queue_write(base().collision, Write::cell(entity.header.stood_cell, WriteOp::SetCell)));
     bitmap_arena.apply();
     let mut test_simulation = Simulation::new(1);
     let mut steps = 0;
@@ -58,9 +61,9 @@ fn a_step_to_a_cell_goes_round_what_is_in_the_way() {
             for entity in tick_state.woken_entities() {
                 let walker_cell = entity.header.stood_cell;
                 let passable = square_around_a_cell::read_layer(tick_state, STONE_LAYER, walker_cell).hot;
-                assert_eq!(steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, walker_cell.at_cartesian_offset(9, 0).unwrap(), &passable), None, "out of the area");
-                let next_cell = steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, goal_cell, &passable).expect("a way round");
-                basegame::libraries::collision::COLLISION.step(tick_state, &entity.header, next_cell, tick_now + 1);
+                assert_eq!(steps_and_paths::step_to(tick_state, in_the_way(), walker_cell, walker_cell.at_cartesian_offset(9, 0).unwrap(), &passable), None, "out of the area");
+                let next_cell = steps_and_paths::step_to(tick_state, in_the_way(), walker_cell, goal_cell, &passable).expect("a way round");
+                Collision { plane: base().collision }.step(tick_state, &entity.header, next_cell, tick_now + 1);
             }
             0
         });
@@ -80,14 +83,14 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
     let (mut bitmap_arena, mut entity_store) = world(1);
     let mut layer_codec = LayerCodec::new();
     for chunk in SuperchunkIndex::from_cartesian(10, 10).chunks() {
-        bitmap_arena.make_hot(BucketKey { layer_type: COLLISION, chunk }, None, &mut layer_codec);
+        bitmap_arena.make_hot(BucketKey { layer_type: base().collision, chunk }, None, &mut layer_codec);
     }
     let (start_cell, goal_cell) = (cell(40, 30), cell(44, 30));
     // Trees, say, across the straight way: open only below.
     for y in 23..=30 {
-        bitmap_arena.queue_write(COLLISION, Write::cell(cell(42, y), WriteOp::SetCell));
+        bitmap_arena.queue_write(base().collision, Write::cell(cell(42, y), WriteOp::SetCell));
     }
-    bitmap_arena.queue_write(COLLISION, Write::cell(cell(41, 29), WriteOp::SetCell));
+    bitmap_arena.queue_write(base().collision, Write::cell(cell(41, 29), WriteOp::SetCell));
     bitmap_arena.apply();
     entity_store.queue_add(walker_header(start_cell, 0), &[]);
     entity_store.apply();
@@ -101,11 +104,11 @@ fn a_cell_the_collision_plane_holds_is_not_stepped_on() {
                 if walker_cell == start_cell {
                     // The neighbour up and to the east is held, the others are free.
                     let about_tiles = cell_and_its_neighbours::tiles_about_cell(walker_cell);
-                    assert_eq!(steps_and_paths::around_steppable(tick_state, IN_THE_WAY, &about_tiles), about_tiles.neighbour_cells().cells_not_in(about_tiles.cell_towards(cell_and_its_neighbours::way_of(walker_cell, cell(41, 29)))));
+                    assert_eq!(steps_and_paths::around_steppable(tick_state, in_the_way(), &about_tiles), about_tiles.neighbour_cells().cells_not_in(about_tiles.cell_towards(cell_and_its_neighbours::way_of(walker_cell, cell(41, 29)))));
                 }
-                let next_cell = steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, goal_cell, &square_around_a_cell::read_layer(tick_state, STONE_LAYER, walker_cell).hot).expect("a way round");
-                assert_eq!(tick_state.layer_holds(COLLISION, next_cell), Ok(false), "a step onto what the collision plane holds");
-                basegame::libraries::collision::COLLISION.step(tick_state, &entity.header, next_cell, tick_now + 1);
+                let next_cell = steps_and_paths::step_to(tick_state, in_the_way(), walker_cell, goal_cell, &square_around_a_cell::read_layer(tick_state, STONE_LAYER, walker_cell).hot).expect("a way round");
+                assert_eq!(tick_state.layer_holds(base().collision, next_cell), Ok(false), "a step onto what the collision plane holds");
+                Collision { plane: base().collision }.step(tick_state, &entity.header, next_cell, tick_now + 1);
             }
             0
         });
@@ -135,7 +138,7 @@ fn a_cell_is_sought_further_and_further_off() {
         }
         test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed as u64, |tick_state: &mut SimulationTickState| {
             for entity in tick_state.woken_entities() {
-                let found_step = steps_and_paths::seek(tick_state, IN_THE_WAY, start_cell, STONE_LAYER);
+                let found_step = steps_and_paths::seek(tick_state, in_the_way(), start_cell, STONE_LAYER);
                 assert_eq!(found_step.map(|mapped_step| mapped_step.scale), scale, "{goal_across} across, {goal_down} down");
                 if let Some(some_step) = found_step {
                     let (step_cartesian, start_cartesian, goal_cartesian) = (some_step.step_cell.cartesian(), start_cell.cartesian(), goal_cell.cartesian());
@@ -163,7 +166,7 @@ fn walls_of_the_terrain_bar_steps() {
     with_walls_hot(&mut bitmap_arena);
     // A cliff between columns 41 and 42, rows 20 to 40, with a gap at row 33: walls east of column 41, which bar the diagonals across it too.
     for y in (20..=40).filter(|&y| y != 33) {
-        bitmap_arena.queue_write(WALL_EAST, Write::cell(cell(41, y), WriteOp::SetCell));
+        bitmap_arena.queue_write(base().wall_east, Write::cell(cell(41, y), WriteOp::SetCell));
     }
     bitmap_arena.apply();
     let (start_cell, goal_cell) = (cell(41, 30), cell(43, 30));
@@ -179,12 +182,12 @@ fn walls_of_the_terrain_bar_steps() {
                 if walker_cell == start_cell {
                     // The three cells east of it are behind the cliff.
                     let about_start_tiles = cell_and_its_neighbours::tiles_about_cell(walker_cell);
-                    assert_eq!(steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &about_start_tiles), about_start_tiles.nine_cells().cells_not_in(about_start_tiles.cell_towards(cell_and_its_neighbours::NORTH_EAST) | about_start_tiles.cell_towards(cell_and_its_neighbours::EAST) | about_start_tiles.cell_towards(cell_and_its_neighbours::SOUTH_EAST)));
+                    assert_eq!(steps_and_paths::around_unwalled(tick_state, in_the_way(), &about_start_tiles), about_start_tiles.nine_cells().cells_not_in(about_start_tiles.cell_towards(cell_and_its_neighbours::NORTH_EAST) | about_start_tiles.cell_towards(cell_and_its_neighbours::EAST) | about_start_tiles.cell_towards(cell_and_its_neighbours::SOUTH_EAST)));
                 }
                 let passable = square_around_a_cell::read_layer(tick_state, STONE_LAYER, walker_cell).hot;
-                let next_cell = steps_and_paths::step_to(tick_state, IN_THE_WAY, walker_cell, goal_cell, &passable).expect("a way through the gap");
+                let next_cell = steps_and_paths::step_to(tick_state, in_the_way(), walker_cell, goal_cell, &passable).expect("a way through the gap");
                 let about_tiles = cell_and_its_neighbours::tiles_about_cell(walker_cell);
-                assert!(!(steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &about_tiles) & about_tiles.cell_towards(cell_and_its_neighbours::way_of(walker_cell, next_cell))).is_empty(), "a step through a wall");
+                assert!(!(steps_and_paths::around_unwalled(tick_state, in_the_way(), &about_tiles) & about_tiles.cell_towards(cell_and_its_neighbours::way_of(walker_cell, next_cell))).is_empty(), "a step through a wall");
                 server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, next_cell, tick_now + 1);
             }
             0
@@ -209,19 +212,19 @@ fn a_drop_is_stepped_down_and_not_back_up() {
     let cliff_row = 20 + seeded_random.draw_below(20) as u32;
     // High ground west of column 42: every cell of the column bars its step west, further up and down than an area reaches.
     for y in cliff_row - 16..=cliff_row + 16 {
-        bitmap_arena.queue_write(WALL_WEST, Write::cell(cell(42, y), WriteOp::SetCell));
+        bitmap_arena.queue_write(base().wall_west, Write::cell(cell(42, y), WriteOp::SetCell));
     }
     bitmap_arena.apply();
     let (above_cell, below_cell) = (cell(41, cliff_row), cell(43, cliff_row));
     Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         let (about_above, about_foot) = (cell_and_its_neighbours::tiles_about_cell(above_cell), cell_and_its_neighbours::tiles_about_cell(cell(42, cliff_row)));
-        assert_eq!(steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &about_above), about_above.nine_cells(), "every step open from above");
+        assert_eq!(steps_and_paths::around_unwalled(tick_state, in_the_way(), &about_above), about_above.nine_cells(), "every step open from above");
         let west_ways = about_foot.cell_towards(cell_and_its_neighbours::NORTH_WEST) | about_foot.cell_towards(cell_and_its_neighbours::WEST) | about_foot.cell_towards(cell_and_its_neighbours::SOUTH_WEST);
-        assert_eq!(steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &about_foot), about_foot.nine_cells().cells_not_in(west_ways), "none back up");
+        assert_eq!(steps_and_paths::around_unwalled(tick_state, in_the_way(), &about_foot), about_foot.nine_cells().cells_not_in(west_ways), "none back up");
         let passable = square_around_a_cell::read_layer(tick_state, STONE_LAYER, above_cell).hot;
-        assert_eq!(steps_and_paths::step_to(tick_state, IN_THE_WAY, above_cell, below_cell, &passable).map(|next_cell| next_cell.cartesian().x), Some(cell(42, cliff_row).cartesian().x), "down it");
+        assert_eq!(steps_and_paths::step_to(tick_state, in_the_way(), above_cell, below_cell, &passable).map(|next_cell| next_cell.cartesian().x), Some(cell(42, cliff_row).cartesian().x), "down it");
         let passable = square_around_a_cell::read_layer(tick_state, STONE_LAYER, below_cell).hot;
-        assert_eq!(steps_and_paths::step_to(tick_state, IN_THE_WAY, below_cell, above_cell, &passable), None, "no way back in the area");
+        assert_eq!(steps_and_paths::step_to(tick_state, in_the_way(), below_cell, above_cell, &passable), None, "no way back in the area");
         0
     });
 }
@@ -239,7 +242,7 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
     let mut seeded_random = utilities::rng::RandomSource::new(seed);
     for y in 0..64 {
         for x in 0..64 {
-            for layer_type in [WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST] {
+            for layer_type in [base().wall_north, base().wall_west, base().wall_south, base().wall_east] {
                 if seeded_random.draw_below(4) == 0 {
                     bitmap_arena.queue_write(layer_type, Write::cell(cell(x, y), WriteOp::SetCell));
                 }
@@ -252,7 +255,7 @@ fn the_turn_and_pathfinding_bar_the_same_steps() {
         for y in 1..63 {
             for x in 1..63 {
                 let asked_cell = cell(x, y);
-                let (unwalled_cells, walls) = (steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &cell_and_its_neighbours::tiles_about_cell(asked_cell)), steps_and_paths::area_walls(tick_state, IN_THE_WAY, asked_cell));
+                let (unwalled_cells, walls) = (steps_and_paths::around_unwalled(tick_state, in_the_way(), &cell_and_its_neighbours::tiles_about_cell(asked_cell)), steps_and_paths::area_walls(tick_state, in_the_way(), asked_cell));
                 let area_centre = server::pathfinding::Cell { x: AREA_CENTRE as u8, y: AREA_CENTRE as u8 };
                 for way_checked in (0..cell_and_its_neighbours::WAYS).filter(|&way_filtered| way_filtered != cell_and_its_neighbours::HERE) {
                     let beside_cartesian = cell_and_its_neighbours::cell(asked_cell, way_checked).expect("in the world").cartesian();

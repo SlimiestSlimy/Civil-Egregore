@@ -5,15 +5,15 @@
 //! on one cell the one refused is born later
 //! (`docs/server.md`, "Two writes on one cell").
 
+use crate::worlds::base;
 use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, add_entity, tick_sheep};
 use server::bitplane_manager::Write;
 use utilities::coordinates::{CellCartesian, CellIndex};
 use server::entity_manager::{Header, WholeAttribute, NEVER_WAKES};
-use basegame::entity_rules::sheep::{SheepState, BIRTHS_COUNT, EATEN_COUNT, SHEEP, SHEEP_STATE, STEP_JITTER, STEP};
+use basegame::entity_rules::sheep::{SheepState, BIRTHS_COUNT, EATEN_COUNT, STEP_JITTER, STEP};
 use basegame::sca_rules::{grass, trees};
 use server::World;
 use std::collections::HashSet;
-use basegame::base_types::{GRASS, TREE, TREE_STAGE};
 use utilities::rng::RandomSource;
 
 /// The cell `(x, y)` cells from the top left of `world`.
@@ -36,16 +36,16 @@ fn no_two_sheep_eat_one_cell() {
     while taken_offsets.len() < 10_000 {
         let (x, y) = (test_random.draw_below(CROWD_SIDE as u64) as u32, test_random.draw_below(CROWD_SIDE as u64) as u32);
         if taken_offsets.insert((x, y)) {
-            let header = Header { entity_type: SHEEP, stood_cell: cell(&world, 400 + x, 400 + y), wake: test_random.draw_below(STEP.ticks()) };
+            let header = Header { entity_type: base().sheep, stood_cell: cell(&world, 400 + x, 400 + y), wake: test_random.draw_below(STEP.ticks()) };
             crate::worlds::add_entity(&mut world, header, &hungry_at(0));
         }
     }
     let grass_before = cells_of_grass(&world);
     let mut cells_eaten = 0;
     for tick in 0..4 * STEP.ticks() {
-        let grass_words_before = crate::worlds::layer_words(&world, GRASS);
+        let grass_words_before = crate::worlds::layer_words(&world, base().grass);
         let report = tick_sheep(&mut world);
-        assert_eq!(crate::worlds::cells_set_and_cleared(&grass_words_before, &crate::worlds::layer_words(&world, GRASS)), (0, report.rules[EATEN_COUNT]), "tick {tick}");
+        assert_eq!(crate::worlds::cells_set_and_cleared(&grass_words_before, &crate::worlds::layer_words(&world, base().grass)), (0, report.rules[EATEN_COUNT]), "tick {tick}");
         cells_eaten += report.rules[EATEN_COUNT];
     }
     assert!(cells_eaten >= 10_000, "{cells_eaten} cells eaten");
@@ -62,13 +62,13 @@ fn no_two_sheep_eat_one_cell() {
 #[test]
 fn grass_spread_decayed_and_eaten_changes_once_a_cell() {
     let mut world = crate::worlds::start_world(server::WorldStart { seed: crate::test_seed::TestSeedHandle::open().seed(), ..plain_start(1, basegame::worldgen::FRACTION_ONE / 2, 20_000, 2) });
-    let (grass_rule, sheep_rule) = (world.rule_place(basegame::base_types::RULE_OF_GRASS.0), world.rule_place(basegame::base_types::RULE_OF_SHEEP.0));
+    let (grass_rule, sheep_rule) = (world.rule_place(crate::worlds::type_id_named(basegame::base_types::GRASS_RULE)), world.rule_place(crate::worlds::type_id_named(basegame::base_types::SHEEP_RULE)));
     let chosen_rules = || server::ChosenRules::from_rules(&[grass_rule, sheep_rule]);
     for tick in 0..600 {
-        let grass_words_before = crate::worlds::layer_words(&world, GRASS);
+        let grass_words_before = crate::worlds::layer_words(&world, base().grass);
         let report = world.tick_only(chosen_rules(), false);
         let (grass_counts, sheep_counts) = (report.rules.counts_of(grass_rule), report.rules.counts_of(sheep_rule));
-        let (cells_set, cells_cleared) = crate::worlds::cells_set_and_cleared(&grass_words_before, &crate::worlds::layer_words(&world, GRASS));
+        let (cells_set, cells_cleared) = crate::worlds::cells_set_and_cleared(&grass_words_before, &crate::worlds::layer_words(&world, base().grass));
         assert_eq!(cells_set, grass_counts[grass::SPREADS_COUNT], "tick {tick}: cells set, spreads counted");
         let (grass_decays, cells_eaten) = (grass_counts[grass::DECAYS_COUNT], sheep_counts[EATEN_COUNT]);
         assert_eq!(cells_cleared, grass_decays + cells_eaten, "tick {tick}: cells cleared, {grass_decays} decayed and {cells_eaten} eaten");
@@ -85,12 +85,12 @@ fn a_tree_written_twice_is_one_tree() {
     let superchunk = first_superchunk(&world);
     // A tree every fourth cell each way, each old enough to spread and not crowded.
     let trees: Vec<CellIndex> = (0..256).flat_map(|y| (0..256).map(move |x| (4 * x, 4 * y))).map(|(x, y)| cell(&world, x, y)).collect();
-    let planted = world.write_cells(TREE, trees.iter().map(|&tree_cell| Write::cell(tree_cell, server::bitplane_manager::WriteOp::SetCell)));
-    let aged_writes = world.write_cells(TREE_STAGE.layer_type(), trees.iter().map(|&aged_cell| Write::value(TREE_STAGE, aged_cell, trees::SEEDS_FROM)));
+    let planted = world.write_cells(base().tree, trees.iter().map(|&tree_cell| Write::cell(tree_cell, server::bitplane_manager::WriteOp::SetCell)));
+    let aged_writes = world.write_cells(base().tree_stage.layer_type(), trees.iter().map(|&aged_cell| Write::value(base().tree_stage, aged_cell, trees::SEEDS_FROM)));
     assert_eq!((planted.missed, aged_writes.missed), (0, 0));
-    let trees_there = |world: &World| world.bitmap_arena().superchunk_count(TREE, superchunk) as u64;
+    let trees_there = |world: &World| world.bitmap_arena().superchunk_count(base().tree, superchunk) as u64;
     let mut spread = 0;
-    let trees_rule = world.rule_place(basegame::base_types::RULE_OF_TREES.0);
+    let trees_rule = world.rule_place(crate::worlds::type_id_named(basegame::base_types::TREES_RULE));
     for tick in 0..2_000 {
         let trees_before = trees_there(&world);
         let trees_counts = world.tick_only(server::ChosenRules::from_rules(&[trees_rule]), false).rules.counts_of(trees_rule);
@@ -103,18 +103,18 @@ fn a_tree_written_twice_is_one_tree() {
 
 /// The state of a sheep next hungry at `hungry_at`, in the middle of nothing.
 fn hungry_at(hungry_at: u64) -> WholeAttribute {
-    WholeAttribute::holding_value(SHEEP_STATE, SheepState { hungry_at, ..SheepState::default() })
+    WholeAttribute::holding_value(base().sheep_state, SheepState { hungry_at, ..SheepState::default() })
 }
 
 /// What `sheep_ref` keeps: every sheep has its block.
 fn sheep_state_of(sheep_ref: &server::entity_manager::EntityRef) -> SheepState {
-    sheep_ref.attribute(SHEEP_STATE).expect("a sheep's state, always")
+    sheep_ref.attribute(base().sheep_state).expect("a sheep's state, always")
 }
 
 /// The state of a sheep next hungry at `hungry_at` whose lamb is
 /// due at tick 1: the first tick a lamb can be due at, 0 being none.
 fn carrying_lamb(hungry_at: u64) -> WholeAttribute {
-    WholeAttribute::holding_value(SHEEP_STATE, SheepState { hungry_at, lamb_due_at: 1, ..SheepState::default() })
+    WholeAttribute::holding_value(base().sheep_state, SheepState { hungry_at, lamb_due_at: 1, ..SheepState::default() })
 }
 
 /// Two lambs put on one cell in a tick: the second is refused, and
@@ -125,12 +125,12 @@ fn a_lamb_refused_its_cell_is_born_later() {
     let mut world = crate::worlds::start_world(server::WorldStart { seed: crate::test_seed::TestSeedHandle::open().seed(), ..plain_start(1, 0, 0, 1) });
     let (x, y) = (500, 500);
     for mother_x in [x, x + 2] {
-        let header = Header { entity_type: SHEEP, stood_cell: cell(&world, mother_x, y), wake: 1 };
+        let header = Header { entity_type: base().sheep, stood_cell: cell(&world, mother_x, y), wake: 1 };
         add_entity(&mut world, header, &carrying_lamb(1));
     }
     // Every cell beside either taken, but the one between them.
     let beside_cells: Vec<(u32, u32)> = (x - 1..=x + 3).flat_map(|x| (y - 1..=y + 1).map(move |y| (x, y))).filter(|&beside_cell| ![(x, y), (x + 1, y), (x + 2, y)].contains(&beside_cell)).collect();
-    let blocker_headers: Vec<Header> = beside_cells.iter().map(|&(x, y)| Header { entity_type: SHEEP, stood_cell: cell(&world, x, y), wake: NEVER_WAKES }).collect();
+    let blocker_headers: Vec<Header> = beside_cells.iter().map(|&(x, y)| Header { entity_type: base().sheep, stood_cell: cell(&world, x, y), wake: NEVER_WAKES }).collect();
     for &blocker_header in &blocker_headers {
         add_entity(&mut world, blocker_header, &hungry_at(0));
     }
@@ -163,14 +163,14 @@ fn a_lamb_whose_cell_was_taken_is_born_the_tick_after() {
     let mut world = crate::worlds::start_world(server::WorldStart { seed: crate::test_seed::TestSeedHandle::open().seed(), ..plain_start(1, 0, 0, 1) });
     let (x, y) = (500, 500);
     for mother_x in [x, x + 2] {
-        let header = Header { entity_type: SHEEP, stood_cell: cell(&world, mother_x, y), wake: 1 };
+        let header = Header { entity_type: base().sheep, stood_cell: cell(&world, mother_x, y), wake: 1 };
         // Not hungry for long: neither walks onto the cell the other's lamb is to have.
         add_entity(&mut world, header, &carrying_lamb(5000));
     }
     // Every cell beside either taken, but two between them.
     let free_cells = [(x, y), (x + 1, y), (x + 1, y + 1), (x + 2, y)];
     for (x, y) in (x - 1..=x + 3).flat_map(|x| (y - 1..=y + 1).map(move |y| (x, y))).filter(|beside_cell| !free_cells.contains(beside_cell)) {
-        let header = Header { entity_type: SHEEP, stood_cell: cell(&world, x, y), wake: NEVER_WAKES };
+        let header = Header { entity_type: base().sheep, stood_cell: cell(&world, x, y), wake: NEVER_WAKES };
         add_entity(&mut world, header, &hungry_at(0));
     }
     // A tick with nobody awake: the lambs are due at the next.

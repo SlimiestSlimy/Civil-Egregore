@@ -7,7 +7,7 @@ use std::fs;
 /// What the server says to `command_line`, read by its flags.
 fn said_to(command_line: &str) -> Result<String, String> {
     let server_parameters = ServerParameters { shell_words: command_line.split_whitespace().map(str::to_string).collect() };
-    server::start(&server_parameters.cleaned(server::params::server_flags()).map_err(|flag_error| format!("{flag_error:?}"))?, crate::worlds::types())
+    server::start(&server_parameters.cleaned(server::params::server_flags()).map_err(|flag_error| format!("{flag_error:?}"))?, basegame::default_types::register_types)
 }
 
 /// A world made, run twice -- the second run going on from where the
