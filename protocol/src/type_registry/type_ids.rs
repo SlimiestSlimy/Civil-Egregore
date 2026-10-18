@@ -25,6 +25,12 @@ pub enum TypeKind {
     /// A world generation: a world's superchunks' cells, and what
     /// lives on them.
     Worldgen = 0x05,
+    /// A rule of the renderer: how its master -- a plane or a type of
+    /// entity -- is drawn.
+    RenderRule = 0x06,
+    /// A window of the client's, its grid's contents declared: nested
+    /// in another, or on its own.
+    Gui = 0x07,
 }
 
 /// Where an ID keeps its kind: its first byte, over its number.
@@ -189,6 +195,40 @@ impl WorldgenType {
     /// The world generation of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
         Self(type_id(TypeKind::Worldgen, type_number, 0))
+    }
+
+    /// Its number.
+    pub const fn type_number(self) -> u64 {
+        number_of(self.0)
+    }
+}
+
+/// A rule of the renderer: an ID from the one namespace, of its own
+/// kind. It has no size: its last byte is 0.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RenderRuleType(pub u64);
+
+impl RenderRuleType {
+    /// The rule of the renderer of number `type_number`.
+    pub const fn from_number(type_number: u64) -> Self {
+        Self(type_id(TypeKind::RenderRule, type_number, 0))
+    }
+
+    /// Its number.
+    pub const fn type_number(self) -> u64 {
+        number_of(self.0)
+    }
+}
+
+/// A window of the client's: an ID from the one namespace, of its own
+/// kind. It has no size: its last byte is 0.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct GuiType(pub u64);
+
+impl GuiType {
+    /// The window of number `type_number`.
+    pub const fn from_number(type_number: u64) -> Self {
+        Self(type_id(TypeKind::Gui, type_number, 0))
     }
 
     /// Its number.

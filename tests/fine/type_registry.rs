@@ -2,7 +2,7 @@
 //! types frozen find each again -- tried on the base game's types.
 
 use basegame::base_types::{BaseTypes, GRASS_RULE, SHEEP_RULE, TREES_RULE, SheepState};
-use protocol::type_registry::{AttributeType, EntityType, FrozenTypeRegistry, LayerType, RegisteredType, Registration, RegistryRefusal, TypeRegistry, TYPE_ID_NUMBERS};
+use protocol::type_registry::{AttributeType, Drawn, EntityType, FrozenTypeRegistry, LayerType, RegisteredType, Registration, RegistryRefusal, TypeKind, TypeRegistry, TYPE_ID_NUMBERS};
 use server::simulation::simulation_api::{data_words, Attribute, Layout};
 use utilities::rng::RandomSource;
 
@@ -50,9 +50,11 @@ fn a_name_is_registered_once_whatever_its_kind() {
     let mut seeded_rng = RandomSource::new(crate::test_seed::TestSeedHandle::open().fine_seed());
     let (default_frozen, _) = frozen_base_types();
     for _ in 0..200 {
-        let of_a_drawn_kind = |name: &str, seeded_rng: &mut RandomSource| match seeded_rng.draw_below(3) {
+        let of_a_drawn_kind = |name: &str, seeded_rng: &mut RandomSource| match seeded_rng.draw_below(5) {
             0 => Registration::layer(name),
             1 => Registration::entity(name, None),
+            2 => Registration::render_rule(name, "grass"),
+            3 => Registration::gui(name, None),
             _ => Attribute::<u64>::registration(name),
         };
         let taken_name = default_frozen.types()[seeded_rng.draw_below(default_frozen.types().len() as u64) as usize].name();
@@ -67,7 +69,8 @@ fn a_name_is_registered_once_whatever_its_kind() {
 
 /// What a type names is registered before it: a default attribute, an
 /// attribute; a rule's master, a plane for a rule of the cells -- a
-/// layer or a wide plane -- and a type of entity for an entity's; and
+/// layer or a wide plane -- and a type of entity for an entity's; a
+/// rule of the renderer's, either; a window's parent, a window; and
 /// each type it depends on. One named amiss -- nothing registered, or
 /// registered only after, of another kind -- is refused.
 #[test]
@@ -84,7 +87,16 @@ fn what_a_type_names_is_registered_before_it() {
         (Registration::sca_rule("a rule", "sheep"), master_amiss.clone()),
         (Registration::entity_rule("a rule", "sheep"), Ok(())),
         (Registration::entity_rule("a rule", "unheard of"), master_amiss.clone()),
-        (Registration::entity_rule("a rule", "grass"), master_amiss),
+        (Registration::entity_rule("a rule", "grass"), master_amiss.clone()),
+        (Registration::render_rule("a rule", "grass"), Ok(())),
+        (Registration::render_rule("a rule", "height"), Ok(())),
+        (Registration::render_rule("a rule", "sheep"), Ok(())),
+        (Registration::render_rule("a rule", "unheard of"), master_amiss.clone()),
+        (Registration::render_rule("a rule", "sheep state"), master_amiss.clone()),
+        (Registration::render_rule("a rule", GRASS_RULE), master_amiss),
+        (Registration::gui("a window", None), Ok(())),
+        (Registration::gui("a window", Some("unheard of")), Err(RegistryRefusal::ParentAmiss)),
+        (Registration::gui("a window", Some("grass")), Err(RegistryRefusal::ParentAmiss)),
         (Registration::layer("depending").depending_on(&["collision"]), Ok(())),
         (Registration::layer("depending").depending_on(&["unheard of"]), Err(RegistryRefusal::DependencyAmiss)),
     ] {
@@ -200,4 +212,25 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
         drawn_number.write(&mut word);
         assert_eq!((<u64 as Layout>::read_data(&word), word[1..].iter().sum::<u64>()), (drawn_number, 0));
     }
+}
+
+/// A rule of the renderer is of its own kind, and says what it draws:
+/// the plane or the type of entity its master is. A window nested in
+/// another holds its parent's ID -- a child names its parent, once the
+/// parent is registered -- and a window on its own, none.
+#[test]
+fn a_rule_of_the_renderer_draws_its_master_and_a_window_holds_its_parent() {
+    let (mut type_registry, base_types) = with_base_types();
+    let grass_drawn = type_registry.register(Registration::render_rule("grass drawn", "grass")).expect("of a plane");
+    let sheep_drawn = type_registry.register(Registration::render_rule("sheep drawn", "sheep")).expect("of a type of entity");
+    assert!(matches!(grass_drawn, RegisteredType::RenderRule { master: Drawn::Plane(layer_type), .. } if layer_type == base_types.grass));
+    assert!(matches!(sheep_drawn, RegisteredType::RenderRule { master: Drawn::Entity(entity_type), .. } if entity_type == base_types.sheep));
+    assert!([grass_drawn.type_id(), sheep_drawn.type_id()].iter().all(|type_id| type_id >> 56 == TypeKind::RenderRule as u64), "of the renderer's kind");
+    let menu = type_registry.register(Registration::gui("menu", None)).expect("on its own");
+    let entry = type_registry.register(Registration::gui("entry", Some("menu"))).expect("its parent registered before it");
+    let (RegisteredType::Gui { gui: menu_id, parent: None, .. }, RegisteredType::Gui { parent: Some(entry_parent), .. }) = (&menu, &entry) else { panic!("windows: {menu:?}, {entry:?}") };
+    assert_eq!(entry_parent, menu_id, "the child holds its parent's ID");
+    assert_eq!(menu.type_id() >> 56, TypeKind::Gui as u64);
+    assert!(!grass_drawn.is_a_rule() && !menu.is_a_rule(), "nothing the simulation ticks");
+    assert_eq!(type_registry.freeze().expect("frozen").rules().count(), 3, "the base game's three rules tick, and no rule of the renderer");
 }

@@ -14,7 +14,7 @@ mod registry;
 mod type_ids;
 
 pub use frozen_type_registry::FrozenTypeRegistry;
-pub use registered_type::RegisteredType;
+pub use registered_type::{Drawn, RegisteredType};
 pub use registration::{Declared, Hook, Library, Registration};
 pub use registry::{RegistryRefusal, TypeRegistry};
-pub use type_ids::{AttributeType, EntityRuleType, EntityType, LayerType, TypeKind, ScaRuleType, WorldgenType, ATTRIBUTE_NUMBERS, TYPE_ID_NUMBERS};
+pub use type_ids::{AttributeType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, TypeKind, ScaRuleType, WorldgenType, ATTRIBUTE_NUMBERS, TYPE_ID_NUMBERS};

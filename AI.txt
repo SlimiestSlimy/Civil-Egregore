@@ -209,6 +209,50 @@ NOW
   registry frozen by whoever starts it and checked against a save's
   types file), worldgen parameters' name (DONE, the commit after
   b50b63d: world file format 5, its rows `worldgen <name>`).
+- RENDER RULES AND GUI TYPES (the user, 2026-10-18, verbatim, the
+  design of the client rewrite): "a new types for the registry rendering
+  rule, and gui type / rendering rule has a.master plane/entity and the
+  renderer runs this rule to properly render that plane/entity / a gui
+  type is basically a self contained bevy gui, there is an optional
+  hook "show by default" so it shows bt default upon world start";
+  "gui work needs to be centralized, a simple draggable windows with a
+  grid inside to put elements in is enough, and furthermore, gui types
+  can expose a library to play nicely for nesting and stuff. so for
+  example we have a gui type for the sliders button, that opens the
+  sliders menu, esch entry being another gui type, etc. etc. highly
+  composable within the type registry"; "im the algorithms guy, not
+  the rendering or gui guy". Settled in the asking:
+  * render rules give data (a colour a cell or tile, a mark an entity),
+    the renderer draws; later "the type registry declare textures and
+    shaders, simplest case would be the sheep rendering rule bundling
+    the texture. wip tho"; "everything render will eventually become a
+    rule" (the 3D ground too; a first pass is fine).
+  * gui types declare their grid's contents (the client's public API
+    for its types in the registry), the one window system builds them.
+  * "childs nest themselves" (a gui names its parent); "gui elements can
+    expose their own libraries for extra functionality for their
+    dependencies". No global store of values (my idea, doubted).
+  * "client stops depending on basegame is the goal, when that happens
+    were 90% of the way".
+  * "there is a special api call for the simulation api reset_world()
+    basically keeps the frozen type registry but everything else is
+    restaryed from scratch".
+  * "worldgen bundles its own library to expose getters and setters for
+    the worldgen parsmeters, no specific server api involvement needed".
+    Then: "can we serialize the library calls through the tcp
+    connection? so sliders in client can still talk to worldgen
+    libraries in server"; "i like the opt in nature of calls through the
+    tcp connection, that's basically a security feature lol"; "my
+    suggestion is more in the order of, adding an optional parameter to
+    type libraries to include function layouts for client calls" (not
+    Layout reused, not a kind of its own). Asked, unanswered: what a
+    call's layout says -- typed fields (whole number, fraction, yes/no)
+    for its arguments and its answer (mine), or counts of words.
+  * DONE (the commit after 3474fbc): TypeKind::RenderRule (0x06) and
+    Gui (0x07), Registration::render_rule(name, master) -- a plane or a
+    type of entity, RegisteredType::RenderRule { master: Drawn } -- and
+    Registration::gui(name, parent), a parent a window registered
+    before it (RegistryRefusal::ParentAmiss), Hook::ShownByDefault.
 - WHAT IS LEFT, IN ORDER (the user, 2026-10-18, on my list of what is
   left: "1 go ahead, 2 not quite, we need client side gui rules or
   something like that first / 3 same, fold into 5 with 2 / 4 can be

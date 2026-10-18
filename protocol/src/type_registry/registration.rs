@@ -28,6 +28,8 @@ pub enum Hook {
     /// It is a type of entity the world is kept hot about: its halos
     /// follow these. A world has one for now, unless forced hot.
     KeepsTheWorldHot,
+    /// It is a window shown as a world starts, not only when asked for.
+    ShownByDefault,
 }
 
 /// What a type is, as it is declared: everything its ID says but its
@@ -69,6 +71,18 @@ pub enum Declared {
     },
     /// A way of generating a world.
     Worldgen,
+    /// A rule of the renderer, and what it draws -- a plane or a type of
+    /// entity -- by its name.
+    RenderRule {
+        /// Its master's name.
+        master: String,
+    },
+    /// A window of the client's, and the window it is nested in, by its
+    /// name, if any: a child names its parent.
+    Gui {
+        /// Its parent's name.
+        parent: Option<String>,
+    },
 }
 
 /// A type to register: its name, what it is, the names of the types it
@@ -135,6 +149,17 @@ impl Registration {
     /// A world generation named `name`.
     pub fn worldgen(name: &str) -> Self {
         Self::of(name, Declared::Worldgen)
+    }
+
+    /// A rule of the renderer named `name`, drawing the plane or the type
+    /// of entity named `master`.
+    pub fn render_rule(name: &str, master: &str) -> Self {
+        Self::of(name, Declared::RenderRule { master: master.to_string() })
+    }
+
+    /// A window named `name`, nested in the window named `parent` if any.
+    pub fn gui(name: &str, parent: Option<&str>) -> Self {
+        Self::of(name, Declared::Gui { parent: parent.map(str::to_string) })
     }
 
     /// It depending on the types named `type_names` too.
