@@ -6,8 +6,12 @@
 //!
 //! `cargo test`
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use crate::worlds::{world_contents, folder};
-use server::chunk_storage::disk::{self, DiskError};
+use server::internals_for_root_tests::disk::{self, DiskError};
 use utilities::coordinates::CellCartesian;
 use basegame::entity_rules::sheep::EATEN_COUNT;
 
@@ -248,7 +252,7 @@ fn sheep_never_step_through_a_wall() {
 #[test]
 fn a_plane_of_tiles_holds_a_number_a_tile_through_ticks_and_a_save() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    use server::bitplane_manager::Write;
+    use server::internals_for_root_tests::Write;
     let folder = folder("tiles");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
     let (frozen_types, test_tiles) = crate::worlds::with_test_tiles();

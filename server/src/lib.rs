@@ -10,13 +10,15 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-pub mod bitplane_manager;
-pub mod chunk_storage;
-pub mod commands;
-pub mod entity_manager;
+// The server's own parts, private: the simulation shows its API alone.
+mod bitplane_manager;
+mod chunk_storage;
+mod commands;
+mod entity_manager;
 pub mod host;
+pub mod internals_for_root_tests;
 pub mod params;
-pub mod pathfinding;
+mod pathfinding;
 pub mod simulation;
 mod pipe_end;
 mod save_and_load;
@@ -24,8 +26,36 @@ mod world_access;
 mod world_hash;
 mod world_start;
 
+// The crate's own tests, its internals theirs to reach: the tiers in
+// `tests/`, and what they share -- the run's seed, and the chunks,
+// arenas, walkers and areas they are drawn on.
+#[cfg(test)]
+#[path = "../tests/fine/main.rs"]
+mod fine_tests;
+#[cfg(test)]
+#[path = "../tests/fast/main.rs"]
+mod fast_tests;
+#[cfg(test)]
+#[allow(dead_code)] // a shared file: each test uses a part of it
+#[path = "../../utilities/test_seed.rs"]
+mod test_seed;
+#[cfg(test)]
+#[path = "../tests/shared/arenas.rs"]
+mod arenas;
+#[cfg(test)]
+#[path = "../tests/shared/areas.rs"]
+mod areas;
+#[cfg(test)]
+#[path = "../tests/shared/chunks.rs"]
+mod chunks;
+#[cfg(test)]
+#[path = "../tests/shared/walkers.rs"]
+mod walkers;
+
 pub use crate::simulation::hot::halos_about;
-pub use crate::simulation::{ChosenRules, HaloChange, RulePlace, TickCounts, WorldTick, COOL_TICKS, WARM_TICKS};
+pub use crate::simulation::halos::{HaloChange, COOL_TICKS, WARM_TICKS};
+pub use crate::simulation::rules::{ChosenRules, RulePlace, TickCounts};
+pub use crate::simulation::simulation_handle::WorldTick;
 pub use save_and_load::{load_keeping, load_world, read_types, save, worlds_in, write_types, SaveWritten};
 pub use world_hash::{world_hash, WorldHash};
 pub use world_start::{drawn_seed, seed_fit_to_start, WorldSize, WorldStart};

@@ -1,13 +1,13 @@
 //! The area about a cell: read at once, it is its cells read one by
 //! one.
 //!
-//! `cargo test --test fast`
+//! `cargo test -p server --lib fast_tests`
 
 use crate::arenas::{stone_arena, cell, STONE_LAYER};
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex};
-use server::entity_manager::WorldEntities;
-use server::simulation::simulation_api::square_around_a_cell::{self, AREA_CENTRE, AREA_SIDE};
-use server::simulation::Simulation;
+use crate::entity_manager::WorldEntities;
+use crate::simulation::simulation_api::square_around_a_cell::{self, AREA_CENTRE, AREA_SIDE};
+use crate::simulation::Simulation;
 
 /// Cells scattered over the 3x3 superchunks from `(10, 10)`, some on
 /// their borders, drawn from `seed`.

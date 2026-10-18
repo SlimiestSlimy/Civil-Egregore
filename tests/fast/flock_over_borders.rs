@@ -11,15 +11,19 @@
 //!
 //! `cargo test --test fast flock_over_borders`
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use crate::worlds::base;
 use crate::arenas::{cell, walker_header, world, STONE_LAYER, WALKER_TYPE};
-use server::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
-use server::chunk_storage::LayerCodec;
+use server::internals_for_root_tests::{BitmapArena, BucketKey, Write, WriteOp};
+use server::internals_for_root_tests::LayerCodec;
 use utilities::coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use server::entity_manager::{Attribute, AttributeBlock, WorldEntities, InstructionsApplied};
+use server::internals_for_root_tests::{Attribute, AttributeBlock, WorldEntities, InstructionsApplied};
 use server::simulation::simulation_api::cell_and_its_neighbours;
 use server::simulation::simulation_api::{cell_reads_and_writes, compare_and_write, SimulationTickState};
-use server::simulation::Simulation;
+use server::internals_for_root_tests::Simulation;
 use std::collections::BTreeSet;
 use utilities::rng::RandomSource;
 use basegame::libraries::collision::Collision;
@@ -70,7 +74,7 @@ fn drawn_for(seed: u64, tick_now: u64, from_pasture: (i64, i64)) -> RandomSource
 }
 
 /// The entity on `asked_cell` as the tick found it, if one stood there.
-fn entity_standing_on<'a>(tick_state: &SimulationTickState<'a>, asked_cell: CellIndex) -> Option<server::entity_manager::EntityRef<'a>> {
+fn entity_standing_on<'a>(tick_state: &SimulationTickState<'a>, asked_cell: CellIndex) -> Option<server::internals_for_root_tests::EntityRef<'a>> {
     tick_state.entities_in(asked_cell.chunk())?.find(|entity| entity.header.stood_cell == asked_cell)
 }
 

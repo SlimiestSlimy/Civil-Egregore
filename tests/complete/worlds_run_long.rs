@@ -1,5 +1,9 @@
 //! Worlds run for long: stopped and saved often, they come to the same.
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use crate::worlds::base;
 use crate::worlds::{world_contents, folder};
 

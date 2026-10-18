@@ -8,20 +8,8 @@
 #[allow(dead_code)] // a shared file: each test program uses a part of it
 #[path = "../../utilities/test_seed.rs"]
 mod test_seed;
-// Hot arenas of stone and walkers on them: actions' tests' own, shared.
-#[path = "../../server/tests/shared/arenas.rs"]
-mod arenas;
-#[path = "../shared/walkers.rs"]
-mod walkers;
 
-mod acts_over_a_border;
 mod basegame_api;
-mod chunk_storage;
-mod compare_and_write;
 mod docs;
-mod entities_moving;
-mod entities_waking;
 mod entity_manager;
-mod entity_over_a_border;
-mod instructions;
 mod type_registry;

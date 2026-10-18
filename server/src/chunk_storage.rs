@@ -20,10 +20,12 @@ mod writeback_ring;
 pub use paging::{read_back, ImageStored};
 pub use layer_codec::{BucketKey, LayerCodec};
 pub use protocol::type_registry::LayerType;
-pub use crate::bitplane_manager::{Bits16, Bits2, Bits32, Bits4, Bits8, WidePlane, Width};
 pub use generated_area::GeneratedArea;
-pub use superchunk_image::{InvalidImage, LayerChange, SuperchunkImage};
-pub use writeback_ring::{RingEntry, WritebackRing};
+pub use superchunk_image::{LayerChange, SuperchunkImage};
+pub use writeback_ring::WritebackRing;
+// Names only the crate's tests use.
+#[cfg(test)]
+pub(crate) use {crate::bitplane_manager::{Bits16, Bits2, Bits4, Bits8, WidePlane, Width}, superchunk_image::InvalidImage};
 
 use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 use crate::chunk_storage::paging::{bytes_of, ImageKept, ColdPoolPaging};

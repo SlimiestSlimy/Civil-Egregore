@@ -3,14 +3,14 @@
 //! whether it holds at any of the mask's cells; what is set and
 //! cleared under a mask is the mask; and a mask's own cells.
 //!
-//! `cargo test --test fast`
+//! `cargo test -p server --lib fast_tests`
 
 use crate::arenas::{cell, STONE_LAYER};
-use server::bitplane_manager::BitmapArena;
+use crate::bitplane_manager::BitmapArena;
 use utilities::coordinates::SuperchunkIndex;
-use server::entity_manager::WorldEntities;
-use server::simulation::simulation_api::tile_masks::{self, Mask, MASK_SIDES};
-use server::simulation::Simulation;
+use crate::entity_manager::WorldEntities;
+use crate::simulation::simulation_api::tile_masks::{self, Mask, MASK_SIDES};
+use crate::simulation::Simulation;
 use utilities::rng::RandomSource;
 
 /// An arena with `STONE` hot over the 3x3 superchunks from `(10, 10)`,

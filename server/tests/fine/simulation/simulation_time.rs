@@ -2,9 +2,9 @@
 //! rate, to the nearest and one at least; and a thing with a mean
 //! time happens, tick by tick, that long apart on average.
 //!
-//! `cargo test --test fine simulation_time`
+//! `cargo test -p server --lib simulation_time`
 
-use server::simulation::simulation_time::{SimulationTime, TICKS_A_SIMULATION_SECOND};
+use crate::simulation::simulation_time::{SimulationTime, TICKS_A_SIMULATION_SECOND};
 use utilities::rng::RandomSource;
 
 /// Seconds are the tick rate's ticks each, milliseconds their share

@@ -6,6 +6,10 @@
 //!
 //! `cargo test --test fast collision`
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use crate::worlds::base;
 use crate::worlds::{tag_of, tag_sheep, tick_rule, tick_sheep};
 use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};

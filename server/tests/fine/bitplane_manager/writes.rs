@@ -4,9 +4,9 @@
 //!
 //! `cargo test`
 
-use server::bitplane_manager::{WritesApplied, BitmapArena, BucketKey, WriteShape, Write, WriteOp};
+use crate::bitplane_manager::{WritesApplied, BitmapArena, BucketKey, WriteShape, Write, WriteOp};
 use crate::chunks::{grass_on_dirt, MOCK_DIRT, MOCK_GRASS};
-use server::chunk_storage::{ChunkStorage, LayerCodec, LayerType};
+use crate::chunk_storage::{ChunkStorage, LayerCodec, LayerType};
 use utilities::coordinates::{CellCartesian, CellIndex, WORLD_MIDDLE};
 
 /// The layer type the tests write.

@@ -105,6 +105,7 @@ pub fn sample_tiles_of_layer(superchunk: SuperchunkIndex, layer: LayerView, tile
 /// Chooses each set cell of `layer_type`'s hot bitmaps in `bitmap_arena` with
 /// `chance`, independently, and hands every chosen cell to `emit_sample`
 /// in Morton order -- superchunk by superchunk: how many were chosen.
+#[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
 pub fn sample(bitmap_arena: &BitmapArena, layer_type: LayerType, chance: Chance, random_stream: &mut RandomSource, mut emit_sample: impl FnMut(CellIndex)) -> usize {
     bitmap_arena
         .superchunks()

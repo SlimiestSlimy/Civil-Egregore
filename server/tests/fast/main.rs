@@ -1,19 +1,17 @@
 //! The server's fast tier: the simulation's cells sampled from bitmaps grown from a seed -- seconds.
 //! The tiers: `docs/testing_protocol.md`, at the repository's root.
 //!
-//! `cargo test --test fast`
+//! `cargo test -p server --lib fast_tests`
 
-#[allow(dead_code)] // a shared file: each test program uses a part of it
-#[path = "../../../utilities/test_seed.rs"]
-mod test_seed;
-#[path = "../shared/arenas.rs"]
-mod arenas;
+// What the tiers share is declared at the crate's root, beside them.
 
 mod around;
 
 mod area;
 
 mod mask;
+
+mod tick;
 
 mod sampling {
     //! SCA sampling: every set cell chosen with the probability
@@ -22,11 +20,11 @@ mod sampling {
     //!
     //! `cargo test`
 
-    use server::bitplane_manager::{BitmapArena, BucketKey, WriteShape, Write, WriteOp};
-    use server::simulation::sample;
+    use crate::bitplane_manager::{BitmapArena, BucketKey, WriteShape, Write, WriteOp};
+    use crate::simulation::sample;
     use utilities::chance::Chance;
     use utilities::rng::RandomSource;
-    use server::chunk_storage::{LayerCodec, LayerType};
+    use crate::chunk_storage::{LayerCodec, LayerType};
     use utilities::coordinates::{CellCartesian, CellIndex, ChunkIndex};
 
     /// The layer type the tests sample.
@@ -140,7 +138,7 @@ mod sampling {
         let (kept_chunk, evicted_chunk) = (chunk_at(102_400, 102_400), chunk_at(102_656, 102_400));
         let mut bitmap_arena = arena_with(&[kept_chunk, evicted_chunk], &rect_writes(102_400, 102_400, 512, 4));
         assert_eq!(sampled_cells(&bitmap_arena, Chance::ALWAYS_HAPPENS, seed).len(), 2048);
-        let mut evicted_storage = server::chunk_storage::ChunkStorage::new(1 << 12);
+        let mut evicted_storage = crate::chunk_storage::ChunkStorage::new(1 << 12);
         bitmap_arena.write_back(evicted_chunk.superchunk(), &mut evicted_storage, &mut LayerCodec::new());
         assert!(bitmap_arena.evict(BucketKey { layer_type: STONE_LAYER, chunk: evicted_chunk }));
         assert!(sampled_cells(&bitmap_arena, Chance::ALWAYS_HAPPENS, seed).iter().all(|&cell| CellIndex::from(cell).chunk() == kept_chunk));

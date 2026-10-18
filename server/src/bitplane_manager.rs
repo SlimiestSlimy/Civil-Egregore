@@ -21,11 +21,11 @@ mod writes;
 mod buckets_unit_tests;
 
 pub use arena::BitmapArena;
-pub use reader::aligned_tiles::{SmallTiles, SMALL_TILES_TOGETHER, SMALL_TILE_CELLS, SMALL_TILE_SIDE};
+pub use reader::aligned_tiles::{SmallTiles, SMALL_TILE_CELLS, SMALL_TILE_SIDE};
 pub use reader::{CellReader, Window};
-pub use superchunk::{Bucket, LayerView, Superchunk};
+pub use superchunk::{LayerView, Superchunk};
 pub use wide_plane::{Bits16, Bits2, Bits32, Bits4, Bits8, WidePlane, Width};
-pub use writes::{count_missed, WritesApplied, WriteShape, Write, WriteOp, WriteQueues};
+pub use writes::{WritesApplied, WriteShape, Write, WriteOp};
 
 use utilities::bitmap::{BITS_PER_WORD, WORDS};
 use utilities::coordinates::CHUNKS_IN_SUPERCHUNK;

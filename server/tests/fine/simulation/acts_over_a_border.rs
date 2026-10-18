@@ -3,14 +3,14 @@
 //! whole or not at all -- in the one order of the world, however the superchunks wait on one
 //! another (`docs/simulation.md`, "An act over a border").
 //!
-//! `cargo test --test fine acts_over_a_border`
+//! `cargo test -p server --lib acts_over_a_border`
 
 use crate::arenas::{cell, walker_header, world, STONE_LAYER};
 use crate::walkers::{ENTITY_NUMBER, WOKEN_COUNT};
-use server::bitplane_manager::BitmapArena;
+use crate::bitplane_manager::BitmapArena;
 use utilities::coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
-use server::entity_manager::{AttributeBlock, WorldEntities, NEVER_WAKES};
-use server::simulation::{Compare, Simulation, SimulationTickState};
+use crate::entity_manager::{AttributeBlock, WorldEntities, NEVER_WAKES};
+use crate::simulation::{Compare, Simulation, SimulationTickState};
 use std::collections::BTreeSet;
 use utilities::rng::RandomSource;
 
@@ -37,10 +37,10 @@ fn an_act_over_a_border_happens_whole_or_not_at_all() {
         let report = Simulation::new(2).tick(&mut bitmap_arena, &mut entity_store, seeded_rng.next_draw(), |tick_state: &mut SimulationTickState| {
             for entity in tick_state.woken_entities() {
                 tick_state.seeing_to(entity.header.stood_cell);
-                let mut entity_made = server::simulation::simulation_api::entity_reads_and_writes::begin_making_entity(tick_state, crate::arenas::WALKER_TYPE, beside_cell, NEVER_WAKES, &[AttributeBlock::holding_value(ENTITY_NUMBER, 5)]);
-                server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut entity_made, &entity.header, WOKEN_COUNT, None, 1);
+                let mut entity_made = crate::simulation::simulation_api::entity_reads_and_writes::begin_making_entity(tick_state, crate::arenas::WALKER_TYPE, beside_cell, NEVER_WAKES, &[AttributeBlock::holding_value(ENTITY_NUMBER, 5)]);
+                crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut entity_made, &entity.header, WOKEN_COUNT, None, 1);
                 drop(entity_made);
-                server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
+                crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &entity.header, entity.header.stood_cell, NEVER_WAKES);
             }
             0
         });
@@ -85,19 +85,19 @@ fn flip_what_is_about(tick_state: &mut SimulationTickState, seed: u64) -> u64 {
         let (header, stood_cartesian) = (entity.header, entity.header.stood_cell.cartesian());
         tick_state.seeing_to(header.stood_cell);
         if RandomSource::for_stream(seed ^ current_tick, u64::from(stood_cartesian.y) << 32 | u64::from(stood_cartesian.x)).draw_below(3) != 0 {
-            server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &header, header.stood_cell, current_tick + 1);
+            crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &header, header.stood_cell, current_tick + 1);
             continue;
         }
         let seen_at = |tick_state: &SimulationTickState, x: u32, y: u32| (CellIndex::from(utilities::coordinates::CellCartesian { x, y }), u32::from(tick_state.layer_holds(STONE_LAYER, utilities::coordinates::CellCartesian { x, y }.into()) == Ok(true)));
         let (east_seen, south_seen, past_seen) = (seen_at(tick_state, stood_cartesian.x + 1, stood_cartesian.y), seen_at(tick_state, stood_cartesian.x, stood_cartesian.y + 1), seen_at(tick_state, stood_cartesian.x + 1, stood_cartesian.y + 2));
-        let mut east_as_seen = server::simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: STONE_LAYER, target_cell: east_seen.0, seen_value: east_seen.1 });
-        server::simulation::simulation_api::compare_and_write::write(&mut east_as_seen, Compare::Cell { layer_type: STONE_LAYER, target_cell: south_seen.0, seen_value: south_seen.1 }, STONE_LAYER, past_seen.0, past_seen.1, 1 - past_seen.1, None);
-        server::simulation::simulation_api::cell_reads_and_writes::seen_becoming(&mut east_as_seen, STONE_LAYER, south_seen.0, south_seen.1, 1 - south_seen.1, None);
-        server::simulation::simulation_api::cell_reads_and_writes::seen_becoming(&mut east_as_seen, STONE_LAYER, east_seen.0, east_seen.1, 1 - east_seen.1, None);
+        let mut east_as_seen = crate::simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: STONE_LAYER, target_cell: east_seen.0, seen_value: east_seen.1 });
+        crate::simulation::simulation_api::compare_and_write::write(&mut east_as_seen, Compare::Cell { layer_type: STONE_LAYER, target_cell: south_seen.0, seen_value: south_seen.1 }, STONE_LAYER, past_seen.0, past_seen.1, 1 - past_seen.1, None);
+        crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(&mut east_as_seen, STONE_LAYER, south_seen.0, south_seen.1, 1 - south_seen.1, None);
+        crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(&mut east_as_seen, STONE_LAYER, east_seen.0, east_seen.1, 1 - east_seen.1, None);
         let counted_wakes = entity.attribute(WOKEN_COUNT);
-        server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut east_as_seen, &header, WOKEN_COUNT, counted_wakes, counted_wakes.unwrap_or(0) + 1);
+        crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut east_as_seen, &header, WOKEN_COUNT, counted_wakes, counted_wakes.unwrap_or(0) + 1);
         drop(east_as_seen);
-        server::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &header, header.stood_cell, current_tick + 1);
+        crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &header, header.stood_cell, current_tick + 1);
     }
     0
 }

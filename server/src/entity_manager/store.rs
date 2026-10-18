@@ -6,7 +6,7 @@ mod entity_reader;
 mod named_in_a_tick;
 mod world_entities;
 
-pub use entity_reader::{EntityReader, OCCUPIED_SIDE};
+pub use entity_reader::EntityReader;
 pub use world_entities::WorldEntities;
 
 use crate::entity_manager::bucket::{place, Bucket};

@@ -1,6 +1,8 @@
 [package]
 name = "server"
 edition = "2024"
+# Its tests are the crate's own, in `tests/`: declared at its root, its internals theirs to reach.
+autotests = false
 description = "Civil Egregore's server: the world as a whole, made from a seed, ticked -- its cells' rules and its entities together -- saved and loaded"
 
 [dependencies]

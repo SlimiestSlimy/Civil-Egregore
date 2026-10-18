@@ -3,9 +3,13 @@
 //! they are crowded, die of age only at the oldest, and leave no stage
 //! behind.
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use crate::worlds::base;
 use crate::worlds::{first_superchunk, plain_start, tick_rule};
-use server::bitplane_manager::{Write, WriteOp};
+use server::internals_for_root_tests::{Write, WriteOp};
 use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use basegame::sca_rules::trees::{DIED_COUNT, GROWN_COUNT, SAMPLED_COUNT, SEEDS_FROM, SPREADS_COUNT};
 use server::World;

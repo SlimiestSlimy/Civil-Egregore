@@ -6,7 +6,7 @@
 
 use crate::areas::*;
 use utilities::rng::RandomSource;
-use server::pathfinding::{a_star, rows_hold, step_towards, Cell, Rows, Walls, Wave, AREA_SIDE};
+use crate::pathfinding::{a_star, rows_hold, step_towards, Cell, Rows, Walls, Wave, AREA_SIDE};
 
 /// A wall bars the step between two cells, both ways, whatever the cells
 /// are: a wall across the area with one gap is gone round by waves and

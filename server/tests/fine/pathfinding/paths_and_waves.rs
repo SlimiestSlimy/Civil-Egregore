@@ -5,7 +5,7 @@
 
 use crate::areas::*;
 use utilities::rng::RandomSource;
-use server::pathfinding::{a_star, rows_hold, nearest_goal, step_towards, steps_apart, Cell, Path, Rows, Wave, AREA_SIDE};
+use crate::pathfinding::{a_star, rows_hold, nearest_goal, step_towards, steps_apart, Cell, Path, Rows, Wave, AREA_SIDE};
 
 /// A cell of the area, drawn.
 fn cell_drawn(seeded_rng: &mut RandomSource) -> Cell {

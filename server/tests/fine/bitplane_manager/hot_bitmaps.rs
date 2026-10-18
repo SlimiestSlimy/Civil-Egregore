@@ -6,8 +6,8 @@
 //! `cargo test`
 
 use crate::chunks::*;
-use server::bitplane_manager::{BitmapArena, BucketKey, NotHot, WriteOp};
-use server::chunk_storage::{LayerCodec, LayerType};
+use crate::bitplane_manager::{BitmapArena, BucketKey, NotHot, WriteOp};
+use crate::chunk_storage::{LayerCodec, LayerType};
 use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 
 /// A bitmap turns hot decoded from its chunk's layer, or empty if the

@@ -2,15 +2,15 @@
 //! after it to the tag of its skip-tag set, a set within it passed
 //! over whole; one within a set skips to its own tag alone.
 //!
-//! `cargo test --test fine`
+//! `cargo test -p server --lib fine_tests`
 
-use server::bitplane_manager::{BitmapArena, BucketKey};
-use server::chunk_storage::{LayerCodec, LayerType};
+use crate::bitplane_manager::{BitmapArena, BucketKey};
+use crate::chunk_storage::{LayerCodec, LayerType};
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use server::entity_manager::WorldEntities;
-use server::simulation::simulation_api::compare_and_write;
-use server::simulation::simulation_api::SimulationTickState;
-use server::simulation::Simulation;
+use crate::entity_manager::WorldEntities;
+use crate::simulation::simulation_api::compare_and_write;
+use crate::simulation::simulation_api::SimulationTickState;
+use crate::simulation::Simulation;
 use utilities::rng::RandomSource;
 
 /// The layer the arena holds.

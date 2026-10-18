@@ -5,11 +5,15 @@
 //! Here and not in the server's own tests: its types are the base
 //! game's.
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use server::entity_manager::saved::{decode_state, encode_state};
+use server::internals_for_root_tests::{decode_state, encode_state};
 use basegame::base_types::BaseTypes;
 use protocol::type_registry::{FrozenTypes, TypeRegistry};
-use server::entity_manager::{may_be_given, DefaultAttributes, WholeAttribute, find_attribute, push_attribute, is_attribute_list, Attribute, AttributeBlock, AttributeType, WorldEntities, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER_WAKES};
+use server::internals_for_root_tests::{may_be_given, DefaultAttributes, WholeAttribute, find_attribute, push_attribute, is_attribute_list, Attribute, AttributeBlock, AttributeType, WorldEntities, EntityType, Header, Instructions, InstructionsApplied, Layout, BLOCK_WORDS, NEVER_WAKES};
 
 /// The base game's types of a new world, frozen, and the IDs they were
 /// given: the types the store is tried with.
@@ -56,7 +60,7 @@ struct BothEnds {
 
 impl Layout for BothEnds {
     const WORDS: usize = 15;
-    const MEMBERS: &'static [server::entity_manager::Member] = &[server::entity_manager::Member::word(0), server::entity_manager::Member::word(14)];
+    const MEMBERS: &'static [server::internals_for_root_tests::Member] = &[server::internals_for_root_tests::Member::word(0), server::internals_for_root_tests::Member::word(14)];
 
     fn write(self, attribute_data: &mut [u64]) {
         (attribute_data[0], attribute_data[14]) = (self.first_word, self.last_word);
@@ -329,7 +333,7 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
         assert_eq!(added_entity.attribute_list()[0].0[0], held_state.hungry_at, "round {round_number}");
         assert_eq!((added_entity.attribute(base().sheep_state), added_entity.attribute(SORTS_BEFORE_STATE), added_entity.attribute(ONE_BLOCK_ATTRIBUTE)), (Some(held_state), has_before.then_some(5), has_after.then_some(7)), "round {round_number}");
         assert_eq!(added_entity.default_attribute().as_deref(), Some(&*WholeAttribute::holding_value(base().sheep_state, held_state)));
-        assert_eq!(added_entity.attribute_seen(base().sheep_state.attribute_type()), server::entity_manager::attribute_seen(Some(&WholeAttribute::holding_value(base().sheep_state, held_state))));
+        assert_eq!(added_entity.attribute_seen(base().sheep_state.attribute_type()), server::internals_for_root_tests::attribute_seen(Some(&WholeAttribute::holding_value(base().sheep_state, held_state))));
         // Edits drawn: the state whole, a member of it, its removal -- refused -- and the others', which leave it be.
         for edit in 0..8 {
             let (mut instruction_queue, mut instructions_applied) = (Instructions::default(), InstructionsApplied::default());

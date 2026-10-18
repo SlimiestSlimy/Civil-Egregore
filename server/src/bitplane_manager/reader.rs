@@ -7,7 +7,8 @@ use super::{COARSEST_SCALE, COUNTS_IN_COARSEST, COUNT_TILE_CELLS, NotHot, contai
 use super::superchunk::Superchunk;
 use utilities::bitmap::{BITS_PER_WORD, CellWords};
 use utilities::bitmap::window::{PLACE_IN_WORD_TILE, WORD_TILE_SIDE, in_word_tile, left_columns, rows_from_morton, top_rows, window};
-use crate::chunk_storage::{BucketKey, LayerType, WidePlane, Width};
+use crate::chunk_storage::{BucketKey, LayerType};
+use crate::bitplane_manager::{WidePlane, Width};
 use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use std::cell::Cell;
 use utilities::cache::prefetch_cache_line;
@@ -80,11 +81,6 @@ impl<'a> CellReader<'a> {
     /// is not hot.
     pub fn tiles_holding(&self, layer_type: LayerType, cell: CellIndex) -> Option<u16> {
         self.lookup.tiles_holding(self.superchunks, layer_type, cell)
-    }
-
-    /// Where `superchunk` is among the superchunks, if there.
-    pub fn superchunk(&self, superchunk: SuperchunkIndex) -> Option<usize> {
-        self.lookup.superchunk(self.superchunks, superchunk).ok()
     }
 }
 

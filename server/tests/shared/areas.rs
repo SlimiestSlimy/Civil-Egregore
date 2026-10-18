@@ -6,7 +6,7 @@
 // A tier uses what it needs of it.
 #![allow(dead_code)]
 
-use server::pathfinding::{rows_hold, Cell, Rows, Walls, AREA_SIDE};
+use crate::pathfinding::{rows_hold, Cell, Rows, Walls, AREA_SIDE};
 
 
 /// No walls.

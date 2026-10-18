@@ -252,6 +252,9 @@ fn heights(terrain: &dyn AsksTerrain, world: u64, top_left: (u32, u32), given_he
 
 #[cfg(test)]
 mod tests {
+    // TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+    // and the world's handles to them -- until the world has reads of its
+    // own and this is rewritten against them (AI.txt, LATER).
     use super::*;
 
     /// Two superchunks side by side, and one below: the shadow lines
@@ -265,7 +268,7 @@ mod tests {
         use std::sync::Arc;
         // A new world's types frozen first, as the server freezes them.
         let frozen_types = Arc::new(protocol::world_types::of_a_new_world(register_types).expect("the base game's types"));
-        let worldgen = server::simulation::worldgen_of(&frozen_types).expect("a world generation");
+        let worldgen = server::internals_for_root_tests::worldgen_of(&frozen_types).expect("a world generation");
         let generation_numbers = WorldGeneration { sheep_per_superchunk: 1, ..WorldGeneration::DEFAULT }.numbers();
         let world_start = server::WorldStart { seed: server::seed_fit_to_start(crate::renderer::test_seed::TestSeedHandle::open().seed(), &generation_numbers, &worldgen), generation_numbers, ..server::WorldStart::default() };
         let (host, frame_receiver) = server::host::Host::start_on_thread(register_types);

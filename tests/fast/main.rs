@@ -9,7 +9,7 @@ mod test_seed;
 #[path = "../shared/worlds.rs"]
 mod worlds;
 // Hot arenas of stone and walkers on them: actions' tests' own, shared.
-#[path = "../../server/tests/shared/arenas.rs"]
+#[path = "../shared/arenas.rs"]
 mod arenas;
 
 mod collision;
@@ -22,7 +22,6 @@ mod host;
 mod paging;
 mod pipe;
 mod sheep;
-mod tick;
 mod trees;
 mod walking;
 mod world;

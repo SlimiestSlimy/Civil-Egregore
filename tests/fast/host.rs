@@ -1,5 +1,9 @@
 //! The host: a world run on a thread of its own, asked for frames.
 
+// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
+// and the world's handles to them -- until the world has reads of its
+// own and this is rewritten against them (AI.txt, LATER).
+
 use crate::worlds::base;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use server::host::{Host, HostSent};
@@ -126,7 +130,7 @@ fn the_terrain_asked_for_is_what_the_frames_bring() {
 #[test]
 fn a_frame_brings_a_plane_of_tiles_a_tile_at_a_time() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    use server::bitplane_manager::Write;
+    use server::internals_for_root_tests::Write;
     use utilities::coordinates::{place_from_cartesian, CellCartesian, SUPERCHUNK_SIDE_CELLS};
     let folder = crate::worlds::folder("tiles_in_frames");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());

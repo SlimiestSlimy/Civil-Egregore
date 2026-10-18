@@ -5,7 +5,8 @@
 use crate::bitplane_manager::superchunk_layer::SuperchunkLayer;
 use crate::bitplane_manager::{contains, BitmapArena};
 use utilities::bitmap::morton::morton_index;
-use crate::chunk_storage::{LayerType, WidePlane, Width};
+use crate::chunk_storage::{LayerType};
+use crate::bitplane_manager::{WidePlane, Width};
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
 
 /// What a write does to each cell it covers.
@@ -153,11 +154,6 @@ impl WriteQueues {
         self.queues_by_type.iter().map(|(_, writes)| writes.len()).sum()
     }
 
-    /// Whether no write is queued.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     /// Every queue, by type.
     pub fn iter(&self) -> impl Iterator<Item = (LayerType, &[Write])> {
         self.queues_by_type.iter().map(|(layer_type, writes)| (*layer_type, writes.as_slice()))
@@ -184,12 +180,6 @@ impl Write {
             .filter(move |_| !no_cells)
             .map(|(x, y)| SuperchunkIndex::from_cartesian(x, y))
     }
-}
-
-/// Counts the cells of the part of `write` in `superchunk` -- which has
-/// no bitmap in use -- as missed.
-pub fn count_missed(superchunk: SuperchunkIndex, write: Write, writes_applied: &mut WritesApplied) {
-    apply_in(None, superchunk, LayerType::of_a_bit(0), write, writes_applied);
 }
 
 /// Applies the part of `write`, to `layer_type`'s bitplane, that lies in
