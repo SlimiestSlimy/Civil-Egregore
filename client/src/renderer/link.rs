@@ -4,6 +4,7 @@
 //! paused, paced -- and the painter the shading the sliders set.
 
 use crate::renderer::paint::PaintedFrame;
+use basegame::base_types::BaseTypes;
 use bevy::prelude::*;
 use crate::gui::options::Options;
 use crate::gui::{CapturedInput, CurrentTuning, MakeWorld, OpenWorld, Save, ShownScreen};
@@ -70,6 +71,9 @@ pub struct LastFrameSeen {
     /// The last frame, its cells gone into pixels: none until a world
     /// runs.
     pub last_frame: Option<ViewportFrame>,
+    /// Its world's types, as the window froze them: what its planes are
+    /// asked for by. None until a frame of a world is painted.
+    pub base_types: Option<BaseTypes>,
     /// Superchunks the frame painted.
     pub painted_superchunks: usize,
     /// Seconds of the painter's thread the frame took.

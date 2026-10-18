@@ -1,52 +1,69 @@
-//! The base game's types registered, each with its library and hooks
-//! ([`new_type_registry_with_default_types`]): every rule's code its
-//! library, hooked to run every tick, and the world generation's,
-//! hooked to generate the world. The program's initialization builds
-//! the registry and hands it, frozen, to the server and the client
-//! ([`default_frozen_types`]): neither names a type of the base game.
+//! The base game's types registered in a world's registry, in their
+//! order, each with its library and hooks ([`register`]): every rule's
+//! code its library, hooked to run every tick, and the world
+//! generation's, hooked to generate the world -- each made with the IDs
+//! the world gave the types it works on, as they were registered. What
+//! the program's initialization hands the server and the client
+//! ([`register_types`]): neither names a type of the base game, and
+//! the registry is made for each world.
 
-use crate::base_types::{CLIMATE, CLOUD, COLLISION, ELEVATION, GRASS, HEIGHT, WATER_DEPTH, GRASS_RULE, RULE_OF_GRASS, RULE_OF_SHEEP, RULE_OF_TREES, RULE_OF_WEATHER, SHEEP, SHEEP_RULE, SHEEP_STATE, TREE, TREES_RULE, TREE_STAGE, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST, WEATHER_RULE, WET, WORLD_GENERATION};
-use protocol::type_registry::{FrozenTypes, Hook, RegisteredType, Registration, TypeRegistry};
+use crate::base_types::{BaseTypes, SheepState, GRASS_RULE, SHEEP_RULE, TREES_RULE, WEATHER_RULE, WEATHER_TILE_SCALE};
+use crate::libraries::collision::Collision;
+use protocol::type_registry::{Bits16, Bits32, Bits4, Bits8, Hook, RegisteredType, Registration, RegistryRefusal, TypeRegistry};
 use std::sync::Arc;
 
-/// A registry of the base game's types, in the order they are
-/// registered: an attribute before the type of entity it is the
-/// default of, a plane or a type of entity before its rules, what a
-/// type depends on before it. The rules tick in it.
-pub fn new_type_registry_with_default_types() -> TypeRegistry {
-    let mut type_registry = TypeRegistry::default();
-    let default_types: [Registration; 21] = [
-        RegisteredType::layer("grass", GRASS).into(),
-        RegisteredType::layer("tree", TREE).into(),
-        RegisteredType::wide_plane("tree stage", TREE_STAGE).into(),
-        RegisteredType::layer("wall east", WALL_EAST).into(),
-        RegisteredType::layer("wall south", WALL_SOUTH).into(),
-        RegisteredType::layer("collision", COLLISION).with_library(&crate::libraries::collision::COLLISION),
-        RegisteredType::layer("wall north", WALL_NORTH).into(),
-        RegisteredType::layer("wall west", WALL_WEST).into(),
-        RegisteredType::attribute("sheep state", SHEEP_STATE).into(),
-        RegisteredType::entity("sheep", SHEEP, Some(SHEEP_STATE)).depending_on(&["collision"]).with_hooks(&[Hook::KeepsTheWorldHot]),
-        RegisteredType::layer("wet", WET).into(),
-        RegisteredType::wide_plane("cloud", CLOUD).into(),
-        RegisteredType::wide_plane("climate", CLIMATE).into(),
-        RegisteredType::wide_plane("elevation", ELEVATION).into(),
-        RegisteredType::wide_plane("height", HEIGHT).into(),
-        RegisteredType::wide_plane("water depth", WATER_DEPTH).into(),
-        RegisteredType::ScaRule { name: GRASS_RULE.to_string(), rule: RULE_OF_GRASS, master: GRASS }.with_library(&crate::sca_rules::grass::CODE).with_hooks(&[Hook::RunsEveryTick]),
-        RegisteredType::ScaRule { name: TREES_RULE.to_string(), rule: RULE_OF_TREES, master: TREE }.with_library(&crate::sca_rules::trees::CODE).with_hooks(&[Hook::RunsEveryTick]),
-        RegisteredType::EntityRule { name: SHEEP_RULE.to_string(), rule: RULE_OF_SHEEP, master: SHEEP }.with_library(&crate::entity_rules::sheep::CODE).with_hooks(&[Hook::RunsEveryTick]),
-        RegisteredType::ScaRule { name: WEATHER_RULE.to_string(), rule: RULE_OF_WEATHER, master: CLIMATE.layer_type() }.with_library(&crate::sca_rules::weather::CODE).with_hooks(&[Hook::RunsEveryTick]),
-        RegisteredType::Worldgen { name: "world generation".to_string(), worldgen: WORLD_GENERATION }.depending_on(&["sheep", "collision"]).with_library(&crate::worldgen::world_generation::WORLD_GENERATION).with_hooks(&[Hook::GeneratesTheWorld]),
-    ];
-    for default_type in default_types {
-        let type_name = default_type.registered_type.name().to_string();
-        type_registry.register(default_type).unwrap_or_else(|refusal| panic!("the default type {type_name}: {refusal:?}"));
-    }
-    type_registry
+/// The base game's types registered in `type_registry`, in their order:
+/// an attribute before the type of entity it is the default of, a
+/// plane or a type of entity before its rules, what a type depends on
+/// before it. The rules tick in it. The types as the world gave them
+/// their IDs; or the first refused.
+pub fn register(type_registry: &mut TypeRegistry) -> Result<BaseTypes, String> {
+    let layer = |registered_type: RegisteredType| registered_type.layer_type().expect("a layer");
+    let grass = layer(registered(type_registry, Registration::layer("grass"))?);
+    let tree = layer(registered(type_registry, Registration::layer("tree"))?);
+    let tree_stage = registered(type_registry, Registration::wide_plane::<Bits4>("tree stage"))?.wide_plane().expect("four bits a cell");
+    let wall_east = layer(registered(type_registry, Registration::layer("wall east"))?);
+    let wall_south = layer(registered(type_registry, Registration::layer("wall south"))?);
+    // The collision plane's library works on the plane itself: made of its ID.
+    let collision = type_registry.register_with_own_library(Registration::layer("collision"), |registered_type| Arc::new(Collision { plane: layer(registered_type.clone()) })).map_err(refused("collision"))?;
+    let collision = layer(collision);
+    let wall_north = layer(registered(type_registry, Registration::layer("wall north"))?);
+    let wall_west = layer(registered(type_registry, Registration::layer("wall west"))?);
+    let sheep_state = registered(type_registry, Registration::attribute::<SheepState>("sheep state"))?.attribute().expect("laid out as a sheep's state");
+    let sheep = registered(type_registry, Registration::entity("sheep", Some("sheep state")).depending_on(&["collision"]).with_hooks(&[Hook::KeepsTheWorldHot]))?.entity_type().expect("a type of entity");
+    let wet = layer(registered(type_registry, Registration::layer("wet"))?);
+    let cloud = registered(type_registry, Registration::wide_plane_of_tiles::<Bits4>("cloud", WEATHER_TILE_SCALE))?.wide_plane().expect("four bits a tile");
+    let climate = registered(type_registry, Registration::wide_plane_of_tiles::<Bits32>("climate", WEATHER_TILE_SCALE))?.wide_plane().expect("thirty-two bits a tile");
+    let elevation = registered(type_registry, Registration::wide_plane_of_tiles::<Bits8>("elevation", WEATHER_TILE_SCALE))?.wide_plane().expect("eight bits a tile");
+    let height = registered(type_registry, Registration::wide_plane::<Bits16>("height"))?.wide_plane().expect("sixteen bits a cell");
+    let water_depth = registered(type_registry, Registration::wide_plane::<Bits16>("water depth"))?.wide_plane().expect("sixteen bits a cell");
+    let base_types = BaseTypes { grass, tree, tree_stage, wall_east, wall_south, collision, wall_north, wall_west, sheep_state, sheep, wet, cloud, climate, elevation, height, water_depth };
+    // Each rule's code, and the world generation's, made with the types it works on.
+    let rule_hooks = [Hook::RunsEveryTick];
+    registered(type_registry, Registration::sca_rule(GRASS_RULE, "grass").with_library(Arc::new(crate::sca_rules::grass::code(base_types))).with_hooks(&rule_hooks))?;
+    registered(type_registry, Registration::sca_rule(TREES_RULE, "tree").with_library(Arc::new(crate::sca_rules::trees::code(base_types))).with_hooks(&rule_hooks))?;
+    registered(type_registry, Registration::entity_rule(SHEEP_RULE, "sheep").with_library(Arc::new(crate::entity_rules::sheep::code(base_types))).with_hooks(&rule_hooks))?;
+    registered(type_registry, Registration::sca_rule(WEATHER_RULE, "climate").with_library(Arc::new(crate::sca_rules::weather::code(base_types))).with_hooks(&rule_hooks))?;
+    registered(type_registry, Registration::worldgen("world generation").depending_on(&["sheep", "collision"]).with_library(Arc::new(crate::worldgen::world_generation::code(base_types))).with_hooks(&[Hook::GeneratesTheWorld]))?;
+    Ok(base_types)
 }
 
-/// The base game's types, frozen: what the server makes new worlds
-/// with, and finds a loaded world's types among.
-pub fn default_frozen_types() -> Arc<FrozenTypes> {
-    Arc::new(new_type_registry_with_default_types().freeze())
+/// `registration`'s type registered in `type_registry`, with its ID; or why
+/// it was refused.
+fn registered(type_registry: &mut TypeRegistry, registration: Registration) -> Result<RegisteredType, String> {
+    let type_name = registration.name.clone();
+    type_registry.register(registration).map_err(refused(&type_name))
+}
+
+/// Why the base game's type named `type_name` was refused, of the refusal.
+fn refused(type_name: &str) -> impl FnOnce(RegistryRefusal) -> String {
+    move |refusal| format!("the base game's type {type_name}: {refusal:?}")
+}
+
+/// The base game's types registered in `type_registry` ([`register`]):
+/// what the program's initialization hands the server and the client
+/// (`protocol::world_types::GameTypes`), each world's registry made and
+/// frozen with it.
+pub fn register_types(type_registry: &mut TypeRegistry) -> Result<(), String> {
+    register(type_registry).map(drop)
 }

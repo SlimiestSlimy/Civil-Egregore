@@ -6,7 +6,7 @@
 //! ([`ChosenRules`]) by their place ([`RulePlace`]) (`docs/server.md`,
 //! "TickCounts").
 
-use crate::simulation::simulation_api::{RuleCode, RuleContext, RuleCounts, RuleMaster, TickReport, SimulationTickState, WorldgenCode, COUNTS_OF_A_RULE};
+use crate::simulation::simulation_api::{RuleCode, RuleContext, RuleCounts, RuleMaster, RuleRun, TickReport, SimulationTickState, WorldgenCode, COUNTS_OF_A_RULE};
 use std::sync::Arc;
 use crate::entity_manager::EntityType;
 use protocol::type_registry::{FrozenTypes, Hook, RegisteredType};
@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 pub const MOST_RULES: usize = 16;
 
 /// One rule of a world.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Rule {
     /// Its type's ID, whole: what the server knows it by.
     pub rule_id: u64,
@@ -30,7 +30,15 @@ pub struct Rule {
     /// What it counts, each named at its place in its counts.
     pub count_names: &'static [&'static str],
     /// The rule, on one superchunk's turn.
-    pub rule: fn(&mut SimulationTickState, &RuleContext) -> RuleCounts,
+    pub rule: Arc<RuleRun>,
+}
+
+impl std::fmt::Debug for Rule {
+    /// Its ID, what it runs with and what it counts: what the rule is,
+    /// only its code knows.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.debug_struct("Rule").field("rule_id", &self.rule_id).field("context", &self.context).field("count_names", &self.count_names).finish_non_exhaustive()
+    }
 }
 
 /// The rules a world of `frozen_types` ticks, each run by its library: every
@@ -51,10 +59,10 @@ pub fn rules_of(frozen_types: &FrozenTypes) -> Result<Arc<[Rule]>, String> {
                 _ => unreachable!("a rule's master is a plane or a type of entity"),
             };
             // Gathered once: each library the rule may ask for, by the ID of the type exposing it.
-            let libraries = frozen_types.dependencies_of(master_type).filter_map(|dependency| Some((dependency.type_id(), *frozen_types.library_of(dependency)?))).collect();
+            let libraries = frozen_types.dependencies_of(master_type).filter_map(|dependency| Some((dependency.type_id(), frozen_types.library_of(dependency)?.clone()))).collect();
             // Cast once: the rule's code, its library.
             let code = library.and_then(|rule_library| rule_library.downcast_ref::<RuleCode>()).ok_or_else(|| format!("{} runs every tick, and its library is no rule's code", registered_rule.name()))?;
-            Ok(Rule { rule_id: registered_rule.type_id(), context: RuleContext { master, libraries }, count_names: code.count_names, rule: code.run })
+            Ok(Rule { rule_id: registered_rule.type_id(), context: RuleContext { master, libraries }, count_names: code.count_names, rule: code.run.clone() })
         })
         .collect::<Result<_, String>>()?;
     if rules.len() > MOST_RULES {
@@ -73,7 +81,7 @@ pub fn worldgen_of(frozen_types: &FrozenTypes) -> Result<WorldgenCode, String> {
     if let Some((another_type, _)) = generating.next() {
         return Err(format!("{} and {} both generate the world", generating_type.name(), another_type.name()));
     }
-    library.and_then(|worldgen_library| worldgen_library.downcast_ref::<WorldgenCode>()).copied().ok_or_else(|| format!("{} generates the world, and its library is no world generation's code", generating_type.name()))
+    library.and_then(|worldgen_library| worldgen_library.downcast_ref::<WorldgenCode>()).cloned().ok_or_else(|| format!("{} generates the world, and its library is no world generation's code", generating_type.name()))
 }
 
 /// The type of entity a world of `frozen_types` is kept hot about: its one

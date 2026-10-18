@@ -4,7 +4,7 @@
 //! (`docs/sca_rules.md`, "Weather").
 
 use server::simulation::simulation_api::simulation_time::SimulationTime;
-use crate::base_types::{passes_a_slope, pressure_falls_by, Climate, CLIMATE, CLOUD, ELEVATION, HIGHEST_PRESSURE, HUMIDITY_A_LEVEL_OF_CLOUD, PRESSURE_AT_REST, STRONGEST_WIND, TILES_ABOUT, WEATHER_TILE_SCALE, WET, Wind};
+use crate::base_types::{passes_a_slope, pressure_falls_by, BaseTypes, Climate, HIGHEST_PRESSURE, HUMIDITY_A_LEVEL_OF_CLOUD, PRESSURE_AT_REST, STRONGEST_WIND, TILES_ABOUT, WEATHER_TILE_SCALE, Wind};
 use server::simulation::simulation_api::{on_each_sampled, RuleCode, cell_reads_and_writes, place_counted, tick_and_random_stream, CellIndex, Chance, RuleCounts, SimulationTickState};
 
 /// The simulation time from one sample of a tile to the next, on
@@ -37,9 +37,11 @@ const TILE_SIDE: i32 = 1 << WEATHER_TILE_SCALE;
 /// What the rule counts, each named at its place in its
 /// [`RuleCounts`]: the one order, the places below worked out from it.
 pub const COUNT_NAMES: [&str; 8] = ["sampled", "deepened", "thinned", "blown", "raining", "carried", "pushed", "evened"];
-/// What runs the weather's rule, as it is registered: [`rule`] on each
-/// sample of its master, chosen with [`SAMPLE_CHANCE`].
-pub const CODE: RuleCode = RuleCode { count_names: &COUNT_NAMES, run: |tick_state, context| on_each_sampled(tick_state, context.master, SAMPLE_CHANCE, rule) };
+/// What runs the weather's rule, as it is registered with `base_types`:
+/// [`rule`] on each sample of its master, chosen with [`SAMPLE_CHANCE`].
+pub fn code(base_types: BaseTypes) -> RuleCode {
+    RuleCode::new(&COUNT_NAMES, move |tick_state, context| on_each_sampled(tick_state, context.master, SAMPLE_CHANCE, |tick_state, tile, counts| rule(&base_types, tick_state, tile, counts)))
+}
 /// Tiles sampled.
 pub const SAMPLED_COUNT: usize = place_counted(&COUNT_NAMES, "sampled");
 /// Levels of cloud added: counted as each is applied.
@@ -74,24 +76,24 @@ const CARRIED_OF_A_CLIMATE: u64 = 3;
 
 /// The tile a step of `(tiles_across, tiles_down)` tiles from `tile`, and its
 /// climate: none past the world's edge or where it is not loaded.
-fn tile_beside(tick_state: &SimulationTickState, tile: CellIndex, (tiles_across, tiles_down): (i32, i32)) -> Option<(CellIndex, Climate)> {
+fn tile_beside(base_types: &BaseTypes, tick_state: &SimulationTickState, tile: CellIndex, (tiles_across, tiles_down): (i32, i32)) -> Option<(CellIndex, Climate)> {
     let beside_tile = tile.at_cartesian_offset(tiles_across * TILE_SIDE, tiles_down * TILE_SIDE)?;
-    cell_reads_and_writes::value(tick_state, CLIMATE, beside_tile).map(|climate| (beside_tile, Climate::of_number(climate)))
+    cell_reads_and_writes::value(tick_state, base_types.climate, beside_tile).map(|climate| (beside_tile, Climate::of_number(climate)))
 }
 
 /// Whether the tile at `tile` has a tile about it that is not
 /// loaded, or is past the world's edge: its wind is what comes in
 /// from there, and nothing inside turns it.
-fn at_the_border_of_what_is_loaded(tick_state: &SimulationTickState, tile: CellIndex) -> bool {
-    TILES_ABOUT.iter().any(|&step| tile_beside(tick_state, tile, step).is_none())
+fn at_the_border_of_what_is_loaded(base_types: &BaseTypes, tick_state: &SimulationTickState, tile: CellIndex) -> bool {
+    TILES_ABOUT.iter().any(|&step| tile_beside(base_types, tick_state, tile, step).is_none())
 }
 
 /// The parts of `whole_parts` with which air goes from the tile at `from_tile`
 /// to the one at `to_tile`: the more downhill, the less uphill, mildly
 /// either way (`passes_a_slope`) -- the one resistance of the land,
 /// to pressure and to wind alike.
-fn air_passes(tick_state: &SimulationTickState, from_tile: CellIndex, to_tile: CellIndex, whole_parts: u32) -> u32 {
-    let elevation_of = |tile| cell_reads_and_writes::value(tick_state, ELEVATION, tile).unwrap_or(0) as i32;
+fn air_passes(base_types: &BaseTypes, tick_state: &SimulationTickState, from_tile: CellIndex, to_tile: CellIndex, whole_parts: u32) -> u32 {
+    let elevation_of = |tile| cell_reads_and_writes::value(tick_state, base_types.elevation, tile).unwrap_or(0) as i32;
     passes_a_slope(elevation_of(to_tile) - elevation_of(from_tile), whole_parts)
 }
 
@@ -99,9 +101,9 @@ fn air_passes(tick_state: &SimulationTickState, from_tile: CellIndex, to_tile: C
 /// `climate_here` becomes `climate_left` but for that unit, to the one at `to_tile`, of
 /// climate `climate_there`: both climates under both compares, so no air is
 /// made or lost wherever a border falls between them.
-fn give_pressure(tick_state: &mut SimulationTickState, (from_tile, climate_here, climate_left): (CellIndex, Climate, Climate), (to_tile, climate_there): (CellIndex, Climate), count_place: usize) {
+fn give_pressure(base_types: &BaseTypes, tick_state: &mut SimulationTickState, (from_tile, climate_here, climate_left): (CellIndex, Climate, Climate), (to_tile, climate_there): (CellIndex, Climate), count_place: usize) {
     let (from_climate_after, to_climate_after) = (Climate { pressure: climate_here.pressure - 1, ..climate_left }, Climate { pressure: climate_there.pressure + 1, ..climate_there });
-    cell_reads_and_writes::change_both(tick_state, CLIMATE, (from_tile, climate_here.plane_number(), from_climate_after.plane_number()), (to_tile, climate_there.plane_number(), to_climate_after.plane_number()), count_place);
+    cell_reads_and_writes::change_both(tick_state, base_types.climate, (from_tile, climate_here.plane_number(), from_climate_after.plane_number()), (to_tile, climate_there.plane_number(), to_climate_after.plane_number()), count_place);
 }
 
 /// How much likelier pressure falls to the tile the step `step_tiles`
@@ -125,8 +127,8 @@ pub const fn wind_leans_pressure(wind: Wind, step_tiles: (i32, i32)) -> u32 {
 /// less often. The air leaving turns the tile's own wind that way
 /// (`Wind::pushed_by`), unless it is at the border of what is loaded.
 /// Whether a unit went.
-fn pressure_falls(tick_state: &mut SimulationTickState, sampled_tile: CellIndex, climate_here: Climate) -> bool {
-    let tiles_beside = TILES_ABOUT.map(|step| tile_beside(tick_state, sampled_tile, step));
+fn pressure_falls(base_types: &BaseTypes, tick_state: &mut SimulationTickState, sampled_tile: CellIndex, climate_here: Climate) -> bool {
+    let tiles_beside = TILES_ABOUT.map(|step| tile_beside(base_types, tick_state, sampled_tile, step));
     let mut fall_weights = tiles_beside.map(|tile_and_climate| tile_and_climate.map_or(0, |(_, climate_beside)| pressure_falls_by(climate_here.pressure, climate_beside.pressure)));
     for (way, fall_weight) in fall_weights.iter_mut().enumerate() {
         *fall_weight *= wind_leans_pressure(climate_here.wind, TILES_ABOUT[way]);
@@ -141,9 +143,9 @@ fn pressure_falls(tick_state: &mut SimulationTickState, sampled_tile: CellIndex,
         let Some((towards_tile, climate_there)) = tiles_beside[way] else {
             continue;
         };
-        if drawn_part < way_fall_weight * air_passes(tick_state, sampled_tile, towards_tile, WHOLE_PARTS) {
+        if drawn_part < way_fall_weight * air_passes(base_types, tick_state, sampled_tile, towards_tile, WHOLE_PARTS) {
             let wind = if tiles_beside.iter().all(Option::is_some) { climate_here.wind.pushed_by(TILES_ABOUT[way].0, TILES_ABOUT[way].1) } else { climate_here.wind };
-            give_pressure(tick_state, (sampled_tile, climate_here, Climate { wind, ..climate_here }), (towards_tile, climate_there), EVENED_COUNT);
+            give_pressure(base_types, tick_state, (sampled_tile, climate_here, Climate { wind, ..climate_here }), (towards_tile, climate_there), EVENED_COUNT);
             return true;
         }
         drawn_part = drawn_part.saturating_sub(way_fall_weight * WHOLE_PARTS);
@@ -157,15 +159,15 @@ fn pressure_falls(tick_state: &mut SimulationTickState, sampled_tile: CellIndex,
 /// tile it comes from (`Climate::with_humidity_carried_from` and the
 /// two beside it). A tile at the border of what is loaded keeps its
 /// wind. Nothing is queued where the two are alike already.
-fn carry_climate(tick_state: &mut SimulationTickState, climate_here: Climate, towards_tile: CellIndex, climate_there: Climate) {
+fn carry_climate(base_types: &BaseTypes, tick_state: &mut SimulationTickState, climate_here: Climate, towards_tile: CellIndex, climate_there: Climate) {
     let climate_carried = match tick_and_random_stream::random_stream(tick_state).draw_below(CARRIED_OF_A_CLIMATE) {
         0 => climate_there.with_humidity_carried_from(climate_here),
         1 => climate_there.with_temperature_carried_from(climate_here),
-        _ if at_the_border_of_what_is_loaded(tick_state, towards_tile) => climate_there,
+        _ if at_the_border_of_what_is_loaded(base_types, tick_state, towards_tile) => climate_there,
         _ => climate_there.with_wind_carried_from(climate_here),
     };
     if climate_carried != climate_there {
-        cell_reads_and_writes::set_value_counted(tick_state, CLIMATE, towards_tile, climate_there.plane_number(), climate_carried.plane_number(), CARRIED_COUNT);
+        cell_reads_and_writes::set_value_counted(tick_state, base_types.climate, towards_tile, climate_there.plane_number(), climate_carried.plane_number(), CARRIED_COUNT);
     }
 }
 
@@ -177,26 +179,26 @@ fn carry_climate(tick_state: &mut SimulationTickState, climate_here: Climate, to
 /// onto that tile -- so winds that meet on a tile raise it -- and
 /// with it a level of its cloud, if it has one and there is room.
 /// Whether a level of cloud went.
-fn wind_blows(tick_state: &mut SimulationTickState, sampled_tile: CellIndex, climate_here: Climate, cloud: u32) -> bool {
+fn wind_blows(base_types: &BaseTypes, tick_state: &mut SimulationTickState, sampled_tile: CellIndex, climate_here: Climate, cloud: u32) -> bool {
     let wind_draw_bound = STRONGEST_WIND as u64 + 1;
     let (drawn_across, drawn_down) = (tick_and_random_stream::random_stream(tick_state).draw_below(wind_draw_bound) as u32, tick_and_random_stream::random_stream(tick_state).draw_below(wind_draw_bound) as u32);
-    let Some((towards_tile, climate_there)) = climate_here.wind.step_drawn(drawn_across, drawn_down).and_then(|step| tile_beside(tick_state, sampled_tile, step)) else {
+    let Some((towards_tile, climate_there)) = climate_here.wind.step_drawn(drawn_across, drawn_down).and_then(|step| tile_beside(base_types, tick_state, sampled_tile, step)) else {
         return false;
     };
-    if tick_and_random_stream::random_stream(tick_state).draw_below(u64::from(WHOLE_PARTS)) as u32 >= air_passes(tick_state, sampled_tile, towards_tile, WHOLE_PARTS) {
+    if tick_and_random_stream::random_stream(tick_state).draw_below(u64::from(WHOLE_PARTS)) as u32 >= air_passes(base_types, tick_state, sampled_tile, towards_tile, WHOLE_PARTS) {
         return false;
     }
     if tick_and_random_stream::random_stream(tick_state).chance(CARRY_CHANCE) {
-        carry_climate(tick_state, climate_here, towards_tile, climate_there);
+        carry_climate(base_types, tick_state, climate_here, towards_tile, climate_there);
         return false;
     }
     if climate_here.pressure > 0 && climate_there.pressure < HIGHEST_PRESSURE {
-        give_pressure(tick_state, (sampled_tile, climate_here, climate_here), (towards_tile, climate_there), PUSHED_COUNT);
+        give_pressure(base_types, tick_state, (sampled_tile, climate_here, climate_here), (towards_tile, climate_there), PUSHED_COUNT);
     }
     if cloud > 0
-        && let Some(over_there) = cell_reads_and_writes::value(tick_state, CLOUD, towards_tile).filter(|&over_there| over_there < CLOUD.most_value())
+        && let Some(over_there) = cell_reads_and_writes::value(tick_state, base_types.cloud, towards_tile).filter(|&over_there| over_there < base_types.cloud.most_value())
     {
-        cell_reads_and_writes::move_one(tick_state, CLOUD, sampled_tile, cloud, towards_tile, over_there, BLOWN_COUNT);
+        cell_reads_and_writes::move_one(tick_state, base_types.cloud, sampled_tile, cloud, towards_tile, over_there, BLOWN_COUNT);
         return true;
     }
     false
@@ -220,17 +222,17 @@ pub const fn deepens_and_thins(climate: Climate, cloud: u32, over_water: bool) -
 /// The cloud forms: that at level `cloud` over the tile at `sampled_tile`,
 /// of climate `climate_here`, deepens or thins a level, or stays
 /// ([`deepens_and_thins`]).
-fn cloud_forms(tick_state: &mut SimulationTickState, sampled_tile: CellIndex, climate_here: Climate, cloud: u32) {
+fn cloud_forms(base_types: &BaseTypes, tick_state: &mut SimulationTickState, sampled_tile: CellIndex, climate_here: Climate, cloud: u32) {
     // A tile is water's if most of its cells are under it.
-    let over_water = cell_reads_and_writes::held_in_tile(tick_state, WET, sampled_tile) * 2 > (TILE_SIDE * TILE_SIDE) as u32;
+    let over_water = cell_reads_and_writes::held_in_tile(tick_state, base_types.wet, sampled_tile) * 2 > (TILE_SIDE * TILE_SIDE) as u32;
     let (deepen_parts, thin_parts) = deepens_and_thins(climate_here, cloud, over_water);
     let drawn_part = tick_and_random_stream::random_stream(tick_state).draw_below(u64::from(WHOLE_PARTS)) as u32;
     if drawn_part < deepen_parts {
-        if cloud < CLOUD.most_value() {
-            cell_reads_and_writes::set_value_counted(tick_state, CLOUD, sampled_tile, cloud, cloud + 1, DEEPENED_COUNT);
+        if cloud < base_types.cloud.most_value() {
+            cell_reads_and_writes::set_value_counted(tick_state, base_types.cloud, sampled_tile, cloud, cloud + 1, DEEPENED_COUNT);
         }
     } else if drawn_part < deepen_parts + thin_parts && cloud > 0 {
-        cell_reads_and_writes::set_value_counted(tick_state, CLOUD, sampled_tile, cloud, cloud - 1, THINNED_COUNT);
+        cell_reads_and_writes::set_value_counted(tick_state, base_types.cloud, sampled_tile, cloud, cloud - 1, THINNED_COUNT);
     }
 }
 
@@ -242,15 +244,15 @@ fn cloud_forms(tick_state: &mut SimulationTickState, sampled_tile: CellIndex, cl
 /// its cloud forms or clears ([`cloud_forms`]), unless a level of it
 /// has just been blown off.
 #[inline]
-pub fn rule(tick_state: &mut SimulationTickState, sampled_tile: CellIndex, counts: &mut RuleCounts) {
+pub fn rule(base_types: &BaseTypes, tick_state: &mut SimulationTickState, sampled_tile: CellIndex, counts: &mut RuleCounts) {
     counts[SAMPLED_COUNT] += 1;
-    let (Some(climate), Some(cloud)) = (cell_reads_and_writes::value(tick_state, CLIMATE, sampled_tile), cell_reads_and_writes::value(tick_state, CLOUD, sampled_tile)) else {
+    let (Some(climate), Some(cloud)) = (cell_reads_and_writes::value(tick_state, base_types.climate, sampled_tile), cell_reads_and_writes::value(tick_state, base_types.cloud, sampled_tile)) else {
         return;
     };
     let climate_here = Climate::of_number(climate);
     counts[RAINING_COUNT] += u64::from(climate_here.rains(cloud));
-    if !pressure_falls(tick_state, sampled_tile, climate_here) && wind_blows(tick_state, sampled_tile, climate_here, cloud) {
+    if !pressure_falls(base_types, tick_state, sampled_tile, climate_here) && wind_blows(base_types, tick_state, sampled_tile, climate_here, cloud) {
         return;
     }
-    cloud_forms(tick_state, sampled_tile, climate_here, cloud);
+    cloud_forms(base_types, tick_state, sampled_tile, climate_here, cloud);
 }

@@ -26,7 +26,7 @@ mod world_start;
 
 pub use crate::simulation::hot::halos_about;
 pub use crate::simulation::{ChosenRules, HaloChange, RulePlace, TickCounts, WorldTick, COOL_TICKS, WARM_TICKS};
-pub use save_and_load::{load_keeping, load_world, read_types, save, worlds_in, write_types, SaveWritten, TYPES_FILE};
+pub use save_and_load::{load_keeping, load_world, read_types, save, worlds_in, write_types, SaveWritten};
 pub use world_hash::{world_hash, WorldHash};
 pub use world_start::{drawn_seed, seed_fit_to_start, WorldSize, WorldStart};
 
@@ -36,6 +36,7 @@ use crate::simulation::simulation_api::WorldgenCode;
 use crate::simulation::{ColdPoolPaging, SimulationHandle};
 use std::sync::Arc;
 use protocol::type_registry::FrozenTypes;
+use protocol::world_types::GameTypes;
 
 /// Bytes of cold superchunks' images a world keeps in memory, unless
 /// told another number ([`World::keep_cold_pool_within`]): past it
@@ -91,20 +92,21 @@ impl World {
 
 /// Runs what `clean_parameters` ask for: the server's one way in from
 /// a command line, whichever command is nested in them -- with
-/// `frozen_types`, the types initialization hands it: those worlds made
-/// new run with, and a loaded world's are found among.
-pub fn start(clean_parameters: &protocol::server_parameters::CleanServerParameters, frozen_types: Arc<FrozenTypes>) -> Result<String, String> {
+/// `game_types`, what registers the game's types: each world's are
+/// registered and frozen before it is made or loaded
+/// (`protocol::world_types`).
+pub fn start(clean_parameters: &protocol::server_parameters::CleanServerParameters, game_types: GameTypes) -> Result<String, String> {
     if let Some(new_parameters) = clean_parameters.nested(params::NEW) {
-        return commands::new(utilities::seed::given_or_fresh_seed(clean_parameters.hex(params::SEED)), new_parameters, &frozen_types);
+        return commands::new(utilities::seed::given_or_fresh_seed(clean_parameters.hex(params::SEED)), new_parameters, game_types);
     }
     if let Some(run_parameters) = clean_parameters.nested(params::RUN) {
-        return commands::run_saved_world(run_parameters, &frozen_types);
+        return commands::run_saved_world(run_parameters, game_types);
     }
     if let Some(info_parameters) = clean_parameters.nested(params::INFO) {
         return commands::describe_saved_world(info_parameters);
     }
     if clean_parameters.nested(params::PIPE).is_some() {
-        return pipe_end::serve_the_pipe(frozen_types);
+        return pipe_end::serve_the_pipe(game_types);
     }
     Err("no command given: --help says them".to_string())
 }

@@ -1,7 +1,8 @@
 //! Civil Egregore, from the command line: the one program, built with the
 //! client or without it (the `client` feature, on by default) -- and its
-//! initialization: the base game's types registered and frozen
-//! ([`basegame::default_types`]), handed to the server. It hands its
+//! initialization: what registers the base game's types
+//! ([`basegame::default_types`]), handed to the server, which makes and
+//! freezes each world's registry with it before the world. It hands its
 //! command line to the server's flags ([`server::params`]) and the
 //! server ([`server::start`]).
 //!
@@ -58,7 +59,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    match server::start(&clean_parameters, basegame::default_types::default_frozen_types()) {
+    match server::start(&clean_parameters, basegame::default_types::register_types) {
         Ok(said) => {
             // Served over the pipe, nothing is left to say: stdout was the wire.
             if !said.is_empty() {

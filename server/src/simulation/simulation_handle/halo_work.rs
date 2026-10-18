@@ -15,12 +15,12 @@ use std::sync::Arc;
 impl SimulationHandle {
     /// Has the halos do `halo_work` on what the world holds.
     fn with_halos<WorkResult>(&mut self, halo_work: impl FnOnce(&mut Halos, &mut LentWorld<'_>) -> WorkResult) -> WorkResult {
-        let (seed, worldgen, generation_numbers) = (self.seed, self.worldgen, Arc::clone(&self.generation_numbers));
+        let (seed, generate_cells, generation_numbers) = (self.seed, Arc::clone(&self.worldgen.generate_cells), Arc::clone(&self.generation_numbers));
         let generate_job_of = move |superchunk: SuperchunkIndex| -> GenerateImage {
-            let generation_numbers = Arc::clone(&generation_numbers);
+            let (generate_cells, generation_numbers) = (Arc::clone(&generate_cells), Arc::clone(&generation_numbers));
             Box::new(move |layer_codec: &mut LayerCodec| {
                 let mut generated_area = GeneratedArea::of_superchunk(superchunk);
-                (worldgen.generate_cells)(&generation_numbers, seed, &mut generated_area);
+                generate_cells(&generation_numbers, seed, &mut generated_area);
                 generated_area.image(layer_codec)
             })
         };

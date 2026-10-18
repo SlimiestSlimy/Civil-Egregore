@@ -60,6 +60,18 @@ const fn is_of(type_id_value: u64, type_kind: TypeKind) -> bool {
     type_id_value >> KIND_SHIFT == type_kind as u64
 }
 
+/// The numbers an ID of any kind takes: a wide plane's one a bit, its
+/// cold planes', anything else's one.
+pub(crate) fn numbers_taken(type_id_value: u64) -> std::ops::Range<u64> {
+    if is_of(type_id_value, TypeKind::Attribute) {
+        let attribute_number = AttributeType(type_id_value).type_number();
+        return attribute_number..attribute_number + 1;
+    }
+    let first_number = number_of(type_id_value);
+    let numbers = if is_of(type_id_value, TypeKind::Layer) { u64::from(LayerType(type_id_value).width_bits()) } else { 1 };
+    first_number..first_number + numbers
+}
+
 /// What a layer represents: a `u64` the registry gives a meaning
 /// ([`super::TypeRegistry`]). It may be wide, 2 to 32 bits a cell: its
 /// last byte says how many (`docs/type_registry.md`, "Width").
@@ -194,6 +206,11 @@ impl<W: Width> WidePlane<W> {
     /// the types `first_number` on.
     pub const fn of_tiles(first_number: u64, tile_scale: u32) -> Self {
         Self { layer_type: LayerType::of_tiles(first_number, W::BITS_A_CELL, tile_scale), width: std::marker::PhantomData }
+    }
+
+    /// The plane `layer_type` is, if it is of its width.
+    pub const fn of_layer_type(layer_type: LayerType) -> Option<Self> {
+        if layer_type.width_bits() == W::BITS_A_CELL { Some(Self { layer_type, width: std::marker::PhantomData }) } else { None }
     }
 
     /// Its layer type: what it is made hot, and found in the arena, by.

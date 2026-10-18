@@ -16,6 +16,7 @@ mod near;
 mod overlays;
 mod paint;
 mod view;
+mod world_types;
 
 // The tests' seed, from the workspace's file: test infrastructure, built
 // into the tests alone.

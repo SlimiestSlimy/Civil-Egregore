@@ -2,37 +2,37 @@
 //! how wide a cell or a tile of each is, and a tile read off their
 //! words -- the clouds, the climates, which tiles rain.
 
-use crate::base_types::{Climate, CLIMATE, CLOUD, TREE_STAGE};
+use crate::base_types::{Climate, WEATHER_TILE_SCALE};
+use protocol::type_registry::{Bits32, Bits4, Width};
 
 /// Bits a word holds.
 const WORD_BITS: usize = u64::BITS as usize;
 
 /// Bits a cell's stage takes in a frame's stages.
-pub const STAGE_BITS: usize = TREE_STAGE.layer_type().width_bits() as usize;
+pub const STAGE_BITS: usize = Bits4::BITS_A_CELL as usize;
 
 /// Bits a tile's cloud takes in a frame's clouds: the cloud plane's,
-/// as the type registry has it.
-pub const CLOUD_BITS: usize = CLOUD.layer_type().width_bits() as usize;
+/// as it is registered.
+pub const CLOUD_BITS: usize = Bits4::BITS_A_CELL as usize;
 /// How many places a cell's place in its superchunk is shifted by to
-/// give its tile's in the cloud plane: the plane's tile size, as the
-/// type registry has it.
-pub const CLOUD_TILE_SHIFT: u32 = CLOUD.layer_type().tile_shift();
+/// give its tile's in the cloud plane: two a scale of its tile size.
+pub const CLOUD_TILE_SHIFT: u32 = 2 * WEATHER_TILE_SCALE;
 /// The most cloud a tile holds: the deepest shadow.
-pub const DEEPEST_CLOUD: u32 = CLOUD.most_value();
+pub const DEEPEST_CLOUD: u32 = u32::MAX >> (u32::BITS - Bits4::BITS_A_CELL);
 
 /// How many places a cell's place in its chunk is shifted by to give
-/// its climate's tile's, as the type registry has it.
-pub const CLIMATE_TILE_SHIFT: u32 = CLIMATE.layer_type().tile_shift();
+/// its climate's tile's: two a scale of its tile size.
+pub const CLIMATE_TILE_SHIFT: u32 = 2 * WEATHER_TILE_SCALE;
 /// Bits a tile's climate takes in a frame's climates: the climate
 /// plane's.
-pub const CLIMATE_BITS: usize = CLIMATE.layer_type().width_bits() as usize;
+pub const CLIMATE_BITS: usize = Bits32::BITS_A_CELL as usize;
 
 /// The climate of the tile at `tile` of a superchunk -- its tiles in
 /// Morton order, as a frame's climates hold them: none where no
 /// climate was sent.
 pub fn climate_over(climates: &[u64], tile: usize) -> Option<Climate> {
     let first_bit = tile * CLIMATE_BITS;
-    climates.get(first_bit / WORD_BITS).map(|word| Climate::of_number((word >> (first_bit % WORD_BITS)) as u32 & CLIMATE.most_value()))
+    climates.get(first_bit / WORD_BITS).map(|word| Climate::of_number((word >> (first_bit % WORD_BITS)) as u32))
 }
 
 /// The cloud over the tile at `tile` of a superchunk -- its tiles in

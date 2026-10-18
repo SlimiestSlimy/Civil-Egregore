@@ -4,12 +4,15 @@
 use crate::renderer::link::{HostLink, LastFrameSeen};
 use bevy::prelude::*;
 use crate::gui::ShownScreen;
-use basegame::base_types::{GRASS, TREE};
+use basegame::base_types::BaseTypes;
 use protocol::type_registry::LayerType;
 
-/// The layers whose cells the text counts, asked of every frame
-/// ([`protocol::pipe::frame::FrameAsk::counted`]): its grass, and its trees.
-pub const COUNTED: [LayerType; 2] = [GRASS, TREE];
+/// The layers whose cells the text counts, of `base_types`, asked of
+/// every frame ([`protocol::pipe::frame::FrameAsk::counted`]): its
+/// grass, and its trees.
+pub const fn counted_layers(base_types: &BaseTypes) -> [LayerType; 2] {
+    [base_types.grass, base_types.tree]
+}
 
 /// The text over the world.
 #[derive(Component)]
@@ -59,6 +62,7 @@ pub fn write_hud(hud_parts: Single<(&mut Text, &mut Visibility), With<HudText>>,
     let said_line = last_frame.last_outcome.as_ref().map_or(String::new(), |frame_said| format!("{frame_said}\n"));
     let size_said = last_frame.side_superchunks.map_or("no end".to_string(), |side_superchunks| format!("{side_superchunks} superchunks a side"));
     let counted = |layer_type: LayerType| last_frame.counts.iter().find(|(counted_type, _)| *counted_type == layer_type).map_or(0, |&(_, count)| count);
+    let [grass_counted, trees_counted] = last_seen.base_types.as_ref().map_or([0; 2], |base_types| counted_layers(base_types).map(counted));
     shown_text.0 = format!(
         "{said_line}seed {}   {size_said}   ocean at {}   tick {}\n{} ticks a second ({pace_said})\n{} entities   {} cells of grass   {} trees\n{} superchunk(s) in the viewport, {} hot, {drawn_said}\na frame, {} of them: {:.0} us of the host ({:.2}% of its time), {:.1} ms painting\n{KEYS_TEXT}",
         utilities::seed::seed_as_hex(last_frame.seed),
@@ -66,8 +70,8 @@ pub fn write_hud(hud_parts: Single<(&mut Text, &mut Visibility), With<HudText>>,
         grouped_in_threes(last_frame.tick),
         grouped_in_threes(last_frame.ticks_a_second as u64),
         grouped_in_threes(last_frame.entity_count as u64),
-        grouped_in_threes(counted(GRASS)),
-        grouped_in_threes(counted(TREE)),
+        grouped_in_threes(grass_counted),
+        grouped_in_threes(trees_counted),
         last_seen.viewport_superchunks,
         last_frame.hot.len(),
         last_seen.painted_superchunks,

@@ -3,9 +3,9 @@
 //! walks to grass, a step a wake (`docs/entity_rules.md`, "The sheep").
 
 use server::simulation::simulation_api::cell_and_its_neighbours;
-pub use crate::base_types::{SheepState, SHEEP, SHEEP_STATE};
+pub use crate::base_types::SheepState;
 use server::simulation::simulation_api::simulation_time::SimulationTime;
-use crate::base_types::{COLLISION, GRASS, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
+use crate::base_types::BaseTypes;
 use server::simulation::simulation_api::steps_and_paths::PlanesInTheWay;
 use server::simulation::simulation_api::RuleCode;
 use crate::libraries::collision::Collision;
@@ -63,11 +63,17 @@ pub const LAMBHOOD_TIME: SimulationTime = SimulationTime::from_seconds(450);
 /// What the rule counts, each named at its place in its
 /// [`RuleCounts`]: the one order, the places below worked out from it.
 pub const COUNT_NAMES: [&str; 7] = ["woken", "eaten", "births", "deaths", "sought", "paths", "far"];
-/// What runs the sheep's rule, as it is registered: [`rule`], on every
-/// sheep due.
-pub const CODE: RuleCode = RuleCode { count_names: &COUNT_NAMES, run: |tick_state, context| rule(tick_state, context.library(COLLISION.0).expect("a sheep depends on the collision plane")) };
-/// What is in a sheep's way: what stands on a cell, and the terrain's walls.
-pub const IN_THE_WAY: PlanesInTheWay = PlanesInTheWay { collision: COLLISION, wall_north: WALL_NORTH, wall_west: WALL_WEST, wall_south: WALL_SOUTH, wall_east: WALL_EAST };
+/// What runs the sheep's rule, as it is registered with `base_types`:
+/// [`rule`], on every sheep due, through the collision plane's library.
+pub fn code(base_types: BaseTypes) -> RuleCode {
+    RuleCode::new(&COUNT_NAMES, move |tick_state, context| rule(&base_types, tick_state, context.library(base_types.collision.0).expect("a sheep depends on the collision plane")))
+}
+
+/// What is in a sheep's way, of `base_types`: what stands on a cell, and
+/// the terrain's walls.
+pub const fn in_the_way(base_types: &BaseTypes) -> PlanesInTheWay {
+    PlanesInTheWay { collision: base_types.collision, wall_north: base_types.wall_north, wall_west: base_types.wall_west, wall_south: base_types.wall_south, wall_east: base_types.wall_east }
+}
 /// Sheep woken.
 pub const WOKEN_COUNT: usize = place_counted(&COUNT_NAMES, "woken");
 /// Cells of grass eaten: counted as each meal is applied.
@@ -83,10 +89,12 @@ pub const PATHS: usize = place_counted(&COUNT_NAMES, "paths");
 /// Of those found, the ones beyond the area about the sheep.
 pub const FAR_COUNT: usize = place_counted(&COUNT_NAMES, "far");
 
-/// What the rule keeps over a superchunk's turn: what the sheep did, and
-/// the collision plane's API, which a sheep comes, goes and steps
-/// through.
+/// What the rule keeps over a superchunk's turn: the types it works on,
+/// what the sheep did, and the collision plane's API, which a sheep
+/// comes, goes and steps through.
 struct Flock<'library> {
+    /// The types it works on.
+    base_types: &'library BaseTypes,
     /// What the sheep did.
     rule_counts: RuleCounts,
     /// The collision plane's API.
@@ -95,9 +103,9 @@ struct Flock<'library> {
 
 /// The rule, on one superchunk's turn: every sheep waking, each seen to
 /// by [`wake`], coming, going and stepping through `collision`.
-pub fn rule(tick_state: &mut SimulationTickState, collision: &Collision) -> RuleCounts {
-    let mut flock = Flock { rule_counts: RuleCounts::default(), collision };
-    entity_reads_and_writes::each_woken(tick_state, [GRASS, WALL_NORTH, WALL_WEST, WALL_SOUTH, WALL_EAST, COLLISION], &mut flock, wake);
+pub fn rule(base_types: &BaseTypes, tick_state: &mut SimulationTickState, collision: &Collision) -> RuleCounts {
+    let mut flock = Flock { base_types, rule_counts: RuleCounts::default(), collision };
+    entity_reads_and_writes::each_woken(tick_state, [base_types.grass, base_types.wall_north, base_types.wall_west, base_types.wall_south, base_types.wall_east, base_types.collision], &mut flock, wake);
     flock.rule_counts
 }
 
@@ -105,15 +113,16 @@ pub fn rule(tick_state: &mut SimulationTickState, collision: &Collision) -> Rule
 /// meal, a lamb, growing up -- and sleeps again, as long as it can.
 #[inline]
 fn wake(tick_state: &mut SimulationTickState, woken_sheep: EntityRef, flock: &mut Flock) {
-    let (collision, rule_counts, tick_now) = (flock.collision, &mut flock.rule_counts, tick_and_random_stream::current_tick(tick_state));
+    let (base_types, collision, rule_counts, tick_now) = (flock.base_types, flock.collision, &mut flock.rule_counts, tick_and_random_stream::current_tick(tick_state));
+    let grass = base_types.grass;
     rule_counts[WOKEN_COUNT] += 1;
     let (sheep_cell, header_before) = (woken_sheep.header.stood_cell, woken_sheep.header);
     let about_tiles = cell_and_its_neighbours::tiles_about_cell(sheep_cell);
-    let grass_about = cell_and_its_neighbours::read_layer(tick_state, GRASS, &about_tiles);
+    let grass_about = cell_and_its_neighbours::read_layer(tick_state, grass, &about_tiles);
     // The neighbours it may step to: on the hot bitplanes, nothing standing there, no wall before them.
-    let steppable_cells = grass_about.hot & steps_and_paths::around_steppable(tick_state, IN_THE_WAY, &about_tiles);
+    let steppable_cells = grass_about.hot & steps_and_paths::around_steppable(tick_state, in_the_way(base_types), &about_tiles);
     // All it keeps, as the tick found it, and as this wake leaves it: written once, if it changed.
-    let state_seen = woken_sheep.attribute(SHEEP_STATE);
+    let state_seen = woken_sheep.attribute(base_types.sheep_state);
     let state_was = state_seen.unwrap_or(SheepState { hungry_at: tick_now, ..SheepState::default() });
     let mut state_after = state_was;
     let (hungry_at, is_roaming) = (state_was.hungry_at, state_was.roaming_until != 0);
@@ -125,7 +134,7 @@ fn wake(tick_state: &mut SimulationTickState, woken_sheep: EntityRef, flock: &mu
         return;
     }
     // The pasture about it, looked at as it eats: thin, it will leave when next hungry; lush, it may.
-    let on_lush_pasture = eats_now && square_around_a_cell::read_layer(tick_state, GRASS, sheep_cell).count() >= LUSH_CELLS;
+    let on_lush_pasture = eats_now && square_around_a_cell::read_layer(tick_state, grass, sheep_cell).count() >= LUSH_CELLS;
     if eats_now {
         state_after.hungry_at = TIME_BETWEEN_MEALS.tick_after(tick_now);
         // Off thin pasture always; off lush, now and then: a flock spreads over the land it could stay on.
@@ -178,7 +187,7 @@ fn wake(tick_state: &mut SimulationTickState, woken_sheep: EntityRef, flock: &mu
         None
     } else {
         rule_counts[SOUGHT_COUNT] += 1;
-        match steps_and_paths::seek(tick_state, IN_THE_WAY, sheep_cell, GRASS) {
+        match steps_and_paths::seek(tick_state, in_the_way(base_types), sheep_cell, grass) {
             Some(found_step) => {
                 rule_counts[PATHS] += 1;
                 rule_counts[FAR_COUNT] += u64::from(found_step.scale > 0);
@@ -200,13 +209,13 @@ fn wake(tick_state: &mut SimulationTickState, woken_sheep: EntityRef, flock: &mu
         // All the sheep comes to this wake hangs on the grass being there still when it is applied: each thing queued under it is held
         // against it, and the grass cleared last. Should it be gone by then -- decayed in this very tick -- none of it happens, and
         // what is held against the grass being gone does instead: the sheep sleeps a step, hungry as it was, and wakes to look again.
-        queue_wake_end(&mut compare_and_write::open_compare(tick_state, compare_and_write::layer_holds(GRASS, sheep_cell)), collision, rule_counts, &header_before, wake_end, Some(sheep_cell));
+        queue_wake_end(base_types, &mut compare_and_write::open_compare(tick_state, compare_and_write::layer_holds(grass, sheep_cell)), collision, rule_counts, &header_before, wake_end, Some(sheep_cell));
         // One of the two is applied, never both: the sheep is written once.
         let hungry_still = next_step(tick_state);
-        entity_reads_and_writes::sleep(&mut compare_and_write::open_compare(tick_state, compare_and_write::layer_lacks(GRASS, sheep_cell)), &header_before, hungry_still);
-        cell_reads_and_writes::clear_counted(tick_state, GRASS, sheep_cell, EATEN_COUNT);
+        entity_reads_and_writes::sleep(&mut compare_and_write::open_compare(tick_state, compare_and_write::layer_lacks(grass, sheep_cell)), &header_before, hungry_still);
+        cell_reads_and_writes::clear_counted(tick_state, grass, sheep_cell, EATEN_COUNT);
     } else {
-        queue_wake_end(tick_state, collision, rule_counts, &header_before, wake_end, None);
+        queue_wake_end(base_types, tick_state, collision, rule_counts, &header_before, wake_end, None);
     }
 }
 
@@ -232,18 +241,18 @@ struct WakeEnd {
 /// Queues `wake_end` for the sheep `sheep_header`: dead of old age, or its state
 /// written if it changed, its step taken and its lamb born. A death
 /// is counted on `meal_cell`, if it ate ([`count`]).
-fn queue_wake_end(tick_state: &mut SimulationTickState, collision: &Collision, rule_counts: &mut RuleCounts, sheep_header: &Header, wake_end: WakeEnd, meal_cell: Option<CellIndex>) {
+fn queue_wake_end(base_types: &BaseTypes, tick_state: &mut SimulationTickState, collision: &Collision, rule_counts: &mut RuleCounts, sheep_header: &Header, wake_end: WakeEnd, meal_cell: Option<CellIndex>) {
     if wake_end.dies_of_age {
         collision.remove(tick_state, sheep_header);
-        return count(tick_state, rule_counts, meal_cell, DEATHS_COUNT);
+        return count(base_types, tick_state, rule_counts, meal_cell, DEATHS_COUNT);
     }
     // Written from where it is worked out, the words that changed alone: nothing of the sheep is copied to be changed.
     if wake_end.state_after != wake_end.state_was {
-        entity_reads_and_writes::set_attribute_of(tick_state, sheep_header, SHEEP_STATE, wake_end.state_seen, wake_end.state_after);
+        entity_reads_and_writes::set_attribute_of(tick_state, sheep_header, base_types.sheep_state, wake_end.state_seen, wake_end.state_after);
     }
     collision.step(tick_state, sheep_header, wake_end.step_cell, wake_end.wake);
     if let Some(lamb_cell) = wake_end.birth_cell {
-        bear_lamb(tick_state, collision, sheep_header, wake_end.state_after, lamb_cell);
+        bear_lamb(base_types, tick_state, collision, sheep_header, wake_end.state_after, lamb_cell);
     }
 }
 
@@ -254,22 +263,23 @@ fn queue_wake_end(tick_state: &mut SimulationTickState, collision: &Collision, r
 /// left it and, within it, one of the lamb's cell being free. So no
 /// lamb is born twice and none is lost, whichever superchunk its
 /// cell is in: the cell taken first, the mother is pregnant still.
-fn bear_lamb(tick_state: &mut SimulationTickState, collision: &Collision, mother_sheep: &Header, mother_state: SheepState, lamb_cell: CellIndex) {
+fn bear_lamb(base_types: &BaseTypes, tick_state: &mut SimulationTickState, collision: &Collision, mother_sheep: &Header, mother_state: SheepState, lamb_cell: CellIndex) {
     let tick_now = tick_and_random_stream::current_tick(tick_state);
     let (wake, lamb_state) = (next_step(tick_state), SheepState { hungry_at: TIME_BETWEEN_MEALS.tick_after(tick_now), grown_at: LAMBHOOD_TIME.tick_after(tick_now), ..SheepState::default() });
     let mother_delivered = SheepState { lamb_due_at: 0, ..mother_state };
-    let mut mother_as_left = compare_and_write::open_compare(tick_state, compare_and_write::attribute(mother_sheep, SHEEP_STATE, Some(mother_state)));
-    let mut lamb_made = collision.begin_making_entity(&mut mother_as_left, SHEEP, lamb_cell, wake, &WholeAttribute::holding_value(SHEEP_STATE, lamb_state));
-    entity_reads_and_writes::set_attribute_of(&mut lamb_made, mother_sheep, SHEEP_STATE, Some(mother_state), mother_delivered);
-    compare_and_write::count(&mut lamb_made, compare_and_write::attribute(mother_sheep, SHEEP_STATE, Some(mother_delivered)), BIRTHS_COUNT);
+    let sheep_state = base_types.sheep_state;
+    let mut mother_as_left = compare_and_write::open_compare(tick_state, compare_and_write::attribute(mother_sheep, sheep_state, Some(mother_state)));
+    let mut lamb_made = collision.begin_making_entity(&mut mother_as_left, base_types.sheep, lamb_cell, wake, &WholeAttribute::holding_value(sheep_state, lamb_state));
+    entity_reads_and_writes::set_attribute_of(&mut lamb_made, mother_sheep, sheep_state, Some(mother_state), mother_delivered);
+    compare_and_write::count(&mut lamb_made, compare_and_write::attribute(mother_sheep, sheep_state, Some(mother_delivered)), BIRTHS_COUNT);
 }
 
 /// Counts one at `place` for the wake of a sheep: if it is `meal_cell`, on
 /// the cell given, as it is applied, the grass there still -- what it
 /// did then happens with the meal or not at all -- else here.
-fn count(tick_state: &mut SimulationTickState, rule_counts: &mut RuleCounts, meal_cell: Option<CellIndex>, place: usize) {
+fn count(base_types: &BaseTypes, tick_state: &mut SimulationTickState, rule_counts: &mut RuleCounts, meal_cell: Option<CellIndex>, place: usize) {
     match meal_cell {
-        Some(grass_cell) => compare_and_write::count(tick_state, compare_and_write::layer_holds(GRASS, grass_cell), place),
+        Some(grass_cell) => compare_and_write::count(tick_state, compare_and_write::layer_holds(base_types.grass, grass_cell), place),
         None => rule_counts[place] += 1,
     }
 }

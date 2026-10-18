@@ -10,7 +10,8 @@ use crate::entity_manager::saved;
 use crate::simulation::SavedImage;
 use std::path::Path;
 use std::sync::Arc;
-use protocol::type_registry::{FrozenTypes, TypeRegistry};
+use protocol::type_registry::FrozenTypes;
+use protocol::world_types::{self, GameTypes, TYPES_FILE};
 
 /// What a save wrote.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -23,16 +24,14 @@ pub struct SaveWritten {
     pub bytes_written: u64,
 }
 
-/// The types file, in a world's folder: the types it was made with, by
-/// name and ID ([`FrozenTypes::to_text`]).
-pub const TYPES_FILE: &str = "types.csv";
-
-/// The types the world in `folder` was made with, each the one of
-/// `available` its types file names, in its order.
-pub fn read_types(folder: &Path, available: &FrozenTypes) -> Result<FrozenTypes, DiskError> {
+/// The types the world in `folder` was made with, frozen: `game_types`
+/// registered, each given the ID its types file
+/// ([`TYPES_FILE`]) gives its name -- the first step of loading it,
+/// before anything of the world is read.
+pub fn read_types(folder: &Path, game_types: GameTypes) -> Result<FrozenTypes, DiskError> {
     let path = folder.join(TYPES_FILE);
     let types_text = std::fs::read_to_string(&path).map_err(|io_error| DiskError::IoFailed(path.clone(), io_error))?;
-    Ok(TypeRegistry::of_saved_text(available, &types_text).map_err(|what_is_wrong| DiskError::InvalidFile(path, what_is_wrong))?.freeze())
+    world_types::of_a_saved_world(&types_text, game_types).map_err(|what_is_wrong| DiskError::InvalidFile(path, what_is_wrong))
 }
 
 /// Writes `frozen_types` as `folder`'s types file: how many bytes.
@@ -94,9 +93,10 @@ pub fn worlds_in(folder: &Path) -> Vec<String> {
 /// hot when it was saved made hot, before it ticks, those cooling
 /// cooling again and those warming warming again, each to turn when it
 /// was to -- as it was when saved, to the cell and the random number.
-/// Its types are those of `available` its types file names.
-pub fn load_world(folder: &Path, available: &FrozenTypes) -> Result<World, DiskError> {
-    load_keeping(folder, COLD_POOL_BYTES_KEPT, available)
+/// Its types are `game_types`, frozen first as its types file says
+/// ([`read_types`]).
+pub fn load_world(folder: &Path, game_types: GameTypes) -> Result<World, DiskError> {
+    load_keeping(folder, COLD_POOL_BYTES_KEPT, game_types)
 }
 
 /// [`load_world`], the world keeping `bytes_kept` bytes of its cold
@@ -104,9 +104,9 @@ pub fn load_world(folder: &Path, available: &FrozenTypes) -> Result<World, DiskE
 /// and those past that many bytes are left in `folder`, read again
 /// when wanted -- so the save is not to be removed while the world
 /// runs.
-pub fn load_keeping(folder: &Path, bytes_kept: u64, available: &FrozenTypes) -> Result<World, DiskError> {
-    // Its types are those it was made with, as initialization registers them.
-    let frozen_types = Arc::new(read_types(folder, available)?);
+pub fn load_keeping(folder: &Path, bytes_kept: u64, game_types: GameTypes) -> Result<World, DiskError> {
+    // Its types first: those it was made with, each of the ID it was saved with.
+    let frozen_types = Arc::new(read_types(folder, game_types)?);
     let world_info = WorldInfo { layers: frozen_types.layer_types(), ..disk::read_world(folder)? };
     let hot = disk::read_hot(folder)?;
     let mut world = World::empty_world(world_info, None, frozen_types).map_err(|why_not| DiskError::InvalidFile(folder.join(TYPES_FILE), why_not))?;

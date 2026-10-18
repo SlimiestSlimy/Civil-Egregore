@@ -1,8 +1,8 @@
 //! The types a world was made with, as its save holds them
 //! ([`FrozenTypes::to_text`]): each one's name and ID, in the order
-//! registered. Loaded again ([`TypeRegistry::of_saved_text`]), each is
-//! the type registered under its name -- the name joins it to its code
-//! -- its ID checked to be the same.
+//! registered. Read again ([`TypeRegistry::for_saved_world`]), each
+//! name is given its ID back as its type is registered -- the name
+//! joins it to its code.
 
 use super::frozen_types::FrozenTypes;
 use super::registry::TypeRegistry;
@@ -21,28 +21,24 @@ impl FrozenTypes {
 }
 
 impl TypeRegistry {
-    /// The types `types_text` names ([`FrozenTypes::to_text`]), in its
-    /// order, each the one of `available` of its name, registered and
-    /// checked as any type is; or what is wrong, naming the type: none
-    /// of its name, or one of another ID.
-    pub fn of_saved_text(available: &FrozenTypes, types_text: &str) -> Result<Self, String> {
+    /// The registry of the world whose types `types_text` names
+    /// ([`FrozenTypes::to_text`]): each name given its ID as its type is
+    /// registered ([`TypeRegistry::of_saved_ids`]); or what is wrong
+    /// with the text.
+    pub fn for_saved_world(types_text: &str) -> Result<Self, String> {
         let mut csv_rows = csv::rows_with_header(types_text).into_iter();
         if csv_rows.next().is_none_or(|first_row| first_row != TYPES_COLUMNS) {
             return Err(format!("does not start with `{}`", TYPES_COLUMNS.join(",")));
         }
-        let mut type_registry = Self::default();
-        for csv_row in csv_rows {
-            let wrong_row = || format!("`{}` is not a type's name and its ID in hexadecimal", csv_row.join(","));
-            let [type_name, type_id] = &csv_row[..] else {
-                return Err(wrong_row());
-            };
-            let (type_name, saved_id) = (type_name.trim(), u64::from_str_radix(type_id.trim(), 16).map_err(|_| wrong_row())?);
-            let registered = available.named(type_name).ok_or_else(|| format!("the type `{type_name}` was saved, none of its name is registered"))?;
-            if registered.type_id() != saved_id {
-                return Err(format!("the type `{type_name}` was saved as {saved_id:016x}, is {:016x}", registered.type_id()));
-            }
-            type_registry.register(available.registration_of(registered)).map_err(|refusal| format!("the type `{type_name}`: {refusal:?}"))?;
-        }
-        Ok(type_registry)
+        let saved_ids = csv_rows
+            .map(|csv_row| {
+                let wrong_row = || format!("`{}` is not a type's name and its ID in hexadecimal", csv_row.join(","));
+                let [type_name, type_id] = &csv_row[..] else {
+                    return Err(wrong_row());
+                };
+                Ok((type_name.trim().to_string(), u64::from_str_radix(type_id.trim(), 16).map_err(|_| wrong_row())?))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        Ok(Self::of_saved_ids(saved_ids))
     }
 }

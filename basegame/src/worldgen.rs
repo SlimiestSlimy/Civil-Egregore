@@ -21,8 +21,8 @@ pub use climate::{ClimateNoises, CLIMATE_SALT};
 pub use generated_area::generate_area;
 pub use generation::{has_land_about, seed_with_land, WorldGeneration, WorldGrowth, FLOCK, TREES_SALT};
 
-use server::simulation::simulation_api::{CellArea, LayerType};
-use crate::base_types::{Height, WALL_EAST, WALL_NORTH, WALL_SOUTH, WALL_WEST};
+use server::simulation::simulation_api::CellArea;
+use crate::base_types::{Height, WALL_WAYS};
 use crate::worldgen::lots::{mix_word, GOLDEN_RATIO};
 
 /// The most a cell may be higher than the one beside it and still be
@@ -31,9 +31,6 @@ pub const STEP: Height = 1;
 /// The most a cell may be lower than the one beside it and still be
 /// stepped down to from it: a hop down, further than a step up.
 pub const DROP: Height = 4;
-
-/// The walls' layers, and the neighbour each is towards.
-pub const WALLS: [(LayerType, (i32, i32)); 4] = [(WALL_EAST, (1, 0)), (WALL_SOUTH, (0, 1)), (WALL_WEST, (-1, 0)), (WALL_NORTH, (0, -1))];
 
 /// How the heights are shaped: the land as a mesh ([`mesh`]) --
 /// vertices that carry heights, each ocean, at the lowest ground, or
@@ -191,7 +188,7 @@ pub const fn wall(from_height: Height, to_height: Height) -> bool {
 }
 
 /// An area's terrain: its heights, and its walls -- for each of the
-/// four ways ([`WALLS`]), the cells that keep one.
+/// four ways ([`WALL_WAYS`]), the cells that keep one.
 pub struct Terrain {
     /// The area.
     pub area: CellArea,
@@ -236,7 +233,7 @@ impl Terrain {
             for x in 0..side_cells {
                 let (height_here, cell) = (grid_height_cartesian(x, y), (y * side_cells + x) as usize);
                 heights.push(height_here);
-                for (way_walls, &(_, (dx, dy))) in walls.iter_mut().zip(&WALLS) {
+                for (way_walls, &(dx, dy)) in walls.iter_mut().zip(&WALL_WAYS) {
                     if wall(height_here, grid_height_cartesian(x + dx, y + dy)) {
                         way_walls[cell / 64] |= 1 << (cell % 64);
                     }
@@ -252,7 +249,7 @@ impl Terrain {
     }
 
     /// Whether the cell `x` across and `y` down from the area's top left
-    /// keeps a wall the `way`-th way of [`WALLS`].
+    /// keeps a wall the `way`-th way of [`WALL_WAYS`].
     pub fn keeps_wall(&self, way: usize, x: u32, y: u32) -> bool {
         let cell = (y * self.area.side_cells + x) as usize;
         self.walls[way][cell / 64] >> (cell % 64) & 1 == 1

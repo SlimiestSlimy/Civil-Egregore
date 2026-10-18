@@ -6,7 +6,7 @@ use crate::params::{FOLDER, FORCED_HOT, SIDE, THREADS, TICKS};
 use crate::HaloChange;
 use crate::chunk_storage::disk;
 use protocol::server_parameters::CleanServerParameters;
-use protocol::type_registry::FrozenTypes;
+use protocol::world_types::{self, GameTypes};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -27,11 +27,12 @@ fn count_of(command_parameters: &CleanServerParameters, parameter_name: &str, de
     command_parameters.integer(parameter_name).map_or(Ok(default_count), |given_count| u64::try_from(given_count).map_err(|_| format!("--{parameter_name} {given_count}: a count is never below 0")))
 }
 
-/// Makes a world of `frozen_types` from `seed` and saves it in the
+/// Makes a world of `game_types` from `seed` -- its types registered
+/// and frozen first, each given the next ID -- and saves it in the
 /// folder, as the command's parameters say: its side, whether forced
 /// hot, and threads; generated as its generation has it unless told
 /// otherwise (`docs/reference.md`, "commands.rs").
-pub fn new(seed: u64, command_parameters: &CleanServerParameters, frozen_types: &Arc<FrozenTypes>) -> Result<String, String> {
+pub fn new(seed: u64, command_parameters: &CleanServerParameters, game_types: GameTypes) -> Result<String, String> {
     let folder = folder_of(command_parameters);
     let folder = folder.as_path();
     if folder.join(disk::WORLD_FILE).exists() {
@@ -40,18 +41,19 @@ pub fn new(seed: u64, command_parameters: &CleanServerParameters, frozen_types: 
     let forced_hot = command_parameters.nested(FORCED_HOT).is_some();
     let world_size = crate::WorldSize::of_side(count_of(command_parameters, SIDE, 0)? as u32, forced_hot)?;
     let thread_count = Some(count_of(command_parameters, THREADS, 0)? as usize).filter(|&asked_threads| asked_threads > 0);
-    let mut made_world = crate::start_world(crate::WorldStart { seed, world_size, thread_count, ..crate::WorldStart::default() }, frozen_types);
+    let frozen_types = Arc::new(world_types::of_a_new_world(game_types)?);
+    let mut made_world = crate::start_world(crate::WorldStart { seed, world_size, thread_count, ..crate::WorldStart::default() }, &frozen_types);
     let save_written = crate::save(folder, &mut made_world).map_err(|save_error| save_error.to_string())?;
     Ok(format!("{}, seed {}: {} superchunks, {} entities, {} bytes in {}", world_name_of(folder), utilities::seed::seed_as_hex(seed), save_written.superchunks, save_written.entities_written, save_written.bytes_written, folder.display()))
 }
 
-/// Loads the world in the folder, its types among `available`, ticks
-/// it, and saves it.
-pub fn run_saved_world(command_parameters: &CleanServerParameters, available: &FrozenTypes) -> Result<String, String> {
+/// Loads the world in the folder, its types `game_types` as it saved
+/// them, ticks it, and saves it.
+pub fn run_saved_world(command_parameters: &CleanServerParameters, game_types: GameTypes) -> Result<String, String> {
     let folder = folder_of(command_parameters);
     let folder = folder.as_path();
     let ticks = count_of(command_parameters, TICKS, 10_000)?;
-    let mut loaded_world = crate::load_world(folder, available).map_err(|load_error| load_error.to_string())?;
+    let mut loaded_world = crate::load_world(folder, game_types).map_err(|load_error| load_error.to_string())?;
     let ticking_began = Instant::now();
     let mut halos = HaloChange::default();
     for _ in 0..ticks {
