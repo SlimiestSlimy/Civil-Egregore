@@ -8,7 +8,8 @@
 use super::frozen_type_registry::FrozenTypeRegistry;
 use super::registered_type::RegisteredType;
 use super::registration::{Declared, Hook, Library, Registration};
-use super::type_ids::{numbers_taken, AttributeType, EntityRuleType, EntityType, LayerType, ScaRuleType, WorldgenType};
+use super::registered_type::Drawn;
+use super::type_ids::{numbers_taken, AttributeType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
 
 /// Why a type was refused.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,6 +24,8 @@ pub enum RegistryRefusal {
     DependencyAmiss,
     /// The world's save gave its name an ID of another kind or size.
     SavedAsAnother,
+    /// The window it is nested in is no window registered before it.
+    ParentAmiss,
 }
 
 /// The types being registered, as a world starts: none until
@@ -141,6 +144,24 @@ impl TypeRegistry {
                 _ => return Err(RegistryRefusal::MasterAmiss),
             },
             Declared::Worldgen => RegisteredType::Worldgen { name, worldgen: WorldgenType::from_number(number) },
+            Declared::RenderRule { master } => {
+                let master = match registered_named(master) {
+                    Some(RegisteredType::Layer { layer_type, .. } | RegisteredType::WidePlane { layer_type, .. }) => Drawn::Plane(*layer_type),
+                    Some(RegisteredType::Entity { entity_type, .. }) => Drawn::Entity(*entity_type),
+                    _ => return Err(RegistryRefusal::MasterAmiss),
+                };
+                RegisteredType::RenderRule { name, rule: RenderRuleType::from_number(number), master }
+            }
+            Declared::Gui { parent } => {
+                let parent = match parent {
+                    None => None,
+                    Some(parent_name) => match registered_named(parent_name) {
+                        Some(RegisteredType::Gui { gui, .. }) => Some(*gui),
+                        _ => return Err(RegistryRefusal::ParentAmiss),
+                    },
+                };
+                RegisteredType::Gui { name, gui: GuiType::from_number(number), parent }
+            }
         })
     }
 }

@@ -2,7 +2,16 @@
 //! runs it, if anything does, is its library, hooked in by its
 //! registration (`super::Hook`).
 
-use super::type_ids::{numbers_taken, AttributeType, EntityRuleType, EntityType, LayerType, ScaRuleType, WorldgenType};
+use super::type_ids::{numbers_taken, AttributeType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
+
+/// What a rule of the renderer draws: a plane, or a type of entity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Drawn {
+    /// A layer or a wide plane.
+    Plane(LayerType),
+    /// A type of entity.
+    Entity(EntityType),
+}
 
 /// A type a world has: its name, and what goes with it by its kind.
 #[derive(Clone, Debug)]
@@ -69,13 +78,32 @@ pub enum RegisteredType {
         /// Its ID.
         worldgen: WorldgenType,
     },
+    /// A rule of the renderer, and the one plane or type of entity it
+    /// draws.
+    RenderRule {
+        /// Its name.
+        name: String,
+        /// Its ID.
+        rule: RenderRuleType,
+        /// Its master.
+        master: Drawn,
+    },
+    /// A window of the client's, and the window it is nested in, if any.
+    Gui {
+        /// Its name.
+        name: String,
+        /// Its ID.
+        gui: GuiType,
+        /// Its parent.
+        parent: Option<GuiType>,
+    },
 }
 
 impl RegisteredType {
     /// Its name.
     pub fn name(&self) -> &str {
         match self {
-            Self::Layer { name, .. } | Self::WidePlane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } | Self::Worldgen { name, .. } => name,
+            Self::Layer { name, .. } | Self::WidePlane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } | Self::Worldgen { name, .. } | Self::RenderRule { name, .. } | Self::Gui { name, .. } => name,
         }
     }
 
@@ -112,10 +140,13 @@ impl RegisteredType {
             Self::ScaRule { rule, .. } => rule.0,
             Self::EntityRule { rule, .. } => rule.0,
             Self::Worldgen { worldgen, .. } => worldgen.0,
+            Self::RenderRule { rule, .. } => rule.0,
+            Self::Gui { gui, .. } => gui.0,
         }
     }
 
-    /// Whether it is a rule, of the cells or of an entity.
+    /// Whether it is a rule the simulation ticks, of the cells or of an
+    /// entity: not one of the renderer's.
     pub fn is_a_rule(&self) -> bool {
         matches!(self, Self::ScaRule { .. } | Self::EntityRule { .. })
     }
