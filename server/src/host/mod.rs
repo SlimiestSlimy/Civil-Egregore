@@ -46,7 +46,6 @@ pub enum HostSent {
 
 /// What a client asks of the host, sent to its thread by a [`Host`]'s
 /// calls.
-#[derive(Clone, Debug)]
 enum HostRequest {
     /// Some of the viewport's superchunks: answered with a [`Frame`] --
     /// unless no world runs, when nothing is.
@@ -63,6 +62,9 @@ enum HostRequest {
     /// run: hot in its halos, as it was saved. Refused, the world run
     /// goes on (the next frame's [`Frame::said`]).
     OpenWorld(String),
+    /// Run this world, started already, in place of any run, of no name:
+    /// what a headless server runs from its start.
+    RunWorld(Box<crate::World>),
     /// Save the world run under this name in the worlds' folder, its
     /// name from then ([`Frame::named`]).
     Save(String),
@@ -128,6 +130,12 @@ impl Host {
     /// run goes on (the next frame's [`Frame::said`]).
     pub fn open_world(&self, world_name: String) -> bool {
         self.request_sender.send(HostRequest::OpenWorld(world_name)).is_ok()
+    }
+
+    /// Runs `world`, started already ([`crate::start_world`]), in place of
+    /// any run, of no name.
+    pub fn run_world(&self, world: crate::World) -> bool {
+        self.request_sender.send(HostRequest::RunWorld(Box::new(world))).is_ok()
     }
 
     /// Saves the world run under `world_name` in the worlds' folder, its name

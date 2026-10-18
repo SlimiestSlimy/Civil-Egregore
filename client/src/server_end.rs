@@ -1,6 +1,7 @@
 //! The server, as the client holds it: the client's own program run
-//! again with `--pipe`, a process of its own, told and asked over its
-//! stdin and answering on its stdout (`protocol::pipe::messages`).
+//! again with `--close_if_no_clients`, a process of its own, connected to
+//! over a socket on this machine at the port it says as it starts --
+//! told, asked and answering in the messages of `protocol::pipe::messages`.
 //! Frames come as the server sends them; every other answer comes in
 //! the order asked, and goes to whoever asked.
 
@@ -8,8 +9,9 @@ use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use protocol::pipe::terrain::{AsksTerrain, Height, HeightsAsk, MapAnswer, MapAsk};
 use std::collections::VecDeque;
-use std::io::BufReader;
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::io::{BufRead, BufReader};
+use std::net::TcpStream;
+use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -38,27 +40,29 @@ pub enum Shown {
 /// Where the server is told and asked: cloned for each thread that asks.
 #[derive(Clone)]
 pub struct ServerLink {
-    /// The server's stdin, and who waits for an answer: one lock for
-    /// both, so the order they wait in is the order the server reads in.
+    /// The connection to the server, and who waits for an answer: one
+    /// lock for both, so the order they wait in is the order the server
+    /// reads in.
     writing: Arc<Mutex<Writing>>,
 }
 
 /// What telling and asking the server goes through.
 struct Writing {
-    /// The server's stdin.
-    to_server: ChildStdin,
+    /// The connection to the server, as written to.
+    to_server: TcpStream,
     /// Who waits for an answer, in the order asked.
     answers_awaited: VecDeque<Sender<ServerMessage>>,
 }
 
 impl ServerEnd {
-    /// Starts the server: this program again, with `--pipe`. What it
-    /// shows -- each world's types, and its frames -- comes back on the
-    /// receiver.
+    /// Starts the server: this program again, with `--close_if_no_clients`,
+    /// connected to at the address it says. What it shows -- each world's
+    /// types, and its frames -- comes back on the receiver.
     pub fn start() -> (Self, Receiver<Shown>) {
         let program = std::env::current_exe().expect("the program's own path");
-        let mut server_process = Command::new(program).arg("--pipe").stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().expect("the server started");
-        let (to_server, from_server) = (server_process.stdin.take().expect("the server's stdin"), server_process.stdout.take().expect("the server's stdout"));
+        let mut server_process = Command::new(program).arg("--close_if_no_clients").stdin(Stdio::null()).stdout(Stdio::piped()).spawn().expect("the server started");
+        let to_server = connect_to(&mut server_process);
+        let from_server = to_server.try_clone().expect("the connection, to read from");
         let link = ServerLink { writing: Arc::new(Mutex::new(Writing { to_server, answers_awaited: VecDeque::new() })) };
         let (frame_sender, frame_receiver) = channel();
         let reading_link = link.clone();
@@ -91,9 +95,25 @@ impl ServerEnd {
     }
 }
 
+/// The connection to `server_process`, at the address the line it says
+/// as it starts listening names (`listening on 127.0.0.1:<port>`).
+fn connect_to(server_process: &mut Child) -> TcpStream {
+    let mut said = BufReader::new(server_process.stdout.take().expect("the server's stdout"));
+    let mut said_line = String::new();
+    while said.read_line(&mut said_line).expect("the server's stdout") > 0 {
+        if let Some(address) = said_line.trim().strip_prefix("listening on ") {
+            let to_server = TcpStream::connect(address).expect("connected to the server");
+            _ = to_server.set_nodelay(true);
+            return to_server;
+        }
+        said_line.clear();
+    }
+    panic!("the server ended before it said where it listens")
+}
+
 impl Drop for ServerEnd {
     fn drop(&mut self) {
-        // Its stdin is held by every link still about: ended outright.
+        // Its connection is held by every link still about: ended outright.
         _ = self.server_process.kill();
         _ = self.server_process.wait();
     }

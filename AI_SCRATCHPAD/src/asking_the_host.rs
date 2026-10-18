@@ -9,7 +9,7 @@ use protocol::pipe::frame::{FrameAsk, ViewportFrame, Viewport};
 use protocol::type_registry::LayerType;
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use server::host::Host;
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration;
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_LOADS, SEED, SIDE, WORLDGEN};
@@ -63,7 +63,7 @@ pub enum ProbedServer {
     /// A host on a thread of this process.
     InProcess(Host),
     /// A server over the pipe: its process, and its stdin.
-    OverPipe(Child, ChildStdin),
+    OverPipe(Child, std::net::TcpStream),
 }
 
 impl ProbedServer {
@@ -85,12 +85,17 @@ impl ProbedServer {
             });
             return (Self::InProcess(host), frame_receiver);
         }
-        let mut server_process = Command::new(program).arg("--pipe").stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().expect("the server started");
-        let (to_server, mut from_server) = (server_process.stdin.take().expect("its stdin"), std::io::BufReader::new(server_process.stdout.take().expect("its stdout")));
+        let mut server_process = Command::new(program).arg("--close_if_no_clients").stdin(Stdio::null()).stdout(Stdio::piped()).spawn().expect("the server started");
+        let said = std::io::BufRead::lines(std::io::BufReader::new(server_process.stdout.take().expect("its stdout")));
+        let address = said.map_while(Result::ok).find_map(|line| line.strip_prefix("listening on ").map(str::to_string)).expect("where it listens");
+        let to_server = std::net::TcpStream::connect(address).expect("connected");
+        let mut from_server = std::io::BufReader::new(to_server.try_clone().expect("to read from"));
         let (frame_sender, frame_receiver) = channel();
         std::thread::spawn(move || {
-            while let Ok(Some(ServerMessage::Frame(frame))) = receive::<ServerMessage>(&mut from_server) {
-                if frame_sender.send(*frame).is_err() {
+            while let Ok(Some(message)) = receive::<ServerMessage>(&mut from_server) {
+                if let ServerMessage::Frame(frame) = message
+                    && frame_sender.send(*frame).is_err()
+                {
                     return;
                 }
             }

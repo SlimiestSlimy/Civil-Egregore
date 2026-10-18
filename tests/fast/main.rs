@@ -20,7 +20,7 @@ mod grass;
 mod halos;
 mod host;
 mod paging;
-mod pipe;
+mod client_connection;
 mod sheep;
 mod trees;
 mod walking;

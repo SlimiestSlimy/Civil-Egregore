@@ -227,13 +227,27 @@ NOW
   (loopback). Mine, agreed in the asking: TCP over std::net, the wire
   framing and messages as they are; a client joining late gets the
   running world's frozen type registry first.
+  Then (2026-10-18): "port number will be 11235" (protocol::pipe::
+  SERVER_PORT, "i like my fibonaccis"); "make the flag on the server be
+  like "--close if no clients" we have like a 30 second timeout for
+  clients to connect if that flag its active, otherwise it just stays
+  open" (DONE: --close_if_no_clients, client_connection::CLIENT_WAIT);
+  "a headless server with no commands specified should only print help
+  string, and exit lol. if renderer is compiled in and no cli args, we
+  obviously open the renderer lol" (DONE); "the client uses the same
+  flags and parameters to start a server lol. thats the idea at least"
+  -- NOT YET: the window starts its server with --close_if_no_clients
+  alone and makes worlds over the connection from its sliders; with the
+  client rewrite and the tuning decoupling, it starts its server with
+  the world's flags (--seed, --side, --world, worldgen parameters).
 - SERVER FLAGS (the user, 2026-10-18: "remove those commands, were
   going to add more later, we just want to keep the bare minimum
   amount, i believe is seed, size and pipe flags"; "one more flag to
   keep its --world to idicate world path"): --seed, --side, --world,
-  --pipe. --new/--run/--info/--threads/--ticks/--forced_hot gone; only
-  --pipe runs anything yet (OPEN: what --seed/--side/--world do without
-  it). Then COUPLINGS LEFT; then render rules on
+  --pipe (now --close_if_no_clients, see CLIENT-SERVER COMMS).
+  --new/--run/--info/--threads/--ticks/--forced_hot gone. A server runs
+  the world --seed/--side/--world say from its start, if any is given;
+  else none until a client makes or opens one. Then COUPLINGS LEFT; then render rules on
   types and the client rewrite.
 - NO GAME CONTENT OUTSIDE THE TYPE REGISTRY (the user, 2026-10-17,
   verbatim): "NO GAME CONTENT ON SERVER CLIENT OR PROTOCOL, TYPE

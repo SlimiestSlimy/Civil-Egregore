@@ -6,3 +6,7 @@
 pub mod frame;
 pub mod messages;
 pub mod terrain;
+
+/// The port a server listens on for its client, on this machine: one
+/// server a machine at a time.
+pub const SERVER_PORT: u16 = 11235;
