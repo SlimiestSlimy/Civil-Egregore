@@ -1,8 +1,0 @@
-[package]
-name = "sca_rules"
-edition = "2024"
-description = "Civil Egregore's rules of the cells, a stochastic cell automaton (SCA), a file each: so far grass spreading over dirt"
-
-[dependencies]
-simulation = { path = "../../simulation" }
-base_types = { path = "../base_types" }

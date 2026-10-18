@@ -5,16 +5,16 @@
 //!
 //! `cargo test`
 
-use base_types::GRASS;
+use basegame::base_types::GRASS;
 use utilities::coordinates::{SuperchunkIndex, WORLD_MIDDLE};
-use bitplane_manager::{Write, WriteOp};
-use entity_manager::{AttributeBlock, EntityType, Header, NEVER_WAKES};
+use server::bitplane_manager::{Write, WriteOp};
+use server::entity_manager::{AttributeBlock, EntityType, Header, NEVER_WAKES};
 use protocol::pipe::frame::Viewport;
 use server::{halos_about, HaloChange, World, COOL_TICKS, WARM_TICKS};
 
 /// The superchunks holding a hot entity.
 fn hot_entities(world: &World) -> Vec<SuperchunkIndex> {
-    let hot_entity = simulation::hot_entity_of(world.frozen_types()).expect("a type keeps the world hot");
+    let hot_entity = server::simulation::hot_entity_of(world.frozen_types()).expect("a type keeps the world hot");
     world.entity_store().superchunks().iter().filter(|superchunk| superchunk.iter().any(|entity| entity.header.entity_type == hot_entity)).map(|superchunk| superchunk.superchunk_index()).collect()
 }
 
@@ -25,7 +25,7 @@ fn hot_entities(world: &World) -> Vec<SuperchunkIndex> {
 /// never both; and the world has grown.
 #[test]
 fn the_hot_superchunks_are_the_halos() {
-    let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
+    let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     let mut world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
     assert_eq!(world.bitmap_arena().superchunk_indices(), halos_about([WORLD_MIDDLE].into_iter()), "the origin's halo");
     let mut halos_moved = HaloChange::default();
@@ -59,7 +59,7 @@ fn the_hot_superchunks_are_the_halos() {
 /// it is due -- still wanted or not -- and then both hold.
 #[test]
 fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
-    let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
+    let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     let mut world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 4_000);
     let try_both = |world: &mut World, cell| {
         let missed = world.write_cells(GRASS, [Write::cell(cell, WriteOp::FlipCell)]).missed;
@@ -85,7 +85,7 @@ fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
 /// again, cooling across a save and a load, it goes cold when due.
 #[test]
 fn a_superchunk_cooling_stays_hot_until_due() {
-    let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
+    let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     let mut world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 1);
     let halo = world.bitmap_arena().superchunk_indices();
     let lone_sheep = world.entity_store().iter().map(|entity| (entity.header, entity.attributes.to_vec())).next().expect("the sheep");
@@ -111,7 +111,7 @@ fn a_superchunk_cooling_stays_hot_until_due() {
     let second_due_tick = world.entity_store().current_tick() + COOL_TICKS;
     let folder = crate::worlds::folder("cooling");
     server::save(&folder, &mut world).expect("saved");
-    world = server::load_world(&folder).expect("loaded");
+    world = server::load_world(&folder, &crate::worlds::types()).expect("loaded");
     assert!(cooling(&world) == halo && world.cooling().all(|(_, goes_cold_tick)| goes_cold_tick == second_due_tick), "cooling as it was");
     let mut cooled_count = 0;
     while world.entity_store().current_tick() < second_due_tick {
@@ -127,7 +127,7 @@ fn a_superchunk_cooling_stays_hot_until_due() {
 /// lingering are kept; once flushed and let go, so decoded from its images.
 #[test]
 fn a_superchunk_gone_cold_comes_back_as_it_was() {
-    let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
+    let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     let mut world = crate::worlds::one_flock_world(server::WorldStart { seed, ..server::WorldStart::default() }, 2_000);
     // 500 ticks, and on to one with nothing warming or cooling: made cold and hot again by hand, one warming would not turn hot when it was due.
     while world.entity_store().current_tick() < 500 || world.warming().next().is_some() || world.cooling().next().is_some() {
@@ -192,10 +192,10 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
 /// sheep at all, and stays so, saved and loaded.
 #[test]
 fn a_world_of_a_size_is_hot_within_it_only() {
-    let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
+    let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     let side_superchunks = 4;
     let world_size = server::WorldSize::SquareOfSide { side_superchunks, forced_hot: false };
-    let mut world = server::start_world(server::WorldStart { seed, world_size, world_generation: crate::worlds::flocked(500), ..server::WorldStart::default() });
+    let mut world = crate::worlds::start_world(server::WorldStart { seed, world_size, generation_numbers: crate::worlds::flocked(500), ..server::WorldStart::default() });
     while world.bitmap_arena().superchunk_indices().len() < (side_superchunks * side_superchunks) as usize || !world.unpopulated().is_empty() {
         assert!(world.entity_store().current_tick() < 8 * WARM_TICKS, "the square hot and populated, flock by flock");
         world.tick();
@@ -211,14 +211,14 @@ fn a_world_of_a_size_is_hot_within_it_only() {
     }
     let folder = crate::worlds::folder("sized");
     server::save(&folder, &mut world).expect("saved");
-    assert_eq!(server::load_world(&folder).expect("loaded").halos().hot, world.halos().hot, "its size, kept");
+    assert_eq!(server::load_world(&folder, &crate::worlds::types()).expect("loaded").halos().hot, world.halos().hot, "its size, kept");
 
     let forced_size = server::WorldSize::SquareOfSide { side_superchunks, forced_hot: true };
-    let mut world = server::start_world(server::WorldStart { seed, world_size: forced_size, world_generation: crate::worlds::flocked(0), ..server::WorldStart::default() });
+    let mut world = crate::worlds::start_world(server::WorldStart { seed, world_size: forced_size, generation_numbers: crate::worlds::flocked(0), ..server::WorldStart::default() });
     assert_eq!(world.bitmap_arena().superchunk_indices().len(), (side_superchunks * side_superchunks) as usize, "forced hot: all of it, no sheep needed");
     _ = std::fs::remove_dir_all(&folder);
     server::save(&folder, &mut world).expect("saved");
-    let mut loaded_world = server::load_world(&folder).expect("loaded");
+    let mut loaded_world = server::load_world(&folder, &crate::worlds::types()).expect("loaded");
     assert_eq!(loaded_world.halos().hot, world.halos().hot, "forced, kept");
     for _ in 0..=WARM_TICKS {
         loaded_world.tick();
@@ -236,8 +236,8 @@ fn a_world_of_a_size_is_hot_within_it_only() {
 /// No sheep: on a world with no end, flocks would spread it for good.
 #[test]
 fn the_camera_loads_the_superchunks_of_the_viewport() {
-    let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
-    let mut world = server::start_world(server::WorldStart { seed, world_generation: crate::worlds::flocked(0), camera_loads: true, ..server::WorldStart::default() });
+    let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
+    let mut world = crate::worlds::start_world(server::WorldStart { seed, generation_numbers: crate::worlds::flocked(0), camera_loads: true, ..server::WorldStart::default() });
     assert!(world.world_info().camera_loads);
     let (x, y) = WORLD_MIDDLE.cartesian();
     world.keep_viewport(Some(Viewport { top_left_superchunk_cartesian: (x - 50, y - 50), bottom_right_superchunk_cartesian: (x + 50, y + 50) }));
@@ -254,13 +254,13 @@ fn the_camera_loads_the_superchunks_of_the_viewport() {
     assert!(viewport.iter().all(|superchunk| world.unpopulated().contains(&superchunk.0)), "generated, and unpopulated until its first tick hot");
     let folder = crate::worlds::folder("camera");
     server::save(&folder, &mut world).expect("saved");
-    let loaded_world = server::load_world(&folder).expect("loaded");
+    let loaded_world = server::load_world(&folder, &crate::worlds::types()).expect("loaded");
     assert!(loaded_world.world_info().camera_loads, "that its camera loads, kept");
     assert_eq!(loaded_world.unpopulated(), world.unpopulated(), "those unpopulated, kept");
     world.tick();
     assert!(viewport.iter().all(|superchunk| !world.unpopulated().contains(&superchunk.0)), "populated on its first tick hot");
 
-    let mut unseen_world = server::start_world(server::WorldStart { seed, world_generation: crate::worlds::flocked(0), ..server::WorldStart::default() });
+    let mut unseen_world = crate::worlds::start_world(server::WorldStart { seed, generation_numbers: crate::worlds::flocked(0), ..server::WorldStart::default() });
     unseen_world.keep_viewport(Some(Viewport { top_left_superchunk_cartesian: (x + 10, y), bottom_right_superchunk_cartesian: (x + 11, y) }));
     assert!(unseen_world.halos().viewport().is_empty() && !unseen_world.world_info().camera_loads, "its camera loads nothing");
 }

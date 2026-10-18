@@ -6,7 +6,9 @@ use crate::host::Host;
 use crate::{worlds_in, WorldStart};
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use protocol::pipe::terrain::AsksTerrain;
+use protocol::type_registry::FrozenTypes;
 use std::io;
+use std::sync::Arc;
 use std::sync::mpsc::channel;
 use std::thread;
 use utilities::wire::{receive, send};
@@ -15,9 +17,11 @@ use utilities::wire::{receive, send};
 /// closes stdin: its asks done by a host of this process's own, the
 /// frames sent as the host makes them, every other ask answered in the
 /// order asked on a thread of its own -- a map takes long, and the
-/// frames go on meanwhile.
-pub fn serve_the_pipe() -> Result<String, String> {
-    let (host, frame_receiver) = Host::start_on_thread();
+/// frames go on meanwhile. Worlds made of `frozen_types`, and opened
+/// among them.
+pub fn serve_the_pipe(frozen_types: Arc<FrozenTypes>) -> Result<String, String> {
+    let worldgen = crate::simulation::worldgen_of(&frozen_types)?;
+    let (host, frame_receiver) = Host::start_on_thread(frozen_types);
     thread::Builder::new()
         .name("frames out".to_string())
         .spawn(move || {
@@ -53,7 +57,7 @@ pub fn serve_the_pipe() -> Result<String, String> {
             ClientMessage::AskFrame(frame_ask) => _ = host.ask_frame(frame_ask),
             ClientMessage::SetPaused(paused) => _ = host.set_paused(paused),
             ClientMessage::SetPace(pace) => _ = host.set_pace(pace),
-            ClientMessage::MakeWorld(seed, tuning) => _ = host.make_world(WorldStart::from_tuning(seed, &tuning)),
+            ClientMessage::MakeWorld(seed, tuning) => _ = host.make_world(WorldStart::from_tuning(seed, &tuning, &worldgen)),
             ClientMessage::OpenWorld(world_name) => _ = host.open_world(world_name),
             ClientMessage::Save(world_name) => _ = host.save_world(world_name),
             ClientMessage::Reset(tuning) => _ = host.reset(&tuning),

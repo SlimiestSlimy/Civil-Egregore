@@ -5,12 +5,12 @@
 //! lost by it.
 
 use crate::worlds::{plain_start, tick_rule};
-use bitplane_manager::Write;
+use server::bitplane_manager::Write;
 use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
-use sca_rules::weather::{deepens_and_thins, BLOWN_COUNT, CARRIED_COUNT, DEEPENED_COUNT, EVENED_COUNT, PUSHED_COUNT, SAMPLED_COUNT, THINNED_COUNT, WHOLE_PARTS};
+use basegame::sca_rules::weather::{deepens_and_thins, BLOWN_COUNT, CARRIED_COUNT, DEEPENED_COUNT, EVENED_COUNT, PUSHED_COUNT, SAMPLED_COUNT, THINNED_COUNT, WHOLE_PARTS};
 use server::World;
-use base_types::{nearer_by_step, passes_a_slope, FALL_THAT_FREES, pressure_falls_by, Climate, Wind, HIGHEST_PRESSURE, HOTTEST_TEMPERATURE, HUMIDITY_A_LEVEL_OF_CLOUD, MOST_HUMID, PRESSURE_AT_REST, PRESSURE_GAP_AT_REST, RISE_THAT_HALVES, STRONGEST_WIND};
-use base_types::{CLIMATE, CLOUD, ELEVATION, WEATHER_TILE_SCALE, WET};
+use basegame::base_types::{nearer_by_step, passes_a_slope, FALL_THAT_FREES, pressure_falls_by, Climate, Wind, HIGHEST_PRESSURE, HOTTEST_TEMPERATURE, HUMIDITY_A_LEVEL_OF_CLOUD, MOST_HUMID, PRESSURE_AT_REST, PRESSURE_GAP_AT_REST, RISE_THAT_HALVES, STRONGEST_WIND};
+use basegame::base_types::{CLIMATE, CLOUD, ELEVATION, WEATHER_TILE_SCALE, WET};
 use utilities::rng::RandomSource;
 
 /// Cells along a tile's side.
@@ -49,7 +49,7 @@ fn over_water(world: &World, (x, y): (u32, u32)) -> bool {
 
 /// A world of land and sea, forced hot, with no sheep.
 fn land_and_sea(seed: u64) -> World {
-    server::start_world(server::WorldStart { seed: server::seed_with_land(seed, &server::WorldGeneration::DEFAULT), world_size: server::WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, world_generation: crate::worlds::flocked(0), ..server::WorldStart::default() })
+    crate::worlds::start_world(server::WorldStart { seed: crate::worlds::seed_with_land(seed, &basegame::worldgen::WorldGeneration::DEFAULT), world_size: server::WorldSize::SquareOfSide { side_superchunks: 2, forced_hot: true }, generation_numbers: crate::worlds::flocked(0), ..server::WorldStart::default() })
 }
 
 /// Every tile of `world` put under `climate`.
@@ -137,11 +137,11 @@ fn the_small_functions_the_air_goes_by() {
         }
         assert_eq!(from_wind.pushed_by(0, 0), from_wind);
         // Pressure leans the way the wind blows: once where it blows no way towards a tile, more the more it blows along the step there.
-        let pressure_leanings = base_types::TILES_ABOUT.map(|step| sca_rules::weather::wind_leans_pressure(from_wind, step));
-        for (way, &(step_across, step_down)) in base_types::TILES_ABOUT.iter().enumerate() {
+        let pressure_leanings = basegame::base_types::TILES_ABOUT.map(|step| basegame::sca_rules::weather::wind_leans_pressure(from_wind, step));
+        for (way, &(step_across, step_down)) in basegame::base_types::TILES_ABOUT.iter().enumerate() {
             let wind_along_step = wind_across * step_across + wind_down * step_down;
-            assert_eq!(pressure_leanings[way], 1 + sca_rules::weather::A_WIND_LEANS_PRESSURE * wind_along_step.max(0) as u32, "{from_wind:?} towards {:?}", base_types::TILES_ABOUT[way]);
-            assert_eq!(sca_rules::weather::wind_leans_pressure(Wind::CALM_AIR, base_types::TILES_ABOUT[way]), 1);
+            assert_eq!(pressure_leanings[way], 1 + basegame::sca_rules::weather::A_WIND_LEANS_PRESSURE * wind_along_step.max(0) as u32, "{from_wind:?} towards {:?}", basegame::base_types::TILES_ABOUT[way]);
+            assert_eq!(basegame::sca_rules::weather::wind_leans_pressure(Wind::CALM_AIR, basegame::base_types::TILES_ABOUT[way]), 1);
         }
         assert!(from_wind == Wind::CALM_AIR || pressure_leanings.iter().max() > pressure_leanings.iter().min(), "{from_wind:?}: some way likelier than another");
     }
@@ -195,12 +195,12 @@ fn a_generated_climate_has_no_catastrophes() {
 fn a_cloud_gathers_to_its_tiles_humidity_and_no_further() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut seeded_random = RandomSource::new(seed);
-    let mut world = server::start_world(server::WorldStart { seed, ..plain_start(4, 0, 0, 2) });
+    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(4, 0, 0, 2) });
     let humidity_cloud_level = 2 + seeded_random.draw_below(6) as u32;
     write_everywhere(&mut world, Climate { humidity: humidity_cloud_level * HUMIDITY_A_LEVEL_OF_CLOUD, wind: Wind::CALM_AIR, temperature: 0, pressure: PRESSURE_AT_REST });
     let (mut clouds_before, mut deepened_total) = (clouds(&world), 0);
     for tick in 0..seeded_random.draw_between(1_500, 2_500) {
-        let tick_counts = tick_rule(&mut world, base_types::RULE_OF_WEATHER.0).rules;
+        let tick_counts = tick_rule(&mut world, basegame::base_types::RULE_OF_WEATHER.0).rules;
         let clouds_after = clouds(&world);
         let cloud_change: i64 = clouds_after.iter().zip(&clouds_before).map(|(&cloud_after, &cloud_before)| i64::from(cloud_after) - i64::from(cloud_before)).sum();
         assert_eq!((cloud_change, tick_counts[THINNED_COUNT], tick_counts[BLOWN_COUNT] + tick_counts[PUSHED_COUNT] + tick_counts[EVENED_COUNT] + tick_counts[CARRIED_COUNT]), (tick_counts[DEEPENED_COUNT] as i64, 0, 0), "tick {tick}");
@@ -220,7 +220,7 @@ fn a_wind_moves_air_and_clouds_and_makes_none() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut seeded_random = RandomSource::new(seed);
     for is_calm in [false, true] {
-        let mut world = server::start_world(server::WorldStart { seed, ..plain_start(4, 0, 0, 2) });
+        let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(4, 0, 0, 2) });
         let side_tiles = tiles_a_side(&world);
         let wind = if is_calm { Wind::CALM_AIR } else { Wind::from_vector(1 + seeded_random.draw_below(STRONGEST_WIND as u64) as i32, seeded_random.draw_between(0, 2 * STRONGEST_WIND as u64 + 1) as i32 - STRONGEST_WIND) };
         write_everywhere(&mut world, Climate { humidity: 0, wind, temperature: 0, pressure: PRESSURE_AT_REST });
@@ -228,7 +228,7 @@ fn a_wind_moves_air_and_clouds_and_makes_none() {
         world.write_cells(CLOUD.layer_type(), cloud_writes);
         let (pressure_began, mut clouds_before, mut moved_totals) = (total_pressure(&world), clouds(&world), [0u64; 3]);
         for tick in 0..seeded_random.draw_between(1_000, 1_500) {
-            let tick_counts = tick_rule(&mut world, base_types::RULE_OF_WEATHER.0).rules;
+            let tick_counts = tick_rule(&mut world, basegame::base_types::RULE_OF_WEATHER.0).rules;
             let clouds_after = clouds(&world);
             let cloud_change: i64 = clouds_after.iter().zip(&clouds_before).map(|(&cloud_after, &cloud_before)| i64::from(cloud_after) - i64::from(cloud_before)).sum();
             // Where the wind has pushed the air out the pressure is under rest, and cloud forms of that alone.
@@ -250,7 +250,7 @@ fn a_wind_moves_air_and_clouds_and_makes_none() {
 fn pressure_falls_to_the_lower_tiles_about_it_and_turns_the_wind() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut seeded_random = RandomSource::new(seed);
-    let mut world = server::start_world(server::WorldStart { seed, ..plain_start(4, 0, 0, 2) });
+    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(4, 0, 0, 2) });
     let side_tiles = tiles_a_side(&world);
     let climate_at_rest = Climate { humidity: 0, wind: Wind::CALM_AIR, temperature: 0, pressure: PRESSURE_AT_REST };
     write_everywhere(&mut world, climate_at_rest);
@@ -258,7 +258,7 @@ fn pressure_falls_to_the_lower_tiles_about_it_and_turns_the_wind() {
     world.write_cells(CLIMATE.layer_type(), vec![Write::value(CLIMATE, tile_at(&world, high_tile), Climate { pressure: pressure_over, ..climate_at_rest }.plane_number())]);
     let (pressure_began, mut evened_total) = (total_pressure(&world), 0);
     for tick in 0..seeded_random.draw_between(6_000, 8_000) {
-        evened_total += tick_rule(&mut world, base_types::RULE_OF_WEATHER.0).rules[EVENED_COUNT];
+        evened_total += tick_rule(&mut world, basegame::base_types::RULE_OF_WEATHER.0).rules[EVENED_COUNT];
         assert_eq!(total_pressure(&world), pressure_began, "tick {tick}: the air is all there");
     }
     let climates_now = climates(&world);
@@ -280,7 +280,7 @@ fn pressure_falls_to_the_lower_tiles_about_it_and_turns_the_wind() {
 fn a_wind_carries_its_climate_down_it() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut seeded_random = RandomSource::new(seed);
-    let mut world = server::start_world(server::WorldStart { seed, ..plain_start(4, 0, 0, 2) });
+    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(4, 0, 0, 2) });
     let side_tiles = tiles_a_side(&world);
     let upwind_climate = Climate { humidity: 128 + seeded_random.draw_below(128) as u32, wind: Wind::from_vector(1 + seeded_random.draw_below(STRONGEST_WIND as u64) as i32, 0), temperature: 128 + seeded_random.draw_below(128) as u32, pressure: PRESSURE_AT_REST };
     let downwind_climate = Climate { humidity: seeded_random.draw_below(128) as u32, wind: Wind::CALM_AIR, temperature: seeded_random.draw_below(128) as u32, pressure: PRESSURE_AT_REST };
@@ -289,7 +289,7 @@ fn a_wind_carries_its_climate_down_it() {
     world.write_cells(CLIMATE.layer_type(), climate_writes);
     let (climates_began, mut carried_total) = (climates(&world), 0);
     for _ in 0..seeded_random.draw_between(4_000, 5_000) {
-        carried_total += tick_rule(&mut world, base_types::RULE_OF_WEATHER.0).rules[CARRIED_COUNT];
+        carried_total += tick_rule(&mut world, basegame::base_types::RULE_OF_WEATHER.0).rules[CARRIED_COUNT];
     }
     let climates_now = climates(&world);
     let mut tiles_come_nearer = 0;

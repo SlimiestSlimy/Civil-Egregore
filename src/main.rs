@@ -1,11 +1,13 @@
 //! Civil Egregore, from the command line: the one program, built with the
-//! client or without it (the `client` feature, on by default). It
-//! hands its command line to the server's flags ([`server::params`]) and
-//! the server ([`server::start`]).
+//! client or without it (the `client` feature, on by default) -- and its
+//! initialization: the base game's types registered and frozen
+//! ([`basegame::default_types`]), handed to the server. It hands its
+//! command line to the server's flags ([`server::params`]) and the
+//! server ([`server::start`]).
 //!
 //! No arguments, built with the client: the window, on its main menu ([`client::run_window`]).
 //! `cargo run --release -- --help`: every flag, and what it takes.
-//! `cargo run --release -- --seed 0x5 --new [folder --sheep 10 --side 4 --forced_hot []]`
+//! `cargo run --release -- --seed 0x5 --new [folder --side 4 --forced_hot []]`
 //! `cargo run --release -- --run [folder --ticks 2000]`
 
 // Every item is documented, private ones included; `cargo clippy`
@@ -56,7 +58,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    match server::start(&clean_parameters) {
+    match server::start(&clean_parameters, basegame::default_types::default_frozen_types()) {
         Ok(said) => {
             // Served over the pipe, nothing is left to say: stdout was the wire.
             if !said.is_empty() {

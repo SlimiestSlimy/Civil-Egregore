@@ -6,12 +6,12 @@
 //! Or, `crossing`, each of a line stepping to that cell and back the
 //! next tick: over the border every tick, with no compare of its own.
 
-use bitplane_manager::{BitmapArena, BucketKey};
-use chunk_storage::{LayerCodec, LayerType};
+use server::bitplane_manager::{BitmapArena, BucketKey};
+use server::chunk_storage::{LayerCodec, LayerType};
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use entity_manager::{Attribute, WorldEntities, EntityType, Header};
-use simulation::simulation_api::{cell_reads_and_writes, compare_and_write, entity_reads_and_writes};
-use simulation::{Compare, Simulation, SimulationTickState};
+use server::entity_manager::{Attribute, WorldEntities, EntityType, Header};
+use server::simulation::simulation_api::{cell_reads_and_writes, compare_and_write, entity_reads_and_writes};
+use server::simulation::{Compare, Simulation, SimulationTickState};
 use crate::ProbeParameters;
 
 /// Superchunks along the world's side.
@@ -60,7 +60,7 @@ fn world(world_side_superchunks: u32, every_so_many_cells: u32, stepping_a_super
         for (line_index, y) in (0..world_side_superchunks * SUPERCHUNK_SIDE_CELLS).step_by(every_so_many_cells as usize).enumerate() {
             // West of the border and east of it by turns, so that each superchunk waits on the other all the way down.
             let x = border_index * SUPERCHUNK_SIDE_CELLS - cells_away - if line_index % 2 == 0 { 1 } else { 3 };
-            entity_store.queue_add(Header { entity_type: WALKER_TYPE, stood_cell: cell(x + if line_index % 2 == 0 { 0 } else { 3 }, y), wake: 0 }, &[entity_manager::AttributeBlock::holding_value(COUNTED_ATTRIBUTE, 0)]);
+            entity_store.queue_add(Header { entity_type: WALKER_TYPE, stood_cell: cell(x + if line_index % 2 == 0 { 0 } else { 3 }, y), wake: 0 }, &[server::entity_manager::AttributeBlock::holding_value(COUNTED_ATTRIBUTE, 0)]);
         }
     }
     for (x, y) in (0..world_side_superchunks).flat_map(|y| (0..world_side_superchunks).map(move |x| (x, y))) {
@@ -106,7 +106,7 @@ pub fn run_probe(given_parameters: &ProbeParameters) -> Result<(), String> {
     let (world_side_superchunks, every_so_many_cells, stepping_a_superchunk, ticks): (u32, u32, u32, u64) = (given_parameters.argument_number(WORLD_SIDE_SUPERCHUNKS)?, given_parameters.argument_number(EVERY_SO_MANY_CELLS)?, given_parameters.argument_number(STEPPING_A_SUPERCHUNK)?, given_parameters.argument_number(TICKS)?);
     println!("lines,threads,acts over a border a tick,applying us a tick,computing us a tick,compares held a tick,compares not a tick");
     let (threads_asked, crossing): (usize, u32) = (given_parameters.argument_number(THREADS_OF_SECOND_RUN)?, given_parameters.argument_number(CROSSING)?);
-    for thread_count in [1, if threads_asked == 0 { simulation::threads_for((world_side_superchunks * world_side_superchunks) as usize) } else { threads_asked }] {
+    for thread_count in [1, if threads_asked == 0 { server::simulation::threads_for((world_side_superchunks * world_side_superchunks) as usize) } else { threads_asked }] {
         for (placement_name, cells_away) in [("away from the border", AWAY_FROM_BORDER), ("over the border", 0)] {
             let (mut bitmap_arena, mut entity_store) = world(world_side_superchunks, every_so_many_cells, stepping_a_superchunk, cells_away);
             let mut timed_simulation = Simulation::new(thread_count);

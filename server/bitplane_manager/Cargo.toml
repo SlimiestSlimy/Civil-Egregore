@@ -1,8 +1,0 @@
-[package]
-name = "bitplane_manager"
-edition = "2024"
-description = "Civil Egregore's hot bitplanes: decoded layers, where cells are read and changed"
-
-[dependencies]
-utilities = { path = "../../utilities" }
-chunk_storage = { path = "../chunk_storage" }

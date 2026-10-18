@@ -2,6 +2,7 @@
 //! superchunk's image a sprite each, and from near one picture of the
 //! viewport's cells (`docs/renderer.md`, "The window asks").
 
+use crate::renderer::hud::COUNTED;
 use crate::renderer::link::{HostLink, LastFrameSeen};
 use crate::renderer::map::MapLink;
 use crate::renderer::mipmaps::{picture_with_mipmaps, MipmapsDue};
@@ -12,6 +13,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use utilities::coordinates::SUPERCHUNK_SIDE_CELLS;
 use protocol::pipe::frame::{FrameAsk, NearRectangle, Viewport};
+use basegame::base_types::{CLIMATE, CLOUD, GRASS, HEIGHT, TREE, TREE_STAGE, WATER_DEPTH, WET};
 
 /// Seconds from one frame asked for to the next, at least: no oftener
 /// than a screen shows them.
@@ -212,11 +214,16 @@ pub fn ask_next_frame(
     };
     // On round the viewport's hot superchunks from the last frame's, or from the first if anything changed.
     let hot = last_seen.last_frame.as_ref().map_or(0, |last_frame| last_frame.hot.len() as u32);
-    let skipped_superchunks = match host_link.last_ask {
+    let skipped_superchunks = match &host_link.last_ask {
         Some(last_ask) if near_wanted.is_none() && last_ask.seen_near.is_none() && last_ask.viewport == viewport && last_ask.pixel_side_log2 == detail_shift && last_ask.superchunks_skipped.saturating_add(last_ask.most_superchunks) < hot => last_ask.superchunks_skipped + last_ask.most_superchunks,
         _ => 0,
     };
-    let next_ask = FrameAsk { viewport, pixel_side_log2: detail_shift, superchunks_skipped: skipped_superchunks, most_superchunks, seen_near: near_wanted };
+    // The planes painted, its trees' stages only where a tree is a cell or more; and what the head-up text counts.
+    let mut planes = vec![GRASS, TREE, WET, CLOUD.layer_type(), CLIMATE.layer_type(), HEIGHT.layer_type(), WATER_DEPTH.layer_type()];
+    if near_wanted.is_some() || detail_shift == 0 {
+        planes.push(TREE_STAGE.layer_type());
+    }
+    let next_ask = FrameAsk { viewport, pixel_side_log2: detail_shift, superchunks_skipped: skipped_superchunks, most_superchunks, seen_near: near_wanted, planes, counted: COUNTED.to_vec() };
     (last_seen.viewport_superchunks, last_seen.detail_shift, last_seen.near_pixels) = (viewport_superchunks, detail_shift, near_wanted.map_or(0, |asked_near| asked_near.pixels_a_cell));
     // Fine images of superchunks gone out of the viewport are dropped, each 4 MiB here and as much on the graphics card; and every one out of it, once there are very many.
     let too_many_kept = superchunk_sprites.tiles.len() > TILES_KEPT;
@@ -228,6 +235,6 @@ pub fn ask_next_frame(
         }
         is_kept
     });
-    host_link.awaiting_frame = host_link.server().ask_frame(next_ask);
+    host_link.awaiting_frame = host_link.server().ask_frame(next_ask.clone());
     (host_link.last_ask, host_link.seconds_since_asked) = (Some(next_ask), 0.0);
 }

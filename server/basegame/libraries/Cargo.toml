@@ -1,8 +1,0 @@
-[package]
-name = "libraries"
-edition = "2024"
-description = "Civil Egregore's base game's libraries: the APIs its types expose to the types depending on them, each a static a handle points to -- so far the collision plane's"
-
-[dependencies]
-simulation = { path = "../../simulation" }
-base_types = { path = "../base_types" }

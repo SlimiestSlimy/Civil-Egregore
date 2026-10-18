@@ -6,8 +6,8 @@
 
 use crate::arenas::cell;
 use utilities::coordinates::CellIndex;
-use entity_manager::{Attribute, Header, remove_attribute, set_attribute};
-use simulation::SimulationTickState;
+use server::entity_manager::{Attribute, Header, remove_attribute, set_attribute};
+use server::simulation::SimulationTickState;
 
 /// An attribute counting the times an entity woke.
 pub const WOKEN_COUNT: Attribute<u64> = Attribute::new(41);
@@ -28,7 +28,7 @@ pub fn count_and_flip(tick_state: &mut SimulationTickState) -> usize {
         if !remove_attribute(&mut attributes, ODD_WAKE.attribute_type()) {
             set_attribute(&mut attributes, ODD_WAKE, 1);
         }
-        simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, Header { wake: tick_state.current_tick() + 1, ..entity.header }, &attributes);
+        server::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, Header { wake: tick_state.current_tick() + 1, ..entity.header }, &attributes);
         woken_count += 1;
     }
     woken_count

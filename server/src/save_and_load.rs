@@ -3,15 +3,14 @@
 //! was made with: loaded with it, the world's own, each the type of its
 //! name the code registers.
 
-use crate::{default_frozen_types, World, COLD_POOL_BYTES_KEPT};
-use chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
+use crate::{World, COLD_POOL_BYTES_KEPT};
+use crate::chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
 use utilities::coordinates::SuperchunkIndex;
-use entity_manager::saved;
-use simulation::SavedImage;
+use crate::entity_manager::saved;
+use crate::simulation::SavedImage;
 use std::path::Path;
 use std::sync::Arc;
-use type_registry::{FrozenTypes, TypeRegistry};
-use worldgen::WorldGeneration;
+use protocol::type_registry::{FrozenTypes, TypeRegistry};
 
 /// What a save wrote.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -73,7 +72,7 @@ pub fn save(folder: &Path, world: &mut World) -> Result<SaveWritten, DiskError> 
     // The world's file last: a save cut short leaves the one before it.
     // The layers a save lists are those it holds: a wide plane's, a bit each.
     let layers = world.world_info.layers.iter().flat_map(|layer| layer.each_bitplane()).collect();
-    let world_info = WorldInfo { tick: simulation_handle.entity_store().current_tick(), layers, unpopulated: simulation_handle.unpopulated().to_vec(), generation_numbers: world.world_generation.numbers(), ..world.world_info.clone() };
+    let world_info = WorldInfo { tick: simulation_handle.entity_store().current_tick(), layers, unpopulated: simulation_handle.unpopulated().to_vec(), ..world.world_info.clone() };
     save_written.bytes_written += disk::write_world(folder, &world_info)?;
     Ok(save_written)
 }
@@ -95,8 +94,9 @@ pub fn worlds_in(folder: &Path) -> Vec<String> {
 /// hot when it was saved made hot, before it ticks, those cooling
 /// cooling again and those warming warming again, each to turn when it
 /// was to -- as it was when saved, to the cell and the random number.
-pub fn load_world(folder: &Path) -> Result<World, DiskError> {
-    load_keeping(folder, COLD_POOL_BYTES_KEPT)
+/// Its types are those of `available` its types file names.
+pub fn load_world(folder: &Path, available: &FrozenTypes) -> Result<World, DiskError> {
+    load_keeping(folder, COLD_POOL_BYTES_KEPT, available)
 }
 
 /// [`load_world`], the world keeping `bytes_kept` bytes of its cold
@@ -104,13 +104,12 @@ pub fn load_world(folder: &Path) -> Result<World, DiskError> {
 /// and those past that many bytes are left in `folder`, read again
 /// when wanted -- so the save is not to be removed while the world
 /// runs.
-pub fn load_keeping(folder: &Path, bytes_kept: u64) -> Result<World, DiskError> {
-    // Its types are those it was made with, as the code registers them -- the base game's for now.
-    let frozen_types = Arc::new(read_types(folder, &default_frozen_types())?);
+pub fn load_keeping(folder: &Path, bytes_kept: u64, available: &FrozenTypes) -> Result<World, DiskError> {
+    // Its types are those it was made with, as initialization registers them.
+    let frozen_types = Arc::new(read_types(folder, available)?);
     let world_info = WorldInfo { layers: frozen_types.layer_types(), ..disk::read_world(folder)? };
     let hot = disk::read_hot(folder)?;
-    let world_generation = WorldGeneration::of_numbers(&world_info.generation_numbers);
-    let mut world = World::empty_world(world_info, world_generation, None, frozen_types).map_err(|why_not| DiskError::InvalidFile(folder.join(TYPES_FILE), why_not))?;
+    let mut world = World::empty_world(world_info, None, frozen_types).map_err(|why_not| DiskError::InvalidFile(folder.join(TYPES_FILE), why_not))?;
     let simulation_handle = &mut world.simulation_handle;
     simulation_handle.keep_cold_pool_within(bytes_kept);
     let (mut entities_kept, saved_in) = (0, Arc::<Path>::from(folder));

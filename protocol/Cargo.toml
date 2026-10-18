@@ -4,5 +4,4 @@ edition = "2024"
 description = "What the client and the server say to each other: the parameters a command line gives the server, the messages and the wire"
 
 [dependencies]
-type_registry = { path = "type_registry" }
 utilities = { path = "../utilities" }

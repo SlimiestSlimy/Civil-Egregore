@@ -10,7 +10,7 @@ use crate::worlds::{tag_of, tag_sheep, tick_rule, tick_sheep};
 use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use server::{WorldStart, World};
 use std::collections::HashMap;
-use base_types::{COLLISION, TREE};
+use basegame::base_types::{COLLISION, TREE};
 
 /// Whether the collision plane holds exactly the cells trees and
 /// entities stand on, over every hot superchunk of `world`; and how
@@ -41,7 +41,7 @@ fn what_stands_and_no_other(world: &World) -> (bool, u64) {
 /// when it is hungry again, a meal later.
 #[test]
 fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
-    let seed = server::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &server::WorldGeneration::DEFAULT);
+    let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     let mut world = crate::worlds::one_flock_world(WorldStart { seed, ..WorldStart::default() }, 4_000);
     let (collision_matches, trees) = what_stands_and_no_other(&world);
     assert!(collision_matches && trees > 0, "as generated: {trees} trees");
@@ -52,7 +52,7 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     let (mut steps_seen, mut lamb_ticks) = (0, 0);
     // A stretch at the least; and on, to the first step: within two meals, as no grass grows back with the sheep's rule alone run.
     let (stretch_ticks, mut tick) = (400, 0);
-    while tick < stretch_ticks || steps_seen == 0 && tick < 2 * entity_rules::sheep::TIME_BETWEEN_MEALS.ticks() {
+    while tick < stretch_ticks || steps_seen == 0 && tick < 2 * basegame::entity_rules::sheep::TIME_BETWEEN_MEALS.ticks() {
         tick_sheep(&mut world);
         tick += 1;
         if tick % 50 == 0 && tick <= stretch_ticks {
@@ -74,10 +74,10 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     assert!(steps_seen > 0, "{steps_seen} steps, {lamb_ticks} lamb-ticks in {tick} ticks");
     assert!(what_stands_and_no_other(&world).0, "after {tick} ticks of the sheep");
     // The trees after the sheep: a sheep whose wake passes with its rule not run never wakes again.
-    let mut trees_counts = simulation::simulation_api::RuleCounts::default();
+    let mut trees_counts = server::simulation::simulation_api::RuleCounts::default();
     for _ in 0..2000 {
-        trees_counts += tick_rule(&mut world, base_types::RULE_OF_TREES.0).rules;
+        trees_counts += tick_rule(&mut world, basegame::base_types::RULE_OF_TREES.0).rules;
     }
     assert!(what_stands_and_no_other(&world).0, "after the trees spread and died");
-    assert!(trees_counts[sca_rules::trees::SPREADS_COUNT] > 0, "trees put");
+    assert!(trees_counts[basegame::sca_rules::trees::SPREADS_COUNT] > 0, "trees put");
 }

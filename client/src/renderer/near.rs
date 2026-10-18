@@ -6,9 +6,10 @@
 use crate::renderer::ground::relief::{laid_over, tint_on_sand, water_light, FOAM_COLOUR, FOAM_MOST, PALE_COLOUR, SAND_COLOUR, SAND_MOST};
 use crate::renderer::ground::{shadow_drop, FineGround, SuperchunkGround, KEPT_MARGIN_CELLS, SUPERCHUNK_CELLS_A_SIDE};
 use crate::renderer::paint::{depth_at, each_cloud, in_rain, stage_at, streak_of_rain_on, tree_colour, under_cloud, under_water};
-use base_types::plane_words::DEEPEST_CLOUD;
-use base_types::OLDEST_TREE_STAGE;
-use protocol::pipe::frame::{Cells, NearRectangle, DEEP_WATER_DEPTH, WORD_BITS};
+use basegame::base_types::plane_words::DEEPEST_CLOUD;
+use basegame::base_types::{GRASS, OLDEST_TREE_STAGE, TREE, WET};
+use protocol::pipe::frame::{bit_set, Cells, NearRectangle, WORD_BITS};
+use basegame::base_types::DEEP_WATER_DEPTH;
 use utilities::tuning::{Tuning, RELIEF_STRENGTH, CAST_SHADOW, STEP_DARK, STEP_LIGHT, GROUND_TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
 use utilities::coordinates::place_from_cartesian;
 use std::collections::HashMap;
@@ -100,22 +101,23 @@ pub fn paint_near(cells: &[Cells], kept_grounds: &HashMap<(u32, u32), Superchunk
         // The superchunk's cells in the picture, from its own top left.
         let picture_columns = first_cell_cartesian.0.max(superchunk_left_column)..(first_cell_cartesian.0 + size_cells.0).min(superchunk_left_column + SUPERCHUNK_CELLS_A_SIDE);
         let picture_rows = first_cell_cartesian.1.max(superchunk_top_row)..(first_cell_cartesian.1 + size_cells.1).min(superchunk_top_row + SUPERCHUNK_CELLS_A_SIDE);
+        let (grass, wet, trees) = (cells.plane(GRASS), cells.plane(WET), cells.plane(TREE));
         for y in picture_rows.clone() {
             for x in picture_columns.clone() {
                 let (own_x, own_y) = (x - superchunk_left_column, y - superchunk_top_row);
                 let place = place_from_cartesian(own_x as u32, own_y as u32);
-                let is_grass = cells.grass_bitmaps[place / WORD_BITS] >> (place % WORD_BITS) & 1 == 1;
+                let is_grass = bit_set(grass, place);
                 let (word, bit_in_word) = (place / WORD_BITS, (place % WORD_BITS) as u32);
-                let water = (cells.wet_bitmaps[word] >> bit_in_word & 1 == 1).then(|| depth_at(cells, word, bit_in_word));
+                let water = bit_set(wet, place).then(|| depth_at(cells, word, bit_in_word));
                 let cell = Cell { fine_ground, tuning, own_cartesian: (own_x, own_y), world: (cells.top_left.0 as u64 + own_x as u64, cells.top_left.1 as u64 + own_y as u64), cover_colour: if is_grass { GRASS_GREEN } else { DIRT_BROWN }, water };
                 let corner_pixel = ((x - first_cell_cartesian.0) * pixels_a_cell, (y - first_cell_cartesian.1) * pixels_a_cell);
                 cell.paint_cell(&mut rgba_pixels, width, corner_pixel, pixels_a_cell);
-                if cells.trees[word] >> bit_in_word & 1 == 1 {
+                if bit_set(trees, place) {
                     tree(&mut rgba_pixels, width, corner_pixel, pixels_a_cell, stage_at(cells, word, bit_in_word));
                 }
             }
         }
-        for &(x, y) in &cells.sheep_cells_cartesian {
+        for &(x, y) in &cells.entity_cells_cartesian {
             let (x, y) = (superchunk_left_column + x as usize, superchunk_top_row + y as usize);
             if picture_columns.contains(&x) && picture_rows.contains(&y) {
                 paint_sheep(&mut rgba_pixels, width, ((x - first_cell_cartesian.0) * pixels_a_cell, (y - first_cell_cartesian.1) * pixels_a_cell), pixels_a_cell);

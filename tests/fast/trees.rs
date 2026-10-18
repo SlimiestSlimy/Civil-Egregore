@@ -5,13 +5,13 @@
 //! behind.
 
 use crate::worlds::{first_superchunk, plain_start, tick_rule};
-use bitplane_manager::{Write, WriteOp};
+use server::bitplane_manager::{Write, WriteOp};
 use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
-use sca_rules::trees::{DIED_COUNT, GROWN_COUNT, SAMPLED_COUNT, SEEDS_FROM, SPREADS_COUNT};
+use basegame::sca_rules::trees::{DIED_COUNT, GROWN_COUNT, SAMPLED_COUNT, SEEDS_FROM, SPREADS_COUNT};
 use server::World;
 use crate::grass::write_climate;
-use base_types::{Climate, Wind, HOTTEST_TEMPERATURE, MOST_HUMID, PRESSURE_AT_REST};
-use base_types::{COLLISION, OLDEST_TREE_STAGE, TREE, TREE_STAGE};
+use basegame::base_types::{Climate, Wind, HOTTEST_TEMPERATURE, MOST_HUMID, PRESSURE_AT_REST};
+use basegame::base_types::{COLLISION, OLDEST_TREE_STAGE, TREE, TREE_STAGE};
 use utilities::rng::RandomSource;
 
 /// Every cell of `world`'s first superchunk, in rows.
@@ -56,7 +56,7 @@ const MILDEST_CLIMATE: Climate = Climate { humidity: MOST_HUMID, wind: Wind::CAL
 #[test]
 fn trees_grow_a_stage_at_a_time_spread_and_die_of_age() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = server::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 2) });
+    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 2) });
     let mut seeded_random = RandomSource::new(seed);
     // The mildest climate: no tree dies of it, and the air always lets one spread.
     write_climate(&mut world, MILDEST_CLIMATE);
@@ -67,7 +67,7 @@ fn trees_grow_a_stage_at_a_time_spread_and_die_of_age() {
     assert!(seeding_trees > 0, "trees old enough to spread");
     let mut count_totals = [0; 4];
     for tick in 0..400 {
-        let tick_counts = tick_rule(&mut world, base_types::RULE_OF_TREES.0).rules;
+        let tick_counts = tick_rule(&mut world, basegame::base_types::RULE_OF_TREES.0).rules;
         let stages_after = stages(&world);
         let (mut grown_seen, mut died_seen, mut new_trees) = (0, 0, 0);
         let mut earlier_stages = stages_before.iter().peekable();
@@ -107,12 +107,12 @@ fn trees_grow_a_stage_at_a_time_spread_and_die_of_age() {
 #[test]
 fn crowded_trees_never_spread() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = server::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 2) });
+    let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 2) });
     let every_cell: Vec<CellIndex> = cells(&world).collect();
     plant_trees(&mut world, &every_cell, || OLDEST_TREE_STAGE);
     let (mut sampled_total, mut died_total) = (0, 0);
     for tick in 0..300 {
-        let tick_counts = tick_rule(&mut world, base_types::RULE_OF_TREES.0).rules;
+        let tick_counts = tick_rule(&mut world, basegame::base_types::RULE_OF_TREES.0).rules;
         assert_eq!(tick_counts[SPREADS_COUNT], 0, "tick {tick}");
         (sampled_total, died_total) = (sampled_total + tick_counts[SAMPLED_COUNT], died_total + tick_counts[DIED_COUNT]);
     }
@@ -131,14 +131,14 @@ fn trees_spread_as_the_air_is_humid_and_die_as_the_climate_is_harsh() {
     let humidity_between = seeded_random.draw_between(64, 192) as u32;
     let harshest_climate = Climate { humidity: 0, temperature: HOTTEST_TEMPERATURE, ..MILDEST_CLIMATE };
     let [mild_outcome, between_outcome, harsh_outcome] = [MILDEST_CLIMATE, Climate { humidity: humidity_between, ..harshest_climate }, harshest_climate].map(|climate| {
-        let mut world = server::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 2) });
+        let mut world = crate::worlds::start_world(server::WorldStart { seed, ..plain_start(1, 0, 0, 2) });
         write_climate(&mut world, climate);
         let planted_cells: Vec<CellIndex> = cells(&world).filter(|_| seeded_random.draw_below(16) == 0).collect();
         plant_trees(&mut world, &planted_cells, || SEEDS_FROM);
         // Too few ticks for a tree to grow from there to the oldest stage.
         let ticks = 700;
-        assert!(u64::from(OLDEST_TREE_STAGE - SEEDS_FROM) * sca_rules::trees::MEAN_TIME_TO_SAMPLE.ticks() > 8 * ticks);
-        (0..ticks).map(|_| tick_rule(&mut world, base_types::RULE_OF_TREES.0).rules).fold((0, 0), |spread_died_totals, tick_counts| (spread_died_totals.0 + tick_counts[SPREADS_COUNT], spread_died_totals.1 + tick_counts[DIED_COUNT]))
+        assert!(u64::from(OLDEST_TREE_STAGE - SEEDS_FROM) * basegame::sca_rules::trees::MEAN_TIME_TO_SAMPLE.ticks() > 8 * ticks);
+        (0..ticks).map(|_| tick_rule(&mut world, basegame::base_types::RULE_OF_TREES.0).rules).fold((0, 0), |spread_died_totals, tick_counts| (spread_died_totals.0 + tick_counts[SPREADS_COUNT], spread_died_totals.1 + tick_counts[DIED_COUNT]))
     });
     assert!(mild_outcome.0 > 20 && mild_outcome.1 == 0, "the mildest: {mild_outcome:?} spread and died");
     assert!(harsh_outcome.0 == 0 && harsh_outcome.1 > 20, "the harshest: {harsh_outcome:?} spread and died");

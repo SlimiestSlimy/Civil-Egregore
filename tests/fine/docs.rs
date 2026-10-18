@@ -341,7 +341,7 @@ fn the_code_points_at_docs_that_are_there() {
 /// The crates rules are written in, the base game's: what they depend
 /// on is the simulation's API and the base game, and they ask their
 /// turn nothing themselves.
-const RULES_CRATES: [&str; 2] = ["server/basegame/sca_rules", "server/basegame/entity_rules"];
+const RULES_CRATES: [&str; 2] = ["basegame/src/sca_rules", "basegame/src/entity_rules"];
 
 /// A rule asks the simulation's API, and nothing else: no rule's
 /// source calls anything of its turn's own -- the turn is handed on to
@@ -351,11 +351,12 @@ const RULES_CRATES: [&str; 2] = ["server/basegame/sca_rules", "server/basegame/e
 #[test]
 fn the_rules_ask_the_simulation_api_alone() {
     let root_folder = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let crates_under_the_api = ["bitplane_manager::", "entity_manager::", "chunk_storage::", "utilities::coordinates::", "type_registry::", "utilities::", "pathfinding::", "worldgen::", "server::"];
+    // The server's modules all under `server::`: what is left of a line with its API taken out.
+    let crates_under_the_api = ["utilities::coordinates::", "type_registry::", "utilities::", "worldgen::", "server::"];
     let mut wrong_places = Vec::new();
     for rules in RULES_CRATES {
         let mut source_files = Vec::new();
-        collect_files(&root_folder.join(rules).join("src"), &[".rs"], &mut source_files);
+        collect_files(&root_folder.join(rules), &[".rs"], &mut source_files);
         assert!(!source_files.is_empty(), "{rules} has no sources");
         for source_file in &source_files {
             let source_text = fs::read_to_string(source_file).expect("read");
@@ -363,15 +364,12 @@ fn the_rules_ask_the_simulation_api_alone() {
             for (line_index, line) in source_text.lines().enumerate() {
                 // What is said in a comment is not asked.
                 let code_part = line.split_once("//").map_or(line, |(before_comment, _)| before_comment);
+                let past_the_api = code_part.replace("server::simulation::simulation_api::", "");
                 if code_part.contains("tick_state.") {
                     wrong_places.push(format!("{shown_path}:{}: asks its tick state itself: `{}`", line_index + 1, code_part.trim()));
                 }
-                if let Some(named_crate) = crates_under_the_api.iter().find(|crate_prefix| code_part.contains(**crate_prefix) && !code_part.contains(&format!("simulation_api::{crate_prefix}"))) {
+                if let Some(named_crate) = crates_under_the_api.iter().find(|crate_prefix| past_the_api.contains(**crate_prefix) && !past_the_api.contains(&format!("simulation_api::{crate_prefix}"))) {
                     wrong_places.push(format!("{shown_path}:{}: names `{}`, under the simulation's API", line_index + 1, named_crate.trim_end_matches(':')));
-                }
-                // The simulation is named by its API alone.
-                if code_part.replace("simulation::simulation_api::", "").contains("simulation::") {
-                    wrong_places.push(format!("{shown_path}:{}: names the simulation past its API: `{}`", line_index + 1, code_part.trim()));
                 }
             }
         }

@@ -7,24 +7,11 @@ authors = ["SlimiestSlimy", "Opus 5.5 high"]
 repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 
 [dependencies]
+basegame = { path = "basegame" }
 client = { path = "client", optional = true }
 protocol = { path = "protocol" }
 server = { path = "server" }
 utilities = { path = "utilities" }
-
-# What the root's tests (`tests/fine`, `tests/fast`, `tests/complete`) reach into.
-[dev-dependencies]
-base_types = { path = "server/basegame/base_types" }
-libraries = { path = "server/basegame/libraries" }
-bitplane_manager = { path = "server/bitplane_manager" }
-chunk_storage = { path = "server/chunk_storage" }
-entity_manager = { path = "server/entity_manager" }
-entity_rules = { path = "server/basegame/entity_rules" }
-pathfinding = { path = "server/pathfinding" }
-sca_rules = { path = "server/basegame/sca_rules" }
-simulation = { path = "server/simulation" }
-type_registry = { path = "protocol/type_registry" }
-worldgen = { path = "server/basegame/worldgen" }
 
 [features]
 # `--features force_default_settings`: run on the built-in defaults
@@ -40,17 +27,7 @@ default = ["client"]
 [workspace]
 members = [
     "protocol",
-    "server/basegame/base_types",
-    "server/basegame/libraries",
-    "server/bitplane_manager",
-    "server/chunk_storage",
-    "server/entity_manager",
-    "server/basegame/entity_rules",
-    "server/pathfinding",
-    "server/basegame/sca_rules",
-    "server/simulation",
-    "server/basegame/worldgen",
-    "protocol/type_registry",
+    "basegame",
     "utilities",
     "client",
     "server",
@@ -60,16 +37,7 @@ members = [
 default-members = [
     ".",
     "protocol",
-    "server/basegame/base_types",
-    "server/basegame/libraries",
-    "server/bitplane_manager",
-    "server/chunk_storage",
-    "server/basegame/entity_rules",
-    "server/pathfinding",
-    "server/basegame/sca_rules",
-    "server/simulation",
-    "server/basegame/worldgen",
-    "protocol/type_registry",
+    "basegame",
     "utilities",
     "server",
 ]

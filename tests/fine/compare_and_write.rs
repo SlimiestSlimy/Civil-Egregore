@@ -5,10 +5,10 @@
 
 use crate::arenas::{cell, walker_header, world, STONE_LAYER};
 use crate::walkers::{cells_drawn};
-use bitplane_manager::{BitmapArena, Write, WriteOp};
+use server::bitplane_manager::{BitmapArena, Write, WriteOp};
 use utilities::coordinates::CellIndex;
-use entity_manager::{Attribute, AttributeBlock};
-use simulation::{Compare, Simulation, SimulationTickState};
+use server::entity_manager::{Attribute, AttributeBlock};
+use server::simulation::{Compare, Simulation, SimulationTickState};
 use utilities::rng::RandomSource;
 
 /// An attribute an entity has once it has eaten.
@@ -36,10 +36,10 @@ fn a_write_is_applied_only_where_the_cell_is_as_it_was_seen() {
     set(&mut bitmap_arena, &[cleared_cell]);
     let report = Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         tick_state.count_under(10);
-        simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, written_twice_cell, 0, 1, Some(DECAYED_COUNT_PLACE as usize));
-        simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, written_twice_cell, 0, 1, Some(DECAYED_COUNT_PLACE as usize));
-        simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, never_set, 1, 0, Some(EATEN_COUNT_PLACE as usize));
-        simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, cleared_cell, 1, 0, None);
+        server::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, written_twice_cell, 0, 1, Some(DECAYED_COUNT_PLACE as usize));
+        server::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, written_twice_cell, 0, 1, Some(DECAYED_COUNT_PLACE as usize));
+        server::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, never_set, 1, 0, Some(EATEN_COUNT_PLACE as usize));
+        server::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, cleared_cell, 1, 0, None);
         0
     });
     let report_writes = report.writes_applied;
@@ -71,15 +71,15 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
     entity_store.apply();
     let mark_cell_of = |eater_cell: CellIndex| eater_cell.at_cartesian_offset(1, 0).expect("in the world");
     let report = Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
-        simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, decaying_cell, 1, 0, Some(DECAYED_COUNT_PLACE as usize));
+        server::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, decaying_cell, 1, 0, Some(DECAYED_COUNT_PLACE as usize));
         for eater_entity in tick_state.woken_entities() {
             let (current_tick, header) = (tick_state.current_tick(), eater_entity.header);
             // Fed if the cell still holds, asleep a tick if it does not: one of the two, the eater written once.
-            simulation::simulation_api::entity_reads_and_writes::update_entity(&mut simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: STONE_LAYER, target_cell: header.stood_cell, seen_value: 1 }), &header, entity_manager::Header { wake: current_tick + 100, ..header }, &[AttributeBlock::holding_value(FED_ATTRIBUTE, 1)]);
-            simulation::simulation_api::entity_reads_and_writes::step(&mut simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: STONE_LAYER, target_cell: header.stood_cell, seen_value: 0 }), &header, header.stood_cell, current_tick + 1);
-            simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, header.stood_cell, 1, 0, Some(EATEN_COUNT_PLACE as usize));
+            server::simulation::simulation_api::entity_reads_and_writes::update_entity(&mut server::simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: STONE_LAYER, target_cell: header.stood_cell, seen_value: 1 }), &header, server::entity_manager::Header { wake: current_tick + 100, ..header }, &[AttributeBlock::holding_value(FED_ATTRIBUTE, 1)]);
+            server::simulation::simulation_api::entity_reads_and_writes::step(&mut server::simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: STONE_LAYER, target_cell: header.stood_cell, seen_value: 0 }), &header, header.stood_cell, current_tick + 1);
+            server::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, header.stood_cell, 1, 0, Some(EATEN_COUNT_PLACE as usize));
             let fed_compare = Compare::attribute(header.stood_cell, FED_ATTRIBUTE.attribute_type(), Some(&[AttributeBlock::holding_value(FED_ATTRIBUTE, 1)]));
-            simulation::simulation_api::compare_and_write::write(tick_state, fed_compare, STONE_LAYER, mark_cell_of(header.stood_cell), 0, 1, None);
+            server::simulation::simulation_api::compare_and_write::write(tick_state, fed_compare, STONE_LAYER, mark_cell_of(header.stood_cell), 0, 1, None);
         }
         0
     });
@@ -151,7 +151,7 @@ fn drawn_writes_come_to_the_same_as_applied_in_order() {
             let superchunk = tick_state.superchunk();
             queue_attempts(seed, &cells, superchunk, |turn_flipped, turn_compared| {
                 let held_against = Compare::Cell { layer_type: STONE_LAYER, target_cell: turn_compared.0, seen_value: u32::from(turn_compared.1) };
-                simulation::simulation_api::compare_and_write::write(tick_state, held_against, STONE_LAYER, turn_flipped.0, u32::from(turn_flipped.1), u32::from(!turn_flipped.1), Some(usize::from(turn_flipped.0 != turn_compared.0)));
+                server::simulation::simulation_api::compare_and_write::write(tick_state, held_against, STONE_LAYER, turn_flipped.0, u32::from(turn_flipped.1), u32::from(!turn_flipped.1), Some(usize::from(turn_flipped.0 != turn_compared.0)));
             });
             0
         });

@@ -3,7 +3,7 @@
 //! frame is asked for and while frames are asked for as a window asks
 //! -- one at a time, sixty a second at most, going round the viewport.
 
-use crate::asking_the_host::{frame_that, seed, whole_answer, ProbedServer};
+use crate::asking_the_host::{drawn_planes, frame_that, seed, whole_answer, ProbedServer, COUNTED};
 use utilities::coordinates::WORLD_MIDDLE;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame, Viewport};
 use std::sync::mpsc::Receiver;
@@ -39,7 +39,7 @@ const SETTLING_TIME: Duration = Duration::from_secs(5);
 
 /// One frame of `viewport`, `skipped_superchunks` of its hot superchunks passed over.
 fn ask_one_frame(host: &mut ProbedServer, frame_receiver: &Receiver<ViewportFrame>, viewport: Viewport, skipped_superchunks: u32, most_superchunks: u32) -> Result<ViewportFrame, String> {
-    if !host.ask_frame(FrameAsk { viewport: Some(viewport), pixel_side_log2: 8, superchunks_skipped: skipped_superchunks, most_superchunks, seen_near: None }) {
+    if !host.ask_frame(FrameAsk { viewport: Some(viewport), pixel_side_log2: 8, superchunks_skipped: skipped_superchunks, most_superchunks, seen_near: None, planes: drawn_planes(), counted: COUNTED.to_vec() }) {
         return Err("the host is gone".to_string());
     }
     whole_answer(frame_receiver)
@@ -59,7 +59,7 @@ pub fn run_probe(given_parameters: &ProbeParameters) -> Result<(), String> {
     host.make_world(seed(given_parameters)?, tuning);
     let whole_frame = frame_that(&mut host, &frame_receiver, Some(viewport), |answered_frame| answered_frame.hot.len() as u32 >= viewport_side * viewport_side)?;
     host.set_pace((pace_ticks_a_second != 0).then_some(pace_ticks_a_second));
-    println!("# seed {}, {} superchunks hot in the viewport, {} sheep", utilities::seed::seed_as_hex(whole_frame.seed), whole_frame.hot.len(), whole_frame.sheep_count);
+    println!("# seed {}, {} superchunks hot in the viewport, {} entities", utilities::seed::seed_as_hex(whole_frame.seed), whole_frame.hot.len(), whole_frame.entity_count);
     // The copy of the whole viewport let go, and the world left to settle: what is measured is its ticks, not its making.
     drop(whole_frame);
     std::thread::sleep(SETTLING_TIME);

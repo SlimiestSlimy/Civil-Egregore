@@ -11,13 +11,16 @@ pub mod terrain;
 
 use crate::WorldStart;
 use utilities::tuning::Tuning;
-use worldgen::WorldGeneration;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
+use protocol::type_registry::FrozenTypes;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-pub use protocol::pipe::messages::TARGET_PACE;
+/// Ticks a second a world is held to unless told otherwise: the
+/// game's target, a second of the simulation in a second.
+pub const TARGET_PACE: u32 = crate::simulation::simulation_time::TICKS_A_SIMULATION_SECOND as u32;
 
 /// The share of a tick's time the host gives to copying a frame's
 /// superchunks before the next tick, when it has no time to spare: a
@@ -49,9 +52,9 @@ enum HostRequest {
     /// Save the world run under this name in the worlds' folder, its
     /// name from then ([`Frame::named`]).
     Save(String),
-    /// Make the world run again from its start, generated as this says:
-    /// of many read between two ticks, the last alone.
-    Reset(Box<WorldGeneration>),
+    /// Make the world run again from its start, generated as these
+    /// sliders say: of many read between two ticks, the last alone.
+    Reset(Box<Tuning>),
 }
 
 /// The host, as a client holds it: each call sent to the host's thread,
@@ -65,15 +68,15 @@ pub struct Host {
 }
 
 impl Host {
-    /// Starts the host on a thread of its own, no world run yet: the
-    /// host, and where its frames come back. It stops once the host is
-    /// dropped.
-    pub fn start_on_thread() -> (Self, Receiver<ViewportFrame>) {
+    /// Starts the host on a thread of its own, no world run yet, worlds
+    /// made of `frozen_types` and opened among them: the host, and where
+    /// its frames come back. It stops once the host is dropped.
+    pub fn start_on_thread(frozen_types: Arc<FrozenTypes>) -> (Self, Receiver<ViewportFrame>) {
         let (request_sender, request_receiver) = channel();
         let (frame_sender, frame_receiver) = channel();
         let terrain = terrain::start_terrain_thread();
         let terrain_for_host = terrain.clone();
-        thread::Builder::new().name("host".to_string()).spawn(move || HostThread::telling_terrain(terrain_for_host).serve_requests(&request_receiver, &frame_sender)).expect("a thread for the host");
+        thread::Builder::new().name("host".to_string()).spawn(move || HostThread::telling_terrain(terrain_for_host, frozen_types).serve_requests(&request_receiver, &frame_sender)).expect("a thread for the host");
         (Self { request_sender, terrain: terrain::TerrainAsker { request_sender: terrain } }, frame_receiver)
     }
 
@@ -118,11 +121,12 @@ impl Host {
     }
 
     /// Makes the world run again from its start, its generation as
-    /// `tuning` has it now (`Generation::from_tuning`), the rest as it
+    /// `tuning` has it now, as its generation reads the sliders
+    /// (`WorldgenCode::numbers_of_tuning`), the rest as it
     /// started: its seed, size, sheep, hot entity and camera. A slider
     /// dragged calls it each frame; of calls with no frame asked between, only the last
     /// is done.
     pub fn reset(&self, tuning: &Tuning) -> bool {
-        self.request_sender.send(HostRequest::Reset(Box::new(WorldGeneration::from_tuning(tuning)))).is_ok()
+        self.request_sender.send(HostRequest::Reset(Box::new(*tuning))).is_ok()
     }
 }
