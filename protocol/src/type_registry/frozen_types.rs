@@ -3,7 +3,7 @@
 //! once stays true. Changed only between worlds.
 
 use super::registered_type::RegisteredType;
-use super::registration::{Hook, Library, Registration};
+use super::registration::{Hook, Library};
 use super::type_ids::{AttributeType, EntityType, LayerType};
 
 /// The types a world runs with, in the order registered: the rules
@@ -43,14 +43,6 @@ impl FrozenTypes {
         self.libraries[self.place_of(registered)].as_ref()
     }
 
-    /// `registered`, one of these, as it was registered: what registers
-    /// it again among other types.
-    pub fn registration_of(&self, registered: &RegisteredType) -> Registration
-    {
-        let depends_on = self.dependencies_of(registered).map(|dependency| dependency.name().to_string()).collect();
-        Registration { registered_type: registered.clone(), depends_on, library: self.library_of(registered).copied(), hooks: self.hooks_of(registered).to_vec() }
-    }
-
     /// What `registered`, one of these, is hooked into.
     pub fn hooks_of(&self, registered: &RegisteredType) -> &[Hook] {
         &self.hooks[self.place_of(registered)]
@@ -58,18 +50,13 @@ impl FrozenTypes {
 
     /// The types hooked into `hook`, in the order registered, each with its
     /// library, if it has one.
-    pub fn hooked(&self, hook: Hook) -> impl Iterator<Item = (&RegisteredType, Option<Library>)> {
-        self.types.iter().zip(&self.hooks).zip(&self.libraries).filter(move |((_, hooks), _)| hooks.contains(&hook)).map(|((registered, _), library)| (registered, *library))
+    pub fn hooked(&self, hook: Hook) -> impl Iterator<Item = (&RegisteredType, Option<&Library>)> {
+        self.types.iter().zip(&self.hooks).zip(&self.libraries).filter(move |((_, hooks), _)| hooks.contains(&hook)).map(|((registered, _), library)| (registered, library.as_ref()))
     }
 
     /// Every type, in the order registered.
     pub fn types(&self) -> &[RegisteredType] {
         &self.types
-    }
-
-    /// The type named `type_name`, if one is.
-    pub fn named(&self, type_name: &str) -> Option<&RegisteredType> {
-        self.types.iter().find(|registered| registered.name() == type_name)
     }
 
     /// The type `type_number` is one of the numbers of, if any: a wide
@@ -134,5 +121,13 @@ impl FrozenTypes {
     /// a cell with nothing on it.
     pub fn layer_types(&self) -> Vec<LayerType> {
         self.types.iter().filter_map(RegisteredType::layer_type).collect()
+    }
+}
+
+impl std::fmt::Debug for FrozenTypes {
+    /// Every type, in the order registered: what a library is, only the
+    /// types depending on it know.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.debug_list().entries(self.types.iter()).finish()
     }
 }

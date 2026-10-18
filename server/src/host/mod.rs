@@ -13,6 +13,7 @@ use crate::WorldStart;
 use utilities::tuning::Tuning;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use protocol::type_registry::FrozenTypes;
+use protocol::world_types::GameTypes;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread;
@@ -32,6 +33,17 @@ const FRAMES_SHARE: f64 = 0.125;
 /// ticks made late by a frame or a sleep are made up, a stall is not.
 const CATCH_UP: Duration = Duration::from_millis(250);
 
+/// What the host sends its client, in the order it happens.
+#[derive(Clone)]
+pub enum HostSent {
+    /// A world runs, the `n`-th the host has run, of these types: sent
+    /// once, as it starts to run, before any frame of it -- what the
+    /// client draws its frames by.
+    WorldRuns(u64, Arc<FrozenTypes>),
+    /// A frame asked for.
+    Frame(ViewportFrame),
+}
+
 /// What a client asks of the host, sent to its thread by a [`Host`]'s
 /// calls.
 #[derive(Clone, Debug)]
@@ -43,8 +55,9 @@ enum HostRequest {
     SetPaused(bool),
     /// Tick so many times a second, or flat out.
     SetPace(Option<u32>),
-    /// Make a world as this says, and run it in place of any run.
-    MakeWorld(WorldStart),
+    /// Make a world as this says, of these types -- frozen for it, before
+    /// anything of it -- and run it in place of any run.
+    MakeWorld(WorldStart, Arc<FrozenTypes>),
     /// Run the world of this name in the worlds' folder in place of any
     /// run: hot in its halos, as it was saved. Refused, the world run
     /// goes on (the next frame's [`Frame::said`]).
@@ -69,15 +82,15 @@ pub struct Host {
 
 impl Host {
     /// Starts the host on a thread of its own, no world run yet, worlds
-    /// made of `frozen_types` and opened among them: the host, and where
-    /// its frames come back. It stops once the host is dropped.
-    pub fn start_on_thread(frozen_types: Arc<FrozenTypes>) -> (Self, Receiver<ViewportFrame>) {
+    /// opened of `game_types`: the host, and where what it sends comes
+    /// back ([`HostSent`]). It stops once the host is dropped.
+    pub fn start_on_thread(game_types: GameTypes) -> (Self, Receiver<HostSent>) {
         let (request_sender, request_receiver) = channel();
-        let (frame_sender, frame_receiver) = channel();
+        let (sender, host_sent) = channel();
         let terrain = terrain::start_terrain_thread();
         let terrain_for_host = terrain.clone();
-        thread::Builder::new().name("host".to_string()).spawn(move || HostThread::telling_terrain(terrain_for_host, frozen_types).serve_requests(&request_receiver, &frame_sender)).expect("a thread for the host");
-        (Self { request_sender, terrain: terrain::TerrainAsker { request_sender: terrain } }, frame_receiver)
+        thread::Builder::new().name("host".to_string()).spawn(move || HostThread::telling_terrain(terrain_for_host, game_types).serve_requests(&request_receiver, &sender)).expect("a thread for the host");
+        (Self { request_sender, terrain: terrain::TerrainAsker { request_sender: terrain } }, host_sent)
     }
 
     /// Where the terrain of the world run is asked of, what no frame
@@ -102,9 +115,10 @@ impl Host {
         self.request_sender.send(HostRequest::SetPace(pace_held_to)).is_ok()
     }
 
-    /// Makes a world as `world_start` says, and runs it in place of any run.
-    pub fn make_world(&self, world_start: WorldStart) -> bool {
-        self.request_sender.send(HostRequest::MakeWorld(world_start)).is_ok()
+    /// Makes a world as `world_start` says, of `frozen_types` -- the new
+    /// world's, frozen first -- and runs it in place of any run.
+    pub fn make_world(&self, world_start: WorldStart, frozen_types: Arc<FrozenTypes>) -> bool {
+        self.request_sender.send(HostRequest::MakeWorld(world_start, frozen_types)).is_ok()
     }
 
     /// Runs the world named `world_name` in the worlds' folder in place of

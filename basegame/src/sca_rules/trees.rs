@@ -1,9 +1,9 @@
-//! Trees: a cell set in [`TREE`] with a stage in [`TREE_STAGE`], four
+//! Trees: a cell set in the tree layer with a stage in the tree stage plane, four
 //! bits a cell. A tree sampled tries to spread, or grows a stage, or
 //! at the oldest may die (`docs/sca_rules.md`, "Trees").
 
 use crate::sca_rules::growing::{humid_enough_to_spread, too_harsh_to_live};
-use crate::base_types::{COLLISION, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WET};
+use crate::base_types::{BaseTypes, OLDEST_TREE_STAGE};
 use server::simulation::simulation_api::simulation_time::SimulationTime;
 use server::simulation::simulation_api::{on_each_sampled, RuleCode, cell_reads_and_writes, compare_and_write, place_counted, tick_and_random_stream, CellIndex, Chance, RuleCounts, SimulationTickState};
 
@@ -34,9 +34,11 @@ pub const AROUND: u32 = 8;
 /// What the rule counts, each named at its place in its
 /// [`RuleCounts`]: the one order, the places below worked out from it.
 pub const COUNT_NAMES: [&str; 4] = ["sampled", "spreads", "grown", "died"];
-/// What runs the trees' rule, as it is registered: [`rule`] on each
-/// sample of its master, chosen with [`SAMPLE_CHANCE`].
-pub const CODE: RuleCode = RuleCode { count_names: &COUNT_NAMES, run: |tick_state, context| on_each_sampled(tick_state, context.master, SAMPLE_CHANCE, rule) };
+/// What runs the trees' rule, as it is registered with `base_types`:
+/// [`rule`] on each sample of its master, chosen with [`SAMPLE_CHANCE`].
+pub fn code(base_types: BaseTypes) -> RuleCode {
+    RuleCode::new(&COUNT_NAMES, move |tick_state, context| on_each_sampled(tick_state, context.master, SAMPLE_CHANCE, |tick_state, cell, counts| rule(&base_types, tick_state, cell, counts)))
+}
 /// Trees sampled.
 pub const SAMPLED_COUNT: usize = place_counted(&COUNT_NAMES, "sampled");
 /// Trees put: counted as each is applied, so two put on one cell are
@@ -53,41 +55,41 @@ pub const DIED_COUNT: usize = place_counted(&COUNT_NAMES, "died");
 /// stage of its climate, with that chance times how harsh its tile's
 /// is ([`too_harsh_to_live`]): the hotter and drier, the sooner.
 #[inline]
-pub fn rule(tick_state: &mut SimulationTickState, cell: CellIndex, counts: &mut RuleCounts) {
+pub fn rule(base_types: &BaseTypes, tick_state: &mut SimulationTickState, cell: CellIndex, counts: &mut RuleCounts) {
     counts[SAMPLED_COUNT] += 1;
     let spreads_this_time = tick_and_random_stream::random_stream(tick_state).chance(SPREAD_SHARE);
-    let Some(stage) = cell_reads_and_writes::value(tick_state, TREE_STAGE, cell) else {
+    let Some(stage) = cell_reads_and_writes::value(tick_state, base_types.tree_stage, cell) else {
         return;
     };
     if spreads_this_time {
-        tree_tries_to_spread(tick_state, cell, stage);
+        tree_tries_to_spread(base_types, tick_state, cell, stage);
         return;
     }
     let of_age = stage == OLDEST_TREE_STAGE && tick_and_random_stream::random_stream(tick_state).chance_among(DIE_CHANCE, GROW_SHARE);
-    if of_age || tick_and_random_stream::random_stream(tick_state).chance_among(DIE_CHANCE, GROW_SHARE) && too_harsh_to_live(tick_state, cell) {
-        tree_dies(tick_state, cell, stage);
+    if of_age || tick_and_random_stream::random_stream(tick_state).chance_among(DIE_CHANCE, GROW_SHARE) && too_harsh_to_live(base_types, tick_state, cell) {
+        tree_dies(base_types, tick_state, cell, stage);
     } else if stage < OLDEST_TREE_STAGE {
-        cell_reads_and_writes::set_value_counted(tick_state, TREE_STAGE, cell, stage, stage + 1, GROWN_COUNT);
+        cell_reads_and_writes::set_value_counted(tick_state, base_types.tree_stage, cell, stage, stage + 1, GROWN_COUNT);
     }
 }
 
 /// The tree at `cell`, `stage` old, dies: counted as it is applied.
-fn tree_dies(tick_state: &mut SimulationTickState, cell: CellIndex, stage: u32) {
+fn tree_dies(base_types: &BaseTypes, tick_state: &mut SimulationTickState, cell: CellIndex, stage: u32) {
     // Its stage goes with it, so the next tree there starts at 0: gone if the tree still stands, which is then cleared.
-    compare_and_write::write(tick_state, compare_and_write::layer_holds(TREE, cell), TREE_STAGE.layer_type(), cell, stage, 0, None);
+    compare_and_write::write(tick_state, compare_and_write::layer_holds(base_types.tree, cell), base_types.tree_stage.layer_type(), cell, stage, 0, None);
     // And its cell is free to step on again, if it is the tree that held it.
-    compare_and_write::write(tick_state, compare_and_write::layer_holds(TREE, cell), COLLISION, cell, 1, 0, None);
-    cell_reads_and_writes::clear_counted(tick_state, TREE, cell, DIED_COUNT);
+    compare_and_write::write(tick_state, compare_and_write::layer_holds(base_types.tree, cell), base_types.collision, cell, 1, 0, None);
+    cell_reads_and_writes::clear_counted(tick_state, base_types.tree, cell, DIED_COUNT);
 }
 
 /// The tree at `cell`, `stage` old, tries to spread: one put where it
 /// may -- no water, nothing standing, and the air humid enough this
 /// time ([`humid_enough_to_spread`]) -- is counted as it is applied.
-fn tree_tries_to_spread(tick_state: &mut SimulationTickState, cell: CellIndex, stage: u32) {
+fn tree_tries_to_spread(base_types: &BaseTypes, tick_state: &mut SimulationTickState, cell: CellIndex, stage: u32) {
     if stage < SEEDS_FROM {
         return;
     }
-    let Some((window_corner, around)) = cell_reads_and_writes::window_about(tick_state, TREE, cell, AROUND) else {
+    let Some((window_corner, around)) = cell_reads_and_writes::window_about(tick_state, base_types.tree, cell, AROUND) else {
         return;
     };
     // Itself is one of those counted.
@@ -102,11 +104,11 @@ fn tree_tries_to_spread(tick_state: &mut SimulationTickState, cell: CellIndex, s
         return;
     };
     // No tree under water, nor where something stands already; and only as often as the air there is humid.
-    if cell_reads_and_writes::layer_holds(tick_state, WET, onto_cell) || cell_reads_and_writes::layer_holds(tick_state, COLLISION, onto_cell) || !humid_enough_to_spread(tick_state, onto_cell) {
+    if cell_reads_and_writes::layer_holds(tick_state, base_types.wet, onto_cell) || cell_reads_and_writes::layer_holds(tick_state, base_types.collision, onto_cell) || !humid_enough_to_spread(base_types, tick_state, onto_cell) {
         return;
     }
     // The tree is put only if its cell is still free in the collision plane -- of two trees, or a tree and a sheep stepping there, the
     // first applied has it -- and then holds it: where a tree stands is not stepped on.
-    compare_and_write::write(tick_state, compare_and_write::layer_lacks(COLLISION, onto_cell), TREE, onto_cell, 0, 1, Some(SPREADS_COUNT));
-    cell_reads_and_writes::set(tick_state, COLLISION, onto_cell);
+    compare_and_write::write(tick_state, compare_and_write::layer_lacks(base_types.collision, onto_cell), base_types.tree, onto_cell, 0, 1, Some(SPREADS_COUNT));
+    cell_reads_and_writes::set(tick_state, base_types.collision, onto_cell);
 }

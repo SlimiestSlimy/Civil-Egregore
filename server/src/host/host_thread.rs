@@ -2,7 +2,7 @@
 //! ticks, frames answered.
 
 use crate::{WorldStart, World};
-use super::{CATCH_UP, FRAMES_SHARE, HostRequest, TARGET_PACE};
+use super::{CATCH_UP, FRAMES_SHARE, HostRequest, HostSent, TARGET_PACE};
 use super::frame::{copy_superchunk, frame_of, hot_in};
 use protocol::pipe::frame::{Cells, FrameAsk, ViewportFrame};
 use super::terrain::{TerrainRequest, WorldTold};
@@ -11,6 +11,7 @@ use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::time::{Duration, Instant};
 use std::sync::Arc;
 use protocol::type_registry::FrozenTypes;
+use protocol::world_types::GameTypes;
 use utilities::tuning::Tuning;
 
 /// The world run, and what goes with running it.
@@ -77,22 +78,24 @@ pub(crate) struct HostThread {
     tick_took: Duration,
     /// The terrain's thread, told of each world run.
     terrain: Sender<TerrainRequest>,
-    /// The types worlds are made of, and opened among.
-    frozen_types: Arc<FrozenTypes>,
+    /// What registers the types of a world opened.
+    game_types: GameTypes,
 }
 
 impl HostThread {
     /// No world, at the game's pace; `terrain` told of each world run;
-    /// worlds made of `frozen_types` and opened among them.
-    pub(crate) fn telling_terrain(terrain: Sender<TerrainRequest>, frozen_types: Arc<FrozenTypes>) -> Self {
-        Self { terrain, frozen_types, running_world: None, worlds: 0, ticking_paused: false, pace_held_to: Some(TARGET_PACE), world_name: None, last_outcome: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), being_answered: None, last_answer_measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
+    /// worlds opened of `game_types`.
+    pub(crate) fn telling_terrain(terrain: Sender<TerrainRequest>, game_types: GameTypes) -> Self {
+        Self { terrain, game_types, running_world: None, worlds: 0, ticking_paused: false, pace_held_to: Some(TARGET_PACE), world_name: None, last_outcome: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), being_answered: None, last_answer_measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
     }
 }
 
 impl HostThread {
     /// Requests read between ticks, a tick, and a wait for the next
-    /// one's time -- until the client is gone.
-    pub(crate) fn serve_requests(mut self, request_receiver: &Receiver<HostRequest>, frame_sender: &Sender<ViewportFrame>) {
+    /// one's time -- until the client is gone. Each world run, its types
+    /// are sent once, before any frame of it.
+    pub(crate) fn serve_requests(mut self, request_receiver: &Receiver<HostRequest>, sender: &Sender<HostSent>) {
+        let mut worlds_told = 0;
         loop {
             // Paused, or with no world, there is nothing to do until the client asks -- once what it asked is answered.
             let mut waited_request = if (self.ticking_paused || self.running_world.is_none()) && self.being_answered.is_none() { request_receiver.recv().ok() } else { None };
@@ -105,12 +108,12 @@ impl HostThread {
                     }
                     Ok(HostRequest::SetPaused(pause_asked)) => (self.ticking_paused, self.next_tick) = (pause_asked, Instant::now()),
                     Ok(HostRequest::SetPace(pace_asked)) => (self.pace_held_to, self.next_tick) = (pace_asked, Instant::now()),
-                    Ok(HostRequest::MakeWorld(world_start)) => {
+                    Ok(HostRequest::MakeWorld(world_start, frozen_types)) => {
                         self.last_outcome = Some(format!("a world made from seed {}", utilities::seed::seed_as_hex(world_start.seed)));
                         (self.world_name, self.reset) = (None, None);
-                        self.run_world(world_start);
+                        self.run_world(world_start, &frozen_types);
                     }
-                    Ok(HostRequest::OpenWorld(world_to_open)) => match crate::load_world(&utilities::settings::world(&world_to_open), &self.frozen_types) {
+                    Ok(HostRequest::OpenWorld(world_to_open)) => match crate::load_world(&utilities::settings::world(&world_to_open), self.game_types) {
                         Ok(opened_world) => {
                             (self.last_outcome, self.world_name, self.reset) = (Some(format!("{world_to_open} opened")), Some(world_to_open), None);
                             self.run_in_place(RunningWorld::from_start(WorldStart::of_world(&opened_world.world_info), opened_world));
@@ -127,8 +130,16 @@ impl HostThread {
                 }
             }
             self.reset_now();
+            if let Some(running_world) = &self.running_world
+                && worlds_told != self.worlds
+            {
+                worlds_told = self.worlds;
+                if sender.send(HostSent::WorldRuns(self.worlds, Arc::clone(&running_world.world.frozen_types))).is_err() {
+                    return;
+                }
+            }
             if let Some(answered_frame) = self.answer_a_little()
-                && frame_sender.send(answered_frame).is_err()
+                && sender.send(HostSent::Frame(answered_frame)).is_err()
             {
                 return;
             }
@@ -138,11 +149,11 @@ impl HostThread {
         }
     }
 
-    /// Makes a world as `world_start` says, and runs it in place of any run:
-    /// that one dropped first, not to hold both.
-    fn run_world(&mut self, world_start: WorldStart) {
+    /// Makes a world as `world_start` says, of `frozen_types`, and runs it in
+    /// place of any run: that one dropped first, not to hold both.
+    fn run_world(&mut self, world_start: WorldStart, frozen_types: &Arc<FrozenTypes>) {
         self.running_world = None;
-        let world = crate::start_world(world_start.clone(), &self.frozen_types);
+        let world = crate::start_world(world_start.clone(), frozen_types);
         self.run_in_place(RunningWorld::from_start(world_start, world));
     }
 
@@ -154,7 +165,7 @@ impl HostThread {
         self.worlds += 1;
         // Told before any frame of this world is sent: an ask of it finds it known. The thread gone, there is no one to ask either.
         let world = &running_world.world;
-        _ = self.terrain.send(TerrainRequest::World(WorldTold { world: self.worlds, seed: world.world_info.seed, generation_numbers: world.world_info.generation_numbers.clone(), worldgen: world.worldgen }));
+        _ = self.terrain.send(TerrainRequest::World(WorldTold { world: self.worlds, seed: world.world_info.seed, generation_numbers: world.world_info.generation_numbers.clone(), worldgen: world.worldgen.clone() }));
         self.running_world = Some(running_world);
         self.next_tick = Instant::now();
     }
@@ -166,9 +177,10 @@ impl HostThread {
         let (Some(reset_tuning), Some(running_world)) = (self.reset.take(), &self.running_world) else {
             return;
         };
-        let world_start = WorldStart { generation_numbers: (running_world.world.worldgen.numbers_of_tuning)(&reset_tuning), ..running_world.world_start.clone() };
+        // Remade of its own types: its IDs stay.
+        let (world_start, frozen_types) = (WorldStart { generation_numbers: (running_world.world.worldgen.numbers_of_tuning)(&reset_tuning), ..running_world.world_start.clone() }, Arc::clone(&running_world.world.frozen_types));
         (self.last_outcome, self.world_name) = (Some(format!("the world remade from seed {}, as the sliders have it", utilities::seed::seed_as_hex(world_start.seed))), None);
-        self.run_world(world_start);
+        self.run_world(world_start, &frozen_types);
     }
 
     /// Saves the world run under `world_name`, if one runs.

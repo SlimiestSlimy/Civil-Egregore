@@ -7,7 +7,7 @@ use crate::renderer::ground::relief::{laid_over, tint_on_sand, water_light, FOAM
 use crate::renderer::ground::{shadow_drop, FineGround, SuperchunkGround, KEPT_MARGIN_CELLS, SUPERCHUNK_CELLS_A_SIDE};
 use crate::renderer::paint::{depth_at, each_cloud, in_rain, stage_at, streak_of_rain_on, tree_colour, under_cloud, under_water};
 use basegame::base_types::plane_words::DEEPEST_CLOUD;
-use basegame::base_types::{GRASS, OLDEST_TREE_STAGE, TREE, WET};
+use basegame::base_types::{BaseTypes, OLDEST_TREE_STAGE};
 use protocol::pipe::frame::{bit_set, Cells, NearRectangle, WORD_BITS};
 use basegame::base_types::DEEP_WATER_DEPTH;
 use utilities::tuning::{Tuning, RELIEF_STRENGTH, CAST_SHADOW, STEP_DARK, STEP_LIGHT, GROUND_TEXTURE, WALL_FADE, WALL_LENGTH, WALL_LIT, WALL_SHADE};
@@ -88,7 +88,7 @@ impl CellEdge {
 /// The cells `near_asked` asks for as one picture, from `cells` -- the
 /// superchunks they are in -- and their `kept_grounds`, shaded as `tuning`
 /// says. A cold superchunk, and one past the world shown, is black.
-pub fn paint_near(cells: &[Cells], kept_grounds: &HashMap<(u32, u32), SuperchunkGround>, near_asked: NearRectangle, tuning: &Tuning) -> PaintedNear {
+pub fn paint_near(base_types: &BaseTypes, cells: &[Cells], kept_grounds: &HashMap<(u32, u32), SuperchunkGround>, near_asked: NearRectangle, tuning: &Tuning) -> PaintedNear {
     let pixels_a_cell = near_asked.pixels_a_cell as usize;
     let (first_cell_cartesian, size_cells) = ((near_asked.first_cell_cartesian.0 as usize, near_asked.first_cell_cartesian.1 as usize), (near_asked.size_in_cells.0 as usize, near_asked.size_in_cells.1 as usize));
     let width = size_cells.0 * pixels_a_cell;
@@ -101,19 +101,19 @@ pub fn paint_near(cells: &[Cells], kept_grounds: &HashMap<(u32, u32), Superchunk
         // The superchunk's cells in the picture, from its own top left.
         let picture_columns = first_cell_cartesian.0.max(superchunk_left_column)..(first_cell_cartesian.0 + size_cells.0).min(superchunk_left_column + SUPERCHUNK_CELLS_A_SIDE);
         let picture_rows = first_cell_cartesian.1.max(superchunk_top_row)..(first_cell_cartesian.1 + size_cells.1).min(superchunk_top_row + SUPERCHUNK_CELLS_A_SIDE);
-        let (grass, wet, trees) = (cells.plane(GRASS), cells.plane(WET), cells.plane(TREE));
+        let (grass, wet, trees) = (cells.plane(base_types.grass), cells.plane(base_types.wet), cells.plane(base_types.tree));
         for y in picture_rows.clone() {
             for x in picture_columns.clone() {
                 let (own_x, own_y) = (x - superchunk_left_column, y - superchunk_top_row);
                 let place = place_from_cartesian(own_x as u32, own_y as u32);
                 let is_grass = bit_set(grass, place);
                 let (word, bit_in_word) = (place / WORD_BITS, (place % WORD_BITS) as u32);
-                let water = bit_set(wet, place).then(|| depth_at(cells, word, bit_in_word));
+                let water = bit_set(wet, place).then(|| depth_at(base_types, cells, word, bit_in_word));
                 let cell = Cell { fine_ground, tuning, own_cartesian: (own_x, own_y), world: (cells.top_left.0 as u64 + own_x as u64, cells.top_left.1 as u64 + own_y as u64), cover_colour: if is_grass { GRASS_GREEN } else { DIRT_BROWN }, water };
                 let corner_pixel = ((x - first_cell_cartesian.0) * pixels_a_cell, (y - first_cell_cartesian.1) * pixels_a_cell);
                 cell.paint_cell(&mut rgba_pixels, width, corner_pixel, pixels_a_cell);
                 if bit_set(trees, place) {
-                    tree(&mut rgba_pixels, width, corner_pixel, pixels_a_cell, stage_at(cells, word, bit_in_word));
+                    tree(&mut rgba_pixels, width, corner_pixel, pixels_a_cell, stage_at(base_types, cells, word, bit_in_word));
                 }
             }
         }
@@ -124,7 +124,7 @@ pub fn paint_near(cells: &[Cells], kept_grounds: &HashMap<(u32, u32), Superchunk
             }
         }
         // The clouds' shadows over all of it: each tile's, over those of its cells that are in the picture.
-        each_cloud(cells, |(tile_left, tile_top), tile_side, cloud, is_raining| {
+        each_cloud(base_types, cells, |(tile_left, tile_top), tile_side, cloud, is_raining| {
             let (tile_across, tile_down) = (picture_columns.start.max(superchunk_left_column + tile_left)..picture_columns.end.min(superchunk_left_column + tile_left + tile_side), picture_rows.start.max(superchunk_top_row + tile_top)..picture_rows.end.min(superchunk_top_row + tile_top + tile_side));
             let pixel_rows = (tile_down.start - first_cell_cartesian.1) * pixels_a_cell..(tile_down.end.max(tile_down.start) - first_cell_cartesian.1) * pixels_a_cell;
             let pixel_columns = (tile_across.start - first_cell_cartesian.0) * pixels_a_cell..(tile_across.end.max(tile_across.start) - first_cell_cartesian.0) * pixels_a_cell;

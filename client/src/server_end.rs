@@ -25,6 +25,16 @@ pub struct ServerEnd {
     server_process: Child,
 }
 
+/// What the server shows the window, in the order it sends it: each
+/// world's types, once, before any frame of it; and the frames.
+pub enum Shown {
+    /// A world runs, the `n`-th the server has run: its types, as its save
+    /// holds them.
+    WorldTypes(u64, String),
+    /// A frame asked for.
+    Frame(ViewportFrame),
+}
+
 /// Where the server is told and asked: cloned for each thread that asks.
 #[derive(Clone)]
 pub struct ServerLink {
@@ -42,9 +52,10 @@ struct Writing {
 }
 
 impl ServerEnd {
-    /// Starts the server: this program again, with `--pipe`. Its frames
-    /// come back on the receiver.
-    pub fn start() -> (Self, Receiver<ViewportFrame>) {
+    /// Starts the server: this program again, with `--pipe`. What it
+    /// shows -- each world's types, and its frames -- comes back on the
+    /// receiver.
+    pub fn start() -> (Self, Receiver<Shown>) {
         let program = std::env::current_exe().expect("the program's own path");
         let mut server_process = Command::new(program).arg("--pipe").stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().expect("the server started");
         let (to_server, from_server) = (server_process.stdin.take().expect("the server's stdin"), server_process.stdout.take().expect("the server's stdout"));
@@ -57,8 +68,13 @@ impl ServerEnd {
                 let mut from_server = BufReader::new(from_server);
                 while let Ok(Some(message)) = receive::<ServerMessage>(&mut from_server) {
                     match message {
+                        ServerMessage::WorldTypes(world, types_text) => {
+                            if frame_sender.send(Shown::WorldTypes(world, types_text)).is_err() {
+                                return;
+                            }
+                        }
                         ServerMessage::Frame(frame) => {
-                            if frame_sender.send(*frame).is_err() {
+                            if frame_sender.send(Shown::Frame(*frame)).is_err() {
                                 return;
                             }
                         }

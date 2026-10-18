@@ -2,11 +2,11 @@
 //! this process, the client's messages read from stdin and answered on
 //! stdout (`protocol::pipe::messages`), until the client closes it.
 
-use crate::host::Host;
+use crate::host::{Host, HostSent};
 use crate::{worlds_in, WorldStart};
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use protocol::pipe::terrain::AsksTerrain;
-use protocol::type_registry::FrozenTypes;
+use protocol::world_types::{self, GameTypes};
 use std::io;
 use std::sync::Arc;
 use std::sync::mpsc::channel;
@@ -17,16 +17,21 @@ use utilities::wire::{receive, send};
 /// closes stdin: its asks done by a host of this process's own, the
 /// frames sent as the host makes them, every other ask answered in the
 /// order asked on a thread of its own -- a map takes long, and the
-/// frames go on meanwhile. Worlds made of `frozen_types`, and opened
-/// among them.
-pub fn serve_the_pipe(frozen_types: Arc<FrozenTypes>) -> Result<String, String> {
-    let worldgen = crate::simulation::worldgen_of(&frozen_types)?;
-    let (host, frame_receiver) = Host::start_on_thread(frozen_types);
+/// frames go on meanwhile. Each world's types `game_types`, registered
+/// and frozen before anything of it: a new world's here, as it is
+/// asked for, its generation then asked how to start it; an opened
+/// world's by the host, as its save gave them.
+pub fn serve_the_pipe(game_types: GameTypes) -> Result<String, String> {
+    let (host, host_sent) = Host::start_on_thread(game_types);
     thread::Builder::new()
         .name("frames out".to_string())
         .spawn(move || {
-            for frame in frame_receiver {
-                if send_out(ServerMessage::Frame(Box::new(frame))).is_err() {
+            for sent in host_sent {
+                let message = match sent {
+                    HostSent::WorldRuns(world, frozen_types) => ServerMessage::WorldTypes(world, frozen_types.to_text()),
+                    HostSent::Frame(frame) => ServerMessage::Frame(Box::new(frame)),
+                };
+                if send_out(message).is_err() {
                     return;
                 }
             }
@@ -57,7 +62,11 @@ pub fn serve_the_pipe(frozen_types: Arc<FrozenTypes>) -> Result<String, String> 
             ClientMessage::AskFrame(frame_ask) => _ = host.ask_frame(frame_ask),
             ClientMessage::SetPaused(paused) => _ = host.set_paused(paused),
             ClientMessage::SetPace(pace) => _ = host.set_pace(pace),
-            ClientMessage::MakeWorld(seed, tuning) => _ = host.make_world(WorldStart::from_tuning(seed, &tuning, &worldgen)),
+            ClientMessage::MakeWorld(seed, tuning) => {
+                let frozen_types = Arc::new(world_types::of_a_new_world(game_types)?);
+                let worldgen = crate::simulation::worldgen_of(&frozen_types)?;
+                _ = host.make_world(WorldStart::from_tuning(seed, &tuning, &worldgen), frozen_types);
+            }
             ClientMessage::OpenWorld(world_name) => _ = host.open_world(world_name),
             ClientMessage::Save(world_name) => _ = host.save_world(world_name),
             ClientMessage::Reset(tuning) => _ = host.reset(&tuning),

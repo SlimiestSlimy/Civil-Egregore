@@ -39,6 +39,12 @@ pub enum ClientMessage {
 /// What the server tells a client.
 #[derive(Clone)]
 pub enum ServerMessage {
+    /// A world runs, the `n`-th the server has run: its types as its
+    /// save holds them (`crate::type_registry::FrozenTypes::to_text`),
+    /// sent once, before any frame of it -- what the client freezes its
+    /// own registry of the game's types with, each of the world's ID
+    /// (`crate::world_types::of_a_saved_world`).
+    WorldTypes(u64, String),
     /// Some of the viewport's superchunks, as a tick left them.
     Frame(Box<ViewportFrame>),
     /// The heights asked for, row by row: none if another world runs
@@ -138,6 +144,11 @@ impl Wired for ServerMessage {
                 words.push(3);
                 world_names.put(words);
             }
+            Self::WorldTypes(world, types_text) => {
+                words.push(4);
+                world.put(words);
+                types_text.put(words);
+            }
         }
     }
 
@@ -147,6 +158,7 @@ impl Wired for ServerMessage {
             1 => Self::Heights(taken(Default::default(), wire)?),
             2 => Self::Map(taken(Default::default(), wire)?),
             3 => Self::Worlds(taken(Default::default(), wire)?),
+            4 => Self::WorldTypes(taken(0, wire)?, taken(String::new(), wire)?),
             _ => return None,
         };
         Some(())

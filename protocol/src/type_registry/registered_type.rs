@@ -3,7 +3,7 @@
 //! registration (`super::Hook`).
 
 use super::layouts::{Attribute, Layout};
-use super::type_ids::{AttributeType, EntityRuleType, EntityType, LayerType, ScaRuleType, WidePlane, Width, WorldgenType};
+use super::type_ids::{numbers_taken, AttributeType, EntityRuleType, EntityType, LayerType, ScaRuleType, WidePlane, Width, WorldgenType};
 
 /// A type a world has: its name, and what goes with it by its kind.
 #[derive(Clone, Debug)]
@@ -73,26 +73,6 @@ pub enum RegisteredType {
 }
 
 impl RegisteredType {
-    /// A layer named `name`.
-    pub fn layer(name: &str, layer_type: LayerType) -> Self {
-        Self::Layer { name: name.to_string(), layer_type }
-    }
-
-    /// A wide plane named `name`.
-    pub fn wide_plane<W: Width>(name: &str, wide_plane: WidePlane<W>) -> Self {
-        Self::WidePlane { name: name.to_string(), layer_type: wide_plane.layer_type() }
-    }
-
-    /// A type of entity named `name`, with `default_attribute` if any.
-    pub fn entity<L: Layout>(name: &str, entity_type: EntityType, default_attribute: Option<Attribute<L>>) -> Self {
-        Self::Entity { name: name.to_string(), entity_type, default_attribute: default_attribute.map(Attribute::attribute_type) }
-    }
-
-    /// An attribute named `name`, of a fixed size: its layout's.
-    pub fn attribute<L: Layout>(name: &str, attribute: Attribute<L>) -> Self {
-        Self::Attribute { name: name.to_string(), attribute_type: attribute.attribute_type(), data_words: Some(L::WORDS) }
-    }
-
     /// Its name.
     pub fn name(&self) -> &str {
         match self {
@@ -104,6 +84,30 @@ impl RegisteredType {
     pub fn layer_type(&self) -> Option<LayerType> {
         match self {
             Self::Layer { layer_type, .. } | Self::WidePlane { layer_type, .. } => Some(*layer_type),
+            _ => None,
+        }
+    }
+
+    /// Its plane, if it is a wide plane of `W`.
+    pub fn wide_plane<W: Width>(&self) -> Option<WidePlane<W>> {
+        match self {
+            Self::WidePlane { layer_type, .. } => WidePlane::of_layer_type(*layer_type),
+            _ => None,
+        }
+    }
+
+    /// Its type of entity, if it is one.
+    pub fn entity_type(&self) -> Option<EntityType> {
+        match self {
+            Self::Entity { entity_type, .. } => Some(*entity_type),
+            _ => None,
+        }
+    }
+
+    /// Its attribute, if it is one laid out as `L`.
+    pub fn attribute<L: Layout>(&self) -> Option<Attribute<L>> {
+        match self {
+            Self::Attribute { attribute_type, .. } => Attribute::of_attribute_type(*attribute_type),
             _ => None,
         }
     }
@@ -128,15 +132,6 @@ impl RegisteredType {
     /// The numbers its ID takes: a wide plane one a bit, its cold
     /// planes', anything else one.
     pub fn numbers(&self) -> std::ops::Range<u64> {
-        let (first_number, numbers_taken) = match self {
-            Self::Layer { layer_type, .. } => (layer_type.type_number(), 1),
-            Self::WidePlane { layer_type, .. } => (layer_type.type_number(), u64::from(layer_type.width_bits())),
-            Self::Entity { entity_type, .. } => (entity_type.type_number(), 1),
-            Self::Attribute { attribute_type, .. } => (attribute_type.type_number(), 1),
-            Self::ScaRule { rule, .. } => (rule.type_number(), 1),
-            Self::EntityRule { rule, .. } => (rule.type_number(), 1),
-            Self::Worldgen { worldgen, .. } => (worldgen.type_number(), 1),
-        };
-        first_number..first_number + numbers_taken
+        numbers_taken(self.type_id())
     }
 }

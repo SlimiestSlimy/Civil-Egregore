@@ -4,18 +4,18 @@
 //! the generation's to know.
 
 use crate::worldgen::climate::ClimateNoises;
-use crate::worldgen::{WorldGeneration, Terrain, WALLS};
-use crate::base_types::{CLIMATE, COLLISION, ELEVATION, GRASS, HEIGHT, OLDEST_TREE_STAGE, TREE, TREE_STAGE, WATER_DEPTH, WET};
+use crate::worldgen::{WorldGeneration, Terrain};
+use crate::base_types::{BaseTypes, OLDEST_TREE_STAGE};
 use server::simulation::simulation_api::{CellCartesian, GeneratedArea};
 
 /// Writes the cells of `generated_area`'s area in a world made from
-/// `seed` as `world_generation` says: its terrain -- every cell's height
+/// `seed`, on the planes of `base_types`, as `world_generation` says: its terrain -- every cell's height
 /// and walls -- the ocean where it is under the ocean's level, as deep
 /// as it is lower, and on the rest grass in patches -- dirt where there
 /// is none -- and trees in patches of their own, each of a stage drawn
 /// for its cell; and over all of it the climate, a tile at a time
 /// ([`ClimateNoises`]) -- the same whenever it is made.
-pub fn generate_area(world_generation: &WorldGeneration, seed: u64, generated_area: &mut GeneratedArea) {
+pub fn generate_area(base_types: &BaseTypes, world_generation: &WorldGeneration, seed: u64, generated_area: &mut GeneratedArea) {
     let area = generated_area.area();
     let terrain = Terrain::generate_shaped(&world_generation.land_shape, seed, area);
     let ocean = world_generation.land_shape.ocean;
@@ -23,8 +23,8 @@ pub fn generate_area(world_generation: &WorldGeneration, seed: u64, generated_ar
     for (y, x) in (0..area.side_cells).flat_map(|y| (0..area.side_cells).map(move |x| (y, x))) {
         let cell = CellCartesian { x: area.top_left.x + x, y: area.top_left.y + y };
         let height = terrain.height(x, y);
-        generated_area.set_value(HEIGHT, cell, height.into());
-        for (way, &(wall_layer, _)) in WALLS.iter().enumerate() {
+        generated_area.set_value(base_types.height, cell, height.into());
+        for (way, wall_layer) in base_types.walls().into_iter().enumerate() {
             if terrain.keeps_wall(way, x, y) {
                 generated_area.set(wall_layer, cell);
             }
@@ -32,29 +32,29 @@ pub fn generate_area(world_generation: &WorldGeneration, seed: u64, generated_ar
         // Nothing grows under water.
         let water_depth = ocean.saturating_sub(height);
         if water_depth > 0 {
-            generated_area.set_value(WATER_DEPTH, cell, water_depth.into());
-            generated_area.set(WET, cell);
+            generated_area.set_value(base_types.water_depth, cell, water_depth.into());
+            generated_area.set(base_types.wet, cell);
             continue;
         }
         let grown_cell = cell_growth.grown_at(cell.x, cell.y);
         if grown_cell.has_grass {
-            generated_area.set(GRASS, cell);
+            generated_area.set(base_types.grass, cell);
         }
         if let Some(tree_lot) = grown_cell.tree {
-            generated_area.set(TREE, cell);
+            generated_area.set(base_types.tree, cell);
             // Where a tree stands is not stepped on.
-            generated_area.set(COLLISION, cell);
+            generated_area.set(base_types.collision, cell);
             // Its stage: a lot of the cell's own.
-            generated_area.set_value(TREE_STAGE, cell, (tree_lot % (OLDEST_TREE_STAGE as u64 + 1)) as u32);
+            generated_area.set_value(base_types.tree_stage, cell, (tree_lot % (OLDEST_TREE_STAGE as u64 + 1)) as u32);
         }
     }
     // The climate, a number a tile, worked out at the tile's middle cell; and how high the tile stands over the ocean there: what the air's moves are held against.
-    let (mut climate, tile_side) = (ClimateNoises::new(seed), CLIMATE.layer_type().tile_side());
+    let (mut climate, tile_side) = (ClimateNoises::new(seed), base_types.climate.layer_type().tile_side());
     for (tile_y, tile_x) in (0..area.side_cells / tile_side).flat_map(|tile_y| (0..area.side_cells / tile_side).map(move |tile_x| (tile_y, tile_x))) {
         let (x, y) = (tile_x * tile_side + tile_side / 2, tile_y * tile_side + tile_side / 2);
         let middle_cell = CellCartesian { x: area.top_left.x + x, y: area.top_left.y + y };
         let height_above_ocean = terrain.height(x, y).saturating_sub(ocean);
-        generated_area.set_value(CLIMATE, middle_cell, climate.climate_at(middle_cell.x, middle_cell.y, height_above_ocean, terrain.height(x, y) < ocean).plane_number());
-        generated_area.set_value(ELEVATION, middle_cell, u32::from(height_above_ocean).min(ELEVATION.most_value()));
+        generated_area.set_value(base_types.climate, middle_cell, climate.climate_at(middle_cell.x, middle_cell.y, height_above_ocean, terrain.height(x, y) < ocean).plane_number());
+        generated_area.set_value(base_types.elevation, middle_cell, u32::from(height_above_ocean).min(base_types.elevation.most_value()));
     }
 }

@@ -6,16 +6,13 @@
 use server::simulation::simulation_api::compare_and_write::{self, SkipTagSet};
 use server::simulation::simulation_api::{entity_reads_and_writes, AttributeBlock, CellIndex, EntityType, Header, LayerType, SimulationTickState};
 
-/// The collision plane's library, as its registration exposes it.
-pub static COLLISION: Collision = Collision { plane: crate::base_types::COLLISION };
-
 /// What an entity that collides does through the collision plane: what
 /// stands on a cell bars it, and it bars the cell it stands on.
 #[derive(Debug)]
 pub struct Collision {
     /// The plane: a cell set wherever something stands that bars
     /// stepping there.
-    plane: LayerType,
+    pub plane: LayerType,
 }
 
 impl Collision {

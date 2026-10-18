@@ -9,6 +9,7 @@ use utilities::coordinates::CellIndex;
 use crate::simulation::SimulationTickState;
 use protocol::type_registry::{EntityType, LayerType, Library};
 use utilities::chance::Chance;
+use std::sync::Arc;
 
 /// What a rule is of: its master, as the world's types say it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -51,15 +52,33 @@ impl RuleContext {
     }
 }
 
+/// A rule on one superchunk's turn, with what it runs with: made as its
+/// type is registered, with the IDs of the types it works on.
+pub type RuleRun = dyn Fn(&mut SimulationTickState, &RuleContext) -> RuleCounts + Send + Sync;
+
 /// What runs a rule: what it counts, each named at its place in its
 /// counts, and the rule on one superchunk's turn, with what it runs
 /// with.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone)]
 pub struct RuleCode {
     /// What it counts.
     pub count_names: &'static [&'static str],
     /// The rule, on one superchunk's turn.
-    pub run: fn(&mut SimulationTickState, &RuleContext) -> RuleCounts,
+    pub run: Arc<RuleRun>,
+}
+
+impl RuleCode {
+    /// The rule `run`, counting `count_names`.
+    pub fn new(count_names: &'static [&'static str], run: impl Fn(&mut SimulationTickState, &RuleContext) -> RuleCounts + Send + Sync + 'static) -> Self {
+        Self { count_names, run: Arc::new(run) }
+    }
+}
+
+impl std::fmt::Debug for RuleCode {
+    /// What it counts: what the rule is, only its code knows.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.debug_struct("RuleCode").field("count_names", &self.count_names).finish_non_exhaustive()
+    }
 }
 
 /// One superchunk's turn of a rule of the cells: `rule`, the function on

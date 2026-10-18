@@ -2,7 +2,7 @@
 //! superchunk's image a sprite each, and from near one picture of the
 //! viewport's cells (`docs/renderer.md`, "The window asks").
 
-use crate::renderer::hud::COUNTED;
+use crate::renderer::hud::counted_layers;
 use crate::renderer::link::{HostLink, LastFrameSeen};
 use crate::renderer::map::MapLink;
 use crate::renderer::mipmaps::{picture_with_mipmaps, MipmapsDue};
@@ -13,7 +13,6 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use utilities::coordinates::SUPERCHUNK_SIDE_CELLS;
 use protocol::pipe::frame::{FrameAsk, NearRectangle, Viewport};
-use basegame::base_types::{CLIMATE, CLOUD, GRASS, HEIGHT, TREE, TREE_STAGE, WATER_DEPTH, WET};
 
 /// Seconds from one frame asked for to the next, at least: no oftener
 /// than a screen shows them.
@@ -122,7 +121,7 @@ pub fn show_frames(
             }
         }
         last_seen.climates.extend(painted_picture.climates);
-        (last_seen.last_frame, last_seen.painted_superchunks, last_seen.paint_seconds) = (Some(painted_picture.host_frame), last_seen.painted_superchunks + painted_picture.superchunks.len(), painted_picture.paint_seconds);
+        (last_seen.last_frame, last_seen.base_types, last_seen.painted_superchunks, last_seen.paint_seconds) = (Some(painted_picture.host_frame), Some(painted_picture.base_types), last_seen.painted_superchunks + painted_picture.superchunks.len(), painted_picture.paint_seconds);
         for painted_superchunk in painted_picture.superchunks {
             let (superchunk_cartesian, side_pixels) = (painted_superchunk.superchunk_cartesian, painted_superchunk.side_pixels);
             // Its mipmaps are the graphics card's to make, each time its pixels change.
@@ -218,12 +217,19 @@ pub fn ask_next_frame(
         Some(last_ask) if near_wanted.is_none() && last_ask.seen_near.is_none() && last_ask.viewport == viewport && last_ask.pixel_side_log2 == detail_shift && last_ask.superchunks_skipped.saturating_add(last_ask.most_superchunks) < hot => last_ask.superchunks_skipped + last_ask.most_superchunks,
         _ => 0,
     };
-    // The planes painted, its trees' stages only where a tree is a cell or more; and what the head-up text counts.
-    let mut planes = vec![GRASS, TREE, WET, CLOUD.layer_type(), CLIMATE.layer_type(), HEIGHT.layer_type(), WATER_DEPTH.layer_type()];
-    if near_wanted.is_some() || detail_shift == 0 {
-        planes.push(TREE_STAGE.layer_type());
-    }
-    let next_ask = FrameAsk { viewport, pixel_side_log2: detail_shift, superchunks_skipped: skipped_superchunks, most_superchunks, seen_near: near_wanted, planes, counted: COUNTED.to_vec() };
+    // The planes painted, its trees' stages only where a tree is a cell or more; and what the head-up text counts. None until the
+    // world's types are known: its first frame brings them.
+    let (planes, counted) = match &last_seen.base_types {
+        Some(base_types) => {
+            let mut planes = vec![base_types.grass, base_types.tree, base_types.wet, base_types.cloud.layer_type(), base_types.climate.layer_type(), base_types.height.layer_type(), base_types.water_depth.layer_type()];
+            if near_wanted.is_some() || detail_shift == 0 {
+                planes.push(base_types.tree_stage.layer_type());
+            }
+            (planes, counted_layers(base_types).to_vec())
+        }
+        None => (Vec::new(), Vec::new()),
+    };
+    let next_ask = FrameAsk { viewport, pixel_side_log2: detail_shift, superchunks_skipped: skipped_superchunks, most_superchunks, seen_near: near_wanted, planes, counted };
     (last_seen.viewport_superchunks, last_seen.detail_shift, last_seen.near_pixels) = (viewport_superchunks, detail_shift, near_wanted.map_or(0, |asked_near| asked_near.pixels_a_cell));
     // Fine images of superchunks gone out of the viewport are dropped, each 4 MiB here and as much on the graphics card; and every one out of it, once there are very many.
     let too_many_kept = superchunk_sprites.tiles.len() > TILES_KEPT;

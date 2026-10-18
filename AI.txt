@@ -139,8 +139,13 @@ Boundaries, asked first, would have put that on the table.
   through simulation_api alone (tests/fine/docs.rs checks).
 - THE TYPE REGISTRY: dynamic, frozen per world, names unique ("that's
   our invariant"), saved as a world's types.csv; base types in
-  basegame/src/default_types.rs, frozen by initialization (src/main.rs)
-  and handed to the server.
+  basegame/src/default_types.rs. Frozen per world, before the server
+  inits (REGISTRY FIRST): IDs on demand for a new world, from
+  types.csv for a saved one; after freezing, lookups by ID only ("lookups
+  by name? that should only happen before freezing"), the names kept
+  ("we need it for locating stuff later on"). "the idea of the frozen
+  registry is to downcast everything possible and remove all
+  indirection basically / but for now its fine just doing id lookups".
   A type's code is its library. Hooks
   ("just another parameter on the registry types"): GeneratesTheWorld,
   RunsEveryTick, KeepsTheWorldHot ("good use of hook there") -- the
@@ -195,6 +200,58 @@ NOW
   depths as planes, base_types off utilities (DONE 2026-10-18); (e)
   NEXT: REGISTRY FIRST (below), then the client rewrite rendering from
   the frozen types.
+- HANDOFF 2026-10-18 (cloud -> local; "were going back to my local
+  session, please push all work and write a handoff messsge in ai.txt").
+  Pushed to main as WORK IN PROGRESS: REGISTRY FIRST is wired end to
+  end, but NOT CLIPPED AND NOT TESTED -- the user stopped the clippy run.
+  Built clean: protocol, basegame, utilities, server, the headless root
+  (`-p Civil_Egregore --no-default-features`), the client
+  (`cargo build -p client`, without --all-targets). Not built yet: the
+  client's tests (`--all-targets`), every test crate.
+  What is in:
+  * protocol: TypeRegistry::for_new_world / for_saved_world, register
+    -> RegisteredType with its ID (one counter, from 1),
+    register_with_own_library (a library made of its own type's ID:
+    collision), freeze -> FrozenTypes (Debug lists them).
+    protocol::world_types: GameTypes = fn(&mut TypeRegistry) ->
+    Result<(), String>, TYPES_FILE, of_a_new_world, of_a_saved_world,
+    saved_in. pipe: ServerMessage::WorldTypes(world, text), wire tag 4.
+  * basegame: default_types::register -> BaseTypes (a Copy struct of
+    every ID); register_types is the GameTypes initialization hands
+    over. Rules and worldgen are closures capturing BaseTypes
+    (RuleCode::new, WorldgenCode's generate_cells/populate Arcs). No
+    ID consts left.
+  * server: start / commands / load_world / Host::start_on_thread take
+    GameTypes; each world's registry frozen before the world inits;
+    HostRequest::MakeWorld(WorldStart, Arc<FrozenTypes>).
+    Host output HostSent::{WorldRuns(world, Arc<FrozenTypes>),
+    Frame(..)}: the types ONCE a world, before its first frame (the
+    user: "the client, a the server, recieves the frozen set once, not
+    per frame"); pipe_end sends them as ServerMessage::WorldTypes.
+  * client (interim, until the rewrite): server_end's Shown::{WorldTypes,
+    Frame}; the painter freezes the text once a world
+    (renderer/world_types.rs base_types_of: for_saved_world + register +
+    freeze) and puts BaseTypes in every PaintedFrame;
+    LastFrameSeen.base_types; the ask's planes and counts and the HUD's
+    counts (hud::counted_layers) from it, empty until known.
+  Left, in order:
+  1. clippy --all-targets on the headless pkgs, the root and the
+     client; then the tests to the new APIs: tests/fast/* (host.rs:
+     HostSent, make_world with frozen types), tests/fine/
+     {type_registry, entity_manager}.rs (type_registry rewritten),
+     tests/shared/worlds.rs (worlds::types()),
+     tests/complete/worlds_run_long.rs, server/tests/fast/around.rs.
+     tests/fast/world.rs:176 changes meaning: a type missing from the
+     save gets a fresh ID now (a saved type nobody registers is still
+     refused, by freeze). Then tests, one at a time.
+  2. Unchecked (mine): after a world switch the client asks one frame
+     with the old world's IDs until the new world's first frame is
+     painted -- check the server ignores planes it doesn't hold.
+  3. The client rewrite: rendering from the frozen registry ("we need
+     to rewrite the client asap so it can take rendering stuff from the
+     frozen registry"); its design with the user first. "i believe we
+     already had the capability to include librarie handles (hooks are
+     something else) on all types" -- yes: any type can carry a library.
 - REGISTRY FIRST (the user, 2026-10-18: "very important"): "the type
   registry is not initialized until a new world is created or an
   existing world selected for loading. either HEADLESS or with client
@@ -205,16 +262,8 @@ NOW
   is also the first steps of world loading before server inits
   basically"; "then server loads the rest based on the frozen type
   registry, and rendering renders based on the frozen registry as
-  well". Today: src/main.rs builds default_frozen_types() at program
-  start; basegame's IDs are consts (HEIGHT = 88 ...); of_saved_text
-  only checks saved IDs equal the consts. To be: protocol's world
-  initialization (new: register, IDs on demand, freeze; load: read
-  types.csv, the saved IDs by name, freeze), the server handed only a
-  frozen registry; basegame finds its IDs by name in the frozen
-  registry at world start, through the simulation API; the client
-  given the same frozen registry, drawing from it ("we need to rewrite
-  the client asap so it can take rendering stuff from the frozen
-  registry").
+  well". Wired (see HANDOFF); basegame gets its IDs as it registers,
+  not by name after freezing.
 - MODULES, NOT CRATES (the user, 2026-10-17: "every folder inside top
   level folders should be a module, not a crate"; "were doing code
   decopuling en masse basi[cally]"): utilities/bitmap and coordinates
@@ -225,10 +274,9 @@ NOW
 - THE CLIENT GETS THE WORLD'S TYPES: "type can include optional
   utilities, client should get a copy of the frozen type registry on
   server start. and therefore can use the libraries that the registered
-  types can include". A type's library is joined to it by name
-  (TypeRegistry::of_saved_text), so the server sends the frozen types'
-  text and the client rebuilds them against the default registry it
-  links. Ties to CLIENT HOOKS ("this ties to something we need to do"):
+  types can include". The server sends the frozen types' text once a
+  world; the client registers the base game against it and freezes
+  (interim, see HANDOFF). Ties to CLIENT HOOKS ("this ties to something we need to do"):
   hooks on registered types for the client, as the server's; the
   climate labels read a climate through its type's library. Sliders and
   the server's reset get client hooks later ("dont focus too much on

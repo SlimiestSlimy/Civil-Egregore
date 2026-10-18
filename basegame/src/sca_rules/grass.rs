@@ -4,7 +4,7 @@
 //! pass for both (`docs/sca_rules.md`, "Grass").
 
 use crate::sca_rules::growing::{humid_enough_to_spread, too_harsh_to_live};
-use crate::base_types::{GRASS, WET};
+use crate::base_types::BaseTypes;
 use server::simulation::simulation_api::simulation_time::SimulationTime;
 use server::simulation::simulation_api::{on_each_sampled, RuleCode, cell_reads_and_writes, place_counted, tick_and_random_stream, CellIndex, Chance, RuleCounts, SimulationTickState, NEIGHBOUR_OFFSETS};
 
@@ -29,9 +29,11 @@ pub const SAMPLE_CHANCE: Chance = SPREAD_CHANCE.plus_disjoint(DECAY_CHANCE);
 /// What the rule counts, each named at its place in its
 /// [`RuleCounts`]: the one order, the places below worked out from it.
 pub const COUNT_NAMES: [&str; 3] = ["sampled", "spreads", "decays"];
-/// What runs the grass's rule, as it is registered: [`rule`] on each
-/// sample of its master, chosen with [`SAMPLE_CHANCE`].
-pub const CODE: RuleCode = RuleCode { count_names: &COUNT_NAMES, run: |tick_state, context| on_each_sampled(tick_state, context.master, SAMPLE_CHANCE, rule) };
+/// What runs the grass's rule, as it is registered with `base_types`:
+/// [`rule`] on each sample of its master, chosen with [`SAMPLE_CHANCE`].
+pub fn code(base_types: BaseTypes) -> RuleCode {
+    RuleCode::new(&COUNT_NAMES, move |tick_state, context| on_each_sampled(tick_state, context.master, SAMPLE_CHANCE, |tick_state, cell, counts| rule(&base_types, tick_state, cell, counts)))
+}
 /// Cells of grass sampled.
 pub const SAMPLED_COUNT: usize = place_counted(&COUNT_NAMES, "sampled");
 /// Cells grass spread onto: counted as each is applied, so two
@@ -51,19 +53,19 @@ pub const DECAYS_COUNT: usize = place_counted(&COUNT_NAMES, "decays");
 /// held against its climate, it decays with a chance of the
 /// harshness of its tile's ([`too_harsh_to_live`]).
 #[inline]
-pub fn rule(tick_state: &mut SimulationTickState, cell: CellIndex, counts: &mut RuleCounts) {
+pub fn rule(base_types: &BaseTypes, tick_state: &mut SimulationTickState, cell: CellIndex, counts: &mut RuleCounts) {
     counts[SAMPLED_COUNT] += 1;
     if tick_and_random_stream::random_stream(tick_state).chance_among(SPREAD_CHANCE, SAMPLE_CHANCE) {
         let (dx, dy) = NEIGHBOUR_OFFSETS[tick_and_random_stream::random_stream(tick_state).draw_below(NEIGHBOUR_OFFSETS.len() as u64) as usize];
         // Stepped on the Morton index itself: no cartesian coordinates.
         // Dirt is a cell with no grass on it: no layer of its own.
         // And grass does not spread under water; a world with no water has none.
-        if let Some(neighbour_cell) = cell.at_cartesian_offset(dx, dy).filter(|&candidate_cell| cell_reads_and_writes::layer_lacks(tick_state, GRASS, candidate_cell) && !cell_reads_and_writes::layer_holds(tick_state, WET, candidate_cell))
-            && humid_enough_to_spread(tick_state, neighbour_cell)
+        if let Some(neighbour_cell) = cell.at_cartesian_offset(dx, dy).filter(|&candidate_cell| cell_reads_and_writes::layer_lacks(tick_state, base_types.grass, candidate_cell) && !cell_reads_and_writes::layer_holds(tick_state, base_types.wet, candidate_cell))
+            && humid_enough_to_spread(base_types, tick_state, neighbour_cell)
         {
-            cell_reads_and_writes::set_counted(tick_state, GRASS, neighbour_cell, SPREADS_COUNT);
+            cell_reads_and_writes::set_counted(tick_state, base_types.grass, neighbour_cell, SPREADS_COUNT);
         }
-    } else if too_harsh_to_live(tick_state, cell) {
-        cell_reads_and_writes::clear_counted(tick_state, GRASS, cell, DECAYS_COUNT);
+    } else if too_harsh_to_live(base_types, tick_state, cell) {
+        cell_reads_and_writes::clear_counted(tick_state, base_types.grass, cell, DECAYS_COUNT);
     }
 }

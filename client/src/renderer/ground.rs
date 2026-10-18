@@ -12,7 +12,7 @@ use relief::{slope_light, height_tint, water_light, FOAM_COLOUR, PALE_COLOUR, SA
 
 use utilities::coordinates::{place_from_cartesian, SUPERCHUNK_SIDE_CELLS};
 use std::collections::HashMap;
-use basegame::base_types::HEIGHT;
+use protocol::type_registry::{Bits16, Width};
 use protocol::pipe::frame::value_at;
 use protocol::pipe::terrain::{AsksTerrain, Height, HeightsAsk, DrawnHeightRange};
 
@@ -223,7 +223,7 @@ impl SuperchunkGround {
     }
 }
 
-/// Heights already worked out: a superchunk's plane of [`HEIGHT`] by
+/// Heights already worked out: a superchunk's plane of heights by
 /// its top left cell.
 pub type GivenHeights<'a> = HashMap<(u32, u32), &'a [u64]>;
 
@@ -243,7 +243,7 @@ fn heights(terrain: &dyn AsksTerrain, world: u64, top_left: (u32, u32), given_he
             let (in_x, in_y) = (x % SUPERCHUNK_CELLS_A_SIDE as u32, y % SUPERCHUNK_CELLS_A_SIDE as u32);
             let superchunk_run = (SUPERCHUNK_CELLS_A_SIDE - in_x as usize).min(WORKED_SIDE_CELLS - cells_across);
             if let Some(words) = given_heights.get(&(x - in_x, y - in_y)) {
-                heights[cells_across..cells_across + superchunk_run].iter_mut().zip(0u32..).for_each(|(height, cells_along)| *height = value_at(words, HEIGHT.layer_type().width_bits(), place_from_cartesian(in_x + cells_along, in_y)) as Height);
+                heights[cells_across..cells_across + superchunk_run].iter_mut().zip(0u32..).for_each(|(height, cells_along)| *height = value_at(words, Bits16::BITS_A_CELL, place_from_cartesian(in_x + cells_along, in_y)) as Height);
             }
             cells_across += superchunk_run;
         }
@@ -261,14 +261,25 @@ mod tests {
     #[test]
     fn shadows_are_the_same_from_both_sides_of_an_edge() {
         use protocol::pipe::frame::FrameAsk;
-        use basegame::worldgen::world_generation::WORLD_GENERATION;
+        use basegame::default_types::register_types;
         use basegame::worldgen::WorldGeneration;
-        let frozen_types = basegame::default_types::default_frozen_types();
+        use std::sync::Arc;
+        // A new world's types frozen first, as the server freezes them.
+        let frozen_types = Arc::new(protocol::world_types::of_a_new_world(register_types).expect("the base game's types"));
+        let worldgen = server::simulation::worldgen_of(&frozen_types).expect("a world generation");
         let generation_numbers = WorldGeneration { sheep_per_superchunk: 1, ..WorldGeneration::DEFAULT }.numbers();
-        let world_start = server::WorldStart { seed: server::seed_fit_to_start(crate::renderer::test_seed::TestSeedHandle::open().seed(), &generation_numbers, &WORLD_GENERATION), generation_numbers, ..server::WorldStart::default() };
-        let (host, frame_receiver) = server::host::Host::start_on_thread(frozen_types.clone());
-        assert!(host.set_paused(true) && host.make_world(world_start.clone()) && host.ask_frame(FrameAsk::default()));
-        let first_frame = frame_receiver.recv_timeout(std::time::Duration::from_secs(1800)).expect("a frame of the world made");
+        let world_start = server::WorldStart { seed: server::seed_fit_to_start(crate::renderer::test_seed::TestSeedHandle::open().seed(), &generation_numbers, &worldgen), generation_numbers, ..server::WorldStart::default() };
+        let (host, frame_receiver) = server::host::Host::start_on_thread(register_types);
+        assert!(host.set_paused(true) && host.make_world(world_start.clone(), frozen_types) && host.ask_frame(FrameAsk::default()));
+        // The world's types, sent once before its first frame; then its frames.
+        let received = || frame_receiver.recv_timeout(std::time::Duration::from_secs(1800)).expect("the world made");
+        let server::host::HostSent::WorldRuns(_, world_types) = received() else { panic!("a frame before the world's types") };
+        let height = crate::renderer::world_types::base_types_of(&world_types.to_text()).expect("the world's types").height.layer_type();
+        let next_frame = || match received() {
+            server::host::HostSent::Frame(frame) => frame,
+            server::host::HostSent::WorldRuns(..) => panic!("the world's types sent twice"),
+        };
+        let first_frame = next_frame();
         let terrain = host.terrain();
         let origin_top_left = utilities::coordinates::WORLD_MIDDLE.top_left().cartesian();
         let (origin_left, origin_top, side_cells) = (origin_top_left.x, origin_top_left.y, SUPERCHUNK_CELLS_A_SIDE as u32);
@@ -284,15 +295,15 @@ mod tests {
         assert_eq!(differing_lines, 0, "shadow lines unlike over an edge");
         // The origin's heights as a frame brings them.
         let (middle_x, middle_y) = utilities::coordinates::WORLD_MIDDLE.cartesian();
-        let origin_ask = FrameAsk { viewport: Some(protocol::pipe::frame::Viewport { top_left_superchunk_cartesian: (middle_x, middle_y), bottom_right_superchunk_cartesian: (middle_x, middle_y) }), most_superchunks: u32::MAX, planes: vec![HEIGHT.layer_type()], ..FrameAsk::default() };
+        let origin_ask = FrameAsk { viewport: Some(protocol::pipe::frame::Viewport { top_left_superchunk_cartesian: (middle_x, middle_y), bottom_right_superchunk_cartesian: (middle_x, middle_y) }), most_superchunks: u32::MAX, planes: vec![height], ..FrameAsk::default() };
         let origin_cells = loop {
             assert!(host.ask_frame(origin_ask.clone()));
-            let origin_frame = frame_receiver.recv_timeout(std::time::Duration::from_secs(1800)).expect("a frame of the world made");
+            let origin_frame = next_frame();
             if let Some(cells) = origin_frame.cells.into_iter().find(|cells| cells.top_left == (origin_left, origin_top)) {
                 break cells;
             }
         };
-        let brought_ground = fine_ground_at((origin_left, origin_top), &[((origin_left, origin_top), origin_cells.plane(HEIGHT.layer_type()))].into_iter().collect());
+        let brought_ground = fine_ground_at((origin_left, origin_top), &[((origin_left, origin_top), origin_cells.plane(height))].into_iter().collect());
         let cells = || (0..SUPERCHUNK_CELLS_A_SIDE as isize).flat_map(|y| (0..SUPERCHUNK_CELLS_A_SIDE as isize).map(move |x| (x, y)));
         assert!(cells().all(|(x, y)| brought_ground.height(x, y) == origin_ground.height(x, y) && brought_ground.shadow_line(x, y) == origin_ground.shadow_line(x, y)), "heights brought unlike those asked for");
         // Asked of a world the host does not run: no answer, and a ground flat at the ocean's level.

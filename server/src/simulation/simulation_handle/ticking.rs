@@ -36,7 +36,7 @@ impl SimulationHandle {
     /// is populated on its turn first, by the world's generation: the tick
     /// makes what lives there, under compares as a rule does.
     pub fn tick_only(&mut self, chosen_rules: ChosenRules, each_rule_timed: bool) -> TickReport<TickCounts> {
-        let (seed, worldgen, rules, generation_numbers, unpopulated) = (self.seed, self.worldgen, &self.rules, &self.generation_numbers, &self.unpopulated);
+        let (seed, worldgen, rules, generation_numbers, unpopulated) = (self.seed, &self.worldgen, &self.rules, &self.generation_numbers, &self.unpopulated);
         // Those hot now have their turn: each of them unpopulated is populated on it.
         let hot_now = (!unpopulated.is_empty()).then(|| self.bitmap_arena.superchunk_indices());
         let report = self.world_simulation.tick(&mut self.bitmap_arena, &mut self.entity_store, seed, |tick_state| {
