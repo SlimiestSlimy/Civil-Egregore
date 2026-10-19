@@ -3,13 +3,12 @@
 //! frame is asked for and while frames are asked for as a window asks
 //! -- one at a time, sixty a second at most, going round the viewport.
 
-use crate::asking_the_host::{counted, drawn_planes, frame_that, seed, whole_answer, ProbedServer};
+use crate::asking_the_host::{camera_world, counted, drawn_planes, frame_that, seed, whole_answer, ProbedServer};
 use utilities::coordinates::WORLD_MIDDLE;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame, Viewport};
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 use crate::ProbeParameters;
-use utilities::tuning::{default_tuning, CAMERA_LOADS, SHEEP_PER_SUPERCHUNK, WORLD_SIDE};
 
 /// Sheep each superchunk generated in the viewport is given.
 pub const SHEEP_A_SUPERCHUNK: &str = "sheep";
@@ -49,14 +48,12 @@ fn ask_one_frame(host: &mut ProbedServer, frame_receiver: &Receiver<ViewportFram
 /// those with frames asked.
 pub fn run_probe(given_parameters: &ProbeParameters) -> Result<(), String> {
     let (sheep_a_superchunk, viewport_side, seconds_measured, most_superchunks, pace_ticks_a_second): (f32, u32, f64, u32, u32) = (given_parameters.argument_number(SHEEP_A_SUPERCHUNK)?, given_parameters.argument_number(VIEWPORT_SIDE)?, given_parameters.argument_number(SECONDS_MEASURED)?, given_parameters.argument_number(SUPERCHUNKS_A_FRAME)?, given_parameters.argument_number(PACE_TICKS_A_SECOND)?);
-    let mut tuning = default_tuning();
-    (tuning[WORLD_SIDE], tuning[CAMERA_LOADS], tuning[SHEEP_PER_SUPERCHUNK]) = (0.0, 1.0, sheep_a_superchunk);
     let (middle_x, middle_y) = WORLD_MIDDLE.cartesian();
     let viewport_first_cartesian = (middle_x - viewport_side / 2, middle_y - viewport_side / 2);
     let viewport = Viewport { top_left_superchunk_cartesian: viewport_first_cartesian, bottom_right_superchunk_cartesian: (viewport_first_cartesian.0 + viewport_side.max(1) - 1, viewport_first_cartesian.1 + viewport_side.max(1) - 1) };
     let (mut host, frame_receiver) = ProbedServer::start(&given_parameters.argument_text(OVER_PIPE)?);
     host.set_pace(None);
-    host.make_world(seed(given_parameters)?, tuning);
+    host.make_world(camera_world(seed(given_parameters)?, sheep_a_superchunk as u64));
     let whole_frame = frame_that(&mut host, &frame_receiver, Some(viewport), |answered_frame| answered_frame.hot.len() as u32 >= viewport_side * viewport_side)?;
     host.set_pace((pace_ticks_a_second != 0).then_some(pace_ticks_a_second));
     println!("# seed {}, {} superchunks hot in the viewport, {} entities", utilities::seed::seed_as_hex(whole_frame.seed), whole_frame.hot.len(), whole_frame.entity_count);

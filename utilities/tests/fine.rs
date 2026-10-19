@@ -21,9 +21,6 @@ mod dispatcher;
 #[path = "fine/settings.rs"]
 mod settings;
 
-#[path = "fine/tuning.rs"]
-mod tuning;
-
 #[path = "fine/chance.rs"]
 mod chance;
 

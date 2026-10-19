@@ -3,12 +3,11 @@
 //! what grows on a cell; a seed with land where a flock is to stand
 //! (`docs/worldgen.md`, "Generation").
 
-use crate::worldgen::mesh::{WorldLand, SIGMOID_ONE};
+use crate::worldgen::mesh::WorldLand;
 use crate::worldgen::patches::Patches;
 use crate::worldgen::{SmoothNoise, LandShape, FRACTION_ONE};
 use server::simulation::simulation_api::{CellCartesian, SUPERCHUNK_SIDE_CELLS};
 use crate::worldgen::lots::mix_word;
-use server::simulation::simulation_api::tuning::{self, Tuning};
 
 /// What keeps the trees' numbers apart from the grass's.
 pub const TREES_SALT: u64 = 0x7472_6565_735F_6C6F;
@@ -144,19 +143,6 @@ impl WorldGeneration {
         sheep_per_superchunk: FLOCK,
     };
 
-    /// As the sliders' numbers have it: what is typed held to what a
-    /// height, the mesh and the noise can take.
-    pub fn from_tuning(slider_tuning: &Tuning) -> Self {
-        let of_one = |share_typed: f32| (share_typed.clamp(0.0, 1024.0) * FRACTION_ONE as f32) as u64;
-        let patches = |[cover_slider, patch_slider, detail_slider, scatter_slider]: [usize; 4]| Patches { cover_share: of_one(slider_tuning[cover_slider]), patch_size_power: slider_tuning[patch_slider].round().clamp(0.0, 16.0) as u32, detail_share: of_one(slider_tuning[detail_slider]), scatter_share: of_one(slider_tuning[scatter_slider]) };
-        Self {
-            land_shape: shape_from_tuning(slider_tuning),
-            grass_patches: patches([tuning::GRASS_COVER, tuning::GRASS_PATCH, tuning::GRASS_DETAIL, tuning::GRASS_SCATTER]),
-            trees: patches([tuning::TREE_COVER, tuning::TREE_PATCH, tuning::TREE_DETAIL, tuning::TREE_SCATTER]),
-            sheep_per_superchunk: slider_tuning[tuning::SHEEP_PER_SUPERCHUNK].max(0.0) as u64,
-        }
-    }
-
     /// What grows in a world of `seed` generated so: the thresholds
     /// found once, each cell then asked ([`WorldGrowth::grown_at`]).
     pub fn world_growth(&self, seed: u64) -> WorldGrowth {
@@ -171,36 +157,6 @@ impl WorldGeneration {
             grass_under: self.grass_patches.cover_threshold(seed) * self.grass_patches.weights(),
             trees_under: self.trees.cover_threshold(trees_seed) * self.trees.weights(),
         }
-    }
-}
-
-/// The heights' shape, as the sliders' numbers have it.
-fn shape_from_tuning(slider_tuning: &Tuning) -> LandShape {
-    let height = |slider_value: f32| slider_value.round().clamp(0.0, u16::MAX as f32) as u16;
-    let to_share = |slider_value: f32| (slider_value.clamp(0.0, 1.0) * FRACTION_ONE as f32) as u64;
-    let to_sigmoid = |slider_value: f32| (slider_value.clamp(1.0, 16.0) * SIGMOID_ONE as f32) as u64;
-    let ocean_floor = height(slider_tuning[tuning::OCEAN_FLOOR]);
-    LandShape {
-        ocean_floor,
-        // No ocean under its own floor.
-        ocean: height(slider_tuning[tuning::OCEAN_LEVEL]).max(ocean_floor),
-        vertex_spacing_power: slider_tuning[tuning::VERTEX_SPACING].round().clamp(6.0, 24.0) as u32,
-        ocean_share: to_share(slider_tuning[tuning::OCEAN_SHARE]),
-        highest_land: height(slider_tuning[tuning::HIGHEST_LAND]),
-        coast_breadth: slider_tuning[tuning::COAST_BREADTH].round().clamp(0.0, 4.0) as u32,
-        coast_low: to_sigmoid(slider_tuning[tuning::COAST_LOWNESS]),
-        land_clumping: to_share(slider_tuning[tuning::LAND_CLUMPING]),
-        narrowest_blend: to_share(slider_tuning[tuning::NARROWEST_BLEND]),
-        widest_blend: to_share(slider_tuning[tuning::WIDEST_BLEND]),
-        least_sigmoidness: to_sigmoid(slider_tuning[tuning::LEAST_SIGMOID]),
-        most_sigmoidness: to_sigmoid(slider_tuning[tuning::MOST_SIGMOID]),
-        line_bending: (slider_tuning[tuning::LINE_BENDING].clamp(0.0, 4.0) * FRACTION_ONE as f32) as u64,
-        finer_depth: slider_tuning[tuning::FINER_DEPTH].round().clamp(0.0, 10.0) as u32,
-        finer_fall: to_share(slider_tuning[tuning::FINER_FALL]),
-        weight: to_share(slider_tuning[tuning::WEIGHT_SPREAD]),
-        finer_share: to_share(slider_tuning[tuning::FINER_SHARE]),
-        finer_height: height(slider_tuning[tuning::FINER_HEIGHT]) as u64,
-        raised_share: to_share(slider_tuning[tuning::RAISED_SHARE]),
     }
 }
 

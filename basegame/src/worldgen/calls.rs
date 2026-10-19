@@ -2,7 +2,8 @@
 //! ([`call_registrations`]): a worldgen parameter the world is reset with,
 //! read and set, each by its place among the generation's parameters
 //! ([`WorldGeneration::worldgen_parameters`]'s order) -- and the
-//! world's reset. What the sliders call, as the client's own code.
+//! world's reset: what the base game's sliders will call, as gui types
+//! of the client.
 
 use crate::worldgen::WorldGeneration;
 use protocol::type_registry::Registration;

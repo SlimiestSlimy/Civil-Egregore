@@ -10,7 +10,7 @@ mod test_seed;
 
 use protocol::pipe::frame::{Cells, FrameAsk, NearRectangle, Viewport, ViewportFrame};
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
-use protocol::pipe::terrain::{CellCover, HeightsAsk, MapAnswer, MapAsk, MapCell};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue};
 use protocol::type_registry::LayerType;
 use utilities::rng::RandomSource;
 use utilities::wire::{receive, send, Wired};
@@ -71,30 +71,40 @@ fn drawn_frame(random: &mut RandomSource) -> ViewportFrame {
     }
 }
 
+/// Server parameters drawn from `random`: of every kind of value, some
+/// nested to `depth` more levels.
+fn drawn_parameters(random: &mut RandomSource, depth: u32) -> CleanServerParameters {
+    (0..random.draw_below(6)).fold(CleanServerParameters::default(), |parameters, parameter_index| {
+        let value = match random.draw_below(if depth > 0 { 5 } else { 4 }) {
+            0 => ParameterValue::Hex(random.next_draw()),
+            1 => ParameterValue::Integer(random.next_draw() as i64),
+            2 => ParameterValue::Float(f64::from_bits(random.next_draw())),
+            3 => ParameterValue::Text(format!("ünïcode {}", random.next_draw())),
+            _ => ParameterValue::Nested(drawn_parameters(random, depth - 1)),
+        };
+        parameters.with(format!("parameter {parameter_index}"), value)
+    })
+}
+
 /// Every kind of message each way, drawn from `random`.
 fn drawn_messages(random: &mut RandomSource) -> (Vec<ClientMessage>, Vec<ServerMessage>) {
-    let tuning = std::array::from_fn(|_| f32::from_bits(random.next_draw() as u32));
-    let heights_ask = HeightsAsk { world: random.next_draw(), first_cell_cartesian: drawn_pair(random), size_in_cells: drawn_pair(random), skipped_corners_cartesian: (0..random.draw_below(4)).map(|_| drawn_pair(random)).collect() };
-    let map_ask = MapAsk { world: random.next_draw(), first_cell_cartesian: (random.next_draw() as i64, random.next_draw() as i64), step: random.next_draw() as u32, size_in_pixels: drawn_pair(random), mesh_lines_asked: random.percent_chance(50) };
-    let covers = [CellCover::Ocean, CellCover::Tree, CellCover::Grass, CellCover::Dirt];
-    let map_cells = (0..random.draw_below(50)).map(|_| random.percent_chance(80).then(|| MapCell { height: random.next_draw() as u16, height_above: random.next_draw() as u16, cell_cover: covers[random.draw_below(4) as usize], on_a_mesh_line: random.percent_chance(50) })).collect();
+    let (call_arguments, answer_words) = (random.draw_below(5), random.draw_below(5));
     let client = vec![
         ClientMessage::AskFrame(drawn_ask(random)),
         ClientMessage::SetPaused(random.percent_chance(50)),
         ClientMessage::SetPace(random.percent_chance(50).then(|| random.next_draw() as u32)),
-        ClientMessage::MakeWorld(random.percent_chance(50).then(|| random.next_draw()), tuning),
+        ClientMessage::MakeWorld(drawn_parameters(random, 2)),
         ClientMessage::OpenWorld("a world's name, ünïcode and all".to_string()),
         ClientMessage::Save(String::new()),
-        ClientMessage::Reset(tuning),
-        ClientMessage::AskHeights(heights_ask),
-        ClientMessage::AskMap(map_ask),
         ClientMessage::ListWorlds,
+        ClientMessage::Call(random.next_draw(), drawn_words(random, call_arguments)),
     ];
     let server = vec![
         ServerMessage::Frame(Box::new(drawn_frame(random))),
-        ServerMessage::Heights(random.percent_chance(50).then(|| (0..random.draw_below(100)).map(|_| random.next_draw() as u16).collect())),
-        ServerMessage::Map(random.percent_chance(80).then(|| MapAnswer { map_ask, drawn_heights: Default::default(), cells: map_cells })),
         ServerMessage::Worlds(vec!["one".to_string(), "two".to_string()]),
+        ServerMessage::WorldTypes(random.next_draw(), "type,id\nbasegame,0900000000000001\n".to_string()),
+        ServerMessage::Answered(drawn_words(random, answer_words)),
+        ServerMessage::CallRefused("no world runs".to_string()),
     ];
     (client, server)
 }

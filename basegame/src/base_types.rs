@@ -12,7 +12,8 @@ mod sheep_state;
 
 pub use sheep_state::SheepState;
 
-pub use server::simulation::simulation_api::terrain::Height;
+/// A cell's height: what the height plane holds, sixteen bits a cell.
+pub type Height = u16;
 
 use protocol::type_registry::{EntityType, LayerType};
 use server::simulation::simulation_api::{Attribute, Bits16, Bits4, WidePlane, Width};

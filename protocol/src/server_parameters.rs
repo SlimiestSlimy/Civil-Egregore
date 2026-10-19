@@ -5,6 +5,7 @@
 
 use crate::flags::{Flag, FlagError, FlagParser};
 use std::collections::BTreeMap;
+use utilities::wire::{WireReader, Wired};
 
 // The parameters a world is started by, whoever starts it: a command
 // line, or a window through the host.
@@ -128,4 +129,71 @@ impl CleanServerParameters {
             _ => None,
         }
     }
+}
+
+impl Default for ParameterValue {
+    /// A flag given with nothing of its own: what a value taken off the
+    /// wire is filled in.
+    fn default() -> Self {
+        Self::Nested(CleanServerParameters::default())
+    }
+}
+
+impl Wired for ParameterValue {
+    fn put(&mut self, words: &mut Vec<u64>) {
+        match self {
+            Self::Hex(hex_number) => {
+                words.push(0);
+                hex_number.put(words);
+            }
+            Self::Integer(integer) => {
+                words.push(1);
+                integer.put(words);
+            }
+            Self::Float(float) => {
+                words.push(2);
+                float.put(words);
+            }
+            Self::Text(text) => {
+                words.push(3);
+                text.put(words);
+            }
+            Self::Nested(nested_parameters) => {
+                words.push(4);
+                nested_parameters.put(words);
+            }
+        }
+    }
+
+    fn take(&mut self, wire: &mut WireReader) -> Option<()> {
+        *self = match wire.next_word()? {
+            0 => Self::Hex(taken(0, wire)?),
+            1 => Self::Integer(taken(0, wire)?),
+            2 => Self::Float(taken(0.0, wire)?),
+            3 => Self::Text(taken(String::new(), wire)?),
+            4 => Self::Nested(taken(CleanServerParameters::default(), wire)?),
+            _ => return None,
+        };
+        Some(())
+    }
+}
+
+impl Wired for CleanServerParameters {
+    /// Every parameter, by its name: what a client starts a world by, as
+    /// a command line would.
+    fn put(&mut self, words: &mut Vec<u64>) {
+        let mut each: Vec<(String, ParameterValue)> = self.parameter_values.iter().map(|(parameter_name, parameter_value)| (parameter_name.clone(), parameter_value.clone())).collect();
+        each.put(words);
+    }
+
+    fn take(&mut self, wire: &mut WireReader) -> Option<()> {
+        self.parameter_values = taken(Vec::<(String, ParameterValue)>::new(), wire)?.into_iter().collect();
+        Some(())
+    }
+}
+
+/// The next value on `wire`, taken in place of `value`.
+fn taken<Value: Wired>(mut value: Value, wire: &mut WireReader) -> Option<Value> {
+    value.take(wire)?;
+    Some(value)
 }

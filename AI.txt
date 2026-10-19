@@ -420,6 +420,14 @@ NOW
     (NameAmiss); names whole, references bare = own bundle, `::` =
     whole; in_bundle(bundle, name); basegame's types in "basegame"
     (default_types::BUNDLE); the tests' in "tests".
+  * THE COUPLINGS CUT, not ported ("your plan sounds good, proceed",
+    2026-10-18): the old client's game knowledge goes -- BaseTypes,
+    tree stages, water depth, the HUD's counts, the ground, the map, the
+    slider menu; its types from a register function the root hands it;
+    Tuning out of utilities, protocol and the server (MakeWorld carries
+    worldgen parameters by name, a reset through "reset world"); the
+    terrain path out of protocol and simulation_api. Until the fresh
+    client, the window draws no world or plain per-plane colours.
   * DRAW ORDER: "draw order is specified, things that render should
     include a render layer number".
   * THE CYCLE (basegame cannot reach client_api while the client
@@ -670,28 +678,24 @@ PLAN AGREED 2026-10-16, LEFT (co-op, file by file):
   only upon server request ... it starts doing reads to stuff".
 
 COUPLINGS LEFT (each its own pass)
-- the client's TARGET_PACE (renderer/link.rs, 256) a copy of the
-  simulation's tick rate, until "client gui will later dictate specific
-  tick rate by hooks/libraries".
-- the client names base_types: the planes and counts it asks for
-  (renderer/frames.rs, hud.rs COUNTED), plane_words (clouds, climate,
-  stages, raining_tiles_of -- whether a tile rains is worked out by
-  the client now), Climate, OLDEST_TREE_STAGE, HEIGHT, WATER_DEPTH, DEEP_WATER_DEPTH -- until the
-  client's hooks.
-- protocol names the base game: pipe::terrain's CellCover
-  (Ocean/Tree/Grass/Dirt): with step 5 (sliders/Tuning, terrain asks)
-  and the client rewrite.
-- simulation_api still re-exports two whole modules, until step 5:
-  protocol::pipe::terrain and utilities::tuning (game content sitting
-  in utilities). The rest are names: CellArea, CellCartesian,
-  GeneratedArea, WidePlane, RandomSource, Chance ...
-- the HUD counts "entities" (all of them), no longer "sheep": the frame
-  counts entities generically.
-- the server's docs moved to server/docs/ with their relative links
-  unfixed (docs paused; the pointer tests ignored).
-- the client resets on any slider but the shading's changing, not on
-  WorldGeneration changing (a move rounding to the same generation
-  resets too) -- until the client's hooks for sliders and reset.
+- DONE 2026-10-18 (cut, not ported: "wait, why are we fixing the old
+  renderer if we rewriting it?" -- "yes" to deleting it): the old
+  renderer and gui deleted; the client a skeleton (window.rs: an empty
+  Bevy window and its server; server_end.rs; client_api.rs), on no
+  basegame. Tuning gone from utilities (tuning.rs, sliders.csv, the
+  slider rows of default_settings.csv), protocol and the server:
+  ClientMessage::MakeWorld carries CleanServerParameters (Wired now),
+  no Reset message -- a reset is the "reset world" call. The terrain
+  path gone: protocol::pipe::terrain, the frame's drawn heights, the
+  host's terrain thread, WorldgenCode's drawn_heights/heights/map and
+  worldgen_parameters_of_tuning, basegame's terrain_asked.rs and
+  WorldGeneration::from_tuning; simulation_api's terrain and tuning
+  modules. basegame::base_types::Height its own (u16).
+- Left: the root tests on internals_for_root_tests (until the world
+  has reads of its own); the server's docs' relative links (docs
+  paused). Then the fresh client ("after deleting the old client and
+  keeping the skeleton parts, we finish decoupling before writing more
+  client").
 
 WAITING ON THE USER
 - Mask / word-of-cells instructions ("this will have to wait").
@@ -736,6 +740,11 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- The first shader, from scratch: "i know whats the first shader we
+  must program in, the shader for shadows and stuff, so the terrain
+  looks 3d again, we should do that one from scratch later the one we
+  had was not good enough lol" (2026-10-18). With the Shader kind, in
+  the fresh client.
 - Content versions: a version or hash a bundle, for a client on another
   machine -- names alone do not prove the same code or bytes: "dont
   worry about content versions now, that comes later" (2026-10-18).
