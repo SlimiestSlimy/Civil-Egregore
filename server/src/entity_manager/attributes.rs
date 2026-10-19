@@ -87,7 +87,7 @@ pub(crate) fn write_default(default_blocks: &mut [AttributeBlock], kept_default:
 pub(crate) fn default_seen(kept_default: DefaultKept, default_blocks: &[AttributeBlock]) -> u64 {
     let data_words = default_blocks.iter().flat_map(|kept_block| kept_block.0).take(kept_default.words);
     // As long as it is given: its type, its data, and nothing to the end of its last block.
-    let words = std::iter::once(kept_default.attribute_type.0).chain(data_words).chain(std::iter::repeat(0)).take(kept_default.attribute_type.block_count() * BLOCK_WORDS);
+    let words = std::iter::once(kept_default.attribute_type.header_word()).chain(data_words).chain(std::iter::repeat(0)).take(kept_default.attribute_type.block_count() * BLOCK_WORDS);
     words.fold(0xcbf2_9ce4_8422_2325, |running_sum: u64, word| (running_sum ^ word).wrapping_mul(0x0000_0100_0000_01b3).rotate_left(29)).max(NO_ATTRIBUTE + 1)
 }
 
@@ -106,8 +106,9 @@ pub fn may_be_given(kept_default: Option<DefaultKept>, attributes: &[AttributeBl
 }
 
 /// A block of an attribute: two words, sixteen bytes, aligned as
-/// such. An attribute's first block has its type in its first word,
-/// whose last four bits say how many blocks the attribute is.
+/// such. An attribute's first block has its header in its first word
+/// (`AttributeType::header_word`): its type's number, and in the last
+/// four bits how many blocks the attribute is.
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AttributeBlock(pub [u64; BLOCK_WORDS]);
@@ -120,7 +121,7 @@ impl AttributeBlock {
     pub fn holding_value<L: Layout>(attribute: Attribute<L>, value: L) -> Self {
         const { assert!(L::BLOCK_COUNT == 1, "a layout of more blocks than one") };
         let mut made_block = Self([0; BLOCK_WORDS]);
-        made_block.0[0] = attribute.attribute_type().0;
+        made_block.0[0] = attribute.attribute_type().header_word();
         value.write(&mut made_block.0[1..]);
         made_block
     }
@@ -128,11 +129,11 @@ impl AttributeBlock {
     /// The type of the attribute it is the first block of.
     #[inline]
     pub fn attribute_type(&self) -> AttributeType {
-        AttributeType(self.0[0])
+        AttributeType::of_header_word(self.0[0])
     }
 
     /// Blocks the attribute it is the first block of takes: what
-    /// the last four bits of its type say, one at least.
+    /// the last four bits of its header say, one at least.
     #[inline]
     pub fn block_count(&self) -> usize {
         self.attribute_type().block_count()
@@ -156,7 +157,7 @@ impl WholeAttribute {
     pub fn holding_value<L: Layout>(attribute: Attribute<L>, value: L) -> Self {
         const { assert!(L::BLOCK_COUNT <= ATTRIBUTE_BLOCKS_MOST, "a layout of more than 256 bytes") };
         let mut words = [0; ATTRIBUTE_WORDS_MOST];
-        words[0] = attribute.attribute_type().0;
+        words[0] = attribute.attribute_type().header_word();
         value.write(&mut words[1..L::BLOCK_COUNT * BLOCK_WORDS]);
         let mut block_array = [AttributeBlock([0; BLOCK_WORDS]); ATTRIBUTE_BLOCKS_MOST];
         for (made_block, words) in block_array.iter_mut().zip(words.as_chunks::<BLOCK_WORDS>().0).take(L::BLOCK_COUNT) {
@@ -173,7 +174,7 @@ impl WholeAttribute {
     #[inline]
     pub(crate) fn of_default(kept_default: DefaultKept, default_blocks: &[AttributeBlock]) -> Self {
         let (mut block_array, count) = ([AttributeBlock([0; BLOCK_WORDS]); ATTRIBUTE_BLOCKS_MOST], kept_default.attribute_type.block_count());
-        block_array[0].0[0] = kept_default.attribute_type.0;
+        block_array[0].0[0] = kept_default.attribute_type.header_word();
         for word in 0..kept_default.words {
             block_array[(word + 1) / BLOCK_WORDS].0[(word + 1) % BLOCK_WORDS] = word_of(default_blocks, word);
         }

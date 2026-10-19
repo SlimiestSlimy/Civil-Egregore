@@ -40,10 +40,10 @@ fn compare_holds(instruction: &Instruction, compared_cell: CellIndex, superchunk
         Opcode::CompareCellFree => entities_read.free_for_a_new_entity(compared_cell),
         Opcode::CompareEntity => entities_read.get_named(compared_cell).is_some_and(|entity| entity.header.entity_type.0 == instruction.first_operand),
         // Gone, it holds against nothing; there, against what is seen of the attribute, none seen of one it has not.
-        Opcode::CompareAttribute => entities_read.get_named(compared_cell).is_some_and(|entity| entity.attribute_seen(AttributeType(instruction.second_operand)) == instruction.first_operand),
+        Opcode::CompareAttribute => entities_read.get_named(compared_cell).is_some_and(|entity| entity.attribute_seen(AttributeType::of_header_word(instruction.second_operand)) == instruction.first_operand),
         Opcode::CompareAttributeMember => {
             let (member_first_byte, member_byte_count) = instruction.member();
-            entities_read.get_named(compared_cell).and_then(|entity| entity.attribute_member(AttributeType(instruction.first_operand), member_first_byte, member_byte_count)) == Some(instruction.second_operand)
+            entities_read.get_named(compared_cell).and_then(|entity| entity.attribute_member(AttributeType::of_header_word(instruction.first_operand), member_first_byte, member_byte_count)) == Some(instruction.second_operand)
         }
         _ => unreachable!("no compare"),
     }
@@ -228,14 +228,14 @@ impl InstructionQueue {
                     let was_written = match instruction.opcode {
                         Opcode::WriteAttributeMember => {
                             let (member_first_byte, member_byte_count) = instruction.member();
-                            landed_entities.write_attribute_bytes_named(landed_cell, AttributeType(instruction.first_operand), member_first_byte, member_byte_count, instruction.second_operand)
+                            landed_entities.write_attribute_bytes_named(landed_cell, AttributeType::of_header_word(instruction.first_operand), member_first_byte, member_byte_count, instruction.second_operand)
                         }
                         Opcode::WriteAttribute => {
                             let (carried_first, count) = ((instruction.second_operand >> 32) as usize, instruction.second_operand as u32 as usize);
                             let attribute = &self.carried_blocks[carried_first..carried_first + count];
                             landed_entities.edit_named(landed_cell, attribute[0].attribute_type(), attribute)
                         }
-                        _ => landed_entities.edit_named(landed_cell, AttributeType(instruction.first_operand), &[]),
+                        _ => landed_entities.edit_named(landed_cell, AttributeType::of_header_word(instruction.first_operand), &[]),
                     };
                     match was_written {
                         true => applied_instructions.edits += 1,

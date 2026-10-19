@@ -319,8 +319,13 @@ NOW
   its first bitplane's once the size byte went); cold storage, world
   file, ring: bitplanes by ID; instructions name a plane by ID, the hot
   superchunk's layer gives its shape (Superchunk::layer_type_of_id).
-  ATTRIBUTES NEXT (the user: "atributes go as well, size is another
-  parsmeter at registry time").
+  ATTRIBUTES DONE (the commit after 1ee824d; the user: "atributes go as
+  well, size is another parsmeter at registry time"): AttributeType
+  { type_id, block_count }, its ID kind 0 + number; a stored
+  attribute's first word is its header, AttributeType::header_word
+  (number << 4 | blocks - 1) -- the same bits the old ID was, so the
+  entity store's words and saves are unchanged; instructions carry the
+  header word; types.csv adds "blocks", checked on load.
 - WHAT IS LEFT, IN ORDER (the user, 2026-10-18, on my list of what is
   left: "1 go ahead, 2 not quite, we need client side gui rules or
   something like that first / 3 same, fold into 5 with 2 / 4 can be

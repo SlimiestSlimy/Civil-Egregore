@@ -204,13 +204,13 @@ impl Instruction {
 
     /// Whether the attribute `attribute_type` of the entity on `named_cell` sums to `seen_value`.
     pub(crate) fn compare_attribute(named_cell: CellIndex, attribute_type: AttributeType, seen_value: u64) -> Self {
-        Self { first_operand: seen_value, second_operand: attribute_type.0, ..Self::on_cell(Opcode::CompareAttribute, named_cell) }
+        Self { first_operand: seen_value, second_operand: attribute_type.header_word(), ..Self::on_cell(Opcode::CompareAttribute, named_cell) }
     }
 
     /// Whether `member` of the attribute `attribute_type` of the entity on `named_cell`
     /// holds `seen_value`.
     pub(crate) fn compare_attribute_member(named_cell: CellIndex, attribute_type: AttributeType, member: Member, seen_value: u64) -> Self {
-        Self { member_operand: u16::from(member.byte_offset) | u16::from(member.byte_count) << 8, first_operand: attribute_type.0, second_operand: seen_value, ..Self::on_cell(Opcode::CompareAttributeMember, named_cell) }
+        Self { member_operand: u16::from(member.byte_offset) | u16::from(member.byte_count) << 8, first_operand: attribute_type.header_word(), second_operand: seen_value, ..Self::on_cell(Opcode::CompareAttributeMember, named_cell) }
     }
 
     /// `value` written to `member` of the attribute `attribute_type` of the
@@ -227,7 +227,7 @@ impl Instruction {
 
     /// The attribute `attribute_type` taken from the entity on `named_cell`.
     pub(crate) fn remove_attribute(named_cell: CellIndex, attribute_type: AttributeType) -> Self {
-        Self { first_operand: attribute_type.0, ..Self::on_cell(Opcode::RemoveAttribute, named_cell) }
+        Self { first_operand: attribute_type.header_word(), ..Self::on_cell(Opcode::RemoveAttribute, named_cell) }
     }
 
     /// The entity on `named_cell` to wake next at `wake`.

@@ -119,7 +119,8 @@ fn what_a_type_names_is_registered_before_it() {
 /// overlapping, the same every time; a saved world's types are each
 /// given the ID the save gave its name, whatever order they come in, a
 /// type the save does not name one past them all; a saved name given
-/// to a type of another kind, or a plane of another shape, is refused,
+/// to a type of another kind, a plane of another shape or an attribute
+/// of other blocks, is refused,
 /// and a saved name nobody registers keeps the types from freezing.
 #[test]
 fn a_saved_world_keeps_its_ids() {
@@ -142,6 +143,8 @@ fn a_saved_world_keeps_its_ids() {
     let mut reshaped = TypeRegistry::for_saved_world(&saved_text).expect("a world's types");
     assert_eq!(outcome(reshaped.register(Registration::wide_plane("grass", 2))), Err(RegistryRefusal::SavedAsAnother), "another width");
     assert_eq!(outcome(reshaped.register(Registration::wide_plane_of_tiles("grass", 1, 2))), Err(RegistryRefusal::SavedAsAnother), "another tile size");
+    // Nor an attribute's blocks: one of other blocks is refused.
+    assert_eq!(outcome(reshaped.register(Registration::attribute("sheep state", 2, 1))), Err(RegistryRefusal::SavedAsAnother), "other blocks");
     // Registered whole, the same types come back.
     let mut whole = TypeRegistry::for_saved_world(&saved_text).expect("a world's types");
     assert_eq!(basegame::default_types::register(&mut whole).expect("registered"), base_types);
@@ -175,22 +178,25 @@ fn the_frozen_types_find_each_type_again() {
 }
 
 /// An ID says what it is of in its first byte and keeps its number
-/// under it -- an attribute's last four bits its blocks, as yet; a
-/// plane's bits a cell beside its ID, not in it; an attribute registered
+/// under it -- a plane's bits a cell and an attribute's blocks beside
+/// it, not in it; an attribute's first word says its number and blocks;
+/// an attribute registered
 /// says the words its data is; and a layout's fields come back from the
 /// words they were written to.
 #[test]
 fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let mut seeded_rng = utilities::rng::RandomSource::new(seed);
-    // The fewest blocks and the most, and every count between with a number drawn: any an attribute's ID holds.
+    // The fewest blocks and the most, and every count between with a number drawn: any an ID holds.
     for block_count in 1..=AttributeType::MOST_BLOCKS {
-        let type_number = 1 + seeded_rng.draw_below(protocol::type_registry::ATTRIBUTE_NUMBERS - 1);
+        let type_number = 1 + seeded_rng.draw_below(TYPE_ID_NUMBERS - 1);
         let drawn_type = AttributeType::of_blocks(type_number, block_count);
-        assert_eq!((drawn_type.block_count(), drawn_type.type_number(), drawn_type.0 & 0xF, drawn_type.0 >> 56, drawn_type.is_an_attributes()), (block_count, type_number, block_count as u64 - 1, 0x00, true));
+        assert_eq!((drawn_type.block_count(), drawn_type.type_number(), drawn_type.type_id(), drawn_type.is_an_attributes()), (block_count, type_number, type_number, true), "the ID its kind -- 0 -- and number alone, the blocks beside it");
+        // An attribute's first word says its number and blocks, and gives its type back.
+        assert_eq!((drawn_type.header_word() & 0xF, AttributeType::of_header_word(drawn_type.header_word())), (block_count as u64 - 1, drawn_type));
         let varying_type = AttributeType::of_varying_size(type_number);
-        // One whose size varies is registered with its four bits 0; an attribute of it so many blocks long says so there, and is of the same type.
-        assert_eq!((varying_type.0 & 0xF, varying_type.type_number(), varying_type.is_an_attributes()), (0, type_number, true));
+        // One whose size varies is registered as one block; an attribute of it so many blocks long says so in its first word, and is of the same type.
+        assert_eq!((varying_type.header_word() & 0xF, varying_type.type_number(), varying_type.is_an_attributes()), (0, type_number, true));
         assert_eq!((varying_type.with_blocks(block_count).block_count(), varying_type.with_blocks(block_count).type_identity()), (block_count, varying_type.type_identity()));
         let (drawn_width, first_number) = (1u32 << seeded_rng.draw_below(5), seeded_rng.draw_below(TYPE_ID_NUMBERS - 16));
         let wide_layer = LayerType::of_width(first_number, drawn_width);
@@ -202,10 +208,8 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
         let entity = EntityType::from_number(type_number);
         assert_eq!((entity.type_number(), entity.0), (type_number, 0x02 << 56 | type_number));
     }
-    // An ID of another kind is no attribute's: the one namespace is everything's.
-    for other_id in [frozen_base_types().1.grass.type_id(), frozen_base_types().1.sheep.0, frozen_base_types().1.tree_stage.layer_type().type_id(), 0] {
-        assert!(!AttributeType(other_id).is_an_attributes());
-    }
+    // A first word of number 0 is no attribute's: 0 is nobody's.
+    assert!(!AttributeType::of_header_word(0).is_an_attributes() && !AttributeType::of_header_word(0xF).is_an_attributes());
     let (frozen_type_registry, base_types) = frozen_base_types();
     let state_type = base_types.sheep_state.attribute_type();
     assert_eq!((state_type.block_count(), frozen_type_registry.data_words_of(state_type)), (3, Some(data_words(3))));
