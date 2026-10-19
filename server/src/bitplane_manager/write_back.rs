@@ -37,8 +37,7 @@ impl BitmapArena {
     pub fn written_back(&mut self, superchunk: SuperchunkIndex, bucket_keys: impl Iterator<Item = BucketKey>) {
         let directory_entry = self.entry_mut(superchunk).expect("a superchunk written back is hot or lingering");
         for bucket_key in bucket_keys {
-            // A wide layer is written back as its planes: any of their types names it.
-            let layer = directory_entry.layers.iter().position(|layer| layer.layer_type == bucket_key.layer_type || layer.layer_type.holds_bitplane(bucket_key.layer_type)).expect("a layer written back is in use");
+            let layer = directory_entry.layers.iter().position(|layer| layer.layer_type == bucket_key.layer_type).expect("a layer written back is in use");
             set_membership(&mut directory_entry.layers[layer].chunk_flags.in_ring, bucket_key.chunk.place(), true);
         }
         directory_entry.on_their_way -= 1;
@@ -57,11 +56,7 @@ impl BitmapArena {
         }
         let mut flushed_superchunks = Vec::new();
         for (bucket_key, cells) in &dirty {
-            let bits_a_cell = bucket_key.layer_type.width_bits();
-            for bit_of_cell in 0..bits_a_cell {
-                let one_bit_bitmap = crate::chunk_storage::wide::bitmap_of_bit(cells, bits_a_cell, bit_of_cell);
-                cold_storage.write_back(bucket_key.chunk, bucket_key.layer_type.bitplane_of(bit_of_cell), layer_codec.encode_layer(&one_bit_bitmap), &mut flushed_superchunks);
-            }
+            cold_storage.write_back(bucket_key.chunk, bucket_key.layer_type, &crate::chunk_storage::wide::encode_bucket(bucket_key.layer_type, cells, layer_codec), &mut flushed_superchunks);
         }
         // Flushed before the last bitmap went in: the superchunk written back waits on, all its bitmaps marked.
         self.flushed_from_ring(&flushed_superchunks);

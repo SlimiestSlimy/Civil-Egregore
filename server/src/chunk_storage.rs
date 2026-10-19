@@ -106,7 +106,7 @@ impl ChunkStorage {
     /// ([`SuperchunkImage::layer`]). Of an image in memory
     /// ([`ChunkStorage::image`]).
     pub fn layer(&self, chunk: ChunkIndex, layer_type: LayerType) -> Option<&[u64]> {
-        self.image(chunk.superchunk())?.layer(chunk.place(), layer_type)
+        self.image(chunk.superchunk())?.layer(chunk.place(), layer_type.type_id())
     }
 
     /// Writes `encoded_layer` back into the ring as the layer of `layer_type`
@@ -115,7 +115,7 @@ impl ChunkStorage {
     /// superchunk at the ring's tail is to be flushed first
     /// ([`ChunkStorage::take_tail`]).
     pub fn try_write_back(&mut self, chunk: ChunkIndex, layer_type: LayerType, encoded_layer: &[u64]) -> bool {
-        while !self.writeback_ring.push(chunk, layer_type, encoded_layer) {
+        while !self.writeback_ring.push(chunk, layer_type.type_id(), encoded_layer) {
             if !self.writeback_ring.is_empty() {
                 return false;
             }
@@ -146,7 +146,7 @@ impl ChunkStorage {
         if ring_entries.is_empty() {
             return None;
         }
-        let layer_changes = ring_entries.iter().map(|ring_entry| (ring_entry.place, ring_entry.layer_type, self.writeback_ring.encoded_layer(ring_entry).to_vec())).collect();
+        let layer_changes = ring_entries.iter().map(|ring_entry| (ring_entry.place, ring_entry.type_id, self.writeback_ring.encoded_layer(ring_entry).to_vec())).collect();
         self.writeback_ring.release_superchunk(superchunk);
         Some(Flush { superchunk, image: self.shared_image(superchunk), layer_changes })
     }
@@ -200,15 +200,15 @@ pub struct Flush {
     pub superchunk: SuperchunkIndex,
     /// Its image when the entries were taken, if it had one.
     pub image: Option<Arc<SuperchunkImage>>,
-    /// Its entries, oldest first: each layer's chunk place, type and words.
-    pub layer_changes: Vec<(usize, LayerType, Vec<u64>)>,
+    /// Its entries, oldest first: each layer's chunk place, type's ID and words.
+    pub layer_changes: Vec<(usize, u64, Vec<u64>)>,
 }
 
 impl Flush {
     /// The image with every change made: of a superchunk with no image
     /// made, on an empty one.
     pub fn rewritten_image(&self) -> SuperchunkImage {
-        let image_changes: Vec<LayerChange> = self.layer_changes.iter().map(|(place, layer_type, encoded_words)| LayerChange { place: *place, layer_type: *layer_type, encoded_layer: encoded_words }).collect();
+        let image_changes: Vec<LayerChange> = self.layer_changes.iter().map(|(place, type_id, encoded_words)| LayerChange { place: *place, type_id: *type_id, encoded_layer: encoded_words }).collect();
         match &self.image {
             Some(image) => image.rewritten_with(&image_changes),
             None => SuperchunkImage::empty().rewritten_with(&image_changes),

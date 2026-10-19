@@ -59,10 +59,9 @@ impl FrozenTypeRegistry {
         &self.types
     }
 
-    /// The type `type_number` is one of the numbers of, if any: a wide
-    /// plane's for any of its cold planes'.
+    /// The type of number `type_number`, if any.
     pub fn of_number(&self, type_number: u64) -> Option<&RegisteredType> {
-        self.types.iter().find(|registered| registered.numbers().contains(&type_number))
+        self.types.iter().find(|registered| registered.type_number() == type_number)
     }
 
     /// The type of entity `entity_type`, if it is registered.

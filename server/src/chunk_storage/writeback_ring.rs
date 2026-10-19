@@ -2,7 +2,6 @@
 //! cold pool (`docs/chunk_storage.md`, "The ring's words").
 
 use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
-use protocol::type_registry::LayerType;
 use std::ops::Range;
 
 /// Words an entry's header takes: its chunk, its type, its length.
@@ -18,8 +17,8 @@ const DEAD_BIT: u64 = 1;
 pub struct RingEntry {
     /// Its chunk's place in its superchunk.
     pub place: usize,
-    /// Its layer's type.
-    pub layer_type: LayerType,
+    /// The ID of its layer's type.
+    pub type_id: u64,
     /// Where its encoded layer's words are in the ring.
     pub words: Range<usize>,
 }
@@ -68,9 +67,9 @@ impl WritebackRing {
         }
     }
 
-    /// Appends `encoded_layer` as the layer of `layer_type` in `chunk` (no
-    /// words: no layer), if it fits. Returns whether it did.
-    pub fn push(&mut self, chunk: ChunkIndex, layer_type: LayerType, encoded_layer: &[u64]) -> bool {
+    /// Appends `encoded_layer` as the layer of the type of ID `type_id` in
+    /// `chunk` (no words: no layer), if it fits. Returns whether it did.
+    pub fn push(&mut self, chunk: ChunkIndex, type_id: u64, encoded_layer: &[u64]) -> bool {
         let entry_words = HEADER_WORDS + encoded_layer.len();
         let Some(entry_at) = self.room_for(entry_words) else {
             return false;
@@ -80,7 +79,7 @@ impl WritebackRing {
         } else if entry_at < self.head_word && self.head_word < self.words.len() {
             self.words[self.head_word] = WRAP_MARKER;
         }
-        self.words[entry_at..entry_at + HEADER_WORDS].copy_from_slice(&[chunk.0, layer_type.type_id(), (encoded_layer.len() as u64) << 1]);
+        self.words[entry_at..entry_at + HEADER_WORDS].copy_from_slice(&[chunk.0, type_id, (encoded_layer.len() as u64) << 1]);
         self.words[entry_at + HEADER_WORDS..entry_at + entry_words].copy_from_slice(encoded_layer);
         self.head_word = entry_at + entry_words;
         self.entry_count += 1;
@@ -107,14 +106,14 @@ impl WritebackRing {
 
     /// Every entry, live or dead, oldest first: where each starts, its
     /// chunk, its type, its length and whether it is dead.
-    fn all_entries(&self) -> impl Iterator<Item = (usize, ChunkIndex, LayerType, usize, bool)> + '_ {
+    fn all_entries(&self) -> impl Iterator<Item = (usize, ChunkIndex, u64, usize, bool)> + '_ {
         let mut next_at = self.tail_word;
         (0..self.entry_count).map(move |_| {
             let start_word = self.entry_start(next_at);
-            let [chunk, layer_type, length_word] = [self.words[start_word], self.words[start_word + 1], self.words[start_word + 2]];
+            let [chunk, type_id, length_word] = [self.words[start_word], self.words[start_word + 1], self.words[start_word + 2]];
             let words = (length_word >> 1) as usize;
             next_at = start_word + HEADER_WORDS + words;
-            (start_word, ChunkIndex(chunk), LayerType::bitplane_of_id(layer_type), words, length_word & DEAD_BIT != 0)
+            (start_word, ChunkIndex(chunk), type_id, words, length_word & DEAD_BIT != 0)
         })
     }
 
@@ -128,9 +127,9 @@ impl WritebackRing {
     pub fn entries_of(&self, superchunk: SuperchunkIndex) -> Vec<RingEntry> {
         self.all_entries()
             .filter(|&(_, chunk, .., is_dead)| !is_dead && chunk.superchunk() == superchunk)
-            .map(|(start_word, chunk, layer_type, words, _)| RingEntry {
+            .map(|(start_word, chunk, type_id, words, _)| RingEntry {
                 place: chunk.place(),
-                layer_type,
+                type_id,
                 words: start_word + HEADER_WORDS..start_word + HEADER_WORDS + words,
             })
             .collect()

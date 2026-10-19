@@ -9,7 +9,6 @@ use super::frozen_type_registry::FrozenTypeRegistry;
 use super::registered_type::RegisteredType;
 use super::registration::{Declared, Hook, Library, Registration};
 use super::registered_type::Drawn;
-use super::saved_types::SavedType;
 use super::type_ids::{AttributeType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
 
 /// Why a type was refused.
@@ -23,8 +22,7 @@ pub enum RegistryRefusal {
     MasterAmiss,
     /// A type it depends on is nothing registered before it.
     DependencyAmiss,
-    /// The world's save gave its name an ID of another kind, or a
-    /// plane of another shape.
+    /// The world's save gave its name an ID of another kind.
     SavedAsAnother,
     /// The window it is nested in is no window registered before it.
     ParentAmiss,
@@ -35,8 +33,8 @@ pub enum RegistryRefusal {
 /// runs.
 #[derive(Clone)]
 pub struct TypeRegistry {
-    /// The types a world's save holds, by name: none for a new world.
-    saved_types: Vec<SavedType>,
+    /// The IDs a world's save gave the names it holds: none for a new world.
+    saved_ids: Vec<(String, u64)>,
     /// The number the next type not saved is given: past every number
     /// taken. 0 is nobody's.
     next_number: u64,
@@ -54,15 +52,15 @@ impl TypeRegistry {
     /// The registry of a new world: no type registered, every ID
     /// handed out as its type is.
     pub fn for_new_world() -> Self {
-        Self::of_saved_types(Vec::new())
+        Self::of_saved_ids(Vec::new())
     }
 
-    /// The registry of a world whose save holds `saved_types`: each type
-    /// registered of a name among them is given its ID, any other one
-    /// past them all.
-    pub(crate) fn of_saved_types(saved_types: Vec<SavedType>) -> Self {
-        let next_number = saved_types.iter().map(|saved_type| saved_type.numbers().end).max().unwrap_or(0).max(1);
-        Self { saved_types, next_number, types: Vec::new(), depends_on: Vec::new(), libraries: Vec::new(), hooks: Vec::new() }
+    /// The registry of a world whose save gave `saved_ids` -- each a
+    /// type's name and ID: each type registered of a name it holds is
+    /// given its ID, any other the number after them all.
+    pub fn of_saved_ids(saved_ids: Vec<(String, u64)>) -> Self {
+        let next_number = saved_ids.iter().map(|&(_, saved_id)| (saved_id & (super::TYPE_ID_NUMBERS - 1)) + 1).max().unwrap_or(1);
+        Self { saved_ids, next_number, types: Vec::new(), depends_on: Vec::new(), libraries: Vec::new(), hooks: Vec::new() }
     }
 
     /// Registers `registration`'s type, checked against every type before
@@ -77,15 +75,15 @@ impl TypeRegistry {
             return Err(RegistryRefusal::NameTaken);
         }
         let depended_on = depends_on.iter().map(|type_name| self.place_named(type_name)).collect::<Option<Box<[usize]>>>().ok_or(RegistryRefusal::DependencyAmiss)?;
-        let saved_type = self.saved_types.iter().find(|saved_type| saved_type.name == name).cloned();
-        // Its number: the saved ID's, or the next; checked against the saved type once it is made.
-        let number = saved_type.as_ref().map_or(self.next_number, |saved_type| saved_type.numbers().start);
+        let saved_id = self.saved_ids.iter().find(|(saved_name, _)| *saved_name == name).map(|&(_, saved_id)| saved_id);
+        // Its number: the saved ID's, or the next; checked against the saved ID once it is made.
+        let number = saved_id.map_or(self.next_number, |saved_id| saved_id & (super::TYPE_ID_NUMBERS - 1));
         let registered_type = self.made(name, &declared, number)?;
-        if saved_type.as_ref().is_some_and(|saved_type| !saved_type.is(&registered_type)) {
+        if saved_id.is_some_and(|saved_id| saved_id != registered_type.type_id()) {
             return Err(RegistryRefusal::SavedAsAnother);
         }
-        if saved_type.is_none() {
-            self.next_number = registered_type.numbers().end;
+        if saved_id.is_none() {
+            self.next_number = number + 1;
         }
         self.types.push(registered_type.clone());
         self.depends_on.push(depended_on);
@@ -108,7 +106,7 @@ impl TypeRegistry {
     /// entering from then on; or what is
     /// wrong: a type the world's save holds that none registered is.
     pub fn freeze(self) -> Result<FrozenTypeRegistry, String> {
-        if let Some(SavedType { name: saved_name, .. }) = self.saved_types.iter().find(|saved_type| self.place_named(&saved_type.name).is_none()) {
+        if let Some((saved_name, _)) = self.saved_ids.iter().find(|(saved_name, _)| self.place_named(saved_name).is_none()) {
             return Err(format!("the type `{saved_name}` was saved, none of its name is registered"));
         }
         Ok(FrozenTypeRegistry::of_registered(self.types, self.depends_on, self.libraries, self.hooks))

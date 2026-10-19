@@ -8,7 +8,7 @@ use utilities::csv;
 /// The world file's columns.
 const WORLD_COLUMNS: [&str; 2] = ["world", "is"];
 /// The world file's format, and the number of the one written.
-const FORMAT_ROW: (&str, &str) = ("format", "5");
+const FORMAT_ROW: (&str, &str) = ("format", "6");
 
 /// The name of the row saying a world's camera loads superchunks.
 const CAMERA_LOADS: &str = "camera loads";
@@ -48,15 +48,13 @@ pub struct WorldInfo {
 
 impl WorldInfo {
     /// As the world's file holds it: a row a thing the world is, its
-    /// name and what it is -- its seed in hexadecimal, its layer types
-    /// with spaces between.
+    /// name and what it is -- its seed in hexadecimal. Its layer types
+    /// are its registry's, not the file's.
     pub(crate) fn to_text(&self) -> String {
-        let layers: Vec<String> = self.layers.iter().map(|layer| layer.type_id().to_string()).collect();
         let mut name_value_rows = vec![
             (FORMAT_ROW.0.to_string(), FORMAT_ROW.1.to_string()),
             ("seed".to_string(), utilities::seed::seed_as_hex(self.seed)),
             ("tick".to_string(), self.tick.to_string()),
-            ("layers".to_string(), layers.join(" ")),
         ];
         name_value_rows.extend(self.side_in_superchunks.map(|side_value| ("side".to_string(), side_value.to_string())));
         name_value_rows.extend(self.forced_hot.then(|| ("forced".to_string(), "1".to_string())));
@@ -92,7 +90,6 @@ impl WorldInfo {
                 _ if row_name == FORMAT_ROW.0 => {}
                 "seed" => seed = Some(utilities::seed::of_hex(value).ok_or_else(|| format!("`{value}` is not a seed"))?),
                 "tick" => read_info.tick = parse_number()?,
-                "layers" => read_info.layers = value.split_whitespace().map(|layer| layer.parse().map(LayerType::bitplane_of_id).map_err(|_| format!("`{layer}` is not a layer type"))).collect::<Result<Vec<_>, _>>()?,
                 "side" => read_info.side_in_superchunks = Some(value.parse().map_err(|_| format!("`{value}` is not a side"))?),
                 "forced" => read_info.forced_hot = parse_number()? != 0,
                 CAMERA_LOADS => read_info.camera_loads = parse_number()? != 0,

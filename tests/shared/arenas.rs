@@ -10,8 +10,9 @@ use server::internals_for_root_tests::{BitmapArena, BucketKey, LayerCodec, World
 use server::simulation::simulation_api::{EntityType, Header, LayerType};
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 
-/// The layer type the arena holds.
-pub const STONE_LAYER: LayerType = LayerType::of_a_bit(6);
+/// The layer type the arena holds: of a number far past the base
+/// game's types, whose planes it is held beside.
+pub const STONE_LAYER: LayerType = LayerType::of_a_bit(1 << 20);
 /// The entities' type.
 pub const WALKER_TYPE: EntityType = EntityType::from_number(40);
 

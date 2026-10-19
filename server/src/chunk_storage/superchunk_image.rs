@@ -3,7 +3,6 @@
 //! superchunk image").
 
 use utilities::coordinates::CHUNKS_IN_SUPERCHUNK;
-use protocol::type_registry::LayerType;
 
 /// Where the first chunk starts: after the chunk table.
 const CHUNKS_START: usize = CHUNKS_IN_SUPERCHUNK;
@@ -14,14 +13,14 @@ const ENTRY_WORDS: usize = 2;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InvalidImage(pub &'static str);
 
-/// A change to an image: the layer of `layer_type` in the chunk at
-/// `place` is now `encoded`, or is gone if `encoded` is empty.
+/// A change to an image: the layer of the type of ID `type_id` in the
+/// chunk at `place` is now `encoded`, or is gone if `encoded` is empty.
 #[derive(Clone, Copy, Debug)]
 pub struct LayerChange<'a> {
     /// The chunk's place in its superchunk.
     pub place: usize,
-    /// The layer's type.
-    pub layer_type: LayerType,
+    /// The ID of the layer's type.
+    pub type_id: u64,
     /// The layer, encoded; empty for no layer.
     pub encoded_layer: &'a [u64],
 }
@@ -72,35 +71,35 @@ impl SuperchunkImage {
         &self.words[self.words[place] as usize..chunk_end]
     }
 
-    /// The encoded layer of `layer_type` in the chunk at `place`, if it
-    /// has one: its words from its first to its chunk's end, since its own
-    /// end is where its stream ends.
-    pub fn layer(&self, place: usize, layer_type: LayerType) -> Option<&[u64]> {
+    /// The encoded layer of the type of ID `type_id` in the chunk at
+    /// `place`, if it has one: its words from its first to its chunk's
+    /// end, since its own end is where its stream ends.
+    pub fn layer(&self, place: usize, type_id: u64) -> Option<&[u64]> {
         let words = self.chunk(place);
         let table = layer_table(words);
-        let entry_index = table.binary_search_by_key(&layer_type.type_id(), |table_entry| table_entry[0]).ok()?;
+        let entry_index = table.binary_search_by_key(&type_id, |table_entry| table_entry[0]).ok()?;
         Some(&words[table[entry_index][1] as usize..])
     }
 
-    /// The types of the layers of the chunk at `place`, sorted.
-    pub fn layer_types(&self, place: usize) -> impl Iterator<Item = LayerType> + '_ {
-        layer_table(self.chunk(place)).iter().map(|table_entry| LayerType::bitplane_of_id(table_entry[0]))
+    /// The IDs of the types of the layers of the chunk at `place`, sorted.
+    pub fn type_ids(&self, place: usize) -> impl Iterator<Item = u64> + '_ {
+        layer_table(self.chunk(place)).iter().map(|table_entry| table_entry[0])
     }
 
     /// The image with `layer_changes` made, in order: a later change to a
     /// layer replaces an earlier one. Every encoded layer is copied; this
     /// image is not changed.
     pub fn rewritten_with(&self, layer_changes: &[LayerChange]) -> Self {
-        let mut chunks: [Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK] = Default::default();
+        let mut chunks: [Vec<(u64, &[u64])>; CHUNKS_IN_SUPERCHUNK] = Default::default();
         for (place, layers) in chunks.iter_mut().enumerate() {
             *layers = exact_layers(self.chunk(place));
         }
         for layer_change in layer_changes {
             let layers = &mut chunks[layer_change.place];
-            match (layers.binary_search_by_key(&layer_change.layer_type, |&(layer_type, _)| layer_type), layer_change.encoded_layer.is_empty()) {
+            match (layers.binary_search_by_key(&layer_change.type_id, |&(type_id, _)| type_id), layer_change.encoded_layer.is_empty()) {
                 (Ok(found_index), false) => layers[found_index].1 = layer_change.encoded_layer,
                 (Ok(removed_index), true) => drop(layers.remove(removed_index)),
-                (Err(insert_index), false) => layers.insert(insert_index, (layer_change.layer_type, layer_change.encoded_layer)),
+                (Err(insert_index), false) => layers.insert(insert_index, (layer_change.type_id, layer_change.encoded_layer)),
                 (Err(_), true) => {}
             }
         }
@@ -139,25 +138,25 @@ fn check_chunk(chunk: &[u64]) -> Result<(), InvalidImage> {
 
 /// A chunk's encoded layers, sorted by type, each one's words up to the
 /// next one's start, or the chunk's end.
-fn exact_layers(chunk: &[u64]) -> Vec<(LayerType, &[u64])> {
+fn exact_layers(chunk: &[u64]) -> Vec<(u64, &[u64])> {
     let table = layer_table(chunk);
     let mut layer_starts: Vec<usize> = table.iter().map(|table_entry| table_entry[1] as usize).collect();
     layer_starts.sort_unstable();
     table
         .iter()
-        .map(|&[layer_type, layer_offset]| {
+        .map(|&[type_id, layer_offset]| {
             let layer_start = layer_offset as usize;
             let next_index = layer_starts.partition_point(|&other_start| other_start <= layer_start);
             let layer_end = layer_starts.get(next_index).copied().unwrap_or(chunk.len());
-            (LayerType::bitplane_of_id(layer_type), &chunk[layer_start..layer_end])
+            (type_id, &chunk[layer_start..layer_end])
         })
         .collect()
 }
 
 /// An image's words: the chunk table, then each chunk's encoded
 /// layers, sorted by type.
-fn build_image_words(chunks: &[Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK]) -> Box<[u64]> {
-    let chunk_words = |layers: &Vec<(LayerType, &[u64])>| 1 + layers.len() * ENTRY_WORDS + layers.iter().map(|(_, words)| words.len()).sum::<usize>();
+fn build_image_words(chunks: &[Vec<(u64, &[u64])>; CHUNKS_IN_SUPERCHUNK]) -> Box<[u64]> {
+    let chunk_words = |layers: &Vec<(u64, &[u64])>| 1 + layers.len() * ENTRY_WORDS + layers.iter().map(|(_, words)| words.len()).sum::<usize>();
     let mut chunk_start = CHUNKS_START;
     let mut words = Vec::with_capacity(chunk_start + chunks.iter().map(chunk_words).sum::<usize>());
     for layers in chunks {
@@ -167,8 +166,8 @@ fn build_image_words(chunks: &[Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK]) 
     for layers in chunks {
         words.push(layers.len() as u64);
         let mut layer_offset = 1 + layers.len() * ENTRY_WORDS;
-        for &(layer_type, encoded_layer) in layers {
-            words.extend([layer_type.type_id(), layer_offset as u64]);
+        for &(type_id, encoded_layer) in layers {
+            words.extend([type_id, layer_offset as u64]);
             layer_offset += encoded_layer.len();
         }
         for (_, layer_words) in layers {
