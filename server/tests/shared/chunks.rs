@@ -7,6 +7,7 @@
 #![allow(dead_code)]
 
 use utilities::bitmap::{Bitmap, CellWords, BITS_PER_WORD, WORDS};
+use crate::test_types::TestTypes;
 use crate::bitplane_manager::{WritesApplied, BitmapArena, Write, WriteOp};
 use crate::chunk_storage::{ChunkStorage, LayerChange, LayerCodec, LayerType, SuperchunkImage};
 use utilities::bitmap::morton::morton_index;
@@ -67,16 +68,12 @@ pub fn storage_with(superchunk: SuperchunkIndex, place: usize, layers: &[(LayerT
     cold_storage
 }
 
-/// The mock superchunk's dirt: every cell its grass is not on.
-pub const MOCK_DIRT: LayerType = LayerType::of_a_bit(1);
-/// The mock superchunk's grass.
-pub const MOCK_GRASS: LayerType = LayerType::of_a_bit(2);
 
 /// A superchunk of dirt, flat at height 0, with grass on `grass_cells`
 /// cells drawn at random from `seed` -- fewer if a cell is drawn twice.
 /// Each chunk has a dirt layer, and a grass layer if any grass fell on
 /// it.
-pub fn grass_on_dirt(seed: u64, grass_cells: usize, layer_codec: &mut LayerCodec) -> SuperchunkImage {
+pub fn grass_on_dirt(types: TestTypes, seed: u64, grass_cells: usize, layer_codec: &mut LayerCodec) -> SuperchunkImage {
     let mut grass_bitmaps: [CellWords; CHUNKS_IN_SUPERCHUNK] = [[0; WORDS]; CHUNKS_IN_SUPERCHUNK];
     let mut xorshift_state = seed | 1;
     for _ in 0..grass_cells {
@@ -90,9 +87,9 @@ pub fn grass_on_dirt(seed: u64, grass_cells: usize, layer_codec: &mut LayerCodec
     }
     let mut encoded_layers: Vec<(usize, LayerType, Vec<u64>)> = Vec::new();
     for (chunk, chunk_grass) in grass_bitmaps.iter().enumerate() {
-        encoded_layers.push((chunk, MOCK_DIRT, layer_codec.encode_cells(&chunk_grass.map(|word| !word)).to_vec()));
+        encoded_layers.push((chunk, types.dirt, layer_codec.encode_cells(&chunk_grass.map(|word| !word)).to_vec()));
         if chunk_grass.iter().any(|&word| word != 0) {
-            encoded_layers.push((chunk, MOCK_GRASS, layer_codec.encode_cells(chunk_grass).to_vec()));
+            encoded_layers.push((chunk, types.grass, layer_codec.encode_cells(chunk_grass).to_vec()));
         }
     }
     let layer_changes: Vec<LayerChange> = encoded_layers.iter().map(|(chunk, layer_type, words)| LayerChange { place: *chunk, type_id: layer_type.type_id(), encoded_layer: words }).collect();

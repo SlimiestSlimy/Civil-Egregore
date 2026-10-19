@@ -326,6 +326,54 @@ NOW
   chunks by Morton index, as always. World file format 6: no layers
   row (the registry's). Instructions name a plane by ID, the hot
   superchunk's layer gives its shape.
+- TESTS' TYPES (the user, 2026-10-18): "tests should not check for
+  hardcoded typeids"; seeds are fine and wanted ("tests should use seed
+  whenever possible gor determinism"). Asked to weigh one registry for
+  all tests against one a test ("i feel that could impact twst
+  effectiveness, discuss please"): per test, "yes go ahead" -- each
+  test registers exactly its types, after a seed-drawn number of filler
+  types so IDs move with the seed; shared helpers take their types from
+  the test. "worlds made by tests should live in transient data btw, i
+  understand some tests may share worlds, so those should load the type
+  registry from thw world, if shared is saved, otherwise is not".
+  DONE: each test registers a set of types in a registry of its own,
+  after a seed-drawn number of fillers -- the whole set of its file's
+  tier (server/tests/shared/test_types.rs, tests/shared/arenas.rs,
+  tests/fine/entity_manager.rs), not exactly its own types. No test
+  counts on registration order: lists in type order are sorted by ID in
+  the test, the server's ten plain layers register in a drawn order;
+  the one attribute that must sort before the sheep's state registers
+  before the base game, the test asserting so. The sheep tag is found
+  by name in the world's frozen registry ("the frozen registry still
+  keeps names to lookup the ids, tests could be a good use for that"),
+  registered only by the worlds that tag sheep. Attribute::new and
+  WidePlane::new/of_tiles removed: types come from registering alone.
+- TYPES.CSV DRIVES LOADING (the user, 2026-10-18): "hmmm if a world
+  loads and is unable to load a name in types.csv it should fail lol",
+  "it should not fail because the tag is not registered, it should fail
+  because the type registry csnt find the type to register in the first
+  place", "types.csv is the source of truth, for type registry
+  loading". Now: the game registers in its order, each type taking its
+  saved ID; a saved name nothing registered fails at freeze. NEXT:
+  loading walks types.csv, finding each row's registration.
+- ONE TRANSIENT DATA (the user, 2026-10-18): "we are making a single
+  unfified transient data directory at the root, shared by everyone
+  (they can have their own folders inside if needed like the test saves
+  folder)". server/tests' paging test writes server/transient_data/
+  (the crate's): to move to the root's.
+- EVERY WORLD A FOLDER (the user, 2026-10-18, on paging kept apart from
+  the world): "1: make every world produce a world folder to save stuff
+  into. since no path to save the world is specified the default path
+  is used, and a random name is given to the world. 2: [pages newer
+  than the save] thats correct, but the paging folder should be on the
+  world folder 3: we should have lock files for that already" -- only
+  paging folders have locks today; the world folder gets one (one run a
+  world): "the lock file should be on the world folder root lol". "the
+  default for a compiled binary should be the civil egregore as usual,
+  for tests, transient data folder" -- no test hook in production: every
+  test names its world's folder under transient_data (a shared helper). Pages
+  kept apart from the save's files inside the world folder. After the
+  tests' types.
 - WHAT IS LEFT, IN ORDER (the user, 2026-10-18, on my list of what is
   left: "1 go ahead, 2 not quite, we need client side gui rules or
   something like that first / 3 same, fold into 5 with 2 / 4 can be
@@ -603,6 +651,11 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- Registry users cast down once: "users of the registry ideally cast
+  stuff down once if needed and never again, but thats for later lol"
+  (2026-10-18). A type looked up by name in the frozen registry (its
+  RegisteredType) turned into its handle (LayerType, Attribute<L>, ...)
+  once, where it is first needed, and the handle kept from then on.
 - A reset world button, calling basegame's "reset world" call: "we
   probably will add a "reset world" button later for that lol"
   (2026-10-18).

@@ -12,7 +12,7 @@
 
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, SEED};
 use crate::worlds::base;
-use crate::worlds::{tag_of, tag_sheep, tick_rule, tick_sheep};
+use crate::worlds::{sheep_tag, tag_of, tag_sheep, tick_rule, tick_sheep};
 use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use server::World;
 use std::collections::HashMap;
@@ -47,13 +47,14 @@ fn what_stands_and_no_other(world: &World) -> (bool, u64) {
 #[test]
 fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let mut world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
+    let mut world = crate::worlds::one_flock_world_of(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000, &crate::worlds::with_sheep_tag());
     let (collision_matches, trees) = what_stands_and_no_other(&world);
     assert!(collision_matches && trees > 0, "as generated: {trees} trees");
     assert!(world.entity_store().iter().all(|put_sheep| world.bitmap_arena().layer_holds_cell(base().tree, put_sheep.header.stood_cell) == Ok(false)), "a sheep put on a tree");
     // Each sheep told from the others by a tag; a lamb, born after, has none.
     tag_sheep(&mut world);
-    let mut stood_cell_by_tag: HashMap<u64, CellIndex> = world.entity_store().iter().map(|tagged_sheep| (tag_of(&tagged_sheep).expect("tagged"), tagged_sheep.header.stood_cell)).collect();
+    let sheep_tag = sheep_tag(&world);
+    let mut stood_cell_by_tag: HashMap<u64, CellIndex> = world.entity_store().iter().map(|tagged_sheep| (tag_of(sheep_tag, &tagged_sheep).expect("tagged"), tagged_sheep.header.stood_cell)).collect();
     let (mut steps_seen, mut lamb_ticks) = (0, 0);
     // A stretch at the least; and on, to the first step: within two meals, as no grass grows back with the sheep's rule alone run.
     let (stretch_ticks, mut tick) = (400, 0);
@@ -65,12 +66,12 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
         }
         for ticked_sheep in world.entity_store().iter() {
             let stood_cell = ticked_sheep.header.stood_cell;
-            let Some(sheep_tag) = tag_of(&ticked_sheep) else {
+            let Some(tag_number) = tag_of(sheep_tag, &ticked_sheep) else {
                 assert_eq!(world.bitmap_arena().layer_holds_cell(base().tree, stood_cell), Ok(false), "a lamb on a tree's cell");
                 lamb_ticks += 1;
                 continue;
             };
-            if stood_cell_by_tag.insert(sheep_tag, stood_cell) != Some(stood_cell) {
+            if stood_cell_by_tag.insert(tag_number, stood_cell) != Some(stood_cell) {
                 assert_eq!(world.bitmap_arena().layer_holds_cell(base().tree, stood_cell), Ok(false), "a sheep come onto a tree's cell");
                 steps_seen += 1;
             }

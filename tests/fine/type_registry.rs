@@ -20,8 +20,8 @@ fn frozen_base_types() -> (FrozenTypeRegistry, BaseTypes) {
     (type_registry.freeze().expect("frozen"), base_types)
 }
 
-/// The type of `frozen_type_registry` named `type_name`, if any: a test's own
-/// look-up, frozen types being known by their IDs alone.
+/// The type of `frozen_type_registry` named `type_name`, if any: found by
+/// its name, as anything would find it.
 fn named<'frozen>(frozen_type_registry: &'frozen FrozenTypeRegistry, type_name: &str) -> Option<&'frozen RegisteredType> {
     frozen_type_registry.types().iter().find(|registered_type| registered_type.name() == type_name)
 }

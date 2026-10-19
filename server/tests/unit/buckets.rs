@@ -3,8 +3,9 @@
 //! (`src/lib.rs`).
 
 use crate::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
+use crate::test_types::TestTypes;
 use utilities::bitmap::WORDS;
-use crate::chunk_storage::{Bits4, LayerCodec, LayerType, WidePlane};
+use crate::chunk_storage::LayerCodec;
 use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 
 /// A hot bitmap with no cell set keeps no bucket, and reads clear; the
@@ -13,8 +14,9 @@ use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 /// bucket makes none.
 #[test]
 fn a_bucket_is_kept_only_for_a_chunk_with_cells() {
+    let types = TestTypes::seeded(crate::test_seed::TestSeedHandle::open().seed());
     let (mut layer_codec, mut bitmap_arena) = (LayerCodec::new(), BitmapArena::new());
-    let (plain, stage) = (LayerType::of_a_bit(5), WidePlane::<Bits4>::new(40));
+    let (plain, stage) = (types.layers[0], types.four_bits);
     let chunk = |place: u64| ChunkIndex(place);
     for place in 0..16 {
         bitmap_arena.make_hot(BucketKey { layer_type: plain, chunk: chunk(place) }, None, &mut layer_codec);

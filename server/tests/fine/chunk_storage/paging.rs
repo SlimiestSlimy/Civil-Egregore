@@ -2,7 +2,8 @@
 //! written to a folder of its own and read back the same, and folders
 //! left behind removed.
 
-use crate::chunk_storage::{disk, ChunkStorage, ImageStored, LayerChange, LayerCodec, LayerType, SuperchunkImage};
+use crate::chunk_storage::{disk, ChunkStorage, ImageStored, LayerChange, LayerCodec, SuperchunkImage};
+use crate::test_types::TestTypes;
 use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,7 +19,7 @@ fn folder(test_name: &str) -> PathBuf {
 
 /// `count` superchunks drawn, no two the same, each with an image of
 /// a cell of a layer drawn: all the same size.
-fn images_drawn(seeded_random: &mut RandomSource, count: usize) -> Vec<(SuperchunkIndex, SuperchunkImage)> {
+fn images_drawn(types: TestTypes, seeded_random: &mut RandomSource, count: usize) -> Vec<(SuperchunkIndex, SuperchunkImage)> {
     let mut superchunks: Vec<u64> = Vec::new();
     while superchunks.len() < count {
         let drawn_superchunk = seeded_random.draw_below(1 << 40);
@@ -30,7 +31,7 @@ fn images_drawn(seeded_random: &mut RandomSource, count: usize) -> Vec<(Superchu
     let mut one_cell = [0; utilities::bitmap::WORDS];
     one_cell[0] = 1;
     let encoded_layer = layer_codec.encode_cells(&one_cell).to_vec();
-    superchunks.into_iter().map(|superchunk| (SuperchunkIndex(superchunk), SuperchunkImage::empty().rewritten_with(&[LayerChange { place: 0, type_id: 2 + seeded_random.draw_below(200), encoded_layer: &encoded_layer }]))).collect()
+    superchunks.into_iter().map(|superchunk| (SuperchunkIndex(superchunk), SuperchunkImage::empty().rewritten_with(&[LayerChange { place: 0, type_id: types.layers[seeded_random.draw_below(10) as usize].type_id(), encoded_layer: &encoded_layer }]))).collect()
 }
 
 /// What is in `folder`: how many entries.
@@ -49,9 +50,10 @@ fn count_entries(folder: &std::path::Path) -> usize {
 #[test]
 fn images_past_what_is_kept_go_to_disk_and_read_back_the_same() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let types = TestTypes::seeded(seed);
     let mut seeded_random = RandomSource::new(seed);
     let (paging_root, save, other_save) = (folder("paging_root"), folder("paging_save"), folder("paging_other"));
-    let images = images_drawn(&mut seeded_random, 12);
+    let images = images_drawn(types, &mut seeded_random, 12);
     let image_bytes = std::mem::size_of_val(images[0].1.words()) as u64;
     let mut cold_storage = ChunkStorage::new(1 << 12);
     cold_storage.page_under(paging_root.clone(), 3 * image_bytes);
@@ -63,7 +65,7 @@ fn images_past_what_is_kept_go_to_disk_and_read_back_the_same() {
     // One held by its caller, one by its changes in the ring: drawn.
     let (held_superchunk, in_ring) = (images[seeded_random.draw_below(6) as usize].0, images[6 + seeded_random.draw_below(6) as usize].0);
     let (mut layer_codec, mut flushed_superchunks) = (LayerCodec::new(), Vec::new());
-    cold_storage.write_back(ChunkIndex::from_superchunk_place(in_ring, seeded_random.draw_below(16) as usize), LayerType::of_a_bit(1), layer_codec.encode_cells(&[u64::MAX; utilities::bitmap::WORDS]), &mut flushed_superchunks);
+    cold_storage.write_back(ChunkIndex::from_superchunk_place(in_ring, seeded_random.draw_below(16) as usize), types.layers[0], layer_codec.encode_cells(&[u64::MAX; utilities::bitmap::WORDS]), &mut flushed_superchunks);
     assert!(flushed_superchunks.is_empty());
     assert_eq!(cold_storage.page_out(|superchunk| superchunk == held_superchunk).expect("paged out"), 9);
     assert!(!cold_storage.over_memory_kept() && cold_storage.on_disk() == 9 && cold_storage.bytes_in_memory() == 3 * image_bytes);
@@ -118,9 +120,10 @@ fn images_past_what_is_kept_go_to_disk_and_read_back_the_same() {
 #[test]
 fn a_paging_folder_left_behind_is_removed_and_one_in_use_is_left() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let types = TestTypes::seeded(seed);
     let mut seeded_random = RandomSource::new(seed);
     let paging_root = folder("paging_left_behind");
-    let images = images_drawn(&mut seeded_random, 2);
+    let images = images_drawn(types, &mut seeded_random, 2);
     let paged = |image: &(SuperchunkIndex, SuperchunkImage)| {
         let mut cold_storage = ChunkStorage::new(1 << 12);
         cold_storage.page_under(paging_root.clone(), 0);

@@ -7,17 +7,11 @@
 //! `cargo test -p server --lib entity_over_a_border`
 
 use crate::arenas::{cell, walker_header, world};
+use crate::test_types::TestTypes;
 use utilities::coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
-use crate::entity_manager::{Attribute, WorldEntities, Header, NEVER_WAKES};
+use crate::entity_manager::{WorldEntities, Header, NEVER_WAKES};
 use crate::simulation::{Simulation, SimulationTickState};
 use utilities::rng::RandomSource;
-
-/// What the crosser has from the start.
-const NAME_ATTRIBUTE: Attribute<u64> = Attribute::new(50);
-/// What a writer writes of itself.
-const OWN_ATTRIBUTE: Attribute<u64> = Attribute::new(51);
-/// The first of the attributes the writers give the crosser, one each.
-const FIRST_GIVEN_ATTRIBUTE: u64 = 60;
 
 /// What a writer does to the crosser.
 #[derive(Clone, Copy, PartialEq)]
@@ -58,16 +52,16 @@ fn crossing_scene(crosser_row: u32, last_writer_does: WriterDoes) -> (CellIndex,
 /// One tick of the scene: the crosser steps over the border, every
 /// writer does what it does to it. What the tick applied, and the
 /// entities after.
-fn tick(seed: u64, thread_count: usize, crosser_row: u32, last_writer_does: WriterDoes, is_blocked: bool) -> (crate::entity_manager::InstructionsApplied, WorldEntities) {
-    let (mut bitmap_arena, mut entity_store) = world(3);
+fn tick(types: TestTypes, seed: u64, thread_count: usize, crosser_row: u32, last_writer_does: WriterDoes, is_blocked: bool) -> (crate::entity_manager::InstructionsApplied, WorldEntities) {
+    let (mut bitmap_arena, mut entity_store) = world(types, 3);
     let (from_cell, to_cell, writer_cells) = crossing_scene(crosser_row, last_writer_does);
-    let crosser_header = walker_header(from_cell, 0);
-    entity_store.queue_add(crosser_header, &[crate::entity_manager::AttributeBlock::holding_value(NAME_ATTRIBUTE, 7)]);
+    let crosser_header = walker_header(types, from_cell, 0);
+    entity_store.queue_add(crosser_header, &[crate::entity_manager::AttributeBlock::holding_value(types.name, 7)]);
     for &(writer_cell, _) in &writer_cells {
-        entity_store.queue_add(walker_header(writer_cell, 0), &[]);
+        entity_store.queue_add(walker_header(types, writer_cell, 0), &[]);
     }
     if is_blocked {
-        entity_store.queue_add(walker_header(to_cell, NEVER_WAKES), &[]);
+        entity_store.queue_add(walker_header(types, to_cell, NEVER_WAKES), &[]);
     }
     entity_store.apply();
     for &(later_writer_cell, _) in &writer_cells[1..] {
@@ -88,9 +82,9 @@ fn tick(seed: u64, thread_count: usize, crosser_row: u32, last_writer_does: Writ
             match writer_cells[writer_index].1 {
                 WriterDoes::RemovesCrosser => crate::simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &crosser_header),
                 writer_does => {
-                    crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &crosser_header, Attribute::<u64>::new(FIRST_GIVEN_ATTRIBUTE + writer_index as u64), None, writer_index as u64 + 1);
+                    crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &crosser_header, types.given[writer_index], None, writer_index as u64 + 1);
                     if writer_does == WriterDoes::GivesAndKeeps {
-                        crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &header, OWN_ATTRIBUTE, None, 1);
+                        crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &header, types.own, None, 1);
                     }
                 }
             }
@@ -110,17 +104,18 @@ fn tick(seed: u64, thread_count: usize, crosser_row: u32, last_writer_does: Writ
 #[test]
 fn what_others_write_to_an_entity_follows_it_over_a_border() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let types = TestTypes::seeded(seed);
     let mut seeded_rng = RandomSource::new(seed);
     let crosser_row = 4 + seeded_rng.draw_below(900) as u32;
     for (thread_count, is_blocked) in [(1, false), (crate::simulation::threads_for(9), false), (1, true), (crate::simulation::threads_for(9), true)] {
-        let (applied_counts, entity_store) = tick(seed, thread_count, crosser_row, WriterDoes::GivesAttribute, is_blocked);
+        let (applied_counts, entity_store) = tick(types, seed, thread_count, crosser_row, WriterDoes::GivesAttribute, is_blocked);
         let (from_cell, to_cell, writer_cells) = crossing_scene(crosser_row, WriterDoes::GivesAttribute);
         assert_eq!((applied_counts.border_crossings, applied_counts.turned_back), (usize::from(!is_blocked), usize::from(is_blocked)), "on {thread_count} threads, row {crosser_row}");
         let crosser_entity = entity_store.get(if is_blocked { from_cell } else { to_cell }).expect("the crosser, where it should stand");
-        assert_eq!((crosser_entity.attribute(NAME_ATTRIBUTE), entity_store.get(from_cell).is_some()), (Some(7), is_blocked));
+        assert_eq!((crosser_entity.attribute(types.name), entity_store.get(from_cell).is_some()), (Some(7), is_blocked));
         for (writer_index, &(writer_cell, writer_does)) in writer_cells.iter().enumerate() {
-            assert_eq!(crosser_entity.attribute(Attribute::<u64>::new(FIRST_GIVEN_ATTRIBUTE + writer_index as u64)), Some(writer_index as u64 + 1), "writer {writer_index} on {thread_count} threads, row {crosser_row}, blocked {is_blocked}");
-            assert_eq!(entity_store.get(writer_cell).expect("the writer").attribute(OWN_ATTRIBUTE), (writer_does == WriterDoes::GivesAndKeeps).then_some(1), "writer {writer_index}'s own");
+            assert_eq!(crosser_entity.attribute(types.given[writer_index]), Some(writer_index as u64 + 1), "writer {writer_index} on {thread_count} threads, row {crosser_row}, blocked {is_blocked}");
+            assert_eq!(entity_store.get(writer_cell).expect("the writer").attribute(types.own), (writer_does == WriterDoes::GivesAndKeeps).then_some(1), "writer {writer_index}'s own");
         }
         assert_eq!(entity_store.len(), writer_cells.len() + 1 + usize::from(is_blocked));
     }
@@ -132,10 +127,11 @@ fn what_others_write_to_an_entity_follows_it_over_a_border() {
 #[test]
 fn an_entity_removed_after_it_crossed_is_gone() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
+    let types = TestTypes::seeded(seed);
     let mut seeded_rng = RandomSource::new(seed);
     let crosser_row = 4 + seeded_rng.draw_below(900) as u32;
     for thread_count in [1, crate::simulation::threads_for(9)] {
-        let (applied_counts, entity_store) = tick(seed, thread_count, crosser_row, WriterDoes::RemovesCrosser, false);
+        let (applied_counts, entity_store) = tick(types, seed, thread_count, crosser_row, WriterDoes::RemovesCrosser, false);
         let (from_cell, to_cell, writer_cells) = crossing_scene(crosser_row, WriterDoes::RemovesCrosser);
         assert_eq!((applied_counts.border_crossings, applied_counts.entities_removed), (1, 1), "on {thread_count} threads, row {crosser_row}");
         assert!(entity_store.get(from_cell).is_none() && entity_store.get(to_cell).is_none(), "on {thread_count} threads, row {crosser_row}");

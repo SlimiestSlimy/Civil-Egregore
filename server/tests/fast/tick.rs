@@ -4,27 +4,26 @@
 //! found it, and never past the superchunks next door.
 
 use crate::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
+use crate::test_types::TestTypes;
 use crate::entity_manager::WorldEntities;
 use crate::simulation::{Simulation, SimulationTickState};
 use utilities::chance::Chance;
-use crate::chunk_storage::{LayerCodec, LayerType};
+use crate::chunk_storage::LayerCodec;
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 
-/// The layer type the tests run on.
-const STONE_LAYER: LayerType = LayerType::of_a_bit(6);
 
-/// An arena with `STONE_LAYER` hot over the `side_superchunks` by `side_superchunks` superchunks from
+/// An arena with `types.stone` hot over the `side_superchunks` by `side_superchunks` superchunks from
 /// `(10, 10)`, the cells `cells` set.
-fn stone_arena(side_superchunks: u32, cells: impl Iterator<Item = CellCartesian>) -> BitmapArena {
+fn stone_arena(types: TestTypes, side_superchunks: u32, cells: impl Iterator<Item = CellCartesian>) -> BitmapArena {
     let (mut layer_codec, mut bitmap_arena) = (LayerCodec::new(), BitmapArena::new());
     for y in 10..10 + side_superchunks {
         for x in 10..10 + side_superchunks {
             for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
-                bitmap_arena.make_hot(BucketKey { layer_type: STONE_LAYER, chunk }, None, &mut layer_codec);
+                bitmap_arena.make_hot(BucketKey { layer_type: types.stone, chunk }, None, &mut layer_codec);
             }
         }
     }
-    cells.for_each(|cell| bitmap_arena.queue_write(STONE_LAYER, Write::cell(cell.into(), WriteOp::SetCell)));
+    cells.for_each(|cell| bitmap_arena.queue_write(types.stone, Write::cell(cell.into(), WriteOp::SetCell)));
     assert_eq!(bitmap_arena.apply().missed, 0);
     bitmap_arena
 }
@@ -37,13 +36,13 @@ fn top_left_cartesian(x: u32, y: u32) -> CellCartesian {
 /// Stone creeping: each cell sampled at 5% sets a random neighbour it
 /// sees clear -- within the 3x3 around it -- or clears itself: how
 /// many it sampled.
-fn stone_creep(tick_state: &mut SimulationTickState) -> usize {
-    tick_state.each_sampled(STONE_LAYER, Chance::one_in(20), &mut (), |tick_state, cell, _| {
+fn stone_creep(types: TestTypes, tick_state: &mut SimulationTickState) -> usize {
+    tick_state.each_sampled(types.stone, Chance::one_in(20), &mut (), |tick_state, cell, _| {
         let (dx, dy) = (tick_state.random_stream().draw_below(3) as i32 - 1, tick_state.random_stream().draw_below(3) as i32 - 1);
         if (dx, dy) == (0, 0) {
-            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, cell, 1, 0, None);
-        } else if let Some(clear_neighbour) = cell.at_cartesian_offset(dx, dy).filter(|&candidate_neighbour| tick_state.layer_holds(STONE_LAYER, candidate_neighbour) == Ok(false)) {
-            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, clear_neighbour, 0, 1, None);
+            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, types.stone, cell, 1, 0, None);
+        } else if let Some(clear_neighbour) = cell.at_cartesian_offset(dx, dy).filter(|&candidate_neighbour| tick_state.layer_holds(types.stone, candidate_neighbour) == Ok(false)) {
+            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, types.stone, clear_neighbour, 0, 1, None);
         }
     })
 }
@@ -68,9 +67,10 @@ fn scattered_cells(seed: u64) -> impl Iterator<Item = CellCartesian> {
 #[test]
 fn any_number_of_threads_ticks_the_same() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut one_thread_arena, mut four_thread_arena) = (stone_arena(3, scattered_cells(seed)), stone_arena(3, scattered_cells(seed)));
+    let types = TestTypes::seeded(seed);
+    let (mut one_thread_arena, mut four_thread_arena) = (stone_arena(types, 3, scattered_cells(seed)), stone_arena(types, 3, scattered_cells(seed)));
     for tick in 0..20 {
-        let (one_thread_report, four_thread_report) = (Simulation::new(1).tick(&mut one_thread_arena, &mut WorldEntities::new(), seed, stone_creep), Simulation::new(4).tick(&mut four_thread_arena, &mut WorldEntities::new(), seed, stone_creep));
+        let (one_thread_report, four_thread_report) = (Simulation::new(1).tick(&mut one_thread_arena, &mut WorldEntities::new(), seed, |tick_state: &mut SimulationTickState| stone_creep(types, tick_state)), Simulation::new(4).tick(&mut four_thread_arena, &mut WorldEntities::new(), seed, |tick_state: &mut SimulationTickState| stone_creep(types, tick_state)));
         assert_eq!((one_thread_report.rules, one_thread_report.writes_applied), (four_thread_report.rules, four_thread_report.writes_applied), "tick {tick}");
     }
     assert_eq!(every_cell(&one_thread_arena), every_cell(&four_thread_arena));
@@ -81,20 +81,21 @@ fn any_number_of_threads_ticks_the_same() {
 #[test]
 fn writes_cross_borders_and_reads_see_the_tick_start() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let types = TestTypes::seeded(seed);
     // Any cell down the superchunk's east edge.
     let east_border_cell = CellCartesian { x: top_left_cartesian(11, 10).x - 1, y: top_left_cartesian(10, 10).y + utilities::rng::RandomSource::new(seed).draw_below(1024) as u32 };
-    let mut bitmap_arena = stone_arena(2, [east_border_cell].into_iter());
+    let mut bitmap_arena = stone_arena(types, 2, [east_border_cell].into_iter());
     let across_cell: CellIndex = CellCartesian { x: east_border_cell.x + 1, y: east_border_cell.y }.into();
     let report = Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |tick_state| {
-        tick_state.each_sampled(STONE_LAYER, Chance::ALWAYS_HAPPENS, &mut (), |tick_state, cell, _| {
+        tick_state.each_sampled(types.stone, Chance::ALWAYS_HAPPENS, &mut (), |tick_state, cell, _| {
             let east_neighbour = cell.at_cartesian_offset(1, 0).expect("in the world");
-            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, east_neighbour, 0, 1, None);
-            assert_eq!(tick_state.layer_holds(STONE_LAYER, east_neighbour), Ok(false), "still as the tick found it");
+            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, types.stone, east_neighbour, 0, 1, None);
+            assert_eq!(tick_state.layer_holds(types.stone, east_neighbour), Ok(false), "still as the tick found it");
         })
     });
     assert_eq!((report.rules, report.writes_applied.cells_changed), (1, 1));
-    assert_eq!(bitmap_arena.layer_holds_cell(STONE_LAYER, across_cell), Ok(true), "set in the neighbour");
-    assert_eq!(bitmap_arena.superchunk_count(STONE_LAYER, SuperchunkIndex::from_cartesian(11, 10)), 1);
+    assert_eq!(bitmap_arena.layer_holds_cell(types.stone, across_cell), Ok(true), "set in the neighbour");
+    assert_eq!(bitmap_arena.superchunk_count(types.stone, SuperchunkIndex::from_cartesian(11, 10)), 1);
 }
 
 /// The cells of a square straddling the corner four superchunks meet
@@ -102,14 +103,15 @@ fn writes_cross_borders_and_reads_see_the_tick_start() {
 #[test]
 fn writes_about_a_corner_land_in_the_four_superchunks() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let types = TestTypes::seeded(seed);
     let meeting_corner = top_left_cartesian(11, 11);
-    let mut bitmap_arena = stone_arena(2, [CellCartesian { x: meeting_corner.x - 1, y: meeting_corner.y - 1 }].into_iter());
+    let mut bitmap_arena = stone_arena(types, 2, [CellCartesian { x: meeting_corner.x - 1, y: meeting_corner.y - 1 }].into_iter());
     let report = Simulation::new(2).tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |tick_state| {
-        tick_state.each_sampled(STONE_LAYER, Chance::ALWAYS_HAPPENS, &mut (), |tick_state, cell, _| {
+        tick_state.each_sampled(types.stone, Chance::ALWAYS_HAPPENS, &mut (), |tick_state, cell, _| {
             for (x, y) in (-1..3).flat_map(|y| (-1..3).map(move |x| (x, y))) {
                 let square_cell = cell.at_cartesian_offset(x, y).expect("in the world");
-                if tick_state.layer_holds(STONE_LAYER, square_cell) == Ok(false) {
-                    crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, square_cell, 0, 1, None);
+                if tick_state.layer_holds(types.stone, square_cell) == Ok(false) {
+                    crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, types.stone, square_cell, 0, 1, None);
                 }
             }
         });
@@ -117,7 +119,7 @@ fn writes_about_a_corner_land_in_the_four_superchunks() {
     });
     assert_eq!(report.writes_applied.cells_changed, 15, "the 4x4 from two up and left of the meeting point, one cell set already");
     for (x, y, cells) in [(10, 10, 4), (11, 10, 4), (10, 11, 4), (11, 11, 4)] {
-        assert_eq!(bitmap_arena.superchunk_count(STONE_LAYER, SuperchunkIndex::from_cartesian(x, y)), cells, "superchunk ({x}, {y})");
+        assert_eq!(bitmap_arena.superchunk_count(types.stone, SuperchunkIndex::from_cartesian(x, y)), cells, "superchunk ({x}, {y})");
     }
 }
 
@@ -126,11 +128,12 @@ fn writes_about_a_corner_land_in_the_four_superchunks() {
 #[test]
 fn writes_to_cold_neighbours_are_missed() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let types = TestTypes::seeded(seed);
     let east_border_cell = CellCartesian { x: top_left_cartesian(11, 10).x - 1, y: top_left_cartesian(10, 10).y + utilities::rng::RandomSource::new(seed).draw_below(1024) as u32 };
-    let mut bitmap_arena = stone_arena(1, [east_border_cell].into_iter());
+    let mut bitmap_arena = stone_arena(types, 1, [east_border_cell].into_iter());
     let report = Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |tick_state| {
-        tick_state.each_sampled(STONE_LAYER, Chance::ALWAYS_HAPPENS, &mut (), |tick_state, cell, _| {
-            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, cell.at_cartesian_offset(1, 0).expect("in the world"), 0, 1, None);
+        tick_state.each_sampled(types.stone, Chance::ALWAYS_HAPPENS, &mut (), |tick_state, cell, _| {
+            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, types.stone, cell.at_cartesian_offset(1, 0).expect("in the world"), 0, 1, None);
         });
         0
     });
@@ -142,10 +145,11 @@ fn writes_to_cold_neighbours_are_missed() {
 #[should_panic(expected = "past the speed of light")]
 fn writes_past_the_speed_of_light_panic() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut bitmap_arena = stone_arena(1, [top_left_cartesian(10, 10)].into_iter());
+    let types = TestTypes::seeded(seed);
+    let mut bitmap_arena = stone_arena(types, 1, [top_left_cartesian(10, 10)].into_iter());
     Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |tick_state| {
-        tick_state.each_sampled(STONE_LAYER, Chance::ALWAYS_HAPPENS, &mut (), |tick_state, cell, _| {
-            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, STONE_LAYER, cell.at_cartesian_offset(2 * SUPERCHUNK_SIDE_CELLS as i32, 0).expect("in the world"), 0, 1, None);
+        tick_state.each_sampled(types.stone, Chance::ALWAYS_HAPPENS, &mut (), |tick_state, cell, _| {
+            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, types.stone, cell.at_cartesian_offset(2 * SUPERCHUNK_SIDE_CELLS as i32, 0).expect("in the world"), 0, 1, None);
         });
         0
     });

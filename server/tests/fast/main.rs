@@ -21,14 +21,13 @@ mod sampling {
     //! `cargo test`
 
     use crate::bitplane_manager::{BitmapArena, BucketKey, WriteShape, Write, WriteOp};
+    use crate::test_types::TestTypes;
     use crate::simulation::sample;
     use utilities::chance::Chance;
     use utilities::rng::RandomSource;
-    use crate::chunk_storage::{LayerCodec, LayerType};
+    use crate::chunk_storage::LayerCodec;
     use utilities::coordinates::{CellCartesian, CellIndex, ChunkIndex};
 
-    /// The layer type the tests sample.
-    const STONE_LAYER: LayerType = LayerType::of_a_bit(4);
 
     /// Writes setting every cell of the `width` by `height` rectangle from
     /// `(x, y)`, in pieces of at most 128 cells a side.
@@ -39,24 +38,24 @@ mod sampling {
             .collect()
     }
 
-    /// An arena with `STONE_LAYER` hot in the chunks at `chunks`, the cells of
+    /// An arena with `types.stone` hot in the chunks at `chunks`, the cells of
     /// `writes` set.
-    fn arena_with(chunks: &[ChunkIndex], writes: &[Write]) -> BitmapArena {
+    fn arena_with(types: TestTypes, chunks: &[ChunkIndex], writes: &[Write]) -> BitmapArena {
         let (mut layer_codec, mut bitmap_arena) = (LayerCodec::new(), BitmapArena::new());
         for &chunk in chunks {
-            bitmap_arena.make_hot(BucketKey { layer_type: STONE_LAYER, chunk }, None, &mut layer_codec);
+            bitmap_arena.make_hot(BucketKey { layer_type: types.stone, chunk }, None, &mut layer_codec);
         }
         for &write in writes {
-            bitmap_arena.queue_write(STONE_LAYER, write);
+            bitmap_arena.queue_write(types.stone, write);
         }
         assert_eq!(bitmap_arena.apply().missed, 0);
         bitmap_arena
     }
 
     /// Every cell sampled, with `chance`.
-    fn sampled_cells(bitmap_arena: &BitmapArena, chance: Chance, seed: u64) -> Vec<CellCartesian> {
+    fn sampled_cells(types: TestTypes, bitmap_arena: &BitmapArena, chance: Chance, seed: u64) -> Vec<CellCartesian> {
         let mut cells = Vec::new();
-        let count = sample(bitmap_arena, STONE_LAYER, chance, &mut RandomSource::new(seed), |cell| cells.push(cell.cartesian()));
+        let count = sample(bitmap_arena, types.stone, chance, &mut RandomSource::new(seed), |cell| cells.push(cell.cartesian()));
         assert_eq!(count, cells.len());
         cells
     }
@@ -76,6 +75,7 @@ mod sampling {
     #[test]
     fn certain_sampling_finds_every_set_cell_in_morton_order() {
         let seed = crate::test_seed::TestSeedHandle::open().seed();
+        let types = TestTypes::seeded(seed);
         // The first cell of all, and discs, rectangles and cells drawn anywhere over the two superchunks, their border too.
         let mut seeded_rng = RandomSource::new(seed);
         let mut writes = vec![Write::cell(CellCartesian { x: 102_400, y: 102_400 }.into(), WriteOp::SetCell)];
@@ -89,13 +89,13 @@ mod sampling {
             };
             writes.push(Write { anchor_cell: shape_cell.into(), write_op: WriteOp::SetCell, write_shape: drawn_shape });
         }
-        let bitmap_arena = arena_with(&two_superchunks(), &writes);
-        let cells = sampled_cells(&bitmap_arena, Chance::ALWAYS_HAPPENS, seed);
-        let expected_count: usize = two_superchunks().iter().map(|&chunk| bitmap_arena.bucket(BucketKey { layer_type: STONE_LAYER, chunk }).expect("hot").count() as usize).sum();
+        let bitmap_arena = arena_with(types, &two_superchunks(), &writes);
+        let cells = sampled_cells(types, &bitmap_arena, Chance::ALWAYS_HAPPENS, seed);
+        let expected_count: usize = two_superchunks().iter().map(|&chunk| bitmap_arena.bucket(BucketKey { layer_type: types.stone, chunk }).expect("hot").count() as usize).sum();
         assert_eq!(cells.len(), expected_count);
         assert!(cells.windows(2).all(|cell_pair| CellIndex::from(cell_pair[0]) < CellIndex::from(cell_pair[1])), "in Morton order, each once");
-        assert!(cells.iter().all(|&cell| bitmap_arena.layer_holds_cell(STONE_LAYER, cell.into()) == Ok(true)), "only set cells");
-        assert!(sampled_cells(&bitmap_arena, Chance::NEVER_HAPPENS, seed).is_empty());
+        assert!(cells.iter().all(|&cell| bitmap_arena.layer_holds_cell(types.stone, cell.into()) == Ok(true)), "only set cells");
+        assert!(sampled_cells(types, &bitmap_arena, Chance::NEVER_HAPPENS, seed).is_empty());
     }
 
     /// Each set cell is chosen with the probability asked: over a million
@@ -104,10 +104,11 @@ mod sampling {
     #[test]
     fn each_cell_is_chosen_with_the_probability_asked() {
         let seed = crate::test_seed::TestSeedHandle::open().seed();
+        let types = TestTypes::seeded(seed);
         let chunks: Vec<ChunkIndex> = (0..4).flat_map(|y| (0..4).map(move |x| chunk_at(102_400 + 256 * x, 102_400 + 256 * y))).collect();
-        let bitmap_arena = arena_with(&chunks, &rect_writes(102_400, 102_400, 1024, 1024));
+        let bitmap_arena = arena_with(types, &chunks, &rect_writes(102_400, 102_400, 1024, 1024));
         for seed in (0..3).map(|seed_number| seed.wrapping_add(seed_number)) {
-            let cells = sampled_cells(&bitmap_arena, Chance::one_in(100), seed);
+            let cells = sampled_cells(types, &bitmap_arena, Chance::one_in(100), seed);
             let (expected_mean, standard_deviation) = (1_048_576.0 * 0.01, (1_048_576.0f64 * 0.01 * 0.99).sqrt());
             assert!((cells.len() as f64 - expected_mean).abs() < 5.0 * standard_deviation, "seed {seed}: {} cells", cells.len());
             assert!(cells.windows(2).all(|cell_pair| CellIndex::from(cell_pair[0]) < CellIndex::from(cell_pair[1])));
@@ -120,10 +121,11 @@ mod sampling {
     #[test]
     fn chunks_are_weighted_by_their_counts() {
         let seed = crate::test_seed::TestSeedHandle::open().seed();
+        let types = TestTypes::seeded(seed);
         let (full_chunk, sparse_chunk) = (chunk_at(102_400, 102_400), chunk_at(102_656, 102_400));
         let writes = [rect_writes(102_400, 102_400, 256, 256), rect_writes(102_656, 102_400, 64, 64)].concat();
-        let bitmap_arena = arena_with(&[full_chunk, sparse_chunk], &writes);
-        let cells = sampled_cells(&bitmap_arena, Chance::one_in(20), seed);
+        let bitmap_arena = arena_with(types, &[full_chunk, sparse_chunk], &writes);
+        let cells = sampled_cells(types, &bitmap_arena, Chance::one_in(20), seed);
         let in_sparse = cells.iter().filter(|&&cell| CellIndex::from(cell).chunk() == sparse_chunk).count() as f64;
         let in_full = cells.len() as f64 - in_sparse;
         // Each chunk's samples: its set cells at one in 20, binomial.
@@ -135,13 +137,14 @@ mod sampling {
     #[test]
     fn only_hot_bitmaps_are_sampled() {
         let seed = crate::test_seed::TestSeedHandle::open().seed();
+        let types = TestTypes::seeded(seed);
         let (kept_chunk, evicted_chunk) = (chunk_at(102_400, 102_400), chunk_at(102_656, 102_400));
-        let mut bitmap_arena = arena_with(&[kept_chunk, evicted_chunk], &rect_writes(102_400, 102_400, 512, 4));
-        assert_eq!(sampled_cells(&bitmap_arena, Chance::ALWAYS_HAPPENS, seed).len(), 2048);
+        let mut bitmap_arena = arena_with(types, &[kept_chunk, evicted_chunk], &rect_writes(102_400, 102_400, 512, 4));
+        assert_eq!(sampled_cells(types, &bitmap_arena, Chance::ALWAYS_HAPPENS, seed).len(), 2048);
         let mut evicted_storage = crate::chunk_storage::ChunkStorage::new(1 << 12);
         bitmap_arena.write_back(evicted_chunk.superchunk(), &mut evicted_storage, &mut LayerCodec::new());
-        assert!(bitmap_arena.evict(BucketKey { layer_type: STONE_LAYER, chunk: evicted_chunk }));
-        assert!(sampled_cells(&bitmap_arena, Chance::ALWAYS_HAPPENS, seed).iter().all(|&cell| CellIndex::from(cell).chunk() == kept_chunk));
-        assert_eq!(sampled_cells(&bitmap_arena, Chance::ALWAYS_HAPPENS, seed).len(), 1024);
+        assert!(bitmap_arena.evict(BucketKey { layer_type: types.stone, chunk: evicted_chunk }));
+        assert!(sampled_cells(types, &bitmap_arena, Chance::ALWAYS_HAPPENS, seed).iter().all(|&cell| CellIndex::from(cell).chunk() == kept_chunk));
+        assert_eq!(sampled_cells(types, &bitmap_arena, Chance::ALWAYS_HAPPENS, seed).len(), 1024);
     }
 }

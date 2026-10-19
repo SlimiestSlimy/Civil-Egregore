@@ -209,7 +209,7 @@ fn sheep_never_step_through_a_wall() {
     // Small polygons joined by cliffs, and a seed whose origin superchunk has walls enough.
     let land_shape = basegame::worldgen::LandShape { vertex_spacing_power: 8, highest_land: 552, narrowest_blend: 2, widest_blend: 2, ocean_share: 0, finer_depth: 3, ..basegame::worldgen::LandShape::DEFAULT };
     let seed = (crate::test_seed::TestSeedHandle::open().seed()..).find(|&seed| basegame::worldgen::Terrain::generate_shaped(&land_shape, seed, utilities::coordinates::CellArea { top_left: utilities::coordinates::WORLD_MIDDLE_CELL, side_cells: utilities::coordinates::SUPERCHUNK_SIDE_CELLS }).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
-    let mut made_world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(1)).with(WORLDGEN, crate::worlds::worldgen(basegame::worldgen::WorldGeneration { land_shape, sheep_per_superchunk: 4_000, ..basegame::worldgen::WorldGeneration::DEFAULT }.worldgen_parameters())), &crate::worlds::types()).expect("the world started");
+    let mut made_world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(1)).with(WORLDGEN, crate::worlds::worldgen(basegame::worldgen::WorldGeneration { land_shape, sheep_per_superchunk: 4_000, ..basegame::worldgen::WorldGeneration::DEFAULT }.worldgen_parameters())), &crate::worlds::with_sheep_tag()).expect("the world started");
     // The superchunk's heights and a cell more all round, worked out once: asked for at every sheep, every tick.
     let (corner_cartesian, side_cells) = (utilities::coordinates::WORLD_MIDDLE.top_left().cartesian(), utilities::coordinates::SUPERCHUNK_SIDE_CELLS as usize + 2);
     let mut mesh_lands = basegame::worldgen::mesh::WorldLand::new(&land_shape, seed);
@@ -224,13 +224,14 @@ fn sheep_never_step_through_a_wall() {
     // The flock made the first tick, by the world's generation.
     made_world.tick();
     crate::worlds::tag_sheep(&mut made_world);
-    let mut stood_cell_by_tag: HashMap<u64, utilities::coordinates::CellIndex> = made_world.entity_store().iter().map(|tagged_sheep| (crate::worlds::tag_of(&tagged_sheep).expect("tagged"), tagged_sheep.header.stood_cell)).collect();
+    let sheep_tag = crate::worlds::sheep_tag(&made_world);
+    let mut stood_cell_by_tag: HashMap<u64, utilities::coordinates::CellIndex> = made_world.entity_store().iter().map(|tagged_sheep| (crate::worlds::tag_of(sheep_tag, &tagged_sheep).expect("tagged"), tagged_sheep.header.stood_cell)).collect();
     let (mut steps_moved, mut beside_walls) = (0, 0);
     for _ in 0..1_500 {
         made_world.tick();
         for ticked_sheep in made_world.entity_store().iter() {
             let stood_cell = ticked_sheep.header.stood_cell;
-            if let Some(was_cell) = crate::worlds::tag_of(&ticked_sheep).and_then(|sheep_tag| stood_cell_by_tag.insert(sheep_tag, stood_cell)).filter(|&previous_cell| previous_cell != stood_cell) {
+            if let Some(was_cell) = crate::worlds::tag_of(sheep_tag, &ticked_sheep).and_then(|tag_number| stood_cell_by_tag.insert(tag_number, stood_cell)).filter(|&previous_cell| previous_cell != stood_cell) {
                 let (step_from_cartesian, step_to_cartesian) = (was_cell.cartesian(), stood_cell.cartesian());
                 // The cells of each way round: the straight step's alone, or the diagonal's two corners.
                 let corner_cells = [CellCartesian { x: step_to_cartesian.x, y: step_from_cartesian.y }, CellCartesian { x: step_from_cartesian.x, y: step_to_cartesian.y }];

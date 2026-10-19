@@ -13,7 +13,7 @@ use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_
 use crate::worlds::base;
 use utilities::coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use server::internals_for_root_tests::{Write, WriteOp};
-use server::internals_for_root_tests::{AttributeBlock, EntityType, Header, NEVER_WAKES};
+use server::internals_for_root_tests::{AttributeBlock, Header, NEVER_WAKES};
 use protocol::pipe::frame::Viewport;
 use server::{halos_about, HaloChange, World, COOL_TICKS, WARM_TICKS};
 
@@ -68,7 +68,7 @@ fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
     let mut world = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
     let try_both = |world: &mut World, cell| {
         let missed = world.write_cells(base().grass, [Write::cell(cell, WriteOp::FlipCell)]).missed;
-        (missed, world.add_entity(Header { entity_type: EntityType::from_number(99), stood_cell: cell, wake: NEVER_WAKES }, &[]).lost)
+        (missed, world.add_entity(Header { entity_type: base().sheep, stood_cell: cell, wake: NEVER_WAKES }, &[]).lost)
     };
     while world.warming().next().is_none() {
         assert!(world.entity_store().current_tick() < 60_000, "the halos moved");

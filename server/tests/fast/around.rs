@@ -6,29 +6,21 @@
 //!
 //! `cargo test -p server --lib fast_tests`
 
-use crate::arenas::{cell, STONE_LAYER};
+use crate::arenas::cell;
+use crate::test_types::TestTypes;
 use crate::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
-use crate::chunk_storage::{LayerCodec, LayerType};
+use crate::chunk_storage::LayerCodec;
 use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use crate::entity_manager::WorldEntities;
 use crate::simulation::simulation_api::{cell_and_its_neighbours, steps_and_paths};
 use crate::simulation::Simulation;
 use utilities::rng::RandomSource;
 
-/// What is in a walker's way here: the base game's collision plane and walls.
-/// The planes in the way, the test's own: what stands on a cell, and a wall
-/// on each side of one.
-const COLLISION: LayerType = LayerType::of_a_bit(7);
-/// A wall on a cell's north side.
-const WALL_NORTH: LayerType = LayerType::of_a_bit(8);
-/// A wall on a cell's west side.
-const WALL_WEST: LayerType = LayerType::of_a_bit(9);
-/// A wall on a cell's south side.
-const WALL_SOUTH: LayerType = LayerType::of_a_bit(10);
-/// A wall on a cell's east side.
-const WALL_EAST: LayerType = LayerType::of_a_bit(11);
-/// They, as walking asks them.
-const IN_THE_WAY: steps_and_paths::PlanesInTheWay = steps_and_paths::PlanesInTheWay { collision: COLLISION, wall_north: WALL_NORTH, wall_west: WALL_WEST, wall_south: WALL_SOUTH, wall_east: WALL_EAST };
+/// The planes in a walker's way, the test's own -- what stands on a
+/// cell, and a wall on each side of one -- as walking asks them.
+fn in_the_way(types: TestTypes) -> steps_and_paths::PlanesInTheWay {
+    steps_and_paths::PlanesInTheWay { collision: types.collision, wall_north: types.wall_north, wall_west: types.wall_west, wall_south: types.wall_south, wall_east: types.wall_east }
+}
 
 /// Cells of the 3x3 superchunks from `(10, 10)`, across and down from
 /// its top left: every way a cell lies in its small tile and its word
@@ -42,8 +34,9 @@ fn cells_every_way() -> impl Iterator<Item = (u32, u32)> {
 #[test]
 fn the_nine_about_a_cell_are_its_cells_read_one_by_one() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let types = TestTypes::seeded(seed);
     let mut seeded_random = RandomSource::new(seed);
-    let mut bitmap_arena = crate::arenas::stone_arena(3, (0..3_000_000).map(move |_| cell(seeded_random.draw_below(3072) as u32, seeded_random.draw_below(3072) as u32)));
+    let mut bitmap_arena = crate::arenas::stone_arena(types, 3, (0..3_000_000).map(move |_| cell(seeded_random.draw_below(3072) as u32, seeded_random.draw_below(3072) as u32)));
     let report = Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |tick_state| {
         if tick_state.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
@@ -52,9 +45,9 @@ fn the_nine_about_a_cell_are_its_cells_read_one_by_one() {
         for (x, y) in cells_every_way() {
             let asked_cell = cell(x, y);
             let about_tiles = cell_and_its_neighbours::tiles_about_cell(asked_cell);
-            let stone_about = cell_and_its_neighbours::read_layer(tick_state, STONE_LAYER, &about_tiles);
+            let stone_about = cell_and_its_neighbours::read_layer(tick_state, types.stone, &about_tiles);
             for way in 0..cell_and_its_neighbours::WAYS {
-                let holds_there = cell_and_its_neighbours::cell(asked_cell, way).map(|cell| tick_state.layer_holds(STONE_LAYER, cell));
+                let holds_there = cell_and_its_neighbours::cell(asked_cell, way).map(|cell| tick_state.layer_holds(types.stone, cell));
                 let (hot, is_set) = (matches!(holds_there, Some(Ok(_))), holds_there == Some(Ok(true)));
                 let cell_that_way = about_tiles.cell_towards(way);
                 assert_eq!((!(stone_about.hot & cell_that_way).is_empty(), !(stone_about.set_cells & cell_that_way).is_empty()), (hot, is_set), "the way {way} from ({x}, {y})");
@@ -89,32 +82,33 @@ fn the_nine_about_a_cell_are_its_cells_read_one_by_one() {
 #[test]
 fn what_may_be_stepped_to_is_the_unwalled_less_the_held() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let types = TestTypes::seeded(seed);
     let (mut layer_codec, mut bitmap_arena, mut seeded_random) = (LayerCodec::new(), BitmapArena::new(), RandomSource::new(seed));
-    for layer_type in [WALL_NORTH, WALL_WEST, WALL_EAST, WALL_SOUTH, COLLISION] {
+    for layer_type in [types.wall_north, types.wall_west, types.wall_east, types.wall_south, types.collision] {
         for (x, y) in (10..13).flat_map(|y| (10..13).map(move |x| (x, y))) {
             for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
                 bitmap_arena.make_hot(BucketKey { layer_type, chunk }, None, &mut layer_codec);
             }
         }
         // The collision plane thick enough to hem cells in, the walls thin.
-        let cells = if layer_type == COLLISION { 5_000_000 } else { 1_000_000 };
+        let cells = if layer_type == types.collision { 5_000_000 } else { 1_000_000 };
         (0..cells).for_each(|_| bitmap_arena.queue_write(layer_type, Write::cell(cell(seeded_random.draw_below(3072) as u32, seeded_random.draw_below(3072) as u32), WriteOp::SetCell)));
     }
     // One cell hemmed in whatever was drawn.
     let hemmed_cell: CellIndex = cell(1023, 1024);
-    (0..cell_and_its_neighbours::WAYS).filter(|&way_checked| way_checked != cell_and_its_neighbours::HERE).for_each(|way_held| bitmap_arena.queue_write(COLLISION, Write::cell(cell_and_its_neighbours::cell(hemmed_cell, way_held).unwrap(), WriteOp::SetCell)));
+    (0..cell_and_its_neighbours::WAYS).filter(|&way_checked| way_checked != cell_and_its_neighbours::HERE).for_each(|way_held| bitmap_arena.queue_write(types.collision, Write::cell(cell_and_its_neighbours::cell(hemmed_cell, way_held).unwrap(), WriteOp::SetCell)));
     assert_eq!(bitmap_arena.apply().missed, 0);
     let report = Simulation::new(1).tick(&mut bitmap_arena, &mut WorldEntities::new(), seed, |tick_state| {
         if tick_state.superchunk() != SuperchunkIndex::from_cartesian(10, 10) {
             return 0;
         }
-        assert!(steps_and_paths::around_steppable(tick_state, IN_THE_WAY, &cell_and_its_neighbours::tiles_about_cell(hemmed_cell)).is_empty(), "hemmed in");
+        assert!(steps_and_paths::around_steppable(tick_state, in_the_way(types), &cell_and_its_neighbours::tiles_about_cell(hemmed_cell)).is_empty(), "hemmed in");
         let mut open_steps = 0;
         for (x, y) in cells_every_way() {
             let asked_cell = cell(x, y);
             let about_tiles = cell_and_its_neighbours::tiles_about_cell(asked_cell);
-            let (steppable_cells, collision_about) = (steps_and_paths::around_steppable(tick_state, IN_THE_WAY, &about_tiles), cell_and_its_neighbours::read_layer(tick_state, COLLISION, &about_tiles));
-            assert_eq!(steppable_cells, (steps_and_paths::around_unwalled(tick_state, IN_THE_WAY, &about_tiles) & about_tiles.neighbour_cells()).cells_not_in(collision_about.set_cells), "about ({x}, {y})");
+            let (steppable_cells, collision_about) = (steps_and_paths::around_steppable(tick_state, in_the_way(types), &about_tiles), cell_and_its_neighbours::read_layer(tick_state, types.collision, &about_tiles));
+            assert_eq!(steppable_cells, (steps_and_paths::around_unwalled(tick_state, in_the_way(types), &about_tiles) & about_tiles.neighbour_cells()).cells_not_in(collision_about.set_cells), "about ({x}, {y})");
             open_steps += steppable_cells.count() as usize;
         }
         open_steps

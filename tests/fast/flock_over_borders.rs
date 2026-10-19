@@ -16,11 +16,12 @@
 // own and this is rewritten against them (AI.txt, LATER).
 
 use crate::worlds::base;
-use crate::arenas::{cell, walker_header, world, STONE_LAYER, WALKER_TYPE};
+use crate::arenas::TestTypes;
+use crate::arenas::{cell, walker_header, world};
 use server::internals_for_root_tests::{BitmapArena, BucketKey, Write, WriteOp};
 use server::internals_for_root_tests::LayerCodec;
 use utilities::coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use server::internals_for_root_tests::{Attribute, AttributeBlock, WorldEntities, InstructionsApplied};
+use server::internals_for_root_tests::{AttributeBlock, WorldEntities, InstructionsApplied};
 use server::simulation::simulation_api::cell_and_its_neighbours;
 use server::simulation::simulation_api::{cell_reads_and_writes, compare_and_write, SimulationTickState};
 use server::internals_for_root_tests::Simulation;
@@ -42,12 +43,6 @@ const PASTURE_SIDE: u32 = 240;
 const FLOCK: usize = 8000;
 /// Ticks run.
 const TICKS: u64 = 300;
-/// What a walker counts: its meals, and what its neighbours count on it.
-const COUNTED_ATTRIBUTE: Attribute<u64> = Attribute::new(41);
-/// The stones a walker laid: counted only if the stone was.
-const LAID_ATTRIBUTE: Attribute<u64> = Attribute::new(42);
-/// The walkers a walker made: counted only if the walker was.
-const MADE_ATTRIBUTE: Attribute<u64> = Attribute::new(43);
 /// Cells past the pasture, each way, that what came of it is read on:
 /// further than a walker comes in the ticks run.
 const READ_PAST: i64 = 320;
@@ -86,41 +81,41 @@ fn entity_standing_on<'a>(tick_state: &SimulationTickState<'a>, asked_cell: Cell
 /// cell and every attribute written is a compare-and-write, and what
 /// is counted of a cell beside it is under a compare of that cell --
 /// in another superchunk, where a border lies between.
-fn flock(tick_state: &mut SimulationTickState, seed: u64, pasture_shift: (u32, u32)) -> u64 {
+fn flock(types: TestTypes, tick_state: &mut SimulationTickState, seed: u64, pasture_shift: (u32, u32)) -> u64 {
     let tick_now = tick_state.current_tick();
     for entity in tick_state.woken_entities() {
         let (header, walker_cell) = (entity.header, entity.header.stood_cell);
         tick_state.seeing_to(walker_cell);
         let mut walker_random = drawn_for(seed, tick_now, from_pasture(pasture_shift, walker_cell));
         let about_tiles = cell_and_its_neighbours::tiles_about_cell(walker_cell);
-        let stone_about = cell_and_its_neighbours::read_layer(tick_state, STONE_LAYER, &about_tiles);
+        let stone_about = cell_and_its_neighbours::read_layer(tick_state, types.stone, &about_tiles);
         let (open_cells, collision_cells) = (stone_about.hot & about_tiles.neighbour_cells(), cell_and_its_neighbours::read_layer(tick_state, base().collision, &about_tiles).set_cells & about_tiles.neighbour_cells());
         let chance = walker_random.draw_below(100);
         if chance < 4 {
             collision_library().remove(tick_state, &header);
             continue;
         }
-        let meals_seen = entity.attribute(COUNTED_ATTRIBUTE);
+        let meals_seen = entity.attribute(types.counted);
         if !(stone_about.set_cells & about_tiles.centre_cell()).is_empty() {
             // The meal is counted only if the stone is there still: another on its way here may not eat it, but one counting on this one may.
-            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut compare_and_write::open_compare(tick_state, compare_and_write::layer_holds(STONE_LAYER, walker_cell)), &header, COUNTED_ATTRIBUTE, meals_seen, meals_seen.unwrap_or(0) + 1);
-            cell_reads_and_writes::clear(tick_state, STONE_LAYER, walker_cell);
+            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut compare_and_write::open_compare(tick_state, compare_and_write::layer_holds(types.stone, walker_cell)), &header, types.counted, meals_seen, meals_seen.unwrap_or(0) + 1);
+            cell_reads_and_writes::clear(tick_state, types.stone, walker_cell);
         } else if let Some(laid_cell) = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, open_cells.cells_not_in(stone_about.set_cells)).filter(|_| chance < 40).and_then(|laid_way| cell_and_its_neighbours::cell(walker_cell, laid_way)) {
             // Laid and counted, or neither: the cell may be another's stone by then, whichever side of a border it is on.
-            let laid_seen = entity.attribute(LAID_ATTRIBUTE);
-            let mut cell_bare_still = compare_and_write::open_compare(tick_state, compare_and_write::layer_lacks(STONE_LAYER, laid_cell));
-            cell_reads_and_writes::set(&mut cell_bare_still, STONE_LAYER, laid_cell);
-            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut cell_bare_still, &header, LAID_ATTRIBUTE, laid_seen, laid_seen.unwrap_or(0) + 1);
+            let laid_seen = entity.attribute(types.laid);
+            let mut cell_bare_still = compare_and_write::open_compare(tick_state, compare_and_write::layer_lacks(types.stone, laid_cell));
+            cell_reads_and_writes::set(&mut cell_bare_still, types.stone, laid_cell);
+            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut cell_bare_still, &header, types.laid, laid_seen, laid_seen.unwrap_or(0) + 1);
         }
         if let Some(neighbour_entity) = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, collision_cells).and_then(|neighbour_way| cell_and_its_neighbours::cell(walker_cell, neighbour_way)).and_then(|neighbour_cell| entity_standing_on(tick_state, neighbour_cell)) {
-            let count_seen = neighbour_entity.attribute(COUNTED_ATTRIBUTE);
-            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &neighbour_entity.header, COUNTED_ATTRIBUTE, count_seen, count_seen.unwrap_or(0) + 1000);
+            let count_seen = neighbour_entity.attribute(types.counted);
+            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &neighbour_entity.header, types.counted, count_seen, count_seen.unwrap_or(0) + 1000);
         }
         if let Some(made_cell) = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, open_cells.cells_not_in(collision_cells)).filter(|_| chance < 9).and_then(|made_way| cell_and_its_neighbours::cell(walker_cell, made_way)) {
             // Made and counted, or neither.
-            let made_seen = entity.attribute(MADE_ATTRIBUTE);
-            let mut entity_made = collision_library().begin_making_entity(tick_state, WALKER_TYPE, made_cell, tick_now + 1 + walker_random.draw_below(3), &[]);
-            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut entity_made, &header, MADE_ATTRIBUTE, made_seen, made_seen.unwrap_or(0) + 1);
+            let made_seen = entity.attribute(types.made);
+            let mut entity_made = collision_library().begin_making_entity(tick_state, types.walker, made_cell, tick_now + 1 + walker_random.draw_below(3), &[]);
+            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut entity_made, &header, types.made, made_seen, made_seen.unwrap_or(0) + 1);
         }
         let step_cell = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, open_cells).and_then(|step_way| cell_and_its_neighbours::cell(walker_cell, step_way)).unwrap_or(walker_cell);
         collision_library().step(tick_state, &header, step_cell, tick_now + 1 + walker_random.draw_below(3));
@@ -131,8 +126,8 @@ fn flock(tick_state: &mut SimulationTickState, seed: u64, pasture_shift: (u32, u
 /// A world with the pasture on it, `pasture_shift` cells east and south: stone
 /// on the cells the seed draws, walkers on others it draws, each set
 /// in the collision plane.
-fn pasture_world(seed: u64, pasture_shift: (u32, u32)) -> (BitmapArena, WorldEntities) {
-    let (mut bitmap_arena, mut entity_store) = world(WORLD);
+fn pasture_world(types: TestTypes, seed: u64, pasture_shift: (u32, u32)) -> (BitmapArena, WorldEntities) {
+    let (mut bitmap_arena, mut entity_store) = world(types, WORLD);
     let mut layer_codec = LayerCodec::new();
     for (x, y) in (10..10 + WORLD).flat_map(|y| (10..10 + WORLD).map(move |x| (x, y))) {
         for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
@@ -142,7 +137,7 @@ fn pasture_world(seed: u64, pasture_shift: (u32, u32)) -> (BitmapArena, WorldEnt
     let mut seeded_random = RandomSource::new(seed);
     for (x, y) in (0..i64::from(PASTURE_SIDE)).flat_map(|y| (0..i64::from(PASTURE_SIDE)).map(move |x| (x, y))) {
         if seeded_random.draw_below(100) < 40 {
-            bitmap_arena.queue_write(STONE_LAYER, Write::cell(pasture_cell(pasture_shift, x, y), WriteOp::SetCell));
+            bitmap_arena.queue_write(types.stone, Write::cell(pasture_cell(pasture_shift, x, y), WriteOp::SetCell));
         }
     }
     assert_eq!(bitmap_arena.apply().missed, 0, "the pasture on hot superchunks");
@@ -150,7 +145,7 @@ fn pasture_world(seed: u64, pasture_shift: (u32, u32)) -> (BitmapArena, WorldEnt
     while drawn_places.len() < FLOCK {
         let drawn_place = (seeded_random.draw_below(u64::from(PASTURE_SIDE)) as i64, seeded_random.draw_below(u64::from(PASTURE_SIDE)) as i64);
         if drawn_places.insert(drawn_place) {
-            entity_store.queue_add(walker_header(pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), seeded_random.draw_below(3)), &[]);
+            entity_store.queue_add(walker_header(types, pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), seeded_random.draw_below(3)), &[]);
             bitmap_arena.queue_write(base().collision, Write::cell(pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), WriteOp::SetCell));
         }
     }
@@ -165,10 +160,10 @@ fn pasture_world(seed: u64, pasture_shift: (u32, u32)) -> (BitmapArena, WorldEnt
 type PastureOutcome = (BTreeSet<(i64, i64)>, BTreeSet<(i64, i64)>, Vec<(i64, i64, u64, Vec<AttributeBlock>)>);
 
 /// [`PastureOutcome`] of a world whose pasture is `pasture_shift` cells east and south.
-fn pasture_outcome(bitmap_arena: &BitmapArena, entity_store: &WorldEntities, pasture_shift: (u32, u32)) -> PastureOutcome {
+fn pasture_outcome(types: TestTypes, bitmap_arena: &BitmapArena, entity_store: &WorldEntities, pasture_shift: (u32, u32)) -> PastureOutcome {
     let read_range = -READ_PAST..i64::from(PASTURE_SIDE) + READ_PAST;
     let cells_holding = |layer| read_range.clone().flat_map(|y| read_range.clone().map(move |x| (x, y))).filter(|&(x, y)| bitmap_arena.layer_holds_cell(layer, pasture_cell(pasture_shift, x, y)) == Ok(true)).collect();
-    let (stone_cells, collision_cells) = (cells_holding(STONE_LAYER), cells_holding(base().collision));
+    let (stone_cells, collision_cells) = (cells_holding(types.stone), cells_holding(base().collision));
     let place_in_pasture = |walker_cell: CellIndex| from_pasture(pasture_shift, walker_cell);
     let mut walker_rows: Vec<_> = entity_store.iter().map(|walker_entity| (place_in_pasture(walker_entity.header.stood_cell).0, place_in_pasture(walker_entity.header.stood_cell).1, walker_entity.header.wake, walker_entity.attributes.to_vec())).collect();
     walker_rows.sort_unstable_by_key(|walker_row| (walker_row.0, walker_row.1));
@@ -185,21 +180,22 @@ fn pasture_outcome(bitmap_arena: &BitmapArena, entity_store: &WorldEntities, pas
 #[test]
 fn a_flock_over_borders_comes_to_the_same_on_any_number_of_threads() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
+    let types = TestTypes::seeded(seed);
     let mut seeded_random = RandomSource::new(!seed);
     // Under half the pasture each way: the corner four superchunks meet at stays on it, wherever on it.
     let pasture_shift = (seeded_random.draw_below(u64::from(PASTURE_SIDE / 2 - 10)) as u32, seeded_random.draw_below(u64::from(PASTURE_SIDE / 2 - 10)) as u32);
-    let ((mut bitmap_arena, mut entity_store), (mut arena_there, mut entities_there)) = (pasture_world(seed, pasture_shift), pasture_world(seed, pasture_shift));
+    let ((mut bitmap_arena, mut entity_store), (mut arena_there, mut entities_there)) = (pasture_world(types, seed, pasture_shift), pasture_world(types, seed, pasture_shift));
     let (mut test_simulation, mut simulation_there) = (Simulation::new(1), Simulation::for_superchunks((WORLD * WORLD) as usize));
-    assert_eq!(pasture_outcome(&bitmap_arena, &entity_store, pasture_shift), pasture_outcome(&arena_there, &entities_there, pasture_shift), "the same pasture put, shifted {pasture_shift:?}");
+    assert_eq!(pasture_outcome(types, &bitmap_arena, &entity_store, pasture_shift), pasture_outcome(types, &arena_there, &entities_there, pasture_shift), "the same pasture put, shifted {pasture_shift:?}");
     let (mut instructions_done, mut writes_refused, mut compares_refused, mut over_a_border) = (InstructionsApplied::default(), 0, 0, (0, 0));
     for _ in 0..TICKS {
-        let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| flock(tick_state, seed, pasture_shift));
-        let report_there = simulation_there.tick(&mut arena_there, &mut entities_there, seed, |tick_state: &mut SimulationTickState| flock(tick_state, seed, pasture_shift));
+        let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| flock(types, tick_state, seed, pasture_shift));
+        let report_there = simulation_there.tick(&mut arena_there, &mut entities_there, seed, |tick_state: &mut SimulationTickState| flock(types, tick_state, seed, pasture_shift));
         over_a_border = (over_a_border.0 + report.acts_over_a_border, over_a_border.1 + report_there.acts_over_a_border);
         instructions_done += report.instructions_applied;
         writes_refused += report.writes_applied.writes_refused;
         compares_refused += report.instructions_compared.1;
-        let ((stone_cells, collision_cells, walker_rows), (stone_there, held_there, walkers_there)) = (pasture_outcome(&bitmap_arena, &entity_store, pasture_shift), pasture_outcome(&arena_there, &entities_there, pasture_shift));
+        let ((stone_cells, collision_cells, walker_rows), (stone_there, held_there, walkers_there)) = (pasture_outcome(types, &bitmap_arena, &entity_store, pasture_shift), pasture_outcome(types, &arena_there, &entities_there, pasture_shift));
         // The collision plane holds the cells the walkers stand on, and no other.
         assert_eq!(collision_cells, walker_rows.iter().map(|walker_row| (walker_row.0, walker_row.1)).collect(), "after tick {}", entity_store.current_tick());
         let stone_apart: Vec<_> = stone_cells.symmetric_difference(&stone_there).chain(collision_cells.symmetric_difference(&held_there)).take(4).collect();
