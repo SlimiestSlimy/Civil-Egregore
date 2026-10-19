@@ -11,7 +11,7 @@ mod test_seed;
 use protocol::pipe::frame::{Cells, FrameAsk, NearRectangle, Viewport, ViewportFrame};
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use protocol::server_parameters::{CleanServerParameters, ParameterValue};
-use protocol::type_registry::LayerType;
+use protocol::type_registry::{EntityType, LayerType};
 use utilities::rng::RandomSource;
 use utilities::wire::{receive, send, Wired};
 
@@ -44,7 +44,7 @@ fn drawn_cells(random: &mut RandomSource) -> Cells {
         drawn_words(random, count)
     };
     let planes = drawn_layer_types(random, 8).into_iter().map(|layer_type| (layer_type, plane(random))).collect();
-    Cells { superchunk_cartesian: drawn_pair(random), planes, top_left: drawn_pair(random), entity_cells_cartesian: (0..random.draw_below(30)).map(|_| (random.next_draw() as u16, random.next_draw() as u16)).collect() }
+    Cells { superchunk_cartesian: drawn_pair(random), planes, top_left: drawn_pair(random), entities: (0..random.draw_below(30)).map(|_| (EntityType::from_number(random.draw_below(1 << 20)), (random.next_draw() as u16, random.next_draw() as u16))).collect() }
 }
 
 /// A frame drawn from `random`.

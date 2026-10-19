@@ -73,7 +73,7 @@ fn a_name_is_registered_once_in_its_bundle_whatever_its_kind() {
         let of_a_drawn_kind = |name: &str, seeded_rng: &mut RandomSource| match seeded_rng.draw_below(5) {
             0 => Registration::layer(name),
             1 => Registration::entity(name, None),
-            2 => Registration::render_rule(name, &base("grass")),
+            2 => Registration::shader(name, ""),
             3 => Registration::gui(name, None),
             _ => Attribute::<u64>::registration(name),
         };
@@ -124,12 +124,14 @@ fn every_type_is_in_a_bundle_and_named_whole_by_it() {
 /// What a type names is registered before it: a default attribute, an
 /// attribute; a rule's master, a plane for a rule of the cells -- a
 /// layer or a wide plane -- and a type of entity for an entity's; a
-/// rule of the renderer's, either; a window's parent, a window; a
+/// rule of the renderer's, either, and its shader a shader; a window's parent, a window; a
 /// client call's, any type; and each type it depends on. One named amiss -- nothing registered, or
 /// registered only after, of another kind -- is refused.
 #[test]
 fn what_a_type_names_is_registered_before_it() {
-    let (before, _) = with_base_types();
+    let (mut before, _) = with_base_types();
+    // A shader of a bundle of its own, for the rules of the renderer to name.
+    drop(before.open_bundle("shaders").expect("a bundle").register(Registration::shader("flat", "")).expect("a shader"));
     let (default_amiss, master_amiss) = (Err(RegistryRefusal::DefaultAmiss), Err(RegistryRefusal::MasterAmiss));
     for (registration, wanted) in [
         (Registration::entity("defaulting", Some(&base("sheep state"))), Ok(())),
@@ -143,12 +145,14 @@ fn what_a_type_names_is_registered_before_it() {
         (Registration::entity_rule("a rule", &base("sheep")), Ok(())),
         (Registration::entity_rule("a rule", "unheard of"), master_amiss.clone()),
         (Registration::entity_rule("a rule", &base("grass")), master_amiss.clone()),
-        (Registration::render_rule("a rule", &base("grass")), Ok(())),
-        (Registration::render_rule("a rule", &base("height")), Ok(())),
-        (Registration::render_rule("a rule", &base("sheep")), Ok(())),
-        (Registration::render_rule("a rule", "unheard of"), master_amiss.clone()),
-        (Registration::render_rule("a rule", &base("sheep state")), master_amiss.clone()),
-        (Registration::render_rule("a rule", &base(GRASS_RULE)), master_amiss),
+        (Registration::render_rule("a rule", &base("grass"), "shaders::flat", 0), Ok(())),
+        (Registration::render_rule("a rule", &base("height"), "shaders::flat", 0), Ok(())),
+        (Registration::render_rule("a rule", &base("sheep"), "shaders::flat", 0), Ok(())),
+        (Registration::render_rule("a rule", "unheard of", "shaders::flat", 0), master_amiss.clone()),
+        (Registration::render_rule("a rule", &base("sheep state"), "shaders::flat", 0), master_amiss.clone()),
+        (Registration::render_rule("a rule", &base(GRASS_RULE), "shaders::flat", 0), master_amiss),
+        (Registration::render_rule("a rule", &base("grass"), "unheard of", 0), Err(RegistryRefusal::ShaderAmiss)),
+        (Registration::render_rule("a rule", &base("grass"), &base("grass"), 0), Err(RegistryRefusal::ShaderAmiss)),
         (Registration::gui("a window", None), Ok(())),
         (Registration::gui("a window", Some("unheard of")), Err(RegistryRefusal::ParentAmiss)),
         (Registration::gui("a window", Some(&base("grass"))), Err(RegistryRefusal::ParentAmiss)),
@@ -279,8 +283,9 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
     }
 }
 
-/// A rule of the renderer is of its own kind, and says what it draws:
-/// the plane or the type of entity its master is. A window nested in
+/// A rule of the renderer is of its own kind, and says what it draws --
+/// the plane or the type of entity its master is -- with which shader,
+/// on which render layer; a shader is of its own kind. A window nested in
 /// another holds its parent's ID -- a child names its parent, once the
 /// parent is registered -- and a window on its own, none. A function a
 /// client may call is of its own kind, holding its master's ID.
@@ -288,10 +293,12 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
 fn a_rule_of_the_renderer_draws_its_master_and_a_window_holds_its_parent() {
     let (mut type_registry, base_types) = with_base_types();
     let mut tests = type_registry.open_bundle(TESTS_BUNDLE).expect("the tests' bundle");
-    let grass_drawn = tests.register(Registration::render_rule("grass drawn", &base("grass"))).expect("of a plane");
-    let sheep_drawn = tests.register(Registration::render_rule("sheep drawn", &base("sheep"))).expect("of a type of entity");
-    assert!(matches!(grass_drawn, RegisteredType::RenderRule { master: Drawn::Plane(layer_type), .. } if layer_type == base_types.grass));
-    assert!(matches!(sheep_drawn, RegisteredType::RenderRule { master: Drawn::Entity(entity_type), .. } if entity_type == base_types.sheep));
+    let flat = tests.register(Registration::shader("flat", "")).expect("a shader");
+    assert_eq!(flat.type_id() >> 56, TypeKind::Shader as u64, "of the shaders' kind");
+    let grass_drawn = tests.register(Registration::render_rule("grass drawn", &base("grass"), "flat", 2)).expect("of a plane");
+    let sheep_drawn = tests.register(Registration::render_rule("sheep drawn", &base("sheep"), "flat", 7)).expect("of a type of entity");
+    assert!(matches!(grass_drawn, RegisteredType::RenderRule { master: Drawn::Plane(layer_type), shader, render_layer: 2, .. } if layer_type == base_types.grass && shader.0 == flat.type_id()));
+    assert!(matches!(sheep_drawn, RegisteredType::RenderRule { master: Drawn::Entity(entity_type), render_layer: 7, .. } if entity_type == base_types.sheep));
     assert!([grass_drawn.type_id(), sheep_drawn.type_id()].iter().all(|type_id| type_id >> 56 == TypeKind::RenderRule as u64), "of the renderer's kind");
     let menu = tests.register(Registration::gui("menu", None)).expect("on its own");
     let entry = tests.register(Registration::gui("entry", Some("menu"))).expect("its parent registered before it");

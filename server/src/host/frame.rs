@@ -6,6 +6,7 @@
 use crate::World;
 use crate::bitplane_manager::BucketKey;
 use crate::chunk_storage::LayerType;
+use crate::entity_manager::EntityType;
 use utilities::coordinates::{CellCartesian, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use protocol::pipe::frame::{Cells, FrameAsk, Viewport, ViewportFrame};
 
@@ -47,7 +48,7 @@ pub(crate) fn copy_superchunk(world: &World, (x, y): (u32, u32), frame_ask: &Fra
     let CellCartesian { x: left_cell_x, y: top_cell_y } = superchunk.top_left().cartesian();
     // A plane all clear: nothing to send, nothing to draw.
     let planes = frame_ask.planes.iter().map(|&layer_type| (layer_type, Some(layer(world, layer_type, superchunk)).filter(|words| words.iter().any(|&word| word != 0)).unwrap_or_default())).collect();
-    Some(Cells { superchunk_cartesian: (x, y), planes, top_left: (left_cell_x, top_cell_y), entity_cells_cartesian: entity_cells_of(world, superchunk) })
+    Some(Cells { superchunk_cartesian: (x, y), planes, top_left: (left_cell_x, top_cell_y), entities: entities_of(world, superchunk) })
 }
 
 /// `superchunk`'s cells of `layer_type`: its chunks' words, one chunk
@@ -65,11 +66,12 @@ fn layer(world: &World, layer_type: LayerType, superchunk: SuperchunkIndex) -> V
     words
 }
 
-/// The cells `superchunk`'s entities stand on, from its top left.
-fn entity_cells_of(world: &World, superchunk: SuperchunkIndex) -> Vec<(u16, u16)> {
+/// `superchunk`'s entities: each one's type and the cell it stands on,
+/// from its top left.
+fn entities_of(world: &World, superchunk: SuperchunkIndex) -> Vec<(EntityType, (u16, u16))> {
     let Some(superchunk_entities) = world.entity_store().superchunk(superchunk) else {
         return Vec::new();
     };
     let CellCartesian { x: left_cell_x, y: top_cell_y } = superchunk.top_left().cartesian();
-    superchunk_entities.iter().map(|entity| entity.header.stood_cell.cartesian()).map(|entity_cell| ((entity_cell.x - left_cell_x) as u16, (entity_cell.y - top_cell_y) as u16)).collect()
+    superchunk_entities.iter().map(|entity| (entity.header.entity_type, entity.header.stood_cell.cartesian())).map(|(entity_type, entity_cell)| (entity_type, ((entity_cell.x - left_cell_x) as u16, (entity_cell.y - top_cell_y) as u16))).collect()
 }

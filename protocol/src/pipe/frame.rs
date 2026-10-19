@@ -3,7 +3,7 @@
 //! copied as a tick left it and nothing more -- the planes asked for, by
 //! their layer types, whatever they are: the server names none.
 
-use crate::type_registry::LayerType;
+use crate::type_registry::{EntityType, LayerType};
 use utilities::wire::{WireReader, Wired, WiredStruct};
 
 /// Words a chunk's bitmap takes.
@@ -83,6 +83,20 @@ impl Wired for LayerType {
     }
 }
 
+/// An entity's type on the wire: its ID.
+impl Wired for EntityType {
+    fn put(&mut self, words: &mut Vec<u64>) {
+        words.push(self.0);
+    }
+
+    fn take(&mut self, wire: &mut WireReader) -> Option<()> {
+        let mut type_id = 0u64;
+        type_id.take(wire)?;
+        *self = EntityType::of_id(type_id)?;
+        Some(())
+    }
+}
+
 /// Cells seen from near: a rectangle of them, each many pixels.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct NearRectangle {
@@ -109,8 +123,9 @@ pub struct Cells {
     /// Its top left cell in the world, `(x, y)`: what its ground is
     /// worked out from.
     pub top_left: (u32, u32),
-    /// The cells its entities stand on, `(x, y)` from its top left.
-    pub entity_cells_cartesian: Vec<(u16, u16)>,
+    /// Its entities: each one's type and the cell it stands on, `(x, y)`
+    /// from its top left.
+    pub entities: Vec<(EntityType, (u16, u16))>,
 }
 
 impl Cells {
@@ -214,7 +229,7 @@ impl WiredStruct for NearRectangle {
 }
 
 impl WiredStruct for Cells {
-    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|cells| &mut cells.superchunk_cartesian, |cells| &mut cells.planes, |cells| &mut cells.top_left, |cells| &mut cells.entity_cells_cartesian];
+    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|cells| &mut cells.superchunk_cartesian, |cells| &mut cells.planes, |cells| &mut cells.top_left, |cells| &mut cells.entities];
 }
 
 impl WiredStruct for ViewportFrame {
