@@ -43,7 +43,7 @@ fn main() -> ExitCode {
     #[cfg(feature = "client")]
     if shell_words.is_empty() {
         leave_the_console();
-        client::run_window();
+        client::run_window(basegame::default_types::register_types);
         return ExitCode::SUCCESS;
     }
 

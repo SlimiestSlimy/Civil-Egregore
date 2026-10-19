@@ -469,6 +469,64 @@ NOW
   one-cell shader (the GPU the loop), entities by instancing, a Shader
   kind in the registry. THE INVARIANT: zoomed far out, the server is
   never stalled and the window holds ~60 fps; rendering may be heavy.
+  The user: "that's why today the server doesn't answer a whole frame
+  at once at large zoomouts" -- the host's bound is the existing ask
+  of a few superchunks; the client goes round. MY DESIGN (2026-10-19):
+  a render layer is ONE quad over the window; its fragment shader finds
+  the world cell under the pixel and runs the rule's WGSL for one cell
+  (the client's prelude gives it reads of the planes it names). Each
+  plane's words live in one GPU storage buffer, a slot a superchunk on
+  screen, a table superchunk -> slot: a frame's cost is a draw a render
+  layer, whatever the zoom. Far out, a client thread makes coarse
+  levels (a cell a block, set if most of the block is); rules read them
+  as cells, blind to the zoom. Entities: the client makes each type's
+  plane of the cells its entities stand on, so an entity's rule is a
+  plane rule. "rememwber you're on my local machine so rendering,
+  screenshots, etc are all om the table for your convenience".
+  SUPERSEDED (2026-10-19): "idk how bevy does it but we want to avoid
+  non rust code on the type registry for shaders if possible. we dont
+  want to go around writing shading language if bevy provides apis for
+  it already" / "what i mean is, bsse game can depend on bevy itself".
+  Bevy has no shaders written in Rust: its own are WGSL. So no Shader
+  kind (taken out again); a render rule is Rust using Bevy's types,
+  its library a client_api RenderCode behind basegame's `client`
+  feature (basegame then depends on the client and on Bevy). The loop
+  the GPU was to be is the client's, on Bevy's task threads, run when a
+  superchunk's data arrives: at a DETAIL LEVEL matched to the zoom (a
+  drawn cell 2^level cells a side; a superchunk's planes are Morton
+  end to end, so a drawn cell is a run of bits -- its share set is a
+  popcount), so the cells painted are about the screen's pixels however
+  far out. The result an image a superchunk a render layer, drawn by
+  Bevy as a sprite, stacked by render layer: the earlier settled (3).
+  Textures later through Bevy's TilemapChunk (a tile index and a tint a
+  cell, one draw a chunk). The user on Bevy in the public API: "this is
+  basically making bevy part of the public api of client lol, i hope
+  this will make gui work easier ss well" / "once we fully freeze the
+  public api we also freeze bevy version, simple as that  after all
+  bevy is our only external dependency so we need to fix it a little
+  anyways" -- at the freeze, Bevy pinned to its exact version.
+  "freezing the public api will be our 0.7 moment for civil egregore"
+  -- the freeze is version 0.7 (Cargo.toml says 0.6.0 now). 0.6 was
+  "simulation engine works + basic client", "arbitrary" in number.
+  DONE (2026-10-19, uncommitted): client_api::rendering (RenderCode,
+  RenderTurn, DrawnCell; on_each_set_cell, on_each_drawn_cell,
+  on_each_entity -- entities cover a drawn cell by the share of its
+  cells they stand on), painting.rs (RenderRules), the window (camera:
+  WASD/arrows, drag, wheel, Q/E; Space, = - 0 F to the server; the
+  title says ticks, entities, hot superchunks, the frames' share of the
+  server's time, fps), basegame/src/render_rules (ground, grass, trees,
+  water, walls, sheep). The world at start: default parameters but a
+  side of 8 (the user: "fix the world size lol, sheep are running
+  rampant"). Measured with vsync off, 8x8 world: 1077 fps near, 851
+  with the whole world in view, the server held at 256 ticks/s.
+  The user: "for this gsme vsync on as default is ok" / "my idea for
+  this game is to have no graphic settings on the basegame lol the
+  rendering is very simple tbh".
+  OPEN: the host copies every plane whole whatever the detail level
+  (16-bit height and water depth: 2 MB a superchunk each), so a far
+  view of many hot superchunks goes round slowly (a boundless world
+  zoomed out: 625 hot, a few dozen drawn in 6 s). Sending planes at
+  the detail level is the host's work to weigh against its thread.
 - SAVED FOR AFTER THE DECOUPLING (the user, 2026-10-18: "save all
   those, we need to finish decoupling and the public apis including
   client"): TYPES.CSV DRIVES LOADING (above; open, the user's to say: a

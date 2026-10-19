@@ -1,13 +1,28 @@
 //! The window: a Bevy window, its server started and connected to as it
-//! opens ([`crate::server_end`]). It shows nothing yet.
+//! opens ([`crate::server_end`]), a world made with the default
+//! parameters but a side, and the world drawn ([`drawing`]) as its camera sees it
+//! ([`camera`]: WASD or the arrows, the mouse, its wheel, Q and E). Space pauses; `=` and `-` double and halve the pace,
+//! `0` holds it to the simulation's own, `F` lets it run flat out.
+
+mod camera;
+mod drawing;
 
 use crate::server_end::{ServerEnd, Shown};
 use bevy::prelude::*;
+use drawing::Drawing;
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, SIDE};
+use protocol::world_types::RegisterTypes;
 use std::sync::mpsc::Receiver;
 use std::sync::Mutex;
 
+/// The window's title, before what it says of the world.
+const TITLE: &str = "Civil Egregore";
+/// Superchunks along a side of the world the window opens with: one of
+/// no size grows hot wherever its sheep wander.
+const FIRST_WORLD_SIDE: i64 = 8;
+
 /// The window's server: its process, ended with the window, and what it
-/// shows -- each world's types and frames -- read by nothing yet.
+/// shows -- each world's types and frames.
 #[derive(Resource)]
 struct WindowServer {
     /// The server's process, and where it is told and asked.
@@ -16,20 +31,71 @@ struct WindowServer {
     shown: Mutex<Receiver<Shown>>,
 }
 
-/// Opens the window, its server started, and runs until it is closed.
-pub fn run_window() {
+/// Opens the window, its server started, and runs until it is closed:
+/// each world's types registered by `register_types`, the game's.
+pub fn run_window(register_types: RegisterTypes) {
     let (server_end, shown) = ServerEnd::start();
     let server_calls = crate::client_api::ServerCalls::through(server_end.link.clone());
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin { primary_window: Some(Window { title: "Civil Egregore".to_string(), ..default() }), ..default() }))
+        .add_plugins(DefaultPlugins.set(WindowPlugin { primary_window: Some(Window { title: TITLE.to_string(), ..default() }), ..default() }))
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(server_calls)
         .insert_resource(WindowServer { server_end, shown: Mutex::new(shown) })
-        .add_systems(Startup, spawn_camera)
+        .insert_resource(Drawing::new(register_types))
+        .add_systems(Startup, (camera::spawn_camera, make_a_world))
+        .add_systems(Update, (camera::move_camera, drawing::take_shown, drawing::ask_frames, drawing::show_painted, keys_to_the_server, say_in_the_title).chain())
         .run();
 }
 
-/// The window's camera: what shows the clear colour.
-fn spawn_camera(mut bevy_commands: Commands) {
-    bevy_commands.spawn(Camera2d);
+/// A world made with the default parameters, [`FIRST_WORLD_SIDE`]
+/// superchunks a side: until the window has its menus, the world it
+/// opens with.
+fn make_a_world(window_server: Res<WindowServer>) {
+    window_server.server_end.link.make_world(CleanServerParameters::default().with(SIDE, ParameterValue::Integer(FIRST_WORLD_SIDE)));
+}
+
+/// The keys the server is told by: Space pauses or goes on; `=` and `-`
+/// double and halve the pace, `0` holds it to the simulation's own,
+/// `F` lets it run flat out.
+fn keys_to_the_server(keys: Res<ButtonInput<KeyCode>>, window_server: Res<WindowServer>, drawing: Res<Drawing>, mut paused: Local<bool>) {
+    let link = &window_server.server_end.link;
+    if keys.just_pressed(KeyCode::Space) {
+        *paused = !*paused;
+        link.set_paused(*paused);
+    }
+    let Some(frame) = &drawing.last_frame else {
+        return;
+    };
+    let pace_now = frame.held_pace.unwrap_or(frame.target_pace);
+    if keys.just_pressed(KeyCode::Equal) {
+        link.set_pace(Some(pace_now.saturating_mul(2)));
+    }
+    if keys.just_pressed(KeyCode::Minus) {
+        link.set_pace(Some((pace_now / 2).max(1)));
+    }
+    if keys.just_pressed(KeyCode::Digit0) {
+        link.set_pace(Some(frame.target_pace));
+    }
+    if keys.just_pressed(KeyCode::KeyF) {
+        link.set_pace(None);
+    }
+}
+
+/// The window's title saying how the world runs and how fast the window
+/// draws, every half second.
+fn say_in_the_title(drawing: Res<Drawing>, time: Res<Time>, mut window: Single<&mut Window>, mut since_said: Local<(f32, u32)>) {
+    let (seconds, frames) = &mut *since_said;
+    (*seconds, *frames) = (*seconds + time.delta_secs(), *frames + 1);
+    if *seconds < 0.5 {
+        return;
+    }
+    let frames_a_second = *frames as f32 / *seconds;
+    (*seconds, *frames) = (0.0, 0);
+    window.title = match &drawing.last_frame {
+        Some(frame) => {
+            let pace = frame.held_pace.map_or("flat out".to_string(), |held_pace| format!("held to {held_pace}"));
+            format!("{TITLE} -- tick {}, {:.0} ticks a second ({pace}), {} entities, {} hot superchunks in view, frames {:.0}% of the server's time -- {frames_a_second:.0} fps", frame.tick, frame.ticks_a_second, frame.entity_count, frame.hot.len(), 100.0 * frame.sync_share)
+        }
+        None => format!("{TITLE} -- no world yet -- {frames_a_second:.0} fps"),
+    };
 }

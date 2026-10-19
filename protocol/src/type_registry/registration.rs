@@ -76,8 +76,6 @@ pub enum Declared {
     RenderRule {
         /// Its master's name.
         master: String,
-        /// Its shader's name: the code for one cell or entity of its master.
-        shader: String,
         /// Where it is drawn among the render layers: the higher over the lower.
         render_layer: u32,
     },
@@ -96,14 +94,7 @@ pub enum Declared {
     /// A bundle: the types registered while it is open are in it
     /// (`super::TypeRegistry::open_bundle`).
     Bundle,
-    /// A shader: its library is its code ([`ShaderSource`]).
-    Shader,
 }
-
-/// A shader's library: the code the GPU runs for one cell or one entity,
-/// in WGSL, as the client's renderer asks it of a shader.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ShaderSource(pub String);
 
 /// A type to register: its name, what it is, the names of the types it
 /// depends on -- registered before it -- its library, if it exposes
@@ -172,16 +163,11 @@ impl Registration {
     }
 
     /// A rule of the renderer named `name`, drawing the plane or the type
-    /// of entity named `master` with the shader named `shader`, on the
-    /// render layer `render_layer`. The other planes it reads, it depends
-    /// on ([`Registration::depending_on`]).
-    pub fn render_rule(name: &str, master: &str, shader: &str, render_layer: u32) -> Self {
-        Self::of(name, Declared::RenderRule { master: master.to_string(), shader: shader.to_string(), render_layer })
-    }
-
-    /// A shader named `name`, its code `wgsl`: its library.
-    pub fn shader(name: &str, wgsl: &str) -> Self {
-        Self::of(name, Declared::Shader).with_library(Arc::new(ShaderSource(wgsl.to_string())))
+    /// of entity named `master` on the render layer `render_layer`: its
+    /// library, the client's, is its code for one cell. The other planes
+    /// it reads, it depends on ([`Registration::depending_on`]).
+    pub fn render_rule(name: &str, master: &str, render_layer: u32) -> Self {
+        Self::of(name, Declared::RenderRule { master: master.to_string(), render_layer })
     }
 
     /// A window named `name`, nested in the window named `parent` if any.

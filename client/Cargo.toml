@@ -1,6 +1,7 @@
 [package]
 name = "client"
 edition = "2024"
+autotests = false
 description = "Civil Egregore's client: a Bevy window and its server, written afresh from the world's frozen types"
 
 [dependencies]

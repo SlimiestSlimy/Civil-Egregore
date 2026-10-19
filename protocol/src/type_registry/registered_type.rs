@@ -2,7 +2,7 @@
 //! runs it, if anything does, is its library, hooked in by its
 //! registration (`super::Hook`).
 
-use super::type_ids::{AttributeType, BundleType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, ShaderType, WorldgenType};
+use super::type_ids::{AttributeType, BundleType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
 
 /// What a rule of the renderer draws: a plane, or a type of entity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -88,8 +88,6 @@ pub enum RegisteredType {
         rule: RenderRuleType,
         /// Its master.
         master: Drawn,
-        /// Its shader.
-        shader: ShaderType,
         /// Where it is drawn among the render layers.
         render_layer: u32,
     },
@@ -119,20 +117,13 @@ pub enum RegisteredType {
         /// Its ID.
         bundle: BundleType,
     },
-    /// A shader: its library is its code.
-    Shader {
-        /// Its name.
-        name: String,
-        /// Its ID.
-        shader: ShaderType,
-    },
 }
 
 impl RegisteredType {
     /// Its name.
     pub fn name(&self) -> &str {
         match self {
-            Self::Layer { name, .. } | Self::WidePlane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } | Self::Worldgen { name, .. } | Self::RenderRule { name, .. } | Self::Gui { name, .. } | Self::ClientCall { name, .. } | Self::Bundle { name, .. } | Self::Shader { name, .. } => name,
+            Self::Layer { name, .. } | Self::WidePlane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } | Self::Worldgen { name, .. } | Self::RenderRule { name, .. } | Self::Gui { name, .. } | Self::ClientCall { name, .. } | Self::Bundle { name, .. } => name,
         }
     }
 
@@ -173,7 +164,6 @@ impl RegisteredType {
             Self::Gui { gui, .. } => gui.0,
             Self::ClientCall { call, .. } => call.0,
             Self::Bundle { bundle, .. } => bundle.0,
-            Self::Shader { shader, .. } => shader.0,
         }
     }
 

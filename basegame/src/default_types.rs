@@ -2,7 +2,7 @@
 //! order, each with its library and hooks ([`register`]): every rule's
 //! code its library, hooked to run every tick, the world
 //! generation's, hooked to generate the world, and the functions of it
-//! a client may call -- each made with the IDs
+//! a client may call, and how it is drawn -- each made with the IDs
 //! the world gave the types it works on, as they were registered. What
 //! the program's initialization hands the server and the client
 //! ([`register_types`]): neither names a type of the base game, and
@@ -53,12 +53,13 @@ pub fn register(type_registry: &mut TypeRegistry) -> Result<BaseTypes, String> {
     for call_registration in crate::worldgen::calls::call_registrations("world generation") {
         registered(type_registry, call_registration)?;
     }
+    crate::render_rules::register(type_registry, base_types)?;
     Ok(base_types)
 }
 
 /// `registration`'s type registered in `type_registry`, with its ID; or why
 /// it was refused.
-fn registered(type_registry: &mut TypeRegistry, registration: Registration) -> Result<RegisteredType, String> {
+pub(crate) fn registered(type_registry: &mut TypeRegistry, registration: Registration) -> Result<RegisteredType, String> {
     let type_name = registration.name.clone();
     type_registry.register(registration).map_err(refused(&type_name))
 }

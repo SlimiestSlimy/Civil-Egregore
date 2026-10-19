@@ -15,7 +15,7 @@ use super::frozen_type_registry::FrozenTypeRegistry;
 use super::registered_type::RegisteredType;
 use super::registration::{Declared, Hook, Library, Registration};
 use super::registered_type::Drawn;
-use super::type_ids::{AttributeType, BundleType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, ShaderType, WorldgenType};
+use super::type_ids::{AttributeType, BundleType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
 
 /// Why a type was refused.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,8 +26,6 @@ pub enum RegistryRefusal {
     DefaultAmiss,
     /// Its master is nothing registered before it.
     MasterAmiss,
-    /// Its shader is no shader registered before it.
-    ShaderAmiss,
     /// A type it depends on is nothing registered before it.
     DependencyAmiss,
     /// The world's save gave its name an ID of another kind.
@@ -188,16 +186,13 @@ impl TypeRegistry {
                 _ => return Err(RegistryRefusal::MasterAmiss),
             },
             Declared::Worldgen => RegisteredType::Worldgen { name, worldgen: WorldgenType::from_number(number) },
-            Declared::RenderRule { master, shader, render_layer } => {
+            Declared::RenderRule { master, render_layer } => {
                 let master = match registered_named(master) {
                     Some(RegisteredType::Layer { layer_type, .. } | RegisteredType::WidePlane { layer_type, .. }) => Drawn::Plane(*layer_type),
                     Some(RegisteredType::Entity { entity_type, .. }) => Drawn::Entity(*entity_type),
                     _ => return Err(RegistryRefusal::MasterAmiss),
                 };
-                let Some(RegisteredType::Shader { shader, .. }) = registered_named(shader) else {
-                    return Err(RegistryRefusal::ShaderAmiss);
-                };
-                RegisteredType::RenderRule { name, rule: RenderRuleType::from_number(number), master, shader: *shader, render_layer: *render_layer }
+                RegisteredType::RenderRule { name, rule: RenderRuleType::from_number(number), master, render_layer: *render_layer }
             }
             Declared::Gui { parent } => {
                 let parent = match parent {
@@ -214,7 +209,6 @@ impl TypeRegistry {
                 RegisteredType::ClientCall { name, call: ClientCallType::from_number(number), master }
             }
             Declared::Bundle => RegisteredType::Bundle { name, bundle: BundleType::from_number(number) },
-            Declared::Shader => RegisteredType::Shader { name, shader: ShaderType::from_number(number) },
         })
     }
 }
