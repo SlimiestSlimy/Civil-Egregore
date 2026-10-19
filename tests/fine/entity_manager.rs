@@ -86,7 +86,7 @@ const VARYING_TAIL: AttributeType = AttributeType::of_varying_size(43);
 fn varying_attribute(attribute_type: AttributeType, attribute_data: &[u64]) -> Vec<AttributeBlock> {
     let block_count = (1 + attribute_data.len()).div_ceil(BLOCK_WORDS);
     let mut words = vec![0; block_count * BLOCK_WORDS];
-    words[0] = attribute_type.with_blocks(block_count).0;
+    words[0] = attribute_type.with_blocks(block_count).header_word();
     words[1..1 + attribute_data.len()].copy_from_slice(attribute_data);
     words.as_chunks::<BLOCK_WORDS>().0.iter().map(|&block_words| AttributeBlock(block_words)).collect()
 }
@@ -106,7 +106,7 @@ fn attributes() -> Vec<AttributeBlock> {
 /// says.
 #[test]
 fn every_attribute_is_found_over_those_of_any_length() {
-    assert_eq!((ONE_BLOCK_ATTRIBUTE.attribute_type().block_count(), BOTH_ENDS_ATTRIBUTE.attribute_type().block_count(), VARYING_NOTE.0 & 0xF), (1, 8, 0));
+    assert_eq!((ONE_BLOCK_ATTRIBUTE.attribute_type().block_count(), BOTH_ENDS_ATTRIBUTE.attribute_type().block_count(), VARYING_NOTE.header_word() & 0xF), (1, 8, 0));
     assert_eq!((BOTH_ENDS_ATTRIBUTE.attribute_type().type_number(), VARYING_NOTE.type_number()), (41, 42));
     let attribute_list = attributes();
     assert_eq!(attribute_list.len(), 1 + 8 + 5 + 2);
@@ -172,8 +172,8 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
 
     // The note's block length said to be more than the entity has blocks: nothing is read.
     let mut wrong_words = words.clone();
-    let note_type_index = wrong_words.iter().position(|&word| AttributeType(word).type_identity() == VARYING_NOTE.type_identity()).expect("the note's type");
-    wrong_words[note_type_index] = VARYING_NOTE.with_blocks(16).0;
+    let note_type_index = wrong_words.iter().position(|&word| AttributeType::of_header_word(word).type_identity() == VARYING_NOTE.type_identity()).expect("the note's type");
+    wrong_words[note_type_index] = VARYING_NOTE.with_blocks(16).header_word();
     assert!(decode_state(&wrong_words, 4, &mut world()).is_err());
     assert!(decode_state(&words[..words.len() - 1], 4, &mut world()).is_err(), "cut short");
 }
@@ -206,18 +206,18 @@ fn attributes_edited_in_any_order_are_those_last_set() {
         let (mut instruction_queue, mut instructions_applied) = (Instructions::default(), InstructionsApplied::default());
         if seeded_rng.draw_below(3) == 0 {
             instruction_queue.unset_attribute(target_header.stood_cell, attribute_type);
-            held_attributes.remove(&attribute_type.0);
+            held_attributes.remove(&attribute_type.header_word());
         } else {
             let set_blocks = match (!size_varies).then_some(attribute_type.block_count()) {
                 Some(block_count) => {
                     let mut words: Vec<u64> = (0..block_count * BLOCK_WORDS).map(|_| seeded_rng.next_draw()).collect();
-                    words[0] = attribute_type.0;
+                    words[0] = attribute_type.header_word();
                     words.as_chunks::<BLOCK_WORDS>().0.iter().map(|&block_words| AttributeBlock(block_words)).collect()
                 }
                 None => varying_attribute(attribute_type, &(0..1 + seeded_rng.draw_below(28)).map(|_| seeded_rng.next_draw()).collect::<Vec<_>>()),
             };
             instruction_queue.set_attribute_blocks(target_header.stood_cell, &set_blocks);
-            held_attributes.insert(attribute_type.0, set_blocks);
+            held_attributes.insert(attribute_type.header_word(), set_blocks);
         }
         instruction_queue.apply(world_entities.superchunks_mut(), 0, &mut instructions_applied);
         assert_eq!((instructions_applied.edits, instructions_applied.passed_over), (1, 0), "edit {edit}");
@@ -226,7 +226,7 @@ fn attributes_edited_in_any_order_are_those_last_set() {
         let expected_blocks: Vec<AttributeBlock> = held_attributes.values().flatten().copied().collect();
         assert!(edited_entity.attributes == expected_blocks.as_slice(), "edit {edit}: {} blocks held, {} expected", edited_entity.attributes.len(), expected_blocks.len());
         for &(attribute_type, _) in &attribute_types {
-            assert_eq!(edited_entity.attribute_blocks(attribute_type), held_attributes.get(&attribute_type.0).map(Vec::as_slice), "edit {edit}: {attribute_type:?}");
+            assert_eq!(edited_entity.attribute_blocks(attribute_type), held_attributes.get(&attribute_type.header_word()).map(Vec::as_slice), "edit {edit}: {attribute_type:?}");
         }
     }
     let (words, count) = encode_state(None, world_entities.superchunk(target_header.stood_cell.superchunk()));

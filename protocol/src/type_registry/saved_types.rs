@@ -1,6 +1,6 @@
 //! The types a world was made with, as its save holds them
 //! ([`FrozenTypeRegistry::to_text`]): each one's name and ID -- and a
-//! plane's shape -- in the order registered. Read again ([`TypeRegistry::for_saved_world`]), each
+//! plane's shape, an attribute's blocks -- in the order registered. Read again ([`TypeRegistry::for_saved_world`]), each
 //! name is given its ID back as its type is registered -- the name
 //! joins it to its code.
 
@@ -10,8 +10,9 @@ use super::registry::TypeRegistry;
 use super::type_ids::numbers_taken;
 use utilities::csv;
 
-/// The columns of the types' text: a plane's shape blank for any other type.
-const TYPES_COLUMNS: [&str; 4] = ["type", "id", "bits a cell", "tile scale"];
+/// The columns of the types' text: a plane's shape, and an attribute's
+/// blocks, blank for any other type.
+const TYPES_COLUMNS: [&str; 5] = ["type", "id", "bits a cell", "tile scale", "blocks"];
 
 /// A type as a save holds it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -22,6 +23,8 @@ pub(crate) struct SavedType {
     pub(crate) type_id: u64,
     /// A plane's bits a cell and tiles' scale; none for any other type.
     pub(crate) plane_shape: Option<(u32, u32)>,
+    /// An attribute's blocks; none for any other type.
+    pub(crate) attribute_blocks: Option<usize>,
 }
 
 impl SavedType {
@@ -30,19 +33,22 @@ impl SavedType {
         numbers_taken(self.type_id, self.plane_shape)
     }
 
-    /// Whether `registered` is it: of its ID, and a plane of its shape.
+    /// Whether `registered` is it: of its ID, a plane of its shape, an
+    /// attribute of its blocks.
     pub(crate) fn is(&self, registered: &RegisteredType) -> bool {
-        registered.type_id() == self.type_id && registered.plane_shape() == self.plane_shape
+        registered.type_id() == self.type_id && registered.plane_shape() == self.plane_shape && registered.attribute_blocks() == self.attribute_blocks
     }
 }
 
 impl FrozenTypeRegistry {
     /// As a save holds them: a row a type, its name, its ID in
-    /// hexadecimal and a plane's shape, in the order registered.
+    /// hexadecimal, a plane's shape and an attribute's blocks, in the
+    /// order registered.
     pub fn to_text(&self) -> String {
         let types = self.types().iter().map(|registered| {
             let (width_bits, tile_scale) = registered.plane_shape().map_or((String::new(), String::new()), |(width_bits, tile_scale)| (width_bits.to_string(), tile_scale.to_string()));
-            csv::row_text(&[registered.name().to_string(), format!("{:016x}", registered.type_id()), width_bits, tile_scale])
+            let blocks = registered.attribute_blocks().map_or_else(String::new, |blocks| blocks.to_string());
+            csv::row_text(&[registered.name().to_string(), format!("{:016x}", registered.type_id()), width_bits, tile_scale, blocks])
         });
         std::iter::once(csv::row_text(&TYPES_COLUMNS)).chain(types).collect()
     }
@@ -55,7 +61,7 @@ impl FrozenTypeRegistry {
             let type_name = &saved_type.name;
             match self.types().iter().find(|registered| registered.name() == type_name) {
                 Some(registered) if saved_type.is(registered) => {}
-                Some(registered) => return Err(format!("`{type_name}` saved as {:016x} {:?}, frozen as {:016x} {:?}", saved_type.type_id, saved_type.plane_shape, registered.type_id(), registered.plane_shape())),
+                Some(registered) => return Err(format!("`{type_name}` saved as {:016x} {:?} {:?}, frozen as {:016x} {:?} {:?}", saved_type.type_id, saved_type.plane_shape, saved_type.attribute_blocks, registered.type_id(), registered.plane_shape(), registered.attribute_blocks())),
                 None => return Err(format!("`{type_name}` saved, and not among the types frozen")),
             }
         }
@@ -84,8 +90,8 @@ fn saved_types_of(types_text: &str) -> Result<Vec<SavedType>, String> {
     }
     let saved_types = csv_rows
         .map(|csv_row| {
-            let wrong_row = || format!("`{}` is not a type's name, its ID in hexadecimal, and a plane's bits a cell and tile scale", csv_row.join(","));
-            let [type_name, type_id, width_bits, tile_scale] = &csv_row[..] else {
+            let wrong_row = || format!("`{}` is not a type's name, its ID in hexadecimal, a plane's bits a cell and tile scale, and an attribute's blocks", csv_row.join(","));
+            let [type_name, type_id, width_bits, tile_scale, blocks] = &csv_row[..] else {
                 return Err(wrong_row());
             };
             let type_id = u64::from_str_radix(type_id.trim(), 16).map_err(|_| wrong_row())?;
@@ -93,7 +99,11 @@ fn saved_types_of(types_text: &str) -> Result<Vec<SavedType>, String> {
                 ("", "") => None,
                 (width_bits, tile_scale) => Some((width_bits.parse().map_err(|_| wrong_row())?, tile_scale.parse().map_err(|_| wrong_row())?)),
             };
-            Ok(SavedType { name: type_name.trim().to_string(), type_id, plane_shape })
+            let attribute_blocks = match blocks.trim() {
+                "" => None,
+                blocks => Some(blocks.parse().map_err(|_| wrong_row())?),
+            };
+            Ok(SavedType { name: type_name.trim().to_string(), type_id, plane_shape, attribute_blocks })
         })
         .collect::<Result<Vec<_>, String>>()?;
     for (place, saved_type) in saved_types.iter().enumerate() {

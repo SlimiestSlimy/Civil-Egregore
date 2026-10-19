@@ -154,7 +154,7 @@ fn files_that_are_not_a_save_are_refused() {
 }
 
 /// A save holds the world's types by name and ID -- and a plane's bits
-/// a cell and tile scale -- in the order registered, and a world loaded has those: each the type the code
+/// a cell and tile scale, an attribute's blocks -- in the order registered, and a world loaded has those: each the type the code
 /// registers under its name, of the ID saved for it; one the save does
 /// not name, an ID past them all. A name none registers, an ID sharing
 /// a number with another's, or a name said twice, is refused, naming
@@ -168,9 +168,9 @@ fn a_world_is_loaded_with_the_types_it_was_made_with() {
     let types_path = folder.join(protocol::world_types::TYPES_FILE);
     let types_text = std::fs::read_to_string(&types_path).expect("the types file");
     let lines: Vec<String> = types_text.lines().map(str::to_string).collect();
-    let shape_of = |registered: &protocol::type_registry::RegisteredType| registered.plane_shape().map_or(",".to_string(), |(width_bits, tile_scale)| format!("{width_bits},{tile_scale}"));
+    let shape_of = |registered: &protocol::type_registry::RegisteredType| registered.plane_shape().map_or(",".to_string(), |(width_bits, tile_scale)| format!("{width_bits},{tile_scale}")) + "," + &registered.attribute_blocks().map_or_else(String::new, |blocks| blocks.to_string());
     let world_lines = world.frozen_type_registry().types().iter().map(|registered| format!("{},{:016x},{}", registered.name(), registered.type_id(), shape_of(registered)));
-    assert_eq!(lines, std::iter::once("type,id,bits a cell,tile scale".to_string()).chain(world_lines).collect::<Vec<_>>());
+    assert_eq!(lines, std::iter::once("type,id,bits a cell,tile scale,blocks".to_string()).chain(world_lines).collect::<Vec<_>>());
     let line_of = |type_name: &str| lines.iter().position(|line| line.split(',').next() == Some(type_name)).expect("saved");
     let with_lines = |change: &dyn Fn(&mut Vec<String>)| {
         let mut changed_lines = lines.clone();

@@ -4,9 +4,9 @@
 //! of its own so that one is never passed for another.
 //!
 //! Every ID is laid out alike: its first byte its [`TypeKind`], its
-//! number under it -- an attribute's last four bits its blocks, as yet.
-//! A plane's bits a cell and tile size are its registration's, carried
-//! beside its ID in its [`LayerType`].
+//! number under it. A plane's bits a cell and tile size, and an
+//! attribute's blocks, are their registration's, carried beside the ID
+//! in its [`LayerType`] or [`AttributeType`].
 
 /// What an ID is of, kept in its first byte.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,10 +65,6 @@ const fn is_of(type_id_value: u64, type_kind: TypeKind) -> bool {
 /// other plane its own and one a bit after it, its cold planes'
 /// ([`LayerType::bitplane_of`]); anything else's one.
 pub(crate) fn numbers_taken(type_id_value: u64, plane_shape: Option<(u32, u32)>) -> std::ops::Range<u64> {
-    if is_of(type_id_value, TypeKind::Attribute) {
-        let attribute_number = AttributeType(type_id_value).type_number();
-        return attribute_number..attribute_number + 1;
-    }
     let first_number = number_of(type_id_value);
     let numbers = match plane_shape {
         Some((1, 0)) | None => 1,
@@ -308,73 +304,94 @@ impl EntityRuleType {
     }
 }
 
-/// An attribute's type, from the same namespace, laid out its own
-/// way under the kind: its number in the 52 bits after it, and
-/// in its last four how many blocks an attribute of it takes, less
-/// one -- 1 to 16. A type of a fixed size says its size there, set
-/// as it is registered. One whose size varies is registered with the
-/// four bits 0, and each attribute of it keeps its own length in
-/// them: so the first word of any attribute says how long it is, and
-/// what tells two types apart is all but those bits
-/// (`docs/type_registry.md`, "Layouts").
+/// An attribute's type: an ID from the same namespace, of its own kind,
+/// and how many blocks an attribute of it takes, as it was registered --
+/// 1 to 16. One whose size varies is registered as one block, and each
+/// attribute of it says its own length: an attribute's first word, its
+/// header ([`AttributeType::header_word`]), says its number and its
+/// blocks, so the first word of any attribute says how long it is, and
+/// what tells two types apart is their IDs (`docs/type_registry.md`,
+/// "Layouts"). Sorted by its ID first.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct AttributeType(pub u64);
+pub struct AttributeType {
+    /// Its ID.
+    type_id: u64,
+    /// Blocks an attribute of it takes: a fixed type's size, or the
+    /// length of one attribute of a type whose size varies.
+    block_count: u8,
+}
 
-/// Bits of an attribute's ID that are its blocks, less one.
-const ATTRIBUTE_SIZE_BITS: u32 = 4;
-/// Numbers an attribute can have: those of the 52 bits between.
-pub const ATTRIBUTE_NUMBERS: u64 = 1 << (KIND_SHIFT - ATTRIBUTE_SIZE_BITS);
+/// Bits of an attribute's header word that are its blocks, less one.
+const HEADER_BLOCK_BITS: u32 = 4;
 
 impl AttributeType {
-    /// The most blocks an attribute's ID says it takes: what its last
-    /// four bits hold.
-    pub const MOST_BLOCKS: usize = 1 << ATTRIBUTE_SIZE_BITS;
+    /// The most blocks an attribute takes: what its header's last four
+    /// bits hold.
+    pub const MOST_BLOCKS: usize = 1 << HEADER_BLOCK_BITS;
 
     /// The type of number `type_number` whose attributes take `block_count`
     /// blocks, 1 to 16.
     pub const fn of_blocks(type_number: u64, block_count: usize) -> Self {
-        assert!(type_number < ATTRIBUTE_NUMBERS && block_count >= 1 && block_count <= Self::MOST_BLOCKS, "an attribute's number is under 2^52, and it is 1 to 16 blocks");
-        Self((TypeKind::Attribute as u64) << KIND_SHIFT | type_number << ATTRIBUTE_SIZE_BITS | (block_count as u64 - 1))
+        assert!(block_count >= 1 && block_count <= Self::MOST_BLOCKS, "an attribute is 1 to 16 blocks");
+        Self { type_id: type_id(TypeKind::Attribute, type_number), block_count: block_count as u8 }
     }
 
-    /// The type of number `type_number` whose attributes vary in size: its
-    /// last four bits 0, for each attribute of it to say its own.
+    /// The type of number `type_number` whose attributes vary in size:
+    /// registered as one block, for each attribute of it to say its own.
     pub const fn of_varying_size(type_number: u64) -> Self {
         Self::of_blocks(type_number, 1)
     }
 
-    /// It with `block_count` blocks said in its last four bits: what the
-    /// first word of an attribute of it so long holds, if its size
-    /// varies.
+    /// The attribute's type an attribute's first word, `header_word`,
+    /// says: its number and its blocks. Any word says one; whether it
+    /// is an attribute's at all, [`AttributeType::is_an_attributes`].
+    #[inline]
+    pub const fn of_header_word(header_word: u64) -> Self {
+        Self { type_id: header_word >> HEADER_BLOCK_BITS, block_count: (header_word & ((1 << HEADER_BLOCK_BITS) - 1)) as u8 + 1 }
+    }
+
+    /// What an attribute's first word holds: its number, and its blocks
+    /// less one in the last four bits.
+    #[inline]
+    pub const fn header_word(self) -> u64 {
+        self.type_id << HEADER_BLOCK_BITS | (self.block_count as u64 - 1)
+    }
+
+    /// It with `block_count` blocks: what the first word of an attribute
+    /// of it so long says, if its size varies.
     pub const fn with_blocks(self, block_count: usize) -> Self {
         Self::of_blocks(self.type_number(), block_count)
     }
 
-    /// Blocks its last four bits say: a fixed type's size, or the
+    /// Its ID: its kind and its number.
+    pub const fn type_id(self) -> u64 {
+        self.type_id
+    }
+
+    /// Blocks an attribute of it takes: a fixed type's size, or the
     /// length of the one attribute whose first word it is.
     #[inline]
     pub const fn block_count(self) -> usize {
-        (self.0 & ((1 << ATTRIBUTE_SIZE_BITS) - 1)) as usize + 1
+        self.block_count as usize
     }
 
-    /// What tells it from another type: all of it but its blocks.
-    /// Two attributes of one type whose size varies are the same by
-    /// this, however long each is.
+    /// What tells it from another type: its ID. Two attributes of one
+    /// type whose size varies are the same by this, however long each is.
     #[inline]
     pub const fn type_identity(self) -> u64 {
-        self.0 >> ATTRIBUTE_SIZE_BITS
+        self.type_id
     }
 
-    /// Whether it is an attribute's type at all: its first byte the
-    /// attributes', its number not 0 -- the one namespace being
+    /// Whether it is an attribute's type at all: an ID of the
+    /// attributes' kind, its number not 0 -- the one namespace being
     /// everything's, and 0 nobody's.
     #[inline]
     pub const fn is_an_attributes(self) -> bool {
-        is_of(self.0, TypeKind::Attribute) && self.type_number() != 0
+        is_of(self.type_id, TypeKind::Attribute) && self.type_number() != 0
     }
 
-    /// Its number, between its kind and its size.
+    /// Its number, under its kind.
     pub const fn type_number(self) -> u64 {
-        (self.0 >> ATTRIBUTE_SIZE_BITS) & (ATTRIBUTE_NUMBERS - 1)
+        number_of(self.type_id)
     }
 }

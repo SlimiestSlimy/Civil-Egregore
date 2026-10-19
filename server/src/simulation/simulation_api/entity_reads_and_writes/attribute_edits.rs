@@ -67,7 +67,7 @@ pub fn set_attribute_of<L: Layout>(tick_state: &mut SimulationTickState, target_
     // Both as their words, the type first: all a member is read from, and what the attribute sums to.
     let (entity_cell, type_of_attribute, words) = (target_entity.stood_cell, attribute.attribute_type(), L::BLOCK_COUNT * BLOCK_WORDS);
     let (mut words_seen, mut words_becoming) = ([0; ATTRIBUTE_WORDS_MOST], [0; ATTRIBUTE_WORDS_MOST]);
-    (words_seen[0], words_becoming[0]) = (type_of_attribute.0, type_of_attribute.0);
+    (words_seen[0], words_becoming[0]) = (type_of_attribute.header_word(), type_of_attribute.header_word());
     seen_layout.write(&mut words_seen[1..words]);
     value.write(&mut words_becoming[1..words]);
     let mut attribute_as_seen = compare_and_write::open_compare(tick_state, Compare::Attribute { named_cell: entity_cell, attribute_type: type_of_attribute, seen_value: words_sum(&words_seen[..words]).max(NO_ATTRIBUTE + 1) });

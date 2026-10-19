@@ -147,7 +147,7 @@ impl RegisteredType {
         match self {
             Self::Layer { layer_type, .. } | Self::WidePlane { layer_type, .. } => layer_type.type_id(),
             Self::Entity { entity_type, .. } => entity_type.0,
-            Self::Attribute { attribute_type, .. } => attribute_type.0,
+            Self::Attribute { attribute_type, .. } => attribute_type.type_id(),
             Self::ScaRule { rule, .. } => rule.0,
             Self::EntityRule { rule, .. } => rule.0,
             Self::Worldgen { worldgen, .. } => worldgen.0,
@@ -167,6 +167,12 @@ impl RegisteredType {
     /// plane its own, and one a bit, its cold planes'; anything else one.
     pub fn numbers(&self) -> std::ops::Range<u64> {
         numbers_taken(self.type_id(), self.plane_shape())
+    }
+
+    /// Blocks an attribute of it takes, if it is an attribute's type, as
+    /// registered.
+    pub fn attribute_blocks(&self) -> Option<usize> {
+        self.attribute_type().map(AttributeType::block_count)
     }
 
     /// Its plane's shape, if it is a layer or a wide plane: its bits a
