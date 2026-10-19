@@ -29,12 +29,6 @@ pub enum Hot {
 }
 
 impl Hot {
-    /// A world of no size, hot about every entity of the kind `entity`
-    /// alone.
-    pub const fn about_entity(entity: EntityType) -> Self {
-        Self::AboutHotEntities { entity, world_side_superchunks: None, viewport: false }
-    }
-
     /// Whether the viewport's superchunks are hot too: never forced
     /// hot, the whole of which is.
     pub const fn viewport(&self) -> bool {

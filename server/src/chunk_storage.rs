@@ -87,6 +87,7 @@ impl ChunkStorage {
     /// memory, as a hot superchunk's is, and any where nothing is
     /// paged. One paged to disk is not lent from here: a panic, the
     /// caller's mistake ([`ChunkStorage::shared_image`] reads it).
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn image(&self, superchunk: SuperchunkIndex) -> Option<&SuperchunkImage> {
         self.find_superchunk(superchunk).ok().map(|pool_index| match &self.cold_pool[pool_index].1 {
             ImageKept::InMemory(image) => &**image,
@@ -105,6 +106,7 @@ impl ChunkStorage {
     /// one: from its first word to its chunk's end
     /// ([`SuperchunkImage::layer`]). Of an image in memory
     /// ([`ChunkStorage::image`]).
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn layer(&self, chunk: ChunkIndex, layer_type: LayerType) -> Option<&[u64]> {
         self.image(chunk.superchunk())?.layer(chunk.place(), layer_type.type_id())
     }
@@ -128,6 +130,7 @@ impl ChunkStorage {
     /// ring's tail here until it fits, and adding each one flushed to
     /// `flushed_superchunks`. Every superchunk was flushed before `encoded_layer` went in,
     /// so its entries left in the ring are this one and later ones.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn write_back(&mut self, chunk: ChunkIndex, layer_type: LayerType, encoded_layer: &[u64], flushed_superchunks: &mut Vec<SuperchunkIndex>) {
         while !self.try_write_back(chunk, layer_type, encoded_layer) {
             let flush = self.take_tail().expect("a full ring has a tail");
@@ -158,6 +161,7 @@ impl ChunkStorage {
     }
 
     /// [`ChunkStorage::take_entries`] of the superchunk at the ring's tail.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn take_tail(&mut self) -> Option<Flush> {
         self.take_entries(self.writeback_ring.tail_superchunk()?)
     }
@@ -169,6 +173,7 @@ impl ChunkStorage {
 
     /// Rewrites the image of `superchunk` with all its entries in the
     /// ring, here, and frees them. Returns whether it had any.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn flush(&mut self, superchunk: SuperchunkIndex) -> bool {
         let Some(flush) = self.take_entries(superchunk) else {
             return false;
@@ -179,6 +184,7 @@ impl ChunkStorage {
 
     /// Flushes every superchunk with entries in the ring, each added to
     /// `flushed_superchunks`: the ring is empty after.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn flush_all(&mut self, flushed_superchunks: &mut Vec<SuperchunkIndex>) {
         while let Some(superchunk) = self.writeback_ring.tail_superchunk() {
             self.flush(superchunk);
@@ -197,6 +203,7 @@ impl ChunkStorage {
 /// thread.
 pub struct Flush {
     /// The superchunk.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub superchunk: SuperchunkIndex,
     /// Its image when the entries were taken, if it had one.
     pub image: Option<Arc<SuperchunkImage>>,

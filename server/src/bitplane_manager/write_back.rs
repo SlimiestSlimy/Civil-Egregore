@@ -49,6 +49,7 @@ impl BitmapArena {
     /// ([`BitmapArena::take_dirty`], then [`BitmapArena::written_back`]),
     /// the superchunks the ring flushes here to make room
     /// [`BitmapArena::flushed_from_ring`]: how many were written.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn write_back(&mut self, superchunk: SuperchunkIndex, cold_storage: &mut ChunkStorage, layer_codec: &mut LayerCodec) -> usize {
         let dirty = self.take_dirty(superchunk);
         if dirty.is_empty() {
@@ -108,6 +109,7 @@ impl BitmapArena {
     /// bucket of it is hot or waiting, leaves the directory.
     /// Dropping a dirty bitmap would lose its changes,
     /// and is a bug: write it back first.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn evict(&mut self, bucket_key: BucketKey) -> bool {
         let Some((allocation_at, chunk)) = self.hot(bucket_key) else {
             return false;

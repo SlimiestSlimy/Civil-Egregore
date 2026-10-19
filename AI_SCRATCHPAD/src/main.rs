@@ -6,7 +6,6 @@
 //!
 //! `cargo run --release -p AI_SCRATCHPAD -- --<probe> [--<parameter> <value> ...]`, `--help` for them all
 
-mod acts_over_a_border;
 mod asking_the_host;
 mod ticks_under_a_wide_viewport;
 
@@ -53,14 +52,8 @@ impl ProbeParameters<'_> {
 }
 
 /// Every parameter any probe reads, a general flag each.
-const PARAMETERS: [&str; 13] = [
+const PARAMETERS: [&str; 7] = [
     SEED,
-    acts_over_a_border::WORLD_SIDE_SUPERCHUNKS,
-    acts_over_a_border::EVERY_SO_MANY_CELLS,
-    acts_over_a_border::STEPPING_A_SUPERCHUNK,
-    acts_over_a_border::TICKS,
-    acts_over_a_border::THREADS_OF_SECOND_RUN,
-    acts_over_a_border::CROSSING,
     ticks_under_a_wide_viewport::VIEWPORT_SIDE,
     ticks_under_a_wide_viewport::SECONDS_MEASURED,
     ticks_under_a_wide_viewport::SUPERCHUNKS_A_FRAME,
@@ -98,13 +91,7 @@ const fn probe_flag<const PROBE: usize>() -> Flag {
 }
 
 /// The probes.
-const PROBES: [Probe; 2] = [
-    Probe {
-        probe_name: "acts_over_a_border",
-        what_it_does: "times the second phase with lines of entities acting over every border running north to south (flipping a cell beyond it under a compare, or with `crossing` 1 stepping over it and back), and with the same lines moved away from it, on one thread and on all: what an act over a border costs",
-        parameter_defaults: &[(acts_over_a_border::WORLD_SIDE_SUPERCHUNKS, "4"), (acts_over_a_border::EVERY_SO_MANY_CELLS, "2"), (acts_over_a_border::STEPPING_A_SUPERCHUNK, "4000"), (acts_over_a_border::TICKS, "200"), (acts_over_a_border::THREADS_OF_SECOND_RUN, "0"), (acts_over_a_border::CROSSING, "0")],
-        run_probe: acts_over_a_border::run_probe,
-    },
+const PROBES: [Probe; 1] = [
     Probe {
         probe_name: "ticks_under_a_wide_viewport",
         what_it_does: "makes a world with no side whose camera loads, keeps a square viewport hot, and prints its ticks a second with no frame asked and with frames asked as a window asks: what answering a client costs the simulation",
@@ -117,7 +104,6 @@ const PROBES: [Probe; 2] = [
 fn probe_flags() -> Vec<Flag> {
     vec![
         probe_flag::<0>(),
-        probe_flag::<1>(),
         parameter_flag::<0>(),
         parameter_flag::<1>(),
         parameter_flag::<2>(),
@@ -125,12 +111,6 @@ fn probe_flags() -> Vec<Flag> {
         parameter_flag::<4>(),
         parameter_flag::<5>(),
         parameter_flag::<6>(),
-        parameter_flag::<7>(),
-        parameter_flag::<8>(),
-        parameter_flag::<9>(),
-        parameter_flag::<10>(),
-        parameter_flag::<11>(),
-        parameter_flag::<12>(),
     ]
 }
 

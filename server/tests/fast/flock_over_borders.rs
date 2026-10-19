@@ -9,29 +9,24 @@
 //! cross it every run, the flock's rule, and the one generator every
 //! chance of the rule is read from, by the tick and the entity.
 //!
-//! `cargo test --test fast flock_over_borders`
+//! `cargo test -p server --lib flock_over_borders`
 
-// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
-// and the world's handles to them -- until the world has reads of its
-// own and this is rewritten against them (AI.txt, LATER).
-
-use crate::worlds::base;
-use crate::arenas::TestTypes;
+use crate::test_types::TestTypes;
 use crate::arenas::{cell, walker_header, world};
-use server::internals_for_root_tests::{BitmapArena, BucketKey, Write, WriteOp};
-use server::internals_for_root_tests::LayerCodec;
+use crate::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
+use crate::chunk_storage::LayerCodec;
 use utilities::coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use server::internals_for_root_tests::{AttributeBlock, WorldEntities, InstructionsApplied};
-use server::simulation::simulation_api::cell_and_its_neighbours;
-use server::simulation::simulation_api::{cell_reads_and_writes, compare_and_write, SimulationTickState};
-use server::internals_for_root_tests::Simulation;
+use crate::entity_manager::{AttributeBlock, WorldEntities, InstructionsApplied};
+use crate::simulation::simulation_api::cell_and_its_neighbours;
+use crate::simulation::simulation_api::{cell_reads_and_writes, compare_and_write, SimulationTickState};
+use crate::simulation::tick::Simulation;
 use std::collections::BTreeSet;
 use utilities::rng::RandomSource;
-use basegame::libraries::collision::Collision;
+use crate::collision::Collision;
 
 /// The base game's collision plane's library, of a new world's ID.
-fn collision_library() -> Collision {
-    Collision { plane: base().collision }
+fn collision_library(types: TestTypes) -> Collision {
+    Collision { plane: types.collision }
 }
 
 /// Superchunks along the side of the world.
@@ -69,7 +64,7 @@ fn drawn_for(seed: u64, tick_now: u64, from_pasture: (i64, i64)) -> RandomSource
 }
 
 /// The entity on `asked_cell` as the tick found it, if one stood there.
-fn entity_standing_on<'a>(tick_state: &SimulationTickState<'a>, asked_cell: CellIndex) -> Option<server::internals_for_root_tests::EntityRef<'a>> {
+fn entity_standing_on<'a>(tick_state: &SimulationTickState<'a>, asked_cell: CellIndex) -> Option<crate::entity_manager::EntityRef<'a>> {
     tick_state.entities_in(asked_cell.chunk())?.find(|entity| entity.header.stood_cell == asked_cell)
 }
 
@@ -89,36 +84,36 @@ fn flock(types: TestTypes, tick_state: &mut SimulationTickState, seed: u64, past
         let mut walker_random = drawn_for(seed, tick_now, from_pasture(pasture_shift, walker_cell));
         let about_tiles = cell_and_its_neighbours::tiles_about_cell(walker_cell);
         let stone_about = cell_and_its_neighbours::read_layer(tick_state, types.stone, &about_tiles);
-        let (open_cells, collision_cells) = (stone_about.hot & about_tiles.neighbour_cells(), cell_and_its_neighbours::read_layer(tick_state, base().collision, &about_tiles).set_cells & about_tiles.neighbour_cells());
+        let (open_cells, collision_cells) = (stone_about.hot & about_tiles.neighbour_cells(), cell_and_its_neighbours::read_layer(tick_state, types.collision, &about_tiles).set_cells & about_tiles.neighbour_cells());
         let chance = walker_random.draw_below(100);
         if chance < 4 {
-            collision_library().remove(tick_state, &header);
+            collision_library(types).remove(tick_state, &header);
             continue;
         }
         let meals_seen = entity.attribute(types.counted);
         if !(stone_about.set_cells & about_tiles.centre_cell()).is_empty() {
             // The meal is counted only if the stone is there still: another on its way here may not eat it, but one counting on this one may.
-            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut compare_and_write::open_compare(tick_state, compare_and_write::layer_holds(types.stone, walker_cell)), &header, types.counted, meals_seen, meals_seen.unwrap_or(0) + 1);
+            crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut compare_and_write::open_compare(tick_state, compare_and_write::layer_holds(types.stone, walker_cell)), &header, types.counted, meals_seen, meals_seen.unwrap_or(0) + 1);
             cell_reads_and_writes::clear(tick_state, types.stone, walker_cell);
         } else if let Some(laid_cell) = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, open_cells.cells_not_in(stone_about.set_cells)).filter(|_| chance < 40).and_then(|laid_way| cell_and_its_neighbours::cell(walker_cell, laid_way)) {
             // Laid and counted, or neither: the cell may be another's stone by then, whichever side of a border it is on.
             let laid_seen = entity.attribute(types.laid);
             let mut cell_bare_still = compare_and_write::open_compare(tick_state, compare_and_write::layer_lacks(types.stone, laid_cell));
             cell_reads_and_writes::set(&mut cell_bare_still, types.stone, laid_cell);
-            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut cell_bare_still, &header, types.laid, laid_seen, laid_seen.unwrap_or(0) + 1);
+            crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut cell_bare_still, &header, types.laid, laid_seen, laid_seen.unwrap_or(0) + 1);
         }
         if let Some(neighbour_entity) = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, collision_cells).and_then(|neighbour_way| cell_and_its_neighbours::cell(walker_cell, neighbour_way)).and_then(|neighbour_cell| entity_standing_on(tick_state, neighbour_cell)) {
             let count_seen = neighbour_entity.attribute(types.counted);
-            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &neighbour_entity.header, types.counted, count_seen, count_seen.unwrap_or(0) + 1000);
+            crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &neighbour_entity.header, types.counted, count_seen, count_seen.unwrap_or(0) + 1000);
         }
         if let Some(made_cell) = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, open_cells.cells_not_in(collision_cells)).filter(|_| chance < 9).and_then(|made_way| cell_and_its_neighbours::cell(walker_cell, made_way)) {
             // Made and counted, or neither.
             let made_seen = entity.attribute(types.made);
-            let mut entity_made = collision_library().begin_making_entity(tick_state, types.walker, made_cell, tick_now + 1 + walker_random.draw_below(3), &[]);
-            server::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut entity_made, &header, types.made, made_seen, made_seen.unwrap_or(0) + 1);
+            let mut entity_made = collision_library(types).begin_making_entity(tick_state, types.walker, made_cell, tick_now + 1 + walker_random.draw_below(3), &[]);
+            crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(&mut entity_made, &header, types.made, made_seen, made_seen.unwrap_or(0) + 1);
         }
         let step_cell = cell_and_its_neighbours::pick_way(&mut walker_random, &about_tiles, open_cells).and_then(|step_way| cell_and_its_neighbours::cell(walker_cell, step_way)).unwrap_or(walker_cell);
-        collision_library().step(tick_state, &header, step_cell, tick_now + 1 + walker_random.draw_below(3));
+        collision_library(types).step(tick_state, &header, step_cell, tick_now + 1 + walker_random.draw_below(3));
     }
     0
 }
@@ -131,7 +126,7 @@ fn pasture_world(types: TestTypes, seed: u64, pasture_shift: (u32, u32)) -> (Bit
     let mut layer_codec = LayerCodec::new();
     for (x, y) in (10..10 + WORLD).flat_map(|y| (10..10 + WORLD).map(move |x| (x, y))) {
         for chunk in SuperchunkIndex::from_cartesian(x, y).chunks() {
-            bitmap_arena.make_hot(BucketKey { layer_type: base().collision, chunk }, None, &mut layer_codec);
+            bitmap_arena.make_hot(BucketKey { layer_type: types.collision, chunk }, None, &mut layer_codec);
         }
     }
     let mut seeded_random = RandomSource::new(seed);
@@ -146,7 +141,7 @@ fn pasture_world(types: TestTypes, seed: u64, pasture_shift: (u32, u32)) -> (Bit
         let drawn_place = (seeded_random.draw_below(u64::from(PASTURE_SIDE)) as i64, seeded_random.draw_below(u64::from(PASTURE_SIDE)) as i64);
         if drawn_places.insert(drawn_place) {
             entity_store.queue_add(walker_header(types, pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), seeded_random.draw_below(3)), &[]);
-            bitmap_arena.queue_write(base().collision, Write::cell(pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), WriteOp::SetCell));
+            bitmap_arena.queue_write(types.collision, Write::cell(pasture_cell(pasture_shift, drawn_place.0, drawn_place.1), WriteOp::SetCell));
         }
     }
     entity_store.apply();
@@ -163,7 +158,7 @@ type PastureOutcome = (BTreeSet<(i64, i64)>, BTreeSet<(i64, i64)>, Vec<(i64, i64
 fn pasture_outcome(types: TestTypes, bitmap_arena: &BitmapArena, entity_store: &WorldEntities, pasture_shift: (u32, u32)) -> PastureOutcome {
     let read_range = -READ_PAST..i64::from(PASTURE_SIDE) + READ_PAST;
     let cells_holding = |layer| read_range.clone().flat_map(|y| read_range.clone().map(move |x| (x, y))).filter(|&(x, y)| bitmap_arena.layer_holds_cell(layer, pasture_cell(pasture_shift, x, y)) == Ok(true)).collect();
-    let (stone_cells, collision_cells) = (cells_holding(types.stone), cells_holding(base().collision));
+    let (stone_cells, collision_cells) = (cells_holding(types.stone), cells_holding(types.collision));
     let place_in_pasture = |walker_cell: CellIndex| from_pasture(pasture_shift, walker_cell);
     let mut walker_rows: Vec<_> = entity_store.iter().map(|walker_entity| (place_in_pasture(walker_entity.header.stood_cell).0, place_in_pasture(walker_entity.header.stood_cell).1, walker_entity.header.wake, walker_entity.attributes.to_vec())).collect();
     walker_rows.sort_unstable_by_key(|walker_row| (walker_row.0, walker_row.1));

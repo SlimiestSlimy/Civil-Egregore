@@ -11,5 +11,4 @@ mod test_seed;
 
 mod basegame_api;
 mod docs;
-mod entity_manager;
 mod type_registry;

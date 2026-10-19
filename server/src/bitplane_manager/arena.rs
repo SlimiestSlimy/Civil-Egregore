@@ -41,6 +41,7 @@ pub struct BitmapArena {
     /// The arena's own lookups, remembering the last.
     pub(crate) lookup: Lookup,
     /// Writes queued from outside a tick, not yet applied.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub(crate) queued_writes: WriteQueues,
 }
 
@@ -59,22 +60,26 @@ impl BitmapArena {
 
     /// Every allocation in use, superchunk by superchunk in Morton order,
     /// in each by type.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub(crate) fn layers(&self) -> impl Iterator<Item = &SuperchunkLayer> {
         self.directory.iter().flat_map(|directory_entry| &directory_entry.layers)
     }
 
     /// How many bitmaps are hot.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn len(&self) -> usize {
         self.layers().map(|layer| layer.chunk_flags.hot.count_ones() as usize).sum()
     }
 
     /// Whether no bitmap is hot.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// How many allocations are in use: holding a hot bitmap, or one
     /// waiting in the ring.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn allocations(&self) -> usize {
         self.layers().count()
     }
@@ -97,6 +102,7 @@ impl BitmapArena {
     }
 
     /// Whether `bucket_key`'s bitmap is hot.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn is_hot(&self, bucket_key: BucketKey) -> bool {
         self.hot(bucket_key).is_some()
     }
@@ -137,11 +143,13 @@ impl BitmapArena {
 
     /// Whether `layer_type` holds at `cell`, anywhere in the world: its
     /// superchunk, chunk and bit taken from its index.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn layer_holds_cell(&self, layer_type: LayerType, cell: CellIndex) -> Result<bool, NotHot> {
         self.lookup.layer_holds_cell(&self.directory, layer_type, cell)
     }
 
     /// The number `wide_plane` holds at `cell`, anywhere in the world.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn value<W: Width>(&self, wide_plane: WidePlane<W>, cell: CellIndex) -> Result<u32, NotHot> {
         self.lookup.value(&self.directory, wide_plane, cell)
     }
@@ -181,6 +189,7 @@ impl BitmapArena {
 
     /// Every hot bitmap's key, in the arena's order: by superchunk, then
     /// type, then chunk, superchunks and chunks in Morton order.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn hot_bucket_keys(&self) -> impl Iterator<Item = BucketKey> + '_ {
         self.directory.iter().flat_map(move |directory_entry| {
             directory_entry.layers.iter().flat_map(move |allocation| {

@@ -155,6 +155,7 @@ impl ChunkStorage {
     }
 
     /// Bytes of images in memory.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn bytes_in_memory(&self) -> u64 {
         self.cold_pool_paging.bytes_in_memory
     }
@@ -165,6 +166,7 @@ impl ChunkStorage {
     }
 
     /// Superchunks whose image is on disk.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn on_disk(&self) -> usize {
         self.cold_pool.iter().filter(|(_, image_kept)| matches!(image_kept, ImageKept::OnDisk(_))).count()
     }

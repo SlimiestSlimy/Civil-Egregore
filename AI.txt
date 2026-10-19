@@ -691,9 +691,57 @@ COUPLINGS LEFT (each its own pass)
   worldgen_parameters_of_tuning, basegame's terrain_asked.rs and
   WorldGeneration::from_tuning; simulation_api's terrain and tuning
   modules. basegame::base_types::Height its own (u16).
-- Left: the root tests on internals_for_root_tests (until the world
-  has reads of its own); the server's docs' relative links (docs
-  paused). Then the fresh client ("after deleting the old client and
+- THE ROOT TESTS OFF THE SERVER'S INTERNALS ("yes, we must finish with
+  all decoupling"). My plan: the tests of the server's machinery move
+  into the server crate on its own test types; the rest kept to public
+  APIs. The user: "hmmm the plan is solid minus that world handle,
+  adding, writing and removing entities and cells already has a public
+  api. the worldgen parameters should be consulted through the worldgen
+  type libraries with setters and getters for example"; "no between
+  ticks work is allowed". So: no reads or edits of a world from
+  outside a tick -- a root test sets up and observes through rules of
+  its own bundle, run in ticks through simulation_api; worldgen
+  parameters through worldgen's calls. internals_for_root_tests and
+  World's TEMPORARY handles (bitmap_arena, entity_store, chunk_storage,
+  world_simulation, cold, halos, add_entity, remove_entity,
+  write_cells ...) deleted. DONE (2026-10-19, uncommitted at writing):
+  * THE PROBE (tests/shared/probe.rs): a rule of the root tests' own,
+    in bundle "tests first" -- registered BEFORE basegame, so it runs
+    first in a turn and its writes meet the game's first (the meal lost
+    to a decay needs that) -- on a plane of its own ("probe plane"),
+    hooked RunsEveryTick, doing on every superchunk's turn whatever the
+    test hands it for that one tick (Probe::tick with chosen rules,
+    ::alone, ::tick_rule, ::whole_tick = world.tick()). Reads come back
+    as data, sorted by superchunk; asserts are made OUTSIDE the tick (a
+    panic on a tick thread may hang the dispatcher). base() is the
+    BaseTypes of a probed world; game_base() of the game alone (host,
+    client_connection, the binary). A probe-alone tick skips every
+    entity woken in it (asleep for good): reads that must not, ride
+    along the rules' own tick (tick_rule/tick/whole_tick); a flock put
+    by worlds::one_flock_world wakes no sooner than FLOCK_SETTLES (8)
+    ticks on. Saved worlds of probed types load with
+    worlds::probe_and_base_game. Root save/load equality by
+    server::world_hash.
+  * Machinery tests moved into the server (server/tests/fast/: halos,
+    paging, world -- save format, load, types file, tiles, a folder
+    given a new world; walking, flock_over_borders; fine/entity_manager)
+    on the server's test game (server/tests/shared/test_game.rs:
+    walkers wandering scattered stone, trail, births and deaths one wake
+    in 64, KeepsTheWorldHot, its generation and rule through
+    simulation_api) and whole_worlds.rs. There, between-tick edits by
+    the server's own handles stay: they are its invariants' tests.
+  * World's handles pub(crate); simulation_api exports NEVER_WAKES (a
+    rule may want an entity asleep for good). The root's
+    sheep_never_step_through_a_wall is tests/fast/walls.rs.
+  * Items only the server's tests use are marked with the crate's idiom
+    `#[cfg_attr(not(test), allow(dead_code))] // only the crate's tests
+    ask it yet` (see OPEN: TEST-ONLY MACHINERY). Five used by nothing
+    deleted (Bucket get, two is_empty, Hot::about_entity,
+    Simulation::thread_count).
+  * The scratchpad's acts_over_a_border probe deleted: it timed the
+    second phase on raw arenas, which nothing outside the server
+    reaches now. To come back, if wanted, as a server diagnostic.
+- Left besides: the server's docs' relative links (docs paused). Then the fresh client ("after deleting the old client and
   keeping the skeleton parts, we finish decoupling before writing more
   client").
 
@@ -708,6 +756,15 @@ WAITING ON THE USER
   shape.
 
 OPEN, FOUND BY ME
+- TEST-ONLY MACHINERY (2026-10-19): with the root tests on public APIs,
+  production never builds a between-ticks write (WriteOp SetCell/
+  ClearCell/FlipCell, WriteShape Rectangle/Disc, the arena's write
+  queue), the entity Instructions queue's Move/Edit/RemoveEntity,
+  World/SimulationHandle add_entity/remove_entity/write_cells, and
+  more: only the server's own tests do, to set up arenas. Marked "only
+  the crate's tests ask it yet". To the bones would have the server's
+  tests set up through ticks too and delete these; a large rewrite of
+  its tests -- not started.
 - ATOMICS (the user, 2026-10-17: "im concerned about how much atomics
   we have in the code now"): ~46 of the program's ~53 atomic lines are
   the applying phase's scheduler (tick/applying.rs, who_goes_on.rs,

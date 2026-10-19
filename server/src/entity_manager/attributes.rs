@@ -319,6 +319,7 @@ pub fn attribute<L: Layout>(attribute_list: &[AttributeBlock], attribute: Attrib
 
 /// Sets the attribute `attribute` is the blocks of in `attribute_list`, sorted
 /// by type: in place of the one of its type, or added.
+#[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
 pub fn set_attribute_blocks(attribute_list: &mut Vec<AttributeBlock>, attribute: &[AttributeBlock]) {
     debug_assert!(attribute.first().is_some_and(|first_block| first_block.block_count() == attribute.len()), "an attribute as long as its type or its block length says");
     match find_attribute(attribute_list, attribute[0].attribute_type()) {
@@ -331,12 +332,14 @@ pub fn set_attribute_blocks(attribute_list: &mut Vec<AttributeBlock>, attribute:
 /// Sets `attribute` in `attribute_list`, sorted by type, to `value`: added if
 /// it was not there.
 #[inline]
+#[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
 pub fn set_attribute<L: Layout>(attribute_list: &mut Vec<AttributeBlock>, attribute: Attribute<L>, value: L) {
     set_attribute_blocks(attribute_list, &WholeAttribute::holding_value(attribute, value));
 }
 
 /// Removes the attribute of type `attribute_type` from `attribute_list`, sorted by type:
 /// whether it was there.
+#[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
 pub fn remove_attribute(attribute_list: &mut Vec<AttributeBlock>, attribute_type: AttributeType) -> bool {
     let search_result = find_attribute(attribute_list, attribute_type);
     if let Ok(found_range) = &search_result {

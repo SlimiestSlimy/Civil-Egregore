@@ -72,6 +72,7 @@ pub struct Simulation {
 /// otherwise: every one the machine has -- threads are never held back
 /// -- but no more than there are superchunks, a thread taking whole
 /// superchunks.
+#[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
 pub fn threads_for(superchunks: usize) -> usize {
     std::thread::available_parallelism().map_or(1, usize::from).min(superchunks).max(1)
 }
@@ -79,12 +80,14 @@ pub fn threads_for(superchunks: usize) -> usize {
 impl Simulation {
     /// A simulation of `superchunks` superchunks on every thread the
     /// machine has ([`threads_for`]), kept between ticks.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn for_superchunks(superchunks: usize) -> Self {
         Self::new(threads_for(superchunks))
     }
 
     /// A simulation on `thread_count` threads, kept between ticks: a number
     /// given only to measure against another.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn new(thread_count: usize) -> Self {
         Self::on_dispatcher(Arc::new(Dispatcher::new(thread_count)))
     }
@@ -123,11 +126,6 @@ impl Simulation {
                 Err(_) => (aligned_superchunk, RandomSource::for_stream(seed, aligned_superchunk.0)),
             })
             .collect();
-    }
-
-    /// How many threads it ticks on.
-    pub fn thread_count(&self) -> usize {
-        self.dispatcher.thread_count()
     }
 
     /// One tick of `rule` over every superchunk of `bitmap_arena` and its

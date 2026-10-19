@@ -13,10 +13,13 @@ use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, CHUNK_SI
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WriteOp {
     /// Makes the cell set.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     SetCell,
     /// Makes the cell clear.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     ClearCell,
     /// Makes the cell set if it was clear, clear if it was set.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     FlipCell,
     /// Makes the cell's number this: for a layer more than a bit a cell
     /// wide, its low bits as many as the layer has. On a layer of a bit
@@ -32,6 +35,7 @@ pub enum WriteShape {
     Cell,
     /// `width` by `height` cells, the anchor the top left one; no cells
     /// if either is 0.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     RectangleOfCells {
         /// Cells across.
         width: u8,
@@ -40,6 +44,7 @@ pub enum WriteShape {
     },
     /// Every cell no farther than `radius` from the anchor, centre to
     /// centre: the anchor alone at radius 0.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     DiscOfCells {
         /// The farthest a cell may be, in cells.
         radius_in_cells: u8,
@@ -69,6 +74,7 @@ impl Write {
 
     /// `value` made the number of the cell `anchor_cell`, of a wide plane: no
     /// more than a plane of that width holds.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn value<W: Width>(wide_plane: WidePlane<W>, anchor_cell: CellIndex, value: u32) -> Self {
         debug_assert!(value <= wide_plane.most_value(), "{value} in a plane of {} bits a cell", W::BITS_A_CELL);
         Self { anchor_cell, write_op: WriteOp::WriteValue(value), write_shape: WriteShape::Cell }
@@ -133,11 +139,13 @@ impl std::ops::AddAssign for WritesApplied {
 #[derive(Default)]
 pub struct WriteQueues {
     /// The queues, by type.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     queues_by_type: Vec<(LayerType, Vec<Write>)>,
 }
 
 impl WriteQueues {
     /// Queues `write` into `layer_type`'s queue.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn push(&mut self, layer_type: LayerType, write: Write) {
         let queue_index = match self.queues_by_type.binary_search_by_key(&layer_type, |(queued_type, _)| *queued_type) {
             Ok(found_index) => found_index,
@@ -150,16 +158,19 @@ impl WriteQueues {
     }
 
     /// How many writes are queued.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn len(&self) -> usize {
         self.queues_by_type.iter().map(|(_, writes)| writes.len()).sum()
     }
 
     /// Every queue, by type.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn iter(&self) -> impl Iterator<Item = (LayerType, &[Write])> {
         self.queues_by_type.iter().map(|(layer_type, writes)| (*layer_type, writes.as_slice()))
     }
 
     /// Empties every queue, keeping its room.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn clear(&mut self) {
         self.queues_by_type.iter_mut().for_each(|(_, writes)| writes.clear());
     }
@@ -171,6 +182,7 @@ const CHUNK_SIDE_U32: u32 = CHUNK_SIDE as u32;
 impl Write {
     /// The superchunks the write's cells lie in: one, or for a shape
     /// across a border up to four.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn superchunks(self) -> impl Iterator<Item = SuperchunkIndex> {
         let ([left_column, right_column], [top_row, bottom_row]) = self.cartesian_bounds().unwrap_or(([1, 0], [1, 0]));
         let superchunk_of = |cell_coordinate: u32| cell_coordinate / SUPERCHUNK_SIDE_CELLS;
@@ -254,11 +266,13 @@ impl BitmapArena {
     /// other queued, in order, by [`BitmapArena::apply`]: until then no
     /// cell changes. For writes from outside a tick -- setting up, say;
     /// a simulation's rules queue theirs through its own queues.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn queue_write(&mut self, layer_type: LayerType, write: Write) {
         self.queued_writes.push(layer_type, write);
     }
 
     /// How many writes are queued, over every layer type.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn queued_write_count(&self) -> usize {
         self.queued_writes.len()
     }
@@ -267,6 +281,7 @@ impl BitmapArena {
     /// and empties them: where writes to one bitplane overlap, the latest
     /// wins. A write covering cells of bitmaps that are not hot leaves
     /// those cells out.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn apply(&mut self) -> WritesApplied {
         let mut writes_applied = WritesApplied::default();
         let taken_queues = std::mem::take(&mut self.queued_writes);

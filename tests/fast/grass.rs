@@ -3,18 +3,20 @@
 //! crowds it.
 
 use protocol::server_parameters::{ParameterValue, SEED};
-use crate::worlds::{cells_of_grass, first_superchunk, plain_start, plant_grass, tick_grass};
-use utilities::coordinates::CellCartesian;
+use crate::probe::Probe;
+use crate::worlds::{base, cells_of_grass, first_superchunk, nothing_more, plain_start, probed_world, set_rectangle, tick_grass};
+use utilities::coordinates::{CellCartesian, CellIndex, SUPERCHUNK_SIDE_CELLS};
 use basegame::sca_rules::grass::{DECAYS_COUNT, DECAY_CHANCE, SPREADS_COUNT, SPREAD_CHANCE};
+use server::simulation::simulation_api::{cell_reads_and_writes, tick_and_random_stream};
 use server::World;
 use utilities::rng::RandomSource;
 
 /// Cells in a superchunk.
 const CELLS: u64 = 1 << 20;
 
-/// The first cell of `world`, at its top left.
-fn origin(world: &World) -> CellCartesian {
-    first_superchunk(world).top_left().cartesian()
+/// The first cell of `world`, at its top left, read in a tick of the probe alone.
+fn origin(world: &mut World, probe: &Probe) -> CellCartesian {
+    first_superchunk(world, probe).top_left().cartesian()
 }
 
 /// A superchunk all grass, with no dirt to spread onto: over some ticks
@@ -27,15 +29,12 @@ fn origin(world: &World) -> CellCartesian {
 fn grass_crowded_by_grass_decays_at_its_chance() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut seeded_random = RandomSource::new(seed);
-    let mut world = server::start_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
-    let origin = origin(&world);
-    let plant_all = |world: &mut World| {
-        for (x, y) in (0..8).flat_map(|y| (0..8).map(move |x| (x, y))) {
-            plant_grass(world, CellCartesian { x: origin.x + 128 * x, y: origin.y + 128 * y }, 128, 128);
-        }
-    };
+    let (mut world, probe) = probed_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let origin = origin(&mut world, &probe);
+    // Every cell, in a tick of the probe alone: the grass rule's ticks are of a superchunk all grass.
+    let plant_all = |world: &mut World| set_rectangle(world, &probe, base().grass, origin, SUPERCHUNK_SIDE_CELLS, SUPERCHUNK_SIDE_CELLS);
     plant_all(&mut world);
-    assert_eq!(cells_of_grass(&world), CELLS);
+    assert_eq!(cells_of_grass(&mut world, &probe), CELLS);
     let (ticks, mut decays_counted) = (seeded_random.draw_between(40, 80), 0);
     for _ in 0..ticks {
         let tick_counts = tick_grass(&mut world).rules;
@@ -58,13 +57,18 @@ fn grass_crowded_by_grass_decays_at_its_chance() {
 #[allow(clippy::disallowed_methods)]
 fn lone_grass_never_decays_and_spreads_at_its_chance() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = server::start_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
-    let origin = origin(&world);
+    let (mut world, probe) = probed_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let origin = origin(&mut world, &probe);
     // A cell every fourth across and down: far enough apart that one spread never makes two neighbours.
-    for (x, y) in (0..256).flat_map(|y| (0..256).map(move |x| (x, y))) {
-        plant_grass(&mut world, CellCartesian { x: origin.x + 4 * x + 1, y: origin.y + 4 * y + 1 }, 1, 1);
-    }
-    let lone_cells = cells_of_grass(&world);
+    let lone_cells: Vec<CellIndex> = (0..256).flat_map(|y| (0..256).map(move |x| CellCartesian { x: origin.x + 4 * x + 1, y: origin.y + 4 * y + 1 }.into())).collect();
+    probe.alone(&mut world, move |tick_state| {
+        let turn_superchunk = tick_and_random_stream::superchunk(tick_state);
+        for &lone_cell in lone_cells.iter().filter(|&&lone_cell| lone_cell.superchunk() == turn_superchunk) {
+            cell_reads_and_writes::set(tick_state, base().grass, lone_cell);
+        }
+        Vec::<()>::new()
+    });
+    let lone_cells = cells_of_grass(&mut world, &probe);
     let (mut spreads_counted, mut ticks) = (0, 0);
     while spreads_counted < 400 {
         let tick_counts = tick_grass(&mut world).rules;
@@ -89,12 +93,13 @@ fn lone_grass_never_decays_and_spreads_at_its_chance() {
 fn grass_changes_by_what_spread_and_decayed() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     // Grass enough that some of it spreads in so few ticks.
-    let mut world = server::start_world(&plain_start(1, 6_250, 0, 1).with(SEED, ParameterValue::Hex(seed)), &crate::worlds::types()).expect("the world started");
-    let grass_at_start = cells_of_grass(&world);
+    let (mut world, probe) = probed_world(&plain_start(1, 6_250, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let grass_at_start = cells_of_grass(&mut world, &probe);
     let mut grass_before = grass_at_start;
     for _ in 0..1000 {
         let tick_counts = tick_grass(&mut world).rules;
-        let grass_now = cells_of_grass(&world);
+        // Counted in a tick of the probe alone, the grass's rule not run in it.
+        let grass_now = cells_of_grass(&mut world, &probe);
         assert!(grass_now + tick_counts[DECAYS_COUNT] >= grass_before && grass_now + tick_counts[DECAYS_COUNT] <= grass_before + tick_counts[SPREADS_COUNT], "grown by what spread, less what decayed");
         grass_before = grass_now;
     }

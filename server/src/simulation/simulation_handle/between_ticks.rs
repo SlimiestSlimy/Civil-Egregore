@@ -23,6 +23,7 @@ impl SimulationHandle {
     /// Puts `header`'s entity on the world, whole: what came of it --
     /// lost, if its superchunk is not hot. Its cells on any plane are
     /// whoever puts it's to write.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn add_entity(&mut self, header: Header, attributes: &[AttributeBlock]) -> InstructionsApplied {
         self.entity_store.queue_add(header, attributes);
         self.entity_store.apply()
@@ -30,6 +31,7 @@ impl SimulationHandle {
 
     /// Removes `header`'s entity from the world. Its cells on any plane
     /// are whoever removes it's to clear.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn remove_entity(&mut self, header: &Header) -> InstructionsApplied {
         self.entity_store.queue_remove(header.stood_cell);
         self.entity_store.apply()
@@ -37,6 +39,7 @@ impl SimulationHandle {
 
     /// Applies `writes` to the cells of `layer_type`: what came of them
     /// -- missed, where the cells are not hot.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn write_cells(&mut self, layer_type: LayerType, writes: impl IntoIterator<Item = Write>) -> WritesApplied {
         writes.into_iter().for_each(|write| self.bitmap_arena.queue_write(layer_type, write));
         self.bitmap_arena.apply()

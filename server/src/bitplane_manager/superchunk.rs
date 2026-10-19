@@ -4,7 +4,7 @@
 use super::{COUNT_TILES_IN_CHUNK, contains};
 use super::superchunk_layer::{SuperchunkLayer};
 use super::writes::{Write, WritesApplied, apply_in};
-use utilities::bitmap::{BITS_PER_WORD, CellWords};
+use utilities::bitmap::CellWords;
 use crate::chunk_storage::LayerType;
 use utilities::coordinates::{CellIndex, SuperchunkIndex};
 
@@ -22,12 +22,8 @@ impl Bucket<'_> {
         self.count
     }
 
-    /// Whether the cell at `place` in the chunk is set.
-    pub fn get(&self, place: usize) -> bool {
-        self.cells()[place / BITS_PER_WORD] >> (place % BITS_PER_WORD) & 1 == 1
-    }
-
     /// Every cell, in Morton order, 64 a word: of a layer a bit a cell.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn cells(&self) -> &CellWords {
         self.words.try_into().expect("a bucket of a bit a cell is a bitmap's words")
     }

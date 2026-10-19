@@ -8,21 +8,17 @@
 mod test_seed;
 #[path = "../shared/worlds.rs"]
 mod worlds;
-// Hot arenas of stone and walkers on them: actions' tests' own, shared.
-#[path = "../shared/arenas.rs"]
-mod arenas;
+// The tests' rule, setting up and reading a world in its ticks.
+#[path = "../shared/probe.rs"]
+mod probe;
 
 mod collision;
 mod commands;
 mod double_writes;
-mod flock_over_borders;
 mod grass;
-mod halos;
 mod host;
-mod paging;
 mod client_connection;
 mod sheep;
 mod trees;
-mod walking;
-mod world;
+mod walls;
 mod world_hash;

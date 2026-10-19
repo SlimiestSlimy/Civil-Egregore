@@ -17,6 +17,7 @@ const SEARCH_TILES: usize = 16;
 /// The bits of a place below its search tile's.
 const PLACE_IN_SEARCH_TILE_BITS: u32 = u16::BITS - SEARCH_TILES.trailing_zeros();
 /// Cells in an aligned 8x8 tile, which is a run of places.
+#[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
 const WORD_TILE_CELLS: u16 = 64;
 
 /// The search tile `place` is in.
@@ -133,6 +134,7 @@ impl Bucket {
     /// The places of the entities standing on the aligned 8x8 tile whose
     /// first cell is at `first_place`. An aligned tile is a run of cells in
     /// Morton order, so these are a run of `places`.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub(crate) fn in_word_tile(&self, first_place: u16) -> &[u16] {
         let start_index = self.index_of(first_place).0;
         // A word tile lies within one search tile.

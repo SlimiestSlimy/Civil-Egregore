@@ -25,6 +25,7 @@ pub use reader::aligned_tiles::{SmallTiles, SMALL_TILE_CELLS, SMALL_TILE_SIDE};
 pub use reader::{CellReader, Window};
 pub use superchunk::{LayerView, Superchunk};
 pub use wide_plane::{Bits16, Bits2, Bits32, Bits4, Bits8, WidePlane, Width};
+#[cfg_attr(not(test), allow(unused_imports))] // only the crate's tests ask it yet
 pub use writes::{WritesApplied, WriteShape, Write, WriteOp};
 
 use utilities::bitmap::{BITS_PER_WORD, WORDS};

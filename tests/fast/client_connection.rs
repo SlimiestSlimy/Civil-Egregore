@@ -5,7 +5,7 @@
 //! (`protocol::pipe::SERVER_PORT`): the tests here take turns, and fail
 //! if another server -- a game's -- is running.
 
-use crate::worlds::base;
+use crate::worlds::game_base;
 use protocol::pipe::frame::{FrameAsk, Viewport};
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use std::io::{BufRead, BufReader};
@@ -30,7 +30,7 @@ fn server_started(arguments: &[&str]) -> (Child, String) {
 /// A frame ask of every superchunk, the grass plane asked for and counted.
 fn whole_world_ask() -> ClientMessage {
     let whole_world = Viewport { top_left_superchunk_cartesian: (0, 0), bottom_right_superchunk_cartesian: (u32::MAX, u32::MAX) };
-    ClientMessage::AskFrame(FrameAsk { viewport: Some(whole_world), pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: 4, seen_near: None, planes: vec![base().grass], counted: vec![base().grass] })
+    ClientMessage::AskFrame(FrameAsk { viewport: Some(whole_world), pixel_side_log2: 0, superchunks_skipped: 0, most_superchunks: 4, seen_near: None, planes: vec![game_base().grass], counted: vec![game_base().grass] })
 }
 
 /// A server started as a window starts it runs no world until its
@@ -65,8 +65,8 @@ fn a_world_made_by_a_client_is_answered_with_its_frames() {
         };
         frames_seen += 1;
         if frame.seed == seed && frame.hot.len() == 4 {
-            assert!(frame.counts.len() == 1 && frame.counts[0].0 == base().grass, "the layer counted, and no other");
-            assert!(frame.cells.iter().all(|cells| cells.planes.iter().all(|(layer_type, _)| *layer_type == base().grass)), "the plane asked for, and no other");
+            assert!(frame.counts.len() == 1 && frame.counts[0].0 == game_base().grass, "the layer counted, and no other");
+            assert!(frame.cells.iter().all(|cells| cells.planes.iter().all(|(layer_type, _)| *layer_type == game_base().grass)), "the plane asked for, and no other");
             assert_eq!(types_seen, 1, "the world's types sent once");
             break;
         }
@@ -100,7 +100,7 @@ fn a_server_tells_each_client_joining_its_world_the_world_s_types_first() {
         let Some(ServerMessage::Frame(frame)) = receive(&mut from_server).expect("read") else { panic!("client {client}: a frame answers a frame asked") };
         assert_eq!(frame.seed, seed, "client {client}: the world the flags said");
         // A call of what no client may call -- a plane's ID -- refused, and the asks after it answered in order.
-        send(&mut ClientMessage::Call(base().grass.type_id(), vec![1, 2]), &mut to_server).expect("sent");
+        send(&mut ClientMessage::Call(game_base().grass.type_id(), vec![1, 2]), &mut to_server).expect("sent");
         send(&mut ClientMessage::ListWorlds, &mut to_server).expect("sent");
         let mut answers = std::iter::from_fn(|| loop {
             match receive(&mut from_server).expect("read") {

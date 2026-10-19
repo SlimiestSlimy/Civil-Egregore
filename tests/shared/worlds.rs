@@ -1,17 +1,15 @@
 //! Worlds as the tiers' tests make and read them: a folder beside no
 //! `main.rs`, so no test program of its own -- a module of each tier
-//! that uses it (`#[path = "../shared/worlds.rs"]`).
-
-// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
-// and the world's handles to them -- until the world has reads of its
-// own and this is rewritten against them (AI.txt, LATER).
+//! that uses it (`#[path = "../shared/worlds.rs"]`). A world is set up
+//! and read inside its ticks alone, by the tests' probe
+//! (`../shared/probe.rs`), through the public APIs.
 
 // A tier uses what it needs of it.
 #![allow(dead_code)]
 
-use server::internals_for_root_tests::SuperchunkImage;
-use utilities::coordinates::SuperchunkIndex;
-use server::internals_for_root_tests::{set_attribute, Attribute, AttributeBlock, EntityRef, Header};
+use crate::probe::{entities_of_the_turn, of_the_turn, put_entity, Probe};
+use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
+use server::simulation::simulation_api::{cell_reads_and_writes, entity_reads_and_writes, tick_and_random_stream, Attribute, AttributeBlock, EntityRef, Header, LayerType, SimulationTickState};
 use basegame::worldgen::WorldGeneration;
 use basegame::base_types::BaseTypes;
 use protocol::type_registry::{in_bundle, FrozenTypeRegistry, RegisteredType, TypeRegistry};
@@ -35,6 +33,18 @@ fn registered_types() -> &'static (Arc<FrozenTypeRegistry>, BaseTypes) {
     })
 }
 
+/// The IDs of the base game's types in a world of the probe's types
+/// ([`Probe::types`]): the probe registered first, then the base game,
+/// as in every such world.
+pub fn base() -> BaseTypes {
+    static PROBED: OnceLock<BaseTypes> = OnceLock::new();
+    *PROBED.get_or_init(|| {
+        let mut type_registry = TypeRegistry::for_new_world();
+        Probe::default().register(&mut type_registry).expect("the probe");
+        basegame::default_types::register(&mut type_registry).expect("the base game's types registered")
+    })
+}
+
 /// The type of `frozen_type_registry` named `type_name`, if any: a type
 /// a test registered found as anything would find it, by its name.
 pub fn named<'frozen>(frozen_type_registry: &'frozen FrozenTypeRegistry, type_name: &str) -> Option<&'frozen RegisteredType> {
@@ -46,8 +56,9 @@ pub fn types() -> Arc<FrozenTypeRegistry> {
     registered_types().0.clone()
 }
 
-/// The IDs of the base game's types in a new world.
-pub fn base() -> BaseTypes {
+/// The IDs of the base game's types in a new world of its types alone,
+/// as the game's own server registers them.
+pub fn game_base() -> BaseTypes {
     registered_types().1
 }
 
@@ -65,10 +76,8 @@ pub fn test_type_named<'frozen>(frozen_type_registry: &'frozen FrozenTypeRegistr
 /// through ticks, saves and frames, the base game having none.
 pub const TEST_TILES: &str = "test tiles";
 
-/// The base game's types and [`TEST_TILES`]: a game of the tests' own,
-/// as initialization hands one the server.
-pub fn types_with_test_tiles(type_registry: &mut TypeRegistry) -> Result<(), String> {
-    basegame::default_types::register_types(type_registry)?;
+/// Registers [`TEST_TILES`] in the tests' bundle.
+pub fn test_tiles_registered(type_registry: &mut TypeRegistry) -> Result<(), String> {
     let mut tests = type_registry.open_bundle(TESTS_BUNDLE).map_err(|refusal| format!("{TESTS_BUNDLE}: {refusal:?}"))?;
     tests.register(WidePlane::<Bits4>::registration_of_tiles(TEST_TILES, 3)).map(drop).map_err(|refusal| format!("{TEST_TILES}: {refusal:?}"))
 }
@@ -87,12 +96,16 @@ pub fn types_with_test_call(type_registry: &mut TypeRegistry) -> Result<(), Stri
     tests.register(protocol::type_registry::Registration::client_call(TEST_CALL, &in_bundle(BASE_BUNDLE, "world generation")).with_library(Arc::new(echo))).map(drop).map_err(|refusal| format!("{TEST_CALL}: {refusal:?}"))
 }
 
-/// The types of [`types_with_test_tiles`], frozen for a new world, and
-/// the plane of tiles among them.
-pub fn with_test_tiles() -> (Arc<FrozenTypeRegistry>, WidePlane<Bits4>) {
-    let frozen_type_registry = protocol::world_types::of_a_new_world(types_with_test_tiles).expect("the tests' types");
-    let test_tiles = test_type_named(&frozen_type_registry, TEST_TILES).and_then(WidePlane::registered).expect("four bits a tile");
-    (Arc::new(frozen_type_registry), test_tiles)
+/// The probe's types, the base game's and [`TEST_TILES`]: a game of the
+/// tests' own, as initialization hands one the server.
+pub fn types_with_test_tiles(type_registry: &mut TypeRegistry) -> Result<(), String> {
+    probe_and_base_game(type_registry)?;
+    test_tiles_registered(type_registry)
+}
+
+/// The plane of [`TEST_TILES`] of `world`.
+pub fn test_tiles(world: &World) -> WidePlane<Bits4> {
+    test_type_named(world.frozen_type_registry(), TEST_TILES).and_then(WidePlane::registered).expect("four bits a tile")
 }
 
 /// The ID of the base game's type named `type_name` in its bundle, in a
@@ -143,20 +156,6 @@ pub fn folder(test_name: &str) -> PathBuf {
     folder
 }
 
-/// Every hot cell of grass and dirt, every entity with its attributes,
-/// the tick, every random stream, every cold superchunk's image and
-/// kept state, and the superchunks warming and cooling with when each is due: what
-/// two worlds the same hold the same.
-pub type WorldContents = (Vec<u64>, Vec<(Header, Vec<AttributeBlock>)>, u64, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, SuperchunkImage, Vec<u64>)>, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, u64)>);
-
-/// [`WorldContents`] `world` holds.
-pub fn world_contents(world: &World) -> WorldContents {
-    let cells = world.world_info().layers.clone().into_iter().flat_map(|layer| world.bitmap_arena().buckets_of(layer)).flat_map(|(_, bucket)| bucket.words().to_vec()).collect();
-    let entities_with_attributes = world.entity_store().iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
-    let cold = world.cold().iter().map(|(&superchunk, words)| (superchunk, SuperchunkImage::clone(&world.chunk_storage().shared_image(superchunk).expect("a cold superchunk's image")), words.clone())).collect();
-    (cells, entities_with_attributes, world.entity_store().current_tick(), world.world_simulation().random_states().collect(), cold, world.warming().collect(), world.cooling().collect())
-}
-
 /// How a plain test world is started -- a rule tried alone, the
 /// terrain taking no part: a plain forced hot of at least
 /// `superchunks` superchunks -- a square of them -- with grass on
@@ -174,38 +173,37 @@ pub fn flocked(sheep: usize) -> Vec<(String, u64)> {
     WorldGeneration { sheep_per_superchunk: sheep as u64, ..WorldGeneration::DEFAULT }.worldgen_parameters()
 }
 
-/// A world started as `parameters` say -- given no side, with no end -- and one flock of
-/// `sheep` at its origin, the flock's halo hot: what a halo test follows.
-/// Its generation gives no sheep -- a flock on every superchunk
-/// generated would grow a world with no end for good -- so the one
-/// flock is put between ticks ([`put_flock`]).
-pub fn one_flock_world(parameters: CleanServerParameters, sheep: usize) -> World {
-    one_flock_world_of(parameters, sheep, &types())
+/// A world started as `parameters` say, of the base game's types, the
+/// probe's and those `more` registers: the world, and its probe.
+pub fn probed_world(parameters: &CleanServerParameters, more: impl FnOnce(&mut TypeRegistry) -> Result<(), String>) -> (World, Probe) {
+    let probe = Probe::default();
+    let world = server::start_world(parameters, &probe.types(more)).expect("the world started");
+    (world, probe)
 }
 
-/// [`one_flock_world`], of the types `frozen_type_registry`.
-pub fn one_flock_world_of(parameters: CleanServerParameters, sheep: usize, frozen_type_registry: &Arc<FrozenTypeRegistry>) -> World {
-    let mut world = server::start_world(&parameters.with(WORLDGEN, worldgen(flocked(0))), frozen_type_registry).expect("the world started");
-    put_flock(&mut world, utilities::coordinates::WORLD_MIDDLE, sheep);
-    world.keep_hot(&server::halos_about([utilities::coordinates::WORLD_MIDDLE].into_iter()));
-    world
+/// Nothing more of the tests' own to register.
+pub fn nothing_more(_: &mut TypeRegistry) -> Result<(), String> {
+    Ok(())
 }
 
-/// The top left superchunk of `world`'s hot ones.
-pub fn first_superchunk(world: &World) -> SuperchunkIndex {
-    world.bitmap_arena().superchunk_indices().into_iter().min_by_key(|superchunk| (superchunk.cartesian().1, superchunk.cartesian().0)).expect("a hot superchunk")
+/// The superchunks of `world` hot, sorted, read in a tick of the probe alone.
+pub fn hot_superchunks(world: &mut World, probe: &Probe) -> Vec<SuperchunkIndex> {
+    probe.alone(world, |tick_state| vec![tick_and_random_stream::superchunk(tick_state)])
 }
 
-/// The cells of `layer_type` on every hot chunk of `world`, as words: what
-/// two of, a tick apart, tell what the tick did to the layer
-/// ([`cells_set_and_cleared`]).
-pub fn layer_words(world: &World, layer_type: protocol::type_registry::LayerType) -> Vec<(utilities::coordinates::ChunkIndex, Vec<u64>)> {
-    world.bitmap_arena().buckets_of(layer_type).map(|(chunk, bucket)| (chunk, bucket.cells().to_vec())).collect()
+/// The top left superchunk of `world`'s hot ones, read in a tick of
+/// the probe alone.
+pub fn first_superchunk(world: &mut World, probe: &Probe) -> SuperchunkIndex {
+    hot_superchunks(world, probe).into_iter().min_by_key(|superchunk| (superchunk.cartesian().1, superchunk.cartesian().0)).expect("a hot superchunk")
 }
+
+/// The cells of a layer on each of some chunks, as words: a chunk's cells
+/// in Morton order ([`crate::probe::words_of_the_turn`]).
+pub type ChunkWords = Vec<(utilities::coordinates::ChunkIndex, Vec<u64>)>;
 
 /// The cells set and the cells cleared from `words_before` to `words_after`,
-/// two [`layer_words`] of the same hot chunks.
-pub fn cells_set_and_cleared(words_before: &[(utilities::coordinates::ChunkIndex, Vec<u64>)], words_after: &[(utilities::coordinates::ChunkIndex, Vec<u64>)]) -> (u64, u64) {
+/// two readings of the words of the same hot chunks ([`crate::probe::words_of_the_turn`]).
+pub fn cells_set_and_cleared(words_before: &ChunkWords, words_after: &ChunkWords) -> (u64, u64) {
     assert_eq!(words_before.len(), words_after.len(), "the same chunks hot");
     let word_pairs = words_before.iter().zip(words_after).flat_map(|((chunk, before), (same_chunk, after))| {
         assert_eq!(chunk, same_chunk);
@@ -214,61 +212,49 @@ pub fn cells_set_and_cleared(words_before: &[(utilities::coordinates::ChunkIndex
     word_pairs.fold((0, 0), |(set, cleared), (&word_before, &word_after)| (set + u64::from((word_after & !word_before).count_ones()), cleared + u64::from((word_before & !word_after).count_ones())))
 }
 
-/// Cells of grass over `world`'s hot superchunks.
-pub fn cells_of_grass(world: &World) -> u64 {
-    world.bitmap_arena().superchunk_indices().into_iter().map(|superchunk| world.bitmap_arena().superchunk_count(base().grass, superchunk) as u64).sum()
+/// The cells of the rectangle `width` by `height` whose top left is
+/// `top_left_cartesian` that are of the turn's superchunk.
+pub fn rectangle_in_the_turn(tick_state: &SimulationTickState, top_left_cartesian: CellCartesian, width: u32, height: u32) -> Vec<CellIndex> {
+    (0..height).flat_map(|y| (0..width).map(move |x| CellCartesian { x: top_left_cartesian.x + x, y: top_left_cartesian.y + y }.into())).filter(|&cell| of_the_turn(tick_state, cell)).collect()
 }
 
-/// Turns to grass the rectangle of cells `width` by `height` whose top
-/// left is `top_left_cartesian`, all of it on `world`'s hot superchunks.
-pub fn plant_grass(world: &mut World, top_left_cartesian: utilities::coordinates::CellCartesian, width: u8, height: u8) {
-    use server::internals_for_root_tests::{WriteShape, Write, WriteOp};
-    let write_shape = if (width, height) == (1, 1) { WriteShape::Cell } else { WriteShape::RectangleOfCells { width, height } };
-    let planted_writes = world.write_cells(base().grass, [Write { anchor_cell: top_left_cartesian.into(), write_op: WriteOp::SetCell, write_shape }]);
-    assert_eq!(planted_writes.missed, 0, "grass planted off the hot superchunks");
-}
-
-/// Puts an entity on `world`, whole, its cell held in the collision
-/// plane -- as an entity that collides holds it: there before the next
-/// tick.
-pub fn add_entity(world: &mut World, header: Header, attributes: &[AttributeBlock]) -> server::internals_for_root_tests::InstructionsApplied {
-    let applied = world.add_entity(header, attributes);
-    if applied.added > 0 {
-        world.write_cells(base().collision, [server::internals_for_root_tests::Write::cell(header.stood_cell, server::internals_for_root_tests::WriteOp::SetCell)]);
-    }
-    applied
-}
-
-/// Puts `count` sheep on cells of `superchunk` drawn from the seed,
-/// each free of the collision plane, between ticks: one flock on a
-/// world whose generation gives none ([`flocked`] 0) -- a halo test's
-/// one flock wandering a world with no end, which a flock on every
-/// superchunk generated would grow for good.
-pub fn put_flock(world: &mut World, superchunk: SuperchunkIndex, count: usize) {
-    use utilities::coordinates::{CellCartesian, SUPERCHUNK_SIDE_CELLS};
-    use basegame::entity_rules::sheep::{STEP, TIME_BETWEEN_MEALS};
-    let mut random_stream = utilities::rng::RandomSource::for_stream(!world.world_info().seed, superchunk.0);
-    let (corner, side_in_cells, tick_now) = (superchunk.top_left().cartesian(), SUPERCHUNK_SIDE_CELLS as u64, world.entity_store().current_tick());
-    let mut put = 0;
-    while put < count {
-        let drawn_cell = CellCartesian { x: corner.x + random_stream.draw_below(side_in_cells) as u32, y: corner.y + random_stream.draw_below(side_in_cells) as u32 }.into();
-        if world.bitmap_arena().layer_holds_cell(base().collision, drawn_cell) == Ok(true) {
-            continue;
+/// Sets `layer_type` on every cell of the rectangle `width` by `height`
+/// whose top left is `top_left_cartesian` that does not hold it, in a
+/// tick of the probe alone: grass planted, say.
+pub fn set_rectangle(world: &mut World, probe: &Probe, layer_type: LayerType, top_left_cartesian: CellCartesian, width: u32, height: u32) {
+    probe.alone(world, move |tick_state| {
+        for cell in rectangle_in_the_turn(tick_state, top_left_cartesian, width, height) {
+            if cell_reads_and_writes::layer_lacks(tick_state, layer_type, cell) {
+                cell_reads_and_writes::set(tick_state, layer_type, cell);
+            }
         }
-        let header = Header { entity_type: base().sheep, stood_cell: drawn_cell, wake: STEP.part_drawn(&mut random_stream).tick_after(tick_now) };
-        let sheep_state = basegame::base_types::SheepState { hungry_at: TIME_BETWEEN_MEALS.part_drawn(&mut random_stream).tick_after(tick_now), ..basegame::base_types::SheepState::default() };
-        put += add_entity(world, header, &server::internals_for_root_tests::WholeAttribute::holding_value(base().sheep_state, sheep_state)).added;
-    }
+        Vec::<()>::new()
+    });
 }
 
-/// Takes `header`'s entity off `world`, the cell it held in the collision
-/// plane let go.
-pub fn remove_entity(world: &mut World, header: &Header) -> server::internals_for_root_tests::InstructionsApplied {
-    let remove_applied = world.remove_entity(header);
-    if remove_applied.entities_removed > 0 {
-        world.write_cells(base().collision, [server::internals_for_root_tests::Write::cell(header.stood_cell, server::internals_for_root_tests::WriteOp::ClearCell)]);
-    }
-    remove_applied
+/// Puts each entity of `entities` -- its header and its attributes -- in a
+/// tick of the probe alone, as an entity that collides comes: woken
+/// no sooner than the tick after.
+pub fn put_entities(world: &mut World, probe: &Probe, entities: Vec<(Header, Vec<AttributeBlock>)>) {
+    probe.alone(world, move |tick_state| {
+        let turn_superchunk = tick_and_random_stream::superchunk(tick_state);
+        for (header, attributes) in entities.iter().filter(|(header, _)| header.stood_cell.superchunk() == turn_superchunk) {
+            put_entity(tick_state, *header, attributes);
+        }
+        Vec::<()>::new()
+    });
+}
+
+/// What `look` reads of every entity of `world`, in a tick of the probe
+/// alone, in Morton order by cell.
+pub fn every_entity<T: Send + 'static>(world: &mut World, probe: &Probe, look: impl Fn(&EntityRef) -> T + Send + Sync + 'static) -> Vec<T> {
+    probe.alone(world, move |tick_state| entities_of_the_turn(tick_state).iter().map(&look).collect())
+}
+
+/// Cells of grass over `world`'s hot superchunks, read in a tick of the probe alone.
+pub fn cells_of_grass(world: &mut World, probe: &Probe) -> u64 {
+    let grass = base().grass;
+    probe.alone(world, move |tick_state| vec![crate::probe::count_of_the_turn(tick_state, grass)]).into_iter().sum()
 }
 
 /// The name of a test's own attribute: a number a sheep is told from the
@@ -276,35 +262,30 @@ pub fn remove_entity(world: &mut World, header: &Header) -> server::internals_fo
 /// cell names it for a tick alone.
 pub const SHEEP_TAG: &str = "sheep tag";
 
-/// The base game's types and [`SHEEP_TAG`]: a game of the tests' own,
-/// as initialization hands one the server.
-pub fn types_with_sheep_tag(type_registry: &mut TypeRegistry) -> Result<(), String> {
-    basegame::default_types::register_types(type_registry)?;
+/// Registers [`SHEEP_TAG`] in the tests' bundle: with the probe's types,
+/// a world whose sheep are tagged ([`tag_sheep`]).
+pub fn sheep_tag_registered(type_registry: &mut TypeRegistry) -> Result<(), String> {
     let mut tests = type_registry.open_bundle(TESTS_BUNDLE).map_err(|refusal| format!("{TESTS_BUNDLE}: {refusal:?}"))?;
     tests.register(Attribute::<u64>::registration(SHEEP_TAG)).map(drop).map_err(|refusal| format!("{SHEEP_TAG}: {refusal:?}"))
 }
 
-/// The types of [`types_with_sheep_tag`], frozen for a new world: those
-/// of a world whose sheep are tagged ([`tag_sheep`]).
-pub fn with_sheep_tag() -> Arc<FrozenTypeRegistry> {
-    Arc::new(protocol::world_types::of_a_new_world(types_with_sheep_tag).expect("the tests' types"))
-}
 
 /// The [`SHEEP_TAG`] attribute of `world`, found by its name among the world's types.
 pub fn sheep_tag(world: &World) -> Attribute<u64> {
     test_type_named(world.frozen_type_registry(), SHEEP_TAG).and_then(Attribute::registered).expect("a world of the types with the sheep tag")
 }
 
-/// Gives every sheep of `world` a [`SHEEP_TAG`], each its own: taken off the
-/// world and put back with it. A lamb born after has none.
-pub fn tag_sheep(world: &mut World) {
+/// Gives every sheep of `world` a [`SHEEP_TAG`], each its own -- the
+/// number of the cell it stands on -- in a tick of the probe alone. A
+/// lamb born after has none.
+pub fn tag_sheep(world: &mut World, probe: &Probe) {
     let sheep_tag = sheep_tag(world);
-    let every_sheep: Vec<(Header, Vec<AttributeBlock>)> = world.entity_store().iter().map(|one_sheep| (one_sheep.header, one_sheep.attributes.to_vec())).collect();
-    for (tag_number, (header, mut attributes)) in every_sheep.into_iter().enumerate() {
-        set_attribute(&mut attributes, sheep_tag, tag_number as u64);
-        assert_eq!(world.remove_entity(&header).entities_removed, 1);
-        assert_eq!(world.add_entity(header, &attributes).added, 1);
-    }
+    probe.alone(world, move |tick_state| {
+        for tagged_sheep in entities_of_the_turn(tick_state) {
+            entity_reads_and_writes::set_attribute_of(tick_state, &tagged_sheep.header, sheep_tag, None, tagged_sheep.header.stood_cell.0);
+        }
+        Vec::<()>::new()
+    });
 }
 
 /// The tag of `tagged_sheep`, its world's [`sheep_tag`], if it was given one.
@@ -312,22 +293,80 @@ pub fn tag_of(sheep_tag: Attribute<u64>, tagged_sheep: &EntityRef) -> Option<u64
     tagged_sheep.attribute(sheep_tag)
 }
 
-/// One tick of the rule whose type's ID is `rule_id` alone over `world`'s hot
-/// superchunks, its halos left where they are: the tick's report, the
-/// rule's counts alone in it.
-pub fn tick_rule(world: &mut World, rule_id: u64) -> server::internals_for_root_tests::TickReport<server::simulation::simulation_api::RuleCounts> {
-    let rule = world.rule_place(rule_id);
-    let report = world.tick_only(server::ChosenRules::from_rules(&[rule]), false);
-    server::internals_for_root_tests::TickReport { writes_applied: report.writes_applied, instructions_applied: report.instructions_applied, instructions_compared: report.instructions_compared, counted_when_applied: report.counted_when_applied, rules: report.rules.counts_of(rule), computing_time: report.computing_time, applying_time: report.applying_time, acts_over_a_border: report.acts_over_a_border }
+/// Every cell of the superchunk `superchunk`, row by row.
+pub fn cells_of(superchunk: SuperchunkIndex) -> impl Iterator<Item = CellIndex> {
+    let corner_cartesian = superchunk.top_left().cartesian();
+    (0..SUPERCHUNK_SIDE_CELLS).flat_map(move |y| (0..SUPERCHUNK_SIDE_CELLS).map(move |x| CellCartesian { x: corner_cartesian.x + x, y: corner_cartesian.y + y }.into()))
 }
 
-/// One tick of the sheep's rule alone over `world`'s hot superchunks,
-/// its halos left where they are.
-pub fn tick_sheep(world: &mut World) -> server::internals_for_root_tests::TickReport<server::simulation::simulation_api::RuleCounts> {
-    tick_rule(world, type_id_named(basegame::base_types::SHEEP_RULE))
+/// One tick of the base game's rule named `rule_name` alone over
+/// `world`'s hot superchunks, its halos left where they are: the tick's
+/// report, the rule's counts alone in it.
+pub fn tick_rule(world: &mut World, rule_name: &str) -> server::simulation::simulation_api::TickReport<server::simulation::simulation_api::RuleCounts> {
+    let rule = crate::probe::rule_place(world, rule_name);
+    crate::probe::report_of(world.tick_only(server::ChosenRules::from_rules(&[rule]), false), rule)
 }
 
-/// One tick of the grass's rule alone over `world`'s hot superchunks.
-pub fn tick_grass(world: &mut World) -> server::internals_for_root_tests::TickReport<server::simulation::simulation_api::RuleCounts> {
-    tick_rule(world, type_id_named(basegame::base_types::GRASS_RULE))
+/// One tick of the sheep's rule alone.
+pub fn tick_sheep(world: &mut World) -> server::simulation::simulation_api::TickReport<server::simulation::simulation_api::RuleCounts> {
+    tick_rule(world, basegame::base_types::SHEEP_RULE)
+}
+
+/// One tick of the grass's rule alone.
+pub fn tick_grass(world: &mut World) -> server::simulation::simulation_api::TickReport<server::simulation::simulation_api::RuleCounts> {
+    tick_rule(world, basegame::base_types::GRASS_RULE)
+}
+
+/// The tick `world` is at, read in a tick of the probe alone: the tick
+/// after it is the one it reads at, plus one.
+pub fn tick_read_at(world: &mut World, probe: &Probe) -> u64 {
+    probe.alone(world, |tick_state| vec![tick_and_random_stream::current_tick(tick_state)])[0]
+}
+
+/// The ticks after a flock is put ([`one_flock_world`]) before any of
+/// it wakes: room for a test's reading and setting up in ticks of the
+/// probe alone, which no sheep's rule runs in -- a sheep whose wake
+/// passes so sleeps for good.
+pub const FLOCK_SETTLES: u64 = 8;
+
+/// A world started as `parameters` say -- given no side, with no end --
+/// of the probe's types and those `more` registers, its generation
+/// giving no sheep, and one flock of `sheep` put at its middle by the
+/// probe, the flock's halo kept hot: what a halo test follows, and a
+/// world run long. A flock on every superchunk generated would grow a
+/// world with no end for good. No sheep wakes before [`FLOCK_SETTLES`]
+/// ticks on.
+pub fn one_flock_world(parameters: CleanServerParameters, sheep: usize, more: impl FnOnce(&mut TypeRegistry) -> Result<(), String>) -> (World, Probe) {
+    use basegame::entity_rules::sheep::{STEP, TIME_BETWEEN_MEALS};
+    let (mut world, probe) = probed_world(&parameters.with(WORLDGEN, worldgen(flocked(0))), more);
+    let middle = utilities::coordinates::WORLD_MIDDLE;
+    world.keep_hot(&server::halos_about([middle].into_iter()));
+    // Cells of the middle drawn from the seed, each free of the collision plane as the tick found it and drawn once.
+    let (report, put) = probe.tick(&mut world, &[], move |tick_state| {
+        if tick_and_random_stream::superchunk(tick_state) != middle {
+            return Vec::new();
+        }
+        let (corner, tick_now) = (middle.top_left().cartesian(), tick_and_random_stream::current_tick(tick_state));
+        let mut random_stream = utilities::rng::RandomSource::for_stream(!tick_and_random_stream::random_stream(tick_state).next_draw(), middle.0);
+        let mut drawn_cells = std::collections::HashSet::new();
+        while drawn_cells.len() < sheep {
+            let drawn_cell: CellIndex = CellCartesian { x: corner.x + random_stream.draw_below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32, y: corner.y + random_stream.draw_below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32 }.into();
+            if cell_reads_and_writes::layer_holds(tick_state, base().collision, drawn_cell) || !drawn_cells.insert(drawn_cell) {
+                continue;
+            }
+            let header = Header { entity_type: base().sheep, stood_cell: drawn_cell, wake: STEP.part_drawn(&mut random_stream).tick_after(tick_now + FLOCK_SETTLES) };
+            let sheep_state = basegame::base_types::SheepState { hungry_at: TIME_BETWEEN_MEALS.part_drawn(&mut random_stream).tick_after(tick_now), ..basegame::base_types::SheepState::default() };
+            put_entity(tick_state, header, &server::simulation::simulation_api::WholeAttribute::holding_value(base().sheep_state, sheep_state));
+        }
+        vec![sheep]
+    });
+    assert_eq!((put, report.instructions_applied.added, report.instructions_applied.adds_refused), (vec![sheep], sheep, 0), "the flock put at the middle, hot");
+    (world, probe)
+}
+
+/// The probe's types and the base game's, as a world of the probe's
+/// types is opened again: a probe of its own, handed nothing.
+pub fn probe_and_base_game(type_registry: &mut TypeRegistry) -> Result<(), String> {
+    Probe::default().register(type_registry)?;
+    basegame::default_types::register_types(type_registry)
 }

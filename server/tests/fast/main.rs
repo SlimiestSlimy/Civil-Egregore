@@ -7,6 +7,16 @@
 
 mod around;
 
+mod halos;
+
+mod paging;
+
+mod world;
+
+mod flock_over_borders;
+
+mod walking;
+
 mod area;
 
 mod mask;
