@@ -214,7 +214,7 @@ fn a_wide_plane_holds_numbers<W: Width>(wide_plane: WidePlane<W>) {
     assert_eq!(bitmap_arena.write_back(WORLD_MIDDLE, &mut cold_storage, &mut layer_codec), 1);
     cold_storage.flush_all(&mut flushed_superchunks);
     bitmap_arena.flushed_from_ring(&flushed_superchunks);
-    assert!(layer_type.each_bitplane().any(|bit_layer_type| cold_storage.layer(chunk, bit_layer_type).is_some()) && cold_storage.layer(chunk, layer_type).is_none(), "cold as its bits' bitmaps");
+    assert!(cold_storage.layer(chunk, layer_type).is_some(), "cold under its one ID, its bits' bitmaps in order");
     assert!(bitmap_arena.evict(bucket_key));
     assert_eq!(bitmap_arena.value(wide_plane, emptied_cell), Err(NotHot(bucket_key)));
     assert_eq!(bitmap_arena.make_hot_layers(chunk, &[layer_type], &cold_storage, &mut layer_codec), 1);

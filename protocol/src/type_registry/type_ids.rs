@@ -60,19 +60,6 @@ const fn is_of(type_id_value: u64, type_kind: TypeKind) -> bool {
     type_id_value >> KIND_SHIFT == type_kind as u64
 }
 
-/// The numbers an ID of any kind takes, a plane's of `plane_shape` --
-/// its bits a cell and tiles' scale: a plane a bit a cell its one, any
-/// other plane its own and one a bit after it, its cold planes'
-/// ([`LayerType::bitplane_of`]); anything else's one.
-pub(crate) fn numbers_taken(type_id_value: u64, plane_shape: Option<(u32, u32)>) -> std::ops::Range<u64> {
-    let first_number = number_of(type_id_value);
-    let numbers = match plane_shape {
-        Some((1, 0)) | None => 1,
-        Some((width_bits, _)) => 1 + u64::from(width_bits),
-    };
-    first_number..first_number + numbers
-}
-
 /// What a layer represents: an ID the registry gives a meaning
 /// ([`super::TypeRegistry`]), and the plane's shape as it was
 /// registered -- 1 to 32 bits a cell, or a tile `2^tile_scale` cells a
@@ -107,12 +94,6 @@ impl LayerType {
         assert!(width_bits.is_power_of_two() && width_bits <= 32, "a plane is 1, 2, 4, 8, 16 or 32 bits a cell");
         assert!(tile_scale <= MOST_TILE_SCALE, "a plane's tiles are at most 8 cells a side");
         Self { type_id: type_id(TypeKind::Layer, first_number), width_bits: width_bits as u8, tile_scale: tile_scale as u8 }
-    }
-
-    /// The plane of the ID `type_id_value`, a bit a cell: what a cold
-    /// plane, kept by its ID alone, is.
-    pub const fn bitplane_of_id(type_id_value: u64) -> Self {
-        Self { type_id: type_id_value, width_bits: 1, tile_scale: 0 }
     }
 
     /// The plane of the ID `type_id_value`, of the shape said -- as it
@@ -153,31 +134,10 @@ impl LayerType {
         number_of(self.type_id)
     }
 
-    /// Whether it is a plane of cells a bit a cell: its own one
-    /// bitplane, its ID that bitplane's.
+    /// Whether it is a plane of cells a bit a cell: one bitmap a chunk,
+    /// hot and cold alike.
     pub const fn is_a_bitplane(self) -> bool {
         self.width_bits == 1 && self.tile_scale == 0
-    }
-
-    /// The number of its first bitplane: its own, if it is one; else
-    /// the one after its own, for no two IDs to be one.
-    const fn first_bitplane_number(self) -> u64 {
-        self.type_number() + if self.is_a_bitplane() { 0 } else { 1 }
-    }
-
-    /// The type of its plane `bit_index`, a bit a cell: what it is kept cold as.
-    pub const fn bitplane_of(self, bit_index: u32) -> Self {
-        Self::of_a_bit(self.first_bitplane_number() + bit_index as u64)
-    }
-
-    /// The types of its planes, the lowest bit's first.
-    pub fn each_bitplane(self) -> impl Iterator<Item = Self> {
-        (0..self.width_bits()).map(move |bit_index| self.bitplane_of(bit_index))
-    }
-
-    /// Whether `asked_bitplane`, a type of a bit a cell, is one of its planes.
-    pub const fn holds_bitplane(self, asked_bitplane: Self) -> bool {
-        asked_bitplane.is_a_bitplane() && asked_bitplane.type_number() >= self.first_bitplane_number() && asked_bitplane.type_number() < self.first_bitplane_number() + self.width_bits() as u64
     }
 }
 

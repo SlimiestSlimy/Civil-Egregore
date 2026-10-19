@@ -3,7 +3,6 @@
 
 use super::{COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS, contains, set_membership};
 use super::arena::{BitmapArena, Lingering};
-use utilities::bitmap::WORDS;
 use crate::chunk_storage::{BucketKey, ChunkStorage, LayerCodec, LayerType};
 use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 
@@ -61,24 +60,13 @@ impl BitmapArena {
     /// hot empty, and one already hot is left as it is: how many were made
     /// hot.
     pub fn make_hot_layers(&mut self, chunk: ChunkIndex, layer_types: &[LayerType], cold_storage: &ChunkStorage, layer_codec: &mut LayerCodec) -> usize {
-        let mut make_layer_hot = |bitmap_arena: &mut Self, layer_type: LayerType| match layer_type.width_bits() {
-            1 => bitmap_arena.make_hot(BucketKey { layer_type, chunk }, cold_storage.layer(chunk, layer_type), layer_codec),
-            // A wide layer: its planes decoded, a bit of every cell each.
-            bits_a_cell => {
-                // With no plane kept, no cell holds a number: no bucket.
-                let any_bit_kept = (0..bits_a_cell).any(|kept_bit| cold_storage.layer(chunk, layer_type.bitplane_of(kept_bit)).is_some());
-                let fill_bucket = any_bit_kept.then_some(|bucket: &mut [u64]| {
-                    bucket.fill(0);
-                    let mut one_bit_bitmap = [0; WORDS];
-                    for bit_of_cell in 0..bits_a_cell {
-                        if let Some(layer) = cold_storage.layer(chunk, layer_type.bitplane_of(bit_of_cell)) {
-                            layer_codec.decode_cells(layer, &mut one_bit_bitmap);
-                            crate::chunk_storage::wide::spread_into_wide(&one_bit_bitmap, bits_a_cell, bit_of_cell, bucket);
-                        }
-                    }
-                });
-                bitmap_arena.make_hot_with(BucketKey { layer_type, chunk }, fill_bucket)
+        let mut make_layer_hot = |bitmap_arena: &mut Self, layer_type: LayerType| {
+            if layer_type.is_a_bitplane() {
+                return bitmap_arena.make_hot(BucketKey { layer_type, chunk }, cold_storage.layer(chunk, layer_type), layer_codec);
             }
+            // A wide layer, or one of tiles: its bits decoded in order. With none kept, no cell holds a number: no bucket.
+            let fill_bucket = cold_storage.layer(chunk, layer_type).map(|layer| |bucket: &mut [u64]| crate::chunk_storage::wide::decode_bucket(layer_type, layer, layer_codec, bucket));
+            bitmap_arena.make_hot_with(BucketKey { layer_type, chunk }, fill_bucket)
         };
         layer_types.iter().filter(|&&layer_type| make_layer_hot(self, layer_type)).count()
     }

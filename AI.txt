@@ -311,21 +311,21 @@ NOW
   Price: 8 -> 16 bytes (bucket keys, wire, world file's layers):
   benchmark against the commit before -- NOT MEASURED, no way to
   measure yet (LATER).
-  PLANES DONE (the commit after 8015f09): an ID is kind byte + 56-bit
-  number; LayerType { type_id, width_bits, tile_scale }; types.csv
-  "type,id,bits a cell,tile scale" (a plane's shape checked on load,
-  SavedAsAnother); a plane not a plain bit plane takes its own number
-  and its bitplanes the ones after (IDs unique: a wide plane's ID was
-  its first bitplane's once the size byte went); cold storage, world
-  file, ring: bitplanes by ID; instructions name a plane by ID, the hot
-  superchunk's layer gives its shape (Superchunk::layer_type_of_id).
-  ATTRIBUTES DONE (the commit after 1ee824d; the user: "atributes go as
-  well, size is another parsmeter at registry time"): AttributeType
-  { type_id, block_count }, its ID kind 0 + number; a stored
-  attribute's first word is its header, AttributeType::header_word
-  (number << 4 | blocks - 1) -- the same bits the old ID was, so the
-  entity store's words and saves are unchanged; instructions carry the
-  header word; types.csv adds "blocks", checked on load.
+  DONE (1ee824d, 94e388d, and the commit after): an ID is kind byte +
+  56-bit number, ONE NUMBER A TYPE ("there is one type id for
+  everything, thats the whole point all along"). LayerType { type_id,
+  width_bits, tile_scale }; AttributeType { type_id, block_count }, a
+  stored attribute's first word its header (number << 4 | blocks - 1,
+  the old ID's bits). types.csv is name and ID alone: "world loading is
+  registration from a list on a file, theres not really a "separate
+  mechanism"". Cold: a wide plane under its one ID, its bits' bitmaps
+  in order, each after a length word ("storing in order is more than
+  plenty"); hot, a cell's n bits together, as always ("the whole point
+  of multi bitnplanes is to store them as a number of n bits
+  together"). Chunk storage keys a chunk's layers by bare type ID;
+  chunks by Morton index, as always. World file format 6: no layers
+  row (the registry's). Instructions name a plane by ID, the hot
+  superchunk's layer gives its shape.
 - WHAT IS LEFT, IN ORDER (the user, 2026-10-18, on my list of what is
   left: "1 go ahead, 2 not quite, we need client side gui rules or
   something like that first / 3 same, fold into 5 with 2 / 4 can be

@@ -61,7 +61,7 @@ pub fn one_cell((x, y): (u8, u8)) -> CellWords {
 pub fn storage_with(superchunk: SuperchunkIndex, place: usize, layers: &[(LayerType, CellWords)], layer_codec: &mut LayerCodec) -> ChunkStorage {
     let encoded_layers: Vec<(LayerType, Vec<u64>)> = layers.iter().map(|(layer_type, cells)| (*layer_type, layer_codec.encode_cells(cells).to_vec())).collect();
     let layer_changes: Vec<LayerChange> =
-        encoded_layers.iter().map(|(layer_type, words)| LayerChange { place, layer_type: *layer_type, encoded_layer: words }).collect();
+        encoded_layers.iter().map(|(layer_type, words)| LayerChange { place, type_id: layer_type.type_id(), encoded_layer: words }).collect();
     let mut cold_storage = ChunkStorage::new(1 << 12);
     cold_storage.insert(superchunk, SuperchunkImage::empty().rewritten_with(&layer_changes));
     cold_storage
@@ -95,6 +95,6 @@ pub fn grass_on_dirt(seed: u64, grass_cells: usize, layer_codec: &mut LayerCodec
             encoded_layers.push((chunk, MOCK_GRASS, layer_codec.encode_cells(chunk_grass).to_vec()));
         }
     }
-    let layer_changes: Vec<LayerChange> = encoded_layers.iter().map(|(chunk, layer_type, words)| LayerChange { place: *chunk, layer_type: *layer_type, encoded_layer: words }).collect();
+    let layer_changes: Vec<LayerChange> = encoded_layers.iter().map(|(chunk, layer_type, words)| LayerChange { place: *chunk, type_id: layer_type.type_id(), encoded_layer: words }).collect();
     SuperchunkImage::empty().rewritten_with(&layer_changes)
 }

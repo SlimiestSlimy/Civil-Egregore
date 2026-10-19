@@ -70,11 +70,7 @@ impl Job {
             Self::EncodeWriteBack(dirty) => {
                 let mut encoded_layers = Vec::with_capacity(dirty.len());
                 for (bucket_key, cells) in dirty {
-                    match bucket_key.layer_type.width_bits() {
-                        1 => encoded_layers.push((bucket_key, layer_codec.encode_layer(cells[..].try_into().expect("a bitmap's words")).to_vec())),
-                        // A wide bucket is encoded a plane at a time: its bits' bitmaps, each under its own type.
-                        bits_a_cell => encoded_layers.extend((0..bits_a_cell).map(|bit_of_cell| (BucketKey { layer_type: bucket_key.layer_type.bitplane_of(bit_of_cell), chunk: bucket_key.chunk }, layer_codec.encode_layer(&wide::bitmap_of_bit(&cells, bits_a_cell, bit_of_cell)).to_vec()))),
-                    }
+                    encoded_layers.push((bucket_key, wide::encode_bucket(bucket_key.layer_type, &cells, layer_codec)));
                 }
                 JobDone::WriteBackEncoded(encoded_layers)
             }
@@ -90,14 +86,12 @@ impl Job {
                 let mut cells = Vec::with_capacity(types.len() * superchunk.chunks().count());
                 for chunk in superchunk.chunks() {
                     for &layer_type in &types {
-                        // A wide layer's planes decoded and put together: none of them there, no cell set.
-                        let (layer_bits_a_cell, mut one_bit_bitmap, mut bucket) = (layer_type.width_bits(), [0; utilities::bitmap::WORDS], None);
-                        for bit_decoded in 0..layer_bits_a_cell {
-                            if let Some(layer) = image.layer(chunk.place(), layer_type.bitplane_of(bit_decoded)) {
-                                layer_codec.decode_cells(layer, &mut one_bit_bitmap);
-                                wide::spread_into_wide(&one_bit_bitmap, layer_bits_a_cell, bit_decoded, bucket.get_or_insert_with(|| vec![0; wide::bucket_words(layer_type)].into_boxed_slice()));
-                            }
-                        }
+                        // No layer kept, no cell set.
+                        let bucket = image.layer(chunk.place(), layer_type.type_id()).map(|layer| {
+                            let mut bucket = vec![0; wide::bucket_words(layer_type)].into_boxed_slice();
+                            wide::decode_bucket(layer_type, layer, layer_codec, &mut bucket);
+                            bucket
+                        });
                         cells.push((BucketKey { layer_type, chunk }, bucket));
                     }
                 }

@@ -62,7 +62,7 @@ fn a_name_is_registered_once_whatever_its_kind() {
         assert_eq!(outcome(type_registry.register(of_a_drawn_kind(taken_name, &mut seeded_rng))), Err(RegistryRefusal::NameTaken), "{taken_name}");
         assert_eq!(each_told_by(&type_registry.clone().freeze().expect("frozen")), each_told_by(&default_frozen), "a type refused is not kept");
         let unheard_of = type_registry.register(of_a_drawn_kind("unheard of", &mut seeded_rng)).expect("a name no type has");
-        assert!(default_frozen.types().iter().all(|registered_type| !registered_type.numbers().any(|number| unheard_of.numbers().contains(&number))), "an ID no type has");
+        assert!(default_frozen.types().iter().all(|registered_type| registered_type.type_number() != unheard_of.type_number()), "an ID no type has");
         assert_eq!(type_registry.freeze().expect("frozen").types().len(), default_frozen.types().len() + 1);
     }
 }
@@ -119,14 +119,14 @@ fn what_a_type_names_is_registered_before_it() {
 /// overlapping, the same every time; a saved world's types are each
 /// given the ID the save gave its name, whatever order they come in, a
 /// type the save does not name one past them all; a saved name given
-/// to a type of another kind, a plane of another shape or an attribute
-/// of other blocks, is refused,
-/// and a saved name nobody registers keeps the types from freezing.
+/// to a type of another kind is refused, and a saved name nobody
+/// registers keeps the types from freezing. A type is one number, one
+/// ID, whatever its size.
 #[test]
 fn a_saved_world_keeps_its_ids() {
     let (frozen_type_registry, base_types) = frozen_base_types();
-    let numbers: Vec<_> = frozen_type_registry.types().iter().flat_map(RegisteredType::numbers).collect();
-    assert!(numbers.windows(2).all(|pair| pair[0] < pair[1]) && numbers[0] >= 1, "handed out in order, none overlapping, none 0");
+    let numbers: Vec<_> = frozen_type_registry.types().iter().map(RegisteredType::type_number).collect();
+    assert!(numbers.windows(2).all(|pair| pair[1] == pair[0] + 1) && numbers[0] == 1, "handed out in order, one a type, none 0");
     assert_eq!(frozen_base_types().1, base_types, "the same IDs every time");
     let saved_text = frozen_type_registry.to_text();
     // Read back, in another order: each name its saved ID.
@@ -135,16 +135,11 @@ fn a_saved_world_keeps_its_ids() {
     let grass = reordered.register(Registration::layer("grass")).expect("saved");
     let newcomer = reordered.register(Registration::layer("newcomer")).expect("a name the save does not hold");
     assert_eq!((collision.layer_type(), grass.layer_type()), (Some(base_types.collision), Some(base_types.grass)));
-    assert!(newcomer.numbers().start > *numbers.last().expect("types"), "past every saved ID");
+    assert!(newcomer.type_number() > *numbers.last().expect("types"), "past every saved ID");
     assert!(reordered.freeze().is_err(), "saved types nobody registered");
     let mut as_another = TypeRegistry::for_saved_world(&saved_text).expect("a world's types");
     assert_eq!(outcome(as_another.register(Registration::entity("grass", None))), Err(RegistryRefusal::SavedAsAnother));
     // A plane's shape is no part of its ID: the save keeps it, and a plane of another width or tile size is refused.
-    let mut reshaped = TypeRegistry::for_saved_world(&saved_text).expect("a world's types");
-    assert_eq!(outcome(reshaped.register(Registration::wide_plane("grass", 2))), Err(RegistryRefusal::SavedAsAnother), "another width");
-    assert_eq!(outcome(reshaped.register(Registration::wide_plane_of_tiles("grass", 1, 2))), Err(RegistryRefusal::SavedAsAnother), "another tile size");
-    // Nor an attribute's blocks: one of other blocks is refused.
-    assert_eq!(outcome(reshaped.register(Registration::attribute("sheep state", 2, 1))), Err(RegistryRefusal::SavedAsAnother), "other blocks");
     // Registered whole, the same types come back.
     let mut whole = TypeRegistry::for_saved_world(&saved_text).expect("a world's types");
     assert_eq!(basegame::default_types::register(&mut whole).expect("registered"), base_types);
@@ -152,15 +147,14 @@ fn a_saved_world_keeps_its_ids() {
     assert!(TypeRegistry::for_saved_world("not,a world's types\n").is_err());
 }
 
-/// The types frozen find each again, by its name and by each of its
-/// numbers; the layer types are every layer and wide plane; a sheep's
+/// The types frozen find each again, by its name and by its number; the layer types are every layer and wide plane; a sheep's
 /// default attribute is its state, the only one; the rules tick in the
 /// order registered, each among the rules of the master it names.
 #[test]
 fn the_frozen_types_find_each_type_again() {
     let (frozen_type_registry, base_types) = frozen_base_types();
     for registered_type in frozen_type_registry.types() {
-        assert!(registered_type.numbers().all(|type_number| told_by(frozen_type_registry.of_number(type_number)) == told_by(Some(registered_type))), "{}", registered_type.name());
+        assert_eq!(told_by(frozen_type_registry.of_number(registered_type.type_number())), told_by(Some(registered_type)), "{}", registered_type.name());
         assert_eq!(frozen_type_registry.master_of(registered_type).is_some(), registered_type.is_a_rule(), "{}", registered_type.name());
     }
     let layer_types = frozen_type_registry.layer_types();
@@ -201,10 +195,6 @@ fn an_attribute_type_says_its_blocks_and_a_layout_its_fields() {
         let (drawn_width, first_number) = (1u32 << seeded_rng.draw_below(5), seeded_rng.draw_below(TYPE_ID_NUMBERS - 16));
         let wide_layer = LayerType::of_width(first_number, drawn_width);
         assert_eq!((wide_layer.width_bits(), wide_layer.type_number(), wide_layer.type_id()), (drawn_width, first_number, 0x01 << 56 | first_number), "the ID its kind and number alone, the width beside it");
-        // A plane a bit a cell is its own bitplane; a wide one's bitplanes take the numbers after its own, no two IDs one.
-        let first_bitplane = first_number + u64::from(drawn_width > 1);
-        assert!((0..drawn_width).all(|bit_index| wide_layer.holds_bitplane(wide_layer.bitplane_of(bit_index)) && wide_layer.bitplane_of(bit_index) == LayerType::of_a_bit(first_bitplane + u64::from(bit_index))) && !wide_layer.holds_bitplane(wide_layer.bitplane_of(drawn_width)));
-        assert!(drawn_width == 1 || wide_layer.each_bitplane().all(|bitplane| bitplane.type_id() != wide_layer.type_id()), "a wide plane's ID none of its bitplanes'");
         let entity = EntityType::from_number(type_number);
         assert_eq!((entity.type_number(), entity.0), (type_number, 0x02 << 56 | type_number));
     }

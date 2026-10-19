@@ -69,9 +69,7 @@ pub fn save(folder: &Path, world: &mut World) -> Result<SaveWritten, DiskError> 
     save_written.bytes_written += disk::write_hot(folder, &HotSuperchunks { hot: simulation_handle.bitmap_arena().superchunk_indices(), cooling: simulation_handle.cooling().collect(), warming: simulation_handle.warming().collect() })?;
     save_written.bytes_written += write_types(folder, &world.frozen_type_registry)?;
     // The world's file last: a save cut short leaves the one before it.
-    // The layers a save lists are those it holds: a wide plane's, a bit each.
-    let layers = world.world_info.layers.iter().flat_map(|layer| layer.each_bitplane()).collect();
-    let world_info = WorldInfo { tick: simulation_handle.entity_store().current_tick(), layers, unpopulated: simulation_handle.unpopulated().to_vec(), ..world.world_info.clone() };
+    let world_info = WorldInfo { tick: simulation_handle.entity_store().current_tick(), unpopulated: simulation_handle.unpopulated().to_vec(), ..world.world_info.clone() };
     save_written.bytes_written += disk::write_world(folder, &world_info)?;
     Ok(save_written)
 }

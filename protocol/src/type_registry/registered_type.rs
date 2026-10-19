@@ -2,7 +2,7 @@
 //! runs it, if anything does, is its library, hooked in by its
 //! registration (`super::Hook`).
 
-use super::type_ids::{numbers_taken, AttributeType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
+use super::type_ids::{AttributeType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
 
 /// What a rule of the renderer draws: a plane, or a type of entity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -163,21 +163,8 @@ impl RegisteredType {
         matches!(self, Self::ScaRule { .. } | Self::EntityRule { .. })
     }
 
-    /// The numbers its ID takes: a plane a bit a cell one; any other
-    /// plane its own, and one a bit, its cold planes'; anything else one.
-    pub fn numbers(&self) -> std::ops::Range<u64> {
-        numbers_taken(self.type_id(), self.plane_shape())
-    }
-
-    /// Blocks an attribute of it takes, if it is an attribute's type, as
-    /// registered.
-    pub fn attribute_blocks(&self) -> Option<usize> {
-        self.attribute_type().map(AttributeType::block_count)
-    }
-
-    /// Its plane's shape, if it is a layer or a wide plane: its bits a
-    /// cell and its tiles' scale, as registered.
-    pub fn plane_shape(&self) -> Option<(u32, u32)> {
-        self.layer_type().map(|layer_type| (layer_type.width_bits(), layer_type.tile_scale()))
+    /// Its number: what its ID holds under its kind, no other type's.
+    pub fn type_number(&self) -> u64 {
+        self.type_id() & (super::TYPE_ID_NUMBERS - 1)
     }
 }
