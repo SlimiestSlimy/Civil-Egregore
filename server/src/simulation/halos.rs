@@ -147,6 +147,7 @@ impl Halos {
 
     /// The viewport's superchunks within the world, sorted: none unless
     /// they are hot ([`Halos::keep_viewport`]).
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn viewport(&self) -> &[SuperchunkIndex] {
         &self.viewport
     }

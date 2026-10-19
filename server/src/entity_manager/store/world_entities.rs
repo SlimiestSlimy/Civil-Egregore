@@ -27,6 +27,7 @@ pub struct WorldEntities {
 
 impl WorldEntities {
     /// None, at tick 0, no type of entity with a default attribute.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn new() -> Self {
         Self::default()
     }
@@ -53,11 +54,6 @@ impl WorldEntities {
         self.superchunks.iter().map(SuperchunkEntities::len).sum()
     }
 
-    /// Whether there are none.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     /// The superchunks, by Morton index.
     pub fn superchunks(&self) -> &[SuperchunkEntities] {
         &self.superchunks
@@ -74,6 +70,7 @@ impl WorldEntities {
     }
 
     /// The entity standing on `stood_cell`, if one does.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn get(&self, stood_cell: CellIndex) -> Option<EntityRef<'_>> {
         self.superchunk(stood_cell.superchunk())?.get(stood_cell)
     }
@@ -107,11 +104,13 @@ impl WorldEntities {
     }
 
     /// Queues removing the entity standing on `stood_cell`, outside a tick.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn queue_remove(&mut self, stood_cell: CellIndex) {
         self.queued_instructions.remove(stood_cell);
     }
 
     /// How many instructions are queued.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn queued_count(&self) -> usize {
         self.queued_instructions.len()
     }

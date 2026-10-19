@@ -26,6 +26,7 @@ enum Instruction {
     /// Moves the entity the tick found on `from` to `header`'s cell,
     /// to wake at its tick, its attributes as they are -- or, the
     /// cell being the one it stands on, only sets when it next wakes.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     Move {
         /// Its fixed part, as it is to be.
         header: Header,
@@ -35,6 +36,7 @@ enum Instruction {
     /// Sets one attribute of the entity the tick found on `at` to the
     /// blocks `first..first_block + count` of the queue's list, or with
     /// none removes it.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     Edit {
         /// Its cell, as the tick found it.
         named_cell: CellIndex,
@@ -46,6 +48,7 @@ enum Instruction {
         count: u32,
     },
     /// Removes the entity the tick found on `at`.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     RemoveEntity {
         /// Its cell, as the tick found it.
         named_cell: CellIndex,
@@ -89,6 +92,7 @@ impl Instructions {
     /// its cell's superchunk -- to its cell, to wake at its tick, with
     /// the attributes it has: none are carried. Its cell `named_cell` itself,
     /// it only sleeps until then.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn move_entity(&mut self, header: Header, named_cell: CellIndex) {
         debug_assert_eq!(header.stood_cell.superchunk(), named_cell.superchunk(), "an entity moved from another superchunk: a crossing");
         self.instructions.push(Instruction::Move { header, named_cell });
@@ -96,6 +100,7 @@ impl Instructions {
 
     /// Queues setting `attribute` of the entity the tick found on
     /// `named_cell` to `value`.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn set_attribute<L: Layout>(&mut self, named_cell: CellIndex, attribute: Attribute<L>, value: L) {
         let first_block = self.attributes.len() as u32;
         push_attribute(&mut self.attributes, attribute, value);
@@ -105,6 +110,7 @@ impl Instructions {
     /// Queues setting the attribute `attribute` is the blocks of, of
     /// the entity the tick found on `named_cell`: how one whose size varies
     /// is set.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn set_attribute_blocks(&mut self, named_cell: CellIndex, attribute: &[AttributeBlock]) {
         debug_assert!(attribute.first().is_some_and(|first_block| first_block.block_count() == attribute.len()), "an attribute as long as its type or its block length says");
         self.instructions.push(Instruction::Edit { named_cell, attribute_type: attribute[0].attribute_type(), first_block: self.attributes.len() as u32, count: attribute.len() as u32 });
@@ -113,23 +119,21 @@ impl Instructions {
 
     /// Queues removing the attribute of type `attribute_type` of the entity
     /// the tick found on `named_cell`.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn unset_attribute(&mut self, named_cell: CellIndex, attribute_type: AttributeType) {
         self.instructions.push(Instruction::Edit { named_cell, attribute_type, first_block: 0, count: 0 });
     }
 
     /// Queues removing the entity the tick found on `named_cell`.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn remove(&mut self, named_cell: CellIndex) {
         self.instructions.push(Instruction::RemoveEntity { named_cell });
     }
 
     /// How many instructions are queued.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn len(&self) -> usize {
         self.instructions.len()
-    }
-
-    /// Whether none is.
-    pub fn is_empty(&self) -> bool {
-        self.instructions.is_empty()
     }
 
     /// Empties the queue, keeping its room.

@@ -65,6 +65,7 @@ impl SuperchunkEntities {
     }
 
     /// Whether it holds none.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -189,6 +190,7 @@ impl SuperchunkEntities {
     /// The places, in the chunk at `chunk`, of the entities standing on
     /// the word tile whose first cell is at `first_place` there: a run of the
     /// bucket's places, a word tile being a run of cells in Morton order.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub(crate) fn in_word_tile(&self, chunk: usize, first_place: u16) -> &[u16] {
         self.chunks[chunk].in_word_tile(first_place)
     }

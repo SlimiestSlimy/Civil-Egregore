@@ -17,7 +17,6 @@ mod chunk_storage;
 mod client_connection;
 mod entity_manager;
 pub mod host;
-pub mod internals_for_root_tests;
 pub mod params;
 mod pathfinding;
 pub mod simulation;
@@ -54,6 +53,15 @@ mod walkers;
 #[cfg(test)]
 #[path = "../tests/shared/test_types.rs"]
 mod test_types;
+#[cfg(test)]
+#[path = "../tests/shared/collision.rs"]
+mod collision;
+#[cfg(test)]
+#[path = "../tests/shared/test_game.rs"]
+mod test_game;
+#[cfg(test)]
+#[path = "../tests/shared/whole_worlds.rs"]
+mod whole_worlds;
 
 pub use crate::simulation::hot::halos_about;
 pub use crate::simulation::halos::{HaloChange, COOL_TICKS, WARM_TICKS};

@@ -8,6 +8,7 @@ use utilities::coordinates::{CellIndex, ChunkIndex, SuperchunkIndex};
 
 /// Cells along the side of the most [`EntityReader::occupied`] reads at
 /// once: a row's bits.
+#[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
 pub const OCCUPIED_SIDE: usize = 16;
 
 /// Reads entities from superchunks in a tick's first phase, across
@@ -39,6 +40,7 @@ impl<'a> EntityReader<'a> {
     /// (each up to 16) whose top left cell is `origin`, a row a word:
     /// cell `(x, y)` from `origin` at bit `x` of row `y`
     /// (`docs/entity_manager.md`, "The store").
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn occupied(&self, origin: CellIndex, width: u32, height: u32) -> [u16; OCCUPIED_SIDE] {
         debug_assert!(width as usize <= OCCUPIED_SIDE && height as usize <= OCCUPIED_SIDE, "more cells than a row's bits");
         let mut occupied_rows = [0; OCCUPIED_SIDE];

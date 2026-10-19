@@ -10,6 +10,7 @@ impl BitmapArena {
     /// Makes `bucket_key`'s bitmap hot, decoding `layer` -- its encoded bitmap,
     /// `None` for one with no cell set: whether it was made hot now
     /// (`docs/bitplane_manager.md`, "Making hot, writing back, evicting").
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn make_hot(&mut self, bucket_key: BucketKey, layer: Option<&[u64]>, layer_codec: &mut LayerCodec) -> bool {
         assert_eq!(bucket_key.layer_type.width_bits(), 1, "one encoded bitmap makes a layer of a bit a cell hot");
         self.make_hot_with(bucket_key, layer.map(|layer| |bucket: &mut [u64]| layer_codec.decode_cells(layer, bucket.try_into().expect("a bitmap's words"))))
@@ -59,6 +60,7 @@ impl BitmapArena {
     /// other layers stay encoded. A type the chunk has no layer of turns
     /// hot empty, and one already hot is left as it is: how many were made
     /// hot.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn make_hot_layers(&mut self, chunk: ChunkIndex, layer_types: &[LayerType], cold_storage: &ChunkStorage, layer_codec: &mut LayerCodec) -> usize {
         let mut make_layer_hot = |bitmap_arena: &mut Self, layer_type: LayerType| {
             if layer_type.is_a_bitplane() {
@@ -120,6 +122,7 @@ impl BitmapArena {
     }
 
     /// How many superchunks are lingering.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn lingering(&self) -> usize {
         self.lingering.len()
     }

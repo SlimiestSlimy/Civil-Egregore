@@ -1,11 +1,7 @@
 //! The host: a world run on a thread of its own, asked for frames.
 
-// TEMPORARY: reaches the server's internals -- `server::internals_for_root_tests`
-// and the world's handles to them -- until the world has reads of its
-// own and this is rewritten against them (AI.txt, LATER).
-
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SEED, SIDE, WORLDGEN};
-use crate::worlds::base;
+use crate::worlds::game_base;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use server::host::{Host, HostSent};
 use std::sync::mpsc::Receiver;
@@ -45,15 +41,15 @@ fn next_frame(frame_receiver: &Receiver<HostSent>) -> ViewportFrame {
 #[test]
 fn a_frame_brings_a_plane_of_tiles_a_tile_at_a_time() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    use server::internals_for_root_tests::Write;
+    use server::simulation::simulation_api::{cell_reads_and_writes, tick_and_random_stream, CellIndex};
     use utilities::coordinates::{place_from_cartesian, CellCartesian, SUPERCHUNK_SIDE_CELLS};
     let folder = crate::worlds::folder("tiles_in_frames");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
-    let (frozen_type_registry, test_tiles) = crate::worlds::with_test_tiles();
+    let (mut world, probe) = crate::worlds::probed_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(0))), crate::worlds::test_tiles_registered);
+    let test_tiles = crate::worlds::test_tiles(&world);
     let tile_shift = test_tiles.layer_type().tile_shift();
-    let mut world = server::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(0))), &frozen_type_registry).expect("the world started");
     // Numbers on one of the four superchunks alone.
-    let written_superchunk = world.bitmap_arena().superchunk_indices()[test_random.draw_below(4) as usize];
+    let written_superchunk = crate::worlds::hot_superchunks(&mut world, &probe)[test_random.draw_below(4) as usize];
     let written_corner_cartesian = written_superchunk.top_left().cartesian();
     let mut numbers = std::collections::BTreeMap::new();
     for _ in 0..test_random.draw_between(50, 200) {
@@ -62,8 +58,16 @@ fn a_frame_brings_a_plane_of_tiles_a_tile_at_a_time() {
         let tile = place_from_cartesian(cell.0, cell.1) >> tile_shift;
         numbers.entry(tile).or_insert((cell, 1 + test_random.draw_below(u64::from(test_tiles.most_value())) as u32));
     }
-    let writes: Vec<Write> = numbers.values().map(|&((x, y), number)| Write::value(test_tiles, CellCartesian { x: written_corner_cartesian.x + x, y: written_corner_cartesian.y + y }.into(), number)).collect();
-    assert_eq!(world.write_cells(test_tiles.layer_type(), writes).cells_changed, numbers.len() as u64);
+    // Written in a tick of the probe alone, each tile held 0 till then.
+    let writes: Vec<(CellIndex, u32)> = numbers.values().map(|&((x, y), number)| (CellCartesian { x: written_corner_cartesian.x + x, y: written_corner_cartesian.y + y }.into(), number)).collect();
+    let (report, _) = probe.tick(&mut world, &[], move |tick_state| {
+        let turn_superchunk = tick_and_random_stream::superchunk(tick_state);
+        for &(cell, number) in writes.iter().filter(|&&(cell, _)| cell.superchunk() == turn_superchunk) {
+            cell_reads_and_writes::set_value(tick_state, test_tiles, cell, 0, number);
+        }
+        Vec::<()>::new()
+    });
+    assert_eq!(report.writes_applied.cells_changed, numbers.len() as u64);
     server::save(&folder, &mut world).expect("saved");
 
     let (host, frame_receiver) = Host::start_on_thread(crate::worlds::types_with_test_tiles);
@@ -104,7 +108,7 @@ fn a_call_is_answered_by_the_world_running_and_only_a_client_call_is() {
     assert_eq!(host.call(test_call, arguments.clone()), Ok([seed, 0].into_iter().chain(arguments).collect::<Vec<_>>()), "the seed, tick 0 -- paused -- and the words");
     let refused = |call: u64| host.call(call, Vec::new()).expect_err("refused");
     assert!(refused(test_call ^ 1 << 40).contains("no type is of the ID"));
-    assert!(refused(base().grass.type_id()).contains("no function a client may call"), "a plane's ID");
+    assert!(refused(game_base().grass.type_id()).contains("no function a client may call"), "a plane's ID");
     assert!(host.call(test_call, Vec::new()).is_ok(), "the host goes on after a call refused");
 }
 

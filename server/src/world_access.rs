@@ -28,9 +28,8 @@ pub(crate) struct CallAnswered {
 impl World {
     /// What the world is, and the tick it was made or loaded at.
     ///
-    /// TEMPORARY public: the root's tests reach the server's internals
-    /// through it until the world has reads of its own (AI.txt, LATER).
-    pub fn world_info(&self) -> &WorldInfo {
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
+    pub(crate) fn world_info(&self) -> &WorldInfo {
         &self.world_info
     }
 
@@ -56,49 +55,37 @@ impl World {
 
     /// Its hot bitmaps: every layer type of every hot superchunk.
     ///
-    /// TEMPORARY public: the root's tests reach the server's internals
-    /// through it until the world has reads of its own (AI.txt, LATER).
-    pub fn bitmap_arena(&self) -> &BitmapArena {
+    pub(crate) fn bitmap_arena(&self) -> &BitmapArena {
         self.simulation_handle.bitmap_arena()
     }
 
     /// Every superchunk ever made, as stored.
     ///
-    /// TEMPORARY public: the root's tests reach the server's internals
-    /// through it until the world has reads of its own (AI.txt, LATER).
-    pub fn chunk_storage(&self) -> &ChunkStorage {
+    pub(crate) fn chunk_storage(&self) -> &ChunkStorage {
         self.simulation_handle.chunk_storage()
     }
 
     /// The hot superchunks' entities, at its tick.
     ///
-    /// TEMPORARY public: the root's tests reach the server's internals
-    /// through it until the world has reads of its own (AI.txt, LATER).
-    pub fn entity_store(&self) -> &WorldEntities {
+    pub(crate) fn entity_store(&self) -> &WorldEntities {
         self.simulation_handle.entity_store()
     }
 
     /// The tick's threads, and the hot superchunks' random numbers.
     ///
-    /// TEMPORARY public: the root's tests reach the server's internals
-    /// through it until the world has reads of its own (AI.txt, LATER).
-    pub fn world_simulation(&self) -> &Simulation {
+    pub(crate) fn world_simulation(&self) -> &Simulation {
         self.simulation_handle.world_simulation()
     }
 
     /// Each cold superchunk's state, as a save keeps it.
     ///
-    /// TEMPORARY public: the root's tests reach the server's internals
-    /// through it until the world has reads of its own (AI.txt, LATER).
-    pub fn cold(&self) -> &BTreeMap<SuperchunkIndex, Vec<u64>> {
+    pub(crate) fn cold(&self) -> &BTreeMap<SuperchunkIndex, Vec<u64>> {
         self.simulation_handle.cold()
     }
 
     /// Its halos: the superchunks warming and cooling.
     ///
-    /// TEMPORARY public: the root's tests reach the server's internals
-    /// through it until the world has reads of its own (AI.txt, LATER).
-    pub fn halos(&self) -> &Halos {
+    pub(crate) fn halos(&self) -> &Halos {
         self.simulation_handle.halos()
     }
 
@@ -161,25 +148,22 @@ impl World {
     /// Puts `header`'s entity on the world between two ticks: input from
     /// outside, made by the simulation (`SimulationHandle::add_entity`).
     ///
-    /// TEMPORARY public: the root's tests reach the server's internals
-    /// through it until the world has reads of its own (AI.txt, LATER).
-    pub fn add_entity(&mut self, header: Header, attributes: &[AttributeBlock]) -> InstructionsApplied {
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
+    pub(crate) fn add_entity(&mut self, header: Header, attributes: &[AttributeBlock]) -> InstructionsApplied {
         self.simulation_handle.add_entity(header, attributes)
     }
 
     /// Removes `header`'s entity from the world between two ticks.
     ///
-    /// TEMPORARY public: the root's tests reach the server's internals
-    /// through it until the world has reads of its own (AI.txt, LATER).
-    pub fn remove_entity(&mut self, header: &Header) -> InstructionsApplied {
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
+    pub(crate) fn remove_entity(&mut self, header: &Header) -> InstructionsApplied {
         self.simulation_handle.remove_entity(header)
     }
 
     /// Applies `writes` to the cells of `layer_type` between two ticks.
     ///
-    /// TEMPORARY public: the root's tests reach the server's internals
-    /// through it until the world has reads of its own (AI.txt, LATER).
-    pub fn write_cells(&mut self, layer_type: LayerType, writes: impl IntoIterator<Item = Write>) -> WritesApplied {
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
+    pub(crate) fn write_cells(&mut self, layer_type: LayerType, writes: impl IntoIterator<Item = Write>) -> WritesApplied {
         self.simulation_handle.write_cells(layer_type, writes)
     }
 

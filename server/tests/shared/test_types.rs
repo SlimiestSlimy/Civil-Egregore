@@ -70,6 +70,12 @@ pub struct TestTypes {
     pub fed: Attribute<u64>,
     /// Attributes others give an entity, one each.
     pub given: [Attribute<u64>; 8],
+    /// What a walker counts: its meals, and what its neighbours count on it.
+    pub counted: Attribute<u64>,
+    /// The stones a walker laid: counted only if the stone was.
+    pub laid: Attribute<u64>,
+    /// The walkers a walker made: counted only if the walker was.
+    pub made: Attribute<u64>,
 }
 
 impl TestTypes {
@@ -106,6 +112,7 @@ impl TestTypes {
         let (woken_count, odd_wake, entity_number) = (attribute("woken count"), attribute("odd wake"), attribute("entity number"));
         let (name, mark, scar, own, fed) = (attribute("name"), attribute("mark"), attribute("scar"), attribute("own"), attribute("fed"));
         let given = std::array::from_fn(|giver| attribute(&format!("given {giver}")));
-        Self { stone, dirt, grass, collision, wall_north, wall_west, wall_south, wall_east, layers, two_bits, four_bits, eight_bits, sixteen_bits, four_bit_tiles, sixteen_bit_tiles, walker, woken_count, odd_wake, entity_number, name, mark, scar, own, fed, given }
+        let (counted, laid, made) = (attribute("counted"), attribute("laid"), attribute("made"));
+        Self { stone, dirt, grass, collision, wall_north, wall_west, wall_south, wall_east, layers, two_bits, four_bits, eight_bits, sixteen_bits, four_bit_tiles, sixteen_bit_tiles, walker, woken_count, odd_wake, entity_number, name, mark, scar, own, fed, given, counted, laid, made }
     }
 }

@@ -26,7 +26,7 @@ pub mod steps_and_paths;
 pub use crate::bitplane_manager::{Bits16, Bits2, Bits32, Bits4, Bits8, WidePlane, Width};
 pub use crate::chunk_storage::{GeneratedArea, LayerType};
 pub use utilities::coordinates::{CellArea, CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOUR_OFFSETS, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE_CELL};
-pub use crate::entity_manager::{data_words, Attribute, AttributeBlock, AttributeType, EntityRef, EntityType, Header, Layout, Member, WholeAttribute};
+pub use crate::entity_manager::{data_words, Attribute, AttributeBlock, AttributeType, EntityRef, EntityType, Header, Layout, Member, WholeAttribute, NEVER_WAKES};
 pub use rule_interface::{on_each_sampled, RuleCode, RuleContext, RuleMaster, RuleRun};
 pub use worldgen_interface::{WorldgenParameters, WorldgenCode};
 pub use client_call_interface::{CallCode, CallContext};
