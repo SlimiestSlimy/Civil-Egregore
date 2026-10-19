@@ -7,8 +7,9 @@ description = "Civil Egregore's client: a Bevy window and its server, written af
 [dependencies]
 utilities = { path = "../utilities" }
 protocol = { path = "../protocol" }
-# Bevy for the window, the drawing, the menus and the keys only: no 3D, no audio.
-bevy = { version = "0.19", default-features = false, features = ["2d", "ui"] }
+# Bevy for the window, the drawing, the menus and the keys only: no 3D, no
+# audio. Its Feathers widgets are what the gui types are built of.
+bevy = { version = "0.19", default-features = false, features = ["2d", "ui", "bevy_feathers"] }
 
 [features]
 # The machine's settings file is neither read nor written: the settings are the default ones.

@@ -1,13 +1,18 @@
 //! The window: a Bevy window, its server started and connected to as it
 //! opens ([`crate::server_end`]), a world made with the default
-//! parameters but a side, and the world drawn ([`drawing`]) as its camera sees it
+//! parameters but a side, its windows ([`windows`]: the world's gui
+//! types), and the world drawn ([`drawing`]) as its camera sees it
 //! ([`camera`]: WASD or the arrows, the mouse, its wheel, Q and E). Space pauses; `=` and `-` double and halve the pace,
 //! `0` holds it to the simulation's own, `F` lets it run flat out.
 
 mod camera;
 mod drawing;
+mod windows;
 
 use crate::server_end::{ServerEnd, Shown};
+use bevy::feathers::dark_theme::create_dark_theme;
+use bevy::feathers::theme::UiTheme;
+use bevy::feathers::FeathersPlugins;
 use bevy::prelude::*;
 use drawing::Drawing;
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, SIDE};
@@ -37,7 +42,12 @@ pub fn run_window(register_types: RegisterTypes) {
     let (server_end, shown) = ServerEnd::start();
     let server_calls = crate::client_api::ServerCalls::through(server_end.link.clone());
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin { primary_window: Some(Window { title: TITLE.to_string(), ..default() }), ..default() }))
+        .add_plugins((DefaultPlugins.set(WindowPlugin { primary_window: Some(Window { title: TITLE.to_string(), ..default() }), ..default() }), FeathersPlugins))
+        .insert_resource(UiTheme(create_dark_theme()))
+        .init_resource::<windows::Windows>()
+        .add_observer(windows::take_world_types)
+        .add_observer(windows::open_window)
+        .add_systems(Last, windows::let_go_of_focus)
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(server_calls)
         .insert_resource(WindowServer { server_end, shown: Mutex::new(shown) })

@@ -522,6 +522,25 @@ NOW
   The user: "for this gsme vsync on as default is ok" / "my idea for
   this game is to have no graphic settings on the basegame lol the
   rendering is very simple tbh".
+  GUI, FIRST STRETCH, DONE (2026-10-19; the user: "you can straight up
+  write bevy gui code on basegame remember"): client_api::gui (GuiCode:
+  blocks across and down, and a build given the EntityCommands of its
+  place; GuiContext: its type and ServerCalls; OpenWindow, an event a
+  gui triggers). The one window system (client/src/window/windows.rs):
+  a gui naming no parent is a window -- title bar dragged by, x closing
+  it, a grid of BLOCK_PIXELS blocks its guis flow into in registration
+  order; ShownByDefault ones open with each world; a world remade of
+  the same types keeps its windows; the mouse over a window is not the
+  camera's; no gui keeps the keys' focus (Space would press the last
+  button clicked). Feathers (bevy_feathers) for the look. basegame/src/
+  gui: "world" (shown by default: "world generation" opens the sliders,
+  "reset world" calls the reset) and "world generation sliders", a gui
+  type a worldgen parameter (28), each reading its value as it is built
+  and setting it as it is slid, through the worldgen calls; ranges from
+  the old sliders.csv. Verified by clicking: ocean share 0.95, reset,
+  a world of ocean. Not yet: tooltips (the old "does" texts), scrolling
+  a window, keyboard navigation; calls are made on the main thread,
+  waiting for the host's answer.
   OPEN: the host copies every plane whole whatever the detail level
   (16-bit height and water depth: 2 MB a superchunk each), so a far
   view of many hot superchunks goes round slowly (a boundless world

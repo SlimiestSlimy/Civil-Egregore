@@ -4,6 +4,7 @@
 //! drawn a cell a unit, about the world's middle: its far corners lie
 //! beyond what Bevy's numbers hold finely.
 
+use super::windows::pointer_on_a_window;
 use crate::client_api::rendering::SUPERCHUNK_SIDE_LOG2;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll, MouseScrollUnit};
 use bevy::prelude::*;
@@ -37,8 +38,12 @@ pub fn spawn_camera(mut bevy_commands: Commands) {
 
 /// The camera moved by the keys -- WASD or the arrows -- or dragged by
 /// the mouse, and taken nearer or farther by the wheel, about the
-/// pointer, or by E and Q, about the window's middle.
-pub fn move_camera(keys: Res<ButtonInput<KeyCode>>, mouse_buttons: Res<ButtonInput<MouseButton>>, mouse_motion: Res<AccumulatedMouseMotion>, mouse_scroll: Res<AccumulatedMouseScroll>, time: Res<Time>, window: Single<&Window>, camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>) {
+/// pointer, or by E and Q, about the window's middle: the mouse left to
+/// the windows while it is over one.
+#[allow(clippy::too_many_arguments)]
+pub fn move_camera(keys: Res<ButtonInput<KeyCode>>, mouse_buttons: Res<ButtonInput<MouseButton>>, mouse_motion: Res<AccumulatedMouseMotion>, mouse_scroll: Res<AccumulatedMouseScroll>, time: Res<Time>, window: Single<&Window>, camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>, window_roots: Query<&Interaction, With<GlobalZIndex>>) {
+    // The mouse over a window is the window's.
+    let mouse_on_the_world = !pointer_on_a_window(window_roots);
     let (mut transform, mut projection) = camera.into_inner();
     let Projection::Orthographic(orthographic) = &mut *projection else {
         return;
@@ -46,15 +51,15 @@ pub fn move_camera(keys: Res<ButtonInput<KeyCode>>, mouse_buttons: Res<ButtonInp
     let pressed = |key_codes: [KeyCode; 2]| key_codes.iter().any(|&key_code| keys.pressed(key_code));
     let key_direction = Vec2::new(f32::from(pressed([KeyCode::KeyD, KeyCode::ArrowRight])) - f32::from(pressed([KeyCode::KeyA, KeyCode::ArrowLeft])), f32::from(pressed([KeyCode::KeyW, KeyCode::ArrowUp])) - f32::from(pressed([KeyCode::KeyS, KeyCode::ArrowDown])));
     let mut moved = key_direction * KEY_PAN_SPEED * window.width() * orthographic.scale * time.delta_secs();
-    if mouse_buttons.any_pressed([MouseButton::Left, MouseButton::Right, MouseButton::Middle]) {
+    if mouse_on_the_world && mouse_buttons.any_pressed([MouseButton::Left, MouseButton::Right, MouseButton::Middle]) {
         moved += Vec2::new(-mouse_motion.delta.x, mouse_motion.delta.y) * orthographic.scale;
     }
     let key_lines = (f32::from(keys.pressed(KeyCode::KeyE)) - f32::from(keys.pressed(KeyCode::KeyQ))) * KEY_ZOOM_LINES * time.delta_secs();
-    let lines_scrolled = key_lines
-        + match mouse_scroll.unit {
-            MouseScrollUnit::Line => mouse_scroll.delta.y,
-            MouseScrollUnit::Pixel => mouse_scroll.delta.y / PIXELS_A_LINE,
-        };
+    let wheel_lines = match mouse_scroll.unit {
+        MouseScrollUnit::Line => mouse_scroll.delta.y,
+        MouseScrollUnit::Pixel => mouse_scroll.delta.y / PIXELS_A_LINE,
+    };
+    let lines_scrolled = key_lines + if mouse_on_the_world { wheel_lines } else { 0.0 };
     if lines_scrolled != 0.0 {
         let new_scale = (orthographic.scale * ZOOM_A_LINE.powf(-lines_scrolled)).clamp(NEAREST, FARTHEST);
         // The cell under the pointer stays under it.

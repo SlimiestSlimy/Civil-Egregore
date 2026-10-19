@@ -1,10 +1,11 @@
 //! The client's API for game content: what a type's code reaches as the
 //! client runs it -- of the three public APIs, the client's, beside the
 //! type registry and the simulation's: the calls of functions the
-//! server's types let a client call ([`ServerCalls`]), and render rules
-//! ([`rendering`]); windows to come. Bevy is part of it: a type's code
+//! server's types let a client call ([`ServerCalls`]), render rules
+//! ([`rendering`]) and gui types ([`gui`]). Bevy is part of it: a type's code
 //! in the client is Bevy code.
 
+pub mod gui;
 pub mod rendering;
 
 use crate::server_end::ServerLink;
