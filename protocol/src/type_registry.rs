@@ -7,6 +7,7 @@
 //! `docs/type_registry_reference.md`.
 
 mod frozen_type_registry;
+mod open_bundle;
 mod registered_type;
 mod registration;
 mod saved_types;
@@ -16,5 +17,6 @@ mod type_ids;
 pub use frozen_type_registry::FrozenTypeRegistry;
 pub use registered_type::{Drawn, RegisteredType};
 pub use registration::{Declared, Hook, Library, Registration};
-pub use registry::{RegistryRefusal, TypeRegistry};
-pub use type_ids::{AttributeType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, TypeKind, ScaRuleType, WorldgenType, TYPE_ID_NUMBERS};
+pub use open_bundle::OpenBundle;
+pub use registry::{in_bundle, RegistryRefusal, TypeRegistry, BUNDLE_SEPARATOR};
+pub use type_ids::{AttributeType, BundleType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, TypeKind, ScaRuleType, WorldgenType, TYPE_ID_NUMBERS};

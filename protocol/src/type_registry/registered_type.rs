@@ -2,7 +2,7 @@
 //! runs it, if anything does, is its library, hooked in by its
 //! registration (`super::Hook`).
 
-use super::type_ids::{AttributeType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
+use super::type_ids::{AttributeType, BundleType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
 
 /// What a rule of the renderer draws: a plane, or a type of entity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -108,13 +108,20 @@ pub enum RegisteredType {
         /// Its master's ID, whole.
         master: u64,
     },
+    /// A bundle: the types whose names begin with its own are in it.
+    Bundle {
+        /// Its name, whole: its outer bundle's, if any, then its own.
+        name: String,
+        /// Its ID.
+        bundle: BundleType,
+    },
 }
 
 impl RegisteredType {
     /// Its name.
     pub fn name(&self) -> &str {
         match self {
-            Self::Layer { name, .. } | Self::WidePlane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } | Self::Worldgen { name, .. } | Self::RenderRule { name, .. } | Self::Gui { name, .. } | Self::ClientCall { name, .. } => name,
+            Self::Layer { name, .. } | Self::WidePlane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } | Self::Worldgen { name, .. } | Self::RenderRule { name, .. } | Self::Gui { name, .. } | Self::ClientCall { name, .. } | Self::Bundle { name, .. } => name,
         }
     }
 
@@ -154,6 +161,7 @@ impl RegisteredType {
             Self::RenderRule { rule, .. } => rule.0,
             Self::Gui { gui, .. } => gui.0,
             Self::ClientCall { call, .. } => call.0,
+            Self::Bundle { bundle, .. } => bundle.0,
         }
     }
 

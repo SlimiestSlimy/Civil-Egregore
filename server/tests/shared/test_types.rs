@@ -78,6 +78,7 @@ impl TestTypes {
     /// fields are, but `layers` in an order drawn.
     pub fn seeded(seed: u64) -> Self {
         let (mut type_registry, mut seeded_random) = (TypeRegistry::for_new_world(), RandomSource::new(seed ^ 0x7e57_7e57));
+        let mut type_registry = type_registry.open_bundle("tests").expect("the tests' bundle");
         for filler in 0..seeded_random.draw_below(MOST_FILLERS + 1) {
             type_registry.register(Registration::layer(&format!("filler {filler}"))).expect("a filler of its own name");
         }

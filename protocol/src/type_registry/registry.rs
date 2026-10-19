@@ -4,12 +4,18 @@
 //! name. Each is given its ID as it is registered: a new world's are
 //! handed out as they are asked for, a saved world's are those its
 //! save gave each name ([`TypeRegistry::for_saved_world`]).
+//!
+//! Every type is in a bundle: one is opened ([`TypeRegistry::open_bundle`]),
+//! the types registered while it is open are in it -- a bundle too --
+//! and the registry writes their names whole, the bundle's name first
+//! (`basegame::sheep`). In a bundle, a name with no `::` in it is one
+//! of the bundle's own; another bundle's is written whole.
 
 use super::frozen_type_registry::FrozenTypeRegistry;
 use super::registered_type::RegisteredType;
 use super::registration::{Declared, Hook, Library, Registration};
 use super::registered_type::Drawn;
-use super::type_ids::{AttributeType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
+use super::type_ids::{AttributeType, BundleType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
 
 /// Why a type was refused.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,6 +32,20 @@ pub enum RegistryRefusal {
     SavedAsAnother,
     /// The window it is nested in is no window registered before it.
     ParentAmiss,
+    /// It is no bundle and no bundle is open: every type is in one.
+    OutsideABundle,
+    /// Its name is empty or holds `::`, which the registry alone writes.
+    NameAmiss,
+}
+
+/// What a whole name puts between a bundle's name and a name in it.
+pub const BUNDLE_SEPARATOR: &str = "::";
+
+/// The whole name of the type named `type_name` in the bundle whose
+/// whole name is `bundle`: what a test, or a type of another bundle,
+/// finds it by.
+pub fn in_bundle(bundle: &str, type_name: &str) -> String {
+    format!("{bundle}{BUNDLE_SEPARATOR}{type_name}")
 }
 
 /// The types being registered, as a world starts: none until
@@ -46,6 +66,9 @@ pub struct TypeRegistry {
     libraries: Vec<Option<Library>>,
     /// What each is hooked into.
     hooks: Vec<Box<[Hook]>>,
+    /// The whole name of the bundle open, if any: the one the types
+    /// registered now are in.
+    pub(super) open_bundle: Option<String>,
 }
 
 impl TypeRegistry {
@@ -60,21 +83,29 @@ impl TypeRegistry {
     /// given its ID, any other the number after them all.
     pub fn of_saved_ids(saved_ids: Vec<(String, u64)>) -> Self {
         let next_number = saved_ids.iter().map(|&(_, saved_id)| (saved_id & (super::TYPE_ID_NUMBERS - 1)) + 1).max().unwrap_or(1);
-        Self { saved_ids, next_number, types: Vec::new(), depends_on: Vec::new(), libraries: Vec::new(), hooks: Vec::new() }
+        Self { saved_ids, next_number, types: Vec::new(), depends_on: Vec::new(), libraries: Vec::new(), hooks: Vec::new(), open_bundle: None }
     }
 
-    /// Registers `registration`'s type, checked against every type before
-    /// it: its name is no other's, its default attribute, its master and
-    /// each type it depends on are registered; and given its ID -- the
-    /// one saved for its name, which must be of what it is declared, or
-    /// the next. It comes back with its ID: what whatever works on it
-    /// is made with, its name not looked for again.
+    /// Registers `registration`'s type in the bundle open, checked
+    /// against every type before it: it is in a bundle, its name is
+    /// whole no other's, its default attribute, its master and each type
+    /// it depends on are registered; and given its ID -- the one saved
+    /// for its name, which must be of what it is declared, or the next.
+    /// It comes back with its ID and its name whole: what whatever works
+    /// on it is made with, its name not looked for again.
     pub fn register(&mut self, registration: Registration) -> Result<RegisteredType, RegistryRefusal> {
         let Registration { name, declared, depends_on, library, hooks } = registration;
+        if name.is_empty() || name.contains(BUNDLE_SEPARATOR) {
+            return Err(RegistryRefusal::NameAmiss);
+        }
+        if self.open_bundle.is_none() && declared != Declared::Bundle {
+            return Err(RegistryRefusal::OutsideABundle);
+        }
+        let name = self.whole_name(&name);
         if self.types.iter().any(|registered| registered.name() == name) {
             return Err(RegistryRefusal::NameTaken);
         }
-        let depended_on = depends_on.iter().map(|type_name| self.place_named(type_name)).collect::<Option<Box<[usize]>>>().ok_or(RegistryRefusal::DependencyAmiss)?;
+        let depended_on = depends_on.iter().map(|type_name| self.place_named(&self.whole_name(type_name))).collect::<Option<Box<[usize]>>>().ok_or(RegistryRefusal::DependencyAmiss)?;
         let saved_id = self.saved_ids.iter().find(|(saved_name, _)| *saved_name == name).map(|&(_, saved_id)| saved_id);
         // Its number: the saved ID's, or the next; checked against the saved ID once it is made.
         let number = saved_id.map_or(self.next_number, |saved_id| saved_id & (super::TYPE_ID_NUMBERS - 1));
@@ -112,15 +143,26 @@ impl TypeRegistry {
         Ok(FrozenTypeRegistry::of_registered(self.types, self.depends_on, self.libraries, self.hooks))
     }
 
-    /// The place of the type named `type_name` among those registered, if one is.
+    /// The whole name `type_name` stands for in the bundle open: itself if
+    /// it is whole already -- another bundle's, written so -- or with no
+    /// bundle open; else the open bundle's name, then it.
+    fn whole_name(&self, type_name: &str) -> String {
+        match &self.open_bundle {
+            Some(bundle) if !type_name.contains(BUNDLE_SEPARATOR) => in_bundle(bundle, type_name),
+            _ => type_name.to_string(),
+        }
+    }
+
+    /// The place of the type whose whole name is `type_name` among those registered, if one is.
     fn place_named(&self, type_name: &str) -> Option<usize> {
         self.types.iter().position(|registered| registered.name() == type_name)
     }
 
-    /// The type named `name`, `declared` so, of number `number`: what it
-    /// is of found among the types registered before it.
+    /// The type whose whole name is `name`, `declared` so, of number
+    /// `number`: what it is of found among the types registered before
+    /// it, by the names it gives as the bundle open reads them.
     fn made(&self, name: String, declared: &Declared, number: u64) -> Result<RegisteredType, RegistryRefusal> {
-        let registered_named = |type_name: &str| self.place_named(type_name).map(|place| &self.types[place]);
+        let registered_named = |type_name: &str| self.place_named(&self.whole_name(type_name)).map(|place| &self.types[place]);
         Ok(match declared {
             Declared::Layer => RegisteredType::Layer { name, layer_type: LayerType::of_a_bit(number) },
             Declared::WidePlane { width_bits, tile_scale } => RegisteredType::WidePlane { name, layer_type: LayerType::of_tiles(number, *width_bits, *tile_scale) },
@@ -166,6 +208,7 @@ impl TypeRegistry {
                 let master = registered_named(master).map(RegisteredType::type_id).ok_or(RegistryRefusal::MasterAmiss)?;
                 RegisteredType::ClientCall { name, call: ClientCallType::from_number(number), master }
             }
+            Declared::Bundle => RegisteredType::Bundle { name, bundle: BundleType::from_number(number) },
         })
     }
 }

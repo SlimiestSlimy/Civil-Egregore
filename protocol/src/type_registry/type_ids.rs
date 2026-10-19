@@ -35,6 +35,9 @@ pub enum TypeKind {
     /// A function a client may call across the connection: its library
     /// the function, its master the type it belongs to.
     ClientCall = 0x08,
+    /// A bundle: what every other type is registered in, its name the
+    /// first part of theirs -- in another bundle, or on its own.
+    Bundle = 0x09,
 }
 
 /// Where an ID keeps its kind: its first byte, over its number.
@@ -238,6 +241,23 @@ impl ClientCallType {
     /// The call of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
         Self(type_id(TypeKind::ClientCall, type_number))
+    }
+
+    /// Its number.
+    pub const fn type_number(self) -> u64 {
+        number_of(self.0)
+    }
+}
+
+/// A bundle: an ID from the one namespace, of its own kind. It has no
+/// size.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct BundleType(pub u64);
+
+impl BundleType {
+    /// The bundle of number `type_number`.
+    pub const fn from_number(type_number: u64) -> Self {
+        Self(type_id(TypeKind::Bundle, type_number))
     }
 
     /// Its number.

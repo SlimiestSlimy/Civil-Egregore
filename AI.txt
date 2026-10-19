@@ -356,6 +356,91 @@ NOW
   loading". Now: the game registers in its order, each type taking its
   saved ID; a saved name nothing registered fails at freeze. NEXT:
   loading walks types.csv, finding each row's registration.
+- THE FRESH CLIENT (the user, 2026-10-18: "we need to finish decoupling
+  and the public apis including client"). Asked how the rendering moves
+  onto the registry: "Fresh client" -- a new client written beside the
+  old from the registry up, switched to once it draws the world, the
+  old renderer and gui then deleted. On Bevy and the client's API:
+  "bevy is part of our public api wether we want it or not, becase
+  thats where the gui and rendering stuff will come from, the client
+  simply executrs the code provided in the rype registry for gui and
+  rendering" -- client_api exposes Bevy; basegame's render rules and
+  gui types are Bevy code. On terrain as worldgen client calls:
+  "unless were in force camera chubks hot. but that is deprecated so
+  font worry about that now" -- terrain (CellCover, map asks, the
+  terrain thread) not planned around now.
+  Then: "we need textures, shaders, etc. to be provided to the client
+  and i dont know how bevy works lol. remember, the server and the
+  client have all the same libraries, (thats why the server sents the
+  type registry to the client, to check exactly that) / now, probably
+  we want to restructure how the type registry works to do this, make
+  bundling easier (probably a bundle type that imports many typeids at
+  once) / maybe a centralized texture processing for future texture
+  pack support? idk man, im not a rendering guy tbh". My answer, put
+  to the user: textures and shaders as data in the registry, Bevy kept
+  inside the client (below, PROPOSED).
+  AGREED (my proposal: textures and shaders data in the registry, Bevy
+  inside the client alone, client_api Bevy-free, gui declarative, a
+  Texture kind, render rules naming their textures, a Bundle kind):
+  "yes, go ahead, go with simplest first, we dont need texture pack
+  support right now for example, bundles also have their own kind and
+  typeid btw. all types registered under a bundle get namespaced in
+  their string name like: bundlename::bundletype (the raw writing on
+  the name string is done automatically by the registry preferrably so
+  inside a bundle the developer simply writes "sheep"instead of
+  "basegame::sheep" everywhere)". Shaders and texture packs later.
+  SUPERSEDED by that: Bevy in the public API, and the feature below.
+  Asked to evaluate it for soundness ("i need ypu to evaluate that for
+  soundness though", "is what we want to do?"); my three corrections
+  and the user's answers (2026-10-18), SETTLED:
+  * BUNDLES: "yes, bundles become the base thing, everything has a base
+    bundle, basegame in our case, bundles can be inside other bundles /
+    still, no 2 bundles can have the same name so watever is inside
+    them is guaranteed to not collide, im taking this as a lesson from
+    how minecraft works with mods and namespaces". Every type is in a
+    bundle; a bare name in a bundle means its own bundle's, no fallback;
+    another's is written whole (other::name). As I read "no 2 bundles
+    can have the same name": a nested bundle's name is its whole path
+    (basegame::sheep), so no two whole names are alike.
+  * CLIENT RULES AS THE SERVER'S: "well no, but yes, we use the same
+    approach server has, the rule provides how to work with one thing,
+    the server does the running in a loop of many things of the same
+    type, client should follow the same philosophy" -- a render rule is
+    code for one thing; the client loops over the many. "rules in
+    server should get a server handle, rules in cl8ent should get a
+    client handle, rules always needed to read many planes or entities
+    sheep rule reads and writes sheep and grass for example, even if
+    the rule's master is the sheep". Mine, to keep it fast: the client
+    runs a rule when its things' data changes (a frame's), the GPU
+    draws the results every frame.
+    DONE: TypeKind::Bundle (0x09), BundleType, TypeRegistry::open_bundle
+    -> OpenBundle (registers the bundle in the one open, opens it, the
+    outer one open again once dropped); register refuses a type with no
+    bundle open (OutsideABundle) and a name empty or holding `::`
+    (NameAmiss); names whole, references bare = own bundle, `::` =
+    whole; in_bundle(bundle, name); basegame's types in "basegame"
+    (default_types::BUNDLE); the tests' in "tests".
+  * DRAW ORDER: "draw order is specified, things that render should
+    include a render layer number".
+  * THE CYCLE (basegame cannot reach client_api while the client
+    depends on basegame): "since were doing the client from scratch we
+    need to remove de remaining coupling first" -- the couplings go
+    before the fresh client, and the content's declarations then live
+    in the client's API.
+  Mine, to put to the user: a headless build compiles no Bevy, yet its
+  worlds must hold the same types as a windowed one's (types.csv the
+  source of truth) -- so basegame registers its render rules and gui
+  types always, and only their libraries (the Bevy code) sit behind a
+  basegame feature the windowed build turns on.
+- SAVED FOR AFTER THE DECOUPLING (the user, 2026-10-18: "save all
+  those, we need to finish decoupling and the public apis including
+  client"): TYPES.CSV DRIVES LOADING (above; open, the user's to say: a
+  type the game registers and the save does not name -- joins under a
+  new ID as now, or the load refused), ONE TRANSIENT DATA and EVERY
+  WORLD A FOLDER (below), and --cold_pool_bytes a server flag ("nice
+  one on the --cold-pool-bytes server flag thats the kind of flag we
+  want indeed", "if its on cleanparameters it csn become a cli flag
+  just fine yes": a Flag of server/src/params.rs over COLD_POOL_BYTES).
 - ONE TRANSIENT DATA (the user, 2026-10-18): "we are making a single
   unfified transient data directory at the root, shared by everyone
   (they can have their own folders inside if needed like the test saves
@@ -651,6 +736,9 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- Content versions: a version or hash a bundle, for a client on another
+  machine -- names alone do not prove the same code or bytes: "dont
+  worry about content versions now, that comes later" (2026-10-18).
 - Registry users cast down once: "users of the registry ideally cast
   stuff down once if needed and never again, but thats for later lol"
   (2026-10-18). A type looked up by name in the frozen registry (its

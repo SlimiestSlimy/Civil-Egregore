@@ -14,7 +14,8 @@ use utilities::coordinates::SuperchunkIndex;
 use server::internals_for_root_tests::{set_attribute, Attribute, AttributeBlock, EntityRef, Header};
 use basegame::worldgen::WorldGeneration;
 use basegame::base_types::BaseTypes;
-use protocol::type_registry::{FrozenTypeRegistry, RegisteredType, TypeRegistry};
+use protocol::type_registry::{in_bundle, FrozenTypeRegistry, RegisteredType, TypeRegistry};
+use basegame::default_types::BUNDLE as BASE_BUNDLE;
 use server::simulation::simulation_api::{Bits4, WidePlane};
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SIDE, THREADS, WORLD, WORLDGEN};
 use server::World;
@@ -50,6 +51,15 @@ pub fn base() -> BaseTypes {
     registered_types().1
 }
 
+/// The tests' own bundle: every type of theirs is in it, registered after
+/// the base game's.
+pub const TESTS_BUNDLE: &str = "tests";
+
+/// The tests' own type named `type_name` in their bundle, of `frozen_type_registry`, if any.
+pub fn test_type_named<'frozen>(frozen_type_registry: &'frozen FrozenTypeRegistry, type_name: &str) -> Option<&'frozen RegisteredType> {
+    named(frozen_type_registry, &in_bundle(TESTS_BUNDLE, type_name))
+}
+
 /// The tests' own plane of tiles: four bits a tile 8 by 8 cells,
 /// registered after the base game's types -- what tiles are tried on
 /// through ticks, saves and frames, the base game having none.
@@ -59,7 +69,8 @@ pub const TEST_TILES: &str = "test tiles";
 /// as initialization hands one the server.
 pub fn types_with_test_tiles(type_registry: &mut TypeRegistry) -> Result<(), String> {
     basegame::default_types::register_types(type_registry)?;
-    type_registry.register(WidePlane::<Bits4>::registration_of_tiles(TEST_TILES, 3)).map(drop).map_err(|refusal| format!("{TEST_TILES}: {refusal:?}"))
+    let mut tests = type_registry.open_bundle(TESTS_BUNDLE).map_err(|refusal| format!("{TESTS_BUNDLE}: {refusal:?}"))?;
+    tests.register(WidePlane::<Bits4>::registration_of_tiles(TEST_TILES, 3)).map(drop).map_err(|refusal| format!("{TEST_TILES}: {refusal:?}"))
 }
 
 /// The tests' own function a client may call, belonging to the world
@@ -72,21 +83,22 @@ pub const TEST_CALL: &str = "test call";
 pub fn types_with_test_call(type_registry: &mut TypeRegistry) -> Result<(), String> {
     basegame::default_types::register_types(type_registry)?;
     let echo = server::simulation::simulation_api::CallCode::new(|call_context, arguments| Ok([call_context.seed(), call_context.tick()].into_iter().chain(arguments.iter().copied()).collect()));
-    type_registry.register(protocol::type_registry::Registration::client_call(TEST_CALL, "world generation").with_library(Arc::new(echo))).map(drop).map_err(|refusal| format!("{TEST_CALL}: {refusal:?}"))
+    let mut tests = type_registry.open_bundle(TESTS_BUNDLE).map_err(|refusal| format!("{TESTS_BUNDLE}: {refusal:?}"))?;
+    tests.register(protocol::type_registry::Registration::client_call(TEST_CALL, &in_bundle(BASE_BUNDLE, "world generation")).with_library(Arc::new(echo))).map(drop).map_err(|refusal| format!("{TEST_CALL}: {refusal:?}"))
 }
 
 /// The types of [`types_with_test_tiles`], frozen for a new world, and
 /// the plane of tiles among them.
 pub fn with_test_tiles() -> (Arc<FrozenTypeRegistry>, WidePlane<Bits4>) {
     let frozen_type_registry = protocol::world_types::of_a_new_world(types_with_test_tiles).expect("the tests' types");
-    let test_tiles = named(&frozen_type_registry, TEST_TILES).and_then(WidePlane::registered).expect("four bits a tile");
+    let test_tiles = test_type_named(&frozen_type_registry, TEST_TILES).and_then(WidePlane::registered).expect("four bits a tile");
     (Arc::new(frozen_type_registry), test_tiles)
 }
 
-/// The ID of the base game's type named `type_name`, in a new world:
-/// a rule ticked alone is asked for by it.
+/// The ID of the base game's type named `type_name` in its bundle, in a
+/// new world: a rule ticked alone is asked for by it.
 pub fn type_id_named(type_name: &str) -> u64 {
-    types().types().iter().find(|registered_type| registered_type.name() == type_name).unwrap_or_else(|| panic!("no type named {type_name}")).type_id()
+    named(&types(), &in_bundle(BASE_BUNDLE, type_name)).unwrap_or_else(|| panic!("no type named {type_name}")).type_id()
 }
 
 /// Worldgen parameters, each by its name, as [`WORLDGEN`] holds them.
@@ -268,7 +280,8 @@ pub const SHEEP_TAG: &str = "sheep tag";
 /// as initialization hands one the server.
 pub fn types_with_sheep_tag(type_registry: &mut TypeRegistry) -> Result<(), String> {
     basegame::default_types::register_types(type_registry)?;
-    type_registry.register(Attribute::<u64>::registration(SHEEP_TAG)).map(drop).map_err(|refusal| format!("{SHEEP_TAG}: {refusal:?}"))
+    let mut tests = type_registry.open_bundle(TESTS_BUNDLE).map_err(|refusal| format!("{TESTS_BUNDLE}: {refusal:?}"))?;
+    tests.register(Attribute::<u64>::registration(SHEEP_TAG)).map(drop).map_err(|refusal| format!("{SHEEP_TAG}: {refusal:?}"))
 }
 
 /// The types of [`types_with_sheep_tag`], frozen for a new world: those
@@ -279,7 +292,7 @@ pub fn with_sheep_tag() -> Arc<FrozenTypeRegistry> {
 
 /// The [`SHEEP_TAG`] attribute of `world`, found by its name among the world's types.
 pub fn sheep_tag(world: &World) -> Attribute<u64> {
-    named(world.frozen_type_registry(), SHEEP_TAG).and_then(Attribute::registered).expect("a world of the types with the sheep tag")
+    test_type_named(world.frozen_type_registry(), SHEEP_TAG).and_then(Attribute::registered).expect("a world of the types with the sheep tag")
 }
 
 /// Gives every sheep of `world` a [`SHEEP_TAG`], each its own: taken off the

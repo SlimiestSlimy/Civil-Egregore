@@ -176,10 +176,10 @@ fn a_world_is_loaded_with_the_types_it_was_made_with() {
         changed_lines.join("\n") + "\n"
     };
     // A type the save does not name -- as in a world saved before the game added it: registered all the same, given an ID past every saved one.
-    std::fs::write(&types_path, with_lines(&|changed_lines| _ = changed_lines.remove(line_of("water depth")))).expect("written");
+    std::fs::write(&types_path, with_lines(&|changed_lines| _ = changed_lines.remove(line_of(&protocol::type_registry::in_bundle(basegame::default_types::BUNDLE, "water depth"))))).expect("written");
     let loaded_world = crate::worlds::opened(&folder, basegame::default_types::register_types).expect("loaded without it");
-    let water_depth = loaded_world.frozen_type_registry().types().iter().find(|registered| registered.name() == "water depth").expect("registered");
-    let last_saved_number = world.frozen_type_registry().types().iter().filter(|registered| registered.name() != "water depth").map(|registered| registered.type_number()).max().expect("types");
+    let water_depth = crate::worlds::named(loaded_world.frozen_type_registry(), &protocol::type_registry::in_bundle(basegame::default_types::BUNDLE, "water depth")).expect("registered");
+    let last_saved_number = world.frozen_type_registry().types().iter().filter(|registered| registered.name() != protocol::type_registry::in_bundle(basegame::default_types::BUNDLE, "water depth")).map(|registered| registered.type_number()).max().expect("types");
     assert!(water_depth.type_number() > last_saved_number && loaded_world.frozen_type_registry().types().len() == lines.len() - 1);
     // A type drawn, renamed, of an ID sharing a number with another, or said twice. The order types are saved in is nothing to them.
     let mut seeded_rng = utilities::rng::RandomSource::new(seed);
