@@ -38,9 +38,6 @@ pub enum TypeKind {
     /// A bundle: what every other type is registered in, its name the
     /// first part of theirs -- in another bundle, or on its own.
     Bundle = 0x09,
-    /// A shader: its library the code the GPU runs for one cell or one
-    /// entity, as text -- data, the same headless or windowed.
-    Shader = 0x0A,
 }
 
 /// Where an ID keeps its kind: its first byte, over its number.
@@ -266,23 +263,6 @@ impl BundleType {
     /// The bundle of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
         Self(type_id(TypeKind::Bundle, type_number))
-    }
-
-    /// Its number.
-    pub const fn type_number(self) -> u64 {
-        number_of(self.0)
-    }
-}
-
-/// A shader: an ID from the one namespace, of its own kind. It has no
-/// size.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ShaderType(pub u64);
-
-impl ShaderType {
-    /// The shader of number `type_number`.
-    pub const fn from_number(type_number: u64) -> Self {
-        Self(type_id(TypeKind::Shader, type_number))
     }
 
     /// Its number.

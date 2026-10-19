@@ -17,6 +17,8 @@ utilities = { path = "utilities" }
 # `--features force_default_settings`: run on the built-in defaults
 # (`utilities/force_default_settings.csv`), ignoring the machine's `settings.csv`.
 force_default_settings = ["utilities/force_default_settings", "client?/force_default_settings"]
+# The window, and the base game's render rules with their code.
+client = ["dep:client", "basegame/client"]
 default = ["client"]
 
 # Every crate of Civil Egregore, built together: one lock file and one `target/`

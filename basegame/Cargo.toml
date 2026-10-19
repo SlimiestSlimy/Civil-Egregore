@@ -6,6 +6,15 @@ description = "Civil Egregore's base game: its types, the libraries they expose,
 [dependencies]
 protocol = { path = "../protocol" }
 server = { path = "../server" }
+# The render rules' code: the client's API and Bevy's colours, only with
+# the `client` feature.
+client = { path = "../client", optional = true }
+bevy = { version = "0.19", default-features = false, features = ["bevy_color"], optional = true }
+
+[features]
+# The render rules with their code: a windowed build's. Without it they
+# are registered all the same, of no code.
+client = ["dep:client", "dep:bevy"]
 
 # The tests' seed (`utilities/test_seed.rs`) reads and writes through
 # utilities; the crate itself reaches it only through the server's API.

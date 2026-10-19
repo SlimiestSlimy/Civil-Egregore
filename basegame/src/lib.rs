@@ -1,8 +1,9 @@
 //! Civil Egregore's base game: the one crate of its content, a module
 //! each -- its types ([`base_types`]), the libraries they expose
 //! ([`libraries`]), the rules of its cells ([`sca_rules`]) and of its
-//! entities ([`entity_rules`]), and its world generation
-//! ([`worldgen`]) -- and its types registered ([`default_types`]).
+//! entities ([`entity_rules`]), its world generation ([`worldgen`])
+//! and how it is drawn ([`render_rules`]: their code only with the
+//! `client` feature) -- and its types registered ([`default_types`]).
 //! Nothing but the program's initialization should name it: the server
 //! and the client are handed its types.
 
@@ -14,5 +15,6 @@ pub mod base_types;
 pub mod default_types;
 pub mod entity_rules;
 pub mod libraries;
+pub mod render_rules;
 pub mod sca_rules;
 pub mod worldgen;
