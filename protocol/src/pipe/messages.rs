@@ -3,8 +3,7 @@
 //! which it is, then what it carries.
 
 use super::frame::{FrameAsk, ViewportFrame};
-use super::terrain::{Height, HeightsAsk, MapAnswer, MapAsk};
-use utilities::tuning::Tuning;
+use crate::server_parameters::CleanServerParameters;
 use utilities::wire::{WireReader, Wired};
 
 /// What a client asks of the server.
@@ -17,20 +16,13 @@ pub enum ClientMessage {
     SetPaused(bool),
     /// Tick so many times a second, or flat out.
     SetPace(Option<u32>),
-    /// Make a world from the seed, or one drawn, as the sliders' numbers
-    /// say, and run it in place of any run.
-    MakeWorld(Option<u64>, Tuning),
+    /// Make a world as these parameters say -- the server's own, as a
+    /// command line gives them -- and run it in place of any run.
+    MakeWorld(CleanServerParameters),
     /// Run the world of this name in the worlds' folder in place of any run.
     OpenWorld(String),
     /// Save the world run under this name in the worlds' folder.
     Save(String),
-    /// Make the world run again from its start, generated as the
-    /// sliders' numbers say.
-    Reset(Tuning),
-    /// The heights of a rectangle of cells: answered with them.
-    AskHeights(HeightsAsk),
-    /// A map: answered with it.
-    AskMap(MapAsk),
     /// The names of the worlds in the worlds' folder: answered with them.
     #[default]
     ListWorlds,
@@ -53,11 +45,6 @@ pub enum ServerMessage {
     WorldTypes(u64, String),
     /// Some of the viewport's superchunks, as a tick left them.
     Frame(Box<ViewportFrame>),
-    /// The heights asked for, row by row: none if another world runs
-    /// than the one asked of.
-    Heights(Option<Vec<Height>>),
-    /// The map asked for: none if another world runs than the one asked of.
-    Map(Option<MapAnswer>),
     /// The names of the worlds in the worlds' folder.
     Worlds(Vec<String>),
     /// A call's answer: its words.
@@ -89,10 +76,9 @@ impl Wired for ClientMessage {
                 words.push(2);
                 pace.put(words);
             }
-            Self::MakeWorld(seed, tuning) => {
+            Self::MakeWorld(parameters) => {
                 words.push(3);
-                seed.put(words);
-                tuning.put(words);
+                parameters.put(words);
             }
             Self::OpenWorld(world_name) => {
                 words.push(4);
@@ -102,21 +88,9 @@ impl Wired for ClientMessage {
                 words.push(5);
                 world_name.put(words);
             }
-            Self::Reset(tuning) => {
-                words.push(6);
-                tuning.put(words);
-            }
-            Self::AskHeights(heights_ask) => {
-                words.push(7);
-                heights_ask.put(words);
-            }
-            Self::AskMap(map_ask) => {
-                words.push(8);
-                map_ask.put(words);
-            }
-            Self::ListWorlds => words.push(9),
+            Self::ListWorlds => words.push(6),
             Self::Call(call, arguments) => {
-                words.push(10);
+                words.push(7);
                 call.put(words);
                 arguments.put(words);
             }
@@ -128,14 +102,11 @@ impl Wired for ClientMessage {
             0 => Self::AskFrame(taken(Default::default(), wire)?),
             1 => Self::SetPaused(taken(Default::default(), wire)?),
             2 => Self::SetPace(taken(Default::default(), wire)?),
-            3 => Self::MakeWorld(taken(None, wire)?, taken([0.0; _], wire)?),
+            3 => Self::MakeWorld(taken(Default::default(), wire)?),
             4 => Self::OpenWorld(taken(Default::default(), wire)?),
             5 => Self::Save(taken(Default::default(), wire)?),
-            6 => Self::Reset(taken([0.0; _], wire)?),
-            7 => Self::AskHeights(taken(Default::default(), wire)?),
-            8 => Self::AskMap(taken(Default::default(), wire)?),
-            9 => Self::ListWorlds,
-            10 => Self::Call(taken(0, wire)?, taken(Vec::new(), wire)?),
+            6 => Self::ListWorlds,
+            7 => Self::Call(taken(0, wire)?, taken(Vec::new(), wire)?),
             _ => return None,
         };
         Some(())
@@ -149,29 +120,21 @@ impl Wired for ServerMessage {
                 words.push(0);
                 frame.put(words);
             }
-            Self::Heights(heights) => {
-                words.push(1);
-                heights.put(words);
-            }
-            Self::Map(map_answer) => {
-                words.push(2);
-                map_answer.put(words);
-            }
             Self::Worlds(world_names) => {
-                words.push(3);
+                words.push(1);
                 world_names.put(words);
             }
             Self::WorldTypes(world, types_text) => {
-                words.push(4);
+                words.push(2);
                 world.put(words);
                 types_text.put(words);
             }
             Self::Answered(answer) => {
-                words.push(5);
+                words.push(3);
                 answer.put(words);
             }
             Self::CallRefused(why_refused) => {
-                words.push(6);
+                words.push(4);
                 why_refused.put(words);
             }
         }
@@ -180,12 +143,10 @@ impl Wired for ServerMessage {
     fn take(&mut self, wire: &mut WireReader) -> Option<()> {
         *self = match wire.next_word()? {
             0 => Self::Frame(Box::new(taken(Default::default(), wire)?)),
-            1 => Self::Heights(taken(Default::default(), wire)?),
-            2 => Self::Map(taken(Default::default(), wire)?),
-            3 => Self::Worlds(taken(Default::default(), wire)?),
-            4 => Self::WorldTypes(taken(0, wire)?, taken(String::new(), wire)?),
-            5 => Self::Answered(taken(Vec::new(), wire)?),
-            6 => Self::CallRefused(taken(String::new(), wire)?),
+            1 => Self::Worlds(taken(Default::default(), wire)?),
+            2 => Self::WorldTypes(taken(0, wire)?, taken(String::new(), wire)?),
+            3 => Self::Answered(taken(Vec::new(), wire)?),
+            4 => Self::CallRefused(taken(String::new(), wire)?),
             _ => return None,
         };
         Some(())

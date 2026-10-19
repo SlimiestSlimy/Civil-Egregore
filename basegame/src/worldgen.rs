@@ -14,7 +14,6 @@ pub mod generation;
 pub mod lots;
 pub mod mesh;
 pub mod patches;
-pub mod terrain_asked;
 pub mod world_generation;
 
 pub use generated_area::generate_area;

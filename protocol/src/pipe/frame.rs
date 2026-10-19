@@ -152,8 +152,6 @@ pub struct ViewportFrame {
     /// How it is generated: each of its generation's parameters, by its
     /// name, as a world's file keeps them.
     pub worldgen_parameters: Vec<(String, u64)>,
-    /// The heights it is drawn between.
-    pub drawn_heights: super::terrain::DrawnHeightRange,
     /// Superchunks along its side, a square about its origin, if it has
     /// a size.
     pub side_superchunks: Option<u32>,
@@ -203,7 +201,7 @@ pub struct ViewportFrame {
 impl Default for ViewportFrame {
     /// Of no world: what a frame taken off the wire is filled in.
     fn default() -> Self {
-        Self { world: 0, seed: 0, worldgen_parameters: Vec::new(), drawn_heights: Default::default(), side_superchunks: None, tick: 0, ticks_a_second: 0.0, target_pace: 0, held_pace: None, entity_count: 0, counts: Vec::new(), sync_seconds: 0.0, sync_share: 0.0, viewport: None, hot: Vec::new(), pixel_side_log2: 0, seen_near: None, world_name: None, last_outcome: None, more_to_come: false, cells: Vec::new() }
+        Self { world: 0, seed: 0, worldgen_parameters: Vec::new(), side_superchunks: None, tick: 0, ticks_a_second: 0.0, target_pace: 0, held_pace: None, entity_count: 0, counts: Vec::new(), sync_seconds: 0.0, sync_share: 0.0, viewport: None, hot: Vec::new(), pixel_side_log2: 0, seen_near: None, world_name: None, last_outcome: None, more_to_come: false, cells: Vec::new() }
     }
 }
 
@@ -220,5 +218,5 @@ impl WiredStruct for Cells {
 }
 
 impl WiredStruct for ViewportFrame {
-    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|frame| &mut frame.world, |frame| &mut frame.seed, |frame| &mut frame.worldgen_parameters, |frame| &mut frame.drawn_heights, |frame| &mut frame.side_superchunks, |frame| &mut frame.tick, |frame| &mut frame.ticks_a_second, |frame| &mut frame.target_pace, |frame| &mut frame.held_pace, |frame| &mut frame.entity_count, |frame| &mut frame.counts, |frame| &mut frame.sync_seconds, |frame| &mut frame.sync_share, |frame| &mut frame.viewport, |frame| &mut frame.hot, |frame| &mut frame.pixel_side_log2, |frame| &mut frame.seen_near, |frame| &mut frame.world_name, |frame| &mut frame.last_outcome, |frame| &mut frame.more_to_come, |frame| &mut frame.cells];
+    const FIELDS: &'static [fn(&mut Self) -> &mut dyn Wired] = &[|frame| &mut frame.world, |frame| &mut frame.seed, |frame| &mut frame.worldgen_parameters, |frame| &mut frame.side_superchunks, |frame| &mut frame.tick, |frame| &mut frame.ticks_a_second, |frame| &mut frame.target_pace, |frame| &mut frame.held_pace, |frame| &mut frame.entity_count, |frame| &mut frame.counts, |frame| &mut frame.sync_seconds, |frame| &mut frame.sync_share, |frame| &mut frame.viewport, |frame| &mut frame.hot, |frame| &mut frame.pixel_side_log2, |frame| &mut frame.seen_near, |frame| &mut frame.world_name, |frame| &mut frame.last_outcome, |frame| &mut frame.more_to_come, |frame| &mut frame.cells];
 }

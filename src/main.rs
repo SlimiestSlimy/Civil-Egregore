@@ -6,7 +6,7 @@
 //! command line to the server's flags ([`server::params`]) and the
 //! server ([`server::start`]).
 //!
-//! No arguments, built with the client: the window, on its main menu ([`client::run_window`]).
+//! No arguments, built with the client: the window ([`client::run_window`]).
 //! `cargo run --release -- --help`: every flag, and what it takes.
 //! `cargo run --release -- --seed 0x5 --side 4`: a server running headless, listening for a client.
 

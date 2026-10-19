@@ -7,7 +7,7 @@
 
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
-use protocol::pipe::terrain::{AsksTerrain, Height, HeightsAsk, MapAnswer, MapAsk};
+use protocol::server_parameters::CleanServerParameters;
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
@@ -15,7 +15,6 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use utilities::tuning::Tuning;
 use utilities::wire::{receive, send};
 
 /// The server's process, and where it is told and asked. Dropped, the
@@ -164,10 +163,10 @@ impl ServerLink {
         self.tell(ClientMessage::SetPace(pace_held_to))
     }
 
-    /// Makes a world from `seed`, or one drawn, as `tuning` says, and runs
-    /// it in place of any run.
-    pub fn make_world(&self, seed: Option<u64>, tuning: Tuning) -> bool {
-        self.tell(ClientMessage::MakeWorld(seed, tuning))
+    /// Makes a world as `parameters` say -- the server's own, as a
+    /// command line gives them -- and runs it in place of any run.
+    pub fn make_world(&self, parameters: CleanServerParameters) -> bool {
+        self.tell(ClientMessage::MakeWorld(parameters))
     }
 
     /// Runs the world named `world_name` in the worlds' folder in place of any run.
@@ -180,33 +179,12 @@ impl ServerLink {
         self.tell(ClientMessage::Save(world_name))
     }
 
-    /// Makes the world run again from its start, generated as `tuning` says.
-    pub fn reset(&self, tuning: Tuning) -> bool {
-        self.tell(ClientMessage::Reset(tuning))
-    }
-
     /// The names of the worlds in the worlds' folder: none if the
     /// server is gone.
     pub fn list_worlds(&self) -> Vec<String> {
         match self.ask(ClientMessage::ListWorlds) {
             Some(ServerMessage::Worlds(world_names)) => world_names,
             _ => Vec::new(),
-        }
-    }
-}
-
-impl AsksTerrain for ServerLink {
-    fn heights(&self, heights_ask: HeightsAsk) -> Option<Vec<Height>> {
-        match self.ask(ClientMessage::AskHeights(heights_ask))? {
-            ServerMessage::Heights(heights) => heights,
-            _ => None,
-        }
-    }
-
-    fn map(&self, map_ask: MapAsk) -> Option<MapAnswer> {
-        match self.ask(ClientMessage::AskMap(map_ask))? {
-            ServerMessage::Map(map_answer) => map_answer,
-            _ => None,
         }
     }
 }

@@ -56,8 +56,9 @@ fn the_default_settings_never_replace_a_machines() {
     let read_settings = Settings::read_or_start(&existing_file);
     assert_eq!(std::fs::read_to_string(&existing_file).expect("the file"), own_text, "the machine's file as it was");
     assert_eq!((read_settings.get(WORLDS), read_settings.get("another's")), (Some("/somewhere/else"), Some("7")));
-    let (setting_name, value) = ("ocean share", default_values.get("ocean share").expect("a default"));
-    assert_eq!(read_settings.get(setting_name), Some(value), "what the file lacks, from the default settings");
+    // A file lacking it: the worlds' folder from the default settings.
+    std::fs::write(&existing_file, "setting,value\nanother's,7\n").expect("written");
+    assert_eq!(Settings::read_or_start(&existing_file).get(WORLDS), default_values.get(WORLDS), "what the file lacks, from the default settings");
 }
 
 /// Settings are found by name, whatever the order of their lines:
@@ -73,9 +74,7 @@ fn settings_are_found_by_name_in_any_order() {
     std::fs::create_dir_all(path.parent().expect("a folder")).expect("its folder made");
     std::fs::write(&path, lines.join("\n")).expect("written");
     let (read_settings, default_values) = (Settings::read_from(&path), Settings::default_settings());
-    for setting_name in utilities::tuning::NAMES.into_iter().chain([WORLDS]) {
-        assert_eq!(read_settings.get(setting_name), default_values.get(setting_name), "{setting_name}");
-    }
+    assert_eq!(read_settings.get(WORLDS), default_values.get(WORLDS));
     let found_rows = utilities::csv::rows_by_column("uses,seed\n3,0x1\n", &["seed", "uses", "never written"]);
     assert_eq!(found_rows, [["0x1", "3", ""]]);
 }

@@ -2,15 +2,13 @@
 //! size, threads and camera, and its worldgen parameters -- handed to the
 //! type hooked to generate it untouched, each by its name: what they
 //! mean, and what one not given is, are its to know. Whoever gives them
-//! -- a command line, a window's sliders ([`parameters_of_tuning`]) --
-//! gives them so.
+//! -- a command line, a client -- gives them so.
 
 use crate::chunk_storage::disk::WorldInfo;
 use crate::simulation::simulation_api::WorldgenCode;
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_LOADS, FORCED_HOT, SEED, SIDE, THREADS, WORLDGEN};
 use protocol::type_registry::FrozenTypeRegistry;
 use std::hash::{BuildHasher, RandomState};
-use utilities::tuning::{Tuning, CAMERA_LOADS as CAMERA_LOADS_SLIDER, FORCED_HOT as FORCED_HOT_SLIDER, WORLD_SIDE};
 
 /// Seeds tried after one drawn at random for one its generation finds
 /// fit to start, before the one drawn is taken.
@@ -59,20 +57,6 @@ pub(crate) fn thread_count_of(parameters: &CleanServerParameters) -> Result<Opti
 /// `worldgen_parameters` -- what a world remade from its start is.
 pub(crate) fn parameters_of_world(world_info: &WorldInfo, worldgen_parameters: &[(String, u64)]) -> CleanServerParameters {
     new_world_parameters(world_info.side_in_superchunks.unwrap_or(0), world_info.forced_hot, world_info.camera_loads, worldgen_parameters).with(SEED, ParameterValue::Hex(world_info.seed))
-}
-
-/// The parameters of a new world as a window's sliders have it
-/// (`utilities::tuning`), its worldgen parameters as `worldgen` reads
-/// the sliders, of `seed` if given -- else one drawn as it starts.
-/// Until the sliders are the client's own, giving parameters.
-pub(crate) fn parameters_of_tuning(seed: Option<u64>, tuning: &Tuning, worldgen: &WorldgenCode) -> CleanServerParameters {
-    let side_superchunks = tuning[WORLD_SIDE].round().max(0.0) as u32;
-    let forced_hot = side_superchunks > 0 && tuning[FORCED_HOT_SLIDER] >= 0.5;
-    let parameters = new_world_parameters(side_superchunks, forced_hot, !forced_hot && tuning[CAMERA_LOADS_SLIDER] >= 0.5, &(worldgen.worldgen_parameters_of_tuning)(tuning));
-    match seed {
-        Some(given_seed) => parameters.with(SEED, ParameterValue::Hex(given_seed)),
-        None => parameters,
-    }
 }
 
 /// The parameters of a new world `side_superchunks` a side -- 0, no

@@ -66,7 +66,6 @@ pub use world_start::{drawn_seed, seed_fit_to_start};
 
 use crate::chunk_storage::disk::WorldInfo;
 use utilities::coordinates::WORLD_MIDDLE;
-use crate::simulation::simulation_api::WorldgenCode;
 use crate::simulation::{ColdPoolPaging, SimulationHandle};
 use std::sync::Arc;
 use protocol::type_registry::FrozenTypeRegistry;
@@ -94,9 +93,6 @@ pub struct World {
     /// parts -- its tick, those unpopulated -- read from the simulation
     /// when it is saved.
     pub(crate) world_info: WorldInfo,
-    /// What generates it: the library of its type hooked into
-    /// generating the world, asked of what the server is asked of it.
-    pub(crate) worldgen: WorldgenCode,
     /// The types it runs with: frozen as it starts, the same as long as
     /// it runs.
     pub(crate) frozen_type_registry: Arc<FrozenTypeRegistry>,
@@ -120,7 +116,7 @@ impl World {
         let simulation_handle = SimulationHandle::new(&world_info, &frozen_type_registry, thread_count, ColdPoolPaging { folder: paging_folder(), bytes_kept: COLD_POOL_BYTES_KEPT })?;
         // Those unpopulated are the simulation's to keep from here on.
         let worldgen_parameters_for_reset = world_info.worldgen_parameters.clone();
-        Ok(Self { world_info: WorldInfo { unpopulated: Vec::new(), ..world_info }, worldgen, frozen_type_registry, simulation_handle, worldgen_parameters_for_reset })
+        Ok(Self { world_info: WorldInfo { unpopulated: Vec::new(), ..world_info }, frozen_type_registry, simulation_handle, worldgen_parameters_for_reset })
     }
 
     /// The types it runs with.

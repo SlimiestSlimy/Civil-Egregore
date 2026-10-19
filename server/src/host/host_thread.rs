@@ -5,7 +5,6 @@ use crate::World;
 use super::{CATCH_UP, FRAMES_SHARE, HostRequest, HostSent, TARGET_PACE};
 use super::frame::{copy_superchunk, frame_of, hot_in};
 use protocol::pipe::frame::{Cells, FrameAsk, ViewportFrame};
-use super::terrain::{TerrainRequest, WorldTold};
 use std::thread;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::time::{Duration, Instant};
@@ -67,17 +66,14 @@ pub(crate) struct HostThread {
     last_answer_measured: (f64, f64, f64),
     /// What the last tick took.
     tick_took: Duration,
-    /// The terrain's thread, told of each world run.
-    terrain: Sender<TerrainRequest>,
     /// What registers the types of a world opened.
     register_types: RegisterTypes,
 }
 
 impl HostThread {
-    /// No world, at the game's pace; `terrain` told of each world run;
-    /// worlds opened of `register_types`.
-    pub(crate) fn telling_terrain(terrain: Sender<TerrainRequest>, register_types: RegisterTypes) -> Self {
-        Self { terrain, register_types, running_world: None, worlds: 0, ticking_paused: false, pace_held_to: Some(TARGET_PACE), world_name: None, last_outcome: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), being_answered: None, last_answer_measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
+    /// No world, at the game's pace; worlds opened of `register_types`.
+    pub(crate) fn new(register_types: RegisterTypes) -> Self {
+        Self { register_types, running_world: None, worlds: 0, ticking_paused: false, pace_held_to: Some(TARGET_PACE), world_name: None, last_outcome: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), being_answered: None, last_answer_measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
     }
 }
 
@@ -130,7 +126,6 @@ impl HostThread {
                         self.reset_now();
                         self.save(name_to_save);
                     }
-                    Ok(HostRequest::Reset(reset_tuning)) => self.reset = self.running_world.as_ref().map(|running_world| (running_world.world.worldgen.worldgen_parameters_of_tuning)(&reset_tuning)),
                     Err(TryRecvError::Empty) => break,
                     Err(TryRecvError::Disconnected) => return,
                 }
@@ -180,15 +175,12 @@ impl HostThread {
         // A frame half answered was of the world before.
         self.being_answered = None;
         self.worlds += 1;
-        // Told before any frame of this world is sent: an ask of it finds it known. The thread gone, there is no one to ask either.
-        let world = &running_world.world;
-        _ = self.terrain.send(TerrainRequest::World(WorldTold { world: self.worlds, seed: world.world_info.seed, worldgen_parameters: world.world_info.worldgen_parameters.clone(), worldgen: world.worldgen.clone() }));
         self.running_world = Some(running_world);
         self.next_tick = Instant::now();
     }
 
     /// Makes the world run again from its start, generated as the
-    /// worldgen parameters last asked say -- the sliders', or a call's --
+    /// worldgen parameters a call last asked for say --
     /// if it was asked to be: a world of its own from then, of no name.
     fn reset_now(&mut self) {
         let (Some(reset_worldgen_parameters), Some(running_world)) = (self.reset.take(), &self.running_world) else {

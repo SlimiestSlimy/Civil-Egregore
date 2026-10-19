@@ -2,19 +2,15 @@
 //! hooked into generating the world exposes it: each superchunk's
 //! cells, and a flock on each queued on its turn the first tick it is
 //! hot ([`flock`]) -- both as the world's worldgen parameters say ([`WorldGeneration`]);
-//! the worldgen parameters off a window's sliders; a seed with land about the
-//! middle, where the sheep start; the terrain asked of the server.
+//! and a seed with land about the middle, where the sheep start.
 
-use crate::worldgen::terrain_asked::{drawn_heights_of, heights, map};
 use crate::worldgen::{generate_area, has_land_about, WorldGeneration};
 use crate::base_types::{BaseTypes, SheepState};
 use crate::entity_rules::sheep::{STEP, TIME_BETWEEN_MEALS};
 use crate::libraries::collision::Collision;
 use std::sync::Arc;
-use server::simulation::simulation_api::terrain::{DrawnHeightRange, Height, HeightsAsk, MapAnswer, MapAsk};
 use server::simulation::simulation_api::{cell_reads_and_writes, tick_and_random_stream, CellCartesian, CellIndex, GeneratedArea, WorldgenParameters, RandomSource, SimulationTickState, WholeAttribute, WorldgenCode, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE_CELL};
 use std::collections::HashSet;
-use server::simulation::simulation_api::tuning::Tuning;
 
 /// The world generation's library, as it is registered with
 /// `base_types`: the cells generated on its planes, and the flocks made
@@ -25,11 +21,7 @@ pub fn code(base_types: BaseTypes) -> WorldgenCode {
         generate_cells: Arc::new(move |worldgen_parameters, seed, generated_area| generate_cells(&base_types, worldgen_parameters, seed, generated_area)),
         populate: Arc::new(move |tick_state, worldgen_parameters, seed| populate(&base_types, &collision, tick_state, worldgen_parameters, seed)),
         parameters_read,
-        worldgen_parameters_of_tuning,
         fit_to_start,
-        drawn_heights,
-        heights: heights_asked,
-        map: map_asked,
     }
 }
 
@@ -44,30 +36,10 @@ fn parameters_read(worldgen_parameters: &WorldgenParameters) -> Vec<(String, u64
     WorldGeneration::of_worldgen_parameters(worldgen_parameters).worldgen_parameters()
 }
 
-/// The worldgen parameters a window's sliders say ([`WorldGeneration::from_tuning`]).
-fn worldgen_parameters_of_tuning(tuning: &Tuning) -> Vec<(String, u64)> {
-    WorldGeneration::from_tuning(tuning).worldgen_parameters()
-}
-
 /// Whether the world of `seed` has land about the middle, where the
 /// sheep start ([`has_land_about`]).
 fn fit_to_start(worldgen_parameters: &WorldgenParameters, seed: u64) -> bool {
     has_land_about(seed, &WorldGeneration::of_worldgen_parameters(worldgen_parameters).land_shape, WORLD_MIDDLE_CELL)
-}
-
-/// The heights the world is drawn between ([`drawn_heights_of`]).
-fn drawn_heights(worldgen_parameters: &WorldgenParameters) -> DrawnHeightRange {
-    drawn_heights_of(&WorldGeneration::of_worldgen_parameters(worldgen_parameters))
-}
-
-/// The heights `heights_ask` asks for, of the world of `seed` ([`heights`]).
-fn heights_asked(worldgen_parameters: &WorldgenParameters, seed: u64, heights_ask: &HeightsAsk) -> Vec<Height> {
-    heights(seed, &WorldGeneration::of_worldgen_parameters(worldgen_parameters), heights_ask)
-}
-
-/// The map `map_ask` asks for, of the world of `seed` ([`map`]).
-fn map_asked(worldgen_parameters: &WorldgenParameters, seed: u64, map_ask: MapAsk) -> MapAnswer {
-    map(seed, &WorldGeneration::of_worldgen_parameters(worldgen_parameters), map_ask)
 }
 
 /// A flock of as many sheep as `worldgen_parameters` say, queued on `tick_state`, its

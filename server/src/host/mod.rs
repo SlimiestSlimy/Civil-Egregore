@@ -7,9 +7,7 @@ mod host_thread;
 use host_thread::HostThread;
 
 mod frame;
-pub mod terrain;
 
-use utilities::tuning::Tuning;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use protocol::server_parameters::CleanServerParameters;
 use protocol::type_registry::FrozenTypeRegistry;
@@ -71,9 +69,6 @@ enum HostRequest {
     /// Save the world run under this name in the worlds' folder, its
     /// name from then ([`Frame::named`]).
     Save(String),
-    /// Make the world run again from its start, generated as these
-    /// sliders say: of many read between two ticks, the last alone.
-    Reset(Box<Tuning>),
 }
 
 /// The host, as a client holds it: each call sent to the host's thread,
@@ -84,8 +79,6 @@ enum HostRequest {
 pub struct Host {
     /// Where the calls go.
     request_sender: Sender<HostRequest>,
-    /// Where the terrain is asked of.
-    terrain: terrain::TerrainAsker,
 }
 
 impl Host {
@@ -95,16 +88,8 @@ impl Host {
     pub fn start_on_thread(register_types: RegisterTypes) -> (Self, Receiver<HostSent>) {
         let (request_sender, request_receiver) = channel();
         let (sender, host_sent) = channel();
-        let terrain = terrain::start_terrain_thread();
-        let terrain_for_host = terrain.clone();
-        thread::Builder::new().name("host".to_string()).spawn(move || HostThread::telling_terrain(terrain_for_host, register_types).serve_requests(&request_receiver, &sender)).expect("a thread for the host");
-        (Self { request_sender, terrain: terrain::TerrainAsker { request_sender: terrain } }, host_sent)
-    }
-
-    /// Where the terrain of the world run is asked of, what no frame
-    /// brings: a handle of its own, for a thread that may wait.
-    pub fn terrain(&self) -> terrain::TerrainAsker {
-        self.terrain.clone()
+        thread::Builder::new().name("host".to_string()).spawn(move || HostThread::new(register_types).serve_requests(&request_receiver, &sender)).expect("a thread for the host");
+        (Self { request_sender }, host_sent)
     }
 
     /// Asks for some of the viewport's superchunks: answered with a
@@ -157,15 +142,5 @@ impl Host {
     /// from then ([`Frame::named`]).
     pub fn save_world(&self, world_name: String) -> bool {
         self.request_sender.send(HostRequest::Save(world_name)).is_ok()
-    }
-
-    /// Makes the world run again from its start, its generation as
-    /// `tuning` has it now, as its generation reads the sliders
-    /// (`WorldgenCode::worldgen_parameters_of_tuning`), the rest as it
-    /// started: its seed, size, sheep, hot entity and camera. A slider
-    /// dragged calls it each frame; of calls with no frame asked between, only the last
-    /// is done.
-    pub fn reset(&self, tuning: &Tuning) -> bool {
-        self.request_sender.send(HostRequest::Reset(Box::new(*tuning))).is_ok()
     }
 }

@@ -12,7 +12,7 @@ use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, PoisonError};
-use utilities::tuning::{default_tuning, FORCED_HOT, SHEEP_PER_SUPERCHUNK, WORLD_SIDE};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SEED, SIDE, WORLDGEN};
 use utilities::wire::{receive, send};
 
 /// Held while a test's server runs: one at a time on the one port.
@@ -48,9 +48,9 @@ fn a_world_made_by_a_client_is_answered_with_its_frames() {
     let mut from_server = BufReader::new(to_server.try_clone().expect("to read from"));
     send(&mut ClientMessage::ListWorlds, &mut to_server).expect("sent");
     assert!(matches!(receive(&mut from_server).expect("read"), Some(ServerMessage::Worlds(_))), "the worlds listed");
-    let mut tuning = default_tuning();
-    (tuning[WORLD_SIDE], tuning[FORCED_HOT], tuning[SHEEP_PER_SUPERCHUNK]) = (2.0, 1.0, 3.0);
-    send(&mut ClientMessage::MakeWorld(Some(seed), tuning), &mut to_server).expect("sent");
+    // The server's own parameters, as a command line gives them.
+    let parameters = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(3)));
+    send(&mut ClientMessage::MakeWorld(parameters), &mut to_server).expect("sent");
     let mut frame_ask = whole_world_ask();
     let (mut frames_seen, mut types_seen) = (0, 0);
     loop {

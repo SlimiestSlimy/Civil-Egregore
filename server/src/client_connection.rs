@@ -15,7 +15,6 @@ use crate::params::{CLOSE_IF_NO_CLIENTS, SEED, SIDE, WORLD};
 use crate::worlds_in;
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use protocol::pipe::SERVER_PORT;
-use protocol::pipe::terrain::AsksTerrain;
 use protocol::server_parameters::CleanServerParameters;
 use protocol::world_types::{self, RegisterTypes};
 use std::io::BufReader;
@@ -99,14 +98,12 @@ pub fn serve_clients(clean_parameters: &CleanServerParameters, register_types: R
         })
         .map_err(|spawn_error| spawn_error.to_string())?;
     let (ask_sender, asks) = channel();
-    let (terrain, answers_outgoing, calls_host) = (host.terrain(), Arc::clone(&outgoing), host.clone());
+    let (answers_outgoing, calls_host) = (Arc::clone(&outgoing), host.clone());
     thread::Builder::new()
         .name("answers out".to_string())
         .spawn(move || {
             for ask in asks {
                 let answer = match ask {
-                    ClientMessage::AskHeights(heights_ask) => ServerMessage::Heights(terrain.heights(heights_ask)),
-                    ClientMessage::AskMap(map_ask) => ServerMessage::Map(terrain.map(map_ask)),
                     ClientMessage::ListWorlds => ServerMessage::Worlds(worlds_in(&utilities::settings::worlds())),
                     ClientMessage::Call(call, arguments) => match calls_host.call(call, arguments) {
                         Ok(answer) => ServerMessage::Answered(answer),
@@ -163,16 +160,15 @@ fn serve_one_client(client: TcpStream, host: &Host, ask_sender: &std::sync::mpsc
             ClientMessage::AskFrame(frame_ask) => _ = host.ask_frame(frame_ask),
             ClientMessage::SetPaused(paused) => _ = host.set_paused(paused),
             ClientMessage::SetPace(pace) => _ = host.set_pace(pace),
-            ClientMessage::MakeWorld(seed, tuning) => match world_types::of_a_new_world(register_types).and_then(|frozen_type_registry| Ok((crate::simulation::worldgen_of(&frozen_type_registry)?, frozen_type_registry))) {
-                Ok((worldgen, frozen_type_registry)) => _ = host.make_world(crate::world_start::parameters_of_tuning(seed, &tuning, &worldgen), Arc::new(frozen_type_registry)),
+            ClientMessage::MakeWorld(parameters) => match world_types::of_a_new_world(register_types) {
+                Ok(frozen_type_registry) => _ = host.make_world(parameters, Arc::new(frozen_type_registry)),
                 // The game's types not registering is nothing a client can mend: no world made.
                 Err(_) => continue,
             },
             ClientMessage::OpenWorld(world_name) => _ = host.open_world(world_name),
             ClientMessage::Save(world_name) => _ = host.save_world(world_name),
-            ClientMessage::Reset(tuning) => _ = host.reset(&tuning),
             // Answered, in the order asked: a client matches each answer to its ask by that order.
-            ask @ (ClientMessage::AskHeights(_) | ClientMessage::AskMap(_) | ClientMessage::ListWorlds | ClientMessage::Call(..)) => _ = ask_sender.send(ask),
+            ask @ (ClientMessage::ListWorlds | ClientMessage::Call(..)) => _ = ask_sender.send(ask),
         }
     }
 }
