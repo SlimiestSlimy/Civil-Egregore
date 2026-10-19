@@ -67,14 +67,19 @@ pub struct FrameAsk {
     pub counted: Vec<LayerType>,
 }
 
-/// A layer type on the wire: its number.
+/// A layer type on the wire: its ID, then its shape -- bits a cell and
+/// tiles' scale -- in a word.
 impl Wired for LayerType {
     fn put(&mut self, words: &mut Vec<u64>) {
-        self.0.put(words);
+        words.extend([self.type_id(), u64::from(self.width_bits()) << 32 | u64::from(self.tile_scale())]);
     }
 
     fn take(&mut self, wire: &mut WireReader) -> Option<()> {
-        self.0.take(wire)
+        let (mut type_id, mut shape) = (0u64, 0u64);
+        type_id.take(wire)?;
+        shape.take(wire)?;
+        *self = LayerType::of_id_and_shape(type_id, (shape >> 32) as u32, shape as u32)?;
+        Some(())
     }
 }
 

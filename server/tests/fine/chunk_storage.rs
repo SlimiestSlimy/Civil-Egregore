@@ -127,7 +127,7 @@ fn images_hold_one_layer_a_type_in_type_order() {
     let mut layer_codec = LayerCodec::new();
     let (drawn_words, one_cell_words) = (layer_codec.encode_cells(&rectangle_and_circle()).to_vec(), layer_codec.encode_cells(&one_cell(CELL)).to_vec());
     let place = 13;
-    let layer_change = |layer_type, words| LayerChange { place, layer_type: LayerType(layer_type), encoded_layer: words };
+    let layer_change = |layer_type, words| LayerChange { place, layer_type: LayerType::bitplane_of_id(layer_type), encoded_layer: words };
     let image = SuperchunkImage::empty().rewritten_with(&[
         layer_change(42, &one_cell_words),
         layer_change(7, &drawn_words),
@@ -137,11 +137,11 @@ fn images_hold_one_layer_a_type_in_type_order() {
         layer_change(0, &[]),
         layer_change(5, &[]),
     ]);
-    assert_eq!(image.layer_types(place).collect::<Vec<_>>(), [LayerType(7), LayerType(42), LayerType(u64::MAX)]);
+    assert_eq!(image.layer_types(place).collect::<Vec<_>>(), [LayerType::bitplane_of_id(7), LayerType::bitplane_of_id(42), LayerType::bitplane_of_id(u64::MAX)]);
     for (layer_type, cells) in [(7, rectangle_and_circle()), (42, rectangle_and_circle()), (u64::MAX, one_cell(CELL))] {
-        assert_eq!(decoded_cells(&mut layer_codec, image.layer(place, LayerType(layer_type)).expect("held")), cells, "type {layer_type}");
+        assert_eq!(decoded_cells(&mut layer_codec, image.layer(place, LayerType::bitplane_of_id(layer_type)).expect("held")), cells, "type {layer_type}");
     }
-    assert!(image.layer(place, LayerType(0)).is_none());
+    assert!(image.layer(place, LayerType::bitplane_of_id(0)).is_none());
     assert!((0..16).filter(|&other_place| other_place != place).all(|checked_place| image.layer_types(checked_place).count() == 0));
     assert_eq!(image.words()[0] as usize, 16, "the first chunk after the chunk table");
 
@@ -156,7 +156,7 @@ fn images_hold_one_layer_a_type_in_type_order() {
 fn broken_images_are_refused() {
     let mut layer_codec = LayerCodec::new();
     let one_cell_words = layer_codec.encode_cells(&one_cell(CELL)).to_vec();
-    let image = SuperchunkImage::empty().rewritten_with(&[LayerChange { place: 15, layer_type: LayerType(1), encoded_layer: &one_cell_words }]);
+    let image = SuperchunkImage::empty().rewritten_with(&[LayerChange { place: 15, layer_type: LayerType::bitplane_of_id(1), encoded_layer: &one_cell_words }]);
     let words = image.words();
     assert!(SuperchunkImage::from_words(words[..10].into()).is_err(), "shorter than its chunk table");
     let mut bad_chunk_offset = words.to_vec();
@@ -176,29 +176,29 @@ fn the_ring_frees_from_its_tail_and_wraps() {
     let mut writeback_ring = WritebackRing::new(40);
     let (superchunk_a, superchunk_b) = (SuperchunkIndex::from_cartesian(1, 0), SuperchunkIndex::from_cartesian(0, 1));
     let chunk = ChunkIndex::from_superchunk_place;
-    assert!(writeback_ring.push(chunk(superchunk_a, 1), LayerType(1), &[11; 5]));
-    assert!(writeback_ring.push(chunk(superchunk_b, 2), LayerType(2), &[22; 5]));
-    assert!(writeback_ring.push(chunk(superchunk_a, 3), LayerType(3), &[33; 5]));
-    assert!(!writeback_ring.push(chunk(superchunk_b, 4), LayerType(4), &[44; 20]), "no room");
+    assert!(writeback_ring.push(chunk(superchunk_a, 1), LayerType::bitplane_of_id(1), &[11; 5]));
+    assert!(writeback_ring.push(chunk(superchunk_b, 2), LayerType::bitplane_of_id(2), &[22; 5]));
+    assert!(writeback_ring.push(chunk(superchunk_a, 3), LayerType::bitplane_of_id(3), &[33; 5]));
+    assert!(!writeback_ring.push(chunk(superchunk_b, 4), LayerType::bitplane_of_id(4), &[44; 20]), "no room");
     assert_eq!(writeback_ring.tail_superchunk(), Some(superchunk_a));
     let entries_of_a = writeback_ring.entries_of(superchunk_a);
     assert_eq!(entries_of_a.iter().map(|ring_entry| (ring_entry.place, ring_entry.layer_type, writeback_ring.encoded_layer(ring_entry)[0])).collect::<Vec<_>>(), [
-        (1, LayerType(1), 11),
-        (3, LayerType(3), 33)
+        (1, LayerType::bitplane_of_id(1), 11),
+        (3, LayerType::bitplane_of_id(3), 33)
     ]);
     writeback_ring.release_superchunk(superchunk_a);
     assert_eq!(writeback_ring.tail_superchunk(), Some(superchunk_b), "b's entry is the tail now");
     // Words 24 to 37 go to the next entry; the one after it does not fit
     // before the end, and wraps into the 8 words freed before b's.
-    assert!(writeback_ring.push(chunk(superchunk_a, 5), LayerType(5), &[55; 10]));
-    assert!(writeback_ring.push(chunk(superchunk_a, 6), LayerType(6), &[66; 2]));
-    assert!(!writeback_ring.push(chunk(superchunk_a, 7), LayerType(7), &[77; 1]), "full up to b's entry");
+    assert!(writeback_ring.push(chunk(superchunk_a, 5), LayerType::bitplane_of_id(5), &[55; 10]));
+    assert!(writeback_ring.push(chunk(superchunk_a, 6), LayerType::bitplane_of_id(6), &[66; 2]));
+    assert!(!writeback_ring.push(chunk(superchunk_a, 7), LayerType::bitplane_of_id(7), &[77; 1]), "full up to b's entry");
     assert_eq!(writeback_ring.entries_of(superchunk_a).iter().map(|later_entry| writeback_ring.encoded_layer(later_entry)[0]).collect::<Vec<_>>(), [55, 66]);
     writeback_ring.release_superchunk(superchunk_b);
     assert_eq!(writeback_ring.tail_superchunk(), Some(superchunk_a));
     writeback_ring.release_superchunk(superchunk_a);
     assert!(writeback_ring.is_empty() && writeback_ring.tail_superchunk().is_none());
-    assert!(writeback_ring.push(chunk(superchunk_b, 0), LayerType(9), &[99; 37]), "an empty ring starts over");
+    assert!(writeback_ring.push(chunk(superchunk_b, 0), LayerType::bitplane_of_id(9), &[99; 37]), "an empty ring starts over");
 }
 
 /// Written back, a bitmap is in the ring and not yet in the cold pool; flushed,
@@ -209,19 +209,19 @@ fn flushing_writes_the_ring_into_the_cold_pool() {
     let (mut layer_codec, mut cold_storage, mut flushed_superchunks) = (LayerCodec::new(), ChunkStorage::new(1 << 12), Vec::new());
     cold_storage.insert(WORLD_MIDDLE, SuperchunkImage::empty());
     let chunk = ChunkIndex::from_superchunk_place(WORLD_MIDDLE, 6);
-    cold_storage.write_back(chunk, LayerType(1), layer_codec.encode_cells(&one_cell(CELL)), &mut flushed_superchunks);
-    cold_storage.write_back(chunk, LayerType(2), layer_codec.encode_cells(&rectangle_and_circle()), &mut flushed_superchunks);
-    cold_storage.write_back(chunk, LayerType(1), layer_codec.encode_cells(&rectangle_and_circle()), &mut flushed_superchunks);
-    assert!(flushed_superchunks.is_empty() && cold_storage.layer(chunk, LayerType(1)).is_none(), "in the ring, not the cold pool");
+    cold_storage.write_back(chunk, LayerType::bitplane_of_id(1), layer_codec.encode_cells(&one_cell(CELL)), &mut flushed_superchunks);
+    cold_storage.write_back(chunk, LayerType::bitplane_of_id(2), layer_codec.encode_cells(&rectangle_and_circle()), &mut flushed_superchunks);
+    cold_storage.write_back(chunk, LayerType::bitplane_of_id(1), layer_codec.encode_cells(&rectangle_and_circle()), &mut flushed_superchunks);
+    assert!(flushed_superchunks.is_empty() && cold_storage.layer(chunk, LayerType::bitplane_of_id(1)).is_none(), "in the ring, not the cold pool");
     assert!(cold_storage.flush(WORLD_MIDDLE) && !cold_storage.flush(WORLD_MIDDLE));
     assert!(cold_storage.nothing_to_flush());
-    assert_eq!(decoded_cells(&mut layer_codec, cold_storage.layer(chunk, LayerType(1)).expect("flushed")), rectangle_and_circle(), "the later write");
-    assert_eq!(decoded_cells(&mut layer_codec, cold_storage.layer(chunk, LayerType(2)).expect("flushed")), rectangle_and_circle());
+    assert_eq!(decoded_cells(&mut layer_codec, cold_storage.layer(chunk, LayerType::bitplane_of_id(1)).expect("flushed")), rectangle_and_circle(), "the later write");
+    assert_eq!(decoded_cells(&mut layer_codec, cold_storage.layer(chunk, LayerType::bitplane_of_id(2)).expect("flushed")), rectangle_and_circle());
 
-    cold_storage.write_back(chunk, LayerType(2), &[], &mut flushed_superchunks);
+    cold_storage.write_back(chunk, LayerType::bitplane_of_id(2), &[], &mut flushed_superchunks);
     cold_storage.flush_all(&mut flushed_superchunks);
     assert_eq!(flushed_superchunks, [WORLD_MIDDLE]);
-    assert!(cold_storage.layer(chunk, LayerType(2)).is_none() && cold_storage.layer(chunk, LayerType(1)).is_some());
+    assert!(cold_storage.layer(chunk, LayerType::bitplane_of_id(2)).is_none() && cold_storage.layer(chunk, LayerType::bitplane_of_id(1)).is_some());
 }
 
 /// A full ring flushes the superchunk at its tail to make room, and says
@@ -234,14 +234,14 @@ fn a_full_ring_flushes_its_tail() {
     assert!(words.len() > 8, "bigger than the ring");
     let (first_superchunk, second_superchunk) = (SuperchunkIndex::from_cartesian(5, 5), SuperchunkIndex::from_cartesian(6, 5));
     let first_chunk = ChunkIndex::from_superchunk_place(first_superchunk, 0);
-    cold_storage.write_back(first_chunk, LayerType(1), &words, &mut flushed_superchunks);
+    cold_storage.write_back(first_chunk, LayerType::bitplane_of_id(1), &words, &mut flushed_superchunks);
     assert!(flushed_superchunks.is_empty(), "grown, nothing flushed");
     let second_chunk = ChunkIndex::from_superchunk_place(second_superchunk, 3);
-    cold_storage.write_back(second_chunk, LayerType(1), &words, &mut flushed_superchunks);
+    cold_storage.write_back(second_chunk, LayerType::bitplane_of_id(1), &words, &mut flushed_superchunks);
     assert_eq!(flushed_superchunks, [first_superchunk]);
-    assert_eq!(decoded_cells(&mut layer_codec, cold_storage.layer(first_chunk, LayerType(1)).expect("flushed")), rectangle_and_circle());
-    assert!(cold_storage.image(first_superchunk).expect("made").layer(3, LayerType(1)).is_none(), "made empty");
-    assert!(cold_storage.layer(second_chunk, LayerType(1)).is_none(), "still in the ring");
+    assert_eq!(decoded_cells(&mut layer_codec, cold_storage.layer(first_chunk, LayerType::bitplane_of_id(1)).expect("flushed")), rectangle_and_circle());
+    assert!(cold_storage.image(first_superchunk).expect("made").layer(3, LayerType::bitplane_of_id(1)).is_none(), "made empty");
+    assert!(cold_storage.layer(second_chunk, LayerType::bitplane_of_id(1)).is_none(), "still in the ring");
 }
 
 mod paging;

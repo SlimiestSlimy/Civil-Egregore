@@ -45,7 +45,7 @@ pub fn world_hash(world: &mut World) -> WorldHash {
     world.flush_what_went_cold();
     let mut cells = 0;
     for &layer_type in &world.world_info.layers {
-        cells = fold_word(cells, layer_type.0);
+        cells = fold_word(cells, layer_type.type_id());
         for (chunk, bucket) in world.bitmap_arena().buckets_of(layer_type) {
             cells = fold_all(fold_word(fold_word(cells, chunk.0), u64::from(bucket.count())), bucket.words());
         }

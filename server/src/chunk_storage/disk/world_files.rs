@@ -51,7 +51,7 @@ impl WorldInfo {
     /// name and what it is -- its seed in hexadecimal, its layer types
     /// with spaces between.
     pub(crate) fn to_text(&self) -> String {
-        let layers: Vec<String> = self.layers.iter().map(|layer| layer.0.to_string()).collect();
+        let layers: Vec<String> = self.layers.iter().map(|layer| layer.type_id().to_string()).collect();
         let mut name_value_rows = vec![
             (FORMAT_ROW.0.to_string(), FORMAT_ROW.1.to_string()),
             ("seed".to_string(), utilities::seed::seed_as_hex(self.seed)),
@@ -92,7 +92,7 @@ impl WorldInfo {
                 _ if row_name == FORMAT_ROW.0 => {}
                 "seed" => seed = Some(utilities::seed::of_hex(value).ok_or_else(|| format!("`{value}` is not a seed"))?),
                 "tick" => read_info.tick = parse_number()?,
-                "layers" => read_info.layers = value.split_whitespace().map(|layer| layer.parse().map(LayerType).map_err(|_| format!("`{layer}` is not a layer type"))).collect::<Result<Vec<_>, _>>()?,
+                "layers" => read_info.layers = value.split_whitespace().map(|layer| layer.parse().map(LayerType::bitplane_of_id).map_err(|_| format!("`{layer}` is not a layer type"))).collect::<Result<Vec<_>, _>>()?,
                 "side" => read_info.side_in_superchunks = Some(value.parse().map_err(|_| format!("`{value}` is not a side"))?),
                 "forced" => read_info.forced_hot = parse_number()? != 0,
                 CAMERA_LOADS => read_info.camera_loads = parse_number()? != 0,

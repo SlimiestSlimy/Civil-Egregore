@@ -66,7 +66,7 @@ pub const COUNT_NAMES: [&str; 7] = ["woken", "eaten", "births", "deaths", "sough
 /// What runs the sheep's rule, as it is registered with `base_types`:
 /// [`rule`], on every sheep due, through the collision plane's library.
 pub fn code(base_types: BaseTypes) -> RuleCode {
-    RuleCode::new(&COUNT_NAMES, move |tick_state, context| rule(&base_types, tick_state, context.library(base_types.collision.0).expect("a sheep depends on the collision plane")))
+    RuleCode::new(&COUNT_NAMES, move |tick_state, context| rule(&base_types, tick_state, context.library(base_types.collision.type_id()).expect("a sheep depends on the collision plane")))
 }
 
 /// What is in a sheep's way, of `base_types`: what stands on a cell, and

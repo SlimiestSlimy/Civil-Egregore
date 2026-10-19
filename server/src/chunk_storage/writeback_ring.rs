@@ -80,7 +80,7 @@ impl WritebackRing {
         } else if entry_at < self.head_word && self.head_word < self.words.len() {
             self.words[self.head_word] = WRAP_MARKER;
         }
-        self.words[entry_at..entry_at + HEADER_WORDS].copy_from_slice(&[chunk.0, layer_type.0, (encoded_layer.len() as u64) << 1]);
+        self.words[entry_at..entry_at + HEADER_WORDS].copy_from_slice(&[chunk.0, layer_type.type_id(), (encoded_layer.len() as u64) << 1]);
         self.words[entry_at + HEADER_WORDS..entry_at + entry_words].copy_from_slice(encoded_layer);
         self.head_word = entry_at + entry_words;
         self.entry_count += 1;
@@ -114,7 +114,7 @@ impl WritebackRing {
             let [chunk, layer_type, length_word] = [self.words[start_word], self.words[start_word + 1], self.words[start_word + 2]];
             let words = (length_word >> 1) as usize;
             next_at = start_word + HEADER_WORDS + words;
-            (start_word, ChunkIndex(chunk), LayerType(layer_type), words, length_word & DEAD_BIT != 0)
+            (start_word, ChunkIndex(chunk), LayerType::bitplane_of_id(layer_type), words, length_word & DEAD_BIT != 0)
         })
     }
 

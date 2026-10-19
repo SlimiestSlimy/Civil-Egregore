@@ -189,7 +189,7 @@ fn a_call_is_answered_by_the_world_running_and_only_a_client_call_is() {
     assert_eq!(host.call(test_call, arguments.clone()), Ok([seed, 0].into_iter().chain(arguments).collect::<Vec<_>>()), "the seed, tick 0 -- paused -- and the words");
     let refused = |call: u64| host.call(call, Vec::new()).expect_err("refused");
     assert!(refused(test_call ^ 1 << 40).contains("no type is of the ID"));
-    assert!(refused(base().grass.0).contains("no function a client may call"), "a plane's ID");
+    assert!(refused(base().grass.type_id()).contains("no function a client may call"), "a plane's ID");
     assert!(host.call(test_call, Vec::new()).is_ok(), "the host goes on after a call refused");
 }
 

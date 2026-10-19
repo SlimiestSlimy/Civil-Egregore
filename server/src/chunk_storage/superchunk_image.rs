@@ -78,13 +78,13 @@ impl SuperchunkImage {
     pub fn layer(&self, place: usize, layer_type: LayerType) -> Option<&[u64]> {
         let words = self.chunk(place);
         let table = layer_table(words);
-        let entry_index = table.binary_search_by_key(&layer_type.0, |table_entry| table_entry[0]).ok()?;
+        let entry_index = table.binary_search_by_key(&layer_type.type_id(), |table_entry| table_entry[0]).ok()?;
         Some(&words[table[entry_index][1] as usize..])
     }
 
     /// The types of the layers of the chunk at `place`, sorted.
     pub fn layer_types(&self, place: usize) -> impl Iterator<Item = LayerType> + '_ {
-        layer_table(self.chunk(place)).iter().map(|table_entry| LayerType(table_entry[0]))
+        layer_table(self.chunk(place)).iter().map(|table_entry| LayerType::bitplane_of_id(table_entry[0]))
     }
 
     /// The image with `layer_changes` made, in order: a later change to a
@@ -149,7 +149,7 @@ fn exact_layers(chunk: &[u64]) -> Vec<(LayerType, &[u64])> {
             let layer_start = layer_offset as usize;
             let next_index = layer_starts.partition_point(|&other_start| other_start <= layer_start);
             let layer_end = layer_starts.get(next_index).copied().unwrap_or(chunk.len());
-            (LayerType(layer_type), &chunk[layer_start..layer_end])
+            (LayerType::bitplane_of_id(layer_type), &chunk[layer_start..layer_end])
         })
         .collect()
 }
@@ -168,7 +168,7 @@ fn build_image_words(chunks: &[Vec<(LayerType, &[u64])>; CHUNKS_IN_SUPERCHUNK]) 
         words.push(layers.len() as u64);
         let mut layer_offset = 1 + layers.len() * ENTRY_WORDS;
         for &(layer_type, encoded_layer) in layers {
-            words.extend([layer_type.0, layer_offset as u64]);
+            words.extend([layer_type.type_id(), layer_offset as u64]);
             layer_offset += encoded_layer.len();
         }
         for (_, layer_words) in layers {

@@ -7,7 +7,6 @@ use super::conditional::{CountedWhenApplied, InstructionQueue, COUNTED_WHEN_APPL
 use super::instruction::{Instruction, Opcode, NO_COUNT};
 use super::landing::InstructionLanding;
 use crate::bitplane_manager::{Superchunk, Write, WriteOp, WritesApplied};
-use crate::chunk_storage::LayerType;
 use utilities::coordinates::CellIndex;
 use crate::entity_manager::{AttributeType, EntityType, Header, InstructionsApplied, EntityWritten, SuperchunkEntities};
 
@@ -37,7 +36,7 @@ impl Default for PartApplied {
 fn compare_holds(instruction: &Instruction, compared_cell: CellIndex, superchunk: &mut Superchunk, superchunk_entities: &mut SuperchunkEntities) -> bool {
     let entities_read = &*superchunk_entities;
     match instruction.opcode {
-        Opcode::CompareCell => superchunk.value_at(LayerType(instruction.first_operand), compared_cell) == Some(instruction.second_operand as u32),
+        Opcode::CompareCell => superchunk.layer_type_of_id(instruction.first_operand).and_then(|layer_type| superchunk.value_at(layer_type, compared_cell)) == Some(instruction.second_operand as u32),
         Opcode::CompareCellFree => entities_read.free_for_a_new_entity(compared_cell),
         Opcode::CompareEntity => entities_read.get_named(compared_cell).is_some_and(|entity| entity.header.entity_type.0 == instruction.first_operand),
         // Gone, it holds against nothing; there, against what is seen of the attribute, none seen of one it has not.
@@ -189,14 +188,16 @@ impl InstructionQueue {
                     self.skip_to_tag(instruction, &mut next_instruction, &mut skip_tag_sets, part_applied);
                 }
                 Opcode::WriteCell => {
-                    let layer_type = LayerType(instruction.first_operand);
+                    // Named by its ID alone: the layer the superchunk holds of it gives its shape.
+                    let layer_type = superchunk.layer_type_of_id(instruction.first_operand);
                     part_applied.writes.writes += 1;
-                    if superchunk.value_at(layer_type, landed_cell).is_none() {
-                        part_applied.writes.missed += 1;
-                    } else {
-                        superchunk.apply(layer_type, Write::cell(landed_cell, WriteOp::WriteValue(instruction.value_written())), &mut part_applied.writes);
-                        if instruction.counted_under() != NO_COUNT {
-                            part_applied.counted_when_applied[instruction.counted_under() as usize] += 1;
+                    match layer_type.filter(|&layer_type| superchunk.value_at(layer_type, landed_cell).is_some()) {
+                        None => part_applied.writes.missed += 1,
+                        Some(layer_type) => {
+                            superchunk.apply(layer_type, Write::cell(landed_cell, WriteOp::WriteValue(instruction.value_written())), &mut part_applied.writes);
+                            if instruction.counted_under() != NO_COUNT {
+                                part_applied.counted_when_applied[instruction.counted_under() as usize] += 1;
+                            }
                         }
                     }
                 }
