@@ -20,9 +20,9 @@ fn drawn_words(random: &mut RandomSource, count: u64) -> Vec<u64> {
     (0..count).map(|_| random.next_draw()).collect()
 }
 
-/// Up to `most` layer types drawn from `random`.
+/// Up to `most` layer types drawn from `random`, of every shape.
 fn drawn_layer_types(random: &mut RandomSource, most: u64) -> Vec<LayerType> {
-    (0..random.draw_below(most + 1)).map(|_| LayerType(random.next_draw())).collect()
+    (0..random.draw_below(most + 1)).map(|_| LayerType::of_tiles(random.draw_below(protocol::type_registry::TYPE_ID_NUMBERS - 32), 1 << random.draw_below(6), random.draw_below(4) as u32)).collect()
 }
 
 /// A pair drawn from `random`.

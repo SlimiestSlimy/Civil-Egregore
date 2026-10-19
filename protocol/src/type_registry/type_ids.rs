@@ -4,8 +4,9 @@
 //! of its own so that one is never passed for another.
 //!
 //! Every ID is laid out alike: its first byte its [`TypeKind`], its
-//! last its size -- bits a cell of a plane, blocks of an attribute --
-//! and its number between (`docs/type_registry.md`, "The bytes of an ID").
+//! number under it -- an attribute's last four bits its blocks, as yet.
+//! A plane's bits a cell and tile size are its registration's, carried
+//! beside its ID in its [`LayerType`].
 
 /// What an ID is of, kept in its first byte.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,30 +39,20 @@ pub enum TypeKind {
 
 /// Where an ID keeps its kind: its first byte, over its number.
 const KIND_SHIFT: u32 = 56;
-/// Bits of a plane's ID's last byte that say its bits a cell; those
-/// above say its tile size ([`LayerType::tile_scale`]).
-const WIDTH_BITS: u32 = 6;
-/// Bits of an ID's last byte, its size, under its number.
-const SIZE_BITS: u32 = 8;
-/// The most an ID's last byte holds.
-const SIZE_MOST: u64 = (1 << SIZE_BITS) - 1;
-/// Numbers an ID can have: those of the six bytes between.
-pub const TYPE_ID_NUMBERS: u64 = 1 << (KIND_SHIFT - SIZE_BITS);
+/// Numbers an ID can have: those of the seven bytes under its kind.
+pub const TYPE_ID_NUMBERS: u64 = 1 << KIND_SHIFT;
+/// The most a plane's tiles' scale is: tiles 8 cells a side.
+const MOST_TILE_SCALE: u32 = 3;
 
-/// The ID of number `type_number`, of `type_kind`, whose size is `size_byte`.
-const fn type_id(type_kind: TypeKind, type_number: u64, size_byte: u64) -> u64 {
-    assert!(type_number < TYPE_ID_NUMBERS && size_byte <= SIZE_MOST, "an ID's number is under 2^48, its size a byte");
-    (type_kind as u64) << KIND_SHIFT | type_number << SIZE_BITS | size_byte
+/// The ID of number `type_number`, of `type_kind`.
+const fn type_id(type_kind: TypeKind, type_number: u64) -> u64 {
+    assert!(type_number < TYPE_ID_NUMBERS, "an ID's number is under 2^56");
+    (type_kind as u64) << KIND_SHIFT | type_number
 }
 
-/// The number of `type_id_value`, between its kind and its size.
+/// The number of `type_id_value`, under its kind.
 const fn number_of(type_id_value: u64) -> u64 {
-    (type_id_value >> SIZE_BITS) & (TYPE_ID_NUMBERS - 1)
-}
-
-/// The size `type_id_value` keeps in its last byte.
-const fn size_of(type_id_value: u64) -> u64 {
-    type_id_value & SIZE_MOST
+    type_id_value & (TYPE_ID_NUMBERS - 1)
 }
 
 /// Whether `type_id_value` is of `type_kind`.
@@ -69,23 +60,36 @@ const fn is_of(type_id_value: u64, type_kind: TypeKind) -> bool {
     type_id_value >> KIND_SHIFT == type_kind as u64
 }
 
-/// The numbers an ID of any kind takes: a wide plane's one a bit, its
-/// cold planes', anything else's one.
-pub(crate) fn numbers_taken(type_id_value: u64) -> std::ops::Range<u64> {
+/// The numbers an ID of any kind takes, a plane's of `plane_shape` --
+/// its bits a cell and tiles' scale: a plane a bit a cell its one, any
+/// other plane its own and one a bit after it, its cold planes'
+/// ([`LayerType::bitplane_of`]); anything else's one.
+pub(crate) fn numbers_taken(type_id_value: u64, plane_shape: Option<(u32, u32)>) -> std::ops::Range<u64> {
     if is_of(type_id_value, TypeKind::Attribute) {
         let attribute_number = AttributeType(type_id_value).type_number();
         return attribute_number..attribute_number + 1;
     }
     let first_number = number_of(type_id_value);
-    let numbers = if is_of(type_id_value, TypeKind::Layer) { u64::from(LayerType(type_id_value).width_bits()) } else { 1 };
+    let numbers = match plane_shape {
+        Some((1, 0)) | None => 1,
+        Some((width_bits, _)) => 1 + u64::from(width_bits),
+    };
     first_number..first_number + numbers
 }
 
-/// What a layer represents: a `u64` the registry gives a meaning
-/// ([`super::TypeRegistry`]). It may be wide, 2 to 32 bits a cell: its
-/// last byte says how many (`docs/type_registry.md`, "Width").
+/// What a layer represents: an ID the registry gives a meaning
+/// ([`super::TypeRegistry`]), and the plane's shape as it was
+/// registered -- 1 to 32 bits a cell, or a tile `2^tile_scale` cells a
+/// side. Sorted by its ID first.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct LayerType(pub u64);
+pub struct LayerType {
+    /// Its ID.
+    type_id: u64,
+    /// Bits a cell, or a tile.
+    width_bits: u8,
+    /// Its tiles' scale: 0 for a plane of cells.
+    tile_scale: u8,
+}
 
 impl LayerType {
     /// The layer of number `type_number`, a bit a cell.
@@ -105,20 +109,36 @@ impl LayerType {
     /// 0 is a plane of cells, as every plane was.
     pub const fn of_tiles(first_number: u64, width_bits: u32, tile_scale: u32) -> Self {
         assert!(width_bits.is_power_of_two() && width_bits <= 32, "a plane is 1, 2, 4, 8, 16 or 32 bits a cell");
-        assert!(tile_scale < 1 << (SIZE_BITS - WIDTH_BITS), "a plane's tile size is said in two bits");
-        Self(type_id(TypeKind::Layer, first_number, (tile_scale as u64) << WIDTH_BITS | width_bits as u64))
+        assert!(tile_scale <= MOST_TILE_SCALE, "a plane's tiles are at most 8 cells a side");
+        Self { type_id: type_id(TypeKind::Layer, first_number), width_bits: width_bits as u8, tile_scale: tile_scale as u8 }
     }
 
-    /// Bits a cell -- or a tile -- from its ID's last byte: 1 unless
-    /// the type is wide.
+    /// The plane of the ID `type_id_value`, a bit a cell: what a cold
+    /// plane, kept by its ID alone, is.
+    pub const fn bitplane_of_id(type_id_value: u64) -> Self {
+        Self { type_id: type_id_value, width_bits: 1, tile_scale: 0 }
+    }
+
+    /// The plane of the ID `type_id_value`, of the shape said -- as it
+    /// was registered, sent over the wire: none if no plane is so.
+    pub fn of_id_and_shape(type_id_value: u64, width_bits: u32, tile_scale: u32) -> Option<Self> {
+        (is_of(type_id_value, TypeKind::Layer) && width_bits.is_power_of_two() && width_bits <= 32 && tile_scale <= MOST_TILE_SCALE).then_some(Self { type_id: type_id_value, width_bits: width_bits as u8, tile_scale: tile_scale as u8 })
+    }
+
+    /// Its ID: its kind and its number.
+    pub const fn type_id(self) -> u64 {
+        self.type_id
+    }
+
+    /// Bits a cell -- or a tile: 1 unless the type is wide.
     pub const fn width_bits(self) -> u32 {
-        (size_of(self.0) & ((1 << WIDTH_BITS) - 1)) as u32
+        self.width_bits as u32
     }
 
     /// Its tile size, as a scale: its tiles are `2^scale` cells a
     /// side. 0 for a plane of cells; 3 for one of 8 by 8 tiles.
     pub const fn tile_scale(self) -> u32 {
-        (size_of(self.0) >> WIDTH_BITS) as u32
+        self.tile_scale as u32
     }
 
     /// Cells along a side of one of its tiles: its tile size.
@@ -134,12 +154,24 @@ impl LayerType {
 
     /// Its number: a wide plane's first, its lowest bit's layer's.
     pub const fn type_number(self) -> u64 {
-        number_of(self.0)
+        number_of(self.type_id)
+    }
+
+    /// Whether it is a plane of cells a bit a cell: its own one
+    /// bitplane, its ID that bitplane's.
+    pub const fn is_a_bitplane(self) -> bool {
+        self.width_bits == 1 && self.tile_scale == 0
+    }
+
+    /// The number of its first bitplane: its own, if it is one; else
+    /// the one after its own, for no two IDs to be one.
+    const fn first_bitplane_number(self) -> u64 {
+        self.type_number() + if self.is_a_bitplane() { 0 } else { 1 }
     }
 
     /// The type of its plane `bit_index`, a bit a cell: what it is kept cold as.
     pub const fn bitplane_of(self, bit_index: u32) -> Self {
-        Self::of_a_bit(self.type_number() + bit_index as u64)
+        Self::of_a_bit(self.first_bitplane_number() + bit_index as u64)
     }
 
     /// The types of its planes, the lowest bit's first.
@@ -149,20 +181,20 @@ impl LayerType {
 
     /// Whether `asked_bitplane`, a type of a bit a cell, is one of its planes.
     pub const fn holds_bitplane(self, asked_bitplane: Self) -> bool {
-        asked_bitplane.width_bits() == 1 && asked_bitplane.type_number() >= self.type_number() && asked_bitplane.type_number() < self.type_number() + self.width_bits() as u64
+        asked_bitplane.is_a_bitplane() && asked_bitplane.type_number() >= self.first_bitplane_number() && asked_bitplane.type_number() < self.first_bitplane_number() + self.width_bits() as u64
     }
 }
 
 /// An entity's type: a type ID like a layer's, from the one `u64`
 /// namespace every type in Civil Egregore is drawn from. It has no
-/// size: its last byte is 0.
+/// size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EntityType(pub u64);
 
 impl EntityType {
     /// The entity type of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
-        Self(type_id(TypeKind::EntityType, type_number, 0))
+        Self(type_id(TypeKind::EntityType, type_number))
     }
 
     /// Its number.
@@ -172,15 +204,15 @@ impl EntityType {
 }
 
 /// A rule of the cells (`docs/type_registry.md`, "Rules"): an ID
-/// from the one namespace, of its own kind. It has no size: its
-/// last byte is 0.
+/// from the one namespace, of its own kind. It has no
+/// size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ScaRuleType(pub u64);
 
 impl ScaRuleType {
     /// The rule of the cells of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
-        Self(type_id(TypeKind::ScaRule, type_number, 0))
+        Self(type_id(TypeKind::ScaRule, type_number))
     }
 
     /// Its number.
@@ -190,14 +222,14 @@ impl ScaRuleType {
 }
 
 /// A world generation: an ID from the one namespace, of its own kind.
-/// It has no size: its last byte is 0.
+/// It has no size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct WorldgenType(pub u64);
 
 impl WorldgenType {
     /// The world generation of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
-        Self(type_id(TypeKind::Worldgen, type_number, 0))
+        Self(type_id(TypeKind::Worldgen, type_number))
     }
 
     /// Its number.
@@ -207,14 +239,14 @@ impl WorldgenType {
 }
 
 /// A rule of the renderer: an ID from the one namespace, of its own
-/// kind. It has no size: its last byte is 0.
+/// kind. It has no size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RenderRuleType(pub u64);
 
 impl RenderRuleType {
     /// The rule of the renderer of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
-        Self(type_id(TypeKind::RenderRule, type_number, 0))
+        Self(type_id(TypeKind::RenderRule, type_number))
     }
 
     /// Its number.
@@ -224,14 +256,14 @@ impl RenderRuleType {
 }
 
 /// A window of the client's: an ID from the one namespace, of its own
-/// kind. It has no size: its last byte is 0.
+/// kind. It has no size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct GuiType(pub u64);
 
 impl GuiType {
     /// The window of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
-        Self(type_id(TypeKind::Gui, type_number, 0))
+        Self(type_id(TypeKind::Gui, type_number))
     }
 
     /// Its number.
@@ -242,14 +274,14 @@ impl GuiType {
 
 /// A function a client may call across the connection: an ID from the
 /// one namespace, of its own kind -- what a call names on the wire. It
-/// has no size: its last byte is 0.
+/// has no size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ClientCallType(pub u64);
 
 impl ClientCallType {
     /// The call of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
-        Self(type_id(TypeKind::ClientCall, type_number, 0))
+        Self(type_id(TypeKind::ClientCall, type_number))
     }
 
     /// Its number.
@@ -259,15 +291,15 @@ impl ClientCallType {
 }
 
 /// A rule of an entity (`docs/type_registry.md`, "Rules"): an ID
-/// from the one namespace, of its own kind. It has no size: its
-/// last byte is 0.
+/// from the one namespace, of its own kind. It has no
+/// size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EntityRuleType(pub u64);
 
 impl EntityRuleType {
     /// The rule of an entity of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
-        Self(type_id(TypeKind::EntityRule, type_number, 0))
+        Self(type_id(TypeKind::EntityRule, type_number))
     }
 
     /// Its number.

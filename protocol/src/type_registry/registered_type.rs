@@ -23,7 +23,8 @@ pub enum RegisteredType {
         /// Its ID.
         layer_type: LayerType,
     },
-    /// A wide plane: a number a cell, its width and tile size in its ID.
+    /// A wide plane: a number a cell, its width and tile size in its
+    /// layer type, as registered.
     WidePlane {
         /// Its name.
         name: String,
@@ -141,10 +142,10 @@ impl RegisteredType {
         }
     }
 
-    /// Its ID whole -- kind, number and size -- as a world records it.
+    /// Its ID whole -- kind and number -- as a world records it.
     pub fn type_id(&self) -> u64 {
         match self {
-            Self::Layer { layer_type, .. } | Self::WidePlane { layer_type, .. } => layer_type.0,
+            Self::Layer { layer_type, .. } | Self::WidePlane { layer_type, .. } => layer_type.type_id(),
             Self::Entity { entity_type, .. } => entity_type.0,
             Self::Attribute { attribute_type, .. } => attribute_type.0,
             Self::ScaRule { rule, .. } => rule.0,
@@ -162,9 +163,15 @@ impl RegisteredType {
         matches!(self, Self::ScaRule { .. } | Self::EntityRule { .. })
     }
 
-    /// The numbers its ID takes: a wide plane one a bit, its cold
-    /// planes', anything else one.
+    /// The numbers its ID takes: a plane a bit a cell one; any other
+    /// plane its own, and one a bit, its cold planes'; anything else one.
     pub fn numbers(&self) -> std::ops::Range<u64> {
-        numbers_taken(self.type_id())
+        numbers_taken(self.type_id(), self.plane_shape())
+    }
+
+    /// Its plane's shape, if it is a layer or a wide plane: its bits a
+    /// cell and its tiles' scale, as registered.
+    pub fn plane_shape(&self) -> Option<(u32, u32)> {
+        self.layer_type().map(|layer_type| (layer_type.width_bits(), layer_type.tile_scale()))
     }
 }

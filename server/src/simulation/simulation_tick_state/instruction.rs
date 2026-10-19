@@ -147,14 +147,14 @@ impl Instruction {
 
     /// Whether `layer_type` holds `seen_value` at `target_cell`.
     pub(crate) fn compare_cell(layer_type: LayerType, target_cell: CellIndex, seen_value: u32) -> Self {
-        Self { first_operand: layer_type.0, second_operand: u64::from(seen_value), ..Self::on_cell(Opcode::CompareCell, target_cell) }
+        Self { first_operand: layer_type.type_id(), second_operand: u64::from(seen_value), ..Self::on_cell(Opcode::CompareCell, target_cell) }
     }
 
     /// `layer_type` made to hold `value` at `target_cell`, counted under
     /// `count`, or under nothing ([`NO_COUNT`]): the value the second
     /// word's high half, the count its low.
     pub(crate) fn write_cell(layer_type: LayerType, target_cell: CellIndex, value: u32, count: u32) -> Self {
-        Self { first_operand: layer_type.0, second_operand: u64::from(value) << 32 | u64::from(count), ..Self::on_cell(Opcode::WriteCell, target_cell) }
+        Self { first_operand: layer_type.type_id(), second_operand: u64::from(value) << 32 | u64::from(count), ..Self::on_cell(Opcode::WriteCell, target_cell) }
     }
 
     /// The number a write of a cell makes its cell hold.

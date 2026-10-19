@@ -30,7 +30,7 @@ fn images_drawn(seeded_random: &mut RandomSource, count: usize) -> Vec<(Superchu
     let mut one_cell = [0; utilities::bitmap::WORDS];
     one_cell[0] = 1;
     let encoded_layer = layer_codec.encode_cells(&one_cell).to_vec();
-    superchunks.into_iter().map(|superchunk| (SuperchunkIndex(superchunk), SuperchunkImage::empty().rewritten_with(&[LayerChange { place: 0, layer_type: LayerType(2 + seeded_random.draw_below(200)), encoded_layer: &encoded_layer }]))).collect()
+    superchunks.into_iter().map(|superchunk| (SuperchunkIndex(superchunk), SuperchunkImage::empty().rewritten_with(&[LayerChange { place: 0, layer_type: LayerType::bitplane_of_id(2 + seeded_random.draw_below(200)), encoded_layer: &encoded_layer }]))).collect()
 }
 
 /// What is in `folder`: how many entries.
@@ -63,7 +63,7 @@ fn images_past_what_is_kept_go_to_disk_and_read_back_the_same() {
     // One held by its caller, one by its changes in the ring: drawn.
     let (held_superchunk, in_ring) = (images[seeded_random.draw_below(6) as usize].0, images[6 + seeded_random.draw_below(6) as usize].0);
     let (mut layer_codec, mut flushed_superchunks) = (LayerCodec::new(), Vec::new());
-    cold_storage.write_back(ChunkIndex::from_superchunk_place(in_ring, seeded_random.draw_below(16) as usize), LayerType(1), layer_codec.encode_cells(&[u64::MAX; utilities::bitmap::WORDS]), &mut flushed_superchunks);
+    cold_storage.write_back(ChunkIndex::from_superchunk_place(in_ring, seeded_random.draw_below(16) as usize), LayerType::bitplane_of_id(1), layer_codec.encode_cells(&[u64::MAX; utilities::bitmap::WORDS]), &mut flushed_superchunks);
     assert!(flushed_superchunks.is_empty());
     assert_eq!(cold_storage.page_out(|superchunk| superchunk == held_superchunk).expect("paged out"), 9);
     assert!(!cold_storage.over_memory_kept() && cold_storage.on_disk() == 9 && cold_storage.bytes_in_memory() == 3 * image_bytes);

@@ -97,7 +97,7 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
     let world_file_text = std::fs::read_to_string(folder.join("world.csv")).expect("the world's file");
     let worldgen: String = saved_world.worldgen_parameters().iter().map(|(name, value)| format!("worldgen {name},{value}\n")).collect();
     // Every layer the world's types have, a wide plane as the layers it is kept cold as.
-    let layers: Vec<String> = saved_world.frozen_type_registry().layer_types().into_iter().flat_map(|layer_type| layer_type.each_bitplane()).map(|plane_type| plane_type.0.to_string()).collect();
+    let layers: Vec<String> = saved_world.frozen_type_registry().layer_types().into_iter().flat_map(|layer_type| layer_type.each_bitplane()).map(|plane_type| plane_type.type_id().to_string()).collect();
     assert_eq!(world_file_text, format!("world,is\nformat,5\nseed,{}\ntick,0\nlayers,{}\nunpopulated,{}\n{worldgen}", utilities::seed::seed_as_hex(seed), layers.join(" "), utilities::coordinates::WORLD_MIDDLE.0), "no name: the folder's; the origin unpopulated until the first tick");
     let hot: String = saved_world.bitmap_arena().superchunk_indices().iter().map(|superchunk| format!("{:011x},hot,\n", superchunk.0)).collect();
     assert_eq!(std::fs::read_to_string(folder.join("hot.csv")).expect("the hot file"), format!("superchunk,is,until\n{hot}"), "the nine hot, none cooling or warming");
@@ -153,8 +153,8 @@ fn files_that_are_not_a_save_are_refused() {
     assert!(matches!(crate::worlds::opened(&folder, basegame::default_types::register_types), Err(DiskError::InvalidFile(..))));
 }
 
-/// A save holds the world's types by name and ID, in the order
-/// registered, and a world loaded has those: each the type the code
+/// A save holds the world's types by name and ID -- and a plane's bits
+/// a cell and tile scale -- in the order registered, and a world loaded has those: each the type the code
 /// registers under its name, of the ID saved for it; one the save does
 /// not name, an ID past them all. A name none registers, an ID sharing
 /// a number with another's, or a name said twice, is refused, naming
@@ -168,8 +168,9 @@ fn a_world_is_loaded_with_the_types_it_was_made_with() {
     let types_path = folder.join(protocol::world_types::TYPES_FILE);
     let types_text = std::fs::read_to_string(&types_path).expect("the types file");
     let lines: Vec<String> = types_text.lines().map(str::to_string).collect();
-    let world_lines = world.frozen_type_registry().types().iter().map(|registered| format!("{},{:016x}", registered.name(), registered.type_id()));
-    assert_eq!(lines, std::iter::once("type,id".to_string()).chain(world_lines).collect::<Vec<_>>());
+    let shape_of = |registered: &protocol::type_registry::RegisteredType| registered.plane_shape().map_or(",".to_string(), |(width_bits, tile_scale)| format!("{width_bits},{tile_scale}"));
+    let world_lines = world.frozen_type_registry().types().iter().map(|registered| format!("{},{:016x},{}", registered.name(), registered.type_id(), shape_of(registered)));
+    assert_eq!(lines, std::iter::once("type,id,bits a cell,tile scale".to_string()).chain(world_lines).collect::<Vec<_>>());
     let line_of = |type_name: &str| lines.iter().position(|line| line.split(',').next() == Some(type_name)).expect("saved");
     let with_lines = |change: &dyn Fn(&mut Vec<String>)| {
         let mut changed_lines = lines.clone();

@@ -61,6 +61,13 @@ impl Superchunk {
         self.layers.binary_search_by_key(&layer_type, |layer| layer.layer_type).ok()
     }
 
+    /// The layer type of the ID `type_id` among its layers, if it has
+    /// one: an instruction names its plane by its ID alone, the shape
+    /// the layer's own.
+    pub(crate) fn layer_type_of_id(&self, type_id: u64) -> Option<LayerType> {
+        self.layers.binary_search_by_key(&type_id, |layer| layer.layer_type.type_id()).ok().map(|layer| self.layers[layer].layer_type)
+    }
+
     /// Which superchunk it is.
     pub fn superchunk_index(&self) -> SuperchunkIndex {
         self.superchunk_index

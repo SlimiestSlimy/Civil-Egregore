@@ -100,7 +100,7 @@ fn a_server_tells_each_client_joining_its_world_the_world_s_types_first() {
         let Some(ServerMessage::Frame(frame)) = receive(&mut from_server).expect("read") else { panic!("client {client}: a frame answers a frame asked") };
         assert_eq!(frame.seed, seed, "client {client}: the world the flags said");
         // A call of what no client may call -- a plane's ID -- refused, and the asks after it answered in order.
-        send(&mut ClientMessage::Call(base().grass.0, vec![1, 2]), &mut to_server).expect("sent");
+        send(&mut ClientMessage::Call(base().grass.type_id(), vec![1, 2]), &mut to_server).expect("sent");
         send(&mut ClientMessage::ListWorlds, &mut to_server).expect("sent");
         let mut answers = std::iter::from_fn(|| loop {
             match receive(&mut from_server).expect("read") {
