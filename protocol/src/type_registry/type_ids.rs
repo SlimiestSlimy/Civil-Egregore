@@ -38,6 +38,9 @@ pub enum TypeKind {
     /// A bundle: what every other type is registered in, its name the
     /// first part of theirs -- in another bundle, or on its own.
     Bundle = 0x09,
+    /// A shader: its library the code the GPU runs for one cell or one
+    /// entity, as text -- data, the same headless or windowed.
+    Shader = 0x0A,
 }
 
 /// Where an ID keeps its kind: its first byte, over its number.
@@ -147,10 +150,15 @@ impl LayerType {
 /// An entity's type: a type ID like a layer's, from the one `u64`
 /// namespace every type in Civil Egregore is drawn from. It has no
 /// size.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EntityType(pub u64);
 
 impl EntityType {
+    /// The entity type of ID `type_id_value`, if it is one's.
+    pub const fn of_id(type_id_value: u64) -> Option<Self> {
+        if is_of(type_id_value, TypeKind::EntityType) { Some(Self(type_id_value)) } else { None }
+    }
+
     /// The entity type of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
         Self(type_id(TypeKind::EntityType, type_number))
@@ -258,6 +266,23 @@ impl BundleType {
     /// The bundle of number `type_number`.
     pub const fn from_number(type_number: u64) -> Self {
         Self(type_id(TypeKind::Bundle, type_number))
+    }
+
+    /// Its number.
+    pub const fn type_number(self) -> u64 {
+        number_of(self.0)
+    }
+}
+
+/// A shader: an ID from the one namespace, of its own kind. It has no
+/// size.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ShaderType(pub u64);
+
+impl ShaderType {
+    /// The shader of number `type_number`.
+    pub const fn from_number(type_number: u64) -> Self {
+        Self(type_id(TypeKind::Shader, type_number))
     }
 
     /// Its number.

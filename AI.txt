@@ -440,6 +440,35 @@ NOW
   source of truth) -- so basegame registers its render rules and gui
   types always, and only their libraries (the Bevy code) sit behind a
   basegame feature the windowed build turns on.
+- THE FRESH CLIENT'S FIRST STRETCH, SETTLED (2026-10-19, the user:
+  "nice, push! and lets get onto the client"; answers to my four
+  questions): (1) basegame registers its render rules always -- same
+  names and IDs headless or windowed -- their libraries (Bevy code)
+  behind a basegame `client` feature, basegame depending on the client
+  crate only with it. (2) A render rule is code for one thing, "look at
+  how the server does it for inspiration": as the server's, its
+  registered code runs on one superchunk's turn as a call to the
+  client API's loop (on_each_set_cell, on_each_entity...) with a
+  closure for one cell or entity, inlined -- the client does the
+  looping; the turn is the client handle (reads any plane of the
+  superchunk, paints into the rule's render layer). (3) An image a
+  render layer a superchunk, sprites stacked by layer number: Bevy
+  composites, a change to one plane repaints its layer. (4) Until the
+  declarative GUI, the window makes a world with the default
+  parameters at start (camera pan and zoom, pause and pace keys).
+  Mine: the window registers types with the root's register function
+  and freezes a registry per world from the types text the server
+  sends; frames carry each entity's type with its cell. First stretch
+  without textures, shaders, the GUI or relief: colours.
+  REVISED the same day: CPU painting (an RGBA image a layer a
+  superchunk) put to the user against shaders -- "i mean, probably B,
+  here is the invariant, rendering doesn't have to be light per se, the
+  rendering main priority is not stalling the server at large zoom out
+  levels, while keeping roughly the same fps, our fps target is 60
+  btw". So B: plane words uploaded as data textures, a render rule a
+  one-cell shader (the GPU the loop), entities by instancing, a Shader
+  kind in the registry. THE INVARIANT: zoomed far out, the server is
+  never stalled and the window holds ~60 fps; rendering may be heavy.
 - SAVED FOR AFTER THE DECOUPLING (the user, 2026-10-18: "save all
   those, we need to finish decoupling and the public apis including
   client"): TYPES.CSV DRIVES LOADING (above; open, the user's to say: a
