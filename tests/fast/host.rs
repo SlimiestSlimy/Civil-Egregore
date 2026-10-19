@@ -181,7 +181,7 @@ fn a_frame_brings_a_plane_of_tiles_a_tile_at_a_time() {
 fn a_call_is_answered_by_the_world_running_and_only_a_client_call_is() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let frozen_type_registry = std::sync::Arc::new(protocol::world_types::of_a_new_world(crate::worlds::types_with_test_call).expect("the tests' types"));
-    let test_call = frozen_type_registry.types().iter().find(|registered| registered.name() == crate::worlds::TEST_CALL).expect("registered").type_id();
+    let test_call = crate::worlds::test_type_named(&frozen_type_registry, crate::worlds::TEST_CALL).expect("registered").type_id();
     let (host, _host_sent) = Host::start_on_thread(crate::worlds::types_with_test_call);
     assert_eq!(host.call(test_call, vec![1]), Err("no world runs".to_string()));
     assert!(host.set_paused(true) && host.make_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), std::sync::Arc::clone(&frozen_type_registry)));

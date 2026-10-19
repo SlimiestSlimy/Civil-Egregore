@@ -50,6 +50,7 @@ impl ProbeTypes {
     /// Every one registered.
     fn registered() -> Self {
         let mut type_registry = TypeRegistry::for_new_world();
+        let mut type_registry = type_registry.open_bundle("probe").expect("the probe's bundle");
         let mut register = |registration: Registration| type_registry.register(registration).expect("a type of a name no other has");
         let stone = register(Registration::layer("stone")).layer_type().expect("a layer");
         let walker = register(Registration::entity("walker", None)).entity_type().expect("a type of entity");

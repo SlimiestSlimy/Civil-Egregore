@@ -89,6 +89,9 @@ pub enum Declared {
         /// Its master's name.
         master: String,
     },
+    /// A bundle: the types registered while it is open are in it
+    /// (`super::TypeRegistry::open_bundle`).
+    Bundle,
 }
 
 /// A type to register: its name, what it is, the names of the types it
@@ -173,6 +176,11 @@ impl Registration {
     /// a library of the server's, opted into function by function.
     pub fn client_call(name: &str, master: &str) -> Self {
         Self::of(name, Declared::ClientCall { master: master.to_string() })
+    }
+
+    /// A bundle named `name`: opened by `super::TypeRegistry::open_bundle`.
+    pub fn bundle(name: &str) -> Self {
+        Self::of(name, Declared::Bundle)
     }
 
     /// It depending on the types named `type_names` too.

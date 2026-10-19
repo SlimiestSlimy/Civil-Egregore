@@ -43,6 +43,7 @@ impl TestTypes {
     pub fn seeded(seed: u64) -> Self {
         let mut type_registry = TypeRegistry::for_new_world();
         let base = basegame::default_types::register(&mut type_registry).expect("the base game's types registered");
+        let mut type_registry = type_registry.open_bundle("tests").expect("the tests' bundle");
         for filler in 0..RandomSource::new(seed ^ 0x7e57_7e57).draw_below(MOST_FILLERS + 1) {
             type_registry.register(Registration::layer(&format!("filler {filler}"))).expect("a filler of its own name");
         }

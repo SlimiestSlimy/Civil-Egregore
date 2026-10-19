@@ -60,12 +60,17 @@ fn edited_shape(edited: usize) -> Option<usize> {
 /// is of the lower ID.
 fn registered_types(seed: u64) -> (FrozenTypeRegistry, TestTypes) {
     let (mut type_registry, mut seeded_random) = (TypeRegistry::for_new_world(), RandomSource::new(seed ^ 0x7e57_7e57));
-    for filler in 0..seeded_random.draw_below(MOST_FILLERS + 1) {
-        type_registry.register(Registration::layer(&format!("filler {filler}"))).expect("a filler of its own name");
-    }
     let registered_alone = |type_registry: &mut TypeRegistry, registration: Registration| type_registry.register(registration).expect("a test's type, of a name no other has");
-    let sorts_before_state = Attribute::registered(&registered_alone(&mut type_registry, Attribute::<u64>::registration("sorts before state"))).expect("a word's attribute");
+    // A bundle of its own before the base game's, for its attribute to be of a lower ID.
+    let sorts_before_state = {
+        let mut before_the_base_game = type_registry.open_bundle("tests before").expect("a bundle of its own");
+        for filler in 0..seeded_random.draw_below(MOST_FILLERS + 1) {
+            before_the_base_game.register(Registration::layer(&format!("filler {filler}"))).expect("a filler of its own name");
+        }
+        Attribute::registered(&registered_alone(&mut before_the_base_game, Attribute::<u64>::registration("sorts before state"))).expect("a word's attribute")
+    };
     let base = basegame::default_types::register(&mut type_registry).expect("the base game's types registered");
+    let mut tests = type_registry.open_bundle("tests").expect("the tests' bundle");
     let varying = |name: &str| Registration::attribute(name, 1, 0);
     let mut registrations: Vec<(usize, Registration)> = [Registration::entity("walker", None), Attribute::<u64>::registration("one block"), Attribute::<BothEnds>::registration("both ends"), varying("varying note"), varying("varying tail"), varying("never held")]
         .into_iter()
@@ -78,7 +83,7 @@ fn registered_types(seed: u64) -> (FrozenTypeRegistry, TestTypes) {
     for last in (1..registrations.len()).rev() {
         registrations.swap(last, seeded_random.draw_below(last as u64 + 1) as usize);
     }
-    let mut registered: Vec<(usize, RegisteredType)> = registrations.into_iter().map(|(place, registration)| (place, registered_alone(&mut type_registry, registration))).collect();
+    let mut registered: Vec<(usize, RegisteredType)> = registrations.into_iter().map(|(place, registration)| (place, registered_alone(&mut tests, registration))).collect();
     registered.sort_by_key(|(place, _)| *place);
     let attribute_type = |place: usize| registered[place].1.attribute_type().expect("an attribute");
     let test_types = TestTypes {
@@ -92,6 +97,7 @@ fn registered_types(seed: u64) -> (FrozenTypeRegistry, TestTypes) {
         never_held: attribute_type(5),
         edited: std::array::from_fn(|edited| (attribute_type(6 + edited), edited_shape(edited).is_none())),
     };
+    drop(tests);
     (type_registry.freeze().expect("frozen"), test_types)
 }
 

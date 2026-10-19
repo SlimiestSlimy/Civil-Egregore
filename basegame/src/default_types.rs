@@ -14,12 +14,18 @@ use protocol::type_registry::{Hook, RegisteredType, Registration, RegistryRefusa
 use server::simulation::simulation_api::{Attribute, Bits16, Bits4, WidePlane};
 use std::sync::Arc;
 
-/// The base game's types registered in `type_registry`, in their order:
-/// an attribute before the type of entity it is the default of, a
-/// plane or a type of entity before its rules, what a type depends on
-/// before it. The rules tick in it. The types as the world gave them
-/// their IDs; or the first refused.
+/// The base game's bundle: every type of it is in it, its name the
+/// first part of theirs (`basegame::sheep`).
+pub const BUNDLE: &str = "basegame";
+
+/// The base game's types registered in `type_registry`, in their
+/// [`BUNDLE`] and their order: an attribute before the type of entity
+/// it is the default of, a plane or a type of entity before its rules,
+/// what a type depends on before it. The rules tick in it. The types as
+/// the world gave them their IDs; or the first refused.
 pub fn register(type_registry: &mut TypeRegistry) -> Result<BaseTypes, String> {
+    let mut basegame = type_registry.open_bundle(BUNDLE).map_err(refused(BUNDLE))?;
+    let type_registry = &mut *basegame;
     let layer = |registered_type: RegisteredType| registered_type.layer_type().expect("a layer");
     let grass = layer(registered(type_registry, Registration::layer("grass"))?);
     let tree = layer(registered(type_registry, Registration::layer("tree"))?);
