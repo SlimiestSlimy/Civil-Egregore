@@ -6,13 +6,13 @@ description = "Civil Egregore's base game: its types, the libraries they expose,
 [dependencies]
 protocol = { path = "../protocol" }
 server = { path = "../server" }
-# The render rules' code: the client's API and Bevy's colours, only with
-# the `client` feature.
+# The render rules' and the windows' code: the client's API and Bevy,
+# only with the `client` feature.
 client = { path = "../client", optional = true }
-bevy = { version = "0.19", default-features = false, features = ["bevy_color"], optional = true }
+bevy = { version = "0.19", default-features = false, features = ["2d", "ui", "bevy_feathers"], optional = true }
 
 [features]
-# The render rules with their code: a windowed build's. Without it they
+# The render rules and the windows with their code: a windowed build's. Without it they
 # are registered all the same, of no code.
 client = ["dep:client", "dep:bevy"]
 

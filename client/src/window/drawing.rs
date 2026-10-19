@@ -6,6 +6,7 @@
 //! render layer, stacked by layer.
 
 use super::camera::{drawn_at, seen_by};
+use super::windows::WorldTypesFrozen;
 use super::WindowServer;
 use crate::painting::{Picture, RenderRules};
 use crate::server_end::Shown;
@@ -78,7 +79,7 @@ impl Drawing {
 }
 
 /// What the server shows taken in: a world's types -- the world drawn
-/// afresh -- and frames, each superchunk of them sent to be painted.
+/// afresh, its windows told ([`WorldTypesFrozen`]) -- and frames, each superchunk of them sent to be painted.
 pub fn take_shown(window_server: Res<WindowServer>, mut drawing: ResMut<Drawing>, mut bevy_commands: Commands) {
     let shown = window_server.shown.lock().expect("what the server shows");
     while let Ok(shown) = shown.try_recv() {
@@ -88,7 +89,11 @@ pub fn take_shown(window_server: Res<WindowServer>, mut drawing: ResMut<Drawing>
                     sprites.into_iter().for_each(|sprite| bevy_commands.entity(sprite).despawn());
                 }
                 drawing.world = match of_a_saved_world(&types_text, drawing.register_types) {
-                    Ok(frozen_type_registry) => Some((world, Arc::new(RenderRules::of(&frozen_type_registry)))),
+                    Ok(frozen_type_registry) => {
+                        let render_rules = Arc::new(RenderRules::of(&frozen_type_registry));
+                        bevy_commands.trigger(WorldTypesFrozen { types_text, frozen_type_registry: Arc::new(frozen_type_registry) });
+                        Some((world, render_rules))
+                    }
                     Err(why_not) => {
                         error!("the world's types do not register here: {why_not}");
                         None

@@ -162,8 +162,8 @@ fn serve_one_client(client: TcpStream, host: &Host, ask_sender: &std::sync::mpsc
             ClientMessage::SetPace(pace) => _ = host.set_pace(pace),
             ClientMessage::MakeWorld(parameters) => match world_types::of_a_new_world(register_types) {
                 Ok(frozen_type_registry) => _ = host.make_world(parameters, Arc::new(frozen_type_registry)),
-                // The game's types not registering is nothing a client can mend: no world made.
-                Err(_) => continue,
+                // The game's types not registering is nothing a client can mend: no world made, said where the program's errors go.
+                Err(why_not) => eprintln!("no world made: {why_not}"),
             },
             ClientMessage::OpenWorld(world_name) => _ = host.open_world(world_name),
             ClientMessage::Save(world_name) => _ = host.save_world(world_name),

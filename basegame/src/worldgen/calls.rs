@@ -6,7 +6,7 @@
 //! of the client.
 
 use crate::worldgen::WorldGeneration;
-use protocol::type_registry::Registration;
+use protocol::type_registry::{ClientCallType, RegisteredType, Registration};
 use server::simulation::simulation_api::{CallCode, CallContext};
 use std::sync::Arc;
 
@@ -19,6 +19,33 @@ pub const SET_WORLDGEN_PARAMETER_CALL: &str = "set worldgen parameter";
 /// The call resetting the world, generated as the worldgen parameters
 /// set for its reset say: nothing in, nothing out.
 pub const RESET_WORLD_CALL: &str = "reset world";
+
+/// The world generation's calls as the world registered them: what its
+/// gui types call.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WorldgenCalls {
+    /// [`WORLDGEN_PARAMETER_CALL`]'s type.
+    pub parameter: ClientCallType,
+    /// [`SET_WORLDGEN_PARAMETER_CALL`]'s.
+    pub set_parameter: ClientCallType,
+    /// [`RESET_WORLD_CALL`]'s.
+    pub reset_world: ClientCallType,
+}
+
+impl WorldgenCalls {
+    /// The calls of `registered`, as [`call_registrations`] were registered,
+    /// in their order: none if any is not a call.
+    pub fn of(registered: &[RegisteredType]) -> Option<Self> {
+        let call_type = |registered_type: &RegisteredType| match registered_type {
+            RegisteredType::ClientCall { call, .. } => Some(*call),
+            _ => None,
+        };
+        let [parameter, set_parameter, reset_world] = registered else {
+            return None;
+        };
+        Some(Self { parameter: call_type(parameter)?, set_parameter: call_type(set_parameter)?, reset_world: call_type(reset_world)? })
+    }
+}
 
 /// The registrations of the world generation's calls, each its master,
 /// with its code.

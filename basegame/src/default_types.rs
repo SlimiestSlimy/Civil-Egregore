@@ -2,7 +2,7 @@
 //! order, each with its library and hooks ([`register`]): every rule's
 //! code its library, hooked to run every tick, the world
 //! generation's, hooked to generate the world, and the functions of it
-//! a client may call, and how it is drawn -- each made with the IDs
+//! a client may call, how it is drawn and its windows -- each made with the IDs
 //! the world gave the types it works on, as they were registered. What
 //! the program's initialization hands the server and the client
 //! ([`register_types`]): neither names a type of the base game, and
@@ -10,6 +10,7 @@
 
 use crate::base_types::{BaseTypes, SheepState, GRASS_RULE, SHEEP_RULE, TREES_RULE};
 use crate::libraries::collision::Collision;
+use crate::worldgen::calls::WorldgenCalls;
 use protocol::type_registry::{Hook, RegisteredType, Registration, RegistryRefusal, TypeRegistry};
 use server::simulation::simulation_api::{Attribute, Bits16, Bits4, WidePlane};
 use std::sync::Arc;
@@ -50,10 +51,10 @@ pub fn register(type_registry: &mut TypeRegistry) -> Result<BaseTypes, String> {
     registered(type_registry, Registration::entity_rule(SHEEP_RULE, "sheep").with_library(Arc::new(crate::entity_rules::sheep::code(base_types))).with_hooks(&rule_hooks))?;
     registered(type_registry, Registration::worldgen("world generation").depending_on(&["sheep", "collision"]).with_library(Arc::new(crate::worldgen::world_generation::code(base_types))).with_hooks(&[Hook::GeneratesTheWorld]))?;
     // What a client may call of the world generation.
-    for call_registration in crate::worldgen::calls::call_registrations("world generation") {
-        registered(type_registry, call_registration)?;
-    }
+    let calls = crate::worldgen::calls::call_registrations("world generation").into_iter().map(|call_registration| registered(type_registry, call_registration)).collect::<Result<Vec<_>, _>>()?;
+    let worldgen_calls = WorldgenCalls::of(&calls).expect("the world generation's calls, in their order");
     crate::render_rules::register(type_registry, base_types)?;
+    crate::gui::register(type_registry, worldgen_calls)?;
     Ok(base_types)
 }
 
