@@ -14,7 +14,7 @@ use utilities::coordinates::SuperchunkIndex;
 use server::internals_for_root_tests::{set_attribute, Attribute, AttributeBlock, EntityRef, Header};
 use basegame::worldgen::WorldGeneration;
 use basegame::base_types::BaseTypes;
-use protocol::type_registry::{FrozenTypeRegistry, TypeRegistry};
+use protocol::type_registry::{FrozenTypeRegistry, RegisteredType, TypeRegistry};
 use server::simulation::simulation_api::{Bits4, WidePlane};
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SIDE, THREADS, WORLD, WORLDGEN};
 use server::World;
@@ -32,6 +32,12 @@ fn registered_types() -> &'static (Arc<FrozenTypeRegistry>, BaseTypes) {
         let base_types = basegame::default_types::register(&mut type_registry).expect("the base game's types registered");
         (Arc::new(type_registry.freeze().expect("the base game's types frozen")), base_types)
     })
+}
+
+/// The type of `frozen_type_registry` named `type_name`, if any: a type
+/// a test registered found as anything would find it, by its name.
+pub fn named<'frozen>(frozen_type_registry: &'frozen FrozenTypeRegistry, type_name: &str) -> Option<&'frozen RegisteredType> {
+    frozen_type_registry.types().iter().find(|registered_type| registered_type.name() == type_name)
 }
 
 /// The base game's types, frozen: what initialization hands the server.
@@ -73,7 +79,7 @@ pub fn types_with_test_call(type_registry: &mut TypeRegistry) -> Result<(), Stri
 /// the plane of tiles among them.
 pub fn with_test_tiles() -> (Arc<FrozenTypeRegistry>, WidePlane<Bits4>) {
     let frozen_type_registry = protocol::world_types::of_a_new_world(types_with_test_tiles).expect("the tests' types");
-    let test_tiles = frozen_type_registry.types().iter().find(|registered| registered.name() == TEST_TILES).and_then(WidePlane::registered).expect("four bits a tile");
+    let test_tiles = named(&frozen_type_registry, TEST_TILES).and_then(WidePlane::registered).expect("four bits a tile");
     (Arc::new(frozen_type_registry), test_tiles)
 }
 
@@ -162,7 +168,12 @@ pub fn flocked(sheep: usize) -> Vec<(String, u64)> {
 /// generated would grow a world with no end for good -- so the one
 /// flock is put between ticks ([`put_flock`]).
 pub fn one_flock_world(parameters: CleanServerParameters, sheep: usize) -> World {
-    let mut world = server::start_world(&parameters.with(WORLDGEN, worldgen(flocked(0))), &types()).expect("the world started");
+    one_flock_world_of(parameters, sheep, &types())
+}
+
+/// [`one_flock_world`], of the types `frozen_type_registry`.
+pub fn one_flock_world_of(parameters: CleanServerParameters, sheep: usize, frozen_type_registry: &Arc<FrozenTypeRegistry>) -> World {
+    let mut world = server::start_world(&parameters.with(WORLDGEN, worldgen(flocked(0))), frozen_type_registry).expect("the world started");
     put_flock(&mut world, utilities::coordinates::WORLD_MIDDLE, sheep);
     world.keep_hot(&server::halos_about([utilities::coordinates::WORLD_MIDDLE].into_iter()));
     world
@@ -248,25 +259,44 @@ pub fn remove_entity(world: &mut World, header: &Header) -> server::internals_fo
     remove_applied
 }
 
-/// A test's own attribute: a number a sheep is told from the others
-/// by from a tick to the next -- an entity has no ID, and its cell
-/// names it for a tick alone.
-pub const SHEEP_TAG: Attribute<u64> = Attribute::new(1 << 20);
+/// The name of a test's own attribute: a number a sheep is told from the
+/// others by from a tick to the next -- an entity has no ID, and its
+/// cell names it for a tick alone.
+pub const SHEEP_TAG: &str = "sheep tag";
+
+/// The base game's types and [`SHEEP_TAG`]: a game of the tests' own,
+/// as initialization hands one the server.
+pub fn types_with_sheep_tag(type_registry: &mut TypeRegistry) -> Result<(), String> {
+    basegame::default_types::register_types(type_registry)?;
+    type_registry.register(Attribute::<u64>::registration(SHEEP_TAG)).map(drop).map_err(|refusal| format!("{SHEEP_TAG}: {refusal:?}"))
+}
+
+/// The types of [`types_with_sheep_tag`], frozen for a new world: those
+/// of a world whose sheep are tagged ([`tag_sheep`]).
+pub fn with_sheep_tag() -> Arc<FrozenTypeRegistry> {
+    Arc::new(protocol::world_types::of_a_new_world(types_with_sheep_tag).expect("the tests' types"))
+}
+
+/// The [`SHEEP_TAG`] attribute of `world`, found by its name among the world's types.
+pub fn sheep_tag(world: &World) -> Attribute<u64> {
+    named(world.frozen_type_registry(), SHEEP_TAG).and_then(Attribute::registered).expect("a world of the types with the sheep tag")
+}
 
 /// Gives every sheep of `world` a [`SHEEP_TAG`], each its own: taken off the
 /// world and put back with it. A lamb born after has none.
 pub fn tag_sheep(world: &mut World) {
+    let sheep_tag = sheep_tag(world);
     let every_sheep: Vec<(Header, Vec<AttributeBlock>)> = world.entity_store().iter().map(|one_sheep| (one_sheep.header, one_sheep.attributes.to_vec())).collect();
     for (tag_number, (header, mut attributes)) in every_sheep.into_iter().enumerate() {
-        set_attribute(&mut attributes, SHEEP_TAG, tag_number as u64);
+        set_attribute(&mut attributes, sheep_tag, tag_number as u64);
         assert_eq!(world.remove_entity(&header).entities_removed, 1);
         assert_eq!(world.add_entity(header, &attributes).added, 1);
     }
 }
 
-/// The [`SHEEP_TAG`] of `tagged_sheep`, if it was given one.
-pub fn tag_of(tagged_sheep: &EntityRef) -> Option<u64> {
-    tagged_sheep.attribute(SHEEP_TAG)
+/// The tag of `tagged_sheep`, its world's [`sheep_tag`], if it was given one.
+pub fn tag_of(sheep_tag: Attribute<u64>, tagged_sheep: &EntityRef) -> Option<u64> {
+    tagged_sheep.attribute(sheep_tag)
 }
 
 /// One tick of the rule whose type's ID is `rule_id` alone over `world`'s hot

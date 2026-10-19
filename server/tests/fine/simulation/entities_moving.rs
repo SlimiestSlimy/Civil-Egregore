@@ -5,6 +5,7 @@
 //! `cargo test`
 
 use crate::arenas::*;
+use crate::test_types::TestTypes;
 use crate::walkers::*;
 use utilities::coordinates::{CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use crate::entity_manager::{AttributeBlock, WorldEntities, EntityReader, Header, NEVER_WAKES};
@@ -16,8 +17,9 @@ use std::sync::Mutex;
 #[test]
 fn turns_read_entities_across_superchunks() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
-    let (mut bitmap_arena, mut entity_store) = world(2);
-    let (left_walker, right_walker) = (walker_header(cell(SUPERCHUNK_SIDE_CELLS - 1, 7), 0), walker_header(cell(SUPERCHUNK_SIDE_CELLS, 7), NEVER_WAKES));
+    let types = TestTypes::seeded(seed);
+    let (mut bitmap_arena, mut entity_store) = world(types, 2);
+    let (left_walker, right_walker) = (walker_header(types, cell(SUPERCHUNK_SIDE_CELLS - 1, 7), 0), walker_header(types, cell(SUPERCHUNK_SIDE_CELLS, 7), NEVER_WAKES));
     entity_store.queue_add(left_walker, &[]);
     entity_store.queue_add(right_walker, &[]);
     entity_store.apply();
@@ -43,9 +45,10 @@ fn turns_read_entities_across_superchunks() {
 #[test]
 fn entities_wake_in_morton_order() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
-    let (mut bitmap_arena, mut entity_store) = world(1);
+    let types = TestTypes::seeded(seed);
+    let (mut bitmap_arena, mut entity_store) = world(types, 1);
     for walker_cell in cells_drawn(seed, 500, 1000) {
-        entity_store.queue_add(walker_header(walker_cell, 0), &[]);
+        entity_store.queue_add(walker_header(types, walker_cell, 0), &[]);
     }
     entity_store.apply();
     let mut world_simulation = Simulation::new(1);
@@ -71,10 +74,11 @@ fn entities_wake_in_morton_order() {
 #[test]
 fn entities_stay_in_morton_order_as_they_step() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
-    let (mut bitmap_arena, mut entity_store) = world(1);
+    let types = TestTypes::seeded(seed);
+    let (mut bitmap_arena, mut entity_store) = world(types, 1);
     for walker_number in 0..600u64 {
         let walker_cell = cell(200 + (walker_number % 20) as u32 * 3, 240 + (walker_number / 20) as u32 * 3);
-        entity_store.queue_add(walker_header(walker_cell, 0), &[AttributeBlock::holding_value(ENTITY_NUMBER, walker_number)]);
+        entity_store.queue_add(walker_header(types, walker_cell, 0), &[AttributeBlock::holding_value(types.entity_number, walker_number)]);
     }
     entity_store.apply();
     let mut world_simulation = Simulation::new(1);
@@ -93,9 +97,9 @@ fn entities_stay_in_morton_order_as_they_step() {
     }
     for entity in entity_store.iter() {
         let header = entity.header;
-        assert_eq!(entity_store.get(header.stood_cell).map(|found_entity| (found_entity.header, found_entity.attribute(ENTITY_NUMBER))), Some((header, entity.attribute(ENTITY_NUMBER))), "found where it stands");
+        assert_eq!(entity_store.get(header.stood_cell).map(|found_entity| (found_entity.header, found_entity.attribute(types.entity_number))), Some((header, entity.attribute(types.entity_number))), "found where it stands");
     }
-    let mut entity_numbers: Vec<_> = entity_store.iter().map(|entity| entity.attribute(ENTITY_NUMBER).expect("its own attributes")).collect();
+    let mut entity_numbers: Vec<_> = entity_store.iter().map(|entity| entity.attribute(types.entity_number).expect("its own attributes")).collect();
     entity_numbers.sort_unstable();
     assert!(entity_numbers.into_iter().eq(0..600), "each its own attributes still, none lost and none twice");
 }
@@ -106,8 +110,9 @@ fn entities_stay_in_morton_order_as_they_step() {
 #[test]
 fn a_change_to_an_entity_that_moved_on_is_passed_over() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
-    let (mut bitmap_arena, mut entity_store) = world(1);
-    entity_store.queue_add(walker_header(cell(50, 50), 0), &[]);
+    let types = TestTypes::seeded(seed);
+    let (mut bitmap_arena, mut entity_store) = world(types, 1);
+    entity_store.queue_add(walker_header(types, cell(50, 50), 0), &[]);
     entity_store.apply();
     let mut world_simulation = Simulation::new(1);
     let report = world_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state| {
@@ -133,15 +138,16 @@ fn a_change_to_an_entity_that_moved_on_is_passed_over() {
 #[test]
 fn entities_never_overlap() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
-    let (mut bitmap_arena, mut entity_store) = world(2);
+    let types = TestTypes::seeded(seed);
+    let (mut bitmap_arena, mut entity_store) = world(types, 2);
     // Crowded about the corner the four superchunks meet at, which is the corner of chunks too.
     let crowd_corner = SUPERCHUNK_SIDE_CELLS - 20;
     for walker_number in 0..900u64 {
-        entity_store.queue_add(walker_header(cell(crowd_corner + (walker_number % 30) as u32, crowd_corner + (walker_number / 30) as u32), walker_number % 3), &[AttributeBlock::holding_value(ENTITY_NUMBER, walker_number)]);
+        entity_store.queue_add(walker_header(types, cell(crowd_corner + (walker_number % 30) as u32, crowd_corner + (walker_number / 30) as u32), walker_number % 3), &[AttributeBlock::holding_value(types.entity_number, walker_number)]);
     }
     // Two on a cell already taken: refused.
-    entity_store.queue_add(walker_header(cell(crowd_corner, crowd_corner), 0), &[]);
-    entity_store.queue_add(walker_header(cell(crowd_corner + 7, crowd_corner + 7), 0), &[]);
+    entity_store.queue_add(walker_header(types, cell(crowd_corner, crowd_corner), 0), &[]);
+    entity_store.queue_add(walker_header(types, cell(crowd_corner + 7, crowd_corner + 7), 0), &[]);
     let applied_counts = entity_store.apply();
     assert_eq!((applied_counts.added, applied_counts.adds_refused, entity_store.len()), (900, 2, 900));
     let jostle_rule = |tick_state: &mut SimulationTickState| {
@@ -153,7 +159,7 @@ fn entities_never_overlap() {
             if tick_state.random_stream().draw_below(50) == 0 {
                 let born_cell = header.stood_cell.at_cartesian_offset(tick_state.random_stream().draw_below(5) as i32 - 2, tick_state.random_stream().draw_below(5) as i32 - 2).unwrap();
                 let born_number = 1000 + tick_state.random_stream().next_draw();
-                crate::simulation::simulation_api::entity_reads_and_writes::make_entity(tick_state, header.entity_type, born_cell, wake, &[AttributeBlock::holding_value(ENTITY_NUMBER, born_number)]);
+                crate::simulation::simulation_api::entity_reads_and_writes::make_entity(tick_state, header.entity_type, born_cell, wake, &[AttributeBlock::holding_value(types.entity_number, born_number)]);
             }
         }
         0
@@ -167,7 +173,7 @@ fn entities_never_overlap() {
         let mut cells: Vec<CellIndex> = entity_store.iter().map(|entity| entity.header.stood_cell).collect();
         cells.sort_unstable();
         assert!(cells.windows(2).all(|cell_pair| cell_pair[0] != cell_pair[1]), "tick {tick}: two entities on a cell");
-        let mut entity_numbers: Vec<u64> = entity_store.iter().map(|entity| entity.attribute(ENTITY_NUMBER).expect("tagged")).collect();
+        let mut entity_numbers: Vec<u64> = entity_store.iter().map(|entity| entity.attribute(types.entity_number).expect("tagged")).collect();
         entity_numbers.sort_unstable();
         assert!(entity_numbers.windows(2).all(|number_pair| number_pair[0] != number_pair[1]), "tick {tick}: an entity on two cells");
         if tick % 50 == 0 {

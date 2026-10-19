@@ -5,28 +5,23 @@
 #![allow(dead_code)]
 
 use crate::arenas::cell;
+use crate::test_types::TestTypes;
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::{Attribute, Header, remove_attribute, set_attribute};
+use crate::entity_manager::{Header, remove_attribute, set_attribute};
 use crate::simulation::SimulationTickState;
 
-/// An attribute counting the times an entity woke.
-pub const WOKEN_COUNT: Attribute<u64> = Attribute::new(41);
-/// An attribute a test tells its entities apart by: a number each.
-pub const ENTITY_NUMBER: Attribute<u64> = Attribute::new(43);
-/// An attribute present every other time an entity woke.
-pub const ODD_WAKE: Attribute<u64> = Attribute::new(42);
 
-/// Each walker woken counts it, flips `ODD_WAKE`, and wakes next tick, where
+/// Each walker woken counts it, flips `types.odd_wake`, and wakes next tick, where
 /// it stands: how many woke.
-pub fn count_and_flip(tick_state: &mut SimulationTickState) -> usize {
+pub fn count_and_flip(types: TestTypes, tick_state: &mut SimulationTickState) -> usize {
     let mut woken_count = 0;
     let mut attributes = Vec::new();
     for entity in tick_state.woken_entities() {
         attributes.clear();
         attributes.extend_from_slice(entity.attributes);
-        set_attribute(&mut attributes, WOKEN_COUNT, entity.attribute(WOKEN_COUNT).unwrap_or(0) + 1);
-        if !remove_attribute(&mut attributes, ODD_WAKE.attribute_type()) {
-            set_attribute(&mut attributes, ODD_WAKE, 1);
+        set_attribute(&mut attributes, types.woken_count, entity.attribute(types.woken_count).unwrap_or(0) + 1);
+        if !remove_attribute(&mut attributes, types.odd_wake.attribute_type()) {
+            set_attribute(&mut attributes, types.odd_wake, 1);
         }
         crate::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, Header { wake: tick_state.current_tick() + 1, ..entity.header }, &attributes);
         woken_count += 1;

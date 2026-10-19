@@ -99,11 +99,6 @@ pub struct Attribute<L: Layout> {
 }
 
 impl<L: Layout> Attribute<L> {
-    /// The attribute of number `type_number`, laid out as `L`.
-    pub const fn new(type_number: u64) -> Self {
-        Self { attribute_type: AttributeType::of_blocks(type_number, L::BLOCK_COUNT), layout: std::marker::PhantomData }
-    }
-
     /// The attribute `attribute_type` is, if it takes as many blocks as `L`.
     pub const fn of_attribute_type(attribute_type: AttributeType) -> Option<Self> {
         if attribute_type.block_count() == L::BLOCK_COUNT { Some(Self { attribute_type, layout: std::marker::PhantomData }) } else { None }

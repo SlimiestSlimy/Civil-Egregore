@@ -51,6 +51,9 @@ mod chunks;
 #[cfg(test)]
 #[path = "../tests/shared/walkers.rs"]
 mod walkers;
+#[cfg(test)]
+#[path = "../tests/shared/test_types.rs"]
+mod test_types;
 
 pub use crate::simulation::hot::halos_about;
 pub use crate::simulation::halos::{HaloChange, COOL_TICKS, WARM_TICKS};

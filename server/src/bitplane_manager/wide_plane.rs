@@ -51,25 +51,13 @@ impl Width for Bits32 {
 /// alone, set or clear.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WidePlane<W: Width> {
-    /// Its layer type, which says its width too ([`LayerType::of_width`]).
+    /// Its layer type, which says its width too.
     layer_type: LayerType,
     /// Its width.
     width: std::marker::PhantomData<W>,
 }
 
 impl<W: Width> WidePlane<W> {
-    /// The plane whose bits are kept cold as the types `first_number` on.
-    pub const fn new(first_number: u64) -> Self {
-        Self::of_tiles(first_number, 0)
-    }
-
-    /// The plane of a number a tile, the tiles `2^tile_scale` cells a
-    /// side ([`LayerType::of_tiles`]), whose bits are kept cold as
-    /// the types `first_number` on.
-    pub const fn of_tiles(first_number: u64, tile_scale: u32) -> Self {
-        Self { layer_type: LayerType::of_tiles(first_number, W::BITS_A_CELL, tile_scale), width: std::marker::PhantomData }
-    }
-
     /// The plane `layer_type` is, if it is of its width.
     pub const fn of_layer_type(layer_type: LayerType) -> Option<Self> {
         if layer_type.width_bits() == W::BITS_A_CELL { Some(Self { layer_type, width: std::marker::PhantomData }) } else { None }

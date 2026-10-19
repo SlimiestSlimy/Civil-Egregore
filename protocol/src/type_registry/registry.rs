@@ -107,7 +107,7 @@ impl TypeRegistry {
     /// wrong: a type the world's save holds that none registered is.
     pub fn freeze(self) -> Result<FrozenTypeRegistry, String> {
         if let Some((saved_name, _)) = self.saved_ids.iter().find(|(saved_name, _)| self.place_named(saved_name).is_none()) {
-            return Err(format!("the type `{saved_name}` was saved, none of its name is registered"));
+            return Err(format!("the world's types name `{saved_name}`, and the game registers no type of that name: nothing to load it as"));
         }
         Ok(FrozenTypeRegistry::of_registered(self.types, self.depends_on, self.libraries, self.hooks))
     }
