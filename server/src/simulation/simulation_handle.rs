@@ -83,7 +83,7 @@ impl SimulationHandle {
     pub fn new(world_info: &WorldInfo, frozen_type_registry: &FrozenTypeRegistry, thread_count: Option<usize>, cold_pool_paging: ColdPoolPaging) -> Result<Self, String> {
         let hot = match (world_info.side_in_superchunks, world_info.forced_hot) {
             (Some(side_superchunks), true) => Hot::Forced { world_side_superchunks: side_superchunks },
-            (side_if_sized, _) => Hot::AboutHotEntities { entity: hot_entity_of(frozen_type_registry)?, world_side_superchunks: side_if_sized, viewport: world_info.camera_loads },
+            (side_if_sized, _) => Hot::AboutHotEntities { entity: hot_entity_of(frozen_type_registry)?, world_side_superchunks: side_if_sized, viewport: world_info.camera_forces_superchunks_hot },
         };
         // The world's superchunks not counted, as it grows: one set of threads, the tick's and chunk storage's jobs' alike.
         let dispatcher = Arc::new(thread_count.map_or_else(Dispatcher::of_the_machine, Dispatcher::new));

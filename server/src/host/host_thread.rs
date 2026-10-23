@@ -215,7 +215,7 @@ impl HostThread {
 
     /// Begins answering `frame_ask`, if a world runs, in place of any frame
     /// half answered -- its viewport kept hot from now, if the world's
-    /// camera loads superchunks.
+    /// camera forces superchunks hot.
     fn begin_frame(&mut self, frame_ask: FrameAsk) {
         let Some(running_world) = &mut self.running_world else {
             return;

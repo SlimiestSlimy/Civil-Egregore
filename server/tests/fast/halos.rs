@@ -5,7 +5,7 @@
 //!
 //! `cargo test`
 
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_LOADS, FORCED_HOT, SEED, SIDE, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, FORCED_HOT, SEED, SIDE, WORLDGEN};
 use utilities::coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use crate::bitplane_manager::{Write, WriteOp};
 use crate::entity_manager::{AttributeBlock, Header, NEVER_WAKES};
@@ -226,18 +226,18 @@ fn a_world_of_a_size_is_hot_within_it_only() {
     assert_eq!((loaded_world.warming().count(), loaded_world.cooling().count()), (0, 0));
 }
 
-/// A world whose camera loads superchunks: a wide viewport is wanted
+/// A world whose camera forces superchunks hot: a wide viewport is wanted
 /// hot whole, every superchunk of it, and no viewport none; two
 /// superchunks of the viewport, far from the origin, turn hot as a
 /// halo's would, generated and unpopulated until their first tick hot.
-/// A save keeps that its camera loads, and those generated yet
-/// unpopulated; a world whose camera loads nothing keeps no viewport.
+/// A save keeps that its camera forces superchunks hot, and those generated yet
+/// unpopulated; a world whose camera forces nothing hot keeps no viewport.
 /// No sheep: on a world with no end, flocks would spread it for good.
 #[test]
-fn the_camera_loads_the_superchunks_of_the_viewport() {
+fn the_camera_forces_the_superchunks_of_the_viewport_hot() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let mut world = crate::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(WORLDGEN, crate::test_game::walkers(0)).with(CAMERA_LOADS, crate::whole_worlds::given()), &crate::test_game::TestGame::new_world_types().0).expect("the world started");
-    assert!(world.world_info().camera_loads);
+    let mut world = crate::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(WORLDGEN, crate::test_game::walkers(0)).with(CAMERA_FORCES_SUPERCHUNKS_HOT, crate::whole_worlds::given()), &crate::test_game::TestGame::new_world_types().0).expect("the world started");
+    assert!(world.world_info().camera_forces_superchunks_hot);
     let (x, y) = WORLD_MIDDLE.cartesian();
     world.keep_viewport(Some(Viewport { top_left_superchunk_cartesian: (x - 50, y - 50), bottom_right_superchunk_cartesian: (x + 50, y + 50) }));
     let wide_viewport = world.halos().viewport();
@@ -254,12 +254,12 @@ fn the_camera_loads_the_superchunks_of_the_viewport() {
     let folder = crate::whole_worlds::folder("camera");
     crate::save(&folder, &mut world).expect("saved");
     let loaded_world = crate::whole_worlds::opened(&folder).expect("loaded");
-    assert!(loaded_world.world_info().camera_loads, "that its camera loads, kept");
+    assert!(loaded_world.world_info().camera_forces_superchunks_hot, "that its camera forces superchunks hot, kept");
     assert_eq!(loaded_world.unpopulated(), world.unpopulated(), "those unpopulated, kept");
     world.tick();
     assert!(viewport.iter().all(|superchunk| !world.unpopulated().contains(&superchunk.0)), "populated on its first tick hot");
 
     let mut unseen_world = crate::start_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(WORLDGEN, crate::test_game::walkers(0)), &crate::test_game::TestGame::new_world_types().0).expect("the world started");
     unseen_world.keep_viewport(Some(Viewport { top_left_superchunk_cartesian: (x + 10, y), bottom_right_superchunk_cartesian: (x + 11, y) }));
-    assert!(unseen_world.halos().viewport().is_empty() && !unseen_world.world_info().camera_loads, "its camera loads nothing");
+    assert!(unseen_world.halos().viewport().is_empty() && !unseen_world.world_info().camera_forces_superchunks_hot, "its camera forces nothing hot");
 }

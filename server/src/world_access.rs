@@ -134,7 +134,7 @@ impl World {
     }
 
     /// Keeps the superchunks `viewport` shows hot, if the world's
-    /// camera loads them: asked for the next time the halos move.
+    /// camera forces them hot: asked for the next time the halos move.
     pub fn keep_viewport(&mut self, viewport: Option<Viewport>) {
         self.simulation_handle.keep_viewport(viewport);
     }

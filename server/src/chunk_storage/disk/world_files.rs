@@ -10,8 +10,8 @@ const WORLD_COLUMNS: [&str; 2] = ["world", "is"];
 /// The world file's format, and the number of the one written.
 const FORMAT_ROW: (&str, &str) = ("format", "6");
 
-/// The name of the row saying a world's camera loads superchunks.
-const CAMERA_LOADS: &str = "camera loads";
+/// The name of the row saying a world's camera forces superchunks hot.
+const CAMERA_FORCES_SUPERCHUNKS_HOT: &str = "camera forces superchunks hot";
 
 /// The name of the row of the superchunks generated and not yet
 /// populated ([`WorldInfo::unpopulated`]): spaces between them.
@@ -35,8 +35,8 @@ pub struct WorldInfo {
     /// Whether every superchunk of it is hot throughout, whatever its
     /// entities do: only one with a size can be.
     pub forced_hot: bool,
-    /// Whether its camera loads superchunks: the viewport's hot as well.
-    pub camera_loads: bool,
+    /// Whether its camera forces superchunks hot: the viewport's hot as well.
+    pub camera_forces_superchunks_hot: bool,
     /// The superchunks generated and not yet hot since: each populated
     /// by the world's generation the first tick it is hot. Sorted.
     pub unpopulated: Vec<u64>,
@@ -58,7 +58,7 @@ impl WorldInfo {
         ];
         name_value_rows.extend(self.side_in_superchunks.map(|side_value| ("side".to_string(), side_value.to_string())));
         name_value_rows.extend(self.forced_hot.then(|| ("forced".to_string(), "1".to_string())));
-        name_value_rows.extend(self.camera_loads.then(|| (CAMERA_LOADS.to_string(), "1".to_string())));
+        name_value_rows.extend(self.camera_forces_superchunks_hot.then(|| (CAMERA_FORCES_SUPERCHUNKS_HOT.to_string(), "1".to_string())));
         let unpopulated_superchunks: Vec<String> = self.unpopulated.iter().map(u64::to_string).collect();
         name_value_rows.extend((!unpopulated_superchunks.is_empty()).then(|| (UNPOPULATED.to_string(), unpopulated_superchunks.join(" "))));
         name_value_rows.extend(self.worldgen_parameters.iter().map(|(generation_name, value)| (format!("{WORLDGEN_PREFIX}{generation_name}"), value.to_string())));
@@ -73,7 +73,7 @@ impl WorldInfo {
         if csv_rows.next().is_none_or(|first_row| first_row != WORLD_COLUMNS) {
             return Err(format!("does not start with `{}`", WORLD_COLUMNS.join(",")));
         }
-        let mut read_info = Self { seed: 0, tick: 0, layers: Vec::new(), side_in_superchunks: None, forced_hot: false, camera_loads: false, unpopulated: Vec::new(), worldgen_parameters: Vec::new() };
+        let mut read_info = Self { seed: 0, tick: 0, layers: Vec::new(), side_in_superchunks: None, forced_hot: false, camera_forces_superchunks_hot: false, unpopulated: Vec::new(), worldgen_parameters: Vec::new() };
         let (mut seed, mut names_seen) = (None, Vec::new());
         for csv_row in csv_rows {
             let [raw_name, value] = &csv_row[..] else {
@@ -92,7 +92,7 @@ impl WorldInfo {
                 "tick" => read_info.tick = parse_number()?,
                 "side" => read_info.side_in_superchunks = Some(value.parse().map_err(|_| format!("`{value}` is not a side"))?),
                 "forced" => read_info.forced_hot = parse_number()? != 0,
-                CAMERA_LOADS => read_info.camera_loads = parse_number()? != 0,
+                CAMERA_FORCES_SUPERCHUNKS_HOT => read_info.camera_forces_superchunks_hot = parse_number()? != 0,
                 UNPOPULATED => read_info.unpopulated = value.split_whitespace().map(|superchunk| superchunk.parse().map_err(|_| format!("`{superchunk}` is not a superchunk"))).collect::<Result<_, _>>()?,
                 _ if row_name.starts_with(WORLDGEN_PREFIX) => read_info.worldgen_parameters.push((row_name[WORLDGEN_PREFIX.len()..].to_string(), parse_number()?)),
                 // A name of another format: passed over.

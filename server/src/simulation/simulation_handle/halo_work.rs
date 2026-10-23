@@ -29,7 +29,7 @@ impl SimulationHandle {
     }
 
     /// Moves the halos to where the hot entities stand, with the
-    /// viewport's superchunks if its camera loads them -- each superchunk
+    /// viewport's superchunks if its camera forces them hot -- each superchunk
     /// generated left to be populated its first tick hot.
     pub(super) fn move_halos(&mut self) -> HaloChange {
         let halo_change = self.with_halos(|halos, world_held| halos.move_to_hot_entities(world_held));
@@ -46,7 +46,7 @@ impl SimulationHandle {
     }
 
     /// Keeps the superchunks `viewport` shows hot, if the world's
-    /// camera loads them: asked for the next time the halos move.
+    /// camera forces them hot: asked for the next time the halos move.
     pub fn keep_viewport(&mut self, viewport: Option<Viewport>) {
         self.halos.keep_viewport(viewport);
     }

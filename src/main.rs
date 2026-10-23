@@ -16,6 +16,8 @@
 
 use protocol::flags::FlagError;
 use protocol::server_parameters::ServerParameters;
+#[cfg(feature = "client")]
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, WORLDGEN};
 use std::process::ExitCode;
 
 #[cfg(all(windows, feature = "client"))]
@@ -34,6 +36,14 @@ fn leave_the_console() {
     FreeConsole();
 }
 
+/// The world the window opens with, until it has its menus: of no size,
+/// no sheep in it, the superchunks the window shows kept hot.
+#[cfg(feature = "client")]
+fn first_world() -> CleanServerParameters {
+    let no_sheep = CleanServerParameters::default().with(basegame::worldgen::generation::SHEEP_PER_SUPERCHUNK, ParameterValue::Integer(0));
+    CleanServerParameters::default().with(CAMERA_FORCES_SUPERCHUNKS_HOT, ParameterValue::Nested(CleanServerParameters::default())).with(WORLDGEN, ParameterValue::Nested(no_sheep))
+}
+
 /// No arguments, built with the client: the window, and nothing else
 /// run once it closes; built headless, the flags' help. Otherwise, the
 /// command line read by the server's flags, and run by the server.
@@ -43,7 +53,7 @@ fn main() -> ExitCode {
     #[cfg(feature = "client")]
     if shell_words.is_empty() {
         leave_the_console();
-        client::run_window(basegame::default_types::register_types);
+        client::run_window(basegame::default_types::register_types, first_world());
         return ExitCode::SUCCESS;
     }
 
