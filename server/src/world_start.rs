@@ -6,7 +6,7 @@
 
 use crate::chunk_storage::disk::WorldInfo;
 use crate::simulation::simulation_api::WorldgenCode;
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_LOADS, FORCED_HOT, SEED, SIDE, THREADS, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, FORCED_HOT, SEED, SIDE, THREADS, WORLDGEN};
 use protocol::type_registry::FrozenTypeRegistry;
 use std::hash::{BuildHasher, RandomState};
 
@@ -26,8 +26,8 @@ pub(crate) fn new_world_info(frozen_type_registry: &FrozenTypeRegistry, worldgen
     }
     let worldgen_parameters = worldgen_parameters_of(parameters)?;
     let seed = parameters.hex(SEED).unwrap_or_else(|| drawn_seed(&worldgen_parameters, worldgen));
-    let camera_loads = parameters.nested(CAMERA_LOADS).is_some() && !forced_hot;
-    Ok(WorldInfo { seed, tick: 0, layers: frozen_type_registry.layer_types(), side_in_superchunks: Some(side_superchunks).filter(|&side| side > 0), forced_hot, camera_loads, unpopulated: Vec::new(), worldgen_parameters })
+    let camera_forces_superchunks_hot = parameters.nested(CAMERA_FORCES_SUPERCHUNKS_HOT).is_some() && !forced_hot;
+    Ok(WorldInfo { seed, tick: 0, layers: frozen_type_registry.layer_types(), side_in_superchunks: Some(side_superchunks).filter(|&side| side > 0), forced_hot, camera_forces_superchunks_hot, unpopulated: Vec::new(), worldgen_parameters })
 }
 
 /// The worldgen parameters given under [`WORLDGEN`], each by its name --
@@ -56,19 +56,19 @@ pub(crate) fn thread_count_of(parameters: &CleanServerParameters) -> Result<Opti
 /// made by: its seed, size and camera, its worldgen parameters
 /// `worldgen_parameters` -- what a world remade from its start is.
 pub(crate) fn parameters_of_world(world_info: &WorldInfo, worldgen_parameters: &[(String, u64)]) -> CleanServerParameters {
-    new_world_parameters(world_info.side_in_superchunks.unwrap_or(0), world_info.forced_hot, world_info.camera_loads, worldgen_parameters).with(SEED, ParameterValue::Hex(world_info.seed))
+    new_world_parameters(world_info.side_in_superchunks.unwrap_or(0), world_info.forced_hot, world_info.camera_forces_superchunks_hot, worldgen_parameters).with(SEED, ParameterValue::Hex(world_info.seed))
 }
 
 /// The parameters of a new world `side_superchunks` a side -- 0, no
-/// end -- forced hot and its camera loading as said, its worldgen
+/// end -- forced hot and its camera forcing superchunks hot as said, its worldgen
 /// parameters `worldgen_parameters`, no seed given.
-fn new_world_parameters(side_superchunks: u32, forced_hot: bool, camera_loads: bool, worldgen_parameters: &[(String, u64)]) -> CleanServerParameters {
+fn new_world_parameters(side_superchunks: u32, forced_hot: bool, camera_forces_superchunks_hot: bool, worldgen_parameters: &[(String, u64)]) -> CleanServerParameters {
     let worldgen = worldgen_parameters.iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name.as_str(), ParameterValue::Hex(*value)));
     let mut parameters = CleanServerParameters::default().with(WORLDGEN, ParameterValue::Nested(worldgen));
     if side_superchunks > 0 {
         parameters.insert(SIDE, ParameterValue::Integer(i64::from(side_superchunks)));
     }
-    for (parameter_name, is_given) in [(FORCED_HOT, forced_hot), (CAMERA_LOADS, camera_loads)] {
+    for (parameter_name, is_given) in [(FORCED_HOT, forced_hot), (CAMERA_FORCES_SUPERCHUNKS_HOT, camera_forces_superchunks_hot)] {
         if is_given {
             parameters.insert(parameter_name, ParameterValue::Nested(CleanServerParameters::default()));
         }

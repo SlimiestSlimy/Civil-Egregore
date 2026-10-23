@@ -3,6 +3,7 @@
 //! it as it is slid -- the world itself changed only by a reset.
 
 use crate::worldgen::calls::WorldgenCalls;
+use crate::worldgen::generation::SHEEP_PER_SUPERCHUNK;
 use crate::worldgen::mesh::SIGMOID_ONE;
 use crate::worldgen::FRACTION_ONE;
 use bevy::feathers::controls::FeathersSlider;
@@ -78,7 +79,7 @@ const SLIDS: [(&str, Slid); 28] = [
     ("tree patch size", whole(1.0, 10.0)),
     ("tree patch detail", share(2.0)),
     ("tree scatter", share(2.0)),
-    ("sheep per superchunk", whole(0.0, 16000.0)),
+    (SHEEP_PER_SUPERCHUNK, whole(0.0, 16000.0)),
 ];
 
 /// The slider of the worldgen parameter `parameter_name`, at `place`

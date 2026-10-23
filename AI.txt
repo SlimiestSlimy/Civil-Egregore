@@ -541,6 +541,13 @@ NOW
   a world of ocean. Not yet: tooltips (the old "does" texts), scrolling
   a window, keyboard navigation; calls are made on the main thread,
   waiting for the host's answer.
+  THE WINDOW'S FIRST WORLD (the user, 2026-10-23: "when doing those kinds
+  of test make the world limitless and simply reduce sheep spawning on
+  worldgen to 0 lol"): handed to run_window by the root's main.rs (the
+  client names no content): no side, no sheep, the camera forcing
+  superchunks hot. Renamed: "unlimited camera loads is better named
+  "camera forces superchunks hot"" -- the parameter
+  camera_forces_superchunks_hot, the world file's row, WorldInfo's field.
   OPEN: the host copies every plane whole whatever the detail level
   (16-bit height and water depth: 2 MB a superchunk each), so a far
   view of many hot superchunks goes round slowly (a boundless world
@@ -903,6 +910,8 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- Doc comments thinned: "yeah, there is a lot of doc comments in the code
+  now, understandable for now, had to be fixed later" (2026-10-23).
 - The first shader, from scratch: "i know whats the first shader we
   must program in, the shader for shadows and stuff, so the terrain
   looks 3d again, we should do that one from scratch later the one we

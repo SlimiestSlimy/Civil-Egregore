@@ -6,7 +6,7 @@
 //!
 //! `cargo test`
 
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_LOADS, FORCED_HOT, SEED, SIDE, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, FORCED_HOT, SEED, SIDE, WORLDGEN};
 use crate::whole_worlds::{world_contents, folder};
 use crate::chunk_storage::disk;
 use crate::DiskError;
@@ -113,7 +113,7 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
 fn a_world_file_is_read_in_any_order() {
     let folder = folder("any_order");
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, _) = crate::test_game::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(CAMERA_LOADS, crate::whole_worlds::given()), 10);
+    let (mut world, _) = crate::test_game::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(CAMERA_FORCES_SUPERCHUNKS_HOT, crate::whole_worlds::given()), 10);
     crate::save(&folder, &mut world).expect("saved");
     let saved_info = disk::read_world(&folder).expect("read");
     let path = folder.join("world.csv");
@@ -124,7 +124,7 @@ fn a_world_file_is_read_in_any_order() {
     assert_eq!(disk::read_world(&folder).expect("read turned round"), saved_info);
     std::fs::write(&path, format!("world,is\nseed,{}\n", utilities::seed::seed_as_hex(seed))).expect("written");
     let bare_info = disk::read_world(&folder).expect("read with the seed alone");
-    assert_eq!(bare_info, disk::WorldInfo { seed, tick: 0, layers: Vec::new(), side_in_superchunks: None, forced_hot: false, camera_loads: false, unpopulated: Vec::new(), worldgen_parameters: Vec::new() });
+    assert_eq!(bare_info, disk::WorldInfo { seed, tick: 0, layers: Vec::new(), side_in_superchunks: None, forced_hot: false, camera_forces_superchunks_hot: false, unpopulated: Vec::new(), worldgen_parameters: Vec::new() });
     let generation = crate::simulation::rules::worldgen_of(world.frozen_type_registry()).expect("the test game's generation");
     assert_eq!((generation.parameters_read)(&bare_info.worldgen_parameters), vec![(crate::test_game::WALKERS_PER_SUPERCHUNK.to_string(), 0)], "generated as by default");
     for refused_text in ["world,is\ntick,3\n", "world,is\nseed,0x7\nseed,0x8\n", "world,is\nformat,1\nseed,0x7\n", "seed,0x7\nworld,is\n"] {

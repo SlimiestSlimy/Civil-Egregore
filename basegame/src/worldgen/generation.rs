@@ -14,6 +14,8 @@ pub const TREES_SALT: u64 = 0x7472_6565_735F_6C6F;
 
 /// Sheep a superchunk is given unless told otherwise.
 pub const FLOCK: u64 = 4_000;
+/// The worldgen parameter of the sheep each superchunk starts with.
+pub const SHEEP_PER_SUPERCHUNK: &str = "sheep per superchunk";
 
 /// How superchunks are generated: the heights' shape, how the grass and
 /// the trees lie on them, and the sheep each is given.
@@ -101,7 +103,7 @@ const PARAMETER_FIELDS: [(&str, NumberField); 28] = [
     ("tree patch size", |generation| &mut generation.trees.patch_size_power),
     ("tree patch detail", |generation| &mut generation.trees.detail_share),
     ("tree scatter", |generation| &mut generation.trees.scatter_share),
-    ("sheep per superchunk", |generation| &mut generation.sheep_per_superchunk),
+    (SHEEP_PER_SUPERCHUNK, |generation| &mut generation.sheep_per_superchunk),
 ];
 
 impl WorldGeneration {

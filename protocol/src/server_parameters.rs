@@ -26,8 +26,8 @@ pub const WORLD: &str = "world";
 /// Bytes of its cold superchunks' images an opened world keeps in
 /// memory: none given, the server's own.
 pub const COLD_POOL_BYTES: &str = "cold_pool_bytes";
-/// A new world's camera loads superchunks: the viewport's hot as well.
-pub const CAMERA_LOADS: &str = "camera_loads";
+/// A new world's camera forces superchunks hot: the viewport's hot as well.
+pub const CAMERA_FORCES_SUPERCHUNKS_HOT: &str = "camera_forces_superchunks_hot";
 /// A new world's worldgen parameters, each by its name: its
 /// generation's own, handed it untouched.
 pub const WORLDGEN: &str = "worldgen";

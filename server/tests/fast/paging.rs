@@ -1,7 +1,7 @@
 //! The cold pool paged to disk: a world keeping none of its cold
 //! superchunks' images in memory is the world keeping them all.
 
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_LOADS, COLD_POOL_BYTES, SEED, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, COLD_POOL_BYTES, SEED, WORLDGEN};
 use crate::whole_worlds::{world_contents, folder};
 use utilities::coordinates::{SuperchunkIndex, WORLD_SIDE_SUPERCHUNKS};
 use crate::{World, COOL_TICKS, WARM_TICKS};
@@ -49,7 +49,7 @@ fn the_same(paged: &mut World, kept_world: &mut World) -> bool {
 #[test]
 fn a_world_paged_to_disk_is_the_world_kept_in_memory() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let world_start = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(WORLDGEN, crate::test_game::walkers(0)).with(CAMERA_LOADS, crate::whole_worlds::given());
+    let world_start = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(WORLDGEN, crate::test_game::walkers(0)).with(CAMERA_FORCES_SUPERCHUNKS_HOT, crate::whole_worlds::given());
     let (mut paged, mut kept_world) = (crate::start_world(&world_start.clone(), &crate::test_game::TestGame::new_world_types().0).expect("the world started"), crate::start_world(&world_start, &crate::test_game::TestGame::new_world_types().0).expect("the world started"));
     paged.keep_cold_pool_within(0);
     let (middle_coordinate, mut order_random) = (WORLD_SIDE_SUPERCHUNKS / 2, RandomSource::new(crate::test_seed::TestSeedHandle::open().seed()));

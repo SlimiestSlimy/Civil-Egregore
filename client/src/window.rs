@@ -1,6 +1,5 @@
 //! The window: a Bevy window, its server started and connected to as it
-//! opens ([`crate::server_end`]), a world made with the default
-//! parameters but a side, its windows ([`windows`]: the world's gui
+//! opens ([`crate::server_end`]), a world made as its program says, its windows ([`windows`]: the world's gui
 //! types), and the world drawn ([`drawing`]) as its camera sees it
 //! ([`camera`]: WASD or the arrows, the mouse, its wheel, Q and E). Space pauses; `=` and `-` double and halve the pace,
 //! `0` holds it to the simulation's own, `F` lets it run flat out.
@@ -15,16 +14,13 @@ use bevy::feathers::theme::UiTheme;
 use bevy::feathers::FeathersPlugins;
 use bevy::prelude::*;
 use drawing::Drawing;
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, SIDE};
+use protocol::server_parameters::CleanServerParameters;
 use protocol::world_types::RegisterTypes;
 use std::sync::mpsc::Receiver;
 use std::sync::Mutex;
 
 /// The window's title, before what it says of the world.
 const TITLE: &str = "Civil Egregore";
-/// Superchunks along a side of the world the window opens with: one of
-/// no size grows hot wherever its sheep wander.
-const FIRST_WORLD_SIDE: i64 = 8;
 
 /// The window's server: its process, ended with the window, and what it
 /// shows -- each world's types and frames.
@@ -37,8 +33,10 @@ struct WindowServer {
 }
 
 /// Opens the window, its server started, and runs until it is closed:
-/// each world's types registered by `register_types`, the game's.
-pub fn run_window(register_types: RegisterTypes) {
+/// each world's types registered by `register_types`, the game's, and
+/// the world it opens with made as `first_world` says -- until the
+/// window has its menus, the program's to say.
+pub fn run_window(register_types: RegisterTypes, first_world: CleanServerParameters) {
     let (server_end, shown) = ServerEnd::start();
     let server_calls = crate::client_api::ServerCalls::through(server_end.link.clone());
     App::new()
@@ -52,16 +50,20 @@ pub fn run_window(register_types: RegisterTypes) {
         .insert_resource(server_calls)
         .insert_resource(WindowServer { server_end, shown: Mutex::new(shown) })
         .insert_resource(Drawing::new(register_types))
+        .insert_resource(FirstWorld(first_world))
         .add_systems(Startup, (camera::spawn_camera, make_a_world))
         .add_systems(Update, (camera::move_camera, drawing::take_shown, drawing::ask_frames, drawing::show_painted, keys_to_the_server, say_in_the_title).chain())
         .run();
 }
 
-/// A world made with the default parameters, [`FIRST_WORLD_SIDE`]
-/// superchunks a side: until the window has its menus, the world it
-/// opens with.
-fn make_a_world(window_server: Res<WindowServer>) {
-    window_server.server_end.link.make_world(CleanServerParameters::default().with(SIDE, ParameterValue::Integer(FIRST_WORLD_SIDE)));
+/// The parameters of the world the window opens with.
+#[derive(Resource)]
+struct FirstWorld(CleanServerParameters);
+
+/// The world the window opens with made: until the window has its
+/// menus, the one its program says.
+fn make_a_world(window_server: Res<WindowServer>, first_world: Res<FirstWorld>) {
+    window_server.server_end.link.make_world(first_world.0.clone());
 }
 
 /// The keys the server is told by: Space pauses or goes on; `=` and `-`

@@ -12,7 +12,7 @@ use server::host::Host;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration;
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_LOADS, SEED, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, SEED, WORLDGEN};
 use utilities::wire::{receive, send};
 use crate::ProbeParameters;
 
@@ -29,12 +29,12 @@ pub fn counted() -> [LayerType; 2] {
 }
 
 /// A new world's parameters, as a command line gives them: of `seed` if
-/// given, else one drawn; no end, its camera loading; generated as the
+/// given, else one drawn; no end, its camera forcing superchunks hot; generated as the
 /// base game is by default but for `sheep_a_superchunk`.
 pub fn camera_world(seed: Option<u64>, sheep_a_superchunk: u64) -> CleanServerParameters {
     let worldgen_parameters = basegame::worldgen::WorldGeneration { sheep_per_superchunk: sheep_a_superchunk, ..basegame::worldgen::WorldGeneration::DEFAULT }.worldgen_parameters();
     let worldgen = worldgen_parameters.into_iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name, ParameterValue::Hex(value)));
-    let parameters = CleanServerParameters::default().with(WORLDGEN, ParameterValue::Nested(worldgen)).with(CAMERA_LOADS, ParameterValue::Nested(CleanServerParameters::default()));
+    let parameters = CleanServerParameters::default().with(WORLDGEN, ParameterValue::Nested(worldgen)).with(CAMERA_FORCES_SUPERCHUNKS_HOT, ParameterValue::Nested(CleanServerParameters::default()));
     match seed {
         Some(given_seed) => parameters.with(SEED, ParameterValue::Hex(given_seed)),
         None => parameters,
