@@ -5,8 +5,8 @@
 use crate::bitplane_manager::superchunk_layer::SuperchunkLayer;
 use crate::bitplane_manager::{contains, BitmapArena};
 use utilities::bitmap::morton::morton_index;
-use crate::chunk_storage::{LayerType};
-use crate::bitplane_manager::{WidePlane, Width};
+use crate::chunk_storage::LayerType;
+use protocol::server_types::plane_widths::{WidePlane, Width};
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, CHUNK_SIDE, SUPERCHUNK_SIDE_CELLS};
 
 /// What a write does to each cell it covers.

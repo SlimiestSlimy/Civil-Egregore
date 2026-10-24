@@ -3,8 +3,9 @@
 //! at the oldest may die (`docs/sca_rules.md`, "Trees").
 
 use crate::base_types::{BaseTypes, OLDEST_TREE_STAGE};
-use server::simulation::simulation_api::simulation_time::SimulationTime;
-use server::simulation::simulation_api::{on_each_sampled, RuleCode, cell_reads_and_writes, compare_and_write, place_counted, tick_and_random_stream, CellIndex, Chance, RuleCounts, SimulationTickState};
+use protocol::server_types::simulation_time::SimulationTime;
+use server::simulation::simulation_api::{on_each_sampled, RuleCode, cell_reads_and_writes, compare_and_write, tick_and_random_stream, CellIndex, Chance, SimulationTickState};
+use server::simulation::simulation_api::rule_counts::{place_counted, RuleCounts};
 
 /// The simulation time from one sample of a tree to the next, on
 /// average: what its chance each tick is worked out from, so trees

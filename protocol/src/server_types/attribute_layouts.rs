@@ -2,7 +2,7 @@
 //! and the attribute's constant typed by it ([`Attribute`])
 //! (`docs/type_registry.md`, "Layouts").
 
-use protocol::type_registry::{AttributeType, RegisteredType, Registration};
+use crate::type_registry::{AttributeType, RegisteredType, Registration};
 
 /// Words in an attribute block: sixteen bytes.
 pub const BLOCK_WORDS: usize = 2;

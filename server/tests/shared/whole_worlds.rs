@@ -6,7 +6,9 @@
 #![allow(dead_code)]
 
 use crate::chunk_storage::SuperchunkImage;
-use crate::entity_manager::{AttributeBlock, Header, InstructionsApplied};
+use crate::entity_manager::InstructionsApplied;
+use protocol::server_types::entity::EntityBaseData;
+use protocol::server_types::attributes::AttributeBlock;
 use crate::test_game::TestGame;
 use crate::{DiskError, World, WorldNotMade};
 use protocol::server_parameters::{CleanServerParameters, ParameterValue};
@@ -43,34 +45,34 @@ pub fn opened(folder: &Path) -> Result<World, DiskError> {
 /// random stream, every cold superchunk's image and kept state, and the
 /// superchunks warming and cooling with when each is due: what two
 /// worlds the same hold the same.
-pub type WorldContents = (Vec<u64>, Vec<(Header, Vec<AttributeBlock>)>, u64, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, SuperchunkImage, Vec<u64>)>, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, u64)>);
+pub type WorldContents = (Vec<u64>, Vec<(EntityBaseData, Vec<AttributeBlock>)>, u64, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, SuperchunkImage, Vec<u64>)>, Vec<(SuperchunkIndex, u64)>, Vec<(SuperchunkIndex, u64)>);
 
 /// [`WorldContents`] `world` holds.
 pub fn world_contents(world: &World) -> WorldContents {
     let cells = world.world_info().layers.clone().into_iter().flat_map(|layer| world.bitmap_arena().buckets_of(layer)).flat_map(|(_, bucket)| bucket.words().to_vec()).collect();
-    let entities_with_attributes = world.entity_store().iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect();
+    let entities_with_attributes = world.entity_store().iter().map(|entity| (entity.base_data, entity.attributes.to_vec())).collect();
     let cold = world.cold().iter().map(|(&superchunk, words)| (superchunk, SuperchunkImage::clone(&world.chunk_storage().shared_image(superchunk).expect("a cold superchunk's image")), words.clone())).collect();
     (cells, entities_with_attributes, world.entity_store().current_tick(), world.world_simulation().random_states().collect(), cold, world.warming().collect(), world.cooling().collect())
 }
 
 /// Puts an entity on `world` between ticks, whole, its cell held in the
 /// test game's collision plane: there before the next tick.
-pub fn add_entity(world: &mut World, test_game: TestGame, header: Header, attributes: &[AttributeBlock]) -> InstructionsApplied {
+pub fn add_entity(world: &mut World, test_game: TestGame, base_data: EntityBaseData, attributes: &[AttributeBlock]) -> InstructionsApplied {
     use crate::bitplane_manager::{Write, WriteOp};
-    let applied = world.add_entity(header, attributes);
+    let applied = world.add_entity(base_data, attributes);
     if applied.added > 0 {
-        world.write_cells(test_game.collision, [Write::cell(header.stood_cell, WriteOp::SetCell)]);
+        world.write_cells(test_game.collision, [Write::cell(base_data.stood_cell, WriteOp::SetCell)]);
     }
     applied
 }
 
-/// Takes `header`'s entity off `world` between ticks, the cell it held
+/// Takes `base_data`'s entity off `world` between ticks, the cell it held
 /// in the test game's collision plane let go.
-pub fn remove_entity(world: &mut World, test_game: TestGame, header: &Header) -> InstructionsApplied {
+pub fn remove_entity(world: &mut World, test_game: TestGame, base_data: &EntityBaseData) -> InstructionsApplied {
     use crate::bitplane_manager::{Write, WriteOp};
-    let applied = world.remove_entity(header);
+    let applied = world.remove_entity(base_data);
     if applied.entities_removed > 0 {
-        world.write_cells(test_game.collision, [Write::cell(header.stood_cell, WriteOp::ClearCell)]);
+        world.write_cells(test_game.collision, [Write::cell(base_data.stood_cell, WriteOp::ClearCell)]);
     }
     applied
 }

@@ -14,7 +14,7 @@ pub struct WorldHash {
     /// Every hot bitmap: each layer type's, a chunk at a time, in
     /// Morton order -- the chunk, its count of cells set, its words.
     pub cells: u64,
-    /// Every entity, in Morton order by cell, then by ID: its header
+    /// Every entity, in Morton order by cell, then by ID: its base data
     /// and its attributes.
     pub entities: u64,
     /// Every hot superchunk's random stream.
@@ -52,8 +52,8 @@ pub fn world_hash(world: &mut World) -> WorldHash {
     }
     let mut entities_hash = fold_word(0, world.entity_store().len() as u64);
     for entity in world.entity_store().iter() {
-        let header = entity.header;
-        entities_hash = [header.entity_type.0, header.stood_cell.0, header.wake, entity.attribute_list().len() as u64].into_iter().fold(entities_hash, fold_word);
+        let base_data = entity.base_data;
+        entities_hash = [base_data.entity_type.0, base_data.stood_cell.0, base_data.wake, entity.attribute_list().len() as u64].into_iter().fold(entities_hash, fold_word);
         entities_hash = entity.attribute_list().iter().flat_map(|attribute_block| attribute_block.0).fold(entities_hash, fold_word);
     }
     let random_streams = world.world_simulation().random_states().fold(0, |streams_hash, (superchunk, random_state)| fold_word(fold_word(streams_hash, superchunk.0), random_state));

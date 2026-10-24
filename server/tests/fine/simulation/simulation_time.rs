@@ -4,7 +4,7 @@
 //!
 //! `cargo test -p server --lib simulation_time`
 
-use crate::simulation::simulation_time::{SimulationTime, TICKS_A_SIMULATION_SECOND};
+use protocol::server_types::simulation_time::{SimulationTime, TICKS_A_SIMULATION_SECOND};
 use utilities::rng::RandomSource;
 
 /// Seconds are the tick rate's ticks each, milliseconds their share

@@ -7,8 +7,6 @@
 
 pub mod attribute_layouts;
 pub mod attributes;
-pub mod client_calls;
 pub mod entity;
 pub mod plane_widths;
-pub mod rule_counts;
 pub mod simulation_time;

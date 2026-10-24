@@ -21,7 +21,8 @@ pub const SHEEP_EACH_SUPERCHUNK: &str = "sheep_each_superchunk";
 pub fn run_probe(given_parameters: &ProbeParameters) -> Result<(), String> {
     let (world_side, ticks_run, sheep_each_superchunk): (u64, u64, u64) = (given_parameters.argument_number(WORLD_SIDE)?, given_parameters.argument_number(TICKS_RUN)?, given_parameters.argument_number(SHEEP_EACH_SUPERCHUNK)?);
     let seed = u64::from_str_radix(given_parameters.argument_text(crate::SEED)?.trim_start_matches("0x"), 16).map_err(|_| "--seed: a hexadecimal number".to_string())?;
-    let folder = crate::asking_the_host::scratch_world("ticks counted", basegame::worldgen::WorldGeneration { sheep_per_superchunk: sheep_each_superchunk, ..basegame::worldgen::WorldGeneration::DEFAULT });
+    // A folder a run: runs of one build in parallel never share one.
+    let folder = crate::asking_the_host::scratch_world(&format!("ticks counted {}", std::process::id()), basegame::worldgen::WorldGeneration { sheep_per_superchunk: sheep_each_superchunk, ..basegame::worldgen::WorldGeneration::DEFAULT });
     let parameters = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(world_side as i64));
     let mut world = server::make_world_of(&folder, &parameters, basegame::default_types::register_types).map_err(|why_not| why_not.to_string())?;
     for _ in 0..ticks_run {
@@ -29,5 +30,7 @@ pub fn run_probe(given_parameters: &ProbeParameters) -> Result<(), String> {
     }
     let world_hash = server::world_hash(&mut world);
     println!("ticks {ticks_run}, at tick {}, cells hash {:#x}, entities hash {:#x}", world_hash.tick, world_hash.cells, world_hash.entities);
+    drop(world);
+    _ = std::fs::remove_dir_all(&folder);
     Ok(())
 }

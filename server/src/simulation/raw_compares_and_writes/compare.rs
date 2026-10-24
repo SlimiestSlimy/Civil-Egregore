@@ -4,10 +4,13 @@
 //! compare or the end of the compare: one compare, any number of
 //! writes (`docs/compares_and_writes.md`, "Compares").
 
-use crate::chunk_storage::{LayerType};
-use crate::bitplane_manager::{WidePlane, Width};
+use crate::chunk_storage::LayerType;
+use protocol::server_types::plane_widths::{WidePlane, Width};
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::{push_attribute, Attribute, AttributeBlock, AttributeType, Header, Layout, Member};
+use crate::entity_manager::{push_attribute, AttributeType};
+use protocol::server_types::entity::EntityBaseData;
+use protocol::server_types::attribute_layouts::{Attribute, Layout, Member};
+use protocol::server_types::attributes::AttributeBlock;
 pub(crate) use crate::simulation::Compare;
 use crate::simulation::{SimulationTickState, Write};
 
@@ -32,7 +35,7 @@ pub fn value<W: Width>(wide_plane: WidePlane<W>, cell: CellIndex, seen_value: u3
 /// `entity` still stands where it stood, its `attribute` what the
 /// rule `seen_attribute` -- or it still has none, if it saw none.
 #[inline]
-pub fn attribute<L: Layout>(entity: &Header, attribute: Attribute<L>, seen_attribute: Option<L>) -> Compare {
+pub fn attribute<L: Layout>(entity: &EntityBaseData, attribute: Attribute<L>, seen_attribute: Option<L>) -> Compare {
     let mut seen_blocks = Vec::new();
     seen_attribute.into_iter().for_each(|seen_attribute_data| push_attribute(&mut seen_blocks, attribute, seen_attribute_data));
     Compare::attribute(entity.stood_cell, attribute.attribute_type(), seen_attribute.map(|_| &seen_blocks[..]))
@@ -41,7 +44,7 @@ pub fn attribute<L: Layout>(entity: &Header, attribute: Attribute<L>, seen_attri
 /// The entity `entity` -- its type, on the cell the tick found it on
 /// -- is there still, wherever it stands now.
 #[inline]
-pub fn entity(entity: &Header) -> Compare {
+pub fn entity(entity: &EntityBaseData) -> Compare {
     Compare::Entity { named_cell: entity.stood_cell, entity_type: entity.entity_type }
 }
 

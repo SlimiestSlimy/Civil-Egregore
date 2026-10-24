@@ -7,7 +7,8 @@
 
 use crate::bitplane_manager::Superchunk;
 use crate::chunk_storage::LayerType;
-use crate::entity_manager::{DefaultAttributes, EntityBeingMade, EntityType, FirstWake, SuperchunkEntities};
+use crate::entity_manager::{DefaultAttributes, EntityBeingMade, EntityType, SuperchunkEntities};
+use protocol::server_types::simulation_time::SimulationTime;
 use std::sync::Arc;
 use utilities::coordinates::{CellIndex, SuperchunkIndex};
 
@@ -56,9 +57,10 @@ impl GeneratingSuperchunk {
         &self.entities
     }
 
-    /// An entity to make on `cell`, for the tick it turns hot at.
-    pub fn new_entity(&mut self, entity_type: EntityType, cell: CellIndex, first_wake: FirstWake) -> EntityBeingMade<'_> {
-        self.entities.new_entity(self.first_hot_tick, entity_type, cell, first_wake)
+    /// An entity to make on `cell`, for the tick it turns hot at, first
+    /// waking `wakes_after` after it: never before.
+    pub fn new_entity(&mut self, entity_type: EntityType, cell: CellIndex, wakes_after: SimulationTime) -> EntityBeingMade<'_> {
+        self.entities.new_entity(self.first_hot_tick, entity_type, cell, wakes_after)
     }
 
     /// It made, for the arena and the store to take as it turns hot.

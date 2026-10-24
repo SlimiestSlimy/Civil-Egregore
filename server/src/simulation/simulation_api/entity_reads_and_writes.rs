@@ -8,7 +8,9 @@ pub use attribute_edits::{set_attribute_blocks, set_attribute_member, set_attrib
 
 use crate::chunk_storage::LayerType;
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::{AttributeBlock, EntityRef, EntityType, Header};
+use crate::entity_manager::{EntityRef, EntityType};
+use protocol::server_types::entity::EntityBaseData;
+use protocol::server_types::attributes::AttributeBlock;
 use crate::simulation::simulation_api::compare_and_write::{self, SkipTagSet};
 use crate::simulation::Write;
 use crate::simulation::SimulationTickState;
@@ -20,7 +22,7 @@ use crate::simulation::SimulationTickState;
 #[inline]
 pub fn each_woken<'a, const N: usize, S>(tick_state: &mut SimulationTickState<'a>, layers: [LayerType; N], rule_state: &mut S, mut entity_rule: impl FnMut(&mut SimulationTickState<'a>, EntityRef<'a>, &mut S)) {
     for entity in tick_state.woken_reading(layers) {
-        tick_state.seeing_to(entity.header.stood_cell);
+        tick_state.seeing_to(entity.base_data.stood_cell);
         entity_rule(tick_state, entity, rule_state);
     }
 }
@@ -50,14 +52,14 @@ pub fn make_entity(tick_state: &mut SimulationTickState, entity_type: EntityType
 #[inline]
 pub fn begin_making_entity<'scope, 'world>(tick_state: &'scope mut SimulationTickState<'world>, entity_type: EntityType, entity_cell: CellIndex, wake: u64, attributes: &[AttributeBlock]) -> SkipTagSet<'scope, 'world> {
     let mut cell_free_still = compare_and_write::open_compare(tick_state, compare_and_write::cell_free(entity_cell));
-    cell_free_still.make_entity(Header { entity_type, stood_cell: entity_cell, wake }, attributes);
+    cell_free_still.make_entity(EntityBaseData { entity_type, stood_cell: entity_cell, wake }, attributes);
     cell_free_still
 }
 
 /// Queues `entity` sleeping where it stands until `wake`: its
 /// attributes as they are, none carried.
 #[inline]
-pub fn sleep(tick_state: &mut SimulationTickState, entity: &Header, wake: u64) {
+pub fn sleep(tick_state: &mut SimulationTickState, entity: &EntityBaseData, wake: u64) {
     step(tick_state, entity, entity.stood_cell, wake);
 }
 
@@ -68,7 +70,7 @@ pub fn sleep(tick_state: &mut SimulationTickState, entity: &Header, wake: u64) {
 /// a border: the simulation's to see to
 /// (`../../simulation/docs/simulation.md`, "An entity over a border").
 #[inline]
-pub fn step(tick_state: &mut SimulationTickState, entity: &Header, to_cell: CellIndex, wake: u64) {
+pub fn step(tick_state: &mut SimulationTickState, entity: &EntityBaseData, to_cell: CellIndex, wake: u64) {
     let move_and_wake = [Write::MoveEntity { from_cell: entity.stood_cell, to_cell }, Write::Wake { named_cell: entity.stood_cell, wake }];
     // Sleeping where it stands, it is not moved.
     compare_and_write::with_writes(tick_state, compare_and_write::entity(entity), &move_and_wake[usize::from(to_cell == entity.stood_cell)..]);
@@ -76,6 +78,6 @@ pub fn step(tick_state: &mut SimulationTickState, entity: &Header, to_cell: Cell
 
 /// Queues removing `entity`.
 #[inline]
-pub fn remove(tick_state: &mut SimulationTickState, entity: &Header) {
+pub fn remove(tick_state: &mut SimulationTickState, entity: &EntityBaseData) {
     compare_and_write::with_writes(tick_state, compare_and_write::entity(entity), &[Write::RemoveEntity(entity.stood_cell)]);
 }

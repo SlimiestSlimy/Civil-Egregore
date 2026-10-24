@@ -1,6 +1,7 @@
 //! A superchunk's timer wheel: which entities wake at which tick
 //! (`docs/entity_manager.md`, "The timer wheel").
 
+use protocol::server_types::entity::NEVER_WAKES;
 use utilities::coordinates::CellIndex;
 
 /// Ticks the wheel holds a slot for.
@@ -33,10 +34,15 @@ impl Wheel {
         &self.slots[(tick % WHEEL_TICKS) as usize]
     }
 
-    /// Files `wake` for `tick`, no earlier than `earliest_tick`: the tick about
+    /// Files `wake` for `tick`, no earlier than `earliest_tick` -- or nowhere,
+    /// at [`NEVER_WAKES`]: the tick about
     /// to run between ticks, the next one during a tick's second phase,
     /// after [`Wheel::pass_tick`].
     pub(crate) fn file_wake(&mut self, earliest_tick: u64, tick: u64, wake: Wake) {
+        // An entity that never wakes is filed nowhere.
+        if tick == NEVER_WAKES {
+            return;
+        }
         assert!(tick >= earliest_tick, "a wake at tick {tick}, before {earliest_tick}");
         if tick - earliest_tick < WHEEL_TICKS {
             self.slots[(tick % WHEEL_TICKS) as usize].push(wake);

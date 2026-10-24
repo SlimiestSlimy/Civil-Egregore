@@ -2,8 +2,11 @@
 //! (`docs/entity_manager.md`, "Saved").
 
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::attributes::{may_be_given, AttributeBlock, DefaultAttributes, BLOCK_WORDS};
-use crate::entity_manager::entity::{EntityType, Header};
+use crate::entity_manager::attributes::{may_be_given, DefaultAttributes};
+use protocol::server_types::attribute_layouts::BLOCK_WORDS;
+use protocol::server_types::attributes::AttributeBlock;
+use crate::entity_manager::entity::EntityType;
+use protocol::server_types::entity::EntityBaseData;
 use crate::entity_manager::store::{EntityWritten, SuperchunkEntities};
 
 /// The first word: `TSstate` and the format's number, 5.
@@ -24,11 +27,11 @@ pub fn encode_state(random_stream_state: Option<u64>, superchunk_entities: Optio
     let count = superchunk_entities.map_or(0, SuperchunkEntities::len);
     let mut words = vec![FIRST_WORD, random_stream_state.is_some() as u64, random_stream_state.unwrap_or(0), count as u64];
     for entity in superchunk_entities.into_iter().flat_map(SuperchunkEntities::iter) {
-        let header = entity.header;
+        let base_data = entity.base_data;
         // Its type's default attribute first, its type before it as any other's: a file says what each of its blocks is.
         let whole_default = entity.default_attribute();
         let default_blocks = whole_default.as_deref().unwrap_or(&[]);
-        words.extend([header.entity_type.0, header.stood_cell.0, header.wake, (default_blocks.len() + entity.attributes.len()) as u64]);
+        words.extend([base_data.entity_type.0, base_data.stood_cell.0, base_data.wake, (default_blocks.len() + entity.attributes.len()) as u64]);
         words.extend(default_blocks.iter().chain(entity.attributes).flat_map(|saved_block| saved_block.0));
     }
     (words, count)
@@ -40,8 +43,8 @@ pub fn encode_state(random_stream_state: Option<u64>, superchunk_entities: Optio
 /// passed while it was cold waking at `first_hot_tick`. Its random
 /// numbers' state, if it had one; or what is wrong with the file.
 pub fn decode_into(words: &[u64], first_hot_tick: u64, default_attributes: &DefaultAttributes, superchunk_entities: &mut SuperchunkEntities) -> Result<Option<u64>, &'static str> {
-    let saved_state = read_state(words, default_attributes, |header, attributes| {
-        let made = superchunk_entities.make_entity(first_hot_tick, Header { wake: header.wake.max(first_hot_tick), ..header }, attributes);
+    let saved_state = read_state(words, default_attributes, |base_data, attributes| {
+        let made = superchunk_entities.make_entity(first_hot_tick, EntityBaseData { wake: base_data.wake.max(first_hot_tick), ..base_data }, attributes);
         debug_assert_eq!(made, EntityWritten::Added, "a state keeps one entity a cell");
     })?;
     Ok(saved_state.random_stream_state)
@@ -49,7 +52,7 @@ pub fn decode_into(words: &[u64], first_hot_tick: u64, default_attributes: &Defa
 
 /// Reads the state file `words`, each entity handed to `each_entity` with its
 /// attributes: what it held beside them, or what is wrong with it.
-fn read_state(words: &[u64], default_attributes: &DefaultAttributes, mut each_entity: impl FnMut(Header, &[AttributeBlock])) -> Result<SavedState, &'static str> {
+fn read_state(words: &[u64], default_attributes: &DefaultAttributes, mut each_entity: impl FnMut(EntityBaseData, &[AttributeBlock])) -> Result<SavedState, &'static str> {
     let mut words = words.iter().copied();
     let mut next_word = || words.next().ok_or("cut short");
     if next_word()? != FIRST_WORD {
@@ -70,7 +73,7 @@ fn read_state(words: &[u64], default_attributes: &DefaultAttributes, mut each_en
         if !may_be_given(default_attributes.of(EntityType(type_word)), &attributes) {
             return Err("an entity's attributes are not whole ones sorted by type");
         }
-        each_entity(Header { entity_type: EntityType(type_word), stood_cell: CellIndex(cell_word), wake }, &attributes);
+        each_entity(EntityBaseData { entity_type: EntityType(type_word), stood_cell: CellIndex(cell_word), wake }, &attributes);
     }
     Ok(SavedState { random_stream_state: (has_random == 1).then_some(random_stream_state), entity_count: count as usize })
 }

@@ -7,7 +7,8 @@ use crate::chunks::*;
 use crate::test_types::TestTypes;
 use utilities::bitmap::CellWords;
 use crate::bitplane_manager::{BitmapArena, BucketKey, NotHot, CellReader, WriteShape, Window, Write, WriteOp, COUNT_TILES_IN_CHUNK, COUNT_TILE_WORDS};
-use crate::chunk_storage::{WidePlane, Width, ChunkStorage, LayerCodec};
+use crate::chunk_storage::{ChunkStorage, LayerCodec};
+use protocol::server_types::plane_widths::{WidePlane, Width};
 use utilities::rng::RandomSource;
 use utilities::coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 

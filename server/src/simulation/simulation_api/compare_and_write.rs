@@ -13,7 +13,10 @@ pub use crate::simulation::simulation_tick_state::one_instruction::Write;
 use crate::simulation::SimulationTickState;
 use crate::chunk_storage::LayerType;
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::{each_attribute, AttributeBlock, AttributeType, Header, Member};
+use crate::entity_manager::{each_attribute, AttributeType};
+use protocol::server_types::entity::EntityBaseData;
+use protocol::server_types::attribute_layouts::Member;
+use protocol::server_types::attributes::AttributeBlock;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
@@ -103,12 +106,12 @@ impl<'scope> SkipTagSet<'scope, '_> {
         raw_writes::count(self.tick_state, count_place);
     }
 
-    /// Queues `header`'s entity made, with `attributes` sorted by type.
+    /// Queues `base_data`'s entity made, with `attributes` sorted by type.
     #[inline]
-    pub fn make_entity(&mut self, header: Header, attributes: &[AttributeBlock]) {
-        entity_writes::queue_entity_made(self.tick_state, header);
+    pub fn make_entity(&mut self, base_data: EntityBaseData, attributes: &[AttributeBlock]) {
+        entity_writes::queue_entity_made(self.tick_state, base_data);
         for attribute in each_attribute(attributes) {
-            raw_writes::attribute_whole(self.tick_state, header.stood_cell, attribute);
+            raw_writes::attribute_whole(self.tick_state, base_data.stood_cell, attribute);
         }
     }
 

@@ -8,8 +8,12 @@
 #![allow(dead_code)]
 
 use crate::collision::Collision;
-use crate::simulation::simulation_api::{cell_and_its_neighbours, entity_reads_and_writes, tick_and_random_stream, Attribute, Bits4, CellCartesian, CellIndex, EntityRef, EntityType, FirstWake, GeneratingSuperchunk, LayerType, RandomSource, RuleCode, RuleCounts, SetUpWorldgen, SimulationTickState, WholeAttribute, WidePlane, WorldgenCode, Write, WriteOp, WritesApplied, SUPERCHUNK_SIDE_CELLS};
-use crate::simulation::simulation_api::simulation_time::SimulationTime;
+use crate::simulation::simulation_api::{cell_and_its_neighbours, entity_reads_and_writes, tick_and_random_stream, CellCartesian, CellIndex, EntityRef, EntityType, GeneratingSuperchunk, LayerType, RandomSource, RuleCode, SetUpWorldgen, SimulationTickState, WorldgenCode, Write, WriteOp, WritesApplied, SUPERCHUNK_SIDE_CELLS};
+use protocol::server_types::attribute_layouts::Attribute;
+use protocol::server_types::attributes::WholeAttribute;
+use protocol::server_types::plane_widths::{Bits4, WidePlane};
+use crate::simulation::simulation_api::rule_counts::RuleCounts;
+use protocol::server_types::simulation_time::SimulationTime;
 use crate::World;
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, WORLD};
 use std::path::{Path, PathBuf};
@@ -107,31 +111,31 @@ impl TestGame {
     /// A walker woken.
     fn wake(self, tick_state: &mut SimulationTickState, walker: EntityRef, rule_counts: &mut RuleCounts) {
         rule_counts[WOKEN_COUNT] += 1;
-        let (header, tick_now, collision) = (walker.header, tick_and_random_stream::current_tick(tick_state), self.collision_library());
+        let (base_data, tick_now, collision) = (walker.base_data, tick_and_random_stream::current_tick(tick_state), self.collision_library());
         let (fate, way, sleep) = {
             let random_stream = tick_and_random_stream::random_stream(tick_state);
             (random_stream.draw_below(ONE_IN), random_stream.draw_below(8) as u32, 1 + random_stream.draw_below(LONGEST_SLEEP))
         };
         if fate == 0 {
             rule_counts[DEATHS_COUNT] += 1;
-            return collision.remove(tick_state, &header);
+            return collision.remove(tick_state, &base_data);
         }
-        let neighbour = cell_and_its_neighbours::cell(header.stood_cell, way).filter(|&neighbour| !crate::simulation::simulation_api::cell_reads_and_writes::layer_holds(tick_state, self.collision, neighbour));
+        let neighbour = cell_and_its_neighbours::cell(base_data.stood_cell, way).filter(|&neighbour| !crate::simulation::simulation_api::cell_reads_and_writes::layer_holds(tick_state, self.collision, neighbour));
         let Some(neighbour) = neighbour else {
-            return entity_reads_and_writes::sleep(tick_state, &header, tick_now + sleep);
+            return entity_reads_and_writes::sleep(tick_state, &base_data, tick_now + sleep);
         };
         if fate == 1 {
             let mut born = collision.begin_making_entity(tick_state, self.walker, neighbour, tick_now + sleep, &WholeAttribute::holding_value(self.steps, 0));
             born.count(BIRTHS_COUNT);
             drop(born);
-            return entity_reads_and_writes::sleep(tick_state, &header, tick_now + sleep);
+            return entity_reads_and_writes::sleep(tick_state, &base_data, tick_now + sleep);
         }
-        if crate::simulation::simulation_api::cell_reads_and_writes::layer_lacks(tick_state, self.trail, header.stood_cell) {
-            crate::simulation::simulation_api::cell_reads_and_writes::set(tick_state, self.trail, header.stood_cell);
+        if crate::simulation::simulation_api::cell_reads_and_writes::layer_lacks(tick_state, self.trail, base_data.stood_cell) {
+            crate::simulation::simulation_api::cell_reads_and_writes::set(tick_state, self.trail, base_data.stood_cell);
         }
         let steps_before = walker.attribute(self.steps).expect("a walker's steps, always");
-        entity_reads_and_writes::set_attribute_of(tick_state, &header, self.steps, Some(steps_before), steps_before + 1);
-        collision.step(tick_state, &header, neighbour, tick_now + sleep);
+        entity_reads_and_writes::set_attribute_of(tick_state, &base_data, self.steps, Some(steps_before), steps_before + 1);
+        collision.step(tick_state, &base_data, neighbour, tick_now + sleep);
         rule_counts[STEPS_COUNT] += 1;
     }
 
@@ -173,7 +177,7 @@ impl TestGame {
                 continue;
             }
             let first_wake = SimulationTime::time_between_ticks(0, 1 + random_stream.draw_below(LONGEST_SLEEP));
-            if generating.new_entity(self.walker, drawn_cell, FirstWake::After(first_wake)).with(self.steps, 0).make() {
+            if generating.new_entity(self.walker, drawn_cell, first_wake).with(self.steps, 0).make() {
                 generating.cells_mut().apply(self.collision, Write::cell(drawn_cell, WriteOp::SetCell), &mut writes_applied);
                 made += 1;
             }
@@ -240,8 +244,8 @@ pub fn put_flock(world: &mut World, test_game: TestGame, superchunk: SuperchunkI
         if world.bitmap_arena().layer_holds_cell(test_game.collision, drawn_cell) == Ok(true) {
             continue;
         }
-        let header = crate::entity_manager::Header { entity_type: test_game.walker, stood_cell: drawn_cell, wake: tick_now + 1 + random_stream.draw_below(LONGEST_SLEEP) };
-        let added = world.add_entity(header, &WholeAttribute::holding_value(test_game.steps, 0)).added;
+        let base_data = protocol::server_types::entity::EntityBaseData { entity_type: test_game.walker, stood_cell: drawn_cell, wake: tick_now + 1 + random_stream.draw_below(LONGEST_SLEEP) };
+        let added = world.add_entity(base_data, &WholeAttribute::holding_value(test_game.steps, 0)).added;
         if added > 0 {
             world.write_cells(test_game.collision, [Write::cell(drawn_cell, WriteOp::SetCell)]);
         }

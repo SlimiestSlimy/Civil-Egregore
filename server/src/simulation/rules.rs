@@ -6,7 +6,8 @@
 //! ([`ChosenRules`]) by their place ([`RulePlace`]) (`docs/server.md`,
 //! "TickCounts").
 
-use crate::simulation::simulation_api::{CallCode, RuleCode, RuleContext, RuleCounts, RuleMaster, RuleRun, TickReport, SimulationTickState, WorldgenCode, COUNTS_OF_A_RULE};
+use crate::simulation::simulation_api::{CallCode, RuleCode, RuleContext, RuleMaster, RuleRun, TickReport, SimulationTickState, WorldgenCode};
+use crate::simulation::simulation_api::rule_counts::{RuleCounts, COUNTS_OF_A_RULE};
 use std::sync::Arc;
 use crate::entity_manager::EntityType;
 use protocol::type_registry::{root_bundle_of, FrozenTypeRegistry, Hook, RegisteredType};

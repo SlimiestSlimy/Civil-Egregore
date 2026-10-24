@@ -4,12 +4,15 @@
 
 use server::simulation::simulation_api::cell_and_its_neighbours;
 pub use crate::base_types::SheepState;
-use server::simulation::simulation_api::simulation_time::SimulationTime;
+use protocol::server_types::simulation_time::SimulationTime;
 use crate::base_types::BaseTypes;
 use server::simulation::simulation_api::steps_and_paths::PlanesInTheWay;
 use server::simulation::simulation_api::RuleCode;
 use crate::libraries::collision::Collision;
-use server::simulation::simulation_api::{WholeAttribute, Chance, square_around_a_cell, cell_reads_and_writes, compare_and_write, entity_reads_and_writes, place_counted, tick_and_random_stream, steps_and_paths, CellIndex, EntityRef, Header, RuleCounts, SimulationTickState};
+use server::simulation::simulation_api::{Chance, square_around_a_cell, cell_reads_and_writes, compare_and_write, entity_reads_and_writes, tick_and_random_stream, steps_and_paths, CellIndex, EntityRef, SimulationTickState};
+use protocol::server_types::entity::EntityBaseData;
+use protocol::server_types::attributes::WholeAttribute;
+use server::simulation::simulation_api::rule_counts::{place_counted, RuleCounts};
 
 /// Every time below is said in simulation time: the rule adds them to
 /// the tick it runs in and never says how many ticks they are -- the
@@ -116,7 +119,7 @@ fn wake(tick_state: &mut SimulationTickState, woken_sheep: EntityRef, flock: &mu
     let (base_types, collision, rule_counts, tick_now) = (flock.base_types, flock.collision, &mut flock.rule_counts, tick_and_random_stream::current_tick(tick_state));
     let grass = base_types.grass;
     rule_counts[WOKEN_COUNT] += 1;
-    let (sheep_cell, header_before) = (woken_sheep.header.stood_cell, woken_sheep.header);
+    let (sheep_cell, base_data_before) = (woken_sheep.base_data.stood_cell, woken_sheep.base_data);
     let about_tiles = cell_and_its_neighbours::tiles_about_cell(sheep_cell);
     let grass_about = cell_and_its_neighbours::read_layer(tick_state, grass, &about_tiles);
     // The neighbours it may step to: on the hot bitplanes, nothing standing there, no wall before them.
@@ -129,7 +132,7 @@ fn wake(tick_state: &mut SimulationTickState, woken_sheep: EntityRef, flock: &mu
     // On its way, roaming, it does not stop to eat.
     let eats_now = tick_now >= hungry_at && !(grass_about.set_cells & about_tiles.centre_cell()).is_empty() && !is_roaming;
     if !eats_now && tick_now >= TIME_TO_STARVE.tick_after(hungry_at) {
-        collision.remove(tick_state, &header_before);
+        collision.remove(tick_state, &base_data_before);
         rule_counts[DEATHS_COUNT] += 1;
         return;
     }
@@ -209,13 +212,13 @@ fn wake(tick_state: &mut SimulationTickState, woken_sheep: EntityRef, flock: &mu
         // All the sheep comes to this wake hangs on the grass being there still when it is applied: each thing queued under it is held
         // against it, and the grass cleared last. Should it be gone by then -- decayed in this very tick -- none of it happens, and
         // what is held against the grass being gone does instead: the sheep sleeps a step, hungry as it was, and wakes to look again.
-        queue_wake_end(base_types, &mut compare_and_write::open_compare(tick_state, compare_and_write::layer_holds(grass, sheep_cell)), collision, rule_counts, &header_before, wake_end, Some(sheep_cell));
+        queue_wake_end(base_types, &mut compare_and_write::open_compare(tick_state, compare_and_write::layer_holds(grass, sheep_cell)), collision, rule_counts, &base_data_before, wake_end, Some(sheep_cell));
         // One of the two is applied, never both: the sheep is written once.
         let hungry_still = next_step(tick_state);
-        entity_reads_and_writes::sleep(&mut compare_and_write::open_compare(tick_state, compare_and_write::layer_lacks(grass, sheep_cell)), &header_before, hungry_still);
+        entity_reads_and_writes::sleep(&mut compare_and_write::open_compare(tick_state, compare_and_write::layer_lacks(grass, sheep_cell)), &base_data_before, hungry_still);
         cell_reads_and_writes::clear_counted(tick_state, grass, sheep_cell, EATEN_COUNT);
     } else {
-        queue_wake_end(base_types, tick_state, collision, rule_counts, &header_before, wake_end, None);
+        queue_wake_end(base_types, tick_state, collision, rule_counts, &base_data_before, wake_end, None);
     }
 }
 
@@ -238,21 +241,21 @@ struct WakeEnd {
     birth_cell: Option<CellIndex>,
 }
 
-/// Queues `wake_end` for the sheep `sheep_header`: dead of old age, or its state
+/// Queues `wake_end` for the sheep `sheep_base_data`: dead of old age, or its state
 /// written if it changed, its step taken and its lamb born. A death
 /// is counted on `meal_cell`, if it ate ([`count`]).
-fn queue_wake_end(base_types: &BaseTypes, tick_state: &mut SimulationTickState, collision: &Collision, rule_counts: &mut RuleCounts, sheep_header: &Header, wake_end: WakeEnd, meal_cell: Option<CellIndex>) {
+fn queue_wake_end(base_types: &BaseTypes, tick_state: &mut SimulationTickState, collision: &Collision, rule_counts: &mut RuleCounts, sheep_base_data: &EntityBaseData, wake_end: WakeEnd, meal_cell: Option<CellIndex>) {
     if wake_end.dies_of_age {
-        collision.remove(tick_state, sheep_header);
+        collision.remove(tick_state, sheep_base_data);
         return count(base_types, tick_state, rule_counts, meal_cell, DEATHS_COUNT);
     }
     // Written from where it is worked out, the words that changed alone: nothing of the sheep is copied to be changed.
     if wake_end.state_after != wake_end.state_was {
-        entity_reads_and_writes::set_attribute_of(tick_state, sheep_header, base_types.sheep_state, wake_end.state_seen, wake_end.state_after);
+        entity_reads_and_writes::set_attribute_of(tick_state, sheep_base_data, base_types.sheep_state, wake_end.state_seen, wake_end.state_after);
     }
-    collision.step(tick_state, sheep_header, wake_end.step_cell, wake_end.wake);
+    collision.step(tick_state, sheep_base_data, wake_end.step_cell, wake_end.wake);
     if let Some(lamb_cell) = wake_end.birth_cell {
-        bear_lamb(base_types, tick_state, collision, sheep_header, wake_end.state_after, lamb_cell);
+        bear_lamb(base_types, tick_state, collision, sheep_base_data, wake_end.state_after, lamb_cell);
     }
 }
 
@@ -263,7 +266,7 @@ fn queue_wake_end(base_types: &BaseTypes, tick_state: &mut SimulationTickState, 
 /// left it and, within it, one of the lamb's cell being free. So no
 /// lamb is born twice and none is lost, whichever superchunk its
 /// cell is in: the cell taken first, the mother is pregnant still.
-fn bear_lamb(base_types: &BaseTypes, tick_state: &mut SimulationTickState, collision: &Collision, mother_sheep: &Header, mother_state: SheepState, lamb_cell: CellIndex) {
+fn bear_lamb(base_types: &BaseTypes, tick_state: &mut SimulationTickState, collision: &Collision, mother_sheep: &EntityBaseData, mother_state: SheepState, lamb_cell: CellIndex) {
     let tick_now = tick_and_random_stream::current_tick(tick_state);
     let (wake, lamb_state) = (next_step(tick_state), SheepState { hungry_at: TIME_BETWEEN_MEALS.tick_after(tick_now), grown_at: LAMBHOOD_TIME.tick_after(tick_now), ..SheepState::default() });
     let mother_delivered = SheepState { lamb_due_at: 0, ..mother_state };

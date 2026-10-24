@@ -16,7 +16,7 @@ use crate::bitplane_manager::BitmapArena;
 use crate::chunk_storage::jobs::{JobDone, Jobs, JobTicket};
 use crate::chunk_storage::{ChunkStorage, LayerType};
 use utilities::coordinates::SuperchunkIndex;
-use crate::simulation::simulation_time::SimulationTime;
+use protocol::server_types::simulation_time::SimulationTime;
 use crate::entity_manager::WorldEntities;
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::AddAssign;

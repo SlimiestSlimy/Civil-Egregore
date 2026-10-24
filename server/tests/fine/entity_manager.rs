@@ -9,7 +9,10 @@ mod default_attributes;
 mod edited_in_any_order;
 mod named_by_its_cell;
 
-use crate::entity_manager::{find_attribute, is_attribute_list, Attribute, AttributeBlock, AttributeType, DefaultAttributes, EntityType, Header, Instructions, InstructionsApplied, Layout, Member, SuperchunkEntities, WholeAttribute, WorldEntities, BLOCK_WORDS, NEVER_WAKES};
+use crate::entity_manager::{find_attribute, is_attribute_list, AttributeType, DefaultAttributes, EntityType, Instructions, InstructionsApplied, SuperchunkEntities, WorldEntities};
+use protocol::server_types::entity::{EntityBaseData, NEVER_WAKES};
+use protocol::server_types::attribute_layouts::{Attribute, Layout, Member, BLOCK_WORDS};
+use protocol::server_types::attributes::{AttributeBlock, WholeAttribute};
 use crate::entity_manager::saved::{decode_into, encode_state};
 use std::sync::Arc;
 use protocol::type_registry::{FrozenTypeRegistry, RegisteredType, Registration, TypeRegistry};
@@ -151,8 +154,8 @@ fn cell(x: u32, y: u32) -> CellIndex {
 }
 
 /// A walker on `stood_cell`, never waking.
-fn walker_header(types: TestTypes, stood_cell: CellIndex) -> Header {
-    Header { entity_type: types.walker, stood_cell, wake: NEVER_WAKES }
+fn walker_base_data(types: TestTypes, stood_cell: CellIndex) -> EntityBaseData {
+    EntityBaseData { entity_type: types.walker, stood_cell, wake: NEVER_WAKES }
 }
 
 /// A layout of two blocks: a number in its data's first word and one
@@ -231,10 +234,10 @@ fn every_attribute_is_found_over_those_of_any_length() {
     assert!(!is_attribute_list(&[AttributeBlock([types.walker.0, 0])]), "an entity type is no attribute's");
 
     let mut world_entities = world(&frozen_types);
-    let header = walker_header(types, cell(40, 30));
-    world_entities.queue_add(header, &attribute_list);
+    let base_data = walker_base_data(types, cell(40, 30));
+    world_entities.queue_add(base_data, &attribute_list);
     world_entities.apply();
-    let entity = world_entities.get(header.stood_cell).expect("put");
+    let entity = world_entities.get(base_data.stood_cell).expect("put");
     assert_eq!((entity.attribute(types.one_block), entity.attribute(types.both_ends)), (Some(7), Some(BothEnds { first_word: 11, last_word: 13 })));
     assert_eq!(entity.attribute_blocks(types.varying_note).map(<[_]>::len), Some(5));
     assert_eq!(entity.attribute_blocks(types.varying_tail).expect("after the note")[1].0[0], 3);
@@ -248,21 +251,21 @@ fn every_attribute_is_found_over_those_of_any_length() {
 fn an_attribute_is_edited_to_any_length_and_saved() {
     let (frozen_types, types) = registered_types(crate::test_seed::TestSeedHandle::open().fine_seed());
     let mut world_entities = world(&frozen_types);
-    let target_header = walker_header(types, cell(40, 30));
-    world_entities.queue_add(target_header, &attributes(types));
+    let target_base_data = walker_base_data(types, cell(40, 30));
+    world_entities.queue_add(target_base_data, &attributes(types));
     world_entities.apply();
     let edits: [&dyn Fn(&mut Instructions); 4] = [
-        &|instruction_queue| instruction_queue.set_attribute_blocks(target_header.stood_cell, &varying_attribute(types.varying_note, &[6; 21])),
-        &|instruction_queue| instruction_queue.set_attribute_blocks(target_header.stood_cell, &varying_attribute(types.varying_note, &[8; 3])),
-        &|instruction_queue| instruction_queue.set_attribute(target_header.stood_cell, types.both_ends, BothEnds { first_word: 17, last_word: 19 }),
-        &|instruction_queue| instruction_queue.unset_attribute(target_header.stood_cell, types.one_block.attribute_type()),
+        &|instruction_queue| instruction_queue.set_attribute_blocks(target_base_data.stood_cell, &varying_attribute(types.varying_note, &[6; 21])),
+        &|instruction_queue| instruction_queue.set_attribute_blocks(target_base_data.stood_cell, &varying_attribute(types.varying_note, &[8; 3])),
+        &|instruction_queue| instruction_queue.set_attribute(target_base_data.stood_cell, types.both_ends, BothEnds { first_word: 17, last_word: 19 }),
+        &|instruction_queue| instruction_queue.unset_attribute(target_base_data.stood_cell, types.one_block.attribute_type()),
     ];
     for (tick, edit) in edits.into_iter().enumerate() {
         let (mut instruction_queue, mut instructions_applied) = (Instructions::default(), InstructionsApplied::default());
         edit(&mut instruction_queue);
         instruction_queue.apply(world_entities.superchunks_mut(), 0, &mut instructions_applied);
         assert_eq!(instructions_applied.edits, 1, "edit {tick}");
-        let edited_entity = world_entities.get(target_header.stood_cell).expect("where it stood");
+        let edited_entity = world_entities.get(target_base_data.stood_cell).expect("where it stood");
         assert!(is_attribute_list(edited_entity.attributes), "edit {tick}");
         let note_blocks = edited_entity.attribute_blocks(types.varying_note).expect("the note");
         assert_eq!((note_blocks.len(), note_blocks[1].0[0]), if tick == 0 { (11, 6) } else { (2, 8) }, "edit {tick}");
@@ -271,13 +274,13 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
         assert_eq!(edited_entity.attribute_blocks(types.varying_tail).map(|tail_blocks| tail_blocks[1].0[0]), Some(3), "edit {tick}");
     }
 
-    let superchunk = target_header.stood_cell.superchunk();
+    let superchunk = target_base_data.stood_cell.superchunk();
     let (words, count) = encode_state(None, world_entities.superchunk(superchunk));
     assert_eq!(count, 1);
     let read_entities = read_back(&frozen_types, &words, 4).expect("read back");
     assert_eq!(read_entities.len(), 1);
-    let (saved_entity, read_entity) = (world_entities.get(target_header.stood_cell).expect("there"), read_entities.get(target_header.stood_cell).expect("read back"));
-    assert_eq!((saved_entity.header, saved_entity.attributes), (read_entity.header, read_entity.attributes));
+    let (saved_entity, read_entity) = (world_entities.get(target_base_data.stood_cell).expect("there"), read_entities.get(target_base_data.stood_cell).expect("read back"));
+    assert_eq!((saved_entity.base_data, saved_entity.attributes), (read_entity.base_data, read_entity.attributes));
 
     // The note's block length said to be more than the entity has blocks: nothing is read.
     let mut wrong_words = words.clone();

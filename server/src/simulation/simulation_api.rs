@@ -16,6 +16,8 @@ mod client_call_interface;
 mod rule_interface;
 mod worldgen_interface;
 pub mod tick_and_random_stream;
+// DEPRECATED: diagnostics, out when diagnostics are made again (0.8/0.9).
+pub mod rule_counts;
 // Composed by the actions, never by a rule: a rule asks what is about a cell, and is not shown the tiles.
 pub(crate) mod four_tiles_under_the_neighbours;
 pub mod steps_and_paths;
@@ -23,10 +25,10 @@ pub mod steps_and_paths;
 // The words the actions are asked in: where a cell and an entity
 // are, what a layer and an attribute are, a turn, a tick's report, the
 // lot drawn.
-pub use crate::bitplane_manager::{Bits16, Bits2, Bits32, Bits4, Bits8, Superchunk, WidePlane, Width, Write, WriteOp, WritesApplied};
+pub use crate::bitplane_manager::{Superchunk, Write, WriteOp, WritesApplied};
 pub use crate::chunk_storage::LayerType;
 pub use utilities::coordinates::{CellArea, CellCartesian, CellIndex, SuperchunkIndex, NEIGHBOUR_OFFSETS, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE_CELL};
-pub use crate::entity_manager::{data_words, Attribute, AttributeBlock, AttributeType, EntityBeingMade, EntityRef, EntityType, FirstWake, Header, Layout, Member, SuperchunkEntities, WholeAttribute, NEVER_WAKES};
+pub use crate::entity_manager::{AttributeType, EntityBeingMade, EntityRef, EntityType, SuperchunkEntities};
 pub use rule_interface::{on_each_sampled, RuleCode, RuleContext, RuleMaster, RuleRun};
 pub use worldgen_interface::{Generate, SetUp, SetUpWorldgen, WorldgenCode};
 pub use crate::simulation::halos::GeneratingSuperchunk;
@@ -35,71 +37,3 @@ pub use crate::simulation::simulation_tick_state::SimulationTickState;
 pub use crate::simulation::tick::TickReport;
 pub use utilities::chance::Chance;
 pub use utilities::rng::RandomSource;
-
-use std::ops::{AddAssign, Index, IndexMut};
-
-// Simulation time: a rule says how long a thing takes in seconds of
-// the simulation, never in ticks, so it is the same rule at any tick
-// rate (`docs/simulation.md`, "Simulation time").
-#[path = "simulation_time.rs"]
-pub mod simulation_time;
-
-/// The most counts a rule keeps.
-pub const COUNTS_OF_A_RULE: usize = 8;
-
-/// The place of the count named `count_name` among `count_names`, the names of
-/// what a rule counts in the order it keeps them: the one order, from
-/// which each place is worked out as the rule is compiled.
-///
-/// # Panics
-/// If nothing is named so -- for a constant, as it is compiled.
-pub const fn place_counted(count_names: &[&str], count_name: &str) -> usize {
-    let mut place = 0;
-    while place < count_names.len() {
-        let (listed_bytes, name_bytes) = (count_names[place].as_bytes(), count_name.as_bytes());
-        let mut bytes_same = listed_bytes.len() == name_bytes.len();
-        let mut byte_index = 0;
-        while bytes_same && byte_index < listed_bytes.len() {
-            bytes_same = listed_bytes[byte_index] == name_bytes[byte_index];
-            byte_index += 1;
-        }
-        if bytes_same {
-            return place;
-        }
-        place += 1;
-    }
-    panic!("the rule counts nothing named so")
-}
-
-/// What a rule did, on a turn or added up over many: its counts, each
-/// at the place the rule names it by, the rest 0.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct RuleCounts(pub [u64; COUNTS_OF_A_RULE]);
-
-impl Index<usize> for RuleCounts {
-    type Output = u64;
-
-    /// The count at `place`.
-    #[inline(always)]
-    fn index(&self, place: usize) -> &u64 {
-        &self.0[place]
-    }
-}
-
-impl IndexMut<usize> for RuleCounts {
-    /// The count at `place`, to add to.
-    #[inline(always)]
-    fn index_mut(&mut self, place: usize) -> &mut u64 {
-        &mut self.0[place]
-    }
-}
-
-impl AddAssign for RuleCounts {
-    /// Each count added to its like.
-    #[inline]
-    fn add_assign(&mut self, counts_added: Self) {
-        for (count, count_added) in self.0.iter_mut().zip(counts_added.0) {
-            *count += count_added;
-        }
-    }
-}

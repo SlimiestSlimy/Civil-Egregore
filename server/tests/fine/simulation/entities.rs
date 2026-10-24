@@ -4,10 +4,11 @@
 //!
 //! `cargo test -p server --lib fine_tests`
 
-use crate::arenas::{cell, walker_header, world};
+use crate::arenas::{cell, walker_base_data, world};
 use crate::test_types::TestTypes;
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::{AttributeBlock, NEVER_WAKES};
+use protocol::server_types::entity::NEVER_WAKES;
+use protocol::server_types::attributes::AttributeBlock;
 use crate::simulation::simulation_api::cell_and_its_neighbours;
 use crate::simulation::simulation_api::{entity_reads_and_writes, SimulationTickState};
 use crate::simulation::Simulation;
@@ -23,18 +24,18 @@ fn an_entity_is_written_only_the_attributes_changed() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let types = TestTypes::seeded(seed);
     let (mut bitmap_arena, mut entity_store) = world(types, 1);
-    entity_store.queue_add(walker_header(types, cell(40, 30), 0), &[AttributeBlock::holding_value(types.name, 7)]);
-    entity_store.queue_add(walker_header(types, cell(40, 40), 0), &[AttributeBlock::holding_value(types.name, 7)]);
+    entity_store.queue_add(walker_base_data(types, cell(40, 30), 0), &[AttributeBlock::holding_value(types.name, 7)]);
+    entity_store.queue_add(walker_base_data(types, cell(40, 40), 0), &[AttributeBlock::holding_value(types.name, 7)]);
     entity_store.apply();
     let mut test_simulation = Simulation::new(1);
     let report = test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         for entity in tick_state.woken_entities() {
             // The first is left as it was; the second walker's name is changed.
-            if entity.header.stood_cell == cell(40, 40) {
-                entity_reads_and_writes::set_attribute_of(tick_state, &entity.header, types.name, entity.attribute(types.name), 8);
+            if entity.base_data.stood_cell == cell(40, 40) {
+                entity_reads_and_writes::set_attribute_of(tick_state, &entity.base_data, types.name, entity.attribute(types.name), 8);
             }
-            let step_cell = entity.header.stood_cell.at_cartesian_offset(1, 1).expect("in the world");
-            entity_reads_and_writes::step(tick_state, &entity.header, step_cell, NEVER_WAKES);
+            let step_cell = entity.base_data.stood_cell.at_cartesian_offset(1, 1).expect("in the world");
+            entity_reads_and_writes::step(tick_state, &entity.base_data, step_cell, NEVER_WAKES);
         }
         0
     });
@@ -51,13 +52,13 @@ fn the_cells_beside_an_entity_are_asked_as_sets() {
     let types = TestTypes::seeded(seed);
     let (mut bitmap_arena, mut entity_store) = world(types, 1);
     let walker_cell = cell(40, 30);
-    entity_store.queue_add(walker_header(types, walker_cell, 0), &[]);
+    entity_store.queue_add(walker_base_data(types, walker_cell, 0), &[]);
     entity_store.apply();
     let seen_by_rule = Mutex::new(Vec::new());
     let mut test_simulation = Simulation::new(1);
     test_simulation.tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         for entity in tick_state.woken_entities() {
-            let woken_cell = entity.header.stood_cell;
+            let woken_cell = entity.base_data.stood_cell;
             let about_tiles = cell_and_its_neighbours::tiles_about_cell(woken_cell);
             let stone_about = cell_and_its_neighbours::read_layer(tick_state, types.stone, &about_tiles);
             // Up and left of it, and to its right: the two chosen among.
@@ -66,7 +67,7 @@ fn the_cells_beside_an_entity_are_asked_as_sets() {
             let none_drawn = cell_and_its_neighbours::pick_way(tick_state.random_stream(), &about_tiles, two_chosen.cells_not_in(two_chosen));
             let cells: Vec<CellIndex> = [cell_and_its_neighbours::NORTH_WEST, cell_and_its_neighbours::EAST].iter().filter_map(|&way| cell_and_its_neighbours::cell(woken_cell, way)).collect();
             seen_by_rule.lock().unwrap().push((stone_about.set_cells.count(), stone_about.hot == about_tiles.nine_cells(), ways_drawn, none_drawn, cells, cell_and_its_neighbours::way_of(woken_cell, woken_cell.at_cartesian_offset(-1, 1).unwrap())));
-            entity_reads_and_writes::sleep(tick_state, &entity.header, NEVER_WAKES);
+            entity_reads_and_writes::sleep(tick_state, &entity.base_data, NEVER_WAKES);
         }
         0
     });

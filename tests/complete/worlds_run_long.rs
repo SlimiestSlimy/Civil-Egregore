@@ -45,7 +45,7 @@ fn a_flock_on_generated_ground_lasts() {
     for _ in 0..300_000 {
         made_world.tick();
     }
-    let (grass_cells, sheep_count) = (cells_of_grass(&mut made_world, &probe), every_entity(&mut made_world, &probe, |entity| entity.header.entity_type == base().sheep).into_iter().filter(|&is_sheep| is_sheep).count());
+    let (grass_cells, sheep_count) = (cells_of_grass(&mut made_world, &probe), every_entity(&mut made_world, &probe, |entity| entity.base_data.entity_type == base().sheep).into_iter().filter(|&is_sheep| is_sheep).count());
     assert!((500..200_000).contains(&sheep_count), "{sheep_count} sheep");
     assert!(grass_cells > 4 * 1024 * 1024 / 20, "{grass_cells} cells of grass");
 }

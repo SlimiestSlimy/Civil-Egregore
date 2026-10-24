@@ -14,7 +14,10 @@ use crate::worlds::named;
 use basegame::default_types::BUNDLE as BASE_BUNDLE;
 use protocol::type_registry::{in_bundle, FrozenTypeRegistry, Hook, Registration, TypeRegistry};
 use basegame::libraries::collision::Collision;
-use server::simulation::simulation_api::{tick_and_random_stream, AttributeBlock, CellIndex, EntityRef, Header, LayerType, RuleCode, RuleCounts, SimulationTickState, SuperchunkIndex, TickReport};
+use server::simulation::simulation_api::{tick_and_random_stream, CellIndex, EntityRef, LayerType, RuleCode, SimulationTickState, SuperchunkIndex, TickReport};
+use protocol::server_types::entity::EntityBaseData;
+use protocol::server_types::attributes::AttributeBlock;
+use server::simulation::simulation_api::rule_counts::RuleCounts;
 use utilities::coordinates::{ChunkIndex, CHUNK_SIDE};
 use server::{ChosenRules, RulePlace, TickCounts, World, WorldTick};
 use std::sync::{Arc, Mutex};
@@ -163,16 +166,16 @@ pub fn count_of_the_turn(tick_state: &SimulationTickState, layer_type: LayerType
     words_of_the_turn(tick_state, layer_type).iter().flat_map(|(_, words)| words).map(|word| u64::from(word.count_ones())).sum()
 }
 
-/// Puts an entity as `header` says, with `attributes`, its cell held in
+/// Puts an entity as `base_data` says, with `attributes`, its cell held in
 /// the collision plane -- as one that collides comes -- unless the cell
 /// is taken by then. Woken no sooner than the tick after.
-pub fn put_entity(tick_state: &mut SimulationTickState, header: Header, attributes: &[AttributeBlock]) {
-    let wake = header.wake.max(tick_and_random_stream::current_tick(tick_state) + 1);
-    drop(Collision { plane: crate::worlds::base().collision }.begin_making_entity(tick_state, header.entity_type, header.stood_cell, wake, attributes));
+pub fn put_entity(tick_state: &mut SimulationTickState, base_data: EntityBaseData, attributes: &[AttributeBlock]) {
+    let wake = base_data.wake.max(tick_and_random_stream::current_tick(tick_state) + 1);
+    drop(Collision { plane: crate::worlds::base().collision }.begin_making_entity(tick_state, base_data.entity_type, base_data.stood_cell, wake, attributes));
 }
 
-/// Takes `header`'s entity away, the cell it held in the collision plane
+/// Takes `base_data`'s entity away, the cell it held in the collision plane
 /// let go.
-pub fn take_entity(tick_state: &mut SimulationTickState, header: &Header) {
-    Collision { plane: crate::worlds::base().collision }.remove(tick_state, header);
+pub fn take_entity(tick_state: &mut SimulationTickState, base_data: &EntityBaseData) {
+    Collision { plane: crate::worlds::base().collision }.remove(tick_state, base_data);
 }

@@ -4,8 +4,9 @@
 //! (`docs/sca_rules.md`, "Grass").
 
 use crate::base_types::BaseTypes;
-use server::simulation::simulation_api::simulation_time::SimulationTime;
-use server::simulation::simulation_api::{on_each_sampled, RuleCode, cell_reads_and_writes, place_counted, tick_and_random_stream, CellIndex, Chance, RuleCounts, SimulationTickState, NEIGHBOUR_OFFSETS};
+use protocol::server_types::simulation_time::SimulationTime;
+use server::simulation::simulation_api::{on_each_sampled, RuleCode, cell_reads_and_writes, tick_and_random_stream, CellIndex, Chance, SimulationTickState, NEIGHBOUR_OFFSETS};
+use server::simulation::simulation_api::rule_counts::{place_counted, RuleCounts};
 
 /// The simulation time a cell of grass takes, on average, to try to
 /// spread: what its chance each tick is worked out from, so the grass

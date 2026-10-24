@@ -24,7 +24,6 @@ pub(crate) use tick::{Simulation, TickReport};
 pub(crate) use simulation_tick_state::conditional::Compare;
 pub(crate) use simulation_tick_state::one_instruction::Write;
 pub(crate) use simulation_tick_state::SimulationTickState;
-pub(crate) use simulation_api::simulation_time;
 // Names only the crate's tests use.
 #[cfg(test)]
 pub(crate) use {sampling::sample, tick::threads_for};

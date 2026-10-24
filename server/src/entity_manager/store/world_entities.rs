@@ -1,8 +1,10 @@
 //! Every superchunk's entities together: the world's, with what is
 //! queued to be put and removed.
 
-use crate::entity_manager::attributes::{AttributeBlock, DefaultAttributes};
-use crate::entity_manager::entity::{EntityRef, Header};
+use crate::entity_manager::attributes::DefaultAttributes;
+use protocol::server_types::attributes::AttributeBlock;
+use crate::entity_manager::entity::EntityRef;
+use protocol::server_types::entity::EntityBaseData;
 use crate::entity_manager::instructions::{Instructions, InstructionsApplied};
 use super::SuperchunkEntities;
 use super::entity_reader::EntityReader;
@@ -110,12 +112,12 @@ impl WorldEntities {
         dropped_entities + had_superchunks.map(|superchunk| superchunk.len()).sum::<usize>()
     }
 
-    /// Queues making `header`'s entity, with `attributes` sorted by
+    /// Queues making `base_data`'s entity, with `attributes` sorted by
     /// type, outside a tick: setting up, say. It wakes at its wake
     /// tick, the tick about to run or later. Not made, an entity
     /// standing on its cell.
-    pub fn queue_add(&mut self, header: Header, attributes: &[AttributeBlock]) {
-        self.queued_instructions.add(header, attributes);
+    pub fn queue_add(&mut self, base_data: EntityBaseData, attributes: &[AttributeBlock]) {
+        self.queued_instructions.add(base_data, attributes);
     }
 
     /// Queues removing the entity standing on `stood_cell`, outside a tick.

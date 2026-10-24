@@ -7,7 +7,9 @@ use crate::{World, WorldInfo};
 use crate::bitplane_manager::{BitmapArena, Write, WritesApplied};
 use crate::chunk_storage::{ChunkStorage, LayerType};
 use utilities::coordinates::SuperchunkIndex;
-use crate::entity_manager::{AttributeBlock, Header, InstructionsApplied, WorldEntities};
+use crate::entity_manager::{InstructionsApplied, WorldEntities};
+use protocol::server_types::entity::EntityBaseData;
+use protocol::server_types::attributes::AttributeBlock;
 use protocol::pipe::frame::Viewport;
 use crate::simulation::halos::Halos;
 use crate::simulation::{ChosenRules, HaloChange, RulePlace, Simulation, TickCounts, TickReport, WorldTick};
@@ -133,19 +135,19 @@ impl World {
         self.simulation_handle.keep_cold_pool_within(bytes_kept);
     }
 
-    /// Puts `header`'s entity on the world between two ticks: input from
+    /// Puts `base_data`'s entity on the world between two ticks: input from
     /// outside, made by the simulation (`SimulationHandle::add_entity`).
     ///
     #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
-    pub(crate) fn add_entity(&mut self, header: Header, attributes: &[AttributeBlock]) -> InstructionsApplied {
-        self.simulation_handle.add_entity(header, attributes)
+    pub(crate) fn add_entity(&mut self, base_data: EntityBaseData, attributes: &[AttributeBlock]) -> InstructionsApplied {
+        self.simulation_handle.add_entity(base_data, attributes)
     }
 
-    /// Removes `header`'s entity from the world between two ticks.
+    /// Removes `base_data`'s entity from the world between two ticks.
     ///
     #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
-    pub(crate) fn remove_entity(&mut self, header: &Header) -> InstructionsApplied {
-        self.simulation_handle.remove_entity(header)
+    pub(crate) fn remove_entity(&mut self, base_data: &EntityBaseData) -> InstructionsApplied {
+        self.simulation_handle.remove_entity(base_data)
     }
 
     /// Applies `writes` to the cells of `layer_type` between two ticks.

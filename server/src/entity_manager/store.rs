@@ -7,14 +7,16 @@ mod entity_reader;
 mod named_in_a_tick;
 mod world_entities;
 
-pub use entity_being_made::{EntityBeingMade, FirstWake};
+pub use entity_being_made::EntityBeingMade;
 pub use entity_reader::EntityReader;
 pub use world_entities::WorldEntities;
 
 use crate::entity_manager::bucket::{place, Bucket};
 pub use crate::entity_manager::bucket::EntityWritten;
-use crate::entity_manager::attributes::{append_kept, may_be_given, AttributeBlock, AttributeType, DefaultAttributes};
-use crate::entity_manager::entity::{EntityRef, Header, NEVER_WAKES};
+use crate::entity_manager::attributes::{append_kept, may_be_given, AttributeType, DefaultAttributes};
+use protocol::server_types::attributes::AttributeBlock;
+use crate::entity_manager::entity::EntityRef;
+use protocol::server_types::entity::EntityBaseData;
 use crate::entity_manager::wheel::{Wake, Wheel};
 use utilities::coordinates::{CellIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 use std::sync::Arc;
@@ -119,64 +121,64 @@ impl SuperchunkEntities {
             if let Some(ahead_wake) = due_wakes.get(wake_index + ATTRIBUTES_AHEAD) {
                 self.chunks[ahead_wake.stood_cell.chunk().place()].prefetch_attributes(ahead_wake.stood_cell);
             }
-            self.get(wake.stood_cell).filter(|entity| entity.header.wake == tick)
+            self.get(wake.stood_cell).filter(|entity| entity.base_data.wake == tick)
         })
     }
 
-    /// Makes `header`'s entity on its cell, with `attributes` sorted
+    /// Makes `base_data`'s entity on its cell, with `attributes` sorted
     /// by type -- its type's default attribute among them or, not
     /// given, zeroes -- and files its wake, no earlier than
     /// `earliest_tick`: new, or refused, an entity standing there.
-    pub(crate) fn make_entity(&mut self, earliest_tick: u64, header: Header, attributes: &[AttributeBlock]) -> EntityWritten {
-        debug_assert_eq!(header.stood_cell.superchunk(), self.superchunk_index, "an entity made in a superchunk it is not in");
-        let kept_default = self.default_attributes.of(header.entity_type);
+    pub(crate) fn make_entity(&mut self, earliest_tick: u64, base_data: EntityBaseData, attributes: &[AttributeBlock]) -> EntityWritten {
+        debug_assert_eq!(base_data.stood_cell.superchunk(), self.superchunk_index, "an entity made in a superchunk it is not in");
+        let kept_default = self.default_attributes.of(base_data.entity_type);
         debug_assert!(may_be_given(kept_default, attributes), "attributes whole, sorted by type, each type once");
         self.carried_blocks.clear();
         append_kept(kept_default, attributes, &mut self.carried_blocks);
-        let made = self.chunks[header.stood_cell.chunk().place()].make_entity(header, &self.carried_blocks, &self.default_attributes);
-        if made == EntityWritten::Added && header.wake != NEVER_WAKES {
-            self.wheel.file_wake(earliest_tick, header.wake, Wake { stood_cell: header.stood_cell });
+        let made = self.chunks[base_data.stood_cell.chunk().place()].make_entity(base_data, &self.carried_blocks, &self.default_attributes);
+        if made == EntityWritten::Added {
+            self.wheel.file_wake(earliest_tick, base_data.wake, Wake { stood_cell: base_data.stood_cell });
         }
         made
     }
 
-    /// Gives the entity standing on `from_cell` `header` -- its cell, when
+    /// Gives the entity standing on `from_cell` `base_data` -- its cell, when
     /// it wakes -- leaving it the attributes it has; and files its
     /// wake, if it is `earliest_tick` or later: what came of it
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
-    pub(crate) fn write_entity(&mut self, earliest_tick: u64, header: Header, from_cell: CellIndex) -> EntityWritten {
-        debug_assert_eq!(header.stood_cell.superchunk(), self.superchunk_index, "an entity put in a superchunk it is not in");
+    pub(crate) fn write_entity(&mut self, earliest_tick: u64, base_data: EntityBaseData, from_cell: CellIndex) -> EntityWritten {
+        debug_assert_eq!(base_data.stood_cell.superchunk(), self.superchunk_index, "an entity put in a superchunk it is not in");
         debug_assert_eq!(from_cell.superchunk(), self.superchunk_index, "an entity put from another superchunk: a crossing");
-        let (origin, target_chunk_place) = (from_cell.chunk().place(), header.stood_cell.chunk().place());
+        let (origin, target_chunk_place) = (from_cell.chunk().place(), base_data.stood_cell.chunk().place());
         let written = if origin == target_chunk_place {
-            self.chunks[target_chunk_place].write_entity(header, place(from_cell), None)
+            self.chunks[target_chunk_place].write_entity(base_data, place(from_cell), None)
         } else if let Some(stood_entity) = self.chunks[origin].get(from_cell, &self.default_attributes) {
             // Those it has go with it to the other bucket, as that one kept them.
             self.carried_blocks.clear();
             self.carried_blocks.extend_from_slice(stood_entity.kept_blocks);
-            self.move_between(origin, target_chunk_place, header, from_cell)
+            self.move_between(origin, target_chunk_place, base_data, from_cell)
         } else {
             EntityWritten::PassedOver
         };
-        let standing_cell = if written == EntityWritten::TurnedBack { from_cell } else { header.stood_cell };
+        let standing_cell = if written == EntityWritten::TurnedBack { from_cell } else { base_data.stood_cell };
         // A wake already passed is not filed again: whatever sets its next one files that.
-        if !matches!(written, EntityWritten::RefusedOccupied | EntityWritten::PassedOver) && header.wake != NEVER_WAKES && header.wake >= earliest_tick {
-            self.wheel.file_wake(earliest_tick, header.wake, Wake { stood_cell: standing_cell });
+        if !matches!(written, EntityWritten::RefusedOccupied | EntityWritten::PassedOver) && base_data.wake >= earliest_tick {
+            self.wheel.file_wake(earliest_tick, base_data.wake, Wake { stood_cell: standing_cell });
         }
         written
     }
 
-    /// Moves `header`'s entity, standing on `from_cell` in the chunk at
+    /// Moves `base_data`'s entity, standing on `from_cell` in the chunk at
     /// `origin`, to its cell in the chunk at `target_chunk_place`, with the
     /// attributes `carried` -- unless an entity stands there, when it
     /// stays, changed all the same.
-    fn move_between(&mut self, origin: usize, target_chunk_place: usize, header: Header, from_cell: CellIndex) -> EntityWritten {
-        if self.chunks[target_chunk_place].occupied(place(header.stood_cell)) {
-            self.chunks[origin].write_entity(Header { stood_cell: from_cell, ..header }, place(from_cell), Some(&self.carried_blocks));
+    fn move_between(&mut self, origin: usize, target_chunk_place: usize, base_data: EntityBaseData, from_cell: CellIndex) -> EntityWritten {
+        if self.chunks[target_chunk_place].occupied(place(base_data.stood_cell)) {
+            self.chunks[origin].write_entity(EntityBaseData { stood_cell: from_cell, ..base_data }, place(from_cell), Some(&self.carried_blocks));
             EntityWritten::TurnedBack
         } else {
             self.chunks[origin].remove(from_cell);
-            self.chunks[target_chunk_place].make_entity(header, &self.carried_blocks, &self.default_attributes);
+            self.chunks[target_chunk_place].make_entity(base_data, &self.carried_blocks, &self.default_attributes);
             EntityWritten::MovedToCell
         }
     }

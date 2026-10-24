@@ -9,12 +9,15 @@
 
 use crate::probe::{entities_of_the_turn, of_the_turn, put_entity, Probe};
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use server::simulation::simulation_api::{cell_reads_and_writes, entity_reads_and_writes, tick_and_random_stream, Attribute, AttributeBlock, EntityRef, Header, LayerType, SimulationTickState};
+use server::simulation::simulation_api::{cell_reads_and_writes, entity_reads_and_writes, tick_and_random_stream, EntityRef, LayerType, SimulationTickState};
+use protocol::server_types::entity::EntityBaseData;
+use protocol::server_types::attribute_layouts::Attribute;
+use protocol::server_types::attributes::AttributeBlock;
 use basegame::worldgen::WorldGeneration;
 use basegame::base_types::BaseTypes;
 use protocol::type_registry::{in_bundle, FrozenTypeRegistry, RegisteredType, TypeRegistry};
 use basegame::default_types::BUNDLE as BASE_BUNDLE;
-use server::simulation::simulation_api::{Bits4, WidePlane};
+use protocol::server_types::plane_widths::{Bits4, WidePlane};
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SIDE, THREADS, WORLD};
 use server::World;
 use std::path::{Path, PathBuf};
@@ -236,14 +239,14 @@ pub fn set_rectangle(world: &mut World, probe: &Probe, layer_type: LayerType, to
     });
 }
 
-/// Puts each entity of `entities` -- its header and its attributes -- in a
+/// Puts each entity of `entities` -- its base data and its attributes -- in a
 /// tick of the probe alone, as an entity that collides comes: woken
 /// no sooner than the tick after.
-pub fn put_entities(world: &mut World, probe: &Probe, entities: Vec<(Header, Vec<AttributeBlock>)>) {
+pub fn put_entities(world: &mut World, probe: &Probe, entities: Vec<(EntityBaseData, Vec<AttributeBlock>)>) {
     probe.alone(world, move |tick_state| {
         let turn_superchunk = tick_and_random_stream::superchunk(tick_state);
-        for (header, attributes) in entities.iter().filter(|(header, _)| header.stood_cell.superchunk() == turn_superchunk) {
-            put_entity(tick_state, *header, attributes);
+        for (base_data, attributes) in entities.iter().filter(|(base_data, _)| base_data.stood_cell.superchunk() == turn_superchunk) {
+            put_entity(tick_state, *base_data, attributes);
         }
         Vec::<()>::new()
     });
@@ -286,7 +289,7 @@ pub fn tag_sheep(world: &mut World, probe: &Probe) {
     let sheep_tag = sheep_tag(world);
     probe.alone(world, move |tick_state| {
         for tagged_sheep in entities_of_the_turn(tick_state) {
-            entity_reads_and_writes::set_attribute_of(tick_state, &tagged_sheep.header, sheep_tag, None, tagged_sheep.header.stood_cell.0);
+            entity_reads_and_writes::set_attribute_of(tick_state, &tagged_sheep.base_data, sheep_tag, None, tagged_sheep.base_data.stood_cell.0);
         }
         Vec::<()>::new()
     });
@@ -306,18 +309,18 @@ pub fn cells_of(superchunk: SuperchunkIndex) -> impl Iterator<Item = CellIndex> 
 /// One tick of the base game's rule named `rule_name` alone over
 /// `world`'s hot superchunks, its halos left where they are: the tick's
 /// report, the rule's counts alone in it.
-pub fn tick_rule(world: &mut World, rule_name: &str) -> server::simulation::simulation_api::TickReport<server::simulation::simulation_api::RuleCounts> {
+pub fn tick_rule(world: &mut World, rule_name: &str) -> server::simulation::simulation_api::TickReport<server::simulation::simulation_api::rule_counts::RuleCounts> {
     let rule = crate::probe::rule_place(world, rule_name);
     crate::probe::report_of(world.tick_only(server::ChosenRules::from_rules(&[rule]), false), rule)
 }
 
 /// One tick of the sheep's rule alone.
-pub fn tick_sheep(world: &mut World) -> server::simulation::simulation_api::TickReport<server::simulation::simulation_api::RuleCounts> {
+pub fn tick_sheep(world: &mut World) -> server::simulation::simulation_api::TickReport<server::simulation::simulation_api::rule_counts::RuleCounts> {
     tick_rule(world, basegame::base_types::SHEEP_RULE)
 }
 
 /// One tick of the grass's rule alone.
-pub fn tick_grass(world: &mut World) -> server::simulation::simulation_api::TickReport<server::simulation::simulation_api::RuleCounts> {
+pub fn tick_grass(world: &mut World) -> server::simulation::simulation_api::TickReport<server::simulation::simulation_api::rule_counts::RuleCounts> {
     tick_rule(world, basegame::base_types::GRASS_RULE)
 }
 
@@ -359,9 +362,9 @@ pub fn one_flock_world(test_name: &str, parameters: CleanServerParameters, sheep
             if cell_reads_and_writes::layer_holds(tick_state, base().collision, drawn_cell) || !drawn_cells.insert(drawn_cell) {
                 continue;
             }
-            let header = Header { entity_type: base().sheep, stood_cell: drawn_cell, wake: STEP.part_drawn(&mut random_stream).tick_after(tick_now + FLOCK_SETTLES) };
+            let base_data = EntityBaseData { entity_type: base().sheep, stood_cell: drawn_cell, wake: STEP.part_drawn(&mut random_stream).tick_after(tick_now + FLOCK_SETTLES) };
             let sheep_state = basegame::base_types::SheepState { hungry_at: TIME_BETWEEN_MEALS.part_drawn(&mut random_stream).tick_after(tick_now), ..basegame::base_types::SheepState::default() };
-            put_entity(tick_state, header, &server::simulation::simulation_api::WholeAttribute::holding_value(base().sheep_state, sheep_state));
+            put_entity(tick_state, base_data, &protocol::server_types::attributes::WholeAttribute::holding_value(base().sheep_state, sheep_state));
         }
         vec![sheep]
     });

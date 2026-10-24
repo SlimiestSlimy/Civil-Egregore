@@ -6,11 +6,12 @@
 //! tick).
 
 use super::SuperchunkEntities;
-use crate::entity_manager::attributes::{AttributeBlock, AttributeType};
+use crate::entity_manager::attributes::AttributeType;
+use protocol::server_types::attributes::AttributeBlock;
 use crate::entity_manager::bucket::{place, EntityWritten};
-use crate::entity_manager::entity::NEVER_WAKES;
 use crate::entity_manager::wheel::Wake;
-use crate::entity_manager::entity::{EntityRef, Header};
+use crate::entity_manager::entity::EntityRef;
+use protocol::server_types::entity::EntityBaseData;
 use utilities::coordinates::CellIndex;
 
 impl SuperchunkEntities {
@@ -61,16 +62,16 @@ impl SuperchunkEntities {
         if destination_entities.named_or_taken(to_cell) {
             return EntityWritten::TurnedBack;
         }
-        let header = Header { stood_cell: to_cell, ..entity.header };
+        let base_data = EntityBaseData { stood_cell: to_cell, ..entity.base_data };
         // Those it has go with it as this superchunk kept them.
         let mut carried_blocks = std::mem::take(&mut destination_entities.carried_blocks);
         carried_blocks.clear();
         carried_blocks.extend_from_slice(entity.kept_blocks);
-        let made = destination_entities.chunks[to_cell.chunk().place()].make_entity(header, &carried_blocks, &destination_entities.default_attributes);
+        let made = destination_entities.chunks[to_cell.chunk().place()].make_entity(base_data, &carried_blocks, &destination_entities.default_attributes);
         destination_entities.carried_blocks = carried_blocks;
         debug_assert_eq!(made, EntityWritten::Added, "a cell seen free");
-        if header.wake != NEVER_WAKES && header.wake >= earliest_tick {
-            destination_entities.wheel.file_wake(earliest_tick, header.wake, Wake { stood_cell: to_cell });
+        if base_data.wake >= earliest_tick {
+            destination_entities.wheel.file_wake(earliest_tick, base_data.wake, Wake { stood_cell: to_cell });
         }
         self.remove(named_cell);
         self.left_this_tick.insert(named_cell, Some(to_cell));
@@ -89,30 +90,30 @@ impl SuperchunkEntities {
         self.get(self.now_on(named_cell)?)
     }
 
-    /// Makes `header`'s entity on its cell, with `attributes`: new --
+    /// Makes `base_data`'s entity on its cell, with `attributes`: new --
     /// or refused, the cell another's this tick.
-    pub fn make_named(&mut self, earliest_tick: u64, header: Header, attributes: &[AttributeBlock]) -> EntityWritten {
-        if self.named_or_taken(header.stood_cell) {
+    pub fn make_named(&mut self, earliest_tick: u64, base_data: EntityBaseData, attributes: &[AttributeBlock]) -> EntityWritten {
+        if self.named_or_taken(base_data.stood_cell) {
             return EntityWritten::RefusedOccupied;
         }
-        self.make_entity(earliest_tick, header, attributes)
+        self.make_entity(earliest_tick, base_data, attributes)
     }
 
-    /// Moves the entity the tick found on `named_cell` to `header`'s cell,
+    /// Moves the entity the tick found on `named_cell` to `base_data`'s cell,
     /// to wake at its tick, with the attributes it has, its cell being `named_cell` if it is to stay where
     /// it is. Where it stands is written as anything is, by
     /// compare-and-write: one that already left `named_cell` this tick is
     /// passed over -- of two moving one entity, the first applied
     /// does. And it comes to no cell that is another's this tick: it
     /// stays.
-    pub fn write_named(&mut self, earliest_tick: u64, header: Header, named_cell: CellIndex) -> EntityWritten {
+    pub fn write_named(&mut self, earliest_tick: u64, base_data: EntityBaseData, named_cell: CellIndex) -> EntityWritten {
         if self.left_this_tick.contains_key(&named_cell) || !self.occupied(named_cell) {
             return EntityWritten::PassedOver;
         }
-        if header.stood_cell != named_cell && self.named_or_taken(header.stood_cell) {
-            return self.write_entity(earliest_tick, Header { stood_cell: named_cell, ..header }, named_cell).as_turned_back();
+        if base_data.stood_cell != named_cell && self.named_or_taken(base_data.stood_cell) {
+            return self.write_entity(earliest_tick, EntityBaseData { stood_cell: named_cell, ..base_data }, named_cell).as_turned_back();
         }
-        let (to_cell, written) = (header.stood_cell, self.write_entity(earliest_tick, header, named_cell));
+        let (to_cell, written) = (base_data.stood_cell, self.write_entity(earliest_tick, base_data, named_cell));
         if written == EntityWritten::MovedToCell {
             self.left_this_tick.insert(named_cell, Some(to_cell));
         }
@@ -132,10 +133,10 @@ impl SuperchunkEntities {
     /// to come, is filed where it now stands -- one already passed is
     /// not, whatever writes its next one files that.
     pub fn move_named(&mut self, earliest_tick: u64, named_cell: CellIndex, to_cell: CellIndex) -> EntityWritten {
-        let Some(header) = self.get(named_cell).map(|entity| entity.header) else {
+        let Some(base_data) = self.get(named_cell).map(|entity| entity.base_data) else {
             return EntityWritten::PassedOver;
         };
-        self.write_named(earliest_tick, Header { stood_cell: to_cell, ..header }, named_cell)
+        self.write_named(earliest_tick, EntityBaseData { stood_cell: to_cell, ..base_data }, named_cell)
     }
 
     /// Sets the tick the entity the tick found on `named_cell` next wakes
@@ -146,9 +147,7 @@ impl SuperchunkEntities {
         let Some(now_on) = self.now_on(named_cell).filter(|&now_on| self.chunks[now_on.chunk().place()].set_wake(place(now_on), wake)) else {
             return false;
         };
-        if wake != NEVER_WAKES {
-            self.wheel.file_wake(earliest_tick, wake, Wake { stood_cell: now_on });
-        }
+        self.wheel.file_wake(earliest_tick, wake, Wake { stood_cell: now_on });
         true
     }
 

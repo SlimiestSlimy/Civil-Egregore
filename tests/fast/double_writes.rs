@@ -8,7 +8,9 @@
 use protocol::server_parameters::{ParameterValue, SEED};
 use crate::probe::{count_of_the_turn, entities_of_the_turn, rule_place, take_entity, words_of_the_turn, Probe};
 use crate::worlds::{base, cells_set_and_cleared, first_superchunk, nothing_more, plain_start, probed_world, put_entities, set_rectangle, tick_read_at, tick_sheep};
-use server::simulation::simulation_api::{cell_reads_and_writes, tick_and_random_stream, AttributeBlock, CellIndex, Header, WholeAttribute, NEVER_WAKES};
+use server::simulation::simulation_api::{cell_reads_and_writes, tick_and_random_stream, CellIndex};
+use protocol::server_types::entity::{EntityBaseData, NEVER_WAKES};
+use protocol::server_types::attributes::{AttributeBlock, WholeAttribute};
 use utilities::coordinates::{CellCartesian, SuperchunkIndex};
 use basegame::base_types::{GRASS_RULE, SHEEP_RULE, TREES_RULE};
 use basegame::entity_rules::sheep::{SheepState, BIRTHS_COUNT, EATEN_COUNT, STEP_JITTER, STEP};
@@ -42,7 +44,7 @@ fn no_two_sheep_eat_one_cell() {
     while taken_offsets.len() < 10_000 {
         let (x, y) = (test_random.draw_below(CROWD_SIDE as u64) as u32, test_random.draw_below(CROWD_SIDE as u64) as u32);
         if taken_offsets.insert((x, y)) {
-            crowd.push((Header { entity_type: base().sheep, stood_cell: cell(400 + x, 400 + y), wake: test_random.draw_below(STEP.ticks()) }, hungry_at(0)));
+            crowd.push((EntityBaseData { entity_type: base().sheep, stood_cell: cell(400 + x, 400 + y), wake: test_random.draw_below(STEP.ticks()) }, hungry_at(0)));
         }
     }
     put_entities(&mut world, &probe, crowd);
@@ -112,7 +114,7 @@ fn a_tree_written_twice_is_one_tree() {
         let (report, trees_there) = probe.tick(&mut world, &[TREES_RULE], move |tick_state| vec![count_of_the_turn(tick_state, tree)]);
         let trees_there: u64 = trees_there.into_iter().sum();
         if let Some((trees_before, trees_counts)) = before {
-            let trees_counts: server::simulation::simulation_api::RuleCounts = trees_counts;
+            let trees_counts: server::simulation::simulation_api::rule_counts::RuleCounts = trees_counts;
             let trees_set = trees_there + trees_counts[trees::DIED_COUNT] - trees_before;
             assert_eq!(trees_set, trees_counts[trees::SPREADS_COUNT], "tick {tick}: trees more, trees put");
             spread += trees_set;
@@ -148,11 +150,11 @@ fn summed(turns: Vec<(usize, usize)>) -> (usize, usize) {
 /// they wake, and a blocker asleep for good on every cell beside either
 /// but `free_cells`, put in a tick of the probe alone; then a tick of
 /// the sheep with nobody awake. The blockers.
-fn mothers_among_blockers(world: &mut World, probe: &Probe, cell: &impl Fn(u32, u32) -> CellIndex, (x, y): (u32, u32), free_cells: &[(u32, u32)], hungry_after: u64) -> Vec<Header> {
+fn mothers_among_blockers(world: &mut World, probe: &Probe, cell: &impl Fn(u32, u32) -> CellIndex, (x, y): (u32, u32), free_cells: &[(u32, u32)], hungry_after: u64) -> Vec<EntityBaseData> {
     // Put the tick after the one read at; awake, and due, the tick after the one with nobody awake.
     let due_at = tick_read_at(world, probe) + 3;
-    let mothers = [x, x + 2].map(|mother_x| (Header { entity_type: base().sheep, stood_cell: cell(mother_x, y), wake: due_at }, carrying_lamb(due_at + hungry_after, due_at)));
-    let blockers: Vec<Header> = (x - 1..=x + 3).flat_map(|x| (y - 1..=y + 1).map(move |y| (x, y))).filter(|beside_cell| !free_cells.contains(beside_cell)).map(|(x, y)| Header { entity_type: base().sheep, stood_cell: cell(x, y), wake: NEVER_WAKES }).collect();
+    let mothers = [x, x + 2].map(|mother_x| (EntityBaseData { entity_type: base().sheep, stood_cell: cell(mother_x, y), wake: due_at }, carrying_lamb(due_at + hungry_after, due_at)));
+    let blockers: Vec<EntityBaseData> = (x - 1..=x + 3).flat_map(|x| (y - 1..=y + 1).map(move |y| (x, y))).filter(|beside_cell| !free_cells.contains(beside_cell)).map(|(x, y)| EntityBaseData { entity_type: base().sheep, stood_cell: cell(x, y), wake: NEVER_WAKES }).collect();
     put_entities(world, probe, mothers.into_iter().chain(blockers.iter().map(|&blocker| (blocker, hungry_at(0)))).collect());
     assert_eq!(tick_sheep(world).rules[BIRTHS_COUNT], 0, "nobody awake");
     blockers
@@ -166,14 +168,14 @@ fn a_lamb_refused_its_cell_is_born_later() {
     let (mut world, probe, cell) = one_superchunk("a_lamb_refused_its_cell_is_born_later", 0, 0, 1);
     let (x, y) = (500, 500);
     // Every cell beside either taken, but the one between them.
-    let blocker_headers = mothers_among_blockers(&mut world, &probe, &cell, (x, y), &[(x, y), (x + 1, y), (x + 2, y)], 1);
+    let blockers_base_data = mothers_among_blockers(&mut world, &probe, &cell, (x, y), &[(x, y), (x + 1, y), (x + 2, y)], 1);
     // Both bear on the one cell, neither with another to bear on: one lamb is made, its mother's the birth, in that tick; the other
     // is refused whole, and has no cell to try again on.
     let report = tick_sheep(&mut world);
     // As that tick left them, read in the next of the sheep -- which frees a cell beside each: the other's lamb is born, a step's wait on.
     let (next_report, after_births) = probe.tick_rule(&mut world, SHEEP_RULE, move |tick_state| {
         let turn_superchunk = tick_and_random_stream::superchunk(tick_state);
-        for freed_blocker in blocker_headers.iter().filter(|freed_blocker| freed_blocker.stood_cell.superchunk() == turn_superchunk) {
+        for freed_blocker in blockers_base_data.iter().filter(|freed_blocker| freed_blocker.stood_cell.superchunk() == turn_superchunk) {
             take_entity(tick_state, freed_blocker);
         }
         lambs_and_pregnant(tick_state)

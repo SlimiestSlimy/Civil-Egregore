@@ -11,7 +11,9 @@ use super::instruction::Instruction;
 use super::SimulationTickState;
 use crate::chunk_storage::LayerType;
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::{attribute_seen, AttributeBlock, AttributeType, Member};
+use crate::entity_manager::{attribute_seen, AttributeType};
+use protocol::server_types::attribute_layouts::Member;
+use protocol::server_types::attributes::AttributeBlock;
 
 /// As many skip-tag sets as are open at once, one within another.
 pub(crate) const SKIP_TAG_SETS_WITHIN: usize = 8;

@@ -4,7 +4,7 @@
 //! [`LayerType`] alone, the width said in it; this is what a rule
 //! reads and writes it by.
 
-use protocol::type_registry::{LayerType, RegisteredType, Registration};
+use crate::type_registry::{LayerType, RegisteredType, Registration};
 
 /// How wide a plane is, as a type: what a [`WidePlane`] plane is of, so that
 /// its width is known where it is read and written, and a number of

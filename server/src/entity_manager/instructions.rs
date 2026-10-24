@@ -3,8 +3,10 @@
 //! (`docs/entity_manager.md`, "Instructions").
 
 use crate::entity_manager::bucket::EntityWritten;
-use crate::entity_manager::attributes::{push_attribute, Attribute, AttributeBlock, AttributeType, Layout};
-use crate::entity_manager::entity::Header;
+use crate::entity_manager::attributes::{push_attribute, AttributeType};
+use protocol::server_types::attribute_layouts::{Attribute, Layout};
+use protocol::server_types::attributes::AttributeBlock;
+use protocol::server_types::entity::EntityBaseData;
 use crate::entity_manager::store::SuperchunkEntities;
 use utilities::coordinates::CellIndex;
 use std::ops::AddAssign;
@@ -17,19 +19,19 @@ enum Instruction {
     /// entity standing there.
     Add {
         /// Its fixed part.
-        header: Header,
+        base_data: EntityBaseData,
         /// Its attributes' first block.
         first_block: u32,
         /// How many blocks they are.
         count: u32,
     },
-    /// Moves the entity the tick found on `from` to `header`'s cell,
+    /// Moves the entity the tick found on `from` to `base_data`'s cell,
     /// to wake at its tick, its attributes as they are -- or, the
     /// cell being the one it stands on, only sets when it next wakes.
     #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     Move {
         /// Its fixed part, as it is to be.
-        header: Header,
+        base_data: EntityBaseData,
         /// The cell it stands on, in its cell's superchunk.
         named_cell: CellIndex,
     },
@@ -59,7 +61,7 @@ impl Instruction {
     /// The cell it lands on: its superchunk applies it.
     fn landing_cell(&self) -> CellIndex {
         match *self {
-            Self::Add { header, .. } | Self::Move { header, .. } => header.stood_cell,
+            Self::Add { base_data, .. } | Self::Move { base_data, .. } => base_data.stood_cell,
             Self::Edit { named_cell: at, .. } | Self::RemoveEntity { named_cell: at, .. } => at,
         }
     }
@@ -76,15 +78,15 @@ pub struct Instructions {
 }
 
 impl Instructions {
-    /// Queues making `header`'s entity on its cell, with
+    /// Queues making `base_data`'s entity on its cell, with
     /// `attributes`: not made, an entity standing there by then.
-    pub fn add(&mut self, header: Header, attributes: &[AttributeBlock]) {
-        self.push(header, attributes);
+    pub fn add(&mut self, base_data: EntityBaseData, attributes: &[AttributeBlock]) {
+        self.push(base_data, attributes);
     }
 
     /// Queues an entity added.
-    fn push(&mut self, header: Header, attributes: &[AttributeBlock]) {
-        self.instructions.push(Instruction::Add { header, first_block: self.attributes.len() as u32, count: attributes.len() as u32 });
+    fn push(&mut self, base_data: EntityBaseData, attributes: &[AttributeBlock]) {
+        self.instructions.push(Instruction::Add { base_data, first_block: self.attributes.len() as u32, count: attributes.len() as u32 });
         self.attributes.extend_from_slice(attributes);
     }
 
@@ -93,9 +95,9 @@ impl Instructions {
     /// the attributes it has: none are carried. Its cell `named_cell` itself,
     /// it only sleeps until then.
     #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
-    pub fn move_entity(&mut self, header: Header, named_cell: CellIndex) {
-        debug_assert_eq!(header.stood_cell.superchunk(), named_cell.superchunk(), "an entity moved from another superchunk: a crossing");
-        self.instructions.push(Instruction::Move { header, named_cell });
+    pub fn move_entity(&mut self, base_data: EntityBaseData, named_cell: CellIndex) {
+        debug_assert_eq!(base_data.stood_cell.superchunk(), named_cell.superchunk(), "an entity moved from another superchunk: a crossing");
+        self.instructions.push(Instruction::Move { base_data, named_cell });
     }
 
     /// Queues setting `attribute` of the entity the tick found on
@@ -169,9 +171,9 @@ impl Instructions {
             };
             let superchunk = &mut superchunks[found_index];
             match instruction {
-                Instruction::Add { header, first_block: first, count } => {
+                Instruction::Add { base_data, first_block: first, count } => {
                     let attributes = &self.attributes[first as usize..(first + count) as usize];
-                    let made = superchunk.make_named(earliest_tick, header, attributes);
+                    let made = superchunk.make_named(earliest_tick, base_data, attributes);
                     match made {
                         EntityWritten::Added | EntityWritten::InPlace | EntityWritten::MovedToCell => instructions_applied.added += 1,
                         EntityWritten::TurnedBack => (instructions_applied.added, instructions_applied.turned_back) = (instructions_applied.added + 1, instructions_applied.turned_back + 1),
@@ -179,7 +181,7 @@ impl Instructions {
                         EntityWritten::PassedOver => instructions_applied.passed_over += 1,
                     }
                 }
-                Instruction::Move { header, named_cell: from } => match superchunk.write_named(earliest_tick, header, from) {
+                Instruction::Move { base_data, named_cell: from } => match superchunk.write_named(earliest_tick, base_data, from) {
                     EntityWritten::TurnedBack => (instructions_applied.moves, instructions_applied.turned_back) = (instructions_applied.moves + 1, instructions_applied.turned_back + 1),
                     EntityWritten::PassedOver => instructions_applied.passed_over += 1,
                     _ => instructions_applied.moves += 1,

@@ -6,10 +6,11 @@
 //!
 //! `cargo test -p server --lib entity_over_a_border`
 
-use crate::arenas::{cell, walker_header, world};
+use crate::arenas::{cell, walker_base_data, world};
 use crate::test_types::TestTypes;
 use utilities::coordinates::{CellIndex, SUPERCHUNK_SIDE_CELLS};
-use crate::entity_manager::{WorldEntities, Header, NEVER_WAKES};
+use crate::entity_manager::WorldEntities;
+use protocol::server_types::entity::{EntityBaseData, NEVER_WAKES};
 use crate::simulation::{Simulation, SimulationTickState};
 use utilities::rng::RandomSource;
 
@@ -55,13 +56,13 @@ fn crossing_scene(crosser_row: u32, last_writer_does: WriterDoes) -> (CellIndex,
 fn tick(types: TestTypes, seed: u64, thread_count: usize, crosser_row: u32, last_writer_does: WriterDoes, is_blocked: bool) -> (crate::entity_manager::InstructionsApplied, WorldEntities) {
     let (mut bitmap_arena, mut entity_store) = world(types, 3);
     let (from_cell, to_cell, writer_cells) = crossing_scene(crosser_row, last_writer_does);
-    let crosser_header = walker_header(types, from_cell, 0);
-    entity_store.queue_add(crosser_header, &[crate::entity_manager::AttributeBlock::holding_value(types.name, 7)]);
+    let crosser_base_data = walker_base_data(types, from_cell, 0);
+    entity_store.queue_add(crosser_base_data, &[protocol::server_types::attributes::AttributeBlock::holding_value(types.name, 7)]);
     for &(writer_cell, _) in &writer_cells {
-        entity_store.queue_add(walker_header(types, writer_cell, 0), &[]);
+        entity_store.queue_add(walker_base_data(types, writer_cell, 0), &[]);
     }
     if is_blocked {
-        entity_store.queue_add(walker_header(types, to_cell, NEVER_WAKES), &[]);
+        entity_store.queue_add(walker_base_data(types, to_cell, NEVER_WAKES), &[]);
     }
     entity_store.apply();
     for &(later_writer_cell, _) in &writer_cells[1..] {
@@ -71,20 +72,20 @@ fn tick(types: TestTypes, seed: u64, thread_count: usize, crosser_row: u32, last
     let report = Simulation::new(thread_count).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         let current_tick = tick_state.current_tick();
         crate::simulation::simulation_api::entity_reads_and_writes::each_woken(tick_state, [], &mut (), |tick_state, entity, _| {
-            let header: Header = entity.header;
-            if header.stood_cell == from_cell {
-                crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &header, to_cell, current_tick + 1);
+            let base_data: EntityBaseData = entity.base_data;
+            if base_data.stood_cell == from_cell {
+                crate::simulation::simulation_api::entity_reads_and_writes::step(tick_state, &base_data, to_cell, current_tick + 1);
                 return;
             }
-            let Some(writer_index) = writer_cells.iter().position(|&(candidate_cell, _)| candidate_cell == header.stood_cell) else {
+            let Some(writer_index) = writer_cells.iter().position(|&(candidate_cell, _)| candidate_cell == base_data.stood_cell) else {
                 return;
             };
             match writer_cells[writer_index].1 {
-                WriterDoes::RemovesCrosser => crate::simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &crosser_header),
+                WriterDoes::RemovesCrosser => crate::simulation::simulation_api::entity_reads_and_writes::remove(tick_state, &crosser_base_data),
                 writer_does => {
-                    crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &crosser_header, types.given[writer_index], None, writer_index as u64 + 1);
+                    crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &crosser_base_data, types.given[writer_index], None, writer_index as u64 + 1);
                     if writer_does == WriterDoes::GivesAndKeeps {
-                        crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &header, types.own, None, 1);
+                        crate::simulation::simulation_api::entity_reads_and_writes::set_attribute_of(tick_state, &base_data, types.own, None, 1);
                     }
                 }
             }
