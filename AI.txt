@@ -1693,6 +1693,11 @@ LATER (every "for later" of the user's, and mine, as said)
   No mod changes another's code: "i dont see why mods would be touching
   anyone else compiled libraries at runtime magically. however mods will
   be able to register hooks later, when we need them" (2026-10-24).
+- MOD DEVELOPMENT EASE, a goal (the user, 2026-10-24): "i want a
+  relative ease of development for mods,.at least to the level of other
+  games, even if we start with a disadvantage with rust on that front
+  lol". Inspirations named: Factorio, Fabric, Satisfactory, Vintage
+  Story ("basegame as mods lol").
 - Mod support's edges, each "when we need them" (2026-10-24): versioning
   and load safeguards, a mod's panic, a mod finding its own assets,
   unloading a world's mods on the client, whose rule wins a contested
