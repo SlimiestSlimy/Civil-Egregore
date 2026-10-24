@@ -3,20 +3,32 @@ name = "basegame"
 edition = "2024"
 description = "Civil Egregore's base game: its types, the libraries they expose, the rules of its cells and entities, and its world generation"
 
+# A workspace of its own, apart from Civil Egregore's, as a mod is: built
+# and tested here, `cargo test` in this folder, against the game's public
+# APIs as path dependencies.
+[workspace]
+
+[workspace.dependencies]
+# The game's Bevy, the same as its workspace's: one Bevy across the game
+# and its mods. Named here too for its macros, which look for it by name.
+bevy = { version = "0.19", default-features = false, features = ["2d", "ui", "bevy_feathers"] }
+
 [dependencies]
+# The game as a mod reaches it: the type registry, the simulation's API,
+# the client's API, and Bevy.
 protocol = { path = "../protocol" }
 server = { path = "../server" }
-# The render rules' and the windows' code: the client's API and Bevy,
-# only with the `client` feature.
-client = { path = "../client", optional = true }
-bevy = { version = "0.19", default-features = false, features = ["2d", "ui", "bevy_feathers"], optional = true }
-
-[features]
-# The render rules and the windows with their code: a windowed build's. Without it they
-# are registered all the same, of no code.
-client = ["dep:client", "dep:bevy"]
+client = { path = "../client" }
+bevy = { workspace = true }
 
 # The tests' seed (`utilities/test_seed.rs`) reads and writes through
 # utilities; the crate itself reaches it only through the server's API.
 [dev-dependencies]
 utilities = { path = "../utilities" }
+
+[profile.release]
+debug = "line-tables-only"
+
+# Bevy unoptimized is too slow to watch.
+[profile.dev.package.bevy]
+opt-level = 3

@@ -1,12 +1,11 @@
-//! Civil Egregore, from the command line: the one program, built with the
-//! client or without it (the `client` feature, on by default) -- and its
-//! initialization: what registers the base game's types
+//! Civil Egregore, from the command line: the one program -- the window,
+//! or a server run headless -- and its initialization: what registers the base game's types
 //! ([`basegame::default_types`]), handed to the server, which makes and
 //! freezes each world's registry with it before the world. It hands its
 //! command line to the server's flags ([`server::params`]) and the
 //! server ([`server::start`]).
 //!
-//! No arguments, built with the client: the window ([`client::run_window`]).
+//! No arguments: the window ([`client::run_window`]).
 //! `cargo run --release -- --help`: every flag, and what it takes.
 //! `cargo run --release -- --seed 0x5 --side 4`: a server running headless, listening for a client.
 
@@ -15,12 +14,10 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 use protocol::flags::FlagError;
-use protocol::server_parameters::ServerParameters;
-#[cfg(feature = "client")]
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, ServerParameters, CAMERA_FORCES_SUPERCHUNKS_HOT, WORLDGEN};
 use std::process::ExitCode;
 
-#[cfg(all(windows, feature = "client"))]
+#[cfg(windows)]
 unsafe extern "system" {
     /// Windows' own: lets go of the console the program was given.
     safe fn FreeConsole() -> i32;
@@ -30,7 +27,6 @@ unsafe extern "system" {
 /// program is a console program, so that its commands print where they
 /// are typed, and Windows opens a console beside one started by a
 /// click, which the window has no use for. Elsewhere, nothing.
-#[cfg(feature = "client")]
 fn leave_the_console() {
     #[cfg(windows)]
     FreeConsole();
@@ -38,27 +34,23 @@ fn leave_the_console() {
 
 /// The world the window opens with, until it has its menus: of no size,
 /// no sheep in it, the superchunks the window shows kept hot.
-#[cfg(feature = "client")]
 fn first_world() -> CleanServerParameters {
     let no_sheep = CleanServerParameters::default().with(basegame::worldgen::generation::SHEEP_PER_SUPERCHUNK, ParameterValue::Integer(0));
     CleanServerParameters::default().with(CAMERA_FORCES_SUPERCHUNKS_HOT, ParameterValue::Nested(CleanServerParameters::default())).with(WORLDGEN, ParameterValue::Nested(no_sheep))
 }
 
-/// No arguments, built with the client: the window, and nothing else
-/// run once it closes; built headless, the flags' help. Otherwise, the
-/// command line read by the server's flags, and run by the server.
+/// No arguments: the window, and nothing else run once it closes.
+/// Otherwise, the command line read by the server's flags, and run by
+/// the server.
 fn main() -> ExitCode {
     let shell_words: Vec<String> = std::env::args().skip(1).collect();
 
-    #[cfg(feature = "client")]
     if shell_words.is_empty() {
         leave_the_console();
         client::run_window(basegame::default_types::register_types, first_world());
         return ExitCode::SUCCESS;
     }
 
-    // No arguments, built headless: nothing to run, the flags said instead.
-    let shell_words = if shell_words.is_empty() { vec!["--help".to_string()] } else { shell_words };
     let clean_parameters = match (ServerParameters { shell_words }).cleaned(server::params::server_flags()) {
         Ok(clean_parameters) => clean_parameters,
         Err(FlagError::HelpShown(help_text)) => {

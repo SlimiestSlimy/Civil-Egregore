@@ -72,7 +72,7 @@ fn refused(type_name: &str) -> impl FnOnce(RegistryRefusal) -> String {
 
 /// The base game's types registered in `type_registry` ([`register`]):
 /// what the program's initialization hands the server and the client
-/// (`protocol::world_types::RegisterTypes`), each world's registry made and
+/// (a mod's register function), each world's registry made and
 /// frozen with it.
 pub fn register_types(type_registry: &mut TypeRegistry) -> Result<(), String> {
     register(type_registry).map(drop)
