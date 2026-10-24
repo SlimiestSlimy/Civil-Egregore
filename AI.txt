@@ -521,7 +521,14 @@ NOW
   bevy is our only external dependency so we need to fix it a little
   anyways" -- at the freeze, Bevy pinned to its exact version.
   "freezing the public api will be our 0.7 moment for civil egregore"
-  -- the freeze is version 0.7 (Cargo.toml says 0.6.0 now). 0.6 was
+  -- the freeze is version 0.7 (Cargo.toml says 0.6.0 now). What the freeze
+  means (the user, 2026-10-24): "the public api is stable for a given
+  distributed version of the game, between versions it csn change, this
+  is a game, not an operating system" -- stable within a released
+  version, free to change between them; 0.7 is the first version mods
+  are supported in, not a promise across versions. Then content ("once
+  we finish mod support and reach 0.7 we start working on content (and
+  performance as needed)"). 0.6 was
   "simulation engine works + basic client", "arbitrary" in number.
   DONE (2026-10-19, uncommitted): client_api::rendering (RenderCode,
   RenderTurn, DrawnCell; on_each_set_cell, on_each_drawn_cell,
