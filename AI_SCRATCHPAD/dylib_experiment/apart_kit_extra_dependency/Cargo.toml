@@ -1,0 +1,15 @@
+# A client mod built against the game's build alone (its libraries, and
+# Bevy's metadata and macros), with a dependency of its own that Bevy
+# shares, asking one feature more.
+[package]
+name = "kit_extra_dependency"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["dylib"]
+
+[workspace]
+
+[dependencies]
+bitflags = { version = "2", features = ["example_generated"] }

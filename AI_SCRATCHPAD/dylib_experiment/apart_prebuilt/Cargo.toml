@@ -1,0 +1,12 @@
+# A server and client bundle built apart against the game's own built
+# libraries: no engine source, no engine dependency -- only `--extern`
+# to the shipped libraries (.cargo/config.toml).
+[package]
+name = "apart_prebuilt"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["dylib"]
+
+[workspace]

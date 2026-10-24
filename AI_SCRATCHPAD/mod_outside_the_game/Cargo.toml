@@ -1,0 +1,21 @@
+# A client mod as the template would make it, by paths alone: the game
+# repository beside it, named by its path here and in .cargo/config.toml.
+[package]
+name = "kit_paths"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["dylib"]
+
+[workspace]
+
+[dependencies]
+bitflags = { version = "2", features = ["example_generated"] }
+# The engine's source, for the editor alone: never built.
+engine_client = { path = "../dylib_experiment/engine_client", optional = true }
+shapes_client = { path = "../dylib_experiment/mods/shapes/client", optional = true }
+
+[features]
+# Only rust-analyzer turns it on.
+editor = ["dep:engine_client", "dep:shapes_client"]
