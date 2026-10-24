@@ -20,17 +20,14 @@ pub const FORCED_HOT: &str = "forced_hot";
 /// Threads a world ticks on: none, every one the machine has.
 pub const THREADS: &str = "threads";
 /// A world's folder: a name in the worlds' folder, or a path. The world
-/// saved there is opened -- every parameter of a new one nothing to it
-/// -- or, none saved there, a new one is made and saved there.
+/// there is run -- every parameter of a new one nothing to it -- or,
+/// none there, a new one is created, set up and run there.
 pub const WORLD: &str = "world";
 /// Bytes of its cold superchunks' images an opened world keeps in
 /// memory: none given, the server's own.
 pub const COLD_POOL_BYTES: &str = "cold_pool_bytes";
 /// A new world's camera forces superchunks hot: the viewport's hot as well.
 pub const CAMERA_FORCES_SUPERCHUNKS_HOT: &str = "camera_forces_superchunks_hot";
-/// A new world's worldgen parameters, each by its name: its
-/// generation's own, handed it untouched.
-pub const WORLDGEN: &str = "worldgen";
 
 /// The command line as the shell gave it: words, nothing read yet.
 pub struct ServerParameters {

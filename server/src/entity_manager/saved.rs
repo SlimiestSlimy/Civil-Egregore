@@ -4,7 +4,7 @@
 use utilities::coordinates::CellIndex;
 use crate::entity_manager::attributes::{may_be_given, AttributeBlock, DefaultAttributes, BLOCK_WORDS};
 use crate::entity_manager::entity::{EntityType, Header};
-use crate::entity_manager::store::{WorldEntities, SuperchunkEntities};
+use crate::entity_manager::store::{EntityWritten, SuperchunkEntities};
 
 /// The first word: `TSstate` and the format's number, 5.
 const FIRST_WORD: u64 = u64::from_le_bytes(*b"TSstate\x05");
@@ -34,12 +34,17 @@ pub fn encode_state(random_stream_state: Option<u64>, superchunk_entities: Optio
     (words, count)
 }
 
-/// Reads the state file `words` of a world at tick `current_tick`: its entities
-/// queued to be put in `world_entities`, each whose wake has passed -- kept
-/// while its superchunk was cold -- waking at `current_tick`.
-pub fn decode_state(words: &[u64], current_tick: u64, world_entities: &mut WorldEntities) -> Result<SavedState, &'static str> {
-    let default_attributes = world_entities.default_attributes().clone();
-    read_state(words, &default_attributes, |header, attributes| world_entities.queue_add(Header { wake: header.wake.max(current_tick), ..header }, attributes))
+/// Reads the state file `words` into `superchunk_entities`, its
+/// superchunk's, warming to be hot at `first_hot_tick`, against the
+/// world's `default_attributes`: each entity made there, each whose wake
+/// passed while it was cold waking at `first_hot_tick`. Its random
+/// numbers' state, if it had one; or what is wrong with the file.
+pub fn decode_into(words: &[u64], first_hot_tick: u64, default_attributes: &DefaultAttributes, superchunk_entities: &mut SuperchunkEntities) -> Result<Option<u64>, &'static str> {
+    let saved_state = read_state(words, default_attributes, |header, attributes| {
+        let made = superchunk_entities.make_entity(first_hot_tick, Header { wake: header.wake.max(first_hot_tick), ..header }, attributes);
+        debug_assert_eq!(made, EntityWritten::Added, "a state keeps one entity a cell");
+    })?;
+    Ok(saved_state.random_stream_state)
 }
 
 /// Reads the state file `words`, each entity handed to `each_entity` with its

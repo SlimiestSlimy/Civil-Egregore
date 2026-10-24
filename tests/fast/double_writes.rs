@@ -20,9 +20,9 @@ use utilities::rng::RandomSource;
 /// A plain world of one superchunk on `thread_count` threads, of
 /// `grass_cover` and `sheep_per_flock`, and its probe: and the cell
 /// `(x, y)` cells from its top left, as a function.
-fn one_superchunk(grass_cover: u64, sheep_per_flock: usize, thread_count: usize) -> (World, Probe, impl Fn(u32, u32) -> CellIndex) {
+fn one_superchunk(test_name: &str, grass_cover: u64, sheep_per_flock: usize, thread_count: usize) -> (World, Probe, impl Fn(u32, u32) -> CellIndex) {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, probe) = probed_world(&plain_start(1, grass_cover, sheep_per_flock, thread_count).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let (mut world, probe) = probed_world(&plain_start(test_name, 1, grass_cover, sheep_per_flock, thread_count).with(SEED, ParameterValue::Hex(seed)), nothing_more);
     let superchunk: SuperchunkIndex = first_superchunk(&mut world, &probe);
     let top_left_cartesian = superchunk.top_left().cartesian();
     (world, probe, move |x, y| CellCartesian { x: top_left_cartesian.x + x, y: top_left_cartesian.y + y }.into())
@@ -34,7 +34,7 @@ fn one_superchunk(grass_cover: u64, sheep_per_flock: usize, thread_count: usize)
 #[test]
 fn no_two_sheep_eat_one_cell() {
     const CROWD_SIDE: u32 = 200;
-    let (mut world, probe, cell) = one_superchunk(0, 0, 2);
+    let (mut world, probe, cell) = one_superchunk("no_two_sheep_eat_one_cell", 0, 0, 2);
     let mut test_random = RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
     set_rectangle(&mut world, &probe, base().grass, cell(400, 400).cartesian(), CROWD_SIDE, CROWD_SIDE);
     let mut taken_offsets = HashSet::new();
@@ -70,7 +70,7 @@ fn no_two_sheep_eat_one_cell() {
 /// (`a_meal_lost_to_a_decay_leaves_the_sheep_hungry`).
 #[test]
 fn grass_spread_decayed_and_eaten_changes_once_a_cell() {
-    let (mut world, probe, _) = one_superchunk(basegame::worldgen::FRACTION_ONE / 2, 20_000, 2);
+    let (mut world, probe, _) = one_superchunk("grass_spread_decayed_and_eaten_changes_once_a_cell", basegame::worldgen::FRACTION_ONE / 2, 20_000, 2);
     let (grass_rule, sheep_rule, grass) = (rule_place(&world, GRASS_RULE), rule_place(&world, SHEEP_RULE), base().grass);
     // Each tick's grass as the tick found it, with both rules: what the tick before did to it.
     let (mut grass_words_before, mut report_before): (Option<crate::worlds::ChunkWords>, _) = (None, None);
@@ -94,7 +94,7 @@ fn grass_spread_decayed_and_eaten_changes_once_a_cell() {
 /// tree, and one put counted.
 #[test]
 fn a_tree_written_twice_is_one_tree() {
-    let (mut world, probe, cell) = one_superchunk(0, 0, 2);
+    let (mut world, probe, cell) = one_superchunk("a_tree_written_twice_is_one_tree", 0, 0, 2);
     // A tree every fourth cell each way, each old enough to spread and not crowded.
     let planted: Vec<CellIndex> = (0..256).flat_map(|y| (0..256).map(move |x| (4 * x, 4 * y))).map(|(x, y)| cell(x, y)).collect();
     probe.alone(&mut world, move |tick_state| {
@@ -163,7 +163,7 @@ fn mothers_among_blockers(world: &mut World, probe: &Probe, cell: &impl Fn(u32, 
 /// none -- and bears it once a cell beside her is free.
 #[test]
 fn a_lamb_refused_its_cell_is_born_later() {
-    let (mut world, probe, cell) = one_superchunk(0, 0, 1);
+    let (mut world, probe, cell) = one_superchunk("a_lamb_refused_its_cell_is_born_later", 0, 0, 1);
     let (x, y) = (500, 500);
     // Every cell beside either taken, but the one between them.
     let blocker_headers = mothers_among_blockers(&mut world, &probe, &cell, (x, y), &[(x, y), (x + 1, y), (x + 2, y)], 1);
@@ -195,7 +195,7 @@ fn a_lamb_refused_its_cell_is_born_later() {
 /// two having drawn one cell, the second a step's wait on.
 #[test]
 fn a_lamb_whose_cell_was_taken_is_born_the_tick_after() {
-    let (mut world, probe, cell) = one_superchunk(0, 0, 1);
+    let (mut world, probe, cell) = one_superchunk("a_lamb_whose_cell_was_taken_is_born_the_tick_after", 0, 0, 1);
     let (x, y) = (500, 500);
     // Every cell beside either taken, but two between them. Not hungry for long: neither walks onto the cell the other's lamb is to have.
     mothers_among_blockers(&mut world, &probe, &cell, (x, y), &[(x, y), (x + 1, y), (x + 1, y + 1), (x + 2, y)], 5000);

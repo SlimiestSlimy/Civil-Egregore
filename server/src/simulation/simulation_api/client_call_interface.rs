@@ -1,11 +1,13 @@
 //! A function a client may call across the connection, as its type's
 //! library holds it ([`CallCode`]), and what it is answered against
-//! ([`CallContext`]): the world running, between two ticks -- and the
-//! world's reset, which a call may set up and ask for. A call's
-//! arguments and its answer are words, which the function's own code
-//! makes and reads on both ends -- the client and the server have the
-//! same types, and so the same code.
+//! ([`CallContext`]): the world running, between two ticks -- its mod's
+//! folder of the world's mod config, to read and write as it will, and
+//! the world's reset, which a call may ask for. A call's arguments and
+//! its answer are words, which the function's own code makes and reads
+//! on both ends -- the client and the server have the same types, and
+//! so the same code.
 
+use std::path::Path;
 use std::sync::Arc;
 
 /// A function a client may call, as its code is: words in, words out
@@ -13,18 +15,16 @@ use std::sync::Arc;
 type CallFunction = dyn Fn(&mut CallContext, &[u64]) -> Result<Vec<u64>, String> + Send + Sync;
 
 /// What a function a client may call is answered against: the world
-/// running, as far as a call is let see it, between two ticks; and its
-/// reset -- the world made again from its start, of the same types and
-/// seed, with the worldgen parameters set for it.
+/// running, as far as a call is let see it, between two ticks; its mod's
+/// config; and its reset -- the world made again from its start in its
+/// folder, of the same types, seed and config.
 pub struct CallContext<'world> {
     /// The world's seed.
     pub(crate) seed: u64,
     /// The tick it is at.
     pub(crate) tick: u64,
-    /// Its worldgen parameters, each by name.
-    pub(crate) worldgen_parameters: &'world [(String, u64)],
-    /// The worldgen parameters it is reset with, each by name.
-    pub(crate) worldgen_parameters_for_reset: &'world mut Vec<(String, u64)>,
+    /// The call's mod's folder of the world's mod config.
+    pub(crate) mod_config_folder: &'world Path,
     /// Whether the call asked for the world to be reset.
     pub(crate) reset_asked: bool,
 }
@@ -40,32 +40,15 @@ impl CallContext<'_> {
         self.tick
     }
 
-    /// The world's worldgen parameters, each by name: those it was
-    /// generated with.
-    pub fn worldgen_parameters(&self) -> &[(String, u64)] {
-        self.worldgen_parameters
-    }
-
-    /// The worldgen parameters the world is reset with, each by name:
-    /// its own, until one is set ([`CallContext::set_worldgen_parameter_for_reset`]).
-    pub fn worldgen_parameters_for_reset(&self) -> &[(String, u64)] {
-        self.worldgen_parameters_for_reset
-    }
-
-    /// Sets the worldgen parameter `name` the world is reset with to
-    /// `value`: the world running is generated as it was, until it is
-    /// reset ([`CallContext::reset_world`]). A name the world's
-    /// generation does not read is dropped as it is reset.
-    pub fn set_worldgen_parameter_for_reset(&mut self, name: &str, value: u64) {
-        match self.worldgen_parameters_for_reset.iter_mut().find(|(parameter_name, _)| parameter_name == name) {
-            Some((_, kept_value)) => *kept_value = value,
-            None => self.worldgen_parameters_for_reset.push((name.to_string(), value)),
-        }
+    /// The call's mod's folder of the world's mod config: its files the
+    /// mod's own, read and written as it will -- the server reads none.
+    pub fn mod_config_folder(&self) -> &Path {
+        self.mod_config_folder
     }
 
     /// Resets the world once the call is answered: made again from its
-    /// start, of the same types and seed, with the worldgen parameters
-    /// set for its reset -- everything else of it gone.
+    /// start in its folder, of the same types and seed, generated as its
+    /// config then says -- everything else of it gone.
     pub fn reset_world(&mut self) {
         self.reset_asked = true;
     }

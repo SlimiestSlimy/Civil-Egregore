@@ -2,10 +2,12 @@
 //! every superchunk's ([`Entities`]), read in a tick by an
 //! [`EntityReader`] (`docs/entity_manager.md`, "The store").
 
+mod entity_being_made;
 mod entity_reader;
 mod named_in_a_tick;
 mod world_entities;
 
+pub use entity_being_made::{EntityBeingMade, FirstWake};
 pub use entity_reader::EntityReader;
 pub use world_entities::WorldEntities;
 
@@ -201,10 +203,10 @@ impl SuperchunkEntities {
         self.chunks[stood_cell.chunk().place()].remove(stood_cell)
     }
 
-    /// Whether an entity stands on `stood_cell`.
+    /// Whether an entity stands on `stood_cell`: none on a cell of another
+    /// superchunk.
     pub fn occupied(&self, stood_cell: CellIndex) -> bool {
-        debug_assert_eq!(stood_cell.superchunk(), self.superchunk_index);
-        self.chunks[stood_cell.chunk().place()].occupied(place(stood_cell))
+        stood_cell.superchunk() == self.superchunk_index && self.chunks[stood_cell.chunk().place()].occupied(place(stood_cell))
     }
 
     /// Passes `tick`, just run, on the wheel.

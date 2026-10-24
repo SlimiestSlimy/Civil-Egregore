@@ -35,7 +35,7 @@ impl BitmapArena {
     /// waiting there -- held until storage tells they were flushed
     /// ([`BitmapArena::flushed_from_ring`]) -- and one write-back fewer on its way.
     pub fn written_back(&mut self, superchunk: SuperchunkIndex, bucket_keys: impl Iterator<Item = BucketKey>) {
-        let directory_entry = self.entry_mut(superchunk).expect("a superchunk written back is hot or lingering");
+        let directory_entry = self.entry_mut(superchunk).expect("a superchunk written back is hot or cooled");
         for bucket_key in bucket_keys {
             let layer = directory_entry.layers.iter().position(|layer| layer.layer_type == bucket_key.layer_type).expect("a layer written back is in use");
             set_membership(&mut directory_entry.layers[layer].chunk_flags.in_ring, bucket_key.chunk.place(), true);
@@ -65,11 +65,11 @@ impl BitmapArena {
         dirty.len()
     }
 
-    /// `superchunk`, hot or lingering, to change.
+    /// `superchunk`, hot or cooled, to change.
     fn entry_mut(&mut self, superchunk: SuperchunkIndex) -> Option<&mut Superchunk> {
         match self.lookup.superchunk(&self.directory, superchunk) {
             Ok(entry_index) => Some(&mut self.directory[entry_index]),
-            Err(_) => self.lingering_at(superchunk).ok().map(|lingering_index| &mut self.lingering[lingering_index].superchunk),
+            Err(_) => self.cooled_at(superchunk).ok().map(|cooled_index| &mut self.cooled[cooled_index].superchunk),
         }
     }
 
@@ -94,9 +94,9 @@ impl BitmapArena {
 
     /// Releases every allocation with no bucket hot or waiting in the
     /// ring, its buckets with it, every superchunk left with none, and
-    /// every lingering superchunk done with.
+    /// every cooled superchunk done with.
     pub(crate) fn release_unused(&mut self) {
-        self.lingering.retain(|lingering| !lingering.can_be_let_go());
+        self.cooled.retain(|cooled| !cooled.can_be_let_go());
         for directory_entry in &mut self.directory {
             directory_entry.layers.retain(|allocation| allocation.chunk_flags.hot | allocation.chunk_flags.in_ring != 0);
         }

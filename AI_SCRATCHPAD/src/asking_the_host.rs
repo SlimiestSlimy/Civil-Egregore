@@ -12,7 +12,7 @@ use server::host::Host;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration;
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, SEED, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, SEED, WORLD};
 use utilities::wire::{receive, send};
 use crate::ProbeParameters;
 
@@ -28,13 +28,23 @@ pub fn counted() -> [LayerType; 2] {
     [base_types().1.grass, base_types().1.tree]
 }
 
-/// A new world's parameters, as a command line gives them: of `seed` if
-/// given, else one drawn; no end, its camera forcing superchunks hot; generated as the
-/// base game is by default but for `sheep_a_superchunk`.
+/// The folder of a probe's world named `world_name`, in the scratchpad's
+/// transient data, emptied, and basegame's config in it written as
+/// `world_generation` says: where the world is made.
+pub fn scratch_world(world_name: &str, world_generation: basegame::worldgen::WorldGeneration) -> std::path::PathBuf {
+    let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("transient_data").join(world_name);
+    _ = std::fs::remove_dir_all(&folder);
+    world_generation.write_config(&folder.join(server::MOD_CONFIG).join(basegame::default_types::BUNDLE)).expect("the probe's world's config written");
+    folder
+}
+
+/// A new world's parameters, as a command line gives them: in a folder
+/// of its own ([`scratch_world`]), of `seed` if given, else one drawn; no
+/// end, its camera forcing superchunks hot; generated as the base game is
+/// by default but for `sheep_a_superchunk`.
 pub fn camera_world(seed: Option<u64>, sheep_a_superchunk: u64) -> CleanServerParameters {
-    let worldgen_parameters = basegame::worldgen::WorldGeneration { sheep_per_superchunk: sheep_a_superchunk, ..basegame::worldgen::WorldGeneration::DEFAULT }.worldgen_parameters();
-    let worldgen = worldgen_parameters.into_iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name, ParameterValue::Hex(value)));
-    let parameters = CleanServerParameters::default().with(WORLDGEN, ParameterValue::Nested(worldgen)).with(CAMERA_FORCES_SUPERCHUNKS_HOT, ParameterValue::Nested(CleanServerParameters::default()));
+    let folder = scratch_world("camera world", basegame::worldgen::WorldGeneration { sheep_per_superchunk: sheep_a_superchunk, ..basegame::worldgen::WorldGeneration::DEFAULT });
+    let parameters = CleanServerParameters::default().with(WORLD, ParameterValue::Text(folder.display().to_string())).with(CAMERA_FORCES_SUPERCHUNKS_HOT, ParameterValue::Nested(CleanServerParameters::default()));
     match seed {
         Some(given_seed) => parameters.with(SEED, ParameterValue::Hex(given_seed)),
         None => parameters,
@@ -104,7 +114,7 @@ impl ProbedServer {
         match (self, message) {
             (Self::InProcess(host), ClientMessage::AskFrame(frame_ask)) => host.ask_frame(frame_ask),
             (Self::InProcess(host), ClientMessage::SetPace(pace)) => host.set_pace(pace),
-            (Self::InProcess(host), ClientMessage::MakeWorld(parameters)) => host.make_world(parameters, base_types().0.clone()),
+            (Self::InProcess(host), ClientMessage::MakeWorld(parameters)) => host.make_world(parameters),
             (Self::InProcess(_), _) => false,
             (Self::OverPipe(_, to_server), mut message) => send(&mut message, to_server).is_ok(),
         }

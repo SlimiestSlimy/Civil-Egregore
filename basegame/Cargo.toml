@@ -14,17 +14,13 @@ description = "Civil Egregore's base game: its types, the libraries they expose,
 bevy = { version = "0.19", default-features = false, features = ["2d", "ui", "bevy_feathers"] }
 
 [dependencies]
-# The game as a mod reaches it: the type registry, the simulation's API,
-# the client's API, and Bevy.
+# The game as a mod reaches it: the shared libraries (utilities, and
+# protocol over it), the simulation's API, the client's API, and Bevy.
+utilities = { path = "../utilities" }
 protocol = { path = "../protocol" }
 server = { path = "../server" }
 client = { path = "../client" }
 bevy = { workspace = true }
-
-# The tests' seed (`utilities/test_seed.rs`) reads and writes through
-# utilities; the crate itself reaches it only through the server's API.
-[dev-dependencies]
-utilities = { path = "../utilities" }
 
 [profile.release]
 debug = "line-tables-only"

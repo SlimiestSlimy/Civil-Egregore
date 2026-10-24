@@ -1,7 +1,8 @@
-//! A world saved in a folder and opened from it ([`save`],
-//! [`crate::start_world`] given the folder): every superchunk, hot and cold, and the types it
-//! was made with: loaded with it, the world's own, each the type of its
-//! name the code registers.
+//! A world saved in a folder and loaded as it runs again from it
+//! ([`save`], [`load_saved`]): every superchunk, hot and cold, the types
+//! it was made with -- loaded with it, the world's own, each the type of
+//! its name the code registers -- and its mods and their config, carried
+//! along to a folder it is saved into anew.
 
 use crate::World;
 use crate::chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
@@ -41,14 +42,21 @@ pub fn write_types(folder: &Path, frozen_type_registry: &FrozenTypeRegistry) -> 
     Ok(types_text.len() as u64)
 }
 
-/// Saves `world` in `folder`, made if not there -- between two ticks.
-/// An image paged to disk is copied there file to file, never read
-/// into memory.
+/// Saves `world` in `folder`, made if not there -- between two ticks --
+/// its folder from then on: one other than its own given its mods and
+/// their config, copied. An image paged to disk is copied there file to
+/// file, never read into memory.
 /// Every dirty bitmap is written back and the ring flushed first, so
 /// the cold pool's images are the world's cells; each superchunk's
 /// state is its live one if hot, as kept if cold; and which superchunks
 /// are hot, which of them cooling, and which warming, in the hot file.
 pub fn save(folder: &Path, world: &mut World) -> Result<SaveWritten, DiskError> {
+    if folder != world.folder {
+        for carried_folder in &crate::WORLD_FOLDERS[1..] {
+            copy_folder(&world.folder.join(carried_folder), &folder.join(carried_folder))?;
+        }
+        world.folder = folder.to_path_buf();
+    }
     world.simulation_handle.ready_for_save();
     let simulation_handle = &world.simulation_handle;
     let mut save_written = SaveWritten::default();
@@ -69,9 +77,27 @@ pub fn save(folder: &Path, world: &mut World) -> Result<SaveWritten, DiskError> 
     save_written.bytes_written += disk::write_hot(folder, &HotSuperchunks { hot: simulation_handle.bitmap_arena().superchunk_indices(), cooling: simulation_handle.cooling().collect(), warming: simulation_handle.warming().collect() })?;
     save_written.bytes_written += write_types(folder, &world.frozen_type_registry)?;
     // The world's file last: a save cut short leaves the one before it.
-    let world_info = WorldInfo { tick: simulation_handle.entity_store().current_tick(), unpopulated: simulation_handle.unpopulated().to_vec(), ..world.world_info.clone() };
+    let world_info = WorldInfo { tick: simulation_handle.entity_store().current_tick(), ..world.world_info.clone() };
     save_written.bytes_written += disk::write_world(folder, &world_info)?;
     Ok(save_written)
+}
+
+/// `from_folder`'s files and folders, and theirs, copied into `to_folder`,
+/// made if not there: none if there is no `from_folder`.
+fn copy_folder(from_folder: &Path, to_folder: &Path) -> Result<(), DiskError> {
+    std::fs::create_dir_all(to_folder).map_err(|io_error| DiskError::IoFailed(to_folder.to_path_buf(), io_error))?;
+    let Ok(entries) = std::fs::read_dir(from_folder) else {
+        return Ok(());
+    };
+    for entry in entries.flatten() {
+        let (from_path, to_path) = (entry.path(), to_folder.join(entry.file_name()));
+        if from_path.is_dir() {
+            copy_folder(&from_path, &to_path)?;
+        } else {
+            std::fs::copy(&from_path, &to_path).map_err(|io_error| DiskError::IoFailed(from_path, io_error))?;
+        }
+    }
+    Ok(())
 }
 
 /// The worlds saved in `folder`, by their folders' names, sorted:
@@ -86,29 +112,19 @@ pub fn worlds_in(folder: &Path) -> Vec<String> {
     worlds
 }
 
-/// Opens the world saved in `folder` ([`crate::start_world`] given its
-/// folder): every superchunk's image into the cold pool and its state
-/// kept as a cold one's; then the superchunks hot when it was saved
-/// made hot, before it ticks, those cooling cooling again and those
-/// warming warming again, each to turn when it was to -- as it was when
-/// saved, to the cell and the random number. Its types are
-/// `frozen_type_registry`, frozen first as its types file says ([`read_types`])
-/// -- refused if they say otherwise; on `thread_count` threads, every one the machine has if none is
-/// given. It keeps `bytes_kept` bytes of its cold superchunks' images
-/// in memory: every image is read and checked, and those past that
-/// many bytes are left in `folder`, read again when wanted -- so the
-/// save is not to be removed while the world runs.
-pub(crate) fn open_world(folder: &Path, bytes_kept: u64, thread_count: Option<usize>, frozen_type_registry: &Arc<FrozenTypeRegistry>) -> Result<World, DiskError> {
-    // Its types first: those it was made with, each of the ID it was saved with.
-    let types_path = folder.join(TYPES_FILE);
-    let types_text = std::fs::read_to_string(&types_path).map_err(|io_error| DiskError::IoFailed(types_path.clone(), io_error))?;
-    frozen_type_registry.agree_with_saved(&types_text).map_err(|what_is_wrong| DiskError::InvalidFile(types_path, what_is_wrong))?;
-    let frozen_type_registry = Arc::clone(frozen_type_registry);
-    let world_info = WorldInfo { layers: frozen_type_registry.layer_types(), ..disk::read_world(folder)? };
+/// Loads into `world`, run from `folder` and empty yet, the world saved
+/// there ([`crate::run_world`], of a world that has run): every
+/// superchunk's image into the cold pool and its state kept as a cold
+/// one's; then the superchunks hot when it was saved made hot, before it
+/// ticks, those cooling cooling again and those warming warming again,
+/// each to turn when it was to -- as it was when saved, to the cell and
+/// the random number. Every image is read and checked, and those past
+/// the bytes the world keeps in memory are left in `folder`, read again
+/// when wanted -- so the folder is not to be removed while the world
+/// runs. Or what is wrong with a file of it.
+pub(crate) fn load_saved(folder: &Path, world: &mut World) -> Result<(), DiskError> {
     let hot = disk::read_hot(folder)?;
-    let mut world = World::empty_world(world_info, thread_count, frozen_type_registry).map_err(|why_not| DiskError::InvalidFile(folder.join(TYPES_FILE), why_not))?;
     let simulation_handle = &mut world.simulation_handle;
-    simulation_handle.keep_cold_pool_within(bytes_kept);
     let (mut entities_kept, saved_in) = (0, Arc::<Path>::from(folder));
     let default_attributes = simulation_handle.entity_store().default_attributes().clone();
     for superchunk in disk::saved_superchunks(folder)? {
@@ -129,5 +145,5 @@ pub(crate) fn open_world(folder: &Path, bytes_kept: u64, thread_count: Option<us
     if entities_held != entities_kept {
         return Err(DiskError::InvalidFile(folder.to_path_buf(), format!("{entities_held} of {entities_kept} entities put back: some on a cell taken")));
     }
-    Ok(world)
+    Ok(())
 }

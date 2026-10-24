@@ -14,7 +14,7 @@
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 use protocol::flags::FlagError;
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, ServerParameters, CAMERA_FORCES_SUPERCHUNKS_HOT, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, ServerParameters, CAMERA_FORCES_SUPERCHUNKS_HOT, WORLD};
 use std::process::ExitCode;
 
 #[cfg(windows)]
@@ -32,11 +32,23 @@ fn leave_the_console() {
     FreeConsole();
 }
 
-/// The world the window opens with, until it has its menus: of no size,
-/// no sheep in it, the superchunks the window shows kept hot.
+/// The folder of the world the window opens with, in the worlds' folder.
+const FIRST_WORLD: &str = "window test world";
+
+/// The world the window opens with, until it has its menus: in its own
+/// folder, of no size, the superchunks the window shows kept hot -- and
+/// no sheep in it, basegame's config written so before the window asks
+/// for it to be made, a world not there yet. Until a new world's config
+/// is the client's to give, the program writes it.
 fn first_world() -> CleanServerParameters {
-    let no_sheep = CleanServerParameters::default().with(basegame::worldgen::generation::SHEEP_PER_SUPERCHUNK, ParameterValue::Integer(0));
-    CleanServerParameters::default().with(CAMERA_FORCES_SUPERCHUNKS_HOT, ParameterValue::Nested(CleanServerParameters::default())).with(WORLDGEN, ParameterValue::Nested(no_sheep))
+    let config_folder = utilities::settings::world(FIRST_WORLD).join(server::MOD_CONFIG).join(basegame::default_types::BUNDLE);
+    if !config_folder.exists() {
+        let no_sheep = basegame::worldgen::WorldGeneration { sheep_per_superchunk: 0, ..basegame::worldgen::WorldGeneration::DEFAULT };
+        if let Err(why_not) = no_sheep.write_config(&config_folder) {
+            eprintln!("the window's world keeps its sheep: {why_not}");
+        }
+    }
+    CleanServerParameters::default().with(WORLD, ParameterValue::Text(FIRST_WORLD.to_string())).with(CAMERA_FORCES_SUPERCHUNKS_HOT, ParameterValue::Nested(CleanServerParameters::default()))
 }
 
 /// No arguments: the window, and nothing else run once it closes.

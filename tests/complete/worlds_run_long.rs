@@ -11,13 +11,13 @@ use server::world_hash;
 fn a_world_stopped_often_comes_to_the_same() {
     const LAST_TICK: u64 = 30_000;
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let (mut straight_world, _) = one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000, nothing_more);
+    let (mut straight_world, _) = one_flock_world("a_world_stopped_often_comes_to_the_same_straight", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000, nothing_more);
     // The flock put in the first tick.
     for _ in 1..LAST_TICK {
         straight_world.tick();
     }
     let folder = folder("complete");
-    let (mut stopped_world, _) = one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000, nothing_more);
+    let (mut stopped_world, _) = one_flock_world("a_world_stopped_often_comes_to_the_same_stopped", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000, nothing_more);
     let mut tick = 1;
     for stop_tick in (5_000..=LAST_TICK).step_by(5_000) {
         while tick < stop_tick {
@@ -41,7 +41,7 @@ fn a_world_stopped_often_comes_to_the_same() {
 #[ignore]
 fn a_flock_on_generated_ground_lasts() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let (mut made_world, probe) = one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000, nothing_more);
+    let (mut made_world, probe) = one_flock_world("a_flock_on_generated_ground_lasts", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000, nothing_more);
     for _ in 0..300_000 {
         made_world.tick();
     }

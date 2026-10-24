@@ -32,7 +32,7 @@ impl Halos {
     /// Takes the changes of the superchunk at the ring's tail out of it,
     /// to rewrite its image by a job -- its flush before, if
     /// still on its way, put in the cold pool first, so each rewrites the
-    /// image the one before made. Its buckets, hot or lingering, hold its
+    /// image the one before made. Its buckets, hot or cooled, hold its
     /// newest cells until the image is in ([`Halos::land_flushes`]).
     fn flush_tail(&mut self, lent_world: &mut LentWorld<'_>) {
         let superchunk = lent_world.chunk_storage.tail_superchunk().expect("a full ring has a tail");
@@ -95,7 +95,7 @@ impl Halos {
 
     /// Pages the cold pool's images out while more of them are in
     /// memory than it keeps (`ChunkStorage::page_out`): how many went.
-    /// None of a superchunk hot -- cooling too -- warming or lingering
+    /// None of a superchunk hot -- cooling too -- warming or cooled
     /// goes, so a hot superchunk's image is always in memory. If that
     /// is not enough, the ring is flushed first -- a cold superchunk
     /// whose changes wait there is held by them -- and the rest paged.
@@ -112,9 +112,9 @@ impl Halos {
     }
 
     /// Pages out the images of the superchunks neither hot, warming
-    /// nor lingering, until the pool keeps no more than it may.
+    /// nor cooled, until the pool keeps no more than it may.
     fn page_out_unheld(&self, lent_world: &mut LentWorld<'_>) -> Result<usize, DiskError> {
         let (hot, bitmap_arena, warming) = (lent_world.bitmap_arena.superchunk_indices(), &*lent_world.bitmap_arena, &self.warming);
-        lent_world.chunk_storage.page_out(|superchunk| hot.binary_search(&superchunk).is_ok() || bitmap_arena.is_lingering(superchunk) || warming.binary_search_by_key(&superchunk, |warming| warming.superchunk).is_ok())
+        lent_world.chunk_storage.page_out(|superchunk| hot.binary_search(&superchunk).is_ok() || bitmap_arena.is_cooled(superchunk) || warming.binary_search_by_key(&superchunk, |warming| warming.superchunk).is_ok())
     }
 }

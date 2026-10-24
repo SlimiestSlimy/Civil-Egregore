@@ -1,6 +1,6 @@
 //! The host: a world run on a thread of its own, asked for frames.
 
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SEED, SIDE, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SEED, SIDE};
 use crate::worlds::game_base;
 use protocol::pipe::frame::{FrameAsk, ViewportFrame};
 use server::host::{Host, HostSent};
@@ -45,7 +45,8 @@ fn a_frame_brings_a_plane_of_tiles_a_tile_at_a_time() {
     use utilities::coordinates::{place_from_cartesian, CellCartesian, SUPERCHUNK_SIDE_CELLS};
     let folder = crate::worlds::folder("tiles_in_frames");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
-    let (mut world, probe) = crate::worlds::probed_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(0))), crate::worlds::test_tiles_registered);
+    let parameters = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given());
+    let (mut world, probe) = crate::worlds::probed_world(&crate::worlds::in_folder(parameters, "a_frame_brings_a_plane_of_tiles_a_tile_at_a_time", crate::worlds::flocked(0)), crate::worlds::test_tiles_registered);
     let test_tiles = crate::worlds::test_tiles(&world);
     let tile_shift = test_tiles.layer_type().tile_shift();
     // Numbers on one of the four superchunks alone.
@@ -103,7 +104,8 @@ fn a_call_is_answered_by_the_world_running_and_only_a_client_call_is() {
     let test_call = crate::worlds::test_type_named(&frozen_type_registry, crate::worlds::TEST_CALL).expect("registered").type_id();
     let (host, _host_sent) = Host::start_on_thread(crate::worlds::types_with_test_call);
     assert_eq!(host.call(test_call, vec![1]), Err("no world runs".to_string()));
-    assert!(host.set_paused(true) && host.make_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), std::sync::Arc::clone(&frozen_type_registry)));
+    let parameters = crate::worlds::in_folder(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), "a_call_is_answered_by_the_world_running_and_only_a_client_call_is", WorldGeneration::DEFAULT);
+    assert!(host.set_paused(true) && host.make_world(parameters));
     let arguments = vec![seed ^ 7, 3, 5];
     assert_eq!(host.call(test_call, arguments.clone()), Ok([seed, 0].into_iter().chain(arguments).collect::<Vec<_>>()), "the seed, tick 0 -- paused -- and the words");
     let refused = |call: u64| host.call(call, Vec::new()).expect_err("refused");
@@ -113,27 +115,30 @@ fn a_call_is_answered_by_the_world_running_and_only_a_client_call_is() {
 }
 
 /// The world generation's calls: a worldgen parameter read and set for
-/// the world's reset by its place, the world running generated as it
-/// was until a call resets it -- made again then, another world of the
-/// same seed, with the parameter set; a place past the parameters, or
-/// words too few, refused.
+/// the world's reset by its place -- in the config file of its reset,
+/// the world's own as it was -- the world running generated as it was
+/// until a call resets it: made again then in its folder, another world
+/// of the same seed, with the parameter set; a place past the
+/// parameters, or words too few, refused.
 #[test]
 fn a_worldgen_parameter_set_by_a_call_holds_once_a_call_resets_the_world() {
     use basegame::worldgen::calls::{RESET_WORLD_CALL, SET_WORLDGEN_PARAMETER_CALL, WORLDGEN_PARAMETER_CALL};
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let (host, frame_receiver) = Host::start_on_thread(basegame::default_types::register_types);
-    assert!(host.set_paused(true) && host.make_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(3))), crate::worlds::types()));
+    let parameters = crate::worlds::in_folder(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), "a_worldgen_parameter_set_by_a_call_holds_once_a_call_resets_the_world", crate::worlds::flocked(3));
+    let config_folder = crate::worlds::folder_of(&parameters).join(server::MOD_CONFIG).join(basegame::default_types::BUNDLE);
+    assert!(host.set_paused(true) && host.make_world(parameters));
     let (read, set, reset) = (crate::worlds::type_id_named(WORLDGEN_PARAMETER_CALL), crate::worlds::type_id_named(SET_WORLDGEN_PARAMETER_CALL), crate::worlds::type_id_named(RESET_WORLD_CALL));
     let sheep_place = WorldGeneration::DEFAULT.worldgen_parameters().iter().position(|(name, _)| name == "sheep per superchunk").expect("a parameter") as u64;
-    let sheep_of = |worldgen_parameters: &[(String, u64)]| worldgen_parameters.iter().find(|(name, _)| name == "sheep per superchunk").expect("a parameter").1;
+    let world_sheep = || WorldGeneration::DEFAULT.read_config(&config_folder).expect("the world's config").sheep_per_superchunk;
     assert_eq!(host.call(read, vec![sheep_place]), Ok(vec![3]), "the world's own, before any is set");
     assert_eq!(host.call(set, vec![sheep_place, 5]), Ok(Vec::new()));
     assert_eq!(host.call(read, vec![sheep_place]), Ok(vec![5]), "set for the reset");
     let made_frame = frame_that(&host, &frame_receiver, |_| true);
-    assert_eq!(sheep_of(&made_frame.worldgen_parameters), 3, "the world running generated as it was");
+    assert_eq!(world_sheep(), 3, "the world running generated as it was");
     assert!(host.call(read, vec![1 << 40]).expect_err("refused").contains("no worldgen parameter at"));
     assert!(host.call(set, vec![sheep_place]).is_err(), "a value is wanted");
     assert_eq!(host.call(reset, Vec::new()), Ok(Vec::new()));
     let reset_frame = frame_that(&host, &frame_receiver, |answered_frame| answered_frame.world > made_frame.world);
-    assert_eq!((reset_frame.seed, sheep_of(&reset_frame.worldgen_parameters)), (seed, 5), "the same seed, the parameter set");
+    assert_eq!((reset_frame.seed, world_sheep()), (seed, 5), "the same seed, the parameter set");
 }

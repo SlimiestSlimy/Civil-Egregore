@@ -8,8 +8,8 @@
 use crate::chunk_storage::SuperchunkImage;
 use crate::entity_manager::{AttributeBlock, Header, InstructionsApplied};
 use crate::test_game::TestGame;
-use crate::{DiskError, World, WorldNotStarted};
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, WORLD};
+use crate::{DiskError, World, WorldNotMade};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use utilities::coordinates::SuperchunkIndex;
@@ -28,20 +28,14 @@ pub fn given() -> ParameterValue {
     ParameterValue::Nested(CleanServerParameters::default())
 }
 
-/// The parameters of the world saved in `folder` ([`WORLD`]).
-pub fn world_at(folder: &Path) -> CleanServerParameters {
-    CleanServerParameters::default().with(WORLD, ParameterValue::Text(folder.display().to_string()))
-}
-
-/// The world of the test game saved in `folder`, started again -- its
-/// types frozen first as its types file says -- or what of the save is
-/// not read.
+/// The world of the test game saved in `folder`, run again -- its types
+/// frozen first as its types file says -- or what of the save is not
+/// read.
 pub fn opened(folder: &Path) -> Result<World, DiskError> {
     let frozen_type_registry = Arc::new(crate::read_types(folder, TestGame::register_types)?);
-    crate::start_world(&world_at(folder), &frozen_type_registry).map_err(|why_not| match why_not {
-        WorldNotStarted::Unreadable(disk_error) => disk_error,
-        WorldNotStarted::Refused(why_refused) => panic!("refused: {why_refused}"),
-        WorldNotStarted::Unsaved(disk_error) => panic!("an opened world saved: {disk_error}"),
+    crate::run_world(folder, &frozen_type_registry, &CleanServerParameters::default()).map_err(|why_not| match why_not {
+        WorldNotMade::Disk(disk_error) => disk_error,
+        WorldNotMade::Refused(why_refused) => panic!("refused: {why_refused}"),
     })
 }
 

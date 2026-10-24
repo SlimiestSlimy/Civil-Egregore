@@ -1,28 +1,28 @@
-//! The arena: the directory of hot superchunks, the lingering ones, and
+//! The arena: the directory of hot superchunks, the cooled ones, and
 //! what is read off them.
 
-use super::{COUNT_TILES_IN_CHUNK, NotHot, contains, members};
-use super::superchunk_layer::{ChunkFlags, SuperchunkLayer};
+use super::{NotHot, contains, members};
+use super::superchunk_layer::SuperchunkLayer;
 use super::reader::{LayerAt, Lookup};
 use super::superchunk::{Bucket, Superchunk};
 use super::writes::WriteQueues;
 use crate::chunk_storage::{BucketKey, LayerType};
 use crate::bitplane_manager::{WidePlane, Width};
-use utilities::coordinates::{CHUNKS_IN_SUPERCHUNK, CellIndex, ChunkIndex, SuperchunkIndex};
+use utilities::coordinates::{CellIndex, ChunkIndex, SuperchunkIndex};
 
 /// A superchunk gone cold as a whole ([`BitmapArena::make_cold_superchunk`]):
 /// its allocations kept as they were -- hot buckets and all, counted --
 /// until chunk storage holds its changes, or for as long as it is
 /// wanted hot again, when it is made hot as it is, nothing decoded
 /// ([`BitmapArena::make_hot_again`]).
-pub(crate) struct Lingering {
+pub(crate) struct Cooled {
     /// The superchunk, as it was when it went cold.
     pub(crate) superchunk: Superchunk,
     /// Whether it is wanted hot again: kept until it is.
     pub(crate) wanted_hot_again: bool,
 }
 
-impl Lingering {
+impl Cooled {
     /// Whether it can be let go: unwanted, and every change of it in
     /// chunk storage's cold pool -- none on its way, none in the ring.
     pub(crate) fn can_be_let_go(&self) -> bool {
@@ -37,7 +37,7 @@ pub struct BitmapArena {
     pub(crate) directory: Vec<Superchunk>,
     /// The superchunks gone cold whose allocations are kept, sorted by
     /// superchunk index.
-    pub(crate) lingering: Vec<Lingering>,
+    pub(crate) cooled: Vec<Cooled>,
     /// The arena's own lookups, remembering the last.
     pub(crate) lookup: Lookup,
     /// Writes queued from outside a tick, not yet applied.
@@ -55,7 +55,7 @@ impl Default for BitmapArena {
 impl BitmapArena {
     /// An arena with no bitmap hot.
     pub fn new() -> Self {
-        Self { directory: Vec::new(), lingering: Vec::new(), lookup: Lookup::default(), queued_writes: WriteQueues::default() }
+        Self { directory: Vec::new(), cooled: Vec::new(), lookup: Lookup::default(), queued_writes: WriteQueues::default() }
     }
 
     /// Every allocation in use, superchunk by superchunk in Morton order,
@@ -120,8 +120,7 @@ impl BitmapArena {
         });
         let layers = &mut self.directory[entry_index].layers;
         let layer = layers.binary_search_by_key(&layer_type, |layer| layer.layer_type).expect_err("not in use");
-        let new_allocation = SuperchunkLayer { layer_type, buckets: Vec::new(), chunks_with_bucket: 0, chunk_flags: ChunkFlags::default(), counts_less_one: [0; CHUNKS_IN_SUPERCHUNK], hot_count: 0, tile_counts: [[0; COUNT_TILES_IN_CHUNK]; CHUNKS_IN_SUPERCHUNK] };
-        layers.insert(layer, new_allocation);
+        layers.insert(layer, SuperchunkLayer::empty(layer_type, 0));
         (entry_index, layer)
     }
 }

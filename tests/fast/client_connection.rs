@@ -12,7 +12,7 @@ use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, PoisonError};
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SEED, SIDE, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SEED, SIDE};
 use utilities::wire::{receive, send};
 
 /// Held while a test's server runs: one at a time on the one port.
@@ -49,7 +49,7 @@ fn a_world_made_by_a_client_is_answered_with_its_frames() {
     send(&mut ClientMessage::ListWorlds, &mut to_server).expect("sent");
     assert!(matches!(receive(&mut from_server).expect("read"), Some(ServerMessage::Worlds(_))), "the worlds listed");
     // The server's own parameters, as a command line gives them.
-    let parameters = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()).with(WORLDGEN, crate::worlds::worldgen(crate::worlds::flocked(3)));
+    let parameters = crate::worlds::in_folder(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given()), "a_world_made_by_a_client_is_answered_with_its_frames", crate::worlds::flocked(3));
     send(&mut ClientMessage::MakeWorld(parameters), &mut to_server).expect("sent");
     let mut frame_ask = whole_world_ask();
     let (mut frames_seen, mut types_seen) = (0, 0);
@@ -89,7 +89,8 @@ fn a_world_made_by_a_client_is_answered_with_its_frames() {
 fn a_server_tells_each_client_joining_its_world_the_world_s_types_first() {
     let _one_server = ONE_SERVER.lock().unwrap_or_else(PoisonError::into_inner);
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut server, address) = server_started(&["--seed", &format!("{seed:#x}"), "--side", "2"]);
+    let folder = crate::worlds::folder("a_server_tells_each_client_joining_its_world_the_world_s_types_first");
+    let (mut server, address) = server_started(&["--seed", &format!("{seed:#x}"), "--side", "2", "--world", &folder.display().to_string()]);
     let mut worlds_told = Vec::new();
     for client in 0..2 {
         let mut to_server = TcpStream::connect(&address).expect("connected");

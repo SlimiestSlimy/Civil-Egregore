@@ -1,7 +1,7 @@
 //! The cold pool paged to disk: a world keeping none of its cold
 //! superchunks' images in memory is the world keeping them all.
 
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, COLD_POOL_BYTES, SEED, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, COLD_POOL_BYTES, SEED};
 use crate::whole_worlds::{world_contents, folder};
 use utilities::coordinates::{SuperchunkIndex, WORLD_SIDE_SUPERCHUNKS};
 use crate::{World, COOL_TICKS, WARM_TICKS};
@@ -49,8 +49,8 @@ fn the_same(paged: &mut World, kept_world: &mut World) -> bool {
 #[test]
 fn a_world_paged_to_disk_is_the_world_kept_in_memory() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let world_start = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(WORLDGEN, crate::test_game::walkers(0)).with(CAMERA_FORCES_SUPERCHUNKS_HOT, crate::whole_worlds::given());
-    let (mut paged, mut kept_world) = (crate::start_world(&world_start.clone(), &crate::test_game::TestGame::new_world_types().0).expect("the world started"), crate::start_world(&world_start, &crate::test_game::TestGame::new_world_types().0).expect("the world started"));
+    let world_start = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(CAMERA_FORCES_SUPERCHUNKS_HOT, crate::whole_worlds::given());
+    let (mut paged, mut kept_world) = (crate::test_game::made(&crate::test_game::in_folder(world_start.clone(), "a_world_paged_to_disk", 0)), crate::test_game::made(&crate::test_game::in_folder(world_start, "a_world_kept_in_memory", 0)));
     paged.keep_cold_pool_within(0);
     let (middle_coordinate, mut order_random) = (WORLD_SIDE_SUPERCHUNKS / 2, RandomSource::new(crate::test_seed::TestSeedHandle::open().seed()));
     // The three places in an order drawn.
@@ -67,7 +67,8 @@ fn a_world_paged_to_disk_is_the_world_kept_in_memory() {
 
     let (saved_in, copied_to) = (folder("paging_saved"), folder("paging_copied"));
     crate::save(&saved_in, &mut paged).expect("saved");
-    let mut loaded_world = crate::start_world(&crate::whole_worlds::world_at(&saved_in).with(COLD_POOL_BYTES, ParameterValue::Integer(0)), &std::sync::Arc::new(crate::read_types(&saved_in, crate::test_game::TestGame::register_types).expect("its types"))).expect("loaded");
+    let saved_types = std::sync::Arc::new(crate::read_types(&saved_in, crate::test_game::TestGame::register_types).expect("its types"));
+    let mut loaded_world = crate::run_world(&saved_in, &saved_types, &CleanServerParameters::default().with(COLD_POOL_BYTES, ParameterValue::Integer(0))).expect("loaded");
     assert!(loaded_world.chunk_storage().on_disk() > 0, "images left in the save");
     kept_world.keep_viewport(None);
     assert!(the_same(&mut loaded_world, &mut kept_world), "loaded as the world that kept its images");

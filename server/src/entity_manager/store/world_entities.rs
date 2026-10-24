@@ -44,6 +44,12 @@ impl WorldEntities {
         &self.default_attributes
     }
 
+    /// The default attributes of the types the world runs with, shared:
+    /// each superchunk's entities hold them too.
+    pub(crate) fn shared_default_attributes(&self) -> &Arc<DefaultAttributes> {
+        &self.default_attributes
+    }
+
     /// The tick about to run.
     pub fn current_tick(&self) -> u64 {
         self.current_tick
@@ -67,6 +73,15 @@ impl WorldEntities {
     /// `superchunk`'s entities, if kept here.
     pub fn superchunk(&self, superchunk: SuperchunkIndex) -> Option<&SuperchunkEntities> {
         EntityReader::new(&self.superchunks).superchunk(superchunk)
+    }
+
+    /// Takes `superchunk_entities` as its superchunk's, kept
+    /// ([`WorldEntities::keep_superchunks`]) and holding none yet: a
+    /// superchunk's entities made apart, off the tick, as it turned hot.
+    pub fn adopt_superchunk(&mut self, superchunk_entities: SuperchunkEntities) {
+        let kept_index = self.superchunks.binary_search_by_key(&superchunk_entities.superchunk_index(), SuperchunkEntities::superchunk_index).expect("a superchunk adopted is kept");
+        debug_assert!(self.superchunks[kept_index].is_empty(), "a superchunk adopted held none yet");
+        self.superchunks[kept_index] = superchunk_entities;
     }
 
     /// The entity standing on `stood_cell`, if one does.

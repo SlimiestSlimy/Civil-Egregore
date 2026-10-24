@@ -6,10 +6,14 @@
 mod warming;
 mod write_back;
 
+pub use warming::generating_superchunk::GeneratingSuperchunk;
+pub(crate) use warming::warm_job::GenerateSuperchunk;
+use warming::warm_job::WarmedSuperchunk;
+
 use crate::simulation::hot::Hot;
 use crate::simulation::Simulation;
 use crate::bitplane_manager::BitmapArena;
-use crate::chunk_storage::jobs::{GenerateImage, Jobs, JobTicket};
+use crate::chunk_storage::jobs::{JobDone, Jobs, JobTicket};
 use crate::chunk_storage::{ChunkStorage, LayerType};
 use utilities::coordinates::SuperchunkIndex;
 use crate::simulation::simulation_time::SimulationTime;
@@ -36,7 +40,7 @@ pub struct HaloChange {
     pub superchunks_reached: usize,
     /// Superchunks made hot for the first time: generated.
     pub superchunks_generated: usize,
-    /// Superchunks made hot again, as they were: lingering, or from storage.
+    /// Superchunks made hot again, as they were: cooled, or from storage.
     pub superchunks_restored: usize,
     /// Superchunks gone cold.
     pub superchunks_cooled: usize,
@@ -68,7 +72,7 @@ pub(crate) struct LentWorld<'a> {
     /// Its layer types: made hot on every chunk.
     pub(crate) layers: &'a [LayerType],
     /// What generates a superchunk never made.
-    pub(crate) generate_superchunk: &'a dyn Fn(SuperchunkIndex) -> GenerateImage,
+    pub(crate) generate_superchunk: &'a dyn Fn(SuperchunkIndex) -> GenerateSuperchunk,
 }
 
 /// The halos: which superchunks are to be hot, those warming and
@@ -77,8 +81,10 @@ pub struct Halos {
     /// Which superchunks are to be hot: the world's size, the hot
     /// entity, and whether the viewport's are.
     pub hot: Hot,
-    /// The threads encoding, generating and decoding off the tick.
-    jobs: Jobs,
+    /// Chunk storage's jobs: write-backs encoded, images rewritten.
+    jobs: Jobs<JobDone>,
+    /// The warmings' jobs: each superchunk warming built whole, off the tick.
+    warm_jobs: Jobs<WarmedSuperchunk>,
     /// The superchunks warming, sorted.
     warming: Vec<Warming>,
     /// The hot superchunks cooling, sorted, each with the tick it goes
@@ -95,8 +101,6 @@ pub struct Halos {
     /// Its superchunks within the world, sorted: wanted hot besides the
     /// halos.
     viewport: Vec<SuperchunkIndex>,
-    /// The superchunks the last move generated, sorted.
-    generated_superchunks: Vec<SuperchunkIndex>,
 }
 
 /// A superchunk warming: a halo reached it, and it turns hot at `due`.
@@ -106,24 +110,15 @@ struct Warming {
     superchunk: SuperchunkIndex,
     /// The tick it turns hot at.
     due_tick: u64,
-    /// Where its cells come from.
-    warmed_from: WarmedFrom,
-}
-
-/// Where a warming superchunk's cells come from.
-#[derive(Clone, Copy, Debug)]
-enum WarmedFrom {
-    /// Its bitmaps, lingering: made hot as they are.
-    Lingering,
-    /// A job, decoding its image: its ticket.
-    Job(JobTicket),
+    /// Its job, building it whole.
+    job: JobTicket,
 }
 
 impl Halos {
     /// No halos yet, as `hot` says which superchunks are to be, their
     /// jobs on `dispatcher`'s threads.
     pub(crate) fn new(hot: Hot, dispatcher: Arc<Dispatcher>) -> Self {
-        Self { hot, jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing_superchunks: Vec::new(), last_told_viewport: None, viewport: Vec::new(), generated_superchunks: Vec::new() }
+        Self { hot, jobs: Jobs::new(Arc::clone(&dispatcher)), warm_jobs: Jobs::new(dispatcher), warming: Vec::new(), cooling: Vec::new(), writing_back: VecDeque::new(), flushing_superchunks: Vec::new(), last_told_viewport: None, viewport: Vec::new() }
     }
 
     /// Takes `viewport` -- what the renderer renders now, if any --
@@ -152,12 +147,6 @@ impl Halos {
         &self.viewport
     }
 
-    /// The superchunks the last move -- or [`Halos::keep_hot`] --
-    /// generated, sorted: made hot for the first time, nothing on them.
-    pub fn generated_superchunks(&self) -> &[SuperchunkIndex] {
-        &self.generated_superchunks
-    }
-
     /// Takes up `cooling` -- sorted, each with the tick it goes cold
     /// at -- as the hot superchunks cooling: as a save kept them.
     pub(crate) fn restore_cooling(&mut self, cooling: Vec<(SuperchunkIndex, u64)>) {
@@ -175,7 +164,6 @@ impl Halos {
             wanted_superchunks.sort_unstable();
             wanted_superchunks.dedup();
         }
-        self.generated_superchunks.clear();
         self.make_hot_within(lent_world, &wanted_superchunks, WARM_TICKS, COOL_TICKS)
     }
 
@@ -183,7 +171,6 @@ impl Halos {
     /// warming or cooling after: what generating and loading start
     /// from (`docs/simulation_reference.md`, "Halos::keep_hot").
     pub(crate) fn keep_hot(&mut self, lent_world: &mut LentWorld<'_>, wanted_superchunks: &[SuperchunkIndex]) -> HaloChange {
-        self.generated_superchunks.clear();
         let mut halo_change = self.make_hot_within(lent_world, wanted_superchunks, 0, 0);
         // One that was warming and is not wanted turned hot, as every warming does: cold now.
         if !self.cooling.is_empty() {

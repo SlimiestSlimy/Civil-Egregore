@@ -1,10 +1,12 @@
-//! Chunks as stored: an area as generated, the layer codec,
-//! superchunk images, the writeback ring and the cold pool it feeds.
+//! Chunks as stored: a superchunk generated and written back, the
+//! layer codec, superchunk images, the writeback ring and the cold pool
+//! it feeds.
 
 use utilities::bitmap::{Bitmap, CellWords, WORDS};
 use crate::test_types::TestTypes;
-use crate::chunk_storage::{ChunkStorage, GeneratedArea, InvalidImage, LayerChange, LayerCodec, LayerType, SuperchunkImage, WritebackRing};
-use utilities::coordinates::{place_from_cartesian, CellCartesian, ChunkIndex, SuperchunkIndex, CELLS_IN_CHUNK, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
+use crate::bitplane_manager::{BitmapArena, Superchunk, Write, WritesApplied};
+use crate::chunk_storage::{ChunkStorage, InvalidImage, LayerChange, LayerCodec, LayerType, SuperchunkImage, WritebackRing};
+use utilities::coordinates::{CellCartesian, CellIndex, ChunkIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS, WORLD_MIDDLE};
 use utilities::rng::RandomSource;
 
 /// A cell of a chunk, cartesian: across and down from its top left.
@@ -82,47 +84,45 @@ fn layers_drawn_decode_to_what_was_encoded() {
     }
 }
 
-/// Numbers set on wide planes come back from the image made of them:
-/// a bit a layer, at the cell's place -- on a plane of tiles, at its
-/// tile's -- the last number set on a cell kept, and a layer with no
-/// bit set not kept at all.
+/// Numbers written on the wide planes of a superchunk being generated
+/// come back from the image its cooling writes -- the last number
+/// written on a cell kept, a plane of tiles' at its tile -- through the
+/// arena's own write-back, and the superchunk made from that image again.
 #[test]
 fn numbers_generated_come_back_from_the_image() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let types = TestTypes::seeded(seed);
     let mut seeded_random = RandomSource::new(seed);
     let (cell_plane, tile_plane) = (types.sixteen_bits, types.four_bit_tiles);
-    let mut generated_area = GeneratedArea::of_superchunk(WORLD_MIDDLE);
-    let area = generated_area.area();
-    let drawn_cell = |seeded_random: &mut RandomSource| CellCartesian { x: area.top_left.x + seeded_random.draw_below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32, y: area.top_left.y + seeded_random.draw_below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32 };
+    let layer_types: [LayerType; 2] = [cell_plane.layer_type(), tile_plane.layer_type()];
+    let mut generated = Superchunk::to_generate(WORLD_MIDDLE, &layer_types);
+    let mut writes_applied = WritesApplied::default();
+    let corner = WORLD_MIDDLE.top_left().cartesian();
+    let drawn_cell = |seeded_random: &mut RandomSource| CellIndex::from(CellCartesian { x: corner.x + seeded_random.draw_below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32, y: corner.y + seeded_random.draw_below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32 });
     let mut numbers_set = std::collections::HashMap::new();
     for _ in 0..2_000 {
         let cell = drawn_cell(&mut seeded_random);
-        // Set twice, the second number the one kept.
-        generated_area.set_value(cell_plane, cell, seeded_random.draw_below(1 << 16) as u32);
+        // Written twice, the second number the one kept.
+        generated.apply(cell_plane.layer_type(), Write::value(cell_plane, cell, seeded_random.draw_below(1 << 16) as u32), &mut writes_applied);
         let number = seeded_random.draw_below(1 << 15) as u32;
-        generated_area.set_value(cell_plane, cell, number);
+        generated.apply(cell_plane.layer_type(), Write::value(cell_plane, cell, number), &mut writes_applied);
         numbers_set.insert(cell, number);
     }
     let (tile_cell, tile_number) = (drawn_cell(&mut seeded_random), 0b1010);
-    generated_area.set_value(tile_plane, tile_cell, tile_number);
-    let image = generated_area.image(&mut LayerCodec::new());
+    generated.apply(tile_plane.layer_type(), Write::value(tile_plane, tile_cell, tile_number), &mut writes_applied);
+    assert_eq!(writes_applied.missed, 0, "every cell of a superchunk generated is hot");
+    // Made hot whole, then cold: every bucket it wrote dirty, encoded into an image as a cooling writes them back.
+    let mut bitmap_arena = BitmapArena::new();
+    bitmap_arena.make_hot_warmed(generated);
     let mut layer_codec = LayerCodec::new();
-    // Each plane under its one ID, its bits in order: decoded whole, its number read at a place.
-    let mut number_at = |layer_type: LayerType, place: usize| {
-        image.layer(place / CELLS_IN_CHUNK, layer_type.type_id()).map_or(0, |words| {
-            let mut bucket = vec![0; crate::chunk_storage::wide::bucket_words(layer_type)];
-            crate::chunk_storage::wide::decode_bucket(layer_type, words, &mut layer_codec, &mut bucket);
-            protocol::pipe::frame::value_at(&bucket, layer_type.width_bits(), place % CELLS_IN_CHUNK)
-        })
-    };
+    let encoded_layers: Vec<(usize, u64, Vec<u64>)> = bitmap_arena.make_cold_superchunk(WORLD_MIDDLE).into_iter().map(|(bucket_key, cells)| (bucket_key.chunk.place(), bucket_key.layer_type.type_id(), crate::chunk_storage::wide::encode_bucket(bucket_key.layer_type, &cells, &mut layer_codec))).collect();
+    let layer_changes: Vec<LayerChange> = encoded_layers.iter().map(|(place, type_id, encoded_layer)| LayerChange { place: *place, type_id: *type_id, encoded_layer }).collect();
+    let image = SuperchunkImage::empty().rewritten_with(&layer_changes);
+    let warmed_again = Superchunk::from_image(WORLD_MIDDLE, &layer_types, &image, &mut layer_codec);
     for (cell, number) in numbers_set {
-        let place = place_from_cartesian(cell.x - area.top_left.x, cell.y - area.top_left.y);
-        assert_eq!(number_at(cell_plane.layer_type(), place), number, "{cell:?}");
+        assert_eq!(warmed_again.value_at(cell_plane.layer_type(), cell), Some(number), "{cell:?}");
     }
-    let place = place_from_cartesian(tile_cell.x - area.top_left.x, tile_cell.y - area.top_left.y);
-    let tile_place = place / CELLS_IN_CHUNK * CELLS_IN_CHUNK + ((place % CELLS_IN_CHUNK) >> tile_plane.layer_type().tile_shift());
-    assert_eq!(number_at(tile_plane.layer_type(), tile_place), tile_number);
+    assert_eq!(warmed_again.value_at(tile_plane.layer_type(), tile_cell), Some(tile_number));
 }
 
 /// An image's layers come out by type, one a type, however they went

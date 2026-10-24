@@ -82,6 +82,7 @@ impl SuperchunkImage {
     }
 
     /// The IDs of the types of the layers of the chunk at `place`, sorted.
+    #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
     pub fn type_ids(&self, place: usize) -> impl Iterator<Item = u64> + '_ {
         layer_table(self.chunk(place)).iter().map(|table_entry| table_entry[0])
     }

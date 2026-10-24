@@ -15,9 +15,11 @@ pub mod lots;
 pub mod mesh;
 pub mod patches;
 pub mod world_generation;
+pub mod worldgen_config;
 
 pub use generated_area::generate_area;
 pub use generation::{has_land_about, seed_with_land, WorldGeneration, WorldGrowth, FLOCK, TREES_SALT};
+pub use worldgen_config::{RESET_CONFIG_FILE, WORLDGEN_CONFIG_FILE};
 
 use server::simulation::simulation_api::CellArea;
 use crate::base_types::{Height, WALL_WAYS};

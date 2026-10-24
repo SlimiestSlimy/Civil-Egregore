@@ -48,6 +48,13 @@ pub fn in_bundle(bundle: &str, type_name: &str) -> String {
     format!("{bundle}{BUNDLE_SEPARATOR}{type_name}")
 }
 
+/// The root bundle of the type whose whole name is `type_name`: what is
+/// before its first separator -- the mod it is of, until mods are named
+/// by their manifests -- or the whole name, of a type in no bundle.
+pub fn root_bundle_of(type_name: &str) -> &str {
+    type_name.split(BUNDLE_SEPARATOR).next().unwrap_or(type_name)
+}
+
 /// The types being registered, as a world starts: none until
 /// registered -- the base game's, then a mod's -- and frozen before it
 /// runs.

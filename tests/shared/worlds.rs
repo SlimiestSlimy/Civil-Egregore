@@ -15,7 +15,7 @@ use basegame::base_types::BaseTypes;
 use protocol::type_registry::{in_bundle, FrozenTypeRegistry, RegisteredType, TypeRegistry};
 use basegame::default_types::BUNDLE as BASE_BUNDLE;
 use server::simulation::simulation_api::{Bits4, WidePlane};
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SIDE, THREADS, WORLD, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, FORCED_HOT, SIDE, THREADS, WORLD};
 use server::World;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
@@ -114,9 +114,18 @@ pub fn type_id_named(type_name: &str) -> u64 {
     named(&types(), &in_bundle(BASE_BUNDLE, type_name)).unwrap_or_else(|| panic!("no type named {type_name}")).type_id()
 }
 
-/// Worldgen parameters, each by its name, as [`WORLDGEN`] holds them.
-pub fn worldgen(worldgen_parameters: Vec<(String, u64)>) -> ParameterValue {
-    ParameterValue::Nested(worldgen_parameters.into_iter().fold(CleanServerParameters::default(), |worldgen, (parameter_name, value)| worldgen.with(parameter_name, ParameterValue::Hex(value))))
+/// `parameters` of a new world in a folder of its own for the test
+/// `test_name`, emptied ([`folder`]), basegame's config written there as
+/// `world_generation` says: what the world is made of.
+pub fn in_folder(parameters: CleanServerParameters, test_name: &str, world_generation: WorldGeneration) -> CleanServerParameters {
+    let folder = folder(test_name);
+    world_generation.write_config(&folder.join(server::MOD_CONFIG).join(BASE_BUNDLE)).expect("the test world's config written");
+    parameters.with(WORLD, ParameterValue::Text(folder.display().to_string()))
+}
+
+/// The folder `parameters` name ([`WORLD`]).
+pub fn folder_of(parameters: &CleanServerParameters) -> PathBuf {
+    PathBuf::from(parameters.text(WORLD).expect("a test world's folder named"))
 }
 
 /// A parameter given with nothing of its own -- forced hot, the camera
@@ -125,27 +134,21 @@ pub fn given() -> ParameterValue {
     ParameterValue::Nested(CleanServerParameters::default())
 }
 
-/// The parameters of the world saved in `folder` ([`WORLD`]).
-pub fn world_at(folder: &Path) -> CleanServerParameters {
-    CleanServerParameters::default().with(WORLD, ParameterValue::Text(folder.display().to_string()))
-}
-
-/// The world saved in `folder`, started again -- its types `register_types`
+/// The world saved in `folder`, run again -- its types `register_types`
 /// frozen first as its types file says -- or what of the save is not
 /// read.
 pub fn opened(folder: &Path, register_types: protocol::world_types::RegisterTypes) -> Result<World, server::DiskError> {
     let frozen_type_registry = Arc::new(server::read_types(folder, register_types)?);
-    server::start_world(&world_at(folder), &frozen_type_registry).map_err(|why_not| match why_not {
-        server::WorldNotStarted::Unreadable(disk_error) => disk_error,
-        server::WorldNotStarted::Refused(why_refused) => panic!("refused: {why_refused}"),
-        server::WorldNotStarted::Unsaved(disk_error) => panic!("an opened world saved: {disk_error}"),
+    server::run_world(folder, &frozen_type_registry, &CleanServerParameters::default()).map_err(|why_not| match why_not {
+        server::WorldNotMade::Disk(disk_error) => disk_error,
+        server::WorldNotMade::Refused(why_refused) => panic!("refused: {why_refused}"),
     })
 }
 
 /// The first seed from `first_seed_tried` on whose world, generated as
 /// `world_generation` says, the base game finds land about the middle.
 pub fn seed_with_land(first_seed_tried: u64, world_generation: &WorldGeneration) -> u64 {
-    server::seed_fit_to_start(first_seed_tried, &world_generation.worldgen_parameters(), &basegame::worldgen::world_generation::code(base()))
+    basegame::worldgen::seed_with_land(first_seed_tried, &world_generation.land_shape, utilities::coordinates::WORLD_MIDDLE_CELL)
 }
 
 /// A folder of its own for the test `test_name`, emptied: in the
@@ -156,28 +159,29 @@ pub fn folder(test_name: &str) -> PathBuf {
     folder
 }
 
-/// How a plain test world is started -- a rule tried alone, the
-/// terrain taking no part: a plain forced hot of at least
-/// `superchunks` superchunks -- a square of them -- with grass on
-/// `grass_cover` of [`basegame::worldgen::FRACTION_ONE`] of its cells and
-/// `sheep_per_flock` sheep on each superchunk -- made the first tick --, on
-/// `thread_count` threads.
-pub fn plain_start(superchunks: u32, grass_cover: u64, sheep_per_flock: usize, thread_count: usize) -> CleanServerParameters {
-    let worldgen_parameters = WorldGeneration { sheep_per_superchunk: sheep_per_flock as u64, ..WorldGeneration::plain(grass_cover) }.worldgen_parameters();
-    CleanServerParameters::default().with(WORLDGEN, worldgen(worldgen_parameters)).with(SIDE, ParameterValue::Integer(i64::from(utilities::coordinates::square_side(superchunks)))).with(FORCED_HOT, given()).with(THREADS, ParameterValue::Integer(thread_count as i64))
+/// How a plain test world is made, in a folder of its own for the test
+/// `test_name` -- a rule tried alone, the terrain taking no part: a plain
+/// forced hot of at least `superchunks` superchunks -- a square of them
+/// -- with grass on `grass_cover` of [`basegame::worldgen::FRACTION_ONE`]
+/// of its cells and `sheep_per_flock` sheep on each superchunk --
+/// generated with it --, on `thread_count` threads.
+pub fn plain_start(test_name: &str, superchunks: u32, grass_cover: u64, sheep_per_flock: usize, thread_count: usize) -> CleanServerParameters {
+    let parameters = CleanServerParameters::default().with(SIDE, ParameterValue::Integer(i64::from(utilities::coordinates::square_side(superchunks)))).with(FORCED_HOT, given()).with(THREADS, ParameterValue::Integer(thread_count as i64));
+    in_folder(parameters, test_name, WorldGeneration { sheep_per_superchunk: sheep_per_flock as u64, ..WorldGeneration::plain(grass_cover) })
 }
 
-/// The numbers of the default generation, with `sheep` sheep on each
-/// superchunk: made the first tick it is hot.
-pub fn flocked(sheep: usize) -> Vec<(String, u64)> {
-    WorldGeneration { sheep_per_superchunk: sheep as u64, ..WorldGeneration::DEFAULT }.worldgen_parameters()
+/// The default generation, with `sheep` sheep on each superchunk:
+/// generated with it.
+pub fn flocked(sheep: usize) -> WorldGeneration {
+    WorldGeneration { sheep_per_superchunk: sheep as u64, ..WorldGeneration::DEFAULT }
 }
 
-/// A world started as `parameters` say, of the base game's types, the
-/// probe's and those `more` registers: the world, and its probe.
+/// A world made in the folder `parameters` name ([`in_folder`]), as they
+/// say, of the base game's types, the probe's and those `more`
+/// registers: the world, and its probe.
 pub fn probed_world(parameters: &CleanServerParameters, more: impl FnOnce(&mut TypeRegistry) -> Result<(), String>) -> (World, Probe) {
     let probe = Probe::default();
-    let world = server::start_world(parameters, &probe.types(more)).expect("the world started");
+    let world = server::make_world(&folder_of(parameters), parameters, &probe.types(more)).expect("the world made");
     (world, probe)
 }
 
@@ -329,16 +333,17 @@ pub fn tick_read_at(world: &mut World, probe: &Probe) -> u64 {
 /// passes so sleeps for good.
 pub const FLOCK_SETTLES: u64 = 8;
 
-/// A world started as `parameters` say -- given no side, with no end --
-/// of the probe's types and those `more` registers, its generation
-/// giving no sheep, and one flock of `sheep` put at its middle by the
+/// A world made in a folder of its own for the test `test_name` as
+/// `parameters` say -- given no side, with no end -- of the probe's types
+/// and those `more` registers, its generation giving no sheep, and one
+/// flock of `sheep` put at its middle by the
 /// probe, the flock's halo kept hot: what a halo test follows, and a
 /// world run long. A flock on every superchunk generated would grow a
 /// world with no end for good. No sheep wakes before [`FLOCK_SETTLES`]
 /// ticks on.
-pub fn one_flock_world(parameters: CleanServerParameters, sheep: usize, more: impl FnOnce(&mut TypeRegistry) -> Result<(), String>) -> (World, Probe) {
+pub fn one_flock_world(test_name: &str, parameters: CleanServerParameters, sheep: usize, more: impl FnOnce(&mut TypeRegistry) -> Result<(), String>) -> (World, Probe) {
     use basegame::entity_rules::sheep::{STEP, TIME_BETWEEN_MEALS};
-    let (mut world, probe) = probed_world(&parameters.with(WORLDGEN, worldgen(flocked(0))), more);
+    let (mut world, probe) = probed_world(&in_folder(parameters, test_name, flocked(0)), more);
     let middle = utilities::coordinates::WORLD_MIDDLE;
     world.keep_hot(&server::halos_about([middle].into_iter()));
     // Cells of the middle drawn from the seed, each free of the collision plane as the tick found it and drawn once.

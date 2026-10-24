@@ -1,9 +1,9 @@
 //! Attributes of types drawn, set, set again and unset in an order
 //! drawn, saved and read back.
 
-use super::{registered_types, varying_attribute, walker_header, world, cell};
+use super::{read_back, registered_types, varying_attribute, walker_header, world, cell};
 use crate::entity_manager::{is_attribute_list, AttributeBlock, Instructions, InstructionsApplied, BLOCK_WORDS};
-use crate::entity_manager::saved::{decode_state, encode_state};
+use crate::entity_manager::saved::encode_state;
 use utilities::rng::RandomSource;
 
 /// Attributes of types drawn -- one block, two, three, and of sizes
@@ -54,9 +54,8 @@ fn attributes_edited_in_any_order_are_those_last_set() {
         }
     }
     let (words, count) = encode_state(None, world_entities.superchunk(target_header.stood_cell.superchunk()));
-    let mut read_back = world(&frozen_types);
-    assert_eq!((count, decode_state(&words, 4, &mut read_back).map(|saved_state| saved_state.entity_count)), (1, Ok(1)));
-    read_back.apply();
-    let (saved_entity, read_entity) = (world_entities.get(target_header.stood_cell).expect("there"), read_back.get(target_header.stood_cell).expect("read back"));
+    let read_entities = read_back(&frozen_types, &words, 4).expect("read back");
+    assert_eq!((count, read_entities.len()), (1, 1));
+    let (saved_entity, read_entity) = (world_entities.get(target_header.stood_cell).expect("there"), read_entities.get(target_header.stood_cell).expect("read back"));
     assert!((saved_entity.header, saved_entity.attributes) == (read_entity.header, read_entity.attributes));
 }

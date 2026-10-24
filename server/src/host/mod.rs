@@ -52,10 +52,10 @@ enum HostRequest {
     SetPaused(bool),
     /// Tick so many times a second, or flat out.
     SetPace(Option<u32>),
-    /// Make a world as these parameters say, of this frozen type
-    /// registry -- frozen for it, before anything of it -- and run it in
-    /// place of any run.
-    MakeWorld(CleanServerParameters, Arc<FrozenTypeRegistry>),
+    /// Make a world in the folder these parameters name, as they say --
+    /// created, set up of the host's game's types, and run -- in place of
+    /// any run.
+    MakeWorld(CleanServerParameters),
     /// Run the world of this name in the worlds' folder in place of any
     /// run: hot in its halos, as it was saved. Refused, the world run
     /// goes on (the next frame's [`Frame::said`]).
@@ -108,11 +108,11 @@ impl Host {
         self.request_sender.send(HostRequest::SetPace(pace_held_to)).is_ok()
     }
 
-    /// Makes a world as `parameters` say, of `frozen_type_registry` -- the
-    /// new world's, frozen first -- and runs it in place of any run
-    /// ([`crate::start_world`]).
-    pub fn make_world(&self, parameters: CleanServerParameters, frozen_type_registry: Arc<FrozenTypeRegistry>) -> bool {
-        self.request_sender.send(HostRequest::MakeWorld(parameters, frozen_type_registry)).is_ok()
+    /// Makes a world in the folder `parameters` name ([`WORLD`]), as they
+    /// say, of the host's game's types, and runs it in place of any run
+    /// ([`crate::make_world`]).
+    pub fn make_world(&self, parameters: CleanServerParameters) -> bool {
+        self.request_sender.send(HostRequest::MakeWorld(parameters)).is_ok()
     }
 
     /// Runs the world named `world_name` in the worlds' folder in place of

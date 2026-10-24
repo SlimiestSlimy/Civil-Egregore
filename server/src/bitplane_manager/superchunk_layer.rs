@@ -2,7 +2,7 @@
 //! buckets in one allocation -- which chunks have one, their cells read
 //! and changed, their set cells counted.
 
-use super::{COUNT_TILES_IN_CHUNK, COUNT_TILE_CELLS, ChunkSet, NO_CELLS, contains, members, set_membership};
+use super::{COUNT_TILES_IN_CHUNK, COUNT_TILE_CELLS, COUNT_TILE_WORDS, ChunkSet, NO_CELLS, contains, members, set_membership};
 use utilities::bitmap::{BITS_PER_WORD, CellWords, WORDS};
 use crate::chunk_storage::LayerType;
 use utilities::coordinates::CHUNKS_IN_SUPERCHUNK;
@@ -55,6 +55,42 @@ pub(crate) struct SuperchunkLayer {
 }
 
 impl SuperchunkLayer {
+    /// An allocation of `layer_type` with no bucket and nothing set, its
+    /// chunks hot as `hot` says.
+    pub(crate) fn empty(layer_type: LayerType, hot: ChunkSet) -> Self {
+        Self { layer_type, buckets: Vec::new(), chunks_with_bucket: 0, chunk_flags: ChunkFlags { hot, ..ChunkFlags::default() }, counts_less_one: [0; CHUNKS_IN_SUPERCHUNK], hot_count: 0, tile_counts: [[0; COUNT_TILES_IN_CHUNK]; CHUNKS_IN_SUPERCHUNK] }
+    }
+
+    /// Makes the bucket of the chunk at `chunk` hot, `fill_bucket` writing
+    /// its cells into it -- unless it is hot already, or waiting in the
+    /// ring, its bucket holding its newest cells -- then counted: whether
+    /// it was made hot now. With no `fill_bucket` it has no cell set, and
+    /// no bucket.
+    pub(crate) fn make_chunk_hot(&mut self, chunk: usize, fill_bucket: Option<impl FnOnce(&mut [u64])>) -> bool {
+        if contains(self.chunk_flags.hot, chunk) {
+            return false;
+        }
+        if !contains(self.chunk_flags.in_ring, chunk) {
+            match fill_bucket {
+                Some(fill_given) => {
+                    let (bits_a_cell, tile_shift) = (self.layer_type.width_bits(), self.layer_type.tile_shift());
+                    let bucket = self.bucket_or_insert(chunk);
+                    fill_given(bucket);
+                    // A count tile's cells: as many times its words as the layer has bits a cell -- over its tile's cells, of a plane of tiles.
+                    let tile_words = (COUNT_TILE_WORDS * bits_a_cell as usize) >> tile_shift;
+                    assert!(tile_words > 0, "a plane of tiles has a word a count tile at the least");
+                    let tile_counts: [u16; COUNT_TILES_IN_CHUNK] = std::array::from_fn(|tile| crate::chunk_storage::wide::cells_set(&bucket[tile * tile_words..][..tile_words], bits_a_cell) as u16);
+                    self.tile_counts[chunk] = tile_counts;
+                    self.set_count(chunk, tile_counts.iter().map(|&count| count as u32).sum());
+                }
+                None => self.let_bucket_go(chunk),
+            }
+        }
+        set_membership(&mut self.chunk_flags.hot, chunk, true);
+        self.hot_count += self.count(chunk);
+        true
+    }
+
     /// How many cells the bucket at `chunk` has set.
     pub(crate) fn count(&self, chunk: usize) -> u32 {
         if contains(self.chunk_flags.with_cells_set, chunk) { self.counts_less_one[chunk] as u32 + 1 } else { 0 }
