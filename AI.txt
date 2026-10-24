@@ -873,6 +873,67 @@ NOW
   experiment's laid-out game folder (dylib_experiment/out: game/, world/,
   modding.toml), what run.sh makes; in the real game, the folder its
   build lays out.
+  Committed (51c8cb01, 9695cc59; the user: "yeah, lets commit and discuss
+  the next steps ... we need to make building the game spit out a
+  directory instead of a single binary lmao ... the mod template and
+  making sure basegame works with it. removing basegame from watever main
+  still has it. in general probably removing the main from the root src/
+  since now client and server are their own binaries lol"). Then: "how
+  does the other mod systems treat their entry points? compared to how
+  were doing it? ... im not sure if my client/server/common model with
+  the 3 known possible entry point types is as good as it can be already
+  as well." -- discussion, my comparison that day.
+  Then: "whats start?" / "about point number 2, mod hooks are the way,
+  for waaay later indeed" (LATER) / "we do need the signature of the
+  known entrypoint functions for mods to have a static shape of course,
+  since they compile against protocol we can just make a trait do it for
+  us lmao". Then: "ahh i see, start is just a very bad name" / "i mean,
+  what im thinking is following the fabric model, the manifest file has a
+  string that points to the entry point struct that implements the
+  bundle trait i guess?" -- registration stays in code (the trait's);
+  the manifest names the entry, as Fabric's entrypoints name a class.
+  Then: "what we actually want to be our safety guard is the manifest
+  file, in it we trust, if the libraries dont match the manifest we
+  refuse to load / the manifest becomes the source of truth for the
+  mod". Then: "ideally we want the mod template to include a
+  manifest generator. and i was going to propose instead of using
+  xstasks, simply have compile time code execution ... running a program
+  at compile time to do stuff like genersting files and directories and
+  stuff, we could use that for also doing the folder with the linked file
+  distribution stuff cant we?" -- my answer that day: build scripts run
+  before their crate is compiled, so they cannot see the linked results.
+  Then: "what i want to avoid is using script files of any kind (cmd,
+  shell, etc) and avoiding third party libraries / about your game
+  packager, im not against it. what we want ultimately is a proper game
+  folder with its components on build, so it can run at all lol. if we
+  csn call a binary from cargo aliases then i guess thats what we need
+  to do" -- the packager: a Rust binary, std only, run by a cargo alias;
+  no script files (the experiment's run.sh, run_windows.sh and
+  write_modding.sh were the experiment's alone).
+  Then: "i see, its just a cargo run lol, its kind of a hack but its
+  simple and effective. / we would ideally make 2 packagers, a game
+  packager, very simple, just builds the game, makes the game folder on
+  the target directory and puts the game stuff on it / mod packager
+  takes care of running commands as needed if the game hasn't been
+  compiled. generates the manifest, etc. packages the mods libraries and
+  manifest into a folder in the mods target directory in the same way". Then: "yes packagers would be crates on the game's repo
+  root" / "folder names correct, for now lets keep it just release. i
+  believe adding thebug build support later will not be that hard with
+  the remaining infrastructure in place even if we hardcode release
+  everywhere on the packagers now". SETTLED: two root crates, the game's
+  packager and the mods' (names to propose); the game laid out in
+  target/civil_egregore/, modding.toml beside it in target/; a mod in its
+  own target/<mod name>/ (manifest.csv and its libraries); release only.
+  The root tests, once src/main.rs goes: "probably move into basegame
+  indeed" -- into basegame's workspace. Names: "good names, simple,
+  effective, more than one word which is a bad habit of yours" --
+  game_packager, mod_packager.
+  STEP 1 DONE (uncommitted): game_packager/ (std only), `cargo
+  package_game`: builds the program in release (the cargo that runs it,
+  in the repository's root) and lays out target/civil_egregore/ anew,
+  today the one program; run from there, the window starts its server
+  from the same folder. Next, step 2: the engine's crates as shared
+  libraries, measured.
   WINDOWS (MinGW, under Wine): all of the above but built apart works;
   the folder ships std-*.dll, libgcc_s_seh-1.dll, libwinpthread-1.dll;
   DLLs found beside the exe, a loaded one reused by name; the server
@@ -1245,6 +1306,12 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- Debug builds in the packagers (release hardcoded for now): "adding
+  thebug build support later will not be that hard with the remaining
+  infrastructure in place" (2026-10-23).
+- Mod-defined hooks (the way one mod offers an extension point others
+  plug into, as Fabric's custom entrypoints): "mod hooks are the way,
+  for waaay later indeed" (2026-10-23).
 - Our CSV files (manifests, world.csv, types.csv, settings) in the
   user's own format: "csv format will eventually be replaced with a
   custom format that i made years ago, why? because i like to

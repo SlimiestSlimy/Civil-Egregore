@@ -29,6 +29,7 @@ members = [
     "utilities",
     "client",
     "server",
+    "game_packager",
     "AI_SCRATCHPAD",
 ]
 

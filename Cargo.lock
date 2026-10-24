@@ -2538,6 +2538,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "game_packager"
+version = "0.0.0"
+
+[[package]]
 name = "gethostname"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
