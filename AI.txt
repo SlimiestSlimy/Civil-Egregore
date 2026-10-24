@@ -1690,6 +1690,13 @@ LATER (every "for later" of the user's, and mine, as said)
 - Mod-defined hooks (the way one mod offers an extension point others
   plug into, as Fabric's custom entrypoints): "mod hooks are the way,
   for waaay later indeed" (2026-10-23).
+  No mod changes another's code: "i dont see why mods would be touching
+  anyone else compiled libraries at runtime magically. however mods will
+  be able to register hooks later, when we need them" (2026-10-24).
+- Mod support's edges, each "when we need them" (2026-10-24): versioning
+  and load safeguards, a mod's panic, a mod finding its own assets,
+  unloading a world's mods on the client, whose rule wins a contested
+  cell across mods.
 - Our CSV files (manifests, world.csv, types.csv, settings) in the
   user's own format: "csv format will eventually be replaced with a
   custom format that i made years ago, why? because i like to
