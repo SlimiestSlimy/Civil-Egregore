@@ -160,8 +160,9 @@ Boundaries, asked first, would have put that on the table.
   compatibility, but things need to be able to moved to next versions on
   basegame as the game updates indeed, however breaking changes are
   still many to come. until 1.0 at least, far away, we probably going to
-  get to 0.20 before 1.0". Mine, open: a migration must know what it
-  migrates from, and no world records which version of a mod wrote it.
+  get to 0.20 before 1.0". Versioning when there is something to
+  version: "why do we need versioning support and safeguards if we dont
+  even have mods or saves to version?"
   A type's code is its library. Hooks
   ("just another parameter on the registry types"): GeneratesTheWorld,
   RunsEveryTick, KeepsTheWorldHot ("good use of hook there") -- the
