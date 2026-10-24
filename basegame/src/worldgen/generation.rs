@@ -114,10 +114,10 @@ impl WorldGeneration {
         PARAMETER_FIELDS.iter().map(|(name, field)| (name.to_string(), field(&mut generation).read())).collect()
     }
 
-    /// As `worldgen_parameters` say, each by its name: one not among them
-    /// as in [`WorldGeneration::DEFAULT`], one not known passed over.
-    pub fn of_worldgen_parameters(worldgen_parameters: &[(String, u64)]) -> Self {
-        let mut generation = Self::DEFAULT;
+    /// It as `worldgen_parameters` say, each by its name: one not among
+    /// them as it is, one not known passed over.
+    pub fn with_worldgen_parameters(self, worldgen_parameters: &[(String, u64)]) -> Self {
+        let mut generation = self;
         for (name, value) in worldgen_parameters {
             if let Some((_, field)) = PARAMETER_FIELDS.iter().find(|(field_name, _)| field_name == name) {
                 field(&mut generation).write(*value);

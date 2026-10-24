@@ -49,7 +49,7 @@ type SeenSheep = (Option<u64>, CellIndex, bool);
 #[test]
 fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let (mut world, probe) = one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000, sheep_tag_registered);
+    let (mut world, probe) = one_flock_world("trees_bar_their_cells_and_no_sheep_steps_onto_one", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000, sheep_tag_registered);
     let (collision_matches, trees) = over_the_world(&mut world, &probe);
     assert!(collision_matches && trees > 0, "as generated: {trees} trees");
     // Each sheep told from the others by a tag; a lamb, born after, has none.

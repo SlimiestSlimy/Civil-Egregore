@@ -14,8 +14,8 @@ use server::world_hash;
 #[test]
 fn the_same_world_hashes_the_same_however_it_is_ticked() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
-    let (mut one_thread_world, _) = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(THREADS, ParameterValue::Integer(1)), 2_000, crate::worlds::nothing_more);
-    let (mut several_threads_world, _) = crate::worlds::one_flock_world(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(THREADS, ParameterValue::Integer(3)), 2_000, crate::worlds::nothing_more);
+    let (mut one_thread_world, _) = crate::worlds::one_flock_world("the_same_world_hashes_the_same_however_it_is_ticked_one_thread", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(THREADS, ParameterValue::Integer(1)), 2_000, crate::worlds::nothing_more);
+    let (mut several_threads_world, _) = crate::worlds::one_flock_world("the_same_world_hashes_the_same_however_it_is_ticked_several_threads", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(THREADS, ParameterValue::Integer(3)), 2_000, crate::worlds::nothing_more);
     let mut hashes_seen = vec![world_hash(&mut one_thread_world).whole_hash(seed)];
     for stop_number in 1..=6 {
         for _ in 0..100 {

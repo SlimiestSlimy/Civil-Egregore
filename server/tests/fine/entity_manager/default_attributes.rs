@@ -1,8 +1,8 @@
 //! A type's default attribute: kept without its type, used as any other.
 
-use super::{registered_types, world, cell, GrazerState};
+use super::{read_back, registered_types, world, cell, GrazerState};
 use crate::entity_manager::{attribute_seen, is_attribute_list, may_be_given, push_attribute, DefaultAttributes, Header, Instructions, InstructionsApplied, Layout, WholeAttribute, BLOCK_WORDS, NEVER_WAKES};
-use crate::entity_manager::saved::{decode_state, encode_state};
+use crate::entity_manager::saved::encode_state;
 use utilities::rng::RandomSource;
 
 /// A grazer, whose type is registered with a default attribute -- its
@@ -96,10 +96,9 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
         // Saved and read back: the same grazer, kept the same.
         let saved_entity = world_entities.iter().next().expect("the one grazer");
         let (words, count) = encode_state(None, world_entities.superchunk(saved_entity.header.stood_cell.superchunk()));
-        let mut read_back = world(&frozen_types);
-        assert_eq!((count, decode_state(&words, 0, &mut read_back).map(|saved_state| saved_state.entity_count)), (1, Ok(1)));
-        read_back.apply();
-        let read_entity = read_back.get(saved_entity.header.stood_cell).expect("read back");
+        let read_entities = read_back(&frozen_types, &words, 0).expect("read back");
+        assert_eq!((count, read_entities.len()), (1, 1));
+        let read_entity = read_entities.get(saved_entity.header.stood_cell).expect("read back");
         assert_eq!((saved_entity.header, saved_entity.attribute_list()), (read_entity.header, read_entity.attribute_list()), "round {round_number}");
     }
 }

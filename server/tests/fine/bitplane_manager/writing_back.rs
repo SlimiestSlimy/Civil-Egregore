@@ -1,5 +1,5 @@
 //! Changes written back into chunk storage's ring, bitmaps evicted and
-//! superchunks lingering until the ring is flushed.
+//! superchunks cooled until the ring is flushed.
 //!
 //! `cargo test`
 
@@ -71,11 +71,11 @@ fn evicted_bitmaps_wait_for_the_ring() {
 }
 
 /// A superchunk made cold as a whole hands back its changed bitmaps to
-/// encode, and is set aside, lingering: not hot, it is let go once its
+/// encode, and is set aside, cooled: not hot, it is let go once its
 /// changes are flushed -- unless held, wanted hot again, when it is made
 /// hot as it was; let go, it is decoded from the cold pool.
 #[test]
-fn a_superchunk_lingering_waits_for_its_changes() {
+fn a_cooled_superchunk_waits_for_its_changes() {
     let types = TestTypes::seeded(crate::test_seed::TestSeedHandle::open().fine_seed());
     let (mut layer_codec, mut bitmap_arena, mut flushed_superchunks) = (LayerCodec::new(), BitmapArena::new(), Vec::new());
     let mut cold_storage = ChunkStorage::new(1 << 12);
@@ -86,25 +86,25 @@ fn a_superchunk_lingering_waits_for_its_changes() {
 
     let dirty = bitmap_arena.make_cold_superchunk(WORLD_MIDDLE);
     assert_eq!(dirty.iter().map(|(dirty_key, cells)| (*dirty_key, cells.to_vec())).collect::<Vec<_>>(), vec![(bucket_key, one_cell(a_cell()).to_vec())], "its one change, to encode");
-    assert_eq!((bitmap_arena.len(), bitmap_arena.lingering()), (0, 1), "cold, lingering");
+    assert_eq!((bitmap_arena.len(), bitmap_arena.cooled_count()), (0, 1), "cold, cooled");
     assert_eq!(bitmap_arena.layer_holds_cell(types.layers[0], cell), Err(NotHot(bucket_key)));
     cold_storage.flush_all(&mut flushed_superchunks);
     bitmap_arena.flushed_from_ring(&flushed_superchunks);
-    assert_eq!(bitmap_arena.lingering(), 1, "its change on its way: kept");
+    assert_eq!(bitmap_arena.cooled_count(), 1, "its change on its way: kept");
 
     for (written_key, cells) in &dirty {
         assert!(cold_storage.try_write_back(written_key.chunk, written_key.layer_type, layer_codec.encode_layer(cells[..].try_into().expect("a bitmap's words"))));
     }
     bitmap_arena.written_back(WORLD_MIDDLE, dirty.iter().map(|(returned_key, _)| *returned_key));
-    assert!(bitmap_arena.hold_lingering(WORLD_MIDDLE), "lingering, so held");
+    assert!(bitmap_arena.hold_cooled(WORLD_MIDDLE), "cooled, so held");
     cold_storage.flush_all(&mut flushed_superchunks);
     bitmap_arena.flushed_from_ring(&flushed_superchunks);
-    assert_eq!(bitmap_arena.lingering(), 1, "flushed, but held");
+    assert_eq!(bitmap_arena.cooled_count(), 1, "flushed, but held");
     assert!(bitmap_arena.make_hot_again(WORLD_MIDDLE));
-    assert_eq!((bitmap_arena.lingering(), bitmap_arena.layer_holds_cell(types.layers[0], cell)), (0, Ok(true)), "hot as it was");
+    assert_eq!((bitmap_arena.cooled_count(), bitmap_arena.layer_holds_cell(types.layers[0], cell)), (0, Ok(true)), "hot as it was");
 
     assert!(bitmap_arena.make_cold_superchunk(WORLD_MIDDLE).is_empty(), "nothing changed since");
-    assert_eq!(bitmap_arena.lingering(), 0, "nothing on its way or in the ring: let go at once");
+    assert_eq!(bitmap_arena.cooled_count(), 0, "nothing on its way or in the ring: let go at once");
     assert!(!bitmap_arena.make_hot_again(WORLD_MIDDLE));
     bitmap_arena.make_hot(bucket_key, cold_storage.layer(bucket_key.chunk, bucket_key.layer_type), &mut layer_codec);
     assert_eq!(bitmap_arena.layer_holds_cell(types.layers[0], cell), Ok(true), "decoded from the cold pool");

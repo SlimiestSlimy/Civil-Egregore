@@ -1,10 +1,16 @@
 //! Superchunks made hot and let cool: those wanted set against those
 //! hot, the new ones warming on the jobs' threads, the unwanted cooling.
 
-use super::{HaloChange, Halos, LentWorld, WarmedFrom, Warming};
-use crate::chunk_storage::jobs::{JobDone, Job};
+pub(crate) mod generating_superchunk;
+pub(crate) mod warm_job;
+
+use super::{HaloChange, Halos, LentWorld, Warming};
+use crate::chunk_storage::jobs::Job;
+use crate::chunk_storage::SuperchunkImage;
 use utilities::coordinates::SuperchunkIndex;
 use crate::entity_manager::saved;
+use std::sync::Arc;
+use warm_job::{warm_superchunk, WarmSource};
 
 impl Halos {
     /// Makes `wanted_superchunks` -- sorted -- the superchunks hot or warming, each
@@ -52,8 +58,29 @@ impl Halos {
         if halo_change.superchunks_cooled == 0 && due_warmings.is_empty() {
             return halo_change;
         }
+        let mut warmed_entities = Vec::with_capacity(due_warmings.len());
+        let mut put_back = Vec::new();
         for warming in &due_warmings {
-            self.finish_warming(lent_world, warming, &mut halo_change);
+            // Waited for, if it is not done: the tick does not run on without it.
+            let warmed = self.warm_jobs.take_waiting(warming.job);
+            // Paged to disk: in memory again while it is hot.
+            if let Some(image) = warmed.image_read_back {
+                lent_world.chunk_storage.bring_in(warming.superchunk, image);
+            }
+            match warmed.cells {
+                Some(cells) => lent_world.bitmap_arena.make_hot_warmed(cells),
+                None => drop(lent_world.bitmap_arena.make_hot_again(warming.superchunk)),
+            }
+            if warmed.generated {
+                // Made now, nothing written back yet: its buckets, all dirty, are its cells till it cools.
+                lent_world.chunk_storage.insert(warming.superchunk, SuperchunkImage::empty());
+                halo_change.superchunks_generated += 1;
+            } else {
+                halo_change.superchunks_restored += 1;
+            }
+            lent_world.cold.remove(&warming.superchunk);
+            put_back.extend(warmed.random_stream_state.map(|random_state| (warming.superchunk, random_state)));
+            warmed_entities.push(warmed.entities);
             // One no halo reaches any more turned hot all the same, and is cooling from now.
             if wanted_within_world.binary_search(&warming.superchunk).is_err() {
                 let still_cooling_insert_index = self.cooling.binary_search_by_key(&warming.superchunk, |&(cooling, _)| cooling).expect_err("not hot till now");
@@ -62,12 +89,8 @@ impl Halos {
         }
         let now_hot = lent_world.bitmap_arena.superchunk_indices();
         lent_world.entity_store.keep_superchunks(&now_hot);
-        let mut put_back = Vec::new();
-        for warming in &due_warmings {
-            if let Some(words) = lent_world.cold.remove(&warming.superchunk) {
-                let decoded_state = saved::decode_state(&words, current_tick, lent_world.entity_store).expect("a cold superchunk's state, as it was kept");
-                put_back.extend(decoded_state.random_stream_state.map(|put_back_random_state| (warming.superchunk, put_back_random_state)));
-            }
+        for superchunk_entities in warmed_entities {
+            lent_world.entity_store.adopt_superchunk(superchunk_entities);
         }
         lent_world.entity_store.apply();
         // The random streams of the superchunks hot all along, and of those made hot the ones kept: none of one gone cold.
@@ -79,49 +102,23 @@ impl Halos {
         halo_change
     }
 
-    /// Starts warming `superchunk`, to turn hot at tick `due_tick`: kept as
-    /// it is if it is lingering, else sent as a job.
+    /// Starts warming `superchunk`, to turn hot at tick `due_tick`: its
+    /// job sent, building it whole from where it comes from -- cooled, its
+    /// cells still in the arena; stored; or never made, generated.
     pub(crate) fn start_warming(&mut self, lent_world: &mut LentWorld<'_>, superchunk: SuperchunkIndex, due_tick: u64) {
-        let warmed_from = if lent_world.bitmap_arena.hold_lingering(superchunk) {
-            WarmedFrom::Lingering
+        // Kept cold until it lands: a save while it warms reads it there.
+        let entity_state = lent_world.cold.get(&superchunk).cloned();
+        let source = if lent_world.bitmap_arena.hold_cooled(superchunk) {
+            WarmSource::Cooled { entity_state }
         } else {
-            let job = Job::WarmSuperchunk { superchunk, image: lent_world.chunk_storage.stored_image(superchunk), generate_image: (lent_world.generate_superchunk)(superchunk), layer_types: lent_world.layers.to_vec() };
-            WarmedFrom::Job(self.jobs.send_job(job))
+            match lent_world.chunk_storage.stored_image(superchunk) {
+                Some(image) => WarmSource::Stored { image, entity_state },
+                None => WarmSource::Generated((lent_world.generate_superchunk)(superchunk)),
+            }
         };
+        let (layer_types, default_attributes) = (lent_world.layers.to_vec(), Arc::clone(lent_world.entity_store.shared_default_attributes()));
+        let job = self.warm_jobs.send_work(move |layer_codec| warm_superchunk(superchunk, source, &layer_types, due_tick, default_attributes, layer_codec));
         let warming_insert_index = self.warming.binary_search_by_key(&superchunk, |warming| warming.superchunk).expect_err("not warming");
-        self.warming.insert(warming_insert_index, Warming { superchunk, due_tick, warmed_from });
-    }
-
-    /// Makes `warming`'s bitmaps hot -- as they were, or as the
-    /// job made them, waiting for it if need be -- counted in
-    /// `halo_change`.
-    fn finish_warming(&mut self, lent_world: &mut LentWorld<'_>, warming: &Warming, halo_change: &mut HaloChange) {
-        match warming.warmed_from {
-            WarmedFrom::Lingering => {
-                lent_world.bitmap_arena.make_hot_again(warming.superchunk);
-                halo_change.superchunks_restored += 1;
-            }
-            WarmedFrom::Job(job_ticket) => {
-                let JobDone::SuperchunkWarmed { generated_image: generated, image_read_back: read, cells } = self.jobs.take_waiting(job_ticket) else {
-                    unreachable!("a warming's job makes a superchunk's cells");
-                };
-                // Paged to disk: in memory again while it is hot.
-                if let Some(image) = read {
-                    lent_world.chunk_storage.bring_in(warming.superchunk, image);
-                }
-                match generated {
-                    Some(image) => {
-                        lent_world.chunk_storage.insert(warming.superchunk, image);
-                        let generated_insert_index = self.generated_superchunks.binary_search(&warming.superchunk).expect_err("generated once");
-                        self.generated_superchunks.insert(generated_insert_index, warming.superchunk);
-                        halo_change.superchunks_generated += 1;
-                    }
-                    None => halo_change.superchunks_restored += 1,
-                }
-                for (bucket_key, cells) in &cells {
-                    lent_world.bitmap_arena.make_hot_cells(*bucket_key, cells.as_deref());
-                }
-            }
-        }
+        self.warming.insert(warming_insert_index, Warming { superchunk, due_tick, job });
     }
 }

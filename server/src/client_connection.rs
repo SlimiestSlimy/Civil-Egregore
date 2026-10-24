@@ -16,7 +16,7 @@ use crate::worlds_in;
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use protocol::pipe::SERVER_PORT;
 use protocol::server_parameters::CleanServerParameters;
-use protocol::world_types::{self, RegisterTypes};
+use protocol::world_types::{RegisterTypes, TYPES_FILE};
 use std::io::BufReader;
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::sync::mpsc::{channel, RecvTimeoutError};
@@ -61,20 +61,23 @@ impl Outgoing {
 /// a thread of its own -- a map takes long, and the frames go on
 /// meanwhile. Each world's type registry frozen by `register_types`
 /// before anything of it. The world `clean_parameters` say runs from
-/// the start, if they say one -- the one saved in their [`WORLD`]
-/// folder, or a new one of their seed and side; or why it does not.
+/// the start, if they say one -- the one in their [`WORLD`] folder, or a
+/// new one of their seed and side made there; or why it does not.
 pub fn serve_clients(clean_parameters: &CleanServerParameters, register_types: RegisterTypes) -> Result<String, String> {
     let close_if_no_clients = clean_parameters.nested(CLOSE_IF_NO_CLIENTS).is_some();
     // The port first: a server that cannot listen starts nothing.
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, SERVER_PORT)).map_err(|bind_error| format!("port {SERVER_PORT} not listened on -- another server running? {bind_error}"))?;
     let (host, host_sent) = Host::start_on_thread(register_types);
     if clean_parameters.each().any(|(parameter_name, _)| [SEED, SIDE, WORLD].contains(&parameter_name)) {
-        let frozen_type_registry = match clean_parameters.text(WORLD) {
-            Some(world_named) if crate::holds_a_world(&utilities::settings::world(world_named)) => crate::read_types(&utilities::settings::world(world_named), register_types).map_err(|read_error| read_error.to_string())?,
-            _ => world_types::of_a_new_world(register_types)?,
+        let folder = utilities::settings::world(clean_parameters.text(WORLD).ok_or(format!("a world is made in a folder: --{WORLD}"))?);
+        let world = if folder.join(TYPES_FILE).exists() {
+            let frozen_type_registry = crate::read_types(&folder, register_types).map_err(|read_error| read_error.to_string())?;
+            crate::run_world(&folder, &Arc::new(frozen_type_registry), clean_parameters)
+        } else {
+            crate::make_world_of(&folder, clean_parameters, register_types)
         };
-        let world = crate::start_world(clean_parameters, &Arc::new(frozen_type_registry)).map_err(|why_not| why_not.to_string())?;
-        println!("seed {}, at tick {}: running", utilities::seed::seed_as_hex(world.world_info.seed), world.world_info.tick);
+        let world = world.map_err(|why_not| why_not.to_string())?;
+        println!("seed {}, at tick {}: running", utilities::seed::seed_as_hex(world.seed()), world.entity_store().current_tick());
         _ = host.run_world(world);
     }
     // The one line said: the client that started the server reads it to connect.
@@ -142,7 +145,7 @@ pub fn serve_clients(clean_parameters: &CleanServerParameters, register_types: R
                 outgoing.send_to_client(ServerMessage::WorldTypes(world, types_text));
             }
         }
-        serve_one_client(client_reader, &host, &ask_sender, register_types);
+        serve_one_client(client_reader, &host, &ask_sender);
         outgoing.lock().expect("the client's connection").client = None;
         // Left by its client, the world goes on as it was before one came.
         _ = host.set_paused(false);
@@ -150,9 +153,8 @@ pub fn serve_clients(clean_parameters: &CleanServerParameters, register_types: R
 }
 
 /// Reads `client`'s messages until it leaves, each done by `host` or
-/// sent on to be answered in the order asked; a new world's type
-/// registry frozen by `register_types`.
-fn serve_one_client(client: TcpStream, host: &Host, ask_sender: &std::sync::mpsc::Sender<ClientMessage>, register_types: RegisterTypes) {
+/// sent on to be answered in the order asked.
+fn serve_one_client(client: TcpStream, host: &Host, ask_sender: &std::sync::mpsc::Sender<ClientMessage>) {
     let mut client = BufReader::new(client);
     while let Ok(Some(message)) = receive::<ClientMessage>(&mut client) {
         // The host gone is the process ending: nothing to tell it.
@@ -160,11 +162,7 @@ fn serve_one_client(client: TcpStream, host: &Host, ask_sender: &std::sync::mpsc
             ClientMessage::AskFrame(frame_ask) => _ = host.ask_frame(frame_ask),
             ClientMessage::SetPaused(paused) => _ = host.set_paused(paused),
             ClientMessage::SetPace(pace) => _ = host.set_pace(pace),
-            ClientMessage::MakeWorld(parameters) => match world_types::of_a_new_world(register_types) {
-                Ok(frozen_type_registry) => _ = host.make_world(parameters, Arc::new(frozen_type_registry)),
-                // The game's types not registering is nothing a client can mend: no world made, said where the program's errors go.
-                Err(why_not) => eprintln!("no world made: {why_not}"),
-            },
+            ClientMessage::MakeWorld(parameters) => _ = host.make_world(parameters),
             ClientMessage::OpenWorld(world_name) => _ = host.open_world(world_name),
             ClientMessage::Save(world_name) => _ = host.save_world(world_name),
             // Answered, in the order asked: a client matches each answer to its ask by that order.

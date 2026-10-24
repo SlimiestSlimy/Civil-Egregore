@@ -14,8 +14,8 @@ use bevy::feathers::theme::UiTheme;
 use bevy::feathers::FeathersPlugins;
 use bevy::prelude::*;
 use drawing::Drawing;
-use protocol::server_parameters::CleanServerParameters;
-use protocol::world_types::RegisterTypes;
+use protocol::server_parameters::{CleanServerParameters, WORLD};
+use protocol::world_types::{RegisterTypes, TYPES_FILE};
 use std::sync::mpsc::Receiver;
 use std::sync::Mutex;
 
@@ -60,10 +60,15 @@ pub fn run_window(register_types: RegisterTypes, first_world: CleanServerParamet
 #[derive(Resource)]
 struct FirstWorld(CleanServerParameters);
 
-/// The world the window opens with made: until the window has its
-/// menus, the one its program says.
+/// The world the window opens with: until the window has its menus, the
+/// one its program says -- made in the folder its parameters name, or
+/// run again if a world is set up there already.
 fn make_a_world(window_server: Res<WindowServer>, first_world: Res<FirstWorld>) {
-    window_server.server_end.link.make_world(first_world.0.clone());
+    let link = &window_server.server_end.link;
+    match first_world.0.text(WORLD) {
+        Some(world_name) if utilities::settings::world(world_name).join(TYPES_FILE).exists() => link.open_world(world_name.to_string()),
+        _ => link.make_world(first_world.0.clone()),
+    };
 }
 
 /// The keys the server is told by: Space pauses or goes on; `=` and `-`

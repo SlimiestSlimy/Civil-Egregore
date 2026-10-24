@@ -9,8 +9,7 @@ use std::thread;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::time::{Duration, Instant};
 use std::sync::Arc;
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, WORLD};
-use protocol::type_registry::FrozenTypeRegistry;
+use protocol::server_parameters::{CleanServerParameters, WORLD};
 use protocol::world_types::RegisterTypes;
 
 /// The world run, and what goes with running it.
@@ -51,9 +50,9 @@ pub(crate) struct HostThread {
     world_name: Option<String>,
     /// What opening or saving a world last came to.
     last_outcome: Option<String>,
-    /// The worldgen parameters the world run is to be made again with,
-    /// before the next tick, if it is to be.
-    reset: Option<Vec<(String, u64)>>,
+    /// Whether the world run is to be made again in its folder, before
+    /// the next tick.
+    reset: bool,
     /// When the next tick is due.
     next_tick: Instant,
     /// When the last frame was answered, and the tick then.
@@ -73,7 +72,7 @@ pub(crate) struct HostThread {
 impl HostThread {
     /// No world, at the game's pace; worlds opened of `register_types`.
     pub(crate) fn new(register_types: RegisterTypes) -> Self {
-        Self { register_types, running_world: None, worlds: 0, ticking_paused: false, pace_held_to: Some(TARGET_PACE), world_name: None, last_outcome: None, reset: None, next_tick: Instant::now(), last_frame: (Instant::now(), 0), being_answered: None, last_answer_measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
+        Self { register_types, running_world: None, worlds: 0, ticking_paused: false, pace_held_to: Some(TARGET_PACE), world_name: None, last_outcome: None, reset: false, next_tick: Instant::now(), last_frame: (Instant::now(), 0), being_answered: None, last_answer_measured: (0.0, 0.0, 0.0), tick_took: Duration::ZERO }
     }
 }
 
@@ -95,30 +94,28 @@ impl HostThread {
                     }
                     Ok(HostRequest::SetPaused(pause_asked)) => (self.ticking_paused, self.next_tick) = (pause_asked, Instant::now()),
                     Ok(HostRequest::SetPace(pace_asked)) => (self.pace_held_to, self.next_tick) = (pace_asked, Instant::now()),
-                    Ok(HostRequest::MakeWorld(parameters, frozen_type_registry)) => {
-                        (self.world_name, self.reset) = (None, None);
-                        self.last_outcome = Some(match self.run_world(&parameters, &frozen_type_registry) {
+                    Ok(HostRequest::MakeWorld(parameters)) => {
+                        (self.world_name, self.reset) = (parameters.text(WORLD).map(str::to_string), false);
+                        self.last_outcome = Some(match self.make_world(&parameters) {
                             Ok(seed) => format!("a world made from seed {}", utilities::seed::seed_as_hex(seed)),
                             Err(why_not) => format!("no world made: {why_not}"),
                         });
                     }
                     Ok(HostRequest::RunWorld(world)) => {
-                        (self.last_outcome, self.world_name, self.reset) = (Some(format!("a world run from seed {}", utilities::seed::seed_as_hex(world.world_info.seed))), None, None);
+                        (self.last_outcome, self.world_name, self.reset) = (Some(format!("a world run from seed {}", utilities::seed::seed_as_hex(world.seed()))), None, false);
                         self.running_world = None;
                         self.run_in_place(RunningWorld { world: *world });
                     }
                     Ok(HostRequest::OpenWorld(world_to_open)) => match self.open_world(&world_to_open) {
                         Ok(opened_world) => {
-                            (self.last_outcome, self.world_name, self.reset) = (Some(format!("{world_to_open} opened")), Some(world_to_open), None);
+                            (self.last_outcome, self.world_name, self.reset) = (Some(format!("{world_to_open} opened")), Some(world_to_open), false);
                             self.run_in_place(RunningWorld { world: opened_world });
                         }
                         Err(why_not) => self.last_outcome = Some(format!("{world_to_open} not opened: {why_not}")),
                     },
                     Ok(HostRequest::Call(call, arguments, answer_sender)) => {
-                        let call_answered = self.running_world.as_mut().map_or_else(|| crate::world_access::CallAnswered { answer: Err("no world runs".to_string()), reset_with: None }, |running_world| running_world.world.answer_call(call, &arguments));
-                        if call_answered.reset_with.is_some() {
-                            self.reset = call_answered.reset_with;
-                        }
+                        let call_answered = self.running_world.as_mut().map_or_else(|| crate::world_access::CallAnswered { answer: Err("no world runs".to_string()), reset_asked: false }, |running_world| running_world.world.answer_call(call, &arguments));
+                        self.reset |= call_answered.reset_asked;
                         // The caller gone has no use for its answer.
                         _ = answer_sender.send(call_answered.answer);
                     }
@@ -150,23 +147,26 @@ impl HostThread {
         }
     }
 
-    /// Makes a world as `parameters` say, of `frozen_type_registry`, and runs it
-    /// in place of any run: that one dropped first, not to hold both. Its
-    /// seed; or why not, nothing run.
-    fn run_world(&mut self, parameters: &CleanServerParameters, frozen_type_registry: &Arc<FrozenTypeRegistry>) -> Result<u64, String> {
+    /// Makes a world in the folder `parameters` name, as they say, of the
+    /// game's types ([`crate::make_world`]), and runs it in place of any
+    /// run: that one dropped first, not to hold both. Its seed; or why
+    /// not, nothing run.
+    fn make_world(&mut self, parameters: &CleanServerParameters) -> Result<u64, String> {
+        let world_named = parameters.text(WORLD).ok_or("a world is made in a folder: none named")?;
         self.running_world = None;
-        let world = crate::start_world(parameters, frozen_type_registry).map_err(|why_not| why_not.to_string())?;
-        let seed = world.world_info.seed;
+        let world = crate::make_world_of(&utilities::settings::world(world_named), parameters, self.register_types).map_err(|why_not| why_not.to_string())?;
+        let seed = world.seed();
         self.run_in_place(RunningWorld { world });
         Ok(seed)
     }
 
-    /// The world named `world_to_open` in the worlds' folder, started of its
+    /// The world named `world_to_open` in the worlds' folder, run of its
     /// own types -- frozen first, as its types file says -- the world run
     /// left running if it cannot be.
     fn open_world(&self, world_to_open: &str) -> Result<World, String> {
-        let frozen_type_registry = Arc::new(crate::read_types(&utilities::settings::world(world_to_open), self.register_types).map_err(|read_error| read_error.to_string())?);
-        crate::start_world(&CleanServerParameters::default().with(WORLD, ParameterValue::Text(world_to_open.to_string())), &frozen_type_registry).map_err(|why_not| why_not.to_string())
+        let folder = utilities::settings::world(world_to_open);
+        let frozen_type_registry = Arc::new(crate::read_types(&folder, self.register_types).map_err(|read_error| read_error.to_string())?);
+        crate::run_world(&folder, &frozen_type_registry, &CleanServerParameters::default()).map_err(|why_not| why_not.to_string())
     }
 
     /// Runs `running_world` in place of any run, from its world's own tick.
@@ -179,19 +179,26 @@ impl HostThread {
         self.next_tick = Instant::now();
     }
 
-    /// Makes the world run again from its start, generated as the
-    /// worldgen parameters a call last asked for say --
-    /// if it was asked to be: a world of its own from then, of no name.
+    /// Makes the world run again from its start in its folder, of the same
+    /// types and seed, generated as its config says now
+    /// ([`crate::world_creation::unrun_world`]) -- if it was asked to be.
     fn reset_now(&mut self) {
-        let (Some(reset_worldgen_parameters), Some(running_world)) = (self.reset.take(), &self.running_world) else {
+        if !std::mem::take(&mut self.reset) {
+            return;
+        }
+        let Some(running_world) = self.running_world.take() else {
             return;
         };
-        // Remade of its own types: its IDs stay.
-        let world = &running_world.world;
-        let (parameters, frozen_type_registry) = (crate::world_start::parameters_of_world(&world.world_info, &reset_worldgen_parameters), Arc::clone(&world.frozen_type_registry));
-        self.world_name = None;
-        self.last_outcome = Some(match self.run_world(&parameters, &frozen_type_registry) {
-            Ok(seed) => format!("the world remade from seed {}", utilities::seed::seed_as_hex(seed)),
+        // Remade of its own types: its IDs stay. Let go first: nothing of it is read from its folder after.
+        let (folder, frozen_type_registry) = (running_world.world.folder().to_path_buf(), Arc::clone(&running_world.world.frozen_type_registry));
+        drop(running_world);
+        let remade = crate::world_creation::unrun_world(&folder).and_then(|()| crate::run_world(&folder, &frozen_type_registry, &CleanServerParameters::default()));
+        self.last_outcome = Some(match remade {
+            Ok(world) => {
+                let seed_text = utilities::seed::seed_as_hex(world.seed());
+                self.run_in_place(RunningWorld { world });
+                format!("the world remade from seed {seed_text}")
+            }
             Err(why_not) => format!("the world not remade: {why_not}"),
         });
     }

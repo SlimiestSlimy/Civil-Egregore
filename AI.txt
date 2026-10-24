@@ -183,6 +183,20 @@ Boundaries, asked first, would have put that on the table.
 == TO DO ==
 
 NOW
+- PAUSED HERE 2026-10-24 (the user rebooting: "yeah lets just pause
+  then"). The folder-worlds pass (three-step creation, whole-superchunk
+  warming, worldgen through the server's own APIs, every world a
+  folder) is DONE, committed and pushed ("and comit xD" / "and push"). The server tests are converted
+  (each world in a folder named by its test; the walkers count in
+  mod_config/test game/; world.rs's creation test is
+  a_world_is_created_set_up_and_run), and both world_at helpers are
+  gone. Green: the root's 203 and basegame's 7; clippy is clean on both
+  workspaces. NOT RUN YET: the ignored tiers (root complete 3, fine 3;
+  basegame complete 2) and the per-test timing for the tier split (c);
+  the timing command is RUSTC_BOOTSTRAP=1 cargo test --release
+  --workspace -- -Z unstable-options --report-time. Then report, the
+  commit when asked, and step 3.1 again (the plain types into
+  protocol::server_types, a module that exists but is not hooked up).
 - CLIMATE REMOVED (the user, 2026-10-18: "remove anything related to
   climate system, thats going to be redone from scratch ... make grass
   propagate by itself like old times in the mean time"): DONE. Gone:
@@ -966,8 +980,265 @@ NOW
   dyn any to register it by the name of the struct itself. / so its like
   builder::new() .new_bundle(name and stuff) .type(a struct) .type(another
   struct) .close_bundle() .new_bundle() etc. take this as a style guide,
-  not the final form lol".
-  STEP 2 DONE (uncommitted): utilities, protocol, server, client each
+  not the final form lol". Names: "lets just make the registration type add function
+  recieve a static string that csn ve written straight in the same
+  function call. simple as that then" -- `.add("grass", Grass)`.
+  Point 3: "yes, basically anything callable should recieve a simulation
+  handle, client handle, or both. then the rule gathers watever it needs
+  from theand save it somewhere (statics maybe?) for when its called.
+  this is the ideal setup, but i can see its only imaginary, there are
+  things that dont work with this approach".
+  Downcasting/capture for rules: "that downcasting example for rules is
+  exactly the approach we need" (a kind trait's setup gathers handles
+  and returns code with them captured). The frame ask: "different
+  rendering modes (future feature) may only read some layers and not
+  others. maybe some entities and not others. what i mean is, whats
+  asked for in a frame to the server can vary". Settled: each render
+  rule's setup declares what it reads (planes, entity types), kept with
+  the rule; a rendering mode picks the active rules; a frame asks for
+  the union of the active rules' reads. Fixed per rule: "do we want
+  rules to change what planes they read frame to frame? ... rule setup
+  also pre-declares what it.wants to read so we probably wanna do the
+  same even if some planes may remain unread for that frame for that
+  rendering rule, the same for server side rules can happen. but the
+  code is simpler tbh. we probably keep it fixed now and add dynamicity
+  on that front later if needed. simple is better now".
+  Rendering modes: "we dont have rendering modes yet, thats a future mod
+  lol". Shared machinery: "client and server are supposed to use roughly
+  the same model, so we should have as much of that machinery in
+  protocol, and let server and client leverage it where they act the
+  same way". My proposal (asked): in protocol the builder, a lookup
+  handle noting reads (TypeLookups), Reads, SetUpType<Code>, a generic
+  kind trait (Handle, Code, set_up) and one setup walk matching frozen
+  types to the structs added by name (replacing rules_of, worldgen_of,
+  RenderRules::of, the gui gathering); CallCode/CallContext into
+  protocol (common bundles compile against protocol only). Code types,
+  the handles' own parts and running stay per side. Orphan rule: (a)
+  wrapper functions per kind, my lean, or (b) kind traits in protocol.
+  The user: "yes kind traits most definitely should live in protocol,
+  like probably we need to rename protocol, you're thinking of protocol
+  as the word itself, too narrowly. i think of it broadly. encompassing
+  client and server and mods" / "there is a reason both server and
+  client depend on protocol" / "utilities and protocol are.the shared
+  libraries" / "(utilities a level down on protocol of course)". SETTLED:
+  (b), kind traits in protocol; protocol is the shared layer of server,
+  client and mods, utilities under it. Rename: hedged, not asked.
+  Then: "i was actually thinking that we can probably get away with
+  centralizing a lot of server and possibly client types into protocol,
+  and then they both client and server use them, this also allows us to
+  have those types directly in the public api instead of wrapping
+  possibly useful types that currently get reexported by the public apis
+  on server for example". My sort (asked): already protocol's and
+  re-exported; plain words (widths, WidePlane, entity header and
+  attribute layout, RuleCounts, simulation time, worldgen parameters,
+  CallCode/CallContext, RenderTurn/RenderCode) move; behaviour over the
+  server's internals (SimulationTickState, the compare-and-write and
+  read functions) and Bevy (GuiCode) stay. Side parameter left only for
+  those.
+  The user: "yes, but we probably want to have a servertypes/clientypes
+  modules on protocol, not just randomly placed on type registry, normal
+  rust types are different from what the game itself perceives as types.
+  one is simply types, the other is registered types or frozen types".
+  My layout (asked): protocol::server_types, protocol::client_types
+  (plain Rust types, each with its side's kind traits);
+  protocol::type_registry keeps the game's types (IDs, registration,
+  freezing) and the shared machinery (builder, lookups, set-up walk).
+  Names: "yeah normal rust guidelines for names lol" -- server_types,
+  client_types. Type IDs stay in type_registry; kind traits beside their
+  side's types; types both read under the side defining them.
+  3.1 CO-OP (2026-10-23): "yes, go ahead. lets go co op this time".
+  Applied: protocol/src/lib.rs (doc broadened, `pub mod server_types`),
+  Cargo.toml description, protocol/src/server_types.rs (module root).
+  Found as I read: RenderTurn/RenderCode paint with Bevy's Color (stay
+  in client; no client_types this pass); GeneratedArea and WorldgenCode
+  on server internals (stay); RuleMaster waits for 3.3.
+  WORLDGEN PARAMETERS OUT OF THE SERVER, FIRST: "why is there a
+  worldgenparsmeter alias in server?" then "oh ok, we need to move that
+  out of there first then. the only thing the server should b3 concerned
+  about is a worldgen hook being used. nothing else. we can have mods
+  write their parameters in a modconfig folder inside the worldfolder.
+  the slider values for worldgen can go there" / "since worldgen itself
+  is basically a bundle of basegame".
+  On a new world's values (my point 4): "dont worry about that for now,
+  later we'll make the client handle that better, basically well change
+  how worlds are.created entirely, for now you can just strip worlds of
+  functionality as conflicts arise / basically the new world model
+  creation will be kinda 3 step process, declare world, setup world, run
+  world. existing worlds just skip straight to run basically". Then:
+  "also, world.csv basically becomes format + seed i believe? its fine".
+  Then, on world.csv's unpopulated row: "ok, here isnthe thing, that
+  shouldn't work like that lol, why is there a state where a superchunk
+  is half generated, planes but not entities? thats completely wrong
+  lol". My proposal: generation makes the whole superchunk, planes and
+  entities, in one job (nothing sees it before it exists, so no
+  compares); populate, unpopulated and its world.csv row go. Files 1-2
+  (with_worldgen_parameters, worldgen_config.rs) applied: "the code for
+  worldgen config loading looks mostly fine at a glsnce otherwise".
+  File 3 shown (basegame naming utilities directly). On first wakes:
+  "superchunks must load in exatcly 256 ticks after they start warming
+  or the simulation stalls completely, never more, never less. so there
+  is no way to break entity scheduling, it starts 256 ticks after the
+  chunk started generating, or the simulation stalls at tick 255" -- so
+  generation is given the tick its superchunk is first hot (the
+  generation tick + WARM_TICKS) and times its entities from it.
+  File 3 applied: "yes in fine having basegame use utilities, thats what
+  utilities is for if its not reachable otherwise, past, wrong decisions
+  lol".
+  Server file 1 (generated_area.rs: first_hot_tick, holds, make_entity,
+  entities_by_cell) applied: "we can optimize worldgen later, we want
+  hacks in basegame, not on server".
+  Then, on checking a generated entity's attributes only as it warms:
+  "server is the main thing, we want 0 hacks there".
+  On the encode/decode of a generated superchunk: "im kinda uncomfortable
+  with the fact that worldgen encodes and decodes the newly gwnerated
+  super chunk lol" / "im thinking we should probably work on fixing this
+  today, so, there are very few things that can run between ticks,
+  worldgen injecting data into the hot arena and entity stores is one of
+  the few allowed. we simply use make the worlgen hook tap directly into
+  the internal server apis, thats what hooks are for". (Revised file 1,
+  EntityRefused, shown, not applied; file 2 encode_generated dropped.)
+  Where it runs (asked: off the tick, handed over at the due tick?):
+  "i sometimes write worse than an AI lol, i cant communicate properly" /
+  "yes, generation has 256 ticks of free time to generate, then we stall
+  when we finish tick 255 if the superchunk is not ready, stall for it,
+  and once its data is on the hot memory areas we csn continue with tick
+  256". SETTLED: the warming job generates into the arena's own bucket
+  form and the store's own SuperchunkEntities; at the due tick the arena
+  and the store take them (stalling for the job if need be, as now); no
+  image at generation -- an empty image in the cold pool, every generated
+  bucket dirty, written back on cooling; unpopulated goes.
+  File 1 (generated_area.rs, arena buckets + SuperchunkEntities): "looks
+  good, but why do we need atributes not whole?" then "i still have my
+  doubts, wakes before hot should also be impossible by construction /
+  and the entity store should sort all this mess with entity atributes,
+  i dont see why genersted area has to deal with any of this,.the entity
+  store api should abstract all of this and just provide the allocations
+  for the atributes and access to them in an abstract way by type id".
+  My proposal: FirstWake { After(SimulationTime), Never }; an entity
+  builder in the store (new_entity(..).with(attribute, value).make(),
+  Err(CellTaken)); u8 area coordinates (wrong: I took a superchunk as
+  256 a side). The user: "a suoerchunk is 1024*1024, a chunk is 256 by
+  256, chunks in fact, are just a storage convenience to keep tessera
+  happy and memory usage on sparse plains low. chunks are otherwise
+  irrelevant and superchunks are what matters" / "the builder is good.
+  but the entity store should be able to add and remove atributes at
+  runtime (except default atribute)".
+  Then: "i mean, i still dont see why we need 2 apis for the same thing,
+  the worldgen hook is allowed work between ticks, doesn't mean it has to
+  use a different api. whats outsidethearea for?" / on world
+  coordinates: "why world coordinates? preferably we should use cell's
+  superchunk morton index, or cartesian superchunk cell coordinates st
+  the least" / "i think we should have cartesian stuff on utilities
+  already" / "were.getting closer, but why do we need cell in
+  superchunk?" -- dropped: CellIndex everywhere, as the tick API. Then:
+  "yeah, entity overlapping is forbidden as normal, like generation of a
+  superchunk simply rejects or fails on writes outside the superchunk
+  being generated". SETTLED: generation is lent the arena's own
+  Superchunk (every layer, every chunk hot, nothing set) and the store's
+  own SuperchunkEntities, and writes through their own APIs
+  (Superchunk::apply, the store's make); a write outside it is not
+  applied (apply_in's own rule); at the due tick the arena takes the
+  Superchunk as make_hot_again does, the store its entities. GeneratedArea
+  has no API of its own.
+  Applied (agreed): SuperchunkLayer::empty, Superchunk::to_generate,
+  value_at None for another superchunk, make_hot_generated; the store's
+  entity_being_made.rs (FirstWake, EntityBeingMade: new_entity(..)
+  .with(..).make() -> bool), occupied false for another superchunk,
+  WorldEntities::adopt_superchunk; `pub mod server_types` unhooked from
+  protocol's lib.rs until 3.1 resumes (the file stays). Then: "i do have
+  a question, outside special world gen stuff, warming a chunk is
+  essentially equivalent to generating it (warming is done either way)
+  so we need to reutilize warming stuff as much as possible, warming is
+  already in between chunk work anyways, instead of tsking the data from
+  the save file we take it from the worldgen hook".
+  My proposal: the warm job builds the arena's Superchunk and the store's
+  SuperchunkEntities from either source (stored: image and cold entity
+  state decoded in the job; generated: lent to the hook); one landing at
+  the due tick (adopted, as make_hot_again). The user: "yeah, warming
+  should also stall on tick 255 for generation or loading from save, so
+  its exactly the same".
+  Applied (each agreed): jobs.rs generic (Jobs<Done>, send_work, send_job
+  for chunk storage's Job; JobPanicked gone; the warm job leaves for the
+  halos -- "yes, triggering warming and cooling is halo code job (i force
+  hot stuff should also tap into halo code i hope)": forced hot, start,
+  load and the camera all go through make_hot_within); make_chunk_hot on
+  SuperchunkLayer, Superchunk::from_image, make_hot_warmed; saved.rs
+  decode_into with &DefaultAttributes ("good yeah, we want to avoid sync
+  primitives as much as possible"); halos/warming/generating_superchunk.rs
+  ("looks good, but wouldn't it be called generating superchunk?").
+  "instead of lingering they shpuld be cooled lol" -- renamed everywhere
+  in the server (Cooled, hold_cooled, cooled_count...). The landing
+  applied: three sources (Cooled, Stored, Generated), each a warm job;
+  the cold state copied for the job, kept cold until it lands (a save
+  while warming reads it); Warming holds its job's ticket; warm_jobs
+  beside jobs. Worldgen interface: one `generate` over a
+  GeneratingSuperchunk; halo_work hands it to the halos.
+  Then (agreed: "go yes, worldgen does need to make collision because
+  things like trees do have collision tho"): basegame's generated_area.rs
+  through cells_mut().apply, world_generation.rs one generate with the
+  flock made whole (FirstWake from the first hot tick); unpopulated gone
+  everywhere (world.csv format 7); the old chunk_storage/generated_area.rs
+  deleted; simulation_api re-exports the new types. Tests adjusted: the
+  test game generates whole (generate_walkers); halos/world tests lose
+  unpopulated; entity_manager tests read back through decode_into
+  (read_back helper); chunk_storage's numbers test is now the whole
+  round trip (to_generate, hot, cold, encoded, from_image);
+  sheep_never_overlap no longer ticks once before counting (sheep exist
+  before tick 0 and may wake, and die of age, in it); basegame_api
+  allows utilities (the user's call). All pass: root 203, basegame 7;
+  clippy clean both. MEASURED against 1345b931 (callgrind, ticks_counted:
+  4x4, 250 sheep a superchunk, same seed; 3 runs at 50k ticks, 2 at 100,
+  in parallel; the baseline's 100-tick run repeated, 43.4995 G against
+  43.5035 G): making the world + 100 ticks 43.50 G -> 30.08 G (-30.8%);
+  49,900 ticks 34.187 G -> 34.253 G (+0.19%; 685.1k -> 686.4k a tick;
+  runs of one build vary ~0.02%); the world hash differs (the flock's
+  draws and wakes are new), so the ticks are not of the same world.
+  The user: "good, we can continue with the remaining steps". Next: the
+  worldgen parameters out of the server -- found: a running world has
+  no folder (the host's new and reset worlds run unnamed), so I proposed
+  the mod config kept in memory with the world as each mod's files,
+  saved to and loaded from <world>/mod_config/<mod>/; worldgen reading
+  its files at set-up (registered values otherwise); calls reading and
+  writing their mod's files through CallContext; the reset's values in
+  basegame's worldgen_for_reset.csv, copied over worldgen.csv by "reset
+  world"; the server carrying the files into the remade world. Asked.
+  The user: "honestly, we csn slowly remove memory only worlds, the idea
+  is to not have those lol" / "tests make randomly named worlds for
+  testing on transient data. we cant loose more tests. also wdym unnamed
+  worlds?" / on register_types_with: "i mean, if no config is provided
+  worldgen can use a default config lol" / "i mean, we probably should
+  take the opportunity to move all memory tests to worlds yeah, and move
+  them to complete tier". SO: config on disk only, defaults when none;
+  tests choosing values write their config into their own transient
+  folder and start there; those tests move to the complete tier.
+  Tiers: (c) -- the long-running world tests to the complete tier, the
+  short ones stay fast, all in folders. Then, on file 1 (WorldgenCode as
+  set_up(Option<&Path>) -> SetUpWorldgen; World keeps its folder): "i
+  think it does, but i may have to explain the world creation process /
+  creation makes the folder structure, the basic 3 folders and a
+  world.csv / setup is where we make the type registry for the first
+  time, this where mods are inserted to the mods folder,.and base game
+  included/excluded, we also create types.csv / the we run the world".
+  My reading (asked): create = world.csv and the folders superchunks/,
+  mods/, mod_config/; set up = the registry registered and frozen,
+  types.csv written (mods into mods/ and basegame in or out come with
+  runtime loading); run = opened from the folder, worldgen set up from
+  its config, the start superchunks generated if it never ran; no save
+  at start. The user: "go ahead" (2026-10-24) -- folded into this pass,
+  first. "yes those.are the three folders". The API (world_creation.rs:
+  create_world, set_up_world, run_world; never run = no hot file; the
+  seed drawn at set-up if none given; MakeWorld names its folder; a
+  reset remakes the world in its own folder; the window's world in
+  worlds/window test world, opened if there): "looks good".
+  Then: "setup step (2) should not load any libraries, that only happens
+  till game run, just to clarify  a frozen registry therefore should not
+  have loaded any libraries yet" -- set_up_world writes types.csv alone;
+  the seed, if none was given, is drawn as the world first runs. Then:
+  "seed draw should.be happening on step 1" -- create_world draws it at
+  random if none is given; fit_to_start (drawn_seed, seed_fit_to_start)
+  leaves the server, needing the worldgen's code; tests pick seeds with
+  land through basegame's seed_with_land.
+  STEP 2 DONE (1345b931, pushed): utilities, protocol, server, client each
   crate-type dylib; prefer-dynamic and $ORIGIN (Linux), the CPU line
   repeated (a target's rustflags replace [build]'s); the packager lays
   out the four libraries and libstd beside the program (2.5 MB, was
@@ -1351,6 +1622,34 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- A world made with no seed may have ocean where the sheep start (fit to
+  start left with seeds drawn at creation): mine -- the worldgen choosing
+  where the start is, rather than the seed chosen for it. The user: "yes
+  indeed, we need worldgen to be able to give a land starting point to
+  the server on first run to load the very first hot superchunk at
+  least. thats something we probably need to work on lol".
+- The mod list built on mods/ in the gui between creating a world and
+  setting it up: "later we basically build the mod list on mods/ on the
+  gui between step 1 and 2. Just so you know what the concept is in the
+  future".
+- keep_hot on a running world with warmings in flight shortens them to
+  now, but their jobs timed entities from the original due tick (a wake
+  could fire a wheel turn early): mine, only tests do it (World::keep_hot
+  mid-run); start and load are exact ("we do need to make as if the
+  chunks never went cold on world save/load, thats exactly why we keep
+  the list of hot chunks of world").
+- The tick API's raw-block entry points (set_attribute_blocks,
+  make_entity taking &[AttributeBlock]) typed and by type ID, through the
+  store's builder, as the user asked for the store ("the entity store api
+  should abstract all of this and just provide the allocations for the
+  atributes and access to them in an abstract way by type id").
+- World creation as three steps, declare world, set up world, run world
+  ("existing worlds just skip straight to run basically"); the client
+  handling a new world's mod config ("later we'll make the client handle
+  that better, basically well change how worlds are.created entirely").
+- Reads that change frame to frame (render rules) or tick to tick
+  (server rules): "we probably keep it fixed now and add dynamicity on
+  that front later if needed. simple is better now".
 - Lowering kernel.perf_event_paranoid for perf (not for callgrind, which
   needs nothing): "in fact, i believe we can disable some kernel security
   to get even more performance info" / "fair, well do it when needed"

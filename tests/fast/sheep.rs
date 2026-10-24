@@ -44,7 +44,7 @@ fn well_formed(sheep_entity: &EntityRef) -> bool {
 #[test]
 fn sheep_without_grass_starve() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, probe) = probed_world(&plain_start(1, 0, 500, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let (mut world, probe) = probed_world(&plain_start("sheep_without_grass_starve", 1, 0, 500, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
     let (mut eaten_total, mut deaths_total) = (0, 0);
     for _ in 0..TIME_BETWEEN_MEALS.ticks() + TIME_TO_STARVE.ticks() + 2 * (STEP.ticks() + STEP_JITTER.ticks()) {
         let tick_counts = tick_sheep(&mut world).rules;
@@ -59,7 +59,7 @@ fn sheep_without_grass_starve() {
 #[test]
 fn sheep_eat_breed_and_grow_up() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, probe) = probed_world(&plain_start(4, 18_750, 400, 2).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let (mut world, probe) = probed_world(&plain_start("sheep_eat_breed_and_grow_up", 4, 18_750, 400, 2).with(SEED, ParameterValue::Hex(seed)), nothing_more);
     let (mut eaten_total, mut births_total, mut lost, mut lambs_seen, mut pregnant_seen) = (0, 0, 0, false, false);
     // A gestation and six meals' time: the lambs conceived over those meals born, whatever either lasts.
     for tick in 0..GESTATION_TIME.ticks() + 6 * TIME_BETWEEN_MEALS.ticks() {
@@ -89,7 +89,7 @@ fn sheep_eat_breed_and_grow_up() {
 #[test]
 fn hungry_sheep_walk_to_the_nearest_grass() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, probe) = probed_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let (mut world, probe) = probed_world(&plain_start("hungry_sheep_walk_to_the_nearest_grass", 1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
     let corner_cartesian = first_superchunk(&mut world, &probe).top_left().cartesian();
     a_sheep_and_its_grass(&mut world, &probe, CellCartesian { x: corner_cartesian.x + 500, y: corner_cartesian.y + 500 }, CellCartesian { x: corner_cartesian.x + 506, y: corner_cartesian.y + 493 });
     let (mut counts_so_far, mut ate_at) = (RuleCounts::default(), None);
@@ -114,7 +114,7 @@ fn hungry_sheep_walk_to_the_nearest_grass() {
 #[test]
 fn hungry_sheep_walk_to_grass_far_off() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, probe) = probed_world(&plain_start(4, 0, 0, 2).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let (mut world, probe) = probed_world(&plain_start("hungry_sheep_walk_to_grass_far_off", 4, 0, 0, 2).with(SEED, ParameterValue::Hex(seed)), nothing_more);
     // The square's top left superchunk: the first, row by row.
     let corner_cartesian = first_superchunk(&mut world, &probe).top_left().cartesian();
     a_sheep_and_its_grass(&mut world, &probe, CellCartesian { x: corner_cartesian.x + 900, y: corner_cartesian.y + 700 }, CellCartesian { x: corner_cartesian.x + 1050, y: corner_cartesian.y + 800 });
@@ -144,7 +144,7 @@ fn hungry_sheep_walk_to_grass_far_off() {
 #[test]
 fn sheep_on_thin_pasture_roam_away() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, probe) = probed_world(&plain_start(16, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let (mut world, probe) = probed_world(&plain_start("sheep_on_thin_pasture_roam_away", 16, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
     let superchunks = hot_superchunks(&mut world, &probe);
     let start_cells: Vec<CellCartesian> = superchunks.iter().map(|superchunk| superchunk.top_left().cartesian()).map(|corner_cartesian| CellCartesian { x: corner_cartesian.x + 500, y: corner_cartesian.y + 500 }).collect();
     for &start_cell in &start_cells {
@@ -184,7 +184,7 @@ fn sheep_on_thin_pasture_roam_away() {
 fn any_number_of_threads_ticks_sheep_the_same() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let run_with_threads = |thread_count| {
-        let (mut world, probe) = probed_world(&plain_start(4, 12_500, 300, thread_count).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+        let (mut world, probe) = probed_world(&plain_start(&format!("any_number_of_threads_ticks_sheep_the_same_{thread_count}"), 4, 12_500, 300, thread_count).with(SEED, ParameterValue::Hex(seed)), nothing_more);
         let reports: Vec<_> = (0..1500).map(|_| tick_sheep(&mut world)).map(|report| (report.rules, report.instructions_applied)).collect();
         let sheep_list = every_entity(&mut world, &probe, |sheep_entity| (sheep_entity.header, sheep_entity.attributes.to_vec()));
         (reports, sheep_list, cells_of_grass(&mut world, &probe))
@@ -200,8 +200,8 @@ fn any_number_of_threads_ticks_sheep_the_same() {
 #[test]
 fn sheep_never_overlap() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, probe) = probed_world(&plain_start(4, 18_750, 60_000, 4).with(SEED, ParameterValue::Hex(seed)), nothing_more);
-    world.tick();
+    let (mut world, probe) = probed_world(&plain_start("sheep_never_overlap", 4, 18_750, 60_000, 4).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    // The flock generated with the world: counted on the first tick, as it found them.
     // About one sheep in sixteen made pregnant, its lamb due within 2,000 ticks and the sheep awake for it -- one not
     // woken this tick, so its own rule writes nothing to it: which and when drawn from the run's seed and its cell.
     let (lamb_report, flock_count) = probe.tick_rule(&mut world, SHEEP_RULE, move |tick_state| {
@@ -241,7 +241,7 @@ fn sheep_never_overlap() {
 #[test]
 fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, probe) = probed_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let (mut world, probe) = probed_world(&plain_start("a_meal_lost_to_a_decay_leaves_the_sheep_hungry", 1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
     let corner_cartesian = first_superchunk(&mut world, &probe).top_left().cartesian();
     let (decaying_cell, standing_cell): (CellIndex, CellIndex) = (CellCartesian { x: corner_cartesian.x + 400, y: corner_cartesian.y + 400 }.into(), CellCartesian { x: corner_cartesian.x + 600, y: corner_cartesian.y + 400 }.into());
     for grass_cell in [decaying_cell, standing_cell] {

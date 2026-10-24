@@ -15,8 +15,8 @@ use utilities::rng::RandomSource;
 
 /// A world of one superchunk, bare, and its probe: and the superchunk's
 /// cells, in rows.
-fn bare_world(seed: u64) -> (World, Probe, Vec<CellIndex>) {
-    let (mut world, probe) = probed_world(&plain_start(1, 0, 0, 2).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+fn bare_world(test_name: &str, seed: u64) -> (World, Probe, Vec<CellIndex>) {
+    let (mut world, probe) = probed_world(&plain_start(test_name, 1, 0, 0, 2).with(SEED, ParameterValue::Hex(seed)), nothing_more);
     let cells = cells_of(first_superchunk(&mut world, &probe)).collect();
     (world, probe, cells)
 }
@@ -65,7 +65,7 @@ fn stages(world: &mut World, probe: &Probe, cells: &[CellIndex]) -> Vec<(CellInd
 #[test]
 fn trees_grow_a_stage_at_a_time_spread_and_die_of_age() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, probe, cells) = bare_world(seed);
+    let (mut world, probe, cells) = bare_world("trees_grow_a_stage_at_a_time_spread_and_die_of_age", seed);
     let mut seeded_random = RandomSource::new(seed);
     let planted_cells: Vec<CellIndex> = cells.iter().copied().filter(|_| seeded_random.draw_below(16) == 0).collect();
     plant_trees(&mut world, &probe, &planted_cells, || if seeded_random.draw_below(2) == 0 { OLDEST_TREE_STAGE } else { seeded_random.draw_below(u64::from(OLDEST_TREE_STAGE) + 1) as u32 });
@@ -115,7 +115,7 @@ fn trees_grow_a_stage_at_a_time_spread_and_die_of_age() {
 #[test]
 fn crowded_trees_never_spread() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, probe, every_cell) = bare_world(seed);
+    let (mut world, probe, every_cell) = bare_world("crowded_trees_never_spread", seed);
     plant_trees(&mut world, &probe, &every_cell, || OLDEST_TREE_STAGE);
     let (mut sampled_total, mut died_total) = (0, 0);
     for tick in 0..300 {
@@ -133,7 +133,7 @@ fn crowded_trees_never_spread() {
 fn young_trees_spread_and_none_dies() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut seeded_random = RandomSource::new(seed);
-    let (mut world, probe, cells) = bare_world(seed);
+    let (mut world, probe, cells) = bare_world("young_trees_spread_and_none_dies", seed);
     let planted_cells: Vec<CellIndex> = cells.iter().copied().filter(|_| seeded_random.draw_below(16) == 0).collect();
     plant_trees(&mut world, &probe, &planted_cells, || SEEDS_FROM);
     // Too few ticks for a tree to grow from there to the oldest stage.

@@ -1,12 +1,12 @@
 //! A superchunk's layers as the simulation is handed them: the
 //! superchunk itself, a layer of it to read, and a hot bucket.
 
-use super::{COUNT_TILES_IN_CHUNK, contains};
+use super::{COUNT_TILES_IN_CHUNK, ChunkSet, contains};
 use super::superchunk_layer::{SuperchunkLayer};
 use super::writes::{Write, WritesApplied, apply_in};
 use utilities::bitmap::CellWords;
-use crate::chunk_storage::LayerType;
-use utilities::coordinates::{CellIndex, SuperchunkIndex};
+use crate::chunk_storage::{LayerCodec, LayerType, SuperchunkImage};
+use utilities::coordinates::{CellIndex, SuperchunkIndex, CHUNKS_IN_SUPERCHUNK};
 
 /// One hot bitmap, to read.
 pub struct Bucket<'a> {
@@ -52,6 +52,35 @@ pub struct Superchunk {
 }
 
 impl Superchunk {
+    /// `superchunk` to be generated, apart from the arena: a layer of each
+    /// of `layer_types`, every chunk hot and nothing set -- written
+    /// through [`Superchunk::apply`], each bucket a write makes dirty,
+    /// then made hot whole ([`super::BitmapArena::make_hot_warmed`]).
+    pub(crate) fn to_generate(superchunk: SuperchunkIndex, layer_types: &[LayerType]) -> Self {
+        let mut layers: Vec<SuperchunkLayer> = layer_types.iter().map(|&layer_type| SuperchunkLayer::empty(layer_type, ChunkSet::MAX)).collect();
+        layers.sort_unstable_by_key(|layer| layer.layer_type);
+        Self { superchunk_index: superchunk, layers, on_their_way: 0 }
+    }
+
+    /// `superchunk` as `image` keeps it, apart from the arena: a layer of
+    /// each of `layer_types`, every chunk made hot from the image with
+    /// `layer_codec` -- off the tick, as it warms -- then made hot whole
+    /// ([`super::BitmapArena::make_hot_warmed`]).
+    pub(crate) fn from_image(superchunk: SuperchunkIndex, layer_types: &[LayerType], image: &SuperchunkImage, layer_codec: &mut LayerCodec) -> Self {
+        let mut layers = Vec::with_capacity(layer_types.len());
+        for &layer_type in layer_types {
+            let mut layer = SuperchunkLayer::empty(layer_type, 0);
+            for chunk in 0..CHUNKS_IN_SUPERCHUNK {
+                // No layer kept, no cell set.
+                let fill_bucket = image.layer(chunk, layer_type.type_id()).map(|encoded_layer| |bucket: &mut [u64]| crate::chunk_storage::wide::decode_bucket(layer_type, encoded_layer, layer_codec, bucket));
+                layer.make_chunk_hot(chunk, fill_bucket);
+            }
+            layers.push(layer);
+        }
+        layers.sort_unstable_by_key(|layer| layer.layer_type);
+        Self { superchunk_index: superchunk, layers, on_their_way: 0 }
+    }
+
     /// Where `layer_type` is among the layers, if it has one.
     pub(crate) fn layer_index(&self, layer_type: LayerType) -> Option<usize> {
         self.layers.binary_search_by_key(&layer_type, |layer| layer.layer_type).ok()
@@ -76,10 +105,13 @@ impl Superchunk {
 
     /// The number `layer_type` holds at `asked_cell`, a cell of this superchunk,
     /// as it is now -- 1 or 0 on a layer of a bit a cell: none where
-    /// its bitmap is not hot. What a write that says what its rule saw
-    /// is held against (`docs/bitplane_manager.md`, "Writes").
+    /// its bitmap is not hot, or the cell is of another superchunk. What
+    /// a write that says what its rule saw is held against
+    /// (`docs/bitplane_manager.md`, "Writes").
     pub fn value_at(&self, layer_type: LayerType, asked_cell: CellIndex) -> Option<u32> {
-        debug_assert_eq!(asked_cell.superchunk(), self.superchunk_index, "a cell of another superchunk");
+        if asked_cell.superchunk() != self.superchunk_index {
+            return None;
+        }
         let layer = &self.layers[self.layer_index(layer_type)?];
         let chunk = asked_cell.chunk().place();
         contains(layer.chunk_flags.hot, chunk).then(|| layer.value(chunk, asked_cell.place()))

@@ -29,7 +29,7 @@ fn origin(world: &mut World, probe: &Probe) -> CellCartesian {
 fn grass_crowded_by_grass_decays_at_its_chance() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let mut seeded_random = RandomSource::new(seed);
-    let (mut world, probe) = probed_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let (mut world, probe) = probed_world(&plain_start("grass_crowded_by_grass_decays_at_its_chance", 1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
     let origin = origin(&mut world, &probe);
     // Every cell, in a tick of the probe alone: the grass rule's ticks are of a superchunk all grass.
     let plant_all = |world: &mut World| set_rectangle(world, &probe, base().grass, origin, SUPERCHUNK_SIDE_CELLS, SUPERCHUNK_SIDE_CELLS);
@@ -57,7 +57,7 @@ fn grass_crowded_by_grass_decays_at_its_chance() {
 #[allow(clippy::disallowed_methods)]
 fn lone_grass_never_decays_and_spreads_at_its_chance() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let (mut world, probe) = probed_world(&plain_start(1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let (mut world, probe) = probed_world(&plain_start("lone_grass_never_decays_and_spreads_at_its_chance", 1, 0, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
     let origin = origin(&mut world, &probe);
     // A cell every fourth across and down: far enough apart that one spread never makes two neighbours.
     let lone_cells: Vec<CellIndex> = (0..256).flat_map(|y| (0..256).map(move |x| CellCartesian { x: origin.x + 4 * x + 1, y: origin.y + 4 * y + 1 }.into())).collect();
@@ -93,7 +93,7 @@ fn lone_grass_never_decays_and_spreads_at_its_chance() {
 fn grass_changes_by_what_spread_and_decayed() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     // Grass enough that some of it spreads in so few ticks.
-    let (mut world, probe) = probed_world(&plain_start(1, 6_250, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
+    let (mut world, probe) = probed_world(&plain_start("grass_changes_by_what_spread_and_decayed", 1, 6_250, 0, 1).with(SEED, ParameterValue::Hex(seed)), nothing_more);
     let grass_at_start = cells_of_grass(&mut world, &probe);
     let mut grass_before = grass_at_start;
     for _ in 0..1000 {

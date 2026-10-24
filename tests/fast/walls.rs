@@ -1,7 +1,7 @@
 //! Walls of generated ground: no sheep steps through one, across, down
 //! or diagonally.
 
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, SEED, SIDE, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, SEED, SIDE};
 use crate::probe::entities_of_the_turn;
 use server::simulation::simulation_api::entity_reads_and_writes;
 use utilities::coordinates::CellCartesian;
@@ -15,7 +15,8 @@ fn sheep_never_step_through_a_wall() {
     // Small polygons joined by cliffs, and a seed whose origin superchunk has walls enough.
     let land_shape = basegame::worldgen::LandShape { vertex_spacing_power: 8, highest_land: 552, narrowest_blend: 2, widest_blend: 2, ocean_share: 0, finer_depth: 3, ..basegame::worldgen::LandShape::DEFAULT };
     let seed = (crate::test_seed::TestSeedHandle::open().seed()..).find(|&seed| basegame::worldgen::Terrain::generate_shaped(&land_shape, seed, utilities::coordinates::CellArea { top_left: utilities::coordinates::WORLD_MIDDLE_CELL, side_cells: utilities::coordinates::SUPERCHUNK_SIDE_CELLS }).wall_counts().iter().sum::<u64>() > 5_000).expect("a walled origin");
-    let (mut made_world, probe) = crate::worlds::probed_world(&CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(1)).with(WORLDGEN, crate::worlds::worldgen(basegame::worldgen::WorldGeneration { land_shape, sheep_per_superchunk: 4_000, ..basegame::worldgen::WorldGeneration::DEFAULT }.worldgen_parameters())), crate::worlds::sheep_tag_registered);
+    let parameters = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(1));
+    let (mut made_world, probe) = crate::worlds::probed_world(&crate::worlds::in_folder(parameters, "sheep_never_step_through_a_wall", basegame::worldgen::WorldGeneration { land_shape, sheep_per_superchunk: 4_000, ..basegame::worldgen::WorldGeneration::DEFAULT }), crate::worlds::sheep_tag_registered);
     // The superchunk's heights and a cell more all round, worked out once: asked for at every sheep, every tick.
     let (corner_cartesian, side_cells) = (utilities::coordinates::WORLD_MIDDLE.top_left().cartesian(), utilities::coordinates::SUPERCHUNK_SIDE_CELLS as usize + 2);
     let mut mesh_lands = basegame::worldgen::mesh::WorldLand::new(&land_shape, seed);

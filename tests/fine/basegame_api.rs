@@ -1,6 +1,8 @@
 //! The base game against the server: it reaches the server through
-//! the simulation's API alone, and nothing of utilities -- "basegame
-//! cant depend on server internals, only the public apis".
+//! the simulation's API alone -- "basegame cant depend on server
+//! internals, only the public apis". Utilities it may name: a shared
+//! library, as protocol is ("yes in fine having basegame use utilities,
+//! thats what utilities is for").
 
 use std::fs;
 use std::path::Path;
@@ -18,8 +20,7 @@ fn sources_in(folder: &Path, found_sources: &mut Vec<std::path::PathBuf>) {
 }
 
 /// No line of the base game's sources names the server but by its
-/// simulation's API, nor utilities at all: what it takes of either
-/// comes re-exported by that API. Comments are let be.
+/// simulation's API. Comments are let be.
 #[test]
 fn the_base_game_asks_the_simulation_api_alone() {
     let root_folder = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -32,7 +33,7 @@ fn the_base_game_asks_the_simulation_api_alone() {
         for (line_index, line) in fs::read_to_string(source_file).expect("read").lines().enumerate() {
             let code_part = line.split_once("//").map_or(line, |(before_comment, _)| before_comment);
             let past_the_api = code_part.replace("server::simulation::simulation_api::", "");
-            if past_the_api.contains("server::") || past_the_api.contains("utilities::") {
+            if past_the_api.contains("server::") {
                 wrong_places.push(format!("{shown_path}:{}: `{}`", line_index + 1, code_part.trim()));
             }
         }

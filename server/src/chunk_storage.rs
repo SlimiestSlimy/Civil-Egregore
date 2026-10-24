@@ -12,7 +12,6 @@ pub mod disk;
 pub mod jobs;
 mod layer_codec;
 mod paging;
-mod generated_area;
 mod superchunk_image;
 pub mod wide;
 mod writeback_ring;
@@ -20,7 +19,6 @@ mod writeback_ring;
 pub use paging::{read_back, ImageStored};
 pub use layer_codec::{BucketKey, LayerCodec};
 pub use protocol::type_registry::LayerType;
-pub use generated_area::GeneratedArea;
 pub use superchunk_image::{LayerChange, SuperchunkImage};
 pub use writeback_ring::WritebackRing;
 // Names only the crate's tests use.

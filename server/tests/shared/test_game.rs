@@ -8,17 +8,21 @@
 #![allow(dead_code)]
 
 use crate::collision::Collision;
-use crate::simulation::simulation_api::{cell_and_its_neighbours, entity_reads_and_writes, tick_and_random_stream, Attribute, Bits4, CellCartesian, CellIndex, EntityRef, EntityType, GeneratedArea, LayerType, RandomSource, RuleCode, RuleCounts, SimulationTickState, WholeAttribute, WidePlane, WorldgenCode, WorldgenParameters, SUPERCHUNK_SIDE_CELLS};
+use crate::simulation::simulation_api::{cell_and_its_neighbours, entity_reads_and_writes, tick_and_random_stream, Attribute, Bits4, CellCartesian, CellIndex, EntityRef, EntityType, FirstWake, GeneratingSuperchunk, LayerType, RandomSource, RuleCode, RuleCounts, SetUpWorldgen, SimulationTickState, WholeAttribute, WidePlane, WorldgenCode, Write, WriteOp, WritesApplied, SUPERCHUNK_SIDE_CELLS};
+use crate::simulation::simulation_api::simulation_time::SimulationTime;
 use crate::World;
-use protocol::server_parameters::{CleanServerParameters, ParameterValue, WORLDGEN};
+use protocol::server_parameters::{CleanServerParameters, ParameterValue, WORLD};
+use std::path::{Path, PathBuf};
 use protocol::type_registry::{FrozenTypeRegistry, Hook, Registration, TypeRegistry};
 use std::sync::Arc;
 use utilities::coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 
 /// The test game's bundle.
 pub const BUNDLE: &str = "test game";
-/// The worldgen parameter of the walkers each superchunk generated is given.
-pub const WALKERS_PER_SUPERCHUNK: &str = "walkers per superchunk";
+/// The test game's config file, in its folder of a world's mod config:
+/// the walkers each superchunk generated is given, a number -- none if
+/// there is no file.
+pub const WALKERS_CONFIG_FILE: &str = "walkers per superchunk.txt";
 /// The walkers' rule's name.
 pub const WALKERS_RULE: &str = "walkers rule";
 /// A walker's chance, one in this, of giving birth at a wake, and of dying.
@@ -132,66 +136,93 @@ impl TestGame {
     }
 
     /// The generation: stone on a cell in sixteen, drawn from the seed
-    /// and the cell, held in the collision plane; as many walkers on
-    /// each superchunk the first tick it is hot as the worldgen
-    /// parameters say, on cells of their own free of it.
+    /// and the cell, held in the collision plane; and on each superchunk
+    /// as many walkers as its config says ([`WALKERS_CONFIG_FILE`]), on
+    /// cells of their own free of it -- the superchunk generated whole.
     fn generation(self) -> WorldgenCode {
-        WorldgenCode {
-            generate_cells: Arc::new(move |_, seed, generated_area: &mut GeneratedArea| {
-                let corner = generated_area.area().top_left;
+        WorldgenCode { set_up: Arc::new(move |config_folder: &Path| Ok(self.set_up_generation(walkers_in(config_folder)?))) }
+    }
+
+    /// The generation set up, `walkers` walkers given each superchunk.
+    fn set_up_generation(self, walkers: u64) -> SetUpWorldgen {
+        SetUpWorldgen {
+            generate: Arc::new(move |seed, generating: &mut GeneratingSuperchunk| {
+                let (superchunk, mut writes_applied) = (generating.superchunk_index(), WritesApplied::default());
+                let corner = superchunk.top_left().cartesian();
                 for (x, y) in (0..SUPERCHUNK_SIDE_CELLS).flat_map(|y| (0..SUPERCHUNK_SIDE_CELLS).map(move |x| (x, y))) {
-                    let cell = CellCartesian { x: corner.x + x, y: corner.y + y };
-                    if RandomSource::for_stream(seed, CellIndex::from(cell).0).draw_below(16) == 0 {
-                        generated_area.set(self.stone, cell);
-                        generated_area.set(self.collision, cell);
+                    let cell = CellIndex::from(CellCartesian { x: corner.x + x, y: corner.y + y });
+                    if RandomSource::for_stream(seed, cell.0).draw_below(16) == 0 {
+                        generating.cells_mut().apply(self.stone, Write::cell(cell, WriteOp::SetCell), &mut writes_applied);
+                        generating.cells_mut().apply(self.collision, Write::cell(cell, WriteOp::SetCell), &mut writes_applied);
                     }
                 }
+                self.generate_walkers(generating, walkers, &mut RandomSource::for_stream(!seed, superchunk.0));
             }),
-            populate: Arc::new(move |tick_state, worldgen_parameters, seed| {
-                let walkers = walkers_per_superchunk(worldgen_parameters);
-                let superchunk = tick_and_random_stream::superchunk(tick_state);
-                self.put_walkers(tick_state, superchunk, walkers, &mut RandomSource::for_stream(!seed, superchunk.0));
-            }),
-            parameters_read: |worldgen_parameters| vec![(WALKERS_PER_SUPERCHUNK.to_string(), walkers_per_superchunk(worldgen_parameters))],
-            fit_to_start: |_, _| true,
         }
     }
 
-    /// Queues `count` walkers on cells of `superchunk` drawn from
+    /// Makes on `generating` `count` walkers on cells drawn from
     /// `random_stream`, each of its own and free of the collision plane,
-    /// waking within [`LONGEST_SLEEP`] of the tick after.
-    pub fn put_walkers(self, tick_state: &mut SimulationTickState, superchunk: SuperchunkIndex, count: u64, random_stream: &mut RandomSource) {
-        let (corner, tick_now) = (superchunk.top_left().cartesian(), tick_and_random_stream::current_tick(tick_state));
-        let mut drawn_cells = std::collections::HashSet::new();
-        while (drawn_cells.len() as u64) < count {
+    /// which then holds it, first waking within [`LONGEST_SLEEP`] of the
+    /// tick after it turns hot.
+    pub fn generate_walkers(self, generating: &mut GeneratingSuperchunk, count: u64, random_stream: &mut RandomSource) {
+        let (corner, mut writes_applied, mut made) = (generating.superchunk_index().top_left().cartesian(), WritesApplied::default(), 0);
+        while made < count {
             let drawn_cell: CellIndex = CellCartesian { x: corner.x + random_stream.draw_below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32, y: corner.y + random_stream.draw_below(u64::from(SUPERCHUNK_SIDE_CELLS)) as u32 }.into();
-            if crate::simulation::simulation_api::cell_reads_and_writes::layer_holds(tick_state, self.collision, drawn_cell) || !drawn_cells.insert(drawn_cell) {
+            if generating.cells().value_at(self.collision, drawn_cell) == Some(1) {
                 continue;
             }
-            let wake = tick_now + 1 + random_stream.draw_below(LONGEST_SLEEP);
-            drop(self.collision_library().begin_making_entity(tick_state, self.walker, drawn_cell, wake, &WholeAttribute::holding_value(self.steps, 0)));
+            let first_wake = SimulationTime::time_between_ticks(0, 1 + random_stream.draw_below(LONGEST_SLEEP));
+            if generating.new_entity(self.walker, drawn_cell, FirstWake::After(first_wake)).with(self.steps, 0).make() {
+                generating.cells_mut().apply(self.collision, Write::cell(drawn_cell, WriteOp::SetCell), &mut writes_applied);
+                made += 1;
+            }
         }
     }
 }
 
-/// The walkers each superchunk generated is given, as `worldgen_parameters` say: none unless said.
-fn walkers_per_superchunk(worldgen_parameters: &WorldgenParameters) -> u64 {
-    worldgen_parameters.iter().find(|(name, _)| name == WALKERS_PER_SUPERCHUNK).map_or(0, |&(_, walkers)| walkers)
+/// The walkers each superchunk generated is given, as the test game's
+/// config in `config_folder` says: none if it has none. Or why not.
+fn walkers_in(config_folder: &Path) -> Result<u64, String> {
+    let config_path = config_folder.join(WALKERS_CONFIG_FILE);
+    match std::fs::read_to_string(&config_path) {
+        Ok(config_text) => config_text.trim().parse().map_err(|_| format!("{}: not a number", config_path.display())),
+        Err(_) => Ok(0),
+    }
 }
 
-/// `parameters` with `walkers` walkers given each superchunk generated.
-pub fn with_walkers(parameters: CleanServerParameters, walkers: u64) -> CleanServerParameters {
-    parameters.with(WORLDGEN, ParameterValue::Nested(CleanServerParameters::default().with(WALKERS_PER_SUPERCHUNK, ParameterValue::Hex(walkers))))
+/// `parameters` of a new world of the test game in a folder of its own
+/// for the test `test_name`, emptied (`crate::whole_worlds::folder`), its
+/// config giving each superchunk generated `walkers` walkers.
+pub fn in_folder(parameters: CleanServerParameters, test_name: &str, walkers: u64) -> CleanServerParameters {
+    let folder = crate::whole_worlds::folder(test_name);
+    let config_folder = folder.join(crate::MOD_CONFIG).join(BUNDLE);
+    std::fs::create_dir_all(&config_folder).expect("the test world's config folder");
+    std::fs::write(config_folder.join(WALKERS_CONFIG_FILE), walkers.to_string()).expect("the test world's config written");
+    parameters.with(WORLD, ParameterValue::Text(folder.display().to_string()))
 }
 
-/// A world of the test game started as `parameters` say -- given no
-/// side, with no end -- its generation giving no walkers, and `walkers`
-/// put at its middle by the server between ticks, their halo kept hot:
-/// a flock wandering a world with no end, which a flock on every
-/// superchunk generated would grow for good.
-pub fn one_flock_world(parameters: CleanServerParameters, walkers: u64) -> (World, TestGame) {
+/// The folder `parameters` name ([`WORLD`]).
+pub fn folder_of(parameters: &CleanServerParameters) -> PathBuf {
+    PathBuf::from(parameters.text(WORLD).expect("a test world's folder named"))
+}
+
+/// A world of the test game made in the folder `parameters` name
+/// ([`in_folder`]), as they say.
+pub fn made(parameters: &CleanServerParameters) -> World {
+    crate::make_world(&folder_of(parameters), parameters, &TestGame::new_world_types().0).expect("the world made")
+}
+
+/// A world of the test game made in a folder of its own for the test
+/// `test_name` as `parameters` say -- given no side, with no end -- its
+/// generation giving no walkers, and `walkers` put at its middle by the
+/// server between ticks, their halo kept hot: a flock wandering a world
+/// with no end, which a flock on every superchunk generated would grow
+/// for good.
+pub fn one_flock_world(test_name: &str, parameters: CleanServerParameters, walkers: u64) -> (World, TestGame) {
     let (frozen_type_registry, test_game) = TestGame::new_world_types();
-    let mut world = crate::start_world(&with_walkers(parameters, 0), &frozen_type_registry).expect("the world started");
+    let parameters = in_folder(parameters, test_name, 0);
+    let mut world = crate::make_world(&folder_of(&parameters), &parameters, &frozen_type_registry).expect("the world made");
     world.keep_hot(&crate::halos_about([WORLD_MIDDLE].into_iter()));
     put_flock(&mut world, test_game, WORLD_MIDDLE, walkers);
     (world, test_game)
@@ -218,11 +249,6 @@ pub fn put_flock(world: &mut World, test_game: TestGame, superchunk: SuperchunkI
     }
 }
 
-/// The worldgen parameters giving `walkers` walkers to each superchunk
-/// generated, as [`WORLDGEN`] holds them.
-pub fn walkers(walkers: u64) -> ParameterValue {
-    ParameterValue::Nested(CleanServerParameters::default().with(WALKERS_PER_SUPERCHUNK, ParameterValue::Hex(walkers)))
-}
 
 /// The place of the walkers' rule among `world`'s rules.
 pub fn walkers_rule(world: &World) -> crate::RulePlace {

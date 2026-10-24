@@ -1,11 +1,12 @@
 //! The world generation's functions a client may call
 //! ([`call_registrations`]): a worldgen parameter the world is reset with,
 //! read and set, each by its place among the generation's parameters
-//! ([`WorldGeneration::worldgen_parameters`]'s order) -- and the
-//! world's reset: what the base game's sliders will call, as gui types
-//! of the client.
+//! ([`WorldGeneration::worldgen_parameters`]'s order) -- kept in the
+//! config file of the world's reset -- and the world's reset, that file
+//! made the world's own first: what the base game's sliders call, as
+//! gui types of the client.
 
-use crate::worldgen::WorldGeneration;
+use crate::worldgen::{WorldGeneration, RESET_CONFIG_FILE, WORLDGEN_CONFIG_FILE};
 use protocol::type_registry::{ClientCallType, RegisteredType, Registration};
 use server::simulation::simulation_api::{CallCode, CallContext};
 use std::sync::Arc;
@@ -58,32 +59,39 @@ pub fn call_registrations(world_generation: &str) -> [Registration; 3] {
 }
 
 /// The worldgen parameter at the place `arguments` names, as the
-/// world's reset is to read it: or why not.
+/// world's reset is to read it ([`WorldGeneration::read_reset_config`]):
+/// or why not.
 fn worldgen_parameter(call_context: &mut CallContext, arguments: &[u64]) -> Result<Vec<u64>, String> {
     let &[place] = arguments else {
         return Err(format!("{WORLDGEN_PARAMETER_CALL}: one word, the parameter's place"));
     };
-    let read = WorldGeneration::of_worldgen_parameters(call_context.worldgen_parameters_for_reset()).worldgen_parameters();
+    let read = WorldGeneration::DEFAULT.read_reset_config(call_context.mod_config_folder())?.worldgen_parameters();
     let (_, value) = parameter_at(&read, place)?;
     Ok(vec![*value])
 }
 
 /// Sets the worldgen parameter at the place `arguments` names to the
-/// value after it, for the world's reset: or why not.
+/// value after it, for the world's reset -- in its config file, the
+/// world running generated as it was: or why not.
 fn set_worldgen_parameter(call_context: &mut CallContext, arguments: &[u64]) -> Result<Vec<u64>, String> {
     let &[place, value] = arguments else {
         return Err(format!("{SET_WORLDGEN_PARAMETER_CALL}: two words, the parameter's place and its value"));
     };
-    let read = WorldGeneration::DEFAULT.worldgen_parameters();
-    let (name, _) = parameter_at(&read, place)?;
-    call_context.set_worldgen_parameter_for_reset(name, value);
+    let for_reset = WorldGeneration::DEFAULT.read_reset_config(call_context.mod_config_folder())?;
+    let (name, _) = parameter_at(&for_reset.worldgen_parameters(), place)?.clone();
+    for_reset.with_worldgen_parameters(&[(name, value)]).write_reset_config(call_context.mod_config_folder())?;
     Ok(Vec::new())
 }
 
-/// Resets the world: nothing taken, nothing answered.
+/// Resets the world, the config file of its reset -- if one was written
+/// -- made the world's own first: nothing taken, nothing answered.
 fn reset_world(call_context: &mut CallContext, arguments: &[u64]) -> Result<Vec<u64>, String> {
     if !arguments.is_empty() {
         return Err(format!("{RESET_WORLD_CALL}: no words"));
+    }
+    let (reset_path, world_path) = (call_context.mod_config_folder().join(RESET_CONFIG_FILE), call_context.mod_config_folder().join(WORLDGEN_CONFIG_FILE));
+    if reset_path.exists() {
+        std::fs::rename(&reset_path, &world_path).map_err(|error| format!("{}: {error}", reset_path.display()))?;
     }
     call_context.reset_world();
     Ok(Vec::new())

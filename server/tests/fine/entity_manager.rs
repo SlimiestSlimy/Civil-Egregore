@@ -9,8 +9,9 @@ mod default_attributes;
 mod edited_in_any_order;
 mod named_by_its_cell;
 
-use crate::entity_manager::{find_attribute, is_attribute_list, Attribute, AttributeBlock, AttributeType, EntityType, Header, Instructions, InstructionsApplied, Layout, Member, WholeAttribute, WorldEntities, BLOCK_WORDS, NEVER_WAKES};
-use crate::entity_manager::saved::{decode_state, encode_state};
+use crate::entity_manager::{find_attribute, is_attribute_list, Attribute, AttributeBlock, AttributeType, DefaultAttributes, EntityType, Header, Instructions, InstructionsApplied, Layout, Member, SuperchunkEntities, WholeAttribute, WorldEntities, BLOCK_WORDS, NEVER_WAKES};
+use crate::entity_manager::saved::{decode_into, encode_state};
+use std::sync::Arc;
 use protocol::type_registry::{FrozenTypeRegistry, RegisteredType, Registration, TypeRegistry};
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
 use utilities::rng::RandomSource;
@@ -132,6 +133,16 @@ fn world(frozen_types: &FrozenTypeRegistry) -> WorldEntities {
     let mut world_entities = WorldEntities::for_types(frozen_types, 0);
     assert_eq!(world_entities.keep_superchunks(&[SuperchunkIndex::from_cartesian(10, 10)]), 0);
     world_entities
+}
+
+/// The state file `words` read back into the superchunk `(10, 10)`'s
+/// entities, of the types `frozen_types`, warming to be hot at
+/// `first_hot_tick`: or what is wrong with the file.
+fn read_back(frozen_types: &FrozenTypeRegistry, words: &[u64], first_hot_tick: u64) -> Result<SuperchunkEntities, &'static str> {
+    let default_attributes = Arc::new(DefaultAttributes::of_types(frozen_types));
+    let mut read_entities = SuperchunkEntities::new(SuperchunkIndex::from_cartesian(10, 10), Arc::clone(&default_attributes));
+    decode_into(words, first_hot_tick, &default_attributes, &mut read_entities)?;
+    Ok(read_entities)
 }
 
 /// The cell `(x, y)` cells from the top left of the superchunk `(10, 10)`.
@@ -263,16 +274,15 @@ fn an_attribute_is_edited_to_any_length_and_saved() {
     let superchunk = target_header.stood_cell.superchunk();
     let (words, count) = encode_state(None, world_entities.superchunk(superchunk));
     assert_eq!(count, 1);
-    let mut read_back = world(&frozen_types);
-    assert_eq!(decode_state(&words, 4, &mut read_back).map(|saved_state| saved_state.entity_count), Ok(1));
-    read_back.apply();
-    let (saved_entity, read_entity) = (world_entities.get(target_header.stood_cell).expect("there"), read_back.get(target_header.stood_cell).expect("read back"));
+    let read_entities = read_back(&frozen_types, &words, 4).expect("read back");
+    assert_eq!(read_entities.len(), 1);
+    let (saved_entity, read_entity) = (world_entities.get(target_header.stood_cell).expect("there"), read_entities.get(target_header.stood_cell).expect("read back"));
     assert_eq!((saved_entity.header, saved_entity.attributes), (read_entity.header, read_entity.attributes));
 
     // The note's block length said to be more than the entity has blocks: nothing is read.
     let mut wrong_words = words.clone();
     let note_type_index = wrong_words.iter().position(|&word| AttributeType::of_header_word(word).type_identity() == types.varying_note.type_identity()).expect("the note's type");
     wrong_words[note_type_index] = types.varying_note.with_blocks(16).header_word();
-    assert!(decode_state(&wrong_words, 4, &mut world(&frozen_types)).is_err());
-    assert!(decode_state(&words[..words.len() - 1], 4, &mut world(&frozen_types)).is_err(), "cut short");
+    assert!(read_back(&frozen_types, &wrong_words, 4).is_err());
+    assert!(read_back(&frozen_types, &words[..words.len() - 1], 4).is_err(), "cut short");
 }

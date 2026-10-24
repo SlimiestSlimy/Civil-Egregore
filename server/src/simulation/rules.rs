@@ -9,7 +9,7 @@
 use crate::simulation::simulation_api::{CallCode, RuleCode, RuleContext, RuleCounts, RuleMaster, RuleRun, TickReport, SimulationTickState, WorldgenCode, COUNTS_OF_A_RULE};
 use std::sync::Arc;
 use crate::entity_manager::EntityType;
-use protocol::type_registry::{FrozenTypeRegistry, Hook, RegisteredType};
+use protocol::type_registry::{root_bundle_of, FrozenTypeRegistry, Hook, RegisteredType};
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
@@ -72,28 +72,33 @@ pub fn rules_of(frozen_type_registry: &FrozenTypeRegistry) -> Result<Arc<[Rule]>
 }
 
 /// What generates a world of `frozen_type_registry`: the library of its one type hooked
-/// into generating the world ([`Hook::GeneratesTheWorld`]), cast once. Or
-/// why it cannot run: none hooked, more than one, or a library that is
-/// no world generation's code.
-pub fn worldgen_of(frozen_type_registry: &FrozenTypeRegistry) -> Result<WorldgenCode, String> {
+/// into generating the world ([`Hook::GeneratesTheWorld`]), cast once, and
+/// the mod it is of ([`root_bundle_of`]): whose folder of the world's mod
+/// config it is set up from. Or why it cannot run: none hooked, more
+/// than one, or a library that is no world generation's code.
+pub fn worldgen_of(frozen_type_registry: &FrozenTypeRegistry) -> Result<(WorldgenCode, String), String> {
     let mut generating = frozen_type_registry.hooked(Hook::GeneratesTheWorld);
     let (generating_type, library) = generating.next().ok_or("no type generates the world")?;
     if let Some((another_type, _)) = generating.next() {
         return Err(format!("{} and {} both generate the world", generating_type.name(), another_type.name()));
     }
-    library.and_then(|worldgen_library| worldgen_library.downcast_ref::<WorldgenCode>()).cloned().ok_or_else(|| format!("{} generates the world, and its library is no world generation's code", generating_type.name()))
+    let worldgen = library.and_then(|worldgen_library| worldgen_library.downcast_ref::<WorldgenCode>()).cloned().ok_or_else(|| format!("{} generates the world, and its library is no world generation's code", generating_type.name()))?;
+    Ok((worldgen, root_bundle_of(generating_type.name()).to_string()))
 }
 
 /// The code of the function a client may call whose ID is `call`, among
-/// `frozen_type_registry`'s types, cast. Or why it is refused: no type
-/// of the ID, one no client may call, or a library that is no call's
-/// code -- only a type registered as a client call is ever run.
-pub fn call_code_of(frozen_type_registry: &FrozenTypeRegistry, call: u64) -> Result<CallCode, String> {
+/// `frozen_type_registry`'s types, cast, and the mod it is of
+/// ([`root_bundle_of`]): whose config it reads and writes. Or why it is
+/// refused: no type of the ID, one no client may call, or a library
+/// that is no call's code -- only a type registered as a client call is
+/// ever run.
+pub fn call_code_of(frozen_type_registry: &FrozenTypeRegistry, call: u64) -> Result<(CallCode, String), String> {
     let called = frozen_type_registry.types().iter().find(|registered| registered.type_id() == call).ok_or_else(|| format!("no type is of the ID {call:#018x}"))?;
     if !matches!(called, RegisteredType::ClientCall { .. }) {
         return Err(format!("{} is no function a client may call", called.name()));
     }
-    frozen_type_registry.library_of(called).and_then(|call_library| call_library.downcast_ref::<CallCode>()).cloned().ok_or_else(|| format!("{} is a client call, and its library is no call's code", called.name()))
+    let call_code = frozen_type_registry.library_of(called).and_then(|call_library| call_library.downcast_ref::<CallCode>()).cloned().ok_or_else(|| format!("{} is a client call, and its library is no call's code", called.name()))?;
+    Ok((call_code, root_bundle_of(called.name()).to_string()))
 }
 
 /// The type of entity a world of `frozen_type_registry` is kept hot about: its one
