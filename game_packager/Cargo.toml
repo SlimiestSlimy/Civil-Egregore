@@ -1,0 +1,7 @@
+[package]
+name = "game_packager"
+edition = "2024"
+description = "Civil Egregore's game packager: the game built in release and laid out as the folder it ships as, target/civil_egregore/"
+
+# Nothing but std: it runs cargo, and copies what cargo built.
+[dependencies]
