@@ -35,6 +35,9 @@ mod fine_tests;
 #[path = "../tests/fast/main.rs"]
 mod fast_tests;
 #[cfg(test)]
+#[path = "../tests/complete/main.rs"]
+mod complete_tests;
+#[cfg(test)]
 #[allow(dead_code)] // a shared file: each test uses a part of it
 #[path = "../../utilities/test_seed.rs"]
 mod test_seed;
