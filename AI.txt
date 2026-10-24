@@ -149,6 +149,12 @@ Boundaries, asked first, would have put that on the table.
   ("we need it for locating stuff later on"). "the idea of the frozen
   registry is to downcast everything possible and remove all
   indirection basically / but for now its fine just doing id lookups".
+  Names are final (the user, 2026-10-24): "type id strings are final,
+  that's why we have a file for them specifically"; "savefiles survive
+  base game uodstes by the same mechanism" -- a name keeps its ID in
+  every later version, of the game or a mod. types.csv holds name and
+  ID alone: a type's shape (width, tile size, attribute blocks) is not
+  saved or checked at load.
   A type's code is its library. Hooks
   ("just another parameter on the registry types"): GeneratesTheWorld,
   RunsEveryTick, KeepsTheWorldHot ("good use of hook there") -- the
@@ -1629,6 +1635,13 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- Removing a mod from a world (its names stay in types.csv, nothing
+  registers them, the world refuses to load): "later we will add proper
+  mod removal, another day, that requires server side cleanup we just
+  font have yet, one step at a time lol" (2026-10-24). Updates are
+  covered by names keeping their IDs: "mods survive uodate thanks to
+  types.csv, new game version, new mods for the new game version, same
+  strings".
 - A world made with no seed may have ocean where the sheep start (fit to
   start left with seeds drawn at creation): mine -- the worldgen choosing
   where the start is, rather than the seed chosen for it. The user: "yes
