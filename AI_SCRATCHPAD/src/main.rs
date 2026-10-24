@@ -7,6 +7,7 @@
 //! `cargo run --release -p AI_SCRATCHPAD -- --<probe> [--<parameter> <value> ...]`, `--help` for them all
 
 mod asking_the_host;
+mod ticks_counted;
 mod ticks_under_a_wide_viewport;
 
 use protocol::flags::{Flag, FlagError, FlagKind, FlagParser};
@@ -52,7 +53,7 @@ impl ProbeParameters<'_> {
 }
 
 /// Every parameter any probe reads, a general flag each.
-const PARAMETERS: [&str; 7] = [
+const PARAMETERS: [&str; 10] = [
     SEED,
     ticks_under_a_wide_viewport::VIEWPORT_SIDE,
     ticks_under_a_wide_viewport::SECONDS_MEASURED,
@@ -60,6 +61,9 @@ const PARAMETERS: [&str; 7] = [
     ticks_under_a_wide_viewport::SHEEP_A_SUPERCHUNK,
     ticks_under_a_wide_viewport::PACE_TICKS_A_SECOND,
     ticks_under_a_wide_viewport::OVER_PIPE,
+    ticks_counted::WORLD_SIDE,
+    ticks_counted::TICKS_RUN,
+    ticks_counted::SHEEP_EACH_SUPERCHUNK,
 ];
 
 /// Puts the parameter `PARAMETERS[PARAMETER]`, as text, under its own name.
@@ -91,12 +95,18 @@ const fn probe_flag<const PROBE: usize>() -> Flag {
 }
 
 /// The probes.
-const PROBES: [Probe; 1] = [
+const PROBES: [Probe; 2] = [
     Probe {
         probe_name: "ticks_under_a_wide_viewport",
         what_it_does: "makes a world with no side whose camera forces superchunks hot, keeps a square viewport hot, and prints its ticks a second with no frame asked and with frames asked as a window asks: what answering a client costs the simulation",
         parameter_defaults: &[(ticks_under_a_wide_viewport::VIEWPORT_SIDE, "12"), (ticks_under_a_wide_viewport::SECONDS_MEASURED, "10"), (ticks_under_a_wide_viewport::SUPERCHUNKS_A_FRAME, "32"), (ticks_under_a_wide_viewport::SHEEP_A_SUPERCHUNK, "250"), (ticks_under_a_wide_viewport::PACE_TICKS_A_SECOND, "0"), (ticks_under_a_wide_viewport::OVER_PIPE, ""), (SEED, "0")],
         run_probe: ticks_under_a_wide_viewport::run_probe,
+    },
+    Probe {
+        probe_name: "ticks_counted",
+        what_it_does: "makes a world of a side's superchunks, every one hot, sheep in each, ticks it so many times on one seed and prints its hash: a fixed amount of work, for counting instructions (callgrind) rather than timing",
+        parameter_defaults: &[(ticks_counted::WORLD_SIDE, "4"), (ticks_counted::TICKS_RUN, "100"), (ticks_counted::SHEEP_EACH_SUPERCHUNK, "250"), (SEED, "0x11a342b024040109")],
+        run_probe: ticks_counted::run_probe,
     },
 ];
 
@@ -104,6 +114,7 @@ const PROBES: [Probe; 1] = [
 fn probe_flags() -> Vec<Flag> {
     vec![
         probe_flag::<0>(),
+        probe_flag::<1>(),
         parameter_flag::<0>(),
         parameter_flag::<1>(),
         parameter_flag::<2>(),
@@ -111,6 +122,9 @@ fn probe_flags() -> Vec<Flag> {
         parameter_flag::<4>(),
         parameter_flag::<5>(),
         parameter_flag::<6>(),
+        parameter_flag::<7>(),
+        parameter_flag::<8>(),
+        parameter_flag::<9>(),
     ]
 }
 

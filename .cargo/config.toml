@@ -11,5 +11,13 @@ linux_rd = ["build"]
 linux_rr = ["build", "--release"]
 linux_hr = ["build", "--release", "--no-default-features"]
 
+# The engine's crates are shared libraries: every binary links libstd
+# (prefer-dynamic) and them dynamically, and on Linux finds them beside
+# itself ($ORIGIN), as in the game's folder. A target's rustflags replace
+# [build]'s, so the CPU line is said again.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=x86-64-v3", "-C", "prefer-dynamic", "-C", "link-args=-Wl,-rpath,$ORIGIN"]
+
 [target.x86_64-pc-windows-gnu]
 linker = "x86_64-w64-mingw32-gcc"
+rustflags = ["-C", "target-cpu=x86-64-v3", "-C", "prefer-dynamic"]

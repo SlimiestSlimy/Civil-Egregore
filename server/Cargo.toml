@@ -5,6 +5,11 @@ edition = "2024"
 autotests = false
 description = "Civil Egregore's server: the world as a whole, made from a seed, ticked -- its cells' rules and its entities together -- saved and loaded"
 
+# A shared library of its own, as the game ships it: the binaries, every
+# other engine library and the mods link this one copy.
+[lib]
+crate-type = ["dylib"]
+
 [dependencies]
 utilities = { path = "../utilities" }
 protocol = { path = "../protocol" }

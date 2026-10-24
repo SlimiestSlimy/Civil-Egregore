@@ -4,9 +4,10 @@
 //!
 //! `cargo package_game` (an alias in `.cargo/config.toml`).
 //!
-//! Today the folder holds the one program. The engine's shared
-//! libraries, the server's and the client's binaries, libstd, and the
-//! base game as a mod join it as the game is split.
+//! Today the folder holds the one program, the engine's shared libraries
+//! beside it, and libstd, which they all share. The server's and the
+//! client's binaries, and the base game as a mod, join it as the game is
+//! split.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -20,6 +21,8 @@ use std::process::{Command, ExitCode};
 const GAME_FOLDER: &str = "civil_egregore";
 /// The program's package: built, and laid out in the game's folder.
 const PROGRAM_PACKAGE: &str = "Civil_Egregore";
+/// The engine's crates, each a shared library laid out beside the program.
+const ENGINE_LIBRARIES: [&str; 4] = ["utilities", "protocol", "server", "client"];
 
 /// The game packaged, and where it was laid out said; or why not.
 fn main() -> ExitCode {
@@ -49,6 +52,10 @@ fn package_the_game() -> Result<PathBuf, String> {
     fs::create_dir_all(&game_folder).map_err(|error| format!("{}: {error}", game_folder.display()))?;
     let program_file = format!("{PROGRAM_PACKAGE}{}", std::env::consts::EXE_SUFFIX);
     copy_into(&built_folder.join(program_file), &game_folder)?;
+    for engine_library in ENGINE_LIBRARIES {
+        copy_into(&built_folder.join(shared_library_file(engine_library)), &game_folder)?;
+    }
+    copy_into(&standard_library()?, &game_folder)?;
     Ok(game_folder)
 }
 
@@ -68,6 +75,22 @@ fn build_the_game(repository_root: &Path) -> Result<(), String> {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
     let built = Command::new(cargo).args(["build", "--release", "-p", PROGRAM_PACKAGE]).current_dir(repository_root).status().map_err(|error| format!("cargo could not be run: {error}"))?;
     if built.success() { Ok(()) } else { Err(format!("the game's build failed ({built})")) }
+}
+
+/// The file name the platform gives the shared library `library`
+/// (`libserver.so`, `server.dll`).
+fn shared_library_file(library: &str) -> String {
+    format!("{}{library}{}", std::env::consts::DLL_PREFIX, std::env::consts::DLL_SUFFIX)
+}
+
+/// libstd as a shared library, the one every binary and library of the
+/// game links: in the target library folder of the rustc that built them.
+fn standard_library() -> Result<PathBuf, String> {
+    let printed = Command::new("rustc").args(["--print", "target-libdir"]).output().map_err(|error| format!("rustc could not be run: {error}"))?;
+    let library_folder = PathBuf::from(String::from_utf8_lossy(&printed.stdout).trim());
+    let standard_library_start = format!("{}std-", std::env::consts::DLL_PREFIX);
+    let folder_entries = fs::read_dir(&library_folder).map_err(|error| format!("{}: {error}", library_folder.display()))?;
+    folder_entries.flatten().map(|entry| entry.path()).find(|path| path.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.starts_with(&standard_library_start) && name.ends_with(std::env::consts::DLL_SUFFIX))).ok_or(format!("no shared libstd in {}", library_folder.display()))
 }
 
 /// `file` copied into `folder`, under its own name.

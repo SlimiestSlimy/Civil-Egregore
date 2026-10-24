@@ -928,12 +928,57 @@ NOW
   indeed" -- into basegame's workspace. Names: "good names, simple,
   effective, more than one word which is a bad habit of yours" --
   game_packager, mod_packager.
-  STEP 1 DONE (uncommitted): game_packager/ (std only), `cargo
+  STEP 1 DONE (ef23be21, pushed): game_packager/ (std only), `cargo
   package_game`: builds the program in release (the cargo that runs it,
   in the repository's root) and lays out target/civil_egregore/ anew,
   today the one program; run from there, the window starts its server
   from the same folder. Next, step 2: the engine's crates as shared
   libraries, measured.
+  STEP 3'S DESIGN, the user's answers (2026-10-23): "1:yes, ideally
+  common means "server AND client" but can also be used for common
+  libraries if thats the layout the modder decides on. so client calls
+  need both server and client so implementing them inside a common
+  bundle is the only way for them to work anyways" / "2:fair, types.csv
+  can technically live just fine without client types, but for local
+  worlds (where the client also loads mods from the world mods folder)
+  and server side forced client mods we want types.csv to have ALL the
+  types" / "3 needs to be discussed more" (masters, and what a render
+  rule reads) / "4:honestly i dont see why we csnt have nested bundles,
+  bundles are just a logical grouping for convenience, as long as it
+  doesn't have unintended side effects were fine with nested bundles.
+  only the root level bundles need to be in the manifest" / "5 fair lol"
+  (step 3 before runtime loading, basegame's bundles listed in code).
+  Then, on point 2 (the server would load Bevy to learn client types):
+  "fuck i forgot that just trying to read a dynamic library loads all of
+  it lol / ideally we separate registration from code loading entirely"
+  -- my proposal, the mod packager calling register_types at build time
+  and writing the declarations out -- then: "ok, then this means
+  something, we really need to move types strings into the manifest, and
+  just dont involve the libraries at all on type registration, just
+  manifests". SETTLED: type registration from manifests alone; a
+  library is opened only to provide its bundle's libraries, after the
+  freeze, on its own side. Then: "we could probably make a simple derive macro ... idk,
+  just throwing something to the wall, there's probably an easier way" /
+  "fair probably having a function that spits all the pointers and types
+  names automatically, and have bundles be a manual organization on this
+  registration function / we csn probably make this very easy by making
+  a type state pattern constructor ... passing the structs with a simple
+  dyn any to register it by the name of the struct itself. / so its like
+  builder::new() .new_bundle(name and stuff) .type(a struct) .type(another
+  struct) .close_bundle() .new_bundle() etc. take this as a style guide,
+  not the final form lol".
+  STEP 2 DONE (uncommitted): utilities, protocol, server, client each
+  crate-type dylib; prefer-dynamic and $ORIGIN (Linux), the CPU line
+  repeated (a target's rustflags replace [build]'s); the packager lays
+  out the four libraries and libstd beside the program (2.5 MB, was
+  545 MB). Measured (callgrind, the scratchpad's ticks_counted probe: a
+  4x4 world, 250 sheep a superchunk, same seed; 3 runs a build at 50k
+  ticks, in parallel): a tick 685k instructions in both; 49,900 ticks
+  -0.05% shared against static (runs of one build vary 0.01-0.03%);
+  making the world +0.08%; same world hash in all. Tests 203 + 7 pass;
+  the server's own took 26 s then 21 s (18 s before): noise of the
+  machine's other programs, the counts equal. The window runs from
+  target/civil_egregore/.
   WINDOWS (MinGW, under Wine): all of the above but built apart works;
   the folder ships std-*.dll, libgcc_s_seh-1.dll, libwinpthread-1.dll;
   DLLs found beside the exe, a loaded one reused by name; the server
@@ -1306,6 +1351,12 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- Lowering kernel.perf_event_paranoid for perf (not for callgrind, which
+  needs nothing): "in fact, i believe we can disable some kernel security
+  to get even more performance info" / "fair, well do it when needed"
+  (2026-10-23) -- until a reboot only (sysctl), when perf is needed.
+- Windows builds in the packagers (a cross build from Linux; the folder's
+  MinGW DLLs): "good job, later we can fix windows builds" (2026-10-23).
 - Debug builds in the packagers (release hardcoded for now): "adding
   thebug build support later will not be that hard with the remaining
   infrastructure in place" (2026-10-23).
