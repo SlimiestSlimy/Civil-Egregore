@@ -368,7 +368,6 @@ dependencies = [
  "client",
  "protocol",
  "server",
- "utilities",
 ]
 
 [[package]]
