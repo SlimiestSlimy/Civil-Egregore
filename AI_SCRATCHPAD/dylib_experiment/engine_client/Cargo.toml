@@ -1,0 +1,11 @@
+[package]
+name = "engine_client"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+engine_common = { path = "../engine_common" }
+bevy = { workspace = true }

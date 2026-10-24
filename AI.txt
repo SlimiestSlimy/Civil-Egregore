@@ -114,7 +114,8 @@ Boundaries, asked first, would have put that on the table.
 == SETTLED (in force) ==
 
 - THE ROOT: six crates -- server, client, protocol, basegame,
-  tessera, utilities ("utilities remains as a 6th crate") -- every
+  tessera, utilities ("utilities remains as a 6th crate"); tessera and
+  basegame workspaces of their own (basegame since 2026-10-23) -- every
   folder inside one a module, not a crate: utilities/ (bitmap,
   coordinates, ..., and the shared test_seed.rs), protocol/
   (type_registry, pipe), server/ (simulation, bitplane_manager,
@@ -548,6 +549,340 @@ NOW
   superchunks hot. Renamed: "unlimited camera loads is better named
   "camera forces superchunks hot"" -- the parameter
   camera_forces_superchunks_hot, the world file's row, WorldInfo's field.
+  WORLDGEN PARAMETERS' PLACE (the user, 2026-10-23: "i have my doubts on
+  why the worldgen parameters load where they currently load, there is
+  a file thata supposed to save the settings you know"): the window's
+  first world to come from settings.csv rows (worldgen parameters by
+  name), the sliders writing theirs back -- needed anyway once basegame
+  is loaded at runtime and main.rs cannot name it. Not done yet.
+- THE SDK (the user, 2026-10-23): "making a civil egregore sdk. crate.
+  this crate will contain all public apis and bevy. dynamically linked /
+  why? so we can make base game truly a mod as it should be. the tradeoff
+  is that any third party mod developer will require to use the same
+  toolchain we're using as well. i think its a worthy tradeoff". My
+  answer, agreed: the sdk a dylib (in practice the engine with its public
+  APIs re-exported); a mod a dylib depending on the sdk alone (not a
+  cdylib: its own copy of the sdk and Bevy would break library
+  downcasts), one entry point handing its register function; loaded by
+  the launcher with the OS's own calls declared by hand, never unloaded;
+  a build fingerprint (sdk version, rustc version) checked before calling
+  into a mod. Answers: "1: yeah one sdk" (Bevy always in it: a headless
+  server carries Bevy, never opening a window -- the settled
+  "headless compiles no Bevy" goes); "2: ok, basegame should still be
+  included by default, in theory now our compiled products should be in
+  a folder with the executable, and a couple of .so/.dlls if im not
+  mistaken"; "4:fair, we have wine and Proton if u need to run windows
+  builds" (Windows' 65535 exported-symbol cap the risk to check). Mine:
+  measure ticks before and after the dylibs. STEPS: (1) the sdk crate,
+  static, basegame on it alone; (2) sdk and basegame dylibs, still
+  linked at build time, measured, checked on Windows; (3) mods loaded at
+  runtime from beside the executable, basegame out of the binary's
+  dependencies, the first world from the settings file.
+  THEN (2026-10-23, discussion, nothing built for it yet): "were going to
+  separate the server and client into 2 binaries" / "the client always
+  needs bevy, the server never needs ir" / "the idea is to bundle the
+  game as folder now. not as a single binary, the folder would include
+  the client binary, the server binary, and any required linked
+  libraries. running headless then simply becomes running the server
+  binary directly" / "we want to avoid server compiling bevy, that
+  should be client side only wven if dynamic code loads with bevy
+  function pointers dynamically linked they should just be completely
+  ignored and not runnable from the server side" / "mods folders would
+  be per world, we simply have a basegame library alongside the
+  binaries. im being very explicit about that." / on registration: "no,
+  registration code is a shared library for both server and client, and
+  client or server share the type registry with the other as needed" /
+  "if the server loads bevy code because the mdos have it as a
+  dependency thats fine, because its a mods dependency, not a server
+  dependency, what we ultimately want is zero clients mods to load zero
+  bevy code on server side". On loading: "we probably want to load mods
+  from a manifest declaring the content bundles instead of a function?
+  ill leave you up to that one, im happy with a common registration
+  function signature for this purpose tbh" -- mine: the function, no
+  manifest. So: two SDK libraries (engine and public APIs, no Bevy; the
+  client API and Bevy), a facade crate re-exporting both for mods; the
+  server cannot name render or gui code, so cannot run it. Shipped
+  beside the binaries: the libraries, libstd (Rust dylibs need it
+  shared), basegame's library; Linux finds them by $ORIGIN. Step 1 of
+  the earlier steps sat in the working tree uncommitted (the sdk
+  crate, basegame on it, the client feature gone); the sdk crate is gone
+  since ("forget about the sdk"), the client feature's removal kept.
+  Per-world mods, the user's answers (2026-10-23): "1: yes basegame is a
+  default, not obligatory. Ideally on world creation we specify which
+  mods are included and which ones are not" / "2: types.csv already
+  should be in order" / "4: most definitely not, first, for a server to
+  open a new world it has to be openend from scratch. on the client side
+  closing and opening worlds loads new type registries" / "5:no, the
+  files must be preinstalled on both client and servee beforehand" /
+  "clients basically have a similar worlds folder on the civil egregore
+  folder. Basically client/worlds/specific world/ where the only thing
+  that should be there is the same mods that specific server world uses.
+  this is for remote worlds. for local worlds the mods folder is already
+  in the normal world folder so both client and server csn share it".
+  Then: "1:yes, reset world keeps the frozen registry, we already
+  established this" (a server process runs one world: making or opening
+  another is a new server process; MakeWorld/OpenWorld messages to go) /
+  "2: registries are made new for each world opened and any old
+  registries are completely dropped" / "3:use a timestamp of world
+  creation time + the world name as the per wolrd id stored on
+  world.csv. guaranteed to never conflict basically" / "4: the game
+  folder is static after compilation. any dynamic content must live on
+  the civil egregore local folder for the machine. on world creation we
+  dont complicate ourselves. we first create the wolrd folder with the
+  settings, and an empty mods folder, the mods are copied there (never
+  basegame). for now its as simple as having a option on server and
+  client to creste the world without running it. so the user csn copy
+  the mods to the folder. then run the wolrd first time, creating the
+  types.csv file on the world folder" / "mod loading order is mostly
+  irrelevant, we just need to respect dependency order when loading
+  arbitrary mods".
+  Then: "1: we need to get rid of the per mod register function, that is
+  a type registry responsibility, the mods should only provide a list of
+  what bundles to load." / "2:yes, but basegame not being included is a
+  separate flag, since basegame never loads from a worlds folder, is
+  basically the only "special path" mod. it requires a separate flag to
+  not include it, completely separate from "create world without
+  running"" / "3: when a client disconnects from a server it should do
+  all that by default and go back to the main menu" (drop the registry,
+  the windows, close the mods' libraries) / "mods are folders, inside
+  the respective mods folder. just in case they need to include assets
+  and such / basegame follows the same philosophy inside the game
+  folder, we have a basegame/ directory with the same structure as a
+  mod basically".
+  Then: "i was thinking of straight up a known function that all mods
+  include, callable by the registry thanks to the sdk, that spits out a
+  list of what to load. but thats just an idea not final" / "any typeid
+  already states its dependencies. the real concern to me is we should
+  instead depend on bundles, not just typeids" / "every bundle carries a
+  list of strings for the other bundles it depends on. the internal
+  typeids on a bundle never specify dependemcies directly (specifying
+  stuff like master planes and such is mostly informative and was mostly
+  for testing, in practice we dont need any of that inside a bundle)" /
+  "registration is a completely separate step from execution. making a
+  type registey and freezing it simply validate the dependencies.
+  execution of watever is on the frozen registry is on server/client
+  side" / "delete anything not needed anymore inside bundles". Compared
+  with Factorio, Forge, Fabric, RimWorld, Luanti: "it seems were
+  choosing a very sparsely used scheme" / "manifest files are probably a
+  good idea but we have to understand more about how are they normally
+  done before deciding on a layout" / "having separate client and server
+  entrypoints is probably not a bad idea at all in fact, i think our
+  system is halfway there". Then: "we should probably copy factorio and
+  fabric models were we can, that basic manifest file is good. and
+  simplifying the architecture so a mod/bundle (from the game
+  perspective is logically the same thing) specifies entrypoints seems
+  like a good idea, fsbric library only mods simply don't have entry
+  points i guess?" / "basically any mod in our game needs 1-2 of 3
+  possible handles. client handle, server handle, and frozen registry
+  handle. i say handles for lack of a better name, we need more
+  research". Then: "basetypes most definitely should have never existed
+  lol" / "before commuting to our "handles" or watever, we need more
+  research! im talking go to the internet and read type research" /
+  "mods types are internal to it, the manifests are bundle/mod level (as
+  i said, bundles and mods are logically the same thing, i just named
+  them bundles)". Researched 2026-10-23 (Factorio, Fabric, Forge,
+  Vintage Story, Unreal, Godot, Bedrock, tModLoader, RimWorld, Luanti,
+  Bevy's removed dynamic plugins); the findings in my answer that day.
+  Then: "about 5, yeah, simple ordering by dependency and name is fine"
+  (Factorio's: dependency depth, then name) / "about 6, one idea is to
+  indicate to the typeregistry building phase what we're building for,
+  client, or server, and skip bundles accordingly (ideally every bundle
+  declared in a mod manifest points to a single .so/dll file to keep
+  things tidy and 1:1)" / "the bundles can be manifested as "client" or
+  "server". never both, that makes the cut very clean, but im concerned
+  about possible development hell on mods that might have bundles for
+  both server and client that need to talk to each other" / "doing the
+  experiment is a very good idea indeed. it would be lovely if we could
+  simply use scripting languages, but the performance targets for this
+  game forbid it unfortunately, were already risking a lot by having
+  dynamic type loading lol" (the experiment: TypeId casts, engine
+  statics and Bevy resources across separately built libraries) / "we
+  need to reevaluate if we still need an sdk crate after all. if we have
+  the manifest declare client or server mods can simply build against
+  the respecitve crates public api and thats it lol".
+  Then: "lets proceed with experiment and forget about the sdk. there are
+  still many details to choose but the experiment is crucial indeed" /
+  "we should probably have "client" "server" and "common" bundle types
+  then. so instead of making clients load server and client stuff, we
+  delegate that to common bundles" -- three bundle sides: common (both
+  load it), server, client. The experiment in AI_SCRATCHPAD/
+  dylib_experiment (its own workspace).
+  Then: "before you continue, move basegame to its own workspace lol" /
+  "i think that'll be the winner try for this" (winner). DONE,
+  uncommitted: basegame/ a workspace of its own (excluded from the root's,
+  its own Cargo.lock, target/, transient_data/), naming protocol, server,
+  client and Bevy directly; the sdk/ crate deleted; the root package
+  still depends on basegame by path until mods load at runtime.
+  Tests: 203 root + 7 basegame, all pass; clippy clean on both.
+  EXPERIMENT SO FAR (Linux, one workspace's build): engine_common,
+  engine_server, engine_client (Bevy inside it) as Rust dylibs; mods'
+  bundles (common, server, client) dlopened from a world's mods folder
+  by manifest, Factorio's order. Works: cast down across libraries
+  (common->server, common->client, mod->mod), a wrong cast refused,
+  engine statics and a mod's statics one copy, Bevy components of one mod
+  queried by another, the engine's task pools from a mod, a mod calling
+  another mod's library through DT_NEEDED (found by soname, the
+  dependency loaded first). The server process maps no Bevy and no
+  client engine. Found: Bevy's derives need `bevy` named in the mod's own
+  Cargo.toml (the engine's re-export is not enough); `--as-needed` drops
+  a library only named for types, not called.
+  BUILT APART (found through basegame's own workspace): Cargo hashes a
+  path dependency by its path from the workspace's root, so the same
+  engine crate built in another workspace gets another crate hash
+  (protocol, server, client, utilities all differ between the root's
+  build and basegame's; registry crates -- bevy_ecs, bevy_app -- match).
+  A mod built apart against the engine BY PATH is refused at load
+  (undefined symbol ..engine_common: clean, no UB). A mod built against
+  the game's OWN BUILT LIBRARIES (`--extern engine_server=<lib>.so`, `-L
+  dependency=<the build's deps>`, no engine source, no engine
+  dependency in its Cargo.toml) loads and works -- a server bundle, and a
+  client bundle with a Bevy derive of its own (`--extern bevy_ecs=<rlib>`
+  for the derive's paths), built in 0.6 s, no Bevy compiled or copied.
+  The user: "we probably want to allow building against the code instead
+  of the precompiled libraries if possible, we need to find where that
+  conflict comes from" / "hmmmm im not liking where this is going for
+  some reason, but lets see the results of the investigation first".
+  WHERE IT COMES FROM (cargo's compute_metadata, src/compiler/
+  build_runner/compilation_files.rs, and SourceId::stable_hash): -C
+  metadata hashes the package's name, version and source -- a path
+  source by its path from the workspace root if inside the root, else
+  by its absolute path -- its features, its profile, the build kind and
+  target, rustc's version, and its dependencies' own hashes; not
+  RUSTFLAGS. Shown: the game's workspace moved elsewhere keeps its
+  hashes; a mod's workspace moved elsewhere changes them. BUILT FROM
+  SOURCE, MATCHING: a modder's workspace (elsewhere on disk) with the
+  engine's crates at the game's paths from its root -- symlinked or
+  copied -- and the same lock file, features and profile gets the same
+  hashes; its client mod, Bevy derive included, loads into the game.
+  DECIDED (the user, 2026-10-23): "all the forcing yeah, i think its
+  probably easier if we limit mods to compiling against the precompiled
+  game tbh. having the game compiled is kinda a requirement to test the
+  mods in dev anyways" -- mods build against the game's built libraries
+  alone (`--extern`), never its source. Then: "cant we just straight up
+  simply use the precompiled libraries that come in the game?" --
+  tested: a SERVER bundle builds against the shipped game folder alone
+  (its libraries, nothing else); a CLIENT bundle does not: a Rust dylib
+  embeds only its own crate's metadata, so the crates statically inside
+  it (Bevy's) need their .rmeta files, and Bevy's derives their
+  proc-macro libraries built for the modder's machine. The .rmeta files
+  alone are enough (no .rlib): a client mod built from the game folder
+  plus a folder of .rmeta files and proc macros loads and runs. That
+  folder was 716 MB, about half of it stale (the experiment's earlier
+  build with fewer Bevy features left a second bevy_ecs, glam...).
+  Then: "cant we build agains the precompiled bevy library on the game +
+  listing bevy as a dependency om the mods cargo file? so we get the
+  macros and stuff from.the cargo dependency while linking to the in game
+  bevy library?" / "Ideally we would want the setup required for mod
+  development to be a one time cargo file configuration or similar,
+  probably just indicating where the path to the precompiled game build
+  is. we want mod source code to be free of restraints ad much as
+  possible." / "we probably want to make a new workspace "mod template"
+  in the tree for future reference, and basegame should basically be a
+  copy of it with the basegame code added and the names changed." / "all
+  this is honestly outrageous lol". TESTED, WORKS: a client mod listing
+  Bevy (same version and features) in its own Cargo.toml, the engine
+  through `--extern` in its .cargo/config.toml (all its crates get it),
+  links to the game's Bevy (none of its own) and runs. What made the
+  mod's own Bevy differ from the game's: rustc's crate hash (SVH, checked
+  at compile time) takes in source paths, and serde and thiserror
+  include files from their build scripts' output folder, inside each
+  build's own target/ -- fixed by both builds mapping their target/ and
+  Cargo's crate sources to fixed names (`--remap-path-prefix`; cargo's
+  trim-paths, which would do it, is unstable). Conditions left on a mod:
+  the same rustc, the game's lock file for Bevy's dependencies, Bevy's
+  version and features as the game's, the game's profile (a debug build
+  of a mod will not match a release game), and the config (the game's
+  build, the path maps). The game's build itself must map its paths.
+  Then: "we need to weigh this further, becase just shipping the compiled
+  game as is for development plus the template is also not a bad route
+  if the template handles the complex parts. and i dont really see why we
+  would want to avoid modders from listing bevy as a dependency if their
+  are doing client side mods inside their own mods, is there a downside
+  to it?" TESTED: the Bevy-in-Cargo.toml mod plus `bitflags` (a crate
+  under Bevy) with one feature Bevy does not ask (example_generated):
+  REFUSED (cargo unifies the feature into Bevy's own bitflags, Bevy's
+  hash moves, the engine no longer matches). The same dependency on the
+  kit route (no Bevy in the mod's Cargo.toml; Bevy's .rmeta and macros
+  from the game's build): builds in 1 s, runs -- the mod's bitflags its
+  own copy, apart from the engine's. The kit route's own catch: two
+  copies of a shared crate are two types (a mod's own glam::Vec2 is not
+  Bevy's), so mods use Bevy's re-exports; a compile error, not a refusal.
+  Both routes: rust-analyzer sees no crate given by `--extern` (the
+  engine's, and on the kit route Bevy's): no completion for them.
+  DECIDED (the user, 2026-10-23): "ok, sounds like option 2 is the way to
+  go, we can expect modders to compile the game in their machines so we
+  can assume there is a path to the game's source code and target/
+  directory by extension" -- the kit route: a mod builds against the
+  game as compiled on the modder's machine (its target/: the libraries,
+  Bevy's .rmeta files, the derive macros); no Bevy in a mod's
+  Cargo.toml; the template's config names the game's folder.
+  Mine, to put to the user: at load, only symbol names are checked, and
+  they come from -C metadata (name, version, features, profile...), not
+  from the source: a mod built against another commit of the same
+  version would load and could misbehave -- so a build fingerprint (the
+  engine's commit and rustc's version, a const of the engine's the mod
+  compiles in) checked against the running engine's before a mod's
+  entry is called.
+  Then: "yeah, hopefully this simplifies the mod template setup to simply
+  specifying the root of civil egregore local repo in summary". TESTED,
+  WORKS (apart_kit_editor, deleted since: the paths below replaced it): a mod's whole setup one line of its
+  .cargo/config.toml, `include = [".../modding.toml"]` (cargo's config
+  include, stable; relative to the .cargo/ folder). The fragment, which
+  the game's build would write into its target/: the --extern and -L
+  flags, and `[patch.crates-io]` pointing the engine's crates at the
+  game's source. The mod's Cargo.toml names the engine's crates as
+  optional dependencies behind an "editor" feature (no paths): off for
+  builds (built 0.8 s, loaded, ran), on for rust-analyzer, which then
+  finds the shapes mod's Palette in its source (and finds nothing without
+  it). Not yet tested: rust-analyzer's check on save with the feature on
+  (would build the engine from source beside the --extern copy: to be
+  run without it); Windows; who writes modding.toml. Mine: the engine's
+  crate names are looked up on crates.io whenever the patch is missing,
+  so they must be names no one else can publish (ours).
+  Then: "Ideally we avoid any crstes.io interactions at all lol" / "and
+  fail instead" / "cant we just work with paths instead of having a
+  crates.io section?" / "you'll have to show me snippets for all this
+  stuff lol" / "i can't see the code myself at the moment". TRIED: a git
+  source on a .invalid URL, patched (cargo fetches the original anyway:
+  fails both ways); a registry of the game's own, patched and replaced by
+  an empty local folder (works, no network; without the fragment fails
+  at once) -- both dropped for PATHS: TESTED, WORKS (AI_SCRATCHPAD/
+  mod_outside_the_game): the mod's folder holds `civil_egregore`, a link
+  to the game's repository, the one thing a modder makes; Cargo.toml
+  names the engine's crates by path through it (optional, "editor"),
+  .cargo/config.toml includes the game's written fragment through it
+  (dylib_experiment/write_modding.sh writes it). Built 0.79 s, ran;
+  rust-analyzer finds the shapes mod's Palette through the link; without
+  the link the build fails at once, naming the include. Found: (1) the
+  engine's crates must not inherit dependencies (`bevy = { workspace =
+  true }`): reached through the link, cargo looks for their workspace
+  above the link, in the mod's folder; (2) a mod inside the game's
+  repository makes the link a loop (rust-analyzer never settles) -- an
+  in-tree template or basegame needs another way. Windows: a junction
+  for the link, untested.
+  Then: "where is out/ we probably want to avoid simlinks and use paths
+  directly if possible" / "about mods inside the games repo, yeah, that
+  shouldn't happen at all lol, thats why o said to move basegame to
+  another workspace lol" / "otherwise good job, it seems we found a
+  decent solution". TESTED, WORKS: no link -- the mod's Cargo.toml names
+  the engine's crates by their real relative path, its .cargo/config.toml
+  includes the fragment by its real relative path. Both findings above
+  go with the link: through a real path cargo finds the engine's own
+  workspace, so `bevy = { workspace = true }` stays; and nothing loops,
+  so an in-tree mod (basegame) works the same way. out/ was the
+  experiment's laid-out game folder (dylib_experiment/out: game/, world/,
+  modding.toml), what run.sh makes; in the real game, the folder its
+  build lays out.
+  WINDOWS (MinGW, under Wine): all of the above but built apart works;
+  the folder ships std-*.dll, libgcc_s_seh-1.dll, libwinpthread-1.dll;
+  DLLs found beside the exe, a loaded one reused by name; the server
+  imports no client engine. EXPORTS: engine_client.dll with the game's
+  Bevy features (2d, ui, bevy_feathers) exports 36434 of Windows' 65535
+  -- room now, a risk as Bevy and the engine grow (the way out: Bevy its
+  own DLL apart from the client engine). Sizes: the client engine 210 MB
+  (123 MB stripped) on Linux, Bevy inside it. Scripts: run.sh,
+  run_windows.sh; apart_by_path, apart_prebuilt, apart_prebuilt_client
+  the built-apart mods.
   OPEN: the host copies every plane whole whatever the detail level
   (16-bit height and water depth: 2 MB a superchunk each), so a far
   view of many hot superchunks goes round slowly (a boundless world
@@ -910,6 +1245,11 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- Our CSV files (manifests, world.csv, types.csv, settings) in the
+  user's own format: "csv format will eventually be replaced with a
+  custom format that i made years ago, why? because i like to
+  complocate myself instead of using external libraries whenever
+  possible" (2026-10-23).
 - Doc comments thinned: "yeah, there is a lot of doc comments in the code
   now, understandable for now, had to be fixed later" (2026-10-23).
 - The first shader, from scratch: "i know whats the first shader we
