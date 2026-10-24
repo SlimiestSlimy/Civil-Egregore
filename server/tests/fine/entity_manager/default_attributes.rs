@@ -1,7 +1,10 @@
 //! A type's default attribute: kept without its type, used as any other.
 
 use super::{read_back, registered_types, world, cell, GrazerState};
-use crate::entity_manager::{attribute_seen, is_attribute_list, may_be_given, push_attribute, DefaultAttributes, Header, Instructions, InstructionsApplied, Layout, WholeAttribute, BLOCK_WORDS, NEVER_WAKES};
+use crate::entity_manager::{attribute_seen, is_attribute_list, may_be_given, push_attribute, DefaultAttributes, Instructions, InstructionsApplied};
+use protocol::server_types::entity::{EntityBaseData, NEVER_WAKES};
+use protocol::server_types::attribute_layouts::{Layout, BLOCK_WORDS};
+use protocol::server_types::attributes::WholeAttribute;
 use crate::entity_manager::saved::encode_state;
 use utilities::rng::RandomSource;
 
@@ -29,7 +32,7 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
     for round_number in 0..200 {
         let mut world_entities = world(&frozen_types);
         let grazer_cell = cell(seeded_rng.draw_below(200) as u32, seeded_rng.draw_below(200) as u32);
-        let grazer_header = Header { entity_type: types.grazer, stood_cell: grazer_cell, wake: NEVER_WAKES };
+        let grazer_base_data = EntityBaseData { entity_type: types.grazer, stood_cell: grazer_cell, wake: NEVER_WAKES };
         // Given its state or not, with an attribute before it by type, one after, both or neither.
         let (drawn_state, state_given, has_before, has_after) = (draw_state(&mut seeded_rng), seeded_rng.draw_below(2) == 0, seeded_rng.draw_below(2) == 0, seeded_rng.draw_below(2) == 0);
         let mut attributes = Vec::new();
@@ -43,7 +46,7 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
             push_attribute(&mut attributes, types.one_block, 7);
         }
         assert!(may_be_given(default_attributes.of(types.grazer), &attributes));
-        world_entities.queue_add(grazer_header, &attributes);
+        world_entities.queue_add(grazer_base_data, &attributes);
         world_entities.apply();
         let mut held_state = if state_given { drawn_state } else { GrazerState::default() };
         let added_entity = world_entities.get(grazer_cell).expect("put");
@@ -58,7 +61,7 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
         // Edits drawn: the state whole, a member of it, its removal -- refused -- and the others', which leave it be.
         for edit in 0..8 {
             let (mut instruction_queue, mut instructions_applied) = (Instructions::default(), InstructionsApplied::default());
-            let now_at = world_entities.iter().next().expect("the one grazer").header.stood_cell;
+            let now_at = world_entities.iter().next().expect("the one grazer").base_data.stood_cell;
             let chosen_edit = seeded_rng.draw_below(5);
             match chosen_edit {
                 0 => {
@@ -81,7 +84,7 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
                 2 => instruction_queue.unset_attribute(now_at, types.grazer_state.attribute_type()),
                 3 => instruction_queue.set_attribute(now_at, types.one_block, 100 + edit),
                 // To a cell of another chunk as often as not: all it has goes with it.
-                _ => instruction_queue.move_entity(Header { stood_cell: cell(seeded_rng.draw_below(600) as u32, seeded_rng.draw_below(600) as u32), ..grazer_header }, now_at),
+                _ => instruction_queue.move_entity(EntityBaseData { stood_cell: cell(seeded_rng.draw_below(600) as u32, seeded_rng.draw_below(600) as u32), ..grazer_base_data }, now_at),
             }
             instruction_queue.apply(world_entities.superchunks_mut(), 0, &mut instructions_applied);
             // The tick over: it is named by where it stands now.
@@ -95,10 +98,10 @@ fn a_types_default_attribute_is_kept_without_its_type_and_used_as_any_other() {
         }
         // Saved and read back: the same grazer, kept the same.
         let saved_entity = world_entities.iter().next().expect("the one grazer");
-        let (words, count) = encode_state(None, world_entities.superchunk(saved_entity.header.stood_cell.superchunk()));
+        let (words, count) = encode_state(None, world_entities.superchunk(saved_entity.base_data.stood_cell.superchunk()));
         let read_entities = read_back(&frozen_types, &words, 0).expect("read back");
         assert_eq!((count, read_entities.len()), (1, 1));
-        let read_entity = read_entities.get(saved_entity.header.stood_cell).expect("read back");
-        assert_eq!((saved_entity.header, saved_entity.attribute_list()), (read_entity.header, read_entity.attribute_list()), "round {round_number}");
+        let read_entity = read_entities.get(saved_entity.base_data.stood_cell).expect("read back");
+        assert_eq!((saved_entity.base_data, saved_entity.attribute_list()), (read_entity.base_data, read_entity.attribute_list()), "round {round_number}");
     }
 }

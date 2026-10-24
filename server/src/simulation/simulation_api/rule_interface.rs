@@ -4,7 +4,7 @@
 //! master depends on. A rule of the cells runs on each sample of its
 //! master ([`on_each_sampled`]).
 
-use crate::simulation::simulation_api::RuleCounts;
+use crate::simulation::simulation_api::rule_counts::RuleCounts;
 use utilities::coordinates::CellIndex;
 use crate::simulation::SimulationTickState;
 use protocol::type_registry::{EntityType, LayerType, Library};

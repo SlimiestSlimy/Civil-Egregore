@@ -1,32 +1,18 @@
-//! What an entity is: a header -- its type, its cell, when it next
-//! wakes -- and its attribute list, blocks that may grow or
-//! shrink at run time. It has no ID: no two stand on one cell, so the
-//! cell it stands on names it (`docs/entity_manager.md`,
-//! "Instructions", An entity's name in a tick).
+//! An entity as the store keeps it ([`EntityRef`]): its base data
+//! (`protocol::server_types::entity`) and its attribute list, blocks that
+//! may grow or shrink at run time.
 
-use crate::entity_manager::attributes::{attribute_blocks, attribute_bytes, attribute_seen, default_seen, Attribute, AttributeBlock, AttributeType, DefaultAttributes, DefaultKept, Layout, WholeAttribute, ATTRIBUTE_WORDS_MOST, BLOCK_WORDS};
-use utilities::coordinates::CellIndex;
+use crate::entity_manager::attributes::{attribute_blocks, attribute_bytes, attribute_seen, default_seen, AttributeType, DefaultAttributes, DefaultKept};
+use protocol::server_types::attribute_layouts::{Attribute, Layout, ATTRIBUTE_WORDS_MOST, BLOCK_WORDS};
+use protocol::server_types::attributes::{AttributeBlock, WholeAttribute};
+use protocol::server_types::entity::EntityBaseData;
 pub use protocol::type_registry::EntityType;
 
-/// The tick an entity that never wakes wakes at.
-pub const NEVER_WAKES: u64 = u64::MAX;
-
-/// An entity's fixed part.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Header {
-    /// Its type.
-    pub entity_type: EntityType,
-    /// The cell it stands on.
-    pub stood_cell: CellIndex,
-    /// The tick it next wakes at, or [`NEVER_WAKES`].
-    pub wake: u64,
-}
-
-/// An entity as stored: its header and its attributes.
+/// An entity as stored: its base data and its attributes.
 #[derive(Clone, Copy, Debug)]
 pub struct EntityRef<'a> {
     /// Its fixed part.
-    pub header: Header,
+    pub base_data: EntityBaseData,
     /// Its attributes' blocks, sorted by type: all but its type's
     /// default attribute, which is read as any other
     /// ([`EntityRef::attribute`]) but kept apart
@@ -49,7 +35,7 @@ impl<'a> EntityRef<'a> {
         if default_block_count == 0 {
             return None;
         }
-        Some((self.default_attributes.of(self.header.entity_type)?, &self.kept_blocks[..default_block_count]))
+        Some((self.default_attributes.of(self.base_data.entity_type)?, &self.kept_blocks[..default_block_count]))
     }
 
     /// Its type's default attribute as kept, if `attribute_type` is it.
@@ -85,7 +71,7 @@ impl<'a> EntityRef<'a> {
     /// attribute is given: if its type has one.
     #[inline]
     pub fn default_attribute(&self) -> Option<WholeAttribute> {
-        self.default_kept().map(|(kept_default, default_blocks)| WholeAttribute::of_default(kept_default, default_blocks))
+        self.default_kept().map(|(kept_default, default_blocks)| crate::entity_manager::attributes::whole_default(kept_default, default_blocks))
     }
 
     /// What is seen of its attribute of type `attribute_type`, in 64 bits

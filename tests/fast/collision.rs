@@ -18,7 +18,7 @@ use std::collections::HashMap;
 /// entities stand on, over the turn's superchunk; and how many trees
 /// those are.
 fn what_stands_and_no_other(tick_state: &SimulationTickState) -> (bool, u64) {
-    let stood_on: std::collections::HashSet<CellIndex> = entities_of_the_turn(tick_state).iter().map(|entity| entity.header.stood_cell).collect();
+    let stood_on: std::collections::HashSet<CellIndex> = entities_of_the_turn(tick_state).iter().map(|entity| entity.base_data.stood_cell).collect();
     let (mut collision_matches, mut trees) = (true, 0);
     for cell in cells_of(tick_and_random_stream::superchunk(tick_state)) {
         let tree = cell_reads_and_writes::layer_holds(tick_state, base().tree, cell);
@@ -55,7 +55,7 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     // Each sheep told from the others by a tag; a lamb, born after, has none.
     tag_sheep(&mut world, &probe);
     let sheep_tag = sheep_tag(&world);
-    let read_sheep = move |tick_state: &mut SimulationTickState| -> Vec<SeenSheep> { entities_of_the_turn(tick_state).iter().map(|seen_sheep| (tag_of(sheep_tag, seen_sheep), seen_sheep.header.stood_cell, cell_reads_and_writes::layer_holds(tick_state, base().tree, seen_sheep.header.stood_cell))).collect() };
+    let read_sheep = move |tick_state: &mut SimulationTickState| -> Vec<SeenSheep> { entities_of_the_turn(tick_state).iter().map(|seen_sheep| (tag_of(sheep_tag, seen_sheep), seen_sheep.base_data.stood_cell, cell_reads_and_writes::layer_holds(tick_state, base().tree, seen_sheep.base_data.stood_cell))).collect() };
     let tagged = probe.alone(&mut world, read_sheep);
     assert!(tagged.iter().all(|&(tag, _, on_tree)| tag.is_some() && !on_tree), "every sheep tagged, and none put on a tree");
     let mut stood_cell_by_tag: HashMap<u64, CellIndex> = tagged.iter().map(|&(tag, stood_cell, _)| (tag.expect("tagged"), stood_cell)).collect();
@@ -85,7 +85,7 @@ fn trees_bar_their_cells_and_no_sheep_steps_onto_one() {
     assert!(steps_seen > 0, "{steps_seen} steps, {lamb_ticks} lamb-ticks in {tick} ticks");
     assert!(over_the_world(&mut world, &probe).0, "after {tick} ticks of the sheep");
     // The trees after the sheep: a sheep whose wake passes with its rule not run never wakes again.
-    let mut trees_counts = server::simulation::simulation_api::RuleCounts::default();
+    let mut trees_counts = server::simulation::simulation_api::rule_counts::RuleCounts::default();
     for _ in 0..2000 {
         trees_counts += tick_rule(&mut world, TREES_RULE).rules;
     }

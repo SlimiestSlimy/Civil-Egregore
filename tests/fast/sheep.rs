@@ -9,7 +9,10 @@ use protocol::server_parameters::{ParameterValue, SEED};
 use crate::probe::{entities_of_the_turn, of_the_turn, Probe};
 use crate::worlds::{base, cells_of_grass, every_entity, first_superchunk, hot_superchunks, nothing_more, plain_start, probed_world, put_entities, set_rectangle, tick_sheep};
 use utilities::coordinates::{CellCartesian, CellIndex};
-use server::simulation::simulation_api::{cell_reads_and_writes, entity_reads_and_writes, tick_and_random_stream, AttributeBlock, EntityRef, Header, RuleCounts, WholeAttribute};
+use server::simulation::simulation_api::{cell_reads_and_writes, entity_reads_and_writes, tick_and_random_stream, EntityRef};
+use protocol::server_types::entity::EntityBaseData;
+use protocol::server_types::attributes::{AttributeBlock, WholeAttribute};
+use server::simulation::simulation_api::rule_counts::RuleCounts;
 use server::World;
 use basegame::base_types::SHEEP_RULE;
 use basegame::entity_rules::sheep::{BIRTHS_COUNT, DEATHS_COUNT, EATEN_COUNT, FAR_COUNT, PATHS, SOUGHT_COUNT, WOKEN_COUNT, GESTATION_TIME, TIME_BETWEEN_MEALS, ROAMING_TIME, TIME_TO_STARVE, SheepState, STEP_JITTER, STEP};
@@ -28,7 +31,7 @@ fn sheep_state(sheep_entity: &EntityRef) -> SheepState {
 /// `grass_cartesian`, set up in ticks of the probe alone.
 fn a_sheep_and_its_grass(world: &mut World, probe: &Probe, sheep_cartesian: CellCartesian, grass_cartesian: CellCartesian) {
     set_rectangle(world, probe, base().grass, grass_cartesian, 1, 1);
-    put_entities(world, probe, vec![(Header { entity_type: base().sheep, stood_cell: sheep_cartesian.into(), wake: 0 }, hungry_at(0))]);
+    put_entities(world, probe, vec![(EntityBaseData { entity_type: base().sheep, stood_cell: sheep_cartesian.into(), wake: 0 }, hungry_at(0))]);
 }
 
 /// Whether `sheep_entity` is well formed: a sheep, knowing when it is
@@ -36,7 +39,7 @@ fn a_sheep_and_its_grass(world: &mut World, probe: &Probe, sheep_cartesian: Cell
 /// judged after it: a test's assert fails outside the tick's threads.
 fn well_formed(sheep_entity: &EntityRef) -> bool {
     let checked_state = sheep_state(sheep_entity);
-    sheep_entity.header.entity_type == base().sheep && (checked_state.grown_at == 0 || checked_state.lamb_due_at == 0)
+    sheep_entity.base_data.entity_type == base().sheep && (checked_state.grown_at == 0 || checked_state.lamb_due_at == 0)
 }
 
 /// With no grass at all, every sheep starves, within the wakes it
@@ -150,14 +153,14 @@ fn sheep_on_thin_pasture_roam_away() {
     for &start_cell in &start_cells {
         set_rectangle(&mut world, &probe, base().grass, start_cell, 1, 1);
     }
-    put_entities(&mut world, &probe, start_cells.iter().map(|&start_cell| (Header { entity_type: base().sheep, stood_cell: start_cell.into(), wake: 0 }, hungry_at(0))).collect());
+    put_entities(&mut world, &probe, start_cells.iter().map(|&start_cell| (EntityBaseData { entity_type: base().sheep, stood_cell: start_cell.into(), wake: 0 }, hungry_at(0))).collect());
     // A sheep is told from the others by its superchunk, which it does not walk out of in so few steps.
     let index_of_sheep = |sheep_cell: CellIndex| superchunks.binary_search(&sheep_cell.superchunk()).expect("on a hot superchunk");
     // Each sheep: whether it has set off, and where its steps ran out.
     let (mut eaten_total, mut sheep_walks) = (0, vec![(false, None); start_cells.len()]);
     for _ in 0..TIME_BETWEEN_MEALS.ticks() + ROAMING_TIME.ticks() + 4 * (STEP.ticks() + STEP_JITTER.ticks()) {
         // Each sheep as the tick found it: where it stands, and whether it roams.
-        let (report, seen_sheep) = probe.tick_rule(&mut world, SHEEP_RULE, |tick_state| entities_of_the_turn(tick_state).iter().map(|sheep_entity| (sheep_entity.header.stood_cell, sheep_state(sheep_entity).roaming_until != 0)).collect());
+        let (report, seen_sheep) = probe.tick_rule(&mut world, SHEEP_RULE, |tick_state| entities_of_the_turn(tick_state).iter().map(|sheep_entity| (sheep_entity.base_data.stood_cell, sheep_state(sheep_entity).roaming_until != 0)).collect());
         eaten_total += report.rules[EATEN_COUNT];
         for (sheep_cell, is_roaming) in seen_sheep {
             let (set_off, came_to) = &mut sheep_walks[index_of_sheep(sheep_cell)];
@@ -168,7 +171,7 @@ fn sheep_on_thin_pasture_roam_away() {
         }
     }
     assert_eq!(eaten_total, start_cells.len() as u64, "each its one cell of grass, eaten: thin pasture");
-    let alive_sheep: Vec<usize> = every_entity(&mut world, &probe, |alive_entity| alive_entity.header.stood_cell).into_iter().map(index_of_sheep).collect();
+    let alive_sheep: Vec<usize> = every_entity(&mut world, &probe, |alive_entity| alive_entity.base_data.stood_cell).into_iter().map(index_of_sheep).collect();
     assert!(!alive_sheep.is_empty(), "sixteen sheep, every one dead of old age in so few ticks");
     for sheep_index in alive_sheep {
         let (walk_start, came_to) = (start_cells[sheep_index], sheep_walks[sheep_index].1.expect("it set off, and its steps ran out"));
@@ -186,7 +189,7 @@ fn any_number_of_threads_ticks_sheep_the_same() {
     let run_with_threads = |thread_count| {
         let (mut world, probe) = probed_world(&plain_start(&format!("any_number_of_threads_ticks_sheep_the_same_{thread_count}"), 4, 12_500, 300, thread_count).with(SEED, ParameterValue::Hex(seed)), nothing_more);
         let reports: Vec<_> = (0..1500).map(|_| tick_sheep(&mut world)).map(|report| (report.rules, report.instructions_applied)).collect();
-        let sheep_list = every_entity(&mut world, &probe, |sheep_entity| (sheep_entity.header, sheep_entity.attributes.to_vec()));
+        let sheep_list = every_entity(&mut world, &probe, |sheep_entity| (sheep_entity.base_data, sheep_entity.attributes.to_vec()));
         (reports, sheep_list, cells_of_grass(&mut world, &probe))
     };
     let (on_one_thread, on_four_threads) = (run_with_threads(1), run_with_threads(4));
@@ -206,13 +209,13 @@ fn sheep_never_overlap() {
     // woken this tick, so its own rule writes nothing to it: which and when drawn from the run's seed and its cell.
     let (lamb_report, flock_count) = probe.tick_rule(&mut world, SHEEP_RULE, move |tick_state| {
         let (tick_now, every_sheep) = (tick_and_random_stream::current_tick(tick_state), entities_of_the_turn(tick_state));
-        for sheep_entity in every_sheep.iter().filter(|sheep_entity| sheep_entity.header.wake > tick_now) {
-            let mut sheep_random = utilities::rng::RandomSource::for_stream(seed, sheep_entity.header.stood_cell.0);
+        for sheep_entity in every_sheep.iter().filter(|sheep_entity| sheep_entity.base_data.wake > tick_now) {
+            let mut sheep_random = utilities::rng::RandomSource::for_stream(seed, sheep_entity.base_data.stood_cell.0);
             let due_tick = tick_now + 1 + sheep_random.draw_below(2_000);
             if sheep_random.draw_below(16) == 0 {
                 let state_was = sheep_state(sheep_entity);
-                entity_reads_and_writes::set_attribute_of(tick_state, &sheep_entity.header, base().sheep_state, Some(state_was), SheepState { lamb_due_at: due_tick, ..state_was });
-                entity_reads_and_writes::sleep(tick_state, &sheep_entity.header, sheep_entity.header.wake.min(due_tick));
+                entity_reads_and_writes::set_attribute_of(tick_state, &sheep_entity.base_data, base().sheep_state, Some(state_was), SheepState { lamb_due_at: due_tick, ..state_was });
+                entity_reads_and_writes::sleep(tick_state, &sheep_entity.base_data, sheep_entity.base_data.wake.min(due_tick));
             }
         }
         vec![every_sheep.len()]
@@ -221,7 +224,7 @@ fn sheep_never_overlap() {
     let (mut moves_total, mut births_total) = (lamb_report.instructions_applied.moves, lamb_report.rules[BIRTHS_COUNT]);
     for tick in 0..2_000 {
         // Every 100th tick, where every sheep stands as the tick found it.
-        let (report, mut cells) = probe.tick_rule(&mut world, SHEEP_RULE, move |tick_state| if tick % 100 == 99 { entities_of_the_turn(tick_state).iter().map(|sheep_entity| sheep_entity.header.stood_cell).collect() } else { Vec::new() });
+        let (report, mut cells) = probe.tick_rule(&mut world, SHEEP_RULE, move |tick_state| if tick % 100 == 99 { entities_of_the_turn(tick_state).iter().map(|sheep_entity| sheep_entity.base_data.stood_cell).collect() } else { Vec::new() });
         (moves_total, births_total) = (moves_total + report.instructions_applied.moves, births_total + report.rules[BIRTHS_COUNT]);
         cells.sort_unstable();
         assert!(cells.windows(2).all(|adjacent_pair| adjacent_pair[0] != adjacent_pair[1]), "tick {tick}: two sheep on a cell");
@@ -248,7 +251,7 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
         set_rectangle(&mut world, &probe, base().grass, grass_cell.cartesian(), 1, 1);
     }
     let was_hungry_at = 0;
-    put_entities(&mut world, &probe, [decaying_cell, standing_cell].map(|sheep_cell| (Header { entity_type: base().sheep, stood_cell: sheep_cell, wake: 0 }, hungry_at(was_hungry_at))).to_vec());
+    put_entities(&mut world, &probe, [decaying_cell, standing_cell].map(|sheep_cell| (EntityBaseData { entity_type: base().sheep, stood_cell: sheep_cell, wake: 0 }, hungry_at(was_hungry_at))).to_vec());
     // The decay, counted as the probe's first; the sheep's rule, woken that tick.
     let (report, meeting_tick) = probe.tick_rule(&mut world, SHEEP_RULE, move |tick_state| {
         if !of_the_turn(tick_state, decaying_cell) {
@@ -265,12 +268,12 @@ fn a_meal_lost_to_a_decay_leaves_the_sheep_hungry() {
     let (compares_applied, compares_refused) = report.instructions_compared;
     assert!(compares_applied >= 2 && compares_refused >= 2, "{compares_applied} applied, {compares_refused} refused");
     assert_eq!((report.counted_when_applied[0], report.rules[EATEN_COUNT]), (1, 1), "a decay and one meal, counted as applied");
-    let sheep_list = every_entity(&mut world, &probe, |sheep_entity| (sheep_entity.header, sheep_state(sheep_entity)));
+    let sheep_list = every_entity(&mut world, &probe, |sheep_entity| (sheep_entity.base_data, sheep_state(sheep_entity)));
     // One may die of old age before so long a sleep as a meal's, on any seed: its death is its meal's, both or neither.
-    let fed_sheep = sheep_list.iter().find(|(header, _)| header.stood_cell == standing_cell);
+    let fed_sheep = sheep_list.iter().find(|(base_data, _)| base_data.stood_cell == standing_cell);
     assert_eq!(fed_sheep.is_none() as u64, report.rules[DEATHS_COUNT]);
-    assert!(fed_sheep.is_none_or(|(header, fed_state)| fed_state.hungry_at == meeting_tick + TIME_BETWEEN_MEALS.ticks() && header.wake >= meeting_tick + TIME_BETWEEN_MEALS.ticks()), "fed, and asleep until hungry");
-    let (hungry_header, hungry_state) = sheep_list.iter().find(|(header, _)| header.stood_cell == decaying_cell).expect("the sheep whose meal was refused, alive");
-    assert_eq!((*hungry_state, hungry_header.stood_cell), (SheepState { hungry_at: was_hungry_at, ..SheepState::default() }, decaying_cell), "as it was");
-    assert!((meeting_tick + STEP.ticks()..meeting_tick + STEP.ticks() + STEP_JITTER.ticks()).contains(&hungry_header.wake), "asleep a step: it wakes at {}", hungry_header.wake);
+    assert!(fed_sheep.is_none_or(|(base_data, fed_state)| fed_state.hungry_at == meeting_tick + TIME_BETWEEN_MEALS.ticks() && base_data.wake >= meeting_tick + TIME_BETWEEN_MEALS.ticks()), "fed, and asleep until hungry");
+    let (hungry_base_data, hungry_state) = sheep_list.iter().find(|(base_data, _)| base_data.stood_cell == decaying_cell).expect("the sheep whose meal was refused, alive");
+    assert_eq!((*hungry_state, hungry_base_data.stood_cell), (SheepState { hungry_at: was_hungry_at, ..SheepState::default() }, decaying_cell), "as it was");
+    assert!((meeting_tick + STEP.ticks()..meeting_tick + STEP.ticks() + STEP_JITTER.ticks()).contains(&hungry_base_data.wake), "asleep a step: it wakes at {}", hungry_base_data.wake);
 }

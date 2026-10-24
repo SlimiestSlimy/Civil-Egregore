@@ -9,7 +9,7 @@ use crate::base_types::{BaseTypes, SheepState};
 use crate::entity_rules::sheep::{STEP, TIME_BETWEEN_MEALS};
 use std::path::Path;
 use std::sync::Arc;
-use server::simulation::simulation_api::{CellCartesian, CellIndex, FirstWake, GeneratingSuperchunk, RandomSource, SetUpWorldgen, Write, WriteOp, WritesApplied, WorldgenCode, SUPERCHUNK_SIDE_CELLS};
+use server::simulation::simulation_api::{CellCartesian, CellIndex, GeneratingSuperchunk, RandomSource, SetUpWorldgen, Write, WriteOp, WritesApplied, WorldgenCode, SUPERCHUNK_SIDE_CELLS};
 
 /// The world generation's library, as it is registered with
 /// `base_types`: set up from a world's config in `config_folder`, each
@@ -56,7 +56,7 @@ pub fn flock(base_types: &BaseTypes, generating: &mut GeneratingSuperchunk, coun
             continue;
         }
         let (first_wake, hungry_at) = (STEP.part_drawn(random_stream), TIME_BETWEEN_MEALS.part_drawn(random_stream).tick_after(first_hot_tick));
-        if generating.new_entity(base_types.sheep, drawn_cell, FirstWake::After(first_wake)).with(base_types.sheep_state, SheepState { hungry_at, ..SheepState::default() }).make() {
+        if generating.new_entity(base_types.sheep, drawn_cell, first_wake).with(base_types.sheep_state, SheepState { hungry_at, ..SheepState::default() }).make() {
             generating.cells_mut().apply(base_types.collision, Write::cell(drawn_cell, WriteOp::SetCell), &mut writes_applied);
             made += 1;
         }

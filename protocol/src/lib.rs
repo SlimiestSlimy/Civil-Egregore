@@ -12,5 +12,6 @@
 pub mod flags;
 pub mod pipe;
 pub mod server_parameters;
+pub mod server_types;
 pub mod type_registry;
 pub mod world_types;

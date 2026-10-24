@@ -34,15 +34,15 @@ fn sheep_never_step_through_a_wall() {
     let (_, tagged_cells) = probe.whole_tick(&mut made_world, move |tick_state| {
         let every_sheep = entities_of_the_turn(tick_state);
         every_sheep.iter().map(|tagged_sheep| {
-            entity_reads_and_writes::set_attribute_of(tick_state, &tagged_sheep.header, sheep_tag, None, tagged_sheep.header.stood_cell.0);
-            tagged_sheep.header.stood_cell
+            entity_reads_and_writes::set_attribute_of(tick_state, &tagged_sheep.base_data, sheep_tag, None, tagged_sheep.base_data.stood_cell.0);
+            tagged_sheep.base_data.stood_cell
         }).collect()
     });
     let mut stood_cell_by_tag: HashMap<u64, utilities::coordinates::CellIndex> = tagged_cells.into_iter().map(|tagged_cell| (tagged_cell.0, tagged_cell)).collect();
     let (mut steps_moved, mut beside_walls) = (0, 0);
     for _ in 0..1_500 {
         // Every sheep as the whole tick found it: as the one before left it.
-        let (_, seen_sheep) = probe.whole_tick(&mut made_world, move |tick_state| entities_of_the_turn(tick_state).iter().map(|seen_sheep| (crate::worlds::tag_of(sheep_tag, seen_sheep), seen_sheep.header.stood_cell)).collect());
+        let (_, seen_sheep) = probe.whole_tick(&mut made_world, move |tick_state| entities_of_the_turn(tick_state).iter().map(|seen_sheep| (crate::worlds::tag_of(sheep_tag, seen_sheep), seen_sheep.base_data.stood_cell)).collect());
         for (tag, stood_cell) in seen_sheep {
             if let Some(was_cell) = tag.and_then(|tag_number| stood_cell_by_tag.insert(tag_number, stood_cell)).filter(|&previous_cell| previous_cell != stood_cell) {
                 let (step_from_cartesian, step_to_cartesian) = (was_cell.cartesian(), stood_cell.cartesian());

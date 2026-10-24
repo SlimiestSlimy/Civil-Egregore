@@ -7,7 +7,9 @@ use super::SimulationHandle;
 use crate::bitplane_manager::{Write, WritesApplied};
 use crate::chunk_storage::{LayerType, SuperchunkImage};
 use utilities::coordinates::SuperchunkIndex;
-use crate::entity_manager::{AttributeBlock, Header, InstructionsApplied};
+use crate::entity_manager::InstructionsApplied;
+use protocol::server_types::entity::EntityBaseData;
+use protocol::server_types::attributes::AttributeBlock;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -20,20 +22,20 @@ pub enum SavedImage {
 }
 
 impl SimulationHandle {
-    /// Puts `header`'s entity on the world, whole: what came of it --
+    /// Puts `base_data`'s entity on the world, whole: what came of it --
     /// lost, if its superchunk is not hot. Its cells on any plane are
     /// whoever puts it's to write.
     #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
-    pub fn add_entity(&mut self, header: Header, attributes: &[AttributeBlock]) -> InstructionsApplied {
-        self.entity_store.queue_add(header, attributes);
+    pub fn add_entity(&mut self, base_data: EntityBaseData, attributes: &[AttributeBlock]) -> InstructionsApplied {
+        self.entity_store.queue_add(base_data, attributes);
         self.entity_store.apply()
     }
 
-    /// Removes `header`'s entity from the world. Its cells on any plane
+    /// Removes `base_data`'s entity from the world. Its cells on any plane
     /// are whoever removes it's to clear.
     #[cfg_attr(not(test), allow(dead_code))] // only the crate's tests ask it yet
-    pub fn remove_entity(&mut self, header: &Header) -> InstructionsApplied {
-        self.entity_store.queue_remove(header.stood_cell);
+    pub fn remove_entity(&mut self, base_data: &EntityBaseData) -> InstructionsApplied {
+        self.entity_store.queue_remove(base_data.stood_cell);
         self.entity_store.apply()
     }
 

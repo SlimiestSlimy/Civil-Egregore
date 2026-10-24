@@ -8,7 +8,10 @@ use super::instruction::{Instruction, NO_COUNT};
 use super::SimulationTickState;
 use crate::chunk_storage::LayerType;
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::{AttributeBlock, AttributeType, Header, Member};
+use crate::entity_manager::AttributeType;
+use protocol::server_types::entity::EntityBaseData;
+use protocol::server_types::attribute_layouts::Member;
+use protocol::server_types::attributes::AttributeBlock;
 
 /// A write, said whole: one instruction, queued by [`SimulationTickState::write`]
 /// or with its compare by [`SimulationTickState::compare_with_writes`] -- every
@@ -31,9 +34,9 @@ pub enum Write {
     /// One added to the rule's count of this place: it lands where
     /// the compare open last does.
     Count(u32),
-    /// An entity made as the header says: of its type, on its cell,
+    /// An entity made as its base data says: of its type, on its cell,
     /// to wake at its wake.
-    MakeEntity(Header),
+    MakeEntity(EntityBaseData),
     /// The entity the tick found on `from` moved to `to`, in its
     /// superchunk or in another: one instruction either way, the
     /// border a rule's to cross without knowing of it. Over a border
@@ -84,9 +87,9 @@ impl SimulationTickState<'_> {
         match write {
             Write::Cell { layer_type, target_cell: at, value, counted_place: counted } => (Some(at), Instruction::write_cell(layer_type, at, value, counted.map_or(NO_COUNT, |place| self.counted_number(place)))),
             Write::Count(place) => (None, Instruction::count_under(self.counted_number(place))),
-            Write::MakeEntity(header) => {
-                debug_assert!(header.wake > self.current_tick, "an entity made to wake at tick {}, not after {}", header.wake, self.current_tick);
-                (Some(header.stood_cell), Instruction::make_entity(header.stood_cell, header.entity_type.0, header.wake))
+            Write::MakeEntity(base_data) => {
+                debug_assert!(base_data.wake > self.current_tick, "an entity made to wake at tick {}, not after {}", base_data.wake, self.current_tick);
+                (Some(base_data.stood_cell), Instruction::make_entity(base_data.stood_cell, base_data.entity_type.0, base_data.wake))
             }
             Write::MoveEntity { from_cell: from, to_cell: to } if from.superchunk() == to.superchunk() => (Some(from), Instruction::move_entity(from, to)),
             Write::MoveEntity { from_cell: from, to_cell: to } => (Some(from), Instruction::cross_entity(from, to)),

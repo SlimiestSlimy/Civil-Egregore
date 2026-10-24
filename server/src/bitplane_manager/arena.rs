@@ -7,7 +7,7 @@ use super::reader::{LayerAt, Lookup};
 use super::superchunk::{Bucket, Superchunk};
 use super::writes::WriteQueues;
 use crate::chunk_storage::{BucketKey, LayerType};
-use crate::bitplane_manager::{WidePlane, Width};
+use protocol::server_types::plane_widths::{WidePlane, Width};
 use utilities::coordinates::{CellIndex, ChunkIndex, SuperchunkIndex};
 
 /// A superchunk gone cold as a whole ([`BitmapArena::make_cold_superchunk`]):

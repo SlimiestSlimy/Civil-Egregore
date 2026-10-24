@@ -8,14 +8,15 @@
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, FORCED_HOT, SEED, SIDE};
 use utilities::coordinates::{SuperchunkIndex, WORLD_MIDDLE};
 use crate::bitplane_manager::{Write, WriteOp};
-use crate::entity_manager::{AttributeBlock, Header, NEVER_WAKES};
+use protocol::server_types::entity::{EntityBaseData, NEVER_WAKES};
+use protocol::server_types::attributes::AttributeBlock;
 use protocol::pipe::frame::Viewport;
 use crate::{halos_about, HaloChange, World, COOL_TICKS, WARM_TICKS};
 
 /// The superchunks holding a hot entity.
 fn hot_entities(world: &World) -> Vec<SuperchunkIndex> {
     let hot_entity = crate::simulation::rules::hot_entity_of(world.frozen_type_registry()).expect("a type keeps the world hot");
-    world.entity_store().superchunks().iter().filter(|superchunk| superchunk.iter().any(|entity| entity.header.entity_type == hot_entity)).map(|superchunk| superchunk.superchunk_index()).collect()
+    world.entity_store().superchunks().iter().filter(|superchunk| superchunk.iter().any(|entity| entity.base_data.entity_type == hot_entity)).map(|superchunk| superchunk.superchunk_index()).collect()
 }
 
 /// A flock wandering off its origin for 6,000 ticks, or as many as it takes a halo to move: after every tick
@@ -63,7 +64,7 @@ fn a_superchunk_warming_takes_nothing_until_it_turns_hot() {
     let (mut world, test_game) = crate::test_game::one_flock_world("a_superchunk_warming_takes_nothing_until_it_turns_hot", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
     let try_both = |world: &mut World, cell| {
         let missed = world.write_cells(test_game.trail, [Write::cell(cell, WriteOp::FlipCell)]).missed;
-        (missed, world.add_entity(Header { entity_type: test_game.walker, stood_cell: cell, wake: NEVER_WAKES }, &[]).lost)
+        (missed, world.add_entity(EntityBaseData { entity_type: test_game.walker, stood_cell: cell, wake: NEVER_WAKES }, &[]).lost)
     };
     while world.warming().next().is_none() {
         assert!(world.entity_store().current_tick() < 60_000, "the halos moved");
@@ -88,7 +89,7 @@ fn a_superchunk_cooling_stays_hot_until_due() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let (mut world, test_game) = crate::test_game::one_flock_world("a_superchunk_cooling_stays_hot_until_due", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 1);
     let halo = world.bitmap_arena().superchunk_indices();
-    let lone_sheep = world.entity_store().iter().map(|entity| (entity.header, entity.attributes.to_vec())).next().expect("the sheep");
+    let lone_sheep = world.entity_store().iter().map(|entity| (entity.base_data, entity.attributes.to_vec())).next().expect("the sheep");
     let take_away = |world: &mut World| {
         crate::whole_worlds::remove_entity(world, test_game, &lone_sheep.0);
         world.tick().halos
@@ -103,7 +104,7 @@ fn a_superchunk_cooling_stays_hot_until_due() {
     }
     // Back asleep over the tick that follows: awake, it might step over an edge and move its halo.
     let wake = lone_sheep.0.wake.max(world.entity_store().current_tick() + 2);
-    crate::whole_worlds::add_entity(&mut world, test_game, Header { wake, ..lone_sheep.0 }, &lone_sheep.1);
+    crate::whole_worlds::add_entity(&mut world, test_game, EntityBaseData { wake, ..lone_sheep.0 }, &lone_sheep.1);
     let back_change = world.tick().halos;
     assert!(back_change == HaloChange::default() && world.cooling().next().is_none() && world.bitmap_arena().superchunk_indices() == halo, "the sheep back: the halo hot as it was, nothing made");
 
@@ -136,10 +137,10 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
     }
     let ticks_run = world.entity_store().current_tick();
     let halo = world.bitmap_arena().superchunk_indices();
-    type WorldHeld = (Vec<u64>, Vec<(Header, Vec<AttributeBlock>)>, Vec<(SuperchunkIndex, u64)>);
+    type WorldHeld = (Vec<u64>, Vec<(EntityBaseData, Vec<AttributeBlock>)>, Vec<(SuperchunkIndex, u64)>);
     let world_held = |world: &World| -> WorldHeld {
         let cells = world.world_info().layers.clone().into_iter().flat_map(|layer| world.bitmap_arena().buckets_of(layer)).flat_map(|(_, bucket)| bucket.words().to_vec()).collect();
-        (cells, world.entity_store().iter().map(|entity| (entity.header, entity.attributes.to_vec())).collect(), world.world_simulation().random_states().collect())
+        (cells, world.entity_store().iter().map(|entity| (entity.base_data, entity.attributes.to_vec())).collect(), world.world_simulation().random_states().collect())
     };
     let held_before = world_held(&world);
     let (mut twin_world, _) = crate::test_game::one_flock_world("a_superchunk_gone_cold_comes_back_as_it_was_twin", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 2_000);

@@ -8,7 +8,7 @@ use super::superchunk::Superchunk;
 use utilities::bitmap::{BITS_PER_WORD, CellWords};
 use utilities::bitmap::window::{PLACE_IN_WORD_TILE, WORD_TILE_SIDE, in_word_tile, left_columns, rows_from_morton, top_rows, window};
 use crate::chunk_storage::{BucketKey, LayerType};
-use crate::bitplane_manager::{WidePlane, Width};
+use protocol::server_types::plane_widths::{WidePlane, Width};
 use utilities::coordinates::{CellIndex, SuperchunkIndex};
 use std::cell::Cell;
 use utilities::cache::prefetch_cache_line;

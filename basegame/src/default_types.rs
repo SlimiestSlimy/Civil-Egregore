@@ -12,7 +12,8 @@ use crate::base_types::{BaseTypes, SheepState, GRASS_RULE, SHEEP_RULE, TREES_RUL
 use crate::libraries::collision::Collision;
 use crate::worldgen::calls::WorldgenCalls;
 use protocol::type_registry::{Hook, RegisteredType, Registration, RegistryRefusal, TypeRegistry};
-use server::simulation::simulation_api::{Attribute, Bits16, Bits4, WidePlane};
+use protocol::server_types::attribute_layouts::Attribute;
+use protocol::server_types::plane_widths::{Bits16, Bits4, WidePlane};
 use std::sync::Arc;
 
 /// The base game's bundle: every type of it is in it, its name the

@@ -73,5 +73,5 @@ fn entities_of(world: &World, superchunk: SuperchunkIndex) -> Vec<(EntityType, (
         return Vec::new();
     };
     let CellCartesian { x: left_cell_x, y: top_cell_y } = superchunk.top_left().cartesian();
-    superchunk_entities.iter().map(|entity| (entity.header.entity_type, entity.header.stood_cell.cartesian())).map(|(entity_type, entity_cell)| (entity_type, ((entity_cell.x - left_cell_x) as u16, (entity_cell.y - top_cell_y) as u16))).collect()
+    superchunk_entities.iter().map(|entity| (entity.base_data.entity_type, entity.base_data.stood_cell.cartesian())).map(|(entity_type, entity_cell)| (entity_type, ((entity_cell.x - left_cell_x) as u16, (entity_cell.y - top_cell_y) as u16))).collect()
 }

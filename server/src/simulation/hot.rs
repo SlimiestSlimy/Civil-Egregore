@@ -74,7 +74,7 @@ impl Hot {
     /// none outside the world either way.
     pub fn wanted_hot_superchunks(&self, entity_store: &WorldEntities) -> Vec<SuperchunkIndex> {
         let mut wanted_superchunks = match *self {
-            Self::AboutHotEntities { entity, .. } => halos_about(entity_store.superchunks().iter().filter(|superchunk| superchunk.iter().any(|kept_entity| kept_entity.header.entity_type == entity)).map(|superchunk| superchunk.superchunk_index())),
+            Self::AboutHotEntities { entity, .. } => halos_about(entity_store.superchunks().iter().filter(|superchunk| superchunk.iter().any(|kept_entity| kept_entity.base_data.entity_type == entity)).map(|superchunk| superchunk.superchunk_index())),
             Self::Forced { .. } => self.all_superchunks(),
         };
         wanted_superchunks.retain(|&superchunk| self.is_within_world(superchunk));

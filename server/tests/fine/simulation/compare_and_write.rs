@@ -3,12 +3,12 @@
 //! -- the cell made to decay and be eaten in one tick, on purpose, and
 //! all of it the same on any number of threads.
 
-use crate::arenas::{cell, walker_header, world};
+use crate::arenas::{cell, walker_base_data, world};
 use crate::test_types::TestTypes;
 use crate::walkers::cells_drawn;
 use crate::bitplane_manager::{BitmapArena, Write, WriteOp};
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::AttributeBlock;
+use protocol::server_types::attributes::AttributeBlock;
 use crate::simulation::{Compare, Simulation, SimulationTickState};
 use utilities::rng::RandomSource;
 
@@ -67,20 +67,20 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
     let (mut bitmap_arena, mut entity_store) = world(types, 1);
     let (decaying_cell, eaten_cell) = (cell(300, 300), cell(301, 400));
     set(types, &mut bitmap_arena, &[decaying_cell, eaten_cell]);
-    entity_store.queue_add(walker_header(types, decaying_cell, 0), &[]);
-    entity_store.queue_add(walker_header(types, eaten_cell, 0), &[]);
+    entity_store.queue_add(walker_base_data(types, decaying_cell, 0), &[]);
+    entity_store.queue_add(walker_base_data(types, eaten_cell, 0), &[]);
     entity_store.apply();
     let mark_cell_of = |eater_cell: CellIndex| eater_cell.at_cartesian_offset(1, 0).expect("in the world");
     let report = Simulation::new(1).tick(&mut bitmap_arena, &mut entity_store, seed, |tick_state: &mut SimulationTickState| {
         crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, types.stone, decaying_cell, 1, 0, Some(DECAYED_COUNT_PLACE as usize));
         for eater_entity in tick_state.woken_entities() {
-            let (current_tick, header) = (tick_state.current_tick(), eater_entity.header);
+            let (current_tick, base_data) = (tick_state.current_tick(), eater_entity.base_data);
             // Fed if the cell still holds, asleep a tick if it does not: one of the two, the eater written once.
-            crate::simulation::simulation_api::entity_reads_and_writes::update_entity(&mut crate::simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: types.stone, target_cell: header.stood_cell, seen_value: 1 }), &header, crate::entity_manager::Header { wake: current_tick + 100, ..header }, &[AttributeBlock::holding_value(types.fed, 1)]);
-            crate::simulation::simulation_api::entity_reads_and_writes::step(&mut crate::simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: types.stone, target_cell: header.stood_cell, seen_value: 0 }), &header, header.stood_cell, current_tick + 1);
-            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, types.stone, header.stood_cell, 1, 0, Some(EATEN_COUNT_PLACE as usize));
-            let fed_compare = Compare::attribute(header.stood_cell, types.fed.attribute_type(), Some(&[AttributeBlock::holding_value(types.fed, 1)]));
-            crate::simulation::simulation_api::compare_and_write::write(tick_state, fed_compare, types.stone, mark_cell_of(header.stood_cell), 0, 1, None);
+            crate::simulation::simulation_api::entity_reads_and_writes::update_entity(&mut crate::simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: types.stone, target_cell: base_data.stood_cell, seen_value: 1 }), &base_data, protocol::server_types::entity::EntityBaseData { wake: current_tick + 100, ..base_data }, &[AttributeBlock::holding_value(types.fed, 1)]);
+            crate::simulation::simulation_api::entity_reads_and_writes::step(&mut crate::simulation::simulation_api::compare_and_write::open_compare(tick_state, Compare::Cell { layer_type: types.stone, target_cell: base_data.stood_cell, seen_value: 0 }), &base_data, base_data.stood_cell, current_tick + 1);
+            crate::simulation::simulation_api::cell_reads_and_writes::seen_becoming(tick_state, types.stone, base_data.stood_cell, 1, 0, Some(EATEN_COUNT_PLACE as usize));
+            let fed_compare = Compare::attribute(base_data.stood_cell, types.fed.attribute_type(), Some(&[AttributeBlock::holding_value(types.fed, 1)]));
+            crate::simulation::simulation_api::compare_and_write::write(tick_state, fed_compare, types.stone, mark_cell_of(base_data.stood_cell), 0, 1, None);
         }
         0
     });
@@ -94,8 +94,8 @@ fn a_cell_decayed_and_eaten_in_one_tick_is_a_meal_refused_write_by_write() {
     assert_eq!(report.instructions_compared, (9, 4), "one eater fed, one asleep a tick: each written once");
     assert_eq!((report.counted_when_applied[DECAYED_COUNT_PLACE as usize], report.counted_when_applied[EATEN_COUNT_PLACE as usize]), (1, 1));
     let (hungry_entity, fed_entity) = (entity_store.get(decaying_cell).expect("where it stood"), entity_store.get(eaten_cell).expect("where it stood"));
-    assert_eq!((hungry_entity.attribute(types.fed), hungry_entity.header.wake), (None, 1), "nothing of its meal happened: asleep a tick");
-    assert_eq!((fed_entity.attribute(types.fed), fed_entity.header.wake), (Some(1), 100), "its meal whole");
+    assert_eq!((hungry_entity.attribute(types.fed), hungry_entity.base_data.wake), (None, 1), "nothing of its meal happened: asleep a tick");
+    assert_eq!((fed_entity.attribute(types.fed), fed_entity.base_data.wake), (Some(1), 100), "its meal whole");
 }
 
 /// What a superchunk's turn queues in

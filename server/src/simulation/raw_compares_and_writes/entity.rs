@@ -3,14 +3,14 @@
 //! (`docs/compares_and_writes.md`, "Writes").
 
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::Header;
+use protocol::server_types::entity::EntityBaseData;
 use crate::simulation::{SimulationTickState, Write};
 
-/// Queues an entity made as `header` says: of its type, on its cell,
+/// Queues an entity made as `base_data` says: of its type, on its cell,
 /// to wake at its wake.
 #[inline]
-pub fn queue_entity_made(tick_state: &mut SimulationTickState, header: Header) {
-    tick_state.write(Write::MakeEntity(header));
+pub fn queue_entity_made(tick_state: &mut SimulationTickState, base_data: EntityBaseData) {
+    tick_state.write(Write::MakeEntity(base_data));
 }
 
 /// Queues the entity the tick found on `from_cell` moved to `to_cell`, a cell

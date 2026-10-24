@@ -7,7 +7,8 @@
 use crate::arenas::cell;
 use crate::test_types::TestTypes;
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::{Header, remove_attribute, set_attribute};
+use crate::entity_manager::{remove_attribute, set_attribute};
+use protocol::server_types::entity::EntityBaseData;
 use crate::simulation::SimulationTickState;
 
 
@@ -23,7 +24,7 @@ pub fn count_and_flip(types: TestTypes, tick_state: &mut SimulationTickState) ->
         if !remove_attribute(&mut attributes, types.odd_wake.attribute_type()) {
             set_attribute(&mut attributes, types.odd_wake, 1);
         }
-        crate::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.header, Header { wake: tick_state.current_tick() + 1, ..entity.header }, &attributes);
+        crate::simulation::simulation_api::entity_reads_and_writes::update_entity(tick_state, &entity.base_data, EntityBaseData { wake: tick_state.current_tick() + 1, ..entity.base_data }, &attributes);
         woken_count += 1;
     }
     woken_count

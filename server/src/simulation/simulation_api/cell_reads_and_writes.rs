@@ -4,8 +4,8 @@
 //! and is applied only if the cell still holds it.
 
 use crate::bitplane_manager::Window;
-use crate::chunk_storage::{LayerType};
-use crate::bitplane_manager::{WidePlane, Width};
+use crate::chunk_storage::LayerType;
+use protocol::server_types::plane_widths::{WidePlane, Width};
 use utilities::coordinates::CellIndex;
 use crate::simulation::simulation_api::compare_and_write;
 use crate::simulation::{Compare, Write};

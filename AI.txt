@@ -103,8 +103,9 @@ Boundaries, asked first, would have put that on the table.
   FREEZE_SEED=0x... pins one, FREEZE_SEED= keeps the file's -- the one
   environment variable ("that's one environment variable we do need,
   freeze seed lmao"). The binary never reads repo files.
-- Names long, human, the glossary's ("more than one word"). No file
-  much past 300 lines. No macro of our own where a function or a table
+- Names long, human, the glossary's ("more than one word"). Files about
+  300 lines: "bellow 400 lines is warning, not refactor" -- 400 and
+  over is split. No macro of our own where a function or a table
   will do.
 - Refactors through rust-analyzer: AI_SCRATCHPAD/scripts/
   rust_analyzer_driver.py (rename, move, refs, diagnostics -- one
@@ -158,10 +159,6 @@ THE TREE
 - DOCS PAUSED, ALL OF THEM (2026-10-17): no upkeep while the code is
   hot, root docs included; a rough update only when asked. The docs
   pointer tests stay ignored.
-- DIAGNOSTICS: "diagnostics have 2 roles, make testing easier, and
-  writing stuff down for comparisons"; "only diagnostics should
-  generate transient data" (and tests). The old ones deleted; from
-  scratch when made.
 
 TESTS
 - A crate's own tests check its invariants; the root's tests/ the
@@ -330,7 +327,11 @@ MODS AND THE GAME FOLDER
   be, writes the manifest, lays out the mod in its own target/<mod>/.
   Release only for now. A mod template workspace in the tree, basegame
   "basically a copy of it".
-- VERSIONS: "freezing the public api will be our 0.7 moment" -- "the
+- VERSIONS: now 0.6.5293 ("decided now. were on version 0.6.5293, why?
+  idk", 2026-10-24): "we should have a single version on the root crate"
+  -- the root Cargo.toml's alone; basegame "still follows the root
+  version so it doesn't carry one of its own even if it acts as a
+  separate workspace"; tessera its own (its own project). "freezing the public api will be our 0.7 moment" -- "the
   public api is stable for a given distributed version of the game,
   between versions it csn change, this is a game, not an operating
   system"; 0.7 the first version with mods, then content. Breaking
@@ -343,18 +344,41 @@ MODS AND THE GAME FOLDER
 == TO DO ==
 
 NOW
-- Commit and push the tier split and this file's cleanup ("and push
-  yeah").
+- BASEGAME AS A MOD, the 0.7 milestone ("nvm its going to be 0.7", after
+  "probably the 0.8 milestone"), with the public API's freeze; what is left (asked 2026-10-24, "to remember lol"):
+  3.1's last two files; 3.2 the builder and kind traits (the design, the
+  entry point's shape); 3.3 basegame registering through it and split by
+  side into a library a bundle -- server (rules), client (render rules,
+  gui), common (worldgen calls); step 4 runtime loading (manifests, each
+  side opening its bundles after the freeze, basegame out of the
+  binaries' dependencies, the two binaries, src/main.rs gone, the root
+  tests into basegame's workspace); step 5 the mod packager and template
+  (built against the compiled game's target/). Step 6 not needed for it.
 - STEP 3 (the mod model in code, before runtime loading), co-op file by
   file:
-  3.1 plain types into protocol::server_types (attribute_layouts,
-      attributes, client_calls, entity, plane_widths, rule_counts,
-      simulation_time; protocol/src/server_types.rs exists, not hooked
-      up), the server and its public API using them in place of
-      re-exports. Stay in the server: SimulationTickState and the tick's
-      read and write functions, GeneratingSuperchunk and WorldgenCode
-      (server internals); in the client: RenderTurn/RenderCode (Bevy's
-      Color), GuiCode. RuleMaster waits for 3.3.
+  3.1 DONE (2026-10-24): simulation_time, plane_widths,
+      attribute_layouts, attributes (AttributeBlock, WholeAttribute,
+      of_block_array), entity (EntityBaseData, NEVER_WAKES) in
+      protocol::server_types, their tests in the server ("protocl is a
+      dependency of server after all"), no re-exports of them. Header
+      renamed EntityBaseData ("explicit names for stuff"), its fields
+      base_data; one NEVER_WAKES guard, in the wheel; FirstWake gone
+      (new_entity takes wakes_after: SimulationTime). Rule counts kept,
+      deprecated (LATER).
+  3.2 CLIENT CALLS FIRST, as a kind: "file 6 is actually a special one
+      ... server is just the provider of answers, client is the asker.
+      that sounds like protocol to me" / "the type registry is already
+      the hook manager ... i dont see why the type registry cant freeze
+      this too. there is always a limited set of client calls and server
+      responses" / "why do we have a worlds lifetime? why do we need those
+      specific context for calls? we already have 3 defined entrypoints
+      for everything, client server or protocol handles". So: no
+      CallContext -- a call's code gets the server's handle, as a rule
+      does; the world's calls frozen with its types (each call's mod and
+      code, cast once, sorted by ID, found by it; a client call whose
+      library is no call's code refuses the freeze -- completed as each
+      side opens its bundles once libraries load after the freeze);
+      ServerMessage::of_answer/into_answer for both ends of the wire.
   3.2 the builder and the kind traits in protocol, one setup walk
       matching frozen types to the structs added by name (replacing
       rules_of, worldgen_of, RenderRules::of, the gui gathering).
@@ -425,6 +449,12 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- Positionless entities: "i actually have another plan for positionless
+  entities dont worry about it for now" (2026-10-24). Position stays an
+  entity's primary addressing ("entities primary addresing method is
+  their position indeed, keep it as is"); type and wake the obligatory
+  parts, NEVER_WAKES u64::MAX as it is ("is fine tbh, but 4 guards is a
+  lot lol").
 - Removing a mod from a world (its names stay in types.csv, nothing
   registers them, the world refuses to load): "later we will add proper
   mod removal, another day, that requires server side cleanup we just
@@ -442,6 +472,25 @@ LATER (every "for later" of the user's, and mine, as said)
 - keep_hot on a running world with warmings in flight shortens them to
   now, but their jobs timed entities from the original due tick: mine,
   only tests do it.
+- Attributes up to 256 blocks of 16 bytes (4,096 bytes): "we need to
+  change max atribute size to 256 * 16 bytes. since we now use a single
+  byte for the size (on variably sized atributes, otherwise sized is
+  fixed and not stored on the atribute itself)" / "if its not done it
+  will be for later unless its easy to change" (2026-10-24). Today: 4
+  bits in every header (the ID << 4 | blocks - 1: ID masking, working
+  only as every kind is under 16), 16 blocks the most. The user's design:
+  "we want our types to be 56 bits + 8 bit kind, the size have to be the
+  following byte. we already deprecated typeid masking long ago, typeids
+  are typeids, they should not carry sizes" -- an attribute's first word
+  its whole ID, the byte after it its blocks less one; kept in every
+  attribute (my point, "1: fine": a list walked by its headers needs no
+  registry lookup a step). Open: the data then starts at byte 9, and
+  today a member lies in one word, words from byte 8. Mine also:
+  WholeAttribute, a stack buffer of the most blocks, would be 4 KB zeroed
+  on every default attribute read (every sheep wake): 16 blocks inline,
+  the heap past them, measured. The store is compact already (each
+  attribute its own blocks, the default without its type word, garbage
+  swept).
 - The tick API's raw-block entry points (set_attribute_blocks,
   make_entity taking &[AttributeBlock]) typed and by type ID through the
   store's builder ("the entity store api should abstract all of this");
@@ -491,13 +540,19 @@ LATER (every "for later" of the user's, and mine, as said)
   client learns it from the server, never a constant of its own.
 - The climate, from scratch ("thats going to be redone from scratch");
   grass spreads by itself meanwhile.
-- Rendering test runs again, not as diagnostics; the user has "a better
-  idea for later".
-- Tessera's diagnostics ("well get to that later"); Tessera's deep
-  clean.
-- The diagnostics crate: "server then instantiates a diagnosticsManager
-  or something, and gives it a handle to the simulation internals. and
-  only upon server request ... it starts doing reads".
+- Rendering test runs again; the user has "a better idea for later".
+- Diagnostics, at 0.8/0.9: "disgnostics will come later at version
+  0.8/0.9"; their role to be set then ("diagnostics are changing roles
+  in the future", 2026-10-24).
+  Rule counts go with them: "ugh thats diagnostics, we need to remove
+  that lol" / "if leaving those tests and diagnostics as is is chesper
+  for now, leave them on server, dont move them.to protocol, mark that
+  file as deprecated" -- kept, in simulation_api/rule_counts.rs marked
+  DEPRECATED; out then with the counted writes, count places,
+  count_under, counted_when_applied, TickCounts and the rules' times,
+  RuleCode's count names, the tests that judge by counts observing
+  through the probe instead. Nothing new counts through them.
+- Tessera's deep clean.
 - Declined for now ("nah, there are other things to do"): fold
   SetSkipTag into its first compare's spare bits (~4% back).
 - Crate docs, when resumed: simulation's still describe compare ends;

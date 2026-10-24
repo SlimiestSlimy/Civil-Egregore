@@ -1,6 +1,6 @@
 //! What a sheep keeps ([`SheepState`]): its default attribute's layout.
 
-use server::simulation::simulation_api::{Layout, Member};
+use protocol::server_types::attribute_layouts::{Layout, Member};
 
 /// All a sheep keeps, in the three blocks of [`SHEEP_STATE`](crate::base_types::SHEEP_STATE):
 /// a word a member, in the order written. A tick of 0 is none: the

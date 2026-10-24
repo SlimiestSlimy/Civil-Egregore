@@ -11,7 +11,6 @@ mod making_hot;
 mod superchunk_layer;
 mod reader;
 mod superchunk;
-mod wide_plane;
 mod write_back;
 mod writes;
 
@@ -24,7 +23,6 @@ pub use arena::BitmapArena;
 pub use reader::aligned_tiles::{SmallTiles, SMALL_TILE_CELLS, SMALL_TILE_SIDE};
 pub use reader::{CellReader, Window};
 pub use superchunk::{LayerView, Superchunk};
-pub use wide_plane::{Bits16, Bits2, Bits32, Bits4, Bits8, WidePlane, Width};
 #[cfg_attr(not(test), allow(unused_imports))] // only the crate's tests ask it yet
 pub use writes::{WritesApplied, WriteShape, Write, WriteOp};
 

@@ -5,9 +5,10 @@
 // A tier uses what it needs of it.
 #![allow(dead_code)]
 
-use crate::bitplane_manager::{Bits16, Bits2, Bits4, Bits8, WidePlane};
+use protocol::server_types::plane_widths::{Bits16, Bits2, Bits4, Bits8, WidePlane};
 use crate::chunk_storage::LayerType;
-use crate::entity_manager::{Attribute, EntityType};
+use crate::entity_manager::EntityType;
+use protocol::server_types::attribute_layouts::Attribute;
 use protocol::type_registry::{Registration, TypeRegistry};
 use utilities::rng::RandomSource;
 

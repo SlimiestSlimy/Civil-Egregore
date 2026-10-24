@@ -7,7 +7,8 @@
 
 use crate::chunk_storage::LayerType;
 use utilities::coordinates::{CellIndex, SuperchunkIndex};
-use crate::entity_manager::{AttributeType, Member};
+use crate::entity_manager::AttributeType;
+use protocol::server_types::attribute_layouts::Member;
 
 /// What an instruction does: its first two bytes. The high byte is
 /// its family -- 0 neither compares nor writes the world, 1 plane and

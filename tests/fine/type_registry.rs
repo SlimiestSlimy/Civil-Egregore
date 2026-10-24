@@ -4,7 +4,7 @@
 use basegame::base_types::{BaseTypes, GRASS_RULE, SHEEP_RULE, TREES_RULE, SheepState};
 use basegame::default_types::BUNDLE as BASE_BUNDLE;
 use protocol::type_registry::{in_bundle, AttributeType, Drawn, EntityType, FrozenTypeRegistry, LayerType, RegisteredType, Registration, RegistryRefusal, TypeKind, TypeRegistry, TYPE_ID_NUMBERS};
-use server::simulation::simulation_api::{data_words, Attribute, Layout};
+use protocol::server_types::attribute_layouts::{data_words, Attribute, Layout};
 use utilities::rng::RandomSource;
 
 /// A new world's registry with the base game's types registered, and

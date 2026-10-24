@@ -4,7 +4,9 @@
 
 use crate::chunk_storage::LayerType;
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::{AttributeBlock, AttributeType, Member};
+use crate::entity_manager::AttributeType;
+use protocol::server_types::attribute_layouts::Member;
+use protocol::server_types::attributes::AttributeBlock;
 use crate::simulation::{SimulationTickState, Write};
 
 /// Queues the number of `layer_type` at `cell` becoming `value` -- 1

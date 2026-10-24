@@ -1,15 +1,17 @@
-//! A chunk's entities: their headers, sorted by cell in Morton order,
+//! A chunk's entities: their base data, sorted by cell in Morton order,
 //! and their attributes in one list beside them. A cell holds at most
 //! one entity, enforced here (`docs/entity_manager.md`, "A chunk's
 //! bucket").
 
-use crate::entity_manager::attributes::{find_attribute, DefaultAttributes, write_attribute_bytes, write_bytes, write_default, AttributeBlock, AttributeType};
-use crate::entity_manager::entity::{EntityRef, Header};
+use crate::entity_manager::attributes::{find_attribute, DefaultAttributes, write_attribute_bytes, write_bytes, write_default, AttributeType};
+use protocol::server_types::attributes::AttributeBlock;
+use crate::entity_manager::entity::EntityRef;
+use protocol::server_types::entity::EntityBaseData;
 use utilities::coordinates::CellIndex;
 use utilities::cache::prefetch_cache_line;
 
 /// Attribute blocks in a cache line.
-const CACHE_LINE_BLOCKS: usize = 64 / crate::entity_manager::attributes::BLOCK_BYTES;
+const CACHE_LINE_BLOCKS: usize = 64 / protocol::server_types::attribute_layouts::BLOCK_BYTES;
 
 /// The chunk is searched in 64x64 tiles of cells: a place is first
 /// narrowed to its tile, whose places are a run of the sorted list.
@@ -31,12 +33,12 @@ pub(crate) fn place(cell: CellIndex) -> u16 {
     cell.place() as u16
 }
 
-/// An entity as its bucket keeps it: its header, and where its
+/// An entity as its bucket keeps it: its base data, and where its
 /// attributes' blocks are in the bucket's list of them.
 #[derive(Clone, Copy, Debug)]
 struct StoredEntity {
     /// The entity's fixed part.
-    header: Header,
+    base_data: EntityBaseData,
     /// Where its blocks start in the list.
     first_block: u32,
     /// How many blocks they are.
@@ -148,55 +150,55 @@ impl Bucket {
         self.index_of(place).1
     }
 
-    /// Makes `header`'s entity on its cell, with `attributes` as a
+    /// Makes `base_data`'s entity on its cell, with `attributes` as a
     /// bucket keeps them ([`crate::entity_manager::attributes::append_kept`]): new, or
     /// refused, an entity standing there
     /// (`docs/entity_manager.md`, "A chunk's bucket", Putting).
-    pub(crate) fn make_entity(&mut self, header: Header, attributes: &[AttributeBlock], default_attributes: &DefaultAttributes) -> EntityWritten {
-        let target_place = place(header.stood_cell);
+    pub(crate) fn make_entity(&mut self, base_data: EntityBaseData, attributes: &[AttributeBlock], default_attributes: &DefaultAttributes) -> EntityWritten {
+        let target_place = place(base_data.stood_cell);
         let Err(entity_index) = self.find_place(target_place) else {
             return EntityWritten::RefusedOccupied;
         };
         self.places.insert(entity_index, target_place);
         self.tile_starts[search_tile(target_place) + 1..].iter_mut().for_each(|tile_start| *tile_start += 1);
-        let default_blocks = default_attributes.of(header.entity_type).map_or(0, |kept_default| kept_default.block_count as u16);
+        let default_blocks = default_attributes.of(base_data.entity_type).map_or(0, |kept_default| kept_default.block_count as u16);
         debug_assert!(attributes.len() >= default_blocks as usize && attributes.len() <= u16::MAX as usize, "an entity's blocks as a bucket keeps them");
-        self.stored_entities.insert(entity_index, StoredEntity { header, first_block: self.attributes.len() as u32, count: attributes.len() as u16, default_blocks });
+        self.stored_entities.insert(entity_index, StoredEntity { base_data, first_block: self.attributes.len() as u32, count: attributes.len() as u16, default_blocks });
         self.attributes.extend_from_slice(attributes);
         EntityWritten::Added
     }
 
-    /// Gives the entity standing on the cell at `former_place` `header` -- its
+    /// Gives the entity standing on the cell at `former_place` `base_data` -- its
     /// cell, when it wakes -- and `attributes`, or, with none given,
-    /// leaves it those it has: moved to `header`'s cell, or left
+    /// leaves it those it has: moved to `base_data`'s cell, or left
     /// where it stands, that one taken; passed over, none standing on
     /// `former_place` (`docs/entity_manager.md`, "A chunk's bucket", Putting).
-    pub(crate) fn write_entity(&mut self, header: Header, former_place: u16, attributes: Option<&[AttributeBlock]>) -> EntityWritten {
-        let target_place = place(header.stood_cell);
+    pub(crate) fn write_entity(&mut self, base_data: EntityBaseData, former_place: u16, attributes: Option<&[AttributeBlock]>) -> EntityWritten {
+        let target_place = place(base_data.stood_cell);
         let (entity_index, written) = match (self.find_place(former_place), former_place == target_place) {
             (Ok(found_index), true) => (found_index, EntityWritten::InPlace),
             (Ok(from_index), false) => {
                 let (goes_index, occupied) = self.index_of(target_place);
                 if occupied {
                     // Its cell is occupied: it stays on the cell it was on.
-                    let turned_back_header = Header { stood_cell: CellIndex(header.stood_cell.0 - target_place as u64 + former_place as u64), ..header };
-                    self.rewrite_entity(from_index, turned_back_header, attributes);
+                    let turned_back_base_data = EntityBaseData { stood_cell: CellIndex(base_data.stood_cell.0 - target_place as u64 + former_place as u64), ..base_data };
+                    self.rewrite_entity(from_index, turned_back_base_data, attributes);
                     return EntityWritten::TurnedBack;
                 }
                 (self.shift_entity(from_index, goes_index, target_place), EntityWritten::MovedToCell)
             }
             (Err(_), _) => return EntityWritten::PassedOver,
         };
-        self.rewrite_entity(entity_index, header, attributes);
+        self.rewrite_entity(entity_index, base_data, attributes);
         written
     }
 
-    /// Gives the entity at `entity_index` `header`, and `attributes` if given:
+    /// Gives the entity at `entity_index` `base_data`, and `attributes` if given:
     /// written over its attribute list when they are as many blocks,
     /// else as a new attribute list at the end of the bucket's blocks.
-    fn rewrite_entity(&mut self, entity_index: usize, header: Header, attributes: Option<&[AttributeBlock]>) {
+    fn rewrite_entity(&mut self, entity_index: usize, base_data: EntityBaseData, attributes: Option<&[AttributeBlock]>) {
         let stored_entity = &mut self.stored_entities[entity_index];
-        stored_entity.header = header;
+        stored_entity.base_data = base_data;
         let Some(attributes) = attributes else {
             return;
         };
@@ -223,7 +225,7 @@ impl Bucket {
         let (first_block, count) = (self.stored_entities[entity_index].first_block as usize, self.stored_entities[entity_index].count as usize);
         // The type's default attribute is written where it is kept, its type left off, and never removed.
         let first_other_block = first_block + self.stored_entities[entity_index].default_blocks as usize;
-        if let Some(kept_default) = default_attributes.of(self.stored_entities[entity_index].header.entity_type).filter(|candidate_default| first_other_block > first_block && candidate_default.attribute_type.type_identity() == attribute_type.type_identity()) {
+        if let Some(kept_default) = default_attributes.of(self.stored_entities[entity_index].base_data.entity_type).filter(|candidate_default| first_other_block > first_block && candidate_default.attribute_type.type_identity() == attribute_type.type_identity()) {
             return write_default(&mut self.attributes[first_block..first_other_block], kept_default, whole_attribute);
         }
         let (former_range, new_start) = match find_attribute(&self.attributes[first_other_block..first_block + count], attribute_type) {
@@ -256,7 +258,7 @@ impl Bucket {
         let (first_block, count) = (self.stored_entities[entity_index].first_block as usize, self.stored_entities[entity_index].count as usize);
         let first_other_block = first_block + self.stored_entities[entity_index].default_blocks as usize;
         // A member of the type's default attribute is where it would be were its type kept before it.
-        if first_other_block > first_block && default_attributes.of(self.stored_entities[entity_index].header.entity_type).is_some_and(|kept_default| kept_default.attribute_type.type_identity() == attribute_type.type_identity()) {
+        if first_other_block > first_block && default_attributes.of(self.stored_entities[entity_index].base_data.entity_type).is_some_and(|kept_default| kept_default.attribute_type.type_identity() == attribute_type.type_identity()) {
             return byte_offset >= 8 && write_bytes(&mut self.attributes[first_block..first_other_block], byte_offset - 8, byte_count, value);
         }
         let Ok(found_range) = find_attribute(&self.attributes[first_other_block..first_block + count], attribute_type) else {
@@ -271,7 +273,7 @@ impl Bucket {
         let Ok(entity_index) = self.find_place(place) else {
             return false;
         };
-        self.stored_entities[entity_index].header.wake = wake;
+        self.stored_entities[entity_index].base_data.wake = wake;
         true
     }
 
@@ -334,7 +336,7 @@ impl Bucket {
     fn entity<'a>(&'a self, stored_entity: &StoredEntity, default_attributes: &'a DefaultAttributes) -> EntityRef<'a> {
         let first_block = stored_entity.first_block as usize;
         let kept_blocks = &self.attributes[first_block..first_block + stored_entity.count as usize];
-        EntityRef { header: stored_entity.header, attributes: &kept_blocks[stored_entity.default_blocks as usize..], kept_blocks, default_attributes }
+        EntityRef { base_data: stored_entity.base_data, attributes: &kept_blocks[stored_entity.default_blocks as usize..], kept_blocks, default_attributes }
     }
 
     /// Sweeps the garbage out of the list of blocks, once there is as

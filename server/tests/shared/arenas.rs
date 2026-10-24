@@ -9,7 +9,8 @@ use crate::bitplane_manager::{BitmapArena, BucketKey, Write, WriteOp};
 use crate::test_types::TestTypes;
 use crate::chunk_storage::LayerCodec;
 use utilities::coordinates::{CellCartesian, CellIndex, SuperchunkIndex, SUPERCHUNK_SIDE_CELLS};
-use crate::entity_manager::{WorldEntities, Header};
+use crate::entity_manager::WorldEntities;
+use protocol::server_types::entity::EntityBaseData;
 
 
 /// An arena with `types.stone` hot over the `side_superchunks` by `side_superchunks` superchunks from
@@ -39,6 +40,6 @@ pub fn cell(x: u32, y: u32) -> CellIndex {
 }
 
 /// A walker on `walker_cell`, waking at `wake`.
-pub fn walker_header(types: TestTypes, walker_cell: CellIndex, wake: u64) -> Header {
-    Header { entity_type: types.walker, stood_cell: walker_cell, wake }
+pub fn walker_base_data(types: TestTypes, walker_cell: CellIndex, wake: u64) -> EntityBaseData {
+    EntityBaseData { entity_type: types.walker, stood_cell: walker_cell, wake }
 }

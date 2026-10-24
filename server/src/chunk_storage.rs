@@ -23,7 +23,7 @@ pub use superchunk_image::{LayerChange, SuperchunkImage};
 pub use writeback_ring::WritebackRing;
 // Names only the crate's tests use.
 #[cfg(test)]
-pub(crate) use {crate::bitplane_manager::{WidePlane, Width}, superchunk_image::InvalidImage};
+pub(crate) use superchunk_image::InvalidImage;
 
 use utilities::coordinates::{ChunkIndex, SuperchunkIndex};
 use crate::chunk_storage::paging::{bytes_of, ImageKept, ColdPoolPaging};

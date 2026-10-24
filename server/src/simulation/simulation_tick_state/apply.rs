@@ -8,7 +8,8 @@ use super::instruction::{Instruction, Opcode, NO_COUNT};
 use super::landing::InstructionLanding;
 use crate::bitplane_manager::{Superchunk, Write, WriteOp, WritesApplied};
 use utilities::coordinates::CellIndex;
-use crate::entity_manager::{AttributeType, EntityType, Header, InstructionsApplied, EntityWritten, SuperchunkEntities};
+use crate::entity_manager::{AttributeType, EntityType, InstructionsApplied, EntityWritten, SuperchunkEntities};
+use protocol::server_types::entity::EntityBaseData;
 
 /// What a thread applied in a tick's second phase.
 pub(crate) struct PartApplied {
@@ -38,7 +39,7 @@ fn compare_holds(instruction: &Instruction, compared_cell: CellIndex, superchunk
     match instruction.opcode {
         Opcode::CompareCell => superchunk.layer_type_of_id(instruction.first_operand).and_then(|layer_type| superchunk.value_at(layer_type, compared_cell)) == Some(instruction.second_operand as u32),
         Opcode::CompareCellFree => entities_read.free_for_a_new_entity(compared_cell),
-        Opcode::CompareEntity => entities_read.get_named(compared_cell).is_some_and(|entity| entity.header.entity_type.0 == instruction.first_operand),
+        Opcode::CompareEntity => entities_read.get_named(compared_cell).is_some_and(|entity| entity.base_data.entity_type.0 == instruction.first_operand),
         // Gone, it holds against nothing; there, against what is seen of the attribute, none seen of one it has not.
         Opcode::CompareAttribute => entities_read.get_named(compared_cell).is_some_and(|entity| entity.attribute_seen(AttributeType::of_header_word(instruction.second_operand)) == instruction.first_operand),
         Opcode::CompareAttributeMember => {
@@ -202,8 +203,8 @@ impl InstructionQueue {
                     }
                 }
                 Opcode::MakeEntity => {
-                    let header = Header { entity_type: EntityType(instruction.first_operand), stood_cell: landed_cell, wake: instruction.second_operand };
-                    match landed_entities.make_named(earliest_wake, header, &[]) {
+                    let base_data = EntityBaseData { entity_type: EntityType(instruction.first_operand), stood_cell: landed_cell, wake: instruction.second_operand };
+                    match landed_entities.make_named(earliest_wake, base_data, &[]) {
                         EntityWritten::Added => applied_instructions.added += 1,
                         _ => applied_instructions.adds_refused += 1,
                     }
