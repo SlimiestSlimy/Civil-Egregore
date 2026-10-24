@@ -153,8 +153,15 @@ Boundaries, asked first, would have put that on the table.
   that's why we have a file for them specifically"; "savefiles survive
   base game uodstes by the same mechanism" -- a name keeps its ID in
   every later version, of the game or a mod. types.csv holds name and
-  ID alone: a type's shape (width, tile size, attribute blocks) is not
-  saved or checked at load.
+  ID alone. Shape is NOT final: "no, shape is not final, mods are
+  expected to migrate their own data on world saves as needed. basegame
+  will do the same as well". Compatibility: "this is not an OS, and is
+  not minecraft either, i dont care particularly much about backwards
+  compatibility, but things need to be able to moved to next versions on
+  basegame as the game updates indeed, however breaking changes are
+  still many to come. until 1.0 at least, far away, we probably going to
+  get to 0.20 before 1.0". Mine, open: a migration must know what it
+  migrates from, and no world records which version of a mod wrote it.
   A type's code is its library. Hooks
   ("just another parameter on the registry types"): GeneratesTheWorld,
   RunsEveryTick, KeepsTheWorldHot ("good use of hook there") -- the
