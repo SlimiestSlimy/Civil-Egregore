@@ -9,7 +9,7 @@
 //! cross it every run, the flock's rule, and the one generator every
 //! chance of the rule is read from, by the tick and the entity.
 //!
-//! `cargo test -p server --lib flock_over_borders`
+//! `cargo test --release -p server --lib flock_over_borders -- --ignored`
 
 use crate::test_types::TestTypes;
 use crate::arenas::{cell, walker_header, world};
@@ -173,6 +173,7 @@ fn pasture_outcome(types: TestTypes, bitmap_arena: &BitmapArena, entity_store: &
 /// And the flock did all the test is of: walkers crossed borders, were
 /// refused cells and writes, were made and removed and written.
 #[test]
+#[ignore]
 fn a_flock_over_borders_comes_to_the_same_on_any_number_of_threads() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let types = TestTypes::seeded(seed);

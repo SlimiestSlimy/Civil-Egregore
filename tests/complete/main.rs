@@ -11,6 +11,10 @@ mod worlds;
 // The tests' rule, setting up and reading a world in its ticks.
 #[path = "../shared/probe.rs"]
 mod probe;
+// Trees planted on a bare plain, what both tiers' trees tests start from.
+#[path = "../shared/tree_planting.rs"]
+mod tree_planting;
 
 mod server_closing;
+mod trees;
 mod worlds_run_long;

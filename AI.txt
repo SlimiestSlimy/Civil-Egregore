@@ -79,1517 +79,306 @@ Boundaries, asked first, would have put that on the table.
   "Decided on my own: nothing." Commit and push only when asked, to
   `main`, the one branch.
 - Testing, committing and pushing are separate commands; the test
-  output is read before a commit. Clippy clean before a commit. Never
-  `cargo fmt`, never `cargo clippy --fix`. One test run at a time.
-- The fast tier (tests/fast) runs in under 60 seconds whole.
-- Measure before calling a change done, against the commit before:
-  was `--seed 0x5eed1234 --new [folder --side 8 --forced_hot []]`
-  then `--run [folder --ticks 10000]`, alternating rounds, medians --
-  those commands are gone (SERVER FLAGS); a way to measure again is
-  LATER.
-  (`--sheep` purged 2026-10-17, game content: the world has the
-  generation's default sheep now, so numbers before then are not
-  comparable. docs/testing_protocol.md still says `--sheep 40`: docs
-  paused.)
-- REMOTE (cloud, no screen): never `--workspace` (it builds Bevy); per
-  crate `cargo test --release --offline -p <crate>`; the root with
-  `-p Civil_Egregore --no-default-features`. LOCAL: the renderer is
-  built and run as usual; test runs are unshown (showing them is LATER).
+  output is read before a commit. Clippy clean before a commit, on both
+  workspaces (the root's and basegame's). Never `cargo fmt`, never
+  `cargo clippy --fix`. One test run at a time.
+- The fast tiers run in under 60 seconds whole; a test past that
+  shrinks or moves to its crate's complete tier. Time them per test:
+  RUSTC_BOOTSTRAP=1 cargo test --release --workspace -- -Z
+  unstable-options --report-time.
+- Measure before calling a hot-path change done, against the commit
+  before, numbers in the commit: callgrind on AI_SCRATCHPAD's
+  ticks_counted probe (a 4x4 world, every superchunk hot, 250 sheep
+  each, one seed; 2-3 runs a build at 50k ticks, in parallel, the
+  100-tick runs subtracted; the world hash printed to compare builds).
+  perf works too at kernel.perf_event_paranoid 2 ("we can run perfs
+  now btw", 2026-10-24); lowering it is asked first, until a reboot.
+- REMOTE (cloud, no screen): never build Bevy -- never `--workspace`,
+  nor anything naming the client (basegame does); per crate
+  `cargo test --release --offline -p <crate>` (server, protocol,
+  utilities). LOCAL: the window is built and run as usual; test runs
+  are unshown (showing them is LATER).
 - Tests take their seed from utilities/test_seed.rs (TestSeedHandle:
   transient_data/test_seed.csv, rolled every few counted uses);
   FREEZE_SEED=0x... pins one, FREEZE_SEED= keeps the file's -- the one
   environment variable ("that's one environment variable we do need,
-  freeze seed lmao"). The binary never reads repo files: given no seed,
-  a command draws a fresh one and prints it.
-- Names long, human, the glossary's. No file much past 300 lines.
-  No macro of our own where a function or a table will do.
+  freeze seed lmao"). The binary never reads repo files.
+- Names long, human, the glossary's ("more than one word"). No file
+  much past 300 lines. No macro of our own where a function or a table
+  will do.
 - Refactors through rust-analyzer: AI_SCRATCHPAD/scripts/
   rust_analyzer_driver.py (rename, move, refs, diagnostics -- one
   rename per call).
 - Every "for later" goes into LATER at once, quoted.
 - This file stays short: a task done is removed, a note that no longer
-  holds is deleted.
+  holds is deleted, history is git's (the long versions up to d019445
+  and d26a6128).
 
 
 == SETTLED (in force) ==
 
-- THE ROOT: six crates -- server, client, protocol, basegame,
-  tessera, utilities ("utilities remains as a 6th crate"); tessera and
-  basegame workspaces of their own (basegame since 2026-10-23) -- every
-  folder inside one a module, not a crate: utilities/ (bitmap,
-  coordinates, ..., and the shared test_seed.rs), protocol/
-  (type_registry, pipe), server/ (simulation, bitplane_manager,
-  chunk_storage, entity_manager, pathfinding, host; their docs in
-  server/docs/), client/ (gui, renderer), basegame/ (base_types,
-  libraries, sca_rules, entity_rules, worldgen, default_types) -- plus
-  src/ and tests/ (the program and its tests: "root /src/ and /tests/
-  stay"), docs/, transient_data/, AI_SCRATCHPAD/ (stays at the root),
-  diagnostics/ (to come). tessera is its own project ("keep in mind tessrra
-  is its own isolated project"): Cargo lets no workspace live under a
-  member's folder. A group named as a crate is that crate ("we cant
-  have utilities/utilities").
-- TESTS: a crate's own tests check its invariants alone; root tests/
-  holds the fine/fast/complete tiers of higher behaviour. Test
-  infrastructure lives in tests, no production hook for a test.
-- BASEGAME (basegame/: base_types, libraries, sca_rules,
-  entity_rules, worldgen, default_types): "a rule is, nothing else
-  (except the default types registry creation) can depend on
-  basegame". "basegame cant depend on server internals, only the
-  public apis"; "utilities CAN'T be used by basegame crate": basegame
-  names server::simulation::simulation_api, protocol::type_registry
-  and std alone (tests/fine/basegame_api.rs checks; utilities only a
-  dev-dependency, for the tests' seed). Rules reach the simulation
-  through simulation_api alone (tests/fine/docs.rs checks).
-- THE TYPE REGISTRY: dynamic, frozen per world, names unique ("that's
-  our invariant"), saved as a world's types.csv; base types in
-  basegame/src/default_types.rs. Frozen per world, before the server
-  inits (REGISTRY FIRST): IDs on demand for a new world, from
-  types.csv for a saved one; after freezing, lookups by ID only ("lookups
-  by name? that should only happen before freezing"), the names kept
-  ("we need it for locating stuff later on"). "the idea of the frozen
-  registry is to downcast everything possible and remove all
-  indirection basically / but for now its fine just doing id lookups".
-  Names are final (the user, 2026-10-24): "type id strings are final,
-  that's why we have a file for them specifically"; "savefiles survive
-  base game uodstes by the same mechanism" -- a name keeps its ID in
-  every later version, of the game or a mod. types.csv holds name and
-  ID alone. Shape is NOT final: "no, shape is not final, mods are
-  expected to migrate their own data on world saves as needed. basegame
-  will do the same as well". Compatibility: "this is not an OS, and is
-  not minecraft either, i dont care particularly much about backwards
-  compatibility, but things need to be able to moved to next versions on
-  basegame as the game updates indeed, however breaking changes are
-  still many to come. until 1.0 at least, far away, we probably going to
-  get to 0.20 before 1.0". Versioning when there is something to
-  version: "why do we need versioning support and safeguards if we dont
-  even have mods or saves to version?"
-  A type's code is its library. Hooks
-  ("just another parameter on the registry types"): GeneratesTheWorld,
-  RunsEveryTick, KeepsTheWorldHot ("good use of hook there") -- the
-  simulation finds its rules, generation and hot type by them.
-- THE SIMULATION HANDLE ("simulatedworld should be simulationhandle"):
-  server/src/simulation/simulation_handle/ owns the world's state and
-  does everything to it -- ticking, populating, halos, paging, every
-  change between ticks. "server is a coordinator, not a doer";
-  "anythong in between ticks is internal simulation api". A rule gets
-  a SimulationTickState (one superchunk's turn) and its RuleContext
-  (its master and its dependencies' libraries).
-- WORLDGEN populates in-tick: an unpopulated superchunk's turn, before
-  its rules, under compares; every generated superchunk gets a flock
-  ("a feature for testing, not a bug"). Halo tests use one flock on a
-  world with no end (tests/shared one_flock_world).
-- SKIP TAGS (the user's design): SetSkipTag before a chain of compares
-  (operand 0 a new set; k+1 the existing tag k sets out, which must
-  enclose it); SkipTag closes a new set; writes are methods of
-  SkipTagSet only ("we can't have naked writes").
-- DOCS PAUSED, ALL OF THEM (2026-10-17: "were not keeping docs up to
-  date since the code is so hot, oncve we settle more we focus on"
-  them): no upkeep, root docs included; a rough update only when asked
-  (the testing protocol, 2026-10-17). The docs pointer tests stay
-  ignored. The style guide was deleted.
+THE TREE
+- THE ROOT: crates server, client, protocol, utilities, game_packager,
+  AI_SCRATCHPAD (mine; nothing depends on it) in the root workspace;
+  basegame and tessera workspaces of their own ("keep in mind tessrra is
+  its own isolated project"; basegame "built and tested in its folder
+  like a mod", the root package still depending on it by path until mods
+  load at runtime). Folders inside a crate are modules, not crates ("we
+  cant have utilities/utilities"). Plus src/ and tests/ (the root
+  program and its tests, until they go -- TO DO), docs/,
+  transient_data/.
+- LAYERS: utilities, then protocol, then server and client, then mods.
+  "utilities and protocol are.the shared libraries" / "(utilities a
+  level down on protocol of course)"; protocol is not the wire alone:
+  "i think of it broadly. encompassing client and server and mods" /
+  "there is a reason both server and client depend on protocol".
+  protocol::type_registry holds the game's types (IDs, registration,
+  freezing, the shared machinery); protocol::server_types and
+  protocol::client_types hold plain Rust types shared by both sides
+  ("normal rust types are different from what the game itself perceives
+  as types. one is simply types, the other is registered types or
+  frozen types"), each beside its side's kind traits. Kind traits live
+  in protocol ("most definitely"), a side type parameter only where
+  code touches server internals or Bevy.
+- NO GAME CONTENT OUTSIDE BASEGAME (2026-10-17): "NO GAME CONTENT ON
+  SERVER CLIENT OR PROTOCOL, TYPE REGISTRY IS FOR THAT / SERVER IS FOR
+  SIMULATION RUNNING, CLIENT IS FOR RENDERING, PROTOCOL IS THE GLUE".
+  basegame names protocol, the server's simulation_api, the client's
+  client_api, Bevy and utilities ("thats what utilities is for if its
+  not reachable otherwise"); rules reach the simulation through
+  simulation_api alone; nothing depends on basegame but the root
+  program, for now.
+- ZERO HACKS IN THE SERVER: "server is the main thing, we want 0 hacks
+  there" / "we want hacks in basegame, not on server". The server knows
+  a worldgen hook is used, nothing else of it.
+- AVOID SYNC PRIMITIVES (Arc, Mutex, atomics) where a borrow or a move
+  will do: "we want to avoid sync primitives as much as possible";
+  "arcs on the cold side are completely fine".
+- TO THE BONES: "delete dead code, we want to go to the bones".
+- DOCS PAUSED, ALL OF THEM (2026-10-17): no upkeep while the code is
+  hot, root docs included; a rough update only when asked. The docs
+  pointer tests stay ignored.
 - DIAGNOSTICS: "diagnostics have 2 roles, make testing easier, and
   writing stuff down for comparisons"; "only diagnostics should
-  generate transient data". The old ones deleted 2026-10-17 by the
-  user ("were doing it from scratch fr lol").
-- TO THE BONES: "delete dead code, we want to go to the bones".
+  generate transient data" (and tests). The old ones deleted; from
+  scratch when made.
+
+TESTS
+- A crate's own tests check its invariants; the root's tests/ the
+  higher behaviour, through public APIs alone ("no between ticks work
+  is allowed"): a root test sets up and reads through the probe
+  (tests/shared/probe.rs), a rule of its own bundle "tests first"
+  registered before basegame, run in ticks; asserts outside the tick.
+  The server's tests (server/tests/, declared in its lib.rs) may edit
+  between ticks: they are its invariants' tests.
+- Tiers fine / fast / complete, complete `#[ignore]`d: the root and the
+  server have all three, basegame fast and complete. DETERMINISM: "keep determinism testing
+  server side and worldless if possible, just internal machinery
+  testing" (2026-10-24; the flock over borders, in the server's
+  complete tier).
+- Seeded ("tests should be seed genereated when possible"); types from
+  registering, never hard-coded IDs; a test's own types after a
+  seed-drawn number of fillers. Scaffolding in test files, no
+  production hook for a test.
+- Every test world a folder in transient data, named by its test ("tests
+  make randomly named worlds for testing on transient data. we cant
+  loose more tests"); a test choosing worldgen values writes its mod
+  config there first.
+
+THE TYPE REGISTRY
+- Dynamic, frozen per world before the server starts (REGISTRY FIRST:
+  "the type registry is not initialized until a new world is created or
+  an existing world selected for loading"); "registries are made new
+  for each world opened and any old registries are completely
+  dropped". IDs on demand for a new world, from types.csv for a saved
+  one; "types.csv is the source of truth, for type registry loading"
+  -- a saved name nothing registers fails. After freezing, lookups by
+  ID; "the idea of the frozen registry is to downcast everything
+  possible and remove all indirection".
+- An ID is a kind byte and a 56-bit number, one number a type ("there
+  is one type id for everything"); a plane's width and tile size are
+  registration parameters, carried by its handle (LayerType { type_id,
+  width_bits, tile_scale }).
+- NAMES ARE FINAL (2026-10-24): "type id strings are final, that's why
+  we have a file for them specifically"; "savefiles survive base game
+  uodstes by the same mechanism"; "mods survive uodate thanks to
+  types.csv". SHAPE IS NOT: "mods are expected to migrate their own data
+  on world saves as needed. basegame will do the same as well".
+- BUNDLES: every type in one; names namespaced by the registry
+  (bundle::name; a bare name in a bundle is its own bundle's); nested
+  bundles fine, "only the root level bundles need to be in the
+  manifest"; "no 2 bundles can have the same name". A mod and a bundle
+  are "logically the same thing". Sides: common ("server AND client",
+  or shared libraries -- client calls live there), server, client;
+  each bundle a single library ("1:1").
+- REGISTRATION APART FROM CODE: "we really need to move types strings
+  into the manifest, and just dont involve the libraries at all on type
+  registration, just manifests" -- a library is opened only after the
+  freeze, on its own side; "setup step (2) should not load any
+  libraries". Hooks ("just another parameter on the registry types"):
+  GeneratesTheWorld, RunsEveryTick, KeepsTheWorldHot, ShownByDefault.
+- THE BUILDER (style guide, "not the final form"): builder::new()
+  .new_bundle(..).add("grass", Grass).add(..).close_bundle() -- "a
+  static string that csn ve written straight in the same function call";
+  one function lists a mod's types and their code. Anything callable
+  gets the side's handle at setup ("simulation handle, client handle, or
+  both"), gathers what it needs and keeps it ("that downcasting example
+  for rules is exactly the approach we need"). Reads are declared per
+  rule at setup and fixed for now; a frame asks for the union of the
+  active render rules' reads ("simple is better now").
+- CLIENT CALLS: a ClientCall type a function, by ID, words in and out,
+  between ticks, opt in ("basically a security feature"); callable in
+  process too. A call gets its mod's config folder.
+
+WORLDS
+- THREE STEPS: create (the folder, superchunks/, mods/, mod_config/,
+  world.csv with the seed -- "seed draw should.be happening on step 1"),
+  set up (types.csv; mods into mods/ and basegame in or out, with
+  runtime loading -- "never basegame" copied; leaving it out is "a
+  separate flag"), run ("existing worlds just skip straight to run").
+  Never run = no hot file. world.csv is format 7: format, seed, tick and
+  the flag rows. "honestly, we csn slowly remove memory only worlds": no
+  world without a folder.
+- MOD CONFIG on disk alone, in <world>/mod_config/<mod>/, read by the mod,
+  never the server; "if no config is provided worldgen can use a default
+  config". A reset keeps the frozen registry: the world unrun and run
+  again in its own folder.
+- A server process runs one world; another world is another process. On
+  client disconnect, everything is dropped and the client goes back to
+  the main menu. Mods are folders, per world; "the files must be
+  preinstalled on both client and servee beforehand"; a remote world's
+  mods in client/worlds/<world>/.
+- A world ID, the creation time and the name, in world.csv ("guaranteed
+  to never conflict"): not written yet.
+
+THE SIMULATION
+- THE SIMULATION HANDLE owns a world's state and does everything to it:
+  "server is a coordinator, not a doer"; "anythong in between ticks is
+  internal simulation api". A rule gets a SimulationTickState (one
+  superchunk's turn) and its RuleContext.
+- SUPERCHUNKS ARE WHAT MATTER: 1024x1024 cells; a chunk (256x256) is
+  "just a storage convenience to keep tessera happy". APIs by superchunk
+  and CellIndex.
+- WARMING, EXACTLY 256 TICKS: "superchunks must load in exatcly 256
+  ticks after they start warming or the simulation stalls completely,
+  never more, never less"; the server stalls at tick 255 for a job not
+  done. Generating is warming ("instead of tsking the data from the save
+  file we take it from the worldgen hook"): one warm job a superchunk,
+  from the cooled arena, the store, or the worldgen hook, built off the
+  tick into the arena's own Superchunk and the store's own
+  SuperchunkEntities, adopted at the due tick. Never half generated.
+  The worldgen writes through the server's own APIs ("thats what hooks
+  are for"); writes outside its superchunk are not applied; entities
+  through the store's builder, FirstWake making a wake before first hot
+  impossible. Warming and cooling are the halos' job, forced hot and the
+  camera too. A save and load as if nothing went cold ("thats exactly
+  why we keep the list of hot chunks").
+- ATOMIC COMPARE-AND-WRITES: every write under a compare, everywhere.
+  SKIP TAGS (the user's design): SetSkipTag before a chain of compares;
+  writes are methods of SkipTagSet only ("we can't have naked writes").
+
+THE CLIENT
+- Bevy is in the client's public API ("bevy is part of our public api
+  wether we want it or not"); basegame's render rules and gui types are
+  Bevy code ("bsse game can depend on bevy itself"; no shading language
+  of ours). At the 0.7 freeze, Bevy pinned to its exact version.
+- A render rule is code for one thing; the client loops ("we use the
+  same approach server has"), at a detail level matched to the zoom; an
+  image a superchunk a render layer, stacked by render layer number
+  ("things that render should include a render layer number").
+- THE INVARIANT: "the rendering main priority is not stalling the server
+  at large zoom out levels, while keeping roughly the same fps, our fps
+  target is 60"; "that's why today the server doesn't answer a whole
+  frame at once at large zoomouts". Vsync on; "no graphic settings on
+  the basegame".
+- GUI: "a simple draggable windows with a grid inside", gui types
+  nested by naming their parent, libraries for their dependants; the
+  window system one, in the client.
+- The window's test world: limitless, no sheep, the camera forcing
+  superchunks hot.
+- COMMS: TCP on loopback, port 11235 ("i like my fibonaccis"); one
+  client for now, which alone may make, open, save, reset, pause; a
+  client joining late gets the world's frozen types first;
+  --close_if_no_clients (a 30 s wait) for a server a client started;
+  a headless server given nothing prints its help.
+
+MODS AND THE GAME FOLDER
+- Two binaries: "the client always needs bevy, the server never needs
+  ir"; "zero clients mods to load zero bevy code on server side". The
+  game shipped as a folder: the binaries, the engine's libraries (each
+  crate a Rust dylib, prefer-dynamic, $ORIGIN), libstd, basegame's
+  library. "the game folder is static after compilation".
+- THE MANIFEST: "in it we trust, if the libraries dont match the
+  manifest we refuse to load / the manifest becomes the source of truth
+  for the mod"; it names each bundle's entry, a struct implementing the
+  bundle trait (Fabric's model: "the manifest file has a string that
+  points to the entry point struct"). Load order by dependency, then
+  name ("simple ordering by dependency and name is fine"); bundles list
+  the bundles they depend on.
+- BUILDING A MOD: against the game as compiled on the modder's machine
+  ("we can expect modders to compile the game in their machines"),
+  never its source; the engine's crates and the game's include fragment
+  by plain relative paths ("cant we just work with paths", "Ideally we
+  avoid any crstes.io interactions at all lol" / "and fail instead"); no
+  Bevy in a mod's Cargo.toml (the kit route). "we want mod source code
+  to be free of restraints"; the setup "simply specifying the root of
+  civil egregore local repo". Mods never inside the game's repository.
+- THE PACKAGERS: Rust binaries, std only, run by cargo aliases; "avoid
+  using script files of any kind (cmd, shell, etc) and avoiding third
+  party libraries". game_packager (`cargo package_game`) lays out
+  target/civil_egregore/; mod_packager (to come) builds the game if need
+  be, writes the manifest, lays out the mod in its own target/<mod>/.
+  Release only for now. A mod template workspace in the tree, basegame
+  "basically a copy of it".
+- VERSIONS: "freezing the public api will be our 0.7 moment" -- "the
+  public api is stable for a given distributed version of the game,
+  between versions it csn change, this is a game, not an operating
+  system"; 0.7 the first version with mods, then content. Breaking
+  changes "until 1.0 at least ... we probably going to get to 0.20
+  before 1.0"; "why do we need versioning support and safeguards if we
+  dont even have mods or saves to version?" World formats not
+  stabilized: no backwards compatibility for saves yet.
 
 
 == TO DO ==
 
 NOW
-- PAUSED HERE 2026-10-24 (the user rebooting: "yeah lets just pause
-  then"). The folder-worlds pass (three-step creation, whole-superchunk
-  warming, worldgen through the server's own APIs, every world a
-  folder) is DONE, committed and pushed ("and comit xD" / "and push"). The server tests are converted
-  (each world in a folder named by its test; the walkers count in
-  mod_config/test game/; world.rs's creation test is
-  a_world_is_created_set_up_and_run), and both world_at helpers are
-  gone. Green: the root's 203 and basegame's 7; clippy is clean on both
-  workspaces. NOT RUN YET: the ignored tiers (root complete 3, fine 3;
-  basegame complete 2) and the per-test timing for the tier split (c);
-  the timing command is RUSTC_BOOTSTRAP=1 cargo test --release
-  --workspace -- -Z unstable-options --report-time. Then report, the
-  commit when asked, and step 3.1 again (the plain types into
-  protocol::server_types, a module that exists but is not hooked up).
-- CLIMATE REMOVED (the user, 2026-10-18: "remove anything related to
-  climate system, thats going to be redone from scratch ... make grass
-  propagate by itself like old times in the mean time"): DONE. Gone:
-  the climate, cloud and elevation planes, the weather rule, worldgen's
-  climate noises, growing.rs, the client's clouds, rain and climate
-  labels (K), the weather tests. Grass as before 867a64e: spreads onto
-  dry dirt, decays where a drawn neighbour is grass. Trees die of age
-  alone, spread wherever free and dry. Tile planes keep their tests on
-  a tests-only plane (tests/shared/worlds.rs TEST_TILES).
-- MERGE ORDER (the user, 2026-10-18: "take the local branch and merge
-  the old changes that are better than upstream. then go ahead with
-  the remaining decoupling ... client rewrite ... thats the last step,
-  because the idea is for types to include a rendering rule so client
-  can render stuff as needed"): from local-2026-10-17 -- the flags fix
-  (DONE, 7356950), the registry exporting registry things alone (DONE,
-  b7e6e08), the server private with its tests inside it (DONE, the
-  commit after b7e6e08: server/tests declared in lib.rs, autotests
-  off; seven root tests moved in; internals_for_root_tests and World's
-  handles TEMPORARY), one start (DONE, the commit after: the user,
-  2026-10-18, "only one way of starting the server must exist, for
-  tests or for gameplay"; "instead of worldstart as a parsmeter, there
-  is an ecisting clean parsmeters"; "instead of gametypes, the name is
-  frozen type registry" -- server::start_world(&CleanServerParameters,
-  &Arc<FrozenTypes>), the world's folder the `world` parameter, the
-  registry frozen by whoever starts it and checked against a save's
-  types file), worldgen parameters' name (DONE, the commit after
-  b50b63d: world file format 5, its rows `worldgen <name>`).
-- RENDER RULES AND GUI TYPES (the user, 2026-10-18, verbatim, the
-  design of the client rewrite): "a new types for the registry rendering
-  rule, and gui type / rendering rule has a.master plane/entity and the
-  renderer runs this rule to properly render that plane/entity / a gui
-  type is basically a self contained bevy gui, there is an optional
-  hook "show by default" so it shows bt default upon world start";
-  "gui work needs to be centralized, a simple draggable windows with a
-  grid inside to put elements in is enough, and furthermore, gui types
-  can expose a library to play nicely for nesting and stuff. so for
-  example we have a gui type for the sliders button, that opens the
-  sliders menu, esch entry being another gui type, etc. etc. highly
-  composable within the type registry"; "im the algorithms guy, not
-  the rendering or gui guy". Settled in the asking:
-  * render rules give data (a colour a cell or tile, a mark an entity),
-    the renderer draws; later "the type registry declare textures and
-    shaders, simplest case would be the sheep rendering rule bundling
-    the texture. wip tho"; "everything render will eventually become a
-    rule" (the 3D ground too; a first pass is fine).
-  * gui types declare their grid's contents (the client's public API
-    for its types in the registry), the one window system builds them.
-  * "childs nest themselves" (a gui names its parent); "gui elements can
-    expose their own libraries for extra functionality for their
-    dependencies". No global store of values (my idea, doubted).
-  * "client stops depending on basegame is the goal, when that happens
-    were 90% of the way".
-  * "there is a special api call for the simulation api reset_world()
-    basically keeps the frozen type registry but everything else is
-    restaryed from scratch".
-  * "worldgen bundles its own library to expose getters and setters for
-    the worldgen parsmeters, no specific server api involvement needed".
-    Then: "can we serialize the library calls through the tcp
-    connection? so sliders in client can still talk to worldgen
-    libraries in server"; "i like the opt in nature of calls through the
-    tcp connection, that's basically a security feature lol"; "my
-    suggestion is more in the order of, adding an optional parameter to
-    type libraries to include function layouts for client calls" (not
-    Layout reused, not a kind of its own). Then: "both client and
-    server have access to the same types and therefore their libraries
-    (thanks frozen type registry) so we actually just need to label
-    client callable functions with a typeid, and just pass the raw
-    arguments and results back and forth". Weighed (asked: "lets
-    actually weigh each one"): (A) a ClientCall kind, one type a
-    callable function, its master the type it belongs to, its library
-    the function; (B) the user's "make library its own kind in the
-    registry, and inside each library registration we register each
-    function separately. plus a "client callable" flag" ("per
-    function"). The user: "fair, simpler first" -- A now, built to grow
-    into B (ClientCall becomes Function { client_callable } under a
-    Library kind) if listing a library's API or per-function
-    dependencies are ever wanted; local calls never by ID (typing, hot
-    paths).
-  * DONE (the commit after 3474fbc): TypeKind::RenderRule (0x06) and
-    Gui (0x07), Registration::render_rule(name, master) -- a plane or a
-    type of entity, RegisteredType::RenderRule { master: Drawn } -- and
-    Registration::gui(name, parent), a parent a window registered
-    before it (RegistryRefusal::ParentAmiss), Hook::ShownByDefault.
-  * DONE (the commit after bde5f03): client calls, A. TypeKind::
-    ClientCall (0x08), Registration::client_call(name, master) -- the
-    master any type registered before it -- its library a
-    simulation_api::CallCode: words in, words out or why not, against a
-    CallContext (seed, tick, worldgen parameters) between two ticks.
-    ClientMessage::Call(ID, words) answered Answered(words) or
-    CallRefused(why); the host's thread answers it (HostRequest::Call),
-    "no world runs" without one. The user: "client callable functions
-    are still callable within the server eh" -- yes: Host::call is the
-    same call in process, no socket; and the code is the library's own
-    function, basegame's to call directly as any of its functions.
-  * DONE (the commit after e9bf11a): client::client_api, the client's
-    public API ("right now lol"), calls alone for now: ServerCalls, a
-    Bevy resource, call(ClientCallType, words). NOT YET USABLE BY
-    BASEGAME: the client still depends on basegame (the renderer's
-    BaseTypes, DEEP_WATER_DEPTH, OLDEST_TREE_STAGE, STAGE_BITS), and
-    Cargo refuses the cycle. The rewrite takes the client off basegame
-    (render rules); then basegame depends on client_api. Untested on
-    its own: a client crate test cannot start the program's server
-    (current_exe is the test); the wire it goes over is tested.
-  * DONE (the commit after 5eee20a): worldgen parameters through
-    calls. The user, on a setter changing what the next reset uses, not
-    the world running: "yes, what you said, we probably will add a
-    "reset world" button later for that lol". CallContext gives the
-    worldgen parameters for the reset (World keeps them, its own until
-    one is set), set_worldgen_parameter_for_reset, and reset_world() --
-    the simulation API's reset: same types, same seed, the parameters
-    set, everything else made again. The host's reset is of worldgen
-    parameters now (the sliders' turned into them as asked). basegame/
-    src/worldgen/calls.rs: "worldgen parameter" (place -> value),
-    "set worldgen parameter" (place, value), "reset world", their
-    master the world generation; a place is the parameter's in
-    WorldGeneration::worldgen_parameters' order.
-- TYPE IDS, KIND BYTE ONLY (the user, 2026-10-18: "the first byte and
-  last 4 bits of a type id serve special purposes, the first byte is
-  the kind, the last 4 bits are for a size if the kind needs it";
-  "otherwise the last 4 bits are 0"; told the code keeps a whole size
-  byte -- a plane's bits a cell and tile size: "ohh i see, ok, no more
-  rederved byte then, make tile size and plane width parameters at
-  registration time, only the first byte remains for kind"). NEXT.
-  Chosen by the user (asked, 2026-10-18): the handle carries the shape
-  -- LayerType becomes { id, width_bits, tile_scale }, filled in by the
-  registry at registration; call sites keep layer_type.width_bits().
-  Price: 8 -> 16 bytes (bucket keys, wire, world file's layers):
-  benchmark against the commit before -- NOT MEASURED, no way to
-  measure yet (LATER).
-  DONE (1ee824d, 94e388d, and the commit after): an ID is kind byte +
-  56-bit number, ONE NUMBER A TYPE ("there is one type id for
-  everything, thats the whole point all along"). LayerType { type_id,
-  width_bits, tile_scale }; AttributeType { type_id, block_count }, a
-  stored attribute's first word its header (number << 4 | blocks - 1,
-  the old ID's bits). types.csv is name and ID alone: "world loading is
-  registration from a list on a file, theres not really a "separate
-  mechanism"". Cold: a wide plane under its one ID, its bits' bitmaps
-  in order, each after a length word ("storing in order is more than
-  plenty"); hot, a cell's n bits together, as always ("the whole point
-  of multi bitnplanes is to store them as a number of n bits
-  together"). Chunk storage keys a chunk's layers by bare type ID;
-  chunks by Morton index, as always. World file format 6: no layers
-  row (the registry's). Instructions name a plane by ID, the hot
-  superchunk's layer gives its shape.
-- TESTS' TYPES (the user, 2026-10-18): "tests should not check for
-  hardcoded typeids"; seeds are fine and wanted ("tests should use seed
-  whenever possible gor determinism"). Asked to weigh one registry for
-  all tests against one a test ("i feel that could impact twst
-  effectiveness, discuss please"): per test, "yes go ahead" -- each
-  test registers exactly its types, after a seed-drawn number of filler
-  types so IDs move with the seed; shared helpers take their types from
-  the test. "worlds made by tests should live in transient data btw, i
-  understand some tests may share worlds, so those should load the type
-  registry from thw world, if shared is saved, otherwise is not".
-  DONE: each test registers a set of types in a registry of its own,
-  after a seed-drawn number of fillers -- the whole set of its file's
-  tier (server/tests/shared/test_types.rs, tests/shared/arenas.rs,
-  tests/fine/entity_manager.rs), not exactly its own types. No test
-  counts on registration order: lists in type order are sorted by ID in
-  the test, the server's ten plain layers register in a drawn order;
-  the one attribute that must sort before the sheep's state registers
-  before the base game, the test asserting so. The sheep tag is found
-  by name in the world's frozen registry ("the frozen registry still
-  keeps names to lookup the ids, tests could be a good use for that"),
-  registered only by the worlds that tag sheep. Attribute::new and
-  WidePlane::new/of_tiles removed: types come from registering alone.
-- TYPES.CSV DRIVES LOADING (the user, 2026-10-18): "hmmm if a world
-  loads and is unable to load a name in types.csv it should fail lol",
-  "it should not fail because the tag is not registered, it should fail
-  because the type registry csnt find the type to register in the first
-  place", "types.csv is the source of truth, for type registry
-  loading". Now: the game registers in its order, each type taking its
-  saved ID; a saved name nothing registered fails at freeze. NEXT:
-  loading walks types.csv, finding each row's registration.
-- THE FRESH CLIENT (the user, 2026-10-18: "we need to finish decoupling
-  and the public apis including client"). Asked how the rendering moves
-  onto the registry: "Fresh client" -- a new client written beside the
-  old from the registry up, switched to once it draws the world, the
-  old renderer and gui then deleted. On Bevy and the client's API:
-  "bevy is part of our public api wether we want it or not, becase
-  thats where the gui and rendering stuff will come from, the client
-  simply executrs the code provided in the rype registry for gui and
-  rendering" -- client_api exposes Bevy; basegame's render rules and
-  gui types are Bevy code. On terrain as worldgen client calls:
-  "unless were in force camera chubks hot. but that is deprecated so
-  font worry about that now" -- terrain (CellCover, map asks, the
-  terrain thread) not planned around now.
-  Then: "we need textures, shaders, etc. to be provided to the client
-  and i dont know how bevy works lol. remember, the server and the
-  client have all the same libraries, (thats why the server sents the
-  type registry to the client, to check exactly that) / now, probably
-  we want to restructure how the type registry works to do this, make
-  bundling easier (probably a bundle type that imports many typeids at
-  once) / maybe a centralized texture processing for future texture
-  pack support? idk man, im not a rendering guy tbh". My answer, put
-  to the user: textures and shaders as data in the registry, Bevy kept
-  inside the client (below, PROPOSED).
-  AGREED (my proposal: textures and shaders data in the registry, Bevy
-  inside the client alone, client_api Bevy-free, gui declarative, a
-  Texture kind, render rules naming their textures, a Bundle kind):
-  "yes, go ahead, go with simplest first, we dont need texture pack
-  support right now for example, bundles also have their own kind and
-  typeid btw. all types registered under a bundle get namespaced in
-  their string name like: bundlename::bundletype (the raw writing on
-  the name string is done automatically by the registry preferrably so
-  inside a bundle the developer simply writes "sheep"instead of
-  "basegame::sheep" everywhere)". Shaders and texture packs later.
-  SUPERSEDED by that: Bevy in the public API, and the feature below.
-  Asked to evaluate it for soundness ("i need ypu to evaluate that for
-  soundness though", "is what we want to do?"); my three corrections
-  and the user's answers (2026-10-18), SETTLED:
-  * BUNDLES: "yes, bundles become the base thing, everything has a base
-    bundle, basegame in our case, bundles can be inside other bundles /
-    still, no 2 bundles can have the same name so watever is inside
-    them is guaranteed to not collide, im taking this as a lesson from
-    how minecraft works with mods and namespaces". Every type is in a
-    bundle; a bare name in a bundle means its own bundle's, no fallback;
-    another's is written whole (other::name). As I read "no 2 bundles
-    can have the same name": a nested bundle's name is its whole path
-    (basegame::sheep), so no two whole names are alike.
-  * CLIENT RULES AS THE SERVER'S: "well no, but yes, we use the same
-    approach server has, the rule provides how to work with one thing,
-    the server does the running in a loop of many things of the same
-    type, client should follow the same philosophy" -- a render rule is
-    code for one thing; the client loops over the many. "rules in
-    server should get a server handle, rules in cl8ent should get a
-    client handle, rules always needed to read many planes or entities
-    sheep rule reads and writes sheep and grass for example, even if
-    the rule's master is the sheep". Mine, to keep it fast: the client
-    runs a rule when its things' data changes (a frame's), the GPU
-    draws the results every frame.
-    DONE: TypeKind::Bundle (0x09), BundleType, TypeRegistry::open_bundle
-    -> OpenBundle (registers the bundle in the one open, opens it, the
-    outer one open again once dropped); register refuses a type with no
-    bundle open (OutsideABundle) and a name empty or holding `::`
-    (NameAmiss); names whole, references bare = own bundle, `::` =
-    whole; in_bundle(bundle, name); basegame's types in "basegame"
-    (default_types::BUNDLE); the tests' in "tests".
-  * THE COUPLINGS CUT, not ported ("your plan sounds good, proceed",
-    2026-10-18): the old client's game knowledge goes -- BaseTypes,
-    tree stages, water depth, the HUD's counts, the ground, the map, the
-    slider menu; its types from a register function the root hands it;
-    Tuning out of utilities, protocol and the server (MakeWorld carries
-    worldgen parameters by name, a reset through "reset world"); the
-    terrain path out of protocol and simulation_api. Until the fresh
-    client, the window draws no world or plain per-plane colours.
-  * DRAW ORDER: "draw order is specified, things that render should
-    include a render layer number".
-  * THE CYCLE (basegame cannot reach client_api while the client
-    depends on basegame): "since were doing the client from scratch we
-    need to remove de remaining coupling first" -- the couplings go
-    before the fresh client, and the content's declarations then live
-    in the client's API.
-  Mine, to put to the user: a headless build compiles no Bevy, yet its
-  worlds must hold the same types as a windowed one's (types.csv the
-  source of truth) -- so basegame registers its render rules and gui
-  types always, and only their libraries (the Bevy code) sit behind a
-  basegame feature the windowed build turns on.
-- THE FRESH CLIENT'S FIRST STRETCH, SETTLED (2026-10-19, the user:
-  "nice, push! and lets get onto the client"; answers to my four
-  questions): (1) basegame registers its render rules always -- same
-  names and IDs headless or windowed -- their libraries (Bevy code)
-  behind a basegame `client` feature, basegame depending on the client
-  crate only with it. (2) A render rule is code for one thing, "look at
-  how the server does it for inspiration": as the server's, its
-  registered code runs on one superchunk's turn as a call to the
-  client API's loop (on_each_set_cell, on_each_entity...) with a
-  closure for one cell or entity, inlined -- the client does the
-  looping; the turn is the client handle (reads any plane of the
-  superchunk, paints into the rule's render layer). (3) An image a
-  render layer a superchunk, sprites stacked by layer number: Bevy
-  composites, a change to one plane repaints its layer. (4) Until the
-  declarative GUI, the window makes a world with the default
-  parameters at start (camera pan and zoom, pause and pace keys).
-  Mine: the window registers types with the root's register function
-  and freezes a registry per world from the types text the server
-  sends; frames carry each entity's type with its cell. First stretch
-  without textures, shaders, the GUI or relief: colours.
-  REVISED the same day: CPU painting (an RGBA image a layer a
-  superchunk) put to the user against shaders -- "i mean, probably B,
-  here is the invariant, rendering doesn't have to be light per se, the
-  rendering main priority is not stalling the server at large zoom out
-  levels, while keeping roughly the same fps, our fps target is 60
-  btw". So B: plane words uploaded as data textures, a render rule a
-  one-cell shader (the GPU the loop), entities by instancing, a Shader
-  kind in the registry. THE INVARIANT: zoomed far out, the server is
-  never stalled and the window holds ~60 fps; rendering may be heavy.
-  The user: "that's why today the server doesn't answer a whole frame
-  at once at large zoomouts" -- the host's bound is the existing ask
-  of a few superchunks; the client goes round. MY DESIGN (2026-10-19):
-  a render layer is ONE quad over the window; its fragment shader finds
-  the world cell under the pixel and runs the rule's WGSL for one cell
-  (the client's prelude gives it reads of the planes it names). Each
-  plane's words live in one GPU storage buffer, a slot a superchunk on
-  screen, a table superchunk -> slot: a frame's cost is a draw a render
-  layer, whatever the zoom. Far out, a client thread makes coarse
-  levels (a cell a block, set if most of the block is); rules read them
-  as cells, blind to the zoom. Entities: the client makes each type's
-  plane of the cells its entities stand on, so an entity's rule is a
-  plane rule. "rememwber you're on my local machine so rendering,
-  screenshots, etc are all om the table for your convenience".
-  SUPERSEDED (2026-10-19): "idk how bevy does it but we want to avoid
-  non rust code on the type registry for shaders if possible. we dont
-  want to go around writing shading language if bevy provides apis for
-  it already" / "what i mean is, bsse game can depend on bevy itself".
-  Bevy has no shaders written in Rust: its own are WGSL. So no Shader
-  kind (taken out again); a render rule is Rust using Bevy's types,
-  its library a client_api RenderCode behind basegame's `client`
-  feature (basegame then depends on the client and on Bevy). The loop
-  the GPU was to be is the client's, on Bevy's task threads, run when a
-  superchunk's data arrives: at a DETAIL LEVEL matched to the zoom (a
-  drawn cell 2^level cells a side; a superchunk's planes are Morton
-  end to end, so a drawn cell is a run of bits -- its share set is a
-  popcount), so the cells painted are about the screen's pixels however
-  far out. The result an image a superchunk a render layer, drawn by
-  Bevy as a sprite, stacked by render layer: the earlier settled (3).
-  Textures later through Bevy's TilemapChunk (a tile index and a tint a
-  cell, one draw a chunk). The user on Bevy in the public API: "this is
-  basically making bevy part of the public api of client lol, i hope
-  this will make gui work easier ss well" / "once we fully freeze the
-  public api we also freeze bevy version, simple as that  after all
-  bevy is our only external dependency so we need to fix it a little
-  anyways" -- at the freeze, Bevy pinned to its exact version.
-  "freezing the public api will be our 0.7 moment for civil egregore"
-  -- the freeze is version 0.7 (Cargo.toml says 0.6.0 now). What the freeze
-  means (the user, 2026-10-24): "the public api is stable for a given
-  distributed version of the game, between versions it csn change, this
-  is a game, not an operating system" -- stable within a released
-  version, free to change between them; 0.7 is the first version mods
-  are supported in, not a promise across versions. Then content ("once
-  we finish mod support and reach 0.7 we start working on content (and
-  performance as needed)"). 0.6 was
-  "simulation engine works + basic client", "arbitrary" in number.
-  DONE (2026-10-19, uncommitted): client_api::rendering (RenderCode,
-  RenderTurn, DrawnCell; on_each_set_cell, on_each_drawn_cell,
-  on_each_entity -- entities cover a drawn cell by the share of its
-  cells they stand on), painting.rs (RenderRules), the window (camera:
-  WASD/arrows, drag, wheel, Q/E; Space, = - 0 F to the server; the
-  title says ticks, entities, hot superchunks, the frames' share of the
-  server's time, fps), basegame/src/render_rules (ground, grass, trees,
-  water, walls, sheep). The world at start: default parameters but a
-  side of 8 (the user: "fix the world size lol, sheep are running
-  rampant"). Measured with vsync off, 8x8 world: 1077 fps near, 851
-  with the whole world in view, the server held at 256 ticks/s.
-  The user: "for this gsme vsync on as default is ok" / "my idea for
-  this game is to have no graphic settings on the basegame lol the
-  rendering is very simple tbh".
-  GUI, FIRST STRETCH, DONE (2026-10-19; the user: "you can straight up
-  write bevy gui code on basegame remember"): client_api::gui (GuiCode:
-  blocks across and down, and a build given the EntityCommands of its
-  place; GuiContext: its type and ServerCalls; OpenWindow, an event a
-  gui triggers). The one window system (client/src/window/windows.rs):
-  a gui naming no parent is a window -- title bar dragged by, x closing
-  it, a grid of BLOCK_PIXELS blocks its guis flow into in registration
-  order; ShownByDefault ones open with each world; a world remade of
-  the same types keeps its windows; the mouse over a window is not the
-  camera's; no gui keeps the keys' focus (Space would press the last
-  button clicked). Feathers (bevy_feathers) for the look. basegame/src/
-  gui: "world" (shown by default: "world generation" opens the sliders,
-  "reset world" calls the reset) and "world generation sliders", a gui
-  type a worldgen parameter (28), each reading its value as it is built
-  and setting it as it is slid, through the worldgen calls; ranges from
-  the old sliders.csv. Verified by clicking: ocean share 0.95, reset,
-  a world of ocean. Not yet: tooltips (the old "does" texts), scrolling
-  a window, keyboard navigation; calls are made on the main thread,
-  waiting for the host's answer.
-  THE WINDOW'S FIRST WORLD (the user, 2026-10-23: "when doing those kinds
-  of test make the world limitless and simply reduce sheep spawning on
-  worldgen to 0 lol"): handed to run_window by the root's main.rs (the
-  client names no content): no side, no sheep, the camera forcing
-  superchunks hot. Renamed: "unlimited camera loads is better named
-  "camera forces superchunks hot"" -- the parameter
-  camera_forces_superchunks_hot, the world file's row, WorldInfo's field.
-  WORLDGEN PARAMETERS' PLACE (the user, 2026-10-23: "i have my doubts on
-  why the worldgen parameters load where they currently load, there is
-  a file thata supposed to save the settings you know"): the window's
-  first world to come from settings.csv rows (worldgen parameters by
-  name), the sliders writing theirs back -- needed anyway once basegame
-  is loaded at runtime and main.rs cannot name it. Not done yet.
-- THE SDK (the user, 2026-10-23): "making a civil egregore sdk. crate.
-  this crate will contain all public apis and bevy. dynamically linked /
-  why? so we can make base game truly a mod as it should be. the tradeoff
-  is that any third party mod developer will require to use the same
-  toolchain we're using as well. i think its a worthy tradeoff". My
-  answer, agreed: the sdk a dylib (in practice the engine with its public
-  APIs re-exported); a mod a dylib depending on the sdk alone (not a
-  cdylib: its own copy of the sdk and Bevy would break library
-  downcasts), one entry point handing its register function; loaded by
-  the launcher with the OS's own calls declared by hand, never unloaded;
-  a build fingerprint (sdk version, rustc version) checked before calling
-  into a mod. Answers: "1: yeah one sdk" (Bevy always in it: a headless
-  server carries Bevy, never opening a window -- the settled
-  "headless compiles no Bevy" goes); "2: ok, basegame should still be
-  included by default, in theory now our compiled products should be in
-  a folder with the executable, and a couple of .so/.dlls if im not
-  mistaken"; "4:fair, we have wine and Proton if u need to run windows
-  builds" (Windows' 65535 exported-symbol cap the risk to check). Mine:
-  measure ticks before and after the dylibs. STEPS: (1) the sdk crate,
-  static, basegame on it alone; (2) sdk and basegame dylibs, still
-  linked at build time, measured, checked on Windows; (3) mods loaded at
-  runtime from beside the executable, basegame out of the binary's
-  dependencies, the first world from the settings file.
-  THEN (2026-10-23, discussion, nothing built for it yet): "were going to
-  separate the server and client into 2 binaries" / "the client always
-  needs bevy, the server never needs ir" / "the idea is to bundle the
-  game as folder now. not as a single binary, the folder would include
-  the client binary, the server binary, and any required linked
-  libraries. running headless then simply becomes running the server
-  binary directly" / "we want to avoid server compiling bevy, that
-  should be client side only wven if dynamic code loads with bevy
-  function pointers dynamically linked they should just be completely
-  ignored and not runnable from the server side" / "mods folders would
-  be per world, we simply have a basegame library alongside the
-  binaries. im being very explicit about that." / on registration: "no,
-  registration code is a shared library for both server and client, and
-  client or server share the type registry with the other as needed" /
-  "if the server loads bevy code because the mdos have it as a
-  dependency thats fine, because its a mods dependency, not a server
-  dependency, what we ultimately want is zero clients mods to load zero
-  bevy code on server side". On loading: "we probably want to load mods
-  from a manifest declaring the content bundles instead of a function?
-  ill leave you up to that one, im happy with a common registration
-  function signature for this purpose tbh" -- mine: the function, no
-  manifest. So: two SDK libraries (engine and public APIs, no Bevy; the
-  client API and Bevy), a facade crate re-exporting both for mods; the
-  server cannot name render or gui code, so cannot run it. Shipped
-  beside the binaries: the libraries, libstd (Rust dylibs need it
-  shared), basegame's library; Linux finds them by $ORIGIN. Step 1 of
-  the earlier steps sat in the working tree uncommitted (the sdk
-  crate, basegame on it, the client feature gone); the sdk crate is gone
-  since ("forget about the sdk"), the client feature's removal kept.
-  Per-world mods, the user's answers (2026-10-23): "1: yes basegame is a
-  default, not obligatory. Ideally on world creation we specify which
-  mods are included and which ones are not" / "2: types.csv already
-  should be in order" / "4: most definitely not, first, for a server to
-  open a new world it has to be openend from scratch. on the client side
-  closing and opening worlds loads new type registries" / "5:no, the
-  files must be preinstalled on both client and servee beforehand" /
-  "clients basically have a similar worlds folder on the civil egregore
-  folder. Basically client/worlds/specific world/ where the only thing
-  that should be there is the same mods that specific server world uses.
-  this is for remote worlds. for local worlds the mods folder is already
-  in the normal world folder so both client and server csn share it".
-  Then: "1:yes, reset world keeps the frozen registry, we already
-  established this" (a server process runs one world: making or opening
-  another is a new server process; MakeWorld/OpenWorld messages to go) /
-  "2: registries are made new for each world opened and any old
-  registries are completely dropped" / "3:use a timestamp of world
-  creation time + the world name as the per wolrd id stored on
-  world.csv. guaranteed to never conflict basically" / "4: the game
-  folder is static after compilation. any dynamic content must live on
-  the civil egregore local folder for the machine. on world creation we
-  dont complicate ourselves. we first create the wolrd folder with the
-  settings, and an empty mods folder, the mods are copied there (never
-  basegame). for now its as simple as having a option on server and
-  client to creste the world without running it. so the user csn copy
-  the mods to the folder. then run the wolrd first time, creating the
-  types.csv file on the world folder" / "mod loading order is mostly
-  irrelevant, we just need to respect dependency order when loading
-  arbitrary mods".
-  Then: "1: we need to get rid of the per mod register function, that is
-  a type registry responsibility, the mods should only provide a list of
-  what bundles to load." / "2:yes, but basegame not being included is a
-  separate flag, since basegame never loads from a worlds folder, is
-  basically the only "special path" mod. it requires a separate flag to
-  not include it, completely separate from "create world without
-  running"" / "3: when a client disconnects from a server it should do
-  all that by default and go back to the main menu" (drop the registry,
-  the windows, close the mods' libraries) / "mods are folders, inside
-  the respective mods folder. just in case they need to include assets
-  and such / basegame follows the same philosophy inside the game
-  folder, we have a basegame/ directory with the same structure as a
-  mod basically".
-  Then: "i was thinking of straight up a known function that all mods
-  include, callable by the registry thanks to the sdk, that spits out a
-  list of what to load. but thats just an idea not final" / "any typeid
-  already states its dependencies. the real concern to me is we should
-  instead depend on bundles, not just typeids" / "every bundle carries a
-  list of strings for the other bundles it depends on. the internal
-  typeids on a bundle never specify dependemcies directly (specifying
-  stuff like master planes and such is mostly informative and was mostly
-  for testing, in practice we dont need any of that inside a bundle)" /
-  "registration is a completely separate step from execution. making a
-  type registey and freezing it simply validate the dependencies.
-  execution of watever is on the frozen registry is on server/client
-  side" / "delete anything not needed anymore inside bundles". Compared
-  with Factorio, Forge, Fabric, RimWorld, Luanti: "it seems were
-  choosing a very sparsely used scheme" / "manifest files are probably a
-  good idea but we have to understand more about how are they normally
-  done before deciding on a layout" / "having separate client and server
-  entrypoints is probably not a bad idea at all in fact, i think our
-  system is halfway there". Then: "we should probably copy factorio and
-  fabric models were we can, that basic manifest file is good. and
-  simplifying the architecture so a mod/bundle (from the game
-  perspective is logically the same thing) specifies entrypoints seems
-  like a good idea, fsbric library only mods simply don't have entry
-  points i guess?" / "basically any mod in our game needs 1-2 of 3
-  possible handles. client handle, server handle, and frozen registry
-  handle. i say handles for lack of a better name, we need more
-  research". Then: "basetypes most definitely should have never existed
-  lol" / "before commuting to our "handles" or watever, we need more
-  research! im talking go to the internet and read type research" /
-  "mods types are internal to it, the manifests are bundle/mod level (as
-  i said, bundles and mods are logically the same thing, i just named
-  them bundles)". Researched 2026-10-23 (Factorio, Fabric, Forge,
-  Vintage Story, Unreal, Godot, Bedrock, tModLoader, RimWorld, Luanti,
-  Bevy's removed dynamic plugins); the findings in my answer that day.
-  Then: "about 5, yeah, simple ordering by dependency and name is fine"
-  (Factorio's: dependency depth, then name) / "about 6, one idea is to
-  indicate to the typeregistry building phase what we're building for,
-  client, or server, and skip bundles accordingly (ideally every bundle
-  declared in a mod manifest points to a single .so/dll file to keep
-  things tidy and 1:1)" / "the bundles can be manifested as "client" or
-  "server". never both, that makes the cut very clean, but im concerned
-  about possible development hell on mods that might have bundles for
-  both server and client that need to talk to each other" / "doing the
-  experiment is a very good idea indeed. it would be lovely if we could
-  simply use scripting languages, but the performance targets for this
-  game forbid it unfortunately, were already risking a lot by having
-  dynamic type loading lol" (the experiment: TypeId casts, engine
-  statics and Bevy resources across separately built libraries) / "we
-  need to reevaluate if we still need an sdk crate after all. if we have
-  the manifest declare client or server mods can simply build against
-  the respecitve crates public api and thats it lol".
-  Then: "lets proceed with experiment and forget about the sdk. there are
-  still many details to choose but the experiment is crucial indeed" /
-  "we should probably have "client" "server" and "common" bundle types
-  then. so instead of making clients load server and client stuff, we
-  delegate that to common bundles" -- three bundle sides: common (both
-  load it), server, client. The experiment in AI_SCRATCHPAD/
-  dylib_experiment (its own workspace).
-  Then: "before you continue, move basegame to its own workspace lol" /
-  "i think that'll be the winner try for this" (winner). DONE,
-  uncommitted: basegame/ a workspace of its own (excluded from the root's,
-  its own Cargo.lock, target/, transient_data/), naming protocol, server,
-  client and Bevy directly; the sdk/ crate deleted; the root package
-  still depends on basegame by path until mods load at runtime.
-  Tests: 203 root + 7 basegame, all pass; clippy clean on both.
-  EXPERIMENT SO FAR (Linux, one workspace's build): engine_common,
-  engine_server, engine_client (Bevy inside it) as Rust dylibs; mods'
-  bundles (common, server, client) dlopened from a world's mods folder
-  by manifest, Factorio's order. Works: cast down across libraries
-  (common->server, common->client, mod->mod), a wrong cast refused,
-  engine statics and a mod's statics one copy, Bevy components of one mod
-  queried by another, the engine's task pools from a mod, a mod calling
-  another mod's library through DT_NEEDED (found by soname, the
-  dependency loaded first). The server process maps no Bevy and no
-  client engine. Found: Bevy's derives need `bevy` named in the mod's own
-  Cargo.toml (the engine's re-export is not enough); `--as-needed` drops
-  a library only named for types, not called.
-  BUILT APART (found through basegame's own workspace): Cargo hashes a
-  path dependency by its path from the workspace's root, so the same
-  engine crate built in another workspace gets another crate hash
-  (protocol, server, client, utilities all differ between the root's
-  build and basegame's; registry crates -- bevy_ecs, bevy_app -- match).
-  A mod built apart against the engine BY PATH is refused at load
-  (undefined symbol ..engine_common: clean, no UB). A mod built against
-  the game's OWN BUILT LIBRARIES (`--extern engine_server=<lib>.so`, `-L
-  dependency=<the build's deps>`, no engine source, no engine
-  dependency in its Cargo.toml) loads and works -- a server bundle, and a
-  client bundle with a Bevy derive of its own (`--extern bevy_ecs=<rlib>`
-  for the derive's paths), built in 0.6 s, no Bevy compiled or copied.
-  The user: "we probably want to allow building against the code instead
-  of the precompiled libraries if possible, we need to find where that
-  conflict comes from" / "hmmmm im not liking where this is going for
-  some reason, but lets see the results of the investigation first".
-  WHERE IT COMES FROM (cargo's compute_metadata, src/compiler/
-  build_runner/compilation_files.rs, and SourceId::stable_hash): -C
-  metadata hashes the package's name, version and source -- a path
-  source by its path from the workspace root if inside the root, else
-  by its absolute path -- its features, its profile, the build kind and
-  target, rustc's version, and its dependencies' own hashes; not
-  RUSTFLAGS. Shown: the game's workspace moved elsewhere keeps its
-  hashes; a mod's workspace moved elsewhere changes them. BUILT FROM
-  SOURCE, MATCHING: a modder's workspace (elsewhere on disk) with the
-  engine's crates at the game's paths from its root -- symlinked or
-  copied -- and the same lock file, features and profile gets the same
-  hashes; its client mod, Bevy derive included, loads into the game.
-  DECIDED (the user, 2026-10-23): "all the forcing yeah, i think its
-  probably easier if we limit mods to compiling against the precompiled
-  game tbh. having the game compiled is kinda a requirement to test the
-  mods in dev anyways" -- mods build against the game's built libraries
-  alone (`--extern`), never its source. Then: "cant we just straight up
-  simply use the precompiled libraries that come in the game?" --
-  tested: a SERVER bundle builds against the shipped game folder alone
-  (its libraries, nothing else); a CLIENT bundle does not: a Rust dylib
-  embeds only its own crate's metadata, so the crates statically inside
-  it (Bevy's) need their .rmeta files, and Bevy's derives their
-  proc-macro libraries built for the modder's machine. The .rmeta files
-  alone are enough (no .rlib): a client mod built from the game folder
-  plus a folder of .rmeta files and proc macros loads and runs. That
-  folder was 716 MB, about half of it stale (the experiment's earlier
-  build with fewer Bevy features left a second bevy_ecs, glam...).
-  Then: "cant we build agains the precompiled bevy library on the game +
-  listing bevy as a dependency om the mods cargo file? so we get the
-  macros and stuff from.the cargo dependency while linking to the in game
-  bevy library?" / "Ideally we would want the setup required for mod
-  development to be a one time cargo file configuration or similar,
-  probably just indicating where the path to the precompiled game build
-  is. we want mod source code to be free of restraints ad much as
-  possible." / "we probably want to make a new workspace "mod template"
-  in the tree for future reference, and basegame should basically be a
-  copy of it with the basegame code added and the names changed." / "all
-  this is honestly outrageous lol". TESTED, WORKS: a client mod listing
-  Bevy (same version and features) in its own Cargo.toml, the engine
-  through `--extern` in its .cargo/config.toml (all its crates get it),
-  links to the game's Bevy (none of its own) and runs. What made the
-  mod's own Bevy differ from the game's: rustc's crate hash (SVH, checked
-  at compile time) takes in source paths, and serde and thiserror
-  include files from their build scripts' output folder, inside each
-  build's own target/ -- fixed by both builds mapping their target/ and
-  Cargo's crate sources to fixed names (`--remap-path-prefix`; cargo's
-  trim-paths, which would do it, is unstable). Conditions left on a mod:
-  the same rustc, the game's lock file for Bevy's dependencies, Bevy's
-  version and features as the game's, the game's profile (a debug build
-  of a mod will not match a release game), and the config (the game's
-  build, the path maps). The game's build itself must map its paths.
-  Then: "we need to weigh this further, becase just shipping the compiled
-  game as is for development plus the template is also not a bad route
-  if the template handles the complex parts. and i dont really see why we
-  would want to avoid modders from listing bevy as a dependency if their
-  are doing client side mods inside their own mods, is there a downside
-  to it?" TESTED: the Bevy-in-Cargo.toml mod plus `bitflags` (a crate
-  under Bevy) with one feature Bevy does not ask (example_generated):
-  REFUSED (cargo unifies the feature into Bevy's own bitflags, Bevy's
-  hash moves, the engine no longer matches). The same dependency on the
-  kit route (no Bevy in the mod's Cargo.toml; Bevy's .rmeta and macros
-  from the game's build): builds in 1 s, runs -- the mod's bitflags its
-  own copy, apart from the engine's. The kit route's own catch: two
-  copies of a shared crate are two types (a mod's own glam::Vec2 is not
-  Bevy's), so mods use Bevy's re-exports; a compile error, not a refusal.
-  Both routes: rust-analyzer sees no crate given by `--extern` (the
-  engine's, and on the kit route Bevy's): no completion for them.
-  DECIDED (the user, 2026-10-23): "ok, sounds like option 2 is the way to
-  go, we can expect modders to compile the game in their machines so we
-  can assume there is a path to the game's source code and target/
-  directory by extension" -- the kit route: a mod builds against the
-  game as compiled on the modder's machine (its target/: the libraries,
-  Bevy's .rmeta files, the derive macros); no Bevy in a mod's
-  Cargo.toml; the template's config names the game's folder.
-  Mine, to put to the user: at load, only symbol names are checked, and
-  they come from -C metadata (name, version, features, profile...), not
-  from the source: a mod built against another commit of the same
-  version would load and could misbehave -- so a build fingerprint (the
-  engine's commit and rustc's version, a const of the engine's the mod
-  compiles in) checked against the running engine's before a mod's
-  entry is called.
-  Then: "yeah, hopefully this simplifies the mod template setup to simply
-  specifying the root of civil egregore local repo in summary". TESTED,
-  WORKS (apart_kit_editor, deleted since: the paths below replaced it): a mod's whole setup one line of its
-  .cargo/config.toml, `include = [".../modding.toml"]` (cargo's config
-  include, stable; relative to the .cargo/ folder). The fragment, which
-  the game's build would write into its target/: the --extern and -L
-  flags, and `[patch.crates-io]` pointing the engine's crates at the
-  game's source. The mod's Cargo.toml names the engine's crates as
-  optional dependencies behind an "editor" feature (no paths): off for
-  builds (built 0.8 s, loaded, ran), on for rust-analyzer, which then
-  finds the shapes mod's Palette in its source (and finds nothing without
-  it). Not yet tested: rust-analyzer's check on save with the feature on
-  (would build the engine from source beside the --extern copy: to be
-  run without it); Windows; who writes modding.toml. Mine: the engine's
-  crate names are looked up on crates.io whenever the patch is missing,
-  so they must be names no one else can publish (ours).
-  Then: "Ideally we avoid any crstes.io interactions at all lol" / "and
-  fail instead" / "cant we just work with paths instead of having a
-  crates.io section?" / "you'll have to show me snippets for all this
-  stuff lol" / "i can't see the code myself at the moment". TRIED: a git
-  source on a .invalid URL, patched (cargo fetches the original anyway:
-  fails both ways); a registry of the game's own, patched and replaced by
-  an empty local folder (works, no network; without the fragment fails
-  at once) -- both dropped for PATHS: TESTED, WORKS (AI_SCRATCHPAD/
-  mod_outside_the_game): the mod's folder holds `civil_egregore`, a link
-  to the game's repository, the one thing a modder makes; Cargo.toml
-  names the engine's crates by path through it (optional, "editor"),
-  .cargo/config.toml includes the game's written fragment through it
-  (dylib_experiment/write_modding.sh writes it). Built 0.79 s, ran;
-  rust-analyzer finds the shapes mod's Palette through the link; without
-  the link the build fails at once, naming the include. Found: (1) the
-  engine's crates must not inherit dependencies (`bevy = { workspace =
-  true }`): reached through the link, cargo looks for their workspace
-  above the link, in the mod's folder; (2) a mod inside the game's
-  repository makes the link a loop (rust-analyzer never settles) -- an
-  in-tree template or basegame needs another way. Windows: a junction
-  for the link, untested.
-  Then: "where is out/ we probably want to avoid simlinks and use paths
-  directly if possible" / "about mods inside the games repo, yeah, that
-  shouldn't happen at all lol, thats why o said to move basegame to
-  another workspace lol" / "otherwise good job, it seems we found a
-  decent solution". TESTED, WORKS: no link -- the mod's Cargo.toml names
-  the engine's crates by their real relative path, its .cargo/config.toml
-  includes the fragment by its real relative path. Both findings above
-  go with the link: through a real path cargo finds the engine's own
-  workspace, so `bevy = { workspace = true }` stays; and nothing loops,
-  so an in-tree mod (basegame) works the same way. out/ was the
-  experiment's laid-out game folder (dylib_experiment/out: game/, world/,
-  modding.toml), what run.sh makes; in the real game, the folder its
-  build lays out.
-  Committed (51c8cb01, 9695cc59; the user: "yeah, lets commit and discuss
-  the next steps ... we need to make building the game spit out a
-  directory instead of a single binary lmao ... the mod template and
-  making sure basegame works with it. removing basegame from watever main
-  still has it. in general probably removing the main from the root src/
-  since now client and server are their own binaries lol"). Then: "how
-  does the other mod systems treat their entry points? compared to how
-  were doing it? ... im not sure if my client/server/common model with
-  the 3 known possible entry point types is as good as it can be already
-  as well." -- discussion, my comparison that day.
-  Then: "whats start?" / "about point number 2, mod hooks are the way,
-  for waaay later indeed" (LATER) / "we do need the signature of the
-  known entrypoint functions for mods to have a static shape of course,
-  since they compile against protocol we can just make a trait do it for
-  us lmao". Then: "ahh i see, start is just a very bad name" / "i mean,
-  what im thinking is following the fabric model, the manifest file has a
-  string that points to the entry point struct that implements the
-  bundle trait i guess?" -- registration stays in code (the trait's);
-  the manifest names the entry, as Fabric's entrypoints name a class.
-  Then: "what we actually want to be our safety guard is the manifest
-  file, in it we trust, if the libraries dont match the manifest we
-  refuse to load / the manifest becomes the source of truth for the
-  mod". Then: "ideally we want the mod template to include a
-  manifest generator. and i was going to propose instead of using
-  xstasks, simply have compile time code execution ... running a program
-  at compile time to do stuff like genersting files and directories and
-  stuff, we could use that for also doing the folder with the linked file
-  distribution stuff cant we?" -- my answer that day: build scripts run
-  before their crate is compiled, so they cannot see the linked results.
-  Then: "what i want to avoid is using script files of any kind (cmd,
-  shell, etc) and avoiding third party libraries / about your game
-  packager, im not against it. what we want ultimately is a proper game
-  folder with its components on build, so it can run at all lol. if we
-  csn call a binary from cargo aliases then i guess thats what we need
-  to do" -- the packager: a Rust binary, std only, run by a cargo alias;
-  no script files (the experiment's run.sh, run_windows.sh and
-  write_modding.sh were the experiment's alone).
-  Then: "i see, its just a cargo run lol, its kind of a hack but its
-  simple and effective. / we would ideally make 2 packagers, a game
-  packager, very simple, just builds the game, makes the game folder on
-  the target directory and puts the game stuff on it / mod packager
-  takes care of running commands as needed if the game hasn't been
-  compiled. generates the manifest, etc. packages the mods libraries and
-  manifest into a folder in the mods target directory in the same way". Then: "yes packagers would be crates on the game's repo
-  root" / "folder names correct, for now lets keep it just release. i
-  believe adding thebug build support later will not be that hard with
-  the remaining infrastructure in place even if we hardcode release
-  everywhere on the packagers now". SETTLED: two root crates, the game's
-  packager and the mods' (names to propose); the game laid out in
-  target/civil_egregore/, modding.toml beside it in target/; a mod in its
-  own target/<mod name>/ (manifest.csv and its libraries); release only.
-  The root tests, once src/main.rs goes: "probably move into basegame
-  indeed" -- into basegame's workspace. Names: "good names, simple,
-  effective, more than one word which is a bad habit of yours" --
-  game_packager, mod_packager.
-  STEP 1 DONE (ef23be21, pushed): game_packager/ (std only), `cargo
-  package_game`: builds the program in release (the cargo that runs it,
-  in the repository's root) and lays out target/civil_egregore/ anew,
-  today the one program; run from there, the window starts its server
-  from the same folder. Next, step 2: the engine's crates as shared
-  libraries, measured.
-  STEP 3'S DESIGN, the user's answers (2026-10-23): "1:yes, ideally
-  common means "server AND client" but can also be used for common
-  libraries if thats the layout the modder decides on. so client calls
-  need both server and client so implementing them inside a common
-  bundle is the only way for them to work anyways" / "2:fair, types.csv
-  can technically live just fine without client types, but for local
-  worlds (where the client also loads mods from the world mods folder)
-  and server side forced client mods we want types.csv to have ALL the
-  types" / "3 needs to be discussed more" (masters, and what a render
-  rule reads) / "4:honestly i dont see why we csnt have nested bundles,
-  bundles are just a logical grouping for convenience, as long as it
-  doesn't have unintended side effects were fine with nested bundles.
-  only the root level bundles need to be in the manifest" / "5 fair lol"
-  (step 3 before runtime loading, basegame's bundles listed in code).
-  Then, on point 2 (the server would load Bevy to learn client types):
-  "fuck i forgot that just trying to read a dynamic library loads all of
-  it lol / ideally we separate registration from code loading entirely"
-  -- my proposal, the mod packager calling register_types at build time
-  and writing the declarations out -- then: "ok, then this means
-  something, we really need to move types strings into the manifest, and
-  just dont involve the libraries at all on type registration, just
-  manifests". SETTLED: type registration from manifests alone; a
-  library is opened only to provide its bundle's libraries, after the
-  freeze, on its own side. Then: "we could probably make a simple derive macro ... idk,
-  just throwing something to the wall, there's probably an easier way" /
-  "fair probably having a function that spits all the pointers and types
-  names automatically, and have bundles be a manual organization on this
-  registration function / we csn probably make this very easy by making
-  a type state pattern constructor ... passing the structs with a simple
-  dyn any to register it by the name of the struct itself. / so its like
-  builder::new() .new_bundle(name and stuff) .type(a struct) .type(another
-  struct) .close_bundle() .new_bundle() etc. take this as a style guide,
-  not the final form lol". Names: "lets just make the registration type add function
-  recieve a static string that csn ve written straight in the same
-  function call. simple as that then" -- `.add("grass", Grass)`.
-  Point 3: "yes, basically anything callable should recieve a simulation
-  handle, client handle, or both. then the rule gathers watever it needs
-  from theand save it somewhere (statics maybe?) for when its called.
-  this is the ideal setup, but i can see its only imaginary, there are
-  things that dont work with this approach".
-  Downcasting/capture for rules: "that downcasting example for rules is
-  exactly the approach we need" (a kind trait's setup gathers handles
-  and returns code with them captured). The frame ask: "different
-  rendering modes (future feature) may only read some layers and not
-  others. maybe some entities and not others. what i mean is, whats
-  asked for in a frame to the server can vary". Settled: each render
-  rule's setup declares what it reads (planes, entity types), kept with
-  the rule; a rendering mode picks the active rules; a frame asks for
-  the union of the active rules' reads. Fixed per rule: "do we want
-  rules to change what planes they read frame to frame? ... rule setup
-  also pre-declares what it.wants to read so we probably wanna do the
-  same even if some planes may remain unread for that frame for that
-  rendering rule, the same for server side rules can happen. but the
-  code is simpler tbh. we probably keep it fixed now and add dynamicity
-  on that front later if needed. simple is better now".
-  Rendering modes: "we dont have rendering modes yet, thats a future mod
-  lol". Shared machinery: "client and server are supposed to use roughly
-  the same model, so we should have as much of that machinery in
-  protocol, and let server and client leverage it where they act the
-  same way". My proposal (asked): in protocol the builder, a lookup
-  handle noting reads (TypeLookups), Reads, SetUpType<Code>, a generic
-  kind trait (Handle, Code, set_up) and one setup walk matching frozen
-  types to the structs added by name (replacing rules_of, worldgen_of,
-  RenderRules::of, the gui gathering); CallCode/CallContext into
-  protocol (common bundles compile against protocol only). Code types,
-  the handles' own parts and running stay per side. Orphan rule: (a)
-  wrapper functions per kind, my lean, or (b) kind traits in protocol.
-  The user: "yes kind traits most definitely should live in protocol,
-  like probably we need to rename protocol, you're thinking of protocol
-  as the word itself, too narrowly. i think of it broadly. encompassing
-  client and server and mods" / "there is a reason both server and
-  client depend on protocol" / "utilities and protocol are.the shared
-  libraries" / "(utilities a level down on protocol of course)". SETTLED:
-  (b), kind traits in protocol; protocol is the shared layer of server,
-  client and mods, utilities under it. Rename: hedged, not asked.
-  Then: "i was actually thinking that we can probably get away with
-  centralizing a lot of server and possibly client types into protocol,
-  and then they both client and server use them, this also allows us to
-  have those types directly in the public api instead of wrapping
-  possibly useful types that currently get reexported by the public apis
-  on server for example". My sort (asked): already protocol's and
-  re-exported; plain words (widths, WidePlane, entity header and
-  attribute layout, RuleCounts, simulation time, worldgen parameters,
-  CallCode/CallContext, RenderTurn/RenderCode) move; behaviour over the
-  server's internals (SimulationTickState, the compare-and-write and
-  read functions) and Bevy (GuiCode) stay. Side parameter left only for
-  those.
-  The user: "yes, but we probably want to have a servertypes/clientypes
-  modules on protocol, not just randomly placed on type registry, normal
-  rust types are different from what the game itself perceives as types.
-  one is simply types, the other is registered types or frozen types".
-  My layout (asked): protocol::server_types, protocol::client_types
-  (plain Rust types, each with its side's kind traits);
-  protocol::type_registry keeps the game's types (IDs, registration,
-  freezing) and the shared machinery (builder, lookups, set-up walk).
-  Names: "yeah normal rust guidelines for names lol" -- server_types,
-  client_types. Type IDs stay in type_registry; kind traits beside their
-  side's types; types both read under the side defining them.
-  3.1 CO-OP (2026-10-23): "yes, go ahead. lets go co op this time".
-  Applied: protocol/src/lib.rs (doc broadened, `pub mod server_types`),
-  Cargo.toml description, protocol/src/server_types.rs (module root).
-  Found as I read: RenderTurn/RenderCode paint with Bevy's Color (stay
-  in client; no client_types this pass); GeneratedArea and WorldgenCode
-  on server internals (stay); RuleMaster waits for 3.3.
-  WORLDGEN PARAMETERS OUT OF THE SERVER, FIRST: "why is there a
-  worldgenparsmeter alias in server?" then "oh ok, we need to move that
-  out of there first then. the only thing the server should b3 concerned
-  about is a worldgen hook being used. nothing else. we can have mods
-  write their parameters in a modconfig folder inside the worldfolder.
-  the slider values for worldgen can go there" / "since worldgen itself
-  is basically a bundle of basegame".
-  On a new world's values (my point 4): "dont worry about that for now,
-  later we'll make the client handle that better, basically well change
-  how worlds are.created entirely, for now you can just strip worlds of
-  functionality as conflicts arise / basically the new world model
-  creation will be kinda 3 step process, declare world, setup world, run
-  world. existing worlds just skip straight to run basically". Then:
-  "also, world.csv basically becomes format + seed i believe? its fine".
-  Then, on world.csv's unpopulated row: "ok, here isnthe thing, that
-  shouldn't work like that lol, why is there a state where a superchunk
-  is half generated, planes but not entities? thats completely wrong
-  lol". My proposal: generation makes the whole superchunk, planes and
-  entities, in one job (nothing sees it before it exists, so no
-  compares); populate, unpopulated and its world.csv row go. Files 1-2
-  (with_worldgen_parameters, worldgen_config.rs) applied: "the code for
-  worldgen config loading looks mostly fine at a glsnce otherwise".
-  File 3 shown (basegame naming utilities directly). On first wakes:
-  "superchunks must load in exatcly 256 ticks after they start warming
-  or the simulation stalls completely, never more, never less. so there
-  is no way to break entity scheduling, it starts 256 ticks after the
-  chunk started generating, or the simulation stalls at tick 255" -- so
-  generation is given the tick its superchunk is first hot (the
-  generation tick + WARM_TICKS) and times its entities from it.
-  File 3 applied: "yes in fine having basegame use utilities, thats what
-  utilities is for if its not reachable otherwise, past, wrong decisions
-  lol".
-  Server file 1 (generated_area.rs: first_hot_tick, holds, make_entity,
-  entities_by_cell) applied: "we can optimize worldgen later, we want
-  hacks in basegame, not on server".
-  Then, on checking a generated entity's attributes only as it warms:
-  "server is the main thing, we want 0 hacks there".
-  On the encode/decode of a generated superchunk: "im kinda uncomfortable
-  with the fact that worldgen encodes and decodes the newly gwnerated
-  super chunk lol" / "im thinking we should probably work on fixing this
-  today, so, there are very few things that can run between ticks,
-  worldgen injecting data into the hot arena and entity stores is one of
-  the few allowed. we simply use make the worlgen hook tap directly into
-  the internal server apis, thats what hooks are for". (Revised file 1,
-  EntityRefused, shown, not applied; file 2 encode_generated dropped.)
-  Where it runs (asked: off the tick, handed over at the due tick?):
-  "i sometimes write worse than an AI lol, i cant communicate properly" /
-  "yes, generation has 256 ticks of free time to generate, then we stall
-  when we finish tick 255 if the superchunk is not ready, stall for it,
-  and once its data is on the hot memory areas we csn continue with tick
-  256". SETTLED: the warming job generates into the arena's own bucket
-  form and the store's own SuperchunkEntities; at the due tick the arena
-  and the store take them (stalling for the job if need be, as now); no
-  image at generation -- an empty image in the cold pool, every generated
-  bucket dirty, written back on cooling; unpopulated goes.
-  File 1 (generated_area.rs, arena buckets + SuperchunkEntities): "looks
-  good, but why do we need atributes not whole?" then "i still have my
-  doubts, wakes before hot should also be impossible by construction /
-  and the entity store should sort all this mess with entity atributes,
-  i dont see why genersted area has to deal with any of this,.the entity
-  store api should abstract all of this and just provide the allocations
-  for the atributes and access to them in an abstract way by type id".
-  My proposal: FirstWake { After(SimulationTime), Never }; an entity
-  builder in the store (new_entity(..).with(attribute, value).make(),
-  Err(CellTaken)); u8 area coordinates (wrong: I took a superchunk as
-  256 a side). The user: "a suoerchunk is 1024*1024, a chunk is 256 by
-  256, chunks in fact, are just a storage convenience to keep tessera
-  happy and memory usage on sparse plains low. chunks are otherwise
-  irrelevant and superchunks are what matters" / "the builder is good.
-  but the entity store should be able to add and remove atributes at
-  runtime (except default atribute)".
-  Then: "i mean, i still dont see why we need 2 apis for the same thing,
-  the worldgen hook is allowed work between ticks, doesn't mean it has to
-  use a different api. whats outsidethearea for?" / on world
-  coordinates: "why world coordinates? preferably we should use cell's
-  superchunk morton index, or cartesian superchunk cell coordinates st
-  the least" / "i think we should have cartesian stuff on utilities
-  already" / "were.getting closer, but why do we need cell in
-  superchunk?" -- dropped: CellIndex everywhere, as the tick API. Then:
-  "yeah, entity overlapping is forbidden as normal, like generation of a
-  superchunk simply rejects or fails on writes outside the superchunk
-  being generated". SETTLED: generation is lent the arena's own
-  Superchunk (every layer, every chunk hot, nothing set) and the store's
-  own SuperchunkEntities, and writes through their own APIs
-  (Superchunk::apply, the store's make); a write outside it is not
-  applied (apply_in's own rule); at the due tick the arena takes the
-  Superchunk as make_hot_again does, the store its entities. GeneratedArea
-  has no API of its own.
-  Applied (agreed): SuperchunkLayer::empty, Superchunk::to_generate,
-  value_at None for another superchunk, make_hot_generated; the store's
-  entity_being_made.rs (FirstWake, EntityBeingMade: new_entity(..)
-  .with(..).make() -> bool), occupied false for another superchunk,
-  WorldEntities::adopt_superchunk; `pub mod server_types` unhooked from
-  protocol's lib.rs until 3.1 resumes (the file stays). Then: "i do have
-  a question, outside special world gen stuff, warming a chunk is
-  essentially equivalent to generating it (warming is done either way)
-  so we need to reutilize warming stuff as much as possible, warming is
-  already in between chunk work anyways, instead of tsking the data from
-  the save file we take it from the worldgen hook".
-  My proposal: the warm job builds the arena's Superchunk and the store's
-  SuperchunkEntities from either source (stored: image and cold entity
-  state decoded in the job; generated: lent to the hook); one landing at
-  the due tick (adopted, as make_hot_again). The user: "yeah, warming
-  should also stall on tick 255 for generation or loading from save, so
-  its exactly the same".
-  Applied (each agreed): jobs.rs generic (Jobs<Done>, send_work, send_job
-  for chunk storage's Job; JobPanicked gone; the warm job leaves for the
-  halos -- "yes, triggering warming and cooling is halo code job (i force
-  hot stuff should also tap into halo code i hope)": forced hot, start,
-  load and the camera all go through make_hot_within); make_chunk_hot on
-  SuperchunkLayer, Superchunk::from_image, make_hot_warmed; saved.rs
-  decode_into with &DefaultAttributes ("good yeah, we want to avoid sync
-  primitives as much as possible"); halos/warming/generating_superchunk.rs
-  ("looks good, but wouldn't it be called generating superchunk?").
-  "instead of lingering they shpuld be cooled lol" -- renamed everywhere
-  in the server (Cooled, hold_cooled, cooled_count...). The landing
-  applied: three sources (Cooled, Stored, Generated), each a warm job;
-  the cold state copied for the job, kept cold until it lands (a save
-  while warming reads it); Warming holds its job's ticket; warm_jobs
-  beside jobs. Worldgen interface: one `generate` over a
-  GeneratingSuperchunk; halo_work hands it to the halos.
-  Then (agreed: "go yes, worldgen does need to make collision because
-  things like trees do have collision tho"): basegame's generated_area.rs
-  through cells_mut().apply, world_generation.rs one generate with the
-  flock made whole (FirstWake from the first hot tick); unpopulated gone
-  everywhere (world.csv format 7); the old chunk_storage/generated_area.rs
-  deleted; simulation_api re-exports the new types. Tests adjusted: the
-  test game generates whole (generate_walkers); halos/world tests lose
-  unpopulated; entity_manager tests read back through decode_into
-  (read_back helper); chunk_storage's numbers test is now the whole
-  round trip (to_generate, hot, cold, encoded, from_image);
-  sheep_never_overlap no longer ticks once before counting (sheep exist
-  before tick 0 and may wake, and die of age, in it); basegame_api
-  allows utilities (the user's call). All pass: root 203, basegame 7;
-  clippy clean both. MEASURED against 1345b931 (callgrind, ticks_counted:
-  4x4, 250 sheep a superchunk, same seed; 3 runs at 50k ticks, 2 at 100,
-  in parallel; the baseline's 100-tick run repeated, 43.4995 G against
-  43.5035 G): making the world + 100 ticks 43.50 G -> 30.08 G (-30.8%);
-  49,900 ticks 34.187 G -> 34.253 G (+0.19%; 685.1k -> 686.4k a tick;
-  runs of one build vary ~0.02%); the world hash differs (the flock's
-  draws and wakes are new), so the ticks are not of the same world.
-  The user: "good, we can continue with the remaining steps". Next: the
-  worldgen parameters out of the server -- found: a running world has
-  no folder (the host's new and reset worlds run unnamed), so I proposed
-  the mod config kept in memory with the world as each mod's files,
-  saved to and loaded from <world>/mod_config/<mod>/; worldgen reading
-  its files at set-up (registered values otherwise); calls reading and
-  writing their mod's files through CallContext; the reset's values in
-  basegame's worldgen_for_reset.csv, copied over worldgen.csv by "reset
-  world"; the server carrying the files into the remade world. Asked.
-  The user: "honestly, we csn slowly remove memory only worlds, the idea
-  is to not have those lol" / "tests make randomly named worlds for
-  testing on transient data. we cant loose more tests. also wdym unnamed
-  worlds?" / on register_types_with: "i mean, if no config is provided
-  worldgen can use a default config lol" / "i mean, we probably should
-  take the opportunity to move all memory tests to worlds yeah, and move
-  them to complete tier". SO: config on disk only, defaults when none;
-  tests choosing values write their config into their own transient
-  folder and start there; those tests move to the complete tier.
-  Tiers: (c) -- the long-running world tests to the complete tier, the
-  short ones stay fast, all in folders. Then, on file 1 (WorldgenCode as
-  set_up(Option<&Path>) -> SetUpWorldgen; World keeps its folder): "i
-  think it does, but i may have to explain the world creation process /
-  creation makes the folder structure, the basic 3 folders and a
-  world.csv / setup is where we make the type registry for the first
-  time, this where mods are inserted to the mods folder,.and base game
-  included/excluded, we also create types.csv / the we run the world".
-  My reading (asked): create = world.csv and the folders superchunks/,
-  mods/, mod_config/; set up = the registry registered and frozen,
-  types.csv written (mods into mods/ and basegame in or out come with
-  runtime loading); run = opened from the folder, worldgen set up from
-  its config, the start superchunks generated if it never ran; no save
-  at start. The user: "go ahead" (2026-10-24) -- folded into this pass,
-  first. "yes those.are the three folders". The API (world_creation.rs:
-  create_world, set_up_world, run_world; never run = no hot file; the
-  seed drawn at set-up if none given; MakeWorld names its folder; a
-  reset remakes the world in its own folder; the window's world in
-  worlds/window test world, opened if there): "looks good".
-  Then: "setup step (2) should not load any libraries, that only happens
-  till game run, just to clarify  a frozen registry therefore should not
-  have loaded any libraries yet" -- set_up_world writes types.csv alone;
-  the seed, if none was given, is drawn as the world first runs. Then:
-  "seed draw should.be happening on step 1" -- create_world draws it at
-  random if none is given; fit_to_start (drawn_seed, seed_fit_to_start)
-  leaves the server, needing the worldgen's code; tests pick seeds with
-  land through basegame's seed_with_land.
-  STEP 2 DONE (1345b931, pushed): utilities, protocol, server, client each
-  crate-type dylib; prefer-dynamic and $ORIGIN (Linux), the CPU line
-  repeated (a target's rustflags replace [build]'s); the packager lays
-  out the four libraries and libstd beside the program (2.5 MB, was
-  545 MB). Measured (callgrind, the scratchpad's ticks_counted probe: a
-  4x4 world, 250 sheep a superchunk, same seed; 3 runs a build at 50k
-  ticks, in parallel): a tick 685k instructions in both; 49,900 ticks
-  -0.05% shared against static (runs of one build vary 0.01-0.03%);
-  making the world +0.08%; same world hash in all. Tests 203 + 7 pass;
-  the server's own took 26 s then 21 s (18 s before): noise of the
-  machine's other programs, the counts equal. The window runs from
-  target/civil_egregore/.
-  WINDOWS (MinGW, under Wine): all of the above but built apart works;
-  the folder ships std-*.dll, libgcc_s_seh-1.dll, libwinpthread-1.dll;
-  DLLs found beside the exe, a loaded one reused by name; the server
-  imports no client engine. EXPORTS: engine_client.dll with the game's
-  Bevy features (2d, ui, bevy_feathers) exports 36434 of Windows' 65535
-  -- room now, a risk as Bevy and the engine grow (the way out: Bevy its
-  own DLL apart from the client engine). Sizes: the client engine 210 MB
-  (123 MB stripped) on Linux, Bevy inside it. Scripts: run.sh,
-  run_windows.sh; apart_by_path, apart_prebuilt, apart_prebuilt_client
-  the built-apart mods.
-  OPEN: the host copies every plane whole whatever the detail level
-  (16-bit height and water depth: 2 MB a superchunk each), so a far
-  view of many hot superchunks goes round slowly (a boundless world
-  zoomed out: 625 hot, a few dozen drawn in 6 s). Sending planes at
-  the detail level is the host's work to weigh against its thread.
-- SAVED FOR AFTER THE DECOUPLING (the user, 2026-10-18: "save all
-  those, we need to finish decoupling and the public apis including
-  client"): TYPES.CSV DRIVES LOADING (above; open, the user's to say: a
-  type the game registers and the save does not name -- joins under a
-  new ID as now, or the load refused), ONE TRANSIENT DATA and EVERY
-  WORLD A FOLDER (below), and --cold_pool_bytes a server flag ("nice
-  one on the --cold-pool-bytes server flag thats the kind of flag we
-  want indeed", "if its on cleanparameters it csn become a cli flag
-  just fine yes": a Flag of server/src/params.rs over COLD_POOL_BYTES).
-- ONE TRANSIENT DATA (the user, 2026-10-18): "we are making a single
-  unfified transient data directory at the root, shared by everyone
-  (they can have their own folders inside if needed like the test saves
-  folder)". server/tests' paging test writes server/transient_data/
-  (the crate's): to move to the root's.
-- EVERY WORLD A FOLDER (the user, 2026-10-18, on paging kept apart from
-  the world): "1: make every world produce a world folder to save stuff
-  into. since no path to save the world is specified the default path
-  is used, and a random name is given to the world. 2: [pages newer
-  than the save] thats correct, but the paging folder should be on the
-  world folder 3: we should have lock files for that already" -- only
-  paging folders have locks today; the world folder gets one (one run a
-  world): "the lock file should be on the world folder root lol". "the
-  default for a compiled binary should be the civil egregore as usual,
-  for tests, transient data folder" -- no test hook in production: every
-  test names its world's folder under transient_data (a shared helper). Pages
-  kept apart from the save's files inside the world folder. After the
-  tests' types.
-- WHAT IS LEFT, IN ORDER (the user, 2026-10-18, on my list of what is
-  left: "1 go ahead, 2 not quite, we need client side gui rules or
-  something like that first / 3 same, fold into 5 with 2 / 4 can be
-  done right away / 5 yeah..."): the sliders out of utilities, protocol
-  and the server (2) and game content out of protocol -- CellCover,
-  DrawnHeightRange, drawn heights, mesh lines, the terrain thread (3)
-  -- both wait for client-side GUI rules and fold into the render rules
-  and the client rewrite (5). Done of 4: the client's TARGET_PACE copy
-  gone (the frame carries target_pace and held_pace), simulation_api's
-  terrain and tuning narrowed to the names basegame reads.
-- CLIENT-SERVER COMMS (the user, 2026-10-18, verbatim): "the current
-  client-server comms mode is bad, we want headless servers to allow
-  clients to connect later. what --pipe does (and should have a better
-  name) is basically telling the server "this server is being started
-  from a client" so the client basically autoconnects to the server.
-  thats basically it. and we probably need to move away from stdin/out
-  to something better". Also: "headless is a compilation flag and a not
-  a cli flag or environment flag --pipe is basically "gui mode"". So:
-  a server always runs a world as --seed/--side/--world say and takes
-  clients that connect; the renamed --pipe only says a client started
-  it, to connect at once. The user's answers (2026-10-18): "one at a
-  time for now, multi client support for later date"; "since we will
-  limit ourselves to one client, only that client can do those stuff"
-  (make, open, save, reset, pause); "if the server was started headless
-  it keeps running, otherwise it closes with the client that started
-  it"; "simplest for now, multiplayer is not a priority by a long shot"
-  (loopback). Mine, agreed in the asking: TCP over std::net, the wire
-  framing and messages as they are; a client joining late gets the
-  running world's frozen type registry first.
-  Then (2026-10-18): "port number will be 11235" (protocol::pipe::
-  SERVER_PORT, "i like my fibonaccis"); "make the flag on the server be
-  like "--close if no clients" we have like a 30 second timeout for
-  clients to connect if that flag its active, otherwise it just stays
-  open" (DONE: --close_if_no_clients, client_connection::CLIENT_WAIT);
-  "a headless server with no commands specified should only print help
-  string, and exit lol. if renderer is compiled in and no cli args, we
-  obviously open the renderer lol" (DONE); "the client uses the same
-  flags and parameters to start a server lol. thats the idea at least"
-  -- NOT YET: the window starts its server with --close_if_no_clients
-  alone and makes worlds over the connection from its sliders; with the
-  client rewrite and the tuning decoupling, it starts its server with
-  the world's flags (--seed, --side, --world, worldgen parameters).
-- SERVER FLAGS (the user, 2026-10-18: "remove those commands, were
-  going to add more later, we just want to keep the bare minimum
-  amount, i believe is seed, size and pipe flags"; "one more flag to
-  keep its --world to idicate world path"): --seed, --side, --world,
-  --pipe (now --close_if_no_clients, see CLIENT-SERVER COMMS).
-  --new/--run/--info/--threads/--ticks/--forced_hot gone. A server runs
-  the world --seed/--side/--world say from its start, if any is given;
-  else none until a client makes or opens one.
-  --world (the user: "make world flag create the world if one doesn't
-  exists"): the world saved in the folder opened, or a new one made and
-  saved there as it starts (server::holds_a_world decides; DONE). Then COUPLINGS LEFT; then render rules on
-  types and the client rewrite.
-- NO GAME CONTENT OUTSIDE THE TYPE REGISTRY (the user, 2026-10-17,
-  verbatim): "NO GAME CONTENT ON SERVER CLIENT OR PROTOCOL, TYPE
-  REGISTRY IS FOR THAT / SERVER IS FOR SIMULATION RUNNING, CLIENT IS
-  FOR RENDERING, PROTOCOL IS THE GLUE BETWEEN SERVER, CLIENT AND
-  INITIALIZATION". Every coupling under COUPLINGS LEFT breaks it.
-  Order (mine; the user: "watever is best tbh, im leaving rendering and
-  gui for last"): (a) quick fixes -- the tick rate back in simulation,
-  the grass test deleted (DONE 2026-10-17); (b) type_registry a module
-  of protocol (DONE); (c) basegame one crate at the root (DONE), the
-  server off basegame (DONE: the types handed to server::start,
-  start_world, load_world and the host by initialization -- src/main.rs
-  and the tests' worlds::types(); generation numbers opaque, asked of
-  the worldgen type's WorldgenCode; the frame generic -- FrameAsk names
-  the planes and the counted layers by LayerType, the client asks for
-  the base game's; `--sheep` purged), the server's sub-crates its
-  modules (DONE 2026-10-17: tests needing basegame in root tests/,
-  basegame through the simulation API alone); (d) heights and water
-  depths as planes, base_types off utilities (DONE 2026-10-18); (e)
-  NEXT: REGISTRY FIRST (below), then the client rewrite rendering from
-  the frozen types.
-- HANDOFF 2026-10-18 (cloud -> local; "were going back to my local
-  session, please push all work and write a handoff messsge in ai.txt").
-  Pushed to main as WORK IN PROGRESS: REGISTRY FIRST is wired end to
-  end, but NOT CLIPPED AND NOT TESTED -- the user stopped the clippy run.
-  Built clean: protocol, basegame, utilities, server, the headless root
-  (`-p Civil_Egregore --no-default-features`), the client
-  (`cargo build -p client`, without --all-targets). Not built yet: the
-  client's tests (`--all-targets`), every test crate.
-  What is in:
-  * protocol: TypeRegistry::for_new_world / for_saved_world, register
-    -> RegisteredType with its ID (one counter, from 1),
-    register_with_own_library (a library made of its own type's ID:
-    collision), freeze -> FrozenTypes (Debug lists them).
-    protocol::world_types: GameTypes = fn(&mut TypeRegistry) ->
-    Result<(), String>, TYPES_FILE, of_a_new_world, of_a_saved_world,
-    saved_in. pipe: ServerMessage::WorldTypes(world, text), wire tag 4.
-  * basegame: default_types::register -> BaseTypes (a Copy struct of
-    every ID); register_types is the GameTypes initialization hands
-    over. Rules and worldgen are closures capturing BaseTypes
-    (RuleCode::new, WorldgenCode's generate_cells/populate Arcs). No
-    ID consts left.
-  * server: start / commands / load_world / Host::start_on_thread take
-    GameTypes; each world's registry frozen before the world inits;
-    HostRequest::MakeWorld(WorldStart, Arc<FrozenTypes>).
-    Host output HostSent::{WorldRuns(world, Arc<FrozenTypes>),
-    Frame(..)}: the types ONCE a world, before its first frame (the
-    user: "the client, a the server, recieves the frozen set once, not
-    per frame"); pipe_end sends them as ServerMessage::WorldTypes.
-  * client (interim, until the rewrite): server_end's Shown::{WorldTypes,
-    Frame}; the painter freezes the text once a world
-    (renderer/world_types.rs base_types_of: for_saved_world + register +
-    freeze) and puts BaseTypes in every PaintedFrame;
-    LastFrameSeen.base_types; the ask's planes and counts and the HUD's
-    counts (hud::counted_layers) from it, empty until known.
-  Left, in order:
-  1. clippy --all-targets on the headless pkgs, the root and the
-     client; then the tests to the new APIs: tests/fast/* (host.rs:
-     HostSent, make_world with frozen types), tests/fine/
-     {type_registry, entity_manager}.rs (type_registry rewritten),
-     tests/shared/worlds.rs (worlds::types()),
-     tests/complete/worlds_run_long.rs, server/tests/fast/around.rs.
-     tests/fast/world.rs:176 changes meaning: a type missing from the
-     save gets a fresh ID now (a saved type nobody registers is still
-     refused, by freeze). Then tests, one at a time.
-  2. Unchecked (mine): after a world switch the client asks one frame
-     with the old world's IDs until the new world's first frame is
-     painted -- check the server ignores planes it doesn't hold.
-  3. The client rewrite: rendering from the frozen registry ("we need
-     to rewrite the client asap so it can take rendering stuff from the
-     frozen registry"); its design with the user first. "i believe we
-     already had the capability to include librarie handles (hooks are
-     something else) on all types" -- yes: any type can carry a library.
-- REGISTRY FIRST (the user, 2026-10-18: "very important"): "the type
-  registry is not initialized until a new world is created or an
-  existing world selected for loading. either HEADLESS or with client
-  present, the server startup is the same, we FIRST make the frozen
-  registry before initializing server or passing the frozen registry to
-  the client for rendering code"; "typeids are assigned on demand on a
-  new world, or read from the world typed.csv file on load"; "protocol
-  is also the first steps of world loading before server inits
-  basically"; "then server loads the rest based on the frozen type
-  registry, and rendering renders based on the frozen registry as
-  well". Wired (see HANDOFF); basegame gets its IDs as it registers,
-  not by name after freezing.
-- MODULES, NOT CRATES (the user, 2026-10-17: "every folder inside top
-  level folders should be a module, not a crate"; "were doing code
-  decopuling en masse basi[cally]"): utilities/bitmap and coordinates
-  into utilities (DONE 2026-10-17); protocol/type_registry into protocol ("protocol cant
-  depend on type registry, is a module inside it"); server's simulation,
-  chunk_storage, entity_manager, pathfinding, bitplane_manager into
-  server (DONE 2026-10-17). tessera stays its own project.
-- THE CLIENT GETS THE WORLD'S TYPES: "type can include optional
-  utilities, client should get a copy of the frozen type registry on
-  server start. and therefore can use the libraries that the registered
-  types can include". The server sends the frozen types' text once a
-  world; the client registers the base game against it and freezes
-  (interim, see HANDOFF). Ties to CLIENT HOOKS ("this ties to something we need to do"):
-  hooks on registered types for the client, as the server's; the
-  climate labels read a climate through its type's library. Sliders and
-  the server's reset get client hooks later ("dont focus too much on
-  that rn").
-- BASEGAME A CRATE OF ITS OWN, at the root: "basegame crate is
-  completely separate, and only depends on the simulation public api,
-  nothing else" -- and the client's hooks ("for rendering mainly, but
-  also for sliders and stuff") and protocol's type registry. As I read
-  it: basegame -> server's simulation_api, client's hook API,
-  protocol::type_registry; neither server nor client depends on it; the
-  root program builds the default registry from it and hands it to both.
-  base_types, libraries, sca_rules, entity_rules, worldgen its modules.
-  The user: "we have 3 public apis for game content": the type registry
-  (initializes and freezes the set of types before the server starts),
-  the simulation/server API, and the client API (custom rendering, GUI).
-  "utilities CAN'T be used by basegame crate": what basegame took from
-  utilities (coordinates, hash, rng, the bitmap, tuning) comes through
-  simulation_api, re-exported whole for now (see COUPLINGS LEFT).
-- The process split: DONE 2026-10-17 (protocol::pipe, utilities::wire,
-  the server's --pipe, the client's server_end). Measured: ticks equal
-  idle, ~5% fewer under frames; ~23% fewer frames a second (each frame
-  copied four times on its way). Left: fewer copies if it matters;
-  tests over the pipe, only the long-lived ones shown.
-- Protocol at the bottom ("why protocol depends on simulation? it
-  should be the other way around"): DONE 2026-10-17 but the fold --
-  protocol on utilities and type_registry alone; Viewport in protocol;
-  the tick rate back in simulation ("tick rate is not protocol, is
-  simulation."); the frame carries
-  generation_numbers; the planes' readers in base_types::plane_words.
-- HEIGHTS A PLANE: DONE 2026-10-18. HEIGHT and WATER_DEPTH are
-  16-bit wide planes of base_types, hot like every plane, kept cold and
-  on disk as their bitplanes; the image has no section of its own
-  (world format 4); the frame copies them as any plane asked for, every
-  frame ("bot height and water can change, sending it once is
-  meaningless"). The world's generation writes an area through the
-  API's GeneratedArea (set, set_value) over a CellArea; worldgen keeps
-  its own copy of the hash helpers (worldgen/lots.rs: "worldgen can
-  have a copy of its helper functions from utilities").
-  protocol::pipe::frame::value_at reads a wide plane's number.
-- A lock on a world ("we need a lock file on worlds lmao. so no two
-  instances can open the same world"): world.lock in its folder, held
-  with File::try_lock while it is open or saved to; refused if held.
-
-PLAN AGREED 2026-10-16, LEFT (co-op, file by file):
-- The client crate: DONE 2026-10-17 (client/, gui and renderer its
-  modules). Left of it, with the process split: "client normally
-  doesn't receive any cli parameters ... if cli args are passed then
-  the client simply setups the correct rendering mode ... and passes
-  the arguments to server".
-- The process split: client and server binaries over pipes, "also make
-  tests use the pipes if possible"; "what we want when compiling from
-  root is bundling the server and client binaries into a single binary
-  basically" (the client relaunches its own executable as the server);
-  terrain answered over the pipe. Measured. Tests shown over the pipe:
-  "not all tests have to be visible, only the longest lived ones".
-- The diagnostics crate, from scratch: "server then instantiates a diagnosticsManager
-  or something, and gives it a handle to the simulation internals. and
-  only upon server request ... it starts doing reads to stuff".
-
-COUPLINGS LEFT (each its own pass)
-- DONE 2026-10-18 (cut, not ported: "wait, why are we fixing the old
-  renderer if we rewriting it?" -- "yes" to deleting it): the old
-  renderer and gui deleted; the client a skeleton (window.rs: an empty
-  Bevy window and its server; server_end.rs; client_api.rs), on no
-  basegame. Tuning gone from utilities (tuning.rs, sliders.csv, the
-  slider rows of default_settings.csv), protocol and the server:
-  ClientMessage::MakeWorld carries CleanServerParameters (Wired now),
-  no Reset message -- a reset is the "reset world" call. The terrain
-  path gone: protocol::pipe::terrain, the frame's drawn heights, the
-  host's terrain thread, WorldgenCode's drawn_heights/heights/map and
-  worldgen_parameters_of_tuning, basegame's terrain_asked.rs and
-  WorldGeneration::from_tuning; simulation_api's terrain and tuning
-  modules. basegame::base_types::Height its own (u16).
-- THE ROOT TESTS OFF THE SERVER'S INTERNALS ("yes, we must finish with
-  all decoupling"). My plan: the tests of the server's machinery move
-  into the server crate on its own test types; the rest kept to public
-  APIs. The user: "hmmm the plan is solid minus that world handle,
-  adding, writing and removing entities and cells already has a public
-  api. the worldgen parameters should be consulted through the worldgen
-  type libraries with setters and getters for example"; "no between
-  ticks work is allowed". So: no reads or edits of a world from
-  outside a tick -- a root test sets up and observes through rules of
-  its own bundle, run in ticks through simulation_api; worldgen
-  parameters through worldgen's calls. internals_for_root_tests and
-  World's TEMPORARY handles (bitmap_arena, entity_store, chunk_storage,
-  world_simulation, cold, halos, add_entity, remove_entity,
-  write_cells ...) deleted. DONE (2026-10-19, uncommitted at writing):
-  * THE PROBE (tests/shared/probe.rs): a rule of the root tests' own,
-    in bundle "tests first" -- registered BEFORE basegame, so it runs
-    first in a turn and its writes meet the game's first (the meal lost
-    to a decay needs that) -- on a plane of its own ("probe plane"),
-    hooked RunsEveryTick, doing on every superchunk's turn whatever the
-    test hands it for that one tick (Probe::tick with chosen rules,
-    ::alone, ::tick_rule, ::whole_tick = world.tick()). Reads come back
-    as data, sorted by superchunk; asserts are made OUTSIDE the tick (a
-    panic on a tick thread may hang the dispatcher). base() is the
-    BaseTypes of a probed world; game_base() of the game alone (host,
-    client_connection, the binary). A probe-alone tick skips every
-    entity woken in it (asleep for good): reads that must not, ride
-    along the rules' own tick (tick_rule/tick/whole_tick); a flock put
-    by worlds::one_flock_world wakes no sooner than FLOCK_SETTLES (8)
-    ticks on. Saved worlds of probed types load with
-    worlds::probe_and_base_game. Root save/load equality by
-    server::world_hash.
-  * Machinery tests moved into the server (server/tests/fast/: halos,
-    paging, world -- save format, load, types file, tiles, a folder
-    given a new world; walking, flock_over_borders; fine/entity_manager)
-    on the server's test game (server/tests/shared/test_game.rs:
-    walkers wandering scattered stone, trail, births and deaths one wake
-    in 64, KeepsTheWorldHot, its generation and rule through
-    simulation_api) and whole_worlds.rs. There, between-tick edits by
-    the server's own handles stay: they are its invariants' tests.
-  * World's handles pub(crate); simulation_api exports NEVER_WAKES (a
-    rule may want an entity asleep for good). The root's
-    sheep_never_step_through_a_wall is tests/fast/walls.rs.
-  * Items only the server's tests use are marked with the crate's idiom
-    `#[cfg_attr(not(test), allow(dead_code))] // only the crate's tests
-    ask it yet` (see OPEN: TEST-ONLY MACHINERY). Five used by nothing
-    deleted (Bucket get, two is_empty, Hot::about_entity,
-    Simulation::thread_count).
-  * The scratchpad's acts_over_a_border probe deleted: it timed the
-    second phase on raw arenas, which nothing outside the server
-    reaches now. To come back, if wanted, as a server diagnostic.
-- Left besides: the server's docs' relative links (docs paused). Then the fresh client ("after deleting the old client and
-  keeping the skeleton parts, we finish decoupling before writing more
-  client").
+- Commit and push the tier split and this file's cleanup ("and push
+  yeah").
+- STEP 3 (the mod model in code, before runtime loading), co-op file by
+  file:
+  3.1 plain types into protocol::server_types (attribute_layouts,
+      attributes, client_calls, entity, plane_widths, rule_counts,
+      simulation_time; protocol/src/server_types.rs exists, not hooked
+      up), the server and its public API using them in place of
+      re-exports. Stay in the server: SimulationTickState and the tick's
+      read and write functions, GeneratingSuperchunk and WorldgenCode
+      (server internals); in the client: RenderTurn/RenderCode (Bevy's
+      Color), GuiCode. RuleMaster waits for 3.3.
+  3.2 the builder and the kind traits in protocol, one setup walk
+      matching frozen types to the structs added by name (replacing
+      rules_of, worldgen_of, RenderRules::of, the gui gathering).
+  3.3 basegame registering through the builder; its bundles listed in
+      code until manifests.
+- STEP 4: runtime loading -- manifests, libraries opened after the
+  freeze on their side; basegame out of the binaries' dependencies.
+- STEP 5: the mod packager and the mod template; basegame on it.
+- STEP 6: per-world mods (mods/ copied at set up, basegame in or out).
+- Two binaries, client and server; src/main.rs removed; the root tests
+  into basegame's workspace ("probably move into basegame indeed").
+- ONE TRANSIENT DATA (2026-10-18): "a single unfified transient data
+  directory at the root, shared by everyone (they can have their own
+  folders inside if needed like the test saves folder)" -- the server's
+  tests still write server/transient_data/, basegame its own.
+- A lock on a world: world.lock at its folder's root, held while it is
+  open ("the lock file should be on the world folder root lol"); only
+  paging holds locks today. Pages kept inside the world folder.
+- "the client uses the same flags and parameters to start a server
+  lol": the window starts its server with --close_if_no_clients alone
+  and makes its world over the connection.
+- TYPES.CSV DRIVES LOADING: loading to walk types.csv, finding each
+  row's registration (today the game registers in its order, each type
+  taking its saved ID).
 
 WAITING ON THE USER
 - Mask / word-of-cells instructions ("this will have to wait").
@@ -1597,47 +386,40 @@ WAITING ON THE USER
 - Whether the whole-attribute compare (by sum) or the member compare is
   set_attribute's default ("both are fine by me").
 - How tile planes are kept cold: raw, or bit-planes through Tessera.
-- The user's to check: the land and worldgen's speed; whether the
-  mipmaps stop the shimmer; whether Around/Area/Window should be one
-  shape.
+- Whether Around/Area/Window should be one shape.
+- Renaming protocol (hedged, not asked).
 
 OPEN, FOUND BY ME
-- TEST-ONLY MACHINERY (2026-10-19): with the root tests on public APIs,
-  production never builds a between-ticks write (WriteOp SetCell/
-  ClearCell/FlipCell, WriteShape Rectangle/Disc, the arena's write
-  queue), the entity Instructions queue's Move/Edit/RemoveEntity,
-  World/SimulationHandle add_entity/remove_entity/write_cells, and
-  more: only the server's own tests do, to set up arenas. Marked "only
-  the crate's tests ask it yet". To the bones would have the server's
-  tests set up through ticks too and delete these; a large rewrite of
-  its tests -- not started.
-- ATOMICS (the user, 2026-10-17: "im concerned about how much atomics
-  we have in the code now"): ~46 of the program's ~53 atomic lines are
-  the applying phase's scheduler (tick/applying.rs, who_goes_on.rs,
-  following.rs) -- where the deadlock was. NOT a Mutex in their
-  place: "we want to eliminate specific syncronization primitives as
-  much as possible, like the 2 tick philosophy" -- the applying phase
-  redesigned so its order needs no handshakes, as the two phases need
-  none within. Arcs too ("sync::Arc is an atomic aint it?"): the
-  frame's Arc<Water> went with the pipe's step 2. Elsewhere: Arcs of
-  read-only data (FrozenTypes, DefaultAttributes cloned into every
-  superchunk's entities, SuperchunkImage, paths) -- most could be
-  borrows; the client's Mutex<Receiver>s (Bevy wants Sync); channels
-  between threads (host <-> client go with the pipe); the dispatcher's
-  Mutex + Condvar, the one real primitive the tick stands on.
-  The user: "the arcs as borrows atracts me if they are read only
-  stuff". Plan: (1) FrozenTypes, DefaultAttributes, Arc<Dispatcher>
-  owned once and borrowed; Arc<Path> of paged images kept once per
-  storage, jobs their own PathBuf -- one pass, measured. (2) The
-  writeback ring's Arc<SuperchunkImage>: the image moved to its flush
-  job and back -- its own step.
-- THE FLOCK DIES OUT: a long run -- the sheep rise past 150,000, the
-  grass goes to 0, the flock dies. Cause not looked for.
-- The type registry made the tick ~9% slower (2026-10-16, "no matter
-  performance right now"): suspects, the default attribute looked up in
-  a slice; TickCounts 16 rules wide.
+- TEST-ONLY MACHINERY: production never builds a between-ticks write
+  (WriteOp SetCell/ClearCell/FlipCell, WriteShape Rectangle/Disc, the
+  arena's write queue, the entity queue's Move/Edit/RemoveEntity,
+  add_entity/remove_entity/write_cells); only the server's tests do,
+  marked "only the crate's tests ask it yet". To the bones would set
+  those tests up through ticks and delete them -- not started.
+- ATOMICS ("im concerned about how much atomics we have"): most are the
+  applying phase's scheduler (tick/applying.rs, who_goes_on.rs,
+  following.rs); not a Mutex in their place: the applying phase
+  redesigned so its order needs no handshakes ("like the 2 tick
+  philosophy"). Arcs of read-only data as borrows ("the arcs as borrows
+  atracts me if they are read only stuff"): FrozenTypeRegistry,
+  DefaultAttributes, the dispatcher, paged images' paths -- one pass,
+  measured; the writeback ring's Arc<SuperchunkImage> moved to its
+  flush job and back -- its own step.
+- THE FLOCK DIES OUT on a long run (sheep past 150,000, grass to 0).
+  Cause not looked for.
+- The type registry made the tick ~9% slower (2026-10-16): suspects,
+  the default attribute looked up in a slice; TickCounts 16 rules wide.
+- A far view goes round slowly: the host copies every plane whole
+  whatever the detail level (16-bit planes 2 MB a superchunk); sending
+  planes at the detail level is the host's work to weigh.
+- Windows: engine_client.dll exports 36434 of Windows' 65535 symbols
+  with the game's Bevy features -- the way out, Bevy its own DLL.
+- A mod built against another commit of the same version loads (symbol
+  names come from -C metadata, not the source): the manifest's check, or
+  a build fingerprint, when there is something to version.
+- The window's server calls wait for the host on the main thread.
 - Simplification not yet read for: entity_manager, server, utilities,
-  chunk_storage, bitplane_manager, renderer.
+  chunk_storage, bitplane_manager.
 - Morton pathfinding: server/src/pathfinding/morton.rs, used by nothing,
   tested equal to the rows' search; left: one-way walls for it, wire
   into walking, measure both, the best wins.
@@ -1646,53 +428,36 @@ LATER (every "for later" of the user's, and mine, as said)
 - Removing a mod from a world (its names stay in types.csv, nothing
   registers them, the world refuses to load): "later we will add proper
   mod removal, another day, that requires server side cleanup we just
-  font have yet, one step at a time lol" (2026-10-24). Updates are
-  covered by names keeping their IDs: "mods survive uodate thanks to
-  types.csv, new game version, new mods for the new game version, same
-  strings".
-- A world made with no seed may have ocean where the sheep start (fit to
-  start left with seeds drawn at creation): mine -- the worldgen choosing
-  where the start is, rather than the seed chosen for it. The user: "yes
-  indeed, we need worldgen to be able to give a land starting point to
-  the server on first run to load the very first hot superchunk at
-  least. thats something we probably need to work on lol".
+  font have yet, one step at a time lol" (2026-10-24).
+- The worldgen giving the server a land start point (seeds are drawn at
+  creation, so a world may start on ocean): "yes indeed, we need
+  worldgen to be able to give a land starting point to the server on
+  first run to load the very first hot superchunk at least".
 - The mod list built on mods/ in the gui between creating a world and
   setting it up: "later we basically build the mod list on mods/ on the
-  gui between step 1 and 2. Just so you know what the concept is in the
-  future".
+  gui between step 1 and 2".
+- The client handling a new world's mod config ("later we'll make the
+  client handle that better, basically well change how worlds
+  are.created entirely").
 - keep_hot on a running world with warmings in flight shortens them to
-  now, but their jobs timed entities from the original due tick (a wake
-  could fire a wheel turn early): mine, only tests do it (World::keep_hot
-  mid-run); start and load are exact ("we do need to make as if the
-  chunks never went cold on world save/load, thats exactly why we keep
-  the list of hot chunks of world").
+  now, but their jobs timed entities from the original due tick: mine,
+  only tests do it.
 - The tick API's raw-block entry points (set_attribute_blocks,
-  make_entity taking &[AttributeBlock]) typed and by type ID, through the
-  store's builder, as the user asked for the store ("the entity store api
-  should abstract all of this and just provide the allocations for the
-  atributes and access to them in an abstract way by type id").
-- World creation as three steps, declare world, set up world, run world
-  ("existing worlds just skip straight to run basically"); the client
-  handling a new world's mod config ("later we'll make the client handle
-  that better, basically well change how worlds are.created entirely").
+  make_entity taking &[AttributeBlock]) typed and by type ID through the
+  store's builder ("the entity store api should abstract all of this");
+  attributes added and removed at run time, but the default one.
 - Reads that change frame to frame (render rules) or tick to tick
   (server rules): "we probably keep it fixed now and add dynamicity on
-  that front later if needed. simple is better now".
-- Lowering kernel.perf_event_paranoid for perf (not for callgrind, which
-  needs nothing): "in fact, i believe we can disable some kernel security
-  to get even more performance info" / "fair, well do it when needed"
-  (2026-10-23) -- until a reboot only (sysctl), when perf is needed.
-- Windows builds in the packagers (a cross build from Linux; the folder's
-  MinGW DLLs): "good job, later we can fix windows builds" (2026-10-23).
-- Debug builds in the packagers (release hardcoded for now): "adding
-  thebug build support later will not be that hard with the remaining
-  infrastructure in place" (2026-10-23).
-- Mod-defined hooks (the way one mod offers an extension point others
-  plug into, as Fabric's custom entrypoints): "mod hooks are the way,
-  for waaay later indeed" (2026-10-23).
-  No mod changes another's code: "i dont see why mods would be touching
-  anyone else compiled libraries at runtime magically. however mods will
-  be able to register hooks later, when we need them" (2026-10-24).
+  that front later if needed".
+- Windows builds in the packagers: "good job, later we can fix windows
+  builds" (2026-10-23).
+- Debug builds in the packagers: "adding thebug build support later will
+  not be that hard" (2026-10-23).
+- Mod-defined hooks (one mod's extension point others plug into): "mod
+  hooks are the way, for waaay later indeed". No mod changes another's
+  code: "i dont see why mods would be touching anyone else compiled
+  libraries at runtime magically. however mods will be able to register
+  hooks later, when we need them" (2026-10-24).
 - MOD DEVELOPMENT EASE, a goal (the user, 2026-10-24): "i want a
   relative ease of development for mods,.at least to the level of other
   games, even if we start with a disadvantage with rust on that front
@@ -1702,72 +467,43 @@ LATER (every "for later" of the user's, and mine, as said)
   and load safeguards, a mod's panic, a mod finding its own assets,
   unloading a world's mods on the client, whose rule wins a contested
   cell across mods.
-- Our CSV files (manifests, world.csv, types.csv, settings) in the
-  user's own format: "csv format will eventually be replaced with a
-  custom format that i made years ago, why? because i like to
-  complocate myself instead of using external libraries whenever
-  possible" (2026-10-23).
-- Doc comments thinned: "yeah, there is a lot of doc comments in the code
-  now, understandable for now, had to be fixed later" (2026-10-23).
-- The first shader, from scratch: "i know whats the first shader we
-  must program in, the shader for shadows and stuff, so the terrain
-  looks 3d again, we should do that one from scratch later the one we
-  had was not good enough lol" (2026-10-18). With the Shader kind, in
-  the fresh client.
+- Our CSV files in the user's own format: "csv format will eventually be
+  replaced with a custom format that i made years ago".
+- Doc comments thinned: "a lot of doc comments in the code now,
+  understandable for now, had to be fixed later".
+- The first shader, from scratch: "the shader for shadows and stuff, so
+  the terrain looks 3d again, we should do that one from scratch later".
+  Textures and texture packs later ("we dont need texture pack support
+  right now").
 - Content versions: a version or hash a bundle, for a client on another
-  machine -- names alone do not prove the same code or bytes: "dont
-  worry about content versions now, that comes later" (2026-10-18).
+  machine: "dont worry about content versions now, that comes later".
 - Registry users cast down once: "users of the registry ideally cast
-  stuff down once if needed and never again, but thats for later lol"
-  (2026-10-18). A type looked up by name in the frozen registry (its
-  RegisteredType) turned into its handle (LayerType, Attribute<L>, ...)
-  once, where it is first needed, and the handle kept from then on.
-- A reset world button, calling basegame's "reset world" call: "we
-  probably will add a "reset world" button later for that lol"
-  (2026-10-18).
-- Saving on shutdown (Ctrl-C, SIGTERM) for a server run headless: "lets
-  not do save on shutdown for now, thats scope creep we dont need right
-  now, later is better" (2026-10-18). Until then a headless world is
-  saved only as it is made (--world) or when its client asks.
-- Several clients at once ("multi client support for later date"):
-  each its own viewport and frames; who may change the world then.
-- Multiplayer beyond loopback ("not a priority by a long shot").
-- A way to measure the server again, the commands it was measured with
-  gone ("were going to add more later").
-- World's own public reads (a cell on a plane, the hot superchunks,
-  each entity); then server::internals_for_root_tests, World's
-  TEMPORARY handles and tests/shared/arenas.rs go, and every root test
-  labelled TEMPORARY is rewritten against them (the user: "Keep them
-  until World has reads"; "make sure all is labeled as temporary in the
-  code lol").
+  stuff down once if needed and never again, but thats for later lol".
+- Saving on shutdown (Ctrl-C, SIGTERM) for a headless server: "lets not
+  do save on shutdown for now, thats scope creep".
+- Several clients at once ("multi client support for later date");
+  multiplayer beyond loopback ("not a priority by a long shot").
 - A "hot" attribute on entities in place of the one hooked type ("some
-  entities will have the "hot", atribute later"); sheep stop being the
-  hot entity ("sheep won't be the hot entity for long").
-- Simulation second as a server knob ("a prime candidate for a knob
-  that csn be exposed to server"); "remember simulation-second stuff,
-  thats very important lol" (2026-10-17). One source today:
-  simulation_time::TICKS_A_SIMULATION_SECOND, the host's TARGET_PACE
-  derived from it; the client's a copy until the GUI's hooks set it. As a knob, the client learns it from
-  the server (a frame carries it), never a constant of its own.
-- Worldgen's numbers (the GUI sliders) handed to it by a registered type
-  it depends on, not by the server: "only stuff registered in the type
-  registry should be spawning stuff, if those registered stuff depend
-  on third party handles like gui sliders thats the types problem".
-- Open question: libraries for any dependent type (not only rules).
-- Crate docs, when resumed: simulation's still describe compare ends;
-  server's still describe camera flocks and sheep_per_flock.
-- Rendering test runs again: not as diagnostics ("rendering tests
-  should not be part of diagnostics"); the user has "a better idea for
-  later". The old code went with diagnostics/.
-- Tessera's diagnostics ("its the only thing that doesn't need
-  diagnostics in fact, well get to that later").
+  entities will have the "hot", atribute later"; "sheep won't be the hot
+  entity for long").
+- Simulation second as a server knob ("a prime candidate for a knob");
+  "remember simulation-second stuff, thats very important lol". The
+  client learns it from the server, never a constant of its own.
+- The climate, from scratch ("thats going to be redone from scratch");
+  grass spreads by itself meanwhile.
+- Rendering test runs again, not as diagnostics; the user has "a better
+  idea for later".
+- Tessera's diagnostics ("well get to that later"); Tessera's deep
+  clean.
+- The diagnostics crate: "server then instantiates a diagnosticsManager
+  or something, and gives it a handle to the simulation internals. and
+  only upon server request ... it starts doing reads".
 - Declined for now ("nah, there are other things to do"): fold
   SetSkipTag into its first compare's spare bits (~4% back).
-- Weather: water conserved roughly; the ocean told from lakes; lakes
-  can dry, the ocean never.
+- Crate docs, when resumed: simulation's still describe compare ends;
+  server's still describe camera flocks and sheep_per_flock.
 - Rules that sample entities as cells are sampled (maybe only dormant).
-- Mods registering their own types.
-- Tessera deep clean: settle the code, move abstraction boundaries.
 - An area allocator: 256 MiB blocks, 256-byte units.
 - Optimizations and inlining; cold states paged; page-out on the
   tick's thread.
+- Open question: libraries for any dependent type (not only rules).
