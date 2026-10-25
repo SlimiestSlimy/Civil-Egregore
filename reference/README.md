@@ -5,10 +5,12 @@ game is rewritten (2026-10-25).
 
 - `compare_and_write/`: the old server's compare-and-write builder and
   the least of its core needed to make sense of it.
-- `protocol/`: the old protocol crate, but its type registry (now the
-  `type_registry` crate at the root): the wire, the frames, the server's
+- `protocol/`: the old protocol crate, but its type registry: the wire, the frames, the server's
   parameters and shared types, the kinds.
 - `client/`: the client, as it was, built on that protocol.
+- `type_registry/`: the old type registry -- open bundles, registrations,
+  libraries, frozen, saved types -- replaced by one built from the
+  manifests (2026-10-25).
 
 Paths inside them are as they were before the move.
 

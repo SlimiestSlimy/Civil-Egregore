@@ -1,26 +1,107 @@
-//! Civil Egregore's type registry: the one `u64` namespace every type
-//! in a world is drawn from, the IDs' types, and the registry a world
-//! is given its types in ([`TypeRegistry`]), each by a name no other
-//! has. Which types: none of its own -- initialization registers them.
-//!
-//! Out of protocol (2026-10-25), on its own for a while, to be made to
-//! take what the manifest reader validates.
+//! Civil Egregore's type registry: the mods' manifests, read and checked
+//! already ([`protocol::manifests::read_mods`]), made into one flat list
+//! of types ([`TypeRegistry::of_manifests`]) -- each bundle a type too,
+//! before its own -- each with its ID and its full name. Nothing is
+//! checked here: the manifests were.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
-mod frozen_type_registry;
-mod open_bundle;
-mod registered_type;
-mod registration;
-mod saved_types;
-mod registry;
-mod type_ids;
+use protocol::kinds::{Hook, Kind};
+use protocol::manifests::Manifest;
+use protocol::type_names::{BundleName, TypeName};
 
-pub use frozen_type_registry::FrozenTypeRegistry;
-pub use registered_type::{Drawn, RegisteredType};
-pub use registration::{Declared, Hook, Library, Registration};
-pub use open_bundle::OpenBundle;
-pub use registry::{in_bundle, root_bundle_of, RegistryRefusal, TypeRegistry, BUNDLE_SEPARATOR};
-pub use type_ids::{AttributeType, BundleType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, TypeKind, ScaRuleType, WorldgenType, TYPE_ID_NUMBERS};
+/// Where an ID keeps its kind: its first byte, over its number.
+pub const KIND_SHIFT: u32 = 56;
+
+/// Numbers an ID can have: those of the seven bytes under its kind.
+pub const TYPE_ID_NUMBERS: u64 = 1 << KIND_SHIFT;
+
+/// The byte an ID of `kind` has first.
+pub fn kind_byte(kind: &Kind) -> u8 {
+    match kind {
+        Kind::Attribute { .. } => 0x00,
+        Kind::Plane { .. } => 0x01,
+        Kind::Entity { .. } => 0x02,
+        Kind::ScaProc => 0x03,
+        Kind::EntityProc { .. } => 0x04,
+        Kind::Worldgen => 0x05,
+        Kind::RenderProc { .. } => 0x06,
+        Kind::Gui { .. } => 0x07,
+        Kind::ClientCall => 0x08,
+        Kind::Bundle(_) => 0x09,
+    }
+}
+
+/// A type as the registry keeps it: its ID, its full name, its kind and
+/// its hooks.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RegisteredType {
+    /// Its ID: its kind's byte over its number.
+    type_id: u64,
+    /// Its full name: `mod>bundle` a bundle's, `mod>bundle>type` a type's.
+    full_name: String,
+    /// Its kind, and the kind's fields.
+    kind: Kind,
+    /// Its hooks.
+    hooks: Vec<Hook>,
+}
+
+impl RegisteredType {
+    /// Its ID.
+    pub fn type_id(&self) -> u64 {
+        self.type_id
+    }
+
+    /// Its full name.
+    pub fn full_name(&self) -> &str {
+        &self.full_name
+    }
+
+    /// Its kind, and the kind's fields.
+    pub fn kind(&self) -> &Kind {
+        &self.kind
+    }
+
+    /// Its hooks.
+    pub fn hooks(&self) -> &[Hook] {
+        &self.hooks
+    }
+}
+
+/// Every type of a world's mods, one flat list.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TypeRegistry {
+    /// The types, in the order given out: their numbers counting up.
+    types: Vec<RegisteredType>,
+}
+
+impl TypeRegistry {
+    /// The types of `manifests`, in their order: each mod's bundles, each
+    /// bundle first and then its types, numbered one after another from
+    /// 0 whatever their kind -- as a world's are when it is made.
+    pub fn of_manifests(manifests: &[Manifest]) -> Self {
+        let mut types = Vec::new();
+        let mut give = |full_name: String, kind: Kind, hooks: Vec<Hook>| {
+            let type_id = u64::from(kind_byte(&kind)) << KIND_SHIFT | types.len() as u64;
+            types.push(RegisteredType { type_id, full_name, kind, hooks });
+        };
+        for manifest in manifests {
+            for bundle in manifest.bundles() {
+                let bundle_name = BundleName { mod_name: manifest.name().to_string(), bundle: bundle.name().to_string() };
+                give(bundle_name.to_string(), Kind::Bundle(bundle.fields().clone()), Vec::new());
+                for bundle_type in bundle.types() {
+                    let type_name = TypeName { bundle_name: bundle_name.clone(), type_name: bundle_type.name().to_string() };
+                    give(type_name.to_string(), bundle_type.kind().clone(), bundle_type.hooks().to_vec());
+                }
+            }
+        }
+        Self { types }
+    }
+
+    /// Every type, in the order given out.
+    pub fn types(&self) -> &[RegisteredType] {
+        &self.types
+    }
+}

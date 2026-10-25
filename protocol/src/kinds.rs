@@ -1,13 +1,45 @@
 //! The kinds of types, as both the manifest says them and the type
 //! registry keeps them: one enum ([`Kind`]), each kind with its own
-//! fields, and the hooks a type of a kind may take ([`Hook`]).
+//! fields -- a bundle among them, a type too -- and the hooks a type of a
+//! kind may take ([`Hook`]).
 
-use crate::type_names::TypeName;
+use crate::type_names::{BundleName, TypeName};
+use std::path::PathBuf;
+
+/// The side a bundle's code runs on. A common bundle depends on common
+/// ones alone; a server bundle on common and server ones; a client
+/// bundle on common and client ones.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Side {
+    /// Both: client calls, and types both sides know.
+    Common,
+    /// The server.
+    Server,
+    /// The client.
+    Client,
+}
+
+/// A bundle's fields: the side its code runs on, its library and that
+/// library's hash, and the bundles it depends on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BundleFields {
+    /// The side its code runs on.
+    pub side: Side,
+    /// Its library, its path from its mod's folder.
+    pub library: PathBuf,
+    /// The library's hash ([`utilities::hash::hash_bytes`]).
+    pub library_hash: u64,
+    /// The bundles it depends on: the only ones but its own whose types
+    /// its types name.
+    pub depends_on: Vec<BundleName>,
+}
 
 /// A type's kind, and that kind's fields: each type it names there of
 /// the kind it must be.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
+    /// A bundle: what holds a mod's types.
+    Bundle(BundleFields),
     /// A plane: a number a cell, or a tile.
     Plane {
         /// Bits a number: 1, 2, 4, 8, 16 or 32.

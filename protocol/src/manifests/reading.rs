@@ -5,10 +5,10 @@
 //! needed for -- names once among them all, dependencies, references --
 //! is checked after.
 
-use super::{Bundle, Manifest, ManifestError, Side, Type};
+use super::{Bundle, Manifest, ManifestError, Type};
 use crate::cdnf::{self, Element};
-use crate::kinds::{Hook, Kind};
-use crate::type_names::{is_a_name, TypeName, NAME_SEPARATOR};
+use crate::kinds::{BundleFields, Hook, Kind, Side};
+use crate::type_names::{is_a_name, BundleName, TypeName, NAME_SEPARATOR};
 use std::path::{Path, PathBuf};
 
 /// A mod's manifest, at the root of its folder.
@@ -49,7 +49,7 @@ pub(super) fn read_manifest(mod_folder: &Path) -> Result<Manifest, ManifestError
     }
     let mut bundles: Vec<Bundle> = Vec::new();
     for bundle_section in &mod_section.sections {
-        let bundle = read_bundle(mod_folder, bundle_section).map_err(|(section, what)| refused(None, &section, what))?;
+        let bundle = read_bundle(mod_folder, &mod_section.name, bundle_section).map_err(|(section, what)| refused(None, &section, what))?;
         if bundles.iter().any(|read_before| read_before.name == bundle.name) {
             return Err(refused(None, &bundle.name, "a bundle named twice".to_string()));
         }
@@ -66,9 +66,9 @@ fn not_a_name(name: &str) -> String {
     format!("`{name}` is no name: one character or more, each of A-Z, a-z, 0-9, - and _")
 }
 
-/// The bundle `section` is, in the mod in `mod_folder`: or the section
-/// something is wrong in, and what.
-fn read_bundle(mod_folder: &Path, section: &cdnf::Section) -> Result<Bundle, (String, String)> {
+/// The bundle `section` is, in the mod `mod_name` in `mod_folder`: or
+/// the section something is wrong in, and what.
+fn read_bundle(mod_folder: &Path, mod_name: &str, section: &cdnf::Section) -> Result<Bundle, (String, String)> {
     let in_bundle = |what: String| (section.name.clone(), what);
     if !is_a_name(&section.name) {
         return Err(in_bundle(not_a_name(&section.name)));
@@ -85,7 +85,7 @@ fn read_bundle(mod_folder: &Path, section: &cdnf::Section) -> Result<Bundle, (St
                 let (Element::Text(type_name), Element::List(items)) = (&**left, &**right) else {
                     return Err(in_bundle("a type is its name paired with the list of its fields".to_string()));
                 };
-                let read_type = read_type(&section.name, type_name, items).map_err(|what| (format!("{}{NAME_SEPARATOR}{type_name}", section.name), what))?;
+                let read_type = read_type(&BundleName { mod_name: mod_name.to_string(), bundle: section.name.clone() }, type_name, items).map_err(|what| (format!("{}{NAME_SEPARATOR}{type_name}", section.name), what))?;
                 if types.iter().any(|read_before| read_before.name == read_type.name) {
                     return Err(in_bundle(format!("a type named twice: {type_name}")));
                 }
@@ -101,13 +101,13 @@ fn read_bundle(mod_folder: &Path, section: &cdnf::Section) -> Result<Bundle, (St
     let library_hash_said = (hash_text.len() == 16).then(|| u64::from_str_radix(hash_text, 16).ok()).flatten().ok_or_else(|| in_bundle(format!("hash: 16 hexadecimal digits, not `{hash_text}`")))?;
     let mut depends_on = Vec::new();
     for dependency in fields.optional_list("depends on").map_err(in_bundle)? {
-        let Element::Text(bundle_name) = dependency else {
+        let Element::Text(dependency_text) = dependency else {
             return Err(in_bundle("depends on: a list of bundles' names".to_string()));
         };
-        if !is_a_name(bundle_name) || depends_on.contains(bundle_name) {
-            return Err(in_bundle(format!("depends on: `{bundle_name}` no name, or said twice")));
+        match BundleName::read(mod_name, dependency_text) {
+            Some(bundle_name) if !depends_on.contains(&bundle_name) => depends_on.push(bundle_name),
+            _ => return Err(in_bundle(format!("depends on: `{dependency_text}` names no bundle -- its name, or its mod's, {NAME_SEPARATOR} and its own -- or is said twice"))),
         }
-        depends_on.push(bundle_name.clone());
     }
     fields.none_left("a bundle").map_err(in_bundle)?;
     if let Some(off_side) = types.iter().find(|bundle_type| side_of(&bundle_type.kind) != side) {
@@ -119,12 +119,12 @@ fn read_bundle(mod_folder: &Path, section: &cdnf::Section) -> Result<Bundle, (St
     if library_hash_found != library_hash_said {
         return Err(in_bundle(format!("library {}: its hash is {library_hash_found:016x}, the manifest says {library_hash_said:016x}", library.display())));
     }
-    Ok(Bundle { name: section.name.clone(), side, library, library_hash: library_hash_said, depends_on, types })
+    Ok(Bundle { name: section.name.clone(), fields: BundleFields { side, library, library_hash: library_hash_said, depends_on }, types })
 }
 
 /// The type named `type_name` in the bundle `bundle_name`, its fields
 /// `items`.
-fn read_type(bundle_name: &str, type_name: &str, items: &[Element]) -> Result<Type, String> {
+fn read_type(bundle_name: &BundleName, type_name: &str, items: &[Element]) -> Result<Type, String> {
     if !is_a_name(type_name) {
         return Err(not_a_name(type_name));
     }
@@ -173,14 +173,10 @@ fn read_type(bundle_name: &str, type_name: &str, items: &[Element]) -> Result<Ty
     Ok(Type { name: type_name.to_string(), kind, hooks })
 }
 
-/// The type `text` names, from the bundle `bundle_name`: its name alone,
-/// of the bundle, or its bundle's, [`NAME_SEPARATOR`] and its own.
-fn type_name_of(bundle_name: &str, text: &str) -> Result<TypeName, String> {
-    let (bundle, type_name) = text.split_once(NAME_SEPARATOR).unwrap_or((bundle_name, text));
-    if !is_a_name(bundle) || !is_a_name(type_name) {
-        return Err(format!("`{text}` names no type: a name, or a bundle's, {NAME_SEPARATOR} and a type's"));
-    }
-    Ok(TypeName { bundle: bundle.to_string(), type_name: type_name.to_string() })
+/// The type `text` names, from the bundle `bundle_name`
+/// ([`TypeName::read`]).
+fn type_name_of(bundle_name: &BundleName, text: &str) -> Result<TypeName, String> {
+    TypeName::read(bundle_name, text).ok_or_else(|| format!("`{text}` names no type: its name, or its bundle's and its own, or its mod's, its bundle's and its own, {NAME_SEPARATOR} between each"))
 }
 
 /// The number `text` is.
@@ -201,6 +197,7 @@ fn word<T: PartialEq>(words: &[(T, &'static str)], meant: T) -> &'static str {
 /// A kind's word, as a manifest says it.
 fn kind_word(kind: &Kind) -> &'static str {
     match kind {
+        Kind::Bundle(_) => "bundle",
         Kind::Plane { .. } => "plane",
         Kind::Entity { .. } => "entity",
         Kind::Attribute { .. } => "attribute",
@@ -216,6 +213,7 @@ fn kind_word(kind: &Kind) -> &'static str {
 /// The side a type of `kind` is in a bundle of.
 fn side_of(kind: &Kind) -> Side {
     match kind {
+        Kind::Bundle(fields) => fields.side,
         Kind::Plane { .. } | Kind::Attribute { .. } | Kind::ClientCall => Side::Common,
         Kind::Entity { .. } | Kind::EntityProc { .. } | Kind::ScaProc | Kind::Worldgen => Side::Server,
         Kind::RenderProc { .. } | Kind::Gui { .. } => Side::Client,

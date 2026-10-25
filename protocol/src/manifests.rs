@@ -1,13 +1,13 @@
 //! The mods' manifests, read and checked: each mod's `manifest.cdnf`
 //! read as CDNF, checked as a manifest -- its shape, every field, every
 //! name, each library's hash -- and then all of them together: every
-//! name once, every dependency there and none in a ring, every type
-//! named where its bundle may name it. What comes out ([`Manifest`])
+//! mod's name once, every dependency there and none in a ring, every
+//! type named where its bundle may name it. What comes out ([`Manifest`])
 //! only this module makes, so the type registry made of them checks
 //! nothing. A type is of a kind, said as the registry says it
 //! ([`crate::kinds`]).
 
-use crate::kinds::{Hook, Kind};
+use crate::kinds::{BundleFields, Hook, Kind};
 use std::path::{Path, PathBuf};
 
 mod across_mods;
@@ -52,70 +52,34 @@ impl Manifest {
     }
 }
 
-/// A bundle: its name -- no other bundle's, of any mod -- the side its
-/// code runs on, its library and that library's hash, the bundles it
-/// depends on, and its types, in the order written.
+/// A bundle: its name -- no other bundle's of its mod -- its fields, and
+/// its types, in the order written.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Bundle {
-    /// Its name.
+    /// Its name, in its mod.
     name: String,
-    /// The side its code runs on.
-    side: Side,
-    /// Its library, its path from the mod's folder.
-    library: PathBuf,
-    /// The library's hash, as the manifest gives it and the file has it
-    /// ([`utilities::hash::hash_bytes`]).
-    library_hash: u64,
-    /// The bundles it depends on, by name: the only ones whose types
-    /// its types name.
-    depends_on: Vec<String>,
+    /// Its fields: its side, its library and that library's hash, and
+    /// the bundles it depends on.
+    fields: BundleFields,
     /// Its types.
     types: Vec<Type>,
 }
 
 impl Bundle {
-    /// Its name.
+    /// Its name, in its mod.
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// The side its code runs on.
-    pub fn side(&self) -> Side {
-        self.side
-    }
-
-    /// Its library, its path from the mod's folder.
-    pub fn library(&self) -> &Path {
-        &self.library
-    }
-
-    /// The library's hash.
-    pub fn library_hash(&self) -> u64 {
-        self.library_hash
-    }
-
-    /// The bundles it depends on, by name.
-    pub fn depends_on(&self) -> &[String] {
-        &self.depends_on
+    /// Its fields.
+    pub fn fields(&self) -> &BundleFields {
+        &self.fields
     }
 
     /// Its types, in the order written.
     pub fn types(&self) -> &[Type] {
         &self.types
     }
-}
-
-/// The side a bundle's code runs on. A common bundle depends on common
-/// ones alone; a server bundle on common and server ones; a client
-/// bundle on common and client ones.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Side {
-    /// Both: client calls, and types both sides know.
-    Common,
-    /// The server.
-    Server,
-    /// The client.
-    Client,
 }
 
 /// A type: its name -- no other type's in its bundle -- its kind, and

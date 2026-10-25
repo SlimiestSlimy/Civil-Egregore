@@ -1,7 +1,10 @@
 [package]
 name = "type_registry"
 edition = "2024"
-description = "Civil Egregore's type registry: the one u64 namespace every type in a world is drawn from, its IDs' kinds, and the registry a world's types are given in -- out of protocol, on its own for a while"
+description = "Civil Egregore's type registry: the mods' manifests, checked already, made into one flat list of types, each with its ID and its full name"
 
 [dependencies]
+protocol = { path = "../protocol" }
+
+[dev-dependencies]
 utilities = { path = "../utilities" }

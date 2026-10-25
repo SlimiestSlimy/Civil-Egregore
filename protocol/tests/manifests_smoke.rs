@@ -2,10 +2,10 @@
 //! together -- their libraries files of their own, hashed as their
 //! manifests say.
 
-use protocol::kinds::{Hook, Kind};
-use protocol::manifests::{read_mods, Side, MANIFEST_FILE};
+use protocol::kinds::{Hook, Kind, Side};
+use protocol::manifests::{read_mods, MANIFEST_FILE};
 use utilities::hash::hash_bytes;
-use protocol::type_names::TypeName;
+use protocol::type_names::{BundleName, TypeName};
 use std::path::{Path, PathBuf};
 
 /// A mod's folder made in the test's own, its libraries -- each its
@@ -23,9 +23,14 @@ fn mod_made(test_folder: &Path, mod_name: &str, libraries: &[(&str, &[u8])], man
     mod_folder
 }
 
-/// The type `type_name` of the bundle `bundle`.
-fn named(bundle: &str, type_name: &str) -> TypeName {
-    TypeName { bundle: bundle.to_string(), type_name: type_name.to_string() }
+/// The bundle `bundle` of the mod `mod_name`.
+fn bundle_named(mod_name: &str, bundle: &str) -> BundleName {
+    BundleName { mod_name: mod_name.to_string(), bundle: bundle.to_string() }
+}
+
+/// The type `type_name` of the bundle `bundle` of the mod `mod_name`.
+fn named(mod_name: &str, bundle: &str, type_name: &str) -> TypeName {
+    TypeName { bundle_name: bundle_named(mod_name, bundle), type_name: type_name.to_string() }
 }
 
 /// Two mods, one depending on the other's common bundle, read as
@@ -81,7 +86,7 @@ world_generation :
 - library : libdrawn.so
 - hash : {libdrawn.so}
 - depends on :
-- base_common
+- base>base_common
 
 
 grass_drawn :
@@ -98,13 +103,13 @@ main_window :
     let [base_manifest, drawn_manifest] = manifests.as_slice() else { panic!("two mods") };
     assert_eq!((base_manifest.name(), drawn_manifest.name()), ("base", "drawn"));
     let server = &base_manifest.bundles()[1];
-    assert_eq!((server.name(), server.side(), server.depends_on()), ("base_server", Side::Server, &["base_common".to_string()][..]));
-    assert_eq!(server.library_hash(), hash_bytes(b"server bytes"));
+    assert_eq!((server.name(), server.fields().side, &server.fields().depends_on[..]), ("base_server", Side::Server, &[bundle_named("base", "base_common")][..]));
+    assert_eq!(server.fields().library_hash, hash_bytes(b"server bytes"));
     let sheep = &server.types()[0];
-    assert_eq!((sheep.kind(), sheep.hooks()), (&Kind::Entity { default_attribute: Some(named("base_common", "sheep_data")) }, &[Hook::KeepsTheWorldHot][..]));
+    assert_eq!((sheep.kind(), sheep.hooks()), (&Kind::Entity { default_attribute: Some(named("base", "base_common", "sheep_data")) }, &[Hook::KeepsTheWorldHot][..]));
     assert_eq!(base_manifest.bundles()[0].types()[0].kind(), &Kind::Plane { width_bits: 4, tile_size: 8 });
     let client = &drawn_manifest.bundles()[0];
-    assert_eq!((client.side(), client.types()[0].kind(), client.types()[1].hooks()), (Side::Client, &Kind::RenderProc { draw_order: 3 }, &[Hook::ShownByDefault][..]));
+    assert_eq!((client.fields().side, client.types()[0].kind(), client.types()[1].hooks()), (Side::Client, &Kind::RenderProc { draw_order: 3 }, &[Hook::ShownByDefault][..]));
 
     let wrong_side = mod_made(&test_folder, "wrong_side", &[("libwrong.so", b"wrong bytes")], "\
 :wrong_side:
@@ -114,9 +119,9 @@ main_window :
 - library : libwrong.so
 - hash : {libwrong.so}
 - depends on :
-- base_server
+- base>base_server
 ");
     let refusal = read_mods(&[base, drawn, wrong_side]).expect_err("a client bundle on a server one");
-    assert!(refusal.what.contains("depends on base_server"), "{refusal}");
+    assert!(refusal.what.contains("depends on base>base_server"), "{refusal}");
     _ = std::fs::remove_dir_all(&test_folder);
 }

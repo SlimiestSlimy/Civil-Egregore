@@ -440,7 +440,25 @@ NOW
   planes. not just one. and sca procs are sampled automatically, entity
   rules need to list their entities because entities work on wakeup
   semantics, ao the server needs to know what to run for a given entity
-  on a wakeup, think of it as hooking procs to entities lol"; client -- render rule,
+  on a wakeup, think of it as hooking procs to entities lol";
+  FULL NAMES (2026-10-25): "names have to be mod>bundle>type, because
+  across mods bundle names may repeat. the mod name is the widest
+  namespace layer that cannot collide never, however only bundles are
+  types, a mod is just a namespace and a container basically". In a
+  manifest: type alone in its bundle, bundle>type in its mod,
+  mod>bundle>type from another; depends on: bundle, or mod>bundle.
+  Kind::Bundle(BundleFields) in kinds (Side there too).
+- THE REGISTRY (2026-10-25): "once the vec of manifests is handed to type
+  registry, it means it passed all validations. and the type registry
+  basically juat copies the manifests data into a flat lists of types
+  with assigned ids and their full strings per type (including bundles,
+  those are also types/kinds) / no checks needed, all data is assumed
+  valid" / "Basically is just the "making the flat list with ids and
+  full qualified string names for everything" and thats it. because the
+  next step would be loading and downcasting, which we need real mods to
+  make first". IDs in order, fresh: "because at world creation this same
+  process is what runs the first time to make types.csv"; one counter
+  for all kinds, the kind's byte over it. client -- render rule,
   gui. Attributes: their size alone ("instead of "blocks" it should be
   "size""), in 16-byte blocks, 1 to 256 ("yes, it should've been like
   this from the beggining lol"), data words gone -- "atributes have a

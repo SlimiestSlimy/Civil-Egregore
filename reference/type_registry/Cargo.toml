@@ -1,0 +1,7 @@
+[package]
+name = "type_registry"
+edition = "2024"
+description = "Civil Egregore's type registry: the one u64 namespace every type in a world is drawn from, its IDs' kinds, and the registry a world's types are given in -- out of protocol, on its own for a while"
+
+[dependencies]
+utilities = { path = "../utilities" }
