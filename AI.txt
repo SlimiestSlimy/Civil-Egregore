@@ -375,6 +375,96 @@ NOW
   is out of protocol already (type_registry/, as it was, saved_types
   still on utilities::csv); protocol and the client archived in
   reference/, the Bevy lines the client needs kept in reference/README.md.
+- THE MANIFEST, settled so far (2026-10-25): written in CDNF, the user's
+  own "Colon Dash and Newline Format" (example.cdnf at the root). A mod
+  declares only its name for now ("yes all of that later. for now just a
+  name lol"). Flat: "keep it flat yes, a mod now is a bundle container
+  basically". Libraries checked by the file's hash: "hashing of the file
+  bro validation is not loading and we dont need it to be lol". Every
+  type says its kind and that kind's fields: "how do we know the kind
+  otherwise? every kind needs to register different data". Fields are
+  list items ("yup, lists"): a pair's right side is a text body, which
+  runs on over contiguous lines. "bundles are sections yes, but types are
+  just a string with a paired list". "hooks is another nested list,
+  listing the hooks for that thing. later the manifest crate verifies the
+  correct hooks per kind". "library paths relative by to the manifest by
+  default". The kinds and their fields, "yea": plane (width, tile size),
+  entity (default attribute optional, rule), attribute (blocks, data
+  words), entity proc, sca proc, worldgen, client call (none), render
+  rule (draw order), gui (parent optional). Masters gone.
+  "cdnf just parses the file, so ita cdnf valid, manifest verifies its
+  registry valid before any registry ever touches it" -- the hooks per
+  kind checked there. THE CHAIN: "the result of a manifest check is a
+  safemanifest, which is converted into a typeregistry (what was a
+  frozen registry before) which then is what loads the libraries and is
+  passed to server or client or watever" -- no open registry phase.
+  Why not one step: "separating it like this basically makes sure the
+  code is very decoupled, manifest checks validity of manifest totally,
+  registry is simply in charge of loading and providing, and can omit
+  all checks since manifest does them first". The checks across mods
+  (dependencies, cycles, references, unique names) are the manifest's
+  too ("yea thats manifest"). Sides: "common is basically to define
+  client calls or common types and everything else is best done on
+  client or server" -- common on common only, server on common and
+  server, client on common and client.
+  NAMES: "we use string in the same manner, but instead of using double
+  colon we use > / so sheepbundle>sheep is the ship string from outside
+  the sheepbundle, inaide the sheep bundle is only sheep the only
+  characters allowed on type string are Aa-Zz 0-9 - or _". Mod and
+  bundle names too ("yes"). Reach: "only dependecies explicitly listed
+  may be used" -- a type names types of its own bundle, or of a bundle
+  its bundle lists in depends on, never further.
+- THE NEW PROTOCOL (2026-10-25): "lets actually drop "safe" from manifest
+  wording lol" / "instead of having a custom enum, we now make the
+  protocol crate, and fold both manifest and cdnf into protocol, we add
+  another module into protocol called kinds, and there we define the
+  kinds, this kinds types will be equivalent on the type registry and on
+  the manifest". protocol/ (fresh; the old one in reference/protocol):
+  cdnf, kinds (Kind, Hook), manifest (Manifest, Bundle, Type, Side,
+  ManifestError), type_names (TypeName, NAME_SEPARATOR, is_a_name).
+  Next: manifest's reading and across-mods checks, then the registry
+  made of Manifests, its own kind enums replaced by protocol::kinds.
+  Kinds per side ("1 yes"): common -- plane, attribute, client call;
+  server -- entity, entity proc, sca proc, worldgen ("entities are
+  something very specifically server side, as rules are as well" / "what
+  i said is common has common types, i dont recall saying entities
+  specifically"); "rules come in 2 specific types, entity rules or sca rules
+  specifically (or render rules of course, ignored for now), there are no
+  plain "rules""; and then: "lets take a moment while the code is smalk and
+  rename rule/rules to proc/procs if it doesn't conflict with anything
+  like macros or watever lol" -- EntityProc, ScaProc, RenderProc; an
+  entity's field "entity proc" first, then turned round: "this means
+  rules list the entity to be run on, which also means entities can have
+  multipke rules which we also need for future stuff" -- an entity proc's
+  field "entity", the entity none; sca procs name nothing: "sca procs can work across many
+  planes. not just one. and sca procs are sampled automatically, entity
+  rules need to list their entities because entities work on wakeup
+  semantics, ao the server needs to know what to run for a given entity
+  on a wakeup, think of it as hooking procs to entities lol"; client -- render rule,
+  gui. Attributes: their size alone ("instead of "blocks" it should be
+  "size""), in 16-byte blocks, 1 to 256 ("yes, it should've been like
+  this from the beggining lol"), data words gone -- "atributes have a
+  fixed size btw, no variable size anymore. variably sized data will be
+  elsewhere later".
+- CDNF (the cdnf crate, 2026-10-25, its parser: "cdnf crate"): sections
+  -- a colon at a line's start, as many closing, deeper by one colon,
+  none skipped, a single colon not required and any number of them;
+  elements -- text bodies (contiguous text, ended by a blank line, a
+  dash, a section or a colon: "only double newline ia significant to end
+  a text body, a single line is part of it"), lists (dashes at a line's
+  start, blank lines between items allowed), pairs ("at the beggining of
+  line is a section / at the middle or end of line is a pair with
+  watever next element, there is no real distinction"; a b c is a (b c);
+  blank lines before the next element allowed; "- a :" then "- b" is "a
+  list inside a pair element inside a list"; "a triple newline terminates
+  a list always, thats the only list special case" -- the innermost
+  open, so a nested list ends and the one it is in goes on); quotes ("when a new
+  element is expected, we can either parse a quoted text, or something
+  else"), \" and \\ escaped; # comments; indentation means nothing; a
+  comment-only line is no line at all. A tokenizer, then the parser
+  ("i would make a tokenizer instead of going byte by byte"); one smoke
+  test ("we dont need too much testing").
+
 - ON HOLD with the server gone: basegame as a mod and step 3 below, as
   written before the cleanup -- the plan's reasoning kept, its code
   removed.
@@ -493,6 +583,8 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- Variably sized data, out of attributes: "variably sized data will be
+  elsewhere later" (2026-10-25).
 - Positionless entities: "i actually have another plan for positionless
   entities dont worry about it for now" (2026-10-24). Position stays an
   entity's primary addressing ("entities primary addresing method is

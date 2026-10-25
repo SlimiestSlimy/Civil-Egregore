@@ -1,0 +1,46 @@
+before any section
+on two lines
+
+:first:
+name : smoke   # a comment after a pair
+
+a : b : c
+
+a body
+# a comment alone is no line
+goes on : and its pair
+        indented lines
+    read alike
+
+::lists::
+items:
+- one
+- two : paired
+
+- three
+  on two lines
+- nested :
+- inner one
+- inner two
+
+
+- back in the outer list
+- nested again :
+- inner three
+
+
+
+after the list
+
+:::deeper:::
+key :
+
+value after a blank line
+
+::quotes::
+"a quoted key: with a colon" : "a value
+on two lines, \"escaped\" and C:\games\\"
+he said "hi" : a quote mid-text is text
+
+:second:
+- last

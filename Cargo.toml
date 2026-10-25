@@ -4,6 +4,7 @@
 [workspace]
 members = [
     "utilities",
+    "protocol",
     "type_registry",
     "game_packager",
     "AI_SCRATCHPAD",

@@ -1,0 +1,7 @@
+[package]
+name = "protocol"
+edition = "2024"
+description = "What every part of the game shares: the kinds of types, the mods' manifests read and checked, and CDNF, the format they are written in"
+
+[dependencies]
+utilities = { path = "../utilities" }

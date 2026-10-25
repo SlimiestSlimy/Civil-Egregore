@@ -1,8 +1,9 @@
 //! Hashing, three ways: a key to its slot in a table whose size is a
 //! power of two -- Fibonacci hashing, one multiplication -- a word's bits
 //! mixed so every bit of it moves every bit of the result -- SplitMix64's
-//! finalizer, what [`crate::rng`] draws with -- and many words folded
-//! into one ([`fold_word`]), the same on every machine.
+//! finalizer, what [`crate::rng`] draws with -- and many words, or
+//! bytes, folded into one ([`fold_word`], [`hash_bytes`]), the same on
+//! every machine.
 
 /// 2^64 over the golden ratio, odd: multiplying by it spreads a key's
 /// low bits into the high ones, which [`slot`] keeps. SplitMix64 steps
@@ -43,4 +44,19 @@ pub const fn fold_word(running_hash: u64, word: u64) -> u64 {
 /// the same words split elsewhere.
 pub fn fold_all(running_hash: u64, words: &[u64]) -> u64 {
     words.iter().fold(fold_word(running_hash, words.len() as u64), |folded_hash, &word| fold_word(folded_hash, word))
+}
+
+/// The hash of `bytes`, the same on every machine: how many they are
+/// folded first, then each eight of them as a word, the lowest byte
+/// first, the last word's bytes past the end zeros -- the count telling
+/// apart bytes that only differ by zeros at their end.
+pub fn hash_bytes(bytes: &[u8]) -> u64 {
+    let (whole_words, last_bytes) = bytes.as_chunks::<8>();
+    let whole_hash = whole_words.iter().fold(fold_word(0, bytes.len() as u64), |folded_hash, &word_bytes| fold_word(folded_hash, u64::from_le_bytes(word_bytes)));
+    if last_bytes.is_empty() {
+        return whole_hash;
+    }
+    let mut padded_word = [0; 8];
+    padded_word[..last_bytes.len()].copy_from_slice(last_bytes);
+    fold_word(whole_hash, u64::from_le_bytes(padded_word))
 }
