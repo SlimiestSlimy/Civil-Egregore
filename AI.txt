@@ -119,15 +119,18 @@ Boundaries, asked first, would have put that on the table.
 == SETTLED (in force) ==
 
 THE TREE
-- THE ROOT: crates server, client, protocol, utilities, game_packager,
-  AI_SCRATCHPAD (mine; nothing depends on it) in the root workspace;
-  basegame and tessera workspaces of their own ("keep in mind tessrra is
-  its own isolated project"; basegame "built and tested in its folder
-  like a mod", the root package still depending on it by path until mods
-  load at runtime). Folders inside a crate are modules, not crates ("we
-  cant have utilities/utilities"). Plus src/ and tests/ (the root
-  program and its tests, until they go -- TO DO), docs/,
-  transient_data/.
+- THE ROOT (since the cleanup, 2026-10-25): a virtual workspace --
+  utilities (the old one, kept as reference but built: "we are also
+  keeping the old utilities as reference" / "but they can compile juat
+  fine so leave them be for now"), type_registry (out of protocol, "for
+  a while", isolated), game_packager (stale), AI_SCRATCHPAD (mine, empty;
+  nothing depends on it) -- the version in [workspace.package]; tessera a
+  workspace of its own ("keep in mind tessrra is its own isolated
+  project"); reference/ (not built: compare_and_write/, protocol/,
+  client/ -- "juat archive client and protocol on reference straight
+  up"); docs/design_statements.md alone of the docs; transient_data/.
+  Folders inside a crate are modules, not crates ("we cant have
+  utilities/utilities"). Next: manifest/.
 - LAYERS: utilities, then protocol, then server and client, then mods.
   "utilities and protocol are.the shared libraries" / "(utilities a
   level down on protocol of course)"; protocol is not the wire alone:
@@ -344,6 +347,37 @@ MODS AND THE GAME FOLDER
 == TO DO ==
 
 NOW
+- THE CLEANUP (2026-10-25), after the exp-newserver branch's rewrite:
+  "this experument told me something, we need to rewrite a lot of stuff
+  from scratch, but we need to follow another direction this time. were
+  going to cleanup all main code except a few specific things: type
+  registry core code / client (were basically not going to touch it) /
+  the compare and write builder and a minimal amount of core logic to
+  make sense of it later" / "utilities do stay lol. keep the client on
+  life support otherwise" / "this also means deleting basically all
+  docs" / "tessera stays as well". The builder to a reference folder;
+  root src/ and tests/, docs/ deleted with server and basegame; on main,
+  exp-newserver kept as is. Decided on my own: protocol whole kept (the
+  client builds on its pipe, parameters and world types; "protocol's
+  server parts" was not picked to go); docs/design_statements.md kept
+  (the user's file); game_packager kept, stale (it packages
+  Civil_Egregore and libserver); AI_SCRATCHPAD emptied of its probes.
+- THE OTHER DIRECTION (2026-10-25): "were going to make a new moduke on
+  root called manifest, which will be the reader of the manifest, then
+  were going to take the type registry out of the protocol (for a while)
+  so its isolated and make it consume the manifest output". "manifest is
+  just a parser to give everything validated to the type registry, its
+  checks are completely external side looking, checking that a manifest
+  is valid, that the libraries match whats in the manifest. the type
+  registry simply recieves a list of safemanifests the validated
+  structure of a mod". "we're not uaing csv this time its over for csv".
+  The format: "Fresh, discussed first". Co-op file by file. The registry
+  is out of protocol already (type_registry/, as it was, saved_types
+  still on utilities::csv); protocol and the client archived in
+  reference/, the Bevy lines the client needs kept in reference/README.md.
+- ON HOLD with the server gone: basegame as a mod and step 3 below, as
+  written before the cleanup -- the plan's reasoning kept, its code
+  removed.
 - BASEGAME AS A MOD, the 0.7 milestone ("nvm its going to be 0.7", after
   "probably the 0.8 milestone"), with the public API's freeze; what is left (asked 2026-10-24, "to remember lol"):
   3.1's last two files; 3.2 the builder and kind traits (the design, the

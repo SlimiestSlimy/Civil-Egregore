@@ -6,7 +6,4 @@ description = "The AI's own scratchpad: probes of Civil Egregore, questions aske
 # NOTHING DEPENDS ON THIS CRATE: it is no part of the program, and may be
 # deleted whole without anything else changing.
 [dependencies]
-server = { path = "../server" }
 utilities = { path = "../utilities" }
-protocol = { path = "../protocol" }
-basegame = { path = "../basegame" }

@@ -1,61 +1,24 @@
-[package]
-name = "Civil_Egregore"
-version = "0.6.5293"
-edition = "2024"
-description = "Nudges to Civilization."
-authors = ["SlimiestSlimy", "Opus 5.5 high"]
-repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
-
-[dependencies]
-basegame = { path = "basegame" }
-client = { path = "client" }
-protocol = { path = "protocol" }
-server = { path = "server" }
-utilities = { path = "utilities" }
-
-[features]
-# `--features force_default_settings`: run on the built-in defaults
-# (`utilities/force_default_settings.csv`), ignoring the machine's `settings.csv`.
-force_default_settings = ["utilities/force_default_settings", "client/force_default_settings"]
-
 # Every crate of Civil Egregore's engine, built together: one lock file and one `target/`
 # for them all, here, whichever crate's folder cargo is run from.
-# `cargo test` here tests every one: `cargo run --release` opens the window. Tessera's external
-# benchmarks stay a workspace of their own, so the codecs they compare
-# against never enter this build.
+# Tessera is a project of its own, with its own workspace and tests.
 [workspace]
 members = [
-    "protocol",
     "utilities",
-    "client",
-    "server",
+    "type_registry",
     "game_packager",
     "AI_SCRATCHPAD",
 ]
+exclude = ["tessera"]
+resolver = "3"
 
-default-members = [
-    ".",
-    "protocol",
-    "utilities",
-    "client",
-    "server",
-]
-# Tessera is a project of its own, with its own workspace and tests; the
-# base game too, built as a mod is, apart from the engine.
-exclude = ["tessera", "basegame"]
-
-[workspace.dependencies]
-# Bevy for the window, the drawing, the menus and the keys only: no 3D, no
-# audio. Its Feathers widgets are what the gui types are built of. One
-# version for every crate, the base game's (its own workspace's) too.
-bevy = { version = "0.19", default-features = false, features = ["2d", "ui", "bevy_feathers"] }
+# The game's one version.
+[workspace.package]
+version = "0.6.5293"
+edition = "2024"
+authors = ["SlimiestSlimy", "Opus 5.5 high"]
+repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 
 # Lines kept for the profilers -- perf, callgrind -- which say nothing
 # useful without them; they cost no speed.
 [profile.release]
 debug = "line-tables-only"
-
-# Bevy unoptimized is too slow to watch, even while the renderer itself is
-# being worked on.
-[profile.dev.package.bevy]
-opt-level = 3
