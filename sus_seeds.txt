@@ -1,0 +1,2 @@
+0xdc673f1b8424814e
+fails server test every_attribute_is_found_over_those_of_any_length on untouched code: an entity type ID read as an attribute header parses as kind 0x00 (attribute) when its low nibble is 0

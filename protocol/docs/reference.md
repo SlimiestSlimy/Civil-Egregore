@@ -1,5 +1,7 @@
 # protocol: reference
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 ## flags.rs
 
 **`CommandLineToken`**: `OpeningBracket`, `ClosingBracket`, `Flag`,

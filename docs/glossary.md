@@ -1,5 +1,7 @@
 # Civil Egregore's glossary
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 Every word the code and the docs use for a thing of Civil Egregore's own: what
 it means, and what it relates to. One word is one thing, everywhere --
 in type names, function names, variables, comments and docs. A word

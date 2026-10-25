@@ -1,9 +1,9 @@
 //! What a client asks of the world's viewport ([`FrameAsk`]) and what it is
 //! answered with ([`ViewportFrame`]): the hot superchunks asked for, each
 //! copied as a tick left it and nothing more -- the planes asked for, by
-//! their layer types, whatever they are: the server names none.
+//! their plane types, whatever they are: the server names none.
 
-use crate::type_registry::{EntityType, LayerType};
+use crate::type_registry::{EntityType, PlaneType};
 use utilities::wire::{WireReader, Wired, WiredStruct};
 
 /// Words a chunk's bitmap takes.
@@ -43,7 +43,7 @@ impl Viewport {
 /// What a client wants of the world, one frame: some of the hot
 /// superchunks of its viewport -- as many as a frame may carry, the
 /// client going round them frame after frame -- how finely it will
-/// draw them, which of their planes, and which layers counted over the
+/// draw them, which of their planes, and which planes counted over the
 /// whole world.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct FrameAsk {
@@ -61,24 +61,24 @@ pub struct FrameAsk {
     /// picture, a cell many pixels. Passed on in the frame.
     pub seen_near: Option<NearRectangle>,
     /// The planes of each superchunk sent ([`Cells::planes`]), in this order.
-    pub planes: Vec<LayerType>,
-    /// The layers whose cells are counted over every hot superchunk
+    pub planes: Vec<PlaneType>,
+    /// The planes whose cells are counted over every hot superchunk
     /// ([`ViewportFrame::counts`]), in this order.
-    pub counted: Vec<LayerType>,
+    pub counted: Vec<PlaneType>,
 }
 
-/// A layer type on the wire: its ID, then its shape -- bits a cell and
-/// tiles' scale -- in a word.
-impl Wired for LayerType {
+/// A plane type on the wire: its ID, then its shape -- its width's bits
+/// and its tile size's scale -- in a word.
+impl Wired for PlaneType {
     fn put(&mut self, words: &mut Vec<u64>) {
-        words.extend([self.type_id(), u64::from(self.width_bits()) << 32 | u64::from(self.tile_scale())]);
+        words.extend([self.type_id(), u64::from(self.width().bits()) << 32 | u64::from(self.tile_size().scale())]);
     }
 
     fn take(&mut self, wire: &mut WireReader) -> Option<()> {
         let (mut type_id, mut shape) = (0u64, 0u64);
         type_id.take(wire)?;
         shape.take(wire)?;
-        *self = LayerType::of_id_and_shape(type_id, (shape >> 32) as u32, shape as u32)?;
+        *self = PlaneType::of_id_and_shape(type_id, (shape >> 32) as u32, shape as u32)?;
         Some(())
     }
 }
@@ -113,13 +113,12 @@ pub struct NearRectangle {
 pub struct Cells {
     /// Where it is in the world, `(x, y)` in superchunks.
     pub superchunk_cartesian: (u32, u32),
-    /// The planes asked for ([`FrameAsk::planes`]), each its layer type
-    /// and its 16 chunks' buckets one after another, in the chunks'
-    /// Morton order, as the arena holds the plane: a bitmap's
-    /// [`CHUNK_WORDS`] words a chunk, in Morton order, so many times
-    /// over as the plane has bits a cell. A chunk not hot is all clear;
+    /// The planes asked for ([`FrameAsk::planes`]), each its plane type
+    /// and its 16 chunks one after another, in the chunks' Morton order:
+    /// [`PlaneType::chunk_words`] words a chunk, its numbers one after
+    /// another in Morton order. A chunk not hot is all clear;
     /// a plane all clear is sent empty ([`Cells::plane`]).
-    pub planes: Vec<(LayerType, Vec<u64>)>,
+    pub planes: Vec<(PlaneType, Vec<u64>)>,
     /// Its top left cell in the world, `(x, y)`: what its ground is
     /// worked out from.
     pub top_left: (u32, u32),
@@ -129,16 +128,16 @@ pub struct Cells {
 }
 
 impl Cells {
-    /// The words of its plane of `layer_type`: empty if it was not
+    /// The words of its plane of `plane_type`: empty if it was not
     /// asked for, or is all clear.
-    pub fn plane(&self, layer_type: LayerType) -> &[u64] {
-        self.planes.iter().find(|(sent_type, _)| *sent_type == layer_type).map_or(&[], |(_, words)| words)
+    pub fn plane(&self, plane_type: PlaneType) -> &[u64] {
+        self.planes.iter().find(|(sent_type, _)| *sent_type == plane_type).map_or(&[], |(_, words)| words)
     }
 
-    /// Its plane of `layer_type` taken out of it, empty as
+    /// Its plane of `plane_type` taken out of it, empty as
     /// [`Cells::plane`] would be.
-    pub fn take_plane(&mut self, layer_type: LayerType) -> Vec<u64> {
-        self.planes.iter_mut().find(|(sent_type, _)| *sent_type == layer_type).map_or_else(Vec::new, |(_, words)| std::mem::take(words))
+    pub fn take_plane(&mut self, plane_type: PlaneType) -> Vec<u64> {
+        self.planes.iter_mut().find(|(sent_type, _)| *sent_type == plane_type).map_or_else(Vec::new, |(_, words)| std::mem::take(words))
     }
 }
 
@@ -148,11 +147,11 @@ pub fn bit_set(words: &[u64], bit_index: usize) -> bool {
     words.get(bit_index / WORD_BITS).is_some_and(|word| word >> (bit_index % WORD_BITS) & 1 == 1)
 }
 
-/// The number at the `place`-th cell of a wide plane's `words`, of
-/// `width_bits` bits a cell, each cell's bits one after another: none
-/// where none was sent.
-pub fn value_at(words: &[u64], width_bits: u32, place: usize) -> u32 {
-    let first_bit = place * width_bits as usize;
+/// The `number`-th number of `words`, numbers of `plane_type` one after
+/// another: 0 where none was sent.
+pub fn value_at(words: &[u64], plane_type: PlaneType, number: usize) -> u32 {
+    let width_bits = plane_type.width().bits();
+    let first_bit = number * width_bits as usize;
     words.get(first_bit / WORD_BITS).map_or(0, |word| (word >> (first_bit % WORD_BITS)) as u32 & (u32::MAX >> (u32::BITS - width_bits)))
 }
 
@@ -180,9 +179,9 @@ pub struct ViewportFrame {
     pub held_pace: Option<u32>,
     /// Entities in the whole world.
     pub entity_count: usize,
-    /// The cells of each layer counted ([`FrameAsk::counted`]) over
+    /// The cells of each plane counted ([`FrameAsk::counted`]) over
     /// every hot superchunk, in the order asked.
-    pub counts: Vec<(LayerType, u64)>,
+    pub counts: Vec<(PlaneType, u64)>,
     /// What answering the last ask answered whole took of the host's
     /// thread -- the copy, all a client costs it -- in seconds.
     pub sync_seconds: f64,

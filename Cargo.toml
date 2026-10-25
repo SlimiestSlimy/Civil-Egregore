@@ -1,53 +1,39 @@
-[package]
-name = "Civil_Egregore"
+# Every crate of Civil Egregore's engine, built together: one lock file and one `target/`
+# for them all, here, whichever crate's folder cargo is run from.
+# `cargo test` here tests the default members. Tessera's external
+# benchmarks stay a workspace of their own, so the codecs they compare
+# against never enter this build.
+[workspace]
+resolver = "3"
+members = [
+    "protocol",
+    "utilities",
+    "client",
+    "newserver",
+    "game_packager",
+]
+
+default-members = [
+    "protocol",
+    "utilities",
+    "newserver",
+]
+# Tessera is a project of its own, with its own workspace and tests;
+# AI_SCRATCHPAD holds experiments, built apart.
+exclude = ["tessera", "AI_SCRATCHPAD"]
+
+# The game's version and who makes it: kept here until a binary carries them again.
+[workspace.package]
 version = "0.6.5293"
 edition = "2024"
 description = "Nudges to Civilization."
 authors = ["SlimiestSlimy", "Opus 5.5 high"]
 repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"
 
-[dependencies]
-basegame = { path = "basegame" }
-client = { path = "client" }
-protocol = { path = "protocol" }
-server = { path = "server" }
-utilities = { path = "utilities" }
-
-[features]
-# `--features force_default_settings`: run on the built-in defaults
-# (`utilities/force_default_settings.csv`), ignoring the machine's `settings.csv`.
-force_default_settings = ["utilities/force_default_settings", "client/force_default_settings"]
-
-# Every crate of Civil Egregore's engine, built together: one lock file and one `target/`
-# for them all, here, whichever crate's folder cargo is run from.
-# `cargo test` here tests every one: `cargo run --release` opens the window. Tessera's external
-# benchmarks stay a workspace of their own, so the codecs they compare
-# against never enter this build.
-[workspace]
-members = [
-    "protocol",
-    "utilities",
-    "client",
-    "server",
-    "game_packager",
-    "AI_SCRATCHPAD",
-]
-
-default-members = [
-    ".",
-    "protocol",
-    "utilities",
-    "client",
-    "server",
-]
-# Tessera is a project of its own, with its own workspace and tests; the
-# base game too, built as a mod is, apart from the engine.
-exclude = ["tessera", "basegame"]
-
 [workspace.dependencies]
 # Bevy for the window, the drawing, the menus and the keys only: no 3D, no
 # audio. Its Feathers widgets are what the gui types are built of. One
-# version for every crate, the base game's (its own workspace's) too.
+# version for every crate.
 bevy = { version = "0.19", default-features = false, features = ["2d", "ui", "bevy_feathers"] }
 
 # Lines kept for the profilers -- perf, callgrind -- which say nothing

@@ -1,5 +1,7 @@
 # The type registry, item by item
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 The design is in `type_registry.md`.
 
 ## `type_ids.rs`

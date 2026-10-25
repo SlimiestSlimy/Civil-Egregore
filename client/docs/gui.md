@@ -1,5 +1,7 @@
 # gui
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 Civil Egregore's menus, laid over whatever window shows the world: the
 main menu the window opens on, the options Escape opens over a world,
 and the sliders. It knows nothing of the world or of what draws it,

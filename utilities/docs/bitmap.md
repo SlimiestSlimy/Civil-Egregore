@@ -1,5 +1,7 @@
 # The bitmap
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 Civil Egregore's bitmap: 256 by 256 cells, one bit a cell, in 1024 64-bit
 words, and what can be asked of them or done to them. Every layer of a
 chunk is one; Tessera encodes them, the bitplane manager holds them hot.

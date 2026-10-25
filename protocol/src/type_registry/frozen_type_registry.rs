@@ -3,8 +3,8 @@
 //! once stays true. Changed only between worlds.
 
 use super::registered_type::RegisteredType;
-use super::registration::{Hook, Library};
-use super::type_ids::{AttributeType, EntityType, LayerType};
+use super::registration::Hook;
+use super::type_ids::{AttributeType, EntityType, PlaneType};
 
 /// The types a world runs with, in the order registered: the rules
 /// tick in it. Read only: no type enters after
@@ -13,18 +13,14 @@ use super::type_ids::{AttributeType, EntityType, LayerType};
 pub struct FrozenTypeRegistry {
     /// Every type, in the order registered.
     types: Box<[RegisteredType]>,
-    /// The places among them of the types each depends on.
-    depends_on: Box<[Box<[usize]>]>,
-    /// The library each exposes, if any.
-    libraries: Box<[Option<Library>]>,
     /// What each is hooked into.
     hooks: Box<[Box<[Hook]>]>,
 }
 
 impl FrozenTypeRegistry {
     /// `types`, registered and checked, frozen.
-    pub(crate) fn of_registered(types: Vec<RegisteredType>, depends_on: Vec<Box<[usize]>>, libraries: Vec<Option<Library>>, hooks: Vec<Box<[Hook]>>) -> Self {
-        Self { types: types.into_boxed_slice(), depends_on: depends_on.into_boxed_slice(), libraries: libraries.into_boxed_slice(), hooks: hooks.into_boxed_slice() }
+    pub(crate) fn of_registered(types: Vec<RegisteredType>, hooks: Vec<Box<[Hook]>>) -> Self {
+        Self { types: types.into_boxed_slice(), hooks: hooks.into_boxed_slice() }
     }
 
     /// The place among them of `registered`, one of theirs.
@@ -32,26 +28,14 @@ impl FrozenTypeRegistry {
         self.types.iter().position(|of_these| std::ptr::eq(of_these, registered)).expect("one of these types")
     }
 
-    /// The types `registered`, one of these, depends on, in the order it
-    /// names them.
-    pub fn dependencies_of(&self, registered: &RegisteredType) -> impl Iterator<Item = &RegisteredType> {
-        self.depends_on[self.place_of(registered)].iter().map(|&place| &self.types[place])
-    }
-
-    /// The library `registered`, one of these, exposes, if any.
-    pub fn library_of(&self, registered: &RegisteredType) -> Option<&Library> {
-        self.libraries[self.place_of(registered)].as_ref()
-    }
-
     /// What `registered`, one of these, is hooked into.
     pub fn hooks_of(&self, registered: &RegisteredType) -> &[Hook] {
         &self.hooks[self.place_of(registered)]
     }
 
-    /// The types hooked into `hook`, in the order registered, each with its
-    /// library, if it has one.
-    pub fn hooked(&self, hook: Hook) -> impl Iterator<Item = (&RegisteredType, Option<&Library>)> {
-        self.types.iter().zip(&self.hooks).zip(&self.libraries).filter(move |((_, hooks), _)| hooks.contains(&hook)).map(|((registered, _), library)| (registered, library.as_ref()))
+    /// The types hooked into `hook`, in the order registered.
+    pub fn hooked(&self, hook: Hook) -> impl Iterator<Item = &RegisteredType> {
+        self.types.iter().zip(&self.hooks).filter(move |(_, hooks)| hooks.contains(&hook)).map(|(registered, _)| registered)
     }
 
     /// Every type, in the order registered.
@@ -83,25 +67,6 @@ impl FrozenTypeRegistry {
         self.types.iter().filter(|registered| registered.is_a_rule())
     }
 
-    /// The rules whose master is `master`: those of a plane, or of a
-    /// type of entity.
-    pub fn rules_of<'registry>(&'registry self, master: &'registry RegisteredType) -> impl Iterator<Item = &'registry RegisteredType> {
-        self.rules().filter(move |rule| match rule {
-            RegisteredType::ScaRule { master: rule_master, .. } => master.layer_type() == Some(*rule_master),
-            RegisteredType::EntityRule { master: rule_master, .. } => matches!(master, RegisteredType::Entity { entity_type, .. } if entity_type == rule_master),
-            _ => false,
-        })
-    }
-
-    /// The master of `rule`: the plane or the type of entity it is of.
-    pub fn master_of(&self, rule: &RegisteredType) -> Option<&RegisteredType> {
-        match rule {
-            RegisteredType::ScaRule { master, .. } => self.types.iter().find(|registered| registered.layer_type() == Some(*master)),
-            RegisteredType::EntityRule { master, .. } => self.entity(*master),
-            _ => None,
-        }
-    }
-
     /// Every type of entity with a default attribute, each with that
     /// attribute's type and the words its data is: what keeping an
     /// entity asks of the registry, copied out once.
@@ -115,17 +80,15 @@ impl FrozenTypeRegistry {
             .collect()
     }
 
-    /// Every layer type a world's cells have, as the hot bitmaps know
-    /// them: each layer, and each wide plane whole. Dirt has none: it is
+    /// Every plane type a world's cells have. Dirt has none: it is
     /// a cell with nothing on it.
-    pub fn layer_types(&self) -> Vec<LayerType> {
-        self.types.iter().filter_map(RegisteredType::layer_type).collect()
+    pub fn plane_types(&self) -> Vec<PlaneType> {
+        self.types.iter().filter_map(RegisteredType::plane_type).collect()
     }
 }
 
 impl std::fmt::Debug for FrozenTypeRegistry {
-    /// Every type, in the order registered: what a library is, only the
-    /// types depending on it know.
+    /// Every type, in the order registered.
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.debug_list().entries(self.types.iter()).finish()
     }

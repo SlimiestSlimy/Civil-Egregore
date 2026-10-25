@@ -1,0 +1,16 @@
+[package]
+name = "newserver"
+edition = "2024"
+# Its tests are the crate's own, in `tests/`: declared at its root, its internals theirs to reach.
+autotests = false
+description = "Civil Egregore's server, rewritten beside the old one: a world's cold and hot superchunks, its two-phase tick, saved and loaded"
+
+# A shared library of its own, as the game ships it: the binaries, every
+# other engine library and the mods link this one copy.
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+utilities = { path = "../utilities" }
+protocol = { path = "../protocol" }
+tessera = { path = "../tessera" }

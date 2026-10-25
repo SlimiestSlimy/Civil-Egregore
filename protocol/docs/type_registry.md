@@ -1,5 +1,7 @@
 # The type registry
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 Every type a world has is a `u64` from one namespace: a layer of its
 cells, a wide plane, a type of entity, an attribute an entity carries,
 a rule of the cells, a rule of an entity.

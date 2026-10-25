@@ -1,5 +1,7 @@
 # Civil Egregore, function by function
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 The `Civil_Egregore` crate is the program, and nothing else: `src/main.rs`
 holds which crates have commands, and hands the command line to the one
 its first word names (`utilities::commands`). Everything run is a crate

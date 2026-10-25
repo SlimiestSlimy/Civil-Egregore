@@ -3,27 +3,6 @@
 version = 4
 
 [[package]]
-name = "AI_SCRATCHPAD"
-version = "0.0.0"
-dependencies = [
- "basegame",
- "protocol",
- "server",
- "utilities",
-]
-
-[[package]]
-name = "Civil_Egregore"
-version = "0.6.5293"
-dependencies = [
- "basegame",
- "client",
- "protocol",
- "server",
- "utilities",
-]
-
-[[package]]
 name = "ab_glyph"
 version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -359,17 +338,6 @@ name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
-
-[[package]]
-name = "basegame"
-version = "0.0.0"
-dependencies = [
- "bevy",
- "client",
- "protocol",
- "server",
- "utilities",
-]
 
 [[package]]
 name = "bevy"
@@ -3315,6 +3283,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "newserver"
+version = "0.0.0"
+dependencies = [
+ "protocol",
+ "tessera",
+ "utilities",
+]
+
+[[package]]
 name = "nix"
 version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4296,15 +4273,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
-]
-
-[[package]]
-name = "server"
-version = "0.0.0"
-dependencies = [
- "protocol",
- "tessera",
- "utilities",
 ]
 
 [[package]]

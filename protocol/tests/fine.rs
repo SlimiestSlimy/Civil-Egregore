@@ -1,17 +1,19 @@
 //! The fine tier: every message a client and a server send each other,
 //! drawn from the seed, comes off the wire as it went on -- the same
-//! words put again.
+//! words put again; and mods' manifests ([`manifest_file`]).
 //!
 //! `cargo test --test fine`
 
 #[allow(dead_code)] // a shared file: each test program uses a part of it
 #[path = "../../utilities/test_seed.rs"]
 mod test_seed;
+#[path = "fine/manifest_file.rs"]
+mod manifest_file;
 
 use protocol::pipe::frame::{Cells, FrameAsk, NearRectangle, Viewport, ViewportFrame};
 use protocol::pipe::messages::{ClientMessage, ServerMessage};
 use protocol::server_parameters::{CleanServerParameters, ParameterValue};
-use protocol::type_registry::{EntityType, LayerType};
+use protocol::type_registry::{EntityType, PlaneTileSize, PlaneType, PlaneWidth};
 use utilities::rng::RandomSource;
 use utilities::wire::{receive, send, Wired};
 
@@ -20,9 +22,9 @@ fn drawn_words(random: &mut RandomSource, count: u64) -> Vec<u64> {
     (0..count).map(|_| random.next_draw()).collect()
 }
 
-/// Up to `most` layer types drawn from `random`, of every shape.
-fn drawn_layer_types(random: &mut RandomSource, most: u64) -> Vec<LayerType> {
-    (0..random.draw_below(most + 1)).map(|_| LayerType::of_tiles(random.draw_below(protocol::type_registry::TYPE_ID_NUMBERS - 32), 1 << random.draw_below(6), random.draw_below(4) as u32)).collect()
+/// Up to `most` plane types drawn from `random`, of every shape.
+fn drawn_plane_types(random: &mut RandomSource, most: u64) -> Vec<PlaneType> {
+    (0..random.draw_below(most + 1)).map(|_| PlaneType::new(random.draw_below(protocol::type_registry::TYPE_ID_NUMBERS - 32), PlaneWidth::of_bits(1 << random.draw_below(6)).expect("a width"), PlaneTileSize::of_scale(random.draw_below(9) as u32).expect("a tile size"))).collect()
 }
 
 /// A pair drawn from `random`.
@@ -34,7 +36,7 @@ fn drawn_pair(random: &mut RandomSource) -> (u32, u32) {
 fn drawn_ask(random: &mut RandomSource) -> FrameAsk {
     let viewport = random.percent_chance(50).then(|| Viewport { top_left_superchunk_cartesian: drawn_pair(random), bottom_right_superchunk_cartesian: drawn_pair(random) });
     let seen_near = random.percent_chance(50).then(|| NearRectangle { first_cell_cartesian: drawn_pair(random), size_in_cells: drawn_pair(random), pixels_a_cell: random.draw_below(9) as u32 });
-    FrameAsk { viewport, pixel_side_log2: random.draw_below(8) as u32, superchunks_skipped: random.next_draw() as u32, most_superchunks: random.next_draw() as u32, seen_near, planes: drawn_layer_types(random, 8), counted: drawn_layer_types(random, 3) }
+    FrameAsk { viewport, pixel_side_log2: random.draw_below(8) as u32, superchunks_skipped: random.next_draw() as u32, most_superchunks: random.next_draw() as u32, seen_near, planes: drawn_plane_types(random, 8), counted: drawn_plane_types(random, 3) }
 }
 
 /// A superchunk's cells drawn from `random`, some planes empty.
@@ -43,7 +45,7 @@ fn drawn_cells(random: &mut RandomSource) -> Cells {
         let count = random.draw_below(3) * random.draw_below(64);
         drawn_words(random, count)
     };
-    let planes = drawn_layer_types(random, 8).into_iter().map(|layer_type| (layer_type, plane(random))).collect();
+    let planes = drawn_plane_types(random, 8).into_iter().map(|plane_type| (plane_type, plane(random))).collect();
     Cells { superchunk_cartesian: drawn_pair(random), planes, top_left: drawn_pair(random), entities: (0..random.draw_below(30)).map(|_| (EntityType::from_number(random.draw_below(1 << 20)), (random.next_draw() as u16, random.next_draw() as u16))).collect() }
 }
 
@@ -58,7 +60,7 @@ fn drawn_frame(random: &mut RandomSource) -> ViewportFrame {
         target_pace: random.next_draw() as u32,
         held_pace: random.percent_chance(50).then(|| random.next_draw() as u32),
         entity_count: random.draw_below(1 << 40) as usize,
-        counts: drawn_layer_types(random, 3).into_iter().map(|layer_type| (layer_type, random.next_draw())).collect(),
+        counts: drawn_plane_types(random, 3).into_iter().map(|plane_type| (plane_type, random.next_draw())).collect(),
         side_superchunks: random.percent_chance(50).then(|| random.next_draw() as u32),
         hot: (0..random.draw_below(20)).map(|_| drawn_pair(random)).collect(),
         viewport: ask.viewport,

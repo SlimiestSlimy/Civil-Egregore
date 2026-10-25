@@ -1,5 +1,7 @@
 # What Civil Egregore costs, and what was found measuring it
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 What measuring has shown, and the command that shows it. Figures are
 written only where they explain an optimization -- what it was before
 and after, on a Ryzen 5 5600 (6 cores, 12 threads) -- and nowhere else:

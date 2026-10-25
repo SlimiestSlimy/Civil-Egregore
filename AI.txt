@@ -5,8 +5,9 @@ before every task. What is done leaves it; its history is in git (the
 long version up to d019445).
 
 Docs that say the rest: docs/testing_protocol.md,
-docs/glossary.md (one name per thing -- use its names, not the ones in
-its "not" column), docs/design_statements.md.
+docs/design_statements.md. Names: newserver/GLOSSARY.md, one name per
+thing, read before making a new one. docs/glossary.md is out of date
+("the okd glossary is outdated btw", 2026-10-24): not a source of names.
 
 
 == THE DESIGN STATEMENTS, AS I UNDERSTAND THEM ==
@@ -105,8 +106,10 @@ Boundaries, asked first, would have put that on the table.
   freeze seed lmao"). The binary never reads repo files.
 - Names long, human, the glossary's ("more than one word"). Files about
   300 lines: "bellow 400 lines is warning, not refactor" -- 400 and
-  over is split. No macro of our own where a function or a table
-  will do.
+  over is split. Doc comments do not count toward a file's lines, a
+  guideline until 0.8 and its docs rework (the user, 2026-10-24: "doc
+  codes are allowed and do not contribute to file line counts btw").
+  No macro of our own where a function or a table will do.
 - Refactors through rust-analyzer: AI_SCRATCHPAD/scripts/
   rust_analyzer_driver.py (rename, move, refs, diagnostics -- one
   rename per call).
@@ -205,7 +208,8 @@ THE TYPE REGISTRY
   (bundle::name; a bare name in a bundle is its own bundle's); nested
   bundles fine, "only the root level bundles need to be in the
   manifest"; "no 2 bundles can have the same name". A mod and a bundle
-  are "logically the same thing". Sides: common ("server AND client",
+  are "logically the same thing" -- CORRECTED 2026-10-25: "a mod folder
+  contains one or more bundles". Sides: common ("server AND client",
   or shared libraries -- client calls live there), server, client;
   each bundle a single library ("1:1").
 - REGISTRATION APART FROM CODE: "we really need to move types strings
@@ -344,6 +348,183 @@ MODS AND THE GAME FOLDER
 == TO DO ==
 
 NOW
+- SERVER CLEANUP, the remote session's job (the user, 2026-10-24: "lets
+  do the server cleanup, this is a separate job for you, the remote
+  session lol. our goal is to drastically reduce server code size,
+  deduplicate. and clean names"). Remote: basegame and the root's tests
+  are not built here (Bevy) -- a change to what basegame names is made
+  in basegame's source too and said, for a local build to check.
+- NEWSERVER (the user, 2026-10-24): "lets actually do something, what if
+  we try to rewrite server from scratch? now we know what to do and what
+  not to do, and what we need" / "most invariants stay, and yes we start
+  the new server as a new crate, just name it newserver for now lol" /
+  "there are some boundaries we need to discuss before starting to write
+  any new server". Boundaries said: the cold/hot separation kept; "on the
+  hot side, a single store. not the miriad of stores we have right now,
+  the conceptual designs stay, chunks, superchunks, atributes. etc. the
+  organization changes drastically to allow a single store api/handle for
+  everything hot"; "whats already well isolated and modular inside the
+  current server can be moved if possible"; "2 phase tick and the 10
+  queue design is also important to keep conceptually"; "tests stay the
+  same, mostly ... we want behaviour parity on world hashes tests indeed
+  (not forced, only if possible and convenient)"; "i think we can cut the
+  server codelines to 1/4 of the current code and keep feature parity
+  lol". The public API "decently solid, skiptagset needs a better name".
+  The phase-1 claim Mutex: "we shouldn't need mutex or unsafe here at all
+  ideally, this is a symptom of an underlying architectural problem".
+  Proposals before applying ("you should propose your code changes to me
+  before applying").
+  PHASE 2 ACROSS SUPERCHUNKS, the direction (2026-10-24, discussed, not
+  final): the 9 queues, each superchunk applying only its own cells, in
+  the one order; an act whose compares or writes span superchunks gated by
+  a counted atomic -- "we need to count up to the amount of compares tied
+  to the atomic, plus a bool that says if any failed so we abort
+  inmediatly" / "the expected number is not the number of superchunk, is
+  the expected numbers of compares that must succeed" / "at least 2 new
+  types of compare, compare and update atomic and compare atomic
+  (expected equals atmoc count, the last gate before writes are allowed
+  to proceed)" / "the server instruction translation from the perceived
+  single threaded public api compares and writes translates to the proper
+  atomic counter and flag instructions only where necessary (the public
+  compare and write api is oblivious to superchunk boundaries)". "yeah we
+  have to wait on the atomic bruv": a gate not yet met waits. Why compare
+  and write at all: "it is much cheaper to simply reject gated writes
+  later than preemptively checking if the write will be valid against all
+  previous writes". "the server is basically a vm for the Public api".
+  Atomics and skip tags: "for every skip tag there is an atomic (if
+  needed, a skip tag is not necessarily tied to an atomic, but an atomic
+  is always tied to a skip tag, this os to preserve instruction
+  execution/skip guarantees intact)". Compare and update atomic skips if
+  the atomic's fail bit is set, or if its own compare fails (setting it);
+  compare atomic "is just to enforce the wait, basically like a fence".
+  A superchunk may hold only compares of a set (a remote compare gating
+  local writes): "fair on point 1, compares without writes are valid in
+  this model".
+  A waiting superchunk parks and gives its thread back: "parked list is
+  fine yes, simper solution first, if blocking and polling is easiest
+  first go for it". Entity names stable for the tick: "the origin
+  positions are meant to be stable in tick ids for entities, so a
+  crossing entity to a new superchunk has its origin still on the
+  superchunk before moving. ideally every superchunk has a list of all
+  origin positions and the corrwsponding entity, and those origin
+  positions get updated to the current tick origin positions at the end
+  of phase 2 (literally the last thing done)" / "so even if an entity
+  comes from.another superchunk it still keeps the origin position in the
+  new suoerchunk for that tick".
+  Entities that crossed: "a chunk also keeps a list of entities that left
+  the chunk, and to which chunk index they went". So: every superchunk
+  keeps its entities by origin name and a departed list (name -> the
+  superchunk it went to); the superchunk left skips instructions naming a
+  departed entity; the superchunk arrived at, on taking part in the move,
+  looks the name up in phase 1's named-by-others list and slots those
+  authors' instructions, read from the left superchunk's outbox, into its
+  own order; an act naming another entity gets an atomic up front, as it
+  may be split across superchunks at run time (its expected count
+  unchanged). Moving is internal instructions: "we want instructions at
+  the internal level to move entities and trigger the deletion on one
+  superchunk and addition on the other. and also updating the
+  corresponding bookkeeping lists for origin positions vs current
+  position" -- "other than that id say record".
+  THE HOT SUPERCHUNK (2026-10-24): "it holds the planes, thw entities and
+  their atributes, and the remaining bookeeping information for that
+  superchunk to be tickable" -- "the per superchunk random stream. the
+  bookeeping structures for origin position and current position".
+  Cooling: "a cooling superchunk is never triggered by the superchunk to
+  be cooled itself. but on the other hand, that allows the superchunk to
+  manage its cooling lifecycle by itself". Cooled: "cooled and dirty
+  superchunks simply wait in the state their last tick left them, at the
+  same memory position, until write back and dealloc".
+  THE CODE PLAN's answers (2026-10-24): "1 drop counts" (rule counts not
+  carried over; tests judging by them observe otherwise), "2 yes" (no
+  between-ticks write queue or shapes in production: a test-only setup on
+  the hot store), "3 one world" (one world per process, now), morton.rs
+  left behind. Names: "we do need better names for the files though, you
+  have a bad habit lf non specifc, single word names".
+  Agreed names: SkipTagSet becomes CompareWriteSkipSet ("the skiptage set
+  must be renamed to CompareWriteSkip set");
+  SimulationTickState becomes SuperchunkReadHandle ("superchunk read
+  handle sounds nice"); the tree: cold_storage/, hot_superchunks/
+  (superchunk_planes/, superchunk_entities/, hot_superchunk.rs,
+  hot_store.rs, warming_and_cooling.rs), tick/ ("tick/module can stay as
+  tick": queued_instructions.rs, compare_write_skip_set_lowering.rs,
+  read_phase.rs, compare_and_write_phase.rs, claim_once_slice.rs),
+  simulation_api/, registered_code.rs, running_world.rs, world_host/,
+  server_flags.rs, entity_pathfinding/; world_creation.rs,
+  save_and_load.rs, world_hash.rs, client_connection.rs as they are.
+  PLANES, NOT LAYERS: "layers? whats a layer?we only have planes afaik lol"
+  / "we have planes, not layers" -- newserver says plane where the old
+  code says layer (superchunk_planes/, SuperchunkPlane); the glossary's
+  "layer" (one layer type over a chunk) is out of date (docs paused).
+  protocol's LayerType keeps its name until asked.
+  TESTS WRITTEN AFRESH: "we want the old tests to be rewritten, we dont
+  want to risk the old server tests unintentionally leading us back to
+  the old ways" -- newserver's tests are new, the old ones a list of
+  behaviours to cover, never code to copy (step 1's copied cold tests
+  rewritten too).
+  SPARSE PLANES: "what we want is sparse planes to be stored sparsely so
+  we dont have a water planes for chunks that dont have water lol". Per
+  chunk hotness gone: a superchunk is hot whole (production never made a
+  chunk hot alone). FEW NAMES: "it was layers becayse the server was made
+  y parts first, then it got tsngled together, so many old names were
+  kept. we want as few names as possible, probably we should make a new
+  server glossary so we can consult when deciding to make a new concept,
+  or just reuse an existing one (and reuse the structures as well were
+  possible so a single glossary entry refers to a single thing in code)".
+  PAGING IN THE WORLD (2026-10-25): "since the new world creation
+  architecture is in force, paging only works inside a paging folder
+  inside a valid world".
+  HOT AND COLD PREFIXES (2026-10-25): "as a rule, when prefixing something
+  with hot or cold, since for example a cold plane is definitely a
+  different type from a hot plane, same for superchunks, etc. so for
+  example coldsuperchunk replaces image / please use hot or cold prefix
+  where possible, unless a type works for both hot and cold side, in which
+  case it can skip the prefix of coursw".
+  The chunk is the grain of sparseness ("chunk as the grain of sparseness
+  is fine, it has to work with tessera anyways"); no "bucket" concept: a
+  plane keeps a chunk only if it has a cell set. Old docs marked
+  DEPRECATED, not deleted ("mark any old doxs deprecated but dont delete
+  them yet"); design_statements.md is current.
+  PLANES, THE RENAME (2026-10-25): layer gone from protocol -- PlaneType,
+  PlaneWidth (an enum of the six widths, "lets have a plane width enum
+  with all widths"), one Declared/RegisteredType::Plane, draw_order for
+  the render rules' order. Tiles are a concept, aligned 2^n squares;
+  planes of tiles kept, scale 0 to 8 ("1-256 cells a side for max tile
+  planes is fine"). Generics weighed and dropped ("we came full circle
+  and were going back to only runtime, but we want to still have a
+  limited set of.plane widths and tile sizes"): PlaneWidth and
+  PlaneTileSize enums in PlaneType, WidePlane<W> and its markers gone;
+  storage reads the shape off the plane type, never a width passed
+  loose. Counts count cells reading not 0, a tile's cells all.
+  MANIFEST V0 (2026-10-25, "lets get data only manifests working right
+  away"): protocol::type_registry::manifest_file -- a manifest.csv a mod,
+  a row a type in order; "just parse a bundle, then its contents until
+  a bundle end mark": a bundle row opens, an end row naming it closes;
+  "first row opens the "mod" bundle itself, where the root level bundles
+  (never types) are declared ... lets keep it at 1 level", their types
+  in them; dependencies on those bundles, a type naming only its own
+  bundle's and its dependencies'. A side a bundle ("thats per bundle
+  btw, not per type lol"): common, server or client, the mod's own on
+  none. Columns by name
+  (type, kind, depends on, hooks, width, tile size, default attribute,
+  rule, blocks, data words, draw order, parent), lists by `;`, hooks in
+  words, a field a kind takes not refused; parse, write back, register.
+  Registration is data alone: no Library. NO MASTERS ("no master planes
+  anymore"): sca rules "are sampled automatically, entity rules are when
+  entity awokens"; an entity names its rule ("its just the entity rule
+  for that entity lol"). DEPENDS ON AT BUNDLE LEVEL alone: a bundle in
+  the mod lists the bundles it depends on; its types name only theirs
+  and its own. Hooks: GeneratesTheWorld, KeepsTheWorldHot, ShownByDefault
+  (RunsEveryTick gone: "thats not needed anymore"). Kind word: "sca
+  rule". The client still names masters and Drawn: stale until its
+  kinds are redone.
+  THE NUKE (2026-10-25): "nuke old server, nuke basegame, lets focus on
+  having protocol and newserver working the right way" -- server/ and
+  basegame/ deleted (git history keeps them; "we have a git history for
+  that"); then "nuke the root code as well": src/ and the root tests/
+  deleted, the root Cargo.toml a virtual workspace (the version kept in
+  [workspace.package]); AI_SCRATCHPAD out of the workspace. The game
+  packager still names the root binary and the server: dead until a
+  binary exists again.
 - BASEGAME AS A MOD, the 0.7 milestone ("nvm its going to be 0.7", after
   "probably the 0.8 milestone"), with the public API's freeze; what is left (asked 2026-10-24, "to remember lol"):
   3.1's last two files; 3.2 the builder and kind traits (the design, the

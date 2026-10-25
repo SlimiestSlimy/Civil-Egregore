@@ -185,9 +185,9 @@ pub fn show_painted(mut drawing: ResMut<Drawing>, mut images: ResMut<Assets<Imag
         }
         let (x, y) = superchunk_cartesian;
         let middle = drawn_at(u64::from(x * SUPERCHUNK_SIDE_CELLS), u64::from(y * SUPERCHUNK_SIDE_CELLS)) + Vec2::new(1.0, -1.0) * (SUPERCHUNK_SIDE_CELLS / 2) as f32;
-        let spawned = render_rules.render_layers().zip(images_of).map(|(render_layer, image)| {
+        let spawned = render_rules.draw_orders().zip(images_of).map(|(draw_order, image)| {
             let visibility = if image.is_some() { Visibility::Inherited } else { Visibility::Hidden };
-            bevy_commands.spawn((Sprite { image: image.unwrap_or_default(), custom_size: Some(Vec2::splat(SUPERCHUNK_SIDE_CELLS as f32)), ..default() }, Transform::from_translation(middle.extend(render_layer as f32)), visibility)).id()
+            bevy_commands.spawn((Sprite { image: image.unwrap_or_default(), custom_size: Some(Vec2::splat(SUPERCHUNK_SIDE_CELLS as f32)), ..default() }, Transform::from_translation(middle.extend(draw_order as f32)), visibility)).id()
         });
         drawing.sprites.insert(superchunk_cartesian, spawned.collect());
     }

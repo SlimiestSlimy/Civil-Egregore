@@ -1,39 +1,22 @@
-//! A type a world has: a name, and what goes with it by its kind. What
-//! runs it, if anything does, is its library, hooked in by its
-//! registration (`super::Hook`).
+//! A type a world has: a name, and what goes with it by its kind.
 
-use super::type_ids::{AttributeType, BundleType, ClientCallType, EntityRuleType, EntityType, GuiType, LayerType, RenderRuleType, ScaRuleType, WorldgenType};
-
-/// What a rule of the renderer draws: a plane, or a type of entity.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Drawn {
-    /// A layer or a wide plane.
-    Plane(LayerType),
-    /// A type of entity.
-    Entity(EntityType),
-}
+use super::registration::BundleSide;
+use super::type_ids::{AttributeType, BundleType, ClientCallType, EntityRuleType, EntityType, GuiType, PlaneType, RenderRuleType, ScaRuleType, WorldgenType};
 
 /// A type a world has: its name, and what goes with it by its kind.
 #[derive(Clone, Debug)]
 pub enum RegisteredType {
-    /// A layer: a bit a cell.
-    Layer {
+    /// A plane: a number a cell, or a tile, its width and tile size in
+    /// its plane type, as registered.
+    Plane {
         /// Its name.
         name: String,
-        /// Its ID.
-        layer_type: LayerType,
+        /// Its ID and shape.
+        plane_type: PlaneType,
     },
-    /// A wide plane: a number a cell, its width and tile size in its
-    /// layer type, as registered.
-    WidePlane {
-        /// Its name.
-        name: String,
-        /// Its ID, the plane whole.
-        layer_type: LayerType,
-    },
-    /// A type of entity, and the attribute every entity of it has for
-    /// as long as it is, if any: one of a fixed size, so that it need
-    /// not say its type where it is kept.
+    /// A type of entity, the attribute every entity of it has for as long
+    /// as it is, if any -- one of a fixed size, so that it need not say
+    /// its type where it is kept -- and the rule run as one wakes, if any.
     Entity {
         /// Its name.
         name: String,
@@ -41,6 +24,8 @@ pub enum RegisteredType {
         entity_type: EntityType,
         /// Its default attribute.
         default_attribute: Option<AttributeType>,
+        /// The entity rule run as one of it wakes.
+        rule: Option<EntityRuleType>,
     },
     /// An attribute of an entity, and the words its data is: none if
     /// its size varies, each of it then saying its own length.
@@ -52,24 +37,19 @@ pub enum RegisteredType {
         /// The words its data is.
         data_words: Option<usize>,
     },
-    /// A rule of the cells, and the one plane it is of -- whatever
-    /// else it reads or writes.
+    /// A rule of the cells.
     ScaRule {
         /// Its name.
         name: String,
         /// Its ID.
         rule: ScaRuleType,
-        /// Its master.
-        master: LayerType,
     },
-    /// A rule of an entity, and the one type of entity it is of.
+    /// A rule of entities.
     EntityRule {
         /// Its name.
         name: String,
         /// Its ID.
         rule: EntityRuleType,
-        /// Its master.
-        master: EntityType,
     },
     /// A way of generating a world: its superchunks' cells, and what
     /// lives on them.
@@ -79,17 +59,14 @@ pub enum RegisteredType {
         /// Its ID.
         worldgen: WorldgenType,
     },
-    /// A rule of the renderer, and the one plane or type of entity it
-    /// draws.
+    /// A rule of the renderer.
     RenderRule {
         /// Its name.
         name: String,
         /// Its ID.
         rule: RenderRuleType,
-        /// Its master.
-        master: Drawn,
-        /// Where it is drawn among the render layers.
-        render_layer: u32,
+        /// Where it is drawn among the render rules: the higher over the lower.
+        draw_order: u32,
     },
     /// A window of the client's, and the window it is nested in, if any.
     Gui {
@@ -100,15 +77,12 @@ pub enum RegisteredType {
         /// Its parent.
         parent: Option<GuiType>,
     },
-    /// A function a client may call across the connection, and the type
-    /// it belongs to.
+    /// A function a client may call across the connection.
     ClientCall {
         /// Its name.
         name: String,
         /// Its ID: what a call names on the wire.
         call: ClientCallType,
-        /// Its master's ID, whole.
-        master: u64,
     },
     /// A bundle: the types whose names begin with its own are in it.
     Bundle {
@@ -116,6 +90,10 @@ pub enum RegisteredType {
         name: String,
         /// Its ID.
         bundle: BundleType,
+        /// The side its code runs on: none for a mod's own bundle.
+        side: Option<BundleSide>,
+        /// The bundles it depends on.
+        depends_on: Box<[BundleType]>,
     },
 }
 
@@ -123,14 +101,14 @@ impl RegisteredType {
     /// Its name.
     pub fn name(&self) -> &str {
         match self {
-            Self::Layer { name, .. } | Self::WidePlane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } | Self::Worldgen { name, .. } | Self::RenderRule { name, .. } | Self::Gui { name, .. } | Self::ClientCall { name, .. } | Self::Bundle { name, .. } => name,
+            Self::Plane { name, .. } | Self::Entity { name, .. } | Self::Attribute { name, .. } | Self::ScaRule { name, .. } | Self::EntityRule { name, .. } | Self::Worldgen { name, .. } | Self::RenderRule { name, .. } | Self::Gui { name, .. } | Self::ClientCall { name, .. } | Self::Bundle { name, .. } => name,
         }
     }
 
-    /// Its layer type, if it is a layer or a wide plane.
-    pub fn layer_type(&self) -> Option<LayerType> {
+    /// Its plane type, if it is a plane.
+    pub fn plane_type(&self) -> Option<PlaneType> {
         match self {
-            Self::Layer { layer_type, .. } | Self::WidePlane { layer_type, .. } => Some(*layer_type),
+            Self::Plane { plane_type, .. } => Some(*plane_type),
             _ => None,
         }
     }
@@ -154,7 +132,7 @@ impl RegisteredType {
     /// Its ID whole -- kind and number -- as a world records it.
     pub fn type_id(&self) -> u64 {
         match self {
-            Self::Layer { layer_type, .. } | Self::WidePlane { layer_type, .. } => layer_type.type_id(),
+            Self::Plane { plane_type, .. } => plane_type.type_id(),
             Self::Entity { entity_type, .. } => entity_type.0,
             Self::Attribute { attribute_type, .. } => attribute_type.type_id(),
             Self::ScaRule { rule, .. } => rule.0,

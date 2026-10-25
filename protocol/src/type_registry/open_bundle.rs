@@ -3,7 +3,7 @@
 //! until it is dropped and the bundle it was opened in is open again.
 
 use super::registered_type::RegisteredType;
-use super::registration::Registration;
+use super::registration::{BundleSide, Registration};
 use super::registry::{RegistryRefusal, TypeRegistry};
 use super::type_ids::BundleType;
 
@@ -21,12 +21,12 @@ pub struct OpenBundle<'registry> {
 
 impl TypeRegistry {
     /// Registers the bundle named `bundle_name` -- in the bundle open, if
-    /// any -- and opens it: the types registered through what comes back
-    /// are in it, until it is dropped. Refused as any type would be: a
-    /// name taken or amiss.
-    pub fn open_bundle(&mut self, bundle_name: &str) -> Result<OpenBundle<'_>, RegistryRefusal> {
-        let registered = self.register(Registration::bundle(bundle_name))?;
-        let RegisteredType::Bundle { name, bundle } = registered else { unreachable!("a bundle registered as one") };
+    /// any -- its code on `side`, depending on the bundles named
+    /// `depends_on`, and opens it: the types registered through what comes
+    /// back are in it, until it is dropped. Refused as any type would be.
+    pub fn open_bundle(&mut self, bundle_name: &str, side: Option<BundleSide>, depends_on: &[&str]) -> Result<OpenBundle<'_>, RegistryRefusal> {
+        let registered = self.register(Registration::bundle(bundle_name, side, depends_on))?;
+        let RegisteredType::Bundle { name, bundle, .. } = registered else { unreachable!("a bundle registered as one") };
         let outer_bundle = self.open_bundle.replace(name);
         Ok(OpenBundle { type_registry: self, outer_bundle, bundle })
     }

@@ -11,7 +11,7 @@
 
 use bevy::color::{Color, ColorToPacked, LinearRgba};
 use protocol::pipe::frame::{value_at, Cells, CHUNK_WORDS, WORD_BITS};
-use protocol::type_registry::{Drawn, EntityType, LayerType};
+use protocol::type_registry::{Drawn, EntityType, PlaneType};
 use std::sync::Arc;
 use utilities::coordinates::SUPERCHUNK_SIDE_CELLS;
 
@@ -140,7 +140,7 @@ impl<'turn> RenderTurn<'turn> {
     }
 
     /// How many of `drawn`'s cells `layer` has set, of how many it has.
-    pub fn count_set(&self, layer: LayerType, drawn: DrawnCell) -> (u32, u32) {
+    pub fn count_set(&self, layer: PlaneType, drawn: DrawnCell) -> (u32, u32) {
         let (first_bit, bit_count) = self.bits_of(drawn);
         let words = self.cells.plane(layer);
         if words.is_empty() {
@@ -155,19 +155,18 @@ impl<'turn> RenderTurn<'turn> {
     }
 
     /// The share of `drawn`'s cells `layer` has set, from 0 to 1.
-    pub fn share_set(&self, layer: LayerType, drawn: DrawnCell) -> f32 {
+    pub fn share_set(&self, layer: PlaneType, drawn: DrawnCell) -> f32 {
         let (set_cells, all_cells) = self.count_set(layer, drawn);
         set_cells as f32 / all_cells as f32
     }
 
-    /// The number the wide plane `plane` holds at `drawn`'s first cell
+    /// The number `plane` holds at `drawn`'s first cell
     /// -- its tile's, of a plane of tiles: what stands for them all.
-    pub fn value(&self, plane: LayerType, drawn: DrawnCell) -> u32 {
+    pub fn value(&self, plane: PlaneType, drawn: DrawnCell) -> u32 {
         let first_cell = drawn.morton_index << (2 * self.detail_level);
-        let width_bits = plane.width_bits();
-        let chunk_first_word = (first_cell >> CHUNK_CELLS_LOG2) * ((CHUNK_WORDS * width_bits as usize) >> plane.tile_shift());
+        let chunk_first_word = (first_cell >> CHUNK_CELLS_LOG2) * plane.chunk_words();
         let words = self.cells.plane(plane).get(chunk_first_word..).unwrap_or_default();
-        value_at(words, width_bits, (first_cell & ((1 << CHUNK_CELLS_LOG2) - 1)) >> plane.tile_shift())
+        value_at(words, plane, (first_cell & ((1 << CHUNK_CELLS_LOG2) - 1)) >> plane.tile_size().shift())
     }
 
     /// Paints `drawn` `color`, over what the layer's rules painted before.
@@ -189,7 +188,7 @@ pub(crate) const fn drawn_side(detail_level: u32) -> u32 {
 /// drawn cell any of whose cells `layer` has set, painting it the colour
 /// it gives, if any.
 #[inline]
-pub fn on_each_set_cell(turn: &mut RenderTurn, layer: LayerType, mut rule: impl FnMut(&RenderTurn, DrawnCell) -> Option<Color>) {
+pub fn on_each_set_cell(turn: &mut RenderTurn, layer: PlaneType, mut rule: impl FnMut(&RenderTurn, DrawnCell) -> Option<Color>) {
     let words = turn.cells.plane(layer);
     let block_log2 = 2 * turn.detail_level;
     let (mut next_bit, all_bits) = (0, words.len() * WORD_BITS);

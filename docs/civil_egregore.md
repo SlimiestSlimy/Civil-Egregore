@@ -1,5 +1,7 @@
 # Civil Egregore
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 What Civil Egregore is, and every decision about it made so far, written down
 so that none is forgotten. What is built is marked as built; the rest is
 the plan. Every decision here is weighed against the

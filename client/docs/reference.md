@@ -1,5 +1,7 @@
 # The client, function by function
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 The designs: `renderer.md` (`src/renderer/`), `gui.md` (`src/gui/`).
 
 # The renderer (`src/renderer/`)

@@ -1,30 +1,19 @@
 //! A type as it is registered ([`Registration`]): its name, what it is
 //! -- with no ID: the registry gives it one, or the world's save does
-//! -- the types it depends on by name, the library it exposes
-//! ([`Library`]), and what it is hooked into ([`Hook`]): what the
-//! server does with it, and its library, beyond keeping it. Names are
-//! for registering: once frozen, a type is found by its ID.
+//! -- and what it is hooked into ([`Hook`]): what the engine does with
+//! it beyond keeping it. Data alone, as a mod's manifest says it: no
+//! code. Names are for registering: once frozen, a type is found by its
+//! ID.
 
-use std::any::Any;
-use std::sync::Arc;
+use super::type_ids::{PlaneTileSize, PlaneWidth};
 
-/// What a type exposes to the types depending on it: a handle to its
-/// API, which each is given by the type's ID and casts to what it
-/// knows the API as. The registry knows nothing of what is in it. Made
-/// as the world's types are registered, it holds the IDs of the types
-/// it works on: those registered before it.
-pub type Library = Arc<dyn Any + Send + Sync>;
-
-/// What a type is hooked into: what the simulation does with it, and
-/// with its library, beyond keeping it. One more is one more variant.
+/// What a type is hooked into: what the engine does with it beyond
+/// keeping it. One more is one more variant.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hook {
-    /// Its library generates the world: the cells of each superchunk,
-    /// and what lives on it. A world has one.
+    /// Its code generates the world: the cells of each superchunk, and
+    /// what lives on it. A world has one.
     GeneratesTheWorld,
-    /// Its library is run on every hot superchunk every tick: a rule's,
-    /// of its master.
-    RunsEveryTick,
     /// It is a type of entity the world is kept hot about: its halos
     /// follow these. A world has one for now, unless forced hot.
     KeepsTheWorldHot,
@@ -32,25 +21,36 @@ pub enum Hook {
     ShownByDefault,
 }
 
+/// Which side a bundle's code runs on: its library is opened there.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BundleSide {
+    /// Server and client both: what both use, client calls among it.
+    Common,
+    /// The server alone.
+    Server,
+    /// The client alone.
+    Client,
+}
+
 /// What a type is, as it is declared: everything its ID says but its
-/// number, and the types it is of by name.
+/// number, and the types it names, by name.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Declared {
-    /// A layer: a bit a cell.
-    Layer,
-    /// A wide plane: `width_bits` a cell -- or a tile, `2^tile_scale`
-    /// cells a side.
-    WidePlane {
-        /// Bits a cell: 2, 4, 8, 16 or 32.
-        width_bits: u32,
-        /// Its tile size, as a scale: 0 for a plane of cells.
-        tile_scale: u32,
+    /// A plane: a number of `width` a tile of `tile_size` -- a cell, for
+    /// a plane of cells.
+    Plane {
+        /// Bits a number.
+        width: PlaneWidth,
+        /// What a number is of.
+        tile_size: PlaneTileSize,
     },
-    /// A type of entity, and the attribute every entity of it has, by
-    /// its name, if any.
+    /// A type of entity: the attribute every entity of it has, and the
+    /// entity rule run as one wakes, each by its name, if any.
     Entity {
         /// Its default attribute's name.
         default_attribute: Option<String>,
+        /// Its rule's name.
+        rule: Option<String>,
     },
     /// An attribute of an entity of a fixed size.
     Attribute {
@@ -59,25 +59,17 @@ pub enum Declared {
         /// The words its data is.
         data_words: usize,
     },
-    /// A rule of the cells, and the plane it is of, by its name.
-    ScaRule {
-        /// Its master's name.
-        master: String,
-    },
-    /// A rule of an entity, and the type of entity it is of, by its name.
-    EntityRule {
-        /// Its master's name.
-        master: String,
-    },
+    /// A rule of the cells, run on the cells sampled.
+    ScaRule,
+    /// A rule of entities, run on each entity of a type naming it as it
+    /// wakes.
+    EntityRule,
     /// A way of generating a world.
     Worldgen,
-    /// A rule of the renderer, and what it draws -- a plane or a type of
-    /// entity -- by its name.
+    /// A rule of the renderer: what it draws, its code says.
     RenderRule {
-        /// Its master's name.
-        master: String,
-        /// Where it is drawn among the render layers: the higher over the lower.
-        render_layer: u32,
+        /// Where it is drawn among the render rules: the higher over the lower.
+        draw_order: u32,
     },
     /// A window of the client's, and the window it is nested in, by its
     /// name, if any: a child names its parent.
@@ -85,30 +77,29 @@ pub enum Declared {
         /// Its parent's name.
         parent: Option<String>,
     },
-    /// A function a client may call across the connection, and the type
-    /// it belongs to, by its name: its library is the function.
-    ClientCall {
-        /// Its master's name.
-        master: String,
-    },
+    /// A function a client may call across the connection: its code is
+    /// the function.
+    ClientCall,
     /// A bundle: the types registered while it is open are in it
-    /// (`super::TypeRegistry::open_bundle`).
-    Bundle,
+    /// (`super::TypeRegistry::open_bundle`). It names the bundles it
+    /// depends on: theirs are the only types but its own those in it
+    /// may name.
+    Bundle {
+        /// The side its code runs on: none for a mod's own bundle, which
+        /// holds bundles alone.
+        side: Option<BundleSide>,
+        /// The names of the bundles it depends on, registered before it.
+        depends_on: Vec<String>,
+    },
 }
 
-/// A type to register: its name, what it is, the names of the types it
-/// depends on -- registered before it -- its library, if it exposes
-/// one, and its hooks.
-#[derive(Clone)]
+/// A type to register: its name, what it is, and its hooks.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Registration {
     /// Its name: what it is known by, in the registry and in a save.
     pub name: String,
     /// What it is.
     pub declared: Declared,
-    /// The names of the types it depends on.
-    pub depends_on: Vec<String>,
-    /// Its library, if it exposes one.
-    pub library: Option<Library>,
     /// What it is hooked into.
     pub hooks: Vec<Hook>,
 }
@@ -116,29 +107,18 @@ pub struct Registration {
 impl Registration {
     /// The type named `name`, `declared` so.
     pub fn of(name: &str, declared: Declared) -> Self {
-        Self { name: name.to_string(), declared, depends_on: Vec::new(), library: None, hooks: Vec::new() }
+        Self { name: name.to_string(), declared, hooks: Vec::new() }
     }
 
-    /// A layer named `name`.
-    pub fn layer(name: &str) -> Self {
-        Self::of(name, Declared::Layer)
-    }
-
-    /// A wide plane named `name`, `width_bits` a cell.
-    pub fn wide_plane(name: &str, width_bits: u32) -> Self {
-        Self::wide_plane_of_tiles(name, width_bits, 0)
-    }
-
-    /// A wide plane named `name`, `width_bits` a tile `2^tile_scale`
-    /// cells a side.
-    pub fn wide_plane_of_tiles(name: &str, width_bits: u32, tile_scale: u32) -> Self {
-        Self::of(name, Declared::WidePlane { width_bits, tile_scale })
+    /// A plane named `name`, a number of `width` a tile of `tile_size`.
+    pub fn plane(name: &str, width: PlaneWidth, tile_size: PlaneTileSize) -> Self {
+        Self::of(name, Declared::Plane { width, tile_size })
     }
 
     /// A type of entity named `name`, with the attribute named
-    /// `default_attribute` if any.
-    pub fn entity(name: &str, default_attribute: Option<&str>) -> Self {
-        Self::of(name, Declared::Entity { default_attribute: default_attribute.map(str::to_string) })
+    /// `default_attribute` and the entity rule named `rule`, if any.
+    pub fn entity(name: &str, default_attribute: Option<&str>, rule: Option<&str>) -> Self {
+        Self::of(name, Declared::Entity { default_attribute: default_attribute.map(str::to_string), rule: rule.map(str::to_string) })
     }
 
     /// An attribute named `name` of a fixed size: `block_count` blocks,
@@ -147,14 +127,14 @@ impl Registration {
         Self::of(name, Declared::Attribute { block_count, data_words })
     }
 
-    /// A rule of the cells named `name`, of the plane named `master`.
-    pub fn sca_rule(name: &str, master: &str) -> Self {
-        Self::of(name, Declared::ScaRule { master: master.to_string() })
+    /// A rule of the cells named `name`.
+    pub fn sca_rule(name: &str) -> Self {
+        Self::of(name, Declared::ScaRule)
     }
 
-    /// A rule of an entity named `name`, of the type of entity named `master`.
-    pub fn entity_rule(name: &str, master: &str) -> Self {
-        Self::of(name, Declared::EntityRule { master: master.to_string() })
+    /// A rule of entities named `name`.
+    pub fn entity_rule(name: &str) -> Self {
+        Self::of(name, Declared::EntityRule)
     }
 
     /// A world generation named `name`.
@@ -162,12 +142,10 @@ impl Registration {
         Self::of(name, Declared::Worldgen)
     }
 
-    /// A rule of the renderer named `name`, drawing the plane or the type
-    /// of entity named `master` on the render layer `render_layer`: its
-    /// library, the client's, is its code for one cell. The other planes
-    /// it reads, it depends on ([`Registration::depending_on`]).
-    pub fn render_rule(name: &str, master: &str, render_layer: u32) -> Self {
-        Self::of(name, Declared::RenderRule { master: master.to_string(), render_layer })
+    /// A rule of the renderer named `name`, drawn at the draw order
+    /// `draw_order`.
+    pub fn render_rule(name: &str, draw_order: u32) -> Self {
+        Self::of(name, Declared::RenderRule { draw_order })
     }
 
     /// A window named `name`, nested in the window named `parent` if any.
@@ -175,27 +153,16 @@ impl Registration {
         Self::of(name, Declared::Gui { parent: parent.map(str::to_string) })
     }
 
-    /// A function named `name` a client may call across the connection,
-    /// belonging to the type named `master`: the one way a client reaches
-    /// a library of the server's, opted into function by function.
-    pub fn client_call(name: &str, master: &str) -> Self {
-        Self::of(name, Declared::ClientCall { master: master.to_string() })
+    /// A function named `name` a client may call across the connection.
+    pub fn client_call(name: &str) -> Self {
+        Self::of(name, Declared::ClientCall)
     }
 
-    /// A bundle named `name`: opened by `super::TypeRegistry::open_bundle`.
-    pub fn bundle(name: &str) -> Self {
-        Self::of(name, Declared::Bundle)
-    }
-
-    /// It depending on the types named `type_names` too.
-    pub fn depending_on(mut self, type_names: &[&str]) -> Self {
-        self.depends_on.extend(type_names.iter().map(|type_name| type_name.to_string()));
-        self
-    }
-
-    /// It exposing `library`.
-    pub fn with_library(self, library: Library) -> Self {
-        Self { library: Some(library), ..self }
+    /// A bundle named `name`, its code on `side` -- none for a mod's own
+    /// -- depending on the bundles named `depends_on`: opened by
+    /// `super::TypeRegistry::open_bundle`.
+    pub fn bundle(name: &str, side: Option<BundleSide>, depends_on: &[&str]) -> Self {
+        Self::of(name, Declared::Bundle { side, depends_on: depends_on.iter().map(|bundle_name| bundle_name.to_string()).collect() })
     }
 
     /// It hooked into `hooks` too.

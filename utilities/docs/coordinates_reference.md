@@ -1,5 +1,7 @@
 # Coordinates, function by function
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 The design is in `coordinates.md`.
 
 ## `lib.rs`

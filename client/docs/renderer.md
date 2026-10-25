@@ -1,5 +1,7 @@
 # The renderer
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 Civil Egregore on the screen: a Bevy window showing a world run by the
 host (`server::host`) on a thread of its own -- dirt brown, grass
 green, trees, water, a sheep white -- on ground lit by its height

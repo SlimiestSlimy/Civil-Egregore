@@ -9,9 +9,8 @@
 use crate::type_registry::{FrozenTypeRegistry, TypeRegistry};
 use std::path::Path;
 
-/// What registers a game's types in a registry, in their order -- each
-/// library made with the IDs the types registered before it were
-/// given: what every world is made of. Or why one was refused.
+/// What registers a game's types in a registry, in their order: what
+/// every world is made of. Or why one was refused.
 pub type RegisterTypes = fn(&mut TypeRegistry) -> Result<(), String>;
 
 /// The file a world's save keeps its types in, in its folder.

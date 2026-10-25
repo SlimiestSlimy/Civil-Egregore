@@ -5,24 +5,24 @@
 use crate::client_api::rendering::{drawn_side, on_each_entity, on_each_set_cell, DrawnCell, RenderTurn, SUPERCHUNK_SIDE_LOG2};
 use bevy::color::Color;
 use protocol::pipe::frame::{Cells, CHUNK_WORDS, WORD_BITS};
-use protocol::type_registry::{EntityType, LayerType, Registration, TypeRegistry};
+use protocol::type_registry::{EntityType, PlaneTileSize, PlaneType, PlaneWidth, Registration, TypeRegistry};
 use utilities::coordinates::{CHUNKS_IN_SUPERCHUNK, SUPERCHUNK_SIDE_CELLS};
 
 /// The tests' bundle.
 const TESTS_BUNDLE: &str = "tests";
 
 /// A layer and a type of entity, as a new world's registry gives them their IDs.
-fn registered_types() -> (LayerType, EntityType) {
+fn registered_types() -> (PlaneType, EntityType) {
     let mut type_registry = TypeRegistry::for_new_world();
     let mut tests = type_registry.open_bundle(TESTS_BUNDLE).expect("the tests' bundle");
-    let layer = tests.register(Registration::layer("grass")).expect("a layer").layer_type().expect("a layer");
+    let layer = tests.register(Registration::plane("grass", PlaneWidth::Bits1, PlaneTileSize::Side1)).expect("a layer").plane_type().expect("a layer");
     let entity = tests.register(Registration::entity("sheep", None)).expect("a type of entity").entity_type().expect("a type of entity");
     (layer, entity)
 }
 
 /// A superchunk's cells with `layer` set at each of `set_cells`, `(x, y)`
 /// from its top left, and an entity of `entity_type` at each of `entity_cells`.
-fn cells_with(layer: LayerType, set_cells: &[(u32, u32)], entity_type: EntityType, entity_cells: &[(u16, u16)]) -> Cells {
+fn cells_with(layer: PlaneType, set_cells: &[(u32, u32)], entity_type: EntityType, entity_cells: &[(u16, u16)]) -> Cells {
     let mut words = vec![0u64; CHUNKS_IN_SUPERCHUNK * CHUNK_WORDS];
     for &(x, y) in set_cells {
         let bit = DrawnCell::at(x, y).morton_index;

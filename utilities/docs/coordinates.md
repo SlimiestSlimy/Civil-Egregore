@@ -1,5 +1,7 @@
 # Coordinates
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 Where things are in Civil Egregore's world: superchunks, chunks and cells.
 Every crate that places anything uses them. The decisions behind them
 are in `../../docs/civil_egregore.md`, "The world".

@@ -1,5 +1,7 @@
 # Civil Egregore
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 **Start with the [design statements](docs/design_statements.md).**
 Every design decision in this repository is weighed against them.
 

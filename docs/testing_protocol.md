@@ -1,5 +1,7 @@
 # How Civil Egregore is tested
 
+> **DEPRECATED** -- out of date, kept until the docs rework at 0.8: not a source of names or designs. Names: `newserver/GLOSSARY.md`.
+
 Few tests, each a generator of many cases. Tessera is a project of its
 own, tested in its own workspace (`tessera/docs/testing_protocol.md`).
 
