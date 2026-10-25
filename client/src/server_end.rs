@@ -140,11 +140,7 @@ impl ServerLink {
     /// client call -- with `arguments`, and waits for its answer, or why
     /// it is refused: none if the server is gone.
     pub fn call(&self, call: u64, arguments: Vec<u64>) -> Option<Result<Vec<u64>, String>> {
-        match self.ask(ClientMessage::Call(call, arguments))? {
-            ServerMessage::Answered(answer) => Some(Ok(answer)),
-            ServerMessage::CallRefused(why_refused) => Some(Err(why_refused)),
-            _ => None,
-        }
+        self.ask(ClientMessage::Call(call, arguments))?.into_answer()
     }
 
     /// Asks for some of the viewport's superchunks: answered with a
@@ -174,9 +170,9 @@ impl ServerLink {
         self.tell(ClientMessage::OpenWorld(world_name))
     }
 
-    /// Saves the world run under `world_name` in the worlds' folder.
-    pub fn save_world(&self, world_name: String) -> bool {
-        self.tell(ClientMessage::Save(world_name))
+    /// Saves the world run in its folder.
+    pub fn save_world(&self) -> bool {
+        self.tell(ClientMessage::Save)
     }
 
     /// The names of the worlds in the worlds' folder: none if the

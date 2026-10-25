@@ -379,6 +379,16 @@ NOW
       library is no call's code refuses the freeze -- completed as each
       side opens its bundles once libraries load after the freeze);
       ServerMessage::of_answer/into_answer for both ends of the wire.
+      KINDS IN ONE MODULE: "Ideally we want to centralize kinds into a
+      single kinds module lol" -- every kind's trait (client call, rule,
+      worldgen, render rule, gui) in one protocol module.
+      DONE (2026-10-24): protocol::kinds::server -- ClientCall (set up
+      once at world start through ServerSetUp, answering through the
+      BetweenTicks handle), WorldClientCalls; basegame's calls are it.
+      The client never holds a server handle: "what if client and server
+      are remote to each other". The server answers calls between ticks.
+      "Save as" removed: "save as is no longer needed under the new world
+      creation model" -- a world saves into its own folder; Save nameless.
   3.2 the builder and the kind traits in protocol, one setup walk
       matching frozen types to the structs added by name (replacing
       rules_of, worldgen_of, RenderRules::of, the gui gathering).
@@ -531,7 +541,10 @@ LATER (every "for later" of the user's, and mine, as said)
 - Saving on shutdown (Ctrl-C, SIGTERM) for a headless server: "lets not
   do save on shutdown for now, thats scope creep".
 - Several clients at once ("multi client support for later date");
-  multiplayer beyond loopback ("not a priority by a long shot").
+  multiplayer beyond loopback ("not a priority by a long shot"). They are
+  one thing: "having multiple client connections is how well have
+  multiñlayer in the future basically, for now only single client"
+  (2026-10-24) -- a call then may need to know which client asked.
 - A "hot" attribute on entities in place of the one hooked type ("some
   entities will have the "hot", atribute later"; "sheep won't be the hot
   entity for long").

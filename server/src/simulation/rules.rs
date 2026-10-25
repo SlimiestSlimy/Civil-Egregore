@@ -6,7 +6,7 @@
 //! ([`ChosenRules`]) by their place ([`RulePlace`]) (`docs/server.md`,
 //! "TickCounts").
 
-use crate::simulation::simulation_api::{CallCode, RuleCode, RuleContext, RuleMaster, RuleRun, TickReport, SimulationTickState, WorldgenCode};
+use crate::simulation::simulation_api::{RuleCode, RuleContext, RuleMaster, RuleRun, TickReport, SimulationTickState, WorldgenCode};
 use crate::simulation::simulation_api::rule_counts::{RuleCounts, COUNTS_OF_A_RULE};
 use std::sync::Arc;
 use crate::entity_manager::EntityType;
@@ -85,21 +85,6 @@ pub fn worldgen_of(frozen_type_registry: &FrozenTypeRegistry) -> Result<(Worldge
     }
     let worldgen = library.and_then(|worldgen_library| worldgen_library.downcast_ref::<WorldgenCode>()).cloned().ok_or_else(|| format!("{} generates the world, and its library is no world generation's code", generating_type.name()))?;
     Ok((worldgen, root_bundle_of(generating_type.name()).to_string()))
-}
-
-/// The code of the function a client may call whose ID is `call`, among
-/// `frozen_type_registry`'s types, cast, and the mod it is of
-/// ([`root_bundle_of`]): whose config it reads and writes. Or why it is
-/// refused: no type of the ID, one no client may call, or a library
-/// that is no call's code -- only a type registered as a client call is
-/// ever run.
-pub fn call_code_of(frozen_type_registry: &FrozenTypeRegistry, call: u64) -> Result<(CallCode, String), String> {
-    let called = frozen_type_registry.types().iter().find(|registered| registered.type_id() == call).ok_or_else(|| format!("no type is of the ID {call:#018x}"))?;
-    if !matches!(called, RegisteredType::ClientCall { .. }) {
-        return Err(format!("{} is no function a client may call", called.name()));
-    }
-    let call_code = frozen_type_registry.library_of(called).and_then(|call_library| call_library.downcast_ref::<CallCode>()).cloned().ok_or_else(|| format!("{} is a client call, and its library is no call's code", called.name()))?;
-    Ok((call_code, root_bundle_of(called.name()).to_string()))
 }
 
 /// The type of entity a world of `frozen_type_registry` is kept hot about: its one

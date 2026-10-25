@@ -95,7 +95,7 @@ fn drawn_messages(random: &mut RandomSource) -> (Vec<ClientMessage>, Vec<ServerM
         ClientMessage::SetPace(random.percent_chance(50).then(|| random.next_draw() as u32)),
         ClientMessage::MakeWorld(drawn_parameters(random, 2)),
         ClientMessage::OpenWorld("a world's name, ünïcode and all".to_string()),
-        ClientMessage::Save(String::new()),
+        ClientMessage::Save,
         ClientMessage::ListWorlds,
         ClientMessage::Call(random.next_draw(), drawn_words(random, call_arguments)),
     ];

@@ -109,7 +109,7 @@ fn a_server_tells_each_client_joining_its_world_the_world_s_types_first() {
                 answer => return answer,
             }
         });
-        assert!(matches!(answers.next(), Some(ServerMessage::CallRefused(why_refused)) if why_refused.contains("no function a client may call")), "client {client}: a plane is no call");
+        assert!(matches!(answers.next(), Some(ServerMessage::CallRefused(why_refused)) if why_refused.contains("no client call is of the ID")), "client {client}: a plane is no call");
         assert!(matches!(answers.next(), Some(ServerMessage::Worlds(_))), "client {client}: the next ask answered after it");
         // A call a client may make -- the world generation's first parameter -- answered with its value.
         send(&mut ClientMessage::Call(crate::worlds::type_id_named(basegame::worldgen::calls::WORLDGEN_PARAMETER_CALL), vec![0]), &mut to_server).expect("sent");

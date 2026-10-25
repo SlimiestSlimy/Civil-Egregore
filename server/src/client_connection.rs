@@ -108,10 +108,7 @@ pub fn serve_clients(clean_parameters: &CleanServerParameters, register_types: R
             for ask in asks {
                 let answer = match ask {
                     ClientMessage::ListWorlds => ServerMessage::Worlds(worlds_in(&utilities::settings::worlds())),
-                    ClientMessage::Call(call, arguments) => match calls_host.call(call, arguments) {
-                        Ok(answer) => ServerMessage::Answered(answer),
-                        Err(why_refused) => ServerMessage::CallRefused(why_refused),
-                    },
+                    ClientMessage::Call(call, arguments) => ServerMessage::of_answer(calls_host.call(call, arguments)),
                     _ => continue,
                 };
                 answers_outgoing.lock().expect("the client's connection").send_to_client(answer);
@@ -164,7 +161,7 @@ fn serve_one_client(client: TcpStream, host: &Host, ask_sender: &std::sync::mpsc
             ClientMessage::SetPace(pace) => _ = host.set_pace(pace),
             ClientMessage::MakeWorld(parameters) => _ = host.make_world(parameters),
             ClientMessage::OpenWorld(world_name) => _ = host.open_world(world_name),
-            ClientMessage::Save(world_name) => _ = host.save_world(world_name),
+            ClientMessage::Save => _ = host.save_world(),
             // Answered, in the order asked: a client matches each answer to its ask by that order.
             ask @ (ClientMessage::ListWorlds | ClientMessage::Call(..)) => _ = ask_sender.send(ask),
         }

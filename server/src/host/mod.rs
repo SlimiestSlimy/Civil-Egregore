@@ -66,9 +66,8 @@ enum HostRequest {
     /// A client's call of the function whose ID is this, with these words
     /// for arguments: answered, or refused, on the sender.
     Call(u64, Vec<u64>, Sender<Result<Vec<u64>, String>>),
-    /// Save the world run under this name in the worlds' folder, its
-    /// name from then ([`Frame::named`]).
-    Save(String),
+    /// Save the world run in its folder.
+    Save,
 }
 
 /// The host, as a client holds it: each call sent to the host's thread,
@@ -138,9 +137,8 @@ impl Host {
         self.request_sender.send(HostRequest::RunWorld(Box::new(world))).is_ok()
     }
 
-    /// Saves the world run under `world_name` in the worlds' folder, its name
-    /// from then ([`Frame::named`]).
-    pub fn save_world(&self, world_name: String) -> bool {
-        self.request_sender.send(HostRequest::Save(world_name)).is_ok()
+    /// Saves the world run in its folder.
+    pub fn save_world(&self) -> bool {
+        self.request_sender.send(HostRequest::Save).is_ok()
     }
 }

@@ -8,7 +8,8 @@
 
 use crate::worldgen::{WorldGeneration, RESET_CONFIG_FILE, WORLDGEN_CONFIG_FILE};
 use protocol::type_registry::{ClientCallType, RegisteredType, Registration};
-use server::simulation::simulation_api::{CallCode, CallContext};
+use protocol::kinds::server::client_call::{AnswerCall, ClientCall, ClientCallLibrary};
+use protocol::kinds::server::handles::ServerSetUp;
 use std::sync::Arc;
 
 /// The call reading a worldgen parameter the world is reset with: its
@@ -51,50 +52,70 @@ impl WorldgenCalls {
 /// The registrations of the world generation's calls, each its master,
 /// with its code.
 pub fn call_registrations(world_generation: &str) -> [Registration; 3] {
-    [
-        Registration::client_call(WORLDGEN_PARAMETER_CALL, world_generation).with_library(Arc::new(CallCode::new(worldgen_parameter))),
-        Registration::client_call(SET_WORLDGEN_PARAMETER_CALL, world_generation).with_library(Arc::new(CallCode::new(set_worldgen_parameter))),
-        Registration::client_call(RESET_WORLD_CALL, world_generation).with_library(Arc::new(CallCode::new(reset_world))),
-    ]
+    let call = |name: &str, code: Box<dyn ClientCall>| Registration::client_call(name, world_generation).with_library(Arc::new(ClientCallLibrary(code)));
+    [call(WORLDGEN_PARAMETER_CALL, Box::new(WorldgenParameter)), call(SET_WORLDGEN_PARAMETER_CALL, Box::new(SetWorldgenParameter)), call(RESET_WORLD_CALL, Box::new(ResetWorld))]
 }
 
-/// The worldgen parameter at the place `arguments` names, as the
-/// world's reset is to read it ([`WorldGeneration::read_reset_config`]):
-/// or why not.
-fn worldgen_parameter(call_context: &mut CallContext, arguments: &[u64]) -> Result<Vec<u64>, String> {
-    let &[place] = arguments else {
-        return Err(format!("{WORLDGEN_PARAMETER_CALL}: one word, the parameter's place"));
-    };
-    let read = WorldGeneration::DEFAULT.read_reset_config(call_context.mod_config_folder())?.worldgen_parameters();
-    let (_, value) = parameter_at(&read, place)?;
-    Ok(vec![*value])
-}
+/// [`WORLDGEN_PARAMETER_CALL`]: the worldgen parameter at the place its
+/// argument names, as the world's reset is to read it
+/// ([`WorldGeneration::read_reset_config`]).
+struct WorldgenParameter;
 
-/// Sets the worldgen parameter at the place `arguments` names to the
-/// value after it, for the world's reset -- in its config file, the
-/// world running generated as it was: or why not.
-fn set_worldgen_parameter(call_context: &mut CallContext, arguments: &[u64]) -> Result<Vec<u64>, String> {
-    let &[place, value] = arguments else {
-        return Err(format!("{SET_WORLDGEN_PARAMETER_CALL}: two words, the parameter's place and its value"));
-    };
-    let for_reset = WorldGeneration::DEFAULT.read_reset_config(call_context.mod_config_folder())?;
-    let (name, _) = parameter_at(&for_reset.worldgen_parameters(), place)?.clone();
-    for_reset.with_worldgen_parameters(&[(name, value)]).write_reset_config(call_context.mod_config_folder())?;
-    Ok(Vec::new())
-}
-
-/// Resets the world, the config file of its reset -- if one was written
-/// -- made the world's own first: nothing taken, nothing answered.
-fn reset_world(call_context: &mut CallContext, arguments: &[u64]) -> Result<Vec<u64>, String> {
-    if !arguments.is_empty() {
-        return Err(format!("{RESET_WORLD_CALL}: no words"));
+impl ClientCall for WorldgenParameter {
+    /// Answering from the base game's folder of the world's mod config.
+    fn set_up(&self, server: &ServerSetUp) -> Result<Box<AnswerCall>, String> {
+        let config_folder = server.mod_config_folder().to_path_buf();
+        Ok(Box::new(move |_, arguments| {
+            let &[place] = arguments else {
+                return Err(format!("{WORLDGEN_PARAMETER_CALL}: one word, the parameter's place"));
+            };
+            let read = WorldGeneration::DEFAULT.read_reset_config(&config_folder)?.worldgen_parameters();
+            let (_, value) = parameter_at(&read, place)?;
+            Ok(vec![*value])
+        }))
     }
-    let (reset_path, world_path) = (call_context.mod_config_folder().join(RESET_CONFIG_FILE), call_context.mod_config_folder().join(WORLDGEN_CONFIG_FILE));
-    if reset_path.exists() {
-        std::fs::rename(&reset_path, &world_path).map_err(|error| format!("{}: {error}", reset_path.display()))?;
+}
+
+/// [`SET_WORLDGEN_PARAMETER_CALL`]: sets the worldgen parameter at the
+/// place its first argument names to the second, for the world's reset
+/// -- in its config file, the world running generated as it was.
+struct SetWorldgenParameter;
+
+impl ClientCall for SetWorldgenParameter {
+    /// Writing into the base game's folder of the world's mod config.
+    fn set_up(&self, server: &ServerSetUp) -> Result<Box<AnswerCall>, String> {
+        let config_folder = server.mod_config_folder().to_path_buf();
+        Ok(Box::new(move |_, arguments| {
+            let &[place, value] = arguments else {
+                return Err(format!("{SET_WORLDGEN_PARAMETER_CALL}: two words, the parameter's place and its value"));
+            };
+            let for_reset = WorldGeneration::DEFAULT.read_reset_config(&config_folder)?;
+            let (name, _) = parameter_at(&for_reset.worldgen_parameters(), place)?.clone();
+            for_reset.with_worldgen_parameters(&[(name, value)]).write_reset_config(&config_folder)?;
+            Ok(Vec::new())
+        }))
     }
-    call_context.reset_world();
-    Ok(Vec::new())
+}
+
+/// [`RESET_WORLD_CALL`]: resets the world, the config file of its reset
+/// -- if one was written -- made the world's own first.
+struct ResetWorld;
+
+impl ClientCall for ResetWorld {
+    /// Its files in the base game's folder of the world's mod config.
+    fn set_up(&self, server: &ServerSetUp) -> Result<Box<AnswerCall>, String> {
+        let (reset_path, world_path) = (server.mod_config_folder().join(RESET_CONFIG_FILE), server.mod_config_folder().join(WORLDGEN_CONFIG_FILE));
+        Ok(Box::new(move |between_ticks, arguments| {
+            if !arguments.is_empty() {
+                return Err(format!("{RESET_WORLD_CALL}: no words"));
+            }
+            if reset_path.exists() {
+                std::fs::rename(&reset_path, &world_path).map_err(|error| format!("{}: {error}", reset_path.display()))?;
+            }
+            between_ticks.reset_world();
+            Ok(Vec::new())
+        }))
+    }
 }
 
 /// The parameter at `place` among `worldgen_parameters`: or why there

@@ -33,7 +33,9 @@ fn the_base_game_asks_the_simulation_api_alone() {
         for (line_index, line) in fs::read_to_string(source_file).expect("read").lines().enumerate() {
             let code_part = line.split_once("//").map_or(line, |(before_comment, _)| before_comment);
             let past_the_api = code_part.replace("server::simulation::simulation_api::", "");
-            if past_the_api.contains("server::") {
+            // The server crate's paths alone: `kinds::server::` is protocol's.
+            let names_the_server = past_the_api.match_indices("server::").any(|(found_at, _)| !past_the_api[..found_at].ends_with(|before: char| before == ':' || before == '_' || before.is_alphanumeric()));
+            if names_the_server {
                 wrong_places.push(format!("{shown_path}:{}: `{}`", line_index + 1, code_part.trim()));
             }
         }

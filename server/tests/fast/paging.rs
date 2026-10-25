@@ -2,7 +2,7 @@
 //! superchunks' images in memory is the world keeping them all.
 
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, CAMERA_FORCES_SUPERCHUNKS_HOT, COLD_POOL_BYTES, SEED};
-use crate::whole_worlds::{world_contents, folder};
+use crate::whole_worlds::world_contents;
 use utilities::coordinates::{SuperchunkIndex, WORLD_SIDE_SUPERCHUNKS};
 use crate::{World, COOL_TICKS, WARM_TICKS};
 use protocol::pipe::frame::Viewport;
@@ -44,8 +44,8 @@ fn the_same(paged: &mut World, kept_world: &mut World) -> bool {
 /// cold image in memory pages them out, makes them hot again from
 /// disk, and is at every stop the world that keeps them all. Saved
 /// and loaded keeping none, its images are left in the save and it is
-/// that world still; saved again there and elsewhere, both saves load
-/// as it; and it goes on as that world.
+/// that world still; saved again there, the save loads as it; and it
+/// goes on as that world.
 #[test]
 fn a_world_paged_to_disk_is_the_world_kept_in_memory() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
@@ -65,18 +65,15 @@ fn a_world_paged_to_disk_is_the_world_kept_in_memory() {
     }
     assert!(been_on_disk.len() >= 3 && hot_again, "{} superchunks paged out, one hot again: {hot_again}", been_on_disk.len());
 
-    let (saved_in, copied_to) = (folder("paging_saved"), folder("paging_copied"));
-    crate::save(&saved_in, &mut paged).expect("saved");
+    crate::save(&mut paged).expect("saved");
+    let saved_in = paged.folder().to_path_buf();
     let saved_types = std::sync::Arc::new(crate::read_types(&saved_in, crate::test_game::TestGame::register_types).expect("its types"));
     let mut loaded_world = crate::run_world(&saved_in, &saved_types, &CleanServerParameters::default().with(COLD_POOL_BYTES, ParameterValue::Integer(0))).expect("loaded");
     assert!(loaded_world.chunk_storage().on_disk() > 0, "images left in the save");
     kept_world.keep_viewport(None);
     assert!(the_same(&mut loaded_world, &mut kept_world), "loaded as the world that kept its images");
-    crate::save(&saved_in, &mut loaded_world).expect("saved where it was loaded from");
-    crate::save(&copied_to, &mut loaded_world).expect("saved elsewhere");
-    for save in [&saved_in, &copied_to] {
-        assert!(the_same(&mut crate::whole_worlds::opened(save).expect("loaded"), &mut kept_world), "the save in {}", save.display());
-    }
+    crate::save(&mut loaded_world).expect("saved where it was loaded from");
+    assert!(the_same(&mut crate::whole_worlds::opened(&saved_in).expect("loaded"), &mut kept_world), "saved again");
     drop(paged);
     for &camera_cartesian_again in &places {
         watch_camera_at(&mut loaded_world, &mut kept_world, camera_cartesian_again, &mut been_on_disk);

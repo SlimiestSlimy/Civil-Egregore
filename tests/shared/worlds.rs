@@ -13,6 +13,8 @@ use server::simulation::simulation_api::{cell_reads_and_writes, entity_reads_and
 use protocol::server_types::entity::EntityBaseData;
 use protocol::server_types::attribute_layouts::Attribute;
 use protocol::server_types::attributes::AttributeBlock;
+use protocol::kinds::server::client_call::{AnswerCall, ClientCall, ClientCallLibrary};
+use protocol::kinds::server::handles::ServerSetUp;
 use basegame::worldgen::WorldGeneration;
 use basegame::base_types::BaseTypes;
 use protocol::type_registry::{in_bundle, FrozenTypeRegistry, RegisteredType, TypeRegistry};
@@ -86,17 +88,25 @@ pub fn test_tiles_registered(type_registry: &mut TypeRegistry) -> Result<(), Str
 }
 
 /// The tests' own function a client may call, belonging to the world
-/// generation: it answers the world's seed and tick, then the words it
-/// was called with.
+/// generation: it answers the words it was called with, last first.
 pub const TEST_CALL: &str = "test call";
+
+/// [`TEST_CALL`]'s code.
+struct TestCall;
+
+impl ClientCall for TestCall {
+    /// Nothing of the world's taken.
+    fn set_up(&self, _: &ServerSetUp) -> Result<Box<AnswerCall>, String> {
+        Ok(Box::new(|_, arguments| Ok(arguments.iter().rev().copied().collect())))
+    }
+}
 
 /// The base game's types and [`TEST_CALL`]: a game of the tests' own,
 /// as initialization hands one the server.
 pub fn types_with_test_call(type_registry: &mut TypeRegistry) -> Result<(), String> {
     basegame::default_types::register_types(type_registry)?;
-    let echo = server::simulation::simulation_api::CallCode::new(|call_context, arguments| Ok([call_context.seed(), call_context.tick()].into_iter().chain(arguments.iter().copied()).collect()));
     let mut tests = type_registry.open_bundle(TESTS_BUNDLE).map_err(|refusal| format!("{TESTS_BUNDLE}: {refusal:?}"))?;
-    tests.register(protocol::type_registry::Registration::client_call(TEST_CALL, &in_bundle(BASE_BUNDLE, "world generation")).with_library(Arc::new(echo))).map(drop).map_err(|refusal| format!("{TEST_CALL}: {refusal:?}"))
+    tests.register(protocol::type_registry::Registration::client_call(TEST_CALL, &in_bundle(BASE_BUNDLE, "world generation")).with_library(Arc::new(ClientCallLibrary(Box::new(TestCall))))).map(drop).map_err(|refusal| format!("{TEST_CALL}: {refusal:?}"))
 }
 
 /// The probe's types, the base game's and [`TEST_TILES`]: a game of the

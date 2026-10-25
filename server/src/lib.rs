@@ -80,6 +80,7 @@ use crate::simulation::simulation_api::SetUpWorldgen;
 use crate::simulation::{ColdPoolPaging, SimulationHandle};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use protocol::kinds::server::client_call::WorldClientCalls;
 use protocol::type_registry::FrozenTypeRegistry;
 use protocol::server_parameters::CleanServerParameters;
 use protocol::world_types::RegisterTypes;
@@ -110,6 +111,9 @@ pub struct World {
     pub(crate) frozen_type_registry: Arc<FrozenTypeRegistry>,
     /// The world itself, as the simulation holds it.
     pub(crate) simulation_handle: SimulationHandle,
+    /// The functions of its types a client may call, set up with its
+    /// folder's mod config: what a call is answered by.
+    pub(crate) client_calls: WorldClientCalls,
 }
 
 impl World {
@@ -121,7 +125,8 @@ impl World {
     /// is given.
     fn empty_world(world_info: WorldInfo, folder: &Path, worldgen: SetUpWorldgen, thread_count: Option<usize>, frozen_type_registry: Arc<FrozenTypeRegistry>) -> Result<Self, String> {
         let simulation_handle = SimulationHandle::new(&world_info, worldgen, &frozen_type_registry, thread_count, ColdPoolPaging { folder: paging_folder(), bytes_kept: COLD_POOL_BYTES_KEPT })?;
-        Ok(Self { world_info, folder: folder.to_path_buf(), frozen_type_registry, simulation_handle })
+        let client_calls = WorldClientCalls::set_up(&frozen_type_registry, &folder.join(MOD_CONFIG))?;
+        Ok(Self { world_info, folder: folder.to_path_buf(), frozen_type_registry, simulation_handle, client_calls })
     }
 
     /// The types it runs with.

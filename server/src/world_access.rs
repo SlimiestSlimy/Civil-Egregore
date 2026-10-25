@@ -4,6 +4,7 @@
 //! The server does none of it: each call is the simulation's.
 
 use crate::{World, WorldInfo};
+use protocol::kinds::server::handles::BetweenTicks;
 use crate::bitplane_manager::{BitmapArena, Write, WritesApplied};
 use crate::chunk_storage::{ChunkStorage, LayerType};
 use utilities::coordinates::SuperchunkIndex;
@@ -26,6 +27,20 @@ pub(crate) struct CallAnswered {
     pub(crate) reset_asked: bool,
 }
 
+/// The server between two ticks as a call reaches it: what the call
+/// asked of the world, done once it is answered.
+struct CallBetweenTicks {
+    /// Whether the call asked for the world to be reset.
+    reset_asked: bool,
+}
+
+impl BetweenTicks for CallBetweenTicks {
+    /// Asked: the host resets the world once the call is answered.
+    fn reset_world(&mut self) {
+        self.reset_asked = true;
+    }
+}
+
 impl World {
     /// What the world is, and the tick it was made or loaded at.
     ///
@@ -37,14 +52,9 @@ impl World {
     /// A client's call of the function whose ID is `call`, with
     /// `arguments`, answered between two ticks.
     pub(crate) fn answer_call(&mut self, call: u64, arguments: &[u64]) -> CallAnswered {
-        let (call_code, mod_name) = match crate::simulation::rules::call_code_of(&self.frozen_type_registry, call) {
-            Ok(call_code_and_mod) => call_code_and_mod,
-            Err(why_refused) => return CallAnswered { answer: Err(why_refused), reset_asked: false },
-        };
-        let (tick, mod_config_folder) = (self.entity_store().current_tick(), self.folder.join(crate::MOD_CONFIG).join(mod_name));
-        let mut call_context = crate::simulation::simulation_api::CallContext { seed: self.world_info.seed, tick, mod_config_folder: &mod_config_folder, reset_asked: false };
-        let answer = call_code.answer(&mut call_context, arguments);
-        CallAnswered { answer, reset_asked: call_context.reset_asked }
+        let mut between_ticks = CallBetweenTicks { reset_asked: false };
+        let answer = self.client_calls.find(call).and_then(|answer_call| answer_call(&mut between_ticks, arguments));
+        CallAnswered { answer, reset_asked: between_ticks.reset_asked }
     }
 
     /// Its hot bitmaps: every layer type of every hot superchunk.

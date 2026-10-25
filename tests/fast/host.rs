@@ -43,7 +43,6 @@ fn a_frame_brings_a_plane_of_tiles_a_tile_at_a_time() {
     let seed = crate::worlds::seed_with_land(crate::test_seed::TestSeedHandle::open().seed(), &basegame::worldgen::WorldGeneration::DEFAULT);
     use server::simulation::simulation_api::{cell_reads_and_writes, tick_and_random_stream, CellIndex};
     use utilities::coordinates::{place_from_cartesian, CellCartesian, SUPERCHUNK_SIDE_CELLS};
-    let folder = crate::worlds::folder("tiles_in_frames");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
     let parameters = CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(SIDE, ParameterValue::Integer(2)).with(FORCED_HOT, crate::worlds::given());
     let (mut world, probe) = crate::worlds::probed_world(&crate::worlds::in_folder(parameters, "a_frame_brings_a_plane_of_tiles_a_tile_at_a_time", crate::worlds::flocked(0)), crate::worlds::test_tiles_registered);
@@ -69,7 +68,8 @@ fn a_frame_brings_a_plane_of_tiles_a_tile_at_a_time() {
         Vec::<()>::new()
     });
     assert_eq!(report.writes_applied.cells_changed, numbers.len() as u64);
-    server::save(&folder, &mut world).expect("saved");
+    server::save(&mut world).expect("saved");
+    let folder = world.folder().to_path_buf();
 
     let (host, frame_receiver) = Host::start_on_thread(crate::worlds::types_with_test_tiles);
     assert!(host.set_paused(true) && host.open_world(folder.to_string_lossy().into_owned()));
@@ -94,9 +94,9 @@ fn a_frame_brings_a_plane_of_tiles_a_tile_at_a_time() {
 
 /// A client's call is answered by the world running, between two ticks,
 /// with what the function's code makes of its words -- here the tests'
-/// own call, its world's seed and tick, then the words; and refused, the
-/// host going on, when no world runs, when no type is of its ID, and
-/// when the type of its ID is none a client may call.
+/// own call, the words last first; and refused, the host going on, when
+/// no world runs and when no client call is of its ID, whether no type
+/// is or the type is another kind.
 #[test]
 fn a_call_is_answered_by_the_world_running_and_only_a_client_call_is() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
@@ -107,10 +107,10 @@ fn a_call_is_answered_by_the_world_running_and_only_a_client_call_is() {
     let parameters = crate::worlds::in_folder(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), "a_call_is_answered_by_the_world_running_and_only_a_client_call_is", WorldGeneration::DEFAULT);
     assert!(host.set_paused(true) && host.make_world(parameters));
     let arguments = vec![seed ^ 7, 3, 5];
-    assert_eq!(host.call(test_call, arguments.clone()), Ok([seed, 0].into_iter().chain(arguments).collect::<Vec<_>>()), "the seed, tick 0 -- paused -- and the words");
+    assert_eq!(host.call(test_call, arguments.clone()), Ok(vec![5, 3, seed ^ 7]), "the words, last first");
     let refused = |call: u64| host.call(call, Vec::new()).expect_err("refused");
-    assert!(refused(test_call ^ 1 << 40).contains("no type is of the ID"));
-    assert!(refused(game_base().grass.type_id()).contains("no function a client may call"), "a plane's ID");
+    assert!(refused(test_call ^ 1 << 40).contains("no client call is of the ID"));
+    assert!(refused(game_base().grass.type_id()).contains("no client call is of the ID"), "a plane's ID");
     assert!(host.call(test_call, Vec::new()).is_ok(), "the host goes on after a call refused");
 }
 

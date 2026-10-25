@@ -119,9 +119,9 @@ impl HostThread {
                         // The caller gone has no use for its answer.
                         _ = answer_sender.send(call_answered.answer);
                     }
-                    Ok(HostRequest::Save(name_to_save)) => {
+                    Ok(HostRequest::Save) => {
                         self.reset_now();
-                        self.save(name_to_save);
+                        self.save();
                     }
                     Err(TryRecvError::Empty) => break,
                     Err(TryRecvError::Disconnected) => return,
@@ -203,19 +203,16 @@ impl HostThread {
         });
     }
 
-    /// Saves the world run under `world_name`, if one runs.
-    fn save(&mut self, world_name: String) {
+    /// Saves the world run in its folder, if one runs.
+    fn save(&mut self) {
         let Some(running_world) = &mut self.running_world else {
             return;
         };
         let world = &mut running_world.world;
-        self.last_outcome = Some(match crate::save(&utilities::settings::world(&world_name), world) {
-            Ok(save_written) => {
-                let saved_text = format!("{world_name} saved at tick {}: {} superchunks, {} entities", world.entity_store().current_tick(), save_written.superchunks, save_written.entities_written);
-                self.world_name = Some(world_name);
-                saved_text
-            }
-            Err(save_error) => format!("{world_name} not saved: {save_error}"),
+        let folder_text = world.folder().display().to_string();
+        self.last_outcome = Some(match crate::save(world) {
+            Ok(save_written) => format!("{folder_text} saved at tick {}: {} superchunks, {} entities", world.entity_store().current_tick(), save_written.superchunks, save_written.entities_written),
+            Err(save_error) => format!("{folder_text} not saved: {save_error}"),
         });
         self.next_tick = Instant::now();
     }

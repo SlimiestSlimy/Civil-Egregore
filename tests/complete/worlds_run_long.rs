@@ -1,7 +1,7 @@
 //! Worlds run for long: stopped and saved often, they come to the same.
 
 use protocol::server_parameters::{CleanServerParameters, ParameterValue, SEED};
-use crate::worlds::{base, cells_of_grass, every_entity, folder, nothing_more, one_flock_world, probe_and_base_game};
+use crate::worlds::{base, cells_of_grass, every_entity, nothing_more, one_flock_world, probe_and_base_game};
 use server::world_hash;
 
 /// A world run 30,000 ticks straight, and the same world saved and
@@ -16,15 +16,15 @@ fn a_world_stopped_often_comes_to_the_same() {
     for _ in 1..LAST_TICK {
         straight_world.tick();
     }
-    let folder = folder("complete");
     let (mut stopped_world, _) = one_flock_world("a_world_stopped_often_comes_to_the_same_stopped", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000, nothing_more);
+    let folder = stopped_world.folder().to_path_buf();
     let mut tick = 1;
     for stop_tick in (5_000..=LAST_TICK).step_by(5_000) {
         while tick < stop_tick {
             stopped_world.tick();
             tick += 1;
         }
-        server::save(&folder, &mut stopped_world).expect("saved");
+        server::save(&mut stopped_world).expect("saved");
         stopped_world = crate::worlds::opened(&folder, probe_and_base_game).expect("loaded");
     }
     // A cooled superchunk's last changes wait in the writeback ring: flushed, as a save's are, before the two are hashed.

@@ -21,8 +21,8 @@ pub enum ClientMessage {
     MakeWorld(CleanServerParameters),
     /// Run the world of this name in the worlds' folder in place of any run.
     OpenWorld(String),
-    /// Save the world run under this name in the worlds' folder.
-    Save(String),
+    /// Save the world run in its folder.
+    Save,
     /// The names of the worlds in the worlds' folder: answered with them.
     #[default]
     ListWorlds,
@@ -84,10 +84,7 @@ impl Wired for ClientMessage {
                 words.push(4);
                 world_name.put(words);
             }
-            Self::Save(world_name) => {
-                words.push(5);
-                world_name.put(words);
-            }
+            Self::Save => words.push(5),
             Self::ListWorlds => words.push(6),
             Self::Call(call, arguments) => {
                 words.push(7);
@@ -104,12 +101,31 @@ impl Wired for ClientMessage {
             2 => Self::SetPace(taken(Default::default(), wire)?),
             3 => Self::MakeWorld(taken(Default::default(), wire)?),
             4 => Self::OpenWorld(taken(Default::default(), wire)?),
-            5 => Self::Save(taken(Default::default(), wire)?),
+            5 => Self::Save,
             6 => Self::ListWorlds,
             7 => Self::Call(taken(0, wire)?, taken(Vec::new(), wire)?),
             _ => return None,
         };
         Some(())
+    }
+}
+
+impl ServerMessage {
+    /// A call's answer as it goes back: its words, or why it was refused.
+    pub fn of_answer(answer: Result<Vec<u64>, String>) -> Self {
+        match answer {
+            Ok(words) => Self::Answered(words),
+            Err(why_refused) => Self::CallRefused(why_refused),
+        }
+    }
+
+    /// The call's answer this is, if it is one.
+    pub fn into_answer(self) -> Option<Result<Vec<u64>, String>> {
+        match self {
+            Self::Answered(words) => Some(Ok(words)),
+            Self::CallRefused(why_refused) => Some(Err(why_refused)),
+            _ => None,
+        }
     }
 }
 

@@ -1,8 +1,7 @@
-//! A world saved in a folder and loaded as it runs again from it
-//! ([`save`], [`load_saved`]): every superchunk, hot and cold, the types
-//! it was made with -- loaded with it, the world's own, each the type of
-//! its name the code registers -- and its mods and their config, carried
-//! along to a folder it is saved into anew.
+//! A world saved in its folder and loaded as it runs again from it
+//! ([`save`], [`load_saved`]): every superchunk, hot and cold, and the
+//! types it was made with -- loaded with it, the world's own, each the
+//! type of its name the code registers.
 
 use crate::World;
 use crate::chunk_storage::disk::{self, DiskError, HotSuperchunks, WorldInfo};
@@ -42,21 +41,13 @@ pub fn write_types(folder: &Path, frozen_type_registry: &FrozenTypeRegistry) -> 
     Ok(types_text.len() as u64)
 }
 
-/// Saves `world` in `folder`, made if not there -- between two ticks --
-/// its folder from then on: one other than its own given its mods and
-/// their config, copied. An image paged to disk is copied there file to
-/// file, never read into memory.
+/// Saves `world` in its folder, between two ticks.
 /// Every dirty bitmap is written back and the ring flushed first, so
 /// the cold pool's images are the world's cells; each superchunk's
 /// state is its live one if hot, as kept if cold; and which superchunks
 /// are hot, which of them cooling, and which warming, in the hot file.
-pub fn save(folder: &Path, world: &mut World) -> Result<SaveWritten, DiskError> {
-    if folder != world.folder {
-        for carried_folder in &crate::WORLD_FOLDERS[1..] {
-            copy_folder(&world.folder.join(carried_folder), &folder.join(carried_folder))?;
-        }
-        world.folder = folder.to_path_buf();
-    }
+pub fn save(world: &mut World) -> Result<SaveWritten, DiskError> {
+    let folder = world.folder.as_path();
     world.simulation_handle.ready_for_save();
     let simulation_handle = &world.simulation_handle;
     let mut save_written = SaveWritten::default();
@@ -80,24 +71,6 @@ pub fn save(folder: &Path, world: &mut World) -> Result<SaveWritten, DiskError> 
     let world_info = WorldInfo { tick: simulation_handle.entity_store().current_tick(), ..world.world_info.clone() };
     save_written.bytes_written += disk::write_world(folder, &world_info)?;
     Ok(save_written)
-}
-
-/// `from_folder`'s files and folders, and theirs, copied into `to_folder`,
-/// made if not there: none if there is no `from_folder`.
-fn copy_folder(from_folder: &Path, to_folder: &Path) -> Result<(), DiskError> {
-    std::fs::create_dir_all(to_folder).map_err(|io_error| DiskError::IoFailed(to_folder.to_path_buf(), io_error))?;
-    let Ok(entries) = std::fs::read_dir(from_folder) else {
-        return Ok(());
-    };
-    for entry in entries.flatten() {
-        let (from_path, to_path) = (entry.path(), to_folder.join(entry.file_name()));
-        if from_path.is_dir() {
-            copy_folder(&from_path, &to_path)?;
-        } else {
-            std::fs::copy(&from_path, &to_path).map_err(|io_error| DiskError::IoFailed(from_path, io_error))?;
-        }
-    }
-    Ok(())
 }
 
 /// The worlds saved in `folder`, by their folders' names, sorted:

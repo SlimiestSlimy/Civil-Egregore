@@ -110,8 +110,8 @@ fn a_superchunk_cooling_stays_hot_until_due() {
 
     take_away(&mut world);
     let second_due_tick = world.entity_store().current_tick() + COOL_TICKS;
-    let folder = crate::whole_worlds::folder("cooling");
-    crate::save(&folder, &mut world).expect("saved");
+    crate::save(&mut world).expect("saved");
+    let folder = world.folder().to_path_buf();
     world = crate::whole_worlds::opened(&folder).expect("loaded");
     assert!(cooling(&world) == halo && world.cooling().all(|(_, goes_cold_tick)| goes_cold_tick == second_due_tick), "cooling as it was");
     let mut cooled_count = 0;
@@ -175,7 +175,7 @@ fn a_superchunk_gone_cold_comes_back_as_it_was() {
     let halos = world.bitmap_arena().superchunk_indices();
     assert!(world.warming().next().is_none() && world.cooling().next().is_none() && halos == twin_world.bitmap_arena().superchunk_indices(), "the two alike, none warming or cooling");
     world.keep_hot(&[]);
-    crate::save(&crate::whole_worlds::folder("gone_cold"), &mut world).expect("saved");
+    crate::save(&mut world).expect("saved");
     assert_eq!(world.bitmap_arena().cooled_count(), 0, "flushed, so let go");
     world.keep_hot(&halos);
     for _ in 0..500 {
@@ -210,15 +210,13 @@ fn a_world_of_a_size_is_hot_within_it_only() {
         world.tick();
         assert!(world.bitmap_arena().superchunk_indices().into_iter().chain(world.warming().map(|(superchunk, _)| superchunk)).all(|superchunk| world.halos().hot.is_within_world(superchunk)));
     }
-    let folder = crate::whole_worlds::folder("sized");
-    crate::save(&folder, &mut world).expect("saved");
-    assert_eq!(crate::whole_worlds::opened(&folder).expect("loaded").halos().hot, world.halos().hot, "its size, kept");
+    crate::save(&mut world).expect("saved");
+    assert_eq!(crate::whole_worlds::opened(world.folder()).expect("loaded").halos().hot, world.halos().hot, "its size, kept");
 
     let mut world = crate::test_game::made(&crate::test_game::in_folder(sized.with(FORCED_HOT, crate::whole_worlds::given()), "a_world_of_a_size_is_hot_within_it_only_forced", 0));
     assert_eq!(world.bitmap_arena().superchunk_indices().len(), (side_superchunks * side_superchunks) as usize, "forced hot: all of it, no sheep needed");
-    _ = std::fs::remove_dir_all(&folder);
-    crate::save(&folder, &mut world).expect("saved");
-    let mut loaded_world = crate::whole_worlds::opened(&folder).expect("loaded");
+    crate::save(&mut world).expect("saved");
+    let mut loaded_world = crate::whole_worlds::opened(world.folder()).expect("loaded");
     assert_eq!(loaded_world.halos().hot, world.halos().hot, "forced, kept");
     for _ in 0..=WARM_TICKS {
         loaded_world.tick();
@@ -251,9 +249,8 @@ fn the_camera_forces_the_superchunks_of_the_viewport_hot() {
         assert!(world.entity_store().current_tick() < 4 * WARM_TICKS, "the viewport generated and hot");
         world.tick();
     }
-    let folder = crate::whole_worlds::folder("camera");
-    crate::save(&folder, &mut world).expect("saved");
-    let loaded_world = crate::whole_worlds::opened(&folder).expect("loaded");
+    crate::save(&mut world).expect("saved");
+    let loaded_world = crate::whole_worlds::opened(world.folder()).expect("loaded");
     assert!(loaded_world.world_info().camera_forces_superchunks_hot, "that its camera forces superchunks hot, kept");
 
     let mut unseen_world = crate::test_game::made(&crate::test_game::in_folder(CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), "the_camera_forces_the_superchunks_of_the_viewport_hot_unseen", 0));

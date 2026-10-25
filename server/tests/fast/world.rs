@@ -18,18 +18,15 @@ use crate::test_game::STEPS_COUNT;
 #[test]
 fn a_world_loaded_goes_on_as_the_one_saved() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let folder = folder("goes_on");
     let (mut first_world, _) = crate::test_game::one_flock_world("a_world_loaded_goes_on_as_the_one_saved", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 3_000);
     for _ in 0..1_500 {
         first_world.tick();
     }
-    let save_written = crate::save(&folder, &mut first_world).expect("saved");
+    let save_written = crate::save(&mut first_world).expect("saved");
     assert_eq!((save_written.superchunks, save_written.entities_written), (first_world.chunk_storage().superchunks().count(), first_world.entity_store().len()));
 
-    let mut second_world = crate::whole_worlds::opened(&folder).expect("loaded");
+    let mut second_world = crate::whole_worlds::opened(first_world.folder()).expect("loaded");
     assert_eq!((second_world.world_info().seed, second_world.world_info().tick), (seed, 1_500));
-    let config_of = |world_folder: &std::path::Path| std::fs::read_to_string(world_folder.join(crate::MOD_CONFIG).join(crate::test_game::BUNDLE).join(crate::test_game::WALKERS_CONFIG_FILE)).expect("the test game's config");
-    assert_eq!(config_of(&folder), config_of(first_world.folder()), "its mods' config saved with it");
     assert_eq!(second_world.world_info().layers, first_world.world_info().layers);
     assert!(world_contents(&first_world) == world_contents(&second_world), "loaded as saved");
 
@@ -64,8 +61,8 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
     }
     let (warming, last_tick) = (warming.expect("seen above"), straight_world.entity_store().current_tick());
 
-    let folder = folder("mid_run");
     let (mut stopped_world, _) = crate::test_game::one_flock_world("a_world_saved_and_loaded_mid_run_comes_to_the_same_stopped", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 4_000);
+    let folder = stopped_world.folder().to_path_buf();
     let mut stop_ticks = vec![1, 700, 701, 1_900, 3_333, warming, last_tick];
     stop_ticks.sort_unstable();
     stop_ticks.dedup();
@@ -73,14 +70,14 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
         while stopped_world.entity_store().current_tick() < stop_tick {
             stopped_world.tick();
         }
-        crate::save(&folder, &mut stopped_world).expect("saved");
+        crate::save(&mut stopped_world).expect("saved");
         // What ran is dropped whole: the next stretch runs on what the files hold alone.
         stopped_world = crate::whole_worlds::opened(&folder).expect("loaded");
         assert_eq!((stopped_world.world_info().tick, stopped_world.broken_invariant()), (stop_tick, None));
     }
     assert_ne!(straight_world.entity_store().len(), 4_000, "a flock that was born into or died of, over the run");
     // The one that ran straight saved too: a superchunk gone cold on the way has its last cells in the writeback ring until a save, or the ring's need of room, puts them in its image.
-    crate::save(&folder.join("straight"), &mut straight_world).expect("saved");
+    crate::save(&mut straight_world).expect("saved");
     assert!(world_contents(&straight_world) == world_contents(&stopped_world), "the same at tick {last_tick}");
 }
 
@@ -90,10 +87,10 @@ fn a_world_saved_and_loaded_mid_run_comes_to_the_same() {
 /// in hexadecimal.
 #[test]
 fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
-    let folder = folder("files");
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let (mut saved_world, _) = crate::test_game::one_flock_world("a_save_is_a_directory_of_files_named_by_superchunk_index", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 10);
-    crate::save(&folder, &mut saved_world).expect("saved");
+    crate::save(&mut saved_world).expect("saved");
+    let folder = saved_world.folder().to_path_buf();
     let world_file_text = std::fs::read_to_string(folder.join("world.csv")).expect("the world's file");
     // No layers: they are the registry's.
     assert_eq!(world_file_text, format!("world,is\nformat,7\nseed,{}\ntick,0\n", utilities::seed::seed_as_hex(seed)), "no name: the folder's");
@@ -114,10 +111,10 @@ fn a_save_is_a_directory_of_files_named_by_superchunk_index() {
 /// one written, is refused.
 #[test]
 fn a_world_file_is_read_in_any_order() {
-    let folder = folder("any_order");
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     let (mut world, _) = crate::test_game::one_flock_world("a_world_file_is_read_in_any_order", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)).with(CAMERA_FORCES_SUPERCHUNKS_HOT, crate::whole_worlds::given()), 10);
-    crate::save(&folder, &mut world).expect("saved");
+    crate::save(&mut world).expect("saved");
+    let folder = world.folder().to_path_buf();
     let saved_info = disk::read_world(&folder).expect("read");
     let path = folder.join("world.csv");
     let world_file_text = std::fs::read_to_string(&path).expect("the world's file");
@@ -138,9 +135,11 @@ fn a_world_file_is_read_in_any_order() {
 #[test]
 fn files_that_are_not_a_save_are_refused() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let folder = folder("refused");
-    assert!(matches!(crate::whole_worlds::opened(&folder), Err(DiskError::IoFailed(..))), "no such folder");
-    crate::save(&folder, &mut crate::test_game::one_flock_world("files_that_are_not_a_save_are_refused", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 10).0).expect("saved");
+    assert!(matches!(crate::whole_worlds::opened(&folder("files_that_are_not_a_save_are_refused_none")), Err(DiskError::IoFailed(..))), "no such folder");
+    let (mut world, _) = crate::test_game::one_flock_world("files_that_are_not_a_save_are_refused", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 10);
+    crate::save(&mut world).expect("saved");
+    let folder = world.folder().to_path_buf();
+    drop(world);
     let state_path = std::fs::read_dir(folder.join("superchunks")).unwrap().map(|dir_entry| dir_entry.unwrap().path()).find(|path| path.extension().unwrap() == "state").unwrap();
     let whole_state = std::fs::read(&state_path).unwrap();
     std::fs::write(&state_path, &whole_state[..whole_state.len() - 8]).unwrap();
@@ -160,9 +159,9 @@ fn files_that_are_not_a_save_are_refused() {
 #[test]
 fn a_world_is_loaded_with_the_types_it_was_made_with() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
-    let folder = folder("types");
     let (mut world, _) = crate::test_game::one_flock_world("a_world_is_loaded_with_the_types_it_was_made_with", CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed)), 10);
-    crate::save(&folder, &mut world).expect("saved");
+    crate::save(&mut world).expect("saved");
+    let folder = world.folder().to_path_buf();
     let types_path = folder.join(protocol::world_types::TYPES_FILE);
     let types_text = std::fs::read_to_string(&types_path).expect("the types file");
     let lines: Vec<String> = types_text.lines().map(str::to_string).collect();
@@ -208,7 +207,6 @@ fn a_world_is_loaded_with_the_types_it_was_made_with() {
 fn a_plane_of_tiles_holds_a_number_a_tile_through_ticks_and_a_save() {
     let seed = crate::test_seed::TestSeedHandle::open().seed();
     use crate::bitplane_manager::Write;
-    let folder = folder("tiles");
     let mut test_random = utilities::rng::RandomSource::new(crate::test_seed::TestSeedHandle::open().seed());
     let (frozen_type_registry, test_game) = crate::test_game::TestGame::new_world_types();
     let test_tiles = test_game.tiles;
@@ -239,8 +237,8 @@ fn a_plane_of_tiles_holds_a_number_a_tile_through_ticks_and_a_save() {
         world.tick();
     }
     check_held(&world, "after ticks", &mut test_random);
-    crate::save(&folder, &mut world).expect("saved");
-    let loaded_world = crate::whole_worlds::opened(&folder).expect("loaded");
+    crate::save(&mut world).expect("saved");
+    let loaded_world = crate::whole_worlds::opened(world.folder()).expect("loaded");
     check_held(&loaded_world, "loaded from a save", &mut test_random);
     assert!(world_contents(&world) == world_contents(&loaded_world), "loaded as saved");
 }
@@ -269,7 +267,7 @@ fn a_world_is_created_set_up_and_run() {
     for _ in 0..10 {
         made_world.tick();
     }
-    crate::save(&folder, &mut made_world).expect("saved where it runs");
+    crate::save(&mut made_world).expect("saved where it runs");
     drop(made_world);
     let opened_world = crate::run_world(&folder, &std::sync::Arc::new(crate::read_types(&folder, crate::test_game::TestGame::register_types).expect("its types")), &CleanServerParameters::default().with(SEED, ParameterValue::Hex(seed ^ 1))).expect("opened");
     assert_eq!((opened_world.world_info().seed, opened_world.world_info().tick), (seed, 10), "the world saved, not another seed's");
