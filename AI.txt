@@ -122,8 +122,8 @@ THE TREE
 - THE ROOT (since the cleanup, 2026-10-25): a virtual workspace --
   utilities (the old one, kept as reference but built: "we are also
   keeping the old utilities as reference" / "but they can compile juat
-  fine so leave them be for now"), type_registry (out of protocol, "for
-  a while", isolated), game_packager (stale), AI_SCRATCHPAD (mine, empty;
+  fine so leave them be for now"), protocol (cdnf, kinds, type_names,
+  manifests, type_registry), game_packager (stale), AI_SCRATCHPAD (mine, empty;
   nothing depends on it) -- the version in [workspace.package]; tessera a
   workspace of its own ("keep in mind tessrra is its own isolated
   project"); reference/ (not built: compare_and_write/, protocol/,
@@ -458,7 +458,10 @@ NOW
   next step would be loading and downcasting, which we need real mods to
   make first". IDs in order, fresh: "because at world creation this same
   process is what runs the first time to make types.csv"; one counter
-  for all kinds, the kind's byte over it. client -- render rule,
+  for all kinds, the kind's byte over it. Then: "fold cdnf.rs and manifests.rs into
+  their folders lol / type registry is also a module of protocol" --
+  protocol/src/{cdnf,manifests,type_registry}/mod.rs; no type_registry
+  crate. client -- render rule,
   gui. Attributes: their size alone ("instead of "blocks" it should be
   "size""), in 16-byte blocks, 1 to 256 ("yes, it should've been like
   this from the beggining lol"), data words gone -- "atributes have a

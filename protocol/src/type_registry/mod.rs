@@ -1,16 +1,12 @@
 //! Civil Egregore's type registry: the mods' manifests, read and checked
-//! already ([`protocol::manifests::read_mods`]), made into one flat list
+//! already ([`crate::manifests::read_mods`]), made into one flat list
 //! of types ([`TypeRegistry::of_manifests`]) -- each bundle a type too,
 //! before its own -- each with its ID and its full name. Nothing is
 //! checked here: the manifests were.
 
-// Every item is documented, private ones included; `cargo clippy`
-// checks the private ones.
-#![warn(missing_docs, clippy::missing_docs_in_private_items)]
-
-use protocol::kinds::{Hook, Kind};
-use protocol::manifests::Manifest;
-use protocol::type_names::{BundleName, TypeName};
+use crate::kinds::{Hook, Kind};
+use crate::manifests::Manifest;
+use crate::type_names::{BundleName, TypeName};
 
 /// Where an ID keeps its kind: its first byte, over its number.
 pub const KIND_SHIFT: u32 = 56;

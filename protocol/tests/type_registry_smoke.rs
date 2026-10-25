@@ -2,7 +2,7 @@
 
 use protocol::kinds::{BundleFields, Kind, Side};
 use protocol::manifests::{read_mods, MANIFEST_FILE};
-use type_registry::{TypeRegistry, KIND_SHIFT};
+use protocol::type_registry::{TypeRegistry, KIND_SHIFT};
 use utilities::hash::hash_bytes;
 use std::path::{Path, PathBuf};
 

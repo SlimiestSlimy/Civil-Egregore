@@ -21,13 +21,5 @@ dependencies = [
 ]
 
 [[package]]
-name = "type_registry"
-version = "0.0.0"
-dependencies = [
- "protocol",
- "utilities",
-]
-
-[[package]]
 name = "utilities"
 version = "0.0.0"
