@@ -541,6 +541,19 @@ NOW
   basegame>server: no such bundle). The folder's rename to
   civil_egregore: "do the folder name change later yes" -- at a
   session's end, my memory copied to the new path first.
+- A MOD BUILT ON ANOTHER MACHINE (2026-10-25, "i can start a remote
+  session"): AI_SCRATCHPAD/FOREIGN_MOD_TEST.md walked a fresh remote
+  session through building the game, basegame and an out-of-tree mod
+  foreign (one server bundle downcasting basegame's GrassSeen); it
+  pushed the built library to the branch foreign-mod-test. Copied here
+  and loaded with this machine's basegame: 3 libraries loaded, the
+  downcast held. -C metadata the same on both machines (utilities
+  4362a3fed97132b8, protocol 49fc914d70399142, basegame_server
+  38514cd5050192e0) though the repository's absolute path differed and
+  the libraries' bytes did too: the metadata takes the compiler's
+  version and the crate's place in its workspace, not the machine. The
+  remote's rustup default (1.97) failed the mod's build -- a mod outside
+  the tree does not see rust-toolchain.toml (in LATER).
 - CSV GONE (2026-10-25): "delete csv from utilities and move cdnf there
   lol" -- utilities::cdnf (and cdnf::quoted, to write a quoted text);
   settings in settings.cdnf, a list of "name" : "value", values quoted;
@@ -690,10 +703,20 @@ LATER (every "for later" of the user's, and mine, as said)
 - A CDNF writer (2026-10-25): "eventually we will make a cdnf writer,
   thats why i needed you to make the tokenizer with proper tokens lol";
   cdnf::quoted is all there is yet.
-- A mod built on another machine (the user's suggestion, 2026-10-25,
-  "a little later when we have the 2 mods working here lol"): a remote
-  session compiles a mod from instructions left for it, the mod copied
-  here and loaded.
+- THE MOD TEMPLATE (2026-10-25): "thats exactly why were making a
+  mod_template crate. empty, but with all the setup required lol,
+  ideally the only setup is declaring the path of the game source
+  somewhere in cargo if possible, and all else is handled
+  automatically". And "remember mods depend on modpackager later btw".
+  Why: a mod outside the tree is out of reach of the game's
+  rust-toolchain.toml; on a rustup default of another version it fails
+  to build (E0514, "compiled by an incompatible version of rustc" -- the
+  foreign-machine test). Found: cargo 1.99 takes `include = [...]` in
+  .cargo/config.toml, stable, a path relative to that config file -- so
+  the template's config can be that one line, the game's path, and the
+  game's build write the file it includes (the flags, the --extern
+  libraries, -L). The toolchain no include sets: the mod packager,
+  built by the game's toolchain, building mods with it.
 - A mod built against another build of the game (mine, 2026-10-25): a
   bundle library loads on a rebuilt libprotocol.so and its TypeIds
   agree (the crate's metadata, not its source), but nothing checks it
