@@ -122,8 +122,9 @@ THE TREE
 - THE ROOT (since the cleanup, 2026-10-25): a virtual workspace --
   utilities (the old one, kept as reference but built: "we are also
   keeping the old utilities as reference" / "but they can compile juat
-  fine so leave them be for now"), protocol (cdnf, kinds, type_names,
-  manifests, type_registry), game_packager (stale), AI_SCRATCHPAD (mine, empty;
+  fine so leave them be for now"; cdnf in it, csv gone), protocol
+  (kinds, type_names, manifests, type_registry), basegame (its own
+  workspace), game_packager (stale), AI_SCRATCHPAD (mine, empty;
   nothing depends on it) -- the version in [workspace.package]; tessera a
   workspace of its own ("keep in mind tessrra is its own isolated
   project"); reference/ (not built: compare_and_write/, protocol/,
@@ -517,7 +518,33 @@ NOW
   refuses code for a type the manifest lacks, or none for a kind with
   code (entity proc, sca proc, worldgen, render proc, gui). Only bundles
   carry a path: "yes, only bundles should carry the paths lol" -- the
-  registry makes a bundle's library path whole, its mod's folder joined. client -- render rule,
+  registry makes a bundle's library path whole, its mod's folder joined.
+- ONE WORLD A PROCESS (2026-10-25): "there is one world per process,
+  opening a new world is closing the server, and opening a new one from
+  0. this is obligatory, not optional" / "the server is also just one per
+  process, one registry, one server one worlx". The handles as statics
+  weighed and let be: "maybe we dont need to do this static stuff at
+  all, the code works just fine already lol" -- they stay parameters. A
+  proc's server handle: the world read-only (&, the read phase), its
+  thread's queue its own (&mut).
+- TWO MODS (2026-10-25): "just basegame mod should be in civil egregore,
+  this s3cond mod should be out of tree". basegame>server, a sca proc
+  grass_seen downcasting basegame>common>grass's export at set up: one
+  bundle on another, in one mod; the client side loads common alone. And
+  meadow, out of the tree at ~/container/programming/Rust/meadow ("where
+  ok" / "meadow is fine, we just want to make sure the downcats work
+  across mods lol"): one server bundle, meadow_grows, downcasting the
+  base game's GrassSeen; --extern protocol and basegame_server from the
+  game's target/, the game's flags said again in its .cargo/config.toml
+  (outside the tree, the root's config is not read). Loaded with
+  basegame: the downcast holds across mods; alone, refused (depends on
+  basegame>server: no such bundle). The folder's rename to
+  civil_egregore: "do the folder name change later yes" -- at a
+  session's end, my memory copied to the new path first.
+- CSV GONE (2026-10-25): "delete csv from utilities and move cdnf there
+  lol" -- utilities::cdnf (and cdnf::quoted, to write a quoted text);
+  settings in settings.cdnf, a list of "name" : "value", values quoted;
+  default_settings.cdnf; the test seed in transient_data/test_seed.cdnf. client -- render rule,
   gui. Attributes: their size alone ("instead of "blocks" it should be
   "size""), in 16-byte blocks, 1 to 256 ("yes, it should've been like
   this from the beggining lol"), data words gone -- "atributes have a
@@ -660,6 +687,10 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- A mod built on another machine (the user's suggestion, 2026-10-25,
+  "a little later when we have the 2 mods working here lol"): a remote
+  session compiles a mod from instructions left for it, the mod copied
+  here and loaded.
 - A mod built against another build of the game (mine, 2026-10-25): a
   bundle library loads on a rebuilt libprotocol.so and its TypeIds
   agree (the crate's metadata, not its source), but nothing checks it

@@ -5,3 +5,7 @@ version = 4
 [[package]]
 name = "basegame_common"
 version = "0.0.0"
+
+[[package]]
+name = "basegame_server"
+version = "0.0.0"

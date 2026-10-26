@@ -1,5 +1,5 @@
 //! The test seed: the one seed every crate's tests grow what they run
-//! on from, kept in the workspace's `transient_data/test_seed.csv` and
+//! on from, kept in the workspace's `transient_data/test_seed.cdnf` and
 //! rolled every few uses (`docs/utilities.md`, "The seed"). Test
 //! infrastructure: beside `src/`, compiled into no library, each test
 //! program taking it by path --
@@ -20,15 +20,31 @@ pub const USES_BEFORE_THE_SEED_ROLLS: u64 = 5;
 /// file's seed, and it never rolls.
 pub const FREEZE_SEED: &str = "FREEZE_SEED";
 
-/// The file's columns.
-const SEED_COLUMNS: [&str; 2] = ["seed", "uses"];
+/// The file's fields, a list of them: the seed, and its uses.
+const SEED: &str = "seed";
+/// The uses the seed has served.
+const USES: &str = "uses";
+
+/// The value of the field `field` among the list `kept_text` is, if any.
+fn field_of(kept_text: &str, field: &str) -> Option<String> {
+    use utilities::cdnf::Element;
+    let document = utilities::cdnf::parse(kept_text).ok()?;
+    let Some(Element::List(items)) = document.elements.first() else { return None };
+    items.iter().find_map(|item| match item {
+        Element::Pair(name, value) => match (&**name, &**value) {
+            (Element::Text(name), Element::Text(value)) if name == field => Some(value.clone()),
+            _ => None,
+        },
+        _ => None,
+    })
+}
 
 /// A handle on the workspace's test seed file. Every handle locks the
 /// file while it reads and writes it, so tests on parallel threads, and
 /// other processes, take turns.
 #[derive(Clone)]
 pub struct TestSeedHandle {
-    /// `transient_data/test_seed.csv` in the workspace.
+    /// `transient_data/test_seed.cdnf` in the workspace.
     seed_file: PathBuf,
 }
 
@@ -38,7 +54,7 @@ impl TestSeedHandle {
     pub fn open() -> Self {
         let crate_folder = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let workspace_folder = crate_folder.ancestors().find(|folder| folder.join("Cargo.lock").is_file()).expect("a test inside the workspace");
-        Self { seed_file: workspace_folder.join("transient_data").join("test_seed.csv") }
+        Self { seed_file: workspace_folder.join("transient_data").join("test_seed.cdnf") }
     }
 
     /// The seed, counted as a use.
@@ -65,16 +81,15 @@ impl TestSeedHandle {
         file.lock().expect("the test seed file locked");
         let mut kept_text = String::new();
         file.read_to_string(&mut kept_text).expect("the test seed file read");
-        let kept_row = utilities::csv::rows_by_column(&kept_text, &SEED_COLUMNS).into_iter().next().unwrap_or_default();
-        let kept_seed = kept_row.first().and_then(|seed| of_hex(seed));
-        let past_uses: u64 = kept_row.get(1).and_then(|uses| uses.trim().parse().ok()).unwrap_or(0);
+        let kept_seed = field_of(&kept_text, SEED).and_then(|seed| of_hex(&seed));
+        let past_uses: u64 = field_of(&kept_text, USES).and_then(|uses| uses.trim().parse().ok()).unwrap_or(0);
 
         let (seed, uses) = match kept_seed {
             Some(seed) if !counts_a_use => return seed,
             Some(seed) if past_uses < USES_BEFORE_THE_SEED_ROLLS => (seed, past_uses + 1),
             _ => (fresh_seed(), counts_a_use as u64),
         };
-        let new_text = utilities::csv::row_text(&SEED_COLUMNS) + &utilities::csv::row_text(&[seed_as_hex(seed), uses.to_string()]);
+        let new_text = format!("- {SEED} : {}\n- {USES} : {uses}\n", seed_as_hex(seed));
         file.set_len(0).and_then(|()| file.seek(SeekFrom::Start(0))).and_then(|_| file.write_all(new_text.as_bytes())).expect("the test seed file written");
         seed
     }

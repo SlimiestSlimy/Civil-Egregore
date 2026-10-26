@@ -1,6 +1,6 @@
 //! A smoke test: one file of most of the format, read as written.
 
-use protocol::cdnf::{Document, Element, Section};
+use utilities::cdnf::{Document, Element, Section};
 
 /// A text.
 fn text(text: &str) -> Element {
@@ -25,7 +25,7 @@ fn section(name: &str, elements: Vec<Element>, sections: Vec<Section>) -> Sectio
 /// `cdnf_smoke.cdnf` parses into the tree it is written as.
 #[test]
 fn the_smoke_file_reads_as_written() {
-    let read = protocol::cdnf::parse(include_str!("cdnf_smoke.cdnf")).expect("parsed");
+    let read = utilities::cdnf::parse(include_str!("cdnf_smoke.cdnf")).expect("parsed");
     let deeper = section("deeper", vec![pair(text("key"), text("value after a blank line"))], Vec::new());
     let lists = section(
         "lists",

@@ -1,4 +1,4 @@
-//! The settings of this machine, kept from one run to the next: one CSV
+//! The settings of this machine, kept from one run to the next: one CDNF
 //! file in Civil Egregore's own folder, which also holds the worlds
 //! (`docs/utilities.md`, "Settings").
 
@@ -11,12 +11,10 @@ use std::str::FromStr;
 /// The folder's name, under the system's place for what programs keep.
 pub const FOLDER: &str = "Civil Egregore";
 /// The file's name, in the folder.
-pub const SETTINGS_FILE_NAME: &str = "settings.csv";
-/// The file's columns.
-const SETTINGS_COLUMNS: [&str; 2] = ["setting", "value"];
+pub const SETTINGS_FILE_NAME: &str = "settings.cdnf";
 /// The default settings: every setting there is, and what it is
 /// unless changed.
-const DEFAULT_SETTINGS_TEXT: &str = include_str!("../default_settings.csv");
+const DEFAULT_SETTINGS_TEXT: &str = include_str!("../default_settings.cdnf");
 /// The setting naming the folder worlds are kept in: a path, taken
 /// from Civil Egregore's folder unless it is a whole one.
 pub const WORLDS: &str = "worlds";
@@ -124,11 +122,26 @@ impl Settings {
         Self::parse_text(&read_to_string(path).unwrap_or_default())
     }
 
-    /// The settings `settings_text` has, a row each after the one naming the
-    /// columns: a row that is not a name and a value is passed over.
+    /// The settings `settings_text` has: a list, each item a name paired
+    /// with its value -- what is not, passed over, and all of it if the
+    /// text is no CDNF.
     fn parse_text(settings_text: &str) -> Self {
-        let name_and_value = |settings_row: Vec<String>| <[String; 2]>::try_from(settings_row).ok().map(|[row_name, value]| (row_name.trim().to_string(), value.trim().to_string()));
-        Self { lines: crate::csv::rows_named(settings_text).into_iter().filter_map(name_and_value).collect() }
+        use crate::cdnf::Element;
+        let Ok(document) = crate::cdnf::parse(settings_text) else {
+            return Self::default();
+        };
+        let name_and_value = |item: &Element| match item {
+            Element::Pair(name, value) => match (&**name, &**value) {
+                (Element::Text(name), Element::Text(value)) => Some((name.clone(), value.clone())),
+                _ => None,
+            },
+            _ => None,
+        };
+        let lines = document.elements.iter().filter_map(|element| match element {
+            Element::List(items) => Some(items.iter().filter_map(name_and_value)),
+            _ => None,
+        }).flatten().collect();
+        Self { lines }
     }
 
     /// The value of the setting named `setting_name`, if it has a line.
@@ -169,6 +182,6 @@ impl Settings {
         if let Some(folder) = path.parent() {
             create_dir_all(folder)?;
         }
-        write(path, crate::csv::row_text(&SETTINGS_COLUMNS) + &self.lines.iter().map(|(setting_name, value)| crate::csv::row_text(&[setting_name, value])).collect::<String>())
+        write(path, self.lines.iter().map(|(setting_name, value)| format!("- {} : {}\n", crate::cdnf::quoted(setting_name), crate::cdnf::quoted(value))).collect::<String>())
     }
 }

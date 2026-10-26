@@ -15,6 +15,9 @@ mod hash;
 #[path = "fine/rng.rs"]
 mod rng;
 
+#[path = "fine/cdnf.rs"]
+mod cdnf;
+
 #[path = "fine/dispatcher.rs"]
 mod dispatcher;
 

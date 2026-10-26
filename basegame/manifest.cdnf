@@ -9,3 +9,14 @@ grass :
 - kind : plane
 - width : 1
 - tile size : 1
+
+::server::
+- side : server
+- library : ../target/release/libbasegame_server.so
+- hash : 64d149f570e07517
+- depends on :
+- common
+
+
+grass_seen :
+- kind : sca proc

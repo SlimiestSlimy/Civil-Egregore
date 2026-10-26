@@ -1,0 +1,11 @@
+[package]
+name = "basegame_server"
+edition = "2024"
+description = "The base game's server bundle: what it takes of the common bundle"
+
+# A bundle: one library, loaded by the game.
+[lib]
+crate-type = ["dylib"]
+
+# None: the game's libraries come by `--extern` (.cargo/config.toml).
+[dependencies]

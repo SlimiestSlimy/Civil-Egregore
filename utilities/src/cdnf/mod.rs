@@ -7,6 +7,12 @@ mod parse;
 mod tokens;
 pub use parse::parse;
 
+/// `text` as a quoted text, to write: read back as it is, whatever marks
+/// it holds -- its quotes and backslashes escaped.
+pub fn quoted(text: &str) -> String {
+    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
 use std::fmt;
 
 /// Why a text is no document: the line, counted from 1, and what is
