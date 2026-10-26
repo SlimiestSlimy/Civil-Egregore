@@ -687,6 +687,9 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- A CDNF writer (2026-10-25): "eventually we will make a cdnf writer,
+  thats why i needed you to make the tokenizer with proper tokens lol";
+  cdnf::quoted is all there is yet.
 - A mod built on another machine (the user's suggestion, 2026-10-25,
   "a little later when we have the 2 mods working here lol"): a remote
   session compiles a mod from instructions left for it, the mod copied
