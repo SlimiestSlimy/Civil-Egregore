@@ -331,9 +331,10 @@ MODS AND THE GAME FOLDER
   be, writes the manifest, lays out the mod in its own target/<mod>/.
   Release only for now. A mod template workspace in the tree, basegame
   "basically a copy of it".
-- VERSIONS: now 0.7.0 ("i believe we deserve that 0.7 before commit and
-  push haha", 2026-10-26: basegame and meadow packaged as mods, loaded
-  from their zips); was 0.6.5293 ("decided now. were on version
+- VERSIONS: now 0.7.1 ("yes, thats 0.7.1 btw", 2026-10-26: the mod
+  template, `cargo package_mod new`); 0.7.0 ("i believe we deserve that
+  0.7 before commit and push haha", 2026-10-26: basegame and meadow
+  packaged as mods, loaded from their zips); was 0.6.5293 ("decided now. were on version
   0.6.5293, why? idk", 2026-10-24): "we should have a single version on the root crate"
   -- the root Cargo.toml's alone; basegame "still follows the root
   version so it doesn't carry one of its own even if it acts as a
@@ -920,7 +921,15 @@ NOW
       code until manifests.
 - STEP 4: runtime loading -- manifests, libraries opened after the
   freeze on their side; basegame out of the binaries' dependencies.
-- STEP 5: the mod packager and the mod template; basegame on it.
+- STEP 5 DONE (2026-10-26): the mod packager and the mod template;
+  basegame on it. `cargo package_mod new <folder> <side>`: the mod named
+  by its folder, one crate at the root, an empty [workspace], the game's
+  protocol by absolute path behind the packaging cfg, rust-toolchain.toml
+  of the game's channel, the premanifest (read back first: name, taken
+  names, side), .gitignore, empty dependencies/, a lib.rs of docs alone
+  ("empty, but with all the setup required"). "how do we specify the mod
+  path?" -- as packaging: the argument, relative to where it is run (the
+  game's folder, the alias there) or absolute.
 - STEP 6: per-world mods (mods/ copied at set up, basegame in or out).
 - Two binaries, client and server; src/main.rs removed; the root tests
   into basegame's workspace ("probably move into basegame indeed").

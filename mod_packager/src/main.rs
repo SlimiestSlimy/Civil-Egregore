@@ -6,7 +6,8 @@
 //! game reads it.
 //!
 //! `cargo package_mod <mod folder>`, from the game (an alias in its
-//! `.cargo/config.toml`).
+//! `.cargo/config.toml`). And a mod's crate made, empty but ready to
+//! package: `cargo package_mod new <mod folder> <side>`.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -17,18 +18,20 @@ use std::process::ExitCode;
 
 mod building;
 mod dependencies;
+mod new_mod;
 mod packaging;
 mod premanifest;
 mod set_up_check;
 
-/// The mod in the folder given packaged; or why not.
+/// The mod in the folder given packaged, or a new one made; or why not.
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let [mod_folder] = arguments.as_slice() else {
-        eprintln!("mod_packager: one mod folder, its crate's or a container's");
-        return ExitCode::FAILURE;
+    let done = match arguments.as_slice() {
+        [mod_folder] => package_the_mod(&PathBuf::from(mod_folder)),
+        [new, mod_folder, side] if new == "new" => new_mod::make_a_new_mod(&PathBuf::from(mod_folder), side),
+        _ => Err("a mod folder, its crate's or a container's, to package; or `new`, a mod folder and its side -- common, server or client".to_string()),
     };
-    match package_the_mod(&PathBuf::from(mod_folder)) {
+    match done {
         Ok(()) => ExitCode::SUCCESS,
         Err(why_not) => {
             eprintln!("mod_packager: {why_not}");

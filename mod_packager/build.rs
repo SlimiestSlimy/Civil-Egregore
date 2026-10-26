@@ -11,5 +11,9 @@ fn main() {
     println!("cargo::rerun-if-env-changed=RUSTUP_TOOLCHAIN");
     if let Ok(toolchain) = std::env::var("RUSTUP_TOOLCHAIN") {
         println!("cargo::rustc-env=GAME_TOOLCHAIN={toolchain}");
+        // Its channel, as a rust-toolchain.toml says it on any machine: the host's triple off.
+        let host = std::env::var("HOST").unwrap_or_default();
+        let channel = toolchain.strip_suffix(&format!("-{host}")).unwrap_or(&toolchain);
+        println!("cargo::rustc-env=GAME_CHANNEL={channel}");
     }
 }
