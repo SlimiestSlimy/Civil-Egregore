@@ -1,7 +1,7 @@
 //! What every part of the game shares: the kinds of types
 //! ([`kinds`]) and their names ([`type_names`]), the mods' manifests
 //! read and checked ([`manifests`]) -- written in CDNF
-//! ([`utilities::cdnf`]) -- and the type registry made of them
+//! ([`cdnf`]) -- and the type registry made of them
 //! ([`type_registry`]).
 
 // Every item is documented, private ones included; `cargo clippy`

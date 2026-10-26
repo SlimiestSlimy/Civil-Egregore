@@ -6,7 +6,7 @@
 //! is checked after.
 
 use super::{Bundle, Manifest, ManifestError, Type};
-use utilities::cdnf::{self, Element};
+use cdnf::Element;
 use crate::kinds::{BundleFields, Hook, Kind, Side};
 use crate::type_names::{is_a_name, BundleName, TypeName, NAME_SEPARATOR};
 use std::path::{Path, PathBuf};

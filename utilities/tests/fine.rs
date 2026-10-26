@@ -15,8 +15,6 @@ mod hash;
 #[path = "fine/rng.rs"]
 mod rng;
 
-#[path = "fine/cdnf.rs"]
-mod cdnf;
 
 #[path = "fine/dispatcher.rs"]
 mod dispatcher;
@@ -24,8 +22,6 @@ mod dispatcher;
 #[path = "fine/dynamic_library.rs"]
 mod dynamic_library;
 
-#[path = "fine/settings.rs"]
-mod settings;
 
 #[path = "fine/chance.rs"]
 mod chance;

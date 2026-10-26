@@ -1,17 +1,16 @@
-//! The Colon Dash and Newline Format: everything is text, made into
-//! sections -- colons at a line's start -- and in them elements: text
-//! bodies, lists of dashes, and pairs -- a colon anywhere else, pairing
-//! what came before it with the next element ([`parse`]).
+//! The Colon Dash and Newline Format: natural text a program reads too
+//! -- its rules, written in it: `cdnf.cdnf`, at this crate's root. A text
+//! read ([`parse`]); a document written as it is built
+//! ([`writer::CdnfWriter`]).
+
+// Every item is documented, private ones included; `cargo clippy`
+// checks the private ones.
+#![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
 mod parse;
 mod tokens;
+pub mod writer;
 pub use parse::parse;
-
-/// `text` as a quoted text, to write: read back as it is, whatever marks
-/// it holds -- its quotes and backslashes escaped.
-pub fn quoted(text: &str) -> String {
-    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
-}
 
 use std::fmt;
 

@@ -27,8 +27,8 @@ const USES: &str = "uses";
 
 /// The value of the field `field` among the list `kept_text` is, if any.
 fn field_of(kept_text: &str, field: &str) -> Option<String> {
-    use utilities::cdnf::Element;
-    let document = utilities::cdnf::parse(kept_text).ok()?;
+    use cdnf::Element;
+    let document = cdnf::parse(kept_text).ok()?;
     let Some(Element::List(items)) = document.elements.first() else { return None };
     items.iter().find_map(|item| match item {
         Element::Pair(name, value) => match (&**name, &**value) {

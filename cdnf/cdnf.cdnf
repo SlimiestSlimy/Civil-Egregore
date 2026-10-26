@@ -1,0 +1,106 @@
+# The rules of CDNF, written in CDNF: this file reads as it says.
+
+:cdnf:
+
+The Colon Dash and Newline Format is natural text a program can read
+too. A plain message is already a document, and its few marks are the
+ones people write by hand anyway, colons, dashes and line ends.
+
+Everything is text. A value is never a number, nor a true or a false,
+only the text it is written as, and what it means is its reader's to
+say.
+
+::elements::
+
+Every element is one of three kinds, and nothing else.
+
+kinds :
+- a text body
+- a pair : what comes before a colon, and the element after it
+-- a list : items, each opened by a dash
+
+::text bodies::
+
+A text body runs on until a blank line, or until another element
+starts. One line end inside it is part of it, so this body is one
+text over three lines.
+
+Spaces at a line's start and end mean nothing, so a body may be
+indented however it reads best.
+
+Any run of empty lines is one blank line. A line holding only a
+comment is no line at all, and parts nothing.
+
+::pairs::
+
+A colon anywhere but at a line's start makes a pair, of what came
+before it and the next element after it, whatever kind that is.
+
+a pair : its right
+
+a pair of a pair : left : right
+
+a pair of a list :
+- the list's first item
+-- its last item
+
+The right may start on the line after the colon, even after a blank
+line.
+
+A text on the line right after a pair's text right is more of that
+text, so pairs one after another are parted by blank lines, or made a
+list's items.
+
+::lists::
+
+A dash at a line's start opens a list's item, and two dashes open its
+last one, after which the list has ended. A list with no last item
+ends at whatever comes after a blank line and is no item. A line
+right after an item's text, with no dash, is more of that text.
+
+A list nested in another ends on two dashes, or the outer list's next
+items would join it.
+
+nesting :
+- an item
+- an item holding a list :
+    - an inner item
+    -- the inner list's last item
+- back in the outer list
+-- two lists ending at once :
+    -- the inner list's one item
+
+Spaces around a dash or a colon mean nothing. Indentation is for the
+eye alone, nested lists a step deeper.
+
+::sections::
+
+A line of colons, a name, and as many colons again is a section's
+line. One colon on each side opens a section of the document, two a
+subsection of the one before, and so on. Its colons start the line,
+with no space before them.
+
+a section's line : "::name::"
+
+A section holds its own elements first, then its subsections. The
+elements before any section are the document's own.
+
+::quotes::
+
+Where an element starts, a quote opens a quoted text, running to the
+next quote. Everything between is kept as written, colons, dashes,
+hashes and blank lines too. A backslash before a quote or another
+backslash escapes it.
+
+a quoted text : "colons : and - dashes # stay
+as they are,
+
+blank lines too, and a \"quote\" escaped"
+
+A quote anywhere else is text, like the ones in he said "hi". After a
+closing quote, only a colon or the line's end may come.
+
+::comments::
+
+A hash opens a comment, running to its line's end, and it means
+nothing.   # like this one

@@ -592,9 +592,11 @@ NOW
   everything on a pair's right but a text indented; "make the end()
   functions be end_list() style for better readability".
 - CSV GONE (2026-10-25): "delete csv from utilities and move cdnf there
-  lol" -- utilities::cdnf (and cdnf::quoted, to write a quoted text);
-  settings in settings.cdnf, a list of "name" : "value", values quoted;
-  default_settings.cdnf; the test seed in transient_data/test_seed.cdnf. client -- render rule,
+  lol" -- CDNF its own crate since 2026-10-26 ("cdnf basically has the
+  same status as tessera, a self contained project"): cdnf/, its rules
+  written in it in cdnf/cdnf.cdnf; the writer, typestate, quoting for
+  itself. Settings deleted 2026-10-26 ("delete settings lol"). The test
+  seed in transient_data/test_seed.cdnf. client -- render rule,
   gui. Attributes: their size alone ("instead of "blocks" it should be
   "size""), in 16-byte blocks, 1 to 256 ("yes, it should've been like
   this from the beggining lol"), data words gone -- "atributes have a
@@ -737,9 +739,6 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
-- A CDNF writer (2026-10-25): "eventually we will make a cdnf writer,
-  thats why i needed you to make the tokenizer with proper tokens lol";
-  cdnf::quoted is all there is yet.
 - THE MOD TEMPLATE (2026-10-25): "thats exactly why were making a
   mod_template crate. empty, but with all the setup required lol,
   ideally the only setup is declaring the path of the game source
@@ -759,7 +758,9 @@ LATER (every "for later" of the user's, and mine, as said)
   agree (the crate's metadata, not its source), but nothing checks it
   was built against this one -- a stale mod misbehaves quietly. The mod
   packager's: rebuild mods as the game changes, or record the game build
-  a mod was made against.
+  a mod was made against. Seen 2026-10-26: cargo does not watch a
+  library given by --extern, so `cargo build` in a mod after protocol
+  was rebuilt rebuilt nothing; `cargo clean -p <bundle>` first did.
 - The manifest made in code (2026-10-25): a typestate builder the mod
   imports from mod_packager, at mod level -- "a bundle basically
   corresponds to a compilation unit ie a crate" -- the packager building

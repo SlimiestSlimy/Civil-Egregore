@@ -3,7 +3,7 @@
 //! and the spaces at a line's start mean nothing, and are let go.
 //! Every mark is ASCII, so what lies between two is whole UTF-8.
 
-use crate::cdnf::CdnfError;
+use crate::CdnfError;
 
 /// One token.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -6,9 +6,14 @@ version = 4
 name = "AI_SCRATCHPAD"
 version = "0.0.0"
 dependencies = [
+ "cdnf",
  "protocol",
  "utilities",
 ]
+
+[[package]]
+name = "cdnf"
+version = "0.0.0"
 
 [[package]]
 name = "game_packager"
@@ -18,9 +23,13 @@ version = "0.0.0"
 name = "protocol"
 version = "0.0.0"
 dependencies = [
+ "cdnf",
  "utilities",
 ]
 
 [[package]]
 name = "utilities"
 version = "0.0.0"
+dependencies = [
+ "cdnf",
+]

@@ -1,8 +1,8 @@
-//! The parser ([`parse`]): a text's tokens ([`crate::cdnf::tokens`]) made into
+//! The parser ([`parse`]): a text's tokens ([`crate::tokens`]) made into
 //! its sections and their elements.
 
-use crate::cdnf::tokens::{tokens, Located, Token};
-use crate::cdnf::{CdnfError, Document, Element, Section};
+use crate::tokens::{tokens, Located, Token};
+use crate::{CdnfError, Document, Element, Section};
 
 /// `text` read as a document: or the first thing wrong in it.
 pub fn parse(text: &str) -> Result<Document, CdnfError> {
