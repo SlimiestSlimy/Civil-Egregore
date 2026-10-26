@@ -2,7 +2,9 @@
 - side : server
 - version : 0.1
 - depends on :
-    -- basegame_common : 0.1
+    -- basegame_common :
+        - version : 0.1
+        -- source : ../common
 
 grass_tick :
 - kind : sca proc

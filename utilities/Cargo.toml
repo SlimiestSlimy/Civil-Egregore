@@ -9,5 +9,8 @@ description = "General-purpose utilities: what diagnostics are made with (tables
 crate-type = ["dylib"]
 
 [dependencies]
-cdnf = { path = "../cdnf" }
 libloading = { workspace = true }
+
+# Its tests read their seed file, written in CDNF.
+[dev-dependencies]
+cdnf = { path = "../cdnf" }

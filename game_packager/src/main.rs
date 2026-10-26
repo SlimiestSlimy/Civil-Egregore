@@ -4,10 +4,11 @@
 //!
 //! `cargo package_game` (an alias in `.cargo/config.toml`).
 //!
-//! Today the folder holds the one program, the engine's shared libraries
-//! beside it, and libstd, which they all share. The server's and the
-//! client's binaries, and the base game as a mod, join it as the game is
-//! split.
+//! The folder holds the game's binaries, its libraries beside them, and
+//! libstd, which they all share: the game alone, no mod -- the base game
+//! is packaged into it by `cargo distribute_game`. Today the libraries
+//! alone; the server's and the client's binaries, the client's library
+//! and Bevy's join it as they come.
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -19,10 +20,11 @@ use std::process::{Command, ExitCode};
 
 /// The game's folder, inside the target folder.
 const GAME_FOLDER: &str = "civil_egregore";
-/// The program's package: built, and laid out in the game's folder.
-const PROGRAM_PACKAGE: &str = "Civil_Egregore";
-/// The engine's crates, each a shared library laid out beside the program.
-const ENGINE_LIBRARIES: [&str; 4] = ["utilities", "protocol", "server", "client"];
+/// The game's libraries, each a crate of the game's built as a shared
+/// library. The mod packager keeps the same list, by side.
+const GAME_LIBRARIES: [&str; 3] = ["utilities", "protocol", "server"];
+/// The game's binaries, each built by a crate of the game's. None yet.
+const GAME_BINARIES: [&str; 0] = [];
 
 /// The game packaged, and where it was laid out said; or why not.
 fn main() -> ExitCode {
@@ -50,10 +52,11 @@ fn package_the_game() -> Result<PathBuf, String> {
         fs::remove_dir_all(&game_folder).map_err(|error| format!("{}: {error}", game_folder.display()))?;
     }
     fs::create_dir_all(&game_folder).map_err(|error| format!("{}: {error}", game_folder.display()))?;
-    let program_file = format!("{PROGRAM_PACKAGE}{}", std::env::consts::EXE_SUFFIX);
-    copy_into(&built_folder.join(program_file), &game_folder)?;
-    for engine_library in ENGINE_LIBRARIES {
-        copy_into(&built_folder.join(shared_library_file(engine_library)), &game_folder)?;
+    for binary in GAME_BINARIES {
+        copy_into(&built_folder.join(format!("{binary}{}", std::env::consts::EXE_SUFFIX)), &game_folder)?;
+    }
+    for library in GAME_LIBRARIES {
+        copy_into(&built_folder.join(shared_library_file(library)), &game_folder)?;
     }
     copy_into(&standard_library()?, &game_folder)?;
     Ok(game_folder)
@@ -70,10 +73,16 @@ fn target_folder(repository_root: &Path) -> PathBuf {
     std::env::var_os("CARGO_TARGET_DIR").map_or(repository_root.join("target"), PathBuf::from)
 }
 
-/// The game built in release, by the cargo that runs this packager.
+/// The game built in release, by the cargo that runs this packager:
+/// the crate of each library, its binaries with it.
 fn build_the_game(repository_root: &Path) -> Result<(), String> {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-    let built = Command::new(cargo).args(["build", "--release", "-p", PROGRAM_PACKAGE]).current_dir(repository_root).status().map_err(|error| format!("cargo could not be run: {error}"))?;
+    let mut command = Command::new(cargo);
+    command.args(["build", "--release"]).current_dir(repository_root);
+    for library in GAME_LIBRARIES {
+        command.args(["-p", library]);
+    }
+    let built = command.status().map_err(|error| format!("cargo could not be run: {error}"))?;
     if built.success() { Ok(()) } else { Err(format!("the game's build failed ({built})")) }
 }
 

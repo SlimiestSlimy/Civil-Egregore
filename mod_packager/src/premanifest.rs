@@ -39,10 +39,12 @@ impl Premanifest {
     }
 
     /// The manifest it makes, its library's hash `hash`: every field
-    /// its, the dependencies it carries among those it depends on.
+    /// its but its dependencies' sources, the dependencies it carries
+    /// among those it depends on.
     pub fn manifest(&self, hash: Option<String>) -> ModDocument {
         let mut manifest = self.document.clone();
         manifest.depends_on.append(&mut manifest.carried_dependencies);
+        manifest.sources.clear();
         manifest.hash = hash;
         manifest
     }

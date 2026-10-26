@@ -180,6 +180,8 @@ grass_dies :
     assert!(refusal.contains("does not reach"), "{refusal}");
     let refusal = refusal_of(&mods, mod_made(&test_folder, "carrying", Some(b"bytes"), ":carrying:\n- side : common\n- version : 1\n- hash : {hash}\n- carried dependencies :\n    -- base_common : 0.1\n"));
     assert!(refusal.contains("carried dependencies"), "{refusal}");
+    let refusal = refusal_of(&mods, mod_made(&test_folder, "sourced", Some(b"bytes"), ":sourced:\n- side : common\n- version : 1\n- hash : {hash}\n- depends on :\n    -- base_common :\n        - version : 0.1\n        -- source : ../base_common\n"));
+    assert!(refusal.contains("source"), "{refusal}");
     let refusal = refusal_of(&mods, mod_made(&test_folder, "protocol", Some(b"bytes"), ":protocol:\n- side : common\n- version : 1\n- hash : {hash}\n"));
     assert!(refusal.contains("no name"), "{refusal}");
     let given_twice = read_mods(&[&mods[..], &[written(&test_folder, "base_common_again", &base_common)]].concat()).expect("the same mod twice");
@@ -203,7 +205,7 @@ grass_dies :
 fn every_field_written_reads_back() {
     let documents = [
         ":kinds_common:\n- side : common\n- version : 1.0 \"beta\"\n- hash : 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n- depends on :\n    -- other : 2\n\nwater :\n- kind : plane\n- width : 8\n- tile size : 16\n\nhealth :\n- kind : attribute\n- size : 2\n\nask :\n- kind : client call\n- set up : ask_set_up\n",
-        ":kinds_server:\n- side : server\n- version : 0.1\n- depends on :\n    -- kinds_common : 1.0\n- carried dependencies :\n    - carried_one : 3\n    -- carried_two : 4\n\nsheep :\n- kind : entity\n- default attribute : kinds_common>health\n- hooks :\n    -- keeps the world hot\n\nwolf :\n- kind : entity\n\nsheep_walks :\n- kind : entity proc\n- entity : sheep\n- set up : sheep_walks_set_up\n\nwater_flows :\n- kind : sca proc\n- planes :\n    - kinds_common>water\n    -- other>lava\n- set up : water_flows_set_up\n\nislands :\n- kind : worldgen\n- hooks :\n    -- generates the world\n- set up : islands_set_up\n",
+        ":kinds_server:\n- side : server\n- version : 0.1\n- depends on :\n    -- kinds_common : 1.0\n- carried dependencies :\n    - carried_one :\n        - version : 3\n        -- source : ../carried_one\n    -- carried_two : 4\n\nsheep :\n- kind : entity\n- default attribute : kinds_common>health\n- hooks :\n    -- keeps the world hot\n\nwolf :\n- kind : entity\n\nsheep_walks :\n- kind : entity proc\n- entity : sheep\n- set up : sheep_walks_set_up\n\nwater_flows :\n- kind : sca proc\n- planes :\n    - kinds_common>water\n    -- other>lava\n- set up : water_flows_set_up\n\nislands :\n- kind : worldgen\n- hooks :\n    -- generates the world\n- set up : islands_set_up\n",
         ":kinds_client:\n- side : client\n- version : 0.1\n\nwater_drawn :\n- kind : render proc\n- draw order : 3\n- set up : water_drawn_set_up\n\nmenu :\n- kind : gui\n- hooks :\n    -- shown by default\n- set up : menu_set_up\n\nsubmenu :\n- kind : gui\n- parent : menu\n- set up : submenu_set_up\n",
         ":kinds_container:\n- side : server\n- version : 0.1\n- container mod\n- carried dependencies :\n    -- kinds_server : 0.1\n",
     ];

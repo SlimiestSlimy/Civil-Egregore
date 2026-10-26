@@ -62,6 +62,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "game_distribution"
+version = "0.0.0"
+
+[[package]]
 name = "game_packager"
 version = "0.0.0"
 

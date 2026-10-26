@@ -1,0 +1,7 @@
+[package]
+name = "game_distribution"
+edition = "2024"
+description = "Civil Egregore as it ships: the game packaged, the base game packaged into its folder"
+
+# Nothing but std: it runs the packagers, and copies what they made.
+[dependencies]

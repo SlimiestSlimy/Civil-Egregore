@@ -334,7 +334,9 @@ MODS AND THE GAME FOLDER
 - VERSIONS: 0.8 the server, 0.9 diagnostics back ("yeah, thats something
   we also want to measure once we have diagnostics back on 0.9, 0.8 will
   be the server version it seems", 2026-10-26: the split queues measured
-  then). Now 0.7.1 ("yes, thats 0.7.1 btw", 2026-10-26: the mod
+  then). Now 0.7.5 ("nice, bumpt the version to 0.7.5, and push",
+  2026-10-26: the game packager fixed, game_distribution, dependency
+  sources); 0.7.1 ("yes, thats 0.7.1 btw", 2026-10-26: the mod
   template, `cargo package_mod new`); 0.7.0 ("i believe we deserve that
   0.7 before commit and push haha", 2026-10-26: basegame and meadow
   packaged as mods, loaded from their zips); was 0.6.5293 ("decided now. were on version
@@ -1028,6 +1030,15 @@ NOW
   to `&dyn Any` (no as_any). "yeah trait objects have to be, thats the
   crux of the server interface, doing it any other way will probably
   make things more complicated haha".
+  THE SERVER'S ORDER (2026-10-26, "the plan is good, but i think well
+  defer that a bit", the game packager first): 1 a superchunk's planes
+  (packed by width, Morton, by TypeId; read and write a tile); 2 the
+  applier, one superchunk, one thread (compare, skip to the skip tag,
+  write); 3 the builder, its tests real ticks; 4 several superchunks:
+  the lowering with atomic and fence, applied on ONE thread in global
+  author order -- the reference meaning of a tick, the grass across a
+  border its first test; 5 threads, parking at fences, checked equal to
+  4's run. Atomics plain counters until 5.
 - STEP 5 DONE (2026-10-26): the mod packager and the mod template;
   basegame on it. `cargo package_mod new <folder> <side>`: the mod named
   by its folder, one crate at the root, an empty [workspace], the game's
@@ -1099,16 +1110,24 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
-- THE MOD PACKAGER CALLS THE GAME PACKAGER (2026-10-26): "later well
-  have mod packager call game packager instead for this, for now this
-  hack is fine, but note it down" -- today building::
-  build_the_games_libraries runs `cargo build --release -p` the side's
-  game libraries in the game's folder itself.
+- THE GAME FOLDER WIPED BY EVERY MOD PACKAGED (2026-10-26): the mod
+  packager runs the game packager, which lays target/civil_egregore/
+  out anew, so basegame.zip put there by `cargo distribute_game` is gone
+  after any `cargo package_mod`. "honestly, for now this is not an
+  issue, once the game gets bigger it may, not for now". My proposal
+  then: the game packager clears only what is not a zip.
 - REAL MOD DEVELOPERS (2026-10-26): "aight, if we ever had real mod
   developers we will have to review this, for now it's fine to cut
   corners for compatibility" -- the packager ignoring a mod's rustflags,
-  its own build folder, basegame packaged by hand in order (common,
-  copied into server's dependencies/, server, both into basegame's).
+  its own build folder. (Basegame packaged by hand in order: done,
+  2026-10-26, sources in the premanifest -- "id say, on the premanifest
+  we can optionally specify a second path for each dependency to its
+  source, and then the modpackager builds it and movea it into the
+  dependencies folder automatically" / "aight let it be A" -- the
+  version and the source a list paired with the dependency; kept a
+  field of their own inside, "lets keep it for now ... we can be more
+  sloppy with the packagers code since their functions are relatively
+  simple".)
 - SOURCES IN PACKAGES (my suggestion, 2026-10-26, not a plan): a
   package optionally carrying its crate's source (Maven's -sources.jar),
   the packager taking it out beside the libraries, so a dependency's zip

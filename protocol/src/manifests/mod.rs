@@ -75,6 +75,9 @@ fn read_manifest(text: &str, entries: &[(&str, &[u8])], path: &PackagePath) -> R
     if !document.carried_dependencies.is_empty() {
         return Err(in_mod("carried dependencies: a premanifest's field, the manifest's depends on holds them".to_string()));
     }
+    if !document.sources.is_empty() {
+        return Err(in_mod("a dependency's source: a premanifest's, the packager's to read".to_string()));
+    }
     if !document.container {
         let hash_said = document.hash.as_deref().ok_or_else(|| in_mod("hash: missing, the library's".to_string()))?;
         let library_file = library_file_name(&document.name);

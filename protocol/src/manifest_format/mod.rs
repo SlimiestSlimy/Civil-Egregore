@@ -3,7 +3,7 @@
 //! section, the mod's, of its fields' list and its types; every name,
 //! each kind on its side, each hook on its kind. What one form alone
 //! needs or refuses -- a manifest's hash, a premanifest's carried
-//! dependencies -- its own reader checks after, of the [`ModDocument`]
+//! dependencies and sources -- its own reader checks after, of the [`ModDocument`]
 //! this one gives. And a [`ModDocument`] written back
 //! ([`write_mod_document`]).
 
@@ -41,6 +41,11 @@ pub struct ModDocument {
     /// The mods it depends on and carries in its package, each by its
     /// name and version: a premanifest's field.
     pub carried_dependencies: Vec<(String, String)>,
+    /// Where mods it depends on, or carries, are packaged from, each by
+    /// its name and its folder, relative to the document's: said beside
+    /// the dependency, its version and its source paired with it in a
+    /// list. A premanifest's field.
+    pub sources: Vec<(String, String)>,
     /// Its library's hash, if said: SHA-256, `0x` and 64 hexadecimal
     /// digits. A manifest's field.
     pub hash: Option<String>,
@@ -134,8 +139,9 @@ pub fn read_mod_document(document: &cdnf::Document) -> Result<ModDocument, Forma
     let side = types::side_named(fields.text("side").map_err(in_mod)?).map_err(in_mod)?;
     let version = fields.text("version").map_err(in_mod)?.to_string();
     let container = fields.flag("container mod");
-    let depends_on = read_dependencies(fields.optional_list("depends on").map_err(in_mod)?, "depends on").map_err(in_mod)?;
-    let carried_dependencies = read_dependencies(fields.optional_list("carried dependencies").map_err(in_mod)?, "carried dependencies").map_err(in_mod)?;
+    let mut sources = Vec::new();
+    let depends_on = read_dependencies(fields.optional_list("depends on").map_err(in_mod)?, "depends on", &mut sources).map_err(in_mod)?;
+    let carried_dependencies = read_dependencies(fields.optional_list("carried dependencies").map_err(in_mod)?, "carried dependencies", &mut sources).map_err(in_mod)?;
     if let Some((both, _)) = carried_dependencies.iter().find(|(carried, _)| depends_on.iter().any(|(depended, _)| depended == carried)) {
         return Err(in_mod(format!("{both}: in depends on and carried dependencies both, a carried one depended on already")));
     }
@@ -155,24 +161,33 @@ pub fn read_mod_document(document: &cdnf::Document) -> Result<ModDocument, Forma
     if let Some(off_side) = types.iter().find(|each_type| types::side_of(&each_type.kind) != side) {
         return Err(in_mod(format!("{}: a {} has no place in a mod of the {} side", off_side.name, types::kind_word(&off_side.kind), types::side_word(side))));
     }
-    Ok(ModDocument { name: name.clone(), side, version, container, depends_on, carried_dependencies, hash: hash.map(str::to_string), types })
+    Ok(ModDocument { name: name.clone(), side, version, container, depends_on, carried_dependencies, sources, hash: hash.map(str::to_string), types })
 }
 
-/// The mods `items` name, each its name paired with what the form says
-/// of it, in the field `field_name`.
-fn read_dependencies(items: &[Element], field_name: &str) -> Result<Vec<(String, String)>, String> {
+/// The mods `items` name, in the field `field_name`, each its name
+/// paired with its version -- or with a list of its version and its
+/// source, the source put in `sources`.
+fn read_dependencies(items: &[Element], field_name: &str, sources: &mut Vec<(String, String)>) -> Result<Vec<(String, String)>, String> {
+    let shape = || format!("{field_name}: each a mod's name paired with its version, or with a list of its version and its source");
     let mut dependencies: Vec<(String, String)> = Vec::new();
     for item in items {
-        let Element::Pair(left, right) = item else {
-            return Err(format!("{field_name}: each a mod's name paired with its version"));
-        };
-        let (Element::Text(mod_name), Element::Text(said)) = (&**left, &**right) else {
-            return Err(format!("{field_name}: each a mod's name paired with its version"));
-        };
+        let Element::Pair(left, right) = item else { return Err(shape()) };
+        let Element::Text(mod_name) = &**left else { return Err(shape()) };
         if !is_a_name(mod_name) || dependencies.iter().any(|(said_before, _)| said_before == mod_name) {
             return Err(format!("{field_name}: `{mod_name}` is no name, or is said twice"));
         }
-        dependencies.push((mod_name.clone(), said.clone()));
+        let version = match &**right {
+            Element::Text(version) => version.clone(),
+            Element::List(said) => {
+                let mut said = FieldList::of(said).map_err(|what| format!("{field_name}, {mod_name}: {what}"))?;
+                let version = said.text("version").map_err(|what| format!("{field_name}, {mod_name}: {what}"))?.to_string();
+                sources.push((mod_name.clone(), said.text("source").map_err(|what| format!("{field_name}, {mod_name}: {what}"))?.to_string()));
+                said.none_left(mod_name).map_err(|what| format!("{field_name}: {what}"))?;
+                version
+            }
+            _ => return Err(shape()),
+        };
+        dependencies.push((mod_name.clone(), version));
     }
     Ok(dependencies)
 }

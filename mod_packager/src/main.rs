@@ -1,6 +1,7 @@
 //! The mod packager: a mod -- its crate, or a container's folder --
-//! made into the zip it ships as. Its premanifest read and checked; its
-//! dependencies' zips, in its `dependencies/` folder, read and checked;
+//! made into the zip it ships as. Its premanifest read and checked; the
+//! dependencies it gives a source of packaged first, into its
+//! `dependencies/` folder; its dependencies' zips there read and checked;
 //! the mod built against the game and them; its set up functions
 //! checked; its manifest written; all of it zipped, and read back as the
 //! game reads it.
@@ -22,12 +23,13 @@ mod new_mod;
 mod packaging;
 mod premanifest;
 mod set_up_check;
+mod sources;
 
 /// The mod in the folder given packaged, or a new one made; or why not.
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let done = match arguments.as_slice() {
-        [mod_folder] => package_the_mod(&PathBuf::from(mod_folder)),
+        [mod_folder] => package_the_mod(&PathBuf::from(mod_folder), &mut sources::PackagingRun::default()).map(|_| ()),
         [new, mod_folder, side] if new == "new" => new_mod::make_a_new_mod(&PathBuf::from(mod_folder), side),
         _ => Err("a mod folder, its crate's or a container's, to package; or `new`, a mod folder and its side -- common, server or client".to_string()),
     };
@@ -40,15 +42,19 @@ fn main() -> ExitCode {
     }
 }
 
-/// The mod in `mod_folder` packaged: or why not.
-fn package_the_mod(mod_folder: &std::path::Path) -> Result<(), String> {
+/// The mod in `mod_folder` packaged in `run`, its sourced dependencies
+/// first: its zip's path, or why not.
+fn package_the_mod(mod_folder: &std::path::Path, run: &mut sources::PackagingRun) -> Result<PathBuf, String> {
     let mod_folder = &mod_folder.canonicalize().map_err(|io_error| format!("{}: {io_error}", mod_folder.display()))?;
     let premanifest = premanifest::read_premanifest(mod_folder)?;
+    run.in_progress.push(mod_folder.clone());
+    sources::package_the_sources(mod_folder, &premanifest, run)?;
+    run.in_progress.pop();
     let dependencies = dependencies::read_dependencies(mod_folder, &premanifest)?;
     // A container's crate is none: nothing built, nothing to check.
     let mut library = None;
     if !premanifest.document().container {
-        building::build_the_games_libraries(premanifest.document().side)?;
+        building::package_the_game()?;
         let flags = building::packaging_flags(mod_folder, &premanifest, &dependencies)?;
         let built = building::build_the_mod(mod_folder, &premanifest, &flags)?;
         set_up_check::check_set_ups(mod_folder, &premanifest, &built, &flags)?;
@@ -56,5 +62,6 @@ fn package_the_mod(mod_folder: &std::path::Path) -> Result<(), String> {
     }
     let package = packaging::make_the_package(mod_folder, &premanifest, library.as_deref(), &dependencies)?;
     println!("{}: packaged, {}", premanifest.document().name, package.display());
-    Ok(())
+    run.packaged.push((mod_folder.clone(), package.clone()));
+    Ok(package)
 }
