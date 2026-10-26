@@ -1,0 +1,10 @@
+# Civil Egregore's base game, a mod as any other: a workspace of its own,
+# a crate a bundle, each a dylib built against the game's own libraries
+# -- the same compiler, the same target folder (.cargo/config.toml).
+[workspace]
+members = ["common"]
+resolver = "3"
+
+# The game's own: the same profile builds the same libraries.
+[profile.release]
+debug = "line-tables-only"

@@ -1,0 +1,11 @@
+[package]
+name = "basegame_common"
+edition = "2024"
+description = "The base game's common bundle: grass"
+
+# A bundle: one library, loaded by the game.
+[lib]
+crate-type = ["dylib"]
+
+# None: the game's libraries come by `--extern` (.cargo/config.toml).
+[dependencies]

@@ -1,0 +1,11 @@
+:basegame:
+
+::common::
+- side : common
+- library : ../target/release/libbasegame_common.so
+- hash : f947fc8eabbb2931
+
+grass :
+- kind : plane
+- width : 1
+- tile size : 1

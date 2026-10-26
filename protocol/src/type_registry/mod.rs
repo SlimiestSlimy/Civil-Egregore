@@ -4,9 +4,12 @@
 //! before its own -- each with its ID and its full name. Nothing is
 //! checked here: the manifests were.
 
-use crate::kinds::{Hook, Kind};
+use crate::kinds::{BundleFields, Hook, Kind};
 use crate::manifests::Manifest;
 use crate::type_names::{BundleName, TypeName};
+
+mod loading;
+pub use loading::{BundleSetUp, Export, LoadedRegistry, TypeRegistryHandle, BUNDLE_SET_UP};
 
 /// Where an ID keeps its kind: its first byte, over its number.
 pub const KIND_SHIFT: u32 = 56;
@@ -64,6 +67,7 @@ impl RegisteredType {
     pub fn hooks(&self) -> &[Hook] {
         &self.hooks
     }
+
 }
 
 /// Every type of a world's mods, one flat list.
@@ -76,7 +80,8 @@ pub struct TypeRegistry {
 impl TypeRegistry {
     /// The types of `manifests`, in their order: each mod's bundles, each
     /// bundle first and then its types, numbered one after another from
-    /// 0 whatever their kind -- as a world's are when it is made.
+    /// 0 whatever their kind -- as a world's are when it is made. A
+    /// bundle's library's path is made whole, from its mod's folder.
     pub fn of_manifests(manifests: &[Manifest]) -> Self {
         let mut types = Vec::new();
         let mut give = |full_name: String, kind: Kind, hooks: Vec<Hook>| {
@@ -86,7 +91,9 @@ impl TypeRegistry {
         for manifest in manifests {
             for bundle in manifest.bundles() {
                 let bundle_name = BundleName { mod_name: manifest.name().to_string(), bundle: bundle.name().to_string() };
-                give(bundle_name.to_string(), Kind::Bundle(bundle.fields().clone()), Vec::new());
+                // Its library's path made whole: from its mod's folder.
+                let fields = BundleFields { library: manifest.folder().join(&bundle.fields().library), ..bundle.fields().clone() };
+                give(bundle_name.to_string(), Kind::Bundle(fields), Vec::new());
                 for bundle_type in bundle.types() {
                     let type_name = TypeName { bundle_name: bundle_name.clone(), type_name: bundle_type.name().to_string() };
                     give(type_name.to_string(), bundle_type.kind().clone(), bundle_type.hooks().to_vec());

@@ -461,7 +461,63 @@ NOW
   for all kinds, the kind's byte over it. Then: "fold cdnf.rs and manifests.rs into
   their folders lol / type registry is also a module of protocol" --
   protocol/src/{cdnf,manifests,type_registry}/mod.rs; no type_registry
-  crate. client -- render rule,
+  crate.
+- LOADING AND SETUP, THE MODEL (2026-10-25, design, nothing written):
+  pure Rust between game and mods, no C-style bindings: "we compile mods
+  against the game source code and compiler the game is built on,
+  remember, so we can avoid using c style bindings and remain pure rust"
+  (opening the file is the OS loader's: dlopen/dlsym declared by hand,
+  no crate). Three handles: type registry, server, client. "we care
+  about being able to downcast stuff so mods dont have to do downcats
+  when calling their dependencies every time ... the type registry
+  handle, which has the pointers ids and strings for everything. thats
+  where we get our pointers to stuff to downcast in the first place ...
+  this process produces a lot of new stuff which is basically more
+  pointers to functions, but this time not dynamically dispatched. and
+  this ia where the real proc code lives ... what cant be downcasted ie
+  specific plane access inside the server ... are indexed by id acquired
+  from the type registry at load/setup time" / "the server cant downcast
+  a sheep call to a function receiving a sheep ... so general public api
+  serverhandles are always given for things like entity o sca procs, but
+  also gives rules freedom to the whoke server api". "setup only
+  receives typeregistry, server handle is what server kinds receive on
+  the fixed signature. common side bundles dont have code that recieves
+  neither client nor server handles btw. mostly useless for now, much
+  more useful later i swear". Server kinds' code types (traits, fixed
+  signatures) in the server, client kinds' in the client: "the same will
+  be done with client along with its types because of bevy, so lets also
+  move the respective types to server anyways for parity". My proposal:
+  every bundle library exports bundle_exports() (name -> Box<dyn Any>,
+  for dependents to downcast) and bundle_set_up(&TypeRegistryHandle)
+  (name -> built code, which the side downcasts once to its own trait
+  object). How a client call, a common kind, reaches the server: put
+  off, see LATER. The loader: "lets put the loading utility in the
+  utilities folder, that decouples the code from protocol and we can
+  later adapt the utility to work with windows or Linux automatically"
+  -- utilities::dynamic_library (DynamicLibrary::open, ::function),
+  dlopen/dlsym/dlerror declared by hand, RTLD_NOW, never closed.
+- BASEGAME, THE FIRST MOD (2026-10-25): "lets name it basegame, but lets
+  make something stupid basic, because well also make the mod template
+  from it lol, and also model the mod pacjager with it" / "just grass no
+  entities is even simpler". basegame/ its own workspace, a crate a
+  bundle (common/, basegame_common, a dylib); manifest.cdnf and its hash
+  by hand for now (AI_SCRATCHPAD hash <file>; load <side> <mods>...).
+  FOUND: built from protocol's source in its own workspace, cargo gives
+  protocol another -C metadata -- another crate, TypeIds apart, the
+  downcast fails, and target/release/libprotocol.so overwritten. So, as
+  settled before ("against the game as compiled ... never its source"):
+  no dependency on the game in a bundle's Cargo.toml; --extern
+  protocol=../target/release/libprotocol.so and -L
+  dependency=../target/release/deps in basegame/.cargo/config.toml,
+  target-dir ../target, the game's flags read from the root's config.
+  Then grass's export downcasts on the game's side to protocol's
+  TypeName. Each bundle's bundle_set_up (BUNDLE_SET_UP, BundleSetUp)
+  returns its code by name; protocol::type_registry::load(side) opens
+  the common and side bundles, dependencies first, first by name, and
+  refuses code for a type the manifest lacks, or none for a kind with
+  code (entity proc, sca proc, worldgen, render proc, gui). Only bundles
+  carry a path: "yes, only bundles should carry the paths lol" -- the
+  registry makes a bundle's library path whole, its mod's folder joined. client -- render rule,
   gui. Attributes: their size alone ("instead of "blocks" it should be
   "size""), in 16-byte blocks, 1 to 256 ("yes, it should've been like
   this from the beggining lol"), data words gone -- "atributes have a
@@ -604,6 +660,26 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- A mod built against another build of the game (mine, 2026-10-25): a
+  bundle library loads on a rebuilt libprotocol.so and its TypeIds
+  agree (the crate's metadata, not its source), but nothing checks it
+  was built against this one -- a stale mod misbehaves quietly. The mod
+  packager's: rebuild mods as the game changes, or record the game build
+  a mod was made against.
+- The manifest made in code (2026-10-25): a typestate builder the mod
+  imports from mod_packager, at mod level -- "a bundle basically
+  corresponds to a compilation unit ie a crate" -- the packager building
+  each bundle crate, hashing, writing the manifest "with the hashes and
+  all the details at once"; the builder takes each setup function only
+  so the compiler checks it ("its just a hack to make tye type system
+  work for us"). And a macro_rules! writing bundle_set_up: "we could
+  conceivably make the macro buold the manifest and registration
+  function, i dont see why not lol" -- "ok, for later, right now we need
+  the mod working, were hashing and making the manifests by hand for the
+  first few tries lol".
+- How a client call -- a common kind, whose code gets no handle -- is
+  answered by the server: "let's leave the client call questions for
+  when we start working on the client again lol" (2026-10-25).
 - Variably sized data, out of attributes: "variably sized data will be
   elsewhere later" (2026-10-25).
 - Positionless entities: "i actually have another plan for positionless

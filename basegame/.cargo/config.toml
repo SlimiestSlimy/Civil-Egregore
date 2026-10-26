@@ -1,0 +1,9 @@
+# Built into the game's own target folder, against the game's own
+# libraries as compiled there -- never built again here, so one crate is
+# one crate, its types the same on both sides -- with the game's flags
+# (its .cargo/config.toml, a folder up, read too: these are added to its).
+[build]
+target-dir = "../target"
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["--extern", "protocol=../target/release/libprotocol.so", "-L", "dependency=../target/release/deps"]

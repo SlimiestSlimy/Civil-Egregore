@@ -18,6 +18,9 @@ mod rng;
 #[path = "fine/dispatcher.rs"]
 mod dispatcher;
 
+#[path = "fine/dynamic_library.rs"]
+mod dynamic_library;
+
 #[path = "fine/settings.rs"]
 mod settings;
 

@@ -7,3 +7,4 @@ description = "The AI's own scratchpad: probes of Civil Egregore, questions aske
 # deleted whole without anything else changing.
 [dependencies]
 utilities = { path = "../utilities" }
+protocol = { path = "../protocol" }

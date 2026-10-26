@@ -25,7 +25,8 @@ pub enum Side {
 pub struct BundleFields {
     /// The side its code runs on.
     pub side: Side,
-    /// Its library, its path from its mod's folder.
+    /// Its library: its path from its mod's folder, as a manifest says
+    /// it; made whole, from there, in the type registry.
     pub library: PathBuf,
     /// The library's hash ([`utilities::hash::hash_bytes`]).
     pub library_hash: u64,

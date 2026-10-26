@@ -1,6 +1,7 @@
 # Every crate of Civil Egregore's engine, built together: one lock file and one `target/`
 # for them all, here, whichever crate's folder cargo is run from.
-# Tessera is a project of its own, with its own workspace and tests.
+# Tessera is a project of its own, with its own workspace and tests; the
+# base game a workspace of its own, built as a mod is.
 [workspace]
 members = [
     "utilities",
@@ -8,7 +9,7 @@ members = [
     "game_packager",
     "AI_SCRATCHPAD",
 ]
-exclude = ["tessera"]
+exclude = ["tessera", "basegame"]
 resolver = "3"
 
 # The game's one version.

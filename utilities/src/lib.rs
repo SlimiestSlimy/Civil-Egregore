@@ -14,6 +14,7 @@ pub mod chance;
 pub mod coordinates;
 pub mod csv;
 pub mod dispatcher;
+pub mod dynamic_library;
 pub mod fixed_list;
 pub mod fixed_point;
 pub mod hash;
