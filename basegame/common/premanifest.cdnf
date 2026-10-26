@@ -1,0 +1,9 @@
+:basegame_common:
+- side : common
+- version : 0.1
+
+grass :
+- kind : plane
+- width : 1
+- tile size : 1
+- set up : grass_set_up

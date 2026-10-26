@@ -7,6 +7,7 @@ members = [
     "utilities",
     "protocol",
     "game_packager",
+    "mod_packager",
     "AI_SCRATCHPAD",
 ]
 exclude = ["tessera", "cdnf", "basegame"]
@@ -14,7 +15,7 @@ resolver = "3"
 
 # The game's one version.
 [workspace.package]
-version = "0.6.5293"
+version = "0.7.0"
 edition = "2024"
 authors = ["SlimiestSlimy", "Opus 5.5 high"]
 repository = "https://github.com/SlimiestSlimy/Civil-Egregore.git"

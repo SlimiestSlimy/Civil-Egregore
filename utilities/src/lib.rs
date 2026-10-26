@@ -8,6 +8,7 @@
 // checks the private ones.
 #![warn(missing_docs, clippy::missing_docs_in_private_items)]
 
+pub mod archive;
 pub mod bitmap;
 pub mod cache;
 pub mod chance;

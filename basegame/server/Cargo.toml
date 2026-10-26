@@ -1,11 +1,14 @@
 [package]
 name = "basegame_server"
 edition = "2024"
-description = "The base game's server bundle: what it takes of the common bundle"
+description = "The base game's server mod: what it takes of the common mod"
 
-# A bundle: one library, loaded by the game.
+# A mod: one library, loaded by the game.
 [lib]
 crate-type = ["dylib"]
 
-# None: the game's libraries come by `--extern` (.cargo/config.toml).
-[dependencies]
+# The source each is developed with; packaging drops it, the compiled
+# libraries given instead.
+[target.'cfg(not(civil_egregore_packaging))'.dependencies]
+protocol = { path = "../../protocol" }
+basegame_common = { path = "../common" }

@@ -91,6 +91,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mod_packager"
+version = "0.0.0"
+dependencies = [
+ "cdnf",
+ "protocol",
+ "sha2",
+ "utilities",
+]
+
+[[package]]
 name = "protocol"
 version = "0.0.0"
 dependencies = [

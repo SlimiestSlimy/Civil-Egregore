@@ -1,0 +1,10 @@
+[package]
+name = "mod_packager"
+edition = "2024"
+description = "Civil Egregore's mod packager: a mod's premanifest checked, the mod built against the game and its dependencies, its set up functions checked, its manifest written, and the mod zipped as it ships"
+
+[dependencies]
+utilities = { path = "../utilities" }
+protocol = { path = "../protocol" }
+cdnf = { path = "../cdnf" }
+sha2 = { workspace = true }

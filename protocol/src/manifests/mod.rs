@@ -1,133 +1,125 @@
-//! The mods' manifests, read and checked: each mod's `manifest.cdnf`
-//! read as CDNF, checked as a manifest -- its shape, every field, every
-//! name, each library's hash -- and then all of them together: every
-//! mod's name once, every dependency there and none in a ring, every
-//! type named where its bundle may name it. What comes out ([`Manifest`])
-//! only this module makes, so the type registry made of them checks
-//! nothing. A type is of a kind, said as the registry says it
-//! ([`crate::kinds`]).
+//! The mods' manifests, read and checked: each mod's package read
+//! ([`crate::packages`]), its manifest read as CDNF, then as the format
+//! every manifest-alike file shares ([`crate::manifest_format`]), then as
+//! a manifest -- no carried dependencies, a premanifest's; a library in
+//! the package and its hash, for every mod but a container -- the mods
+//! it carries read the same, and then all of them together: every
+//! dependency there at its version and on a side it may be, none in a
+//! ring, every type named where its mod may name it. What comes out
+//! ([`Manifest`]) only this module makes, so the type registry made of
+//! them checks nothing. A type is of a kind, said as the registry says
+//! it ([`crate::kinds`]).
 
-use crate::kinds::{BundleFields, Hook, Kind};
-use std::path::{Path, PathBuf};
+use crate::manifest_format::{read_mod_document, FormatError, ModDocument};
+use crate::packages::{PackagePath, DEPENDENCIES_FOLDER, MANIFEST_FILE, PACKAGE_EXTENSION};
+use sha2::{Digest, Sha256};
+use std::path::PathBuf;
+use utilities::archive::read_archive;
+use utilities::dynamic_library::library_file_name;
 
 mod across_mods;
-mod reading;
-pub use reading::MANIFEST_FILE;
 
-/// The manifests of the mods in `mod_folders`, each read and checked
-/// alone, then all checked together: or the first thing wrong. In the
-/// order given.
-pub fn read_mods(mod_folders: &[PathBuf]) -> Result<Vec<Manifest>, ManifestError> {
-    let manifests = mod_folders.iter().map(|mod_folder| reading::read_manifest(mod_folder)).collect::<Result<Vec<_>, _>>()?;
+/// The manifests of the mods in the packages `packages` and of every mod
+/// they carry, flattened -- each mod before those it carries, a mod read
+/// twice kept once if its manifest is the same both times -- each read
+/// and checked alone, then all checked together: or the first thing
+/// wrong. In the order given.
+pub fn read_mods(packages: &[PathBuf]) -> Result<Vec<Manifest>, ManifestError> {
+    let mut read = Vec::new();
+    for package in packages {
+        let path = PackagePath::on_disk(package);
+        let bytes = std::fs::read(package).map_err(|io_error| ManifestError { package: path.clone(), line: None, section: String::new(), what: io_error.to_string() })?;
+        read_package(&bytes, path, &mut read)?;
+    }
+    let manifests: Vec<Manifest> = read.into_iter().map(|(manifest, _)| manifest).collect();
     across_mods::check_across_mods(&manifests)?;
     Ok(manifests)
 }
 
-/// A mod's manifest, checked, with every other mod's: its name and its
-/// bundles, in the order written.
+/// The mod of the package `package`, at `path`, and every mod it
+/// carries, each read and checked alone, put in `read` with its
+/// manifest's text: a mod read before kept once, if its manifest is the
+/// same.
+fn read_package(package: &[u8], path: PackagePath, read: &mut Vec<(Manifest, String)>) -> Result<(), ManifestError> {
+    let refused = |what: String| ManifestError { package: path.clone(), line: None, section: String::new(), what };
+    let entries = read_archive(package).map_err(refused)?;
+    let manifest_bytes = entries.iter().find(|&&(entry, _)| entry == MANIFEST_FILE).ok_or_else(|| refused(format!("no {MANIFEST_FILE}")))?.1;
+    let text = std::str::from_utf8(manifest_bytes).map_err(|_| refused(format!("{MANIFEST_FILE}: not UTF-8")))?;
+    let manifest = read_manifest(text, &entries, &path)?;
+    if let Some((read_before, text_before)) = read.iter().find(|(read_before, _)| read_before.document.name == manifest.document.name) {
+        if text_before != text {
+            return Err(refused(format!("a mod named as the one in {} is, its manifest not the same", read_before.package)));
+        }
+        return Ok(());
+    }
+    let library_file = (!manifest.document.container).then(|| library_file_name(&manifest.document.name));
+    read.push((manifest, text.to_string()));
+    for &(entry, bytes) in &entries {
+        let carried = entry.strip_prefix(DEPENDENCIES_FOLDER).is_some_and(|file| !file.contains('/') && file.ends_with(PACKAGE_EXTENSION));
+        if carried {
+            read_package(bytes, path.inside(entry), read)?;
+        } else if entry != MANIFEST_FILE && Some(entry) != library_file.as_deref() {
+            return Err(refused(format!("{entry}: neither the manifest, the library nor a carried mod's package")));
+        }
+    }
+    Ok(())
+}
+
+/// The manifest `text` of the mod whose package, at `path`, has the
+/// entries `entries`, read and checked alone.
+fn read_manifest(text: &str, entries: &[(&str, &[u8])], path: &PackagePath) -> Result<Manifest, ManifestError> {
+    let refused = |line: Option<usize>, section: &str, what: String| ManifestError { package: path.clone(), line, section: section.to_string(), what };
+    let document = cdnf::parse(text).map_err(|cdnf_error| refused(Some(cdnf_error.line), "", cdnf_error.what))?;
+    let document = read_mod_document(&document).map_err(|FormatError { section, what }| refused(None, &section, what))?;
+    let in_mod = |what: String| refused(None, &document.name, what);
+    if !document.carried_dependencies.is_empty() {
+        return Err(in_mod("carried dependencies: a premanifest's field, the manifest's depends on holds them".to_string()));
+    }
+    if !document.container {
+        let hash_said = document.hash.as_deref().ok_or_else(|| in_mod("hash: missing, the library's".to_string()))?;
+        let library_file = library_file_name(&document.name);
+        let library_bytes = entries.iter().find(|&&(entry, _)| entry == library_file).ok_or_else(|| in_mod(format!("no library {library_file}")))?.1;
+        let hash = format!("0x{:x}", Sha256::digest(library_bytes));
+        if !hash.eq_ignore_ascii_case(hash_said) {
+            return Err(in_mod(format!("library {library_file}: its hash is {hash}, the manifest says {hash_said}")));
+        }
+    }
+    Ok(Manifest { document, package: path.clone() })
+}
+
+/// A mod's manifest, checked with every other mod's: the mod as its
+/// manifest says it -- a hash unless it is a container, no carried
+/// dependencies -- and where its package is.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Manifest {
-    /// The mod's name.
-    name: String,
-    /// The mod's folder, its manifest at its root.
-    folder: PathBuf,
-    /// Its bundles.
-    bundles: Vec<Bundle>,
+    /// The mod as its manifest says it.
+    document: ModDocument,
+    /// Where the mod's package is.
+    package: PackagePath,
 }
 
 impl Manifest {
-    /// The mod's name.
-    pub fn name(&self) -> &str {
-        &self.name
+    /// The mod as its manifest says it.
+    pub fn document(&self) -> &ModDocument {
+        &self.document
     }
 
-    /// The mod's folder.
-    pub fn folder(&self) -> &Path {
-        &self.folder
-    }
-
-    /// Its bundles, in the order written.
-    pub fn bundles(&self) -> &[Bundle] {
-        &self.bundles
+    /// Where the mod's package is.
+    pub fn package(&self) -> &PackagePath {
+        &self.package
     }
 }
 
-/// A bundle: its name -- no other bundle's of its mod -- its fields, and
-/// its types, in the order written.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Bundle {
-    /// Its name, in its mod.
-    name: String,
-    /// Its fields: its side, its library and that library's hash, and
-    /// the bundles it depends on.
-    fields: BundleFields,
-    /// Its types.
-    types: Vec<Type>,
-}
-
-impl Bundle {
-    /// Its name, in its mod.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Its fields.
-    pub fn fields(&self) -> &BundleFields {
-        &self.fields
-    }
-
-    /// Its types, in the order written.
-    pub fn types(&self) -> &[Type] {
-        &self.types
-    }
-}
-
-/// A type: its name -- no other type's in its bundle -- its kind, its
-/// hooks, each one its kind takes, and its set up function's name.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Type {
-    /// Its name, in its bundle.
-    name: String,
-    /// Its kind, and the kind's fields.
-    kind: Kind,
-    /// Its hooks.
-    hooks: Vec<Hook>,
-    /// The name its bundle's library exports its set up function as: one
-    /// a type of a kind with code has, any other may.
-    set_up: Option<String>,
-}
-
-impl Type {
-    /// Its name, in its bundle.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Its kind, and the kind's fields.
-    pub fn kind(&self) -> &Kind {
-        &self.kind
-    }
-
-    /// Its hooks.
-    pub fn hooks(&self) -> &[Hook] {
-        &self.hooks
-    }
-
-    /// The name its set up function is exported as, if it has one.
-    pub fn set_up(&self) -> Option<&str> {
-        self.set_up.as_deref()
-    }
-}
-
-/// Why the mods' manifests were refused: the mod, where in its manifest
-/// -- its line, if the CDNF said, and the section -- and what is wrong.
+/// Why the mods' manifests were refused: the mod's package, where in its
+/// manifest -- its line, if the CDNF said, and the section -- and what is
+/// wrong.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ManifestError {
-    /// The mod's folder.
-    pub mod_folder: PathBuf,
+    /// Where the mod's package is.
+    pub package: PackagePath,
     /// The line, if known.
     pub line: Option<usize>,
-    /// The section: the bundle, and the type, as far as known.
+    /// The section: the mod, and the type, as far as known.
     pub section: String,
     /// What is wrong.
     pub what: String,
@@ -135,7 +127,7 @@ pub struct ManifestError {
 
 impl std::fmt::Display for ManifestError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(formatter, "{}", self.mod_folder.display())?;
+        write!(formatter, "{}", self.package)?;
         if let Some(line) = self.line {
             write!(formatter, ", line {line}")?;
         }

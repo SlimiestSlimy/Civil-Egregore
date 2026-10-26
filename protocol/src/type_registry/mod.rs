@@ -1,12 +1,12 @@
 //! Civil Egregore's type registry: the mods' manifests, read and checked
 //! already ([`crate::manifests::read_mods`]), made into one flat list
-//! of types ([`TypeRegistry::of_manifests`]) -- each bundle a type too,
+//! of types ([`TypeRegistry::of_manifests`]) -- each mod a type too,
 //! before its own -- each with its ID and its full name. Nothing is
 //! checked here: the manifests were.
 
-use crate::kinds::{BundleFields, Hook, Kind};
+use crate::kinds::{Hook, Kind, ModFields};
 use crate::manifests::Manifest;
-use crate::type_names::{BundleName, TypeName};
+use crate::type_names::TypeName;
 
 mod loading;
 pub use loading::{Export, LoadedRegistry, TypeRegistryHandle, TypeSetUp};
@@ -29,7 +29,7 @@ pub fn kind_byte(kind: &Kind) -> u8 {
         Kind::RenderProc { .. } => 0x06,
         Kind::Gui { .. } => 0x07,
         Kind::ClientCall => 0x08,
-        Kind::Bundle(_) => 0x09,
+        Kind::Mod(_) => 0x09,
     }
 }
 
@@ -39,14 +39,14 @@ pub fn kind_byte(kind: &Kind) -> u8 {
 pub struct RegisteredType {
     /// Its ID: its kind's byte over its number.
     type_id: u64,
-    /// Its full name: `mod>bundle` a bundle's, `mod>bundle>type` a type's.
+    /// Its full name: `mod` a mod's, `mod>type` a type's.
     full_name: String,
     /// Its kind, and the kind's fields.
     kind: Kind,
     /// Its hooks.
     hooks: Vec<Hook>,
-    /// The name its bundle's library exports its set up function as, if
-    /// it has one.
+    /// The name its mod's library exports its set up function as, if it
+    /// has one.
     set_up: Option<String>,
 }
 
@@ -85,10 +85,9 @@ pub struct TypeRegistry {
 }
 
 impl TypeRegistry {
-    /// The types of `manifests`, in their order: each mod's bundles, each
-    /// bundle first and then its types, numbered one after another from
-    /// 0 whatever their kind -- as a world's are when it is made. A
-    /// bundle's library's path is made whole, from its mod's folder.
+    /// The types of `manifests`, in their order: each mod first and then
+    /// its types, numbered one after another from 0 whatever their kind
+    /// -- as a world's are when it is made.
     pub fn of_manifests(manifests: &[Manifest]) -> Self {
         let mut types = Vec::new();
         let mut give = |full_name: String, kind: Kind, hooks: Vec<Hook>, set_up: Option<&str>| {
@@ -96,15 +95,12 @@ impl TypeRegistry {
             types.push(RegisteredType { type_id, full_name, kind, hooks, set_up: set_up.map(str::to_string) });
         };
         for manifest in manifests {
-            for bundle in manifest.bundles() {
-                let bundle_name = BundleName { mod_name: manifest.name().to_string(), bundle: bundle.name().to_string() };
-                // Its library's path made whole: from its mod's folder.
-                let fields = BundleFields { library: manifest.folder().join(&bundle.fields().library), ..bundle.fields().clone() };
-                give(bundle_name.to_string(), Kind::Bundle(fields), Vec::new(), None);
-                for bundle_type in bundle.types() {
-                    let type_name = TypeName { bundle_name: bundle_name.clone(), type_name: bundle_type.name().to_string() };
-                    give(type_name.to_string(), bundle_type.kind().clone(), bundle_type.hooks().to_vec(), bundle_type.set_up());
-                }
+            let document = manifest.document();
+            let fields = ModFields { side: document.side, depends_on: document.depends_on.clone(), library: (!document.container).then(|| manifest.package().clone()) };
+            give(document.name.clone(), Kind::Mod(fields), Vec::new(), None);
+            for mod_type in &document.types {
+                let type_name = TypeName { mod_name: document.name.clone(), type_name: mod_type.name().to_string() };
+                give(type_name.to_string(), mod_type.kind().clone(), mod_type.hooks().to_vec(), mod_type.set_up());
             }
         }
         Self { types }

@@ -1,0 +1,7 @@
+:basegame:
+- side : common
+- version : 0.1
+- container mod
+- carried dependencies :
+    - basegame_common : 0.1
+    -- basegame_server : 0.1

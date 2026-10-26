@@ -331,8 +331,10 @@ MODS AND THE GAME FOLDER
   be, writes the manifest, lays out the mod in its own target/<mod>/.
   Release only for now. A mod template workspace in the tree, basegame
   "basically a copy of it".
-- VERSIONS: now 0.6.5293 ("decided now. were on version 0.6.5293, why?
-  idk", 2026-10-24): "we should have a single version on the root crate"
+- VERSIONS: now 0.7.0 ("i believe we deserve that 0.7 before commit and
+  push haha", 2026-10-26: basegame and meadow packaged as mods, loaded
+  from their zips); was 0.6.5293 ("decided now. were on version
+  0.6.5293, why? idk", 2026-10-24): "we should have a single version on the root crate"
   -- the root Cargo.toml's alone; basegame "still follows the root
   version so it doesn't carry one of its own even if it acts as a
   separate workspace"; tessera its own (its own project). "freezing the public api will be our 0.7 moment" -- "the
@@ -561,30 +563,162 @@ NOW
   hand basically" / "i think its a sound plan". (On the way: a builder
   taking the function itself needed no macro, std::any::type_name giving
   its path -- moot now.)
-  NAMES BY CONVENTION ("since library names follow a specific convention
-  we can derive the library name from the bundle name"): a bundle's crate
-  is <mod>_<bundle>, its library lib<mod>_<bundle>.so (- made _, as cargo
-  does; std's DLL_PREFIX/DLL_SUFFIX) beside the manifest -- no `crate`
-  field in the premanifest, no `library` in the manifest. The two files
-  differ by `hash` alone, and by the premanifest's dependency folders.
-  DEPENDENCY FOLDERS IN THE PREMANIFEST ("making this premanifest.cdnf
-  also include dependency paths lol, so the packager only needs to read
-  the premanifest.cdnf and can build the entire mod ... make the package
-  builder generate the files automatically"): at mod level, before the
-  bundles, `depends on mods :` pairs of a mod's name and its packaged
-  folder ("mod dependencies involves pointing to the mod folder to see
-  the libraries"). Never in the shipped manifest. The game's path not
-  written anywhere: the packager is the game's and knows it.
-  THE PREMANIFEST'S READER IS THE PACKAGER'S ("i do have my doubts
-  about mixing manifest and premanifest parsers into one tho, we
-  probably want "premanifest" to be a separate library in modpackager
-  using the same internals as manifest ideally"): protocol's reader
-  splits read_bundle -- a public shared part (name, side, depends on,
-  types, side checks; the leftover FieldList handed back) and the
-  manifest's own (hash, checked against the library); read_type and
-  FieldList public. Manifest's fields private still: protocol alone
-  makes one. "i believe the dependency of modpackager on protocol is
-  justified".
+  ONE MOD, ONE CRATE (2026-10-26; replaces bundles): "a mod is a bundle
+  is a crate, a mod as a unit is also a bundle, and also compiles to a
+  single library file. its extra work to change how manifests work but i
+  actually think this might just solve all the issues we have and keep
+  the bundle grained loading which is important for sides". Why: a
+  library's dependencies are recorded by name alone (NEEDED on Linux,
+  the DLL's file name on Windows), the first loaded of that name taken --
+  tried 2026-10-26, two libplanes.so in two folders: a library linked to
+  one got whichever loaded first. So a library's name must be unique in
+  the process; <mod>_<bundle> clashed (a_b>c and a>b_c); per-bundle
+  `depends on` said again what Cargo.toml said, unchecked. Bundle-level
+  dependencies were never "bundles rather than mods" but "bundles rather
+  than types" (2026-10-19), and sides: "that reason is tied to bundles
+  sides, because every bundle has a side, and we want to load only whats
+  needed for a given side". Now:
+  - a mod is one crate, one library (or none), one side. Its crate's name
+    is its name, its library lib<name>.so (std's DLL_PREFIX/DLL_SUFFIX)
+    -- no `library` field. Mod names are crate names (A-Z a-z 0-9 _),
+    unique in a world, none of the game's crates' (protocol, utilities,
+    cdnf, std, core...).
+  - full names `mod>type`. One section, the mod's: its fields' list
+    (side, version, depends on, hash...) and its types.
+  - `version` in every manifest, an exact string. `depends on` on both
+    sides with versions ("we rather specify a version string on both
+    sides now rather than later"). DEPENDENCIES' ZIPS IN THE MOD'S
+    dependencies/ (2026-10-26): "we need to properly define how to import
+    depends on as well, probably just providing the zip files in a folder
+    inside the mod crate is plenty. carried dependencies are provided the
+    same way for consistency? we also actually need to carry version on
+    the premanifest on both as well dont we? to validate version strings
+    on whats in the premanifest vs whats on the dependencies" -- the
+    mod's crate holds dependencies/<name>.zip for every mod of both lists
+    (the same folder name a package has inside); both premanifest lists
+    are name : version, as the manifest's; the packager checks each
+    listed name has its zip, the zip's manifest that mod at that version,
+    and no zip there unlisted. No paths in a premanifest. A container's
+    carried mods come in its zip (meadow's dependencies/ holds
+    basegame.zip alone). NO PATHS, NOT EVEN OPTIONAL: "maybe we just
+    skip it and just make the mod developer has all its dependencies on
+    the project dependencies folder, basegame as well if needed, it
+    simplifies things tbh" -- basegame_server's dependencies/ holds
+    basegame_common.zip, copied after packaging it. THE PACKAGER'S FLAGS
+    BY CARGO_ENCODED_RUSTFLAGS (2026-10-26; was its own
+    .cargo/civil_egregore.toml): basegame, inside the game's folder, read
+    the game's .cargo/config.toml, whose target.<triple>.rustflags drop
+    every build.rustflags -- the packager's --cfg and --extern lost,
+    protocol built from source, the set up check's E0460 caught it; a
+    developer's ~/.cargo/config.toml would do the same. Now cargo runs
+    with CARGO_ENCODED_RUSTFLAGS (every config's rustflags give way) and
+    --target-dir <mod>/target/civil_egregore_build (cargo's own folder:
+    it cleans no folder it did not make, CACHEDIR.TAG). A mod's own
+    rustflags are ignored when packaging, its .cargo files otherwise
+    read: "hmmm well we had to acknowledge the fact that moda need a
+    special compilation, the reason for the packager, so i guess we
+    forbid those .cargo files? i guess its our only choice haha". Every dependency's library extracted,
+    each run, into target/civil_egregore_dependencies/ (cargo's deps/
+    differs per profile). Toolchain: never written by the packager; its
+    cargo runs pinned by RUSTUP_TOOLCHAIN from the game's file; a mod's
+    rust-toolchain.toml naming another refused; the template writes it.
+    Cargo.toml never written: the package's name and dylib checked by the
+    library being there after the build. INDIRECT DEPENDENCIES
+    (2026-10-26): dependencies/ may hold zips nobody lists, if a listed
+    one needs them ("yes thats allowed, its the same way the compiler
+    compiles libraries together anyways"), but none nothing needs; and
+    "if forest depends on oak it only makes sense meadow depending on
+    forest only can access oak on the downcasting stage since it will be
+    loaded by the time the downcasting can happen" -- --extern for every
+    dependency library of a side the mod may depend on, indirect ones too;
+    the manifest's references still reach only listed mods (through
+    containers). SOURCE FOR DEVELOPING, LIBRARIES FOR PACKAGING
+    (2026-10-26): "having the dependencies listed in a carfo fike is
+    developer support, the mod packager doesn't care that much about whats
+    kisted in that file" -- but a dependency in Cargo.toml is built from
+    source, another crate (TypeIds apart), so a mod's Cargo.toml lists the
+    game's crates and its dependency mods under
+    [target.'cfg(not(civil_egregore_packaging))'.dependencies] (path to
+    their source; how the developer has it is theirs), and the packager's
+    flags carry --cfg civil_egregore_packaging: cargo drops them, --extern
+    gives the compiled ones. Tried 2026-10-26 on copies of meadow and
+    basegame: packaging built meadow alone, loaded beside basegame's zip,
+    downcast GrassTick; a plain cargo check built protocol and basegame
+    from source and reported a typo against basegame's real GrassTick.
+    No tool does this for cargo (searched:
+    cargo has no prebuilt-dependency support, build scripts can't pass
+    --extern, the pre-RFC closed; the usual answer is a C ABI). "our
+    system is built to be source agnostic ... but practically all rust
+    development is source full" / "if a developer has the library but not
+    the source they are free to write their own plugging code" / "this is
+    the most were getting out of rust to have oue cake and eat it too".
+    Developing pulls protocol's crates.io dependencies into the mod's lock
+    file; packaging never. rust-analyzer itself not tried.
+  PRECEDENTS (searched 2026-10-26, "are we the only crazy people
+  compiling rust projects in this style"): ours is rustc's own pattern --
+  librustc_driver.so linked by clippy/rustdoc/miri, -Zcodegen-backend
+  loading a dylib built against it, one known export
+  (__rustc_codegen_backend); Fyrox 0.34 hot-reloads game dylibs built
+  against fyrox-dylib, same compiler; hot-lib-reloader (libloading).
+  Backed off: bevy_dynamic_plugin, deprecated as unsound (no check of the
+  same Bevy and rustc; doubts two compiles of one source agree). Ours
+  never compiles twice (--extern the one compile), pins the toolchain,
+  rustc refuses another compile's library (E0514/E0460), the hash pins
+  the bytes, symbols carry the compile's hash (a mismatch "undefined
+  symbol", not corruption). Left: Rust promises no layout even within a
+  version (-Zrandomize-layout and such), only if the game used them.
+  Others went to stabby/abi_stable, a C ABI, wasm, or processes --
+  each costs pure Rust or downcasting. Reading a world: each `depends
+    on` finds that version. The game's path written nowhere: the packager is the game's
+    and knows it.
+  - DEPENDENCIES CARRIED (the user, from Fabric's jar-in-jar: "we now
+    optionally provide the dependencies of a mod in a separate
+    dependencies/ folder inside the mod folder. if the dependency is
+    duplicated by its mod name it will be caught by the registry, and we
+    match by a version string on the mod manifest"): a mod's zip may hold
+    dependencies/, each a packaged zip byte for byte (its own hashes still
+    prove it). The premanifest says which ("premanifests is what
+    specifies if dependencies are packaged with the mod. it has to be
+    lol"), dependency by dependency: "a mod can carry some dependencies
+    and not others ... the only difference is on the premanifests,
+    whether we list the dependency on the "carried dependencies"or just
+    "depends on"" -- two lists of name : version pairs, a name in one
+    alone; the manifest's one `depends on` (name : version) holds both. Nesting any depth: "everything gets flattened to a list of
+    mods anyways. the only thing that changes is the recorded path of
+    the libraries to load them from". A name found twice: one kept if
+    the version and contents are the same, refused otherwise.
+  - EMPTY MODS ("basegame basically can be packaged as a single empty mod
+    carrying 2 dependencies lmao"): no library, no types, only depends
+    on; said so in the premanifest and manifest by a flag, `- container
+    mod` ("container mod likey likey"; flags are bare items in the
+    fields' list: "we dont need to make flags be pairs"), not inferred
+    -- a mod of a library and no types is another thing ("probably we want an optinal field in the pre manifest
+    to say "empty mod" right away instead of checking if there are any
+    bundles"). A type in the registry, and a side of its own: "a
+    container mod simply specifies a side to constrain its carried
+    dependencies to that side or common" -- a server container carries
+    server and common mods, a client one client and common; "container
+    common mods can carry anything, its the exception to the rule since
+    a container mod is a special case anyways" -- basegame's is common.
+    Depending on an empty mod reaches what it carries, through empty mods
+    only, filtered by the dependent's side: "we still want dependencies
+    to be able to just say basegame". basegame: basegame (empty, common)
+    carrying basegame_common, basegame_server, later basegame_client.
+  - sides: a mod with a library depends on mods its side sees (common on
+    common; server on common and server; client on common and client).
+    Loading: the flattened list, each mod by dependency then name, taken
+    or skipped by its own side.
+  - a type names types of its own mod or of mods it depends on (through
+    empty mods), never further.
+  THE READERS: protocol::manifest_format, the shared reader (the user:
+  "what we want is a shared library that takes cdnf's output and allows
+  to 2 other libraries to check if its a valid manifest or premanifest" /
+  "the shared part should be its own module"): CDNF's output to a plain
+  document, every check that does not depend on the form. The manifest's
+  own check in protocol::manifests (hash against the library); the
+  premanifest's in mod_packager ("i believe the dependency of
+  modpackager on protocol is justified"). Manifest's fields private
+  still: protocol alone makes one.
   The packager, a binary of the game's (`cargo package_mod <mod folder>`
   from the game; then from the mod by the alias it writes):
   1. premanifest.cdnf read: every check one mod can make alone, before
@@ -639,14 +773,31 @@ NOW
   loading straight from a buffer can work?" -- a world's mods/ holds the
   zips; the manifest read and the hashes made from the archive's
   entries (validation extracts nothing); at run, only the libraries that
-  load taken out, every start, no cache: DynamicLibrary::from_bytes --
-  Linux memfd_create, opened by /proc/self/fd/<n> (tried 2026-10-26:
-  basegame's two libraries loaded from memory, their set ups found; each
-  library's SONAME lets the others' NEEDED match it); Windows has no
-  supported way (hand-made loaders break exceptions, TLS, and read as
-  malware), so a temporary folder each start, removed after. The
-  packager makes the zip. The `zip` crate (MIT, deflate alone) the
-  second third-party crate, at the root.
+  load taken out, every start, no cache. DONE 2026-10-26:
+  protocol::packages (PackagePath: the zip on disk, then the zips inside
+  it); read_mods takes zips, flattens dependencies/<mod>.zip (each mod
+  before those it carries; a mod twice kept once if its manifest's text
+  is the same, refused otherwise; a stray entry refused); loading reads
+  the library out of the package again and opens it with
+  DynamicLibrary::from_bytes(mod_name, bytes). FROM_BYTES, A TEMPORARY
+  FILE ON EVERY OS: "A definitely, the loading library in utilities
+  should take care of the OS specific details" -- written to
+  <temp>/civil_egregore_libraries_<pid>/lib<mod>.so, opened, removed
+  (Linux keeps the mapping; Arch's /tmp is tmpfs). Windows can't remove a
+  loaded DLL, and mod libraries never close, so its files stay for the
+  system: "running multiple servers on a machine is definitely possible
+  and we dont want one server to go deletijg the other server temp files.
+  worst case a reboot cleans that up" -- no sweep of other processes'
+  folders. memfd (needs the libc crate) not taken. NO RE-HASH AT LOAD:
+  "dont worry about that lol, were not a security company, were making a
+  game". OUR OWN ZIP: "damn we need 12 crates to compress a folder into
+  an archive?" / "i mean, honestly, we only need to package things into
+  a zip, nothing else" / "yeah i think doing it this way ia simplest lol"
+  -- utilities::archive: stored entries alone, one date (1980-01-01), so
+  written the same every time; CRCs checked; compressed, encrypted,
+  multi-part, zip64, bad paths and twice-named entries refused. No zip
+  crate. Libraries carry a SONAME (lib<mod>.so): what lets a library
+  opened from anywhere satisfy its dependents' NEEDED.
   THE LIBRARY HASH (2026-10-26): "hash library instead of having our
   own please" / "the library hash doesnt have to be fast, but it
   definitely has to be resistant" / "change hexadecimal prefix to 0x" --
@@ -659,10 +810,12 @@ NOW
   mod_packager new a la cargo style lol" -- the mod template made by the
   packager, as `cargo new` makes a crate.
   Kept from before: each type's set up named in the manifest (`set
-  up`), looked up in its bundle's library by that name, bundle_set_up
-  gone ("B yeah, it matches everything tbh"); set up bundle by bundle,
+  up`), looked up in its mod's library by that name, bundle_set_up
+  gone ("B yeah, it matches everything tbh"); set up mod by mod,
   dependencies first; required for kinds with code, optional for the
   rest; setup functions #[unsafe(no_mangle)], unique in their library.
+  (Steps 1-5 above say bundle where it is now mod; the known gap stands:
+  a `pub use` of a dependency mod's set up function.)
 - SCA PROCS NAME THEIR PLANES (2026-10-25): "remember when i said that
   sca rules are sample automatically, well we also need to say on what
   planes are they sampled against HAHAHAHA,could be more than one btw" --
@@ -830,6 +983,24 @@ OPEN, FOUND BY ME
   into walking, measure both, the best wins.
 
 LATER (every "for later" of the user's, and mine, as said)
+- REAL MOD DEVELOPERS (2026-10-26): "aight, if we ever had real mod
+  developers we will have to review this, for now it's fine to cut
+  corners for compatibility" -- the packager ignoring a mod's rustflags,
+  its own build folder, basegame packaged by hand in order (common,
+  copied into server's dependencies/, server, both into basegame's).
+- SOURCES IN PACKAGES (my suggestion, 2026-10-26, not a plan): a
+  package optionally carrying its crate's source (Maven's -sources.jar),
+  the packager taking it out beside the libraries, so a dependency's zip
+  alone gives the editor its source; the author's choice, a premanifest
+  flag.
+- CDNF ELEMENTS KEEP THEIR LINE (2026-10-26, my opinion asked of the
+  format): the parsed elements carry no line, so a format or manifest
+  error names a section alone -- "that second point is about the code
+  lol, we can fix that indeed". Pairs merging over one line end stays,
+  on purpose: "about the first point: i dont think you understand the
+  reason. And this response is the reason, its parseable" -- a colon
+  then a paragraph over many lines is how people write; lists are for
+  fields ("that about pairs is exactly why we have the lists lol").
 - THE INTERNAL HASHES (2026-10-26): "our internal hashes are very bad
   and artifact prone i have to note, they break the current determinism,
   but changing the hash function doesn't break determinism just by

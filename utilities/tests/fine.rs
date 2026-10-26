@@ -34,3 +34,6 @@ mod bitmap;
 
 #[path = "fine/coordinates.rs"]
 mod coordinates;
+
+#[path = "fine/archive.rs"]
+mod archive;

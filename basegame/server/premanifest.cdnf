@@ -1,0 +1,11 @@
+:basegame_server:
+- side : server
+- version : 0.1
+- depends on :
+    -- basegame_common : 0.1
+
+grass_tick :
+- kind : sca proc
+- planes :
+    -- basegame_common>grass
+- set up : grass_tick_set_up

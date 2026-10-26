@@ -1,22 +1,23 @@
 //! The registry's libraries loaded for one side ([`TypeRegistry::load`]):
-//! every bundle of the common side and that one, dependencies first,
-//! each library opened and each of its types with a set up function set
-//! up -- the function its manifest names, a [`TypeSetUp`], given the
+//! every mod of the common side and that one, dependencies first, each
+//! library read from its mod's package and opened -- none, a
+//! container's -- and each of its types with a
+//! set up function set up -- the function its manifest names, a [`TypeSetUp`], given the
 //! registry and the code of the types before it, to take what it needs
 //! of them once.
 
 use super::TypeRegistry;
-use crate::kinds::{Kind, Side};
+use crate::kinds::{Kind, ModFields, Side};
 use std::any::Any;
 use std::collections::HashMap;
-use utilities::dynamic_library::DynamicLibrary;
+use utilities::dynamic_library::{library_file_name, DynamicLibrary};
 
 /// What a type's set up function makes of it: its code, or what its
 /// dependents take of it -- for them, and for the side, to downcast to
 /// what they know it as.
 pub type Export = Box<dyn Any + Send + Sync>;
 
-/// A type's set up function, as its bundle's library exports it, by the
+/// A type's set up function, as its mod's library exports it, by the
 /// name its manifest gives: its code, made with what it takes of the
 /// registry and of the types before it.
 pub type TypeSetUp = fn(&TypeRegistryHandle<'_>) -> Result<Export, String>;
@@ -77,34 +78,41 @@ impl LoadedRegistry {
 }
 
 impl TypeRegistry {
-    /// Its libraries loaded for `side` -- the common bundles' and the
-    /// side's, each after every bundle it depends on, the first by name
-    /// among those ready -- each bundle's types set up in its order: or
-    /// what went wrong.
+    /// Its libraries loaded for `side` -- the common mods' and the
+    /// side's, each after every mod it depends on that loads on it, the
+    /// first by name among those ready -- each mod's types set up in its
+    /// order: or what went wrong.
     pub fn load(self, side: Side) -> Result<LoadedRegistry, String> {
-        let mut waiting: Vec<usize> = (0..self.types.len()).filter(|&place| matches!(&self.types[place].kind, Kind::Bundle(fields) if fields.side == Side::Common || fields.side == side)).collect();
-        let (mut code, mut libraries, mut set_up) = (HashMap::new(), Vec::new(), Vec::<String>::new());
+        let loads_here = |fields: &ModFields| fields.side == Side::Common || fields.side == side;
+        let mods: HashMap<&str, &ModFields> = self.types.iter().filter_map(|registered| match &registered.kind {
+            Kind::Mod(fields) => Some((registered.full_name.as_str(), fields)),
+            _ => None,
+        }).collect();
+        let mut waiting: Vec<usize> = (0..self.types.len()).filter(|&place| matches!(&self.types[place].kind, Kind::Mod(fields) if loads_here(fields))).collect();
+        let (mut code, mut libraries, mut loaded) = (HashMap::new(), Vec::new(), Vec::<&str>::new());
         while !waiting.is_empty() {
             let ready = |place: &usize| {
-                let Kind::Bundle(fields) = &self.types[*place].kind else { unreachable!("bundles alone wait") };
-                fields.depends_on.iter().all(|dependency| set_up.contains(&dependency.to_string()))
+                let Kind::Mod(fields) = &self.types[*place].kind else { unreachable!("mods alone wait") };
+                // A common container carries mods of every side: those of another side never load here.
+                fields.depends_on.iter().all(|(dependency, _)| loaded.contains(&dependency.as_str()) || !loads_here(mods[dependency.as_str()]))
             };
-            let Some(next) = waiting.iter().filter(|place| ready(place)).min_by_key(|&&place| &self.types[place].full_name).copied() else {
-                return Err("bundles depending on one another in a ring, or on a bundle of another side".to_string());
-            };
+            let next = waiting.iter().filter(|place| ready(place)).min_by_key(|&&place| &self.types[place].full_name).copied().expect("a mod ready: the manifests refuse rings of dependencies");
             waiting.retain(|&place| place != next);
-            let bundle = &self.types[next];
-            let Kind::Bundle(fields) = &bundle.kind else { unreachable!("bundles alone wait") };
-            let library = DynamicLibrary::open(&fields.library)?;
-            // A bundle's types follow it, up to the next bundle.
-            for registered in self.types[next + 1..].iter().take_while(|registered| !matches!(registered.kind, Kind::Bundle(_))) {
+            let mod_type = &self.types[next];
+            loaded.push(&mod_type.full_name);
+            let Kind::Mod(fields) = &mod_type.kind else { unreachable!("mods alone wait") };
+            // A container's library is none, nor its types.
+            let Some(package) = &fields.library else { continue };
+            let library_bytes = package.read_entry(&library_file_name(&mod_type.full_name))?;
+            let library = DynamicLibrary::from_bytes(&mod_type.full_name, &library_bytes)?;
+            // A mod's types follow it, up to the next mod.
+            for registered in self.types[next + 1..].iter().take_while(|registered| !matches!(registered.kind, Kind::Mod(_))) {
                 let Some(function_name) = &registered.set_up else { continue };
                 // SAFETY: built by the same compiler, against this very crate: the function the manifest names is a `TypeSetUp`.
                 let type_set_up = unsafe { library.function::<TypeSetUp>(function_name) }.map_err(|why| format!("{}: {why}", registered.full_name))?;
                 let made = type_set_up(&TypeRegistryHandle { registry: &self, code: &code }).map_err(|why| format!("{}: {why}", registered.full_name))?;
                 code.insert(registered.type_id, made);
             }
-            set_up.push(bundle.full_name.clone());
             libraries.push(library);
         }
         Ok(LoadedRegistry { registry: self, code, libraries })

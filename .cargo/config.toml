@@ -5,6 +5,8 @@ rustflags = ["-C", "target-cpu=x86-64-v3"]
 [alias]
 # The game built and laid out as the folder it ships as, target/civil_egregore/.
 package_game = ["run", "--release", "-p", "game_packager", "--"]
+# A mod checked, built, and zipped as it ships: `cargo package_mod <mod folder>`.
+package_mod = ["run", "--release", "-p", "mod_packager", "--"]
 windows_rr = ["build", "--release", "--target", "x86_64-pc-windows-gnu", "--config", "profile.release.strip=true"]
 linux_hd = ["build", "--no-default-features"]
 linux_rd = ["build"]

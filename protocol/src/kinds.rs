@@ -1,14 +1,14 @@
 //! The kinds of types, as both the manifest says them and the type
 //! registry keeps them: one enum ([`Kind`]), each kind with its own
-//! fields -- a bundle among them, a type too -- and the hooks a type of a
+//! fields -- a mod among them, a type too -- and the hooks a type of a
 //! kind may take ([`Hook`]).
 
-use crate::type_names::{BundleName, TypeName};
-use std::path::PathBuf;
+use crate::packages::PackagePath;
+use crate::type_names::TypeName;
 
-/// The side a bundle's code runs on. A common bundle depends on common
-/// ones alone; a server bundle on common and server ones; a client
-/// bundle on common and client ones.
+/// The side a mod's code runs on. A common mod depends on common ones
+/// alone; a server mod on common and server ones; a client mod on common
+/// and client ones; a container mod, loading nothing, on any.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Side {
     /// Both: client calls, and types both sides know.
@@ -19,29 +19,27 @@ pub enum Side {
     Client,
 }
 
-/// A bundle's fields: the side its code runs on, its library and that
-/// library's hash, and the bundles it depends on.
+/// A mod's fields, as the type registry keeps them: the side its code
+/// runs on, the mods it depends on, and the package its library is read
+/// from -- none if it is a container.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BundleFields {
+pub struct ModFields {
     /// The side its code runs on.
     pub side: Side,
-    /// Its library: its path from its mod's folder, as a manifest says
-    /// it; made whole, from there, in the type registry.
-    pub library: PathBuf,
-    /// The library's hash, as the manifest writes it: SHA-256, `0x` and
-    /// 64 hexadecimal digits.
-    pub library_hash: String,
-    /// The bundles it depends on: the only ones but its own whose types
-    /// its types name.
-    pub depends_on: Vec<BundleName>,
+    /// The mods it depends on, each by its name and the version it was
+    /// built against: the only ones but its own whose types its types
+    /// name, a container's reaching what it carries.
+    pub depends_on: Vec<(String, String)>,
+    /// The package its library is read from, if it is no container mod.
+    pub library: Option<PackagePath>,
 }
 
 /// A type's kind, and that kind's fields: each type it names there of
 /// the kind it must be.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
-    /// A bundle: what holds a mod's types.
-    Bundle(BundleFields),
+    /// A mod: what holds types.
+    Mod(ModFields),
     /// A plane: a number a cell, or a tile.
     Plane {
         /// Bits a number: 1, 2, 4, 8, 16 or 32.

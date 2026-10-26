@@ -1,6 +1,6 @@
-# Civil Egregore's base game, a mod as any other: a workspace of its own,
-# a crate a bundle, each a dylib built against the game's own libraries
-# -- the same compiler, the same target folder (.cargo/config.toml).
+# Civil Egregore's base game, a container mod carrying its mods: a
+# workspace of its own, a crate a mod, each a dylib -- packaged by the
+# game's mod packager, against the game's libraries as compiled.
 [workspace]
 members = ["common", "server"]
 resolver = "3"
