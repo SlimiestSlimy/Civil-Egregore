@@ -6,29 +6,8 @@
 
 use crate::hot_chunk::HotChunk;
 use crate::instruction::{Instruction, Opcode};
+use crate::plane_shapes::PlaneShapes;
 use utilities::coordinates::CellIndex;
-
-/// Each plane's width and tile size, by type ID: what a write making a
-/// plane in a chunk gives it.
-pub struct PlaneShapes {
-    /// Type ID, bits a number, cells a tile's side: sorted by type ID.
-    shapes: Vec<(u64, u32, u32)>,
-}
-
-impl PlaneShapes {
-    /// The shapes of the planes `shapes` -- type ID, width in bits, tile
-    /// size -- each type once.
-    pub fn new(mut shapes: Vec<(u64, u32, u32)>) -> Self {
-        shapes.sort_unstable_by_key(|&(type_id, ..)| type_id);
-        Self { shapes }
-    }
-
-    /// The width and tile size of the plane of ID `plane`, one of them.
-    fn of(&self, plane: u64) -> (u32, u32) {
-        let place = self.shapes.binary_search_by_key(&plane, |&(type_id, ..)| type_id).expect("a plane's type ID");
-        (self.shapes[place].1, self.shapes[place].2)
-    }
-}
 
 /// `instructions`, the queue of `chunk`, applied to it in order.
 pub fn apply(chunk: &mut HotChunk, instructions: &[Instruction], plane_shapes: &PlaneShapes) {
@@ -44,7 +23,7 @@ pub fn apply(chunk: &mut HotChunk, instructions: &[Instruction], plane_shapes: &
             }
             Opcode::Compare | Opcode::SkipTag => {}
             Opcode::Write => {
-                let (width_bits, tile_size) = plane_shapes.of(instruction.plane());
+                let (width_bits, tile_size) = plane_shapes.of(instruction.plane()).expect("a plane's type ID");
                 chunk.write_tile(instruction.plane(), width_bits, tile_size, cell, instruction.plane_value());
             }
         }

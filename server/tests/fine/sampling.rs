@@ -15,7 +15,7 @@ fn tiles_not_zero_sampled_at_the_chance() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let mut random_numbers = RandomSource::new(seed);
     let chunk_index = ChunkIndex(random_numbers.draw_below(1 << 20));
-    let mut chunk = HotChunk::new(chunk_index);
+    let mut chunk = HotChunk::new(chunk_index, seed);
     let (plane, tile_size) = (random_numbers.next_draw(), 1 << random_numbers.draw_below(5));
     let tile_cells = (tile_size * tile_size) as usize;
     // Tiles drawn, one written at a cell drawn inside it.

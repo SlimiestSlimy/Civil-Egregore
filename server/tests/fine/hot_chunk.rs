@@ -15,7 +15,7 @@ fn tiles_read_back_and_are_counted() {
     let seed = crate::test_seed::TestSeedHandle::open().fine_seed();
     let mut random_numbers = RandomSource::new(seed);
     let chunk_index = ChunkIndex(random_numbers.draw_below(1 << 20));
-    let mut chunk = HotChunk::new(chunk_index);
+    let mut chunk = HotChunk::new(chunk_index, seed);
     // Each plane: its ID, width, tile size, and its tiles not 0 by their first cell.
     let mut planes: Vec<(u64, u32, u32, HashMap<usize, u32>)> = Vec::new();
     for _ in 0..6 {

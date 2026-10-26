@@ -1080,6 +1080,19 @@ NOW
   "a sampled grass has a chance of dying, and a slightly bigger chance
   of spreading, this is rule internal code so it can be written like
   watever".
+  A bad instruction while queuing (not a plane, too wide): "yeah panic
+  that mf". Reads beyond the hot: "trying to read a chunk while it's
+  warming is valid albeit impossible, or being at the edge of the world
+  2^31 chunks from the center is also valid and reading a neighbor there
+  would also be impossible. so those things should return 0s instead as
+  if the read tiles were 0/nonexistent plane in that chunk" -- then,
+  told the old server's way (a read of a chunk not hot NotHot, apart
+  from 0; a compare there does not hold, a write there missed): "i agree
+  on the old seever for this one, reada should fail on non hot chunks".
+  So a read is Result<u32, NotHot>: a plane not kept is Ok(0); a chunk
+  not hot, or past the world's edge, NotHot. Compares in a chunk not
+  hot fail. Procs: by TypeId, each over its hits in Morton order ("yes
+  simpler one").
   A CHUNK'S RANDOM STREAM (2026-10-26): "there is one other thing chunks
   must have tho. a seeded random stream, which is where each chunk gets
   its random numbers from".

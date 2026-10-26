@@ -1,22 +1,38 @@
 //! A chunk, hot ([`HotChunk`]): what a thread ticks, its planes held
 //! whole -- only those with a tile that is not 0, each one dense over the
-//! chunk, counting its tiles that are not 0, what sampling goes by.
+//! chunk, counting its tiles that are not 0, what sampling goes by -- and
+//! its random stream, where its tick draws from.
 
 use utilities::coordinates::{CellIndex, ChunkIndex, CELLS_IN_CHUNK};
+use utilities::rng::RandomSource;
 
 /// One chunk, hot: its planes with a tile that is not 0, by type.
 pub struct HotChunk {
     /// Which chunk it is.
     chunk_index: ChunkIndex,
+    /// Its random stream's whole state, as its last tick left it.
+    random_state: u64,
     /// Its planes, sorted by type ID: one emptied stays until the tick's
     /// end ([`HotChunk::drop_empty_planes`]).
     planes: Vec<HotPlane>,
 }
 
 impl HotChunk {
-    /// `chunk_index`, every tile of every plane 0.
-    pub fn new(chunk_index: ChunkIndex) -> Self {
-        Self { chunk_index, planes: Vec::new() }
+    /// `chunk_index` of the world of seed `world_seed`, every tile of
+    /// every plane 0, its random stream the chunk's own of the seed.
+    pub fn new(chunk_index: ChunkIndex, world_seed: u64) -> Self {
+        Self { chunk_index, random_state: RandomSource::for_stream(world_seed, chunk_index.0).whole_state(), planes: Vec::new() }
+    }
+
+    /// Its random stream, as it stands: taken for a tick, and given back
+    /// ([`HotChunk::give_back_random_numbers`]) drawn from.
+    pub fn take_random_numbers(&self) -> RandomSource {
+        RandomSource::new(self.random_state)
+    }
+
+    /// `random_numbers`, its stream taken for a tick, kept as drawn.
+    pub fn give_back_random_numbers(&mut self, random_numbers: RandomSource) {
+        self.random_state = random_numbers.whole_state();
     }
 
     /// Which chunk it is.

@@ -1,9 +1,10 @@
 //! The applier: a chunk's queue applied in order, a compare that fails
 //! skipping past the next skip tag.
 
-use server::applier::{apply, PlaneShapes};
+use server::applier::apply;
 use server::hot_chunk::HotChunk;
 use server::instruction::Instruction;
+use server::plane_shapes::PlaneShapes;
 use utilities::coordinates::{ChunkIndex, CellIndex, CHUNK_SIDE_CELLS};
 use utilities::rng::RandomSource;
 
@@ -18,7 +19,7 @@ fn sets_apply_in_order_and_skip_on_a_failed_compare() {
     let chunk_index = ChunkIndex(random_numbers.draw_below(1 << 20));
     let (grass, rock) = (random_numbers.next_draw(), random_numbers.next_draw());
     let plane_shapes = PlaneShapes::new(vec![(grass, 1, 1), (rock, 8, 4)]);
-    let mut chunk = HotChunk::new(chunk_index);
+    let mut chunk = HotChunk::new(chunk_index, seed);
     // Cells drawn in the chunk, side by side: a's right neighbour is b, b's is c.
     let (x, y) = (random_numbers.draw_below(u64::from(CHUNK_SIDE_CELLS) - 3) as u32, random_numbers.draw_below(u64::from(CHUNK_SIDE_CELLS)) as u32);
     let [a, b, c] = [0, 1, 2].map(|across| CellIndex::from_chunk_place(chunk_index, utilities::coordinates::place_from_cartesian(x + across, y)));
