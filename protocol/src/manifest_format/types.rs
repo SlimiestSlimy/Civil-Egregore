@@ -5,6 +5,7 @@ use super::field_list::FieldList;
 use super::{not_a_name, Type};
 use cdnf::Element;
 use crate::kinds::{Hook, Kind, Side};
+use crate::simulation_time::SimulationSeconds;
 use crate::type_names::{is_a_name, TypeName, NAME_SEPARATOR};
 
 /// Each side, and its word.
@@ -75,7 +76,9 @@ pub(super) fn read_type(mod_name: &str, type_name: &str, items: &[Element]) -> R
             if planes.is_empty() {
                 return Err("planes: missing, the planes it is sampled on, one or more".to_string());
             }
-            Kind::ScaProc { planes }
+            let seconds_text = fields.text("seconds per sample")?;
+            let seconds_per_sample = SimulationSeconds::read(seconds_text).ok_or_else(|| format!("seconds per sample: more than 0, digits and a point if wanted, not `{seconds_text}`"))?;
+            Kind::ScaProc { planes, seconds_per_sample }
         }
         "worldgen" => Kind::Worldgen,
         "client call" => Kind::ClientCall,

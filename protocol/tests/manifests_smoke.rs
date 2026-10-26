@@ -7,10 +7,12 @@ use protocol::kinds::{Hook, Kind, Side};
 use protocol::manifest_format::{read_mod_document, write_mod_document};
 use protocol::manifests::read_mods;
 use protocol::packages::{DEPENDENCIES_FOLDER, MANIFEST_FILE, PACKAGE_EXTENSION};
+use protocol::simulation_time::{SimulationSeconds, TICKS_PER_SIMULATION_SECOND};
 use protocol::type_names::TypeName;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use utilities::archive::write_archive;
+use utilities::chance::{Chance, PARTS};
 use utilities::dynamic_library::library_file_name;
 
 /// The package of the mod `mod_name`: its manifest, `{hash}` in it the
@@ -90,6 +92,7 @@ grass_grows :
 - kind : sca proc
 - planes :
     -- base_common>grass
+- seconds per sample : 1
 - set up : grass_grows_set_up
 
 world_generation :
@@ -140,6 +143,7 @@ meadow_grows :
 - kind : sca proc
 - planes :
     -- base_common>grass
+- seconds per sample : 0.25
 - set up : meadow_grows_set_up
 "),
     ];
@@ -156,7 +160,7 @@ meadow_grows :
     assert_eq!((container.document().container, container.document().types.len()), (true, 0));
     assert_eq!((drawn.document().version.as_str(), drawn.document().types[0].kind(), drawn.document().types[1].hooks()), ("2.0 beta", &Kind::RenderProc { draw_order: 3 }, &[Hook::ShownByDefault][..]));
     let meadow_grows = &meadow.document().types[0];
-    assert_eq!((meadow_grows.kind(), meadow_grows.set_up()), (&Kind::ScaProc { planes: vec![named("base_common", "grass")] }, Some("meadow_grows_set_up")));
+    assert_eq!((meadow_grows.kind(), meadow_grows.set_up()), (&Kind::ScaProc { planes: vec![named("base_common", "grass")], seconds_per_sample: SimulationSeconds::read("0.25").expect("a span") }, Some("meadow_grows_set_up")));
 
     let refusal = refusal_of(&mods, mod_made(&test_folder, "old_version", Some(b"bytes"), ":old_version:\n- side : common\n- version : 1\n- hash : {hash}\n- depends on :\n    -- base_common : 0.2\n"));
     assert!(refusal.contains("base_common is 0.1"), "{refusal}");
@@ -174,6 +178,7 @@ grass_dies :
 - kind : sca proc
 - planes :
     -- base_common>grass
+- seconds per sample : 1
 - set up : grass_dies_set_up
 ";
     let refusal = refusal_of(&mods, mod_made(&test_folder, "out_of_reach", Some(b"bytes"), out_of_reach));
@@ -205,7 +210,7 @@ grass_dies :
 fn every_field_written_reads_back() {
     let documents = [
         ":kinds_common:\n- side : common\n- version : 1.0 \"beta\"\n- hash : 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n- depends on :\n    -- other : 2\n\nwater :\n- kind : plane\n- width : 8\n- tile size : 16\n\nhealth :\n- kind : attribute\n- size : 2\n\nask :\n- kind : client call\n- set up : ask_set_up\n",
-        ":kinds_server:\n- side : server\n- version : 0.1\n- depends on :\n    -- kinds_common : 1.0\n- carried dependencies :\n    - carried_one :\n        - version : 3\n        -- source : ../carried_one\n    -- carried_two : 4\n\nsheep :\n- kind : entity\n- default attribute : kinds_common>health\n- hooks :\n    -- keeps the world hot\n\nwolf :\n- kind : entity\n\nsheep_walks :\n- kind : entity proc\n- entity : sheep\n- set up : sheep_walks_set_up\n\nwater_flows :\n- kind : sca proc\n- planes :\n    - kinds_common>water\n    -- other>lava\n- set up : water_flows_set_up\n\nislands :\n- kind : worldgen\n- hooks :\n    -- generates the world\n- set up : islands_set_up\n",
+        ":kinds_server:\n- side : server\n- version : 0.1\n- depends on :\n    -- kinds_common : 1.0\n- carried dependencies :\n    - carried_one :\n        - version : 3\n        -- source : ../carried_one\n    -- carried_two : 4\n\nsheep :\n- kind : entity\n- default attribute : kinds_common>health\n- hooks :\n    -- keeps the world hot\n\nwolf :\n- kind : entity\n\nsheep_walks :\n- kind : entity proc\n- entity : sheep\n- set up : sheep_walks_set_up\n\nwater_flows :\n- kind : sca proc\n- planes :\n    - kinds_common>water\n    -- other>lava\n- seconds per sample : 12.5\n- set up : water_flows_set_up\n\nislands :\n- kind : worldgen\n- hooks :\n    -- generates the world\n- set up : islands_set_up\n",
         ":kinds_client:\n- side : client\n- version : 0.1\n\nwater_drawn :\n- kind : render proc\n- draw order : 3\n- set up : water_drawn_set_up\n\nmenu :\n- kind : gui\n- hooks :\n    -- shown by default\n- set up : menu_set_up\n\nsubmenu :\n- kind : gui\n- parent : menu\n- set up : submenu_set_up\n",
         ":kinds_container:\n- side : server\n- version : 0.1\n- container mod\n- carried dependencies :\n    -- kinds_server : 0.1\n",
     ];
@@ -214,5 +219,28 @@ fn every_field_written_reads_back() {
         let written = write_mod_document(&read);
         let read_back = read_mod_document(&cdnf::parse(&written).expect("written parses")).expect("written is a mod document");
         assert_eq!(read_back, read, "{written}");
+    }
+}
+
+/// A sca proc's seconds per sample: read exactly, written back as read,
+/// made a chance a tick to the nearest part -- and refused unless more
+/// than 0 and digits with a point if wanted.
+#[test]
+fn seconds_per_sample_read_exactly() {
+    let seconds = |text: &str| SimulationSeconds::read(text);
+    assert_eq!(seconds("1.50"), seconds("1.5"));
+    assert_eq!(["0.25", "1.50", "12", "007.010"].map(|text| seconds(text).expect("a span").to_string()), ["0.25", "1.5", "12", "7.01"]);
+    assert_eq!(seconds("1").expect("a span").chance_per_tick(), Chance::of_parts(PARTS / TICKS_PER_SIMULATION_SECOND));
+    assert_eq!(seconds("0.5").expect("a span").chance_per_tick(), Chance::of_parts(2 * PARTS / TICKS_PER_SIMULATION_SECOND));
+    assert_eq!(seconds("3").expect("a span").chance_per_tick(), Chance::of_parts((PARTS + 3 * TICKS_PER_SIMULATION_SECOND / 2) / (3 * TICKS_PER_SIMULATION_SECOND)));
+    assert!(seconds("0.001").expect("a span").chance_per_tick().is_always(), "shorter than a tick");
+    for refused in ["0", "0.000", ".5", "abc", "-1", "1e3", "", "0.0000000000000000001"] {
+        assert_eq!(seconds(refused), None, "`{refused}`");
+    }
+    let sca_proc = |seconds_field: &str| read_mod_document(&cdnf::parse(&format!(":rated:\n- side : server\n- version : 1\n\nflows :\n- kind : sca proc\n- planes :\n    -- water\n{seconds_field}- set up : flows_set_up\n")).expect("parsed"));
+    assert!(sca_proc("- seconds per sample : 2\n").is_ok());
+    for refused in ["", "- seconds per sample : 0\n", "- seconds per sample : soon\n"] {
+        let refusal = sca_proc(refused).expect_err("refused").what;
+        assert!(refusal.contains("seconds per sample"), "{refusal}");
     }
 }

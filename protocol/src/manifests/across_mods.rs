@@ -109,7 +109,7 @@ fn references(kind: &Kind) -> Vec<Reference<'_>> {
     let (field, named, of_its_kind, kind_word): (_, Vec<&TypeName>, fn(&Kind) -> bool, _) = match kind {
         Kind::Entity { default_attribute: Some(attribute) } => ("default attribute", vec![attribute], |named| matches!(named, Kind::Attribute { .. }), "attribute"),
         Kind::EntityProc { entity } => ("entity", vec![entity], |named| matches!(named, Kind::Entity { .. }), "entity"),
-        Kind::ScaProc { planes } => ("planes", planes.iter().collect(), |named| matches!(named, Kind::Plane { .. }), "plane"),
+        Kind::ScaProc { planes, .. } => ("planes", planes.iter().collect(), |named| matches!(named, Kind::Plane { .. }), "plane"),
         Kind::Gui { parent: Some(parent) } => ("parent", vec![parent], |named| matches!(named, Kind::Gui { .. }), "gui"),
         _ => return Vec::new(),
     };

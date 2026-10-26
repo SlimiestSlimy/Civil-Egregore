@@ -3,7 +3,7 @@
 //! read and checked ([`manifests`]) -- written in CDNF
 //! ([`cdnf`]), shipped in packages ([`packages`]) -- and the type
 //! registry made of them
-//! ([`type_registry`]).
+//! ([`type_registry`]); and simulated time ([`simulation_time`]).
 
 // Every item is documented, private ones included; `cargo clippy`
 // checks the private ones.
@@ -13,5 +13,6 @@ pub mod kinds;
 pub mod manifest_format;
 pub mod manifests;
 pub mod packages;
+pub mod simulation_time;
 pub mod type_names;
 pub mod type_registry;

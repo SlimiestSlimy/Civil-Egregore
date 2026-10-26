@@ -27,7 +27,7 @@ pub fn write_mod_document(document: &ModDocument) -> String {
             Kind::Entity { default_attribute: Some(attribute) } => type_fields.pair("default attribute").text(attribute),
             Kind::Attribute { size } => type_fields.pair("size").text(size),
             Kind::EntityProc { entity } => type_fields.pair("entity").text(entity),
-            Kind::ScaProc { planes } => texts_field(type_fields, "planes", planes),
+            Kind::ScaProc { planes, seconds_per_sample } => texts_field(type_fields, "planes", planes).pair("seconds per sample").text(seconds_per_sample),
             Kind::RenderProc { draw_order } => type_fields.pair("draw order").text(draw_order),
             Kind::Gui { parent: Some(parent) } => type_fields.pair("parent").text(parent),
             Kind::Entity { default_attribute: None } | Kind::Gui { parent: None } | Kind::Worldgen | Kind::ClientCall | Kind::Mod(_) => type_fields,

@@ -4,6 +4,7 @@
 //! kind may take ([`Hook`]).
 
 use crate::packages::PackagePath;
+use crate::simulation_time::SimulationSeconds;
 use crate::type_names::TypeName;
 
 /// The side a mod's code runs on. A common mod depends on common ones
@@ -69,6 +70,8 @@ pub enum Kind {
     ScaProc {
         /// The planes it is sampled on: one or more, each a plane.
         planes: Vec<TypeName>,
+        /// How long, on average, between its samples of a tile not 0.
+        seconds_per_sample: SimulationSeconds,
     },
     /// A way of generating a world.
     Worldgen,

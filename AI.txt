@@ -1039,6 +1039,53 @@ NOW
   author order -- the reference meaning of a tick, the grass across a
   border its first test; 5 threads, parking at fences, checked equal to
   4's run. Atomics plain counters until 5.
+  CHUNKS (2026-10-26): "lets rename superchunks to chunks, what we call
+  chunks today is the thing that needs a new name honestly" / "for now
+  lets do as if chunks didn't exist at all" -- the 1024 square is the
+  chunk; the 256 one gone from live code, named again if cold storage or
+  Tessera want it. reference/ and the exp branch left as they are.
+  HOT STORAGE (2026-10-26): per chunk, the planes with a tile not 0,
+  sorted by TypeId; each dense ("only sparse when we need it to be, ie
+  later"), packed by width, Morton, an exact count of tiles not 0 (what
+  sampling goes by); a plane emptied dropped at the tick's end. A tile is
+  its cells' place over its cells' count, no shift ("tiles are nicely
+  aligned and thats permanent"). The sampler: "lets just use the count
+  and loop over each value on a sampleable plane, completely wasteful,
+  incredibly simple". read_tile/write_tile wrap the plane's read and
+  write, finding (or making) the plane: "for now the wrappers are fine i
+  believe, if it makes the code more understandable"; writing to planes
+  directly later maybe.
+  THE SAMPLING RATE (2026-10-26): "the chance for a sampler is given by
+  the type as another piece of data attached to sca rules like the
+  sampled plane. the chance is specified as mean time per sample on
+  simulation seconds per sampleable cell, so a 1 would be roughly every
+  tile gets sampled by that rule every simulation second (a simulation
+  second is 256 ticks ...)" / "Basically the simulation second is
+  chanhed in code to 128, and everything else simply derices from it,
+  so we abstract ticks from the simulated time ie simulation second".
+  FLAT SKIP TAGS (2026-10-26): a compare that fails skips past the next
+  skip tag; tags unnumbered, no nesting, no run-ending instruction ("i
+  mean do we need to number skip tags at all? maybe not lol" / "yeah
+  this is the simpler design tbh, instructions become a little more
+  wasteful since we have to.suplicate compares, but its fine since we
+  want simplicity right now"). Many compares one tag is the point:
+  "having many compares one after another all leading to the same skip
+  tag is necessary to check larger pieces of data ... for entities is
+  another story". The atomic compare and fence stay internal, added at
+  step 4: "we need a processing step when inserting instructions to the
+  queue to insert those atomic compares anyways, so better to keep it
+  simple for now".
+  THE BUILDER (2026-10-26, step 3): "basically this is just another type
+  state construtor from the serverhandle in theory". The grass rule:
+  "a sampled grass has a chance of dying, and a slightly bigger chance
+  of spreading, this is rule internal code so it can be written like
+  watever".
+  A CHUNK'S RANDOM STREAM (2026-10-26): "there is one other thing chunks
+  must have tho. a seeded random stream, which is where each chunk gets
+  its random numbers from".
+  THE SERVER HANDLE (2026-10-26): "basically a reference to all chunks
+  (read only) plus the instructions queue references, 8 neighbor queues
+  and the current chunk queue, thats basically it in theory".
 - STEP 5 DONE (2026-10-26): the mod packager and the mod template;
   basegame on it. `cargo package_mod new <folder> <side>`: the mod named
   by its folder, one crate at the root, an empty [workspace], the game's

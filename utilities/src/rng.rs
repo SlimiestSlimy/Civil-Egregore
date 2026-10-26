@@ -17,7 +17,7 @@ impl RandomSource {
         Self(seed)
     }
 
-    /// A source of its own for `stream` -- a superchunk index, say -- of
+    /// A source of its own for `stream` -- a chunk index, say -- of
     /// `seed`: its state is mixed, not `seed` moved along, so
     /// two streams are not one sequence a few draws apart, as two
     /// sources whose seeds differ by a multiple of the step would be.

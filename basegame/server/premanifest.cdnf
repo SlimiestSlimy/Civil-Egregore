@@ -10,4 +10,5 @@ grass_tick :
 - kind : sca proc
 - planes :
     -- basegame_common>grass
+- seconds per sample : 1
 - set up : grass_tick_set_up
